@@ -8,6 +8,7 @@
  */
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -28,6 +29,7 @@ const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', 
 function tournamentRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'tournament-1',
+    kind: 'regular_tournament',
     sportId: 'sport-1',
     title: '테스트 대회',
     status: 'draft',
@@ -35,6 +37,9 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
+    coverImageUrl: null,
+    listImageUrl: null,
+    showDetailImage: true,
     venueAddress: null,
     venueProvider: null,
     venueProviderId: null,
@@ -95,6 +100,8 @@ describe('TournamentsAdminService', () => {
   let notifications: { emitNotificationToMany: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Sport: { findUnique: jest.Mock };
     v1Tournament: {
       findMany: jest.Mock;
@@ -108,8 +115,9 @@ describe('TournamentsAdminService', () => {
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; count: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
-    v1TournamentMatchDetails: { count: jest.Mock };
-    v1TournamentGroup: { count: jest.Mock };
+    v1TournamentMatchDetails: { count: jest.Mock; findFirst: jest.Mock };
+    v1TournamentGroup: { count: jest.Mock; updateMany: jest.Mock };
+    v1TournamentStagePeriodSetting: { deleteMany: jest.Mock };
     $executeRaw: jest.Mock;
     $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
@@ -121,6 +129,8 @@ describe('TournamentsAdminService', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Sport: { findUnique: jest.fn() },
       v1Tournament: {
         findMany: jest.fn(),
@@ -137,8 +147,9 @@ describe('TournamentsAdminService', () => {
       // — 대부분의 기존 테스트는 lineupMaxPlayers를 전혀 안 보내거나 종목이 football/futsal이
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
-      v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
+      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TournamentStagePeriodSetting: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
@@ -187,6 +198,25 @@ describe('TournamentsAdminService', () => {
   it('list: non-admin → 403', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);
     await expect(service.list(nonAdminAuthUser, {})).rejects.toThrow(ForbiddenException);
+  });
+
+  it('list: director sees only assigned tournament rows and the same scoped status counts', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentStaffAssignment.findFirst.mockResolvedValue({ id: 'assignment-1', tournamentId: 'own', version: 1 });
+    const rows = [tournamentRow({ id: 'own', status: 'open' }), tournamentRow({ id: 'other', status: 'open' })]
+      .map((row) => ({ ...row, _count: { registrations: 0 } }));
+    const visible = (where: { staffAssignments?: unknown }) => where.staffAssignments ? rows.slice(0, 1) : rows;
+    prisma.v1Tournament.findMany.mockImplementation(({ where }) => Promise.resolve(visible(where)));
+    prisma.v1Tournament.groupBy.mockImplementation(({ where }) => Promise.resolve([{ status: 'open', _count: { _all: visible(where).length } }]));
+    const result = await service.list(nonAdminAuthUser, {});
+    expect(result.items.map((row) => row.id)).toEqual(['own']);
+    expect(result.summary).toMatchObject({ total: 1, byStatus: { open: 1 } });
+  });
+
+  it('director access to an unassigned tournament is denied before loading its detail', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.get(nonAdminAuthUser, 'other')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(prisma.v1Tournament.findFirst).not.toHaveBeenCalled();
   });
 
   // ─── create validation ──────────────────────────────────────────────────────
@@ -266,6 +296,7 @@ describe('TournamentsAdminService', () => {
 
     expect(result).toMatchObject({
       id: 'tournament-1',
+      kind: 'regular_tournament',
       status: 'draft',
       registrationCount: 0,
       entryFee: 120000,
@@ -283,6 +314,28 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.create', targetType: 'tournament' }) }),
     );
+  });
+
+  it('create: two images and hidden detail persist and round-trip', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockImplementation(async ({ data }) => tournamentRow(data));
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1', title: '이미지 대회', teamCount: 8,
+      coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false,
+    });
+    expect(result).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+  });
+
+  it('update: visibility changes preserve both photos and unrelated edits preserve visibility', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    let stored = tournamentRow({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp' });
+    prisma.v1Tournament.findFirst.mockImplementation(async () => ({ ...stored, _count: { registrations: 0 } }));
+    prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => { stored = { ...stored, ...data }; return { count: 1 }; });
+    const hidden = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, showDetailImage: false });
+    expect(hidden).toMatchObject({ showDetailImage: false, coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp' });
+    const edited = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: stored.updatedAt.toISOString(), title: '새 제목' });
+    expect(edited.showDetailImage).toBe(false);
   });
 
   // ─── venue snapshot (장소 검색에서 고른 값만 저장) ─────────────────────────────
@@ -482,7 +535,6 @@ describe('TournamentsAdminService', () => {
 
   it.each([
     ['in_progress', 'open'],
-    ['in_progress', 'closed'],
     ['completed', 'open'],
     ['completed', 'closed'],
     ['completed', 'cancelled'],
@@ -497,9 +549,53 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
+  it('changeStatus: 시작한 경기 없는 진행 중 대회는 사유와 함께 접수 마감으로 복귀한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'closed', reason: '시작을 잘못 눌렀어요' });
+    expect(result).toMatchObject({ previousStatus: 'in_progress', status: 'closed', alreadyInStatus: false });
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith({ where: { id: 'tournament-1' }, data: { status: 'closed' } });
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      fromStatus: 'in_progress', toStatus: 'closed', reason: '시작을 잘못 눌렀어요',
+    }) }));
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: 시작·기록·결과가 있는 경기는 접수 마감 복귀를 차단한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+    prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'started-match' });
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'closed', reason: '실수' }))
+      .rejects.toMatchObject({ response: { code: 'TOURNAMENT_ALREADY_STARTED' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: 대회 잠금 이후에 상태를 읽어 동시 변경을 덮어쓰지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    let locked = false;
+    prisma.$executeRaw.mockImplementation(async () => { locked = true; return 1; });
+    prisma.v1Tournament.findFirst.mockImplementation(async () => {
+      expect(locked).toBe(true);
+      return tournamentRow({ status: 'completed' });
+    });
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'closed', reason: '실수' }))
+      .rejects.toMatchObject({ response: { code: 'TOURNAMENT_STATUS_TRANSITION_INVALID' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('get: 진행 중 대회는 시작 경기 유무에 따라 시작 되돌리기 가능 여부를 내려준다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow({ status: 'in_progress' }), _count: { registrations: 0, announcements: 0 } });
+    expect(await service.get(ownerAuthUser, 'tournament-1')).toMatchObject({ canRevertStart: true });
+    prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'started-match' });
+    expect(await service.get(ownerAuthUser, 'tournament-1')).toMatchObject({ canRevertStart: false });
+  });
+
   it.each([
     ['completed', 'in_progress'],
     ['cancelled', 'draft'],
+    ['in_progress', 'closed'],
   ] as const)('changeStatus: %s → %s 되돌리기는 사유가 있어야 하고 감사 로그에 사유가 남는다', async (from, to) => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: from, entryFee: 0 }));
@@ -1038,6 +1134,32 @@ describe('TournamentsAdminService', () => {
           afterJson: expect.objectContaining({ sportId: 'sport-2', competitionConfigVersionId: 'football-default-version' }),
         }),
       });
+    });
+
+    it('clears stage and group period overrides because they stay pinned to the previous sport config', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+      prisma.v1TournamentStagePeriodSetting.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.v1TournamentGroup.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: 'tournament-1' } });
+      expect(prisma.v1TournamentGroup.updateMany).toHaveBeenCalledWith({
+        where: { tournamentId: 'tournament-1', competitionConfigVersionId: { not: null } },
+        data: { periods: Prisma.DbNull, competitionConfigVersionId: null },
+      });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ afterJson: expect.objectContaining({ periodOverridesCleared: 3 }) }),
+      });
+    });
+
+    it('keeps stage and group period overrides when the sport stays the same', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-1', title: '새 이름' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentGroup.updateMany).not.toHaveBeenCalled();
     });
 
     it('a CAS conflict leaves nothing to commit: the single updateMany carries both columns and no audit log is written', async () => {
@@ -1966,7 +2088,7 @@ describe('TournamentsAdminService', () => {
       await expect(service.update(ownerAuthUser, 'tournament-1', {
         expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'limited', maxSubstitutions: 5,
       })).resolves.toMatchObject({ id: 'tournament-1' });
-      expect(createVersion).toHaveBeenCalledWith(ownerAuthUser, pin.id, expect.objectContaining({ config: expect.objectContaining({ lineup: expect.objectContaining({ substitutions: 'limited', maxSubstitutions: 5 }) }) }));
+      expect(createVersion).toHaveBeenCalledWith(ownerAuthUser, pin.id, expect.objectContaining({ config: expect.objectContaining({ lineup: expect.objectContaining({ substitutions: 'limited', maxSubstitutions: 5 }) }) }), 'tournament-1');
     } finally {
       createVersion.mockRestore();
       change.mockRestore();
@@ -2044,6 +2166,7 @@ describe('TournamentsAdminService', () => {
             }),
           }),
         }),
+        'tournament-1',
       );
     } finally {
       createVersionSpy.mockRestore();

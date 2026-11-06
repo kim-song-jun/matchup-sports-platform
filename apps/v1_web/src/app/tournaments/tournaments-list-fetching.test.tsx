@@ -72,7 +72,10 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
-  useV1Tournaments: () => ({
+  useV1MasterSports: () => ({ data: [] }),
+}));
+vi.mock('@/hooks/use-competition-discovery', () => ({
+  useCompetitionDiscovery: () => ({
     data: {
       items: [buildItem()],
       pageInfo: { hasNext: false, totalPages: 1, total: 1, page: 1, nextCursor: null },
@@ -85,7 +88,6 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isFetching,
     refetch: vi.fn(),
   }),
-  useV1MasterSports: () => ({ data: [] }),
 }));
 vi.mock('@/hooks/use-media-query', () => ({ useMediaQuery: () => false, DESKTOP_LIST_MEDIA_QUERY: '' }));
 vi.mock('@/hooks/use-infinite-scroll', () => ({ useInfiniteScroll: () => ({ current: null }) }));

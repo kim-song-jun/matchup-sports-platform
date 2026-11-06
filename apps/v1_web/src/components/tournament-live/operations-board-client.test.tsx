@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationsBoardClient } from './operations-board-client';
+import { v1Get } from '@/lib/api-client';
 import type { V1TournamentOperationsBoardItem, V1TournamentOperationsBoardPage } from '@/types/api';
 
 const mocks = vi.hoisted(() => ({
@@ -612,6 +613,7 @@ describe('OperationsBoardClient', () => {
       expect.anything(),
       't-1',
       expect.objectContaining({ cursor: 'cursor-2' }),
+      v1Get,
     );
     // 기존 fixture-1 행은 그대로 남아 있고, 새로 불러온 fixture-2(4강) 행이 추가된다.
     expect(screen.getAllByText('레드팀 vs 블루팀').length).toBeGreaterThan(0);

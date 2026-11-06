@@ -154,9 +154,11 @@ describe('TournamentPlayersService', () => {
       updateMany: jest.Mock;
     };
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
-    v1OperationAudit: { create: jest.Mock };
+    v1OperationAudit: { create: jest.Mock; findFirst: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -182,13 +184,15 @@ describe('TournamentPlayersService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1AdminActionLog: {
         create: jest.fn().mockResolvedValue({ id: 'action-log-1' }),
         // 기본은 "어드민이 아직 선출 여부를 확정하지 않음".
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
-      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }) },
+      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }), findFirst: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
@@ -720,6 +724,28 @@ describe('TournamentPlayersService', () => {
       }),
     );
     // 그 대회·리그(같은 id)·같은 팀의 경기 명단 재계산 이벤트를 남긴다.
+    expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: registrationRow().teamId },
+    ]);
+  });
+
+  it.each([true, false, undefined])('addPlayer: 골레이 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockImplementation(async ({ create, update }) => {
+      expect(create.goalkeeper).toBe(goalkeeper ?? false);
+      expect(update.goalkeeper).toBe(goalkeeper ?? false);
+      return playerRow(create);
+    });
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id', realName: '홍길동', goalkeeper,
+    });
+    expect(result).toMatchObject({ goalkeeper: goalkeeper ?? false, genderSnapshot: 'male' });
     expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
       { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: registrationRow().teamId },
     ]);
@@ -1828,7 +1854,7 @@ describe('TournamentPlayersService', () => {
   });
 
   // 이 목록은 "추가" 폼 전용인데 명단 밖 팀원의 실명까지 담는다. 추가 권한이 없는 support 가
-  // 읽을 이유가 없으므로 조회 게이트를 쓰기 게이트와 같은 높이(getMutationAdmin)로 둔다.
+  // 읽을 이유가 없으므로 조회 게이트를 쓰기 게이트와 같은 높이(getTournamentMutationAdmin)로 둔다.
   it('listEligiblePlayersForAdmin: support 어드민은 추가 권한이 없으므로 후보도 못 본다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
 
@@ -2341,4 +2367,91 @@ describe('TournamentPlayersService', () => {
       service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'ghost', 10),
     ).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
   });
+
+  describe('admin player settings', () => {
+    const setup = (kind = 'regular_tournament') => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ tournamentId: 'tournament-1' });
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed', rosterLockedAt: new Date() }));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind, rosterDeadlineAt: new Date('2020-01-01') })));
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({ goalkeeper: false }));
+      prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
+      prisma.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('SELECT id, jersey_number')
+        ? [{ id: 'player-1', jersey_number: 5, goalkeeper: false }] : []);
+    };
+
+    it.each(['regular_tournament', 'regular_league'])('%s: locked roster saves number 0 and GK, preserving eligibility and auditing old/new values', async (kind) => {
+      setup(kind);
+      const result = await service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'player-1', { jerseyNumber: 0, goalkeeper: true });
+      expect(result).toMatchObject({ id: 'player-1', jerseyNumber: 0, goalkeeper: true, eligibilityStatus: 'needs_review' });
+      expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith({ where: { id: 'player-1' }, data: { jerseyNumber: 0, goalkeeper: true } });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        action: 'player.settings', targetId: 'player-1',
+        beforeJson: { registrationId: 'reg-1', jerseyNumber: 5, goalkeeper: false },
+        afterJson: { registrationId: 'reg-1', jerseyNumber: 0, goalkeeper: true },
+      }) }));
+      expect(rosterResyncEvents(prisma.$executeRaw)).toHaveLength(1);
+
+    });
+
+    it('jersey-only edits preserve a legacy null GK instead of overriding per-game roles', async () => {
+      setup();
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({ goalkeeper: null }));
+      prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow({ goalkeeper: null, ...data }));
+      await service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'player-1', { jerseyNumber: 8 });
+      expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith({ where: { id: 'player-1' }, data: { jerseyNumber: 8 } });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        afterJson: { registrationId: 'reg-1', jerseyNumber: 8, goalkeeper: null },
+      }) }));
+    });
+
+    it('clears number and GK together', async () => {
+      setup();
+      await expect(service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'player-1', { jerseyNumber: null, goalkeeper: false }))
+        .resolves.toMatchObject({ jerseyNumber: null, goalkeeper: false });
+    });
+
+    it('rejects duplicate number without writing either setting or an audit/outbox event', async () => {
+      setup();
+      prisma.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('jersey_number =') ? [{ id: 'other' }] : []);
+      await expect(service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'player-1', { jerseyNumber: 5, goalkeeper: true }))
+        .rejects.toMatchObject({ response: { code: 'ROSTER_DUPLICATE_JERSEY_NUMBER' } });
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects support before reading the registration', async () => {
+      setup();
+      prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+      await expect(service.updatePlayerSettingsForAdmin({ ...adminUser, id: 'support-user-id' }, 'reg-1', 'player-1', { jerseyNumber: 1, goalkeeper: true })).rejects.toThrow(ForbiddenException);
+      expect(prisma.v1TournamentRegistration.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('rejects a removed player or a player from another registration', async () => {
+      setup();
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+      await expect(service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'wrong-player', { jerseyNumber: 1, goalkeeper: true }))
+        .rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPlayer.findFirst).toHaveBeenCalledWith({ where: { id: 'wrong-player', registrationId: 'reg-1', removedAt: null } });
+    });
+
+    it('rejects completed competition even for an ops admin', async () => {
+      setup();
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament', status: 'completed' })));
+      await expect(service.updatePlayerSettingsForAdmin(adminUser, 'reg-1', 'player-1', { jerseyNumber: 1, goalkeeper: true }))
+        .rejects.toMatchObject({ response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE' } });
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('admin GET returns persisted jersey and GK rather than null', async () => {
+      setup();
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', teamId: 'team-1', rosterLockedAt: null, team: { name: '팀', ownerUserId: 'captain' }, tournament: { minPlayers: 1 } });
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ ...playerRow({ goalkeeper: true }), user: { phone: null } }]);
+      prisma.$queryRaw.mockResolvedValue([{ id: 'player-1', jersey_number: 0, goalkeeper: true }]);
+      const roster = await service.listPlayersForAdmin(adminUser, 'reg-1');
+      expect(roster.players[0]).toMatchObject({ jerseyNumber: 0, goalkeeper: true });
+    });
+  });
+
 });

@@ -21,6 +21,13 @@
 
 ## Git 브랜치 정책 (Critical — 2026-07-31 실측 기준 정정)
 
+**2026-11-01 사용자 확정 — Teameet 전용 작업 방식:** 전역의 브랜치 생성·전환 및 worktree 생성
+금지는 이 저장소에 적용하지 않는다. 작업을 시작할 때 `git fetch origin dev` 후 최신 `origin/dev`에서
+작업별 브랜치와 격리 worktree를 만들고, 그 안에서 수정·검증·dev 대상 PR·머지·Alpha 검증을 진행한다.
+머지와 필요한 검증을 마치면 **이번 작업이 만든** worktree·브랜치·프로세스·임시 자원을 상태와 소유권을
+확인한 뒤 정리한다. 미커밋 변경이나 미병합 커밋이 있는 worktree를 강제 삭제하지 않으며 다른 세션의
+작업 공간은 정리하지 않는다. 운영 승격은 아래 별도 사용자 전용 규칙을 따른다.
+
 `promote-main.yml`이 default branch에 없어 dispatch가 404이면 격리 feature 브랜치에서
 `CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only`로 릴리스 diff를 준비한다.
 이 모드는 stage/commit/push/dispatch 없이 로컬 Changeset 소비와 승격 게이트만 실행한다.
@@ -42,14 +49,21 @@
 - **프로덕션 DB 전환(Task168 Stage A/B)처럼 승격 뒤 추가 절차가 필요한 배포는
   `docs/ops/prod-task168-transition-runbook.md` 를 따른다** — `deploy.yml`/`deploy-prod.sh` 의
   실패 메시지가 이 문서를 직접 가리킨다.
+- **승인 전 `build-images` 는 prod 서버(SSM)·Parameter Store·KMS·EC2 에 닿지 않는다.** main 에 push 할 수
+  있으면 그 job 의 스텝과 스크립트를 바꿔 실행시킬 수 있으므로, `build-images` 는 빌드 전용 역할
+  (`vars.PROD_BUILD_AWS_ROLE_ARN`: ECR push·스캔 조회·릴리스 소스 S3 업로드만)을 쓰고, 서버 명령·서버 상태
+  읽기·운영 비밀값 쓰기와 배포 역할(`vars.PROD_AWS_ROLE_ARN`)은 승인된 `deploy` job 에만 둔다.
+  `pnpm qa:production-deploy-security` 가 강제한다(`deploy/DEPLOY_GUIDE.md` §4). **한계:** 저장소 수준
+  GitHub secret(배포용 `SECRET_*` 원본 다수)은 `build-images` 도 읽을 수 있다 — 환경 secret 으로 옮기는 것은 별도 후속이다.
 - **모든 작업은 `dev`에서 시작한다.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev → main` 승격은 사용자만 한다.** 에이전트는 `gh pr merge`·`git push origin dev:main` 등
   **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.
   사용자가 GitHub에서 직접 PR을 머지하는 것이 유일한 승격 경로이며, **자동으로 승격(머지)하는
   워크플로는 존재하지 않는다**(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
-  `promote-main.yml`("Promote to main", 수동 실행)은 alpha 검증 + 필요하면 dev에 버전 커밋
-  push까지만 하고, dev→main PR은 사람이 누를 링크만 job summary에 남긴다(저장소 설정이
-  Actions의 PR 생성을 허용하지 않는다) — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
+  `promote-main.yml`("Promote to main", 수동 실행)은 alpha 검증 후 미소비 changeset이 있으면 버전
+  커밋을 `release/version-<버전>` 브랜치로 push해 **dev 대상 PR**을 열고 멈춘다. 그 PR을 머지하고
+  alpha가 새 dev SHA를 서빙하면 다시 실행해 승격 게이트를 검증하고, dev→main PR은 사람이 누를 링크만
+  job summary에 남긴다 — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
 - **dev 머지 = 즉시 alpha 실배포.** 승인 게이트가 없으므로 dev 머지 전 검증(테스트·tsc·lint)을
   실배포 게이트로 취급한다.
 - **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
@@ -64,9 +78,18 @@
   **repository ruleset "Copilot review for default branch"(id 15258451, enforcement=active)가 default 브랜치에
   `deletion`·`non_fast_forward`·`copilot_code_review` 세 가지를 강제한다.** 즉 main으로의 force-push와
   브랜치 삭제는 실제로 막힌다 — 2026-07-31 #231 사고 때 되돌리기 force-push가 `non_fast_forward`로
-  거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 일반 fast-forward push 자체는 막지
-  않으므로 PR 없는 직접 push는 여전히 가능하고 그대로 프로덕션 배포로 이어진다.
+  거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 2026-10-21부터는 ruleset
+  "Require PR for main"(PR 필수, 승인 0명, 예외 없음)도 걸려 main 직접 push가 거부된다 — 승격·핫픽스 모두 PR로.
   **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic protection API만 보면 실상을 놓친다).
+- **배포 environment는 브랜치로 묶여 있다**(2026-10-21): `production`은 `main`에서만(승인자 2명 유지),
+  `alpha`(`rollback-alpha.yml`이 쓰고 alpha OIDC 역할이 `environment:alpha` subject를 신뢰)는 `dev`에서만
+  쓸 수 있다. 다른 브랜치의 job이 이 environment를 선언하면 GitHub가 실행을 거부한다.
+- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음 —
+  2026-10-21 GitHub 토큰 탈취 대응으로 추가). 막는 것은 PR 없이 dev에 **몰래 직접 push**하는 길뿐이다 —
+  같은 토큰으로 PR을 열고 스스로 머지하면 alpha 배포까지 간다(PR 기록만 남는다). 승인 1명 규칙은 자체 머지
+  흐름을 막아 채택하지 않았다.
+  dev로의 직접 push는 누구든 — 워크플로·관리자 포함 — 거부된다. 그래서 `promote-main.yml`의 버전 커밋과
+  릴리스 준비(`--prepare-only` 포함)도 PR로 전달한다. 같은 명령(`gh api repos/<owner>/<repo>/rulesets`)으로 확인한다.
 - **머지·push 전에 항상 `baseRefName`(대상 브랜치)을 확인한다.** 2026-08-09에 dev용 PR을
   `mergeable`/CI만 보고 머지했다가 **base가 main이라 프로덕션 브랜치에 머지된 사고**가 있었다
   (`gh pr merge`는 PR에 설정된 base로 머지하지, 내가 의도한 곳으로 머지하지 않는다). 머지 직전
@@ -221,7 +244,7 @@ infra/load/               → k6 부하 테스트 하네스
 pnpm --filter v1_api dev          # API (8121)
 pnpm --filter v1_web dev          # Web (3013) — 검증 목적으로는 띄우지 않는다(아래 "운영 워크플로" 7)
 pnpm --filter v1_web lint         # tsc --noEmit + scripts/v1-pattern-check.mjs
-pnpm --filter v1_api lint         # tsc --noEmit + scripts/v1-surface-check.mjs
+pnpm --filter v1_api lint         # tsc -p tsconfig.spec.json(테스트 포함) + scripts/v1-surface-check.mjs
 pnpm --filter v1_web build
 pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```
@@ -229,7 +252,7 @@ pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```bash
 pnpm --filter v1_web test              # Vitest(jsdom) — src/**/*.test.{ts,tsx}. 반드시 apps/v1_web 기준으로 실행
 pnpm --filter v1_api test              # Jest unit — src/**/*.spec.ts
-pnpm --filter v1_api test:integration  # Jest integration(--runInBand) — test/**/*.integration-spec.ts, DB 필요
+pnpm --filter v1_api test:integration  # Jest integration(워커 1개, 1GB 넘으면 재시작) — test/**/*.integration-spec.ts, DB 필요
 pnpm v1:test                           # 위 v1_api unit + v1_web test
 pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스택 가동 전제)
 ```
@@ -268,7 +291,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 **`docs/design/competition-canonical-flow.md` 가 정본이다.** 대회·정규 리그·팀 매치·명단·결과 확정·전적에 관한
 설계·구현·리뷰는 그 문서를 먼저 읽고, 충돌하는 다른 문서(태스크 문서 포함)보다 그 문서를 따른다. 요지:
 대회 아래 정규 대회/정규 리그 · 모든 경기는 팀 대 팀 매치(공식/친선) · 참가는 신청제, 명단은 등번호+이름 ·
-경기 명단 = 출전자(선후발 없음, 참가 명단이 기본값이고 팀이 경기 시작 전까지 경기별로 조정, 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
+경기 명단 = 출전자(선후발 없음, 참가 명단이 기본값이고 팀이 경기 시작 전까지 경기별로 조정, 플랫폼 owner·ops 어드민은 종료 경기의 출전도 정정 가능(개인 기록이 있으면 결과 정정), 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
 팀 전적 전체/대회/리그/친선 + 개인 기록. 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.
 
 ### 팀 역할 기반 권한
@@ -498,12 +521,16 @@ start → end-period(하프타임) → start-period(후반) → end-period → e
 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업 저장·제출
 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
 
-실측으로 확인된 계약 2개(하나라도 어기면 409/422):
+실측으로 확인된 계약 3개(1·2는 어기면 409/422, 3은 거절 응답):
 1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
    발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
    (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
    authorizationSubjectVersion: 0 }`).
 2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
+3. **다른 계정이 콘솔을 쥐고 있으면 조용히 뺏지 않는다(MD-QA #165).** 같은 경기 콘솔을 다른 계정이 열어 두었으면
+   (예: 사용자가 브라우저로 콘솔을 보는 중) `game.takeover.request` 는 `{status:'denied', code:'TAKEOVER_HELD', holderName}`
+   이다. 스크립트는 payload 에 `force: true` 를 실어 가져오고, 그 콘솔은 보기 모드로 바뀐다. 같은 계정의 재요청은
+   `force` 없이 넘어간다.
 
 ### 4. 판정은 공개 API를 ground truth로
 

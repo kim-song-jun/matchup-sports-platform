@@ -84,11 +84,7 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
             ) : null}
             {/* [알파 감사 C] "담당자 처리 · 리비전 #N" — 알파 실측 지적 항목. 11px → 12px. */}
             <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
-              {revision.createdByActorType === 'SYSTEM'
-                ? `자동 처리(${revision.createdBySystemActor ?? '시스템'})`
-                : revision.createdByName
-                  ? `${revision.createdByName} 처리`
-                  : '담당자 처리'}
+              {actorText(revision)}
               {' · '}리비전 #{revision.revision}
             </p>
           </li>
@@ -96,4 +92,14 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
       })}
     </ol>
   );
+}
+
+/** 제출한 사람과 확정한 사람이 다르면 둘 다 적는다 — 제출자만 보이면 확정을 누가 했는지 알 수 없다(MD-QA #169). */
+function actorText(revision: GameResultRevision): string {
+  const confirmer = revision.officializedByName;
+  if (revision.createdByActorType === 'SYSTEM') {
+    return `자동 처리(${revision.createdBySystemActor ?? '시스템'})${confirmer ? ` · 확정 ${confirmer}` : ''}`;
+  }
+  if (confirmer && confirmer !== revision.createdByName) return `제출 ${revision.createdByName ?? '담당자'} · 확정 ${confirmer}`;
+  return revision.createdByName ? `${revision.createdByName} 처리` : '담당자 처리';
 }

@@ -4,6 +4,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddPlayerDto,
+  UpdateAdminPlayerSettingsDto,
   UpdatePlayerEligibilityDto,
   UpdatePlayerJerseyDto,
   UpdatePlayerRosterSettingsDto,
@@ -128,6 +129,16 @@ export class TournamentPlayersAdminController {
     @Param('tournamentId') tournamentId: string,
   ) {
     return this.playersService.exportTournamentCsv(user, tournamentId);
+  }
+
+  @Patch('registrations/:registrationId/players/:playerId/settings')
+  updateSettings(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+    @Param('playerId') playerId: string,
+    @Body() dto: UpdateAdminPlayerSettingsDto,
+  ) {
+    return this.playersService.updatePlayerSettingsForAdmin(user, registrationId, playerId, dto);
   }
 
   @Patch('players/:playerId/eligibility')

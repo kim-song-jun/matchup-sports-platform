@@ -129,6 +129,7 @@ export function createTeamMatchRulesStore(initial: readonly V1TeamMatch[]) {
       id: gameId, sourceType: 'TEAM_MATCH', state: 'SCHEDULED', version: 1, lastSequence: 0,
       competitionConfigVersionId: record.pinId, currentOfficialRevisionId: null,
       sides: [], lineups: [], actorRole: 'team_owner',
+      realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
       periods: record.periods.map((_period, index) => ({ id: `${gameId}-period-${index + 1}`, gameId, number: index + 1, state: 'SCHEDULED', startedAt: null, endedAt: null })),
       periodDurations: record.periods.map(({ durationMinutes, extraTime }) => ({ durationMinutes, extraTime })),
     };

@@ -20,8 +20,10 @@ import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId }
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
-export const TOURNAMENT_GROUP_PHASES = ['group', 'round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
+export const TOURNAMENT_GROUP_PHASES = ['group', 'round64', 'round32', 'round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
 export type TournamentGroupPhase = (typeof TOURNAMENT_GROUP_PHASES)[number];
+export const TOURNAMENT_BRACKET_TRACKS = ['overall', 'upper', 'lower'] as const;
+export type TournamentBracketTrack = (typeof TOURNAMENT_BRACKET_TRACKS)[number];
 
 // ─── Group DTOs ───────────────────────────────────────────────────────────────
 
@@ -33,6 +35,10 @@ export class CreateGroupDto {
   @IsOptional()
   @IsIn(TOURNAMENT_GROUP_PHASES)
   phase?: TournamentGroupPhase;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_BRACKET_TRACKS)
+  bracketTrack?: TournamentBracketTrack;
 
   @IsOptional()
   @Type(() => Number)
@@ -100,7 +106,7 @@ export class CreateBracketByeDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(7)
+  @Max(63)
   sortOrder!: number;
 }
 

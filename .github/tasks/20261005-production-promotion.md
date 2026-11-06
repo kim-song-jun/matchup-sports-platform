@@ -1,5 +1,130 @@
 # 2026-10-05 dev → main production promotion
 
+## Current preparation refresh — 2026-10-24 (1.11.9)
+
+This supersedes the 1.11.8 preparation coordinates below; actual main creation/merge and production approval remain user-operated.
+
+- During the post-merge verification of #2055, #2056 introduced admin tournament stage statistics into dev b01eee64727627c350f2ddd243364ddcb72891d3. The newer dev push cancelled CI40099155930; alpha40099155948 stopped before server changes because its matching CI was cancelled. This is supersession, not a product failure.
+- Owned: `/tmp/teameet-main-prep-1.11.9`, branch `release/version-1.11.9`, both app manifests/changelogs, the new consumed Changeset and this task. No runtime/schema/workflow changes, no shared WIP or main/production writes.
+- [x] Fresh dev baseline; official Changesets CLI2.30.0 consumed the one new Web patch. Fixed group now has source API/Web1.11.9 and both version headings. API has no new runtime delta; Web changelog records #2056.
+- [ ] Validate release/promotion policies and publish a new dev preparation PR; exact-head CI then normal dev merge.
+- [ ] Latest dev CI/alpha release identity and API DB health, followed by official promotion gate and user-operated main compare link.
+- Metadata is prepared independently while alpha follows the latest dev; do not claim alpha/prepare-only success for this source yet. Existing resolver plans artifact1.11.10 once these Changesets are consumed.
+- Earlier #2055 and its exact-head product CI succeeded; no earlier alpha or earlier-head review is presented as current verification. AI scan still has the external model-session error and shared root ff-only sync remains blocked by unrelated WIP.
+
+## Current preparation — 2026-10-24 (1.11.8)
+
+This snapshot supersedes historical execution permissions below. The user requested main promotion preparation only. Actual dev→main PR creation/merge and production approval remain user-operated.
+
+- Owned: `/tmp/teameet-main-prep-1.11.8`, local `chore/main-prep-1.11.8-20261024`, remote `release/version-1.11.8` / dev-target PR #2055. Release metadata, consumed Changesets and this task only. Preserve shared WIP; no runtime/schema/workflow/policy edits or production writes.
+- [x] Phase 1 — dev `a31de2c32df2c37018fe3c542712ec9828093458`: exact-head API/Web/Gates CI40093721309 and Alpha40093721285 success. Public alpha Web SHA matches, release1.11.8-alpha.20261024.ga31de2c32df2, API health DB=true.
+- [x] Phase 2 — official Promote workflow40097434301 consumed 2 Changesets and opened #2055, both app source versions/changelogs1.11.8. Scope includes admin ended-game attendance correction and result-card timeline editing. Main1.11.7 has one merge-only commit absent from dev; it has the identical tree to b92096f81. Absorbed origin/main into the dev preparation branch without content changes.
+- [ ] Phase 3 — release/promotion policy and committed diff verification; latest #2055 CI; normal dev merge; matching dev CI/Alpha and public release/SHA/DB check.
+- [ ] Phase 4 — rerun official promotion gate after matching alpha and provide the user-operated main compare link. No main mutation.
+
+### Acceptance / security / ambiguity
+- API/Web versions and both changelogs stay in lockstep; consumed Changesets0. Runtime, Prisma migration, deploy and workflow bytes match current dev. New dev→main delta has no schema or deployment changes.
+- Existing resolver intentionally computes source1.11.8 + no pending Changeset as artifact1.11.9 (alpha1.11.9-alpha.*). Preserve this contract; do not present the source version as the deployed artifact version.
+- Copilot AI scan failed to create its configured model session. No clean-review claim, repeated request or review-policy bypass. Product CI is still required for the release head.
+- Shared root dev fast-forward is currently blocked by existing uncommitted WIP; preserve it. Isolated worktree and remote dev are the release cursor.
+
+### Progress snapshot
+- Official version commit34012a032; main-history merge is metadata-only. Next: publish task/history integration to existing release PR, validate exact-head CI, then complete dev/alpha promotion preparation.
+
+## Current preparation — 2026-10-22 (finalist schedule labels)
+
+This snapshot supersedes previous execution permissions and coordinates below. The current user request authorizes dev deployment and main promotion preparation, not main PR creation/merge or production approval.
+
+- Owned: `_worktrees/release-main-prep-20261022`, branch `chore/release-main-prep-20261022`; both app versions/changelogs, 9 consumed Changesets and this task. Preserve shared WIP; no additional schema/runtime/workflow change, main mutation or production write.
+- [x] #2026 latest head `7b3cf443b` API/Web/Gates CI39619957559 success, including real PostgreSQL regression. Merged dev `b106202e66758e2d460e7de8fbfe6c21d72a6401`; main-tree dev synchronized with document WIP restored.
+- [x] Official Changesets CLI2.30.0 consumed 9 changesets for fixed API/Web1.11.3, including #2008/#2016/#2018/#2026 and other current dev changes. Base main `71411e304` is1.11.2. #2024 concurrently merged as dev `64ead7996`; the release branch integrates it without changing runtime source and regenerates the same1.11.3 with all9 entries. Main promotion now includes its additive login-step-up migration `20261021120000_login_step_up`, superseding the earlier no-migration observation.
+- [ ] Release diff and main-promotion policy checks; dev-target release PR and exact-head CI.
+- [ ] Release PR merge, latest dev push CI and matching alpha workflow success; actual public Web/API SHA/version/DB and finalist labels.
+- [ ] Main promotion gate and user-operated compare link. Main remains untouched.
+
+### Ambiguity / runtime evidence
+
+At 2026-10-21 15:13UTC, merged feature SHA had no push CI/check suites/alpha run registered, despite active push-triggered workflows. Remote dev and merged PR were confirmed. Manual workflow_dispatch CI cannot satisfy the push-only alpha gate, so no bypass is attempted. Version preparation proceeds independently; no claim of alpha validation or prepare-only script success is made. Current alpha remains `b6a7a1a21` /1.11.3-alpha; final deployment verification is pending. Original feature Alpha browser after remains0/3.
+
+The separate GitHub AI security task failed at Processing Request before code CI; it is not counted as a clean AI review. Main PR/production approval remain user-operated.
+
+Release PR #2027 targets dev. Initial CI39623924189 API runner remained queued while Web/Gates passed; an isolated PR cancellation and failed-jobs retry obtained a runner, then Prisma engine download failed with ECONNRESET before validation. No code failure was inferred; retry requested. The new source head after integrating #2024 requires fresh CI. Feature push CI was registered late and superseded by the newer dev push; alpha now follows the latest SHA.
+
+## Main execution refresh — 2026-10-21 after finalist stability regression
+
+This snapshot supersedes prior user-operated-main restrictions for this execution. The user explicitly requested proceeding without review and then executing main promotion. Create/merge the main PR and approve the matching production deployment only after the actual CI gates pass. No policy bypass, forced merge, production data write/reset/seed, or unrelated WIP changes are authorized.
+
+- Promotion PR #2015 (dev -> main) was created from validated dev 821b0d74f. CodeQL/Gates/Web passed, but API CI 39545183659 failed one real PG integration assertion: unchanged latest finalist preview was rejected as FINALIST_PREVIEW_STALE instead of the existing started-game guard FINALIST_NOT_READY. Main/production remain unchanged.
+- Fix PR #2017 / commit 8a87689e4 canonicalizes only unordered group-source map/registration/standing/official-fixture inputs. It preserves meaningful rule ordering, actual result/bracket/start changes, authorization, locks, atomic save/audit and existing round12 behavior. Unit regression observed RED 1failed/18passed -> GREEN 19/19. Local stale Prisma client type failure is recorded separately; final client/type/actual PG validation belongs to the fix PR CI. API surface guard PASS.
+- This release metadata branch is based on that exact fix commit. Official Changesets CLI 2.30.0 consumes its patch Changeset, generates matching source API/Web 1.11.1 and changelog entries. Existing resolver semantics plan production artifact **1.11.2** with no pending Changeset. Earlier expected artifact 1.11.1 is superseded.
+- Ownership: this existing task, both app manifests/changelogs and consumed finalist-preview-stable-source Changeset. Runtime/Prisma/deploy/workflow bytes stay identical to fix commit 8a87689e4; no schema migration. Main already contains the same migration tree and M11 applied ledger; use default stage none.
+- [x] Fix #2017 exact-head CI 39547107834 success (real PG/type/unit/build), merged dev cf896b77b and local dev ff-only synchronized.
+- [ ] Release metadata policy/committed-tree verification pass, fast-forward dev publication after fix CI/merge, followed by matching dev CI/Alpha and local dev ff-only synchronization.
+- [ ] Latest dev CI/Alpha success and actual deployed commit/release/DB match.
+- [ ] #2015 updated head main-promotion policy, CI/CodeQL pass and no unresolved real findings; user-approved review omission is not CI omission.
+- [ ] Normal main merge, matching main CI/images/scans success, production environment approval and actual production SHA/release1.11.2/DB + public browser smoke verification.
+- Rollback predecessor remains production1.10.3 / 33cd8a8b7; use guarded rollback-prod.yml expected-active-SHA contract if deployment fails. No force push or repeated Stage A/B.
+- Alpha public headed smoke before the fix: landing/tournaments/teams at390/768/1440,9/9 HTTP200, page error/failed response/overflow0; screenshots and JSON under local tmp/release-public-smoke-20261021/alpha. Browser Node55288/Chrome33292 closed and absent. This is public smoke, not full authenticated write/permission QA.
+
+
+## Preparation refresh — 2026-10-21
+
+This section supersedes earlier release coordinates and authorizations. The current request is to prepare the already-published dev changes for user-operated main promotion. Main PR creation/merge and production approval are not executed by this task.
+
+### Scope and progress
+
+- Owned: isolated worktree `_worktrees/main-promotion-prep-20261021`, branch `chore/main-promotion-prep-20261021`; both v1 app manifests/changelogs, the 23 consumed Changesets, and this existing task. Forbidden: shared WIP, runtime/UI changes, migration edits, production data writes, main mutation, workflow/policy bypass.
+- [x] Phase 1: fetch and compare remote branches, CI and deployed releases.
+- [x] Phase 2: integrate main history into the dev candidate and generate release metadata with official Changesets CLI 2.30.0.
+- [x] Phase 3: committed preparation/promotion policies passed; published [preparation PR #2014](https://github.com/kim-song-jun/matchup-sports-platform/pull/2014) with base dev and recorded CI/review state.
+- [ ] Release gate after preparation PR merge: latest dev CI/Alpha pass and live SHA/version/DB match; independent release review; user creates/merges main PR and approves production.
+
+### Baseline evidence
+
+- dev: `ab1c1c5180fcadc767c0d2df331bc7a3bb74d995`; main: `33cd8a8b7da3ea7682be68832d8296c6b127d49e`. GitHub compare: dev ahead 86, behind 4. Main-only history consists of promotion #1993 and the #2001 selected tournament cleanup plus release metadata.
+- Main runtime cleanup is already represented in dev. The one merge conflict is `bracket-page-client.tsx`; retain the exact origin/dev file, including current schedule heading control. No runtime, schema, migrations, deployment scripts or workflow bytes differ from baseline dev in this preparation.
+- Main source versions: API/Web 1.10.2; baseline dev source versions: 1.10.1. Official Changesets version consumed 23 files and generated both source versions 1.11.0, preserving main changelog history. Existing resolver semantics with zero pending Changesets plan stable artifact 1.11.1, not 1.11.0. This artifact increment is existing behavior and is not changed here.
+- Baseline [dev CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39530776886): Gates/API/Web success, including migration replay/drift and web lint/typecheck/unit/build. [Alpha deploy](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39530776927): success.
+- Public Alpha landing: HTTP 200, commit matches baseline dev, release `1.11.0-alpha.20261021.gab1c1c5180fc`; API health DB=true. Production landing: HTTP 200, commit matches main, release `1.10.3`; API health DB=true. These are baseline checks, not evidence for a future preparation merge.
+- Baseline main and dev have identical Prisma trees and deployment/workflow contracts. This release adds no migration relative to current production source. The production #2001 deployment [39343729418](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39343729418) completed all jobs. Use ordinary deployment with default `task168_stage=none`; do not repeat historical Stage A/B transition instructions solely because old promotion boilerplate mentions them. If a real ledger guard fails, stop and consult `docs/ops/prod-task168-transition-runbook.md`; do not bypass the guard.
+- [PR #2013 Alpha evidence](https://github.com/kim-song-jun/matchup-sports-platform/pull/2013#issuecomment-6306460899) records authenticated 390/768/1440 finalist entry/preview checks, overflow/console/network 0, and deliberately no assignment save. This task introduces no UI change and does not claim a new complete feature-flow QA run.
+- [PR #2013 review exception](https://github.com/kim-song-jun/matchup-sports-platform/pull/2013#issuecomment-6306120571) was expressly limited to that dev PR. Copilot failed before code review because its configured model was unavailable. The exception does not apply to this preparation or main/production promotion. No clean release review is claimed.
+- Open PRs #2008, #1949, #1944 and #1858 are excluded because they have not merged into dev. Do not silently include them in this release.
+
+### Test scenarios and acceptance criteria
+
+- [x] Both app versions match; consumed Changesets are generated by the official CLI.
+- [x] Preparation runtime and Prisma tree equal origin/dev; preserve all shared dirty files.
+- [x] Preparation changeset policy passes against the actual release-only diff.
+- [x] Promotion policy passes against main 1.10.2 with consumed-Changeset history receipts.
+- [x] Versioning contract tests (24/24), whitespace checks and touched-path debt-marker checks pass.
+- [ ] Preparation PR base is dev, exact-head CI is green, independent review is clean, unresolved review findings are zero before merge.
+- [ ] After dev merge, confirm origin/main is an ancestor, no pending Changesets, latest dev CI/Alpha and actual headers/DB agree.
+
+### User-operated promotion handoff
+
+1. Merge the preparation PR into dev only after matching-head CI/review gates pass. Synchronize the existing local dev checkout using fetch and ff-only without touching unrelated worktrees.
+2. Confirm the new dev Alpha deployment is complete and its live `X-Teameet-Commit` equals origin/dev; API health must have `data.checks.db=true`. Regenerate release metadata from that exact commit and confirm the served release.
+3. Open the [main versus dev comparison](https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev?expand=1). Suggested title: `release: Teameet 1.11.1 대회 운영·명단·결선 배정 승격`. Recompute if dev advances. Main PR creation and merge are performed by the user.
+4. Suggested main PR body: source versions 1.10.2 -> 1.11.0; expected artifact 1.11.1; release-only preparation, 23 Changesets consumed; no new migration/deploy contract. Changes include finalist automatic/manual assignment, roster/GK editing and official corrections, server period expiry, tournament start rollback/unstarted-game deletion, bracket/schedule presentation and team-list pagination. Link this task, exact dev CI/Alpha, and feature QA evidence. State the release review result and limitations explicitly.
+5. Before main merge require promotion CI/review gates and no unresolved findings. After user merge, inspect `CI / Deploy` for that main SHA, approve only its production environment deployment, default stage none. Verify production landing release/commit and API DB=true; manually smoke tournament list/detail/bracket, roster and console permissions before declaring production complete.
+6. Rollback uses the existing `rollback-prod.yml` workflow and recorded prior successful immutable release. User operates production approval; no force push, DB reset/seed or automatic Stage A/B replay. Check migration compatibility and the workflow's rollback guards first.
+
+### Published preparation and blocking review
+
+- PR #2014: `chore/main-promotion-prep-20261021` -> `dev`, MERGEABLE, 28 release/documentation paths. Main history integration is merge commit `e5fa7c6f8`; release consumption is ordinary commit `4cdba2f24`, so production promotion can retrieve its deletion receipts. Preserve both commits with a normal merge commit; do not squash away main ancestry.
+- Actual committed-tree promotion policy passed against main API/Web 1.10.2; runtime/Prisma/deploy/workflow tree remains identical to baseline dev, no untracked dependency, isolated worktree clean after commit. Existing historical `COLORXXX500` changelog text is unchanged; no new debt marker.
+- [Preparation CI 39541097435](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39541097435) on `4cdba2f24` was running when this evidence update was prepared. This documentation commit requires a new matching-head CI result. Pending CI is not treated as passed.
+- Copilot was requested on #2014. [Review service run 39541101453](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39541101453) failed before analysis: `Request session.create failed ... Model "claude-opus-5" is not available`. No review was produced. This is an external review-service blocker, not a code finding or clean review. Do not merge preparation or main without restored clean review or an explicit applicable user decision; the #2013 exception does not apply. No bypass/model/account/policy change was made.
+- Current production deployment log, job `118378873245` of run `39343729418`, explicitly reports `Task168 M11 guard: prod ledger already shows M11 applied`. Together with identical main/dev migration trees, this supports ordinary stage none rather than repeating the historic cutover.
+- Shared working tree and all other worktrees are preserved. No local app/browser/DB service was started, no dev/main push or main PR creation/merge or production approval was performed. Release preparation remains review-blocked; production promotion is not declared ready.
+### Risks, security and ambiguity
+
+- Local Docker daemon is unavailable. This release-metadata-only preparation does not start a DB or repeat full app suites; baseline CI owns migration replay and actual DB integration. Host preflight: CPU 22% on 28 logical processors, approximately 13 GiB free RAM, Node 3 / Chrome 31 / Edge 7 processes. No owned long-running services are started.
+- PUBLIC repository: do not record credentials, environment values, host identifiers or production data. `.env*` files were not read. No app API/DB change, mock drift, new design policy or instruction change is introduced.
+- Preparation is not main promotion approval. Earlier release-specific authorizations and the #2013 review exception are not reused.
+
+
 Status: Review
 
 ## Late review hold — 2026-10-19
@@ -250,3 +375,7 @@ Owned: this task/status record, GitHub canonical promotion workflow dispatch and
 - Test infrastructure: own PostgreSQL container `codex-pr1610-pg`, local port55461, isolated template `ulw_v1_integration_pr1610_base`. Windows checkout CRLF caused the immutable policy-content hash replay guard to fail; a fresh template replay with LF source SQL succeeded. This is local file normalization, not a migration/schema change. Only this owned container is eligible for cleanup.
 - Codemap: `lockGameRows` has two direct consumers: roster write scope and league fixture generator (existing import preserved by re-export). Roster scope is shared by worker and manual adjustment writes. Verification covers real worker/PATCH rollback+retry, actual result/PATCH interleaving, stale-null winner protection, generator/shared-update unit contracts and bracket renderer bye/LOSER labels.
 - Local Jest wrapper reuses the canonical integration project and changes only its test glob to avoid Windows escaping the `.codex` worktree path. RED log: `C:\Users\kinso\.codex\automations\dev-pr-5\qa\pr1610\red-worker-patch.log`.
+
+Release execution note (2026-10-21): after #2017 passes and merges to dev, integrate that dev merge into the prepared metadata branch and publish only the reviewed manifest/changelog/Changeset/task diff by ordinary fast-forward push to dev. This is version preparation as supported by the existing promote-main.sh push_dev contract; no forced push or CI/review policy change. Runtime identity with the exact tested fix commit and preparation/promotion policies must pass first, and the resulting dev CI/Alpha/main-PR gates must pass before main promotion.
+
+Final metadata publication receipt: based on #2017 dev merge cf896b77b, only manifest/changelog/consumed patch Changeset/task files differ; runtime/Prisma/deploy/workflow bytes match tested8a87689e4. Publication is an ordinary fast-forward dev push after preparation and main-promotion policies pass. Final matching dev CI/Alpha/main PR validation remains required before main merge.

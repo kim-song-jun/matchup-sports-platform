@@ -38,15 +38,19 @@ export const TEAM_LIST_PAGE_SIZE = 20;
  * 팀 목록은 limit 과 includeFacets 를 붙인다 — 목록 머리의 전체 건수를 첫 렌더부터 채우려면
  * useV1TeamPages 의 첫 페이지 요청과 같은 includeFacets 가 필요하다.
  */
-export const MATCH_LIST_SEED_PATH = '/matches';
-export const TEAM_MATCH_LIST_SEED_PATH = '/team-matches';
+/**
+ * 개인 매치·팀매치 목록 seed 는 includeFacets 를 붙인다 — 상단 숫자·종목 칩이 첫 HTML 부터 서버가 센 전체 건수여야
+ * 불러온 20건 숫자가 잠깐 보였다가 바뀌지 않는다(팀 목록 seed 와 같은 이유).
+ */
+export const MATCH_LIST_SEED_PATH = '/matches?includeFacets=true';
+export const TEAM_MATCH_LIST_SEED_PATH = '/team-matches?includeFacets=true';
 export const TEAM_LIST_SEED_PATH = teamListSeedPath();
 
 /*
  * 목록 클라이언트가 필터로 읽는 파라미터. 하나라도 값이 있으면 화면이 무필터 첫 페이지와 달라지므로
  * ItemList 를 내지 않는다 — 클라이언트에 필터 파라미터를 더하면 여기에도 더한다.
  */
-const COMMON_LIST_FILTER_PARAMS = ['sportId', 'sort', 'genderRule', 'levelCodes', 'levels', 'q'] as const;
+const COMMON_LIST_FILTER_PARAMS = ['sportId', 'sort', 'genderRule', 'levelCodes', 'levels', 'q', 'recruitingOnly'] as const;
 export const MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'regionId'] as const;
 export const TEAM_MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'kind'] as const;
 export const TEAM_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'regionId'] as const;

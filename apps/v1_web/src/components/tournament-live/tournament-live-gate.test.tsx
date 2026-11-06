@@ -29,8 +29,8 @@ vi.mock('next/navigation', () => ({
 // 셸 자체의 반응형/드로어 로직은 이 게이트 테스트의 관심사가 아니다 — 게이트가 도출한
 // role/origin/children을 정확히 전달하는지만 확인할 수 있게 얇게 대체한다.
 vi.mock('@/components/tournament-ops/tournament-ops-shell', () => ({
-  TournamentOpsShell: ({ children, role, origin, tournamentKind }: { children: React.ReactNode; role: string; origin: string; tournamentKind?: string | null }) => (
-    <div data-testid="shell" data-role={role} data-origin={origin} data-kind={String(tournamentKind)}>
+  TournamentOpsShell: ({ children, role, origin, tournamentKind, tournamentTitle }: { children: React.ReactNode; role: string; origin: string; tournamentKind?: string | null; tournamentTitle?: string }) => (
+    <div data-testid="shell" data-role={role} data-origin={origin} data-kind={String(tournamentKind)} data-title={tournamentTitle}>
       {children}
     </div>
   ),
@@ -478,6 +478,17 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
     window.sessionStorage.clear();
   });
 
+  it('담당 경기 진입은 이전 admin 출처를 덮어쓰고 nav 이동 뒤에도 유지된다', () => {
+    window.sessionStorage.setItem('teameet.v1.tournamentOpsOrigin.t-1', 'admin');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=staff'));
+    const { rerender } = render(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'staff');
+    expect(window.sessionStorage.getItem('teameet.v1.tournamentOpsOrigin.t-1')).toBe('staff');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    rerender(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'staff');
+  });
+
   it('?from=admin이면 origin="admin"으로 셸에 전달하고 sessionStorage에 기록한다', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=admin'));
     render(
@@ -539,5 +550,26 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
       </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'null');
+  });
+});
+
+
+describe('private assigned tournament metadata', () => {
+  it.each(['regular_tournament', 'regular_league'])('retains authenticated assignment metadata for %s when public detail is unavailable', (kind) => {
+    mocks.useV1AuthMe.mockReturnValue({ isPending: false, isError: false, data: AUTH_ME });
+    mocks.usePathname.mockReturnValue('/tournament-ops/tournaments/t-1/operations');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    mocks.useV1MyStaffAssignments.mockReturnValue({ isPending: false, isError: false, data: { platformRole: null, items: [{
+      tournamentId: 't-1', tournamentTitle: '비공개 담당 대회', tournamentKind: kind,
+      assignments: [{ role: 'TOURNAMENT_DIRECTOR', expiresAt: null }],
+    }] } });
+    mocks.useV1TournamentStaffAssignments.mockReturnValue({ isPending: false, isError: false, data: { items: [
+      { userId: 'user-me', role: 'TOURNAMENT_DIRECTOR', revokedAt: null, expiresAt: null },
+    ] } });
+    mocks.useV1Tournament.mockReturnValue({ isPending: false, isError: true, error: apiError(404, 'TOURNAMENT_NOT_FOUND') });
+    render(<TournamentLiveGate tournamentId="t-1"><div>비공개 보드</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-title', '비공개 담당 대회');
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', kind);
+    expect(mocks.useV1Tournament).toHaveBeenLastCalledWith('t-1');
   });
 });

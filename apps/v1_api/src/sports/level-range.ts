@@ -30,10 +30,15 @@ export function parseLevelCodes(value?: string | null): SportLevelCode[] {
   );
 }
 
-export function levelCodeWhere(levelCodes: SportLevelCode[]) {
-  if (levelCodes.length === 0) return {};
+/**
+ * 고른 레벨 중 하나라도 범위에 드는 글. 목록 where 의 `AND` 배열에 펼쳐 넣는다.
+ * 객체로 펼치면 `OR` 키가 목록의 공개 조건 `OR`(지난 글 숨김·대회 경기 제외)을 덮어써
+ * 레벨만 골라도 종료·취소된 글이 다시 나온다.
+ */
+export function levelCodeConstraints(levelCodes: SportLevelCode[]) {
+  if (levelCodes.length === 0) return [];
 
-  return {
+  return [{
     OR: levelCodes.map((code) => {
       const index = SPORT_LEVEL_CODES.indexOf(code);
       return {
@@ -41,7 +46,7 @@ export function levelCodeWhere(levelCodes: SportLevelCode[]) {
         maxSportLevel: { is: { code: { in: SPORT_LEVEL_CODES.slice(index) } } },
       };
     }),
-  };
+  }];
 }
 
 export function formatLevelRange(minLevel?: Pick<SportLevelRecord, 'name'> | null, maxLevel?: Pick<SportLevelRecord, 'name'> | null, fallback?: string | null) {

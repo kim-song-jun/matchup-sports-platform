@@ -23,6 +23,7 @@ const USER = {
 
 type TestSocket = {
   readonly id: string;
+  readonly rooms: Set<string>;
   readonly handshake: {
     readonly headers: Record<string, string>;
     readonly auth: Record<string, unknown>;
@@ -48,8 +49,9 @@ function socket(
   headers: Record<string, string> = {},
   auth: Record<string, unknown> = {},
 ): TestSocket {
-  return {
+  const client: TestSocket = {
     id: 'socket-task-8-handshake',
+    rooms: new Set(),
     handshake: {
       headers,
       auth: {
@@ -59,16 +61,22 @@ function socket(
       },
     },
     data: {},
-    join: jest.fn().mockResolvedValue(undefined),
-    leave: jest.fn().mockResolvedValue(undefined),
+    join: jest.fn(async (room: string) => {
+      client.rooms.add(room);
+    }),
+    leave: jest.fn(async (room: string) => {
+      client.rooms.delete(room);
+    }),
     emit: jest.fn(),
     disconnect: jest.fn(),
   };
+  return client;
 }
 
 function sessionCookie(userId = USER.id, issuedAtMs?: number): string {
   const token = createV1SessionToken({
     userId,
+    sessionEpoch: 0,
     secret: SESSION_SECRET,
     ...(issuedAtMs === undefined ? {} : { issuedAtMs }),
   });
@@ -115,7 +123,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn() } },
         { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
       ],
     }).compile();
@@ -209,7 +217,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
       expect.objectContaining({ status: 'subscribed', room: `game:${GAME_ID}` }),
     );
     expect(prisma.v1User.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: USER.id } }),
+      expect.objectContaining({ where: { id: USER.id, sessionEpoch: 0 } }),
     );
   });
 

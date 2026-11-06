@@ -2,6 +2,7 @@ import type { OperationAuditWriterService } from '../common/audit/operation-audi
 import type { PrismaService } from '../prisma/prisma.service';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 // Task 179 경기 명단 화면의 운영자 판정. support 어드민은 경기 인가(resolveActor)에서 빠지지만
 // 팀 표·어드민 표처럼 명단을 읽기로 본다 — 쓰기는 열지 않는다.
@@ -51,7 +52,7 @@ function makeService(options: { admin?: unknown; memberships?: unknown[] }) {
       findFirst: jest.fn().mockResolvedValue(null),
     },
   };
-  const service = new GamesService(prisma as unknown as PrismaService, {} as OperationAuditWriterService, new GameTakeoverService());
+  const service = new GamesService(prisma as unknown as PrismaService, {} as OperationAuditWriterService, new GameTakeoverService(), new TournamentStaffAccessService(prisma as unknown as PrismaService));
   return { operator: () => service.resolveCompetitionOperator(prisma as never, ids.game, ids.user) };
 }
 

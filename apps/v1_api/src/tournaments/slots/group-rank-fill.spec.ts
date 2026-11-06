@@ -12,6 +12,10 @@ const loadMock = loadGroupRankPreview as jest.MockedFunction<typeof loadGroupRan
 
 const row = (slotId: string, state: GroupRankPreviewRow['state'], extra: Partial<GroupRankPreviewRow> = {}): GroupRankPreviewRow => ({
   slotId,
+  groupId: null,
+  bracketTrack: 'overall',
+  position: 1,
+  sourceGroupId: 'source-group',
   label: `라벨-${slotId}`,
   state,
   candidateRegistrationId: null,
@@ -118,6 +122,17 @@ describe('planFillFromStandings', () => {
     expect(plan.assignments).toEqual([{ slotId: 's1', registrationId: 'Y' }]);
   });
 
+  it('split upper ready 자리는 원천 조 팀이어도 그 순위 후보가 아닌 override 를 거절한다', () => {
+    const upperFirst = Object.assign(row('upper-a1', 'ready', { candidateRegistrationId: 'RANK-1' }), {
+      bracketTrack: 'upper',
+      position: 1,
+    });
+    expect(failure(() => planFillFromStandings(
+      previewOf([upperFirst], { 'upper-a1': ['RANK-1', 'RANK-2', 'RANK-3', 'RANK-4'] }),
+      [{ slotId: 'upper-a1', registrationId: 'RANK-3' }],
+    ))).toEqual({ type: UnprocessableEntityException.name, code: 'SLOT_REGISTRATION_INVALID' });
+  });
+
   // 허용 범위는 스펙 S4 그대로다 — tied 자리 = 그 동률 팀만, ready 자리 = 그 자리의 원천 조 팀만, 그 밖은 전부 422.
   // 조 소속(X·Y·Z)과 동률 팀(X·Y)을 일부러 다르게 둬서 "조 소속이면 통과" 같은 느슨한 구현이 red 가 되게 한다.
   const GROUP = ['X', 'Y', 'Z'];
@@ -173,6 +188,7 @@ describe('서비스 본문 — 권한·대상·잠금 순서', () => {
     const events: string[] = [];
     const prisma = {
       v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.role === null ? null : adminRow(options.role ?? 'ops')) },
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: kindAwareFindFirst({ id: 'tournament-1', kind: options.kind ?? 'regular_tournament' }) },
       v1AdminActionLog: { create: jest.fn(async () => { events.push('audit'); return { id: 'log-1' }; }) },
       $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>): Promise<unknown> => { events.push('tx'); return fn(prisma); }),
@@ -256,7 +272,7 @@ describe('서비스 본문 — 권한·대상·잠금 순서', () => {
     expect(events).toEqual(['tx', 'lock', 'load']);
   });
 
-  it('미리보기는 support 도 볼 수 있고(getActiveAdmin) 행을 slots 로 감싸 돌려준다, 정규 리그 id 는 404', async () => {
+  it('미리보기는 support 도 볼 수 있고(getTournamentAdmin) 행을 slots 로 감싸 돌려준다, 정규 리그 id 는 404', async () => {
     const support = setup({ role: 'support' });
     await expect(previewGroupRankStandings(support.deps, user, 'tournament-1')).resolves.toEqual({ slots: swapPreview.rows });
     const stranger = setup({ role: null });

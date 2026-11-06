@@ -45,7 +45,6 @@ vi.mock('@/lib/v1-game-operations-socket', () => ({
   setGameOperationsAuthorizationSubjectVersion: vi.fn(),
 }));
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: (...args: unknown[]) => mockV1Post(...args),
 }));
 
@@ -67,9 +66,10 @@ describe('useV1GameOperationsConsole — reverseEvent must never enter the offli
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },
@@ -110,6 +110,105 @@ describe('useV1GameOperationsConsole — reverseEvent must never enter the offli
   });
 });
 
+describe('useV1GameOperationsConsole — source-aware operation modes', () => {
+  const ordinaryHostContext = {
+    teamMatchId: 'team-match-1',
+    gameId: 'game-1',
+    status: 'matched' as const,
+    isStandalone: true,
+    viewerCanManageHost: true,
+  };
+
+  it('lets the server-authorized ordinary host operate without acquiring a takeover lease', async () => {
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () =>
+        useV1GameOperationsConsole({
+          gameId: 'game-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
+          gameSourceType: 'TEAM_MATCH',
+          gameActorRole: 'team_manager',
+          operationMode: 'ordinary-host',
+          teamMatchContext: ordinaryHostContext,
+          initialLastSequence: 0,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.gameSnapshot).not.toBeNull());
+    expect(result.current.canOperate).toBe(true);
+    expect(result.current.takeover.status).toBe('none');
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('game.takeover.request', expect.anything(), expect.anything());
+
+    await act(async () => {
+      await result.current.reverseEvent({ eventId: 'event-1', reason: '오심 정정' });
+    });
+    expect(mockV1Post).toHaveBeenCalledWith(
+      '/games/game-1/events/event-1/reverse',
+      expect.objectContaining({ expectedVersion: 5, clientEventId: expect.any(String), reason: '오심 정정' }),
+      expect.objectContaining({ headers: { 'Idempotency-Key': expect.any(String) } }),
+    );
+    const [, body] = mockV1Post.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(body).not.toHaveProperty('takeoverToken');
+
+    await act(async () => {
+      await result.current.submitEvent({
+        type: 'GOAL', period: 1, clockMs: 0, occurredAt: new Date().toISOString(), payload: {},
+      });
+    });
+    await waitFor(() => expect(mockSocket.emit).toHaveBeenCalledWith(
+      'game.event.append',
+      expect.objectContaining({ gameId: 'game-1', event: expect.objectContaining({ type: 'GOAL' }) }),
+      expect.any(Function),
+    ));
+    const eventPayload = mockSocket.emit.mock.calls.find(([event]) => event === 'game.event.append')?.[1] as Record<string, unknown>;
+    expect(eventPayload).not.toHaveProperty('takeoverToken');
+    unmount();
+  });
+
+  it.each([
+    { label: 'opposing manager', context: { ...ordinaryHostContext, viewerCanManageHost: false }, sourceType: 'TEAM_MATCH' as const, role: 'team_manager' as const },
+    { label: 'wrong source', context: ordinaryHostContext, sourceType: 'TOURNAMENT_FIXTURE' as const, role: 'team_manager' as const },
+    { label: 'recruiting', context: { ...ordinaryHostContext, status: 'recruiting' as const }, sourceType: 'TEAM_MATCH' as const, role: 'team_manager' as const },
+    { label: 'completed', context: { ...ordinaryHostContext, status: 'completed' as const }, sourceType: 'TEAM_MATCH' as const, role: 'team_manager' as const },
+    { label: 'cancelled', context: { ...ordinaryHostContext, status: 'cancelled' as const }, sourceType: 'TEAM_MATCH' as const, role: 'team_manager' as const },
+  ])('keeps an unauthorized ordinary-host context read-only: $label', async ({ context, sourceType, role }) => {
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () =>
+        useV1GameOperationsConsole({
+          gameId: 'game-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
+          gameSourceType: sourceType,
+          gameActorRole: role,
+          operationMode: 'ordinary-host',
+          teamMatchContext: context,
+          initialLastSequence: 0,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.gameSnapshot).not.toBeNull());
+    expect(result.current.canOperate).toBe(false);
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('game.takeover.request', expect.anything(), expect.anything());
+    await act(async () => {
+      await expect(result.current.submitEvent({
+        type: 'GOAL', period: 1, clockMs: 0, occurredAt: new Date().toISOString(), payload: {},
+      })).resolves.toBeNull();
+      await expect(result.current.reverseEvent({ eventId: 'event-1', reason: '오심 정정' })).rejects.toThrow();
+    });
+    expect(mockV1Post).not.toHaveBeenCalled();
+    expect(result.current.queue.items).toHaveLength(0);
+    unmount();
+  });
+});
+
 /**
  * Issue #376 — the old `attachAssist` (operate-console.tsx) called
  * `ops.reverseEvent` then `ops.submitEvent` from the same render's `ops`
@@ -129,9 +228,10 @@ describe('useV1GameOperationsConsole — assignAssist must never enter the offli
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },

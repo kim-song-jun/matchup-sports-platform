@@ -32,7 +32,16 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
+  const [officializedFixtureId, setOfficializedFixtureId] = useState<string | null>(null);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // 같은 페이지에서 브라우저 뒤로/앞으로 이동하면 검색 파라미터만 바뀔 수 있다.
+  // 목록에서 사용자가 고른 경기는 유지하되, 실제 딥링크가 바뀌면 새 링크를 따른다.
+  useEffect(() => {
+    setSelectedFixtureId(deepLinkFixtureId);
+    setOfficializedFixtureId(null);
+    setDeepLinkNotFound(false);
+  }, [deepLinkFixtureId, tournamentId]);
 
   /* 보드 API 응답에는 팀 이름이 없어서 목록이 "group · 1경기"로만 보였다 —
      어느 경기를 검토하는지 알 수 없다. 운영 보드와 같은 소스에서 이름을 채운다. */
@@ -90,13 +99,17 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   // truthy가 되면 배너를 명시적으로 내린다.
   useEffect(() => {
     if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
+    if (selectedFixtureId !== deepLinkFixtureId || officializedFixtureId === deepLinkFixtureId) {
+      setDeepLinkNotFound(false);
+      return;
+    }
     if (selectedItem) {
       setDeepLinkNotFound(false);
       setTimeout(() => panelHeadingRef.current?.focus(), 0);
       return;
     }
     setDeepLinkNotFound(true);
-  }, [boardQuery.isSuccess, deepLinkFixtureId, selectedItem]);
+  }, [boardQuery.isSuccess, deepLinkFixtureId, selectedItem, selectedFixtureId, officializedFixtureId]);
 
   return (
     <RequireAuth>
@@ -107,7 +120,11 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
           description="종료된 경기의 기록을 확인하고 공식 결과로 확정해요."
         />
 
-        {deepLinkNotFound ? (
+        {officializedFixtureId !== null && officializedFixtureId === selectedFixtureId ? (
+          <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
+            공식 결과로 확정했어요.
+          </p>
+        ) : deepLinkNotFound ? (
           <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
             전달받은 경기는 지금 검토 목록에 없어요. 아직 종료되지 않았거나 이미 처리됐을 수 있어요.
           </p>
@@ -141,6 +158,8 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
               selectedFixtureId={selectedFixtureId}
               onSelect={(item) => {
                 setSelectedFixtureId(item.fixtureId);
+                setOfficializedFixtureId(null);
+                setDeepLinkNotFound(false);
                 setTimeout(() => panelHeadingRef.current?.focus(), 0);
               }}
               emptyTitle="검토할 결과가 없어요"
@@ -174,6 +193,7 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
                   gameId={selectedItem.gameId}
                   tournamentId={tournamentId}
                   correctionsHref={correctionsHref}
+                  onOfficialized={() => setOfficializedFixtureId(selectedItem.fixtureId)}
                 />
               </div>
             ) : null}

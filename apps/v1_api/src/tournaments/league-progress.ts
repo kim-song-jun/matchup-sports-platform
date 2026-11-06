@@ -42,6 +42,11 @@ export function magicNumberOf(
 ): MagicNumber | null {
   if (standings.length < 2) return null;
   const [leader, ...challengers] = standings;
+  // 남은 경기가 하나도 없으면 순위는 이미 정해졌다 — 승점이 같아도 동점 기준으로 1위가 갈린 것이다.
+  // 아래 +1 보수 계산은 "아직 뒤집힐 수 있을 때"를 위한 것이라, 여기서 쓰면 다 끝난 리그에 "승점 1"이 남는다(MD-QA #166).
+  if (standings.every((row) => (remainingByRegistration.get(row.registrationId) ?? 0) === 0)) {
+    return { registrationId: leader.registrationId, value: 0, clinched: true };
+  }
   const challengerMax = Math.max(
     ...challengers.map(
       (challenger) => challenger.points + (remainingByRegistration.get(challenger.registrationId) ?? 0) * winPoints,

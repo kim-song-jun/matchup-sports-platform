@@ -17,16 +17,19 @@ export function tournamentVisibilityHiddenReason(status: V1TournamentStatus): st
 export function TournamentVisibilityControl({
   tournamentId,
   isPublic,
+  canWrite,
   status,
 }: {
   tournamentId: string;
   isPublic: boolean;
+  canWrite: boolean;
   status: V1TournamentStatus;
 }) {
   const updateVisibility = useV1UpdateTournamentVisibility(tournamentId);
   return (
     <CompetitionVisibilityControl
       isPublic={isPublic}
+      canWrite={canWrite}
       publicDescription="공개 대회 목록과 검색, 홈 화면에 표시돼요."
       privateDescription="일반 사용자에게 숨겨져요. 관리자 운영과 참가·대진 정보는 유지돼요."
       mutation={updateVisibility}

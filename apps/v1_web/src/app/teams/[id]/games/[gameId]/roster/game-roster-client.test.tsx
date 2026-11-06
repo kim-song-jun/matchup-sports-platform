@@ -182,10 +182,7 @@ describe('읽기 전용', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /저장|참가 명단대로/ })).toBeNull();
     expect(screen.getByText('7 김민재')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '우리 팀 다른 경기' })).toHaveAttribute(
-      'href',
-      `/teams/${teamId}#team-upcoming-games`,
-    );
+    expect(screen.queryByRole('link', { name: '우리 팀 다른 경기' })).toBeNull();
   });
 
   it('운영자에게는 "우리 팀 다른 경기" 링크를 보이지 않는다(그 팀 화면에 다가오는 경기가 없다)', async () => {
@@ -224,12 +221,12 @@ describe('자동으로 빠지거나 들어온 선수', () => {
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
   });
 
-  it('참가 명단에 새로 추가돼 들어온 선수를 알린다', async () => {
+  it('추가된 선수는 출전 목록에 표시하고 별도 추가 안내는 띄우지 않는다', async () => {
     mock.markJoinedAfterFixture('player-3');
     renderScreen();
-    expect(
-      await screen.findByText('한도윤 선수가 참가 명단에 추가돼 이 경기 출전에 들어갔어요.'),
-    ).toBeInTheDocument();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    expect(within(section(/출전 3명/)).getByText('한도윤')).toBeInTheDocument();
+    expect(screen.queryByText(/선수가 참가 명단에 추가돼 이 경기 출전에 들어갔어요/)).not.toBeInTheDocument();
     expect(screen.getByText('새로 추가')).toBeInTheDocument();
   });
 

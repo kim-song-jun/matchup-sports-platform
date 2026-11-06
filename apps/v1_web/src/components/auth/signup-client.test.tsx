@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { PENDING_EMAIL_LINK_STORAGE_KEY, readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { SignupClient } from './signup-client';
 
 const router = vi.hoisted(() => ({
@@ -101,10 +103,10 @@ describe('SignupClient required profile contract', () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
   });
 
-  it('휴대폰 번호가 이미 가입돼 있으면 안내와 로그인·계정 찾기 출구를 보여 준다', async () => {
+  it('인증번호 발급이 번호 중복(409)으로 거절돼도 같은 안내 카드와 출구를 보여 준다', async () => {
     hooks.phoneIssueMutateAsync.mockRejectedValue(
       new V1ApiError({ message: '이미 사용 중인 번호예요.', status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', timestamp: '2026-10-09T00:00:00.000Z' }),
     );
@@ -113,12 +115,11 @@ describe('SignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 
-    expect(await screen.findByText(/이 번호로 이미 가입한 계정이 있어요/)).toBeInTheDocument();
+    expect(await screen.findByText('이 번호는 이미 가입돼 있어요')).toBeInTheDocument();
     expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: '기존 계정으로 로그인' }));
-    expect(router.push).toHaveBeenCalledWith('/login');
-    await userEvent.setup().click(screen.getByRole('button', { name: '계정 찾기' }));
-    expect(router.push).toHaveBeenCalledWith('/auth/find-account');
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
+    expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/contact');
   });
 
   it('다른 인증 오류는 기존 문구 그대로 보인다', async () => {
@@ -131,7 +132,8 @@ describe('SignupClient required profile contract', () => {
     fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 
     expect(await screen.findByText('잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
+    expect(screen.queryByText('이 번호는 이미 가입돼 있어요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /이메일로 가입했어요/ })).not.toBeInTheDocument();
   });
 
   it('redirects direct signup entry to terms before accepting account input', async () => {
@@ -221,26 +223,16 @@ describe('SignupClient required profile contract', () => {
     );
   });
 
-  it.each([
-    ['기본(켜짐)', false, true],
-    ['끄고 가입', true, false],
-  ])('경기 기록 공개 스위치: %s → 공개 동의값을 보낸다', async (_label, toggle, granted) => {
+  it('가입 폼은 공개 선택을 덮어쓰지 않고 서버 기본값을 사용한다', async () => {
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
-    const sw = screen.getByRole('switch', { name: '경기 기록 공개' });
-    expect(sw).toHaveAttribute('aria-checked', 'true');
-    if (toggle) fireEvent.click(sw);
-
+    expect(screen.queryByRole('switch', { name: '경기 기록 공개' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
-
-    await waitFor(() =>
-      expect(hooks.registerMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ recordConsent: { granted, policyHash: 'v1-public-record-consent-1' } }),
-      ),
-    );
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    expect(hooks.registerMutateAsync.mock.calls[0][0]).not.toHaveProperty('recordConsent');
   });
 
   it('tracks a sign_up_complete event with method=email once registration succeeds', async () => {
@@ -256,6 +248,52 @@ describe('SignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
+  });
+
+  // 앞서 안내받은 다른 계정용 토큰이 새로 만든 계정의 도착 화면을 가로채면 안 된다.
+  it('가입이 끝나면 남아 있던 대기 연결 토큰을 지운다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-from-earlier-409', linkTokenExpiresInSeconds: 1800 });
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    expect(peekPendingSocialLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
+  });
+
+  it('가입이 끝나면 카카오 쪽으로 나갈 때 보관해 둔 이메일도 지운다', async () => {
+    savePendingEmailLink({ email: 'left-from-earlier@example.com' });
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    expect(readPendingEmailLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    await waitFor(() => expect(readPendingEmailLink()).toBeNull());
+  });
+
+  it('가입 요청이 실패하면 대기 연결 토큰은 그대로 둔다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-from-earlier-409', linkTokenExpiresInSeconds: 1800 });
+    hooks.registerMutateAsync.mockRejectedValue(new Error('network'));
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    expect(peekPendingSocialLink()).not.toBeNull();
   });
 
   it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {
@@ -595,7 +633,7 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
 
   it('가입 요청이 닉네임 중복(409)으로 거절되면 가입 정보 단계에서 그 사실을 알린다', async () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({ expiresAt: new Date(Date.now() + 300000).toISOString() });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
     hooks.registerMutateAsync.mockRejectedValue(new V1ApiError({
       status: 'error',
       statusCode: 409,
@@ -629,7 +667,7 @@ describe('SignupClient 본인인증 단계', () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
   });
 
   it('제목은 인증할 일만 말하고, 하단 버튼 하나가 인증번호 받기에서 인증번호 확인으로 바뀐다', async () => {
@@ -714,5 +752,389 @@ describe('SignupClient 본인인증 단계', () => {
 
     // 가입 정보 → 약관(링크)
     expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', '/terms?mode=signup');
+  });
+});
+
+describe('SignupClient 이미 가입된 번호 안내', () => {
+  const CARD_TITLE = '이 번호는 이미 가입돼 있어요';
+  const OTHER_PHONE = '01099998888';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem(
+      'teameet.v1.signupTermsDocumentIds',
+      JSON.stringify(['11111111-1111-4111-8111-111111111111']),
+    );
+    hooks.checkNicknameMutateAsync.mockResolvedValue({ available: true });
+    hooks.checkEmailMutateAsync.mockResolvedValue({ available: true });
+    hooks.registerMutateAsync.mockResolvedValue({
+      session: { userId: 'user-email', userEmail: 'signup@example.com' },
+    });
+    hooks.phoneIssueMutateAsync.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
+  });
+
+  /** 번호를 넣고 인증번호를 받아 6자리를 확인한다(2단계 화면에서 시작). */
+  async function verifyPhone(phone: string): Promise<void> {
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: phone } });
+    await completePhoneVerification();
+  }
+
+  it('인증 응답이 registered:true 면 다음 단계로 가지 않고 그 자리에서 안내 카드와 세 갈래를 보여 준다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+      expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
+      expect(screen.getByRole('button', { name: '다른 번호로 인증하기' })).toBeEnabled();
+      // 입력칸이 카드로 바뀌므로 포커스가 body 로 빠지지 않고 카드 제목으로 옮겨 간다.
+      await waitFor(() => expect(screen.getByText(CARD_TITLE)).toHaveFocus());
+
+      // 완료 표시도, 인증번호 입력도, 자동 이동도 없다.
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(screen.queryByText('휴대폰 본인인증이 완료됐어요')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('인증번호 6자리')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('registered:false 면 안내 카드 없이 프로필 단계로 넘어간다', async () => {
+    render(<SignupClient />);
+    await advanceToProfile();
+
+    expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /이메일로 가입했어요/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+  });
+
+  it('세 갈래 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    expect(help).toHaveAttribute('href', '/contact');
+    // 로그인·계정 찾기 길이 먼저다.
+    const lastExit = screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ });
+    expect(lastExit.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('로그인·계정 찾기 이동은 원래 가려던 곳(redirect)을 이어 준다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+  });
+
+  it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면 안내를 준다(웹에서는 카카오만)', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    const row = screen.getByRole('link', { name: /카카오.*로 가입했어요/ });
+    expect(row).toHaveAttribute('href', '/login');
+    expect(row).toHaveTextContent('카카오로 가입했어요');
+    expect(row).toHaveTextContent('로그인 첫 화면에서 그 버튼을 눌러요');
+    // 웹에는 Apple 버튼이 없어 Apple 을 언급하지 않는다.
+    expect(row).not.toHaveTextContent('Apple');
+  });
+
+  /** 링크 핸들러는 그대로 돌리되 jsdom 이 실제 이동을 시도하지 않게 막는다. */
+  function clickLink(link: HTMLElement) {
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    fireEvent.click(link);
+  }
+
+  it('소셜 줄은 로그인한 뒤 방금 입력한 이메일도 연결할 수 있다고 알린다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveTextContent('로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.');
+    // 이 문장은 소셜 줄에만 있다 — 다른 두 줄은 그 약속을 하지 않는다.
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).not.toHaveTextContent('연결할 수 있어요');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toHaveTextContent('연결할 수 있어요');
+  });
+
+  it('소셜 줄을 눌러 로그인 첫 화면으로 나가면 입력했던 이메일만 이 탭에 보관하고, 비밀번호는 어디에도 쓰지 않는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+    expect(readPendingEmailLink()).toBeNull();
+
+    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+
+    expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: null });
+    const stored = JSON.parse(window.sessionStorage.getItem(PENDING_EMAIL_LINK_STORAGE_KEY) as string) as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(['email', 'expiresAt', 'returnTo']);
+    const everything = [window.sessionStorage, window.localStorage].flatMap((storage) => (
+      Object.keys(storage).map((key) => `${key}=${storage.getItem(key)}`)
+    )).join('\n');
+    expect(everything).not.toContain('password123');
+  });
+
+  it('원래 가려던 곳(redirect)이 있으면 이메일과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+
+    expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: '/matches/abc' });
+  });
+
+  it('이메일 로그인이나 계정 찾기로 나갈 때는 이메일을 보관하지 않는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    clickLink(screen.getByRole('link', { name: /이메일로 가입했어요/ }));
+    clickLink(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ }));
+
+    expect(readPendingEmailLink()).toBeNull();
+  });
+
+  it('iOS 앱에서는 같은 줄이 Apple 버튼도 안내한다', async () => {
+    window.TeameetNative = { supports: ['sign-in-with-apple'], postMessage: vi.fn() };
+    try {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+      await screen.findByText(CARD_TITLE);
+
+      const row = screen.getByRole('link', { name: /카카오·Apple로 가입했어요/ });
+      expect(row).toHaveAttribute('href', '/login');
+    } finally {
+      delete window.TeameetNative;
+    }
+  });
+
+  it('다른 번호로 인증하기는 번호 입력으로 되돌리고 인증 상태를 비운다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+
+    const phoneInput = screen.getByLabelText(/^휴대폰 번호/);
+    expect(phoneInput).toHaveValue('');
+    expect(phoneInput).toHaveFocus();
+    expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('인증번호 6자리')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeDisabled();
+  });
+
+  it('다른 번호로 인증하면 새 증명으로 프로필 단계에 들어가고 그 증명으로 가입한다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+    fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+
+    await verifyPhone(OTHER_PHONE);
+    await screen.findByLabelText(/^이름/, {}, { timeout: 3000 });
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() =>
+      expect(hooks.registerMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ phone: OTHER_PHONE, phoneProofToken: 'PROOF-TOKEN' }),
+      ),
+    );
+    expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('번호 칸을 직접 고치면 안내 카드가 사라지고 다시 인증할 수 있다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: OTHER_PHONE } });
+
+    expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '인증번호 받기' })).toBeEnabled();
+  });
+
+  describe('번호를 쥔 계정이 탈퇴 유예 중일 때', () => {
+    // KST 로는 11월 7일 00:30. 카드가 유예 종료 시각이 지났는지도 보므로 시계를 고정한다.
+    const UNTIL = '2026-11-06T15:30:00.000Z';
+    const GUIDE_TITLE = '이 번호는 탈퇴를 신청한 계정이 쓰고 있어요';
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    async function verifyPendingPhone(): Promise<void> {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: UNTIL });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+      await screen.findByText(GUIDE_TITLE);
+    }
+
+    it('일반 "이미 가입돼 있어요" 카드 대신 두 가지 방법과 삭제일을 보여 주고 가입 단계로는 넘어가지 않는다', async () => {
+      await verifyPendingPhone();
+
+      expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByText('번호 인증은 잘 끝났어요. 이 번호를 다시 쓰는 방법은 두 가지예요.')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 2 기다리기' })).toBeInTheDocument();
+      expect(screen.getByText('11월 7일')).toBeInTheDocument();
+      expect(screen.getByText('이 번호로 새로 가입할 수 있어요')).toBeInTheDocument();
+      // 이 안내는 가입 수단을 모른다 — 이메일·계정 찾기 갈래를 싣지 않는다.
+      expect(screen.queryByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '다른 번호로 인증하기' })).toBeEnabled();
+      // The guide takes focus in an effect after it renders.
+      await waitFor(() => expect(screen.getByRole('heading', { name: GUIDE_TITLE })).toHaveFocus());
+    });
+
+    it('탈퇴 취소 버튼은 이메일·소셜이 함께 있는 로그인 첫 화면으로 가고 원래 가려던 곳을 이어 준다', async () => {
+      window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
+      await verifyPendingPhone();
+
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+    });
+
+    it('다른 번호로 인증하기를 누르면 안내가 사라지고, 번호를 직접 고쳐도 사라진다', async () => {
+      await verifyPendingPhone();
+      fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('');
+
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: UNTIL });
+      await verifyPhone('01012345678');
+      await screen.findByText(GUIDE_TITLE);
+      fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: OTHER_PHONE } });
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+    });
+
+    it('방법 1 에 고객센터 링크가 있어 비밀번호를 잊은 사람도 막다른 길이 아니다', async () => {
+      await verifyPendingPhone();
+      expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+    });
+
+    it('번호 재배정 안내는 싣지 않는다 — 이 안내에는 자기 문구의 고객센터 링크가 있다', async () => {
+      await verifyPendingPhone();
+      expect(screen.queryByText(/번호를 최근에 새로 받았나요/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+    });
+
+    it('유예 종료 시각이 이미 지났으면 일반 "이미 가입돼 있어요" 카드가 나온다', async () => {
+      // 시계(10월 31일)보다 하루 앞선 시각 — 시계를 옮기면 인증번호 입력 시간이 먼저 만료된다.
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: '2026-10-30T00:00:00.000Z' });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+    });
+
+    it('날짜 없이 registered 만 오면 일반 카드가 그대로 나온다', async () => {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+    });
+
+    it('이전 번호의 탈퇴 안내가 다음 번호의 일반 가입 카드에 새어 나오지 않는다', async () => {
+      await verifyPendingPhone();
+      fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+      await verifyPhone(OTHER_PHONE);
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.queryByText('11월 7일')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('가입 제출의 409 PHONE_CONFLICT(최종 방어)', () => {
+    const phoneConflict = () =>
+      new V1ApiError({ message: '이미 사용 중인 번호예요.', status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', timestamp: '2026-10-31T00:00:00.000Z' });
+
+    async function submitProfile(): Promise<void> {
+      fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+      fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+      fireEvent.click(screen.getByRole('radio', { name: '남' }));
+      fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+    }
+
+    it('같은 안내 카드로 인증 단계에 돌아가고, 같은 오류를 되풀이하는 가입 버튼은 사라진다', async () => {
+      hooks.registerMutateAsync.mockRejectedValue(phoneConflict());
+      render(<SignupClient />);
+      await advanceToProfile();
+      await submitProfile();
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+      expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
+      expect(screen.queryByRole('button', { name: '가입하고 계속' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+      expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
+    });
+
+    it('다른 번호로 다시 인증하면 이미 적은 프로필을 그대로 두고 새 번호로 가입한다', async () => {
+      hooks.registerMutateAsync.mockRejectedValueOnce(phoneConflict());
+      render(<SignupClient />);
+      await advanceToProfile();
+      await submitProfile();
+      await screen.findByText(CARD_TITLE);
+
+      fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+      await verifyPhone(OTHER_PHONE);
+
+      expect(await screen.findByLabelText(/^이름/, {}, { timeout: 3000 })).toHaveValue('홍길동');
+      fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+      await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(2));
+      expect(hooks.registerMutateAsync).toHaveBeenLastCalledWith(
+        expect.objectContaining({ phone: OTHER_PHONE, displayName: '홍길동', birthDate: '20000229' }),
+      );
+    });
   });
 });

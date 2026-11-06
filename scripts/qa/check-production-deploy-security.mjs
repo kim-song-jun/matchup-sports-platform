@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 
 export function normalizeWorkflowSource(source) {
   return source.replace(/\r\n/g, '\n');
@@ -94,12 +95,177 @@ export function findJobsMissingRunnerPrereqs(workflow) {
   return problems;
 }
 
+// 승인(environment) 전에 도는 job 은 main 에 push 할 수 있는 누구든 스텝과 그 스텝이 부르는
+// 스크립트를 바꿔 실행시킬 수 있다. 그 job 이 prod 서버(SSM)·Parameter Store·KMS·EC2 에 닿으면
+// 승인 게이트가 의미를 잃는다 — build-images 가 SSM send-command(롤백 기준 읽기, 호스트 .env
+// 읽기)와 승인 없이 assume 되는 배포 역할(ssm:SendCommand·ssm:PutParameter·KMS 권한 보유)을
+// 쓰던 것이 정확히 그 길이었다. IAM(역할 trust 와 권한)이 경계 자체이고, 이 검사는 같은 실수가
+// 워크플로나 스크립트에 되돌아오는 것을 CI 에서 먼저 잡는 보조 장치다. 정적 검사라 pnpm/npm
+// 스크립트·Dockerfile·변수에 담아 부르는 aws 는 따라가지 않는다.
+//   - 승인 전 job: PROD_AWS_ROLE_ARN 금지. AWS 자격증명을 받는 job 은 빌드 역할만 쓰고,
+//     서버·비밀값 접근 AWS 서비스(ssm·kms·ec2) 호출과 AWS SDK(boto3·aws-sdk) 직접 사용 금지 —
+//     job 이 부르는 스크립트와 그 스크립트가 source/import 하는 파일 안까지 따라간다.
+//   - 승인 job(`environment: production`): 제한 없음.
+// (저장소 수준 GitHub secret 은 이 검사의 대상이 아니다 — 승인 전 job 도 읽을 수 있다.)
+const PRIVILEGED_AWS_SERVICES = '(?:ssm|kms|ec2)';
+// `aws --region x ssm ...` 처럼 서비스 앞에 전역 옵션이 와도 잡는다. 옵션 값 자리가 서비스
+// 이름을 삼키지 않도록 (?!...) 로 막는다. `python -m awscli`·`amazon/aws-cli` 이미지도 같은 형태다.
+const PRIVILEGED_AWS_CALL = new RegExp(
+  String.raw`\baws(?:-?cli)?(?:\s+--?[A-Za-z][A-Za-z-]*(?:[ =](?!${PRIVILEGED_AWS_SERVICES}\b)[^\s|;&<>]+)?)*\s+(${PRIVILEGED_AWS_SERVICES})\b`,
+);
+const AWS_SDK_USAGE = /\b(?:boto3|botocore)\b|@aws-sdk\/|\baws-sdk\b/;
+const BUILD_ROLE_PATTERN = /role-to-assume:\s*\$\{\{\s*vars\.PROD_BUILD_AWS_ROLE_ARN\s*\}\}/;
+// 실행할 수 있는 스크립트 경로 토큰. `bash -x ./a.sh`, `bash "a.sh"`, `./a.sh`(직접 실행), `env X=1 bash a.sh`
+// 처럼 호출 형태가 달라도 경로 자체는 같은 모양이라, 호출어를 보지 않고 경로 토큰을 모은다.
+const SCRIPT_PATH_TOKEN = /[A-Za-z0-9_./-]+\.(?:sh|bash|mjs|cjs|js|py)(?![A-Za-z0-9_])/g;
+// `import './x'`·`from './x'`·`require('./x')` 의 확장자 없는 상대 경로.
+const RELATIVE_IMPORT = /(?:\bfrom|\bimport|\brequire\()\s*(\.{1,2}\/[A-Za-z0-9_./-]+)/g;
+const IMPORT_SUFFIXES = ['', '.mjs', '.js', '.cjs', '/index.js'];
+
+// 탐지용 정규화: 전체 주석 줄 제거 → 줄 끝 `\` 이어붙이기 → 트레일링 주석 제거 → 따옴표 제거.
+// 주석을 먼저 지워야 `# ... \` 로 끝나는 주석 줄이 다음 코드 줄을 삼키지 않는다.
+function stripShellComments(body) {
+  return body
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n')
+    .replace(/\\\r?\n[ \t]*/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\s#.*$/, ''))
+    .join('\n')
+    .replace(/["']/g, '');
+}
+
+// 승인 게이트는 required reviewers 가 걸린 `production` environment 뿐이다 — 다른 이름·식(`${{ }}`)·빈 값은
+// 승인 없이 돌 수 있으므로 승인 job 으로 치지 않는다.
+function isApprovedJob(body) {
+  return /^ {4}environment:[ \t]*['"]?production['"]?[ \t]*$/m.test(body)
+    || /^ {4}environment:[ \t]*\n(?: {6}[^\n]*\n)*? {6}name:[ \t]*['"]?production['"]?[ \t]*$/m.test(body);
+}
+
+function readFileOrNull(path) {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+// 정규화된 코드가 가리키는 스크립트 중 읽을 수 있는 것의 경로. 경로는 저장소 루트 기준으로 먼저,
+// 없으면 부르는 파일의 디렉터리 기준으로 푼다(`source "$(dirname ...)/helper.sh"` 형태).
+function referencedScripts(code, dir, readScript) {
+  const found = new Set();
+  const tryResolve = (token, suffixes) => {
+    const clean = token.replace(/^\/+/, '').replace(/^(?:\.\/)+/, '');
+    const bases = dir ? [clean, `${dir}/${clean}`] : [clean];
+    for (const base of bases) {
+      for (const suffix of suffixes) {
+        if (readScript(`${base}${suffix}`) !== null) {
+          found.add(`${base}${suffix}`);
+          return;
+        }
+      }
+    }
+  };
+  for (const m of code.matchAll(SCRIPT_PATH_TOKEN)) tryResolve(m[0], ['']);
+  for (const m of code.matchAll(RELATIVE_IMPORT)) tryResolve(m[1], IMPORT_SUFFIXES);
+  return [...found];
+}
+
+function privilegedHitsInCode(code) {
+  const hits = [];
+  const call = code.match(PRIVILEGED_AWS_CALL);
+  if (call) hits.push(`aws ${call[1]}`);
+  const sdk = code.match(AWS_SDK_USAGE);
+  if (sdk) hits.push(`AWS SDK(${sdk[0]}) 직접 사용`);
+  return hits;
+}
+
+// 스크립트가 직접 또는 source/import/호출로 부르는 파일 안에서 서버·비밀값 접근을 찾는다.
+// 반환값은 "<경로>: <발견>" 목록.
+export function findPrivilegedAwsInScript(path, readScript = readFileOrNull, seen = new Set()) {
+  if (seen.has(path)) return [];
+  seen.add(path);
+  const body = readScript(path);
+  if (body === null) return [];
+  const code = stripShellComments(body);
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+  const hits = privilegedHitsInCode(code).map((hit) => `${path}: ${hit}`);
+  for (const target of referencedScripts(code, dir, readScript)) {
+    hits.push(...findPrivilegedAwsInScript(target, readScript, seen));
+  }
+  return hits;
+}
+
+export function findProdRoleWithoutApproval(workflow) {
+  const problems = [];
+  for (const { name, body } of splitJobs(workflow)) {
+    if (isApprovedJob(body)) continue;
+    if (/\bvars\.PROD_AWS_ROLE_ARN\b/.test(stripShellComments(body))) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 prod 배포 역할(PROD_AWS_ROLE_ARN)을 assume 합니다 — ` +
+          '그 역할은 ssm:SendCommand·ssm:PutParameter·KMS 권한을 갖습니다. 승인 전 job 은 PROD_BUILD_AWS_ROLE_ARN 만 씁니다',
+      );
+    }
+  }
+  return problems;
+}
+
+export function findPrivilegedAwsWithoutApproval(workflow, readScript = readFileOrNull) {
+  const problems = [];
+  for (const { name, body } of splitJobs(workflow)) {
+    if (isApprovedJob(body)) continue;
+    const code = stripShellComments(body);
+    // 자격증명을 받지 않는 job(gates 등)은 aws 를 불러도 인증이 없어 서버에 닿지 못한다.
+    if (!/uses:\s*aws-actions\/configure-aws-credentials@/.test(code)) continue;
+
+    if (!BUILD_ROLE_PATTERN.test(code)) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 도는 job 이 빌드 역할(vars.PROD_BUILD_AWS_ROLE_ARN)이 아닌 역할을 assume 합니다`,
+      );
+    }
+
+    for (const hit of privilegedHitsInCode(code)) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 도는 job 이 prod 서버·Parameter Store·KMS·EC2 에 닿는 호출(${hit})을 합니다 — ` +
+          '승인된 deploy job 으로 옮기세요',
+      );
+    }
+
+    const seen = new Set();
+    for (const script of referencedScripts(code, '', readScript)) {
+      for (const hit of findPrivilegedAwsInScript(script, readScript, seen)) {
+        problems.push(
+          `job '${name}': 승인(environment) 없이 도는 job 이 부르는 스크립트가 prod 서버·Parameter Store·KMS·EC2 에 닿습니다 (${hit}) — ` +
+            '승인된 deploy job 으로 옮기세요',
+        );
+      }
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
 
 for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
   errors.push(`${workflowPath}: ${problem}`);
+}
+
+for (const problem of [
+  ...findProdRoleWithoutApproval(workflow),
+  ...findPrivilegedAwsWithoutApproval(workflow),
+]) {
+  errors.push(`${workflowPath}: ${problem}`);
+}
+
+// 같은 역할을 다른 워크플로(rollback-prod.yml 등)에서 승인 없이 assume 하는 길도 막는다.
+for (const file of readdirSync('.github/workflows').filter((f) => /\.ya?ml$/.test(f))) {
+  const path = `.github/workflows/${file}`;
+  if (resolvePath(path) === resolvePath(workflowPath)) continue;
+  const other = normalizeWorkflowSource(readFileSync(path, 'utf8'));
+  for (const problem of findProdRoleWithoutApproval(other)) errors.push(`${path}: ${problem}`);
 }
 
 // deploy.yml 이 SSH 를 안 쓰게 됐어도, **그 워크플로가 호출하는 스크립트**가 여전히
@@ -375,10 +541,10 @@ const requiredPatterns = [
     message: 'production immutable image tags must be prefixed with sha-<commit sha>',
   },
   {
-    // build-images job 만 OIDC 로 AWS(ECR push, 대상 검증)를 건드린다 — deploy job 은
-    // SSH 만 쓰고 AWS API 를 직접 호출하지 않으므로 id-token: write 가 필요 없다.
-    pattern: /id-token: write/,
-    message: 'build-images job must request an OIDC token to assume the AWS deploy role',
+    // 승인 전 build-images job 은 ECR push·스캔 조회·소스 업로드 권한만 가진 빌드 역할을 쓴다.
+    // 서버·운영 비밀값 권한이 있는 배포 역할(PROD_AWS_ROLE_ARN)은 승인된 deploy job 전용이다.
+    pattern: /role-to-assume: \$\{\{ vars\.PROD_BUILD_AWS_ROLE_ARN \}\}/,
+    message: 'build-images must assume the build-only role (PROD_BUILD_AWS_ROLE_ARN), never the deploy role',
   },
 ];
 

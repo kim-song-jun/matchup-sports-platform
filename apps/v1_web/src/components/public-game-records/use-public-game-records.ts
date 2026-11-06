@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useInfiniteQuery, useQuery, type Query, type UseQueryResult } from '@tanstack/react-query';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS, publicLivePollDelay } from '@/lib/public-live-polling';
@@ -74,6 +76,7 @@ export function usePublicTournamentSchedule(
   filters: ScheduleFilters = {},
   options: { enabled?: boolean } = {},
 ) {
+  const { v1Get } = useV1DataSource();
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.schedule(tournamentId, filters),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -135,6 +138,7 @@ export function usePublicMatch(
   fixtureId: string,
   options?: { seed?: PublicMatchDetail | null },
 ) {
+  const { v1Get } = useV1DataSource();
   const query = useQuery({
     queryKey: publicGameRecordsKeys.match(tournamentId, fixtureId),
     queryFn: () => v1Get<PublicMatchDetail>(`/tournaments/${tournamentId}/matches/${fixtureId}`),
@@ -157,6 +161,7 @@ export function usePublicMatch(
  * 폴백하므로 404 는 재시도하지 않는다(그 외 오류는 `shouldRetryPublicRecord` 기준으로 재시도).
  */
 export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
+  const { v1Get } = useV1DataSource();
   const query = useQuery({
     queryKey: publicGameRecordsKeys.leagueFixtureRecord(leagueId, teamMatchId),
     queryFn: () => v1Get<PublicMatchDetail>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/record`),
@@ -181,6 +186,7 @@ export function usePublicTeamRecords(
   type?: TeamRecordCategory,
   options: { seed?: PublicTeamRecordsResponse } = {},
 ) {
+  const { v1Get } = useV1DataSource();
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
     // Visibility can change while a route is away; bypass the app's 60s freshness window on mounts
@@ -205,6 +211,7 @@ export function usePublicTeamRecords(
 
 /** `GET /users/:id/records` -- cursor-paginated consent-gated career record + summary. */
 export function usePublicUserRecords(userId: string, season?: string, type?: TeamRecordCategory) {
+  const { v1Get } = useV1DataSource();
   return useInfiniteQuery({
     // `type` 이 키에 들어가야 탭을 바꿀 때 캐시가 갈린다 — 빠지면 다른 탭의 페이지가
     // 그대로 재사용된다(팀 전적 키와 같은 이유·같은 모양).
@@ -235,6 +242,7 @@ export function usePublicTournamentPlayerRecords(
   tournamentId: string,
   options: { enabled?: boolean } = {},
 ) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: publicGameRecordsKeys.playerRecords(tournamentId),
     queryFn: () =>

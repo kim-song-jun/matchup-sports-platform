@@ -34,11 +34,11 @@ export function leagueStateToListStatus(state: string | null | undefined): strin
     : null;
 }
 
-/** 보류 리그는 공개되지 않는다. draft는 시작 전 리그 전체를 찾는 호환 필터다. */
+/** 보류 리그는 공개되지 않는다. draft는 시작 전 리그(준비 중·접수 중·마감) 전체를 찾는 호환 필터다. */
 export const COMPETITION_STATUS_FILTERS: ReadonlyArray<{ value: string | null; label: string }> = [
   { value: null, label: '전체' },
   { value: 'in_progress', label: '진행 중' },
-  { value: 'draft', label: '모집완료' },
+  { value: 'draft', label: '시작 전' },
   { value: 'completed', label: '종료' },
 ];
 

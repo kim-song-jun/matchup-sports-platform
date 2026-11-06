@@ -3,6 +3,7 @@ import {
   isActivityProfileRequired,
   isPendingSocialSignup,
   isPendingSocialSignupRequestAllowed,
+  isUnfinishedSocialSignup,
 } from './social-signup-access';
 
 describe('social signup access contract', () => {
@@ -45,12 +46,20 @@ describe('social signup access contract', () => {
     expect(isActivityProfileRequired('completed')).toBe(false);
   });
 
-  it('allows social-link only while the profile step is pending', () => {
-    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link')).toBe(true);
-    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link')).toBe(false);
-    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/')).toBe(true);
-    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-linkx')).toBe(false);
-    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/preview')).toBe(true);
-    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link/preview')).toBe(false);
+  it('keeps account linking closed to every signup in progress', () => {
+    for (const status of ['social_terms_required', 'social_profile_required']) {
+      expect(isPendingSocialSignupRequestAllowed(status, '/api/v1/auth/link/kakao')).toBe(false);
+      expect(isPendingSocialSignupRequestAllowed(status, '/api/v1/auth/link/apple')).toBe(false);
+    }
+    expect(isPendingSocialSignupRequestAllowed('completed', '/api/v1/auth/link/kakao')).toBe(true);
+  });
+
+  it('counts a skipped profile as an unfinished signup but not a completed one', () => {
+    expect(isUnfinishedSocialSignup('social_terms_required')).toBe(true);
+    expect(isUnfinishedSocialSignup('social_profile_required')).toBe(true);
+    expect(isUnfinishedSocialSignup('social_profile_deferred')).toBe(true);
+    expect(isUnfinishedSocialSignup('signup_done')).toBe(false);
+    expect(isUnfinishedSocialSignup('completed')).toBe(false);
+    expect(isUnfinishedSocialSignup('deferred')).toBe(false);
   });
 });

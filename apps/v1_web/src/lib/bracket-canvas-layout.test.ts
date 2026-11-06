@@ -40,15 +40,15 @@ const f4 = makeFixture({
 });
 
 describe('buildCanvasLayout — 4팀 + 3·4위전', () => {
-  // 입력 순서를 섞어도 열은 4강 > 결승 > 3·4위전이어야 한다.
+  // 입력 순서를 섞어도 열은 4강 > 3·4위전 > 결승이어야 한다.
   const layout = buildCanvasLayout({ groups: [third, final, semi], fixtures: [f4, f2, f3, f1], slots: [] });
   const node = (id: string) => layout.nodes.find((n) => n.fixtureId === id)!;
 
   it('단계 순서로 열을 만들고 x 를 열 폭+간격으로 늘린다', () => {
     expect(layout.columns.map((c) => [c.label, c.x])).toEqual([
       ['4강', 24],
-      ['결승', 328],
-      ['3·4위전', 632],
+      ['3·4위전', 328],
+      ['결승', 632],
     ]);
   });
 
@@ -57,15 +57,16 @@ describe('buildCanvasLayout — 4팀 + 3·4위전', () => {
     // 원천 연결 높이 144·324 의 평균 234 에서 칸 연결 높이 88 을 뺀다.
     expect(node('f3').y).toBe(158);
     expect(node('f4').y).toBe(158);
-    expect(node('f3').x).toBe(328);
+    expect(node('f3').x).toBe(632);
+    expect(node('f4').x).toBe(328);
   });
 
   it('승자·패자 연결선을 칸 오른쪽 가운데에서 대상 사이드 줄까지 꺾어 그린다', () => {
     const edge = (id: string) => layout.edges.find((e) => e.id === id)!;
     expect(layout.edges).toHaveLength(4);
-    expect(edge('f1->f3:HOME')).toMatchObject({ kind: 'WINNER', fromFixtureId: 'f1', toFixtureId: 'f3', side: 'HOME', path: 'M256 144 H292 V224 H328' });
-    expect(edge('f2->f3:AWAY').path).toBe('M256 348 H292 V268 H328');
-    expect(edge('f1->f4:HOME')).toMatchObject({ kind: 'LOSER', path: 'M256 144 H596 V224 H632' });
+    expect(edge('f1->f3:HOME')).toMatchObject({ kind: 'WINNER', fromFixtureId: 'f1', toFixtureId: 'f3', side: 'HOME', path: 'M256 144 H596 V224 H632' });
+    expect(edge('f2->f3:AWAY').path).toBe('M256 348 H596 V268 H632');
+    expect(edge('f1->f4:HOME')).toMatchObject({ kind: 'LOSER', path: 'M256 144 H292 V224 H328' });
   });
 
   it('전체 크기는 마지막 열과 가장 아래 칸에 여백을 더한 값이다', () => {
@@ -130,7 +131,7 @@ describe('buildCanvasLayout — 12강 부전승 대진', () => {
 });
 
 describe('buildCanvasLayout — 16강 대진', () => {
-  // 그룹을 일부러 섞어 넘겨도 열 순서는 sortOrder 가 아니라 단계(round16 > quarter > semi > final > third_place)를 따른다.
+  // 그룹을 일부러 섞어 넘겨도 열 순서는 sortOrder 가 아니라 단계(round16 > quarter > semi > third_place > final)를 따른다.
   const groups = [
     makeGroup({ id: 'g-t', name: '3·4위전', phase: 'third_place', sortOrder: 0 }),
     makeGroup({ id: 'g-f', name: '결승', phase: 'final', sortOrder: 1 }),
@@ -163,8 +164,8 @@ describe('buildCanvasLayout — 16강 대진', () => {
   });
   const layout = buildCanvasLayout({ groups, fixtures: [...r16, ...qf, ...sf, fin, third], slots: [] });
 
-  it('16강 열이 8강보다 앞에 오고 열 순서는 16강 > 8강 > 4강 > 결승 > 3·4위전이다', () => {
-    expect(layout.columns.map((c) => c.label)).toEqual(['16강', '8강', '4강', '결승', '3·4위전']);
+  it('16강 열이 8강보다 앞에 오고 열 순서는 16강 > 8강 > 4강 > 3·4위전 > 결승이다', () => {
+    expect(layout.columns.map((c) => c.label)).toEqual(['16강', '8강', '4강', '3·4위전', '결승']);
     const xs = layout.columns.map((c) => c.x);
     expect([...xs].sort((a, b) => a - b)).toEqual(xs);
   });

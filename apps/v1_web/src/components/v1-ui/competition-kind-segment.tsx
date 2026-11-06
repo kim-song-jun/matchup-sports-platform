@@ -1,3 +1,4 @@
+import { competitionDiscoveryHref, switchCompetitionKind, type CompetitionDiscoveryFilters } from '@/lib/competition-discovery';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 
 /**
@@ -23,6 +24,7 @@ const TABS: Array<{ kind: CompetitionKind; label: string }> = [
 
 interface CompetitionKindSegmentProps {
   active: CompetitionKind;
+  filters?: CompetitionDiscoveryFilters;
 }
 
 /**
@@ -51,7 +53,7 @@ interface CompetitionKindSegmentProps {
  * 현재 위치를 알린다(선택 상태를 색으로만 알리지 않는다 — 프로젝트 접근성 규칙).
  * 터치 타깃 44px 는 `size` 를 생략한 기본값(`'md'`)이 보장한다.
  */
-export function CompetitionKindSegment({ active }: CompetitionKindSegmentProps) {
+export function CompetitionKindSegment({ active, filters }: CompetitionKindSegmentProps) {
   return (
     <SegmentedTabs
       items={TABS.map(({ kind, label }) => ({
@@ -59,7 +61,7 @@ export function CompetitionKindSegment({ active }: CompetitionKindSegmentProps) 
         label,
         /* '전체' 는 쿼리 없는 `/tournaments` 로 보낸다 — 기본값이 `all` 이라 `?kind=all` 과
            같은 화면이고, **같은 화면에 주소가 둘이면 안 된다**(색인·공유 링크가 갈린다). */
-        href: kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`,
+        href: filters ? competitionDiscoveryHref(switchCompetitionKind(filters, kind), { cleared: filters.kind === 'tournament' && kind !== 'tournament' && (filters.genderCategory !== undefined || filters.format !== undefined || filters.feeMin !== undefined || filters.feeMax !== undefined) }) : kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`,
       }))}
       activeId={active}
       ariaLabel="대회 유형"

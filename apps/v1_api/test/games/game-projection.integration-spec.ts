@@ -15,9 +15,10 @@ import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const runId = randomUUID();
 const prefix = `task9:${runId}`;
 let tournamentOutboxId = '';

@@ -75,7 +75,7 @@ export function TeamMatchImagesField({ images, sport, onChange, onUpload, onUplo
 
   return (
     <div style={{ marginTop: 16 }}>
-      <p className="tm-text-caption">이미지는 선택 사항이에요. 한 장만 올리면 목록과 상세에 함께 사용하고, 없으면 종목별 기본 이미지를 보여줘요.</p>
+      <p className="tm-text-caption" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>이미지는 선택 사항이에요. 한 장만 올리면 목록과 상세에 함께 사용하고, 없으면 종목별 기본 이미지를 보여줘요.</p>
       <div className="tm-team-match-images-grid">
         {(['listImageUrl', 'imageUrl'] as const).map((field) => {
           const list = field === 'listImageUrl';

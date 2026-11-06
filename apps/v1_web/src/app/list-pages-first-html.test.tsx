@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Match, V1Sport, V1Team, V1TeamMatch } from '@/types/api';
-import { TEAM_LIST_SEED_PATH } from '@/lib/public-list-seed';
+import { MATCH_LIST_SEED_PATH, TEAM_LIST_SEED_PATH, TEAM_MATCH_LIST_SEED_PATH } from '@/lib/public-list-seed';
 import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
@@ -80,8 +80,8 @@ function pageOf(items: unknown[]) {
 /** 목록 경로마다 한 항목짜리 첫 페이지, 마스터 종목은 풋살 하나. */
 function healthyApi(path: string): Response {
   if (path === '/master/sports') return envelope([FUTSAL]);
-  if (path === '/matches') return envelope(pageOf([CLOSED_MATCH, MATCH]));
-  if (path === '/team-matches') return envelope(pageOf([TEAM_MATCH]));
+  if (path === MATCH_LIST_SEED_PATH) return envelope(pageOf([CLOSED_MATCH, MATCH]));
+  if (path === TEAM_MATCH_LIST_SEED_PATH) return envelope(pageOf([TEAM_MATCH]));
   if (path === TEAM_LIST_SEED_PATH || path.startsWith('/teams?sportId=sport-futsal-uuid&')) {
     return envelope(pageOf([TEAM]));
   }
@@ -163,10 +163,10 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
     expect(html).toContain('href="/matches/match-1"');
     expect(html).toContain('sportId=sport-futsal-uuid');
     expect(html).not.toContain('tm-skeleton-page');
-    // ItemList 는 카드와 1:1 — 같은 순서(모집 중 먼저)·같은 상세 URL·같은 이름.
-    expect(detailPaths(html, '/matches')).toEqual(['/matches/match-1', '/matches/match-0']);
+    // ItemList 는 카드와 1:1 — 같은 순서·같은 상세 URL·같은 이름. 순서는 서버가 정하고(상태 묶음) 화면은 다시 정렬하지 않는다.
+    expect(detailPaths(html, '/matches')).toEqual(['/matches/match-0', '/matches/match-1']);
     expect(ldPaths(html)).toEqual(detailPaths(html, '/matches'));
-    expect(itemList(html)?.map((entry) => entry.name)).toEqual(['금요일 저녁 풋살 한 판', '마감된 수요일 풋살']);
+    expect(itemList(html)?.map((entry) => entry.name)).toEqual(['마감된 수요일 풋살', '금요일 저녁 풋살 한 판']);
   });
 
   it('/team-matches 는 첫 페이지 팀매치와 상세 링크, 실제 종목 ID 칩을 그린다', async () => {
@@ -228,7 +228,7 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
 
   it('/matches 는 필터가 걸려도 전체 목록 쿼리용 seed 를 받는다', async () => {
     await serverHtml(MatchesPage, 'regionId=region-1');
-    expect(requested).toContain('/matches');
+    expect(requested).toContain(MATCH_LIST_SEED_PATH);
   });
 });
 

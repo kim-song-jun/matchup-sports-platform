@@ -12,11 +12,13 @@ import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/
 import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { isResumableStatePriorityCursor, paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
+import { groupIdsByListStatus, LIST_STATUS_GROUPS, listGroupOrderBy, type ListStatusGroup } from '../common/pagination/list-status-groups';
+import { matchApiStatus, matchHostParticipates, matchListGroup, matchParticipantCount } from './match-list-group';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
-import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
+import { formatLevelRange, levelCodeConstraints, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ApproveMatchApplicationDto,
   ChangeMatchParticipantDto,
@@ -62,38 +64,52 @@ export class MatchesService {
     const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
     const fullMatchIds = query.recruitingOnly ? await this.findFullRecruitingMatchIds(now) : [];
     const where = this.listWhere(query, now, fullMatchIds);
-    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기(진행 중·종료
-    // 확인 중·최근 완료)를 그 뒤에 최근 것부터. startAt asc 한 줄로 두면 기본 목록에 함께 실리는
-    // 지난 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는 "시작 전/후"를 가를 수 없어
-    // 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>"). '최신순'을 고른 경우만 등록 최신순이다.
-    const groups: Record<string, Pick<Prisma.V1MatchFindManyArgs, 'where' | 'orderBy'>> = {
-      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-    };
+    // 묶음 순서(list-status-groups.ts): 진행 중 → 신청 가능 → 경기 예정 → 신청 마감 → 끝난 경기.
+    // 개인 매치 상태는 인원으로 정해져 DB 조건으로 가를 수 없다 — 행마다 카드와 같은 기준(matchListGroup)으로 묶고,
+    // 묶음 안 순서만 DB 정렬로 읽는다. 커서는 "<묶음>:<id>@<기준 시각>"이다.
+    // ponytail: 공개 범위 전체의 상태·참가자를 매 요청 읽는다 — 공개 목록이 수천 건을 넘으면 묶음을 컬럼으로 저장하는 쪽으로.
+    const [candidates, counts] = await Promise.all([
+      this.prisma.v1Match.findMany({
+        where,
+        select: {
+          id: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+          deadlineAt: true,
+          maxParticipants: true,
+          proceedConfirmedAt: true,
+          participants: { select: { status: true, role: true } },
+        },
+      }),
+      query.includeFacets && !isResumableStatePriorityCursor(cursor, LIST_STATUS_GROUPS)
+        ? this.countListFacets(query, now, fullMatchIds)
+        : Promise.resolve(null),
+    ]);
+    const idsByGroup = groupIdsByListStatus(candidates, (row) => matchListGroup(row, splitAt));
     const include = this.matchInclude(user);
-    const stateGroups = query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'];
-    // 해석되지 않는 커서는 페이지네이터가 첫 그룹부터 다시 읽으므로 첫 페이지로 본다.
-    const isFirstPage = !isResumableStatePriorityCursor(cursor, stateGroups);
-    const [{ items: pageItems, hasNext, nextCursor }, counts] = await Promise.all([paginateByStatePriority({
-      stateGroups,
+    const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
+      stateGroups: LIST_STATUS_GROUPS,
       limit,
       cursor,
-      fetchGroup: (group, page) =>
-        this.prisma.v1Match
+      fetchGroup: (group, page) => {
+        const ids = idsByGroup.get(group as ListStatusGroup) ?? [];
+        if (ids.length === 0) return Promise.resolve([]);
+        return this.prisma.v1Match
           .findMany({
-            ...groups[group],
+            where: { id: { in: ids } },
+            orderBy: listGroupOrderBy(group as ListStatusGroup, query.sort),
             ...resumeAfterCursorArgs(page.cursorId, page.take),
             include,
           })
-          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    }), query.includeFacets && isFirstPage ? this.countListFacets(query, now, fullMatchIds) : Promise.resolve(null)]);
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group })));
+      },
+    });
 
     return {
       items: pageItems.map((match) => this.toListItem(match, user)),
-      // 최신순은 구간이 없어 기준 시각이 필요 없다.
       pageInfo: {
-        nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
+        nextCursor: encodeReferenceTimeCursor(nextCursor, splitAt),
         hasNext,
         // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 해석되지 않는 커서는 첫 페이지로 읽는다.
         ...(counts ? { totalCount: counts.totalCount } : {}),
@@ -159,9 +175,12 @@ export class MatchesService {
               { title: { contains: query.query, mode: 'insensitive' } },
               { description: { contains: query.query, mode: 'insensitive' } },
               { placeName: { contains: query.query, mode: 'insensitive' } },
+              // 검색창 placeholder 가 "지역"을 약속한다 — 팀매치 검색과 같은 범위로 지역명도 훑는다.
+              { region: { name: { contains: query.query, mode: 'insensitive' } } },
             ],
           } satisfies Prisma.V1MatchWhereInput]
         : []),
+      ...levelCodeConstraints(parseLevelCodes(query.levelCodes)),
     ];
     return {
       deletedAt: null,
@@ -213,7 +232,6 @@ export class MatchesService {
         ? { region: { OR: [{ id: query.regionId }, { parentId: query.regionId }] } }
         : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
-      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(constraints.length ? { AND: constraints } : {}),
     };
   }
@@ -1138,11 +1156,20 @@ export class MatchesService {
       throw stateConflict(getReasonMessage(reasonCode), reasonCode);
     }
 
-    const existing = match.applications[0] ?? null;
     const application = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
-      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      const current = await tx.v1Match.findFirst({
+        where: { id: match.id, deletedAt: null },
+        include: this.matchInclude(user),
+      });
       if (!current || current.status !== 'recruiting' || current.startAt <= new Date() || (current.deadlineAt && current.deadlineAt <= new Date())) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
+      // Another request may have committed an application or participant while this request
+      // waited for the match lock. Recheck the same eligibility contract against that state.
+      const currentReason = this.getEligibilityReason(current, this.getViewer(current, user).state);
+      if (currentReason !== 'OK') {
+        throw stateConflict(getReasonMessage(currentReason), currentReason);
+      }
+      const existing = current.applications[0] ?? null;
       const nextApplication = existing
         ? await (async () => {
             const transition = await tx.v1MatchApplication.updateMany({
@@ -1700,24 +1727,15 @@ export class MatchesService {
   }
 
   private getParticipantCount(match: { participants: Array<Pick<MatchWithRelations['participants'][number], 'status' | 'role'>> }, includeNoShow = false) {
-    return match.participants.filter((participant) => participant.status === 'active' || participant.status === 'completed' || (includeNoShow && participant.status === 'no_show')).length;
+    return matchParticipantCount(match.participants, includeNoShow);
   }
 
   private getHostParticipates(match: { participants: Array<Pick<MatchWithRelations['participants'][number], 'status' | 'role'>> }) {
-    return match.participants.some(
-      (participant) => participant.role === 'host' &&
-        (participant.status === 'active' || participant.status === 'completed'),
-    );
+    return matchHostParticipates(match.participants);
   }
 
   private getApiStatus(match: V1Match, participantCount: number, hostParticipantCount = 0) {
-    if (!['recruiting', 'closed'].includes(match.status)) return match.status;
-    const count = participantCount;
-    const canProceed = count > hostParticipantCount && (Boolean(match.proceedConfirmedAt) || count >= match.maxParticipants);
-    if (match.startAt <= new Date()) return canProceed ? ((match.endAt ?? match.startAt) <= new Date() ? 'completion_pending' : 'in_progress') : 'on_hold';
-    if (match.proceedConfirmedAt && count > hostParticipantCount) return 'scheduled';
-    if ((match.deadlineAt && match.deadlineAt <= new Date()) && !canProceed) return 'on_hold';
-    return match.status;
+    return matchApiStatus(match, participantCount, hostParticipantCount);
   }
 
   private getDisplayState(match: MatchWithRelations) {

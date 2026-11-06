@@ -23,17 +23,17 @@ function database(initialStatus: string, requiresExplicitStart = false) {
 }
 
 describe('new league explicit start', () => {
-  it('creates a closed league at the shared independent/series creation boundary', async () => {
+  it('creates a draft (초안) league at the shared independent/series creation boundary', async () => {
     const db = database('draft');
     await createLeagueMirrorWithRosterSchedule(db.client, {
       id: 'league-1', kind: 'regular_league', status: 'draft', title: '새 시즌', sportId: 'sport-1',
     }, { leagueId: 'league-1', startsOn: new Date('2030-01-01') });
-    expect(db.row.status).toBe('closed');
+    expect(db.row.status).toBe('draft');
     expect(db.row.requiresExplicitStart).toBe(true);
     await expect(promoteLeagueWhenSlotsFilledInTx(db.client, 'league-1')).resolves.toBe(false);
-    expect(db.row.status).toBe('closed');
+    expect(db.row.status).toBe('draft');
     await expect(promoteLeagueOnGameActivityInTx(db.client, 'league-1', 'result_confirmed')).resolves.toBe(false);
-    expect(db.row.status).toBe('closed');
+    expect(db.row.status).toBe('draft');
     expect(db.tx.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 

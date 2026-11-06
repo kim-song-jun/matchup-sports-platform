@@ -4,6 +4,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * `listLeagueClaimableParticipants` (2026-08-25, claim 의 리그 확장) 의 계약 3개를
@@ -34,7 +35,16 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     participants?: unknown[];
     sides?: unknown[];
     linked?: unknown[];
+    /** Kickoff (and so the derived lineup publication) is already past unless stated otherwise. */
+    lineupPublished?: boolean;
   }) {
+    const bySide = <T extends { sideId?: string; invalidatedAt?: Date | null }>(
+      rows: T[],
+      where: { sideId?: { in: string[] }; invalidatedAt?: null },
+    ) => rows.filter((row) =>
+      (where.sideId === undefined || where.sideId.in.includes(row.sideId as string))
+      && (where.invalidatedAt !== null || row.invalidatedAt === null || row.invalidatedAt === undefined),
+    );
     const prisma = {
       v1TeamMatch: {
         findFirst: jest.fn().mockResolvedValue(overrides.teamMatch ?? null),
@@ -50,10 +60,12 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
             tournamentId: 'league-1',
             leagueId: 'league-1',
             fieldId: null,
+            startAt: new Date(Date.now() + (overrides.lineupPublished === false ? 1 : -1) * 24 * 60 * 60 * 1000),
             tournament: { kind: 'regular_league' },
             league: { kind: 'regular_league' },
             tournamentDetails: null,
           },
+          visibilityPolicy: null,
         }),
       },
       v1AdminUser: {
@@ -67,10 +79,10 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
         findMany: jest.fn().mockResolvedValue(overrides.memberships ?? []),
       },
       v1GameLineup: {
-        findMany: jest.fn().mockResolvedValue(overrides.lineups ?? []),
+        findMany: jest.fn(async ({ where }) => bySide((overrides.lineups ?? []) as { sideId?: string; invalidatedAt?: Date | null }[], where)),
       },
       v1GameParticipant: {
-        findMany: jest.fn().mockResolvedValue(overrides.participants ?? []),
+        findMany: jest.fn(async ({ where }) => bySide((overrides.participants ?? []) as { sideId?: string }[], where)),
       },
       v1GameSide: {
         findMany: jest.fn().mockResolvedValue(overrides.sides ?? [{ id: 's-1', sideKey: 'HOME', displayNameSnapshot: '블루팀' }]),
@@ -86,6 +98,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       prisma as unknown as PrismaService,
       {} as OperationAuditWriterService,
       {} as GameTakeoverService,
+      new TournamentStaffAccessService(prisma as unknown as PrismaService),
     );
     return { service, prisma };
   }
@@ -192,6 +205,35 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
         { participantId: 'p-current', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
     });
+  });
+
+  it('팀 교체로 무효화된 제출본 대신 현재 유효한 초안의 후보만 보여준다', async () => {
+    const invalidatedAt = new Date('2026-10-26T00:00:00.000Z');
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 11 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [
+        { id: 'lineup-old', sideId: 's-1', revision: 1, state: 'SUBMITTED', invalidatedAt },
+        { id: 'lineup-current', sideId: 's-1', revision: 2, state: 'DRAFT', invalidatedAt: null },
+      ],
+      participants: [
+        { id: 'p-old-team', sideId: 's-1', lineupId: 'lineup-old', displayNameSnapshot: '이전 팀 선수', jerseyNumber: 7 },
+        { id: 'p-current-team', sideId: 's-1', lineupId: 'lineup-current', displayNameSnapshot: '현재 팀 선수', jerseyNumber: 7 },
+      ],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
+      gameId: 'game-1',
+      version: 11,
+      rosterCount: 1,
+      rosterSubmitted: false,
+      participants: [
+        { participantId: 'p-current-team', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '현재 팀 선수', jerseyNumber: 7 },
+      ],
+    });
+    expect(prisma.v1GameLineup.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ invalidatedAt: null }),
+    }));
   });
 
 
@@ -304,7 +346,10 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
         teamMatch: {
           id: 'tm-1', deletedAt: null, hostTeamId: 'team-host', approvedApplicantTeamId: 'team-away',
           tournamentId: null, leagueId: null, fieldId: null, tournament: null, league: null, tournamentDetails: null,
+          // 경기 뒤 기록 연결 — 킥오프가 지나 상대 쪽(용병) 명단도 공개돼 있다.
+          startAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
+        visibilityPolicy: null,
       });
       return made.service.listTeamMatchClaimableParticipants(user, 'tm-1');
     }
@@ -339,6 +384,40 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
 
     await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).rejects.toMatchObject({
       response: { code: 'GAME_SIDE_CONTEXT_MISSING' },
+    });
+  });
+
+  describe('상대 팀 후보는 명단 공개 뒤에만(MU-3)', () => {
+    const sides = [
+      { id: 's-home', teamId: 'team-host', sideKey: 'HOME', displayNameSnapshot: '마포 FC' },
+      { id: 's-away', teamId: 'team-away', sideKey: 'AWAY', displayNameSnapshot: '합정 유나이티드' },
+    ];
+    const lineups = [
+      { id: 'l-home', sideId: 's-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+      { id: 'l-away', sideId: 's-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+    ];
+    const participants = [
+      { id: 'p-home', sideId: 's-home', lineupId: 'l-home', displayNameSnapshot: '김민준', jerseyNumber: 7 },
+      { id: 'p-away', sideId: 's-away', lineupId: 'l-away', displayNameSnapshot: '이서준', jerseyNumber: 9 },
+    ];
+    const claimable = (memberships: unknown[], lineupPublished: boolean) =>
+      makeService({ teamMatch: { game: { id: 'game-1', version: 4 } }, memberships, lineups, participants, sides, lineupPublished })
+        .service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1');
+
+    it('공개 전에는 내 팀 쪽 후보와 인원만 돌려준다', async () => {
+      const result = await claimable([{ teamId: 'team-host', role: 'member' }], false);
+      expect(result.participants.map((participant) => participant.participantId)).toEqual(['p-home']);
+      expect(result.rosterCount).toBe(1);
+    });
+
+    it('공개 뒤에는 상대 팀 쪽도 고를 수 있다 — 상대 팀에 용병으로 간 팀원이 자기 이름을 찾는 경로', async () => {
+      const result = await claimable([{ teamId: 'team-host', role: 'member' }], true);
+      expect(result.participants.map((participant) => participant.participantId)).toEqual(['p-home', 'p-away']);
+    });
+
+    it('두 팀 모두의 멤버면 공개 전에도 양쪽을 본다', async () => {
+      const result = await claimable([{ teamId: 'team-host', role: 'member' }, { teamId: 'team-away', role: 'member' }], false);
+      expect(result.participants.map((participant) => participant.participantId)).toEqual(['p-home', 'p-away']);
     });
   });
 });

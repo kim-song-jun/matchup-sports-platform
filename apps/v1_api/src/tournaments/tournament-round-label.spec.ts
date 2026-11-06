@@ -25,6 +25,8 @@ describe('competitionMatchLabel', () => {
   it.each<[string, CompetitionMatchLabelInput, string]>([
     ['조 + 라운드(W9 실측: 2팀 조 2회전)', { groupName: 'A조', round: 'league_r2', legNumber: 2 }, 'A조 · 조별리그 2라운드'],
     ['조 이름이 머리에 있는 묶음 안', { groupName: 'A조', round: 'league_r2', legNumber: 2, withinGroup: true }, '조별리그 2라운드'],
+    ['리그 방식 대회(조 하나 "리그")는 조별리그가 아니다(MD-QA #171)', { groupName: '리그', round: 'league_r1' }, '리그 1라운드'],
+    ['리그 방식 대회 묶음 안', { groupName: '리그', round: 'league_r3', withinGroup: true }, '3라운드'],
     ['조 없는 결선', { groupName: null, round: 'semi', legNumber: 1 }, '4강'],
     ['결선 조(단계 이름이 곧 조 이름)', { groupName: '4강', round: '4강', legNumber: 1 }, '4강'],
     ['16강은 결선이라 조 이름을 붙이지 않는다', { groupName: '16강', round: 'round16' }, '16강'],

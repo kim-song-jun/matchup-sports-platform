@@ -16,7 +16,7 @@ type Props = {
 
 export function ByeSideControl(props: Props) {
   const { fixture, slots } = props;
-  const slot = slots.find((row) => row.kind === 'BYE' && (row.id === fixture.homeSlotId || row.id === fixture.awaySlotId));
+  const slot = slots.find((row) => (row.kind === 'BYE' || row.byeSortOrder != null) && (row.id === fixture.homeSlotId || row.id === fixture.awaySlotId));
   if (!slot || fixture.bracketSources?.length !== 1) return null;
   return <ConnectedByeSideControl {...props} slot={slot} />;
 }

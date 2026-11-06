@@ -59,7 +59,7 @@ const adminMe: V1AdminMe = {
 function roster(nickname: string | null): V1AdminTournamentRosterResponse {
   const player: V1AdminTournamentPlayer = {
     id: 'player-parent-lifecycle', userId: 'member', realName: '홍길동', nickname,
-    jerseyNumber: 7, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
+    jerseyNumber: 7, goalkeeper: false, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
     eligibilityStatus: 'needs_review', eligibilityNote: null,
     addedAt: '2026-10-13T00:00:00Z', removedAt: null, phone: null, isTeamCaptain: false,
   };

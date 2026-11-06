@@ -138,4 +138,25 @@ describe('NotificationsPageView — 상세 시트', () => {
     fireEvent.click(card('리그 명단이 자동 확정됐어요'));
     expect(screen.getByRole('dialog')).toHaveTextContent('리그 알림 · 7월 26일 02:10');
   });
+
+  it('운영자 번호 해제 알림은 시스템 알림으로 보이고, 시트의 버튼이 휴대폰 인증 화면으로 보낸다', async () => {
+    const onNavigate = vi.fn();
+    const released: NotificationModel = {
+      ...notification,
+      id: 'n-phone-released',
+      type: 'system',
+      title: '휴대폰 번호가 해제됐어요',
+      body: '운영자가 이 계정의 휴대폰 번호를 해제했어요. 계정은 그대로이고, 휴대폰 번호를 다시 인증해 주세요.',
+      href: '/my/phone-verify?from=%2Fnotifications',
+      actionLabel: '보기',
+    };
+    renderWithClient(<NotificationsPageView model={makeModel({ notifications: [released], onOpen: vi.fn(), onNavigate })} />);
+
+    expect(screen.getByRole('button', { name: /휴대폰 번호가 해제됐어요/ })).toHaveAccessibleName(/^시스템 알림/);
+    fireEvent.click(screen.getByRole('button', { name: /휴대폰 번호가 해제됐어요/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('휴대폰 번호를 다시 인증해 주세요.');
+    fireEvent.click(screen.getByRole('button', { name: '보기' }));
+
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith(released));
+  });
 });

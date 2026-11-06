@@ -272,6 +272,7 @@ function buildFakeAccessService(
         return null;
       },
     },
+    v1TeamMatch: { async findMany() { return []; } },
     v1TournamentStaffAssignment: {
       async findMany() {
         return assignments.map((assignment, index) => ({
@@ -1095,6 +1096,45 @@ describe('PublicTournamentRecordsService.getMatch -- periodCount (정규 피리�
   });
 });
 
+describe('PublicTournamentRecordsService.getMatch -- periodMinutes (정규 피리어드별 길이)', () => {
+  const full = { code: 'FULL', label: '경기', durationMinutes: 40, extraTime: false };
+  const half = (code: string, durationMinutes: number) => ({ code, label: code, durationMinutes, extraTime: false });
+  const periodMinutesFor = async (configPeriods: unknown) => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      configPeriods,
+      periods: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).periodMinutes;
+  };
+
+  it('단판 설정이면 그 길이 하나다', async () => {
+    expect(await periodMinutesFor([full])).toEqual([40]);
+  });
+
+  it('전·후반 설정이면 설정 순서대로 두 길이다 — 전반과 후반이 달라도 그대로 싣는다', async () => {
+    expect(await periodMinutesFor([half('FIRST_HALF', 15), half('SECOND_HALF', 15)])).toEqual([15, 15]);
+    expect(await periodMinutesFor([half('FIRST_HALF', 10), half('SECOND_HALF', 15)])).toEqual([10, 15]);
+  });
+
+  it('연장 피리어드는 정규 길이에 넣지 않는다', async () => {
+    const extra = { code: 'ET', label: '연장', durationMinutes: 5, extraTime: true };
+    expect(await periodMinutesFor([full, extra])).toEqual([40]);
+    expect(await periodMinutesFor([half('H1', 20), half('H2', 20), extra])).toEqual([20, 20]);
+  });
+
+  it('설정 스냅샷이 없거나 길이를 읽을 수 없으면 null이라 화면은 경기 방식 줄을 그리지 않는다', async () => {
+    expect(await periodMinutesFor(undefined)).toBeNull();
+    expect(await periodMinutesFor('broken')).toBeNull();
+    expect(await periodMinutesFor({ count: 2 })).toBeNull();
+    expect(await periodMinutesFor([half('H1', 20), { ...half('H2', 20), durationMinutes: 0 }])).toBeNull();
+  });
+});
+
 /**
  * 대회 경기 기록 실명 표시 정책(2026-08-18 사용자 결정) -- 위 "event participant
  * identity" 블록은 "이름이 보이는가"(동의 게이팅)만 다뤘다. 여기서는 그 게이트를
@@ -1178,7 +1218,7 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
     expect(result.events).toEqual([expect.objectContaining({ participantName: '닉네임러' })]);
   });
 
-  // 탈퇴 회원은 nickname이 `deleted_<8자>`(admin.service.ts buildDeletedNickname)라
+  // 탈퇴 회원은 nickname이 `deleted_<8자>`(users/final-account-deletion.ts)라
   // 화면에 그대로 내보낼 수 없다. 탈퇴 시 displayName만 '탈퇴 회원'으로 덮어쓰므로
   // 이 경우에만 displayName을 쓴다.
   it('탈퇴 회원은 deleted_ 닉네임 대신 익명화된 displayName을 보여준다', async () => {

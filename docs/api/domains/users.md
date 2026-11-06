@@ -25,6 +25,14 @@
 | `POST` | `/api/v1/auth/logout` | Controller guard 없음 | - | 세션 로그아웃 응답 |
 | `POST` | `/api/v1/me/withdrawal-request` | Required | `WithdrawalRequestDto` | 탈퇴 대기 요청 |
 
+## 경기 기록 공개 설정
+
+`GET /me/record-consent`와 `PUT /me/record-consent`는 사용자 단위 경기 기록 공개 상태를 조회·변경한다. 저장 payload는 `{ granted: boolean, policyHash: string }`이며 active 계정만 변경할 수 있다. `granted:false`는 `REVOKED`로 저장된다.
+
+신규 가입 완료(이메일·카카오·Apple 및 소셜 프로필 입력 미루기)는 미설정 상태를 기본 공개로 초기화한다. 기존 회원도 마이그레이션에서 활성·가입 완료·미설정인 경우에만 초기화한다. 기본값 출처는 `policyHash = v1-public-record-default-2`로 명시적 선택과 구분한다. 직접 비공개를 선택한 기존 행은 바꾸지 않는다.
+
+응답의 `hasResponded`는 기존 필드명이며 **설정 행 존재 여부**다(정책 기본값 초기화 포함). 명시적 동의 증거로 사용하지 않는다. `pendingRecordCount`는 비공개일 때 현재 공개 가능한 연결 경기 수이며, 공개 상태에서는 0이다. 기록 공개는 실명 공개와 별개이고 개별 경기 숨김·신원 연결·경기/공식 결과 가시성 규칙을 우회하지 않는다.
+
 ## 프로필 조회·수정
 
 ### `GET /me/profile`
@@ -136,7 +144,9 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 - DB commit 이후 연결 해제가 실패하면 원인을 오류 로그에 남기고 이미 확정된 탈퇴 상태와 성공 응답은 보존한다. 연결 인증 중 탈퇴가 진행되는 경우를 막기 위해 user-room 합류 직후에도 최신 계정 상태를 확인한다.
 - 웹 클라이언트는 성공 즉시 세션 힌트·사용자 캐시·소켓을 정리하고 기기의 Push 구독 해제를 시작한다. 서버 트랜잭션이 웹 Push 행을 이미 삭제했으므로 브라우저는 추가 삭제 API를 호출하지 않는다. 구독 해제가 끝나면 `/login` 문서를 새로 열며, 응답이 멈추면 1.5초 타이머가 이동을 실행한다. 이동까지 재요청 버튼은 잠기고, 요청 중 화면을 떠나도 성공 정리는 이어진다. 로컬 정리 실패는 경고로 기록하며 서버의 성공 결과를 탈퇴 실패로 바꾸지 않는다. 로그인 진입 시 만료된 세션을 정리하다 저장소 오류가 발생해도 경고를 기록한 뒤 로그인 폼을 표시한다.
 - 탈퇴 응답이 유실되거나 5xx이면 1.5초 제한의 실제 세션 확인을 수행한다. 재시도가 계정 이용 제한 403 `PERMISSION_DENIED`로 거부되어도 같은 확인을 수행하여, 첫 확인 이후 늦게 commit된 탈퇴를 처리한다. 유효 세션이면 기존 계정 정보와 오류·재시도 동선을 유지한다. 미인증 401 또는 계정 이용 제한 403 `PERMISSION_DENIED`가 확인되면 제한 시간 안에 로그아웃을 시도하고 브라우저를 게스트 상태로 정리한다. 이 경로는 탈퇴 상태를 확인했다고 표시하지 않는다. 결과를 확인하지 못하면 경고를 기록하고 기존 세션을 보존한다. 로그인 화면은 해당 계정 제한 코드에서도 폼을 표시하되 가입 미완료·약관 재동의 등 다른 403 상태는 구분한다.
-- 관리자 최종 삭제는 FCM/APNs 토큰과 웹 Push endpoint를 영구 제거하고, 프로필의 실명·생년월일·성별·표시 지역 및 활동 지역·선호 종목·검색 기록·인증 토큰을 삭제 또는 비식별화한다. 완료 경기·결제·분쟁·감사 기록처럼 별도 보관 근거가 있는 데이터는 해당 정책을 따른다.
+- 관리자 최종 삭제 전에는 본인이 `POST /api/v1/auth/withdrawal/cancel`로 요청을 철회할 수 있다(로그인 자격을 확인한 거절 응답의 `details.withdrawalCancelToken`, 10분). 철회는 계정을 `active`로 돌리고 새 세션을 발급하지만, 요청 때 정리된 팀 멤버십·로스터·Push 등록은 되돌리지 않는다. 계약은 [Auth](./auth.md)의 "Taking a withdrawal back"에 있다.
+- 탈퇴 요청 후 30일(`WITHDRAWAL_GRACE_DAYS`)이 지나면 서버가 계정을 자동으로 최종 삭제한다(`WithdrawalFinalizationService`, 매시간 실행). 유예 기산 시각은 `targetType=user`, `toStatus=withdrawal_pending`인 가장 최근 `V1StatusChangeLog`이고, 철회 뒤 다시 신청하면 새 신청부터 센다. 계정 행을 `FOR UPDATE`로 잠근 뒤 상태·유예 경과를 다시 확인하므로 API 인스턴스가 여러 개여도 한 번만 삭제한다. 삭제는 운영자 삭제와 같은 코어를 쓰며 상태 로그의 `actorType=system`, `reason=withdrawal_grace_elapsed`로 남는다. 한 번에 최대 20건(`MAX_FINALIZATIONS_PER_RUN`)까지만 삭제하고 남은 기한 경과 계정 수는 보고에 담아 다음 실행으로 넘긴다. 활성 운영자 기록이 있거나, 보관·삭제되지 않은 팀(정지 포함)의 소유자·매니저이거나, 신청 기록이 없거나, 삭제 중 오류가 난 계정은 삭제하지 않고 건너뛴 뒤 운영 Slack(`WITHDRAWAL_FINALIZATION_REPORT` 아웃박스 이벤트)으로 사용자 id와 사유만 알린다. 같은 결과는 하루에 한 번만 알린다.
+- 관리자 최종 삭제는 FCM/APNs 토큰과 웹 Push endpoint를 영구 제거하고, 프로필의 실명·생년월일·성별·표시 지역 및 활동 지역·선호 종목·검색 기록·인증 토큰·카카오/Apple 가입 중 임시 보관한 프로필(`draftJson`)을 삭제 또는 비식별화한다. 완료 경기·결제·분쟁·감사 기록처럼 별도 보관 근거가 있는 데이터는 해당 정책을 따른다.
 
 ## Permission / Error Rules
 

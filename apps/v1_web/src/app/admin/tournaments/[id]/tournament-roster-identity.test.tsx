@@ -35,7 +35,7 @@ const otherRegistration: V1AdminTournamentRegistration = {
 function player(overrides: Partial<V1AdminTournamentPlayer> = {}): V1AdminTournamentPlayer {
   return {
     id: 'player-member', userId: 'member', realName: '홍길동', nickname: '번개 선수',
-    jerseyNumber: 0, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
+    jerseyNumber: 0, goalkeeper: false, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
     eligibilityStatus: 'needs_review', eligibilityNote: null,
     addedAt: '2026-10-13T00:00:00Z', removedAt: null, phone: null, isTeamCaptain: false,
     ...overrides,
@@ -454,7 +454,7 @@ describe('MD-QA #140 관리자 명단 실명·닉네임 A안', () => {
     expect(within(rows[1]).getByText('홍길동')).toBeInTheDocument();
     expect(within(rows[1]).getByText('닉네임 번개 선수')).toBeInTheDocument();
     expect(within(rows[1]).getByLabelText('등번호 0번')).toBeInTheDocument();
-    expect(rows[1]).toHaveTextContent('1995-03-15 · 남성');
+    expect(rows[1]).toHaveTextContent('1995.03.15 · 남성');
     await user.selectOptions(within(rows[1]).getByRole('combobox', { name: '홍길동 자격 상태' }), 'pro');
     await waitFor(() => expect(eligibilityRequests).toEqual([{ playerId: 'player-member', body: { eligibilityStatus: 'pro' } }]));
     await user.click(within(rows[1]).getByRole('button', { name: '홍길동 선수를 명단에서 제외' }));

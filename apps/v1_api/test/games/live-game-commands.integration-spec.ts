@@ -9,6 +9,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   platformOps: '92000000-0000-4000-8000-000000000001',
@@ -27,7 +28,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -63,7 +64,14 @@ async function captureFailure(operation: () => Promise<unknown>): Promise<unknow
 
 async function grantTakeover(gameId: string, userId: string, clientInstanceId = 'task20-client') {
   return (
-    await service.requestTakeover(authUser(userId), gameId, { clientInstanceId, lastSequence: 0 })
+    await service.requestTakeover(authUser(userId), gameId, {
+      clientInstanceId,
+      lastSequence: 0,
+      // These integration scenarios intentionally hand the same game to a
+      // different operator. Mirror the confirmation-backed UI request instead
+      // of relying on the retired silent takeover behavior.
+      force: true,
+    })
   ).takeoverToken;
 }
 
@@ -92,6 +100,11 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
           sourceParticipantId: `${fixtureId}-home-player-1`,
           sideKey: V1GameSideKey.HOME,
           displayNameSnapshot: 'Task 20 Host Scorer',
+        },
+        {
+          sourceParticipantId: `${fixtureId}-away-player-1`,
+          sideKey: V1GameSideKey.AWAY,
+          displayNameSnapshot: 'Task 20 Opponent Player',
         },
       ],
     };
@@ -381,6 +394,7 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     const grant = await service.requestTakeover(authUser(ids.platformOps), liveGameId, {
       clientInstanceId: 'ops-client',
       lastSequence: 0,
+      force: true,
     });
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: liveGameId } });
     const appended = await service.appendEvent(authUser(ids.platformOps), liveGameId, 'task20-ops-token', {
@@ -782,7 +796,10 @@ describe('TEAM_MATCH sourced games allow lifecycle commands other than end, host
         { sideKey: V1GameSideKey.HOME, teamId: tmIds.hostTeam, displayNameSnapshot: 'T3 TM Command Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: tmIds.opponentTeam, displayNameSnapshot: 'T3 TM Command Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 't3-team-match-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'T3 Host Player' },
+        { sourceParticipantId: 't3-team-match-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'T3 Opponent Player' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(

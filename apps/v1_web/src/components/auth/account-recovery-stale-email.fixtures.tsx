@@ -73,8 +73,10 @@ export function installDeferredEmailFlow({ holdFirstConfirmation = false } = {})
 }
 
 export async function startEmailVerification(email = RECOVERY_EMAIL) {
+  if (!screen.queryByLabelText('이메일')) fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
   fireEvent.change(screen.getByLabelText('이메일'), { target: { value: email } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
 }

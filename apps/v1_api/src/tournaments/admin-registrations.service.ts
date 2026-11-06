@@ -58,7 +58,7 @@ export class AdminRegistrationsService {
   ) {}
 
   async list(user: V1AuthUser, tournamentId: string, query: AdminRegistrationListQueryDto) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const limit = query.limit ?? 20;
 
     // 대회 존재 여부 간단 확인 (deleted 포함 어드민은 볼 수 있어야 함).
@@ -118,12 +118,12 @@ export class AdminRegistrationsService {
   }
 
   async confirmPayment(user: V1AuthUser, registrationId: string, dto: AdminConfirmPaymentDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const registration = await this.loadRegistration(registrationId);
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
-      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId }, tx);
       const current = await tx.v1TournamentRegistration.findUnique({
         where: { id: registrationId, tournamentId: registration.tournamentId },
       });
@@ -192,7 +192,7 @@ export class AdminRegistrationsService {
   }
 
   async confirm(user: V1AuthUser, registrationId: string, dto: AdminConfirmRegistrationDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const registration = await this.loadRegistration(registrationId);
 
     // 멱등: 이미 목표 상태이면 alreadyProcessed 반환.
@@ -213,7 +213,7 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       // 확정·대기 승격도 제출/직접 추가와 같은 행을 먼저 잠가 마지막 자리를 직렬화한다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
-      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId }, tx);
       const current = await tx.v1TournamentRegistration.findUnique({
         where: { id: registrationId, tournamentId: registration.tournamentId },
       });
@@ -331,7 +331,7 @@ export class AdminRegistrationsService {
   }
 
   async cancel(user: V1AuthUser, registrationId: string, dto: AdminCancelRegistrationDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const registration = await this.loadRegistration(registrationId);
 
     if (!ADMIN_CANCELLABLE_STATUSES.includes(registration.status)) {
@@ -434,7 +434,7 @@ export class AdminRegistrationsService {
    * cancelRequestedAt은 초기화한다 — 남겨두면 목록 UI가 되돌린 이후에도 "취소 요청" 배지를 계속 표시함.
    */
   async rejectCancelRequest(user: V1AuthUser, registrationId: string) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const registration = await this.loadRegistration(registrationId);
 
     if (registration.status !== 'cancel_requested') {
@@ -446,7 +446,7 @@ export class AdminRegistrationsService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
-      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId }, tx);
       const current = await tx.v1TournamentRegistration.findUnique({
         where: { id: registrationId, tournamentId: registration.tournamentId },
       });
@@ -512,7 +512,7 @@ export class AdminRegistrationsService {
   }
 
   async rosterLock(user: V1AuthUser, registrationId: string, dto: AdminRosterLockDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`
         SELECT id
@@ -616,7 +616,7 @@ export class AdminRegistrationsService {
   }
 
   async rosterUnlock(user: V1AuthUser, registrationId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const registration = await this.loadRegistration(registrationId);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -647,7 +647,7 @@ export class AdminRegistrationsService {
    * status 제약 없음(취소된 신청에도 기술적으로 부여 가능하나 실무상 무해).
    */
   async grantRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     await this.loadRegistration(registrationId);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -675,7 +675,7 @@ export class AdminRegistrationsService {
 
   /** 명단 제출 마감 예외 취소(rosterDeadlineOverrideAt = null). */
   async revokeRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     await this.loadRegistration(registrationId);
 
     const result = await this.prisma.$transaction(async (tx) => {

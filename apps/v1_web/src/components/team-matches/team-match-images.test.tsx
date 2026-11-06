@@ -4,6 +4,14 @@ import { useState } from 'react';
 import { TeamMatchImagesField, teamMatchImage } from './team-match-images';
 
 describe('team match image slots', () => {
+  it('keeps Korean guidance words together while allowing unusually long words to wrap', () => {
+    render(<TeamMatchImagesField images={{}} sport="풋살" onChange={vi.fn()} />);
+    const guidance = screen.getByText('이미지는 선택 사항이에요. 한 장만 올리면 목록과 상세에 함께 사용하고, 없으면 종목별 기본 이미지를 보여줘요.');
+    const style = window.getComputedStyle(guidance);
+    expect(style.wordBreak).toBe('keep-all');
+    expect(style.overflowWrap).toBe('anywhere');
+  });
+
   it('uses the intended image on each surface and shares a single image, including old records', () => {
     const images = { imageUrl: '/uploads/wide.webp', listImageUrl: '/uploads/square.webp' };
     expect(teamMatchImage(images, 'list')).toBe('/uploads/square.webp');

@@ -91,21 +91,6 @@ export type TournamentFixtureRevisionGoal = {
   playerNameSnapshot: string | null;
 };
 
-/**
- * 자책골의 `sideId`는 점수를 얻는 상대 팀을 가리키지만, 경기 기록에서 선수는
- * 실제 소속 팀 영역에 보여야 한다. 점수 계산용 sideId는 변경하지 않고 표시
- * projection에서만 행위 선수의 sideId를 사용한다.
- */
-export function resolveGoalDisplaySideId(
-  creditedSideId: string,
-  participantId: string | null,
-  ownGoal: boolean,
-  participantSideIdById: ReadonlyMap<string, string>,
-): string {
-  if (!ownGoal || participantId === null) return creditedSideId;
-  return participantSideIdById.get(participantId) ?? creditedSideId;
-}
-
 export function parseTournamentFixtureRevisionGoals(
   value: Prisma.JsonValue | null | undefined,
 ): TournamentFixtureRevisionGoal[] | null {
@@ -216,12 +201,12 @@ export function isMinuteUnknown(payload: Prisma.JsonValue | undefined): boolean 
  *
  * `minute`은 `clockMs`를 분으로 환산하되, 백필이 `payload.minuteKnown: false`로
  * "분을 모른다"고 표시한 골은 `0`이 아니라 `null`로 내린다(`isMinuteUnknown` 주석 참고).
+ * 자책골도 득점 귀속 sideId 영역에 표시하며 선수 정보는 실제 행위 선수를 유지한다.
  */
 export function deriveTournamentFixtureOfficialGoals(
   events: readonly TournamentFixtureGoalEventRow[],
   sideKeyById: ReadonlyMap<string, 'HOME' | 'AWAY'>,
   participantNameById: ReadonlyMap<string, string>,
-  participantSideIdById: ReadonlyMap<string, string> = new Map(),
   participantUserIdById: ReadonlyMap<string, string | null> = new Map(),
 ): TournamentFixtureOfficialGoal[] {
   const reversedIds = new Set(
@@ -236,14 +221,7 @@ export function deriveTournamentFixtureOfficialGoals(
     .map((event) => ({
       id: event.id,
       team:
-        sideKeyById.get(
-          resolveGoalDisplaySideId(
-            event.sideId ?? '',
-            event.participantId,
-            event.type === 'OWN_GOAL',
-            participantSideIdById,
-          ),
-        ) === 'HOME'
+        sideKeyById.get(event.sideId ?? '') === 'HOME'
           ? ('home' as const)
           : ('away' as const),
       playerId: event.participantId,
@@ -338,11 +316,6 @@ export function resolveTournamentFixtureOfficialResult(
     const participantNameById = new Map(
       game.participants.map((participant) => [participant.id, participant.displayNameSnapshot] as const),
     );
-    const participantSideIdById = new Map(
-      game.participants.flatMap((participant) =>
-        participant.sideId === undefined ? [] : [[participant.id, participant.sideId] as const],
-      ),
-    );
     const participantUserIdById = new Map(
       game.participants.map((participant) => [participant.id, participant.userId ?? null] as const),
     );
@@ -354,20 +327,12 @@ export function resolveTournamentFixtureOfficialResult(
             game.events,
             sideKeyById,
             participantNameById,
-            participantSideIdById,
             participantUserIdById,
           )
         : revisionGoals.map((event) => ({
             id: event.id,
             team:
-              sideKeyById.get(
-                resolveGoalDisplaySideId(
-                  event.sideId,
-                  event.participantId,
-                  event.ownGoal,
-                  participantSideIdById,
-                ),
-              ) === 'HOME'
+              sideKeyById.get(event.sideId) === 'HOME'
                 ? ('home' as const)
                 : ('away' as const),
             playerId: event.participantId,

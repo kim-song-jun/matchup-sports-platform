@@ -44,7 +44,18 @@ let authorizationSubjectVersion = 0;
  * `game.subscribe`/`game.takeover.request` staleness gate deny a reconnect
  * whose cached authorization is now behind reality. */
 export function setGameOperationsAuthorizationSubjectVersion(version: number): void {
+  if (authorizationSubjectVersion === version) return;
   authorizationSubjectVersion = version;
+  // `active` is also true while Socket.IO is still connecting. In that state
+  // `connected` is false, but the auth callback may already have captured the
+  // old version; cancel and restart that attempt with the new subject.
+  if (!socket?.active) return;
+
+  // Socket.IO snapshots auth data at each connection handshake. Updating the
+  // module value alone leaves an in-flight or connected singleton on the old
+  // subject, so explicitly establish a new handshake before the owner resubscribes.
+  socket.disconnect();
+  socket.connect();
 }
 
 export function getV1GameOperationsSocket(): Socket {
@@ -74,13 +85,10 @@ export function getV1GameOperationsSocket(): Socket {
     });
   });
 
-  // `v1-socket.ts`의 같은 핸들러에는 `reason === 'io client disconnect'`를 걸러내는
-  // 가드가 있는데 여기에는 일부러 두지 않는다: 그 reason은 클라이언트가 스스로
-  // `socket.disconnect()`를 부른 경우에만 발생하고, 이 네임스페이스에는 그런 호출이
-  // 한 곳도 없다(유일했던 `disconnectV1GameOperationsSocket`은 호출처가 0건이라 이번에
-  // 삭제했다). 도달 불가능한 분기를 남겨 두면 다음 사람이 "양쪽 다 필요한 패턴"으로
-  // 오독한다 — 이 네임스페이스에 자발적 disconnect를 다시 도입한다면 그때 함께 넣는다.
+  // Auth subject refresh deliberately disconnects/reconnects this singleton.
+  // Do not report that client-requested handshake transition as a network failure.
   socket.on('disconnect', (reason: string) => {
+    if (reason === 'io client disconnect') return;
     reportClientError({
       message: '경기 운영 실시간 연결이 끊겼어요.',
       level: 'warn',

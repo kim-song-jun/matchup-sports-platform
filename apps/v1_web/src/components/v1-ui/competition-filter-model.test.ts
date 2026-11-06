@@ -67,11 +67,11 @@ describe('buildCompetitionFilterModel — URL 이 권위다', () => {
     expect(m.resetHref).toBe('/tournaments?kind=league');
   });
 
-  it('공개 상태 필터에 모집완료·진행 중·종료를 제공한다', () => {
+  it('공개 상태 필터에 시작 전·진행 중·종료를 제공한다', () => {
     expect(model('').statusOptions.map((o) => o.label)).toEqual([
       '전체',
       '진행 중',
-      '모집완료',
+      '시작 전',
       '종료',
     ]);
   });
@@ -88,7 +88,7 @@ describe('buildCompetitionFilterModel — URL 이 권위다', () => {
   it('요약은 고른 것만 적고, 아무것도 없으면 "전체" 다', () => {
     expect(model('kind=league').summary).toBe('전체');
     expect(model('kind=league').activeCount).toBe(0);
-    expect(model('status=draft&sportId=s-futsal').summary).toBe('모집완료 · 풋살');
+    expect(model('status=draft&sportId=s-futsal').summary).toBe('시작 전 · 풋살');
     expect(model('status=draft&sportId=s-futsal').activeCount).toBe(2);
   });
 
@@ -142,20 +142,20 @@ describe('URL 이 손상돼도 목록이 죽지 않는다', () => {
 });
 
 /**
- * **"모집완료" 은 정규 리그에만 있다.** 대회 탭에서 고르면 항상 0건인데, 데이터가 새는 게
+ * **"시작 전" 은 정규 리그에만 있다.** 대회 탭에서 고르면 항상 0건인데, 데이터가 새는 게
  * 아니라 **고를 수 있는 것처럼 보이는 것**이 문제다 — 빈 목록을 사용자는 "고장" 으로 읽는다.
  */
 describe('statusFiltersFor — 고를 수 없는 칩은 안 보여준다', () => {
-  it('대회 탭에는 "모집완료" 이 없다', () => {
+  it('대회 탭에는 "시작 전" 이 없다', () => {
     expect(statusFiltersFor('tournament').map((o) => o.label)).toEqual(['전체', '진행 중', '종료']);
   });
 
-  it('리그·전체 탭에서 모집완료를 고를 수 있다', () => {
+  it('리그·전체 탭에서 시작 전를 고를 수 있다', () => {
     for (const kind of ['league', 'all', null, undefined]) {
       expect(statusFiltersFor(kind).map((o) => o.label)).toEqual([
         '전체',
         '진행 중',
-        '모집완료',
+        '시작 전',
         '종료',
       ]);
     }
@@ -225,33 +225,33 @@ describe('resolveSportIdParam — 모르는 종목을 서버로 넘기지 않는
 /**
  * **칩(입구)만 막고 URL(뒷문)을 안 막으면 막다른 상태가 된다.**
  *
- * 대회 탭에는 "모집완료" 칩을 안 그리는데, `?kind=tournament&status=draft` 로 **직접 들어오는**
+ * 대회 탭에는 "시작 전" 칩을 안 그리는데, `?kind=tournament&status=draft` 로 **직접 들어오는**
  * 경로는 그대로 남아 있었다. 그러면 화면이:
  * ```
- * 요약 줄   "모집완료"    ← 전역 목록에서 라벨을 찾아서
+ * 요약 줄   "시작 전"    ← 전역 목록에서 라벨을 찾아서
  * 목록      비어 있음    ← 서버가 종류와 묶어서 거르니까
  * 해제 칩   없음         ← 대회 탭엔 그 칩을 안 그리니까
  * ```
  * **해제할 방법이 없는 상태**가 된다. 데이터가 새는 게 아니라 **빠져나올 수 없는** 것이 문제다.
  */
 describe('대회 탭의 draft 는 URL 로도 못 들어온다 — 입구와 뒷문을 같은 기준으로 막는다', () => {
-  it('요약 줄에 "모집완료" 이 남지 않는다', () => {
+  it('요약 줄에 "시작 전" 이 남지 않는다', () => {
     const m = buildCompetitionFilterModel({
       basePath: '/tournaments',
       params: new URLSearchParams('kind=tournament&status=draft'),
       sports: SPORTS,
     });
-    expect(m.summary).not.toContain('모집완료');
+    expect(m.summary).not.toContain('시작 전');
     expect(m.summary).toBe('전체');
   });
 
-  it('옛 리그 draft 링크는 모집완료 필터로 남는다', () => {
+  it('옛 리그 draft 링크는 시작 전 필터로 남는다', () => {
     const m = buildCompetitionFilterModel({
       basePath: '/tournaments',
       params: new URLSearchParams('kind=league&status=draft'),
       sports: SPORTS,
     });
-    expect(m.summary).toBe('모집완료');
+    expect(m.summary).toBe('시작 전');
     expect(m.activeCount).toBe(1);
   });
 
@@ -261,6 +261,6 @@ describe('대회 탭의 draft 는 URL 로도 못 들어온다 — 입구와 뒷�
       params: new URLSearchParams('kind=all&status=draft'),
       sports: SPORTS,
     });
-    expect(m.summary).toBe('모집완료');
+    expect(m.summary).toBe('시작 전');
   });
 });

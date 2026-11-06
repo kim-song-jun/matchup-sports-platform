@@ -1,7 +1,9 @@
 import { tournamentRoundLabel } from './tournament-round-label';
+import type { V1TournamentGroupPhase } from '@prisma/client';
 
 const PHASE_RANK: Readonly<Record<string, number>> = {
   group: 0,
+  round64: 0.25, round32: 0.5,
   round16: 1,
   round12: 2,
   quarter: 3,
@@ -12,6 +14,7 @@ const PHASE_RANK: Readonly<Record<string, number>> = {
 
 const ROUND_RANK: Readonly<Record<string, number>> = {
   '조별리그': 0,
+  '64강': 0.25, '32강': 0.5,
   '16강': 1,
   '12강': 2,
   '8강': 3,
@@ -20,6 +23,30 @@ const ROUND_RANK: Readonly<Record<string, number>> = {
   '3·4위전': 5,
   '결승': 5,
 };
+
+const ROUND_PHASE: Readonly<Record<string, V1TournamentGroupPhase>> = {
+  '조별리그': 'group',
+  '64강': 'round64',
+  '32강': 'round32',
+  '16강': 'round16',
+  '12강': 'round12',
+  '8강': 'quarter',
+  '4강': 'semi',
+  '준결승': 'semi',
+  '3·4위전': 'third_place',
+  '결승': 'final',
+};
+
+/** 조가 없는 수동 대진도 라운드 표시값으로 같은 단계 설정을 찾게 한다. */
+export function competitionStagePhase(input: {
+  phase: V1TournamentGroupPhase | null | undefined;
+  round: string;
+}): V1TournamentGroupPhase | null {
+  if (input.phase != null) return input.phase;
+  const round = input.round.trim();
+  if (/^league_r\d+$/.test(round)) return 'group';
+  return ROUND_PHASE[tournamentRoundLabel(round)] ?? null;
+}
 
 /**
  * 대회 안에서 경기가 속한 단계의 진행 순서(조별리그 0 → 결승 5). 3·4위전과 결승은 같은 단계다.

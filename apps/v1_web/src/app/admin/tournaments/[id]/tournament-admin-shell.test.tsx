@@ -7,11 +7,11 @@
  */
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TournamentAdminShell } from './tournament-admin-shell';
+import { TournamentAdminShell, TournamentManagementContent } from './tournament-admin-shell';
 
 const { adminRoleMock, tournamentStatusMock } = vi.hoisted(() => ({
   adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' },
-  tournamentStatusMock: { value: 'in_progress' as string },
+  tournamentStatusMock: { value: 'in_progress' as string, canRevertStart: false },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -26,6 +26,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
       id: 'tournament-1',
       title: '서울 풋살 챔피언십',
       status: tournamentStatusMock.value,
+      canRevertStart: tournamentStatusMock.canRevertStart,
       sport: { code: 'futsal', name: '풋살' },
       operationCounts: { registrations: 3, fixtures: 4, announcements: 1 },
     },
@@ -41,6 +42,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 describe('TournamentAdminShell 섹션 내비', () => {
+  it('디렉터는 전용 관리 경로를 사용하고 플랫폼 전역 팝업 링크를 보지 않는다', () => {
+    render(<TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface><div>관리 내용</div></TournamentManagementContent>);
+    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/tournament-management');
+    expect(screen.getByRole('link', { name: /개요/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/overview');
+    expect(screen.getByRole('link', { name: /신청 관리/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/registrations');
+    expect(screen.queryByRole('link', { name: /팝업/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/operations');
+    expect(screen.getByRole('region', { name: '공개 설정' })).toBeInTheDocument();
+  });
   it('팝업은 대회 하위 탭이 아니라 경로를 프리필한 전역 팝업 링크다', () => {
     render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
 
@@ -113,6 +123,38 @@ describe('TournamentAdminShell 섹션 내비', () => {
       expect(statusMutate).toHaveBeenCalledWith({ status: target, reason: '잘못 눌렀어요' }, expect.anything());
     } finally {
       tournamentStatusMock.value = 'in_progress';
+    }
+  });
+
+  it('첫 경기 시작 전에는 사유를 받아 접수 마감으로 되돌린다', async () => {
+    adminRoleMock.value = 'ops';
+    tournamentStatusMock.value = 'in_progress';
+    tournamentStatusMock.canRevertStart = true;
+    statusMutate.mockClear();
+    try {
+      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+      fireEvent.click(screen.getByRole('button', { name: '접수 마감으로 되돌리기' }));
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByText(/시작한 경기가 없을 때만/)).toBeInTheDocument();
+      const confirm = within(dialog).getByRole('button', { name: '되돌리기' });
+      expect(confirm).toBeDisabled();
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 대회 시작을 잘못 눌렀어요 ' } });
+      fireEvent.click(confirm);
+      expect(statusMutate).toHaveBeenCalledWith({ status: 'closed', reason: '대회 시작을 잘못 눌렀어요' }, expect.anything());
+    } finally {
+      tournamentStatusMock.canRevertStart = false;
+    }
+  });
+
+  it('첫 경기 시작 전이어도 조회 전용 관리자는 접수 마감 복귀 액션을 못 쓴다', () => {
+    adminRoleMock.value = 'support';
+    tournamentStatusMock.canRevertStart = true;
+    try {
+      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+      expect(screen.queryByRole('button', { name: '접수 마감으로 되돌리기' })).not.toBeInTheDocument();
+    } finally {
+      adminRoleMock.value = 'ops';
+      tournamentStatusMock.canRevertStart = false;
     }
   });
 

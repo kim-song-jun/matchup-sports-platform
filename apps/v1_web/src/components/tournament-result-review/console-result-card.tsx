@@ -64,7 +64,9 @@ export function ConsoleResultCard({
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-4 py-3">
         <CheckCircle2 size={20} aria-hidden="true" className="shrink-0 text-[var(--green500)]" />
-        <p className="tm-text-label min-w-0 flex-1" style={{ lineHeight: 1.5 }}>
+        {/* 기본 폭을 0(flex-1)으로 두면 flex-wrap 이 문구를 0으로 쳐서 버튼을 같은 줄에 다 넣고, 문구가 남은
+            틈에 끼어 6줄로 접혔다(MD-QA #173). 최소 14rem 을 줄바꿈 계산에 넣어 자리가 모자라면 버튼이 내려간다. */}
+        <p className="tm-text-label min-w-0 flex-[1_1_14rem]" style={{ lineHeight: 1.5 }}>
           {scoreText} 공식 결과로 확정했어요.
         </p>
         {confirmedFooter}

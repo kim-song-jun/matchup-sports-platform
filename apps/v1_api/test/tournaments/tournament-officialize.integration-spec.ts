@@ -43,7 +43,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService());
 
@@ -116,6 +116,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     ],
     participants: [
       { sourceParticipantId: `host-player-${fixtureId}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Host One' },
+      { sourceParticipantId: `away-player-${fixtureId}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Opponent One' },
     ],
   };
   const created = await prisma.$transaction((tx) =>
@@ -629,44 +630,19 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     expect(game.currentOfficialRevisionId).toBe(officialized.revisionId);
   });
 
-  it('gates tournament_director officialize behind DIRECTOR_OFFICIALIZE and re-checks it live on every call', async () => {
+  it('assigned director officializes even when the rollout flag is off; outsiders remain denied', async () => {
+    await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'off' } });
     const gateGameIdA = await buildTournamentGame(ids.directorGateFixtureA);
     await endWithOneHomeGoal(gateGameIdA);
     const submittedA = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: gateGameIdA } });
-
-    // off -> deny
-    const deniedOff = await captureFailure(() =>
-      resultReview.officializeResultRevision(authUser(ids.director), gateGameIdA, submittedA.id, 'task22-director-off', {
-        expectedVersion: 3,
-        clientCommandId: 'task22-director-off',
-        projectionPreviewHash: previewHash(submittedA),
-      }),
-    );
-    expectHttpCode(deniedOff, 403, 'DIRECTOR_OFFICIALIZE_DISABLED');
-
-    // on -> allow
-    await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'on' } });
-    const allowed = await resultReview.officializeResultRevision(authUser(ids.director), gateGameIdA, submittedA.id, 'task22-director-on', {
-      expectedVersion: 3,
-      clientCommandId: 'task22-director-on',
-      projectionPreviewHash: previewHash(submittedA),
+    const allowed = await resultReview.officializeResultRevision(authUser(ids.director), gateGameIdA, submittedA.id, 'task22-director-off', {
+      expectedVersion: 3, clientCommandId: 'task22-director-off', projectionPreviewHash: previewHash(submittedA),
     });
     expect(allowed.revisionState).toBe(V1GameResultRevisionState.OFFICIAL);
-
-    // rollback to off -> deny again, on a *different* fresh revision.
-    await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'off' } });
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: gateGameIdA } })).currentOfficialRevisionId).toBe(allowed.revisionId);
     const gateGameIdB = await buildTournamentGame(ids.directorGateFixtureB);
     await endWithOneHomeGoal(gateGameIdB);
     const submittedB = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: gateGameIdB } });
-    const deniedAgain = await captureFailure(() =>
-      resultReview.officializeResultRevision(authUser(ids.director), gateGameIdB, submittedB.id, 'task22-director-off-again', {
-        expectedVersion: 3,
-        clientCommandId: 'task22-director-off-again',
-        projectionPreviewHash: previewHash(submittedB),
-      }),
-    );
-    expectHttpCode(deniedAgain, 403, 'DIRECTOR_OFFICIALIZE_DISABLED');
-
     // A director scoped to a different tournament is denied outright, flag
     // state notwithstanding.
     await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'on' } });

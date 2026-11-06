@@ -76,6 +76,7 @@ type CreatedRevision = {
 type CreatedParticipant = { participantId: string; sideId: string; goals: number };
 
 type HarnessOptions = {
+  readonly role?: 'platform_ops' | 'tournament_director';
   /** 경기장 미정이면 권한 리소스에 fieldId 키 자체를 보내지 않는다. */
   readonly fieldId?: string | null;
   /** 'group' = 조별리그, 'semi' = 결선. 승부차기 가드의 단일 판정 기준. */
@@ -233,6 +234,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
         ? { group: { phase }, _count: { advancementSources: advancementEdges.length } }
         : null,
     },
+    v1GameOperationFlag: { findUnique: async () => ({ value: 'off', version: 0 }) },
     v1IdempotencyRecord: {
       findUnique: async () => null,
       create: async () => ({}),
@@ -328,6 +330,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
           : []),
       ],
     },
+    v1GamePeriod: { findMany: async () => [{ number: 1 }, { number: 2 }] },
     v1CompetitionConfigVersion: {
       findUnique: async () => ({ result: {} }),
     },
@@ -342,8 +345,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     assertAccess: async (input: { resource: Record<string, string> }) => {
       staffAccessInputs.push(input);
       return {
-        role: 'platform_ops' as const,
-        authorizationSubject: `platform_ops:${ids.user}@1`,
+        role: options.role ?? 'platform_ops',
+        authorizationSubject: `${options.role ?? 'platform_ops'}:${ids.user}@1`,
         assignmentId: null,
         assignmentVersion: null,
       };
@@ -485,6 +488,28 @@ describe('canonical source boundary', () => {
 });
 
 describe('공식 득점 타임라인 정합성', () => {
+  it('정정 카드의 합계와 시간을 같은 참가자 스냅샷에 저장한다', async () => {
+    const harness = createHarness();
+    const cards = { yellow: 1, red: 1, events: [
+      { id: 'yellow-1', card: 'YELLOW', minute: 0, period: 1 },
+      { id: 'red-1', card: 'RED' },
+    ] };
+    await harness.correct({ actualParticipants: [{ ...validParticipants[0], cards }, validParticipants[1]] });
+    expect(harness.createdParticipants[0]).toMatchObject({ participantId: ids.homePlayer, cards });
+  });
+  it('없는 피리어드와 선수 간 중복 카드 id는 저장 전에 거부한다', async () => {
+    const harness = createHarness();
+    const cards = { yellow: 1, red: 0, events: [{ id: 'same', card: 'YELLOW', period: 99 }] };
+    const error = await captureFailure(() => harness.correct({ actualParticipants: [
+      { ...validParticipants[0], cards }, validParticipants[1],
+    ] }));
+    expectHttp(error, 422, 'RESULT_CARD_TIMELINE_INVALID');
+    const duplicate = await captureFailure(() => harness.correct({ actualParticipants: [
+      { ...validParticipants[0], cards }, { ...validParticipants[1], cards },
+    ] }));
+    expectHttp(duplicate, 422, 'RESULT_CARD_TIMELINE_INVALID');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
   it('정정한 득점자와 개인 득점 합계가 일치하면 새 참가자 기록에 반영한다', async () => {
     const harness = createHarness();
     await harness.correct({
@@ -1030,6 +1055,25 @@ describe('2-G: penalties 형태 오류는 서비스에서도 막아야 한다', 
  * 그래서 서버가 base 리비전의 값을 승계한다(`readStoredPenalties`).
  */
 describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 막히지 않아야 한다', () => {
+  it('승부차기 정정의 명시적 예외 해제는 base 예외를 다시 승계하지 않는다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, baseScore: {
+      home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: true },
+    } });
+    const error = await captureFailure(() => harness.correct({ score: { home: 1, away: 1, penalties: {
+      home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: false,
+    } } }));
+    expectHttp(error, 422, 'TOURNAMENT_PENALTY_UNDECIDED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+  it('승부차기 정정의 실제 횟수와 예외 해제를 저장한다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, baseScore: {
+      home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: true },
+    } });
+    await harness.correct({ score: { home: 1, away: 1, penalties: {
+      home: 1, away: 0, takenHome: 3, takenAway: 3, operatorOverride: false,
+    } } });
+    expect(harness.createdRevisions[0].score).toEqual({ home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 3, takenAway: 3 } });
+  });
   const baseWithPenalties = { home: 1, away: 1, penalties: { home: 5, away: 4 } };
 
   it('폼이 penalties를 떨어뜨려도 base의 승부차기를 승계해 정정이 통과한다', async () => {
@@ -1373,5 +1417,22 @@ describe('득점 기록이 없는 경기의 정정 — 승부차기 킥 수 면�
 
     expectHttp(error, 422, 'TOURNAMENT_PENALTY_UNDECIDED');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('assigned tournament director result permissions', () => {
+  it('can void an official result without reading the rollout flag', async () => {
+    const h = createHarness({ role: 'tournament_director' });
+    await h.voidRevision();
+    expect(h.createdRevisions).toHaveLength(1);
+    expect(h.createdRevisions[0].state).toBe('VOID');
+  });
+});
+
+describe('league director rollout boundary', () => {
+  it('continues to reject league void when the flag is off without creating a revision', async () => {
+    const h = createHarness({ role: 'tournament_director', canonicalLeague: true });
+    await expect(h.voidRevision()).rejects.toMatchObject({ response: { code: 'DIRECTOR_OFFICIALIZE_DISABLED' } });
+    expect(h.createdRevisions).toHaveLength(0);
   });
 });

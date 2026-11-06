@@ -5,6 +5,7 @@
  */
 const PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round64: '64강', round32: '32강',
   round16: '16강',
   round12: '12강',
   quarter: '8강',
@@ -15,13 +16,15 @@ const PHASE_LABEL: Readonly<Record<string, string>> = {
 };
 
 /** 결선 단계 코드, 큰 단계부터. 공개 대진표가 "결선 경기인가"를 판정할 때 쓴다. */
-export const KNOCKOUT_PHASES = ['round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
+export const KNOCKOUT_PHASES = ['round64', 'round32', 'round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
 
 export function isKnockoutPhase(phase: string): boolean {
   return (KNOCKOUT_PHASES as readonly string[]).includes(phase);
 }
 
 const LEAGUE_ROUND = /^league_r(\d+)$/;
+/** 리그 방식 대회 템플릿이 만드는 하나뿐인 조 이름(bracket-template-plan.ts). */
+const LEAGUE_FORMAT_GROUP = '리그';
 
 export function tournamentRoundLabel(round: string): string {
   const trimmed = round.trim();
@@ -52,6 +55,9 @@ export function competitionMatchLabel({ groupName, round, legNumber, withinGroup
   const leg = legNumber != null && legNumber > 1 && !LEAGUE_ROUND.test(round.trim()) ? ` ${legNumber}차` : '';
   const roundPart = `${tournamentRoundLabel(round)}${leg}`;
   const group = groupName?.trim() ?? '';
+  // 리그 방식 대회는 조가 하나('리그')라 조별리그가 아니다 — "리그 · 조별리그 1라운드" 대신 "리그 1라운드"(MD-QA #171).
+  const leagueRound = LEAGUE_ROUND.exec(round.trim());
+  if (leagueRound !== null && group === LEAGUE_FORMAT_GROUP) return withinGroup ? `${Number(leagueRound[1])}라운드` : `리그 ${Number(leagueRound[1])}라운드`;
   if (withinGroup || group === '' || isKnockoutRound(round) || group === tournamentRoundLabel(round)) return roundPart;
   return `${group} · ${roundPart}`;
 }

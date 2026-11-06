@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { useState, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
@@ -370,7 +370,8 @@ function MobileFieldSetting({ node, competitionId, showToast }: MobileNodeSheetB
 export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   const { node, scope, canWrite, view, onViewChange } = props;
   const groups = props.groups ?? [];
-  const editable = canWrite && !isNodeLocked(node);
+  const managedFinal = groups.some(group => group.id === node.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack));
+  const editable = canWrite && !managedFinal && !isNodeLocked(node);
   const slotById = (id: string | null) => props.slots.find((candidate) => candidate.id === id) ?? null;
   const pickKind = (side: MobileSide): 'slot' | 'direct' | null => {
     if (!editable) return null;
@@ -382,7 +383,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   if (node.byeSlotId && scope === 'tournament') {
     const slot = props.slots.find(slot => slot.id === node.byeSlotId);
     const fixture = props.fixtures?.find(f => f.id === node.fixtureId);
-    if (slot && fixture) return <ByeSlotEditor tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite} registrationsLoaded={props.registrationsState.status === 'success'} />;
+    if (slot && fixture) return <ByeSlotEditor tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite && !managedFinal} registrationsLoaded={props.registrationsState.status === 'success'} />;
   }
   if (view.kind === 'pick') {
     const side = view.side === 'HOME' ? node.home : node.away;

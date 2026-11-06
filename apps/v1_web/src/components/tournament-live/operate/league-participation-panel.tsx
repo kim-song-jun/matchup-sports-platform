@@ -10,7 +10,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { rosterPersonLabel } from '@/lib/roster-presentation';
 import type { GameSide } from '@/types/game-operations';
-import { jerseyText } from './player-label';
+import { jerseyText } from '@/shared/game-operations';
 
 const STATUS_TEXT: Record<V1GameRosterPlayerStatus, string> = {
   PARTICIPATING: '출전',

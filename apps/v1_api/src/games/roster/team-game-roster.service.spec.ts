@@ -81,3 +81,15 @@ describe('TeamGameRosterService.getRegistrationMatrix — 운영진 실명', () 
     expect(tx.v1User.findMany).not.toHaveBeenCalled();
   });
 });
+
+
+describe('TeamGameRosterService — 종료 경기 편집 권한', () => {
+  it.each(['owner', 'ops', 'support'] as const)('%s 어드민의 종료 경기 편집 권한을 표에 반영한다', async (adminRole) => {
+    const { service } = build({ adminRole });
+    const scheduled = await loadTeamRosterColumns({} as never, {} as never);
+    jest.mocked(loadTeamRosterColumns).mockResolvedValue(scheduled.map((column) => ({ ...column, game: { ...column.game, gameState: 'ENDED' } })));
+    const matrix = await service.getRegistrationMatrix(USER, 'cup', 'reg-1');
+    expect(matrix.games[0].editable).toBe(adminRole !== 'support');
+    expect(matrix.games[0].goalkeeperEditable).toBe(false);
+  });
+});

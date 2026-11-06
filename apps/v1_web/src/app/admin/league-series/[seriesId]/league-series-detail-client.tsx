@@ -167,7 +167,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                   <h2 className="text-sm font-bold text-[var(--text-strong)]">{season.seasonNo}시즌</h2>
                   {decided && <AdminStatusPill status="confirmed" label="승강 확정됨" />}
                 </span>
-                {series.tierCount > 1 && !decided && (
+                {!decided && (
                   // 시즌이 안 끝났으면 서버가 409 LEAGUE_SEASON_NOT_FINISHED 로 막는다.
                   // 예전에는 이 버튼이 열려 있고 아래 문구로만 경고해서, 문구는 "계산할 수
                   // 없어요"라고 하는데 눌리면 계산이 되는 모순이 있었다(그때는 서버 게이트도
@@ -179,7 +179,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                     aria-describedby={season.allCompleted ? undefined : `season-${season.seasonNo}-gate`}
                     className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
                   >
-                    {previewPromotions.isPending ? '계산하는 중…' : '승강 후보 계산'}
+                    {previewPromotions.isPending ? '계산하는 중…' : series.tierCount === 1 ? '다음 시즌 준비' : '승강 후보 계산'}
                   </button>
                 )}
               </header>

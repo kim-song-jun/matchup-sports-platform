@@ -7,6 +7,7 @@ import type { V1GameEvent } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import type { AppendGameEventDto } from './dto/game-event.dto';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
@@ -95,7 +96,14 @@ export async function createOrderingService() {
         return { ...game };
       },
     },
-    v1TeamMatch: { async findUnique() { return teamMatch; } },
+    v1TeamMatch: { async findUnique() { return teamMatch; }, async findMany() { return []; } },
+    v1UserProfile: {
+      async findMany({ where }: { where: { userId: { in: string[] } } }) {
+        return where.userId.in.map((userId) => ({
+          userId, realName: null, displayName: null, nickname: `${userId}-닉네임`, tournamentRealNameVisible: false, deletedAt: null,
+        }));
+      },
+    },
     v1AdminUser: {
       async findUnique({ where }: { where: { userId: string } }) {
         const gate = nextActorGate;
@@ -142,7 +150,7 @@ export async function createOrderingService() {
     v1TeamMembership: { async findMany() { return []; } },
   };
   const moduleRef = await Test.createTestingModule({ providers: [
-    GamesService, GameTakeoverService, OperationAuditWriterService,
+    GamesService, GameTakeoverService, OperationAuditWriterService, TournamentStaffAccessService,
     { provide: PrismaService, useValue: database },
   ] }).compile();
   return {

@@ -108,6 +108,8 @@ describe('StaffClient', () => {
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
     const heading = screen.getByRole('heading', { name: '경기장(필드)' });
+    expect(heading.querySelector('.tm-section-title')).toHaveClass('tm-section-title-compact');
+    expect(heading.parentElement).toHaveClass('min-w-0', 'flex-1');
     expect(screen.getAllByText('디렉터윤')[0].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '기존 경기 장소 추가' }));
     expect(screen.getByRole('status')).toHaveTextContent('경기 장소 2개를 추가했어요. 이미 등록된 장소는 1개예요.');
@@ -256,6 +258,19 @@ describe('StaffClient', () => {
 
     expect(screen.getByText(/배정했어요\. 그분은 마이페이지/)).toHaveTextContent('“담당 대회 운영”에서 담당 경기 기록 화면으로');
     expect(document.body.textContent).not.toContain('대회 운영을 맡고 있어요');
+  });
+
+  it('대회 디렉터 배정 안내가 전용 대회 관리 화면으로 이어진다', async () => {
+    setRole('PLATFORM_OPS');
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.selectOptions(screen.getByLabelText('역할'), 'TOURNAMENT_DIRECTOR');
+    expect(screen.getByRole('dialog')).toHaveTextContent('이 대회 관리 화면으로');
+    await pickCandidate(user, '이승민');
+    mocks.grantMutate.mockImplementation((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
+    expect(screen.getByText(/배정했어요\. 그분은 마이페이지/)).toHaveTextContent('“담당 대회 운영”에서 이 대회 관리 화면으로');
   });
 
   /* 종전에는 이 자리가 사용자 UUID 직접 입력이었고, 안내는 "어드민 > 사용자 관리에서 ID를

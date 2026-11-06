@@ -9,6 +9,7 @@ import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-
 import { TeamSchedulesService } from '../../src/team-schedules/team-schedules.service';
 import type { MutateTeamMatchDto, UpdateTeamMatchDto } from '../../src/team-matches/dto/mutate-team-match.dto';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 // 레인 schedule — 매치 ↔ 팀일정 연동. team-matches.service.ts의 create()/approveApplication()/
 // cancel()/update()가 team-schedules.service.ts의 평문 함수(createTeamMatchScheduleInTx/
@@ -29,7 +30,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const teamSchedules = new TeamSchedulesService(prisma);
 const notifications = {
   emitNotification: jest.fn(async () => undefined),

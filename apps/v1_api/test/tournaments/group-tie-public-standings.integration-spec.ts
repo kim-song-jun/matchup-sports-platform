@@ -13,7 +13,7 @@ import { seedBracketTournament } from '../helpers/bracket-canvas-fixture';
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'group-tie@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const adminContext = new AdminContextService(prisma);
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const slots = new TournamentSlotService(prisma, adminContext, games);

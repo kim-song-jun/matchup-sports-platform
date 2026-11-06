@@ -34,7 +34,8 @@ export function generateKakaoOAuthState(): string {
 }
 
 // authorize 기본 URL(state 제외)만 만든다. CSRF 방지 state는 클라이언트 버튼이 클릭 시점에 붙인다.
-function buildKakaoAuthUrl() {
+// 로그인과 계정 연결(lib/kakao-oauth.ts)이 같은 redirect URI·scope 를 쓰도록 한 곳에서 만든다.
+export function buildKakaoAuthUrl() {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
   const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
   if (!clientId || !redirectUri) return null;
@@ -83,15 +84,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       primary: { label: '다시 로그인하기', href: '/login' },
       secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
     },
-    'missing-email': {
-      backHref: '/login',
-      badge: '이메일 누락',
-      title: '확인 가능한 이메일이 필요해요',
-      body: '소셜 계정에서 이메일을 받을 수 없었어요. 이메일을 직접 입력하고 인증한 뒤 가입을 계속할 수 있어요.',
-      tone: 'orange',
-      primary: { label: '이메일 직접 인증', href: '/login/email' },
-      secondary: { label: '소셜 계정 바꾸기', href: '/login', tone: 'neutral' },
-    },
     blocked: {
       backHref: '/login',
       badge: '계정 제한',
@@ -100,15 +92,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       tone: 'red',
       primary: { label: '고객센터 문의', disabled: true, tone: 'danger' },
       secondary: { label: '로그인으로 돌아가기', href: '/login', tone: 'neutral' },
-    },
-    'account-conflict': {
-      backHref: '/login',
-      badge: '계정 충돌',
-      title: '이미 가입된 정보가 있어요',
-      body: '같은 이메일 또는 휴대폰 번호가 다른 로그인 방법과 연결되어 있어요. 기존 계정으로 먼저 로그인해 주세요.',
-      tone: 'orange',
-      primary: { label: '기존 계정 확인', href: '/login/email' },
-      secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
     },
     'location-denied': {
       backHref: '/onboarding/region',
@@ -172,6 +155,24 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
     ],
     primary: { label: '운동 설정 시작하기', href: '/onboarding/sport' },
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },
+  };
+}
+
+/**
+ * 소셜 계정에 이메일 로그인을 더한 직후의 완료 화면. 가입 완료 화면과 같은 그래픽·단계 카드를 쓴다.
+ * 연결하던 도중에 가려던 곳(`returnTo`)이 있으면 그곳으로, 없으면 로그인 방법 화면으로 돌아간다.
+ */
+export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: string, returnTo: string | null = null): SignupCompleteViewModel {
+  return {
+    title: '이메일 로그인이 연결됐어요',
+    sub: `이제 ${email} 과 비밀번호로도 로그인할 수 있어요.`,
+    steps: [
+      { title: '이메일 인증을 마쳤어요', body: '이 이메일이 계정 이메일이 됐어요.', done: true },
+      { title: '비밀번호를 정했어요', body: '기존 로그인 방법도 그대로 쓸 수 있어요.', done: true },
+    ],
+    primary: returnTo
+      ? { label: '하던 곳으로 돌아가기', href: returnTo }
+      : { label: '로그인 방법으로 돌아가기', href: loginMethodsHref },
   };
 }
 

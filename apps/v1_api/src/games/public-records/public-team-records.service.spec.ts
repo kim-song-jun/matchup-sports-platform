@@ -1,7 +1,7 @@
 import type { PrismaService } from '../../prisma/prisma.service';
 import { PublicTeamRecordsService } from './public-team-records.service';
 
-function buildBackfilledGoalPrisma(goalEvents: unknown[]): PrismaService {
+function buildBackfilledGoalPrisma(goalEvents: unknown[] | null, resultParticipants: unknown[] = []): PrismaService {
   const playedAt = new Date('2026-08-09T02:00:00.000Z');
   const officialAt = new Date('2026-08-10T02:00:00.000Z');
   const factFindMany = jest.fn().mockResolvedValue([
@@ -16,6 +16,7 @@ function buildBackfilledGoalPrisma(goalEvents: unknown[]): PrismaService {
       goalsAgainst: 0,
       playedAt,
       resultRevision: {
+        resultParticipants,
         score: { home: 1, away: 0 },
         // 이 골은 V1GameEvent 에 없다 — 리비전 JSON 에만 존재한다.
         goalEvents,
@@ -457,5 +458,30 @@ describe('PublicTeamRecordsService', () => {
 
       expect(result.items[0]).toEqual(expect.objectContaining({ result: null, isForfeit: false }));
     });
+  });
+});
+
+describe.each(['events', 'revision'] as const)('팀 전적 자책골 (%s)', (source) => {
+  it('실제 선수 정보는 유지하고 상대팀 득점 영역에 표시한다', async () => {
+    const goal = { id: 'og-1', sideId: 'side-away', participantId: 'participant-1', minute: 3, period: 1, ownGoal: true };
+    const prisma = buildBackfilledGoalPrisma(source === 'revision' ? [goal] : null);
+    if (source === 'events') {
+      jest.mocked(prisma.v1GameEvent.findMany).mockResolvedValue([
+        { id: 'og-1', gameId: 'game-1', type: 'OWN_GOAL', sideId: 'side-away', participantId: 'participant-1', period: 1, clockMs: 180000, payload: null, reversesEventId: null },
+      ] as never);
+    }
+    const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+    expect(result.items[0].events).toEqual([expect.objectContaining({ type: 'OWN_GOAL', side: 'opponent', participantName: '김도윤', jerseyNumber: 7, profileHref: '/users/user-1' })]);
+  });
+});
+
+
+describe('team record corrected cards', () => {
+  it('publishes the same corrected card snapshot and profile as match records', async () => {
+    const prisma = buildBackfilledGoalPrisma([], [{ participantId: 'participant-1', sideId: 'side-home',
+      cards: { yellow: 0, red: 1, events: [{ id: 'red', card: 'RED', minute: 5, period: 2 }] } }]);
+    const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+    expect(result.items[0].events).toEqual([expect.objectContaining({ type: 'CARD', cardColor: 'RED',
+      period: 2, clockMs: 300000, participantName: '김도윤', profileHref: '/users/user-1' })]);
   });
 });

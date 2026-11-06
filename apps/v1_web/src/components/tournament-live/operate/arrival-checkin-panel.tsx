@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
-import { jerseyText } from './player-label';
-import { participantIdentityCopyText, participantIdentityName, participantIdentityPhone } from './participant-identity';
-import { latestLineupForDisplay } from './lineup-grid';
+import { jerseyText } from '@/shared/game-operations';
+import { participantIdentityCopyText, participantIdentityName, participantIdentityPhone } from '@/shared/game-operations';
+import { latestLineupForDisplay } from '@/shared/game-operations';
 
 /**
  * 명단 검인(체크인) — 킥오프 전 "누가 실제로 왔는지"를 스태프가 확정하는 자리.

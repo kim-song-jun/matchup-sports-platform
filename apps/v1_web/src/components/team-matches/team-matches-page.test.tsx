@@ -82,6 +82,21 @@ describe('team match images', () => {
     expect(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')?.style.backgroundImage).toContain(images.imageUrl);
   });
 
+  it('renders the authorized rule preview as a direct detail action', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.operateAction = {
+      label: '경기 규칙 미리보기',
+      href: '/team-matches/team-match-1/operate',
+    };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: '경기 규칙 미리보기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/operate',
+    );
+  });
+
   it('places the lifecycle notice after the match hero and its mobile back action', () => {
     const model = getTeamMatchDetailViewModel('mine');
     const { container } = renderPage(<TeamMatchDetailPageView model={model} lifecyclePanel={<div data-testid="lifecycle-notice">보류 안내</div>} />);

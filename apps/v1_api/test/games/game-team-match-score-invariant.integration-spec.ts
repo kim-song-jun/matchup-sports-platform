@@ -9,6 +9,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 // Task 17: resolveActor (games.service.ts, TEAM_MATCH branch) unconditionally
 // forbids `event_append` / `event_reverse` for a TEAM_MATCH game, so a
@@ -48,7 +49,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const authUser = (id: string) => ({
   id,
   email: `${id}@example.test`,

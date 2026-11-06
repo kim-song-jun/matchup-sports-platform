@@ -4,6 +4,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 import { writeIdentityAttestRequestNotifications } from './identity-attest-notification';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * attest UI C안 (2026-08-26) 의 서버 계약 2개를 고정한다.
@@ -86,6 +87,7 @@ describe('identity attest (승인함)', () => {
         prisma as unknown as PrismaService,
         {} as OperationAuditWriterService,
         {} as GameTakeoverService,
+        new TournamentStaffAccessService(prisma as unknown as PrismaService),
       );
       return { service, prisma, requestedAt };
     }

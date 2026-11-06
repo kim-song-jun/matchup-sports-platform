@@ -67,6 +67,15 @@ async function lockLeagueRowWithoutWaitingInTx(
   }
 }
 
+/**
+ * 대진 제목 주차 맞추기용(`syncLeagueFixtureWeekTitles`) — 다른 경기 행 여러 개를 고치기 전에 리그 행을 기다리지 않고
+ * FOR UPDATE 로 잡는다. 경기 하나를 쥔 두 수정이 서로의 경기 제목을 고치다 교착하지 않게, 다른 경기를 건드리는 쪽을
+ * 리그 행에서 한 줄로 세운다. 이미 리그 행을 쥔 생성 경로에서는 그대로 지나간다.
+ */
+export async function lockLeagueRowForFixtureTitlesInTx(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
+  await lockLeagueRowWithoutWaitingInTx(tx, leagueId, 'update');
+}
+
 /** 리그 완료 처리용 — 리그 행을 기다리지 않고 FOR UPDATE 로 잡는다(이유는 lockLeagueRowWithoutWaitingInTx). */
 export async function lockLeagueRowForCompletionInTx(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
   await lockLeagueRowWithoutWaitingInTx(tx, leagueId, 'update');

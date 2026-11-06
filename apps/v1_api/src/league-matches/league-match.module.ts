@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { LeagueSeriesConversionController } from './league-series-conversion.controller';
+import { LeagueSeriesConversionService } from './league-series-conversion.service';
 import { AdminContextModule } from '../common/admin-context.module';
 import { GamesModule } from '../games/games.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -35,6 +37,7 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   // UploadsModule: 리그 경기 영상 업로드(LeagueFixtureVideosService)가 UploadsService 를 쓴다.
   imports: [AdminContextModule, GamesModule, NotificationsModule, UploadsModule],
   controllers: [
+    LeagueSeriesConversionController,
     LeagueMatchAdminController,
     // 신청 마감·대표 이미지·참가비 — 서비스가 league-match-admin.service 밖에 있어 컨트롤러도 따로 둔다.
     LeagueEntryFeeController,
@@ -46,6 +49,7 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
     LeagueSeriesAdminController,
   ],
   providers: [
+    LeagueSeriesConversionService,
     LeagueCoverImageService,
     LeagueEntryFeeService,
     LeagueFixtureVideosService,

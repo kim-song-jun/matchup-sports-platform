@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RosterManagerNavigation, useRosterEditorNavigation } from '@/components/game-roster/roster-manager-navigation';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -19,7 +18,6 @@ import { GameRosterHistoryList } from '@/components/game-roster/game-roster-hist
 import { GameRosterJerseySheet, nextPlayerWithoutJersey } from '@/components/game-roster/game-roster-jersey-sheet';
 import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
 import { RegistrationRosterEntry } from '@/components/game-roster/registration-roster-entry';
-import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
 import {
   useV1ApplyGameRosterBatch,
   useV1TeamGameRoster,
@@ -130,8 +128,6 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   if (data === undefined) return <PageSkeleton variant="detail" />;
 
   const started = data.gameState !== 'SCHEDULED';
-  const teamMember = data.viewerRole === 'TEAM_MANAGER' || data.viewerRole === 'TEAM_MEMBER';
-  const joined = data.participants.filter((row) => row.joinedAfterFixtureCreated);
   const events = history.data?.events;
   const historyShown = started || historyOpen;
   const pendingExcludes = changes.filter((change) => change.op === 'EXCLUDE').length;
@@ -225,20 +221,14 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             : `${formatTournamentDateTimeShort(data.deadline) ?? '경기'} 시작 전까지 ${canEdit ? '바꿀 수 있어요.' : '명단이 바뀔 수 있어요.'}`}
           {data.baseSource === 'TEAM_MEMBERS' ? ' 참가 명단이 없어 팀원 전체가 기준이에요.' : ''}
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-          {started ? null : (
+        {started ? null : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
             <button type="button" className="tm-section-action" onClick={openHistory} style={linkButtonStyle}>
               변경 기록{events === undefined ? '' : ` ${events.length}건`}
               <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
             </button>
-          )}
-          {teamMember ? (
-            <Link className="tm-section-action" href={`/teams/${teamId}#${TEAM_UPCOMING_GAMES_ANCHOR}`} style={linkButtonStyle}>
-              우리 팀 다른 경기
-              <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
-            </Link>
-          ) : null}
-        </div>
+          </div>
+        )}
       </Card>
 
       {started ? (
@@ -257,12 +247,6 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         <AlertBanner
           tone="warning"
           message="예전에 저장한 참석명단이 아직 경기 기록에 쓰이고 있어요. 여기서 바꾼 내용은 기록되고, 옮기는 작업이 끝나면 경기 명단에 반영돼요."
-        />
-      ) : null}
-      {joined.length > 0 ? (
-        <AlertBanner
-          tone="info"
-          message={`${joined.map((row) => row.displayName).join(', ')} 선수가 참가 명단에 추가돼 이 경기 출전에 들어갔어요.`}
         />
       ) : null}
       {notice !== null ? <AlertBanner tone={notice.tone} message={notice.message} /> : null}

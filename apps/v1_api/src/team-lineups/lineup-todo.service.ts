@@ -54,7 +54,7 @@ export type LineupTodo = {
    * 리그의 주차는 `V1TeamMatch.title`에 박제된 값을 쓰지 않는다 — 그 제목은 대진 생성
    * 시점에 굳고 재일정(`updateFixture`)에서 갱신되지 않아서, 그대로 쓰면 같은 경기를
    * 공개 경기기록·어드민 영상 화면과 **다른 주차로 부르게 된다**. 저 두 화면과 같은
-   * 규칙(KST 경기일 순번)으로 `startAt`에서 매번 파생한다.
+   * 규칙(KST 달력 주 순번)으로 `startAt`에서 매번 파생한다.
    */
   title: string;
   opponentName: string | null;
@@ -66,6 +66,12 @@ export type LineupTodo = {
 
 /** 대회·리그 경기의 "명단 확인" 대상 — 전날 알림이 쓴다. */
 export type CompetitionRosterCheck = TeamUpcomingGame & { rosterSummary: GameRosterSummary };
+
+interface TeamMatchCollectionOptions {
+  startedWithinMs?: number;
+  /** Keep delayed, not-yet-started tournament games in the team roster selector. */
+  includeElapsedScheduledTournamentGames?: boolean;
+}
 
 /** 대회·리그 경기 명단 웹 화면. 알림 딥링크와 웹 라우트가 같은 값을 써야 한다. */
 export function rosterScreenPath(teamId: string, gameId: string): string {
@@ -117,12 +123,16 @@ export class LineupTodoService {
    * 그대로 쓰면 **팀이 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다** —
    * 전술은 제출 후에도 계속 고치는 것이라 그 동작은 틀렸다.
    *
-   * 알려진 한계: `collect` 계열은 `now` 기준으로 앞으로의 경기만 모은다. 그래서 **끝난
-   * 경기의 전술보드는 이 목록으로 열 수 없다.** 지금은 의도된 범위다(지난 경기 배치를
-   * 다시 여는 화면이 아직 없다) — 이름에 `upcoming` 을 넣어 그 한계를 드러내 둔다.
+   * 팀 roster 선택기는 옵션으로 킥오프 시각이 지난 대회 경기 중 `SCHEDULED`인 경기를 더 받는다.
+   * 이 지연 경기 예외는 진행 중 대회에만 적용하며, `LIVE`·`PAUSED`·종료된 경기는 추가하지 않는다.
+   * 다른 소비자는 기존 시간 범위를 쓴다.
    */
-  async listUpcomingForTeam(teamId: string, now: Date): Promise<TeamUpcomingGame[]> {
-    return this.collectWithLineupState([teamId], now);
+  async listUpcomingForTeam(
+    teamId: string,
+    now: Date,
+    options: Pick<TeamMatchCollectionOptions, 'includeElapsedScheduledTournamentGames'> = {},
+  ): Promise<TeamUpcomingGame[]> {
+    return this.collectWithLineupState([teamId], now, options);
   }
 
   /**
@@ -133,10 +143,10 @@ export class LineupTodoService {
   async listUpcomingForTeams(
     teamIds: readonly string[],
     now: Date,
-    options: { startedWithinMs?: number } = {},
+    options: Pick<TeamMatchCollectionOptions, 'startedWithinMs'> = {},
   ): Promise<TeamUpcomingGame[]> {
     if (teamIds.length === 0) return [];
-    return this.collectWithLineupState([...teamIds], now, options.startedWithinMs ?? 0);
+    return this.collectWithLineupState([...teamIds], now, options);
   }
 
   /**
@@ -171,9 +181,9 @@ export class LineupTodoService {
   private async collectWithLineupState(
     teamIds: string[] | null,
     now: Date,
-    startedWithinMs = 0,
+    options: TeamMatchCollectionOptions = {},
   ): Promise<TeamUpcomingGame[]> {
-    const candidates = await this.loadTeamMatches(teamIds, now, startedWithinMs);
+    const candidates = await this.loadTeamMatches(teamIds, now, options);
     if (candidates.length === 0) return [];
 
     const states = await this.loadLineupStates(candidates.map((candidate) => ({
@@ -201,17 +211,38 @@ export class LineupTodoService {
     return items;
   }
 
-  private async loadTeamMatches(teamIds: string[] | null, now: Date, startedWithinMs: number) {
-    const matches = await this.prisma.v1TeamMatch.findMany({
+  private async loadTeamMatches(teamIds: string[] | null, now: Date, options: TeamMatchCollectionOptions) {
+    const scheduleFilter: Prisma.V1TeamMatchWhereInput = options.includeElapsedScheduledTournamentGames
+      ? {
+          AND: [
+            NOT_IN_HELD_LEAGUE_WHERE,
+            {
+              OR: [
+                { startAt: { gte: now } },
+                {
+                  startAt: { lt: now },
+                  deletedAt: null,
+                  leagueId: null,
+                  tournamentId: { not: null },
+                  tournament: { status: { notIn: ['completed', 'cancelled'] } },
+                  game: { is: { state: 'SCHEDULED' } },
+                },
+              ],
+            },
+          ],
+        }
+      : {
+          startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) },
+          AND: [NOT_IN_HELD_LEAGUE_WHERE],
+        };
+    const matchQuery = {
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
         status: 'matched',
-        startAt: { gte: new Date(now.getTime() - startedWithinMs) },
+        ...scheduleFilter,
         hostTeamId: { not: null },
         approvedApplicantTeamId: { not: null },
         game: { isNot: null },
-        // 보류 리그의 경기는 라인업 할 일·리마인더·다음 경기에서 뺀다 — 보류가 풀리면 다시 나온다(league-hold.ts).
-        AND: [NOT_IN_HELD_LEAGUE_WHERE],
         ...(teamIds !== null
           ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
           : {}),
@@ -234,9 +265,31 @@ export class LineupTodoService {
         league: { select: { title: true } },
         game: { select: { id: true } },
       },
-      orderBy: { startAt: 'asc' },
+      // The stable tie-breaker lets the roster-only path continue after a cursor
+      // without dropping matches that share a kickoff time. Other consumers keep
+      // their prior ordering contract.
+      orderBy: options.includeElapsedScheduledTournamentGames
+        ? [{ startAt: 'asc' }, { id: 'asc' }]
+        : { startAt: 'asc' },
       take: 500,
-    });
+    } satisfies Prisma.V1TeamMatchFindManyArgs;
+    const matches = await this.prisma.v1TeamMatch.findMany(matchQuery);
+    if (options.includeElapsedScheduledTournamentGames && matches.length === matchQuery.take) {
+      // Delayed SCHEDULED tournament games sort before future fixtures. Keep each
+      // database read bounded, but exhaust the roster selector's candidate set so
+      // a backlog cannot hide later fixtures behind the historical 500-row cap.
+      let cursorId = matches[matches.length - 1]?.id;
+      while (cursorId !== undefined) {
+        const page = await this.prisma.v1TeamMatch.findMany({
+          ...matchQuery,
+          cursor: { id: cursorId },
+          skip: 1,
+        });
+        matches.push(...page);
+        if (page.length < matchQuery.take) break;
+        cursorId = page[page.length - 1]!.id;
+      }
+    }
 
     // Prisma keeps these columns nullable because tournament TBD slots share the
     // TeamMatch table. A slot without a scheduled time has no lineup action yet;
@@ -276,7 +329,7 @@ export class LineupTodoService {
       // `V1TeamMatch.title`("<리그명> N주차 M경기")을 쓰지 않는 이유는 그 값이 대진 생성
       // 시점에 굳고 재일정에서 갱신되지 않기 때문이다 — 운영자가 경기를 앞당기면 제목만
       // 옛 주차로 남아, 같은 경기를 공개 경기기록·어드민 영상 화면과 다른 주차로 부르게 된다.
-      // 그래서 주차는 저 화면들과 같은 규칙(KST 경기일 순번)으로 startAt에서 파생한다.
+      // 그래서 주차는 저 화면들과 같은 규칙(KST 달력 주 순번)으로 startAt에서 파생한다.
       // 그날의 경기 순번("M경기")도 붙이지 않는다. timing 을 지정한 리그는 한 팀이 하루에
       // 여러 경기를 뛰므로(팀당 하루 N경기) 순번이 행을 구분해 주긴 했지만, 그 값 역시
       // 제목과 함께 굳어 재일정 뒤에는 실제 킥오프 순서와 어긋난다 — 틀린 순번을 말하느니
@@ -327,7 +380,7 @@ export class LineupTodoService {
    *
    * 규칙은 공개 경기기록(`public-tournament-records.service.ts`의 `resolveLeagueWeekNumber`)·
    * 어드민 영상 화면(`league-fixture-videos.service.ts`)과 **완전히 같다**: 그 리그의 서로 다른
-   * KST 경기일을 오름차순으로 세어 몇 번째 날인지가 곧 주차다. 같은 경기가 화면마다 다른
+   * 경기가 있는 KST 달력 주를 오름차순으로 세어 몇 번째 주인지가 곧 주차다. 같은 경기가 화면마다 다른
    * 주차로 불리면 안 되므로 규칙을 여기서 새로 만들지 않는다.
    *
    * 저쪽이 `startAt <= 대상`으로 범위를 좁히는 것은 비용 최적화일 뿐이다(뒤 날짜는 앞

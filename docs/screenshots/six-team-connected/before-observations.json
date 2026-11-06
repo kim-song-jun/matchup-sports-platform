@@ -1,0 +1,64 @@
+{
+  "browserPid": 756,
+  "parentPid": 27076,
+  "observations": [
+    {
+      "width": 390,
+      "commit": "4790452af6f22c2a8c2e7b3bde54400ced7fe5d9",
+      "status": 200,
+      "text": "대진표\n\n6강 토너먼트 · 총 5경기\n\n6강 · 3경기\n승민 테스트팀5\n-\n승민 테스트팀4\n-\n시간 미정\n경기 상세\n승민 테스트팀2\n-\n승민 테스트팀3\n-\n시간 미정\n경기 상세\n승민 테스트팀1\n-\n마포 레인저스\n-\n시간 미정\n경기 상세\n결승 직행 · 선정 대기\n\n준결승 부전승 1팀 · 6강 승리팀 중 선정\n\n6강 승리팀 3팀이 정해지면 결승 직행팀을 선정해요. 완전 동률이면 운영자가 선택해요.\n\n선정 기준과 기록 보기\n준결승 · 1경기\n6강 승리팀 중 선정\n-\n6강 승리팀 중 선정\n-\n시간 미정\n경기 상세\n결승 · 1경기\n\n결승 직행팀 대 준결승 승리팀\n\n결승 직행팀\n-\n준결승 승리팀\n-\n시간 미정\n경기 상세",
+      "paths": 0,
+      "errors": [
+        {
+          "type": "network",
+          "status": 401,
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        },
+        {
+          "type": "console",
+          "message": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 768,
+      "commit": "4790452af6f22c2a8c2e7b3bde54400ced7fe5d9",
+      "status": 200,
+      "text": "대진표\n\n6강 토너먼트 · 총 5경기\n\n6강 · 3경기\n승민 테스트팀5\n-\n승민 테스트팀4\n-\n시간 미정\n경기 상세\n승민 테스트팀2\n-\n승민 테스트팀3\n-\n시간 미정\n경기 상세\n승민 테스트팀1\n-\n마포 레인저스\n-\n시간 미정\n경기 상세\n결승 직행 · 선정 대기\n\n준결승 부전승 1팀 · 6강 승리팀 중 선정\n\n6강 승리팀 3팀이 정해지면 결승 직행팀을 선정해요. 완전 동률이면 운영자가 선택해요.\n\n선정 기준과 기록 보기\n준결승 · 1경기\n6강 승리팀 중 선정\n-\n6강 승리팀 중 선정\n-\n시간 미정\n경기 상세\n결승 · 1경기\n\n결승 직행팀 대 준결승 승리팀\n\n결승 직행팀\n-\n준결승 승리팀\n-\n시간 미정\n경기 상세",
+      "paths": 0,
+      "errors": [
+        {
+          "type": "network",
+          "status": 401,
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        },
+        {
+          "type": "console",
+          "message": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 1440,
+      "commit": "4790452af6f22c2a8c2e7b3bde54400ced7fe5d9",
+      "status": 200,
+      "text": "대진표\n\n6강 토너먼트 · 총 5경기\n\n6강 · 3경기\n승민 테스트팀5\n-\n승민 테스트팀4\n-\n시간 미정\n경기 상세\n승민 테스트팀2\n-\n승민 테스트팀3\n-\n시간 미정\n경기 상세\n승민 테스트팀1\n-\n마포 레인저스\n-\n시간 미정\n경기 상세\n결승 직행 · 선정 대기\n\n준결승 부전승 1팀 · 6강 승리팀 중 선정\n\n6강 승리팀 3팀이 정해지면 결승 직행팀을 선정해요. 완전 동률이면 운영자가 선택해요.\n\n선정 기준과 기록 보기\n준결승 · 1경기\n6강 승리팀 중 선정\n-\n6강 승리팀 중 선정\n-\n시간 미정\n경기 상세\n결승 · 1경기\n\n결승 직행팀 대 준결승 승리팀\n\n결승 직행팀\n-\n준결승 승리팀\n-\n시간 미정\n경기 상세",
+      "paths": 0,
+      "errors": [
+        {
+          "type": "network",
+          "status": 401,
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        },
+        {
+          "type": "console",
+          "message": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "horizontalOverflow": false
+    }
+  ],
+  "cleanup": "owned headed browser closed"
+}

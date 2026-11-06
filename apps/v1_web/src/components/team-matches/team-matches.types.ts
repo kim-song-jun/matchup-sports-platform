@@ -97,7 +97,13 @@ export type TeamMatchListViewModel = {
     kindOptions: Array<{ label: string; value: '' | 'friendly' | 'competition'; href: string; active?: boolean }>;
   };
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
-  summary: { count: number; today: number; urgent: number };
+  summary: {
+    count: number;
+    today: number;
+    urgent: number;
+    /** '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다. 없으면 숫자만 그린다. */
+    recruitingFilter?: { active: boolean; href: string };
+  };
   matches: TeamMatchModel[];
   /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
   isLoading?: boolean;
@@ -256,6 +262,8 @@ export type TeamMatchDetailViewModel = {
   // 새로 적용하면서(2026-09-04) 행별 tone 은 더 이상 읽히지 않는다 — 죽은 필드로 남기지 않고
   // 제거한다.
   resultAction?: { label: string; href: string } | null;
+  /** Host-only route into the saved-rules preview or the matched game's live console. */
+  operateAction?: { label: string; href: string } | null;
   /** 경기 종료 후 후기 작성 화면(/my/reviews/team_match/:id) 링크. 참가팀 소속일 때만 설정된다.
    * 이 링크가 없던 동안 팀매치 후기는 /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */
   reviewAction?: { label: string; href: string } | null;

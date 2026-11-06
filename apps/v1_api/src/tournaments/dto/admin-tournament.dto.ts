@@ -68,13 +68,14 @@ export class AdminTournamentListQueryDto {
   limit?: number;
 }
 
-export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
+export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
 export const TOURNAMENT_GENDER_CATEGORIES = ['mixed', 'male', 'female'] as const;
 export type TournamentGenderCategory = (typeof TOURNAMENT_GENDER_CATEGORIES)[number];
 export const TOURNAMENT_RULES_TEXT_MAX_LENGTH = 10_000;
 
 export class CreateTournamentDto {
+  @IsOptional() @IsBoolean() sixTeamMode?: boolean;
   @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
   sportId!: string;
 
@@ -139,11 +140,22 @@ export class CreateTournamentDto {
   @MaxLength(1000)
   coverImageUrl?: string | null;
 
+  /** 목록용 이미지. 비우면 상세용 이미지와 함께 사용한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  listImageUrl?: string | null;
+
+  /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
+  @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
+  @IsBoolean()
+  showDetailImage?: boolean;
+
   @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
-  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()
@@ -298,7 +310,7 @@ export class CreateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()
@@ -406,6 +418,7 @@ export class CreateTournamentDto {
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
+  @IsOptional() @IsBoolean() sixTeamMode?: boolean;
   // 동시 편집 CAS(낙관적 잠금) — 클라이언트가 폼을 불러온 시점의 updatedAt을 그대로 되돌려 보낸다.
   // tournament-period-settings.dto.ts의 expectedVersion과 같은 관례(문자열 ISO 타임스탬프 비교).
   @IsString()
@@ -482,11 +495,22 @@ export class UpdateTournamentDto {
   @MaxLength(1000)
   coverImageUrl?: string | null;
 
+  /** 목록용 이미지. 비우면 상세용 이미지와 함께 사용한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  listImageUrl?: string | null;
+
+  /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
+  @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
+  @IsBoolean()
+  showDetailImage?: boolean;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
-  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()
@@ -633,7 +657,7 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()

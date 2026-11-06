@@ -1,6 +1,5 @@
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchListPageClient } from '@/components/team-matches/team-matches-client';
-import { sortTeamMatchesByAvailability } from '@/components/team-matches/team-matches.card-model';
 import { hasListFilter, TEAM_MATCH_LIST_FILTER_PARAMS, TEAM_MATCH_LIST_SEED_PATH } from '@/lib/public-list-seed';
 import { buildPublicMetadata } from '@/lib/seo';
 import { fetchSeoMasterSports, fetchSeoSeed } from '@/lib/seo-list';
@@ -26,7 +25,7 @@ export default async function TeamMatchesPage({ searchParams }: { searchParams: 
   ]);
 
   // matches/page.tsx 와 같은 규칙 — 카드 순서·이름 그대로, 무필터일 때만.
-  const ldItems = page && !filtered ? sortTeamMatchesByAvailability([...page.items]) : [];
+  const ldItems = page && !filtered ? page.items : [];
 
   return (
     <>

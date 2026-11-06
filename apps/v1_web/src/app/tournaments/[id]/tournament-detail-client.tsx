@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { useSearchParams } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -11,7 +12,7 @@ import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
 import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { useV1Tournament, useV1MyRegistrations, useV1MyTeams } from '@/hooks/use-v1-api';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { isTransientFailure, v1Get } from '@/lib/api-client';
 import { placeFromVenueFields, placeToView } from '@/lib/place';
@@ -27,9 +28,11 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
-import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
+import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
+import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
 import { leagueSideLabel } from '@/lib/league-fixture-meta';
-import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
+import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
 import {
   CompetitionFixtureCard,
@@ -49,12 +52,14 @@ import { CompetitionEntrySection } from '@/components/tournaments/competition-en
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
-import { isLeagueCompetition } from '@/lib/competition-kind';
+import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
+  formatTournamentDateRangeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateTimeLong,
+  formatMonthDay,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -194,6 +199,9 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
   const finalFixture = tournament.fixtures.find((f) => f.round === 'final' || f.round === '결승');
   if (!finalFixture?.result) return null;
 
+  const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+  if (selectedWinner) return selectedWinner === finalFixture.homeRegistrationId ? finalFixture.homeTeamName : selectedWinner === finalFixture.awayRegistrationId ? finalFixture.awayTeamName : null;
+
   const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = finalFixture.result;
   let winnerSide: 'home' | 'away' | null = null;
   if (hasPenalty && homePenaltyScore !== null && awayPenaltyScore !== null) {
@@ -214,13 +222,6 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
   return splitPrizeSegments(prizeBreakdown);
-}
-
-function formatPublishedAt(dateStr: string): string {
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${month}월 ${day}일`;
 }
 
 function CapacityProgressBar({
@@ -399,28 +400,68 @@ function ApplyCTAButtons({
   );
 }
 
+/**
+ * 정규 리그의 '다음 리그에서 함께 뛰어요' 안내(모바일 하단)가 뜨는가. 끝난 리그는 언제나 — 이 리그에 참가했던 팀이
+ * 다음 시즌에 재참가하는 입구다(2026-11-03). 시즌 중·마감된 리그는 신청하지 않은 사람에게만 뜬다(참가 중인 팀은
+ * "우리 팀 참가" 카드가 그 자리를 맡는다).
+ */
+export function showsNextLeagueInvite(
+  tournament: Pick<V1TournamentDetail, 'kind' | 'status'>,
+  hasActiveRegistration: boolean,
+  blockReason: ReturnType<typeof resolveTournamentRegistrationBlock>,
+): boolean {
+  if (tournament.kind !== 'regular_league' || tournament.status === 'cancelled') return false;
+  if (tournament.status === 'completed') return true;
+  return blockReason !== null && !hasActiveRegistration;
+}
+
+/** 이 리그에 확정됐던 내 팀 전부(팀원 포함) — 체계로 전환한 리그에서 내 팀이 편성된 티어를 찾는다. */
+function confirmedTeamIdsOf(registrations: readonly V1TournamentRegistration[]): string[] {
+  return registrations.filter((registration) => registration.status === 'confirmed').map((registration) => registration.teamId);
+}
+
+/** 지난 시즌 확정 팀의 현재 팀장·매니저에게만 재참가 신청을 안내한다. */
+function useReturningTeamId(registrations: readonly V1TournamentRegistration[]): string | null {
+  const hasConfirmedRegistration = registrations.some((registration) => registration.status === 'confirmed');
+  const { data, isError } = useV1MyTeams(undefined, { enabled: hasConfirmedRegistration });
+  const teams = data && ('items' in data ? data.items : data);
+  if (!hasConfirmedRegistration || isError || !teams) return null;
+  const managedTeamIds = new Set(teams.filter((team) => team.role === 'owner' || team.role === 'manager').map((team) => team.teamId));
+  return registrations.find((registration) => registration.status === 'confirmed' && managedTeamIds.has(registration.teamId))?.teamId ?? null;
+}
+
 export function ApplyCTA({
   tournament,
   myRegistration,
+  myRegistrations = myRegistration === null ? [] : [myRegistration],
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
+  myRegistrations?: readonly V1TournamentRegistration[];
 }) {
+  const returningTeamId = useReturningTeamId(myRegistrations);
+  const hasActiveRegistration = myRegistration !== null && myRegistration.status !== 'cancelled';
+  const blockReason = resolveTournamentRegistrationBlock(tournament);
+  if (showsNextLeagueInvite(tournament, hasActiveRegistration, blockReason)) {
+    return (
+      /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
+      <div className="tm-fixed-cta tm-hide-desktop">
+        <LeagueNextRegistrationInvite leagueId={tournament.id} returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} />
+      </div>
+    );
+  }
+
   const isOpen = tournament.kind === 'regular_league'
     ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
     : tournament.status === 'open';
 
   // 신청이 있으면 제목 아래 "우리 팀 참가" 카드가 신청 내역·명단으로 보낸다(R-1) — 같은 입구를 한 화면에 두지 않는다.
-  if (!isOpen || (myRegistration !== null && myRegistration.status !== 'cancelled')) return null;
-
-  const blockReason = resolveTournamentRegistrationBlock(tournament);
+  if (!isOpen || hasActiveRegistration) return null;
 
   return (
     /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
     <div className="tm-fixed-cta tm-hide-desktop">
-      {tournament.kind === 'regular_league' && blockReason !== null
-        ? <LeagueNextRegistrationInvite leagueId={tournament.id} />
-        : <ApplyCTAButtons tournament={tournament} blockReason={blockReason} myRegistration={myRegistration} />}
+      <ApplyCTAButtons tournament={tournament} blockReason={blockReason} myRegistration={myRegistration} />
     </div>
   );
 }
@@ -575,7 +616,7 @@ export function TournamentDetailPageClient({
           // 셸이 이 슬롯을 페이지 트리 밖에 그리므로 체인 출처를 따로 감싼다.
           floatingSlot: (
             <DetailChainFromContext.Provider value={chainFrom}>
-              <ApplyCTA tournament={displayData} myRegistration={myRegistration} />
+              <ApplyCTA tournament={displayData} myRegistration={myRegistration} myRegistrations={myRegistrations} />
             </DetailChainFromContext.Provider>
           ),
         }
@@ -619,6 +660,7 @@ export function TournamentDetailPageClient({
       <TournamentDetailView
         tournament={displayData}
         myRegistration={myRegistration}
+        myRegistrations={myRegistrations}
         backHref="/tournaments"
         entrySection={
           <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
@@ -636,16 +678,19 @@ export function TournamentDetailPageClient({
 export function TournamentDetailView({
   tournament,
   myRegistration,
+  myRegistrations = myRegistration === null ? [] : [myRegistration],
   backHref = '/tournaments',
   entrySection = null,
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
+  myRegistrations?: readonly V1TournamentRegistration[];
   backHref?: string;
   /** 모바일은 제목 아래, 데스크톱 참가팀은 우측에 표시하는 카드. */
   entrySection?: ReactNode;
 }) {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const returningTeamId = useReturningTeamId(myRegistrations);
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const sportAccent = getSportAccent(tournament.sport.code);
@@ -678,7 +723,7 @@ export function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
   const entryInAside = isDesktop && !isCompleted && hasActiveRegistration;
   /** 하단 고정 신청 CTA 가 뜨는가 — 신청한 팀은 "우리 팀 참가" 카드가 그 자리를 맡아 뜨지 않는다(ApplyCTA 와 같은 조건). */
-  const showsApplyCta = isOpen && !hasActiveRegistration;
+  const showsApplyCta = (isOpen && !hasActiveRegistration) || showsNextLeagueInvite(tournament, hasActiveRegistration, registrationBlock);
   const showsPublicLeagueLiveCta = isLeagueMirror && tournament.status === 'in_progress';
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
@@ -694,7 +739,8 @@ export function TournamentDetailView({
      QueryClientProvider 없이 단독 렌더되는 기존 테스트가 있다(tournament-detail-cta.test.tsx). */
   const [participantAnnouncements, setParticipantAnnouncements] = useState<V1TournamentAnnouncement[]>([]);
   useEffect(() => {
-    if (!hasActiveRegistration) {
+    // 공지는 정규 대회에만 있다 — 리그로 부르면 404 가 콘솔에 찍힌다(MD-QA #209).
+    if (!hasActiveRegistration || isLeagueMirror) {
       setParticipantAnnouncements([]);
       return;
     }
@@ -713,7 +759,7 @@ export function TournamentDetailView({
     return () => {
       cancelled = true;
     };
-  }, [tournament.id, hasActiveRegistration]);
+  }, [tournament.id, hasActiveRegistration, isLeagueMirror]);
 
   const allAnnouncements = (() => {
     if (participantAnnouncements.length === 0) return tournament.announcements;
@@ -733,9 +779,8 @@ export function TournamentDetailView({
   const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror, isEntryLive);
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
-  // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
-  const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
+  // 저장된 행은 공용 파서로 읽고, 화면에서만 같은 시상의 상품을 묶는다.
+  const prizeRows = parsePrizeRows(tournament.prizeBreakdown ?? '');
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
       <Card pad={20} style={{ background: 'var(--orange50)' }}>
@@ -753,38 +798,16 @@ export function TournamentDetailView({
             </div>
           </div>
         </div>
-        {prizeChips.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            {prizeChips.map((seg, i) => {
-              const m = seg.match(/^(우승|준우승|공동 ?[1-9]위|[1-9]위|MVP|득점왕|도움왕|(?:참가(?:팀|자) )?전원)\s+(.+)$/);
-              return (
-                <span
-                  key={i}
-                  className="tm-text-caption"
-                  // 2026-08-11: 중립 --surface(라이트 흰색/다크 근흑색)를 쓰면 이 칩이 속한
-                  // 주황 카드(Card background: --orange50)와 색이 완전히 분리돼 보인다 —
-                  // 특히 다크모드에서 카드는 따뜻한 주황조인데 칩만 차가운 무채색 검정으로
-                  // 떠 보이는 결함이 실측 확인됐다(라이브 alpha 스크린샷). 카드 톤에 맞춘
-                  // 반투명 --tint-orange(주황 10%, 라이트/다크 공용)로 교체.
-                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 12px', borderRadius: 'var(--radius-pill)' }}
-                >
-                  {m ? (
-                    <>
-                      <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
-                      {isPrizeAmountValue(m[2]) ? (
-                        formatPrizeRowValue(m[2])
-                      ) : (
-                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{m[2].trim()}</span>
-                      )}
-                    </>
-                  ) : (
-                    seg
-                  )}
-                </span>
-              );
-            })}
+        {prizeRows.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <TournamentPrizeList rows={prizeRows} />
           </div>
-        ) : null}
+        )}
+        {tournament.status === 'completed' && (
+          <Link href={childHref(`/tournaments/${tournament.id}/awards`)} style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', marginTop: 16, fontWeight: 700, color: 'var(--blue700)' }}>
+            시상 결과 보기 →
+          </Link>
+        )}
       </Card>
     </section>
   ) : null;
@@ -793,10 +816,12 @@ export function TournamentDetailView({
      layout and the completed layout, which relocates it above the result hero (TARGET §1). ── */
   const headerIdentitySection = (
     <>
-    {tournament.kind === 'regular_league' && tournament.coverImageUrl?.trim() ? (
+    {(tournament.kind === 'regular_league'
+      ? Boolean(tournament.coverImageUrl?.trim())
+      : tournament.showDetailImage !== false) ? (
       <div className="mb-4 aspect-video overflow-hidden rounded-[var(--radius-container)] bg-[var(--grey50)]">
         <TournamentCampaignMedia
-          src={tournament.coverImageUrl}
+          src={tournament.kind === 'regular_league' ? tournament.coverImageUrl : resolveTournamentImage(tournament, 'detail')}
           sportCode={tournament.sport?.code ?? ''}
           alt={`${tournament.title} 대표 이미지`}
           className="h-full w-full object-contain"
@@ -821,7 +846,7 @@ export function TournamentDetailView({
         <Trophy size={28} strokeWidth={1.6} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
+        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
           {tournament.title}
         </h1>
         <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>
@@ -862,6 +887,22 @@ export function TournamentDetailView({
             {sportAccent.label}
           </span>
         </div>
+        {/* 독립 리그가 이어 가는 지난·다음 시즌(2026-11-03, 다음 시즌은 2026-11-05) — 공개된 리그만 서버가 싣는다.
+            종료된 지난 시즌은 우승팀만 보여 다음 시즌으로 이어진 줄 몰랐다 — 같은 자리에 다음 시즌 링크를 둔다. */}
+        {[
+          { label: '지난 시즌', link: tournament.previousSeason },
+          { label: '다음 시즌', link: tournament.nextSeason },
+        ].map(({ label, link }) => link ? (
+          <p key={label} className="tm-text-caption" style={{ margin: 'var(--spacing-1) 0 0', color: 'var(--text-muted)' }}>
+            {`${label} · `}
+            <Link
+              href={`/tournaments/${encodeURIComponent(link.leagueId)}`}
+              className="font-medium text-[var(--blue700)] underline underline-offset-2"
+            >
+              {link.title}
+            </Link>
+          </p>
+        ) : null)}
       </div>
     </div>
     </>
@@ -926,8 +967,8 @@ export function TournamentDetailView({
           ) : null}
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-            <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
+            <InfoRow label="일정" value={scheduleLabel(tournament)} />
+            <ScheduleNoticeCaption kind={tournament.kind} style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             {showsEntryFee ? <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} /> : null}
           </div>
           {/* 항상 표시 */}
@@ -954,7 +995,7 @@ export function TournamentDetailView({
       {/* 신청을 실제로 받는 상태에서만 노출한다. 마감·진행 중·완료된 대회는 물론, status는
           여전히 open이어도 신청 마감·정원 마감으로 신규 신청이 막힌 대회에서
           "회원가입 후 팀을 만들어 신청하세요" 안내는 따라 할 수 없는 안내라 혼란만 준다. */}
-      {isOpen && registrationBlock === null ? <TournamentApplicationGuideSection isFreeEntry={tournament.entryFee === 0} /> : null}
+      {isOpen && registrationBlock === null ? <TournamentApplicationGuideSection kind={tournament.kind} rosterDeadlineAt={tournament.rosterDeadlineAt} isFreeEntry={tournament.entryFee === 0} /> : null}
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
@@ -1005,7 +1046,7 @@ export function TournamentDetailView({
         <FormatLeftSections tournament={tournament} />
       </div>
 
-      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} targetLabel={isLeagueMirror ? '리그' : '대회'} />
     </>
   );
 
@@ -1044,8 +1085,8 @@ export function TournamentDetailView({
           기본 정보
         </div>
         <Card pad={0}>
-          <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-          <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
+          <InfoRow label="일정" value={scheduleLabel(tournament)} />
+          <ScheduleNoticeCaption kind={tournament.kind} style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
           <InfoRow
             label="참가팀"
             value={
@@ -1098,7 +1139,7 @@ export function TournamentDetailView({
 
         <AccordionSection id="precheck-content" title="참가 전 유의사항">
           <div style={{ display: 'grid', gap: 0 }}>
-            {preParticipationCheckItems(Boolean(tournament.refundPolicyText)).map((item, idx, arr) => (
+            {preParticipationCheckItems({ hasCustomRefundPolicy: Boolean(tournament.refundPolicyText), isFreeEntry: tournament.entryFee === 0 }).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{
@@ -1121,7 +1162,7 @@ export function TournamentDetailView({
         </AccordionSection>
       </div>
 
-      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} targetLabel={isLeagueMirror ? '리그' : '대회'} />
     </>
   );
 
@@ -1163,19 +1204,7 @@ export function TournamentDetailView({
         <section aria-label="참가 전 꼭 확인해 주세요" className="tm-show-desktop">
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
-            {([
-              { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정돼요.' },
-              { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가해요.' },
-              { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불돼요.' },
-              { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않아요.' },
-              { label: '허위 정보', text: '경력·소속 이력 허위 제출 시 팀 탈락돼요.' },
-              { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있어요.' },
-              { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인하고 참가해 주세요.' },
-              { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있어요.' },
-            ] as { label: string; text: string }[])
-              // 벤치마크 감사(P0 ①): 이 데스크톱 aside 목록도 모바일 카드와 같은 라벨을 쓰는
-              // 별도 사본이라 같은 모순이 생긴다 — 같은 기준(REFUND_RELATED_LABELS)으로 거른다.
-              .filter((item) => !(tournament.refundPolicyText && REFUND_RELATED_LABELS.has(item.label)))
+            {preParticipationCheckItems({ hasCustomRefundPolicy: Boolean(tournament.refundPolicyText), isFreeEntry: tournament.entryFee === 0 })
               .map((item, idx, arr) => (
               <div
                 key={item.label}
@@ -1203,11 +1232,9 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
-  const leagueApplicationCta = isLeagueMirror && registrationBlock === null && !hasActiveRegistration
-    ? <div className="mt-4"><ApplyCTAButtons tournament={tournament} blockReason={null} myRegistration={myRegistration} /></div>
-    : null;
-  const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
-    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" /></div>
+  // 종료된 리그도 다음 시즌 입구를 보인다 — 모바일 하단 CTA(showsNextLeagueInvite)와 같게(2026-11-04 알파 QA: 데스크톱에만 없었다).
+  const nextLeagueInvite = isLeagueMirror && (registrationBlock !== null || tournament.status === 'completed')
+    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} /></div>
     : null;
   const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
   const railCTA = isOpen && !leagueUsesProgressRail ? (
@@ -1288,10 +1315,10 @@ export function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
+            {scheduleLabel(tournament)}
           </span>
         </div>
-        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <ScheduleNoticeCaption kind={tournament.kind} style={{ marginTop: 0 }} />
         {showsCapacity ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
@@ -1337,9 +1364,9 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
-        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <ScheduleNoticeCaption kind={tournament.kind} style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
             {showsCapacity ? '정원' : '참가팀'}
@@ -1357,7 +1384,6 @@ export function TournamentDetailView({
           </div>
         ) : null}
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'closed' || (isLeagueMirror && tournament.status === 'in_progress') ? (
     /* 경기 없는 날의 정규 리그도 일정 진입을 유지한다.
@@ -1391,15 +1417,14 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
-        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <ScheduleNoticeCaption kind={tournament.kind} style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{showsCapacity ? '정원' : '참가팀'}</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'completed' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">
@@ -1421,12 +1446,13 @@ export function TournamentDetailView({
         <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>최종 결과 · 시상 보기</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
+      {nextLeagueInvite}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
-        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <ScheduleNoticeCaption kind={tournament.kind} style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{showsCapacity ? '정원' : '참가팀'}</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
@@ -1442,7 +1468,7 @@ export function TournamentDetailView({
         <AppBackLink className="tm-desktop-back" fallbackHref={backHref}>
           <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </AppBackLink>
-        <div className="tm-text-heading" style={{ margin: 0 }} aria-hidden="true">대회 상세</div>
+        <div className="tm-text-heading" style={{ margin: 0 }} aria-hidden="true">{competitionNounOf(tournament.kind)} 상세</div>
       </div>
 
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA rail ──
@@ -1497,7 +1523,7 @@ export function TournamentDetailView({
             제거, 이 카드, 새 하단 CTA) 쌓이는 상황이었다. */}
         {!isCompleted && <BracketSection tournament={tournament} />}
         {!isCompleted && (
-          <TournamentPreParticipationNotice hasCustomRefundPolicy={Boolean(tournament.refundPolicyText)} />
+          <TournamentPreParticipationNotice hasCustomRefundPolicy={Boolean(tournament.refundPolicyText)} isFreeEntry={tournament.entryFee === 0} />
         )}
       </div>
     </article>
@@ -1658,13 +1684,22 @@ const REFUND_RELATED_LABELS = new Set(['환불 불가', '주최 취소', '대회
  * 표시). 운영자 정책이 있으면 그 세 항목을 빼 모순을 없애고, 없으면 기존 고정문구가
  * fallback으로 남는다(사용자 결정, 2026-09-15).
  */
-function preParticipationCheckItems(hasCustomRefundPolicy: boolean) {
-  return hasCustomRefundPolicy
-    ? PRE_PARTICIPATION_CHECK_ITEMS.filter((item) => !REFUND_RELATED_LABELS.has(item.label))
-    : PRE_PARTICIPATION_CHECK_ITEMS;
+/**
+ * 무료 대회(참가비 0원)는 낼 돈이 없어 입금·환불 항목이 맞지 않는다(MD-QA #170) — 환불 항목을 빼고, 확정·노쇼 문구에서
+ * 참가비를 뺀다. 데스크톱 aside·모바일 카드·종료 대회 아코디언이 모두 이 함수 하나를 쓴다.
+ */
+function preParticipationCheckItems({ hasCustomRefundPolicy, isFreeEntry }: { hasCustomRefundPolicy: boolean; isFreeEntry: boolean }) {
+  return PRE_PARTICIPATION_CHECK_ITEMS
+    .filter((item) => !((hasCustomRefundPolicy || isFreeEntry) && REFUND_RELATED_LABELS.has(item.label)))
+    .map((item) => (isFreeEntry ? { ...item, text: FREE_ENTRY_CHECK_TEXT[item.label] ?? item.text } : item));
 }
 
-function TournamentPreParticipationNotice({ hasCustomRefundPolicy }: { hasCustomRefundPolicy: boolean }) {
+const FREE_ENTRY_CHECK_TEXT: Record<string, string> = {
+  '신청 확정': '운영진 확인 후 참가가 확정돼요.',
+  '노쇼 실격': '노쇼 시 실격 처리돼요.',
+};
+
+function TournamentPreParticipationNotice({ hasCustomRefundPolicy, isFreeEntry }: { hasCustomRefundPolicy: boolean; isFreeEntry: boolean }) {
   return (
     <div className="tm-tournament-bleed tm-hide-desktop">
       <div className="tm-match-detail-body">
@@ -1673,7 +1708,7 @@ function TournamentPreParticipationNotice({ hasCustomRefundPolicy }: { hasCustom
             참가 전 꼭 확인해 주세요
           </div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
-            {preParticipationCheckItems(hasCustomRefundPolicy).map((item, idx, arr) => (
+            {preParticipationCheckItems({ hasCustomRefundPolicy, isFreeEntry }).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{
@@ -1951,18 +1986,25 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
      여기서 안 걸리고 아래 group_knockout 경로로 떨어져 **없는 대진표를 그린다**. */
   if (isLeagueCompetition(tournament)) return null;
 
+  const sixTeamState = tournament.sixTeamMode ? tournament.sixTeamBracket : null;
+  const bracketContent = sixTeamState ? (
+    <SixTeamBracket tournamentId={tournament.id} state={sixTeamState} fixtures={knockoutFixtures}
+      stageLabels={Object.fromEntries(groupFixturesByRound(knockoutFixtures, groups).map(round => [round.key, round.label]))} />
+  ) : <TournamentBracket fixtures={knockoutFixtures} groups={groups} />;
+  const connectedBracketWide = !sixTeamState && knockoutFixtures.length > 1 ? 'true' : undefined;
+
   /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
     if (!hasAnyFixtures) return null;
     return (
-      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
         <div className="tm-match-detail-body">
           <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
             <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
               대진표
             </div>
             <div style={{ marginTop: 4 }}>
-              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+              {bracketContent}
             </div>
           </section>
         </div>
@@ -1976,14 +2018,14 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (!hasKnockoutFixtures) return null;
 
   return (
-    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
       <div className="tm-match-detail-body">
         <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
           <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             결선 대진표
           </div>
           <div style={{ marginTop: 4 }}>
-            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+            {bracketContent}
           </div>
         </section>
       </div>
@@ -2077,6 +2119,15 @@ function FixturesPlaceholder() {
 
 /* ── InfoRow ── */
 
+/**
+ * 상세 '일정' 칸. 리그는 시작일·종료일(날짜)만 정하므로 날짜만 보인다 — 시각을 붙이면 저장된
+ * UTC 자정이 '09:00'으로 보인다(MD-QA #196). 대회는 실제 개최 시각이 있어 시각까지 보인다.
+ */
+function scheduleLabel(tournament: Pick<V1TournamentDetail, 'kind' | 'scheduledAt' | 'scheduledEndAt'>): string {
+  const format = tournament.kind === 'regular_league' ? formatTournamentDateRangeShort : formatTournamentDateRangeWithTime;
+  return format(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정';
+}
+
 function InfoRow({
   label,
   value,
@@ -2113,13 +2164,13 @@ function InfoRow({
  * 기본 marginTop=8 은 InfoRow 리스트 밖 등 독립 블록 배치용 — desktop rail 의 flex(gap) 목록
  * 안에서는 gap 이 간격을 이미 담당하므로 style로 marginTop:0 을 넘겨 이중 여백을 막는다.
  */
-function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
+function ScheduleNoticeCaption({ kind, style }: { kind: V1TournamentDetail['kind']; style?: React.CSSProperties }) {
   return (
     <div
       className="tm-text-caption"
       style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 8, ...style }}
     >
-      대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있어요. 참가 전 꼭 확인해 주세요.
+      {competitionNounOf(kind)} 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있어요. 참가 전 꼭 확인해 주세요.
     </div>
   );
 }
@@ -2227,7 +2278,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
             {announcement.title}
           </div>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-            {formatPublishedAt(announcement.publishedAt)}
+            {formatMonthDay(announcement.publishedAt) ?? '날짜 미정'}
           </span>
         </div>
         <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>

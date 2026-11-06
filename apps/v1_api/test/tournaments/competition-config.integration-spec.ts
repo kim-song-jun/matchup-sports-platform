@@ -21,13 +21,14 @@ import {
   exerciseCompetitionConfigChange,
   seedCompetitionConfigFixture,
 } from '../fixtures/competition-config.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const adminContext = new AdminContextService(prisma);
 const bracketService = new TournamentBracketService(
   prisma,
   adminContext,
-  new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService()),
+  new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma)),
 );
 
 const authUser = {

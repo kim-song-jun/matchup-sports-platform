@@ -10,6 +10,8 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { server } from '@/test/msw/server';
 import { clearStoredV1Session, saveStoredV1Session, V1_SESSION_HINT_KEY, V1_USER_ID_KEY } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { readWithdrawalCancel, saveWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import type { ClientErrorPayload } from '@/lib/client-error-reporter';
 
 const socket = vi.hoisted(() => ({ disconnect: vi.fn() }));
@@ -130,8 +132,19 @@ describe('WithdrawalPageClient session termination', () => {
   it('shows the 30-day deletion timeline and recovery path before submission', () => {
     renderWithClient(<WithdrawalPageClient />);
 
-    expect(screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에는 고객센터로 복구를 요청할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에 다시 로그인하면 직접 취소할 수 있어요. 다만 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '탈퇴 요청' })).toBeInTheDocument();
+  });
+
+  it('warns in the confirm dialog that the request can be cancelled by signing in but the lost teams and rosters stay lost', async () => {
+    const user = userEvent.setup();
+    renderWithClient(<WithdrawalPageClient />);
+
+    await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/30일 안에는 다시 로그인해 취소할 수 있지만, 빠진 팀과 경기 명단은 돌아오지 않아요/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/직접 취소할 수 없/)).not.toBeInTheDocument();
   });
 
   it('clears the real identity cache and session, disconnects the socket, then replaces the document after API success', async () => {
@@ -139,6 +152,8 @@ describe('WithdrawalPageClient session termination', () => {
     const { queryClient } = renderWithClient(<WithdrawalPageClient />);
     queryClient.setQueryData(v1Keys.profile(), { userId: 'withdrawal-user' });
     queryClient.setQueryData(v1Keys.authMe(), { userId: 'withdrawal-user' });
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-by-someone', linkTokenExpiresInSeconds: 600 });
+    saveWithdrawalCancel({ token: 'left-by-someone-else', expiresInSeconds: 600 }, '/home');
 
     await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
@@ -146,6 +161,8 @@ describe('WithdrawalPageClient session termination', () => {
     await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
     expect(requestCount).toBe(1);
     expect(queryClient.getQueryCache().findAll({ queryKey: v1Keys.all })).toHaveLength(0);
+    expect(peekPendingSocialLink()).toBeNull();
+    expect(readWithdrawalCancel()).toBeNull();
     expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
     expect(localStorage.getItem(V1_USER_ID_KEY)).toBeNull();
     expect(socket.disconnect).toHaveBeenCalledTimes(1);
@@ -348,7 +365,7 @@ describe('WithdrawalPageClient session termination', () => {
   });
 
   it('removes the browser subscription when the inactive-account guard rejects push-row cleanup', async () => {
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockResolvedValue(true) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockResolvedValue(true) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });
@@ -456,7 +473,7 @@ describe('WithdrawalPageClient session termination', () => {
   });
 
   it('still clears the withdrawn session and navigates when browser subscription removal rejects', async () => {
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockRejectedValue(new Error('browser refused unsubscribe')) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockRejectedValue(new Error('browser refused unsubscribe')) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });
@@ -475,7 +492,7 @@ describe('WithdrawalPageClient session termination', () => {
 
   it('keeps valid identity, cached data, and navigation after the API rejects the request', async () => {
     withdrawStatus = 403;
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockResolvedValue(true) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockResolvedValue(true) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });

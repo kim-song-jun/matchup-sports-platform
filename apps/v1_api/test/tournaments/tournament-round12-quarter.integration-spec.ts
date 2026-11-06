@@ -8,10 +8,11 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
 import { competitionConfigFixture, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const service = new TournamentBracketService(prisma, new AdminContextService(prisma),
-  new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService()));
+  new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma)));
 const user = { id: competitionConfigFixture.adminUserId, email: 'task11-admin@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
 describe('12강·8강 실제 저장 계약', () => {

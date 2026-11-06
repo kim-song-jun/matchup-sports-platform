@@ -78,7 +78,7 @@ function createSocket() {
 }
 
 const post = vi.fn<(...args: unknown[]) => Promise<unknown>>();
-vi.mock('@/lib/api-client', () => ({ v1Get: vi.fn(async () => ({ items: [] })), v1Post: (...args: unknown[]) => post(...args) }));
+vi.mock('@/lib/api-client', () => ({ v1Post: (...args: unknown[]) => post(...args) }));
 
 async function mount() {
   const transport = createSocket();
@@ -86,7 +86,10 @@ async function mount() {
   const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   function wrapper({ children }: { readonly children: ReactNode }) { return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>; }
-  const hook = renderHook(({ gameId }: { readonly gameId: string }) => useV1GameOperationsConsole({ tournamentId: null, gameId, myUserId: USER_ID, initialLastSequence: 1 }), { wrapper, initialProps: { gameId: GAME_ID } });
+  const hook = renderHook(({ gameId }: { readonly gameId: string }) => useV1GameOperationsConsole({ gameId,
+          gameDetailGameId: gameId,
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 }, initialLastSequence: 1 }), { wrapper, initialProps: { gameId: GAME_ID } });
   await waitFor(() => expect(hook.result.current.takeover.status).toBe('held'));
   return { ...hook, transport };
 }

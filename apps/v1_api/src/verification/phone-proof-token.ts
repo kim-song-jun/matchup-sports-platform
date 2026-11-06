@@ -14,10 +14,19 @@ import { issueProofToken, verifyProofToken, type ProofPayloadBuilder } from './p
  *
  * 서명·만료·상수시간 비교는 proof-token 에 모여 있다.
  */
-export type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+export type PhoneProofPurpose = 'signup' | 'password_reset';
 
 function payloadFor(phone: string, purpose: PhoneProofPurpose): ProofPayloadBuilder {
   return (expMs) => (purpose === 'signup' ? `${phone}:${expMs}` : `${purpose}:${phone}:${expMs}`);
+}
+
+/**
+ * The legacy signup payload is the bare `{phone}:{exp}`, so a "phone" spelled like another token family's payload
+ * (`withdrawal_cancel:{user}:{epoch}`) would mint that family's token. Real numbers are digits; the HTTP
+ * boundary already enforces 11 of them, and this keeps the bare form closed to anything else.
+ */
+function isBareSignupPhone(phone: string): boolean {
+  return /^\d+$/.test(phone);
 }
 
 export function issuePhoneProofToken(
@@ -25,6 +34,9 @@ export function issuePhoneProofToken(
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): string {
+  if (purpose === 'signup' && !isBareSignupPhone(phone)) {
+    throw new Error('A signup phone proof can only be issued for a digit-only phone number');
+  }
   return issueProofToken(payloadFor(phone, purpose), nowMs);
 }
 
@@ -34,5 +46,6 @@ export function verifyPhoneProofToken(
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): boolean {
+  if (purpose === 'signup' && !isBareSignupPhone(phone)) return false;
   return verifyProofToken(token, payloadFor(phone, purpose), nowMs);
 }

@@ -79,6 +79,7 @@ function buildSocket(
       },
     },
     data: {},
+    client: { conn: { close: jest.fn() } },
     rooms,
     join: jest.fn(async (room: string) => {
       rooms.add(room);
@@ -128,6 +129,7 @@ describe('RealtimeGateway', () => {
     renewTakeover: jest.fn(),
   };
   const server = {
+    adapter: { rooms: new Map<string, Set<string>>() },
     to: jest.fn().mockReturnThis(),
     except: jest.fn().mockReturnThis(),
     emit: jest.fn(),
@@ -138,6 +140,7 @@ describe('RealtimeGateway', () => {
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
   const managedTerms = { signupCompliance: jest.fn() };
+  const emitCommittedEvent = jest.fn();
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -148,6 +151,7 @@ describe('RealtimeGateway', () => {
     gamesService.assertReadAccess.mockReset().mockResolvedValue(undefined);
     staffAccess.assertAccess.mockReset();
     managedTerms.signupCompliance.mockReset().mockResolvedValue({ compliant: true });
+    server.adapter.rooms.clear();
     delete process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     moduleRef = await Test.createTestingModule({
@@ -164,7 +168,7 @@ describe('RealtimeGateway', () => {
         // 게이트웨이가 afterInit 에서 자신을 등록하는 룸 브로드캐스터. 이 스펙들은
         // 소켓 경로만 검증하므로 주입만 만족하면 된다(REST 경로 브로드캐스트는
         // games.controller.broadcast.spec.ts 가 따로 검증한다).
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitCommittedEvent } },
         GameTakeoverService,
       ],
     }).compile();
@@ -175,6 +179,67 @@ describe('RealtimeGateway', () => {
   afterEach(async () => {
     await moduleRef.close();
     jest.useRealTimers();
+  });
+
+  it('keeps pending committed-event accounting exact at the per-game and per-socket caps', () => {
+    const socket = buildSocket({}, {}, 'fanout-cap');
+    const get = <T>(name: string): T => Reflect.get(gateway, name) as T;
+    const socketClients = get<Map<string, ReturnType<typeof buildSocket>>>('socketClients');
+    const generations = get<Map<string, Map<string, number>>>('staffLeaseGenerations');
+    const snapshotAcks = get<Map<string, { generation: number }>>('pendingGameSnapshotAcks');
+    const pendingCounts = get<Map<string, number>>('pendingCommittedEventsBySocket');
+    const queueKeys = get<Map<string, Set<string>>>('committedEventQueueKeysBySocket');
+    const generationByGame = new Map<string, number>();
+    const ackByGame = new Map<string, { generation: number }>();
+    const gameIds = Array.from({ length: 5 }, (_, index) => `game-${index}`);
+    for (const gameId of gameIds) {
+      socket.rooms.add(`game:${gameId}`);
+      server.adapter.rooms.set(`game:${gameId}`, new Set([socket.id]));
+      generationByGame.set(gameId, 1);
+      ackByGame.set(`${socket.id}:${gameId}`, { generation: 1 });
+    }
+    socketClients.set(socket.id, socket);
+    generations.set(socket.id, generationByGame);
+    for (const [key, value] of ackByGame) snapshotAcks.set(key, value);
+    const enqueue = (gameId: string, version: number) =>
+      Reflect.apply(Reflect.get(gateway, 'enqueueCommittedEventForSubscribers'), gateway, [gameId, version, { version }]);
+
+    for (let index = 0; index < 128; index += 1) enqueue(gameIds[0]!, index + 1);
+    expect(pendingCounts.get(socket.id)).toBe(128);
+    enqueue(gameIds[0]!, 129);
+    expect(pendingCounts.has(socket.id)).toBe(false);
+
+    // Re-establish the fixture after the per-game cap correctly forced recovery.
+    socketClients.set(socket.id, socket);
+    generations.set(socket.id, generationByGame);
+    for (const [key, value] of ackByGame) snapshotAcks.set(key, value);
+    for (const gameId of gameIds.slice(1)) {
+      for (let index = 0; index < 128; index += 1) enqueue(gameId, index + 1);
+    }
+    expect(pendingCounts.get(socket.id)).toBe(512);
+    enqueue(gameIds[0]!, 130);
+    expect(pendingCounts.has(socket.id)).toBe(false);
+    expect(queueKeys.has(socket.id)).toBe(false);
+  });
+
+  it('does not let cleanup for an old room generation erase the replacement queue', () => {
+    const socket = buildSocket({}, {}, 'generation-owner');
+    const get = <T>(name: string): T => Reflect.get(gateway, name) as T;
+    const queues = get<Map<string, object>>('committedEventDeliveryQueues');
+    const queueKeys = get<Map<string, Set<string>>>('committedEventQueueKeysBySocket');
+    const pendingCounts = get<Map<string, number>>('pendingCommittedEventsBySocket');
+    const key = `${socket.id}:game-1`;
+    const oldQueue = { socket, gameId: 'game-1', generation: 1, events: [{ version: 1, payload: {}, requiresSnapshot: false }], draining: false };
+    const newQueue = { socket, gameId: 'game-1', generation: 2, events: [{ version: 2, payload: {}, requiresSnapshot: false }], draining: false };
+    queues.set(key, newQueue);
+    queueKeys.set(socket.id, new Set([key]));
+    pendingCounts.set(socket.id, 1);
+    Reflect.apply(Reflect.get(gateway, 'clearCommittedEventDeliveryQueue'), gateway, [socket.id, 'game-1', oldQueue.generation]);
+    expect(queues.get(key)).toBe(newQueue);
+    expect(pendingCounts.get(socket.id)).toBe(1);
+    Reflect.apply(Reflect.get(gateway, 'clearCommittedEventDeliveryQueue'), gateway, [socket.id, 'game-1', newQueue.generation]);
+    expect(queues.has(key)).toBe(false);
+    expect(pendingCounts.has(socket.id)).toBe(false);
   });
 
   it('joins the user room on a handshake carrying the identity via the auth payload (the real client path)', async () => {
@@ -386,6 +451,14 @@ describe('RealtimeGateway', () => {
       stubUser('social_profile_deferred', { status: 'active' });
       const socket = await connect();
       await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+      expect(emitCommittedEvent).toHaveBeenCalledWith('game-1', 2, {
+        gameId: 'game-1',
+        sequence: 1,
+        version: 2,
+        event: {},
+      });
+      expect(socket.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ version: 2 }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ version: 2, event: {} }));
 
       stubUser('social_profile_deferred', { status: 'revoked' });
       await expect(append(socket)).resolves.toMatchObject({ code: 'ACTIVITY_PROFILE_REQUIRED' });
@@ -395,6 +468,9 @@ describe('RealtimeGateway', () => {
       stubUser('completed');
       const socket = await connect();
       await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+      expect(emitCommittedEvent).toHaveBeenCalledWith('game-1', 2, expect.objectContaining({ event: {} }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ version: 2 }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ version: 2, event: {} }));
       await expect(requestTakeover(socket)).resolves.toMatchObject({ status: 'granted' });
     });
 
@@ -478,6 +554,219 @@ describe('RealtimeGateway', () => {
       staffAccess.assertAccess.mockResolvedValue(staffPrincipal(GAME_SCOPE));
     }
 
+    it('bounds initial history jobs, cancels a queued subscription on disconnect, and starts the next one', async () => {
+      resolveScopedGame();
+      const sockets = await Promise.all(
+        Array.from({ length: 4 }, (_, index) => connectAuthenticatedSocket(`initial-${index}`)),
+      );
+      const gates = Array.from({ length: 3 }, () => deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>());
+      const entered = Array.from({ length: 3 }, () => deferred<void>());
+      let started = 0;
+      let active = 0;
+      let maximumActive = 0;
+      gamesService.listEvents.mockImplementation(() => {
+        const index = started++;
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        entered[index]?.resolve();
+        return gates[index]!.promise.finally(() => { active -= 1; });
+      });
+
+      const subscriptions = sockets.map((socket) =>
+        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }));
+      await Promise.all([entered[0]!.promise, entered[1]!.promise]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(started).toBe(2);
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, { scheduled?: { cancel(): boolean } }>;
+      expect(pendingAcks.get(`${sockets[2]!.id}:${GAME_SCOPE.gameId}`)?.scheduled).toBeDefined();
+
+      handleDisconnect(gateway, sockets[2]!);
+      await expect(subscriptions[2]).resolves.toMatchObject({ status: 'denied' });
+      gates[0]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      gates[1]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await entered[2]!.promise;
+      expect(started).toBe(3);
+      expect(maximumActive).toBe(2);
+      gates[2]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+
+      const [first, second, fourth] = await Promise.all([subscriptions[0], subscriptions[1], subscriptions[3]]);
+      expect(first).toMatchObject({ status: 'subscribed' });
+      expect(second).toMatchObject({ status: 'subscribed' });
+      expect(fourth).toMatchObject({ status: 'subscribed' });
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(3);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(3, activeUser, GAME_SCOPE.gameId, 0);
+    });
+
+    it('returns an already emitted newer refresh snapshot in the subscribe acknowledgement', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      const finalAuthorization = deferred<ReturnType<typeof staffPrincipal>>();
+      const finalAuthorizationEntered = deferred<void>();
+      const refreshBackfillEntered = deferred<void>();
+      let authorizationCalls = 0;
+      staffAccess.assertAccess.mockImplementation(() => {
+        authorizationCalls += 1;
+        if (authorizationCalls === 2) {
+          finalAuthorizationEntered.resolve();
+          return finalAuthorization.promise;
+        }
+        return Promise.resolve(staffPrincipal(GAME_SCOPE));
+      });
+      gamesService.listEvents
+        .mockResolvedValueOnce({ version: 4, state: 'LIVE', events: [{ sequence: 1 }], lastSequence: 1 })
+        .mockImplementationOnce(() => {
+          refreshBackfillEntered.resolve();
+          return Promise.resolve({ version: 9, state: 'LIVE', events: [{ sequence: 1 }], lastSequence: 1 });
+        });
+
+      const subscribing = task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      await finalAuthorizationEntered.promise;
+      const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [socket, GAME_SCOPE.gameId, 9]) as Promise<void>;
+      await refreshBackfillEntered.promise;
+      await refresh;
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, { snapshot?: { version: number } }>;
+      expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.snapshot?.version).toBe(9);
+
+      finalAuthorization.resolve(staffPrincipal(GAME_SCOPE));
+      await expect(subscribing).resolves.toMatchObject({ status: 'subscribed', snapshot: { version: 9 } });
+      expect(socket.emit).toHaveBeenCalledWith('game.snapshot', expect.objectContaining({ version: 9 }));
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
+    });
+
+    it.each([
+      [4, false],
+      [9, true],
+    ] as const)(
+      'preserves a failed refresh floor until subscribe settles (initial version %i; satisfies floor: %s)',
+      async (initialVersion, satisfiesFloor) => {
+        const socket = await connectAuthenticatedSocket();
+        resolveScopedGame();
+        const initialRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+        const initialReadEntered = deferred<void>();
+        gamesService.listEvents.mockImplementation(() => {
+          initialReadEntered.resolve();
+          return initialRead.promise;
+        });
+
+        const subscribing = task8Gateway().subscribeToGame(socket, {
+          gameId: GAME_SCOPE.gameId,
+          afterSequence: 0,
+        });
+        await initialReadEntered.promise;
+
+        prisma.v1Game.findUnique.mockRejectedValueOnce(new Error('refresh game lookup failed'));
+        const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+          socket,
+          GAME_SCOPE.gameId,
+          9,
+        ]) as Promise<void>;
+        const refreshOutcome = refresh.then(() => null, (error: unknown) => error);
+        await expect(refreshOutcome).resolves.toBeInstanceOf(Error);
+
+        const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<
+          string,
+          { failedRefreshMinimumVersion?: number }
+        >;
+        expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.failedRefreshMinimumVersion).toBe(9);
+        expect((Reflect.get(gateway, 'subscriberRefreshFlights') as Map<string, unknown>).size).toBe(0);
+
+        initialRead.resolve({ version: initialVersion, state: 'LIVE', events: [], lastSequence: 0 });
+        if (satisfiesFloor) {
+          await expect(subscribing).resolves.toMatchObject({ status: 'subscribed', snapshot: { version: 9 } });
+          expect(socket.client.conn.close).not.toHaveBeenCalled();
+        } else {
+          await expect(subscribing).rejects.toThrow('behind a failed committed refresh');
+          expect(socket.client.conn.close).toHaveBeenCalled();
+          expect(socket.emit).toHaveBeenCalledWith('game.error', { code: 'INTERNAL_ERROR' });
+          expect(socket.emit).not.toHaveBeenCalledWith('game.snapshot', expect.anything());
+        }
+      },
+    );
+
+    it('keeps a resubscribed queue alive when the previous generation refresh rejects', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      const room = `game:${GAME_SCOPE.gameId}`;
+      server.adapter.rooms.set(room, new Set([socket.id]));
+
+      const oldRead = deferred<ReturnType<typeof gameScopeRecord>>();
+      const oldReadEntered = deferred<void>();
+      prisma.v1Game.findUnique.mockImplementationOnce(() => {
+        oldReadEntered.resolve();
+        return oldRead.promise;
+      });
+      const requestRefresh = (minimumVersion: number) =>
+        Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [socket, GAME_SCOPE.gameId, minimumVersion]) as Promise<void>;
+      const oldRefresh = requestRefresh(4);
+      const oldRefreshOutcome = oldRefresh.then(() => null, (error: unknown) => error);
+      await oldReadEntered.promise;
+      Reflect.apply(Reflect.get(gateway, 'enqueueCommittedEventForSubscribers'), gateway, [GAME_SCOPE.gameId, 5, { version: 5 }]);
+
+      await task8Gateway().unsubscribeFromGame(socket, { gameId: GAME_SCOPE.gameId });
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      server.adapter.rooms.set(room, new Set([socket.id]));
+
+      const newRead = deferred<ReturnType<typeof gameScopeRecord>>();
+      const newReadEntered = deferred<void>();
+      prisma.v1Game.findUnique.mockImplementationOnce(() => {
+        newReadEntered.resolve();
+        return newRead.promise;
+      });
+      const newRefresh = requestRefresh(5);
+      const newRefreshOutcome = newRefresh.then(() => null, (error: unknown) => error);
+      await newReadEntered.promise;
+      Reflect.apply(Reflect.get(gateway, 'enqueueCommittedEventForSubscribers'), gateway, [GAME_SCOPE.gameId, 6, { version: 6 }]);
+      const queues = Reflect.get(gateway, 'committedEventDeliveryQueues') as Map<string, { generation: number; events: unknown[] }>;
+      const pendingCounts = Reflect.get(gateway, 'pendingCommittedEventsBySocket') as Map<string, number>;
+      const generationBySocket = Reflect.get(gateway, 'staffLeaseGenerations') as Map<string, Map<string, number>>;
+      const roomOwners = Reflect.get(gateway, 'staffRoomOwners') as Map<string, number>;
+      const socketClients = Reflect.get(gateway, 'socketClients') as Map<string, ReturnType<typeof buildSocket>>;
+      const queueKey = `${socket.id}:${GAME_SCOPE.gameId}`;
+      const newQueue = queues.get(queueKey);
+      expect(newQueue?.events).toHaveLength(1);
+      expect(pendingCounts.get(socket.id)).toBe(1);
+
+      oldRead.reject(new Error('old generation history read failed'));
+      const oldError = await oldRefreshOutcome;
+      expect(oldError).toBeInstanceOf(Error);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(queues.get(queueKey)).toBe(newQueue);
+      expect(newQueue?.generation).toBe(generationBySocket.get(socket.id)?.get(GAME_SCOPE.gameId));
+      expect(roomOwners.get(queueKey)).toBe(newQueue?.generation);
+      expect(pendingCounts.get(socket.id)).toBe(1);
+      expect(socketClients.get(socket.id)).toBe(socket);
+      expect(socket.client.conn.close).not.toHaveBeenCalled();
+      expect(socket.rooms.has(room)).toBe(true);
+
+      gamesService.listEvents.mockResolvedValue({ version: 7, state: 'LIVE', events: [], lastSequence: 0 });
+      newRead.resolve(gameScopeRecord(GAME_SCOPE));
+      expect(await newRefreshOutcome).toBeNull();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.committed', { version: 6 });
+      expect(pendingCounts.has(socket.id)).toBe(false);
+
+      const currentRead = deferred<ReturnType<typeof gameScopeRecord>>();
+      const currentReadEntered = deferred<void>();
+      prisma.v1Game.findUnique.mockImplementationOnce(() => {
+        currentReadEntered.resolve();
+        return currentRead.promise;
+      });
+      const currentRefresh = requestRefresh(7);
+      const currentRefreshOutcome = currentRefresh.then(() => null, (error: unknown) => error);
+      await currentReadEntered.promise;
+      Reflect.apply(Reflect.get(gateway, 'enqueueCommittedEventForSubscribers'), gateway, [GAME_SCOPE.gameId, 8, { version: 8 }]);
+      currentRead.reject(new Error('current generation history read failed'));
+      expect(await currentRefreshOutcome).toBeInstanceOf(Error);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(socket.client.conn.close).toHaveBeenCalled();
+    });
+
     function gameScopeRecord(scope: GameScope) {
       return canonicalGameScopeRecord(scope);
     }
@@ -540,10 +829,9 @@ describe('RealtimeGateway', () => {
       try {
         const socket = await connectAuthenticatedSocket();
         const expiresAt = new Date(Date.now() + 1_000);
-        prisma.v1Game.findUnique
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+        prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
         staffAccess.assertAccess
+          .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockRejectedValueOnce(
             new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', details: { reason: 'ASSIGNMENT_EXPIRED' } }),
@@ -590,6 +878,7 @@ describe('RealtimeGateway', () => {
         const authorizationEntered = deferred<void>();
         staffAccess.assertAccess
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+          .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockImplementation(() => {
             authorizationEntered.resolve();
             return pendingAuthorization.promise;
@@ -635,9 +924,7 @@ describe('RealtimeGateway', () => {
         const expiresAt = new Date(Date.now() + 500);
         const backfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
         const backfillEntered = deferred<void>();
-        prisma.v1Game.findUnique
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+        prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
         staffAccess.assertAccess
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockRejectedValueOnce(new ForbiddenException({ code: 'STAFF_SCOPE_DENIED' }));
@@ -659,16 +946,149 @@ describe('RealtimeGateway', () => {
       }
     });
 
+    it.each([
+      [4, false],
+      [9, true],
+    ] as const)(
+      'checks the failed refresh floor before an expired-lease rejoin snapshot (version %i; satisfies floor: %s)',
+      async (rejoinVersion, satisfiesFloor) => {
+        jest.useFakeTimers();
+        try {
+          const socket = await connectAuthenticatedSocket();
+          const expiresAt = new Date(Date.now() + 1_000);
+          const renewedExpiresAt = new Date(Date.now() + 60_000);
+          prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
+          staffAccess.assertAccess
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, renewedExpiresAt));
+          await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+
+          const snapshotsBeforeRejoin = socket.emit.mock.calls.filter(([event]) => event === 'game.snapshot').length;
+          const leases = Reflect.get(gateway, 'staffLeases') as Map<string, Map<string, { expiresAt: Date | null }>>;
+          const lease = leases.get(socket.id)?.get(GAME_SCOPE.gameId);
+          expect(lease).toBeDefined();
+          jest.setSystemTime(expiresAt.getTime() + 1);
+
+          const rejoinBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+          const rejoinBackfillEntered = deferred<void>();
+          gamesService.listEvents.mockImplementationOnce(() => {
+            rejoinBackfillEntered.resolve();
+            return rejoinBackfill.promise;
+          });
+          const rejoining = Reflect.apply(Reflect.get(gateway, 'expireStaffLease'), gateway, [socket, lease]) as Promise<void>;
+          await rejoinBackfillEntered.promise;
+
+          prisma.v1Game.findUnique.mockRejectedValueOnce(new Error('committed refresh metadata lookup failed'));
+          const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+            socket,
+            GAME_SCOPE.gameId,
+            9,
+          ]) as Promise<void>;
+          const refreshOutcome = refresh.then(() => null, (error: unknown) => error);
+          await expect(refreshOutcome).resolves.toBeInstanceOf(Error);
+
+          const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, {
+            generation: number;
+            failedRefreshMinimumVersion?: number;
+          }>;
+          expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.failedRefreshMinimumVersion).toBe(9);
+
+          rejoinBackfill.resolve({ version: rejoinVersion, state: 'LIVE', events: [], lastSequence: 0 });
+          await rejoining;
+
+          const snapshotCountAfterRejoin = socket.emit.mock.calls.filter(([event]) => event === 'game.snapshot').length;
+          if (satisfiesFloor) {
+            expect(snapshotCountAfterRejoin).toBe(snapshotsBeforeRejoin + 1);
+            expect(socket.client.conn.close).not.toHaveBeenCalled();
+          } else {
+            expect(snapshotCountAfterRejoin).toBe(snapshotsBeforeRejoin);
+            expect(socket.client.conn.close).toHaveBeenCalled();
+          }
+          expect(pendingAcks.has(`${socket.id}:${GAME_SCOPE.gameId}`)).toBe(false);
+        } finally {
+          jest.useRealTimers();
+        }
+      },
+    );
+
+    it('does not apply a stale refresh failure floor to a replacement pending ACK record', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+
+      const oldSubscriptionRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+      const oldSubscriptionEntered = deferred<void>();
+      const replacementRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+      const replacementReadEntered = deferred<void>();
+      gamesService.listEvents
+        .mockImplementationOnce(() => {
+          oldSubscriptionEntered.resolve();
+          return oldSubscriptionRead.promise;
+        })
+        .mockImplementationOnce(() => {
+          replacementReadEntered.resolve();
+          return replacementRead.promise;
+        });
+      const oldSubscription = task8Gateway().subscribeToGame(socket, {
+        gameId: GAME_SCOPE.gameId,
+        afterSequence: 0,
+      });
+      await oldSubscriptionEntered.promise;
+
+      const oldRefreshMetadata = deferred<ReturnType<typeof gameScopeRecord>>();
+      const oldRefreshMetadataEntered = deferred<void>();
+      prisma.v1Game.findUnique.mockImplementationOnce(() => {
+        oldRefreshMetadataEntered.resolve();
+        return oldRefreshMetadata.promise;
+      });
+      const oldRefresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+        socket,
+        GAME_SCOPE.gameId,
+        9,
+      ]) as Promise<void>;
+      const oldRefreshOutcome = oldRefresh.then(() => null, (error: unknown) => error);
+      await oldRefreshMetadataEntered.promise;
+
+      const replacementJoinEntered = deferred<void>();
+      const originalJoin = socket.join.getMockImplementation();
+      socket.join.mockImplementation(async (room: string) => {
+        await originalJoin?.(room);
+        if (room === `game:${GAME_SCOPE.gameId}`) replacementJoinEntered.resolve();
+      });
+      const replacement = task8Gateway().subscribeToGame(socket, {
+        gameId: GAME_SCOPE.gameId,
+        afterSequence: 0,
+      });
+      await replacementJoinEntered.promise;
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, {
+        failedRefreshMinimumVersion?: number;
+      }>;
+      const replacementAck = pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`);
+      expect(replacementAck).toBeDefined();
+
+      oldRefreshMetadata.reject(new Error('stale generation metadata lookup failed'));
+      await expect(oldRefreshOutcome).resolves.toBeInstanceOf(Error);
+      await replacementReadEntered.promise;
+      expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)).toBe(replacementAck);
+      expect(replacementAck?.failedRefreshMinimumVersion).toBeUndefined();
+
+      oldSubscriptionRead.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await expect(oldSubscription).resolves.toMatchObject({ status: 'denied' });
+      replacementRead.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await expect(replacement).resolves.toMatchObject({ status: 'subscribed' });
+      expect(socket.client.conn.close).not.toHaveBeenCalled();
+    });
+
     it.each(['resolve', 'reject'] as const)('does not let an older pending backfill %s leave a newer successful subscription', async (olderOutcome) => {
       const socket = await connectAuthenticatedSocket();
       const firstBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
       const secondBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
       const firstBackfillEntered = deferred<void>();
       const secondBackfillEntered = deferred<void>();
-      prisma.v1Game.findUnique
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+      prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
       staffAccess.assertAccess
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
       gamesService.listEvents
@@ -700,6 +1120,9 @@ describe('RealtimeGateway', () => {
       }
       expect(socket.rooms.has(`game:${GAME_SCOPE.gameId}`)).toBe(true);
       expect(socket.emit).toHaveBeenCalledWith('game.snapshot', expect.objectContaining({ version: 5 }));
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
     });
 
     it('Task 8 subscribes an authenticated, authorized user to the stable game room', async () => {
@@ -730,6 +1153,8 @@ describe('RealtimeGateway', () => {
           fieldId: GAME_SCOPE.fieldId,
         },
       });
+      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(1);
       expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 0);
       expect(socket.join.mock.calls).toEqual([
         [`user:${activeUser.id}`],
@@ -900,20 +1325,28 @@ describe('RealtimeGateway', () => {
       expect(socket.join).not.toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);
     });
 
-    it('Task 8 returns the authoritative reconnect backfill in ascending sequence order', async () => {
+    it('Task 8 reads one authoritative backfill from the reconnect cursor', async () => {
       const socket = await connectAuthenticatedSocket();
       resolveScopedGame();
-      const events = [{ sequence: 2 }, { sequence: 3 }];
-      gamesService.listEvents.mockResolvedValue({ version: 4, state: 'LIVE', events, lastSequence: 3 });
+      const events = [{ sequence: 4 }, { sequence: 5 }];
+      gamesService.listEvents.mockResolvedValue({
+        version: 4,
+        state: 'LIVE',
+        events,
+        lastSequence: 5,
+        gap: { expectedSequence: 3, availableFrom: 4 },
+      });
 
       await expect(
-        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 1 }),
+        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 2 }),
       ).resolves.toMatchObject({
         status: 'subscribed',
-        afterSequence: 1,
-        snapshot: { lastSequence: 3, events },
+        afterSequence: 2,
+        snapshot: { lastSequence: 5, events },
       });
-      expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 1);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(1);
+      expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 2);
+      expect(socket.emit).toHaveBeenCalledWith('game.gap', { expectedSequence: 3, availableFrom: 4 });
     });
 
     it('Task 8 reauthorizes after reconnect and resumes from the last contiguous sequence', async () => {
@@ -939,7 +1372,8 @@ describe('RealtimeGateway', () => {
         snapshot: { lastSequence: 3, events: [{ sequence: 3 }] },
       });
 
-      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(2);
+      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(4);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
       expect(gamesService.listEvents).toHaveBeenLastCalledWith(activeUser, GAME_SCOPE.gameId, 2);
     });
 
@@ -1061,11 +1495,12 @@ describe('RealtimeGateway', () => {
 
     it('Task 8 evicts only matching game rooms through the server without disconnecting the user room', async () => {
       const socket = await connectAuthenticatedSocket();
-      prisma.v1Game.findUnique
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-        .mockResolvedValueOnce(gameScopeRecord(OTHER_GAME_SCOPE));
+      prisma.v1Game.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+        Promise.resolve(where.id === GAME_SCOPE.gameId ? gameScopeRecord(GAME_SCOPE) : gameScopeRecord(OTHER_GAME_SCOPE)));
       staffAccess.assertAccess
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(OTHER_GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(OTHER_GAME_SCOPE));
       expect(task8Gateway().evictUserFromScopedGameRooms).toEqual(expect.any(Function));
       await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
@@ -1114,7 +1549,9 @@ describe('RealtimeGateway', () => {
       });
       // 재구독을 시도하면 방금 만료로 제거된 상태에서 다시 정상 판정을 받는지
       // 확인 — 내부 gameSubscriptions 맵에서도 실제로 지워졌다는 방증.
-      staffAccess.assertAccess.mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
+      staffAccess.assertAccess
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
       await expect(
         task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }),
       ).resolves.toMatchObject({ status: 'subscribed' });

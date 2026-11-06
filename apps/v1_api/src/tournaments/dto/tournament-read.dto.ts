@@ -3,6 +3,8 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsDateString,
+  Matches,
   IsOptional,
   IsString,
   IsUUID,
@@ -53,6 +55,46 @@ export type CompetitionListStatus = (typeof COMPETITION_LIST_STATUSES)[number];
 
 export class TournamentListQueryDto {
   @IsOptional()
+  @IsIn(['true'])
+  withTotal?: 'true';
+
+  /**
+   * 카드 오른쪽 위 상태 배지와 1:1인 목록 필터. 목록 정렬 그룹과 같은 값이라 배지·필터·순서가 어긋나지 않는다
+   * (`tournament-list-query.ts` 의 `GROUP_RANK_SQL`). `preparing` 은 정규 리그 초안만 담는다 — 대회 초안은 비공개다.
+   */
+  @IsOptional()
+  @IsIn(['preparing', 'recruiting', 'recruit_closed', 'ongoing', 'completed'])
+  stage?: 'preparing' | 'recruiting' | 'recruit_closed' | 'ongoing' | 'completed';
+
+  @IsOptional()
+  @IsIn(['league', 'knockout', 'group_knockout', 'league_knockouts'])
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^(?!0000)\d{4}-\d{2}-\d{2}$/)
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^(?!0000)\d{4}-\d{2}-\d{2}$/)
+  dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  feeMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  feeMax?: number;
+
+  @IsOptional()
   @IsIn(COMPETITION_LIST_STATUSES)
   status?: CompetitionListStatus;
 
@@ -73,8 +115,8 @@ export class TournamentListQueryDto {
   kind?: CompetitionListKind;
 
   @IsOptional()
-  @IsIn(['mixed', 'male', 'female'])
-  genderCategory?: 'mixed' | 'male' | 'female';
+  @IsIn(['mixed', 'male', 'female', 'unspecified'])
+  genderCategory?: 'mixed' | 'male' | 'female' | 'unspecified';
 
   @IsOptional()
   @IsString()

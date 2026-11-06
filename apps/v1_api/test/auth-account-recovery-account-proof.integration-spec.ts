@@ -10,8 +10,8 @@ const EMAIL_USER = `${PREFIX}-email-user`;
 const SOCIAL_USER = `${PREFIX}-social-user`;
 const EMAIL = `${PREFIX}@integration.test`;
 const SOCIAL_EMAIL = `${PREFIX}-social@integration.test`;
-const EMAIL_PHONE = '01055550133';
-const SOCIAL_PHONE = '01055550134';
+const EMAIL_PHONE = '01000000133';
+const SOCIAL_PHONE = '01000000134';
 const USER_IDS = [EMAIL_USER, SOCIAL_USER];
 const PHONES = [EMAIL_PHONE, SOCIAL_PHONE];
 const EMAILS = [EMAIL, SOCIAL_EMAIL];
@@ -117,14 +117,52 @@ describe('V1 account recovery requires independent email proof', () => {
     expect(await accountState()).toEqual(before);
   });
 
-  it.each(['signup', 'social_link'] as const)('retains the %s proof-purpose rejection before account lookup or writes', async (purpose) => {
+  it('retains the signup proof-purpose rejection before account lookup or writes', async () => {
     const before = await accountState();
     const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/reset-password')
-      .send({ phone: EMAIL_PHONE, proofToken: issuePhoneProofToken(EMAIL_PHONE, purpose), newPassword: REPLACEMENT_PASSWORD });
+      .send({ phone: EMAIL_PHONE, proofToken: issuePhoneProofToken(EMAIL_PHONE, 'signup'), newPassword: REPLACEMENT_PASSWORD });
 
     expect({ status: response.status, code: response.body.code }).toEqual({ status: 400, code: 'PHONE_NOT_VERIFIED' });
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(await accountState()).toEqual(before);
+  });
+
+  it('revokes every session cookie issued before an email password reset, and the new password signs in again', async () => {
+    const sessionCookieOf = (response: request.Response) =>
+      ([] as string[]).concat(response.headers['set-cookie'] ?? []).find((cookie) => cookie.startsWith('teameet_v1_session='))?.split(';')[0];
+    const signedIn = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: ORIGINAL_PASSWORD }).expect(201);
+    const oldCookie = sessionCookieOf(signedIn);
+    if (!oldCookie) throw new RecoveryFixtureError('Login did not set a session cookie');
+    expect((await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', oldCookie)).status).not.toBe(401);
+
+    const issued = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/request').send({ email: EMAIL }).expect(200);
+    const confirmed = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/confirm')
+      .send({ email: EMAIL, code: issued.body.data.devCode }).expect(200);
+    await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/reset-password')
+      .send({ email: EMAIL, proofToken: confirmed.body.data.proofToken, newPassword: REPLACEMENT_PASSWORD }).expect(200);
+
+    const revoked = await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', oldCookie);
+    expect({ status: revoked.status, code: revoked.body.code }).toEqual({ status: 401, code: 'UNAUTHENTICATED' });
+    const signedInAgain = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: REPLACEMENT_PASSWORD }).expect(201);
+    const newCookie = sessionCookieOf(signedInAgain);
+    if (!newCookie) throw new RecoveryFixtureError('Login after reset did not set a session cookie');
+    expect((await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', newCookie)).status).not.toBe(401);
+  });
+
+  it.each(['kakao', 'apple'] as const)('finds a %s login only after real email OTP without creating a password', async (provider) => {
+    await prisma.v1AuthIdentity.update({ where: { id: `${PREFIX}-social-identity` }, data: { provider } });
+    const denied = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/find-account')
+      .send({ email: SOCIAL_EMAIL, proofToken: 'invalid' }).expect(400);
+    expect(denied.body.code).toBe('EMAIL_NOT_VERIFIED');
+    const issued = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/request').send({ email: SOCIAL_EMAIL }).expect(200);
+    const confirmed = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/confirm')
+      .send({ email: SOCIAL_EMAIL, code: issued.body.data.devCode }).expect(200);
+    const found = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/find-account')
+      .send({ email: SOCIAL_EMAIL, proofToken: confirmed.body.data.proofToken }).expect(200);
+    expect(found.body.data).toMatchObject({ providers: [provider], hasPassword: false, withdrawalPendingUntil: null });
+    const identities = await prisma.v1AuthIdentity.findMany({ where: { userId: SOCIAL_USER } });
+    expect(identities).toHaveLength(1);
+    expect(identities[0].passwordHash).toBeNull();
   });
 
   it('preserves the real email OTP request, confirmation, and legitimate password reset', async () => {

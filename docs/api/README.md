@@ -1,3 +1,29 @@
+배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
+리그 + N개 토너먼트는 토너먼트별 독립 진출팀 확정과 공식 순위 기반 추천/4개 조 12팀 교차 배치를 제공한다. 미리보기는 저장하지 않으며 확정은 선택한 결선만 원자적으로 변경한다. [대회 계약](./domains/tournaments.md#토너먼트-하나의-진출팀-확정-2026-11-06).
+
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
+N개 토너먼트 대회의 독립 대진 초기화와 예선 수정도 활성 디렉터의 담당 대회 권한으로 보호한다. 대진이 없는 상태의 예선 수정, 수동·자동·부분 팀 배정은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선은 팀 미정 상태로 선생성할 수 있고, 조별 전체 순위·동률을 확인해 후속 배정할 때 같은 구조의 경기 ID와 일정을 유지한다. 미리보기·시상·공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+[6강 결승 직행 API 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28): 6팀 방식 설정, 템플릿 생성, 진출 조회/수동 결정, 공개 대진표 메타데이터.
+
+대진 v2는 조마다 `groups[].legs`로 1·2회전을 따로 설정한다. 기존 최상위 `legs`와 초안 복원은 호환되며 [대회 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
+
+대회 시상 계획은 팀·개인·기타 분류를 명시해 저장하며, 자유 시상명과 우승·1위·1등 별칭을 지원한다. 기존 텍스트와 신규 분류 문자열 포맷은 [시상 계획 계약](./domains/tournaments.md#categorized-prize-plans)을 따른다.
+
+신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
+
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다. [공개 기록 계약](./domains/public-records.md#own-goal-display-side-2026-10-22).
+
+템플릿 경기 전체 삭제 후에도 조별 자리 비우기가 편성을 정리하며, 조 삭제는 미사용 빈 자리/고아 편성만 원자적으로 정리한다. 실제 배정·경기·참조는 계속 보호한다. [대회 계약](./domains/tournaments.md) 참고.
+
+결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
+
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원은 처음 선택한 서로 다른 팀 수 이상이어야 한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
@@ -6,7 +32,17 @@
 
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
 
+일반 팀매치 경기 운영의 명령·이벤트 요청은 `takeoverToken` 생략을 transport에서 허용한다. 생략 시에도 GamesService의 기존 host/lease 권한 판정이 최종 기준이며, tournament-scoped 운영은 기존 유효 lease를 요구한다. 제공 값은 공백 문자가 아닌 문자를 하나 이상 포함한 문자열이어야 하며 원문 그대로 전달된다. 빈 문자열·공백 전용 문자열·`null`·잘못된 타입은 계속 validation error다. [Games](./domains/games.md) · [Game realtime](./domains/game-realtime.md).
+
 # Teameet v1 API contracts
+
+대회 디렉터의 배정 대회 전체 관리는 [대회 관리 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다. 기존 관리자 API를 대회 범위로 재사용하며 플랫폼 관리자 계정은 만들지 않는다.
+
+대진 v2는 4~64팀 짝수, 조별 인원·진출 수와 홀수 결선, 서버 미리보기·초안·멱등 생성 계약을 제공한다. 활성화와 수동 결선 진출 표시 규칙은 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
+
+공개 대회 일정의 결선 기본 문구는 저장된 진출 연결로 보완한다(직접 문구·슬롯·실제 팀 우선). [대회 라벨 계약](./domains/tournaments.md)을 따른다.
+
+대회 진행 중에도 미시작 경기 삭제를 허용한다. 결과·후속 대진 보호는 [대회 삭제 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
 
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
@@ -38,7 +74,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — 정규리그 + N개 토너먼트·수동 진출팀·범위별 시상, competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -105,3 +141,25 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
 
 - 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.
+
+선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
+
+- 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
+
+대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+대회 이미지 설정의 JSON boolean 검증과 관리자 종목 기본 이미지 선택도 같은 계약에서 관리한다. `showDetailImage`의 문자열/숫자 강제 변환은 허용하지 않는다.
+
+- 2026-10-24: [경기 계약](domains/games.md#어드민-종료-경기의-출전-정정-2026-10-24)에 owner·ops 어드민의 종료 경기 EXCLUDE/REVOKE 예외 및 결과 이력 보존 계약을 반영했다.
+
+## 결과 정정 카드 계약 보완
+
+카드의 기존 합계와 선택적 시간별 기록(`cards.events`), 정정·재제출 검증 및 공개 프로젝션은
+[games 도메인 문서](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.
+
+승부차기 정정의 성공·시도 횟수와 명시적 `operatorOverride:false`의 예외 승계 해제는
+[대회 운영 계약](./domains/tournament-operations.md)을 따른다. 결과 정정 초안 생성과 공식 확정은 별도 단계다.

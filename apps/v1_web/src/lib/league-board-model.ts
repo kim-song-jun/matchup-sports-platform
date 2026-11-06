@@ -1,7 +1,8 @@
 import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { fixtureNodeState } from './bracket-canvas-layout';
-import { toKstDateString } from './kst-calendar';
+import { DAY_MS, kstMidnightMs, toKstDateString } from './kst-calendar';
+import { kstWeekKey } from './league-fixture-week';
 
 export type LeagueBoardNodeState = ReturnType<typeof fixtureNodeState> | 'voided';
 
@@ -10,6 +11,8 @@ export interface LeagueBoardSide {
   label: string;
   filled: boolean;
   registrationId: string | null;
+  /** 정해진 팀. 자리만 있고 팀이 빈 사이드·부전승은 null — 주차 요약이 쉬는 팀을 셀 때 쓴다. */
+  teamId: string | null;
 }
 
 export interface LeagueBoardNode {
@@ -26,11 +29,29 @@ export interface LeagueBoardNode {
   game: V1AdminBracketFixtureGame | null;
 }
 
-/** key 는 경기 시작의 KST 달력 날짜(`YYYY-MM-DD`), weekNumber 는 날짜 오름차순 순번(1부터). */
+/** 한 주차의 운영 요약. 취소된 경기는 세지 않는다. 팀 목록을 아직 모르면 팀 칸은 비어 있다. */
+export interface LeagueWeekSummary {
+  gameCount: number;
+  /** 리그 참가팀 중 이 주에 경기가 없는 팀(이름순). */
+  restingTeamNames: string[];
+  /** 이 주에 두 경기 이상 잡힌 팀(이름순) — 운영자가 의도했는지 확인할 경고다. */
+  doubleBookedTeamNames: string[];
+}
+
+/**
+ * 주차 한 칸. key 는 그 주 월요일의 KST 날짜(`YYYY-MM-DD`), weekNumber 는 경기가 있는 주의 순번(1부터) —
+ * 서버·공개 화면과 같은 달력 주 규칙이다(`league-fixture-week.ts`, 2026-11-03 사용자 확정).
+ */
 export interface LeagueBoardColumn {
   key: string;
   weekNumber: number;
+  /** 그 주 월요일·일요일의 KST 날짜(`YYYY-MM-DD`). */
+  startDate: string;
+  endDate: string;
+  /** 이 주에 경기일이 둘 이상이면 true — 경기 카드에 날짜를 같이 보여 준다. */
+  multiDay: boolean;
   nodes: LeagueBoardNode[];
+  summary: LeagueWeekSummary;
 }
 
 export interface LeagueBoardSummary {
@@ -38,6 +59,8 @@ export interface LeagueBoardSummary {
   filledSlotCount: number;
   hiddenFixtureCount: number;
   hasEmptySlot: boolean;
+  /** 아직 한 번도 맞붙지 않은(취소 아닌 경기가 없는) 참가팀 쌍의 수. 팀 목록을 모르면 0. */
+  unplayedPairCount: number;
 }
 
 interface BuildInput {
@@ -61,6 +84,7 @@ function buildSide(
       label: slot?.teamName ?? teamNameById.get(teamId) ?? '팀',
       filled: true,
       registrationId: slot?.registrationId ?? null,
+      teamId,
     };
   }
   // 자리 없이 원정이 비면 예전부터 있던 부전(bye) 경기다.
@@ -69,6 +93,7 @@ function buildSide(
     label: slot?.label ?? (side === 'home' ? '미정' : '부전승'),
     filled: false,
     registrationId: null,
+    teamId: null,
   };
 }
 
@@ -97,7 +122,7 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       away: buildSide('away', fixture.awayTeamId, fixture.awaySlotId, slotById, teamNameById),
       game,
     };
-    const key = toKstDateString(new Date(fixture.startAt));
+    const key = kstWeekKey(new Date(fixture.startAt));
     const column = columnsByKey.get(key);
     if (column === undefined) columnsByKey.set(key, [node]);
     else column.push(node);
@@ -105,11 +130,18 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
 
   const columns = [...columnsByKey.entries()]
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-    .map(([key, nodes], index) => ({
-      key,
-      weekNumber: index + 1,
-      nodes: nodes.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.title.localeCompare(right.title)),
-    }));
+    .map(([key, nodes], index): LeagueBoardColumn => {
+      const sorted = nodes.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.title.localeCompare(right.title));
+      return {
+        key,
+        weekNumber: index + 1,
+        startDate: key,
+        endDate: toKstDateString(new Date(kstMidnightMs(key) + 6 * DAY_MS)),
+        multiDay: new Set(sorted.map((node) => toKstDateString(new Date(node.startAt)))).size > 1,
+        nodes: sorted,
+        summary: summarizeWeek(sorted, teamNameById),
+      };
+    });
 
   const filledSlotCount = slots.filter((slot) => slot.registrationId !== null).length;
   return {
@@ -119,8 +151,49 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       filledSlotCount,
       hiddenFixtureCount: columns.reduce((sum, column) => sum + column.nodes.filter((node) => node.hiddenFromPublic).length, 0),
       hasEmptySlot: filledSlotCount < slots.length,
+      unplayedPairCount: countUnplayedPairs(columns.flatMap((column) => column.nodes), teamNameById),
     },
   };
+}
+
+/** 취소·무효가 아닌 경기 — 쉬는 팀·중복·안 붙은 대진은 실제로 치를 경기로만 센다. */
+function isLive(node: LeagueBoardNode): boolean {
+  return node.state !== 'cancelled' && node.state !== 'voided';
+}
+
+const byKoreanName = (left: string, right: string) => left.localeCompare(right, 'ko');
+
+function summarizeWeek(nodes: readonly LeagueBoardNode[], teamNameById: ReadonlyMap<string, string>): LeagueWeekSummary {
+  const live = nodes.filter(isLive);
+  const gamesByTeam = new Map<string, number>();
+  for (const node of live) {
+    for (const teamId of [node.home.teamId, node.away.teamId]) {
+      if (teamId !== null) gamesByTeam.set(teamId, (gamesByTeam.get(teamId) ?? 0) + 1);
+    }
+  }
+  const nameOf = (teamId: string) => teamNameById.get(teamId) ?? '팀';
+  return {
+    gameCount: live.length,
+    restingTeamNames: [...teamNameById.keys()].filter((teamId) => !gamesByTeam.has(teamId)).map(nameOf).sort(byKoreanName),
+    doubleBookedTeamNames: [...gamesByTeam].filter(([, count]) => count > 1).map(([teamId]) => nameOf(teamId)).sort(byKoreanName),
+  };
+}
+
+function countUnplayedPairs(nodes: readonly LeagueBoardNode[], teamNameById: ReadonlyMap<string, string>): number {
+  const teamIds = [...teamNameById.keys()];
+  const played = new Set<string>();
+  for (const node of nodes.filter(isLive)) {
+    const { teamId: home } = node.home;
+    const { teamId: away } = node.away;
+    if (home !== null && away !== null) played.add([home, away].sort().join(':'));
+  }
+  let unplayed = 0;
+  for (const [index, left] of teamIds.entries()) {
+    for (const right of teamIds.slice(index + 1)) {
+      if (!played.has([left, right].sort().join(':'))) unplayed += 1;
+    }
+  }
+  return unplayed;
 }
 
 /**

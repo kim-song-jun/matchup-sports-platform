@@ -9,6 +9,7 @@ import type { GameActorRole, GameResultRevisionState } from '@/hooks/use-tournam
  * `extractErrorMessage` -- never a raw stack/technical string.
  */
 export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
+  RESULT_CARD_TIMELINE_INVALID: '카드 기록의 선수·피리어드와 중복 여부를 확인해 주세요.',
   DIRECTOR_OFFICIALIZE_DISABLED: '이 기능은 아직 활성화되지 않았어요. 플랫폼 운영팀에 문의해 주세요.',
   STAFF_SCOPE_DENIED: '이 대회의 담당자 권한이 없어졌거나 만료됐어요. 새로고침 후 다시 시도해 주세요.',
   PROJECTION_PREVIEW_MISMATCH: '결과 내용이 방금 바뀌었어요. 최신 내용을 다시 확인한 뒤 시도해 주세요.',
@@ -47,6 +48,10 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
     '승부차기는 결선 경기의 정규시간 무승부에서만 기록할 수 있어요. 경기 종류와 정규시간 점수를 다시 확인해 주세요.',
   TOURNAMENT_PENALTY_INVALID:
     '승부차기 점수가 올바르지 않아요. 양 팀 점수를 0 이상의 정수로, 승자가 갈리도록 입력해 주세요.',
+  TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED:
+    '승부차기 결과를 변경하려면 양 팀의 실제 시도 횟수를 입력해 주세요.',
+  TOURNAMENT_PENALTY_UNDECIDED:
+    '입력한 성공·시도 횟수로는 승부차기 승자가 확정되지 않아요. 시도 횟수와 먼저 찬 팀을 확인해 주세요.',
 };
 
 /** Extracts a domain error code and maps it to a 해요체 안내 문구, falling
@@ -95,7 +100,7 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
  */
 export const ACTOR_ROLE_LABELS: Record<GameActorRole, string> = {
   platform_ops: '플랫폼 운영자',
-  tournament_director: '대회 감독관',
+  tournament_director: '대회 디렉터',
   field_operator: '현장 진행요원',
   support_readonly: '고객지원(읽기 전용)',
   team_owner: '팀장',

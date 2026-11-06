@@ -3,6 +3,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { PrismaService } from '../prisma/prisma.service';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * **플랫폼 운영자가 리그 경기를 콘솔에서 운영할 수 있는가.**
@@ -63,6 +64,7 @@ describe('GamesService.requestTakeover — 플랫폼 운영자와 TEAM_MATCH 게
       prisma as unknown as PrismaService,
       {} as OperationAuditWriterService,
       takeover,
+      new TournamentStaffAccessService(prisma as unknown as PrismaService),
     );
     return { service, prisma, grant, takeover };
   }

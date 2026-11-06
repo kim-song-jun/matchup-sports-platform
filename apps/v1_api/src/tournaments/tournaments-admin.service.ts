@@ -27,18 +27,18 @@ import {
 import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from './competition-config/competition-config';
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
-import { lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { lockCompetitionFixtureRows, lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 
 /**
  * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
- * (완료 되돌리기), cancelled→draft(초안 복구)를 허용한다. in_progress→open/closed 는 이미
- * 생긴 경기·결과가 새 신청과 섞이므로 계속 막는다.
+ * (완료 되돌리기), cancelled→draft(초안 복구)를 허용한다. in_progress→closed 는
+ * 실제 시작·기록·결과가 없는 경우에만 허용하며 in_progress→open 은 계속 막는다.
  */
 const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   draft: ['open', 'cancelled'],
   open: ['closed', 'cancelled'],
   closed: ['open', 'in_progress', 'cancelled'],
-  in_progress: ['completed', 'cancelled'],
+  in_progress: ['closed', 'completed', 'cancelled'],
   completed: ['in_progress'],
   cancelled: ['draft'],
 };
@@ -47,6 +47,7 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
 const REASON_REQUIRED_TRANSITIONS: ReadonlyArray<readonly [TournamentStatus, TournamentStatus]> = [
   ['completed', 'in_progress'],
   ['cancelled', 'draft'],
+  ['in_progress', 'closed'],
 ];
 
 /** 신청 팀 수에서 빼는 상태 — 미제출 초안과 취소(운영자 거부 포함)된 신청은 참가 후보가 아니다. */
@@ -123,13 +124,14 @@ export class TournamentsAdminService {
   }
 
   async list(user: V1AuthUser, query: AdminTournamentListQueryDto) {
-    await this.adminContext.getActiveAdmin(user.id);
+    const managementWhere = await this.adminContext.tournamentManagementWhere(user.id);
     const limit = query.limit ?? 20;
 
     const statusFacetWhere: Prisma.V1TournamentWhereInput = {
       // 목록과 상태 탭 카운트가 **같은 조건**을 봐야 한다 — 한쪽만 거르면 탭 숫자가
       // 목록 행 수와 어긋난다. 아래 `where` 가 이 객체를 spread 하므로 둘 다 적용된다.
       ...TOURNAMENT_SURFACE_KIND,
+      ...managementWhere,
       deletedAt: null,
       ...(query.visibility ? { AND: [adminTournamentVisibilityWhere(query.visibility)] } : {}),
       ...(query.sportId ? { sportId: query.sportId } : {}),
@@ -188,7 +190,7 @@ export class TournamentsAdminService {
   }
 
   async get(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: {
@@ -217,6 +219,7 @@ export class TournamentsAdminService {
     const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
     return {
       formatChangeBlockedReason,
+      canRevertStart: row.status === 'in_progress' && !(await this.hasStartedTournamentFixture(this.prisma, tournamentId)),
       ...this.serialize(
         row,
         row._count.registrations,
@@ -289,6 +292,8 @@ export class TournamentsAdminService {
         message: '참가 팀 수를 입력해 주세요.',
       });
     }
+    if (dto.format !== 'league_knockouts' && (dto.teamCount ?? 0) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
+    if (dto.sixTeamMode && (dto.teamCount !== 6 || dto.format !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 결승 직행 방식은 모집 정원 6팀의 토너먼트에서 선택해 주세요.' });
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
     this.assertSubstitutionPolicyPair(dto.substitutionMode, dto.maxSubstitutions);
     this.assertScheduleRange(
@@ -343,6 +348,7 @@ export class TournamentsAdminService {
           title: dto.title,
           competitionConfigVersionId,
           format: dto.format ?? 'group_knockout',
+          sixTeamMode: dto.sixTeamMode ?? false,
           minMatchesPerTeam: dto.minMatchesPerTeam ?? null,
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
@@ -350,6 +356,8 @@ export class TournamentsAdminService {
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           ...this.venueColumns(venueSnapshot),
           coverImageUrl: dto.coverImageUrl ?? null,
+          listImageUrl: nullableText(dto.listImageUrl) ?? null,
+          showDetailImage: dto.showDetailImage ?? true,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
@@ -409,7 +417,7 @@ export class TournamentsAdminService {
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
@@ -426,6 +434,12 @@ export class TournamentsAdminService {
       });
     }
 
+    if (existing.sixTeamBracket != null && ((dto.teamCount !== undefined && dto.teamCount !== 6) || (dto.format !== undefined && dto.format !== 'knockout') || dto.sixTeamMode === false)) {
+      throw new ConflictException({ code: 'SIX_TEAM_SETTINGS_LOCKED', message: '6강 대진을 만든 뒤에는 모집 정원과 진행 방식을 바꿀 수 없어요.' });
+    }
+    if ((dto.format ?? existing.format) !== 'league_knockouts' && (dto.teamCount ?? existing.teamCount) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
+    const sixTeamMode = dto.sixTeamMode ?? (existing.sixTeamMode && (dto.teamCount ?? existing.teamCount) === 6 && (dto.format ?? existing.format) === 'knockout');
+    if (sixTeamMode && ((dto.teamCount ?? existing.teamCount) !== 6 || (dto.format ?? existing.format) !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 방식은 모집 정원 6팀의 토너먼트에서만 선택할 수 있어요.' });
     const formatChanged = dto.format !== undefined && dto.format !== existing.format;
     if (formatChanged) await this.assertFormatChangeAllowed(this.prisma, tournamentId, existing.status);
 
@@ -559,6 +573,7 @@ export class TournamentsAdminService {
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
     if (sportChanged) data.competitionConfigVersionId = sportChangeConfigVersionId;
     if (dto.title !== undefined) data.title = dto.title;
+    data.sixTeamMode = sixTeamMode;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
     if (dto.registrationDeadlineAt !== undefined) {
@@ -572,6 +587,8 @@ export class TournamentsAdminService {
     if (venueSnapshot !== undefined) Object.assign(data, this.venueColumns(venueSnapshot));
     if (dto.parkingInfo !== undefined) data.parkingInfo = nullableText(dto.parkingInfo);
     if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
+    if (dto.listImageUrl !== undefined) data.listImageUrl = nullableText(dto.listImageUrl);
+    if (dto.showDetailImage !== undefined && dto.showDetailImage !== null) data.showDetailImage = dto.showDetailImage;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
@@ -647,6 +664,7 @@ export class TournamentsAdminService {
           normalizeCompetitionSportCode(sport.code),
           {
             baseConfig: pinnedConfig,
+            tournamentId,
             baseConfigName: pinnedVersion?.name,
             maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
             substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
@@ -688,6 +706,15 @@ export class TournamentsAdminService {
           message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
         });
       }
+      // 단계·조별 경기 시간은 이전 종목의 규칙 버전을 가리키므로 종목과 함께 지운다. 종목은 대진이 없을 때만
+      // 바뀌어 옮길 경기(경기별 재정의)도 없다 — 단계·조 설정은 새 종목 기본값 위에서 다시 정한다.
+      const periodOverridesCleared = sportChanged
+        ? (await tx.v1TournamentStagePeriodSetting.deleteMany({ where: { tournamentId } })).count
+          + (await tx.v1TournamentGroup.updateMany({
+            where: { tournamentId, competitionConfigVersionId: { not: null } },
+            data: { periods: Prisma.DbNull, competitionConfigVersionId: null },
+          })).count
+        : 0;
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -708,6 +735,7 @@ export class TournamentsAdminService {
             ...(sportChanged && {
               sportId: dto.sportId,
               competitionConfigVersionId: sportChangeConfigVersionId,
+              periodOverridesCleared,
             }),
           },
         },
@@ -724,7 +752,7 @@ export class TournamentsAdminService {
    * 동시에 반대로 바꾸는 요청이 있으면 나중 요청을 409 로 돌려 감사 기록의 이전 값이 틀리지 않게 한다.
    */
   async updateVisibility(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentVisibilityDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     return this.prisma.$transaction(async (tx) => {
       const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
@@ -757,76 +785,94 @@ export class TournamentsAdminService {
     });
   }
 
-  async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
-      where: { id: tournamentId, deletedAt: null },
+  /** 대진/자동 명단만 있는 경기는 허용한다. 실제 운영 흔적·결과가 있으면 이력을 보존한다. */
+  private async hasStartedTournamentFixture(
+    db: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    tournamentId: string,
+  ): Promise<boolean> {
+    const started = await db.v1TournamentMatchDetails.findFirst({
+      where: {
+        tournamentId,
+        teamMatch: {
+          tournamentId,
+          OR: [
+            { status: 'completed' },
+            { game: { is: { OR: [
+              { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } },
+              { events: { some: {} } },
+              { resultRevisions: { some: {} } },
+              { periods: { some: { OR: [
+                { state: { not: 'SCHEDULED' } }, { startedAt: { not: null } },
+                { endedAt: { not: null } }, { pausedAt: { not: null } },
+              ] } } },
+            ] } } },
+          ],
+        },
+      },
+      select: { teamMatchId: true },
     });
-    if (!existing) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-    }
+    return started !== null;
+  }
 
-    const from = existing.status as TournamentStatus;
-    const to = dto.status;
-    if (from === to) {
-      // 동일 상태 재요청은 멱등 처리(no-op).
-      return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true };
-    }
-    if (!TOURNAMENT_TRANSITIONS[from].includes(to)) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_STATUS_TRANSITION_INVALID',
-        message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
+  async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 관리자 상태 변경은 같은 대회 행에서 직렬화된다. 판정은 잠금 이후 DB 상태로 한다.
+      await lockTournamentForConfigChange(tx, tournamentId);
+      const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId, deletedAt: null },
       });
-    }
-    const reason = dto.reason?.trim() ? dto.reason.trim() : undefined;
-    if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
-      throw new BadRequestException({
-        code: 'TOURNAMENT_STATUS_REASON_REQUIRED',
-        message: '되돌리는 사유를 입력해 주세요.',
-      });
-    }
-    if (to === 'open') {
-      this.assertPaidTournamentPaymentInstructions(existing);
-    }
-    // Review-request notifications are sent on the first completion only; a revert + re-complete must not re-notify.
-    const alreadyCompletedBefore =
-      to === 'completed' &&
-      (await this.prisma.v1StatusChangeLog.count({
+      if (!existing) {
+        throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      }
+      const from = existing.status as TournamentStatus;
+      const to = dto.status;
+      if (from === to) {
+        return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true, requestReviews: false };
+      }
+      if (!TOURNAMENT_TRANSITIONS[from].includes(to)) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_STATUS_TRANSITION_INVALID',
+          message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
+        });
+      }
+      const reason = dto.reason?.trim() || undefined;
+      if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
+        throw new BadRequestException({ code: 'TOURNAMENT_STATUS_REASON_REQUIRED', message: '되돌리는 사유를 입력해 주세요.' });
+      }
+      if (from === 'in_progress' && to === 'closed') {
+        // 경기 시작 커맨드도 Game 행을 잠근다. 먼저 시작된 요청을 기다린 뒤 이력을 다시 확인한다.
+        await lockCompetitionFixtureRows(tx, existing.kind, tournamentId);
+        if (await this.hasStartedTournamentFixture(tx, tournamentId)) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_ALREADY_STARTED',
+            message: '이미 시작했거나 기록·결과가 있는 경기가 있어 접수 마감으로 되돌릴 수 없어요.',
+          });
+        }
+      }
+      if (to === 'open') this.assertPaidTournamentPaymentInstructions(existing);
+      const alreadyCompletedBefore = to === 'completed' && (await tx.v1StatusChangeLog.count({
         where: { targetType: 'tournament', targetId: tournamentId, toStatus: 'completed' },
       })) > 0;
-
-    await this.prisma.$transaction(async (tx) => {
       await tx.v1Tournament.update({ where: { id: tournamentId }, data: { status: to } });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.status',
-          targetType: 'tournament',
-          targetId: tournamentId,
-          reason: reason ?? null,
-          fromStatus: from,
-          toStatus: to,
-        },
-        tx,
-      );
+      await this.adminContext.logAdminAction(admin, {
+        action: 'tournament.status', targetType: 'tournament', targetId: tournamentId,
+        reason: reason ?? null, fromStatus: from, toStatus: to,
+      }, tx);
+      return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false,
+        requestReviews: to === 'completed' && !alreadyCompletedBefore };
     });
-
-    if (to === 'completed' && !alreadyCompletedBefore) {
-      // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
-      // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
-      // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.
-      // 수신자 조회(DB 일시 오류)와 발송(알림 인프라) 어느 쪽이 넘어져도 전이 결과는 지킨다.
+    if (result.requestReviews) {
+      // 알림 실패가 이미 커밋된 상태 전이를 실패 응답으로 바꾸면 안 된다.
       try {
         await this.requestTournamentReviews(tournamentId);
       } catch (error) {
-        this.logger.error(
-          `대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
-          error instanceof Error ? error.stack : String(error),
-        );
+        this.logger.error(`대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
+          error instanceof Error ? error.stack : String(error));
       }
     }
-
-    return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
+    const { requestReviews: _requestReviews, ...response } = result;
+    return response;
   }
 
   /**
@@ -901,7 +947,7 @@ export class TournamentsAdminService {
    * 공개로 전환된다. 이미 지난 시각은 받지 않는다(즉시 공개와 구분되지 않아 혼란스럽다).
    */
   async publishBracket(user: V1AuthUser, tournamentId: string, scheduledAt?: Date) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
@@ -981,7 +1027,7 @@ export class TournamentsAdminService {
    * 시각만 저장한다. 같은 엔드포인트를 다시 호출하면 예약 시각이 덮어써진다(변경 = 재예약).
    */
   private async scheduleBracketPublish(
-    admin: Awaited<ReturnType<AdminContextService['getMutationAdmin']>>,
+    admin: Awaited<ReturnType<AdminContextService['getTournamentMutationAdmin']>>,
     tournamentId: string,
     scheduledAt: Date,
   ) {
@@ -1048,7 +1094,7 @@ export class TournamentsAdminService {
    * idempotent: 이미 비공개면 트랜잭션/로그 없이 alreadyUnpublished:true 반환.
    */
   async unpublishBracket(user: V1AuthUser, tournamentId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
@@ -1358,10 +1404,13 @@ export class TournamentsAdminService {
   ) {
     return {
       id: row.id,
+      kind: row.kind,
       sportId: row.sportId,
       title: row.title,
       status: row.status,
       format: row.format,
+      sixTeamBracket: row.sixTeamBracket,
+      sixTeamMode: row.sixTeamMode,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
@@ -1376,6 +1425,8 @@ export class TournamentsAdminService {
       latitude: row.latitude,
       longitude: row.longitude,
       coverImageUrl: row.coverImageUrl,
+      listImageUrl: row.listImageUrl,
+      showDetailImage: row.showDetailImage,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,

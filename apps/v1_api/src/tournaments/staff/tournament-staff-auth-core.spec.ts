@@ -24,6 +24,8 @@ const IDS = {
   otherTournament: '77000000-0000-4000-8000-000000000041',
   fixture: '77000000-0000-4000-8000-000000000050',
   field: '77000000-0000-4000-8000-000000000060',
+  homeTeam: '77000000-0000-4000-8000-000000000070',
+  awayTeam: '77000000-0000-4000-8000-000000000071',
   otherField: '77000000-0000-4000-8000-000000000061',
 } as const;
 
@@ -121,11 +123,21 @@ function accessService(options: {
   admin?: object | null;
   assignments?: readonly object[];
   findMany?: jest.Mock;
+  /** 이 사용자가 경기 한쪽 팀의 활성 멤버인지(MD-QA #193). */
+  memberOfFixtureTeam?: boolean;
 } = {}) {
   const prisma = {
     v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.admin ?? null) },
     v1TournamentStaffAssignment: {
       findMany: options.findMany ?? jest.fn().mockResolvedValue(options.assignments ?? []),
+    },
+    v1TeamMatch: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: IDS.fixture, hostTeamId: IDS.homeTeam, approvedApplicantTeamId: IDS.awayTeam, tournamentDetails: null },
+      ]),
+    },
+    v1TeamMembership: {
+      findMany: jest.fn().mockResolvedValue(options.memberOfFixtureTeam ? [{ teamId: IDS.homeTeam }] : []),
     },
   };
   return {
@@ -179,6 +191,14 @@ function currentUserFactory(): CustomRouteArgumentMetadata['factory'] {
 }
 
 describe('Tournament staff auth core', () => {
+  it('rejects read-only lock mode for mutation authorization', async () => {
+    const { service } = accessService();
+
+    await expect(
+      service.assertAccess(staffInput(), undefined, { lockMode: 'read_only' }),
+    ).rejects.toThrow('STAFF_ACCESS_READ_ONLY_LOCK_MODE_REQUIRES_READ_ACTION');
+  });
+
   it('PINs the existing authenticated-user request/decorator convention', () => {
     const user = {
       id: '77000000-0000-4000-8000-000000000001',
@@ -247,6 +267,18 @@ describe('Tournament staff auth core', () => {
         staffInput(),
       ),
     ).resolves.toMatchObject({ role: 'field_operator' });
+    // 참가팀 선수는 자기 팀 경기의 현장 담당자로 기록할 수 없다(MD-QA #193). 디렉터는 그대로다.
+    await expectScopeDenial(
+      accessService({ assignments: [staffAssignment('FIELD_OPERATOR')], memberOfFixtureTeam: true }).service.assertAccess(
+        staffInput(),
+      ),
+      'OWN_TEAM_FIXTURE',
+    );
+    await expect(
+      accessService({ assignments: [staffAssignment('TOURNAMENT_DIRECTOR')], memberOfFixtureTeam: true }).service.assertAccess(
+        staffInput(),
+      ),
+    ).resolves.toMatchObject({ role: 'tournament_director' });
     await expect(
       accessService({ assignments: [staffAssignment('SUPPORT_READONLY')] }).service.assertAccess(
         staffInput({ action: 'read' }),

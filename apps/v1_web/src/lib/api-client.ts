@@ -2,6 +2,7 @@ import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
 import { randomUuid } from './uuid';
 import { reportClientError } from './client-error-reporter';
+import { PHONE_CONFLICT_CODE, SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
 import {
   PHONE_VERIFICATION_REQUIRED_CODE,
   notifyPhoneVerificationRequired,
@@ -168,7 +169,10 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
     const phoneVerificationRequired = error.code === PHONE_VERIFICATION_REQUIRED_CODE;
     const activityProfileRequired = error.code === ACTIVITY_PROFILE_REQUIRED_CODE;
-    if (!phoneVerificationRequired && !activityProfileRequired && !isExpectedGuestAuthProbe(path, init, error)) {
+    // 번호 중복과 "원래 계정으로 로그인 뒤 연결" 안내도 같은 이유로 제품 상태다.
+    const accountExistsGuidance = error.statusCode === 409
+      && (error.code === PHONE_CONFLICT_CODE || (error.details as { next?: unknown } | null)?.next === SIGN_IN_THEN_LINK_NEXT);
+    if (!phoneVerificationRequired && !activityProfileRequired && !accountExistsGuidance && !isExpectedGuestAuthProbe(path, init, error)) {
       reportClientError({
         message: error.message,
         level: error.statusCode >= 500 ? 'error' : 'warn',

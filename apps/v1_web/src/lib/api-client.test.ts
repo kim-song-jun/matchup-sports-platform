@@ -80,6 +80,25 @@ describe('v1Api error reporting', () => {
     vi.restoreAllMocks();
   });
 
+  it.each([
+    ['PHONE_CONFLICT', null],
+    ['SOCIAL_LINK_CONTACT_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' }],
+  ])('does not report the account-exists guidance %s', async (code, details) => {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ status: 'error', statusCode: 409, code, message: '이미 팀밋 계정이 있어요.', details, timestamp: new Date().toISOString() }),
+      }),
+    );
+
+    await expect(v1Get('/verification/phone/request')).rejects.toThrow('이미 팀밋 계정이 있어요.');
+
+    expect(reportSpy).not.toHaveBeenCalled();
+  });
+
   it('reports API errors to the client-error reporter before rethrowing', async () => {
     const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
     vi.stubGlobal(
@@ -174,7 +193,7 @@ describe('v1Api error reporting', () => {
       }),
     );
 
-    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' })).resolves.toBeUndefined();
+    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/abc' })).resolves.toBeUndefined();
   });
 
   // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 body 다. 이 구분을 놓쳐서

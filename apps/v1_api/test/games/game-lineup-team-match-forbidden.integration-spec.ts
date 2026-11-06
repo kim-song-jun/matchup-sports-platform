@@ -6,6 +6,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Task 14 blocker fix: the generic per-side lineup endpoints
@@ -43,7 +44,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
 
 const authUser = (id: string) => ({

@@ -276,3 +276,81 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
    이관 뒤 저장본 번호가 사라진다. → **B2 결정(2026-09-29): 참가 명단 번호로 옮겨 적는다.** 한 경기 번호가 리그 전체 번호가 되는 것은
    받아들이고, 덮어쓰기·팀 안 중복은 하지 않는다(위 "리그 이관").
 5. **회의 화자.** 녹취에 화자 구분이 없어 일부 발언의 주체가 불명확하다(아티팩트 표시). 결정에는 영향 없음.
+
+## 2026-10-20 추가 선수 안내 간소화
+
+- 사용자 요청: 참가 명단 추가를 알리는 경기 출전 안내 배너 제거.
+- 경기 명단 공통 컴포넌트의 안내 배너와 배너 전용 필터만 제거했다. 출전 계산·API·선수별 `새로 추가` 표시는 유지한다. 기존 세로 gap 레이아웃이 남은 요소 간격을 유지한다.
+- 기존 명단 테스트는 추가 선수가 출전 목록에 남고 해당 배너는 표시되지 않는 계약으로 변경했다. Web patch changeset을 추가했다.
+- 검증: `git diff --check` 통과, 변경 소스의 TODO/FIXME/HACK/XXX 없음. 단일 Vitest 실행은 기존 설치의 `@vitest/utils` 누락으로 시작 실패했다.
+- Alpha 배포·실제 로그인·390/768/1440 화면 및 console/network 검증은 미수행. 이 변경은 로컬 작업트리에만 있으며 배포 완료로 간주하지 않는다.
+- 같은 사용자 요청으로 `우리 팀 다른 경기` 링크도 제거하고 `변경 기록`은 유지한다. 시작한 경기에서는 빈 액션 컨테이너도 렌더하지 않는다.
+- 대회 참가 명단과 팀 경기 명단 진입점은 모두 `CompetitionRosterManager` → `GameRosterClient`를 사용하며, 공통 컴포넌트 변경은 TOURNAMENT/LEAGUE 양쪽에 적용된다. 링크용 import·역할 필터와 팀 일정 앵커의 오래된 설명을 정리했다. 팀원 테스트의 기존 링크 기대값도 제거 계약으로 변경했다.
+
+## 2026-10-23 회귀: 지연된 SCHEDULED 대회 경기의 팀원 선택 목록
+
+- 증상: 대회 참가 신청 화면의 `경기 출전`에서 owner/manager는 시작 시각이 지난 `SCHEDULED` 경기를 보지만, member는 `/teams/:teamId/upcoming-games` 응답에서 그 경기를 못 본다.
+- 원인: 관리자 표는 `V1Game.state = SCHEDULED`와 종료되지 않은 대회 상태를 기준으로 시작 전 경기를 모으지만, 팀원 경기 목록은 공유 `LineupTodoService`의 `startAt >= now` 조건으로 먼저 잘라 지연 경기를 놓쳤다.
+- 수정: `/teams/:teamId/upcoming-games` 소비자만 `includeElapsedScheduledTournamentGames`를 요청한다. 킥오프 시각이 지난 `SCHEDULED` 대회 경기만 추가하고, 취소 경기·취소/종료 대회·다른 팀 경기는 조회에서 제외한다. 일정 미정 경기, 개인 라인업 할 일·홈 다음 경기·알림은 기존 시간 기준을 유지한다. 이 변경은 읽기 경로만 다루며 member 쓰기 권한은 그대로다.
+- 회귀 검증: `lineup-todo.service.spec.ts`의 새 조건 조회 테스트는 수정 전 API signature가 2개 인자만 받아 TS2554로 실패했고, 수정 후 같은 단일 케이스가 통과했다(1 passed, 12 skipped). DB 회귀는 `team-game-rosters.integration-spec.ts`에 추가했으며, 실제 DB를 사용하는 격리 CI에서 실행 대기다. 로컬 integration은 실행하지 않았다.
+- 문서 계약: `docs/api/domains/games.md`에 경기 명단 팀원 목록의 시간/상태 범위와 다른 소비자 시간 기준을 명시했다.
+- 미실행: backend 전체 unit, integration, lint/typecheck, alpha 로그인·390 role 비교. root가 직렬 typecheck를 진행하고 member/manager alpha 실측을 후속 처리한다.
+- 2026-10-23 독립 리뷰 보완: `/teams/:teamId/upcoming-games` 는 전체 roster selector 목록 계약을 유지하므로, 지연된 `SCHEDULED` 대회 경기 수가 500개를 넘을 때도 이후 시각순 경기까지 반환해야 한다. 조회당 500행 제한은 유지하되 이 소비자만 안정 정렬(`startAt`, `id`) 커서로 후보를 모두 읽는다. 할 일·홈·알림 소비자의 기존 단일 조회/시간 기준은 바꾸지 않는다.
+- 보완 회귀: 실제 integration DB에 기존 지연 경기보다 더 오래된 지연 `SCHEDULED` 대회 경기 500개를 추가하고, 활성 member의 HTTP 목록에서 뒤의 미래 경기가 계속 나오는지 확인한다. 다른 팀 대조군은 대회가 활성인 상태에서 검사하고, 취소 대회도 별도 제외 조건으로 검사한다. 로컬 integration DB는 실행하지 않고 CI에서 확인한다.
+- 실제 behavior RED (2026-10-23): root가 test-only commit `26f1db032d825a2ed481e0e537c15b0a2e180057` CI run `39906701234`의 API 실패를 검토했다. `team-game-rosters.integration-spec.ts:675:96`에서 실제 member HTTP 응답이 과거 `SCHEDULED` g1 대신 미래 경기만 반환해 `toContain(g1.gameId)`가 실패했다. 178 suites passed, 1 failed, 1,314 passed, 3 skipped; Web 및 gates는 성공. Root가 해당 실패를 정확한 동작 회귀로 확인했다. 다른 unrelated CI error 로그는 추가 실패로 세지 않았다.
+- 후속 성능 수정: 500행 cursor paging 뒤 기존 per-game `loadGameRoster` 호출이 N경기 동안 직렬 쿼리를 만들어 응답 시간을 늘릴 수 있다. 팀원 목록 전용 helper는 game context/side, 역할, 조정, 결장 데이터를 100건 이하의 DB batch로 읽고, 순수 `computeGameRoster` 계산과 기존 roster summary 직렬화를 재사용한다. 경기 순서·징계 이력은 competition마다 한 번 읽으며 새 plural-key `readSuspensionVerdictsForUpcomingKeys`가 같은 이력을 이용해 각 team match key를 개별 판정한다. 조회 수는 경기마다 증가하는 대신 대략 O(ceil(경기수/100) + 서로 다른 competition 수)다. generic `loadRosterSummaries`를 사용하는 home/TODO/reminder caller는 그대로 둔다.
+- 경계 보강: 500개 과거 `SCHEDULED` 경기를 같은 kickoff 시각으로 둬 ID tie-break/cursor 경계를 실제 HTTP에서 통과시키고, 500개 backlog + elapsed g1 + future g2 총 502개 ID가 중복 없이 모두 응답되는지 단언한다. 징계 plural helper는 기존 singular helper와 판정 순서·결과가 같고 DB history를 1회만 읽는 좁은 unit 비교를 추가했다. helper의 계산·member HTTP 출력은 격리 DB integration에서 기존 roster summary 계산과 비교한다.
+- Copilot 리뷰 보완: 취소 대회 제외를 검사한 뒤 대회 상태를 `in_progress`로 복원했을 때 member upcoming-games와 manager matrix 양쪽이 elapsed `SCHEDULED` g1을 다시 포함하는 HTTP positive control을 추가한다. 그 다음에만 대회를 `completed`로 바꾸고 두 목록에서 빠지는 negative control을 검증한다.
+- 후속 검증 대기: root가 직렬 테스트 슬롯을 배정하기 전에는 tests/build/typecheck/lint/integration을 실행하지 않는다. 예상 narrow targets: `lineup-todo.service.spec.ts`, `team-game-order.spec.ts`, `team-game-rosters.integration-spec.ts`, `team-upcoming-games.service.spec.ts`. 실제 CI RED는 확인됐지만 후속 product GREEN은 아직 확인되지 않았다.
+- 직렬 unit 슬롯 검증 (2026-10-23): 첫 명령 `pnpm --filter v1_api exec jest --selectProjects unit --runInBand src/team-upcoming-games.service.spec.ts src/tournaments/discipline/team-game-order.spec.ts` 는 2개 suite를 골랐고 fake cutoff 불일치로 service spec 2개가 실패(나머지 23 통과)했다. fake cutoff 추출을 `AND/OR` 경로도 읽게 보정했다. 같은 malformed target로 실행한 후속 결과 1 suite / 14 passed는 discipline spec만 실행한 것으로 확인되어 service spec GREEN 증거로 취급하지 않는다. root 요청 뒤 정확한 명령 `pnpm --filter v1_api exec jest --selectProjects unit --runInBand src/team-lineups/team-upcoming-games.service.spec.ts` 실행: runner가 이 spec을 명시해 1 suite / 11 tests passed, exit 0. 앞선 suspension spec은 14/14로 통과했다. 실제 HTTP + DB batch/parity integration은 로컬 실행하지 않았고 정확한 제품-green CI가 필요하다.
+
+
+## 2026-10-24 후속: 어드민 종료 경기 빠짐 처리
+
+Status: In Progress
+
+### Context / Goal / Original Conditions
+- 사용자: “어드민 경기별 명단에서 지난 경기도 빠짐 처리”, “수정하고 PR”. 범위: v1 API·Web·관련 계약 문서, dev 대상 PR.
+- 기존 표는 종료 경기까지 읽지만 editable=false이고 batch가 모든 시작 경기를 409로 거절했다.
+
+### User Scenarios / Test Scenarios
+- [x] owner·ops 어드민이 종료 경기 칸을 빠짐으로 저장하고 되돌린다.
+- [x] 팀장·대회 스태프·support는 기존 마감 유지, 진행 중·일시정지·취소 및 종료 GK 변경은 불가.
+- [x] 공식 결과 출전자가 새 리비전에 반영되고 기존 이력·점수·상대팀은 보존된다.
+- [x] 개인 기록이 있는 선수는 결과 정정 안내와 409, batch 전체 rollback.
+- [ ] alpha 실제 로그인·화면·network 검증: PR 머지/배포 전이므로 미실행.
+
+### Parallel Work Breakdown / Owned / Forbidden
+- 서브에이전트 없이 직렬 작업. Owned: games/roster의 matrix·batch·새 종료 정정 helper·테스트, 어드민 명단 표의 기존 제어 로직·문구·테스트·MSW, API/정본/task 문서와 changeset.
+- Forbidden: schema/migration, 일반 사용자 권한 확대, 운영 데이터 수정, main 승격, 타 세션 WIP.
+- 기존 표 구조를 유지하는 권한·로직 수정으로 신규 디자인은 만들지 않는다.
+
+### Acceptance Criteria / Security Notes
+- owner·ops active/status/revokedAt/accountStatus를 서버가 판정하고 잠금 뒤 ENDED만 예외.
+- 기존 결과·라인업은 덮어쓰지 않고 후속 리비전·주체·outbox를 남긴다.
+- 저장 실패를 성공으로 표시하지 않으며 개인 기록은 조용히 삭제하지 않는다.
+
+### Tech Debt Resolved
+- 화면의 editable 계약과 서버 batch의 종료 경기 처리 계약을 일치시킨다.
+
+### Risks & Dependencies / Ambiguity Log
+- 개인 기록이 있는 선수는 기존 결과 정정으로 함께 고친다. 단순 출전 토글이 기록을 자동 삭제하지 않는다.
+- alpha QA는 배포와 실제 로그인 계정이 필요하다. DB integration은 CI에서 실행한다.
+- 원본 shared tree는 광범위한 WIP와 CRLF 변동이 있어 최신 origin/dev 기반 `/tmp/teameet-admin-past-roster` 격리 worktree에서 구현한다.
+
+### Progress Snapshot
+- Base: b92096f81 (origin/dev). 권한/matrix/출전 정정 및 MSW 수정 완료.
+- API unit: matrix·registration 서비스·권한 gate·공식 결과 보존 총 45개 통과. 최초 42개 green 뒤 확정 전/결과 없음 및 외부 정정 후 재제외 보강 3개를 추가했고 최종 helper/access 20개도 green. 반복 요청은 새 결과 이력을 만들지 않고, 외부 공식 정정으로 복귀한 선수는 이전 EXCLUDE가 활성이어도 실제 출전을 다시 조정한다.
+- Web 어드민 표 21개 통과(종료 경기 빠짐·되돌리기 HTTP batch payload와 저장 후 상태 포함).
+- API/Web typecheck 통과. API는 공유 node_modules의 오래된 Prisma 생성물을 수정하지 않고 최신 schema로 `/tmp/teameet-admin-prisma-client`에 엔진 없는 client를 생성해 임시 paths/moduleNameMapper로 검증했다. 이 QA 설정/생성물은 PR에 포함하지 않는다.
+- 새 DB integration 4건(공식/제출/결과 없음의 왕복, 개인 기록 충돌 시 전체 rollback)은 CI에서 실행. 로컬 DB/alpha 실제 클릭·스크린샷 검증은 미실행.
+- Changeset 정책·git diff --check 통과, touched path debt marker 추가 없음. 실제 schema/DTO 변경 및 migration 없음.
+
+
+### 2026-10-24 alpha 배포 준비 / 실제 DB RED 수정
+- 사용자가 alpha 배포를 요청했다. dev PR #2053의 Gates·Web은 통과했지만 CI `40090070568`의 실제 DB integration에서 새 테스트 4건이 실패했다(179 suites 통과).
+- 실제 원인: DB는 DRAFT 결과에만 참가자 INSERT를 허용하므로 helper와 fixture 모두 DRAFT 생성 → 참가자 쓰기 → SUBMITTED/OFFICIAL 전환 순서가 필요하다. 개인 기록 충돌 fixture도 확정 뒤 결과 행을 수정하지 않고 DRAFT 때 기록을 넣는다.
+- HTTP DTO의 선택 필드가 undefined로 존재해 감사 스냅샷 검증이 거절한 런타임 결함도 수정: 감사 데이터는 userId/op만 명시적으로 직렬화한다. unit fixture에 DB DRAFT guard와 실제 DTO의 undefined 필드를 추가해 같은 결함이 unit에서도 실패하도록 강화했다.
+- Copilot 스캔은 외부 모델 세션 생성 실패로 clean 판정을 얻지 못한 상태이며 재요청/정책 변경 없이 기록한다. 제품 CI가 green이 된 후 사용자 배포 요청에 따라 표준 dev 머지·alpha 자동 배포 경로로 진행한다.
+- 보강 helper unit 10개 통과 및 API typecheck 통과. DB trigger를 우회하지 않고 상태 전환 순서를 바로잡은 수정만 PR에 반영해 실제 CI integration을 재검증한다.
+- 수정 head `7ecdea532`의 CI `40091201436`: Gates/API/Web 모두 성공. 실제 DB의 새 4개 시나리오도 통과했다. 대기 중 dev에 #2054 카드 타임라인 변경이 머지되어 문서 2곳의 append 충돌을 양쪽 보존으로 해결하고 최신 dev를 통합한다. 코드 충돌은 없다.

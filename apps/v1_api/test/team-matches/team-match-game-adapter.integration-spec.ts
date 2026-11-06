@@ -16,6 +16,7 @@ import { NotificationsService } from '../../src/notifications/notifications.serv
 import { PrismaService } from '../../src/prisma/prisma.service';
 import type { MutateTeamMatchDto } from '../../src/team-matches/dto/mutate-team-match.dto';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   hostUser: '62000000-0000-4000-8000-000000000001',
@@ -31,7 +32,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const notifications = {
   emitNotification: async () => undefined,
   emitToManyDeferred: () => undefined,

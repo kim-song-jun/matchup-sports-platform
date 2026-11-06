@@ -30,6 +30,11 @@ export class AddPlayerDto {
   @Max(99, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
   jerseyNumber?: number;
 
+  /** 골레이 여부. 생략 시 일반 선수로 등록한다. */
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
+
   /** 미지정 시 needs_review 로 저장. */
   @IsOptional()
   @IsIn(PLAYER_ELIGIBILITY_STATUSES)
@@ -73,6 +78,13 @@ export class UpdatePlayerRosterSettingsDto {
   @Max(99)
   jerseyNumber?: number | null;
 
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
+}
+
+/** 번호는 명시적으로 저장하고, GK는 바꾼 경우에만 보내 기존 경기 역할을 보존한다. */
+export class UpdateAdminPlayerSettingsDto extends UpdatePlayerJerseyDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   goalkeeper?: boolean;

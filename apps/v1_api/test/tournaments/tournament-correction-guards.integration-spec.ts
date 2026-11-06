@@ -54,9 +54,7 @@ import { TournamentResultReviewService } from '../../src/tournament-operations/r
  * `jest.config.ts`의 `test/tournaments/**\/*.integration-spec.ts` 글롭이 이
  * 파일을 자동으로 선택한다(위 글롭의 `/`를 이스케이프한 이유: 이스케이프
  * 없이 적으면 `**` 뒤의 `*` + `/`가 이 블록 주석을 여기서 닫아 버려 아래 코드
- * 전체가 주석 밖으로 튀어나오고, 파일이 파싱조차 되지 않는다 — `test/`는
- * `tsconfig.json`의 `include`에 없어서 `tsc --noEmit`으로는 드러나지 않고
- * CI에서 "Test suite failed to run"으로만 나타난다).
+ * 전체가 주석 밖으로 튀어나오고, 파일이 파싱조차 되지 않는다).
  */
 const ids = {
   platformOps: '91000000-0000-4000-8000-000000000001',
@@ -94,7 +92,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService());
 

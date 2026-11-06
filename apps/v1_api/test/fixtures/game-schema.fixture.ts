@@ -597,7 +597,17 @@ export const gameSchemaSourceManifest = {
   // 2026-10-17: additive V1Match.isOnline backed by
   // 20261017100000_v1_match_online_classification. Game operations migration is unchanged.
   // 2026-10-18: additive V1Tournament.requiresExplicitStart; historical game migration unchanged.
-  schema: '23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644',
+  // 2026-10-21: additive V1LoginAttempt, V1LoginStepUpChallenge, V1SecurityAnomaly (+ V1User back-relation),
+  // backed by 20261021120000_login_step_up. No game model changes; historical game migration unchanged.
+  // 2026-10-22: additive show_detail_image boolean default true; historical game migration unchanged.
+  // 2026-10-22: additive V1User.session_epoch integer default 0 (20261022120000_user_session_epoch); historical game migration unchanged.
+  // 2026-10-27: additive round64/round32 and bracket draft fields. LF migration replay + drift passed.
+  // 2026-10-28: six-team mode adds tournament fields only; historical game migration unchanged.
+  // 2026-10-29: additive v1_tournament_stage_period_settings + group/match period override columns; historical game migration unchanged.
+  // 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); historical game migration unchanged.
+  // 2026-11-02: add V1User.signupEmailLoginRequired; historical game migration is unchanged.
+  // 2026-11-03: additive V1Tournament.previousLeagueId; historical game migration unchanged.
+  schema: 'b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

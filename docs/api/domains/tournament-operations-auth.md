@@ -11,7 +11,7 @@
 | `opponent_manager` | request opponent lineup change before lock; approve/change-request opponent result | none | approve/change-request team result only | none | read |
 | `field_operator` | none | assigned fixture/field commands and event input | none | own warnings read | read |
 | `support_readonly` | none | assigned board read | none | list/detail/ack due `REMINDER`, never resolve | read |
-| `tournament_director` | none | assigned tournament/field operations | correction plus flag-gated officialize/void | manage subordinate staff; list/detail/ack due `REMINDER`, never resolve | read |
+| `tournament_director` | none | assigned tournament/field operations | correction, officialize/void and quick result for assigned tournaments; league officialize/void remains flag-gated | manage subordinate staff; list/detail/ack due `REMINDER`, never resolve | read |
 | `platform_ops` | audit/read | all tournaments | officialize/correct/void | bootstrap director and revoke; list/detail/ack/resolve due `ESCALATION` | read |
 
 <!-- API_CONTRACT_SECTION_END:Canonical actor-action matrix -->

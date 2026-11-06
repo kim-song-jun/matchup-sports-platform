@@ -1,7 +1,8 @@
 'use client';
 
-import { useV1AdminBracket } from '@/hooks/use-v1-api';
-import type { V1AdminBracketFixture } from '@/types/api';
+import type { ReactNode } from 'react';
+import { useV1AdminBracket, useV1AdminTournamentPlayers } from '@/hooks/use-v1-api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup } from '@/types/api';
 import { AdminEmpty, AdminTableSkeleton } from '@/components/admin';
 import { extractErrorMessage } from '@/lib/error-message';
 import { rosterPersonLabel } from '@/lib/roster-presentation';
@@ -51,6 +52,7 @@ const UNRESOLVED_GOAL_SCORER_PLACEHOLDER = '선수 정보 없음';
 
 export function buildTournamentStatistics(
   fixtures: V1AdminBracketFixture[],
+  scorerLimit = 10,
 ): TournamentStatistics {
   const scorers = new Map<string, TournamentScorerStat>();
   const teams = new Map<string, TournamentTeamStat>();
@@ -143,7 +145,7 @@ export function buildTournamentStatistics(
   return {
     scorers: [...scorers.values()]
       .sort((a, b) => b.goals - a.goals || a.playerName.localeCompare(b.playerName, 'ko-KR') || byName(a, b))
-      .slice(0, 10),
+      .slice(0, scorerLimit),
     leastConceded: [...teamRows]
       .sort((a, b) => a.goalsAgainst - b.goalsAgainst || b.played - a.played || b.goalsFor - a.goalsFor || byName(a, b)),
     mostScored: [...teamRows]
@@ -151,6 +153,36 @@ export function buildTournamentStatistics(
     completedFixtures,
     excludedFixtures,
   };
+}
+
+/** Group phase is authoritative; ungrouped manual fixtures use the supported round labels. */
+export function buildTournamentStageScorers(
+  fixtures: V1AdminBracketFixture[],
+  groups: Pick<V1AdminBracketGroup, 'id' | 'phase'>[],
+  stage: 'final' | 'third_place',
+): TournamentScorerStat[] {
+  const phases = new Map(groups.map((group) => [group.id, group.phase]));
+  const labels = stage === 'final' ? ['final', '결승'] : ['third_place', '3·4위전'];
+  return buildTournamentStatistics(fixtures.filter((fixture) => fixture.groupId
+    ? phases.get(fixture.groupId) === stage
+    : labels.includes(fixture.round.trim())), Number.POSITIVE_INFINITY).scorers;
+}
+
+function TeamGoalkeepers({ registrationId }: { registrationId: string }) {
+  const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(registrationId);
+  if (isPending) return <span>등록 GK 조회 중…</span>;
+  if (isError || !data) return (
+    <span className="block">
+      {extractErrorMessage(error, '등록 GK를 불러오지 못했어요.')}
+      <button type="button" onClick={() => void refetch()} className="min-h-[44px] px-2 text-[var(--blue500)] font-semibold">GK 다시 시도</button>
+    </span>
+  );
+  const goalkeepers = data.players.filter((player) => player.goalkeeper && !player.removedAt);
+  return <span className="block">등록 GK: {goalkeepers.length > 0
+    ? goalkeepers.map((player) => player.nickname
+      ? rosterPersonLabel({ displayName: player.nickname, realName: player.realName })
+      : player.realName).join(', ')
+    : '등록된 GK가 없어요.'}</span>;
 }
 
 function RankingTable({
@@ -163,7 +195,7 @@ function RankingTable({
 }: {
   title: string;
   description: string;
-  rows: Array<{ key: string; name: string; sub: string; played: number; value: number }>;
+  rows: Array<{ key: string; name: string; sub: ReactNode; played: number; value: number }>;
   valueLabel: string;
   value: (row: { value: number }) => string;
   showPlayed?: boolean;
@@ -224,6 +256,9 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
   }
 
   const stats = buildTournamentStatistics(data.fixtures);
+  const finalScorers = buildTournamentStageScorers(data.fixtures, data.groups, 'final');
+  const thirdPlaceScorers = buildTournamentStageScorers(data.fixtures, data.groups, 'third_place');
+  const minimumConceded = stats.leastConceded[0]?.goalsAgainst;
   return (
     <div className="tm-content-enter p-4">
       <div className="mb-4">
@@ -249,8 +284,8 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
         />
         <RankingTable
           title="최소 실점 팀"
-          description="누적 실점이 적은 순서이며, 동률이면 경기 수가 많은 팀이 앞서요."
-          rows={stats.leastConceded.map((row) => ({ key: row.key, name: row.teamName, sub: `${row.goalsFor}득점`, played: row.played, value: row.goalsAgainst }))}
+          description="누적 실점이 적은 순서이며, 동률이면 경기 수가 많은 팀이 앞서요. 최소 실점 공동 1위 팀은 등록 명단의 GK를 함께 표시해요. 개인별 실점 기록은 아니에요."
+          rows={stats.leastConceded.map((row) => ({ key: row.key, name: row.teamName, sub: <>{row.goalsFor}득점{row.goalsAgainst === minimumConceded && <TeamGoalkeepers registrationId={row.key} />}</>, played: row.played, value: row.goalsAgainst }))}
           valueLabel="실점"
           value={(row) => `${row.value}골`}
         />
@@ -260,6 +295,24 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
           rows={stats.mostScored.map((row) => ({ key: row.key, name: row.teamName, sub: `${row.goalsAgainst}실점`, played: row.played, value: row.goalsFor }))}
           valueLabel="득점"
           value={(row) => `${row.value}골`}
+        />
+      </div>
+      <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <RankingTable
+          title="결승전 득점자"
+          description="공식 결과에 기록된 결승전 득점자를 모두 표시해요. 자책골과 승부차기는 제외해요."
+          rows={finalScorers.map((row) => ({ key: row.key, name: row.playerName, sub: row.teamName, played: 0, value: row.goals }))}
+          valueLabel="득점"
+          value={(row) => `${row.value}골`}
+          showPlayed={false}
+        />
+        <RankingTable
+          title="3·4위전 득점자"
+          description="공식 결과에 기록된 3·4위전 득점자를 모두 표시해요. 자책골과 승부차기는 제외해요."
+          rows={thirdPlaceScorers.map((row) => ({ key: row.key, name: row.playerName, sub: row.teamName, played: 0, value: row.goals }))}
+          valueLabel="득점"
+          value={(row) => `${row.value}골`}
+          showPlayed={false}
         />
       </div>
     </div>

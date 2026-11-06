@@ -7,7 +7,16 @@ import {
   INQUIRY_SLACK_NOTIFICATION_TYPE,
   InquirySlackNotifier,
 } from '../inquiries/inquiry-slack-notifier';
+import {
+  LoginAnomalySlackNotifier,
+  securityEnvironmentLabel,
+} from '../auth/login-security/login-anomaly-slack-notifier';
+import { SECURITY_LOGIN_ANOMALY_TYPE } from '../auth/login-security/login-security.policy';
+import { EMAIL_DELIVERY_FAILED_TYPE } from '../verification/email/email-delivery-failure';
+import { EmailDeliveryFailureSlackNotifier } from '../verification/email/email-delivery-failure-slack-notifier';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
+import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from '../users/withdrawal-finalization-report';
+import { WithdrawalFinalizationSlackNotifier } from '../users/withdrawal-finalization-slack-notifier';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE } from '../team-matches/team-match-lineup.service';
 import {
   SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
@@ -18,7 +27,17 @@ import {
   LineupReminderService,
   scheduleNextScan,
 } from './lineup-reminders/lineup-reminder.service';
+import {
+  LOGIN_SECURITY_RETENTION_SCAN_TYPE,
+  LoginSecurityRetentionService,
+  scheduleNextLoginSecurityRetentionScan,
+} from './login-security-retention/login-security-retention.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
+import {
+  scheduleNextNoOpponentScan,
+  TEAM_MATCH_NO_OPPONENT_SCAN_TYPE,
+  TeamMatchNoOpponentCancelService,
+} from './team-match-no-opponent/team-match-no-opponent-cancel.service';
 import { V1GameOperationsWorkerModule } from './v1-game-operations-worker.module';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
 
@@ -31,9 +50,26 @@ async function bootstrap(): Promise<void> {
       frontendUrl: process.env.FRONTEND_URL,
     });
     worker.registerHandler(INQUIRY_SLACK_NOTIFICATION_TYPE, inquirySlack.handler);
+    // Security alerts reuse the inquiry webhook (no separate env); registration follows the same condition.
+    const loginAnomalySlack = new LoginAnomalySlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      frontendUrl: process.env.FRONTEND_URL,
+      environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
+    });
+    worker.registerHandler(SECURITY_LOGIN_ANOMALY_TYPE, loginAnomalySlack.handler);
+    const emailDeliverySlack = new EmailDeliveryFailureSlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
+    });
+    worker.registerHandler(EMAIL_DELIVERY_FAILED_TYPE, emailDeliverySlack.handler);
+    const withdrawalFinalizationSlack = new WithdrawalFinalizationSlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
+    });
+    worker.registerHandler(WITHDRAWAL_FINALIZATION_REPORT_TYPE, withdrawalFinalizationSlack.handler);
   } else {
     new Logger('InquirySlackNotifier').warn(
-      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry Slack outbox events remain pending',
+      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry, login-anomaly, email-delivery and withdrawal-finalization Slack outbox events have no handler and retry until POISONED',
     );
   }
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
@@ -86,6 +122,16 @@ async function bootstrap(): Promise<void> {
   // 체인의 첫 고리. 이미 예약돼 있으면 슬롯 키가 같아 무시되므로, 워커를 몇 번 재시작해도
   // 스캔이 늘어나지 않는다. 반대로 어떤 이유로 체인이 끊겼더라도 다음 배포 때 되살아난다.
   await prisma.$transaction((tx) => scheduleNextScan(tx, new Date()));
+
+  // 상대 없이 끝난 일반 팀매치 자동 취소(2026-10-21). 라인업 리마인더와 같은 자기 예약 스캔이고, 첫 고리는 여기서 심는다.
+  const noOpponentCancel = new TeamMatchNoOpponentCancelService(prisma, webPush);
+  worker.registerHandler(TEAM_MATCH_NO_OPPONENT_SCAN_TYPE, noOpponentCancel.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextNoOpponentScan(tx, new Date()));
+
+  // 로그인 시도 기록·만료 챌린지 보관 정리(30일/7일). 같은 자기 예약 스캔이다.
+  const loginSecurityRetention = new LoginSecurityRetentionService(prisma);
+  worker.registerHandler(LOGIN_SECURITY_RETENTION_SCAN_TYPE, loginSecurityRetention.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextLoginSecurityRetentionScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

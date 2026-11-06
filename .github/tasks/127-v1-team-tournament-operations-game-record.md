@@ -1896,3 +1896,33 @@ Validation:
 - [x] 대회·정규 리그 라우트와 A → B 선택 회귀 테스트 추가
 - [x] 관련 Web 테스트 128건, `tsc --noEmit`, v1 패턴 검사 통과
 - [ ] PR CI와 머지 후 Alpha 복귀 동선 확인
+
+## 후속 작업 — REST 경기 상태 실시간 갱신 (MD-QA #134, 2026-10-26)
+
+- [x] 실제 REST `start` 명령 뒤 별도 `SUPPORT_READONLY` Socket.IO 구독자와 동일 operator의 두 번째 콘솔에 승인된 전체 `game.snapshot`을 전달하는 HTTP/Socket.IO 통합 회귀를 추가한다. 양 팀의 positive participant/lineup fixture를 사용하고 observer는 팀 소유권이 없다.
+- [x] 별도의 unscoped friendly TeamMatch에서 두 팀 소유자가 새 REST `start` snapshot을 받는지, 다른 scoped room의 조회자가 target friendly game 권한 없이 subscribe/snapshot을 받지 않는지 실제 Socket.IO 소비자로 대조한다.
+- [x] observer 상세의 state/version/period `startedAt`, 후속 `pause` snapshot의 state/version/non-empty event history, 상세 `pausedAt`, 접근 없는 socket의 구독 거부를 검증하도록 확장한다.
+- [x] 실제 assignment revoke 또는 expiry가 `listEvents`의 실제 DB 결과 반환 중 일어나면 snapshot 전달과 재가입이 차단되는 통합 반례를 추가한다. 테스트 spy는 실제 `GamesService.listEvents`를 호출하고 그 결과를 barrier 뒤 반환한다.
+- [x] 첫 REST lifecycle refresh의 실제 `listEvents` 반환을 보류한 동안 후속 더 높은 version 명령의 floor를 같은 refresh에 병합하고, gate 해제 뒤 최신 `PAUSED` snapshot이 전달되며 낮은 snapshot으로 되돌아가지 않는지 실제 통합으로 대조한다.
+- [x] 세 번째 명령의 실제 `listEvents` 반환을 보류한 상태에서 unsubscribe/re-subscribe로 새 generation을 만든 뒤 오래된 결과를 해제해도 구 generation snapshot이 새 room에 전달되지 않고 새 generation의 version floor가 유지되는지 실제 통합으로 대조한다.
+- [x] 실제 HTTP idempotent command replay와 실제 실패 command가 refresh/snapshot을 만들지 않는지, pause/resume의 period `pausedAt`/`pausedTotalMs` 및 `end-period` 뒤 다음 period detail을 대조하는 통합 사례를 추가한다.
+- [x] Gateway refresh는 실제 namespace game room 멤버마다 기존 scoped/unscoped 권한 검사를 적용한다. source scope는 event-read 전에 다시 읽어 비교하고, event-read 뒤에는 권한·room ownership·generation과 committed version floor를 재검증한 뒤 snapshot을 발행한다. event-read 뒤 source DB를 다시 읽는 동작은 하지 않는다.
+- [x] 각 recipient에 미완료된 subscribe/lifecycle snapshot이 있으면 같은 socket/game/generation의 committed event를 그 refresh 뒤 FIFO로 보낸다. 수렴된 event-only 경로는 추가 full-history 조회를 하지 않으며 socket command ACK는 즉시 유지한다.
+- [x] Per-game 128건 및 socket 전체 512건의 event backlog 상한, overflow 또는 snapshot floor 실패 시 Engine.IO transport 종료, 자동 재연결 뒤 full snapshot 복구, subscribe ACK/세대교체/revoke/expiry/disconnect/shutdown 정리를 명시한다. 중간 event는 조용히 생략하지 않는다.
+- [x] 실제 REST event가 snapshot보다 먼저 전달되지 않는지 실제 HTTP/Socket.IO 회귀를 추가하고, 같은 recipient refresh 교착을 만드는 race 기대 순서를 refresh 해제 후 coalesced snapshot으로 수정한다.
+- [x] CI API run `40311513836`, job `121533581445`에서 정확한 PR test head `7a33af8c95acff77250246a23e42e986e0ae3102`의 의도된 RED를 확인했다. REST start는 201이었고 observer의 `game.snapshot` wait만 timeout됐다.
+- [ ] CI에서 현재 수정 head의 exact API typecheck, real integration GREEN, revoke/expiry/version-order/generation/replay/failure/period assertions를 실행해 확인한다. 로컬 shared Prisma client mismatch로 새 테스트 실행은 하지 않았다.
+- 범위: `apps/v1_api/src/games/games.controller.ts`, `apps/v1_api/src/games/game-broadcast.registry.ts`, `apps/v1_api/src/games/games.controller.broadcast.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.ts`, `apps/v1_api/test/games/game-command-realtime.integration-spec.ts`, `docs/api/domains/game-realtime.md`, `.changeset/mdqa-134-realtime.md`.
+- 검증 책임: CI가 실제 isolated DB fixture와 앱의 HTTP/Socket.IO 경로로 실행한다. 로컬 통합 DB 실행은 하지 않는다. 로컬 단위 실행은 0 tests에서 Prisma generated-client/schema type mismatch로 중단됐으며, generated files를 수정하지 않았다.
+- 초기 테스트 초안은 각 팀 참가자가 없어 시작 전용 `GAME_START_LINEUP_EMPTY`에서 막힐 수 있어 positive fixture와 분리 소유 계정으로 보정했다. 이는 테스트 준비 결함 수정이며, REST-to-realtime 회귀의 RED 관측이 아니다.
+- 실제 Socket.IO 통합에 중첩 subscribe A/B의 pending ACK 보존과 auto-rejoin 중 REST refresh 병합 회귀를 추가했다. Auto-rejoin은 이후 expiry 사례와 권한 assignment가 겹치지 않도록 별도 QA 사용자를 쓴다. Append/retry 관련 2개 스펙의 broadcaster 계약과 전달 단언을 보정하고 Task 8 protocol 스펙의 room 동작을 모델링했다. Handshake/takeover 2개 스펙에서는 사용되지 않는 `emitToGame` mock 속성만 삭제했다. 모두 CI 실행 대기이며 GREEN 증거가 아니다.
+- 추가 scope: `apps/v1_api/src/realtime/realtime.gateway.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.task8-protocol.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.task8-handshake.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.task20-takeover.spec.ts`.
+- 전파 비용은 실제 room ID 순회와 증분 대기 수 집계로 제한하고, snapshot 갱신 작업은 전체 4개·경기당 2개까지 공정하게 실행해요. 대기 중 최신 version floor를 병합하고 구독 수 제한이나 수신자 생략은 추가하지 않아요. 실행 전 취소와 실제 완료 뒤 실행 자리 반환을 검증하는 scheduler 단위 테스트 4개는 통과했어요. 실제 조회자 6명의 전원 수신·동시 조회 한도와 이전 세대 실패가 새 연결을 끊지 않는 gateway 회귀는 CI 실행 대기예요. 새 수정 커밋의 전체 통합 GREEN·머지·Alpha 완료는 아직 확인하지 않았어요.
+- 추가 scope: `apps/v1_api/src/realtime/game-subscriber-refresh.scheduler.ts`, `apps/v1_api/src/realtime/game-subscriber-refresh.scheduler.spec.ts`.
+- 구독은 요청한 `afterSequence`로 기록을 한 번만 읽고 최종 권한·scope 검사까지 같은 제한된 작업 안에서 처리해요. 이전 요청의 취소는 자신이 소유한 대기 작업에만 적용하고, 이미 보낸 최신 snapshot보다 낮은 ACK는 반환하지 않아요. 최종 권한 검사는 유지했으며 기존 lease·room 테스트도 실제 호출 순서에 맞췄어요.
+- 커밋 `bfc97076e`의 실제 CI DB 통합은 181개 suite 모두 통과했지만 뒤의 단위 단계는 7건 실패했어요. 위 구독 수정 후 커밋 스키마와 같은 격리 Prisma client 및 원본의 강한 Jest/TypeScript 진단 설정으로 관련 단위 2개 suite·59개 테스트가 통과했어요. 새 수정 커밋의 전체 CI·Alpha 검증은 아직 남아 있어요. 공유 Prisma 생성물·패키지·lock·schema는 바꾸지 않았어요.
+- Pending refresh 실패 뒤에도 최소 확정 버전을 소유 ACK에 보존해 오래된 성공 ACK를 막는 회복 경로를 추가했어요. 게이트웨이 단위 52개가 통과했고, 같은 production 소스에서 앞서 통과한 handshake 9개도 유지돼요. 첫 실행의 테스트 문법 오류는 실행 전 실패로 기록하고 수정 후 해당 게이트웨이 파일만 재실행했어요.
+- `fe5d710a7` CI는 초기 ACK가 뒤의 GOAL까지 포함한다는 이전 단언에서 실패했어요. START 갱신 완료를 초기 read 보류 중 확인한 뒤 GOAL을 제출해 ACK v1과 후속 GOAL snapshot/event v2를 분리하고, 실제 GOAL 내용과 동일 버전의 snapshot-before-event를 대조하도록 보정했어요. 수신 타이머는 GOAL 제출 직전에 시작하고 `finally`에서 정리해요. 이후 실행기 OOM/exit 134로 전수 집계가 없었으므로 새 CI의 재발 여부를 확인해야 하며, 전체 통합 GREEN이나 OOM 해결은 아직 주장하지 않아요.
+
+- `addd59091`의 현재-head CODE P2에서 자동 재가입에 실패 refresh floor 검사가 빠진 반례를 확인했어요. 원본에서 최소 버전9 뒤 버전4 snapshot을 발행해 기대1·실제2로 실패했고, 버전9 대조는 통과했어요. 동일 ACK·세대·room 소유권을 확인한 뒤 초기/최신 snapshot의 최댓값이 floor를 충족해야 발행해요. 미달이면 비동기 퇴장 대기 없이 기존 transport recovery를 호출해 이전 요청이 새 구독을 끊는 경합을 막아요. 별도 A/B 대조는 두 scheduler 자리를 보류한 채 세 번째 조회를 기다리던 준비 순서를 실제 join 신호→이전 실패→새 조회로 보정했어요. 수정 후 gateway 한 파일55개가 독립 Sol 실행에서 통과했어요.
+- `addd59091` CI는 181개 suite 중180 통과·1 실패,1330 passed/2 failed/3 skipped로 집계됐고 OOM은 없었어요. 첫 실패는 committed event envelope 안의 실제 GOAL을 검사하는 중첩 기대값 오류로, 두 수신자의 실제 `event.event` 구조에 맞췄고 snapshot 내용과 버전·전달 순서 단언은 유지했어요. 별도 자동 재가입 subscribe ACK timeout은 원인을 따로 판정해야 하며, 앞선 실패의 영향이라고 단정하지 않아요. 수정본의 새 CI·실제 화면·Alpha 검증은 남아 있어요.

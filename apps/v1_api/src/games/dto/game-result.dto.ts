@@ -12,7 +12,60 @@ import {
   Min,
   ValidateIf,
   ValidateNested,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+import type { ResultCardEvent } from '../core/result-card-events';
+
+export class ResultCardEventDto implements ResultCardEvent {
+  @IsString()
+  @IsNotEmpty()
+  id!: string;
+
+  @IsIn(['YELLOW', 'RED'])
+  card!: 'YELLOW' | 'RED';
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(0)
+  minute?: number;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  period?: number;
+}
+
+@ValidatorConstraint({ name: 'cardTimelineMatchesTotals', async: false })
+class CardTimelineMatchesTotals implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    if (!value || typeof value !== 'object') return false;
+    const cards = value as ResultCardsDto;
+    if (cards.events === undefined) return true;
+    if (!Array.isArray(cards.events)) return false;
+    return new Set(cards.events.map((event) => event?.id)).size === cards.events.length
+      && cards.events.filter((event) => event?.card === 'YELLOW').length === cards.yellow
+      && cards.events.filter((event) => event?.card === 'RED').length === cards.red;
+  }
+  defaultMessage() { return '카드 타임라인과 경고·퇴장 합계가 일치해야 해요.'; }
+}
+
+export class ResultCardsDto {
+  @IsInt()
+  @Min(0)
+  yellow!: number;
+
+  @IsInt()
+  @Min(0)
+  red!: number;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ResultCardEventDto)
+  events?: ResultCardEventDto[];
+}
 
 export class PenaltyScoreDto {
   @Type(() => Number)
@@ -160,7 +213,10 @@ export class GameResultParticipantDto {
   fouls?: number;
 
   @IsObject()
-  cards!: { yellow: number; red: number };
+  @ValidateNested()
+  @Type(() => ResultCardsDto)
+  @Validate(CardTimelineMatchesTotals)
+  cards!: ResultCardsDto;
 
   @IsBoolean()
   goalkeeper!: boolean;

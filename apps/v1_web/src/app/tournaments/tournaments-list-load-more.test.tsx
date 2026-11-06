@@ -17,9 +17,12 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
+vi.mock('@/hooks/use-competition-discovery', () => ({
+  useCompetitionDiscovery: useV1TournamentsMock,
+ }));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
-  useV1Tournaments: useV1TournamentsMock,
   useV1MasterSports: () => ({ data: [] }),
 }));
 vi.mock('@/hooks/use-media-query', () => ({ useMediaQuery: () => false, DESKTOP_LIST_MEDIA_QUERY: '' }));
@@ -37,7 +40,7 @@ describe('/tournaments 더 보기 — 배경 재검증과 분리', () => {
     expect(button).toBeEnabled();
     fireEvent.click(button);
 
-    expect(useV1TournamentsMock).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'cursor-2' }), expect.anything());
+    expect(useV1TournamentsMock).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'cursor-2' }), undefined);
   });
 
   it('서버 seed(placeholder)가 떠 있는 동안에는 cursor 가 없어도 더 보기를 잠근다', () => {
@@ -50,6 +53,6 @@ describe('/tournaments 더 보기 — 배경 재검증과 분리', () => {
 
     expect(screen.getByRole('button', { name: '더 보기' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    expect(useV1TournamentsMock).not.toHaveBeenCalledWith(expect.objectContaining({ cursor: 'seed-cursor' }), expect.anything());
+    expect(useV1TournamentsMock).not.toHaveBeenCalledWith(expect.objectContaining({ cursor: 'seed-cursor' }), undefined);
   });
 });

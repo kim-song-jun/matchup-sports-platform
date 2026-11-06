@@ -36,9 +36,8 @@ jobs:
       ORG_GRADLE_PROJECT_firebaseApiKeyAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_API_KEY }}
       ORG_GRADLE_PROJECT_firebaseSenderIdAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_SENDER_ID }}
       ORG_GRADLE_PROJECT_kakaoNativeAppKeyAlpha: ${{ vars.ANDROID_ALPHA_KAKAO_NATIVE_APP_KEY }}
-      ANDROID_ALPHA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_ALPHA_KEYSTORE_PASSWORD }}
-      ANDROID_ALPHA_KEY_ALIAS: ${{ secrets.ANDROID_ALPHA_KEY_ALIAS }}
-      ANDROID_ALPHA_KEY_PASSWORD: ${{ secrets.ANDROID_ALPHA_KEY_PASSWORD }}
+      # The fixed alpha signing key is reachable only from dev; every other ref builds with the debug key.
+      ALPHA_SIGNING: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/dev' }}
       # Public SHA-1 of the fixed alpha signing certificate (not a secret).
       EXPECTED_ALPHA_SIGNER_SHA1: cef37c0cf09463f05644d6531d7137aff6ac3ef4
     steps:
@@ -96,9 +95,13 @@ jobs:
         run: gradle -p apps/v1_android --no-daemon verifyAlphaFirebaseConfiguration
 
       - name: Materialize fixed alpha signing key
+        if: env.ALPHA_SIGNING == 'true'
         shell: bash
         env:
           ANDROID_ALPHA_KEYSTORE_BASE64: ${{ secrets.ANDROID_ALPHA_KEYSTORE_BASE64 }}
+          ANDROID_ALPHA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_ALPHA_KEYSTORE_PASSWORD }}
+          ANDROID_ALPHA_KEY_ALIAS: ${{ secrets.ANDROID_ALPHA_KEY_ALIAS }}
+          ANDROID_ALPHA_KEY_PASSWORD: ${{ secrets.ANDROID_ALPHA_KEY_PASSWORD }}
         run: |
           set -Eeuo pipefail
           missing=()
@@ -115,10 +118,16 @@ jobs:
           chmod 600 "${keystore_path}"
           echo "ANDROID_ALPHA_KEYSTORE_PATH=${keystore_path}" >> "${GITHUB_ENV}"
 
+      # Outside dev the values stay empty, so Gradle falls back to the debug key.
       - name: Test and build alpha APK and release bundle contract
+        env:
+          ANDROID_ALPHA_KEYSTORE_PASSWORD: ${{ env.ALPHA_SIGNING == 'true' && secrets.ANDROID_ALPHA_KEYSTORE_PASSWORD || '' }}
+          ANDROID_ALPHA_KEY_ALIAS: ${{ env.ALPHA_SIGNING == 'true' && secrets.ANDROID_ALPHA_KEY_ALIAS || '' }}
+          ANDROID_ALPHA_KEY_PASSWORD: ${{ env.ALPHA_SIGNING == 'true' && secrets.ANDROID_ALPHA_KEY_PASSWORD || '' }}
         run: gradle -p apps/v1_android --no-daemon testAlphaDebugUnitTest testProductionDebugUnitTest assembleAlphaDebug bundleAlphaRelease
 
       - name: Verify alpha APK signer
+        if: env.ALPHA_SIGNING == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -154,12 +163,12 @@ jobs:
           grep -q "Missing production release signing configuration" release-gate.log
 
       - name: Create alpha APK checksum
-        if: steps.firebase.outputs.ready == 'true'
+        if: steps.firebase.outputs.ready == 'true' && env.ALPHA_SIGNING == 'true'
         working-directory: apps/v1_android/app/build/outputs/apk/alpha/debug
         run: sha256sum app-alpha-debug.apk > app-alpha-debug.apk.sha256
 
       - name: Upload alpha APK
-        if: steps.firebase.outputs.ready == 'true'
+        if: steps.firebase.outputs.ready == 'true' && env.ALPHA_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: teameet-alpha-${{ github.sha }}

@@ -4,13 +4,18 @@ import { makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 
 const save = vi.hoisted(() => vi.fn());
+const periods = vi.hoisted(() => ({ match: null as null | Record<string, unknown>, save: vi.fn() }));
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentMatchPeriods: () => ({ data: periods.match ?? undefined, isPending: !periods.match, isError: false }),
+  useUpdateTournamentPeriodSettings: () => ({ mutateAsync: periods.save, isPending: false }),
+}));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1UpdateFixture: () => ({ mutateAsync: save, isPending: false }),
   useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: 'A구장', active: true }] }, isPending: false, isError: false }),
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); periods.match = null; });
 beforeEach(() => { save.mockReset(); save.mockResolvedValue({}); });
 const group = makeGroup({ id: 'semi', name: '준결승', phase: 'semi' });
 const source = makeFixture({ id: 'source', groupId: group.id, fixtureNumber: 12 });
@@ -53,5 +58,23 @@ describe('shared fixture metadata editor', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기장 비우기' }));
     fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', fieldId: null, venue: '' }));
+  });
+
+  it('경기 방식만 바꾸면 경기 정보 PATCH 없이 이 경기에만 저장한다', async () => {
+    const half = (durationMinutes: number, code: string, label: string) => ({ code, label, durationMinutes, extraTime: false });
+    periods.match = {
+      tournamentId: 't-1', teamMatchId: 'final', expectedVersion: 'v-1', overridden: false, editable: true,
+      periods: [half(10, 'FIRST_HALF', '전반'), half(10, 'SECOND_HALF', '후반')], legacyPeriodCount: null,
+      inherited: { source: 'stage', phase: 'final', groupName: null, periods: [half(10, 'FIRST_HALF', '전반'), half(10, 'SECOND_HALF', '후반')], legacyPeriodCount: null },
+    };
+    periods.save.mockReset().mockResolvedValue({});
+    render(editor());
+    expect(screen.getByRole('radio', { name: /위 설정 따르기/ }).closest('label')).toHaveTextContent('결승 설정 · 전·후반 각 10분');
+    fireEvent.click(screen.getByRole('radio', { name: '이 경기만 따로' }));
+    fireEvent.click(screen.getByRole('button', { name: '단판' }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    await waitFor(() => expect(periods.save).toHaveBeenCalledWith({ expectedVersion: 'v-1', teamMatchId: 'final', periods: [{ durationMinutes: 20 }] }));
+    expect(save).not.toHaveBeenCalled();
+    expect(await screen.findByRole('status')).toHaveTextContent('저장했어요');
   });
 });

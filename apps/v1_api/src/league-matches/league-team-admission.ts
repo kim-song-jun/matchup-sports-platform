@@ -147,11 +147,11 @@ export async function createLeagueRosterRegistration(
   if (league === null) {
     throw new UnprocessableEntityException({ code: 'LEAGUE_TEAM_INVALID', message: '리그를 찾을 수 없어요.' });
   }
+  const existing = await tx.v1TournamentRegistration.findUnique({
+    where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
+    select: { id: true, status: true },
+  });
   if (capacityLimitOf(league) !== null) {
-    const existing = await tx.v1TournamentRegistration.findUnique({
-      where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
-      select: { id: true },
-    });
     const reservedCount = await countCapacityReservations(tx, input.leagueId, existing?.id);
     if (isCapacityFull(league, reservedCount)) {
       throw new ConflictException({ code: 'TOURNAMENT_CAPACITY_FULL', message: '참가팀 정원이 가득 차 팀을 추가할 수 없어요.' });
@@ -159,7 +159,7 @@ export async function createLeagueRosterRegistration(
   }
   const team = await tx.v1Team.findUnique({
     where: { id: input.teamId },
-    select: { ownerUserId: true },
+    select: { ownerUserId: true, name: true },
   });
   if (team === null) {
     // 로스터 행이 같은 트랜잭션에서 이미 FK 를 통과했으므로 실질적으로 도달하지 않는다.
@@ -167,6 +167,14 @@ export async function createLeagueRosterRegistration(
     throw new UnprocessableEntityException({
       code: 'LEAGUE_TEAM_INVALID',
       message: '없는 팀은 리그에 등록할 수 없어요.',
+    });
+  }
+  // 신청이 진행 중인 행(입금 대기·확인 중 등)은 confirmed 로 올리지 않는다 — 올리면 결제는 '대기'인 채 참가 확정이 된다
+  // (2026-11-04 알파 QA). 그 팀은 신청 관리에서 입금을 확인해 확정한다. 아직 내지 않은 draft 와 취소한 신청은 올린다.
+  if (existing !== null && !['draft', 'cancelled', 'confirmed'].includes(existing.status)) {
+    throw new UnprocessableEntityException({
+      code: 'LEAGUE_TEAM_ALREADY_APPLIED',
+      message: `${team.name}: 이미 참가 신청한 팀이에요. 신청 관리에서 입금을 확인해 확정해 주세요.`,
     });
   }
   // `(tournamentId, teamId)` 는 `@@unique` 다 — **무조건 create 하면 P2002 로 500 이 난다.**

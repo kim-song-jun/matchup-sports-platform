@@ -37,6 +37,8 @@ Add these repository variables under Settings → Secrets and variables → Acti
 `.github/workflows/android-alpha.yml` uses them to build `app-alpha-debug.apk`. On pull requests,
 missing values permit compile/unit checks but suppress APK upload so an FCM-disabled artifact is
 not presented as test-ready. On `dev` pushes and manual dispatches, missing values fail the job.
+The fixed alpha signing key, the signer check, and the APK upload are limited to `dev` pushes and
+`dev` manual dispatches; pull requests and other refs build with the debug key and upload nothing.
 When present, the Gradle gate checks formats, sender/app ID consistency, the Alpha project name,
 and separation from any supplied production project ID.
 

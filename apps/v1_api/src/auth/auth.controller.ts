@@ -3,32 +3,43 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
+  Ip,
   Post,
   Query,
+  Req,
+  Res,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { CurrentUser } from './current-user.decorator';
+import { AccountLinkService } from './account-link.service';
 import { AuthService } from './auth.service';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
 import { CheckEmailQueryDto, CheckNicknameQueryDto } from './dto/check-availability.dto';
 import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { LoginStepUpResendDto, LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { RegisterDto } from './dto/register.dto';
-import { SocialLinkDto } from './dto/social-link.dto';
+import { LinkKakaoDto } from './dto/link-kakao.dto';
+import { LinkPendingDto } from './dto/link-pending.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import type { V1AuthUser } from './v1-auth-user';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { V1AuthGuard } from './v1-auth.guard';
+import { NonProductionGuard } from './non-production.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
+import { readCurrentV1SessionAgeSeconds } from './v1-session';
 
 @Controller('auth')
 @UseInterceptors(V1SessionCookieInterceptor)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly accountLink: AccountLinkService,
     private readonly appleIdentity: AppleIdentityService,
   ) {}
 
@@ -38,10 +49,31 @@ export class AuthController {
     return this.authService.me(user.id);
   }
 
+  /** A step-up challenge is a 200 (no session, nothing created); a completed login keeps its existing status. */
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @Res({ passthrough: true }) response: { status(code: number): unknown },
+  ) {
+    const result = await this.authService.login(dto, { ip });
+    if ('stepUp' in result) response.status(HttpStatus.OK);
+    return result;
+  }
+
+  @Post('login/step-up/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  verifyLoginStepUp(@Body() dto: LoginStepUpVerifyDto, @Ip() ip: string) {
+    return this.authService.verifyLoginStepUp(dto, { ip });
+  }
+
+  @Post('login/step-up/resend')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  resendLoginStepUp(@Body() dto: LoginStepUpResendDto) {
+    return this.authService.resendLoginStepUp(dto.challengeToken);
   }
 
   /**
@@ -56,7 +88,8 @@ export class AuthController {
    * itself isn't usable to obtain one.
    */
   @Post('dev-session')
-  @UseGuards(V1AuthGuard)
+  // A valid cookie in, a fresh seven-day cookie out: in production that would keep a stolen cookie alive forever.
+  @UseGuards(NonProductionGuard, V1AuthGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   devSession(@CurrentUser() user: V1AuthUser) {
     return this.authService.devSession(user.id, user.email);
@@ -108,22 +141,36 @@ export class AuthController {
     return this.authService.deferSocialProfile(user.id);
   }
 
-  /** Rejects phone-only account linking after validating the caller and OTP proof. */
-  @Post('social-link')
-  @HttpCode(200)
-  @UseGuards(V1AuthGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  linkSocialToPhoneOwner(@CurrentUser() user: V1AuthUser, @Body() dto: SocialLinkDto) {
-    return this.authService.linkSocialToPhoneOwner(user.id, dto);
-  }
-
-  /** Rejects phone-only account previews without consuming proof or exposing the holder. */
-  @Post('social-link/preview')
+  /**
+   * Attaches a Kakao login to the signed-in account. The session proves the account, the Kakao token proves the
+   * identity; a session older than 30 minutes is refused.
+   */
+  @Post('link/kakao')
   @HttpCode(200)
   @UseGuards(V1AuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  previewSocialLink(@CurrentUser() user: V1AuthUser, @Body() dto: SocialLinkDto) {
-    return this.authService.previewSocialLink(user.id, dto);
+  linkKakao(@CurrentUser() user: V1AuthUser, @Body() dto: LinkKakaoDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkKakao(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
+  }
+
+  @Post('link/apple')
+  @HttpCode(200)
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  linkApple(@CurrentUser() user: V1AuthUser, @Body() dto: AppleLoginDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkApple(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
+  }
+
+  /**
+   * Attaches the provider identity from a `linkToken` (carried by a social sign-in/signup 409) to the account the
+   * caller just signed in to.
+   */
+  @Post('link/pending')
+  @HttpCode(200)
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  linkPending(@CurrentUser() user: V1AuthUser, @Body() dto: LinkPendingDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkPending(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
   }
 
   @Post('social-terms')

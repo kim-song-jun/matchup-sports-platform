@@ -21,6 +21,12 @@ function serverErrorApiError() {
 }
 
 describe('TournamentOpsQuickLinks (T6-5, D-16)', () => {
+  it('디렉터 관리 화면은 같은 대회의 스태프 운영 경로로 연결한다', () => {
+    vi.mocked(useV1TournamentStaffAssignments).mockReturnValue({ isPending: false, isError: false } as never);
+    render(<TournamentOpsQuickLinks tournamentId="t-1" staffSurface />);
+    expect(screen.getByRole('link', { name: '스태프 배정 콘솔' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/staff');
+    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+  });
   it('접근 가능하면 from=admin이 붙은 활성 링크 2개를 렌더한다', () => {
     vi.mocked(useV1TournamentStaffAssignments).mockReturnValue({ isPending: false, isError: false, data: { items: [] } } as never);
     render(<TournamentOpsQuickLinks tournamentId="t-1" />);

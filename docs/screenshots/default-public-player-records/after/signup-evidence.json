@@ -1,0 +1,22 @@
+{
+  "origin": "https://alpha.teameet.co.kr",
+  "persona": "new disposable alpha signup",
+  "checks": [
+    "Real signup UI, official alpha OTP fixture, omitted record choice, server default public PASS"
+  ],
+  "errors": [],
+  "network": [],
+  "process": {
+    "browserPid": 54232,
+    "launcherPid": 35692,
+    "headless": false
+  },
+  "defaultConsent": {
+    "granted": true,
+    "hasResponded": true
+  },
+  "cleanup": {
+    "ownedTestAccountWithdrawalStatus": 201,
+    "success": true
+  }
+}

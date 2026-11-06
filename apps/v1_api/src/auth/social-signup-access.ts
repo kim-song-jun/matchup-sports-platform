@@ -18,6 +18,11 @@ export function isActivityProfileRequired(status: V1OnboardingStatus | string) {
   return status === 'social_profile_deferred';
 }
 
+/** Social signup not finished: still pending, or the profile step was skipped. */
+export function isUnfinishedSocialSignup(status: V1OnboardingStatus | string) {
+  return isPendingSocialSignup(status) || isActivityProfileRequired(status);
+}
+
 export function isPendingSocialSignup(status: V1OnboardingStatus | string) {
   return getPendingSocialSignupRoute(status) !== null;
 }
@@ -46,8 +51,6 @@ export function isPendingSocialSignupRequestAllowed(
     return (
       pathname.endsWith('/auth/social-profile') ||
       pathname.endsWith('/auth/social-profile/defer') ||
-      pathname.endsWith('/auth/social-link') ||
-      pathname.endsWith('/auth/social-link/preview') ||
       pathname.endsWith('/auth/check-nickname') ||
       pathname.endsWith('/verification/phone/request') ||
       pathname.endsWith('/verification/phone/confirm')

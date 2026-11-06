@@ -8,6 +8,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const STATUSES = [{ value: '' }, { value: 'active' }, { value: 'suspended' }] as const;
+const MULTI_FILTERS = { signup: ['incomplete', 'profile_deferred'], providers: ['email', 'kakao', 'apple'] };
 
 function TeamsList() {
   const list = useAdminUrlListQuery(STATUSES, 20);
@@ -26,6 +27,31 @@ afterEach(() => {
 });
 
 describe('관리자 목록 조건의 상세 왕복 (MD-QA #21)', () => {
+  it('복수 필터를 검증·복원하고 연속 변경과 상세 복귀에서도 보존한다', () => {
+    window.history.replaceState(null, '', '/admin/users?status=active&signup=incomplete,invalid&providers=apple,kakao,kakao&page=3');
+    const { result, unmount } = renderHook(() => useAdminUrlListQuery(STATUSES, 20, MULTI_FILTERS));
+    expect(result.current.filters).toEqual({ status: 'active', signup: 'incomplete', providers: 'kakao,apple', page: 3, limit: 20 });
+    act(() => {
+      result.current.setMultiFilter('signup', ['profile_deferred']);
+      result.current.setMultiFilter('providers', ['email', 'apple']);
+    });
+    expect(result.current.filters).toEqual({ status: 'active', signup: 'profile_deferred', providers: 'email,apple', page: 1, limit: 20 });
+    const saved = window.location.pathname + window.location.search;
+    unmount();
+    window.history.replaceState(null, '', '/admin/users/member-id');
+    expect(renderHook(() => useAdminListReturnHref('/admin/users')).result.current).toBe(saved);
+  });
+
+  it('브라우저 URL 변경 시 복수 선택을 복원하고 전체 선택으로 그 그룹만 해제한다', () => {
+    window.history.replaceState(null, '', '/admin/users?providers=kakao&signup=incomplete');
+    const { result, rerender } = renderHook(() => useAdminUrlListQuery(STATUSES, 20, MULTI_FILTERS));
+    window.history.replaceState(null, '', '/admin/users?providers=apple&signup=profile_deferred&page=2');
+    rerender();
+    expect(result.current.filters).toMatchObject({ providers: 'apple', signup: 'profile_deferred', page: 2 });
+    act(() => result.current.setMultiFilter('providers', []));
+    expect(result.current.filters).not.toHaveProperty('providers');
+    expect(result.current.filters).toMatchObject({ signup: 'profile_deferred', page: 1 });
+  });
   it('목록 조건을 바꿀 때마다 그 주소를 기억하고, 상세의 목록 버튼이 그 주소로 돌아간다', () => {
     window.history.replaceState(null, '', '/admin/teams?q=E2E');
     navigation.querySnapshot = window.location.search;

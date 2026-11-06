@@ -1,5 +1,9 @@
 # Public records and consent contract
 
+## Default public player records — 2026-10-23
+
+Signup completion initializes a missing `V1UserRecordConsent` to `GRANTED` using the product-default marker `v1-public-record-default-2`. A data migration applies the same default only to active, non-deleted, signup-complete accounts without a preference. Explicit `REVOKED` rows remain private. The existing shared eligibility function still requires an identity link and `GRANTED`, and respects participant-level `REVOKED` overrides. Game visibility and official-result requirements are unchanged. Defaults may expose already-linked historical records; real-name display remains a separate opt-in. See [signup](./auth.md#signup-flow) and [settings](./users.md#경기-기록-공개-설정).
+
 ## Shared tournament fixture detail route
 
 `GET /api/v1/tournaments/:tournamentId/matches/:fixtureId` supports both
@@ -252,6 +256,17 @@ projection, computed only when there is no official revision yet:
   events under one "경기 결과" heading instead of "전반"; `null` (no game or an
   unreadable snapshot) keeps the legacy 전반/후반 wording. Present on
   `getMatch`, `getLeagueFixtureRecord` and every `presentScheduleEntry` entry.
+- `periodMinutes` -- `number[] | null`, the *regular* periods' lengths in minutes in
+  config order (extra time excluded), read from the same competition-config snapshot
+  (`regularPeriodMinutes`, `competition-config.parse.ts`). It counts regular periods by
+  the same rule as `periodCount`, so a non-null value always has `periodCount` entries.
+  The web renders it as one "경기 방식" line under the venue/date row of the schedule
+  card and under the date line of the match detail header (tournaments and regular
+  leagues share both components): `[20]` → "단판 20분", `[15, 15]` → "전·후반 15분",
+  `[10, 15]` → "전반 10분, 후반 15분". `null` (no game, unreadable snapshot, legacy
+  `{ count }` shape, or any regular period without a positive length) means "do not
+  guess" -- the web draws no line. Present on `getMatch`, `getLeagueFixtureRecord` and
+  every `presentScheduleEntry` entry.
 
 None of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`
@@ -352,7 +367,7 @@ identity/side itself:
   missing-scorer integrity warning. Public event rows render a null goal
   participant as `익명` and a null own-goal participant as `OG`.
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
-  `scorers: { side, participantName, jerseyNumber, period, clockMs }[]` -- a
+  `scorers: { side, participantName, jerseyNumber, period, clockMs, ownGoal?: true }[]` -- a
   goal-only summary for the schedule card, same identity/consent rule as
   above. `period` is the stored game period (`1` first half, `2` second half,
   `null` only for malformed/historical data) and lets consumers group halves
@@ -556,7 +571,7 @@ only from the current official result revision's `mvpParticipantId`.
 `tournamentAwards[]` is a separate list backed by
 `V1TournamentAward.recipientUserId`. Each item contains `id`,
 `tournamentId`, `tournamentTitle`, `awardType`, the tournament-defined
-`awardLabel`, nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
+`awardLabel`, `bracketTrack` (`overall | upper | lower`), nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
 Clients display `awardLabel` verbatim because award categories vary by
 tournament; they must not collapse tournament awards into match MVP.
 
@@ -568,3 +583,9 @@ the response still omits `consentGranted` for non-owners.
 ## 2026-10-13 정규 리그 자동 명단 공개
 
 리그 경기 공개 기록은 사이드별 최신 제출·잠금 명단을 우선 사용한다. 제출본이 없는 사이드는 유효한 최신 자동 초안을 표시하므로 홈만 출전을 조정해도 원정 명단이 사라지지 않는다. 무효화된 명단은 제외하며 제출본 위의 미제출 초안은 기존 제출본을 덮어쓰지 않는다. 이름 동의·명단 공개 시각·가시성 정책과 대회 명단 규칙은 유지한다.
+
+### Own-goal display side (2026-10-22)
+
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다.
+
+선수가 미지정이거나 현재 참가자 목록에 없어도 득점 팀 영역을 유지한다. 이 변경은 표시 projection만 수정하며 저장된 이벤트·점수·개인 기록 집계를 변경하지 않는다. 이전의 선수 소속팀 기준 표시 계약을 대체한다.

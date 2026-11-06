@@ -25,13 +25,16 @@ afterEach(() => { cleanup(); flow.releaseAll(); authUiServer.resetHandlers(); })
 
 const renderEmailRecovery = () => renderRecovery(<StrictMode><AccountRecoveryClient initialMode="reset-password" /></StrictMode>);
 const returnToEmailMode = () => {
-  fireEvent.click(screen.getByRole('tab', { name: '아이디 찾기' }));
-  fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+  if (!screen.queryByLabelText('이메일')) fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
+  fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
+  fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
+  fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
 };
 const expectUnverifiedEmail = () => {
   expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
   expect(screen.queryByText('이메일 본인인증이 완료됐어요.')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '다음' })).toBeInTheDocument();
   expect(wireCalls.emailReset).toHaveLength(0);
 };
 
@@ -51,6 +54,7 @@ describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 
     renderEmailRecovery();
     await startEmailVerification();
     await waitFor(() => expect(flow.confirmations).toHaveLength(1));
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: currentEmail } });
     await settleRequests(() => flow.releaseConfirmation(0));
 
@@ -76,6 +80,7 @@ describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 
     renderEmailRecovery();
     await startEmailVerification();
     await waitFor(() => expect(flow.confirmations).toHaveLength(1));
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: OTHER_EMAIL } });
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
     await settleRequests(() => flow.releaseConfirmation(0));
@@ -87,6 +92,7 @@ describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 
   it('이메일 인증 뒤 같은 정규화 주소를 다시 입력해도 인증 카드를 다시 사용할 수 있다', async () => {
     renderEmailRecovery();
     await verifyCurrentEmail();
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'Owner@Example.TEST ' } });
 
     expectUnverifiedEmail();
@@ -94,18 +100,14 @@ describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 
     expect(flow.confirmations).toHaveLength(2);
   });
 
-  it('이메일 입력이 끝 공백을 제거해 실제 값이 바뀌지 않으면 현재 인증을 그대로 사용한다', async () => {
+  it('이메일 단계로 돌아가 같은 주소를 입력해도 이전 인증은 재사용하지 않는다', async () => {
     renderEmailRecovery();
     await verifyCurrentEmail();
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: `${RECOVERY_EMAIL} ` } });
-
-    expect(screen.getByLabelText('이메일')).toHaveValue(RECOVERY_EMAIL);
-    expect(screen.getByText('이메일 본인인증이 완료됐어요.')).toBeInTheDocument();
-    const index = await submitCurrentEmailPassword(flow);
-    expect(flow.resets[index].body).toEqual({ email: RECOVERY_EMAIL, proofToken: flow.confirmations[0].proofToken, newPassword: NEW_EMAIL_PASSWORD });
-    await settleRequests(() => flow.releaseReset(index, 'success'));
-    expect(screen.getByText('비밀번호를 바꿨어요')).toBeInTheDocument();
-    expect(flow.confirmations).toHaveLength(1);
+    expectUnverifiedEmail();
+    await completeCurrentEmailReset();
+    expect(flow.confirmations).toHaveLength(2);
   });
 
   it.each([

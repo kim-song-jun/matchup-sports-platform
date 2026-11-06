@@ -172,3 +172,12 @@ alpha 에는 보통 시작 전 대회 경기가 **하나도 없다**(전수 확�
 **경기를 시작하지 않으면** 대회에 되돌릴 수 없는 잠금도 안 생긴다.
 
 자격증명은 전부 환경변수로만 받는다(`ALPHA_EMAIL`/`ALPHA_PASSWORD`) — 이 저장소는 PUBLIC 이다.
+
+## 운영 콘솔 체험 수동 캡처
+
+scripts/qa/tournament-ops-demo-browser.cjs는 Alpha headed Chrome을 열어 JSON stdin 명령으로 실제 화면을 클릭·캡처해요. 자격증명은 비에코 stdin으로만 받으며 세션 파일은 만들지 않아요. activity는 API 요청 method/path와 console/pageerror를 관측해요. 종료 명령은 close이며 소유 context/browser/입력을 finally에서 닫아요. 생성 경로는 docs/screenshots/tournament-ops-demo예요.
+
+`scripts/qa/capture-tournament-admin-demo.cjs before|after`는 실제 어드민 재사용 체험의 전용 검증이에요.
+Alpha의 익명 샘플만 사용하고 13개 화면을 390/768/1440에서 캡처해요. after는 실제 정보 편집·4팀 확정·대진 생성/배정·점수 확정·새로고침·초기화를 클릭해요.
+`PLAYWRIGHT_CORE_MODULE`은 설치된 Playwright 모듈 경로, `QA_BROWSER_EXECUTABLE`은 headed 브라우저 실행 파일 경로예요. 자격증명은 사용하지 않아요.
+증거는 `docs/screenshots/tournament-admin-demo-20261105/`에 저장하고, 소유 PID/PPID·console/network·overflow·cleanup을 JSON report로 남겨요.

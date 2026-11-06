@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { resolveResultCardEvents } from '../core/result-card-events';
 import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,7 +24,6 @@ import {
   isMinuteUnknown,
   isPeriodUnknown,
   parseTournamentFixtureRevisionGoals,
-  resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
 import {
   TournamentStaffAccessService,
@@ -59,9 +59,11 @@ import {
 } from '../../league-matches/league-fixture-list-source';
 import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
+import { leagueWeekCounter } from '../../league-matches/league-week-number';
 import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
+import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
-import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
+import { regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
 import { PLACE_SELECT } from '../../places/place-select';
 import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
@@ -149,6 +151,7 @@ const GAME_MATCH_SELECT = {
       officialAt: true,
       score: true,
       goalEvents: true,
+      resultParticipants: { select: { participantId: true, sideId: true, cards: true } },
       mvpParticipantId: true,
       outcomeReason: true,
       outcomeNote: true,
@@ -177,6 +180,10 @@ const CANONICAL_SCHEDULE_SELECT = {
   awayRegistrationId: true,
   homeDisplayLabel: true,
   awayDisplayLabel: true,
+  advancementTargets: {
+    where: { source: { teamMatch: { deletedAt: null } } },
+    select: { targetSide: true, sourceOutcome: true, source: { select: { round: true, fixtureNumber: true } } },
+  },
   group: { select: { name: true } },
   homeRegistration: { select: { team: { select: { id: true, name: true } } } },
   awayRegistration: { select: { team: { select: { id: true, name: true } } } },
@@ -220,6 +227,8 @@ type FixtureScheduleRow = {
   field: CanonicalScheduleRow['teamMatch']['field'];
   homeDisplayLabel: string | null;
   awayDisplayLabel: string | null;
+  homeSourceLabel: string | null;
+  awaySourceLabel: string | null;
   homeSlot: CanonicalScheduleRow['teamMatch']['homeSlot'];
   awaySlot: CanonicalScheduleRow['teamMatch']['awaySlot'];
   videos: CanonicalScheduleRow['teamMatch']['videos'];
@@ -227,6 +236,14 @@ type FixtureScheduleRow = {
 };
 
 function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow {
+  // Resolve from persisted edges, not the filtered/page-sized list: the source
+  // can be unscheduled or outside the current round, group, or cursor page.
+  const sourceLabel = (side: 'HOME' | 'AWAY'): string | null => {
+    const edge = row.advancementTargets?.find((source) => source.targetSide === side);
+    return edge
+      ? `${tournamentRoundLabel(edge.source.round)} ${edge.source.fixtureNumber}경기 ${edge.sourceOutcome === 'LOSER' ? '패자' : '승자'}`
+      : null;
+  };
   return {
     id: row.teamMatchId,
     round: row.round,
@@ -245,6 +262,8 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     field: row.teamMatch.field,
     homeDisplayLabel: row.homeDisplayLabel,
     awayDisplayLabel: row.awayDisplayLabel,
+    homeSourceLabel: sourceLabel('HOME'),
+    awaySourceLabel: sourceLabel('AWAY'),
     homeSlot: row.teamMatch.homeSlot,
     awaySlot: row.teamMatch.awaySlot,
     videos: row.teamMatch.videos,
@@ -962,7 +981,7 @@ export class PublicTournamentRecordsService {
    *   소비처가 **행 식별자** 로만 쓰기 때문이다 -- `toLeagueScheduleRow` 주석 참조.)
    *
    * ## 페이지네이션을 메모리에서 하는 이유
-   * 주차 번호는 **리그 전체의 경기일 집합**을 알아야 정해진다(N번째 경기일 = N주차).
+   * 주차 번호는 **리그 전체의 경기 날짜 집합**을 알아야 정해진다(경기가 있는 N번째 달력 주 = N주차).
    * DB 에서 페이지만 잘라 오면 그 집합을 모르므로 2페이지의 첫 경기가 1주차가 된다.
    * 리그 한 시즌의 대진 수는 팀 수의 제곱 규모(수십 건)라 전량 조회가 문제되지 않는다.
    */
@@ -1260,6 +1279,8 @@ export class PublicTournamentRecordsService {
             consentMap,
             nameProfileByUserId,
             isStaffBypass,
+            fixture.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? fixture.game.currentOfficialRevision.resultParticipants : undefined,
           );
     const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, nameProfileByUserId, isStaffBypass);
 
@@ -1301,6 +1322,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(fixture.game),
+      periodMinutes: gamePeriodMinutes(fixture.game),
       lineup,
       events,
       mvp,
@@ -1502,9 +1524,10 @@ export class PublicTournamentRecordsService {
     consentMap: Map<string, ParticipantConsentEligibility>,
     nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
     isStaffBypass: boolean,
+    officialParticipants?: readonly { participantId: string; sideId: string; cards: unknown }[],
   ) {
     if (gameId === null) return [];
-    const events = await this.prisma.v1GameEvent.findMany({
+    const liveEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId },
       // 타임라인은 입력(append) 순서가 아니라 경기 시각순이어야 한다 -- sequence 는
       // 서버가 이벤트를 "받은" 순서일 뿐 경기 중 실제 발생 순서와 다를 수 있다
@@ -1523,15 +1546,24 @@ export class PublicTournamentRecordsService {
         reversesEventId: true,
       },
     });
+    // Explicit correction snapshots replace live cards, including deletions.
+    const events = officialParticipants === undefined ? liveEvents : [
+      ...liveEvents.filter((event) => event.type !== 'CARD'),
+      ...resolveResultCardEvents(officialParticipants, liveEvents).map((event) => ({
+        id: event.id, type: 'CARD' as const, sideId: event.sideId, participantId: event.participantId,
+        assistParticipantId: null, period: event.period ?? 1, clockMs: event.clockMs ?? (event.minute ?? 0) * 60000,
+        officialPeriod: event.period ?? null,
+        officialClockMs: event.clockMs ?? (event.minute === undefined ? null : event.minute * 60000),
+        reversesEventId: null,
+        payload: { card: event.card },
+      })),
+    ];
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );
     const scoringTypes: ReadonlySet<V1GameEventType> = new Set(['GOAL', 'OWN_GOAL', 'CARD']);
     const revisionGoals = parseTournamentFixtureRevisionGoals(officialGoalEvents);
     const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
-    const participantSideIdById = new Map(
-      participants.map((participant) => [participant.id, participant.sideId] as const),
-    );
     // 홈/원정 매핑을 이 자리에서 서버가 직접 해준다 -- `sideId` 는 클라이언트에서
     // 재구성할 수 없는 내부 id 라서, 라인업(lineup)이 아직 공개되지 않은 경기라도
     // (아래 참고: 이름/등번호가 라인업 게이트와 독립인 것과 같은 이유로) 타임라인을
@@ -1547,7 +1579,7 @@ export class PublicTournamentRecordsService {
       .filter(
         (event) =>
           scoringTypes.has(event.type) &&
-          !reversedIds.has(event.id) &&
+          (!reversedIds.has(event.id) || (officialParticipants !== undefined && event.type === 'CARD')) &&
           (revisionGoals === null || event.type === 'CARD'),
       )
       .map((event) => {
@@ -1564,12 +1596,7 @@ export class PublicTournamentRecordsService {
         // 골/카드 이벤트는 경기가 시작된 뒤에만 발생하므로 득점자를 보여주는 것이 선발
         // 명단을 미리 흘리는 것이 아니다.
         const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
-        const displaySideId = resolveGoalDisplaySideId(
-          event.sideId ?? '',
-          event.participantId,
-          event.type === 'OWN_GOAL',
-          participantSideIdById,
-        );
+
         return {
           type: event.type,
           cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
@@ -1577,7 +1604,7 @@ export class PublicTournamentRecordsService {
           // `sideId`는 스키마상 nullable(`String?`)이지만 GOAL/CARD 이벤트는 게임
           // 로직상 항상 한쪽 사이드에 귀속되므로 실질적으로는 null이 되지 않는다 --
           // 그래도 타입 안전을 위해 null이면 'away'로 접지(fail-safe)한다.
-          side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
+          side: sideKeyById.get(event.sideId ?? '') === 'HOME' ? ('home' as const) : ('away' as const),
           participantId: eligible ? event.participantId : null,
           participantName: eligible
             ? event.participantId === null
@@ -1591,12 +1618,12 @@ export class PublicTournamentRecordsService {
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
           // 만든다. null이면 프론트가 이미 "기타" 구간으로 렌더한다.
-          period: isPeriodUnknown(event.payload) ? null : event.period,
+          period: 'officialPeriod' in event ? event.officialPeriod : isPeriodUnknown(event.payload) ? null : event.period,
           // 백필로 복원된 "분 미상" 골은 `clockMs: 0`으로 저장돼 있으므로 그대로
           // 내보내면 "0:00 득점"이 된다 -- 표식이 있으면 시각을 아예 내리지 않는다
           // (`PublicMatchEvent.clockMs`는 이미 `number | null`이고, 프론트
           // `formatClock`/`isClockAbnormal`도 null을 "표시 없음"으로 다룬다).
-          clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
+          clockMs: 'officialClockMs' in event ? event.officialClockMs : isMinuteUnknown(event.payload) ? null : event.clockMs,
         };
       })
       .sort(byUnknownLast);
@@ -1606,17 +1633,12 @@ export class PublicTournamentRecordsService {
       const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
       const participant =
         event.participantId === null ? undefined : participantById.get(event.participantId);
-      const displaySideId = resolveGoalDisplaySideId(
-        event.sideId,
-        event.participantId,
-        event.ownGoal,
-        participantSideIdById,
-      );
+
       return {
         type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
         cardColor: null,
         sideId: event.sideId,
-        side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
+        side: sideKeyById.get(event.sideId ?? '') === 'HOME' ? ('home' as const) : ('away' as const),
         participantId: eligible ? event.participantId : null,
         participantName: eligible
           ? event.participantId === null
@@ -1687,14 +1709,21 @@ export class PublicTournamentRecordsService {
     const result = new Map<string, ScheduleEventRow[]>();
     for (const fixture of fixturesWithGame) {
       const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
-      const participantSideIdById = new Map(
-        fixture.game.participants.map((participant) => [participant.id, participant.sideId] as const),
-      );
       const revisionGoals =
         fixture.game.currentOfficialRevision?.state === 'OFFICIAL'
           ? parseTournamentFixtureRevisionGoals(fixture.game.currentOfficialRevision.goalEvents)
           : null;
-      const rows: ScheduleEventRow[] = (eventsByGame.get(fixture.game.id) ?? [])
+      const liveRows = eventsByGame.get(fixture.game.id) ?? [];
+      const official = fixture.game.currentOfficialRevision;
+      const cardRows: ScheduleEventRow[] = official?.state === 'OFFICIAL'
+        ? resolveResultCardEvents(official.resultParticipants ?? [], liveRows).map((event) => ({
+          type: 'CARD', cardColor: event.card,
+          side: sideKeyById.get(event.sideId) === 'HOME' ? 'home' : 'away',
+          participantId: event.participantId, playerNameSnapshot: null,
+          period: event.period ?? null, clockMs: event.clockMs ?? (event.minute === undefined ? null : event.minute * 60000),
+        })) : [];
+      const rows: ScheduleEventRow[] = liveRows
+        .filter((event) => official?.state !== 'OFFICIAL' || event.type !== 'CARD')
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => ({
         type:
@@ -1707,14 +1736,7 @@ export class PublicTournamentRecordsService {
         // 색을 모르는 과거 payload 면 null 이고, 그때 프론트는 색 대신 중립 카드로 그린다.
         cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
         // sideId nullable 방어(위 buildEvents와 동일한 fail-safe 규칙).
-        side: (sideKeyById.get(
-          resolveGoalDisplaySideId(
-            event.sideId ?? '',
-            event.participantId,
-            event.type === 'OWN_GOAL',
-            participantSideIdById,
-          ),
-        ) === 'HOME' ? 'home' : 'away') as 'home' | 'away',
+        side: (sideKeyById.get(event.sideId ?? '') === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
         playerNameSnapshot: null,
         // buildEvents와 동일한 규칙 -- 백필 복원 골은 전/후반을 모른다.
@@ -1722,20 +1744,14 @@ export class PublicTournamentRecordsService {
         // buildEvents와 동일한 규칙 -- 분 미상 골은 시각을 내리지 않는다.
         clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
         }));
+      rows.push(...cardRows);
       if (revisionGoals !== null) {
         rows.push(
           ...revisionGoals.map((event) => ({
             type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
             cardColor: null,
             side:
-              sideKeyById.get(
-                resolveGoalDisplaySideId(
-                  event.sideId,
-                  event.participantId,
-                  event.ownGoal,
-                  participantSideIdById,
-                ),
-              ) === 'HOME'
+              sideKeyById.get(event.sideId) === 'HOME'
                 ? ('home' as const)
                 : ('away' as const),
             participantId: event.participantId,
@@ -1967,6 +1983,8 @@ export class PublicTournamentRecordsService {
             consentMap,
             nameProfileByUserId,
             false,
+            teamMatch.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? teamMatch.game.currentOfficialRevision.resultParticipants : undefined,
           );
     const mvp = buildMvp({ game: teamMatch.game }, mode, currentRevisionState, consentMap, nameProfileByUserId, false);
 
@@ -2014,6 +2032,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(teamMatch.game),
+      periodMinutes: gamePeriodMinutes(teamMatch.game),
       lineup,
       events,
       mvp,
@@ -2109,15 +2128,15 @@ export class PublicTournamentRecordsService {
   }
 
   /**
-   * 주차 라벨 — 리그 대진은 주 단위 템플릿으로 일괄 생성되므로(weeksCount) KST 기준
-   * "몇 번째 경기 날짜인가"가 곧 주차다. 리그 상세 화면(league-fixture-detail-client)의
-   * 클라이언트 파생과 같은 규칙을 쓴다 — 같은 경기가 화면마다 다른 주차로 불리면 안 된다.
+   * 주차 라벨 — `league-week-number.ts` 의 단일 규칙(KST 달력 주, 경기가 있는 주만 센다).
+   * 리그 상세 화면(league-fixture-detail-client)의 클라이언트 파생과 같은 규칙이다 — 같은 경기가
+   * 화면마다 다른 주차로 불리면 안 된다.
    */
   private async resolveLeagueWeekNumber(leagueId: string, startAt: Date): Promise<number> {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 KST 날짜의
-      // 대진은 전부 startAt 이 더 작고, 같은 날짜의 늦은 대진은 잘려도 그 날짜 자체가
-      // 이 경기로 이미 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
+      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 주의 대진은
+      // 전부 startAt 이 더 작고, 같은 주의 늦은 대진은 잘려도 그 주 자체가 이 경기로 이미
+      // 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
       // 범위 축소다(Copilot 리뷰 #747).
       where: { leagueId, deletedAt: null, startAt: { lte: startAt } },
       select: { startAt: true },
@@ -2132,13 +2151,9 @@ export class PublicTournamentRecordsService {
       }
       return { startAt: fixture.startAt };
     });
-    const days = Array.from(new Set(scheduledFixtures.map((fixture) => KST_DAY.format(fixture.startAt)))).sort();
-    const index = days.indexOf(KST_DAY.format(startAt));
-    return index >= 0 ? index + 1 : 1;
+    return leagueWeekCounter(scheduledFixtures.map((fixture) => fixture.startAt))(startAt);
   }
 }
-
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 
 /**
  * 팀매치(리그 대진)의 공개 진행 상태 — 취소를 먼저 반영한 뒤 게임 상태를 따른다.
@@ -2247,18 +2262,15 @@ type LeagueScheduleRow = Prisma.V1TeamMatchGetPayload<{ select: typeof LEAGUE_SC
 
 /**
  * 대진마다 주차 번호를 매긴다. **한 번에 계산한다** -- `resolveLeagueWeekNumber` 는 대진
- * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 그것과 같다(KST 날짜를 모아
- * 정렬하고 인덱스+1).
- *
- * 같은 규칙을 쓰는 곳이 셋이다 -- 이 목록, `resolveLeagueFixtureRecord`, 그리고 프론트의
- * 리그 상세. 규칙이 갈리면 **같은 경기가 화면마다 다른 주차로 불린다.**
+ * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 둘 다 `league-week-number.ts` 하나다
+ * (KST 달력 주, 경기가 있는 주만 센다). 프론트의 리그 상세도 같은 규칙을 쓴다 — 규칙이 갈리면
+ * **같은 경기가 화면마다 다른 주차로 불린다.**
  *
  * @param siblingStartAts 주차를 세는 날짜 집합 -- 표시 목록이 아니라 비삭제 전체(가려진 경기 포함).
  */
 function leagueWeekNumbers(siblingStartAts: readonly Date[], fixtures: readonly { startAt: Date }[]): number[] {
-  const days = [...new Set(siblingStartAts.map((startAt) => KST_DAY.format(startAt)))].sort();
-  const indexByDay = new Map(days.map((day, index) => [day, index + 1]));
-  return fixtures.map((fixture) => indexByDay.get(KST_DAY.format(fixture.startAt)) ?? 1);
+  const weekOf = leagueWeekCounter(siblingStartAts);
+  return fixtures.map((fixture) => weekOf(fixture.startAt));
 }
 
 /**
@@ -2305,6 +2317,8 @@ function toLeagueScheduleRow(
     field: fixture.field,
     homeDisplayLabel: null,
     awayDisplayLabel: null,
+    homeSourceLabel: null,
+    awaySourceLabel: null,
     homeSlot: null,
     awaySlot: null,
     videos: fixture.videos,
@@ -2360,6 +2374,14 @@ function assertLeagueTeamMatchOperationalInvariant<T extends LeagueTeamMatchOper
 /** 경기의 정규 피리어드 수. 경기 레코드가 없거나 설정을 읽을 수 없으면 null — 화면은 지금 동작을 유지한다. */
 function gamePeriodCount(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number | null {
   return regularPeriodCount(game?.competitionConfig?.periods);
+}
+
+/**
+ * 경기의 정규 피리어드별 길이(분, 연장 제외). 화면이 "단판 20분"·"전·후반 15분"을 적는 데 쓴다.
+ * 경기 레코드가 없거나 길이를 읽을 수 없으면 null — 화면은 그때 경기 방식 줄을 그리지 않는다.
+ */
+function gamePeriodMinutes(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number[] | null {
+  return regularPeriodMinutes(game?.competitionConfig?.periods);
 }
 
 function presentScheduleEntry(
@@ -2473,8 +2495,8 @@ function presentScheduleEntry(
     home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
     away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
     // Shown instead of "TBD" when a side has no team yet; null once a team exists.
-    homeSlotLabel: fixture.homeRegistration === null ? publicFixtureSideLabel(fixture.homeSlot, fixture.homeDisplayLabel) : null,
-    awaySlotLabel: fixture.awayRegistration === null ? publicFixtureSideLabel(fixture.awaySlot, fixture.awayDisplayLabel) : null,
+    homeSlotLabel: fixture.homeRegistration === null ? publicFixtureSideLabel(fixture.homeSlot, fixture.homeDisplayLabel) ?? fixture.homeSourceLabel : null,
+    awaySlotLabel: fixture.awayRegistration === null ? publicFixtureSideLabel(fixture.awaySlot, fixture.awayDisplayLabel) ?? fixture.awaySourceLabel : null,
     visibilityMode: mode as EffectiveMode,
     status,
     resultState: resolveResultState({
@@ -2486,6 +2508,7 @@ function presentScheduleEntry(
     clock,
     periodBreak,
     periodCount: gamePeriodCount(fixture.game),
+    periodMinutes: gamePeriodMinutes(fixture.game),
     scorers,
     cards,
     // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지

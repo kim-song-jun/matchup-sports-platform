@@ -8,7 +8,7 @@
  */
 import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
 import type { MatchCardModel, MatchListViewModel } from './matches.types';
-import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import type { ListFacets, V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 
@@ -56,18 +56,23 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
   };
 }
 
-export function buildSportSummary(params: URLSearchParams, items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[]) {
+/**
+ * 종목 칩. 서버 건수(facets — 종목 필터만 뺀 나머지 필터로 센 전체 건수)가 있으면 그것을 쓰고, 아직 없으면(첫 렌더·
+ * 조회 실패) 불러온 목록으로 센다 — 불러온 20개만 세면 "전체 20"처럼 실제보다 작게 보인다.
+ */
+export function buildSportSummary(params: URLSearchParams, items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[], facets?: Pick<ListFacets, 'sports'>) {
   const counts = new Map<string, number>();
   items.forEach((item) => {
     const name = item.sport?.name ?? item.sportName ?? '기타';
     counts.set(name, (counts.get(name) ?? 0) + 1);
   });
+  const facetCounts = facets ? new Map(facets.sports.map(({ sportId, count }) => [sportId, count] as const)) : null;
 
   const fixedSports = FIXED_MATCH_SPORT_NAMES.map((name) => {
     const sport = masterSports?.find((item) => item.name === name);
     return {
       label: name,
-      count: counts.get(name) ?? 0,
+      count: facetCounts && sport?.id ? facetCounts.get(sport.id) ?? 0 : counts.get(name) ?? 0,
       active: sport?.id !== undefined && sport.id === selectedSportId,
       // 종목 ID 를 모르면(마스터 조회 실패 등) 링크를 붙이지 않는다 — 예전에는 sportId 없는
       // `/matches` 로 링크해, 눌러도 필터가 걸리지 않는 '가짜 필터'가 됐다.
@@ -76,7 +81,7 @@ export function buildSportSummary(params: URLSearchParams, items: V1Match[], fal
   });
 
   return [
-    { label: fallback.sports[0]?.label ?? '전체', count: items.length, active: !selectedSportId, href: buildMatchHref(params, { sportId: null, filter: null }) },
+    { label: fallback.sports[0]?.label ?? '전체', count: facetCounts ? [...facetCounts.values()].reduce((sum, count) => sum + count, 0) : items.length, active: !selectedSportId, href: buildMatchHref(params, { sportId: null, filter: null }) },
     ...fixedSports,
   ];
 }
@@ -132,18 +137,6 @@ export function getStatus(match: V1Match): V1MatchApiStatus {
   return base;
 }
 
-/**
- * 서버가 정한 정렬(최신순/마감임박순)은 각 상태 그룹 안에서 그대로 유지하면서,
- * 현재 신청 가능한 카드만 신청 마감 카드보다 먼저 보이게 안정적으로 분리한다.
- * 새 배열을 반환해 React Query 캐시의 원본 응답은 변경하지 않는다.
- */
-export function sortMatchesByAvailability(items: V1Match[]): V1Match[] {
-  return items
-    .map((item, index) => ({ item, index, rank: lifecycleRank(getStatus(item)) }))
-    .sort((left, right) => left.rank - right.rank || left.index - right.index)
-    .map(({ item }) => item);
-}
-
 export function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
   return preflight ?? match.viewer?.state ?? match.viewerState ?? 'none';
 }
@@ -154,15 +147,6 @@ export function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1View
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
   if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full' || status === 'in_progress' || status === 'completion_pending' || status === 'on_hold' || status === 'scheduled') return 'full';
   return 'open';
-}
-
-function lifecycleRank(status: V1MatchApiStatus) {
-  if (status === 'closed' || status === 'full') return 1;
-  if (status === 'in_progress') return 2;
-  if (status === 'completion_pending' || status === 'on_hold' || status === 'scheduled') return 3;
-  if (status === 'completed') return 4;
-  if (status === 'cancelled' || status === 'expired') return 5;
-  return 0;
 }
 
 export function actionLabel(status: MatchCardModel['status'], lifecycleStatus?: V1MatchApiStatus, viewerState: V1ViewerState = 'none') {

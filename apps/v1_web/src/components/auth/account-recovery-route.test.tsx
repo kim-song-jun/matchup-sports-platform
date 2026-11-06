@@ -22,6 +22,7 @@ describe('MD-QA #133 실제 계정 찾기 페이지의 로그인 복귀', () => 
     screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', loginHref));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '다음' }));
     await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
     await user.click(await screen.findByRole('button', { name: '확인' }));
     fireEvent.change(await screen.findByLabelText('새 비밀번호'), { target: { value: 'synthetic-new-password' } });
@@ -35,8 +36,9 @@ describe('MD-QA #133 실제 계정 찾기 페이지의 로그인 복귀', () => 
   it.each(['https://outside.example.test/steal', ['/chat', 'https://outside.example.test']])('잘못된 redirect %s는 버리고 안전한 from은 보존한다', async (redirect) => {
     renderAuthUi(await FindAccountPage({ searchParams: Promise.resolve({ redirect, from: '/my/settings' }) }));
     screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings'));
-    expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+    expect(screen.getByRole('group', { name: '찾을 항목' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     expect(wireCalls.emailReset).toHaveLength(0);
   });

@@ -61,9 +61,15 @@ GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위
 
 ### POST `/notifications/push-subscribe`
 
+`endpoint` 는 표준 브라우저 푸시 서비스(`fcm.googleapis.com`·`updates.push.services.mozilla.com`·`notify.windows.com`·
+`web.push.apple.com` 와 그 하위 도메인)의 https URL 이어야 하고, 포트·사용자 정보를 붙일 수 없다(400). 서버는 WHATWG 표준형으로
+저장하고(원문 형태로 저장된 옛 행은 재구독 때 같은 소유 규칙으로 표준형 행에 합친다), 보내기 직전에 같은 검사를 다시 해
+통과하지 못한 구독(검사 도입 전에 저장된 행)은 보내지 않고 지운다(`src/notifications/push-endpoint.ts`).
+`push-unsubscribe` 는 자기 행을 저장된 문자열로 지우기만 하므로 이 검사를 걸지 않는다(빈 값·2048자 초과만 400).
+
 ```json
 {
-  "endpoint": "https://push-service.example/subscription",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/subscription-id",
   "keys": {
     "p256dh": "base64url",
     "auth": "base64url"
@@ -75,7 +81,7 @@ GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위
 
 ```json
 {
-  "endpoint": "https://push-service.example/subscription"
+  "endpoint": "https://fcm.googleapis.com/fcm/send/subscription-id"
 }
 ```
 
@@ -137,8 +143,9 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 1:1 문의에 어드민이 답변하면 문의한 회원에게 `inquiry_answered`(targetType `inquiry`, 딥링크
 `/my/inquiries/:inquiryId`)를 emit한다 — 게스트 문의는 계정이 없으므로 연락처로 대신 응답한다. 이
 이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
-소셜 로그인이 휴대폰 주인의 기존 계정에 연결되면 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
-`/my/settings`)를 emit한다 — 보안 알림이라 같은 `importantEnabled`로 게이팅된다.
+로그인한 계정에 카카오·Apple 로그인이 연결되거나(`POST /auth/link/{provider}`) 이메일·비밀번호 로그인이 더해지면(`POST /auth/link/email/complete`, 본문 "이메일·비밀번호 로그인이 연결됐어요…") 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
+`/my/settings`)를 남긴다 — 보안 알림이라 알림 설정과 무관하게 항상 남고, 알림함 행은 연결과 같은 트랜잭션 안에서 만든다(푸시·실시간 전달은 커밋 뒤).
+운영자가 계정에서 휴대폰 번호를 해제하면(`POST /admin/users/:userId/phone/release`) 그 계정에 `phone_released_by_operator`(targetType `system`, 딥링크 `/my/phone-verify`, 본문 "운영자가 이 계정의 휴대폰 번호를 해제했어요…")를 같은 방식으로 남긴다. 번호는 본문에 싣지 않는다.
 
 팀 초대를 받으면 `team_invitation_received`(targetType `team`, targetId는 팀 id)를 emit하고 딥링크는 팀 상세가
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로

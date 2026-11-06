@@ -1,3 +1,4 @@
+import { namedFinalsMsw } from './named-finals-handlers';
 import { http, HttpResponse } from 'msw';
 import isISO8601 from 'validator/lib/isISO8601';
 import isEmail from 'validator/lib/isEmail';
@@ -77,7 +78,10 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
+import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
+import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
+import { v1AdminUserPhoneReleaseMswHandlers } from './admin-user-phone-release-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
@@ -111,7 +115,7 @@ function ok<T>(data: T) {
 }
 
 const authAccountPhoneFixture = '01012345678';
-type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+type PhoneProofPurpose = 'signup' | 'password_reset';
 type PhoneProof = {
   readonly phone: string;
   readonly channel: 'phone';
@@ -181,7 +185,7 @@ function sweepAuthPhoneState() {
 }
 
 function isPhoneProofPurpose(value: string): value is PhoneProofPurpose {
-  return value === 'signup' || value === 'password_reset' || value === 'social_link';
+  return value === 'signup' || value === 'password_reset';
 }
 
 function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPurpose): boolean {
@@ -218,22 +222,8 @@ async function verifyAuthPhone(request: Request) {
   authPhoneChallenges.set(body.phone, { ...challenge, verified: true });
   const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
   authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
-  return ok({ verified: true, proofToken });
-}
-
-async function socialLinkAccountProofRequired(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken']);
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || !body.proofToken || body.proofToken.length > 512) {
-    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
-  }
-  if (!hasPhoneProof(body.phone, body.proofToken, 'social_link') || !authPhoneChallenges.get(body.phone)?.verified) {
-    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
-  }
-  if (body.phone !== authAccountPhoneFixture) {
-    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
-  }
-  return authProofError('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-    '휴대폰 번호 인증만으로 기존 계정에 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요. 비밀번호를 잊었다면 로그인 화면에서 이메일로 재설정해 주세요.', 409);
+  // 번호 소유를 증명한 뒤에만 알려준다. 발급 단계에서는 알리지 않는다.
+  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture, withdrawalPendingUntil: null });
 }
 
 async function requestRecoveryEmail(request: Request) {
@@ -263,6 +253,26 @@ async function confirmRecoveryEmail(request: Request) {
   return ok({ verified: true, proofToken });
 }
 
+async function findAccountByRecoveryEmail(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['email', 'proofToken']);
+  const email = recoveryEmail(body);
+  if (!email || typeof body?.proofToken !== 'string' || body.proofToken.length > 2048) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  sweepRecoveryEmailState();
+  const proof = recoveryEmailProofs.get(body.proofToken);
+  if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
+    return authProofError('EMAIL_NOT_VERIFIED', '이메일 인증을 다시 진행해 주세요.');
+  }
+  const social = email === PASSWORD_UNAVAILABLE_MSW.email;
+  if (!social && email !== v1UserFixture.email?.trim().toLowerCase()) {
+    return authProofError('ACCOUNT_NOT_FOUND', '가입된 계정을 찾지 못했어요.', 404);
+  }
+  const [local, domain] = email.split('@');
+  const maskedEmail = domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***';
+  return ok({ maskedEmail, providers: social ? [...PASSWORD_UNAVAILABLE_MSW.providers] : ['email'], hasPassword: !social, withdrawalPendingUntil: null });
+}
+
 async function resetPasswordByRecoveryEmail(request: Request) {
   const body = parseAuthProofInput(await request.json(), ['email', 'proofToken', 'newPassword']);
   const email = recoveryEmail(body);
@@ -274,6 +284,7 @@ async function resetPasswordByRecoveryEmail(request: Request) {
   if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
   }
+  if (email === PASSWORD_UNAVAILABLE_MSW.email) return passwordLoginUnavailableResponse();
   if (email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }
@@ -309,7 +320,7 @@ async function findAccountByRecoveryPhone(request: Request) {
   const email = v1UserFixture.email;
   const [local = '', domain] = email?.split('@') ?? [];
   const maskedEmail = email ? (domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***') : null;
-  return ok({ maskedEmail, providers: ['email'], hasPassword: true });
+  return ok({ maskedEmail, providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
 }
 
 function notFound(message: string) {
@@ -618,6 +629,7 @@ let v1GameFixture = {
   lastSequence: 0,
   competitionConfigVersionId: 'competition-config-v1',
   currentOfficialRevisionId: null as string | null,
+  realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 } as const,
   sides: [
     { id: 'side-home-1', gameId: 'game-1', sideKey: 'HOME' as const, teamId: 'team-1', displayNameSnapshot: '성수 볼러즈' },
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
@@ -748,23 +760,33 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
   place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
+  ...namedFinalsMsw.handlers,
+  http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
+  ...v1AdminUserPhoneReleaseMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueCapacityMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   ...v1TeamMatchRulesMsw.handlers,
-  http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
+  http.get(`${api}/auth/me`, () => ok({
+    socialSignupPrefill: null,
+    user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
+      onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
+      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
+    profile: { displayName: v1UserFixture.displayName, nickname: v1UserFixture.displayName },
+    verification: { emailVerified: true, phoneVerified: false },
+  })),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
-  http.post(`${api}/auth/social-link/preview`, ({ request }) => socialLinkAccountProofRequired(request)),
-  http.post(`${api}/auth/social-link`, ({ request }) => socialLinkAccountProofRequired(request)),
   http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
+  http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
-  http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
+  ...v1AuthLinkMswHandlers,
+  ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();
     const issue = getRegisterIssue(body);
@@ -1682,6 +1704,7 @@ export const v1MswHandlers = [
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdByName: '스태프 닉네임',
+      officializedByName: null,
       createdBySystemActor: null,
       supersedesId: null,
       submittedAt: null,

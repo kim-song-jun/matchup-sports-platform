@@ -10,6 +10,7 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { createSharedRecordFixture } from '../fixtures/team-match-shared-record.fixture';
 import type { MutateTeamMatchRecordDto } from '../../src/team-matches/dto/team-match-record.dto';
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const records = new TeamMatchRecordService(prisma);
@@ -194,14 +195,14 @@ describe('friendly match shared score sheet (real DB)', () => {
   it('old host submission cannot replace an active shared record', async () => {
     const f = await createSharedRecordFixture(prisma);
     await records.mutate(user(f.userIds[1]), f.match.id, cmd('add', 0, { sideId: f.sides[0].id }));
-    const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+    const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
     const id = randomUUID();
     await expect(games.createResultRevision(user(f.userIds[0]), f.game.id, id, { clientCommandId: id, expectedVersion: 1, score: { home: 0, away: 0 }, eventsHash: 'other', actualParticipants: [] })).rejects.toMatchObject({ response: expect.objectContaining({ code: 'SHARED_RECORD_REQUIRED' }) });
   });
   it('default and recommended discovery retain a started matched game even after its application deadline', async () => {
     const f = await createSharedRecordFixture(prisma);
     await prisma.v1TeamMatch.update({ where: { id: f.match.id }, data: { deadlineAt: new Date(Date.now() - 3600_000) } });
-    const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+    const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
     const matches = new TeamMatchesService(prisma, {} as NotificationsService, games);
     for (const sort of [undefined, 'recommended'] as const) {
       const page = await matches.list(null, { teamId: f.teams[0].id, sort });

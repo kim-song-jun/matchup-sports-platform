@@ -63,9 +63,12 @@ describe('buildSportsEventLd', () => {
     ]) expect(buildSportsEventLd(item)?.offers).toMatchObject({ availability: 'https://schema.org/SoldOut' });
   });
 
-  it('리그는 진행 중이어도 실제 신청 마감 전이면 신청 가능으로 안내한다', () => {
-    expect(buildSportsEventLd(tournament({ kind: 'regular_league', status: 'in_progress', entryFeeConfigured: true }))?.offers)
+  // 2026-10-27: 리그도 대회처럼 접수 중일 때만 신청을 받는다 — 진행 중이면 마감이 남아도 받지 않는다.
+  it('리그는 접수 중일 때만 신청 가능으로 안내한다', () => {
+    expect(buildSportsEventLd(tournament({ kind: 'regular_league', status: 'open', entryFeeConfigured: true }))?.offers)
       .toMatchObject({ availability: 'https://schema.org/InStock' });
+    expect(buildSportsEventLd(tournament({ kind: 'regular_league', status: 'in_progress', entryFeeConfigured: true }))?.offers)
+      .toMatchObject({ availability: 'https://schema.org/SoldOut' });
   });
 
   it('구장 이름을 우편 주소로 지어내지 않는다', () => {

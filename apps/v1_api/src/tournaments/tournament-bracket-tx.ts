@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSourceType, type V1TournamentGroup, type V1TournamentGroupPhase } from '@prisma/client';
-import { writeAdminActionLog, type V1ActiveAdmin } from '../common/admin-context.service';
+import { writeAdminActionLog, type V1TournamentManager } from '../common/admin-context.service';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { canonicalGameCommandPayloadHash, type GamesService } from '../games/games.service';
 import {
@@ -27,9 +27,9 @@ type Tx = Prisma.TransactionClient;
 
 export async function createGroupInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
-  input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null },
+  input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: string },
 ): Promise<V1TournamentGroup> {
   const group = await tx.v1TournamentGroup.create({
     data: {
@@ -38,13 +38,14 @@ export async function createGroupInTx(
       phase: input.phase,
       sortOrder: input.sortOrder,
       advanceCount: input.advanceCount,
+      bracketTrack: input.bracketTrack ?? 'overall',
     },
   });
   await writeAdminActionLog(tx, admin, {
     action: 'tournament.bracket.group.create',
     targetType: 'tournament_group',
     targetId: group.id,
-    afterJson: { tournamentId, name: group.name, phase: group.phase },
+    afterJson: { tournamentId, name: group.name, phase: group.phase, bracketTrack: group.bracketTrack },
   });
   return group;
 }
@@ -182,7 +183,7 @@ export async function assertNotInOppositeFinalStageInTx(
  */
 export async function ensureGroupPhaseTeamsInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
   groupId: string,
   groupPhase: string,
@@ -253,7 +254,7 @@ export type TournamentFixtureUpdateInput = {
  * 부전승 팀을 거절하고 조별리그 조에 편성한 뒤, 사이드·팀 일정·명단 재계산 이벤트는 `updateTournamentMatchInTx` 가 맡는다.
  * undefined 인 필드는 건드리지 않고 null 은 "미정으로 비움" 이다.
  */
-export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, input: TournamentFixtureUpdateInput) {
+export async function updateTournamentFixtureInTx(tx: Tx, admin: V1TournamentManager, input: TournamentFixtureUpdateInput) {
   const changesTeams = input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined;
   if (changesTeams) {
     if (input.groupId) {
@@ -333,7 +334,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
 export async function assignTournamentFixtureSideInTx(
   tx: Tx,
   _deps: BracketTxDeps,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: { fixtureId: string; side: 'HOME' | 'AWAY'; registrationId: string | null; enrollmentSink: GroupEnrollment[] },
 ): Promise<void> {
   const details = await tx.v1TournamentMatchDetails.findUnique({
@@ -372,7 +373,7 @@ export function assertSidesNotSlotLinked(
  * 시작 전 경기를 숨긴다(Game·감사 이력은 지우지 않는다). 자리 연결(`homeSlotId`·`awaySlotId`)도 같은 update 로 푼다.
  * 경기 한 건의 Game→TeamMatch 행만 잠그며 대회 행·advisory lock 은 호출자가 잡는다.
  */
-export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, fixtureId: string): Promise<void> {
+export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1TournamentManager, fixtureId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;
   const canonical = await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId },
@@ -381,8 +382,8 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
   const game = canonical.teamMatch.game;
   if (!game || game.sourceType !== V1GameSourceType.TEAM_MATCH) throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 TeamMatch 게임을 찾을 수 없어요.' });
   if (game.currentOfficialRevisionId !== null) throw new ConflictException({ code: 'FIXTURE_HAS_RESULT', message: '결과가 기록된 경기는 삭제할 수 없어요.' });
-  if (!['draft', 'open', 'closed'].includes(canonical.tournament.status) || game.state !== 'SCHEDULED' || canonical.teamMatch.status !== 'matched') {
-    throw new ConflictException({ code: 'FIXTURE_ALREADY_STARTED', message: '대회 시작 전의 아직 시작하지 않은 경기만 삭제할 수 있어요.' });
+  if (!['draft', 'open', 'closed', 'in_progress'].includes(canonical.tournament.status) || game.state !== 'SCHEDULED' || canonical.teamMatch.status !== 'matched') {
+    throw new ConflictException({ code: 'FIXTURE_ALREADY_STARTED', message: '종료·취소되지 않은 대회의 아직 시작하지 않은 경기만 삭제할 수 있어요.' });
   }
   await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_advancement_edges e ON g.team_match_id = e.target_team_match_id WHERE e.source_team_match_id = ${fixtureId} ORDER BY g.id FOR UPDATE OF g`;
   const linked = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { sourceTeamMatchId: fixtureId }, include: { target: { include: { teamMatch: { include: { game: true } } } } } });
@@ -398,37 +399,60 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
   await tx.v1TournamentMatchAdvancementEdge.deleteMany({ where: { OR: [{ sourceTeamMatchId: fixtureId }, { targetTeamMatchId: fixtureId }] } });
   // Free the original round/number unique key; the original identity is retained in the audit below.
   await tx.v1TournamentMatchDetails.update({ where: { teamMatchId: fixtureId }, data: { groupId: null, parentTeamMatchId: null, round: canonical.round + ':deleted:' + fixtureId } });
-  await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: fixtureId, fromStatus: canonical.teamMatch.status, toStatus: 'archived', actorType: 'admin', actorUserId: admin.userId, reason: 'admin_bracket_deleted_before_start' } });
+  await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: fixtureId, fromStatus: canonical.teamMatch.status, toStatus: 'archived', actorType: admin.id === null ? 'user' : 'admin', actorUserId: admin.userId, reason: 'admin_bracket_deleted_before_start' } });
   await writeAdminActionLog(tx, admin, { action: 'tournament.bracket.fixture.delete', targetType: 'team_match', targetId: fixtureId,
     beforeJson: { tournamentId: canonical.tournamentId, groupId: canonical.groupId, round: canonical.round, fixtureNumber: canonical.fixtureNumber, legNumber: canonical.legNumber },
     afterJson: { deleted: true, gameId: game.id, state: 'CANCELLED' } });
 }
 
 /**
- * 조 삭제. 편성 팀·경기·자리가 남아 있으면 실수 방지를 위해 409 로 막는다. 자리는 FK(Restrict)가 500 을 내기 전에 여기서
- * 막는다 — 템플릿 교체(PR-1b)는 자리를 먼저 지운 뒤 이 함수를 부른다. 호출자가 advisory lock 을 잡는다.
+ * 조 삭제. 실제 팀 배정·경기·참조된 자리는 보호하고, 비어 있는 미사용 템플릿 자리와 고아 편성만 정리한다.
+ * 호출자가 대회 advisory lock 을 잡는다.
  */
-export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, groupId: string): Promise<void> {
+export async function deleteTournamentGroupInTx(tx: Tx, admin: V1TournamentManager, groupId: string): Promise<void> {
   const group = await tx.v1TournamentGroup.findUnique({
     where: { id: groupId },
     include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true, slots: true, rankSlots: true } } },
   });
   if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
-  if (group._count.groupTeams > 0 || group._count.byeSlots > 0) {
+  const hasSlots = group._count.slots > 0 || group._count.rankSlots > 0;
+  const slots = hasSlots ? await tx.v1TournamentSlot.findMany({
+    where: { tournamentId: group.tournamentId, OR: [{ groupId }, { sourceGroupId: groupId }] },
+    select: { id: true, groupId: true, kind: true, registrationId: true },
+  }) : [];
+  const emptySlots = slots.length > 0 && slots.every((slot) => slot.registrationId === null);
+  // 취소/보관 경기라도 참조가 남아 있으면 기록을 임의로 바꾸지 않는다.
+  const unusedSlots = emptySlots && group._count.tournamentMatchDetails === 0 && group._count.byeSlots === 0
+    && await tx.v1TeamMatch.findFirst({ where: { OR: [
+      { homeSlotId: { in: slots.map((slot) => slot.id) } }, { awaySlotId: { in: slots.map((slot) => slot.id) } },
+    ] }, select: { id: true } }) === null;
+  const orphanEnrollment = unusedSlots && group.phase === 'group'
+    && slots.some((slot) => slot.groupId === groupId && slot.kind === 'ENTRY');
+  if ((group._count.groupTeams > 0 && !orphanEnrollment) || group._count.byeSlots > 0
+    || slots.some((slot) => slot.groupId === groupId && slot.kind === 'ENTRY' && slot.registrationId !== null)) {
     throw new ConflictException({ code: 'GROUP_HAS_TEAMS', message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.' });
   }
   if (group._count.tournamentMatchDetails > 0) {
     throw new ConflictException({ code: 'GROUP_HAS_FIXTURES', message: '조에 연결된 경기가 있어요. 경기를 먼저 삭제해 주세요.' });
   }
-  if (group._count.slots > 0 || group._count.rankSlots > 0) {
+  if (hasSlots && !unusedSlots) {
     throw new ConflictException({ code: 'GROUP_HAS_SLOTS', message: '조에 대진 자리가 남아 있어요. 대진 템플릿을 교체하거나 자리를 먼저 지워 주세요.' });
   }
+  if (unusedSlots) {
+    if (orphanEnrollment && group._count.groupTeams > 0) {
+      await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId, isBye: false } });
+      await tx.v1TournamentStanding.deleteMany({ where: { groupId } });
+    }
+    await tx.v1TournamentSlot.deleteMany({ where: { id: { in: slots.map((slot) => slot.id) } } });
+  }
   await tx.v1TournamentGroup.delete({ where: { id: groupId } });
+  if (orphanEnrollment && group._count.groupTeams > 0) await recalculateStandingsInTx(tx, group.tournamentId);
   await writeAdminActionLog(tx, admin, {
     action: 'tournament.bracket.group.delete',
     targetType: 'tournament_group',
     targetId: groupId,
     beforeJson: { name: group.name, phase: group.phase },
+    ...(unusedSlots ? { afterJson: { removedUnusedSlotIds: slots.map((slot) => slot.id), removedOrphanGroupTeamCount: orphanEnrollment ? group._count.groupTeams : 0 } } : {}),
   });
 }
 
@@ -440,7 +464,7 @@ export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, gr
 export async function createEmptyTournamentFixtureInTx(
   tx: Tx,
   deps: BracketTxDeps,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: {
     tournament: { id: string; sportId: string; regionId: string | null; competitionConfigVersionId: string; title: string } & TournamentVenueRow;
     groupId: string;
@@ -494,7 +518,7 @@ export async function createEmptyTournamentFixtureInTx(
     competitionConfigVersionId: tournament.competitionConfigVersionId,
     home: { id: null, name: '홈 팀 미정' },
     away: { id: null, name: '어웨이 팀 미정' },
-    actor: { actorType: 'USER', actorUserId: admin.userId, role: 'platform_ops', tournamentId: tournament.id },
+    actor: { actorType: 'USER', actorUserId: admin.userId, role: admin.id === null ? 'tournament_director' : 'platform_ops', tournamentId: tournament.id },
     durableCommandId,
     payloadHash: canonicalGameCommandPayloadHash(commandPayload),
   });
@@ -514,7 +538,7 @@ export async function createEmptyTournamentFixtureInTx(
  */
 export async function releaseUnusedGroupTeamsInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
   groupId: string,
   registrationIds: readonly string[],
@@ -529,6 +553,8 @@ export async function releaseUnusedGroupTeamsInTx(
       },
     });
     if (stillPlaying > 0) continue;
+    // 경기 없는 조의 자리 맞바꾸기에서도 최종 ENTRY에 남은 팀은 편성을 유지한다.
+    if (await tx.v1TournamentSlot.findFirst({ where: { groupId, kind: 'ENTRY', registrationId }, select: { id: true } })) continue;
     const groupTeam = await tx.v1TournamentGroupTeam.findFirst({ where: { groupId, registrationId, isBye: false }, select: { id: true } });
     if (groupTeam === null) continue;
     const hadStandings = (await tx.v1TournamentStanding.count({ where: { groupId } })) > 0;

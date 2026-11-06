@@ -1,0 +1,173 @@
+'use client';
+import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/components/v1-ui/button';
+import { AlertBanner, SectionTitle } from '@/components/v1-ui/primitives';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useMultiFinals, type MultiFinalPolicy, type MultiFinalView } from '@/hooks/use-multi-finals';
+import { useV1AdminBracket } from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
+import { BracketLeagueStandings } from './bracket-league-standings';
+
+const control = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label';
+type Props = { tournamentId: string; open: boolean; onClose: () => void; onApplied: () => void };
+export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onApplied }: Props) {
+  const api = useMultiFinals(tournamentId, open);
+  const bracket = useV1AdminBracket(open ? tournamentId : '');
+  const [view, setView] = useState<MultiFinalView | null>(null);
+  const [name, setName] = useState('');
+  const [ids, setIds] = useState<string[]>([]);
+  const [policy, setPolicy] = useState<MultiFinalPolicy>('rank_order');
+  const [sourceVersion, setSourceVersion] = useState('');
+  const [needsRecommendation, setNeedsRecommendation] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState('');
+  const initialized = useRef(false);
+  const content = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const { confirm, ConfirmModal } = useConfirm();
+  const busy = api.assign.isPending || api.assignmentPreview.isPending;
+  async function close() {
+    if (busy) return;
+    if (dirty && !await confirm({ title: '진출팀 배정 닫기', message: '확정하지 않은 배치를 닫을까요?', confirmLabel: '닫기' })) return;
+    onClose();
+  }
+  const { mounted, dialogRef, onBackdropClick } = useModalA11y({ open, onClose: () => void close(), pending: busy });
+  function loadFinal(next: MultiFinalView, finalName: string) {
+    const final = next.finals.find(row => row.name === finalName);
+    setView(next); setName(finalName); setIds(final?.registrationIds ?? final?.suggestedRegistrationIds ?? []);
+    setPolicy(final?.assignmentPolicy ?? 'rank_order'); setSourceVersion(''); setNeedsRecommendation(false);
+    setDirty(false); setReviewing(false); setError('');
+  }
+  useEffect(() => {
+    if (!open) { initialized.current = false; setView(null); return; }
+    if (initialized.current || !api.view.data || api.view.isFetching || api.view.isError) return;
+    initialized.current = true; loadFinal(api.view.data, api.view.data.finals[0]?.name ?? '');
+  }, [open, api.view.data, api.view.isFetching, api.view.isError]);
+  useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [reviewing, error]);
+  if (!mounted || typeof document === 'undefined') return null;
+  const final = view?.finals.find(row => row.name === name);
+  const registrations = view?.registrations ?? [];
+  const complete = Boolean(view?.groupStandings?.length) && view!.groupStandings!.every(group => group.complete);
+  const groups = bracket.data?.groups.filter(group => group.phase !== 'group' && group.bracketTrack === name) ?? [];
+  const groupIds = new Set(groups.map(group => group.id));
+  const slots = bracket.data?.slots.filter(slot => slot.kind === 'GROUP_RANK' && slot.groupId !== null && groupIds.has(slot.groupId)).sort((a, b) => a.position - b.position) ?? [];
+  const fixtures = bracket.data?.fixtures.filter(fixture => fixture.groupId !== null && groupIds.has(fixture.groupId)).sort((a, b) => a.fixtureNumber - b.fixtureNumber) ?? [];
+  const started = fixtures.some(fixture => fixture.status !== 'scheduled' || fixture.game === null || fixture.game.state !== 'SCHEDULED' || fixture.game.hasLiveRecords || fixture.game.hasOfficialResult);
+  const rulesConfigured = slots.length > 0 && (final?.rules.length === slots.length || final?.registrationIds?.length === slots.length);
+  const ready = rulesConfigured && complete && Boolean(view?.generated) && slots.length > 0 && fixtures.length > 0 && !started && !api.view.isError && !bracket.isError;
+  const teamName = (id: string) => registrations.find(row => row.id === id)?.team.name ?? '확정 명단에 없는 팀';
+  const otherIds = new Set(view?.finals.filter(row => row.name !== name).flatMap(row => row.registrationIds ?? []) ?? []);
+  async function chooseFinal(next: string) {
+    if (!view || busy) return;
+    if (dirty && !await confirm({ title: '다른 토너먼트 선택', message: '현재 토너먼트의 확정하지 않은 변경을 버릴까요?', confirmLabel: '변경 버리기' })) return;
+    loadFinal(view, next);
+  }
+  async function reload() {
+    if (dirty && !await confirm({ title: '최신 설정 불러오기', message: '확정하지 않은 배치를 지우고 최신 설정을 불러올까요?', confirmLabel: '다시 불러오기' })) return;
+    const [result] = await Promise.all([api.view.refetch(), bracket.refetch()]);
+    if (result.isError || !result.data) { setError('최신 설정을 불러오지 못했어요. 다시 시도해 주세요.'); return; }
+    loadFinal(result.data, result.data.finals.some(row => row.name === name) ? name : result.data.finals[0]?.name ?? '');
+  }
+  async function recommend() {
+    if (!view) return;
+    try {
+      setError('');
+      const result = await api.assignmentPreview.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy });
+      setIds(result.registrationIds); setSourceVersion(result.sourceVersion); setNeedsRecommendation(false); setDirty(true);
+    } catch (err) { setError(extractErrorMessage(err, '추천 배치를 만들지 못했어요.')); }
+  }
+  async function review() {
+    if (!view) return;
+    try {
+      setError('');
+      if (!ready) throw new Error('예선 공식 결과와 해당 토너먼트의 시작 전 대진을 먼저 확인해 주세요.');
+      if (needsRecommendation) throw new Error('선택한 방식으로 추천 배치를 먼저 만들어 주세요.');
+      if (ids.length !== slots.length || new Set(ids).size !== ids.length) throw new Error(`진출팀을 중복 없이 ${slots.length}팀 선택해 주세요.`);
+      if (ids.some(id => !registrations.some(row => row.id === id) || otherIds.has(id))) throw new Error('미확정 팀이나 다른 토너먼트에 배정된 팀은 제외해 주세요.');
+      if (!sourceVersion) {
+        const result = await api.assignmentPreview.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy });
+        setSourceVersion(result.sourceVersion);
+      }
+      setReviewing(true);
+    } catch (err) { setError(extractErrorMessage(err, '배치를 확인하지 못했어요.')); }
+  }
+  async function save() {
+    if (!view) return;
+    try {
+      setError('');
+      const result = await api.assign.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy, registrationIds: ids, sourceVersion });
+      loadFinal(result, name); onApplied();
+    } catch (err) { setError(extractErrorMessage(err, '진출팀을 배정하지 못했어요.')); }
+  }
+  function edit(next: string[]) { setIds(next); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true); }
+  return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">
+      <div className="shrink-0 border-b border-[var(--border)] p-4">
+        <h2 id={titleId} className="tm-text-heading">토너먼트별 진출팀 배정</h2>
+        <p className="mt-2 tm-text-caption">{reviewing ? '2. 대진 확인 후 확정' : '1. 토너먼트와 진출팀 선택'}</p>
+      </div>
+      <div ref={content} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        {error && <AlertBanner tone="error" message={error} />}
+        {!view ? api.view.isError ? <div role="alert"><p>설정을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void api.view.refetch()}>다시 시도</Button></div> : <p role="status">설정을 불러오고 있어요.</p> : <fieldset disabled={busy} className="min-w-0 space-y-4">
+          <label className="block tm-text-label">배정할 토너먼트<select className={control} value={name} disabled={reviewing} onChange={event => void chooseFinal(event.target.value)}>
+            {view.finals.map(row => <option key={row.name} value={row.name}>{row.name} · {row.registrationIds == null ? '미배정' : `${row.registrationIds.length}팀 배정됨`}</option>)}
+          </select></label>
+          {api.view.isError && <AlertBanner tone="warning" message="설정을 다시 불러오지 못했어요. 최신 설정 다시 불러오기를 눌러 주세요." />}
+          {!view.generated && <AlertBanner tone="warning" message="예선·토너먼트 대진 생성에서 빈 결선 대진을 먼저 만들어 주세요." />}
+          {view.generated && slots.length > 0 && !rulesConfigured && <AlertBanner tone="warning" message="토너먼트 배정 규칙에서 자리 수에 맞게 순위별 목적지를 먼저 설정해 주세요." />}
+          {!complete && <AlertBanner tone="warning" message="예선 경기가 모두 끝나고 공식 순위가 반영된 뒤 배정할 수 있어요." />}
+          {bracket.isError ? <div role="alert"><p>대진을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void bracket.refetch()}>대진 다시 시도</Button></div> : bracket.isLoading ? <p role="status">대진을 불러오고 있어요.</p> : null}
+          {started && <AlertBanner tone="warning" message="이 토너먼트는 시작했거나 기록·결과가 있어 진출팀을 다시 배정할 수 없어요." />}
+          {!reviewing ? <>
+            <SectionTitle title="조별 공식 순위" />
+            <p className="tm-text-caption">추천은 아래 공식 순위를 그대로 사용해요. 저장한 진출팀은 이후 순위가 바뀌어도 유지돼요.</p>
+            <BracketLeagueStandings groups={(view.groupStandings ?? []).map(group => ({ groupId: group.groupId, name: `${group.name}${group.complete ? ' · 확정' : ' · 진행 중'}`, rows: group.rows.map(row => ({ registrationId: row.registrationId, teamName: row.teamName, rank: row.position ?? 0, played: row.wins + row.draws + row.losses, wins: row.wins, draws: row.draws, losses: row.losses, goalDifference: row.goalsFor - row.goalsAgainst, points: row.points })) }))} />
+            <label className="block tm-text-label">진출팀 배치 방식<select className={control} value={policy} disabled={!ready} onChange={event => { setPolicy(event.target.value as MultiFinalPolicy); setNeedsRecommendation(true); setDirty(true); setSourceVersion(''); }}>
+              <option value="rank_order">기본 순위 순서 · 수동 조정 가능</option>
+              {final?.crossGroupTopThreeAvailable && <option value="cross_group_top3">1위 부전승 · 2위 교차 고정 · 3위 같은 조 회피</option>}
+            </select></label>
+            {policy === 'cross_group_top3' && <p className="tm-text-caption">예선 조 순서대로 1위를 부전승 배치해요. 2위는 다음 조로 교차 고정하고, 3위는 12강과 8강에서 같은 조를 만나지 않도록 무작위 배치해요.</p>}
+            <Button variant="neutral" disabled={!ready} onClick={() => void recommend()}>{policy === 'cross_group_top3' ? '무작위 추천 배치 만들기' : '공식 순위로 추천 배치 만들기'}</Button>
+            <SectionTitle title={`${name || '토너먼트'} 진출팀 · ${ids.length}/${slots.length}팀`} />
+            <p className="tm-text-caption">팀 선택이나 시드 순서를 직접 바꾸면 기본 수동 배치로 전환돼요. 다른 토너먼트에서 이미 확정한 팀은 중복 선택할 수 없어요.</p>
+            {ids.some(id => !registrations.some(row => row.id === id)) && <Button variant="neutral" onClick={() => edit(ids.filter(id => registrations.some(row => row.id === id)))}>확정 명단에 없는 팀 제외</Button>}
+            <div className="grid gap-2 sm:grid-cols-2">{registrations.map(reg => <label key={reg.id} className="flex min-h-11 items-center gap-2 tm-text-label">
+              <input type="checkbox" checked={ids.includes(reg.id)} disabled={!ready || otherIds.has(reg.id) && !ids.includes(reg.id)} onChange={event => edit(event.target.checked ? [...ids, reg.id] : ids.filter(id => id !== reg.id))} />
+              <span>{reg.team.name}{otherIds.has(reg.id) ? ' · 다른 토너먼트에 배정됨' : ''}</span>
+            </label>)}</div>
+          </> : <>
+            <SectionTitle title={`${name} 대진 확인`} />
+            <p className="tm-text-label">이 토너먼트만 확정해요. 다른 토너먼트와 예선 결과·경기 일정은 유지돼요.</p>
+            {slots.filter(slot => slot.byeSortOrder != null).map(slot => <p key={slot.id} className="tm-text-label">부전승 · {teamName(ids[slot.position - 1])} → 다음 라운드 직행</p>)}
+            {groups.map(group => <section key={group.id} className="space-y-2"><h3 className="tm-text-body font-semibold">{group.name}</h3>{fixtures.filter(fixture => fixture.groupId === group.id).map(fixture => {
+              const label = (side: 'HOME' | 'AWAY') => {
+                const slot = slots.find(slot => slot.id === (side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId));
+                if (slot) return teamName(ids[slot.position - 1]);
+                const edge = fixture.bracketSources?.find(edge => edge.side === side);
+                const source = fixtures.find(row => row.id === edge?.fixtureId);
+                return source ? `${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : '진출팀 미정';
+              };
+              return <p key={fixture.id} className="tm-text-label">{fixture.fixtureNumber}경기 · {label('HOME')} vs {label('AWAY')}</p>;
+            })}</section>)}
+          </>}
+          <SectionTitle title="시드 순서" />
+          <ol className="space-y-2">{ids.map((id, index) => <li key={`${id}:${index}`} className="flex min-h-11 flex-wrap items-center justify-between gap-2 tm-text-label">
+            <span>{index + 1}번 시드 · {teamName(id)}</span>{!reviewing && <div className="flex gap-2">
+              <Button variant="neutral" aria-label={`${teamName(id)} 시드 올리기`} disabled={!ready || index === 0} onClick={() => { const next = [...ids]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; edit(next); }}>위로</Button>
+              <Button variant="neutral" aria-label={`${teamName(id)} 시드 내리기`} disabled={!ready || index === ids.length - 1} onClick={() => { const next = [...ids]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; edit(next); }}>아래로</Button>
+            </div>}
+          </li>)}</ol>
+          <Button variant="neutral" onClick={() => void reload()}>최신 설정 다시 불러오기</Button>
+        </fieldset>}
+      </div>
+      <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--border)] p-4">
+        <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>
+        {reviewing && <Button variant="neutral" disabled={busy} onClick={() => setReviewing(false)}>이전</Button>}
+        <Button variant="primary" disabled={!ready || busy} onClick={() => void (reviewing ? save() : review())}>{busy ? '처리 중…' : reviewing ? `${name} 진출팀 확정` : '선택한 토너먼트 대진 확인'}</Button>
+      </div>
+    </div>{ConfirmModal}
+  </div>, document.body);
+}

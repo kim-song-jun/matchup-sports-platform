@@ -58,3 +58,21 @@ describe('TournamentApplicationGuideSection — 참가비 유무에 따른 안�
     expect(screen.getByText('2시간 내 입금 확인')).toBeInTheDocument();
   });
 });
+
+describe('MD-QA #197 — 정규 리그 신청 안내', () => {
+  it.each([true, false])('무료 여부 %s와 관계없이 대회·2시간 취소·없는 마감을 안내하지 않는다', isFreeEntry => {
+    const { container } = render(<TournamentApplicationGuideSection kind="regular_league" isFreeEntry={isFreeEntry} rosterDeadlineAt={null} />);
+    expect(screen.getByText('이 리그는 팀 단위로 신청해요')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('대회');
+    expect(container).not.toHaveTextContent('2시간');
+    expect(container).not.toHaveTextContent('마감일 전까지');
+    expect(container).toHaveTextContent('명단이 잠기기 전까지');
+  });
+
+  it('명단 마감이 설정된 리그는 실제 마감 시각을 안내한다', () => {
+    const { container } = render(<TournamentApplicationGuideSection kind="regular_league" isFreeEntry rosterDeadlineAt="2099-01-01T03:00:00Z" />);
+    expect(container).toHaveTextContent('마감');
+    expect(container).toHaveTextContent('2099');
+    expect(container).not.toHaveTextContent('명단이 잠기기 전까지');
+  });
+});

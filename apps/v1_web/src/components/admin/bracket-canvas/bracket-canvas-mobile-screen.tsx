@@ -8,12 +8,14 @@ import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { buildBracketMobileRounds, buildLeagueTournamentMobileRounds, candidatesFromRegistrations } from '@/lib/bracket-canvas-mobile-model';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
+import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracket } from '@/types/api';
+import { FinalistAssignmentButton } from './finalist-assignment-button';
 import { BracketCanvasMobile } from './bracket-canvas-mobile';
 import { BracketLeagueStandings } from './bracket-league-standings';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileScreenProps {
+  sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
@@ -23,7 +25,7 @@ export interface BracketCanvasMobileScreenProps {
 }
 
 /** 768px 미만의 대진 그림 화면. 구조 편집 도구(툴바·트레이)는 두지 않고 목록과 시트만 보여 준다. */
-export function BracketCanvasMobileScreen({ tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
+export function BracketCanvasMobileScreen({ sixTeamState, tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const rounds = useMemo(() => {
     if (bracket === undefined) return [];
@@ -56,6 +58,7 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
 
   return (
     <>
+      {canWrite && format === 'group_knockout' ? <div className="mb-3 flex justify-end"><FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /></div> : null}
       {format === 'league' && standingsGroups.length > 0 ? (
         <details className="mb-3" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)' }}>
           <summary className="tm-text-label flex min-h-[44px] cursor-pointer items-center px-4 font-semibold">조별 순위</summary>
@@ -65,6 +68,8 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
         </details>
       ) : null}
       <BracketCanvasMobile
+        sixTeamState={sixTeamState}
+        registrations={registrations}
         competitionId={tournamentId}
         scope="tournament"
         rounds={rounds}

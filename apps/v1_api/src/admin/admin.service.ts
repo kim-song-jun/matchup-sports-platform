@@ -1,4 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
+import { authProviderWhere, signupFilterWhere, signupStage, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
 import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
@@ -27,9 +28,13 @@ import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
-import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
-import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { formatLevelRange } from '../sports/level-range';
+import {
+  assertNoTeamAuthority,
+  detachUserFromActiveCommitments,
+  finalizeAccountDeletion,
+  lockUserRow,
+} from '../users/final-account-deletion';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
   AdminListQueryDto,
@@ -55,12 +60,14 @@ import {
   CreateAdminPopupDto,
   DeleteAdminUserDto,
   GrantAdminDto,
+  ReleaseAdminUserPhoneDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
   UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { SetMatchOnlineDto } from './dto/set-match-online.dto';
+import { maskPhoneTail } from '../verification/sms-event-log.service';
 
 type ActiveAdmin = {
   id: string;
@@ -252,7 +259,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
-      await this.lockUserRow(tx, userId);
+      await lockUserRow(tx, userId);
 
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -307,7 +314,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       // 팀이 정상 운영 중인 것처럼 남는다**(V1Team.ownerUserId 는 그대로, 팀은 active).
       // 소유권을 먼저 넘기게 하고 여기서 멈춘다.
       if (dto.status !== 'active') {
-        await this.assertNoTeamAuthority(tx, userId);
+        await assertNoTeamAuthority(tx, userId);
       }
 
       const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
@@ -315,7 +322,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       // 비활성화 전이는 진행 중·예정 대회의 로스터와 팀 명단에서도 빼 준다. 남겨 두면
       // 정원만 차지하고 대회 당일 출전 자격 문제가 된다(2026-08-03 프로덕션 사고).
       if (dto.status !== 'active') {
-        await this.detachUserFromActiveCommitments(tx, userId, admin.userId, dto.reason);
+        await detachUserFromActiveCommitments(tx, userId, { type: 'admin', admin }, { reason: dto.reason, logger: this.logger });
       }
 
       return this.writeAdminStatusLogs(
@@ -357,7 +364,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
-      await this.lockUserRow(tx, userId);
+      await lockUserRow(tx, userId);
 
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -382,102 +389,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
-      // changeUserStatus 와 같은 이유로 소유권을 먼저 넘기게 한다 — 삭제는 되돌릴 수
-      // 없으므로 여기서 막는 것이 더 중요하다.
-      await this.assertNoTeamAuthority(tx, userId);
-
-      const updated = await tx.v1User.update({
-        where: { id: userId },
-        data: {
-          accountStatus: 'deleted',
-          deletedAt,
-          email: target.email ? buildDeletedEmail(userId) : null,
-          phone: target.phone ? buildDeletedPhone(userId) : null,
-          emailVerifiedAt: null,
-          phoneVerifiedAt: null,
-        },
+      // changeUserStatus 와 같은 이유로 소유권을 먼저 넘기게 한다(finalizeAccountDeletion 이 막는다) — 삭제는
+      // 되돌릴 수 없으므로 여기서 막는 것이 더 중요하다.
+      const result = await finalizeAccountDeletion(tx, {
+        target,
+        actor: { type: 'admin', admin },
+        reason: dto.reason,
+        deletedAt,
+        logger: this.logger,
       });
-
-      await this.detachUserFromActiveCommitments(tx, userId, admin.userId, dto.reason, deletedAt);
-      const identities = await tx.v1AuthIdentity.findMany({
-        where: { userId },
-        select: { id: true, provider: true },
-      });
-      await Promise.all(
-        identities.map((identity) =>
-          tx.v1AuthIdentity.update({
-            where: { id: identity.id },
-            data: {
-              status: 'unlinked',
-              providerUserKey: buildDeletedProviderUserKey(userId, identity.id),
-              email: null,
-              passwordHash: null,
-              providerRefreshTokenCiphertext: null,
-              unlinkedAt: deletedAt,
-            },
-          }),
-        ),
-      );
-      await tx.v1UserProfile.updateMany({
-        where: { userId },
-        data: {
-          nickname: buildDeletedNickname(userId),
-          displayName: '탈퇴 회원',
-          realName: null,
-          gender: null,
-          birthDate: null,
-          bio: null,
-          profileImageUrl: null,
-          displayRegion: null,
-          visibility: 'private',
-          tournamentRealNameVisible: false,
-          deletedAt,
-        },
-      });
-      // 공개 개인 기록 게이트(`isParticipantPubliclyEligible`, public-consent.ts)는
-      // `V1UserRecordConsent.state`가 GRANTED인지만 본다 -- 여기서 REVOKED로 함께
-      // 전환하지 않으면 탈퇴 전 동의를 켰던 사용자의 경기 기록(사용자 기록 페이지 +
-      // 대회 기록/랭킹 등 같은 게이트를 쓰는 다른 공개 화면)이 탈퇴 후에도 계속 공개
-      // 후보로 남는다. 동의 행이 없던 사용자는 그대로 두어도 이미 non-eligible이므로
-      // updateMany 로 기존 GRANTED 행만 REVOKED 전환한다(없는 행을 새로 만들 필요 없음).
-      await tx.v1UserRecordConsent.updateMany({
-        where: { userId, state: 'GRANTED' },
-        data: { state: 'REVOKED', effectiveAt: deletedAt },
-      });
-      // 탈퇴 요청 단계에서는 기기 등록을 revoked 상태로 남겨 운영 이력을 보존하지만,
-      // 최종 삭제 단계에서는 FCM/APNs 토큰과 웹 Push endpoint 자체가 더 이상 필요하지
-      // 않다. 둘 다 재식별 가능한 기기 식별자이므로 계정 삭제 트랜잭션 안에서 제거한다.
-      await tx.v1PushSubscription.deleteMany({ where: { userId } });
-      await tx.v1PushDevice.deleteMany({ where: { userId } });
-      await tx.v1ChatUserBlock.deleteMany({ where: { OR: [{ blockerUserId: userId }, { blockedUserId: userId }] } });
-      await tx.v1UserRegion.deleteMany({ where: { userId } });
-      await tx.v1UserSportPreference.deleteMany({ where: { userId } });
-      await tx.v1SearchHistory.deleteMany({ where: { userId } });
-      await tx.v1VerificationToken.deleteMany({ where: { userId } });
-      const result = await this.writeAdminStatusLogs(
-        admin,
-        {
-          action: 'user.delete',
-          targetType: 'user',
-          targetId: userId,
-          previousStatus: target.accountStatus,
-          status: updated.accountStatus,
-          reason: dto.reason,
-          beforeState: {
-            accountStatus: target.accountStatus,
-            deletedAt: target.deletedAt?.toISOString() ?? '',
-            hasEmail: target.email ? 'true' : 'false',
-            hasPhone: target.phone ? 'true' : 'false',
-          },
-          afterState: {
-            accountStatus: updated.accountStatus,
-            deletedAt: deletedAt.toISOString(),
-            personalDataMasked: 'true',
-          },
-          responseIdKey: 'userId',
-        },
-        tx,
-      );
 
       return { ...result, deletedAt };
     });
@@ -493,6 +413,70 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
 
     return result;
+  }
+
+  /**
+   * Frees a phone number so another person can register it (carriers reassign old numbers). Only the contact is
+   * cleared; status, sessions and logins stay, and the phone gate asks the account to verify a number again.
+   */
+  async releaseUserPhone(user: V1AuthUser, userId: string, dto: ReleaseAdminUserPhoneDto) {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await lockUserRow(tx, userId);
+
+      const target = await tx.v1User.findUnique({
+        where: { id: userId },
+        select: { accountStatus: true, deletedAt: true, phone: true, phoneVerifiedAt: true },
+      });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      // A deleted account only holds a tombstone value, and its number was freed when it was deleted.
+      if (target.accountStatus === 'deleted' && target.deletedAt !== null) {
+        throw new ConflictException({
+          code: 'USER_DELETED_IRREVERSIBLE',
+          message: '이미 삭제된 계정이에요. 휴대폰 번호는 삭제할 때 이미 해제됐어요.',
+        });
+      }
+      if (target.phone === null) {
+        throw new ConflictException({ code: 'PHONE_NOT_SET', message: '해제할 휴대폰 번호가 없어요.' });
+      }
+
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active' && admin.adminRole !== 'owner') {
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: '운영자 계정의 휴대폰 번호는 owner만 해제할 수 있어요.',
+        });
+      }
+
+      await tx.v1User.update({ where: { id: userId }, data: { phone: null, phoneVerifiedAt: null } });
+
+      const logged = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.phone.release',
+          targetType: 'user',
+          statusLogTargetType: 'user_contact',
+          targetId: userId,
+          previousStatus: target.phoneVerifiedAt ? 'confirmed' : 'unverified',
+          status: 'released',
+          reason: dto.reason,
+          beforeState: { phoneLast4: maskPhoneTail(target.phone), phoneVerified: target.phoneVerifiedAt ? 'true' : 'false' },
+          afterState: { phoneLast4: null, phoneVerified: 'false' },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
+      const notification =
+        (await this.notifications?.createInTransaction(tx, userId, 'phone_released_by_operator', {
+          businessKey: `phone-release:${logged.statusChangeLogId}`,
+        })) ?? null;
+      return { logged, notification };
+    });
+
+    if (outcome.notification) this.notifications?.deliverCreated(userId, 'phone_released_by_operator', outcome.notification);
+    return outcome.logged;
   }
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
@@ -827,12 +811,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         }
       : {};
 
-    const [rows, statusGroups] = await Promise.all([this.prisma.v1User.findMany({
-      where: {
-        ...(query.status ? { accountStatus: query.status } : {}),
-        ...searchWhere,
-      },
-      orderBy: { createdAt: 'desc' },
+    const accountWhere: Prisma.V1UserWhereInput = query.status ? { accountStatus: query.status } : {};
+    const signupWhere = signupFilterWhere(query.signup);
+    const providerWhere = authProviderWhere(query.providers);
+    const where: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, signupWhere, providerWhere] };
+    // Each facet excludes only its own selection so operators can add another OR option.
+    const signupBase: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, providerWhere] };
+    const providerBase: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, signupWhere] };
+    const [rows, statusGroups, total, signupTotal, providerTotal, signupCounts, providerCounts] = await Promise.all([this.prisma.v1User.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...paginationArgs(query, limit),
       select: {
@@ -844,6 +832,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: true,
         deletedAt: true,
         profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        termsConsents: { take: 1, select: { id: true } },
         authIdentities: {
           where: { status: 'active' },
           select: { provider: true },
@@ -862,9 +851,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
     }), this.prisma.v1User.groupBy({
       by: ['accountStatus'],
-      where: searchWhere,
+      where: { AND: [searchWhere, signupWhere, providerWhere] },
       _count: { _all: true },
-    })]);
+    }), this.prisma.v1User.count({ where }),
+    this.prisma.v1User.count({ where: signupBase }),
+    this.prisma.v1User.count({ where: providerBase }),
+    Promise.all(USER_SIGNUP_FILTERS.map((key) => this.prisma.v1User.count({
+      where: { AND: [signupBase, USER_SIGNUP_WHERE[key]] },
+    }))),
+    Promise.all(USER_AUTH_PROVIDERS.map((key) => this.prisma.v1User.count({
+      where: { AND: [providerBase, authProviderWhere([key])] },
+    }))),
+    ]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
@@ -881,9 +879,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         nickname: row.profile?.nickname ?? null,
         displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
         email: row.email ?? null,
-        authProviders: row.authIdentities.map((identity) => identity.provider),
+        authProviders: [...new Set(row.authIdentities.map((identity) => identity.provider))],
         accountStatus: row.accountStatus,
         onboardingStatus: row.onboardingStatus,
+        signupStage: signupStage(row),
         lastLoginAt: row.lastLoginAt,
         createdAt: row.createdAt,
         hostedMatchCount: row._count.hostedMatches,
@@ -899,11 +898,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       pageInfo: buildPageInfo({
         page: query.page,
         limit,
-        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        total,
         hasNext,
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
       }),
-      summary,
+      summary: {
+        ...summary,
+        signupTotal,
+        providerTotal,
+        bySignup: Object.fromEntries(USER_SIGNUP_FILTERS.map((key, index) => [key, signupCounts[index]])),
+        byProvider: Object.fromEntries(USER_AUTH_PROVIDERS.map((key, index) => [key, providerCounts[index]])),
+      },
     };
   }
 
@@ -1047,7 +1052,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         role: membership.role,
         joinedAt: membership.joinedAt,
       })),
-      withdrawalRequest: row.statusLogs[0]
+      // A cancelled request must not keep showing on an account that is active again.
+      withdrawalRequest: row.statusLogs[0] && (row.accountStatus === 'withdrawal_pending' || row.accountStatus === 'deleted')
         ? {
             reason: row.statusLogs[0].reason,
             requestedAt: row.statusLogs[0].createdAt,
@@ -2798,7 +2804,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const withUser = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const actor = await this.getTransactionOwnerAdmin(tx, user.id);
-      await this.lockUserRow(tx, dto.userId);
+      await lockUserRow(tx, dto.userId);
 
       const targetUser = await tx.v1User.findUnique({ where: { id: dto.userId } });
       if (!targetUser) {
@@ -2880,7 +2886,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const actor = await this.getTransactionOwnerAdmin(tx, user.id);
-      await this.lockUserRow(tx, targetUserId);
+      await lockUserRow(tx, targetUserId);
 
       if (actor.userId === targetUserId) {
         throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
@@ -2991,79 +2997,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return admin;
   }
 
-  // 본인 탈퇴의 assertWithdrawable() 과 같은 규칙을 관리자 경로에도 적용한다.
-  // 팀 owner·manager 를 비활성화하면 그 팀은 운영자 없이 active 로 남는다.
-  private async assertNoTeamAuthority(tx: Prisma.TransactionClient, userId: string) {
-    const authority = await tx.v1TeamMembership.findFirst({
-      where: {
-        userId,
-        status: 'active',
-        role: { in: ['owner', 'manager'] },
-        team: { status: 'active', deletedAt: null },
-      },
-      select: { team: { select: { id: true, name: true } }, role: true },
-    });
-    if (authority) {
-      throw new ConflictException({
-        code: 'USER_HAS_TEAM_AUTHORITY',
-        message: `이 사용자는 '${authority.team.name}' 팀의 ${authority.role === 'owner' ? '소유자' : '매니저'}예요. 팀 권한을 다른 멤버에게 넘긴 뒤 다시 시도해주세요.`,
-      });
-    }
-  }
-
-  // 계정이 비활성화되면 진행 중·예정 대회의 로스터와 팀 명단에서도 빠져야 한다.
-  // 남겨 두면 대회 정원만 차지하고, 출전 자격 문제가 된다(2026-08-03 프로덕션 사고).
-  // 완료된 대회는 기록 보존을 위해 건드리지 않는다 — roster-cleanup.ts 주석 참조.
-  private async detachUserFromActiveCommitments(
-    tx: Prisma.TransactionClient,
-    userId: string,
-    actorUserId: string,
-    reason: string | undefined,
-    at: Date = new Date(),
-  ) {
-    const memberships = await tx.v1TeamMembership.findMany({
-      where: { userId, status: 'active' },
-      select: { id: true, teamId: true, role: true },
-    });
-    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at });
-
-    for (const membership of memberships) {
-      await tx.v1TeamMembership.update({
-        where: { id: membership.id },
-        data: { status: 'removed', removedByUserId: actorUserId, leftAt: at },
-      });
-      await tx.v1Team.update({
-        where: { id: membership.teamId },
-        data: {
-          memberCount: { decrement: 1 },
-          ...(membership.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
-        },
-      });
-      await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: 'team_membership',
-          targetId: membership.id,
-          fromStatus: 'active',
-          toStatus: 'removed',
-          actorType: 'admin',
-          actorUserId,
-          reason: reason ?? 'admin_account_deactivated',
-        },
-      });
-    }
-    await enqueueRosterResync(
-      tx,
-      teamMembersTargets(memberships.map((membership) => membership.teamId)),
-    );
-
-    if (removedRosterCount > 0 || memberships.length > 0) {
-      this.logger?.info(
-        { userId, rosters: removedRosterCount, teams: memberships.length },
-        '계정 비활성화에 따른 대회 명단·팀 멤버십 정리',
-      );
-    }
-  }
-
   private async getTransactionMutationAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
     const admin = await this.getTransactionActiveAdmin(tx, userId);
     if (admin.adminRole === 'support') {
@@ -3084,7 +3017,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM "v1_admin_users" WHERE "user_id" = ${userId} FOR UPDATE
     `;
-    await this.lockUserRow(tx, userId);
+    await lockUserRow(tx, userId);
 
     const admin = await tx.v1AdminUser.findUnique({
       where: { userId },
@@ -3112,12 +3045,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     `;
   }
 
-  private async lockUserRow(tx: Prisma.TransactionClient, userId: string) {
-    await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "v1_users" WHERE id = ${userId} FOR UPDATE
-    `;
-  }
-
   private async assertAnotherActiveOwner(tx: Prisma.TransactionClient, targetUserId: string) {
     const remainingOwnerCount = await tx.v1AdminUser.count({
       where: {
@@ -3140,6 +3067,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     input: {
       action: string;
       targetType: string;
+      /** Target type of the status change row when it differs from the action log's. */
+      statusLogTargetType?: string;
       targetId: string;
       previousStatus: string;
       status: string;
@@ -3164,7 +3093,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
     const statusChangeLog = await client.v1StatusChangeLog.create({
       data: {
-        targetType: input.targetType,
+        targetType: input.statusLogTargetType ?? input.targetType,
         targetId: input.targetId,
         fromStatus: input.previousStatus,
         toStatus: input.status,
@@ -3549,22 +3478,6 @@ function getCapabilities(role: ActiveAdmin['adminRole']) {
   if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'admin:owner'];
   if (role === 'ops') return ['overview:read', 'status:write', 'logs:read'];
   return ['overview:read', 'logs:read'];
-}
-
-function buildDeletedEmail(userId: string) {
-  return `deleted+${userId}@deleted.teameet.local`;
-}
-
-function buildDeletedPhone(userId: string) {
-  return `deleted-${userId}`;
-}
-
-function buildDeletedProviderUserKey(userId: string, identityId: string) {
-  return `deleted:${userId}:${identityId}`;
-}
-
-function buildDeletedNickname(userId: string) {
-  return `deleted_${userId.slice(0, 8)}`;
 }
 
 /**

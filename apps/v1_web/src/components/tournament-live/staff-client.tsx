@@ -13,7 +13,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
-import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
+import { TOURNAMENT_STAFF_ENTRY_LABEL, tournamentStaffEntryDestination } from '@/lib/tournament-staff-entry-label';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { staffRoleLabel } from '@/components/tournament-ops/badges';
@@ -148,8 +148,8 @@ function TournamentFieldsSection({
         <span className="text-blue-500 mt-0.5 shrink-0" aria-hidden="true">
           <MapPin size={18} />
         </span>
-        <div>
-          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" /></div>
+        <div className="min-w-0 flex-1">
+          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" compact /></div>
           <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
             경기 설정과 스태프 배정에서 같은 경기장을 선택해요. 기존 경기 장소도 이름별로 모을 수 있어요.
           </p>
@@ -295,9 +295,7 @@ export function StaffClient({ tournamentId }: Props) {
         setGrantOpen(false);
         showToast('스태프를 배정했어요.');
         setGrantNotice(
-          payload.role === 'FIELD_OPERATOR'
-            ? `배정했어요. 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 담당 경기 기록 화면으로 바로 들어갈 수 있어요.`
-            : `배정했어요. 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 이 대회 운영 보드로 들어갈 수 있어요.`,
+          `배정했어요. 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 ${tournamentStaffEntryDestination(payload.role, tournament.data?.kind)} 들어갈 수 있어요.`,
         );
       },
       onError: (error) => {
@@ -534,6 +532,7 @@ export function StaffClient({ tournamentId }: Props) {
           onSubmit={handleGrantSubmit}
           tournamentId={tournamentId}
           roleOptions={grantableRoles}
+          tournamentKind={tournament.data?.kind}
           fields={fields.data?.items ?? []}
           pending={grant.isPending}
           errorMessage={grantError}

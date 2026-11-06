@@ -4600,6 +4600,7 @@ export type V1AdminBracketGroup = {
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
   bracketTrack?: V1TournamentBracketTrack;
+  bracketColorIndex?: number;
 };
 
 export type V1AdminBracketGroupTeam = {

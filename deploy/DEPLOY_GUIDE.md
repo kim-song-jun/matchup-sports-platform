@@ -13,7 +13,7 @@ Nginx는 v1 Web을 별도 브라우저 prefix 없이 루트에 제공한다.
 | `/` 및 페이지 경로 | `v1_web:3013` | Next.js Web |
 | `/_next/static/*` | `v1_web:3013` | 정적 빌드 자산 |
 | `/_next/image` | `v1_web:3013` | 표시 폭에 맞춘 WebP 변환(Next 의 `Cache-Control` 을 그대로 통과). 변환 결과는 `v1_web_image_cache` 볼륨에 남아 배포 뒤에도 다시 변환하지 않는다(상한 256MB) |
-| `/brand/*`·`/fonts/*`·`/illustrations/*`·`/images/*`·`/map-apps/*`·`/mock/*`·`/apple/*`·`/favicon.png` | `v1_web:3013` | `public/` 고정 파일. `Cache-Control: no-cache` — 보관하되 쓸 때마다 ETag 로 확인(304). 내용을 바꿀 땐 파일 이름도 바꾼다 |
+| `/brand/*`·`/fonts/*`·`/illustrations/*`·`/images/*`·`/map-apps/*`·`/mock/*`·`/apple/*`·`/favicon.png` | `v1_web:3013` | `public/` 고정 파일. `Cache-Control: no-cache` — 보관하되 쓸 때마다 ETag 로 확인(304)하므로 같은 이름으로 바꿔도 바로 반영된다. 단 `/_next/image` 로 변환해 쓰는 그림은 변환본이 최대 7일 남으므로 파일 이름을 바꾼다 |
 | `/api/v1/*` | `v1_api:8121` | canonical backend API |
 | `/uploads/*` | `v1_api:8121/uploads/*` | 업로드 자산 |
 
@@ -275,4 +275,5 @@ test "$(curl -sS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w '%{http_c
 - Nginx에서만 실패하면 `nginx -t`, upstream container health, root path proxy 순으로 확인한다.
 - 업로드 쓰기 실패 시 persistent volume의 owner가 v1 API container UID/GID와 일치하는지 확인한다.
 - Web 로그에 `Failed to write image to cache` 가 반복되면 `v1_web_image_cache` 볼륨(`/app/apps/v1_web/.next/cache/images`) 소유자가 UID/GID 1001 인지 확인한다. 쓰기에 실패해도 이미지는 나가고, 요청마다 다시 변환할 뿐이다.
+- Web 컨테이너는 시작할 때 `[image-cache] checked N, removed M` 을 남긴다(`standalone-start.mjs`). 쓰다 만 변환 파일(프로세스가 쓰는 도중 죽은 흔적)을 지운 수다. 남겨 두면 Next 가 디스크 캐시를 통째로 끄거나 잘린 이미지를 계속 낸다.
 - 이미지 빌드 중 메모리가 부족하면 인스턴스를 확장하거나 swap을 임시로 추가한다.

@@ -870,22 +870,25 @@ describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 �
 });
 
 describe('player card brand mark mask', () => {
-  // teameet-mark-mask.webp 는 teameet-mark.png 의 알파만 옮긴 무손실 WebP 다. 원본을 바꾸면 마스크도 다시 만든다:
-  // sharp({ create: { width, height, channels: 3, background: '#000' } }).joinChannel(<원본 알파 raw>).webp({ lossless: true })
+  // teameet-mark-mask.webp 는 scripts/build-brand-mask.mjs 가 teameet-mark.png 의 알파만 옮겨 만든 무손실 WebP 다.
   const markPng = readFileSync(resolve(process.cwd(), 'public/brand/teameet-mark.png'));
   const maskWebp = readFileSync(resolve(process.cwd(), 'public/brand/teameet-mark-mask.webp'));
 
   it('masks every player card mark with the WebP, not the 93KB PNG', () => {
-    const brandMasks = [...globalsCss.matchAll(/mask:\s*url\('(\/brand\/[^']+)'\)/g)].map((m) => m[1]);
+    const brandMasks = [...globalsCss.matchAll(/mask(?:-image)?\s*:[^;]*?url\(\s*['"]?(\/brand\/[^'")\s]+)/g)].map((m) => m[1]);
     expect(brandMasks.length).toBeGreaterThan(0);
     expect(new Set(brandMasks)).toEqual(new Set(['/brand/teameet-mark-mask.webp']));
   });
 
   it('was generated from the current brand mark at full resolution', () => {
-    expect(
-      createHash('sha256').update(markPng).digest('hex'),
-      'teameet-mark.png 가 바뀌었다 — teameet-mark-mask.webp 를 다시 만들고 이 해시를 고친다',
-    ).toBe('3a1a6f889d0b9cb830c2978bbb81d915908f52b3264e7be0159f6efade65ec6a');
+    const sha = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
+    const regenerate = 'node apps/v1_web/scripts/build-brand-mask.mjs 로 마스크를 다시 만들고 출력된 해시로 고친다';
+    expect(sha(markPng), `teameet-mark.png 가 바뀌었다 — ${regenerate}`).toBe(
+      '3a1a6f889d0b9cb830c2978bbb81d915908f52b3264e7be0159f6efade65ec6a',
+    );
+    expect(sha(maskWebp), `teameet-mark-mask.webp 가 스크립트 출력과 다르다 — ${regenerate}`).toBe(
+      'de0ab0705a40d6216aa7050d6c20cfa8a9314057a2c093edd19858fc991ade0c',
+    );
     expect(maskWebp.toString('ascii', 8, 16)).toBe('WEBPVP8L');
     const bits = maskWebp.readUInt32LE(21);
     expect([(bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1]).toEqual([markPng.readUInt32BE(16), markPng.readUInt32BE(20)]);

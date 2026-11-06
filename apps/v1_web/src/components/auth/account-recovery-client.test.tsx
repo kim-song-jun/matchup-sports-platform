@@ -398,7 +398,8 @@ describe('AccountRecoveryClient', () => {
 
     it('결과가 뜨면 포커스가 제목으로 옮겨 간다', async () => {
       await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
-      expect(screen.getByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toHaveFocus();
+      // 제목이 DOM 에 나타난 시점에는 포커스 효과가 아직 돌지 않았을 수 있다(이전 단계의 h1 포커스가 남는다).
+      await waitFor(() => expect(screen.getByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toHaveFocus());
     });
 
     it('번호를 고치면 탈퇴 안내도 함께 사라진다', async () => {

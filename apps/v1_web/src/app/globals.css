@@ -6753,8 +6753,12 @@ textarea.tm-chat-input-placeholder::placeholder {
   font-weight: 800;
 }
 
+/* 열을 명시하지 않은 grid 의 암묵 열(auto)은 가장 넓은 자식의 min-content 까지 늘어난다.
+   공백 없는 이메일·팀명 하나가 열 전체를 앱 프레임 밖으로 밀어 오른쪽 배지·화살표가 잘리므로
+   단일 열을 minmax(0, 1fr) 로 고정한다. 안쪽 grid(.tm-my-list-stack 등)도 같은 이유로 열을 명시한다. */
 .tm-my-shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 20px var(--v1-shell-page-x) 124px;
 }
@@ -6763,18 +6767,6 @@ textarea.tm-chat-input-placeholder::placeholder {
   .tm-my-fixed-cta-shell {
     padding-bottom: max(124px, calc(var(--tm-create-cta-height, 0px) + 16px));
   }
-}
-
-/* 내 매치 목록은 API에서 팀명·장소·매치명을 그대로 받는다. 공백 없는 긴 값이 들어와도
-   grid의 min-content 폭이 모바일 앱 프레임보다 커지지 않도록 이 화면의 단일 열을 명시한다. */
-.tm-my-matches-desktop {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.tm-my-matches-desktop > *,
-.tm-my-matches-desktop .tm-my-list-stack,
-.tm-my-matches-desktop .tm-card {
-  min-width: 0;
 }
 
 .tm-my-matches-desktop .tm-segment-row {
@@ -6972,7 +6964,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 
 .tm-my-stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -7144,6 +7136,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 
 .tm-my-list-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -7157,6 +7150,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 .tm-my-card-head > :first-child {
   flex: 1 1 auto;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tm-my-card-context {
@@ -7257,8 +7251,9 @@ textarea.tm-chat-input-placeholder::placeholder {
   padding: 20px var(--v1-shell-page-x) 124px;
 }
 
+/* 하단 고정 CTA 는 안내 문구 줄 수·안전 영역에 따라 높이가 달라진다 — useCreateCtaSpace 가 잰 높이만큼 비운다. */
 .tm-review-compose-shell {
-  padding-bottom: 132px;
+  padding-bottom: max(132px, calc(var(--tm-create-cta-height, 0px) + 16px));
 }
 
 /* .tm-review-tabs/.tm-review-tab 정의는 .tm-seg-tabs 근처(세그먼트 탭 공통 블록)로

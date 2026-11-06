@@ -52,12 +52,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function validateCompetitionConfig(
-  value: unknown,
-  options: { preserveMissingCatalogKeys?: boolean } = {},
-): CompetitionConfig {
-  if (!isRecord(value)) invalidConfig('경기 설정은 객체여야 해요.');
-  const periods = value.periods;
+/** 문서 전체 검증 없이 `periods` 섹션만 읽어야 하는 호출부를 위해 분리했다. */
+export function validateCompetitionPeriods(periods: unknown): CompetitionConfig['periods'] {
   if (
     !Array.isArray(periods) ||
     periods.length === 0 ||
@@ -73,6 +69,15 @@ export function validateCompetitionConfig(
   ) {
     invalidConfig('periods에는 유효한 경기 시간 구성이 필요해요.');
   }
+  return periods as CompetitionConfig['periods'];
+}
+
+export function validateCompetitionConfig(
+  value: unknown,
+  options: { preserveMissingCatalogKeys?: boolean } = {},
+): CompetitionConfig {
+  if (!isRecord(value)) invalidConfig('경기 설정은 객체여야 해요.');
+  validateCompetitionPeriods(value.periods);
   if (
     !Array.isArray(value.events) ||
     value.events.length === 0 ||

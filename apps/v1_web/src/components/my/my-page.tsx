@@ -251,7 +251,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
           </AppBackLink>
           <h1 className="tm-text-heading">내 팀</h1>
         </div>
-        <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+        <div className="tm-my-stat-grid">
           {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
         <div className="tm-my-list-stack">

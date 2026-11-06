@@ -105,7 +105,8 @@ function ProviderRow({
         <ProviderMark provider={mark} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{label}</div>
-          <div className="tm-text-caption" style={{ wordBreak: 'keep-all' }}>{caption}</div>
+          {/* caption 에는 계정 이메일이 들어온다 — 공백이 없어 keep-all 만으로는 좁은 폭에서 배지 쪽으로 넘친다. */}
+          <div className="tm-text-caption" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{caption}</div>
         </div>
         {badge}
       </div>
@@ -272,7 +273,7 @@ export function LoginMethodsPageClient() {
           </AppBackLink>
           <h1 className="tm-text-heading">로그인 방법</h1>
         </div>
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
           <p className="tm-text-body" style={{ margin: 0, color: 'var(--text-muted)', wordBreak: 'keep-all' }}>
             {canLink ? '이 계정에 연결된 로그인 방법이에요. 카카오·Apple·이메일을 연결하면 같은 계정으로 바로 로그인할 수 있어요.' : '이 계정에 연결된 로그인 방법이에요.'}
           </p>
@@ -299,7 +300,7 @@ export function LoginMethodsPageClient() {
             <p className="tm-text-label" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{startError}</p>
           ) : null}
           <Card pad={16}>
-            <ul role="list" aria-label="로그인 방법 목록" style={{ margin: 0, padding: 0, display: 'grid', gap: 12 }}>
+            <ul role="list" aria-label="로그인 방법 목록" style={{ margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
               {has('email') ? (
                 <ProviderRow
                   mark="email"

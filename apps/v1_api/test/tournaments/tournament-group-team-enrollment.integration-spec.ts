@@ -7,10 +7,11 @@ import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'group-team-enrollment@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const bracket = new TournamentBracketService(prisma, new AdminContextService(prisma), games);
 
 const [reg0, reg1, reg2, reg3] = ids.registrationIds;

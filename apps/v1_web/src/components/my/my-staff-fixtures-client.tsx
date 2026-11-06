@@ -175,7 +175,7 @@ function StaffFixtureRow({
   return (
     <Link
       className="tm-list-row tm-pressable"
-      href={`/tournament-ops/tournaments/${tournamentId}/fixtures/${fixture.fixtureId}/operate`}
+      href={`/tournament-ops/tournaments/${tournamentId}/fixtures/${fixture.fixtureId}/operate?from=staff`}
       aria-label={`${teamTitle}, 경기 운영 콘솔 열기`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>

@@ -42,3 +42,33 @@ describe('RichContentRenderer link handling', () => {
     expect(anchor).not.toHaveAttribute('target');
   });
 });
+
+function docWithImage(src: string): V1RichContentDocument {
+  return { type: 'doc', content: [{ type: 'image', attrs: { src, alt: '공지 사진' } }] };
+}
+
+describe('RichContentRenderer 이미지', () => {
+  it('업로드 이미지는 원본이 아니라 최적화기를 거친 폭 후보로 받는다', () => {
+    render(<RichContentRenderer content={docWithImage('/uploads/2026/11/notice.png')} />);
+
+    const img = screen.getByRole('img', { name: '공지 사진' });
+    const src = new URL(img.getAttribute('src') ?? '', 'http://localhost');
+    expect(src.pathname).toBe('/_next/image');
+    expect(src.searchParams.get('url')).toBe('/uploads/2026/11/notice.png');
+    const widths = (img.getAttribute('srcset') ?? '').split(',').map((entry) => {
+      const [candidate] = entry.trim().split(' ');
+      return Number(new URL(candidate, 'http://localhost').searchParams.get('w'));
+    });
+    // sizes="(max-width: 640px) 100vw, 760px" 에서 고를 수 있도록 좁은 폭부터 넓은 폭까지 후보가 있다.
+    expect(Math.min(...widths)).toBeLessThanOrEqual(640);
+    expect(Math.max(...widths)).toBeGreaterThanOrEqual(760);
+  });
+
+  it('최적화기가 받아 올 수 없는 외부 이미지 URL 은 그대로 둔다', () => {
+    render(<RichContentRenderer content={docWithImage('https://images.example.com/notice.png')} />);
+
+    const img = screen.getByRole('img', { name: '공지 사진' });
+    expect(img).toHaveAttribute('src', 'https://images.example.com/notice.png');
+    expect(img).not.toHaveAttribute('srcset');
+  });
+});

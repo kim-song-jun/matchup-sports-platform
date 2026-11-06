@@ -44,6 +44,13 @@ export class EmailRecoveryConfirmDto {
   code!: string;
 }
 
+/** Recovery email proof can also identify which login methods the mailbox owner used. */
+export class FindAccountByEmailDto extends EmailRecoveryRequestDto {
+  @IsString()
+  @MaxLength(2048)
+  proofToken!: string;
+}
+
 export class ResetPasswordByEmailDto {
   @IsEmail({}, { message: '이메일 형식이 올바르지 않아요.' })
   @MaxLength(254, { message: '이메일이 너무 길어요.' })

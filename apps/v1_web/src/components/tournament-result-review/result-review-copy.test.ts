@@ -23,6 +23,8 @@ import { describeResultReviewError } from './result-review-copy';
  */
 
 const SERVER_MESSAGES = {
+  TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED: ['penalties.takenHome and penalties.takenAway are required when recording a penalty shootout'],
+  TOURNAMENT_PENALTY_UNDECIDED: ['The penalty shootout has not been decided under this tournament policy'],
   TOURNAMENT_PENALTY_REQUIRED: ['결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.'],
   TOURNAMENT_PENALTY_NOT_ALLOWED: [
     'Penalty shootouts can only be recorded for knockout-phase fixtures',

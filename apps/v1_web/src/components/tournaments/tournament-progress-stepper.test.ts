@@ -341,10 +341,10 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
       }),
     );
 
-    // 리그는 두 칸(풀리그 · 시상)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
+    // 리그는 두 칸(풀리그 · 시즌 종료)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
     expect(shape(stages)).toEqual([
       ['풀리그', 'active'],
-      ['시상', 'upcoming'],
+      ['시즌 종료', 'upcoming'],
     ]);
   });
 
@@ -363,4 +363,10 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
     expect(stages.map((s) => s.label)).not.toContain('풀리그');
     expect(stages.map((s) => s.label)).toContain('조별리그');
   });
+});
+
+it('6강 전용 방식은 일반 8강·4강 명칭 대신 6강→준결승→결승을 표시한다', () => {
+  const value = tournament({ format: 'knockout', status: 'in_progress', fixtures: [fixture({ round: '6강', liveStatus: 'live' })] });
+  value.sixTeamMode = true;
+  expect(buildTournamentStages(value).map(row => row.label)).toEqual(['6강', '준결승', '결승']);
 });

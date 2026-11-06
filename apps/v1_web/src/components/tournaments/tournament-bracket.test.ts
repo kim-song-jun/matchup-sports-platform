@@ -35,7 +35,7 @@ function makeGroup(
   overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGroup, 'id' | 'phase'>,
 ): V1TournamentGroup {
   return {
-    name: overrides.phase,
+    name: ({ round16: '16강', round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3·4위전' } as Record<string, string>)[overrides.phase] ?? overrides.phase,
     sortOrder: 0,
     advanceCount: null,
     groupTeams: [],
@@ -48,6 +48,14 @@ function makeGroup(
 /* ── Tests ── */
 
 describe('groupFixturesByRound', () => {
+  it('uses the configured group name without changing the phase key', () => {
+    const group = makeGroup({ id: 'semi-group', phase: 'semi', name: '준결승' });
+    const rounds = groupFixturesByRound([
+      makeFixture({ id: 'semi', fixtureNumber: 1, round: '3팀 첫 라운드', groupId: group.id }),
+      makeFixture({ id: 'final', fixtureNumber: 2, round: '결승', groupId: group.id }),
+    ], [group]);
+    expect(rounds.map(({ key, label }) => [key, label])).toEqual([['semi', '준결승'], ['final', '결승']]);
+  });
   it('returns an empty array when no fixtures are provided', () => {
     const result = groupFixturesByRound([], []);
     expect(result).toEqual([]);
@@ -169,9 +177,9 @@ describe('groupFixturesByRound', () => {
   });
 
   it('returns correct labels for known phases', () => {
-    const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi' });
-    const groupFinal = makeGroup({ id: 'g-final', phase: 'final' });
-    const groupThird = makeGroup({ id: 'g-third', phase: 'third_place' });
+    const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi', name: '4강' });
+    const groupFinal = makeGroup({ id: 'g-final', phase: 'final', name: '결승' });
+    const groupThird = makeGroup({ id: 'g-third', phase: 'third_place', name: '3·4위전' });
 
     const rounds = groupFixturesByRound(
       [
@@ -247,4 +255,14 @@ describe('16강 결선 정렬', () => {
     const rounds = groupFixturesByRound([makeFixture({ id: 'x', fixtureNumber: 1, round: 'A매치', groupId: 'r16' })], [makeGroup({ id: 'r16', phase: 'round16' })]);
     expect(rounds.map((round) => round.label)).toEqual(['16강']);
   });
+});
+
+it('128강과 64강의 저장 phase가 같아도 부전승 조의 이름을 다른 라운드에 붙이지 않는다', () => {
+  const large = makeGroup({ id: 'large', phase: 'round64', name: '챔피언 · 128강', groupTeams: [{ id: 'bye', registrationId: 'r-bye', teamId: 't-bye', teamName: '부전승팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] });
+  const small = makeGroup({ id: 'small', phase: 'round64', name: '챔피언 · 64강' });
+  const rounds = groupFixturesByRound([
+    makeFixture({ id: 'r128', fixtureNumber: 1, round: '128강', groupId: 'large' }),
+    makeFixture({ id: 'r64', fixtureNumber: 2, round: '64강', groupId: 'small' }),
+  ], [large, small]);
+  expect(rounds.map(({ key, label }) => [key, label])).toEqual([['128강', '챔피언 · 128강'], ['round64', '챔피언 · 64강']]);
 });

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { serializeAdminBracketGame } from './slots/admin-bracket-view';
 import { PLACE_SELECT } from '../places/place-select';
 import { toPlaceView } from '../places/place-snapshot';
+import { isByeSlot } from './slots/tournament-slot-label';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -22,8 +23,8 @@ export const tournamentTeamMatchBracketInclude = {
       updatedAt: true,
       homeSlotId: true,
       awaySlotId: true,
-      homeSlot: { select: { kind: true, displayLabel: true } },
-      awaySlot: { select: { kind: true, displayLabel: true } },
+      homeSlot: { select: { kind: true, byeSortOrder: true, displayLabel: true } },
+      awaySlot: { select: { kind: true, byeSortOrder: true, displayLabel: true } },
       videos: { orderBy: { sortOrder: 'asc' }, select: { id: true, title: true, url: true, sortOrder: true } },
       game: {
         select: {
@@ -82,8 +83,8 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     awayRegistrationId: row.awayRegistrationId,
     homeSlotId: match.homeSlotId,
     awaySlotId: match.awaySlotId,
-    homeDisplayLabel: (match.homeSlot?.kind === 'BYE' ? match.homeSlot.displayLabel : row.homeDisplayLabel) ?? null,
-    awayDisplayLabel: (match.awaySlot?.kind === 'BYE' ? match.awaySlot.displayLabel : row.awayDisplayLabel) ?? null,
+    homeDisplayLabel: (isByeSlot(match.homeSlot) ? match.homeSlot.displayLabel : row.homeDisplayLabel) ?? null,
+    awayDisplayLabel: (isByeSlot(match.awaySlot) ? match.awaySlot.displayLabel : row.awayDisplayLabel) ?? null,
     scheduledAt: match.startAt?.toISOString() ?? null,
     venue: match.field?.name ?? match.placeName,
     fieldId: match.fieldId,

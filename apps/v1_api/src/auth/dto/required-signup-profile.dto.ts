@@ -60,7 +60,7 @@ export abstract class RequiredSignupProfileDto {
   @IsString()
   profileImageUrl?: string;
 
-  /** Omitted by older clients: no consent row is written (undecided). */
+  /** Omitted: initialize public visibility without replacing an existing preference. */
   @IsOptional()
   @ValidateNested()
   @Type(() => SignupRecordConsentDto)

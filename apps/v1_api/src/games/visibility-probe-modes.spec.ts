@@ -1,5 +1,6 @@
 import { V1GameEventType, V1GameState, V1VisibilityMode } from '@prisma/client';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * `GET /games/:gameId/visibility` 가 저장된 정책 네 값을 전부 해석하는지 고정한다.
@@ -55,7 +56,7 @@ function serviceWith(input: {
       findUnique: jest.fn().mockResolvedValue({ value: input.publicLive }),
     },
   };
-  return new GamesService(prisma as never, {} as never, {} as never);
+  return new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
 }
 
 describe('GET /games/:gameId/visibility resolves every stored policy mode', () => {

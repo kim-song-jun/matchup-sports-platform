@@ -19,6 +19,7 @@ describe('normalizeNotificationHref', () => {
     expect(normalizeNotificationHref('/teams/team-1?from=%2Fnotifications')).toBe(
       '/teams/team-1?from=%2Fnotifications',
     );
+    expect(normalizeNotificationHref('/my/phone-verify', 'system')).toBe('/my/phone-verify?from=%2Fnotifications');
   });
 
   // 기록 동의 딥링크는 이미 from=tournament 를 싣는다 — 키가 두 개가 되면 get('from') 이 앞의 값을 읽어

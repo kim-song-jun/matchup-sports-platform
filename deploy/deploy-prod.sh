@@ -284,7 +284,7 @@ if [[ "${had_active}" == false ]]; then
   cp "${PROD_RUNTIME_METADATA_FILE}" "${legacy_metadata_backup}"
 fi
 # Stage A 는 승격하지 않는다 — 여기서 쓰면 B 전에 nginx 가 재시작될 때 승격 안 된 SHA 가
-# 공개 헤더에 실려 Stage B 빌드의 resolve-prod-rollback-base.sh 가 거부한다.
+# 공개 헤더에 실려 Stage B deploy job 의 resolve-prod-rollback-base.sh 가 거부한다.
 if [[ "${task168_stage}" != stageA ]]; then
   write_release_metadata "${PROD_MANIFEST_FILE}"
 fi

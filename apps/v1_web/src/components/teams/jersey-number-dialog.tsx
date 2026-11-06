@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 
@@ -53,16 +54,21 @@ export function JerseyNumberDialog({
     if (open) setValue(current === null ? '' : String(current));
   }, [open, current]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   const trimmed = value.trim();
   const parsed = trimmed === '' ? null : Number(trimmed);
   const invalid = parsed !== null && (!Number.isInteger(parsed) || parsed < 0 || parsed > 999);
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'rgba(25,31,40,0.45)' }}
+      className="fixed inset-x-0 top-0 flex items-end justify-center sm:items-center p-4"
+      style={{
+        zIndex: 'var(--z-modal)',
+        background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)',
+        height: 'var(--teameet-visual-viewport-height, 100dvh)',
+        paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))',
+      }}
       onClick={onBackdropClick}
     >
       <div
@@ -71,7 +77,12 @@ export function JerseyNumberDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         className="w-full max-w-[340px] rounded-2xl overflow-hidden"
-        style={{ background: 'var(--card-surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
+        style={{
+          background: 'var(--card-surface)',
+          boxShadow: 'var(--shadow-modal)',
+          maxHeight: '100%',
+          overflowY: 'auto',
+        }}
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 12 }}>
@@ -132,6 +143,7 @@ export function JerseyNumberDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -5,6 +5,7 @@ import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -14,7 +15,7 @@ import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { FieldErrorText } from '@/components/v1-ui/create-form-fields';
 import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
@@ -89,7 +90,7 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
   // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
   useShellOverride({
     // 팀이 없는 새 사용자에게 "+" 만으로는 진입점이 약하다 — 글자를 함께 쓴다(F21).
-    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
+    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop tm-team-mobile-create" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
   });
   return (
     <>
@@ -112,28 +113,49 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             되고, 세로 44px 를 돌려받는다(사용자 확정 — 보이는 제목을 주되 줄은 더하지 않는다).
             hide/show-desktop 으로 같은 값을 두 번 그리던 중복도 함께 사라진다. */}
         <div className="tm-team-summary-bar">
-          <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
-          <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
+          <div className="tm-team-summary-meta">
+            <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
+            <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
+          </div>
+          <Link className="tm-btn tm-btn-md tm-btn-primary tm-team-tablet-create" href="/teams/new">
+            <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
+            팀 만들기
+          </Link>
         </div>
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (
           <>
             <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} fromHref={fromHref} />)}</div>
-            {model.hasNextPage ? (
+            {model.hasNextPage && model.loadMoreLocked ? (
+              <button type="button" disabled className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more">
+                {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+              </button>
+            ) : model.hasNextPage && model.loadMoreHref ? (
               <>
                 {model.loadMoreError ? (
                   <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록을 불러오지 못했어요. 다시 시도해 주세요.</p>
                 ) : null}
-                <button
-                  type="button"
+                <Link
+                  href={model.loadMoreHref}
+                  prefetch={false}
                   className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
-                  onClick={model.onLoadMore}
-                  disabled={model.isFetchingNextPage || model.loadMoreLocked}
+                  aria-disabled={model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref || undefined}
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    if (model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.preventDefault();
+                    model.onLoadMore?.();
+                  }}
                 >
                   {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
-                </button>
+                </Link>
               </>
+            ) : model.hasNextPage ? (
+              <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록으로 이동할 수 없어요. 잠시 후 다시 시도해 주세요.</p>
             ) : null}
           </>
         ) : (
@@ -153,6 +175,9 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
 }
 
 function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  if (typeof summary.total !== 'number') {
+    return <span role="status">{summary.totalState === 'error' ? '팀 수 정보를 불러오지 못했어요' : '팀 수 확인 중…'}</span>;
+  }
   const partiallyLoaded = typeof summary.loaded === 'number' && summary.loaded < summary.total;
   return (
     <>
@@ -164,6 +189,7 @@ function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] })
         <> · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span></>
       )}
       {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
+      {summary.totalRefreshError ? <> · 팀 수를 새로 확인하지 못했어요</> : null}
     </>
   );
 }
@@ -988,11 +1014,15 @@ function TeamContactRow({ href, unavailableReason, children }: { href?: string; 
   );
 }
 
+// 팀 상단 이미지가 그려지는 최대 폭: 상세 히어로 카드 데스크톱 1440 632px·태블릿 560px, 폼 미리보기 560px 이하.
+// 600 이면 2배 폭이 1200 단계에 걸린다.
+const TEAM_COVER_DISPLAY_WIDTH = 600;
+
 function teamHeroStyle(team: Pick<TeamModel, 'coverImageUrl'>): CSSProperties {
   if (!team.coverImageUrl) return { position: 'relative' };
   return {
     position: 'relative',
-    backgroundImage: `linear-gradient(180deg, rgba(20, 24, 31, 0.45), rgba(20, 24, 31, 0.72)), ${cssUrl(team.coverImageUrl)}`,
+    backgroundImage: `linear-gradient(180deg, rgba(20, 24, 31, 0.45), rgba(20, 24, 31, 0.72)), ${optimizedCssUrl(team.coverImageUrl, TEAM_COVER_DISPLAY_WIDTH)}`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
   };
@@ -1017,6 +1047,7 @@ export function TeamFormPageView({
   const errorRef = useRef<HTMLDivElement>(null);
   const formFieldsRef = useRef<HTMLDivElement>(null);
   const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const focusFrameRef = useRef<number | null>(null);
   const submitFrameRef = useRef<number | null>(null);
   const viewportFrameRef = useRef<number | null>(null);
@@ -1650,7 +1681,7 @@ function TeamCoverImageField({
           minHeight: 210,
           borderRadius: 'var(--radius-field)',
           border: '1px solid var(--border-strong)',
-          background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
+          background: coverImageUrl ? `${optimizedCssUrl(coverImageUrl, TEAM_COVER_DISPLAY_WIDTH)} center/cover` : 'var(--grey50)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

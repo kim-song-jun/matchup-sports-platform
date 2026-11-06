@@ -63,6 +63,23 @@ describe('SponsorLogoStrip', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('requests an uploaded logo at twice its 112px frame instead of the original, and leaves external logos alone', () => {
+    render(
+      <SponsorLogoStrip
+        sponsors={[
+          sponsor({ id: 'up', name: '업로드', logoUrl: '/uploads/2026/11/logo.png', sortOrder: 1 }),
+          sponsor({ id: 'ext', name: '외부', logoUrl: 'https://images.example.com/ext.png', sortOrder: 2 }),
+        ]}
+      />,
+    );
+
+    const uploaded = new URL(screen.getByRole('img', { name: '업로드 로고' }).getAttribute('src') ?? '', 'http://localhost');
+    expect(uploaded.pathname).toBe('/_next/image');
+    expect(uploaded.searchParams.get('url')).toBe('/uploads/2026/11/logo.png');
+    expect(uploaded.searchParams.get('w')).toBe('256');
+    expect(screen.getByRole('img', { name: '외부 로고' })).toHaveAttribute('src', 'https://images.example.com/ext.png');
+  });
+
   it('filters out sponsors without a logo image', () => {
     render(
       <SponsorLogoStrip

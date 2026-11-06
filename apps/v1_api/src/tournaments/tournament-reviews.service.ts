@@ -1,16 +1,17 @@
+import { assertNamedAwardScopes, assertLegacyAwardScopes } from './multi-finals/multi-finals-scope';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1TournamentBracketTrack } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { MAX_PAGE_NUMBER } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Matches, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   ALL_COMPETITION_KINDS,
@@ -19,6 +20,7 @@ import {
   tournamentKindCondition,
   TOURNAMENT_KINDS,
 } from './tournament-surface-lookup';
+import { lockCompetitionForSlotReleaseInTx } from './slots/competition-bracket-lock';
 
 export class ListTournamentReviewsQueryDto {
   @IsOptional()
@@ -72,6 +74,12 @@ export class SubmitTournamentReviewDto {
 
 /** 개인 어워드 항목 하나 — awardType: 'mvp' | 'top_scorer' | 'best_defense' | 'best_keeper' | 'best_rookie' | 'fair_play' | string */
 export class TournamentAwardItemDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  @Matches(/\S/)
+  bracketTrack?: string;
+
   @IsString()
   awardType!: string;
 
@@ -102,7 +110,7 @@ export class TournamentAwardItemDto {
 }
 
 export class SetTournamentAwardsDto {
-  /** 어워드 배열. 같은 대회 안에서 awardType은 한 번만 보낼 수 있다. */
+  /** 어워드 배열. 같은 bracketTrack 안에서 awardType은 한 번만 보낼 수 있다. */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TournamentAwardItemDto)
@@ -441,7 +449,7 @@ export class TournamentReviewsService {
 
   /** 어드민 리뷰 목록 — 숨김 포함 전체 조회. active admin이면 조회 가능 (읽기 전용). */
   async listReviewsAdmin(user: V1AuthUser, tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const { rows, total, page, pageSize } = await this.queryReviews(tournamentId, query, false);
     return {
       items: rows.map((r) => ({
@@ -457,7 +465,7 @@ export class TournamentReviewsService {
 
   /** 리뷰 숨김 (멱등 — 이미 숨김이면 alreadyHidden: true) */
   async hideReview(user: V1AuthUser, tournamentId: string, reviewId: string, dto: HideTournamentReviewDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const review = await this.prisma.v1TournamentReview.findFirst({
       where: { id: reviewId, tournamentId },
@@ -497,7 +505,7 @@ export class TournamentReviewsService {
 
   /** 리뷰 숨김 해제 (멱등 — 이미 노출 중이면 alreadyVisible: true) */
   async unhideReview(user: V1AuthUser, tournamentId: string, reviewId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const review = await this.prisma.v1TournamentReview.findFirst({
       where: { id: reviewId, tournamentId },
@@ -543,6 +551,7 @@ export class TournamentReviewsService {
     });
     return awards.map((a) => ({
       id: a.id,
+      bracketTrack: a.bracketTrack,
       awardType: a.awardType,
       awardLabel: a.awardLabel,
       iconKey: a.iconKey ?? null,
@@ -558,13 +567,13 @@ export class TournamentReviewsService {
    * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
    */
   async listAwards(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     return this.listAwardsInternal(tournamentId);
   }
 
   /** 어워드 설정 (어드민 전용, 전체 replace — support 등급은 mutation 불가) */
   async setAwards(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardsDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
@@ -573,19 +582,28 @@ export class TournamentReviewsService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
+    const requestedTracks = new Set(dto.awards.map((award) => award.bracketTrack ?? V1TournamentBracketTrack.overall));
+    assertLegacyAwardScopes(tournament.format, [...requestedTracks]);
+    if (
+      tournament.kind !== 'regular_tournament' &&
+      [...requestedTracks].some((track) => track !== V1TournamentBracketTrack.overall)
+    ) {
+      throw new BadRequestException({
+        code: 'AWARD_TRACK_UNSUPPORTED',
+        message: '상위·하위 시상 범위는 정규대회에서만 설정할 수 있어요.',
+      });
+    }
+
     // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
     const submittedAwards = dto.awards.map((a) => ({
       ...a,
+      bracketTrack: a.bracketTrack ?? V1TournamentBracketTrack.overall,
       awardType: a.awardType.trim(),
       recipientName: a.recipientName.trim(),
       teamName: a.teamName?.trim() || null,
     }));
-    const duplicateAwardTypes = [...new Set(
-      submittedAwards
-        .map((award) => award.awardType.trim())
-        .filter((awardType, index, awardTypes) => awardTypes.indexOf(awardType) !== index),
-    )];
-    if (duplicateAwardTypes.length > 0) {
+    const awardKeys = submittedAwards.map((award) => JSON.stringify([award.bracketTrack, award.awardType]));
+    if (awardKeys.some((key, index) => awardKeys.indexOf(key) !== index)) {
       throw new BadRequestException({
         code: 'DUPLICATE_AWARD_TYPE',
         message: '같은 종류의 어워드가 중복되어 있어요. 중복 항목을 제거한 뒤 다시 저장해 주세요.',
@@ -594,7 +612,7 @@ export class TournamentReviewsService {
 
     // 로스터 전용 강제 — 이름만 비교하면 동명이인을 잘못 연결할 수 있으므로 계정 ID,
     // 이름 스냅샷, 팀을 같은 confirmed 등록 행에서 교차 검증한다.
-    let awards: Array<TournamentAwardItemDto & { teamName: string }> = [];
+    let awards: Array<TournamentAwardItemDto & { teamName: string; bracketTrack: string }> = [];
     if (submittedAwards.length > 0) {
       const registrations = await this.prisma.v1TournamentRegistration.findMany({
         where: { tournamentId, status: 'confirmed' },
@@ -664,11 +682,17 @@ export class TournamentReviewsService {
      * 이미 뜨는 `before` 스냅샷을 그대로 재사용해 (수상항목, 수상자) 쌍이 새로 생긴
      * 경우만 고른다 — 같은 사람이 다른 상을 새로 받은 것도 새 수상으로 친다.
      */
-    const newlyAwarded: Array<{ userId: string; awardLabel: string }> = [];
+    const newlyAwarded: Array<{
+      userId: string;
+      awardLabel: string;
+      bracketTrack: string;
+    }> = [];
 
     // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
     // (감사 로그 실패 시 데이터 변경도 함께 롤백, before/after drift 방지 — 타 admin mutation과 동일 패턴)
     await this.prisma.$transaction(async (tx) => {
+      await lockCompetitionForSlotReleaseInTx(tx, tournament);
+      if (tournament.format === 'league_knockouts') await assertNamedAwardScopes(tx, tournamentId, [...requestedTracks]);
       const before = await tx.v1TournamentAward.findMany({
         where: { tournamentId },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -676,16 +700,21 @@ export class TournamentReviewsService {
 
       // 키는 JSON 배열로 만든다 — awardType 이 자유 문자열이라 구분자를 문자로 고르면
       // 그 문자가 값에 섞였을 때 서로 다른 쌍이 같은 키로 뭉개진다.
-      const pairKey = (awardType: string, userId: string) => JSON.stringify([awardType, userId]);
+      const pairKey = (bracketTrack: string, awardType: string, userId: string) =>
+        JSON.stringify([bracketTrack, awardType, userId]);
       const previousPairs = new Set(
         before
           .filter((a) => a.recipientUserId !== null)
-          .map((a) => pairKey(a.awardType, a.recipientUserId as string)),
+          .map((a) => pairKey(a.bracketTrack, a.awardType, a.recipientUserId as string)),
       );
       for (const a of awards) {
         if (a.recipientUserId === null || a.recipientUserId === undefined) continue;
-        if (previousPairs.has(pairKey(a.awardType, a.recipientUserId))) continue;
-        newlyAwarded.push({ userId: a.recipientUserId, awardLabel: a.awardLabel });
+        if (previousPairs.has(pairKey(a.bracketTrack, a.awardType, a.recipientUserId))) continue;
+        newlyAwarded.push({
+          userId: a.recipientUserId,
+          awardLabel: a.awardLabel,
+          bracketTrack: a.bracketTrack,
+        });
       }
 
       await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
@@ -693,6 +722,7 @@ export class TournamentReviewsService {
         await tx.v1TournamentAward.create({
           data: {
             tournamentId,
+            bracketTrack: a.bracketTrack,
             awardType: a.awardType,
             awardLabel: a.awardLabel,
             iconKey: a.iconKey ?? null,
@@ -713,6 +743,7 @@ export class TournamentReviewsService {
           targetId: tournamentId,
           beforeJson: {
             awards: before.map((a) => ({
+              bracketTrack: a.bracketTrack,
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
@@ -722,6 +753,7 @@ export class TournamentReviewsService {
           },
           afterJson: {
             awards: awards.map((a) => ({
+              bracketTrack: a.bracketTrack,
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
@@ -751,7 +783,7 @@ export class TournamentReviewsService {
      * (감사 evidence: 알림과 착지 화면이 서로 다른 말을 하는 막다른 길).
      */
     for (const recipient of newlyAwarded) {
-      const awardedBody = `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`;
+      const awardedBody = `${tournament.title} — ${recipient.bracketTrack === V1TournamentBracketTrack.upper ? '상위' : recipient.bracketTrack === V1TournamentBracketTrack.lower ? '하위' : recipient.bracketTrack === 'overall' ? '전체' : recipient.bracketTrack} '${recipient.awardLabel}' 수상자로 선정됐어요.`;
       const body =
         tournament.status === 'completed'
           ? awardedBody

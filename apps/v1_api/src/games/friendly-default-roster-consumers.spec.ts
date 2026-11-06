@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import { GameTakeoverService } from './game-takeover.service';
 import { gameOperationAuditActor, GamesService } from './games.service';
 
@@ -135,7 +136,7 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
     v1IdempotencyRecord: { findUnique: async () => null, create: async () => ({ id: randomUUID() }) },
     v1OutboxEvent: { create: async () => ({ id: randomUUID() }) },
   };
-  const moduleRef = await Test.createTestingModule({ providers: [GamesService, GameTakeoverService,
+  const moduleRef = await Test.createTestingModule({ providers: [GamesService, GameTakeoverService, TournamentStaffAccessService,
     { provide: PrismaService, useValue: database }, { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
   ] }).compile();
   return { service: moduleRef.get(GamesService), game, events, audits, lineups, participants, members, transactionOptions, sideLookups, sides, close: () => moduleRef.close() };

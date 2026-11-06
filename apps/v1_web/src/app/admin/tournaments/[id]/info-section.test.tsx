@@ -9,19 +9,20 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1Tournament } from '@/types/api';
+import type { V1Sport, V1Tournament } from '@/types/api';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { TournamentInfoSection } from './info-section';
 import { TournamentAdminProvider } from './tournament-admin-context';
 
 const { hooks } = vi.hoisted(() => ({
-  hooks: { tournament: undefined as unknown, mutate: vi.fn(), showToast: vi.fn(), isPending: false },
+  hooks: { tournament: undefined as unknown, mutate: vi.fn(), showToast: vi.fn(), isPending: false, masterSports: vi.fn<() => V1Sport[]>(() => []) },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournament: () => ({ data: hooks.tournament }),
   useV1UpdateTournament: () => ({ mutate: hooks.mutate, isPending: hooks.isPending }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1MasterSports: () => ({ data: [] }),
+  useV1MasterSports: () => ({ data: hooks.masterSports() }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1LineupSizeOptions: () => ({ data: [], isPending: false, isError: false }),
@@ -36,6 +37,8 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
       periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false }],
       legacyPeriodCount: null,
       requiresDurationInput: false,
+      kind: 'regular_tournament',
+      stageOverrides: [], groupOverrides: [],
     },
     isPending: false,
     isError: false,
@@ -110,14 +113,20 @@ function renderSection(canWrite: boolean, overrides: Partial<V1Tournament> = {})
 }
 
 describe('TournamentInfoSection', () => {
+  it('상세 이미지 숨김은 CAS 버전과 함께 저장하고 사진을 지우지 않는다', () => {
+    renderSection(true, { listImageUrl: '/uploads/list.webp', coverImageUrl: '/uploads/detail.webp', showDetailImage: true });
+    fireEvent.click(screen.getByRole('switch', { name: '상세 이미지 표시' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ showDetailImage: false, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
   it('같은 값을 두 번 그리지 않는다', () => {
     renderSection(true);
 
     for (const label of ['신청 마감', '명단 마감', '참가비', '팀 수', '출전 인원', '교체 방식', '입금 계좌']) {
       expect(screen.getAllByText(label)).toHaveLength(1);
     }
-    // 카드 제목과 업로더 자체 label이 겹쳐 '커버 이미지'가 두 번 뜬 적이 있다.
-    expect(screen.getAllByText('커버 이미지')).toHaveLength(1);
+    expect(screen.getAllByText('목록 이미지 (선택)')).toHaveLength(1);
+    expect(screen.getAllByText('상세 이미지 (선택)')).toHaveLength(1);
   });
 
   it('편집 진입점은 관심사마다 하나씩이다', () => {
@@ -158,6 +167,33 @@ describe('TournamentInfoSection', () => {
     // 상금 저장 버튼과 입력이 함께 잠긴다 — 예전에는 둘 다 그대로 노출됐다.
     expect(screen.queryByRole('button', { name: '상금 정보 저장' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('상품 및 상금')).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '상세 이미지 표시' })).toBeDisabled();
+    expect(screen.getByLabelText('목록 이미지')).toBeDisabled();
+  });
+});
+
+describe('TournamentInfoSection — 종목 기본 이미지', () => {
+  beforeEach(() => {
+    hooks.masterSports.mockReturnValue([
+      { id: 'sport-1', code: 'futsal', name: '풋살', levels: [] },
+    ]);
+  });
+  afterEach(() => {
+    hooks.masterSports.mockReturnValue([]);
+  });
+
+  it('이미지가 없는 풋살 대회는 목록과 상세 미리보기에 풋살 기본 이미지를 표시한다', () => {
+    // Given: 종목 코드와 표시 이름이 다른 실제 마스터 응답, 업로드 이미지가 없는 대회.
+    const images = { listImageUrl: null, coverImageUrl: null };
+
+    // When: 실제 관리자 정보 섹션과 공유 이미지 필드를 렌더한다.
+    renderSection(true, images);
+
+    // Then: 두 미리보기 모두 공용 그래픽이 아닌 해당 종목의 이미지를 고른다.
+    const listPreview = screen.getByRole('img', { name: '목록 이미지 미리보기' });
+    const detailPreview = screen.getByRole('img', { name: '상세 이미지 미리보기' });
+    expect.soft(resolveNextImageSrc(listPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
+    expect.soft(resolveNextImageSrc(detailPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
   });
 });
 
@@ -231,9 +267,18 @@ describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual calle
     expect(hooks.mutate).toHaveBeenCalledWith({
       prizePool: 650000,
       prizeSummary: '수정된 시상 안내',
-      prizeBreakdown: '1위 650,000원 / 상품 우승 트로피·상품권',
+      prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '1위', amount: '650,000원' }, { category: '기타 시상', label: '상품', amount: '우승 트로피·상품권' }]),
       expectedVersion: tournament.updatedAt,
     }, expect.anything());
+  });
+
+  it('시상 항목을 모두 삭제해 저장하면 null을 보내 기존 시상을 비운다', async () => {
+    const user = userEvent.setup();
+    renderSection(true);
+    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
+    await user.click(card.getByRole('button', { name: '상금 항목 1 삭제' }));
+    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith(expect.objectContaining({ prizeBreakdown: null }), expect.anything());
   });
 
   it.each([
@@ -247,7 +292,7 @@ describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual calle
     const name = card.getByRole('combobox', { name: '상금 항목 1 이름' });
     const value = card.getByRole('textbox', { name: '상금 항목 1 내용' });
     const remove = card.getByRole('button', { name: '상금 항목 1 삭제' });
-    const add = card.getByRole('button', { name: '항목 추가' });
+    const add = card.getByRole('button', { name: '팀 시상 추가' });
     for (const control of [name, value, remove, add, card.getByRole('textbox', { name: '총상금' }), card.getByRole('textbox', { name: '상품 및 상금' })]) {
       expect(control).toBeDisabled();
     }
@@ -366,5 +411,25 @@ describe('대회 형식 수정', () => {
     renderSection(true, { status });
     fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
     expect(screen.getByLabelText('대회 형식')).toBeDisabled();
+  });
+});
+
+
+describe('6강 방식 수정 payload', () => {
+  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
+  it('6팀 토너먼트에서 선택한 방식만 CAS 버전과 함께 저장한다', () => {
+    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: false });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    fireEvent.change(screen.getByLabelText('6팀 토너먼트 진행'), { target: { value: 'six' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ sixTeamMode: true, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+  it('이미 선택된 6강 방식은 불러오고 다른 필드 수정에 끼워 보내지 않는다', () => {
+    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: true });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('6팀 토너먼트 진행')).toHaveValue('six');
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
   });
 });

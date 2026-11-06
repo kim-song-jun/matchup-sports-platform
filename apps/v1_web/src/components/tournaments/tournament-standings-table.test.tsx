@@ -337,3 +337,15 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
     expect(bracketHeaders).toEqual(scheduleHeaders);
   });
 });
+
+it('renders ten destination colors without a T prefix or a blue row overriding their distinction', () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ ...ROW, key: 'r'+i, teamId: 't'+i, teamName: 'team '+i }));
+  const labels = new Map(rows.map((row, i) => [row.key, ['destination '+i]]));
+  const colors = new Map(rows.map((_, i) => ['destination '+i, i]));
+  render(<TournamentStandingsTable rows={rows} advancingKeys={new Set(rows.map(row => row.key))} advancingLabels={labels} advancingColors={colors} ariaLabel="colors" />);
+  rows.forEach((_, i) => {
+    const badge = screen.getByText('destination '+i);
+    expect(badge).toHaveClass('tm-final-color-'+i);
+    expect(badge.closest('tr')).not.toHaveClass('tm-standings-row-highlight');
+  });
+});

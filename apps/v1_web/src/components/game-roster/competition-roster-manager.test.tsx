@@ -68,6 +68,16 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     fireEvent.click(tab(entry === 'match' ? '참가 선수' : '경기 출전'));
     await waitFor(() => expect(tab(entry === 'match' ? '참가 선수' : '경기 출전')).toHaveAttribute('aria-selected', 'true'));
   });
+  it('MD-QA #201: 시작 전 경기 목록이 비어도 경기 자체가 없다고 안내하지 않는다', async () => {
+    server.use(http.get('*/api/v1/teams/:id/game-rosters', () => ok({ teamId, viewerRole: 'TEAM_OWNER', games: [], players: [] })));
+    open('registration');
+    fireEvent.click(await screen.findByRole('tab', { name: '경기 출전' }));
+    expect(await screen.findByText('출전을 수정할 수 있는 경기가 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '출전을 수정할 수 있는 경기 없음' })).toBeInTheDocument();
+    expect(screen.queryByText('등록된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText(/시작한 경기는 경기 상세에서/)).toBeInTheDocument();
+  });
+
   it('출전 제외를 저장하고 참가 탭으로 이동한 뒤 돌아와도 선택 경기와 제외가 남는다', async () => {
     open(); await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
     fireEvent.click(checkbox()); fireEvent.click(tab('참가 선수'));
@@ -79,6 +89,33 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     await waitFor(() => expect(checkbox()).not.toBeChecked());
     expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
     expect(screen.queryByRole('button', { name: /골키퍼로 지정/ })).not.toBeInTheDocument();
+  });
+  it.each(['regular_tournament', 'regular_league'] as const)('%s 참가 선수 안내는 확정 문구를 표시한다', async value => {
+    kind = value;
+    open('registration');
+    const noun = value === 'regular_league' ? '리그' : '대회';
+    expect(await screen.findByText((_, element) => element?.tagName === 'P' &&
+      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
+  });
+  it.each([false, true])('통합 명단 선수 추가는 골레이 %s를 POST에 전달한다', async goalkeeper => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.get('*/api/v1/teams/:id/members', () => ok({ items: [{ userId: 'new-player', displayName: '새선수',
+        realName: '새선수', gender: 'female', birthDate: '1995-03-15', phone: '01012345678', role: 'member' }],
+        pageInfo: { hasNext: false, nextCursor: null } })),
+      http.post('*/api/v1/tournaments/:id/registrations/:reg/players', async ({ request }) => {
+        body = await request.json() as Record<string, unknown>;
+        return ok({ id: 'new-player-row', ...body });
+      }),
+    );
+    open('registration');
+    fireEvent.click(await screen.findByRole('button', { name: '선수 추가' }));
+    await screen.findByRole('option', { name: /새선수/ });
+    fireEvent.change(screen.getByLabelText(/팀원 선택/), { target: { value: 'new-player' } });
+    expect(screen.getByLabelText('성별')).toHaveValue('여성');
+    if (goalkeeper) fireEvent.click(screen.getByRole('checkbox', { name: '골레이로 등록해요' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 등록' }));
+    await waitFor(() => expect(body).toMatchObject({ userId: 'new-player', goalkeeper }));
   });
   it('번호 0·GK 공통 설정을 저장하면 다른 경기에도 보이며 제외 상태와는 독립적이다', async () => {
     open('registration');

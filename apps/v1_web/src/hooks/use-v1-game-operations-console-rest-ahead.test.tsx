@@ -92,7 +92,6 @@ function createMockSocket() {
 }
 
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: vi.fn(async () => ({})),
 }));
 
@@ -122,9 +121,10 @@ describe('useV1GameOperationsConsole — REST가 앞서도 뒤늦은 브로드�
     const { result, rerender, unmount } = renderHook(
       ({ initialLastSequence }: { initialLastSequence: number }) =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: GAME_ID,
-          myUserId: 'user-1',
+          gameDetailGameId: GAME_ID,
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence,
         }),
       {
@@ -180,9 +180,10 @@ describe('useV1GameOperationsConsole — REST가 앞서도 뒤늦은 브로드�
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: GAME_ID,
-          myUserId: 'user-1',
+          gameDetailGameId: GAME_ID,
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: SNAPSHOT_LAST_SEQUENCE,
         }),
       { wrapper: createWrapper(queryClient) },

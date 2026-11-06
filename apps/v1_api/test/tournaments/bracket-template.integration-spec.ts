@@ -10,10 +10,11 @@ import { TournamentSlotService } from '../../src/tournaments/slots/tournament-sl
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, seedSupportAdmin } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'bracket-template@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const templates = new BracketTemplateService(prisma, new AdminContextService(prisma), games);
 
 const liveFixtures = (tournamentId: string) => prisma.v1TournamentMatchDetails.findMany({

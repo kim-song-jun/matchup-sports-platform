@@ -124,6 +124,7 @@ export function TournamentCampaignTemplate({
                           sportCode={tournament.sport.code}
                           alt={highlight.title}
                           className={storyStyles.highlightImage}
+                          sizes="(min-width: 768px) 620px, 100vw"
                         />
                       </div>
                     ) : (

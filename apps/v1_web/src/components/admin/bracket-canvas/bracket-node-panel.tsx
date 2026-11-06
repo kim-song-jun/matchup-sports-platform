@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
@@ -177,7 +177,9 @@ export function BracketNodePanel({
     const slot = slotId === null ? undefined : slotsById.get(slotId);
     const source = classifyFixtureSide(fixture, side, slotsById);
     let body: React.ReactNode;
-    if (source === 'direct') {
+    if (groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))) {
+      body = <p className="tm-text-caption text-[var(--text-muted)]">진출팀은 페이지 위의 진출팀 배정 화면에서 편집해요.</p>;
+    } else if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
         body = (

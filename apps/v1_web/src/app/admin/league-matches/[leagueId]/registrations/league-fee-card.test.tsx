@@ -29,7 +29,7 @@ const unset: LeagueFeeSource = {
 };
 
 const renderCard = (league: LeagueFeeSource) =>
-  render(<LeagueFeeCard league={league} leagueId="league-1" focusRequest={0} />);
+  render(<LeagueFeeCard league={league} leagueId="league-1" />);
 const fee = () => screen.getByLabelText('팀당 참가비 (원)');
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const save = () => fireEvent.click(screen.getByRole('button', { name: '저장' }));

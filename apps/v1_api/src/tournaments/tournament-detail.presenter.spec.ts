@@ -38,6 +38,7 @@ describe('isBracketPublished', () => {
   it('예약 시각이 지났으면 공개 — 별도 스케줄러 실행 없이 전환된다', () => {
     expect(isBracketPublished(null, new Date('2026-07-31T09:00:00.000Z'), now)).toBe(true);
   });
+
 });
 
 // R3 §4-3단계: 공개 상세의 fixtures[].result가 레거시 legacy result row 대신
@@ -128,6 +129,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       latitude: null,
       longitude: null,
       coverImageUrl: null,
+      listImageUrl: null,
+      showDetailImage: true,
       teamCount: 8,
       minPlayers: 6,
       maxPlayers: 10,
@@ -214,6 +217,11 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       byeTarget: { fixtureId: detail.teamMatchId, side } });
     const hidden = presentTournamentDetail({ ...row, bracketPublishedAt: null, bracketPublishScheduledAt: null }, false);
     expect(hidden.groups).toEqual([]);
+  });
+
+  it('공개 상세는 사진 두 장과 숨김 설정을 지우거나 목록 사진으로 덮어쓰지 않는다', () => {
+    const row = baseRow({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+    expect(presentTournamentDetail(row, false)).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
   });
 
   describe('자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {
@@ -827,6 +835,51 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     expect(presented.reviews).toHaveLength(2);
     expect(presented.reviewsTotalCount).toBe(45);
   });
+
+  it('공개 그룹·개인상에 범위를 붙이고 팀 시상 안내 두 행을 노출한다', () => {
+    const row = baseRow({
+      groups: [{ id: 'group-a', name: 'A조', phase: 'group', sortOrder: 0, advanceCount: 2, bracketTrack: 'overall', groupTeams: [], byeSlots: [], standings: [] }],
+      awards: [{ id: 'award-lower', awardType: 'mvp', awardLabel: 'MVP', iconKey: null, recipientName: '선수', recipientUserId: null, teamName: null, note: null, bracketTrack: 'lower' }],
+      awardSets: [
+        { bracketTrack: 'upper', prizePool: 100000, prizeSummary: '상위 우승', prizeBreakdown: null },
+        { bracketTrack: 'lower', prizePool: 50000, prizeSummary: '하위 우승', prizeBreakdown: null },
+      ],
+    } as never);
+    const summaries = new Map([['group-a', {
+      sharedRankByRegistrationId: new Map(),
+      qualification: { advancingRegistrationIds: ['r1', 'r2'], undecided: false },
+      qualificationByTrack: {
+        upper: { advancingRegistrationIds: ['r1', 'r2'], undecided: false },
+        lower: { advancingRegistrationIds: ['r3', 'r4'], undecided: false },
+      },
+    }]]);
+
+    const presented = presentTournamentDetail(row, true, new Date(), false, [], new Map(), summaries);
+    expect(presented.groups[0]).toMatchObject({ bracketTrack: 'overall', qualificationByTrack: { upper: { colorIndex: 0 }, lower: { colorIndex: 1 } } });
+    expect(presented.awards[0]).toMatchObject({ bracketTrack: 'lower' });
+    expect(presented.awardSets).toEqual([
+      { bracketTrack: 'upper', prizePool: 100000, prizeSummary: '상위 우승', prizeBreakdown: null },
+      { bracketTrack: 'lower', prizePool: 50000, prizeSummary: '하위 우승', prizeBreakdown: null },
+    ]);
+  });
+  it('uses stored destination colors after reordering names and preserves unresolved null', () => {
+    const row = baseRow({
+      multiFinals: { nextColorIndex: 4, finals: [
+        { id: 'final-c', name: 'Renamed', colorIndex: 2, rules: [], thirdPlace: false },
+        { id: 'final-a', name: 'Champion', colorIndex: 0, rules: [], thirdPlace: false },
+      ] },
+      groups: [{ id: 'group-a', name: 'A', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall', groupTeams: [], byeSlots: [], standings: [] }, { id: 'final-renamed', name: 'Renamed Final', phase: 'final', sortOrder: 1, advanceCount: null, bracketTrack: 'Renamed', groupTeams: [], byeSlots: [], standings: [] }],
+    } as never);
+    const summary = new Map([['group-a', { sharedRankByRegistrationId: new Map<string, number>(), qualification: null,
+      qualificationByTrack: { Champion: { advancingRegistrationIds: ['r1'], undecided: false }, Renamed: { advancingRegistrationIds: ['r2'], undecided: false }, Pending: null } }]]);
+    const result = presentTournamentDetail(row, true, new Date(), false, [], new Map(), summary);
+    expect(result.groups[1]).toMatchObject({ bracketColorIndex: 2 });
+    expect(result.groups[0].qualificationByTrack).toEqual({
+      Champion: { advancingRegistrationIds: ['r1'], undecided: false, colorIndex: 0 },
+      Renamed: { advancingRegistrationIds: ['r2'], undecided: false, colorIndex: 2 }, Pending: null,
+    });
+  });
+
 });
 
 
@@ -1202,4 +1255,5 @@ describe('presentTournamentDetail — 조별 공개 순위표 요약', () => {
     expect(groups[0].standings.map((s) => s.sharedRank)).toEqual([1, 1, 1]);
     expect(groups[0].qualification?.advancingRegistrationIds).toEqual(['b', 'c']);
   });
+
 });

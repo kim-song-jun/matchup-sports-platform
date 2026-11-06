@@ -21,6 +21,7 @@ import {
   toGameHttpException,
   GamesService,
 } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
   return {
@@ -523,6 +524,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
       prisma as never,
       {} as never,
       {} as never,
+      new TournamentStaffAccessService(prisma as never),
     );
 
     await expect(
@@ -600,7 +602,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
         ]),
       },
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
 
     await expect(
       service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
@@ -632,7 +634,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
         ]),
       },
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
 
     await expect(
       service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
@@ -673,7 +675,7 @@ describe('GamesService.confirmSideArrival', () => {
       },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
     const resolveActor = jest
       .spyOn(service as never, 'resolveActor' as never)
       .mockResolvedValue((options.actor ?? { role: 'platform_ops', teamId: null }) as never);
@@ -823,7 +825,23 @@ describe('GamesService.confirmSideArrival', () => {
 // W4-V14 — 대진 취소는 게임을 건드리지 않는다. 열어 둔 콘솔이 취소된 대진의 경기를 시작하면 결과 없이
 // 진행 중으로 남으므로 시작에서 막는다.
 describe('GamesService start — 취소된 대진의 경기', () => {
-  function makeTx(teamMatchStatus: string, lifecycleStatus = 'in_progress', requiresExplicitStart = true) {
+  function makeTx(
+    teamMatchStatus: string,
+    lifecycleStatus = 'in_progress',
+    requiresExplicitStart = true,
+    roster: {
+      lineups?: Array<{ id: string; sideId: string; revision: number; state: 'DRAFT' | 'SUBMITTED' | 'LOCKED'; invalidatedAt: Date | null }>;
+      participants?: Array<{ id: string; sideId: string; lineupId: string }>;
+    } = {},
+  ) {
+    const lineups = roster.lineups ?? [
+      { id: 'home-lineup', sideId: 'side-home', revision: 1, state: 'DRAFT' as const, invalidatedAt: null },
+      { id: 'away-lineup', sideId: 'side-away', revision: 1, state: 'DRAFT' as const, invalidatedAt: null },
+    ];
+    const participants = roster.participants ?? [
+      { id: 'home-player', sideId: 'side-home', lineupId: 'home-lineup' },
+      { id: 'away-player', sideId: 'side-away', lineupId: 'away-lineup' },
+    ];
     return {
       v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
@@ -839,15 +857,17 @@ describe('GamesService start — 취소된 대진의 경기', () => {
       },
       v1GameSide: {
         findMany: jest.fn().mockResolvedValue([
-          { sideKey: 'HOME', teamId: 'team-h' },
-          { sideKey: 'AWAY', teamId: 'team-a' },
+          { id: 'side-home', sideKey: 'HOME', teamId: 'team-h', displayNameSnapshot: '홈팀' },
+          { id: 'side-away', sideKey: 'AWAY', teamId: 'team-a', displayNameSnapshot: '원정팀' },
         ]),
       },
+      v1GameLineup: { findMany: jest.fn().mockResolvedValue(lineups) },
+      v1GameParticipant: { findMany: jest.fn().mockResolvedValue(participants) },
     };
   }
 
   function assertStartable(tx: ReturnType<typeof makeTx>) {
-    const service = new GamesService({} as never, {} as never, {} as never) as unknown as {
+    const service = new GamesService({} as never, {} as never, {} as never, new TournamentStaffAccessService({} as never)) as unknown as {
       assertTournamentMatchStartable(tx: unknown, game: { id: string; sourceType: string; teamMatchId: string }): Promise<void>;
     };
     return service.assertTournamentMatchStartable(tx, { id: 'game-1', sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' });
@@ -871,6 +891,51 @@ describe('GamesService start — 취소된 대진의 경기', () => {
 
   it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {
     await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ['홈', [{ id: 'away-player', sideId: 'side-away', lineupId: 'away-lineup' }]],
+    ['원정', [{ id: 'home-player', sideId: 'side-home', lineupId: 'home-lineup' }]],
+    ['양쪽', []],
+  ])('유효 명단에 %s 팀 출전 선수가 없으면 일반 시작을 거부한다', async (_label, participants) => {
+    const tx = makeTx('matched', 'in_progress', true, { participants });
+    await expect(assertStartable(tx)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'GAME_START_LINEUP_EMPTY' }),
+    });
+  });
+
+  it('제출본이 있는 사이드에서는 그 위의 빈 DRAFT가 기존 유효 명단을 지우지 않는다', async () => {
+    const tx = makeTx('matched', 'in_progress', true, {
+      lineups: [
+        { id: 'home-submitted', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'home-draft', sideId: 'side-home', revision: 2, state: 'DRAFT', invalidatedAt: null },
+        { id: 'away-draft', sideId: 'side-away', revision: 1, state: 'DRAFT', invalidatedAt: null },
+      ],
+      participants: [
+        { id: 'submitted-player', sideId: 'side-home', lineupId: 'home-submitted' },
+        { id: 'away-player', sideId: 'side-away', lineupId: 'away-draft' },
+      ],
+    });
+
+    await expect(assertStartable(tx)).resolves.toBeUndefined();
+  });
+
+  it('제출본 없이 가장 최신 DRAFT가 비었으면 이전 DRAFT 참가자로 시작을 허용하지 않는다', async () => {
+    const tx = makeTx('matched', 'in_progress', true, {
+      lineups: [
+        { id: 'home-old', sideId: 'side-home', revision: 1, state: 'DRAFT', invalidatedAt: null },
+        { id: 'home-current', sideId: 'side-home', revision: 2, state: 'DRAFT', invalidatedAt: null },
+        { id: 'away-current', sideId: 'side-away', revision: 1, state: 'DRAFT', invalidatedAt: null },
+      ],
+      participants: [
+        { id: 'old-home-player', sideId: 'side-home', lineupId: 'home-old' },
+        { id: 'away-player', sideId: 'side-away', lineupId: 'away-current' },
+      ],
+    });
+
+    await expect(assertStartable(tx)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'GAME_START_LINEUP_EMPTY' }),
+    });
   });
 });
 
@@ -902,7 +967,7 @@ describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%
       ...transactionClient,
       $transaction: jest.fn(async (callback: (tx: typeof transactionClient) => Promise<unknown>) => callback(transactionClient)),
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
     jest.spyOn(service as never, 'resolveActor' as never).mockResolvedValue({ role, teamId: 'team-home' } as never);
     return { service, prisma };
   }

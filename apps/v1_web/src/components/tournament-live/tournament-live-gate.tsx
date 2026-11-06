@@ -188,9 +188,6 @@ interface TournamentLiveGateProps {
 
 export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGateProps) {
   const authMe = useV1AuthMe();
-  // 공개 대회 상세(제목 표시용)는 셸 진입 가능 여부와 무관하다 — 실패해도 게이트를 막지 않고
-  // 셸이 fallback 제목("대회 운영")으로 조용히 대체한다.
-  const tournament = useV1Tournament(tournamentId);
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -198,6 +195,11 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
   // 경기 콘솔은 이 응답만 사용하고, 운영 보드는 전역 staff 조회도 수행한다.
   const fixtureId = fixtureIdFromConsolePath(pathname, tournamentId);
   const myAssignments = useV1MyTournamentStaffAssignments({ enabled: true });
+  const ownGroup = findMyTournamentGroup(myAssignments.data, tournamentId);
+  // 비공개 대회도 자기 배정 응답에는 제목·종류가 있다. 공개 상세의 404로
+  // 운영 셸이 대회 이름을 잃거나 리그를 대회 관리로 안내하지 않게 한다.
+  const tournament = useV1Tournament(tournamentId);
+  const tournamentTitle = ownGroup?.tournamentTitle ?? tournament.data?.title;
   const ownAssignmentRole = deriveMyRole(myAssignments.data, tournamentId);
   const ownConsoleAccess =
     fixtureId !== null &&
@@ -214,16 +216,22 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
   // 돌아가기'가 맞다. 스태프 표면에서만 `?from=admin` 이 의미를 갖는다.
   const onAdminSurface = isAdminLiveConsolePath(pathname);
   const queryFromAdmin = searchParams.get('from') === 'admin';
+  const queryFromStaff = searchParams.get('from') === 'staff';
   useEffect(() => {
     // 박제는 **쿼리로 온 경우만** 한다. 어드민 표면은 경로만 보면 알 수 있는데도 박제하면,
     // 같은 대회를 스태프 표면에서 여는 사람에게 '대회 관리로 돌아가기'가 남아 그가 갈 수
     // 없는 화면으로 안내하게 된다(sessionStorage 는 대회 단위로만 구분한다).
     if (queryFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
-  }, [queryFromAdmin, tournamentId]);
-  const origin = onAdminSurface || queryFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
+    else if (queryFromStaff) saveTournamentOpsOrigin(tournamentId, 'staff');
+  }, [queryFromAdmin, queryFromStaff, tournamentId]);
+  const origin = onAdminSurface || queryFromAdmin ? 'admin' : queryFromStaff ? 'staff' : getTournamentOpsOrigin(tournamentId);
   // 셸의 어드민 복귀 목적지(대회 관리 / 리그 관리)를 가른다. 조회 중이면 `undefined`(셸이 링크를
   // 잠시 숨김), 끝났으면 종류 — 실패하면 `null` 이라 예전처럼 대회 관리로 간다.
-  const tournamentKind = tournament.isPending ? undefined : (tournament.data?.kind ?? null);
+  const assignedKind = ownGroup?.tournamentKind;
+  const tournamentKind = ownGroup
+    ? assignedKind === 'regular_tournament' || assignedKind === 'regular_league' ? assignedKind
+      : assignedKind == null ? null : undefined
+    : tournament.isPending ? undefined : (tournament.data?.kind ?? null);
 
   if (
     authMe.isPending ||
@@ -247,7 +255,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
       return (
         <TournamentOpsRoleProvider role="FIELD_OPERATOR">
           <FieldOperatorConsoleFrame
-            tournamentTitle={tournament.data?.title}
+            tournamentTitle={tournamentTitle}
             tournamentId={tournamentId}
           >
             {children}
@@ -260,7 +268,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
         <TournamentOpsShell
           tournamentId={tournamentId}
           role={ownAssignmentRole}
-          tournamentTitle={tournament.data?.title}
+          tournamentTitle={tournamentTitle}
           tournamentCoverImageUrl={tournament.data?.coverImageUrl}
           origin={origin}
           tournamentKind={tournamentKind}
@@ -296,7 +304,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
       <TournamentOpsShell
         tournamentId={tournamentId}
         role={role}
-        tournamentTitle={tournament.data?.title}
+        tournamentTitle={tournamentTitle}
         tournamentCoverImageUrl={tournament.data?.coverImageUrl}
         origin={origin}
         tournamentKind={tournamentKind}

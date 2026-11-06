@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { V1AdminMonitoringSummary } from '@/types/api';
 import { MonitoringClient } from './monitoring-client';
 
 // 탭 본문 4개는 각자 자기 페이지였던 완결 화면(각자 훅·폴링 보유)이라 여기서는
@@ -28,7 +29,24 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams,
 }));
 
-const SUMMARY = { errorsLast24h: 4, pushUnacked: 2, smsUnacked: 0, auditToday: 11 };
+const SUMMARY: V1AdminMonitoringSummary = {
+  errorsLast24h: 4,
+  pushUnacked: 2,
+  smsUnacked: 0,
+  auditToday: 11,
+  loginAnomalies: {
+    last24hCount: 2,
+    // 2026-10-21 05:03 UTC = 14:03 KST
+    latest: {
+      startedAt: '2026-10-21T05:03:00.000Z',
+      lastDetectedAt: '2026-10-21T05:09:00.000Z',
+      failedCount: 63,
+      accountCount: 14,
+      ipCount: 9,
+      active: false,
+    },
+  },
+};
 
 describe('MonitoringClient', () => {
   beforeEach(() => {
@@ -82,5 +100,80 @@ describe('MonitoringClient', () => {
     render(<MonitoringClient />);
 
     expect(screen.getByText('stub-errors-body')).toBeInTheDocument();
+  });
+
+  describe('로그인 이상 신호', () => {
+    it('shows the 24h count with the latest detection time, failure count and account count', () => {
+      render(<MonitoringClient />);
+
+      const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 2건' });
+      expect(tile).toHaveTextContent('마지막 감지 10.21 14:09');
+      expect(tile).toHaveTextContent('실패 63건 · 계정 14개 · IP 9개');
+      expect(tile).not.toHaveTextContent('감지 중');
+    });
+
+    it('is display-only: it opens no tab and the strip keeps its own tab shortcuts', async () => {
+      const user = userEvent.setup();
+      render(<MonitoringClient />);
+
+      await user.click(screen.getByRole('group', { name: /로그인 이상/ }));
+
+      expect(replaceMock).not.toHaveBeenCalled();
+      expect(screen.getByText('stub-errors-body')).toBeInTheDocument();
+    });
+
+    it('says nothing has been detected yet when there is no record', () => {
+      summaryMock.mockReturnValue({
+        data: { ...SUMMARY, loginAnomalies: { last24hCount: 0, latest: null } },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      render(<MonitoringClient />);
+
+      const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 0건' });
+      expect(tile).toHaveTextContent('감지된 적이 없어요');
+    });
+
+    it('keeps the older detection visible when the last 24 hours were quiet', () => {
+      summaryMock.mockReturnValue({
+        data: {
+          ...SUMMARY,
+          loginAnomalies: {
+            last24hCount: 0,
+            latest: {
+              startedAt: '2026-10-19T05:03:00.000Z',
+              lastDetectedAt: '2026-10-19T05:03:00.000Z',
+              failedCount: 41,
+              accountCount: 12,
+              ipCount: 5,
+              active: false,
+            },
+          },
+        },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      render(<MonitoringClient />);
+
+      const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 0건' });
+      expect(tile).toHaveTextContent('마지막 감지 10.19 14:03');
+      expect(tile).toHaveTextContent('실패 41건 · 계정 12개 · IP 5개');
+    });
+
+    it('says the attack is still being detected and step-up is on while it is active', () => {
+      summaryMock.mockReturnValue({
+        data: { ...SUMMARY, loginAnomalies: { last24hCount: 1, latest: { ...SUMMARY.loginAnomalies.latest!, active: true } } },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      render(<MonitoringClient />);
+
+      const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 1건, 지금 감지 중' });
+      expect(tile).toHaveTextContent('감지 중 · 추가 인증 요구 · 마지막 10.21 14:09');
+    });
+
+    it('shows a placeholder instead of a count while the summary is loading', () => {
+      summaryMock.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
+      render(<MonitoringClient />);
+
+      expect(screen.getByRole('group', { name: '로그인 이상(최근 24시간): 집계 중' })).toHaveTextContent('—');
+    });
   });
 });

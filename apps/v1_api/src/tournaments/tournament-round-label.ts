@@ -1,6 +1,7 @@
 /** 조별리그 대진 생성기(`league_r{n}`)와 조 단계 코드가 남긴 라운드 값을 화면 이름으로. 이미 한국어인 값은 그대로. */
 export const TOURNAMENT_PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round64: '64강', round32: '32강',
   round16: '16강',
   round12: '12강',
   quarter: '8강',
@@ -11,6 +12,8 @@ export const TOURNAMENT_PHASE_LABEL: Readonly<Record<string, string>> = {
 };
 
 const LEAGUE_ROUND = /^league_r(\d+)$/;
+/** 리그 방식 대회 템플릿이 만드는 하나뿐인 조 이름(bracket-template-plan.ts). */
+const LEAGUE_FORMAT_GROUP = '리그';
 
 export function tournamentRoundLabel(round: string): string {
   const trimmed = round.trim();
@@ -41,6 +44,9 @@ export function competitionMatchLabel({ groupName, round, legNumber, withinGroup
   const leg = legNumber != null && legNumber > 1 && !LEAGUE_ROUND.test(round.trim()) ? ` ${legNumber}차` : '';
   const roundPart = `${tournamentRoundLabel(round)}${leg}`;
   const group = groupName?.trim() ?? '';
+  // 리그 방식 대회는 조가 하나('리그')라 조별리그가 아니다 — "리그 · 조별리그 1라운드" 대신 "리그 1라운드"(MD-QA #171).
+  const leagueRound = LEAGUE_ROUND.exec(round.trim());
+  if (leagueRound !== null && group === LEAGUE_FORMAT_GROUP) return withinGroup ? `${Number(leagueRound[1])}라운드` : `리그 ${Number(leagueRound[1])}라운드`;
   if (withinGroup || group === '' || isKnockoutRound(round) || group === tournamentRoundLabel(round)) return roundPart;
   return `${group} · ${roundPart}`;
 }

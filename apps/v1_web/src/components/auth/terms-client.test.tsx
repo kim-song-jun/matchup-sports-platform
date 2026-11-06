@@ -132,6 +132,38 @@ afterEach(() => {
   footerTermsValue = { data: undefined, isPending: false, isError: false };
 });
 
+describe('신규 가입 기록 공개 안내', () => {
+  const notice = '경기 기록은 닉네임으로 기본 공개돼요.';
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentTermsValue = currentTerms();
+  });
+
+  it.each(['signup', 'social'])('%s 가입 약관의 하단 버튼 바로 위에 안내한다', (mode) => {
+    searchParamsValue = new URLSearchParams({ mode });
+    render(<TermsClient />);
+    const message = screen.getByText(notice);
+    const footer = message.closest('.tm-auth-fixed-cta');
+    expect(footer).not.toBeNull();
+    const button = screen.getByRole('button', { name: '필수 약관에 동의해 주세요' });
+    expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('공개 여부는 가입 후 설정에서 변경할 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('기존 회원 재동의에는 신규 가입 안내를 표시하지 않는다', () => {
+    searchParamsValue = new URLSearchParams('mode=renewal');
+    currentTermsValue = currentTerms(true);
+    render(<TermsClient />);
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+
+  it('공개 약관 문서에는 가입 안내를 표시하지 않는다', () => {
+    searchParamsValue = new URLSearchParams('document=terms');
+    render(<TermsClient />);
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+});
+
 describe('TermsClient social navigation contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();

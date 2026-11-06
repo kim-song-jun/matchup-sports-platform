@@ -4,6 +4,8 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { invalidateLineupAndTactics } from '../../src/tournaments/tournament-match-update';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * [P1-c] 라인업을 **한쪽도 제출하지 않은** 대회 경기를 시작할 수 있어야 한다.
@@ -28,18 +30,21 @@ const ids = {
   operatorUser: '6c000000-0000-4000-8000-000000000001',
   hostUser: '6c000000-0000-4000-8000-000000000002',
   awayUser: '6c000000-0000-4000-8000-000000000003',
+  replacementUser: '6c000000-0000-4000-8000-000000000004',
   sport: '6c000000-0000-4000-8000-000000000010',
   region: '6c000000-0000-4000-8000-000000000011',
   hostTeam: '6c000000-0000-4000-8000-000000000020',
   awayTeam: '6c000000-0000-4000-8000-000000000021',
+  replacementTeam: '6c000000-0000-4000-8000-000000000022',
   tournament: '6c000000-0000-4000-8000-000000000030',
   hostRegistration: '6c000000-0000-4000-8000-000000000031',
   awayRegistration: '6c000000-0000-4000-8000-000000000032',
+  replacementRegistration: '6c000000-0000-4000-8000-000000000033',
   fixture: '6c000000-0000-4000-8000-000000000040',
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -59,6 +64,9 @@ function creationContext(commandId: string, payload: unknown): GameCommandContex
 
 describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 수 있다', () => {
   let gameId: string;
+  let hostParticipantIds: string[] = [];
+  let replacedAwayParticipantIds: string[] = [];
+  let replacementParticipantId: string | undefined;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -75,7 +83,7 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     }
 
     await prisma.v1User.createMany({
-      data: [ids.operatorUser, ids.hostUser, ids.awayUser].map((id, index) => ({
+      data: [ids.operatorUser, ids.hostUser, ids.awayUser, ids.replacementUser].map((id, index) => ({
         id,
         email: `p1c-start-${index}@example.test`,
         accountStatus: 'active',
@@ -91,6 +99,7 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
       data: [
         { id: ids.hostTeam, ownerUserId: ids.hostUser, sportId: ids.sport, regionId: ids.region, name: 'P1c host' },
         { id: ids.awayTeam, ownerUserId: ids.awayUser, sportId: ids.sport, regionId: ids.region, name: 'P1c away' },
+        { id: ids.replacementTeam, ownerUserId: ids.replacementUser, sportId: ids.sport, regionId: ids.region, name: 'P1c replacement' },
       ],
     });
     await prisma.v1Tournament.create({
@@ -110,6 +119,13 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
           tournamentId: ids.tournament,
           teamId: ids.awayTeam,
           appliedByUserId: ids.awayUser,
+          status: 'confirmed',
+        },
+        {
+          id: ids.replacementRegistration,
+          tournamentId: ids.tournament,
+          teamId: ids.replacementTeam,
+          appliedByUserId: ids.replacementUser,
           status: 'confirmed',
         },
       ],
@@ -173,7 +189,84 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     expect(lineups.every((lineup) => lineup.state === 'DRAFT')).toBe(true);
   });
 
-  it('제출본이 없어도 start 가 성공한다 (예전에는 409 LINEUP_NOT_SUBMITTED 였다)', async () => {
+  it('현재 유효 명단이 한쪽에서 비면 시작을 거부하고 경기 상태를 유지한다', async () => {
+    const awaySide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } });
+    const awayParticipants = await prisma.v1GameParticipant.findMany({ where: { gameId, sideId: awaySide.id } });
+    expect(awayParticipants.length).toBeGreaterThan(0);
+    const grant = await service.requestTakeover(authUser(ids.operatorUser), gameId, {
+      clientInstanceId: 'p1c-client-empty-away',
+      lastSequence: 0,
+    });
+    await prisma.v1GameParticipant.deleteMany({ where: { gameId, sideId: awaySide.id } });
+
+    try {
+      const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
+      await expect(service.executeCommand(authUser(ids.operatorUser), gameId, 'start', 'p1c-start-empty-away', {
+        expectedVersion: game.version,
+        clientCommandId: 'p1c-start-empty-away',
+        takeoverToken: grant.takeoverToken,
+        occurredAt: new Date().toISOString(),
+        payload: { period: 1 },
+      })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'GAME_START_LINEUP_EMPTY' }),
+      });
+      await expect(prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { state: true } }))
+        .resolves.toMatchObject({ state: V1GameState.SCHEDULED });
+    } finally {
+      await prisma.v1GameParticipant.createMany({ data: awayParticipants });
+    }
+  });
+
+  it('팀 교체 뒤 유효한 새 초안이 있으면 start 가 성공한다', async () => {
+    const awaySide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } });
+    const homeSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+    hostParticipantIds = (await prisma.v1GameParticipant.findMany({
+      where: { gameId, sideId: homeSide.id },
+      select: { id: true },
+    })).map((participant) => participant.id);
+    replacedAwayParticipantIds = (await prisma.v1GameParticipant.findMany({
+      where: { gameId, sideId: awaySide.id },
+      select: { id: true },
+    })).map((participant) => participant.id);
+    const priorLineup = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId, sideId: awaySide.id },
+      orderBy: { revision: 'desc' },
+      select: { id: true },
+    });
+    const replacementLineupId = await prisma.$transaction(async (tx) => {
+      await tx.v1GameLineup.update({ where: { id: priorLineup.id }, data: { state: 'SUBMITTED' } });
+      const newLineupId = await invalidateLineupAndTactics(tx, gameId, awaySide.id);
+      if (newLineupId === null) throw new Error('Replacement lineup was not created');
+      await tx.v1TeamMatch.update({ where: { id: ids.fixture }, data: { approvedApplicantTeamId: ids.replacementTeam } });
+      await tx.v1TournamentMatchDetails.update({
+        where: { teamMatchId: ids.fixture },
+        data: { awayRegistrationId: ids.replacementRegistration },
+      });
+      await tx.v1GameSide.update({
+        where: { id: awaySide.id },
+        data: { teamId: ids.replacementTeam, displayNameSnapshot: 'P1c replacement' },
+      });
+      const replacementParticipant = await tx.v1GameParticipant.create({
+        data: {
+          gameId,
+          sideId: awaySide.id,
+          lineupId: newLineupId,
+          userId: ids.replacementUser,
+          displayNameSnapshot: '대체 선수',
+          jerseyNumber: 9,
+        },
+        select: { id: true },
+      });
+      replacementParticipantId = replacementParticipant.id;
+      return newLineupId;
+    });
+    expect(await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: replacementLineupId }, select: { state: true, invalidatedAt: true } }))
+      .toMatchObject({ state: 'DRAFT', invalidatedAt: null });
+    expect(await prisma.v1GameLineup.findUniqueOrThrow({
+      where: { id: priorLineup.id },
+      select: { state: true, invalidatedAt: true, invalidationReason: true },
+    })).toMatchObject({ state: 'SUBMITTED', invalidatedAt: expect.any(Date), invalidationReason: 'SIDE_TEAM_CHANGED' });
+
     const grant = await service.requestTakeover(authUser(ids.operatorUser), gameId, {
       clientInstanceId: 'p1c-client',
       lastSequence: 0,
@@ -191,7 +284,7 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     expect(started.state).toBe(V1GameState.LIVE);
   });
 
-  it('제출 없이 끝난 경기의 공식 결과에도 선수가 실린다 (엄격 셀렉터였다면 빈 명단이었다)', async () => {
+  it('팀 교체 뒤 공식 결과에는 새 유효 명단만 싣고 무효화된 이전 제출 선수는 제외한다', async () => {
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
     const grant = await service.requestTakeover(authUser(ids.operatorUser), gameId, {
       clientInstanceId: 'p1c-client-end',
@@ -206,8 +299,6 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
       payload: {},
     });
 
-    // 이 단언이 이 스펙의 핵심이다. 게이트만 지우고 셀렉터를 그대로 뒀다면 여기가 0 이 되고,
-    // 그건 "경기는 시작되는데 아무 기록도 안 남는" 상태다.
     const revision = await prisma.v1GameResultRevision.findFirst({
       where: { gameId },
       orderBy: { createdAt: 'desc' },
@@ -219,6 +310,12 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
       where: { resultRevisionId: revision!.id },
       select: { participantId: true },
     });
-    expect(resultParticipants.length).toBe(4);
+    const resultParticipantIds = resultParticipants.map((participant) => participant.participantId);
+    expect(resultParticipantIds).toHaveLength(3);
+    expect(resultParticipantIds).toEqual(expect.arrayContaining(hostParticipantIds));
+    expect(resultParticipantIds).toContain(replacementParticipantId);
+    for (const previousTeamParticipantId of replacedAwayParticipantIds) {
+      expect(resultParticipantIds).not.toContain(previousTeamParticipantId);
+    }
   });
 });

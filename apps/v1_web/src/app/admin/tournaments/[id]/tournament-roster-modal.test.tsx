@@ -44,6 +44,7 @@ let eligibleState: Record<string, unknown>;
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
+  useV1AdminUpdatePlayerSettings: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
   useV1AdminRosterEligibleMembers: () => eligibleState,
@@ -109,7 +110,7 @@ describe('admin tournament roster modal', () => {
             userId: 'user-1',
             realName: '홍길동',
             nickname: '길동이',
-            birthDateSnapshot: '1995-03-15',
+            birthDateSnapshot: '19950315',
             genderSnapshot: 'male',
             phone: '01012345678',
             isTeamCaptain: false,
@@ -161,7 +162,7 @@ describe('admin tournament roster modal', () => {
     );
 
     expect(screen.getByRole('dialog', { name: '명단 검토 — 번개팀' })).toBeInTheDocument();
-    expect(screen.getByText('1995-03-15 · 남성')).toBeInTheDocument();
+    expect(screen.getByText('1995.03.15 · 남성')).toBeInTheDocument();
     expect(screen.getByText('휴대폰 010-1234-5678')).toBeInTheDocument();
   });
 
@@ -206,7 +207,7 @@ describe('admin tournament roster modal', () => {
       />,
     );
 
-    expect(screen.getByText('1995-03-15 · 성별 미등록')).toBeInTheDocument();
+    expect(screen.getByText('1995.03.15 · 성별 미등록')).toBeInTheDocument();
     expect(screen.getByText('휴대폰 미등록')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
   });

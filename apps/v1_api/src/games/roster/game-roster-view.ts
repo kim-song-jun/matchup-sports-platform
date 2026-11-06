@@ -190,6 +190,28 @@ function playedPeople(rows: readonly PlayedLineupRow[], base: readonly GameRoste
     .sort(byRosterOrder);
 }
 
+/**
+ * 시작된 경기면 기록 명단을 출전자(`played`)로 잇는다. 시작 전(`playedLineup === null`)이면 `played` 는 null 이고
+ * 계산 그대로다. 경기 명단 화면과 팀·어드민 선수 × 경기 표가 같은 규칙을 쓴다.
+ */
+export function reconcilePlayedLineup(
+  computation: GameRosterComputation,
+  base: readonly GameRosterBaseEntry[],
+  playedLineup: readonly PlayedLineupRow[] | null,
+) {
+  const played = playedLineup === null ? null : playedPeople(playedLineup, base);
+  const playedIds = new Set(played?.map((row) => row.userId) ?? []);
+  // 시작된 경기에서 기록에 있는 사람은 그 뒤 생긴 결장·정지로 "빠짐"이 되지 않는다.
+  const notPlayed = <T extends { entry: GameRosterBaseEntry }>(rows: readonly T[]): readonly T[] =>
+    played === null ? rows : rows.filter((row) => !playedIds.has(row.entry.userId));
+  return {
+    played,
+    excluded: notPlayed(computation.excluded),
+    unavailable: notPlayed(computation.unavailable),
+    suspended: notPlayed(computation.suspended),
+  };
+}
+
 export function buildGameRosterView(input: GameRosterViewInput): GameRosterView {
   const { context, computation } = input;
   const actor = (userId: string, role: string | null): GameRosterActorView => ({
@@ -202,14 +224,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     const realName = input.realNameByUserId?.get(row.userId);
     return realName === undefined ? row : { ...row, realName };
   };
-  const played = input.playedLineup === null ? null : playedPeople(input.playedLineup, input.base);
-  const playedIds = new Set(played?.map((row) => row.userId) ?? []);
-  // 시작된 경기에서 기록에 있는 사람은 그 뒤 생긴 결장·정지로 "빠짐"이 되지 않는다.
-  const notPlayed = <T extends { entry: GameRosterBaseEntry }>(rows: readonly T[]): readonly T[] =>
-    played === null ? rows : rows.filter((row) => !playedIds.has(row.entry.userId));
-  const excluded = notPlayed(computation.excluded);
-  const unavailable = notPlayed(computation.unavailable);
-  const suspended = notPlayed(computation.suspended);
+  const { played, excluded, unavailable, suspended } = reconcilePlayedLineup(computation, input.base, input.playedLineup);
   const statusByUser = new Map<string, GameRosterView['base'][number]['status']>();
   for (const row of suspended) statusByUser.set(row.entry.userId, 'SUSPENDED');
   for (const row of unavailable) statusByUser.set(row.entry.userId, 'UNAVAILABLE');

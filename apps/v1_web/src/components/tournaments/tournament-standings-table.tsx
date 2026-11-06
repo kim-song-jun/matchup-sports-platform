@@ -125,6 +125,8 @@ function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
 export function TournamentStandingsTable({
   rows,
   advancingKeys,
+  advancingLabels,
+  advancingColors,
   ariaLabel,
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
@@ -134,6 +136,8 @@ export function TournamentStandingsTable({
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
+  advancingLabels?: ReadonlyMap<string, readonly string[]>;
+  advancingColors?: ReadonlyMap<string, number>;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
@@ -214,7 +218,13 @@ export function TournamentStandingsTable({
                       >
                         {isHidden ? '참가팀 비공개' : row.teamName}
                       </span>
-                      {promoted ? <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>진출</span> : null}
+                      {promoted ? (
+                        advancingLabels?.get(row.key)?.length ? (
+                          <span className="flex flex-wrap gap-1">
+                            {advancingLabels.get(row.key)!.map((label) => <span key={label} className={`tm-badge tm-badge-sm tm-final-color-${((advancingColors?.get(label) ?? 0) % 10 + 10) % 10}`} style={{ flexShrink: 0 }}>{label}</span>)}
+                          </span>
+                        ) : <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>진출</span>
+                      ) : null}
                     </span>
                   </>
                 );
@@ -229,7 +239,7 @@ export function TournamentStandingsTable({
                 return (
                   <Fragment key={row.key}>
                     <tr
-                      className={`tm-standings-row${promoted ? ' tm-standings-row-highlight' : ''}`}
+                      className={`tm-standings-row${promoted && !advancingLabels?.get(row.key)?.length ? ' tm-standings-row-highlight' : ''}`}
                     >
                       <td style={{ paddingLeft: 12 }}>
                         <StandingRankBadge pos={row.position} sharedRank={row.sharedRank} promoted={promoted} unranked={unranked} />

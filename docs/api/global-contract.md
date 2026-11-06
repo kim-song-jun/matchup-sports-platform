@@ -1,8 +1,34 @@
+배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
+리그 + N개 토너먼트는 토너먼트별 독립 진출팀 확정과 공식 순위 기반 추천/4개 조 12팀 교차 배치를 제공한다. 미리보기는 저장하지 않으며 확정은 선택한 결선만 원자적으로 변경한다. [대회 계약](./domains/tournaments.md#토너먼트-하나의-진출팀-확정-2026-11-06).
+
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
+N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대회 활성 디렉터의 별도 변경 액션이다. expectedRevision, 대회 advisory lock, 경기 행 잠금, 감사 로그와 원자적 저장을 사용한다. 시작/기록/결과가 있으면 초기화는 409이며 예선 수정은 기존 대진이 없을 때만 허용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미승인 명단은 null로 유지하며 명시 capacity 또는 이전 계약의 진출 규칙 수만큼 미정 시드를 선생성한다. 생성 UI는 이름·자리 수만 정하고 순위별 목적지는 별도 규칙 화면에서 연결한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.
+
+신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
+
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다. [공개 기록 계약](./domains/public-records.md#own-goal-display-side-2026-10-22).
+
+결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
+
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원이 선택한 서로 다른 팀 수보다 작으면 `422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`로 쓰기 전에 거부한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
 
 # Global v1 API contract
+
+대회 관리 API의 권한은 플랫폼 관리자 또는 해당 대회의 활성 `TOURNAMENT_DIRECTOR` 배정이다. 전역 관리자 게이트는 유지한다. 하위 리소스 ID의 실제 소속 대회를 서버에서 확인하고 범위 밖 요청은 `403 PERMISSION_DENIED`다. 자세한 범위와 예외는 [대회 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
+대진 v2 생성은 게임 명령 헤더 대신 body의 `requestId`와 서버 `previewHash`를 사용한다. 각 조의 `groups[].legs`(1·2회전)가 기존 최상위 `legs`보다 우선하며 둘 다 없으면 1회전이다. 초안·미리보기·실제 생성·경기 상한은 같은 조별 회전 설정을 사용한다. 같은 키의 입력 변경·오래된 미리보기·초안 revision 충돌은 409이며 부분 생성은 없다. 권한과 출시 플래그는 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
+
+공개 대회 일정의 미배정 홈·어웨이는 직접/슬롯 문구가 없으면 저장된 진출 연결의 원천 라운드·경기 번호·승자/패자를 기존 라벨 필드에 제공한다. 삭제된 원천은 제외하고 실제 팀명·가림 정책은 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
 대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 형식과 라인업 설정을 함께 바꾸는 PATCH는 설정 핀·대진 리포인트·일반 필드·감사를 같은 트랜잭션에서 저장하므로 거부된 요청은 부분 저장되지 않는다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
 
@@ -15,6 +41,8 @@ Ordinary team matches accept optional `periods` on existing create/update routes
 Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.
+
+대회 경기 삭제는 대회 `in_progress`에서도 허용하되 경기 `SCHEDULED`/`matched`, 결과 없음, 후속 대진·하위 경기 보호를 적용한다. 종료·취소 대회는 계속 거부한다. [대회 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
 
 This contract is frozen against the approved Task 127 plan. Domain documents provide navigation and domain-specific policy; this registry is the exact cross-domain REST, field, actor, idempotency, error, transition, and compensation contract.
 
@@ -39,18 +67,19 @@ All responses use `{status,data,timestamp}`. Collection reads use `limit` (defau
 | `POST /api/v1/team-matches/:teamMatchId/lineup/submit` | `{expectedVersion}` → submitted lineup/version/publicLineupAt | team_manager/team_owner |
 | `POST /api/v1/team-matches/:teamMatchId/lineup/change-request` | `{expectedVersion,reason}` → change-requested lineup/version | opponent_manager before lock; audited |
 | `GET /api/v1/games/:gameId` | no body → game, sides, periods, lifecycle, currentVersion, lastSequence, current official/draft refs | resource-scoped actor |
-| `POST /api/v1/games/:gameId/commands/:command` | `{expectedVersion,clientCommandId,takeoverToken,occurredAt,payload}` where command is `start|pause|resume|end` and `clientCommandId` must equal `Idempotency-Key` → committed version/state | tournament fixtures: assigned field_operator, assigned tournament_director, or platform_ops with a valid exclusive token; team matches: no generic command surface, because validated team result submission owns the end transition |
+| `POST /api/v1/games/:gameId/commands/:command` | `{expectedVersion,clientCommandId,takeoverToken?,occurredAt,payload}` where command is `start|pause|resume|end|end-period|start-period|revert-period|next-period` and `clientCommandId` must equal `Idempotency-Key` → committed version/state | A supplied token must be a string containing at least one non-whitespace character and is passed unchanged. Tournament-scoped operators require a valid exclusive token; ordinary TeamMatch actions retain the existing source-specific service authorization and may omit the token. Generic TeamMatch `end` remains forbidden where validated team result submission owns that transition |
 | `POST /api/v1/games/:gameId/cancel` | `{expectedVersion,reason}` → cancelled game/version and hidden public projection | team_owner/team_manager for team match; tournament_director/platform_ops for tournament; cancels lineup publication, result SLA, and pending fixture jobs |
-| `GET/POST /api/v1/games/:gameId/events` | `afterSequence` or `{expectedVersion,clientEventId,takeoverToken,type,sideId,participantId?,period,clockMs,occurredAt,payload}` → ordered events/ack sequence | scoped reader; assigned field_operator, assigned tournament_director, or platform_ops append with valid token |
-| `POST /api/v1/games/:gameId/events/:eventId/reverse` | `{expectedVersion,clientEventId,takeoverToken,reason}` → one append-only compensating event `{reversalSequence,version}` | assigned tournament_director/platform_ops; a corrected replacement is a separate normal append with its own clientEventId/payloadHash/ack |
-| `GET/POST /api/v1/games/:gameId/result-revisions` | GET reads history (each revision carries `createdByName`, the nickname of the user who created that revision (a team-match draft can be submitted by another manager), `null` for system revisions); POST `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason?}` creates a content-immutable team-match draft only | scoped actors read; team_manager/team_owner POST for team match; tournament POST returns `409 TOURNAMENT_RESULT_DERIVED_ONLY` because normal `end` derives+submits, zero-revision drift uses recovery, and corrections use `/corrections` |
+| `GET/POST /api/v1/games/:gameId/events` | `afterSequence` or `{expectedVersion,clientEventId,takeoverToken?,type,sideId,participantId?,period,clockMs,occurredAt,payload}` → ordered events/ack sequence | A supplied token must be a string containing at least one non-whitespace character and is passed unchanged. Scoped reader; ordinary TeamMatch host owner/manager actions use existing service authorization and may omit token; tournament-scoped operators require a valid token |
+| `POST /api/v1/games/:gameId/events/:eventId/reverse` | `{expectedVersion,clientEventId,takeoverToken?,reason}` → one append-only compensating event `{reversalSequence,version}` | ordinary TeamMatch host owner/manager or assigned tournament director/field operator/platform operations under existing service authorization; a supplied token must be a string containing a non-whitespace character and is passed unchanged; token requirements follow the source scope |
+| `POST /api/v1/games/:gameId/events/:eventId/assist` | `{expectedVersion,clientEventId,takeoverToken?,assistParticipantId}` → in-place assist change with version/sequence | ordinary TeamMatch host owner/manager or assigned tournament director/field operator/platform operations under existing service authorization; a supplied token must be a string containing a non-whitespace character and is passed unchanged; token requirements follow the source scope |
+| `GET/POST /api/v1/games/:gameId/result-revisions` | GET reads history (each revision carries `createdByName`, the nickname of the user who created that revision (a team-match draft can be submitted by another manager), `null` for system revisions, and `officializedByName`, the nickname of the user whose command made it `OFFICIAL` (from the operation audit; `null` before officialization or when no user audit exists) — MD-QA #169); POST `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason?}` creates a content-immutable team-match draft only | scoped actors read; team_manager/team_owner POST for team match; tournament POST returns `409 TOURNAMENT_RESULT_DERIVED_ONLY` because normal `end` derives+submits, zero-revision drift uses recovery, and corrections use `/corrections` |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/submit` | `{expectedVersion}` → submitted revision/SLA timestamps; for a team-match source only, the same transaction validates authority/result and moves `SCHEDULED|LIVE|PAUSED→ENDED` before submission | owning team_manager/team_owner |
 | `POST /api/v1/games/:gameId/result-recovery/derive-and-submit` | `{expectedVersion,takeoverToken,eventsHash,reason}` → atomically derived submitted revision/review timestamps | assigned tournament_director or platform_ops; only when game is `ENDED` and has no result revision, otherwise `409 RESULT_RECOVERY_NOT_REQUIRED` |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/decision` | `{expectedVersion,decision:approve|change_request,reason?}` → official/pending state | opponent_manager for team match |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` → atomically creates a content-immutable superseding revision, moves it `DRAFT→SUBMITTED`, and starts a fresh review SLA | tournament_director/platform_ops; base must be `SUBMITTED` (Task 166 — 어드민이 제출된 결과를 그 자리에서 고친다), otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `{expectedVersion,projectionPreviewHash}` → official revision/outbox watermark | platform_ops; tournament_director only when audited flag enabled |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `{expectedVersion,reason}` → append-only void revision/current pointer/outbox watermark | platform_ops; audited tournament_director only when flag enabled |
-| `POST /api/v1/games/:gameId/corrections` | `{expectedVersion,baseRevisionId,reason,changes}` → superseding draft revision | platform_ops/tournament_director |
+| `POST /api/v1/games/:gameId/corrections` | `{expectedVersion,baseRevisionId,reason,changes}` → superseding draft revision; changed shootout scores require actual paired kick counts on event-backed games; explicit `changes.score.penalties.operatorOverride:false` prevents base override inheritance | platform_ops/tournament_director |
 | `GET /api/v1/tournaments/:tournamentId/fixtures/:fixtureId/claimable-participants` · `GET /api/v1/league-matches/:leagueId/fixtures/:teamMatchId/claimable-participants` · `GET /api/v1/team-matches/:teamMatchId/claimable-participants` | → `{gameId,version,rosterCount,rosterSubmitted,participants[]}`; `participants` are the roster rows not yet linked or pending, `rosterCount` counts the whole roster with the official-result selector (per side: submitted lineup, else latest draft) so an empty list can tell "no roster yet" (`0`) from "everyone is linked"; `rosterSubmitted` is `true` once at least one side has a submitted (SUBMITTED/LOCKED) lineup — a draft-only roster still counts and lists candidates, but with no candidates the screen says "no submitted roster yet" instead of "everyone is linked" (tournament/league rosters are always submitted) | member of either participating team (`participant_identity`) |
 | `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests` | `{expectedVersion}` → `{requestId,state:"pending_attestation",version,effectiveAt,expiresAt}` | authenticated user is server-derived; database transaction time is `effectiveAt`, expiry is database `effectiveAt+24h`; caller identity/time fields are forbidden |
 | `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests/:requestId/attest` | `{expectedVersion,decision:approve|reject,reason}` → append-only attestation event and active/rejected link state | owning team_owner or platform_ops; cannot self-attest; expired/race-lost request returns `409 IDENTITY_LINK_REQUEST_EXPIRED` |
@@ -194,3 +223,45 @@ The [league image endpoint](./domains/league-matches.md#cover-image-목록상세
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
 
 - 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.
+
+선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
+
+Admin roster settings writes use the owner/ops-only gate and append actor/before/after audit records.
+Support admins may only read. See [admin roster settings](./domains/tournaments.md#admin-roster-player-settings-2026-10-20).
+
+대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
+
+공통 결선 배정은 `GET .../bracket/finalist-preview` → `POST .../bracket/finalist-assignments`로 수행한다([대회 계약](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21)). 활성 관리자 읽기/쓰기 분리, SHA256 preview 버전 재검증, 사유·변경 전후 감사, 단일 트랜잭션/부분 성공 없음 원칙을 따른다. 공식 순위는 변경하지 않으며 운영자 결선 배정안만 저장한다.
+
+빈 템플릿 조 정리(2026-10-21): 기존 관리자 mutation 권한·대회 레인 잠금·단일 트랜잭션을 유지한다. 실제 배정/경기/슬롯 참조는409로 보호하고, 비어 있는 미사용 자리와 그에 종속된 고아 편성만 삭제 시 정리한다. 세부 조건은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+대회 이미지 설정은 기존 관리자 create/PATCH 권한·CAS·감사 계약으로 저장한다. `showDetailImage: false`는 사진 삭제 없이 상세 미디어만 숨긴다. [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+대회 `showDetailImage` 입력은 JSON boolean을 보존한다. boolean이 아닌 값은 전역 HTTP pipe에서 `400 VALIDATION_ERROR`로 거절하며, 문자열 `"false"`를 true로 바꾸지 않는다. 생략/null의 optional 처리는 대회 이미지 계약을 따른다.
+
+
+### Competition discovery pagination extension (Task 20261103)
+
+The public `/tournaments` collection additionally accepts phase/registration/date/format/fee
+filters and latest/deadline/scheduled sorting. This domain retains `pageInfo` pagination rather
+than the frozen game contracts above: numbered pages include total/totalPages; cursor callers
+opt into total with `withTotal=true`. Filters run before pagination and do not widen public
+visibility. Admission-window and capacity semantics, 400 range errors, and backward-compatible
+status inputs are defined in [Tournaments](./domains/tournaments.md#competition-discovery-filters-task-20261103).
+
+- 종료 경기 명단의 관리자 정정도 기존 transaction/error envelope를 따른다. owner·ops만 batch EXCLUDE/REVOKE 예외를 가지며 개인 기록과 충돌하면 409 `ROSTER_RESULT_CORRECTION_REQUIRED`로 전체 요청을 rollback한다([경기 계약](domains/games.md)).
+
+## 카드 기록 중첩 검증
+
+경기 결과 참가자의 `cards.events`는 명시적 빈 배열과 생략의 의미가 다르다. 빈 배열은 카드 삭제,
+생략은 기존 합계 전용 입력이다. 상세 형식·합계 일치·피리어드 검증은 [games](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.
+
+
+대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
+
+- 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).
+
+### Qualification display metadata
+Tournament qualification destinations may carry a server-owned colorIndex. Editors round-trip the returned named-final id; colors are persisted independently of labels/order. Existing auth, publication and qualification gates apply (see domains/tournaments.md).

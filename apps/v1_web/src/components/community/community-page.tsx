@@ -11,7 +11,7 @@ import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl, optimizedImageSrc } from '@/lib/assets';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
 import { ChatImageViewer, ChatPlusPanel, ChatSharePicker } from './chat-plus-panel';
@@ -19,6 +19,10 @@ import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { TeamContactStatusCard, contactStatusLabel } from './team-contact-status-card';
+
+/** `.tm-chat-image` 의 200×200 과 `.tm-chat-avatar` 의 46×46(모바일 42) — globals.css 와 같아야 한다. */
+const CHAT_IMAGE_SIZE = 200;
+const CHAT_AVATAR_SIZE = 46;
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
   // 셸 승격(U34): title/activeTab/bottomNav/backHref/showNotifications 전부 정적이라
@@ -331,8 +335,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                           </Link>
                         ) : message.kind === 'image' && message.imageUrl ? (
                           <button type="button" className="tm-chat-image-button" aria-label="사진 크게 보기" onClick={() => setViewerUrl(message.imageUrl ?? null)}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- 사용자 업로드(/uploads)는 next/image 최적화 대상이 아니다. */}
-                            <img src={message.imageUrl} alt="" className="tm-chat-image" loading="lazy" />
+                            {/* eslint-disable-next-line @next/next/no-img-element -- <img> 를 유지하고 src 만 optimizedImageSrc 로 줄여 받는다. */}
+                            <img src={optimizedImageSrc(message.imageUrl, CHAT_IMAGE_SIZE)} alt="" className="tm-chat-image" loading="lazy" />
                           </button>
                         ) : (
                           <div className="tm-text-body">{message.body}</div>
@@ -732,7 +736,7 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
         onClickCapture={handleClick}
       >
         <Link className="tm-chat-row-main" href={`/chat/${room.id}`} aria-current={selected ? 'page' : undefined}>
-          <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
+          <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: optimizedCssUrl(room.avatarUrl, CHAT_AVATAR_SIZE) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>

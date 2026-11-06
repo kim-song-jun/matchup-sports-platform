@@ -38,15 +38,50 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     const publicView = await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`);
     expect(publicView.status).toBe(200);
     expect(publicView.body.data.rulesText).toBe(body.rulesText);
-    expect(publicView.body.data.registrationOpen).toBe(true);
+    // 2026-10-27: 마감을 정하는 것만으로는 열리지 않는다 — 대회처럼 '접수 시작하기'(open)가 연다.
+    expect(publicView.body.data.registrationOpen).toBe(false);
+    await h.prisma.v1Tournament.update({ where: { id }, data: { status: 'open' } });
+    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(true);
     const stale = await patch(id, { ...body, title: '오래된 화면' });
     expect(stale.status).toBe(409);
     expect(stale.body.code).toBe('LEAGUE_SETTINGS_STALE');
     expect(await h.prisma.v1AdminActionLog.count({ where: { targetId: id, action: 'league_match.update_settings' } })).toBe(1);
-    const close = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null, plannedFixtureCount: null });
-    expect(close.status).toBe(200);
+    const cleared = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null, plannedFixtureCount: null });
+    expect(cleared.status).toBe(200);
     expect((await get(id)).body.data.plannedFixtureCount).toBeNull();
-    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(false);
+    // 마감을 비우면 '접수 마감하기'를 누를 때까지 받는다(대회와 같다).
+    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(true);
+  });
+  // 2026-11-03 사용자 요청: 리그도 만들 때 대회와 같은 성별을 고른다.
+  it('생성 때 고른 성별을 저장해 설정·공개 상세에 싣고, 수정은 생략하면 유지하고 보내면 바꾼다', async () => {
+    const http = () => request(app.getHttpServer());
+    const base = { sportId: h.sportId, regionId: h.regionId, startsOn: '2098-01-01T00:00:00.000Z', endsOn: '2098-12-31T00:00:00.000Z', teamIds: [] };
+    const invalid = await http().post('/api/v1/admin/league-matches').set('x-v1-user-id', h.adminUserId)
+      .send({ ...base, title: `성별 오류 ${h.sportId}`, genderCategory: 'unknown' });
+    expect(invalid.status).toBe(400);
+    const created = await http().post('/api/v1/admin/league-matches').set('x-v1-user-id', h.adminUserId)
+      .send({ ...base, title: `여성부 리그 ${h.sportId}`, genderCategory: 'female' });
+    expect(created.status).toBe(201);
+    const id = created.body.data.leagueId as string;
+    expect(await h.prisma.v1Tournament.findUniqueOrThrow({ where: { id } })).toMatchObject({ genderCategory: 'female' });
+    const createAudit = await h.prisma.v1AdminActionLog.findFirstOrThrow({ where: { targetId: id, action: 'league_match.create' } });
+    expect(createAudit.afterJson).toMatchObject({ genderCategory: 'female' });
+    expect((await get(id)).body.data.genderCategory).toBe('female');
+    expect((await http().get(`/api/v1/tournaments/${id}`).expect(200)).body.data.genderCategory).toBe('female');
+
+    // 화면이 바꾸지 않은 성별을 생략해도 그대로 남는다.
+    expect((await patch(id, { ...await snapshot(id), title: '여성부 리그 수정' })).status).toBe(200);
+    expect((await get(id)).body.data.genderCategory).toBe('female');
+    expect((await patch(id, { ...await snapshot(id), genderCategory: 'nope' })).status).toBe(400);
+    const changed = await patch(id, { ...await snapshot(id), genderCategory: 'mixed' });
+    expect(changed.status).toBe(200);
+    expect(changed.body.data.genderCategory).toBe('mixed');
+    const audit = await h.prisma.v1AdminActionLog.findFirstOrThrow({ where: { targetId: id, action: 'league_match.update_settings' }, orderBy: { createdAt: 'desc' } });
+    expect(audit.beforeJson).toMatchObject({ genderCategory: 'female' });
+    expect(audit.afterJson).toMatchObject({ genderCategory: 'mixed' });
+
+    // 성별을 받기 전 경로로 만든 리그는 null 이다.
+    expect((await get(await h.makeLeague())).body.data.genderCategory).toBeNull();
   });
   it('실제 권한, kind, 종료 상태와 DTO whitelist를 검사한다', async () => {
     const id = await h.makeLeague();

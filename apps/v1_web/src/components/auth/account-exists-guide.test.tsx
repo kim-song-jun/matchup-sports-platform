@@ -1,0 +1,226 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { AccountExistsGuide } from './account-exists-guide';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }) }));
+
+const renderGuide = (props: Parameters<typeof AccountExistsGuide>[0]) =>
+  render(<QueryClientProvider client={new QueryClient()}><AccountExistsGuide {...props} /></QueryClientProvider>);
+
+const storeToken = (provider: 'kakao' | 'apple') =>
+  savePendingSocialLink({ next: 'sign_in_then_link', provider, linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+
+beforeEach(() => {
+  vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', 'rest-key');
+  vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', 'https://teameet.test/callback/kakao');
+});
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+  vi.unstubAllEnvs();
+});
+
+describe('AccountExistsGuide', () => {
+  it('이미 다른 소셜 계정이 연결된 경우 자동 연결이 보장되지 않음을 안내한다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.getByText(/이미 다른 카카오 계정이 연결돼 있으면/)).toBeInTheDocument();
+    expect(screen.queryByText('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요')).not.toBeInTheDocument();
+  });
+
+  it('이미 팀밋 계정이 있다고 알리고 원래 방법으로 로그인하는 3단계를 번호 순서로 보여 준다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('이미 팀밋 계정이 있어요');
+    expect(screen.getByText(/카카오로 새로 가입할 수 없어요/)).toBeInTheDocument();
+    const steps = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toHaveTextContent('원래 가입한 방법으로 로그인해요');
+    expect(steps[1]).toHaveTextContent('카카오 로그인 연결을 시도해요');
+    expect(steps[2]).toHaveTextContent('연결 결과를 확인해요');
+  });
+
+  it('3단계 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다 — 로그인 버튼 쪽 길이 먼저다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: '/teams/new' });
+
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    // 돌아갈 경로 같은 쿼리를 싣지 않는다.
+    expect(help).toHaveAttribute('href', '/contact');
+    const lastStep = screen.getByText('연결 결과를 확인해요');
+    expect(lastStep.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('Apple 충돌이면 문구도 Apple 로 바뀐다', () => {
+    storeToken('apple');
+    renderGuide({ provider: 'apple', redirectPath: null });
+    expect(screen.getByText(/Apple로 새로 가입할 수 없어요/)).toBeInTheDocument();
+    expect(screen.getByText('Apple 로그인 연결을 시도해요')).toBeInTheDocument();
+    expect(screen.queryByText(/카카오 로그인이 자동으로/)).not.toBeInTheDocument();
+  });
+
+  // 연결 토큰이 없거나 만료됐으면 자동 연결을 약속하지 않는다 — 설정에서 직접 연결하도록 안내한다.
+  it('보관된 연결 토큰이 없으면 자동 연결 대신 설정에서 직접 연결하라고 안내한다', () => {
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.getByText('로그인한 뒤 설정에서 연결해요')).toBeInTheDocument();
+    expect(screen.getByText(/"로그인 방법"에서 카카오 로그인을 연결해 주세요/)).toBeInTheDocument();
+  });
+
+  it('만료된 토큰은 자동 연결을 약속하지 않고, 만료 표식은 소비하지 않는다', () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 }, Date.now() - 601_000);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.getByText('로그인한 뒤 설정에서 연결해요')).toBeInTheDocument();
+    expect(peekPendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
+  });
+
+  it('이메일 로그인·계정 찾기·비밀번호 재설정으로 가는 길을 주고 돌아갈 경로를 싣는다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: '/teams/new' });
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email?redirect=%2Fteams%2Fnew');
+    const guide = encodeURIComponent('/auth/account-conflict?provider=kakao&redirect=%2Fteams%2Fnew');
+    expect(screen.getByRole('link', { name: '계정 찾기' })).toHaveAttribute('href', `/auth/find-account?from=${guide}&redirect=%2Fteams%2Fnew`);
+    expect(screen.getByRole('link', { name: '비밀번호 재설정' })).toHaveAttribute(
+      'href',
+      `/auth/find-account?mode=reset-password&from=${guide}&redirect=%2Fteams%2Fnew`,
+    );
+  });
+
+  it('돌아갈 경로가 없으면 쿼리 없이 이메일 로그인으로 보낸다', () => {
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
+  });
+
+  it('원래 수단이 카카오일 수도 있어 카카오 로그인 버튼도 준다', () => {
+    renderGuide({ provider: 'apple', redirectPath: null });
+    expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toBeInTheDocument();
+  });
+
+  it('카카오 설정이 없는 환경에서는 카카오 버튼을 그리지 않는다', () => {
+    vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', '');
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toBeInTheDocument();
+  });
+
+  it('제공자를 모르면 특정 서비스를 단정하지 않는다', () => {
+    renderGuide({ provider: null, redirectPath: null });
+    expect(screen.getByText(/소셜로 새로 가입할 수 없어요/)).toBeInTheDocument();
+  });
+});
+
+describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', () => {
+  // KST 로는 11월 7일 00:30. 지났는지도 보므로 시계를 고정한다.
+  const UNTIL = '2026-11-06T15:30:00.000Z';
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const storeWithdrawal = (provider: 'kakao' | 'apple', withdrawalPendingUntil: string | null, nowMs: number = Date.now()) =>
+    savePendingSocialLink(
+      { next: 'sign_in_then_link', provider, linkToken: 'link-token-1', linkTokenExpiresInSeconds: 1800, withdrawalPendingUntil },
+      nowMs,
+    );
+
+  it('3단계 대신 두 가지 방법을 보여 주고, 방법 1 은 탈퇴 취소를 거쳐 자동 연결로 끝난다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('이미 팀밋 계정이 있어요');
+    expect(screen.getByText('가입했던 계정이 탈퇴 신청 중이라, 카카오로 새로 가입할 수 없어요. 아래 두 가지 중에서 골라 주세요.')).toBeInTheDocument();
+    const wayOne = within(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' })).getAllByRole('listitem');
+    expect(wayOne).toHaveLength(3);
+    expect(wayOne[0]).toHaveTextContent('원래 가입한 방법으로 로그인해요');
+    expect(wayOne[1]).toHaveTextContent('탈퇴 신청을 취소해요');
+    expect(wayOne[2]).toHaveTextContent('카카오 로그인 연결을 시도해요30분 안에 로그인하고 탈퇴 신청을 취소해 주세요. 이미 다른 카카오 계정이 연결돼 있으면 결과를 알려 드려요.');
+    expect(screen.queryByText('연결 결과를 확인해요')).not.toBeInTheDocument();
+
+    const wayTwo = within(screen.getByRole('list', { name: '기다릴 때의 일정' })).getAllByRole('listitem');
+    expect(wayTwo[1]).toHaveTextContent('11월 7일계정이 삭제돼요');
+    expect(wayTwo[2]).toHaveTextContent('카카오로 새로 가입할 수 있어요');
+  });
+
+  it('Apple 충돌이면 두 곳의 문구가 Apple 로 바뀐다', () => {
+    storeWithdrawal('apple', UNTIL);
+    renderGuide({ provider: 'apple', redirectPath: null });
+
+    expect(screen.getByText('Apple 로그인 연결을 시도해요')).toBeInTheDocument();
+    expect(screen.getByText('Apple로 새로 가입할 수 있어요')).toBeInTheDocument();
+  });
+
+  it('날짜를 모르면(null) 방법 2 와 "두 가지" 문장을 빼고 방법 1 만 남긴다', () => {
+    storeWithdrawal('kakao', null);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.getByText('가입했던 계정이 탈퇴 신청 중이라, 카카오로 새로 가입할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/두 가지 중에서/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '기다릴 때의 일정' })).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+  });
+
+  // 탈퇴 계정이라는 사실과 날짜는 토큰 수명과 무관하다 — 토큰만 만료되면 자동 연결 약속은 거두되 방법 2 는 그대로다.
+  it('토큰이 만료돼도 두 가지 방법은 남고 자동 연결 대신 설정에서 직접 연결하라고 안내한다', () => {
+    storeWithdrawal('kakao', UNTIL, Date.now() - 1_801_000);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.getByRole('list', { name: '기다릴 때의 일정' })).toBeInTheDocument();
+    expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.getByText('로그인한 뒤 설정에서 연결해요')).toBeInTheDocument();
+    expect(screen.getByText(/"로그인 방법"에서 카카오 로그인을 연결해 주세요/)).toBeInTheDocument();
+    expect(peekPendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
+  });
+
+  it('방법 1 에 고객센터 링크가 있어 비밀번호를 잊은 사람도 막다른 길이 아니다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+  });
+
+  // 유예 종료 시각이 지났어도 탈퇴 계정이라는 사실은 남는다 — 방법 2 만 빠지고 방법 1 은 그대로다.
+  it('저장된 유예 종료 시각이 지나면 방법 2 와 "두 가지" 문장만 빠지고 탈퇴 계정 안내는 남는다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    vi.setSystemTime(Date.parse(UNTIL) - 1);
+    const { unmount } = renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.getByRole('list', { name: '기다릴 때의 일정' })).toBeInTheDocument();
+    unmount();
+
+    vi.setSystemTime(Date.parse(UNTIL));
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.queryByRole('list', { name: '기다릴 때의 일정' })).not.toBeInTheDocument();
+    expect(screen.getByText('가입했던 계정이 탈퇴 신청 중이라, 카카오로 새로 가입할 수 없어요.')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+    expect(screen.queryByText('연결 결과를 확인해요')).not.toBeInTheDocument();
+  });
+
+  it('번호 재배정 안내는 싣지 않는다 — 방법 1 에 자기 문구의 고객센터 링크가 있다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.queryByText(/번호를 최근에 새로 받았나요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toBeInTheDocument();
+  });
+
+  it('탈퇴 계정이 아닌 일반 충돌은 기존 3단계 그대로다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.queryByRole('list', { name: '기다릴 때의 일정' })).not.toBeInTheDocument();
+    expect(screen.getByText('연결 결과를 확인해요')).toBeInTheDocument();
+  });
+
+  it('로그인 버튼과 계정 찾기 길은 그대로 두어 어느 방법으로 가입했든 거기서 탈퇴 취소로 이어진다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    renderGuide({ provider: 'kakao', redirectPath: '/teams/new' });
+
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email?redirect=%2Fteams%2Fnew');
+    expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '계정 찾기' })).toBeInTheDocument();
+  });
+});

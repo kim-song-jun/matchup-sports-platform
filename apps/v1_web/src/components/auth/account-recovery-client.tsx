@@ -9,26 +9,25 @@ import { PhoneVerificationCard } from '@/components/auth/phone-verification/phon
 import {
   useV1AuthMe,
   useV1FindAccountByPhone,
+  useV1FindAccountByEmail,
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
+import { AuthStepHeader } from './auth-step-header';
+import { AuthStepCta } from './auth-step-cta';
+import { describeFoundAccount } from './found-account-login';
+import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
+import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
+import styles from './account-recovery.module.css';
 
 type Mode = 'find-id' | 'reset-password';
-
-const MODE_COPY: Record<Mode, { title: string; sub: string }> = {
-  'find-id': {
-    title: '가입한 이메일을 찾아요',
-    sub: '가입할 때 등록한 휴대폰 번호로 본인인증하면 로그인에 쓰는 이메일을 알려드려요.',
-  },
-  'reset-password': {
-    title: '비밀번호를 다시 설정해요',
-    sub: '가입한 이메일로 인증번호를 보내드려요. 코드를 확인하면 새 비밀번호를 정할 수 있어요.',
-  },
-};
+type FindMethod = 'phone' | 'email';
+type RecoveryStep = 'purpose' | 'method' | 'identity' | 'verify' | 'result' | 'password' | 'complete';
 
 /**
  * 인증 카드를 띄울지 정하는 가벼운 형식 확인. 최종 판정은 서버(class-validator)가 하고,
@@ -38,7 +37,54 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
-export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/login/email', redirectPath }: {
+/** 번호로 찾은 계정이 실제로 쓰는 로그인 수단만 안내하고, 수단마다 맞는 화면으로 보낸다. */
+function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword, showRecycledNumberHelp }: {
+  account: V1FoundAccount;
+  emailLoginHref: string;
+  loginHref: string;
+  onResetPassword: () => void;
+  showRecycledNumberHelp: boolean;
+}) {
+  const { label, value, socialNames, appleUnavailable, links } = describeFoundAccount(account, { emailLoginHref, loginHref });
+  let guidance: string | null = null;
+  if (!account.hasPassword) {
+    guidance = socialNames
+      ? `이 계정은 ${socialNames} 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.`
+      : '이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요. 문의 창구로 알려 주세요.';
+  } else if (socialNames) {
+    guidance = `${socialNames} 로그인도 쓸 수 있어요.`;
+  }
+
+  return (
+    <Card pad={16} className="tm-auth-soft-card">
+      <div className="tm-text-body-lg">{label}</div>
+      {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
+      {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
+      {appleUnavailable ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+        {links.map((link, index) => (
+          <Link
+            key={link.label}
+            className={`tm-btn tm-btn-lg tm-btn-block ${link.kakao ? 'tm-auth-kakao' : index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            href={link.href}
+          >
+            {link.label}
+          </Link>
+        ))}
+        {/* 이 환경에서 쓸 수 있는 로그인 버튼이 없으면 막다른 길이 되지 않게 문의 창구를 준다. */}
+        {links.length === 0 ? (
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/contact">문의 창구 보기</Link>
+        ) : null}
+        {account.hasPassword ? (
+          <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
+        ) : null}
+      </div>
+      {showRecycledNumberHelp ? <RecycledNumberHelp variant="not-mine" spaced /> : null}
+    </Card>
+  );
+}
+
+export function AccountRecoveryClient({ initialMode, backHref = '/login/email', redirectPath }: {
   initialMode?: Mode;
   backHref?: string;
   redirectPath?: string | null;
@@ -50,16 +96,19 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   const recoveryBackHref = backHref === '/login/email' ? emailLoginHref : backHref;
   const returnToSettings = backHref === '/my/settings';
   const currentAccount = useV1AuthMe({ enabled: returnToSettings });
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<Mode>(initialMode ?? 'find-id');
+  const [step, setStep] = useState<RecoveryStep>(initialMode ? 'identity' : 'purpose');
+  const [findMethod, setFindMethod] = useState<FindMethod>('phone');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [proofToken, setProofToken] = useState<string | null>(null);
   const [found, setFound] = useState<V1FoundAccount | null>(null);
   const [emailInput, setEmailInput] = useState('');
   const [emailProofToken, setEmailProofToken] = useState<string | null>(null);
   /**
-   * 카카오 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
+   * 소셜 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
    * 알려 주면 이메일 하나로 계정 종류를 훑을 수 있기 때문이다. 그래서 서버가 재설정을 막을 때
-   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다.
+   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다. 응답은 어느 제공자인지 알려 주지 않는다.
    */
   const [resetBlockedSocialOnly, setResetBlockedSocialOnly] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -76,10 +125,12 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
 
   useEffect(() => {
     mounted.current = true;
+    setReady(true);
     return () => { mounted.current = false; };
   }, []);
 
   const findAccount = useV1FindAccountByPhone();
+  const findAccountByEmail = useV1FindAccountByEmail();
   const resetPasswordByEmail = useV1ResetPasswordByEmail();
 
   const normalizedEmail = emailInput.trim().toLowerCase();
@@ -119,11 +170,18 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   const switchMode = (next: Mode) => {
     setMode(next);
     resetProgress();
+    setStep(next === 'find-id' ? 'method' : 'identity');
+  };
+
+  const switchFindMethod = (next: FindMethod) => {
+    if (next === findMethod) return;
+    setFindMethod(next);
+    resetProgress();
   };
 
   const onPhoneVerified = async (token?: string) => {
     // 인증 중 번호/방법이 바뀌거나 화면을 떠나면 이전 카드의 증명으로 조회를 시작하지 않는다.
-    if (!token || !mounted.current || mode !== 'find-id' || phoneFlowGeneration !== phoneRequestGeneration.current) return;
+    if (!token || !mounted.current || mode !== 'find-id' || findMethod !== 'phone' || phoneFlowGeneration !== phoneRequestGeneration.current) return;
     const lookupGeneration = ++phoneRequestGeneration.current;
     setPhoneFlowGeneration(lookupGeneration);
     setProofToken(token);
@@ -132,6 +190,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
       const account = await findAccount.mutateAsync({ phone: phoneDigits, proofToken: token });
       if (!mounted.current || lookupGeneration !== phoneRequestGeneration.current) return;
       setFound(account);
+      setStep('result');
     } catch (err) {
       if (!mounted.current || lookupGeneration !== phoneRequestGeneration.current) return;
       setFound(null);
@@ -139,71 +198,128 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
     }
   };
 
-  const onEmailVerified = (token?: string) => {
-    if (!token || !mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current) return;
+  const onEmailVerified = async (token?: string) => {
+    if (!token || !mounted.current || emailFlowGeneration !== emailRequestGeneration.current) return;
     setEmailProofToken(token);
     setError(null);
+    if (mode === 'reset-password') {
+      if (!returnToSettings || (currentAccount.data && normalizedEmail === accountEmail.trim().toLowerCase())) setStep('password');
+      return;
+    }
+    if (findMethod !== 'email') return;
+    const lookupGeneration = emailRequestGeneration.current;
+    try {
+      const account = await findAccountByEmail.mutateAsync({ email: normalizedEmail, proofToken: token });
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      setFound(account);
+      setStep('result');
+    } catch (err) {
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      setFound(null);
+      if (extractErrorCode(err) === 'EMAIL_NOT_VERIFIED') {
+        emailRequestGeneration.current += 1;
+        setEmailFlowGeneration(emailRequestGeneration.current);
+        setEmailProofToken(null);
+      }
+      setError(extractErrorMessage(err, '계정을 찾지 못했어요.'));
+    }
   };
 
-  const copy = MODE_COPY[mode];
-  // 번호 조회 결과는 아이디 찾기에만 쓰고, 이메일 재설정은 해당 이메일의 서버 판정을 따른다.
-  const socialOnly = mode === 'find-id' ? found !== null && !found.hasPassword : resetBlockedSocialOnly;
   const resetting = resetPasswordByEmail.isPending;
+  // 날짜를 모르거나 이미 지났으면 일반 결과 카드다 — 그 계정으로 로그인해도 403 이 탈퇴 취소 화면으로 이어 준다.
+  const withdrawalGraceEnd = found ? usableWithdrawalDate(found.withdrawalPendingUntil) : null;
 
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset = Boolean(emailProofToken);
   const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data
     && normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase());
-  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !socialOnly && !resetDone;
+  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !resetBlockedSocialOnly && !resetDone;
   const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
 
   const submitReset = async () => {
     if (!mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current
-      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || socialOnly) return;
+      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || resetBlockedSocialOnly) return;
     const resetGeneration = emailFlowGeneration;
     setError(null);
     try {
       await resetPasswordByEmail.mutateAsync({ email: normalizedEmail, proofToken: emailProofToken, newPassword });
       if (!mounted.current || resetGeneration !== emailRequestGeneration.current) return;
       setResetDone(true);
+      setStep('complete');
     } catch (err) {
       if (!mounted.current || resetGeneration !== emailRequestGeneration.current) return;
       if (extractErrorCode(err) === 'PASSWORD_LOGIN_UNAVAILABLE') {
         setResetBlockedSocialOnly(true);
+        setStep('result');
         return;
       }
       setError(extractErrorMessage(err, '비밀번호를 바꾸지 못했어요.'));
     }
   };
 
-  return (
-    <AuthFrame topTitle={returnToSettings ? '비밀번호 변경' : '계정 찾기'} backHref={recoveryBackHref} appBack={returnToSettings} stage={AUTH_NOTICE_STAGE}>
-      <div className="tm-auth-body">
-        <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
-          <button
-            className={`tm-auth-segment ${mode === 'find-id' ? 'tm-auth-segment-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={mode === 'find-id'}
-            onClick={() => switchMode('find-id')}
-          >
-            아이디 찾기
-          </button>
-          <button
-            className={`tm-auth-segment ${mode === 'reset-password' ? 'tm-auth-segment-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={mode === 'reset-password'}
-            onClick={() => switchMode('reset-password')}
-          >
-            비밀번호 재설정
-          </button>
-        </div>
+  const flow: RecoveryStep[] = mode === 'find-id'
+    ? ['purpose', 'method', 'identity', 'verify', 'result']
+    : ['purpose', 'identity', 'verify', 'password', 'complete'];
+  const visibleFlow = initialMode ? flow.filter((item) => item !== 'purpose') : flow;
+  const progressStep = mode === 'reset-password' && step === 'result' ? 'password' : step;
+  const progressIndex = Math.max(0, visibleFlow.indexOf(progressStep));
+  const phoneFlow = mode === 'find-id' && findMethod === 'phone';
+  const titles: Record<RecoveryStep, { title: string; sub?: string }> = {
+    purpose: { title: '어떤 도움이 필요하세요?', sub: '찾을 항목을 선택해 주세요.' },
+    method: { title: '어떤 방법으로 확인할까요?', sub: '가입할 때 등록한 방법을 선택해 주세요.' },
+    identity: phoneFlow
+      ? { title: '휴대폰 번호를 입력해 주세요', sub: '인증번호를 보내 본인인지 확인할게요.' }
+      : { title: '가입한 이메일을 입력해 주세요', sub: '이메일로 인증번호를 보내드려요.' },
+    verify: { title: '인증번호를 확인해 주세요', sub: phoneFlow ? '입력한 휴대폰으로 인증번호를 받아 주세요.' : '입력한 이메일로 인증번호를 받아 주세요.' },
+    result: mode === 'find-id'
+      ? { title: '가입한 방법을 찾았어요', sub: '확인한 로그인 방법으로 계속해 주세요.' }
+      : { title: '로그인 방법을 확인해 주세요' },
+    password: { title: '새 비밀번호를 정해 주세요', sub: '8자 이상으로 입력해 주세요.' },
+    complete: { title: '비밀번호를 바꿨어요', sub: returnToSettings ? '현재 계정의 비밀번호를 바꿨어요.' : '새 비밀번호로 로그인해 주세요.' },
+  };
+  const firstStep = step === 'purpose' || Boolean(initialMode === mode && step === 'identity');
+  const previousStep = () => {
+    resetProgress();
+    if (step === 'method') setStep('purpose');
+    else if (step === 'identity') setStep(mode === 'find-id' ? 'method' : 'purpose');
+    else setStep('identity');
+  };
+  const nextDisabled = !ready || (step === 'identity' && (phoneFlow ? phoneDigits.length !== 11 : !looksLikeEmail(emailInput)));
+  const next = () => {
+    if (step === 'purpose') switchMode(mode);
+    else if (step === 'method') setStep('identity');
+    else if (step === 'identity' && !nextDisabled) setStep('verify');
+  };
+  const fixedAction = ['purpose', 'method', 'identity'].includes(step)
+    ? <AuthStepCta action={{ label: '다음', disabled: nextDisabled, loading: !ready, onClick: next }} hint={ready ? null : '화면을 준비하고 있어요.'} />
+    : undefined;
 
-        <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-        <p className="tm-text-body tm-auth-sub">
-          {copy.sub}
-        </p>
+  return (
+    <AuthFrame
+      topTitle={returnToSettings ? '비밀번호 변경' : '계정 찾기'}
+      backHref={firstStep ? recoveryBackHref : undefined}
+      onBack={firstStep ? undefined : previousStep}
+      backLabel={firstStep ? undefined : '이전 단계'}
+      appBack={returnToSettings}
+      fixedAction={fixedAction}
+      stage={AUTH_NOTICE_STAGE}
+    >
+      <div className="tm-auth-body">
+        <AuthStepHeader name="계정 찾기" steps={visibleFlow} index={progressIndex} title={titles[step].title} sub={titles[step].sub} focusOnChange />
+
+        {step === 'purpose' ? (
+          <div className={styles.choiceGroup} role="group" aria-label="찾을 항목">
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={mode === 'find-id'} onClick={() => setMode('find-id')}>아이디·로그인 방법 찾기</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={mode === 'reset-password'} onClick={() => setMode('reset-password')}>비밀번호 재설정</button>
+          </div>
+        ) : null}
+
+        {step === 'method' ? (
+          <div className={styles.choiceGroup} role="group" aria-label="본인 확인 방법">
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
+          </div>
+        ) : null}
 
         {returnToSettings && currentAccount.isError ? (
           <Card pad={16} className="tm-auth-soft-card-error"><div role="alert">{extractErrorMessage(currentAccount.error, '계정 정보를 확인하지 못했어요. 설정에서 다시 시도해 주세요.')}</div></Card>
@@ -212,171 +328,98 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
         ) : null}
 
         <div className="tm-auth-form">
-          {mode === 'find-id' ? (
+          {step === 'identity' && phoneFlow ? (
+            <label className="tm-auth-field" htmlFor={`${fieldId}-phone`}>
+              <span className="tm-text-label">휴대폰 번호</span>
+              <input id={`${fieldId}-phone`} className="tm-input tm-auth-input" disabled={!ready} inputMode="numeric" placeholder="010-0000-0000" value={formatPhone(phoneDigits)} onChange={(event) => {
+                resetProgress();
+                setPhoneDigits(normalizeSeparatedDigits(event.target.value));
+              }} />
+            </label>
+          ) : null}
+
+          {step === 'identity' && !phoneFlow ? (
+            <label className="tm-auth-field" htmlFor={`${fieldId}-email`}>
+              <span className="tm-text-label">이메일</span>
+              <input id={`${fieldId}-email`} autoComplete="email" className="tm-input tm-auth-input" disabled={!ready} inputMode="email" placeholder="you@example.com" type="email" value={emailInput} onChange={(event) => {
+                resetProgress();
+                setEmailInput(event.target.value);
+              }} />
+            </label>
+          ) : null}
+
+          {step === 'verify' && phoneFlow && !proofToken ? (
+            <PhoneVerificationCard key={phoneFlowGeneration} mode="public" purpose="password_reset" surface="plain" phone={phoneDigits} onVerified={(token) => void onPhoneVerified(token)} />
+          ) : null}
+          {step === 'verify' && !phoneFlow && !emailProofToken ? (
             <>
-              <label className="tm-auth-field" htmlFor={`${fieldId}-phone`}>
-                <span className="tm-text-label">휴대폰 번호</span>
-                <input
-                  id={`${fieldId}-phone`}
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  onChange={(event) => {
-                    phoneRequestGeneration.current += 1;
-                    setPhoneFlowGeneration(phoneRequestGeneration.current);
-                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
-                    // 번호를 고치면 앞 번호로 받은 증명은 더는 유효하지 않다.
-                    setProofToken(null);
-                    setFound(null);
-                    setResetBlockedSocialOnly(false);
-                    setResetDone(false);
-                  }}
-                  placeholder="010-0000-0000"
-                  value={formatPhone(phoneDigits)}
-                />
-              </label>
-
-              {phoneDigits.length === 11 && !proofToken ? (
-                <PhoneVerificationCard
-                  key={phoneFlowGeneration}
-                  mode="public"
-                  purpose="password_reset"
-                  phone={phoneDigits}
-                  onVerified={(token) => void onPhoneVerified(token)}
-                />
-              ) : null}
+              <EmailVerificationCard key={emailFlowGeneration} email={normalizedEmail} surface="plain" onVerified={(token) => void onEmailVerified(token)} />
+              <p className="tm-text-caption" style={{ margin: 0 }}>가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나 스팸함을 확인해 주세요.</p>
             </>
-          ) : (
-            <>
-              <label className="tm-auth-field" htmlFor={`${fieldId}-email`}>
-                <span className="tm-text-label">이메일</span>
-                <input
-                  id={`${fieldId}-email`}
-                  autoComplete="email"
-                  className="tm-input tm-auth-input"
-                  inputMode="email"
-                  onChange={(event) => {
-                    emailRequestGeneration.current += 1;
-                    setEmailFlowGeneration(emailRequestGeneration.current);
-                    setEmailInput(event.target.value);
-                    // 주소를 고치면 앞 주소로 받은 증명은 더는 유효하지 않다.
-                    setEmailProofToken(null);
-                    setResetBlockedSocialOnly(false);
-                    setResetDone(false);
-                  }}
-                  placeholder="you@example.com"
-                  type="email"
-                  value={emailInput}
-                />
-              </label>
+          ) : null}
+          {step === 'verify' && (findAccount.isPending || findAccountByEmail.isPending) ? (
+            <p className="tm-text-body" role="status">가입한 로그인 방법을 확인하고 있어요.</p>
+          ) : null}
 
-              {looksLikeEmail(emailInput) ? (
-                <>
-                  {/* 인증 뒤에도 완료 상태를 보여 주는 기존 이메일 카드를 유지한다. */}
-                  <EmailVerificationCard
-                    key={emailFlowGeneration}
-                    email={normalizedEmail}
-                    onVerified={onEmailVerified}
-                  />
-                  {/* 가입 여부는 서버도 알려 주지 않는다(아무나 이메일만으로 가입 여부를 훑지
-                      못하게). 메일이 오지 않는 이유를 사용자가 스스로 좁힐 수 있게 안내한다. */}
-                  {emailProofToken ? null : (
-                    <p className="tm-text-caption" style={{ margin: 0 }}>
-                      가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나
-                      스팸함을 확인해 주세요.
-                    </p>
-                  )}
-                </>
-              ) : null}
-            </>
-          )}
+          {step === 'result' && found && mode === 'find-id' ? (
+            withdrawalGraceEnd !== null ? (
+              <FoundAccountWithdrawalGuide account={found} until={withdrawalGraceEnd} emailLoginHref={emailLoginHref} loginHref={loginHref} />
+            ) : (
+              <FoundAccountCard account={found} emailLoginHref={emailLoginHref} loginHref={loginHref} onResetPassword={() => switchMode('reset-password')} showRecycledNumberHelp={findMethod === 'phone'} />
+            )
+          ) : null}
 
-          {found && mode === 'find-id' ? (
+          {step === 'result' && mode === 'reset-password' && resetBlockedSocialOnly ? (
             <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">가입한 이메일</div>
-              <div className="tm-text-heading" style={{ marginTop: 4 }}>{found.maskedEmail ?? '—'}</div>
-              {socialOnly ? (
-                <div className="tm-text-caption" style={{ marginTop: 8 }}>
-                  이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.
-                </div>
-              ) : null}
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={emailLoginHref} style={{ marginTop: 16 }}>
-                로그인하러 가기
-              </Link>
+              <div className="tm-text-body-lg" role="alert">비밀번호가 없는 계정이에요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>카카오나 Apple 같은 소셜 로그인으로 가입해서 바꿀 비밀번호가 없어요. 가입한 방법으로 로그인해 주세요.</div>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref} style={{ marginTop: 16 }}>로그인 화면으로</Link>
             </Card>
           ) : null}
 
-          {mode === 'reset-password' && socialOnly ? (
-            <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">비밀번호가 없는 계정이에요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                카카오 로그인으로 가입해서 바꿀 비밀번호가 없어요. 카카오로 로그인해 주세요.
-              </div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref} style={{ marginTop: 16 }}>
-                로그인 화면으로
-              </Link>
-            </Card>
-          ) : null}
-
-          {passwordFormVisible ? (
+          {step === 'password' && passwordFormVisible ? (
             <>
               <label className="tm-auth-field" htmlFor={`${fieldId}-password`}>
                 <span className="tm-text-label">새 비밀번호</span>
-                <input
-                  id={`${fieldId}-password`}
-                  className="tm-input tm-auth-input"
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="8자 이상"
-                  type="password"
-                  value={newPassword}
-                />
+                <input id={`${fieldId}-password`} className="tm-input tm-auth-input" onChange={(event) => setNewPassword(event.target.value)} placeholder="8자 이상" type="password" value={newPassword} />
               </label>
               <label className="tm-auth-field" htmlFor={`${fieldId}-password-confirm`}>
                 <span className="tm-text-label">새 비밀번호 확인</span>
-                <input
-                  id={`${fieldId}-password-confirm`}
-                  className="tm-input tm-auth-input"
-                  onChange={(event) => setPasswordConfirm(event.target.value)}
-                  placeholder="비밀번호 다시 입력"
-                  type="password"
-                  value={passwordConfirm}
-                />
-                {passwordConfirm.length > 0 && newPassword !== passwordConfirm ? (
-                  <span className="tm-text-caption tm-auth-field-helper-error" role="alert">
-                    비밀번호가 일치하지 않아요.
-                  </span>
-                ) : null}
+                <input id={`${fieldId}-password-confirm`} className="tm-input tm-auth-input" onChange={(event) => setPasswordConfirm(event.target.value)} placeholder="비밀번호 다시 입력" type="password" value={passwordConfirm} />
+                {passwordConfirm.length > 0 && newPassword !== passwordConfirm ? <span className="tm-text-caption tm-auth-field-helper-error" role="alert">비밀번호가 일치하지 않아요.</span> : null}
               </label>
-              <Button
-                block
-                disabled={!passwordReady}
-                loading={resetting}
-                onClick={() => void submitReset()}
-                size="lg"
-                type="button"
-                variant={passwordReady ? 'primary' : 'neutral'}
-              >
-                비밀번호 바꾸기
-              </Button>
+              <Button block disabled={!passwordReady} loading={resetting} onClick={() => void submitReset()} size="lg" type="button" variant={passwordReady ? 'primary' : 'neutral'}>비밀번호 바꾸기</Button>
             </>
           ) : null}
 
-          {resetDone ? (
-            <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">비밀번호를 바꿨어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>{returnToSettings ? '인증한 계정의 비밀번호를 바꿨어요.' : '새 비밀번호로 로그인해 주세요.'}</div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={returnToSettings ? backHref : emailLoginHref} style={{ marginTop: 16 }}>
-                {returnToSettings ? '계정 설정으로 돌아가기' : '로그인하러 가기'}
-              </Link>
-            </Card>
+          {step === 'complete' && resetDone ? (
+            <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={returnToSettings ? backHref : emailLoginHref}>
+              {returnToSettings ? '계정 설정으로 돌아가기' : '로그인하러 가기'}
+            </Link>
           ) : null}
 
           {error ? (
             <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
               <div className="tm-text-body-lg">계정을 확인하지 못했어요</div>
-              <div className="tm-text-caption">{error}</div>
+              <div className="tm-text-caption" role="alert">{error}</div>
+              {step === 'verify' && mode === 'find-id' && findMethod === 'email' && emailProofToken ? (
+                <Button type="button" variant="neutral" size="sm" loading={findAccountByEmail.isPending} onClick={() => void onEmailVerified(emailProofToken)}>다시 확인하기</Button>
+              ) : null}
+              {step === 'verify' && phoneFlow && proofToken ? (
+                <Button type="button" variant="neutral" size="sm" loading={findAccount.isPending} onClick={() => void onPhoneVerified(proofToken)}>다시 확인하기</Button>
+              ) : null}
             </Card>
           ) : null}
         </div>
+
+        {(!returnToSettings && step === 'identity') || (step === 'result' && mode === 'find-id' && withdrawalGraceEnd !== null && found?.hasPassword) ? (
+          <div className={styles.alternative}>
+            <span>{mode === 'find-id' ? '비밀번호를 잊으셨나요?' : '가입한 로그인 방법이 궁금하신가요?'}</span>
+            <button type="button" disabled={!ready} onClick={() => switchMode(mode === 'find-id' ? 'reset-password' : 'find-id')}>
+              {mode === 'find-id' ? '비밀번호 재설정' : '로그인 방법 찾기'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </AuthFrame>
   );

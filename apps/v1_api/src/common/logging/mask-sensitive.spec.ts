@@ -97,6 +97,44 @@ describe('maskSensitive', () => {
     });
   });
 
+  // 로그인 추가 인증 verify 가 4xx/429 면 본문이 V1ErrorLog 에 무기한 저장된다 — 토큰과 코드가 평문으로 남으면 안 된다.
+  it('masks the login step-up challenge token and code', () => {
+    expect(maskSensitive({ challengeToken: 'opaque-token-value', code: '123456', note: 'kept' })).toEqual({
+      challengeToken: '[REDACTED]',
+      code: '[REDACTED]',
+      note: 'kept',
+    });
+  });
+
+  it('masks the social link token wherever it appears, and not its neighbouring fields', () => {
+    expect(maskSensitive({ details: { linkToken: 'signed.value', link_token: 'signed.value', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' } })).toEqual({
+      details: { linkToken: '[REDACTED]', link_token: '[REDACTED]', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' },
+    });
+    expect(maskSensitiveText('{"details":{"linkToken":"signed.value","provider":"kakao"}}')).toBe(
+      '{"details":{"linkToken":"[REDACTED]","provider":"kakao"}}',
+    );
+  });
+
+  // 이메일 로그인 추가의 verify 응답·complete 요청 본문이 에러 로그에 저장될 수 있다 — 토큰과 비밀번호가 함께 남으면 안 된다.
+  it('masks the email link token, its password pair and the verification code', () => {
+    expect(
+      maskSensitive({ emailLinkToken: 'signed.value', email_link_token: 'signed.value', password: 'secret-1', passwordConfirm: 'secret-1', code: '123456', expiresInSeconds: 600 }),
+    ).toEqual({
+      emailLinkToken: '[REDACTED]',
+      email_link_token: '[REDACTED]',
+      password: '[REDACTED]',
+      passwordConfirm: '[REDACTED]',
+      code: '[REDACTED]',
+      expiresInSeconds: 600,
+    });
+  });
+
+  // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
+  it('masks the withdrawal cancel token inside an error response body', () => {
+    const body = { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalCancelToken: 'signed.value', expiresInSeconds: 600 } };
+    expect(maskSensitive(body).details).toEqual({ withdrawalCancelToken: '[REDACTED]', expiresInSeconds: 600 });
+  });
+
   // entry-fee 요청이 4xx/5xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 계좌번호·예금주가 평문으로 남으면 안 된다.
   it('masks league entry-fee bank account and holder (any key spelling), keeps bank name and amount', () => {
     const result = maskSensitive({

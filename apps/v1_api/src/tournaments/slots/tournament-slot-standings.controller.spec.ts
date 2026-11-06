@@ -21,6 +21,8 @@ describe('TournamentSlotStandingsController', () => {
   });
 
   it.each([
+    ['finalistPreview', 'admin/tournaments/:tournamentId/bracket/finalist-preview', RequestMethod.GET],
+    ['finalistApply', 'admin/tournaments/:tournamentId/bracket/finalist-assignments', RequestMethod.POST],
     ['standingsPreview', 'admin/tournaments/:tournamentId/slots/standings-preview', RequestMethod.GET],
     ['fillFromStandings', 'admin/tournaments/:tournamentId/slots/fill-from-standings', RequestMethod.POST],
   ] as const)('%s 는 계약 경로·메서드로 노출된다', (methodName, path, method) => {

@@ -1,3 +1,6 @@
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
+import { ConflictException } from '@nestjs/common';
+import { syncSixTeamBracket } from '../tournaments/six-team/six-team-state';
 import { Prisma } from '@prisma/client';
 import { enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
@@ -50,6 +53,7 @@ export async function projectCanonicalAdvancement(
   score: OfficialScore,
 ): Promise<void> {
   if (revision.tournamentTeamMatchId === null || revision.tournamentId === null) return;
+  if (await isRankedSixTeam(tx, revision.tournamentId)) { await syncSixTeamBracket(tx, revision.tournamentId); return; }
   const source = await lockMatch(tx, revision.tournamentId, revision.tournamentTeamMatchId);
   const edges = await lockEdges(tx, revision.tournamentId, source.teamMatchId);
   if (edges.length === 0) return;
@@ -109,6 +113,7 @@ export async function reprojectCanonicalAdvancement(
     throw new Error('BRACKET_SOURCE_REPROJECTION_SCOPE_INVALID');
   }
 
+  if (await isRankedSixTeam(tx, currentRevision.tournamentId)) { await syncSixTeamBracket(tx, currentRevision.tournamentId); return; }
   const source = await lockMatch(tx, currentRevision.tournamentId, currentRevision.tournamentTeamMatchId);
   const edges = await lockEdges(tx, currentRevision.tournamentId, source.teamMatchId);
   if (edges.length === 0) return;
@@ -164,6 +169,7 @@ export async function reverseCanonicalAdvancement(
   supersededScore: OfficialScore,
 ): Promise<void> {
   if (revision.tournamentTeamMatchId === null || revision.tournamentId === null) return;
+  if (await isRankedSixTeam(tx, revision.tournamentId)) { await syncSixTeamBracket(tx, revision.tournamentId, revision.tournamentTeamMatchId); return; }
   const source = await lockMatch(tx, revision.tournamentId, revision.tournamentTeamMatchId);
   const edges = await lockEdges(tx, revision.tournamentId, source.teamMatchId);
   if (edges.length === 0) return;
@@ -562,4 +568,43 @@ function resolveWinnerSide(score: OfficialScore): Side {
     return score.penalties.home > score.penalties.away ? 'HOME' : 'AWAY';
   }
   throw new Error('BRACKET_RESULT_DRAW_UNSUPPORTED');
+}
+
+async function isRankedSixTeam(tx: Tx, tournamentId: string): Promise<boolean> {
+  const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: tournamentId }, select: { sixTeamBracket: true } });
+  return tournament?.sixTeamBracket != null;
+}
+
+/** Reuse canonical roster/schedule invalidation rather than updating Details alone. */
+export async function replaceRankedBracketAssignments(tx: Tx, tournamentId: string,
+  changes: Array<{ fixtureId: string; home: string | null; away: string | null }>): Promise<void> {
+  const targets = await lockMatches(tx, tournamentId, changes.map(row => row.fixtureId));
+  const registrations = await lockRegistrations(tx, tournamentId, [...targetRegistrationIds(targets),
+    ...changes.flatMap(row => [row.home, row.away]).filter((id): id is string => id !== null)]);
+  for (const change of changes) {
+    const target = targets.find(row => row.teamMatchId === change.fixtureId);
+    if (!target) throw new Error('BRACKET_TARGET_NOT_FOUND');
+    const dirty = target.homeRegistrationId !== change.home || target.awayRegistrationId !== change.away;
+    if (!dirty) continue;
+    if (target.gameState !== 'SCHEDULED' || target.status !== 'matched') {
+      throw new ConflictException({ code: 'NEXT_FIXTURE_CONFLICT', message: '다음 경기가 이미 시작됐어요. 관련 경기 정정 절차를 먼저 진행해 주세요.' });
+    }
+    if (change.home !== null && change.home === change.away) throw new Error('BRACKET_TARGET_SIDE_CONFLICT');
+    // Clear both changed sides before assigning: a manual swap must be atomic.
+    for (const side of ['HOME', 'AWAY'] as const) {
+      if ((side === 'HOME' ? target.homeRegistrationId : target.awayRegistrationId) !== (side === 'HOME' ? change.home : change.away)) {
+        await clearTarget(tx, target, side, registrations);
+        if (side === 'HOME') { target.homeRegistrationId = null; target.hostTeamId = null; target.homeSideTeamId = null; }
+        else { target.awayRegistrationId = null; target.approvedApplicantTeamId = null; target.awaySideTeamId = null; }
+      }
+    }
+    for (const side of ['HOME', 'AWAY'] as const) {
+      const id = side === 'HOME' ? change.home : change.away;
+      if (id !== null && (side === 'HOME' ? target.homeRegistrationId : target.awayRegistrationId) !== id) {
+        const registration = registrations.find(row => row.id === id);
+        if (!registration || registration.status !== 'confirmed') throw new Error('BRACKET_REGISTRATION_INVALID');
+        await assignTarget(tx, target, side, id, registrations);
+      }
+    }
+  }
 }

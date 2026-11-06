@@ -41,10 +41,10 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-const { savePeriodsMutate } = vi.hoisted(() => ({ savePeriodsMutate: vi.fn() }));
+const { savePeriodsMutateAsync } = vi.hoisted(() => ({ savePeriodsMutateAsync: vi.fn() }));
 vi.mock('@/hooks/use-tournament-period-settings', () => ({
-  useTournamentPeriodSettings: () => ({ data: undefined }),
-  useSaveTournamentPeriodSettings: () => ({ mutate: savePeriodsMutate, isPending: false }),
+  useTournamentPeriodSettings: () => ({ data: undefined, refetch: vi.fn().mockResolvedValue({ data: undefined }) }),
+  useSaveTournamentPeriodSettings: () => ({ mutateAsync: savePeriodsMutateAsync, isPending: false }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -213,6 +213,8 @@ function fakeDraftResponseForPayload(
     venue: payload.venue ?? null,
     venueAddress: payload.venueAddress ?? null,
     coverImageUrl: payload.coverImageUrl ?? null,
+    listImageUrl: payload.listImageUrl ?? null,
+    showDetailImage: payload.showDetailImage ?? true,
     teamCount: payload.teamCount ?? 8,
     minPlayers: payload.minPlayers ?? 6,
     maxPlayers: payload.maxPlayers ?? 10,
@@ -327,6 +329,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       isPending: false,
     });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
+    savePeriodsMutateAsync.mockResolvedValue({ expectedVersion: '2026-08-01T00:02:00.000Z' });
     useV1UploadImagesMock.mockReturnValue({
       mutateAsync: uploadMutateAsync,
       isPending: false,
@@ -439,7 +442,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(within(group).getByRole('button', { name: '5명' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('경기 시간: 종목 기본 전·후반이 채워지고, 단판으로 바꿔 고치면 대회를 만든 직후 피리어드 설정으로 저장한다', () => {
+  it('경기 시간: 종목 기본 전·후반이 채워지고, 단판으로 바꿔 고치면 대회를 만든 직후 피리어드 설정으로 저장한다', async () => {
     createMutate.mockImplementationOnce(
       (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
         opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: '2026-08-01T00:00:00.000Z' })),
@@ -462,10 +465,9 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
     expect(createMutate).toHaveBeenCalledTimes(1);
-    expect(savePeriodsMutate).toHaveBeenCalledWith(
+    await waitFor(() => expect(savePeriodsMutateAsync).toHaveBeenCalledWith(
       { tournamentId: 'draft-1', expectedVersion: '2026-08-01T00:00:00.000Z', periods: [{ durationMinutes: 30 }] },
-      expect.any(Object),
-    );
+    ));
   });
 
   it('경기 시간: 기본값 그대로 만들면 피리어드 설정을 따로 저장하지 않는다', () => {
@@ -478,11 +480,39 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
     expect(createMutate).toHaveBeenCalledTimes(1);
-    expect(savePeriodsMutate).not.toHaveBeenCalled();
+    expect(savePeriodsMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '접수 시작하기' })).toBeEnabled();
   });
 
-  it('경기 시간: 피리어드 저장이 끝나기 전에는 공개 확인과 접수 시작을 열지 않는다', () => {
+  it('경기 시간: 생성 전에 결승 재정의를 추가하면 초안 직후 단계 설정으로 저장한다', async () => {
+    createMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: '2026-08-01T00:00:00.000Z' })),
+    );
+    renderPage();
+    goToParticipationStep();
+
+    fireEvent.change(screen.getByLabelText('경기 시간 재정의를 추가할 단계'), { target: { value: 'final' } });
+    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
+    const finalSection = screen.getByRole('group', { name: '결승 경기 방식' }).parentElement;
+    expect(finalSection).not.toBeNull();
+    const inputs = within(finalSection!).getAllByRole('spinbutton');
+    fireEvent.change(inputs[0], { target: { value: '10' } });
+    fireEvent.change(inputs[1], { target: { value: '10' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    await waitFor(() => expect(savePeriodsMutateAsync).toHaveBeenCalledWith({
+      tournamentId: 'draft-1',
+      expectedVersion: '2026-08-01T00:00:00.000Z',
+      phase: 'final',
+      periods: [{ durationMinutes: 10 }, { durationMinutes: 10 }],
+    }));
+  });
+
+  it('경기 시간: 피리어드 저장이 끝나기 전에는 공개 확인과 접수 시작을 열지 않는다', async () => {
+    savePeriodsMutateAsync.mockReturnValueOnce(new Promise(() => undefined));
     createMutate.mockImplementationOnce(
       (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
         opts.onSuccess(fakeDraftResponseForPayload(payload)),
@@ -493,13 +523,13 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
-    expect(savePeriodsMutate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(savePeriodsMutateAsync).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('button', { name: '접수 시작하기' })).toBeNull();
     expect(screen.getByRole('button', { name: /공개 확인/ })).toBeDisabled();
     expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/new?draftId=draft-1');
   });
 
-  it('경기 시간: 저장 실패 후 입력과 초안을 유지하고 재시도하면 중복 생성 없이 최신 버전으로 계속한다', () => {
+  it('경기 시간: 저장 실패 후 입력과 초안을 유지하고 재시도하면 중복 생성 없이 최신 버전으로 계속한다', async () => {
     const createdVersion = '2026-08-01T00:00:00.000Z';
     const updatedVersion = '2026-08-01T00:01:00.000Z';
     const periodsVersion = '2026-08-01T00:02:00.000Z';
@@ -507,16 +537,14 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
         opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: createdVersion })),
     );
-    savePeriodsMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onError: (error: Error) => void }) => opts.onError(new Error('경기 시간 저장 실패')),
-    );
+    savePeriodsMutateAsync.mockRejectedValueOnce(new Error('경기 시간 저장 실패'));
     renderPage();
     goToParticipationStep();
     fireEvent.change(screen.getByLabelText('전반 시간(분)'), { target: { value: '15' } });
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
-    expect(screen.getByText('경기 시간 저장 실패')).toBeInTheDocument();
+    expect(await screen.findByText('경기 시간 저장 실패')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '접수 시작하기' })).toBeNull();
     expect(screen.getByRole('button', { name: /공개 확인/ })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /이전/ }));
@@ -528,24 +556,50 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
         opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: updatedVersion })),
     );
-    savePeriodsMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (result: { expectedVersion: string }) => void }) =>
-        opts.onSuccess({ expectedVersion: periodsVersion }),
-    );
+    savePeriodsMutateAsync.mockResolvedValueOnce({ expectedVersion: periodsVersion });
     fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
 
     expect(createMutate).toHaveBeenCalledTimes(1);
     expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: createdVersion }), expect.any(Object));
-    expect(savePeriodsMutate).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(savePeriodsMutateAsync).toHaveBeenLastCalledWith(
       { tournamentId: 'draft-1', expectedVersion: updatedVersion, periods: [{ durationMinutes: 15 }, { durationMinutes: 20 }] },
-      expect.any(Object),
-    );
+    ));
     expect(screen.getByRole('button', { name: '접수 시작하기' })).toBeEnabled();
     expect(changeStatusMutate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /이전/ }));
     fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
     expect(updateMutate).toHaveBeenLastCalledWith(expect.objectContaining({ expectedVersion: periodsVersion }), expect.any(Object));
-    expect(savePeriodsMutate).toHaveBeenCalledTimes(2);
+    expect(savePeriodsMutateAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('경기 시간: 기본 시간 저장 뒤 단계 저장이 실패하면 재시도는 올라간 버전으로 보낸다', async () => {
+    const createdVersion = '2026-08-01T00:00:00.000Z';
+    const periodsVersion = '2026-08-01T00:02:00.000Z';
+    createMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: createdVersion })),
+    );
+    savePeriodsMutateAsync
+      .mockResolvedValueOnce({ expectedVersion: periodsVersion })
+      .mockRejectedValueOnce(new Error('결승 경기 시간 저장 실패'));
+    renderPage();
+    goToParticipationStep();
+    fireEvent.change(screen.getByLabelText('전반 시간(분)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 재정의를 추가할 단계'), { target: { value: 'final' } });
+    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(await screen.findByText('결승 경기 시간 저장 실패')).toBeInTheDocument();
+    expect(savePeriodsMutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ expectedVersion: periodsVersion, phase: 'final' }));
+    expect(screen.getByRole('button', { name: /공개 확인/ })).toBeDisabled();
+
+    updateMutate.mockImplementationOnce(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+
+    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: periodsVersion }), expect.any(Object));
   });
 
   it('경기 시간: 1~240분 정수가 아니면 다음 단계로 못 넘어간다', () => {
@@ -745,7 +799,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({
         prizePool: 600000,
         prizeSummary: '현금과 물품 시상',
-        prizeBreakdown: '우승 600,000원 / 상품 우승 트로피·상품권',
+        prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '우승', amount: '600,000원' }, { category: '팀 시상', label: '상품', amount: '우승 트로피·상품권' }]),
       }), expect.anything());
       expect(updateMutate).not.toHaveBeenCalled();
       expect(screen.getByText('STEP 5 / 5')).toBeInTheDocument();
@@ -806,10 +860,19 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       genderMinFemale: 2,
       coverImageUrl: '/uploads/cover-test.webp',
       prizePool: 600000,
-      prizeBreakdown: '1위 600,000원',
+      prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '1위', amount: '600,000원' }]),
       promoHomeEnabled: true,
       promoHomeTitle: '이번 주 추천 대회',
     });
+  });
+
+  it('초안을 다시 열면 두 사진과 false를 복원하고 다시 저장해도 유지한다', () => {
+    const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: fakeDraftTournament({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false }),
+    });
+    expect(hydrated).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+    expect(buildTournamentCreatePayload(hydrated)).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
   });
 
   it('T6b serializes "제한" substitution mode with its count, but omits the count entirely for "무제한"', () => {
@@ -1003,6 +1066,19 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
     useV1UploadImagesMock.mockReturnValue({ mutateAsync: uploadMutateAsync, isPending: false });
+  });
+
+  it('목록·상세 사진과 표시 설정을 생성 payload로 전달한다', async () => {
+    renderPage();
+    goToPresentationStep();
+    const listFile = new File(['list'], 'list.webp', { type: 'image/webp' });
+    fireEvent.change(screen.getByLabelText('목록 이미지'), { target: { files: [listFile] } });
+    await waitFor(() => expect(screen.getByLabelText('목록 이미지')).toBeEnabled());
+    fireEvent.click(screen.getByRole('switch', { name: '상세 이미지 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({
+      listImageUrl: '/uploads/cover-test.webp', coverImageUrl: null, showDetailImage: false,
+    }), expect.any(Object));
   });
 
   it('상금·홍보 단계에서 CTA는 "다음"이 아니라 실제로 일어날 일(대회 만들기)을 말한다', () => {

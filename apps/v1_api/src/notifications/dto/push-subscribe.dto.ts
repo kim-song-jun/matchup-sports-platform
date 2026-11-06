@@ -1,26 +1,16 @@
 import { Type } from 'class-transformer';
 import {
   IsDefined,
+  IsNotEmpty,
   IsObject,
   IsString,
+  MaxLength,
   ValidateNested,
   ValidationArguments,
   ValidationOptions,
   registerDecorator,
 } from 'class-validator';
-
-const ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES = [
-  'fcm.googleapis.com',
-  'updates.push.services.mozilla.com',
-  'notify.windows.com',
-  'web.push.apple.com',
-];
-
-function isAllowedPushEndpointHost(hostname: string): boolean {
-  return ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES.some(
-    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
-  );
-}
+import { normalizePushEndpoint } from '../push-endpoint';
 
 /**
  * 표준 브라우저 푸시 서비스(FCM/Mozilla/Windows/Apple) 호스트만 허용한다.
@@ -36,14 +26,7 @@ function IsPushEndpointUrl(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         validate(value: unknown) {
-          if (typeof value !== 'string') return false;
-          let parsed: URL;
-          try {
-            parsed = new URL(value);
-          } catch {
-            return false;
-          }
-          return parsed.protocol === 'https:' && isAllowedPushEndpointHost(parsed.hostname);
+          return typeof value === 'string' && normalizePushEndpoint(value) !== null;
         },
         defaultMessage(args: ValidationArguments) {
           return `${args.property}는 FCM/Mozilla/Windows/Apple 푸시 서비스의 https URL이어야 해요.`;
@@ -73,6 +56,10 @@ export class PushSubscribeDto {
 }
 
 export class PushUnsubscribeDto {
-  @IsPushEndpointUrl()
+  // 해지는 이 사용자의 행을 문자열로 지울 뿐 어디에도 보내지 않는다. 등록 검사를 걸면 검사가 생기기 전에
+  // 저장된 행을 해지할 수 없게 된다.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2048)
   endpoint!: string;
 }

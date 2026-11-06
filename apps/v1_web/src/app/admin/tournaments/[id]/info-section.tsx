@@ -1,15 +1,16 @@
 'use client';
+import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
-import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
 import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { v1Keys } from '@/lib/query-keys';
-import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
@@ -62,6 +63,7 @@ export function TournamentInfoSection() {
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editSportId, setEditSportId] = useState('');
+  const [editSixTeamMode, setEditSixTeamMode] = useState(false);
   const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
   const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
     ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
@@ -148,6 +150,7 @@ export function TournamentInfoSection() {
     setEditParkingInfo(tournament.parkingInfo ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
+    setEditSixTeamMode(tournament.sixTeamMode ?? false);
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
     // 빈 문자열로 시작 — "아직 안 바꿈"을 뜻하며, 선택지 그룹은 tournament.lineupMaxPlayers를
@@ -239,8 +242,8 @@ export function TournamentInfoSection() {
     const teamCount = Number(editTeamCount);
     const minPlayers = Number(editMinPlayers);
     const maxPlayers = Number(editMaxPlayers);
-    if (!Number.isInteger(teamCount) || teamCount < 2 || teamCount > 64) {
-      showToast('참가 팀 수는 2~64 사이의 정수여야 해요.', 'error');
+    if (!Number.isInteger(teamCount) || teamCount < 2 || (editFormat !== 'league_knockouts' && teamCount > 64)) {
+      showToast(editFormat === 'league_knockouts' ? '참가 팀 수는 2 이상의 정수여야 해요.' : '참가 팀 수는 2~64 사이의 정수여야 해요.', 'error');
       return;
     }
     if (
@@ -291,6 +294,8 @@ export function TournamentInfoSection() {
     // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
+    const nextSixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
+    if (nextSixTeamMode !== (tournament.sixTeamMode ?? false)) payload.sixTeamMode = nextSixTeamMode;
     if (editFormat !== tournament.format) payload.format = editFormat;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {
@@ -583,7 +588,7 @@ export function TournamentInfoSection() {
 
       <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
 
-      <CoverImageCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
+      <CoverImageCard tournament={tournament} sportName={masterSports?.find((sport) => sport.id === tournament.sportId)?.name} canWrite={canWrite} showToast={showToast} />
 
       <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
@@ -825,6 +830,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
+            <SixTeamModeField eligible={editFormat === 'knockout' && Number(editTeamCount) === 6} value={editSixTeamMode} onChange={setEditSixTeamMode} disabled={updateTournament.isPending || Boolean(tournament?.sixTeamBracket)} />
             <div className="flex flex-col gap-2">
               <label htmlFor="edit-min-players" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">최소 선수 (등록 명단)</label>
               <input
@@ -1212,6 +1218,7 @@ export function TournamentInfoSection() {
             defaultImageUrl={resolveTournamentImage(
               {
                 coverImageUrl: tournament?.coverImageUrl,
+                listImageUrl: tournament?.listImageUrl,
                 promoHomeImageUrl: null,
                 promoListImageUrl: promoListImageUrl,
               },
@@ -1255,6 +1262,7 @@ export function TournamentInfoSection() {
             defaultImageUrl={resolveTournamentImage(
               {
                 coverImageUrl: tournament?.coverImageUrl,
+                listImageUrl: tournament?.listImageUrl,
                 promoHomeImageUrl: promoHomeImageUrl,
                 promoListImageUrl: null,
               },
@@ -1281,7 +1289,7 @@ export function TournamentInfoSection() {
 const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
   league: '리그 방식 (순위전)',
   knockout: '토너먼트 (녹아웃)',
-  group_knockout: '조별리그 + 토너먼트',
+  group_knockout: '조별리그 + 토너먼트', league_knockouts: '정규리그 + N개 토너먼트',
 };
 
 function GenderQuotaInput({
@@ -1318,13 +1326,15 @@ function GenderQuotaInput({
   );
 }
 
-/** 커버 이미지 — 목록 카드 썸네일. 읽기 전용 관리자에게는 업로더를 잠근다. */
+/** 목록·상세 이미지와 노출 설정. 기존 관리자 권한 및 CAS를 그대로 따른다. */
 function CoverImageCard({
   tournament,
+  sportName,
   canWrite,
   showToast,
 }: {
   tournament: V1Tournament;
+  sportName?: string;
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
@@ -1341,42 +1351,28 @@ function CoverImageCard({
     showToast(extractErrorMessage(err, fallback), 'error');
   };
 
-  const handleUpload = async (file: File) => {
-    try {
-      const { urls } = await uploadImages.mutateAsync(file);
-      if (!urls[0]) {
-        showToast('업로드된 이미지 URL을 받지 못했어요.', 'error');
-        return;
-      }
-      updateTournament.mutate({ coverImageUrl: urls[0], expectedVersion: tournament.updatedAt }, {
-        onSuccess: () => showToast('커버 이미지를 저장했어요.', 'success'),
-        onError: (err) => handleConflict(err, '커버 이미지 저장에 실패했어요.'),
-      });
-    } catch (err) {
-      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
-    }
-  };
-
-  const handleRemove = () => {
-    updateTournament.mutate({ coverImageUrl: null, expectedVersion: tournament.updatedAt }, {
-      onSuccess: () => showToast('커버 이미지를 제거했어요.', 'success'),
-      onError: (err) => handleConflict(err, '커버 이미지 제거에 실패했어요.'),
+  const persist = (patch: Pick<V1UpdateTournamentPayload, 'coverImageUrl' | 'listImageUrl' | 'showDetailImage'>) => {
+    updateTournament.mutate({ ...patch, expectedVersion: tournament.updatedAt }, {
+      onSuccess: () => showToast('대회 이미지 설정을 저장했어요.', 'success'),
+      onError: (err) => handleConflict(err, '이미지 설정을 저장하지 못했어요.'),
     });
   };
 
   return (
-    <section
-      aria-label="커버 이미지"
-      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6"
-    >
-      {/* 제목은 CoverImageUploader가 자체 label로 그린다 — 여기서 또 그리면 같은 글자가 두 번 뜬다. */}
-      <CoverImageUploader
-        value={tournament.coverImageUrl}
-        onSelectFile={(file) => void handleUpload(file)}
-        onClear={handleRemove}
-        uploading={uploadImages.isPending}
-        disabled={!canWrite || updateTournament.isPending}
-        eager
+    <section aria-label="대회 이미지" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
+      <TournamentImagesField
+        coverImageUrl={tournament.coverImageUrl}
+        listImageUrl={tournament.listImageUrl ?? null}
+        showDetailImage={tournament.showDetailImage ?? true}
+        sportName={sportName}
+        onImageChange={(field, value) => persist({ [field]: value })}
+        onVisibilityChange={(visible) => persist({ showDetailImage: visible })}
+        onUpload={async (file) => {
+          const { urls } = await uploadImages.mutateAsync(file);
+          if (!urls[0]) throw new Error('업로드된 이미지 URL을 받지 못했어요.');
+          return urls[0];
+        }}
+        disabled={!canWrite || uploadImages.isPending || updateTournament.isPending}
       />
     </section>
   );
@@ -1404,20 +1400,18 @@ function PrizeCard({
     tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '',
   );
   const [prizeSummary, setPrizeSummary] = useState(() => tournament.prizeSummary ?? '');
-  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
+  // 배분은 명시적 분류와 함께 저장한다. 공용 파서는 기존 텍스트도 읽는다.
   // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
   const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>(() =>
     parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
       id: createPrizeRowId(),
       label: row.label,
+      category: prizeCategoryOf(row),
       value: row.amount,
     })),
   );
 
   const handleSave = () => {
-    // expectedVersion은 diff 축적이 끝난 뒤 mutate() 호출부에서 tournament.updatedAt으로
-    // 채운다 — 여기서 처음부터 넣으면 아래 "변경 없음" 판정(Object.keys 길이)이 항상
-    // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     const pool = prizePool.trim();
     if (pool !== '') {
@@ -1431,11 +1425,7 @@ function PrizeCard({
     if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
     // 금액 행은 "1,234,567원" 형태로 정규화, 물품 행은 입력한 자유 텍스트 그대로 저장한다.
     const breakdownText = serializeTournamentPrizeRows(prizeRows);
-    if (breakdownText) payload.prizeBreakdown = breakdownText;
-    if (Object.keys(payload).length === 0) {
-      showToast('변경할 상금 정보를 입력해주세요.', 'error');
-      return;
-    }
+    payload.prizeBreakdown = breakdownText || null;
     updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
       onError: (err) => {

@@ -23,7 +23,10 @@ import {
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
 import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
+import { isRegistrationWindowOpen } from './registration-window';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
+import { copyPreviousSeasonRoster } from '../league-matches/league-roster-autofill';
+import { findLeagueAdmissionBlocker, leagueAdmissionBlockerMessage } from '../league-matches/league-team-admission';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -50,38 +53,15 @@ type TournamentPaymentInstructionSource = Pick<
 
 
 /**
- * 신청을 받는 중인지 — **리그와 대회가 판정 축이 다르다.**
- *
- * · **대회**: `status === 'open'` 이 곧 "모집 중" 이다(운영자가 상태로 연다). 그대로 둔다.
- * · **리그**: 판정자는 `registrationDeadlineAt` 하나다(정본 §6, 2026-09-04 사용자 확정).
- *   `status` 는 수명주기 표시 전용이 됐다 — `generateFixtures` 가 `in_progress` 로 옮기기
- *   때문에 status 를 보면 **대진이 있는 리그가 영영 신청을 못 받는다**(alpha 실측).
- *
- * 두 축을 한 조건으로 합치지 않는 이유: 대회의 `status === 'open'` 요구를 건드리면 대회
- * 신청 경로 전체가 회귀 범위에 들어온다. 리그만 갈라 대회는 한 줄도 안 바뀌게 한다.
+ * 신청을 받는 중인지 — 대회와 정규 리그가 같은 규칙이다(`registration-window.ts`, 2026-10-27).
+ * 거절 사유만 둘로 나눠 알린다: 접수 중이 아니면 `TOURNAMENT_NOT_OPEN`, 마감이 지났으면
+ * `REGISTRATION_DEADLINE_PASSED`.
  */
-function assertRegistrationOpen(tournament: {
-  kind: string | null;
-  status: string;
-  registrationDeadlineAt: Date | null;
-}): void {
-  if (tournament.kind === 'regular_league') {
-    if (tournament.status === 'completed' || tournament.status === 'cancelled') {
-      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
-    }
-    if (tournament.registrationDeadlineAt === null) {
-      // 마감이 없으면 아무도 연 적이 없는 리그다(정본 §6 "안 정하면 신청을 안 받는다").
-      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
-    }
-    if (tournament.registrationDeadlineAt.getTime() < Date.now()) {
-      throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
-    }
-    return;
-  }
+function assertRegistrationOpen(tournament: { status: string; registrationDeadlineAt: Date | null }): void {
   if (tournament.status !== 'open') {
     throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
   }
-  if (tournament.registrationDeadlineAt && tournament.registrationDeadlineAt.getTime() < Date.now()) {
+  if (!isRegistrationWindowOpen(tournament.status, tournament.registrationDeadlineAt)) {
     throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
   }
 }
@@ -171,10 +151,29 @@ export class TournamentRegistrationsService {
     }
   }
 
+  /**
+   * 같은 시즌 다른 티어에 이미 확정된 팀은 신청부터 받지 않는다(2026-11-05 알파 QA — 확정에서야 막혀
+   * 입금까지 받은 뒤 거절됐다). 판정은 확정·어드민 추가와 같은 `findLeagueAdmissionBlocker` 다.
+   * 활성·종목은 이 서비스가 따로 보고, 이미 참가 중인 팀은 기존 신청을 돌려주므로 형제 티어만 본다.
+   */
+  private async assertNotInSiblingTier(
+    db: Prisma.TransactionClient,
+    tournament: { id: string; kind: V1CompetitionKind | null; seriesId: string | null },
+    teamId: string,
+  ) {
+    // 형제 티어는 리그 체계에 속한 리그에만 있다.
+    if (tournament.kind !== V1CompetitionKind.regular_league || !tournament.seriesId) return;
+    const blocker = await findLeagueAdmissionBlocker(db, { leagueId: tournament.id, teamId });
+    if (blocker?.kind === 'SIBLING_TIER') {
+      throw new ConflictException({ code: 'LEAGUE_TEAM_INVALID', message: leagueAdmissionBlockerMessage(blocker) });
+    }
+  }
+
   async create(user: V1AuthUser, tournamentId: string, dto: CreateRegistrationDto) {
     const tournament = await this.loadOpenTournament(tournamentId);
     const teamSportId = await this.assertTeamManager(dto.teamId, user.id);
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
+    await this.assertNotInSiblingTier(this.prisma, tournament, dto.teamId);
 
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
@@ -373,6 +372,8 @@ export class TournamentRegistrationsService {
           message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
         });
       }
+      // 초안을 둔 사이에 형제 티어에 확정됐을 수 있다 — 입금 안내 전에 다시 본다.
+      await this.assertNotInSiblingTier(tx, lockedTournament, registration.teamId);
 
       // ## 참가비가 0 이면 입금 단계를 건너뛴다 (Task 164 BE-4, 정본 §4 "스텝 최소")
       // 지금까지는 `entryFee` 와 무관하게 `awaiting_payment` 로 보냈고, 그 상태는
@@ -461,18 +462,26 @@ export class TournamentRegistrationsService {
           data: { tournamentRealNameVisible: true },
         });
       }
-      return { updated, payment, tournament: lockedTournament };
+      // 독립 리그의 다음 시즌(2026-11-03): 재참가 팀이면 지난 시즌 명단을 옮겨 담는다 — 같은 트랜잭션이라 제출이 실패하면
+      // 옮긴 명단도 남지 않는다. 판정·잠금은 자동 채움과 같은 함수 계열(`copyPreviousSeasonRoster`)이 한다.
+      const carried = lockedTournament.kind === 'regular_league' && lockedTournament.previousLeagueId != null
+        ? await copyPreviousSeasonRoster(tx, tournamentId, { id: registrationId, teamId: registration.teamId })
+        : null;
+      return { updated, payment, tournament: lockedTournament, carriedPlayers: carried?.added ?? 0 };
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
     const noun = competitionNounFor(result.tournament.kind);
+    const carriedNote = result.carriedPlayers > 0 ? ` 지난 시즌 명단 ${result.carriedPlayers}명을 옮겨 왔어요. 확인해 주세요.` : '';
     void this.notifications.emitNotification(
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
       result.tournament.entryFee > 0
-        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.`
-        : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
+        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.${carriedNote}`
+        : result.carriedPlayers > 0
+          ? `"${result.tournament.title}" ${noun} 신청이 접수됐어요.${carriedNote}`
+          : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
       { competitionKind: result.tournament.kind },
     );
 

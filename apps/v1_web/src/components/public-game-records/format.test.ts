@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatClock, formatGoalMinute, formatPenaltyScoreline, formatScoreline, isClockAbnormal } from './format';
+import { formatClock, formatGoalMinute, formatPenaltyScoreline, formatPeriodFormat, formatScoreline, isClockAbnormal } from './format';
 
 /**
  * alpha 실측 사고(2026-08) 회귀 방지 -- 실제 DB 값으로 재현한다.
@@ -70,4 +70,37 @@ describe('formatPenaltyScoreline', () => {
       formatPenaltyScoreline({ home: 1, away: 1, penalties: { home: 4, away: 3 } }, 'unavailable'),
     ).toBeNull();
   });
+});
+
+/**
+ * 일정 카드·경기 상세가 장소·일시 줄 아래에 적는 경기 방식 한 줄. 오너가 정한 문구 규칙 그대로다:
+ * 단판 `단판 N분` / 전·후반이 같으면 `전·후반 N분` / 다르면 `전반 N분, 후반 M분`.
+ */
+describe('formatPeriodFormat', () => {
+  it('길이 하나면 단판이다', () => {
+    expect(formatPeriodFormat([20])).toBe('단판 20분');
+    expect(formatPeriodFormat([7])).toBe('단판 7분');
+  });
+
+  it('전반과 후반 길이가 같으면 "전·후반 N분" 하나로 묶는다', () => {
+    expect(formatPeriodFormat([15, 15])).toBe('전·후반 15분');
+    expect(formatPeriodFormat([10, 10])).toBe('전·후반 10분');
+  });
+
+  it('전반과 후반 길이가 다르면 각각 적는다', () => {
+    expect(formatPeriodFormat([10, 15])).toBe('전반 10분, 후반 15분');
+    expect(formatPeriodFormat([20, 10])).toBe('전반 20분, 후반 10분');
+  });
+
+  it('셋 이상(옛 설정)은 기록 묶음·콘솔과 같은 이름(전반·후반·3피리어드)으로 나열한다', () => {
+    expect(formatPeriodFormat([10, 10, 10])).toBe('전반 10분, 후반 10분, 3피리어드 10분');
+    expect(formatPeriodFormat([10, 15, 5])).toBe('전반 10분, 후반 15분, 3피리어드 5분');
+  });
+
+  it.each([[null], [undefined], [[]], [[0]], [[10, 0]], [[-5, 10]], [[Number.NaN]], [[10, Number.POSITIVE_INFINITY]]])(
+    '길이를 모르면 줄을 그리지 않는다 — 일부만 적지 않는다 (%j)',
+    (value) => {
+      expect(formatPeriodFormat(value as never)).toBeNull();
+    },
+  );
 });

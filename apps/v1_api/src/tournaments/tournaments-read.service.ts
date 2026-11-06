@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1CompetitionKind, V1GameSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo } from '../common/pagination/page-args';
@@ -39,6 +39,7 @@ import {
   resolveLeagueChampions,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
+import { findConversionSourceLeague } from '../league-matches/league-season-link';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 
@@ -120,6 +121,11 @@ export class TournamentsReadService {
    */
   async list(query: TournamentListQueryDto) {
     const limit = query.limit ?? 20;
+    if ((query.dateFrom && query.dateTo && query.dateFrom > query.dateTo)
+      || (query.feeMin !== undefined && query.feeMax !== undefined && query.feeMin > query.feeMax)) {
+      throw new BadRequestException({ code: 'INVALID_FILTER_RANGE', message: '필터의 시작값은 종료값 이하여야 해요.' });
+    }
+    const now = new Date();
 
     // Only page-number requests need the grand total; infinite scroll just needs "is there a next".
     const page = query.page !== undefined && query.page > 0 ? query.page : undefined;
@@ -131,7 +137,7 @@ export class TournamentsReadService {
       limit,
       ...(page !== undefined ? { offset: (page - 1) * limit } : { cursor: query.cursor }),
     });
-    const total = wantsPageNumbers ? await countTournamentList(this.prisma, query) : null;
+    const total = wantsPageNumbers || query.withTotal ? await countTournamentList(this.prisma, query) : null;
     const hasNext = window.length > limit;
     const pageWindow = hasNext ? window.slice(0, limit) : window;
     const pageIds = pageWindow.map((row) => row.id);
@@ -149,13 +155,13 @@ export class TournamentsReadService {
     const nextCursor = hasNext ? (pageWindow.at(-1)?.cursor ?? null) : null;
 
     return {
-      items: pageItems.map(presentTournamentCard),
+      items: pageItems.map((row) => presentTournamentCard(row, now)),
       // 페이지 번호를 묻지 않은 요청에는 **예전과 똑같은 두 필드만** 돌려준다. total 을
       // 세지 않았으므로 `total: 0`/`totalPages: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이
       // 되고, 커서 클라이언트가 그 값을 읽기 시작하면 조용히 틀린 화면이 나온다.
       pageInfo: wantsPageNumbers
         ? buildPageInfo({ page, limit, total, hasNext, nextCursor })
-        : { nextCursor, hasNext },
+        : { nextCursor, hasNext, ...(query.withTotal ? { total } : {}) },
     };
   }
 
@@ -229,20 +235,35 @@ export class TournamentsReadService {
     const now = new Date();
     const groupStandingSummaries =
       row.kind !== V1CompetitionKind.regular_league &&
-      row.format === 'group_knockout' &&
+      (row.format === 'group_knockout' || row.format === 'league_knockouts') &&
       isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now)
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();
 
-    return presentTournamentDetail(
-      row,
-      publicLiveEnabled,
-      now,
-      staffBypass,
-      leagueFixtures,
-      rosterByRegistrationId,
-      groupStandingSummaries,
-    );
+    // 이어진 이전 시즌 — 공개 상세의 '이전 시즌 보기'(데스크톱 레일·모바일 본문 카드, 2026-11-06). 공개된 리그만 싣는다.
+    // 독립 리그는 `previousLeagueId` 로 이은 지난 시즌, 리그 체계로 전환해 만든 첫 시즌 티어는 원본 리그다.
+    // 다음 시즌은 다음 리그 안내(`GET /league-matches/:id` 의 nextRound·nextSeasonTiers)가 맡는다.
+    const isLeague = row.kind === V1CompetitionKind.regular_league;
+    const linkedPrevious = isLeague && row.previousLeagueId !== null
+      ? await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
+          where: { id: row.previousLeagueId, deletedAt: null },
+          select: { id: true, title: true },
+        })
+      : null;
+    const previousSeason = linkedPrevious ?? (isLeague ? await findConversionSourceLeague(this.prisma, row) : null);
+
+    return {
+      ...presentTournamentDetail(
+        row,
+        publicLiveEnabled,
+        now,
+        staffBypass,
+        leagueFixtures,
+        rosterByRegistrationId,
+        groupStandingSummaries,
+      ),
+      previousSeason: previousSeason === null ? null : { leagueId: previousSeason.id, title: previousSeason.title },
+    };
   }
 
   /**

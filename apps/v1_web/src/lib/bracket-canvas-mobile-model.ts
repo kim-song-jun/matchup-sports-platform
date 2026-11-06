@@ -12,6 +12,7 @@ import {
   type SideLabelContext,
 } from '@/lib/bracket-canvas-layout';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import { buildLeagueBoard, type LeagueBoardNode, type LeagueBoardSide } from '@/lib/league-board-model';
 import type {
   V1AdminBracketFixture,
@@ -90,7 +91,7 @@ export function bracketMobileSide(fixture: V1AdminBracketFixture, side: SideKey,
     registrationId,
     teamName: registrationId === null ? null : side === 'HOME' ? fixture.homeTeamName : fixture.awayTeamName,
     slotLabel: registrationId === null ? fixtureSideLabel(fixture, side, labels) : null,
-    ...(registrationId !== null && slotId && labels.slotsById.get(slotId)?.kind === 'BYE' ? { byeLabel: fixtureSideDisplayLabel(fixture, side, labels) } : {}),
+    ...(registrationId !== null && slotId && (labels.slotsById.get(slotId)?.kind === 'BYE' || labels.slotsById.get(slotId)?.byeSortOrder != null) ? { byeLabel: fixtureSideDisplayLabel(fixture, side, labels) } : {}),
   };
 }
 
@@ -122,6 +123,7 @@ export function bracketMobileNode(
   groupName: string | null,
   knockout: boolean,
   labels: SideLabelContext,
+  bracketTrack?: V1AdminBracketGroup['bracketTrack'],
 ): MobileNode {
   const game = fixture.game;
   // 취소는 게임을 SCHEDULED 로 남기는 경우가 있어 팀매치 status 가 먼저다(PR-5b `buildLeagueBoard` 와 같은 규칙).
@@ -130,7 +132,7 @@ export function bracketMobileNode(
     fixtureId: fixture.id,
     ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
     groupId: fixture.groupId,
-    title: groupName ? `${groupName} · ${fixture.fixtureNumber}번 경기` : `${fixture.fixtureNumber}번 경기`,
+    title: `${bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${groupName ? `${groupName} · ` : ''}${fixture.fixtureNumber}번 경기`,
     state,
     home: bracketMobileSide(fixture, 'HOME', labels),
     away: bracketMobileSide(fixture, 'AWAY', labels),
@@ -192,12 +194,22 @@ export function pickableCandidates(
 // 3·4위전은 결승과 같은 탭에 둔다 — 탭이 6개를 넘으면 390 폭에서 한 칸이 너무 좁아진다.
 const PHASE_BUCKET: Record<V1TournamentGroupPhase, { key: string; label: string }> = {
   group: { key: 'group', label: '조별' },
+  round64: { key: 'round64', label: '64강' },
+  round32: { key: 'round32', label: '32강' },
   round16: { key: 'round16', label: '16강' },
   round12: { key: 'round12', label: '12강' },
   quarter: { key: 'quarter', label: '8강' },
   semi: { key: 'semi', label: '4강' },
   final: { key: 'final', label: '결승' },
   third_place: { key: 'final', label: '결승' },
+};
+const PHASE_ORDER: Record<string, number> = {
+  group: 0,
+  round16: 1,
+  round12: 2,
+  quarter: 3,
+  semi: 4,
+  final: 5,
 };
 
 type FixtureOrder = { id: string; fixtureNumber: number; legNumber: number };
@@ -210,8 +222,13 @@ export function buildBracketMobileRounds(input: {
 }): MobileRound[] {
   const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
   const groupIds = new Set(input.groups.map((group) => group.id));
-  const order: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
-  const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  const order: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
+  const trackOrder = (track: string | undefined) => ({ overall: 0, upper: 1, lower: 2 }[track ?? 'overall'] ?? 3);
+  const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99)
+    || a.sortOrder - b.sortOrder
+    || trackOrder(a.bracketTrack) - trackOrder(b.bracketTrack)
+    || (a.bracketTrack ?? 'overall').localeCompare(b.bracketTrack ?? 'overall')
+    || a.id.localeCompare(b.id));
   const rounds: MobileRound[] = [];
   const roundByKey = new Map<string, MobileRound>();
   const thirdPlaceSectionKeys = new Set<string>();
@@ -220,14 +237,14 @@ export function buildBracketMobileRounds(input: {
     const nodes = input.fixtures
       .filter((f) => f.groupId === group.id)
       .sort(byFixtureOrder)
-      .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels));
-    if (group.phase === 'round12') {
-      for (const slot of input.slots.filter(slot => slot.kind === 'BYE' && slot.groupId === group.id).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+      .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels, group.bracketTrack));
+    if (group.phase !== 'group') {
+      for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && slot.groupId === group.id).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
         const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
         if (!target) continue;
         const home = target.homeSlotId === slot.id;
-        const node = bracketMobileNode(target, null, true, labels);
-        node.key = 'bye:' + slot.id; node.byeSlotId = slot.id; node.title = '12강 부전승'; node.groupId = group.id;
+        const node = bracketMobileNode(target, null, true, labels, group.bracketTrack);
+        node.key = 'bye:' + slot.id; node.byeSlotId = slot.id; node.title = `${input.fixtures.find(f => f.groupId === group.id)?.round ?? group.name} 부전승`; node.groupId = group.id;
         node.home = bracketMobileSide(target, home ? 'HOME' : 'AWAY', labels); node.scheduledAt = null; node.venue = null; node.scoreText = null; node.quickEntered = false;
         const sourceId = target.bracketSources?.find(source => source.side === (home ? 'AWAY' : 'HOME'))?.fixtureId;
         const index = nodes.findIndex(node => node.fixtureId === sourceId);
@@ -243,14 +260,16 @@ export function buildBracketMobileRounds(input: {
       roundByKey.set(bucket.key, round);
       rounds.push(round);
     }
-    round.sections.push({ key: group.id, heading: group.name, nodes });
+    const trackLabel = bracketTrackLabel(group.bracketTrack);
+    round.sections.push({ key: group.id, heading: trackLabel ? `${trackLabel} · ${group.name}` : group.name, nodes });
     if (group.phase === 'third_place') thirdPlaceSectionKeys.add(group.id);
   }
 
   for (const round of rounds) {
     if (round.key === 'group' && round.sections.length === 1) round.label = round.sections[0].heading ?? round.label;
-    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(a.key)) - Number(thirdPlaceSectionKeys.has(b.key)));
+    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(b.key)) - Number(thirdPlaceSectionKeys.has(a.key)));
   }
+  rounds.sort((a, b) => PHASE_ORDER[a.key] - PHASE_ORDER[b.key]);
 
   const orphans = input.fixtures
     .filter((f) => f.groupId === null || !groupIds.has(f.groupId))

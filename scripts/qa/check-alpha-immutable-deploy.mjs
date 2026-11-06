@@ -16,12 +16,20 @@ const expectedRuntimeParameterNames = [
   'APNS_KEY_ID',
   'APNS_PRIVATE_KEY',
   'APNS_TEAM_ID',
+  'GABIA_API_KEY',
+  'GABIA_SENDER_NUMBER',
+  'GABIA_SMS_ID',
   'KAKAO_APP_ID',
   'KAKAO_CLIENT_ID',
   'KAKAO_CLIENT_SECRET',
   'KAKAO_REDIRECT_URI',
   'SLACK_INQUIRY_WEBHOOK_URL',
+  'SMS_PROVIDER',
+  'SOLAPI_API_KEY',
+  'SOLAPI_API_SECRET',
+  'SOLAPI_SENDER_NUMBER',
 ];
+const operatorRuntimeParameterNames = ['ALPHA_SES_ACCESS_KEY_ID', 'ALPHA_SES_SECRET_ACCESS_KEY'];
 const syncScriptsOutsideIam = new Set(['sync-alpha-apple-sign-in-env.sh', 'sync-alpha-firebase-env.sh']);
 
 const workflowPath = '.github/workflows/deploy-alpha.yml';
@@ -84,7 +92,7 @@ requirePatterns(workflowPath, [
   [/SECRET_KAKAO_CLIENT_SECRET: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_SECRET \}\}/, 'API secret must be isolated from production'],
   [/SECRET_KAKAO_APP_ID: \$\{\{ secrets\.ALPHA_KAKAO_APP_ID \}\}/, 'native token audience must use the alpha app ID'],
   [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
-  [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (accepts the Promote bot dispatch of version commits)'],
+  [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (push runs of the exact release SHA only)'],
 ]);
 
 requirePatterns(firebaseRuntimeSyncPath, [
@@ -359,7 +367,10 @@ function validateRuntimePolicies(policies, targetErrors) {
       label: 'Alpha EC2 role',
       sid: 'ReadAlphaRuntimeParameter',
       action: 'ssm:GetParameter',
-      resource: parameterArn,
+      resource: [
+        ...parameterArn,
+        ...operatorRuntimeParameterNames.map((name) => `arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/${name}`),
+      ],
     },
     targetErrors,
   );

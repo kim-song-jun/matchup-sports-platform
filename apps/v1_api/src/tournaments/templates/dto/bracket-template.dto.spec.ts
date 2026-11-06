@@ -13,6 +13,16 @@ const codeOf = (fn: () => unknown) => {
 };
 
 describe('ApplyBracketTemplateDto', () => {
+  it('accepts independent group rotations without a global rotation', async () => {
+    const groups = [{ name: 'A', capacity: 3, advanceCount: 1, legs: 1 }, { name: 'B', capacity: 3, advanceCount: 1, legs: 2 }];
+    expect(toBracketTemplateInput(await run({ schemaVersion: 2, kind: 'group_knockout', groups })))
+      .toMatchObject({ groups, legs: 1 });
+  });
+  it.each([0, 3, 1.5])('rejects invalid per-group rotation %s', async (legs) => {
+    await expect(run({ schemaVersion: 2, kind: 'group_knockout', legs: 1,
+      groups: [{ name: 'A', capacity: 3, advanceCount: 1, legs }, { name: 'B', capacity: 3, advanceCount: 1, legs: 1 }] }))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
   it('토너먼트 본문을 입력으로 바꾼다 — thirdPlace 생략은 false', async () => {
     expect(toBracketTemplateInput(await run({ kind: 'knockout', size: 8, thirdPlace: true }))).toEqual({ kind: 'knockout', size: 8, thirdPlace: true });
     expect(toBracketTemplateInput(await run({ kind: 'knockout', size: 16, thirdPlace: true }))).toEqual({ kind: 'knockout', size: 16, thirdPlace: true });
@@ -24,6 +34,8 @@ describe('ApplyBracketTemplateDto', () => {
     expect(
       toBracketTemplateInput(await run({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true })),
     ).toEqual({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true });
+    expect(toBracketTemplateInput(await run({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, lowerBracket: true })))
+      .toEqual({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false, lowerBracket: true });
   });
 
   it('replaceExisting 은 입력(계획)이 아니라 DTO 에만 남는다', async () => {

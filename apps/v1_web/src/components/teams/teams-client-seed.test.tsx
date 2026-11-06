@@ -82,6 +82,186 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(sportsOptions.seed).toEqual(seed.sports);
   });
 
+  it('필터된 cursor seed는 UI URL dialect를 보존하고 일반 클릭은 기존 append를 유지한다', () => {
+    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
+    const page = { items: [seedTeam(20)], nextCursor: 'opaque/cursor +2', pageInfo: { nextCursor: 'opaque/cursor +2', hasNext: true, totalCount: 52 } };
+    const fetchNextPage = vi.fn();
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage,
+    });
+    const seed = { page, sports: [seedSport], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'deadline', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2' };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const continuation = screen.getByRole('link', { name: '더 보기' });
+    const href = new URL(continuation.getAttribute('href') ?? '', 'https://teameet.test');
+    expect(href.pathname).toBe('/teams');
+    expect(href.searchParams.get('sportId')).toBe('sport-futsal');
+    expect(href.searchParams.get('regionId')).toBe('region-seoul');
+    expect(href.searchParams.get('sort')).toBe('deadline');
+    expect(href.searchParams.get('q')).toBe('마포 FC');
+    expect(href.searchParams.get('query')).toBeNull();
+    expect(href.searchParams.get('joinPolicy')).toBeNull();
+    expect(href.searchParams.get('cursor')).toBe('opaque/cursor +2');
+
+    const [apiFilters, hookOptions] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>, { seed?: unknown; initialCursor?: string }];
+    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', joinPolicy: 'approval_required' });
+    expect(hookOptions.seed).toEqual(page);
+    expect(hookOptions.initialCursor).toBe('opaque-page-2');
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+    continuation.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { isPlaceholderData: true, isFetching: true },
+    { isPlaceholderData: false, isFetching: true },
+  ])('일치하는 seed 재조회 중에는 href를 유지하고 append 클릭을 막는다: %j', (state) => {
+    const page = { items: [seedTeam(0)], nextCursor: 'next-team', pageInfo: { nextCursor: 'next-team', hasNext: true, totalCount: 52 } };
+    const fetchNextPage = vi.fn();
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] }, isPending: false, isError: false, hasNextPage: true,
+      isFetchingNextPage: false, ...state, fetchNextPage,
+    });
+    render(<TeamListPageClient seed={{ page, sports: [seedSport], query: TEAM_LIST_SEED_PATH }} />);
+
+    const link = screen.getByRole('link', { name: '더 보기' });
+    expect(link).toHaveAttribute('href', '/teams?cursor=next-team');
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(link);
+    expect(fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('직접 진입한 필터 cursor seed의 레코드와 시작 커서를 그대로 화면과 query에 사용한다', () => {
+    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
+    hookMocks.useV1MasterSports.mockReturnValue({ data: [seedSport, seedSoccer] });
+    const secondPage = {
+      items: [{ ...seedTeam(20), id: 'team-page-2', teamId: 'team-page-2', name: '두 번째 페이지 팀' }],
+      nextCursor: 'opaque-page-3',
+      pageInfo: { nextCursor: 'opaque-page-3', hasNext: true, totalCount: 52 },
+    };
+    const metadata = {
+      items: [],
+      nextCursor: null,
+      pageInfo: { nextCursor: null, hasNext: true, totalCount: 105 },
+      facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+    };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [secondPage] },
+      listMetadata: metadata,
+      isPending: false,
+      isError: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    const seed = { page: secondPage, sports: [seedSport, seedSoccer], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'deadline', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2', metadata };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    expect(screen.getByRole('link', { name: /두 번째 페이지 팀/ }).getAttribute('href')).toMatch(/^\/teams\/team-page-2\?from=/);
+    expect(document.querySelector('.tm-team-summary-bar')?.textContent).toContain('105팀');
+    expect(screen.getByRole('link', { name: /풋살\s+94/ })).toBeInTheDocument();
+    const sportLink = new URL(screen.getByRole('link', { name: /풋살\s+94/ }).getAttribute('href') ?? '', 'https://teameet.test');
+    expect(sportLink.searchParams.has('cursor')).toBe(false);
+    const nextPageLink = new URL(screen.getByRole('link', { name: '더 보기' }).getAttribute('href') ?? '', 'https://teameet.test');
+    expect(nextPageLink.searchParams.get('cursor')).toBe('opaque-page-3');
+    expect(nextPageLink.searchParams.get('sportId')).toBe('sport-futsal');
+    expect(nextPageLink.searchParams.get('regionId')).toBe('region-seoul');
+    expect(nextPageLink.searchParams.get('sort')).toBe('deadline');
+    expect(nextPageLink.searchParams.get('q')).toBe('마포 FC');
+    expect(nextPageLink.searchParams.get('query')).toBeNull();
+    expect(nextPageLink.searchParams.get('joinPolicy')).toBeNull();
+    const [apiFilters, options] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>, { seed?: unknown; initialCursor?: string; metadataSeed?: unknown }];
+    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', joinPolicy: 'approval_required' });
+    expect(options.seed).toEqual(secondPage);
+    expect(options.initialCursor).toBe('opaque-page-2');
+    expect(options.metadataSeed).toEqual(metadata);
+  });
+
+  it('필터 초기화 링크는 직접 진입 cursor를 제거한다', () => {
+    searchParamsMock.value = new URLSearchParams('cursor=opaque-page-2&regionId=region-seoul&sort=latest&filter=1');
+    const page = { items: [seedTeam(20)], nextCursor: 'opaque-page-3', pageInfo: { nextCursor: 'opaque-page-3', hasNext: true, totalCount: 52 } };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    const seed = { page, sports: [seedSport], query: teamListSeedPath({ regionId: 'region-seoul', sort: 'latest', cursor: 'opaque-page-2' }) };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const reset = new URL(screen.getByRole('link', { name: '초기화' }).getAttribute('href') ?? '', 'https://teameet.test');
+    expect(reset.searchParams.has('cursor')).toBe(false);
+    expect(reset.searchParams.has('regionId')).toBe(false);
+    expect(reset.searchParams.has('sort')).toBe(false);
+  });
+
+  it('마지막 cursor의 metadata 실패 때 전체·종목 수를 추정하지 않고 재조회 후 복구한다', () => {
+    searchParamsMock.value = new URLSearchParams('cursor=opaque-page-2');
+    hookMocks.useV1MasterSports.mockReturnValue({ data: [seedSport, seedSoccer] });
+    const page = { items: [seedTeam(20)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      listMetadata: undefined,
+      isListMetadataPending: false,
+      isListMetadataError: true,
+      isPending: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    const seed = { page, sports: [seedSport], query: teamListSeedPath({ cursor: 'opaque-page-2' }), cursor: 'opaque-page-2' };
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrappedClient = (node: ReactElement) => <QueryClientProvider client={client}>{node}</QueryClientProvider>;
+    const view = rtlRender(wrappedClient(<TeamListPageClient seed={seed} />));
+
+    expect(screen.getByRole('status')).toHaveTextContent('팀 수 정보를 불러오지 못했어요');
+    expect(screen.queryByText('1팀')).not.toBeInTheDocument();
+    const failedChips = screen.getByRole('group', { name: '종목 필터' });
+    expect(failedChips.textContent).toBe('전체풋살축구');
+
+    const metadata = {
+      items: [],
+      pageInfo: { hasNext: true, totalCount: 105 },
+      facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+    };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      listMetadata: metadata,
+      isListMetadataPending: false,
+      isListMetadataError: false,
+      isPending: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    view.rerender(wrappedClient(<TeamListPageClient seed={seed} />));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(document.querySelector('.tm-team-summary-bar')?.textContent).toContain('105팀');
+    expect(screen.getByRole('link', { name: /풋살\s+94/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /축구\s+11/ })).toBeInTheDocument();
+  });
+
   it('SSR 첫 페이지 20팀과 hasNextPage 미정 상태에서도 전체 105·풋살 94·축구 11의 facet 건수를 보인다', () => {
     const page = {
       items: [
@@ -187,7 +367,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
     expect(screen.getByText('52')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    fireEvent.click(screen.getByRole('link', { name: '더 보기' }));
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
@@ -205,7 +385,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
     expect(screen.getByText('서버시드팀 0')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('다음 목록을 불러오지 못했어요');
-    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    fireEvent.click(screen.getByRole('link', { name: '다시 불러오기' }));
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
@@ -218,7 +398,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
     expect(screen.getByText('서버시드팀 0')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '더 보기' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: '더 보기' })).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('대조군 — 첫 페이지 자체가 실패하면 전체 에러 화면이다', () => {
@@ -229,7 +409,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     render(<TeamListPageClient />);
 
     expect(screen.queryByText('서버시드팀 0')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '더 보기' })).not.toBeInTheDocument();
   });
 
   it('seed(placeholder)가 떠 있는 동안에는 더 보기가 잠겨 낡은 커서를 따라가지 않는다', () => {
@@ -243,6 +423,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     const button = screen.getByRole('button', { name: '더 보기' });
     expect(button).toBeDisabled();
     expect(button).toHaveClass('tm-load-more', 'tm-btn-md');
+    expect(screen.queryByRole('link', { name: '더 보기' })).not.toBeInTheDocument();
     fireEvent.click(button);
     expect(fetchNextPage).not.toHaveBeenCalled();
   });

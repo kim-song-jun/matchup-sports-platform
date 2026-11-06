@@ -194,6 +194,7 @@ describe('대회 로스터 정리 계약 (팀 이탈 경로)', () => {
   });
 
   it('회원 탈퇴 신청 시 로스터와 팀 멤버십이 함께 정리된다', async () => {
+    const { sessionEpoch: epochBefore } = await prisma.v1User.findUniqueOrThrow({ where: { id: memberId } });
     await profile.withdrawalRequest(asUser(memberId), {});
 
     expect(await activeRosterCount(openRegistrationId)).toBe(0);
@@ -206,6 +207,8 @@ describe('대회 로스터 정리 계약 (팀 이탈 경로)', () => {
 
     const user = await prisma.v1User.findUniqueOrThrow({ where: { id: memberId } });
     expect(user.accountStatus).toBe('withdrawal_pending');
+    // 다른 기기에 남은 쿠키도 끊는다 — 탈퇴가 철회돼 active 로 돌아와도 옛 쿠키는 살아나지 않는다.
+    expect(user.sessionEpoch).toBe(epochBefore + 1);
   });
 
   it('자리를 비운 뒤에는 정원이 실제로 회복된다 — 사고의 사용자 체감 증상', async () => {

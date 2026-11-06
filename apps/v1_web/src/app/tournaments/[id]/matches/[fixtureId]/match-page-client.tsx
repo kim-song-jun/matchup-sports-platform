@@ -62,7 +62,7 @@ export function MatchPageClient({
       <MatchDetailContent
         data={data}
         from={currentHref ?? undefined}
-        afterHeader={<MatchTeamRosterCard team={rosterTeam} />}
+        afterHeader={<MatchTeamRosterCard team={rosterTeam} showRegistrationRosterEntry={false} />}
       />
       <div style={{ padding: '0 16px' }}>
         {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는

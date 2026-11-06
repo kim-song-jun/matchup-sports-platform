@@ -4,6 +4,7 @@ import { loadCompetitionRosterBase, loadGameRoster } from '../games/roster/game-
 import { PrismaService } from '../prisma/prisma.service';
 import { LineupTodoService } from './lineup-todo.service';
 import { TeamUpcomingGamesService } from './team-upcoming-games.service';
+import { loadTeamUpcomingRosterSummaries } from './team-upcoming-roster-summaries';
 
 // 명단 계산 입력(DB 로더)만 대체한다. 계산 자체(`computeGameRoster`)는 진짜를 쓴다.
 jest.mock('../games/roster/game-roster-loader', () => ({
@@ -12,6 +13,9 @@ jest.mock('../games/roster/game-roster-loader', () => ({
 }));
 jest.mock('../tournaments/discipline/team-game-order', () => ({
   loadTeamCompetitionGameOrder: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('./team-upcoming-roster-summaries', () => ({
+  loadTeamUpcomingRosterSummaries: jest.fn(),
 }));
 
 const NOW = new Date('2026-09-29T15:00:00.000Z');
@@ -95,16 +99,27 @@ function buildPrisma(db: FakeDb) {
       ),
     },
     v1TeamMatch: {
-      findMany: jest.fn((args: { where: { leagueId?: unknown; status?: string; startAt?: { gte: Date }; OR?: Array<Record<string, { in: string[] }>> } }) => {
+      findMany: jest.fn((args: {
+        where: {
+          leagueId?: unknown;
+          status?: string;
+          startAt?: { gte: Date };
+          AND?: Array<{ OR?: Array<{ startAt?: { gte?: Date } }> }>;
+          OR?: Array<Record<string, { in: string[] }>>;
+        };
+      }) => {
         // 리그 주차 계산용 형제 대진 조회.
         if (args.where.leagueId !== undefined) return Promise.resolve([{ leagueId: LEAGUE_ID, startAt: LEAGUE_KICKOFF }]);
         const teamIds = args.where.OR?.[0]?.hostTeamId?.in;
+        const startAt = args.where.startAt?.gte ?? args.where.AND
+          ?.flatMap((clause) => clause.OR ?? [])
+          .find((condition) => condition.startAt?.gte !== undefined)?.startAt?.gte ?? new Date(0);
         const statusOf = (match: FakeMatch) => (db.completedTeamMatchIds?.includes(match.id) ? 'completed' : 'matched');
         return Promise.resolve(
           MATCHES.filter(
             (match) =>
               statusOf(match) === args.where.status &&
-              match.startAt >= (args.where.startAt?.gte ?? new Date(0)) &&
+              match.startAt >= startAt &&
               (teamIds === undefined || teamIds.includes(match.hostTeamId)),
           ).map(toTeamMatchRow),
         );
@@ -168,6 +183,14 @@ beforeEach(() => {
     });
     return { computation } as never;
   });
+  jest.mocked(loadTeamUpcomingRosterSummaries).mockImplementation(async (_tx, _teamId, games) =>
+    new Map(games.map((game) => [game.gameId, {
+      teamMatchId: game.competitionKind === 'FRIENDLY' ? 'match-friendly' : 'match-league',
+      sideId: game.competitionKind === 'FRIENDLY' ? 'side-match-friendly-home' : 'side-match-league-home',
+      summary: null,
+      participantUserIds: game.competitionKind === 'FRIENDLY' ? null : new Set([PLAYER_IN]),
+    }])),
+  );
 });
 
 describe('TeamUpcomingGamesService.nextForMemberships — 홈 "다음 경기"', () => {

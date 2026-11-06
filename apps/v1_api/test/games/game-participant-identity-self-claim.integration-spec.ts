@@ -5,6 +5,8 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { invalidateLineupAndTactics } from '../../src/tournaments/tournament-match-update';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Task 154 P0-5 (사용자 결정 A안).
@@ -35,6 +37,7 @@ const ids = {
   region: '6c000000-0000-4000-8000-000000000011',
   hostTeam: '6c000000-0000-4000-8000-000000000020',
   opponentTeam: '6c000000-0000-4000-8000-000000000021',
+  replacementTeam: '6c000000-0000-4000-8000-000000000022',
   tournament: '6c000000-0000-4000-8000-000000000030',
   homeRegistration: '6c000000-0000-4000-8000-000000000031',
   awayRegistration: '6c000000-0000-4000-8000-000000000032',
@@ -42,7 +45,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -111,6 +114,7 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
       data: [
         { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 154 Self Claim Host' },
         { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 154 Self Claim Opponent' },
+        { id: ids.replacementTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 154 Self Claim Replacement' },
       ],
     });
     // 자가신청 자격의 근거는 "등록팀의 활성 멤버"다. attestor 는 반대편 팀 멤버로 둬서
@@ -119,6 +123,7 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
       data: [
         { teamId: ids.hostTeam, userId: ids.teamMember, role: 'member', status: 'active' },
         { teamId: ids.opponentTeam, userId: ids.attestor, role: 'member', status: 'active' },
+        { teamId: ids.replacementTeam, userId: ids.teamMember, role: 'member', status: 'active' },
       ],
     });
     await prisma.v1Tournament.create({
@@ -214,6 +219,24 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } })).toBe(before);
   });
 
+  it('명단 공개(킥오프 60분 전) 전에는 상대 등록팀 멤버가 이쪽 참가자에게 연결을 신청할 수 없다', async () => {
+    const before = await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } });
+
+    const error = await captureFailure(() =>
+      service.requestIdentityLink(
+        authUser(ids.attestor),
+        gameId,
+        participantId,
+        'mu3-opponent-request-before-lineup',
+        { expectedVersion: 1, clientCommandId: 'mu3-opponent-request-before-lineup' },
+      ),
+    );
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(403);
+    expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } })).toBe(before);
+  });
+
   it('신청자가 자기 신청을 스스로 확인할 수는 없다 (신청자 ≠ 확인자)', async () => {
     // 여기가 이 변경의 안전장치다. 신청 자격을 열어도 혼자서 연결을 완성할 수 없어야
     // 아무나 남의 기록을 자기 것으로 만들지 못한다.
@@ -290,5 +313,82 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
 
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(403);
+  });
+
+  it('팀 교체로 무효화된 제출 선수는 후보와 신청에서 제외하고 새 초안 선수는 신청할 수 있다', async () => {
+    const homeSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: 'HOME' } });
+    const previousLineup = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId, sideId: homeSide.id, invalidatedAt: null },
+      orderBy: { revision: 'desc' },
+      select: { id: true },
+    });
+    const previousParticipant = await prisma.v1GameParticipant.create({
+      data: {
+        gameId,
+        sideId: homeSide.id,
+        lineupId: previousLineup.id,
+        displayNameSnapshot: '이전 팀 게스트',
+      },
+      select: { id: true },
+    });
+
+    const currentParticipantId = await prisma.$transaction(async (tx) => {
+      await tx.v1GameLineup.update({ where: { id: previousLineup.id }, data: { state: 'SUBMITTED' } });
+      const currentLineupId = await invalidateLineupAndTactics(tx, gameId, homeSide.id);
+      if (currentLineupId === null) throw new Error('Replacement lineup was not created');
+      await tx.v1TeamMatch.update({ where: { id: ids.fixture }, data: { hostTeamId: ids.replacementTeam } });
+      await tx.v1TournamentRegistration.update({ where: { id: ids.homeRegistration }, data: { teamId: ids.replacementTeam } });
+      await tx.v1GameSide.update({ where: { id: homeSide.id }, data: { teamId: ids.replacementTeam, displayNameSnapshot: 'Task 154 Self Claim Replacement' } });
+      const participant = await tx.v1GameParticipant.create({
+        data: {
+          gameId,
+          sideId: homeSide.id,
+          lineupId: currentLineupId,
+          displayNameSnapshot: '현재 팀 게스트',
+          jerseyNumber: 8,
+        },
+        select: { id: true },
+      });
+      return participant.id;
+    });
+
+    await expect(prisma.v1GameLineup.findUniqueOrThrow({
+      where: { id: previousLineup.id },
+      select: { state: true, invalidatedAt: true, invalidationReason: true },
+    })).resolves.toMatchObject({ state: 'SUBMITTED', invalidatedAt: expect.any(Date), invalidationReason: 'SIDE_TEAM_CHANGED' });
+    const currentParticipant = await prisma.v1GameParticipant.findUniqueOrThrow({
+      where: { id: currentParticipantId },
+      select: { lineupId: true },
+    });
+    await expect(prisma.v1GameLineup.findUniqueOrThrow({
+      where: { id: currentParticipant.lineupId },
+      select: { state: true, invalidatedAt: true },
+    })).resolves.toMatchObject({ state: 'DRAFT', invalidatedAt: null });
+
+    const candidates = await service.listClaimableParticipants(authUser(ids.teamMember), ids.tournament, ids.fixture);
+    expect(candidates.participants.map((candidate) => candidate.participantId)).toContain(currentParticipantId);
+    expect(candidates.participants.map((candidate) => candidate.participantId)).not.toContain(previousParticipant.id);
+
+    const eventsBeforeStaleRequest = await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId: previousParticipant.id } });
+    const staleRequestError = await captureFailure(() => service.requestIdentityLink(
+      authUser(ids.teamMember),
+      gameId,
+      previousParticipant.id,
+      'task154-replaced-team-stale-request',
+      { expectedVersion: candidates.version, clientCommandId: 'task154-replaced-team-stale-request' },
+    ));
+    expect(staleRequestError).toBeInstanceOf(HttpException);
+    expect((staleRequestError as HttpException).getStatus()).toBe(409);
+    expect(staleRequestError).toMatchObject({ response: { code: 'GAME_PARTICIPANT_NOT_CURRENT_LINEUP' } });
+    expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId: previousParticipant.id } })).toBe(eventsBeforeStaleRequest);
+
+    await service.requestIdentityLink(
+      authUser(ids.teamMember),
+      gameId,
+      currentParticipantId,
+      'task154-replaced-team-current-request',
+      { expectedVersion: candidates.version, clientCommandId: 'task154-replaced-team-current-request' },
+    );
+    expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId: currentParticipantId, actorUserId: ids.teamMember } })).toBe(1);
   });
 });

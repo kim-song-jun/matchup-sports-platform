@@ -8,11 +8,12 @@ import type { MutateTeamMatchRecordDto } from '../../src/team-matches/dto/team-m
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 import { TeamMatchRecordService } from '../../src/team-matches/team-match-record.service';
 import { createSharedRecordFixture } from '../fixtures/team-match-shared-record.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const records = new TeamMatchRecordService(prisma);
 const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const user = (id: string): V1AuthUser => ({ id, email: null, accountStatus: 'active', onboardingStatus: 'completed' });
 const command = (
   action: MutateTeamMatchRecordDto['action'],

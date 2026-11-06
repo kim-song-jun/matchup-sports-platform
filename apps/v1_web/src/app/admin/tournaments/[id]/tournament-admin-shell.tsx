@@ -20,7 +20,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { canWriteTournamentAdmin, deriveTournamentAdminRole } from '@/lib/admin-tournament-role';
+import { canWriteTournamentAdmin, deriveTournamentAdminRole, type TournamentAdminRole } from '@/lib/admin-tournament-role';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 import { TournamentAdminProvider } from './tournament-admin-context';
 import {
@@ -83,7 +83,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
     label: '사후',
     items: [
       { slug: 'reviews', label: '리뷰 관리' },
-      { slug: 'awards', label: '개인 어워드' },
+      { slug: 'awards', label: '시상' },
       { slug: 'statistics', label: '통계' },
     ],
   },
@@ -97,7 +97,7 @@ const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>>
   },
   in_progress: {
     title: '대회를 시작할까요?',
-    message: '시작하면 접수 단계로 되돌릴 수 없어요. 대진표와 경기 일정을 먼저 확인해 주세요.',
+    message: '대진표와 경기 일정을 먼저 확인해 주세요. 실제 시작한 경기가 없으면 접수 마감으로 되돌릴 수 있어요.',
     confirmLabel: '대회 시작하기',
   },
   completed: {
@@ -109,13 +109,22 @@ const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>>
 };
 
 export function TournamentAdminShell({ id, children }: { id: string; children: ReactNode }) {
-  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const { data: adminMe } = useV1AdminMe();
   // 역할이 단일 출처다 — canWrite 는 거기서 파생된다. adminMe 가 아직 없으면 가장 좁은
   // 역할(조회 전용)로 둔다: 로딩 중에 쓰기 버튼이 잠깐 보였다가 사라지면 안 된다.
   const role = adminMe
     ? deriveTournamentAdminRole({ kind: 'platform', adminRole: adminMe.adminRole })
     : 'SUPPORT_READONLY';
+  return <TournamentManagementContent id={id} role={role}>{children}</TournamentManagementContent>;
+}
+
+/** Both surfaces use exactly the same forms; the director entry supplies a verified scoped role. */
+export function TournamentManagementContent({ id, role, staffSurface = false, navigation, children }: {
+  id: string; role: TournamentAdminRole; staffSurface?: boolean; children: ReactNode;
+  /** Explicit route dependencies for the isolated public sample; no auth or API behavior changes. */
+  navigation?: { basePath: string; listHref: string; operationsBasePath: string; localPopups?: boolean };
+}) {
+  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
   const [revertOpen, setRevertOpen] = useState(false);
@@ -123,8 +132,9 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
   // '대회 목록으로'는 대회 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
-  const listHref = useAdminListReturnHref('/admin/tournaments');
-  const basePath = `/admin/tournaments/${id}`;
+  const adminListHref = useAdminListReturnHref('/admin/tournaments');
+  const listHref = navigation?.listHref ?? (staffSurface ? '/tournament-management' : adminListHref);
+  const basePath = navigation?.basePath ?? `${staffSurface ? '/tournament-management/tournaments' : '/admin/tournaments'}/${id}`;
 
   // ── Status change ────────────────────────────────────────────────────
   const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
@@ -161,7 +171,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   };
 
   const onConfirmRevert = (reason: string) => {
-    const target = tournament ? revertTargetStatus(tournament.status) : null;
+    const target = tournament ? revertTargetStatus(tournament.status, tournament.canRevertStart === true) : null;
     if (!tournament || !target) return;
     changeStatus.mutate(
       { status: target, reason: reason.trim() },
@@ -204,22 +214,22 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   }
 
   const nextStatuses = allowedNextStatuses(tournament.status);
-  const revertCopy = revertTargetStatus(tournament.status) ? REVERT_COPY[tournament.status] : undefined;
+  const revertCopy = revertTargetStatus(tournament.status, tournament.canRevertStart === true) ? REVERT_COPY[tournament.status] : undefined;
   const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
   const counts = tournament.operationCounts;
   const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
     label: group.label,
-    items: group.items.map((item) => ({
+    items: group.items.filter((item) => !staffSurface || !item.externalHref).map((item) => ({
       slug: item.slug,
       label: item.label,
       count: item.countKey ? counts?.[item.countKey] : undefined,
-      externalHref: item.externalHref?.(id),
-      externalNote: item.externalHref ? '전역 팝업 화면으로 이동' : undefined,
+      externalHref: navigation?.localPopups ? undefined : item.externalHref?.(id),
+      externalNote: item.externalHref && !navigation?.localPopups ? '전역 팝업 화면으로 이동' : undefined,
     })),
   }));
 
   return (
-    <TournamentAdminProvider value={{ tournamentId: id, role, canWrite, showToast }}>
+    <TournamentAdminProvider value={{ tournamentId: id, basePath, role, canWrite, showToast }}>
       {/* ── Back link ─────────────────────────────────────────────────── */}
       <div className="mb-4">
         <Link
@@ -234,7 +244,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       {/* ── Header ────────────────────────────────────────────────────── */}
       {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
       <AdminPageHeader
-        eyebrow="플랫폼 · 대회"
+        eyebrow={staffSurface ? '담당 대회 관리' : '플랫폼 · 대회'}
         title={tournament.title}
         description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
       />
@@ -288,12 +298,12 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       )}
 
       {/* 공개 설정 — 비공개면 일반 사용자 화면에서 숨고 관리자 운영은 그대로다(리그와 같은 카드). */}
-      <TournamentVisibilityControl tournamentId={id} isPublic={tournament.isPublic ?? true} status={tournament.status} />
+      <TournamentVisibilityControl canWrite={canWrite} tournamentId={id} isPublic={tournament.isPublic ?? true} status={tournament.status} />
 
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 섹션들과 별개인 대회 현장 운영
           콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
           권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
-      <TournamentOpsQuickLinks tournamentId={id} />
+      <TournamentOpsQuickLinks tournamentId={id} staffSurface={staffSurface} basePath={navigation?.operationsBasePath} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}

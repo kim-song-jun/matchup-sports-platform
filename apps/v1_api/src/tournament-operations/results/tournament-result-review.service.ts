@@ -415,7 +415,7 @@ export class TournamentResultReviewService {
    * Officializes a SUBMITTED revision (STANDARD flow, tournament review
    * pass) or a correction DRAFT created via createResultCorrection
    * (CORRECTION flow). platform_ops always; tournament_director only while
-   * DIRECTOR_OFFICIALIZE is 'on'. Atomically swaps the game's current
+   * DIRECTOR_OFFICIALIZE is 'on' for leagues; assigned tournament directors always have this permission. Atomically swaps the game's current
    * official pointer and writes the same GAME_RESULT_OFFICIAL outbox event
    * the team-match approve path already uses, so the existing projection
    * worker (facts/cache/bracket/terminal/watermarks) applies unchanged.
@@ -1155,7 +1155,9 @@ export class TournamentResultReviewService {
             },
             tx,
           );
-          if (input.requiredRole !== undefined && principal.role !== input.requiredRole) {
+          // Active, scoped tournament directors manage all tournament results. League policy remains separate.
+          const fullTournamentDirector = principal.role === 'tournament_director' && source.tournamentKind !== 'regular_league';
+          if (input.requiredRole !== undefined && principal.role !== input.requiredRole && !fullTournamentDirector) {
             throw new ForbiddenException({
               code: 'PERMISSION_DENIED',
               message: '플랫폼 운영자만 쓸 수 있는 기능이에요.',
@@ -1189,7 +1191,7 @@ export class TournamentResultReviewService {
           // written. `directorOfficializeFlag` is the flag's exact
           // value/version *at the moment this command evaluated it*.
           let directorOfficializeFlag: DirectorOfficializeFlagSnapshot | null = null;
-          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director') {
+          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director' && !fullTournamentDirector) {
             directorOfficializeFlag = await this.readDirectorOfficializeFlagSnapshot(tx);
             if (directorOfficializeFlag.value !== 'on') {
               deniedAuditInput = {
@@ -1278,6 +1280,7 @@ export class TournamentResultReviewService {
               actorRole: principal.role,
               authorizationSubject: principal.authorizationSubject,
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
+              ...(fullTournamentDirector ? { authorizationPolicy: 'assigned_tournament_full_management' } : {}),
             },
             tournamentId: source.tournamentId,
             teamMatchId: game.teamMatchId,
@@ -1502,7 +1505,8 @@ export class TournamentResultReviewService {
       //
       // 점수가 base 와 다를 때는 메우지 않는다 — 그때의 base 킥 수는 다른 승부차기를
       // 설명하는 값이라, 옮기면 `home <= takenHome` 같은 불변식이 조용히 깨진다.
-      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore);
+      // The parser normalizes false to absence. Keep the explicit opt-out for base audit inheritance.
+      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore, score.penalties?.operatorOverride !== false);
       const applied = assertPenaltiesNotAllowed(regulation, carriedOver, facts);
       // 정정이 승부차기를 **새로 쓰는가**를 base 와 비교해 판정한다. 새로 쓰는 것이면
       // `end` 와 똑같이 킥 수를 요구하고, base 를 그대로 옮기는 것이면 면제한다.
@@ -1611,7 +1615,7 @@ export class TournamentResultReviewService {
    * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
    * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
    */
-  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
+  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue, allowInheritedOverride = true): StoredPenalties {
     const base = readStoredPenalties(baseScore);
     if (base === undefined) return submitted;
     if (base.home !== submitted.home || base.away !== submitted.away) return submitted;
@@ -1624,7 +1628,7 @@ export class TournamentResultReviewService {
         ? { takenHome: base.takenHome, takenAway: base.takenAway }
         : {};
     const override =
-      submitted.operatorOverride === undefined && base.operatorOverride === true
+      allowInheritedOverride && submitted.operatorOverride === undefined && base.operatorOverride === true
         ? { operatorOverride: true as const }
         : {};
     // 선축도 **같은 이유로** 메운다. 빠뜨렸다가 2026-08-19 alpha 감사에서 두 가지 피해가
@@ -1694,6 +1698,17 @@ export class TournamentResultReviewService {
           code: 'PARTICIPANT_INVALID',
           message: 'actualParticipants must not drop every participant recorded on the base revision',
         });
+      }
+    }
+    const cardEvents = content.actualParticipants.flatMap((participant) => participant.cards.events ?? []);
+    if (new Set(cardEvents.map((event) => event.id)).size !== cardEvents.length) {
+      throw new UnprocessableEntityException({ code: 'RESULT_CARD_TIMELINE_INVALID', message: '카드 기록이 중복돼요.' });
+    }
+    if (cardEvents.some((event) => event.period !== undefined)) {
+      const periods = await tx.v1GamePeriod.findMany({ where: { gameId }, select: { number: true } });
+      const allowed = new Set(periods.map((period) => period.number));
+      if (cardEvents.some((event) => event.period !== undefined && !allowed.has(event.period))) {
+        throw new UnprocessableEntityException({ code: 'RESULT_CARD_TIMELINE_INVALID', message: '이 경기의 피리어드를 선택해 주세요.' });
       }
     }
     // Participants of a lineup invalidated by a side team change belong to the replaced team; their rows stay for

@@ -6,6 +6,17 @@ Status: In Progress (draft PR #1990; Alpha QA pending; current CI tracked in PR 
 **Canonical worktree**: `_worktrees/league-state-audit`
 
 ## Context
+
+### 현재 계약 — PR #2065 / 2026-10-27 결정 반영
+
+아래 2026-10-18~19 구현·검증은 과거 이력이다. 신규 리그의 모집 마감 생성·4상태 문구와 모든 기존 상태 보존 기대는 [정본 §6](../../docs/design/competition-canonical-flow.md#6-결정-이력--무엇이-바뀌었나-무엇을-얻고-잃나)의 2026-10-27 결정으로 대체한다.
+
+- 신규 독립 리그·시리즈 시즌·승계 시즌은 `draft`(초안)로 생성한다. 명시적 시작 원칙은 유지한다.
+- `open`이며 마감 전 또는 마감 없음일 때만 접수한다. 시작·보류 중에는 신청과 접수 재오픈을 막는다.
+- `20261027120000_league_registration_status`는 기존 시작 전 리그와 보류 복원 상태를 새 신청 규칙에 맞게 변환한다. 기존 참가팀·신청·경기와 `requiresExplicitStart`는 유지한다.
+- [현재 QA 시나리오](../../docs/scenarios/league-explicit-start.md), [필터 QA](../../docs/scenarios/competition-discovery-filters-2026-10-22.md), [API 계약](../../docs/api/domains/league-matches.md).
+- 2026-10-30 리뷰 후속: 위 두 QA 문서의 옛 기대를 수정했다. 문서 링크·구현 계약 대조는 완료했고, #2065 변경 후 실제 alpha 검증은 미실행이다.
+
 리그를 만든 뒤 대진 준비만으로 진행 중으로 보이는 문제. 사용자는 생성 → 모집 마감 → 리그 시작하기를 승인했고, 후속으로 PR 생성과 기존 데이터 무회귀를 요청했다.
 
 ## Goal

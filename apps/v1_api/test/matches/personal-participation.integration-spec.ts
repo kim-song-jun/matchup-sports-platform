@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { holdRowLock } from '../team-schedules/helpers/lock-barrier';
 
 const host = randomUUID();
 const member = randomUUID();
@@ -68,6 +70,51 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const applicationId = applied.body.data.applicationId as string;
     await post(host, `/match-applications/${applicationId}/approve`).expect(201);
     return applicationId;
+  }
+
+  async function applyBehindMatchLock(matchId: string) {
+    let holderPid = 0;
+    const holder = await holdRowLock(db, async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+      if (!rows[0]) throw new Error('PostgreSQL holder PID missing');
+      holderPid = rows[0].pid;
+      await tx.$queryRaw`SELECT id FROM v1_matches WHERE id = ${matchId} FOR UPDATE`;
+    });
+    const settled = [false, false];
+    const outcomes = settled.map((_, index) => Promise.resolve(post(member, `/matches/${matchId}/applications`)).then(
+      response => { settled[index] = true; return { kind: 'response' as const, response }; },
+      error => { settled[index] = true; return { kind: 'error' as const, error }; },
+    ));
+    let barrierFailure: { error: unknown } | undefined;
+    try {
+      const deadline = Date.now() + 5000;
+      let observed = false;
+      while (Date.now() < deadline) {
+        const rows = await db.$queryRaw<Array<{ waiting: number }>>`
+          WITH RECURSIVE lock_waits AS (
+            SELECT pid AS waiter_pid, unnest(pg_blocking_pids(pid)) AS blocker_pid
+            FROM pg_stat_activity WHERE datname = current_database()
+          ), blocking_chain AS (
+            SELECT waiter_pid, blocker_pid FROM lock_waits
+            UNION
+            SELECT chain.waiter_pid, next.blocker_pid
+            FROM blocking_chain chain JOIN lock_waits next ON chain.blocker_pid = next.waiter_pid
+          )
+          SELECT count(DISTINCT waiter_pid)::int AS waiting FROM blocking_chain
+          WHERE blocker_pid = ${holderPid}::int`;
+        if ((rows[0]?.waiting ?? 0) >= outcomes.length) { observed = true; break; }
+        if (settled.some(Boolean)) throw new Error('신청 요청이 매치 잠금 대기 전에 종료됐습니다');
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      if (!observed) throw new Error('두 신청 요청의 PostgreSQL 잠금 대기를 확인하지 못했습니다');
+    } catch (error) { barrierFailure = { error }; }
+    finally { await holder.release(); }
+    const results = await Promise.all(outcomes);
+    if (barrierFailure) throw barrierFailure.error;
+    return results.map(result => {
+      if (result.kind === 'error') throw result.error;
+      return result.response;
+    });
   }
   async function end(matchId: string, confirmProceed = true) {
     // Clock fixture only: actual completion still goes through the guarded HTTP action.
@@ -134,6 +181,37 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     await post(host, `/match-applications/${applicationId}/approve`).expect(201);
     expect((await get(member, `/matches/${id}`)).body.data.participantCount).toBe(2);
   });
+
+  it('동시 최초 신청은 1건만 접수하고 나머지는 이미 신청한 충돌을 반환한다', async () => {
+    const id = await createMatch();
+    const notifications = jest.spyOn(app.get(NotificationsService), 'emitNotification');
+    try {
+      const responses = await applyBehindMatchLock(id);
+      expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+      expect(responses.find(response => response.status === 409)?.body.code).toBe('ALREADY_REQUESTED');
+      const applications = await db.v1MatchApplication.findMany({ where: { matchId: id, applicantUserId: member } });
+      expect(applications).toHaveLength(1);
+      expect(applications[0]).toMatchObject({ status: 'requested' });
+      expect(await db.v1StatusChangeLog.count({ where: { targetId: applications[0].id, toStatus: 'requested' } })).toBe(1);
+      expect(notifications.mock.calls.filter(([recipient, type, target]) => recipient === host && type === 'match_application_received' && target === id)).toHaveLength(1);
+    } finally { notifications.mockRestore(); }
+  }, 30000);
+
+  it('철회한 신청을 동시에 다시 보내면 1건만 재접수하고 다른 요청은 충돌한다', async () => {
+    const id = await createMatch();
+    const applicationId: string = (await post(member, `/matches/${id}/applications`).expect(201)).body.data.applicationId;
+    await post(member, `/match-applications/${applicationId}/withdraw`).expect(201);
+    const notifications = jest.spyOn(app.get(NotificationsService), 'emitNotification');
+    try {
+      const responses = await applyBehindMatchLock(id);
+      expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+      expect(responses.find(response => response.status === 409)?.body.code).toBe('ALREADY_REQUESTED');
+      expect(await db.v1MatchApplication.count({ where: { matchId: id, applicantUserId: member } })).toBe(1);
+      expect(await db.v1MatchApplication.findUniqueOrThrow({ where: { id: applicationId } })).toMatchObject({ status: 'requested' });
+      expect(await db.v1StatusChangeLog.count({ where: { targetId: applicationId, reason: 'match_application_resubmitted' } })).toBe(1);
+      expect(notifications.mock.calls.filter(([recipient, type, target]) => recipient === host && type === 'match_application_received' && target === id)).toHaveLength(1);
+    } finally { notifications.mockRestore(); }
+  }, 30000);
 
   it('호스트 완료는 참여·후기 자격을 저장하고 재시도해도 중복 집계하지 않는다', async () => {
     const id = await createMatch();
@@ -409,7 +487,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect(hostItems.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['승인 뒤 첫 안내', '저도 갈게요']));
   });
 
-  it('목록 기본 정렬은 경기일 순 — 시작 전 경기를 가까운 날부터, 지난 경기는 그 뒤에 이어 페이지를 넘긴다', async () => {
+  it('목록 기본 정렬은 상태 묶음 순 — 신청 가능을 경기 가까운 날부터, 끝난 경기는 그 뒤에 이어 페이지를 넘긴다', async () => {
     // 이 테스트만의 종목으로 걸러 다른 테스트가 만든 매치와 섞이지 않게 한다. 등록 순서는 경기일과 엇갈리게 둔다.
     const ownSportId = (await db.v1Sport.create({ data: { code: `order-${randomUUID()}`, name: '풋살' } })).id;
     const at = (hours: number) => new Date(Date.now() + hours * 3600000).toISOString();
@@ -420,14 +498,15 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
 
     const page1 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2`).expect(200)).body.data;
     expect(page1.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, far]);
-    expect(page1.pageInfo).toEqual({ nextCursor: expect.stringMatching(new RegExp(`^upcoming:${far}@\\d+$`)), hasNext: true });
+    expect(page1.pageInfo).toEqual({ nextCursor: expect.stringMatching(new RegExp(`^open:${far}@\\d+$`)), hasNext: true });
 
     const page2 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2&cursor=${page1.pageInfo.nextCursor}`).expect(200)).body.data;
     expect(page2.items.map((m: { matchId: string }) => m.matchId)).toEqual([ended]);
     expect(page2.pageInfo).toEqual({ nextCursor: null, hasNext: false });
 
+    // 최신순은 신청 가능 묶음 안의 순서만 바꾼다 — 끝난 경기는 여전히 그 뒤다.
     const latest = (await get(outsider, `/matches?sportId=${ownSportId}&sort=latest`).expect(200)).body.data;
-    expect(latest.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, ended, far]);
+    expect(latest.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, far, ended]);
   });
 
   it('목록을 넘기는 사이 1페이지의 마지막 경기가 시작해도 다음 경기를 건너뛰지 않는다', async () => {

@@ -133,6 +133,16 @@ validate_alpha_final_release_manifest() {
        .database.task168.schemaSha256 == "d54fe0c8c3415eabd9a363277afc8c5b20ff14a8bbae1c04fc943c1ba50df8b3" or
        .database.task168.schemaSha256 == "1f217e10790894fd23fb206aa4b8693c9fb8c35ceadd2e99e60a4a5731b33970" or
        .database.task168.schemaSha256 == "8776cccbf35b17cca2bd962cd44fe09fa98542c0395304b109e2a00f04684d0b" or
+       .database.task168.schemaSha256 == "309ffb06dc57dea03709dc6910ebbe447f52006774c2f64ce9e82c8cef477627" or
+       .database.task168.schemaSha256 == "b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960" or
+       .database.task168.schemaSha256 == "82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112" or
+       .database.task168.schemaSha256 == "082bac1bb887f76b131dbd17ac4acbb11979b79fdf2bcc957d18fc06db57b04f" or
+       .database.task168.schemaSha256 == "1f9a9917691c053189e39f60af3640dfc4c4b8ff5ec62a29a32b500961893aad" or
+       .database.task168.schemaSha256 == "3ec98b92af1b34477bb90bfc257e3f150fbeb14f9fe9cc568c4b05d07889edbb" or
+       .database.task168.schemaSha256 == "7cb13512f128b7b6e5eaf8f474938b65b1f30782afb46b833967d7f9be9e6626" or
+       .database.task168.schemaSha256 == "de8b01ba4d2aa2538dcc2879dd4af58dfa5356e6afc34694e5622c84b681a69f" or
+       .database.task168.schemaSha256 == "c8c382bd8c3659e3d754703b12d4c55c5522b91af928cddfb3ae8649a8f2bc3e" or
+       .database.task168.schemaSha256 == "df6fc250677a43c796ee145190b7053a2a7ed791f503f7e1940ddb7d3d214e16" or
        .database.task168.schemaSha256 == "23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644" or
        .database.task168.schemaSha256 == "887da0ea94d64d5c0ee6b51927f82a9022bfff97878b2e5094ad0d88ea05eaf3" or
        .database.task168.schemaSha256 == "96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42" or

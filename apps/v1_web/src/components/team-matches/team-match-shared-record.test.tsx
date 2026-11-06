@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { RecordChange, SharedGoal, SharedRecord } from '@/hooks/use-team-match-record';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
+import { queryImageBySrc } from '@/test/next-image';
 
 const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn(), search: '', mutationError: undefined as unknown }));
 vi.mock('next/navigation', () => ({
@@ -322,7 +323,7 @@ describe('shared record participant flow', () => {
   it('shows player photos and offers the opposing roster for an own goal', () => {
     const { container } = render(<TeamMatchSharedRecord teamMatchId="match" />);
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
-    expect(container.querySelector('img[src="/mock/players/minsu.jpg"]')).not.toBeNull();
+    expect(queryImageBySrc(container, '/mock/players/minsu.jpg')).not.toBeNull();
     fireEvent.click(screen.getByRole('checkbox', { name: /자책골/ }));
     expect(screen.queryByRole('radio', { name: /김민수/ })).toBeNull();
     expect(screen.getByRole('radio', { name: /박지훈/ })).toBeInTheDocument();

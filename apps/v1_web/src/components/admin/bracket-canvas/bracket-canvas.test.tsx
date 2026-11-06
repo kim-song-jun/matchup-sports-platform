@@ -64,10 +64,27 @@ describe('fixtureTitle', () => {
 });
 
 describe('BracketCanvas', () => {
+  it('기존 6강 템플릿 상태로 부전승과 결승 연결을 표시하고 실제 경기 편집을 연다', () => {
+    const rounds: [string, string, string, string, string] = ['r1', 'r2', 'r3', 's', 'f'];
+    const sixFixtures = rounds.map((id, i) => makeFixture({ id, fixtureNumber: i + 1, groupId: i < 3 ? 'six' : i === 3 ? 'semi' : 'final', round: i < 3 ? '6강' : i === 3 ? '준결승' : '결승' }));
+    const { container, props } = renderCanvas({
+      sixTeamState: { rounds, bye: null, manual: false, winners: {}, needsReview: false },
+      groups: [makeGroup({ id: 'six', name: '6강', phase: 'quarter' }), makeGroup({ id: 'semi', name: '준결승', phase: 'semi' }), makeGroup({ id: 'final', name: '결승', phase: 'final' })],
+      fixtures: sixFixtures,
+      slots: [],
+    });
+    expect(container.querySelectorAll('[data-fixture-id]')).toHaveLength(5);
+    expect(within(screen.getByRole('region', { name: '6강' })).getByText('1번 경기')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '6강' })).queryByText('6강 1번 경기')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[data-connection]')).toHaveLength(2);
+    expect(within(screen.getByRole('region', { name: '준결승' })).getByRole('group', { name: '준결승 부전승 · 선정 대기' })).toHaveTextContent('6강 승리팀 중 선정 대기');
+    fireEvent.click(screen.getByRole('button', { name: '홈 결승 직행팀' }));
+    expect(props.onSelectFixture).toHaveBeenCalledWith('f');
+  });
   it('열 이름을 단계 순서(4강 > 결승 > 3·4위전)로 보여 준다', () => {
     renderCanvas();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-    expect(headings).toEqual(['4강', '결승', '3·4위전']);
+    expect(headings).toEqual(['4강', '3·4위전', '결승']);
   });
 
   it('칸마다 제목과 자리 라벨을 그리고, 연결선은 승자 2 + 패자 2 개를 SVG 로 그린다', () => {
@@ -113,6 +130,10 @@ describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
     });
   const rank = (letter: string, sourceGroupId: string, position: number) =>
     makeSlot({ id: `r${letter}${position}`, kind: 'GROUP_RANK', groupId: 'g-semi', sourceGroupId, position, label: `${letter}조 ${position}위` });
+  const splitRank = (letter: string, sourceGroupId: string, targetGroupId: string, position: number, bracketTrack: 'upper' | 'lower') => ({
+    ...makeSlot({ id: `split-${letter}${position}`, kind: 'GROUP_RANK', groupId: targetGroupId, sourceGroupId, position, label: `${letter}조 ${position}위` }),
+    bracketTrack,
+  });
   const rankSlots = [rank('A', 'gA', 1), rank('A', 'gA', 2), rank('B', 'gB', 1), rank('B', 'gB', 2)];
   const groupSlots = [
     entry('gA', 'A', 1, '서울FC'), entry('gA', 'A', 2), entry('gA', 'A', 3), entry('gA', 'A', 4),
@@ -143,6 +164,27 @@ describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['A조', 'B조', '조 편성', '4강', '결승']);
     expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 1번, 서울FC' })).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 2번, 빈 자리' })).toBeInTheDocument();
+  });
+
+  it('하위 트랙 GROUP_RANK 슬롯이 있을 때 이름과 무관하게 분리 진출 규칙을 표시한다', () => {
+    const lower = makeGroup({ id: 'g-lower', name: '패자부활', phase: 'quarter', sortOrder: 2 });
+    renderCanvas({
+      ...stageProps(),
+      groups: [gFinal, gSemi, lower, gB, gA],
+      slots: [
+        ...groupSlots,
+        splitRank('A', 'gA', 'g-semi', 1, 'upper'),
+        splitRank('A', 'gA', 'g-semi', 2, 'upper'),
+        splitRank('B', 'gB', 'g-semi', 1, 'upper'),
+        splitRank('B', 'gB', 'g-semi', 2, 'upper'),
+        splitRank('A', 'gA', 'g-lower', 3, 'lower'),
+        splitRank('A', 'gA', 'g-lower', 4, 'lower'),
+        splitRank('B', 'gB', 'g-lower', 3, 'lower'),
+        splitRank('B', 'gB', 'g-lower', 4, 'lower'),
+      ],
+    });
+    expect(screen.getAllByText('1·2위 상위 · 3·4위 하위')).toHaveLength(2);
+    expect(screen.queryByText('상위 2팀 진출')).not.toBeInTheDocument();
   });
 
   it('조 순위 연결선 4개는 선·점 점선이고 설명 문구가 따로 붙는다 (승자선 설명과 구분)', () => {
@@ -204,7 +246,7 @@ it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고
     slots: [makeSlot({ id: 'bye', kind: 'BYE', groupId: 'r12', label: '5번 시드', registrationId, teamName: registrationId ? '확정팀' : null })],
     fixtures: [makeFixture({ id: 'quarter', fixtureNumber: 1, groupId: 'q', round: '8강', homeSlotId: 'bye', homeRegistrationId: registrationId, homeTeamName: registrationId ? '확정팀' : 'TBD' })],
   });
-  const tile = screen.getByRole('button', { name: `12강 부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
+  const tile = screen.getByRole('button', { name: `부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
   if (registrationId) {
     expect(tile).not.toHaveTextContent('5번 시드');
     expect(tile).toHaveStyle({ background: 'var(--blue50)' });
@@ -212,4 +254,45 @@ it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고
     expect(tile).toHaveTextContent('5번 시드');
     expect(tile).not.toHaveStyle({ background: 'var(--blue50)' });
   }
+});
+
+describe('named finals are stacked in independent diagrams', () => {
+  it.each([2,10])('renders %i finals as separate sections and keeps every fixture selectable', count => {
+    const groups = Array.from({length: count}, (_,i) => makeGroup({ id: 'g-'+i, name: '결승', phase: 'final', bracketTrack: '토너먼트 '+i, bracketColorIndex: i, sortOrder: i*100 }));
+    const fixtures = groups.map((group,i) => makeFixture({ id: 'f-'+i, groupId: group.id, fixtureNumber: i+1, round: '결승' }));
+    const { container, props } = renderCanvas({ groups, fixtures, slots: [] });
+    const sections = [...container.querySelectorAll('details')];
+    expect(sections).toHaveLength(count);
+    sections.forEach((section,i) => {
+      expect(within(section).getByRole('region', {name:'대진 그림'})).toBeInTheDocument();
+      expect(within(section).getAllByRole('group')).toHaveLength(1);
+      expect(section.querySelector('.tm-final-color-'+i)).toBeInTheDocument();
+      fireEvent.click(within(section).getByRole('button', {name: new RegExp((i+1)+'번 경기 열기')}));
+      expect(props.onSelectFixture).toHaveBeenLastCalledWith('f-'+i);
+    });
+    const last = sections[count-1] as HTMLDetailsElement;
+    last.open = false;
+    fireEvent.click(within(screen.getByRole('navigation', {name:'토너먼트 그림 바로가기'})).getByRole('button', {name:'토너먼트 '+(count-1)}));
+    expect(last.open).toBe(true);
+  });
+  it('retains preliminary rank slot assignment and confines winner paths to their final', () => {
+    const preliminary = makeGroup({ id:'pre', name:'A조', phase:'group' });
+    const first = makeGroup({ id:'a-semi', name:'4강', phase:'semi', bracketTrack:'챔피언' });
+    const last = makeGroup({ id:'a-final', name:'결승', phase:'final', bracketTrack:'챔피언', sortOrder:1 });
+    const other = makeGroup({ id:'b-final', name:'결승', phase:'final', bracketTrack:'챌린지', sortOrder:100 });
+    const rank = makeSlot({ id:'rank', groupId:first.id, kind:'GROUP_RANK', sourceGroupId:preliminary.id, label:'A조 1위' });
+    const entry = makeSlot({ id:'entry', groupId:preliminary.id, kind:'ENTRY', label:'A조 1번' });
+    const fixtures = [makeFixture({id:'a1', groupId:first.id, fixtureNumber:1, homeSlotId:rank.id}),makeFixture({id:'a2',groupId:last.id,fixtureNumber:2,bracketSources:[{fixtureId:'a1',outcome:'WINNER',side:'HOME'}]}),makeFixture({id:'b',groupId:other.id,fixtureNumber:3})];
+    const {container,props} = renderCanvas({groups:[preliminary,first,last,other],fixtures,slots:[entry,rank],pendingRegistrationId:'reg-1'});
+    const sections = [...container.querySelectorAll('details')];
+    expect(sections).toHaveLength(3);
+    expect(sections[1].querySelectorAll('svg path')).toHaveLength(1);
+    expect(sections[2].querySelectorAll('svg path')).toHaveLength(0);
+    fireEvent.click(within(sections[1]).getByRole('button',{name:/홈 A조 1위/}));
+    expect(props.onAssignSlot).not.toHaveBeenCalled();
+    expect(props.onSelectFixture).toHaveBeenCalledWith('a1');
+    fireEvent.click(within(sections[0]).getByRole('button',{name:'A조 1번, 빈 자리, 선택한 팀을 여기에 넣어요'}));
+    expect(props.onAssignSlot).toHaveBeenCalledWith('entry','reg-1');
+    expect(within(sections[0]).getAllByText('A조').length).toBeGreaterThan(0);
+  });
 });

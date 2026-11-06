@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { SportIllustration, sportIllustration } from '@/components/v1-ui/sport-illustration';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 
 type Images = { imageUrl?: string | null; listImageUrl?: string | null };
@@ -17,9 +17,16 @@ export function teamMatchImage(images: Images, surface: 'list' | 'detail') {
   return primary?.trim() || secondary?.trim() || null;
 }
 
-export function teamMatchBackgroundImage(image: string, sport?: string) {
+// 사진이 그려지는 가장 넓은 CSS 폭(px). 최적화 URL 은 이 폭의 2배 밀도로 받는다.
+export const TEAM_MATCH_THUMB_WIDTH = 96; // .tm-match-row-thumb
+// .tm-team-vs-hero: 태블릿 프레임 600px, 데스크톱 1440 좌측 열 619px. 600 이면 2배 폭이 1200 단계에 걸린다.
+export const TEAM_MATCH_HERO_WIDTH = 600;
+const PREVIEW_SQUARE_WIDTH = 200; // .tm-team-match-image-square max-width
+const PREVIEW_WIDE_WIDTH = TEAM_MATCH_HERO_WIDTH; // 상세 이미지 미리보기는 히어로와 같은 사진
+
+export function teamMatchBackgroundImage(image: string, sport: string | undefined, displayWidth: number) {
   // Keep a local sport image behind remote uploads, including broken URLs.
-  return `${cssUrl(image)}, ${cssUrl(`/illustrations/${sportIllustration(sport)}-640.webp`)}`;
+  return `${optimizedCssUrl(image, displayWidth)}, ${optimizedCssUrl(`/illustrations/${sportIllustration(sport)}-640.webp`, displayWidth)}`;
 }
 
 export function TeamMatchImagesPreview({ images, sport }: { images: Images; sport?: string }) {
@@ -31,7 +38,7 @@ export function TeamMatchImagesPreview({ images, sport }: { images: Images; spor
         <div className="tm-text-label">{label}</div>
         <div className="tm-team-match-image-stage">
           <div role="img" aria-label={`${label} 미리보기`} className={`tm-team-match-image-preview ${surface === 'list' ? 'tm-team-match-image-square' : 'tm-team-match-image-wide'}`}
-            style={image ? { backgroundImage: teamMatchBackgroundImage(image, sport) } : undefined}>
+            style={image ? { backgroundImage: teamMatchBackgroundImage(image, sport, surface === 'list' ? PREVIEW_SQUARE_WIDTH : PREVIEW_WIDE_WIDTH) } : undefined}>
             {image ? null : <SportIllustration sport={sport} sizes="200px" />}
           </div>
         </div>
@@ -75,7 +82,7 @@ export function TeamMatchImagesField({ images, sport, onChange, onUpload, onUplo
 
   return (
     <div style={{ marginTop: 16 }}>
-      <p className="tm-text-caption">이미지는 선택 사항이에요. 한 장만 올리면 목록과 상세에 함께 사용하고, 없으면 종목별 기본 이미지를 보여줘요.</p>
+      <p className="tm-text-caption" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>이미지는 선택 사항이에요. 한 장만 올리면 목록과 상세에 함께 사용하고, 없으면 종목별 기본 이미지를 보여줘요.</p>
       <div className="tm-team-match-images-grid">
         {(['listImageUrl', 'imageUrl'] as const).map((field) => {
           const list = field === 'listImageUrl';
@@ -86,7 +93,7 @@ export function TeamMatchImagesField({ images, sport, onChange, onUpload, onUplo
               <div className="tm-text-label">{label} (선택)</div>
               <div className="tm-team-match-image-stage">
                 <div role="img" aria-label={`${label} 미리보기`} className={`tm-team-match-image-preview ${list ? 'tm-team-match-image-square' : 'tm-team-match-image-wide'}`}
-                  style={image ? { backgroundImage: teamMatchBackgroundImage(image, sport) } : undefined}>
+                  style={image ? { backgroundImage: teamMatchBackgroundImage(image, sport, list ? PREVIEW_SQUARE_WIDTH : PREVIEW_WIDE_WIDTH) } : undefined}>
                   {image ? null : <SportIllustration sport={sport} sizes="200px" />}
                 </div>
               </div>

@@ -1403,7 +1403,7 @@ describe('ProfileService withdrawal admin lockout', () => {
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
-      data: { accountStatus: 'withdrawal_pending' },
+      data: { accountStatus: 'withdrawal_pending', sessionEpoch: { increment: 1 } },
     });
     expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
       where: { userId: user.id },

@@ -104,7 +104,7 @@ describe('OperationFlagTogglePanel', () => {
     await user.click(screen.getByRole('button', { name: '결과 확정 권한 끄기' }));
     const dialog = await screen.findByRole('alertdialog', { name: '결과 확정 권한 끄기' });
 
-    expect(within(dialog).getByText(/디렉터의 결과 확정 요청이 거부돼요/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/리그 디렉터의 결과 확정 요청이 거부돼요/)).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText(/사유/), '운영 중단 필요');
     await user.click(within(dialog).getByRole('button', { name: '끄기' }));

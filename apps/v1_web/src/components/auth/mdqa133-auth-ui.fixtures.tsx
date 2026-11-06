@@ -7,17 +7,14 @@ import { setupServer } from 'msw/node';
 export const RECOVERY_EMAIL = 'owner@example.test';
 export const RECOVERY_PHONE = '01012345678';
 export const RETURN_PATH = '/chat?room=team#latest';
-const PROOF_REQUIRED_MESSAGE = '기존 계정의 로그인 수단으로 계정 소유를 확인해 주세요.';
 
 type WireCalls = {
-  logout: number; preview: number; link: number; phoneReset: number;
+  logout: number; phoneReset: number;
   emailIssue: unknown[]; emailVerify: unknown[]; emailReset: unknown[];
   phoneVerify: unknown[]; findAccount: unknown[];
 };
 export const wireCalls: WireCalls = {
   logout: 0,
-  preview: 0,
-  link: 0,
   phoneReset: 0,
   emailIssue: [],
   emailVerify: [],
@@ -42,22 +39,14 @@ export const authUiServer = setupServer(
     wireCalls.logout += 1;
     return scenario.logoutFails ? failure('INTERNAL_ERROR', '합성 로그아웃 오류', 503) : success({ ok: true });
   }),
-  http.post('*/api/v1/auth/social-link/preview', () => {
-    wireCalls.preview += 1;
-    return failure('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', PROOF_REQUIRED_MESSAGE);
-  }),
-  http.post('*/api/v1/auth/social-link', () => {
-    wireCalls.link += 1;
-    return failure('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', PROOF_REQUIRED_MESSAGE);
-  }),
   http.post('*/api/v1/auth/phone/issue', issued),
   http.post('*/api/v1/auth/phone/verify', async ({ request }) => {
     wireCalls.phoneVerify.push(await request.json());
-    return success({ verified: true, proofToken: 'phone-proof' });
+    return success({ verified: true, proofToken: 'phone-proof', registered: false, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/find-account', async ({ request }) => {
     wireCalls.findAccount.push(await request.json());
-    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true });
+    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/reset-password', () => {
     wireCalls.phoneReset += 1;
@@ -81,8 +70,6 @@ export function resetWireScenario() {
   scenario.provider = 'kakao';
   scenario.logoutFails = false;
   wireCalls.logout = 0;
-  wireCalls.preview = 0;
-  wireCalls.link = 0;
   wireCalls.phoneReset = 0;
   wireCalls.emailIssue = [];
   wireCalls.emailVerify = [];

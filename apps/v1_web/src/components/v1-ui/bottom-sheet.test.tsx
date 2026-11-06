@@ -90,15 +90,16 @@ afterEach(() => {
   __resetNavigationHistoryForTests();
 });
 
-function drag(dialog: HTMLElement, offset: number) {
-  fireEvent.pointerDown(dialog, { clientY: 0, pointerId: 1 });
-  fireEvent.pointerMove(dialog, { clientY: offset, pointerId: 1 });
-  fireEvent.pointerUp(dialog, { clientY: offset, pointerId: 1 });
+function drag(target: HTMLElement, offset: number) {
+  fireEvent.pointerDown(target, { clientY: 0, pointerId: 1 });
+  fireEvent.pointerMove(target, { clientY: offset, pointerId: 1 });
+  fireEvent.pointerUp(target, { clientY: offset, pointerId: 1 });
 }
 
 const renderSheet = (children: ReactNode = <p>내용</p>) =>
   render(
     <BottomSheet open closeHref="/matches" ariaLabel="필터">
+      <div className="tm-filter-sheet-handle" aria-hidden="true" />
       {children}
     </BottomSheet>,
   );
@@ -108,7 +109,7 @@ describe('BottomSheet 드래그-닫기', () => {
     // 오작동 방지: 살짝 스친 정도로 시트가 닫혀 버리면 사용자가 필터를 훑어보다가 실수로 다 잃는다.
     window.history.replaceState(null, '', '/matches?filter=open');
     renderSheet();
-    drag(screen.getByRole('dialog'), BELOW_THRESHOLD_OFFSET);
+    drag(screen.getByRole('dialog').querySelector('.tm-filter-sheet-handle')!, BELOW_THRESHOLD_OFFSET);
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
   });
@@ -116,7 +117,7 @@ describe('BottomSheet 드래그-닫기', () => {
   it('임계치를 넘기면 닫는다 — 시트를 연 항목이 없으면(딥링크) closeHref 로 replace', () => {
     window.history.replaceState(null, '', '/matches?filter=open');
     renderSheet();
-    drag(screen.getByRole('dialog'), ABOVE_THRESHOLD_OFFSET);
+    drag(screen.getByRole('dialog').querySelector('.tm-filter-sheet-handle')!, ABOVE_THRESHOLD_OFFSET);
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/matches');
     expect(router.push).not.toHaveBeenCalled();
@@ -132,6 +133,14 @@ describe('BottomSheet 드래그-닫기', () => {
     fireEvent.pointerMove(button, { clientY: ABOVE_THRESHOLD_OFFSET, pointerId: 1 });
     fireEvent.pointerUp(button, { clientY: ABOVE_THRESHOLD_OFFSET, pointerId: 1 });
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('본문에서 시작한 스와이프는 시트를 닫지 않는다', () => {
+    window.history.replaceState(null, '', '/matches?filter=open');
+    renderSheet(<p>스크롤할 필터 내용</p>);
+    drag(screen.getByText('스크롤할 필터 내용'), ABOVE_THRESHOLD_OFFSET);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
   });
 });
 
@@ -183,7 +192,7 @@ describe('BottomSheet onClose 모드', () => {
     ['✕ 버튼', () => fireEvent.click(screen.getByRole('button', { name: '닫기' }))],
     ['scrim', () => fireEvent.click(document.querySelector('.tm-filter-scrim')!)],
     ['ESC', () => fireEvent.keyDown(document, { key: 'Escape' })],
-    ['임계치를 넘는 드래그', () => drag(screen.getByRole('dialog', { name: '매치 관리' }), ABOVE_THRESHOLD_OFFSET)],
+    ['임계치를 넘는 드래그', () => drag(screen.getByRole('dialog', { name: '매치 관리' }).querySelector('.tm-filter-sheet-handle')!, ABOVE_THRESHOLD_OFFSET)],
   ])('%s 로 닫으면 onClose 만 부르고 라우터는 건드리지 않는다', (_, close) => {
     const onClose = vi.fn();
     renderLocal(onClose);

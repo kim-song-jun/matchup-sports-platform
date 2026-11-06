@@ -10,6 +10,7 @@ import type {
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 // Task T1-1 follow-up: game-team-match-score-invariant.integration-spec.ts
 // proves the TEAM_MATCH-with-zero-events exemption in game-invariants.ts
@@ -30,7 +31,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

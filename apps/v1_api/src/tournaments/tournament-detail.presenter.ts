@@ -1,3 +1,4 @@
+import { parseSixTeamState } from './six-team/six-team-state';
 import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
 import { effectivePublicVisibilityMode, publicFixtureStatus } from '../games/public-records/public-visibility';
 import {
@@ -5,6 +6,8 @@ import {
   type ParticipantNameProfileRow,
 } from '../games/public-records/participant-name-gating';
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
+import { normalizeFinalColors } from './multi-finals/multi-finals-colors';
+import type { FinalColorConfig } from './multi-finals/multi-finals-colors';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
@@ -317,8 +320,15 @@ export function presentTournamentDetail(
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
   // 공개돼도(구조는 보여도) 모집 중이면 그 안의 팀 식별 정보만 별도로 가려진다.
   const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
+  const finalConfig = row.multiFinals as unknown as FinalColorConfig | null;
+  const finalColors = new Map((finalConfig?.finals ? normalizeFinalColors(finalConfig).finals : []).map(final => [final.name, final.colorIndex]));
 
   return {
+    sixTeamMode: row.sixTeamMode,
+    sixTeamBracket: bracketPublished ? (() => {
+      const state = parseSixTeamState(row.sixTeamBracket);
+      return state ? { rounds: state.rounds, bye: state.bye, manual: state.manual, swapSemi: state.swapSemi ?? false, swapFinal: state.swapFinal ?? false, winners: state.winners, needsReview: state.needsReview } : null;
+    })() : null,
     id: row.id,
     sportId: row.sportId,
     sport: { code: row.sport.code, name: row.sport.name },
@@ -361,7 +371,8 @@ export function presentTournamentDetail(
     latitude: row.latitude,
     longitude: row.longitude,
     coverImageUrl: row.coverImageUrl ?? (row.kind === 'regular_league' ? row.listImageUrl : null) ?? null,
-    ...(row.kind === 'regular_league' ? { listImageUrl: row.listImageUrl } : {}),
+    listImageUrl: row.listImageUrl,
+    showDetailImage: row.showDetailImage,
     teamCount: row.teamCount,
     minPlayers: row.minPlayers,
     maxPlayers: row.maxPlayers,
@@ -448,11 +459,18 @@ export function presentTournamentDetail(
       id: group.id,
       name: group.name,
       phase: group.phase,
+      bracketTrack: group.bracketTrack,
+      ...(group.phase !== 'group' && finalColors.has(group.bracketTrack) ? { bracketColorIndex: finalColors.get(group.bracketTrack) } : {}),
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
+      ...(groupStandingSummaries.get(group.id)?.qualificationByTrack
+        ? { qualificationByTrack: Object.fromEntries(Object.entries(groupStandingSummaries.get(group.id)!.qualificationByTrack!).map(([track, qualification], index) => {
+            return [track, qualification === null ? null : { ...qualification, colorIndex: finalColors.get(track) ?? (track === 'upper' ? 0 : track === 'lower' ? 1 : index) }];
+          })) }
+        : {}),
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
-        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.kind === 'BYE' && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
+        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.byeSortOrder != null && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
         // The stored slot link survives an empty/reassigned team and custom labels.
         // Never infer an unassigned BYE target from fixture numbers or visual order.
         const target = slot ? row.tournamentMatchDetails.find(detail => detail.teamMatch.homeSlotId === slot.id || detail.teamMatch.awaySlotId === slot.id) : undefined;
@@ -591,6 +609,7 @@ export function presentTournamentDetail(
       return {
         id: award.id,
         awardType: award.awardType,
+        bracketTrack: award.bracketTrack,
         awardLabel: award.awardLabel,
         iconKey: award.iconKey ?? null,
         recipientName: presentAwardRecipientName(award),
@@ -600,6 +619,12 @@ export function presentTournamentDetail(
         note: award.note ?? null,
       };
     }),
+    awardSets: (row.awardSets ?? []).map((awardSet) => ({
+      bracketTrack: awardSet.bracketTrack,
+      prizePool: awardSet.prizePool,
+      prizeSummary: awardSet.prizeSummary,
+      prizeBreakdown: awardSet.prizeBreakdown,
+    })),
     // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
     // 아예 그리지 않는다(`fixtures` 와 같은 규약).
     leagueFixtures: leagueFixtures.map((fixture) => ({

@@ -10,7 +10,7 @@ import { CrossGroupRound12Dialog } from './cross-group-round12-dialog';
 import { BracketListTemplateTools } from './bracket-list-template-tools';
 
 const api = 'http://localhost/api/v1/admin/tournaments/test/bracket';
-const server = setupServer();
+const server = setupServer(http.get(`${api}/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2 })));
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
 beforeAll(() => { vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1'); server.listen({ onUnhandledRequest: 'error' }); });
 afterAll(() => { server.close(); vi.unstubAllEnvs(); });

@@ -5,6 +5,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import { loadGameRoster } from '../../src/games/roster/game-roster-loader';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 대회 축 출전정지 — 규정이 있는 대회에서 앞 경기 레드카드 선수는 다음 경기 명단 계산에서 빠진다
@@ -38,7 +39,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 describe('대회 축 출전정지 — 다음 경기 명단 계산에서 빠진다', () => {
   let configId: string;

@@ -1,6 +1,18 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BracketScheduleTab } from './bracket-page-client';
+import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
+
+function makeGroup(overrides: Pick<V1TournamentGroup, 'id' | 'phase' | 'name'>): V1TournamentGroup {
+  return { sortOrder: 0, advanceCount: null, groupTeams: [], standings: [], qualification: null, ...overrides };
+}
+
+function makeFixture(overrides: Pick<V1TournamentFixture, 'id' | 'status' | 'groupId' | 'round'>): V1TournamentFixture {
+  return { fixtureNumber: 1, legNumber: 1, scheduledAt: null, venue: null, liveStatus: 'scheduled',
+    homeRegistrationId: null, homeTeamId: null, homeTeamName: null, homeTeamLogoUrl: null,
+    awayRegistrationId: null, awayTeamId: null, awayTeamName: null, awayTeamLogoUrl: null,
+    homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [], ...overrides };
+}
 
 const scheduleMock = vi.fn();
 const myFixturesMock = vi.fn();
@@ -116,5 +128,35 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     expect(playerRecordsMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: '득점 순위' })).not.toBeInTheDocument();
     expect(screen.queryByText('득점선수')).not.toBeInTheDocument();
+  });
+
+  it('추가 페이지와 시간 미정 경기에도 대진표의 결선 조 이름과 라운드를 적용한다', () => {
+    const existing = scheduleMock();
+    const page = existing.data.pages[0];
+    const entry = page.items[0];
+    scheduleMock.mockReturnValue({ ...existing, data: { pages: [
+      { ...page, items: [{ ...entry, fixtureId: 'semi', round: '3팀 첫 라운드', groupId: 'semi-group', groupName: '4강', cards: [] }],
+        unscheduled: [{ ...entry, fixtureId: 'final', round: '결승', groupId: 'semi-group', groupName: '4강', scheduledAt: null, cards: [] }] },
+      { ...page, items: [{ ...entry, fixtureId: 'group', groupId: 'group-a', groupName: '1경기', round: '예선', cards: [] }], unscheduled: [] },
+    ] } });
+    const tournament: NonNullable<Parameters<typeof BracketScheduleTab>[0]['tournament']> = { format: 'group_knockout',
+      groups: [makeGroup({ id: 'semi-group', phase: 'semi', name: '준결승' }), makeGroup({ id: 'group-a', phase: 'group', name: '1경기' })],
+      fixtures: [
+        makeFixture({ id: 'semi', status: 'scheduled', groupId: 'semi-group', round: '3팀 첫 라운드' }),
+        makeFixture({ id: 'final', status: 'scheduled', groupId: 'semi-group', round: '결승' }),
+        makeFixture({ id: 'group', status: 'scheduled', groupId: 'group-a', round: '예선' }),
+      ],
+    };
+    render(<BracketScheduleTab tournamentId="tour-1" tournament={tournament} />);
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '일정 조 선택' })).getByRole('button', { name: '1경기' }));
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const rounds = screen.getByRole('navigation', { name: '일정 결선 단계 선택' });
+    expect(within(rounds).queryByRole('button', { name: '4강' })).not.toBeInTheDocument();
+    fireEvent.click(within(rounds).getByRole('button', { name: '준결승' }));
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/semi');
+    fireEvent.click(within(rounds).getByRole('button', { name: '결승' }));
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/final');
   });
 });

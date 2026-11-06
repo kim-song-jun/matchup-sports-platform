@@ -600,6 +600,9 @@ model V1User {
   deletedAt        DateTime?          @map("deleted_at")
   emailVerifiedAt  DateTime?          @map("email_verified_at")
   phoneVerifiedAt  DateTime?          @map("phone_verified_at")
+  signupEmailLoginRequired Boolean      @default(false) @map("signup_email_login_required")
+  /// 세션 쿠키는 서버에 저장하지 않는 서명표라, 이 값을 올리면 그 전에 발급된 쿠키가 모두 무효가 된다(비밀번호 재설정·탈퇴 신청).
+  sessionEpoch     Int                @default(0) @map("session_epoch")
   themePreference  V1ThemePreference  @default(light) @map("theme_preference")
 
   chatBlocksMade                 V1ChatUserBlock[] @relation("ChatBlockActor")
@@ -647,6 +650,7 @@ model V1User {
   tournamentStaffAssignments     V1TournamentStaffAssignment[] @relation("V1TournamentStaffUser")
   grantedTournamentStaff         V1TournamentStaffAssignment[] @relation("V1TournamentStaffGrantor")
   verificationTokens             V1VerificationToken[]
+  loginStepUpChallenges          V1LoginStepUpChallenge[]
   inquiries                      V1Inquiry[]
   uploadAssets                   V1UploadAsset[]
   acknowledgedResultEscalations  V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
@@ -712,10 +716,20 @@ enum V1VerificationChannel {
   phone
 }
 
+/// 코드가 증명하는 일. 한 계정의 코드는 같은 목적의 흐름에서만 대조·소비·폐기된다 — 다른 흐름이 만든 코드로
+/// 이쪽 증명을 통과하거나(최근 로그인 확인 우회), 새 코드가 다른 흐름의 코드를 지우지 못하게 한다.
+enum V1VerificationPurpose {
+  /// 내 연락처(이메일·휴대폰) 인증: /verification/*
+  contact
+  /// 이메일 로그인 추가: /auth/link/email/*
+  email_login_link
+}
+
 model V1VerificationToken {
   id           String                @id @default(uuid())
   userId       String                @map("user_id")
   channel      V1VerificationChannel
+  purpose      V1VerificationPurpose @default(contact)
   target       String
   codeHash     String                @map("code_hash")
   expiresAt    DateTime              @map("expires_at")
@@ -758,6 +772,78 @@ model V1EmailVerificationChallenge {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("v1_email_verification_challenges")
+}
+
+enum V1LoginAttemptResult {
+  /// 세션이 발급된 로그인(추가 인증을 마친 경우 포함). 계정 실패 집계를 끊는다.
+  success
+  /// 비밀번호 불일치·계정 없음. 추가 인증 상태에서도 틀리면 이 값이다.
+  failed
+  /// 비밀번호는 맞았지만 추가 인증 챌린지를 내보냈다. 실패로도 성공으로도 세지 않는다.
+  step_up_issued
+}
+
+/// 이메일 로그인 시도 기록 — 계정별 실패 집계(추가 인증 판정)와 전체 실패율(공격 감지)의 원천.
+/// 이메일·IP 는 원문이 아니라 서버 비밀값 HMAC 으로만 둔다(유출돼도 계정 목록이 되지 않는다).
+/// 보관 30일(워커 정리).
+model V1LoginAttempt {
+  id        String               @id @default(uuid())
+  emailKey  String               @map("email_key")
+  ipKey     String?              @map("ip_key")
+  result    V1LoginAttemptResult
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  @@index([emailKey, createdAt])
+  @@index([createdAt, result])
+  @@map("v1_login_attempts")
+}
+
+/// 로그인 추가 인증(step-up) 챌린지. 비밀번호 맞음/틀림/계정 없음을 응답으로 가를 수 없게
+/// 가짜 챌린지(userId null — 메일을 보내지 않는다)도 같은 모양으로 만든다.
+/// 토큰·코드는 해시만 저장한다. 만료 7일 뒤 워커가 정리한다.
+model V1LoginStepUpChallenge {
+  id           String    @id @default(uuid())
+  tokenHash    String    @unique @map("token_hash")
+  emailKey     String    @map("email_key")
+  userId       String?   @map("user_id")
+  codeHash     String    @map("code_hash")
+  attemptCount Int       @default(0) @map("attempt_count")
+  /// 발급·재발송한 인증번호 수(가짜 챌린지 포함 — 상한이 계정 존재를 드러내지 않게). 이메일당 24시간 상한의 원천.
+  sentCount    Int       @default(0) @map("sent_count")
+  expiresAt    DateTime  @map("expires_at")
+  lastSentAt   DateTime  @map("last_sent_at")
+  /// 마지막 메일 발송이 실패했으면 그 시각(진단 기록). 응답·쿨다운은 성공과 같게 둔다 — 다르면 계정 존재가 드러난다.
+  sendFailedAt DateTime? @map("send_failed_at")
+  usedAt       DateTime? @map("used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user V1User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([emailKey, lastSentAt])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("v1_login_step_up_challenges")
+}
+
+enum V1SecurityAnomalyKind {
+  /// 짧은 시간에 서로 다른 계정에 걸친 로그인 실패 급증(password spray).
+  login_spray
+}
+
+/// 보안 이상 기록. 마지막 감지 후 30분 안이면 "진행 중"이라, 감지가 반복돼도 새 행(과 Slack 알림)을 만들지 않고
+/// 마지막 감지 시각·집계만 갱신한다.
+model V1SecurityAnomaly {
+  id             String                @id @default(uuid())
+  kind           V1SecurityAnomalyKind
+  startedAt      DateTime              @default(now()) @map("started_at")
+  lastDetectedAt DateTime              @default(now()) @map("last_detected_at")
+  failedCount    Int                   @map("failed_count")
+  accountCount   Int                   @map("account_count")
+  ipCount        Int                   @map("ip_count")
+
+  @@index([kind, lastDetectedAt])
+  @@index([startedAt])
+  @@map("v1_security_anomalies")
 }
 
 model V1UserProfile {
@@ -1852,6 +1938,9 @@ model V1TeamMatch {
   /// 대진 편집기의 자리(V1TournamentSlot). 대회·정규 리그 경기가 같은 컬럼을 쓴다.
   homeSlotId                 String?           @map("home_slot_id")
   awaySlotId                 String?           @map("away_slot_id")
+  /// 대회·리그 경기 하나만 피리어드를 바꿨다는 표시. true 면 competitionConfigVersionId 가 이 경기 전용
+  /// 피리어드 버전이고, 조·단계·대회 기본 피리어드가 바뀌어도 따라가지 않는다.
+  periodOverride             Boolean           @default(false) @map("period_override")
 
   hostTeam              V1Team?                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User?                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -2503,6 +2592,7 @@ enum V1TournamentCampaignStatus {
 }
 
 enum V1TournamentFormat {
+  league_knockouts
   league
   knockout
   group_knockout
@@ -2575,12 +2665,20 @@ enum V1TournamentPlayerEligibility {
 
 enum V1TournamentGroupPhase {
   group
+  round64
+  round32
   round16
   round12
   quarter
   semi
   final
   third_place
+}
+
+enum V1TournamentBracketTrack {
+  overall
+  upper
+  lower
 }
 
 
@@ -2602,6 +2700,13 @@ enum V1TournamentAnnouncementCategory {
 }
 
 model V1Tournament {
+  /// Six-team result-ranked advancement; null preserves the standard bracket.
+  sixTeamMode Boolean @default(false) @map("six_team_mode")
+  sixTeamBracket Json? @map("six_team_bracket")
+  multiFinals Json? @map("multi_finals")
+  multiFinalsRevision Int @default(0) @map("multi_finals_revision")
+  bracketDraft Json? @map("bracket_draft")
+  bracketDraftRevision Int @default(0) @map("bracket_draft_revision")
   id                         String                      @id @default(uuid())
   sportId                    String                      @map("sport_id")
   title                      String
@@ -2633,6 +2738,7 @@ model V1Tournament {
   venueProviderId            String?                     @map("venue_provider_id")
   coverImageUrl              String?                     @map("cover_image_url")
   listImageUrl               String?                     @map("list_image_url")
+  showDetailImage            Boolean                     @default(true) @map("show_detail_image")
   teamCount                  Int                         @default(8) @map("team_count")
   minPlayers                 Int                         @default(6) @map("min_players")
   /// 팀 등록 명단 정원. null = 제한 없음(리그 기본값 — 팀 전원이 명단·라인업에 오른다). 대회는 항상 값을 채운다.
@@ -2722,11 +2828,18 @@ model V1Tournament {
   regionId                   String?                     @map("region_id")
   tier                       Int?
   seasonNo                   Int?                        @map("season_no")
+  /// 독립 정규 리그의 지난 시즌(2026-11-03 사용자 확정 — 독립 리그 → 독립 리그 이어가기). 새 리그가 지난 리그를
+  /// 가리키고, 한 리그의 다음 시즌은 하나뿐이라 유니크다. 리그 체계(seriesId) 리그는 쓰지 않는다 — 그쪽은 승강이 잇는다.
+  /// 지난 리그가 지워지면 연결만 풀린다.
+  previousLeagueId           String?                     @unique @map("previous_league_id")
 
   sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
   series               V1LeagueSeries?                      @relation("V1TournamentSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_tournaments_series_fk")
+  previousLeague       V1Tournament?                        @relation("V1TournamentPreviousLeague", fields: [previousLeagueId], references: [id], onDelete: SetNull, map: "v1_tournaments_previous_league_fk")
+  nextLeague           V1Tournament?                        @relation("V1TournamentPreviousLeague")
   region               V1Region?                            @relation("V1TournamentRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_tournaments_region_fk")
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  stagePeriodSettings  V1TournamentStagePeriodSetting[]
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
   /// BE-5 drop: 리그 대진과 승강 기록이 `V1League` 대신 여기를 가리킨다(kind='regular_league'
@@ -2739,6 +2852,7 @@ model V1Tournament {
   sponsors             V1TournamentSponsor[]
   reviews              V1TournamentReview[]
   awards               V1TournamentAward[]
+  awardSets            V1TournamentAwardSet[]
   campaign             V1TournamentCampaign?
   popups               V1TournamentPopup[]
   fields               V1TournamentField[]
@@ -2763,6 +2877,25 @@ model V1Tournament {
   // NULL 이고, Postgres 는 NULL 끼리 충돌로 보지 않으므로 기존 행끼리는 걸리지 않는다.
   @@unique([seriesId, seasonNo, tier], map: "v1_tournaments_series_season_tier_key")
   @@map("v1_tournaments")
+}
+
+/// 대회의 기본 경기 설정을 덮어쓰는 단계별 피리어드 설정.
+/// 행이 없으면 V1Tournament.competitionConfigVersionId를 상속한다. 경기 자체는 생성 시 선택한
+/// immutable config version을 계속 고정하므로 이후 설정 변경이 시작된 경기의 기록을 바꾸지 않는다.
+model V1TournamentStagePeriodSetting {
+  id                         String                     @id @default(uuid())
+  tournamentId               String                     @map("tournament_id")
+  phase                      V1TournamentGroupPhase
+  periods                    Json
+  competitionConfigVersionId String                     @map("competition_config_version_id")
+  createdAt                  DateTime                   @default(now()) @map("created_at")
+  updatedAt                  DateTime                   @updatedAt @map("updated_at")
+  tournament                 V1Tournament               @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_tournament_stage_period_settings_tournament_fk")
+  competitionConfig          V1CompetitionConfigVersion @relation("V1TournamentStagePeriodCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_stage_period_settings_config_fk")
+
+  @@unique([tournamentId, phase], map: "v1_tournament_stage_period_settings_tournament_phase_key")
+  @@index([competitionConfigVersionId], map: "v1_tournament_stage_period_settings_config_idx")
+  @@map("v1_tournament_stage_period_settings")
 }
 
 model V1TournamentCampaign {
@@ -2823,6 +2956,7 @@ model V1TournamentReview {
 model V1TournamentAward {
   id            String   @id @default(uuid())
   tournamentId  String   @map("tournament_id")
+  bracketTrack  String @default("overall") @map("bracket_track")
   awardType     String   @map("award_type") // 'mvp' | 'top_scorer' | 'best_defense' | etc.
   awardLabel    String   @map("award_label") // 표시명: 'MVP', '득점왕', '베스트 11' 등
   iconKey       String?  @map("icon_key") // trophy | crown | goal | shield | glove | handshake | sparkles | medal | star
@@ -2837,10 +2971,27 @@ model V1TournamentAward {
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   recipient  V1User?      @relation("V1TournamentAwardRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
 
-  @@unique([tournamentId, awardType])
+  @@unique([tournamentId, bracketTrack, awardType])
   @@index([tournamentId, sortOrder])
   @@index([recipientUserId, createdAt])
   @@map("v1_tournament_awards")
+}
+
+/// 정규대회 상위·하위 결선의 팀 시상 안내. 대회 전체 안내는 기존 prize 필드를 사용한다.
+model V1TournamentAwardSet {
+  id             String                   @id @default(uuid())
+  tournamentId   String                   @map("tournament_id")
+  bracketTrack   String  @map("bracket_track")
+  prizePool      Int?                      @map("prize_pool")
+  prizeSummary   String?                   @map("prize_summary")
+  prizeBreakdown String?                   @map("prize_breakdown")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+
+  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, bracketTrack])
+  @@map("v1_tournament_award_sets")
 }
 
 model V1TournamentRegistration {
@@ -2964,13 +3115,19 @@ model V1TournamentGroup {
   tournamentId String                 @map("tournament_id")
   name         String
   phase        V1TournamentGroupPhase @default(group)
+  bracketTrack String @default("overall") @map("bracket_track")
   sortOrder    Int                    @default(0) @map("sort_order")
   // 이 조에서 상위 몇 팀이 다음 단계로 진출하는지(조별리그 진출선 표시용). null이면 진출 표시 없음.
   advanceCount Int?                   @map("advance_count")
+  /// 조별리그 조 하나의 피리어드 재정의. 둘 다 null 이면 단계(조별리그) 설정 → 대회 기본값을 따른다.
+  /// competitionConfigVersionId 는 대회 기본 규칙에 이 피리어드만 바꾼 immutable 버전이다.
+  periods                    Json?
+  competitionConfigVersionId String?                @map("competition_config_version_id")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
 
   tournament V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  competitionConfig V1CompetitionConfigVersion? @relation("V1TournamentGroupPeriodCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_groups_competition_config_fk")
   tournamentMatchDetails V1TournamentMatchDetails[]
   groupTeams V1TournamentGroupTeam[]
   byeSlots   V1TournamentByeSlot[]
@@ -2981,6 +3138,7 @@ model V1TournamentGroup {
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@unique([tournamentId, id], map: "v1_tournament_groups_tournament_id_id_key")
   @@index([tournamentId, phase, sortOrder])
+  @@index([competitionConfigVersionId], map: "v1_tournament_groups_competition_config_idx")
   @@map("v1_tournament_groups")
 }
 
@@ -3853,6 +4011,8 @@ model V1CompetitionConfigVersion {
   games           V1Game[]                  @relation("V1GameCompetitionConfig")
   teamMatches     V1TeamMatch[]             @relation("V1TeamMatchCompetitionConfig")
   tournaments     V1Tournament[]            @relation("V1TournamentCompetitionConfig")
+  tournamentStagePeriodSettings V1TournamentStagePeriodSetting[] @relation("V1TournamentStagePeriodCompetitionConfig")
+  tournamentGroups V1TournamentGroup[] @relation("V1TournamentGroupPeriodCompetitionConfig")
 
   @@unique([sportCode, name, version])
   @@map("v1_competition_config_versions")

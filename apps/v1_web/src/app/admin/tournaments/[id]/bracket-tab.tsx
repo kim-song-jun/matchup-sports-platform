@@ -1,7 +1,9 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useId, useState } from 'react';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
@@ -50,6 +52,7 @@ import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar
 import { Button } from '@/components/v1-ui/button';
 import { BracketListTemplateTools } from '@/components/admin/bracket-canvas/bracket-list-template-tools';
 import { CrossGroupRound12Dialog } from '@/components/admin/bracket-canvas/cross-group-round12-dialog';
+import { PeriodOverrideField, useGroupPeriodOverride, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 
 
 /**
@@ -151,8 +154,9 @@ export function BracketTab({
   bracketPublishedAt: string | null | undefined;
   bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
-  tournamentFormat?: 'knockout' | 'league' | 'group_knockout';
+  tournamentFormat?: 'knockout' | 'league' | 'group_knockout' | 'league_knockouts';
 }) {
+  const { v1Post, v1Patch } = useV1DataSource();
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const [round12AutoOpen, setRound12AutoOpen] = useState(false);
   const createGroup = useV1CreateGroup(tournamentId);
@@ -192,6 +196,9 @@ export function BracketTab({
   const [editGroup, setEditGroup] = useState<V1AdminBracketGroup | null>(null);
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupAdvance, setEditGroupAdvance] = useState('');
+  // 경기 방식은 이 경기·조에만 저장한다 — 단계·대회 기본 설정은 대회 정보에서만 바뀐다.
+  const fixturePeriods = useMatchPeriodOverride(tournamentId, editFixture?.id ?? null, '대회 기본값');
+  const groupPeriods = useGroupPeriodOverride(tournamentId, editGroup?.phase === 'group' ? editGroup.id : null);
 
   // 조 카드 트리 — 그룹 생성 폼·팀 배정 폼·픽스처 생성 폼은 각 조 카드(bracket-group-card.tsx)
   // 안으로 이동했다(설계안 B). 여기 남는 건 "방금 만든 조로 스크롤" 신호뿐.
@@ -235,6 +242,31 @@ export function BracketTab({
   const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
   const slotSideLocked = (side: 'HOME' | 'AWAY') => editFixtureAccess === 'started' && editFixture !== null && (side === 'HOME' ? editFixture.homeSlotId : editFixture.awaySlotId) !== null;
 
+  function openFixtureEditor(fixture: V1AdminBracketFixture) {
+    setEditFixture(fixture);
+    setEditFxNumber(String(fixture.fixtureNumber));
+    setEditFxScheduledAt(isoToKstDatetimeLocal(fixture.scheduledAt));
+    setEditFxVenue(fixtureVenueValue(fixture));
+    setEditFxLabels(fixtureLabelDraft(fixture));
+    setEditFxFieldId(fixture.fieldId ?? '');
+    setEditFxError(null);
+    setEditFxHomeRegId(fixture.homeRegistrationId ?? '');
+    setEditFxAwayRegId(fixture.awayRegistrationId ?? '');
+  }
+
+  async function handleFixtureCreated(fixtureId: string) {
+    try {
+      // 생성 응답은 요약이다. 실제 game·slot·팀 정보를 가진 조회 응답으로만 수정창을 연다.
+      const refreshed = await refetch();
+      if (refreshed.isError) throw refreshed.error;
+      const fixture = refreshed.data?.fixtures.find((row) => row.id === fixtureId);
+      if (!fixture) throw new Error('생성한 경기를 최신 대진에서 찾지 못했어요.');
+      openFixtureEditor(fixture);
+    } catch (error) {
+      showToast(`경기는 생성됐지만 수정 정보를 불러오지 못했어요. ${extractErrorMessage(error, '목록을 다시 불러온 뒤 수정해 주세요.')}`, 'error');
+    }
+  }
+
   const handleUpdateFixture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
@@ -258,6 +290,7 @@ export function BracketTab({
     // 로컬 타임존으로 잘못 해석된다. 대칭 함수 kstDatetimeLocalToIso 로 KST 오프셋을 고정해야
     // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
     setEditFxError(null);
+    if (fixturePeriods.payload && fixturePeriods.error) { setEditFxError(fixturePeriods.error); return; }
     const scheduledAtIso = editFxScheduledAt ? kstDatetimeLocalToIso(editFxScheduledAt) : null;
     if (editFxScheduledAt && scheduledAtIso === null) { setEditFxError('경기 시각을 다시 확인해 주세요.'); return; }
     const labelsPatch = fixtureLabelPatch(editFxLabels, editFixture);
@@ -288,7 +321,20 @@ export function BracketTab({
         await assignTournamentSlot.mutateAsync({ slotId: assignment.slotId, registrationId: assignment.registrationId });
         assignedSides.push(assignment.side === 'HOME' ? '홈' : '어웨이');
       }
-      const complete = (result: Awaited<ReturnType<typeof updateFixture.mutateAsync>> | null) => {
+      const complete = async (result: Awaited<ReturnType<typeof updateFixture.mutateAsync>> | null) => {
+        // 경기 방식이 그대로면 기다리지 않고 바로 닫는다(async 함수는 첫 await 전까지 동기로 돈다).
+        if (fixturePeriods.payload) {
+          try {
+            await fixturePeriods.save();
+          } catch (err) {
+            // 경기 정보는 이미 저장됐다 — 창을 닫지 않고 경기 방식만 다시 저장하게 한다.
+            const errorMessage = `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${extractErrorMessage(err, '다시 시도해 주세요.')}`;
+            setEditFxError(errorMessage);
+            showToast(errorMessage, 'error');
+            setSavingFixtureEdit(false);
+            return;
+          }
+        }
         setEditFixture(null);
         showToast(
           result?.startedTeamChange == null
@@ -323,10 +369,10 @@ export function BracketTab({
             ...(directHomeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
             ...(directAwayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
           },
-          { onSuccess: (result) => complete(result), onError: reportFailure },
+          { onSuccess: (result) => void complete(result), onError: reportFailure },
         );
       } else {
-        complete(null);
+        await complete(null);
       }
     } catch (err) {
       setSavingFixtureEdit(false);
@@ -361,6 +407,7 @@ export function BracketTab({
   const handleUpdateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editGroup || !editGroupName.trim()) return;
+    if (groupPeriods.payload && groupPeriods.error) { showToast(groupPeriods.error, 'error'); return; }
     const parsed = Number.parseInt(editGroupAdvance, 10);
     updateGroup.mutate(
       {
@@ -369,7 +416,18 @@ export function BracketTab({
         ...(Number.isInteger(parsed) && parsed > 0 ? { advanceCount: parsed } : {}),
       },
       {
-        onSuccess: () => { setEditGroup(null); showToast('조 정보를 수정했어요.', 'success'); },
+        onSuccess: async () => {
+          if (groupPeriods.payload) {
+            try {
+              await groupPeriods.save();
+            } catch (err) {
+              showToast(`조 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${extractErrorMessage(err, '다시 시도해 주세요.')}`, 'error');
+              return;
+            }
+          }
+          setEditGroup(null);
+          showToast('조 정보를 수정했어요.', 'success');
+        },
         onError: (err) => showToast(extractErrorMessage(err, '조 수정에 실패했어요.'), 'error'),
       },
     );
@@ -573,7 +631,9 @@ export function BracketTab({
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
   const sideLabelContext = buildSideLabelContext(groups, fixtures, bracket?.slots ?? []);
   const allStandings = bracket?.standings ?? [];
-  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures)).length;
+  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures, bracket?.slots ?? [])).length;
+  const qualifyingGroupCount = groups.filter((group) => group.phase === 'group').length;
+  const knockoutStageCount = groups.length - qualifyingGroupCount;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
   // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
@@ -740,7 +800,7 @@ export function BracketTab({
 
     <div className="flex flex-col gap-6">
 
-      {canWrite && tournamentFormat ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
+      {canWrite && tournamentFormat && tournamentFormat !== 'league_knockouts' ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
         hasExistingBracket={groups.length > 0 || fixtures.length > 0 || (bracket?.slots?.length ?? 0) > 0}
         groups={groups} slots={bracket?.slots ?? []} registrations={registrations}
         confirmedTeamCount={confirmedTeamCount} confirmedTeamCountStatus={confirmedTeamCountStatus} showToast={showToast} /> : null}
@@ -749,7 +809,7 @@ export function BracketTab({
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap px-1">
         <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
-          총 {groups.length}개 조 · {readyGroupCount}개 준비 완료
+          총 {qualifyingGroupCount > 0 || knockoutStageCount === 0 ? `${qualifyingGroupCount}개 조` : ''}{qualifyingGroupCount > 0 && knockoutStageCount > 0 ? ' · ' : ''}{knockoutStageCount > 0 ? `${knockoutStageCount}개 결선 단계` : ''} · {readyGroupCount}개 준비 완료
         </p>
         {groups.length > 0 && (
           <button
@@ -764,16 +824,16 @@ export function BracketTab({
         )}
       </div>
 
-      <BracketGroupQuickAdd
+      {tournamentFormat !== 'league_knockouts' && canWrite ? <BracketGroupQuickAdd
         existingGroups={groups}
         createGroup={createGroup}
         showToast={showToast}
         onCreated={(id) => setFocusGroupId(id)}
-      />
+      /> : null}
 
       {/* ── 조 카드 목록 (설계안 B) — 조 1개 = 카드 1개, 배정·순위·대진이 카드 안에서 끝난다 ── */}
       {groups.length === 0 ? (
-        <AdminEmpty title="아직 만든 조가 없어요" description="위에서 원하는 유형을 눌러 조를 만들어 보세요." />
+        <AdminEmpty title="아직 만든 조가 없어요" description={tournamentFormat === 'league_knockouts' ? '예선·토너먼트 대진 생성에서 예선 조를 편성해 주세요.' : '위에서 원하는 유형을 눌러 조를 만들어 보세요.'} />
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
@@ -782,6 +842,7 @@ export function BracketTab({
                 ? <div className="flex justify-end"><Button variant="outline" size="md" onClick={() => setRound12AutoOpen(true)}>12강 진출팀 자동 배정</Button></div> : null}
               <BracketGroupCard
                 tournamentId={tournamentId}
+                structureEditable={canWrite && tournamentFormat !== 'league_knockouts'}
                 slots={bracket?.slots ?? []}
                 group={group}
                 managedEntrySlots={(bracket?.slots ?? []).some((slot) => slot.kind === 'ENTRY' && slot.groupId === group.id)}
@@ -803,14 +864,7 @@ export function BracketTab({
                 onRemoveGroupTeam={(groupTeamId, teamName) => void handleRemoveGroupTeam(groupTeamId, teamName)}
                 autoFocus={focusGroupId === group.id}
                 showToast={showToast}
-                onFixtureCreated={(fixture) => {
-                  setEditFixture(fixture);
-                  setEditFxNumber(String(fixture.fixtureNumber));
-                  setEditFxScheduledAt(isoToKstDatetimeLocal(fixture.scheduledAt));
-                  setEditFxVenue(fixtureVenueValue(fixture)); setEditFxLabels(fixtureLabelDraft(fixture)); setEditFxFieldId(fixture.fieldId ?? ''); setEditFxError(null);
-                  setEditFxHomeRegId(fixture.homeRegistrationId ?? '');
-                  setEditFxAwayRegId(fixture.awayRegistrationId ?? '');
-                }}
+                onFixtureCreated={(fixtureId) => void handleFixtureCreated(fixtureId)}
               />
             </div>
           ))}
@@ -821,19 +875,18 @@ export function BracketTab({
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
-          {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens.
+          {/* 모바일에서는 경기별 카드로 모든 열과 작업을 볼 수 있다.
               tableMaxWidth="max-w-none" — 조 카드 목록과 별개인 전폭 섹션이라
               기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
               불필요한 가로 스크롤을 유발했다. */}
           <AdminDataTable<V1AdminBracketFixture>
-            scrollOnMobile
             tableMaxWidth="max-w-none"
             columns={[
               {
                 key: 'round',
                 header: '라운드',
                 render: (f) => (
-                  <span className="text-[var(--text-muted)]">
+                  <span className="text-[var(--text-muted)] break-words">
                     {competitionMatchLabel({
                       groupName: groups.find((group) => group.id === f.groupId)?.name ?? null,
                       round: f.round,
@@ -853,20 +906,20 @@ export function BracketTab({
                 key: 'homeTeamName',
                 header: '홈',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'HOME', sideLabelContext)}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep break-words">{fixtureSideLabel(f, 'HOME', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep break-words">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'scheduledAt',
                 header: '시각 · 경기장',
-                render: (f) => <span className="tm-text-caption text-[var(--text-muted)]">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
+                render: (f) => <span className="tm-text-caption text-[var(--text-muted)] break-words">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
               },
               {
                 key: 'result',
@@ -903,17 +956,10 @@ export function BracketTab({
               const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
               const operateHref = `/admin/live/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate`;
               return (
-                <span className="inline-flex items-center gap-2">
+                <span className="inline-flex max-w-full flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditFixture(f);
-                      setEditFxNumber(String(f.fixtureNumber));
-                      setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
-                      setEditFxVenue(fixtureVenueValue(f)); setEditFxLabels(fixtureLabelDraft(f)); setEditFxFieldId(f.fieldId ?? ''); setEditFxError(null);
-                      setEditFxHomeRegId(f.homeRegistrationId ?? '');
-                      setEditFxAwayRegId(f.awayRegistrationId ?? '');
-                    }}
+                      onClick={() => openFixtureEditor(f)}
                     aria-label={`${bracketFixtureLabel(f, groups)} 수정`}
                     className="tm-on-tint inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
@@ -1033,6 +1079,16 @@ export function BracketTab({
             />
           </div>
           <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={savingFixtureEdit || updateFixture.isPending || !editFxScheduledAt} onClick={() => setEditFxScheduledAt('')}>시각 비우기</button>
+          <PeriodOverrideField
+            inheritedSummary={fixturePeriods.inheritedSummary}
+            customLabel="이 경기만 따로"
+            customHint="이 경기만 바뀌어요. 조·단계 설정과 대회 기본값은 그대로예요."
+            status={fixturePeriods.status}
+            choice={fixturePeriods.choice}
+            onChange={fixturePeriods.setChoice}
+            disabled={savingFixtureEdit || updateFixture.isPending}
+            lockedReason={fixturePeriods.lockedReason}
+          />
           <CompetitionFieldPicker tournamentId={tournamentId} value={editFxFieldId} onChange={value => { setEditFxFieldId(value); if (!value) setEditFxVenue(null); }} allowNew={false} allowEmpty emptyLabel="경기장 미정" disabled={savingFixtureEdit || updateFixture.isPending} />
           {!editFxFieldId ? <PlacePicker
             maxLength={PLACE_NAME_MAX_LENGTH.tournament}
@@ -1107,7 +1163,7 @@ export function BracketTab({
         open={editGroup !== null}
         title="조 수정"
         onClose={() => setEditGroup(null)}
-        pending={updateGroup.isPending}
+        pending={updateGroup.isPending || groupPeriods.pending}
       >
         <form onSubmit={handleUpdateGroup} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -1135,6 +1191,18 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
+          {editGroup?.phase === 'group' ? (
+            <PeriodOverrideField
+              inheritLabel={groupPeriods.inheritLabel}
+              inheritedSummary={groupPeriods.inheritedSummary}
+              customLabel="이 조만 따로"
+              customHint="이 조의 시작 전 경기와 앞으로 만들 경기만 바뀌어요. 경기에서 따로 정한 값과 조별리그 설정·대회 기본값은 그대로예요."
+              status={groupPeriods.status}
+              choice={groupPeriods.choice}
+              onChange={groupPeriods.setChoice}
+              disabled={updateGroup.isPending || groupPeriods.pending}
+            />
+          ) : null}
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -1144,8 +1212,8 @@ export function BracketTab({
             >
               취소
             </button>
-            <button type="submit" disabled={updateGroup.isPending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
-              {updateGroup.isPending ? '저장 중…' : '저장'}
+            <button type="submit" disabled={updateGroup.isPending || groupPeriods.pending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
+              {updateGroup.isPending || groupPeriods.pending ? '저장 중…' : '저장'}
             </button>
           </div>
         </form>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { AvatarFallback } from './avatar-fallback';
 
@@ -45,6 +45,7 @@ function TeamAvatarContent({ teamId, logoUrl, size = 'md', className }: TeamAvat
         <Image
           key={url}
           src={publicAssetPath(url)}
+          unoptimized={!isOptimizableImagePath(url)}
           alt=""
           width={px}
           height={px}

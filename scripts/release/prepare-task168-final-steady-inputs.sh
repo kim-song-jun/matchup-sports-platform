@@ -36,7 +36,17 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # Combined with PR #1957: nullable V1TournamentSlot.byeSortOrder.
 # 2026-10-17: additive V1Match.isOnline (20261017100000_v1_match_online_classification); M11 remains unchanged.
 # 2026-10-18: additive V1Tournament.requiresExplicitStart (20261018123000_v1_league_explicit_start); M11 remains unchanged.
-[[ "$schema_sha" == 23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644 \
+# 2026-10-21: additive login step-up tables (20261021120000_login_step_up); M11 remains unchanged.
+# 2026-10-22: additive V1Tournament.showDetailImage default true; M11 remains unchanged.
+# 2026-10-22: additive V1User.sessionEpoch default 0 (20261022120000_user_session_epoch); M11 remains unchanged.
+# 2026-10-28: flexible brackets add round64/round32 and tournament draft columns; M11 remains unchanged.
+# 2026-10-28: six-team mode adds six_team_mode/six_team_bracket; M11 remains unchanged.
+# 2026-10-29: tournament stage/group/match period overrides (v1_tournament_stage_period_settings + override columns); M11 remains unchanged.
+# 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); M11 remains unchanged.
+# 2026-11-03: additive V1Tournament.previousLeagueId; M11 remains unchanged.
+[[ ( "$schema_sha" == b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960 \
+  || "$schema_sha" == 82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112 \
+  || "$schema_sha" == 082bac1bb887f76b131dbd17ac4acbb11979b79fdf2bcc957d18fc06db57b04f ) \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

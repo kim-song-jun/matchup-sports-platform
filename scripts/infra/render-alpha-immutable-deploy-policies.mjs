@@ -7,12 +7,22 @@ export const ALPHA_RUNTIME_PARAMETER_NAMES = [
   'APNS_KEY_ID',
   'APNS_PRIVATE_KEY',
   'APNS_TEAM_ID',
+  'GABIA_API_KEY',
+  'GABIA_SENDER_NUMBER',
+  'GABIA_SMS_ID',
   'KAKAO_APP_ID',
   'KAKAO_CLIENT_ID',
   'KAKAO_CLIENT_SECRET',
   'KAKAO_REDIRECT_URI',
   'SLACK_INQUIRY_WEBHOOK_URL',
+  'SMS_PROVIDER',
+  'SOLAPI_API_KEY',
+  'SOLAPI_API_SECRET',
+  'SOLAPI_SENDER_NUMBER',
 ];
+
+// Operator-owned SES credentials are readable on the host but cannot be replaced by the GitHub deploy role.
+export const ALPHA_OPERATOR_PARAMETER_NAMES = ['ALPHA_SES_ACCESS_KEY_ID', 'ALPHA_SES_SECRET_ACCESS_KEY'];
 
 export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, instanceId }) {
   requireValue(region, 'region');
@@ -23,6 +33,9 @@ export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, 
   const apiRepository = 'teameet-alpha-v1-api';
   const webRepository = 'teameet-alpha-v1-web';
   const parameterArns = ALPHA_RUNTIME_PARAMETER_NAMES.map(
+    (name) => `arn:aws:ssm:${region}:${accountId}:parameter/teameet/alpha/env/${name}`,
+  );
+  const operatorParameterArns = ALPHA_OPERATOR_PARAMETER_NAMES.map(
     (name) => `arn:aws:ssm:${region}:${accountId}:parameter/teameet/alpha/env/${name}`,
   );
   return {
@@ -110,7 +123,7 @@ export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, 
           Sid: 'ReadAlphaRuntimeParameter',
           Effect: 'Allow',
           Action: 'ssm:GetParameter',
-          Resource: parameterArns,
+          Resource: [...parameterArns, ...operatorParameterArns],
         },
       ],
     },

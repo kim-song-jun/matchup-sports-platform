@@ -60,6 +60,8 @@ describe('TournamentSponsorsService', () => {
   let service: TournamentSponsorsService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentSponsor: {
       create: jest.Mock;
@@ -72,6 +74,8 @@ describe('TournamentSponsorsService', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentSponsor: {
         create: jest.fn(),

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { isNativeAppleSignInAvailable, requestNativeAppleSignIn } from '@/lib/native-apple';
 import { extractErrorMessage } from '@/lib/error-message';
 import { v1Post } from '@/lib/api-client';
-import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath } from '@/lib/session-storage';
+import { clearV1IdentityCache } from '@/lib/query-keys';
+import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { isSocialOnboardingRoute } from './auth.view-model';
+import { routeSocialLoginRecovery } from './login-recovery-route';
 import type { V1AuthSessionResponse } from '@/types/api';
 
 /**
@@ -21,6 +24,7 @@ import type { V1AuthSessionResponse } from '@/types/api';
  */
 export function AppleLoginButton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +58,21 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
         ...(result.authorizationCode ? { authorizationCode: result.authorizationCode } : {}),
         ...(result.fullName ? { fullName: result.fullName } : {}),
       });
+      // 세션 힌트가 있어야 앱 전역 게이트가 인증 상태를 읽는다(카카오 로그인과 같은 순서).
+      saveStoredV1Session(session.session);
+      clearV1IdentityCache(queryClient);
       // 신규 가입이면 약관 단계로, 기존 회원이면 홈으로. 경로는 서버가 정한다.
       const route = session.next?.route ?? getSavedRedirectPath() ?? '/home';
       if (!isSocialOnboardingRoute(route)) clearSavedRedirectPath();
       router.replace(route);
       router.refresh();
     } catch (err) {
-      setError(extractErrorMessage(err, 'Apple 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.'));
+      const recovery = routeSocialLoginRecovery(err, getSavedRedirectPath());
+      if (recovery?.type === 'navigate') {
+        router.replace(recovery.path);
+        return;
+      }
+      setError(recovery?.message ?? extractErrorMessage(err, 'Apple 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(false);
     }

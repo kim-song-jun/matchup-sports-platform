@@ -1,4 +1,5 @@
 import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import type {
   V1AdminBracketFixture,
   V1AdminBracketFixtureGame,
@@ -51,8 +52,8 @@ export type CanvasLayout = {
   groupBlocks: GroupBlockLayout[];
 };
 
-// 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > final > third_place 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
-const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+// 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > third_place > final 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
+const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
 
 type ColumnSeed = { key: string; groupId: string | null; label: string; fixtures: V1AdminBracketFixture[] };
 
@@ -80,7 +81,7 @@ function bracketColumns(groups: readonly V1AdminBracketGroup[], fixtures: readon
     .map((group) => ({
       key: group.id,
       groupId: group.id,
-      label: group.name,
+      label: bracketTrackLabel(group.bracketTrack) && !group.name.startsWith(bracketTrackLabel(group.bracketTrack)! + ' · ') ? `${bracketTrackLabel(group.bracketTrack)} · ${group.name}` : group.name,
       fixtures: fixtures.filter((fixture) => fixture.groupId === group.id).sort(compareFixtures),
     }));
   const known = new Set(groups.map((group) => group.id));
@@ -145,8 +146,8 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       cursor = y + CANVAS_NODE_HEIGHT + CANVAS_ROW_GAP;
       if (bye && target && target.awaySlotId === bye.id) placeBye(bye, target);
     }
-    if (input.groups.find(group => group.id === seed.groupId)?.phase === 'round12') {
-      for (const slot of input.slots.filter(slot => slot.kind === 'BYE' && slot.groupId === seed.groupId && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+    if (input.groups.find(group => group.id === seed.groupId)?.phase !== 'group') {
+      for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && slot.groupId === seed.groupId && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
         const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
         if (target) placeBye(slot, target);
       }
@@ -175,7 +176,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       for (const side of ['HOME', 'AWAY'] as const) {
         const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
         const slot = slotId === null ? undefined : slotsById.get(slotId);
-        if (slot?.kind === 'BYE') {
+        if (slot && (slot.kind === 'BYE' || slot.byeSortOrder != null)) {
           const bye = byeNodes.find(node => node.slotId === slot.id);
           edges.push({
             id: `bye:${fixture.id}:${side}`,
@@ -188,13 +189,14 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
         }
         const block = slot?.kind === 'GROUP_RANK' && slot.sourceGroupId !== null ? blockByGroup.get(slot.sourceGroupId) : undefined;
         if (slot !== undefined && block !== undefined) {
+          const bye = byeNodes.find(node => node.slotId === slot.id);
           edges.push({
             id: `rank:${fixture.id}:${side}`,
             kind: 'GROUP_RANK',
             fromFixtureId: null,
             toFixtureId: fixture.id,
             side,
-            path: elbowPath(block.x + block.width, groupRankAnchorY(block, slot.position), target.x, sideAnchorY(target, side)),
+            path: elbowPath(block.x + block.width, groupRankAnchorY(block, slot.position), bye?.x ?? target.x, bye ? bye.y + bye.height / 2 : sideAnchorY(target, side)),
           });
         }
       }

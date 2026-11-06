@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState, type DragEvent } from 'react';
-import { EyeOff } from 'lucide-react';
+import { AlertTriangle, EyeOff } from 'lucide-react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
@@ -10,10 +10,12 @@ import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { bracketNodeStateChip } from '@/lib/competition-status';
-import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { formatKstTime, formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { kstMidnightMs } from '@/lib/kst-calendar';
 import {
   buildLeagueBoard,
   leagueDirectPlacedRegistrationIds,
+  type LeagueBoardColumn,
   type LeagueBoardNode,
   type LeagueBoardSide,
 } from '@/lib/league-board-model';
@@ -37,9 +39,42 @@ export interface LeagueScheduleBoardProps {
   onEditSchedule: (teamMatchId: string) => void;
   onCancelFixture: (teamMatchId: string) => void;
   onShowList: () => void;
+  /** 주차 칸의 '이 주에 경기 추가'. 없으면 버튼을 그리지 않는다(읽기 전용·끝난 리그). */
+  onAddToWeek?: (column: LeagueBoardColumn) => void;
 }
 
 const TOOLBAR_BUTTON = 'tm-btn tm-btn-sm tm-btn-outline';
+
+/** 주차 칸 제목 — '2주차 · 11/17 (월)~11/23 (일)'. 데스크톱 칸과 모바일 주차 머리가 같이 쓴다. */
+export function leagueWeekHeading(column: LeagueBoardColumn): string {
+  const range = formatTournamentDateRangeShort(
+    new Date(kstMidnightMs(column.startDate)).toISOString(),
+    new Date(kstMidnightMs(column.endDate)).toISOString(),
+  );
+  return `${column.weekNumber}주차 · ${range}`;
+}
+
+/**
+ * 주차 요약 한 줄 + 두 경기 팀 경고(2026-11-03 사용자 선택). 쉬는 팀은 참가팀을 알아야 셀 수 있어
+ * 팀 목록이 아직 없으면 경기 수만 보인다 — '쉬는 팀 없음'을 지어내지 않는다.
+ */
+export function LeagueWeekSummaryLines({ column, teamsKnown }: { column: LeagueBoardColumn; teamsKnown: boolean }) {
+  const { gameCount, restingTeamNames, doubleBookedTeamNames } = column.summary;
+  const resting = !teamsKnown ? null : restingTeamNames.length === 0 ? '쉬는 팀 없음' : `쉬는 팀 ${restingTeamNames.join(', ')}`;
+  return (
+    <>
+      <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+        {[`${gameCount}경기`, resting].filter(Boolean).join(' · ')}
+      </p>
+      {doubleBookedTeamNames.length > 0 ? (
+        <p className="inline-flex items-center gap-1 text-[length:var(--font-size-caption)] font-semibold text-[var(--orange700)]">
+          <AlertTriangle size={12} aria-hidden="true" />
+          {`두 경기 이상: ${doubleBookedTeamNames.join(', ')}`}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 function scoreText(node: LeagueBoardNode): string | null {
   const score = node.game?.latestRevision?.score;
@@ -48,7 +83,7 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onShowList }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onShowList, onAddToWeek }: LeagueScheduleBoardProps) {
   const headingId = useId();
   // 서버 기본값 true — 하이드레이션 전엔 지금 배치를 유지하고 좁은 태블릿만 클라이언트에서 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
@@ -205,6 +240,7 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
           {summary.slotCount > 0
             ? `자리 ${summary.filledSlotCount}/${summary.slotCount} 배정${summary.hiddenFixtureCount > 0 ? ` · 공개 대기 ${summary.hiddenFixtureCount}경기` : ''}`
             : '자리 없이 만든 대진이에요. 팀 넣기는 템플릿으로 다시 만든 뒤 쓸 수 있어요.'}
+          {(teams?.length ?? 0) >= 2 ? ` · 아직 안 붙은 대진 ${summary.unplayedPairCount}개` : ''}
         </p>
         {canWrite ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -252,12 +288,15 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
         </aside>
 
         <div className="overflow-x-auto">
-        <ol className="flex min-w-max gap-3" aria-label="경기일별 일정">
+        <ol className="flex min-w-max gap-3" aria-label="주차별 일정">
           {columns.map((column) => (
             <li key={column.key} className="w-64 shrink-0">
-              <h3 className="mb-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-                {`${column.weekNumber}주차 · ${formatKstDateShort(column.nodes[0].startAt)}`}
-              </h3>
+              <div className="mb-2 flex flex-col gap-0.5">
+                <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+                  {leagueWeekHeading(column)}
+                </h3>
+                <LeagueWeekSummaryLines column={column} teamsKnown={teams !== undefined} />
+              </div>
               <ul className="flex flex-col gap-2">
                 {column.nodes.map((node) => {
                   const score = scoreText(node);
@@ -275,7 +314,8 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
                         className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg px-1 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                       >
                         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                          {`${formatKstTime(node.startAt)} · ${node.placeName}`}
+                          {/* 토·일에 나눠 치르는 주는 시각만으로 어느 날 경기인지 모른다 — 날짜를 같이 보인다. */}
+                          {`${column.multiDay ? formatTournamentDateTimeShort(node.startAt) : formatKstTime(node.startAt)} · ${node.placeName}`}
                         </span>
                         <StatusChip chip={bracketNodeStateChip(node.state)} />
                       </button>
@@ -317,6 +357,16 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
                   );
                 })}
               </ul>
+              {onAddToWeek ? (
+                <button
+                  type="button"
+                  onClick={() => onAddToWeek(column)}
+                  aria-label={`${column.weekNumber}주차에 경기 추가`}
+                  className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-dashed border-[var(--border-strong)] text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  + 이 주에 경기 추가
+                </button>
+              ) : null}
             </li>
           ))}
         </ol>

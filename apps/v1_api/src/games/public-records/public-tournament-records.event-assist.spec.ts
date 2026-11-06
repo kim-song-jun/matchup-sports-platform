@@ -205,3 +205,15 @@ describe('PublicTournamentRecordsService -- 이벤트의 도움(assist)', () => 
     expect(ownGoal.assist).toBeNull();
   });
 });
+
+describe.each(['live', 'official'] as const)('자책골 경기 상세 (%s)', (source) => {
+  it('득점한 상대팀 영역에 실제 선수의 이름·OG를 유지하고 도움을 제외한다', async () => {
+    const ownGoal: FakeEvent = { ...goal('og-1', SCORER.id, ASSISTER.id, 180_000), type: 'OWN_GOAL', sideId: 'side-away' };
+    const events = await getEvents(buildFakePrisma({
+      events: [ownGoal], consentedUserIds: [],
+      ...(source === 'official' ? { official: { goalEvents: [{ id: 'og-1', sideId: 'side-away', participantId: SCORER.id, ownGoal: true, minute: 3, period: 1 }] } } : {}),
+    }));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: 'OWN_GOAL', side: 'away', sideId: 'side-away', participantName: '골잡이', jerseyNumber: 9, assist: null });
+  });
+});

@@ -41,7 +41,7 @@ describe('WebPushController', () => {
   });
 
   it('push-subscribe delegates to WebPushService.subscribe with the current user', async () => {
-    const dto = { endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } };
+    const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
 
     await controller.pushSubscribe(user, dto as never);
 
@@ -49,8 +49,8 @@ describe('WebPushController', () => {
   });
 
   it('push-unsubscribe delegates to WebPushService.unsubscribe', async () => {
-    await controller.pushUnsubscribe(user, { endpoint: 'https://push.example/abc' } as never);
+    await controller.pushUnsubscribe(user, { endpoint: 'https://fcm.googleapis.com/fcm/send/abc' } as never);
 
-    expect(webPushService.unsubscribe).toHaveBeenCalledWith(user.id, 'https://push.example/abc');
+    expect(webPushService.unsubscribe).toHaveBeenCalledWith(user.id, 'https://fcm.googleapis.com/fcm/send/abc');
   });
 });

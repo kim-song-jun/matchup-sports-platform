@@ -7,6 +7,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { createTournamentMatchInTx } from '../../src/tournaments/tournament-match-creation';
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { LineupTodoService, loadRosterSummaries } from '../../src/team-lineups/lineup-todo.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -635,9 +636,130 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       const other = await getAs(path(f.tournament.id, `missing-${suiteId}`), f.adminId);
       expect([other.status, other.body.code]).toEqual([404, 'REGISTRATION_NOT_FOUND']);
     });
+
+    it('진행한 경기도 기록 명단으로 읽기 전용 칸에 남고, 취소된 경기는 빠진다(팀 표는 시작 전 경기만)', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      const regA = f.registrations.get(f.teamA.id)!;
+      const path = `/api/v1/admin/tournaments/${f.tournament.id}/registrations/${regA}/game-rosters`;
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'LIVE' } });
+
+      const data = (await getAs(path, f.adminId)).body.data as MatrixBody;
+      expect(data.games.map((game) => [game.gameId, game.editable])).toEqual([
+        [f.games.g1.gameId, false],
+        [f.games.g2.gameId, true],
+      ]);
+      expect(statusesOf(data)).toEqual({ [a1]: ['PARTICIPATING', 'PARTICIPATING'], [a2]: ['PARTICIPATING', 'PARTICIPATING'] });
+      const team = (await getAs(matrixPath(f.teamA.id), f.teamA.ownerId)).body.data as MatrixBody;
+      expect(team.games.map((game) => game.gameId)).toEqual([f.games.g2.gameId]);
+
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'CANCELLED' } });
+      const afterCancel = (await getAs(path, f.adminId)).body.data as MatrixBody;
+      expect(afterCancel.games.map((game) => game.gameId)).toEqual([f.games.g1.gameId]);
+    });
   });
 
   describe('다가오는 경기 — 명단 요약', () => {
+    it('킥오프가 지나도 SCHEDULED 대회 경기는 팀원 선택 목록과 팀장 표에 남고, 취소·종료 뒤에는 빠진다', async () => {
+      const f = await seedTournament();
+      const pastKickoff = new Date(Date.now() - 60_000);
+      await prisma.v1TeamMatch.update({
+        where: { id: f.games.g1.teamMatchId },
+        data: { startAt: pastKickoff },
+      });
+
+      const memberPath = `/api/v1/teams/${f.teamA.id}/upcoming-games`;
+      const managerPath = matrixPath(f.teamA.id);
+      const member = await getAs(memberPath, f.teamA.members[0]);
+      const manager = await getAs(managerPath, f.teamA.ownerId);
+      expect(member.status).toBe(200);
+      expect((member.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g1.gameId);
+      expect((manager.body.data as MatrixBody).games.map((game) => game.gameId)).toContain(f.games.g1.gameId);
+
+      // Keep this check while the tournament is eligible. Checking after it is
+      // completed would pass even if team scoping were broken.
+      const otherTeam = await getAs(`/api/v1/teams/${f.teamC.id}/upcoming-games`, f.teamC.members[0]);
+      expect(otherTeam.status).toBe(200);
+      expect((otherTeam.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+
+      // The endpoint's rows are consumed as one roster selector list. More than
+      // 500 older delayed fixtures must not crowd out a later scheduled fixture.
+      const sharedPastKickoff = new Date(pastKickoff.getTime() - 1_000);
+      const backlogMatches = Array.from({ length: 500 }, (_, index) => ({
+        id: randomUUID(),
+        sportId,
+        regionId,
+        title: `지연 경기 ${index + 1} ${suiteId}`,
+        tournamentId: f.tournament.id,
+        hostTeamId: f.teamA.id,
+        approvedApplicantTeamId: f.teamB.id,
+        startAt: sharedPastKickoff,
+        status: 'matched' as const,
+        competitionConfigVersionId: configId,
+      }));
+      await prisma.v1TeamMatch.createMany({ data: backlogMatches });
+      await prisma.v1TournamentMatchDetails.createMany({
+        data: backlogMatches.map((match, index) => ({
+          teamMatchId: match.id,
+          tournamentId: f.tournament.id,
+          round: 'group',
+          fixtureNumber: index + 3,
+          homeRegistrationId: f.registrations.get(f.teamA.id)!,
+          awayRegistrationId: f.registrations.get(f.teamB.id)!,
+        })),
+      });
+      const backlogGameIds = backlogMatches.map(() => randomUUID());
+      await prisma.v1Game.createMany({
+        data: backlogMatches.map((match, index) => ({
+          id: backlogGameIds[index],
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: match.id,
+          state: 'SCHEDULED',
+          competitionConfigVersionId: configId,
+        })),
+      });
+      await prisma.v1GameSide.createMany({
+        data: backlogGameIds.flatMap((gameId) => [
+          { gameId, sideKey: V1GameSideKey.HOME, teamId: f.teamA.id, displayNameSnapshot: '홈' },
+          { gameId, sideKey: V1GameSideKey.AWAY, teamId: f.teamB.id, displayNameSnapshot: '원정' },
+        ]),
+      });
+      const withBacklog = await getAs(memberPath, f.teamA.members[0]);
+      expect(withBacklog.status).toBe(200);
+      const returnedGameIds = (withBacklog.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId);
+      expect(returnedGameIds).toHaveLength(502);
+      expect(new Set(returnedGameIds).size).toBe(returnedGameIds.length);
+      expect(returnedGameIds).toEqual(expect.arrayContaining([...backlogGameIds, f.games.g1.gameId, f.games.g2.gameId]));
+
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: pastKickoff } });
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'ENDED' } });
+      const endedGame = await getAs(memberPath, f.teamA.members[0]);
+      expect((endedGame.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g2.gameId);
+
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'CANCELLED' } });
+      const cancelled = await getAs(memberPath, f.teamA.members[0]);
+      expect((cancelled.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
+
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'SCHEDULED' } });
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'cancelled' } });
+      const cancelledTournament = await getAs(memberPath, f.teamA.members[0]);
+      expect((cancelledTournament.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'in_progress' } });
+      const activeTournament = await getAs(memberPath, f.teamA.members[0]);
+      const activeManagerMatrix = await getAs(managerPath, f.teamA.ownerId);
+      expect(activeTournament.status).toBe(200);
+      expect((activeTournament.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g1.gameId);
+      expect(activeManagerMatrix.status).toBe(200);
+      expect((activeManagerMatrix.body.data as MatrixBody).games.map((game) => game.gameId)).toContain(f.games.g1.gameId);
+
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
+      const endedCompetition = await getAs(memberPath, f.teamA.members[0]);
+      expect((endedCompetition.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
+
+    });
+
     it('대회 경기에는 rosterSummary 와 사이드를, 친선에는 null 을 싣는다', async () => {
       const f = await seedTournament();
       const [a1] = f.teamA.members;
@@ -665,6 +787,16 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(res.status).toBe(200);
       type Item = { gameId: string; competitionKind: string; sideId: string | null; teamMatchId: string | null; rosterSummary: unknown };
       const byGame = new Map((res.body.data.items as Item[]).map((item) => [item.gameId, item]));
+      const lineupGames = await app.get(LineupTodoService).listUpcomingForTeam(f.teamA.id, new Date());
+      const legacySummaryByGame = await loadRosterSummaries(prisma, f.teamA.id, lineupGames);
+      for (const item of byGame.values()) {
+        const expected = legacySummaryByGame.get(item.gameId)!;
+        expect(item).toMatchObject({
+          teamMatchId: expected.teamMatchId,
+          sideId: expected.sideId,
+          rosterSummary: expected.summary,
+        });
+      }
       expect(byGame.get(f.games.g1.gameId)).toMatchObject({
         competitionKind: 'TOURNAMENT',
         sideId: f.games.g1.sideByTeam.get(f.teamA.id),
@@ -680,4 +812,68 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(g1ForB?.rosterSummary).toEqual({ participating: 1, excluded: 0, unavailable: 0, suspended: 0 });
     });
   });
+
+  describe('어드민 종료 경기 출전 정정', () => {
+    async function endedFixture(resultState: 'OFFICIAL' | 'SUBMITTED' | null, goals = 0) {
+      const f = await seedTournament();
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const lineups = await prisma.v1GameLineup.findMany({ where: { gameId: target.gameId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+      const latestSides = [...new Map(lineups.map((row) => row.sideId).map((sideId) => [sideId, lineups.find((row) => row.sideId === sideId)!])).values()];
+      const participants = await prisma.v1GameParticipant.findMany({ where: { lineupId: { in: latestSides.map((row) => row.id) } } });
+      let revisionId: string | null = null;
+      if (resultState !== null) {
+        const revision = await prisma.v1GameResultRevision.create({ data: {
+          gameId: target.gameId, revision: 1, state: 'DRAFT', score: { home: goals, away: 0 }, eventsHash: 'ended-roster-test',
+          createdByActorType: 'USER', createdByUserId: f.adminId,
+        } });
+        revisionId = revision.id;
+        await prisma.v1GameResultParticipant.createMany({ data: participants.map((row) => ({ resultRevisionId: revision.id, participantId: row.id, sideId: row.sideId, started: true, goals: row.userId === f.teamA.members[0] ? goals : 0, cards: { yellow: 0, red: 0 } })) });
+        await prisma.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: resultState, submittedAt: new Date(), officialAt: resultState === 'OFFICIAL' ? new Date() : null } });
+      }
+      await prisma.v1Game.update({ where: { id: target.gameId }, data: { state: 'ENDED', currentOfficialRevisionId: resultState === 'OFFICIAL' ? revisionId : null } });
+      return { f, target, participants, revisionId };
+    }
+
+    it.each(['OFFICIAL', 'SUBMITTED', null] as const)('%s 결과의 종료 경기를 어드민이 빼고 되돌리며 이력을 보존한다', async (state) => {
+      const { f, target, participants, revisionId } = await endedFixture(state);
+      const userId = f.teamA.members[0];
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const change = { gameId: target.gameId, userId, op: 'EXCLUDE' };
+      for (const actor of [f.teamA.ownerId, f.teamA.managerId, f.directorId]) {
+        const denied = await postAs(path, actor, { changes: [change] });
+        expect([denied.status, denied.body.code]).toEqual([409, 'LINEUP_DEADLINE_PASSED']);
+      }
+      const saved = await postAs(path, f.adminId, { changes: [change] });
+      expect([saved.status, saved.body.data?.results[0]?.alreadyApplied]).toEqual([200, false]);
+      const view = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId);
+      expect(view.body.data.participants.map((row: { userId: string }) => row.userId)).not.toContain(userId);
+      expect(view.body.data.excluded.map((row: { userId: string }) => row.userId)).toContain(userId);
+      expect(await prisma.v1GameRosterAdjustment.findFirst({ where: { ...target, userId, revokedAt: null } })).toMatchObject({ actorRole: 'ADMIN', actorUserId: f.adminId });
+      expect((await postAs(path, f.adminId, { changes: [change] })).body.data.results[0].alreadyApplied).toBe(true);
+      expect((await postAs(path, f.adminId, { changes: [{ ...change, op: 'REVOKE' }] })).status).toBe(200);
+      const restored = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId);
+      expect(restored.body.data.participants.map((row: { userId: string }) => row.userId)).toContain(userId);
+      expect(await prisma.v1GameParticipant.count({ where: { id: { in: participants.map((row) => row.id) } } })).toBe(participants.length);
+      if (revisionId !== null) {
+        expect(await prisma.v1GameResultParticipant.count({ where: { resultRevisionId: revisionId } })).toBe(participants.length);
+        const latest = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: target.gameId }, orderBy: { revision: 'desc' } });
+        expect(latest).toMatchObject({ state, score: { home: 0, away: 0 }, createdByUserId: f.adminId });
+        expect(await prisma.v1GameResultParticipant.count({ where: { resultRevisionId: latest.id } })).toBe(participants.length);
+        expect(await prisma.v1OutboxEvent.count({ where: { revisionId: latest.id, type: state === 'OFFICIAL' ? 'GAME_RESULT_OFFICIAL' : 'GAME_RESULT_SUBMITTED' } })).toBe(1);
+      }
+    });
+
+    it('개인 기록이 있는 선수는 결과 정정으로 안내하고 다른 경기 변경까지 rollback한다', async () => {
+      const { f, target, revisionId } = await endedFixture('OFFICIAL', 1);
+      const userId = f.teamA.members[0];
+      const saved = await postAs(matrixPath(f.teamA.id) + '/batch', f.adminId, { changes: [
+        { gameId: f.games.g2.gameId, userId, op: 'EXCLUDE' },
+        { gameId: target.gameId, userId, op: 'EXCLUDE' },
+      ] });
+      expect([saved.status, saved.body.code]).toEqual([409, 'ROSTER_RESULT_CORRECTION_REQUIRED']);
+      expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: { in: [target.gameId, f.games.g2.gameId] } } })).toBe(0);
+      expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: target.gameId } })).currentOfficialRevisionId).toBe(revisionId);
+    });
+  });
+
 });

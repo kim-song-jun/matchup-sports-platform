@@ -149,6 +149,10 @@ export function BottomSheet(props: BottomSheetProps) {
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const target = event.target;
     if (target instanceof Element && target.closest(INTERACTIVE_SELECTOR)) return;
+    // 내용이 긴 시트는 본문 스와이프를 스크롤에 양보하고 손잡이에서만 닫는다.
+    // 손잡이가 없는 기존 시트는 원래의 드래그 동작을 유지한다.
+    const handle = event.currentTarget.querySelector('.tm-filter-sheet-handle');
+    if (handle && (!(target instanceof Element) || !handle.contains(target))) return;
     startYRef.current = event.clientY;
     activePointerIdRef.current = event.pointerId;
     setIsDragging(true);
@@ -197,7 +201,7 @@ export function BottomSheet(props: BottomSheetProps) {
     <div className="tm-filter-layer" onClickCapture={closeHref !== undefined ? onLinkClick : undefined}>
       <section
         ref={dialogRef}
-        className={`tm-filter-sheet${isDragging ? ' is-dragging' : ''}`}
+        className={`tm-filter-sheet tm-scrollable-drag-sheet${isDragging ? ' is-dragging' : ''}`}
         role="dialog"
         data-nosnippet={excludeFromSnippet ? '' : undefined}
         aria-modal="true"

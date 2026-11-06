@@ -16,6 +16,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   hostUser: '61000000-0000-4000-8000-000000000001',
@@ -36,7 +37,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 async function grantTournamentTakeover(gameId: string, userId: string): Promise<string> {
   const grant = await service.requestTakeover(authUser(userId), gameId, {
@@ -242,6 +243,11 @@ describe('Task 6 L1 game lifecycle', () => {
           sideKey: V1GameSideKey.HOME,
           displayNameSnapshot: 'Host One',
         },
+        {
+          sourceParticipantId: 'opponent-player-1',
+          sideKey: V1GameSideKey.AWAY,
+          displayNameSnapshot: 'Opponent One',
+        },
       ],
     };
     const actor: GameActorScope = {
@@ -271,7 +277,7 @@ describe('Task 6 L1 game lifecycle', () => {
     expect(persisted.competitionConfigVersionId).toBe(configId);
     expect(persisted.sides).toHaveLength(2);
     expect(persisted.periods.length).toBeGreaterThan(0);
-    expect(persisted.participants).toHaveLength(1);
+    expect(persisted.participants).toHaveLength(2);
 
     // Task 179: 대회 경기 명단은 참가 명단에서 계산된다 — 운영자라도 라인업 저장·제출 경로는 409 이고
     // 게임 버전·리비전을 건드리지 않는다.
@@ -456,8 +462,8 @@ describe('Task 6 L1 game lifecycle', () => {
       gameState: V1GameState.ENDED,
       gameVersion: 3,
       revisionStates: [V1GameResultRevisionState.SUBMITTED],
-      // 제출본이 없으면 셀렉터는 최신 리비전을 읽는다 — 생성 시점 HOME 참가자("Host One") 한 명.
-      participantCounts: [1],
+      // 제출본이 없으면 셀렉터는 최신 리비전을 읽는다 — 생성 시점에 양쪽에서 한 명씩.
+      participantCounts: [2],
     });
 
     const replay = await service.executeCommand(

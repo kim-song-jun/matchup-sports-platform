@@ -13,7 +13,6 @@ const routes = [
   '/login',
   '/login/email',
   '/auth/provider-denied',
-  '/auth/missing-email',
   '/auth/blocked',
   '/auth/account-conflict',
   '/auth/location-denied',

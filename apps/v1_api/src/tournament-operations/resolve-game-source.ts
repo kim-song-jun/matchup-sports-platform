@@ -11,6 +11,7 @@ import { Prisma, V1GameSourceType } from '@prisma/client';
  */
 export type ResolvedGameSource = {
   readonly kind: 'teamMatch'; readonly tournamentId: string; readonly fixtureId: string;
+  readonly tournamentKind: 'regular_tournament' | 'regular_league' | null;
   readonly fieldId: string | null; readonly teamMatchId: string;
 };
 
@@ -63,6 +64,7 @@ export async function resolveGameSource(
   if (!isRegularLeague && !isCanonicalTournament) return null;
   return {
     kind: 'teamMatch',
+    tournamentKind: teamMatch.tournament?.kind ?? null,
     tournamentId,
     // The original fixture UUID remains the staff scope ID after migration.
     fixtureId: teamMatch.id,

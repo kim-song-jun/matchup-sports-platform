@@ -5,11 +5,13 @@ import { AdminEmpty, AdminPageSkeleton, AdminToasts, useAdminToast } from '@/com
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useLeagueSettings, useUpdateLeagueSettings } from '@/hooks/use-league-settings';
+import { GenderCategoryField } from '@/components/admin/gender-category-field';
 import { useV1MasterRegions } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso, toKstDateString } from '@/lib/kst-calendar';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { LeagueSettings } from '@/types/league-settings';
+import type { V1TournamentGenderCategory } from '@/types/api';
 import { LeagueBasicFields, leagueInputClass, leagueLabelClass } from '../../league-basic-fields';
 import { LeaguePlannedFixtureField, LeagueTeamCapacityField, leagueTeamCapacityError } from '../../league-settings-fields';
 
@@ -18,7 +20,9 @@ function draftOf(data: LeagueSettings) {
     startsOn: data.startsOn ? toKstDateString(new Date(data.startsOn)) : '',
     endsOn: data.endsOn ? toKstDateString(new Date(data.endsOn)) : '',
     deadline: isoToKstDatetimeLocal(data.registrationDeadlineAt),
-    plannedFixtureCount: data.plannedFixtureCount?.toString() ?? '', maxTeams: data.maxTeams?.toString() ?? '' };
+    plannedFixtureCount: data.plannedFixtureCount?.toString() ?? '', maxTeams: data.maxTeams?.toString() ?? '',
+    // 성별을 받기 전에 만든 리그는 null 이다 — 비워 둔 채 다른 칸도 저장할 수 있어야 한다.
+    genderCategory: (data.genderCategory ?? '') as V1TournamentGenderCategory | '' };
 }
 const buttonClass = 'tm-btn tm-btn-md tm-btn-neutral min-h-[44px]';
 
@@ -84,6 +88,7 @@ function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string
         registrationDeadlineAt: draft.deadline === original.deadline ? snapshot.registrationDeadlineAt : kstDatetimeLocalToIso(draft.deadline),
         plannedFixtureCount: draft.plannedFixtureCount.trim() === '' ? null : Number(draft.plannedFixtureCount),
         maxTeams: draft.maxTeams.trim() === '' ? null : Number(draft.maxTeams),
+        ...(draft.genderCategory !== '' && draft.genderCategory !== original.genderCategory ? { genderCategory: draft.genderCategory } : {}),
       });
       // 저장 응답이 캐시에 들어가 있어 다시 그리면 새 updatedAt 으로 이어서 고칠 수 있다.
       onSaved();
@@ -103,6 +108,8 @@ function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string
         sportHint="리그를 만든 뒤에는 종목을 바꿀 수 없어요."
         disabled={disabled}
       />
+      <GenderCategoryField value={draft.genderCategory} onChange={value => change('genderCategory', value)} disabled={disabled}
+        hint="남성부·여성부는 그 성별 선수만 참가 명단에 올릴 수 있어요. 바꿔도 이미 올린 명단은 그대로예요." />
       {regions.isError && <p role="alert">지역 목록을 불러오지 못했어요. <button className={buttonClass} type="button" disabled={busy} onClick={() => regions.refetch()}>지역 다시 불러오기</button></p>}
       <LeaguePlannedFixtureField value={draft.plannedFixtureCount} onChange={value => change('plannedFixtureCount', value)} disabled={disabled} />
       <p className="tm-text-caption text-[var(--text-muted)]">총 경기 수나 기간을 바꿔도 기존 경기의 수와 일정은 바뀌지 않아요.</p>

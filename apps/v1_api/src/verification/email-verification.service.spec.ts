@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { EmailVerificationService } from './email-verification.service';
 import { verifyEmailProofToken } from './email-proof-token';
 import { SmsEventLogService } from './sms-event-log.service';
@@ -47,12 +48,43 @@ function prismaMock() {
         },
       ),
       findUnique: jest.fn(async ({ where }: { where: { email: string } }) => store.get(where.email) ?? null),
+      // Same contract as the database: the attemptCount condition is checked and applied in one step.
       update: jest.fn(
-        async ({ where, data }: { where: { email: string }; data: Record<string, unknown> }) => {
-          const row = store.get(where.email)!;
-          if ((data.attemptCount as { increment?: number })?.increment) row.attemptCount += 1;
-          if ('verifiedAt' in data) row.verifiedAt = data.verifiedAt as Date | null;
-          return row;
+        async ({
+          where,
+          data,
+        }: {
+          where: { email: string; codeHash?: string; attemptCount?: { lt: number } };
+          data: { attemptCount: { increment: number } };
+        }) => {
+          const row = store.get(where.email);
+          if (
+            !row ||
+            (where.codeHash !== undefined && row.codeHash !== where.codeHash) ||
+            (where.attemptCount && row.attemptCount >= where.attemptCount.lt)
+          ) {
+            throw new Prisma.PrismaClientKnownRequestError('No record was found for an update.', {
+              code: 'P2025',
+              clientVersion: 'test',
+            });
+          }
+          row.attemptCount += data.attemptCount.increment;
+          return { attemptCount: row.attemptCount };
+        },
+      ),
+      updateMany: jest.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { email: string; codeHash: string };
+          data: { attemptCount: { decrement: number }; verifiedAt: Date };
+        }) => {
+          const row = store.get(where.email);
+          if (!row || row.codeHash !== where.codeHash) return { count: 0 };
+          row.attemptCount -= data.attemptCount.decrement;
+          row.verifiedAt = data.verifiedAt;
+          return { count: 1 };
         },
       ),
       deleteMany: jest.fn(
@@ -78,7 +110,8 @@ const storeOf = (prisma: unknown) => (prisma as { __store: Store }).__store;
 function dispatcherMock(devEcho = true) {
   return {
     devEcho,
-    devEchoActive: devEcho,
+    assertDeliveryAvailable: jest.fn(),
+    mayEchoCode: jest.fn().mockResolvedValue(devEcho),
     send: jest.fn().mockResolvedValue(undefined),
   } as unknown as VerificationDispatcherService;
 }
@@ -87,6 +120,14 @@ const EMAIL = 'runner@example.com';
 
 describe('EmailVerificationService (공개 이메일 OTP)', () => {
   const OLD_SECRET = process.env.V1_SESSION_SECRET;
+  it.each([true, false])('메일 미설정은 가입 여부(deliver=%s)와 관계없이 같은 오류로 표시한다', async (deliver) => {
+    const prisma = prismaMock();
+    const dispatcher = dispatcherMock(false);
+    (dispatcher.assertDeliveryAvailable as jest.Mock).mockImplementation(() => { throw new Error('EMAIL_SEND_UNAVAILABLE'); });
+    const svc = new EmailVerificationService(prisma, dispatcher, eventLogStub());
+    await expect(svc.issueChallenge('real@gmail.com', { deliver })).rejects.toThrow('EMAIL_SEND_UNAVAILABLE');
+    expect(storeOf(prisma).size).toBe(0);
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
@@ -96,7 +137,7 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     else process.env.V1_SESSION_SECRET = OLD_SECRET;
   });
 
-  it('비밀번호 재설정 문구로 메일을 보내고 코드는 해시로만 저장한다', async () => {
+  it('계정 복구 용도로 메일을 보내고 코드는 해시로만 저장한다', async () => {
     const prisma = prismaMock();
     const dispatcher = dispatcherMock(true);
     const svc = new EmailVerificationService(prisma, dispatcher, eventLogStub());
@@ -104,8 +145,9 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     const res = await svc.issueChallenge(EMAIL, { deliver: true });
 
     expect(res.devCode).toMatch(/^\d{6}$/);
-    // 메일 문구가 'verify'(이메일 인증)로 나가면 비밀번호를 바꾸려던 사용자가 엉뚱한 안내를 받는다.
+    // 계정 찾기와 비밀번호 재설정은 동일한 이메일 소유 증명 경로를 쓴다.
     expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, res.devCode, 'password_reset');
+    expect(dispatcher.mayEchoCode).toHaveBeenCalledWith({ channel: 'email', address: EMAIL });
     const row = storeOf(prisma).get(EMAIL)!;
     expect(row.codeHash).toBeTruthy();
     expect(row.codeHash).not.toBe(res.devCode); // 평문 저장 금지
@@ -181,17 +223,61 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     expect(storeOf(prisma).get(EMAIL)!.attemptCount).toBe(1);
   });
 
-  it('시도 상한을 넘기면 TOO_MANY_ATTEMPTS — 단 올바른 코드는 그래도 통과한다(멱등)', async () => {
+  it('다섯 번 틀린 뒤에는 올바른 코드도 TOO_MANY_ATTEMPTS — 아니면 상한이 추측을 막지 못한다', async () => {
     const prisma = prismaMock();
     const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(EMAIL, { deliver: true });
     const wrong = devCode === '000000' ? '111111' : '000000';
-    storeOf(prisma).get(EMAIL)!.attemptCount = 5;
+    for (let i = 0; i < 5; i += 1) {
+      await expect(svc.verifyCode(EMAIL, wrong)).rejects.toMatchObject({
+        response: { code: 'VERIFICATION_CODE_MISMATCH' },
+      });
+    }
 
-    await expect(svc.verifyCode(EMAIL, wrong)).rejects.toMatchObject({
+    await expect(svc.verifyCode(EMAIL, devCode!)).rejects.toMatchObject({
       response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' },
     });
+    expect(storeOf(prisma).get(EMAIL)!.verifiedAt).toBeNull();
+  });
+
+  it('동시에 보낸 추측은 다섯 개만 대조된다', async () => {
+    const prisma = prismaMock();
+    const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(EMAIL, { deliver: true });
+    const wrong = devCode === '000000' ? '111111' : '000000';
+
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => svc.verifyCode(EMAIL, wrong)));
+    const codes = results.map((result) => (result as PromiseRejectedResult).reason.getResponse().code);
+    expect(codes.filter((code) => code === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(5);
+    expect(codes.filter((code) => code === 'VERIFICATION_TOO_MANY_ATTEMPTS')).toHaveLength(7);
+  });
+
+  it('읽은 뒤 새 번호가 발급됐으면 NO_PENDING 이고 새 번호의 시도 횟수는 깎지 않는다', async () => {
+    const prisma = prismaMock();
+    const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(EMAIL, { deliver: true });
+    const issued = { ...storeOf(prisma).get(EMAIL)! };
+    (prisma as never as { v1EmailVerificationChallenge: { findUnique: jest.Mock } }).v1EmailVerificationChallenge.findUnique
+      .mockResolvedValueOnce(issued);
+    storeOf(prisma).get(EMAIL)!.codeHash = 'replaced-by-a-newer-issue';
+
+    await expect(svc.verifyCode(EMAIL, devCode!)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_NO_PENDING' },
+    });
+    expect(storeOf(prisma).get(EMAIL)!.attemptCount).toBe(0);
+    expect(storeOf(prisma).get(EMAIL)!.verifiedAt).toBeNull();
+  });
+
+  it('올바른 코드는 시도로 세지 않아 상한 직전에도 재제출이 멱등하게 통과한다', async () => {
+    const prisma = prismaMock();
+    const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(EMAIL, { deliver: true });
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 4; i += 1) await svc.verifyCode(EMAIL, wrong).catch(() => undefined);
+
     expect(await svc.verifyCode(EMAIL, devCode!)).toBe(true);
+    expect(await svc.verifyCode(EMAIL, devCode!)).toBe(true);
+    expect(storeOf(prisma).get(EMAIL)!.attemptCount).toBe(4);
   });
 
   // verifiedAt 만으로 단락하면 주소만 아는 쪽이 임의 코드로 증명을 가져갈 수 있다.

@@ -110,7 +110,7 @@ Notes:
 | AUTH-013 | 온보딩 region | `/onboarding/region` | 신규 사용자 | 지역 선택/미선택 허용 정책, 검색, 저장 후 reload |
 | AUTH-014 | 온보딩 완료/유예 | `/onboarding/confirm`, `/onboarding/resume` | 신규 사용자 | 완료 후 `/home`, 유예 시 제한 홈, 부분 진행 재개 |
 | AUTH-014A | 소셜 가입 필수 단계 온보딩 mutation 차단 | API `PATCH /onboarding/preferences`, `POST /onboarding/complete`, `POST /onboarding/defer` | `social_terms_required`, `social_profile_required` 사용자 | 2개 상태 × 3개 mutation 모두 409 `ONBOARDING_STEP_REQUIRED`, required route가 각각 `/terms?mode=social`·`/signup/social`, write/transaction 0회, 일반 onboarding status 회귀 없음 |
-| AUTH-015 | auth 예외 route | `/auth/blocked`, `/auth/missing-email`, `/auth/account-conflict`, `/auth/location-denied`, `/auth/password-reset` | `GUEST` | 각 route 문구/CTA/복귀 동선, 데드엔드 없음 |
+| AUTH-015 | auth 예외 route | `/auth/blocked`, `/auth/account-conflict?provider=kakao|apple`(3단계 안내), `/auth/location-denied`, `/auth/password-reset` | `GUEST` | 각 route 문구/CTA/복귀 동선, 데드엔드 없음 |
 
 ## TEAM
 

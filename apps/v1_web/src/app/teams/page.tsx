@@ -1,6 +1,6 @@
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamListPageClient } from '@/components/teams/teams-client';
-import { hasListFilter, TEAM_LIST_FILTER_PARAMS, teamListSeedPath } from '@/lib/public-list-seed';
+import { firstSearchParam, hasListFilter, TEAM_LIST_FILTER_PARAMS, teamListMetadataPath, teamListSeedPath } from '@/lib/public-list-seed';
 import { buildPublicMetadata } from '@/lib/seo';
 import { fetchSeoMasterSports, fetchSeoSeed } from '@/lib/seo-list';
 import { buildItemListLd } from '@/lib/structured-data';
@@ -23,10 +23,12 @@ export const revalidate = 0;
 export default async function TeamsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const query = teamListSeedPath(params);
+  const cursor = firstSearchParam(params.cursor) ?? undefined;
   const filtered = hasListFilter(params, TEAM_LIST_FILTER_PARAMS);
-  const [page, sports] = await Promise.all([
+  const [page, sports, metadata] = await Promise.all([
     fetchSeoSeed<CursorPage<V1Team>>(query, 'teams'),
     fetchSeoMasterSports(),
+    cursor ? fetchSeoSeed<CursorPage<V1Team>>(teamListMetadataPath(params), 'teams metadata') : Promise.resolve(null),
   ]);
 
   // Filtered routes keep their matching SSR cards, but preserve the existing base-list-only ItemList contract.
@@ -43,7 +45,7 @@ export default async function TeamsPage({ searchParams }: { searchParams: Search
           )}
         />
       ) : null}
-      <TeamListPageClient seed={page ? { page, sports, query } : undefined} />
+      <TeamListPageClient seed={page ? { page, sports, query, metadata: metadata ?? undefined } : undefined} />
     </>
   );
 }

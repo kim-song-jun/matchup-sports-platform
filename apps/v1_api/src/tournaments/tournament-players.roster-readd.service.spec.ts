@@ -181,6 +181,7 @@ async function setup(options: {
       },
     },
     v1AdminActionLog: { findFirst: async () => null },
+    v1OperationAudit: { findFirst: async () => null },
     v1Game: {
       findMany: async ({ where }: { where: unknown }) => games.filter((row) => matches(row, where)),
       findUnique: async ({ where }: { where: { id: string } }) => games.find((row) => row.id === where.id) ?? null,

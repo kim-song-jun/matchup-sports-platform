@@ -9,6 +9,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 정규 리그에도 출전정지 규정이 걸린다 — **옵트인이고, 리그 축으로 판정한다.**
@@ -77,7 +78,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 function makeAdminService() {
   return new LeagueMatchAdminService(

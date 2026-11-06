@@ -1,5 +1,5 @@
 import { Card } from '@/components/v1-ui/primitives';
-import { isLeagueCompetition } from '@/lib/competition-kind';
+import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import type { V1TournamentDetail } from '@/types/api';
 
 type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format'>;
@@ -19,9 +19,9 @@ function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body
   // format=league 단발 대회도 참이라 쓰면 안 된다 — 단발 대회는 맨 아래 대진표 안내로 가야 한다.
   if (competition.kind === 'regular_league') {
     return [
-      { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
+      { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.' },
       { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
-      { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
+      { title: '시즌 종료', body: '확정된 경기 결과와 최종 순위를 확인해요. 시상이 있는 경우 리그 안내를 확인해 주세요.' },
     ];
   }
   const { format } = competition;
@@ -51,7 +51,7 @@ export function TournamentFlowSection({ tournament }: { tournament: FlowCompetit
   const steps = getFlowSteps(tournament);
   return (
     <section aria-labelledby="flow-heading" style={{ marginTop: 24 }}>
-      <div id="flow-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 진행 방식</div>
+      <div id="flow-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>{competitionNounOf(tournament.kind)} 진행 방식</div>
       <Card pad={16} style={{ marginTop: 4 }}>
         <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament)}</div>
         <ol className="tm-tourn-flow">

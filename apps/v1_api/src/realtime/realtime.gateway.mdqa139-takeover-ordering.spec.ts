@@ -5,10 +5,11 @@ import { createGatewayOrderingFixture } from './realtime.gateway.mdqa139-takeove
 
 describe('MD-QA 139 gateway takeover arrival order before profile authorization', () => {
   it.each([
-    { clientInstanceId: 'same-tab', user: ORDERING_USER, scenario: 'same client remount' },
-    { clientInstanceId: 'new-tab', user: ORDERING_USER, scenario: 'another client' },
-    { clientInstanceId: 'operator-tab', user: { ...ORDERING_USER, id: 'new-operator' }, scenario: 'another operator' },
-  ])('preserves the acknowledged newer grant after a delayed profile lookup: $scenario', async ({ user, clientInstanceId }) => {
+    { clientInstanceId: 'same-tab', user: ORDERING_USER, scenario: 'same client remount', late: { status: 'denied', code: 'TAKEOVER_SUPERSEDED' } },
+    { clientInstanceId: 'new-tab', user: ORDERING_USER, scenario: 'another client', late: { status: 'denied', code: 'TAKEOVER_SUPERSEDED' } },
+    // 다른 사람이 이미 쥐었으면 늦게 온 요청은 보유자를 알려 주는 TAKEOVER_HELD 로 거절된다(MD-QA #165).
+    { clientInstanceId: 'operator-tab', user: { ...ORDERING_USER, id: 'new-operator' }, scenario: 'another operator', late: { status: 'denied', code: 'TAKEOVER_HELD', holderName: 'new-operator-닉네임' } },
+  ])('preserves the acknowledged newer grant after a delayed profile lookup: $scenario', async ({ user, clientInstanceId, late }) => {
     // Given: R1 entered the actual gateway but its first profile database await is pending.
     const fixture = await createGatewayOrderingFixture();
     const profile = fixture.holdNextProfile();
@@ -21,7 +22,7 @@ describe('MD-QA 139 gateway takeover arrival order before profile authorization'
       if (latest.status !== 'granted') throw new TypeError('The newer request did not acquire the game');
       profile.release();
       // Then: R1 is superseded and R2 can renew and commit an actual event.
-      expect(await old).toEqual({ status: 'denied', code: 'TAKEOVER_SUPERSEDED' });
+      expect(await old).toEqual(late);
       await expect(fixture.service.renewTakeover(user, ORDERING_GAME_ID,
         { takeoverToken: latest.takeoverToken, clientInstanceId }))
         .resolves.toMatchObject({ takeoverToken: latest.takeoverToken });

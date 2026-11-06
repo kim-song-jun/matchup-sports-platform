@@ -18,7 +18,7 @@ export function cellKey(gameId: string, userId: string): string {
   return `${gameId}:${userId}`;
 }
 
-/** 칩으로 켜고 끌 수 있는 칸 — 시작 전 경기의 출전·빠짐만. 결장·출전정지·명단 밖은 계산이 정한다. */
+/** 칩으로 켜고 끌 수 있는 칸 — 서버가 편집을 허용한 경기의 출전·빠짐만. 결장·출전정지·명단 밖은 계산이 정한다. */
 export function isToggleable(game: V1TeamRosterMatrixGame, cell: V1TeamRosterCell): boolean {
   return game.editable && (cell.status === 'PARTICIPATING' || cell.status === 'EXCLUDED');
 }

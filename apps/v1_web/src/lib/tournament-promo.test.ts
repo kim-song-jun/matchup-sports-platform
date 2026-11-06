@@ -137,3 +137,19 @@ describe('resolveTournamentImage', () => {
     ).toBeNull();
   });
 });
+
+
+describe('대회 목록·상세 2장', () => {
+  const images = { coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp' };
+  it('각 화면의 사진을 우선하고 하나만 있으면 공유한다', () => {
+    expect(resolveTournamentImage(images, 'cover')).toBe(images.listImageUrl);
+    expect(resolveTournamentImage(images, 'detail')).toBe(images.coverImageUrl);
+    expect(resolveTournamentImage({ ...images, coverImageUrl: null }, 'detail')).toBe(images.listImageUrl);
+    expect(resolveTournamentImage({ ...images, listImageUrl: null }, 'cover')).toBe(images.coverImageUrl);
+  });
+  it('상세 숨김은 목록 사진에 영향을 주지 않으며 홍보 이미지를 상세로 대체하지 않는다', () => {
+    expect(resolveTournamentImage({ ...images, showDetailImage: false }, 'detail')).toBeNull();
+    expect(resolveTournamentImage({ ...images, showDetailImage: false }, 'cover')).toBe(images.listImageUrl);
+    expect(resolveTournamentImage({ promoHomeImageUrl: '/uploads/promo.webp' }, 'detail')).toBeNull();
+  });
+});

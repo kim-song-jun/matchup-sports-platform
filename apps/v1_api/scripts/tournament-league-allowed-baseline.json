@@ -49,8 +49,8 @@
     "why": "Competition configuration is a shared tournament/league axis; the resolved kind selects the canonical TeamMatch ownership predicate before mutation."
   },
   "src/tournaments/competition-config/tournament-period-settings.service.ts": {
-    "allowed": 2,
-    "why": "Period settings are an explicitly shared tournament/league contract; both read and serializable update paths resolve the kind-gated surface before checking the active admin."
+    "allowed": 3,
+    "why": "Period settings are an explicitly shared tournament/league contract; the settings read, the per-match read (league fixtures also take a match-only override) and the serializable update path resolve the kind-gated surface before checking the active admin."
   },
   "src/tournament-operations/fields/tournament-operations-fields.service.ts": {
     "allowed": 1,

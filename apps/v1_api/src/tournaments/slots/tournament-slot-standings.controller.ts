@@ -3,6 +3,7 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import { V1AuthUser } from '../../auth/v1-auth-user';
+import { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
 import { FillFromStandingsDto } from './dto/fill-from-standings.dto';
 import { CrossGroupRound12Dto } from './dto/cross-group-round12.dto';
 import { TournamentSlotService } from './tournament-slot.service';
@@ -12,6 +13,16 @@ import { TournamentSlotService } from './tournament-slot.service';
 @UseGuards(V1AuthGuard)
 export class TournamentSlotStandingsController {
   constructor(private readonly slots: TournamentSlotService) {}
+
+  @Get('admin/tournaments/:tournamentId/bracket/finalist-preview')
+  finalistPreview(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+    return this.slots.finalistPreview(user, tournamentId);
+  }
+
+  @Post('admin/tournaments/:tournamentId/bracket/finalist-assignments')
+  finalistApply(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string, @Body() dto: FinalistAssignmentDto) {
+    return this.slots.finalistApply(user, tournamentId, dto);
+  }
 
   @Get('admin/tournaments/:tournamentId/bracket/round12-preview')
   round12Preview(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {

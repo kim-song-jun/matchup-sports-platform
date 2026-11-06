@@ -155,9 +155,14 @@ describe('leagueMirrorCreateData — 시즌 승계(inherited)', () => {
     expect(data).toMatchObject({ maxTeams, minPlayers: 1, maxPlayers: null });
   });
 
+  it.each([['female', 'female'], [undefined, null]] as const)('성별 %s 을 이어받고, 이전 계약 입력(생략)은 미지정 null 로 둔다', (genderCategory, expected) => {
+    const data = leagueMirrorCreateData({ ...base, inherited: { ...inherited, ...(genderCategory ? { genderCategory } : {}) } });
+    expect(data.genderCategory).toBe(expected);
+  });
+
   it('inherited 가 없으면 승계 컬럼 키가 아예 없고(DB 기본값: 0원·null) 팀 명단 인원은 제한 없음이다', () => {
     const data = leagueMirrorCreateData(base);
-    for (const key of ['coverImageUrl', 'entryFee', 'bankName', 'bankAccount', 'bankHolder', 'entryFeeConfiguredAt']) {
+    for (const key of ['coverImageUrl', 'entryFee', 'bankName', 'bankAccount', 'bankHolder', 'entryFeeConfiguredAt', 'genderCategory']) {
       expect(data).not.toHaveProperty(key);
     }
     expect(data).toMatchObject({ minPlayers: 1, maxPlayers: null });

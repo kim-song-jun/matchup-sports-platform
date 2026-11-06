@@ -1,18 +1,19 @@
 'use client';
 
-import Image from 'next/image';
 import { MatchParticipationActions } from './match-participation-actions';
 import Link from 'next/link';
 import type { ChangeEvent, FocusEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Card, EmptyState, ErrorState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl, responsiveBackgroundImageVars } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
 import type {
@@ -31,6 +32,17 @@ import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1MatchApiStatus, V1PlaceView } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
+
+/*
+ * 사진이 그려지는 자리의 가장 넓은 CSS 폭(px). optimizedCssUrl 이 2배 밀도 폭으로 올려 받는다.
+ * 상세 히어로는 데스크톱에서 1072px 까지 가지만 2배(2144)면 3840 폭으로 올림되므로 1920 폭에 맞춘다(대회 홍보 배너와 같다).
+ * 휴대폰·태블릿은 앱 프레임 상한 600px 라 1200 폭으로 충분하다.
+ */
+const MATCH_ROW_THUMB_PX = 96; // .tm-match-row-thumb
+const MATCH_LIST_MEDIA_PX = 320; // .tm-match-rail-h > * (≥1024px)
+const MATCH_DETAIL_HERO_NARROW_PX = 600; // .tm-match-detail-hero <1024px → 1200 폭
+const MATCH_DETAIL_HERO_WIDE_PX = 960; // .tm-match-detail-hero ≥1024px → 1920 폭
+const MATCH_CREATE_PREVIEW_PX = 600; // .tm-match-create-shell 최대 폭
 
 /**
  * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
@@ -117,8 +129,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
               줄을 더하지 않고 요약 행 안에서 제목 역할을 한다(2026-09-07 사용자 확정). */}
           <h2 className="tm-list-scope-heading">{model.summary.label}</h2>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
-          {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
+          <ListSummaryCounts summary={model.summary} />
         </div>
         {/* team-matches-page.tsx #5와 동일 — 로딩 중(isLoading)엔 PageSkeleton, 완료 후
             비어 있으면 EmptyState. 이 분기 없이는 필터를 바꿔 새 쿼리가 도는 동안에도
@@ -363,7 +374,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
         {/* 사진이 없으면 그래픽을 위, 카피를 아래로 쌓는다(영상 pCc9GspeYfg 02 의 4칸 모듈).
             예전에는 사진 히어로와 같은 면에 그래픽을 우하단 구석으로 얹어 아이콘 버튼·오버레이
             텍스트와 자리를 다퉜다 — alpha 에서 실제로 겹쳐 한 번 옮긴 자리다. */}
-        <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-detail-hero-stack'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+        <div className={`tm-match-detail-hero${match.image ? ' tm-responsive-bg' : ' tm-match-detail-hero-stack'}`} style={match.image ? responsiveBackgroundImageVars(match.image, MATCH_DETAIL_HERO_NARROW_PX, MATCH_DETAIL_HERO_WIDE_PX) : undefined}>
           {match.image ? null : (
             <div className="tm-match-hero-graphic">
               {/* 이 자리는 176px(≥1024 208px)이라 agy-3d-graphic 기준의 "큰 자리"다 —
@@ -599,6 +610,8 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
   );
 }
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const edit = model.mode === 'edit' || model.step === 'edit';
   const wizardStep = model.step === 'edit' ? 'info' : model.step;
   const stepNo = stepToNumber(wizardStep);
@@ -665,7 +678,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
           </section>
         ) : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-create-fixed-cta">
         <div className="tm-create-fixed-cta-actions">
           {secondaryAction ? (
             <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{wizardStep === 'sport' ? (edit ? '변경 취소' : '취소') : '이전'}</button>
@@ -841,7 +854,7 @@ function matchStateBadge(match: MatchCardModel): { label: string; className: str
 }
 
 /**
- * 목록의 기본 단위 — 좌측 64px 썸네일 + 비교 축(시간·장소·인원) 한 줄.
+ * 목록의 기본 단위 — 좌측 96px 썸네일 + 비교 축(시간·장소·인원) 한 줄.
  * 배너 카드는 미디어가 카드의 절반(146/286px)을 써서 390 폭에서 2.95장밖에 안 보였다.
  * 목록은 이해시키는 화면이 아니라 비교시키는 화면이라 개수가 먼저다(browse-density 스킬).
  */
@@ -849,7 +862,7 @@ function MatchRowItem({ match, fromHref }: { match: MatchCardModel; fromHref?: s
   const stateBadge = matchStateBadge(match);
   return (
     <Link className={`tm-match-row tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={withFromPath(`/matches/${match.id}`, fromHref)}>
-      <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+      <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: optimizedCssUrl(match.image, MATCH_ROW_THUMB_PX) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
       <div className="tm-match-row-main">
@@ -976,7 +989,7 @@ function MatchCardItem({ match, fromHref }: { match: MatchCardModel; fromHref: s
   const stateBadge = matchStateBadge(match);
   return (
     <Link className={`tm-match-list-card tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={withFromPath(`/matches/${match.id}`, fromHref)}>
-      <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+      <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: optimizedCssUrl(match.image, MATCH_LIST_MEDIA_PX) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="132px" />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
@@ -1190,7 +1203,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
 
   return (
     <Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}>
-      <div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(image) }}>
+      <div className="tm-create-image-preview" style={{ backgroundImage: optimizedCssUrl(image, MATCH_CREATE_PREVIEW_PX) }}>
         <span className="tm-badge tm-badge-grey">대표 이미지</span>
       </div>
       <div style={{ padding: 16 }}>
@@ -1356,7 +1369,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const endDate = draft.endDate || draft.date;
   const endText = endDate === draft.date ? draft.endTime : `${endDate} ${draft.endTime}`;
   const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${endText}` : `${draft.date} ${draft.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.place?.name ?? ''} sub={draft.place?.address ?? undefined} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: optimizedCssUrl(draft.image, MATCH_CREATE_PREVIEW_PX) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.place?.name ?? ''} sub={draft.place?.address ?? undefined} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {
@@ -1383,3 +1396,4 @@ function nextCreateHref(step: MatchCreateViewModel['step']) {
   // 만약 도달하면 안전하게 목록으로 복귀.
   return '/matches';
 }
+

@@ -51,7 +51,7 @@ export default function AccountDeletionPage() {
           <Card pad={16}>
             <h2 className="tm-text-body-lg" style={{ margin: 0 }}>처리 범위</h2>
             <ul className="tm-text-caption" style={{ margin: '10px 0 0', paddingLeft: 20, lineHeight: 1.7 }}>
-              <li>앱에서 탈퇴 요청이 접수되면 로그인과 푸시 알림 등록을 즉시 중지해요.</li>
+              <li>앱에서 탈퇴 요청이 접수되면 서비스 이용과 푸시 알림 등록을 즉시 중지해요.</li>
               <li>{WITHDRAWAL_GRACE_NOTICE}</li>
               <li>본인 확인 후 연락처, 로그인 연결 정보, 프로필 기본 정보, 활동 지역과 검색 기록을 삭제하거나 식별할 수 없게 처리해요.</li>
               <li>진행 중인 매치나 팀 운영 권한이 있으면 먼저 정리가 필요할 수 있어요.</li>

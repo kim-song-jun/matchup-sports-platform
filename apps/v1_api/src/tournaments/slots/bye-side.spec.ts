@@ -65,6 +65,16 @@ describe('부전승의 같은 경기 홈·어웨이 교환', () => {
     await s.run();
     expect(updateTournamentMatchInTx).toHaveBeenCalledTimes(1);
   });
+  it.each(['BYE', 'GROUP_RANK'])('일반 짝수 대진의 %s 부전승은 출처와 가지 번호를 보존한다', async (kind) => {
+    const s = setup();
+    s.slot.kind = kind;
+    s.slot.group.phase = 'quarter';
+    s.detail.group.phase = 'semi';
+    await expect(s.run()).resolves.toMatchObject({ side: 'AWAY', sortOrder: 2 });
+    expect(s.slot).toMatchObject({ kind, position: 2, byeSortOrder: 2 });
+    expect(s.tx.v1TournamentByeSlot.findUnique).not.toHaveBeenCalled();
+    expect(s.edges().find((edge) => edge.id === 'incoming')?.targetSide).toBe('HOME');
+  });
   it('어웨이에서 홈으로 되돌릴 수 있다', async () => {
     const s = setup(); await s.run(); await s.run('HOME', 'AWAY');
     expect(s.detail).toMatchObject({ homeRegistrationId: 'bye-team', awayRegistrationId: 'winner' });

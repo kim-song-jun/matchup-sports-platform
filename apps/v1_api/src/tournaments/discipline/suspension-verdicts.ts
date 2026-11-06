@@ -39,8 +39,8 @@ function emptyVerdicts(): Map<string, SuspensionVerdict> {
 
 /**
  * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
- * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
- * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
+ * `{ yellow: number, red: number }` 뿐이다(경고 누적 퇴장 구분은 `classifyGameCards` 규칙으로
+ * `evaluateSuspension` 안에서 한다). 모양이 다르면 0으로 본다 —
  * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
  */
 function readResultCards(value: unknown): { yellow: number; red: number } {
@@ -84,8 +84,7 @@ export async function readSuspensionRules(
  *
  * **주입 서비스가 아니라 평범한 export 함수인 이유**: 이 코드를 쓰는 `GamesService`·
  * `TeamMatchLineupService` 의 생성자에 인자를 하나 더하면 그 클래스를 직접 `new` 하는
- * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳 — CI 실측이고, 그 스펙들의
- * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다). `tx` 를
+ * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳). `tx` 를
  * 인자로 받으면 호출부의 트랜잭션을 그대로 쓸 수 있어 **제출과 같은 스냅샷**에서 읽는
  * 이점도 유지된다.
  *
@@ -105,18 +104,39 @@ export async function readSuspensionVerdicts(
   tx: Tx,
   input: SuspensionVerdictInput,
 ): Promise<Map<string, SuspensionVerdict>> {
+  const byUpcomingKey = await readSuspensionVerdictsForUpcomingKeys(tx, {
+    competitionId: input.competitionId,
+    orderedGames: input.orderedGames,
+    upcomingKeys: [input.upcomingKey],
+  });
+  return byUpcomingKey.get(input.upcomingKey) ?? new Map(NO_VERDICTS);
+}
+
+/** Read one competition's disciplinary history once and evaluate several upcoming team games. */
+export async function readSuspensionVerdictsForUpcomingKeys(
+  tx: Tx,
+  input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
+): Promise<Map<string, Map<string, SuspensionVerdict>>> {
   const rules = await readSuspensionRules(tx, input.competitionId);
   // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회·리그가 그렇다(옵트인).
-  if (!suspensionRulesEnabled(rules)) return emptyVerdicts();
+  if (!suspensionRulesEnabled(rules)) {
+    return new Map(input.upcomingKeys.map((key) => [key, emptyVerdicts()]));
+  }
 
   const orderByKey = new Map(input.orderedGames.map((game, index) => [game.key, index + 1]));
-  const upcomingGameOrder = orderByKey.get(input.upcomingKey);
-  if (upcomingGameOrder === undefined) return emptyVerdicts();
+  const upcomingOrders = new Map(
+    input.upcomingKeys.flatMap((key) => {
+      const order = orderByKey.get(key);
+      return order === undefined ? [] : [[key, order] as const];
+    }),
+  );
+  const requestedKeys = [...upcomingOrders.keys()];
+  if (requestedKeys.length === 0) return new Map();
 
   const gameIds = input.orderedGames
     .map((game) => game.gameId)
     .filter((gameId): gameId is string => gameId !== null);
-  if (gameIds.length === 0) return emptyVerdicts();
+  if (gameIds.length === 0) return new Map(requestedKeys.map((key) => [key, emptyVerdicts()]));
 
   /**
    * 경기마다 **딱 한 개**의 리비전만 센다 — 여러 개를 세면 정정 이력이 카드로 중복
@@ -164,13 +184,15 @@ export async function readSuspensionVerdicts(
     const revisionId = revisionByGameId.get(game.gameId) ?? null;
     if (revisionId !== null) revisionToOrder.set(revisionId, order);
   }
-  if (revisionToOrder.size === 0) return emptyVerdicts();
+  if (revisionToOrder.size === 0) return new Map(requestedKeys.map((key) => [key, emptyVerdicts()]));
 
   const resultParticipants = await tx.v1GameResultParticipant.findMany({
     where: { resultRevisionId: { in: [...revisionToOrder.keys()] } },
     select: { resultRevisionId: true, participantId: true, cards: true },
   });
-  if (resultParticipants.length === 0) return emptyVerdicts();
+  if (resultParticipants.length === 0) {
+    return new Map(requestedKeys.map((key) => [key, emptyVerdicts()]));
+  }
 
   const participants = await tx.v1GameParticipant.findMany({
     where: { id: { in: resultParticipants.map((row) => row.participantId) } },
@@ -189,9 +211,12 @@ export async function readSuspensionVerdicts(
     playedByUserId.set(userId, bucket);
   }
 
-  const verdicts = new Map<string, SuspensionVerdict>();
+  const verdictsByUpcomingKey = new Map<string, Map<string, SuspensionVerdict>>();
+  for (const key of requestedKeys) verdictsByUpcomingKey.set(key, new Map());
   for (const [userId, played] of playedByUserId) {
-    verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
+    for (const [key, upcomingGameOrder] of upcomingOrders) {
+      verdictsByUpcomingKey.get(key)!.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
+    }
   }
-  return verdicts;
+  return verdictsByUpcomingKey;
 }

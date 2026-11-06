@@ -59,7 +59,11 @@ export const LEAGUE_PHASE_LABELS: SchedulePhaseLabels = {
  * "3위 결정전"처럼 조가 아닌 이름은 두 조건 모두 걸리지 않는다.
  */
 function isGroupStage(entry: PublicScheduleEntry): boolean {
-  if (tournamentRoundLabel(entry.round).startsWith('조별')) return true;
+  const roundLabel = tournamentRoundLabel(entry.round);
+  if (roundLabel.startsWith('조별')) return true;
+  // A configured knockout group may also end in "조" (for example "우승조").
+  // The known round is authoritative; the name is only a fallback.
+  if (/^(\d+강|준결승|결승|3·4위전)$/.test(roundLabel)) return false;
   const name = entry.groupName?.trim() ?? '';
   return name.endsWith('조');
 }

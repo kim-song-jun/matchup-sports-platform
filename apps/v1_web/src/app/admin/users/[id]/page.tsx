@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ArrowLeft, ChevronRight, PhoneOff, Trash2 } from 'lucide-react';
 import {
   AdminEmpty,
   AdminPageHeader,
+  AdminReasonConfirmDialog,
   AdminStatusPill,
   AdminTableSkeleton,
   AdminToasts,
@@ -15,12 +16,12 @@ import {
 import {
   useV1AdminUser,
   useV1DeleteAdminUser,
+  useV1ReleaseAdminUserPhone,
 } from '@/hooks/use-v1-api';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
+import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle, maskPhoneNumber } from '@/lib/format-user';
 import { mergeUserTeams } from '@/lib/admin-user-teams';
 import type { V1AdminUserDetail } from '@/types/api';
 import { useAdminListReturnHref } from '../../use-admin-url-list-query';
@@ -52,46 +53,41 @@ export default function AdminUserDetailPage() {
   const userId = params.id;
   const { data: user, isPending, isError, error, refetch } = useV1AdminUser(userId);
   const deleteMutation = useV1DeleteAdminUser(userId);
+  const releaseMutation = useV1ReleaseAdminUserPhone(userId);
   const { toasts, showToast } = useAdminToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteReason, setDeleteReason] = useState('');
-  // 어드민 모달 중 유일하게 ESC·focus trap·포커스 복원이 없던 인라인 모달 — 공용 훅으로 표준화.
-  const {
-    dialogRef: deleteDialogRef,
-    initialFocusRef: deleteReasonRef,
-    onBackdropClick: onDeleteBackdropClick,
-    // mounted/closing 을 읽지 않으면 훅이 이 컴포넌트(부모)에 살아 있는 채로
-    // 모달 DOM 만 즉시 사라진다 — 퇴장 시간 동안 화면에 아무것도 없는데
-    // 스크롤 잠금·ESC·focus trap 이 그대로 걸려 있게 된다.
-    mounted: deleteMounted,
-    closing: deleteClosing,
-  } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
-    open: deleteOpen,
-    onClose: () => setDeleteOpen(false),
-    pending: deleteMutation.isPending,
-  });
+  const [releaseOpen, setReleaseOpen] = useState(false);
 
   const canWrite = useAdminCanWrite();
   const canDelete = canWrite && user?.accountStatus !== 'deleted';
+  // 서버는 완전히 삭제된 계정(deletedAt 이 있는 삭제 상태)의 번호 해제를 막는다 — 그 계정의 번호는 삭제 때 이미 풀렸다.
+  const hasReleasablePhone = Boolean(user?.phone) && !user?.deletedAt;
 
-  function handleDeleteSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const reason = deleteReason.trim();
-    if (!reason) {
-      showToast('삭제 사유를 입력해 주세요.', 'error');
-      return;
-    }
-
+  function handleDeleteSubmit(reason: string) {
     deleteMutation.mutate(
       { reason },
       {
         onSuccess: () => {
           setDeleteOpen(false);
-          setDeleteReason('');
           showToast('회원을 삭제 처리했어요.', 'success');
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '회원 삭제에 실패했어요.'), 'error');
+        },
+      },
+    );
+  }
+
+  function handleReleaseSubmit(reason: string) {
+    releaseMutation.mutate(
+      { reason },
+      {
+        onSuccess: () => {
+          setReleaseOpen(false);
+          showToast('휴대폰 번호를 해제했어요.', 'success');
+        },
+        onError: (err) => {
+          showToast(extractErrorMessage(err, '휴대폰 번호 해제에 실패했어요.'), 'error');
         },
       },
     );
@@ -242,6 +238,24 @@ export default function AdminUserDetailPage() {
             </dl>
           </section>
 
+          {hasReleasablePhone ? (
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+              <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">휴대폰 번호 해제</h2>
+              <p className="mt-2 text-[length:var(--font-size-body-sm)] leading-relaxed text-[var(--text-muted)]">
+                통신사가 번호를 다른 사람에게 다시 배정해 가입이 막힌 경우에 써요. 번호만 이 계정에서 빠지고 계정은 그대로 남아요. 처리 사유는 감사 로그에 남아요.
+              </p>
+              <button
+                type="button"
+                disabled={!canWrite}
+                onClick={() => setReleaseOpen(true)}
+                className="mt-4 inline-flex h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                <PhoneOff size={16} aria-hidden="true" />
+                휴대폰 번호 해제
+              </button>
+            </section>
+          ) : null}
+
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">삭제 처리</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
@@ -260,62 +274,44 @@ export default function AdminUserDetailPage() {
         </aside>
       </div>
 
-      {deleteMounted ? (
-        <div
-          className={`tm-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4${
-            deleteClosing ? ' is-closing' : ''
-          }`}
-          onClick={onDeleteBackdropClick}
-        >
-          <form
-            ref={deleteDialogRef}
-            onSubmit={handleDeleteSubmit}
-            // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
-            // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
-            className={`tm-modal-panel w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]${
-              deleteClosing ? ' is-closing' : ''
-            }`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-user-title"
-          >
-            <h2 id="delete-user-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">회원 삭제</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-              {userTitle(user)} 회원을 삭제 처리해요. 삭제한 계정은 되돌릴 수 없지만, 이메일·전화번호·로그인 식별자를 사용해 새로 가입할 수 있어요.
+      <AdminReasonConfirmDialog
+        open={deleteOpen}
+        title="회원 삭제"
+        description={`${userTitle(user)} 회원을 삭제 처리해요. 삭제한 계정은 되돌릴 수 없지만, 이메일·전화번호·로그인 식별자를 사용해 새로 가입할 수 있어요.`}
+        reasonLabel="삭제 사유"
+        reasonPlaceholder="운영자가 확인한 삭제 사유를 입력해 주세요."
+        submitLabel="삭제 처리"
+        pendingLabel="삭제 중"
+        pending={deleteMutation.isPending}
+        onSubmit={handleDeleteSubmit}
+        onClose={() => setDeleteOpen(false)}
+      />
+
+      <AdminReasonConfirmDialog
+        open={releaseOpen}
+        title="휴대폰 번호 해제"
+        description={
+          <>
+            <p>
+              {userTitle(user)} 회원의 휴대폰 번호({maskPhoneNumber(user.phone)})를 해제해요.
             </p>
-            <label className="mt-4 block text-sm font-semibold text-[var(--text-body)]" htmlFor="delete-user-reason">
-              삭제 사유
-            </label>
-            <textarea
-              ref={deleteReasonRef}
-              id="delete-user-reason"
-              value={deleteReason}
-              onChange={(event) => setDeleteReason(event.target.value)}
-              className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-[var(--border)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="운영자가 확인한 삭제 사유를 입력해 주세요."
-              maxLength={500}
-            />
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={deleteMutation.isPending}
-                onClick={() => setDeleteOpen(false)}
-                // 방금 card-surface로 바뀐 모달 폼(위)과 겹치지 않게 surface-soft로 구분.
-                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] disabled:opacity-60"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                disabled={deleteMutation.isPending}
-                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl bg-red-500 px-4 text-sm font-semibold text-white hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-500"
-              >
-                {deleteMutation.isPending ? '삭제 중' : '삭제 처리'}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>번호가 이 계정에서 지워져요.</li>
+              <li>계정은 그대로 남지만, 휴대폰 번호를 다시 인증해야 해요.</li>
+              <li>해제한 번호로 다른 사람이 가입할 수 있어요.</li>
+            </ul>
+            <p className="mt-2">회원에게는 번호가 해제됐다는 알림이 가요.</p>
+          </>
+        }
+        reasonLabel="해제 사유"
+        reasonPlaceholder="운영자가 확인한 해제 사유를 입력해 주세요."
+        submitLabel="번호 해제"
+        pendingLabel="해제 중"
+        tone="primary"
+        pending={releaseMutation.isPending}
+        onSubmit={handleReleaseSubmit}
+        onClose={() => setReleaseOpen(false)}
+      />
 
       <AdminToasts toasts={toasts} />
     </>

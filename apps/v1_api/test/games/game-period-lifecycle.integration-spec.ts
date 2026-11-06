@@ -9,6 +9,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * T1-0 — this is a live-defect fix, not a new feature (design doc §2.8).
@@ -31,7 +32,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -163,6 +164,7 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
       ],
       participants: [
         { sourceParticipantId: 't1-0-home-player-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'T1-0 Scorer' },
+        { sourceParticipantId: 't1-0-away-player-1', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'T1-0 Opponent Player' },
       ],
     };
     const actor: GameActorScope = {

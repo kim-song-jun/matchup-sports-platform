@@ -13,6 +13,7 @@ import type { TournamentAdminRole } from '@/lib/admin-tournament-role';
  */
 export interface TournamentAdminContextValue {
   tournamentId: string;
+  basePath?: string;
   /**
    * 지금 사용자의 대회 관리 역할. 플랫폼 관리자와 대회 스태프를 같은 어휘로 표현한다
    * (`lib/admin-tournament-role.ts` — 서버 `assertAccess` 와 같은 역할 집합).

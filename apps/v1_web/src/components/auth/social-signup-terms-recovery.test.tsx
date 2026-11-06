@@ -8,12 +8,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { V1AuthMe } from '@/types/api';
 import { v1Keys } from '@/lib/query-keys';
 import { getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
-import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
 import { TermsClient } from './terms-client';
 import { OnboardingClient } from './onboarding-client';
-import { authSession, createRedirectFixture, DOCUMENT, stepForRoute } from './social-link-required-redirect-fixtures';
+import { authSession, createRedirectFixture, DOCUMENT, stepForRoute } from './required-step-redirect.fixtures';
 
 const navigation = vi.hoisted(() => ({ pathname: '/signup/social', replace: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -125,8 +124,10 @@ async function prepareProfile() {
   fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '카카오러너' } });
   fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
   await screen.findByText('사용 가능한 닉네임이에요.');
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
   fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
-  const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  const submit = await screen.findByRole('button', { name: '확인하고 계속' });
   expect(submit).toBeEnabled();
   return submit;
 }
@@ -168,7 +169,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       }),
       http.post('*/api/v1/auth/social-profile', async ({ request }) => {
         expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
-          birthDate: '19950115', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+          birthDate: '19950115', gender: 'female' });
         profileRequests += 1;
         state.auth = { ...requiredAuth, user: { ...requiredAuth.user, onboardingStatus: 'signup_done' } };
         return success(authSession(state.auth, '/onboarding/sport'));
@@ -295,10 +296,8 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       }),
     );
     await openSignup();
-    const completeButton = await prepareProfile();
-    const deferButton = screen.getByRole('button', { name: '나중에 입력할게요' });
-    const trigger = action === 'defer' ? deferButton : completeButton;
-    const signupForm = screen.getByLabelText(/^닉네임/).closest('form');
+    const trigger = action === 'defer' ? screen.getByRole('button', { name: '나중에 입력할게요' }) : await prepareProfile();
+    const signupForm = document.getElementById('v1-social-signup-form');
     if (!signupForm) throw new Error('실제 가입 폼을 찾지 못했어요.');
 
     try {
@@ -309,12 +308,10 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
         expect(client.getQueryState(v1Keys.authMe())?.fetchStatus).toBe('fetching');
       });
 
-      // Then: mutation의 종료와 별개로 복구 중 표시와 두 가입 액션의 잠금을 유지한다.
+      // Then: mutation 종료와 별개로 현재 화면의 가입 액션을 잠근다.
       expect(trigger).toHaveAttribute('aria-busy', 'true');
-      expect(completeButton).toBeDisabled();
-      expect(deferButton).toBeDisabled();
+      expect(trigger).toBeDisabled();
       fireEvent.click(trigger);
-      fireEvent.click(deferButton);
       fireEvent.submit(signupForm);
 
       releaseAuth();
@@ -325,8 +322,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       } else {
         await screen.findByText('인증 상태를 확인하지 못했어요.');
         expect(authReads).toBe(4);
-        expect(completeButton).toBeEnabled();
-        expect(deferButton).toBeEnabled();
+        expect(trigger).toBeEnabled();
         expect(trigger).not.toHaveAttribute('aria-busy', 'true');
         expect(navigation.pathname).toBe('/signup/social');
       }

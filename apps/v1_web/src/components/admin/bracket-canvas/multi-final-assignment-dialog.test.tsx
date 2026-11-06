@@ -13,7 +13,7 @@ const registrations = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => 
 function savedView(): MultiFinalView {
   return { revision: 1, generated: true, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], registrations,
     groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
-    finals: ['프리미어', '챌린지'].map((name, i) => ({ name, thirdPlace: false, rules: [i * 2 + 1, i * 2 + 2].map(rank => ({ groupId: 'g-1', rank })), registrationIds: null,
+    finals: ['프리미어', '챌린지'].map((name, i) => ({ id: `final-${i}`, colorIndex: i, name, thirdPlace: false, rules: [i * 2 + 1, i * 2 + 2].map(rank => ({ groupId: 'g-1', rank })), registrationIds: null,
       manual: false, suggestedRegistrationIds: [`reg-${i * 2}`, `reg-${i * 2 + 1}`], unresolved: [], crossGroupTopThreeAvailable: false })) };
 }
 function bracketData() {

@@ -1,3 +1,4 @@
+import { normalizeFinalColors, type FinalColorConfig } from './multi-finals/multi-finals-colors';
 import {
   BadRequestException,
   ConflictException,
@@ -1496,9 +1497,12 @@ export class TournamentBracketService {
     const phaseOrder: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
     const orderedGroups = [...groups].sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
     const groupOrder = new Map(orderedGroups.map((group, index) => [group.id, index]));
+    const finalConfig = tournament.multiFinals as unknown as FinalColorConfig | null;
+    const finalColors = new Map((finalConfig?.finals ? normalizeFinalColors(finalConfig).finals : []).map(final => [final.name, final.colorIndex]));
     return {
       groups: orderedGroups.map((g) => ({
         ...this.serializeGroup(g),
+        ...(g.phase !== 'group' && finalColors.has(g.bracketTrack) ? { bracketColorIndex: finalColors.get(g.bracketTrack) } : {}),
         groupTeams: [...g.groupTeams.map((gt) => ({
           ...this.serializeGroupTeam(gt),
           teamName: gt.registration.team.name,

@@ -21,6 +21,24 @@ describe('TournamentSponsorSection', () => {
     );
   });
 
+  it('requests an uploaded logo at twice its 44px frame, not the 176px intrinsic size', () => {
+    const { container } = render(
+      <TournamentSponsorSection sponsors={[sponsor({ logoUrl: '/uploads/2026/08/logo.webp' })]} />,
+    );
+
+    const src = new URL(container.querySelector(`.${styles.logo} img`)?.getAttribute('src') ?? '', 'http://localhost');
+    expect(src.pathname).toBe('/_next/image');
+    expect(src.searchParams.get('w')).toBe('96');
+  });
+
+  it('leaves an external logo URL to the browser instead of the optimizer', () => {
+    const { container } = render(
+      <TournamentSponsorSection sponsors={[sponsor({ logoUrl: 'https://images.example.com/logo.png' })]} />,
+    );
+
+    expect(container.querySelector(`.${styles.logo} img`)).toHaveAttribute('src', 'https://images.example.com/logo.png');
+  });
+
   it('renders initials when a sponsor has no logo', () => {
     const { container } = render(
       <TournamentSponsorSection sponsors={[sponsor({ logoUrl: null })]} />,

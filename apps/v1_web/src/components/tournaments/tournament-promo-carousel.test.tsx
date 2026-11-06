@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentPromoCarousel } from './tournament-promo-carousel';
@@ -137,5 +138,43 @@ describe('TournamentPromoCarousel', () => {
       'href',
       '/tournaments/detail-tournament',
     );
+  });
+});
+
+/**
+ * 슬라이드 배경은 `background: url(…) center/cover` 단축 속성이라 jsdom 이 파싱하지 못하고 버린다.
+ * 서버 렌더 마크업의 `style` 속성에는 컴포넌트가 낸 값이 그대로 남으므로 그쪽에서 읽는다.
+ */
+function slideBackgrounds(items: V1TournamentListItem[]) {
+  const doc = new DOMParser().parseFromString(renderToStaticMarkup(<TournamentPromoCarousel items={items} />), 'text/html');
+  return [...doc.querySelectorAll('.tm-tournament-promo-card')].map((card) => card.getAttribute('style') ?? '');
+}
+
+function imageRequest(background: string) {
+  const quoted = /url\("([^"]+)"\)/.exec(background);
+  if (!quoted) return null;
+  const url = new URL(quoted[1], 'http://localhost');
+  return { pathname: url.pathname, url: url.searchParams.get('url') ?? quoted[1], w: url.searchParams.get('w') };
+}
+
+describe('TournamentPromoCarousel 홍보 이미지', () => {
+  it('업로드한 홍보 이미지는 원본이 아니라 1920 폭 최적화 주소로 받는다', () => {
+    const [background] = slideBackgrounds([{ ...promo('with-photo', 0), promoListImageUrl: '/uploads/2026/11/banner.png' }]);
+
+    expect(background).toContain('center/cover');
+    expect(imageRequest(background)).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/banner.png', w: '1920' });
+  });
+
+  it('최적화 서버가 받아 올 수 없는 외부 주소는 원본 그대로 둔다', () => {
+    const [background] = slideBackgrounds([{ ...promo('external', 0), promoListImageUrl: 'https://cdn.example.com/banner.png' }]);
+
+    expect(imageRequest(background)).toEqual({ pathname: '/banner.png', url: 'https://cdn.example.com/banner.png', w: null });
+  });
+
+  it('이미지가 없으면 브랜드 그라디언트를 쓴다', () => {
+    const [background] = slideBackgrounds([promo('no-photo', 0)]);
+
+    expect(imageRequest(background)).toBeNull();
+    expect(background).toContain('var(--brand-hero-gradient)');
   });
 });

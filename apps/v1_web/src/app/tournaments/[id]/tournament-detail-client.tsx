@@ -842,6 +842,7 @@ export function TournamentDetailView({
           sportCode={tournament.sport?.code ?? ''}
           alt={`${tournament.title} 대표 이미지`}
           className="h-full w-full object-contain"
+          sizes="(min-width: 1024px) 680px, (min-width: 768px) 600px, 100vw"
           eager
         />
       </div>

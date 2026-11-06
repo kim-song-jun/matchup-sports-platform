@@ -918,7 +918,7 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 공개 `/tournaments/:id/bracket`의 순위·대진표는 `league_knockouts`에도 조별리그/결선 보기를 제공한다. 공개 상세의 `groups[].phase`, `standings`, `qualificationByTrack`, `bracketTrack`, `fixtures`를 그대로 사용하며 팀 미정 결선도 표시한다. 예선에 아직 팀·성적이 없으면 조별 영역을 유지하고 순위 행은 지어내지 않는다. 기존 대진 공개 시각·신원 가림 계약은 유지한다.
 
-결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다.
+결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다(다시 생성은 기존 슬롯을 `bracketTrack + phase + position` 으로 짝지어 이름이 달라도 기존 대진·일정을 지우지 않는다).
 
 예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
 
@@ -936,3 +936,12 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 ### 디렉터 관리와 최신 대회 기능 통합 — 2026-11-04
 담당 대회의 활성 디렉터는 다중 결선 조회·설정·선택·미리보기·생성, 결선별 시상 세트, 단계·조·경기 시간 설정과 개별 경기 시간 조회도 사용할 수 있다. 다른 대회·해제 배정은 도메인 읽기/쓰기 전에 403이다. 생성 요청 재시도는 관리자와 디렉터의 감사 이력을 함께 조회하고, 파생 경기 설정 버전의 생성 감사도 실제 디렉터 사용자·배정으로 기록한다. 전역 경기 설정 카탈로그 작성·대회 생성 권한은 확장하지 않는다.
+
+### Stable final destination colors
+- `NamedFinalDto.id` is an optional UUID returned by multi-finals GET/setup/selection. Editors must round-trip it when renaming or reordering. Unknown or duplicate IDs are rejected. New finals omit it. Legacy requests without IDs match by unchanged name; renaming without an ID creates a new destination.
+- Admin final responses include server-owned `colorIndex`; do not submit it. The JSON config persists final identity, colorIndex and monotonic nextColorIndex (no schema migration). Existing configs derive colors from stored order and persist on mutation. Generate/reset/assignment retain identity and color.
+- Public tournament detail `groups[].qualificationByTrack[track].colorIndex` identifies the stable destination color. Null qualification stays null; completion/publication/privacy gates are unchanged. Built-in upper/lower use 0/1. Palette order: blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve. Indices beyond 9 cycle the palette; destination text remains present. Deleted indices are not compacted.
+
+- Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
+
+- Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.

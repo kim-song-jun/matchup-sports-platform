@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { isOptimizableImagePath } from '@/lib/assets';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { sportIllustration } from '@/components/v1-ui/sport-illustration';
+
+// sizes 가 없으면 next/image 가 width(1600)의 1x/2x 인 1920·3840 을 받는다 — 기본값은 콘텐츠 열 전체 폭
+// (프레임 480·600, 데스크톱 스크롤 영역 1072). 열보다 좁게 그리는 호출처는 sizes 를 넘긴다.
+const FULL_COLUMN_SIZES = '(min-width: 1024px) 1072px, (min-width: 768px) 600px, (min-width: 480px) 480px, 100vw';
 
 type TournamentCampaignMediaProps = {
   readonly src?: string | null;
@@ -11,6 +16,8 @@ type TournamentCampaignMediaProps = {
   readonly alt: string;
   readonly className?: string;
   readonly eager?: boolean;
+  /** 이미지가 실제로 그려지는 폭(`<img sizes>`). 기본값은 콘텐츠 열 전체 폭이다. */
+  readonly sizes?: string;
 };
 
 /**
@@ -26,6 +33,7 @@ export function TournamentCampaignMedia({
   alt,
   className,
   eager = false,
+  sizes = FULL_COLUMN_SIZES,
 }: TournamentCampaignMediaProps) {
   const requestedSrc = src?.trim() || null;
   const [currentSrc, setCurrentSrc] = useState(requestedSrc);
@@ -50,6 +58,7 @@ export function TournamentCampaignMedia({
           alt=""
           width={640}
           height={640}
+          sizes="160px"
         />
       </div>
     );
@@ -61,6 +70,8 @@ export function TournamentCampaignMedia({
       alt={alt}
       width={1600}
       height={900}
+      sizes={sizes}
+      unoptimized={!isOptimizableImagePath(currentSrc)}
       className={className}
       priority={eager}
       onError={() => setErrored(true)}

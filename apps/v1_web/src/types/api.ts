@@ -4083,6 +4083,8 @@ export type V1TournamentStanding = {
 
 /** 조별리그가 끝난 조의 결선 진출 팀. 동률로 자리가 안 정해졌으면 `undecided`. */
 export type V1TournamentGroupQualification = {
+  /** Stable destination palette index, supplied by the server. */
+  colorIndex?: number;
   advancingRegistrationIds: string[];
   undecided: boolean;
 };
@@ -4100,6 +4102,8 @@ export type V1TournamentGroup = {
   qualification: V1TournamentGroupQualification | null;
   /** Older serialized groups may omit this; omission has the same meaning as overall. */
   bracketTrack?: V1TournamentBracketTrack;
+  /** Stable color available even before preliminary qualification is resolved. */
+  bracketColorIndex?: number;
   qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 
@@ -4593,6 +4597,7 @@ export type V1AdminBracketGroup = {
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
   bracketTrack?: V1TournamentBracketTrack;
+  bracketColorIndex?: number;
 };
 
 export type V1AdminBracketGroupTeam = {

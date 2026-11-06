@@ -1207,3 +1207,66 @@ Status: In Progress
 - Remaining: focused real-DB/unit/type/surface validation, exact-path commit/PR2169 update, latest Copilot clean and CI, dev merge/FF sync, Alpha SHA/health and headed after QA. Default UI runtimes failed initialization; own headed Chrome PID22720/controller16392 is open for administrator login (no credentials persisted).
 
 - Repair validation PASS: full230-migration LF replay on fresh isolated PostgreSQL; both formerly failing integration suites17/17, related unit suites56/56, API typecheck0/surface761 PASS, diff-check/debt grep clean. Owned PostgreSQL PID2444 stopped and absence verified. Latest PR-head CI and review still pending; Alpha after QA remains unverified.
+
+
+## 2026-11-06 follow-up: stable public qualification colors
+Status: In progress
+### Context / Goal
+User approved the local 10-color badge preview without T numbering. Use blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve in setup order; retain existing colors across changes.
+### Original Conditions
+All qualification badges and promoted rows used blue. Named finals used mutable names as their only identity.
+### User Scenarios / Acceptance Criteria
+- [ ] Two/three/ten finals use the first two/three/ten palette colors.
+- [ ] Rename/reorder/delete/add preserves surviving destination colors across reload and generate/reset/assignment.
+- [ ] Actual confirmed qualification gates remain unchanged; names remain visible; no T prefix.
+- [ ] Desktop/tablet/mobile and dark mode remain legible.
+### Parallel Work Breakdown / Owned Scope
+Single agent. Multi-finals identity/color helper, DTO/service, admin wizard identity round-trip, public detail presenter/type, public standings badge styles/tests, API docs and changeset. No other session resources or main changes.
+### Test Scenarios
+Lifecycle JSON round-trip, duplicate/stale identity rejection, 2/3/10 colors, public route qualification mapping, admin rename identity round-trip, API/web type checks, CI/review, Alpha browser screenshots.
+### Tech Debt Resolved
+Remove dependence on mutable names or rendered row order for color identity.
+### Security Notes
+No new auth path; color is server-owned; existing publication/qualification/privacy gates unchanged. No schema migration.
+### Risks & Dependencies
+Existing configs derive initial color from stored order. Old clients renaming without returned ID create a new destination. More than ten lifetime color positions cycle the palette; names remain the discriminator. Copilot clean and Alpha checks pending.
+### Ambiguity Log
+Approved badge-only local sample, no T prefixes. Main/prod out of scope.
+### Progress Snapshot
+Implementation in isolated feat/final-colors-20261106 from origin/dev ec705f79d.
+
+### Validation snapshot
+- API unit: final colors/assignment/presenter focused rerun 74/74. Existing preview/reset suites passed. Web three suites 82/82; updated API-to-badge route assertions additionally 2/2.
+- API lint/tsc + surface check and web lint/tsc + v1 pattern check passed. Light/dark 20 text/background contrast pairs minimum 4.79:1.
+- Real DB integration assertions added for persisted identity/color across generate and rename (CI execution pending).
+- Alpha baseline captured at 390/768/1440. Existing baseline image optimizer 400 and a transient health 503 observed; subsequent health HTTP 200 with DB true. Do not classify these pre-existing responses as a clean session.
+- UI gallery will be posted after dev merge and exact Alpha deployment, per repository workflow. New PR review waiver has not been requested; previous #2169 exception is not assumed for this change.
+
+### Resume cursor (2026-11-06 13:38 KST)
+- PR #2173, head 6dfa13fa125c97c06d11cfdc6087090bcc19f33a. PR CI 42162182740 all SUCCESS (Gates 5m47s / API 9m47s / Web 12m55s); API migration replay step includes real DB integration suite and passed. PR base dev, MERGEABLE/CLEAN.
+- Copilot requested via gh and official REST; zero reviews returned. Requested user exception through async question; no reply received yet. DO NOT merge before clean review or explicit exception for this PR. #2169 exception is not inherited.
+- Owned Alpha QA tournament: 5dab06e4-0379-46b9-affc-ccdb8981e8a0, `(목업) 1106-0424 정규리그+N개 토너먼트 20팀 진행중`. Created via actual admin UI with results (48 games / 80 lineups), then own fixture preconditions via admin API: 5 groups x4 teams, ten named finals of two teams each, selected+generated, revision 6. Before deployment it has no IDs/colors stored; new server must hydrate colors 0..9 by config order (public track key order is NOT configuration order).
+- QA fixture visibility PATCH false returned 200 at 04:38 UTC; do not cancel until QA finishes. To inspect through ordinary user UI, temporarily publish only this own QA fixture, then hide/cancel at completion. Existing f67894a6-1c89-456b-8c00-e8f87f4d3520 tournament is READ ONLY baseline.
+- Headed Chrome PID51568 / parent66416, exec session10355 closed normally with contexts. Temp Playwright prefix: Windows TEMP/teameet-final-colors-browser; PR/review request files use same task prefix. WSL own install log /tmp/teameet-final-colors-install.log. No owned local DB.
+- Own worktree `_worktrees/final-colors-20261106`, branch feat/final-colors-20261106; do not remove while unmerged. Local task note and ten-before-{390,768,1440}.png remain outside the source PR head. Source head has tsc/lint success, public baseline PNGs and headed QA helper scripts/qa/final-colors-browser.cjs. Preserve root's unrelated preview/ads task and other sessions' worktrees.
+- After approval/review: check exact head/base+CI, merge dev, synchronize root+dedicated local dev by safe FF, monitor exact dev CI/Alpha run, verify commit headers+DB health, inspect public user table at 390/768/1440/light/dark and ten destinations. Verify id/color persistence after rename/reorder via own QA fixture only. Commit after-evidence on separate evidence branch, post raw-SHA 3-column gallery on #2173, hide/cancel own QA fixture, clean owned browser/process/temp/worktree resources. Main/prod out of scope.
+
+
+### Scope extension: league + N finals usability (user approved)
+User requested adding filters to the same PR #2173 and retitling it. Add named-final selection then canonical round selection, union rounds for all, preserve common round on track switch and reset unavailable round. Single-final hides name row; preserve legacy upper/lower/league semantics. Group/name/round rows scroll horizontally without wrapping, independently reveal selected chip, retain full names and stable color dots even before qualification resolves. Add route regressions for differing rounds, one/ten finals, existing single/split/league suites. Source changed after original CI, new exact-head CI/review required. No review exception has been approved for #2173.
+
+### Filter extension validation / next cursor
+- Public bracket route 60/60, independent horizontal reveal 1/1, public presenter 53/53 passed. API tsc/surface and web tsc/pattern checks passed. Initial web tsc caught two missing fixture status fields in newly added tests; corrected and rerun passed.
+- Current Alpha a6f8bdcd4be6a4a01a5539ed8b234291b23dd95d filter baseline captured at 1440/768/390; existing image optimizer 400 observed on first capture, no page errors. Owned headed Chrome3316/controller70848 closed normally.
+- Source PR title updated to `feat: 리그 + N개 토너먼트 사용성 개선`. Same feature branch, dev base. Latest scope includes independent group/name/round scroll rows, native horizontal round-jump navigation, selected-row-only reveal, real round union/filter/reset, and public bracketColorIndex for pre-qualification color dots.
+- Push this extension and validate its NEW exact-head CI/review. Original 6dfa13fa1 CI success does not validate the added filters. #2173 is still unmerged and undeployed; no review waiver received. Owned 10-final QA fixture remains private and reserved for post-merge Alpha checks. Preserve this unmerged worktree. No main/prod action.
+
+
+### Admin diagram extension (user approved, same PR2173)
+Separate preliminary and named-final diagrams vertically; preserve horizontal round flow inside each diagram, independent geometry and no inter-final lines. Add same stored color, native accessible collapsible sections and jump navigation. Preserve fixture selection/slot assignment callbacks and full group context for preliminary rank slot labels. Legacy single/upper-lower/six-team diagrams retain their existing layout. Validate 2/10 sections, geometry separation, labels and actual node action callbacks. Previous filter head 113419e58 CI is not the validation for this extension.
+
+### Admin diagram extension validation / resume
+- Admin bracket service unit 232/232 PASS; API tsc/surface PASS. Canvas full rerun21/21 PASS after correcting an invalid test expectation: GROUP_RANK final slots remain managed/read-only, while preliminary ENTRY assignment still works. Final named-section focus rerun3/3 PASS; existing layout62/62 and assignment hook16/16 passed. Final web tsc/pattern PASS.
+- Rendering now separates preliminary/other fixtures and every named final into vertically stacked native details, with independent canvas/SVG/scroll geometry, complete source-label/shared-slot lock context, jump navigation that opens and focuses the destination, server-owned color dot and match count. Repeated track title prefixes removed. Existing single/upper-lower/six-team layouts stay on the existing single renderer.
+- Actual Alpha admin baseline at 1440/768/390 captured from owned private20-team QA tournament; no page/network errors observed. Chrome41968/controller55576 exited normally. QA tournament stays private, unchanged by this task.
+- Filter head113419e58 CI42168900113 all SUCCESS. This admin extension requires NEW exact-head CI/review after push. No merge or Alpha deployment yet and no #2173 review waiver received. Keep this unmerged worktree; main/prod remain out of scope.

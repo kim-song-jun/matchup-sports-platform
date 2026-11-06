@@ -24,6 +24,7 @@ import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
 import { displayInitials } from '@/lib/display-initials';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
+import { optimizedImageSrc } from '@/lib/assets';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -60,9 +61,9 @@ function TournamentEmblem({
 }) {
   if (coverImageUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- 대회 커버는 외부 업로드 URL, next/image 도메인 화이트리스트 밖일 수 있어 원본 태그를 유지한다.
+      // eslint-disable-next-line @next/next/no-img-element -- 커버는 외부 URL 일 수 있어 <img> 를 유지하고, 업로드만 optimizedImageSrc 로 줄여 받는다.
       <img
-        src={coverImageUrl}
+        src={optimizedImageSrc(coverImageUrl, size)}
         alt=""
         aria-hidden="true"
         width={size}

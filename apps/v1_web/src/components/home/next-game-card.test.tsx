@@ -76,6 +76,46 @@ describe('NextGameCard', () => {
     expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
   });
 
+  describe('시각 미정 대회 경기', () => {
+    const untimed = (overrides: Partial<V1HomeNextGame> = {}) =>
+      leagueGame({
+        competitionKind: 'TOURNAMENT',
+        competitionId: 't-1',
+        title: '퀸즈컵 · 상위 토너먼트 · 12강',
+        scheduledAt: null,
+        placeName: null,
+        ...overrides,
+      });
+
+    it('시간 자리에 "일정 미정"과 대회·라운드 이름을 보여 주고, 카운트다운·진행 중 칩은 없다', () => {
+      // 어떤 현재 시각이어도 시작됐다고 읽히지 않아야 한다 — 먼 미래·먼 과거 둘 다.
+      for (const now of [NOW, new Date('2099-01-01T00:00:00.000Z')]) {
+        const { unmount } = render(<NextGameCard game={untimed()} now={now} />);
+
+        expect(screen.getByText('일정 미정')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'vs 합정 유나이티드' })).toBeInTheDocument();
+        expect(screen.getByText('퀸즈컵 · 상위 토너먼트 · 12강')).toBeInTheDocument();
+        expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
+        expect(screen.queryByText(/뒤$/)).not.toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('팀원은 경기 상세로 간다', () => {
+      render(<NextGameCard game={untimed({ participantCount: null, viewerParticipating: false })} now={NOW} />);
+
+      expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['경기 상세']);
+      expect(hrefOf('경기 상세')).toBe('/tournaments/t-1/matches/tm-1?from=%2Fhome');
+    });
+
+    it('팀장은 주 버튼이 출전 관리가 되고, 시작 전이라 명단을 바꿀 수 있다는 안내가 남는다', () => {
+      render(<NextGameCard game={untimed({ viewerCanManage: true })} now={NOW} />);
+
+      expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['이번 경기 출전 관리', '경기 상세']);
+      expect(screen.getByText('마포 FC · 10명 출전 · 경기 시작 전까지 바꿀 수 있어요')).toBeInTheDocument();
+    });
+  });
+
   it('친선: 팀원에게는 팀장 전용인 참석명단 링크를 내지 않고 경기 상세만 준다', () => {
     const friendly = leagueGame({
       competitionKind: 'FRIENDLY',

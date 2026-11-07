@@ -2768,7 +2768,10 @@ export type V1HomeShortcut = {
   disabledReason: string | null;
 };
 
-/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다. */
+/**
+ * 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다.
+ * 시각 있는 경기가 하나도 없을 때만 시각이 아직 정해지지 않은 대회 경기(`scheduledAt` null)가 온다.
+ */
 export type V1HomeNextGame = {
   gameId: string;
   teamMatchId: string | null;
@@ -2777,7 +2780,8 @@ export type V1HomeNextGame = {
   competitionId: string | null;
   title: string;
   opponentName: string | null;
-  scheduledAt: string;
+  /** 킥오프 시각. 대회 경기의 시각이 아직 정해지지 않았으면 null. */
+  scheduledAt: string | null;
   placeName: string | null;
   teamId: string;
   teamName: string;

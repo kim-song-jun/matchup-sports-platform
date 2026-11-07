@@ -6,6 +6,7 @@ import { Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { useV1TeamUpcomingGames, type V1GameRosterSummary, type V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { teamGameDetailHref, teamGameRosterHref } from '@/lib/team-game-links';
+import { UPCOMING_GAME_TIME_TBD } from '@/lib/upcoming-game-time';
 import { MyParticipationChip } from './my-participation-chip';
 import { TeamGameKindBadge } from './team-game-kind-badge';
 
@@ -15,7 +16,8 @@ import { TeamGameKindBadge } from './team-game-kind-badge';
  * 팀원도 경기 상세와 대회·리그 명단을 보기 전용으로 연다. 출전하는 경기에만 "내 출전" 칩(서버 판정).
  *
  * 이 목록이 따로 있는 이유: `팀 일정`(V1TeamSchedule)은 팀이 직접 만드는 캘린더라 대회
- * 경기가 들어오지 않는다. 알려진 한계: 서버가 **앞으로의 경기만** 모은다.
+ * 경기가 들어오지 않는다. 알려진 한계: 서버가 **앞으로의 경기만** 모은다. 시각이 아직 정해지지 않은
+ * 대회 경기는 시각 있는 경기 뒤에 "일정 미정"으로 붙는다.
  */
 /** 팀 상세의 다가오는 경기 섹션 앵커. */
 export const TEAM_UPCOMING_GAMES_ANCHOR = 'team-upcoming-games';
@@ -76,7 +78,7 @@ function UpcomingGameRow({
         <TeamGameKindBadge kind={game.competitionKind} />
       </div>
       <span className="tm-text-caption">
-        {formatTournamentDateTimeShort(game.scheduledAt) ?? '시간 미정'}
+        {formatTournamentDateTimeShort(game.scheduledAt) ?? UPCOMING_GAME_TIME_TBD}
         {game.opponentName !== null ? ` · ${game.title}` : ''}
       </span>
       <div style={{ ...rowLineStyle, flexWrap: 'wrap' }}>

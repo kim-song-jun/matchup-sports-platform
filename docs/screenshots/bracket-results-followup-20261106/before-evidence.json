@@ -1,0 +1,71 @@
+{
+  "state": "before; code not deployed",
+  "persona": "public anonymous",
+  "viewports": [
+    {
+      "route": "results",
+      "width": 390,
+      "url": "https://alpha.teameet.co.kr/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/results",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    },
+    {
+      "route": "bracket",
+      "width": 390,
+      "url": "https://alpha.teameet.co.kr/tournaments/f67894a6-1c89-456b-8c00-e8f87f4d3520/bracket?schedulePhase=knockout",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    },
+    {
+      "route": "results",
+      "width": 768,
+      "url": "https://alpha.teameet.co.kr/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/results",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    },
+    {
+      "route": "bracket",
+      "width": 768,
+      "url": "https://alpha.teameet.co.kr/tournaments/f67894a6-1c89-456b-8c00-e8f87f4d3520/bracket?schedulePhase=knockout",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    },
+    {
+      "route": "results",
+      "width": 1440,
+      "url": "https://alpha.teameet.co.kr/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/results",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    },
+    {
+      "route": "bracket",
+      "width": 1440,
+      "url": "https://alpha.teameet.co.kr/tournaments/f67894a6-1c89-456b-8c00-e8f87f4d3520/bracket?schedulePhase=knockout",
+      "status": 200,
+      "commit": "53e2bb31714566d6017e8c021bba5a4f45eca107",
+      "errors": [],
+      "responses": [],
+      "overflow": false
+    }
+  ],
+  "cleanup": true,
+  "process": {
+    "browserPid": 5242,
+    "parentPid": 5224
+  }
+}

@@ -16,7 +16,7 @@ function setup(sizes = [4, 4, 3, 3]) {
     const ids = Array.from({ length: sizes[i] }, (_, j) => `${group.id}-r${j}`);
     const fixtures = ids.flatMap((home, j) => ids.slice(j + 1).map((away) => ({ homeRegistrationId: home, awayRegistrationId: away, official: { homeScore: 1, awayScore: 0 }, officialAt: null })));
     return [group.id, { registrationIds: ids, teamNameById: new Map(ids.map((id) => [id, id])), fixtures,
-      standings: ids.map((id, j) => ({ registrationId: id, position: j + 1, wins: sizes[i] - j - 1, draws: 0, losses: j, recalculatedAt: null })) }];
+      standings: ids.map((id, j) => ({ registrationId: id, position: j + 1, wins: sizes[i] - j - 1, draws: 0, losses: j, fairPlayPoints: 0, recalculatedAt: null })) }];
   }));
   const standings = groups.flatMap((group) => sources.get(group.id)!.standings.map((row) => ({ ...row, groupId: group.id, points: row.wins * 3, goalsFor: row.wins, goalsAgainst: row.losses })));
   const game = () => ({ state: 'SCHEDULED', currentOfficialRevisionId: null, _count: { events: 0 }, resultRevisions: [] as { state: string }[] });

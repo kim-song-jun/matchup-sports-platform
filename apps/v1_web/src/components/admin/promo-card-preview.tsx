@@ -3,7 +3,10 @@
 import { Trophy } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
+
+// 폼이 놓이는 가장 넓은 자리(새 대회 위저드 max-w-4xl = 896px)에서 카드 폭만큼 그려진다.
+const PREVIEW_MAX_WIDTH = 896;
 
 /**
  * 대회 홍보 카드(홈 오늘의 추천 / 대회 목록 상단) 어드민 폼 라이브 미리보기.
@@ -57,7 +60,7 @@ export function PromoHomePreview({ fields, fallback }: { fields: PromoPreviewFie
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
-        style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'var(--brand-hero-gradient)' }}
+        style={{ background: imageUrl ? `${optimizedCssUrl(imageUrl, PREVIEW_MAX_WIDTH)} center/cover` : 'var(--brand-hero-gradient)' }}
       >
         {!imageUrl ? (
           <div
@@ -120,7 +123,7 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
         flexDirection: 'column',
         padding: '20px 20px',
         borderRadius: 'var(--radius-container)',
-        background: imageUrl ? `${cssUrl(imageUrl)} center 62%/cover` : 'var(--brand-hero-gradient)',
+        background: imageUrl ? `${optimizedCssUrl(imageUrl, PREVIEW_MAX_WIDTH)} center 62%/cover` : 'var(--brand-hero-gradient)',
         color: 'var(--static-white)',
         position: 'relative',
         overflow: 'hidden',

@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc, resolveNextImageSrc } from '@/test/next-image';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { backgroundRequests } from './team-match-images.test-fixture';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
@@ -74,12 +75,15 @@ describe('team match images', () => {
     const list = getTeamMatchListViewModel();
     list.matches = [{ ...list.matches[0], ...images }];
     const first = renderPage(<TeamMatchListPageView model={list} />);
-    expect(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')?.style.backgroundImage).toContain(images.listImageUrl);
+    // 96px 썸네일은 256, 600px 히어로는 1200 폭의 최적화 주소로 받는다(원본을 직접 넣으면 pathname 이 /uploads/… 가 된다).
+    expect(backgroundRequests(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')!.style.backgroundImage)[0])
+      .toEqual({ pathname: '/_next/image', url: images.listImageUrl, w: '256' });
     first.unmount();
     const detail = getTeamMatchDetailViewModel();
     detail.match = { ...detail.match, ...images };
     const second = renderPage(<TeamMatchDetailPageView model={detail} />);
-    expect(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')?.style.backgroundImage).toContain(images.imageUrl);
+    expect(backgroundRequests(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')!.style.backgroundImage)[0])
+      .toEqual({ pathname: '/_next/image', url: images.imageUrl, w: '1200' });
   });
 
   it('renders the authorized rule preview as a direct detail action', () => {
@@ -115,8 +119,11 @@ describe('team match images', () => {
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
     const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
-    expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
-    expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    // 외부 주소는 최적화 서버가 받아 올 수 없어 그대로 두고, 그 뒤 로컬 종목 이미지 층만 최적화 주소다.
+    expect(backgroundRequests(media!.style.backgroundImage)).toEqual([
+      { pathname: '/team-match.webp', url: 'https://cdn.example.com/team-match.webp', w: null },
+      { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '256' },
+    ]);
     expect(media?.style.backgroundImage).not.toContain('linear-gradient');
     expect(media?.textContent).toBe('');
     expect(screen.getByText(model.matches[0].title).closest('a')?.getAttribute('href')).toContain(`/team-matches/${model.matches[0].id}`);
@@ -130,8 +137,10 @@ describe('team match images', () => {
       const { container } = renderPage(<TeamMatchListPageView model={model} />);
       const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
-      expect(media?.style.backgroundImage).toContain(imageUrl);
-      expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+      expect(backgroundRequests(media!.style.backgroundImage)).toEqual([
+        { pathname: '/_next/image', url: imageUrl, w: '256' },
+        { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '256' },
+      ]);
       expect(media?.style.backgroundImage).not.toContain('linear-gradient');
       expect(media?.closest('a')).toHaveClass('tm-card-closed');
       expect(media?.textContent).toBe('');
@@ -158,8 +167,10 @@ describe('team match images', () => {
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
     const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero');
 
-    expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
-    expect(hero?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    expect(backgroundRequests(hero!.style.backgroundImage)).toEqual([
+      { pathname: '/_next/image', url: '/uploads/team-match-cover.webp', w: '1200' },
+      { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '1200' },
+    ]);
     expect(hero?.style.backgroundImage).not.toContain('linear-gradient');
     expect(hero).toHaveClass('tm-team-vs-hero-photo');
     expect(hero?.querySelector('.tm-team-vs-summary')).not.toBeNull();
@@ -1960,6 +1971,72 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     expect(screen.getByRole('region', { name: '아직 신청한 팀이 없어요' })).toBeInTheDocument();
     expect(within(container.querySelector<HTMLElement>('.tm-team-vs-row')!).getByText('신청 후 승인')).toBeInTheDocument();
     expect(screen.queryByText('신청 목록을 불러오지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('마감된 매치 — 호스트 히어로 상대팀 칸이 "모집 중"이 아니라 "모집 마감"이고, 대기 신청은 그대로 센다', () => {
+    const model = hostModel([applicant('합정')]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(hero.getByText('신청 1팀 대기')).toBeInTheDocument();
+  });
+
+  it('마감된 매치에 대기 신청이 없으면 히어로가 "신청 후 승인"을 약속하지 않는다', () => {
+    const model = hostModel([applicant('합정', { applicationStatus: 'rejected', status: '거절', onApprove: undefined, onReject: undefined })]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('신청 후 승인')).not.toBeInTheDocument();
+  });
+
+  it('마감된 매치에서 승인된 신청 팀 시점 히어로도 "모집 중"·"신청 후 승인"을 말하지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [];
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(hero.queryByText('신청 후 승인')).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 모집 중인 매치에서 승인된 신청 팀 시점 히어로는 상대 모집을 안내한다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [];
+    model.match.closed = false;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 중')).toBeInTheDocument();
+    expect(hero.getByText('신청 후 승인')).toBeInTheDocument();
+  });
+
+  it('마감된 매치의 거절 확인 창은 다시 신청할 수 있다고 말하지 않는다', async () => {
+    const model = hostModel([applicant('합정'), applicant('성수')]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '성수 신청 거절' }));
+    const dialog = await screen.findByRole('dialog', { name: '성수 신청을 거절할까요?' });
+    expect(dialog).toHaveTextContent('모집이 마감돼서 다시 신청할 수 없어요.');
+    expect(dialog).not.toHaveTextContent('모집이 계속되는 동안');
+  });
+
+  it('대조군 — 모집 중인 매치의 거절 확인 창은 다시 신청할 수 있다고 안내한다', async () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정')])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '합정 신청 거절' }));
+    const dialog = await screen.findByRole('dialog', { name: '합정 신청을 거절할까요?' });
+    expect(dialog).toHaveTextContent('모집이 계속되는 동안에는 다시 신청할 수 있어요.');
   });
 
   it('신청이 3팀 이상이면 2팀만 펼치고 나머지는 더 보기로 연다', () => {

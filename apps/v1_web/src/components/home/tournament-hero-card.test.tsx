@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
@@ -87,6 +88,21 @@ describe('TournamentHeroCard', () => {
     );
 
     expect(placeholderWatermark(container)).toBeNull();
+  });
+
+  it('히어로 배경 사진은 원본이 아니라 카드 폭(최대 560px)에 맞춘 1200 폭 주소로 받는다', () => {
+    // jsdom 은 `background: url(...) center/cover` 단축 속성을 버려서 서버 렌더 문자열로 읽는다.
+    const host = document.createElement('div');
+    host.innerHTML = renderToStaticMarkup(
+      <TournamentHeroCard items={[{ ...promo('cover-url', 0), promoHomeImageUrl: '/uploads/2026/11/promo.png' }]} />,
+    );
+
+    const style = host.querySelector('.tm-featured-media')?.getAttribute('style') ?? '';
+    const quoted = /url\("([^"]+)"\) center\/cover/.exec(style);
+    expect(quoted, style).not.toBeNull();
+    const url = new URL(quoted![1], 'http://localhost');
+    expect({ pathname: url.pathname, url: url.searchParams.get('url'), w: url.searchParams.get('w') })
+      .toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/promo.png', w: '1200' });
   });
 
   it('커버도 홍보 이미지도 없으면 자리채움 워터마크를 그대로 보여준다', () => {

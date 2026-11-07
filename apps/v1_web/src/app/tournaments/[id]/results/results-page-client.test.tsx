@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { namedFinalGroups } from '@/test/named-final-groups';
 import { ResultsPageContent } from './results-page-client';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -195,6 +196,15 @@ it('분리 결선이 끝나면 상위·하위 결승 우승자를 각각 공개�
 
   expect(screen.getByRole('region', { name: '상위 결선 결과' })).toHaveTextContent('상위 우승팀');
   expect(screen.getByRole('region', { name: '하위 결선 결과' })).toHaveTextContent('하위 우승팀');
+  const upper = within(screen.getByRole('region', { name: '상위 결선 결과' }));
+  expect(upper.getAllByText('득실차')).toHaveLength(2);
+  const upperRanking = within(screen.getByRole('region', { name: '상위 결선 순위' }));
+  expect(upperRanking.getByText('상위 준우승팀')).toBeInTheDocument();
+  expect(upperRanking.queryByText('하위 우승팀')).not.toBeInTheDocument();
+  expect(upperRanking.getByText('GF')).toBeInTheDocument();
+  const lowerMatches = within(screen.getByRole('region', { name: '하위 결선 경기' }));
+  expect(lowerMatches.getByRole('link')).toHaveAttribute('href', expect.stringContaining('/matches/lower-final-fixture'));
+  expect(lowerMatches.queryByText('상위 우승팀')).not.toBeInTheDocument();
 });
 
 /**
@@ -500,8 +510,30 @@ describe('ResultsPageContent — 16강 결선 결과', () => {
     expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toBeInTheDocument();
     expect(screen.getAllByText('16강').length).toBeGreaterThan(0);
   });
+
+  // 2026-11-06: N개 토너먼트의 12팀 첫 라운드는 단계 코드가 round16 이어도 경기 이름(12강)을 그대로 보인다.
+  it('phase=round16 조의 경기라도 라운드 이름이 12강이면 12강으로 보인다', () => {
+    const tournament = baseTournament({
+      format: 'league_knockouts',
+      groups: [{ ...leagueGroup({ id: 'g-r12', name: '프리미어 · 12강', standings: [] }), phase: 'round16', bracketTrack: '프리미어' }],
+      fixtures: [{ ...leagueFixtureWithVideo(), id: 'fx-r12', groupId: 'g-r12', round: '12강', videos: [] }],
+    });
+    render(<ResultsPageContent tournament={tournament} />);
+    expect(screen.getAllByText('12강').length).toBeGreaterThan(0);
+    expect(screen.queryByText('16강')).not.toBeInTheDocument();
+  });
 });
 
+
+it('토너먼트별 경기 카드에 수정한 단계 이름을 중복 접두어 없이 표시한다', () => {
+  const group = { ...leagueGroup({ id: 'edited-stage', name: '프리미어 · 준결승 특별전', standings: [] }), phase: 'semi', bracketTrack: '프리미어' } as V1TournamentGroup;
+  const fixture = { ...leagueFixtureWithVideo(), id: 'edited-match', groupId: group.id, round: 'semi', videos: [] };
+  render(<ResultsPageContent tournament={baseTournament({ format: 'league_knockouts', groups: [group], fixtures: [fixture] })} />);
+  const matches = within(screen.getByRole('region', { name: '프리미어 경기' }));
+  expect(matches.getByText('준결승 특별전')).toBeInTheDocument();
+  expect(matches.queryByText('프리미어 · 준결승 특별전')).not.toBeInTheDocument();
+  expect(matches.getByRole('link')).toHaveAttribute('href', expect.stringContaining('/matches/edited-match'));
+});
 
 it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승패를 %s 최종 순위에 반영한다', track => {
   const groups = ['final', 'third_place'].map((phase, i) => ({
@@ -514,6 +546,22 @@ it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승
   }));
   render(<ResultsPageContent tournament={baseTournament({ format: track === 'upper' ? 'group_knockout' : 'league_knockouts', groups, fixtures })} />);
   const ranking = within(screen.getByRole('region', { name: `${track === 'upper' ? '상위 결선' : track} 순위` }));
-  expect(ranking.getByText('3위 · 3위팀')).toBeInTheDocument();
-  expect(ranking.getByText('4위 · 4위팀')).toBeInTheDocument();
+  expect(ranking.getByText('3위팀')).toBeInTheDocument();
+  expect(ranking.getByText('3위')).toBeInTheDocument();
+  expect(ranking.getByText('4위팀')).toBeInTheDocument();
+  expect(ranking.getByText('4위')).toBeInTheDocument();
+});
+
+it('N개 토너먼트의 결과·순위·경기 구역이 팀 수와 무관하게 만든 순서(프리미어 → 챌린지)로 나온다', () => {
+  // 프리미어 8팀을 먼저, 챌린지 12팀을 나중에 만들었다. 서버 응답은 12팀의 첫 단계가 맨 앞이다.
+  const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);
+  const fixtures = groups.filter(group => group.phase === 'final').map((group, i) => ({
+    ...leagueFixtureWithVideo(), id: `final-${i}`, groupId: group.id, round: 'final', videos: [],
+  }));
+  render(<ResultsPageContent tournament={baseTournament({ status: 'completed', format: 'league_knockouts', groups, fixtures })} />);
+
+  for (const suffix of ['결과', '순위', '경기']) {
+    const labels = screen.getAllByRole('region').map(region => region.getAttribute('aria-label')).filter(label => label?.endsWith(` ${suffix}`));
+    expect(labels).toEqual([`프리미어 ${suffix}`, `챌린지 ${suffix}`]);
+  }
 });

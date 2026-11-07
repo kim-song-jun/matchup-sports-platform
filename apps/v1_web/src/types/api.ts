@@ -4083,6 +4083,8 @@ export type V1TournamentStanding = {
 
 /** 조별리그가 끝난 조의 결선 진출 팀. 동률로 자리가 안 정해졌으면 `undecided`. */
 export type V1TournamentGroupQualification = {
+  /** Stable destination palette index, supplied by the server. */
+  colorIndex?: number;
   advancingRegistrationIds: string[];
   undecided: boolean;
 };
@@ -4100,6 +4102,8 @@ export type V1TournamentGroup = {
   qualification: V1TournamentGroupQualification | null;
   /** Older serialized groups may omit this; omission has the same meaning as overall. */
   bracketTrack?: V1TournamentBracketTrack;
+  /** Stable color available even before preliminary qualification is resolved. */
+  bracketColorIndex?: number;
   qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 
@@ -4250,7 +4254,7 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
-  /** 정규 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 공개된 리그만). 대회·옛 응답은 없음. */
+  /** 이어진 이전 시즌(독립 리그의 지난 시즌, 전환한 체계 첫 시즌 티어는 원본 리그 — 공개된 리그만). 대회·옛 응답은 없음. */
   previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;
   sixTeamBracket?: V1SixTeamBracket | null;
@@ -4593,6 +4597,7 @@ export type V1AdminBracketGroup = {
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
   bracketTrack?: V1TournamentBracketTrack;
+  bracketColorIndex?: number;
 };
 
 export type V1AdminBracketGroupTeam = {
@@ -5073,7 +5078,7 @@ export type V1CancelRegistrationRequestPayload = {
 };
 
 export type V1AddPlayerPayload = {
-  /** 골레이 여부. 생략 시 false. */
+  /** 골키퍼 여부. 생략 시 false. */
   goalkeeper?: boolean;
   userId: string;
   realName: string;

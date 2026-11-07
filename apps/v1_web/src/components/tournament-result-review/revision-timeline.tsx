@@ -4,6 +4,7 @@ import type { GameResultRevision } from '@/hooks/use-tournament-result-review';
 import { REVISION_STATE_BADGE_TONE, REVISION_STATE_LABELS } from './result-review-copy';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { displayRevisionReason } from '@/lib/revision-reason';
 
 // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가
 // `undefined:undefined` 로 나온다 — 알파 실측 사고("처리 이력"에 실제로 이렇게 떴다).
@@ -49,6 +50,7 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
         const previous = revision.supersedesId ? byId.get(revision.supersedesId) : undefined;
         const scoreChanged = previous && scoreText(previous.score) !== scoreText(revision.score);
         const tone = REVISION_STATE_BADGE_TONE[revision.state];
+        const reason = displayRevisionReason(revision.reason);
         return (
           <li key={revision.id} className="tm-card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -77,9 +79,9 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
                 득점자 정보가 없는 골이 있어요
               </p>
             ) : null}
-            {revision.reason ? (
+            {reason ? (
               <p className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
-                사유: {revision.reason}
+                사유: {reason}
               </p>
             ) : null}
             {/* [알파 감사 C] "담당자 처리 · 리비전 #N" — 알파 실측 지적 항목. 11px → 12px. */}

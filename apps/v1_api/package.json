@@ -1,6 +1,6 @@
 {
   "name": "v1_api",
-  "version": "1.13.0",
+  "version": "1.13.5",
   "private": true,
   "type": "commonjs",
   "engines": {
@@ -10,7 +10,7 @@
     "dev": "pnpm exec node -r ts-node/register/transpile-only src/main.ts",
     "build": "nest build",
     "start": "node dist/main",
-    "lint": "tsc --noEmit && node scripts/v1-surface-check.mjs",
+    "lint": "tsc --noEmit -p tsconfig.spec.json && node scripts/v1-surface-check.mjs",
     "lint:surface": "node scripts/v1-surface-check.mjs",
     "clean": "rm -rf dist",
     "db:push": "prisma db push",

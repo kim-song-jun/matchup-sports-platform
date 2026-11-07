@@ -1,0 +1,49 @@
+{
+  "browserPid": 19644,
+  "parentPid": 19626,
+  "results": [
+    {
+      "kind": "before",
+      "width": 390,
+      "text": "QC1106 리허설 01팀 우승!\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "kind": "after",
+      "width": 390,
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "kind": "before",
+      "width": 768,
+      "text": "QC1106 리허설 01팀 우승!\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "kind": "after",
+      "width": 768,
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "kind": "before",
+      "width": 1440,
+      "text": "QC1106 리허설 01팀 우승!\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "kind": "after",
+      "width": 1440,
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "errors": []
+    }
+  ],
+  "cleanup": true
+}

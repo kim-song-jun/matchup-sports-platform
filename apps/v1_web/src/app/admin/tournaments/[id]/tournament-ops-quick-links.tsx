@@ -16,7 +16,7 @@ import {
  * 바로 그 엔드포인트를 미리 조회해 버튼 상태를 맞춘다(별도 프론트 권한 모델을
  * 새로 만들지 않는다).
  */
-export function TournamentOpsQuickLinks({ tournamentId, staffSurface = false }: { tournamentId: string; staffSurface?: boolean }) {
+export function TournamentOpsQuickLinks({ tournamentId, staffSurface = false, basePath }: { tournamentId: string; staffSurface?: boolean; basePath?: string }) {
   const staffAssignments = useV1TournamentStaffAssignments(tournamentId);
 
   let reasonLabel: string | undefined;
@@ -31,7 +31,7 @@ export function TournamentOpsQuickLinks({ tournamentId, staffSurface = false }: 
       : TOURNAMENT_OPS_TRANSIENT_ERROR_LABEL;
   }
 
-  const base = staffSurface ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}` : `/admin/live/${encodeURIComponent(tournamentId)}`;
+  const base = basePath ?? (staffSurface ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}` : `/admin/live/${encodeURIComponent(tournamentId)}`);
   const links = [
     { href: `${base}/staff`, label: '스태프 배정 콘솔' },
     { href: `${base}/operations`, label: '운영 보드' },

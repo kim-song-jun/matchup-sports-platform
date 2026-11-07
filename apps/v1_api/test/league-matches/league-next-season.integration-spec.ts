@@ -261,5 +261,20 @@ describe('독립 리그 다음 시즌 잇기', () => {
     expect(publicSource.nextSeasonTiers).toEqual([
       { leagueId: tier1, title: `전환 체계 ${suiteId} 1시즌 1부`, tier: 1, teamIds: expect.arrayContaining([team.a, team.b, team.c]) },
     ]);
+    // 2026-11-06: 전환으로 만든 첫 시즌 티어의 '이전 시즌 보기'는 원본 리그로 간다.
+    const tierDetail = (await http().get(`/api/v1/tournaments/${tier1}`).expect(200)).body.data;
+    expect(tierDetail.previousSeason).toEqual({ leagueId: source, title: `전환 원본 ${suiteId}` });
+
+    // 2026-11-05 알파 QA: 1부 팀이 같은 시즌 2부에 신청·입금까지 하고 확정에서야 막혔다 — 신청부터 막는다.
+    const {
+      id: _id, createdAt: _createdAt, updatedAt: _updatedAt, sixTeamBracket: _six, multiFinals: _multi, bracketDraft: _draft, ...tierRow
+    } = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tier1 } });
+    const tier2 = (await prisma.v1Tournament.create({
+      data: { ...tierRow, tier: 2, title: `전환 체계 ${suiteId} 1시즌 2부`, status: 'open', registrationDeadlineAt: new Date(Date.now() + 30 * 86_400_000) },
+    })).id;
+    const applied = await http().post(`/api/v1/tournaments/${tier2}/registrations`)
+      .set('x-v1-user-id', owner.a).send({ teamId: team.a }).expect(409);
+    expect(applied.body).toMatchObject({ code: 'LEAGUE_TEAM_INVALID', message: expect.stringContaining('같은 시즌 1부') });
+    expect(await prisma.v1TournamentRegistration.count({ where: { tournamentId: tier2, teamId: team.a } })).toBe(0);
   });
 });

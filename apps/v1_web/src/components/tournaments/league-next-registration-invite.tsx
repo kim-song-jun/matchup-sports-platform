@@ -33,15 +33,17 @@ export function nextLeagueInviteAction(nextRound: V1LeagueNextRound | null, retu
 }
 
 /**
- * 리그 체계로 전환한 리그의 다음 시즌 입구. 티어마다 리그가 따로라, 보는 사람의 팀이 편성된 티어로 보내고
- * 편성된 팀이 없으면 첫 티어로 보낸다. 재참가 신청은 없다 — 전환이 팀과 명단을 이미 넣었다.
+ * 리그 체계로 전환한 리그의 다음 시즌 입구. 티어마다 리그가 따로라 티어마다 버튼을 하나씩 두고(2026-11-06 사용자 선택),
+ * 보는 사람의 팀이 편성된 티어를 맨 앞에 둔다. 재참가 신청은 없다 — 전환이 팀과 명단을 이미 넣었다.
  */
 export function convertedSeasonInviteAction(tiers: readonly V1LeagueNextSeasonTier[], myTeamIds: readonly string[]) {
   const mine = tiers.find((tier) => tier.teamIds.some((teamId) => myTeamIds.includes(teamId)));
-  const target = mine ?? tiers[0];
+  const ordered = mine ? [mine, ...tiers.filter((tier) => tier !== mine)] : tiers;
   return {
-    href: `/tournaments/${target.leagueId}`,
-    label: '다음 시즌 보기',
+    links: ordered.map((tier) => ({
+      href: `/tournaments/${tier.leagueId}`,
+      label: tier.tier === null ? `${tier.title} 보기` : `다음 시즌 ${tier.tier}부 보기`,
+    })),
     description: mine ? `우리 팀은 "${mine.title}"에 편성됐어요.` : '리그 체계 첫 시즌이 시작돼요.',
   };
 }
@@ -101,27 +103,34 @@ function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamI
   const joinedNext = nextRound !== null
     && (nextRound.teamIds ?? []).some((teamId) => teamId === returningTeamId || myTeamIds.includes(teamId));
   const converted = nextRound === null && tiers.length > 0;
-  const { href, label, description } = joinedNext
-    ? { href: `/tournaments/${nextRound.leagueId}`, label: '다음 시즌 보기', description: '우리 팀은 다음 시즌에 참가 확정됐어요.' }
+  const { links, description } = joinedNext
+    ? { links: [{ href: `/tournaments/${nextRound.leagueId}`, label: '다음 시즌 보기' }], description: '우리 팀은 다음 시즌에 참가 확정됐어요.' }
     : converted
       ? convertedSeasonInviteAction(tiers, myTeamIds)
-      : nextLeagueInviteAction(nextRound, returningTeamId);
+      : (({ href, label, description: text }) => ({ links: [{ href, label }], description: text }))(nextLeagueInviteAction(nextRound, returningTeamId));
   if (variant === 'sidebar') {
     return <div style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
       <p className="tm-text-caption text-[var(--text-muted)]" style={{ margin: 0 }}>{description}</p>
-      <Link href={href} className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
-        {label}
-      </Link>
+      {links.map((link) => (
+        <Link key={link.href} href={link.href} className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
+          {link.label}
+        </Link>
+      ))}
     </div>;
   }
+  // 모바일 버튼도 실제로 가는 곳을 적는다 — 고정 문구('다음 리그에서 함께 뛰어요')는 이어진 시즌이 없어 리그 목록으로
+  // 갈 때도 다음 시즌이 있는 것처럼 보였다(2026-11-06 사용자 지적).
   return <div style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
-    <Link
-      href={href}
-      className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-      style={{ fontSize: 'var(--font-size-body-lg)' }}
-    >
-      {joinedNext || converted || (returningTeamId !== null && nextRound?.registrationOpen === true) ? label : '다음 리그에서 함께 뛰어요'}
-    </Link>
+    {links.map((link, index) => (
+      <Link
+        key={link.href}
+        href={link.href}
+        className={index === 0 ? 'tm-btn tm-btn-lg tm-btn-primary tm-btn-block' : 'tm-btn tm-btn-md tm-btn-neutral tm-btn-block'}
+        style={index === 0 ? { fontSize: 'var(--font-size-body-lg)' } : undefined}
+      >
+        {link.label}
+      </Link>
+    ))}
     <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', textAlign: 'center' }}>
       {description}
     </p>

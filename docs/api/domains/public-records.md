@@ -199,7 +199,10 @@ caller, staff included.
 `history[]` of every `OFFICIAL`/`VOID` revision the game has ever had
 (revision number, state, `officialAt`, staff `reason`, whether it was a
 correction) -- this contains no participant identity, so it is shown under
-every non-hidden visibility mode.
+every non-hidden visibility mode. `reason` is the staff-written text only: leading
+machine markers (`[quick-result]` from the admin quick result, uppercase codes such as
+`[LEAGUE_RESULT_ENTRY]`) are stripped on read, and it is `null` when nothing else is
+left. Stored revisions keep the marker; the stripping applies to every read.
 
 ### Lane 1 addition -- live score/clock for an in-progress fixture (2026-08)
 

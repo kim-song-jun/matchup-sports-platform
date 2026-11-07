@@ -1137,3 +1137,164 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - 좁은 검증: service/plan 단위 13/13 PASS, WSL의 실제 bash/git/jq로 runtime rollback 8/8 PASS, bash syntax PASS. jq1.8.1 공식 배포 바이너리의 SHA256을 공식 checksum과 대조했다. 운영 DB rollback 실험은 하지 않았다.
 - Phase C in_progress: API/Web typecheck0, API surface752 PASS, diff-check PASS. Web pattern checker는 Windows cmd의 POSIX find/grep 구문 비호환으로 실행 실패했으며 성공으로 집계하지 않는다. 전체 pattern/실제 DB 통합 검증은 최신 head의 Linux CI에서 확인한다. exact-path commit 및 PR 갱신 후 최신 CI 통과, dev merge와 alpha 배포 상태 확인을 진행한다.
 - Progress Snapshot: alpha 미배포 상태의 신규 수동 QA0/10·viewport0/3은 그대로 유지한다. 배포 완료 후 실제 serving SHA 및 health를 별도로 기록한다.
+
+## 2026-11-06 extension — N개 토너먼트별 독립 진출팀 확정
+
+Status: In Progress
+
+### Context / Goal
+예선·결선 대진 생성과 실제 진출팀 확정을 분리하고, `league_knockouts`의 토너먼트 하나만 독립적으로 배정한다. 현재 배정은 모든 결선의 명단 저장/재생성을 한 번에 실행해 한 결선의 미확정 상태가 다른 결선을 막는다. 순위표는 대회 계산기, 추천은 리그 계산기를 사용해 순위 불일치를 동률로 표시한다.
+
+### Original Conditions / Acceptance Criteria
+- [x] `league_knockouts`에만 적용하며 기존 조별+결선 계약은 유지한다.
+- [x] 대진 생성/진출 규칙 설정/토너먼트별 진출팀 확정을 구분한다.
+- [x] 선택한 토너먼트만 원자적으로 확정하고 다른 결선의 명단·진행 상태·일정·경기 ID를 보존한다.
+- [x] 예선 미완료·미확정 팀·중복·자리 수 불일치·stale revision·선택한 결선의 시작/기록은 서버에서 거절한다.
+- [x] 순위표와 추천은 대회 계산기로 저장된 공식 순위를 함께 사용한다. 기존 시드 배정에 4개 조 12팀의 교차 배치 옵션을 추가했다.
+- [x] A/B/C 제시 후 사용자 A안 선택. 기존 모달에서 토너먼트 선택→명단/시드→해당 대진 확인→독립 확정하며 기존 두 결선 일괄 저장 단계를 제거했다.
+
+### User Scenarios / Test Scenarios
+- 예선과 빈 결선을 만든 뒤 프리미어만 선택/확정해 대진에 반영한다. 챌린지 미확정 상태는 유지한다.
+- 다른 결선이 시작됐어도 아직 시작하지 않은 선택 결선의 배정은 허용한다.
+- 확정 전 미리보기/취소는 명단이나 경기 데이터를 저장하지 않는다.
+- 권한, CAS, 다른 대회 팀, 중복 시드, 미완료 조, 시작한 결선은 실패 원인을 노출한다.
+
+### Parallel Work Breakdown / Ownership
+서브에이전트 없이 순차 실행. Owned: multi-finals API/DTO/service/tests, hook/wizard/page/tests, API 문서, canonical flow 변경 이력, 본 task·시나리오·changeset. Forbidden: 원본 dirty tree WIP, 다른 진행 방식 변경, 실대회 데이터 변경, main 승격.
+
+### Tech Debt Resolved / Security Notes
+기존 대회별 권한/슬롯 배치/감사/게임 잠금을 재사용한다. 토너먼트별 확정은 전체 결선 재생성 API를 사용하지 않는다. 개인정보·로그인 정보는 저장하지 않는다.
+
+### Risks & Dependencies / Ambiguity Log
+- 사용자 A안 선택 완료. 새 기준은 순위 계산 옵션이 아니라 시드 배치 옵션이다. 후속 확인: 1위4팀은 8강 직행, 2·3위8팀은 12강4경기. A/B/C/D의 8강 1위 상대 쪽에 B/C/D/A의 2위 고정, 3위는 두 상대 조를 피해 균등 추첨한다. 미리 본 배열을 그대로 저장한다.
+- Docker daemon 연결 실패(npipe dockerDesktopLinuxEngine 없음)로 실제 DB 통합은 로컬 미실행. headed Playwright는 임시 라이브러리 추출로 준비했고 alpha 변경 전 1440/768/390 캡처 및 console/network 확인 완료(0오류), 쓰기0. controller PID5751/browser5763 트리는 종료했다. 증거 `/tmp/teameet-multi-finals-evidence/`. 변경 후 alpha 수동 QA는 미배포 상태라 대기.
+
+### Progress Snapshot
+- Phase 1 completed: 최신 origin/dev `0b7720cb7d06`에서 `/tmp/teameet-multi-finals-20261106`, `fix/multi-finals-independent-assignment-20261106` 격리. 기존 원본 트리 수정 없음.
+- Phase 2 completed: 화면/DTO/hook/선택 정책/미리보기 sourceVersion/대상 결선 독립 확정 구현. 새로운 옵션은 적합한12팀 결선에서만 표시하며 수동 편집 시 기본 방식으로 전환한다.
+- Phase 3 in_progress: API101 회귀, Web15, 양쪽 tsc0, Web pattern PASS/API surface761 PASS, diff-check PASS. 실제 DB 통합 회귀는 추가했으나 daemon 없음으로 로컬 미실행. 변경 전 alpha3/3폭 PASS, 변경 후 alpha0/3폭·기능0/7. 커밋본 CI/리뷰와 alpha 검증 대기.
+
+- Review follow-up: 교차 배치 옵션은 실제12자리일 때만 제공한다. 생성 뒤 운영자가 편집한 실제12강→8강 연결도 검증해 같은 조 회피가 깨지는 그래프를 거절한다. 순위/시드 배열만 보고 성공 처리하지 않는다. 유효 순열 전수 및 실제plan의 승자 연결 변조 회귀로 확인했다.
+- Delivery cursor: dev 대상 draft PR2169, 최초 커밋 daf8ca3c5. 원격 credential helper의 오래된 경로는 해당 push에서만 gh helper로 override했으며 전역 설정 변경0. 커밋본 CI 진행 중.
+
+- Flow completeness fix: 생성 단계의 필수 순위 매핑을 제거했다. 신규 `capacity`로 이름·자리 수·3/4위전만 정해 빈 결선을 만들고, 별도 rules 화면에서 목적지를 연결한다. 이전 JSON/클라이언트의 capacity 생략은 기존 명단/규칙 수를 사용한다. 규칙 편집 시 기존 크기를 고정해 연결 수 변경으로 경기/일정이 재생성되는 것을 방지한다. 규칙 미설정 결선은 배정 UI에서 명시적으로 안내한다.
+
+- Capacity follow-up validation: 규칙 없는12자리 생성/진출 규칙 연결/명단 확정의 실제 DB 통합 회귀를 추가했다(CI 대상). 로컬 API101·Web15, 양쪽 타입 검사 PASS. 생성 단계의 순위 선택 제거와 별도 규칙 단계 진입을 실제 렌더/API payload로 검증했다. 기존 PR head의 Web/Gates CI는 PASS, API migration replay는 진행 중이며 이 후속 커밋은 새 CI 대상이다.
+
+- Rule-only correction: 순위 목적지를 수정해도 기존 승인 명단을 null로 만들지 않는다. 같은 크기의 규칙 저장은 현재 실제 슬롯과 명단을 그대로 보존하고 새 추천 적용은 독립 assignment 확정으로만 수행한다. UI→실제 selection payload 회귀를 추가했다.
+
+- Final UI boundary validation: 규칙 화면은 단일 저장 액션으로 완료하고 결선 preview/generate를 호출하지 않는다. 기존 승인 명단/크기는 유지하며 변경되는 것은 목적지 규칙뿐이다. 신규 rule-only 회귀 포함 Web16/16 PASS. 최신 로컬 API101 PASS/양쪽 tsc PASS. 이후 CI·리뷰 결과를 최종 SHA 기준으로 확인한다.
+
+### 2026-11-06 current verification / resume cursor
+
+- Runtime code cursor: `364b5d071` (dev PR2169). Source changes complete; code remains frozen pending remote validation/review.
+- Local: API101/Web16 regressions PASS; API/Web typecheck PASS; API surface761/Web pattern PASS; committed diff-check and untracked-import check PASS.
+- Docker alternative: PostgreSQL16.15 binaries extracted under `/tmp/teameet-assignment-pg`, isolated localhost55486, approved test DB `ulw_v1_integration_assignment`, latest Prisma schema only. No existing DB, alpha data, or env files accessed. Owned PID10171 stopped and absence verified.
+- Actual PostgreSQL: new capacity→rules→assignment and independent-final/other-final-LIVE integration cases2/2 PASS. Separate `/tmp/teameet-cross-assignment-qa.cjs` exercised actual4-group/12-team preview→cross assignment, exact draw persistence, fixture ID preservation and broken quarterfinal-edge rejection422; both outcomes PASS. This is functional evidence on a fresh current schema, not migration-history replay proof.
+- Alpha BEFORE: real administrator login, 1440/768/390 captures3/3; console0/network failures0; mutation0. Evidence `/tmp/teameet-multi-finals-evidence/`; browser/controller5751/5763 closed. AFTER alpha0/3 and feature0/7 because no deployment.
+- Remote code-head CI: Gates PASS5m56s, Web PASS12m54s; API remained in `V1 migration replay + drift gate` on run42061455599 as of2026-11-06 01:34 KST. No API failure output yet. This pending state must not be called a pass.
+- Copilot: official requests accepted with empty requested_reviewers; final-head recovery response explicitly matched364b5d071, but no review record or findings/clean result arrived. No settings/account/merge-rule changes and no review bypass.
+- Remaining: final PR CI/review, dev merge (base must be rechecked), alpha serving-SHA verification, AFTER headed QA and screenshots. No main promotion. Review result absence blocks merge under repository S6. No final completion/PR-ready claim.
+
+### 2026-11-06 PR2169 CI repair and Alpha delivery
+
+- User authorized fixing the current PR and deploying to Alpha; main/prod are out of scope.
+- Own isolated worktree `_worktrees/pr2169-alpha-fix`, branch `fix/pr2169-alpha-20261106`, created after fresh origin/dev fetch (29e256c14), then integrated PR head b3bd74ac0. Preserve other sessions and their WIP.
+- RED evidence: exact-head CI42066264451 failed 2/193 integration suites. Existing generation test expected automatic participants; real mock-seed flow omitted explicit assignment, leaving 24 instead of32 submitted lineup sides.
+- Fix: keep generation unassigned; update the existing integration test to explicitly preview/confirm and retain fixture ID/schedule assertions. Mock generation now confirms each final through assignmentPreview/assign, carries the current revision/sourceVersion, and syncs rosters only after successful assignments. Existing mock integration's32-lineup and actual qualification roster assertions remain unchanged.
+- Owned follow-up: mock seed service, multi-finals integration test, relevant API documentation/Changeset, this task. No schema/migration or UI design changes in the repair itself.
+- Local preparation: own WSL dependencies and localhost PostgreSQL16.4 on55489; no existing DB or env files read. Windows CRLF altered a historical policy SQL hash, so a separate LF copy matching Git blobs was replayed into a fresh approved test DB; all230 migrations passed. Do not count the initial CRLF attempt as a pass.
+- Remaining: focused real-DB/unit/type/surface validation, exact-path commit/PR2169 update, latest Copilot clean and CI, dev merge/FF sync, Alpha SHA/health and headed after QA. Default UI runtimes failed initialization; own headed Chrome PID22720/controller16392 is open for administrator login (no credentials persisted).
+
+- Repair validation PASS: full230-migration LF replay on fresh isolated PostgreSQL; both formerly failing integration suites17/17, related unit suites56/56, API typecheck0/surface761 PASS, diff-check/debt grep clean. Owned PostgreSQL PID2444 stopped and absence verified. Latest PR-head CI and review still pending; Alpha after QA remains unverified.
+
+
+## 2026-11-06 follow-up: stable public qualification colors
+Status: In progress
+### Context / Goal
+User approved the local 10-color badge preview without T numbering. Use blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve in setup order; retain existing colors across changes.
+### Original Conditions
+All qualification badges and promoted rows used blue. Named finals used mutable names as their only identity.
+### User Scenarios / Acceptance Criteria
+- [ ] Two/three/ten finals use the first two/three/ten palette colors.
+- [ ] Rename/reorder/delete/add preserves surviving destination colors across reload and generate/reset/assignment.
+- [ ] Actual confirmed qualification gates remain unchanged; names remain visible; no T prefix.
+- [ ] Desktop/tablet/mobile and dark mode remain legible.
+### Parallel Work Breakdown / Owned Scope
+Single agent. Multi-finals identity/color helper, DTO/service, admin wizard identity round-trip, public detail presenter/type, public standings badge styles/tests, API docs and changeset. No other session resources or main changes.
+### Test Scenarios
+Lifecycle JSON round-trip, duplicate/stale identity rejection, 2/3/10 colors, public route qualification mapping, admin rename identity round-trip, API/web type checks, CI/review, Alpha browser screenshots.
+### Tech Debt Resolved
+Remove dependence on mutable names or rendered row order for color identity.
+### Security Notes
+No new auth path; color is server-owned; existing publication/qualification/privacy gates unchanged. No schema migration.
+### Risks & Dependencies
+Existing configs derive initial color from stored order. Old clients renaming without returned ID create a new destination. More than ten lifetime color positions cycle the palette; names remain the discriminator. Copilot clean and Alpha checks pending.
+### Ambiguity Log
+Approved badge-only local sample, no T prefixes. Main/prod out of scope.
+### Progress Snapshot
+Implementation in isolated feat/final-colors-20261106 from origin/dev ec705f79d.
+
+### Validation snapshot
+- API unit: final colors/assignment/presenter focused rerun 74/74. Existing preview/reset suites passed. Web three suites 82/82; updated API-to-badge route assertions additionally 2/2.
+- API lint/tsc + surface check and web lint/tsc + v1 pattern check passed. Light/dark 20 text/background contrast pairs minimum 4.79:1.
+- Real DB integration assertions added for persisted identity/color across generate and rename (CI execution pending).
+- Alpha baseline captured at 390/768/1440. Existing baseline image optimizer 400 and a transient health 503 observed; subsequent health HTTP 200 with DB true. Do not classify these pre-existing responses as a clean session.
+- UI gallery will be posted after dev merge and exact Alpha deployment, per repository workflow. New PR review waiver has not been requested; previous #2169 exception is not assumed for this change.
+
+### Resume cursor (2026-11-06 13:38 KST)
+- PR #2173, head 6dfa13fa125c97c06d11cfdc6087090bcc19f33a. PR CI 42162182740 all SUCCESS (Gates 5m47s / API 9m47s / Web 12m55s); API migration replay step includes real DB integration suite and passed. PR base dev, MERGEABLE/CLEAN.
+- Copilot requested via gh and official REST; zero reviews returned. Requested user exception through async question; no reply received yet. DO NOT merge before clean review or explicit exception for this PR. #2169 exception is not inherited.
+- Owned Alpha QA tournament: 5dab06e4-0379-46b9-affc-ccdb8981e8a0, `(목업) 1106-0424 정규리그+N개 토너먼트 20팀 진행중`. Created via actual admin UI with results (48 games / 80 lineups), then own fixture preconditions via admin API: 5 groups x4 teams, ten named finals of two teams each, selected+generated, revision 6. Before deployment it has no IDs/colors stored; new server must hydrate colors 0..9 by config order (public track key order is NOT configuration order).
+- QA fixture visibility PATCH false returned 200 at 04:38 UTC; do not cancel until QA finishes. To inspect through ordinary user UI, temporarily publish only this own QA fixture, then hide/cancel at completion. Existing f67894a6-1c89-456b-8c00-e8f87f4d3520 tournament is READ ONLY baseline.
+- Headed Chrome PID51568 / parent66416, exec session10355 closed normally with contexts. Temp Playwright prefix: Windows TEMP/teameet-final-colors-browser; PR/review request files use same task prefix. WSL own install log /tmp/teameet-final-colors-install.log. No owned local DB.
+- Own worktree `_worktrees/final-colors-20261106`, branch feat/final-colors-20261106; do not remove while unmerged. Local task note and ten-before-{390,768,1440}.png remain outside the source PR head. Source head has tsc/lint success, public baseline PNGs and headed QA helper scripts/qa/final-colors-browser.cjs. Preserve root's unrelated preview/ads task and other sessions' worktrees.
+- After approval/review: check exact head/base+CI, merge dev, synchronize root+dedicated local dev by safe FF, monitor exact dev CI/Alpha run, verify commit headers+DB health, inspect public user table at 390/768/1440/light/dark and ten destinations. Verify id/color persistence after rename/reorder via own QA fixture only. Commit after-evidence on separate evidence branch, post raw-SHA 3-column gallery on #2173, hide/cancel own QA fixture, clean owned browser/process/temp/worktree resources. Main/prod out of scope.
+
+
+### Scope extension: league + N finals usability (user approved)
+User requested adding filters to the same PR #2173 and retitling it. Add named-final selection then canonical round selection, union rounds for all, preserve common round on track switch and reset unavailable round. Single-final hides name row; preserve legacy upper/lower/league semantics. Group/name/round rows scroll horizontally without wrapping, independently reveal selected chip, retain full names and stable color dots even before qualification resolves. Add route regressions for differing rounds, one/ten finals, existing single/split/league suites. Source changed after original CI, new exact-head CI/review required. No review exception has been approved for #2173.
+
+### Filter extension validation / next cursor
+- Public bracket route 60/60, independent horizontal reveal 1/1, public presenter 53/53 passed. API tsc/surface and web tsc/pattern checks passed. Initial web tsc caught two missing fixture status fields in newly added tests; corrected and rerun passed.
+- Current Alpha a6f8bdcd4be6a4a01a5539ed8b234291b23dd95d filter baseline captured at 1440/768/390; existing image optimizer 400 observed on first capture, no page errors. Owned headed Chrome3316/controller70848 closed normally.
+- Source PR title updated to `feat: 리그 + N개 토너먼트 사용성 개선`. Same feature branch, dev base. Latest scope includes independent group/name/round scroll rows, native horizontal round-jump navigation, selected-row-only reveal, real round union/filter/reset, and public bracketColorIndex for pre-qualification color dots.
+- Push this extension and validate its NEW exact-head CI/review. Original 6dfa13fa1 CI success does not validate the added filters. #2173 is still unmerged and undeployed; no review waiver received. Owned 10-final QA fixture remains private and reserved for post-merge Alpha checks. Preserve this unmerged worktree. No main/prod action.
+
+
+### Admin diagram extension (user approved, same PR2173)
+Separate preliminary and named-final diagrams vertically; preserve horizontal round flow inside each diagram, independent geometry and no inter-final lines. Add same stored color, native accessible collapsible sections and jump navigation. Preserve fixture selection/slot assignment callbacks and full group context for preliminary rank slot labels. Legacy single/upper-lower/six-team diagrams retain their existing layout. Validate 2/10 sections, geometry separation, labels and actual node action callbacks. Previous filter head 113419e58 CI is not the validation for this extension.
+
+### Admin diagram extension validation / resume
+- Admin bracket service unit 232/232 PASS; API tsc/surface PASS. Canvas full rerun21/21 PASS after correcting an invalid test expectation: GROUP_RANK final slots remain managed/read-only, while preliminary ENTRY assignment still works. Final named-section focus rerun3/3 PASS; existing layout62/62 and assignment hook16/16 passed. Final web tsc/pattern PASS.
+- Rendering now separates preliminary/other fixtures and every named final into vertically stacked native details, with independent canvas/SVG/scroll geometry, complete source-label/shared-slot lock context, jump navigation that opens and focuses the destination, server-owned color dot and match count. Repeated track title prefixes removed. Existing single/upper-lower/six-team layouts stay on the existing single renderer.
+- Actual Alpha admin baseline at 1440/768/390 captured from owned private20-team QA tournament; no page/network errors observed. Chrome41968/controller55576 exited normally. QA tournament stays private, unchanged by this task.
+- Filter head113419e58 CI42168900113 all SUCCESS. This admin extension requires NEW exact-head CI/review after push. No merge or Alpha deployment yet and no #2173 review waiver received. Keep this unmerged worktree; main/prod remain out of scope.
+
+## 2026-11-06 follow-up: 경기 일정 필터 정합성
+Status: In Progress
+### Context / Goal / Original Conditions
+PR2173 deployed colors and bracket filters but ScheduleContent retained its combined wrapping group/round filter. User authorized fixing, new dev PR, and Alpha deployment. Apply the already approved UX to 경기 일정 without new design choices.
+### User Scenarios / Acceptance Criteria
+- [ ] 결선 > 전체·토너먼트 이름 > 전체·실제 강수. All uses union; selected final limits available rounds. Preserve common round, reset unavailable round.
+- [ ] Two/three/ten finals retain actual names and stable color dots; single final omits name row.
+- [ ] Group/name/round rows independently scroll horizontally with no wrap.
+- [ ] Scheduled/live/unscheduled and 내 팀만 share the same predicates. URL state/deep links/back/forward and fixture detail return preserve selected final and round.
+- [ ] Single/upper-lower/pure-league behavior and auth/publication gates retained.
+### Test Scenarios
+Focused ScheduleContent behavior and route wiring; existing schedule/history/league regressions; one Web type/pattern run; exact-head CI/review; Alpha3viewports screenshots/network evidence.
+### Parallel Work Breakdown / Ownership
+Single agent; own fresh fix/schedule-final-filters-20261106 worktree from origin/dev1245860f0. Owned ScheduleContent, bracket schedule wiring, focused tests, changeset and this task. No backend/API/schema migration, main/prod, other sessions' files/processes.
+### Tech Debt Resolved / Security Notes
+Reuse BracketFilterRow; eliminate wrapping duplicate filter implementation and keep local draft state. Stable track colors come from existing tournament-detail metadata, never infer identity by translated name parsing. Preserve existing visibility and session gates.
+### Risks & Dependencies / Ambiguity Log
+Schedule rows have no bracketTrack, so hub supplies fixture-ID keyed final metadata from its existing detail response, including rows whose schedule groupId is null. Standalone /schedule redirects to /bracket; regular league uses separate wrapper. No new API request. PR2173 review waiver is not assumed for this new PR.
+### Progress Snapshot
+Fresh branch1245860f0 (includes PR2180 image work). Narrow tests added for union/reset/common round/10final URL restoration; dependencies installed in owned WSL worktree, ignore-scripts. No local Next server.
+### Schedule filter validation snapshot
+- RED: new N-final schedule cases failed2/2 on old implementation because 일정 토너먼트 선택 did not exist.
+- GREEN: four focused suites164/164 PASS (schedule75, actual bracket route61, URL-return14, league14). Includes10final deep-link/re-entry/popstate, common/missing rounds, live/unscheduled/mine intersection, single-final hidden-name row, fixture-ID association with null schedule.groupId and saved color.
+- Changes: supply named-final fixture IDs/colors from the already loaded tournament detail; keep per-entry named group headings; add scheduleFinal to existing local draft/URL sync and fixture return source; reuse independent BracketFilterRow with padded=false inside existing schedule padding. No extra API requests or backend/DB changes.
+- Baseline Alpha1245860f0 captured after deploy42183991187 SUCCESS at1440/768/390. Actual login through player fixture account, read-only tournamentf67894a6; no page/network errors observed in this scoped baseline. Browser28716/controller14088 closed normally. Do not alter that existing tournament.
+- Web lint/tsc pending; commit/PR/CI/Copilot/Alpha after verification remain. Own browser helper/dependencies in Windows TEMP/teameet-schedule-final-browser, WSL install/test/lint logs prefixed teameet-schedule-final. No local Next/DB runtime.
+- Final pre-commit Web lint (tsc --noEmit + v1 pattern check) PASS. Focused164/164 and diff/debt checks passed; baseline images reviewed. Ready for exact-scope commit and latest-head CI/review.

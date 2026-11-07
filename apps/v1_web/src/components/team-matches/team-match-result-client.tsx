@@ -17,6 +17,7 @@ import {
   useV1TeamMatchLineup,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { displayRevisionReason } from '@/lib/revision-reason';
 import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateLong } from '@/lib/date-utils';
 import type {
@@ -32,7 +33,6 @@ import {
   hashResultPayload,
   hydrateResultFormFromRevision,
   toResultRosterRows,
-  displayRevisionReason,
 } from './team-match-result.types';
 import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
 

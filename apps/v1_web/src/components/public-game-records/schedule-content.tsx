@@ -1,5 +1,6 @@
 'use client';
 
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
@@ -40,9 +41,13 @@ import {
   type SchedulePhaseLabels,
 } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
-import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
+import { compareTournamentGroupNames, compareTournamentRounds } from '@/lib/tournament-display-order';
+import { BracketFilterRow } from '@/components/tournaments/bracket-filter-row';
+
+/** Detail response owns named-final identity; schedule groupId can be null. */
+export type ScheduleFinalTrack = { id: string; label: string; colorIndex?: number; fixtureIds: readonly string[] };
 
 /**
  * 참가팀 공개 정책 통일(fix/v1-publish) — side 자체가 null이면 슬롯 미배정("미정"),
@@ -454,7 +459,8 @@ function ScheduleRow({
           alignItems: 'center',
         }}
       >
-        <span style={{ textAlign: 'right', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+        {/* keep-all 은 공백에서만 줄을 바꿔 '06팀' 의 '팀' 이 혼자 떨어지지 않게 하고, anywhere 는 공백 없는 긴 이름을 칸 안에서 꺾는다. */}
+        <span style={{ textAlign: 'right', wordBreak: 'keep-all', overflowWrap: 'anywhere', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.home, entry.homeSlotLabel)}
         </span>
         <span
@@ -471,7 +477,7 @@ function ScheduleRow({
         >
           {formatScoreline(entry.score, entry.scoreStatus)}
         </span>
-        <span style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+        <span style={{ textAlign: 'left', wordBreak: 'keep-all', overflowWrap: 'anywhere', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.away, entry.awaySlotLabel)}
         </span>
       </div>
@@ -767,6 +773,10 @@ function scheduleGroupFromHref(href: string | null | undefined): string | null {
   return new URL(href ?? '/', 'https://teameet.invalid').searchParams.get('scheduleGroup');
 }
 
+function scheduleFinalFromHref(href: string | null | undefined): string | null {
+  return new URL(href ?? '/', 'https://teameet.invalid').searchParams.get('scheduleFinal');
+}
+
 function scheduleGroupKey(entry: PublicScheduleEntry): string {
   return phaseKeyOf(entry) === 'group_stage'
     ? `group:${entry.groupId ?? entry.groupName ?? entry.round}`
@@ -795,6 +805,7 @@ export function ScheduleContent({
   filterSummary,
   isRegularLeague = false,
   knockoutOnly = false,
+  finalTracks = [],
   fromHref,
 }: {
   tournamentId: string;
@@ -816,6 +827,7 @@ export function ScheduleContent({
   isRegularLeague?: boolean;
   /** Pure tournaments have one phase; show round filters directly. */
   knockoutOnly?: boolean;
+  finalTracks?: readonly ScheduleFinalTrack[];
   /**
    * 로그인한 팀장이 이 대회에서 이끄는 팀의 경기 — 공개 일정 위에 겹쳐 "우리 팀 경기"를
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
@@ -841,7 +853,7 @@ export function ScheduleContent({
   // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
   // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
   const [draft, setDraft] = useState(() => ({
-    tournamentId, filter: scheduleFilterFromHref(fromHref), group: scheduleGroupFromHref(fromHref), mineOnly: mineOnlyFromHref(fromHref), href: fromHref,
+    tournamentId, filter: scheduleFilterFromHref(fromHref), group: scheduleGroupFromHref(fromHref), final: scheduleFinalFromHref(fromHref), mineOnly: mineOnlyFromHref(fromHref), href: fromHref,
   }));
   const filter = draft.tournamentId === tournamentId ? draft.filter : 'all';
   const mineOnly = draft.tournamentId === tournamentId ? draft.mineOnly : mineOnlyFromHref(fromHref);
@@ -856,8 +868,9 @@ export function ScheduleContent({
       const nextFilter = scheduleFilterFromHref(href);
       const nextMineOnly = mineOnlyFromHref(href);
       const nextGroup = scheduleGroupFromHref(href);
-      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.group === nextGroup && previous.mineOnly === nextMineOnly && previous.href === href
-        ? previous : { tournamentId, filter: nextFilter, group: nextGroup, mineOnly: nextMineOnly, href });
+      const nextFinal = scheduleFinalFromHref(href);
+      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.group === nextGroup && previous.final === nextFinal && previous.mineOnly === nextMineOnly && previous.href === href
+        ? previous : { tournamentId, filter: nextFilter, group: nextGroup, final: nextFinal, mineOnly: nextMineOnly, href });
     };
     // 늦은 router snapshot은 마지막 선택을 덮지 않는다. 실제 pop/hash 이벤트는 최신 URL을 읽는다.
     if (source.searchParams.toString() === new URLSearchParams(window.location.search).toString()) sync();
@@ -869,7 +882,7 @@ export function ScheduleContent({
     };
   }, [fromHref, tournamentId]);
 
-  function setFilter(nextFilter: string, nextMineOnly = mineOnly, nextGroup: string | null = nextFilter === filter ? draft.group : null) {
+  function setFilter(nextFilter: string, nextMineOnly = mineOnly, nextGroup: string | null = draft.tournamentId === tournamentId && nextFilter === filter ? draft.group : null, nextFinal: string | null = draft.tournamentId === tournamentId && nextFilter === filter ? draft.final : null) {
     let href = fromHref;
     if (fromHref) {
       const source = new URL(fromHref, window.location.origin);
@@ -879,6 +892,8 @@ export function ScheduleContent({
         else url.searchParams.set('schedulePhase', nextFilter);
         if (nextGroup) url.searchParams.set('scheduleGroup', nextGroup);
         else url.searchParams.delete('scheduleGroup');
+        if (nextFinal) url.searchParams.set('scheduleFinal', nextFinal);
+        else url.searchParams.delete('scheduleFinal');
         if (nextMineOnly) url.searchParams.set('teamScope', 'mine');
         else url.searchParams.delete('teamScope');
         href = `${url.pathname}${url.search}${url.hash}`;
@@ -886,7 +901,7 @@ export function ScheduleContent({
       }
     }
     // URL snapshot보다 먼저 실제 경기 링크에도 마지막 선택의 출처를 반영한다.
-    setDraft({ tournamentId, filter: nextFilter, group: nextGroup, mineOnly: nextMineOnly, href });
+    setDraft({ tournamentId, filter: nextFilter, group: nextGroup, final: nextFinal, mineOnly: nextMineOnly, href });
   }
 
   if (!data.bracketPublished) {
@@ -947,8 +962,26 @@ export function ScheduleContent({
   const filters = buildScheduleFilters(phases, false);
   // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
   const activeFilter = !knockoutOnly && filters.some((option) => option.key === filter) ? filter : 'all';
+  const allEntries = [...sourceData.items, ...sourceData.unscheduled];
+  const trackByFixture = new Map(finalTracks.flatMap(track => track.fixtureIds.map(id => [id, track.id] as const)));
+  const availableTracks = isRegularLeague ? [] : finalTracks.filter(track => allEntries.some(entry => phaseKeyOf(entry) === 'knockout' && trackByFixture.get(entry.fixtureId) === track.id));
+  const activeFinal = draft.tournamentId === tournamentId && availableTracks.some(track => track.id === draft.final) ? draft.final : null;
+  const namedFinalPhase = availableTracks.length > 0 && (knockoutOnly || activeFilter === 'knockout');
+  const roundsForFinal = (track: string | null) => {
+    const rounds = new Map<string, { key: string; names: Set<string> }>();
+    for (const entry of allEntries.filter(entry => phaseKeyOf(entry) === 'knockout' && (track === null || trackByFixture.get(entry.fixtureId) === track))
+      .sort((a, b) => compareTournamentRounds(a.round, b.round))) {
+      const key = scheduleGroupKey(entry);
+      const name = entry.groupName?.trim() || tournamentRoundLabel(entry.round);
+      const label = bracketStageLabel(trackByFixture.get(entry.fixtureId), name);
+      const row = rounds.get(key) ?? { key, names: new Set<string>() };
+      row.names.add(label);
+      rounds.set(key, row);
+    }
+    return [...rounds.values()].map(({ key, names }) => ({ key, label: [...names].join(' · ') }));
+  };
   const groupOptionKeys = new Set<string>();
-  const groupOptions = isRegularLeague || (!knockoutOnly && activeFilter === 'all') ? [] :
+  const groupOptions = namedFinalPhase ? roundsForFinal(activeFinal) : isRegularLeague || (!knockoutOnly && activeFilter === 'all') ? [] :
     phases.filter(phase => phase.key === (knockoutOnly ? 'knockout' : activeFilter)).flatMap(phase => phase.groups.flatMap(group => {
       return group.entries.flatMap(entry => {
         const key = scheduleGroupKey(entry);
@@ -958,6 +991,10 @@ export function ScheduleContent({
       });
     }));
   const selectedGroup = draft.tournamentId === tournamentId && groupOptions.some(option => option.key === draft.group) ? draft.group : null;
+  function selectFinal(track: string | null) {
+    const nextRound = roundsForFinal(track).some(option => option.key === selectedGroup) ? selectedGroup : null;
+    setFilter(activeFilter, mineOnly, nextRound, track);
+  }
   const showMineSwitch = myTeamIds === undefined && (hasMyFixtures || mineOnly);
   const teamSwitch = showMineSwitch ? (
     <button type="button" role="switch" aria-checked={mineOnly}
@@ -969,7 +1006,8 @@ export function ScheduleContent({
   ) : null;
   const matchesTeamScope = (entry: PublicScheduleEntry) => !mineOnly || myFixtureIds.has(entry.fixtureId);
   const matchesPhase = (entry: PublicScheduleEntry) => (activeFilter === 'all' || phaseKeyOf(entry) === activeFilter)
-    && (selectedGroup === null || scheduleGroupKey(entry) === selectedGroup);
+    && (selectedGroup === null || scheduleGroupKey(entry) === selectedGroup)
+    && (!namedFinalPhase || activeFinal === null || trackByFixture.get(entry.fixtureId) === activeFinal);
   const filteredLive = live.filter((entry) => matchesTeamScope(entry) && matchesPhase(entry));
 
   // "시간 미정 경기" 섹션도 위 칩과 같은 기준으로 거른다 — 예전엔 필터 state에 접근할
@@ -983,14 +1021,13 @@ export function ScheduleContent({
       {filterAction !== undefined || filters.length > 1 || showMineSwitch || groupOptions.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
           {knockoutOnly ? (filterAction ?? teamSwitch) : <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={setFilter} action={filterAction ?? teamSwitch} />}
+          {namedFinalPhase && availableTracks.length > 1 ? (
+            <BracketFilterRow label="일정 토너먼트 선택" padded={false} items={[{ id: '', label: '전체' }, ...availableTracks]} activeId={activeFinal ?? ''} onSelect={id => selectFinal(id || null)} />
+          ) : null}
           {groupOptions.length > 0 ? (
-            <nav aria-label={activeFilter === 'group_stage' ? '일정 조 선택' : '일정 결선 단계 선택'} className="flex flex-wrap gap-2">
-              {[{ key: null, label: '전체' }, ...groupOptions].map(option => (
-                <button key={option.key ?? 'all'} type="button" aria-pressed={selectedGroup === option.key}
-                  className={`tm-chip${selectedGroup === option.key ? ' tm-chip-active' : ''}`}
-                  onClick={() => setFilter(activeFilter, mineOnly, option.key)}>{option.label}</button>
-              ))}
-            </nav>
+            <BracketFilterRow label={activeFilter === 'group_stage' ? '일정 조 선택' : '일정 결선 단계 선택'} padded={false}
+              items={[{ id: '', label: '전체' }, ...groupOptions.map(option => ({ id: option.key, label: option.label }))]} activeId={selectedGroup ?? ''}
+              onSelect={id => setFilter(activeFilter, mineOnly, id || null)} />
           ) : null}
           {filterSummary}
         </div>

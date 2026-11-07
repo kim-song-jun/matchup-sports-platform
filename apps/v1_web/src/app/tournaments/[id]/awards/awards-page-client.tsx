@@ -31,12 +31,13 @@ import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { displayInitials } from '@/lib/display-initials';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { bracketTrackLabel, orderedBracketTracks, sortByBracketTrackOrder } from '@/lib/bracket-track';
 
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
@@ -377,9 +378,9 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
   const awards = tournament.awards ?? [];
   const isScoped = awards.some((award) => Boolean(award.bracketTrack && award.bracketTrack !== 'overall'));
   const awardGroups = isScoped
-    ? ([...new Set(['overall', ...awards.map(award => award.bracketTrack ?? 'overall')])]).map((track) => ({
+    ? ['overall', ...sortByBracketTrackOrder([...new Set(awards.map(award => award.bracketTrack ?? 'overall').filter(track => track !== 'overall'))], tournament.groups, track => track)].map((track) => ({
         track,
-        label: track === 'overall' ? '대회 전체' : track === 'upper' ? '상위 결선' : track === 'lower' ? '하위 결선' : track,
+        label: track === 'overall' ? '대회 전체' : bracketTrackLabel(track)!,
         awards: awards.filter((award) => (award.bracketTrack ?? 'overall') === track),
       })).filter((group) => group.awards.length > 0)
     : [{ track: 'overall' as const, label: '개인 어워드', awards }];
@@ -727,7 +728,7 @@ export function ReviewFormModal({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photoUrls.map((url) => (
               <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-                <Image src={publicAssetPath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
@@ -812,7 +813,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
-              <Image src={publicAssetPath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>
@@ -1085,12 +1086,13 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const showPrizeColumn = isCompleted && (hasPrizeData(tournament) || hasTrackPrizeData);
   const isSplitBracket = tournament.groups.some((group) => Boolean(group.bracketTrack && group.bracketTrack !== 'overall'));
   const splitPodiums = isSplitBracket
-    ? ([...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).map((track) => ({
+    ? orderedBracketTracks(tournament.groups).map((track) => ({
         track,
-        label: track === 'upper' ? '상위 결선' : track === 'lower' ? '하위 결선' : track,
+        label: bracketTrackLabel(track)!,
         rows: getTrackTopThree(tournament, track),
       })).filter((podium) => podium.rows.length > 0)
     : [];
+  const awardSets = sortByBracketTrackOrder(tournament.awardSets ?? [], tournament.groups, (awardSet) => awardSet.bracketTrack);
 
   return (
     <div className="tm-tourn-sub-page">
@@ -1110,18 +1112,13 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
               heading={tournament.awardSets && tournament.awardSets.length > 0 ? '대회 전체 시상 안내' : undefined}
             />
           ) : null}
-          {tournament.awardSets && tournament.awardSets.length > 0 ? (
-            tournament.awardSets.map((awardSet) => {
-              const label = `${awardSet.bracketTrack === 'upper' ? '상위 결선' : awardSet.bracketTrack === 'lower' ? '하위 결선' : awardSet.bracketTrack} 시상`;
-              return (
-                <PrizeSection
-                  key={awardSet.bracketTrack}
-                  tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
-                  heading={label}
-                />
-              );
-            })
-          ) : null}
+          {awardSets.map((awardSet) => (
+            <PrizeSection
+              key={awardSet.bracketTrack}
+              tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
+              heading={`${bracketTrackLabel(awardSet.bracketTrack)} 시상`}
+            />
+          ))}
         </div>
       )}
 
@@ -1160,16 +1157,14 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
                 heading={tournament.awardSets && tournament.awardSets.length > 0 ? '대회 전체 시상 안내' : undefined}
               />
             ) : null}
-            {tournament.awardSets && tournament.awardSets.length > 0 ? (
-              tournament.awardSets.map((awardSet) => (
-                <PrizeSection
-                  key={awardSet.bracketTrack}
-                  tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
-                  top3={getTrackTopThree(tournament, awardSet.bracketTrack)}
-                  heading={`${awardSet.bracketTrack === 'upper' ? '상위 결선' : awardSet.bracketTrack === 'lower' ? '하위 결선' : awardSet.bracketTrack} 시상`}
-                />
-              ))
-            ) : null}
+            {awardSets.map((awardSet) => (
+              <PrizeSection
+                key={awardSet.bracketTrack}
+                tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
+                top3={getTrackTopThree(tournament, awardSet.bracketTrack)}
+                heading={`${bracketTrackLabel(awardSet.bracketTrack)} 시상`}
+              />
+            ))}
           </div>
 
           <div className="tm-tourn-sub-col" style={{ padding: '0 20px' }}>

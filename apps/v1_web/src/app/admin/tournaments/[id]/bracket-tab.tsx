@@ -1,7 +1,9 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useId, useState } from 'react';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
@@ -154,6 +156,7 @@ export function BracketTab({
   canWrite: boolean;
   tournamentFormat?: 'knockout' | 'league' | 'group_knockout' | 'league_knockouts';
 }) {
+  const { v1Post, v1Patch } = useV1DataSource();
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const [round12AutoOpen, setRound12AutoOpen] = useState(false);
   const createGroup = useV1CreateGroup(tournamentId);
@@ -410,7 +413,7 @@ export function BracketTab({
       {
         groupId: editGroup.id,
         name: editGroupName.trim(),
-        ...(Number.isInteger(parsed) && parsed > 0 ? { advanceCount: parsed } : {}),
+        ...(tournamentFormat !== 'league_knockouts' && Number.isInteger(parsed) && parsed > 0 ? { advanceCount: parsed } : {}),
       },
       {
         onSuccess: async () => {
@@ -840,6 +843,7 @@ export function BracketTab({
               <BracketGroupCard
                 tournamentId={tournamentId}
                 structureEditable={canWrite && tournamentFormat !== 'league_knockouts'}
+                nameEditable={canWrite}
                 slots={bracket?.slots ?? []}
                 group={group}
                 managedEntrySlots={(bracket?.slots ?? []).some((slot) => slot.kind === 'ENTRY' && slot.groupId === group.id)}
@@ -1175,7 +1179,7 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
-          <div className="flex flex-col gap-1">
+          {tournamentFormat !== 'league_knockouts' ? <div className="flex flex-col gap-1">
             <label htmlFor="edit-group-advance" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">진출 팀 수 (선택)</label>
             <input
               id="edit-group-advance"
@@ -1187,8 +1191,8 @@ export function BracketTab({
               placeholder="예: 2"
               className={inputCls}
             />
-          </div>
-          {editGroup?.phase === 'group' ? (
+          </div> : null}
+          {editGroup?.phase === 'group' && tournamentFormat !== 'league_knockouts' ? (
             <PeriodOverrideField
               inheritLabel={groupPeriods.inheritLabel}
               inheritedSummary={groupPeriods.inheritedSummary}

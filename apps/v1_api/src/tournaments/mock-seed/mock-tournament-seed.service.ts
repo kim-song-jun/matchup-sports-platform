@@ -416,6 +416,22 @@ export class MockTournamentSeedService {
       await this.prisma.$transaction((tx) => recalculateStandingsInTx(tx, tournamentId));
       const preview = await this.multiFinals.preview(user, tournamentId);
       await this.multiFinals.generate(user, tournamentId, { expectedRevision: preview.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+      // Generation creates the empty graph; each final must explicitly confirm its seeds.
+      let view = await this.multiFinals.get(user, tournamentId);
+      for (const final of view.finals) {
+        const assignment = await this.multiFinals.assignmentPreview(user, tournamentId, {
+          expectedRevision: view.revision, finalName: final.name, assignmentPolicy: 'rank_order',
+        });
+        const seeds = assignment.registrationIds.filter((id): id is string => id !== null);
+        if (seeds.length !== assignment.registrationIds.length) {
+          throw new ConflictException({ code: 'MOCK_RANK_TIED', message: '목업 순위에 동률이 있어 결선 진출팀을 정할 수 없어요.' });
+        }
+        view = await this.multiFinals.assign(user, tournamentId, {
+          expectedRevision: assignment.revision, finalName: final.name,
+          registrationIds: seeds, assignmentPolicy: assignment.assignmentPolicy,
+          sourceVersion: assignment.sourceVersion,
+        });
+      }
       await this.syncSeatedRosters(tournamentId);
     }
     const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({ where: { tournamentId, teamMatch: { deletedAt: null } } });

@@ -19,8 +19,8 @@ describe('LeagueInfoExtras', () => {
     render(<LeagueInfoExtras leagueId="league-1" />);
 
     expect(screen.getByRole('region', { name: '리그 이미지' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '목록 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/list.webp');
-    expect(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/detail.webp');
+    expect(decodeURIComponent(screen.getByRole('img', { name: '목록 이미지 미리보기' }).style.backgroundImage)).toContain('/uploads/list.webp');
+    expect(decodeURIComponent(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage)).toContain('/uploads/detail.webp');
     expect(screen.getByRole('region', { name: '기본 장소' })).toBeInTheDocument();
   });
 

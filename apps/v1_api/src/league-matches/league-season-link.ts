@@ -1,6 +1,6 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { findPublicTournamentOnSurface, findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 독립 정규 리그의 다음 시즌 잇기(2026-11-03 사용자 확정 — 독립 리그 → 독립 리그).
@@ -29,6 +29,44 @@ export async function readLeagueConversion(db: Db, leagueId: string): Promise<{ 
       ? value.seriesId
       : null;
   return { seriesId };
+}
+
+/**
+ * 리그 체계로 전환한 리그의 첫 시즌 티어(공개, 1부부터)와 확정 팀. 전환하지 않았으면 빈 배열.
+ * 원본 리그 화면이 다음 시즌 입구·'다음 시즌' 링크를 티어마다 그린다(2026-11-04·11-06).
+ */
+export async function findConvertedSeasonTiers(db: Db, leagueId: string) {
+  const conversion = await readLeagueConversion(db, leagueId);
+  if (conversion?.seriesId == null) return [];
+  const leagues = await db.v1Tournament.findMany({
+    where: { kind: 'regular_league', deletedAt: null, isPublic: true, seriesId: conversion.seriesId },
+    orderBy: [{ seasonNo: 'asc' }, { tier: 'asc' }],
+    select: { id: true, title: true, tier: true, seasonNo: true, registrations: { where: { status: 'confirmed' }, select: { teamId: true } } },
+  });
+  const firstSeason = leagues[0]?.seasonNo;
+  return leagues
+    .filter((row) => row.seasonNo === firstSeason)
+    .map((row) => ({ leagueId: row.id, title: row.title, tier: row.tier, teamIds: row.registrations.map((r) => r.teamId) }));
+}
+
+/**
+ * 전환으로 만든 체계 첫 시즌 티어의 지난 시즌 = 전환한 원본 리그(공개된 것만). 전환은 컬럼 없이 감사 기록만 남기므로
+ * 기록의 `afterJson.seriesId` 로 거꾸로 찾는다. 체계의 2시즌부터와 전환 없이 만든 체계는 null 이다(2026-11-06).
+ */
+export async function findConversionSourceLeague(
+  db: Db,
+  league: { seriesId: string | null; seasonNo: number | null },
+): Promise<{ id: string; title: string } | null> {
+  if (league.seriesId === null || league.seasonNo !== 1) return null;
+  const log = await db.v1AdminActionLog.findFirst({
+    where: { action: LEAGUE_CONVERSION_ACTION, targetType: 'league', afterJson: { path: ['seriesId'], equals: league.seriesId } },
+    select: { targetId: true },
+  });
+  if (!log?.targetId) return null;
+  return findPublicTournamentOnSurface(db, ['regular_league'], {
+    where: { id: log.targetId, deletedAt: null },
+    select: { id: true, title: true },
+  });
 }
 
 /** 이 리그를 지난 시즌으로 가리키는(이어진) 다음 시즌 리그. 지운 리그는 이어진 것으로 보지 않는다. */

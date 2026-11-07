@@ -8,6 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
+import { releaseSignupPhone } from '../auth/empty-signup-account';
+import { isPendingSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   countOwnerVisibleParticipations,
@@ -984,6 +986,9 @@ export class ProfileService {
     // 네트워크 유실로 프론트 호출이 안 가도 이 경로는 세션 쿠키가 유효한 한 항상 탄다).
     if (user) {
       await this.prisma.v1PushSubscription.deleteMany({ where: { userId: user.id } });
+      // A social signup still on its terms or profile step can only leave through here ("가입 그만두기"); the number it
+      // saved along the way must not stay locked to a signup nobody is finishing.
+      if (isPendingSocialSignup(user.onboardingStatus)) await releaseSignupPhone(this.prisma, user.id);
     }
     return { ok: true };
   }

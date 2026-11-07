@@ -24,6 +24,7 @@ import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
 import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
+import { ACTIVITY_RELATION_COUNTS } from './empty-signup-account';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import type { RegisterDto } from './dto/register.dto';
@@ -99,6 +100,23 @@ function pendingSocialUserRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const zeroActivityCounts = Object.fromEntries(Object.keys(ACTIVITY_RELATION_COUNTS).map((key) => [key, 0]));
+const signupHolder = (counts: Record<string, number> = zeroActivityCounts) => ({
+  id: 'identity-1', status: 'active', passwordHash: null,
+  user: {
+    accountStatus: 'active', onboardingStatus: 'social_terms_required', phone: '01012345678',
+    adminUser: null, authIdentities: [{ id: 'identity-1' }], _count: counts,
+  },
+});
+const phoneRelease = {
+  where: {
+    id: 'user-1', accountStatus: 'active',
+    onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] }, phone: { not: null },
+  },
+  data: { phone: null, phoneVerifiedAt: null },
+};
+const expiredAt = () => new Date(Date.now() - 25 * 60 * 60 * 1000);
+
 // ─── prisma mock skeleton ────────────────────────────────────────────────────
 
 function buildPrismaMock() {
@@ -117,6 +135,7 @@ function buildPrismaMock() {
     },
     v1AuthIdentity: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({ id: 'created-identity' }),
@@ -760,6 +779,20 @@ describe('AuthService', () => {
       where: { userId: 'user-1' },
       update: { currentStep: 'terms' },
       create: { userId: 'user-1', currentStep: 'terms' },
+    });
+  });
+
+  describe('abandoned social signup releases the number it saved on a completion call', () => {
+    it('completeSocialTerms: 만료 리셋이 가입 대기 계정의 번호를 비운다', async () => {
+      const expiredUser = pendingSocialUserRow({ createdAt: expiredAt(), updatedAt: expiredAt() });
+      prisma.v1User.findUnique.mockResolvedValue(expiredUser);
+      prisma.v1AuthIdentity.findFirst.mockResolvedValue(signupHolder());
+
+      await expect(
+        service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true }),
+      ).rejects.toMatchObject({ response: { code: 'SOCIAL_SIGNUP_EXPIRED' } });
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith(phoneRelease);
     });
   });
 
@@ -2195,6 +2228,57 @@ describe('AuthService', () => {
         data: { lastLoginAt: expect.any(Date) },
       });
       expect(result.session.userId).toBe('user-1');
+    });
+
+    describe('abandoned social signup releases the number it saved', () => {
+    it('만료된 가입 대기 계정으로 다시 로그인하면 리셋과 함께 번호를 비운다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1', status: 'active',
+        user: {
+          id: 'user-1', email: null, accountStatus: 'active', onboardingStatus: 'social_profile_required',
+          createdAt: expiredAt(), updatedAt: expiredAt(),
+        },
+      });
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow({ onboardingStatus: 'social_terms_required' }));
+      prisma.v1AuthIdentity.findFirst.mockResolvedValue(signupHolder());
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith(phoneRelease);
+    });
+
+    it('방치됐어도 활동 기록이 있는 계정의 번호는 그대로 둔다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1', status: 'active',
+        user: {
+          id: 'user-1', email: null, accountStatus: 'active', onboardingStatus: 'social_profile_required',
+          createdAt: expiredAt(), updatedAt: expiredAt(),
+        },
+      });
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow({ onboardingStatus: 'social_terms_required' }));
+      prisma.v1AuthIdentity.findFirst.mockResolvedValue(signupHolder({ ...zeroActivityCounts, teamMemberships: 1 }));
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalledWith(phoneRelease);
+    });
+
+    it('24시간이 지나지 않은 가입은 다시 로그인해도 번호를 그대로 둔다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1', status: 'active',
+        user: {
+          id: 'user-1', email: null, accountStatus: 'active', onboardingStatus: 'social_profile_required',
+          createdAt: new Date(), updatedAt: new Date(),
+        },
+      });
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+      prisma.v1AuthIdentity.findFirst.mockResolvedValue(signupHolder());
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1AuthIdentity.findFirst).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalledWith(phoneRelease);
+    });
     });
   });
 

@@ -37,6 +37,7 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneRegistered } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
+import { releaseSignupPhone } from './empty-signup-account';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -856,6 +857,7 @@ export class AuthService {
         where: { id: user.id },
         data: expired ? { onboardingStatus: 'social_terms_required', lastLoginAt: now } : { lastLoginAt: now },
       });
+      if (expired) await releaseSignupPhone(tx, user.id);
 
       const mergeSeed = pending && seed !== null;
       if (!expired && !mergeSeed) return;
@@ -1500,6 +1502,7 @@ export class AuthService {
         update: { currentStep: 'terms' },
         create: { userId, currentStep: 'terms' },
       });
+      await releaseSignupPhone(tx, userId);
     });
   }
 

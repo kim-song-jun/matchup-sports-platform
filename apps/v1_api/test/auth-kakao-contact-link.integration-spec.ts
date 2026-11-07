@@ -131,6 +131,48 @@ describe('Kakao confirmed contacts and existing membership', () => {
     expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: { in: keys } } })).toBe(0);
   });
 
+  it('answers a withdrawal-pending holder with the link token and the date the withdrawal becomes final, attaching nothing', async () => {
+    const requestedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    await prisma.v1User.update({ where: { id: holderId }, data: { accountStatus: 'withdrawal_pending' } });
+    await prisma.v1StatusChangeLog.create({
+      data: { targetType: 'user', targetId: holderId, fromStatus: 'active', toStatus: 'withdrawal_pending', actorType: 'user', actorUserId: holderId, createdAt: requestedAt },
+    });
+    const before = await prisma.v1User.findUniqueOrThrow({ where: { id: holderId }, include: { authIdentities: true } });
+
+    const response = await kakao({ email, is_email_valid: true, is_email_verified: true }).expect(409);
+
+    expect(response.body.code).toBe('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF');
+    expect(response.body.details).toEqual({
+      next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800,
+      withdrawalPendingUntil: new Date(requestedAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    expect(response.headers['set-cookie']).toBeUndefined();
+    const after = await prisma.v1User.findUniqueOrThrow({ where: { id: holderId }, include: { authIdentities: true } });
+    expect(after).toEqual(before);
+    expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: { in: keys } } })).toBe(0);
+  });
+
+  it('frees the number a Kakao signup saved when it quits on the terms step, so another account can take it', async () => {
+    const response = await kakao({ phone_number: '+82 10-5555-0994' }).expect(201);
+    const id: unknown = response.body.data.session.userId;
+    if (typeof id !== 'string') throw new KakaoContactFixtureError('Kakao signup did not issue a user identity');
+    expect(await prisma.v1User.count({ where: { phone: '01055550994' } })).toBe(1);
+
+    await request(app.getHttpServer()).post('/api/v1/auth/logout').set('x-v1-user-id', id).expect(201);
+
+    await expect(prisma.v1User.findUniqueOrThrow({ where: { id } })).resolves.toMatchObject({
+      phone: null, phoneVerifiedAt: null, onboardingStatus: 'social_terms_required',
+    });
+    await prisma.v1User.create({ data: { id: otherId, phone: '01055550994', phoneVerifiedAt: new Date() } });
+    expect(await prisma.v1User.count({ where: { phone: '01055550994' } })).toBe(1);
+  });
+
+  it('keeps the number of a finished member when they sign out', async () => {
+    await request(app.getHttpServer()).post('/api/v1/auth/logout').set('x-v1-user-id', holderId).expect(201);
+
+    await expect(prisma.v1User.findUniqueOrThrow({ where: { id: holderId } })).resolves.toMatchObject({ phone });
+  });
+
   it('signs in an established Kakao identity without email consent and preserves the original membership', async () => {
     const key = takeKakaoKey();
     const identity = await prisma.v1AuthIdentity.create({ data: { userId: holderId, provider: 'kakao', providerUserKey: key, status: 'active' } });

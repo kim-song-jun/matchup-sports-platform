@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ACTIVITY_RELATION_COUNTS } from '../auth/empty-signup-account';
 import { PrismaService } from '../prisma/prisma.service';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
 import { ProfileService } from './profile.service';
@@ -1536,5 +1537,58 @@ describe('ProfileService logout — 웹 푸시 구독 정리', () => {
     await expect(service.logout(undefined)).resolves.toEqual({ ok: true });
 
     expect(prisma.v1PushSubscription.deleteMany).not.toHaveBeenCalled();
+  });
+
+  describe('가입 그만두기 — 가입 대기 계정이 저장해 둔 번호', () => {
+    const signupHolder = {
+      id: 'identity-1', status: 'active', passwordHash: null,
+      user: {
+        accountStatus: 'active', onboardingStatus: 'social_profile_required', phone: '01012345678',
+        adminUser: null, authIdentities: [{ id: 'identity-1' }],
+        _count: Object.fromEntries(Object.keys(ACTIVITY_RELATION_COUNTS).map((key) => [key, 0])),
+      },
+    };
+    const createSignupPrisma = (holder: unknown) => ({
+      ...createPrisma(),
+      v1AuthIdentity: { findFirst: jest.fn().mockResolvedValue(holder) },
+      v1User: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    });
+
+    it.each(['social_terms_required', 'social_profile_required'] as const)(
+      '%s 단계의 가입 대기 계정이 로그아웃하면 번호를 비워 다른 사람이 쓸 수 있게 한다',
+      async (onboardingStatus) => {
+        const prisma = createSignupPrisma({ ...signupHolder, user: { ...signupHolder.user, onboardingStatus } });
+        const service = createProfileService(prisma as unknown as PrismaService);
+
+        await expect(service.logout({ ...user, onboardingStatus })).resolves.toEqual({ ok: true });
+
+        expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: user.id, accountStatus: 'active',
+            onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] }, phone: { not: null },
+          },
+          data: { phone: null, phoneVerifiedAt: null },
+        });
+      },
+    );
+
+    it('가입을 마친 계정의 로그아웃은 번호를 조회하지도 건드리지도 않는다', async () => {
+      const prisma = createSignupPrisma(signupHolder);
+      const service = createProfileService(prisma as unknown as PrismaService);
+
+      await service.logout(user);
+
+      expect(prisma.v1AuthIdentity.findFirst).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('프로필 입력을 미룬 계정은 이미 쓰는 중이라 로그아웃해도 번호를 그대로 둔다', async () => {
+      const prisma = createSignupPrisma({ ...signupHolder, user: { ...signupHolder.user, onboardingStatus: 'social_profile_deferred' } });
+      const service = createProfileService(prisma as unknown as PrismaService);
+
+      await service.logout({ ...user, onboardingStatus: 'social_profile_deferred' });
+
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
   });
 });

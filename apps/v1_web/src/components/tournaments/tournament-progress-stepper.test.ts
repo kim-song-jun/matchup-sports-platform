@@ -407,8 +407,8 @@ describe('buildTournamentStages — 시상 칸', () => {
  * `round16` 인데 경기 이름은 `12강` 이다.
  */
 describe('buildTournamentStages — 두 토너먼트가 같은 단계를 치를 때', () => {
-  function track(id: string, phase: string, name: string, bracketTrack: string): V1TournamentGroup {
-    return { id, phase, name, bracketTrack, sortOrder: 0, advanceCount: null, groupTeams: [], standings: [], qualification: null };
+  function track(id: string, phase: string, name: string, bracketTrack: string, sortOrder = 0): V1TournamentGroup {
+    return { id, phase, name, bracketTrack, sortOrder, advanceCount: null, groupTeams: [], standings: [], qualification: null };
   }
   const groups = [
     track('u12', 'round16', '상위 토너먼트 · 12강', '상위 토너먼트'),
@@ -455,6 +455,26 @@ describe('buildTournamentStages — 두 토너먼트가 같은 단계를 치를 
       ['상위 토너먼트', '하위 토너먼트'],
       undefined,
     ]);
+  });
+
+  it('토너먼트 이름은 운영자가 만든 순서로 나온다 — 경기 번호 순서가 아니다', () => {
+    const stages = buildTournamentStages(
+      tournament({
+        format: 'league_knockouts',
+        status: 'in_progress',
+        // 챌린지 경기가 번호가 앞서도 프리미어(sortOrder 100대)가 먼저 만들어진 토너먼트다.
+        fixtures: [
+          fixture({ groupId: 'c8', round: '8강', fixtureNumber: 1 }),
+          fixture({ groupId: 'p8', round: '8강', fixtureNumber: 2 }),
+        ],
+        groups: [
+          track('p8', 'quarter', '프리미어 · 8강', '프리미어', 101),
+          track('c8', 'quarter', '챌린지 · 8강', '챌린지', 201),
+        ],
+      }),
+    );
+
+    expect(stages.find((stage) => stage.label === '8강')?.parallelTracks).toEqual(['프리미어', '챌린지']);
   });
 
   it('토너먼트가 하나뿐이면 운영자가 정한 단계 이름을 그대로 쓴다', () => {

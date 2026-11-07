@@ -243,7 +243,7 @@ import { isLeagueCompetition } from '@/lib/competition-kind';
 import { groupFixturesByRound } from './tournament-bracket';
 import { compareTournamentRounds } from '@/lib/tournament-display-order';
 import { tournamentRoundLabel } from '@/lib/tournament-round-label';
-import { bracketTrackLabel } from '@/lib/bracket-track';
+import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 
 /**
  * 라운드 이름 한 개를 단계 분류로 접는다.
@@ -348,12 +348,12 @@ function knockoutStageDrafts(fixtures: V1TournamentFixture[], groups: V1Tourname
     return phase !== 'group' && phase !== 'league' && classifyRound(fixture.round) === 'knockout';
   });
   const rounds = groupFixturesByRound(knockoutFixtures, groups).filter((round) => classifyRound(round.key) === 'knockout');
-  const tracksOf = (roundFixtures: V1TournamentFixture[]) => [...new Set(
-    roundFixtures.flatMap((fixture) => {
-      const track = bracketTrackLabel(fixture.groupId ? groupById.get(fixture.groupId)?.bracketTrack : undefined);
-      return track === null ? [] : [track];
-    }),
-  )];
+  // 토너먼트 이름은 운영자가 만든 순서로 — 경기 번호나 응답 순서가 아니다.
+  const orderedTracks = orderedBracketTracks(groups);
+  const tracksOf = (roundFixtures: V1TournamentFixture[]) => {
+    const present = new Set(roundFixtures.map((fixture) => (fixture.groupId ? groupById.get(fixture.groupId)?.bracketTrack : undefined)));
+    return orderedTracks.filter((track) => present.has(track)).map((track) => bracketTrackLabel(track) ?? track);
+  };
   // 토너먼트가 둘 이상이면 단계 이름이 "상위 토너먼트 · 12강 · 하위 토너먼트 · 12강" 처럼 이어붙어 칸이 한 화면보다
   // 넓어진다 — 칸에는 라운드 이름만 쓰고 토너먼트 이름은 따로 알린다. 토너먼트가 하나면 운영자가 정한 조 이름이 단계 이름이다.
   const parallel = new Set(rounds.flatMap((round) => tracksOf(round.fixtures))).size > 1;

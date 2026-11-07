@@ -1,9 +1,9 @@
 // @vitest-environment node
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resetDiskLRU } from 'next/dist/server/lib/disk-lru-cache.external';
 import { ImageOptimizerCache } from 'next/dist/server/image-optimizer';
 import { sanitizeImageCache } from '../../scripts/image-cache-sanitize.mjs';
 
@@ -13,13 +13,22 @@ const png = await readFile(path.resolve(process.cwd(), 'public/brand/teameet-mar
 let distDir: string;
 let cacheDir: string;
 
-// Next 가 실제로 쓰는 디스크 캐시 — 이름 규칙·LRU 초기화를 이 버전의 Next 코드로 확인한다.
+const nextConfig = { images: { minimumCacheTTL: 60 }, experimental: { isrFlushToDisk: true } };
+
+// Next 가 실제로 쓰는 디스크 캐시로 항목을 쓴다 — 이름 규칙을 이 버전의 Next 코드로 맞춘다.
 function nextCache() {
-  resetDiskLRU();
-  return new ImageOptimizerCache({
-    distDir,
-    nextConfig: { images: { minimumCacheTTL: 60 }, experimental: { isrFlushToDisk: true } },
-  } as unknown as ConstructorParameters<typeof ImageOptimizerCache>[0]);
+  return new ImageOptimizerCache({ distDir, nextConfig } as unknown as ConstructorParameters<typeof ImageOptimizerCache>[0]);
+}
+
+// Next 의 디스크 LRU 는 프로세스당 한 번 초기화되는 싱글턴이라, 읽기 판정은 새 프로세스에서 한다.
+function nextReads(key: string): boolean {
+  const script = `
+    const { ImageOptimizerCache } = require(require.resolve('next/dist/server/image-optimizer', { paths: [process.argv[1]] }));
+    new ImageOptimizerCache({ distDir: process.argv[2], nextConfig: JSON.parse(process.argv[3]) })
+      .get(process.argv[4]).then((entry) => process.stdout.write(entry ? 'hit' : 'miss'));`;
+  const out = execFileSync(process.execPath, ['-e', script, process.cwd(), distDir, JSON.stringify(nextConfig), key], { encoding: 'utf8' });
+  expect(out).toMatch(/^(hit|miss)$/);
+  return out === 'hit';
 }
 
 async function putWithNext(key: string, buffer: Buffer, extension: string) {
@@ -40,7 +49,6 @@ beforeEach(async () => {
   await mkdir(cacheDir, { recursive: true });
 });
 afterEach(async () => {
-  resetDiskLRU();
   await rm(distDir, { recursive: true, force: true });
 });
 
@@ -70,13 +78,13 @@ describe('sanitizeImageCache', () => {
 
   it('turns the disk cache back on after a zero-byte entry had disabled it', async () => {
     await putWithNext('goodWebp', webp, 'webp');
+    expect(nextReads('goodWebp')).toBe(true);
     await putRaw('empty', { '60.1.e.u.webp': Buffer.alloc(0) });
-
-    // Next 의 디스크 LRU 는 크기 0 항목에서 초기화가 실패하고, 그 뒤로는 멀쩡한 항목도 읽지 않는다.
-    expect(await nextCache().get('goodWebp')).toBeNull();
+    // 크기 0 항목이 하나라도 있으면 Next 의 디스크 LRU 초기화가 실패해 멀쩡한 항목도 읽지 않는다.
+    expect(nextReads('goodWebp')).toBe(false);
 
     await sanitizeImageCache(cacheDir);
-    expect((await nextCache().get('goodWebp'))?.value).toMatchObject({ kind: 'IMAGE', extension: 'webp' });
+    expect(nextReads('goodWebp')).toBe(true);
   });
 
   it('treats a missing cache directory as empty', async () => {

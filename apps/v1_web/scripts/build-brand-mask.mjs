@@ -9,8 +9,13 @@ import { fileURLToPath } from 'node:url';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-// sharp 는 v1_web 의 직접 의존성이 아니라 next 가 함께 설치하는 것을 쓴다.
-const sharp = require(require.resolve('sharp', { paths: [path.dirname(require.resolve('next/package.json'))] }));
+// sharp 는 v1_web 의 직접 의존성이 아니라 next 가 함께 설치하는 것을 쓴다(이미지 최적화용 optional 의존성).
+let sharp;
+try {
+  sharp = require(require.resolve('sharp', { paths: [path.dirname(require.resolve('next/package.json'))] }));
+} catch (err) {
+  throw new Error('next 가 설치한 sharp 를 찾지 못했어요 — 저장소 루트에서 pnpm install 을 실행한 뒤 다시 돌려 주세요.', { cause: err });
+}
 
 const source = path.join(appDir, 'public/brand/teameet-mark.png');
 const target = path.join(appDir, 'public/brand/teameet-mark-mask.webp');

@@ -122,7 +122,7 @@ function buildPrisma(db: FakeDb) {
           leagueId?: unknown;
           status?: string;
           startAt?: { gte: Date };
-          AND?: Array<{ OR?: Array<{ startAt?: { gte?: Date } | null }> }>;
+          AND?: Array<{ startAt?: null; OR?: Array<{ startAt?: { gte?: Date } }> }>;
           OR?: Array<Record<string, { in: string[] }>>;
         };
       }) => {
@@ -132,11 +132,11 @@ function buildPrisma(db: FakeDb) {
         const scheduleBranches = args.where.AND?.flatMap((clause) => clause.OR ?? []) ?? [];
         const startAt = args.where.startAt?.gte ?? scheduleBranches
           .find((condition) => condition.startAt?.gte !== undefined)?.startAt?.gte ?? new Date(0);
-        // 쿼리가 `startAt: null` 갈래를 실었을 때만 시각 미정 경기가 후보가 된다.
-        const includesUntimed = scheduleBranches.some((condition) => condition.startAt === null);
+        // 시각 미정 경기는 `startAt: null` 을 건 별도 쿼리에서만 후보가 되고, 시각 있는 쿼리는 시각 있는 경기만 받는다.
+        const isUntimedQuery = args.where.AND?.some((clause) => clause.startAt === null) ?? false;
         const statusOf = (match: FakeMatch) => (db.completedTeamMatchIds?.includes(match.id) ? 'completed' : 'matched');
         const scheduled = (match: FakeMatch) =>
-          match.startAt === null ? includesUntimed : match.startAt >= startAt;
+          isUntimedQuery ? match.startAt === null : match.startAt !== null && match.startAt >= startAt;
         return Promise.resolve(
           matches.filter(
             (match) =>

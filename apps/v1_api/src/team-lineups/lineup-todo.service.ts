@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import { competitionMatchLabel } from '../tournaments/tournament-round-label';
 import { NOT_IN_HELD_LEAGUE_WHERE } from '../league-matches/league-hold';
-import { compareScheduledAtNullLast, orderTimedBeforeUntimed } from './untimed-game-order';
+import { compareScheduledAtNullLast, orderUntimedByProgress } from './untimed-game-order';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -85,19 +85,29 @@ const UNSTARTED_TOURNAMENT_GAME_WHERE = {
   game: { is: { state: 'SCHEDULED' } },
 } satisfies Prisma.V1TeamMatchWhereInput;
 
+/**
+ * Untimed fixtures of a tournament whose bracket is public (`isBracketPublished`'s rule: published, or
+ * the scheduled publication time has passed). Bracket generation creates matched fixtures before they are
+ * announced, and the match detail page the cards link to answers 404 until then.
+ */
+function untimedPublishedTournamentGameWhere(now: Date): Prisma.V1TeamMatchWhereInput {
+  return {
+    AND: [
+      { startAt: null },
+      UNSTARTED_TOURNAMENT_GAME_WHERE,
+      { tournament: { OR: [{ bracketPublishedAt: { not: null } }, { bracketPublishScheduledAt: { lte: now } }] } },
+    ],
+  };
+}
+
 function scheduleFilterOf(now: Date, options: TeamMatchCollectionOptions): Prisma.V1TeamMatchWhereInput {
   const timed = { startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) } };
-  if (!options.includeElapsedScheduledTournamentGames && !options.includeUntimedTournamentGames) {
+  if (!options.includeElapsedScheduledTournamentGames) {
     return { ...timed, AND: [NOT_IN_HELD_LEAGUE_WHERE] };
   }
-  const branches: Prisma.V1TeamMatchWhereInput[] = [timed];
-  if (options.includeElapsedScheduledTournamentGames) {
-    branches.push({ startAt: { lt: now }, ...UNSTARTED_TOURNAMENT_GAME_WHERE });
-  }
-  if (options.includeUntimedTournamentGames) {
-    branches.push({ startAt: null, ...UNSTARTED_TOURNAMENT_GAME_WHERE });
-  }
-  return { AND: [NOT_IN_HELD_LEAGUE_WHERE, { OR: branches }] };
+  return {
+    AND: [NOT_IN_HELD_LEAGUE_WHERE, { OR: [timed, { startAt: { lt: now }, ...UNSTARTED_TOURNAMENT_GAME_WHERE }] }],
+  };
 }
 
 /** 대회·리그 경기 명단 웹 화면. 알림 딥링크와 웹 라우트가 같은 값을 써야 한다. */
@@ -245,64 +255,77 @@ export class LineupTodoService {
   }
 
   private async loadTeamMatches(teamIds: string[] | null, now: Date, options: TeamMatchCollectionOptions) {
-    const scheduleFilter = scheduleFilterOf(now, options);
-    const matchQuery = {
-      where: {
-        // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
-        status: 'matched',
-        ...scheduleFilter,
-        hostTeamId: { not: null },
-        approvedApplicantTeamId: { not: null },
-        game: { isNot: null },
-        ...(teamIds !== null
-          ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
-          : {}),
+    const candidateWhere = {
+      // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
+      status: 'matched',
+      hostTeamId: { not: null },
+      approvedApplicantTeamId: { not: null },
+      game: { isNot: null },
+      ...(teamIds !== null
+        ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
+        : {}),
+    } satisfies Prisma.V1TeamMatchWhereInput;
+    const select = {
+      id: true,
+      // `title`은 읽지 않는다 — 리그 대진의 라벨은 아래에서 리그명 + 파생 주차로 조립하고,
+      // 친선 팀매치의 제목은 모집 문구라 라벨로 쓰지 않는다.
+      startAt: true,
+      hostTeamId: true,
+      hostTeam: { select: { name: true } },
+      approvedApplicantTeamId: true,
+      approvedApplicantTeam: { select: { name: true } },
+      leagueId: true,
+      tournamentId: true,
+      tournament: { select: { title: true } },
+      tournamentDetails: {
+        select: { round: true, legNumber: true, fixtureNumber: true, group: { select: { name: true, phase: true } } },
       },
-      select: {
-        id: true,
-        // `title`은 읽지 않는다 — 리그 대진의 라벨은 아래에서 리그명 + 파생 주차로 조립하고,
-        // 친선 팀매치의 제목은 모집 문구라 라벨로 쓰지 않는다.
-        startAt: true,
-        hostTeamId: true,
-        hostTeam: { select: { name: true } },
-        approvedApplicantTeamId: true,
-        approvedApplicantTeam: { select: { name: true } },
-        leagueId: true,
-        tournamentId: true,
-        tournament: { select: { title: true } },
-        tournamentDetails: {
-          select: { round: true, legNumber: true, fixtureNumber: true, group: { select: { name: true, phase: true } } },
-        },
-        // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
-        // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
-        league: { select: { title: true } },
-        game: { select: { id: true } },
-      },
-      // The stable tie-breaker lets the roster-only path continue after a cursor
-      // without dropping matches that share a kickoff time. Other consumers keep
-      // their prior ordering contract.
-      orderBy: options.includeElapsedScheduledTournamentGames || options.includeUntimedTournamentGames
-        ? [{ startAt: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }]
-        : { startAt: 'asc' },
-      take: 500,
-    } satisfies Prisma.V1TeamMatchFindManyArgs;
-    const matches = await this.prisma.v1TeamMatch.findMany(matchQuery);
-    if (options.includeElapsedScheduledTournamentGames && matches.length === matchQuery.take) {
-      // Delayed SCHEDULED tournament games sort before future fixtures. Keep each
-      // database read bounded, but exhaust the roster selector's candidate set so
-      // a backlog cannot hide later fixtures behind the historical 500-row cap.
-      let cursorId = matches[matches.length - 1]?.id;
-      while (cursorId !== undefined) {
-        const page = await this.prisma.v1TeamMatch.findMany({
-          ...matchQuery,
-          cursor: { id: cursorId },
-          skip: 1,
-        });
-        matches.push(...page);
-        if (page.length < matchQuery.take) break;
-        cursorId = page[page.length - 1]!.id;
+      // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
+      // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
+      league: { select: { title: true } },
+      game: { select: { id: true } },
+    } satisfies Prisma.V1TeamMatchSelect;
+    const take = 500;
+    const readPage = (
+      where: Prisma.V1TeamMatchWhereInput,
+      orderBy: Prisma.V1TeamMatchOrderByWithRelationInput | Prisma.V1TeamMatchOrderByWithRelationInput[],
+      afterId?: string,
+    ) =>
+      this.prisma.v1TeamMatch.findMany({
+        where,
+        select,
+        orderBy,
+        take,
+        ...(afterId === undefined ? {} : { cursor: { id: afterId }, skip: 1 }),
+      });
+    // Database reads stay bounded at one page, but an exhaustive read keeps following the last id until a short
+    // page so a backlog cannot hide later rows behind the 500-row cap.
+    const readAllPages = async (
+      where: Prisma.V1TeamMatchWhereInput,
+      orderBy: Prisma.V1TeamMatchOrderByWithRelationInput | Prisma.V1TeamMatchOrderByWithRelationInput[],
+    ) => {
+      const rows = await readPage(where, orderBy);
+      for (let page = rows; page.length === take; ) {
+        page = await readPage(where, orderBy, page[page.length - 1]!.id);
+        rows.push(...page);
       }
-    }
+      return rows;
+    };
+
+    const timedWhere = { ...candidateWhere, ...scheduleFilterOf(now, options) };
+    // The stable tie-breaker lets the roster-only path continue after a cursor without dropping matches that
+    // share a kickoff time. Every row this filter returns has a `startAt`, so the cursor comparison never meets NULL.
+    const timedMatches = options.includeElapsedScheduledTournamentGames
+      ? await readAllPages(timedWhere, [{ startAt: 'asc' }, { id: 'asc' }])
+      : await readPage(timedWhere, { startAt: 'asc' });
+    // Untimed rows are a separate read: a cursor over `(startAt, id)` compares `startAt` with `>`, which drops
+    // NULL rows, so they are paged on `id` alone.
+    const untimedMatches = options.includeUntimedTournamentGames
+      ? orderUntimedByProgress(
+          await readAllPages({ ...candidateWhere, ...untimedPublishedTournamentGameWhere(now) }, { id: 'asc' }),
+        )
+      : [];
+    const matches = [...timedMatches, ...untimedMatches];
 
     // `startAt` is null only for tournament fixtures whose kickoff is not set yet, and only when the caller
     // asked for them. League fixtures always carry a kickoff, which the week derivation relies on.
@@ -311,7 +334,7 @@ export class LineupTodoService {
     );
 
     const rows: Array<Omit<LineupTodo, 'state'>> = [];
-    for (const match of orderTimedBeforeUntimed(matches)) {
+    for (const match of matches) {
       if (match.game === null) continue;
       // League creators temporarily carry both IDs for the shared TeamMatch row.
       // `leagueId` is the authoritative discriminator for those rows; checking

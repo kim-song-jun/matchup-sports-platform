@@ -83,7 +83,7 @@
     팀 상세 다가오는 경기는 3시간 유예 대신 킥오프가 지났어도 게임이 `SCHEDULED` 인 대회 경기와 시각 미정 대회 경기를
     따로 받는다(`GET /teams/:teamId/upcoming-games`, `games.md`).
   - **시각 미정 대회 경기도 후보다(MD-QA #228, 2026-11-07).** 시각 있는 경기가 하나도 없을 때만, 상대가 정해졌지만
-    킥오프 시각이 아직 없는 대회 경기(게임 `SCHEDULED`, 진행 중 대회, 리그·친선 제외)가 뽑히고 `scheduledAt` 은 `null`
+    킥오프 시각이 아직 없는 대회 경기(게임 `SCHEDULED`, 진행 중 대회, 리그·친선 제외, 대진 공개 후 — `bracketPublishedAt` 이 있거나 예약 공개 시각이 지남)가 뽑히고 `scheduledAt` 은 `null`
     이다. 여럿이면 대회 진행 순서(단계 → 라운드 → 대진 번호 → 차수)로 첫 경기다. 웹은 시간 자리에 "일정 미정"을 적는다.
     팀원·팀장 모두 같은 규칙이며 라인업 할 일·알림은 이 범위를 넓히지 않는다.
   `{ gameId, teamMatchId, competitionKind, competitionId(대회 id 또는 리그 id), title, opponentName, scheduledAt(시각 미정이면 null),

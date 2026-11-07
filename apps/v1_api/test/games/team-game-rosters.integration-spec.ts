@@ -725,6 +725,9 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
           { gameId, sideKey: V1GameSideKey.AWAY, teamId: f.teamB.id, displayNameSnapshot: '원정' },
         ]),
       });
+      // g2 는 시각 미정이다 — 지연 경기 500행을 넘겨 읽는 동안에도 따로 읽혀 빠지지 않는다(대진은 공개 상태).
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { bracketPublishedAt: new Date() } });
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: null } });
       const withBacklog = await getAs(memberPath, f.teamA.members[0]);
       expect(withBacklog.status).toBe(200);
       const returnedGameIds = (withBacklog.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId);
@@ -773,8 +776,32 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       const nextGame = (teamId: string, userId: string) =>
         app.get(TeamUpcomingGamesService).nextForMemberships(userId, [{ teamId, role: 'member' }], new Date());
 
-      // g2 의 시각만 지운다 — g1 은 내일이다.
-      await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: null } });
+      // 대진을 만들었어도 공개 전에는 상대와 "일정 미정" 경기를 팀원에게 내리지 않는다 — 경기 상세가 404 라 막다른 링크가 된다.
+      const bothMatchIds = [f.games.g1.teamMatchId, f.games.g2.teamMatchId];
+      await prisma.v1TeamMatch.updateMany({ where: { id: { in: bothMatchIds } }, data: { startAt: null } });
+      expect(await listedGames()).toEqual([]);
+      expect(await nextGame(f.teamA.id, a1)).toBeNull();
+      // 예약 공개 시각 전에도 비공개다.
+      await prisma.v1Tournament.update({
+        where: { id: f.tournament.id },
+        data: { bracketPublishScheduledAt: new Date(Date.now() + DAY) },
+      });
+      expect(await listedGames()).toEqual([]);
+      expect(await nextGame(f.teamA.id, a1)).toBeNull();
+      // 예약 시각이 지나면 bracketPublishedAt 이 비어 있어도 공개다.
+      await prisma.v1Tournament.update({
+        where: { id: f.tournament.id },
+        data: { bracketPublishScheduledAt: new Date(Date.now() - 60_000) },
+      });
+      expect((await listedGames()).map((item) => item.gameId)).toEqual([f.games.g1.gameId, f.games.g2.gameId]);
+      expect((await nextGame(f.teamA.id, a1))?.gameId).toBe(f.games.g1.gameId);
+      // 공개를 취소하면 다시 숨는다.
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { bracketPublishScheduledAt: null } });
+      expect(await listedGames()).toEqual([]);
+      expect(await nextGame(f.teamA.id, a1)).toBeNull();
+      // 즉시 공개. g1 은 다시 내일이고 g2 만 시각이 없다.
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { bracketPublishedAt: new Date() } });
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g1.teamMatchId }, data: { startAt: new Date(Date.now() + DAY) } });
       const mixed = await listedGames();
       expect(mixed.map((item) => [item.gameId, item.scheduledAt === null])).toEqual([
         [f.games.g1.gameId, false],

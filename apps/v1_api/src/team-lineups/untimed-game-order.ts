@@ -2,7 +2,6 @@ import { competitionStageRank } from '../tournaments/tournament-stage-rank';
 
 export interface OrderableTeamMatch {
   readonly id: string;
-  readonly startAt: Date | null;
   readonly tournamentDetails: {
     readonly round: string;
     readonly fixtureNumber: number;
@@ -14,17 +13,13 @@ export interface OrderableTeamMatch {
 const LEAGUE_ROUND = /^league_r(\d+)$/;
 
 /**
- * 팀 경기 목록의 순서: 시각이 있는 경기가 가까운 순으로 먼저, 시각이 아직 없는 대회 경기는 그 뒤에
- * 대회 안의 진행 순서(단계 → 라운드 → 대진 번호 → 차수)로 놓는다.
+ * 시각이 아직 없는 대회 경기를 대회 안의 진행 순서(단계 → 라운드 → 대진 번호 → 차수 → id)로 놓는다.
  *
- * 시각 있는 경기는 받은 순서(DB 의 시각순)를 그대로 둔다. 단계를 알 수 없는 라운드는 조별 단계와 같은 칸에
- * 둔다(`loadTeamCompetitionGameOrder` 와 같은 규칙). `league_r10` 이 `league_r2` 보다 앞서지 않도록 조별
- * 라운드는 숫자로 비교한다.
+ * 단계는 `competitionStageRank` 로 읽고, 단계를 알 수 없는 라운드는 조별 단계와 같은 칸에 둔다
+ * (`sortByCompetitionStage` 와 같다). 조별 라운드는 `league_r10` 이 `league_r2` 보다 앞서지 않도록 숫자로 비교한다.
  */
-export function orderTimedBeforeUntimed<T extends OrderableTeamMatch>(matches: readonly T[]): T[] {
-  const timed = matches.filter((match) => match.startAt !== null);
-  const untimed = matches.filter((match) => match.startAt === null).sort(compareUntimed);
-  return [...timed, ...untimed];
+export function orderUntimedByProgress<T extends OrderableTeamMatch>(matches: readonly T[]): T[] {
+  return [...matches].sort(compareUntimed);
 }
 
 /** 시각 오름차순, 시각 없는 경기는 맨 뒤. 둘 다 없으면 같은 자리라 받은 순서를 지킨다. */

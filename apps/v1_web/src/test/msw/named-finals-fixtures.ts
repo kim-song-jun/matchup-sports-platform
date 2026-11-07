@@ -10,7 +10,7 @@ export function namedFinalView(): MultiFinalView {
   return { revision: 1, generated: false, fixtureCount: 2, preliminaryFixtureCount: 2, groups, registrations: structuredClone(namedFinalRegistrations),
     groupStandings: groups.map(group => ({ groupId: group.id, name: group.name, complete: false, rows: [] })),
     finals: ['챔피언', '챌린지'].map((name, index) => ({ id: `9d710000-0000-4000-8000-00000000002${index}`, colorIndex: index, name, rules: groups.map(group => ({ groupId: group.id, rank: index + 1 })),
-      thirdPlace: false, registrationIds: [namedFinalRegistrations[index].id, namedFinalRegistrations[index + 2].id], manual: true,
+      thirdPlace: false, registrationIds: [namedFinalRegistrations[index].id, namedFinalRegistrations[index + 2].id], manual: true, standingsChanged: false,
       suggestedRegistrationIds: [], unresolved: groups.map(group => ({ groupId: group.id, rank: index + 1, state: 'group_incomplete', tiedRegistrationIds: [] })),
     })),
   };

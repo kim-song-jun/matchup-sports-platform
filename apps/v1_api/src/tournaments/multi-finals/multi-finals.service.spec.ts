@@ -2,6 +2,7 @@ import type { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { BracketTemplateService } from '../templates/bracket-template.service';
+import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config.presets';
 import { MultiFinalsService } from './multi-finals.service';
 
 describe('N개 결선 미리보기 경기 번호', () => {
@@ -18,6 +19,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 6 } }) },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) }, v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
@@ -43,6 +45,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: maximum } }) },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) }, v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
@@ -133,6 +136,7 @@ describe('옛 순서로 저장된 진출 규칙의 추천', () => {
     const tx = {
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({
         id: 'tournament', kind: 'regular_tournament', format: 'league_knockouts', multiFinalsRevision: 4,
+        competitionConfigVersionId: 'cfg', competitionConfig: FOOTBALL_V1_CONFIG,
         multiFinals: {
           groups: [{ id: 'g-a', name: 'A조', capacity: 2, legs: 1 }, { id: 'g-b', name: 'B조', capacity: 2, legs: 1 }],
           finals: [{ name: '본선', capacity: 4, thirdPlace: false, registrationIds: null, rules: [rule('g-a', 1), rule('g-a', 2), rule('g-b', 1), rule('g-b', 2)] }],

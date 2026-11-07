@@ -17,7 +17,7 @@ export type MultiFinalView = {
   revision: number; groups: MultiFinalGroup[]; generated: boolean; fixtureCount?: number; preliminaryFixtureCount?: number;
   groupStandings?: MultiFinalGroupStanding[];
   registrations: Array<{ id: string; team: { id: string; name: string } }>;
-  finals: Array<MultiFinalDefinition & { id: string; colorIndex: number; suggestedRegistrationIds: string[]; manual: boolean; crossGroupTopThreeAvailable?: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;
+  finals: Array<MultiFinalDefinition & { id: string; colorIndex: number; suggestedRegistrationIds: string[]; manual: boolean; standingsChanged: boolean; crossGroupTopThreeAvailable?: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;
 };
 export type MultiFinalPreview = { plan?: {
   groups: Array<{ key: string; name: string; bracketTrack?: string }>;
@@ -38,7 +38,7 @@ export function useMultiFinals(id: string, enabled: boolean) {
   const preview = useMutation({ mutationFn: () => v1Post<MultiFinalPreview>(`${path}/preview`, {}) });
   const generate = useMutation({ mutationFn: (input: { expectedRevision: number; previewHash: string; requestId: string }) => v1Post<{ revision: number }>(`${path}/generate`, input), onSuccess: refresh });
   const assignmentPreview = useMutation({ mutationFn: (input: { expectedRevision: number; finalName: string; assignmentPolicy: MultiFinalPolicy }) =>
-    v1Post<{ revision: number; finalName: string; registrationIds: string[]; assignmentPolicy: MultiFinalPolicy; sourceVersion: string }>(`${path}/assignment-preview`, input) });
+    v1Post<{ revision: number; finalName: string; registrationIds: Array<string | null>; assignmentPolicy: MultiFinalPolicy; sourceVersion: string }>(`${path}/assignment-preview`, input) });
   const assign = useMutation({ mutationFn: (input: { expectedRevision: number; finalName: string; registrationIds: string[]; assignmentPolicy: MultiFinalPolicy; sourceVersion: string }) =>
     v1Put<MultiFinalView>(`${path}/assignment`, input), onSuccess: refresh });
   return { view, setup, select, updatePreliminary, reset, preview, generate, assignmentPreview, assign };

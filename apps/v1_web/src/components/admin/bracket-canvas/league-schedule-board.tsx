@@ -45,11 +45,11 @@ export interface LeagueScheduleBoardProps {
 
 const TOOLBAR_BUTTON = 'tm-btn tm-btn-sm tm-btn-outline';
 
-/** 주차 칸 제목 — '2주차 · 11/17 (월)~11/23 (일)'. 데스크톱 칸과 모바일 주차 머리가 같이 쓴다. */
+/** Week heading such as '2주차 · 11/21 (토)~11/22 (일)', covering only the days with games; shared by the desktop column and the mobile week header. */
 export function leagueWeekHeading(column: LeagueBoardColumn): string {
   const range = formatTournamentDateRangeShort(
-    new Date(kstMidnightMs(column.startDate)).toISOString(),
-    new Date(kstMidnightMs(column.endDate)).toISOString(),
+    new Date(kstMidnightMs(column.firstGameDate)).toISOString(),
+    new Date(kstMidnightMs(column.lastGameDate)).toISOString(),
   );
   return `${column.weekNumber}주차 · ${range}`;
 }

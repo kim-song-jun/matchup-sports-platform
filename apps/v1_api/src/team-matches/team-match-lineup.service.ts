@@ -10,7 +10,7 @@ import { Prisma, V1ConsentState, V1GameLineupState, V1GameState, type V1TeamMatc
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
-import { isCommandConcurrencyConflict } from '../games/command-concurrency-error';
+import { commandConcurrencyConflict, isCommandConcurrencyConflict } from '../games/command-concurrency-error';
 import {
   TEAM_MATCH_ROSTER_DEPENDENT_EVENT_TYPES,
   latestTeamMatchLineupBySide,
@@ -850,10 +850,7 @@ export class TeamMatchLineupService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
-        throw new ConflictException({
-          code: 'COMMAND_CONCURRENCY_CONFLICT',
-          message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.',
-        });
+        throw commandConcurrencyConflict();
       }
       throw error;
     }

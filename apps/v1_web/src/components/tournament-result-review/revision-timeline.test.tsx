@@ -190,3 +190,21 @@ describe('RevisionTimeline — 처리한 사람', () => {
   });
 });
 
+describe('RevisionTimeline — 사유 줄', () => {
+  it('어드민 빠른 결과가 저장한 [quick-result] 는 사유로 보이지 않는다', () => {
+    render(<RevisionTimeline revisions={[revision({ id: 'rev-1', reason: '[quick-result]' })]} />);
+
+    expect(screen.queryByText(/quick-result/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/사유/)).not.toBeInTheDocument();
+  });
+
+  it('사람이 쓴 정정 사유는 그대로 보인다', () => {
+    render(
+      <RevisionTimeline
+        revisions={[revision({ id: 'rev-2', revision: 2, supersedesId: 'rev-1', reason: '득점자 오기재 정정' })]}
+      />,
+    );
+
+    expect(screen.getByText('사유: 득점자 오기재 정정')).toBeInTheDocument();
+  });
+});

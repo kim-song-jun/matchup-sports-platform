@@ -94,13 +94,13 @@ export function assertPenaltiesNotAllowed(
   if (!facts.isKnockoutFixture) {
     throw new ConflictException({
       code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-      message: 'Penalty shootouts can only be recorded for knockout-phase fixtures',
+      message: '승부차기는 결선 경기에서만 기록할 수 있어요.',
     });
   }
   if (score.home !== score.away) {
     throw new ConflictException({
       code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-      message: 'Penalty shootouts are only recorded when regulation time ends level',
+      message: '승부차기는 정규시간이 무승부로 끝난 경기에서만 기록할 수 있어요.',
     });
   }
   return { ...score, penalties };

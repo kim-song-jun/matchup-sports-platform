@@ -62,7 +62,10 @@
 |---|---|
 | 비로그인 또는 비멤버 | 모든 행에서 `null`(`membersVisibilityEnabled=true`로 디렉터리 자체는 보여도 PII는 안 보임) |
 | 일반 active 멤버 | 본인 `userId` 행에서만 값이 보이고 다른 멤버 행은 `null` |
-| active owner/manager | 로스터 관리 응답으로 모든 반환 멤버 행에서 값이 보임(source가 비어 있으면 여전히 `null`) |
+| active owner/manager | 로스터 관리 응답으로 `status=active`인 멤버 행에서 값이 보임(source가 비어 있으면 여전히 `null`) |
+
+네 필드는 대상 행의 `status`가 `active`일 때만 채워진다. `status=left|removed`로 조회한 행은 owner/manager에게도
+항상 `null`이고, `displayName`·`role`·`status`·`joinedAt` 같은 디렉터리/표시용 필드만 남는다.
 
 `displayName`, `profileImageUrl`, role, status, 가입 메타데이터는 디렉터리/표시용 필드이며 이
 매트릭스가 적용되는 비공개 로스터 데이터가 아니다. 대회 로스터 등록 화면은 `realName`,

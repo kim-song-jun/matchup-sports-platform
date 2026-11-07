@@ -102,7 +102,7 @@ export async function loadGroupRankSources(
   });
   const standings = await client.v1TournamentStanding.findMany({
     where: { groupId: { in: [...groupIds] } },
-    select: { groupId: true, registrationId: true, position: true, wins: true, draws: true, losses: true, recalculatedAt: true },
+    select: { groupId: true, registrationId: true, position: true, wins: true, draws: true, losses: true, fairPlayPoints: true, recalculatedAt: true },
   });
   const details = await client.v1TournamentMatchDetails.findMany({
     where: {

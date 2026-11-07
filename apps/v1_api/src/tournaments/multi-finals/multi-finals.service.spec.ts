@@ -18,6 +18,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 6 } }) },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) }, v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
@@ -43,6 +44,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: maximum } }) },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) }, v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };

@@ -27,6 +27,7 @@ function harness() {
     v1TournamentMatchDetails: { aggregate: jest.fn(async () => ({ _max: { fixtureNumber: 1 } })), count: jest.fn(async () => 2), findMany: jest.fn(async ({ where }) => where.group ? [fixture] : [{ groupId: 'g', homeRegistrationId: 'r1', awayRegistrationId: 'r2', teamMatch: { game: { currentOfficialRevision: complete ? { state: 'OFFICIAL', score: { home: 2, away: 0 }, officialAt: new Date('2026-11-06T00:00:00Z') } : null } } }]) },
     v1TournamentGroup: { count: jest.fn(async () => 2) },
     v1TournamentSlot: { findMany: jest.fn(async ({ where }) => where.group ? [{ id: 's1', position: 1 }, { id: 's2', position: 2 }] : []) },
+    v1AdminActionLog: { findFirst: jest.fn(async () => null) }, v1OperationAudit: { findFirst: jest.fn(async () => null) },
   };
   const admins = { getTournamentMutationAdmin: jest.fn(async () => ({ id: 'admin' })), logAdminAction: jest.fn() };
   const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };

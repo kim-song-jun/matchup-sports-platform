@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -14,7 +14,7 @@ function savedView(): MultiFinalView {
   return { revision: 1, generated: true, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], registrations,
     groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
     finals: ['프리미어', '챌린지'].map((name, i) => ({ id: `final-${i}`, colorIndex: i, name, thirdPlace: false, rules: [i * 2 + 1, i * 2 + 2].map(rank => ({ groupId: 'g-1', rank })), registrationIds: null,
-      manual: false, suggestedRegistrationIds: [`reg-${i * 2}`, `reg-${i * 2 + 1}`], unresolved: [], crossGroupTopThreeAvailable: false })) };
+      manual: false, standingsChanged: false, suggestedRegistrationIds: [`reg-${i * 2}`, `reg-${i * 2 + 1}`], unresolved: [], crossGroupTopThreeAvailable: false })) };
 }
 function bracketData() {
   return { groups: ['프리미어', '챌린지'].map((bracketTrack, i) => ({ id: `final-${i}`, name: `${bracketTrack} 결승`, phase: 'final', bracketTrack })),
@@ -39,6 +39,35 @@ function handlers(view: MultiFinalView, bracket = bracketData()) {
       return success({ revision: view.revision, finalName: input.finalName, assignmentPolicy: input.assignmentPolicy,
         registrationIds: view.finals.find(final => final.name === input.finalName)!.suggestedRegistrationIds, sourceVersion: 'official-source' });
     }));
+}
+
+const STANDINGS_CHANGED = '마지막 배정 이후 조별 순위나 결과가 바뀌었어요. 현재 결선 배정과 최신 순위를 비교해 다시 확인해 주세요.';
+const SEMI_REMATCH = '4강에서는 같은 조 팀이 다시 만날 수 있어요';
+// 6-team tournament: seeds 1-2 get byes into the 4강, seeds 4-5 and 3-6 play the 6강 (the shape planNamedFinals saves).
+function sixTeamTournament(groupOf: string[]) {
+  const teams = ['가팀', '나팀', '다팀', '라팀', '마팀', '바팀'].map((name, i) => ({ id: `t${i + 1}`, team: { id: `team-${i + 1}`, name } }));
+  const seeds = ['t1', 't4', 't2', 't5', 't3', 't6'];
+  const groups = [...new Set(groupOf)].map((id, index) => ({ id: `g-${id}`, name: `${index + 1}조`, capacity: 3, legs: 1 as const }));
+  const view: MultiFinalView = { revision: 1, generated: true, groups, registrations: teams,
+    groupStandings: groups.map(group => ({ groupId: group.id, name: group.name, complete: true,
+      rows: teams.flatMap((reg, i) => groupOf[i] === group.id.slice(2) ? [reg] : []).map((reg, rank) => ({ registrationId: reg.id, teamName: reg.team.name, position: rank + 1, points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, tiedRegistrationIds: [] })) })),
+    finals: [{ id: 'final-0', colorIndex: 0, name: '챌린지', thirdPlace: false, registrationIds: null, manual: false, standingsChanged: false, unresolved: [], crossGroupTopThreeAvailable: false,
+      rules: groups.flatMap(group => [1, 2, 3].map(rank => ({ groupId: group.id, rank }))).slice(0, 6), suggestedRegistrationIds: seeds }] };
+  const phases = [['quarter', '6강'], ['semi', '4강'], ['final', '결승']];
+  const slot = (position: number) => ({ id: `slot-${position}`, groupId: 'quarter', kind: 'GROUP_RANK', position, byeSortOrder: position <= 2 ? position - 1 : null });
+  const fixture = (n: number, phase: string, home: number | null, away: number | null, bracketSources: unknown[] = []) => ({ id: `fixture-${n}`, groupId: phase, fixtureNumber: n, status: 'scheduled',
+    homeSlotId: home === null ? null : `slot-${home}`, awaySlotId: away === null ? null : `slot-${away}`, bracketSources, game: { state: 'SCHEDULED', hasLiveRecords: false, hasOfficialResult: false } });
+  const bracket = { groups: phases.map(([phase, label]) => ({ id: phase, name: `챌린지 · ${label}`, phase, bracketTrack: '챌린지' })), slots: [1, 2, 3, 4, 5, 6].map(slot),
+    fixtures: [fixture(1, 'quarter', 4, 5), fixture(2, 'quarter', 3, 6), fixture(3, 'semi', 1, null, [{ fixtureId: 'fixture-1', outcome: 'WINNER', side: 'AWAY' }]),
+      fixture(4, 'semi', 2, null, [{ fixtureId: 'fixture-2', outcome: 'WINNER', side: 'AWAY' }]),
+      fixture(5, 'final', null, null, [{ fixtureId: 'fixture-3', outcome: 'WINNER', side: 'HOME' }, { fixtureId: 'fixture-4', outcome: 'WINNER', side: 'AWAY' }])], standings: [] };
+  return { view, bracket: bracket as unknown as ReturnType<typeof bracketData> };
+}
+async function openReview(finalName: string) {
+  const button = await screen.findByRole('button', { name: '선택한 토너먼트 대진 확인' });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await screen.findByText(`${finalName} 대진 확인`);
 }
 
 describe('토너먼트별 독립 진출팀 배정', () => {
@@ -96,6 +125,49 @@ describe('토너먼트별 독립 진출팀 배정', () => {
     fireEvent.click(screen.getByRole('button', { name: '프리미어 진출팀 확정' }));
     await waitFor(() => expect(input).toEqual(expect.objectContaining({ assignmentPolicy: 'cross_group_top3', registrationIds: ['reg-1', 'reg-0'], sourceVersion: 'draw-source' })));
     expect(previews).toBe(1);
+  });
+  it('마지막 배정 이후 순위 순서가 바뀐 토너먼트에만 다시 확인 안내를 띄운다', async () => {
+    const view = savedView(); view.finals[0].standingsChanged = true; handlers(view); show();
+    await screen.findByText(STANDINGS_CHANGED);
+    fireEvent.change(screen.getByRole('combobox', { name: '배정할 토너먼트' }), { target: { value: '챌린지' } });
+    await screen.findByRole('checkbox', { name: '다팀' });
+    expect(screen.queryByText(STANDINGS_CHANGED)).not.toBeInTheDocument();
+  });
+  it('순위가 그대로면 다시 확인 안내를 띄우지 않는다', async () => {
+    handlers(savedView()); show();
+    await screen.findByRole('table', { name: 'A조 · 확정 순위표' });
+    expect(screen.queryByText(STANDINGS_CHANGED)).not.toBeInTheDocument();
+  });
+  it('교차 배치 확인 단계에서만 4강 재대결 가능을 알린다', async () => {
+    const view = savedView(); view.finals[0].crossGroupTopThreeAvailable = true; handlers(view);
+    server.use(http.post(`${path}/assignment-preview`, async () => success({ revision: 1, finalName: '프리미어', assignmentPolicy: 'cross_group_top3', registrationIds: ['reg-1', 'reg-0'], sourceVersion: 'draw-source' })));
+    show();
+    fireEvent.change(await screen.findByRole('combobox', { name: '진출팀 배치 방식' }), { target: { value: 'cross_group_top3' } });
+    fireEvent.click(screen.getByRole('button', { name: '무작위 추천 배치 만들기' }));
+    await screen.findByText('1번 시드 · 나팀');
+    expect(screen.queryByText(SEMI_REMATCH)).not.toBeInTheDocument();
+    await openReview('프리미어');
+    expect(screen.getByText(SEMI_REMATCH)).toBeInTheDocument();
+  });
+  it('기본 순위 순서 확인 단계에는 4강 재대결 안내를 띄우지 않는다', async () => {
+    handlers(savedView()); show();
+    await openReview('프리미어');
+    expect(screen.queryByText(SEMI_REMATCH)).not.toBeInTheDocument();
+  });
+  it('기본 순위 순서 확인 단계에서 같은 조 팀이 만날 수 있는 경기 줄마다 경고를 붙인다', async () => {
+    const { view, bracket } = sixTeamTournament(['1', '1', '1', '2', '2', '2']); handlers(view, bracket); show();
+    await openReview('챌린지');
+    const row = (label: string) => screen.getByText(label).parentElement!;
+    expect(within(row('3경기 · 가팀 vs 1경기 승자')).getByText('같은 조 재대결 가능: 가팀 vs 다팀')).toBeInTheDocument();
+    expect(within(row('4경기 · 라팀 vs 2경기 승자')).getByText('같은 조 재대결 가능: 라팀 vs 바팀')).toBeInTheDocument();
+    expect(within(row('1경기 · 마팀 vs 다팀')).queryByText(/같은 조 재대결 가능/)).not.toBeInTheDocument();
+    // 결승 can also pair two same-group teams (마팀 vs 라팀) but is not flagged: only earlier rounds are.
+    expect(screen.getAllByText(/같은 조 재대결 가능/)).toHaveLength(2);
+  });
+  it('모든 팀이 서로 다른 조라면 경고를 붙이지 않는다', async () => {
+    const { view, bracket } = sixTeamTournament(['1', '2', '3', '4', '5', '6']); handlers(view, bracket); show();
+    await openReview('챌린지');
+    expect(screen.queryByText(/같은 조 재대결 가능/)).not.toBeInTheDocument();
   });
   it('자리 수가 부족하면 저장하지 않고 원인을 표시한다', async () => {
     handlers(savedView()); show();

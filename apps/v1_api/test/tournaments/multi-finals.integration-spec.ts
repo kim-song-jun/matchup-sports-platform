@@ -170,6 +170,36 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(filled.map(slot => slot.registrationId)).toEqual(remaining);
     expect((await snapshot('챌린지')).map(row => row.teamMatchId)).toEqual(challengeBefore.map(row => row.teamMatchId));
   });
+  it.each([false, true])('확정한 뒤 한 조의 순위 순서가 바뀌면 그 조를 쓰는 토너먼트만 standingsChanged 로 알린다 (director=%s)', async director => {
+    const actor = director ? (await assignedDirector()).actor : user;
+    const first = await service.setup(user, tournamentId, { expectedRevision: 0,
+      groups: [0, 1].map(i => ({ name: `${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
+      finals: [0, 1].map(i => ({ name: i ? '챌린지' : '챔피언', thirdPlace: false, rules: [1, 2].map(rank => ({ groupId: String(i), rank })), registrationIds: null })) });
+    const preview = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+    await finishPreliminary();
+    for (const finalName of ['챔피언', '챌린지']) {
+      const current = await service.get(actor, tournamentId);
+      const suggestion = await service.assignmentPreview(actor, tournamentId, { expectedRevision: current.revision, finalName, assignmentPolicy: 'rank_order' });
+      await service.assign(actor, tournamentId, { expectedRevision: current.revision, finalName, registrationIds: suggestion.registrationIds, sourceVersion: suggestion.sourceVersion });
+    }
+    const flags = async () => (await service.get(actor, tournamentId)).finals.map(final => final.standingsChanged);
+    expect(await flags()).toEqual([false, false]);
+    const groupId = (await service.get(actor, tournamentId)).groups[0].id;
+    const at = (position: number) => prisma.v1TournamentStanding.findFirstOrThrow({ where: { groupId, position } });
+    const [third, fourth] = [await at(3), await at(4)];
+    await prisma.v1TournamentStanding.update({ where: { id: third.id }, data: { points: { increment: 1 } } });
+    expect(await flags()).toEqual([false, false]);
+    const swap = (a: string, b: string) => prisma.$transaction([
+      prisma.v1TournamentStanding.update({ where: { id: a }, data: { position: 4 } }),
+      prisma.v1TournamentStanding.update({ where: { id: b }, data: { position: 3 } }),
+    ]);
+    await swap(third.id, fourth.id);
+    expect(await flags()).toEqual([true, false]);
+    await prisma.v1TournamentStanding.update({ where: { id: third.id }, data: { position: 3 } });
+    await prisma.v1TournamentStanding.update({ where: { id: fourth.id }, data: { position: 4 } });
+    expect(await flags()).toEqual([false, false]);
+  }, 60000);
   it('순위 밖 팀을 포함해 3개 결선 명단을 저장하고 재계산 뒤에도 유지하며 예선을 보존한다', async () => {
     const first = await setup(); await finishPreliminary(); const before = await preliminarySnapshot();
     const finals = [

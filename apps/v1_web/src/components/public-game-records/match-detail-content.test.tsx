@@ -273,7 +273,10 @@ describe('MatchDetailContent — 선수 이름 프로필 링크', () => {
 
     render(<MatchDetailContent data={data} />);
 
-    expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/users/u-1');
+    const link = screen.getByRole('link', { name: '김도윤' });
+    expect(link).toHaveAttribute('href', '/users/u-1');
+    // 밑줄을 걷은 대신 chevron 이 링크라는 단서다 — 색 말고도 읽히는 신호가 사라지면 안 된다.
+    expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('profileHref 가 없으면 링크를 만들지 않는다 (이름은 그대로 보인다)', () => {
@@ -351,6 +354,9 @@ describe('MatchDetailContent — 팀 이름 진입점', () => {
 
     expect(screen.getByRole('link', { name: '홈팀' })).toHaveAttribute('href', '/teams/team-home');
     expect(screen.getByRole('link', { name: '원정팀' })).toHaveAttribute('href', '/teams/team-away');
+    for (const name of ['홈팀', '원정팀']) {
+      expect(screen.getByRole('link', { name }).querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    }
   });
 
   // 공유 기록 페이지 등 from을 받은 자리에서는 팀 상세에서 뒤로가면 이 기록 화면으로 돌아온다.

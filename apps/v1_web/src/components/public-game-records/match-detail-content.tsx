@@ -24,6 +24,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { InlineChevronLink } from './inline-chevron-link';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
@@ -32,18 +33,9 @@ import { competitionMatchLabel } from '@/lib/tournament-round-label';
  * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
  * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 각 선수 링크가
  * 각자 판단하면 언젠가 갈린다.
- *
- * 링크가 없을 때 굳이 span 으로 감싸지 않고 이름을 그대로 돌려주는 이유: 대부분의
- * 참가자가 그 경우이고, 의미 없는 래퍼가 한 겹 늘면 기존 레이아웃(폭·정렬)이 미묘하게
- * 달라진다.
  */
-function ProfileLink({ href, from, children }: { href: string | null; from?: string; children: React.ReactNode }) {
-  if (href === null) return <>{children}</>;
-  return (
-    <Link href={withFromPath(href, from)} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-      {children}
-    </Link>
-  );
+function ProfileLink({ href, from, children }: { href: string | null; from?: string; children: string }) {
+  return <InlineChevronLink href={href === null ? null : withFromPath(href, from)} label={children} />;
 }
 
 function sideLabel(side: PublicMatchDetail['home']): string {
@@ -63,14 +55,8 @@ function SideName({ side, from }: { side: PublicMatchDetail['home']; from?: stri
   // `teamId` 만 보면 **`'미정'` 이라는 글자가 팀 페이지로 링크된다** — 두 필드가 각각
   // nullable 이라 id 는 있고 이름만 가려진 조합이 나올 수 있다. 이름이 없으면 링크도 없다.
   if (!side?.teamId || !side.teamName) return <>{label}</>;
-  return (
-    <Link
-      href={from ? withFromPath(`/teams/${encodeURIComponent(side.teamId)}`, from) : `/teams/${encodeURIComponent(side.teamId)}`}
-      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
-    >
-      {label}
-    </Link>
-  );
+  const teamHref = `/teams/${encodeURIComponent(side.teamId)}`;
+  return <InlineChevronLink href={from ? withFromPath(teamHref, from) : teamHref} label={label} chevronSize={16} />;
 }
 
 /** `void`/`corrected` states need a visible badge so a stale-looking score is never mistaken for the live truth. */

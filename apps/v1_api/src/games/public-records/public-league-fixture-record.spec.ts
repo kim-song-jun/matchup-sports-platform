@@ -137,6 +137,16 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.history[0].reason).toBe('운영자 직접 입력');
   });
 
+  it('어드민 빠른 결과의 [quick-result] 표식은 리그 경기 이력에서도 사유로 내보내지 않는다', async () => {
+    const service = buildService({
+      revisions: [
+        { revision: 1, state: 'OFFICIAL', officialAt: new Date('2026-09-05T11:00:00.000Z'), reason: '[quick-result]', supersedesId: null },
+      ],
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.history[0].reason).toBeNull();
+  });
+
   it('공식 결과: 스코어·팀 실명·주차가 실리고 대회 전용 필드는 리그 값으로 고정된다', async () => {
     const service = buildService({
       revisions: [{ revision: 1, state: 'OFFICIAL', officialAt: new Date('2026-09-05T11:00:00.000Z'), reason: null, supersedesId: null }],

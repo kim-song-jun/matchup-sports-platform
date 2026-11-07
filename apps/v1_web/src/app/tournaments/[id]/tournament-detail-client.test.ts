@@ -7,6 +7,7 @@ import {
   getTournamentVenuePrepItems,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { v1Get } from '@/lib/api-client';
+import { namedFinalGroups } from '@/test/named-final-groups';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
 
 // 상세 화면의 실제 팀 역할 조회 훅도 앱과 같은 QueryClient 환경에서 실행한다.
@@ -957,6 +958,17 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     for (const name of ['프리미어', '레드 FC', '챌린지', '블루 FC']) expect(hero).toHaveTextContent(name);
     expect(hero).not.toHaveTextContent('공동 우승');
     expect(hero).toHaveAttribute('href', '/tournaments/t1/results');
+  });
+
+  it('lists track champions in creation order even when track sizes differ', () => {
+    // 프리미어 8팀을 먼저, 챌린지 12팀을 나중에 만들었다. 서버 응답은 12팀의 첫 단계(round16)가 맨 앞이다.
+    const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);
+    const final = (track: string, winner: string) => makeFixture({ id: `${track}-f`, groupId: `${track}-final`, round: 'final', status: 'completed',
+      homeTeamName: winner, result: makeFixtureResult({ homeScore: 2, awayScore: 0 }) });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts', groups,
+      fixtures: [final('챌린지', '블루 FC'), final('프리미어', '레드 FC')] });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    expect(screen.getByRole('link', { name: /프리미어: 레드 FC\. 챌린지: 블루 FC/ })).toBeInTheDocument();
   });
 
   it('keeps each unconfirmed track visible without selecting a scheduled fixture winner', () => {

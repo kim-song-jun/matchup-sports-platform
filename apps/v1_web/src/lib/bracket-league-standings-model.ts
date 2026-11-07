@@ -11,6 +11,8 @@ export type LeagueStandingRow = {
   losses: number;
   goalDifference: number;
   points: number;
+  /** Stored rank decided only by the seeded draw; set by the admin finals assignment dialog only. */
+  tied?: boolean;
 };
 export type LeagueStandingsGroup = { groupId: string; name: string; rows: LeagueStandingRow[] };
 

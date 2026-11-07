@@ -4,6 +4,7 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { upcomingWeekend } from './helpers/upcoming-weekend';
 
 // 리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — "한 구장 순차 진행" 모델.
 // 운영자 요구(2026-08-25): 22시 리그에 한 경기장을 쓰면 4팀이 15분 경기·5분 휴식으로
@@ -143,6 +144,21 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
       [1, 2, 3, 4, 5, 6].map((order) => `타이밍 리그 1주차 ${order}경기`),
     );
     expect(fixtures.every((f) => f.placeName === '베이컨 풋살장')).toBe(true);
+  });
+
+  it('이틀이 같은 달력 주면 제목 순번이 날짜를 넘어 이어져 6경기 제목이 모두 다르다', async () => {
+    const leagueId = await createLeague('이틀 리그');
+    const [saturday, sunday] = upcomingWeekend();
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 3, schedule: { dates: [saturday, sunday], time: '10:00' }, timing: { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 3 } });
+    expect(res.status).toBe(201);
+
+    const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    expect(fixtures.map((f) => f.title)).toEqual(
+      [1, 2, 3, 4, 5, 6].map((order) => `이틀 리그 1주차 ${order}경기`),
+    );
   });
 
   it('preview도 같은 timing 계산으로 endAt·매치데이 정보를 내려준다(DB 무변경)', async () => {

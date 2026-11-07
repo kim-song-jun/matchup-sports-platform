@@ -16,7 +16,7 @@ import { buildBracketGraph, bracketConnectionPath, bracketContentCenter, type Br
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { bracketTrackLabel, effectiveBracketTrack, isNamedBracketTrack } from '@/lib/bracket-track';
+import { bracketTrackLabel, effectiveBracketTrack, isNamedBracketTrack, orderedBracketTracks } from '@/lib/bracket-track';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -965,9 +965,7 @@ function SingleTournamentBracket({ fixtures, groups, selectedRoundKey }: Tournam
 }
 
 export function TournamentBracket({ fixtures, groups, selectedRoundKey }: TournamentBracketProps) {
-  const splitTracks = ([...new Set(groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).filter((track) =>
-    groups.some((group) => effectiveBracketTrack(group.bracketTrack) === track),
-  );
+  const splitTracks = orderedBracketTracks(groups);
   if (splitTracks.length === 0) return <SingleTournamentBracket fixtures={fixtures} groups={groups} selectedRoundKey={selectedRoundKey} />;
 
   return (

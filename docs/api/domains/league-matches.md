@@ -480,6 +480,13 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (`syncLeagueFixtureWeekTitles`). Titles without a trailing week token (operator-chosen names) are kept. When
   another fixture's title has to change, that path takes the league row with `FOR UPDATE NOWAIT` first and
   returns `409 COMMAND_CONCURRENCY_CONFLICT` instead of waiting (retryable).
+- **Game number (`M경기`, 2026-11-07):** the auto title `<league> N주차 M경기` counts `M` within the calendar
+  week and keeps counting across the days of that week (Saturday 1–8, Sunday 9–15); a new week restarts at 1.
+  Bulk generation with `timing`, the template (both with and without `gamesPerDay`) and a manual add without
+  `title` all use this rule; a manual add takes the next number of its week (the larger of the week's fixture
+  count and its highest auto-title number, plus one, so a deleted fixture never causes a repeat). `M` is written
+  once at creation: later changes to a fixture's date rewrite `N` only, and generation without `timing`
+  (one round per week) keeps the title without `M경기`. Fixtures created before this rule keep their titles.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -550,8 +557,8 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
   apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
   regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
-  title's `N주차` is first written with the day number and then rewritten to the calendar week (see the week
-  number rule above). `placeName`
+  title is `<league> N주차 M경기` by the week and game number rules above (`N` is rewritten to the calendar
+  week after creation). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`
@@ -689,4 +696,5 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - (2026-11-04) 리그 체계 전환 commit 은 티어 등록마다 원본 리그를 출처로 `copyPreviousSeasonRoster` 를 돌린다. 공개 `GET /league-matches/:leagueId` 는 체계로 전환한 종료 독립 리그에 `nextSeasonTiers: Array<{leagueId,title,tier,teamIds}>`(첫 시즌 공개 티어, 1부부터, 확정 팀)를 싣고 그 밖에는 빈 배열이다.
 - (2026-11-05) 공개 `GET /league-matches/:leagueId` 의 `nextRound` 에 `teamIds`(다음 시즌에 참가 확정된 팀)가 붙는다. 화면은 이미 확정된 내 팀에게 재참가 신청 대신 '다음 시즌 보기'를 건다.
 - (2026-11-05) 리그 체계에 속한 리그의 참가 신청 생성(`POST /tournaments/:id/registrations`)과 제출(`.../submit`)은 같은 시즌 다른 티어에 이미 확정된 팀을 409 `LEAGUE_TEAM_INVALID`로 막는다(확정과 같은 `findLeagueAdmissionBlocker`). 전엔 입금 확인까지 지나 확정에서야 막혔다.
+- (2026-11-07) 성별 부문(남성부·여성부) 리그는 그 성별의 활성 팀원이 1명 이상인 팀만 받는다. 팀 추가(`POST :leagueId/teams`)·한 번에 넣기(`previous-season-teams`)는 422 `TEAM_GENDER_INELIGIBLE`(한 번에 넣기는 `팀 이름: 이유`), 참가 신청 확정은 409 같은 코드다(`findLeagueAdmissionBlocker` 의 `GENDER_INELIGIBLE`). 혼성·성별 미지정 리그와 프로필에 성별이 없는 팀원만 있는 팀의 판정은 `tournaments.md` 의 같은 절을 따른다. 시즌 시드·리그 체계 전환·리그 생성의 `teamIds` 로 팀을 넣는 길은 이 판정을 거치지 않는다.
 - (2026-11-06) 공개 `GET /tournaments/:id` 의 `previousSeason` 은 리그 체계로 전환해 만든 첫 시즌 티어에서 원본 리그를 가리킨다(감사 기록 `afterJson.seriesId` 로 역조회, 공개된 리그만). 11-05 에 넣었던 `nextSeason` 은 뺐다 — 다음 시즌은 `GET /league-matches/:id` 의 `nextRound`·`nextSeasonTiers` 로 다음 리그 안내가 그린다(전환 리그는 티어마다 버튼). 화면은 이전 시즌을 제목 아래가 아니라 데스크톱 레일·모바일 본문 카드의 '이전 시즌 보기'로 보인다.

@@ -19,8 +19,10 @@ import {
 } from './dto/admin-registration.dto';
 import {
   findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerCode,
   leagueAdmissionBlockerMessage,
 } from '../league-matches/league-team-admission';
+import { assertTeamGenderEligible } from './team-gender-eligibility';
 import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 import { TournamentSlotService } from './slots/tournament-slot.service';
@@ -227,7 +229,7 @@ export class AdminRegistrationsService {
       if (dto.decision === 'confirm') {
         const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: current.tournamentId },
-          select: { teamCount: true, maxTeams: true, kind: true },
+          select: { teamCount: true, maxTeams: true, kind: true, genderCategory: true },
         });
         const reservedCount =
           tournament === null || capacityLimitOf(tournament) === null
@@ -238,6 +240,15 @@ export class AdminRegistrationsService {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
+          });
+        }
+        // 신청 뒤 그 성별 팀원이 모두 나갔을 수 있다. 리그는 아래 `findLeagueAdmissionBlocker` 가 같은 판정을 한다.
+        if (tournament && tournament.kind !== V1CompetitionKind.regular_league) {
+          await assertTeamGenderEligible(tx, {
+            teamId: current.teamId,
+            genderCategory: tournament.genderCategory,
+            noun: competitionNounFor(tournament.kind),
+            verb: '참가',
           });
         }
       }
@@ -265,7 +276,7 @@ export class AdminRegistrationsService {
           // 팀의 신청을 확정하는 것은 정상이고, 그때 막으면 확정 자체가 불가능해진다.
           if (blocker !== null && blocker.kind !== 'ALREADY_IN_LEAGUE') {
             throw new ConflictException({
-              code: 'LEAGUE_TEAM_INVALID',
+              code: leagueAdmissionBlockerCode(blocker),
               message: leagueAdmissionBlockerMessage(blocker),
             });
           }

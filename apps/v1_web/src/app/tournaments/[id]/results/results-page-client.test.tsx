@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { namedFinalGroups } from '@/test/named-final-groups';
 import { ResultsPageContent } from './results-page-client';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -549,4 +550,18 @@ it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승
   expect(ranking.getByText('3위')).toBeInTheDocument();
   expect(ranking.getByText('4위팀')).toBeInTheDocument();
   expect(ranking.getByText('4위')).toBeInTheDocument();
+});
+
+it('N개 토너먼트의 결과·순위·경기 구역이 팀 수와 무관하게 만든 순서(프리미어 → 챌린지)로 나온다', () => {
+  // 프리미어 8팀을 먼저, 챌린지 12팀을 나중에 만들었다. 서버 응답은 12팀의 첫 단계가 맨 앞이다.
+  const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);
+  const fixtures = groups.filter(group => group.phase === 'final').map((group, i) => ({
+    ...leagueFixtureWithVideo(), id: `final-${i}`, groupId: group.id, round: 'final', videos: [],
+  }));
+  render(<ResultsPageContent tournament={baseTournament({ status: 'completed', format: 'league_knockouts', groups, fixtures })} />);
+
+  for (const suffix of ['결과', '순위', '경기']) {
+    const labels = screen.getAllByRole('region').map(region => region.getAttribute('aria-label')).filter(label => label?.endsWith(` ${suffix}`));
+    expect(labels).toEqual([`프리미어 ${suffix}`, `챌린지 ${suffix}`]);
+  }
 });

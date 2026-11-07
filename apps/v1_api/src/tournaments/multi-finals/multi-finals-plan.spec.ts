@@ -69,6 +69,27 @@ describe('정규리그 + N개 토너먼트 plans', () => {
     const roundsOfGroup = labels.map((_, i) => [...new Set(plan.fixtures.filter(f => f.groupKey === plan.groups[i].key).map(f => f.round))]);
     expect(roundsOfGroup).toEqual(labels.map(label => [label]));
   });
+  // 웹 화면이 토너먼트를 만든 순서로 보여 주는 근거다(`apps/v1_web/src/lib/bracket-track.ts`의 orderedBracketTracks,
+  // 웹 픽스처 `apps/v1_web/src/test/named-final-groups.ts`가 이 공식을 재현한다). 공식을 바꾸면 여기가 먼저 깨져야 한다.
+  it('토너먼트 그룹의 sortOrder 는 트랙번호*100+단계(3·4위전은 +99)라 팀 수가 달라도 트랙별 최소값이 만든 순서대로 늘어난다', () => {
+    const teamIds = (prefix: string, size: number) => Array.from({ length: size }, (_, i) => `${prefix}${i}`);
+    const plan = planNamedFinals([
+      { name: '프리미어', rules: [], thirdPlace: true, registrationIds: teamIds('p', 8) },
+      { name: '챌린지', rules: [], thirdPlace: true, registrationIds: teamIds('c', 12) },
+      { name: '도전', rules: [], thirdPlace: false, registrationIds: teamIds('d', 4) },
+    ]);
+    const byTrack = (track: string) => plan.groups.filter(g => g.bracketTrack === track);
+    expect(byTrack('프리미어').map(g => [g.phase, g.sortOrder])).toEqual([['quarter', 0], ['semi', 1], ['final', 2], ['third_place', 99]]);
+    expect(byTrack('챌린지').map(g => [g.phase, g.sortOrder])).toEqual([['round16', 100], ['quarter', 101], ['semi', 102], ['final', 103], ['third_place', 199]]);
+    expect(byTrack('도전').map(g => [g.phase, g.sortOrder])).toEqual([['semi', 200], ['final', 201]]);
+    const firstSortOrders = ['프리미어', '챌린지', '도전'].map(track => Math.min(...byTrack(track).map(g => g.sortOrder)));
+    expect(firstSortOrders).toEqual([...firstSortOrders].sort((a, b) => a - b));
+  });
+  it('예선 조 그룹은 트랙 이름을 갖지 않아 결선 순서 계산에 끼어들지 않는다', () => {
+    const plan = planPreliminaryGroups([{ name: 'A조', capacity: 4, legs: 1 }, { name: 'B조', capacity: 4, legs: 1 }]);
+    expect(plan.groups.map(g => g.phase)).toEqual(['group', 'group']);
+    expect(plan.groups.every(g => g.bracketTrack === undefined || g.bracketTrack === 'overall')).toBe(true);
+  });
   it('3개 결선이 경기·승자/패자 연결·시상 범위를 공유하지 않는다', () => {
     const finals = [4, 5, 6].map((size, i) => ({ name: `토너먼트${i}`, thirdPlace: true, rules: [], registrationIds: Array.from({ length: size }, (_, j) => `t${i}-${j}`) }));
     const plan = planNamedFinals(finals); expect(new Set(plan.groups.map(g => g.bracketTrack)).size).toBe(3); expect(plan.fixtures).toHaveLength(15);

@@ -9,6 +9,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
+import { InlineChevronLink } from './inline-chevron-link';
 import {
   useV1AuthMe,
   useV1ClaimableParticipants,
@@ -250,15 +251,13 @@ function ClaimMyRecordView({
                 </div>
                 <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
                   이 경기 명단은 모두 계정에 연결돼 있어요. 그런데도 내 기록이 안 보인다면{' '}
-                  {/* 인라인 텍스트 링크 관례는 auth-page 와 같은 --blue700. 밑줄은
-                      "컬러만으로 정보 전달 금지" 규칙 때문에 함께 둔다. */}
-                  <Link
-                    href="/my/settings/record-consent"
-                    style={{ color: 'var(--blue700)', textDecoration: 'underline' }}
-                  >
-                    기록 공개 설정
-                  </Link>
-                  을 확인해 주세요.
+                  {/* --blue700 은 이 문장의 --text-muted 와 명도가 거의 같아 색만으로는 링크가 안 읽힌다 —
+                      링크 단서는 chevron 이다. 조사 "을" 이 chevron 에서 떨어지지 않게 한 덩어리로 묶는다. */}
+                  <span style={{ whiteSpace: 'nowrap' }}>
+                    <InlineChevronLink href="/my/settings/record-consent" label="기록 공개 설정" tone="link" />
+                    을
+                  </span>{' '}
+                  확인해 주세요.
                 </div>
               </>
             ) : (

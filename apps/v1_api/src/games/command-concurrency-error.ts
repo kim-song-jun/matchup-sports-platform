@@ -17,6 +17,8 @@
  * 컴파일·테스트가 안 된다. 판정 로직만 순수 함수로 떼어 두면 유닛 테스트가 가능하다.
  */
 
+import { ConflictException } from '@nestjs/common';
+
 /** Prisma 가 raw query 실패를 감쌀 때 쓰는 코드. 원래 Postgres 코드는 meta/message 안에 있다. */
 const RAW_QUERY_FAILED = 'P2010';
 
@@ -53,4 +55,12 @@ export function isCommandConcurrencyConflict(
   // 여기서 넓게 잡으면 무관한 SQL 오류가 409 로 둔갑하므로 백틱까지 붙여 좁힌다.
   if (typeof message !== 'string') return false;
   return RETRYABLE_PG_CODES.some((pgCode) => message.includes(`Code: \`${pgCode}\``));
+}
+
+/** 동시 커맨드에 져서 실패한 요청에 돌려주는 409. 코드는 클라이언트가 분기하는 계약이고, 문구는 콘솔이 그대로 띄운다. */
+export function commandConcurrencyConflict(): ConflictException {
+  return new ConflictException({
+    code: 'COMMAND_CONCURRENCY_CONFLICT',
+    message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.',
+  });
 }

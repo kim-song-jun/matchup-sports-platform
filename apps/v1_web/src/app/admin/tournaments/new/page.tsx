@@ -921,7 +921,7 @@ function ParticipationStep({
 
   return (
     <div className="grid gap-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-3">
         <NumberField
           id="team-count"
           label="참가 팀 수"

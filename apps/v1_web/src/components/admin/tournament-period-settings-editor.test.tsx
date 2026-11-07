@@ -194,9 +194,24 @@ describe('TournamentPeriodSettingsEditor', () => {
     );
   });
 
-  it('explains that the quarter-final option also covers the 6-team bracket', () => {
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
-    expect(screen.getByRole('option', { name: '8강 · 6팀 대진의 6강' })).toBeInTheDocument();
+  it('labels the quarter-final stage as also covering the 6-team bracket, in the add list and the configured list', () => {
+    const quarterLabel = '8강 · 6팀 대진의 6강';
+    state.settings = { ...state.settings, kind: 'regular_tournament', stageOverrides: [] };
+    const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByRole('option', { name: quarterLabel })).toBeInTheDocument();
+
+    state.settings = {
+      ...state.settings,
+      stageOverrides: [{
+        phase: 'quarter',
+        competitionConfigVersionId: 'config-quarter',
+        periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 20, extraTime: false }],
+        legacyPeriodCount: null,
+      }],
+    };
+    view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByText(quarterLabel)).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: quarterLabel })).toBeNull();
   });
 
   it('can remove a stage override and return that phase to the tournament default', () => {

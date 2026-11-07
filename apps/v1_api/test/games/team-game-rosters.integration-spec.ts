@@ -8,6 +8,7 @@ import { createTournamentMatchInTx } from '../../src/tournaments/tournament-matc
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { LineupTodoService, loadRosterSummaries } from '../../src/team-lineups/lineup-todo.service';
+import { TeamUpcomingGamesService } from '../../src/team-lineups/team-upcoming-games.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -758,6 +759,64 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect((endedCompetition.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
       expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
 
+    });
+
+    it('시각이 아직 없는 대회 경기는 팀원 목록과 홈 다음 경기에 시각 있는 경기 뒤로 남고, 끝난 경기·취소 경기·끝난 대회에서는 빠진다', async () => {
+      const f = await seedTournament();
+      const [a1] = f.teamA.members;
+      const memberPath = `/api/v1/teams/${f.teamA.id}/upcoming-games`;
+      const listedGames = async () => {
+        const res = await getAs(memberPath, a1);
+        expect(res.status).toBe(200);
+        return res.body.data.items as Array<{ gameId: string; scheduledAt: string | null; rosterSummary: unknown }>;
+      };
+      const nextGame = (teamId: string, userId: string) =>
+        app.get(TeamUpcomingGamesService).nextForMemberships(userId, [{ teamId, role: 'member' }], new Date());
+
+      // g2 의 시각만 지운다 — g1 은 내일이다.
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: null } });
+      const mixed = await listedGames();
+      expect(mixed.map((item) => [item.gameId, item.scheduledAt === null])).toEqual([
+        [f.games.g1.gameId, false],
+        [f.games.g2.gameId, true],
+      ]);
+      expect(mixed[1].rosterSummary).not.toBeNull();
+      expect((await nextGame(f.teamA.id, a1))?.gameId).toBe(f.games.g1.gameId);
+
+      // 둘 다 시각이 없으면 대진 번호 순서(g1 = 1번, g2 = 2번)로 g1 이 다음 경기다.
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g1.teamMatchId }, data: { startAt: null } });
+      expect(await nextGame(f.teamA.id, a1)).toMatchObject({
+        gameId: f.games.g1.gameId,
+        scheduledAt: null,
+        competitionKind: 'TOURNAMENT',
+        competitionId: f.tournament.id,
+        viewerCanManage: false,
+      });
+      // 같은 경기가 팀장에게도 보이고 관리 권한만 다르다.
+      expect(await app.get(TeamUpcomingGamesService).nextForMemberships(
+        f.teamA.ownerId,
+        [{ teamId: f.teamA.id, role: 'owner' }],
+        new Date(),
+      )).toMatchObject({ gameId: f.games.g1.gameId, scheduledAt: null, viewerCanManage: true });
+      // 대조군: 팀 C 는 g2 만 뛴다 — g1(A-B)은 보이지 않는다.
+      expect((await nextGame(f.teamC.id, f.teamC.members[0]))?.gameId).toBe(f.games.g2.gameId);
+
+      // 끝난 경기는 빠지고 다음 시각 미정 경기로 넘어간다.
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'ENDED' } });
+      expect((await nextGame(f.teamA.id, a1))?.gameId).toBe(f.games.g2.gameId);
+      expect((await listedGames()).map((item) => item.gameId)).toEqual([f.games.g2.gameId]);
+
+      // 취소 경기는 빠졌다가, 되살리면 돌아온다.
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'CANCELLED' } });
+      expect(await nextGame(f.teamA.id, a1)).toBeNull();
+      expect(await listedGames()).toEqual([]);
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'SCHEDULED' } });
+      expect((await nextGame(f.teamA.id, a1))?.gameId).toBe(f.games.g2.gameId);
+
+      // 끝난 대회에 남은 시각 미정 경기는 더 이상 다음 경기가 아니다.
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
+      expect(await nextGame(f.teamA.id, a1)).toBeNull();
+      expect(await listedGames()).toEqual([]);
     });
 
     it('대회 경기에는 rosterSummary 와 사이드를, 친선에는 null 을 싣는다', async () => {

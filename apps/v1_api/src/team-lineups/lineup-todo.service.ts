@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import { competitionMatchLabel } from '../tournaments/tournament-round-label';
 import { NOT_IN_HELD_LEAGUE_WHERE } from '../league-matches/league-hold';
+import { compareScheduledAtNullLast, orderTimedBeforeUntimed } from './untimed-game-order';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -71,6 +72,32 @@ interface TeamMatchCollectionOptions {
   startedWithinMs?: number;
   /** Keep delayed, not-yet-started tournament games in the team roster selector. */
   includeElapsedScheduledTournamentGames?: boolean;
+  /** Keep not-yet-started tournament games whose kickoff time has not been set; they sort after timed games. */
+  includeUntimedTournamentGames?: boolean;
+}
+
+/** An unfinished tournament fixture that is still waiting to be played. */
+const UNSTARTED_TOURNAMENT_GAME_WHERE = {
+  deletedAt: null,
+  leagueId: null,
+  tournamentId: { not: null },
+  tournament: { status: { notIn: ['completed', 'cancelled'] } },
+  game: { is: { state: 'SCHEDULED' } },
+} satisfies Prisma.V1TeamMatchWhereInput;
+
+function scheduleFilterOf(now: Date, options: TeamMatchCollectionOptions): Prisma.V1TeamMatchWhereInput {
+  const timed = { startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) } };
+  if (!options.includeElapsedScheduledTournamentGames && !options.includeUntimedTournamentGames) {
+    return { ...timed, AND: [NOT_IN_HELD_LEAGUE_WHERE] };
+  }
+  const branches: Prisma.V1TeamMatchWhereInput[] = [timed];
+  if (options.includeElapsedScheduledTournamentGames) {
+    branches.push({ startAt: { lt: now }, ...UNSTARTED_TOURNAMENT_GAME_WHERE });
+  }
+  if (options.includeUntimedTournamentGames) {
+    branches.push({ startAt: null, ...UNSTARTED_TOURNAMENT_GAME_WHERE });
+  }
+  return { AND: [NOT_IN_HELD_LEAGUE_WHERE, { OR: branches }] };
 }
 
 /** 대회·리그 경기 명단 웹 화면. 알림 딥링크와 웹 라우트가 같은 값을 써야 한다. */
@@ -125,12 +152,16 @@ export class LineupTodoService {
    *
    * 팀 roster 선택기는 옵션으로 킥오프 시각이 지난 대회 경기 중 `SCHEDULED`인 경기를 더 받는다.
    * 이 지연 경기 예외는 진행 중 대회에만 적용하며, `LIVE`·`PAUSED`·종료된 경기는 추가하지 않는다.
+   * 시각이 아직 정해지지 않은 대회 경기(`scheduledAt` null)는 `includeUntimedTournamentGames` 로 받는다.
    * 다른 소비자는 기존 시간 범위를 쓴다.
    */
   async listUpcomingForTeam(
     teamId: string,
     now: Date,
-    options: Pick<TeamMatchCollectionOptions, 'includeElapsedScheduledTournamentGames'> = {},
+    options: Pick<
+      TeamMatchCollectionOptions,
+      'includeElapsedScheduledTournamentGames' | 'includeUntimedTournamentGames'
+    > = {},
   ): Promise<TeamUpcomingGame[]> {
     return this.collectWithLineupState([teamId], now, options);
   }
@@ -139,11 +170,12 @@ export class LineupTodoService {
    * 여러 팀의 다가오는 경기를 시각순으로 한 번에 모은다(홈의 "다음 경기"). 팀이 없으면 빈 목록.
    * `startedWithinMs` 를 주면 킥오프가 그만큼 안쪽으로 지난 경기도 남긴다 — 결과가 나가면
    * 팀매치가 `completed` 가 되어 `status: matched` 조건에서 바로 빠진다.
+   * `includeUntimedTournamentGames` 를 주면 시각이 아직 없는 대회 경기가 시각 있는 경기 뒤에 붙는다.
    */
   async listUpcomingForTeams(
     teamIds: readonly string[],
     now: Date,
-    options: Pick<TeamMatchCollectionOptions, 'startedWithinMs'> = {},
+    options: Pick<TeamMatchCollectionOptions, 'startedWithinMs' | 'includeUntimedTournamentGames'> = {},
   ): Promise<TeamUpcomingGame[]> {
     if (teamIds.length === 0) return [];
     return this.collectWithLineupState([...teamIds], now, options);
@@ -195,7 +227,8 @@ export class LineupTodoService {
       ...candidate,
       lineupState: states.get(`${candidate.gameId}:${candidate.teamId}`) ?? ('MISSING' as const),
     }));
-    items.sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity));
+    // 시각 없는 경기는 뒤로, 그 안의 순서는 `loadTeamMatches` 가 정한 대회 진행 순서를 따른다(정렬은 안정적이다).
+    items.sort((a, b) => compareScheduledAtNullLast(a.scheduledAt, b.scheduledAt));
     return items;
   }
 
@@ -212,29 +245,7 @@ export class LineupTodoService {
   }
 
   private async loadTeamMatches(teamIds: string[] | null, now: Date, options: TeamMatchCollectionOptions) {
-    const scheduleFilter: Prisma.V1TeamMatchWhereInput = options.includeElapsedScheduledTournamentGames
-      ? {
-          AND: [
-            NOT_IN_HELD_LEAGUE_WHERE,
-            {
-              OR: [
-                { startAt: { gte: now } },
-                {
-                  startAt: { lt: now },
-                  deletedAt: null,
-                  leagueId: null,
-                  tournamentId: { not: null },
-                  tournament: { status: { notIn: ['completed', 'cancelled'] } },
-                  game: { is: { state: 'SCHEDULED' } },
-                },
-              ],
-            },
-          ],
-        }
-      : {
-          startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) },
-          AND: [NOT_IN_HELD_LEAGUE_WHERE],
-        };
+    const scheduleFilter = scheduleFilterOf(now, options);
     const matchQuery = {
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
@@ -259,7 +270,9 @@ export class LineupTodoService {
         leagueId: true,
         tournamentId: true,
         tournament: { select: { title: true } },
-        tournamentDetails: { select: { round: true, legNumber: true, group: { select: { name: true } } } },
+        tournamentDetails: {
+          select: { round: true, legNumber: true, fixtureNumber: true, group: { select: { name: true, phase: true } } },
+        },
         // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
         // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
         league: { select: { title: true } },
@@ -268,8 +281,8 @@ export class LineupTodoService {
       // The stable tie-breaker lets the roster-only path continue after a cursor
       // without dropping matches that share a kickoff time. Other consumers keep
       // their prior ordering contract.
-      orderBy: options.includeElapsedScheduledTournamentGames
-        ? [{ startAt: 'asc' }, { id: 'asc' }]
+      orderBy: options.includeElapsedScheduledTournamentGames || options.includeUntimedTournamentGames
+        ? [{ startAt: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }]
         : { startAt: 'asc' },
       take: 500,
     } satisfies Prisma.V1TeamMatchFindManyArgs;
@@ -291,17 +304,14 @@ export class LineupTodoService {
       }
     }
 
-    // Prisma keeps these columns nullable because tournament TBD slots share the
-    // TeamMatch table. A slot without a scheduled time has no lineup action yet;
-    // retain only scheduled rows for this actionable surface and narrow the type
-    // before deriving league weeks.
-    const scheduledMatches = matches.flatMap((match) =>
-      match.startAt === null ? [] : [{ ...match, startAt: match.startAt }],
+    // `startAt` is null only for tournament fixtures whose kickoff is not set yet, and only when the caller
+    // asked for them. League fixtures always carry a kickoff, which the week derivation relies on.
+    const weekNumberByTeamMatchId = await this.resolveLeagueWeekNumbers(
+      matches.flatMap((match) => (match.startAt === null ? [] : [{ id: match.id, leagueId: match.leagueId, startAt: match.startAt }])),
     );
-    const weekNumberByTeamMatchId = await this.resolveLeagueWeekNumbers(scheduledMatches);
 
     const rows: Array<Omit<LineupTodo, 'state'>> = [];
-    for (const match of scheduledMatches) {
+    for (const match of orderTimedBeforeUntimed(matches)) {
       if (match.game === null) continue;
       // League creators temporarily carry both IDs for the shared TeamMatch row.
       // `leagueId` is the authoritative discriminator for those rows; checking

@@ -164,11 +164,11 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
     expect(tournament.queryByRole('link', { name: 'vs 번개FC 명단' })).toBeNull();
   });
 
-  it('상대가 없으면 경기 제목, 시간이 없으면 "시간 미정"', () => {
+  it('상대가 없으면 경기 제목, 시간이 없으면 홈 "다음 경기"와 같은 "일정 미정"', () => {
     show([game({ gameId: 'g-x', opponentName: null, scheduledAt: null })]);
     render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters />);
     expect(screen.getByText('(테스트) 가을 리그 1주차')).toBeInTheDocument();
-    expect(screen.getByText('시간 미정')).toBeInTheDocument();
+    expect(screen.getByText('일정 미정')).toBeInTheDocument();
   });
 });
 

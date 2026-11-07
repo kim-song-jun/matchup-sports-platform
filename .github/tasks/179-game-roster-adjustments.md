@@ -291,7 +291,7 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 
 - 증상: 대회 참가 신청 화면의 `경기 출전`에서 owner/manager는 시작 시각이 지난 `SCHEDULED` 경기를 보지만, member는 `/teams/:teamId/upcoming-games` 응답에서 그 경기를 못 본다.
 - 원인: 관리자 표는 `V1Game.state = SCHEDULED`와 종료되지 않은 대회 상태를 기준으로 시작 전 경기를 모으지만, 팀원 경기 목록은 공유 `LineupTodoService`의 `startAt >= now` 조건으로 먼저 잘라 지연 경기를 놓쳤다.
-- 수정: `/teams/:teamId/upcoming-games` 소비자만 `includeElapsedScheduledTournamentGames`를 요청한다. 킥오프 시각이 지난 `SCHEDULED` 대회 경기만 추가하고, 취소 경기·취소/종료 대회·다른 팀 경기는 조회에서 제외한다. 일정 미정 경기, 개인 라인업 할 일·홈 다음 경기·알림은 기존 시간 기준을 유지한다. 이 변경은 읽기 경로만 다루며 member 쓰기 권한은 그대로다.
+- 수정: `/teams/:teamId/upcoming-games` 소비자만 `includeElapsedScheduledTournamentGames`를 요청한다. 킥오프 시각이 지난 `SCHEDULED` 대회 경기만 추가하고, 취소 경기·취소/종료 대회·다른 팀 경기는 조회에서 제외한다. 개인 라인업 할 일·알림은 기존 시간 기준을 유지한다(일정 미정 경기와 홈 다음 경기의 범위는 2026-11-07 결정으로 바뀌었다 — 맨 아래 "2026-11-07 후속" 참고). 이 변경은 읽기 경로만 다루며 member 쓰기 권한은 그대로다.
 - 회귀 검증: `lineup-todo.service.spec.ts`의 새 조건 조회 테스트는 수정 전 API signature가 2개 인자만 받아 TS2554로 실패했고, 수정 후 같은 단일 케이스가 통과했다(1 passed, 12 skipped). DB 회귀는 `team-game-rosters.integration-spec.ts`에 추가했으며, 실제 DB를 사용하는 격리 CI에서 실행 대기다. 로컬 integration은 실행하지 않았다.
 - 문서 계약: `docs/api/domains/games.md`에 경기 명단 팀원 목록의 시간/상태 범위와 다른 소비자 시간 기준을 명시했다.
 - 미실행: backend 전체 unit, integration, lint/typecheck, alpha 로그인·390 role 비교. root가 직렬 typecheck를 진행하고 member/manager alpha 실측을 후속 처리한다.
@@ -354,3 +354,16 @@ Status: In Progress
 - Copilot 스캔은 외부 모델 세션 생성 실패로 clean 판정을 얻지 못한 상태이며 재요청/정책 변경 없이 기록한다. 제품 CI가 green이 된 후 사용자 배포 요청에 따라 표준 dev 머지·alpha 자동 배포 경로로 진행한다.
 - 보강 helper unit 10개 통과 및 API typecheck 통과. DB trigger를 우회하지 않고 상태 전환 순서를 바로잡은 수정만 PR에 반영해 실제 CI integration을 재검증한다.
 - 수정 head `7ecdea532`의 CI `40091201436`: Gates/API/Web 모두 성공. 실제 DB의 새 4개 시나리오도 통과했다. 대기 중 dev에 #2054 카드 타임라인 변경이 머지되어 문서 2곳의 append 충돌을 양쪽 보존으로 해결하고 최신 dev를 통합한다. 코드 충돌은 없다.
+
+
+## 2026-11-07 후속: 시각 미정 경기를 홈 다음 경기·팀 경기 목록에 포함 (MD-QA #228)
+
+Status: In Progress
+
+- 사용자 결정(2026-11-07, 퀸즈컵 모바일 QA #228 = A): 대진은 공개됐지만 어드민이 경기 시각을 아직 넣지 않은 대회 경기도 "다음 경기" 후보다. 10-23 회귀 때 적은 "일정 미정 경기, 홈 다음 경기는 기존 시간 기준을 유지한다"는 지연 경기 회귀를 고치며 넓히지 않겠다는 범위 선언이었고, 시각 미정 대회에서 팀원이 다음 경기를 못 찾는 문제를 따져 내린 제품 결정이 아니었다.
+- 증상: 퀸즈컵 방식 예선은 시각 없이 생성되므로 대진 공개 직후~시각 입력 전에는 모든 팀원의 홈 "다음 경기"가 비고, 팀장의 대회 상세 "우리 팀 참가" 카드에도 다음 경기 버튼이 없었다.
+- 수집 범위: 상대가 정해진 `matched` 대회 경기 중 `startAt` 이 null, 삭제 안 됨, 리그가 아님, 대회가 종료·취소가 아님, 게임이 `SCHEDULED` 인 것(팀 경기 명단 표의 시작 전 판정과 같은 기준). 팀 id 로 먼저 좁혀지므로 팀당 시각 미정 경기는 대진 수만큼이고 새 인덱스는 필요 없다(`hostTeamId`·`approvedApplicantTeamId` 인덱스가 이미 있다).
+- 순서: 시각 있는 경기가 가까운 순, 그 뒤에 시각 미정 경기가 대회 진행 순서(단계 → 라운드 → 대진 번호 → 차수). 홈은 그 첫 경기를 뽑는다.
+- 소비자: `GET /teams/:teamId/upcoming-games`(팀 상세·팀원 경기 출전 선택·"우리 팀 참가" 카드)와 홈 `teamActivity.nextGame` 만 `includeUntimedTournamentGames` 를 요청한다. 라인업 할 일·리마인더·전날 명단 확인은 넓히지 않는다. 이 변경으로 팀원의 경기 출전 선택 목록이 팀장의 팀 표와 같은 경기 집합(시각 미정 포함)을 본다.
+- 화면: 홈 카드의 시간 자리에 "일정 미정"(카운트다운·진행 중 칩 없음), 아래 줄에 대회·라운드 이름, 팀원·팀장 모두 같은 카드. 팀 상세 목록의 옛 문구 "시간 미정" 도 "일정 미정" 으로 맞췄다.
+- 계약 문서: `docs/api/domains/games.md`(upcoming-games), `docs/api/domains/home-notices-master.md`(`nextGame`).

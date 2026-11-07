@@ -31,8 +31,11 @@ const LEAGUE_GRACE_OVER = new Date(LEAGUE_KICKOFF.getTime() + 3 * HOUR + MINUTE)
 const TEAM_A = 'team-a';
 const TEAM_B = 'team-b';
 const TEAM_X = 'team-x';
+// 시각이 정해진 경기가 하나도 없는 대회에 나가는 팀.
+const TEAM_T = 'team-t';
 const OPPONENT = 'team-opponent';
 const LEAGUE_ID = 'league-1';
+const TOURNAMENT_ID = 'tournament-1';
 
 // 대조군: 두 선수가 같은 팀의 같은 경기를 보되 한 명은 명단에서 빠져 있다.
 const PLAYER_IN = 'user-in';
@@ -41,11 +44,14 @@ const OUTSIDER = 'user-outsider';
 
 interface FakeMatch {
   id: string;
-  startAt: Date;
+  startAt: Date | null;
   hostTeamId: string;
   hostName: string;
-  kind: 'LEAGUE' | 'FRIENDLY';
+  kind: 'LEAGUE' | 'FRIENDLY' | 'TOURNAMENT';
   placeName: string | null;
+  /** 대회 경기의 라운드 코드. 대회 경기만 쓴다. */
+  round?: string;
+  fixtureNumber?: number;
 }
 
 const MATCHES: FakeMatch[] = [
@@ -63,10 +69,13 @@ interface FakeDb {
   participants: Array<{ lineupId: string; userId: string }>;
   /** 결과가 나가 `completed` 가 된 팀매치. 나머지는 `matched`. */
   completedTeamMatchIds?: string[];
+  /** 이 시험에서만 더하는 경기 — 공용 `MATCHES` 를 기대하는 다른 시험을 흔들지 않는다. */
+  extraMatches?: FakeMatch[];
 }
 
 function toTeamMatchRow(match: FakeMatch) {
   const isLeague = match.kind === 'LEAGUE';
+  const isTournament = match.kind === 'TOURNAMENT';
   return {
     id: match.id,
     startAt: match.startAt,
@@ -75,9 +84,17 @@ function toTeamMatchRow(match: FakeMatch) {
     approvedApplicantTeamId: OPPONENT,
     approvedApplicantTeam: { name: '상대 FC' },
     leagueId: isLeague ? LEAGUE_ID : null,
-    tournamentId: null,
-    tournament: null,
-    tournamentDetails: null,
+    tournamentId: isTournament ? TOURNAMENT_ID : null,
+    tournament: isTournament ? { title: '퀸즈컵' } : null,
+    tournamentDetails: isTournament
+      ? {
+          round: match.round ?? 'league_r1',
+          legNumber: 1,
+          fixtureNumber: match.fixtureNumber ?? 1,
+          // 조별 라운드(`league_rN`)만 조별 단계이고, 결선 라운드 코드는 단계 이름과 같다.
+          group: { name: 'A조', phase: (match.round ?? 'league_r1').startsWith('league_r') ? 'group' : match.round },
+        }
+      : null,
     league: isLeague ? { title: '가을 정규 리그' } : null,
     game: { id: `game-${match.id}` },
   };
@@ -87,7 +104,8 @@ function toTeamMatchRow(match: FakeMatch) {
 const TEAM_A_MEMBERS = new Set([PLAYER_IN, PLAYER_OUT]);
 
 function buildPrisma(db: FakeDb) {
-  const sides = MATCHES.flatMap((match) => [
+  const matches = [...MATCHES, ...(db.extraMatches ?? [])];
+  const sides = matches.flatMap((match) => [
     { id: `side-${match.id}-home`, gameId: `game-${match.id}`, teamId: match.hostTeamId, game: { teamMatchId: match.id } },
     { id: `side-${match.id}-away`, gameId: `game-${match.id}`, teamId: OPPONENT, game: { teamMatchId: match.id } },
   ]);
@@ -104,28 +122,32 @@ function buildPrisma(db: FakeDb) {
           leagueId?: unknown;
           status?: string;
           startAt?: { gte: Date };
-          AND?: Array<{ OR?: Array<{ startAt?: { gte?: Date } }> }>;
+          AND?: Array<{ OR?: Array<{ startAt?: { gte?: Date } | null }> }>;
           OR?: Array<Record<string, { in: string[] }>>;
         };
       }) => {
         // 리그 주차 계산용 형제 대진 조회.
         if (args.where.leagueId !== undefined) return Promise.resolve([{ leagueId: LEAGUE_ID, startAt: LEAGUE_KICKOFF }]);
         const teamIds = args.where.OR?.[0]?.hostTeamId?.in;
-        const startAt = args.where.startAt?.gte ?? args.where.AND
-          ?.flatMap((clause) => clause.OR ?? [])
+        const scheduleBranches = args.where.AND?.flatMap((clause) => clause.OR ?? []) ?? [];
+        const startAt = args.where.startAt?.gte ?? scheduleBranches
           .find((condition) => condition.startAt?.gte !== undefined)?.startAt?.gte ?? new Date(0);
+        // 쿼리가 `startAt: null` 갈래를 실었을 때만 시각 미정 경기가 후보가 된다.
+        const includesUntimed = scheduleBranches.some((condition) => condition.startAt === null);
         const statusOf = (match: FakeMatch) => (db.completedTeamMatchIds?.includes(match.id) ? 'completed' : 'matched');
+        const scheduled = (match: FakeMatch) =>
+          match.startAt === null ? includesUntimed : match.startAt >= startAt;
         return Promise.resolve(
-          MATCHES.filter(
+          matches.filter(
             (match) =>
               statusOf(match) === args.where.status &&
-              match.startAt >= startAt &&
+              scheduled(match) &&
               (teamIds === undefined || teamIds.includes(match.hostTeamId)),
           ).map(toTeamMatchRow),
         );
       }),
       findUnique: jest.fn(({ where }: { where: { id: string } }) =>
-        Promise.resolve({ placeName: MATCHES.find((match) => match.id === where.id)?.placeName ?? null }),
+        Promise.resolve({ placeName: matches.find((match) => match.id === where.id)?.placeName ?? null }),
       ),
     },
     v1GameSide: {
@@ -327,6 +349,108 @@ describe('TeamUpcomingGamesService.nextForMemberships — 홈 "다음 경기"', 
       const next = await service.nextForMemberships(OUTSIDER, [{ teamId: TEAM_A, role: 'member' }], NOW);
       expect(next?.teamId).toBe(TEAM_A);
       expect(await service.nextForMemberships(OUTSIDER, [], NOW)).toBeNull();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+});
+
+// 대진은 공개됐는데 어드민이 경기 시각을 아직 넣지 않은 대회 경기.
+const untimedFixture = (id: string, hostTeamId: string, round: string, fixtureNumber: number): FakeMatch => ({
+  id,
+  startAt: null,
+  hostTeamId,
+  hostName: hostTeamId === TEAM_T ? '시각 미정 팀' : '팀A',
+  kind: 'TOURNAMENT',
+  placeName: null,
+  round,
+  fixtureNumber,
+});
+
+describe('TeamUpcomingGamesService — 시각 미정 대회 경기도 다음 경기다', () => {
+  const memberships = [{ teamId: TEAM_T, role: 'member' }];
+  const untimedOnly = (): FakeDb => ({
+    lineups: [],
+    participants: [],
+    // 일부러 진행 순서와 반대로 늘어놓는다 — 결승, 조별 2라운드, 조별 1라운드.
+    extraMatches: [
+      untimedFixture('match-t-final', TEAM_T, 'final', 1),
+      untimedFixture('match-t-r2', TEAM_T, 'league_r2', 2),
+      untimedFixture('match-t-r1', TEAM_T, 'league_r1', 1),
+    ],
+  });
+
+  it('시각 있는 경기가 하나도 없으면 홈 "다음 경기"가 시각 미정 경기 중 대회 진행 순서상 첫 경기를 가리킨다', async () => {
+    const { service, moduleRef } = await buildService(untimedOnly());
+    try {
+      const next = await service.nextForMemberships(PLAYER_IN, memberships, NOW);
+      expect(next).toMatchObject({
+        gameId: 'game-match-t-r1',
+        teamMatchId: 'match-t-r1',
+        competitionKind: 'TOURNAMENT',
+        competitionId: TOURNAMENT_ID,
+        title: '퀸즈컵 · A조 · 조별리그 1라운드',
+        opponentName: '상대 FC',
+        scheduledAt: null,
+        teamId: TEAM_T,
+        viewerCanManage: false,
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('팀장도 같은 경기를 받고 관리 권한만 다르다', async () => {
+    const { service, moduleRef } = await buildService(untimedOnly());
+    try {
+      const next = await service.nextForMemberships(PLAYER_IN, [{ teamId: TEAM_T, role: 'owner' }], NOW);
+      expect(next).toMatchObject({ gameId: 'game-match-t-r1', scheduledAt: null, viewerCanManage: true });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('시각 있는 경기가 있으면 다른 팀의 시각 미정 경기보다 항상 앞선다 — 가장 먼 친선 경기여도', async () => {
+    const { service, moduleRef } = await buildService(untimedOnly());
+    try {
+      const both = [...memberships, { teamId: TEAM_B, role: 'owner' }];
+      // 팀 B 의 유일한 경기는 10/5 친선이다. 그래도 시각 미정 경기(팀 T)보다 먼저다.
+      const next = await service.nextForMemberships(PLAYER_IN, both, NOW);
+      expect(next).toMatchObject({ gameId: 'game-match-b', competitionKind: 'FRIENDLY' });
+      expect(next?.scheduledAt).toEqual(new Date('2026-10-05T10:00:00.000Z'));
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('팀 상세 목록은 시각 있는 경기 뒤에 시각 미정 경기를 진행 순서대로 붙이고 scheduledAt 을 null 로 내린다', async () => {
+    const db: FakeDb = {
+      lineups: [],
+      participants: [],
+      extraMatches: [
+        untimedFixture('match-a-final', TEAM_A, 'final', 1),
+        untimedFixture('match-a-r1', TEAM_A, 'league_r1', 1),
+      ],
+    };
+    const { service, moduleRef } = await buildService(db);
+    try {
+      const list = await service.listForTeam({ id: PLAYER_IN } as never, TEAM_A, NOW);
+      expect(list.items.map((item) => [item.gameId, item.scheduledAt])).toEqual([
+        ['game-match-league', LEAGUE_KICKOFF],
+        ['game-match-friendly', FRIENDLY_KICKOFF],
+        ['game-match-a-r1', null],
+        ['game-match-a-final', null],
+      ]);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('결과가 나가 완료된 시각 미정 경기는 다음 경기에서 빠진다', async () => {
+    const { service, moduleRef } = await buildService({ ...untimedOnly(), completedTeamMatchIds: ['match-t-r1'] });
+    try {
+      const next = await service.nextForMemberships(PLAYER_IN, memberships, NOW);
+      expect(next?.gameId).toBe('game-match-t-r2');
     } finally {
       await moduleRef.close();
     }

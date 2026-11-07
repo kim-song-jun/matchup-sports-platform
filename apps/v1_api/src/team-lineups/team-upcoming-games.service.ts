@@ -21,7 +21,8 @@ export interface NextTeamGame {
   competitionId: string | null;
   title: string;
   opponentName: string | null;
-  scheduledAt: Date;
+  /** 대회 경기의 킥오프 시각이 아직 정해지지 않았으면 null — 시각 있는 경기가 없을 때만 그 경기가 뽑힌다. */
+  scheduledAt: Date | null;
   placeName: string | null;
   teamId: string;
   teamName: string;
@@ -52,6 +53,7 @@ export class TeamUpcomingGamesService {
     await assertTeamLineupMember(this.prisma, teamId, user.id);
     const games = await this.lineupTodos.listUpcomingForTeam(teamId, now, {
       includeElapsedScheduledTournamentGames: true,
+      includeUntimedTournamentGames: true,
     });
     // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
     const rosters = await loadTeamUpcomingRosterSummaries(this.prisma, teamId, games);
@@ -83,6 +85,7 @@ export class TeamUpcomingGamesService {
    * 내 팀들의 경기 중 **가장 가까운 경기** 하나. 팀원이 아니면 애초에 이 팀들에 들지 않으므로
    * 남의 팀 경기는 나오지 않는다 — `memberships` 는 호출자가 활성 멤버십으로 조회한 값이다.
    * 킥오프가 지난 경기는 결과가 나가기 전(팀매치 `matched`)이고 `NEXT_GAME_STARTED_GRACE_MS` 안이면 남는다.
+   * 시각 있는 경기가 하나도 없으면 시각이 아직 정해지지 않은 대회 경기(대회 진행 순서상 첫 경기)가 뽑힌다.
    */
   async nextForMemberships(
     userId: string,
@@ -92,10 +95,10 @@ export class TeamUpcomingGamesService {
     const games = await this.lineupTodos.listUpcomingForTeams(
       memberships.map((membership) => membership.teamId),
       now,
-      { startedWithinMs: NEXT_GAME_STARTED_GRACE_MS },
+      { startedWithinMs: NEXT_GAME_STARTED_GRACE_MS, includeUntimedTournamentGames: true },
     );
-    const next = games.find((game) => game.scheduledAt !== null);
-    if (next === undefined || next.scheduledAt === null) return null;
+    const next = games[0];
+    if (next === undefined) return null;
 
     const rosters = await loadRosterSummaries(this.prisma, next.teamId, [next]);
     const roster = rosters.get(next.gameId);

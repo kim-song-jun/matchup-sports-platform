@@ -2518,6 +2518,7 @@ export function useV1LineupTodos(options?: { enabled?: boolean }) {
  * 라인업 할 일(`useV1LineupTodos`)과 **같은 수집 경로**지만 완료된 라인업도 온다.
  * 할 일 규칙을 그대로 쓰면 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다.
  * 알려진 한계: 서버가 지금 시각 기준 앞으로의 경기만 모은다 — 끝난 경기는 오지 않는다.
+ * 시각이 아직 정해지지 않은 대회 경기는 `scheduledAt` 이 null 이고 시각 있는 경기 뒤에 대회 진행 순서로 온다.
  */
 export type V1TeamUpcomingGame = {
   gameId: string;

@@ -54,12 +54,15 @@ describe('stepperScrollLeft', () => {
 /**
  * jsdom 은 레이아웃이 없다. 스크롤 영역 폭 362 · 내용 폭 725, 단계 하나 72px 가 140px 간격으로
  * 놓인 390 폭 화면을 흉내 낸다(alpha 실측: scrollWidth 725 / clientWidth 362, 단계 5개).
+ * getBoundingClientRect 는 브라우저처럼 뷰포트 기준이라 스크롤한 만큼 단계 left 가 줄어든다 —
+ * 스크롤 위치를 지금 쓰는 단계 계산이 이 보정을 빠뜨리면 이미 스크롤된 뒤의 재정렬이 어긋난다.
  */
 const VIEWPORT = 362;
 const CONTENT = 725;
 const STAGE_PITCH = 140;
 const STAGE_WIDTH = 72;
 const PADDING_LEFT = 20;
+const LIST_LEFT = 16;
 
 describe('TournamentProgressStepper 자동 스크롤', () => {
   let scrollTo: ReturnType<typeof vi.fn>;
@@ -69,7 +72,9 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
 
   beforeEach(() => {
     reducedMotion = false;
-    scrollTo = vi.fn();
+    scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
+      this.scrollLeft = options.left ?? 0;
+    });
     scrollIntoView = vi.fn();
     windowScrollTo = vi.fn();
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
@@ -86,10 +91,14 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => CONTENT });
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       if (this.classList.contains('tm-hub-stages')) {
-        return { left: 0, width: VIEWPORT } as DOMRect;
+        return { left: LIST_LEFT, width: VIEWPORT } as DOMRect;
       }
-      const items = Array.from(this.parentElement?.querySelectorAll('[role="listitem"]') ?? []);
-      return { left: PADDING_LEFT + items.indexOf(this) * STAGE_PITCH, width: STAGE_WIDTH } as DOMRect;
+      const list = this.parentElement as HTMLElement;
+      const items = Array.from(list.querySelectorAll('[role="listitem"]'));
+      return {
+        left: LIST_LEFT + PADDING_LEFT + items.indexOf(this) * STAGE_PITCH - list.scrollLeft,
+        width: STAGE_WIDTH,
+      } as DOMRect;
     });
   });
 
@@ -134,9 +143,11 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
   });
 
   it('진행 단계가 바뀌면 새 단계로 다시 맞춘다 — 움직임을 줄이는 설정이 아니면 부드럽게', () => {
-    const { rerender } = render(
+    const { rerender, container } = render(
       <TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />,
     );
+    // 이미 155 만큼 스크롤된 상태에서 단계가 바뀐다 — 이때 단계 left 는 스크롤만큼 줄어 있다.
+    expect(container.querySelector('.tm-hub-stages')?.scrollLeft).toBe(155);
     scrollTo.mockClear();
 
     rerender(<TournamentProgressStepper stages={stages(['done', 'done', 'done', 'active', 'upcoming'])} />);
@@ -147,9 +158,10 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
 
   it('움직임 줄이기 설정이면 단계가 바뀌어도 애니메이션 없이 옮긴다', () => {
     reducedMotion = true;
-    const { rerender } = render(
+    const { rerender, container } = render(
       <TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />,
     );
+    expect(container.querySelector('.tm-hub-stages')?.scrollLeft).toBe(155);
     scrollTo.mockClear();
 
     rerender(<TournamentProgressStepper stages={stages(['done', 'done', 'done', 'active', 'upcoming'])} />);

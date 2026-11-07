@@ -2480,6 +2480,94 @@ label.tm-btn:focus-within {
   outline-offset: 2px;
 }
 
+/* 득점·도움 순위 — 한 장 카드 안의 눌리는 행(선수 공개 프로필 링크).
+ * 카드에 overflow:hidden 을 걸지 않는다: 포커스 링(offset 2px)이 잘리기 때문에
+ * 첫·끝 행이 카드 모서리 radius 를 직접 갖는다. */
+.tm-record-rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--grey150);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.tm-record-rank-list > li + li {
+  border-top: 1px solid var(--grey150);
+}
+
+.tm-record-rank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+  color: var(--text-strong);
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+}
+
+.tm-record-rank-list > li:first-child > .tm-record-rank-row {
+  border-top-left-radius: var(--radius-control);
+  border-top-right-radius: var(--radius-control);
+}
+
+.tm-record-rank-list > li:last-child > .tm-record-rank-row {
+  border-bottom-left-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
+}
+
+.tm-record-rank-row:active {
+  background: var(--surface-soft);
+  /* --text-muted(grey600)는 --surface-soft(grey100) 위에서 4.19:1 — .tm-list-row-interactive:hover 와 같은 보정. */
+  --text-muted: var(--grey700);
+}
+
+@media (hover: hover) {
+  .tm-record-rank-row:hover {
+    background: var(--surface-soft);
+    --text-muted: var(--grey700);
+  }
+}
+
+.tm-record-rank-row:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-record-rank-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tm-record-rank-no {
+  flex-shrink: 0;
+  min-width: 22px;
+  color: var(--text-muted);
+}
+
+.tm-record-rank-nick {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+
+.tm-record-rank-value {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.tm-record-rank-value > svg {
+  color: var(--grey500);
+}
+
 /* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */
 .tm-btn-disabled {
   opacity: 0.78;

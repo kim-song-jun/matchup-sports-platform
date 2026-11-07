@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { competitionRanks } from '@/lib/competition-ranks';
@@ -91,34 +92,22 @@ function RecordList({
   return (
     <section>
       <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{title}</h3>
-      <ol style={{ display: 'flex', flexDirection: 'column', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
+      <ol className="tm-record-rank-list">
         {rows.map((row, index) => (
-          <li
-            key={row.userId}
-            style={{ display: 'flex', fontSize: 14, color: 'var(--text-strong)' }}
-          >
+          <li key={row.userId}>
             <Link
               href={row.profileHref}
               aria-label={`${title} ${ranks[index]}위 ${row.nickname ?? '선수'} ${value(row)}${unit} — 공개 프로필 보기`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                minHeight: 44,
-                gap: 12,
-                padding: '8px 0',
-                color: 'inherit',
-                textDecoration: 'underline',
-                textUnderlineOffset: 2,
-                textAlign: 'left',
-              }}
+              className="tm-record-rank-row"
             >
-              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                <span>{ranks[index]}. </span>
-                <span>{row.nickname ?? '선수'}</span>
+              <span className="tm-record-rank-name">
+                <span className="tm-record-rank-no tab-num">{ranks[index]}. </span>
+                <span className="tm-record-rank-nick">{row.nickname ?? '선수'}</span>
               </span>
-              <span style={{ flexShrink: 0 }}>{value(row)}{unit}</span>
+              <span className="tm-record-rank-value">
+                {value(row)}{unit}
+                <ChevronRight size={16} aria-hidden="true" />
+              </span>
             </Link>
           </li>
         ))}

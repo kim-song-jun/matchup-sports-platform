@@ -25,8 +25,10 @@ interface TournamentProgressStepperProps {
 
 /**
  * 지금 봐야 할 단계 — 진행 중인 단계, 없으면(단계 사이 구간) 첫 미완료 단계, 모두 끝났으면 마지막 단계.
+ * 단계가 하나도 없으면 -1(findIndex 와 같은 약속).
  */
 export function pickFocusStageIndex(stages: TournamentStage[]): number {
+  if (stages.length === 0) return -1;
   const active = stages.findIndex((stage) => stage.status === 'active');
   if (active !== -1) return active;
   const firstOpen = stages.findIndex((stage) => stage.status !== 'done');

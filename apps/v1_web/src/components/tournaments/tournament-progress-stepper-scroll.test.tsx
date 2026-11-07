@@ -28,6 +28,10 @@ describe('pickFocusStageIndex', () => {
   it('아직 아무것도 시작하지 않았으면 첫 단계다', () => {
     expect(pickFocusStageIndex(stages(['upcoming', 'upcoming', 'upcoming']))).toBe(0);
   });
+
+  it('단계가 없으면 -1 이다', () => {
+    expect(pickFocusStageIndex([])).toBe(-1);
+  });
 });
 
 describe('stepperScrollLeft', () => {

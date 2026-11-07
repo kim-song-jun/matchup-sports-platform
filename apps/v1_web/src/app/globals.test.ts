@@ -1,11 +1,21 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
 const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
 const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
+
+function appSourcesEnablingViewportFitCover(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return appSourcesEnablingViewportFitCover(path);
+    if (!/\.(ts|tsx)$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) return [];
+    const source = readFileSync(path, 'utf8');
+    return /viewportFit\s*:\s*['"]cover['"]|viewport-fit\s*=\s*cover/.test(source) ? [path] : [];
+  });
+}
 
 describe('mobile floating action button layout', () => {
   it('keeps the FAB above both the bottom navigation and the native safe inset', () => {
@@ -45,6 +55,25 @@ describe('Android bottom inset layout', () => {
     expect(globalsCss).toMatch(
       /\.tm-app-frame-no-bottom \.tm-filter-scrim,\s*\.tm-app-frame-no-bottom \.tm-filter-layer\s*\{\s*bottom:\s*0;/,
     );
+  });
+});
+
+describe('shell bottom safe-area source', () => {
+  // Without viewport-fit=cover a correct UA reports env(safe-area-inset-bottom) as 0, but some
+  // in-app WebViews report a non-zero value anyway. Reading it would shorten every
+  // no-bottom-nav scroller (bottom: var(--v1-shell-safe-bottom)) into a blank strip.
+  it('does not read env(safe-area-inset-bottom) while the viewport has no viewport-fit=cover', () => {
+    expect(appSourcesEnablingViewportFitCover(resolve(process.cwd(), 'src/app'))).toEqual([]);
+
+    const declarations = [...globalsCss.matchAll(/--(?:v1-shell|teameet-native)-safe-bottom\s*:\s*([^;]+);/g)];
+    expect(declarations.length).toBeGreaterThan(0);
+    for (const [declaration] of declarations) {
+      expect(declaration).not.toMatch(/env\(/);
+    }
+  });
+
+  it('resolves the shell variable from the native shell value', () => {
+    expect(globalsCss).toMatch(/--v1-shell-safe-bottom:\s*var\(--teameet-native-safe-bottom\);/);
   });
 });
 

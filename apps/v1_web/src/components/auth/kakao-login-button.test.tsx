@@ -265,6 +265,8 @@ describe('KakaoLoginButton', () => {
       sdk.getInitializedKakaoJsSdk.mockReturnValue(new Promise((resolve) => { release = resolve; }));
       renderButton();
       await click();
+      // The attempt is persisted after an async SHA-256, so wait for it before sampling.
+      await waitFor(() => expect(storedAttempt()?.state).toMatch(/^sha256:/));
       const firstVerifier = storedAttempt()?.state;
       await click();
       expect(storedAttempt()?.state).toBe(firstVerifier);

@@ -309,10 +309,13 @@
   /* 스크롤 콘텐츠 마지막 줄 ~ FAB 사이 여백. FAB 몸통(gap+size) 위에 기존 --v1-shell-scroll-bottom-pad
      와 같은 간격(--spacing-3)을 얹는다 — floatingSlot 있는 화면 전용, .tm-scroll-area 에서만 쓴다. */
   --v1-shell-fab-clear-pad: calc(var(--v1-shell-fab-gap) + var(--v1-shell-fab-size) + var(--spacing-3));
-  /* Native Android publishes its measured navigation-bar inset here. The nav surface can then paint
-     edge-to-edge while only controls consume the safe area. Browser/PWA clients keep using env(). */
+  /* Native Android/iOS shells publish their measured bottom inset here. The nav surface can then paint
+     edge-to-edge while only controls consume the safe area. env(safe-area-inset-bottom) is not read:
+     the viewport has no viewport-fit=cover, so a correct UA reports 0 and an in-app WebView that
+     reports more would shorten every no-bottom-nav scroller into a blank strip. Revisit if
+     viewport-fit=cover is ever enabled. */
   --teameet-native-safe-bottom: 0px;
-  --v1-shell-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--teameet-native-safe-bottom));
+  --v1-shell-safe-bottom: var(--teameet-native-safe-bottom);
   /* visualViewport is updated only while the browser or Android WebView changes its visible area. */
   --teameet-visual-viewport-height: 100dvh;
   --teameet-keyboard-inset: 0px;

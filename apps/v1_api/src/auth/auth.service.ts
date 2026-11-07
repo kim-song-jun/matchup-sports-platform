@@ -23,7 +23,12 @@ import { pendingAccountLinkClaims, signInThenLinkConflict, signInThenLinkHint } 
 import type { LinkableSocialProvider, SocialLinkClaims } from './social-link-token';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
+import {
+  SIGNUP_AGE_RESTRICTED_RESPONSE,
+  isSignupAgeEligible,
+  isValidBirthDateDigits,
+  normalizeSignupDisplayName,
+} from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { recordSignupConsent } from './signup-record-consent';
 import { hashPassword, verifyPasswordConstantCost } from './password-hash';
@@ -156,10 +161,7 @@ export class AuthService {
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
     if (isValidBirthDateDigits(birthDate) && !isSignupAgeEligible(birthDate)) {
-      throw new BadRequestException({
-        code: 'SIGNUP_AGE_RESTRICTED',
-        message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
-      });
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     if (!isValidBirthDateDigits(birthDate)) {
@@ -1052,10 +1054,7 @@ export class AuthService {
     const profileImageOmitted = dto.profileImageUrl === undefined;
 
     if (isValidBirthDateDigits(birthDate) && !isSignupAgeEligible(birthDate)) {
-      throw new BadRequestException({
-        code: 'SIGNUP_AGE_RESTRICTED',
-        message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
-      });
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     if (!isValidBirthDateDigits(birthDate)) {

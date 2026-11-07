@@ -90,7 +90,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       title: '현재 계정은 이용할 수 없어요',
       body: '현재 계정은 이용이 제한된 상태예요. 문의가 필요하시면 고객센터를 통해 확인해 주세요.',
       tone: 'red',
-      primary: { label: '고객센터 문의', disabled: true, tone: 'danger' },
+      primary: { label: '고객센터 문의', href: '/contact', tone: 'primary' },
       secondary: { label: '로그인으로 돌아가기', href: '/login', tone: 'neutral' },
     },
     'location-denied': {

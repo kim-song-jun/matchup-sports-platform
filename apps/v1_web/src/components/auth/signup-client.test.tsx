@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { PENDING_EMAIL_LINK_STORAGE_KEY, readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { consumeSignupPhotoNotice } from '@/lib/signup-photo-notice';
 import { SignupClient } from './signup-client';
 
 const router = vi.hoisted(() => ({
@@ -294,6 +295,65 @@ describe('SignupClient required profile contract', () => {
 
     await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
     expect(peekPendingSocialLink()).not.toBeNull();
+  });
+
+  describe('가입은 됐는데 프로필 사진을 올리지 못한 경우', () => {
+    async function submitWithPhoto() {
+      render(<SignupClient />);
+      await advanceToProfile();
+      fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+      fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+      fireEvent.click(screen.getByRole('radio', { name: '남' }));
+      const file = new File(['x'], 'me.png', { type: 'image/png' });
+      fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+      await screen.findByRole('button', { name: '제거' });
+      fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+    }
+
+    it('사진 업로드가 실패해도 가입을 막지 않고 완료 화면으로 가며, 완료 화면이 사진 안내를 띄우게 표시를 남긴다', async () => {
+      hooks.uploadImagesMutateAsync.mockRejectedValue(new Error('upload failed'));
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(1);
+      expect(hooks.updateProfileMutateAsync).not.toHaveBeenCalled();
+      expect(screen.queryByText('회원가입에 실패했어요.')).not.toBeInTheDocument();
+      expect(consumeSignupPhotoNotice()).toBe(true);
+    });
+
+    it('올린 사진을 프로필에 붙이는 요청이 실패해도 같다', async () => {
+      hooks.uploadImagesMutateAsync.mockResolvedValue({ urls: ['/uploads/me.png'] });
+      hooks.updateProfileMutateAsync.mockRejectedValue(new Error('patch failed'));
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(hooks.updateProfileMutateAsync).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('회원가입에 실패했어요.')).not.toBeInTheDocument();
+      expect(consumeSignupPhotoNotice()).toBe(true);
+    });
+
+    it('사진까지 잘 올라가면 안내 표시를 남기지 않는다', async () => {
+      hooks.uploadImagesMutateAsync.mockResolvedValue({ urls: ['/uploads/me.png'] });
+      hooks.updateProfileMutateAsync.mockResolvedValue({});
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(consumeSignupPhotoNotice()).toBe(false);
+    });
+
+    it('가입 요청 자체가 실패하면 사진은 건드리지 않고 안내 표시도 남기지 않는다', async () => {
+      hooks.registerMutateAsync.mockRejectedValue(new Error('network'));
+
+      await submitWithPhoto();
+
+      expect(await screen.findByText('network')).toBeInTheDocument();
+      expect(hooks.uploadImagesMutateAsync).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalledWith('/signup/complete');
+      expect(consumeSignupPhotoNotice()).toBe(false);
+    });
   });
 
   it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {

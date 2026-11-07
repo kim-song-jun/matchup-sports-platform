@@ -109,6 +109,23 @@ describe('AppleLoginButton', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('sends a suspended or blocked account to /auth/blocked instead of showing the server message', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(new V1ApiError({
+          status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: 'This account cannot sign in', timestamp: '2026-10-31T00:00:00.000Z',
+        })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('This account cannot sign in')).toBeNull();
+  });
+
   it('keeps the grace end date with the link token when the matching account is withdrawing', async () => {
     reply = { ok: true, identityToken: 'identity.token' };
     const until = new Date(Date.now() + 7 * 86_400_000).toISOString();

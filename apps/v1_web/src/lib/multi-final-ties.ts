@@ -4,7 +4,7 @@ import { josa } from '@/lib/korean';
 type Final = MultiFinalView['finals'][number];
 type Destination = { finalName: string; seed: number };
 
-/** A rank this tournament draws from that the stored standings only separated by the seeded draw. */
+/** A seed this final fills from a group rank whose tie the standings broke only by the seeded draw. */
 export type TiedSeat = { seat: number; rank: number; groupId: string; tiedRegistrationIds: string[] };
 export type TieNotice = {
   key: string;

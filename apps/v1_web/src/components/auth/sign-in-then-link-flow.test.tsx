@@ -169,6 +169,18 @@ describe('카카오 콜백의 탈퇴 철회 갈래', () => {
   });
 });
 
+describe('카카오 로그인이 탈퇴 유예 계정과 겹친 경우', () => {
+  it('막다른 길 대신 탈퇴 대기 안내를 보여 주고, 연결 토큰에 유예 종료일을 함께 보관한다', async () => {
+    await openCallback(LINK_MSW.loginConflicts.withdrawalPending);
+
+    expect(await screen.findByRole('list', { name: '기다릴 때의 일정' })).toHaveTextContent(/\d+월 \d+일계정이 삭제돼요/);
+    expect(navigation.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao');
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
+    expect(screen.queryByText(/고객센터로 연락/)).not.toBeInTheDocument();
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: expect.any(String) });
+  });
+});
+
 describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취소 → 자동 연결', () => {
   // 시계를 얼리지 않는다(조회 캐시·타이머가 같은 시계를 본다) — 날짜는 지금으로부터 일주일 뒤로 잡는다.
   const UNTIL = new Date(Date.now() + 7 * 86_400_000).toISOString();

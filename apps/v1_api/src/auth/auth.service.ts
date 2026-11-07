@@ -645,12 +645,21 @@ export class AuthService {
         select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true },
       });
       if (!candidate) throw this.kakaoContactConflict(profile, [userId]);
-      this.assertNotWithdrawalPending(candidate.accountStatus);
-      if (candidate.accountStatus !== 'active') {
+      if (candidate.accountStatus !== 'active' && candidate.accountStatus !== 'withdrawal_pending') {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
         throw this.kakaoContactConflict(profile, [userId]);
+      }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // Only a contact Kakao itself vouches for may reveal that this account is withdrawing, and until when.
+        const vouched = Boolean((email && candidate.email === email) || (phone && candidate.phone === phone));
+        throw signInThenLinkConflict(
+          'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          kakaoLinkClaims(profile),
+          [userId],
+          vouched ? { withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate) } : undefined,
+        );
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
@@ -895,8 +904,16 @@ export class AuthService {
       if (!candidate || candidate.email !== input.email) {
         throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // The address is the one the provider vouches for (it just matched `candidate.email`), so the date may be told.
+        throw signInThenLinkConflict(
+          'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          claims,
+          [candidate.id],
+          { withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate) },
+        );
+      }
       if (candidate.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(candidate.accountStatus);
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       assertLinkableByEmail(candidate, claims);

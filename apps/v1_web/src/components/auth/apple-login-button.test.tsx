@@ -109,6 +109,23 @@ describe('AppleLoginButton', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('keeps the grace end date with the link token when the matching account is withdrawing', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(409, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', {
+          next: 'sign_in_then_link', provider: 'apple', linkToken: 'apple-link-token', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: until,
+        })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=apple'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'apple-link-token', provider: 'apple', withdrawalPendingUntil: until });
+  });
+
   it('sends a withdrawal-pending account to the cancel screen with its token', async () => {
     reply = { ok: true, identityToken: 'identity.token' };
     api.v1Post.mockImplementation((path: string) =>

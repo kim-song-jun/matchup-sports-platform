@@ -1725,6 +1725,76 @@ describe('AuthService', () => {
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
+    describe('a contact held by a withdrawal-pending account', () => {
+      const withdrawing = { ...contactOwner, accountStatus: 'withdrawal_pending' };
+      beforeEach(() => {
+        prisma.v1StatusChangeLog.findFirst.mockResolvedValue({ createdAt: new Date('2026-10-08T08:28:00.000Z') });
+      });
+      const refusal = async (account: Record<string, unknown>) => {
+        stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: account })]);
+        return (await service.kakaoTokenLogin({ accessToken: TOKEN }).catch((e: unknown) => e)) as {
+          status: number;
+          getResponse(): { code: string; details: { linkToken?: string; withdrawalPendingUntil?: string } };
+        };
+      };
+      const attachedNothing = () => {
+        expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+        expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+        expect(prisma.v1User.create).not.toHaveBeenCalled();
+      };
+
+      it.each([
+        ['the verified email', { email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true }, 'email'],
+        ['the Kakao-supplied phone', { phone_number: verifiedKakaoAccount.phone_number }, 'phone'],
+      ])('answers %s match with a link token for that account and the date the withdrawal becomes final', async (_name, account, via) => {
+        prisma.v1User.findUnique.mockResolvedValue(withdrawing);
+        if (via === 'phone') prisma.v1User.findFirst.mockResolvedValue(withdrawing);
+
+        const error = await refusal(account);
+
+        expect(error.status).toBe(409);
+        expect(error.getResponse()).toMatchObject({
+          code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 1800, withdrawalPendingUntil: '2026-11-07T08:28:00.000Z' },
+        });
+        expect(readSocialLinkToken(error.getResponse().details.linkToken!)?.allowedAccounts).toEqual([socialLinkAccountDigest(withdrawing.id)]);
+        expect(prisma.v1StatusChangeLog.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+          where: expect.objectContaining({ targetId: withdrawing.id, toStatus: 'withdrawal_pending' }),
+        }));
+        attachedNothing();
+      });
+
+      it('tells nothing of the withdrawal when Kakao did not vouch for the email that matched', async () => {
+        prisma.v1User.findUnique.mockResolvedValue(withdrawing);
+
+        const error = await refusal({ email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: false });
+
+        expect(error.getResponse().code).toBe('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL');
+        expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+        expect(prisma.v1StatusChangeLog.findFirst).not.toHaveBeenCalled();
+        attachedNothing();
+      });
+
+      it('tells nothing of the withdrawal when the contacts disagree with the stored ones', async () => {
+        prisma.v1User.findUnique.mockResolvedValue({ ...withdrawing, email: 'someone-else@example.com' });
+
+        const error = await refusal({ email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true });
+
+        expect(error.getResponse().code).toBe('SOCIAL_LINK_CONTACT_CONFLICT');
+        expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+        attachedNothing();
+      });
+
+      it('still refuses a suspended holder outright instead of offering a way in', async () => {
+        prisma.v1User.findUnique.mockResolvedValue({ ...contactOwner, accountStatus: 'suspended' });
+
+        const error = await refusal({ email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true });
+
+        expect(error.status).toBe(403);
+        expect(error.getResponse().code).toBe('PERMISSION_DENIED');
+        attachedNothing();
+      });
+    });
     it('refuses a verified email contact changed during the link transaction', async () => {
       prisma.v1User.findUnique.mockResolvedValue(contactOwner);
       prisma.v1User.findFirst.mockResolvedValue(contactOwner);

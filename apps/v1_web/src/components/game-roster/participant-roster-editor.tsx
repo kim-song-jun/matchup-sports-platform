@@ -121,7 +121,7 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
       season={noun === '리그' ? { startAt: tournament.data.scheduledAt, endAt: tournament.data.scheduledEndAt, status: tournament.data.status } : null} />
     {team.isError ? <ErrorState title="수정 권한을 확인하지 못했어요" message={extractErrorMessage(team.error, '팀 조회에 실패했어요.')} onRetry={() => void team.refetch()} /> : null}
     <p className="tm-text-caption">
-      선수 명단·등번호·골레이 설정은 {noun}의 모든 경기에 공통으로 적용돼요.<br />
+      선수 명단·등번호·골키퍼(GK) 설정은 {noun}의 모든 경기에 공통으로 적용돼요.<br />
       바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.<br />
       시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.
     </p>

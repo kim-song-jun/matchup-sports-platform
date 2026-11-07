@@ -667,8 +667,8 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
         prizePool: 500000,
         prizeSummary: '대회 전체 시상 안내',
         groups: [
-          { id: 'upper-final', phase: 'final', sortOrder: 0, bracketTrack: 'upper', standings: [] },
           { id: 'lower-final', phase: 'final', sortOrder: 0, bracketTrack: 'lower', standings: [] },
+          { id: 'upper-final', phase: 'final', sortOrder: 0, bracketTrack: 'upper', standings: [] },
         ] as never,
         fixtures: [
           {
@@ -683,12 +683,12 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
           },
         ] as never,
         awardSets: [
-          { bracketTrack: 'upper', prizePool: 300000, prizeSummary: '상위 우승 시상', prizeBreakdown: '1위,300000' },
           { bracketTrack: 'lower', prizePool: 100000, prizeSummary: '하위 우승 시상', prizeBreakdown: '1위,100000' },
+          { bracketTrack: 'upper', prizePool: 300000, prizeSummary: '상위 우승 시상', prizeBreakdown: '1위,300000' },
         ],
         awards: [
-          { id: 'award-upper', awardType: 'mvp', awardLabel: '상위 MVP', recipientName: '상위 선수', recipientUserId: null, recipientProfileImageUrl: null, teamName: '상위팀', note: null, bracketTrack: 'upper' },
           { id: 'award-lower', awardType: 'mvp', awardLabel: '하위 MVP', recipientName: '하위 선수', recipientUserId: null, recipientProfileImageUrl: null, teamName: '하위팀', note: null, bracketTrack: 'lower' },
+          { id: 'award-upper', awardType: 'mvp', awardLabel: '상위 MVP', recipientName: '상위 선수', recipientUserId: null, recipientProfileImageUrl: null, teamName: '상위팀', note: null, bracketTrack: 'upper' },
         ],
       }),
       isLoading: false,
@@ -702,6 +702,10 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
     expect(screen.getByRole('heading', { name: '상위 결선 시상' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '하위 결선 시상' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '대회 전체 시상 안내' })).toBeInTheDocument();
+    // 서버는 같은 단계·sortOrder 에서 하위 결선(lower)을 먼저 내려주지만 화면은 상위 결선이 먼저다.
+    expect(screen.getAllByRole('heading').map(heading => heading.textContent).filter(text => /^(상위|하위) 결선( 시상| 시상 결과)?$/.test(text ?? ''))).toEqual([
+      '상위 결선 시상 결과', '하위 결선 시상 결과', '상위 결선 시상', '하위 결선 시상', '상위 결선', '하위 결선',
+    ]);
     expect(screen.getByText('상위 우승 시상')).toBeInTheDocument();
     expect(screen.getByText('하위 우승 시상')).toBeInTheDocument();
     expect(screen.getByText('대회 전체 시상 안내', { selector: 'p' })).toBeInTheDocument();
@@ -913,10 +917,11 @@ describe('AwardsPageClient — N개 토너먼트의 구역별 순서', () => {
   }
 
   /** 서버는 시상 묶음·개인 어워드를 트랙 이름 가나다순(챌린지 → 프리미어)으로 내려준다. */
-  function showAwardsOf(finals: NamedFinalSpec[]) {
+  function showAwardsOf(finals: NamedFinalSpec[], status: V1TournamentDetail['status'] = 'completed') {
     const alphabetical = [...finals].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     awardsApiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament({
+        status,
         groups: namedFinalGroups(finals),
         fixtures: finals.map(final => finalFixture(final.name, `${final.name} 우승팀`, `${final.name} 준우승팀`)),
         awardSets: alphabetical.map(final => ({ bracketTrack: final.name, prizePool: 100000, prizeSummary: `${final.name} 상금 안내`, prizeBreakdown: null })),
@@ -957,6 +962,12 @@ describe('AwardsPageClient — N개 토너먼트의 구역별 순서', () => {
       '챌린지 시상 결과', '프리미어 시상 결과',
       '챌린지 시상', '프리미어 시상',
       '챌린지', '프리미어',
+    ]);
+  });
+
+  it('진행 중인 대회의 상금 안내도 팀 수가 다른 토너먼트를 만든 순서(프리미어 8팀 → 챌린지 12팀)로 보여준다', () => {
+    expect(showAwardsOf([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }], 'in_progress')).toEqual([
+      '프리미어 시상', '챌린지 시상',
     ]);
   });
 });

@@ -38,6 +38,19 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
     ).toHaveAttribute('href', '/users/a');
   });
 
+  it('순위 행은 밑줄 없이 chevron 으로 눌리는 행임을 알린다', () => {
+    render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        goals={[row({ userId: 'a', nickname: '가', profileHref: '/users/a', goals: 2 })]}
+        assists={[]}
+      />,
+    );
+    const link = screen.getByRole('link', { name: '득점 순위 1위 가 2골 — 공개 프로필 보기' });
+    expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(getComputedStyle(link).textDecoration).not.toContain('underline');
+  });
+
   it('도움 순위는 도움 수 기준으로 별도 섹션에 렌더한다', () => {
     render(
       <TournamentPlayerRecordsSections

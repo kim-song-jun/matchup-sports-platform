@@ -30,6 +30,7 @@ import {
   type TournamentStaffResource,
 } from '../../tournaments/staff/tournament-staff-access.service';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
+import { displayRevisionReason } from './revision-reason-display';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
@@ -1355,7 +1356,7 @@ export class PublicTournamentRecordsService {
         officialAt: revision.officialAt?.toISOString() ?? null,
         // status_only 공개는 진행 여부·시점만 알린다. correction reason은 운영자 자유
         // 텍스트일 수 있어 점수/선수 기록을 가리는 이 모드에서 함께 공개하면 안 된다.
-        reason: mode === 'status_only' ? null : revision.reason,
+        reason: mode === 'status_only' ? null : displayRevisionReason(revision.reason),
         isCorrection: revision.supersedesId !== null,
       })),
       videos: fixture.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
@@ -2099,16 +2100,11 @@ export class PublicTournamentRecordsService {
           revision: revision.revision,
           state: revision.state,
           officialAt: revision.officialAt?.toISOString() ?? null,
-          // 리그 결과 입력·정정 경로는 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...",
-          // league-match-result-entry.service.ts)를 reason 앞에 붙여 저장한다 — 관전자
-          // 화면(결과 변경 이력)에 그대로 나가면 기술 문구다(alpha 실측 2026-08-25).
-          // 표시에서만 마커를 벗긴다 — DB 의 감사 기록 원문은 그대로다.
-          //
-          // 마커를 하나가 아니라 **연속으로 전부** 벗긴다: 리그 결과 경로는 마커를 겹쳐
-          // 붙일 수 있어서(`[LEAGUE_RESULT_ENTRY] [X] ...`) 하나만 벗기면 남은 마커가
-          // 그대로 노출된다. 몰수 마커가 섞인 리비전은 위 분기에서 이미 통째로 null 이
-          // 되므로 여기 오는 것은 공개해도 되는 사유뿐이다 — 원문은 유지하고 마커만 뗀다.
-          reason: revision.reason === null ? null : revision.reason.replace(/^(\[[A-Z0-9_]+\]\s*)+/, ''),
+          // 리그 결과 입력·정정 경로의 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...")와 어드민
+          // 빠른 결과의 "[quick-result]" 는 reason 앞에 붙어 저장된다 — 표시에서만 연속으로
+          // 전부 벗긴다(DB 원문은 그대로). 몰수 마커가 섞인 리비전은 위 분기에서 이미 통째로
+          // null 이 되므로 여기 오는 것은 공개해도 되는 사유뿐이다.
+          reason: displayRevisionReason(revision.reason),
           isCorrection: revision.supersedesId !== null,
         };
       }),

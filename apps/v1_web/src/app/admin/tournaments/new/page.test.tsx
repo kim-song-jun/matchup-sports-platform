@@ -430,6 +430,21 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(changeStatusMutate).not.toHaveBeenCalled();
   });
 
+  it('최대 선수 수 설명은 최대 칸에만 붙고, 세 숫자 칸은 위쪽 정렬로 놓여 설명 높이에 늘어나지 않는다', () => {
+    renderPage();
+    goToParticipationStep();
+
+    const hint = '팀당 등록할 수 있는 최대 인원이에요. 팀이 12명이면 12 이상으로 바꿔 주세요';
+    const maxField = screen.getByLabelText(/최대 선수 수/).parentElement!;
+    expect(within(maxField).getByText(hint)).toBeInTheDocument();
+    expect(within(screen.getByLabelText(/최소 선수 수/).parentElement!).queryByText(hint)).toBeNull();
+    expect(within(screen.getByLabelText(/참가 팀 수/).parentElement!).queryByText(hint)).toBeNull();
+
+    // jsdom은 grid 배치를 계산하지 않는다. 설명 줄이 붙은 칸이 길어질 때 같은 줄의 다른 칸이
+    // 함께 늘어나지 않게 하는 align-items:start 연결만 확인하고, 실제 높이는 alpha 3폭에서 잰다.
+    expect(maxField.parentElement).toHaveClass('grid', 'sm:grid-cols-3', 'items-start');
+  });
+
   // "출전 인원"(라인업 상한) 선택지 — 서버가 종목의 canonical 포메이션에서 파생해
   // 내려주는 값이라 프론트는 후보를 하드코딩하지 않는다. 아래 세 케이스는 각각 다른
   // 실패 모드를 잡는다: 정상 렌더/자동 기본값, 미지원 종목, 그리고 조회 실패.
@@ -555,6 +570,18 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       phase: 'final',
       periods: [{ durationMinutes: 10 }, { durationMinutes: 10 }],
     }));
+  });
+
+  it('경기 시간: 단계 추가 목록과 추가한 단계 제목이 8강 항목을 6팀 대진의 6강까지 풀어 쓴다', () => {
+    renderPage();
+    goToParticipationStep();
+
+    const select = screen.getByLabelText('경기 시간 재정의를 추가할 단계');
+    expect(within(select).getByRole('option', { name: '8강 · 6팀 대진의 6강' })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'quarter' } });
+    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
+
+    expect(screen.getByRole('group', { name: '8강 · 6팀 대진의 6강 경기 방식' })).toBeInTheDocument();
   });
 
   it('경기 시간: 피리어드 저장이 끝나기 전에는 공개 확인과 접수 시작을 열지 않는다', async () => {
@@ -1794,12 +1821,6 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
       expect(screen.getByLabelText(/종목/)).toHaveFocus();
       expect(scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
-    });
-
-    it('최대 선수 수 칸 아래에 등록 명단 최대 인원 설명을 보여 준다', () => {
-      renderInScroller();
-      goToParticipationStep();
-      expect(screen.getByText('팀당 등록할 수 있는 최대 인원이에요. 팀이 12명이면 12 이상으로 바꿔 주세요')).toBeInTheDocument();
     });
 
     it('혼성 정원 그룹 오류는 그 그룹의 첫 입력(남성 최소)에 포커스한다', () => {

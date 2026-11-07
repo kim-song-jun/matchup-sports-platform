@@ -917,6 +917,58 @@ describe('PublicTournamentRecordsService.getMatch -- status-only history privacy
   });
 });
 
+describe('PublicTournamentRecordsService.getMatch -- 결과 이력의 내부 표식', () => {
+  const OFFICIAL_AT = new Date('2026-08-10T06:00:00.000Z');
+
+  async function historyOf(revisions: Array<{ revision: number; reason: string | null; supersedesId: string | null }>) {
+    const rows = revisions.map((rev) => ({ ...rev, state: 'OFFICIAL', officialAt: OFFICIAL_AT }));
+    const service = new PublicTournamentRecordsService(
+      buildFakePrisma({
+        scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+        consentLinks: [],
+        consentSnapshots: [],
+        events: [],
+        visibilityMode: 'LIVE',
+        officialRevision: { ...rows[rows.length - 1], score: { home: 1, away: 0 } },
+        revisions: rows,
+      }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).history;
+  }
+
+  it('어드민 빠른 결과가 저장한 [quick-result] 는 사유가 아니라 표식이라 관전자에게 내보내지 않는다', async () => {
+    const history = await historyOf([{ revision: 1, reason: '[quick-result]', supersedesId: null }]);
+    expect(history).toEqual([
+      { revision: 1, state: 'OFFICIAL', officialAt: '2026-08-10T06:00:00.000Z', reason: null, isCorrection: false },
+    ]);
+  });
+
+  it('무효 뒤 빠른 결과로 다시 넣은 리비전도 같다 — 정정 여부(isCorrection)는 그대로 true', async () => {
+    const history = await historyOf([
+      { revision: 1, reason: null, supersedesId: null },
+      { revision: 3, reason: '[quick-result]', supersedesId: 'revision-2' },
+    ]);
+    expect(history.map(({ revision, reason, isCorrection }) => ({ revision, reason, isCorrection }))).toEqual([
+      { revision: 1, reason: null, isCorrection: false },
+      { revision: 3, reason: null, isCorrection: true },
+    ]);
+  });
+
+  it('표식 뒤에 사람이 쓴 문장이 있으면 표식만 떼고 문장은 그대로 내보낸다', async () => {
+    const history = await historyOf([{ revision: 1, reason: '[quick-result] 현장 기록지 기준', supersedesId: null }]);
+    expect(history[0]?.reason).toBe('현장 기록지 기준');
+  });
+
+  it('운영자가 쓴 정정 사유는 건드리지 않는다 — 대괄호로 시작하는 한글 말머리도 그대로', async () => {
+    const history = await historyOf([
+      { revision: 2, reason: '[비고] 득점자 오기재 정정', supersedesId: 'revision-1' },
+      { revision: 3, reason: '골 기록 [quick-result] 반영', supersedesId: 'revision-2' },
+    ]);
+    expect(history.map((entry) => entry.reason)).toEqual(['[비고] 득점자 오기재 정정', '골 기록 [quick-result] 반영']);
+  });
+});
+
 describe('PublicTournamentRecordsService.getMatch -- 승부차기 표면화', () => {
   const OFFICIAL_AT = new Date('2026-08-10T06:00:00.000Z');
 

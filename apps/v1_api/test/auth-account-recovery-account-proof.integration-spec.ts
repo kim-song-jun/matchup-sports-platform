@@ -224,7 +224,7 @@ describe('V1 account recovery requires independent email proof', () => {
       const response = await findByPhone(EMAIL_PHONE, await proveCurrentPhone(EMAIL_PHONE));
 
       expect(response.status).toBe(200);
-      expect(response.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, withdrawalPendingUntil: null });
+      expect(response.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
       expect(JSON.stringify(response.body)).not.toContain('integration.test');
     });
 
@@ -238,7 +238,16 @@ describe('V1 account recovery requires independent email proof', () => {
       // A real, valid mailbox proof — but for the other fixture account.
       const other = await findByPhone(EMAIL_PHONE, phoneProof, { email: SOCIAL_EMAIL, emailProofToken: await proveMailbox(SOCIAL_EMAIL) });
       expect(other.status).toBe(200);
-      expect(other.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, withdrawalPendingUntil: null });
+      expect(other.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
+    });
+
+    it('tells a number holder whose account has no email that there is no mailbox to prove', async () => {
+      await prisma.v1User.update({ where: { id: SOCIAL_USER }, data: { email: null } });
+
+      const response = await findByPhone(SOCIAL_PHONE, await proveCurrentPhone(SOCIAL_PHONE));
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual({ providers: ['kakao'], hasPassword: false, withdrawalPending: false, maskedEmail: null, emailProofAvailable: false, withdrawalPendingUntil: null });
     });
 
     it('refuses a forged mailbox proof and a proof sent without its address', async () => {
@@ -264,7 +273,7 @@ describe('V1 account recovery requires independent email proof', () => {
 
       expect(found.status).toBe(200);
       expect(found.body.data).toEqual({
-        providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: 'in***@integration.test', withdrawalPendingUntil: GRACE_ENDS_AT,
+        providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: 'in***@integration.test', emailProofAvailable: true, withdrawalPendingUntil: GRACE_ENDS_AT,
       });
     });
 
@@ -273,7 +282,7 @@ describe('V1 account recovery requires independent email proof', () => {
       const phoneProof = await proveCurrentPhone(EMAIL_PHONE);
 
       const smsOnly = await findByPhone(EMAIL_PHONE, phoneProof);
-      expect(smsOnly.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: null, withdrawalPendingUntil: null });
+      expect(smsOnly.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
 
       const withMailbox = await findByPhone(EMAIL_PHONE, phoneProof, { email: EMAIL, emailProofToken: await proveMailbox(EMAIL) });
       expect(withMailbox.body.data).toMatchObject({ withdrawalPending: true, maskedEmail: 'in***@integration.test', withdrawalPendingUntil: GRACE_ENDS_AT });

@@ -47,10 +47,10 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     } satisfies Partial<V1ApiError>);
   });
 
-  it('answers a purpose-bound phone lookup with the login methods only', async () => {
+  it('answers a purpose-bound phone lookup with the login methods and no email', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     await expect(v1Post<V1FoundAccount>('/auth/recovery/find-account', { phone, proofToken }))
-      .resolves.toEqual({ maskedEmail: null, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   });
 
   it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
@@ -93,7 +93,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     await v1Post('/auth/recovery/email/request', { email });
     const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
     await expect(v1Post<V1FoundAccount>('/auth/recovery/email/find-account', { email, proofToken }))
-      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
     await expect(v1Post('/auth/recovery/email/find-account', { email: 'other@example.com', proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'EMAIL_NOT_VERIFIED' });
   });
@@ -209,7 +209,7 @@ describe('phone lookup reveals the masked email and withdrawal date only with th
   it('adds the masked email when the mailbox proof is for this account', async () => {
     const email = fixtureEmail();
     await expect(lookup({ email, emailProofToken: await proveMailbox(email) }))
-      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   });
 
   it('answers a proof for another account\'s mailbox exactly like no proof', async () => {
@@ -231,7 +231,7 @@ describe('phone lookup reveals the masked email and withdrawal date only with th
   it('tells a withdrawal-pending account\'s number holder only that it is pending, until the mailbox is proven', async () => {
     const { email, phone: pendingPhone, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
     await expect(lookup({}, pendingPhone))
-      .resolves.toEqual({ maskedEmail: null, providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil: null });
     await expect(lookup({ email, emailProofToken: await proveMailbox(email) }, pendingPhone))
       .resolves.toMatchObject({ withdrawalPending: true, maskedEmail: 'wi***@example.com', withdrawalPendingUntil });
   });
@@ -241,7 +241,7 @@ describe('email lookup also finds an account waiting out its withdrawal grace', 
   it('carries the pending flag and the end date after the mailbox proof', async () => {
     const { email, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
     await expect(v1Post<V1FoundAccount>('/auth/recovery/email/find-account', { email, proofToken: await proveMailbox(email) }))
-      .resolves.toEqual({ maskedEmail: 'wi***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil });
+      .resolves.toEqual({ maskedEmail: 'wi***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil });
   });
 
   it('refuses to reset the password of such an account and says why, with the end date', async () => {

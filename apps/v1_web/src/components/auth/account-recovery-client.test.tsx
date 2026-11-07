@@ -96,7 +96,7 @@ async function fillNewPassword(value = 'brand-new-pass') {
 
 /** 비밀번호 재설정은 메일함 증명 뒤에 계정이 탈퇴 대기인지 먼저 조회한다. 기본은 활성 계정이다. */
 const ACTIVE_EMAIL_ACCOUNT: V1FoundAccount = {
-  maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null,
+  maskedEmail: 'ru***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null,
 };
 
 function resetEmailLookup(account: V1FoundAccount = ACTIVE_EMAIL_ACCOUNT) {
@@ -125,6 +125,7 @@ describe('AccountRecoveryClient', () => {
     // A phone lookup without a mailbox proof carries no masked email.
     hooks.findAccountMutateAsync.mockResolvedValue({
       maskedEmail: null,
+      emailProofAvailable: true,
       providers: ['email'],
       hasPassword: true,
       withdrawalPending: false,
@@ -182,7 +183,7 @@ describe('AccountRecoveryClient', () => {
   });
 
   it.each(['kakao', 'apple'])('이메일 인증 후에만 %s 소셜 로그인 방법을 보여 준다', async (provider) => {
-    hooks.findAccountByEmailMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: [provider], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
+    hooks.findAccountByEmailMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', emailProofAvailable: true, providers: [provider], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     render(<AccountRecoveryClient />);
     findMethod('email');
     enterEmail();
@@ -195,7 +196,7 @@ describe('AccountRecoveryClient', () => {
   });
 
   it('이메일 인증 뒤 조회가 일시 실패하면 다시 조회할 수 있다', async () => {
-    hooks.findAccountByEmailMutateAsync.mockRejectedValueOnce(new Error('일시 오류')).mockResolvedValueOnce({ maskedEmail: 'ru***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
+    hooks.findAccountByEmailMutateAsync.mockRejectedValueOnce(new Error('일시 오류')).mockResolvedValueOnce({ maskedEmail: 'ru***@example.com', emailProofAvailable: true, providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     render(<AccountRecoveryClient />);
     findMethod('email');
     enterEmail();
@@ -214,7 +215,7 @@ describe('AccountRecoveryClient', () => {
     enterEmail();
     fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
     findMethod('phone');
-    resolveLookup?.({ maskedEmail: 'old***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
+    resolveLookup?.({ maskedEmail: 'old***@example.com', emailProofAvailable: true, providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     await waitFor(() => expect(screen.getByLabelText('휴대폰 번호')).toBeVisible());
     expect(screen.queryByText('old***@example.com')).not.toBeInTheDocument();
   });
@@ -308,8 +309,9 @@ describe('AccountRecoveryClient', () => {
   });
 
   describe('아이디 찾기 결과는 계정의 실제 로그인 수단을 따른다', () => {
-    async function findAccount(account: Omit<V1FoundAccount, 'withdrawalPending' | 'withdrawalPendingUntil'>, props: { redirectPath?: string } = {}) {
-      hooks.findAccountMutateAsync.mockResolvedValue({ ...account, withdrawalPending: false, withdrawalPendingUntil: null });
+    /** 번호 증명만 보낸 조회다 — 서버는 마스킹 이메일 없이 가입 수단만 답한다. */
+    async function findAccount(account: Pick<V1FoundAccount, 'providers' | 'hasPassword'>, props: { redirectPath?: string } = {}) {
+      hooks.findAccountMutateAsync.mockResolvedValue({ ...account, maskedEmail: null, emailProofAvailable: true, withdrawalPending: false, withdrawalPendingUntil: null });
       render(<AccountRecoveryClient {...props} />);
       enterPhone();
       fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
@@ -319,7 +321,7 @@ describe('AccountRecoveryClient', () => {
     const hrefOf = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
 
     it('카카오 전용 계정은 이메일 로그인이 아니라 로그인 첫 화면의 카카오로 보내고 비밀번호 재설정은 권하지 않는다', async () => {
-      await findAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false });
+      await findAccount({ providers: ['kakao'], hasPassword: false });
 
       expect(screen.getByText('이 계정은 카카오 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
       expect(hrefOf('카카오로 로그인하기')).toBe('/login');
@@ -334,7 +336,7 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('웹·안드로이드의 Apple 전용 계정은 쓸 수 없는 Apple 버튼 대신 안내와 문의 창구를 준다', async () => {
-      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+      await findAccount({ providers: ['apple'], hasPassword: false });
 
       expect(screen.getByText('이 계정은 Apple 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
       expect(screen.getByText('Apple 로그인은 iOS 앱에서 쓸 수 있어요.')).toBeInTheDocument();
@@ -345,7 +347,7 @@ describe('AccountRecoveryClient', () => {
 
     it('iOS 앱의 Apple 전용 계정은 로그인 첫 화면의 Apple 버튼으로 보낸다', async () => {
       nativeApple.available = true;
-      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+      await findAccount({ providers: ['apple'], hasPassword: false });
 
       expect(hrefOf('Apple로 로그인하기')).toBe('/login');
       expect(screen.queryByText('Apple 로그인은 iOS 앱에서 쓸 수 있어요.')).not.toBeInTheDocument();
@@ -354,8 +356,8 @@ describe('AccountRecoveryClient', () => {
 
     // 로그인 첫 화면에 없는 제공자(naver)뿐이거나 비밀번호 없는 이메일 신원뿐이면 안내할 수단이 없다.
     it.each([
-      ['naver 전용', { maskedEmail: null, providers: ['naver'], hasPassword: false }],
-      ['비밀번호 없는 이메일 신원', { maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: false }],
+      ['naver 전용', { providers: ['naver'], hasPassword: false }],
+      ['비밀번호 없는 이메일 신원', { providers: ['email'], hasPassword: false }],
     ])('%s 계정은 빈 화면 대신 문의 창구를 준다', async (_name, account) => {
       await findAccount(account);
 
@@ -366,7 +368,7 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('이메일 계정은 이메일 로그인으로 보내고 비밀번호 재설정으로 이어진다', async () => {
-      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+      await findAccount({ providers: ['email'], hasPassword: true });
 
       expect(hrefOf('로그인하러 가기')).toBe('/login/email');
       expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
@@ -376,7 +378,7 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('내 계정이 아닌 사람을 위해, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 로그인 길 뒤에 붙는다', async () => {
-      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+      await findAccount({ providers: ['email'], hasPassword: true });
 
       const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
       expect(help).toHaveAttribute('href', '/contact');
@@ -386,14 +388,14 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('소셜 전용 계정이어도, 이 환경에서 쓸 로그인 길이 없어 문의 창구 버튼이 이미 있어도 같은 한 줄이 붙는다', async () => {
-      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+      await findAccount({ providers: ['apple'], hasPassword: false });
 
       expect(screen.getByRole('link', { name: '문의 창구 보기' })).toHaveAttribute('href', '/contact');
       expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/contact');
     });
 
     it('수단이 여럿이면 가진 수단을 모두 보여 주고 없는 수단은 보여 주지 않는다', async () => {
-      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true });
+      await findAccount({ providers: ['email', 'kakao'], hasPassword: true });
 
       expect(hrefOf('이메일로 로그인하기')).toBe('/login/email');
       expect(hrefOf('카카오로 로그인하기')).toBe('/login');
@@ -403,7 +405,7 @@ describe('AccountRecoveryClient', () => {
 
     it('카카오와 Apple 둘 다 가입했고 iOS 앱이면 두 버튼을 모두 보여 준다', async () => {
       nativeApple.available = true;
-      await findAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao', 'apple'], hasPassword: false });
+      await findAccount({ providers: ['kakao', 'apple'], hasPassword: false });
 
       expect(screen.getByText('이 계정은 카카오·Apple 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
       expect(hrefOf('카카오로 로그인하기')).toBe('/login');
@@ -411,7 +413,7 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('돌아갈 경로는 이메일 로그인과 소셜 로그인 첫 화면 양쪽에 이어진다', async () => {
-      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true }, { redirectPath: '/my' });
+      await findAccount({ providers: ['email', 'kakao'], hasPassword: true }, { redirectPath: '/my' });
 
       expect(hrefOf('이메일로 로그인하기')).toBe('/login/email?redirect=%2Fmy');
       expect(hrefOf('카카오로 로그인하기')).toBe('/login?redirect=%2Fmy');
@@ -428,10 +430,10 @@ describe('AccountRecoveryClient', () => {
     afterEach(() => vi.useRealTimers());
 
     /** 서버처럼 답한다 — 번호 증명만이면 이메일·날짜가 없고, 같은 계정의 이메일 증명이 함께 오면 채운다. */
-    function pendingLookup(account: Omit<V1FoundAccount, 'maskedEmail' | 'withdrawalPending' | 'withdrawalPendingUntil'>) {
+    function pendingLookup(account: Pick<V1FoundAccount, 'providers' | 'hasPassword'>) {
       hooks.findAccountMutateAsync.mockImplementation(async (body: { emailProofToken?: string }) => (body.emailProofToken
-        ? { ...account, maskedEmail: 'ru***@example.com', withdrawalPending: true, withdrawalPendingUntil: UNTIL }
-        : { ...account, maskedEmail: null, withdrawalPending: true, withdrawalPendingUntil: null }));
+        ? { ...account, maskedEmail: 'ru***@example.com', emailProofAvailable: true, withdrawalPending: true, withdrawalPendingUntil: UNTIL }
+        : { ...account, maskedEmail: null, emailProofAvailable: true, withdrawalPending: true, withdrawalPendingUntil: null }));
     }
 
     function confirmMailbox() {
@@ -441,7 +443,7 @@ describe('AccountRecoveryClient', () => {
       fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
     }
 
-    async function findPendingAccount(account: Omit<V1FoundAccount, 'maskedEmail' | 'withdrawalPending' | 'withdrawalPendingUntil'>, props: { redirectPath?: string } = {}) {
+    async function findPendingAccount(account: Pick<V1FoundAccount, 'providers' | 'hasPassword'>, props: { redirectPath?: string } = {}) {
       pendingLookup(account);
       render(<AccountRecoveryClient {...props} />);
       enterPhone();
@@ -530,12 +532,9 @@ describe('AccountRecoveryClient', () => {
     // 서버가 이미 지난 종료일을 주면 "방법 2 기다리기"가 틀린 날짜를 말하게 되므로 그리지 않는다. 탈퇴 취소 길은 그대로다.
     it('유예 종료 시각이 이미 지났으면 날짜가 없는 것과 같아 방법 2 는 그리지 않고 로그인하면 취소할 수 있다는 안내만 남는다', async () => {
       vi.setSystemTime(Date.parse(UNTIL));
-      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil: UNTIL });
-      render(<AccountRecoveryClient />);
-      enterPhone();
-      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+      await findPendingAccount({ providers: ['email'], hasPassword: true });
 
-      expect(await screen.findByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toBeInTheDocument();
       expect(screen.getByText('로그인하면 탈퇴를 취소할 수 있어요.')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: '방법 2 기다리기' })).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email');
@@ -555,7 +554,7 @@ describe('AccountRecoveryClient', () => {
       ['이메일과 카카오를 함께 쓰는 계정', ['email', 'kakao'], true, ['이메일·비밀번호', '카카오']],
       ['카카오만 쓰는 계정', ['kakao'], false, ['카카오']],
     ])('이메일 힌트가 없어도 %s 은 가입한 로그인 방법을 수단 칩으로 알린다', async (_label, providers, hasPassword, chips) => {
-      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: null, providers, hasPassword, withdrawalPending: false, withdrawalPendingUntil: null });
+      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: null, emailProofAvailable: true, providers, hasPassword, withdrawalPending: false, withdrawalPendingUntil: null });
       render(<AccountRecoveryClient />);
       enterPhone();
       fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
@@ -566,12 +565,12 @@ describe('AccountRecoveryClient', () => {
     });
 
     it('날짜가 없으면(null) 일반 결과 카드가 그대로 나온다', async () => {
-      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
       render(<AccountRecoveryClient />);
       enterPhone();
       fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
 
-      expect(await screen.findByText('가입한 이메일')).toBeInTheDocument();
+      expect(await screen.findByText('가입한 로그인 방법')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /탈퇴를 신청한 계정/ })).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: '로그인하러 가기' })).toBeInTheDocument();
     });
@@ -587,6 +586,7 @@ describe('AccountRecoveryClient', () => {
         const ownMailbox = Boolean(body.emailProofToken) && body.email === 'owner@example.com';
         return {
           maskedEmail: ownMailbox ? 'ow***@example.com' : null,
+          emailProofAvailable: true,
           providers: ['email', 'kakao'],
           hasPassword: true,
           withdrawalPending: pending,
@@ -630,6 +630,25 @@ describe('AccountRecoveryClient', () => {
 
       expect(screen.getByRole('button', { name: '이메일로 한 번 더 확인하기' })).toHaveAccessibleDescription('확인하면 가입한 이메일을 볼 수 있어요.');
       expect(screen.queryByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).not.toBeInTheDocument();
+    });
+
+    // 이메일이 없는 계정은 어떤 이메일로도 증명이 맞을 수 없다 — 권하면 사용자가 인증 메일만 반복해 받는 막다른 길이 된다.
+    it.each([
+      ['활성 계정', false],
+      ['탈퇴 대기 계정', true],
+    ])('이메일이 없는 %s 은 이메일로 한 번 더 확인하자고 권하지 않고 가입 수단 결과는 그대로 보여 준다', async (_label, pending) => {
+      hooks.findAccountMutateAsync.mockResolvedValue({
+        maskedEmail: null, emailProofAvailable: false, providers: ['kakao'], hasPassword: false, withdrawalPending: pending, withdrawalPendingUntil: null,
+      } satisfies V1FoundAccount);
+      render(<AccountRecoveryClient />);
+      enterPhone();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+
+      expect(await screen.findByText('가입한 로그인 방법')).toBeInTheDocument();
+      expect(chipsUnder('가입한 로그인 방법')).toEqual(['카카오']);
+      expect(screen.getByRole('link', { name: pending ? '로그인하고 탈퇴 취소하기' : '카카오로 로그인하기' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '이메일로 한 번 더 확인하기' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/확인하면 가입한 이메일/)).not.toBeInTheDocument();
     });
 
     it('이메일 입력 → 인증번호 → 상세 결과: 같은 계정의 이메일이면 마스킹 이메일과 방법 2 일정(삭제 예정일)이 채워진다', async () => {

@@ -47,7 +47,7 @@ export const authUiServer = setupServer(
   }),
   http.post('*/api/v1/auth/recovery/find-account', async ({ request }) => {
     wireCalls.findAccount.push(await request.json());
-    return success({ maskedEmail: null, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+    return success({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/reset-password', () => {
     wireCalls.phoneReset += 1;
@@ -64,7 +64,7 @@ export const authUiServer = setupServer(
   // 비밀번호 재설정은 메일함 증명 뒤에 계정이 탈퇴 대기인지 먼저 확인한다. 기본은 활성 계정이다.
   http.post('*/api/v1/auth/recovery/email/find-account', async ({ request }) => {
     wireCalls.emailFind.push(await request.json());
-    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+    return success({ maskedEmail: 'ow***@example.test', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/email/reset-password', async ({ request }) => {
     wireCalls.emailReset.push(await request.json());

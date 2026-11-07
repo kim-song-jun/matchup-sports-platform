@@ -94,6 +94,7 @@ export type AccountPasswordIssue = 'too_short' | 'too_common';
 
 /** Why a password cannot be used, or null when it can. Too short wins when both hold. */
 export function accountPasswordIssue(password: string): AccountPasswordIssue | null {
-  if (password.length < ACCOUNT_PASSWORD_MIN_LENGTH) return 'too_short';
+  // Spread counts code points like the server's MinLength; String.length would count an emoji as two.
+  if ([...password].length < ACCOUNT_PASSWORD_MIN_LENGTH) return 'too_short';
   return isCommonPassword(password) ? 'too_common' : null;
 }

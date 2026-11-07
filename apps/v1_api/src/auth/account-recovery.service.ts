@@ -66,6 +66,11 @@ export interface FoundAccount {
    */
   maskedEmail: string | null;
   /**
+   * 이 계정에 이메일이 있어 이메일 증명을 받을 수 있는지. 번호로 찾은 화면이 "이메일로 한 번 더 확인하기"를
+   * 권해도 되는지 가르는 값으로, 주소 자체는 싣지 않는다.
+   */
+  emailProofAvailable: boolean;
+  /**
    * 탈퇴 유예가 끝나는 시각(ISO). maskedEmail 과 같은 조건에서만 채우고, 활성 계정이거나 탈퇴 신청 기록이
    * 없으면 null.
    */
@@ -149,6 +154,7 @@ export class AccountRecoveryService {
       hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       withdrawalPending,
       maskedEmail: revealPrivate && user.email ? maskEmail(user.email) : null,
+      emailProofAvailable: user.email !== null,
       withdrawalPendingUntil:
         revealPrivate && withdrawalPending ? await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus }) : null,
     };

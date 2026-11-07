@@ -96,7 +96,7 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     authUiServer.use(http.post<never, { email: string; proofToken: string }>('*/api/v1/auth/recovery/email/find-account', async ({ request }) => {
       const body = await request.json();
       lookups.push(body);
-      return success({ maskedEmail: 'ow***@example.test', providers: [provider], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
+      return success({ maskedEmail: 'ow***@example.test', emailProofAvailable: true, providers: [provider], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     }));
     renderAuthUi(<AccountRecoveryClient />);
     const user = userEvent.setup();

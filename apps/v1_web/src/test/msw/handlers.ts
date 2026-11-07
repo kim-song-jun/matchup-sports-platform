@@ -272,6 +272,7 @@ async function findAccountByRecoveryEmail(request: Request) {
   }
   return ok({
     maskedEmail: maskRecoveryEmail(email),
+    emailProofAvailable: true,
     providers: social ? [...PASSWORD_UNAVAILABLE_MSW.providers] : ['email'],
     hasPassword: !social,
     withdrawalPending: withdrawing,
@@ -360,6 +361,7 @@ async function findAccountByRecoveryPhone(request: Request) {
   const ownMailbox = mailboxEmail !== null && mailboxEmail === accountEmail;
   return ok({
     maskedEmail: ownMailbox && accountEmail ? maskRecoveryEmail(accountEmail) : null,
+    emailProofAvailable: accountEmail !== null,
     providers: ['email'],
     hasPassword: true,
     withdrawalPending: withdrawing,

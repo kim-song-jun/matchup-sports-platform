@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { accountPasswordIssue } from '../account-password-rules';
 import { FindAccountDto, ResetPasswordByEmailDto, ResetPasswordDto } from './account-recovery.dto';
 
 async function failedProperties(cls: new () => object, input: Record<string, unknown>) {
@@ -46,4 +47,14 @@ describe.each([
   it.each(['short12', 'qwer1234', 'Password123', '1q2w3e4r'])('refuses %s', async (newPassword) => {
     expect(await failedProperties(cls, { ...base, newPassword })).toEqual(['newPassword']);
   });
+
+  // The web form judges with accountPasswordIssue; both must give the same answer for an emoji password.
+  it.each(['😀😀😀😀', '😀😀😀😀😀😀😀', '😀😀😀😀😀😀😀😀', 'ab😀😀😀😀😀😀'])(
+    'agrees with the shared rule on the length of %s',
+    async (newPassword) => {
+      const refusedByDto = (await failedProperties(cls, { ...base, newPassword })).length > 0;
+
+      expect(refusedByDto).toBe(accountPasswordIssue(newPassword) !== null);
+    },
+  );
 });

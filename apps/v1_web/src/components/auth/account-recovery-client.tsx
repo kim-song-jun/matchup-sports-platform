@@ -12,6 +12,7 @@ import {
   useV1FindAccountByEmail,
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
+import { ACCOUNT_WITHDRAWAL_PENDING_CODE } from '@/lib/auth-error-codes';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
@@ -30,8 +31,6 @@ import styles from './account-recovery.module.css';
 
 type Mode = 'find-id' | 'reset-password';
 
-/** 탈퇴 신청 중인 계정의 비밀번호 재설정을 서버가 거절할 때의 코드(로그인 거절과 같은 코드, 철회 토큰은 없다). */
-const WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
 type FindMethod = 'phone' | 'email';
 type RecoveryStep = 'purpose' | 'method' | 'identity' | 'verify' | 'result' | 'mailbox' | 'mailbox-verify' | 'password' | 'complete';
 
@@ -335,7 +334,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
         return;
       }
       // 인증한 뒤에 탈퇴를 신청한 계정 — 조회를 다시 해서 같은 탈퇴 안내로 간다(그 사이 활성으로 돌아왔다면 비밀번호 단계에 남는다).
-      if (extractErrorCode(err) === WITHDRAWAL_PENDING_CODE) {
+      if (extractErrorCode(err) === ACCOUNT_WITHDRAWAL_PENDING_CODE) {
         await onEmailVerified(emailProofToken);
         return;
       }
@@ -496,8 +495,8 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
             )
           ) : null}
 
-          {/* 번호 인증만으로는 마스킹 이메일과 삭제 예정일을 알리지 않는다 — 메일함까지 확인한 사람에게만 상세 결과를 보여 준다. */}
-          {step === 'result' && found && phoneFlow && found.maskedEmail === null ? (
+          {/* 번호 인증만으로는 마스킹 이메일과 삭제 예정일을 알리지 않는다 — 메일함까지 확인한 사람에게만 상세 결과를 보여 준다. 이메일이 없는 계정은 확인할 메일함이 없어 권하지 않는다. */}
+          {step === 'result' && found && phoneFlow && found.maskedEmail === null && found.emailProofAvailable ? (
             <div className={styles.mailboxOffer}>
               <Button aria-describedby={mailboxOfferNoteId} block onClick={startMailboxCheck} size="lg" type="button" variant="neutral">이메일로 한 번 더 확인하기</Button>
               <p id={mailboxOfferNoteId} className="tm-text-caption">

@@ -53,4 +53,14 @@ describe('accountPasswordIssue', () => {
     expect(accountPasswordIssue('exactly8')).toBeNull();
     expect(accountPasswordIssue('Sunny-ride-4')).toBeNull();
   });
+
+  // The server validator counts an astral character (emoji) as one; String.length counts two.
+  it.each([
+    ['four emoji, eight UTF-16 units', '😀😀😀😀', 'too_short'],
+    ['seven emoji', '😀😀😀😀😀😀😀', 'too_short'],
+    ['eight emoji, sixteen UTF-16 units', '😀😀😀😀😀😀😀😀', null],
+    ['two letters and six emoji', 'ab😀😀😀😀😀😀', null],
+  ] as const)('counts characters, not UTF-16 units: %s', (_label, password, expected) => {
+    expect(accountPasswordIssue(password)).toBe(expected);
+  });
 });

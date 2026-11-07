@@ -122,6 +122,7 @@ describe('AccountRecoveryService — 계정 찾기(휴대폰)', () => {
       hasPassword: true,
       withdrawalPending: false,
       maskedEmail: null,
+      emailProofAvailable: true,
       withdrawalPendingUntil: null,
     });
     expect(JSON.stringify(result)).not.toMatch(/runner|ru\*\*\*|example\.com/);
@@ -142,6 +143,7 @@ describe('AccountRecoveryService — 계정 찾기(휴대폰)', () => {
       hasPassword: true,
       withdrawalPending: false,
       maskedEmail: 'ru***@example.com',
+      emailProofAvailable: true,
       withdrawalPendingUntil: null,
     });
     // 증명을 해도 전체 주소를 되돌려 주지는 않는다.
@@ -175,6 +177,16 @@ describe('AccountRecoveryService — 계정 찾기(휴대폰)', () => {
     });
 
     expect(result).toMatchObject({ providers: ['kakao'], maskedEmail: null, withdrawalPendingUntil: null });
+  });
+
+  // 화면이 "이메일로 한 번 더 확인하기"를 권해도 되는지 가르는 값이라, 이메일이 없는 계정과 있는 계정이 서로 달라야 한다.
+  it('이메일 증명을 받을 수 있는 계정인지만 알리고 주소는 싣지 않는다', async () => {
+    const withEmail = await service(prismaMock(emailUser)).findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+    const withoutEmail = await service(prismaMock({ ...kakaoOnlyUser, email: null })).findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+
+    expect(withEmail.emailProofAvailable).toBe(true);
+    expect(withoutEmail.emailProofAvailable).toBe(false);
+    expect(JSON.stringify([withEmail, withoutEmail])).not.toMatch(/example\.com|@/);
   });
 
   it.each([
@@ -212,7 +224,7 @@ describe('AccountRecoveryService — 이메일로 로그인 방법 찾기', () =
     const prisma = prismaByEmail({ 'kakao@example.com': kakaoOnlyUser });
     const svc = service(prisma) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
     await expect(svc.findAccountByEmail({ email: 'kakao@example.com', proofToken: issueEmailProofToken('kakao@example.com', 'password_reset') }))
-      .resolves.toEqual({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: 'ka***@example.com', emailProofAvailable: true, providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
   });
 
@@ -274,6 +286,7 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
       hasPassword: false,
       withdrawalPending: true,
       maskedEmail: null,
+      emailProofAvailable: true,
       withdrawalPendingUntil: null,
     });
     expect(JSON.stringify(result)).not.toMatch(/moved|2026-10/);
@@ -295,6 +308,7 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
       hasPassword: false,
       withdrawalPending: true,
       maskedEmail: 'mo***@example.com',
+      emailProofAvailable: true,
       withdrawalPendingUntil: '2026-10-31T00:00:00.000Z',
     });
     expect(JSON.stringify(result)).not.toContain('moved@example.com');
@@ -325,6 +339,14 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
         emailProofToken: issueEmailProofToken('moved@example.com', 'password_reset'),
       }),
     ).resolves.toMatchObject({ providers: ['kakao'], withdrawalPending: true, withdrawalPendingUntil: null });
+  });
+
+  it('이메일이 없는 탈퇴 대기 계정은 이메일 증명을 권할 수 없다고 알린다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: { ...withdrawingUser, email: null } });
+
+    const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
+
+    expect(result).toMatchObject({ withdrawalPending: true, maskedEmail: null, emailProofAvailable: false });
   });
 
   it('활성 계정과 탈퇴 유예 계정이 함께 걸리면 활성 계정을 보여 주고 유예는 말하지 않는다', async () => {
@@ -416,6 +438,7 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정의 이메일을
       hasPassword: true,
       withdrawalPending: true,
       maskedEmail: 'mo***@example.com',
+      emailProofAvailable: true,
       withdrawalPendingUntil: '2026-10-31T00:00:00.000Z',
     });
   });

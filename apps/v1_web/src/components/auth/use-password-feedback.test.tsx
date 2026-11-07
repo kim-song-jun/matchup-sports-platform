@@ -46,6 +46,15 @@ describe('usePasswordFeedback', () => {
     expect(view.result.current.feedback).toEqual({ kind: 'error', message: '8자 이상 입력해 주세요.' });
   });
 
+  it('이모지 네 개는 8자가 아니라 4자로 세어 서버와 같이 사용할 수 없다고 판정한다', () => {
+    const view = setup();
+    view.rerender({ password: '😀😀😀😀' });
+    pause();
+
+    expect(view.result.current.usable).toBe(false);
+    expect(view.result.current.feedback).toEqual({ kind: 'error', message: '8자 이상 입력해 주세요.' });
+  });
+
   it('쓸 수 있는 비밀번호는 멈춘 뒤에 칭찬하고, 흔한 값으로 고치면 칭찬이 바로 사라진다', () => {
     const view = setup();
     view.rerender({ password: 'Sunny-ride-4' });

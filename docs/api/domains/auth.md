@@ -41,11 +41,11 @@
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
-| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, withdrawalPendingUntil }`; the last two are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
+| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; `maskedEmail` and `withdrawalPendingUntil` are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
-| `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | after email proof: `{ providers, hasPassword, withdrawalPending, maskedEmail, withdrawalPendingUntil }`; finds an `active` account first, then a `withdrawal_pending` one |
+| `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | after email proof: `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; finds an `active` account first, then a `withdrawal_pending` one |
 | `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }`; `newPassword` follows the [password rule](#password-rule) | `{ ok: true }`; changes `active` accounts only. A `withdrawal_pending` holder gets `403 ACCOUNT_WITHDRAWAL_PENDING` with `details: { withdrawalPendingUntil }` (ISO or `null`) and nothing is written — see [Account enumeration](#account-enumeration) |
 | `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
@@ -65,11 +65,13 @@ A withdrawn account keeps its `phone` for the 30-day grace period (`WITHDRAWAL_G
 the code proved the number is theirs**:
 
 - `phone/verify` adds `withdrawalPendingUntil` (ISO instant, `null` when the holder is not a withdrawal or the number is free). `registered`
-  keeps meaning "a row holds this number".
+  keeps meaning "a row holds this number". This is kept on purpose: the signup screen tells a person who types a held number when it frees
+  up, and only the account-lookup result hides the date. `purpose` is chosen by the caller, so withholding it for `password_reset` alone would
+  protect nothing.
 - `recovery/find-account` finds the `withdrawal_pending` holder when no `active` account has the number (the `active` one wins if both ever
   matched) and answers `withdrawalPending: true`. The end date (`withdrawalPendingUntil`) and `maskedEmail` come back only with a mailbox
-  proof for that account — see [Lookup by phone number](#lookup-by-phone-number). A number can be reassigned to someone else, so the SMS
-  proof alone never carries the previous holder's email hint or end date. Active holders get `withdrawalPending: false` and `null` dates.
+  proof for that account — see [Lookup by phone number](#lookup-by-phone-number). A number can be reassigned to someone else, so the
+  `find-account` answer to an SMS proof alone never carries the previous holder's email hint or end date (`phone/verify` above still carries the date). Active holders get `withdrawalPending: false` and `null` dates.
   `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
@@ -274,13 +276,16 @@ restrictions — when this refusal is returned.
 - A proof for **someone else's** mailbox is not an error: the answer is identical to sending no mailbox proof, so the call says nothing about
   whose mailbox it was. A proof that does not verify (forged, expired, wrong channel, wrong address) is `400 EMAIL_NOT_VERIFIED`; sending only one
   of `email` / `emailProofToken` is `400 VALIDATION_ERROR`.
+- `emailProofAvailable` is `true` when the account has an email, so a mailbox proof can succeed for it, and `false` when it has none. It is the
+  same on both tiers and never carries the address. The screen offers the mailbox check only when it is `true`; without it an account
+  without an email would send its holder through mailbox proofs that can never match.
 - Whether an account holds the number is still told only after the SMS proof (`404 ACCOUNT_NOT_FOUND` otherwise).
 - `recovery/email/find-account` always carries the second tier, because the mailbox proof is its entry ticket.
 
 ### Password rule
 
 Every route that sets a login password — `register`, `link/email/complete`, `recovery/email/reset-password` and the dead-end phone
-`recovery/reset-password` — validates it with `IsAccountPassword`: a string of **8 or more characters** that is **not on the common-password
+`recovery/reset-password` — validates it with `IsAccountPassword`: a string of **8 or more characters** (counted as characters, so an emoji is one) that is **not on the common-password
 list**. Login (`POST /auth/login`) never applies the rule, so an existing account with a common password still signs in.
 
 - The list (`COMMON_PASSWORDS`) is a few hundred lowercase entries — digit runs, keyboard walks, `YYYY0101` birthdays, common English words and

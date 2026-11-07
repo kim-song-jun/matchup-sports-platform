@@ -32,7 +32,10 @@ describe('필터 선택·적용', () => {
     const actions = dialog.querySelector<HTMLElement>(':scope > .tm-filter-actions');
     expect(actions).not.toBeNull();
     const form = dialog.querySelector('form');
-    expect(within(actions as HTMLElement).getByRole('button', { name: '결과 보기' })).toHaveProperty('form', form);
+    expect(form).not.toBeNull();
+    expect(actions?.contains(form)).toBe(false);
+    const submit = within(actions as HTMLElement).getByRole('button', { name: '결과 보기' }) as HTMLButtonElement;
+    expect(submit.form).toBe(form);
   });
   it('시트에서 고른 값은 결과 보기를 누르기 전 URL에 적용하지 않는다', () => {
     render(<CompetitionDiscoveryControls {...props} sheetOpen />);

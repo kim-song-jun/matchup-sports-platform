@@ -1,5 +1,7 @@
 'use client';
 
+import { useLayoutEffect, useRef, type Ref } from 'react';
+
 /**
  * TournamentProgressStepper
  *
@@ -21,11 +23,64 @@ interface TournamentProgressStepperProps {
   stages: TournamentStage[];
 }
 
+/**
+ * 지금 봐야 할 단계 — 진행 중인 단계, 없으면(단계 사이 구간) 첫 미완료 단계, 모두 끝났으면 마지막 단계.
+ */
+export function pickFocusStageIndex(stages: TournamentStage[]): number {
+  const active = stages.findIndex((stage) => stage.status === 'active');
+  if (active !== -1) return active;
+  const firstOpen = stages.findIndex((stage) => stage.status !== 'done');
+  return firstOpen !== -1 ? firstOpen : stages.length - 1;
+}
+
+/** 기준 단계를 스크롤 영역 가운데로 두는 scrollLeft. 양 끝에서는 영역 밖으로 밀지 않는다. */
+export function stepperScrollLeft({
+  viewport,
+  content,
+  itemStart,
+  itemSize,
+}: {
+  viewport: number;
+  content: number;
+  itemStart: number;
+  itemSize: number;
+}): number {
+  const centered = itemStart + itemSize / 2 - viewport / 2;
+  return Math.min(Math.max(centered, 0), Math.max(content - viewport, 0));
+}
+
 export function TournamentProgressStepper({ stages }: TournamentProgressStepperProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
+  const positioned = useRef(false);
+  const focusIndex = pickFocusStageIndex(stages);
+  const focusKey = stages[focusIndex]?.key;
+
+  // 좁은 화면에서는 스텝퍼가 자기 안에서 가로로 스크롤되고 항상 맨 앞에서 시작한다.
+  // scrollIntoView 는 세로 페이지 스크롤까지 움직이므로 쓰지 않고 이 컨테이너의 scrollLeft 만 맞춘다.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const focus = focusRef.current;
+    if (!list || !focus) return;
+
+    const listRect = list.getBoundingClientRect();
+    const focusRect = focus.getBoundingClientRect();
+    const left = stepperScrollLeft({
+      viewport: list.clientWidth,
+      content: list.scrollWidth,
+      itemStart: focusRect.left - listRect.left + list.scrollLeft,
+      itemSize: focusRect.width,
+    });
+    // 처음 자리 잡을 때는 첫 페인트 전이라 움직임이 보이지 않는다 — 이후 단계가 바뀔 때만 부드럽게.
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    list.scrollTo({ left, behavior: positioned.current && !reduced ? 'smooth' : 'auto' });
+    positioned.current = true;
+  }, [focusKey]);
+
   if (!stages.length) return null;
 
   return (
-    <div className="tm-hub-stages" role="list" aria-label="대회 진행 단계">
+    <div ref={listRef} className="tm-hub-stages" role="list" aria-label="대회 진행 단계">
       {stages.map((stage, idx) => (
         <StageWithConnector
           key={stage.key}
@@ -33,6 +88,7 @@ export function TournamentProgressStepper({ stages }: TournamentProgressStepperP
           isLast={idx === stages.length - 1}
           prevDone={idx > 0 && stages[idx - 1].status === 'done'}
           stepNumber={idx + 1}
+          stageRef={idx === focusIndex ? focusRef : undefined}
         />
       ))}
     </div>
@@ -44,11 +100,13 @@ function StageWithConnector({
   isLast,
   prevDone,
   stepNumber,
+  stageRef,
 }: {
   stage: TournamentStage;
   isLast: boolean;
   prevDone: boolean;
   stepNumber: number;
+  stageRef?: Ref<HTMLDivElement>;
 }) {
   const dotClass = [
     'tm-hub-stage-dot',
@@ -76,6 +134,7 @@ function StageWithConnector({
   return (
     <>
       <div
+        ref={stageRef}
         className="tm-hub-stage"
         role="listitem"
         aria-label={`${stage.label}${stage.status === 'done' ? ' (완료)' : stage.status === 'active' ? ' (진행 중)' : ' (예정)'}`}

@@ -1,6 +1,7 @@
 // apps/v1_api/src/tournaments/slots/group-rank-preview.spec.ts
-import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
+import { FOOTBALL_V1_CONFIG, REQUIRED_TIE_BREAK_ORDER } from '../competition-config/competition-config';
 import { calculateCompetitionStandings } from '../competition-config/competition-standings';
+import { withTournamentTieBreakOrder } from '../competition-config/tournament-tie-break-order';
 import { drawnTieGroups, resolveStoredGroupRank, resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
 
 type Result = readonly [home: string, away: string, homeScore: number, awayScore: number];
@@ -15,8 +16,10 @@ function sourceOf(
     officialAt?: Date | null;
     recalculatedAt?: Date | null;
     fairPlay?: ReadonlyMap<string, number>;
+    tieBreakOrder?: typeof REQUIRED_TIE_BREAK_ORDER;
   } = {},
 ): GroupRankSource {
+  const config = withTournamentTieBreakOrder(FOOTBALL_V1_CONFIG, options.tieBreakOrder ?? null);
   const standings = calculateCompetitionStandings({
     tournamentId: 'tournament-1',
     configVersionId: 'config-1',
@@ -27,12 +30,13 @@ function sourceOf(
       homeScore,
       awayScore,
     })),
-    config: FOOTBALL_V1_CONFIG,
+    config,
     fairPlayByRegistration: options.fairPlay,
   })
     .filter((row) => row.registrationId !== options.dropStandingFor)
     .map((row) => ({ registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses, fairPlayPoints: row.fairPlayPoints, recalculatedAt: options.recalculatedAt ?? null }));
   return {
+    rule: () => ({ tournamentId: 'tournament-1', configVersionId: 'config-1', config }),
     registrationIds: ids,
     standings,
     fixtures: results.map(([home, away, homeScore, awayScore], index) => ({
@@ -54,7 +58,7 @@ const FOUR_TIE_MIDDLE: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['A', 'D'
 const TIE_SECOND_THIRD: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['B', 'C', 0, 0]];
 // 4팀 조: A>B>C>D 동률 없음.
 const FOUR_CLEAN: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['A', 'D', 1, 0], ['B', 'C', 1, 0], ['B', 'D', 1, 0], ['C', 'D', 1, 0]];
-// 저장 순위(설정: 승점 → 맞대결)는 B>A, §5(승점 → 득실)는 A>B 로 갈리는 4팀 조.
+// 맞대결을 앞세운 순서는 B>A, 득실차를 앞세운 순서는 A>B 로 갈리는 4팀 조.
 const RULES_DISAGREE: Result[] = [
   ['B', 'A', 1, 0], ['A', 'C', 4, 0], ['A', 'D', 0, 0], ['B', 'C', 0, 0], ['D', 'B', 1, 0], ['C', 'D', 0, 1],
 ];
@@ -90,12 +94,14 @@ describe('resolveGroupRank', () => {
     expect(resolveGroupRank(source, 3)).toEqual({ state: 'tied', tiedRegistrationIds: ['B', 'C'] });
   });
 
-  it('저장 순위와 §5 순위가 어긋나면 임의로 믿지 않고 두 팀을 tied 로 넘긴다 — 어긋나지 않는 1·4위는 ready', () => {
+  it('맞대결로 갈린 두 팀은 동률이 아니다 — 득실이 나빠도 저장 순위 그대로 ready', () => {
     const source = sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE);
-    expect(resolveGroupRank(source, 1)).toEqual({ state: 'ready', registrationId: 'D' });
-    expect(resolveGroupRank(source, 2)).toEqual({ state: 'tied', tiedRegistrationIds: ['A', 'B'] });
-    expect(resolveGroupRank(source, 3)).toEqual({ state: 'tied', tiedRegistrationIds: ['A', 'B'] });
-    expect(resolveGroupRank(source, 4)).toEqual({ state: 'ready', registrationId: 'C' });
+    expect([1, 2, 3, 4].map((rank) => resolveGroupRank(source, rank))).toEqual([
+      { state: 'ready', registrationId: 'D' },
+      { state: 'ready', registrationId: 'B' },
+      { state: 'ready', registrationId: 'A' },
+      { state: 'ready', registrationId: 'C' },
+    ]);
   });
 
   it('경기가 하나라도 OFFICIAL 이 아니면 모든 순위가 group_incomplete — 전부 확정되면 ready(대조)', () => {
@@ -105,7 +111,7 @@ describe('resolveGroupRank', () => {
   });
 
   it('경기가 하나도 없는 조는 group_incomplete', () => {
-    expect(resolveGroupRank({ registrationIds: ['A', 'B'], fixtures: [], standings: [] }, 1)).toEqual({ state: 'group_incomplete' });
+    expect(resolveGroupRank({ ...sourceOf(['A', 'B'], []), fixtures: [], standings: [] }, 1)).toEqual({ state: 'group_incomplete' });
   });
 
   it('팀 미정 경기가 섞여 있으면 group_incomplete', () => {
@@ -254,28 +260,10 @@ describe('summarizeGroupStanding', () => {
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
     });
 
-    it('저장 순위와 §5 가 갈린 두 팀이 모두 진출선 안쪽이면(상위 3팀) 둘 다 진출이고 undecided 가 아니다', () => {
-      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE), 3, none);
-      expect([...(summary?.qualification?.advancingRegistrationIds ?? [])].sort()).toEqual(['A', 'B', 'D']);
-      expect(summary?.qualification?.undecided).toBe(false);
-    });
-
-    it('저장 순위와 §5 가 갈린 두 팀 중 하나가 진출선 밖이면(상위 2팀) 걸친 것으로 보고 1위만 진출, undecided 이다(대조)', () => {
+    it('맞대결과 득실이 갈린 두 팀은 공동이 아니다 — 저장 순위 그대로 상위 2팀이 진출이고 미정이 아니다', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE), 2, none);
-      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['D'], undecided: true });
-    });
-
-    it('§5 순서로는 진출선 안쪽이어도 저장 순위가 선 밖이면 걸친 것이다 — 저장 position 검사가 이 경우를 가른다', () => {
-      // §5: D>A>B>C, 저장 순위: A·B·C·D — 1위 자리의 {A, D} 는 D 가 §5 로는 안쪽(0)이지만 저장 순위 4위라 선(3) 밖이다.
-      const base = sourceOf(['A', 'B', 'C', 'D'], [['D', 'A', 1, 0], ['D', 'B', 1, 0], ['D', 'C', 1, 0], ['A', 'B', 1, 0], ['A', 'C', 1, 0], ['B', 'C', 1, 0]]);
-      const storedOrder = ['A', 'B', 'C', 'D'];
-      const source: GroupRankSource = {
-        ...base,
-        standings: base.standings.map((row) => ({ ...row, position: storedOrder.indexOf(row.registrationId) + 1 })),
-      };
-      const summary = summarizeGroupStanding(source, 3, none);
-      expect([...(summary?.qualification?.advancingRegistrationIds ?? [])].sort()).toEqual(['A', 'B']);
-      expect(summary?.qualification?.undecided).toBe(true);
+      expect(summary?.sharedRankByRegistrationId.size).toBe(0);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['B', 'D'], undecided: false });
     });
 
     it('수동 조의 진출 수가 없어도 실제 결선에 배정된 소속 팀은 표시한다', () => {
@@ -353,12 +341,11 @@ describe('N개 토너먼트의 공식 저장 순위 추천', () => {
 });
 
 describe('저장 순위가 추첨으로만 갈린 묶음', () => {
-  const rule = () => ({ tournamentId: 'tournament-1', configVersionId: 'config-1', config: FOOTBALL_V1_CONFIG });
-  const bundles = (source: GroupRankSource) => drawnTieGroups(source, rule).map((group) => [...group].sort());
+  const bundles = (source: GroupRankSource) => drawnTieGroups(source).map((group) => [...group].sort());
 
   it('A·B 가 승점·맞대결·득실·득점·페어플레이까지 같으면 한 묶음이고, 그 자리는 tied 로 돌려준다', () => {
     const source = sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND);
-    const ties = drawnTieGroups(source, rule);
+    const ties = drawnTieGroups(source);
     expect(bundles(source)).toEqual([['A', 'B']]);
     for (const rank of [1, 2]) {
       const resolution = resolveStoredGroupRank(source, rank, ties);
@@ -370,7 +357,7 @@ describe('저장 순위가 추첨으로만 갈린 묶음', () => {
 
   it('동률이 없는 조는 묶음이 없고 모든 자리가 ready 다', () => {
     const source = sourceOf(['A', 'B', 'C'], CLEAN);
-    expect(drawnTieGroups(source, rule)).toEqual([]);
+    expect(drawnTieGroups(source)).toEqual([]);
     expect(resolveStoredGroupRank(source, 1, [])).toEqual({ state: 'ready', registrationId: 'A' });
   });
 
@@ -385,11 +372,48 @@ describe('저장 순위가 추첨으로만 갈린 묶음', () => {
     expect(bundles(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE))).toEqual([]);
   });
 
-  it('결과가 덜 끝났거나 순위표가 낡았으면 묶음을 만들지 않고 규칙도 읽지 않는다', () => {
-    const unusedRule = jest.fn(rule);
-    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { unofficialIndex: 0 }), unusedRule)).toEqual([]);
-    expect(unusedRule).not.toHaveBeenCalled();
-    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { unofficialIndex: 0 }), rule)).toEqual([]);
-    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { officialAt: new Date('2026-11-06T01:00:00Z'), recalculatedAt: new Date('2026-11-06T00:00:00Z') }), rule)).toEqual([]);
+  it('결과가 덜 끝났거나 순위표가 낡았으면 묶음을 만들지 않고 대회 규칙도 읽지 않는다', () => {
+    const pending = sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { unofficialIndex: 0 });
+    const readRule = jest.fn(pending.rule);
+    expect(drawnTieGroups({ ...pending, rule: readRule })).toEqual([]);
+    expect(readRule).not.toHaveBeenCalled();
+    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { officialAt: new Date('2026-11-06T01:00:00Z'), recalculatedAt: new Date('2026-11-06T00:00:00Z') }))).toEqual([]);
+  });
+});
+
+describe('대회가 고른 동점 순서와 공개 공동 순위·동률 판정', () => {
+  // P, X and Y finish level on 6 points. P lost to both X and Y but won 6-0 twice, so head-to-head puts X and Y
+  // above P while goal difference puts P first. X and Y are level on every criterion (a drawn bundle); F1 and F2 are
+  // another drawn bundle that sits at 4th–5th under either order.
+  const LEVEL_TRIO: Result[] = [
+    ['X', 'P', 1, 0], ['Y', 'P', 1, 0], ['X', 'Y', 0, 0],
+    ['P', 'F1', 6, 0], ['P', 'F2', 6, 0], ['X', 'F1', 0, 0], ['X', 'F2', 0, 0], ['Y', 'F1', 0, 0], ['Y', 'F2', 0, 0], ['F1', 'F2', 1, 1],
+  ];
+  const IDS = ['P', 'X', 'Y', 'F1', 'F2'];
+  const GOAL_DIFFERENCE_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as typeof REQUIRED_TIE_BREAK_ORDER;
+  const shared = (source: GroupRankSource) => Object.fromEntries([...(summarizeGroupStanding(source, null, new Set())?.sharedRankByRegistrationId ?? [])].sort());
+  const positionOf = (source: GroupRankSource, id: string) => source.standings.find((row) => row.registrationId === id)?.position;
+
+  it('기본 순서에서는 맞대결이 앞서 X·Y 가 1~2위, P 가 3위이고 공동 1위는 X·Y 다 — 기존 대회 표시 그대로', () => {
+    const source = sourceOf(IDS, LEVEL_TRIO);
+    expect(positionOf(source, 'P')).toBe(3);
+    expect(shared(source)).toEqual({ F1: 4, F2: 4, X: 1, Y: 1 });
+    expect(resolveGroupRank(source, 3)).toEqual({ state: 'ready', registrationId: 'P' });
+    expect(resolveGroupRank(source, 1)).toEqual({ state: 'tied', tiedRegistrationIds: ['X', 'Y'] });
+  });
+
+  it('득실차를 앞세운 대회에서는 P 가 1위가 되고 X·Y 의 공동 순위는 2위로 옮겨 간다 — 공개 표와 어드민 판정이 같은 순서를 쓴다', () => {
+    const source = sourceOf(IDS, LEVEL_TRIO, { tieBreakOrder: GOAL_DIFFERENCE_FIRST });
+    expect(positionOf(source, 'P')).toBe(1);
+    expect(shared(source)).toEqual({ F1: 4, F2: 4, X: 2, Y: 2 });
+    expect(resolveGroupRank(source, 1)).toEqual({ state: 'ready', registrationId: 'P' });
+    expect(resolveGroupRank(source, 2)).toEqual({ state: 'tied', tiedRegistrationIds: ['X', 'Y'] });
+    expect(resolveGroupRank(source, 3)).toEqual({ state: 'tied', tiedRegistrationIds: ['X', 'Y'] });
+    expect(drawnTieGroups(source).map((group) => [...group].sort()).sort()).toEqual([['F1', 'F2'], ['X', 'Y']]);
+  });
+
+  it('득실차를 앞세운 대회에서 진출선(상위 1팀)은 P 를 확정하고 동률인 X·Y 는 칠하지 않는다', () => {
+    const summary = summarizeGroupStanding(sourceOf(IDS, LEVEL_TRIO, { tieBreakOrder: GOAL_DIFFERENCE_FIRST }), 1, new Set());
+    expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['P'], undecided: false });
   });
 });

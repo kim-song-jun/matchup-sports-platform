@@ -433,3 +433,72 @@ describe('6강 방식 수정 payload', () => {
     expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
   });
 });
+
+describe('동점일 때 순서 수정', () => {
+  const GOALS_FIRST: V1Tournament['tieBreakOrder'] = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
+  const DEFAULT_ORDER: V1Tournament['tieBreakOrder'] = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
+
+  it('요약 카드에 지금 쓰는 순서를 한 줄로 보여준다 — 안 고른 대회는 기본 순서', () => {
+    const { unmount } = renderSection(true, { tieBreakOrder: GOALS_FIRST });
+    expect(screen.getByText('승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨')).toBeInTheDocument();
+    unmount();
+    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
+    expect(screen.getByText('승점 → 맞대결 → 득실차 → 다득점 → 페어플레이 → 추첨')).toBeInTheDocument();
+  });
+
+  it('조별 순위가 없는 토너먼트 방식에는 순서 칸도 요약도 없다', () => {
+    renderSection(true, { format: 'knockout', tieBreakOrder: DEFAULT_ORDER });
+    expect(screen.queryByText('동점 순서')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.queryByRole('heading', { name: '동점일 때 순서' })).toBeNull();
+  });
+
+  it('수정 창이 지금 순서로 열리고, 순서를 옮겨 저장하면 바뀐 순서를 CAS 버전과 함께 보낸다', () => {
+    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    const labels = () => screen.getAllByRole('listitem').map((item) => item.textContent ?? '').filter((text) => /^\d/.test(text)).map((text) => text.replace(/^\d+/, '').replace(/위로|아래로|항상 처음|항상 마지막/g, '').trim());
+    expect(labels()).toEqual(['승점', '맞대결', '득실차', '다득점', '페어플레이', '추첨']);
+    fireEvent.click(screen.getByRole('button', { name: '득실차 한 칸 위로' }));
+    fireEvent.click(screen.getByRole('button', { name: '다득점 한 칸 위로' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ tieBreakOrder: GOALS_FIRST, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it('순서를 옮긴 뒤 순위표가 없는 토너먼트 방식으로 바꾸면 숨은 순서는 보내지 않는다', () => {
+    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    fireEvent.click(screen.getByRole('button', { name: '득실차 한 칸 위로' }));
+    fireEvent.change(screen.getByLabelText('대회 형식'), { target: { value: 'knockout' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ format: 'knockout', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it('순서를 건드리지 않고 다른 칸만 고치면 순서를 보내지 않는다', () => {
+    renderSection(true, { tieBreakOrder: GOALS_FIRST });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it('고른 순서를 기본 순서로 되돌리면 null 을 보낸다', () => {
+    renderSection(true, { tieBreakOrder: GOALS_FIRST });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    fireEvent.click(screen.getByRole('button', { name: '기본 순서로 되돌리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ tieBreakOrder: null, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it('예선 결과가 확정돼 잠기면 서버의 사유를 보여주고 버튼을 끄며, 다른 칸 저장은 막지 않는다', () => {
+    const reason = '예선 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 결과를 확정하기 전에 정해 주세요.';
+    renderSection(true, { tieBreakOrder: GOALS_FIRST, tieBreakOrderBlockedReason: reason });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '득실차 한 칸 아래로' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '기본 순서로 되돌리기' })).toBeNull();
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+});

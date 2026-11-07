@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { Prisma, V1GameSourceType } from '@prisma/client';
 import { validateCompetitionConfig } from './competition-config/competition-config';
+import { withTournamentTieBreakOrder } from './competition-config/tournament-tie-break-order';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import type { StandingsSourceGroup } from './tournament-group-standings';
 
@@ -77,7 +78,7 @@ export async function loadCanonicalStandingsSource(
   if (!tournament.competitionConfigVersionId) {
     throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.' });
   }
-  const config = validateCompetitionConfig(tournament.competitionConfig);
+  const config = withTournamentTieBreakOrder(validateCompetitionConfig(tournament.competitionConfig), tournament.tieBreakOrder);
   const sourceWhere = { tournamentId, groupId: { not: null }, teamMatch: { is: { deletedAt: null } } } as const;
   const initial = await tx.v1TournamentMatchDetails.findMany({ where: sourceWhere, select: detailsSelect });
   const gameIds = initial.map((row) => row.teamMatch.game?.id).filter((id): id is string => id !== undefined).sort();

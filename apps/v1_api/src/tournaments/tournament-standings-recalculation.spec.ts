@@ -257,6 +257,32 @@ describe('runTournamentStandingsRecalculation', () => {
     expect(overallWinner).toMatchObject({ tournamentId: 't-1', points: 3, wins: 1, position: 1 });
   });
 
+  it('대회가 고른 동점 순서로 관리자 재계산도 같은 순위를 저장한다', async () => {
+    // A and B finish level on 3 points; A beat B head-to-head but has the worse goal difference (-2 vs +3).
+    const detailOf = (id: string, home: string, away: string, homeScore: number, awayScore: number) =>
+      canonicalDetail({
+        teamMatchId: id, homeRegistrationId: home, awayRegistrationId: away,
+        teamMatch: {
+          id, tournamentId: 't-1', leagueId: null, deletedAt: null, status: 'completed',
+          game: { id: `game-${id}`, sourceType: 'TEAM_MATCH', teamMatchId: id, currentOfficialRevision: { state: 'OFFICIAL', score: { home: homeScore, away: awayScore } }, sides: [{ id: 'home', sideKey: 'HOME' }, { id: 'away', sideKey: 'AWAY' }] },
+        },
+      });
+    const positionsFor = async (tieBreakOrder: unknown) => {
+      const { prisma, tx } = makePrisma({
+        tournamentIds: ['t-1'],
+        tournamentsById: { 't-1': { id: 't-1', deletedAt: null, competitionConfigVersionId: 'cfg-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder } },
+        groupsByTournamentId: { 't-1': [groupRow({ groupTeams: ['A', 'B', 'D', 'E'].map((registrationId) => ({ registrationId })) })] },
+        canonicalDetails: [detailOf('m1', 'A', 'B', 1, 0), detailOf('m2', 'D', 'A', 3, 0), detailOf('m3', 'B', 'E', 4, 0), detailOf('m4', 'D', 'E', 1, 0)],
+      });
+      await runTournamentStandingsRecalculation(prisma);
+      return (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls
+        .map(([input]) => input.create).sort((left, right) => left.position - right.position).map((row) => row.registrationId);
+    };
+
+    expect(await positionsFor(null)).toEqual(['D', 'A', 'B', 'E']);
+    expect(await positionsFor(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
+  });
+
   it('includes completed canonical TeamMatch/Details results when no legacy fixture exists', async () => {
     const { prisma, tx } = makePrisma({
       tournamentIds: ['t-1'],

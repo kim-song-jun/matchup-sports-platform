@@ -60,6 +60,7 @@ import {
 } from '../../league-matches/league-fixture-list-source';
 import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
+import { resolveTieBreakOrder } from '../../tournaments/competition-config/tournament-tie-break-order';
 import { leagueWeekCounter } from '../../league-matches/league-week-number';
 import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
 import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
@@ -694,6 +695,7 @@ export class PublicTournamentRecordsService {
         status: true,
         bracketPublishedAt: true,
         bracketPublishScheduledAt: true,
+        tieBreakOrder: true,
       },
     });
     if (tournament === null) {
@@ -724,6 +726,7 @@ export class PublicTournamentRecordsService {
         tournamentId: tournament.id,
         tournamentTitle: tournament.title,
         bracketPublished: false,
+        tieBreakOrder: resolveTieBreakOrder(tournament.tieBreakOrder),
         items: [],
         unscheduled: [],
         standings: [],
@@ -934,6 +937,7 @@ export class PublicTournamentRecordsService {
       tournamentId: tournament.id,
       tournamentTitle: tournament.title,
       bracketPublished: true,
+      tieBreakOrder: resolveTieBreakOrder(tournament.tieBreakOrder),
       items,
       unscheduled,
       standings: [
@@ -1110,6 +1114,7 @@ export class PublicTournamentRecordsService {
       tournamentId: leagueId,
       tournamentTitle: leagueTitle,
       bracketPublished: true,
+      tieBreakOrder: null,
       items,
       unscheduled: [],
       standings: calculateLeagueStandings({

@@ -157,6 +157,11 @@ describe('getSchedule — 정규 리그 갈래', () => {
    * 아래 대조군이 중요하다 — **대회는 같은 조건(미공개)에서 여전히 막힌다.** 그게 없으면
    * 이 테스트는 "게이트를 통째로 없앴다" 와 구분되지 않는다.
    */
+  it('리그는 대회 동점 순서를 싣지 않는다 — 리그 순위표는 리그 고유 순서를 쓴다', async () => {
+    const result = await buildService().getSchedule(LEAGUE_ID, {});
+    expect(result.tieBreakOrder).toBeNull();
+  });
+
   it('bracketPublished 는 true — 대진표 미공개여도 막지 않는다', async () => {
     const result = await buildService({ bracketPublishedAt: null }).getSchedule(LEAGUE_ID, {});
     expect(result.bracketPublished).toBe(true);

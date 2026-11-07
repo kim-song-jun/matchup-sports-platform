@@ -1,5 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDateString,
   IsDefined,
   IsBoolean,
@@ -265,6 +267,16 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(60)
   bankHolder?: string | null;
+
+  /**
+   * Tie-break order (six slots, points first, seeded draw last). Omitted keeps the default (create) or the
+   * current order (update); null resets to the default. The service validates the slots with `assertValidTieBreakOrder`.
+   */
+  @IsOptional()
+  @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
+  @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
+  @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
+  tieBreakOrder?: string[] | null;
 
   /**
    * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.
@@ -612,6 +624,16 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(60)
   bankHolder?: string | null;
+
+  /**
+   * Tie-break order (six slots, points first, seeded draw last). Omitted keeps the default (create) or the
+   * current order (update); null resets to the default. The service validates the slots with `assertValidTieBreakOrder`.
+   */
+  @IsOptional()
+  @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
+  @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
+  @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
+  tieBreakOrder?: string[] | null;
 
   /**
    * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.

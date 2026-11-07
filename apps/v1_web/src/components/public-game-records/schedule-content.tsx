@@ -553,8 +553,11 @@ export function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): 
 function StandingsTable({
   rows,
   showGroupLabel = true,
+  tieBreakOrder = null,
 }: {
   rows: readonly PublicStandingRow[];
+  /** 대회가 고른 동점 순서 — 조별 순위표마다 아래에 한 줄로 알린다. 정규 리그는 null. */
+  tieBreakOrder?: readonly string[] | null;
   /**
    * 그룹 이름을 표 위에 적을지. 대회는 조가 여럿이라 항상 필요한데(`A조`·`B조`),
    * **티어가 없는 단발 리그는 그룹이 하나뿐이고 그 이름이 바깥 제목과 같은 말**이라
@@ -591,6 +594,7 @@ function StandingsTable({
             rows={toStandingsRows(group.rows)}
             advancingKeys={null}
             ariaLabel={standingsAriaLabel(group.groupName, '표')}
+            tieBreakOrder={tieBreakOrder}
           />
         </section>
       ))}
@@ -1069,6 +1073,7 @@ export function ScheduleContent({
           <StandingsTable
             rows={data.standings}
             showGroupLabel={!hideStandingsGroupLabel}
+            tieBreakOrder={data.tieBreakOrder}
           />
         </section>
       ) : null}

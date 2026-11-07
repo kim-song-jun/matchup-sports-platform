@@ -93,19 +93,72 @@ function directStanding(
   return stats;
 }
 
+type MovableCriterion = Exclude<CompetitionConfig['tieBreak']['order'][number], 'points' | 'seeded_draw'>;
+
+function movableCriteria(order: CompetitionConfig['tieBreak']['order']): MovableCriterion[] {
+  return order.filter(
+    (criterion): criterion is MovableCriterion => criterion !== 'points' && criterion !== 'seeded_draw',
+  );
+}
+
 /**
- * Tie-break criteria applied to teams level on points, strongest first; the seeded draw always
- * comes after the last one. A larger value ranks higher, so two teams are separated by the first
- * criterion whose values differ. Mirrors REQUIRED_TIE_BREAK_ORDER between 'points' and 'seeded_draw'.
+ * Values that separate `tied` by one criterion; a larger value ranks higher. Head-to-head reads the games
+ * among exactly these teams (mini-table points, goal difference, goals for, kept together in this order).
  */
-const PRE_DRAW_CRITERIA: ReadonlyArray<(team: StandingWithoutPosition, direct: DirectStanding) => number> = [
-  (_team, direct) => direct.points,
-  (_team, direct) => direct.goalsFor - direct.goalsAgainst,
-  (_team, direct) => direct.goalsFor,
-  (team) => team.goalsFor - team.goalsAgainst,
-  (team) => team.goalsFor,
-  (team) => -team.fairPlayPoints,
-];
+function criterionKeys(
+  criterion: MovableCriterion,
+  tied: StandingWithoutPosition[],
+  fixtures: StandingFixture[],
+  points: CompetitionConfig['tieBreak']['points'],
+): (team: StandingWithoutPosition) => number[] {
+  switch (criterion) {
+    case 'head_to_head': {
+      const direct = directStanding(new Set(tied.map((team) => team.registrationId)), fixtures, points);
+      return (team) => {
+        const standing = direct.get(team.registrationId)!;
+        return [standing.points, standing.goalsFor - standing.goalsAgainst, standing.goalsFor];
+      };
+    }
+    case 'goal_difference':
+      return (team) => [team.goalsFor - team.goalsAgainst];
+    case 'goals_for':
+      return (team) => [team.goalsFor];
+    case 'fair_play':
+      return (team) => [-team.fairPlayPoints];
+  }
+}
+
+function compareKeys(left: number[], right: number[]) {
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
+}
+
+/**
+ * Splits teams level on points by the criteria in order, best first. Each criterion only compares the
+ * teams the earlier ones left level, so head-to-head placed after another criterion is a direct comparison
+ * of those teams, not of everyone who shares the points. A returned group is level on every criterion.
+ */
+function separate(
+  tied: StandingWithoutPosition[],
+  criteria: readonly MovableCriterion[],
+  fixtures: StandingFixture[],
+  points: CompetitionConfig['tieBreak']['points'],
+): StandingWithoutPosition[][] {
+  const [criterion, ...rest] = criteria;
+  if (!criterion || tied.length < 2) return [tied];
+  const keyOf = criterionKeys(criterion, tied, fixtures, points);
+  const keys = new Map(tied.map((team) => [team.registrationId, keyOf(team)]));
+  const ranked = [...tied].sort((left, right) => compareKeys(keys.get(right.registrationId)!, keys.get(left.registrationId)!));
+  const levelGroups: StandingWithoutPosition[][] = [];
+  for (const team of ranked) {
+    const last = levelGroups[levelGroups.length - 1];
+    if (last && compareKeys(keys.get(last[0].registrationId)!, keys.get(team.registrationId)!) === 0) last.push(team);
+    else levelGroups.push([team]);
+  }
+  return levelGroups.flatMap((group) => separate(group, rest, fixtures, points));
+}
 
 export type CompetitionStandingsWithTies = {
   standings: CalculatedStanding[];
@@ -147,6 +200,7 @@ export function calculateCompetitionStandingsWithTies(input: {
     applyFixture(stats, fixture, input.config.tieBreak.points);
   }
 
+  const criteria = movableCriteria(input.config.tieBreak.order);
   const lexicalIds = [...input.registrationIds].sort();
   const drawSeed = createHash('sha256')
     .update(`${input.tournamentId}:${input.configVersionId}:${lexicalIds.join(',')}`)
@@ -163,38 +217,11 @@ export function calculateCompetitionStandingsWithTies(input: {
   const sorted: StandingWithoutPosition[] = [];
   const drawnTies: string[][] = [];
   for (const points of [...pointsGroups.keys()].sort((left, right) => right - left)) {
-    const tied = pointsGroups.get(points) ?? [];
-    const headToHead = directStanding(
-      new Set(tied.map((standing) => standing.registrationId)),
-      input.fixtures,
-      input.config.tieBreak.points,
-    );
-    const keysById = new Map(
-      tied.map((standing) => [
-        standing.registrationId,
-        PRE_DRAW_CRITERIA.map((criterion) => criterion(standing, headToHead.get(standing.registrationId)!)),
-      ]),
-    );
-    const keysOf = (standing: StandingWithoutPosition) => keysById.get(standing.registrationId)!;
-    tied.sort((left, right) => {
-      const leftKeys = keysOf(left);
-      const rightKeys = keysOf(right);
-      for (let index = 0; index < leftKeys.length; index += 1) {
-        if (leftKeys[index] !== rightKeys[index]) return rightKeys[index] - leftKeys[index];
-      }
-      return seededOrder.indexOf(left.registrationId) - seededOrder.indexOf(right.registrationId);
-    });
-    let bundle: string[] = [];
-    tied.forEach((standing, index) => {
-      const sameAsPrevious = index > 0 && keysOf(tied[index - 1]).every((value, at) => value === keysOf(standing)[at]);
-      if (!sameAsPrevious) {
-        if (bundle.length > 1) drawnTies.push(bundle);
-        bundle = [];
-      }
-      bundle.push(standing.registrationId);
-    });
-    if (bundle.length > 1) drawnTies.push(bundle);
-    sorted.push(...tied);
+    for (const bundle of separate(pointsGroups.get(points) ?? [], criteria, input.fixtures, input.config.tieBreak.points)) {
+      bundle.sort((left, right) => seededOrder.indexOf(left.registrationId) - seededOrder.indexOf(right.registrationId));
+      if (bundle.length > 1) drawnTies.push(bundle.map((standing) => standing.registrationId));
+      sorted.push(...bundle);
+    }
   }
   return {
     standings: sorted.map((standing, index) => ({ ...standing, position: index + 1 })),

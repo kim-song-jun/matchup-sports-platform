@@ -46,12 +46,16 @@ const slot = (id: string, position: number, sourceGroupId: string, sortOrder: nu
   sourceGroup: { name: groupName, sortOrder },
 });
 
-function fakeClient(data: { slots: unknown[]; groupTeams: unknown[]; standings: unknown[]; details: unknown[] }) {
+function fakeClient(data: { slots: unknown[]; groupTeams: unknown[]; standings: unknown[]; details: unknown[]; tieBreakOrder?: unknown }) {
   const findSlots = jest.fn().mockResolvedValue(data.slots);
   const findTeams = jest.fn().mockResolvedValue(data.groupTeams);
   const findStandings = jest.fn().mockResolvedValue(data.standings);
   const findDetails = jest.fn().mockResolvedValue(data.details);
+  const findTournament = jest.fn().mockResolvedValue({
+    competitionConfigVersionId: 'config-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder: data.tieBreakOrder ?? null,
+  });
   const client = {
+    v1Tournament: { findFirst: findTournament },
     v1TournamentSlot: { findMany: findSlots },
     v1TournamentGroupTeam: { findMany: findTeams },
     v1TournamentStanding: { findMany: findStandings },
@@ -143,7 +147,7 @@ describe('loadGroupStandingSummaries', () => {
   // r-a→r-b→r-c→r-a 로 이긴 3팀 완전 동률 조 + 동률 없는 조(대조).
   const TIE_THREE: Result[] = [['r-a', 'r-b', 1, 0], ['r-b', 'r-c', 1, 0], ['r-c', 'r-a', 1, 0]];
 
-  function summaryClient(options: { groups?: unknown[]; knockout?: unknown[]; pendingInTie?: boolean; tieOfficialAt?: Date } = {}) {
+  function summaryClient(options: { groups?: unknown[]; knockout?: unknown[]; pendingInTie?: boolean; pendingInClean?: boolean; tournament?: unknown; tieOfficialAt?: Date } = {}) {
     const findGroups = jest.fn().mockResolvedValue(
       options.groups ?? [{ id: 'grp-a', advanceCount: 2 }, { id: 'grp-b', advanceCount: 2 }],
     );
@@ -154,16 +158,20 @@ describe('loadGroupStandingSummaries', () => {
     ]);
     const findDetails = jest.fn().mockImplementation(async (args: { where: { OR?: unknown } }) =>
       args.where.OR === undefined
-        ? [...detailRows('grp-a', TIE_THREE, options.pendingInTie ? 2 : -1, options.tieOfficialAt), ...detailRows('grp-b', GROUP_B)]
+        ? [...detailRows('grp-a', TIE_THREE, options.pendingInTie ? 2 : -1, options.tieOfficialAt), ...detailRows('grp-b', GROUP_B, options.pendingInClean ? 2 : -1)]
         : (options.knockout ?? []),
     );
+    const findTournament = jest.fn().mockResolvedValue(
+      options.tournament ?? { competitionConfigVersionId: 'config-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder: null },
+    );
     const client = {
+      v1Tournament: { findFirst: findTournament },
       v1TournamentGroup: { findMany: findGroups },
       v1TournamentGroupTeam: { findMany: findTeams },
       v1TournamentStanding: { findMany: findStandings },
       v1TournamentMatchDetails: { findMany: findDetails },
     } as unknown as Prisma.TransactionClient;
-    return { client, findGroups, findTeams, findDetails };
+    return { client, findGroups, findTeams, findDetails, findTournament };
   }
   const placedMatch = (home: string | null, away: string | null) => ({ homeRegistrationId: home, awayRegistrationId: away });
 
@@ -188,6 +196,22 @@ describe('loadGroupStandingSummaries', () => {
     expect(summaries.get('grp-a')?.qualification).toEqual({ advancingRegistrationIds: ['r-b', 'r-c'], undecided: false });
     // 동률 없는 B조는 r-e 만 배치됐어도 순위로 확정된 나머지 진출 팀(r-d)까지 진출이다.
     expect(summaries.get('grp-b')?.qualification).toEqual({ advancingRegistrationIds: ['r-d', 'r-e'], undecided: false });
+  });
+
+  it('끝난 조가 하나도 없으면 대회 행(경기 규칙 판)을 읽지 않는다 — 끝난 조가 있으면 조가 여럿이어도 한 번만 읽는다(대조)', async () => {
+    const pending = summaryClient({ pendingInTie: true, pendingInClean: true });
+    expect([...(await loadGroupStandingSummaries(pending.client, 'tournament-1')).keys()]).toEqual([]);
+    expect(pending.findTournament).not.toHaveBeenCalled();
+
+    const settled = summaryClient();
+    expect((await loadGroupStandingSummaries(settled.client, 'tournament-1')).size).toBe(2);
+    expect(settled.findTournament).toHaveBeenCalledTimes(1);
+  });
+
+  it('끝난 조가 있는데 대회에 경기 규칙 판이 없으면 409 COMPETITION_CONFIG_REQUIRED 로 멈춘다', async () => {
+    const { client } = summaryClient({ tournament: { competitionConfigVersionId: null, competitionConfig: null, tieBreakOrder: null } });
+
+    await expect(loadGroupStandingSummaries(client, 'tournament-1')).rejects.toMatchObject({ response: { code: 'COMPETITION_CONFIG_REQUIRED' } });
   });
 
   it('덜 끝난 조는 맵에 없다 — 끝난 조는 그대로 남는다(대조)', async () => {

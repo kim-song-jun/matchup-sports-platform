@@ -1,4 +1,4 @@
-import type { V1PlaceView, V1TournamentBracketTrack } from '@/types/api';
+import type { V1PlaceView, V1TournamentBracketTrack, V1TournamentTieBreakCriterion } from '@/types/api';
 /**
  * Task 24 -- frontend-local mirror of the public-records response shapes
  * shipped in `apps/v1_api/src/games/public-records/**` (see
@@ -216,6 +216,8 @@ export interface PublicTournamentScheduleResponse {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
   readonly bracketPublished: boolean;
+  /** 이 대회가 고른 동점 순서(6칸) — 조별 순위표 아래 안내의 근거. 정규 리그는 null. */
+  readonly tieBreakOrder?: readonly V1TournamentTieBreakCriterion[] | null;
   readonly items: readonly PublicScheduleEntry[];
   readonly unscheduled: readonly PublicScheduleEntry[];
   readonly standings: readonly PublicStandingRow[];

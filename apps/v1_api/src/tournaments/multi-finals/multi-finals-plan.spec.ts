@@ -1,4 +1,4 @@
-import { planNamedFinals, planPreliminaryGroups, validateNamedFinals } from './multi-finals-plan';
+import { orderRulesByRank, planNamedFinals, planPreliminaryGroups, validateNamedFinals } from './multi-finals-plan';
 
 describe('정규리그 + N개 토너먼트 plans', () => {
   it('부분 팀 배정을 허용하고 초과·중복 배정은 거절한다', () => {
@@ -90,5 +90,49 @@ describe('정규리그 + N개 토너먼트 plans', () => {
     for (const size of [0, 1]) expect(() => planNamedFinals([{ name: '결선', thirdPlace: false, rules: [], registrationIds: Array.from({ length: size }, (_, i) => String(i)) }])).toThrow();
     expect(() => planNamedFinals([{ name: '결선', thirdPlace: true, rules: [], registrationIds: ['a', 'b', 'c'] }])).toThrow();
     expect(() => planPreliminaryGroups([{ name: 'A', capacity: 2, legs: 1, registrationIds: ['a', 'a'] }])).toThrow();
+  });
+});
+
+describe('진출 규칙의 시드 순서', () => {
+  const label = (rule: { groupId: string; rank: number }, names: Record<string, string>) => `${names[rule.groupId]}${rule.rank}`;
+  const byGroup = (groups: string[], ranks: number[]) => groups.flatMap(groupId => ranks.map(rank => ({ groupId, rank })));
+  // Seed n is rules[n - 1]; the byes of a short bracket go to the lowest seed numbers.
+  const byeHolders = (rules: Array<{ groupId: string; rank: number }>, names: Record<string, string>) => {
+    const plan = planNamedFinals([{ name: '본선', thirdPlace: false, rules, registrationIds: null }]);
+    return plan.slots.filter(slot => slot.byeSortOrder !== undefined).map(slot => label(rules[slot.position - 1], names));
+  };
+
+  it('조 단위로 넣은 6팀 규칙(5팀×2조, 1~3위)도 순위 먼저 정렬되어 조 1위 둘이 부전승이다', () => {
+    const names = { 0: 'A', 1: 'B' } as Record<string, string>;
+    const typed = byGroup(['0', '1'], [1, 2, 3]);
+    expect(byeHolders(typed, names)).toEqual(['A1', 'A2']);
+    const ordered = orderRulesByRank(typed, ['0', '1']);
+    expect(ordered.map(rule => label(rule, names))).toEqual(['A1', 'B1', 'A2', 'B2', 'A3', 'B3']);
+    expect(byeHolders(ordered, names)).toEqual(['A1', 'B1']);
+  });
+  it('4개 조×3위 12팀 규칙은 1위 4팀 → 2위 4팀 → 3위 4팀 순서이고 부전승 4자리는 조 1위가 받는다', () => {
+    const names = { a: 'A', b: 'B', c: 'C', d: 'D' } as Record<string, string>;
+    const ordered = orderRulesByRank(byGroup(['a', 'b', 'c', 'd'], [1, 2, 3]), ['a', 'b', 'c', 'd']);
+    expect(ordered.map(rule => label(rule, names))).toEqual(['A1', 'B1', 'C1', 'D1', 'A2', 'B2', 'C2', 'D2', 'A3', 'B3', 'C3', 'D3']);
+    expect(byeHolders(ordered, names)).toEqual(['A1', 'B1', 'C1', 'D1']);
+  });
+  it('같은 순위끼리는 저장된 규칙 순서가 아니라 주어진 조 순서를 따른다', () => {
+    const typed = [{ groupId: 'b', rank: 2 }, { groupId: 'a', rank: 2 }, { groupId: 'b', rank: 1 }, { groupId: 'a', rank: 1 }];
+    expect(orderRulesByRank(typed, ['a', 'b'])).toEqual([{ groupId: 'a', rank: 1 }, { groupId: 'b', rank: 1 }, { groupId: 'a', rank: 2 }, { groupId: 'b', rank: 2 }]);
+    expect(orderRulesByRank(typed, ['b', 'a'])).toEqual([{ groupId: 'b', rank: 1 }, { groupId: 'a', rank: 1 }, { groupId: 'b', rank: 2 }, { groupId: 'a', rank: 2 }]);
+  });
+  it('조마다 진출 순위가 달라도 순위 먼저 놓고 비는 자리는 건너뛴다', () => {
+    const typed = [{ groupId: 'a', rank: 1 }, { groupId: 'a', rank: 2 }, { groupId: 'a', rank: 3 }, { groupId: 'b', rank: 1 }, { groupId: 'c', rank: 2 }];
+    expect(orderRulesByRank(typed, ['a', 'b', 'c'])).toEqual([
+      { groupId: 'a', rank: 1 }, { groupId: 'b', rank: 1 }, { groupId: 'a', rank: 2 }, { groupId: 'c', rank: 2 }, { groupId: 'a', rank: 3 },
+    ]);
+  });
+  it('이미 순위순으로 넣은 규칙은 그대로이고 입력 배열은 바뀌지 않는다', () => {
+    const ranked = [{ groupId: 'a', rank: 1 }, { groupId: 'b', rank: 1 }, { groupId: 'a', rank: 2 }, { groupId: 'b', rank: 2 }];
+    const snapshot = ranked.map(rule => ({ ...rule }));
+    expect(orderRulesByRank(ranked, ['a', 'b'])).toEqual(snapshot);
+    const mixed = [ranked[3], ranked[0]];
+    orderRulesByRank(mixed, ['a', 'b']);
+    expect(mixed).toEqual([ranked[3], ranked[0]]);
   });
 });

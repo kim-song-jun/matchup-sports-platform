@@ -162,3 +162,59 @@ it('순위 목적지 수정은 확정 명단을 비우지 않고 규칙만 저�
   expect(submitted?.finals[0].capacity).toBe(2);
   expect(submitted?.finals[0].id).toBe(view.finals[0].id);
 });
+
+describe('규칙 화면의 시드 번호', () => {
+  const caption = '저장하면 순위가 높은 팀부터 시드를 받아요. 같은 순위끼리는 조 순서대로예요(임시 기본값). 진출팀 배정 화면에서 바꿀 수 있어요.';
+  const groupNames = ['A', 'B', 'C', 'D'];
+  const viewWith = (groupCount: number, capacity: number): MultiFinalView => ({
+    revision: 1, generated: true, fixtureCount: 3, registrations,
+    groups: groupNames.slice(0, groupCount).map(name => ({ id: `g-${name}`, name: `${name}조`, capacity: 5, legs: 1 as const })),
+    finals: [{ id: 'final-0', colorIndex: 0, name: '본선', capacity, thirdPlace: false, rules: [], registrationIds: null, manual: false, suggestedRegistrationIds: [], unresolved: [] }],
+  });
+  const seedBadges = () => screen.getAllByText(/^시드 \d+$/).map(node => node.textContent);
+  const rowOf = (groupName: string, rank: number) => screen.getByLabelText(`${groupName}조 ${rank}위 진출 토너먼트`).closest('label') as HTMLElement;
+  async function chooseGroupByGroup(groupCount: number, ranks: number[]) {
+    await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+    // The default walk through the screen: every rank of one group before the next group.
+    for (const name of groupNames.slice(0, groupCount)) for (const rank of ranks) fireEvent.change(screen.getByLabelText(`${name}조 ${rank}위 진출 토너먼트`), { target: { value: '0' } });
+  }
+
+  it('조 단위로 6자리 규칙을 눌러도 시드는 순위 먼저 매겨지고 부전승은 조 1위 둘이다', async () => {
+    server.use(http.get(base, () => success(viewWith(2, 6))));
+    show('rules');
+    await chooseGroupByGroup(2, [1, 2, 3]);
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 5', '시드 2', '시드 4', '시드 6']);
+    for (const [group, rank, bye] of [['A', 1, true], ['B', 1, true], ['A', 2, false], ['B', 2, false], ['A', 3, false], ['B', 3, false]] as const) {
+      const row = within(rowOf(group, rank));
+      expect(row.queryByText('부전승') !== null, `${group}${rank}`).toBe(bye);
+    }
+    expect(screen.getByText(caption)).toBeInTheDocument();
+    expect(screen.getByText('본선 · 6자리 · 6개 순위 연결')).toBeInTheDocument();
+  }, 20_000);
+  it('4개 조×3위 12자리는 조 1위 4팀이 시드 1~4와 부전승을 받는다', async () => {
+    server.use(http.get(base, () => success(viewWith(4, 12))));
+    show('rules');
+    await chooseGroupByGroup(4, [1, 2, 3]);
+    expect(seedBadges()).toEqual(['시드 1', '시드 5', '시드 9', '시드 2', '시드 6', '시드 10', '시드 3', '시드 7', '시드 11', '시드 4', '시드 8', '시드 12']);
+    expect(screen.getAllByText('부전승')).toHaveLength(4);
+    for (const group of groupNames) expect(within(rowOf(group, 1)).getByText('부전승')).toBeInTheDocument();
+  }, 20_000);
+  it('순위가 이미 앞선 순서로 저장된 2자리 규칙은 부전승 없이 시드 1·2 그대로이고 연결 없는 칸에는 시드가 없다', async () => {
+    server.use(http.get(base, () => success({ ...savedView(), generated: true, fixtureCount: 7 })));
+    show('rules');
+    await screen.findByText('챔피언 · 2자리 · 2개 순위 연결');
+    expect(seedBadges()).toEqual(['시드 1', '시드 2']);
+    expect(screen.queryByText('부전승')).not.toBeInTheDocument();
+    expect(within(rowOf('A', 3)).queryByText(/시드/)).not.toBeInTheDocument();
+  });
+  it('목적지를 바꾸면 시드 번호가 바로 다시 매겨진다', async () => {
+    server.use(http.get(base, () => success({ ...viewWith(2, 6), finals: [{ ...viewWith(2, 6).finals[0], rules: [{ groupId: 'g-A', rank: 1 }, { groupId: 'g-B', rank: 1 }, { groupId: 'g-A', rank: 2 }] }] })));
+    show('rules');
+    await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 2']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'B조 2위 진출 토너먼트' }), { target: { value: '0' } });
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 2', '시드 4']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'A조 1위 진출 토너먼트' }), { target: { value: '-1' } });
+    expect(seedBadges()).toEqual(['시드 2', '시드 1', '시드 3']);
+  });
+});

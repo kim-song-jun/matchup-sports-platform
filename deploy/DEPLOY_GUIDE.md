@@ -275,5 +275,5 @@ test "$(curl -sS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w '%{http_c
 - Nginx에서만 실패하면 `nginx -t`, upstream container health, root path proxy 순으로 확인한다.
 - 업로드 쓰기 실패 시 persistent volume의 owner가 v1 API container UID/GID와 일치하는지 확인한다.
 - Web 로그에 `Failed to write image to cache` 가 반복되면 `v1_web_image_cache` 볼륨(`/app/apps/v1_web/.next/cache/images`) 소유자가 UID/GID 1001 인지 확인한다. 쓰기에 실패해도 이미지는 나가고, 요청마다 다시 변환할 뿐이다.
-- Web 컨테이너는 시작할 때 `[image-cache] checked N, removed M` 을 남긴다(`standalone-start.mjs`). 쓰다 만 변환 파일(프로세스가 쓰는 도중 죽은 흔적)을 지운 수다. 남겨 두면 Next 가 디스크 캐시를 통째로 끄거나 잘린 이미지를 계속 낸다.
+- 변환된 사진 하나가 계속 깨져 보이면(디스크가 가득 찼을 때 쓰다 만 파일이 남은 경우) `docker exec teameet_v1_web sh -c 'rm -rf /app/apps/v1_web/.next/cache/images/*'` 로 변환 저장소를 비운다. 다음 요청부터 다시 변환한다. 빈 파일은 Next(16.3+)가 읽을 때 버리고 다시 만든다.
 - 이미지 빌드 중 메모리가 부족하면 인스턴스를 확장하거나 swap을 임시로 추가한다.

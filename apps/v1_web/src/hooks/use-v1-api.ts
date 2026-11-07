@@ -522,9 +522,13 @@ export function useV1PhoneVerify() {
   });
 }
 
+/**
+ * 번호로 계정을 찾는다. `email`+`emailProofToken`(이메일 인증 `proofToken`)을 함께 보내면, 그 메일함이 찾은 계정
+ * 자신의 이메일일 때에 한해 응답이 마스킹된 이메일과 탈퇴 종료일까지 채운다. 둘 중 하나만 보내면 400이다.
+ */
 export function useV1FindAccountByPhone() {
   return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
+    mutationFn: (body: { phone: string; proofToken: string; email?: string; emailProofToken?: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
   });
 }

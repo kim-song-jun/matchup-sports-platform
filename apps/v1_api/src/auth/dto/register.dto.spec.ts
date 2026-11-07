@@ -6,7 +6,7 @@ import { RegisterDto } from './register.dto';
 const VALID_REGISTER_INPUT = {
   nickname: '테스트닉',
   email: 'signup@example.com',
-  password: 'password123',
+  password: 'Sunny-ride-4',
   displayName: '홍길동',
   phone: '01012345678',
   birthDate: '20000229',

@@ -4,6 +4,8 @@ import {
   type LeagueStandingFixture,
 } from '../../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
+import type { CompetitionConfig } from '../competition-config/competition-config.types';
+import { calculateCompetitionStandingsWithTies } from '../competition-config/competition-standings';
 
 export type RankFixtureInput = {
   homeRegistrationId: string | null;
@@ -18,6 +20,7 @@ export type RankStandingInput = {
   wins: number;
   draws: number;
   losses: number;
+  fairPlayPoints: number;
   recalculatedAt: Date | null;
 };
 export type GroupRankSource = {
@@ -101,13 +104,40 @@ export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRa
   return resolveRankIn(source, leagueOf(source, results), rank);
 }
 
+export type StoredRankRule = { tournamentId: string; configVersionId: string; config: CompetitionConfig };
+
+/**
+ * Teams the stored order could separate only by the seeded draw, one array per bundle. Replays the
+ * stored-standings comparator over the settled results, so a pair the comparator ranked by head-to-head
+ * or fair play is not a bundle — unlike the league calculator, which would call those ties.
+ * `rule` is only resolved for a settled group, so callers can defer loading the tournament's config.
+ */
+export function drawnTieGroups(source: GroupRankSource, rule: () => StoredRankRule): string[][] {
+  const results = settledResults(source);
+  if (results === null) return [];
+  return calculateCompetitionStandingsWithTies({
+    ...rule(),
+    registrationIds: [...source.registrationIds],
+    fixtures: results.map((result) => ({
+      homeRegistrationId: result.homeTeamId,
+      awayRegistrationId: result.awayTeamId,
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+    })),
+    fairPlayByRegistration: new Map(source.standings.map((row) => [row.registrationId, row.fairPlayPoints])),
+  }).drawnTies;
+}
+
 /** N개 결선은 대회 계산기로 저장한 공식 순위를 그대로 사용한다.
  * 별도의 리그 계산기로 순서를 재해석하면 승자승 우선 순위를 가짜 동률로 바꾸게 된다.
+ * A rank the stored comparator separated only by the seeded draw (`drawnTies`) comes back tied: the operator decides it.
  */
-export function resolveStoredGroupRank(source: GroupRankSource, rank: number): GroupRankResolution {
+export function resolveStoredGroupRank(source: GroupRankSource, rank: number, drawnTies: readonly (readonly string[])[]): GroupRankResolution {
   if (settledResults(source) === null) return INCOMPLETE;
   const rows = source.standings.filter(row => row.position === rank && source.registrationIds.includes(row.registrationId));
-  return rows.length === 1 ? { state: 'ready', registrationId: rows[0].registrationId } : INCOMPLETE;
+  if (rows.length !== 1) return INCOMPLETE;
+  const tie = drawnTies.find(group => group.includes(rows[0].registrationId));
+  return tie === undefined ? { state: 'ready', registrationId: rows[0].registrationId } : { state: 'tied', tiedRegistrationIds: [...tie] };
 }
 
 export type GroupQualification = { advancingRegistrationIds: string[]; undecided: boolean };

@@ -94,13 +94,15 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
   );
 }
 
-export function SignupCompletePageView({ model, headingRef }: {
+export function SignupCompletePageView({ model, headingRef, topTitle }: {
   model: SignupCompleteViewModel;
+  /** 상단 바 제목. 가입 완료는 흐름이 끝났으므로 없지만, 설정 안의 흐름(이메일 변경)은 어떤 흐름인지 남긴다. */
+  topTitle?: string;
   /** 이 화면이 앞 화면을 대신해 나타날 때(단계 안에서 완료로 넘어갈 때) 제목으로 포커스를 옮기도록 받는다. */
   headingRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
+    <AuthFrame topTitle={topTitle} fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
       <div className="tm-auth-complete">
         {/* 완료 순간의 그래픽(트로피). .tm-complete-check 키프레임은 그대로 살려 등장 피드백으로 쓴다. */}
         <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop tm-complete-check" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Info, Search, X } from 'lucide-react';
 import { useV1TournamentStaffCandidateSearch } from '@/hooks/use-v1-api';
 import type {
   V1GrantTournamentStaffPayload,
@@ -11,7 +11,11 @@ import type {
 } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
-import { TOURNAMENT_STAFF_ENTRY_LABEL, tournamentStaffEntryDestination } from '@/lib/tournament-staff-entry-label';
+import {
+  TOURNAMENT_STAFF_ENTRY_LABEL,
+  tournamentStaffEntryDestination,
+  tournamentStaffGrantLimitNotice,
+} from '@/lib/tournament-staff-entry-label';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 export interface GrantableRoleOption {
@@ -182,6 +186,7 @@ export function GrantStaffModal({
   const trimmedQuery = query.trim();
   const requiresField = role === 'FIELD_OPERATOR';
   const validationError = validationMessage(selected, role, fieldId, fields.length);
+  const limitNotice = tournamentStaffGrantLimitNotice(role, tournamentKind);
   const candidates = search.data?.items ?? [];
   // 디바운스가 끝나기 전에는 직전 검색어의 결과가 남아 있다 — 그 사이 "결과 없음"을
   // 띄우면 아직 찾는 중인데 없다고 단정하는 셈이라 입력이 안정된 뒤에만 판정한다.
@@ -431,6 +436,16 @@ export function GrantStaffModal({
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed bg-[var(--surface-soft)] rounded-xl px-3 py-2">
                 {`배정하면 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 ${tournamentStaffEntryDestination(role, tournamentKind)} 들어갈 수 있어요.`}
             </p>
+
+            {limitNotice !== null && (
+              <p
+                role="status"
+                className="flex items-start gap-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] leading-relaxed bg-[var(--blue50)] rounded-xl px-3 py-2"
+              >
+                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+                <span>{limitNotice}</span>
+              </p>
+            )}
 
             {submitAttempted && validationError !== null && (
               <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">

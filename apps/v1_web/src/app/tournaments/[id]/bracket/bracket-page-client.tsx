@@ -239,7 +239,7 @@ function GroupStandingsSection({
       >
         {group.name}
         {isMyGroup && (
-          <span className="tm-text-caption" style={{ marginLeft: 8, color: 'var(--red)', fontWeight: 600, textTransform: 'none', letterSpacing: 'normal' }}>
+          <span className="tm-text-caption" style={{ marginLeft: 8, color: 'var(--red700)', fontWeight: 600, textTransform: 'none', letterSpacing: 'normal' }}>
             우리 팀이 속한 조예요
           </span>
         )}

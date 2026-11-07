@@ -49,7 +49,7 @@ describe('LeagueMobileScheduleBoard 주차 머리 (2026-11-03)', () => {
   it('고른 주차의 날짜 범위·요약을 보이고 추가 버튼은 그 주를 넘긴다', () => {
     const onAddToWeek = vi.fn();
     renderBoard(onAddToWeek);
-    expect(screen.getByText('1주차 · 1/7 (월)~1/13 (일)')).toBeInTheDocument();
+    expect(screen.getByText('1주차 · 1/12 (토)')).toBeInTheDocument();
     expect(screen.getByText('1경기 · 쉬는 팀 사자FC')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '1주차에 경기 추가' }));
     expect(onAddToWeek).toHaveBeenCalledWith(columns[0]);

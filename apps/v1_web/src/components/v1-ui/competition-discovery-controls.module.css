@@ -14,7 +14,7 @@
 .summary a { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; }
 .group { margin: 0; padding: 0; border: 0; min-width: 0; }
 .group legend { margin-bottom: 12px; }
-.sections { display: grid; gap: 24px; padding: 16px 20px; }
+.sections { display: grid; gap: 24px; padding-block: var(--spacing-4); }
 .range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .range label { display: grid; gap: 8px; min-width: 0; font-size: var(--font-size-caption); }
 .range input {
@@ -23,11 +23,7 @@
   font: inherit;
 }
 .range input:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
-.actions {
-  display: grid; grid-template-columns: 1fr 1fr;
-  position: sticky; bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));
-  background: var(--surface); padding: var(--spacing-4) 0; z-index: 1;
-}
+.actions { grid-template-columns: 1fr 1fr; }
 
 .mobileResultbar {
   display: grid;

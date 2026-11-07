@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { V1GameEventType, V1GameResultRevisionState, V1GameSourceType } from '@prisma/client';
+import { Prisma, V1GameEventType, V1GameResultRevisionState, V1GameSourceType } from '@prisma/client';
 import type { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
@@ -1434,5 +1434,33 @@ describe('league director rollout boundary', () => {
     const h = createHarness({ role: 'tournament_director', canonicalLeague: true });
     await expect(h.voidRevision()).rejects.toMatchObject({ response: { code: 'DIRECTOR_OFFICIALIZE_DISABLED' } });
     expect(h.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('동시 처리 충돌 응답', () => {
+  it('트랜잭션이 쓰기 충돌로 실패하면 409 COMMAND_CONCURRENCY_CONFLICT 를 한국어 안내와 함께 돌려준다', async () => {
+    const prisma = {
+      $transaction: async () => {
+        throw new Prisma.PrismaClientKnownRequestError('write conflict', { code: 'P2034', clientVersion: 'test' });
+      },
+    } as unknown as PrismaService;
+    const service = new TournamentResultReviewService(
+      prisma,
+      {} as TournamentStaffAccessService,
+      {} as OperationAuditWriterService,
+    );
+
+    const error = await captureFailure(() =>
+      service.voidResultRevision(authUser, ids.game, ids.baseRevision, 'concurrent-void-1', {
+        expectedVersion: GAME_VERSION,
+        clientCommandId: 'concurrent-void-1',
+        reason: '오심으로 무효 처리',
+      } as never),
+    );
+
+    expectHttp(error, 409, 'COMMAND_CONCURRENCY_CONFLICT');
+    expect((error as HttpException).getResponse()).toEqual(
+      expect.objectContaining({ message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.' }),
+    );
   });
 });

@@ -78,3 +78,14 @@ export function leagueWeekCounter(siblingStartAts: readonly Date[]): (startAt: D
   const numberByWeek = new Map(weeks.map((week, index) => [week, index + 1]));
   return (startAt) => numberByWeek.get(kstWeekKey(startAt)) ?? 1;
 }
+
+/** 1-based position of each start time within its KST calendar week, counted in input order across days. */
+export function leagueWeekOrdinals(startAts: readonly Date[]): number[] {
+  const seenByWeek = new Map<string, number>();
+  return startAts.map((startAt) => {
+    const week = kstWeekKey(startAt);
+    const ordinal = (seenByWeek.get(week) ?? 0) + 1;
+    seenByWeek.set(week, ordinal);
+    return ordinal;
+  });
+}

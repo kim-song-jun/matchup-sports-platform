@@ -15,8 +15,8 @@ import Foundation
 /// renders the viewport, and a client-side navigation can render it again with the page's own
 /// value. The script rewrites the tag whenever it appears or changes, and rewrites only the
 /// two scale properties — `width=device-width, initial-scale=1` are kept exactly as the page
-/// declared them. It must never add `viewport-fit=cover`: the safe-area contract relies on
-/// `env(safe-area-inset-bottom)` staying 0 inside the shell (see `SafeAreaBridge`).
+/// declared them. It must never add `viewport-fit=cover`: the web's safe-area variables ignore
+/// `env(safe-area-inset-bottom)` only because the page declares none (see `SafeAreaBridge`).
 enum ViewportLock {
 
     /// The pure half, kept separate so it can be run under JavaScriptCore in a unit test:

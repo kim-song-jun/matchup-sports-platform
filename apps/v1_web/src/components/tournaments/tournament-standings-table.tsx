@@ -148,7 +148,7 @@ export function TournamentStandingsTable({
   keepTeamLink?: boolean;
   /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
   fromHref?: string | null;
-  /** 로그인한 사용자가 소속된 팀 — 그 팀 행에 "우리 팀" 배지와 왼쪽 막대를 단다. 비공개 팀(teamId null)은 표시하지 않는다. */
+  /** 로그인한 사용자가 소속된 팀 — 그 팀 행에 "우리 팀" 배지와 왼쪽 막대를 단다. 비공개 팀(teamId null) 행은 그대로 그리되 표식 대상에서 제외한다. */
   myTeamIds?: ReadonlySet<string>;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);

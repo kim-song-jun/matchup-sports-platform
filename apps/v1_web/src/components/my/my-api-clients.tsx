@@ -1991,12 +1991,12 @@ function PlayerCardPhotoAdjust() {
       const nextUrl = uploaded.urls[0];
       if (!nextUrl) throw new Error('업로드 응답에 이미지 URL이 없어요.');
       // PATCH /me/profile 은 보내지 않은 필드를 null 로 덮는다(서버 실측 2026-09-02) --
-      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다.
+      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다. 이메일은 예외다: 서버가 지금 값을 유지하므로,
+      // 캐시의 옛 주소를 실으면 다른 기기에서 바꾼 이메일을 "변경"으로 읽어 400 이 난다.
       await update.mutateAsync({
         realName: data.profile.realName ?? null,
         nickname: data.profile.nickname ?? '',
         bio: data.profile.bio ?? null,
-        email: data.email ?? null,
         profileImageUrl: nextUrl,
         phone: data.phone ?? null,
         // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.

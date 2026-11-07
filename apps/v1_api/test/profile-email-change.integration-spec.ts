@@ -169,6 +169,7 @@ describe('V1 changing the account email needs a code mailed to the new address i
     const saved = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, emailChangeToken: verified.body.data.emailChangeToken }).expect(200);
 
     expect(saved.body.data.profile.nickname).toBe(`변경${PASSWORD_USER.slice(-6)}`);
+    expect(saved.body.data).toMatchObject({ email: NEW_EMAIL, phone: PASSWORD_PHONE });
     expect(await userRow(PASSWORD_USER)).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date), phone: PASSWORD_PHONE });
     expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${PASSWORD_USER}-email` } })).toMatchObject({
       providerUserKey: NEW_EMAIL, email: NEW_EMAIL, status: 'active',

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,6 +54,7 @@ const STORED_PROFILE: V1Profile = {
 
 type Calls = { request: unknown[]; verify: unknown[]; patch: Array<Record<string, unknown>> };
 let calls: Calls;
+let profileReads: number;
 let profile: V1Profile;
 let client: QueryClient;
 
@@ -72,11 +73,15 @@ beforeEach(() => {
   signOut.pending = false;
   signOut.error = null;
   calls = { request: [], verify: [], patch: [] };
+  profileReads = 0;
   profile = STORED_PROFILE;
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   server.use(
     http.post('*/api/v1/logs/client-error', () => HttpResponse.json({ status: 'success', data: {} })),
-    http.get('*/api/v1/me/profile', () => HttpResponse.json({ status: 'success', data: profile, timestamp: '2026-11-06T00:00:00.000Z' })),
+    http.get('*/api/v1/me/profile', () => {
+      profileReads += 1;
+      return HttpResponse.json({ status: 'success', data: profile, timestamp: '2026-11-06T00:00:00.000Z' });
+    }),
     // 공유 핸들러가 응답을 정하고, 이 화면이 실제로 어떤 본문을 보냈는지만 옆에서 기록한다.
     http.post('*/api/v1/me/email-change/request', async ({ request }) => {
       calls.request.push(await request.clone().json());
@@ -165,8 +170,9 @@ describe('EmailChangeClient — 변경 흐름', () => {
       email: NEW_EMAIL,
       emailChangeToken: EMAIL_CHANGE_MSW.tokens.ok,
     }]);
-    // 프로필 화면으로 돌아갔을 때 옛 이메일이 보이지 않는다.
+    // 프로필 화면으로 돌아갔을 때 옛 이메일이 보이지 않는다 — 저장 응답이 캐시를 맞춘다(재조회 없이).
     expect(client.getQueryData<V1Profile>(v1Keys.profile())?.email).toBe(NEW_EMAIL);
+    expect(profileReads).toBe(1);
   });
 
   it('비밀번호 계정에만 로그인 ID 안내를 보이고, 완료 문구도 그에 맞춘다', async () => {
@@ -431,6 +437,44 @@ describe('EmailChangeClient — 프로필 상태', () => {
     failing = false;
     await user.click(screen.getByRole('button', { name: '다시 시도하기' }));
     expect(await heading(EMAIL_STEP)).toBeInTheDocument();
+  });
+
+  it('이미 받은 프로필이 있으면 뒤늦은 재조회가 실패해도 진행 중인 단계와 완료 화면을 그대로 둔다', async () => {
+    const user = userEvent.setup();
+    const failRefetch = async () => {
+      server.use(http.get('*/api/v1/me/profile', () => failure(500, 'INTERNAL_ERROR', '서버에 문제가 생겼어요.')));
+      await act(async () => { await client.refetchQueries({ queryKey: v1Keys.profile() }); });
+      expect(client.getQueryState(v1Keys.profile())?.status).toBe('error');
+    };
+    renderClient();
+    await reachCodeStep(user);
+
+    await failRefetch();
+    expect(screen.getByRole('heading', { level: 1, name: CODE_STEP })).toBeInTheDocument();
+    expect(screen.queryByText('프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).not.toBeInTheDocument();
+
+    await user.click(changeButton());
+    expect(await heading('이메일을 바꿨어요')).toBeInTheDocument();
+    await failRefetch();
+    expect(screen.getByRole('heading', { level: 1, name: '이메일을 바꿨어요' })).toBeInTheDocument();
+    expect(screen.queryByText('프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).not.toBeInTheDocument();
+  });
+
+  const withProfile = (fields: Partial<V1Profile['profile']>): V1Profile => ({ ...STORED_PROFILE, profile: { ...STORED_PROFILE.profile, ...fields } });
+  it.each<[string, V1Profile]>([
+    ['존재하지 않는 날짜인 생년월일', withProfile({ birthDate: '1995-02-30' })],
+    ['11자리가 아닌 휴대폰 번호', { ...STORED_PROFILE, phone: '0101112222' }],
+    ['1자인 닉네임', withProfile({ nickname: '민' })],
+    ['41자인 닉네임', withProfile({ nickname: '가'.repeat(41) })],
+    ['301자인 소개', withProfile({ bio: '가'.repeat(301) })],
+  ])('저장된 %s 은(는) 서버가 저장을 거절하므로 인증번호를 받기 전에 프로필 수정으로 안내한다', async (_name, stored) => {
+    profile = stored;
+    renderClient();
+
+    expect(await heading('프로필을 먼저 저장해 주세요')).toBeInTheDocument();
+    expect(screen.queryByLabelText('이메일')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '프로필로 돌아가기' })).toHaveAttribute('href', PROFILE_EDIT);
+    expect(calls.request).toEqual([]);
   });
 
   it('성별이 저장돼 있지 않은 옛 계정은 서버가 저장을 거절하므로 인증번호를 받기 전에 프로필 저장부터 안내한다', async () => {

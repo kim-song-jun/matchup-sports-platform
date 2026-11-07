@@ -69,7 +69,7 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 - `realName`이 없으면 호환 입력 `displayName`을 사용한다.
 - phone 변경 시 `phoneVerifiedAt`을 비운다(휴대폰 증명이 켜진 환경에서 증명 토큰을 받고 바꾼 번호는 바로 인증된 상태가 된다). email은 아래 [계정 이메일 변경](#계정-이메일-변경)을 따른다.
 - 중복 값은 각각 `409 EMAIL_CONFLICT`, `PHONE_CONFLICT`, `NICKNAME_CONFLICT`다.
-- 성공 응답은 `{ profile, updatedAt }`이다.
+- 성공 응답은 `{ profile, email, phone, updatedAt }`이다. `email`·`phone`은 이 저장 뒤 계정에 남은 값(이메일을 안 보낸 요청은 지금 값, 소셜 계정이 지우면 `null`)이라, 클라이언트는 추측하지 않고 이 값으로 프로필 캐시의 계정 이메일·번호를 맞춘다.
 
 ### 계정 이메일 변경
 

@@ -11,6 +11,7 @@ import { v1ProfileFixture } from './fixtures';
  *  - `PATCH /me/profile`: 이 파일은 이메일 변경 규칙만 흉내 낸다. 지금 쓰는 주소(`currentEmail`)나 이메일을 건드리지 않는 저장은 토큰 없이 성공하고,
  *    다른 주소는 그 주소의 토큰이 있을 때만 성공한다. 토큰이 없거나 다른 주소의 것이면 400 `EMAIL_CHANGE_PROOF_REQUIRED`
  *    (증명 검사가 충돌 확인보다 먼저다). 이메일을 지우는 저장(`email: null`)은 토큰이 필요 없다. 본문은 `UpdateProfileDto` 와 같은 허용 필드를 따른다.
+ *    응답의 `email`·`phone` 은 서버처럼 저장 뒤 계정에 남은 값이다 — 이메일을 빼면 지금 주소(`currentEmail`)가 그대로 온다.
  */
 const api = '*/api/v1';
 const NOW = '2026-11-06T00:00:00.000Z';
@@ -134,7 +135,7 @@ export const v1EmailChangeMswHandlers = [
   // UpdateProfileDto 중 이메일 변경 규칙만. nickname 2~40자와 gender 는 필수다.
   http.patch(`${api}/me/profile`, async ({ request }) => {
     const body = await readJson(request);
-    const { nickname, gender, email, emailChangeToken, realName } = body;
+    const { nickname, gender, email, emailChangeToken, realName, phone } = body;
     if (Object.keys(body).some((key) => !PROFILE_FIELDS.has(key))) return invalidBody();
     if (typeof nickname !== 'string' || nickname.length < 2 || nickname.length > 40) return invalidBody();
     if (gender !== 'male' && gender !== 'female') return invalidBody();
@@ -150,6 +151,8 @@ export const v1EmailChangeMswHandlers = [
     }
     return ok({
       profile: { ...v1ProfileFixture.profile, nickname, realName: typeof realName === 'string' ? realName : null, gender },
+      email: email === undefined ? EMAIL_CHANGE_MSW.currentEmail : target,
+      phone: typeof phone === 'string' ? phone : null,
       updatedAt: NOW,
     });
   }),

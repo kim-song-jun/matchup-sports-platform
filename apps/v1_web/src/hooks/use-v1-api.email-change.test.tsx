@@ -11,7 +11,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { EMAIL_CHANGE_MSW } from '@/test/msw/profile-email-change-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
 import { v1ProfileFixture } from '@/test/msw/fixtures';
-import type { V1Profile } from '@/types/api';
+import type { V1AuthMe, V1Profile } from '@/types/api';
 import { useV1EmailChangeRequest, useV1EmailChangeVerify, useV1UpdateProfile } from './use-v1-api';
 
 const server = setupServer(
@@ -32,10 +32,14 @@ afterEach(() => server.resetHandlers());
 function setup() {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
   queryClient.setQueryData<V1Profile>(v1Keys.profile(), { ...v1ProfileFixture, email: EMAIL_CHANGE_MSW.currentEmail });
-  queryClient.setQueryData(v1Keys.authMe(), { seeded: true });
+  queryClient.setQueryData(v1Keys.authMe(), { seeded: true, user: { id: 'user-1', email: EMAIL_CHANGE_MSW.currentEmail, phone: '01011112222', onboardingStatus: 'completed' } });
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   const authMeIsStale = () => queryClient.getQueryState(v1Keys.authMe())?.isInvalidated === true;
-  return { queryClient, wrapper, authMeIsStale };
+  const cachedEmails = () => ({
+    profile: queryClient.getQueryData<V1Profile>(v1Keys.profile())?.email,
+    authMe: queryClient.getQueryData<V1AuthMe>(v1Keys.authMe())?.user.email,
+  });
+  return { queryClient, wrapper, authMeIsStale, cachedEmails };
 }
 
 // Mutations settle outside React's batching unless awaited inside act.
@@ -151,7 +155,7 @@ describe('changing the account email', () => {
     });
 
     it('request -> verify -> save changes the address and refreshes the account caches', async () => {
-      const { wrapper, authMeIsStale } = setup();
+      const { wrapper, authMeIsStale, cachedEmails } = setup();
       const request = renderHook(() => useV1EmailChangeRequest(), { wrapper });
       const verify = renderHook(() => useV1EmailChangeVerify(), { wrapper });
       const save = renderHook(() => useV1UpdateProfile(), { wrapper });
@@ -164,6 +168,28 @@ describe('changing the account email', () => {
 
       expect(saved.profile.nickname).toBe('러너01');
       expect(authMeIsStale()).toBe(true);
+      // Every later save reads the account email from these caches, so they must hold the stored address at once.
+      expect(cachedEmails()).toEqual({ profile: EMAIL_CHANGE_MSW.emails.ok, authMe: EMAIL_CHANGE_MSW.emails.ok });
+    });
+
+    it('keeps the cached address when a save leaves the email out, and drops it when the account clears it', async () => {
+      const { wrapper, cachedEmails } = setup();
+      const { result } = renderHook(() => useV1UpdateProfile(), { wrapper });
+
+      await succeeds(() => result.current.mutateAsync({ ...PROFILE_BODY }));
+      expect(cachedEmails()).toEqual({ profile: EMAIL_CHANGE_MSW.currentEmail, authMe: EMAIL_CHANGE_MSW.currentEmail });
+
+      await succeeds(() => result.current.mutateAsync({ ...PROFILE_BODY, email: null }));
+      expect(cachedEmails()).toEqual({ profile: null, authMe: null });
+    });
+
+    it('leaves the caches unchanged when the server refuses the new address', async () => {
+      const { wrapper, cachedEmails } = setup();
+      const { result } = renderHook(() => useV1UpdateProfile(), { wrapper });
+
+      await fails(() => result.current.mutateAsync({ ...PROFILE_BODY, email: EMAIL_CHANGE_MSW.emails.ok }));
+
+      expect(cachedEmails()).toEqual({ profile: EMAIL_CHANGE_MSW.currentEmail, authMe: EMAIL_CHANGE_MSW.currentEmail });
     });
 
     it('answers an address another account took after the code was checked with EMAIL_CONFLICT', async () => {

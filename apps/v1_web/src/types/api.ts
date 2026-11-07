@@ -2670,6 +2670,17 @@ export type V1Profile = {
 };
 
 /**
+ * `PATCH /me/profile` 응답. `email`·`phone` 은 저장 뒤 계정에 남은 값이다 — 이메일을 안 보낸 요청은 지금 값이 그대로 오고,
+ * 소셜 계정이 지우면 null 이다. 프로필·`/auth/me` 캐시의 계정 값은 이 값으로 맞춘다.
+ */
+export type V1ProfileUpdateResult = {
+  profile: V1Profile['profile'];
+  email: string | null;
+  phone: string | null;
+  updatedAt: string;
+};
+
+/**
  * 선수 카드 (Task 155). 산식과 잠금 규칙은 서버가 정하고, 프론트는 **그린다**.
  * 잠긴 능력치는 `value: null` 로 오며, 프론트가 임의로 0 이나 추정값을 채우면 안 된다.
  */

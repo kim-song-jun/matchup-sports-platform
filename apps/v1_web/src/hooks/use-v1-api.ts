@@ -156,6 +156,7 @@ import type {
   V1OnboardingMutationResult,
   V1OnboardingPreferencePayload,
   V1Profile,
+  V1ProfileUpdateResult,
   V1PopupTargetScreen,
   V1PublicProfile,
   V1Region,
@@ -3186,13 +3187,17 @@ export function useV1UpdateProfile() {
       /** 한 줄 소개 (Task 154 P1). undefined 로 보내면 기존 값을 건드리지 않는다. */
       bio?: string | null;
     }) =>
-      v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
+      v1Patch<V1ProfileUpdateResult>('/me/profile', body),
     // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
     // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
     // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    // 계정 이메일·번호도 같은 응답으로 맞춘다 — 이메일을 안 보낸 저장이 캐시의 옛 주소를 서버에 되돌려 보내지 않게.
     onSuccess: (result) => {
       queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
-        current ? { ...current, profile: result.profile } : current,
+        current ? { ...current, profile: result.profile, email: result.email, phone: result.phone } : current,
+      );
+      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), (current) =>
+        current ? { ...current, user: { ...current.user, email: result.email, phone: result.phone } } : current,
       );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });

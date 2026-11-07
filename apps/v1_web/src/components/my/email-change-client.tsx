@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { AUTH_WELCOME_STAGE, AuthFrame, SignupCompletePageView } from '@/components/auth/auth-page';
 import { getEmailChangeCompleteViewModel } from '@/components/auth/auth.view-model';
 import { AuthStepCta } from '@/components/auth/auth-step-cta';
@@ -13,7 +12,7 @@ import { AuthStepHeader } from '@/components/auth/auth-step-header';
 import { AuthVerifiedInset } from '@/components/auth/auth-verified-inset';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
-import { isPlausibleEmail, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
+import { isPlausibleEmail, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -27,7 +26,6 @@ import {
 import { EMAIL_SEND_UNAVAILABLE_CODE, RECENT_LOGIN_REQUIRED_CODE } from '@/lib/auth-link-errors';
 import { emailChangePath, parseEmailChangeReturnTo } from '@/lib/email-change-path';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { v1Keys } from '@/lib/query-keys';
 import { getLoginPathForRedirect } from '@/lib/session-storage';
 import type { V1Profile } from '@/types/api';
 import { EmailLinkInterruptionView } from './email-link-interruption';
@@ -37,26 +35,39 @@ type Step = FormStep | 'done';
 
 const FORM_STEPS: readonly FormStep[] = ['email', 'code'];
 const MAX_EMAIL_LENGTH = 254;
+// `UpdateProfileDto` 의 길이 제한 — 저장된 값이 넘으면 서버가 저장을 거절한다.
+const NICKNAME_MIN_LENGTH = 2;
+const NICKNAME_MAX_LENGTH = 40;
+const REAL_NAME_MAX_LENGTH = 40;
+const BIO_MAX_LENGTH = 300;
 
 const SEND_UNAVAILABLE_MESSAGE = '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.';
 const TOKEN_INVALID_MESSAGE = '이메일 인증이 만료돼서 처음부터 다시 해야 해요. 인증번호를 다시 받아 주세요.';
 const LOGIN_ID_NOTE = '이 이메일은 로그인에도 쓰여요. 바꾸면 다음부터 새 이메일로 로그인해요.';
 
 /**
- * 프로필 저장(`PATCH /me/profile`)은 보내지 않은 칸을 비운다. 이메일만 바꿔도 나머지는 서버에 저장된 값 그대로 다시 보낸다.
- * 성별이 없는 옛 계정은 서버가 저장을 거절하므로 이 화면에서 시작하지 않는다(`null` 반환).
+ * 프로필 저장(`PATCH /me/profile`)은 보내지 않은 칸을 비운다(이메일·소개 제외). 이메일만 바꿔도 나머지는 서버에 저장된 값 그대로 다시 보낸다.
+ * 서버가 저장을 거절할 값(성별·닉네임이 없거나, 생년월일·휴대폰 번호·길이가 `UpdateProfileDto` 규칙에 어긋남)이 저장돼 있으면 `null` 을 돌려준다 —
+ * 그대로 시작하면 인증번호만 쓰고 마지막 저장에서 막히고, 같은 증명으로 다시 해도 같은 이유로 실패한다.
  */
 function profileSavePayload(data: V1Profile) {
   const { profile } = data;
   const nickname = (profile.nickname ?? '').trim();
-  if (!profile.gender || !nickname) return null;
+  const realName = profile.realName?.trim() || null;
+  const bio = profile.bio?.trim() || null;
+  const phone = data.phone || null;
+  const birthDate = normalizeSeparatedDigits(profile.birthDate ?? '') || null;
+  if (!profile.gender || nickname.length < NICKNAME_MIN_LENGTH || nickname.length > NICKNAME_MAX_LENGTH) return null;
+  if ((realName?.length ?? 0) > REAL_NAME_MAX_LENGTH || (bio?.length ?? 0) > BIO_MAX_LENGTH) return null;
+  if (phone !== null && !/^\d{11}$/.test(phone)) return null;
+  if (birthDate !== null && !isValidBirthDateDigits(birthDate)) return null;
   return {
-    realName: profile.realName?.trim() || null,
+    realName,
     nickname,
-    bio: profile.bio?.trim() || null,
+    bio,
     profileImageUrl: profile.profileImageUrl || null,
-    phone: data.phone || null,
-    birthDate: normalizeSeparatedDigits(profile.birthDate ?? '') || null,
+    phone,
+    birthDate,
     gender: profile.gender,
   };
 }
@@ -72,7 +83,8 @@ export function EmailChangeClient() {
   const returnTo = parseEmailChangeReturnTo(useSearchParams().get('redirect'));
 
   if (profile.isPending) return <PageSkeleton variant="form" />;
-  if (profile.isError || !profile.data) {
+  // 이미 받은 데이터가 있으면 뒤늦은 재조회 실패로 진행 중인 단계나 완료 화면을 걷어내지 않는다.
+  if (!profile.data) {
     return (
       <AuthFrame stage={AUTH_WELCOME_STAGE} topTitle="이메일 변경" backHref={returnTo} appBack>
         <div className="tm-auth-body">
@@ -98,7 +110,7 @@ function ProfileIncompleteView({ returnTo }: { returnTo: string }) {
       <div className="tm-auth-body">
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">프로필을 먼저 저장해 주세요</h1>
-          <p className="tm-text-body tm-auth-sub">닉네임과 성별이 저장돼 있어야 이메일을 바꿀 수 있어요. 프로필에서 저장한 뒤 다시 시도해 주세요.</p>
+          <p className="tm-text-body tm-auth-sub">이메일을 바꾸려면 닉네임·성별이 저장돼 있고 생년월일·휴대폰 번호가 올바르게 입력돼 있어야 해요. 프로필 수정에서 확인해 저장한 뒤 다시 시도해 주세요.</p>
         </div>
       </div>
     </AuthFrame>
@@ -110,7 +122,6 @@ function EmailChangeFlow({ profile, savePayload, returnTo }: {
   savePayload: NonNullable<ReturnType<typeof profileSavePayload>>;
   returnTo: string;
 }) {
-  const queryClient = useQueryClient();
   const requestEmail = useV1EmailChangeRequest();
   const verifyEmail = useV1EmailChangeVerify();
   const updateProfile = useV1UpdateProfile();
@@ -149,9 +160,6 @@ function EmailChangeFlow({ profile, savePayload, returnTo }: {
       setSaveError(extractErrorMessage(error, '이메일을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.'));
       return false;
     }
-    // 프로필 저장 훅은 응답의 profile 만 캐시에 넣는다 — 바뀐 계정 이메일은 여기서 맞춘다.
-    queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) => (current ? { ...current, email: normalizedEmail } : current));
-    void queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
     setEmailChangeToken(null);
     setChangedEmail(normalizedEmail);
     setStep('done');

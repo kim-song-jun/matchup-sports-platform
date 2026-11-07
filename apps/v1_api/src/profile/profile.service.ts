@@ -334,8 +334,11 @@ export class ProfileService {
     });
     if (notification) this.notifications.deliverCreated(user.id, 'email_changed', notification);
 
+    // email and phone are account columns, not profile ones; the web keeps them in its profile cache next to `profile`.
     return {
       profile: toProfilePayload(profile),
+      email,
+      phone,
       updatedAt: profile.updatedAt,
     };
   }

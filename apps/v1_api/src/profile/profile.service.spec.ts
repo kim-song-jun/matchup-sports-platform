@@ -100,8 +100,10 @@ describe('ProfileService email change proof gate', () => {
     const notifications = buildNotifications();
     const service = createProfileService(prisma, undefined, notifications.service);
 
-    await service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }));
+    const saved = await service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }));
 
+    // The web patches its cached account email from this response, so it must carry the address that was stored.
+    expect(saved).toMatchObject({ email: NEW_EMAIL, phone: '01011112222' });
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
       data: { email: NEW_EMAIL, phone: '01011112222', emailVerifiedAt: expect.any(Date) },
@@ -226,8 +228,9 @@ describe('ProfileService email change proof gate', () => {
     const notifications = buildNotifications();
     const service = createProfileService(prisma, undefined, notifications.service);
 
-    await service.updateMe(user, payload({ email: ' OLD@Teameet.test ' }));
+    const saved = await service.updateMe(user, payload({ email: ' OLD@Teameet.test ' }));
 
+    expect(saved).toMatchObject({ email: user.email });
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
       data: { email: user.email, phone: '01011112222' },
@@ -252,8 +255,9 @@ describe('ProfileService email change proof gate', () => {
     const notifications = buildNotifications();
     const service = createProfileService(prisma, undefined, notifications.service);
 
-    await service.updateMe(user, payload({ email: null }));
+    const saved = await service.updateMe(user, payload({ email: null }));
 
+    expect(saved).toMatchObject({ email: null });
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
       data: { email: null, phone: '01011112222', emailVerifiedAt: null },
@@ -265,8 +269,10 @@ describe('ProfileService email change proof gate', () => {
     const prisma = buildPrisma();
     const service = createProfileService(prisma);
 
-    await service.updateMe(user, payload({ email: undefined }));
+    const saved = await service.updateMe(user, payload({ email: undefined }));
 
+    // A client that left the email out learns the kept address from the response instead of guessing it.
+    expect(saved).toMatchObject({ email: user.email });
     expect(prisma.v1User.update).toHaveBeenCalledWith({ where: { id: user.id }, data: { email: user.email, phone: '01011112222' } });
   });
 });
@@ -488,8 +494,9 @@ describe('ProfileService phone change proof gate', () => {
     const { prisma } = buildPrisma();
     const service = createProfileService(prisma as unknown as PrismaService);
 
-    await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
+    const saved = await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
 
+    expect(saved).toMatchObject({ phone: NEW_PHONE });
     expect(prisma.v1User.update).toHaveBeenCalledTimes(1);
     const data = prisma.v1User.update.mock.calls[0][0].data;
     expect(data.phone).toBe(NEW_PHONE);

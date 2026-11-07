@@ -14,6 +14,7 @@ import { AuthVerifiedInset } from '@/components/auth/auth-verified-inset';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
 import { isPlausibleEmail } from '@/components/auth/signup-profile-validation';
+import { usePasswordFeedback } from '@/components/auth/use-password-feedback';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
@@ -25,7 +26,6 @@ import {
   SOCIAL_LINK_ADMIN_FORBIDDEN_CODE,
   SOCIAL_LINK_PROVIDER_EXISTS_CODE,
 } from '@/lib/auth-error-codes';
-import { COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { EMAIL_SEND_UNAVAILABLE_CODE, RECENT_LOGIN_REQUIRED_CODE } from '@/lib/auth-link-errors';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { emailLinkPath, LOGIN_METHODS_PATH, parseEmailLinkReturnTo } from '@/lib/link-result';
@@ -79,6 +79,7 @@ export function EmailLinkClient() {
   const [emailLinkToken, setEmailLinkToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const passwordRule = usePasswordFeedback(password);
   // 마지막 단계에서 되돌아온 이유. `count` 가 바뀌면 인증번호 상태가 새로 시작한다.
   const [restart, setRestart] = useState<{ count: number; code: string | null }>({ count: 0, code: null });
   const [completeError, setCompleteError] = useState<string | null>(null);
@@ -161,6 +162,8 @@ export function EmailLinkClient() {
         setRestart((current) => ({ ...current, code }));
         return;
       }
+      // 흔한 비밀번호라는 거절은 비밀번호 칸 아래에 올라가고, 그 밖의 거절만 아래 오류 카드에 남는다.
+      if (passwordRule.rejectIfTooCommon(error)) return;
       setCompleteError(extractErrorMessage(error, '이메일 로그인을 연결하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     }
   };
@@ -203,8 +206,6 @@ export function EmailLinkClient() {
 
   const sendReady = normalizedEmail.length <= MAX_EMAIL_LENGTH && isPlausibleEmail(normalizedEmail);
   const codeStillValid = otp.phase === 'sent' && !otp.expired;
-  const passwordIssue = accountPasswordIssue(password);
-  const passwordUsable = passwordIssue === null;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
 
   const emailStepBusy = requestEmail.isPending;
@@ -237,7 +238,7 @@ export function EmailLinkClient() {
             }
       : {
           label: completeLink.isPending ? '연결하는 중...' : '연결하기',
-          disabled: !passwordUsable || !passwordMatch || completeLink.isPending,
+          disabled: !passwordRule.usable || !passwordMatch || completeLink.isPending,
           loading: completeLink.isPending,
           onClick: () => { void submitPassword(); },
         };
@@ -250,9 +251,7 @@ export function EmailLinkClient() {
         : normalizedEmail === '' ? '이메일을 입력해 주세요.' : '이메일 형식을 확인해 주세요.'
       : step === 'code'
         ? '인증번호 6자리를 입력해 주세요.'
-        : !passwordUsable
-          ? passwordIssue === 'too_common' ? COMMON_PASSWORD_MESSAGE : '비밀번호는 8자 이상이어야 해요.'
-          : '비밀번호 확인이 일치해야 해요.';
+        : !passwordRule.usable ? passwordRule.blockedHint : '비밀번호 확인이 일치해야 해요.';
 
   const copy = step === 'email'
     ? {
@@ -367,11 +366,7 @@ export function EmailLinkClient() {
                 value={password}
                 onChange={setPassword}
                 placeholder="8자 이상"
-                feedback={password.length > 0
-                  ? passwordUsable
-                    ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
-                    : { kind: 'error', message: passwordIssue === 'too_common' ? COMMON_PASSWORD_MESSAGE : '8자 이상 입력해 주세요.' }
-                  : null}
+                feedback={passwordRule.feedback}
               />
               <AuthPasswordField
                 label="비밀번호 확인"

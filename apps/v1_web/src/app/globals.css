@@ -1076,6 +1076,30 @@ button:disabled {
   color: var(--text);
 }
 
+/* 가입한 로그인 수단 칩 — 계정 찾기 결과에서 이메일 대신 가입 수단을 알린다. */
+.tm-method-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin: var(--spacing-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-method-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 36px;
+  padding: 0 var(--spacing-3) 0 var(--spacing-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+}
+
 .tm-card.tm-wpg-way {
   display: grid;
   gap: var(--spacing-4);

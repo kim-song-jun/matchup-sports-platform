@@ -16,10 +16,12 @@ function loginStepBody(account: V1FoundAccount, socialNames: string, hasEmail: b
 /**
  * 계정 찾기(번호 또는 이메일)나 이메일 비밀번호 재설정에서 찾은 계정이 탈퇴 유예 중일 때의 결과. 로그인하면 탈퇴 철회 화면이 이어지므로 버튼은
  * 그 계정의 로그인 수단으로 가는 길이다. 로그인할 수 있는 수단이 이 환경에 없으면 문의 창구로 보낸다.
+ * 끝나는 날(`until`)을 모르면 "방법 2 · 기다리기"는 그리지 않고 로그인하면 취소할 수 있다는 말만 남긴다 — 번호 인증만 마친 결과가 그렇다.
  */
 export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, loginHref, via = 'phone' }: {
   account: V1FoundAccount;
-  until: string;
+  /** 유예가 끝나는 시각(ISO). 모르면 null. */
+  until: string | null;
   emailLoginHref: string;
   loginHref: string;
   /** 무엇으로 이 계정을 찾았는지 — 유예가 끝나면 다시 쓸 수 있게 되는 것(번호 또는 이메일)을 문구에 맞춘다. */
@@ -39,8 +41,10 @@ export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, lo
       until={until}
       head={{
         title: '탈퇴를 신청한 계정이에요',
-        lead: hasWays ? `이 ${reused} 다시 쓰는 방법은 두 가지예요.` : undefined,
-        account: summary.value ? { label: summary.label, value: summary.value } : undefined,
+        lead: hasWays ? `이 ${reused} 다시 쓰는 방법은 두 가지예요.` : '로그인하면 탈퇴를 취소할 수 있어요.',
+        account: summary.maskedEmail
+          ? { label: summary.label, value: summary.maskedEmail }
+          : summary.methods.length > 0 ? { label: summary.label, methods: summary.methods } : undefined,
       }}
       steps={[
         { title: '계정에 로그인해요', body: loginStepBody(account, summary.socialNames, Boolean(account.maskedEmail)) },

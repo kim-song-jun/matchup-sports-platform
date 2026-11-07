@@ -728,7 +728,7 @@ export function AddPlayerForm({
             onChange={(event) => patch({ goalkeeper: event.target.checked })}
             disabled={isSubmitting}
           />
-          골레이로 등록해요
+          골키퍼(GK)로 등록해요
         </label>
 
         <FormField id={eligibilityFieldId} label="선출 여부" labelId={`${eligibilityFieldId}-label`}>

@@ -266,3 +266,35 @@ it('128강과 64강의 저장 phase가 같아도 부전승 조의 이름을 다�
   ], [large, small]);
   expect(rounds.map(({ key, label }) => [key, label])).toEqual([['128강', '챔피언 · 128강'], ['round64', '챔피언 · 64강']]);
 });
+
+// 2026-11-06: N개 토너먼트의 12팀 첫 라운드는 경기 이름이 '12강'이고 그룹 단계 코드가 round16(틀 기준)이다.
+describe('N개 토너먼트의 12강', () => {
+  const bye = { id: 'bye', registrationId: 'r-bye', teamId: 't-bye', teamName: '부전승팀', teamLogoUrl: null, sortOrder: 0, isBye: true };
+  const groups = [
+    makeGroup({ id: 'p12', phase: 'round16', name: '프리미어 · 12강', bracketTrack: '프리미어', groupTeams: [bye] }),
+    makeGroup({ id: 'c12', phase: 'round16', name: '챌린지 · 12강', bracketTrack: '챌린지', groupTeams: [bye] }),
+    makeGroup({ id: 'p8', phase: 'quarter', name: '프리미어 · 8강', bracketTrack: '프리미어' }),
+    makeGroup({ id: 'c8', phase: 'quarter', name: '챌린지 · 8강', bracketTrack: '챌린지' }),
+  ];
+  const fixtures = [
+    makeFixture({ id: 'p12-1', fixtureNumber: 1, round: '12강', groupId: 'p12' }),
+    makeFixture({ id: 'c12-1', fixtureNumber: 2, round: '12강', groupId: 'c12' }),
+    makeFixture({ id: 'p8-1', fixtureNumber: 3, round: '8강', groupId: 'p8' }),
+    makeFixture({ id: 'c8-1', fixtureNumber: 4, round: '8강', groupId: 'c8' }),
+  ];
+
+  it('12강은 그룹 단계 코드 열 하나이고 이름은 다른 열과 같은 모양이다 — 빈 16강 열이 따로 생기지 않는다', () => {
+    const rounds = groupFixturesByRound(fixtures, groups);
+    expect(rounds.map(({ key, label }) => [key, label])).toEqual([
+      ['round16', '프리미어 · 12강 · 챌린지 · 12강'],
+      ['quarter', '프리미어 · 8강 · 챌린지 · 8강'],
+    ]);
+    expect(rounds[0].fixtures.map((fixture) => fixture.id)).toEqual(['p12-1', 'c12-1']);
+  });
+
+  it('대조군: 이름 붙인 토너먼트가 아닌 그룹은 경기 이름 12강으로 기존 12강 열이 된다', () => {
+    const legacy = makeGroup({ id: 'l12', phase: 'round12', name: '12강' });
+    const rounds = groupFixturesByRound([makeFixture({ id: 'l', fixtureNumber: 1, round: '12강', groupId: 'l12' })], [legacy]);
+    expect(rounds.map(({ key, label }) => [key, label])).toEqual([['round12', '12강']]);
+  });
+});

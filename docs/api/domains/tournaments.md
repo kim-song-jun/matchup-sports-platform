@@ -615,7 +615,7 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 
 `POST /players` only accepts an active member of the registration team.
 
-`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골레이로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
+`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골키퍼(GK)로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
 
 
 The service reads the selected member's profile and phone from the team membership user record. A member can be added only when all required source fields exist:
@@ -926,6 +926,8 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 공개 `/tournaments/:id/bracket`의 순위·대진표는 `league_knockouts`에도 조별리그/결선 보기를 제공한다. 공개 상세의 `groups[].phase`, `standings`, `qualificationByTrack`, `bracketTrack`, `fixtures`를 그대로 사용하며 팀 미정 결선도 표시한다. 예선에 아직 팀·성적이 없으면 조별 영역을 유지하고 순위 행은 지어내지 않는다. 기존 대진 공개 시각·신원 가림 계약은 유지한다.
 
+결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다(다시 생성은 기존 슬롯을 `bracketTrack + phase + position` 으로 짝지어 이름이 달라도 기존 대진·일정을 지우지 않는다).
+
 예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
 
 결선 범위 `bracketTrack`은 이 방식에서 토너먼트 이름(중복 불가)이다. `overall/upper/lower`는 기존 범위를 위해 예약한다. 대진 그룹·시상·개인상 유일키·알림 identity가 이 범위를 사용한다. 토너먼트 삭제/이름 변경 시 연결된 시상을 먼저 재지정해야 한다. 결선 참가팀을 바꾸는 일반 자리/직접 경기 편집 대신 위 selection API를 사용한다. 기존 slot 배정 API로 예선 빈 자리는 배정할 수 있다.
@@ -951,3 +953,10 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 - Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
 
 - Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.
+
+
+### 조 이름과 결선 규모 표시 (2026-11-06)
+
+`PATCH /admin/groups/:groupId`의 `name`은 `league_knockouts`에서도 구조/경기 진행 상태를 바꾸지 않고 수정할 수 있다. 공백 이름은 400 `GROUP_NAME_REQUIRED`, 진출 수 동시 수정은 409 `MULTI_FINAL_SELECTION_REQUIRED`다. 기존 관리자 mutation 권한과 대진 advisory lock·감사 로그를 적용한다. 예선 이름은 `multiFinals.groups[].name`에 원자적으로 동기화하고 이름 변경 시 `multiFinalsRevision`을 증가시켜 기존 진출팀 편집의 revision 검증을 유지한다. 결선 단계 조 이름 변경은 토너먼트 identity/bracketTrack/규칙/팀 배정/시상 범위를 바꾸지 않는다.
+
+새 N개 토너먼트의 강수 생성 규칙은 선행 PR #2181이 담당한다(짝수 6팀 이상, 2의 제곱 제외; 홀수는 기존 명칭 유지). 이 후속 변경에는 생성기 중복 수정을 포함하지 않는다. 12팀의 대진은 내부 round16 구조·4팀 부전승·8강 연결을 유지하면서 표시 round/name만 12강으로 저장한다. 기존 대진의 자동 생성 이름/round는 migration으로 보정하며 운영자 지정 이름과 phase·경기 ID·결과·edge·slot은 보존한다. 사용자 일정·대진·경기 이름은 저장한 그룹 이름을 우선하며 단계 판정은 이름 변경과 분리한다.

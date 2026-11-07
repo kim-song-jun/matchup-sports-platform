@@ -57,3 +57,18 @@ Persona: mutation 권한 운영 관리자. Route: `/admin/tournaments/:id/bracke
 7. alpha1440/768/390에서 생성/규칙/배정 진입, 결선 선택과 정책 표시, 추천→대진 확인→취소, console/network, 동일 DB snapshot을 확인한다. 기존 실대회에서는 확정 저장을 하지 않는다.
 
 검증: API101/Web16 PASS; 양쪽 tsc·surface/pattern·committed diff PASS. 임시 PostgreSQL16.15의 최신 스키마에서 신규 통합2/2 및 실제 교차 배정/깨진 연결 거절 PASS. 마이그레이션 이력 검증은 원격 API CI로 구분한다. 임시 DB PID10171 종료. 변경 전 alpha3폭 캡처/console·network0오류·쓰기0, 브라우저5751/5763 종료. 코드364b5d071의 Web/Gates CI PASS; API CI와 Copilot 리뷰 결과는 대기. 변경 후 alpha기능0/7·viewport0/3, 미머지·미배포이며 전체 완료가 아니다. [PR2169](https://github.com/kim-song-jun/matchup-sports-platform/pull/2169).
+
+
+## 2026-11-06 — 실제 강수·조 이름 수정·종료 화면 후속
+
+[작업 문서](../../.github/tasks/20261113-bracket-group-name-filters.md#전체-단계-명칭-및-조-이름-수정-복원-2026-11-06-추가-요청).
+
+1. 6/10/12/14팀 결선을 생성하고 첫 단계의 저장 name/round가 실제 참가 수로 표시되는지 확인한다. 12팀은 4팀 부전승과 8강 연결을 유지한다.
+2. 기존 자동 생성 16강/첫 라운드 명칭을 보정하고 운영자가 수정한 이름과 내부 phase·ID·경기 결과·팀 자리를 보존한다.
+3. 관리자 목록 보기에서 예선·결선 조 이름을 수정한다. 구조 삭제/진출 수는 계속 보호하고, 예선 설정 이름과 편집 revision도 함께 갱신한다.
+4. 공개 일정 필터·목록·대진 단계·경기 이름/종료 결과 카드에서 저장한 이름을 확인한다. 이름과 분리한 phase/round 기준으로 분류와 필터·경기 상세 이동이 유지돼야 한다.
+5. 종료 결과에서 토너먼트별 기존 우승 연출/기록/1~4위 순위표/결선 카드를 확인한다. 데스크톱 2열, 390/768은 1열이며 토너먼트 간 경기·순위가 섞이지 않아야 한다.
+
+로컬 API334/Web297 회귀, 양쪽 타입 및 pattern/surface PASS. 데이터 보정은 격리 PostgreSQL(PGlite) 6 시나리오와 재실행 멱등성 PASS. alpha before: 공개 2 routes × 3 widths = 6/6, console/network/overflow 오류 0, cleanup 완료. [증거](../screenshots/bracket-results-followup-20261106/before-evidence.json). alpha after: 공개0/6, admin0/3 widths(미배포/인증 미제공). CI와 전체 migration chain replay는 미실행이며 실제 사용자 대회의 데이터/상태를 변경하지 않았다.
+
+#2181 중복 정리: 강수 생성/관리자 그림/단계 코드/재생성 보존은 #2181이 담당한다. 이 후속 PR에는 해당 생성기·공개 대진 분류 중복 수정을 포함하지 않는다. migration은 짝수 6팀 이상 명명된 결선의 자동 명칭만 보정하며 홀수/일반 flexible 대진/사용자 지정 이름은 보존한다. 이전 로컬 수치는 중복 제거 전 snapshot이며 최종 통합 검증 결과는 task의 후속 PR 절을 따른다. #2181 머지 전 후속 PR은 Draft로 유지한다.

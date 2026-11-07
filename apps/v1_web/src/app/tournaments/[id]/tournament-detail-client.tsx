@@ -53,6 +53,7 @@ import { TournamentInquirySection } from '@/components/tournaments/tournament-in
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
@@ -212,6 +213,20 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
   if (winnerSide === 'home') return finalFixture.homeTeamName || null;
   if (winnerSide === 'away') return finalFixture.awayTeamName || null;
   return null;
+}
+
+/** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
+function getCompletedTrackChampions(tournament: V1TournamentDetail) {
+  if (isLeagueCompetition(tournament)) return [];
+  const tracks = [...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))];
+  if (tracks.length < 2) return [];
+  return tracks.map(track => {
+    const finalGroupIds = new Set(tournament.groups.filter(group => group.bracketTrack === track && group.phase === 'final').map(group => group.id));
+    const fixtures = tournament.fixtures
+      .filter(fixture => finalGroupIds.has(fixture.groupId ?? '') && fixture.status === 'completed')
+      .map(fixture => ({ ...fixture, round: 'final' }));
+    return { track, label: bracketTrackLabel(track), champion: getCompletedChampionName({ ...tournament, fixtures }) };
+  });
 }
 
 /**
@@ -1557,8 +1572,9 @@ export function TournamentDetailView({
  */
 function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail }) {
   const childHref = useChildHref();
-  const championName = getCompletedChampionName(tournament);
-  const title = championName ? `${championName} 우승!` : '대회가 끝났어요';
+  const trackChampions = getCompletedTrackChampions(tournament);
+  const championName = trackChampions.length ? null : getCompletedChampionName(tournament);
+  const title = trackChampions.length ? '토너먼트별 우승팀' : championName ? `${championName} 우승!` : '대회가 끝났어요';
 
   return (
     <section style={{ marginTop: 16 }}>
@@ -1575,7 +1591,9 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(0,0,0,0.2)',
         }}
-        aria-label={championName ? `${championName} 우승. 경기 결과 보기` : '경기 결과 보기'}
+        aria-label={trackChampions.length
+          ? `토너먼트별 우승팀. ${trackChampions.map(row => `${row.label}: ${row.champion ?? '결과 확정 대기'}`).join('. ')}. 경기 결과 보기`
+          : championName ? `${championName} 우승. 경기 결과 보기` : '경기 결과 보기'}
       >
         <span
           aria-hidden="true"
@@ -1607,6 +1625,16 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           >
             {title}
           </div>
+          {trackChampions.length > 0 && (
+            <dl style={{ display: 'grid', gap: 8, margin: '12px 0', color: '#fff' }}>
+              {trackChampions.map(row => (
+                <div key={row.track} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 5fr)', gap: 8, alignItems: 'baseline' }}>
+                  <dt style={{ fontSize: 'var(--font-size-caption)', color: 'rgba(255,255,255,0.65)', overflowWrap: 'anywhere' }}>{row.label}</dt>
+                  <dd style={{ margin: 0, fontSize: 'var(--font-size-body-sm)', fontWeight: 700, overflowWrap: 'anywhere' }}>{row.champion ?? '결과 확정 대기'}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <div style={{ fontSize: 'var(--font-size-caption)', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
             경기 결과 보기
           </div>

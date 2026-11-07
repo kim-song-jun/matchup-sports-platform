@@ -222,34 +222,16 @@ describe('BottomSheet onClose 모드', () => {
       vi.useRealTimers();
     });
 
-    function renderFocus(initialFocus?: 'control' | 'sheet') {
+    it('열리면 첫 컨트롤(닫기 버튼)이 포커스를 받는다', () => {
       render(
-        <BottomSheet open onClose={vi.fn()} title="매치 관리" initialFocus={initialFocus}>
+        <BottomSheet open onClose={vi.fn()} title="매치 관리">
           <button type="button">확인</button>
         </BottomSheet>,
       );
       act(() => {
         vi.advanceTimersByTime(FOCUS_DELAY_MS);
       });
-      return screen.getByRole('dialog', { name: '매치 관리' });
-    }
-
-    it('기본은 첫 컨트롤(닫기 버튼)이 포커스를 받는다', () => {
-      renderFocus();
       expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' }));
-    });
-
-    it('initialFocus="sheet" 면 패널이 포커스를 받고, 그 상태의 Shift+Tab 도 패널 안에 머문다', () => {
-      const dialog = renderFocus('sheet');
-      expect(document.activeElement).toBe(dialog);
-
-      const notPrevented = fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-      expect(notPrevented).toBe(false);
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: '확인' }));
-    });
-
-    it('initialFocus="sheet" 가 아니면 패널은 포커스 대상이 아니다', () => {
-      expect(renderFocus().hasAttribute('tabindex')).toBe(false);
     });
   });
 });

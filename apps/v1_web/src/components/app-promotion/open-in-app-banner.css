@@ -40,7 +40,7 @@
  * 배너를 5px 내려 놓고(top), 여백은 4px 격자에 맞춰 64px 로 둔다.
  */
 @media (max-width: 1023.98px) {
-  .tm-scroll-area:has(> .tm-open-in-app-banner) {
+  .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
     padding-top: 64px;
   }
 
@@ -52,7 +52,7 @@
     height: 56px;
   }
 
-  .tm-app-frame-no-topbar .tm-scroll-area:has(> .tm-open-in-app-banner) {
+  .tm-app-frame-no-topbar .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
     padding-top: 56px;
   }
 
@@ -66,6 +66,11 @@
     margin-top: 16px;
     border-radius: var(--radius-control);
   }
+}
+
+/* 채팅방은 스크롤 영역이 스크롤하지 않아(overflow-y: hidden) 배너가 밀려 올라가 사라질 수 없다 — 입력창 위 공간을 계속 쓰므로 그리지 않는다. */
+.tm-scroll-area:has(.tm-chat-room) > .tm-open-in-app-banner {
+  display: none;
 }
 
 /* 셸이 이미 그려진 화면(전역 404)에서는 셸 안 배너가 맡으므로 문서 맨 위 배너는 숨긴다. */

@@ -496,6 +496,11 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/preview` returns `fixtures[]` with `round`, `matchday`
+  (the n-th game day), `orderInDay`, `homeTeamId`, `awayTeamId`, `startAt`, `endAt` and `week`. `week` is the
+  "N주차" the created fixtures get in their titles (KST Monday–Sunday calendar weeks, only weeks that have games
+  are counted), computed by the same function (`leagueFixtureWeeks`) as the titles. A Saturday + Sunday schedule
+  therefore has two `matchday` values but one `week`. Clients group and count weeks by `week`, not by `matchday`.
 - `weeksCount` (1–104) is the number of round-robin rounds to generate; the optional `roundsCount`
   (1–104) still cuts it down for older clients. `timing.gamesPerDay` (1–50) is the number of games per
   day across all teams: fixtures are split in round-robin order into days of that many games, so the

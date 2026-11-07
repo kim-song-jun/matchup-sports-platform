@@ -1901,9 +1901,58 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(regenMutate).not.toHaveBeenCalled();
   });
 
-  it('timing 미리보기 응답은 매치데이 타임라인으로 렌더된다', async () => {
+  /** 미리보기 mutation 을 이 응답으로 채우고 화면을 연 뒤 "미리보기" 를 누른다. */
+  async function renderPreview(response: unknown) {
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    const previewMutateAsync = vi.fn().mockResolvedValue({
+    useV1PreviewLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(response), isPending: false } as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+  }
+
+  /** KST 벽시계 `HH:mm` 에 시작해 40분씩 이어지는 경기 n개. */
+  function previewDay(date: string, startHour: number, count: number, extra: { matchday: number; week?: number }) {
+    return Array.from({ length: count }, (_, index) => {
+      const startMs = Date.parse(`${date}T00:00:00+09:00`) + (startHour * 60 + index * 40) * 60_000;
+      return {
+        round: extra.matchday, ...extra, orderInDay: index + 1, homeTeamId: 't1', awayTeamId: 't2',
+        startAt: new Date(startMs).toISOString(), endAt: new Date(startMs + 40 * 60_000).toISOString(),
+      };
+    });
+  }
+
+  it('week 가 있는 timing 미리보기는 만들어질 제목과 같은 달력 주로 묶고 한 주 안의 날을 헤더에 나란히 적는다', async () => {
+    // 토 8경기 + 일 7경기는 한 달력 주(1주차), 다음 주 토 2경기는 2주차. 매치데이 순번은 1·2·3 으로 날마다 오른다.
+    await renderPreview({
+      leagueId: 'league-1',
+      rounds: 5,
+      matchdayCount: 3,
+      fixtureCount: 17,
+      placeName: '베이컨 풋살장',
+      fixtures: [
+        ...previewDay('2026-11-21', 10, 8, { matchday: 1, week: 1 }),
+        ...previewDay('2026-11-22', 10, 7, { matchday: 2, week: 1 }),
+        ...previewDay('2026-11-28', 11, 2, { matchday: 3, week: 2 }),
+      ],
+      warnings: [],
+    });
+
+    expect(await screen.findByText(/2주 · 17경기/)).toBeInTheDocument();
+    expect(screen.queryByText(/3주 · 17경기/)).not.toBeInTheDocument();
+    expect(screen.getByText('1주차 · 11/21 (토) 8경기 / 11/22 (일) 7경기')).toBeInTheDocument();
+    expect(screen.getByText('2주차 · 11/28 (토) 2경기')).toBeInTheDocument();
+    // 두 날에 걸친 주는 시각 앞에 요일이 붙고, 하루짜리 주는 붙지 않는다.
+    expect(screen.getByText('토 10:00~10:40')).toBeInTheDocument();
+    expect(screen.getByText('일 10:00~10:40')).toBeInTheDocument();
+    expect(screen.getByText('11:00~11:40')).toBeInTheDocument();
+    expect(screen.queryByText('토 11:00~11:40')).not.toBeInTheDocument();
+  });
+
+  it('week 가 없는 구버전 응답은 매치데이로 묶고 기존 헤더 모양을 유지한다', async () => {
+    await renderPreview({
       leagueId: 'league-1',
       rounds: 3,
       matchdayCount: 1,
@@ -1915,23 +1964,35 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       ],
       warnings: [],
     });
-    useV1PreviewLeagueFixturesMock.mockReturnValue({ mutateAsync: previewMutateAsync, isPending: false } as never);
-
-    render(
-      <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
-      </Providers>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
 
     // KST(TZ 고정): 13:00Z = 22:00, 매치데이 헤더 + 경기별 시간 범위.
     expect(await screen.findByText(/1주 · 6경기/)).toBeInTheDocument();
-    expect(screen.getByText(/1주차/)).toBeInTheDocument();
+    expect(screen.getByText('1주차 — 9. 2. (수) · 2경기')).toBeInTheDocument();
     expect(screen.getByText('22:00~22:15')).toBeInTheDocument();
     expect(screen.getByText('22:20~22:35')).toBeInTheDocument();
     expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
+
+  it('timing 없는 미리보기 표도 주차 칸에 week 를 쓴다 — round 3 이 2주차다', async () => {
+    await renderPreview({
+      leagueId: 'league-1',
+      rounds: 3,
+      fixtureCount: 3,
+      placeName: '베이컨 풋살장',
+      fixtures: [
+        { round: 1, week: 1, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-11-21T01:00:00.000Z' },
+        { round: 2, week: 1, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-11-22T01:00:00.000Z' },
+        { round: 3, week: 2, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-11-28T01:00:00.000Z' },
+      ],
+      warnings: [],
+    });
+
+    expect(await screen.findByText(/2주 · 3경기/)).toBeInTheDocument();
+    expect(screen.getAllByRole('cell', { name: '1주차' })).toHaveLength(2);
+    expect(screen.getAllByRole('cell', { name: '2주차' })).toHaveLength(1);
+    expect(screen.queryByRole('cell', { name: '3주차' })).not.toBeInTheDocument();
+  });
+
   it('리그의 피리어드 설정(25·25)으로 경기 시간을 미리 채우고 출처를 알린다 — 종목 기본 20과 다른 값', () => {
     periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);

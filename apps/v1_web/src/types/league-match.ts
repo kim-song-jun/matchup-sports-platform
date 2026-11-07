@@ -519,8 +519,10 @@ export interface V1PreviewLeagueFixture {
   homeTeamId: string;
   awayTeamId: string;
   startAt: string;
-  /** timing 지정 시 라운드 G개가 묶인 매치데이(주차). 구버전 서버 응답엔 없다. */
+  /** timing 지정 시 라운드 G개가 묶인 매치데이(경기일 순번). 토·일처럼 한 주 안의 날도 따로 센다. 구버전 서버 응답엔 없다. */
   matchday?: number;
+  /** 만들어질 대진 제목의 "N주차"와 같은 값 — KST 달력 주(월~일)에서 경기가 있는 주만 센다. 구버전 서버 응답엔 없다. */
+  week?: number;
   /** timing 지정 시 그 매치데이 안의 경기 순번. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
   orderInDay?: number | null;
   /** timing 지정 시 경기 종료 시각. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
@@ -530,7 +532,7 @@ export interface V1PreviewLeagueFixture {
 export interface V1PreviewLeagueFixturesResult {
   leagueId: string;
   rounds: number;
-  /** timing 지정 시 실제 주차(매치데이) 수 — rounds(라운드 수)와 달라진다. 구버전 서버 응답엔 없다. */
+  /** timing 지정 시 경기일(매치데이) 수 — rounds(라운드 수)와 달라진다. 주 수는 `fixtures[].week` 로 센다. 구버전 서버 응답엔 없다. */
   matchdayCount?: number;
   fixtureCount: number;
   placeName: string;

@@ -312,8 +312,8 @@
   /* Native Android/iOS shells publish their measured bottom inset here. The nav surface can then paint
      edge-to-edge while only controls consume the safe area. env(safe-area-inset-bottom) is not read:
      the viewport has no viewport-fit=cover, so a correct UA reports 0 and an in-app WebView that
-     reports more would shorten every no-bottom-nav scroller into a blank strip. Revisit if
-     viewport-fit=cover is ever enabled. */
+     reports more would add that much dead space to the tab bar and to the end of every
+     no-bottom-nav scroller. Revisit if viewport-fit=cover is ever enabled. */
   --teameet-native-safe-bottom: 0px;
   --v1-shell-safe-bottom: var(--teameet-native-safe-bottom);
   /* visualViewport is updated only while the browser or Android WebView changes its visible area. */
@@ -706,14 +706,16 @@ button:disabled {
 }
 
 .tm-app-frame-no-bottom .tm-scroll-area {
-  /* Detail/form pages have no bottom nav to consume the Android system inset. Keep ordinary
-     scroll content above it; pages with their own inset-aware fixed surface opt out below. */
-  bottom: var(--v1-shell-safe-bottom);
+  /* The scroller reaches the physical screen edge so content passes under the system navigation
+     bar instead of being cut along a line above it; the inset is consumed as end padding, so the
+     last content stops clear of the bar. Pages with their own inset-aware surface opt out below. */
+  bottom: 0;
+  padding-bottom: var(--v1-shell-safe-bottom);
 }
 
 .tm-app-frame-no-bottom .tm-scroll-area:has(.tm-fixed-cta),
 .tm-app-frame-no-bottom .tm-scroll-area:has(.tm-chat-room) {
-  bottom: 0;
+  padding-bottom: 0;
 }
 
 .tm-bottom-nav {
@@ -917,7 +919,8 @@ button:disabled {
 
 .tm-auth-scroll {
   position: absolute;
-  inset: 56px 0 var(--v1-shell-safe-bottom);
+  inset: 56px 0 0;
+  padding-bottom: var(--v1-shell-safe-bottom);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -928,9 +931,11 @@ button:disabled {
   top: 0;
 }
 
-/* 90px 는 안내 줄 없는 버튼 하나짜리 영역의 높이 — AuthFixedCta 가 실제 높이를 재서 덮어쓴다. */
+/* 90px 는 안내 줄 없는 버튼 하나짜리 영역의 높이 — AuthFixedCta 가 실제 높이를 재서 덮어쓴다.
+   안전영역은 그 CTA 의 아래 패딩이 이미 쓰므로 스크롤 영역 끝 여백은 0 이다. */
 .tm-auth-scroll-with-cta {
   bottom: var(--tm-auth-cta-height, 90px);
+  padding-bottom: 0;
 }
 
 .tm-auth-login {

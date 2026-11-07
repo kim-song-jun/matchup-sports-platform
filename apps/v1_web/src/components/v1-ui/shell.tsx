@@ -186,11 +186,13 @@ function AppChromeInner({
       <PullToRefresh areaRef={scrollAreaRef} />
       {/* floatingSlot(.tm-floating-fab)은 이 <main> 밖(아래 {floatingSlot})에 앵커되어 콘텐츠
           위로 떠 있으므로, 스크롤 콘텐츠 쪽에서 그 자리만큼 padding-bottom을 미리 비워둔다 —
-          없으면 화면마다 소비처가 각자 여백을 챙겨야 하고 하나라도 빠뜨리면 마지막 줄이 가려진다. */}
+          없으면 화면마다 소비처가 각자 여백을 챙겨야 하고 하나라도 빠뜨리면 마지막 줄이 가려진다.
+          bottomNav 가 없으면 인라인으로 정하지 않는다 — 안전영역 끝 여백과 화면별 예외
+          (.tm-fixed-cta·채팅방)는 globals.css 의 .tm-app-frame-no-bottom 규칙이 맡는다. */}
       <main
         ref={scrollAreaRef}
         className="tm-scroll-area"
-        style={{ paddingBottom: bottomNav ? (floatingSlot ? 'var(--v1-shell-fab-clear-pad)' : 'var(--v1-shell-scroll-bottom-pad)') : 0 }}
+        style={bottomNav ? { paddingBottom: floatingSlot ? 'var(--v1-shell-fab-clear-pad)' : 'var(--v1-shell-scroll-bottom-pad)' } : undefined}
       >
         {desktopHead && title ? (
           <div className="tm-desktop-page-head tm-show-desktop">

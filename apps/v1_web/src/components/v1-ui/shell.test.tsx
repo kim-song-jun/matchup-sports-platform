@@ -320,9 +320,11 @@ describe('AppChrome 스크롤 영역 — floatingSlot(FAB) 유무에 따른 하�
     expect(scrollWithoutFab?.style.paddingBottom).toBe('var(--v1-shell-scroll-bottom-pad)');
   });
 
-  // bottomNav 자체가 없는 화면(상세·폼)은 FAB 클리어런스를 계산할 기준(하단 탭 높이)이
-  // 없으므로, floatingSlot이 딸려 와도 이 화면에 새 여백을 만들지 않는다.
-  it('bottomNav가 없으면 floatingSlot이 있어도 여백을 주지 않는다', () => {
+  // bottomNav 자체가 없는 화면(상세·폼)은 FAB 클리어런스를 계산할 기준(하단 탭 높이)이 없으므로
+  // floatingSlot이 딸려 와도 여백을 인라인으로 정하지 않는다. 인라인 padding-bottom 은 어떤 값이든
+  // globals.css 의 .tm-app-frame-no-bottom 규칙(안전영역 끝 여백, .tm-fixed-cta·채팅방 예외)을
+  // 이기므로 비워 두어야 그 규칙이 적용된다.
+  it('bottomNav가 없으면 floatingSlot이 있어도 끝 여백을 인라인으로 정하지 않는다', () => {
     const { container } = render(
       <AppChrome
         title="테스트"
@@ -334,7 +336,7 @@ describe('AppChrome 스크롤 영역 — floatingSlot(FAB) 유무에 따른 하�
       </AppChrome>,
     );
 
-    const scroll = container.querySelector<HTMLElement>('.tm-scroll-area');
-    expect(scroll?.style.paddingBottom).toBe('0px');
+    expect(container.querySelector('.tm-app-frame')).toHaveClass('tm-app-frame-no-bottom');
+    expect(container.querySelector<HTMLElement>('.tm-scroll-area')?.style.paddingBottom).toBe('');
   });
 });

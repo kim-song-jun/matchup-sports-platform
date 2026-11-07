@@ -26,6 +26,7 @@
     inset: auto;
     /* Remove the mobile bottom-clearance so content isn't clipped */
     bottom: auto;
+    padding-bottom: 0;
     /* 폰 높이 프레임을 채우도록 — 내용은 위, sticky CTA 는 아래에 자연 배치 */
     flex: 1;
     min-height: 0;

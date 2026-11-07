@@ -6,12 +6,13 @@ const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), '
 const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
 const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
 
-function appSourcesDeclaringViewportFit(dir: string): string[] {
+function appSourcesEnablingViewportFitCover(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return appSourcesDeclaringViewportFit(path);
-    if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\./.test(entry.name)) return [];
-    return /viewportFit|viewport-fit/.test(readFileSync(path, 'utf8')) ? [path] : [];
+    if (entry.isDirectory()) return appSourcesEnablingViewportFitCover(path);
+    if (!/\.(ts|tsx)$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) return [];
+    const source = readFileSync(path, 'utf8');
+    return /viewportFit\s*:\s*['"]cover['"]|viewport-fit\s*=\s*cover/.test(source) ? [path] : [];
   });
 }
 
@@ -61,7 +62,7 @@ describe('shell bottom safe-area source', () => {
   // in-app WebViews report a non-zero value anyway. Reading it would shorten every
   // no-bottom-nav scroller (bottom: var(--v1-shell-safe-bottom)) into a blank strip.
   it('does not read env(safe-area-inset-bottom) while the viewport has no viewport-fit=cover', () => {
-    expect(appSourcesDeclaringViewportFit(resolve(process.cwd(), 'src/app'))).toEqual([]);
+    expect(appSourcesEnablingViewportFitCover(resolve(process.cwd(), 'src/app'))).toEqual([]);
 
     const declarations = [...globalsCss.matchAll(/--(?:v1-shell|teameet-native)-safe-bottom\s*:\s*([^;]+);/g)];
     expect(declarations.length).toBeGreaterThan(0);

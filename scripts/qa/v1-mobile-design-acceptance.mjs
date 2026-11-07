@@ -19,7 +19,6 @@ const routes = [
   '/terms',
   '/signup',
   '/signup/complete',
-  '/onboarding/resume',
   '/onboarding/sport',
   '/onboarding/level',
   '/onboarding/region',

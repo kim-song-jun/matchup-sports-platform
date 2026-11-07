@@ -76,16 +76,13 @@ describe('AccountRecoveryService — 증명 토큰 게이트', () => {
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
   });
 
-  // 가입용 증명으로 남의 비밀번호를 바꿀 수 있으면 안 된다 — 이 테스트가 그 경계다.
-  it('가입용(signup) 토큰은 계정 찾기·비밀번호 재설정에 통하지 않는다', async () => {
+  // 가입용 증명으로 남의 계정을 찾을 수 있으면 안 된다 — 이 테스트가 그 경계다.
+  it('가입용(signup) 토큰은 계정 찾기에 통하지 않는다', async () => {
     const svc = service(prismaMock(emailUser));
     const signupToken = issuePhoneProofToken(PHONE);
 
     await expect(svc.findAccountByPhone({ phone: PHONE, proofToken: signupToken }))
       .rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
-    await expect(
-      svc.resetPasswordByPhone({ phone: PHONE, proofToken: signupToken, newPassword: 'newpassword1' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('다른 번호로 발급된 토큰은 통하지 않는다', async () => {
@@ -240,45 +237,6 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
     );
   });
 
-  it('비밀번호 재설정(휴대폰)은 탈퇴 유예 계정을 찾지 않는다', async () => {
-    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
-
-    await expect(
-      service(prisma).resetPasswordByPhone({ phone: PHONE, proofToken: proof(), newPassword: 'brand-new-password' }),
-    ).rejects.toMatchObject({ response: { code: 'ACCOUNT_NOT_FOUND' }, status: 404 });
-  });
-});
-
-describe('AccountRecoveryService — 비밀번호 재설정(휴대폰)', () => {
-  beforeEach(() => {
-    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
-  });
-
-  it('현재 휴대폰 증명만으로 이메일 계정의 비밀번호를 바꾸지 않는다', async () => {
-    const update = jest.fn().mockResolvedValue({});
-    const svc = service(prismaMock(emailUser, update));
-
-    await expect(svc.resetPasswordByPhone({
-      phone: PHONE,
-      proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
-      newPassword: 'brand-new-password',
-    })).rejects.toMatchObject({ response: { code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL' }, status: 409 });
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it('현재 휴대폰 증명만으로 소셜 전용 계정의 비밀번호 경로를 열지 않는다', async () => {
-    const update = jest.fn();
-    const svc = service(prismaMock(kakaoOnlyUser, update));
-
-    await expect(
-      svc.resetPasswordByPhone({
-        phone: PHONE,
-        proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
-        newPassword: 'brand-new-password',
-      }),
-    ).rejects.toMatchObject({ response: { code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL' }, status: 409 });
-    expect(update).not.toHaveBeenCalled();
-  });
 });
 
 describe('AccountRecoveryService — 인증번호 메일 요청', () => {

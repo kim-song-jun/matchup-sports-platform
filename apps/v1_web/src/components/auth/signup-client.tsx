@@ -20,6 +20,8 @@ import {
 import { optimizedCssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { reportClientError } from '@/lib/client-error-reporter';
+import { markSignupPhotoNotice } from '@/lib/signup-photo-notice';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
@@ -313,21 +315,32 @@ export function SignupClient() {
       trackEvent('sign_up_complete', { method: 'email' });
 
       if (profileImageFile) {
-        const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
-        const uploadedUrl = uploadResult.urls[0];
-        if (!uploadedUrl) {
-          throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
-        }
+        // 계정은 이미 만들어졌다 — 사진만 실패했다고 오류로 멈추면 다시 제출할 때 이메일 중복이 난다.
+        try {
+          const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
+          const uploadedUrl = uploadResult.urls[0];
+          if (!uploadedUrl) {
+            throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
+          }
 
-        await updateProfile.mutateAsync({
-          realName: normalizedRealName,
-          nickname: normalizedNickname,
-          email: normalizedEmail,
-          profileImageUrl: uploadedUrl,
-          phone: profileDraft.phone,
-          birthDate: profileDraft.birthDate,
-          gender: profileDraft.gender,
-        });
+          await updateProfile.mutateAsync({
+            realName: normalizedRealName,
+            nickname: normalizedNickname,
+            email: normalizedEmail,
+            profileImageUrl: uploadedUrl,
+            phone: profileDraft.phone,
+            birthDate: profileDraft.birthDate,
+            gender: profileDraft.gender,
+          });
+        } catch (photoError) {
+          reportClientError({
+            message: 'Signup profile photo was not saved',
+            stack: photoError instanceof Error ? photoError.stack : undefined,
+            level: 'warn',
+            context: { reason: photoError instanceof V1ApiError ? photoError.code : 'unknown' },
+          });
+          markSignupPhotoNotice();
+        }
       }
 
       window.sessionStorage.removeItem(onboardingDraftKey);

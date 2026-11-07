@@ -42,7 +42,6 @@
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil }` |
-| `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil: null }` after email proof |
@@ -68,7 +67,6 @@ the code proved the number is theirs**:
   keeps meaning "a row holds this number".
 - `recovery/find-account` finds the `withdrawal_pending` holder when no `active` account has the number (the `active` one wins if both ever
   matched) and answers with the usual `maskedEmail`, `providers`, `hasPassword` plus `withdrawalPendingUntil`. Active holders get `null`.
-  `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
 - `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
@@ -205,17 +203,15 @@ characters. Every rejection is `400 VALIDATION_ERROR`.
 Finding the signup email and resetting a password happen while logged out, so they cannot reuse
 `/api/v1/verification/*`, which sits behind `V1AuthGuard`. Phone verification proves current
 possession of a number and permits account lookup; it does not prove ownership of an existing
-account. The compatibility phone reset endpoint keeps proof/account preconditions, then returns
-`409 ACCOUNT_RECOVERY_REQUIRES_EMAIL` without changing credentials. Password reset requires
-the separate email proof channel. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
+account. A password can only be reset through the separate email proof channel; there is no phone reset endpoint. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
 
 | Concern | Contract |
 |---|---|
-| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
+| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, `email/reset-password` 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
 | Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
 | Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
 | Code TTL | 5 minutes. Proof token TTL 10 minutes. |
-| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. Phone reset answers `ACCOUNT_RECOVERY_REQUIRES_EMAIL` after its existing proof/account preconditions, regardless of whether the account has a password. |
+| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. |
 
 ### Proof tokens do not cross channels
 
@@ -344,6 +340,8 @@ When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profil
 
 `social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
 
+A pending signup saves a phone number before it is finished — Kakao's number at creation, a typed one when its SMS code is confirmed — and `v1_users.phone` is unique. The number is released (`phone` and `phoneVerifiedAt` set to null) when the pending signup is reset after the 24h expiry (a login that finds it expired, or `social-terms`/`social-profile`/`social-profile/defer` answering `401 SOCIAL_SIGNUP_EXPIRED`) and when it signs out through `POST /auth/logout` ("가입 그만두기"). Only an empty signup on `social_terms_required` or `social_profile_required` is touched, by the same test the account merge uses (single login, no password, no operator role, no activity); `social_profile_deferred` accounts keep their number. Each release writes a `v1_status_change_logs` row (`target_type=user_phone`, `signup` → `released`, reason `abandoned_signup` for logout or `expired_signup` for the reset; the actor is the user for logout and the system for the reset). Logout never fails because of it: a release error is logged as a warning and the session cookie is still cleared. A signup that is simply abandoned without returning or signing out still holds its number until it comes back or an operator releases it.
+
 ### Kakao contact confirmation and automatic account linking
 
 Kakao contacts are fetched by the API from `/v2/user/me`; login requests never accept client-supplied contact assertions. A valid/verified Kakao email and a normalized domestic Kakao phone are saved as confirmed contacts on new signup without email/SMS OTP. Existing Kakao identities can confirm an identical stored contact on subsequent login; a different service contact is not overwritten. This is provider contact confirmation, not telecom identity verification or CI certification.
@@ -370,6 +368,7 @@ Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED`; `403 SIGNUP_INCOMPLE
 A social login or signup that collides with an existing account cannot be settled by proving a phone number or an email. These `409` responses carry `details: { next: 'sign_in_then_link', provider: 'kakao' | 'apple', linkToken, linkTokenExpiresInSeconds: 1800 }` and a message that tells the person that signing in to the original account links the provider by itself:
 
 - `/auth/kakao`, `/auth/kakao/token`, `/auth/apple`: `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL`, `SOCIAL_LINK_CONTACT_CONFLICT`, `SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`. The token carries the identity the server just verified with the provider (provider, provider user key, and the provider-verified email if any). No account holds that identity yet.
+  When the account the provider's contact points at is a `withdrawal_pending` one, the answer is `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF` with the same token plus `details.withdrawalPendingUntil` (ISO instant, `null` when no request log exists) instead of a bare `403 ACCOUNT_WITHDRAWAL_PENDING`: the person signs in to that account, cancels the withdrawal (`POST /auth/withdrawal/cancel`), and the new session spends the token. The key appears only when the match rests on a contact the provider vouches for (Kakao's verified email or Kakao-supplied phone, Apple's verified email). A matching number counts on purpose: a first-time Kakao login is the start of a signup, Kakao's number is possession proof like our SMS code, and the signup screen shows the same end date after a number verification. A contact that disagrees with the stored one (including one that changed under the lock) answers `SOCIAL_LINK_CONTACT_CONFLICT` and an unverified provider email `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL`, both without the key. `suspended`/`blocked` holders stay `403 PERMISSION_DENIED`. A login whose own provider identity is on a withdrawal-pending account still gets the `403` (with `withdrawalCancelToken` once the provider token was verified for that identity).
 - `PHONE_CONFLICT` for a social account whose signup is unfinished (`social_profile_required`, `social_profile_deferred`) — `provider` is that account's own provider. It is answered only **after the number is proven**: `/verification/phone/request` sends the code even when another account holds the number (cooldown and 24-hour quota unchanged) and says nothing about the holder; `/verification/phone/confirm` answers `409` with the token once the code is right. `/auth/social-profile` checks a typed number's SMS proof first (`400 PHONE_NOT_VERIFIED`) and only then says anything about its holder, with the token; the number Kakao itself handed over counts as proven, and with SMS proof switched off a typed number gets the same advice **without** `linkToken`. The token carries that signup's login. A finished account asking to change its number still gets the plain `409` at `request`, without `details`.
 
 **Who may spend the token.** It is a bearer value, so it is bound to the accounts it was issued for: the member(s) the rejected login collided with (email owner and/or phone owner; both when they differ) or the owner of the number. The token holds only keyed digests of those account ids (and of the signup's id), never the ids. `POST /auth/link/pending` refuses a session of any other account with `409 SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH` and does not say which account was meant; the person can still link from settings (`link/kakao`, `link/apple`), which verify the provider token on the spot and have no target restriction.

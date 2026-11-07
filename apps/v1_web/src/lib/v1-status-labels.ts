@@ -131,21 +131,6 @@ export function lockedReasonLabel(reason: string): string {
   return LOCKED_REASON_LABEL[reason] ?? '지금은 수정할 수 없어요.';
 }
 
-/** 온보딩 단계 (V1OnboardingStep). */
-const ONBOARDING_STEP_LABEL: Record<string, string> = {
-  terms: '약관 동의',
-  signup: '회원가입',
-  sport: '종목 선택',
-  level: '실력 입력',
-  region: '지역 선택',
-  confirm: '확인',
-  done: '완료',
-};
-
-export function onboardingStepLabel(step: string): string {
-  return ONBOARDING_STEP_LABEL[step] ?? '종목 선택';
-}
-
 /**
  * 문의 신고 사유(`V1InquiryReportReason`) — `category: 'report'` 문의에만 실린다.
  * 신고 작성 화면(community/team-contact-status-card.tsx)과 어드민 문의 목록/상세가 공유하는 단일 소스다.

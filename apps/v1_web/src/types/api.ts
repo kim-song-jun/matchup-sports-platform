@@ -124,7 +124,6 @@ export type V1AuthMe = {
     canLinkLoginMethods?: boolean;
     /** Whether linking would be permitted after required signup is completed. */
     canLinkAfterSignup?: boolean;
-    signupEmailLoginRequired?: boolean;
     hasPassword?: boolean;
   };
   profile: {
@@ -287,8 +286,8 @@ export type V1SignInThenLinkDetails = {
   /** `linkToken` 의 남은 유효 시간(초). */
   linkTokenExpiresInSeconds?: number;
   /**
-   * 번호를 쥔 계정이 탈퇴 유예 중일 때만 온다(`PHONE_CONFLICT`, 인증번호로 번호를 증명한 뒤의 409). 유예가 끝나는
-   * 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
+   * 충돌한 계정이 탈퇴 유예 중일 때만 온다. 인증번호로 번호를 증명한 뒤의 `PHONE_CONFLICT`, 그리고 제공자가 보증한
+   * 이메일·번호가 그 계정과 겹친 카카오·Apple 로그인 409 에 실린다. 유예가 끝나는 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
    */
   withdrawalPendingUntil?: string | null;
 };

@@ -169,6 +169,18 @@ describe('KakaoLoginButton', () => {
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: code });
     });
 
+    it('keeps the grace end date with the link token when the matching account is withdrawing', async () => {
+      reply = { accessToken: 'kakao-token' };
+      const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+      api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', {
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-3', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: until,
+      }));
+      renderButton();
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-3', provider: 'kakao', withdrawalPendingUntil: until });
+    });
+
     it('carries the saved redirect into the guide and the withdrawal screen', async () => {
       reply = { accessToken: 'kakao-token' };
       window.location.search = '?redirect=%2Fteams%2Fnew';

@@ -25,6 +25,15 @@ describe('필터 선택·적용', () => {
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament', { scroll: false });
   });
+  it('닫기·결과 보기 줄은 시트의 직계 자식이라 바닥에 고정되고 폼 밖에서도 제출한다', () => {
+    render(<CompetitionDiscoveryControls {...props} sheetOpen />);
+    const dialog = screen.getByRole('dialog', { name: '대회·리그 필터' });
+    // globals.css 의 바닥 고정(sticky + 음수 margin)은 `.tm-filter-sheet > .tm-filter-actions` 에만 걸린다. 폼 안에 두면 스크롤 끝에서 시트 아래 패딩만큼 뜬다.
+    const actions = dialog.querySelector<HTMLElement>(':scope > .tm-filter-actions');
+    expect(actions).not.toBeNull();
+    const form = dialog.querySelector('form');
+    expect(within(actions as HTMLElement).getByRole('button', { name: '결과 보기' })).toHaveProperty('form', form);
+  });
   it('시트에서 고른 값은 결과 보기를 누르기 전 URL에 적용하지 않는다', () => {
     render(<CompetitionDiscoveryControls {...props} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));

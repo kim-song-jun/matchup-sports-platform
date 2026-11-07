@@ -8032,15 +8032,54 @@ button:has(> .tm-toggle):focus-visible {
 }
 
 /* ── 대회 진행 단계 표시기 (리그 종료 → 준결승 → 결승) ── */
-.tm-hub-stages {
-  padding: 16px 20px 16px;
+.tm-hub-stepper-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px 0;
+  font-size: var(--font-size-caption);
+}
+.tm-hub-stepper-note {
+  min-width: 0;
+  color: var(--text-caption);
+}
+.tm-hub-stepper-count {
+  flex: none;
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--grey700);
+}
+.tm-hub-stepper-count-total { font-weight: 500; color: var(--text-caption); }
+
+/* 칸이 화면보다 넓으면 스크롤되고, 가려진 쪽 가장자리가 흐려져 더 있다는 것을 알린다(data-fade).
+   마스크라서 카드·페이지 어떤 배경 위에서도 같다. 포커스 링은 마스크에 잘리지 않게 안쪽에 그린다. */
+.tm-hub-stages {
+  padding: 12px 20px 16px;
+  display: flex;
+  align-items: flex-start;
   gap: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .tm-hub-stages::-webkit-scrollbar { display: none; }
+.tm-hub-stages:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+  border-radius: var(--radius-control);
+}
+.tm-hub-stages[data-fade='end'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+.tm-hub-stages[data-fade='start'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28px);
+  mask-image: linear-gradient(to right, transparent, #000 28px);
+}
+.tm-hub-stages[data-fade='both'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 36px), transparent);
+}
 
 /* 각 단계: 아이콘+레이블 수직 배치 */
 .tm-hub-stage {
@@ -8049,7 +8088,7 @@ button:has(> .tm-toggle):focus-visible {
   align-items: center;
   gap: 8px;
   flex: none;
-  min-width: 72px;
+  min-width: 56px;
 }
 
 /* 원형 아이콘 — 기본(upcoming) */
@@ -8107,6 +8146,9 @@ button:has(> .tm-toggle):focus-visible {
   position: absolute;
 }
 
+/* 단계 사이 구간의 다음 단계: 진행 중처럼 채우지 않고 파란 테두리만 둔다. */
+.tm-hub-stage-dot-next { border-color: var(--blue500); }
+
 @keyframes tmStepperPulse {
   0%, 100% { box-shadow: 0 0 0 3px var(--blue50); }
   50%       { box-shadow: 0 0 0 5px rgba(49,130,246,0.15); }
@@ -8132,7 +8174,7 @@ button:has(> .tm-toggle):focus-visible {
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
-.tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
+.tm-hub-stage-label-done  { color: var(--blue700); font-weight: 700; }
 /* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
 /* 12px/800 은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 흰 지면 3.71:1 미달. */
 .tm-hub-stage-label-active { color: var(--blue700); font-weight: 800; }
@@ -8146,15 +8188,17 @@ button:has(> .tm-toggle):focus-visible {
   font-weight: 500;
   margin-top: -2px;
 }
-.tm-hub-stage-sublabel-active { color: var(--blue500); font-weight: 600; }
+.tm-hub-stage-sublabel-active { color: var(--blue700); font-weight: 600; }
 
-/* 연결선 */
+/* 연결선 — 칸마다 높이가 달라도(진행 중·다음 표시) 원 가운데(28px 원의 14px)에 놓는다. */
 .tm-hub-stage-connector {
   flex: 1;
-  min-width: 16px;
+  min-width: 10px;
   height: 2px;
   background: var(--grey200);
-  margin-bottom: 24px;
+  margin-top: 12px;
+  position: relative;
+  top: 1px;
   border-radius: var(--radius-pill);
   transition: background 0.3s;
 }
@@ -8397,7 +8441,6 @@ button:has(> .tm-toggle):focus-visible {
   font-size: 12px;
   font-weight: 700;
 }
-.tm-bracket-page-stepper { padding: 0 20px; }
 
 /* [R-T1 타입 위계 정리] .tm-hub-section-title(15px/850)은 상금·결과·일정·팀기록·
    개인기록·경기상세 등 8개 다른 화면과 공유하는 토큰이라 전역 정의는 그대로 두고,
@@ -9208,7 +9251,6 @@ button:has(> .tm-toggle):focus-visible {
   .tm-bracket-page-intro {
     padding: 28px 0 20px;
   }
-  .tm-bracket-page-stepper { padding: 0; }
   .tm-bracket-page-grid.tm-tourn-sub-grid-6040 {
     grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
   }

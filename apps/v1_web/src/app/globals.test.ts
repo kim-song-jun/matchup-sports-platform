@@ -546,6 +546,18 @@ describe('대진표 예정 단계 라벨 대비 (2026-09-07 사용자 확정 B�
     expect(ratio(value!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('완료 단계 이름과 "진행 중·다음" 표시도 흰 배경에서 AA 를 넘는다', () => {
+    // blue500 은 흰 지면 3.71:1 — 12px 글자라 완화 대상이 아니다.
+    for (const selector of ['.tm-hub-stage-label-done', '.tm-hub-stage-sublabel-active']) {
+      const token = colorOf(selector);
+
+      expect(token, selector + ' 의 color 토큰을 찾지 못했다').toBeTruthy();
+      const value = hex(token!.slice(2));
+      expect(value, token + ' 값을 찾지 못했다').toBeTruthy();
+      expect(ratio(value!, '#ffffff'), selector).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('원 안 숫자는 grey400 그대로다 — 라벨과 중복이라 예외로 등재했다', () => {
     expect(colorOf('.tm-hub-stage-dot')).toBe('--grey400');
   });

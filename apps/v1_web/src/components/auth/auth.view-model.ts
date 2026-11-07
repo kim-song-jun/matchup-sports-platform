@@ -66,7 +66,6 @@ export function getEmailLoginViewModel(redirectPath?: string | null): EmailLogin
       { label: '비밀번호', placeholder: '비밀번호', type: 'password' },
     ],
     primary: { label: '로그인', tone: 'primary' },
-    forgot: { label: '비밀번호 찾기', href: '/auth/password-reset', tone: 'neutral' },
     signupHref: '/terms?mode=signup',
     notice: undefined,
   };
@@ -101,15 +100,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       tone: 'orange',
       primary: { label: '지역 직접 선택하기', href: '/onboarding/region' },
       secondary: { label: '설정에서 권한 열기', disabled: true, tone: 'neutral' },
-    },
-    'password-reset': {
-      backHref: '/login/email',
-      badge: '비밀번호 찾기',
-      title: '이메일 로그인으로 다시 시도해 주세요',
-      body: '현재는 비밀번호 재설정 이메일 발송 기능을 준비 중이에요. 가입했던 이메일과 비밀번호로 로그인해 주세요.',
-      tone: 'orange',
-      primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
-      secondary: { label: '간편 로그인으로 이동', href: '/login', tone: 'neutral' },
     },
   };
 

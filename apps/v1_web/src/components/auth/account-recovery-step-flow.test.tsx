@@ -32,7 +32,6 @@ describe('계정 복구 단계별 흐름', () => {
     expect(await screen.findByText('ow***@example.test')).toBeVisible();
     expect(wireCalls.phoneVerify).toEqual([{ phone: RECOVERY_PHONE, code: '123456', purpose: 'password_reset' }]);
     expect(wireCalls.findAccount).toEqual([{ phone: RECOVERY_PHONE, proofToken: 'phone-proof' }]);
-    expect(wireCalls.phoneReset).toBe(0);
   });
 
   it('비밀번호 재설정은 이메일 인증과 새 비밀번호를 각각 보여주고 실제 저장 뒤 완료한다', async () => {
@@ -50,6 +49,5 @@ describe('계정 복구 단계별 흐름', () => {
     await user.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
     expect(await screen.findByText('비밀번호를 바꿨어요')).toBeVisible();
     expect(wireCalls.emailReset).toEqual([{ email: RECOVERY_EMAIL, proofToken: 'email-proof', newPassword: 'synthetic-new-password' }]);
-    expect(wireCalls.phoneReset).toBe(0);
   });
 });

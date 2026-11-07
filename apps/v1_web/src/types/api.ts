@@ -124,7 +124,6 @@ export type V1AuthMe = {
     canLinkLoginMethods?: boolean;
     /** Whether linking would be permitted after required signup is completed. */
     canLinkAfterSignup?: boolean;
-    signupEmailLoginRequired?: boolean;
     hasPassword?: boolean;
   };
   profile: {

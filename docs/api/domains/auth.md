@@ -42,7 +42,6 @@
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil }` |
-| `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil: null }` after email proof |
@@ -68,7 +67,6 @@ the code proved the number is theirs**:
   keeps meaning "a row holds this number".
 - `recovery/find-account` finds the `withdrawal_pending` holder when no `active` account has the number (the `active` one wins if both ever
   matched) and answers with the usual `maskedEmail`, `providers`, `hasPassword` plus `withdrawalPendingUntil`. Active holders get `null`.
-  `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
 - `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
@@ -205,17 +203,15 @@ characters. Every rejection is `400 VALIDATION_ERROR`.
 Finding the signup email and resetting a password happen while logged out, so they cannot reuse
 `/api/v1/verification/*`, which sits behind `V1AuthGuard`. Phone verification proves current
 possession of a number and permits account lookup; it does not prove ownership of an existing
-account. The compatibility phone reset endpoint keeps proof/account preconditions, then returns
-`409 ACCOUNT_RECOVERY_REQUIRES_EMAIL` without changing credentials. Password reset requires
-the separate email proof channel. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
+account. A password can only be reset through the separate email proof channel; there is no phone reset endpoint. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
 
 | Concern | Contract |
 |---|---|
-| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
+| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, `email/reset-password` 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
 | Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
 | Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
 | Code TTL | 5 minutes. Proof token TTL 10 minutes. |
-| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. Phone reset answers `ACCOUNT_RECOVERY_REQUIRES_EMAIL` after its existing proof/account preconditions, regardless of whether the account has a password. |
+| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. |
 
 ### Proof tokens do not cross channels
 

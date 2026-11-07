@@ -9,6 +9,7 @@ import { useMultiFinals, type MultiFinalDefinition, type MultiFinalGroup, type M
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { randomIndex } from '@/lib/random-index';
+import { byeSeedCount, orderRulesByRank } from '@/lib/multi-final-seed-order';
 import { MultiFinalAssignmentDialog } from './multi-final-assignment-dialog';
 
 type DraftGroup = MultiFinalGroup & { registrationIds?: string[] };
@@ -53,6 +54,11 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
   const remainingFixtures = server?.fixtureCount ?? server?.preliminaryFixtureCount;
   const editable = !configured || remainingFixtures === 0 && !server?.generated;
   const registrations = server?.registrations ?? [];
+  const capacityOf = (f: MultiFinalDefinition) => f.capacity ?? f.registrationIds?.length ?? f.rules.length;
+  const groupOrder = groups.map(g => g.id);
+  const seedOrders = finals.map(f => orderRulesByRank(f.rules, groupOrder));
+  // Rules stored before rank-first ordering keep their old seed order until they are saved again.
+  const needsReorder = finals.some((f, i) => f.rules.some((rule, j) => rule.groupId !== seedOrders[i][j].groupId || rule.rank !== seedOrders[i][j].rank));
   async function resetBracket() {
     if (!server || busy || !await confirm({ title: '대진 초기화', message: '예선과 결선의 모든 대진·일정·대진 자리와 진출팀 선택을 삭제해요. 참가 신청, 예선 조 설정과 팀 선택, 토너먼트 규칙은 유지해요. 시작했거나 기록·결과가 있는 경기가 있으면 초기화할 수 없어요. 초기화할까요?', confirmLabel: '대진 초기화', tone: 'danger' })) return;
     try {
@@ -80,8 +86,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
         setStep(1); return;
       }
       if (step === 1) {
-        if (rulesOnly && !dirty) { onClose(); return; }
-        if (configured && !dirty && !editable) { await preview(); return; }
+        if (!rulesOnly && configured && !dirty && !editable) { await preview(); return; }
         if (finals.some(f => !Number.isSafeInteger(f.capacity ?? f.registrationIds?.length ?? f.rules.length) || (f.capacity ?? f.registrationIds?.length ?? f.rules.length) < 2)) throw new Error('토너먼트 자리 수를 2 이상으로 입력해 주세요.');
         if (rulesOnly && finals.some(f => f.rules.length !== (f.capacity ?? f.registrationIds?.length ?? f.rules.length))) throw new Error('각 토너먼트 자리 수에 맞게 순위별 목적지를 설정해 주세요.');
         if (!finals.length || finals.some(f => !f.name.trim()) || new Set(finals.map(f => f.name.trim())).size !== finals.length) throw new Error('토너먼트 이름을 중복 없이 입력해 주세요.');
@@ -147,11 +152,16 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
             {!rulesOnly ? <>
             {finals.map((f, index) => <div key={index} className="grid items-end gap-3 border-b border-[var(--border)] pb-3 sm:grid-cols-[1fr_auto_auto_auto]"><label className="tm-text-label">토너먼트 {index + 1} 이름<input aria-label={`토너먼트 ${index + 1} 이름`} className={control} value={f.name} maxLength={80} onChange={e => changeFinal(index, { name: e.target.value })} /></label><label className="tm-text-label">자리 수<input aria-label={`토너먼트 ${index + 1} 자리 수`} className={control} type="number" min={2} value={f.capacity ?? f.registrationIds?.length ?? f.rules.length} disabled={rulesOnly} onChange={e => changeFinal(index, { capacity: Number(e.target.value), registrationIds: null })} /></label><label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={f.thirdPlace} onChange={e => changeFinal(index, { thirdPlace: e.target.checked })} />3·4위전</label><Button variant="neutral" onClick={() => { setFinals(rows => rows.filter((_, i) => i !== index)); setDirty(true); }}>토너먼트 삭제</Button></div>)}
             <Button variant="neutral" onClick={() => { setFinals(rows => [...rows, { name: `토너먼트 ${rows.length + 1}`, capacity: 2, rules: [], thirdPlace: false, registrationIds: null }]); setDirty(true); }}>토너먼트 추가</Button>
-            </> : finals.map(f => <p key={f.name} className="tm-text-label">{f.name} · {f.capacity ?? f.rules.length}자리 · {f.rules.length}개 순위 연결</p>)}
+            </> : <div className="space-y-2">
+              {finals.map(f => <p key={f.name} className="tm-text-label">{f.name} · {f.capacity ?? f.rules.length}자리 · {f.rules.length}개 순위 연결</p>)}
+              {finals.length > 0 ? <p className="tm-text-caption text-[var(--text-caption)]">저장하면 순위가 높은 팀부터 시드를 받아요. 같은 순위끼리는 조 순서대로예요(임시 기본값). 진출팀 배정 화면에서 바꿀 수 있어요.</p> : null}
+            </div>}
             {rulesOnly && groups.map(g => <fieldset key={g.id} className="space-y-2"><legend className="tm-text-body font-semibold">{g.name} · {finals.reduce((sum, f) => sum + f.rules.filter(rule => rule.groupId === g.id).length, 0)}팀 기본 진출</legend>
               {Array.from({ length: Number.isSafeInteger(g.capacity) && g.capacity > 0 ? g.capacity : 0 }, (_, rankIndex) => {
                 const rank = rankIndex + 1; const target = finals.findIndex(f => f.rules.some(rule => rule.groupId === g.id && rule.rank === rank));
-                return <label key={rank} className="grid grid-cols-[auto_1fr] items-center gap-3 tm-text-label"><span>{rank}위</span><select aria-label={`${g.name} ${rank}위 진출 토너먼트`} className={control} value={target} onChange={e => { const destination = Number(e.target.value); setFinals(rows => rows.map((f, i) => ({ ...f, rules: [...f.rules.filter(rule => !(rule.groupId === g.id && rule.rank === rank)), ...(i === destination ? [{ groupId: g.id, rank }] : [])] }))); setDirty(true); }}><option value={-1}>기본 진출 없음</option>{finals.map((f, i) => <option key={i} value={i}>{f.name || `토너먼트 ${i + 1}`}</option>)}</select></label>;
+                const seed = target < 0 ? 0 : seedOrders[target].findIndex(rule => rule.groupId === g.id && rule.rank === rank) + 1;
+                return <label key={rank} className="grid grid-cols-[auto_1fr_96px] items-center gap-3 tm-text-label"><span>{rank}위</span><select aria-label={`${g.name} ${rank}위 진출 토너먼트`} className={control} value={target} onChange={e => { const destination = Number(e.target.value); setFinals(rows => rows.map((f, i) => ({ ...f, rules: [...f.rules.filter(rule => !(rule.groupId === g.id && rule.rank === rank)), ...(i === destination ? [{ groupId: g.id, rank }] : [])] }))); setDirty(true); }}><option value={-1}>기본 진출 없음</option>{finals.map((f, i) => <option key={i} value={i}>{f.name || `토너먼트 ${i + 1}`}</option>)}</select>
+                  <span className="flex min-h-11 items-center gap-1 whitespace-nowrap">{seed > 0 ? <><b className="inline-flex h-6 items-center rounded-full bg-[var(--blue50)] px-2 tm-text-caption font-bold text-[var(--blue700)]">시드 {seed}</b>{seed <= byeSeedCount(capacityOf(finals[target])) ? <span className="tm-text-caption font-semibold text-[var(--text-muted)]">부전승</span> : null}</> : null}</span></label>;
               })}
             </fieldset>)}
             {!configured ? <p className="tm-text-caption">다음 단계로 이동하면 예선 대진과 기본 규칙을 저장해요. 대진 생성 후 토너먼트 배정 규칙에서 순위별 목적지를 설정해 주세요.</p> : null}
@@ -184,7 +194,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
       <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--border)] p-4">
         <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>
         {step > (rulesOnly ? 1 : 0) ? <Button variant="neutral" disabled={busy} onClick={() => setStep(step === 3 ? 1 : 0)}>이전</Button> : null}
-        <Button variant="primary" disabled={!server || busy || rulesOnly && (!configured || !dirty)} onClick={() => void next()}>{busy ? '처리 중…' : rulesOnly ? '배정 규칙 저장' : step === 3 ? '확인하고 결선 생성' : step === 1 ? '대진 미리보기' : '다음'}</Button>
+        <Button variant="primary" disabled={!server || busy || rulesOnly && (!configured || !dirty && !needsReorder)} onClick={() => void next()}>{busy ? '처리 중…' : rulesOnly ? '배정 규칙 저장' : step === 3 ? '확인하고 결선 생성' : step === 1 ? '대진 미리보기' : '다음'}</Button>
       </div>
     </div>{ConfirmModal}
   </div>, document.body);

@@ -19,7 +19,7 @@ import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
 import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupBracket, validCrossGroupTopThree } from './multi-finals-seeding';
-import { invalidMultiFinal, namedFinalSize, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
+import { invalidMultiFinal, namedFinalSize, orderRulesByRank, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 import { rankOrderSeeds, savedStandingsSnapshot, standingOrder, standingsOrderChanged } from './multi-finals-standings';
 
 type Tx = Prisma.TransactionClient;
@@ -144,6 +144,8 @@ export class MultiFinalsService {
     const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     const plan = planPreliminaryGroups(dto.groups);
     validateNamedFinals(dto.finals, new Map(dto.groups.map((g, i) => [String(i), g.capacity])));
+    const groupOrder = dto.groups.map((_, i) => String(i));
+    const finals = dto.finals.map(f => ({ ...f, rules: orderRulesByRank(f.rules, groupOrder) }));
     return this.prisma.$transaction(async tx => {
       const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
@@ -157,7 +159,7 @@ export class MultiFinalsService {
       const confirmed = new Set((await this.confirmed(tx, id)).map(r => r.id)); this.assertTeams(dto.finals, confirmed);
       for (const group of dto.groups) for (const reg of group.registrationIds ?? []) if (!confirmed.has(reg)) invalidMultiFinal('이 대회의 확정 참가팀만 선택할 수 있어요.');
       // Resolve identities before any teardown so a stale or duplicate id fails without destructive work.
-      const colored = reconcileFinalColors(this.config(tournament.multiFinals), dto.finals.map(f => ({ ...f, name: f.name.trim() })));
+      const colored = reconcileFinalColors(this.config(tournament.multiFinals), finals.map(f => ({ ...f, name: f.name.trim() })));
       if (editing) {
         const scopes = dto.finals.map(f => f.name.trim());
         if (await tx.v1TournamentAward.count({ where: { tournamentId: id, bracketTrack: { notIn: ['overall', ...scopes] } } })
@@ -222,7 +224,8 @@ export class MultiFinalsService {
         tx.v1TournamentAwardSet.count({ where: { tournamentId: id, bracketTrack: { notIn: scopes } } }),
       ]);
       if (awards || awardSets) throw new ConflictException({ code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', message: '삭제·이름 변경할 토너먼트의 시상 범위를 먼저 정리해 주세요.' });
-      const next: Config = { ...config, ...reconcileFinalColors(config, dto.finals.map(f => ({ ...f, name: f.name.trim() }))) };
+      const groupOrder = config.groups.map(g => g.id);
+      const next: Config = { ...config, ...reconcileFinalColors(config, dto.finals.map(f => ({ ...f, name: f.name.trim(), rules: orderRulesByRank(f.rules, groupOrder) }))) };
       if (sameNamedFinalStructure(config.finals, dto.finals)) await this.assertUnstarted(tx, id);
       else await this.clearFinals(tx, admin, id);
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });

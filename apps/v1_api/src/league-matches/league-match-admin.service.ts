@@ -2640,7 +2640,8 @@ export class LeagueMatchAdminService {
         pairings.flatMap(({ home, away }) => [home.id, away.id]),
       ),
     );
-    // Regeneration also counts the cancelled old fixtures in week numbers, so re-derive "N주차" league-wide.
+    // Fixtures replaced by regeneration are soft-deleted before this runs, so they are not counted in
+    // week numbers; re-derive "N주차" league-wide to match every other write path.
     await syncLeagueFixtureWeekTitles(tx, input.leagueId);
     return { ids, place };
   }

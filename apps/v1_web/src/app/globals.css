@@ -8132,9 +8132,9 @@ button:has(> .tm-toggle):focus-visible {
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
-.tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
-/* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
-/* 12px/800 은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 흰 지면 3.71:1 미달. */
+/* 12px 라벨은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 은 흰 지면 3.71:1 미달이라
+   완료·진행 중 모두 blue700 이다. 둘의 구분은 굵기(700/800)와 단계 원이 맡는다. */
+.tm-hub-stage-label-done  { color: var(--blue700); font-weight: 700; }
 .tm-hub-stage-label-active { color: var(--blue700); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */

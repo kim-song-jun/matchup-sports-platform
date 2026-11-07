@@ -684,7 +684,7 @@ describe('대진표 예정 단계 라벨 대비 (2026-09-07 사용자 확정 B�
   const colorOf = (selector: string) =>
     globalsCss.match(new RegExp('\\' + selector + '\\s*\\{[^}]*?color:\\s*var\\((--[a-z0-9-]+)\\)', 's'))?.[1] ?? null;
 
-  it.each(['.tm-hub-stage-label', '.tm-hub-stage-label-done', '.tm-hub-stage-label-active'])(
+  it.each(['.tm-hub-stage-label', '.tm-hub-stage-label-done', '.tm-hub-stage-label-active', '.tm-hub-stage-sublabel-active'])(
     '%s 는 흰 배경에서 AA 를 넘는다',
     (selector) => {
       const token = colorOf(selector);

@@ -741,7 +741,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         </span>
       </header>
       {/* 진행 단계 */}
-      <div className="tm-tourn-sub-header tm-bracket-page-stepper">
+      <div className="tm-tourn-sub-header">
         {stages.length > 0 && (
           <div style={{ borderBottom: '1px solid var(--grey100)' }}>
             <TournamentProgressStepper stages={stages} />

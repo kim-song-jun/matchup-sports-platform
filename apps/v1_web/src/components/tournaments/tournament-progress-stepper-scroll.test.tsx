@@ -1,7 +1,8 @@
-import { render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   pickFocusStageIndex,
+  stepperFade,
   stepperScrollLeft,
   TournamentProgressStepper,
   type StageStatus,
@@ -52,6 +53,28 @@ describe('stepperScrollLeft', () => {
 
   it('내용이 영역보다 짧으면 움직이지 않는다', () => {
     expect(stepperScrollLeft({ viewport: 400, content: 300, itemStart: 200, itemSize: 72 })).toBe(0);
+  });
+});
+
+describe('stepperFade', () => {
+  const base = { scrollWidth: 725, clientWidth: 362 };
+
+  it('처음에는 오른쪽이 가려진다', () => {
+    expect(stepperFade({ ...base, scrollLeft: 0 })).toBe('end');
+  });
+
+  it('가운데에서는 양쪽이 가려진다', () => {
+    expect(stepperFade({ ...base, scrollLeft: 155 })).toBe('both');
+  });
+
+  it('끝에서는 왼쪽만 가려진다 — 소수점 위치 오차(0.5px)가 끝 판정을 뒤집지 않는다', () => {
+    expect(stepperFade({ ...base, scrollLeft: 363 })).toBe('start');
+    expect(stepperFade({ ...base, scrollLeft: 362.5 })).toBe('start');
+  });
+
+  it('모두 보이면 가장자리를 흐리지 않는다', () => {
+    expect(stepperFade({ scrollWidth: 350, clientWidth: 350, scrollLeft: 0 })).toBe('none');
+    expect(stepperFade({ scrollWidth: 350.5, clientWidth: 350, scrollLeft: 0 })).toBe('none');
   });
 });
 
@@ -192,5 +215,67 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
     rerender(<TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />);
 
     expect(scrollTo).toHaveBeenCalledWith({ left: 155, behavior: 'auto' });
+  });
+
+  it('가려진 쪽에 맞춰 가장자리 흐림 방향을 정한다', () => {
+    const fadeOf = (statuses: StageStatus[]) => {
+      const { container, unmount } = render(<TournamentProgressStepper stages={stages(statuses)} />);
+      const fade = container.querySelector('.tm-hub-stages')?.getAttribute('data-fade');
+      unmount();
+      return fade;
+    };
+
+    expect(fadeOf(['active', 'upcoming', 'upcoming', 'upcoming', 'upcoming'])).toBe('end');
+    expect(fadeOf(['done', 'done', 'active', 'upcoming', 'upcoming'])).toBe('both');
+    expect(fadeOf(['done', 'done', 'done', 'done', 'done'])).toBe('start');
+  });
+
+  it('사용자가 스텝퍼를 밀면 흐림 방향이 따라 바뀐다', () => {
+    const { container } = render(
+      <TournamentProgressStepper stages={stages(['active', 'upcoming', 'upcoming', 'upcoming', 'upcoming'])} />,
+    );
+    const list = container.querySelector('.tm-hub-stages') as HTMLElement;
+    expect(list).toHaveAttribute('data-fade', 'end');
+
+    list.scrollLeft = 200;
+    fireEvent.scroll(list);
+    expect(list).toHaveAttribute('data-fade', 'both');
+
+    list.scrollLeft = CONTENT - VIEWPORT;
+    fireEvent.scroll(list);
+    expect(list).toHaveAttribute('data-fade', 'start');
+  });
+
+  it('화면 폭이 바뀌어 모두 들어가게 되면 흐림과 키보드 스크롤 영역이 사라진다', () => {
+    const { container } = render(
+      <TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />,
+    );
+    const list = container.querySelector('.tm-hub-stages') as HTMLElement;
+    expect(list).toHaveAttribute('data-fade', 'both');
+    expect(list).toHaveAttribute('tabindex', '0');
+
+    // 기기를 가로로 돌리는 것처럼 영역 폭이 내용 폭 이상이 되고, 스크롤 이벤트 없이 resize 만 온다.
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => CONTENT });
+    list.scrollLeft = 0;
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(list).toHaveAttribute('data-fade', 'none');
+    expect(list).not.toHaveAttribute('tabindex');
+  });
+
+  it('넘칠 때만 키보드로 닿는 스크롤 영역이 된다', () => {
+    const { container, unmount } = render(
+      <TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />,
+    );
+    expect(container.querySelector('.tm-hub-stages')).toHaveAttribute('tabindex', '0');
+    unmount();
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => VIEWPORT });
+    const fits = render(<TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />);
+    const list = fits.container.querySelector('.tm-hub-stages');
+    expect(list).toHaveAttribute('data-fade', 'none');
+    expect(list).not.toHaveAttribute('tabindex');
   });
 });

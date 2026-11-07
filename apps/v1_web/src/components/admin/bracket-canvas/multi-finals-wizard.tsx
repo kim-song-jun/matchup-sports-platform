@@ -57,6 +57,8 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
   const capacityOf = (f: MultiFinalDefinition) => f.capacity ?? f.registrationIds?.length ?? f.rules.length;
   const groupOrder = groups.map(g => g.id);
   const seedOrders = finals.map(f => orderRulesByRank(f.rules, groupOrder));
+  // Rules stored before rank-first ordering keep their old seed order until they are saved again.
+  const needsReorder = finals.some((f, i) => f.rules.some((rule, j) => rule.groupId !== seedOrders[i][j].groupId || rule.rank !== seedOrders[i][j].rank));
   async function resetBracket() {
     if (!server || busy || !await confirm({ title: '대진 초기화', message: '예선과 결선의 모든 대진·일정·대진 자리와 진출팀 선택을 삭제해요. 참가 신청, 예선 조 설정과 팀 선택, 토너먼트 규칙은 유지해요. 시작했거나 기록·결과가 있는 경기가 있으면 초기화할 수 없어요. 초기화할까요?', confirmLabel: '대진 초기화', tone: 'danger' })) return;
     try {
@@ -84,8 +86,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
         setStep(1); return;
       }
       if (step === 1) {
-        if (rulesOnly && !dirty) { onClose(); return; }
-        if (configured && !dirty && !editable) { await preview(); return; }
+        if (!rulesOnly && configured && !dirty && !editable) { await preview(); return; }
         if (finals.some(f => !Number.isSafeInteger(f.capacity ?? f.registrationIds?.length ?? f.rules.length) || (f.capacity ?? f.registrationIds?.length ?? f.rules.length) < 2)) throw new Error('토너먼트 자리 수를 2 이상으로 입력해 주세요.');
         if (rulesOnly && finals.some(f => f.rules.length !== (f.capacity ?? f.registrationIds?.length ?? f.rules.length))) throw new Error('각 토너먼트 자리 수에 맞게 순위별 목적지를 설정해 주세요.');
         if (!finals.length || finals.some(f => !f.name.trim()) || new Set(finals.map(f => f.name.trim())).size !== finals.length) throw new Error('토너먼트 이름을 중복 없이 입력해 주세요.');
@@ -153,7 +154,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
             <Button variant="neutral" onClick={() => { setFinals(rows => [...rows, { name: `토너먼트 ${rows.length + 1}`, capacity: 2, rules: [], thirdPlace: false, registrationIds: null }]); setDirty(true); }}>토너먼트 추가</Button>
             </> : <div className="space-y-2">
               {finals.map(f => <p key={f.name} className="tm-text-label">{f.name} · {f.capacity ?? f.rules.length}자리 · {f.rules.length}개 순위 연결</p>)}
-              <p className="tm-text-caption text-[var(--text-caption)]">저장하면 순위가 높은 팀부터 시드를 받아요. 같은 순위끼리는 조 순서대로예요(임시 기본값). 진출팀 배정 화면에서 바꿀 수 있어요.</p>
+              {finals.length > 0 ? <p className="tm-text-caption text-[var(--text-caption)]">저장하면 순위가 높은 팀부터 시드를 받아요. 같은 순위끼리는 조 순서대로예요(임시 기본값). 진출팀 배정 화면에서 바꿀 수 있어요.</p> : null}
             </div>}
             {rulesOnly && groups.map(g => <fieldset key={g.id} className="space-y-2"><legend className="tm-text-body font-semibold">{g.name} · {finals.reduce((sum, f) => sum + f.rules.filter(rule => rule.groupId === g.id).length, 0)}팀 기본 진출</legend>
               {Array.from({ length: Number.isSafeInteger(g.capacity) && g.capacity > 0 ? g.capacity : 0 }, (_, rankIndex) => {
@@ -193,7 +194,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
       <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--border)] p-4">
         <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>
         {step > (rulesOnly ? 1 : 0) ? <Button variant="neutral" disabled={busy} onClick={() => setStep(step === 3 ? 1 : 0)}>이전</Button> : null}
-        <Button variant="primary" disabled={!server || busy || rulesOnly && (!configured || !dirty)} onClick={() => void next()}>{busy ? '처리 중…' : rulesOnly ? '배정 규칙 저장' : step === 3 ? '확인하고 결선 생성' : step === 1 ? '대진 미리보기' : '다음'}</Button>
+        <Button variant="primary" disabled={!server || busy || rulesOnly && (!configured || !dirty && !needsReorder)} onClick={() => void next()}>{busy ? '처리 중…' : rulesOnly ? '배정 규칙 저장' : step === 3 ? '확인하고 결선 생성' : step === 1 ? '대진 미리보기' : '다음'}</Button>
       </div>
     </div>{ConfirmModal}
   </div>, document.body);

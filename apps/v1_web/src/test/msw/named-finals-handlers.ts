@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { MultiFinalDefinition, MultiFinalGroup, MultiFinalPreview } from '@/hooks/use-multi-finals';
+import { orderRulesByRank } from '@/lib/multi-final-seed-order';
 import type { V1AdminTournamentAwardSet, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 import { NAMED_FINALS_ID, namedFinalPublicDetail, namedFinalView } from './named-finals-fixtures';
 
@@ -59,6 +60,8 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
     }
     return finals;
   }
+  // Same contract as the server: rules are stored rank first, equal ranks in group order.
+  const seeded = <T extends MultiFinalDefinition>(finals: T[], groups: readonly MultiFinalGroup[]) => finals.map(f => ({ ...f, rules: orderRulesByRank(f.rules, groups.map(group => group.id)) }));
   // Same identity contract as the server: ids keep their color, id-less rows match unclaimed names, the rest get new colors.
   function identify(finals: MultiFinalDefinition[]) {
     const claimed = new Set(finals.flatMap(f => f.id ? [f.id] : [])); const seen = new Set<string>();
@@ -159,7 +162,8 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       }
       if (!Array.isArray(input.finals)) return invalid();
       const mapped = input.finals.map(f => record(f) && Array.isArray(f.rules) ? { ...f, rules: f.rules.map(r => record(r) ? { ...r, groupId: groups[Number(r.groupId)]?.id ?? '' } : r) } : f);
-      const parsed = parseFinals(mapped, groups); const finals = parsed && identify(parsed); if (!finals) return invalid();
+      const parsed = parseFinals(mapped, groups); const identified = parsed && identify(parsed); if (!identified) return invalid();
+      const finals = seeded(identified, groups);
       if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
       view = { ...view, revision: view.revision + 1, groups, generated: false,
         preliminaryFixtureCount: groups.reduce((sum, g) => sum + g.capacity * (g.capacity - 1) / 2 * g.legs, 0),
@@ -180,7 +184,8 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       const denied = auth(true); if (denied) return denied;
       const input = await body(request); if (!record(input) || Object.keys(input).some(key => !['expectedRevision', 'finals'].includes(key))) return invalid();
       if (input.expectedRevision !== view.revision) return stale();
-      const parsed = parseFinals(input.finals); const finals = parsed && identify(parsed); if (!finals) return invalid();
+      const parsed = parseFinals(input.finals); const identified = parsed && identify(parsed); if (!identified) return invalid();
+      const finals = seeded(identified, view.groups);
       if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
       const sameStructure = finals.length === view.finals.length && finals.every((final, i) => {
         const previous = view.finals[i];

@@ -119,3 +119,41 @@ describe('진출 규칙 저장 시 시드 순서', () => {
     expect(savedRules()).toEqual(ranked);
   });
 });
+
+describe('옛 순서로 저장된 진출 규칙의 추천', () => {
+  const official = (home: number, away: number) => ({ currentOfficialRevision: { state: 'OFFICIAL', score: { home, away }, officialAt: new Date('2026-11-01T00:00:00Z') } });
+  const standing = (groupId: string, registrationId: string, position: number) => ({
+    groupId, registrationId, position, wins: position === 1 ? 1 : 0, draws: 0, losses: position === 1 ? 0 : 1, goalsFor: 0, goalsAgainst: 0, points: 0, recalculatedAt: null,
+  });
+  // Two finished 2-team groups: a1 beats a2 and b1 beats b2.
+  const teams = [['g-a', 'a1'], ['g-a', 'a2'], ['g-b', 'b1'], ['g-b', 'b2']] as const;
+  const rule = (groupId: string, rank: number) => ({ groupId, rank });
+
+  it('조회는 저장된 규칙 순서를 그대로 따르고 읽을 때 순위 먼저로 다시 정렬하지 않는다', async () => {
+    const tx = {
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({
+        id: 'tournament', kind: 'regular_tournament', format: 'league_knockouts', multiFinalsRevision: 4,
+        multiFinals: {
+          groups: [{ id: 'g-a', name: 'A조', capacity: 2, legs: 1 }, { id: 'g-b', name: 'B조', capacity: 2, legs: 1 }],
+          finals: [{ name: '본선', capacity: 4, thirdPlace: false, registrationIds: null, rules: [rule('g-a', 1), rule('g-a', 2), rule('g-b', 1), rule('g-b', 2)] }],
+        },
+      }) },
+      v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentGroupTeam: { findMany: jest.fn().mockResolvedValue(teams.map(([groupId, registrationId]) => ({ groupId, registrationId, registration: { team: { name: registrationId } } }))) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([standing('g-a', 'a1', 1), standing('g-a', 'a2', 2), standing('g-b', 'b1', 1), standing('g-b', 'b2', 2)]) },
+      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(2), findMany: jest.fn().mockResolvedValue([
+        { groupId: 'g-a', homeRegistrationId: 'a1', awayRegistrationId: 'a2', teamMatch: { game: official(1, 0) } },
+        { groupId: 'g-b', homeRegistrationId: 'b1', awayRegistrationId: 'b2', teamMatch: { game: official(1, 0) } },
+      ]) },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
+    const admins = { getTournamentAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
+    const service = new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService, {} as GamesService, {} as BracketTemplateService);
+    const view = await service.get({ id: 'admin', email: 'admin@example.test', accountStatus: 'active', onboardingStatus: 'completed' }, 'tournament');
+    expect(view.finals[0].unresolved).toEqual([]);
+    expect(view.finals[0].rules).toEqual([rule('g-a', 1), rule('g-a', 2), rule('g-b', 1), rule('g-b', 2)]);
+    expect(view.finals[0].suggestedRegistrationIds).toEqual(['a1', 'a2', 'b1', 'b2']);
+  });
+});

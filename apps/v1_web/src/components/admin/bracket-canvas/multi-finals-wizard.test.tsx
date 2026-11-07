@@ -207,6 +207,41 @@ describe('규칙 화면의 시드 번호', () => {
     expect(screen.queryByText('부전승')).not.toBeInTheDocument();
     expect(within(rowOf('A', 3)).queryByText(/시드/)).not.toBeInTheDocument();
   });
+  describe('저장 순서가 순위 순이 아닌 옛 대회', () => {
+    const rulesOf = (order: Array<[string, number]>) => order.map(([groupId, rank]) => ({ groupId, rank }));
+    const stored = (order: Array<[string, number]>): MultiFinalView => ({ ...viewWith(2, 6), generated: true, fixtureCount: 7,
+      finals: [{ ...viewWith(2, 6).finals[0], rules: rulesOf(order) }] });
+    const oldOrder: Array<[string, number]> = [['g-A', 1], ['g-A', 2], ['g-A', 3], ['g-B', 1], ['g-B', 2], ['g-B', 3]];
+    const rankFirst: Array<[string, number]> = [['g-A', 1], ['g-B', 1], ['g-A', 2], ['g-B', 2], ['g-A', 3], ['g-B', 3]];
+    const saveButton = () => screen.getByRole('button', { name: '배정 규칙 저장' });
+    it('아무것도 바꾸지 않아도 저장할 수 있고, 저장하면 규칙을 서버로 보내 새 순서로 다시 저장한다', async () => {
+      const view = stored(oldOrder); let submitted: { finals: MultiFinalView['finals'] } | undefined;
+      server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => {
+        submitted = await request.json() as typeof submitted; return success({ ...view, revision: 2 });
+      }));
+      const props = show('rules');
+      await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+      expect(saveButton()).toBeEnabled();
+      fireEvent.click(saveButton());
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '진출 규칙 변경' })).getByRole('button', { name: '규칙 저장' }));
+      await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
+      expect(submitted?.finals[0].rules).toEqual(rulesOf(oldOrder));
+      expect(submitted?.finals[0].registrationIds).toBeNull();
+      expect(props.onClose).toHaveBeenCalledOnce();
+    });
+    it('이미 순위 순으로 저장된 규칙은 바꾼 것이 없으면 저장할 것이 없어 버튼이 꺼져 있다', async () => {
+      server.use(http.get(base, () => success(stored(rankFirst))));
+      show('rules');
+      await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+      expect(saveButton()).toBeDisabled();
+    });
+  });
+  it('예선을 편성하지 않은 대회에는 시드 안내를 보여 주지 않는다', async () => {
+    server.use(http.get(base, () => success({ revision: 0, groups: [], finals: [], registrations, generated: false })));
+    show('rules');
+    await screen.findByText('예선·토너먼트 대진 생성에서 예선을 먼저 편성해 주세요.');
+    expect(screen.queryByText(caption)).not.toBeInTheDocument();
+  });
   it('목적지를 바꾸면 시드 번호가 바로 다시 매겨진다', async () => {
     server.use(http.get(base, () => success({ ...viewWith(2, 6), finals: [{ ...viewWith(2, 6).finals[0], rules: [{ groupId: 'g-A', rank: 1 }, { groupId: 'g-B', rank: 1 }, { groupId: 'g-A', rank: 2 }] }] })));
     show('rules');

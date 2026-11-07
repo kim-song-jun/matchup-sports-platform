@@ -137,6 +137,9 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(suggestion.registrationIds).toEqual([0, 5, 1, 6, 2, 7].map(index => registrationIds[index]));
     const filled = await service.assign(user, tournamentId, { expectedRevision: ready.revision, finalName: '프리미어', registrationIds: suggestion.registrationIds, sourceVersion: suggestion.sourceVersion });
     expect(filled.finals[0].registrationIds).toHaveLength(6);
+    const byeSeeds = await prisma.v1TournamentSlot.findMany({ where: { tournamentId, kind: 'GROUP_RANK', byeSortOrder: { not: null }, group: { bracketTrack: '프리미어', phase: { not: 'group' } } },
+      orderBy: { position: 'asc' }, select: { position: true, registrationId: true } });
+    expect(byeSeeds).toEqual([{ position: 1, registrationId: registrationIds[0] }, { position: 2, registrationId: registrationIds[5] }]);
     const idsAfter = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } }, orderBy: { fixtureNumber: 'asc' }, select: { teamMatchId: true } });
     expect(idsAfter).toEqual(idsBefore);
   });

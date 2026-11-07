@@ -23,7 +23,7 @@ import type { LinkKakaoDto } from './dto/link-kakao.dto';
 import type { LinkPendingDto } from './dto/link-pending.dto';
 import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
-import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
+import { SOCIAL_PROVIDER_LABELS, socialProviderExists } from './social-link-conflict';
 import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
 import { isUnfinishedSocialSignup } from './social-signup-access';
 
@@ -183,7 +183,7 @@ export class AccountLinkService {
 
     const sameProvider = caller.authIdentities.find((existing) => existing.provider === identity.provider);
     if (sameProvider) {
-      if (sameProvider.providerUserKey !== identity.providerUserKey) throw providerExists(identity.provider);
+      if (sameProvider.providerUserKey !== identity.providerUserKey) throw socialProviderExists(identity.provider);
       return {
         result: {
           provider: identity.provider,
@@ -417,14 +417,6 @@ function isEmptySignupAccount(holder: {
 
 function distinctProviders(identities: { provider: V1AuthProvider }[]): V1AuthProvider[] {
   return [...new Set(identities.map((identity) => identity.provider))];
-}
-
-function providerExists(provider: LinkableSocialProvider) {
-  const label = SOCIAL_PROVIDER_LABELS[provider];
-  return new ConflictException({
-    code: 'SOCIAL_LINK_PROVIDER_EXISTS',
-    message: `이 계정에는 이미 다른 ${label} 계정이 연결돼 있어요.`,
-  });
 }
 
 function providerInUse() {

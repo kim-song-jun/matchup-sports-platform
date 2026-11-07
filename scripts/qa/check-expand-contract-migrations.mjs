@@ -307,6 +307,22 @@ const REVIEWED_NON_ADDITIVE = [
       'history is not restored (user decision W4-V8-backfill).',
   },
   {
+    file: 'apps/v1_api/prisma/migrations/20261106120000_v1_auth_identity_provider_active_unique/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_auth_identities_user_provider_active_key" ON "v1_auth_identities" ("user_id", "provider") ' +
+      'WHERE "status" = \'active\'',
+    reason:
+      'One active login method per provider on an account, reviewed 2026-11-06. The gate rejects CREATE UNIQUE INDEX on an ' +
+      'existing table because existing rows could collide. Measured read-only on alpha and production the same day: no user ' +
+      'holds two identities of one provider in any status, so the build finds no duplicate. A duplicate that appeared before ' +
+      'deploy fails the build with the offending key and rolls the migration back; which login to keep is not a migration ' +
+      'decision, so nothing is deleted or unlinked automatically. The index is partial on status = \'active\', so unlinked ' +
+      'history rows stay unrestricted. Rolling-deploy and rollback safe: the previous release writes a second active identity of ' +
+      'a provider only through the sign-in auto-link (a verified Kakao/Apple email matching an account that already holds that ' +
+      'provider), the gap this change closes; an old instance still serving mid-rollout gets P2002 (a 500 on that one request) ' +
+      'instead of storing a duplicate. Dropping the index on rollback only removes that guard.',
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20260927163000_v1_platform_recruitment_first_home/migration.sql",
     statement: "UPDATE \"v1_team_matches\" AS \"team_match\" SET \"host_team_id\" = \"approved\".\"applicant_team_id\", \"updated_at\" = CURRENT_TIMESTAMP FROM ( SELECT \"team_match_id\", \"applicant_team_id\" FROM ( SELECT \"team_match_id\", \"applicant_team_id\", COUNT(*) OVER (PARTITION BY \"team_match_id\") AS \"approved_count\" FROM \"v1_team_match_applications\" WHERE \"status\" = 'approved' ) AS \"approved_application\" WHERE \"approved_count\" = 1 ) AS \"approved\" WHERE \"team_match\".\"id\" = \"approved\".\"team_match_id\" AND \"team_match\".\"platform_managed\" = true AND \"team_match\".\"status\" = 'recruiting' AND \"team_match\".\"host_team_id\" IS NULL AND \"team_match\".\"approved_applicant_team_id\" IS NULL AND \"team_match\".\"league_id\" IS NULL AND \"team_match\".\"tournament_id\" IS NULL",
     reason: "Task 149 review 2026-09-27: backfills host_team_id only for standalone platform recruitments still recruiting with exactly one approved application, writing the same team the pre-change second approval assigns as HOME (its first approved applicant), so rollback to the previous API sees a state it would itself produce. Every previous-API host path (application approve/reject, manage, viewer host_team state, manage link) is gated on platformManaged, and applying with the approved team was already refused as ALREADY_APPROVED. The host_team_id IS NULL guard makes reruns a no-op; no row is deleted and no schema changes.",

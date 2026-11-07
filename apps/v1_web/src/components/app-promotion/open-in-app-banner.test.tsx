@@ -82,12 +82,29 @@ describe('OpenInAppBanner', () => {
     expect(banner()).toBeNull();
   });
 
-  it.each(['/admin/users', '/auth/callback', '/tournament-ops/abc', '/onboarding'])(
-    '제외 경로 %s 에서는 보이지 않는다',
+  it.each([
+    '/admin/users',
+    '/auth/callback',
+    '/tournament-ops/abc',
+    '/onboarding',
+    // 뷰포트 높이로 고정된 인증 프레임(.tm-auth-frame)을 쓰는 화면 — 배너를 흘리면 하단 CTA 가 접힌 아래로 밀린다.
+    '/',
+    '/terms',
+    '/account-deletion',
+    '/my/settings/login-methods/email',
+  ])('제외 경로 %s 에서는 보이지 않는다', async (path) => {
+    nav.pathname = path;
+    await mount();
+    expect(banner()).toBeNull();
+  });
+
+  // 제외를 넓힌 쪽 대조군: 이웃 경로까지 같이 막히면 배너가 조용히 사라진다.
+  it.each(['/home', '/my', '/my/settings', '/my/settings/login-methods', '/landing', '/teams/abc'])(
+    '이웃 경로 %s 에서는 그대로 보인다',
     async (path) => {
       nav.pathname = path;
       await mount();
-      expect(banner()).toBeNull();
+      expect(banner()).not.toBeNull();
     },
   );
 

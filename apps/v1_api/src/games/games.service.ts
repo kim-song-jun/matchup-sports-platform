@@ -569,7 +569,7 @@ function assertClockNotDrifted(occurredAt: string): void {
   if (!Number.isFinite(occurredAtMs) || Math.abs(Date.now() - occurredAtMs) > CLOCK_DRIFT_TOLERANCE_MS) {
     throw new UnprocessableEntityException({
       code: 'CLOCK_DRIFT',
-      message: '기록 시각이 서버 시각과 30초 넘게 차이 나요. 기기의 날짜와 시간을 확인한 뒤 다시 시도해 주세요.',
+      message: '기록 시각이 서버 시각과 30초 넘게 차이 나요. 다시 시도해 주세요. 계속 같은 안내가 나오면 기기의 날짜와 시간을 확인해 주세요.',
     });
   }
 }

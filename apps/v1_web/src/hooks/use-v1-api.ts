@@ -5400,6 +5400,10 @@ export function useV1UpdateGroup(tournamentId: string) {
       v1Patch<V1AdminBracketGroup>(`/admin/groups/${groupId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: ['multi-finals', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['v1', 'public-game-records', 'schedule', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['v1', 'public-game-records', 'match', tournamentId] });
     },
   });
 }

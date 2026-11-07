@@ -81,7 +81,7 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
             onChange={(value) => { if (value !== undefined || own) set('stage', value as typeof draft.stage); }} />;
         })}
         <FilterChoices title="종목" value={draft.sportId} options={sports.map((sport) => ({ value: sport.id, label: sport.label }))} onChange={(value) => set('sportId', value)} />
-        {tournament && <FilterChoices title="성별 부문" value={draft.genderCategory} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('genderCategory', value as typeof draft.genderCategory)} />}
+        <FilterChoices title="성별 부문" value={draft.genderCategory} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('genderCategory', value as typeof draft.genderCategory)} />
         <fieldset className={styles.group}>
           <legend className="tm-text-label">{filters.kind === 'league' ? '시즌 기간' : tournament ? '개최 기간' : '개최·시즌 기간'}</legend>
           <p className="tm-text-caption">선택한 기간과 겹치는 일정을 찾아요. 날짜 미정은 제외해요.</p>

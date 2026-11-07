@@ -61,7 +61,7 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
   const tournament = filters.kind === 'tournament';
   return <BottomSheet open ariaLabel="대회·리그 필터" closeHref={competitionDiscoveryHref(filters, { page })}>
     <div className="tm-filter-sheet-handle" />
-    <form onSubmit={(event) => {
+    <form id={`${id}-form`} onSubmit={(event) => {
       event.preventDefault();
       const rangeError = discoveryRangeError(draft);
       if (rangeError) { setError(rangeError); return; }
@@ -107,11 +107,12 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
           </fieldset>
         </>}
       </div>
-      <div className={`tm-filter-actions ${styles.actions}`}>
-        <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={competitionDiscoveryHref(filters, { page })}>닫기</Link>
-        <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit">결과 보기</button>
-      </div>
     </form>
+    {/* 시트 바닥 고정은 `.tm-filter-sheet > .tm-filter-actions` 직계 자식에만 걸린다 — 폼 안에 두면 스크롤 끝에서 시트 패딩만큼 뜬다. 제출은 form 속성으로 잇는다. */}
+    <div className={`tm-filter-actions ${styles.actions}`}>
+      <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={competitionDiscoveryHref(filters, { page })}>닫기</Link>
+      <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit" form={`${id}-form`}>결과 보기</button>
+    </div>
   </BottomSheet>;
 }
 

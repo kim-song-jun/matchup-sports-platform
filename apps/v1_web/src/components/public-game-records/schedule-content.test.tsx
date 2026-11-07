@@ -1365,6 +1365,22 @@ describe('ScheduleContent — 예정만·다음 경기', () => {
     expect(ids()).toEqual(['cancelled-1', 'ended-1']);
   });
 
+  it('빈 상태가 눌러 보라고 한 컨트롤을 누르면 지난 경기가 돌아온다 — 단계 탭의 전체가 아니다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: [
+      fixtureEntry({ fixtureId: 'group-done', status: 'ended' }),
+      fixtureEntry({ fixtureId: 'final-done', round: 'final', status: 'ended' }),
+    ] })} />);
+    expect(screen.getByRole('tab', { name: '전체' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    const named = /'([^']+)'를 눌러/.exec(screen.getByText(/지난 경기를 다시 볼 수 있어요/).textContent ?? '')?.[1];
+    expect(named).toBeDefined();
+    const control = [...screen.queryAllByRole('button'), ...screen.queryAllByRole('tab')].find((el) => el.textContent === named);
+    expect(control).toBeDefined();
+    fireEvent.click(control!);
+    expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    expect(ids()).toEqual(['final-done', 'group-done']);
+  });
+
   it('빈 화면의 까닭이 예정만이 아니라 팀 범위면 예정만 빈 상태를 말하지 않는다', () => {
     const side = (teamId: string) => ({ registrationId: `reg-${teamId}`, teamId, teamName: teamId });
     const original = window.location.href;

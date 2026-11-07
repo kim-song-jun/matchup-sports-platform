@@ -5,9 +5,10 @@
 export const UPCOMING_FILTER_LABEL = '예정만';
 export const NEXT_MATCH_BADGE_LABEL = '다음 경기';
 
+// sub 는 아래 cta 이름으로 되돌리는 길을 가리킨다 — 대회 일정 탭의 '전체' 는 단계 칩이라 필터를 풀지 못한다.
 export const UPCOMING_EMPTY_STATE = {
   title: '예정된 경기가 없어요',
-  sub: "'전체'를 눌러 지난 경기를 다시 볼 수 있어요.",
+  sub: "'전체 보기'를 눌러 지난 경기를 다시 볼 수 있어요.",
   cta: '전체 보기',
 } as const;
 

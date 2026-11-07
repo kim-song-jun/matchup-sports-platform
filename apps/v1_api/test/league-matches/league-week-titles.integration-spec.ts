@@ -28,7 +28,7 @@ describe('리그 주차 — 달력 주 · 묶음 추가 · 저장된 제목 맞�
   const pair = (home: number, away: number, startsAt: string) => ({ homeTeamId: teams[home].id, awayTeamId: teams[away].id, startsAt, durationMinutes: 50 });
   const titlesByStart = async (leagueId: string) => {
     const rows = await h.prisma.v1TeamMatch.findMany({ where: { leagueId, deletedAt: null }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }], select: { id: true, title: true, startAt: true } });
-    return rows.map((row) => `${row.startAt?.toISOString().slice(0, 10)} ${row.title.replace(/^.* (\d+주차)$/, '$1')}`);
+    return rows.map((row) => `${row.startAt?.toISOString().slice(0, 10)} ${row.title.replace(/^.* (\d+주차)( \d+경기)?$/, '$1')}`);
   };
 
   it('묶음 추가는 한 번에 만들고, 토·일은 한 주차이며, 앞 주에 끼우면 뒤 제목과 팀 일정이 밀렸다가 옮기면 돌아온다', async () => {
@@ -67,6 +67,29 @@ describe('리그 주차 — 달력 주 · 묶음 추가 · 저장된 제목 맞�
     expect(await titlesByStart(leagueId)).toEqual([
       '2098-11-07 개막 친선전', '2098-11-14 2주차', '2098-11-14 2주차', '2098-11-15 2주차', '2098-11-28 3주차', '2098-11-29 3주차',
     ]);
+  });
+
+  it('같은 주의 경기는 날짜가 달라도 순번이 이어지고, 이어 넣는 경기는 그 주의 다음 번호를 받는다', async () => {
+    const leagueId = await h.makeLeague({ teams, state: 'active' });
+    const titles = async () => {
+      const rows = await h.prisma.v1TeamMatch.findMany({ where: { leagueId, deletedAt: null }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }], select: { title: true } });
+      return rows.map((row) => row.title.replace(/^.* (?=\d+주차)/, ''));
+    };
+
+    // Sat 11/14 (two games) and Sun 11/15 share a calendar week; Sat 11/21 is the next one.
+    const created = await batch(leagueId, [
+      pair(0, 1, '2098-11-14T01:00:00.000Z'),
+      pair(2, 3, '2098-11-14T02:00:00.000Z'),
+      pair(0, 2, '2098-11-15T01:00:00.000Z'),
+      pair(1, 3, '2098-11-21T01:00:00.000Z'),
+    ]);
+    expect(created.status).toBe(201);
+    expect(await titles()).toEqual(['1주차 1경기', '1주차 2경기', '1주차 3경기', '2주차 1경기']);
+
+    const appended = await http().post(`/api/v1/admin/league-matches/${leagueId}/fixtures/manual`).set('x-v1-user-id', h.adminUserId)
+      .send(pair(0, 3, '2098-11-15T03:00:00.000Z'));
+    expect(appended.status).toBe(201);
+    expect(await titles()).toEqual(['1주차 1경기', '1주차 2경기', '1주차 3경기', '1주차 4경기', '2주차 1경기']);
   });
 
   it('묶음 중 한 경기라도 거부되면 아무 경기도 만들지 않는다', async () => {

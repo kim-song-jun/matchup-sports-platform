@@ -16,6 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TournamentSlotService } from './slots/tournament-slot.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
+import { teamMembershipCountFake, type FakeTeamMember } from '../../test/helpers/team-membership-gender-fake';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const supportAuth = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -81,6 +82,7 @@ describe('AdminRegistrationsService', () => {
 
     v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Team: { findFirst: jest.Mock };
+    v1TeamMembership: { count: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
@@ -98,6 +100,7 @@ describe('AdminRegistrationsService', () => {
 
       v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Team: { findFirst: jest.fn().mockResolvedValue({ id: 'team-1', sportId: 'sport-futsal' }) },
+      v1TeamMembership: { count: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -1285,6 +1288,84 @@ describe('AdminRegistrationsService', () => {
       });
       expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
       expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+  });
+  // 성별 부문(QC1106 T4): 신청·제출을 통과해 들어온 옛 신청, 또는 확정 전에 그 성별 팀원이 나간 팀을 확정 단계에서 막는다.
+  describe('confirm: 성별 부문의 팀 자격', () => {
+    const maleOnlyTeam: FakeTeamMember[] = Array.from({ length: 5 }, () => ({ teamId: 'team-1', status: 'active', gender: 'male' }));
+
+    function arrange(
+      kind: 'regular_tournament' | 'regular_league',
+      genderCategory: string | null,
+      members: FakeTeamMember[],
+      registrationStatus = 'payment_checking',
+    ) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+        registrationRow({ status: registrationStatus, tournament: { title: '테스트', kind } }),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed', confirmedAt: new Date() }));
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst({
+          id: 'tournament-1', kind, teamCount: 8, maxTeams: null, genderCategory,
+          sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+        }),
+      );
+      prisma.v1TeamMembership.count = teamMembershipCountFake(members);
+    }
+
+    it('여성부 대회에 여성 팀원이 없는 팀은 확정되지 않는다', async () => {
+      arrange('regular_tournament', 'female', maleOnlyTeam);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 대회에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    });
+
+    it('여성 팀원이 1명이라도 있으면 확정된다', async () => {
+      arrange('regular_tournament', 'female', [...maleOnlyTeam, { teamId: 'team-1', status: 'active', gender: 'female' }]);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).resolves.toMatchObject({ status: 'confirmed' });
+    });
+
+    it('신청 뒤 여성 팀원이 모두 나갔으면 확정되지 않는다 — 활성 팀원만 센다', async () => {
+      arrange('regular_tournament', 'female', [...maleOnlyTeam, { teamId: 'team-1', status: 'left', gender: 'female' }]);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
+        response: { code: 'TEAM_GENDER_INELIGIBLE' },
+      });
+    });
+
+    it('대기자를 확정으로 올릴 때도 같은 판정을 거친다', async () => {
+      arrange('regular_tournament', 'female', maleOnlyTeam, 'waitlisted');
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
+        response: { code: 'TEAM_GENDER_INELIGIBLE' },
+      });
+    });
+
+    it('대기 처리는 막지 않는다 — 참가를 확정하는 일이 아니다', async () => {
+      arrange('regular_tournament', 'female', maleOnlyTeam);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'waitlisted' }));
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'waitlist' })).resolves.toMatchObject({ status: 'waitlisted' });
+    });
+
+    it.each([['mixed'], [null]])('부문이 %s 이면 남자 팀도 확정된다', async (genderCategory) => {
+      arrange('regular_tournament', genderCategory, maleOnlyTeam);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).resolves.toMatchObject({ status: 'confirmed' });
+    });
+
+    it('여성부 리그도 같은 판정이고 문구는 리그다', async () => {
+      arrange('regular_league', 'female', maleOnlyTeam);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    });
+
+    it('여성 팀원이 있는 팀은 여성부 리그에서도 확정된다', async () => {
+      arrange('regular_league', 'female', [{ teamId: 'team-1', status: 'active', gender: 'female' }]);
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).resolves.toMatchObject({ status: 'confirmed' });
     });
   });
 });

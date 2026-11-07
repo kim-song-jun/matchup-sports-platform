@@ -14,6 +14,14 @@ export const COMPETITION_ROSTER_RESYNC_TYPE = 'COMPETITION_ROSTER_RESYNC';
 export type RosterResyncTarget =
   /** 한 팀의 그 대회·리그 시작 전 경기 전부. */
   | { readonly scope: 'competitionTeam'; readonly competitionId: string; readonly teamId: string }
+  /** 재추가 전에 존재하던 경기별 제외만 되돌린 뒤 그 팀의 시작 전 경기 명단을 맞춘다. */
+  | {
+      readonly scope: 'competitionPlayerReadded';
+      readonly competitionId: string;
+      readonly teamId: string;
+      readonly userId: string;
+      readonly adjustmentIds: readonly string[];
+    }
   /** 팀 멤버십이 바뀐 팀의, 참가 명단 없이 팀원 기준으로 뛰는 리그 경기. */
   | { readonly scope: 'teamMembers'; readonly teamId: string }
   /** 결장 기간(ISO 시각) 안에 시작하는 팀의 대회·리그 경기가 걸린 대회·리그 전부. */
@@ -75,6 +83,10 @@ function isString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+function isNonemptyStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isString);
+}
+
 /** 이벤트 payload 를 대상으로 읽는다. 모양이 다르면 던진다(재시도 끝에 POISONED 로 드러난다). */
 export function parseRosterResyncTarget(payload: unknown): RosterResyncTarget {
   const row = (payload ?? {}) as Record<string, unknown>;
@@ -82,6 +94,14 @@ export function parseRosterResyncTarget(payload: unknown): RosterResyncTarget {
     case 'competitionTeam':
       if (isString(row.competitionId) && isString(row.teamId)) {
         return { scope: 'competitionTeam', competitionId: row.competitionId, teamId: row.teamId };
+      }
+      break;
+    case 'competitionPlayerReadded':
+      if (isString(row.competitionId) && isString(row.teamId) && isString(row.userId) && isNonemptyStringArray(row.adjustmentIds)) {
+        return {
+          scope: 'competitionPlayerReadded', competitionId: row.competitionId, teamId: row.teamId,
+          userId: row.userId, adjustmentIds: row.adjustmentIds,
+        };
       }
       break;
     case 'teamMembers':

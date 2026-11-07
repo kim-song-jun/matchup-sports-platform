@@ -561,6 +561,8 @@ The first two mean *the tournament changed while the request was in flight* — 
 
 Registration create and submit both require the team's current `sportId` to match the tournament `sportId`. A mismatch is rejected with `409 TEAM_SPORT_MISMATCH`; clients must only offer same-sport teams as new registration candidates. Submit repeats the check so a saved draft cannot bypass a later team or tournament sport change.
 
+A male-only (`genderCategory: 'male'`) or female-only (`'female'`) tournament or league takes only teams with at least one **active** member whose profile gender is that gender. Members without a profile gender do not count; mixed and unset divisions are not checked. The check runs on registration create (new or reactivated registrations only — an existing registration is returned as before), on submit (re-checked under the tournament row lock) and on admin `confirm` (including promoting a waitlisted team; `decision: 'waitlist'` is not blocked). All three reject with `409 TEAM_GENDER_INELIGIBLE` and a message such as `여성부 대회에는 여성 팀원이 있는 팀만 신청할 수 있어요.` (`참가할 수 있어요` for operator actions; leagues say `리그`). It is a team-level gate only: each player is still checked on roster add (`PLAYER_GENDER_MISMATCH`), and an empty roster or a roster below `minPlayers` is still accepted at submit.
+
 Registration uniqueness is `tournamentId + teamId`. If the database still has an older user-scoped or tournament-scoped unique index, creating another team registration may fail with `409 TOURNAMENT_REGISTRATION_UNIQUE_SCOPE_MISMATCH`; apply the v1 tournament registration team-unique migration before treating the API as ready.
 
 Tournament registration ownership is team-scoped, not user-singleton. A user can belong to multiple teams, so `my-registrations` is the canonical frontend entry point for "내 신청 보기"; it returns every registration for the tournament where the caller has active membership on the registered team. `my-registration?scope=teams` remains an equivalent compatibility route, and plain `my-registration` remains for backward compatibility with one caller-created registration. Create, submit, cancel, and roster mutations remain owner/manager-only.
@@ -602,7 +604,7 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager, and a member's own row, also get personal info) | path ids | roster players (each with `personalInfoVisible`) and `belowMinimum` — see Roster Read Contract |
-| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
+| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player — 재추가의 경기 명단 반영은 아래 비동기 계약 참고 |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId/roster-settings` | user, team manager+ | `UpdatePlayerRosterSettingsDto`: optional `jerseyNumber` (integer 0–99 or null), optional boolean `goalkeeper`; at least one field required | updated player and `goalkeeper`; does not change eligibility |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
@@ -629,6 +631,12 @@ If any required source field is missing, the API rejects the request with `400 P
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 
 `POST /api/v1/admin/registrations/:registrationId/roster-lock` locks the registration row and validates a mixed tournament's active-player `genderSnapshot` counts in the same serializable transaction. A violated minimum or maximum returns `409 TOURNAMENT_GENDER_QUOTA_NOT_MET` with `details.male` and `details.female`, each containing `count`, `min`, `max`, and `ok`; the roster remains unlocked. Male/female tournament categories are labels only and do not enforce a player-gender match.
+
+### 참가 선수 재추가와 경기 명단 반영
+
+제외했던 동일 선수를 같은 참가 신청에 다시 추가하면, 등록 트랜잭션에서 그 대회·리그/팀/선수의 활성 경기별 `EXCLUDE` ID를 포착한다. 이때 `SCHEDULED`이고 공식 결과가 없으며 취소·삭제되지 않은 경기의 조정만 담아 `COMPETITION_ROSTER_RESYNC`의 `competitionPlayerReadded` 대상으로 남긴다. 응답은 복구한 참가 선수이며, 경기 명단 재계산은 후속 워커가 처리한다.
+
+워커는 기존 경기 잠금을 얻은 뒤 [경기 명단의 시작 전 범위](games.md), 현재 팀·사이드, 공식 결과 없음 조건을 다시 확인한다. 그 범위에서 포착한 ID와 선수·팀·사이드가 모두 일치하는 활성 제외만 `revokedByRole=SYSTEM`으로 되돌리고 유효 명단을 다시 계산한다. 조정 행과 되돌리기 이력은 보존한다. 포착 목록에 없는 새 제외 ID, 다른 선수·팀·대회·리그의 조정, 이미 시작·종료·취소된 경기와 공식 결과 이력은 바꾸지 않는다. 최종 출전 여부에는 현재 결장·출전정지 등 나머지 명단 규칙도 적용된다.
 
 ## Roster Read Contract
 

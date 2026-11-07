@@ -107,6 +107,9 @@ import type {
   V1LinkEmailVerifyResult,
   V1LinkPendingPayload,
   V1LinkSocialResult,
+  V1RevokeOtherSessionsResult,
+  V1UnlinkLoginMethodPayload,
+  V1UnlinkLoginMethodResult,
   V1PhoneVerifyResult,
   V1EmailLoginResult,
   V1LoginStepUpResendResult,
@@ -432,6 +435,25 @@ export function useV1LinkEmailComplete() {
   return useMutation({
     mutationFn: (body: V1LinkEmailCompletePayload) => v1Post<V1LinkEmailCompleteResult>('/auth/link/email/complete', body),
     onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/**
+ * 로그인 수단을 뗀다. 서버가 다른 기기를 모두 로그아웃시키고 이 기기의 쿠키만 새로 발급하므로 같은 계정으로 계속 쓴다 —
+ * 연결 훅과 같은 곳(로그인 수단 목록을 담은 스냅샷, 서버가 남기는 알림)만 새로 읽는다.
+ */
+export function useV1UnlinkLoginMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UnlinkLoginMethodPayload) => v1Post<V1UnlinkLoginMethodResult>('/auth/identities/unlink', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 이 기기를 뺀 모든 기기에서 로그아웃한다. 읽어 둔 데이터는 그대로라 새로 읽을 것이 없다. */
+export function useV1RevokeOtherSessions() {
+  return useMutation({
+    mutationFn: () => v1Post<V1RevokeOtherSessionsResult>('/auth/sessions/revoke-others'),
   });
 }
 

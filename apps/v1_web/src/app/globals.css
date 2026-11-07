@@ -2296,6 +2296,11 @@ button:disabled {
   color: var(--text);
 }
 
+/* 배경 없는 파괴 행동 글자 버튼(예: 로그인 방법 연결 해제). 크기·터치 높이는 .tm-btn-sm 이 맡는다. */
+.tm-btn.tm-danger-text {
+  color: var(--red700);
+}
+
 /* 인라인 로딩 스피너 (문자 도착 자동 확인 등). light-only + reduced-motion 대응. */
 .tm-spinner {
   display: inline-block;

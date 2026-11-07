@@ -8,11 +8,15 @@ export function standingOrder(groupStandings: readonly StandingGroup[], groupIds
     .sort((left, right) => left.position - right.position || left.id.localeCompare(right.id)).map(row => row.id) }));
 }
 
-/** Order only: points or goals that move without reordering the teams do not count. */
-export function standingsOrderChanged(saved: StandingsSnapshot, current: StandingsSnapshot): boolean {
-  return saved.some(group => {
-    const now = current.find(row => row.groupId === group.groupId)?.registrationIds;
-    return now === undefined || now.length !== group.registrationIds.length || now.some((id, index) => id !== group.registrationIds[index]);
+/**
+ * True when the team at any rank the final's rules point at differs from the saved order (a rank filled on one side only counts as changed).
+ * Order only: points or goals that move without reordering the teams do not count, and ranks no rule uses are ignored.
+ */
+export function standingsOrderChanged(saved: StandingsSnapshot, current: StandingsSnapshot, rules: ReadonlyArray<{ groupId: string; rank: number }>): boolean {
+  return rules.some(({ groupId, rank }) => {
+    const before = saved.find(group => group.groupId === groupId)?.registrationIds[rank - 1];
+    const now = current.find(group => group.groupId === groupId)?.registrationIds[rank - 1];
+    return before !== now;
   });
 }
 

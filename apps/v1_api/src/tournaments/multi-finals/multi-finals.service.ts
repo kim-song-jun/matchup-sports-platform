@@ -75,12 +75,12 @@ export class MultiFinalsService {
     await tx.v1TournamentByeSlot.deleteMany({ where: { groupId: { in: groupIds } } });
     for (const group of groups) await deleteTournamentGroupInTx(tx, admin, group.id);
   }
-  /** True when a group this final drew from has been reordered since its roster was assigned. Rosters assigned before snapshots existed report false. */
+  /** True when a rank this final's rules point at now holds a different team than when its roster was assigned. Rosters assigned before snapshots existed report false. */
   private async standingsChanged(tx: Tx, id: string, final: NamedFinalDto, groupStandings: Parameters<typeof standingOrder>[0]) {
     if (!final.registrationIds) return false;
     const assigned = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: id, action: 'tournament.multi_finals.assign', afterJson: { path: ['finalName'], equals: final.name } });
     const saved = savedStandingsSnapshot(assigned?.afterJson, final.registrationIds);
-    return saved !== null && standingsOrderChanged(saved, standingOrder(groupStandings, saved.map(group => group.groupId)));
+    return saved !== null && standingsOrderChanged(saved, standingOrder(groupStandings, saved.map(group => group.groupId)), final.rules);
   }
   private async view(tx: Tx, id: string) {
     const tournament = await this.tournament(tx, id); const config = this.config(tournament.multiFinals);

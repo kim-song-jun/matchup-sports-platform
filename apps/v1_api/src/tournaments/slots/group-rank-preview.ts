@@ -1,11 +1,6 @@
 // apps/v1_api/src/tournaments/slots/group-rank-preview.ts
-import {
-  calculateLeagueStandingsWithTieBreakInfo,
-  type LeagueStandingFixture,
-} from '../../league-matches/league-standings';
-import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import type { CompetitionConfig } from '../competition-config/competition-config.types';
-import { calculateCompetitionStandingsWithTies } from '../competition-config/competition-standings';
+import { calculateCompetitionStandingsWithTies, type StandingFixture } from '../competition-config/competition-standings';
 
 export type RankFixtureInput = {
   homeRegistrationId: string | null;
@@ -23,10 +18,16 @@ export type RankStandingInput = {
   fairPlayPoints: number;
   recalculatedAt: Date | null;
 };
+export type StoredRankRule = { tournamentId: string; configVersionId: string; config: CompetitionConfig };
 export type GroupRankSource = {
   registrationIds: readonly string[];
   fixtures: readonly RankFixtureInput[];
   standings: readonly RankStandingInput[];
+  /**
+   * The tournament's own ranking rule (its tie-break order included). Resolved only for a settled
+   * group, so a group with pending results never needs the tournament's config.
+   */
+  rule: () => StoredRankRule;
 };
 export type GroupRankResolution =
   | { state: 'group_incomplete' }
@@ -35,15 +36,15 @@ export type GroupRankResolution =
 
 const INCOMPLETE: GroupRankResolution = { state: 'group_incomplete' };
 
-/** 확정된 결과만 모아 §5 계산 입력으로 바꾼다. 하나라도 덜 끝났거나 순위표가 낡았으면 null. */
-function settledResults(source: GroupRankSource): LeagueStandingFixture[] | null {
+/** 확정된 결과만 모아 순위 계산 입력으로 바꾼다. 하나라도 덜 끝났거나 순위표가 낡았으면 null. */
+function settledResults(source: GroupRankSource): StandingFixture[] | null {
   if (source.fixtures.length === 0) return null;
-  const results: LeagueStandingFixture[] = [];
+  const results: StandingFixture[] = [];
   for (const fixture of source.fixtures) {
     if (fixture.homeRegistrationId === null || fixture.awayRegistrationId === null || fixture.official === null) return null;
     results.push({
-      homeTeamId: fixture.homeRegistrationId,
-      awayTeamId: fixture.awayRegistrationId,
+      homeRegistrationId: fixture.homeRegistrationId,
+      awayRegistrationId: fixture.awayRegistrationId,
       homeScore: fixture.official.homeScore,
       awayScore: fixture.official.awayScore,
     });
@@ -76,74 +77,47 @@ function isStandingStale(source: GroupRankSource): boolean {
   return source.fixtures.some((fixture) => fixture.officialAt !== null && fixture.officialAt.getTime() > oldest);
 }
 
-type GroupLeague = ReturnType<typeof calculateLeagueStandingsWithTieBreakInfo>;
-
-function leagueOf(source: GroupRankSource, results: LeagueStandingFixture[]): GroupLeague {
-  return calculateLeagueStandingsWithTieBreakInfo({
-    teamIds: source.registrationIds,
-    fixtures: results,
-    tieBreakOrder: LEAGUE_TIE_BREAK_ORDER,
-  });
-}
-
-function resolveRankIn(source: GroupRankSource, league: GroupLeague, rank: number): GroupRankResolution {
-  const byRule = league.standings[rank - 1]?.teamId;
-  if (byRule === undefined) return INCOMPLETE;
-  const tie = league.tieGroups.find((group) => group.teamIds.includes(byRule));
-  if (tie !== undefined) return { state: 'tied', tiedRegistrationIds: tie.teamIds };
-  const stored = source.standings.find((row) => row.position === rank)?.registrationId;
-  if (stored === undefined) return INCOMPLETE;
-  // 저장 순위(대회 설정 규칙)와 §5 가 갈라지는 드문 경우 — 어느 쪽도 정답이라 못 박지 않고 운영자에게 넘긴다.
-  if (stored !== byRule) return { state: 'tied', tiedRegistrationIds: [stored, byRule].sort() };
-  return { state: 'ready', registrationId: stored };
-}
-
-export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRankResolution {
-  const results = settledResults(source);
-  if (results === null) return INCOMPLETE;
-  return resolveRankIn(source, leagueOf(source, results), rank);
-}
-
-export type StoredRankRule = { tournamentId: string; configVersionId: string; config: CompetitionConfig };
-
 /**
  * Teams the stored order could separate only by the seeded draw, one array per bundle. Replays the
- * stored-standings comparator over the settled results, so a pair the comparator ranked by head-to-head
- * or fair play is not a bundle — unlike the league calculator, which would call those ties.
- * `rule` is only resolved for a settled group, so callers can defer loading the tournament's config.
+ * stored-standings comparator (with the tournament's own tie-break order) over the settled results,
+ * so a pair the comparator ranked by head-to-head or fair play is not a bundle.
  */
-export function drawnTieGroups(source: GroupRankSource, rule: () => StoredRankRule): string[][] {
+export function drawnTieGroups(source: GroupRankSource): string[][] {
   const results = settledResults(source);
-  if (results === null) return [];
+  return results === null ? [] : drawnTiesOf(source, results);
+}
+
+function drawnTiesOf(source: GroupRankSource, results: StandingFixture[]): string[][] {
   return calculateCompetitionStandingsWithTies({
-    ...rule(),
+    ...source.rule(),
     registrationIds: [...source.registrationIds],
-    fixtures: results.map((result) => ({
-      homeRegistrationId: result.homeTeamId,
-      awayRegistrationId: result.awayTeamId,
-      homeScore: result.homeScore,
-      awayScore: result.awayScore,
-    })),
+    fixtures: results,
     fairPlayByRegistration: new Map(source.standings.map((row) => [row.registrationId, row.fairPlayPoints])),
   }).drawnTies;
 }
 
-/** N개 결선은 대회 계산기로 저장한 공식 순위를 그대로 사용한다.
- * 별도의 리그 계산기로 순서를 재해석하면 승자승 우선 순위를 가짜 동률로 바꾸게 된다.
- * A rank the stored comparator separated only by the seeded draw (`drawnTies`) comes back tied: the operator decides it.
+/**
+ * The stored position is the answer; a rank comes back tied only when the stored comparator reached
+ * the seeded draw (`drawnTies`), so the operator decides it.
  */
 export function resolveStoredGroupRank(source: GroupRankSource, rank: number, drawnTies: readonly (readonly string[])[]): GroupRankResolution {
   if (settledResults(source) === null) return INCOMPLETE;
   const rows = source.standings.filter(row => row.position === rank && source.registrationIds.includes(row.registrationId));
   if (rows.length !== 1) return INCOMPLETE;
   const tie = drawnTies.find(group => group.includes(rows[0].registrationId));
-  return tie === undefined ? { state: 'ready', registrationId: rows[0].registrationId } : { state: 'tied', tiedRegistrationIds: [...tie] };
+  return tie === undefined ? { state: 'ready', registrationId: rows[0].registrationId } : { state: 'tied', tiedRegistrationIds: [...tie].sort() };
+}
+
+export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRankResolution {
+  const results = settledResults(source);
+  if (results === null) return INCOMPLETE;
+  return resolveStoredGroupRank(source, rank, drawnTiesOf(source, results));
 }
 
 export type GroupQualification = { advancingRegistrationIds: string[]; undecided: boolean };
 export type QualificationTrack = string;
 export type GroupStandingSummary = {
-  /** §5 로 끝까지 안 갈린 팀만 들어간다. 값 = 그 동률 묶음 팀들의 저장 position 중 최솟값. */
+  /** 그 대회의 동점 순서로 끝까지 안 갈려 추첨으로 정한 팀만 들어간다. 값 = 그 묶음 팀들의 저장 position 중 최솟값. */
   sharedRankByRegistrationId: Map<string, number>;
   /** 진출 규칙도 실제 결선 배정도 없으면 null. */
   qualification: GroupQualification | null;
@@ -151,7 +125,7 @@ export type GroupStandingSummary = {
 };
 
 /**
- * 공개 순위표용 요약. 어드민의 "동률 — 직접 고르기" 판정(resolveGroupRank)과 같은 settledResults 를 쓴다.
+ * 공개 순위표용 요약. 어드민의 "동률 — 직접 고르기" 판정(resolveGroupRank)과 같은 저장 순위 비교기를 쓴다.
  * 결선 대진에 실제로 들어간 팀이 하나라도 있으면 그 팀들이 진출 팀이다(어드민이 동률 자리에 직접 고른 결과).
  */
 export function summarizeGroupStanding(
@@ -162,27 +136,26 @@ export function summarizeGroupStanding(
 ): GroupStandingSummary | null {
   const results = settledResults(source);
   if (results === null) return null;
-  const league = leagueOf(source, results);
+  const drawnTies = drawnTiesOf(source, results);
   const positionById = new Map(source.standings.map((row) => [row.registrationId, row.position]));
   const sharedRankByRegistrationId = new Map<string, number>();
-  for (const tie of league.tieGroups) {
-    if (tie.teamIds.length < 2) continue;
-    const positions = tie.teamIds.flatMap((id) => positionById.get(id) ?? []);
+  for (const tie of drawnTies) {
+    const positions = tie.flatMap((id) => positionById.get(id) ?? []);
     if (positions.length === 0) continue;
     const shared = Math.min(...positions);
-    for (const id of tie.teamIds) sharedRankByRegistrationId.set(id, shared);
+    for (const id of tie) sharedRankByRegistrationId.set(id, shared);
   }
   if (options.splitBracket) {
-    const upper = qualificationOf(source, league, 2, options.placedByTrack?.get('upper') ?? new Set(), 1);
-    const lower = qualificationOf(source, league, 2, options.placedByTrack?.get('lower') ?? new Set(), 3);
+    const upper = qualificationOf(source, drawnTies, 2, options.placedByTrack?.get('upper') ?? new Set(), 1);
+    const lower = qualificationOf(source, drawnTies, 2, options.placedByTrack?.get('lower') ?? new Set(), 3);
     return { sharedRankByRegistrationId, qualification: upper, qualificationByTrack: { upper, lower } };
   }
-  return { sharedRankByRegistrationId, qualification: qualificationOf(source, league, advanceCount, placedRegistrationIds, 1) };
+  return { sharedRankByRegistrationId, qualification: qualificationOf(source, drawnTies, advanceCount, placedRegistrationIds, 1) };
 }
 
 function qualificationOf(
   source: GroupRankSource,
-  league: GroupLeague,
+  drawnTies: readonly (readonly string[])[],
   advanceCount: number | null,
   placedRegistrationIds: ReadonlySet<string>,
   firstRank: number,
@@ -195,16 +168,14 @@ function qualificationOf(
     return advancingRegistrationIds.length === 0 ? null : { advancingRegistrationIds, undecided: false };
   }
   const effectiveCount = Math.min(advanceCount, Math.max(0, source.registrationIds.length - firstRank + 1));
-  const orderIndexById = new Map(league.standings.map((row, index) => [row.teamId, index]));
   const positionById = new Map(source.standings.map((row) => [row.registrationId, row.position]));
   const isInsideLine = (id: string) =>
-    (orderIndexById.get(id) ?? Infinity) >= firstRank - 1 && (orderIndexById.get(id) ?? Infinity) < firstRank - 1 + effectiveCount &&
     (positionById.get(id) ?? Infinity) >= firstRank && (positionById.get(id) ?? Infinity) < firstRank + effectiveCount;
   // 진출 자리 순서대로 모은 확정 팀. 진출선 안쪽 동률은 누가 올라가는지는 정해졌고 시드만 미정이라 여기 넣는다.
   // 진출선에 걸친 동률 팀은 넣지 않는다 — 운영자가 고를 때까지 진출로 칠하지 않는다.
   const decided = new Set<string>();
   for (let rank = firstRank; rank < firstRank + effectiveCount; rank += 1) {
-    const resolution = resolveRankIn(source, league, rank);
+    const resolution = resolveStoredGroupRank(source, rank, drawnTies);
     if (resolution.state === 'group_incomplete') return null;
     if (resolution.state === 'ready') decided.add(resolution.registrationId);
     else if (resolution.tiedRegistrationIds.every(isInsideLine)) resolution.tiedRegistrationIds.forEach((id) => decided.add(id));

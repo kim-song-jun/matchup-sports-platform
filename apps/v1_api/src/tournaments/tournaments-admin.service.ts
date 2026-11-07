@@ -28,6 +28,7 @@ import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, valida
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { lockCompetitionFixtureRows, lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { normalizeTieBreakOrderForStorage, resolveTieBreakOrder } from './competition-config/tournament-tie-break-order';
 
 /**
  * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
@@ -217,8 +218,10 @@ export class TournamentsAdminService {
     // 안전하게 degrade하지, 여기서 크래시하지 않는다.
     const lineup = await this.loadLineupInfo(row.sport?.code, row.competitionConfigVersionId);
     const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
+    const tieBreakOrderBlockedReason = await this.getTieBreakOrderBlockedReason(this.prisma, tournamentId);
     return {
       formatChangeBlockedReason,
+      tieBreakOrderBlockedReason,
       canRevertStart: row.status === 'in_progress' && !(await this.hasStartedTournamentFixture(this.prisma, tournamentId)),
       ...this.serialize(
         row,
@@ -318,6 +321,7 @@ export class TournamentsAdminService {
       genderMaxFemale: dto.genderMaxFemale,
       maxPlayers: dto.maxPlayers ?? 10,
     });
+    const tieBreakOrder = normalizeTieBreakOrderForStorage(dto.tieBreakOrder ?? null);
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
@@ -349,6 +353,7 @@ export class TournamentsAdminService {
           competitionConfigVersionId,
           format: dto.format ?? 'group_knockout',
           sixTeamMode: dto.sixTeamMode ?? false,
+          ...(tieBreakOrder !== null && { tieBreakOrder }),
           minMatchesPerTeam: dto.minMatchesPerTeam ?? null,
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
@@ -442,6 +447,11 @@ export class TournamentsAdminService {
     if (sixTeamMode && ((dto.teamCount ?? existing.teamCount) !== 6 || (dto.format ?? existing.format) !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 방식은 모집 정원 6팀의 토너먼트에서만 선택할 수 있어요.' });
     const formatChanged = dto.format !== undefined && dto.format !== existing.format;
     if (formatChanged) await this.assertFormatChangeAllowed(this.prisma, tournamentId, existing.status);
+    // Resending the current order (or the default for an untouched tournament) is not a change, so it never trips the lock.
+    const nextTieBreakOrder = dto.tieBreakOrder === undefined ? undefined : normalizeTieBreakOrderForStorage(dto.tieBreakOrder);
+    const tieBreakOrderChanged = nextTieBreakOrder !== undefined
+      && resolveTieBreakOrder(nextTieBreakOrder).join() !== resolveTieBreakOrder(existing.tieBreakOrder).join();
+    if (tieBreakOrderChanged) await this.assertTieBreakOrderEditable(this.prisma, tournamentId);
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
     // pin되는 설정이라 변경 정책도 동일해야 한다(오너 지시 #4) — 아래 게이트를 두
@@ -575,6 +585,7 @@ export class TournamentsAdminService {
     if (dto.title !== undefined) data.title = dto.title;
     data.sixTeamMode = sixTeamMode;
     if (dto.format !== undefined) data.format = dto.format;
+    if (tieBreakOrderChanged) data.tieBreakOrder = nextTieBreakOrder ?? Prisma.DbNull;
     if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
@@ -640,8 +651,9 @@ export class TournamentsAdminService {
     await this.prisma.$transaction(async (tx) => {
       // 설정 핀과 일반 필드를 같은 트랜잭션에 둔다. 구조 검사나 CAS가 거부되면
       // 설정 리포인트와 감사 기록까지 함께 롤백되어야 한다.
-      if (formatChanged || lineupConfigChangeRequested) await lockTournamentForConfigChange(tx, tournamentId);
+      if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged) await lockTournamentForConfigChange(tx, tournamentId);
       if (formatChanged) await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
+      if (tieBreakOrderChanged) await this.assertTieBreakOrderEditable(tx, tournamentId);
       if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
       let casBaseline = existing.updatedAt;
       if (lineupConfigChangeRequested) {
@@ -723,6 +735,7 @@ export class TournamentsAdminService {
           targetId: tournamentId,
           beforeJson: {
             title: existing.title,
+            ...(tieBreakOrderChanged && { tieBreakOrder: resolveTieBreakOrder(existing.tieBreakOrder) }),
             ...(formatChanged && { format: existing.format }),
             ...(sportChanged && {
               sportId: existing.sportId,
@@ -731,6 +744,7 @@ export class TournamentsAdminService {
           },
           afterJson: {
             title: data.title ?? existing.title,
+            ...(tieBreakOrderChanged && { tieBreakOrder: resolveTieBreakOrder(nextTieBreakOrder) }),
             ...(formatChanged && { format: dto.format }),
             ...(sportChanged && {
               sportId: dto.sportId,
@@ -1189,6 +1203,24 @@ export class TournamentsAdminService {
   }
 
   /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
+  private async getTieBreakOrderBlockedReason(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    tournamentId: string,
+  ): Promise<string | null> {
+    const official = await client.v1TournamentMatchDetails.findFirst({
+      where: {
+        tournamentId,
+        group: { is: { phase: 'group' } },
+        teamMatch: { is: { deletedAt: null, game: { is: { currentOfficialRevision: { is: { state: 'OFFICIAL' } } } } } },
+      },
+      select: { teamMatchId: true },
+    });
+    return official === null ? null : '예선 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 결과를 확정하기 전에 정해 주세요.';
+  }
+  private async assertTieBreakOrderEditable(client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>, tournamentId: string) {
+    const message = await this.getTieBreakOrderBlockedReason(client, tournamentId);
+    if (message) throw new ConflictException({ code: 'TIE_BREAK_ORDER_LOCKED', message });
+  }
   private async assertSportChangeAllowed(
     client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
     tournamentId: string,
@@ -1411,6 +1443,7 @@ export class TournamentsAdminService {
       format: row.format,
       sixTeamBracket: row.sixTeamBracket,
       sixTeamMode: row.sixTeamMode,
+      tieBreakOrder: resolveTieBreakOrder(row.tieBreakOrder),
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,

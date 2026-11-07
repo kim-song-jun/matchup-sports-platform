@@ -13,6 +13,7 @@ import type {
 } from '@/types/api';
 import { TournamentAdminShell } from './tournament-admin-shell';
 import AdminTournamentRegistrationsPage from './registrations/page';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/tournament-parent-lifecycle/registrations',
@@ -35,7 +36,7 @@ const tournament: V1Tournament = {
   promoListEnabled: false, promoListTitle: null, promoListSubtitle: null, promoListImageUrl: null,
   promoListBadgeText: null, promoListDateText: null, promoListTeamsText: null,
   promoListLocationText: null, promoListPrizeText: null, promoListPriority: 0,
-  bankName: null, bankAccount: null, bankHolder: null, yellowAccumulationLimit: null,
+  bankName: null, bankAccount: null, bankHolder: null, tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER], yellowAccumulationLimit: null,
   redCardSuspensionMatches: null, rulesText: null, refundPolicyText: null, registrationCount: 1,
   operationCounts: { registrations: 1, fixtures: 0, announcements: 0 },
   createdAt: '2026-10-13T00:00:00Z', updatedAt: '2026-10-13T00:00:00Z',

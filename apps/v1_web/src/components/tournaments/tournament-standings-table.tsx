@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { withFromPath } from '@/lib/session-storage';
+import { formatTournamentTieBreakRule } from '@/lib/tournament-tie-break';
 
 /**
  * §순위표 지표 통일 — 같은 대회 `/bracket` 화면의 두 탭(순위·대진표 탭의
@@ -133,6 +134,7 @@ export function TournamentStandingsTable({
   fromHref,
   header,
   keepTeamLink = false,
+  tieBreakOrder = null,
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
@@ -147,8 +149,11 @@ export function TournamentStandingsTable({
   keepTeamLink?: boolean;
   /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
   fromHref?: string | null;
+  /** 이 대회가 고른 동점 순서. 주면 표 아래에 한 줄로 알린다 — 정규 리그는 주지 않는다. */
+  tieBreakOrder?: readonly string[] | null;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
+  const tieBreakRule = tieBreakOrder ? formatTournamentTieBreakRule(tieBreakOrder) : '';
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const COLUMN_COUNT = 5;
   const hasSharedRank = sorted.some((row) => row.sharedRank !== null);
@@ -346,6 +351,19 @@ export function TournamentStandingsTable({
         >
           아직 경기 기록이 없어요. 첫 결과가 등록되면 순위가 매겨져요.
         </div>
+      ) : null}
+      {tieBreakRule ? (
+        <p
+          className="tm-text-caption"
+          style={{
+            margin: 0,
+            padding: unranked ? '0 12px 12px' : '12px',
+            borderTop: unranked ? undefined : '1px solid var(--grey100)',
+            color: 'var(--text-caption)',
+          }}
+        >
+          동점이면 {tieBreakRule} 순서로 정해요
+        </p>
       ) : null}
     </Card>
   );

@@ -46,12 +46,16 @@ const slot = (id: string, position: number, sourceGroupId: string, sortOrder: nu
   sourceGroup: { name: groupName, sortOrder },
 });
 
-function fakeClient(data: { slots: unknown[]; groupTeams: unknown[]; standings: unknown[]; details: unknown[] }) {
+function fakeClient(data: { slots: unknown[]; groupTeams: unknown[]; standings: unknown[]; details: unknown[]; tieBreakOrder?: unknown }) {
   const findSlots = jest.fn().mockResolvedValue(data.slots);
   const findTeams = jest.fn().mockResolvedValue(data.groupTeams);
   const findStandings = jest.fn().mockResolvedValue(data.standings);
   const findDetails = jest.fn().mockResolvedValue(data.details);
+  const findTournament = jest.fn().mockResolvedValue({
+    competitionConfigVersionId: 'config-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder: data.tieBreakOrder ?? null,
+  });
   const client = {
+    v1Tournament: { findFirst: findTournament },
     v1TournamentSlot: { findMany: findSlots },
     v1TournamentGroupTeam: { findMany: findTeams },
     v1TournamentStanding: { findMany: findStandings },
@@ -158,6 +162,7 @@ describe('loadGroupStandingSummaries', () => {
         : (options.knockout ?? []),
     );
     const client = {
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ competitionConfigVersionId: 'config-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder: null }) },
       v1TournamentGroup: { findMany: findGroups },
       v1TournamentGroupTeam: { findMany: findTeams },
       v1TournamentStanding: { findMany: findStandings },

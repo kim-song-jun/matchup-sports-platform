@@ -1,6 +1,7 @@
 import type { V1Tournament, V1AdminTournamentRegistration, V1AdminTournamentBracket } from '@/types/api';
 import type { V1DataSource } from '@/components/providers/v1-data-source';
 import { V1ApiError } from '@/lib/api-client';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 export const ADMIN_DEMO_ID = 'sample-partner-cup';
 export const ADMIN_DEMO_STORAGE_KEY = 'teameet.tournament-admin-demo.v2';
@@ -37,7 +38,7 @@ export function createAdminDemoState(): AdminDemoState {
     promoHomePrizeText: null, promoHomePriority: 0, promoListEnabled: false, promoListTitle: null,
     promoListSubtitle: null, promoListImageUrl: null, promoListBadgeText: null, promoListDateText: null,
     promoListTeamsText: null, promoListLocationText: null, promoListPrizeText: null, promoListPriority: 0,
-    bankName: null, bankAccount: null, bankHolder: null, yellowAccumulationLimit: null,
+    bankName: null, bankAccount: null, bankHolder: null, tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER], tieBreakOrderBlockedReason: null, yellowAccumulationLimit: null,
     redCardSuspensionMatches: null, rulesText: '샘플 대회 운영을 자유롭게 체험해 보세요.',
     refundPolicyText: null, registrationCount: 4, operationCounts: { registrations: 4, fixtures: 0, announcements: 0 },
     createdAt: stamp, updatedAt: stamp,

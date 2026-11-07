@@ -93,19 +93,31 @@ function directStanding(
   return stats;
 }
 
+type TieBreakKey = (team: StandingWithoutPosition, direct: DirectStanding) => number;
+type MovableCriterion = Exclude<CompetitionConfig['tieBreak']['order'][number], 'points' | 'seeded_draw'>;
+
 /**
- * Tie-break criteria applied to teams level on points, strongest first; the seeded draw always
- * comes after the last one. A larger value ranks higher, so two teams are separated by the first
- * criterion whose values differ. Mirrors REQUIRED_TIE_BREAK_ORDER between 'points' and 'seeded_draw'.
+ * Each movable criterion contributes the keys that separate teams level on points; a larger value
+ * ranks higher. Head-to-head is three keys (mini-table points, goal difference, goals for) that always
+ * stay together in this order.
  */
-const PRE_DRAW_CRITERIA: ReadonlyArray<(team: StandingWithoutPosition, direct: DirectStanding) => number> = [
-  (_team, direct) => direct.points,
-  (_team, direct) => direct.goalsFor - direct.goalsAgainst,
-  (_team, direct) => direct.goalsFor,
-  (team) => team.goalsFor - team.goalsAgainst,
-  (team) => team.goalsFor,
-  (team) => -team.fairPlayPoints,
-];
+const CRITERION_KEYS: Record<MovableCriterion, readonly TieBreakKey[]> = {
+  head_to_head: [
+    (_team, direct) => direct.points,
+    (_team, direct) => direct.goalsFor - direct.goalsAgainst,
+    (_team, direct) => direct.goalsFor,
+  ],
+  goal_difference: [(team) => team.goalsFor - team.goalsAgainst],
+  goals_for: [(team) => team.goalsFor],
+  fair_play: [(team) => -team.fairPlayPoints],
+};
+
+/** The seeded draw always comes after the last key; `points` leads before any key is read. */
+function tieBreakKeys(order: CompetitionConfig['tieBreak']['order']): TieBreakKey[] {
+  return order.flatMap((criterion) =>
+    criterion === 'points' || criterion === 'seeded_draw' ? [] : CRITERION_KEYS[criterion],
+  );
+}
 
 export type CompetitionStandingsWithTies = {
   standings: CalculatedStanding[];
@@ -147,6 +159,7 @@ export function calculateCompetitionStandingsWithTies(input: {
     applyFixture(stats, fixture, input.config.tieBreak.points);
   }
 
+  const criteria = tieBreakKeys(input.config.tieBreak.order);
   const lexicalIds = [...input.registrationIds].sort();
   const drawSeed = createHash('sha256')
     .update(`${input.tournamentId}:${input.configVersionId}:${lexicalIds.join(',')}`)
@@ -172,7 +185,7 @@ export function calculateCompetitionStandingsWithTies(input: {
     const keysById = new Map(
       tied.map((standing) => [
         standing.registrationId,
-        PRE_DRAW_CRITERIA.map((criterion) => criterion(standing, headToHead.get(standing.registrationId)!)),
+        criteria.map((criterion) => criterion(standing, headToHead.get(standing.registrationId)!)),
       ]),
     );
     const keysOf = (standing: StandingWithoutPosition) => keysById.get(standing.registrationId)!;

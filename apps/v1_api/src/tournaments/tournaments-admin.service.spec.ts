@@ -1099,6 +1099,141 @@ describe('TournamentsAdminService', () => {
     });
   });
 
+  describe('동점 순서 (대회별 설정)', () => {
+    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
+    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+    // The "official group result" probe is the only match-details lookup that filters on group phase.
+    const officialGroupResultProbe = (exists: boolean) =>
+      prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: { group?: unknown } }) =>
+        where.group !== undefined && exists ? { teamMatchId: 'fixture-1' } : null);
+    function arrange(overrides: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(overrides), _count: { registrations: 5, announcements: 0 } });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it('create: 고른 순서를 저장하고, 기본 순서나 생략은 null 로 둔다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+      prisma.v1Tournament.create.mockImplementation(async ({ data }) => tournamentRow(data));
+
+      const custom = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '대회', teamCount: 8, tieBreakOrder: GOALS_FIRST });
+      expect(prisma.v1Tournament.create.mock.calls[0][0].data.tieBreakOrder).toEqual(GOALS_FIRST);
+      expect(custom.tieBreakOrder).toEqual(GOALS_FIRST);
+
+      const explicitDefault = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '대회', teamCount: 8, tieBreakOrder: DEFAULT_ORDER });
+      expect(prisma.v1Tournament.create.mock.calls[1][0].data.tieBreakOrder).toBeUndefined();
+      expect(explicitDefault.tieBreakOrder).toEqual(DEFAULT_ORDER);
+
+      const omitted = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '대회', teamCount: 8 });
+      expect(prisma.v1Tournament.create.mock.calls[2][0].data.tieBreakOrder).toBeUndefined();
+      expect(omitted.tieBreakOrder).toEqual(DEFAULT_ORDER);
+    });
+
+    it('create: 잘못된 순서는 대회를 만들기 전에 400 으로 거절한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+      await expect(service.create(ownerAuthUser, { sportId: 'sport-1', title: '대회', teamCount: 8, tieBreakOrder: ['points', 'seeded_draw'] }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_INVALID' } });
+      expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+    });
+
+    it('update: 결과가 없으면 순서를 바꾸고 감사 기록에 바뀐 순서를 남긴다', async () => {
+      arrange();
+      officialGroupResultProbe(false);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { tieBreakOrder: GOALS_FIRST } }));
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        beforeJson: expect.objectContaining({ tieBreakOrder: DEFAULT_ORDER }),
+        afterJson: expect.objectContaining({ tieBreakOrder: GOALS_FIRST }),
+      }) }));
+    });
+
+    it('update: null 을 보내면 기본 순서로 되돌린다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      officialGroupResultProbe(false);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: null });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { tieBreakOrder: Prisma.DbNull } }));
+    });
+
+    it('update: 예선 공식 결과가 하나라도 있으면 순서 변경을 409 TIE_BREAK_ORDER_LOCKED 로 막는다', async () => {
+      arrange();
+      officialGroupResultProbe(true);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('update: 기본 순서로 되돌리는 것도 순서 변경이라 결과가 있으면 막는다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      officialGroupResultProbe(true);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: null }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_LOCKED' } });
+    });
+
+    it('update: 결과가 있어도 같은 순서를 다시 보내는 저장은 막지 않는다 — 다른 칸만 고친다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      officialGroupResultProbe(true);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST, title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { title: '새 이름' } }));
+    });
+
+    it('update: 기본 순서를 명시한 저장도 안 건드린 대회와 같아 결과가 있어도 통과한다', async () => {
+      arrange();
+      officialGroupResultProbe(true);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: DEFAULT_ORDER, title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { title: '새 이름' } }));
+    });
+
+    it('update: 순서를 안 보내면 저장 전에 결과 조회도 하지 않고 순서를 건드리지 않는다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      officialGroupResultProbe(true);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { title: '새 이름' } }));
+      const writeOrder = prisma.v1Tournament.updateMany.mock.invocationCallOrder[0];
+      const probeOrders = prisma.v1TournamentMatchDetails.findFirst.mock.calls
+        .map(([args], index) => (args.where.group !== undefined ? prisma.v1TournamentMatchDetails.findFirst.mock.invocationCallOrder[index] : null))
+        .filter((order): order is number => order !== null);
+      expect(probeOrders.filter((order) => order < writeOrder)).toEqual([]);
+    });
+
+    it('update: 잠금 확인 뒤 락 안에서 한 번 더 확인한다 — 그 사이 결과가 확정되면 막는다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ teamMatchId: 'fixture-1' });
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_LOCKED' } });
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('update: 잘못된 순서는 결과 조회 전에 400 으로 거절한다', async () => {
+      arrange();
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'points'] }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_INVALID' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('get: 지금 쓰는 순서를 돌려주고, 결과가 생기면 잠긴 이유를 같이 준다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      officialGroupResultProbe(false);
+      const open = await service.get(ownerAuthUser, 'tournament-1');
+      expect(open.tieBreakOrder).toEqual(GOALS_FIRST);
+      expect(open.tieBreakOrderBlockedReason).toBeNull();
+
+      officialGroupResultProbe(true);
+      const locked = await service.get(ownerAuthUser, 'tournament-1');
+      expect(locked.tieBreakOrderBlockedReason).toContain('결과');
+    });
+
+    it('get: 저장한 순서가 없는 대회는 기본 순서를 보여준다', async () => {
+      arrange();
+      officialGroupResultProbe(false);
+      expect((await service.get(ownerAuthUser, 'tournament-1')).tieBreakOrder).toEqual(DEFAULT_ORDER);
+    });
+  });
+
   describe('update: sport change re-pins the competition config', () => {
     const sports: Record<string, { id: string; code: string }> = {
       'sport-1': { id: 'sport-1', code: 'futsal' },

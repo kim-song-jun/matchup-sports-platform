@@ -6,6 +6,7 @@ import type {
   V1TournamentFormat,
   V1TournamentGenderCategory,
   V1TournamentListItem,
+  V1TournamentTieBreakOrder,
 } from '@/types/api';
 import type { TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import {
@@ -15,6 +16,7 @@ import {
 import type { TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { DAY_MS, isoToKstDatetimeLocal, kstDatetimeLocalToIso, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER, sameTieBreakOrder, tieBreakOrderOf } from '@/lib/tournament-tie-break';
 import {
   applyPromoFactDefaults,
   buildTournamentPromoFactDefaults,
@@ -108,6 +110,8 @@ export type TournamentCreateState = {
   prizePool: string;
   prizeSummary: string;
   prizeRows: TournamentPrizeRow[];
+  /** 동점일 때 순서(6칸). 기본 순서와 같으면 payload 에 null 로 실려 서버 기본값을 쓴다. */
+  tieBreakOrder: V1TournamentTieBreakOrder;
   /** 경고 누적 출전정지 기준(장). 빈 문자열 = 이 대회에는 규정 미적용. */
   yellowAccumulationLimit: string;
   /** 퇴장 1장당 정지 경기 수. 빈 문자열 = 미적용. */
@@ -183,6 +187,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   ],
   // 기본값은 빈 문자열(미적용)이다 — 기본값을 넣으면 운영자가 의식하지 못한 채
   // 정지 규정이 켜진 대회가 만들어진다.
+  tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
   yellowAccumulationLimit: '',
   redCardSuspensionMatches: '',
   rulesText: '',
@@ -488,6 +493,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       tournament.prizePool === null || tournament.prizePool === undefined ? '' : String(tournament.prizePool),
     prizeSummary: tournament.prizeSummary ?? '',
     prizeRows,
+    tieBreakOrder: tieBreakOrderOf(tournament),
     yellowAccumulationLimit:
       tournament.yellowAccumulationLimit === null || tournament.yellowAccumulationLimit === undefined
         ? ''
@@ -835,6 +841,11 @@ export function buildTournamentCreatePayload(
     prizePool: state.prizePool.trim() ? Number(state.prizePool.trim()) : null,
     prizeSummary: state.prizeSummary.trim() || null,
     prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || null,
+    // 기본 순서(와 순위표가 없는 토너먼트)는 null 로 보낸다 — 초안을 이어 고칠 때 앞서 골랐던 순서를 기본으로 되돌린다.
+    tieBreakOrder:
+      state.format === 'knockout' || sameTieBreakOrder(state.tieBreakOrder, DEFAULT_TOURNAMENT_TIE_BREAK_ORDER)
+        ? null
+        : state.tieBreakOrder,
     yellowAccumulationLimit:
       state.yellowAccumulationLimit.trim() === ''
         ? null

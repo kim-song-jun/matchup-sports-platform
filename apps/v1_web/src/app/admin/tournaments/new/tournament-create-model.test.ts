@@ -10,6 +10,7 @@ import {
   validateTournamentCreateStep,
 } from './tournament-create-model';
 import type { V1Tournament } from '@/types/api';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 function draftWithMinimumMatches(
   minMatchesPerTeam: number | null | undefined,
@@ -74,6 +75,7 @@ function draftWithMinimumMatches(
     bankName: null,
     bankAccount: null,
     bankHolder: null,
+    tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
     yellowAccumulationLimit: null,
     redCardSuspensionMatches: null,
     rulesText: null,
@@ -493,3 +495,32 @@ it('정규리그 + N개 토너먼트는 65팀 이상을 허용하고 기존 방�
   expect(buildTournamentCreatePayload(state).teamCount).toBe(101);
   expect(validateTournamentCreateStep({ ...state, format: 'group_knockout' }, 2).teamCount).toBeDefined();
 });
+
+describe('동점 순서 초안 왕복', () => {
+  const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as const;
+
+  it('기본 순서는 null 로, 고른 순서는 그대로 payload 에 싣는다', () => {
+    const base = { ...INITIAL_TOURNAMENT_CREATE_STATE, sportId: 'sport-1', title: '대회' };
+    expect(buildTournamentCreatePayload(base).tieBreakOrder).toBeNull();
+    expect(buildTournamentCreatePayload({ ...base, tieBreakOrder: [...GOALS_FIRST] }).tieBreakOrder).toEqual(GOALS_FIRST);
+  });
+
+  it('순위표가 없는 토너먼트 방식은 골라 둔 순서가 있어도 보내지 않는다', () => {
+    const state = { ...INITIAL_TOURNAMENT_CREATE_STATE, sportId: 'sport-1', title: '대회', format: 'knockout' as const, tieBreakOrder: [...GOALS_FIRST] };
+    expect(buildTournamentCreatePayload(state).tieBreakOrder).toBeNull();
+  });
+
+  it('저장된 초안의 순서를 폼으로 되살리고, 되살린 폼은 서버 기준과 같아 저장 안 된 변경이 아니다', () => {
+    const saved = mapTournamentToWizardFields(draftWithMinimumMatches(1, { tieBreakOrder: [...GOALS_FIRST] }));
+    expect(saved.tieBreakOrder).toEqual(GOALS_FIRST);
+    expect(buildTournamentCreatePayload(saved).tieBreakOrder).toEqual(GOALS_FIRST);
+    expect(hasUnsavedTournamentChanges(saved, saved.savedPayload)).toBe(false);
+    expect(hasUnsavedTournamentChanges({ ...saved, tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER] }, saved.savedPayload)).toBe(true);
+  });
+
+  it('순서를 모르는 옛 응답은 기본 순서로 되살린다', () => {
+    const legacy = draftWithMinimumMatches(1, { tieBreakOrder: undefined } as never);
+    expect(mapTournamentToWizardFields(legacy).tieBreakOrder).toEqual(DEFAULT_TOURNAMENT_TIE_BREAK_ORDER);
+  });
+});
+

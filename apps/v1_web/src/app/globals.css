@@ -2480,6 +2480,110 @@ label.tm-btn:focus-within {
   outline-offset: 2px;
 }
 
+/* 득점·도움 순위 — 한 장 카드 안의 눌리는 행(선수 공개 프로필 링크).
+ * 카드에 overflow:hidden 을 걸지 않는다: 포커스 링(offset 2px)이 잘리기 때문에
+ * 첫·끝 행이 카드 모서리 radius 를 직접 갖는다. */
+.tm-record-rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--grey150);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.tm-record-rank-list > li + li {
+  border-top: 1px solid var(--grey150);
+}
+
+.tm-record-rank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+  color: var(--text-strong);
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+}
+
+.tm-record-rank-list > li:first-child > .tm-record-rank-row {
+  border-top-left-radius: var(--radius-control);
+  border-top-right-radius: var(--radius-control);
+}
+
+.tm-record-rank-list > li:last-child > .tm-record-rank-row {
+  border-bottom-left-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
+}
+
+/* 눌림·hover 배경(--surface-soft)에서 글자(--text-muted)는 4.19:1 이라 grey700 으로 올리고,
+ * 색 말고 링크임을 알려 주는 chevron 은 grey500 이 2.76:1 이라 grey600(라이트 4.19:1·다크 4.97:1)으로 올린다. */
+.tm-record-rank-row:active {
+  background: var(--surface-soft);
+  --text-muted: var(--grey700);
+}
+
+.tm-record-rank-row:active > .tm-record-rank-value > svg {
+  color: var(--grey600);
+}
+
+@media (hover: hover) {
+  .tm-record-rank-row:hover {
+    background: var(--surface-soft);
+    --text-muted: var(--grey700);
+  }
+
+  .tm-record-rank-row:hover > .tm-record-rank-value > svg {
+    color: var(--grey600);
+  }
+}
+
+.tm-record-rank-row:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-record-rank-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tm-record-rank-no {
+  flex-shrink: 0;
+  min-width: 22px;
+  color: var(--text-muted);
+}
+
+.tm-record-rank-nick {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+
+.tm-record-rank-value {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.tm-record-rank-value > svg {
+  color: var(--grey500);
+}
+
+/* 문장 속 이름 링크(InlineChevronLink) — 순위 행과 같은 포커스 링 규격. */
+.tm-inline-chevron-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: var(--radius-tight);
+}
+
 /* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */
 .tm-btn-disabled {
   opacity: 0.78;
@@ -4130,9 +4234,11 @@ label.tm-btn:focus-within {
   pointer-events: none;
 }
 
-/* 탭바 없는 화면은 비워 둘 탭바가 없다 — 끝까지 덮어야 하단 고정 버튼(.tm-fixed-cta)이 시트 아래로 비치지 않는다. */
-.tm-app-frame-no-bottom .tm-filter-scrim,
-.tm-app-frame-no-bottom .tm-filter-layer {
+/* 탭바가 화면에 없으면 비워 둘 높이가 없다 — 끝까지 덮어야 하단 고정 버튼(.tm-fixed-cta)이 시트 아래로 비치지 않는다.
+   앱 설치 시트는 .tm-app-frame 의 형제로, 프레임이 없는 경로에서는 아예 프레임 없이 마운트되므로
+   프레임 자손 여부가 아니라 탭바 유무로 건다. 특이도가 높아, 이 값을 바꾸는 규칙은 이 선택자와 함께 본다. */
+:root:not(:has(.tm-bottom-nav)) .tm-filter-scrim,
+:root:not(:has(.tm-bottom-nav)) .tm-filter-layer {
   bottom: 0;
 }
 
@@ -4153,7 +4259,7 @@ label.tm-btn:focus-within {
   right: 0;
   bottom: 0;
   width: 100%;
-  --tm-filter-sheet-pad-bottom: calc(20px + var(--v1-shell-safe-bottom));
+  --tm-filter-sheet-pad-bottom: 20px;
   padding: 12px var(--v1-shell-page-x) var(--tm-filter-sheet-pad-bottom);
   border-top: 1px solid var(--grey100);
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
@@ -4172,6 +4278,11 @@ label.tm-btn:focus-within {
   max-height: min(78dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* 시트가 화면 바닥에 붙을 때만 안전영역을 더한다 — 탭바 위에 얹히면 탭바가 이미 소비했다. */
+:root:not(:has(.tm-bottom-nav)) .tm-filter-sheet {
+  --tm-filter-sheet-pad-bottom: calc(20px + var(--v1-shell-safe-bottom));
 }
 
 /* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove
@@ -8135,9 +8246,9 @@ button:has(> .tm-toggle):focus-visible {
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
-.tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
-/* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
-/* 12px/800 은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 흰 지면 3.71:1 미달. */
+/* 12px 라벨은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 은 흰 지면 3.71:1 미달이라
+   완료·진행 중 모두 blue700 이다. 둘의 구분은 굵기(700/800)와 단계 원이 맡는다. */
+.tm-hub-stage-label-done  { color: var(--blue700); font-weight: 700; }
 .tm-hub-stage-label-active { color: var(--blue700); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */
@@ -9923,13 +10034,14 @@ button:has(> .tm-toggle):focus-visible {
   pointer-events: none; z-index: 2;
 }
 @keyframes tmCardSweep { 0%, 62% { transform: translateX(0%) rotate(18deg); } 88%, 100% { transform: translateX(387.1%) rotate(18deg); } }
-/* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다. */
+/* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다.
+   teameet-mark-mask.webp 는 teameet-mark.png 와 알파가 같은 무손실 WebP 다(마스크는 알파만 쓰므로 RGB 는 검정). */
 .tm-pcard-crest-bg {
   position: absolute; right: -26px; top: -16px;
   width: 150px; height: 150px;
   background: var(--tm-ink);
-  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
-  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  -webkit-mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
+  mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
   /* 0.1 이면 카드 모서리 밖으로 나간 마크의 두 원이 흠집처럼 보였다(2026-09-25 alpha). */
   opacity: 0.05; pointer-events: none; z-index: 0;
 }
@@ -9979,8 +10091,8 @@ button:has(> .tm-toggle):focus-visible {
 }
 .tm-pcard-badge-mark {
   width: 13px; height: 13px; background: var(--tm-ink);
-  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
-  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  -webkit-mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
+  mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
 }
 
 /* 선수 사진 -- 둥근 프레임 + 티어 색 테두리(사용자 선택 B안, 2026-10-13).
@@ -10074,8 +10186,8 @@ button:has(> .tm-toggle):focus-visible {
 .tm-pcard-brand em {
   width: 11px; height: 11px; font-style: normal; display: block;
   background: currentColor;
-  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
-  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  -webkit-mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
+  mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
 }
 
 /* ── 티어 토큰 ── 실루엣 + 재질 + 엠블럼이 한 세트로 움직인다.
@@ -10266,8 +10378,8 @@ button:has(> .tm-toggle):focus-visible {
 }
 .tm-pcard-back-h em {
   width: 12px; height: 12px; font-style: normal; background: currentColor;
-  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
-  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  -webkit-mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
+  mask: url('/brand/teameet-mark-mask.webp') center / contain no-repeat;
 }
 /* 숫자 나열 전에 "어떤 선수인가"를 사람 말로 먼저. */
 .tm-pcard-back-sum { font-size: 11.5px; line-height: 1.55; color: #a9b3c2; text-align: center; }

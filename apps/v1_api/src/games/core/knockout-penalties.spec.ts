@@ -31,14 +31,13 @@ import {
  * 대진이 영영 비어 있는 것을 나중에야 알게 된다. 실패는 비동기 잡이 아니라
  * 커맨드 자리에서 돌려줘야 그 자리에서 승부차기를 입력해 복구할 수 있다.
  *
- * ## 문구·상태코드는 바이트 동일해야 한다
+ * ## 문구·상태코드
  *
- * 아래 단언의 코드/메시지는 `applyPenalties`의 현행 값을 그대로 옮긴 것이다.
- * 특히 `TOURNAMENT_PENALTY_NOT_ALLOWED` **두 건의 메시지는 서로 다르다**
+ * 아래 단언의 코드/메시지가 사용자에게 보이는 계약이다. 특히
+ * `TOURNAMENT_PENALTY_NOT_ALLOWED` **두 건의 메시지는 서로 다르다**
  * (knockout 아님 / 정규시간이 무승부 아님) — 두 분기를 한 문구로 합치면
- * 운영자가 무엇을 고쳐야 하는지 알 수 없게 되므로 회귀다. 한국어 문구는
- * `TOURNAMENT_PENALTY_REQUIRED` 한 건뿐이고, 나머지 둘은 영문 원문 그대로
- * 유지한다(번역은 동작 변경이다).
+ * 운영자가 무엇을 고쳐야 하는지 알 수 없게 되므로 회귀다. 세 코드의 문구가
+ * 모두 한국어 해요체여야 화면이 코드별 매핑 없이 서버 문구를 그대로 보여 줄 수 있다.
  */
 const REQUIRED_MESSAGE = '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.';
 /**
@@ -49,8 +48,8 @@ const REQUIRED_MESSAGE = '결선 경기는 무승부로 끝낼 수 없어요. �
  */
 const EDGE_ONLY_REQUIRED_MESSAGE =
   '이 경기 결과로 다음 라운드 진출 팀이 정해지는데 무승부여서 확정할 수 없어요. 대회 대진 설정(조 배정·라운드)을 확인해주세요.';
-const NOT_KNOCKOUT_MESSAGE = 'Penalty shootouts can only be recorded for knockout-phase fixtures';
-const NOT_LEVEL_MESSAGE = 'Penalty shootouts are only recorded when regulation time ends level';
+const NOT_KNOCKOUT_MESSAGE = '승부차기는 결선 경기에서만 기록할 수 있어요.';
+const NOT_LEVEL_MESSAGE = '승부차기는 정규시간이 무승부로 끝난 경기에서만 기록할 수 있어요.';
 
 /** 결선 픽스처이고 다음 라운드로 가는 진출 엣지도 있는 흔한 준결승. */
 const knockoutWithEdges: KnockoutFixtureFacts = {
@@ -151,8 +150,7 @@ describe('assertBracketResolvable', () => {
    * 거부시키기 위해서다.
    *
    * `end` 레인에서는 `extractEndPenalties`가 422
-   * `TOURNAMENT_PENALTY_INVALID`('A penalty shootout must produce a decisive
-   * winner')로 먼저 걸러 여기까지 오지 않는다.
+   * `TOURNAMENT_PENALTY_INVALID`(승자가 갈리지 않음)로 먼저 걸러 여기까지 오지 않는다.
    */
   it('승부차기 점수가 동점이면(승계된 레거시 값) 여전히 브래킷을 해결할 수 없어 막는다', () => {
     expectConflict(

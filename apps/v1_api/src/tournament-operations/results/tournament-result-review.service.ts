@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { resolveGameSource } from '../resolve-game-source';
+import { commandConcurrencyConflict } from '../../games/command-concurrency-error';
 import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
 import { parseLineupCatalog, parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
@@ -1303,10 +1304,7 @@ export class TournamentResultReviewService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         (error.code === 'P2034' || error.code === 'P2002')
       ) {
-        throw new ConflictException({
-          code: 'COMMAND_CONCURRENCY_CONFLICT',
-          message: 'A concurrent command won; reload the current game version and retry',
-        });
+        throw commandConcurrencyConflict();
       }
       throw error;
     }

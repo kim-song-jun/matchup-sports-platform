@@ -13,7 +13,6 @@
  * 수도 같은 하네스에서 센다.
  */
 import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
-import { leagueFixtureTitle } from './league-fixture-creation';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminContextService } from '../common/admin-context.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -25,6 +24,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
+import { teamMembershipCountFake, type FakeTeamMember } from '../../test/helpers/team-membership-gender-fake';
 
 jest.mock('../tournaments/slots/tournament-slot.service', () => ({
   releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
@@ -70,6 +70,10 @@ interface FakeState {
   mirrorUpdates: Array<{ where: { id: string; kind: string; requiresExplicitStart?: boolean; status?: { in: string[] } }; data: { status: string } }>;
   /** 수동 대진의 주차 파생이 읽는 형제 대진 시작 시각. 테스트가 갈아끼운다. */
   siblingStartAts: Date[];
+  /** Stored sibling titles; defaults to the legacy "테스트 리그 N주차" form without a game number. */
+  siblingTitles?: string[];
+  /** When true the sibling query also returns fixtures created in this transaction (read-your-writes). */
+  readOwnCreates?: boolean;
   /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
   teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string; placeAddress?: string | null; placeLatitude?: number | null; placeLongitude?: number | null; placeProvider?: string | null; placeProviderId?: string | null }>;
   /** 자동 승인 신청서에 실린 data — 어드민 화면에 그대로 노출되는 문구를 본다. */
@@ -284,9 +288,14 @@ function createFake() {
       // 수동 대진의 기본 제목이 주차를 파생할 때 읽는 형제 목록.
       // 기본값은 "이미 두 경기일이 있는 리그" — 새로 넣는 경기가 3번째 날이면 3주차다.
       // 주차 제목 맞추기(syncLeagueFixtureWeekTitles)도 같은 목록을 읽는다 — 제목은 각자의 주차와 이미 맞아 고칠 것이 없다.
-      findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt, index) => ({
-        id: `sibling-${index}`, title: `테스트 리그 ${index + 1}주차`, startAt, endAt: null,
-      }))),
+      findMany: track('v1TeamMatch.findMany', async () => [
+        ...state.siblingStartAts.map((startAt, index) => ({
+          id: `sibling-${index}`, title: state.siblingTitles?.[index] ?? `테스트 리그 ${index + 1}주차`, startAt, endAt: null,
+        })),
+        ...(state.readOwnCreates
+          ? state.teamMatchCreates.map((row, index) => ({ id: `created-${index}`, title: row.title, startAt: row.startAt, endAt: row.endAt ?? null }))
+          : []),
+      ]),
       // updateFixture 의 잠금 밖 사전 조회 + 갱신. 장소만 바꾸는 요청이라 시각은 그대로 둔다.
       findFirst: track('v1TeamMatch.findFirst', async () => ({
         id: 'tm-1', leagueId: 'league-1', title: '테스트 리그 1주차',
@@ -653,6 +662,22 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     ]);
   });
 
+  // 2099-11-21 is a Saturday; a far-future date avoids the past-date rejection.
+  it('이틀에 나눠 만든 한 주의 대진은 제목 순번이 날짜를 넘어 이어진다 (둘째 날이 1경기부터 다시 시작하지 않는다)', async () => {
+    await service.generateFixtures(adminUser, 'league-1', {
+      weeksCount: 4,
+      timing: { gameDurationMinutes: 40, breakMinutes: 0, gamesPerDay: 2 },
+      schedule: { dates: ['2099-11-21', '2099-11-22'], time: '09:00' },
+    });
+
+    expect(state.teamMatchCreates.map((row) => row.title)).toEqual([
+      '테스트 리그 1주차 1경기',
+      '테스트 리그 1주차 2경기',
+      '테스트 리그 1주차 3경기',
+      '테스트 리그 1주차 4경기',
+    ]);
+  });
+
   it('roundsCount 가 주차 수 × 팀당 하루 경기 수보다 작으면 그 라운드 수까지만 만든다', async () => {
     // 2팀은 한 라운드 = 한 경기. 3주 × 하루 1경기면 3경기지만 roundsCount 1 이면 한 경기뿐이다.
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 3, roundsCount: 1 });
@@ -764,7 +789,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       // 형제 경기 두 주(9/5, 9/12) + 새 경기 9/19 → 3번째 주.
       await service.createManualFixture(adminUser, 'league-1', { ...manual });
 
-      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차');
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차 1경기');
     });
 
     it('제목 미지정: 이미 경기가 있는 날에 넣으면 그 날의 주차를 쓴다 (9/5 → 1주차)', async () => {
@@ -773,8 +798,8 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
         startsAt: '2026-09-05T08:00:00.000Z',
       });
 
-      // 같은 KST 날짜에 이미 경기가 있으므로 새 날이 아니다 — 4주차가 되면 안 된다.
-      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차');
+      // Same KST day as an existing fixture, so not a new week; it is the week's second game.
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차 2경기');
     });
 
     // 2026-11-03 사용자 확정: 주차는 달력 주(월~일)다 — 토요일 경기가 있는 주의 일요일은 새 주차가 아니다.
@@ -783,7 +808,46 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
         ...manual,
         startsAt: '2026-09-06T01:00:00.000Z',
       });
-      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차');
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차 2경기');
+    });
+
+    it('제목 미지정: 같은 주 안에서는 날짜가 달라도 그 주의 다음 순번을 붙인다 (토 8경기 + 일 7경기 → 16경기)', async () => {
+      state.siblingStartAts = [
+        ...Array.from({ length: 8 }, () => new Date('2026-11-20T15:00:00.000Z')), // 11/21(토) 00:00 KST
+        ...Array.from({ length: 7 }, () => new Date('2026-11-21T15:00:00.000Z')), // 11/22(일) 00:00 KST
+      ];
+      state.siblingTitles = Array.from({ length: 15 }, (_, index) => `테스트 리그 1주차 ${index + 1}경기`);
+
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, startsAt: '2026-11-22T03:00:00.000Z' });
+
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차 16경기');
+    });
+
+    it('제목 미지정: 다른 주에 넣으면 1경기부터 센다 — 같은 리그의 앞 주 순번을 끌어오지 않는다 (대조군)', async () => {
+      state.siblingStartAts = [new Date('2026-11-20T15:00:00.000Z'), new Date('2026-11-21T15:00:00.000Z')];
+      state.siblingTitles = ['테스트 리그 1주차 1경기', '테스트 리그 1주차 2경기'];
+
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, startsAt: '2026-11-28T03:00:00.000Z' });
+
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 2주차 1경기');
+    });
+
+    it('createManualFixtures: 한 번에 넣은 같은 주 경기는 방금 만든 경기를 세어 순번이 이어진다', async () => {
+      // The real DB reads rows created earlier in the same transaction; the fake tx must too.
+      state.siblingStartAts = [];
+      state.readOwnCreates = true;
+
+      await service.createManualFixtures(adminUser, 'league-1', [
+        { ...manual, startsAt: '2026-09-19T03:00:00.000Z' }, // 9/19(토)
+        { ...manual, startsAt: '2026-09-20T03:00:00.000Z' }, // 9/20(일) — 같은 달력 주
+        { ...manual, startsAt: '2026-09-26T03:00:00.000Z' }, // 9/26(토) — 다음 주
+      ]);
+
+      expect(state.teamMatchCreates.map((row) => row.title)).toEqual([
+        '테스트 리그 1주차 1경기',
+        '테스트 리그 1주차 2경기',
+        '테스트 리그 2주차 1경기',
+      ]);
     });
 
     it('createManualFixtures: 여러 경기를 한 트랜잭션에서 만들고 만든 순서대로 id 를 돌려준다', async () => {
@@ -811,7 +875,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
 
       state.teamMatchCreates.length = 0;
       await service.createManualFixture(adminUser, 'league-1', { ...manual, title: '   ' });
-      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차');
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차 1경기');
     });
 
     it('durationMinutes 를 주면 종료 시각이 붙고, 안 주면 비운다', async () => {
@@ -1033,17 +1097,6 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     });
   });
 
-  it('제목 규칙은 자동·수동이 같은 함수를 쓴다 — 슬롯이 있으면 경기 순번까지 붙는다', () => {
-    // 문자열 템플릿을 두 곳에 복사하면 한쪽만 바뀌어 같은 리그 안에서 제목이 갈린다.
-    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3 })).toBe('가을 리그 3주차');
-    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, matchday: 2, orderInDay: 4 })).toBe(
-      '가을 리그 2주차 4경기',
-    );
-    // 슬롯 정보가 반쪽만 있으면 순번을 붙이지 않는다 — "N주차 undefined경기" 를 만들지 않는다.
-    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, matchday: 2 })).toBe('가을 리그 3주차');
-    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, orderInDay: 4 })).toBe('가을 리그 3주차');
-  });
-
   it('대진마다 홈/원정 팀 모두에 팀 일정이 생긴다 — "매치가 곧 팀일정" 불변식', async () => {
     // 그룹 B 감사 결함 5: raw create 경로(createFixturesInTx)는 일반 팀매치 생성/신청승인이
     // 부르는 createTeamMatchScheduleInTx를 우회해서, 리그 대진이 참가 팀 캘린더에 한 건도
@@ -1071,9 +1124,13 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
   const SERIES_ID = 'series-1';
   const NEW_TEAM_ID = 'team-new';
 
-  function makePrisma(siblingLeague: { tier: number | null } | null) {
+  function makePrisma(
+    siblingLeague: { tier: number | null } | null,
+    division: { genderCategory: string | null; members: FakeTeamMember[] } = { genderCategory: null, members: [] },
+  ) {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1TeamMembership: { count: teamMembershipCountFake(division.members) },
       // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
       // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
       // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
@@ -1092,6 +1149,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
             scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
             status: 'draft',
             kind: 'regular_league', teamCount: 8, maxTeams: null,
+            genderCategory: division.genderCategory,
             registrationDeadlineAt: null,
             seriesId: SERIES_ID,
             seasonNo: 1,
@@ -1184,6 +1242,83 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
         }),
       }),
     );
+  });
+});
+
+// ── addTeam: 성별 부문의 팀 자격 (QC1106 T4) ─────────────────────────────────
+// 어드민 직접 추가도 신청·확정과 같은 판정이다 — 여기만 열려 있으면 남자 팀이 여성부 리그에 들어간다.
+describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () => {
+  const LEAGUE_ID = 'league-1';
+  const NEW_TEAM_ID = 'team-new';
+  const maleOnly: FakeTeamMember[] = Array.from({ length: 5 }, () => ({ teamId: NEW_TEAM_ID, status: 'active', gender: 'male' }));
+
+  function makePrisma(genderCategory: string | null, members: FakeTeamMember[]) {
+    const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      v1TeamMembership: { count: teamMembershipCountFake(members) },
+      v1Tournament: {
+        findFirst: jest.fn(async () => ({
+          id: LEAGUE_ID, title: '테스트 리그', sportId: 'sport-futsal', regionId: 'region-1',
+          scheduledAt: new Date('2026-09-05T00:00:00.000Z'), scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
+          status: 'draft', kind: 'regular_league', teamCount: 8, maxTeams: null, genderCategory,
+          registrationDeadlineAt: null, seriesId: null, seasonNo: null, previousLeagueId: 'league-prev',
+          competitionConfigVersionId: 'config-1', sport: { code: 'futsal' }, registrations: [],
+        })),
+      },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
+        findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1', name: '새 팀' }),
+      },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentRegistration: {
+        upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([{ teamId: NEW_TEAM_ID, team: { name: '새 팀' } }]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    return prisma;
+  }
+
+  function makeService(prisma: unknown) {
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+    return new LeagueMatchAdminService(prisma as never, adminContext as never, {} as never, { emitToManyDeferred: jest.fn() } as never);
+  }
+
+  it('여성부 리그에 여성 팀원이 없는 팀은 추가되지 않는다', async () => {
+    const prisma = makePrisma('female', maleOnly);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+    });
+    expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
+  });
+
+  it('여성 팀원이 1명이라도 있으면 추가된다', async () => {
+    const prisma = makePrisma('female', [...maleOnly, { teamId: NEW_TEAM_ID, status: 'active', gender: 'female' }]);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
+    expect(prisma.v1TournamentRegistration.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([['mixed'], [null]])('부문이 %s 이면 남자 팀도 추가된다', async (genderCategory) => {
+    const prisma = makePrisma(genderCategory, maleOnly);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
+  });
+
+  it('지난 시즌 팀 한 번에 넣기도 같은 판정이다 — 한 팀이라도 걸리면 아무 팀도 들어가지 않는다', async () => {
+    const prisma = makePrisma('female', maleOnly);
+    await expect(
+      makeService(prisma).addPreviousSeasonTeams(adminUser, LEAGUE_ID, { teamIds: [NEW_TEAM_ID] } as never),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '새 팀: 여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+    });
+    expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
   });
 });
 

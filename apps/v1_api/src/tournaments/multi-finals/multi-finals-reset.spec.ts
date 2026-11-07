@@ -21,8 +21,8 @@ function harness(options: { director?: boolean; revoked?: boolean; expiresAt?: D
       (!options.expiresAt || options.expiresAt > new Date()) &&
       where.userId === actor.id && where.tournamentId === 't' && where.role === 'TOURNAMENT_DIRECTOR'
         ? { id: 'director-grant', tournamentId: 't', version: 2 } : null) },
-    v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'admin-log' }) },
-    v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'director-log' }) },
+    v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'admin-log' }), findFirst: jest.fn().mockResolvedValue(null) },
+    v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'director-log' }), findFirst: jest.fn().mockResolvedValue(null) },
     v1Tournament: { findFirst: jest.fn(async () => row), update: jest.fn(async ({ data }) => {
       row.multiFinals = data.multiFinals; row.multiFinalsRevision++; return row;
     }) },

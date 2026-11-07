@@ -366,16 +366,26 @@ describe('GamesService command boundary', () => {
       expect(extractEndPenalties({ penalties: { home: 5, away: 4 } })).toEqual({ home: 5, away: 4 });
     });
 
-    it('home === away(승부가 갈리지 않음)면 422 TOURNAMENT_PENALTY_INVALID', () => {
-      expect(() => extractEndPenalties({ penalties: { home: 3, away: 3 } })).toThrow(HttpException);
+    /** 거절 응답의 status·code·message 를 그대로 꺼낸다 — 던지지 않으면 테스트가 실패한다. */
+    function rejectionOf(payload: Record<string, unknown>): { status: number; code: unknown; message: unknown } {
+      let caught: unknown;
       try {
-        extractEndPenalties({ penalties: { home: 3, away: 3 } });
+        extractEndPenalties(payload);
       } catch (error) {
-        expect((error as HttpException).getStatus()).toBe(422);
-        expect((error as HttpException).getResponse()).toEqual(
-          expect.objectContaining({ code: 'TOURNAMENT_PENALTY_INVALID' }),
-        );
+        caught = error;
       }
+      expect(caught).toBeInstanceOf(HttpException);
+      const exception = caught as HttpException;
+      const body = exception.getResponse() as { code?: unknown; message?: unknown };
+      return { status: exception.getStatus(), code: body.code, message: body.message };
+    }
+
+    it('home === away(승부가 갈리지 않음)면 422 TOURNAMENT_PENALTY_INVALID 와 한국어 안내로 거절한다', () => {
+      expect(rejectionOf({ penalties: { home: 3, away: 3 } })).toEqual({
+        status: 422,
+        code: 'TOURNAMENT_PENALTY_INVALID',
+        message: '승부차기는 승자가 갈려야 해요. 두 팀 점수를 서로 다르게 입력해 주세요.',
+      });
     });
 
     it.each([
@@ -384,8 +394,48 @@ describe('GamesService command boundary', () => {
       ['home이 숫자가 아님', { home: '5', away: 4 }],
       ['배열', [5, 4]],
       ['null', null],
-    ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID', (_label, penalties) => {
-      expect(() => extractEndPenalties({ penalties })).toThrow(HttpException);
+    ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID 와 한국어 안내로 거절한다', (_label, penalties) => {
+      expect(rejectionOf({ penalties })).toEqual({
+        status: 422,
+        code: 'TOURNAMENT_PENALTY_INVALID',
+        message: '승부차기 점수(penalties)는 home과 away가 모두 0 이상의 정수여야 해요.',
+      });
+    });
+
+    // 고칠 필드 이름은 문구에 그대로 남아야 API 호출자가 어디를 고칠지 안다.
+    it.each([
+      [
+        '킥 수를 한쪽만 보냄',
+        { home: 3, away: 1, takenHome: 4 },
+        'penalties.takenHome과 penalties.takenAway는 함께 보내 주세요.',
+      ],
+      [
+        '성공 수가 시도 수보다 큼',
+        { home: 5, away: 1, takenHome: 4, takenAway: 4 },
+        '성공한 킥 수(home, away)는 시도한 킥 수(takenHome, takenAway)보다 클 수 없어요.',
+      ],
+      [
+        'operatorOverride 가 boolean 이 아님',
+        { home: 2, away: 0, operatorOverride: 'yes' },
+        'penalties.operatorOverride 값은 true 또는 false여야 해요.',
+      ],
+      [
+        '선축이 HOME/AWAY 가 아님',
+        { home: 5, away: 4, firstKickSideKey: 'home' },
+        "penalties.firstKickSideKey 값은 'HOME' 또는 'AWAY'여야 해요.",
+      ],
+      [
+        '킥 수가 음수',
+        { home: 3, away: 1, takenHome: -1, takenAway: 4 },
+        'penalties.takenHome 값은 0 이상의 정수여야 해요.',
+      ],
+      [
+        '킥 수가 정수가 아님',
+        { home: 3, away: 1, takenHome: 4, takenAway: 4.5 },
+        'penalties.takenAway 값은 0 이상의 정수여야 해요.',
+      ],
+    ])('형식 오류(%s)는 422 TOURNAMENT_PENALTY_INVALID 와 고칠 필드를 짚는 한국어 안내로 거절한다', (_label, penalties, message) => {
+      expect(rejectionOf({ penalties })).toEqual({ status: 422, code: 'TOURNAMENT_PENALTY_INVALID', message });
     });
 
     /**

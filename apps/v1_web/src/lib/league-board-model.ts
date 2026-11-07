@@ -1,7 +1,7 @@
 import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { fixtureNodeState } from './bracket-canvas-layout';
-import { DAY_MS, kstMidnightMs, toKstDateString } from './kst-calendar';
+import { toKstDateString } from './kst-calendar';
 import { kstWeekKey } from './league-fixture-week';
 
 export type LeagueBoardNodeState = ReturnType<typeof fixtureNodeState> | 'voided';
@@ -45,9 +45,9 @@ export interface LeagueWeekSummary {
 export interface LeagueBoardColumn {
   key: string;
   weekNumber: number;
-  /** 그 주 월요일·일요일의 KST 날짜(`YYYY-MM-DD`). */
-  startDate: string;
-  endDate: string;
+  /** KST dates (`YYYY-MM-DD`) of the first and last day with a fixture this week, not Monday and Sunday; equal for a single game day. */
+  firstGameDate: string;
+  lastGameDate: string;
   /** 이 주에 경기일이 둘 이상이면 true — 경기 카드에 날짜를 같이 보여 준다. */
   multiDay: boolean;
   nodes: LeagueBoardNode[];
@@ -135,8 +135,8 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       return {
         key,
         weekNumber: index + 1,
-        startDate: key,
-        endDate: toKstDateString(new Date(kstMidnightMs(key) + 6 * DAY_MS)),
+        firstGameDate: toKstDateString(new Date(sorted[0].startAt)),
+        lastGameDate: toKstDateString(new Date(sorted[sorted.length - 1].startAt)),
         multiDay: new Set(sorted.map((node) => toKstDateString(new Date(node.startAt)))).size > 1,
         nodes: sorted,
         summary: summarizeWeek(sorted, teamNameById),

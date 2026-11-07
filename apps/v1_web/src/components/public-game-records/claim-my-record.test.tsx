@@ -215,7 +215,12 @@ describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount·ros
 
     expect(screen.getByRole('dialog', { name: '연결할 참가자가 없어요' })).toBeInTheDocument();
     expect(screen.getByText(/모두 계정에 연결돼 있어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '기록 공개 설정' })).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: '기록 공개 설정' });
+    expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    // 조사 "을" 이 chevron 에서 떨어져 다음 줄 첫머리로 가지 않게 링크와 한 덩어리로 묶여 있다.
+    const group = link.parentElement as HTMLElement;
+    expect(group).toHaveTextContent('기록 공개 설정을');
+    expect(getComputedStyle(group).whiteSpace).toBe('nowrap');
     expect(screen.queryByText('아직 제출된 참석명단이 없어요')).toBeNull();
   });
 

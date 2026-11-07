@@ -66,6 +66,7 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 - `realName`이 없으면 호환 입력 `displayName`을 사용한다.
 - email/phone 변경 시 해당 verified 시각을 비운다.
 - 중복 값은 각각 `409 EMAIL_CONFLICT`, `PHONE_CONFLICT`, `NICKNAME_CONFLICT`다.
+- 저장된 값과 다른 `birthDate`가 만 14세 미만(미래 날짜 포함)이면 가입과 같은 `400 SIGNUP_AGE_RESTRICTED`로 거절한다. 저장값과 같은 날짜를 다시 보내거나(구분자만 달라도 같은 값) `birthDate`를 보내지 않으면 나이를 검사하지 않아, 이미 미만으로 저장된 계정도 다른 항목은 고칠 수 있다.
 - 성공 응답은 `{ profile, updatedAt }`이다.
 
 ## 활동·공개 프로필

@@ -541,8 +541,9 @@ export class TeamsService {
           membership.status === 'active' &&
           membership.role !== 'owner' &&
           (viewerIsOwner || (viewerIsManager && membership.role === 'member'));
+        // Private profile fields are for current members only; left/removed rows stay masked for every viewer.
         const canAccessPrivateProfile =
-          viewerCanAccessRosterPii || (membership.status === 'active' && membership.userId === user?.id);
+          membership.status === 'active' && (viewerCanAccessRosterPii || membership.userId === user?.id);
         return {
           membershipId: membership.id,
           userId: membership.userId,

@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx, syncTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
-import { leagueWeekCounter } from './league-week-number';
+import { kstWeekKey, leagueWeekCounter, leagueWeekOrdinals } from './league-week-number';
 import { lockLeagueRowForFixtureTitlesInTx } from './league-fixture-generation-guard';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
@@ -81,29 +81,50 @@ export interface LeagueFixtureTeam {
 }
 
 /**
- * 대진 제목. **자동·수동이 같은 규칙을 쓴다** — 템플릿 문자열을 두 곳에 복사하면 한쪽만
- * 바뀌어 같은 리그 안에서 제목 모양이 갈린다.
+ * Fixture title, shared by every creation path so the format cannot drift between them:
+ * "<league> N주차 M경기" with `orderInWeek`, "<league> N주차" without it.
  *
- * - `matchday`/`orderInDay` 가 있으면(= 한 구장 순차 진행 슬롯) "N주차 M경기".
- *   하루에 여러 경기가 서면 "N주차" 만으로는 팀 화면에서 같은 제목이 반복된다.
- * - 없으면 "N주차".
- *
- * ⚠️ `round`(주차 번호)는 **어디에도 저장되지 않는다** — `V1TeamMatch` 에 컬럼이 없고
- * 순위 계산(`league-standings.ts`)도 쓰지 않는다. 화면의 주차 라벨은 `startAt` 에서 파생한다
- * (`league-week-number.ts`, 달력 주). 여기서 지은 "N주차" 는 같은 트랜잭션 끝의
- * `syncLeagueFixtureWeekTitles` 가 그 규칙으로 다시 맞춘다. 그래서 수동 대진은 주차를 받지 않고
- * 제목만 받는다(2026-09-02 사용자 확정, Task 164 Ambiguity 3).
+ * `week` is not stored anywhere: screens derive it from `startAt` (`league-week-number.ts`) and
+ * `syncLeagueFixtureWeekTitles` rewrites the stored token at the end of the same transaction.
+ * `orderInWeek` is written once at creation and never renumbered when a fixture later moves.
  */
-export function leagueFixtureTitle(input: {
-  leagueTitle: string;
-  round: number;
-  matchday?: number;
-  orderInDay?: number;
-}): string {
-  if (input.matchday !== undefined && input.orderInDay !== undefined) {
-    return `${input.leagueTitle} ${input.matchday}주차 ${input.orderInDay}경기`;
-  }
-  return `${input.leagueTitle} ${input.round}주차`;
+export function leagueFixtureTitle(input: { leagueTitle: string; week: number; orderInWeek?: number }): string {
+  const base = `${input.leagueTitle} ${input.week}주차`;
+  return input.orderInWeek === undefined ? base : `${base} ${input.orderInWeek}경기`;
+}
+
+/**
+ * Titles for a batch created together. Week and order both come from the KST calendar week of each
+ * start time, so a second day of the same week continues the first day's numbering.
+ * `numbered: false` (one round per week, no `timing`) omits the game number.
+ */
+export function leagueFixtureTitles(
+  leagueTitle: string,
+  startAts: readonly Date[],
+  options: { numbered?: boolean } = {},
+): string[] {
+  const weekOf = leagueWeekCounter(startAts);
+  const ordinals = options.numbered === false ? [] : leagueWeekOrdinals(startAts);
+  return startAts.map((startAt, index) =>
+    leagueFixtureTitle({ leagueTitle, week: weekOf(startAt), orderInWeek: ordinals[index] }),
+  );
+}
+
+/** The M of an auto title "N주차 M경기"; operator-chosen titles never match. */
+const AUTO_TITLE_ORDER = / \d+주차 (\d+)경기$/;
+
+/**
+ * Next game number in the calendar week of `startAt`. Counts from the larger of the week's fixture
+ * count and its highest auto-title number, so a deleted fixture never causes a repeated number.
+ */
+export function nextOrderInCalendarWeek(
+  siblings: ReadonlyArray<{ startAt: Date; title: string }>,
+  startAt: Date,
+): number {
+  const week = kstWeekKey(startAt);
+  const inWeek = siblings.filter((sibling) => kstWeekKey(sibling.startAt) === week);
+  const highestUsed = Math.max(0, ...inWeek.map((sibling) => Number(AUTO_TITLE_ORDER.exec(sibling.title)?.[1] ?? 0)));
+  return Math.max(inWeek.length, highestUsed) + 1;
 }
 
 /** 자동 제목의 맨 끝 주차 토큰 — "<리그명> N주차" 또는 "<리그명> N주차 M경기". 리그명 안의 숫자는 건드리지 않는다. */

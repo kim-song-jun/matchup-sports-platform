@@ -56,8 +56,36 @@ describe('buildLeagueBoard', () => {
     expect(columns[0].nodes.map((node) => node.fixtureId)).toEqual(['a', 'b', 'sat']);
     expect(columns[1].nodes.map((node) => node.fixtureId)).toEqual(['kst-next-week']);
     expect(columns.map((column) => column.weekNumber)).toEqual([1, 2]);
-    expect(columns[0]).toMatchObject({ startDate: '2030-01-07', endDate: '2030-01-13', multiDay: true });
+    expect(columns[0]).toMatchObject({ multiDay: true });
     expect(columns[1].multiDay).toBe(false);
+  });
+
+  it('칸의 날짜 범위는 그 주에 실제 경기가 있는 첫날과 마지막 날이다 (경기가 하루면 같은 날)', () => {
+    const { columns } = buildLeagueBoard({
+      fixtures: [
+        // Sat 1/12 and Sun 1/13 KST: the only game days of the Mon 1/7 - Sun 1/13 week.
+        fixture({ teamMatchId: 'sun', startAt: '2030-01-13T01:00:00.000Z' }),
+        fixture({ teamMatchId: 'sat', startAt: '2030-01-12T01:00:00.000Z' }),
+        // The next week has a single game day (Sat 1/19).
+        fixture({ teamMatchId: 'next', startAt: '2030-01-19T01:00:00.000Z' }),
+      ],
+      slots: [],
+      teamNameById: NAMES,
+    });
+
+    expect(columns[0]).toMatchObject({ key: '2030-01-07', firstGameDate: '2030-01-12', lastGameDate: '2030-01-13' });
+    expect(columns[1]).toMatchObject({ key: '2030-01-14', firstGameDate: '2030-01-19', lastGameDate: '2030-01-19' });
+  });
+
+  it('칸의 날짜 범위는 KST 날짜다 — 일요일 자정 직후 UTC 로는 전날인 경기도 다음 주 월요일로 센다', () => {
+    const { columns } = buildLeagueBoard({
+      // 2030-01-13T16:00Z is Mon 1/14 01:00 KST
+      fixtures: [fixture({ teamMatchId: 'kst-monday', startAt: '2030-01-13T16:00:00.000Z' })],
+      slots: [],
+      teamNameById: NAMES,
+    });
+
+    expect(columns[0]).toMatchObject({ firstGameDate: '2030-01-14', lastGameDate: '2030-01-14' });
   });
 
   it('주차 요약: 쉬는 팀·두 경기 팀·경기 수는 취소 경기를 빼고 센다', () => {

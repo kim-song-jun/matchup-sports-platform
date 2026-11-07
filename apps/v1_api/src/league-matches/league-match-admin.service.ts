@@ -36,6 +36,7 @@ import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './leagu
 import {
   createLeagueRosterRegistration,
   findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerCode,
   leagueAdmissionBlockerMessage,
 } from './league-team-admission';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
@@ -47,7 +48,9 @@ import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/leag
 import {
   createLeagueFixture,
   leagueFixtureTitle,
+  leagueFixtureTitles,
   loadLeagueTeamRosters,
+  nextOrderInCalendarWeek,
   syncLeagueFixtureWeekTitles,
   type LeagueFixtureTeam,
 } from './league-fixture-creation';
@@ -828,7 +831,7 @@ export class LeagueMatchAdminService {
     const blocker = await findLeagueAdmissionBlocker(this.prisma, { leagueId, teamId: dto.teamId });
     if (blocker !== null) {
       throw new UnprocessableEntityException({
-        code: 'LEAGUE_TEAM_INVALID',
+        code: leagueAdmissionBlockerCode(blocker),
         message: leagueAdmissionBlockerMessage(blocker),
       });
     }
@@ -882,7 +885,7 @@ export class LeagueMatchAdminService {
         const blocker = await findLeagueAdmissionBlocker(tx, { leagueId, teamId });
         if (blocker !== null) {
           throw new UnprocessableEntityException({
-            code: 'LEAGUE_TEAM_INVALID',
+            code: leagueAdmissionBlockerCode(blocker),
             message: `${nameByTeamId.get(teamId) ?? '팀'}: ${leagueAdmissionBlockerMessage(blocker)}`,
           });
         }
@@ -1461,6 +1464,7 @@ export class LeagueMatchAdminService {
           position,
         })),
       });
+      const titles = leagueFixtureTitles(league.title, startAts);
       for (const [index, fixture] of plan.fixtures.entries()) {
         await createLeagueFixture(tx, this.games, {
           leagueId: league.id,
@@ -1468,7 +1472,7 @@ export class LeagueMatchAdminService {
           sportId: league.sportId,
           regionId: league.regionId,
           competitionConfigId: config.id,
-          title: leagueFixtureTitle({ leagueTitle: league.title, round: timings[index].matchday }),
+          title: titles[index],
           place,
           startAt: timings[index].startAt,
           endAt: timings[index].endAt,
@@ -1478,7 +1482,7 @@ export class LeagueMatchAdminService {
           awaySlotId: slotIds[fixture.awayPosition - 1],
         });
       }
-      // 템플릿 제목의 "N주차" 도 경기일 순번이라 달력 주 규칙으로 다시 맞춘다.
+      // Re-derive "N주차" against the whole league, not just this batch.
       await syncLeagueFixtureWeekTitles(tx, leagueId);
       await this.adminContext.logAdminAction(
         admin,
@@ -1510,7 +1514,7 @@ export class LeagueMatchAdminService {
   }
 
   /**
-   * 템플릿 경기마다 몇 번째 날(제목의 N주차)·시작·종료 시각을 푼다. 하루 경기 수가 없으면 옛 동작 그대로 —
+   * 템플릿 경기마다 시작·종료 시각을 푼다. 하루 경기 수가 없으면 옛 동작 그대로 —
    * 하루 한 라운드, 그 라운드 경기는 같은 시각, 종료 시각 없음. 있으면 일괄 생성과 같은
    * "한 구장 순차 진행" 배치(`resolveFixtureTimeSlots`)를 쓴다 — 하루 N경기가 `경기 시간 + 휴식` 간격으로 이어진다.
    */
@@ -1518,11 +1522,11 @@ export class LeagueMatchAdminService {
     dto: ApplyLeagueTemplateDto,
     plan: ReturnType<typeof planLeagueTemplate>,
     configId: string,
-  ): Promise<Array<{ matchday: number; startAt: Date; endAt: Date | null }>> {
+  ): Promise<Array<{ startAt: Date; endAt: Date | null }>> {
     const gamesPerDay = dto.gamesPerDay;
     if (gamesPerDay == null) {
       const startAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, plan.totalRounds);
-      return plan.fixtures.map((fixture) => ({ matchday: fixture.round, startAt: startAts[fixture.round - 1], endAt: null }));
+      return plan.fixtures.map((fixture) => ({ startAt: startAts[fixture.round - 1], endAt: null }));
     }
     const gameDurationMinutes = dto.gameDurationMinutes ?? (await regulationMinutesForConfigVersion(this.prisma, configId));
     if (gameDurationMinutes == null) {
@@ -1672,17 +1676,22 @@ export class LeagueMatchAdminService {
       // 취소된 대진도 센다 — 위 세 화면이 쓰는 조건(deletedAt: null 만)과 같아야 주차가
       // 어긋나지 않는다(league-week-number.ts 의 siblingStartAtsByLeagueId 주석).
       where: { leagueId, deletedAt: null },
-      select: { startAt: true },
+      select: { startAt: true, title: true },
     });
+    const siblingRows = siblings.map((row) => ({
+      title: row.title,
+      startAt: requireLeagueStartAt(row.startAt, '리그 대진의 시작 시각이 없어 주차를 계산할 수 없어요.'),
+    }));
     const targetId = 'manual-fixture-being-created';
     const week = resolveLeagueWeekNumbers(
-      new Map([[leagueId, [
-        ...siblings.map((row) => requireLeagueStartAt(row.startAt, '리그 대진의 시작 시각이 없어 주차를 계산할 수 없어요.')),
-        startAt,
-      ]]]),
+      new Map([[leagueId, [...siblingRows.map((row) => row.startAt), startAt]]]),
       [{ id: targetId, leagueId, startAt }],
     ).get(targetId);
-    return leagueFixtureTitle({ leagueTitle, round: week ?? 1 });
+    return leagueFixtureTitle({
+      leagueTitle,
+      week: week ?? 1,
+      orderInWeek: nextOrderInCalendarWeek(siblingRows, startAt),
+    });
   }
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
@@ -2596,15 +2605,17 @@ export class LeagueMatchAdminService {
           input.timing,
         )
       : undefined;
+    // 날짜 목록이 있으면 라운드 순서대로 그 날짜를 쓰고, 없으면 옛 주간 폴백
+    // (schedule 미지정 = "시작일부터 매주" — 그 동작은 그대로 둔다).
+    const startAts = pairings.map(({ round }, index) =>
+      slots !== undefined
+        ? slots[index].startAt
+        : (input.matchdayStartAts?.[round - 1] ?? resolveFixtureStartAt(input.leagueStartsOn, round)),
+    );
+    const titles = leagueFixtureTitles(input.leagueTitle, startAts, { numbered: slots !== undefined });
     const ids: string[] = [];
-    for (const [index, { round, home, away }] of pairings.entries()) {
+    for (const [index, { home, away }] of pairings.entries()) {
       const slot = slots?.[index];
-      // 날짜 목록이 있으면 라운드 순서대로 그 날짜를 쓰고, 없으면 옛 주간 폴백
-      // (schedule 미지정 = "시작일부터 매주" — 그 동작은 그대로 둔다).
-      const startAt =
-        slot !== undefined
-          ? slot.startAt
-          : (input.matchdayStartAts?.[round - 1] ?? resolveFixtureStartAt(input.leagueStartsOn, round));
       ids.push(
         await createLeagueFixture(tx, this.games, {
           leagueId: input.leagueId,
@@ -2612,14 +2623,9 @@ export class LeagueMatchAdminService {
           sportId: input.sportId,
           regionId: input.regionId,
           competitionConfigId: input.competitionConfigId,
-          title: leagueFixtureTitle({
-            leagueTitle: input.leagueTitle,
-            round,
-            matchday: slot?.matchday,
-            orderInDay: slot?.orderInDay,
-          }),
+          title: titles[index],
           place,
-          startAt,
+          startAt: startAts[index],
           endAt: slot !== undefined ? slot.endAt : null,
           home,
           away,
@@ -2634,7 +2640,7 @@ export class LeagueMatchAdminService {
         pairings.flatMap(({ home, away }) => [home.id, away.id]),
       ),
     );
-    // 제목의 "N주차" 는 경기일 순번(matchday)으로 지었다 — 달력 주 규칙으로 다시 맞춘다(재생성은 취소된 옛 대진도 센다).
+    // Regeneration also counts the cancelled old fixtures in week numbers, so re-derive "N주차" league-wide.
     await syncLeagueFixtureWeekTitles(tx, input.leagueId);
     return { ids, place };
   }

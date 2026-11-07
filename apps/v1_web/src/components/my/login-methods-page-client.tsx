@@ -4,15 +4,16 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Check, Link2, Mail, MessageCircle } from 'lucide-react';
+import { Check, Link2, Lock, Mail, MessageCircle } from 'lucide-react';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { Button } from '@/components/v1-ui/button';
+import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, ErrorState, InfoRow } from '@/components/v1-ui/primitives';
 import { useToast } from '@/components/v1-ui/toast';
-import { useV1AuthMe, useV1LinkApple, useV1LinkKakao } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1LinkApple, useV1LinkKakao, useV1UnlinkLoginMethod } from '@/hooks/use-v1-api';
 import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import { V1ApiError } from '@/lib/api-client';
 import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
@@ -31,8 +32,10 @@ import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { isNativeKakaoSignInAvailable } from '@/lib/native-kakao';
 import { requestNativeAppleLinkPayload, requestNativeKakaoLinkPayload } from '@/lib/native-social-credentials';
 import type { NativeCredentialResult } from '@/lib/native-social-credentials';
-import type { V1LinkableProvider, V1LinkSocialResult } from '@/types/api';
-import { LinkResultNotice, linkSuccessToast } from './link-result-notice';
+import { unlinkResultFromError } from '@/lib/unlink-result';
+import type { UnlinkOutcome } from '@/lib/unlink-result';
+import type { V1LinkableProvider, V1LinkSocialResult, V1UnlinkableProvider } from '@/types/api';
+import { LinkResultNotice, linkSuccessToast, LOGIN_METHOD_NAME, UnlinkResultNotice, unlinkSuccessToast } from './link-result-notice';
 
 const RELOGIN_PATH = `/login?redirect=${encodeURIComponent(LOGIN_METHODS_PATH)}`;
 
@@ -87,6 +90,7 @@ function ProviderRow({
   mark,
   label,
   caption,
+  detail,
   badge,
   action,
   divided = true,
@@ -94,6 +98,8 @@ function ProviderRow({
   mark: Parameters<typeof ProviderMark>[0]['provider'];
   label: string;
   caption: string;
+  /** 설명 아래 줄 — 연결된 수단의 "연결 해제" 버튼 또는 해제할 수 없는 이유. */
+  detail?: ReactNode;
   badge?: ReactNode;
   action?: ReactNode;
   /** 앞 줄과 구분선으로 나눈다. 목록의 첫 줄만 끈다. */
@@ -107,11 +113,70 @@ function ProviderRow({
           <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{label}</div>
           {/* caption 에는 계정 이메일이 들어온다 — 공백이 없어 keep-all 만으로는 좁은 폭에서 배지 쪽으로 넘친다. */}
           <div className="tm-text-caption" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{caption}</div>
+          {detail}
         </div>
         {badge}
       </div>
       {action ? <div style={{ marginTop: 12 }}>{action}</div> : null}
     </li>
+  );
+}
+
+/** 연결 해제 버튼. 목록에 같은 글자가 여럿 있어 스크린리더가 구분하도록 어느 수단인지 이름에 싣는다. */
+function UnlinkButton({ method, disabled, onClick }: { method: V1UnlinkableProvider; disabled: boolean; onClick: () => void }) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="tm-danger-text"
+      style={{ padding: 0, justifyContent: 'flex-start' }}
+      aria-label={`${LOGIN_METHOD_NAME[method]} 로그인 연결 해제`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      연결 해제
+    </Button>
+  );
+}
+
+/** 남은 수단이 이것 하나뿐이라 해제 버튼을 두지 않는 줄의 이유. */
+function LastMethodNote() {
+  return (
+    <div className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+      <Lock size={14} aria-hidden="true" />
+      마지막 로그인 방법이라 해제할 수 없어요
+    </div>
+  );
+}
+
+const REMAINING_METHOD_NAME: Partial<Record<string, string>> = { ...LOGIN_METHOD_NAME, naver: '네이버' };
+
+/** 해제 확인 창의 설명. `providers` 는 해제 전 이 계정의 로그인 수단이고, 해제하는 수단을 뺀 나머지를 "그대로 써요"로 알린다. */
+function unlinkConfirmMessage(method: V1UnlinkableProvider, providers: readonly string[]): string {
+  const staying = [...new Set(providers)]
+    .filter((provider) => provider !== method)
+    .flatMap((provider) => REMAINING_METHOD_NAME[provider] ?? []);
+  const lead = {
+    email: '이 이메일과 비밀번호로는 더 이상 로그인할 수 없어요.',
+    kakao: '카카오 버튼으로는 더 이상 이 계정에 로그인할 수 없어요.',
+    apple: 'Apple 버튼으로는 더 이상 이 계정에 로그인할 수 없어요.',
+  }[method];
+  const tail = {
+    email: '',
+    kakao: ' 같은 카카오 계정은 다시 연결할 수 있어요.',
+    apple: ' 다시 연결하려면 iOS 앱에서 해야 해요.',
+  }[method];
+  return `${lead}${staying.length > 0 ? ` ${staying.join('·')} 로그인은 그대로 쓸 수 있어요.` : ''}${tail}`;
+}
+
+/** 해제하면 무엇이 그대로이고 무엇이 바뀌는지 — 확인 창 본문 아래 요약. */
+function UnlinkImpact({ method }: { method: V1UnlinkableProvider }) {
+  return (
+    <div>
+      <InfoRow label="이 기기" value="로그인 유지" />
+      <InfoRow label="다른 기기" value="모두 로그아웃" isLast={method !== 'email'} />
+      {method === 'email' ? <InfoRow label="계정 이메일" value="연락처로 남아요" isLast /> : null}
+    </div>
   );
 }
 
@@ -122,10 +187,13 @@ export function LoginMethodsPageClient() {
   const authMe = useV1AuthMe();
   const linkKakao = useV1LinkKakao();
   const linkApple = useV1LinkApple();
+  const unlink = useV1UnlinkLoginMethod();
   const signOut = useSignOutAndLeave();
   const { showToast, hideToast, toast } = useToast();
 
   const [outcome, setOutcome] = useState<LinkOutcome | null>(null);
+  const [unlinkOutcome, setUnlinkOutcome] = useState<UnlinkOutcome | null>(null);
+  const [unlinkTarget, setUnlinkTarget] = useState<V1UnlinkableProvider | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState<V1LinkableProvider | null>(null);
   const [nativeApple, setNativeApple] = useState(false);
@@ -160,6 +228,7 @@ export function LoginMethodsPageClient() {
   }, [leavingForAuthorize]);
 
   const present = useCallback((next: LinkOutcome) => {
+    setUnlinkOutcome(null);
     setOutcome(next);
     const message = linkSuccessToast(next);
     if (message) showToast(message);
@@ -177,6 +246,7 @@ export function LoginMethodsPageClient() {
   const begin = (provider: V1LinkableProvider) => {
     setActiveProvider(provider);
     setOutcome(null);
+    setUnlinkOutcome(null);
     setStartError(null);
     hideToast();
   };
@@ -242,6 +312,41 @@ export function LoginMethodsPageClient() {
     void signOut.signOutAndLeave(RELOGIN_PATH, { failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.' });
   };
 
+  const openUnlink = (provider: V1UnlinkableProvider) => {
+    setOutcome(null);
+    setUnlinkOutcome(null);
+    setStartError(null);
+    hideToast();
+    setUnlinkTarget(provider);
+  };
+
+  const presentUnlink = (next: UnlinkOutcome) => {
+    setUnlinkOutcome(next);
+    const message = unlinkSuccessToast(next);
+    if (message) showToast(message);
+  };
+
+  const confirmUnlink = async () => {
+    if (!unlinkTarget) return;
+    const provider = unlinkTarget;
+    try {
+      await unlink.mutateAsync({ provider });
+      presentUnlink({ unlinkResult: 'unlinked', provider });
+    } catch (error) {
+      const signupRoute = getSignupIncompleteRoute(error);
+      if (signupRoute) {
+        router.replace(signupRoute);
+        return;
+      }
+      const unlinkResult = unlinkResultFromError(error);
+      // 화면의 목록이 실제와 달랐던 거절(이미 뗐거나 마지막 수단)은 안내와 함께 목록부터 맞춘다.
+      if (unlinkResult === 'not_found' || unlinkResult === 'last') void authMe.refetch();
+      presentUnlink({ unlinkResult, provider });
+    } finally {
+      setUnlinkTarget(null);
+    }
+  };
+
   const providers = authMe.data?.user.authProviders;
   if (authMe.isError || (authMe.data && !providers)) {
     return <ErrorState message="로그인 방법을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void authMe.refetch()} />;
@@ -256,6 +361,13 @@ export function LoginMethodsPageClient() {
   const needsSignup = !canLink && authMe.data.user.canLinkAfterSignup === true;
   const unavailableCaption = needsSignup ? '가입 정보를 입력한 뒤 연결할 수 있어요' : '이 계정에는 추가할 수 없어요';
   const busy = activeProvider !== null;
+  // 다른 수단이 남아 있어야 뗄 수 있다. 운영 권한·가입 미완료 계정은 서버가 어차피 거절하므로 버튼도 두지 않는다.
+  const unlinkDetail = (method: V1UnlinkableProvider) => {
+    if (!canLink) return undefined;
+    return providers.some((provider) => provider !== method)
+      ? <UnlinkButton method={method} disabled={busy} onClick={() => openUnlink(method)} />
+      : <LastMethodNote />;
+  };
   const justLinked = (provider: V1LinkableProvider) => (
     outcome?.provider === provider && (outcome.linkResult === 'linked' || outcome.linkResult === 'merged')
   );
@@ -296,6 +408,14 @@ export function LoginMethodsPageClient() {
               canConnectHere={connectButtonShown(outcome.provider)}
             />
           ) : null}
+          {unlinkOutcome ? (
+            <UnlinkResultNotice
+              outcome={unlinkOutcome}
+              onDismiss={() => setUnlinkOutcome(null)}
+              onRelogin={reLogin}
+              relogin={{ pending: signOut.pending, error: signOut.error }}
+            />
+          ) : null}
           {startError ? (
             <p className="tm-text-label" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{startError}</p>
           ) : null}
@@ -306,6 +426,7 @@ export function LoginMethodsPageClient() {
                   mark="email"
                   label="이메일·비밀번호"
                   caption={authMe.data.user.email ?? '이메일과 비밀번호로 로그인해요'}
+                  detail={unlinkDetail('email')}
                   badge={<ConnectedBadge />}
                   divided={false}
                 />
@@ -327,6 +448,7 @@ export function LoginMethodsPageClient() {
                   mark="kakao"
                   label="카카오 로그인"
                   caption={justLinked('kakao') ? '방금 연결했어요' : '카카오 버튼으로 이 계정에 들어와요'}
+                  detail={unlinkDetail('kakao')}
                   badge={<ConnectedBadge />}
                 />
               ) : (
@@ -354,6 +476,7 @@ export function LoginMethodsPageClient() {
                   mark="apple"
                   label="Apple 로그인"
                   caption={justLinked('apple') ? '방금 연결했어요' : 'Apple 버튼으로 이 계정에 들어와요'}
+                  detail={unlinkDetail('apple')}
                   badge={<ConnectedBadge />}
                 />
               ) : nativeApple && canLink ? (
@@ -399,6 +522,17 @@ export function LoginMethodsPageClient() {
           ) : null}
         </div>
       </div>
+      <ConfirmModal
+        open={unlinkTarget !== null}
+        title={unlinkTarget ? `${LOGIN_METHOD_NAME[unlinkTarget]} 로그인을 해제할까요?` : ''}
+        message={unlinkTarget ? unlinkConfirmMessage(unlinkTarget, providers) : ''}
+        details={unlinkTarget ? <UnlinkImpact method={unlinkTarget} /> : undefined}
+        confirmLabel={unlinkTarget ? `${LOGIN_METHOD_NAME[unlinkTarget]} 해제` : undefined}
+        tone="danger"
+        busy={unlink.isPending}
+        onConfirm={() => void confirmUnlink()}
+        onCancel={() => setUnlinkTarget(null)}
+      />
       {toast}
     </div>
   );

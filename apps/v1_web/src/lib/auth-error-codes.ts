@@ -13,6 +13,12 @@ export const SOCIAL_LINK_PROVIDER_EXISTS_CODE = 'SOCIAL_LINK_PROVIDER_EXISTS';
 /** 운영자 계정에는 로그인 수단을 연결할 수 없다는 403 코드. */
 export const SOCIAL_LINK_ADMIN_FORBIDDEN_CODE = 'SOCIAL_LINK_ADMIN_FORBIDDEN';
 
+/** 로그인 수단을 떼려는데 그것이 마지막 남은 수단이라는 409 코드. */
+export const LAST_LOGIN_METHOD_CODE = 'LAST_LOGIN_METHOD';
+
+/** 떼려는 로그인 수단이 이 계정에 연결돼 있지 않다(이미 뗐다)는 404 코드. */
+export const LOGIN_METHOD_NOT_FOUND_CODE = 'LOGIN_METHOD_NOT_FOUND';
+
 /** 이메일 인증 증명(`emailLinkToken`)이 만료됐거나 이 계정·주소의 것이 아니라는 400 코드. */
 export const EMAIL_LINK_TOKEN_INVALID_CODE = 'EMAIL_LINK_TOKEN_INVALID';
 

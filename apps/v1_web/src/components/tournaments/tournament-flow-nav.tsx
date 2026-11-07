@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useId } from 'react';
 
 interface TournamentFlowNavProps {
   prev: { href: string; label: string };
@@ -29,6 +30,8 @@ function withDirectionalParticle(label: string): string {
  * tm-btn 기반으로 앱 전체 버튼 스타일과 통일.
  */
 export function TournamentFlowNav({ prev, next }: TournamentFlowNavProps) {
+  const labelId = useId();
+  const hintId = useId();
   return (
     <nav
       style={{
@@ -72,13 +75,13 @@ export function TournamentFlowNav({ prev, next }: TournamentFlowNavProps) {
           disabled
           className="tm-btn tm-btn-md tm-btn-primary"
           style={{ flex: 1, justifyContent: 'space-between', opacity: 0.42, cursor: 'not-allowed' }}
-          aria-label={next.disabledHint ?? `${next.label} 준비 중`}
-          title={next.disabledHint}
+          aria-labelledby={labelId}
+          aria-describedby={next.disabledHint ? hintId : undefined}
         >
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
-            <span>{next.label}</span>
+            <span id={labelId}>{next.label}</span>
             {next.disabledHint && (
-              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.75 }}>{next.disabledHint}</span>
+              <span id={hintId} style={{ fontSize: 12, fontWeight: 500, opacity: 0.75 }}>{next.disabledHint}</span>
             )}
           </span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

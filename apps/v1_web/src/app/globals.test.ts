@@ -1,11 +1,21 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import postcss from 'postcss';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
 const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
 const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
+
+function appSourcesEnablingViewportFitCover(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return appSourcesEnablingViewportFitCover(path);
+    if (!/\.(ts|tsx)$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) return [];
+    const source = readFileSync(path, 'utf8');
+    return /viewportFit\s*:\s*['"]cover['"]|viewport-fit\s*=\s*cover/.test(source) ? [path] : [];
+  });
+}
 
 describe('mobile floating action button layout', () => {
   it('keeps the FAB above both the bottom navigation and the native safe inset', () => {
@@ -98,6 +108,25 @@ describe('bottom sheet placement', () => {
       expect(paddings.length).toBeGreaterThan(0);
       expect(paddings.some((value) => value.includes('--v1-shell-safe-bottom'))).toBe(!hasBottomNav);
     });
+  });
+});
+
+describe('shell bottom safe-area source', () => {
+  // Without viewport-fit=cover a correct UA reports env(safe-area-inset-bottom) as 0, but some
+  // in-app WebViews report a non-zero value anyway. Reading it would shorten every
+  // no-bottom-nav scroller (bottom: var(--v1-shell-safe-bottom)) into a blank strip.
+  it('does not read env(safe-area-inset-bottom) while the viewport has no viewport-fit=cover', () => {
+    expect(appSourcesEnablingViewportFitCover(resolve(process.cwd(), 'src/app'))).toEqual([]);
+
+    const declarations = [...globalsCss.matchAll(/--(?:v1-shell|teameet-native)-safe-bottom\s*:\s*([^;]+);/g)];
+    expect(declarations.length).toBeGreaterThan(0);
+    for (const [declaration] of declarations) {
+      expect(declaration).not.toMatch(/env\(/);
+    }
+  });
+
+  it('resolves the shell variable from the native shell value', () => {
+    expect(globalsCss).toMatch(/--v1-shell-safe-bottom:\s*var\(--teameet-native-safe-bottom\);/);
   });
 });
 
@@ -591,14 +620,17 @@ describe('대진표 예정 단계 라벨 대비 (2026-09-07 사용자 확정 B�
   const colorOf = (selector: string) =>
     globalsCss.match(new RegExp('\\' + selector + '\\s*\\{[^}]*?color:\\s*var\\((--[a-z0-9-]+)\\)', 's'))?.[1] ?? null;
 
-  it('예정 단계 이름은 흰 배경에서 AA 를 넘는다', () => {
-    const token = colorOf('.tm-hub-stage-label');
+  it.each(['.tm-hub-stage-label', '.tm-hub-stage-label-done', '.tm-hub-stage-label-active'])(
+    '%s 는 흰 배경에서 AA 를 넘는다',
+    (selector) => {
+      const token = colorOf(selector);
 
-    expect(token, '.tm-hub-stage-label 의 color 토큰을 찾지 못했다').toBeTruthy();
-    const value = hex(token!.slice(2));
-    expect(value, token + ' 값을 찾지 못했다').toBeTruthy();
-    expect(ratio(value!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-  });
+      expect(token, selector + ' 의 color 토큰을 찾지 못했다').toBeTruthy();
+      const value = hex(token!.slice(2));
+      expect(value, token + ' 값을 찾지 못했다').toBeTruthy();
+      expect(ratio(value!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
   it('원 안 숫자는 grey400 그대로다 — 라벨과 중복이라 예외로 등재했다', () => {
     expect(colorOf('.tm-hub-stage-dot')).toBe('--grey400');

@@ -2539,7 +2539,7 @@ label.tm-btn:focus-within {
 .tm-record-rank-name {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 

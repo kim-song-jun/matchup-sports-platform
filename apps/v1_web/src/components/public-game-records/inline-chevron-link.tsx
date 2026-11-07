@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
+// 코드포인트가 아니라 사용자가 보는 글자 단위로 자른다 — 국기·ZWJ 이모지·분해형(NFD) 한글을 가운데서 가르지 않는다.
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 /**
  * 이름·문장 속 링크(선수 공개 프로필, 팀 페이지, 안내 문장의 설정 링크). 밑줄 대신 글자
  * 뒤 chevron 이 "눌린다"는 신호이고, 색 말고도 링크임이 드러나는 단서(WCAG 1.4.1)다.
@@ -25,9 +28,9 @@ export function InlineChevronLink({
 }) {
   if (href === null) return <>{label}</>;
   // 마지막 글자를 chevron 과 한 덩어리로 묶는다 — 좁은 폭에서 chevron 만 다음 줄로 떨어지지 않는다.
-  const chars = Array.from(label);
-  const lead = chars.slice(0, -1).join('');
-  const tail = chars.slice(-1).join('');
+  const graphemes = Array.from(graphemeSegmenter.segment(label), (part) => part.segment);
+  const lead = graphemes.slice(0, -1).join('');
+  const tail = graphemes.slice(-1).join('');
   return (
     <Link href={href} style={tone === 'link' ? { color: 'var(--blue700)' } : undefined}>
       {lead}

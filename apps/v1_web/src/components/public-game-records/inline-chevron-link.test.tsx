@@ -14,7 +14,21 @@ describe('InlineChevronLink', () => {
   it('마지막 글자와 chevron 이 한 덩어리라 좁은 폭에서 chevron 만 떨어지지 않는다', () => {
     render(<InlineChevronLink href="/users/u-1" label="김도윤" />);
     const chevron = screen.getByRole('link').querySelector('svg');
-    expect(chevron?.parentElement?.textContent).toBe('윤');
+    const tail = chevron?.parentElement;
+    expect(tail?.textContent).toBe('윤');
+    // 줄바꿈을 막는 것은 이 묶음의 nowrap 이다 — 묶기만 하고 nowrap 이 없으면 chevron 앞에서 끊긴다.
+    expect(getComputedStyle(tail as Element).whiteSpace).toBe('nowrap');
+  });
+
+  it.each([
+    ['국기 이모지로 끝나는 이름', '팀🇰🇷', '🇰🇷'],
+    ['ZWJ 이모지로 끝나는 이름', '팀👨‍👩‍👧', '👨‍👩‍👧'],
+    ['분해형(NFD) 한글로 끝나는 이름', '김도윤'.normalize('NFD'), '윤'.normalize('NFD')],
+  ])('%s 도 마지막 글자 하나가 통째로 chevron 과 묶인다', (_name, label, lastGlyph) => {
+    render(<InlineChevronLink href="/users/u-1" label={label} />);
+    const link = screen.getByRole('link');
+    expect(link.querySelector('svg')?.parentElement?.textContent).toBe(lastGlyph);
+    expect(link.textContent).toBe(label);
   });
 
   it('한 글자 이름도 글자째로 chevron 과 묶이고 링크 이름을 지킨다', () => {

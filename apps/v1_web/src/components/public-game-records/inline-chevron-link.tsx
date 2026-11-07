@@ -2,7 +2,17 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
 // 코드포인트가 아니라 사용자가 보는 글자 단위로 자른다 — 국기·ZWJ 이모지·분해형(NFD) 한글을 가운데서 가르지 않는다.
-const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+// Intl.Segmenter 가 없는 옛 브라우저·웹뷰에서 모듈을 불러오는 순간 던지면 이 링크를 쓰는 화면 전체가 깨지므로,
+// 그때만 코드포인트로 자른다(묶음 경계가 어긋날 뿐 글자는 그대로 보인다).
+const graphemeSegmenter =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null;
+
+function splitGraphemes(label: string): string[] {
+  if (graphemeSegmenter === null) return Array.from(label);
+  return Array.from(graphemeSegmenter.segment(label), (part) => part.segment);
+}
 
 /**
  * 이름·문장 속 링크(선수 공개 프로필, 팀 페이지, 안내 문장의 설정 링크). 밑줄 대신 글자
@@ -28,7 +38,7 @@ export function InlineChevronLink({
 }) {
   if (href === null) return <>{label}</>;
   // 마지막 글자를 chevron 과 한 덩어리로 묶는다 — 좁은 폭에서 chevron 만 다음 줄로 떨어지지 않는다.
-  const graphemes = Array.from(graphemeSegmenter.segment(label), (part) => part.segment);
+  const graphemes = splitGraphemes(label);
   const lead = graphemes.slice(0, -1).join('');
   const tail = graphemes.slice(-1).join('');
   return (

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { InlineChevronLink } from './inline-chevron-link';
 
 describe('InlineChevronLink', () => {
@@ -42,5 +42,20 @@ describe('InlineChevronLink', () => {
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.querySelector('svg')).toBeNull();
     expect(container).toHaveTextContent('김도윤');
+  });
+});
+
+describe('Intl.Segmenter 가 없는 브라우저', () => {
+  it('모듈을 불러와도 깨지지 않고 마지막 글자와 chevron 을 묶어 그린다', async () => {
+    vi.resetModules();
+    vi.stubGlobal('Intl', { ...Intl, Segmenter: undefined });
+    try {
+      const { InlineChevronLink: Fresh } = await import('./inline-chevron-link');
+      render(<Fresh href="/users/u-1" label="김도윤" />);
+      const link = screen.getByRole('link', { name: '김도윤' });
+      expect(link.querySelector('svg')?.parentElement?.textContent).toBe('윤');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -126,7 +126,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/auth/blocked` — 미검수
 - [ ] `/auth/find-account` — 미검수
 - [ ] `/auth/location-denied` — 미검수
-- [ ] `/auth/password-reset` — 미검수
+- [x] `/auth/password-reset` — 정리됨(페이지 삭제, 검수 대상 아님)
 - [ ] `/auth/provider-denied` — 미검수
 - [ ] `/auth/withdrawal-cancel` — 미검수
 - [ ] `/callback/kakao` — 미검수
@@ -199,7 +199,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/onboarding/confirm` — 미검수
 - [ ] `/onboarding/level` — 미검수
 - [ ] `/onboarding/region` — 미검수
-- [ ] `/onboarding/resume` — 미검수
+- [x] `/onboarding/resume` — 정리됨(페이지 삭제, 검수 대상 아님)
 - [ ] `/onboarding/sport` — 미검수
 - [ ] `/` — 미검수
 - [ ] `/search/new` — 미검수

@@ -26,7 +26,6 @@ import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './l
 import { normalizeEmail } from './normalize-email';
 import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
 import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
-import { isUnfinishedSocialSignup } from './social-signup-access';
 
 export type AccountLinkResult = {
   provider: LinkableSocialProvider;

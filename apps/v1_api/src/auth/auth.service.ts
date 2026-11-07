@@ -655,14 +655,13 @@ export class AuthService {
         throw this.kakaoContactConflict(profile, [userId]);
       }
       if (candidate.accountStatus === 'withdrawal_pending') {
-        // Only a contact Kakao itself vouches for may reveal that this account is withdrawing, and until when.
+        // Only a contact Kakao vouches for reveals the withdrawal and its end date. A matching number counts: Kakao's
+        // phone proves possession the way our SMS code does, and signup shows the same date after number verification.
         const vouched = Boolean((email && candidate.email === email) || (phone && candidate.phone === phone));
-        throw signInThenLinkConflict(
-          'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-          kakaoLinkClaims(profile),
-          [userId],
-          vouched ? { withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate) } : undefined,
-        );
+        if (!vouched) throw this.kakaoContactConflict(profile, [userId]);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', kakaoLinkClaims(profile), [userId], {
+          withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate),
+        });
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
@@ -859,7 +858,7 @@ export class AuthService {
         where: { id: user.id },
         data: expired ? { onboardingStatus: 'social_terms_required', lastLoginAt: now } : { lastLoginAt: now },
       });
-      if (expired) await releaseSignupPhone(tx, user.id);
+      if (expired) await releaseSignupPhone(tx, user.id, 'expired_signup');
 
       const mergeSeed = pending && seed !== null;
       if (!expired && !mergeSeed) return;
@@ -1501,7 +1500,7 @@ export class AuthService {
         update: { currentStep: 'terms' },
         create: { userId, currentStep: 'terms' },
       });
-      await releaseSignupPhone(tx, userId);
+      await releaseSignupPhone(tx, userId, 'expired_signup');
     });
   }
 

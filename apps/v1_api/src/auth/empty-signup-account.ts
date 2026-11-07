@@ -50,18 +50,23 @@ export function isEmptySignupAccount(holder: {
 
 const SIGNUP_STEP_STATUSES: PendingSocialSignupStatus[] = ['social_terms_required', 'social_profile_required'];
 
+/** Why a signup's number was freed: the person left through logout, or the 24h signup window ran out. */
+export type SignupPhoneReleaseReason = 'abandoned_signup' | 'expired_signup';
+
 /**
  * Frees the phone number a social signup holds while it is still on the terms or profile step. The number is saved
  * the moment Kakao hands it over or an SMS code confirms it, long before the signup is finished, and `v1_users.phone`
  * is unique, so a signup nobody finishes would otherwise keep the number from everyone else.
  *
  * Only an empty signup (see `isEmptySignupAccount`) on one of those two steps is touched; a member who skipped the
- * profile step (`social_profile_deferred`) is already using the account and keeps the number. Returns whether a
- * number was released.
+ * profile step (`social_profile_deferred`) is already using the account and keeps the number. A release writes a
+ * `user_phone` status log in the same client, so call this inside a transaction. Returns whether a number was
+ * released.
  */
 export async function releaseSignupPhone(
-  db: Pick<Prisma.TransactionClient, 'v1AuthIdentity' | 'v1User'>,
+  db: Pick<Prisma.TransactionClient, 'v1AuthIdentity' | 'v1User' | 'v1StatusChangeLog'>,
   userId: string,
+  reason: SignupPhoneReleaseReason,
 ): Promise<boolean> {
   const holder = await db.v1AuthIdentity.findFirst({
     where: { userId, status: 'active' },
@@ -88,5 +93,19 @@ export async function releaseSignupPhone(
     where: { id: userId, accountStatus: 'active', onboardingStatus: { in: SIGNUP_STEP_STATUSES }, phone: { not: null } },
     data: { phone: null, phoneVerifiedAt: null },
   });
-  return released.count === 1;
+  if (released.count !== 1) return false;
+
+  const byUser = reason === 'abandoned_signup';
+  await db.v1StatusChangeLog.create({
+    data: {
+      targetType: 'user_phone',
+      targetId: userId,
+      fromStatus: 'signup',
+      toStatus: 'released',
+      actorType: byUser ? 'user' : 'system',
+      actorUserId: byUser ? userId : null,
+      reason,
+    },
+  });
+  return true;
 }

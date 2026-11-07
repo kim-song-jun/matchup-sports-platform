@@ -993,11 +993,22 @@ export class ProfileService {
     // 네트워크 유실로 프론트 호출이 안 가도 이 경로는 세션 쿠키가 유효한 한 항상 탄다).
     if (user) {
       await this.prisma.v1PushSubscription.deleteMany({ where: { userId: user.id } });
-      // A social signup still on its terms or profile step can only leave through here ("가입 그만두기"); the number it
-      // saved along the way must not stay locked to a signup nobody is finishing.
-      if (isPendingSocialSignup(user.onboardingStatus)) await releaseSignupPhone(this.prisma, user.id);
+      if (isPendingSocialSignup(user.onboardingStatus)) await this.releaseAbandonedSignupPhone(user.id);
     }
     return { ok: true };
+  }
+
+  /**
+   * A social signup still on its terms or profile step can only leave through logout ("가입 그만두기"); the number it
+   * saved along the way must not stay locked to a signup nobody is finishing. Best effort: the logout interceptor
+   * clears the session cookie only when the handler succeeds, so a failure here must not fail the logout.
+   */
+  private async releaseAbandonedSignupPhone(userId: string) {
+    try {
+      await this.prisma.$transaction((tx) => releaseSignupPhone(tx, userId, 'abandoned_signup'));
+    } catch (error) {
+      this.logger.warn(`Signup phone release on logout failed user=${userId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {

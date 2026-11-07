@@ -513,7 +513,7 @@ function ScheduleRow({
   // 일반 경기와 같은 배경을 쓰고 배지와 파란 테두리로 구분한다.
   return (
     <div
-      className={`tm-schedule-card${isMine ? ' tm-schedule-card-mine' : ''}${isNext ? ' tm-schedule-card-next' : ''}`}
+      className={`tm-schedule-card${isMine ? ' tm-schedule-card-mine' : ''}`}
       style={{ background: 'var(--bg)', borderColor: 'var(--blue500)' }}
     >
       {row}
@@ -1078,6 +1078,13 @@ export function ScheduleContent({
     <EmptyState title={UPCOMING_EMPTY_STATE.title} sub={UPCOMING_EMPTY_STATE.sub} illustration={{ name: 'matches-empty' }}
       cta={UPCOMING_EMPTY_STATE.cta} onCta={() => setFilter(activeFilter, mineOnly, undefined, undefined, false)} />
   );
+  // 일정은 시각 순으로 20건씩 오므로 앞쪽 쪽들은 끝난 경기뿐일 수 있다 — 나머지 쪽이 남았으면 아직 "없다"고 말할 수 없다.
+  const upcomingSearching = (
+    <div role="status" aria-label="예정된 경기 찾는 중" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)', padding: 'var(--spacing-5)' }}>
+      <p className="tm-text-caption" style={{ margin: 0 }}>예정된 경기를 찾고 있어요.</p>
+      <div className="tm-skeleton" style={{ height: 'var(--size-control-lg)', borderRadius: 'var(--radius-control)' }} />
+    </div>
+  );
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1177,7 +1184,7 @@ export function ScheduleContent({
               </span>
             </div>
           )
-        ) : upcomingEmpty ? upcomingEmptyState : (
+        ) : upcomingEmpty ? (hasNextPage ? upcomingSearching : upcomingEmptyState) : (
           <ScheduleSections
             tournamentId={tournamentId}
             entries={visibleItems}

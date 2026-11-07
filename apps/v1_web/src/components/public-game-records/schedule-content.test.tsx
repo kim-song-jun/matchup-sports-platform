@@ -1365,6 +1365,20 @@ describe('ScheduleContent — 예정만·다음 경기', () => {
     expect(ids()).toEqual(['cancelled-1', 'ended-1']);
   });
 
+  it('다음 페이지가 남았으면 예정만이 비어 보여도 없다고 말하지 않고, 마지막 페이지까지 비면 그때 빈 상태를 말한다', () => {
+    const finished = progressItems.filter((entry) => entry.status === 'ended' || entry.status === 'cancelled');
+    const view = render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames hasNextPage onLoadMore={() => undefined}
+      data={makeData({ items: finished })} />);
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: '예정된 경기 찾는 중' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '더 보기' })).toBeInTheDocument();
+    view.rerender(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames hasNextPage={false} onLoadMore={() => undefined}
+      data={makeData({ items: finished })} />);
+    expect(screen.getByText('예정된 경기가 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '예정된 경기 찾는 중' })).not.toBeInTheDocument();
+  });
+
   it('빈 상태가 눌러 보라고 한 컨트롤을 누르면 지난 경기가 돌아온다 — 단계 탭의 전체가 아니다', () => {
     render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: [
       fixtureEntry({ fixtureId: 'group-done', status: 'ended' }),

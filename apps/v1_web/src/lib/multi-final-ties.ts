@@ -36,10 +36,20 @@ export function initialSeats(final: Final): Array<string | null> {
   return final.rules.map((_, index) => (open.has(index) ? null : final.suggestedRegistrationIds[next++]));
 }
 
+export const TIE_SEAT_REQUIRED = '동률 자리를 골라야 대진을 확인할 수 있어요.';
+
 export function requireSeats(seats: ReadonlyArray<string | null>): string[] {
   const filled = seats.filter((id): id is string => id !== null);
-  if (filled.length !== seats.length) throw new Error('동률 자리를 골라야 대진을 확인할 수 있어요.');
+  if (filled.length !== seats.length) throw new Error(TIE_SEAT_REQUIRED);
   return filled;
+}
+
+/** A tied candidate takes an open seat of its own bundle; anyone else skips every tie seat so a seat only ever holds one of its candidates. */
+export function placeTeam(ids: ReadonlyArray<string | null>, seats: readonly TiedSeat[], id: string): Array<string | null> {
+  const isTieSeat = (index: number) => seats.some((entry) => entry.seat === index);
+  const own = seats.find((entry) => ids[entry.seat] == null && entry.tiedRegistrationIds.includes(id));
+  const open = own ? own.seat : ids.findIndex((row, index) => row === null && !isTieSeat(index));
+  return open >= 0 ? ids.map((row, index) => (index === open ? id : row)) : [...ids, id];
 }
 
 function destinationOf(view: MultiFinalView, groupId: string, rank: number): Destination | null {

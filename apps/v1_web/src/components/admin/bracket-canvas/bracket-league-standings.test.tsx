@@ -38,7 +38,7 @@ describe('BracketLeagueStandings', () => {
     expect(within(screen.getByRole('table', { name: 'B조 순위표' })).getByText('알파 6인 8팀')).toBeInTheDocument();
   });
 
-  it('동률 팀 행에만 팀 이름 옆에 동률 배지를 붙이고 이름은 그대로 읽힌다', () => {
+  it('동률 팀 행에만 동률 배지를 붙이고 이름은 그대로 읽힌다', () => {
     const tiedGroups: LeagueStandingsGroup[] = [{ groupId: 'gA', name: 'A조', rows: [
       row('r1', '송파 유나이티드', 1), row('r2', '마포 레인저스', 2, { tied: true }), row('r3', '강동 FC', 3, { tied: true }), row('r4', '노원 시티', 4),
     ] }];
@@ -46,5 +46,12 @@ describe('BracketLeagueStandings', () => {
     const rows = within(screen.getByRole('table', { name: 'A조 순위표' })).getAllByRole('row').slice(1);
     expect(rows.map((r) => within(r).queryByText('동률') !== null)).toEqual([false, true, true, false]);
     expect(within(rows[1]).getByText('마포 레인저스')).toBeInTheDocument();
+  });
+
+  it('동률 배지는 팀 이름 줄 아래 따로 놓여 좁은 폭에서도 이름이 배지에 밀려 잘리지 않는다', () => {
+    render(<BracketLeagueStandings groups={[{ groupId: 'gA', name: 'A조', rows: [row('r1', '마포 레인저스', 1, { tied: true })] }]} />);
+    const cell = within(screen.getByRole('table', { name: 'A조 순위표' })).getByText('마포 레인저스').parentElement!;
+    expect(cell).toHaveClass('flex-col');
+    expect(cell).toContainElement(screen.getByText('동률'));
   });
 });

@@ -9,12 +9,11 @@ import { useMultiFinals, type MultiFinalPolicy, type MultiFinalView } from '@/ho
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sameGroupPairs } from '@/lib/multi-final-same-group';
-import { describeTies, initialSeats, requireSeats, tiedSeats } from '@/lib/multi-final-ties';
+import { describeTies, initialSeats, placeTeam, requireSeats, tiedSeats, TIE_SEAT_REQUIRED } from '@/lib/multi-final-ties';
 import { BracketLeagueStandings } from './bracket-league-standings';
 
 const control = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label';
-const controlUnset = control.replace('border-[var(--border)]', 'border-[var(--orange700)]');
-const TIE_SEAT_REQUIRED = '동률 자리를 골라야 대진을 확인할 수 있어요.';
+const controlUnset = 'h-11 w-full rounded-xl border border-[var(--orange700)] bg-[var(--card-surface)] px-3 tm-text-label';
 type Props = { tournamentId: string; open: boolean; onClose: () => void; onApplied: () => void };
 export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onApplied }: Props) {
   const api = useMultiFinals(tournamentId, open);
@@ -67,7 +66,8 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const seats = final ? tiedSeats(final) : [];
   const ties = view && final ? describeTies(view, final) : [];
   const seated = ids.flatMap(id => (id === null ? [] : [id]));
-  const openTieSeat = seats.some(entry => ids[entry.seat] == null);
+  const openSeats = seats.filter(entry => ids[entry.seat] == null);
+  const openTieSeat = openSeats.length > 0;
   // Seat numbers follow the rules, so a tied seat stays where it is: neither it nor a swap with it can move.
   const pinned = (index: number) => ids[index] == null || seats.some(entry => entry.seat === index);
   const candidatesOf = (seat: { seat: number; candidates: string[] }) => [...new Set([...seat.candidates, ...(ids[seat.seat] == null ? [] : [ids[seat.seat] as string])])]
@@ -123,7 +123,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const drop = (remove: (id: string) => boolean) => seats.length > 0
     ? ids.map(id => (id !== null && remove(id) ? null : id))
     : ids.filter(id => id === null || !remove(id));
-  const place = (id: string) => { const open = ids.indexOf(null); return open >= 0 ? ids.map((row, index) => (index === open ? id : row)) : [...ids, id]; };
+  const place = (id: string) => placeTeam(ids, seats, id);
   const pick = (seat: number, id: string) => edit(Array.from({ length: Math.max(ids.length, seat + 1) }, (_, index) => (index === seat ? (id || null) : ids[index] ?? null)));
   return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">
@@ -149,7 +149,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
             <p className="tm-text-caption">추천은 아래 공식 순위를 그대로 사용해요. 저장한 진출팀은 이후 순위가 바뀌어도 유지돼요.</p>
             <BracketLeagueStandings groups={(view.groupStandings ?? []).map(group => ({ groupId: group.groupId, name: `${group.name}${group.complete ? ' · 확정' : ' · 진행 중'}`, rows: group.rows.map(row => ({ registrationId: row.registrationId, teamName: row.teamName, rank: row.position ?? 0, played: row.wins + row.draws + row.losses, wins: row.wins, draws: row.draws, losses: row.losses, goalDifference: row.goalsFor - row.goalsAgainst, points: row.points, tied: row.tiedRegistrationIds.length > 0 })) }))} />
             {ties.map(tie => <div key={tie.key} className="space-y-3">
-              <AlertBanner tone="warning" message={tie.banner} />
+              {tie.seats.some(seat => ids[seat.seat] == null) && <AlertBanner tone="warning" message={tie.banner} />}
               <p className="tm-text-caption">{tie.detail}</p>
               {tie.seats.map(seat => <div key={seat.seat} className="space-y-1">
                 <label className="block tm-text-label">{seat.label}<select className={ids[seat.seat] == null ? controlUnset : control} value={ids[seat.seat] ?? ''} disabled={!ready} onChange={event => pick(seat.seat, event.target.value)}>
@@ -166,7 +166,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
             {final?.crossGroupTopThreeAvailable && seats.length > 0 && policy !== 'cross_group_top3' && <p className="tm-text-caption">동률인 순위가 있어 교차 배치는 쓸 수 없어요.</p>}
             {policy === 'cross_group_top3' && <p className="tm-text-caption">예선 조 순서대로 1위를 부전승 배치해요. 2위는 다음 조로 교차 고정하고, 3위는 12강과 8강에서 같은 조를 만나지 않도록 무작위 배치해요.</p>}
             <Button variant="neutral" disabled={!ready} onClick={() => void recommend()}>{policy === 'cross_group_top3' ? '무작위 추천 배치 만들기' : '공식 순위로 추천 배치 만들기'}</Button>
-            {seats.length > 0 && policy === 'rank_order' && <p className="tm-text-caption">동률인 {seats.map(entry => entry.seat + 1).join('·')}번 시드는 비워 두고 나머지 {slots.length - seats.length}자리만 채워요. 위에서 팀을 고르면 그 자리가 채워져요.</p>}
+            {openTieSeat && policy === 'rank_order' && <p className="tm-text-caption">동률인 {openSeats.map(entry => entry.seat + 1).join('·')}번 시드는 비워 두고 나머지 {slots.length - openSeats.length}자리만 채워요. 위에서 팀을 고르면 그 자리가 채워져요.</p>}
             <SectionTitle title={`${name || '토너먼트'} 진출팀 · ${seated.length}/${slots.length}팀`} />
             <p className="tm-text-caption">팀 선택이나 시드 순서를 직접 바꾸면 기본 수동 배치로 전환돼요. 다른 토너먼트에서 이미 확정한 팀은 중복 선택할 수 없어요.</p>
             {seated.some(id => !registrations.some(row => row.id === id)) && <Button variant="neutral" onClick={() => edit(drop(id => !registrations.some(row => row.id === id)))}>확정 명단에 없는 팀 제외</Button>}

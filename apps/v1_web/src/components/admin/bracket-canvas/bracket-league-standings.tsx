@@ -32,8 +32,8 @@ export function BracketLeagueStandings({ groups }: { groups: LeagueStandingsGrou
                   <th scope="row" className="tab-num tm-text-caption px-1 py-2 text-center font-normal">{row.rank}</th>
                   {row.tied ? (
                     <td className="tm-text-label px-1 py-2 font-semibold" title={row.teamName}>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">{row.teamName}</span>
+                      <span className="flex min-w-0 flex-col items-start gap-1">
+                        <span className="max-w-full truncate">{row.teamName}</span>
                         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--orange50)] px-2 py-0.5 tm-text-caption font-bold text-[var(--orange700)]">
                           <AlertTriangle size={12} aria-hidden="true" />동률
                         </span>

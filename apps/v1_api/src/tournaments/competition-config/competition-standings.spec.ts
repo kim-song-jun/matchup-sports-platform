@@ -105,14 +105,18 @@ describe('calculateCompetitionStandingsWithTies — 추첨으로만 갈린 묶�
     expect(new Set(standings.map((row) => row.position)).size).toBe(3);
   });
 
-  it('진짜 동률 한 쌍과 맞대결로 갈린 한 쌍이 한 조에 같이 있으면 진짜 동률만 묶는다', () => {
-    // A and B are level on everything (7 points); C and D are level on points but C won the head-to-head.
-    const { drawnTies } = ties({
-      registrationIds: ['A', 'B', 'C', 'D'],
-      fixtures: [result('A', 'B', 0, 0), result('A', 'C', 1, 0), result('A', 'D', 1, 0),
-        result('B', 'C', 1, 0), result('B', 'D', 1, 0), result('C', 'D', 1, 0)],
+  it('같은 승점 집단에 진짜 동률 한 쌍과 맞대결로 갈린 한 쌍이 같이 있으면 진짜 동률만 묶는다', () => {
+    // A, B, C and D all finish on 3 points (E and F only supply the points). A and B are level on every criterion;
+    // C and D are level on overall goals too, but C beat D head-to-head, so only A and B are left to the draw.
+    const { standings, drawnTies } = ties({
+      registrationIds: ['A', 'B', 'C', 'D', 'E', 'F'],
+      fixtures: [result('A', 'B', 1, 1), result('A', 'E', 1, 1), result('A', 'F', 1, 1), result('B', 'E', 1, 1), result('B', 'F', 1, 1),
+        result('C', 'D', 1, 0), result('C', 'E', 0, 1), result('C', 'F', 0, 1), result('D', 'E', 1, 0), result('D', 'F', 0, 1)],
     });
+    expect(standings.slice(2, 6).map((row) => row.points)).toEqual([3, 3, 3, 3]);
     expect(sortedTies(drawnTies)).toEqual([['A', 'B']]);
+    const order = standings.map((row) => row.registrationId);
+    expect(order.indexOf('C')).toBeLessThan(order.indexOf('D'));
   });
 
   it('승점이 다른 두 자리에 각각 완전 동률이 있으면 묶음도 둘이다', () => {

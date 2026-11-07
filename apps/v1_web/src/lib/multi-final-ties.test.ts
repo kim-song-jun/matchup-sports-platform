@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MultiFinalView } from '@/hooks/use-multi-finals';
-import { describeTies, initialSeats, requireSeats, tiedSeats } from './multi-final-ties';
+import { describeTies, initialSeats, placeTeam, requireSeats, tiedSeats, TIE_SEAT_REQUIRED } from './multi-final-ties';
 
 type Final = MultiFinalView['finals'][number];
 const names: Record<string, string> = { a1: '1팀', a2: '2팀', a3: '3팀', a4: '4팀', b1: '5팀', b2: '6팀', b3: '7팀', b4: '8팀' };
@@ -55,7 +55,32 @@ describe('initialSeats', () => {
 describe('requireSeats', () => {
   it('빈 자리가 없으면 그대로 돌려주고, 빈 자리가 있으면 확정하지 못하게 던진다', () => {
     expect(requireSeats(['a1', 'a2'])).toEqual(['a1', 'a2']);
-    expect(() => requireSeats(['a1', null])).toThrow('동률 자리를 골라야');
+    expect(() => requireSeats(['a1', null])).toThrow(TIE_SEAT_REQUIRED);
+  });
+});
+
+describe('placeTeam', () => {
+  // Seats 0 and 2 are open tie seats of two different groups; seat 1 was emptied by removing a team.
+  const seats = [
+    { seat: 0, rank: 3, groupId: 'gA', tiedRegistrationIds: ['a3', 'a4'] },
+    { seat: 2, rank: 3, groupId: 'gB', tiedRegistrationIds: ['b3', 'b4'] },
+  ];
+  it('동률 후보는 자기 묶음의 빈 동률 자리에 앉는다', () => {
+    expect(placeTeam([null, null, null], seats, 'b3')).toEqual([null, null, 'b3']);
+    expect(placeTeam([null, null, null], seats, 'a4')).toEqual(['a4', null, null]);
+  });
+  it('동률 후보가 아닌 팀은 동률 자리를 건너뛰고 일반 빈 자리에 앉는다', () => {
+    expect(placeTeam([null, null, null], seats, 'x1')).toEqual([null, 'x1', null]);
+  });
+  it('자기 묶음의 동률 자리가 이미 찼으면 일반 빈 자리에 앉는다', () => {
+    expect(placeTeam(['a3', null, null], seats, 'a4')).toEqual(['a3', 'a4', null]);
+  });
+  it('일반 빈 자리가 없으면 맨 끝에 붙이고 동률 자리는 건드리지 않는다', () => {
+    expect(placeTeam([null, 'x1', null], seats, 'x2')).toEqual([null, 'x1', null, 'x2']);
+  });
+  it('동률 자리가 없으면 첫 빈 자리, 빈 자리가 없으면 맨 끝에 붙인다', () => {
+    expect(placeTeam(['a1', null, 'a3'], [], 'x1')).toEqual(['a1', 'x1', 'a3']);
+    expect(placeTeam(['a1', 'a2'], [], 'x1')).toEqual(['a1', 'a2', 'x1']);
   });
 });
 

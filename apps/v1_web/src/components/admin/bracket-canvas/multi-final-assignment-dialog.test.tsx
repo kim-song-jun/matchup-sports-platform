@@ -235,6 +235,9 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
     expect(screen.getByText('프리미어 진출팀 · 3/3팀')).toBeInTheDocument();
     expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText(TIE_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(/비워 두고 나머지/)).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
     await openReview('프리미어');
     fireEvent.click(screen.getByRole('button', { name: '프리미어 진출팀 확정' }));
     await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());

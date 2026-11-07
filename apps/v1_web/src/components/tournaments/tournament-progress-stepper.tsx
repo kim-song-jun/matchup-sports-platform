@@ -79,10 +79,15 @@ export function stepperFade({
 // 토너먼트 이름 끝의 "토너먼트"·"결선" 은 안내 문장이 다시 붙이므로 뗀다("상위 토너먼트" → "상위").
 const TRACK_NAME_SUFFIX = /\s?(토너먼트|결선)$/;
 
+// 이름은 앞의 둘까지만 읽는다 — 토너먼트가 최대 10개라 다 적으면 한 줄이 칸 위로 여러 줄 쌓인다.
+const NOTE_NAME_LIMIT = 2;
+
 /** 같은 단계를 함께 치르는 토너먼트가 둘 이상일 때 스텝퍼 위에 띄우는 한 줄. */
 export function parallelTracksNote(tracks: string[]): string {
   const stems = tracks.map((track) => track.replace(TRACK_NAME_SUFFIX, '') || track);
-  return `${stems.join('·')} 토너먼트가 같은 단계로 진행돼요`;
+  const named = stems.slice(0, NOTE_NAME_LIMIT).join('·');
+  const rest = stems.length - NOTE_NAME_LIMIT;
+  return `${rest > 0 ? `${named} 외 ${rest}개` : named} 토너먼트가 같은 단계로 진행돼요`;
 }
 
 export function TournamentProgressStepper({ stages }: TournamentProgressStepperProps) {
@@ -377,10 +382,10 @@ function roundOnlyLabel(round: { key: string; fixtures: V1TournamentFixture[] })
 
 /**
  * 모든 형식의 마지막 칸. 결승·풀리그가 끝나도 대회가 끝나기 전에는 "다음" 단계이고,
- * 대회가 끝나면 지금 단계(결과·시상을 확인하는 단계)다.
+ * 대회가 끝나면 다른 단계와 같이 완료다 — 끝난 대회에 "진행 중" 표시가 남지 않는다.
  */
 function awardsStage(tournament: V1TournamentDetail, allDone: boolean): TournamentStage {
-  return { key: 'awards', label: tournament.kind === 'regular_league' ? '시즌 종료' : '시상', status: allDone ? 'active' : 'upcoming' };
+  return { key: 'awards', label: tournament.kind === 'regular_league' ? '시즌 종료' : '시상', status: allDone ? 'done' : 'upcoming' };
 }
 
 /**

@@ -108,4 +108,14 @@ describe('parallelTracksNote', () => {
   it('이름이 "토너먼트" 뿐이면 그 이름을 지우지 않는다', () => {
     expect(parallelTracksNote(['토너먼트', '챌린지'])).toBe('토너먼트·챌린지 토너먼트가 같은 단계로 진행돼요');
   });
+
+  it('토너먼트가 셋 이상이면 앞의 둘만 이름으로 읽고 나머지는 개수로 줄인다 — 이름이 길어도 한 줄을 넘기지 않는다', () => {
+    expect(parallelTracksNote(['상위 토너먼트', '중위 토너먼트', '하위 토너먼트'])).toBe('상위·중위 외 1개 토너먼트가 같은 단계로 진행돼요');
+
+    const ten = Array.from({ length: 10 }, (_, idx) => `아주 긴 이름의 ${idx + 1}번 지역 대표 결선 토너먼트`);
+    const note = parallelTracksNote(ten);
+    expect(note).toContain('외 8개');
+    expect(note).not.toContain('3번 지역');
+    expect(note).not.toContain('10번 지역');
+  });
 });

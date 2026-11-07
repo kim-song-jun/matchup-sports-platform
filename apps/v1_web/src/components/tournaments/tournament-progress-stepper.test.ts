@@ -119,7 +119,7 @@ describe('buildTournamentStages — 한국어 라운드 라벨', () => {
       ['조별리그', 'done'],
       ['4강', 'done'],
       ['결승', 'done'],
-      ['시상', 'active'],
+      ['시상', 'done'],
     ]);
   });
 
@@ -394,10 +394,24 @@ describe('buildTournamentStages — 시상 칸', () => {
     expect(pickFocusStageIndex(stages)).toBe(2);
   });
 
-  it('대회가 끝나면 시상이 마지막 단계로 이어진다 — 리그와 같은 규칙', () => {
+  it('대회가 끝나면 시상까지 전부 완료다 — 끝난 대회가 진행 중으로 읽히면 안 된다', () => {
     const stages = buildTournamentStages(tournament({ format: 'knockout', status: 'completed', fixtures: knockoutFixtures }));
 
-    expect(shape(stages)).toEqual([['4강', 'done'], ['결승', 'done'], ['시상', 'active']]);
+    expect(shape(stages)).toEqual([['4강', 'done'], ['결승', 'done'], ['시상', 'done']]);
+    expect(stages.some((stage) => stage.status === 'active')).toBe(false);
+  });
+
+  it('끝난 리그도 풀리그와 시즌 종료가 모두 완료다', () => {
+    const stages = buildTournamentStages(
+      tournament({
+        format: 'group_knockout',
+        kind: 'regular_league',
+        status: 'completed',
+        fixtures: [fixture({ round: '1라운드', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' })],
+      }),
+    );
+
+    expect(shape(stages)).toEqual([['풀리그', 'done'], ['시즌 종료', 'done']]);
   });
 });
 

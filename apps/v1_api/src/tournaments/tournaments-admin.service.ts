@@ -653,7 +653,11 @@ export class TournamentsAdminService {
       // 설정 리포인트와 감사 기록까지 함께 롤백되어야 한다.
       if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged) await lockTournamentForConfigChange(tx, tournamentId);
       if (formatChanged) await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
-      if (tieBreakOrderChanged) await this.assertTieBreakOrderEditable(tx, tournamentId);
+      if (tieBreakOrderChanged) {
+        // Result confirmation holds its Game row until the OFFICIAL revision commits; wait for it so the check sees that result.
+        await lockCompetitionFixtureRows(tx, existing.kind, tournamentId);
+        await this.assertTieBreakOrderEditable(tx, tournamentId);
+      }
       if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
       let casBaseline = existing.updatedAt;
       if (lineupConfigChangeRequested) {
@@ -1202,7 +1206,7 @@ export class TournamentsAdminService {
     if (message) throw new ConflictException({ code: 'TOURNAMENT_FORMAT_LOCKED', message });
   }
 
-  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
+  /** 예선(phase=group) 경기에 공식 결과가 있으면 순서를 바꿀 수 없는 사유를 돌려준다. */
   private async getTieBreakOrderBlockedReason(
     client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
     tournamentId: string,
@@ -1217,10 +1221,13 @@ export class TournamentsAdminService {
     });
     return official === null ? null : '예선 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 결과를 확정하기 전에 정해 주세요.';
   }
+
   private async assertTieBreakOrderEditable(client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>, tournamentId: string) {
     const message = await this.getTieBreakOrderBlockedReason(client, tournamentId);
     if (message) throw new ConflictException({ code: 'TIE_BREAK_ORDER_LOCKED', message });
   }
+
+  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
   private async assertSportChangeAllowed(
     client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
     tournamentId: string,

@@ -87,6 +87,41 @@ describe('대회별 동점 순서 (PostgreSQL)', () => {
     expect(renamed.title).toBe('이름만 바꿈');
   });
 
+  it('커밋 전인 결과 확정이 쥔 경기 행을 기다렸다가 확정을 보고 순서 변경을 409 로 막는다', async () => {
+    const tournamentId = await seedGroupTournament('tb-race');
+    const expectedVersion = await versionOf(tournamentId);
+    const detail = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { is: { phase: 'group' } } } });
+    const game = await prisma.v1Game.findFirstOrThrow({ where: { teamMatchId: detail.teamMatchId } });
+    let holdsGameRow!: () => void;
+    let commitConfirmation!: () => void;
+    const gameRowHeld = new Promise<void>((resolve) => { holdsGameRow = resolve; });
+    const mayCommit = new Promise<void>((resolve) => { commitConfirmation = resolve; });
+
+    // Stands in for result confirmation: the OFFICIAL revision and the Game row lock exist only inside this open transaction.
+    const confirming = prisma.$transaction(async (tx) => {
+      const revision = await tx.v1GameResultRevision.create({
+        data: { gameId: game.id, revision: 1, state: 'DRAFT', score: { home: 1, away: 0 }, eventsHash: `tie-break-race-${tournamentId}`, createdByActorType: 'SYSTEM', createdBySystemActor: 'TEST_FIXTURE' },
+      });
+      await tx.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'OFFICIAL', officialAt: new Date('2026-01-01T00:00:00.000Z') } });
+      await tx.v1Game.update({ where: { id: game.id }, data: { state: 'ENDED', currentOfficialRevisionId: revision.id } });
+      holdsGameRow();
+      await mayCommit;
+    }, { timeout: 30_000 });
+    await gameRowHeld;
+
+    const changing = admin.update(user, tournamentId, { expectedVersion, tieBreakOrder: FAIR_PLAY_FIRST });
+    const whileConfirming = await Promise.race([
+      changing.then(() => 'finished', () => 'finished'),
+      new Promise<string>((resolve) => { setTimeout(() => resolve('waiting'), 1_500); }),
+    ]);
+    commitConfirmation();
+    await confirming;
+
+    expect(whileConfirming).toBe('waiting');
+    await expect(changing).rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_LOCKED' } });
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId } })).tieBreakOrder).toBeNull();
+  });
+
   it('결선 경기에만 결과가 있으면 잠기지 않는다 — 잠금은 예선 결과만 본다', async () => {
     const tournamentId = await seedGroupTournament('tb-knockout-only');
     await settleFirstFixture(tournamentId, 'knockout');

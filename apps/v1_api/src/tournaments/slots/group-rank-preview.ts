@@ -19,14 +19,13 @@ export type RankStandingInput = {
   recalculatedAt: Date | null;
 };
 export type StoredRankRule = { tournamentId: string; configVersionId: string; config: CompetitionConfig };
-export type GroupRankSource = {
+export type GroupRankInput = {
   registrationIds: readonly string[];
   fixtures: readonly RankFixtureInput[];
   standings: readonly RankStandingInput[];
-  /**
-   * The tournament's own ranking rule (its tie-break order included). Resolved only for a settled
-   * group, so a group with pending results never needs the tournament's config.
-   */
+};
+export type GroupRankSource = GroupRankInput & {
+  /** The tournament's own ranking rule (its tie-break order included); only a settled group resolves it. */
   rule: () => StoredRankRule;
 };
 export type GroupRankResolution =
@@ -37,7 +36,7 @@ export type GroupRankResolution =
 const INCOMPLETE: GroupRankResolution = { state: 'group_incomplete' };
 
 /** 확정된 결과만 모아 순위 계산 입력으로 바꾼다. 하나라도 덜 끝났거나 순위표가 낡았으면 null. */
-function settledResults(source: GroupRankSource): StandingFixture[] | null {
+function settledResults(source: GroupRankInput): StandingFixture[] | null {
   if (source.fixtures.length === 0) return null;
   const results: StandingFixture[] = [];
   for (const fixture of source.fixtures) {
@@ -61,11 +60,16 @@ function settledResults(source: GroupRankSource): StandingFixture[] | null {
   return isStandingStale(source) ? null : results;
 }
 
+/** true when the group's stored standings can be ranked, i.e. a source built from it will resolve its rule. */
+export function hasSettledResults(source: GroupRankInput): boolean {
+  return settledResults(source) !== null;
+}
+
 /**
  * 결과 정정은 경기 수를 바꾸지 않아 소화 경기 수 검사로는 못 잡는다 — 정정된 공식 리비전이
  * 순위 재계산보다 늦으면 낡은 표다. 재계산 시각이 없는 옛 행이 있으면 비교하지 않는다.
  */
-function isStandingStale(source: GroupRankSource): boolean {
+function isStandingStale(source: GroupRankInput): boolean {
   const members = new Set(source.registrationIds);
   const stamps: number[] = [];
   for (const row of source.standings) {

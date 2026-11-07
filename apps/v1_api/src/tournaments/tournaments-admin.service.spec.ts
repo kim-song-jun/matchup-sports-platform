@@ -1208,6 +1208,26 @@ describe('TournamentsAdminService', () => {
       expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
     });
 
+    it('update: 결과 확정이 쥔 경기 행 잠금이 풀릴 때까지 기다린 뒤에 락 안에서 확인한다', async () => {
+      arrange();
+      officialGroupResultProbe(false);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST });
+      const gameLockCall = prisma.$queryRaw.mock.calls.findIndex(([strings]) => strings.join('').includes('FROM v1_games'));
+      expect(gameLockCall).toBeGreaterThanOrEqual(0);
+      const gameLockOrder = prisma.$queryRaw.mock.invocationCallOrder[gameLockCall];
+      const writeOrder = prisma.v1Tournament.updateMany.mock.invocationCallOrder[0];
+      const probesBetweenLockAndWrite = prisma.v1TournamentMatchDetails.findFirst.mock.calls
+        .map(([args], index) => (args.where.group !== undefined ? prisma.v1TournamentMatchDetails.findFirst.mock.invocationCallOrder[index] : null))
+        .filter((order): order is number => order !== null && order > gameLockOrder && order < writeOrder);
+      expect(probesBetweenLockAndWrite).toHaveLength(1);
+    });
+
+    it('update: 순서를 안 바꾸는 저장은 경기 행을 잠그지 않는다', async () => {
+      arrange({ tieBreakOrder: GOALS_FIRST });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST, title: '새 이름' });
+      expect(prisma.$queryRaw.mock.calls.some(([strings]) => strings.join('').includes('FROM v1_games'))).toBe(false);
+    });
+
     it('update: 잘못된 순서는 결과 조회 전에 400 으로 거절한다', async () => {
       arrange();
       await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'points'] }))

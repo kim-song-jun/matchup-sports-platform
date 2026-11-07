@@ -174,6 +174,33 @@ describe('calculateCompetitionStandings — 대회가 고른 동점 순서', () 
     expect(orderOf(['points', 'fair_play', 'head_to_head', 'goal_difference', 'goals_for', 'seeded_draw'], fairPlay)).toEqual(['D', 'B', 'A', 'E']);
   });
 
+  describe('맞대결이 앞 기준으로 갈리지 않은 팀들끼리만 따진다', () => {
+    // A, B and C all beat D and each other in a cycle (A>B 5-0, B>C 1-0, C>A 1-0): 6 points each, overall
+    // goal difference A +5, B +1, C +1. B and C are still level after goal difference, and B beat C directly.
+    // A mini-table over all three would let the A-C result drag B below C; the direct game decides instead.
+    const cycle = [
+      result('A', 'B', 5, 0), result('B', 'C', 1, 0), result('C', 'A', 1, 0),
+      result('A', 'D', 1, 0), result('B', 'D', 5, 0), result('C', 'D', 1, 0),
+    ];
+    const cycleOrder = (tieBreakOrder: CompetitionConfig['tieBreak']['order']) =>
+      calculateCompetitionStandings({
+        tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ['A', 'B', 'C', 'D'], fixtures: cycle,
+        config: withTournamentTieBreakOrder(defaultTestConfig(), tieBreakOrder),
+      }).map((row) => row.registrationId);
+
+    it('득실차 다음에 맞대결이면 같은 득실의 두 팀은 서로의 경기로 가른다', () => {
+      expect(cycleOrder(['points', 'goal_difference', 'head_to_head', 'goals_for', 'fair_play', 'seeded_draw'])).toEqual(['A', 'B', 'C', 'D']);
+    });
+
+    it('다득점이 먼저여도 같은 결과다 — 앞 기준이 이미 B 를 C 앞에 둔다', () => {
+      expect(cycleOrder(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['A', 'B', 'C', 'D']);
+    });
+
+    it('맞대결이 승점 바로 다음이면 세 팀 전체의 맞대결 성적표를 쓴다 — 기본 순서는 그대로', () => {
+      expect(cycleOrder(REQUIRED_TIE_BREAK_ORDER)).toEqual(['A', 'C', 'B', 'D']);
+    });
+  });
+
   it('순서를 바꿔도 추첨으로만 갈린 묶음은 같다 — 어느 기준으로도 안 갈린 팀은 순서와 무관하다', () => {
     const level = [result('A', 'B', 1, 1), result('A', 'C', 1, 0), result('B', 'C', 1, 0)];
     const input = { tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ['A', 'B', 'C'], fixtures: level };

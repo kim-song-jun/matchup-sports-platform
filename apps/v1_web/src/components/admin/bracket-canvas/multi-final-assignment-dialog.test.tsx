@@ -186,3 +186,100 @@ describe('토너먼트별 독립 진출팀 배정', () => {
     expect(screen.getByText('프리미어 대진 확인')).toBeInTheDocument();
   });
 });
+
+// Group A's 3rd and 4th place (다팀, 라팀) were separated only by the draw. 프리미어 takes ranks 1-3, 챌린지 takes rank 4.
+function tieFixture() {
+  const teams = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => ({ id: `reg-${i}`, team: { id: `team-${i}`, name } }));
+  const tiedIds = ['reg-2', 'reg-3'];
+  const final = (id: number, name: string, ranks: number[], suggested: string[], unresolvedRank: number) => ({ id: `final-${id}`, colorIndex: id, name, thirdPlace: false,
+    rules: ranks.map(rank => ({ groupId: 'g-1', rank })), registrationIds: null as string[] | null, manual: false, standingsChanged: false, suggestedRegistrationIds: suggested,
+    unresolved: [{ groupId: 'g-1', rank: unresolvedRank, state: 'tied', tiedRegistrationIds: tiedIds }], crossGroupTopThreeAvailable: id === 0 });
+  const view: MultiFinalView = { revision: 1, generated: true, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], registrations: teams,
+    groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: teams.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1,
+      points: i < 2 ? 9 - i * 3 : 1, wins: i < 2 ? 2 - i : 0, draws: i < 2 ? 0 : 1, losses: i < 2 ? i : 1, goalsFor: i < 2 ? 3 - i : 1, goalsAgainst: i < 2 ? i : 2,
+      tiedRegistrationIds: tiedIds.includes(reg.id) ? tiedIds : [] })) }],
+    finals: [final(0, '프리미어', [1, 2, 3], ['reg-0', 'reg-1'], 3), final(1, '챌린지', [4], [], 4)] };
+  const bracket = { groups: ['프리미어', '챌린지'].map((bracketTrack, i) => ({ id: `final-${i}`, name: `${bracketTrack} 결승`, phase: 'final', bracketTrack })),
+    slots: [[1, 2, 3], [1]].flatMap((positions, i) => positions.map(position => ({ id: `slot-${i}-${position}`, groupId: `final-${i}`, kind: 'GROUP_RANK', position, byeSortOrder: null }))),
+    fixtures: [0, 1].map(i => ({ id: `fixture-${i}`, groupId: `final-${i}`, fixtureNumber: i + 1, status: 'scheduled', homeSlotId: `slot-${i}-1`, awaySlotId: i ? null : `slot-${i}-2`,
+      game: { state: 'SCHEDULED', hasLiveRecords: false, hasOfficialResult: false } })), standings: [] };
+  return { view, bracket: bracket as unknown as ReturnType<typeof bracketData> };
+}
+const TIE_BANNER = 'A조 3위·4위가 완전 동률이에요. 3위는 프리미어, 4위는 챌린지로 갈라지는 자리라 직접 골라야 해요.';
+const SEAT_LABEL = '프리미어 3위 자리(3번 시드)에 보낼 팀';
+
+describe('예선 순위가 추첨으로만 갈린 동률', () => {
+  it('동률 팀에 배지를 붙이고, 걸친 자리는 비워 둔 채 창 안에서 고르게 하며 고르기 전엔 대진 확인을 막는다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    expect(await screen.findByText(TIE_BANNER)).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'A조 · 확정 순위표' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows.map(row => within(row).queryByText('동률') !== null)).toEqual([false, false, true, true]);
+    expect(screen.getByText('승점 1 · 골득실 -1 · 득점 1 · 맞대결·페어플레이까지 같아서 추첨으로만 갈렸어요.')).toBeInTheDocument();
+    const select = screen.getByRole('combobox', { name: SEAT_LABEL });
+    expect(select).toHaveValue('');
+    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '다팀', '라팀']);
+    expect(screen.getByText('고르지 않은 팀은 챌린지 4위 자리(1번 시드)로 가요.')).toBeInTheDocument();
+    expect(screen.getByText('3번 시드 · 팀 선택 필요')).toBeInTheDocument();
+    expect(screen.getByText('프리미어 진출팀 · 2/3팀')).toBeInTheDocument();
+    expect(screen.getByText('동률인 3번 시드는 비워 두고 나머지 2자리만 채워요. 위에서 팀을 고르면 그 자리가 채워져요.')).toBeInTheDocument();
+    expect(screen.getByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선택한 토너먼트 대진 확인' })).toBeDisabled();
+  });
+
+  it('고른 팀이 비워진 시드를 채우고, 확인·확정까지 그 선택 그대로 저장된다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket);
+    let saved: unknown; server.use(http.put(`${path}/assignment`, async ({ request }) => { saved = await request.json(); return success(view); }));
+    const props = show();
+    fireEvent.change(await screen.findByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.getByText('프리미어 진출팀 · 3/3팀')).toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    await openReview('프리미어');
+    fireEvent.click(screen.getByRole('button', { name: '프리미어 진출팀 확정' }));
+    await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
+    expect(saved).toEqual({ expectedRevision: 1, finalName: '프리미어', registrationIds: ['reg-0', 'reg-1', 'reg-3'], assignmentPolicy: 'rank_order', sourceVersion: 'official-source' });
+  });
+
+  it('추천 배치를 만들어도 막히지 않고 동률 자리는 비워 둔다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket);
+    server.use(http.post(`${path}/assignment-preview`, async () => success({ revision: 1, finalName: '프리미어', assignmentPolicy: 'rank_order', registrationIds: ['reg-0', 'reg-1', null], sourceVersion: 'tie-source' })));
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: '공식 순위로 추천 배치 만들기' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '공식 순위로 추천 배치 만들기' })).toBeEnabled());
+    expect(screen.getByText('3번 시드 · 팀 선택 필요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선택한 토너먼트 대진 확인' })).toBeDisabled();
+  });
+
+  it('다른 토너먼트에 이미 배정한 팀은 후보에서 빠지고 남은 팀만 고를 수 있다', async () => {
+    const { view, bracket } = tieFixture(); view.finals[0].registrationIds = ['reg-0', 'reg-1', 'reg-2'];
+    handlers(view, bracket); show();
+    fireEvent.change(await screen.findByRole('combobox', { name: '배정할 토너먼트' }), { target: { value: '챌린지' } });
+    const select = await screen.findByRole('combobox', { name: '챌린지 4위 자리(1번 시드)에 보낼 팀' });
+    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '라팀']);
+    expect(screen.getByText('고르지 않은 팀은 프리미어 3위 자리(3번 시드)로 가요.')).toBeInTheDocument();
+  });
+
+  it('동률 자리와 그 옆 시드는 위아래로 옮길 수 없다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    await screen.findByText('3번 시드 · 팀 선택 필요');
+    expect(screen.getByRole('button', { name: '나팀 시드 내리기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '나팀 시드 올리기' })).toBeEnabled();
+  });
+
+  it('동률이 낀 토너먼트에서는 교차 배치를 고르게 하지 않고 이유를 알린다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    const policy = await screen.findByRole('combobox', { name: '진출팀 배치 방식' });
+    expect(within(policy).getAllByRole('option').map(option => option.textContent)).toEqual(['기본 순위 순서 · 수동 조정 가능']);
+    expect(screen.getByText('동률인 순위가 있어 교차 배치는 쓸 수 없어요.')).toBeInTheDocument();
+  });
+
+  it('동률이 없는 대회는 배지·안내·선택창이 하나도 나오지 않는다', async () => {
+    handlers(savedView()); show();
+    await screen.findByRole('table', { name: 'A조 · 확정 순위표' });
+    expect(screen.queryByText('동률')).not.toBeInTheDocument();
+    expect(screen.queryByText(/완전 동률이에요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/팀 선택 필요/)).not.toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+  });
+});

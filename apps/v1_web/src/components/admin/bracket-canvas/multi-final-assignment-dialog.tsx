@@ -9,16 +9,19 @@ import { useMultiFinals, type MultiFinalPolicy, type MultiFinalView } from '@/ho
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sameGroupPairs } from '@/lib/multi-final-same-group';
+import { describeTies, initialSeats, requireSeats, tiedSeats } from '@/lib/multi-final-ties';
 import { BracketLeagueStandings } from './bracket-league-standings';
 
 const control = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label';
+const controlUnset = control.replace('border-[var(--border)]', 'border-[var(--orange700)]');
+const TIE_SEAT_REQUIRED = '동률 자리를 골라야 대진을 확인할 수 있어요.';
 type Props = { tournamentId: string; open: boolean; onClose: () => void; onApplied: () => void };
 export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onApplied }: Props) {
   const api = useMultiFinals(tournamentId, open);
   const bracket = useV1AdminBracket(open ? tournamentId : '');
   const [view, setView] = useState<MultiFinalView | null>(null);
   const [name, setName] = useState('');
-  const [ids, setIds] = useState<string[]>([]);
+  const [ids, setIds] = useState<Array<string | null>>([]);
   const [policy, setPolicy] = useState<MultiFinalPolicy>('rank_order');
   const [sourceVersion, setSourceVersion] = useState('');
   const [needsRecommendation, setNeedsRecommendation] = useState(false);
@@ -38,7 +41,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const { mounted, dialogRef, onBackdropClick } = useModalA11y({ open, onClose: () => void close(), pending: busy });
   function loadFinal(next: MultiFinalView, finalName: string) {
     const final = next.finals.find(row => row.name === finalName);
-    setView(next); setName(finalName); setIds(final?.registrationIds ?? final?.suggestedRegistrationIds ?? []);
+    setView(next); setName(finalName); setIds(final ? initialSeats(final) : []);
     setPolicy(final?.assignmentPolicy ?? 'rank_order'); setSourceVersion(''); setNeedsRecommendation(false);
     setDirty(false); setReviewing(false); setError('');
   }
@@ -61,8 +64,16 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const ready = rulesConfigured && complete && Boolean(view?.generated) && slots.length > 0 && fixtures.length > 0 && !started && !api.view.isError && !bracket.isError;
   const teamName = (id: string) => registrations.find(row => row.id === id)?.team.name ?? '확정 명단에 없는 팀';
   const otherIds = new Set(view?.finals.filter(row => row.name !== name).flatMap(row => row.registrationIds ?? []) ?? []);
+  const seats = final ? tiedSeats(final) : [];
+  const ties = view && final ? describeTies(view, final) : [];
+  const seated = ids.flatMap(id => (id === null ? [] : [id]));
+  const openTieSeat = seats.some(entry => ids[entry.seat] == null);
+  // Seat numbers follow the rules, so a tied seat stays where it is: neither it nor a swap with it can move.
+  const pinned = (index: number) => ids[index] == null || seats.some(entry => entry.seat === index);
+  const candidatesOf = (seat: { seat: number; candidates: string[] }) => [...new Set([...seat.candidates, ...(ids[seat.seat] == null ? [] : [ids[seat.seat] as string])])]
+    .filter(id => ids[seat.seat] === id || !otherIds.has(id) && !ids.includes(id));
   const lastRoundGroupIds = new Set(groups.filter(group => group.phase === 'final' || group.phase === 'third_place').map(group => group.id));
-  const rematches = reviewing && policy === 'rank_order' ? sameGroupPairs({ fixtures, slots, seeds: ids,
+  const rematches = reviewing && policy === 'rank_order' ? sameGroupPairs({ fixtures, slots, seeds: seated,
     groupOf: id => view?.groupStandings?.find(group => group.rows.some(row => row.registrationId === id))?.groupId }) : null;
   async function chooseFinal(next: string) {
     if (!view || busy) return;
@@ -89,8 +100,9 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
       setError('');
       if (!ready) throw new Error('예선 공식 결과와 해당 토너먼트의 시작 전 대진을 먼저 확인해 주세요.');
       if (needsRecommendation) throw new Error('선택한 방식으로 추천 배치를 먼저 만들어 주세요.');
-      if (ids.length !== slots.length || new Set(ids).size !== ids.length) throw new Error(`진출팀을 중복 없이 ${slots.length}팀 선택해 주세요.`);
-      if (ids.some(id => !registrations.some(row => row.id === id) || otherIds.has(id))) throw new Error('미확정 팀이나 다른 토너먼트에 배정된 팀은 제외해 주세요.');
+      if (openTieSeat) throw new Error(TIE_SEAT_REQUIRED);
+      if (ids.length !== slots.length || seated.length !== ids.length || new Set(ids).size !== ids.length) throw new Error(`진출팀을 중복 없이 ${slots.length}팀 선택해 주세요.`);
+      if (seated.some(id => !registrations.some(row => row.id === id) || otherIds.has(id))) throw new Error('미확정 팀이나 다른 토너먼트에 배정된 팀은 제외해 주세요.');
       if (!sourceVersion) {
         const result = await api.assignmentPreview.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy });
         setSourceVersion(result.sourceVersion);
@@ -102,11 +114,17 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
     if (!view) return;
     try {
       setError('');
-      const result = await api.assign.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy, registrationIds: ids, sourceVersion });
+      const result = await api.assign.mutateAsync({ expectedRevision: view.revision, finalName: name, assignmentPolicy: policy, registrationIds: requireSeats(ids), sourceVersion });
       loadFinal(result, name); onApplied();
     } catch (err) { setError(extractErrorMessage(err, '진출팀을 배정하지 못했어요.')); }
   }
-  function edit(next: string[]) { setIds(next); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true); }
+  function edit(next: Array<string | null>) { setIds(next); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true); }
+  // With tied seats open the seat numbers must not shift, so a removed team leaves its seat empty instead of closing the gap.
+  const drop = (remove: (id: string) => boolean) => seats.length > 0
+    ? ids.map(id => (id !== null && remove(id) ? null : id))
+    : ids.filter(id => id === null || !remove(id));
+  const place = (id: string) => { const open = ids.indexOf(null); return open >= 0 ? ids.map((row, index) => (index === open ? id : row)) : [...ids, id]; };
+  const pick = (seat: number, id: string) => edit(Array.from({ length: Math.max(ids.length, seat + 1) }, (_, index) => (index === seat ? (id || null) : ids[index] ?? null)));
   return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">
       <div className="shrink-0 border-b border-[var(--border)] p-4">
@@ -129,29 +147,42 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
           {!reviewing ? <>
             <SectionTitle title="조별 공식 순위" />
             <p className="tm-text-caption">추천은 아래 공식 순위를 그대로 사용해요. 저장한 진출팀은 이후 순위가 바뀌어도 유지돼요.</p>
-            <BracketLeagueStandings groups={(view.groupStandings ?? []).map(group => ({ groupId: group.groupId, name: `${group.name}${group.complete ? ' · 확정' : ' · 진행 중'}`, rows: group.rows.map(row => ({ registrationId: row.registrationId, teamName: row.teamName, rank: row.position ?? 0, played: row.wins + row.draws + row.losses, wins: row.wins, draws: row.draws, losses: row.losses, goalDifference: row.goalsFor - row.goalsAgainst, points: row.points })) }))} />
+            <BracketLeagueStandings groups={(view.groupStandings ?? []).map(group => ({ groupId: group.groupId, name: `${group.name}${group.complete ? ' · 확정' : ' · 진행 중'}`, rows: group.rows.map(row => ({ registrationId: row.registrationId, teamName: row.teamName, rank: row.position ?? 0, played: row.wins + row.draws + row.losses, wins: row.wins, draws: row.draws, losses: row.losses, goalDifference: row.goalsFor - row.goalsAgainst, points: row.points, tied: row.tiedRegistrationIds.length > 0 })) }))} />
+            {ties.map(tie => <div key={tie.key} className="space-y-3">
+              <AlertBanner tone="warning" message={tie.banner} />
+              <p className="tm-text-caption">{tie.detail}</p>
+              {tie.seats.map(seat => <div key={seat.seat} className="space-y-1">
+                <label className="block tm-text-label">{seat.label}<select className={ids[seat.seat] == null ? controlUnset : control} value={ids[seat.seat] ?? ''} disabled={!ready} onChange={event => pick(seat.seat, event.target.value)}>
+                  <option value="">팀 선택</option>
+                  {candidatesOf(seat).map(id => <option key={id} value={id}>{teamName(id)}</option>)}
+                </select></label>
+                {seat.hint && <p className="tm-text-caption">{seat.hint}</p>}
+              </div>)}
+            </div>)}
             <label className="block tm-text-label">진출팀 배치 방식<select className={control} value={policy} disabled={!ready} onChange={event => { setPolicy(event.target.value as MultiFinalPolicy); setNeedsRecommendation(true); setDirty(true); setSourceVersion(''); }}>
               <option value="rank_order">기본 순위 순서 · 수동 조정 가능</option>
-              {final?.crossGroupTopThreeAvailable && <option value="cross_group_top3">1위 부전승 · 2위 교차 고정 · 3위 같은 조 회피</option>}
+              {final?.crossGroupTopThreeAvailable && (seats.length === 0 || policy === 'cross_group_top3') && <option value="cross_group_top3">1위 부전승 · 2위 교차 고정 · 3위 같은 조 회피</option>}
             </select></label>
+            {final?.crossGroupTopThreeAvailable && seats.length > 0 && policy !== 'cross_group_top3' && <p className="tm-text-caption">동률인 순위가 있어 교차 배치는 쓸 수 없어요.</p>}
             {policy === 'cross_group_top3' && <p className="tm-text-caption">예선 조 순서대로 1위를 부전승 배치해요. 2위는 다음 조로 교차 고정하고, 3위는 12강과 8강에서 같은 조를 만나지 않도록 무작위 배치해요.</p>}
             <Button variant="neutral" disabled={!ready} onClick={() => void recommend()}>{policy === 'cross_group_top3' ? '무작위 추천 배치 만들기' : '공식 순위로 추천 배치 만들기'}</Button>
-            <SectionTitle title={`${name || '토너먼트'} 진출팀 · ${ids.length}/${slots.length}팀`} />
+            {seats.length > 0 && policy === 'rank_order' && <p className="tm-text-caption">동률인 {seats.map(entry => entry.seat + 1).join('·')}번 시드는 비워 두고 나머지 {slots.length - seats.length}자리만 채워요. 위에서 팀을 고르면 그 자리가 채워져요.</p>}
+            <SectionTitle title={`${name || '토너먼트'} 진출팀 · ${seated.length}/${slots.length}팀`} />
             <p className="tm-text-caption">팀 선택이나 시드 순서를 직접 바꾸면 기본 수동 배치로 전환돼요. 다른 토너먼트에서 이미 확정한 팀은 중복 선택할 수 없어요.</p>
-            {ids.some(id => !registrations.some(row => row.id === id)) && <Button variant="neutral" onClick={() => edit(ids.filter(id => registrations.some(row => row.id === id)))}>확정 명단에 없는 팀 제외</Button>}
+            {seated.some(id => !registrations.some(row => row.id === id)) && <Button variant="neutral" onClick={() => edit(drop(id => !registrations.some(row => row.id === id)))}>확정 명단에 없는 팀 제외</Button>}
             <div className="grid gap-2 sm:grid-cols-2">{registrations.map(reg => <label key={reg.id} className="flex min-h-11 items-center gap-2 tm-text-label">
-              <input type="checkbox" checked={ids.includes(reg.id)} disabled={!ready || otherIds.has(reg.id) && !ids.includes(reg.id)} onChange={event => edit(event.target.checked ? [...ids, reg.id] : ids.filter(id => id !== reg.id))} />
+              <input type="checkbox" checked={ids.includes(reg.id)} disabled={!ready || otherIds.has(reg.id) && !ids.includes(reg.id)} onChange={event => edit(event.target.checked ? place(reg.id) : drop(id => id === reg.id))} />
               <span>{reg.team.name}{otherIds.has(reg.id) ? ' · 다른 토너먼트에 배정됨' : ''}</span>
             </label>)}</div>
           </> : <>
             {policy === 'cross_group_top3' && <AlertBanner tone="warning" message="4강에서는 같은 조 팀이 다시 만날 수 있어요" />}
             <SectionTitle title={`${name} 대진 확인`} />
             <p className="tm-text-label">이 토너먼트만 확정해요. 다른 토너먼트와 예선 결과·경기 일정은 유지돼요.</p>
-            {slots.filter(slot => slot.byeSortOrder != null).map(slot => <p key={slot.id} className="tm-text-label">부전승 · {teamName(ids[slot.position - 1])} → 다음 라운드 직행</p>)}
+            {slots.filter(slot => slot.byeSortOrder != null).map(slot => <p key={slot.id} className="tm-text-label">부전승 · {teamName(seated[slot.position - 1])} → 다음 라운드 직행</p>)}
             {groups.map(group => <section key={group.id} className="space-y-2"><h3 className="tm-text-body font-semibold">{group.name}</h3>{fixtures.filter(fixture => fixture.groupId === group.id).map(fixture => {
               const label = (side: 'HOME' | 'AWAY') => {
                 const slot = slots.find(slot => slot.id === (side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId));
-                if (slot) return teamName(ids[slot.position - 1]);
+                if (slot) return teamName(seated[slot.position - 1]);
                 const edge = fixture.bracketSources?.find(edge => edge.side === side);
                 const source = fixtures.find(row => row.id === edge?.fixtureId);
                 return source ? `${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : '진출팀 미정';
@@ -165,18 +196,19 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
           </>}
           <SectionTitle title="시드 순서" />
           <ol className="space-y-2">{ids.map((id, index) => <li key={`${id}:${index}`} className="flex min-h-11 flex-wrap items-center justify-between gap-2 tm-text-label">
-            <span>{index + 1}번 시드 · {teamName(id)}</span>{!reviewing && <div className="flex gap-2">
-              <Button variant="neutral" aria-label={`${teamName(id)} 시드 올리기`} disabled={!ready || index === 0} onClick={() => { const next = [...ids]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; edit(next); }}>위로</Button>
-              <Button variant="neutral" aria-label={`${teamName(id)} 시드 내리기`} disabled={!ready || index === ids.length - 1} onClick={() => { const next = [...ids]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; edit(next); }}>아래로</Button>
+            {id === null ? <span className="text-[var(--orange700)]">{index + 1}번 시드 · 팀 선택 필요</span> : <span>{index + 1}번 시드 · {teamName(id)}</span>}{!reviewing && <div className="flex gap-2">
+              <Button variant="neutral" aria-label={`${id === null ? `${index + 1}번 시드` : teamName(id)} 시드 올리기`} disabled={!ready || index === 0 || pinned(index) || pinned(index - 1)} onClick={() => { const next = [...ids]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; edit(next); }}>위로</Button>
+              <Button variant="neutral" aria-label={`${id === null ? `${index + 1}번 시드` : teamName(id)} 시드 내리기`} disabled={!ready || index === ids.length - 1 || pinned(index) || pinned(index + 1)} onClick={() => { const next = [...ids]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; edit(next); }}>아래로</Button>
             </div>}
           </li>)}</ol>
           <Button variant="neutral" onClick={() => void reload()}>최신 설정 다시 불러오기</Button>
         </fieldset>}
       </div>
-      <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--border)] p-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--border)] p-4">
+        {!reviewing && openTieSeat && <p className="mr-auto flex-[1_1_240px] tm-text-caption">{TIE_SEAT_REQUIRED}</p>}
         <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>
         {reviewing && <Button variant="neutral" disabled={busy} onClick={() => setReviewing(false)}>이전</Button>}
-        <Button variant="primary" disabled={!ready || busy} onClick={() => void (reviewing ? save() : review())}>{busy ? '처리 중…' : reviewing ? `${name} 진출팀 확정` : '선택한 토너먼트 대진 확인'}</Button>
+        <Button variant="primary" disabled={!ready || busy || !reviewing && openTieSeat} onClick={() => void (reviewing ? save() : review())}>{busy ? '처리 중…' : reviewing ? `${name} 진출팀 확정` : '선택한 토너먼트 대진 확인'}</Button>
       </div>
     </div>{ConfirmModal}
   </div>, document.body);

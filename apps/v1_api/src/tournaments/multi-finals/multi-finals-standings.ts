@@ -28,3 +28,15 @@ export function savedStandingsSnapshot(afterJson: unknown, registrationIds: read
   if (!groups.every(group => typeof group?.groupId === 'string' && isIdList(group.registrationIds))) return null;
   return groups.map(group => ({ groupId: group.groupId as string, registrationIds: group.registrationIds as string[] }));
 }
+
+type Rule = { groupId: string; rank: number };
+
+/**
+ * Seed list of the rank-order recommendation: one entry per rule, null where that rule's rank is tied.
+ * `suggestedRegistrationIds` holds the settled rules' teams in rule order, so the tied ones are left out of it.
+ */
+export function rankOrderSeeds(final: { rules: readonly Rule[]; unresolved: readonly Rule[]; suggestedRegistrationIds: readonly string[] }): Array<string | null> {
+  const open = new Set(final.unresolved.map(rule => `${rule.groupId}:${rule.rank}`));
+  let next = 0;
+  return final.rules.map(rule => open.has(`${rule.groupId}:${rule.rank}`) ? null : final.suggestedRegistrationIds[next++]);
+}

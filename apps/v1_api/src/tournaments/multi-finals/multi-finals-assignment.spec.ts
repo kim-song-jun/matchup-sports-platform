@@ -2,6 +2,7 @@ import type { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { BracketTemplateService } from '../templates/bracket-template.service';
+import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config.presets';
 import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { MultiFinalsService } from './multi-finals.service';
 
@@ -9,7 +10,7 @@ jest.mock('../slots/tournament-slot.service', () => ({ assignSlotsBatchInTx: jes
 const user = { id: 'admin', email: 'admin@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 function harness() {
   const rules = [1, 2].map(rank => ({ groupId: 'g', rank }));
-  const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress', multiFinalsRevision: 4,
+  const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress', multiFinalsRevision: 4, competitionConfigVersionId: 'cfg', competitionConfig: FOOTBALL_V1_CONFIG,
     multiFinals: { groups: [{ id: 'g', name: 'A조', capacity: 2, legs: 1 }], finals: [
       { name: '프리미어', thirdPlace: false, rules, registrationIds: null as string[] | null },
       { name: '챌린지', thirdPlace: false, rules: [], registrationIds: ['r3', 'r4'] as string[] | null },
@@ -23,7 +24,7 @@ function harness() {
     }) },
     v1TournamentRegistration: { findMany: jest.fn(async () => ['r1', 'r2', 'r3', 'r4'].map(id => ({ id, team: { id, name: id } }))) },
     v1TournamentGroupTeam: { findMany: jest.fn(async () => ['r1', 'r2'].map(registrationId => ({ groupId: 'g', registrationId, registration: { team: { name: registrationId } } }))) },
-    v1TournamentStanding: { findMany: jest.fn(async () => ['r1', 'r2'].map((registrationId, index) => ({ groupId: 'g', registrationId, position: index + 1, wins: index ? 0 : 1, draws: 0, losses: index ? 1 : 0, recalculatedAt: new Date('2026-11-06T00:01:00Z') }))) },
+    v1TournamentStanding: { findMany: jest.fn(async () => ['r1', 'r2'].map((registrationId, index) => ({ groupId: 'g', registrationId, position: index + 1, wins: index ? 0 : 1, draws: 0, losses: index ? 1 : 0, fairPlayPoints: 0, recalculatedAt: new Date('2026-11-06T00:01:00Z') }))) },
     v1TournamentMatchDetails: { aggregate: jest.fn(async () => ({ _max: { fixtureNumber: 1 } })), count: jest.fn(async () => 2), findMany: jest.fn(async ({ where }) => where.group ? [fixture] : [{ groupId: 'g', homeRegistrationId: 'r1', awayRegistrationId: 'r2', teamMatch: { game: { currentOfficialRevision: complete ? { state: 'OFFICIAL', score: { home: 2, away: 0 }, officialAt: new Date('2026-11-06T00:00:00Z') } : null } } }]) },
     v1TournamentGroup: { count: jest.fn(async () => 2) },
     v1TournamentSlot: { findMany: jest.fn(async ({ where }) => where.group ? [{ id: 's1', position: 1 }, { id: 's2', position: 2 }] : []) },

@@ -2,6 +2,7 @@ import type { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { BracketTemplateService } from '../templates/bracket-template.service';
+import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config.presets';
 import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { MultiFinalsService } from './multi-finals.service';
 
@@ -15,9 +16,9 @@ function harness() {
   const members = { gA: ['a1', 'a2', 'a3'], gB: ['b1', 'b2', 'b3'] };
   const all = [...members.gA, ...members.gB];
   const standing = new Map(all.map((id, index) => [id, { groupId: id.startsWith('a') ? 'gA' : 'gB', registrationId: id, position: index % 3 + 1,
-    points: 9 - index % 3 * 3, wins: 2 - index % 3, draws: 0, losses: index % 3, goalsFor: 6 - index % 3 * 2, goalsAgainst: index % 3 * 2, recalculatedAt: new Date('2026-11-06T00:01:00Z') }]));
+    points: 9 - index % 3 * 3, wins: 2 - index % 3, draws: 0, losses: index % 3, goalsFor: 6 - index % 3 * 2, goalsAgainst: index % 3 * 2, fairPlayPoints: 0, recalculatedAt: new Date('2026-11-06T00:01:00Z') }]));
   const rules = (groupId: string) => [1, 2].map(rank => ({ groupId, rank }));
-  const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress', multiFinalsRevision: 1,
+  const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress', multiFinalsRevision: 1, competitionConfigVersionId: 'cfg', competitionConfig: FOOTBALL_V1_CONFIG,
     multiFinals: { groups: Object.keys(members).map(id => ({ id, name: `${id}조`, capacity: 3, legs: 1 })), finals: [
       { name: '프리미어', thirdPlace: false, rules: rules('gA'), registrationIds: null as string[] | null },
       { name: '챌린지', thirdPlace: false, rules: rules('gB'), registrationIds: null as string[] | null },

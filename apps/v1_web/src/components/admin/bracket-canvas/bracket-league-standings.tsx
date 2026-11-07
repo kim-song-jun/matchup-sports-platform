@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import type { LeagueStandingsGroup } from '@/lib/bracket-league-standings-model';
 
 const HEADERS = ['순위', '팀', '경기', '승', '무', '패', '득실', '승점'] as const;
@@ -29,7 +30,18 @@ export function BracketLeagueStandings({ groups }: { groups: LeagueStandingsGrou
               {group.rows.map((row) => (
                 <tr key={row.registrationId} className="border-t border-[var(--border)]">
                   <th scope="row" className="tab-num tm-text-caption px-1 py-2 text-center font-normal">{row.rank}</th>
-                  <td className="tm-text-label truncate px-1 py-2 font-semibold" title={row.teamName}>{row.teamName}</td>
+                  {row.tied ? (
+                    <td className="tm-text-label px-1 py-2 font-semibold" title={row.teamName}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{row.teamName}</span>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--orange50)] px-2 py-0.5 tm-text-caption font-bold text-[var(--orange700)]">
+                          <AlertTriangle size={12} aria-hidden="true" />동률
+                        </span>
+                      </span>
+                    </td>
+                  ) : (
+                    <td className="tm-text-label truncate px-1 py-2 font-semibold" title={row.teamName}>{row.teamName}</td>
+                  )}
                   {[row.played, row.wins, row.draws, row.losses].map((value, index) => (
                     <td key={index} className="tab-num tm-text-caption px-1 py-2 text-center">{value}</td>
                   ))}

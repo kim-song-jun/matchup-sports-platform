@@ -37,4 +37,14 @@ describe('BracketLeagueStandings', () => {
     expect(within(screen.getByRole('table', { name: 'B조 순위표' })).queryByText('송파 유나이티드')).not.toBeInTheDocument();
     expect(within(screen.getByRole('table', { name: 'B조 순위표' })).getByText('알파 6인 8팀')).toBeInTheDocument();
   });
+
+  it('동률 팀 행에만 팀 이름 옆에 동률 배지를 붙이고 이름은 그대로 읽힌다', () => {
+    const tiedGroups: LeagueStandingsGroup[] = [{ groupId: 'gA', name: 'A조', rows: [
+      row('r1', '송파 유나이티드', 1), row('r2', '마포 레인저스', 2, { tied: true }), row('r3', '강동 FC', 3, { tied: true }), row('r4', '노원 시티', 4),
+    ] }];
+    render(<BracketLeagueStandings groups={tiedGroups} />);
+    const rows = within(screen.getByRole('table', { name: 'A조 순위표' })).getAllByRole('row').slice(1);
+    expect(rows.map((r) => within(r).queryByText('동률') !== null)).toEqual([false, true, true, false]);
+    expect(within(rows[1]).getByText('마포 레인저스')).toBeInTheDocument();
+  });
 });

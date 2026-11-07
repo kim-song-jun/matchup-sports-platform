@@ -194,6 +194,11 @@ describe('TournamentPeriodSettingsEditor', () => {
     );
   });
 
+  it('explains that the quarter-final option also covers the 6-team bracket', () => {
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByRole('option', { name: '8강 · 6팀 대진의 6강' })).toBeInTheDocument();
+  });
+
   it('can remove a stage override and return that phase to the tournament default', () => {
     state.settings = {
       ...state.settings,

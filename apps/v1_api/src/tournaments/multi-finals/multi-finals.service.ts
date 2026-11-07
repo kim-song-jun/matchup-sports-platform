@@ -19,6 +19,7 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface
 import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
 import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupBracket, validCrossGroupTopThree } from './multi-finals-seeding';
 import { invalidMultiFinal, namedFinalSize, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
+import { savedStandingsSnapshot, standingOrder, standingsOrderChanged } from './multi-finals-standings';
 
 type Tx = Prisma.TransactionClient;
 type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] }>; finals: NamedFinalDto[]; nextColorIndex?: number };
@@ -72,6 +73,13 @@ export class MultiFinalsService {
     await tx.v1TournamentByeSlot.deleteMany({ where: { groupId: { in: groupIds } } });
     for (const group of groups) await deleteTournamentGroupInTx(tx, admin, group.id);
   }
+  /** True when a group this final drew from has been reordered since its roster was assigned. Rosters assigned before snapshots existed report false. */
+  private async standingsChanged(tx: Tx, id: string, final: NamedFinalDto, groupStandings: Parameters<typeof standingOrder>[0]) {
+    if (!final.registrationIds) return false;
+    const assigned = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: id, action: 'tournament.multi_finals.assign', afterJson: { path: ['finalName'], equals: final.name } });
+    const saved = savedStandingsSnapshot(assigned?.afterJson, final.registrationIds);
+    return saved !== null && standingsOrderChanged(saved, standingOrder(groupStandings, saved.map(group => group.groupId)));
+  }
   private async view(tx: Tx, id: string) {
     const tournament = await this.tournament(tx, id); const config = this.config(tournament.multiFinals);
     const registrations = await this.confirmed(tx, id);
@@ -98,6 +106,8 @@ export class MultiFinalsService {
         }),
       };
     });
+    const changedByFinal = new Map<string, boolean>();
+    for (const final of config.finals) changedByFinal.set(final.name, await this.standingsChanged(tx, id, final, groupStandings));
     const finals = config.finals.map(final => {
       const candidates: string[] = []; const unresolved: Array<{ groupId: string; rank: number; state: string; tiedRegistrationIds: string[] }> = [];
       for (const rule of final.rules) {
@@ -107,7 +117,8 @@ export class MultiFinalsService {
         if (result.state === 'ready') candidates.push(result.registrationId);
         else unresolved.push({ ...rule, state: result.state, tiedRegistrationIds: result.state === 'tied' ? result.tiedRegistrationIds : [] });
       }
-      return { ...final, crossGroupTopThreeAvailable: supportsCrossGroupTopThree(final, config.groups.map(group => group.id)), suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
+      return { ...final, crossGroupTopThreeAvailable: supportsCrossGroupTopThree(final, config.groups.map(group => group.id)), suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined,
+        standingsChanged: changedByFinal.get(final.name) ?? false };
     });
     const generated = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } }) > 0;
     return { revision: tournament.multiFinalsRevision, groups: config.groups.map(g => {
@@ -283,13 +294,14 @@ export class MultiFinalsService {
       const next: Config = { ...config, finals };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.assign', targetType: 'tournament', targetId: id,
-        beforeJson: JSON.parse(JSON.stringify(selected)), afterJson: { finalName: dto.finalName, registrationIds: dto.registrationIds, assignmentPolicy: dto.assignmentPolicy ?? 'rank_order' } }, tx);
+        beforeJson: JSON.parse(JSON.stringify(selected)), afterJson: { finalName: dto.finalName, registrationIds: dto.registrationIds, assignmentPolicy: dto.assignmentPolicy ?? 'rank_order',
+          standingsSnapshot: standingOrder(view.groupStandings, [...new Set(selected.rules.map(rule => rule.groupId))]) } }, tx);
       return this.view(tx, id);
     }, options);
   }
   private async previewInTx(tx: Tx, id: string) {
     const view = await this.view(tx, id);
-    const finals: NamedFinalDto[] = view.finals.map(({ suggestedRegistrationIds: _suggested, unresolved: _unresolved, manual: _manual, crossGroupTopThreeAvailable: _cross, ...f }) => {
+    const finals: NamedFinalDto[] = view.finals.map(({ suggestedRegistrationIds: _suggested, unresolved: _unresolved, manual: _manual, crossGroupTopThreeAvailable: _cross, standingsChanged: _changed, ...f }) => {
       // Preserve the entire pending roster: a partial suggestion must never shrink the bracket.
       return { ...f, name: f.name, capacity: f.capacity, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
         registrationIds: f.registrationIds ?? null };

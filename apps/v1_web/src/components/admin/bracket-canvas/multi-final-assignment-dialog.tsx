@@ -8,6 +8,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useMultiFinals, type MultiFinalPolicy, type MultiFinalView } from '@/hooks/use-multi-finals';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { sameGroupPairs } from '@/lib/multi-final-same-group';
 import { BracketLeagueStandings } from './bracket-league-standings';
 
 const control = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label';
@@ -60,6 +61,9 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const ready = rulesConfigured && complete && Boolean(view?.generated) && slots.length > 0 && fixtures.length > 0 && !started && !api.view.isError && !bracket.isError;
   const teamName = (id: string) => registrations.find(row => row.id === id)?.team.name ?? '확정 명단에 없는 팀';
   const otherIds = new Set(view?.finals.filter(row => row.name !== name).flatMap(row => row.registrationIds ?? []) ?? []);
+  const lastRoundGroupIds = new Set(groups.filter(group => group.phase === 'final' || group.phase === 'third_place').map(group => group.id));
+  const rematches = reviewing && policy === 'rank_order' ? sameGroupPairs({ fixtures, slots, seeds: ids,
+    groupOf: id => view?.groupStandings?.find(group => group.rows.some(row => row.registrationId === id))?.groupId }) : null;
   async function chooseFinal(next: string) {
     if (!view || busy) return;
     if (dirty && !await confirm({ title: '다른 토너먼트 선택', message: '현재 토너먼트의 확정하지 않은 변경을 버릴까요?', confirmLabel: '변경 버리기' })) return;
@@ -115,6 +119,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
           <label className="block tm-text-label">배정할 토너먼트<select className={control} value={name} disabled={reviewing} onChange={event => void chooseFinal(event.target.value)}>
             {view.finals.map(row => <option key={row.name} value={row.name}>{row.name} · {row.registrationIds == null ? '미배정' : `${row.registrationIds.length}팀 배정됨`}</option>)}
           </select></label>
+          {final?.standingsChanged && <AlertBanner tone="warning" message="마지막 배정 이후 조별 순위나 결과가 바뀌었어요. 현재 결선 배정과 최신 순위를 비교해 다시 확인해 주세요." />}
           {api.view.isError && <AlertBanner tone="warning" message="설정을 다시 불러오지 못했어요. 최신 설정 다시 불러오기를 눌러 주세요." />}
           {!view.generated && <AlertBanner tone="warning" message="예선·토너먼트 대진 생성에서 빈 결선 대진을 먼저 만들어 주세요." />}
           {view.generated && slots.length > 0 && !rulesConfigured && <AlertBanner tone="warning" message="토너먼트 배정 규칙에서 자리 수에 맞게 순위별 목적지를 먼저 설정해 주세요." />}
@@ -139,6 +144,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
               <span>{reg.team.name}{otherIds.has(reg.id) ? ' · 다른 토너먼트에 배정됨' : ''}</span>
             </label>)}</div>
           </> : <>
+            {policy === 'cross_group_top3' && <AlertBanner tone="warning" message="4강에서는 같은 조 팀이 다시 만날 수 있어요" />}
             <SectionTitle title={`${name} 대진 확인`} />
             <p className="tm-text-label">이 토너먼트만 확정해요. 다른 토너먼트와 예선 결과·경기 일정은 유지돼요.</p>
             {slots.filter(slot => slot.byeSortOrder != null).map(slot => <p key={slot.id} className="tm-text-label">부전승 · {teamName(ids[slot.position - 1])} → 다음 라운드 직행</p>)}
@@ -150,7 +156,11 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
                 const source = fixtures.find(row => row.id === edge?.fixtureId);
                 return source ? `${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : '진출팀 미정';
               };
-              return <p key={fixture.id} className="tm-text-label">{fixture.fixtureNumber}경기 · {label('HOME')} vs {label('AWAY')}</p>;
+              const pairs = lastRoundGroupIds.has(fixture.groupId ?? '') ? [] : rematches?.get(fixture.id) ?? [];
+              return <div key={fixture.id} className="flex flex-col gap-1">
+                <p className="tm-text-label">{fixture.fixtureNumber}경기 · {label('HOME')} vs {label('AWAY')}</p>
+                {pairs.length > 0 && <span className="tm-text-caption font-semibold text-[var(--orange700)]">같은 조 재대결 가능: {pairs.map(([home, away]) => `${teamName(home)} vs ${teamName(away)}`).join(' · ')}</span>}
+              </div>;
             })}</section>)}
           </>}
           <SectionTitle title="시드 순서" />

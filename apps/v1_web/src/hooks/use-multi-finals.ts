@@ -17,7 +17,7 @@ export type MultiFinalView = {
   revision: number; groups: MultiFinalGroup[]; generated: boolean; fixtureCount?: number; preliminaryFixtureCount?: number;
   groupStandings?: MultiFinalGroupStanding[];
   registrations: Array<{ id: string; team: { id: string; name: string } }>;
-  finals: Array<MultiFinalDefinition & { id: string; colorIndex: number; suggestedRegistrationIds: string[]; manual: boolean; crossGroupTopThreeAvailable?: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;
+  finals: Array<MultiFinalDefinition & { id: string; colorIndex: number; suggestedRegistrationIds: string[]; manual: boolean; standingsChanged: boolean; crossGroupTopThreeAvailable?: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;
 };
 export type MultiFinalPreview = { plan?: {
   groups: Array<{ key: string; name: string; bracketTrack?: string }>;

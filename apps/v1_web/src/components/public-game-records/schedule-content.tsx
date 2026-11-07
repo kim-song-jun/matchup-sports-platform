@@ -459,7 +459,8 @@ function ScheduleRow({
           alignItems: 'center',
         }}
       >
-        <span style={{ textAlign: 'right', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+        {/* keep-all 은 공백에서만 줄을 바꿔 '06팀' 의 '팀' 이 혼자 떨어지지 않게 하고, anywhere 는 공백 없는 긴 이름을 칸 안에서 꺾는다. */}
+        <span style={{ textAlign: 'right', wordBreak: 'keep-all', overflowWrap: 'anywhere', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.home, entry.homeSlotLabel)}
         </span>
         <span
@@ -476,7 +477,7 @@ function ScheduleRow({
         >
           {formatScoreline(entry.score, entry.scoreStatus)}
         </span>
-        <span style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+        <span style={{ textAlign: 'left', wordBreak: 'keep-all', overflowWrap: 'anywhere', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.away, entry.awaySlotLabel)}
         </span>
       </div>

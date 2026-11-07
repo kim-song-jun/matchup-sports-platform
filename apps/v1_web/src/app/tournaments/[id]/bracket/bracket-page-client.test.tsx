@@ -1709,7 +1709,7 @@ describe('BracketPageContent — 소속 팀 조 우선 표시', () => {
     if (loggedIn) {
       const labels = await screen.findAllByText('우리 팀이 속한 조예요');
       expect(labels).toHaveLength(2);
-      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--red)' });
+      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--red700)' });
     } else expect(screen.queryByText('우리 팀이 속한 조예요')).not.toBeInTheDocument();
     const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
     expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);

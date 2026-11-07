@@ -44,6 +44,21 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: "apps/v1_api/prisma/migrations/20261106130000_knockout_display_names/migration.sql",
+    statement: "CREATE TEMP TABLE knockout_display_repairs ON COMMIT DROP AS WITH seed_counts AS ( SELECT group_id, count(*)::integer AS size FROM v1_tournament_slots WHERE group_id IS NOT NULL AND kind IN ('ENTRY', 'GROUP_RANK', 'BYE') GROUP BY group_id ), candidates AS ( SELECT g.id, g.tournament_id, g.name, g.bracket_track, c.size, power(2, ceil(ln(c.size::numeric) / ln(2::numeric)))::integer AS width, EXISTS (SELECT 1 FROM jsonb_array_elements( CASE WHEN jsonb_typeof(t.multi_finals->'finals') = 'array' THEN t.multi_finals->'finals' ELSE '[]'::jsonb END ) f WHERE f->>'name' = g.bracket_track AND CASE WHEN jsonb_typeof(f->'capacity') = 'number' THEN (f->>'capacity')::numeric = c.size WHEN jsonb_typeof(f->'registrationIds') = 'array' THEN jsonb_array_length(f->'registrationIds') = c.size ELSE jsonb_array_length(CASE WHEN jsonb_typeof(f->'rules') = 'array' THEN f->'rules' ELSE '[]'::jsonb END) = c.size END) AS named FROM v1_tournament_groups g JOIN seed_counts c ON c.group_id = g.id JOIN v1_tournaments t ON t.id = g.tournament_id WHERE g.phase <> 'group' AND c.size >= 6 AND c.size % 2 = 0 AND (c.size & (c.size - 1)) <> 0 ) SELECT c.id, c.tournament_id, c.width::text || '강' AS old_round, c.size::text || '강' AS new_round, CASE WHEN c.named AND c.name = c.bracket_track || ' · ' || c.width::text || '강' THEN c.bracket_track || ' · ' || c.size::text || '강' ELSE c.name END AS new_name FROM candidates c WHERE c.named",
+    reason: "PR #2195, user-authorized existing-bracket label repair (2026-11-06). This exact connection-local TEMP SELECT snapshots only named-final first stages with even non-power-of-two size >=6, matching configured capacity and persisted seed count. ON COMMIT DROP removes only this temporary mapping. No persistent schema, identity, phase, registration, score, slot or edge is changed. Ten PostgreSQL/PGlite preservation and replay scenarios pass. Deploy predecessor #2181 to alpha first; it already matches regenerated slots by immutable track+phase+position.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261106130000_knockout_display_names/migration.sql",
+    statement: "UPDATE v1_tournament_groups g SET name = r.new_name, updated_at = CURRENT_TIMESTAMP FROM knockout_display_repairs r WHERE g.id = r.id AND g.name <> r.new_name AND NOT EXISTS (SELECT 1 FROM v1_tournament_groups other WHERE other.tournament_id = g.tournament_id AND other.name = r.new_name AND other.id <> g.id)",
+    reason: "PR #2195 label-only data repair after #2181. This exact UPDATE changes only automatically generated group names, retaining custom names and avoiding existing-name collisions. IDs, phases, tracks, participants, schedules, scores and edges are preserved. The previous application must be the healthy #2181 release: its generation matches slots by track+phase+position, so display-name changes preserve games during rolling deployment and rollback to that predecessor. Do not deploy this repair before #2181. PostgreSQL/PGlite preservation and two-run idempotency scenarios pass.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261106130000_knockout_display_names/migration.sql",
+    statement: "UPDATE v1_tournament_match_details d SET round = r.new_round, updated_at = CURRENT_TIMESTAMP FROM knockout_display_repairs r WHERE d.group_id = r.id AND d.round = r.old_round",
+    reason: "PR #2195 label-only data repair after #2181. This exact UPDATE changes round text only when it equals the former generated bracket width in the scoped temporary mapping. Custom round text and every phase, match ID, participant, result, schedule and advancement edge remain unchanged. Healthy predecessor #2181 already supports actual-team-count round labels and phase-based slot identity; rollback to it remains compatible. This is not permission for arbitrary UPDATE statements. Ten PostgreSQL/PGlite scenarios and two-run replay pass.",
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20261102100000_v1_multiple_tournament_finals/migration.sql",
     statement: "ALTER TABLE \"v1_tournament_groups\" ALTER COLUMN \"bracket_track\" DROP DEFAULT",
     reason: "User-authorized PR1858 extension: generalize fixed upper/lower award and bracket scopes to named N finals. Enum-to-text is a lossless widening using explicit ::text; existing values, defaults, unique indexes and FK identities remain unchanged. The old enum is retained. The replaced check continues to reject empty/overall team-award scopes. Full migration replay and Prisma drift=0 verified on isolated PostgreSQL; existing-scope API regressions retained. New named scopes require the updated application; rollback after new scopes are written requires explicit re-scoping. This exception applies only to this exact statement/file.",
@@ -2589,6 +2604,20 @@ function selfTest() {
         `allowlist 항목이 뭉쳤다: 소스의 file: 줄 ${fileKeyLines}개 vs 배열 길이 ` +
           `${REVIEWED_NON_ADDITIVE.length}개 — 닫히지 않은 객체가 있어 항목이 서로를 덮고 있다`,
       );
+    }
+  }
+  {
+    const file = 'apps/v1_api/prisma/migrations/20261106130000_knockout_display_names/migration.sql';
+    const repairs = REVIEWED_NON_ADDITIVE.filter(entry => entry.file === file);
+    if (repairs.length !== 3) fail('knockout label repair requires exactly three reviewed statements');
+    for (const entry of repairs) {
+      const failures = [];
+      runAdditivityCheck([{ file: 'unreviewed-label-repair.sql', statement: entry.statement }], new Set(), message => failures.push(message));
+      if (failures.length !== 1) fail('knockout label repair review must not allow another file');
+      const changed = entry.statement.replace(/knockout_display_repairs/g, 'unreviewed_repairs');
+      const changedFailures = [];
+      runAdditivityCheck([{ file, statement: changed }], new Set(), message => changedFailures.push(message));
+      if (changedFailures.length !== 1) fail('knockout label repair review must reject changed SQL');
     }
   }
   console.log('[expand-contract-sql-v1] allowlist 객체 무결성 통과');

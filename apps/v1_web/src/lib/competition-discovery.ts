@@ -33,10 +33,10 @@ function amount(raw: string | null): number | undefined {
 
 /** 기존 status 링크를 상태 필터로 옮기고 알려진 입력만 서버에 전달한다. 옛 phase·registration·sort 값은 읽지 않는다. */
 export function readCompetitionDiscovery(params: URLSearchParams, kind: CompetitionKind): CompetitionDiscoveryFilters {
-  const tournamentCondition = choice(params.get('genderCategory'), ['male', 'female', 'mixed'] as const)
-    || choice(params.get('format'), ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const)
+  // 성별은 대회·리그 모두에 걸린다(2026-11-06). 진행 방식·참가비만 대회 전용이다.
+  const tournamentCondition = choice(params.get('format'), ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const)
     || amount(params.get('feeMin')) !== undefined || amount(params.get('feeMax')) !== undefined;
-  // 기존 전체 탭의 부문 공유 링크는 대회 탭으로 명확히 좁혀 조건을 보존한다.
+  // 기존 전체 탭의 진행 방식·참가비 공유 링크는 대회 탭으로 명확히 좁혀 조건을 보존한다.
   const effectiveKind = kind === 'all' && tournamentCondition ? 'tournament' : kind;
   const legacy = params.get('status');
   const legacyStage = legacy === 'draft' ? 'preparing' : legacy === 'open' ? 'recruiting' : legacy === 'closed' ? 'recruit_closed'
@@ -49,8 +49,8 @@ export function readCompetitionDiscovery(params: URLSearchParams, kind: Competit
     sportId: params.get('sportId') || undefined,
     dateFrom: date(params.get('dateFrom')),
     dateTo: date(params.get('dateTo')),
+    genderCategory: choice(params.get('genderCategory'), ['male', 'female', 'mixed'] as const),
     ...(effectiveKind === 'tournament' ? {
-      genderCategory: choice(params.get('genderCategory'), ['male', 'female', 'mixed'] as const),
       format: choice(params.get('format'), ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const),
       feeMin: amount(params.get('feeMin')),
       feeMax: amount(params.get('feeMax')),
@@ -73,7 +73,7 @@ export function competitionDiscoveryHref(filters: CompetitionDiscoveryFilters, e
 
 export function switchCompetitionKind(filters: CompetitionDiscoveryFilters, kind: CompetitionKind): CompetitionDiscoveryFilters {
   if (kind === 'tournament') return { ...filters, kind, stage: filters.stage === 'preparing' ? undefined : filters.stage };
-  const { genderCategory: _gender, format: _format, feeMin: _min, feeMax: _max, ...common } = filters;
+  const { format: _format, feeMin: _min, feeMax: _max, ...common } = filters;
   return { ...common, kind };
 }
 

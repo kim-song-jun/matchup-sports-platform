@@ -1,3 +1,5 @@
+리그+토너먼트의 조 이름 수정은 구조 편집과 분리한다. 저장 이름은 공개 일정·대진·경기 결과에 반영하며 예선 설정과 revision을 원자적으로 갱신한다. 기존 N개 토너먼트의 자동 생성 명칭은 선행 PR #2181의 짝수 6팀 이상 강수 규칙에 맞춰 보정한다. [대회 계약](./domains/tournaments.md#조-이름과-결선-규모-표시-2026-11-06).
+
 배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
 
 리그 + N개 토너먼트는 토너먼트별 독립 진출팀 확정과 공식 순위 기반 추천/4개 조 12팀 교차 배치를 제공한다. 미리보기는 저장하지 않으며 확정은 선택한 결선만 원자적으로 변경한다. [대회 계약](./domains/tournaments.md#토너먼트-하나의-진출팀-확정-2026-11-06).
@@ -142,7 +144,7 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 - 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.
 
-선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
+선수 추가 성별·골키퍼 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
 
 대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
 

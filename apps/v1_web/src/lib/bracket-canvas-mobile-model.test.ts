@@ -461,3 +461,27 @@ describe('buildLeagueTournamentMobileRounds', () => {
     expect(round.sections[1].nodes[0].title).toBe('B조 · 2번 경기');
   });
 });
+
+// 2026-11-06: N개 토너먼트의 부전승 있는 첫 라운드는 단계 코드(round16)와 이름('12강')이 다르다.
+describe('buildBracketMobileRounds N개 토너먼트', () => {
+  it('탭 이름은 경기가 쓰는 이름(12강)이고 섹션 제목은 토너먼트 이름을 한 번만 붙인다', () => {
+    const rounds = buildBracketMobileRounds({
+      groups: [
+        makeGroup({ id: 'p12', phase: 'round16', name: '프리미어 · 12강', sortOrder: 0, bracketTrack: '프리미어' }),
+        makeGroup({ id: 'c12', phase: 'round16', name: '챌린지 · 12강', sortOrder: 0, bracketTrack: '챌린지' }),
+        makeGroup({ id: 'p8', phase: 'quarter', name: '프리미어 · 8강', sortOrder: 1, bracketTrack: '프리미어' }),
+      ],
+      fixtures: [
+        makeFixture({ id: 'p12-1', groupId: 'p12', fixtureNumber: 1, round: '12강' }),
+        makeFixture({ id: 'c12-1', groupId: 'c12', fixtureNumber: 2, round: '12강' }),
+        makeFixture({ id: 'p8-1', groupId: 'p8', fixtureNumber: 3, round: '8강' }),
+      ],
+      slots: [],
+    });
+    expect(rounds.map((round) => round.label)).toEqual(['12강', '8강']);
+    expect(rounds[0].sections.map((section) => section.heading)).toEqual(['챌린지 · 12강', '프리미어 · 12강']);
+    // 칸 제목에도 토너먼트 이름이 한 번만 붙는다.
+    expect(rounds[0].sections.flatMap((section) => section.nodes.map((node) => node.title))).toEqual(['챌린지 · 12강 · 2번 경기', '프리미어 · 12강 · 1번 경기']);
+  });
+});
+

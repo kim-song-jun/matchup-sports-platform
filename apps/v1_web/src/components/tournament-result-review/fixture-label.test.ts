@@ -55,9 +55,9 @@ describe('resolveFixtureLabel — 경기 이름', () => {
     });
   });
 
-  it('결선은 조 이름 없이 라운드만 쓴다', () => {
+  it('결선은 운영자가 저장한 조 이름을 쓴다', () => {
     expect(resolveFixtureLabel(item({ round: 'semi', fixtureNumber: 9, groupName: '본선' }), teams, new Map()).subtitle)
-      .toBe('4강 · 9번 경기');
+      .toBe('본선 · 9번 경기');
   });
 
   it('결선 2차전은 차수를 붙인다', () => {

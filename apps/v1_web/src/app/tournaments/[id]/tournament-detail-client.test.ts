@@ -944,6 +944,33 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     );
   });
 
+  it('shows both track champions even with customized final round labels', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts',
+      groups: [makeGroup({ id: 'a', phase: 'final', bracketTrack: '프리미어' }), makeGroup({ id: 'b', phase: 'final', bracketTrack: '챌린지' })],
+      fixtures: [
+        makeFixture({ id: 'f1', groupId: 'a', round: '최종전', status: 'completed', homeTeamName: '레드 FC', result: makeFixtureResult({ homeScore: 2, awayScore: 0 }) }),
+        makeFixture({ id: 'f2', groupId: 'b', round: '최종전', status: 'completed', awayTeamName: '블루 FC', result: makeFixtureResult({ homeScore: 0, awayScore: 1 }) }),
+      ],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    const hero = screen.getByRole('link', { name: /토너먼트별 우승팀.*경기 결과 보기/ });
+    for (const name of ['프리미어', '레드 FC', '챌린지', '블루 FC']) expect(hero).toHaveTextContent(name);
+    expect(hero).not.toHaveTextContent('공동 우승');
+    expect(hero).toHaveAttribute('href', '/tournaments/t1/results');
+  });
+
+  it('keeps each unconfirmed track visible without selecting a scheduled fixture winner', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts',
+      groups: [makeGroup({ id: 'a', phase: 'final', bracketTrack: '프리미어' }), makeGroup({ id: 'b', phase: 'final', bracketTrack: '챌린지' })],
+      fixtures: [makeFixture({ id: 'f1', groupId: 'b', round: 'final', status: 'scheduled', result: makeFixtureResult({ homeScore: 1, awayScore: 0 }) })],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    const hero = screen.getByRole('link', { name: /토너먼트별 우승팀.*경기 결과 보기/ });
+    expect(hero).toHaveTextContent('프리미어');
+    expect(hero).toHaveTextContent('챌린지');
+    expect(hero.textContent?.match(/결과 확정 대기/g)).toHaveLength(2);
+  });
+
   it('renders the pre-participation checklist exactly once via the accordion and drops the old duplicated copy', () => {
     const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league', groups: [] });
 

@@ -72,7 +72,9 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   if (query.format) conditions.push(Prisma.sql`t.format::text = ${query.format}`);
   if (query.feeMin !== undefined) conditions.push(Prisma.sql`t.entry_fee >= ${query.feeMin}`);
   if (query.feeMax !== undefined) conditions.push(Prisma.sql`t.entry_fee <= ${query.feeMax}`);
-  if (query.genderCategory || query.format || query.feeMin !== undefined || query.feeMax !== undefined) {
+  // Format and fee are tournament-only. Gender is not: a league picks it at creation too (2026-11-03), so the
+  // gender filter applies to every kind and a league (or tournament) whose gender is empty simply never matches it.
+  if (query.format || query.feeMin !== undefined || query.feeMax !== undefined) {
     conditions.push(Prisma.sql`(t.kind::text = 'regular_tournament' OR t.kind IS NULL)`);
   }
   if (query.dateFrom || query.dateTo) conditions.push(Prisma.sql`t.scheduled_at IS NOT NULL`);

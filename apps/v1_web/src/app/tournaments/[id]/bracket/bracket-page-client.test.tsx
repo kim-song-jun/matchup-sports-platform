@@ -222,6 +222,40 @@ describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
     expect([...container.querySelectorAll('a[href*="/matches/"]')].map(link => link.getAttribute('href')?.split('?')[0])).toEqual(['/tournaments/public-named-finals/matches/named-game-1']);
     expect(screen.getByText('챌린지 · 결승')).toBeInTheDocument();
   });
+  it.each([['챔피언 · 12강', '12강'], ['챔피언 · 본선 첫 경기', '본선 첫 경기']])('일정 호출부가 저장한 %s 이름과 12강 round를 유지한다', (name, label) => {
+    const tournament = namedTournament();
+    tournament.groups.push(makeGroup({ id: 'champ-first', phase: 'round16', name, bracketTrack: '챔피언' }));
+    tournament.fixtures.push(makeFixture({ id: 'first-match', status: 'scheduled', groupId: 'champ-first', round: '12강', fixtureNumber: 18 }));
+    const item = { fixtureId: 'first-match', round: '12강', fixtureNumber: 18, legNumber: 1, groupId: null, groupName: null,
+      scheduledAt: null, venue: null, fieldId: null, fieldName: null, home: null, away: null, homeSlotLabel: null, awaySlotLabel: null,
+      visibilityMode: 'live', status: 'scheduled', resultState: 'pending', scoreStatus: 'unavailable', score: null, clock: null,
+      periodBreak: null, scorers: [], cards: [], outcome: null, hasVideo: false } as PublicScheduleEntry;
+    renderBracketPage(tournament, { tournamentId: tournament.id, tournamentTitle: tournament.title, bracketPublished: true, items: [], unscheduled: [item], standings: [], nextCursor: null });
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const rounds = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    fireEvent.click(rounds.getByRole('button', { name: label }));
+    expect(rounds.queryByRole('button', { name: '16강' })).not.toBeInTheDocument();
+    const links = screen.getAllByRole('link').filter(link => link.getAttribute('href')?.includes('/matches/'));
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', expect.stringContaining('/matches/first-match'));
+    expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+  });
+
+  it.each([['챔피언 · 12강', '12강'], ['챔피언 · 본선 첫 경기', '본선 첫 경기']])('대진 필터는 저장한 %s 이름으로 실제 경기를 선택한다', (name, label) => {
+    const tournament = namedTournament();
+    tournament.groups.push(makeGroup({ id: 'champ-first', phase: 'round16', name, bracketTrack: '챔피언' }));
+    tournament.fixtures.push(makeFixture({ id: 'first-match', status: 'scheduled', groupId: 'champ-first', round: '12강', fixtureNumber: 18, homeTeamName: '첫 경기 홈팀', awayTeamName: '첫 경기 원정팀' }));
+    renderBracketStandingsTab(tournament);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '토너먼트 선택' })).getByRole('button', { name: '챔피언' }));
+    const rounds = within(screen.getByRole('navigation', { name: '결선 단계 선택' }));
+    fireEvent.click(rounds.getByRole('button', { name: label }));
+    expect(rounds.queryByRole('button', { name: '16강' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('첫 경기 홈팀').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('첫 경기 원정팀').length).toBeGreaterThan(0);
+    expect(screen.queryByText('미정 홈 0')).not.toBeInTheDocument();
+  });
+
   function namedTournament(withFinals = true): V1TournamentDetail {
     return makeTournament({ id: 'public-named-finals', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress',
       bracketPublishedAt: '2026-11-04T00:00:00Z',

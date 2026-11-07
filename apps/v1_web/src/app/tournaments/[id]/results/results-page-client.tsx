@@ -15,6 +15,7 @@ import { isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -77,14 +78,17 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Rec
 
 function buildSplitFinalResults(tournament: V1TournamentDetail) {
   return ([...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).map((track) => {
-    const phases = new Map(tournament.groups
-      .filter(group => effectiveBracketTrack(group.bracketTrack) === track && ['final', 'third_place'].includes(group.phase))
+    const trackGroups = tournament.groups.filter(group => effectiveBracketTrack(group.bracketTrack) === track);
+    const trackIds = new Set(trackGroups.map(group => group.id));
+    const trackFixtures = tournament.fixtures.filter(fixture => trackIds.has(fixture.groupId ?? ''));
+    const phases = new Map(trackGroups
+      .filter(group => ['final', 'third_place'].includes(group.phase))
       .map(group => [group.id, group.phase]));
     const fixtures = tournament.fixtures
       .filter(fixture => phases.has(fixture.groupId ?? '') && fixture.status === 'completed' && fixture.result !== null)
       .map(fixture => ({ ...fixture, round: phases.get(fixture.groupId!)! }));
     const rows = buildKnockoutFinalRanking(fixtures, tournament.sixTeamBracket?.winners);
-    return { track, label: bracketTrackLabel(track)!, rows,
+    return { track, label: bracketTrackLabel(track)!, rows, fixtures: trackFixtures,
       winner: rows.find(row => row.pos === 1)?.name ?? null,
       runnerUp: rows.find(row => row.pos === 2)?.name ?? null,
     };
@@ -234,7 +238,9 @@ function DesktopChampionHero({
   champion,
   tournament,
   record,
+  compact = false,
 }: {
+  compact?: boolean;
   champion: string;
   tournament: V1TournamentDetail;
   record?: { w: number; gf: number; ga: number; games: number };
@@ -249,7 +255,7 @@ function DesktopChampionHero({
         position: 'relative',
         background: 'linear-gradient(160deg, #0A0E1A 0%, #0D1B2A 40%, #1A0A2E 100%)',
         borderRadius: 'var(--radius-container)',
-        padding: '44px 56px 40px',
+        padding: compact ? '24px' : '44px 56px 40px',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -272,7 +278,7 @@ function DesktopChampionHero({
       </div>
       {/* 팀명 — 배지 제거 후에도 스크린리더에는 '우승팀' 맥락 유지 */}
       <div className="tm-resd-name" style={{
-        fontSize: 44, fontWeight: 900, color: '#FFFFFF',
+        fontSize: compact ? 'var(--font-size-heading)' : 44, overflowWrap: 'anywhere', fontWeight: 900, color: '#FFFFFF',
         letterSpacing: '-0.03em', lineHeight: 1.1,
         marginBottom: 8,
       }}>
@@ -287,7 +293,7 @@ function DesktopChampionHero({
         {tournament.sport?.name ?? ''} &middot; {tournament.title}
       </div>
       {/* 스탯 3칸 */}
-      <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: compact ? 24 : 40, alignItems: 'center' }}>
         {[
           { n: String(rec.w), label: '승리', sub: `${rec.games}경기 중` },
           { n: String(rec.gf), label: '득점', sub: `${rec.ga}실점` },
@@ -411,6 +417,12 @@ function CoChampionBanner({ names }: { names: string[] }) {
   );
 }
 
+/** 경기가 'N강'(12강·6강…)으로 불리면 그 이름을 그대로 쓴다 — 단계 코드는 틀 기준이라 12강이 round16 이다. */
+function largeRoundName(round: string): string | null {
+  const name = round.trim();
+  return /^\d+강$/.test(name) ? name : null;
+}
+
 /* ── 최종 순위 테이블 ── */
 const ROUND_LABEL_MAP: Record<string, string> = {
   final: '결승', '결승': '결승',
@@ -431,11 +443,13 @@ const ROUND_LABEL_MAP: Record<string, string> = {
 function KnockoutResultsTable({
   fixtures,
   kindOf,
+  labelOf,
   tournamentId,
   fromHref,
 }: {
   fixtures: V1TournamentFixture[];
   kindOf: (fixture: V1TournamentFixture) => KnockoutKind | null;
+  labelOf: (fixture: V1TournamentFixture) => string;
   tournamentId: string;
   fromHref?: string;
 }) {
@@ -601,7 +615,7 @@ function KnockoutResultsTable({
         return (
           <div key={f.id} style={cardStyle}>
             <MatchRow
-              label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Trophy size={13} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />결승</span>}
+              label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Trophy size={13} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />{labelOf(f)}</span>}
               home={f.homeTeamName} away={f.awayTeamName}
               homeScore={homeScore} awayScore={awayScore}
               winner={winner}
@@ -621,7 +635,7 @@ function KnockoutResultsTable({
         return (
           <div key={f.id} style={{ ...cardStyle, background: 'var(--grey50)' }}>
             <MatchRow
-              label="3·4위전"
+              label={labelOf(f)}
               home={f.homeTeamName} away={f.awayTeamName}
               homeScore={homeScore} awayScore={awayScore}
               winner={winner}
@@ -639,7 +653,7 @@ function KnockoutResultsTable({
         const agg = calcAggregate(legs);
         if (!agg) return legs.map((fixture) => fixture.result && (
           <div key={fixture.id} style={cardStyle}>
-            <MatchRow label={fixture.legNumber > 1 ? `4강 ${fixture.legNumber}차` : '4강'}
+            <MatchRow label={fixture.legNumber > 1 ? `${labelOf(fixture)} ${fixture.legNumber}차` : labelOf(fixture)}
               home={fixture.homeTeamName} away={fixture.awayTeamName}
               homeScore={fixture.result.homeScore} awayScore={fixture.result.awayScore}
               winner={getWinnerSide(fixture.result)} hasPenalty={fixture.result.hasPenalty}
@@ -654,7 +668,7 @@ function KnockoutResultsTable({
           <div key={`semi-${leg1.id}`} style={cardStyle}>
             {leg1?.result && (
               <MatchRow
-                label="4강 1차" home={leg1.homeTeamName} away={leg1.awayTeamName}
+                label={`${labelOf(leg1)} 1차`} home={leg1.homeTeamName} away={leg1.awayTeamName}
                 homeScore={leg1.result.homeScore} awayScore={leg1.result.awayScore}
                 winner={getWinnerSide(leg1.result)}
                 hasPenalty={leg1.result.hasPenalty} homePK={leg1.result.homePenaltyScore} awayPK={leg1.result.awayPenaltyScore}
@@ -663,7 +677,7 @@ function KnockoutResultsTable({
               />
             )}
             {leg2?.result && <>{divider}<MatchRow
-              label="4강 2차" home={leg2.homeTeamName} away={leg2.awayTeamName}
+              label={`${labelOf(leg2)} 2차`} home={leg2.homeTeamName} away={leg2.awayTeamName}
               homeScore={leg2.result.homeScore} awayScore={leg2.result.awayScore}
               winner={getWinnerSide(leg2.result)}
               hasPenalty={leg2.result.hasPenalty} homePK={leg2.result.homePenaltyScore} awayPK={leg2.result.awayPenaltyScore}
@@ -685,7 +699,7 @@ function KnockoutResultsTable({
 
       {earlierFixtures.map((fixture) => fixture.result && (
         <div key={fixture.id} style={cardStyle}>
-          <MatchRow label={ROUND_LABEL_MAP[kindOf(fixture) ?? ''] ?? '결선'}
+          <MatchRow label={labelOf(fixture)}
             home={fixture.homeTeamName} away={fixture.awayTeamName}
             homeScore={fixture.result.homeScore} awayScore={fixture.result.awayScore}
             winner={getWinnerSide(fixture.result)} hasPenalty={fixture.result.hasPenalty}
@@ -1141,30 +1155,32 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     .filter((f) => f.status === 'completed' && f.result !== null && knockoutKind(f) !== null)
     .sort((a, b) => knockoutOrder(a) - knockoutOrder(b));
 
+  const groupsById = new Map(tournament.groups.map(group => [group.id, group]));
+  const fixtureLabel = (fixture: V1TournamentFixture) => {
+    const group = groupsById.get(fixture.groupId ?? '');
+    const name = group?.name.trim() ?? '';
+    return bracketStageLabel(group?.bracketTrack, name)
+      || largeRoundName(fixture.round) || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
+  };
+
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
       <h1 className="sr-only">{tournament.title} 최종 결과</h1>
       {/* ── 챔피언 섹션 ── */}
       {isCompleted && isSplitBracket && (
-        <div style={{ padding: '16px 20px 0', display: 'grid', gap: 12 }}>
-          {splitFinalResults.map((result) => (
-            <section
-              key={result.track}
-              aria-label={`${result.label} 결과`}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4"
-            >
-              <h2 className="tm-text-body-lg font-bold" style={{ color: 'var(--text-strong)' }}>{result.label}</h2>
-              {result.winner ? (
-                <div className="mt-3 grid gap-2">
-                  <p className="m-0 tm-text-label"><strong>우승</strong> · {result.winner}</p>
-                  {result.runnerUp ? <p className="m-0 tm-text-label" style={{ color: 'var(--text-muted)' }}>준우승 · {result.runnerUp}</p> : null}
-                </div>
-              ) : (
-                <p className="mt-3 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>결승 결과가 아직 등록되지 않았어요.</p>
-              )}
-            </section>
-          ))}
-          <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
+        <div style={{ padding: '16px 20px 0' }}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {splitFinalResults.map((result) => (
+              <section key={result.track} aria-label={`${result.label} 결과`} className="min-w-0">
+                <h2 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{result.label}</h2>
+                {result.winner ? <>
+                  <DesktopChampionHero compact champion={result.winner} tournament={tournament} />
+                  <MobileChampionBanner champion={result.winner} tournament={tournament} />
+                </> : <EmptyState title="결승 결과가 아직 등록되지 않았어요." sub="운영진이 결과를 확정하면 우승팀이 표시돼요." />}
+              </section>
+            ))}
+          </div>
+          <div style={{ marginTop: 16 }}><TournamentSummaryCard tournament={tournament} detailHref={detailHref} /></div>
         </div>
       )}
       {isCompleted && !isSplitBracket && isCoChampion && (
@@ -1238,17 +1254,16 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       )}
 
       {isCompleted && activeTab === 'results' && (
-        <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
+        <div className={isSplitBracket ? "flex flex-col" : "tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid"}>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>최종 순위</h3>
             {isSplitBracket ? (
-              <div className="grid gap-3">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {splitFinalResults.map((result) => (
-                  <section key={result.track} aria-label={`${result.label} 순위`} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-                    <h4 className="tm-text-body font-bold" style={{ color: 'var(--text-strong)' }}>{result.label}</h4>
-                    <p className="mt-2 mb-0 tm-text-label">{result.winner ? `우승 · ${result.winner}` : '결승 결과가 아직 등록되지 않았어요.'}</p>
-                    {result.runnerUp ? <p className="mt-1 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>준우승 · {result.runnerUp}</p> : null}
-                    {result.rows.filter(row => row.pos >= 3).map(row => <p key={row.pos} className="mt-1 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>{row.pos}위 · {row.name}</p>)}
+                  <section key={result.track} aria-label={`${result.label} 순위`} className="min-w-0">
+                    <h4 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{result.label}</h4>
+                    {result.rows.length > 0 ? <FinalStandingsTable rows={result.rows} fixtures={tournament.fixtures} />
+                      : <EmptyState title="최종 순위가 아직 등록되지 않았어요." sub="운영진이 결과를 확정하면 이곳에서 순위를 확인할 수 있어요." />}
                   </section>
                 ))}
               </div>
@@ -1262,15 +1277,21 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
               />
             )}
             {/* 데스크탑: 순위표가 짧아 비는 좌측 컬럼을 대회 요약으로 채우고 sticky로 고정 */}
-            <div className="tm-show-desktop" style={{ marginTop: 16 }}>
+            {!isSplitBracket ? <div className="tm-show-desktop" style={{ marginTop: 16 }}>
               <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
-            </div>
+            </div> : null}
           </div>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
                 <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결선 경기</h3>
-                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} tournamentId={tournament.id} fromHref={resultsSelfHref ?? undefined} />
+                {isSplitBracket ? <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {splitFinalResults.map(result => <section key={result.track} aria-label={`${result.label} 경기`} className="min-w-0">
+                    <h4 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{result.label}</h4>
+                    <KnockoutResultsTable fixtures={knockoutFixtures.filter(fixture => result.fixtures.some(item => item.id === fixture.id))} kindOf={knockoutKind}
+                      labelOf={fixtureLabel} tournamentId={tournament.id} fromHref={resultsSelfHref ?? undefined} />
+                  </section>)}
+                </div> : <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} labelOf={fixtureLabel} tournamentId={tournament.id} fromHref={resultsSelfHref ?? undefined} />}
               </>
             )}
             <GroupStageFixtures tournament={tournament} fromHref={resultsSelfHref ?? undefined} />

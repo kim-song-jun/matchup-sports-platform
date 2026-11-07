@@ -36,6 +36,7 @@ import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './leagu
 import {
   createLeagueRosterRegistration,
   findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerCode,
   leagueAdmissionBlockerMessage,
 } from './league-team-admission';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
@@ -830,7 +831,7 @@ export class LeagueMatchAdminService {
     const blocker = await findLeagueAdmissionBlocker(this.prisma, { leagueId, teamId: dto.teamId });
     if (blocker !== null) {
       throw new UnprocessableEntityException({
-        code: 'LEAGUE_TEAM_INVALID',
+        code: leagueAdmissionBlockerCode(blocker),
         message: leagueAdmissionBlockerMessage(blocker),
       });
     }
@@ -884,7 +885,7 @@ export class LeagueMatchAdminService {
         const blocker = await findLeagueAdmissionBlocker(tx, { leagueId, teamId });
         if (blocker !== null) {
           throw new UnprocessableEntityException({
-            code: 'LEAGUE_TEAM_INVALID',
+            code: leagueAdmissionBlockerCode(blocker),
             message: `${nameByTeamId.get(teamId) ?? '팀'}: ${leagueAdmissionBlockerMessage(blocker)}`,
           });
         }

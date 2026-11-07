@@ -2,37 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { describeResultReviewError } from './result-review-copy';
 
 /**
- * 정정 레인의 승부차기 가드(서버측 PR)가 추가되면서 아래 3개 도메인 에러 코드가
- * 이 화면에서 **새로 도달 가능**해졌다. `KNOWN_ERROR_MESSAGES` 에 없는 코드는
- * `extractErrorMessage` 폴백을 타고 **서버 원문이 그대로** 화면에 뜨는데, 그중
- * 4개 메시지가 영문이다(서버 문구는 바이트 동일 제약이 있어 서버에서 못 바꾼다).
+ * 승부차기 가드 에러가 이 화면에 도달할 때의 문구 계약.
  *
- * 서버 원문(`apps/v1_api/src/games/games.service.ts`, base 0d48cd8f 실측):
- *   TOURNAMENT_PENALTY_REQUIRED     :5216  '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.'  (409)
- *   TOURNAMENT_PENALTY_NOT_ALLOWED  :5224  'Penalty shootouts can only be recorded for knockout-phase fixtures'  (409)
- *   TOURNAMENT_PENALTY_NOT_ALLOWED  :5230  'Penalty shootouts are only recorded when regulation time ends level'  (409)
- *   TOURNAMENT_PENALTY_INVALID      :509   'penalties must be an object with non-negative integer home and away scores'  (422)
- *   TOURNAMENT_PENALTY_INVALID      :517   'A penalty shootout must produce a decisive winner'  (422)
- *
- * 한 코드에 서버 메시지가 2종인 경우 프론트는 두 변종을 **구분할 수 없다** --
- * `extractErrorCode` 는 code 만 읽고, 두 변종의 code·HTTP status 가 완전히 같다
- * (NOT_ALLOWED 둘 다 409, INVALID 둘 다 422). 서버 원문 substring 매칭은 "바꿀 수
- * 없는 영문 원문"에 프론트를 결합시키는 새 기술부채이므로, **코드별 문구 하나로
- * 합치고 그 문구가 두 원인을 모두 포괄**하는 것이 유일하게 정직한 선택이다.
- * 아래 테스트가 그 계약(같은 코드 → 서버 메시지와 무관하게 같은 안내)을 고정한다.
+ * - `TOURNAMENT_PENALTY_REQUIRED`·`_NOT_ALLOWED`·`_INVALID`: 서버가 원인별 한국어 문구를
+ *   직접 보낸다. 매핑이 같은 코드의 두 원인을 한 문장으로 뭉개던 손실이 있었으므로
+ *   서버 문구를 그대로 보여 준다.
+ * - `_KICK_COUNTS_REQUIRED`·`_UNDECIDED`: 서버 문구는 API 호출자가 고칠 필드 이름을 담고
+ *   있어, 화면은 code 로 결정되는 안내를 따로 보여 준다.
  */
 
-const SERVER_MESSAGES = {
-  TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED: ['penalties.takenHome and penalties.takenAway are required when recording a penalty shootout'],
-  TOURNAMENT_PENALTY_UNDECIDED: ['The penalty shootout has not been decided under this tournament policy'],
+const MAPPED_SERVER_MESSAGES = {
+  TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED: [
+    '승부차기를 기록하려면 양 팀이 찬 킥 수(penalties.takenHome, penalties.takenAway)를 함께 보내 주세요.',
+  ],
+  TOURNAMENT_PENALTY_UNDECIDED: [
+    '이 대회 규칙으로는 승부차기 승자가 아직 정해지지 않았어요. 킥 수와 점수를 확인하거나, 운영자가 결과를 직접 정한다면 penalties.operatorOverride를 true로 보내 주세요.',
+  ],
+} as const;
+
+/** 서버가 원인별로 보내는 한국어 문구 — 화면은 이 문구를 그대로 보여 준다. */
+const PASS_THROUGH_SERVER_MESSAGES = {
   TOURNAMENT_PENALTY_REQUIRED: ['결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.'],
   TOURNAMENT_PENALTY_NOT_ALLOWED: [
-    'Penalty shootouts can only be recorded for knockout-phase fixtures',
-    'Penalty shootouts are only recorded when regulation time ends level',
+    '승부차기는 결선 경기에서만 기록할 수 있어요.',
+    '승부차기는 정규시간이 무승부로 끝난 경기에서만 기록할 수 있어요.',
   ],
   TOURNAMENT_PENALTY_INVALID: [
-    'penalties must be an object with non-negative integer home and away scores',
-    'A penalty shootout must produce a decisive winner',
+    '승부차기 점수(penalties)는 home과 away가 모두 0 이상의 정수여야 해요.',
+    '승부차기는 승자가 갈려야 해요. 두 팀 점수를 서로 다르게 입력해 주세요.',
   ],
 } as const;
 
@@ -41,16 +38,15 @@ function apiError(code: string, message: string) {
   return { code, message };
 }
 
-describe('describeResultReviewError — 승부차기 가드 에러 3종 (한국어 해요체 매핑)', () => {
-  for (const [code, serverMessages] of Object.entries(SERVER_MESSAGES)) {
+describe('describeResultReviewError — 화면용 안내가 필요한 승부차기 에러 2종 (한국어 해요체 매핑)', () => {
+  for (const [code, serverMessages] of Object.entries(MAPPED_SERVER_MESSAGES)) {
     it(`${code} 는 한국어 해요체 안내로 노출된다 (영문 원문 노출 금지)`, () => {
       for (const serverMessage of serverMessages) {
         const shown = describeResultReviewError(apiError(code, serverMessage));
 
-        // 영어 단어가 그대로 노출되면 안 된다(3자 이상 연속 라틴 문자).
+        // 서버 문구의 필드 이름(영문)이 화면에 새면 안 된다(3자 이상 연속 라틴 문자).
         expect(shown).not.toMatch(/[A-Za-z]{3,}/);
-        // 서버 원문이 그대로 새 나가면 안 된다. 이 단언이 없으면 서버 문구가 이미
-        // 한국어인 `TOURNAMENT_PENALTY_REQUIRED` 케이스는 프론트 매핑을 지워도 통과해
+        // 서버 원문이 그대로 새 나가면 안 된다. 이 단언이 없으면 매핑을 지워도 통과해
         // 공허해진다(폴백이 서버 원문을 그대로 돌려주기 때문).
         expect(shown).not.toBe(serverMessage);
         // 해요체 (`~해요`/`~주세요`) -- 합니다체 금지.
@@ -73,11 +69,26 @@ describe('describeResultReviewError — 승부차기 가드 에러 3종 (한국�
   }
 });
 
+describe('describeResultReviewError — 서버가 한국어로 보내는 승부차기 에러는 그대로 보여 준다', () => {
+  for (const [code, serverMessages] of Object.entries(PASS_THROUGH_SERVER_MESSAGES)) {
+    it(`${code} 는 서버 문구를 그대로 노출한다`, () => {
+      for (const serverMessage of serverMessages) {
+        expect(describeResultReviewError(apiError(code, serverMessage))).toBe(serverMessage);
+      }
+    });
+  }
+
+  it('같은 코드의 서로 다른 원인이 서로 다른 안내로 남는다 — 한 문장으로 뭉개지 않는다', () => {
+    const shown = PASS_THROUGH_SERVER_MESSAGES.TOURNAMENT_PENALTY_NOT_ALLOWED.map((message) =>
+      describeResultReviewError(apiError('TOURNAMENT_PENALTY_NOT_ALLOWED', message)),
+    );
+    expect(new Set(shown).size).toBe(2);
+  });
+});
+
 /**
- * 아래 두 테스트는 지금도 통과한다 -- 위 실패가 하네스(에러 객체 형태·추출 경로)
- * 탓이 아니라 **매핑 누락** 탓임을 가르는 대조군이다. 두 번째 테스트는 미매핑
- * 코드에서 서버 원문이 그대로 노출되는 현재 동작(= 위 3개 코드가 영문으로 새는
- * 정확한 메커니즘)을 그대로 고정한다.
+ * 하네스(에러 객체 형태·추출 경로)가 정상임을 가르는 대조군. 두 번째 테스트는 미매핑
+ * 코드에서 서버 원문이 그대로 노출되는 동작 — 위 pass-through 테스트가 기대는 경로 — 을 고정한다.
  */
 describe('describeResultReviewError — 하네스 정상 동작 증명 (대조군)', () => {
   it('이미 매핑된 코드는 서버 원문과 무관하게 매핑 문구를 돌려준다', () => {
@@ -87,9 +98,7 @@ describe('describeResultReviewError — 하네스 정상 동작 증명 (대조�
   });
 
   it('매핑되지 않은 코드는 서버 원문을 그대로 노출한다', () => {
-    expect(describeResultReviewError(apiError('SOME_UNMAPPED_CODE', 'A penalty shootout must produce a decisive winner'))).toBe(
-      'A penalty shootout must produce a decisive winner',
-    );
+    expect(describeResultReviewError(apiError('SOME_UNMAPPED_CODE', '서버가 보낸 문구'))).toBe('서버가 보낸 문구');
   });
 });
 

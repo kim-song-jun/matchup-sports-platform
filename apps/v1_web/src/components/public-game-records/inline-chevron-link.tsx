@@ -32,7 +32,11 @@ export function InlineChevronLink({
   const lead = graphemes.slice(0, -1).join('');
   const tail = graphemes.slice(-1).join('');
   return (
-    <Link href={href} style={tone === 'link' ? { color: 'var(--blue700)' } : undefined}>
+    <Link
+      href={href}
+      className="tm-inline-chevron-link"
+      style={tone === 'link' ? { color: 'var(--blue700)' } : undefined}
+    >
       {lead}
       {/* display:inline 는 브라우저 기본값이다 — jsdom 은 display 가 비어 있는 span 경계마다 접근성 이름에 공백을 넣는다. */}
       <span style={{ display: 'inline', whiteSpace: 'nowrap' }}>

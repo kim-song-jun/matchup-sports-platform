@@ -2518,16 +2518,25 @@ label.tm-btn:focus-within {
   border-bottom-right-radius: var(--radius-control);
 }
 
+/* 눌림·hover 배경(--surface-soft)에서 글자(--text-muted)는 4.19:1 이라 grey700 으로 올리고,
+ * 색 말고 링크임을 알려 주는 chevron 은 grey500 이 2.76:1 이라 grey600(라이트 4.19:1·다크 4.97:1)으로 올린다. */
 .tm-record-rank-row:active {
   background: var(--surface-soft);
-  /* --text-muted(grey600)는 --surface-soft(grey100) 위에서 4.19:1 — .tm-list-row-interactive:hover 와 같은 보정. */
   --text-muted: var(--grey700);
+}
+
+.tm-record-rank-row:active > .tm-record-rank-value > svg {
+  color: var(--grey600);
 }
 
 @media (hover: hover) {
   .tm-record-rank-row:hover {
     background: var(--surface-soft);
     --text-muted: var(--grey700);
+  }
+
+  .tm-record-rank-row:hover > .tm-record-rank-value > svg {
+    color: var(--grey600);
   }
 }
 
@@ -2566,6 +2575,13 @@ label.tm-btn:focus-within {
 
 .tm-record-rank-value > svg {
   color: var(--grey500);
+}
+
+/* 문장 속 이름 링크(InlineChevronLink) — 순위 행과 같은 포커스 링 규격. */
+.tm-inline-chevron-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: var(--radius-tight);
 }
 
 /* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */

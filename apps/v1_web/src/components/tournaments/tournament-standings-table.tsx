@@ -133,6 +133,7 @@ export function TournamentStandingsTable({
   fromHref,
   header,
   keepTeamLink = false,
+  myTeamIds,
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
@@ -147,6 +148,8 @@ export function TournamentStandingsTable({
   keepTeamLink?: boolean;
   /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
   fromHref?: string | null;
+  /** 로그인한 사용자가 소속된 팀 — 그 팀 행에 "우리 팀" 배지와 왼쪽 막대를 단다. 비공개 팀(teamId null)은 표시하지 않는다. */
+  myTeamIds?: ReadonlySet<string>;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -199,6 +202,7 @@ export function TournamentStandingsTable({
                 // 비공개 팀은 로고 없이 기본 팀 아이콘으로 표시한다.
                 const isHidden = row.teamName === null;
                 const promoted = advancingKeys?.has(row.key) ?? false;
+                const isMine = row.teamId !== null && (myTeamIds?.has(row.teamId) ?? false);
                 const teamCell = (
                   <>
                     <TeamAvatar
@@ -218,6 +222,7 @@ export function TournamentStandingsTable({
                       >
                         {isHidden ? '참가팀 비공개' : row.teamName}
                       </span>
+                      {isMine ? <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>우리 팀</span> : null}
                       {promoted ? (
                         advancingLabels?.get(row.key)?.length ? (
                           <span className="flex flex-wrap gap-1">
@@ -241,7 +246,7 @@ export function TournamentStandingsTable({
                     <tr
                       className={`tm-standings-row${promoted && !advancingLabels?.get(row.key)?.length ? ' tm-standings-row-highlight' : ''}`}
                     >
-                      <td style={{ paddingLeft: 12 }}>
+                      <td style={{ paddingLeft: 12, boxShadow: isMine ? 'inset 2px 0 0 var(--blue500)' : undefined }}>
                         <StandingRankBadge pos={row.position} sharedRank={row.sharedRank} promoted={promoted} unranked={unranked} />
                       </td>
                       <td>

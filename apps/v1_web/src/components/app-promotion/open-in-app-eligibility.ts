@@ -1,6 +1,3 @@
-export const OPEN_IN_APP_DISMISSED_KEY = 'teameet:v1:open-in-app:dismissed';
-export const OPEN_IN_APP_DELAY_MS = 1500;
-
 // 가입·인증 흐름과 운영 화면은 방해하지 않는다.
 const EXCLUDED_PATH_PREFIXES = [
   '/admin',

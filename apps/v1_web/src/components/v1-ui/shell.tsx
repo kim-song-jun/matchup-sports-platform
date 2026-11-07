@@ -9,6 +9,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { createContext, Suspense, useContext, useRef } from 'react';
 import { withFromPath } from '@/lib/session-storage';
+import { OpenInAppBanner } from '@/components/app-promotion/open-in-app-banner';
 import { useSlidingIndicatorRect } from './use-sliding-indicator';
 import {
   ChevronLeftIcon,
@@ -192,6 +193,7 @@ function AppChromeInner({
         className="tm-scroll-area"
         style={{ paddingBottom: bottomNav ? (floatingSlot ? 'var(--v1-shell-fab-clear-pad)' : 'var(--v1-shell-scroll-bottom-pad)') : 0 }}
       >
+        <OpenInAppBanner placement="shell" />
         {desktopHead && title ? (
           <div className="tm-desktop-page-head tm-show-desktop">
             {backHref ? (

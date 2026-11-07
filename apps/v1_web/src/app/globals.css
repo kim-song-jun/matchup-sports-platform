@@ -4127,9 +4127,11 @@ label.tm-btn:focus-within {
   pointer-events: none;
 }
 
-/* 탭바 없는 화면은 비워 둘 탭바가 없다 — 끝까지 덮어야 하단 고정 버튼(.tm-fixed-cta)이 시트 아래로 비치지 않는다. */
-.tm-app-frame-no-bottom .tm-filter-scrim,
-.tm-app-frame-no-bottom .tm-filter-layer {
+/* 탭바가 화면에 없으면 비워 둘 높이가 없다 — 끝까지 덮어야 하단 고정 버튼(.tm-fixed-cta)이 시트 아래로 비치지 않는다.
+   앱 설치 시트는 .tm-app-frame 의 형제로, 프레임이 없는 경로에서는 아예 프레임 없이 마운트되므로
+   프레임 자손 여부가 아니라 탭바 유무로 건다. 특이도가 높아, 이 값을 바꾸는 규칙은 이 선택자와 함께 본다. */
+:root:not(:has(.tm-bottom-nav)) .tm-filter-scrim,
+:root:not(:has(.tm-bottom-nav)) .tm-filter-layer {
   bottom: 0;
 }
 
@@ -4150,7 +4152,7 @@ label.tm-btn:focus-within {
   right: 0;
   bottom: 0;
   width: 100%;
-  --tm-filter-sheet-pad-bottom: calc(20px + var(--v1-shell-safe-bottom));
+  --tm-filter-sheet-pad-bottom: 20px;
   padding: 12px var(--v1-shell-page-x) var(--tm-filter-sheet-pad-bottom);
   border-top: 1px solid var(--grey100);
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
@@ -4169,6 +4171,11 @@ label.tm-btn:focus-within {
   max-height: min(78dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* 시트가 화면 바닥에 붙을 때만 안전영역을 더한다 — 탭바 위에 얹히면 탭바가 이미 소비했다. */
+:root:not(:has(.tm-bottom-nav)) .tm-filter-sheet {
+  --tm-filter-sheet-pad-bottom: calc(20px + var(--v1-shell-safe-bottom));
 }
 
 /* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove

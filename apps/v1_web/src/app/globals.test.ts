@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import postcss from 'postcss';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
 const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
@@ -39,11 +40,64 @@ describe('Android bottom inset layout', () => {
     expect(rule).toMatch(/width:\s*100%;/);
     expect(rule).toMatch(/transform:\s*none;/);
   });
+});
 
-  it('lets sheets cover the fixed CTA on pages without a bottom nav instead of leaving the tab-bar gap', () => {
-    expect(globalsCss).toMatch(
-      /\.tm-app-frame-no-bottom \.tm-filter-scrim,\s*\.tm-app-frame-no-bottom \.tm-filter-layer\s*\{\s*bottom:\s*0;/,
-    );
+// jsdom 은 레이아웃·cascade 를 계산하지 못한다. 대신 실제 globals.css 의 규칙 선택자가 각 DOM
+// 구조에서 시트에 매칭되는지를 본다 — 선택자가 시트를 못 찾는 결함(프레임 자손 전용 예외가
+// 프레임 밖에 마운트된 시트에 안 걸림)은 이 수준에서 잡힌다. 매칭된 규칙 간의 우선순위와 실제
+// 픽셀은 alpha 에서 확인한다.
+describe('bottom sheet placement', () => {
+  const rootRules: postcss.Rule[] = [];
+  postcss.parse(globalsCss).each((node) => {
+    if (node.type === 'rule') rootRules.push(node);
+  });
+
+  // 시트 클래스를 이름에 담은 선택자만 비교한다 — 파일 전체를 matches 에 넣으면 jsdom 이 모르는
+  // 의사 요소(::view-transition-* 등)에서 던진다.
+  const matchedValues = (element: Element, property: string) => {
+    const className = `.${[...element.classList].find((name) => name.startsWith('tm-filter-'))}`;
+    return rootRules
+      .filter((rule) => rule.selectors.some((selector) => selector.includes(className) && element.matches(selector)))
+      .flatMap((rule) => rule.nodes.filter((node): node is postcss.Declaration => node.type === 'decl' && node.prop === property))
+      .map((declaration) => declaration.value.trim());
+  };
+
+  const SHEET = `<div class="tm-filter-scrim"></div><div class="tm-filter-layer"><section class="tm-filter-sheet"></section></div>`;
+  const NAV = '<nav class="tm-bottom-nav"></nav>';
+
+  // 앱 설치 시트(OpenInAppSheet)는 .tm-app-frame 의 형제로 마운트된다.
+  const layouts: Record<string, { html: string; hasBottomNav: boolean }> = {
+    'sheet beside a frame without a tab bar': { html: `<div class="tm-app-frame tm-app-frame-no-bottom"></div>${SHEET}`, hasBottomNav: false },
+    'sheet on a route with no app frame at all': { html: SHEET, hasBottomNav: false },
+    'sheet opened inside a frame without a tab bar': { html: `<div class="tm-app-frame tm-app-frame-no-bottom">${SHEET}</div>`, hasBottomNav: false },
+    'sheet beside a frame with a tab bar': { html: `<div class="tm-app-frame">${NAV}</div>${SHEET}`, hasBottomNav: true },
+    'sheet opened inside a frame with a tab bar': { html: `<div class="tm-app-frame">${NAV}${SHEET}</div>`, hasBottomNav: true },
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  describe.each(Object.entries(layouts))('%s', (_name, { html, hasBottomNav }) => {
+    it.each(['.tm-filter-scrim', '.tm-filter-layer'])('%s ends at the screen edge only when there is no tab bar to clear', (selector) => {
+      document.body.innerHTML = html;
+      const bottoms = matchedValues(document.querySelector(selector)!, 'bottom');
+
+      if (hasBottomNav) {
+        expect(bottoms).not.toContain('0');
+        expect(bottoms.some((value) => value.includes('--v1-shell-bottom-nav-height'))).toBe(true);
+      } else {
+        expect(bottoms).toContain('0');
+      }
+    });
+
+    it('adds the safe area to the sheet padding only when the sheet sits on the screen edge', () => {
+      document.body.innerHTML = html;
+      const paddings = matchedValues(document.querySelector('.tm-filter-sheet')!, '--tm-filter-sheet-pad-bottom');
+
+      expect(paddings.length).toBeGreaterThan(0);
+      expect(paddings.some((value) => value.includes('--v1-shell-safe-bottom'))).toBe(!hasBottomNav);
+    });
   });
 });
 
@@ -857,7 +911,7 @@ describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 �
     const sheet = ruleOf('.tm-filter-sheet');
     const actions = ruleOf('.tm-filter-sheet > .tm-filter-actions');
 
-    expect(sheet).toMatch(/--tm-filter-sheet-pad-bottom:\s*calc\(20px \+ var\(--v1-shell-safe-bottom\)\)/);
+    expect(sheet).toMatch(/--tm-filter-sheet-pad-bottom:\s*20px/);
     expect(sheet).toMatch(/padding:\s*12px var\(--v1-shell-page-x\) var\(--tm-filter-sheet-pad-bottom\)/);
     expect(actions).toMatch(/position:\s*sticky/);
     // sticky 기준선은 스크롤 컨테이너의 padding 안쪽이다 — bottom:0 이면 줄 아래 padding 띠로 옵션이 비친다(alpha 실측).

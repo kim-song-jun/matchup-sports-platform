@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   pickFocusStageIndex,
@@ -244,6 +244,25 @@ describe('TournamentProgressStepper 자동 스크롤', () => {
     list.scrollLeft = CONTENT - VIEWPORT;
     fireEvent.scroll(list);
     expect(list).toHaveAttribute('data-fade', 'start');
+  });
+
+  it('화면 폭이 바뀌어 모두 들어가게 되면 흐림과 키보드 스크롤 영역이 사라진다', () => {
+    const { container } = render(
+      <TournamentProgressStepper stages={stages(['done', 'done', 'active', 'upcoming', 'upcoming'])} />,
+    );
+    const list = container.querySelector('.tm-hub-stages') as HTMLElement;
+    expect(list).toHaveAttribute('data-fade', 'both');
+    expect(list).toHaveAttribute('tabindex', '0');
+
+    // 기기를 가로로 돌리는 것처럼 영역 폭이 내용 폭 이상이 되고, 스크롤 이벤트 없이 resize 만 온다.
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => CONTENT });
+    list.scrollLeft = 0;
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(list).toHaveAttribute('data-fade', 'none');
+    expect(list).not.toHaveAttribute('tabindex');
   });
 
   it('넘칠 때만 키보드로 닿는 스크롤 영역이 된다', () => {

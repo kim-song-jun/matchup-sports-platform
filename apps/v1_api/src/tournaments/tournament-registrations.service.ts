@@ -27,6 +27,7 @@ import { isRegistrationWindowOpen } from './registration-window';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
 import { copyPreviousSeasonRoster } from '../league-matches/league-roster-autofill';
 import { findLeagueAdmissionBlocker, leagueAdmissionBlockerMessage } from '../league-matches/league-team-admission';
+import { assertTeamGenderEligible } from './team-gender-eligibility';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -189,6 +190,13 @@ export class TournamentRegistrationsService {
       ]);
       return this.serialize(existing, payment, playerCount, tournament);
     }
+    // 이미 낸 신청은 위에서 그대로 돌려준다 — 팀원이 나간 뒤에도 내 신청은 보여야 해서 새 신청에만 건다.
+    await assertTeamGenderEligible(this.prisma, {
+      teamId: dto.teamId,
+      genderCategory: tournament.genderCategory,
+      noun: competitionNounFor(tournament.kind),
+      verb: '신청',
+    });
     await this.assertCapacityAvailable(tournamentId, tournament);
 
     // 취소된 신청이 남아있으면(unique 제약) draft로 재활성화, 없으면 신규 생성.
@@ -374,6 +382,13 @@ export class TournamentRegistrationsService {
       }
       // 초안을 둔 사이에 형제 티어에 확정됐을 수 있다 — 입금 안내 전에 다시 본다.
       await this.assertNotInSiblingTier(tx, lockedTournament, registration.teamId);
+      // 초안을 둔 사이 그 성별 팀원이 모두 나갔을 수 있다 — 입금 안내 전에 다시 본다.
+      await assertTeamGenderEligible(tx, {
+        teamId: registration.teamId,
+        genderCategory: lockedTournament.genderCategory,
+        noun: competitionNounFor(lockedTournament.kind),
+        verb: '신청',
+      });
 
       // ## 참가비가 0 이면 입금 단계를 건너뛴다 (Task 164 BE-4, 정본 §4 "스텝 최소")
       // 지금까지는 `entryFee` 와 무관하게 `awaiting_payment` 로 보냈고, 그 상태는

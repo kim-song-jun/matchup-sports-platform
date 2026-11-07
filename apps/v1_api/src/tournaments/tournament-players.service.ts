@@ -1511,7 +1511,7 @@ export function evaluateRosterCandidate(input: {
  * 대회 성별 구분이 요구하는 선수 성별. `mixed`(혼성)와 미지정은 특정 성별을 요구하지 않는다 —
  * 혼성은 "성별이 등록돼 있을 것"만 따로 검사한다.
  */
-function genderRequiredByCategory(
+export function genderRequiredByCategory(
   category: V1TournamentGenderCategory | null,
 ): 'male' | 'female' | null {
   return category === 'male' || category === 'female' ? category : null;

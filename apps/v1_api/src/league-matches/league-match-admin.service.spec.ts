@@ -25,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
+import { teamMembershipCountFake, type FakeTeamMember } from '../../test/helpers/team-membership-gender-fake';
 
 jest.mock('../tournaments/slots/tournament-slot.service', () => ({
   releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
@@ -1071,9 +1072,13 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
   const SERIES_ID = 'series-1';
   const NEW_TEAM_ID = 'team-new';
 
-  function makePrisma(siblingLeague: { tier: number | null } | null) {
+  function makePrisma(
+    siblingLeague: { tier: number | null } | null,
+    division: { genderCategory: string | null; members: FakeTeamMember[] } = { genderCategory: null, members: [] },
+  ) {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1TeamMembership: { count: teamMembershipCountFake(division.members) },
       // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
       // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
       // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
@@ -1092,6 +1097,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
             scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
             status: 'draft',
             kind: 'regular_league', teamCount: 8, maxTeams: null,
+            genderCategory: division.genderCategory,
             registrationDeadlineAt: null,
             seriesId: SERIES_ID,
             seasonNo: 1,
@@ -1184,6 +1190,83 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
         }),
       }),
     );
+  });
+});
+
+// ── addTeam: 성별 부문의 팀 자격 (QC1106 T4) ─────────────────────────────────
+// 어드민 직접 추가도 신청·확정과 같은 판정이다 — 여기만 열려 있으면 남자 팀이 여성부 리그에 들어간다.
+describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () => {
+  const LEAGUE_ID = 'league-1';
+  const NEW_TEAM_ID = 'team-new';
+  const maleOnly: FakeTeamMember[] = Array.from({ length: 5 }, () => ({ teamId: NEW_TEAM_ID, status: 'active', gender: 'male' }));
+
+  function makePrisma(genderCategory: string | null, members: FakeTeamMember[]) {
+    const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      v1TeamMembership: { count: teamMembershipCountFake(members) },
+      v1Tournament: {
+        findFirst: jest.fn(async () => ({
+          id: LEAGUE_ID, title: '테스트 리그', sportId: 'sport-futsal', regionId: 'region-1',
+          scheduledAt: new Date('2026-09-05T00:00:00.000Z'), scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
+          status: 'draft', kind: 'regular_league', teamCount: 8, maxTeams: null, genderCategory,
+          registrationDeadlineAt: null, seriesId: null, seasonNo: null, previousLeagueId: 'league-prev',
+          competitionConfigVersionId: 'config-1', sport: { code: 'futsal' }, registrations: [],
+        })),
+      },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
+        findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1', name: '새 팀' }),
+      },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentRegistration: {
+        upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([{ teamId: NEW_TEAM_ID, team: { name: '새 팀' } }]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    return prisma;
+  }
+
+  function makeService(prisma: unknown) {
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+    return new LeagueMatchAdminService(prisma as never, adminContext as never, {} as never, { emitToManyDeferred: jest.fn() } as never);
+  }
+
+  it('여성부 리그에 여성 팀원이 없는 팀은 추가되지 않는다', async () => {
+    const prisma = makePrisma('female', maleOnly);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+    });
+    expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
+  });
+
+  it('여성 팀원이 1명이라도 있으면 추가된다', async () => {
+    const prisma = makePrisma('female', [...maleOnly, { teamId: NEW_TEAM_ID, status: 'active', gender: 'female' }]);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
+    expect(prisma.v1TournamentRegistration.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([['mixed'], [null]])('부문이 %s 이면 남자 팀도 추가된다', async (genderCategory) => {
+    const prisma = makePrisma(genderCategory, maleOnly);
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
+  });
+
+  it('지난 시즌 팀 한 번에 넣기도 같은 판정이다 — 한 팀이라도 걸리면 아무 팀도 들어가지 않는다', async () => {
+    const prisma = makePrisma('female', maleOnly);
+    await expect(
+      makeService(prisma).addPreviousSeasonTeams(adminUser, LEAGUE_ID, { teamIds: [NEW_TEAM_ID] } as never),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '새 팀: 여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+    });
+    expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
   });
 });
 

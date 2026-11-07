@@ -23,7 +23,6 @@ import { createV1QueryClient } from '@/lib/query-client';
 import { NativeAppSurface } from '@/components/providers/native-app-surface';
 import { NativeAppUpdateGate } from '@/components/providers/native-app-update-gate';
 import '@/components/providers/native-app-update-gate.css';
-import { OpenInAppSheet } from '@/components/app-promotion/open-in-app-sheet';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createV1QueryClient);
@@ -48,7 +47,6 @@ export function Providers({ children }: { children: ReactNode }) {
         <KeyboardViewportBridge />
         <NativeAppSurface />
         <NativeAppUpdateGate />
-        <OpenInAppSheet />
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && <GoogleAnalytics />}

@@ -44,7 +44,9 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-10-29: tournament stage/group/match period overrides (v1_tournament_stage_period_settings + override columns); M11 remains unchanged.
 # 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); M11 remains unchanged.
 # 2026-11-03: additive V1Tournament.previousLeagueId; M11 remains unchanged.
-[[ ( "$schema_sha" == b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960 \
+# 2026-11-07: additive V1Tournament.tieBreakOrder (20261107120000_tournament_tie_break_order); M11 remains unchanged.
+[[ ( "$schema_sha" == ff1f720ba2d978c3787eecedbb1abcb48417f04a4b85865fe5934a8f90c3db97 \
+  || "$schema_sha" == b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960 \
   || "$schema_sha" == 82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112 \
   || "$schema_sha" == 082bac1bb887f76b131dbd17ac4acbb11979b79fdf2bcc957d18fc06db57b04f ) \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \

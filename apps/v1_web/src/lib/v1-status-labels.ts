@@ -131,6 +131,39 @@ export function lockedReasonLabel(reason: string): string {
   return LOCKED_REASON_LABEL[reason] ?? '지금은 수정할 수 없어요.';
 }
 
+/**
+ * 팀 일정 취소 사유(`V1TeamSchedule.cancelReason`).
+ *
+ * 이 칸에는 팀장·매니저가 적은 문장과, 서버가 일정을 스스로 취소할 때 남기는 내부 코드가 함께 담긴다.
+ * 코드는 아래 표로 풀고, 사람이 적은 문장은 그대로 보이며, 표에 없는 코드는 일반 문구로 가린다.
+ * 팀매치·대진 코드는 서버가 취소된 팀매치의 일정을 목록에서 숨기므로 대부분 화면에 닿지 않지만
+ * 같은 칸에 저장되는 값이라 함께 둔다.
+ */
+const TEAM_SCHEDULE_CANCEL_REASON_LABEL: ReadonlyMap<string, string> = new Map([
+  ['BRACKET_TEAM_CHANGED', '대진이 바뀌어 이 팀은 이 경기에서 빠졌어요.'],
+  ['BRACKET_SCHEDULE_REMOVED', '경기 시간이 미정으로 바뀌었어요.'],
+  ['BRACKET_SOURCE_REVERSED', '앞선 경기 결과가 바뀌어 이 팀은 이 경기에서 빠졌어요.'],
+  ['LEAGUE_SLOT_TEAM_CHANGED', '리그 대진이 바뀌어 이 팀은 이 경기에서 빠졌어요.'],
+  ['LEAGUE_SLOT_SIDE_INCOMPLETE', '리그 경기에 맞붙을 팀이 아직 모두 정해지지 않았어요.'],
+  ['no_opponent_auto_cancelled', '상대 팀이 정해지지 않아 자동으로 취소됐어요.'],
+  ['host_cancelled', '주최 팀이 팀매치를 취소했어요.'],
+  ['host_deleted', '주최 팀이 팀매치를 삭제했어요.'],
+  ['admin_bracket_deleted_before_start', '운영진이 시작 전 대진을 삭제했어요.'],
+]);
+
+const TEAM_SCHEDULE_CANCEL_REASON_FALLBACK = '일정이 조정됐어요.';
+
+/** 공백 없이 밑줄로 이어진 식별자 모양 — 사람이 쓴 문장과 갈라 낸다. */
+const REASON_CODE_SHAPE = /^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+$/;
+
+export function teamScheduleCancelReasonLabel(reason: string | null | undefined): string | null {
+  const text = reason?.trim();
+  if (!text) return null;
+  const known = TEAM_SCHEDULE_CANCEL_REASON_LABEL.get(text);
+  if (known !== undefined) return known;
+  return REASON_CODE_SHAPE.test(text) ? TEAM_SCHEDULE_CANCEL_REASON_FALLBACK : text;
+}
+
 /** 온보딩 단계 (V1OnboardingStep). */
 const ONBOARDING_STEP_LABEL: Record<string, string> = {
   terms: '약관 동의',

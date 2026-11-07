@@ -136,3 +136,6 @@ Cross-team ownership validation for `teamMatchId` (the referenced team match mus
 
 ## 2026-10-13 Cancelled team-match visibility
 Team schedule list/detail and my-schedule omit entries linked to cancelled/archived/deleted team matches. The schedule rows remain as operational history. Ordinary cancelled team schedules without a team-match link retain their existing visibility; this rule concerns team-match cancellation only.
+
+## 2026-11-07 `cancelReason` carries free text or a system code
+`cancelReason` on the schedule detail is either the sentence a team owner/manager typed into `POST .../cancel`, or a code the server writes when it cancels a schedule itself: `BRACKET_TEAM_CHANGED`, `BRACKET_SCHEDULE_REMOVED`, `BRACKET_SOURCE_REVERSED`, `LEAGUE_SLOT_TEAM_CHANGED`, `LEAGUE_SLOT_SIDE_INCOMPLETE`, `no_opponent_auto_cancelled`, `host_cancelled`, `host_deleted`, `admin_bracket_deleted_before_start`. The API returns the stored value unchanged; clients must not show a code to users. `apps/v1_web` maps the codes in `teamScheduleCancelReasonLabel` (`lib/v1-status-labels.ts`), prints typed sentences as they are, and replaces an unmapped code-shaped value with a generic sentence. A new server-side code needs a label there in the same change.

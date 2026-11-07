@@ -618,6 +618,48 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
   });
 });
 
+describe('TeamScheduleDetailPage — 취소된 일정의 변경 이력', () => {
+  async function renderCancelled(cancelReason: string | null) {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({ state: 'CANCELLED', cancelReason, cancelledAt: '2026-11-06T09:58:00.000Z' }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+    return screen.getByRole('region', { name: '변경 이력' });
+  }
+
+  it('서버가 남긴 취소 사유 코드는 해요체 문장으로 보이고 코드 글자는 화면에 없다', async () => {
+    const history = await renderCancelled('BRACKET_SCHEDULE_REMOVED');
+
+    expect(history).toHaveTextContent('취소 사유 · 경기 시간이 미정으로 바뀌었어요.');
+    expect(screen.queryByText(/BRACKET_SCHEDULE_REMOVED/)).not.toBeInTheDocument();
+  });
+
+  it('팀장·매니저가 직접 적은 취소 사유는 문장 그대로 보인다', async () => {
+    const history = await renderCancelled('우천으로 취소');
+
+    expect(history).toHaveTextContent('취소 사유 · 우천으로 취소');
+  });
+
+  it('모르는 코드는 원문 대신 일반 문구가 보인다', async () => {
+    const history = await renderCancelled('FUTURE_SERVER_REASON');
+
+    expect(history).toHaveTextContent('취소 사유 · 일정이 조정됐어요.');
+    expect(screen.queryByText(/FUTURE_SERVER_REASON/)).not.toBeInTheDocument();
+  });
+
+  it('사유가 없으면 취소 시각만 있고 사유 줄은 그리지 않는다', async () => {
+    const history = await renderCancelled(null);
+
+    expect(history).toHaveTextContent('취소됨');
+    expect(history).not.toHaveTextContent('취소 사유');
+  });
+});
+
 // ── /teams/:id/schedules/new (생성 폼) ────────────────────────────────────────
 
 describe('TeamScheduleCreatePage — 생성 폼 권한 게이팅', () => {

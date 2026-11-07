@@ -255,7 +255,7 @@ the web explicitly requests `all` for its default tab.
 |---|---|
 | `stage` | The state the card shows (one badge): `preparing` = draft (regular leagues only; a tournament draft stays hidden), `recruiting` = `open`, deadline not passed, capacity left, `recruit_closed` = stored `closed`, or `open` whose deadline passed or capacity is full, `ongoing` = in_progress, `completed` = completed. It filters on the same group rank the list order uses, so badge, filter and order cannot disagree |
 | `sportId` | UUID, existing sport filter |
-| `genderCategory` | mixed/male/female. A tournament whose gender is empty (`null`, from before the choice was required) is not selectable here and appears only while no gender filter is set; `unspecified` was removed on 2026-11-06 and is now a 400 |
+| `genderCategory` | mixed/male/female. A tournament or league whose gender is empty (`null`, from before the choice was required) is not selectable here and appears only while no gender filter is set; `unspecified` was removed on 2026-11-06 and is now a 400 |
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
@@ -273,8 +273,10 @@ window/capacity semantics, independent of the viewer's individual team eligibili
 All conditions apply before pagination in the existing SQL keyset query. The cursor carries `["v2", group, sortAt, id]`. A cursor without the version tag (the three-part cursor from before the 2026-11-03 order, or the four-part cursor with a sort mode) is rejected as an empty window, because its group numbers and sort key mean something else now; bump the tag whenever the meaning of `group` or `sortAt` changes again.
 Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
 list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
-are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to
-regular tournaments (including legacy null kind); the web only offers them in the tournament tab.
+are rejected by the existing DTO validation pipe. Format/fee conditions narrow to
+regular tournaments (including legacy null kind) and the web only offers them in the tournament tab.
+The gender condition applies to every kind (a league picks a gender at creation too, 2026-11-03), so the
+web offers it in the all, tournament and league tabs; a row whose gender is empty never matches it.
 
 For dates, scheduledAt must exist. The interval end is scheduledEndAt or scheduledAt when
 end is absent. Date filters do not change lifecycle status. `upcoming` is an operational stage,
@@ -600,7 +602,7 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager, and a member's own row, also get personal info) | path ids | roster players (each with `personalInfoVisible`) and `belowMinimum` — see Roster Read Contract |
-| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
+| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player — 재추가의 경기 명단 반영은 아래 비동기 계약 참고 |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId/roster-settings` | user, team manager+ | `UpdatePlayerRosterSettingsDto`: optional `jerseyNumber` (integer 0–99 or null), optional boolean `goalkeeper`; at least one field required | updated player and `goalkeeper`; does not change eligibility |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
@@ -613,7 +615,7 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 
 `POST /players` only accepts an active member of the registration team.
 
-`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골레이로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
+`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골키퍼(GK)로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
 
 
 The service reads the selected member's profile and phone from the team membership user record. A member can be added only when all required source fields exist:
@@ -627,6 +629,12 @@ If any required source field is missing, the API rejects the request with `400 P
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 
 `POST /api/v1/admin/registrations/:registrationId/roster-lock` locks the registration row and validates a mixed tournament's active-player `genderSnapshot` counts in the same serializable transaction. A violated minimum or maximum returns `409 TOURNAMENT_GENDER_QUOTA_NOT_MET` with `details.male` and `details.female`, each containing `count`, `min`, `max`, and `ok`; the roster remains unlocked. Male/female tournament categories are labels only and do not enforce a player-gender match.
+
+### 참가 선수 재추가와 경기 명단 반영
+
+제외했던 동일 선수를 같은 참가 신청에 다시 추가하면, 등록 트랜잭션에서 그 대회·리그/팀/선수의 활성 경기별 `EXCLUDE` ID를 포착한다. 이때 `SCHEDULED`이고 공식 결과가 없으며 취소·삭제되지 않은 경기의 조정만 담아 `COMPETITION_ROSTER_RESYNC`의 `competitionPlayerReadded` 대상으로 남긴다. 응답은 복구한 참가 선수이며, 경기 명단 재계산은 후속 워커가 처리한다.
+
+워커는 기존 경기 잠금을 얻은 뒤 [경기 명단의 시작 전 범위](games.md), 현재 팀·사이드, 공식 결과 없음 조건을 다시 확인한다. 그 범위에서 포착한 ID와 선수·팀·사이드가 모두 일치하는 활성 제외만 `revokedByRole=SYSTEM`으로 되돌리고 유효 명단을 다시 계산한다. 조정 행과 되돌리기 이력은 보존한다. 포착 목록에 없는 새 제외 ID, 다른 선수·팀·대회·리그의 조정, 이미 시작·종료·취소된 경기와 공식 결과 이력은 바꾸지 않는다. 최종 출전 여부에는 현재 결장·출전정지 등 나머지 명단 규칙도 적용된다.
 
 ## Roster Read Contract
 
@@ -918,6 +926,8 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 공개 `/tournaments/:id/bracket`의 순위·대진표는 `league_knockouts`에도 조별리그/결선 보기를 제공한다. 공개 상세의 `groups[].phase`, `standings`, `qualificationByTrack`, `bracketTrack`, `fixtures`를 그대로 사용하며 팀 미정 결선도 표시한다. 예선에 아직 팀·성적이 없으면 조별 영역을 유지하고 순위 행은 지어내지 않는다. 기존 대진 공개 시각·신원 가림 계약은 유지한다.
 
+결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다(다시 생성은 기존 슬롯을 `bracketTrack + phase + position` 으로 짝지어 이름이 달라도 기존 대진·일정을 지우지 않는다).
+
 예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
 
 결선 범위 `bracketTrack`은 이 방식에서 토너먼트 이름(중복 불가)이다. `overall/upper/lower`는 기존 범위를 위해 예약한다. 대진 그룹·시상·개인상 유일키·알림 identity가 이 범위를 사용한다. 토너먼트 삭제/이름 변경 시 연결된 시상을 먼저 재지정해야 한다. 결선 참가팀을 바꾸는 일반 자리/직접 경기 편집 대신 위 selection API를 사용한다. 기존 slot 배정 API로 예선 빈 자리는 배정할 수 있다.
@@ -943,3 +953,10 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 - Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
 
 - Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.
+
+
+### 조 이름과 결선 규모 표시 (2026-11-06)
+
+`PATCH /admin/groups/:groupId`의 `name`은 `league_knockouts`에서도 구조/경기 진행 상태를 바꾸지 않고 수정할 수 있다. 공백 이름은 400 `GROUP_NAME_REQUIRED`, 진출 수 동시 수정은 409 `MULTI_FINAL_SELECTION_REQUIRED`다. 기존 관리자 mutation 권한과 대진 advisory lock·감사 로그를 적용한다. 예선 이름은 `multiFinals.groups[].name`에 원자적으로 동기화하고 이름 변경 시 `multiFinalsRevision`을 증가시켜 기존 진출팀 편집의 revision 검증을 유지한다. 결선 단계 조 이름 변경은 토너먼트 identity/bracketTrack/규칙/팀 배정/시상 범위를 바꾸지 않는다.
+
+새 N개 토너먼트의 강수 생성 규칙은 선행 PR #2181이 담당한다(짝수 6팀 이상, 2의 제곱 제외; 홀수는 기존 명칭 유지). 이 후속 변경에는 생성기 중복 수정을 포함하지 않는다. 12팀의 대진은 내부 round16 구조·4팀 부전승·8강 연결을 유지하면서 표시 round/name만 12강으로 저장한다. 기존 대진의 자동 생성 이름/round는 migration으로 보정하며 운영자 지정 이름과 phase·경기 ID·결과·edge·slot은 보존한다. 사용자 일정·대진·경기 이름은 저장한 그룹 이름을 우선하며 단계 판정은 이름 변경과 분리한다.

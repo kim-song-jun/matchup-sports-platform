@@ -41,7 +41,7 @@ function show() {
   </QueryClientProvider>);
   fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
 }
-describe('선수 추가 성별·골레이 — 실제 폼과 POST payload', () => {
+describe('선수 추가 성별·골키퍼 — 실제 폼과 POST payload', () => {
   it('선택한 선수의 성별을 읽기 전용으로 바꾸고 미입력을 구분한다', async () => {
     show();
     const select = await screen.findByLabelText(/팀원 선택/);
@@ -55,12 +55,12 @@ describe('선수 추가 성별·골레이 — 실제 폼과 POST payload', () =>
     fireEvent.change(select, { target: { value: 'unknown' } });
     expect(screen.getByLabelText('성별')).toHaveValue('미입력');
   });
-  it.each([['regular_tournament', false], ['regular_tournament', true], ['regular_league', false], ['regular_league', true]] as const)('%s의 골레이 %s 선택값을 실제 추가 API에 보낸다', async (kind, goalkeeper) => {
+  it.each([['regular_tournament', false], ['regular_tournament', true], ['regular_league', false], ['regular_league', true]] as const)('%s의 골키퍼 %s 선택값을 실제 추가 API에 보낸다', async (kind, goalkeeper) => {
     state.kind = kind;
     show();
     await screen.findByRole('option', { name: /남자선수/ });
     fireEvent.change(screen.getByLabelText(/팀원 선택/), { target: { value: 'male' } });
-    const checkbox = screen.getByRole('checkbox', { name: '골레이로 등록해요' });
+    const checkbox = screen.getByRole('checkbox', { name: '골키퍼(GK)로 등록해요' });
     expect(checkbox).not.toBeChecked();
     if (goalkeeper) fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole('button', { name: '선수 등록' }));

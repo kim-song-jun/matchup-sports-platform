@@ -77,7 +77,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
     it.each([
       [null, '전체'], ['open', '신청 접수 중'], ['in_progress', '진행 중'], ['completed', '종료'],
     ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
-      const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
+      const params = new URLSearchParams({ kind: 'tournament', sportId: SWIMMING_ID, genderCategory: 'male' });
       if (status) params.set('status', status);
       search = params.toString();
       tournamentsMock.mockReturnValue({
@@ -106,7 +106,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
       });
       const summary = `${status ? `${label} · ` : ''}수영 · 남성부`;
       expect(within(region).getByRole('link', { name: `필터 열기 — 현재 ${summary}` }))
-        .toHaveAttribute('href', competitionDiscoveryHref(readCompetitionDiscovery(params, 'all'), { filter: true }));
+        .toHaveAttribute('href', competitionDiscoveryHref(readCompetitionDiscovery(params, params.get('kind') === 'tournament' ? 'tournament' : 'all'), { filter: true }));
       if (hasItems) {
         const list = within(region).getByRole('list', { name: '대회 목록' });
         const detailHref = within(list).getByRole('link', { name: /수영 대조 대회/ }).getAttribute('href');
@@ -149,6 +149,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       if (status) params.set('status', status);
       if (withSport) {
         params.set('sportId', SWIMMING_ID);
+        params.set('kind', 'tournament');
         params.set('genderCategory', 'male');
       }
       search = params.toString();
@@ -163,7 +164,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
         ? `${status ? `${label} · ` : ''}수영 · 남성부`
         : label;
       expect(screen.getByRole('link', { name: `필터 열기 — 현재 ${summary}` })).toHaveAttribute(
-        'href', competitionDiscoveryHref(readCompetitionDiscovery(params, 'all'), { filter: true }),
+        'href', competitionDiscoveryHref(readCompetitionDiscovery(params, params.get('kind') === 'tournament' ? 'tournament' : 'all'), { filter: true }),
       );
       expect(screen.getByText(withSport ? '선택한 조건에 맞는 대회가 없어요' : '선택한 조건에 맞는 대회·리그가 없어요')).toBeInTheDocument();
       expect(screen.getByText('필터를 바꾸거나 초기화해서 다시 찾아보세요.')).toBeInTheDocument();

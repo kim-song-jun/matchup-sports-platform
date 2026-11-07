@@ -323,12 +323,12 @@ export class MultiFinalsService {
       const plan = preview.plan;
       const existing = await tx.v1TournamentSlot.findMany({
         where: { tournamentId: id, kind: 'GROUP_RANK', group: { phase: { not: 'group' } } },
-        select: { id: true, position: true, group: { select: { name: true, bracketTrack: true } } },
+        select: { id: true, position: true, group: { select: { phase: true, bracketTrack: true } } },
       });
       const slotIds = new Map<string, string>();
       for (const slot of plan.slots) {
         const group = plan.groups.find(g => g.key === slot.groupKey)!;
-        const match = existing.find(row => row.group !== null && row.group.bracketTrack === group.bracketTrack && row.group.name === group.name && row.position === slot.position);
+        const match = existing.find(row => row.group !== null && row.group.bracketTrack === group.bracketTrack && row.group.phase === group.phase && row.position === slot.position);
         if (match) slotIds.set(slot.key, match.id);
       }
       const fixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, group: { phase: { not: 'group' } }, teamMatch: { deletedAt: null } } });

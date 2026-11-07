@@ -34,10 +34,10 @@ describe('필터 선택·적용', () => {
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&sportId=sport-1&genderCategory=mixed', { scroll: false });
   });
-  it('리그 시트는 성별·참가비·경기 방식을 노출하지 않고 모집·진행 두 줄에서 상태를 하나만 고른다', () => {
-    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league' }} sheetOpen />);
+  it.each(['league', 'all'] as const)('%s 시트는 성별 부문을 보여 주고 참가비·경기 방식은 노출하지 않으며 모집·진행 두 줄에서 상태를 하나만 고른다', (kind) => {
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind }} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
-    expect(dialog.queryByText('성별 부문')).not.toBeInTheDocument();
+    expect(within(dialog.getByRole('group', { name: '성별 부문' })).getAllByRole('button').map((button) => button.textContent)).toEqual(['전체', '남성부', '여성부', '혼성']);
     expect(dialog.queryByText('참가비')).not.toBeInTheDocument();
     expect(dialog.queryByText('경기 방식')).not.toBeInTheDocument();
     const recruit = within(dialog.getByRole('group', { name: '모집 상태' }));
@@ -51,7 +51,14 @@ describe('필터 선택·적용', () => {
     expect(progress.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
     expect(recruit.getByRole('button', { name: '신청 접수 중' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=league&stage=recruiting', { scroll: false });
+    expect(navigation.replace).toHaveBeenCalledWith(`/tournaments?${kind === 'all' ? '' : 'kind=league&'}stage=recruiting`, { scroll: false });
+  });
+  it('리그 탭에서 고른 성별을 주소와 요약에 그대로 싣는다', () => {
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league' }} sheetOpen />);
+    const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
+    fireEvent.click(within(dialog.getByRole('group', { name: '성별 부문' })).getByRole('button', { name: '여성부' }));
+    fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
+    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=league&genderCategory=female', { scroll: false });
   });
   it('한 줄의 전체는 그 줄의 선택만 해제하고 다른 줄의 선택은 건드리지 않는다', () => {
     render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league', stage: 'ongoing' }} sheetOpen />);

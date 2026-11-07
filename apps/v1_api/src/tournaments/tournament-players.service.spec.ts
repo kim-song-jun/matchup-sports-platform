@@ -159,6 +159,7 @@ describe('TournamentPlayersService', () => {
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     v1OperationAudit: { create: jest.Mock; findFirst: jest.Mock };
+    v1GameRosterAdjustment: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -193,6 +194,7 @@ describe('TournamentPlayersService', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }), findFirst: jest.fn().mockResolvedValue(null) },
+      v1GameRosterAdjustment: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
@@ -729,7 +731,7 @@ describe('TournamentPlayersService', () => {
     ]);
   });
 
-  it.each([true, false, undefined])('addPlayer: 골레이 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
+  it.each([true, false, undefined])('addPlayer: 골키퍼 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })

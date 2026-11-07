@@ -166,6 +166,7 @@ interface BracketGroupCardProps {
   showToast: (msg: string, v?: 'success' | 'error') => void;
   managedEntrySlots?: boolean;
   structureEditable?: boolean;
+  nameEditable?: boolean;
   onFixtureCreated?: (fixtureId: string) => void;
 }
 
@@ -189,6 +190,7 @@ export function BracketGroupCard({
   showToast,
   managedEntrySlots = false,
   structureEditable = true,
+  nameEditable = structureEditable,
   onFixtureCreated,
 }: BracketGroupCardProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -376,23 +378,23 @@ export function BracketGroupCard({
             </span>
           </span>
         </button>
-        {structureEditable ? <div className="flex items-center gap-0.5 shrink-0">
-          <button
+        {nameEditable || structureEditable ? <div className="flex items-center gap-0.5 shrink-0">
+          {nameEditable ? <button
             type="button"
             onClick={() => onEditGroup(group)}
             aria-label={`${group.name} 수정`}
             className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Pencil size={14} aria-hidden="true" />
-          </button>
-          <button
+          </button> : null}
+          {structureEditable ? <button
             type="button"
             onClick={() => onDeleteGroup(group)}
             aria-label={`${group.name} 삭제`}
             className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Trash2 size={14} aria-hidden="true" />
-          </button>
+          </button> : null}
         </div> : null}
       </div>
 

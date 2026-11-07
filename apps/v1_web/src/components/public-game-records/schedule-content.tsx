@@ -1,5 +1,6 @@
 'use client';
 
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
@@ -965,10 +966,19 @@ export function ScheduleContent({
   const availableTracks = isRegularLeague ? [] : finalTracks.filter(track => allEntries.some(entry => phaseKeyOf(entry) === 'knockout' && trackByFixture.get(entry.fixtureId) === track.id));
   const activeFinal = draft.tournamentId === tournamentId && availableTracks.some(track => track.id === draft.final) ? draft.final : null;
   const namedFinalPhase = availableTracks.length > 0 && (knockoutOnly || activeFilter === 'knockout');
-  const roundsForFinal = (track: string | null) => [...new Map(allEntries
-    .filter(entry => phaseKeyOf(entry) === 'knockout' && (track === null || trackByFixture.get(entry.fixtureId) === track))
-    .sort((a, b) => compareTournamentRounds(a.round, b.round))
-    .map(entry => [scheduleGroupKey(entry), { key: scheduleGroupKey(entry), label: tournamentRoundLabel(entry.round) }])).values()];
+  const roundsForFinal = (track: string | null) => {
+    const rounds = new Map<string, { key: string; names: Set<string> }>();
+    for (const entry of allEntries.filter(entry => phaseKeyOf(entry) === 'knockout' && (track === null || trackByFixture.get(entry.fixtureId) === track))
+      .sort((a, b) => compareTournamentRounds(a.round, b.round))) {
+      const key = scheduleGroupKey(entry);
+      const name = entry.groupName?.trim() || tournamentRoundLabel(entry.round);
+      const label = bracketStageLabel(trackByFixture.get(entry.fixtureId), name);
+      const row = rounds.get(key) ?? { key, names: new Set<string>() };
+      row.names.add(label);
+      rounds.set(key, row);
+    }
+    return [...rounds.values()].map(({ key, names }) => ({ key, label: [...names].join(' · ') }));
+  };
   const groupOptionKeys = new Set<string>();
   const groupOptions = namedFinalPhase ? roundsForFinal(activeFinal) : isRegularLeague || (!knockoutOnly && activeFilter === 'all') ? [] :
     phases.filter(phase => phase.key === (knockoutOnly ? 'knockout' : activeFilter)).flatMap(phase => phase.groups.flatMap(group => {
@@ -1011,10 +1021,10 @@ export function ScheduleContent({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
           {knockoutOnly ? (filterAction ?? teamSwitch) : <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={setFilter} action={filterAction ?? teamSwitch} />}
           {namedFinalPhase && availableTracks.length > 1 ? (
-            <BracketFilterRow label="일정 토너먼트 선택" padded={false} showLabel items={[{ id: '', label: '전체' }, ...availableTracks]} activeId={activeFinal ?? ''} onSelect={id => selectFinal(id || null)} />
+            <BracketFilterRow label="일정 토너먼트 선택" padded={false} items={[{ id: '', label: '전체' }, ...availableTracks]} activeId={activeFinal ?? ''} onSelect={id => selectFinal(id || null)} />
           ) : null}
           {groupOptions.length > 0 ? (
-            <BracketFilterRow label={activeFilter === 'group_stage' ? '일정 조 선택' : '일정 결선 단계 선택'} padded={false} showLabel={namedFinalPhase && availableTracks.length > 1}
+            <BracketFilterRow label={activeFilter === 'group_stage' ? '일정 조 선택' : '일정 결선 단계 선택'} padded={false}
               items={[{ id: '', label: '전체' }, ...groupOptions.map(option => ({ id: option.key, label: option.label }))]} activeId={selectedGroup ?? ''}
               onSelect={id => setFilter(activeFilter, mineOnly, id || null)} />
           ) : null}

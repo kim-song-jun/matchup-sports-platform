@@ -6,12 +6,17 @@ import { ACTIVITY_PROFILE_ROUTE, getPendingSocialSignupRoute, isUnfinishedSocial
 /** A session older than this must sign in again before it can attach a login method. */
 export const RECENT_LOGIN_MAX_AGE_SECONDS = 30 * 60;
 
+const RECENT_LOGIN_MESSAGES = {
+  link: '보안을 위해 다시 로그인한 뒤 연결해 주세요.',
+  email_change: '이메일을 바꾸려면 다시 로그인해 주세요.',
+} as const;
+
 /** No session age is only possible with a non-production header identity; production never lets it through. */
-export function assertRecentLogin(sessionAgeSeconds: number | null) {
+export function assertRecentLogin(sessionAgeSeconds: number | null, action: keyof typeof RECENT_LOGIN_MESSAGES = 'link') {
   if (sessionAgeSeconds === null ? process.env.NODE_ENV === 'production' : sessionAgeSeconds > RECENT_LOGIN_MAX_AGE_SECONDS) {
     throw new ForbiddenException({
       code: 'RECENT_LOGIN_REQUIRED',
-      message: '보안을 위해 다시 로그인한 뒤 연결해 주세요.',
+      message: RECENT_LOGIN_MESSAGES[action],
       details: { maxAgeSeconds: RECENT_LOGIN_MAX_AGE_SECONDS },
     });
   }

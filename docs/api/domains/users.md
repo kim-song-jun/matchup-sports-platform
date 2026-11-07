@@ -16,7 +16,9 @@
 |---|---|---|---|---|
 | `GET` | `/api/v1/me/profile` | Required | - | 내 전체 프로필 |
 | `GET` | `/api/v1/me/activity-summary` | Required | - | 내 활동 요약 |
-| `PATCH` | `/api/v1/me/profile` | Required | `UpdateProfileDto` | 내 프로필 수정 |
+| `PATCH` | `/api/v1/me/profile` | Required | `UpdateProfileDto` | 내 프로필 수정. 이메일을 바꾸려면 `emailChangeToken` 필요 |
+| `POST` | `/api/v1/me/email-change/request` | Required | `EmailChangeRequestDto` | 새 이메일로 인증번호 발송 |
+| `POST` | `/api/v1/me/email-change/verify` | Required | `EmailChangeVerifyDto` | 인증번호 확인 → `emailChangeToken` |
 | `GET` | `/api/v1/users/:userId/public-profile` | Optional | - | 공개 프로필 |
 | `GET` | `/api/v1/me/settings` | Required | - | 계정·알림 설정 |
 | `PATCH` | `/api/v1/me/settings` | Required | `UpdateSettingsDto` | 알림 설정 수정 |
@@ -57,16 +59,37 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 | `realName` | string or null | No | 최대 40자 |
 | `displayName` | string or null | No | rolling-deploy 호환용 deprecated 입력, 최대 40자 |
 | `nickname` | string | Yes | 2~40자 |
-| `email` | string or null | No | 3~320자; password 계정은 최종 email 필수 |
+| `email` | string or null | No | 3~320자; password 계정은 최종 email 필수. 지금과 다른 주소면 `emailChangeToken` 필요 |
+| `emailChangeToken` | string or null | No | 최대 1024자. 이메일을 바꿀 때만 필요한 소유 증명([계정 이메일 변경](#계정-이메일-변경)) |
 | `profileImageUrl` | string or null | No | 문자열 |
 | `phone` | string or null | No | 숫자 11자리 |
 | `birthDate` | string or null | No | 유효한 `YYYYMMDD` 숫자 8자리 |
 | `gender` | `male | female` | Yes | 필수 |
 
 - `realName`이 없으면 호환 입력 `displayName`을 사용한다.
-- email/phone 변경 시 해당 verified 시각을 비운다.
+- phone 변경 시 `phoneVerifiedAt`을 비운다(휴대폰 증명이 켜진 환경에서 증명 토큰을 받고 바꾼 번호는 바로 인증된 상태가 된다). email은 아래 [계정 이메일 변경](#계정-이메일-변경)을 따른다.
 - 중복 값은 각각 `409 EMAIL_CONFLICT`, `PHONE_CONFLICT`, `NICKNAME_CONFLICT`다.
 - 성공 응답은 `{ profile, updatedAt }`이다.
+
+### 계정 이메일 변경
+
+`PATCH /me/profile`은 이메일을 **입력만으로 바꾸지 않는다.** 새 주소의 메일함을 증명한 `emailChangeToken`이 있어야 바뀐다(소셜 계정의 연락 이메일도 같다). 이메일 로그인을 더하는 [`/auth/link/email/*`](./auth.md#adding-an-email-login-to-a-social-account)와 같은 모양의 2단계다. 두 단계 모두 `V1AuthGuard`, 응답은 `200`.
+
+1. `POST /me/email-change/request { email }` — 새 주소(`normalizeEmail`: 앞뒤 공백 제거·소문자)로 6자리 인증번호를 보낸다. 메일은 전용 문구("이메일 변경 인증번호")다. 응답 `{ sent: true, maskedTarget, expiresInSeconds: 300, resendAvailableInSeconds: 30 }`(`devCode`는 dev-echo가 허용하는 시험용 주소에서만). 레이트 리밋 5/분.
+2. `POST /me/email-change/verify { code }` — 이 계정이 같은 목적으로 받은 가장 최근 코드를 대조해 소비하고 `{ emailChangeToken, expiresInSeconds: 600 }`을 준다. 레이트 리밋 10/분.
+3. `PATCH /me/profile { …, email, emailChangeToken }` — 토큰이 그 주소·이 계정의 것일 때만 바뀐다.
+
+- **request 가 거절하는 것**(메일 발송 전): 활성이 아닌 계정 `403 PERMISSION_DENIED`; **모든 계정**(비밀번호·소셜 구분 없이)은 30분보다 오래된 세션이면 `403 RECENT_LOGIN_REQUIRED`(`details: { maxAgeSeconds: 1800 }`, 메시지 "이메일을 바꾸려면 다시 로그인해 주세요.") — 비밀번호 계정은 이 주소가 로그인 ID라서, 소셜 계정은 인증된 이메일이 카카오·Apple 자동 연결의 조건이라 세션을 탈취한 쪽이 자기 메일함을 "인증된 이메일"로 만들어 영구 접근 수단을 붙이는 길을 막기 위해서다. 이 검사는 계정 조회·메일 발송보다 먼저다; 지금 계정의 이메일과 같은 주소 `400 EMAIL_UNCHANGED`; 다른 계정이 `v1_users.email` 또는 이메일 로그인 키로 쓰는 주소 `409 EMAIL_CONFLICT`(그 계정에 대해 다른 말은 하지 않는다); 메일을 보낼 수단이 없으면 `503 EMAIL_SEND_UNAVAILABLE`.
+- **코드**는 `/verification/*`·`/auth/link/email/*`와 같은 장치다: 5분 유효, 시도 5회(`VERIFICATION_CODE_MISMATCH`·`VERIFICATION_TOO_MANY_ATTEMPTS`), 없거나 만료면 `400 VERIFICATION_NO_PENDING`, 같은 주소 재발송 쿨다운 30초(`VERIFICATION_RESEND_COOLDOWN`), 24시간 발송 상한 주소당 5·계정당 10(`429 VERIFICATION_SEND_QUOTA_EXCEEDED`; 쿨다운·상한은 코드 목적과 무관하게 센다), 메일 발송 실패 `503 EMAIL_SEND_FAILED`(코드를 남기지 않아 바로 다시 받을 수 있다).
+- **목적 분리**: 이 코드는 `purpose = email_change`로 저장된다. `verify`는 `/verification/email/request`의 연락처 코드나 `/auth/link/email/request`의 로그인 연결 코드를 받지 않고(`400 VERIFICATION_NO_PENDING`), 그 둘도 이 코드를 받지 않는다. 이 코드를 새로 요청해도 다른 목적의 대기 코드는 그대로 쓸 수 있다.
+- **`emailChangeToken`**: 무상태, 세션 시크릿으로 서명(`profile/email-change-token.ts`, `verification/account-email-proof.ts`), 10분, 계정(키 다이제스트, id 아님)과 주소에 묶인다. 다른 주소·다른 계정·만료·다른 증명 토큰은 통하지 않는다. 에러 로그에서는 마스킹 키다(`common/logging/mask-sensitive.ts`).
+- **저장 규칙**(`updateMe`): 이메일이 **실제로 바뀔 때만** 토큰을 요구한다 — 같은 주소(대소문자·공백만 다른 것 포함)를 다시 보내거나 필드를 빼면 토큰이 필요 없다. 토큰이 없거나 다른 주소·다른 계정의 것이면 `400 EMAIL_CHANGE_PROOF_REQUIRED`이고, 이 검사는 주소 충돌 확인보다 **먼저**라 증명 없는 호출자는 누가 그 주소를 쓰는지 알 수 없다. 이메일을 지우는 저장(소셜 계정의 연락 이메일 비우기)은 새 주소를 주장하지 않으므로 토큰 없이 허용하고 `emailVerifiedAt`을 비운다(비밀번호 계정은 지울 수 없다).
+- **바뀔 때 한 트랜잭션에서**: 이메일 로그인 키와 같은 advisory lock을 잡고 충돌을 다시 확인한다(그 사이 다른 계정이 가져갔으면 `409 EMAIL_CONFLICT`; 가입처럼 락을 안 잡는 경로는 유니크 인덱스 위반을 `EMAIL_CONFLICT`로 바꾼다); `v1_users.email` = 새 주소, `emailVerifiedAt` = 지금(방금 메일함을 증명했다); 비밀번호 계정은 활성 이메일 신원의 `providerUserKey`·`email`도 새 주소(로그인 ID가 같이 옮겨 간다); `v1_status_change_logs` 한 행(`user`, 사유 `email_changed`); 소유자에게 `email_changed` 보안 알림(targetType `system`, 딥링크 `/my/settings`, 본문에 가린 새 주소 — 알림 설정과 무관하게 변경과 같은 트랜잭션에서 남기고 푸시는 커밋 뒤).
+- **한계**: 다른 기기의 세션은 끊지 않는다(`sessionEpoch` 불변). 옛 주소로 보내는 메일은 없다(알림함 보안 알림만).
+
+오류: `401 UNAUTHENTICATED`; `403 PERMISSION_DENIED`; `403 RECENT_LOGIN_REQUIRED`(request, 모든 계정); `400 VALIDATION_ERROR`(주소·6자리 코드); `400 EMAIL_UNCHANGED`; `409 EMAIL_CONFLICT`; `400 VERIFICATION_NO_PENDING` / `VERIFICATION_CODE_MISMATCH` / `VERIFICATION_TOO_MANY_ATTEMPTS` / `VERIFICATION_RESEND_COOLDOWN`; `429 VERIFICATION_SEND_QUOTA_EXCEEDED`; `409 ALREADY_PROCESSED`(병렬 호출이 먼저 쓴 코드); `503 EMAIL_SEND_FAILED` / `EMAIL_SEND_UNAVAILABLE`; `400 EMAIL_CHANGE_PROOF_REQUIRED`(저장).
+
+> 배포 순서: 이 계약이 서버에 들어가면 토큰 없이 이메일을 바꾸는 옛 프로필 화면은 `400 EMAIL_CHANGE_PROOF_REQUIRED`를 받는다. 이메일을 건드리지 않는 저장은 영향이 없다. 화면(2단계 입력)과 같은 배포로 나간다.
 
 ## 활동·공개 프로필
 

@@ -49,6 +49,7 @@ const MAX_SENDS_PER_USER = 10;
 const EMAIL_PURPOSE_OF: Record<V1VerificationPurpose, OtpEmailPurpose> = {
   contact: 'verify',
   email_login_link: 'login_email_link',
+  email_change: 'email_change',
 };
 
 @Injectable()
@@ -283,17 +284,37 @@ export class VerificationService {
    * 로그인한 계정에 이메일 로그인을 추가하기 위해, 아직 이 계정의 것이 아닌 주소로 인증번호를 보낸다.
    * 주소를 다른 계정이 쓰는지·계정이 추가할 수 있는 상태인지는 호출자가 이미 확인했다. 여기서는 발송 쿨다운·총량 상한만 건다.
    */
-  async requestEmailLinkCode(userId: string, email: string) {
+  requestEmailLinkCode(userId: string, email: string) {
+    return this.requestPurposeEmailCode(userId, email, 'email_login_link');
+  }
+
+  /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
+  consumeEmailLinkCode(userId: string, code: string): Promise<string> {
+    return this.consumePurposeCode(userId, 'email_login_link', code);
+  }
+
+  /** 계정 이메일을 바꾸기 위해 새 주소로 인증번호를 보낸다. 주소 충돌·계정 상태·최근 로그인은 호출자가 이미 확인했다. */
+  requestEmailChangeCode(userId: string, email: string) {
+    return this.requestPurposeEmailCode(userId, email, 'email_change');
+  }
+
+  /** `requestEmailChangeCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
+  consumeEmailChangeCode(userId: string, code: string): Promise<string> {
+    return this.consumePurposeCode(userId, 'email_change', code);
+  }
+
+  /** 로그인한 계정이 아직 자기 것으로 증명하지 않은 주소로 보내는 목적별 인증번호. 쿨다운·24시간 발송 상한은 목적과 무관하게 센다. */
+  private async requestPurposeEmailCode(userId: string, email: string, purpose: Exclude<V1VerificationPurpose, 'contact'>) {
     // 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다.
     if (!this.dispatcher.emailDeliverable) {
-      this.logger.error('email login link requested but email delivery is not configured (SES_REGION/EMAIL_FROM)');
+      this.logger.error(`${purpose} code requested but email delivery is not configured (SES_REGION/EMAIL_FROM)`);
       throw new ServiceUnavailableException({
         code: 'EMAIL_SEND_UNAVAILABLE',
         message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
       });
     }
     await this.assertResendCooldown('email', email);
-    const issued = await this.issue('email', userId, email, 'email_login_link');
+    const issued = await this.issue('email', userId, email, purpose);
     return {
       sent: true as const,
       maskedTarget: issued.target,
@@ -303,9 +324,9 @@ export class VerificationService {
     };
   }
 
-  /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
-  async consumeEmailLinkCode(userId: string, code: string): Promise<string> {
-    const token = await this.checkPendingCode(userId, 'email', 'email_login_link', code);
+  /** 같은 목적으로 보낸 가장 최근 이메일 코드를 대조해 한 번만 소비하고, 코드를 받은 주소를 돌려준다. */
+  private async consumePurposeCode(userId: string, purpose: Exclude<V1VerificationPurpose, 'contact'>, code: string): Promise<string> {
+    const token = await this.checkPendingCode(userId, 'email', purpose, code);
     const consumed = await this.prisma.v1VerificationToken.updateMany({
       where: { id: token.id, consumedAt: null },
       data: { consumedAt: new Date() },

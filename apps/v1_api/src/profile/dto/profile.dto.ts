@@ -18,14 +18,20 @@ export class UpdateProfileDto {
   @MaxLength(40)
   nickname!: string;
 
+  /** 지금과 다른 주소로 바꾸려면 `emailChangeToken` 이 함께 와야 한다(바꾸지 않는 저장에는 필요 없다). */
   @IsOptional()
-  // @IsEmail 이 없어서 임의의 문자열이 그대로 들어갔다. 근본 방어는 소셜 링크 쪽 게이트지만
-  // (auth.service.ts 의 assertLinkableByEmail), 주소 모양조차 검사하지 않으면 남의 주소를
-  // 심어 두는 비용이 0 이다. 소유 증명은 여전히 없고 — 바꾸면 emailVerifiedAt 이 null 이 되어
-  // 그 계정은 소셜 흡수 대상에서 빠진다.
   @IsEmail()
   @MaxLength(320)
   email?: string | null;
+
+  /**
+   * 이메일을 바꿀 때만 필요한 소유 증명. `POST /me/email-change/request` → `verify` 에서 받은 토큰을 그대로 전달한다.
+   * 새 주소·이 계정에만 통하고 10분 안에 써야 한다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024)
+  emailChangeToken?: string | null;
 
   /**
    * 한 줄 소개. 컬럼(`V1UserProfile.bio`)은 오래전부터 있었지만 저장 경로가 없어

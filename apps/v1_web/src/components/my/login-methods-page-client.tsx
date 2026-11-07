@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -28,6 +28,7 @@ import {
   withoutLinkResultQuery,
 } from '@/lib/link-result';
 import type { LinkOutcome } from '@/lib/link-result';
+import { LOGIN_METHOD_NAME, signInMethods } from '@/lib/login-method';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { isNativeKakaoSignInAvailable } from '@/lib/native-kakao';
 import { requestNativeAppleLinkPayload, requestNativeKakaoLinkPayload } from '@/lib/native-social-credentials';
@@ -35,7 +36,9 @@ import type { NativeCredentialResult } from '@/lib/native-social-credentials';
 import { unlinkResultFromError } from '@/lib/unlink-result';
 import type { UnlinkOutcome } from '@/lib/unlink-result';
 import type { V1LinkableProvider, V1LinkSocialResult, V1UnlinkableProvider } from '@/types/api';
-import { LinkResultNotice, linkSuccessToast, LOGIN_METHOD_NAME, UnlinkResultNotice, unlinkSuccessToast } from './link-result-notice';
+import { LinkResultNotice, linkSuccessToast, UnlinkResultNotice, unlinkSuccessToast } from './link-result-notice';
+
+const LIST_CHANGING_UNLINK_RESULTS: ReadonlySet<UnlinkOutcome['unlinkResult']> = new Set(['unlinked', 'not_found', 'last']);
 
 const RELOGIN_PATH = `/login?redirect=${encodeURIComponent(LOGIN_METHODS_PATH)}`;
 
@@ -149,13 +152,9 @@ function LastMethodNote() {
   );
 }
 
-const REMAINING_METHOD_NAME: Partial<Record<string, string>> = { ...LOGIN_METHOD_NAME, naver: '네이버' };
-
-/** 해제 확인 창의 설명. `providers` 는 해제 전 이 계정의 로그인 수단이고, 해제하는 수단을 뺀 나머지를 "그대로 써요"로 알린다. */
-function unlinkConfirmMessage(method: V1UnlinkableProvider, providers: readonly string[]): string {
-  const staying = [...new Set(providers)]
-    .filter((provider) => provider !== method)
-    .flatMap((provider) => REMAINING_METHOD_NAME[provider] ?? []);
+/** 해제 확인 창의 설명. `staying` 은 해제하고도 로그인에 쓸 수 있는 나머지 수단이다. */
+function unlinkConfirmMessage(method: V1UnlinkableProvider, staying: readonly V1UnlinkableProvider[]): string {
+  const stayingNames = staying.map((provider) => LOGIN_METHOD_NAME[provider]);
   const lead = {
     email: '이 이메일과 비밀번호로는 더 이상 로그인할 수 없어요.',
     kakao: '카카오 버튼으로는 더 이상 이 계정에 로그인할 수 없어요.',
@@ -166,7 +165,7 @@ function unlinkConfirmMessage(method: V1UnlinkableProvider, providers: readonly 
     kakao: ' 같은 카카오 계정은 다시 연결할 수 있어요.',
     apple: ' 다시 연결하려면 iOS 앱에서 해야 해요.',
   }[method];
-  return `${lead}${staying.length > 0 ? ` ${staying.join('·')} 로그인은 그대로 쓸 수 있어요.` : ''}${tail}`;
+  return `${lead}${stayingNames.length > 0 ? ` ${stayingNames.join('·')} 로그인은 그대로 쓸 수 있어요.` : ''}${tail}`;
 }
 
 /** 해제하면 무엇이 그대로이고 무엇이 바뀌는지 — 확인 창 본문 아래 요약. */
@@ -195,6 +194,7 @@ export function LoginMethodsPageClient() {
   const [unlinkOutcome, setUnlinkOutcome] = useState<UnlinkOutcome | null>(null);
   const [unlinkTarget, setUnlinkTarget] = useState<V1UnlinkableProvider | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const unlinkNoticeRef = useRef<HTMLDivElement>(null);
   const [activeProvider, setActiveProvider] = useState<V1LinkableProvider | null>(null);
   const [nativeApple, setNativeApple] = useState(false);
 
@@ -226,6 +226,12 @@ export function LoginMethodsPageClient() {
     document.addEventListener('visibilitychange', release);
     return () => document.removeEventListener('visibilitychange', release);
   }, [leavingForAuthorize]);
+
+  // 눌렀던 "연결 해제" 버튼은 해제된 뒤(이미 해제됐거나 마지막 수단이라 목록이 바뀐 경우 포함) 사라져 확인 창이 포커스를 돌려줄 곳이 없다.
+  // 문서 처음으로 떨어지지 않게 결과 안내로 옮긴다. 버튼이 남는 거절에서는 확인 창이 그 버튼으로 돌려준다.
+  useEffect(() => {
+    if (unlinkOutcome && LIST_CHANGING_UNLINK_RESULTS.has(unlinkOutcome.unlinkResult)) unlinkNoticeRef.current?.focus();
+  }, [unlinkOutcome]);
 
   const present = useCallback((next: LinkOutcome) => {
     setUnlinkOutcome(null);
@@ -361,10 +367,12 @@ export function LoginMethodsPageClient() {
   const needsSignup = !canLink && authMe.data.user.canLinkAfterSignup === true;
   const unavailableCaption = needsSignup ? '가입 정보를 입력한 뒤 연결할 수 있어요' : '이 계정에는 추가할 수 없어요';
   const busy = activeProvider !== null;
-  // 다른 수단이 남아 있어야 뗄 수 있다. 운영 권한·가입 미완료 계정은 서버가 어차피 거절하므로 버튼도 두지 않는다.
+  // 다른 수단으로 로그인할 수 있어야 뗄 수 있다(서버의 마지막 수단 판정과 같은 기준). 운영 권한·가입 미완료 계정은 서버가 어차피 거절하므로 버튼도 두지 않는다.
+  const usableMethods = signInMethods(providers, authMe.data.user.hasPassword === true);
+  const staying = (method: V1UnlinkableProvider) => usableMethods.filter((provider) => provider !== method);
   const unlinkDetail = (method: V1UnlinkableProvider) => {
     if (!canLink) return undefined;
-    return providers.some((provider) => provider !== method)
+    return staying(method).length > 0
       ? <UnlinkButton method={method} disabled={busy} onClick={() => openUnlink(method)} />
       : <LastMethodNote />;
   };
@@ -409,12 +417,14 @@ export function LoginMethodsPageClient() {
             />
           ) : null}
           {unlinkOutcome ? (
-            <UnlinkResultNotice
-              outcome={unlinkOutcome}
-              onDismiss={() => setUnlinkOutcome(null)}
-              onRelogin={reLogin}
-              relogin={{ pending: signOut.pending, error: signOut.error }}
-            />
+            <div ref={unlinkNoticeRef} tabIndex={-1}>
+              <UnlinkResultNotice
+                outcome={unlinkOutcome}
+                onDismiss={() => setUnlinkOutcome(null)}
+                onRelogin={reLogin}
+                relogin={{ pending: signOut.pending, error: signOut.error }}
+              />
+            </div>
           ) : null}
           {startError ? (
             <p className="tm-text-label" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{startError}</p>
@@ -525,7 +535,7 @@ export function LoginMethodsPageClient() {
       <ConfirmModal
         open={unlinkTarget !== null}
         title={unlinkTarget ? `${LOGIN_METHOD_NAME[unlinkTarget]} 로그인을 해제할까요?` : ''}
-        message={unlinkTarget ? unlinkConfirmMessage(unlinkTarget, providers) : ''}
+        message={unlinkTarget ? unlinkConfirmMessage(unlinkTarget, staying(unlinkTarget)) : ''}
         details={unlinkTarget ? <UnlinkImpact method={unlinkTarget} /> : undefined}
         confirmLabel={unlinkTarget ? `${LOGIN_METHOD_NAME[unlinkTarget]} 해제` : undefined}
         tone="danger"

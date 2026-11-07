@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import request = require('supertest');
+import { io, type Socket } from 'socket.io-client';
 import { hashPassword, verifyPassword } from '../src/auth/password-hash';
 import { issueSocialLinkToken, type SocialLinkClaims } from '../src/auth/social-link-token';
 import { createV1SessionToken, readV1Session, readV1SessionAgeSeconds, V1_SESSION_COOKIE_NAME } from '../src/auth/v1-session';
@@ -143,6 +144,61 @@ describe('V1 removing a login method and signing out other devices integration',
     return cookie.split(';')[0];
   }
 
+  const liveSockets: Socket[] = [];
+
+  afterEach(() => {
+    for (const socket of liveSockets.splice(0)) socket.disconnect();
+  });
+
+  /** One realtime connection as a device with this cookie would open it; a refused handshake rejects with its error. */
+  async function openSocket(cookie: string): Promise<Socket> {
+    const server = app.getHttpServer();
+    if (!server.listening) await app.listen(0, '127.0.0.1');
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new LoginMethodFixtureError('The integration HTTP server is not listening');
+    const socket = io(`http://127.0.0.1:${address.port}/game-operations`, {
+      autoConnect: false,
+      reconnection: false,
+      transports: ['websocket'],
+      auth: { clientInstanceId: `${PREFIX}-device-${liveSockets.length}`, authorizationSubjectVersion: 0 },
+      extraHeaders: { cookie },
+    });
+    liveSockets.push(socket);
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', () => resolve());
+      socket.once('connect_error', reject);
+      socket.connect();
+    });
+    return socket;
+  }
+
+  function closedByServer(socket: Socket): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new LoginMethodFixtureError('The socket stayed connected')), 5_000);
+      socket.once('disconnect', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  /** Both devices hold an open socket; after `revoke` runs from this device, both are closed, and only this device's new cookie gets back in. */
+  async function expectSocketsReconnectOnlyWithTheReissuedCookie(revoke: (cookie: string) => Promise<request.Response>) {
+    const here = cookieIssuedAgo(MEMBER, 60);
+    const phone = cookieIssuedAgo(MEMBER, 3_600);
+    const hereSocket = await openSocket(here);
+    const phoneSocket = await openSocket(phone);
+    const closed = Promise.all([closedByServer(hereSocket), closedByServer(phoneSocket)]);
+
+    const response = await revoke(here);
+    expect(response.status).toBe(200);
+    await closed;
+
+    const reconnected = await openSocket(sessionCookieOf(response));
+    expect(reconnected.connected).toBe(true);
+    await expect(openSocket(phone)).rejects.toMatchObject({ message: 'SOCKET_AUTH_FAILED' });
+  }
+
   describe('POST /auth/identities/unlink', () => {
     it('removes Kakao: row unlinked with its key kept, others signed out, this device kept signed in with its own age, one notice', async () => {
       const here = cookieIssuedAgo(MEMBER, 5 * 60);
@@ -198,6 +254,17 @@ describe('V1 removing a login method and signing out other devices integration',
       await me(cookie).expect(200);
     });
 
+    it('does not count a Naver login as a method that stays: it has no way to sign in', async () => {
+      await prisma.v1AuthIdentity.create({
+        data: { id: `${KAKAO_ONLY}-naver`, userId: KAKAO_ONLY, provider: 'naver', providerUserKey: `${PREFIX}-naver-key`, status: 'active' },
+      });
+
+      const refused = await unlink(cookieIssuedAgo(KAKAO_ONLY, 60), 'kakao');
+
+      expect([refused.status, refused.body.code]).toEqual([409, 'LAST_LOGIN_METHOD']);
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${KAKAO_ONLY}-kakao` } })).toMatchObject({ status: 'active' });
+    });
+
     it('answers 404 for a method the account does not have', async () => {
       const refused = await unlink(cookieIssuedAgo(KAKAO_ONLY, 60), 'apple');
 
@@ -234,6 +301,10 @@ describe('V1 removing a login method and signing out other devices integration',
       expect([first.status, second.status].sort()).toEqual([200, 401]);
       expect(await prisma.v1AuthIdentity.count({ where: { userId: MEMBER, status: 'active' } })).toBe(1);
       expect((await prisma.v1User.findUniqueOrThrow({ where: { id: MEMBER } })).sessionEpoch).toBe(1);
+    });
+
+    it('closes the open sockets of every device: this one reconnects with its re-signed cookie, the others are refused', async () => {
+      await expectSocketsReconnectOnlyWithTheReissuedCookie((cookie) => unlink(cookie, 'kakao'));
     });
 
     describe('linking again', () => {
@@ -330,6 +401,10 @@ describe('V1 removing a login method and signing out other devices integration',
       expect([first.status, second.status].sort()).toEqual([200, 401]);
       expect((await prisma.v1User.findUniqueOrThrow({ where: { id: MEMBER } })).sessionEpoch).toBe(1);
       expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'sessions_revoked', actorUserId: MEMBER } })).toBe(1);
+    });
+
+    it('closes the open sockets of every device: this one reconnects with its re-signed cookie, the others are refused', async () => {
+      await expectSocketsReconnectOnlyWithTheReissuedCookie((cookie) => withCookie('/auth/sessions/revoke-others', cookie));
     });
 
     it('needs a session', async () => {

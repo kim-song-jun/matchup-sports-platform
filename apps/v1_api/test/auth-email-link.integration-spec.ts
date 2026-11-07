@@ -337,10 +337,10 @@ describe('V1 adding an email login to a social account integration', () => {
     expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'email_login_added', actorUserId: { in: [CALLER, RIVAL] } } })).toBe(1);
   });
 
-  it('brings back the account’s own removed login on the address, instead of adding a second row the unique index would refuse', async () => {
-    // A login removed through POST /auth/identities/unlink: the row stays, unlinked, without a password.
+  it('brings back the account’s own removed login, instead of adding a second row', async () => {
+    // A login removed through POST /auth/identities/unlink: the row stays, unlinked, its key freed and without a password.
     await prisma.v1AuthIdentity.create({
-      data: { id: `${CALLER}-removed-email`, userId: CALLER, provider: 'email', providerUserKey: NEW_EMAIL, status: 'unlinked', unlinkedAt: new Date() },
+      data: { id: `${CALLER}-removed-email`, userId: CALLER, provider: 'email', providerUserKey: `deleted:${CALLER}:${CALLER}-removed-email`, status: 'unlinked', unlinkedAt: new Date() },
     });
 
     const response = await complete(CALLER, issueEmailLinkToken(CALLER, NEW_EMAIL)).expect(200);

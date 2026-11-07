@@ -16,6 +16,9 @@ export const SOCIAL_LINK_ADMIN_FORBIDDEN_CODE = 'SOCIAL_LINK_ADMIN_FORBIDDEN';
 /** 로그인 수단을 떼려는데 그것이 마지막 남은 수단이라는 409 코드. */
 export const LAST_LOGIN_METHOD_CODE = 'LAST_LOGIN_METHOD';
 
+/** 스스로 연결을 해제한 카카오·Apple 로 로그인하려 했다는 403 코드. 정지·차단 계정의 403 `PERMISSION_DENIED` 와 다르다. */
+export const LOGIN_METHOD_UNLINKED_CODE = 'LOGIN_METHOD_UNLINKED';
+
 /** 떼려는 로그인 수단이 이 계정에 연결돼 있지 않다(이미 뗐다)는 404 코드. */
 export const LOGIN_METHOD_NOT_FOUND_CODE = 'LOGIN_METHOD_NOT_FOUND';
 

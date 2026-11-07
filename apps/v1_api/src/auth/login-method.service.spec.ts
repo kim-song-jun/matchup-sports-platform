@@ -3,6 +3,11 @@
  * touch: real rows, the row lock on the caller, rollback of a failed transaction. Specs assert on the rows that
  * result, not on which calls were made.
  */
+import { Test } from '@nestjs/testing';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { AppleTokenService } from './apple-token.service';
 import { LoginMethodService } from './login-method.service';
 import { RECENT_LOGIN_MAX_AGE_SECONDS } from './link-caller-guards';
 import type { V1SessionProof } from './v1-session';
@@ -129,8 +134,9 @@ function build(seed: { users: Row[]; identities: Row[] }) {
   const notice = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 해제됐어요', body: null, deepLink: '/my/settings' };
   const notifications = { createInTransaction: jest.fn().mockResolvedValue(notice), deliverCreated: jest.fn() };
   const appleTokens = { revokeForUser: jest.fn().mockResolvedValue(undefined) };
-  const service = new LoginMethodService(db.prisma as never, notifications as never, appleTokens as never);
-  return { service, notifications, appleTokens, ...db };
+  const realtime = { forceDisconnectUser: jest.fn() };
+  const service = new LoginMethodService(db.prisma as never, notifications as never, appleTokens as never, realtime);
+  return { service, notifications, appleTokens, realtime, ...db };
 }
 
 const kakaoAndEmail = () => ({ users: [user(CALLER, { email: `${CALLER}@example.test` })], identities: [kakao(), emailLogin()] });
@@ -168,6 +174,48 @@ describe('LoginMethodService.unlink', () => {
         reason: 'login_method_removed',
       }),
     ]);
+  });
+
+  describe('open sockets', () => {
+    it('closes every socket of the account once the removal committed, so the other devices must pass the handshake again', async () => {
+      const { service, realtime } = build(kakaoAndEmail());
+
+      await service.unlink(CALLER, 'kakao', proofOf());
+
+      expect(realtime.forceDisconnectUser).toHaveBeenCalledTimes(1);
+      expect(realtime.forceDisconnectUser).toHaveBeenCalledWith(CALLER);
+    });
+
+    it.each([
+      ['the last login method', () => build({ users: [user(CALLER)], identities: [kakao()] }), proofOf()],
+      ['a cookie another bump already revoked', () => build({ users: [user(CALLER, { sessionEpoch: 5 })], identities: [kakao(), emailLogin()] }), proofOf({ sessionEpoch: 4 })],
+      ['a method the account does not have', () => build({ users: [user(CALLER)], identities: [emailLogin()] }), proofOf()],
+    ])('leaves the sockets alone when the removal is refused: %s', async (_label, setup, proof) => {
+      const { service, realtime } = setup();
+
+      await failure(service.unlink(CALLER, 'kakao', proof));
+
+      expect(realtime.forceDisconnectUser).not.toHaveBeenCalled();
+    });
+
+    it('leaves the sockets alone when the removal was rolled back', async () => {
+      const { service, notifications, realtime } = build(kakaoAndEmail());
+      notifications.createInTransaction.mockRejectedValueOnce(new Error('inbox down'));
+
+      await expect(service.unlink(CALLER, 'kakao', proofOf())).rejects.toThrow('inbox down');
+
+      expect(realtime.forceDisconnectUser).not.toHaveBeenCalled();
+    });
+
+    it('still answers the removal when the gateway cannot close them', async () => {
+      const { service, realtime, state } = build(kakaoAndEmail());
+      realtime.forceDisconnectUser.mockImplementation(() => {
+        throw new Error('gateway not ready');
+      });
+
+      await expect(service.unlink(CALLER, 'kakao', proofOf())).resolves.toMatchObject({ sessionEpoch: 1 });
+      expect(rowOf(state, 'kakao-user-1')?.status).toBe('unlinked');
+    });
   });
 
   it('removes the email login: password gone, address freed from the login key, the account keeps its contact email', async () => {
@@ -236,6 +284,24 @@ describe('LoginMethodService.unlink', () => {
 
       expect(await failure(service.unlink(CALLER, 'kakao', proofOf()))).toMatchObject({ code: 'LAST_LOGIN_METHOD' });
       expect(rowOf(state, 'kakao-user-1')?.status).toBe('active');
+    });
+
+    it('does not count a Naver login, which has no way to sign in', async () => {
+      const naver = identity('naver-user-1', CALLER, 'naver', 'naver-key-user-1');
+      const { service, state, realtime } = build({ users: [user(CALLER)], identities: [kakao(), naver] });
+
+      expect(await failure(service.unlink(CALLER, 'kakao', proofOf()))).toMatchObject({ status: 409, code: 'LAST_LOGIN_METHOD' });
+
+      expect(rowOf(state, 'kakao-user-1')?.status).toBe('active');
+      expect(realtime.forceDisconnectUser).not.toHaveBeenCalled();
+    });
+
+    it('still lets a login go when another real one stays next to a Naver login', async () => {
+      const naver = identity('naver-user-1', CALLER, 'naver', 'naver-key-user-1');
+      const { service, state } = build({ users: [user(CALLER)], identities: [kakao(), emailLogin(), naver] });
+
+      await expect(service.unlink(CALLER, 'kakao', proofOf())).resolves.toMatchObject({ authProviders: ['email', 'naver'] });
+      expect(rowOf(state, 'kakao-user-1')?.status).toBe('unlinked');
     });
 
     it('does not count a login that was removed earlier', async () => {
@@ -383,6 +449,26 @@ describe('LoginMethodService.unlink', () => {
   });
 });
 
+describe('LoginMethodService wiring', () => {
+  it('is built by Nest with the real gateway token, so the sockets are closed in the running app and not only in a hand-built service', async () => {
+    const { prisma } = createDatabase({ users: [user(CALLER)], identities: [emailLogin()] });
+    const gateway = { forceDisconnectUser: jest.fn() };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        LoginMethodService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: {} },
+        { provide: AppleTokenService, useValue: {} },
+        { provide: RealtimeGateway, useValue: gateway },
+      ],
+    }).compile();
+
+    await moduleRef.get(LoginMethodService).revokeOtherSessions(CALLER, proofOf());
+
+    expect(gateway.forceDisconnectUser).toHaveBeenCalledWith(CALLER);
+  });
+});
+
 describe('LoginMethodService.revokeOtherSessions', () => {
   it('raises the session epoch once and records it, leaving the login methods alone', async () => {
     const { service, state, notifications } = build(kakaoAndEmail());
@@ -395,6 +481,27 @@ describe('LoginMethodService.revokeOtherSessions', () => {
       expect.objectContaining({ targetType: 'user_session', targetId: CALLER, actorType: 'user', actorUserId: CALLER, reason: 'sessions_revoked' }),
     ]);
     expect(notifications.createInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('closes every socket of the account once the epoch is raised', async () => {
+    const { service, realtime } = build(kakaoAndEmail());
+
+    await service.revokeOtherSessions(CALLER, proofOf());
+
+    expect(realtime.forceDisconnectUser).toHaveBeenCalledTimes(1);
+    expect(realtime.forceDisconnectUser).toHaveBeenCalledWith(CALLER);
+  });
+
+  it('leaves the sockets alone when the request is refused, and answers even if the gateway cannot close them', async () => {
+    const refused = build({ users: [user(CALLER, { sessionEpoch: 3 })], identities: [emailLogin()] });
+    await failure(refused.service.revokeOtherSessions(CALLER, proofOf({ sessionEpoch: 2 })));
+    expect(refused.realtime.forceDisconnectUser).not.toHaveBeenCalled();
+
+    const broken = build(kakaoAndEmail());
+    broken.realtime.forceDisconnectUser.mockImplementation(() => {
+      throw new Error('gateway not ready');
+    });
+    await expect(broken.service.revokeOtherSessions(CALLER, proofOf())).resolves.toEqual({ sessionEpoch: 1 });
   });
 
   it('needs no recent sign-in: a week-old session may sign the others out', async () => {

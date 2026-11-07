@@ -9,11 +9,10 @@ import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { AlertBanner, Card, InfoRow } from '@/components/v1-ui/primitives';
 import { useV1AuthMe, useV1RevokeOtherSessions } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { LOGIN_METHOD_NAME, signInMethods } from '@/lib/login-method';
 import { withFromPath } from '@/lib/session-storage';
 
 const LOGIN_DEVICES_PATH = '/my/settings/devices';
-
-const SOCIAL_ACCOUNT_NAME: Partial<Record<string, string>> = { kakao: '카카오', apple: 'Apple', naver: '네이버' };
 
 /**
  * 기기를 잃어버렸을 때 함께 챙길 것. 비밀번호가 있는 계정은 비밀번호 변경으로 이어 주고,
@@ -31,7 +30,8 @@ function LostDeviceTip({ hasPassword, providers }: { hasPassword: boolean; provi
       </p>
     );
   }
-  const accounts = [...new Set(providers)].flatMap((provider) => SOCIAL_ACCOUNT_NAME[provider] ?? []);
+  // 비밀번호가 없는 계정이므로 로그인에 쓰는 수단은 소셜뿐이다.
+  const accounts = signInMethods(providers, false).map((method) => LOGIN_METHOD_NAME[method]);
   return (
     <p className="tm-text-caption" style={{ margin: 0, paddingInline: 4 }}>
       기기를 잃어버렸다면 {accounts.length > 0 ? `${accounts.join('·')} 계정` : '로그인에 쓰는 계정'}의 보안도 함께 확인해 두면 더 안전해요.

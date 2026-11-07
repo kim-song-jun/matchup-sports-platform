@@ -246,6 +246,31 @@ describe('AuthService.appleSignIn', () => {
     await expect(signIn()).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  /** A login method its owner removed is told apart from a suspended account, so the client can say how to get back in. */
+  it('refuses a removed Apple login with LOGIN_METHOD_UNLINKED, and a blocked or suspended one with PERMISSION_DENIED', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+    const refusal = async (identityStatus: string, accountStatus: string) => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1',
+        status: identityStatus,
+        user: {
+          id: 'user-1', email: null, accountStatus,
+          onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(), sessionEpoch: 2,
+        },
+      });
+      return (await signIn().catch((error: unknown) => error)) as ForbiddenException;
+    };
+
+    const removed = await refusal('unlinked', 'active');
+    expect([removed.getStatus(), (removed.getResponse() as { code: string }).code]).toEqual([403, 'LOGIN_METHOD_UNLINKED']);
+
+    for (const [identityStatus, accountStatus] of [['blocked', 'active'], ['active', 'suspended'], ['unlinked', 'suspended']]) {
+      const refused = await refusal(identityStatus, accountStatus);
+      expect([refused.getStatus(), (refused.getResponse() as { code: string }).code]).toEqual([403, 'PERMISSION_DENIED']);
+    }
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
   /** Withdrawal-pending gets its own message, as every other sign-in path does. */
   it('tells a withdrawal-pending account apart from a plain refusal', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims());

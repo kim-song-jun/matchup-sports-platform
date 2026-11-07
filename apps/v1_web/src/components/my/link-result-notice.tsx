@@ -4,12 +4,8 @@ import Link from 'next/link';
 import { Button } from '@/components/v1-ui/button';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import type { LinkOutcome } from '@/lib/link-result';
+import { LOGIN_METHOD_NAME } from '@/lib/login-method';
 import type { UnlinkOutcome } from '@/lib/unlink-result';
-
-const PROVIDER_NAME = { kakao: '카카오', apple: 'Apple' } as const;
-
-/** 로그인 방법 이름. 연결 안내는 소셜 둘만 쓰고, 해제 안내와 확인 창은 이메일도 쓴다. */
-export const LOGIN_METHOD_NAME = { ...PROVIDER_NAME, email: '이메일' } as const;
 
 /** 로그인한 지 오래돼 새 로그인 수단을 붙일 수 없을 때의 안내. 소셜 연결과 이메일 연결이 같은 문구·같은 길(다시 로그인)을 쓴다. */
 export const RECENT_LOGIN_NOTICE = {
@@ -40,7 +36,7 @@ function withNextStep(reason: string, provider: LinkOutcome['provider'], canConn
 }
 
 function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolean): Notice {
-  const name = PROVIDER_NAME[provider];
+  const name = LOGIN_METHOD_NAME[provider];
   switch (linkResult) {
     case 'linked':
       return { kind: 'banner', message: `${name} 로그인이 연결됐어요. 이제 ${name}로도 같은 계정에 들어올 수 있어요.` };
@@ -100,7 +96,7 @@ function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolea
 
 /** 연결이 새로 이뤄졌을 때 배너와 함께 잠깐 띄우는 한 줄. 이미 연결돼 있었거나 실패한 결과에는 없다. */
 export function linkSuccessToast({ linkResult, provider }: LinkOutcome): string | null {
-  return linkResult === 'linked' || linkResult === 'merged' ? `${PROVIDER_NAME[provider]} 로그인이 연결됐어요` : null;
+  return linkResult === 'linked' || linkResult === 'merged' ? `${LOGIN_METHOD_NAME[provider]} 로그인이 연결됐어요` : null;
 }
 
 type NoticeActions = {

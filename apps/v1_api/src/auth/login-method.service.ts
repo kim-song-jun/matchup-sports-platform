@@ -1,7 +1,8 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Prisma, V1AuthProvider } from '@prisma/client';
 import { NotificationsService, type DeliveredNotification } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { buildDeletedProviderUserKey } from '../users/final-account-deletion';
 import { AppleTokenService } from './apple-token.service';
 import type { UnlinkableLoginProvider } from './dto/unlink-login-method.dto';
@@ -34,15 +35,20 @@ export type UnlinkResult = {
  */
 @Injectable()
 export class LoginMethodService {
+  private readonly logger = new Logger(LoginMethodService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly appleTokens: AppleTokenService,
+    @Inject(RealtimeGateway)
+    private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
   ) {}
 
   async unlink(callerId: string, provider: UnlinkableLoginProvider, proof: V1SessionProof | null): Promise<UnlinkResult> {
     assertRecentLogin(proof?.ageSeconds ?? null, 'unlink');
     const { result, notification } = await this.prisma.$transaction((tx) => this.unlinkInTransaction(tx, callerId, provider, proof));
+    this.closeOpenSockets(callerId);
     if (notification) this.notifications.deliverCreated(callerId, 'social_identity_unlinked', notification);
     // Sign in with Apple expects an app to revoke the grant when the person disconnects it; a failure is logged and
     // leaves the sealed token on the row, where account deletion revokes it.
@@ -52,7 +58,7 @@ export class LoginMethodService {
 
   /** `proof` as in `unlink`; no recent sign-in is required, since this only ever narrows who can act as the account. */
   async revokeOtherSessions(callerId: string, proof: V1SessionProof | null): Promise<{ sessionEpoch: number }> {
-    return this.prisma.$transaction(async (tx) => {
+    const { sessionEpoch } = await this.prisma.$transaction(async (tx) => {
       await lockSession(tx, callerId, proof);
       const bumped = await tx.v1User.update({
         where: { id: callerId },
@@ -72,6 +78,21 @@ export class LoginMethodService {
       });
       return { sessionEpoch: bumped.sessionEpoch };
     });
+    this.closeOpenSockets(callerId);
+    return { sessionEpoch };
+  }
+
+  /**
+   * An open socket checks the session only at its handshake, so the bump alone leaves other devices connected. Closing
+   * every socket of the account makes each one reconnect: this device with the cookie the response re-signs, the others
+   * with a revoked cookie the handshake refuses. The removal has committed, so a failure here is logged, not raised.
+   */
+  private closeOpenSockets(userId: string): void {
+    try {
+      this.realtimeGateway.forceDisconnectUser(userId);
+    } catch (error) {
+      this.logger.warn(`socket disconnect after a session revoke failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async unlinkInTransaction(
@@ -99,10 +120,7 @@ export class LoginMethodService {
     const targets = caller.authIdentities.filter((identity) => identity.provider === provider);
     if (targets.length === 0) throw loginMethodNotFound();
     const remaining = caller.authIdentities.filter((identity) => identity.provider !== provider);
-    // An email identity without a password cannot sign anyone in, so it does not count as a method that stays.
-    if (!remaining.some((identity) => identity.provider !== V1AuthProvider.email || identity.passwordHash !== null)) {
-      throw lastLoginMethod();
-    }
+    if (!remaining.some(canSignIn)) throw lastLoginMethod();
 
     const now = new Date();
     for (const target of targets) {
@@ -147,6 +165,12 @@ export class LoginMethodService {
       notification,
     };
   }
+}
+
+/** Whether the identity can open a session: Naver has no login route, and an email login needs its password. */
+function canSignIn(identity: { provider: V1AuthProvider; passwordHash: string | null }): boolean {
+  if (identity.provider === V1AuthProvider.email) return identity.passwordHash !== null;
+  return identity.provider === V1AuthProvider.kakao || identity.provider === V1AuthProvider.apple;
 }
 
 /** Locks the caller's row and refuses a cookie session another epoch bump has already revoked. */

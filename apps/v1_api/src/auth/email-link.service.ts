@@ -98,7 +98,7 @@ export class EmailLinkService {
 
     const now = new Date();
     // A login this account removed earlier (POST /auth/identities/unlink) is brought back instead of adding a second row.
-    const removed = await findRemovedEmailLogin(tx, callerId, email);
+    const removed = await findRemovedEmailLogin(tx, callerId);
     const loginData = { providerUserKey: email, email, passwordHash, status: 'active', unlinkedAt: null, lastLoginAt: now } as const;
     const identity = removed
       ? await tx.v1AuthIdentity.update({ where: { id: removed.id }, data: loginData, select: { id: true } })
@@ -128,14 +128,13 @@ export class EmailLinkService {
   }
 }
 
-/** The caller's removed email login to bring back; one already on this address wins, so the move cannot land on another removed row's key. */
-async function findRemovedEmailLogin(tx: Prisma.TransactionClient, callerId: string, email: string) {
-  const removed = await tx.v1AuthIdentity.findMany({
+/** The caller's removed email login, if any: adding one again brings that row back, so an account never accumulates a second. */
+function findRemovedEmailLogin(tx: Prisma.TransactionClient, callerId: string) {
+  return tx.v1AuthIdentity.findFirst({
     where: { userId: callerId, provider: V1AuthProvider.email, status: 'unlinked' },
     orderBy: { createdAt: 'asc' },
-    select: { id: true, providerUserKey: true },
+    select: { id: true },
   });
-  return removed.find((identity) => identity.providerUserKey === email) ?? removed[0] ?? null;
 }
 
 /** Refuses an address another account holds as its email or as its email login key; says nothing else about that account. */

@@ -119,6 +119,13 @@ describe('LoginDevicesPageClient - 처음 화면', () => {
     expect(screen.queryByRole('link', { name: '비밀번호 변경' })).not.toBeInTheDocument();
   });
 
+  it('소셜 계정이 둘이면 둘 다 말하고, 로그인할 길이 없는 네이버와 비밀번호 없는 이메일 행은 말하지 않는다', async () => {
+    serveMe({ providers: ['kakao', 'naver', 'apple', 'email'], hasPassword: false });
+    render(<LoginDevicesPageClient />);
+
+    expect(await screen.findByText('기기를 잃어버렸다면 카카오·Apple 계정의 보안도 함께 확인해 두면 더 안전해요.')).toBeInTheDocument();
+  });
+
   it('계정 정보를 불러오지 못해도 다른 기기 로그아웃은 되고, 근거 없는 팁은 보이지 않는다', async () => {
     let meCalls = 0;
     server.use(http.get('*/api/v1/auth/me', () => {

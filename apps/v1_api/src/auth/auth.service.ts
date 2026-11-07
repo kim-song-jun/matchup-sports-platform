@@ -482,14 +482,7 @@ export class AuthService {
 
     if (existingIdentity) {
       if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(
-          existingIdentity.user.accountStatus,
-          existingIdentity.status === 'active' ? existingIdentity.user : undefined,
-        );
-        throw new ForbiddenException({
-          code: 'PERMISSION_DENIED',
-          message: 'This account cannot sign in',
-        });
+        this.refuseInactiveSocialIdentity(existingIdentity);
       }
 
       await this.acceptExistingKakaoContacts(existingIdentity.user.id, profile, now);
@@ -744,14 +737,7 @@ export class AuthService {
 
     if (existingIdentity) {
       if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(
-          existingIdentity.user.accountStatus,
-          existingIdentity.status === 'active' ? existingIdentity.user : undefined,
-        );
-        throw new ForbiddenException({
-          code: 'PERMISSION_DENIED',
-          message: 'This account cannot sign in',
-        });
+        this.refuseInactiveSocialIdentity(existingIdentity);
       }
 
       // Apple sends the name on the first authorization only; later logins carry none.
@@ -1504,6 +1490,27 @@ export class AuthService {
   /** `proven` is passed only by a sign-in that verified this account's own credentials; it adds the cancel token to the refusal. */
   private assertNotWithdrawalPending(accountStatus: V1AccountStatus, proven?: { id: string; sessionEpoch: number }) {
     if (accountStatus === 'withdrawal_pending') throw withdrawalPendingException(proven);
+  }
+
+  /**
+   * Refuses a Kakao/Apple sign-in whose identity row or account is not active. A login method its owner removed gets its
+   * own code, so the client can say how to get back in instead of showing the suspended-account screen.
+   */
+  private refuseInactiveSocialIdentity(identity: {
+    status: string;
+    user: { id: string; accountStatus: V1AccountStatus; sessionEpoch: number };
+  }): never {
+    this.assertNotWithdrawalPending(identity.user.accountStatus, identity.status === 'active' ? identity.user : undefined);
+    if (identity.status === 'unlinked' && identity.user.accountStatus === 'active') {
+      throw new ForbiddenException({
+        code: 'LOGIN_METHOD_UNLINKED',
+        message: '연결을 해제한 로그인 수단이에요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+      });
+    }
+    throw new ForbiddenException({
+      code: 'PERMISSION_DENIED',
+      message: 'This account cannot sign in',
+    });
   }
 
   async sessionResponse(

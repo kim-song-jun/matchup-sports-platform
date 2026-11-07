@@ -141,7 +141,7 @@ function createDatabase(seed: { users: Row[]; identities: Row[] }) {
         apply(found, data);
         return found;
       }),
-      findMany: jest.fn(async ({ where }: Row) => state.identities.filter((row) => matches(row, where))),
+      findFirst: jest.fn(async ({ where }: Row) => state.identities.find((row) => matches(row, where)) ?? null),
       updateMany: jest.fn(async ({ where, data }: Row) => {
         const rows = state.identities.filter((row) => matches(row, where));
         rows.forEach((row) => apply(row, data));
@@ -615,20 +615,6 @@ describe('EmailLinkService.complete', () => {
       const [, , , options] = notifications.createInTransaction.mock.calls[0];
       expect(options.businessKey).toMatch(/^email-link:email-removed:\d+$/);
       expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
-    });
-
-    it('picks the removed row that already sits on the address, so the move cannot collide with another removed row', async () => {
-      const seed = kakaoCaller();
-      seed.identities.push(removedEmailLogin());
-      seed.identities.push(
-        identity('email-removed-newer', CALLER, 'email', NEW_EMAIL, { status: 'unlinked', createdAt: new Date('2026-03-01T00:00:00Z') }),
-      );
-      const { verified, complete, state } = await build(seed);
-
-      await complete(await verified());
-
-      expect(state.identities.find((row) => row.id === 'email-removed-newer')).toMatchObject({ status: 'active', providerUserKey: NEW_EMAIL });
-      expect(state.identities.find((row) => row.id === 'email-removed')).toMatchObject({ status: 'unlinked', providerUserKey: `deleted:${CALLER}:email-removed` });
     });
 
     it('lets another account claim the address the removal freed', async () => {

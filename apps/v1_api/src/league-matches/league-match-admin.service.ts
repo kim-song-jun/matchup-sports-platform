@@ -2612,7 +2612,7 @@ export class LeagueMatchAdminService {
         ? slots[index].startAt
         : (input.matchdayStartAts?.[round - 1] ?? resolveFixtureStartAt(input.leagueStartsOn, round)),
     );
-    const titles = leagueFixtureTitles(input.leagueTitle, startAts, { numbered: slots !== undefined });
+    const titles = leagueFixtureTitles(input.leagueTitle, startAts);
     const ids: string[] = [];
     for (const [index, { home, away }] of pairings.entries()) {
       const slot = slots?.[index];

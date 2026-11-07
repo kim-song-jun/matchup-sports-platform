@@ -1750,6 +1750,12 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
     });
 
+    it('최대 선수 수 칸 아래에 등록 명단 최대 인원 설명을 보여 준다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      expect(screen.getByText('팀당 등록할 수 있는 최대 인원이에요. 팀이 12명이면 12 이상으로 바꿔 주세요')).toBeInTheDocument();
+    });
+
     it('혼성 정원 그룹 오류는 그 그룹의 첫 입력(남성 최소)에 포커스한다', () => {
       renderInScroller();
       goToParticipationStep();

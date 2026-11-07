@@ -480,6 +480,13 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (`syncLeagueFixtureWeekTitles`). Titles without a trailing week token (operator-chosen names) are kept. When
   another fixture's title has to change, that path takes the league row with `FOR UPDATE NOWAIT` first and
   returns `409 COMMAND_CONCURRENCY_CONFLICT` instead of waiting (retryable).
+- **Game number (`M경기`, 2026-11-07):** the auto title `<league> N주차 M경기` counts `M` within the calendar
+  week and keeps counting across the days of that week (Saturday 1–8, Sunday 9–15); a new week restarts at 1.
+  Bulk generation with `timing`, the template (both with and without `gamesPerDay`) and a manual add without
+  `title` all use this rule; a manual add takes the next number of its week (the larger of the week's fixture
+  count and its highest auto-title number, plus one, so a deleted fixture never causes a repeat). `M` is written
+  once at creation: later changes to a fixture's date rewrite `N` only, and generation without `timing`
+  (one round per week) keeps the title without `M경기`. Fixtures created before this rule keep their titles.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -550,8 +557,8 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
   apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
   regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
-  title's `N주차` is first written with the day number and then rewritten to the calendar week (see the week
-  number rule above). `placeName`
+  title is `<league> N주차 M경기` by the week and game number rules above (`N` is rewritten to the calendar
+  week after creation). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`

@@ -954,6 +954,7 @@ function ParticipationStep({
           max={50}
           disabled={pending}
           error={errors.maxPlayers}
+          hint="팀당 등록할 수 있는 최대 인원이에요. 팀이 12명이면 12 이상으로 바꿔 주세요"
           required
         />
       </div>
@@ -1561,10 +1562,12 @@ function NumberField({
   max,
   disabled,
   error,
+  hint,
   required = false,
 }: {
   id: string;
   label: string;
+  hint?: string;
   value: string;
   onChange: (value: string) => void;
   min: number;
@@ -1574,7 +1577,7 @@ function NumberField({
   required?: boolean;
 }) {
   return (
-    <Field id={id} label={label} required={required} error={error}>
+    <Field id={id} label={label} required={required} error={error} hint={hint}>
       <input
         id={id}
         type="number"

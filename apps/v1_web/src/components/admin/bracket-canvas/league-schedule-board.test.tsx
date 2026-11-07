@@ -166,9 +166,10 @@ describe('LeagueScheduleBoard — 렌더', () => {
   });
 
   // 2026-11-03 사용자 확정: 칸은 달력 주(월~일)이고 칸마다 경기 수·쉬는 팀·두 경기 팀을 요약한다.
-  it('주차 칸 제목은 그 주 월~일 날짜 범위이고, 요약 줄에 경기 수와 쉬는 팀을 보인다', () => {
+  it('주차 칸 제목은 그 주에 경기가 있는 날짜이고, 요약 줄에 경기 수와 쉬는 팀을 보인다', () => {
     renderBoard();
-    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('1주차 · 1/7 (월)~1/13 (일)');
+    // A week with games on one day shows only that day, not Monday to Sunday.
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent(/^1주차 · 1\/7 \(월\)$/);
     // 1주차는 팀 없는 자리 경기 하나 — 참가팀 셋이 모두 쉰다.
     expect(screen.getByText('1경기 · 쉬는 팀 독수리FC, 사자FC, 호랑이FC')).toBeInTheDocument();
     // 2주차(사자 vs 호랑이)는 독수리만 쉰다.
@@ -183,7 +184,8 @@ describe('LeagueScheduleBoard — 렌더', () => {
       ],
       slots: [],
     });
-    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('1주차 · 1/7 (월)~1/13 (일)');
+    // Games exist only on Saturday and Sunday, so Monday to Friday stay out of the heading.
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('1주차 · 1/12 (토)~1/13 (일)');
     expect(screen.getByText('두 경기 이상: 독수리FC')).toBeInTheDocument();
     expect(within(cardOf('독수리FC 대 사자FC 경기')).getByText(/1\/13 \(일\) 10:00/)).toBeInTheDocument();
     // 여섯 쌍이 아니라 세 팀 세 쌍 중 호랑이-사자만 아직 안 붙었다.
@@ -194,7 +196,7 @@ describe('LeagueScheduleBoard — 렌더', () => {
     const onAddToWeek = vi.fn();
     const { unmount } = renderBoard({ onAddToWeek });
     fireEvent.click(screen.getByRole('button', { name: '2주차에 경기 추가' }));
-    expect(onAddToWeek).toHaveBeenCalledWith(expect.objectContaining({ weekNumber: 2, startDate: '2030-01-14', endDate: '2030-01-20' }));
+    expect(onAddToWeek).toHaveBeenCalledWith(expect.objectContaining({ weekNumber: 2, key: '2030-01-14', firstGameDate: '2030-01-14', lastGameDate: '2030-01-14' }));
     unmount();
     renderBoard();
     expect(screen.queryByRole('button', { name: /주차에 경기 추가/ })).toBeNull();

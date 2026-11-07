@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import {
+  Prisma,
   V1AccountStatus,
   V1GameEventType,
   V1GameSourceType,
@@ -131,7 +132,7 @@ async function createTask8RetryService(lineupReady = true) {
       id: 'task8-retry-game',
       sourceType: V1GameSourceType.TEAM_MATCH,
       teamMatchId: '80000000-0000-4000-8000-000000000002',
-      state: V1GameState.LIVE,
+      state: V1GameState.LIVE as V1GameState,
       version: 0,
       lastSequence: 0,
       competitionConfigVersionId: 'task8-config',
@@ -140,10 +141,13 @@ async function createTask8RetryService(lineupReady = true) {
       string,
       { payloadHash: string; responseStatus: number; responseBody: Record<string, unknown> }
     >(),
+    /** When set, every transaction rejects with it before running any callback. */
+    transactionError: null as Error | null,
   };
 
   const database = {
     async $transaction(callback: (transaction: unknown) => Promise<unknown>) {
+      if (state.transactionError !== null) throw state.transactionError;
       return callback(database);
     },
     async $queryRaw(_query: TemplateStringsArray, ..._values: unknown[]) {
@@ -613,6 +617,145 @@ describe('Task 8 offline event retry service contract', () => {
       });
       expect(fixture.state.events.map((stored) => stored.sequence)).toEqual([1]);
       expect(fixture.state.game.version).toBe(1);
+    } finally {
+      await fixture.close();
+    }
+  });
+});
+
+/**
+ * 사용자에게 그대로 보이는 거절 문구. 코드는 클라이언트가 분기하는 계약이고,
+ * 문구는 운영 콘솔이 REST 실패를 `extractErrorMessage` 로 그대로 띄우는 화면의 계약이다.
+ */
+describe('거절 응답 문구 — 운영 콘솔이 그대로 보여 주는 한국어 안내', () => {
+  const CONCURRENCY_MESSAGE = '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.';
+  const writeConflict = () =>
+    new Prisma.PrismaClientKnownRequestError('Transaction failed due to a write conflict', {
+      code: 'P2034',
+      clientVersion: 'test',
+    });
+
+  it('이벤트 기록이 동시 커맨드와 부딪히면 409 COMMAND_CONCURRENCY_CONFLICT 를 한국어로 돌려준다', async () => {
+    const fixture = await createTask8RetryService();
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    fixture.state.transactionError = writeConflict();
+
+    try {
+      await expect(
+        fixture.service.appendEvent(
+          reader,
+          'task8-retry-game',
+          'task8-concurrent-append',
+          appendInput('task8-concurrent-append', immutableEvent({}), 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'COMMAND_CONCURRENCY_CONFLICT', message: CONCURRENCY_MESSAGE },
+      });
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it('오프라인 이벤트 재전송이 동시 커맨드와 부딪혀도 같은 코드와 한국어 안내다', async () => {
+    const fixture = await createTask8RetryService();
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    fixture.state.transactionError = writeConflict();
+
+    try {
+      await expect(
+        retryEvent(
+          fixture.service,
+          'task8-retry-game',
+          retryInput('task8-concurrent-retry', offlineImmutableEvent({}), 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'COMMAND_CONCURRENCY_CONFLICT', message: CONCURRENCY_MESSAGE },
+      });
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it('참가자 신원 커맨드가 동시 커맨드와 부딪혀도 같은 코드와 한국어 안내다', async () => {
+    const fixture = await createTask8RetryService();
+    fixture.state.transactionError = writeConflict();
+    const withParticipantCommand = Reflect.get(fixture.service, 'withParticipantCommand');
+
+    try {
+      await expect(
+        Reflect.apply(withParticipantCommand, fixture.service, [
+          {
+            gameId: 'task8-retry-game',
+            action: 'participant_identity',
+            resourceId: 'task8-participant',
+            expectedVersion: 0,
+            headerIdempotencyKey: 'task8-concurrent-identity',
+            bodyCommandId: 'task8-concurrent-identity',
+            payload: {},
+            resolveActor: async () => {
+              throw new Error('transaction must fail before the actor is resolved');
+            },
+          },
+          async () => ({}),
+        ]),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'COMMAND_CONCURRENCY_CONFLICT', message: CONCURRENCY_MESSAGE },
+      });
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it('서버 시각과 30초 넘게 어긋난 이벤트는 422 CLOCK_DRIFT 를 한국어로 돌려준다', async () => {
+    const fixture = await createTask8RetryService();
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    const stale = { ...offlineImmutableEvent({}, 2), type: V1GameEventType.PERIOD_START };
+
+    try {
+      await expect(
+        fixture.service.appendEvent(
+          reader,
+          'task8-retry-game',
+          'task8-clock-drift',
+          appendInput('task8-clock-drift', stale, 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: {
+          code: 'CLOCK_DRIFT',
+          message: '기록 시각이 서버 시각과 30초 넘게 차이 나요. 다시 시도해 주세요. 계속 같은 안내가 나오면 기기의 날짜와 시간을 확인해 주세요.',
+        },
+      });
+      expect(fixture.state.events).toHaveLength(0);
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it('끝난 경기에 이벤트를 기록하면 409 TERMINAL_GAME_IMMUTABLE 을 한국어로 돌려준다', async () => {
+    const fixture = await createTask8RetryService();
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    fixture.state.game.state = V1GameState.ENDED;
+
+    try {
+      await expect(
+        fixture.service.appendEvent(
+          reader,
+          'task8-retry-game',
+          'task8-terminal-append',
+          appendInput('task8-terminal-append', immutableEvent({}), 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: {
+          code: 'TERMINAL_GAME_IMMUTABLE',
+          message: '이미 끝났거나 취소된 경기는 기록을 바꿀 수 없어요.',
+        },
+      });
+      expect(fixture.state.events).toHaveLength(0);
     } finally {
       await fixture.close();
     }

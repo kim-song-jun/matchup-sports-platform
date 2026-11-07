@@ -468,9 +468,7 @@ export function ResultEditModal({
    * (`games.service.ts`)와 1:1로 맞춘다 -- 그쪽은 두 방향 모두 하드 거부한다:
    *
    *  - 결선 픽스처가 아니면        -> 409 `TOURNAMENT_PENALTY_NOT_ALLOWED`
-   *    ('...can only be recorded for knockout-phase fixtures')
    *  - 정규시간이 무승부가 아니면  -> 409 `TOURNAMENT_PENALTY_NOT_ALLOWED`
-   *    ('...only recorded when regulation time ends level')
    *
    * 그래서 그 두 경우에는 base 에 승부차기 값이 있어도 **싣지 않는다**. 무조건 통과시키면
    * (a) 서버 가드가 배포된 뒤에는 결선 경기의 정규시간 점수 정정이 아예 불가능해지고

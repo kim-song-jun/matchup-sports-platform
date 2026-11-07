@@ -29,20 +29,83 @@ describe('mobile floating action button layout', () => {
   });
 });
 
-describe('Android bottom inset layout', () => {
-  it('keeps no-bottom-nav pages above the system navigation area', () => {
-    const rule = globalsCss.match(/\.tm-app-frame-no-bottom \.tm-scroll-area\s*\{([^}]*)\}/)?.[1];
+// jsdom 은 cascade 를 계산하지 못한다. 요소에 매칭되는 globals.css 규칙의 선언값을 파일 순서대로
+// 모으고, 마지막 값을 적용값으로 읽는다 — 스크롤 영역 규칙은 일반 → 예외(:has) 순서로, 뒤에 올수록
+// 선택자가 더 구체적이도록 놓여 있다. 이 순서가 뒤집히면 아래 테스트가 깨진다.
+const globalsRootRules: postcss.Rule[] = [];
+postcss.parse(globalsCss).each((node) => {
+  if (node.type === 'rule') globalsRootRules.push(node);
+});
 
-    expect(rule).toBeDefined();
-    expect(rule).toMatch(/bottom:\s*var\(--v1-shell-safe-bottom\)/);
+function declaredValues(element: Element, property: string, selectorNeedle: string): string[] {
+  return globalsRootRules
+    .filter((rule) => rule.selectors.some((selector) => selector.includes(selectorNeedle) && element.matches(selector)))
+    .flatMap((rule) => rule.nodes.filter((node): node is postcss.Declaration => node.type === 'decl' && node.prop === property))
+    .map((declaration) => declaration.value.trim());
+}
+
+describe('scroll area bottom edge and system inset', () => {
+  const FRAME = (className: string, inner: string) => `<div class="tm-app-frame ${className}"><main class="tm-scroll-area">${inner}</main></div>`;
+  const SAFE = 'var(--v1-shell-safe-bottom)';
+
+  afterEach(() => {
+    document.body.innerHTML = '';
   });
 
-  it('does not reserve the inset twice when a child surface already consumes it', () => {
-    expect(globalsCss).toMatch(
-      /\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-fixed-cta\),\s*\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-chat-room\)\s*\{\s*bottom:\s*0;/,
+  // 안전영역을 스크롤 영역 바깥 간격(bottom)으로 쓰면 그 띠에는 아무것도 안 그려져 카드가 직선으로
+  // 잘린다. 스크롤 영역은 화면 끝까지 닿고, 안전영역은 끝 여백(padding-bottom)으로 쓴다.
+  it('runs a no-tab-bar scroller to the screen edge and reserves the inset as end padding', () => {
+    document.body.innerHTML = FRAME('tm-app-frame-no-bottom', '<div>content</div>');
+    const scroller = document.querySelector('.tm-scroll-area')!;
+
+    expect(declaredValues(scroller, 'bottom', '.tm-scroll-area').at(-1)).toBe('0');
+    expect(declaredValues(scroller, 'padding-bottom', '.tm-scroll-area').at(-1)).toBe(SAFE);
+  });
+
+  it.each([
+    ['a page with its own fixed action bar', '<div class="tm-fixed-cta"></div>'],
+    ['a chat room that lays out its own input bar', '<div class="tm-chat-room"></div>'],
+  ])('does not reserve the inset twice on %s', (_name, inner) => {
+    document.body.innerHTML = FRAME('tm-app-frame-no-bottom', inner);
+    const scroller = document.querySelector('.tm-scroll-area')!;
+
+    expect(declaredValues(scroller, 'bottom', '.tm-scroll-area').at(-1)).toBe('0');
+    expect(declaredValues(scroller, 'padding-bottom', '.tm-scroll-area').at(-1)).toBe('0');
+  });
+
+  it('still stops a tab-bar scroller above the tab bar and leaves its end padding to the shell', () => {
+    document.body.innerHTML = FRAME('', '<div>content</div>');
+    const scroller = document.querySelector('.tm-scroll-area')!;
+
+    expect(declaredValues(scroller, 'bottom', '.tm-scroll-area').at(-1)).toBe(
+      'calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom))',
     );
+    expect(declaredValues(scroller, 'padding-bottom', '.tm-scroll-area')).toEqual([]);
   });
 
+  describe('auth screens', () => {
+    const AUTH = (scrollClass: string) => `<div class="tm-auth-frame"><div class="tm-auth-scroll ${scrollClass}"></div></div>`;
+
+    it('runs the auth scroller to the screen edge and reserves the inset as end padding', () => {
+      document.body.innerHTML = AUTH('');
+      const scroller = document.querySelector('.tm-auth-scroll')!;
+
+      // inset: <top> <left/right> <bottom>
+      expect(declaredValues(scroller, 'inset', '.tm-auth-scroll').at(-1)?.split(/\s+/)[2]).toBe('0');
+      expect(declaredValues(scroller, 'padding-bottom', '.tm-auth-scroll').at(-1)).toBe(SAFE);
+    });
+
+    it('leaves the inset to the fixed action bar below an auth scroller that has one', () => {
+      document.body.innerHTML = AUTH('tm-auth-scroll-with-cta');
+      const scroller = document.querySelector('.tm-auth-scroll')!;
+
+      expect(declaredValues(scroller, 'bottom', '.tm-auth-scroll').at(-1)).toMatch(/^var\(--tm-auth-cta-height/);
+      expect(declaredValues(scroller, 'padding-bottom', '.tm-auth-scroll').at(-1)).toBe('0');
+    });
+  });
+});
+
+describe('Android bottom inset layout', () => {
   it('lets sheets in the admin shell cover the whole viewport (no app-frame width, no tab-bar gap)', () => {
     const rule = globalsCss.match(/\.tm-admin-shell \.tm-filter-scrim,\s*\.tm-admin-shell \.tm-filter-layer\s*\{([^}]*)\}/)?.[1];
 
@@ -114,8 +177,8 @@ describe('bottom sheet placement', () => {
 
 describe('shell bottom safe-area source', () => {
   // Without viewport-fit=cover a correct UA reports env(safe-area-inset-bottom) as 0, but some
-  // in-app WebViews report a non-zero value anyway. Reading it would shorten every
-  // no-bottom-nav scroller (bottom: var(--v1-shell-safe-bottom)) into a blank strip.
+  // in-app WebViews report a non-zero value anyway. Reading it would add that much dead space to
+  // the end of every no-bottom-nav scroller and to the tab bar.
   it('does not read env(safe-area-inset-bottom) while the viewport has no viewport-fit=cover', () => {
     expect(appSourcesEnablingViewportFitCover(resolve(process.cwd(), 'src/app'))).toEqual([]);
 

@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   importFieldPlacesMutate: vi.fn(),
   // 테스트마다 필드 목록을 바꿀 수 있게 한다(빈 목록 케이스가 이 이슈의 핵심).
   fieldsResult: vi.fn(() => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } })),
+  // Kind of the tournament the grant dialog is open for; undefined means unknown (treated as a tournament).
+  tournamentKind: undefined as string | undefined,
   // 스태프 배정 후보 검색. 배정 폼이 UUID 직접 입력에서 닉네임 검색으로 바뀌며 추가됐다.
   candidateSearchResult: vi.fn(() => ({
     data: { items: [{ id: 'user-seungmin', nickname: '이승민', displayName: null, maskedEmail: 'se***@example.com' }] },
@@ -62,7 +64,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     refetch: vi.fn(),
   }),
   useV1TournamentFields: () => mocks.fieldsResult(),
-  useV1Tournament: () => ({ data: { title: '가을 풋살 대회' } }),
+  useV1Tournament: () => ({ data: { title: '가을 풋살 대회', kind: mocks.tournamentKind } }),
   useV1GrantTournamentStaff: () => ({ mutate: mocks.grantMutate, isPending: false }),
   useV1RevokeTournamentStaff: () => ({ mutate: mocks.revokeMutate, isPending: false }),
   useV1CreateTournamentField: () => ({ mutate: mocks.createFieldMutate, isPending: false }),
@@ -95,6 +97,7 @@ describe('StaffClient', () => {
     mocks.createFieldMutate.mockReset();
     mocks.importFieldPlacesMutate.mockReset();
     mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } });
+    mocks.tournamentKind = undefined;
     mocks.candidateSearchResult.mockReturnValue({
       data: { items: [{ id: 'user-seungmin', nickname: '이승민', displayName: null, maskedEmail: 'se***@example.com' }] },
       isError: false,
@@ -271,6 +274,61 @@ describe('StaffClient', () => {
     mocks.grantMutate.mockImplementation((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess());
     await user.click(screen.getByRole('button', { name: '배정하기' }));
     expect(screen.getByText(/배정했어요\. 그분은 마이페이지/)).toHaveTextContent('“담당 대회 운영”에서 이 대회 관리 화면으로');
+  });
+
+  describe('정규 리그의 대회 디렉터 배정 안내', () => {
+    const LEAGUE_DIRECTOR_NOTICE = '리그에서 디렉터는 운영 보드만 볼 수 있어요. 결과 입력·확정은 운영자가 해요.';
+
+    it('정규 리그에서 대회 디렉터를 고르면 할 수 있는 일의 한계를 배정 전에 알려 준다', async () => {
+      setRole('PLATFORM_OPS');
+      mocks.tournamentKind = 'regular_league';
+      const user = userEvent.setup();
+      render(<StaffClient tournamentId="t-1" />);
+      await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+      const dialog = screen.getByRole('dialog');
+
+      // TOURNAMENT_DIRECTOR is the first role for platform ops, so the notice applies as soon as the dialog opens.
+      expect(within(dialog).getByText(LEAGUE_DIRECTOR_NOTICE)).toBeInTheDocument();
+      // The entry-destination note is unchanged: the notice only adds to it.
+      expect(dialog).toHaveTextContent('“담당 대회 운영”에서 이 대회 운영 보드로 들어갈 수 있어요.');
+
+      mocks.grantMutate.mockImplementation((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+      await pickCandidate(user, '이승민');
+      await user.click(screen.getByRole('button', { name: '배정하기' }));
+      expect(mocks.grantMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-seungmin', role: 'TOURNAMENT_DIRECTOR' }),
+        expect.anything(),
+      );
+    });
+
+    it('정규 대회에서 대회 디렉터를 골라도 리그 안내는 없다 (대조군)', async () => {
+      setRole('PLATFORM_OPS');
+      mocks.tournamentKind = 'regular_tournament';
+      const user = userEvent.setup();
+      render(<StaffClient tournamentId="t-1" />);
+      await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+      await user.selectOptions(screen.getByLabelText('역할'), 'TOURNAMENT_DIRECTOR');
+
+      expect(screen.getByRole('dialog')).toHaveTextContent('이 대회 관리 화면으로');
+      expect(screen.queryByText(LEAGUE_DIRECTOR_NOTICE)).not.toBeInTheDocument();
+    });
+
+    it('정규 리그여도 필드 담당자·지원 역할에는 안내가 없고, 디렉터에서 다른 역할로 바꾸면 사라진다 (대조군)', async () => {
+      setRole('PLATFORM_OPS');
+      mocks.tournamentKind = 'regular_league';
+      const user = userEvent.setup();
+      render(<StaffClient tournamentId="t-1" />);
+      await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+      const role = screen.getByLabelText('역할');
+
+      expect(screen.getByText(LEAGUE_DIRECTOR_NOTICE)).toBeInTheDocument();
+      await user.selectOptions(role, 'FIELD_OPERATOR');
+      expect(screen.queryByText(LEAGUE_DIRECTOR_NOTICE)).not.toBeInTheDocument();
+      await user.selectOptions(role, 'SUPPORT_READONLY');
+      expect(screen.queryByText(LEAGUE_DIRECTOR_NOTICE)).not.toBeInTheDocument();
+      await user.selectOptions(role, 'TOURNAMENT_DIRECTOR');
+      expect(screen.getByText(LEAGUE_DIRECTOR_NOTICE)).toBeInTheDocument();
+    });
   });
 
   /* 종전에는 이 자리가 사용자 UUID 직접 입력이었고, 안내는 "어드민 > 사용자 관리에서 ID를

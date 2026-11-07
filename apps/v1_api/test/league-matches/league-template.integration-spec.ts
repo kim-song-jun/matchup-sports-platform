@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { createV1IntegrationApp } from '../integration/integration-app';
 import { createLeagueSlotHarness, type LeagueSlotHarness } from './helpers/league-slot-harness';
+import { upcomingWeekend } from './helpers/upcoming-weekend';
 
 /** KST 달력 날짜 문자열 — 서버가 그 날의 KST 벽시계로 해석한다. 과거 날짜는 422 라 항상 미래로 만든다. */
 const kstDates = (count: number) =>
@@ -53,7 +54,7 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     }
     // 제목의 N주차 ↔ 일정 날짜(N번째) — 라운드와 날짜가 어긋나면 여기서 잡힌다.
     for (const fixture of fixtures) {
-      const round = Number(/(\d+)주차$/.exec(fixture.title)?.[1]);
+      const round = Number(/ (\d+)주차( \d+경기)?$/.exec(fixture.title)?.[1]);
       expect(fixture.startAt?.toISOString()).toBe(new Date(`${dates[round - 1]}T19:00:00+09:00`).toISOString());
     }
     expect(await statusOf(leagueId)).toBe('draft');
@@ -78,14 +79,32 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
       at(dates[1], '19:00'), at(dates[1], '19:25'),
     ]);
     expect(fixtures.every((f) => f.endAt!.getTime() - f.startAt!.getTime() === 20 * 60_000)).toBe(true);
-    // 제목의 N주차는 N번째 경기 날짜다.
-    expect(fixtures.map((f) => Number(/(\d+)주차$/.exec(f.title)?.[1]))).toEqual([1, 1, 1, 1, 2, 2]);
+    // The two dates fall in different calendar weeks: the week number rises and the game number restarts.
+    expect(fixtures.map((f) => f.title.replace(/^.* (?=\d+주차)/, ''))).toEqual([
+      '1주차 1경기', '1주차 2경기', '1주차 3경기', '1주차 4경기', '2주차 1경기', '2주차 2경기',
+    ]);
 
     // 날짜가 모자라면(하루 4경기 → 2일 필요) 422.
     const other = await h.makeLeague();
     const few = await post(other, { teamCount: 4, legs: 1, schedule: { dates: kstDates(1), time: '19:00' }, gamesPerDay: 4 });
     expect(few.status).toBe(422);
     expect(few.body.code).toBe('LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT');
+  });
+
+  it('이틀이 같은 달력 주면 제목 순번이 날짜를 넘어 이어진다 — 둘째 날이 1경기부터 다시 시작하지 않는다', async () => {
+    const leagueId = await h.makeLeague();
+    const [saturday, sunday] = upcomingWeekend();
+
+    // 4 teams, 1 leg = 6 games; 4 a day gives Saturday 4 + Sunday 2.
+    const res = await post(leagueId, {
+      teamCount: 4, legs: 1, schedule: { dates: [saturday, sunday], time: '10:00' }, gamesPerDay: 4, gameDurationMinutes: 20,
+    });
+
+    expect(res.status).toBe(201);
+    const fixtures = await h.prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    expect(fixtures.map((f) => f.title.replace(/^.* (?=\d+주차)/, ''))).toEqual(
+      [1, 2, 3, 4, 5, 6].map((order) => `1주차 ${order}경기`),
+    );
   });
 
   it('일정은 필수다 — 없으면 400, 날짜가 모자라면 422, 과거 날짜는 422 이고 아무것도 만들지 않는다', async () => {

@@ -63,7 +63,7 @@ export class AdminDisciplineService {
       select: { title: true, kind: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true },
     });
     if (competition === null) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회·리그를 찾을 수 없어요.' });
     }
     const isLeague = competition.kind === V1CompetitionKind.regular_league;
     const kind = isLeague ? ('LEAGUE' as const) : ('TOURNAMENT' as const);

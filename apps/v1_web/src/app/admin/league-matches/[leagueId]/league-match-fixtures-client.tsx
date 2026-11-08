@@ -1481,6 +1481,7 @@ export default function LeagueMatchFixturesClient({
 
       {templateOpen ? (
         <LeagueTemplateDialog
+          leagueId={leagueId}
           leagueStartsOn={series.startsOn}
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
           defaultPlace={series.defaultPlace ?? null}

@@ -1,6 +1,48 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { v1Post } from '@/lib/api-client';
+import type { V1LeagueTemplatePreview } from '@/types/league-match';
 import { LeagueTemplateDialog, type LeagueTemplateDialogProps } from './league-template-dialog';
+
+vi.mock('@/lib/api-client', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return { ...actual, v1Post: vi.fn() };
+});
+const v1PostMock = vi.mocked(v1Post);
+
+/** 4 teams, one leg, 3 games a day at 19:00, 25 min + 5 min break. Seat 3 plays games 2 and 3 of day 1 back to back. */
+const PREVIEW: V1LeagueTemplatePreview = {
+  teamCount: 4,
+  legs: 1,
+  totalRounds: 3,
+  fixtureCount: 6,
+  gamesPerDay: 3,
+  days: [
+    {
+      day: 1, startTime: '19:00', endTime: '20:25',
+      games: [
+        { round: 1, order: 1, startTime: '19:00', endTime: '19:25', homePosition: 1, awayPosition: 4, backToBack: [] },
+        { round: 1, order: 2, startTime: '19:30', endTime: '19:55', homePosition: 2, awayPosition: 3, backToBack: [] },
+        { round: 2, order: 3, startTime: '20:00', endTime: '20:25', homePosition: 1, awayPosition: 3, backToBack: [{ position: 3, games: 2 }] },
+      ],
+    },
+    {
+      day: 2, startTime: '19:00', endTime: '20:25',
+      games: [
+        { round: 2, order: 1, startTime: '19:00', endTime: '19:25', homePosition: 4, awayPosition: 2, backToBack: [] },
+        { round: 3, order: 2, startTime: '19:30', endTime: '19:55', homePosition: 1, awayPosition: 2, backToBack: [{ position: 2, games: 2 }] },
+        { round: 3, order: 3, startTime: '20:00', endTime: '20:25', homePosition: 3, awayPosition: 4, backToBack: [] },
+      ],
+    },
+  ],
+  checks: { duplicateMeetings: 0, missingMeetings: 0, backToBackRuns: [{ day: 1, position: 3, fromOrder: 2, toOrder: 3, games: 2 }, { day: 2, position: 2, fromOrder: 1, toOrder: 2, games: 2 }] },
+};
+
+beforeEach(() => {
+  v1PostMock.mockReset();
+  v1PostMock.mockResolvedValue(PREVIEW);
+});
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
@@ -23,7 +65,9 @@ function setup(overrides: Partial<LeagueTemplateDialogProps> = {}) {
   const onSubmit = vi.fn().mockResolvedValue({ slots: 4, fixtures: 6 });
   const onClose = vi.fn();
   render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <LeagueTemplateDialog
+      leagueId="league-1"
       leagueStartsOn={STARTS_ON}
       initialTeamCount={4}
       defaultPlace={null}
@@ -33,7 +77,8 @@ function setup(overrides: Partial<LeagueTemplateDialogProps> = {}) {
       onSubmit={onSubmit}
       onClose={onClose}
       {...overrides}
-    />,
+    />
+    </QueryClientProvider>,
   );
   return { onSubmit, onClose };
 }
@@ -200,5 +245,62 @@ describe('LeagueTemplateDialog', () => {
 
     expect(screen.queryByRole('button', { name: '요일로 채우기' })).toBeNull();
     expect(screen.getByText('리그 시작일이 없어 요일로 채울 수 없어요.')).toBeInTheDocument();
+  });
+
+  describe('생성 미리보기', () => {
+    const previewCalls = () => v1PostMock.mock.calls.filter(([path]) => String(path).endsWith('/fixtures/template/preview'));
+
+    it('하루 경기 수·경기 시간·휴식·시작 시각을 서버에 보내 시간표와 연속 출전을 그대로 보여 준다', async () => {
+      setup();
+
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '25' } });
+      fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
+
+      expect(await screen.findByText('1일째 · 19:00~20:25 · 3경기')).toBeInTheDocument();
+      expect(previewCalls().at(-1)).toEqual([
+        '/admin/league-matches/league-1/fixtures/template/preview',
+        { teamCount: 4, legs: 1, time: '19:00', gamesPerDay: 3, gameDurationMinutes: 25, breakMinutes: 5 },
+      ]);
+      expect(screen.getByText('1번 자리 대 3번 자리')).toBeInTheDocument();
+      expect(screen.getByText('3번 자리 2번 연속')).toBeInTheDocument();
+      expect(screen.getByText(/2곳에서 한 팀이 쉬는 시간 없이 이어서 뛰어요/)).toBeInTheDocument();
+      expect(screen.getByText(/중복·누락 없음/)).toBeInTheDocument();
+    });
+
+    it('연속 출전이 없으면 그렇다고 알리고, 중복·누락이 있으면 숫자를 보여 준다', async () => {
+      v1PostMock.mockResolvedValue({
+        ...PREVIEW,
+        checks: { duplicateMeetings: 1, missingMeetings: 2, backToBackRuns: [] },
+        days: PREVIEW.days.map((day) => ({ ...day, games: day.games.map((game) => ({ ...game, backToBack: [] })) })),
+      });
+      setup();
+
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '3' } });
+
+      expect(await screen.findByText('중복 1경기 · 빠진 경기 2경기가 있어요.')).toBeInTheDocument();
+      expect(screen.getByText('한 팀이 쉬는 시간 없이 이어서 뛰는 경기는 없어요.')).toBeInTheDocument();
+      expect(screen.queryByText(/번 연속/)).toBeNull();
+    });
+
+    it('하루 경기 수가 없거나 범위 밖이면 요청도 영역도 없다', async () => {
+      setup();
+
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '99' } });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      expect(previewCalls()).toHaveLength(0);
+      expect(screen.queryByText('생성 미리보기')).toBeNull();
+    });
+
+    it('서버가 거부하면 그 메시지를 미리보기 자리에 보여 준다', async () => {
+      const { V1ApiError } = await import('@/lib/api-client');
+      v1PostMock.mockRejectedValue(new V1ApiError({ status: 'error', timestamp: '2030-01-01T00:00:00.000Z', statusCode: 422, code: 'LEAGUE_FIXTURE_DURATION_REQUIRED', message: '이 리그의 기본 경기 시간을 알 수 없어요. 경기 시간(분)을 입력해 주세요.' }));
+      setup();
+
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '3' } });
+
+      expect(await screen.findByText(/기본 경기 시간을 알 수 없어요/)).toBeInTheDocument();
+    });
   });
 });

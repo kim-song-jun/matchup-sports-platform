@@ -1,4 +1,4 @@
-import { generateRoundRobinFixtures } from './round-robin-schedule';
+import { generateRoundRobinFixtures, matchdayCountOf, resolveFixtureTimeSlots } from './round-robin-schedule';
 
 export const LEAGUE_TEMPLATE_MIN_TEAMS = 3;
 export const LEAGUE_TEMPLATE_MAX_TEAMS = 20;
@@ -25,4 +25,33 @@ export function planLeagueTemplate(input: { teamCount: number; legs: 1 | 2 }): L
     awayPosition: Number(fixture.awayTeamId),
   }));
   return { slotPositions, fixtures, totalRounds };
+}
+
+export type LeagueTemplateTiming = { gameDurationMinutes: number; breakMinutes: number; gamesPerDay: number };
+export type LeagueTemplateSlot = { matchday: number; orderInDay: number; startAt: Date; endAt: Date | null };
+
+/** Dates needed: one per round, or `ceil(fixtures / gamesPerDay)` when a daily game count is set. */
+export function templateMatchdayCount(plan: LeagueTemplatePlan, gamesPerDay: number | undefined): number {
+  return gamesPerDay === undefined ? plan.totalRounds : matchdayCountOf(plan.fixtures, gamesPerDay);
+}
+
+/**
+ * Start/end time of every template fixture, in plan order. Without `timing` a whole round shares one start
+ * and has no end; with it the day's games run back to back on one pitch (`resolveFixtureTimeSlots`).
+ * Template creation and the dry-run preview both call this so they cannot disagree.
+ */
+export function resolveTemplateSlots(
+  plan: LeagueTemplatePlan,
+  matchdayStartAts: readonly Date[],
+  timing: LeagueTemplateTiming | null,
+): LeagueTemplateSlot[] {
+  if (timing === null) {
+    const seenByRound = new Map<number, number>();
+    return plan.fixtures.map((fixture) => {
+      const orderInDay = (seenByRound.get(fixture.round) ?? 0) + 1;
+      seenByRound.set(fixture.round, orderInDay);
+      return { matchday: fixture.round, orderInDay, startAt: matchdayStartAts[fixture.round - 1], endAt: null };
+    });
+  }
+  return resolveFixtureTimeSlots(plan.fixtures, matchdayStartAts, timing);
 }

@@ -101,6 +101,53 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     expect(few.body.code).toBe('LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT');
   });
 
+  it('미리보기는 쓰기 없이 만들어질 경기와 같은 시각·순서를 내고, 연속 출전을 알려 준다', async () => {
+    const leagueId = await h.makeLeague();
+    const dates = kstDates(2);
+    const body = { teamCount: 4, legs: 1 as const, gamesPerDay: 4, gameDurationMinutes: 20, breakMinutes: 5 };
+
+    const preview = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/template/preview`)
+      .set('x-v1-user-id', h.adminUserId)
+      .send({ ...body, time: '19:00' });
+
+    expect(preview.status).toBe(200);
+    expect(await h.prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
+    expect(await h.prisma.v1TournamentSlot.count({ where: { tournamentId: leagueId } })).toBe(0);
+    const { days, checks } = preview.body.data;
+    expect(checks.duplicateMeetings).toBe(0);
+    expect(checks.missingMeetings).toBe(0);
+
+    await post(leagueId, { ...body, schedule: { dates, time: '19:00' } });
+    const created = await h.prisma.v1TeamMatch.findMany({
+      where: { leagueId },
+      orderBy: { startAt: 'asc' },
+      select: { startAt: true, endAt: true, homeSlot: { select: { position: true } }, awaySlot: { select: { position: true } } },
+    });
+    const clock = (value: Date | null) => new Date(value!.getTime() + 9 * 3_600_000).toISOString().slice(11, 16);
+    type PreviewGame = { startTime: string; endTime: string; homePosition: number; awayPosition: number };
+    const previewed = days.flatMap((day: { games: PreviewGame[] }) => day.games);
+    expect(previewed.map((g: PreviewGame) => [g.startTime, g.endTime, g.homePosition, g.awayPosition])).toEqual(
+      created.map((f) => [clock(f.startAt), clock(f.endAt), f.homeSlot!.position, f.awaySlot!.position]),
+    );
+    // 4 teams: the third game of a day always shares a seat with the second.
+    expect(checks.backToBackRuns.length).toBeGreaterThan(0);
+  });
+
+  it('미리보기도 지원 어드민은 403이고, 하루 경기 수가 없으면 라운드별 시각표만 나온다', async () => {
+    const leagueId = await h.makeLeague();
+    const url = `/api/v1/admin/league-matches/${leagueId}/fixtures/template/preview`;
+
+    const denied = await request(app.getHttpServer()).post(url).set('x-v1-user-id', supportUserId).send({ teamCount: 4, legs: 1, time: '19:00' });
+    expect(denied.status).toBe(403);
+
+    const plain = await request(app.getHttpServer()).post(url).set('x-v1-user-id', h.adminUserId).send({ teamCount: 4, legs: 1, time: '19:00' });
+    expect(plain.status).toBe(200);
+    expect(plain.body.data.days).toHaveLength(3);
+    expect(plain.body.data.days[0].games.map((g: { endTime: string | null }) => g.endTime)).toEqual([null, null]);
+    expect(plain.body.data.checks.backToBackRuns).toEqual([]);
+  });
+
   it('이틀이 같은 달력 주면 제목 순번이 날짜를 넘어 이어진다 — 둘째 날이 1경기부터 다시 시작하지 않는다', async () => {
     const leagueId = await h.makeLeague();
     const [saturday, sunday] = upcomingWeekend();

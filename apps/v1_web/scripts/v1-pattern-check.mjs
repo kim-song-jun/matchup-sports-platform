@@ -130,6 +130,7 @@ function checkInertFontSizeClasses() {
 
 /* ── 모달 스크림 배경 누락 검사 ───────────────────────────────────── */
 // tm-modal-scrim 은 페이드만 정의한다. 배경색은 창마다 넣어서, 빠뜨리면 뒤 화면이 어두워지지 않는다.
+const DARK_SCRIM_CLASS = /(^|\s)bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/\d+)(\s|$)/;
 const SCRIMS_WITH_OWN_CSS_BACKGROUND = ['tm-photo-crop-scrim'];
 function checkModalScrimBackground() {
   const files = execSync("grep -rl 'tm-modal-scrim' src --include='*.tsx' --exclude='*.test.tsx' || true", { encoding: 'utf8' });
@@ -139,7 +140,7 @@ function checkModalScrimBackground() {
       let start = m.index;
       while (start > 0 && !['"', "'", '`'].includes(txt[start - 1])) start--;
       const classes = txt.slice(start, txt.indexOf(txt[start - 1], m.index));
-      if (/(^|\s)bg-/.test(classes) || SCRIMS_WITH_OWN_CSS_BACKGROUND.some((name) => classes.includes(name))) continue;
+      if (DARK_SCRIM_CLASS.test(classes) || SCRIMS_WITH_OWN_CSS_BACKGROUND.some((name) => classes.includes(name))) continue;
       const line = txt.slice(0, m.index).split('\n').length;
       violations.push(`[모달 스크림 배경 누락] ${f}:${line}: tm-modal-scrim 은 페이드만 정의한다. bg-[var(--scrim-dark-32)] 를 함께 넣을 것`);
     }

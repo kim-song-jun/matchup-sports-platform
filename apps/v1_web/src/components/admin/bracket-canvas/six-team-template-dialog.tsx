@@ -71,7 +71,7 @@ export function SixTeamTemplateDialog(
     <>
       {createPortal(<div
         style={{ zIndex: 'var(--z-modal)' }}
-        className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim"
+        className="fixed inset-0 flex items-center justify-center bg-[var(--scrim-dark-32)] p-4 tm-modal-scrim"
         onClick={onBackdropClick}
       >
         <div

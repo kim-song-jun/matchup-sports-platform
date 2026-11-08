@@ -519,8 +519,10 @@ export interface V1PreviewLeagueFixture {
   homeTeamId: string;
   awayTeamId: string;
   startAt: string;
-  /** timing 지정 시 라운드 G개가 묶인 매치데이(주차). 구버전 서버 응답엔 없다. */
+  /** timing 지정 시 라운드 G개가 묶인 매치데이(경기일 순번). 토·일처럼 한 주 안의 날도 따로 센다. 구버전 서버 응답엔 없다. */
   matchday?: number;
+  /** 만들어질 대진 제목의 "N주차"와 같은 값 — KST 달력 주(월~일)에서 경기가 있는 주만 센다. 구버전 서버 응답엔 없다. */
+  week?: number;
   /** timing 지정 시 그 매치데이 안의 경기 순번. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
   orderInDay?: number | null;
   /** timing 지정 시 경기 종료 시각. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
@@ -530,7 +532,7 @@ export interface V1PreviewLeagueFixture {
 export interface V1PreviewLeagueFixturesResult {
   leagueId: string;
   rounds: number;
-  /** timing 지정 시 실제 주차(매치데이) 수 — rounds(라운드 수)와 달라진다. 구버전 서버 응답엔 없다. */
+  /** timing 지정 시 경기일(매치데이) 수 — rounds(라운드 수)와 달라진다. 주 수는 `fixtures[].week` 로 센다. 구버전 서버 응답엔 없다. */
   matchdayCount?: number;
   fixtureCount: number;
   placeName: string;
@@ -851,6 +853,50 @@ export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   placeAddress?: string;
   /** 경기가 이미 있는 리그를 새 템플릿으로 바꿀 때만 true. */
   replaceExisting?: boolean;
+}
+
+/** `POST /admin/league-matches/:leagueId/fixtures/template/preview` — nothing is written. */
+export interface V1PreviewLeagueTemplatePayload {
+  teamCount: number;
+  legs: 1 | 2;
+  /** 'HH:mm' (KST) every day starts at. */
+  time: string;
+  gamesPerDay?: number;
+  gameDurationMinutes?: number;
+  breakMinutes?: number;
+}
+
+export interface V1LeagueTemplatePreviewGame {
+  round: number;
+  /** 1-based position inside the day. */
+  order: number;
+  startTime: string;
+  endTime: string | null;
+  homePosition: number;
+  awayPosition: number;
+  /** Seats of this game that also played the game right before it. */
+  backToBack: Array<{ position: number; games: number }>;
+}
+
+export interface V1LeagueTemplatePreviewDay {
+  day: number;
+  startTime: string;
+  endTime: string | null;
+  games: V1LeagueTemplatePreviewGame[];
+}
+
+export interface V1LeagueTemplatePreview {
+  teamCount: number;
+  legs: 1 | 2;
+  totalRounds: number;
+  fixtureCount: number;
+  gamesPerDay: number | null;
+  days: V1LeagueTemplatePreviewDay[];
+  checks: {
+    duplicateMeetings: number;
+    missingMeetings: number;
+    backToBackRuns: Array<{ day: number; position: number; fromOrder: number; toOrder: number; games: number }>;
+  };
 }
 
 export interface V1ApplyLeagueTemplateResult {

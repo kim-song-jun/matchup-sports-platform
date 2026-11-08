@@ -1,8 +1,8 @@
-import type { MultiFinalView } from '@/hooks/use-multi-finals';
+import type { MultiFinalPolicy, MultiFinalTiePick, MultiFinalView } from '@/hooks/use-multi-finals';
 import { josa } from '@/lib/korean';
 
 type Final = MultiFinalView['finals'][number];
-type Destination = { finalName: string; seed: number };
+type Destination = { finalName: string };
 
 /** A seed this final fills from a group rank whose tie the standings broke only by the seeded draw. */
 export type TiedSeat = { seat: number; rank: number; groupId: string; tiedRegistrationIds: string[] };
@@ -10,8 +10,10 @@ export type TieNotice = {
   key: string;
   banner: string;
   detail: string;
-  seats: Array<{ seat: number; label: string; hint: string | null; candidates: string[] }>;
+  seats: Array<{ seat: number; groupId: string; rank: number; label: string; hint: string | null; candidates: string[] }>;
 };
+/** The operator's tie choices, keyed by `pickKey`; a choice follows the team, not the seed it happens to sit in. */
+export type TiePickMap = Record<string, string>;
 
 const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
 
@@ -36,6 +38,67 @@ export function initialSeats(final: Final): Array<string | null> {
   return final.rules.map((_, index) => (open.has(index) ? null : final.suggestedRegistrationIds[next++]));
 }
 
+export const pickKey = (seat: { groupId: string; rank: number }) => `${seat.groupId}:${seat.rank}`;
+
+/** Saved picks for the current tie seats; a roster saved before picks existed gets them back from the team sitting in its rule-order seat. */
+export function initialPicks(final: Final, ids: ReadonlyArray<string | null>): TiePickMap {
+  const legacy = final.registrationIds != null && (final.assignmentPolicy ?? 'rank_order') === 'rank_order';
+  return Object.fromEntries(tiedSeats(final).flatMap((seat) => {
+    const stored = final.tiePicks.find((pick) => pick.groupId === seat.groupId && pick.rank === seat.rank)?.registrationId;
+    const id = [stored, legacy ? ids[seat.seat] : null].find((candidate) => candidate != null && seat.tiedRegistrationIds.includes(candidate));
+    return id ? [[pickKey(seat), id]] : [];
+  }));
+}
+
+/** Drops the picks whose team this edit took off the roster; a pick still waiting for its team (cross, before the redraw) stays. */
+export function keepPicked(picks: TiePickMap, before: ReadonlyArray<string | null>, after: ReadonlyArray<string | null>): TiePickMap {
+  return Object.fromEntries(Object.entries(picks).filter(([, id]) => after.includes(id) || !before.includes(id)));
+}
+
+/** One pick per tie seat that has one, in the order the server expects them; undefined when there is nothing to send. */
+export function tiePicksPayload(seats: readonly TiedSeat[], picks: TiePickMap): MultiFinalTiePick[] | undefined {
+  const sent = seats.flatMap((seat) => (picks[pickKey(seat)] ? [{ groupId: seat.groupId, rank: seat.rank, registrationId: picks[pickKey(seat)] }] : []));
+  return sent.length > 0 ? sent : undefined;
+}
+
+/**
+ * Puts the chosen tied team on a rank-order roster by identity. Already seated: nothing moves. Otherwise it replaces the
+ * previous pick, then a team of the same tie still on the roster (`mates`, minus teams other seats picked), then takes the
+ * tie seat or the first empty seed, and only appends while the roster is short of `capacity`.
+ */
+export function choosePick(ids: ReadonlyArray<string | null>, input: { seat: number; mates: readonly string[]; previous: string | undefined; id: string; capacity: number }): Array<string | null> {
+  const { seat, mates, previous, id, capacity } = input;
+  if (id && ids.includes(id)) return [...ids];
+  const swap = (from: string) => ids.map((row) => (row === from ? id || null : row));
+  if (previous && ids.includes(previous)) return swap(previous);
+  if (!id) return [...ids];
+  const mate = mates.find((candidate) => candidate !== id && ids.includes(candidate));
+  if (mate) return swap(mate);
+  if ((ids[seat] ?? null) === null) return Array.from({ length: Math.max(ids.length, seat + 1) }, (_, index) => (index === seat ? id : ids[index] ?? null));
+  const empty = ids.indexOf(null);
+  if (empty >= 0) return ids.map((row, index) => (index === empty ? id : row));
+  return ids.length < capacity ? [...ids, id] : [...ids];
+}
+
+/** A rank-order recommendation leaves tied seats null; the operator's picks go back into them. */
+export function fillTieSeats(ids: ReadonlyArray<string | null>, seats: readonly TiedSeat[], picks: TiePickMap): Array<string | null> {
+  return ids.map((row, index) => {
+    const seat = seats.find((entry) => entry.seat === index);
+    return row === null && seat ? picks[pickKey(seat)] ?? null : row;
+  });
+}
+
+/** Where the picked team really sits: the roster once it is settled, else what the next recommendation will do. */
+export function tiePositionCaption(input: { policy: MultiFinalPolicy; seat: number; pick: string | undefined; ids: ReadonlyArray<string | null>; stale: boolean }): string | null {
+  const { policy, seat, pick, ids, stale } = input;
+  if (policy === 'cross_group_top3') {
+    if (!pick) return null;
+    return ids.includes(pick) && !stale ? `지금 ${ids.indexOf(pick) + 1}번 시드예요.` : '교차 배치 추천을 만들면 시드가 정해져요.';
+  }
+  if (!pick) return `고르면 ${seat + 1}번 시드에 들어가요.`;
+  return ids.includes(pick) && !stale ? `지금 ${ids.indexOf(pick) + 1}번 시드예요.` : `추천 배치를 만들면 ${seat + 1}번 시드에 들어가요.`;
+}
+
 export const TIE_SEAT_REQUIRED = '동률 자리를 골라야 대진을 확인할 수 있어요.';
 
 export function requireSeats(seats: ReadonlyArray<string | null>): string[] {
@@ -55,7 +118,7 @@ export function placeTeam(ids: ReadonlyArray<string | null>, seats: readonly Tie
 function destinationOf(view: MultiFinalView, groupId: string, rank: number): Destination | null {
   for (const final of view.finals) {
     const index = final.rules.findIndex((rule) => rule.groupId === groupId && rule.rank === rank);
-    if (index >= 0) return { finalName: final.name, seed: index + 1 };
+    if (index >= 0) return { finalName: final.name };
   }
   return null;
 }
@@ -85,15 +148,15 @@ export function describeTies(view: MultiFinalView, final: Final): TieNotice[] {
     const detail = `승점 ${first.points} · 골득실 ${signed(first.goalsFor - first.goalsAgainst)} · 득점 ${first.goalsFor} · 맞대결·페어플레이까지 같아서 추첨으로만 갈렸어요.`;
     const ownRanks = new Set(seats.map((seat) => seat.rank));
     const others = places.filter((place) => !(place.destination?.finalName === final.name && ownRanks.has(place.rank)));
-    const otherLabels = others.map((place) => (place.destination ? `${place.destination.finalName} ${place.rank}위 자리(${place.destination.seed}번 시드)` : null));
+    const otherLabels = others.map((place) => (place.destination ? `${place.destination.finalName} ${place.rank}위 자리` : null));
     const hint = others.length === 0 ? null
       : otherLabels.every((label) => label === null) ? '고르지 않은 팀은 진출하지 못해요.'
         : `고르지 않은 팀은 ${josa(otherLabels.map((label) => label ?? '진출 없음').join(', '), ['으로', '로'])} 가요.`;
     return [{
       key, banner, detail,
       seats: seats.map((seat) => ({
-        seat: seat.seat,
-        label: `${final.name} ${seat.rank}위 자리(${seat.seat + 1}번 시드)에 보낼 팀`,
+        seat: seat.seat, groupId: seat.groupId, rank: seat.rank,
+        label: `${final.name} ${seat.rank}위 자리에 보낼 팀`,
         hint, candidates: seat.tiedRegistrationIds,
       })),
     }];

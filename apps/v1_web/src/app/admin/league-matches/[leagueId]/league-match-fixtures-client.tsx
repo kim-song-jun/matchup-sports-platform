@@ -43,7 +43,7 @@ import { DAY_MS, isoToKstDatetimeLocal, toKstDateString } from '@/lib/kst-calend
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveFixturePlan, type WeeksPlan } from '@/lib/league-round-robin-plan';
-import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { formatKstDateShort, formatKstTime, formatKstWeekday } from '@/lib/date-utils';
 import {
   DEFAULT_LEAGUE_PLACE_CHOICE,
   isLeaguePlaceChoiceIncomplete,
@@ -62,16 +62,23 @@ import { LeagueTemplateDialog } from './league-template-dialog';
 import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
 import { buildLeagueBoard, type LeagueBoardColumn } from '@/lib/league-board-model';
 import {
+  LEAGUE_FIXTURE_CANCEL_HINT,
+  LEAGUE_FIXTURE_DELETE_HINT,
+  leagueFixtureDeleteBlockedReason,
+} from '@/lib/league-fixture-delete';
+import {
   computeDailyPlan,
   dayOffsetLabel,
-  groupPreviewByMatchday,
   MAX_GAMES_PER_DAY,
+  previewTimingGroups,
+  previewWeekCount,
   suggestGamesPerDay,
   type DailyPlan,
 } from './league-fixture-timing.view-model';
 import type {
   V1GenerateLeagueFixturesPayload,
   V1LeagueFixture,
+  V1PreviewLeagueFixture,
   V1PreviewLeagueFixturesResult,
 } from '@/types/league-match';
 
@@ -93,8 +100,8 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
 }
 
 /**
- * 서버가 경기 삭제(LEAGUE_FIXTURE_NOT_DELETABLE)·팀 바꾸기(FIXTURE_HAS_RESULT)를 막는 조건 — 경기가 시작됐거나
- * 확정(또는 무효) 결과가 있다.
+ * 서버가 팀 바꾸기(FIXTURE_HAS_RESULT)와 템플릿 교체를 막는 조건 — 경기가 시작됐거나
+ * 확정(또는 무효) 결과가 있다. 경기 삭제 가능 여부는 `leagueFixtureDeleteBlockedReason` 이 정한다.
  */
 function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
   // 무효 처리된 결과도 서버에서는 확정 리비전 포인터가 남아 있어 같은 취급이다.
@@ -411,7 +418,7 @@ export default function LeagueMatchFixturesClient({
     actions.push({
       key: 'cancel',
       label: '대진 취소',
-      description: '이 경기를 순위 집계에서 빼요. 되돌릴 수 없어요',
+      description: LEAGUE_FIXTURE_CANCEL_HINT,
       destructive: true,
       disabled: gameInProgress,
       disabledReason: gameInProgress ? '경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요' : null,
@@ -421,14 +428,18 @@ export default function LeagueMatchFixturesClient({
       },
     });
     // 삭제 = 취소 + 대진표에서 숨김. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다(서버와 같은 규칙).
-    const deleteBlocked = row.status !== 'cancelled' && fixtureHasStartedOrResult(row);
+    const deleteBlockedReason = leagueFixtureDeleteBlockedReason({
+      cancelled: row.status === 'cancelled',
+      gameState: row.gameState,
+      hasResult: row.resultStage === 'official' || row.resultStage === 'voided' || row.game?.latestRevision != null,
+    });
     actions.push({
       key: 'delete',
       label: '경기 삭제',
-      description: '대진표에서 이 경기를 지워요. 순위 집계에서도 빠져요',
+      description: LEAGUE_FIXTURE_DELETE_HINT,
       destructive: true,
-      disabled: deleteBlocked,
-      disabledReason: deleteBlocked ? '시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요' : null,
+      disabled: deleteBlockedReason !== null,
+      disabledReason: deleteBlockedReason,
       onSelect: () => {
         setMenuFixture(null);
         setDeleteTarget(row);
@@ -800,6 +811,9 @@ export default function LeagueMatchFixturesClient({
               }
               onCancelFixture={(teamMatchId) =>
                 setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
+              onDeleteFixture={(teamMatchId) =>
+                setDeleteTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
               }
               onShowList={() => setView('list')}
               onAddToWeek={canWrite && !leagueEnded && canAddManualFixture ? openAddFixtureForWeek : undefined}
@@ -1481,6 +1495,7 @@ export default function LeagueMatchFixturesClient({
 
       {templateOpen ? (
         <LeagueTemplateDialog
+          leagueId={leagueId}
           leagueStartsOn={series.startsOn}
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
           defaultPlace={series.defaultPlace ?? null}
@@ -1709,7 +1724,7 @@ function FixturePreviewPanel({
   return (
     <div className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
       <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">
-        미리보기 — {result.matchdayCount ?? result.rounds}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
+        미리보기 — {previewWeekCount(result)}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
       </p>
       {result.warnings.length > 0 && (
         <div className="mb-3 flex items-start gap-2 rounded-lg bg-[var(--tint-orange)] px-3 py-2 text-xs text-[var(--orange700)]">
@@ -1719,24 +1734,18 @@ function FixturePreviewPanel({
       )}
       {isTimingPreview ? (
         <div className="max-h-80 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card-surface)]">
-          {groupPreviewByMatchday(result.fixtures).map((group) => (
-            <div key={group.matchday}>
+          {previewTimingGroups(result.fixtures).map((group) => (
+            <div key={group.key}>
               <p className="border-t border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-strong)] first:border-t-0">
-                {group.matchday}주차 — {formatKstDateShort(group.items[0].startAt)} · {group.items.length}경기
+                {group.heading}
               </p>
               {group.items.map((fixture, index) => (
-                <div
+                <PreviewTimingRow
                   key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`}
-                  className="flex items-center gap-3 border-t border-[var(--border)] px-3 py-2 text-xs"
-                >
-                  <span className="w-[96px] shrink-0 tabular-nums text-[var(--text-muted)]">
-                    {formatKstTime(fixture.startAt)}~{fixture.endAt != null ? formatKstTime(fixture.endAt) : ''}
-                  </span>
-                  <span aria-hidden="true" className="h-5 w-[3px] shrink-0 rounded bg-blue-500/60" />
-                  <span className="text-[var(--text-strong)]">
-                    {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
-                  </span>
-                </div>
+                  fixture={fixture}
+                  teamNameById={teamNameById}
+                  showWeekday={group.showWeekday}
+                />
               ))}
             </div>
           ))}
@@ -1754,7 +1763,7 @@ function FixturePreviewPanel({
             <tbody>
               {result.fixtures.map((fixture, index) => (
                 <tr key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 text-[var(--text-muted)]">{fixture.round}주차</td>
+                  <td className="px-3 py-2 text-[var(--text-muted)]">{fixture.week ?? fixture.round}주차</td>
                   <td className="px-3 py-2 text-[var(--text-strong)]">
                     {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
                   </td>
@@ -1765,6 +1774,33 @@ function FixturePreviewPanel({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// 한 주가 여러 경기일에 걸치면 시각 앞에 요일을 붙여 어느 날 경기인지 알린다. 390px 에서 줄바꿈되지 않게 칸을 넓힌다.
+function PreviewTimingRow({
+  fixture,
+  teamNameById,
+  showWeekday,
+}: {
+  fixture: V1PreviewLeagueFixture;
+  teamNameById: Map<string, string>;
+  showWeekday: boolean;
+}) {
+  const range = `${formatKstTime(fixture.startAt)}~${fixture.endAt != null ? formatKstTime(fixture.endAt) : ''}`;
+  const weekday = showWeekday ? formatKstWeekday(fixture.startAt) : null;
+  return (
+    <div className="flex items-center gap-3 border-t border-[var(--border)] px-3 py-2 text-xs">
+      <span
+        className={`${weekday !== null ? 'w-[120px]' : 'w-[96px]'} shrink-0 whitespace-nowrap tabular-nums text-[var(--text-muted)]`}
+      >
+        {weekday !== null ? `${weekday} ${range}` : range}
+      </span>
+      <span aria-hidden="true" className="h-5 w-[3px] shrink-0 rounded bg-blue-500/60" />
+      <span className="text-[var(--text-strong)]">
+        {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
+      </span>
     </div>
   );
 }

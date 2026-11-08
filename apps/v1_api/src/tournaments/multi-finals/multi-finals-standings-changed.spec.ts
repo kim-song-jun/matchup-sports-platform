@@ -11,8 +11,8 @@ const user = { id: 'admin', email: 'admin@example.test', accountStatus: 'active'
 const ASSIGN = 'tournament.multi_finals.assign';
 type AuditEntry = { action: string; afterJson: { finalName?: string; registrationIds?: string[]; standingsSnapshot?: unknown } };
 
-// Two 3-team preliminary groups. 프리미어 draws from A조, 챌린지 from B조.
-function harness() {
+// Two 3-team preliminary groups. 프리미어 draws ranks 1-2 of A조; 챌린지 ranks 1-2 of B조 unless `challengerRules` replaces its rules.
+function harness(challengerRules?: Array<{ groupId: string; rank: number }>) {
   const members = { gA: ['a1', 'a2', 'a3'], gB: ['b1', 'b2', 'b3'] };
   const all = [...members.gA, ...members.gB];
   const standing = new Map(all.map((id, index) => [id, { groupId: id.startsWith('a') ? 'gA' : 'gB', registrationId: id, position: index % 3 + 1,
@@ -21,7 +21,7 @@ function harness() {
   const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress', multiFinalsRevision: 1, competitionConfigVersionId: 'cfg', competitionConfig: FOOTBALL_V1_CONFIG,
     multiFinals: { groups: Object.keys(members).map(id => ({ id, name: `${id}조`, capacity: 3, legs: 1 })), finals: [
       { name: '프리미어', thirdPlace: false, rules: rules('gA'), registrationIds: null as string[] | null },
-      { name: '챌린지', thirdPlace: false, rules: rules('gB'), registrationIds: null as string[] | null },
+      { name: '챌린지', thirdPlace: false, rules: challengerRules ?? rules('gB'), registrationIds: null as string[] | null },
     ] } };
   const audit: AuditEntry[] = [];
   const fixture = { teamMatchId: 'f', teamMatch: { status: 'matched', game: { state: 'SCHEDULED', currentOfficialRevisionId: null, _count: { events: 0 } } } };
@@ -36,7 +36,7 @@ function harness() {
     v1TournamentMatchDetails: { aggregate: jest.fn(async () => ({ _max: { fixtureNumber: 6 } })), count: jest.fn(async () => 8),
       findMany: jest.fn(async ({ where }) => where.group ? [fixture] : [...roundRobin(members.gA, 'gA'), ...roundRobin(members.gB, 'gB')]) },
     v1TournamentGroup: { count: jest.fn(async () => 4) },
-    v1TournamentSlot: { findMany: jest.fn(async ({ where }) => where.group ? [{ id: `${where.group.bracketTrack}-1`, position: 1 }, { id: `${where.group.bracketTrack}-2`, position: 2 }] : []) },
+    v1TournamentSlot: { findMany: jest.fn(async ({ where }) => where.group ? row.multiFinals.finals.find(final => final.name === where.group.bracketTrack)!.rules.map((_, index) => ({ id: `${where.group.bracketTrack}-${index + 1}`, position: index + 1 })) : []) },
     // Mirrors the JSON-path lookup findTournamentManagementAction runs: newest entry of this action for this final.
     v1AdminActionLog: { findFirst: jest.fn(async ({ where }) => {
       const hit = [...audit].reverse().find(entry => entry.action === where.action && entry.afterJson.finalName === where.afterJson.equals);
@@ -81,6 +81,31 @@ describe('확정한 결선 배정 뒤 예선 순위 순서가 바뀐 경우의 �
     swapPositions('b1', 'b2');
     expect(await changed()).toEqual({ 프리미어: false, 챌린지: true });
   });
+  it('토너먼트가 쓰는 순위만 비교한다: 1·2위가 바뀌면 1~2위를 쓰는 쪽만, 2·3위가 바뀌면 둘 다 알린다', async () => {
+    const { assign, changed, swapPositions } = harness([{ groupId: 'gA', rank: 3 }]);
+    await assign('프리미어', ['a1', 'a2']); await assign('챌린지', ['a3']);
+    swapPositions('a1', 'a2');
+    expect(await changed()).toEqual({ 프리미어: true, 챌린지: false });
+    swapPositions('a1', 'a2');
+    swapPositions('a2', 'a3');
+    expect(await changed()).toEqual({ 프리미어: true, 챌린지: true });
+  });
+  it('쓰는 순위 밖에서만 바뀌면 알리지 않는다', async () => {
+    const { assign, changed, swapPositions } = harness();
+    await assign('프리미어', ['a1', 'a2']);
+    swapPositions('a2', 'a3');
+    expect(await changed()).toEqual({ 프리미어: true, 챌린지: false });
+    swapPositions('a2', 'a3');
+    swapPositions('b2', 'b3');
+    expect(await changed()).toEqual({ 프리미어: false, 챌린지: false });
+  });
+  it('배정 뒤 진출 규칙이 순위 기록에 없던 조를 가리키면 그 순위는 바뀐 것으로 알린다', async () => {
+    const { row, assign, changed } = harness();
+    await assign('챌린지', ['b1', 'b2']);
+    // The roster stays, but the rules now read A조 — a group the assign-time snapshot never stored.
+    row.multiFinals.finals[1].rules = [1, 2].map(rank => ({ groupId: 'gA', rank }));
+    expect(await changed()).toEqual({ 프리미어: false, 챌린지: true });
+  });
   it('순위가 그대로인 점수 정정은 알리지 않는다', async () => {
     const { assign, changed, standing } = harness();
     await assign('프리미어', ['a1', 'a2']);
@@ -101,11 +126,12 @@ describe('확정한 결선 배정 뒤 예선 순위 순서가 바뀐 경우의 �
     swapPositions('a2', 'a3');
     expect(await changed()).toEqual({ 프리미어: false, 챌린지: false });
   });
-  it('조회용 알림 값은 대진 생성 미리보기에 실리지 않아 저장 설정으로 새지 않는다', async () => {
+  it('조회용 알림·동률 선택 값은 대진 생성 미리보기에 실리지 않아 저장 설정으로 새지 않는다', async () => {
     const { assign, service } = harness();
     await assign('프리미어', ['a1', 'a2']);
     const preview = await service.preview(user, 't');
     expect(preview.finals.map(final => Object.keys(final))).not.toContainEqual(expect.arrayContaining(['standingsChanged']));
+    expect(preview.finals.map(final => Object.keys(final))).not.toContainEqual(expect.arrayContaining(['tiePicks']));
   });
   it('다시 배정하면 새 순위를 기준으로 알림이 사라진다', async () => {
     const { assign, changed, swapPositions } = harness();

@@ -2,7 +2,8 @@ import { type Prisma, V1GameResultRevisionState, V1GameState } from '@prisma/cli
 import { parseLineupCatalog } from '../../tournaments/competition-config/competition-config.parse';
 import { compareRosterOrder } from '../../common/roster-order';
 import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
-import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
+import { readSuspensionDiscipline, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
+import { suspensionRulesEnabled, type SuspensionRules } from '../../tournaments/discipline/card-suspension';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
 import { rosterBlockReason } from '../../tournaments/roster-cleanup';
@@ -138,6 +139,13 @@ export interface LoadedGameRoster {
   readonly baseSource: GameRosterBaseSource;
   readonly base: readonly GameRosterBaseEntry[];
   readonly computation: GameRosterComputation;
+  /** 규정이 켜진 대회·리그에서 카드가 쌓인 선수의 누적 — 화면의 "경고 1/2장" 칩이 쓴다. 규정이 없으면 `rules` 가 null. */
+  readonly discipline: GameRosterDiscipline;
+}
+
+export interface GameRosterDiscipline {
+  readonly rules: SuspensionRules | null;
+  readonly cardsByUserId: ReadonlyMap<string, { readonly yellowTotal: number; readonly redTotal: number }>;
 }
 
 export interface GameRosterPreload {
@@ -250,7 +258,7 @@ export async function loadGameRosterForContext(
           },
         });
   const orderedGames = preloaded.orderedGames ?? (await loadTeamCompetitionGameOrder(tx, context));
-  const suspensionVerdicts = await readSuspensionVerdicts(tx, {
+  const { rules, verdicts: suspensionVerdicts } = await readSuspensionDiscipline(tx, {
     competitionId: context.competitionId,
     orderedGames,
     upcomingKey: context.teamMatchId,
@@ -267,6 +275,12 @@ export async function loadGameRosterForContext(
       gameStartAt: context.startAt,
       suspensionVerdicts,
     }),
+    discipline: {
+      rules: suspensionRulesEnabled(rules) ? rules : null,
+      cardsByUserId: new Map(
+        [...suspensionVerdicts].map(([userId, verdict]) => [userId, { yellowTotal: verdict.yellowTotal, redTotal: verdict.redTotal }]),
+      ),
+    },
   };
 }
 

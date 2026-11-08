@@ -1,4 +1,4 @@
-import { evaluateSuspension, suspensionRulesEnabled } from './card-suspension';
+import { evaluateSuspension, isSuspensionImminent, suspensionRulesEnabled } from './card-suspension';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1차 대회(2026-08-15~16) 회고: "옐로카드 누적, 레드카드 퇴장등 필요해보임".
@@ -218,5 +218,23 @@ describe('evaluateSuspension — 입력이 지저분한 경우', () => {
 
   it('기록이 하나도 없으면 정지되지 않는다', () => {
     expect(evaluateSuspension({ rules: BOTH, played: [], upcomingGameOrder: 1 }).suspended).toBe(false);
+  });
+});
+
+describe('isSuspensionImminent — 경고 한 장이면 정지', () => {
+  const limit = (yellowAccumulationLimit: number | null) => ({ yellowAccumulationLimit, redCardSuspensionMatches: 1 });
+
+  it('한도 구간의 마지막 한 장 앞에서만 임박이고, 정지로 소진된 장수는 빼고 센다', () => {
+    expect(isSuspensionImminent(limit(2), 1)).toBe(true);
+    expect(isSuspensionImminent(limit(2), 0)).toBe(false);
+    expect(isSuspensionImminent(limit(2), 2)).toBe(false);
+    expect(isSuspensionImminent(limit(2), 3)).toBe(true);
+    expect(isSuspensionImminent(limit(3), 1)).toBe(false);
+    expect(isSuspensionImminent(limit(3), 2)).toBe(true);
+  });
+
+  it('한도가 1장이거나 경고 규정이 꺼져 있으면 임박이 없다', () => {
+    expect(isSuspensionImminent(limit(1), 0)).toBe(false);
+    expect(isSuspensionImminent(limit(null), 1)).toBe(false);
   });
 });

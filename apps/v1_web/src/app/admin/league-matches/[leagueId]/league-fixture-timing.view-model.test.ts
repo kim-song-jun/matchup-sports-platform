@@ -3,7 +3,12 @@ import {
   computeDailyPlan,
   dayOffsetLabel,
   groupPreviewByMatchday,
+  groupPreviewByWeek,
+  hasCalendarWeeks,
+  previewTimingGroups,
+  previewWeekCount,
   suggestGamesPerDay,
+  weekGroupHeading,
 } from './league-fixture-timing.view-model';
 
 describe('suggestGamesPerDay (시간창 역산)', () => {
@@ -112,5 +117,101 @@ describe('groupPreviewByMatchday (미리보기 매치데이 그룹핑)', () => {
     ];
     const groups = groupPreviewByMatchday(fixtures);
     expect(groups[0].items.map((item) => item.orderInDay)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('groupPreviewByWeek (서버 week 로 묶는 미리보기)', () => {
+  // 2026-11-21 은 토요일. 09:00 KST = 00:00Z.
+  const at = (date: string, hour: number) => new Date(Date.parse(`${date}T00:00:00+09:00`) + hour * 3_600_000).toISOString();
+  const fixture = (round: number, matchday: number, week: number, startAt: string, orderInDay: number) => ({
+    round, matchday, week, orderInDay, homeTeamId: 'a', awayTeamId: 'b', startAt, endAt: startAt,
+  });
+  // 입력은 일부러 섞는다: 일 → 다음 주 토 → 토.
+  const fixtures = [
+    fixture(2, 2, 1, at('2026-11-22', 10), 1),
+    fixture(3, 3, 2, at('2026-11-28', 10), 1),
+    fixture(1, 1, 1, at('2026-11-21', 11), 2),
+    fixture(1, 1, 1, at('2026-11-21', 10), 1),
+  ];
+
+  it('토·일을 한 주로 묶고 시작 시각순으로 정렬하며 날마다 경기 수를 센다', () => {
+    const groups = groupPreviewByWeek(fixtures);
+
+    expect(groups.map((group) => group.week)).toEqual([1, 2]);
+    expect(groups[0].items.map((item) => item.startAt)).toEqual([
+      at('2026-11-21', 10), at('2026-11-21', 11), at('2026-11-22', 10),
+    ]);
+    expect(groups[0].days).toEqual([{ label: '11/21 (토)', count: 2 }, { label: '11/22 (일)', count: 1 }]);
+    expect(groups[1].days).toEqual([{ label: '11/28 (토)', count: 1 }]);
+  });
+
+  it('헤더는 그 주에 경기가 있는 날만 날짜순으로 적는다', () => {
+    const [week1, week2] = groupPreviewByWeek(fixtures);
+
+    expect(weekGroupHeading(week1)).toBe('1주차 · 11/21 (토) 2경기 / 11/22 (일) 1경기');
+    expect(weekGroupHeading(week2)).toBe('2주차 · 11/28 (토) 1경기');
+  });
+
+  it('KST 자정을 넘긴 경기는 다음 날로 센다 — UTC 날짜로 세면 토요일 밤 경기가 토요일에 남는다', () => {
+    const lateSaturday = fixture(1, 1, 1, '2026-11-21T14:30:00.000Z', 1); // 11/21 23:30 KST
+    const afterMidnight = fixture(2, 1, 1, '2026-11-21T15:10:00.000Z', 2); // 11/22 00:10 KST
+
+    expect(groupPreviewByWeek([afterMidnight, lateSaturday])[0].days.map((day) => day.label)).toEqual([
+      '11/21 (토)', '11/22 (일)',
+    ]);
+  });
+});
+
+describe('previewWeekCount / hasCalendarWeeks', () => {
+  const base = { leagueId: 'l', fixtureCount: 3, placeName: 'p', warnings: [] };
+  const row = (round: number, week?: number) => ({
+    round, homeTeamId: 'a', awayTeamId: 'b', startAt: '2026-11-21T01:00:00.000Z', ...(week === undefined ? {} : { week }),
+  });
+
+  it('week 가 있으면 매치데이 수(3)가 아니라 서로 다른 달력 주 수(2)를 센다', () => {
+    const result = { ...base, rounds: 3, matchdayCount: 3, fixtures: [row(1, 1), row(2, 1), row(3, 2)] };
+
+    expect(hasCalendarWeeks(result.fixtures)).toBe(true);
+    expect(previewWeekCount(result)).toBe(2);
+  });
+
+  it('week 가 없는 구버전 응답은 matchdayCount, 그것도 없으면 rounds 를 그대로 쓴다', () => {
+    const legacy = { ...base, rounds: 3, fixtures: [row(1), row(2), row(3)] };
+
+    expect(hasCalendarWeeks(legacy.fixtures)).toBe(false);
+    expect(previewWeekCount({ ...legacy, matchdayCount: 2 })).toBe(2);
+    expect(previewWeekCount(legacy)).toBe(3);
+  });
+
+  it('week 가 일부 경기에만 있으면 구버전으로 본다', () => {
+    expect(hasCalendarWeeks([row(1, 1), row(2)])).toBe(false);
+  });
+});
+
+describe('previewTimingGroups', () => {
+  const row = (round: number, matchday: number, startAt: string, week?: number) => ({
+    round, matchday, orderInDay: 1, homeTeamId: 'a', awayTeamId: 'b', startAt, endAt: startAt, ...(week === undefined ? {} : { week }),
+  });
+
+  it('week 가 있으면 한 주의 토·일이 한 묶음이고 요일 접두를 켠다, 하루짜리 주는 끈다', () => {
+    const groups = previewTimingGroups([
+      row(1, 1, '2026-11-21T01:00:00.000Z', 1),
+      row(2, 2, '2026-11-22T01:00:00.000Z', 1),
+      row(3, 3, '2026-11-28T01:00:00.000Z', 2),
+    ]);
+
+    expect(groups.map((group) => [group.heading, group.showWeekday])).toEqual([
+      ['1주차 · 11/21 (토) 1경기 / 11/22 (일) 1경기', true],
+      ['2주차 · 11/28 (토) 1경기', false],
+    ]);
+  });
+
+  it('week 가 없는 구버전 응답은 매치데이로 묶고 기존 헤더 모양을 쓴다', () => {
+    const groups = previewTimingGroups([
+      row(1, 1, '2026-09-02T13:00:00.000Z'),
+      row(2, 1, '2026-09-02T13:20:00.000Z'),
+    ]);
+
+    expect(groups.map((group) => [group.heading, group.showWeekday])).toEqual([['1주차 — 9. 2. (수) · 2경기', false]]);
   });
 });

@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { LOGIN_METHOD_UNLINKED_CODE } from '@/lib/auth-error-codes';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { getInitializedKakaoJsSdk } from '@/lib/kakao-js-sdk';
 import { storeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
 import { isNativeKakaoSignInAvailable, requestNativeKakaoSignIn } from '@/lib/native-kakao';
 import { detectNativeShell } from '@/lib/native-bridge';
 import { clearV1IdentityCache } from '@/lib/query-keys';
@@ -81,6 +83,10 @@ export function KakaoLoginButton({
       router.replace(route);
       router.refresh();
     } catch (err) {
+      if (isUnlinkedLoginError(err)) {
+        failNative(LOGIN_METHOD_UNLINKED_CODE, unlinkedLoginMessage('kakao'));
+        return;
+      }
       if (err instanceof V1ApiError && err.code === 'PERMISSION_DENIED') {
         trackEvent('login_failed', { method: 'kakao', reason: err.code });
         router.replace('/auth/blocked');

@@ -73,10 +73,10 @@ function socket(
   return client;
 }
 
-function sessionCookie(userId = USER.id, issuedAtMs?: number): string {
+function sessionCookie(userId = USER.id, issuedAtMs?: number, sessionEpoch = 0): string {
   const token = createV1SessionToken({
     userId,
-    sessionEpoch: 0,
+    sessionEpoch,
     secret: SESSION_SECRET,
     ...(issuedAtMs === undefined ? {} : { issuedAtMs }),
   });
@@ -219,6 +219,28 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
     expect(prisma.v1User.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: USER.id, sessionEpoch: 0 } }),
     );
+  });
+
+  it('after the account epoch was raised, admits the re-signed cookie and refuses the one issued before', async () => {
+    // POST /auth/identities/unlink and /auth/sessions/revoke-others raise the epoch, re-sign this device's cookie and close
+    // every open socket: each device reconnects through this handshake.
+    const storedEpoch = 1;
+    prisma.v1User.findFirst.mockImplementation(async ({ where }: { where: { sessionEpoch?: number } }) =>
+      where.sessionEpoch === storedEpoch ? USER : null,
+    );
+    const middleware = captureMiddleware();
+
+    const otherDevice = socket({ cookie: sessionCookie(USER.id, undefined, 0) });
+    const refused = jest.fn<void, [error?: Error]>();
+    await invokeMiddleware(middleware, otherDevice, refused);
+    expect(refused).toHaveBeenCalledWith(expect.any(Error));
+    expect(otherDevice.data).toEqual({});
+
+    const thisDevice = socket({ cookie: sessionCookie(USER.id, undefined, storedEpoch) });
+    const admitted = jest.fn<void, [error?: Error]>();
+    await invokeMiddleware(middleware, thisDevice, admitted);
+    expect(admitted).toHaveBeenCalledWith();
+    expect(thisDevice.data.userId).toBe(USER.id);
   });
 
   it('RED rejects forged identity headers when no valid production session is present before connect', async () => {

@@ -35,7 +35,7 @@ describe('LeagueScheduleBoard — 태블릿 시트 안의 실제 패널', () => 
       <QueryClientProvider client={new QueryClient()}>
         <LeagueScheduleBoard
           leagueId="league-1" fixtures={[FIXTURE]} slots={SLOTS} teams={[]} canWrite showToast={vi.fn()}
-          onOpenTemplate={vi.fn()} onEditSchedule={vi.fn()} onCancelFixture={vi.fn()} onShowList={vi.fn()}
+          onOpenTemplate={vi.fn()} onEditSchedule={vi.fn()} onCancelFixture={vi.fn()} onDeleteFixture={vi.fn()} onShowList={vi.fn()}
         />
       </QueryClientProvider>,
     );

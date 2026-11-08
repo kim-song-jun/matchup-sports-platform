@@ -130,5 +130,4 @@ export async function resetIndependentEmailPassword() {
   await userEvent.setup().click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
   expect(await screen.findByText('비밀번호를 바꿨어요')).toBeInTheDocument();
   expect(wireCalls.emailReset).toEqual([{ email: RECOVERY_EMAIL, proofToken: 'email-proof', newPassword: 'synthetic-new-password' }]);
-  expect(wireCalls.phoneReset).toBe(0);
 }

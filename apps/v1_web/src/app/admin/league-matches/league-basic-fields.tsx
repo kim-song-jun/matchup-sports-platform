@@ -16,7 +16,7 @@ export interface LeagueBasicValue {
 }
 
 /** 생성·수정의 기본 입력 순서, 스타일과 날짜 범위 검증을 공유한다. */
-export function LeagueBasicFields({ value, onChange, sports, regions, sportLocked, sportHint, disabled }: {
+export function LeagueBasicFields({ value, onChange, sports, regions, sportLocked, sportHint, disabled, periodDisabled }: {
   value: LeagueBasicValue;
   onChange: (field: keyof LeagueBasicValue, value: string) => void;
   sports: { id: string; name: string }[];
@@ -24,6 +24,8 @@ export function LeagueBasicFields({ value, onChange, sports, regions, sportLocke
   sportLocked?: boolean;
   sportHint?: string;
   disabled?: boolean;
+  /** 시작일·종료일만 따로 잠근다(끝난 리그에서 이름·지역은 고칠 수 있다). */
+  periodDisabled?: boolean;
 }) {
   const id = useId();
   const rangeError = value.startsOn && value.endsOn && value.endsOn < value.startsOn
@@ -54,11 +56,11 @@ export function LeagueBasicFields({ value, onChange, sports, regions, sportLocke
     <div className="grid grid-cols-2 gap-3">
       <div>
         <label htmlFor={`${id}-start`} className={leagueLabelClass}>시작일</label>
-        <input id={`${id}-start`} type="date" max={DATE_INPUT_MAX} required value={value.startsOn} onChange={e => onChange('startsOn', e.target.value)} className={leagueInputClass} />
+        <input id={`${id}-start`} type="date" max={DATE_INPUT_MAX} required value={value.startsOn} onChange={e => onChange('startsOn', e.target.value)} disabled={periodDisabled} className={leagueInputClass} />
       </div>
       <div>
         <label htmlFor={`${id}-end`} className={leagueLabelClass}>종료일</label>
-        <input id={`${id}-end`} type="date" min={value.startsOn || undefined} max={DATE_INPUT_MAX} required value={value.endsOn} onChange={e => onChange('endsOn', e.target.value)} aria-invalid={rangeError ? true : undefined} aria-describedby={rangeError ? `${id}-range-error` : undefined} className={leagueInputClass} />
+        <input id={`${id}-end`} type="date" min={value.startsOn || undefined} max={DATE_INPUT_MAX} required value={value.endsOn} onChange={e => onChange('endsOn', e.target.value)} disabled={periodDisabled} aria-invalid={rangeError ? true : undefined} aria-describedby={rangeError ? `${id}-range-error` : undefined} className={leagueInputClass} />
       </div>
     </div>
     {rangeError && <p id={`${id}-range-error`} role="alert" className="tm-text-caption font-medium text-[var(--red700)]">{rangeError}</p>}

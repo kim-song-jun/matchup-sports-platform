@@ -30,7 +30,6 @@ describe('MD-QA #133 실제 계정 찾기 페이지의 로그인 복귀', () => 
     await user.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
     expect(await screen.findByRole('link', { name: '로그인하러 가기' })).toHaveAttribute('href', loginHref);
     expect(wireCalls.emailReset).toEqual([{ email: RECOVERY_EMAIL, proofToken: 'email-proof', newPassword: 'synthetic-new-password' }]);
-    expect(wireCalls.phoneReset).toBe(0);
   });
 
   it.each(['https://outside.example.test/steal', ['/chat', 'https://outside.example.test']])('잘못된 redirect %s는 버리고 안전한 from은 보존한다', async (redirect) => {

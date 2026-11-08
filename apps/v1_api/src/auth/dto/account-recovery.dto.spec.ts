@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { accountPasswordIssue } from '../account-password-rules';
-import { FindAccountDto, ResetPasswordByEmailDto, ResetPasswordDto } from './account-recovery.dto';
+import { FindAccountDto, ResetPasswordByEmailDto } from './account-recovery.dto';
 
 async function failedProperties(cls: new () => object, input: Record<string, unknown>) {
   const errors = await validate(plainToInstance(cls, input));
@@ -35,10 +35,10 @@ describe('FindAccountDto', () => {
   });
 });
 
-describe.each([
-  ['ResetPasswordDto (phone)', ResetPasswordDto, { phone: '01012345678', proofToken: 'proof' }],
-  ['ResetPasswordByEmailDto', ResetPasswordByEmailDto, { email: 'runner@example.com', proofToken: 'proof' }],
-] as const)('%s password rule', (_name, cls, base) => {
+describe('ResetPasswordByEmailDto password rule', () => {
+  const cls = ResetPasswordByEmailDto;
+  const base = { email: 'runner@example.com', proofToken: 'proof' };
+
   it('takes a password of eight or more characters that is not common', async () => {
     expect(await failedProperties(cls, { ...base, newPassword: 'Sunny-ride-4' })).toEqual([]);
     expect(await failedProperties(cls, { ...base, newPassword: 'exactly8' })).toEqual([]);

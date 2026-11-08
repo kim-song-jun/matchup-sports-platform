@@ -570,6 +570,17 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
     only when **every** non-cancelled fixture is unstarted and has no result revision; otherwise
     `409 BRACKET_LOCKED` and nothing changes.
   - Support admins get `403`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/template/preview`
+  (`{ teamCount: 3..20, legs: 1|2, time: 'HH:mm', gamesPerDay?, gameDurationMinutes?, breakMinutes? }` — the apply
+  numbers without dates, place or `replaceExisting`) writes nothing and answers `200` with the timetable creation
+  would write: `{ teamCount, legs, totalRounds, fixtureCount, gamesPerDay, days[], checks }`. `days[]` is
+  `{ day, startTime, endTime, games[] }` with `games[]` = `{ round, order, startTime, endTime, homePosition, awayPosition, backToBack[] }`
+  (KST `HH:mm`, seats by position; `endTime` is `null` without `gamesPerDay`, where a whole round starts together).
+  It runs the same plan / timing / slot functions as creation, so the previewed times and pairings are the created
+  ones. `checks`: `duplicateMeetings` and `missingMeetings` (pair meetings above / below `legs`, summed) and
+  `backToBackRuns[]` = `{ day, position, fromOrder, toOrder, games }`, one per run of a seat playing 2+ consecutive
+  games of a day. Back-to-back is a warning only — creation is never blocked by it. Same errors as apply for the
+  numbers (`422 BRACKET_TEMPLATE_TOO_LARGE`, `422 LEAGUE_FIXTURE_DURATION_REQUIRED`); support admins get `403`.
 - An empty fixture has `hostTeamId = approvedApplicantTeamId = null`, `status = matched`, side names
   `홈 팀 미정` / `어웨이 팀 미정`, and no team schedules, participants or application.
 - `PUT /api/v1/admin/tournament-slots/:slotId/assignment` (shared with tournaments, see

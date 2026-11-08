@@ -8,6 +8,7 @@ import {
   AddLeagueTeamDto,
   AddPreviousSeasonTeamsDto,
   ApplyLeagueTemplateDto,
+  PreviewLeagueTemplateDto,
   CancelLeagueFixtureDto,
   ChangeLeagueStateDto,
   CreateLeagueMatchDto,
@@ -191,6 +192,17 @@ export class LeagueMatchAdminController {
     @Body() dto: ApplyLeagueTemplateDto,
   ) {
     return this.service.applyTemplate(user, leagueId, dto);
+  }
+
+  // 템플릿 미리보기 — 쓰기 없음. 세그먼트 수(4)가 달라 위 라우트와 충돌하지 않는다.
+  @Post(':leagueId/fixtures/template/preview')
+  @HttpCode(200)
+  previewTemplate(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: PreviewLeagueTemplateDto,
+  ) {
+    return this.service.previewTemplate(user, leagueId, dto);
   }
 
   // R13: 대진 재생성 — 기존 대진 전부를 취소하고 같은 팀 로스터로 새 라운드로빈 대진을 만든다.

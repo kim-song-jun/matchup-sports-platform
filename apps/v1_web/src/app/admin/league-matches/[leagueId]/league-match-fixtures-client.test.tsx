@@ -63,15 +63,17 @@ vi.mock('@/components/admin/bracket-canvas/bracket-team-tray', () => ({
   BracketTeamTray: () => <div data-testid="tray" />,
 }));
 vi.mock('@/components/admin/bracket-canvas/league-fixture-panel', () => ({
-  LeagueFixturePanel: ({ node, onEditSchedule, onCancelFixture }: {
+  LeagueFixturePanel: ({ node, onEditSchedule, onCancelFixture, onDeleteFixture }: {
     node: { home: { label: string }; away: { label: string } };
     onEditSchedule: () => void;
     onCancelFixture: () => void;
+    onDeleteFixture: () => void;
   }) => (
     <div role="dialog" aria-label="경기 패널">
       {`${node.home.label} vs ${node.away.label}`}
       <button type="button" onClick={onEditSchedule}>일정 수정</button>
       <button type="button" onClick={onCancelFixture}>경기 취소</button>
+      <button type="button" onClick={onDeleteFixture}>경기 삭제</button>
     </div>
   ),
 }));
@@ -2458,7 +2460,7 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
 
     const endedSheet = openRowMenu('2주차');
     expect(within(endedSheet).getByRole('button', { name: /^경기 삭제/ })).toBeDisabled();
-    expect(within(endedSheet).getByText('시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요')).toBeInTheDocument();
+    expect(within(endedSheet).getByText('시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.')).toBeInTheDocument();
   });
 
   // 자리만 있고 팀이 비어 있는 경기 — 팀을 못 정했으니 콘솔·결과·몰수 대상이 아니다.
@@ -2711,7 +2713,7 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     expect(canvasMocks.applyTemplate.mock.calls[0][0]).toMatchObject({ teamCount: 3, legs: 1, replaceExisting: true });
   });
 
-  it('보드 패널의 일정 수정·경기 취소가 기존 모달로 이어진다', () => {
+  it('보드 패널의 일정 수정·경기 취소·경기 삭제가 기존 모달로 이어진다', () => {
     renderClient();
 
     fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
@@ -2722,6 +2724,11 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
     fireEvent.click(screen.getByRole('button', { name: '경기 취소' }));
     expect(screen.getByRole('heading', { name: '대진을 취소할까요?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
+    expect(screen.getByRole('heading', { name: '경기를 삭제할까요?' })).toBeInTheDocument();
   });
 
   it('쓰기 권한이 없으면 보드는 읽기 전용이다', () => {

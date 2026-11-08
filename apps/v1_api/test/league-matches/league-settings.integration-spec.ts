@@ -83,7 +83,7 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     // 성별을 받기 전 경로로 만든 리그는 null 이다.
     expect((await get(await h.makeLeague())).body.data.genderCategory).toBeNull();
   });
-  it('실제 권한, kind, 종료 상태와 DTO whitelist를 검사한다', async () => {
+  it('실제 권한, kind와 DTO whitelist를 검사한다', async () => {
     const id = await h.makeLeague();
     const support = await h.makeAdmin('support');
     const body = await snapshot(id);
@@ -95,7 +95,6 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     }
     await h.prisma.v1Tournament.update({ where: { id }, data: { kind: 'regular_tournament' } });
     expect((await get(id)).status).toBe(404);
-    await h.prisma.v1Tournament.update({ where: { id }, data: { kind: 'regular_league', status: 'completed' } });
   });
   it.each(['completed', 'cancelled'] as const)('%s 리그는 이름·설명·지역만 저장되고 기간·마감·경기 수·정원은 409 로 잠긴다', async (status) => {
     const id = await h.makeLeague();

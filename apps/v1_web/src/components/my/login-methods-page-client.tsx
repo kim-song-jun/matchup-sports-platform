@@ -516,7 +516,7 @@ export function LoginMethodsPageClient() {
                 />
               )}
               {has('naver') ? (
-                <ProviderRow mark="other" label="네이버 로그인" caption="네이버 버튼으로 이 계정에 들어와요" badge={<ConnectedBadge />} />
+                <ProviderRow mark="other" label="네이버 로그인" caption="지금은 네이버로 로그인할 수 없어요" badge={<ConnectedBadge />} />
               ) : null}
             </ul>
           </Card>

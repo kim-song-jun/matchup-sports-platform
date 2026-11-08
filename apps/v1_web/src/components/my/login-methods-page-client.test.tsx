@@ -317,6 +317,7 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     await renderLoaded(['email', 'naver']);
 
     expect(within(rowOf('네이버 로그인')).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(rowOf('네이버 로그인')).getByText('지금은 네이버로 로그인할 수 없어요')).toBeInTheDocument();
     expect(within(rowOf('이메일·비밀번호')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
   });

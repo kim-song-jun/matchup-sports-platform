@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import { useGroupPeriodOverride, useMatchPeriodOverride } from './period-override-field';
 
-const state = vi.hoisted(() => ({ minutes: 20, save: vi.fn() }));
+const state = vi.hoisted(() => ({ minutes: 20, save: vi.fn(), inheritedStage: null as null | { source: 'stage'; phase: TournamentPeriodPhase } }));
 const periods = () => [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: state.minutes, extraTime: false }];
 
 vi.mock('@/hooks/use-tournament-period-settings', () => ({
@@ -10,7 +11,7 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
     isPending: false, isError: false,
     data: teamMatchId ? {
       teamMatchId, expectedVersion: 'version-1', overridden: false, editable: true,
-      periods: periods(), inherited: { source: 'default', periods: periods() },
+      periods: periods(), inherited: state.inheritedStage ? { ...state.inheritedStage, periods: periods() } : { source: 'default', periods: periods() },
     } : undefined,
   }),
   useTournamentPeriodSettings: () => ({
@@ -61,5 +62,15 @@ describe.each(['match', 'group'] as const)('%s 경기 시간 편집', (scope) =>
     rerender({ id: null });
     rerender({ id: 'target-a' });
     expect(result.current.choice).toEqual({ mode: 'inherit', minutes: ['30'] });
+  });
+});
+
+describe('상속 설정 문구', () => {
+  it('단계 설정을 물려받으면 짧은 단계 이름으로 안내한다', () => {
+    state.inheritedStage = { source: 'stage', phase: 'quarter' };
+    const { result } = renderHook(() => useMatchPeriodOverride('tournament-1', 'match-1', '대회 기본값'));
+    state.inheritedStage = null;
+    expect(result.current.inheritedSummary).toContain('8강 설정');
+    expect(result.current.inheritedSummary).not.toContain('6팀');
   });
 });

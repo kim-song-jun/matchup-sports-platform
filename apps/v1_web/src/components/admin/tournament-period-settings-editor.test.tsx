@@ -214,6 +214,34 @@ describe('TournamentPeriodSettingsEditor', () => {
     expect(screen.queryByRole('option', { name: quarterLabel })).toBeNull();
   });
 
+  it('uses the short stage name in the edit heading and save toast while the list keeps the long one', () => {
+    const quarterLabel = '8강 · 6팀 대진의 6강';
+    state.settings = {
+      ...state.settings,
+      expectedVersion: 'version-quarter',
+      kind: 'regular_tournament',
+      stageOverrides: [{
+        phase: 'quarter',
+        competitionConfigVersionId: 'config-quarter',
+        periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 20, extraTime: false }],
+        legacyPeriodCount: null,
+      }],
+    };
+    state.mutate.mockClear();
+    const showToast = vi.fn();
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+    expect(screen.getByText(quarterLabel)).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
+    expect(screen.getByText('8강 설정')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    const { onSuccess } = state.mutate.mock.calls[0][1] as { onSuccess: (saved: { fixturesRepointed: number }) => void };
+    act(() => onSuccess({ fixturesRepointed: 2 }));
+
+    expect(showToast).toHaveBeenCalledWith('8강 경기 시간을 저장했어요. 시작 전 경기 2개에도 적용했어요.', 'success');
+    expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('6팀'), expect.anything());
+  });
+
   it('can remove a stage override and return that phase to the tournament default', () => {
     state.settings = {
       ...state.settings,

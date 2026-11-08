@@ -243,7 +243,7 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
             onViewChange={setView}
             onDone={closeSheet}
           />
-          {canWrite && fixtureActions && view.kind === 'detail' ? (
+          {canWrite && scope === 'league' && fixtureActions && view.kind === 'detail' ? (
             <section aria-label="경기 취소·삭제" className="mt-4 flex flex-col gap-3">
               <LeagueFixtureDangerActions
                 cancelled={selected.state === 'cancelled'}

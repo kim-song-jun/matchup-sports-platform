@@ -771,4 +771,11 @@ describe('BracketCanvasMobile — 리그 경기 취소·삭제 입구', () => {
     expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 취소' })).not.toBeInTheDocument();
   });
+
+  it('대회 scope 에 핸들러가 넘어와도 입구를 그리지 않는다', () => {
+    renderMobile({ scope: 'tournament', fixtureActions: leagueHandlers() });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 취소' })).not.toBeInTheDocument();
+  });
 });

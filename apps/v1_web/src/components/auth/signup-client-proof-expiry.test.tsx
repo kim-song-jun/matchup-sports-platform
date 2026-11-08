@@ -129,12 +129,12 @@ describe('SignupClient 휴대폰 인증 만료', () => {
       fillAccountStep();
       await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
 
-      // 유효 시간 안에서는 아무 일도 없다.
-      await advanceClock((PROOF_TTL_SECONDS - 10) * 1000);
+      // 유효 시간 안에서는 아무 일도 없다. 이 시계는 실제 시간도 함께 흐르므로(shouldAdvanceTime) 만료 직전까지 붙이지 않는다.
+      await advanceClock((PROOF_TTL_SECONDS - 120) * 1000);
       expect(screen.queryByText(EXPIRED_BANNER)).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
 
-      await advanceClock(20_000);
+      await advanceClock(130_000);
 
       expectExpiredBanner(EXPIRED_BANNER);
       expect(screen.getByRole('button', { name: '다시 인증하기' })).toBeEnabled();
@@ -177,13 +177,13 @@ describe('SignupClient 휴대폰 인증 만료', () => {
     });
 
     it('증명이 쓸 수 있는 시간은 서버가 알려 준 초 단위 수명이다(받은 시각 기준)', async () => {
-      hooks.phoneVerifyMutateAsync.mockResolvedValue(verifiedResponse({ proofExpiresInSeconds: 120 }));
+      hooks.phoneVerifyMutateAsync.mockResolvedValue(verifiedResponse({ proofExpiresInSeconds: 300 }));
       render(<SignupClient />);
       await advanceToAccount();
 
       await advanceClock(100_000);
       expect(screen.queryByText(EXPIRED_BANNER)).not.toBeInTheDocument();
-      await advanceClock(30_000);
+      await advanceClock(210_000);
 
       expectExpiredBanner(EXPIRED_BANNER);
     });

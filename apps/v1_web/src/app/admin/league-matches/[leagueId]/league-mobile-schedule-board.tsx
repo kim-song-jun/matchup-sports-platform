@@ -5,7 +5,7 @@ import { LeagueWeekSummaryLines, leagueWeekHeading } from '@/components/admin/br
 import { AlertBanner, EmptyState } from '@/components/v1-ui/primitives';
 import type { LeagueBoardColumn } from '@/lib/league-board-model';
 
-interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 'competitionId' | 'scope' | 'onEditFixture' | 'renderRoundHeader'> {
+interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 'competitionId' | 'scope' | 'onEditFixture' | 'fixtureActions' | 'renderRoundHeader'> {
   leagueId: string;
   replaceExisting: boolean;
   templateBlockedReason: string | null;
@@ -71,8 +71,7 @@ export function LeagueMobileScheduleBoard({
         competitionId={leagueId}
         scope="league"
         onEditFixture={canEditFixture ? onEditFixture : undefined}
-        onCancelFixture={onCancelFixture}
-        onDeleteFixture={onDeleteFixture}
+        fixtureActions={{ onCancel: onCancelFixture, onDelete: onDeleteFixture }}
         renderRoundHeader={(roundKey) => {
           const week = weeks.find((candidate) => candidate.key === roundKey);
           if (week === undefined) return null;

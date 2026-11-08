@@ -41,9 +41,11 @@ export interface BracketCanvasMobileProps {
   registrationsState: RegistrationsLoadState;
   showToast: (message: string, variant?: AdminToastVariant) => void;
   onEditFixture?: (fixtureId: string) => void;
-  /** League only: with `onDeleteFixture`, shows the cancel and delete entries at the bottom of the fixture sheet. */
-  onCancelFixture?: (fixtureId: string) => void;
-  onDeleteFixture?: (fixtureId: string) => void;
+  /** League only: shows the cancel and delete entries at the bottom of the fixture sheet. */
+  fixtureActions?: {
+    onCancel: (fixtureId: string) => void;
+    onDelete: (fixtureId: string) => void;
+  };
   /** 고른 라운드 경기 목록 위에 붙일 머리(리그 주차의 날짜·요약·'이 주에 경기 추가'). 없으면 그리지 않는다. */
   renderRoundHeader?: (roundKey: string) => ReactNode;
 }
@@ -119,7 +121,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, onCancelFixture, onDeleteFixture, renderRoundHeader }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, fixtureActions, renderRoundHeader }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -241,15 +243,15 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
             onViewChange={setView}
             onDone={closeSheet}
           />
-          {canWrite && onCancelFixture && onDeleteFixture && view.kind === 'detail' ? (
+          {canWrite && fixtureActions && view.kind === 'detail' ? (
             <section aria-label="경기 취소·삭제" className="mt-4 flex flex-col gap-3">
               <LeagueFixtureDangerActions
                 cancelled={selected.state === 'cancelled'}
                 live={selected.state === 'live'}
                 gameState={selected.game?.state}
                 hasResult={selected.game?.latestRevision != null}
-                onCancel={() => void closeOverlayThenNavigate(closeSheet, () => onCancelFixture(selected.fixtureId))}
-                onDelete={() => void closeOverlayThenNavigate(closeSheet, () => onDeleteFixture(selected.fixtureId))}
+                onCancel={() => void closeOverlayThenNavigate(closeSheet, () => fixtureActions.onCancel(selected.fixtureId))}
+                onDelete={() => void closeOverlayThenNavigate(closeSheet, () => fixtureActions.onDelete(selected.fixtureId))}
               />
             </section>
           ) : null}

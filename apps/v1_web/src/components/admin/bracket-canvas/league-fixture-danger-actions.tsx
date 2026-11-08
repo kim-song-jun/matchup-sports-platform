@@ -11,7 +11,7 @@ import type { V1GameState } from '@/types/api';
 export interface LeagueFixtureDangerActionsProps {
   cancelled: boolean;
   live: boolean;
-  gameState: V1GameState | null | undefined;
+  gameState: V1GameState | undefined;
   hasResult: boolean;
   onCancel: () => void;
   onDelete: () => void;

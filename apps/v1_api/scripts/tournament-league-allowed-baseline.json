@@ -67,5 +67,9 @@
   "src/game-operations/suspension-notice.service.ts": {
     "allowed": 1,
     "why": "출전정지 알림 본문의 대회·리그 이름 조회 — 징계 규정이 리그에도 켜지고(정본 §4) 알림은 두 종류 모두에서 나간다. 좁혀 두면 리그 결과 확정 때 이름이 비어 '대회' 로 나가고, 같은 서비스의 규정 조회(`readSuspensionRules`)가 리그를 허용하는 것과 어긋난다."
+  },
+  "src/tournaments/discipline/admin-discipline.service.ts": {
+    "allowed": 1,
+    "why": "어드민 징계 현황 — 징계 규정은 대회·리그 둘 다에 켜지고(정본 §4) 이 화면은 같은 id 경로로 두 종류를 모두 연다. 좁혀 두면 리그 id 가 404 가 되어 리그 운영자는 정지 선수를 볼 곳이 없다."
   }
 }

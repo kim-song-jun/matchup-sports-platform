@@ -155,6 +155,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', id, 'campaign'] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
+  adminDiscipline: (competitionId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', competitionId, 'discipline'] as const,
   adminTournamentRoster: (registrationId: string) =>
     [...v1Keys.all, 'admin', 'registrations', registrationId, 'players'] as const,
   adminTournamentPlayerRecords: (tournamentId: string) =>

@@ -353,7 +353,7 @@ export function SixTeamDecisionPanel({
   return (
     <section className="space-y-3 rounded-2xl border border-[var(--border)] p-4">
       <div role="heading" aria-level={3}>
-        <SectionTitle title="6강 진출 관리" />
+        <SectionTitle title="6강 진출 관리" compact />
       </div>
       <p className="tm-text-caption">
         공식 결과에 따라 자동 배정해요. 직접 선택하면 기록은 유지하고 진출

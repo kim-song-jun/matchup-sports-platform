@@ -548,6 +548,27 @@ describe('NotificationsService', () => {
 
   // MD-QA #79 — 확정된 대회 경기 결과를 정정하면 보내는 알림. 매핑 함수 셋이 모두 파일 로컬이고 말미 폴백이 있어
   // (targetType → 'team_match', 딥링크 → /team-matches/…, 선호도 → activityEnabled) 분기를 빠뜨리면 조용히 샌다.
+  describe('player_suspension_* 알림 매핑', () => {
+    it.each([
+      ['player_suspension_notice', '다음 경기에 못 뛰는 선수가 있어요'],
+      ['player_suspension_warning', '경고 한 장이면 정지인 선수가 있어요'],
+    ] as const)("%s 는 팀 알림이고 팀 경기 알림 설정을 따른다", async (type, title) => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      await service.emitNotification('user-1', type, 'team-1');
+      await new Promise(setImmediate);
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ targetType: 'team', targetId: 'team-1', title }) }),
+      );
+
+      jest.clearAllMocks();
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ teamMatchEnabled: false, activityEnabled: true });
+      await service.emitNotification('user-1', type, 'team-1');
+      await new Promise(setImmediate);
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('tournament_match_result_corrected 알림 매핑', () => {
     it("targetType 이 'tournament' 이고 딥링크가 경기 상세로 가며 제목이 '정정'을 말한다", async () => {
       prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);

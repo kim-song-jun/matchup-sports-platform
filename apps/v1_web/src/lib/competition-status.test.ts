@@ -3,6 +3,7 @@ import {
   arrivalCheckInUsed,
   bracketNodeStateChip,
   countLeagueFixturePhases,
+  disciplineWarningChip,
   gameRosterStatusChip,
   gameStateChip,
   leagueFixtureCountChips,
@@ -82,6 +83,28 @@ describe('리그 상태 × 경기 상태 — 한 화면에 함께면 대상을 �
     expect(gameStateChip('SCHEDULED')?.label).toBe('예정');
     expect(gameStateChip('PAUSED')?.label).toBe('일시 중지');
     expect(gameStateChip('SOMETHING_NEW')).toBeNull();
+  });
+});
+
+describe('경고 누적 칩', () => {
+  const rules = { yellowAccumulationLimit: 3 as number | null };
+
+  it('한도 사이에 쌓인 장수만 센다 — 정지로 소진된 장수는 뺀다', () => {
+    expect(disciplineWarningChip({ yellowTotal: 1 }, rules)).toEqual({ label: '경고 1/3장', tone: 'grey', icon: null });
+    expect(disciplineWarningChip({ yellowTotal: 4 }, rules)?.label).toBe('경고 1/3장');
+    expect(disciplineWarningChip({ yellowTotal: 3 }, rules)).toBeNull();
+  });
+
+  it('한 장 더 받으면 정지인 선수는 같은 칩에 그 사실이 붙고 톤이 달라진다', () => {
+    expect(disciplineWarningChip({ yellowTotal: 2 }, rules)).toEqual({ label: '경고 2/3장 · 한 장 더 받으면 정지', tone: 'orange', icon: null });
+    expect(disciplineWarningChip({ yellowTotal: 1 }, { yellowAccumulationLimit: 2 })?.tone).toBe('orange');
+  });
+
+  it('규정이 없거나 경고 규정이 꺼졌거나 한도가 1장이면 칩이 없다', () => {
+    expect(disciplineWarningChip({ yellowTotal: 2 }, null)).toBeNull();
+    expect(disciplineWarningChip({ yellowTotal: 2 }, { yellowAccumulationLimit: null })).toBeNull();
+    expect(disciplineWarningChip({ yellowTotal: 1 }, { yellowAccumulationLimit: 1 })).toBeNull();
+    expect(disciplineWarningChip(null, rules)).toBeNull();
   });
 });
 

@@ -29,7 +29,11 @@ function game(gameId: string, overrides: Partial<TeamRosterMatrixGame> = {}): Te
   };
 }
 
-function loaded(base: GameRosterBaseEntry[], extra: Partial<GameRosterComputationInput> = {}): LoadedGameRoster {
+function loaded(
+  base: GameRosterBaseEntry[],
+  extra: Partial<GameRosterComputationInput> = {},
+  discipline: LoadedGameRoster['discipline'] = { rules: null, cardsByUserId: new Map() },
+): LoadedGameRoster {
   const input: GameRosterComputationInput = {
     base,
     adjustments: [],
@@ -38,7 +42,7 @@ function loaded(base: GameRosterBaseEntry[], extra: Partial<GameRosterComputatio
     suspensionVerdicts: new Map(),
     ...extra,
   };
-  return { context: {} as LoadedGameRoster['context'], baseSource: 'REGISTRATION', base, computation: computeGameRoster(input) };
+  return { context: {} as LoadedGameRoster['context'], baseSource: 'REGISTRATION', base, computation: computeGameRoster(input), discipline };
 }
 
 describe('buildTeamRosterMatrix — 선수 × 경기 표', () => {
@@ -96,6 +100,25 @@ describe('buildTeamRosterMatrix — 선수 × 경기 표', () => {
       { participating: 0, excluded: 1, unavailable: 1, suspended: 1 },
       { participating: 3, excluded: 0, unavailable: 0, suspended: 0 },
     ]);
+  });
+
+  it('경기마다 그 대회의 정지 규정과 선수별 카드 누적을 싣는다 — 규정 없는 경기·카드 없는 선수는 비운다', () => {
+    const rules = { yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 };
+    const matrix = buildTeamRosterMatrix({
+      canWrite: true,
+      columns: [
+        {
+          game: game('cup-1'),
+          loaded: loaded([entry('u1'), entry('u2')], {}, { rules, cardsByUserId: new Map([['u1', { yellowTotal: 1, redTotal: 0 }]]) }),
+        },
+        { game: game('league-1', { competitionId: 'league', competitionKind: 'LEAGUE' }), loaded: loaded([entry('u1'), entry('u2')]) },
+        { game: game('no-roster'), loaded: null },
+      ],
+    });
+    expect(matrix.games.map((column) => column.disciplineRules)).toEqual([rules, null, null]);
+    const byUser = new Map(matrix.players.map((player) => [player.userId, player.cells]));
+    expect(byUser.get('u1')?.map((cell) => cell.cards ?? null)).toEqual([{ yellowTotal: 1, redTotal: 0 }, null, null]);
+    expect(byUser.get('u2')?.map((cell) => cell.cards ?? null)).toEqual([null, null, null]);
   });
 
   it('다른 대회 명단에만 있는 선수는 NOT_IN_ROSTER, 확정 명단이 없는 경기는 전원 NOT_IN_ROSTER', () => {

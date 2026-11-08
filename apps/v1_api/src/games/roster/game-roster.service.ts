@@ -450,6 +450,7 @@ export class GameRosterService {
       rosterRegistrationId: jerseyRegistration?.id ?? null,
       base: loaded.base,
       computation,
+      discipline: loaded.discipline,
       fixtureSnapshotUserIds,
       legacyLineupPending,
       displayNameByUserId,

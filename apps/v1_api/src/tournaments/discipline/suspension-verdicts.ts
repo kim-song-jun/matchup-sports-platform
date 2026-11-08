@@ -4,6 +4,7 @@ import {
   evaluateSuspension,
   suspensionRulesEnabled,
   type PlayedGameCards,
+  type SuspensionRules,
   type SuspensionVerdict,
 } from './card-suspension';
 
@@ -104,12 +105,20 @@ export async function readSuspensionVerdicts(
   tx: Tx,
   input: SuspensionVerdictInput,
 ): Promise<Map<string, SuspensionVerdict>> {
-  const byUpcomingKey = await readSuspensionVerdictsForUpcomingKeys(tx, {
+  return (await readSuspensionDiscipline(tx, input)).verdicts;
+}
+
+/** `readSuspensionVerdicts` 와 같은 조회에 규정을 더한 것. */
+export async function readSuspensionDiscipline(
+  tx: Tx,
+  input: SuspensionVerdictInput,
+): Promise<{ rules: SuspensionRules; verdicts: Map<string, SuspensionVerdict> }> {
+  const { rules, verdictsByUpcomingKey } = await readDisciplineForUpcomingKeys(tx, {
     competitionId: input.competitionId,
     orderedGames: input.orderedGames,
     upcomingKeys: [input.upcomingKey],
   });
-  return byUpcomingKey.get(input.upcomingKey) ?? new Map(NO_VERDICTS);
+  return { rules, verdicts: verdictsByUpcomingKey.get(input.upcomingKey) ?? new Map(NO_VERDICTS) };
 }
 
 /** Read one competition's disciplinary history once and evaluate several upcoming team games. */
@@ -117,7 +126,30 @@ export async function readSuspensionVerdictsForUpcomingKeys(
   tx: Tx,
   input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
 ): Promise<Map<string, Map<string, SuspensionVerdict>>> {
+  return (await readDisciplineForUpcomingKeys(tx, input)).verdictsByUpcomingKey;
+}
+
+export interface CompetitionDiscipline {
+  /** 규정이 둘 다 꺼져 있으면 `suspensionRulesEnabled` 가 false 다. */
+  readonly rules: SuspensionRules;
+  readonly verdictsByUpcomingKey: Map<string, Map<string, SuspensionVerdict>>;
+}
+
+/** 판정과 그 판정에 쓴 규정을 함께 돌려준다 — 화면이 "경고 1/2장" 처럼 한도를 같이 보여 줄 때 쓴다. */
+export async function readDisciplineForUpcomingKeys(
+  tx: Tx,
+  input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
+): Promise<CompetitionDiscipline> {
   const rules = await readSuspensionRules(tx, input.competitionId);
+  const verdictsByUpcomingKey = await evaluateUpcomingKeys(tx, rules, input);
+  return { rules, verdictsByUpcomingKey };
+}
+
+async function evaluateUpcomingKeys(
+  tx: Tx,
+  rules: SuspensionRules,
+  input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
+): Promise<Map<string, Map<string, SuspensionVerdict>>> {
   // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회·리그가 그렇다(옵트인).
   if (!suspensionRulesEnabled(rules)) {
     return new Map(input.upcomingKeys.map((key) => [key, emptyVerdicts()]));

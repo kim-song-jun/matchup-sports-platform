@@ -45,6 +45,8 @@ type CountKey = 'registrations' | 'fixtures' | 'announcements';
 interface SectionItem {
   slug: string;
   label: string;
+  /** 플랫폼 어드민 화면에만 둔다 — 대회 스태프(담당 대회 관리) 셸에서는 그리지 않는다. */
+  platformOnly?: boolean;
   /** 탭 옆 숫자에 쓰이는 operationCounts 키. 없으면 숫자를 그리지 않는다. */
   countKey?: CountKey;
   /**
@@ -64,6 +66,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
       { slug: 'registrations', label: '신청 관리', countKey: 'registrations' },
       { slug: 'bracket', label: '대진 관리', countKey: 'fixtures' },
       { slug: 'announcements', label: '공지', countKey: 'announcements' },
+      { slug: 'discipline', label: '징계 현황', platformOnly: true },
     ],
   },
   {
@@ -219,7 +222,7 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   const counts = tournament.operationCounts;
   const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
     label: group.label,
-    items: group.items.filter((item) => !staffSurface || !item.externalHref).map((item) => ({
+    items: group.items.filter((item) => !(staffSurface && item.externalHref) && !((staffSurface || navigation !== undefined) && item.platformOnly === true)).map((item) => ({
       slug: item.slug,
       label: item.label,
       count: item.countKey ? counts?.[item.countKey] : undefined,

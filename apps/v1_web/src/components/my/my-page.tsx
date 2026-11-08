@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import Link from 'next/link';
 import { CalendarDays, Award,
   Bell,
@@ -86,13 +87,14 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   // 밀어넣는다(§0.4-3).
   useShellOverride({ hasNewNotification: model.hasNewNotification });
   const cardAbsent = useMyPlayerCardAbsent(model.user.userId, model.playerCardSlot);
+  const headingId = useId();
 
   return (
     <>
-      <h1 className="sr-only">마이페이지</h1>
+      <h1 id={headingId} className="sr-only" tabIndex={-1}>마이페이지</h1>
       <div className="tm-my-shell tm-my-home-shell tm-content-enter">
         {model.emailVerifyNudgeUserId ? (
-          <EmailVerifyBanner userId={model.emailVerifyNudgeUserId} className="tm-my-top-notice" />
+          <EmailVerifyBanner userId={model.emailVerifyNudgeUserId} className="tm-my-top-notice" focusAfterCloseId={headingId} />
         ) : null}
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}

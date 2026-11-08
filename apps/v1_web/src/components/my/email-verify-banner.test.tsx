@@ -55,6 +55,21 @@ describe('EmailVerifyBanner — 닫기와 다시 보이기', () => {
     expect(screen.getByRole('link', { name: '인증하기' })).toHaveAttribute('href', '/my/email-verify?redirect=%2Fmy');
   });
 
+  it('닫으면 키보드 포커스를 지정한 제목으로 옮긴다', () => {
+    render(
+      <>
+        <h1 id="my-heading" tabIndex={-1}>마이페이지</h1>
+        <EmailVerifyBanner userId="u1" focusAfterCloseId="my-heading" />
+      </>,
+    );
+
+    const close = screen.getByRole('button', { name: '이메일 인증 안내 닫기' });
+    close.focus();
+    fireEvent.click(close);
+
+    expect(screen.getByRole('heading', { name: '마이페이지' })).toHaveFocus();
+  });
+
   it('닫으면 배너가 사라지고, 다시 알려 주겠다는 안내를 한 번 보인다', () => {
     render(<EmailVerifyBanner userId="u1" />);
 

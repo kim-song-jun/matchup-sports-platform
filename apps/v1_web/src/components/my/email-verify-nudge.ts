@@ -5,8 +5,8 @@ export const EMAIL_VERIFY_NUDGE_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 /** 처음 보인 뒤 다시 보여 주는 최대 횟수. 이 횟수를 다 쓴 뒤 닫으면 다시는 보이지 않는다. */
 export const EMAIL_VERIFY_NUDGE_MAX_RESHOWS = 3;
 
-// 가입 필수 단계를 마친 상태. 목록에 없는 값(진행 중·미룸·새로 생길 값)은 권유하지 않는 쪽이 안전하다.
-const SIGNUP_COMPLETE_STATUSES: readonly string[] = ['signup_done', 'sport_done', 'level_done', 'region_done', 'completed'];
+// 가입 필수 단계를 마친 상태. `deferred` 는 가입을 마치고 관심 설정만 미룬 계정이다. 목록에 없는 값(진행 중·소셜 가입 미룸·새로 생길 값)은 권유하지 않는 쪽이 안전하다.
+const SIGNUP_COMPLETE_STATUSES: readonly string[] = ['signup_done', 'sport_done', 'level_done', 'region_done', 'completed', 'deferred'];
 
 /**
  * 이 계정에 이메일 인증 권유를 띄울 수 있는지 서버가 준 사실만으로 판정한다.

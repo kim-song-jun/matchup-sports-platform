@@ -35,7 +35,7 @@ describe('emailVerifyNudgeTarget — 서버 사실만으로 대상을 가른다'
     expect(emailVerifyNudgeTarget(me({ user: { authProviders: ['email', 'kakao'] } }))).toEqual({ userId: 'user-1' });
   });
 
-  it.each(['signup_done', 'sport_done', 'level_done', 'region_done', 'completed'])(
+  it.each(['signup_done', 'sport_done', 'level_done', 'region_done', 'completed', 'deferred'])(
     '가입 필수 단계를 마친 %s 상태는 대상이다',
     (onboardingStatus) => {
       expect(emailVerifyNudgeTarget(me({ user: { onboardingStatus } }))).toEqual({ userId: 'user-1' });

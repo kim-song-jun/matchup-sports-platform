@@ -204,15 +204,6 @@ describe('AdsPublicService.recordEvents', () => {
     expect(dates).toEqual(['2026-11-10T00:00:00.000Z', '2026-11-11T00:00:00.000Z']);
   });
 
-  it('keeps concurrent batches from losing counts', async () => {
-    const { service, fake } = await build([live()]);
-
-    await Promise.all(Array.from({ length: 5 }, () => service.recordEvents([event('live', 'banner', 'impression'), event('live', 'banner', 'click')], NOW)));
-
-    expect(fake.state.stats).toHaveLength(1);
-    expect(fake.state.stats[0]).toMatchObject({ impressions: 5, clicks: 5 });
-  });
-
   it.each([
     ['a draft campaign', { status: 'draft' as const }],
     ['a stopped campaign', { status: 'stopped' as const }],

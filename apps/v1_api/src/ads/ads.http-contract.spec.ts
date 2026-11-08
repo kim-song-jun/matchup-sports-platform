@@ -1,5 +1,5 @@
 import { ExecutionContext, INestApplication } from '@nestjs/common';
-import { HEADERS_METADATA, HTTP_CODE_METADATA } from '@nestjs/common/constants';
+import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { Test } from '@nestjs/testing';
 import { THROTTLER_LIMIT, THROTTLER_TTL } from '@nestjs/throttler/dist/throttler.constants';
 import { getLoggerToken } from 'nestjs-pino';
@@ -145,6 +145,34 @@ describe('Ads HTTP contract', () => {
     });
   });
 
+  it('does not mark an error response as publicly cacheable', async () => {
+    jest.spyOn(app.get(AdsPublicService), 'findActive').mockRejectedValueOnce(new Error('database unavailable'));
+
+    const failed = await http().get('/api/v1/ads/active').expect(500);
+
+    expect(failed.headers['cache-control'] ?? '').not.toMatch(/public|max-age/);
+    const recovered = await http().get('/api/v1/ads/active').expect(200);
+    expect(recovered.headers['cache-control']).toBe('public, max-age=30');
+  });
+
+  it.each(['banner', 'popup'] as const)('refuses an array where %s belongs and leaves a published ad untouched', async (channel) => {
+    const created = await http().post('/api/v1/admin/ad-campaigns').set(asOwner()).send(body({
+      banner: channel === 'banner' ? creative() : null,
+      popup: channel === 'popup' ? { ...creative(), headline: '제목' } : null,
+    })).expect(201);
+    const id = created.body.data.campaign.id as string;
+    await http().post(`/api/v1/admin/ad-campaigns/${id}/publish`).set(asOwner()).send({ expectedVersion: 1 }).expect(201);
+
+    for (const wrong of [[], [creative()]]) {
+      const res = await http().put(`/api/v1/admin/ad-campaigns/${id}`).set(asOwner()).send({ ...body({ banner: null, popup: null }), [channel]: wrong, expectedVersion: 2 }).expect(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+    }
+
+    const detail = await http().get(`/api/v1/admin/ad-campaigns/${id}`).set(asOwner()).expect(200);
+    expect(detail.body.data.campaign).toMatchObject({ status: 'published', version: 2, [channel]: { imageUrl: BANNER_URL, phase: 'live' } });
+    expect((await http().get('/api/v1/ads/active').expect(200)).body.data[channel]).not.toBeNull();
+  });
+
   it('turns every admin route down for an ops admin and for a caller the guard rejects', async () => {
     const ops = { 'x-test-user': 'user-ops' };
     const routes: Array<[string, string, object?]> = [
@@ -203,11 +231,8 @@ describe('Ads HTTP contract', () => {
     expect(Object.keys(fake.state.stats[0]).sort()).toEqual(['campaignId', 'channel', 'clicks', 'createdAt', 'id', 'impressions', 'statDate', 'updatedAt']);
   });
 
-  it('declares the public routes as unauthenticated, cacheable for under a minute, and the event route throttled with 204', () => {
-    const active = AdsPublicController.prototype.active;
+  it('declares the event route throttled with 204', () => {
     const events = AdsPublicController.prototype.events;
-    const headers = Reflect.getMetadata(HEADERS_METADATA, active) as Array<{ name: string; value: string }>;
-    expect(headers).toEqual([{ name: 'Cache-Control', value: 'public, max-age=30' }]);
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, events)).toBe(204);
     expect(Reflect.getMetadata(`${THROTTLER_LIMIT}default`, events)).toBe(30);
     expect(Reflect.getMetadata(`${THROTTLER_TTL}default`, events)).toBe(60_000);

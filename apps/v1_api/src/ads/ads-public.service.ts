@@ -71,10 +71,14 @@ export class AdsPublicService {
     const byId = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
 
     const statDate = kstCalendarDate(now);
+    // Rows are written in (campaign, channel, date) order. Two requests that touch the same rows in opposite
+    // orders would otherwise wait on each other's row locks and Postgres would abort one with a deadlock.
+    const rowKey = (tally: { campaignId: string; channel: AdChannel }) => `${tally.campaignId}|${tally.channel}|${statDate.toISOString()}`;
+    const ordered = [...tallies.values()].sort((a, b) => (rowKey(a) < rowKey(b) ? -1 : 1));
     const writes = [];
     let accepted = 0;
     let ignored = 0;
-    for (const tally of tallies.values()) {
+    for (const tally of ordered) {
       const count = tally.impressions + tally.clicks;
       const campaign = byId.get(tally.campaignId);
       if (!campaign || !acceptsEvents(campaign, tally.channel, now)) {

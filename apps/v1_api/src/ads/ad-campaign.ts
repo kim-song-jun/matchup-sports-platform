@@ -21,7 +21,6 @@ export type AdChannelFields = {
   endAt: Date | null;
 };
 
-export type AdChannelFieldName = keyof AdChannelFields;
 export type AdChannels = Record<AdChannel, AdChannelFields | null>;
 
 /** A channel is configured as soon as any of its fields is set; a draft may be incomplete. */
@@ -101,6 +100,10 @@ export function findPublishProblems(channels: AdChannels, now: Date, requireFutu
   return problems;
 }
 
+// One window rule everywhere: a channel is live over the half-open interval [startAt, endAt). The two Prisma
+// filters below are that rule for queries; `windowPhase` is the same rule for rows already in memory, and
+// `ad-campaign.spec.ts` checks all of them against each other at the boundary instants.
+
 /** Another published campaign whose window on this channel intersects [startAt, endAt). Touching edges do not overlap. */
 export function overlapWhere(
   channel: AdChannel,
@@ -112,21 +115,20 @@ export function overlapWhere(
     : { id: { not: excludeCampaignId }, status: 'published', popupStartAt: { lt: window.endAt }, popupEndAt: { gt: window.startAt } };
 }
 
-/** `startAt <= now < endAt` on a published campaign. */
+/** A published campaign whose channel is complete and has `startAt <= now < endAt`. */
 export function servingWhere(channel: AdChannel, now: Date): Prisma.V1AdCampaignWhereInput {
   return channel === 'banner'
     ? { status: 'published', bannerImageUrl: { not: null }, bannerAltText: { not: null }, bannerLinkUrl: { not: null }, bannerStartAt: { lte: now }, bannerEndAt: { gt: now } }
     : { status: 'published', popupImageUrl: { not: null }, popupAltText: { not: null }, popupHeadline: { not: null }, popupLinkUrl: { not: null }, popupStartAt: { lte: now }, popupEndAt: { gt: now } };
 }
 
-/** Whether an event for this channel lands inside its window. The caller has already limited rows to published campaigns. */
-export function acceptsEvents(row: ChannelRow, channel: AdChannel, now: Date): boolean {
-  const fields = channelFromRow(row, channel);
-  if (!fields?.imageUrl || !fields.startAt || !fields.endAt) return false;
-  return fields.startAt.getTime() <= now.getTime() && now.getTime() < fields.endAt.getTime() + AD_EVENT_GRACE_MS;
-}
-
 export type AdChannelPhase = 'scheduled' | 'live' | 'ended';
+
+/** Where `now` sits against [startAt, endAt). */
+export function windowPhase(startAt: Date, endAt: Date, now: Date): AdChannelPhase {
+  if (now.getTime() < startAt.getTime()) return 'scheduled';
+  return now.getTime() < endAt.getTime() ? 'live' : 'ended';
+}
 
 /** Derived, never stored. Only a published campaign has a phase. */
 export function channelPhase(
@@ -135,8 +137,15 @@ export function channelPhase(
   now: Date,
 ): AdChannelPhase | null {
   if (status !== 'published' || !fields?.startAt || !fields.endAt) return null;
-  if (now.getTime() < fields.startAt.getTime()) return 'scheduled';
-  return now.getTime() < fields.endAt.getTime() ? 'live' : 'ended';
+  return windowPhase(fields.startAt, fields.endAt, now);
+}
+
+/** Whether an event for this channel lands in its window or the grace period after it. The caller has already limited rows to published campaigns. */
+export function acceptsEvents(row: ChannelRow, channel: AdChannel, now: Date): boolean {
+  const fields = channelFromRow(row, channel);
+  if (!fields?.imageUrl || !fields.startAt || !fields.endAt) return false;
+  const phase = windowPhase(fields.startAt, fields.endAt, now);
+  return phase === 'live' || (phase === 'ended' && now.getTime() < fields.endAt.getTime() + AD_EVENT_GRACE_MS);
 }
 
 export type PublicAd = {

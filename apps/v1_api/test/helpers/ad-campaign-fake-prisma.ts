@@ -54,6 +54,7 @@ export type FakeAsset = {
   popupId: string | null;
   adCampaignId: string | null;
   attachedAt: Date | null;
+  createdAt?: Date;
 };
 
 export type FakeAdmin = {
@@ -201,7 +202,11 @@ export function createAdCampaignFakePrisma(seed: { admins: FakeAdmin[]; assets?:
       }) => {
         await tick();
         let rows = sortRows(state.campaigns.filter((row) => matchRow(row, where)), orderBy);
-        if (cursor) rows = rows.slice(rows.findIndex((row) => row.id === cursor.id));
+        if (cursor) {
+          // Prisma returns nothing when the cursor row does not exist; slicing from -1 would return the last row.
+          const at = rows.findIndex((row) => row.id === cursor.id);
+          rows = at === -1 ? [] : rows.slice(at);
+        }
         rows = rows.slice(skip ?? 0);
         if (take !== undefined) rows = rows.slice(0, take);
         return rows.map(withCreator);

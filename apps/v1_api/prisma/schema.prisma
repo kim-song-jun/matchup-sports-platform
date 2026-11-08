@@ -1197,7 +1197,7 @@ model V1ContentAsset {
   noticeId              String?              @map("notice_id")
   popupId               String?              @map("popup_id")
   /// 광고 캠페인 소재. 소유자는 notice·popup·ad 중 하나다 — 기존 단일 소유자 CHECK 는 notice·popup 만 보므로
-  /// 광고와의 배타는 `AdsService` 의 첨부 가능 검사가 지킨다.
+  /// 광고와의 배타는 `AdsAdminService.syncCampaignAssets` 의 첨부 가능 검사가 지킨다.
   adCampaignId          String?              @map("ad_campaign_id")
   attachedAt            DateTime?            @map("attached_at")
   createdAt             DateTime             @default(now()) @map("created_at")
@@ -1217,7 +1217,7 @@ model V1ContentAsset {
 }
 
 /// 광고 캠페인 1건 = 배너·팝업 소재를 함께 가진 광고 계약 1건. 채널(배너/팝업)마다 이미지·링크·기간이 따로이고
-/// 한 채널만 있어도 된다. 채널당 동시에 게시된 캠페인은 기간이 겹치지 않는다(게시 시점에 `AdsService` 가
+/// 한 채널만 있어도 된다. 채널당 동시에 게시된 캠페인은 기간이 겹치지 않는다(게시 시점에 `AdsAdminService` 가
 /// advisory lock 아래서 검사). 이름이 비슷한 `V1TournamentCampaign` 과는 무관하다.
 model V1AdCampaign {
   id             String             @id @default(uuid())

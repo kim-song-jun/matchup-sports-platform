@@ -107,6 +107,17 @@ describe('SaveAdCampaignDto', () => {
     await expect(parse(SaveAdCampaignDto, save({ banner: creative({ altText: 'a'.repeat(AD_ALT_TEXT_MAX_LENGTH) }) }))).resolves.toBeDefined();
   });
 
+  it.each(['banner', 'popup'] as const)('refuses an array or a scalar where the %s object belongs', async (channel) => {
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [creative()] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [creative(), creative()] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: 0 })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: true })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: '' })));
+    await expect(parse(SaveAdCampaignDto, save({ banner: null, [channel]: creative() }))).resolves.toBeDefined();
+    await expect(parse(SaveAdCampaignDto, save({ banner: null, [channel]: null }))).resolves.toBeDefined();
+  });
+
   it('refuses an over-long alt text and non-string fields', async () => {
     await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ altText: 'a'.repeat(AD_ALT_TEXT_MAX_LENGTH + 1) }) })));
     await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ linkUrl: 42 }) })));

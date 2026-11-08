@@ -3,6 +3,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -94,11 +95,13 @@ export class SaveAdCampaignDto {
   title!: string;
 
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => AdChannelCreativeDto)
   banner?: AdChannelCreativeDto | null;
 
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => AdPopupCreativeDto)
   popup?: AdPopupCreativeDto | null;

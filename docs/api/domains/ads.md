@@ -62,7 +62,7 @@ Images are uploaded first with `POST /api/v1/admin/content-assets` (see [home-no
 PUT replaces all editable fields: an omitted or `null` channel removes that channel and releases its image. Every channel field may be `null` while the campaign is a draft. `advertiserName` (≤60) is shown to users; `title` (≤120) is an internal memo and never leaves the admin API.
 
 - `imageUrl`: only a `/uploads/…` url that `POST /admin/content-assets` returned to the same admin. External urls are a 400 (`VALIDATION_ERROR`); an unknown url is `400 CONTENT_ASSET_NOT_FOUND`; one attached elsewhere or uploaded by someone else is `400 CONTENT_ASSET_UNAVAILABLE`.
-- `linkUrl`: an in-app path (`/…`) or a public HTTPS url. Rejected: `http:`, `javascript:`/`data:`/app schemes, `//host`, backslashes, userinfo, localhost/private/link-local hosts, IPv6 literals, single-label and `.local`/`.internal` hosts, control characters, > 500 chars. The notice popup's own link rule is unchanged.
+- `linkUrl`: an in-app path (`/…`) or a public HTTPS url. Rejected: `http:`, `javascript:`/`data:`/app schemes, `//host`, backslashes, userinfo, localhost/private/link-local/carrier-grade-NAT (100.64.0.0/10) hosts, IPv6 literals, single-label and `.local`/`.internal` hosts (a trailing dot does not get around these), control characters, > 500 chars. An in-app path may not enter `/admin`, `/api`, `/uploads` or `/tournament-ops` (any depth, any letter case, also after percent-decoding and `.`/`..` resolution; a path that cannot be decoded is refused). Whether the target page exists is not checked. The notice popup's own link rule is unchanged.
 - `altText` (≤120, trimmed): the screen-reader description of the image. Optional on a draft, **required to publish** for every channel that has a creative. A blank value counts as empty. The public API sends it as `altText` and never serves a channel without one.
 - `headline` (popup only, ≤40, trimmed): the title line of the popup card. Optional on a draft, **required to publish** a popup; the public API never serves a popup without one. `description` (popup only, ≤80, trimmed, optional): the supporting line; blank counts as empty and is sent as `null`. Sending either on `banner` is a 400 (`VALIDATION_ERROR`). The advertiser name for the line above the headline is `advertiserName`, which the public response already carries.
 
@@ -150,6 +150,22 @@ List items add `stats: { banner: { impressions, clicks }, popup: { impressions, 
 - Counted only for a **published** campaign whose channel was configured and is inside `[startAt, endAt + 10 min)`; everything else is dropped silently (still `204`). Previews and test traffic must not be sent.
 - Stored as per-day counters `(campaignId, channel, KST date)`; no user id, IP or user agent is stored. Counts are client-reported and not suitable as an auditable billing basis.
 - A database failure returns 5xx (recorded in the error log) instead of `204`.
+
+## Behaviour to know (not defects)
+
+- **Image swap on a live ad:** `/ads/active` is cached for up to 30 seconds, so after an image is replaced on a published campaign a cached response can still carry the old `/uploads/…` path for that long. The web hides the ad when its image fails to load.
+- **Event limits:** `POST /ads/events` is limited to 30 requests per minute per IP, so devices behind one network address can lose events when they all report at once. The client does not resend a batch after a network error, so such a batch is lost.
+- **Error responses are not cacheable:** only a successful `GET /ads/active` carries `Cache-Control: public, max-age=30`.
+- **Event write order:** a batch updates its counter rows in `(campaignId, channel, KST date)` order, so concurrent batches that touch the same rows cannot deadlock.
+
+## Decision history
+
+| ID | Decision |
+|---|---|
+| S17 | No retransmission and no event id. A lost batch stays lost; a repeated batch is counted again. |
+| S18 | Totals are kept per campaign, channel and KST date, with no creative version. Replacing an image keeps adding to the same counters. |
+| S19 | The server does not check image ratio or size beyond the upload limits; the web checks the ratio before uploading. |
+| S20 | In-app links block only the reserved paths listed above. The server does not check that the target exists. |
 
 ## Audit
 

@@ -672,6 +672,13 @@ describe('AdsAdminService.list and detail', () => {
     expect(second.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
   });
 
+  it('returns an empty last page for a cursor whose row no longer exists, as the database does', async () => {
+    const { service } = await build({ campaigns: seed() });
+    const page = await service.list(OWNER, { cursor: 'deleted-campaign' });
+    expect(page.items).toEqual([]);
+    expect(page.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+
   it('returns the daily breakdown newest day first, totals per channel and when the numbers last changed', async () => {
     const { service, fake } = await build({ campaigns: seed() });
     fake.state.stats.push(stat('live-1', 'banner', '2026-11-09', 100, 4), stat('live-1', 'banner', '2026-11-10', 50, 1), stat('live-1', 'popup', '2026-11-10', 20, 2), stat('stopped-1', 'banner', '2026-11-10', 999, 99));

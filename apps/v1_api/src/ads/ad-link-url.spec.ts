@@ -48,8 +48,88 @@ describe('isSafeAdLinkUrl', () => {
     ['bare word', 'example.com'],
     ['relative path without slash', 'events/1'],
     ['too long', `/${'a'.repeat(AD_LINK_MAX_LENGTH)}`],
+    ['localhost with a trailing dot', 'https://localhost./x'],
+    ['internal suffix with a trailing dot', 'https://foo.internal./x'],
+    ['mdns suffix with a trailing dot', 'https://printer.local./x'],
+    ['single-label host with a trailing dot', 'https://intranet./x'],
+    ['loopback with a trailing dot', 'https://127.0.0.1./x'],
+    ['carrier-grade NAT lower edge', 'https://100.64.0.1/'],
+    ['carrier-grade NAT inside', 'https://100.100.100.100/'],
+    ['carrier-grade NAT upper edge', 'https://100.127.255.254/'],
   ])('rejects %s', (_label, link) => {
     expect(isSafeAdLinkUrl(link)).toBe(false);
+  });
+
+  it.each([
+    'https://100.63.255.255/',
+    'https://100.128.0.1/',
+    'https://example.com./x',
+    'https://www.example.co.kr./x',
+  ])('accepts %s (just outside the blocked ranges, or a fully qualified public name)', (link) => {
+    expect(isSafeAdLinkUrl(link)).toBe(true);
+  });
+
+  describe('internal paths the web app reserves', () => {
+    it.each([
+      '/admin',
+      '/admin/',
+      '/admin/ops/push-send',
+      '/ADMIN',
+      '/Admin/Users',
+      '/admin?tab=1',
+      '/admin#x',
+      '/api',
+      '/api/v1/health',
+      '/API/v1/auth/logout',
+      '/uploads',
+      '/uploads/ads/banner.webp',
+      '/tournament-ops',
+      '/tournament-ops/abc/console',
+      '/Tournament-Ops/abc',
+      '/./admin',
+      '/foo/../admin',
+      '/foo/../../admin',
+      '/%61dmin',
+      '/%41dmin/users',
+      '/%2561dmin',
+      '/%2e%2e/admin',
+      '/foo/%2e%2e/admin',
+      '/foo/..%2fadmin',
+      '/foo%2f..%2fadmin',
+      '/%2Fadmin',
+      '/ap%69/v1/health',
+      '/up%6Coads/a.webp',
+      '/tournament%2dops/x',
+      '/admin%',
+      '/%zz',
+    ])('rejects %s', (link) => {
+      expect(isSafeAdLinkUrl(link)).toBe(false);
+    });
+
+    it.each([
+      '/',
+      '/tournaments/1',
+      '/home',
+      '/matches?sport=futsal',
+      '/administration',
+      '/apis/x',
+      '/uploaded/x',
+      '/tournament-opsx',
+      '/events/admin',
+      '/events/api/v1',
+      '/tournaments/1?next=/admin',
+      '/tournaments/1#admin',
+      '/%ED%99%88',
+      '/sale/100%25',
+      '/foo/../tournaments/1',
+    ])('accepts %s', (link) => {
+      expect(isSafeAdLinkUrl(link)).toBe(true);
+    });
+
+    it('does not apply to external https urls, whose path belongs to another site', () => {
+      expect(isSafeAdLinkUrl('https://everyday.example.com/admin/event')).toBe(true);
+      expect(isSafeAdLinkUrl('https://everyday.example.com/api/v1')).toBe(true);
+    });
   });
 
   it.each([null, undefined, 42, {}, ['/a']])('rejects non-string %p', (value) => {

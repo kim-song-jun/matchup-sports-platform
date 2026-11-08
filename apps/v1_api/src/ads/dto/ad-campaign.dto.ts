@@ -23,6 +23,8 @@ const TIMESTAMP_MESSAGE = '$property must be an ISO 8601 timestamp with a UTC of
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
 export const AD_ALT_TEXT_MAX_LENGTH = 120;
+export const AD_POPUP_HEADLINE_MAX_LENGTH = 40;
+export const AD_POPUP_DESCRIPTION_MAX_LENGTH = 80;
 
 /** One channel's creative. Every field may be null while the campaign is a draft; publishing requires image, alt text, link and window. */
 export class AdChannelCreativeDto {
@@ -60,6 +62,21 @@ export class AdChannelCreativeDto {
   endAt?: string | null;
 }
 
+/** A popup is a 4:3 card with text: the base creative plus a headline (required to publish) and an optional description. */
+export class AdPopupCreativeDto extends AdChannelCreativeDto {
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(AD_POPUP_HEADLINE_MAX_LENGTH)
+  headline?: string | null;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(AD_POPUP_DESCRIPTION_MAX_LENGTH)
+  description?: string | null;
+}
+
 /** Full replacement of the editable fields: an omitted or null channel removes that channel. */
 export class SaveAdCampaignDto {
   /** Shown to users as "광고 · {advertiserName}". */
@@ -83,8 +100,8 @@ export class SaveAdCampaignDto {
 
   @IsOptional()
   @ValidateNested()
-  @Type(() => AdChannelCreativeDto)
-  popup?: AdChannelCreativeDto | null;
+  @Type(() => AdPopupCreativeDto)
+  popup?: AdPopupCreativeDto | null;
 }
 
 export class UpdateAdCampaignDto extends SaveAdCampaignDto {

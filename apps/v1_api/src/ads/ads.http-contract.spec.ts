@@ -121,6 +121,30 @@ describe('Ads HTTP contract', () => {
     expect(finalDetail.body.data.stats.banner).toEqual({ impressions: 2, clicks: 1 });
   });
 
+  it('publishes a popup only with a headline and serves its headline and description', async () => {
+    const popup = (overrides: Record<string, unknown> = {}) => ({
+      ...creative(), headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', ...overrides,
+    });
+    const withoutHeadline = await http().post('/api/v1/admin/ad-campaigns').set(asOwner()).send(body({ banner: null, popup: popup({ headline: null }) })).expect(201);
+
+    const refused = await http().post(`/api/v1/admin/ad-campaigns/${withoutHeadline.body.data.campaign.id}/publish`).set(asOwner()).send({ expectedVersion: 1 }).expect(400);
+    expect(refused.body).toMatchObject({ code: 'AD_CHANNEL_INCOMPLETE', details: [{ channel: 'popup', missing: ['headline'] }] });
+    expect((await http().get('/api/v1/ads/active').expect(200)).body.data.popup).toBeNull();
+
+    const edited = await http().put(`/api/v1/admin/ad-campaigns/${withoutHeadline.body.data.campaign.id}`).set(asOwner())
+      .send({ ...body({ banner: null, popup: popup() }), expectedVersion: 1 }).expect(200);
+    await http().post(`/api/v1/admin/ad-campaigns/${edited.body.data.campaign.id}/publish`).set(asOwner()).send({ expectedVersion: 2 }).expect(201);
+
+    const active = await http().get('/api/v1/ads/active').expect(200);
+    expect(active.body.data).toEqual({
+      banner: null,
+      popup: {
+        campaignId: edited.body.data.campaign.id, advertiserName: '에버데이', imageUrl: BANNER_URL, altText: '에버데이 신제품',
+        headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', linkUrl: '/tournaments/1',
+      },
+    });
+  });
+
   it('turns every admin route down for an ops admin and for a caller the guard rejects', async () => {
     const ops = { 'x-test-user': 'user-ops' };
     const routes: Array<[string, string, object?]> = [

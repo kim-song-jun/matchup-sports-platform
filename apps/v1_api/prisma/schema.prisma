@@ -1238,6 +1238,9 @@ model V1AdCampaign {
 
   popupImageUrl String?   @map("popup_image_url")
   popupAltText  String?   @map("popup_alt_text")
+  /// 팝업 제목(게시하려면 필수)과 보조 설명(선택). 배너에는 없다.
+  popupHeadline    String?   @map("popup_headline")
+  popupDescription String?   @map("popup_description")
   popupLinkUrl  String?   @map("popup_link_url")
   popupStartAt  DateTime? @map("popup_start_at")
   popupEndAt    DateTime? @map("popup_end_at")

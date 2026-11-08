@@ -21,6 +21,8 @@ export type FakeCampaign = {
   bannerEndAt: Date | null;
   popupImageUrl: string | null;
   popupAltText: string | null;
+  popupHeadline: string | null;
+  popupDescription: string | null;
   popupLinkUrl: string | null;
   popupStartAt: Date | null;
   popupEndAt: Date | null;
@@ -168,7 +170,7 @@ export function createAdCampaignFakePrisma(seed: { admins: FakeAdmin[]; assets?:
         status: 'draft',
         version: 1,
         bannerImageUrl: null, bannerAltText: null, bannerLinkUrl: null, bannerStartAt: null, bannerEndAt: null,
-        popupImageUrl: null, popupAltText: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
+        popupImageUrl: null, popupAltText: null, popupHeadline: null, popupDescription: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
         publishedAt: null, stoppedAt: null,
         createdAt: now, updatedAt: now,
         ...data,

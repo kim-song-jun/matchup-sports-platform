@@ -24,6 +24,8 @@ CREATE TABLE "v1_ad_campaigns" (
     "banner_end_at" TIMESTAMP(3),
     "popup_image_url" TEXT,
     "popup_alt_text" TEXT,
+    "popup_headline" TEXT,
+    "popup_description" TEXT,
     "popup_link_url" TEXT,
     "popup_start_at" TIMESTAMP(3),
     "popup_end_at" TIMESTAMP(3),

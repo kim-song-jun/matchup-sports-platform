@@ -6,20 +6,22 @@ import {
   AD_CHANNELS,
   acceptsEvents,
   servingWhere,
-  toPublicAd,
+  toPublicBanner,
+  toPublicPopup,
   type AdChannel,
   type AdEventType,
   type PublicAd,
+  type PublicPopupAd,
 } from './ad-campaign';
 
-export type ActiveAds = Record<AdChannel, PublicAd | null>;
+export type ActiveAds = { banner: PublicAd | null; popup: PublicPopupAd | null };
 export type AdEventInput = { campaignId: string; channel: AdChannel; type: AdEventType };
 
 const PUBLIC_SELECT = {
   id: true,
   advertiserName: true,
   bannerImageUrl: true, bannerAltText: true, bannerLinkUrl: true, bannerStartAt: true, bannerEndAt: true,
-  popupImageUrl: true, popupAltText: true, popupLinkUrl: true, popupStartAt: true, popupEndAt: true,
+  popupImageUrl: true, popupAltText: true, popupHeadline: true, popupDescription: true, popupLinkUrl: true, popupStartAt: true, popupEndAt: true,
 } as const;
 
 @Injectable()
@@ -41,8 +43,8 @@ export class AdsPublicService {
       ),
     );
     return {
-      banner: banner ? toPublicAd(banner, 'banner') : null,
-      popup: popup ? toPublicAd(popup, 'popup') : null,
+      banner: banner ? toPublicBanner(banner) : null,
+      popup: popup ? toPublicPopup(popup) : null,
     };
   }
 

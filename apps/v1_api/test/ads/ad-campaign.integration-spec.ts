@@ -36,7 +36,13 @@ describe('ad campaigns against PostgreSQL', () => {
   });
 
   async function draft(channel: 'banner' | 'popup', startDay: number, endDay: number) {
-    const creative = { imageUrl: await upload(), altText: '에버데이 행사 안내', linkUrl: '/tournaments/1', ...window(startDay, endDay) };
+    const creative = {
+      imageUrl: await upload(),
+      altText: '에버데이 행사 안내',
+      ...(channel === 'popup' ? { headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' } : {}),
+      linkUrl: '/tournaments/1',
+      ...window(startDay, endDay),
+    };
     const { campaign } = await admin.create(owner, {
       advertiserName: '에버데이',
       title: `${prefix}-${seq}`,
@@ -97,6 +103,27 @@ describe('ad campaigns against PostgreSQL', () => {
       response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ channel: 'banner', missing: ['altText'] }] },
     });
     expect((await prisma.v1AdCampaign.findUniqueOrThrow({ where: { id: noAlt.id } })).status).toBe('draft');
+  });
+
+  it('stores the popup headline and description in their columns, serves them, and refuses a popup without a headline', async () => {
+    const popup = await draft('popup', 1, 5);
+    expect(popup.popup).toMatchObject({ headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' });
+    expect(popup.banner).toBeNull();
+    const [stored] = await prisma.$queryRaw<Array<{ popup_headline: string | null; popup_description: string | null }>>`
+      SELECT popup_headline, popup_description FROM v1_ad_campaigns WHERE id = ${popup.id}`;
+    expect(stored).toEqual({ popup_headline: '에버데이 11월 이벤트', popup_description: '신제품을 먼저 만나 보세요' });
+    await admin.publish(owner, popup.id, { expectedVersion: 1 });
+    expect((await publicAds.findActive()).popup).toMatchObject({ campaignId: popup.id, headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' });
+
+    const { campaign: noHeadline } = await admin.create(owner, {
+      advertiserName: '에버데이',
+      title: `${prefix}-no-headline`,
+      popup: { imageUrl: await upload(), altText: '안내', linkUrl: '/tournaments/1', ...window(10, 20) },
+    } as never);
+    await expect(admin.publish(owner, noHeadline.id, { expectedVersion: 1 })).rejects.toMatchObject({
+      response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ channel: 'popup', missing: ['headline'] }] },
+    });
+    expect((await prisma.v1AdCampaign.findUniqueOrThrow({ where: { id: noHeadline.id } })).status).toBe('draft');
   });
 
   it('keeps one live ad per channel in SQL: overlap refused, touching edges and the other channel allowed', async () => {

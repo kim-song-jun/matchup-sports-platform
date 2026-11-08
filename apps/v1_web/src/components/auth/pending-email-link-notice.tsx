@@ -20,14 +20,24 @@ export function PendingEmailLinkNotice() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    let expiryTimer: number | undefined;
+    // 한 번 읽을 때 기준 시각은 하나다 — 저장소 만료 판정과 남은 시간 계산이 서로 다른 시각을 보면 경계에서 어긋난다.
     const refresh = () => {
-      const pending = readPendingEmailLinkWithExpiry();
-      setNow(Date.now());
-      setNotice(pending && peekPendingSocialLink() === null ? { email: pending.email, expiresAtMs: Date.parse(pending.expiresAt) } : null);
+      const nowMs = Date.now();
+      const pending = readPendingEmailLinkWithExpiry(nowMs);
+      setNow(nowMs);
+      const expiresAtMs = pending ? Date.parse(pending.expiresAt) : null;
+      setNotice(pending && expiresAtMs !== null && peekPendingSocialLink() === null ? { email: pending.email, expiresAtMs } : null);
+      // 주기 갱신을 기다리지 않고 만료 시각에 바로 거둔다.
+      window.clearTimeout(expiryTimer);
+      if (expiresAtMs !== null) expiryTimer = window.setTimeout(refresh, Math.max(0, expiresAtMs - nowMs) + 1);
     };
     refresh();
     const timer = window.setInterval(refresh, NOTICE_REFRESH_MS);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(expiryTimer);
+    };
   }, []);
 
   if (!notice) return null;

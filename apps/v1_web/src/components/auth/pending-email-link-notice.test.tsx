@@ -75,14 +75,14 @@ describe('PendingEmailLinkNotice', () => {
     expect(await screen.findByText(new RegExp(`^${phrase} 로그인하면 이메일 연결을`))).toBeInTheDocument();
   });
 
-  it('화면을 열어 둔 사이 보관 시간이 지나면 안내가 사라진다', () => {
-    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
-    savePendingEmailLink({ email: null }, Date.now() - 580_000);
+  it('화면을 열어 둔 사이 보관 시간이 지나면 주기 갱신(30초)을 기다리지 않고 만료 시각에 안내가 사라진다', () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+    savePendingEmailLink({ email: null }, Date.now() - 590_000);
     render(<PendingEmailLinkNotice />);
     expect(screen.getByText(/^1분 이내에 로그인하면/)).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(31_000);
+      vi.advanceTimersByTime(11_000);
     });
 
     expect(screen.queryByText(/연결을 이어서 도와요/)).not.toBeInTheDocument();

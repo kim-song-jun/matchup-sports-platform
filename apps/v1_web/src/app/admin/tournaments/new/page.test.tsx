@@ -26,6 +26,7 @@ import type {
   TournamentCreateState,
 } from './tournament-create-model';
 import type { V1CreateTournamentPayload, V1Tournament } from '@/types/api';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
@@ -139,6 +140,7 @@ function previousTournament(): V1Tournament {
     bankAccount: '123-456',
     bankHolder: '티밋',
     rulesText: null,
+    tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
     yellowAccumulationLimit: null,
     redCardSuspensionMatches: null,
     refundPolicyText: null,
@@ -254,6 +256,7 @@ function fakeDraftResponseForPayload(
     promoListLocationText: payload.promoListLocationText ?? null,
     promoListPrizeText: payload.promoListPrizeText ?? null,
     promoListPriority: payload.promoListPriority ?? 0,
+    tieBreakOrder: payload.tieBreakOrder ?? [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
     yellowAccumulationLimit: payload.yellowAccumulationLimit ?? null,
     redCardSuspensionMatches: payload.redCardSuspensionMatches ?? null,
     rulesText: payload.rulesText ?? null,
@@ -483,6 +486,49 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     await waitFor(() => expect(savePeriodsMutateAsync).toHaveBeenCalledWith(
       { tournamentId: 'draft-1', expectedVersion: '2026-08-01T00:00:00.000Z', periods: [{ durationMinutes: 30 }] },
     ));
+  });
+
+  it('동점일 때 순서: 참가 조건 단계에서 순서를 옮기면 대회를 만들 때 그 순서를 보낸다', () => {
+    createMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    goToParticipationStep();
+
+    expect(screen.getByRole('heading', { name: '동점일 때 순서' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '득실차 한 칸 위로' }));
+    fireEvent.click(screen.getByRole('button', { name: '다득점 한 칸 위로' }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate.mock.calls[0][0]).toMatchObject({
+      tieBreakOrder: ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'],
+    });
+  });
+
+  it('동점일 때 순서: 건드리지 않으면 null 을 보내 서버 기본 순서를 쓴다', () => {
+    createMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    goToParticipationStep();
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate.mock.calls[0][0]).toMatchObject({ tieBreakOrder: null });
+  });
+
+  it('동점일 때 순서: 조별 순위가 없는 토너먼트 방식에서는 칸이 보이지 않는다', () => {
+    renderPage();
+    fillBasicStep();
+    fireEvent.click(screen.getByRole('radio', { name: '토너먼트만' }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fillScheduleStep();
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+    expect(screen.queryByRole('heading', { name: '동점일 때 순서' })).toBeNull();
   });
 
   it('경기 시간: 기본값 그대로 만들면 피리어드 설정을 따로 저장하지 않는다', () => {

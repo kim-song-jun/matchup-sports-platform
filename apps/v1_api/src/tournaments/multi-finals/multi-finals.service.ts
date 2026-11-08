@@ -9,7 +9,6 @@ import { GamesService } from '../../games/games.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lockCompetitionForBracketMutationInTx } from '../slots/competition-bracket-lock';
 import { loadGroupRankSources } from '../slots/load-group-rank-preview';
-import { validateCompetitionConfig } from '../competition-config/competition-config';
 import { drawnTieGroups, resolveStoredGroupRank } from '../slots/group-rank-preview';
 import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { BracketTemplateService } from '../templates/bracket-template.service';
@@ -36,7 +35,7 @@ export class MultiFinalsService {
 
   private async tournament(tx: Tx, id: string) {
     const row = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: {
-      id: true, kind: true, format: true, status: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true, competitionConfig: true,
+      id: true, kind: true, format: true, status: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true,
       multiFinals: true, multiFinalsRevision: true, ...TOURNAMENT_VENUE_SELECT,
     } });
     if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -95,11 +94,7 @@ export class MultiFinalsService {
     const entries = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id, kind: 'ENTRY', groupId: { in: config.groups.map(g => g.id) } },
       select: { groupId: true, registrationId: true }, orderBy: { position: 'asc' } });
     const sources = await loadGroupRankSources(tx, id, config.groups.map(g => g.id));
-    const rankRule = () => {
-      if (!tournament.competitionConfigVersionId) throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.' });
-      return { tournamentId: id, configVersionId: tournament.competitionConfigVersionId, config: validateCompetitionConfig(tournament.competitionConfig) };
-    };
-    const drawnTies = new Map(config.groups.map(group => [group.id, drawnTieGroups(sources.get(group.id)!, rankRule)]));
+    const drawnTies = new Map(config.groups.map(group => [group.id, drawnTieGroups(sources.get(group.id)!)]));
     const standingRows = await tx.v1TournamentStanding.findMany({
       where: { groupId: { in: config.groups.map(g => g.id) } },
       select: { groupId: true, registrationId: true, position: true, points: true, wins: true, draws: true, losses: true, goalsFor: true, goalsAgainst: true },

@@ -4007,6 +4007,19 @@ export type V1TournamentListItem = {
   updatedAt: string;
 };
 
+/**
+ * 정규 대회의 동점 순서 기준. 서버 `CompetitionConfig['tieBreak']['order']` 와 같은 값이다.
+ * 승점은 언제나 첫 칸, 추첨은 언제나 마지막 칸이고 가운데 네 기준만 순서를 바꿀 수 있다.
+ */
+export type V1TournamentTieBreakCriterion =
+  | 'points'
+  | 'head_to_head'
+  | 'goal_difference'
+  | 'goals_for'
+  | 'fair_play'
+  | 'seeded_draw';
+export type V1TournamentTieBreakOrder = V1TournamentTieBreakCriterion[];
+
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
   sixTeamMode?: boolean;
@@ -4015,6 +4028,10 @@ export type V1Tournament = {
   canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
   formatChangeBlockedReason?: string | null;
+  /** 지금 쓰는 동점 순서(항상 6칸). 안 고른 대회는 기본 순서다. */
+  tieBreakOrder: V1TournamentTieBreakOrder;
+  /** 관리자 상세 응답: null이면 동점 순서 변경 가능, 예선 결과가 확정됐으면 한국어 사유. */
+  tieBreakOrderBlockedReason?: string | null;
   id: string;
   sportId: string;
   title: string;
@@ -4351,6 +4368,8 @@ export type V1TournamentDetail = {
   format: V1TournamentFormat;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
+  /** 이 대회가 고른 동점 순서(6칸). 정규 리그는 리그 고유 순서를 쓰므로 null. */
+  tieBreakOrder?: V1TournamentTieBreakOrder | null;
   /** 정규 리그에만 내려오는 참가팀 정원. null이면 무제한이다. */
   maxTeams?: number | null;
   registrationDeadlineAt: string | null;
@@ -5033,6 +5052,8 @@ export type V1SubstitutionMode = 'limited' | 'rolling';
 
 export type V1CreateTournamentPayload = {
   sixTeamMode?: boolean;
+  /** 동점 순서(6칸). 생략 = 기본 순서(생성)/변경 없음(수정), null = 기본 순서로 되돌리기. */
+  tieBreakOrder?: V1TournamentTieBreakOrder | null;
   sportId: string;
   title: string;
   format?: V1TournamentFormat;

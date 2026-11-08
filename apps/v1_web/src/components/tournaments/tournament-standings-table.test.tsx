@@ -192,6 +192,40 @@ describe('TournamentStandingsTable', () => {
     expect(screen.getByText(/아직 경기 기록이 없어요/)).toBeInTheDocument();
   });
 
+  it('대회가 고른 동점 순서를 표 아래에 한 줄로 알려준다', () => {
+    render(
+      <TournamentStandingsTable
+        rows={[ROW]}
+        advancingKeys={null}
+        ariaLabel="테스트 순위표"
+        tieBreakOrder={['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw']}
+      />,
+    );
+    expect(screen.getByText('동점이면 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요')).toBeInTheDocument();
+  });
+
+  it('동점 순서를 안 받은 표(정규 리그·옛 응답)에는 안내 줄이 없다', () => {
+    const { rerender } = render(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" />);
+    expect(screen.queryByText(/동점이면/)).toBeNull();
+    rerender(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" tieBreakOrder={null} />);
+    expect(screen.queryByText(/동점이면/)).toBeNull();
+  });
+
+  it('안내 줄은 표 밖(아래)에 있고 아직 경기 기록이 없어도 규칙은 알려준다', () => {
+    const zero = { points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
+    render(
+      <TournamentStandingsTable
+        rows={[{ ...ROW, ...zero }]}
+        advancingKeys={null}
+        ariaLabel="테스트 순위표"
+        tieBreakOrder={['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw']}
+      />,
+    );
+    const rule = screen.getByText(/동점이면 승점 → 맞대결/);
+    expect(screen.getByRole('table', { name: '테스트 순위표' })).not.toContainElement(rule);
+    expect(screen.getByText(/아직 경기 기록이 없어요/)).toBeInTheDocument();
+  });
+
   it('행이 없으면 빈 안내 문구를 보여준다', () => {
     render(<TournamentStandingsTable rows={[]} advancingKeys={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByText('순위 집계 전이에요')).toBeInTheDocument();
@@ -368,6 +402,18 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
     expect(bracketHeaders).toEqual(['#', '팀', '전적', '승점', '득실']);
     expect(scheduleHeaders).toEqual(['#', '팀', '전적', '승점', '득실']);
     expect(bracketHeaders).toEqual(scheduleHeaders);
+  });
+
+  it('순위·대진표 탭이 대회 동점 순서를 조별 순위표 아래에 알려준다', () => {
+    const tieBreakOrder = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as const;
+    const rule = '동점이면 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요';
+    const bracket = renderBracketStandingsTab({ ...makeTournament(), tieBreakOrder: [...tieBreakOrder] });
+    expect(within(bracket.container).getByText(rule)).toBeInTheDocument();
+  });
+
+  it('동점 순서를 모르는 응답이면 안내 줄을 만들지 않는다', () => {
+    const bracket = renderBracketStandingsTab({ ...makeTournament(), tieBreakOrder: null });
+    expect(within(bracket.container).queryByText(/동점이면/)).toBeNull();
   });
 });
 

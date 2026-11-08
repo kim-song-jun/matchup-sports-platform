@@ -1,4 +1,5 @@
 import { UnprocessableEntityException } from '@nestjs/common';
+import type { TieBreakOrder } from '../competition-config/tournament-tie-break-order';
 
 export type CrossGroupTeam = {
   registrationId: string; teamName: string; groupId: string; groupName: string;
@@ -11,13 +12,31 @@ export type CrossGroupTarget = {
   byePosition: number | null; groupId: string;
 };
 export type CrossGroupPreview = {
-  version: string; teams: CrossGroupTeam[]; ranks: CrossGroupRank[]; targets: CrossGroupTarget[];
+  version: string; tieBreakOrder: TieBreakOrder; teams: CrossGroupTeam[]; ranks: CrossGroupRank[]; targets: CrossGroupTarget[];
 };
 export type CrossGroupSelection = {
   rankPicks: string[]; rankingOrder: string[]; assignments: string[];
 };
-export const compareCrossGroupTeams = (a: CrossGroupTeam, b: CrossGroupTeam): number =>
-  b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor;
+
+/** The only tie-break criteria that compare teams of different groups: head-to-head needs a game between them and fair play is not part of the cross-group stats. */
+const CROSS_GROUP_VALUES = {
+  goal_difference: (team: CrossGroupTeam) => team.goalsFor - team.goalsAgainst,
+  goals_for: (team: CrossGroupTeam) => team.goalsFor,
+} as const;
+type CrossGroupCriterion = keyof typeof CROSS_GROUP_VALUES;
+
+const crossGroupCriteria = (order: TieBreakOrder): CrossGroupCriterion[] =>
+  order.filter((criterion): criterion is CrossGroupCriterion => criterion === 'goal_difference' || criterion === 'goals_for');
+
+/** Points first, then the tournament's own tie-break order restricted to `crossGroupCriteria`; 0 means fully level. */
+export const compareCrossGroupTeams = (a: CrossGroupTeam, b: CrossGroupTeam, order: TieBreakOrder): number => {
+  if (a.points !== b.points) return b.points - a.points;
+  for (const criterion of crossGroupCriteria(order)) {
+    const value = CROSS_GROUP_VALUES[criterion];
+    if (value(a) !== value(b)) return value(b) - value(a);
+  }
+  return 0;
+};
 
 function invalid(message: string): never {
   throw new UnprocessableEntityException({ code: 'ROUND12_SELECTION_INVALID', message });
@@ -42,8 +61,8 @@ export function validateCrossGroupSelection(preview: CrossGroupPreview, input: C
     const ordered = input.rankingOrder.slice((rank - 1) * 5, rank * 5);
     if (!sameSet(ordered, candidates)) invalid('서로 같은 조별 순위의 팀끼리 비교해 주세요.');
     for (let i = 1; i < ordered.length; i += 1) {
-      if (compareCrossGroupTeams(teams.get(ordered[i - 1])!, teams.get(ordered[i])!) > 0) {
-        invalid('승점·골득실·다득점 순서를 바꿀 수 없어요. 완전 동률인 팀만 순서를 정할 수 있어요.');
+      if (compareCrossGroupTeams(teams.get(ordered[i - 1])!, teams.get(ordered[i])!, preview.tieBreakOrder) > 0) {
+        invalid('조 간 성적 순서를 바꿀 수 없어요. 완전 동률인 팀만 순서를 정할 수 있어요.');
       }
     }
   }

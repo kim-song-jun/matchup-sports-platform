@@ -1,11 +1,18 @@
 // apps/v1_api/src/tournaments/slots/load-group-rank-preview.ts
+import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { validateCompetitionConfig } from '../competition-config/competition-config';
+import { withTournamentTieBreakOrder } from '../competition-config/tournament-tie-break-order';
 import { resolveTournamentFixtureOfficialScore } from '../tournament-fixture-official-result';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import {
+  hasSettledResults,
   resolveGroupRank,
   summarizeGroupStanding,
+  type GroupRankInput,
   type GroupRankSource,
   type GroupStandingSummary,
+  type StoredRankRule,
 } from './group-rank-preview';
 import { tournamentSlotLabel } from './tournament-slot-label';
 
@@ -89,6 +96,27 @@ export async function loadGroupRankPreview(
 }
 
 type LoadedGroupRankSource = GroupRankSource & { teamNameById: ReadonlyMap<string, string> };
+type LoadedGroupRankInput = GroupRankInput & { teamNameById: ReadonlyMap<string, string> };
+
+/** The tournament's stored-standings rule. Called only for a settled group, which is the only case that loads it. */
+async function loadStoredRankRule(client: Prisma.TransactionClient, tournamentId: string): Promise<StoredRankRule> {
+  const tournament = await findTournamentOnSurface(client, TOURNAMENT_KINDS, {
+    where: { id: tournamentId },
+    select: { competitionConfigVersionId: true, competitionConfig: true, tieBreakOrder: true },
+  });
+  if (tournament?.competitionConfigVersionId == null) {
+    throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.' });
+  }
+  return {
+    tournamentId,
+    configVersionId: tournament.competitionConfigVersionId,
+    config: withTournamentTieBreakOrder(validateCompetitionConfig(tournament.competitionConfig), tournament.tieBreakOrder),
+  };
+}
+
+const NO_SETTLED_GROUP_RULE = (): StoredRankRule => {
+  throw new Error('A stored rank rule was requested although no group is settled');
+};
 
 /** 조별 순위 판정 입력. 어드민 미리보기와 공개 순위표가 같은 조회 조건을 쓰도록 한 곳에 둔다. */
 export async function loadGroupRankSources(
@@ -118,10 +146,10 @@ export async function loadGroupRankSources(
     },
   });
 
-  const sourceByGroup = new Map<string, LoadedGroupRankSource>();
+  const inputByGroup = new Map<string, LoadedGroupRankInput>();
   for (const groupId of groupIds) {
     const teams = groupTeams.filter((row) => row.groupId === groupId);
-    sourceByGroup.set(groupId, {
+    inputByGroup.set(groupId, {
       registrationIds: teams.map((row) => row.registrationId),
       teamNameById: new Map(teams.map((row) => [row.registrationId, row.registration.team.name])),
       standings: standings.filter((row) => row.groupId === groupId),
@@ -138,6 +166,12 @@ export async function loadGroupRankSources(
         }),
     });
   }
+  const storedRule = [...inputByGroup.values()].some(hasSettledResults)
+    ? await loadStoredRankRule(client, tournamentId)
+    : null;
+  const rule = storedRule === null ? NO_SETTLED_GROUP_RULE : () => storedRule;
+  const sourceByGroup = new Map<string, LoadedGroupRankSource>();
+  for (const [groupId, input] of inputByGroup) sourceByGroup.set(groupId, { ...input, rule });
   return sourceByGroup;
 }
 

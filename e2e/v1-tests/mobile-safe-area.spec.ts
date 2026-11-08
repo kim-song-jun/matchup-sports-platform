@@ -327,9 +327,12 @@ test.describe('mobile safe area and touch', () => {
       return { handle: offset('.tm-filter-sheet-handle'), head: offset('.tm-filter-sheet-head') };
     });
     const atRest = await offsets();
-    await dialog.evaluate((sheet) => { sheet.scrollTop = sheet.scrollHeight; });
+    await dialog.evaluate((sheet) => { sheet.scrollTop = sheet.scrollHeight - sheet.clientHeight; });
     await expect.poll(() => dialog.evaluate((sheet) => sheet.scrollTop)).toBeGreaterThan(0);
-    expect(await offsets()).toEqual(atRest);
+    const scrolled = await offsets();
+    // getBoundingClientRect can return fractions; a pinned head stays within half a pixel of where it started.
+    expect(scrolled.handle).toBeCloseTo(atRest.handle, 0);
+    expect(scrolled.head).toBeCloseTo(atRest.head, 0);
     // The strip above the head and beside the handle must be opaque: no option may be the top element there.
     const covered = await dialog.evaluate((sheet) => {
       const box = sheet.getBoundingClientRect();

@@ -165,7 +165,7 @@ List items add `stats: { banner: { impressions, clicks }, popup: { impressions, 
 | S17 | No retransmission and no event id. A lost batch stays lost; a repeated batch is counted again. |
 | S18 | Totals are kept per campaign, channel and KST date, with no creative version. Replacing an image keeps adding to the same counters. |
 | S19 | The server does not check image ratio or size beyond the upload limits; the web checks the ratio before uploading. |
-| S20 | In-app links block only the reserved paths listed above. The server does not check that the target exists. |
+| S20 | In-app links block `/admin`, `/api`, `/uploads`, `/tournament-ops` and below, and do not check that the target exists. Format validation is separate and always applies: in-app links must be same-origin relative paths (no `//`, backslash, control characters, or dot segments that normalize to `//`), external links must be `https:`. The server checks on save and the web checks again before rendering. |
 
 ## Audit
 

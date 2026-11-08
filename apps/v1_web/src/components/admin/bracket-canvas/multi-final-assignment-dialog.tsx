@@ -136,7 +136,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
       const id = kept[pickKey(entry)];
       return id && !rows.includes(id) ? choosePick(rows, { seat: entry.seat, mates: matesOf(pickKey(entry), entry.tiedRegistrationIds), previous: undefined, id, capacity: slots.length }) : rows;
     }, next);
-    setIds(placed); setPicks(Object.fromEntries(Object.entries(kept).filter(([, id]) => placed.includes(id)))); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true);
+    setIds(placed); setPicks(Object.fromEntries(Object.entries(kept).filter(([, id]) => placed.includes(id)))); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true); setError('');
   }
   // With tied seats open the seat numbers must not shift, so a removed team leaves its seat empty instead of closing the gap.
   const drop = (remove: (id: string) => boolean) => seats.length > 0
@@ -155,7 +155,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
     if (crossPolicy) { setPicks(next); setNeedsRecommendation(true); setSourceVersion(''); setDirty(true); return; }
     const rows = choosePick(ids, { seat: seat.seat, mates: matesOf(key, seat.candidates), previous, id, capacity: slots.length });
     if (id && !rows.includes(id)) { setError('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.'); return; }
-    setError(''); edit(rows, next);
+    edit(rows, next);
   }
   return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">

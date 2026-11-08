@@ -463,6 +463,8 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     expect(screen.getByText('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.')).toBeInTheDocument();
     expect(select).toHaveValue('');
     expect(seedOrder()).toEqual(['1번 시드 · 가팀', '2번 시드 · 나팀', '3번 시드 · 마팀']);
+    fireEvent.click(screen.getByRole('checkbox', { name: '마팀' }));
+    expect(screen.queryByText('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.')).not.toBeInTheDocument();
   });
 
   it('시작한 토너먼트에는 동률 안내와 선택창을 아예 그리지 않는다', async () => {

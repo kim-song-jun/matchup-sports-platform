@@ -209,7 +209,7 @@ characters. Every rejection is `400 VALIDATION_ERROR`.
 Finding the signup email and resetting a password happen while logged out, so they cannot reuse
 `/api/v1/verification/*`, which sits behind `V1AuthGuard`. Phone verification proves current
 possession of a number and permits account lookup; it does not prove ownership of an existing
-account. A password can only be reset through the separate email proof channel; there is no phone reset endpoint. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
+account. A password can only be reset through the separate email proof channel; there is no phone reset endpoint. Phone proof and email proof can each look up available sign-in methods; both prefer an active account and otherwise find the account in withdrawal grace.
 
 | Concern | Contract |
 |---|---|

@@ -4510,20 +4510,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 12px;
 }
 
-/* 지역 섹션 안내 한 줄: 문장 + 이동 링크. 링크는 44px 터치 영역을 확보한다. */
+/* 지역 섹션 안내 한 줄: 문장 + 이동 링크(칩 아래). */
 .tm-filter-region-notice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 4px;
-  margin-top: 4px;
+  margin-top: 8px;
   color: var(--text-muted);
 }
 
+/* 문장 끝에 이어 붙는 인라인 링크 — 줄 높이는 그대로 두고 padding 만으로 44px 터치 영역을 만든다. */
 .tm-filter-region-notice-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  padding: 14px 4px;
   color: var(--blue700);
   font-weight: 700;
   text-decoration: underline;
@@ -4540,7 +4535,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* 필터 시트의 [닫기][적용하기] 줄은 시트 바닥에 붙여 둔다 — 옵션이 시트 최대 높이를 넘으면 내용만
    그 위에서 스크롤된다(W5-V1: 390×844 에서 버튼 아래 17px 가 접혔다). sticky 기준선은 스크롤
    컨테이너의 padding 안쪽이라, 시트 padding-bottom 만큼 inset·margin 을 음수로 줘 바닥까지 덮고
-   같은 값을 padding 으로 되돌린다(내용이 다 들어갈 때 버튼 위치는 그대로다: 8 + 12 = 기존 20). */
+   같은 값을 padding 으로 되돌린다(내용이 다 들어갈 때 버튼 위치는 그대로다: 16 + 4 = 20). */
 .tm-filter-sheet > .tm-filter-actions {
   position: sticky;
   bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));

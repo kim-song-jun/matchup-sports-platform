@@ -1012,8 +1012,13 @@ describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 �
     expect(actions).toMatch(/position:\s*sticky/);
     // sticky 기준선은 스크롤 컨테이너의 padding 안쪽이다 — bottom:0 이면 줄 아래 padding 띠로 옵션이 비친다(alpha 실측).
     expect(actions).toMatch(/bottom:\s*calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
-    expect(actions).toMatch(/margin:\s*8px 0 calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
-    expect(actions).toMatch(/padding:\s*12px 0 var\(--tm-filter-sheet-pad-bottom\)/);
+    expect(actions).toMatch(/margin:\s*16px 0 calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
+    expect(actions).toMatch(/padding:\s*4px 0 var\(--tm-filter-sheet-pad-bottom\)/);
+    // 스크롤 중에는 버튼 줄 위 16px 에서 내용이 페이드로 사라지고, 클릭은 그 아래 내용으로 통과한다.
+    const fade = ruleOf('.tm-filter-sheet > .tm-filter-actions::before');
+    expect(fade).toMatch(/bottom:\s*100%/);
+    expect(fade).toMatch(/height:\s*16px/);
+    expect(fade).toMatch(/pointer-events:\s*none/);
     expect(actions).toMatch(/background:\s*var\(--bg\)/);
   });
 });

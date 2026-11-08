@@ -100,7 +100,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
   const signedIn = Boolean(authMe.data?.user?.id);
   const profile = useV1Profile({ enabled: signedIn });
   const myRegion = resolveMyTeamRegion({
-    loading: authMe.isPending || (signedIn && profile.isPending) || regions.isPending,
+    unresolved: authMe.isPending || (signedIn && (profile.isPending || profile.isError)) || regions.isPending,
     saved: signedIn ? profile.data?.regions : undefined,
     master: regions.data ?? [],
   });
@@ -1155,9 +1155,9 @@ function buildTeamFilterSheet(
   ];
   const regionNotice: NonNullable<TeamListViewModel['filterSheet']>['regionNotice'] =
     myRegion.status === 'ready'
-      ? { placement: 'below', text: `설정한 활동 지역(${myRegion.savedName})을 시/도 단위로 보여 줘요`, link: { label: '바꾸기', href: LOCATION_SETTINGS_HREF } }
+      ? { text: `설정한 활동 지역(${myRegion.savedName})을 시/도 단위로 보여 줘요`, link: { label: '바꾸기', href: LOCATION_SETTINGS_HREF } }
       : myRegion.status === 'none'
-        ? { placement: 'above', text: '활동 지역을 정해 두면 여기서 한 번에 골라요', link: { label: '활동 지역 설정하기 ›', href: LOCATION_SETTINGS_HREF } }
+        ? { text: '활동 지역을 정해 두면 여기서 한 번에 골라요', link: { label: '활동 지역 설정하기 ›', href: LOCATION_SETTINGS_HREF } }
         : undefined;
 
   return {
@@ -1186,14 +1186,14 @@ type MyTeamRegion =
 
 /**
  * 저장한 활동 지역(시/군/구일 수 있다)을 목록 필터가 쓰는 시/도로 올린다. 서버가 regionId 하나만 받아 기본(primary) 한 곳만 쓴다.
- * 아직 모르는 상태(로딩·마스터에서 못 찾음)는 'none' 과 달리 안내를 내지 않는다 — 지역이 있는 사람에게 설정을 권하지 않기 위해서다.
+ * 아직 모르는 상태(로딩·프로필 조회 실패·마스터에서 못 찾음)는 'none' 과 달리 안내를 내지 않는다 — 지역이 있는 사람에게 설정을 권하지 않기 위해서다.
  */
-function resolveMyTeamRegion({ loading, saved, master }: {
-  loading: boolean;
+function resolveMyTeamRegion({ unresolved, saved, master }: {
+  unresolved: boolean;
   saved: ReadonlyArray<{ regionId: string; primary: boolean }> | undefined;
   master: ReadonlyArray<{ id: string; name: string; parentId: string | null }>;
 }): MyTeamRegion {
-  if (loading) return { status: 'unknown' };
+  if (unresolved) return { status: 'unknown' };
   const mine = saved?.find((region) => region.primary) ?? saved?.[0];
   if (!mine) return { status: 'none' };
   const district = master.find((region) => region.id === mine.regionId);

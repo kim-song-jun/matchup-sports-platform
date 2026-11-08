@@ -54,7 +54,7 @@ export type TeamListViewModel = {
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
     /** 저장한 활동 지역 안내(내 지역 칩이 있을 때) 또는 설정 유도. 프로필을 아직 못 받았으면 없다. */
-    regionNotice?: { placement: 'above' | 'below'; text: string; link: { label: string; href: string } };
+    regionNotice?: { text: string; link: { label: string; href: string } };
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
   summary: { scope: string; total?: number; totalState?: 'loading' | 'error'; totalRefreshError?: boolean; loaded?: number; recruiting: number; nearby?: number };

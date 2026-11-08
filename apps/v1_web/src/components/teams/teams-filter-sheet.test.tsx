@@ -153,6 +153,15 @@ describe('TeamListPageClient — 필터 시트', () => {
       expect(screen.queryByRole('link', { name: /활동 지역 설정하기/ })).toBeNull();
     });
 
+    it('프로필 조회가 실패하면 저장한 지역을 모르는 것이라 설정 유도 링크를 내지 않는다', () => {
+      hookMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } }, isPending: false });
+      hookMocks.useV1Profile.mockReturnValue({ data: undefined, isPending: false, isError: true });
+      render(<TeamListPageClient />);
+
+      expect(chipLabels('지역')).toEqual(['전체', '서울', '경기', '인천']);
+      expect(screen.queryByRole('link', { name: /활동 지역 설정하기/ })).toBeNull();
+    });
+
     it('위치 권한을 부르지 않는다', () => {
       const getCurrentPosition = vi.fn();
       vi.stubGlobal('navigator', { ...navigator, geolocation: { getCurrentPosition } });

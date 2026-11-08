@@ -2146,13 +2146,12 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
         ].map(([title, options]) => (
           <div key={title as string} className="tm-filter-section">
             <div className="tm-text-label">{title as string}</div>
-            {title === '지역' && sheet.regionNotice?.placement === 'above' ? <RegionNotice notice={sheet.regionNotice} /> : null}
             <div className="tm-filter-chip-wrap">
               {(options as Array<{ label: string; value: string; href: string; active?: boolean }>).map((option) => (
                 <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? 'page' : undefined}>{option.label}</Link>
               ))}
             </div>
-            {title === '지역' && sheet.regionNotice?.placement === 'below' ? <RegionNotice notice={sheet.regionNotice} /> : null}
+            {title === '지역' && sheet.regionNotice ? <RegionNotice notice={sheet.regionNotice} /> : null}
           </div>
         ))}
         <div className="tm-filter-actions">

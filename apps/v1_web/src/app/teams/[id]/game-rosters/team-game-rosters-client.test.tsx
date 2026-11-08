@@ -161,6 +161,16 @@ describe('경기 명단 관리 — 칩 토글과 일괄 저장', () => {
     expect(within(await playerCard('김민재')).queryByText(/경고 \d\/\d장/)).toBeNull();
   });
 
+  it('두 대회에 경고가 쌓이면 칩마다 대회 이름이 붙는다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 });
+    mock.setGameInOtherCompetition(G1.gameId);
+    mock.setCards('player-2', 1);
+    renderPage();
+    const card = within(await playerCard('박서준'));
+    expect(card.getByText('다른 풋살컵 · 경고 1/2장 · 한 장 더 받으면 정지')).toBeInTheDocument();
+    expect(card.getByText('성수 풋살컵 · 경고 1/2장 · 한 장 더 받으면 정지')).toBeInTheDocument();
+  });
+
   it('그사이 시작된 경기가 섞이면 409 — 그 경기 변경만 빠지고 나머지를 다시 저장할 수 있다', async () => {
     renderPage();
     const card = within(await playerCard('김민재'));

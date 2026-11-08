@@ -97,6 +97,8 @@ export function createV1GameRosterMswHandlers() {
     realNames: new Map<string, string>(),
     /** 정지 규정이 없는 다른 대회에 속한 경기 — 규정·카드 누적이 null 이고 대회 id 가 다르다. */
     rulelessGames: new Set<string>(),
+    /** 같은 규정을 쓰지만 다른 대회에 속한 경기 — 대회 id·이름만 다르다. */
+    otherCompetitionGames: new Set<string>(),
     /** 대진 수정으로 이 팀이 더는 뛰지 않는 경기 — 표에서 빠지고 일괄 저장은 404 GAME_SIDE_NOT_FOUND. */
     detached: new Set<string>(),
   };
@@ -215,9 +217,9 @@ export function createV1GameRosterMswHandlers() {
       gameId: game.gameId,
       sideId: game.sideId,
       teamMatchId: roster.teamMatchId,
-      competitionId: state.rulelessGames.has(game.gameId) ? 'other-competition' : roster.competitionId,
+      competitionId: state.rulelessGames.has(game.gameId) || state.otherCompetitionGames.has(game.gameId) ? 'other-competition' : roster.competitionId,
       competitionKind: roster.competitionKind,
-      competitionTitle: state.rulelessGames.has(game.gameId) ? '다른 풋살컵' : '성수 풋살컵',
+      competitionTitle: state.rulelessGames.has(game.gameId) || state.otherCompetitionGames.has(game.gameId) ? '다른 풋살컵' : '성수 풋살컵',
       opponentName: game.opponentName,
       scheduledAt: game.startAt,
       gameState: roster.gameState,
@@ -504,6 +506,10 @@ export function createV1GameRosterMswHandlers() {
     /** 이 경기를 규정 없는 다른 대회 소속으로 — 팀 경기 목록에서 규정 있는 대회 경기보다 앞에 놓을 때 쓴다. */
     setGameWithoutRules(gameId: string) {
       state.rulelessGames.add(gameId);
+    },
+    /** 이 경기를 규정은 같고 대회만 다른 경기로 — 한 선수에게 대회별 경고 칩이 둘 생기는 상황을 만든다. */
+    setGameInOtherCompetition(gameId: string) {
+      state.otherCompetitionGames.add(gameId);
     },
     markJoinedAfterFixture(userId: string) {
       state.joinedAfter.add(userId);

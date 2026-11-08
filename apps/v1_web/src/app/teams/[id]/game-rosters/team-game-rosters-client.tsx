@@ -261,7 +261,11 @@ function playerDisciplineWarnings(player: V1TeamRosterMatrixPlayer, games: reado
   games.forEach((game, index) => {
     if (game.gameState !== 'SCHEDULED' || seen.has(game.competitionId)) return;
     const cell = player.cells[index];
-    if (cell === undefined || cell.status === 'SUSPENDED') return;
+    if (cell === undefined) return;
+    if (cell.status === 'SUSPENDED') {
+      seen.add(game.competitionId);
+      return;
+    }
     const chip = disciplineWarningChip(cell.cards, game.disciplineRules);
     if (chip === null) return;
     seen.add(game.competitionId);

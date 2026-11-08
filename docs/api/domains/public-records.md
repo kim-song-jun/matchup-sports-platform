@@ -74,7 +74,7 @@ existing file changed.
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl and isForfeit: true for a forfeit-decided game, always false on status_only rows), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
-`tieBreakOrder`(6칸, 정규 리그 거울은 `null`)는 그 대회가 고른 동점 순서이고 순위표 아래 안내 문구의 근거다(`tournaments.md` 동점일 때 순서). `standings[].sharedRank: number | null` 은 예선 조가 있는 대회(조별+결선 `group_knockout`, 정규리그+N개 토너먼트 `league_knockouts`)의 예선 조 순위 행에서 그 대회의 동점 순서로도 갈리지 않아 추첨으로 정한 팀의 공동 순위(동률 묶음의 최소 `position`)이고, 그 밖(편성 기준선 행·결선 조 등 `phase ≠ group` 행·리그 방식·토너먼트·정규 리그 거울)은 `null` 이다. 대회 상세 `groups[].standings[].sharedRank` 와 같은 값이다(`tournaments.md` 조 순위 항목).
+`standings[].sharedRank: number | null` 은 예선 조가 있는 대회(조별+결선 `group_knockout`, 정규리그+N개 토너먼트 `league_knockouts`)의 예선 조 순위 행에서 그 대회의 동점 순서로도 갈리지 않아 추첨으로 정한 팀의 공동 순위(동률 묶음의 최소 `position`)이고, 그 밖(편성 기준선 행·결선 조 등 `phase ≠ group` 행·리그 방식·토너먼트·정규 리그 거울)은 `null` 이다. 대회 상세 `groups[].standings[].sharedRank` 와 같은 값이다(`tournaments.md` 조 순위 항목).
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.

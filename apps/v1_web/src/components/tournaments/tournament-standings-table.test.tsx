@@ -404,20 +404,16 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
     expect(bracketHeaders).toEqual(scheduleHeaders);
   });
 
-  it('순위·대진표 탭과 일정 탭이 같은 대회 동점 순서를 조별 순위표 아래에 알려준다', () => {
+  it('순위·대진표 탭이 대회 동점 순서를 조별 순위표 아래에 알려준다', () => {
     const tieBreakOrder = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as const;
     const rule = '동점이면 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요';
     const bracket = renderBracketStandingsTab({ ...makeTournament(), tieBreakOrder: [...tieBreakOrder] });
-    const schedule = render(<ScheduleContent tournamentId="tour-1" data={{ ...makeScheduleData(), tieBreakOrder }} />);
     expect(within(bracket.container).getByText(rule)).toBeInTheDocument();
-    expect(within(schedule.container).getByText(rule)).toBeInTheDocument();
   });
 
-  it('동점 순서를 모르는 응답이면 두 탭 모두 안내 줄을 만들지 않는다', () => {
+  it('동점 순서를 모르는 응답이면 안내 줄을 만들지 않는다', () => {
     const bracket = renderBracketStandingsTab({ ...makeTournament(), tieBreakOrder: null });
-    const schedule = render(<ScheduleContent tournamentId="tour-1" data={{ ...makeScheduleData(), tieBreakOrder: null }} />);
     expect(within(bracket.container).queryByText(/동점이면/)).toBeNull();
-    expect(within(schedule.container).queryByText(/동점이면/)).toBeNull();
   });
 });
 

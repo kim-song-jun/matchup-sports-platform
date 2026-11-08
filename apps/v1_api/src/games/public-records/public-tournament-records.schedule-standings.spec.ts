@@ -25,7 +25,7 @@ const standingRow = (groupId: string, registrationId: string, position: number) 
   registration: { team: { id: `team-${registrationId}`, name: `${registrationId}팀`, profile: null } },
 });
 
-function fakePrisma(options: { format: string; kind?: string; baselineGroups?: unknown[]; standingRows?: unknown[]; tieBreakOrder?: string[] | null }): PrismaService {
+function fakePrisma(options: { format: string; kind?: string; baselineGroups?: unknown[]; standingRows?: unknown[] }): PrismaService {
   return {
     v1Tournament: {
       async findFirst() {
@@ -37,7 +37,6 @@ function fakePrisma(options: { format: string; kind?: string; baselineGroups?: u
           status: 'closed',
           bracketPublishedAt: new Date('2026-01-01T00:00:00.000Z'),
           bracketPublishScheduledAt: null,
-          tieBreakOrder: options.tieBreakOrder ?? null,
         };
       },
     },
@@ -146,18 +145,5 @@ describe('PublicTournamentRecordsService.getSchedule -- 조별 순위 sharedRank
 
     expect(loadSummaries).not.toHaveBeenCalled();
     expect(result.standings.every((row) => row.sharedRank === null)).toBe(true);
-  });
-});
-
-describe('PublicTournamentRecordsService.getSchedule -- 동점 순서 안내', () => {
-  beforeEach(() => loadSummaries.mockReset().mockResolvedValue(summaries));
-  const schedule = (prisma: PrismaService) =>
-    new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
-  const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
-
-  it('대회가 고른 순서를 그대로 싣고, 고른 적 없으면 기본 순서를 싣는다', async () => {
-    expect((await schedule(fakePrisma({ format: 'group_knockout', tieBreakOrder: GOALS_FIRST }))).tieBreakOrder).toEqual(GOALS_FIRST);
-    expect((await schedule(fakePrisma({ format: 'group_knockout' }))).tieBreakOrder)
-      .toEqual(['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw']);
   });
 });

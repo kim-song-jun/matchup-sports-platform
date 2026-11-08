@@ -476,13 +476,13 @@ describe('EmailLinkClient — 비밀번호 단계', () => {
     const connect = screen.getByRole('button', { name: '연결하기' });
     expect(connect).toBeDisabled();
     await user.type(screen.getByLabelText('비밀번호'), 'short');
-    expect(screen.getByText('8자 이상 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-invalid', 'true');
     expect(connect).toBeDisabled();
+    expect(await screen.findByText('8자 이상 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-invalid', 'true');
 
     await user.clear(screen.getByLabelText('비밀번호'));
     await user.type(screen.getByLabelText('비밀번호'), PASSWORD);
-    expect(screen.getByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
+    expect(await screen.findByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('비밀번호 확인'), `${PASSWORD}x`);
     expect(screen.getByText('비밀번호가 일치하지 않아요.')).toBeInTheDocument();
     expect(connect).toBeDisabled();
@@ -492,6 +492,52 @@ describe('EmailLinkClient — 비밀번호 단계', () => {
     await user.type(screen.getByLabelText('비밀번호 확인'), PASSWORD);
     expect(screen.getByText('비밀번호가 일치해요.')).toBeInTheDocument();
     expect(connect).toBeEnabled();
+  });
+
+  // 서버가 거절할 비밀번호에 "사용할 수 있는 비밀번호예요"를 띄우면 안 된다 — 서버와 같은 판정 파일을 쓴다.
+  it('서버가 거절할 흔한 비밀번호는 사용할 수 있다고 하지 않고, 버튼은 바로 잠그며 이유는 입력이 멈추면 알린다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+
+    await user.type(screen.getByLabelText('비밀번호'), 'Qwer1234');
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'Qwer1234');
+
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeDisabled();
+    expect(screen.getByText('다른 비밀번호를 정해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('비밀번호')).toHaveAccessibleDescription('너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.'));
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeDisabled();
+
+    await user.clear(screen.getByLabelText('비밀번호'));
+    await user.clear(screen.getByLabelText('비밀번호 확인'));
+    await user.type(screen.getByLabelText('비밀번호'), PASSWORD);
+    await user.type(screen.getByLabelText('비밀번호 확인'), PASSWORD);
+    expect(await screen.findByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeEnabled();
+  });
+
+  // 화면의 목록과 서버의 목록이 어긋나 서버가 거절해도, 이유는 비밀번호 칸 아래에 서버 문구 그대로 남는다.
+  it('서버가 흔한 비밀번호(400)로 거절하면 그 문구를 비밀번호 칸 아래에 보여 주고 같은 값으로는 다시 보낼 수 없다', async () => {
+    const user = userEvent.setup();
+    server.use(http.post('*/api/v1/auth/link/email/complete', () => failure(400, 'PASSWORD_TOO_COMMON', '서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.')));
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+
+    const field = screen.getByLabelText('비밀번호');
+    await waitFor(() => expect(field).toHaveAccessibleDescription('서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.'));
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getAllByText('서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.')).toHaveLength(1);
+    expect(screen.queryByText('다시 시도해 주세요')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeDisabled();
+    expect(screen.getByText('다른 비밀번호를 정해 주세요.')).toBeInTheDocument();
   });
 
   it('보기 토글은 그 칸의 글자만 드러내고 누른 상태를 알린다', async () => {

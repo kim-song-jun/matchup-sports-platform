@@ -44,13 +44,64 @@ describe('leagueFixtureTitles', () => {
     expect(titles.slice(8)).toEqual(Array.from({ length: startAts.length - 8 }, (_, index) => `가을 리그 2주차 ${index + 1}경기`));
   });
 
-  it('순번 없는 생성(하루 한 라운드)은 주차만 붙인다', () => {
+  it('시각이 같은 경기끼리는 입력 순서대로, 주가 바뀌면 순번을 1부터 다시 센다 (시간 없이 만든 대진)', () => {
     const startAts = [kstNine('2026-11-21'), kstNine('2026-11-21'), kstNine('2026-11-28')];
 
-    expect(leagueFixtureTitles('옛 리그', startAts, { numbered: false })).toEqual([
-      '옛 리그 1주차',
-      '옛 리그 1주차',
-      '옛 리그 2주차',
+    expect(leagueFixtureTitles('옛 리그', startAts)).toEqual([
+      '옛 리그 1주차 1경기',
+      '옛 리그 1주차 2경기',
+      '옛 리그 2주차 1경기',
+    ]);
+  });
+
+  it('하루 경기 수 없이 토·일 두 라운드로 만든 대진은 날짜 순서 → 입력 순서로 1경기부터 이어진다', () => {
+    // 4 teams, 2 rounds, no timing: the games of a round share one start time (Sat 11/21, Sun 11/22).
+    const teamIds = ['team-1', 'team-2', 'team-3', 'team-4'];
+    const rounds = generateRoundRobinFixtures(teamIds, 2);
+    const dates = [kstNine('2026-11-21'), kstNine('2026-11-22')];
+    const startAts = rounds.map((fixture) => dates[fixture.round - 1]);
+
+    const titles = leagueFixtureTitles('여성부 리그', startAts);
+
+    expect(rounds.map((fixture) => fixture.round)).toEqual([1, 1, 2, 2]);
+    expect(titles).toEqual([
+      '여성부 리그 1주차 1경기',
+      '여성부 리그 1주차 2경기',
+      '여성부 리그 1주차 3경기',
+      '여성부 리그 1주차 4경기',
+    ]);
+  });
+
+  it('입력이 날짜 순서가 아니어도 이른 날짜가 먼저 번호를 받는다 (같은 날짜는 입력 순서)', () => {
+    const startAts = [kstNine('2026-11-22'), kstNine('2026-11-21'), kstNine('2026-11-22'), kstNine('2026-11-21')];
+
+    expect(leagueFixtureTitles('리그', startAts)).toEqual([
+      '리그 1주차 3경기',
+      '리그 1주차 1경기',
+      '리그 1주차 4경기',
+      '리그 1주차 2경기',
+    ]);
+  });
+
+  it('하루 경기 수로 순차 배치한 대진의 제목은 입력 순서 그대로다 (자정을 넘기는 마지막 경기 포함)', () => {
+    // Sat 22:00 start, 40 minute games, 4 a day: the 4th game starts at Sun 00:00 KST, still the same
+    // calendar week; Sun's own matchday starts at 22:00 and continues the numbering.
+    const fixtures = generateRoundRobinFixtures(['team-1', 'team-2', 'team-3', 'team-4'], 3);
+    const slots = resolveFixtureTimeSlots(
+      fixtures,
+      [new Date('2026-11-21T22:00:00+09:00'), new Date('2026-11-22T22:00:00+09:00')],
+      { gameDurationMinutes: 40, breakMinutes: 0, gamesPerDay: 4 },
+    );
+    const startAts = slots.map((slot) => slot.startAt);
+
+    expect(startAts.map((startAt) => startAt.getTime())).toEqual([...startAts.map((startAt) => startAt.getTime())].sort((a, b) => a - b));
+    expect(leagueFixtureTitles('심야 리그', startAts)).toEqual([
+      '심야 리그 1주차 1경기',
+      '심야 리그 1주차 2경기',
+      '심야 리그 1주차 3경기',
+      '심야 리그 1주차 4경기',
+      '심야 리그 1주차 5경기',
+      '심야 리그 1주차 6경기',
     ]);
   });
 });
@@ -113,8 +164,7 @@ describe('nextOrderInCalendarWeek', () => {
 });
 
 describe('leagueFixtureTitle', () => {
-  it('순번이 있으면 주차 뒤에 붙이고, 없으면 주차만 쓴다', () => {
+  it('주차 뒤에 경기 순번을 붙인다', () => {
     expect(leagueFixtureTitle({ leagueTitle: '가을 리그', week: 2, orderInWeek: 4 })).toBe('가을 리그 2주차 4경기');
-    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', week: 3 })).toBe('가을 리그 3주차');
   });
 });

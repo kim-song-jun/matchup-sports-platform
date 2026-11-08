@@ -224,6 +224,28 @@ describe('NotificationsService', () => {
     expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
   });
 
+  it('로그인 수단 해제 보안 알림도 알림 설정과 무관하게 만들고 설정 화면으로 보낸다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: false });
+    prisma.v1Notification.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
+
+    const created = await service.createInTransaction(prisma as unknown as Prisma.TransactionClient, 'user-1', 'social_identity_unlinked', {
+      vars: { name: '이메일·비밀번호' },
+      businessKey: 'login-method-removed:identity-1:3',
+    });
+
+    expect(created).toMatchObject({ targetType: 'system', targetId: null, deepLink: '/my/settings' });
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        businessKey: 'login-method-removed:identity-1:3:user-1',
+        title: '로그인 수단이 해제됐어요',
+        body: '이메일·비밀번호 로그인이 해제됐어요. 다른 기기는 로그아웃됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+      }),
+    });
+    expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
+  });
+
   it('운영자 번호 해제 알림은 알림 설정과 무관하게 만들고 휴대폰 인증 화면으로 보낸다', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: false });
     prisma.v1Notification.findUnique.mockResolvedValue(null);

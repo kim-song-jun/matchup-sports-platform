@@ -710,6 +710,19 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     });
   });
 
+  it('하루 경기 수 없이 토·일에 나눠 만든 대진도 제목 순번이 날짜 순서대로 이어진다 (모두 "1주차" 로 겹치지 않는다)', async () => {
+    // Dates are sent out of order; the server sorts them, so Sat 11/21 is round 1 and Sun 11/22 round 2.
+    await service.generateFixtures(adminUser, 'league-1', {
+      weeksCount: 2,
+      schedule: { dates: ['2099-11-22', '2099-11-21'], time: '09:00' },
+    });
+
+    expect(state.teamMatchCreates.map((row) => ({ title: row.title, startAt: row.startAt.toISOString() }))).toEqual([
+      { title: '테스트 리그 1주차 1경기', startAt: '2099-11-21T00:00:00.000Z' },
+      { title: '테스트 리그 1주차 2경기', startAt: '2099-11-22T00:00:00.000Z' },
+    ]);
+  });
+
   it('roundsCount 가 주차 수 × 팀당 하루 경기 수보다 작으면 그 라운드 수까지만 만든다', async () => {
     // 2팀은 한 라운드 = 한 경기. 3주 × 하루 1경기면 3경기지만 roundsCount 1 이면 한 경기뿐이다.
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 3, roundsCount: 1 });

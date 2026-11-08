@@ -11,7 +11,7 @@ const success = (data: unknown) => HttpResponse.json({ status: 'success', data }
 const registrations = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => ({ id: `reg-${i}`, team: { id: `team-${i}`, name } }));
 const savedView = (): MultiFinalView => ({ revision: 1, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], generated: false, registrations,
   groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
-  finals: [{ id: 'final-0', colorIndex: 0, name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], unresolved: [] }] });
+  finals: [{ id: 'final-0', colorIndex: 0, name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], tiePicks: [], unresolved: [] }] });
 const server = setupServer(http.post('*/api/v1/logs/client-error', () => success({})));
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => { cleanup(); server.resetHandlers(); });
@@ -101,7 +101,7 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
       const body = await request.json() as { groups: MultiFinalView['groups']; finals: MultiFinalView['finals'] };
       setupInput = body;
       view = { ...view, revision: 1, groups: body.groups.map((group, i) => ({ ...group, id: `saved-${i}` })),
-        finals: body.finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: `saved-${rule.groupId}` })), manual: false, standingsChanged: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+        finals: body.finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: `saved-${rule.groupId}` })), manual: false, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       return success(view);
     }), http.post(`${base}/preview`, () => success({ revision: 1, previewHash: 'pending', finals: view.finals,
       counts: { tournaments: 1, fixtures: 1, byes: 0 } })), http.post(`${base}/generate`, async ({ request }) => { generateInput = await request.json(); return success({ revision: 2 }); }));
@@ -169,7 +169,7 @@ describe('규칙 화면의 시드 번호', () => {
   const viewWith = (groupCount: number, capacity: number): MultiFinalView => ({
     revision: 1, generated: true, fixtureCount: 3, registrations,
     groups: groupNames.slice(0, groupCount).map(name => ({ id: `g-${name}`, name: `${name}조`, capacity: 5, legs: 1 as const })),
-    finals: [{ id: 'final-0', colorIndex: 0, name: '본선', capacity, thirdPlace: false, rules: [], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: [], unresolved: [] }],
+    finals: [{ id: 'final-0', colorIndex: 0, name: '본선', capacity, thirdPlace: false, rules: [], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: [], tiePicks: [], unresolved: [] }],
   });
   const seedBadges = () => screen.getAllByText(/^시드 \d+$/).map(node => node.textContent);
   const rowOf = (groupName: string, rank: number) => screen.getByLabelText(`${groupName}조 ${rank}위 진출 토너먼트`).closest('label') as HTMLElement;

@@ -11,6 +11,8 @@ type Props = {
   /** 대조에 성공하면 비밀번호 재설정용 증명 토큰을 넘긴다. */
   onVerified: (proofToken?: string) => void;
   surface?: 'card' | 'inset' | 'plain';
+  /** 인증번호를 확인하는 버튼의 글자(기본 '확인'). */
+  submitLabel?: string;
 };
 
 /**
@@ -19,7 +21,7 @@ type Props = {
  * 휴대폰 카드와 달리 용도를 고를 수 없다 — 서버가 이 경로의 증명을 재설정용으로 고정하고,
  * 그 증명은 휴대폰 증명과 서로 통하지 않는다.
  */
-export function EmailVerificationCard({ email, onVerified, surface = 'card' }: Props) {
+export function EmailVerificationCard({ email, onVerified, surface = 'card', submitLabel }: Props) {
   const issue = useV1RecoveryEmailIssue();
   const verify = useV1RecoveryEmailVerify();
 
@@ -52,6 +54,7 @@ export function EmailVerificationCard({ email, onVerified, surface = 'card' }: P
       requestFailureMessage="인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요."
       verifyFailureMessage="인증번호가 올바르지 않아요. 다시 확인해 주세요."
       surface={surface}
+      submitLabel={submitLabel}
     />
   );
 }

@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
@@ -117,6 +118,7 @@ function buildPrismaMock() {
     },
     v1AuthIdentity: {
       findUnique: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({ id: 'created-identity' }),
@@ -173,12 +175,15 @@ describe('AuthService', () => {
     scheduleSprayDetection: jest.fn(),
   };
   const loginStepUp = { start: jest.fn(), verify: jest.fn(), resend: jest.fn() };
+  const NOTICE = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 연결됐어요', body: null, deepLink: '/my/settings' };
+  const notifications = { createInTransaction: jest.fn(), deliverCreated: jest.fn() };
   const CLIENT = { ip: '203.0.113.9' };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     prisma.v1User.updateMany.mockResolvedValue({ count: 1 });
     phoneVerification.enabled = false;
+    notifications.createInTransaction.mockResolvedValue(NOTICE);
 
     // $transaction: execute the callback with prisma itself (no real tx isolation)
     (prisma.$transaction as jest.Mock).mockImplementation(
@@ -205,6 +210,7 @@ describe('AuthService', () => {
         { provide: AppleTokenService, useValue: { storeFromAuthorizationCode: jest.fn() } },
         { provide: LoginSecurityService, useValue: loginSecurity },
         { provide: LoginStepUpService, useValue: loginStepUp },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -1542,6 +1548,31 @@ describe('AuthService', () => {
       await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ status: 401 });
     });
 
+    it('스스로 해제한 카카오 로그인은 LOGIN_METHOD_UNLINKED, 정지·차단된 계정은 그대로 PERMISSION_DENIED 로 거절한다', async () => {
+      const held = (identityStatus: string, accountStatus: string) => ({
+        id: 'identity-1',
+        status: identityStatus,
+        user: { id: 'user-1', email: null, accountStatus, onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW, sessionEpoch: 2 },
+      });
+      const refusal = async (identityStatus: string, accountStatus: string) => {
+        stubKakao([tokenInfo(123456), me()]);
+        prisma.v1AuthIdentity.findUnique.mockResolvedValue(held(identityStatus, accountStatus));
+        return (await service.kakaoTokenLogin({ accessToken: TOKEN }).catch((error: unknown) => error)) as {
+          getStatus(): number;
+          getResponse(): { code: string };
+        };
+      };
+
+      const unlinked = await refusal('unlinked', 'active');
+      expect([unlinked.getStatus(), unlinked.getResponse().code]).toEqual([403, 'LOGIN_METHOD_UNLINKED']);
+
+      for (const [identityStatus, accountStatus] of [['blocked', 'active'], ['active', 'suspended'], ['unlinked', 'suspended']]) {
+        const blocked = await refusal(identityStatus, accountStatus);
+        expect([blocked.getStatus(), blocked.getResponse().code]).toEqual([403, 'PERMISSION_DENIED']);
+      }
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
     it('KAKAO_APP_ID 가 없으면 카카오를 호출하기 전에 400 OAUTH_NOT_CONFIGURED', async () => {
       delete process.env.KAKAO_APP_ID;
       const fetchMock = stubKakao([]);
@@ -1652,7 +1683,7 @@ describe('AuthService', () => {
     };
     const contactOwner = {
       id: 'email-member', email: 'member@example.com', phone: '01012345678',
-      accountStatus: 'active', emailVerifiedAt: NOW, phoneVerifiedAt: NOW,
+      accountStatus: 'active', emailVerifiedAt: NOW, phoneVerifiedAt: NOW, adminUser: null,
     };
     it('new Kakao members store provider-verified contacts and Gregorian DOB without OTP', async () => {
       stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
@@ -1680,6 +1711,97 @@ describe('AuthService', () => {
       }));
       expect(prisma.v1User.create).not.toHaveBeenCalled();
       expect(prisma.v1User.delete).not.toHaveBeenCalled();
+    });
+    describe('login that matches an existing account by its verified email', () => {
+      const emailOnly = { email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true };
+      const arrange = (owner: Record<string, unknown> = contactOwner) => {
+        stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: emailOnly })]);
+        prisma.v1User.findUnique.mockResolvedValueOnce(owner).mockResolvedValueOnce(owner).mockResolvedValue(completedUserRow({ id: contactOwner.id }));
+        prisma.v1AuthIdentity.create.mockResolvedValue({ id: 'new-kakao-identity' });
+      };
+      const expectUntouched = () => {
+        expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+        expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(prisma.v1User.create).not.toHaveBeenCalled();
+        expect(notifications.createInTransaction).not.toHaveBeenCalled();
+        expect(notifications.deliverCreated).not.toHaveBeenCalled();
+      };
+
+      it('stores a security notice with the link and pushes it only after the link has committed', async () => {
+        arrange();
+        let committed = false;
+        let deliveredAfterCommit: boolean | null = null;
+        const runTransaction = (prisma.$transaction as jest.Mock).getMockImplementation() as (arg: unknown) => Promise<unknown>;
+        (prisma.$transaction as jest.Mock).mockImplementation(async (arg: unknown) => {
+          const result = await runTransaction(arg);
+          committed = true;
+          return result;
+        });
+        notifications.deliverCreated.mockImplementation(() => { deliveredAfterCommit = committed; });
+
+        await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+        expect(notifications.createInTransaction).toHaveBeenCalledWith(prisma, contactOwner.id, 'social_identity_linked', {
+          vars: { name: '카카오' },
+          businessKey: 'social-link:new-kakao-identity',
+        });
+        expect(notifications.deliverCreated).toHaveBeenCalledWith(contactOwner.id, 'social_identity_linked', NOTICE);
+        expect(deliveredAfterCommit).toBe(true);
+      });
+
+      it('refuses a second Kakao login for an account that already has one, after the account row is locked', async () => {
+        arrange();
+        prisma.v1AuthIdentity.findFirst.mockResolvedValue({ id: 'older-kakao-identity' });
+
+        await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+          status: 409, response: { code: 'SOCIAL_LINK_PROVIDER_EXISTS' },
+        });
+
+        expect(prisma.v1AuthIdentity.findFirst).toHaveBeenCalledWith({
+          where: { userId: contactOwner.id, provider: 'kakao', status: 'active' },
+          select: { id: true },
+        });
+        // A login another transaction attached while this one waited for the row is only visible once the row is held.
+        expect(prisma.v1User.updateMany.mock.invocationCallOrder[0]).toBeLessThan(prisma.v1AuthIdentity.findFirst.mock.invocationCallOrder[0]);
+        expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(notifications.createInTransaction).not.toHaveBeenCalled();
+        expect(notifications.deliverCreated).not.toHaveBeenCalled();
+        expect(prisma.v1User.create).not.toHaveBeenCalled();
+      });
+
+      it.each(['active', 'suspended'])('refuses an operator account whose admin grant is %s without touching it', async (status) => {
+        arrange({ ...contactOwner, adminUser: { status } });
+
+        await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+          status: 403, response: { code: 'SOCIAL_LINK_ADMIN_FORBIDDEN' },
+        });
+
+        expectUntouched();
+      });
+
+      it('still links an account whose admin grant was revoked', async () => {
+        arrange({ ...contactOwner, adminUser: { status: 'revoked' } });
+
+        const result = await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+        expect(result.session.userId).toBe(contactOwner.id);
+        expect(prisma.v1AuthIdentity.create).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not tell a caller who proves only a phone number that the account is an operator account', async () => {
+        const operator = { ...contactOwner, adminUser: { status: 'active' } };
+        stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: { phone_number: verifiedKakaoAccount.phone_number } })]);
+        prisma.v1User.findFirst.mockResolvedValue(operator);
+        prisma.v1User.findUnique.mockResolvedValue(operator);
+
+        await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+          status: 409, response: { code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF' },
+        });
+
+        expectUntouched();
+      });
     });
     it.each([
       { phone_number: verifiedKakaoAccount.phone_number },
@@ -1897,7 +2019,7 @@ describe('AuthService', () => {
           id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
         })
         .mockResolvedValueOnce({
-          id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+          id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW, adminUser: null,
         })
         .mockResolvedValue(completedUserRow({ id: 'user-owner', email: 'owner@example.com' }));
 

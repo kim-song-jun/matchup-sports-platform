@@ -93,6 +93,7 @@ export const settingsModel: SettingsViewModel = {
       title: '계정',
       items: [
         { label: '로그인 방법', sub: '카카오·Apple을 연결해 한 계정으로 로그인해요', href: '/my/settings/login-methods', icon: 'KeyRound' },
+        { label: '로그인 기기', sub: '다른 기기의 로그인을 한 번에 끊어요', href: '/my/settings/devices', icon: 'Smartphone' },
         { label: '위치 및 활동 지역', sub: '현재 위치로 활동 지역을 업데이트해요', href: '/my/settings/location', icon: 'MapPin' },
         { label: '알림 설정', sub: '매치와 채팅 알림을 관리해요', href: '/my/settings/notifications', icon: 'Bell' },
         { label: '화면 테마', sub: '라이트, 다크, 기기 설정 중에서 골라요', href: '/my/settings/theme', icon: 'Moon' },

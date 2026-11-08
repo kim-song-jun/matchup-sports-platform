@@ -168,7 +168,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       view = { ...view, revision: view.revision + 1, groups, generated: false,
         preliminaryFixtureCount: groups.reduce((sum, g) => sum + g.capacity * (g.capacity - 1) / 2 * g.legs, 0),
         groupStandings: groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
-        finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+        finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       detail.groups = preliminaryGroups(); detail.fixtures = [];
       for (const group of groups) for (let leg = 0; leg < group.legs; leg++) for (let homeIndex = 0; homeIndex < group.capacity; homeIndex++) for (let awayIndex = homeIndex + 1; awayIndex < group.capacity; awayIndex++) {
         const home = view.registrations.find(reg => reg.id === group.registrationIds?.[leg ? awayIndex : homeIndex]);
@@ -192,7 +192,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
         return final.name === previous.name && final.thirdPlace === previous.thirdPlace
           && (final.registrationIds?.length ?? final.rules.length) === (previous.registrationIds?.length ?? previous.rules.length);
       });
-      view = { ...view, revision: view.revision + 1, generated: sameStructure && view.generated, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+      view = { ...view, revision: view.revision + 1, generated: sameStructure && view.generated, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       if (!sameStructure) { detail.groups = preliminaryGroups(); detail.fixtures = detail.fixtures.filter(f => f.groupId?.startsWith('group-')); }
       return ok(view);
     }),

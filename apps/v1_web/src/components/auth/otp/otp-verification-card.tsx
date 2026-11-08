@@ -32,6 +32,8 @@ type Props = OtpVerificationOptions & {
   surface?: 'card' | 'inset' | 'plain';
   /** 번호 중복(PHONE_CONFLICT)일 때 오류 배너 대신 보여 줄 안내와 출구. */
   conflictNotice?: ReactNode;
+  /** 인증번호를 넣은 뒤 누르는 버튼의 글자. 인증이 끝나면 무엇이 보이는지 말해 줄 때 바꾼다. */
+  submitLabel?: string;
 };
 
 export function OtpVerificationCard({
@@ -48,6 +50,7 @@ export function OtpVerificationCard({
   verifyFailureMessage,
   surface = 'card',
   conflictNotice,
+  submitLabel = '확인',
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const otp = useOtpVerification({ resetKey, onRequestCode, onSubmitCode, requestFailureMessage, verifyFailureMessage });
@@ -124,7 +127,7 @@ export function OtpVerificationCard({
             onClick={() => void otp.submitCode()}
           >
             {verifying ? <span className="tm-spinner" aria-hidden="true" /> : <KeyRound size={18} aria-hidden="true" />}
-            확인
+            {submitLabel}
           </button>
 
           <OtpRemainingRow idPrefix={idPrefix} otp={otp} issuing={issuing} />

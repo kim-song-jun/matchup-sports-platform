@@ -1,4 +1,4 @@
-import { leagueFixtureTitle, leagueFixtureTitles, nextOrderInCalendarWeek } from './league-fixture-creation';
+import { leagueFixtureTitle, leagueFixtureTitles, leagueFixtureWeeks, nextOrderInCalendarWeek } from './league-fixture-creation';
 import { generateRoundRobinFixtures, resolveFixtureTimeSlots } from './round-robin-schedule';
 
 /** 09:00 KST. 2026-11-21 is a Saturday; Mon 11/16 - Sun 11/22 is one calendar week. */
@@ -103,6 +103,19 @@ describe('leagueFixtureTitles', () => {
       '심야 리그 1주차 5경기',
       '심야 리그 1주차 6경기',
     ]);
+  });
+});
+
+describe('leagueFixtureWeeks', () => {
+  it('토·일은 같은 주차, 다음 주 토요일은 다음 주차이고 제목의 N주차와 한 칸도 어긋나지 않는다', () => {
+    const startAts = generatedStartAts(5, 5, 4, ['2026-11-21', '2026-11-22', '2026-11-28']);
+
+    const weeks = leagueFixtureWeeks(startAts);
+
+    expect(weeks).toEqual([...Array(8).fill(1), ...Array(startAts.length - 8).fill(2)]);
+    expect(weeks).toEqual(
+      leagueFixtureTitles('가을 리그', startAts).map((title) => Number(/ (\d+)주차/.exec(title)?.[1])),
+    );
   });
 });
 

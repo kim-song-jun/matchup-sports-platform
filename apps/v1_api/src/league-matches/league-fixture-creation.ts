@@ -98,11 +98,21 @@ export function leagueFixtureTitle(input: { leagueTitle: string; week: number; o
  * share a start time (every game of a round when no `timing` is given) are numbered in input order.
  */
 export function leagueFixtureTitles(leagueTitle: string, startAts: readonly Date[]): string[] {
-  const weekOf = leagueWeekCounter(startAts);
+  const weeks = leagueFixtureWeeks(startAts);
   const ordinals = leagueWeekOrdinals(startAts);
-  return startAts.map((startAt, index) =>
-    leagueFixtureTitle({ leagueTitle, week: weekOf(startAt), orderInWeek: ordinals[index] }),
+  return startAts.map((_, index) =>
+    leagueFixtureTitle({ leagueTitle, week: weeks[index], orderInWeek: ordinals[index] }),
   );
+}
+
+/**
+ * The "N주차" of each start time in a batch created together — the `week` in `leagueFixtureTitles`
+ * and in the fixture preview response, so a preview can never group games differently than the
+ * titles they are created with.
+ */
+export function leagueFixtureWeeks(startAts: readonly Date[]): number[] {
+  const weekOf = leagueWeekCounter(startAts);
+  return startAts.map((startAt) => weekOf(startAt));
 }
 
 /** The M of an auto title "N주차 M경기"; operator-chosen titles never match. */

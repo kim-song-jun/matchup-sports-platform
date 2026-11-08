@@ -11,6 +11,7 @@ import {
   formatCardTime,
   formatMonthDay,
   formatKstDateShort,
+  formatKstWeekday,
   formatKstTime,
   formatTournamentDateRangeWithTime,
   formatTournamentDateShort,
@@ -154,6 +155,19 @@ describe('formatKstTime / formatKstDateShort (리그 대진 timing 타임라인)
   it('invalid 문자열은 원본을 그대로 반환한다', () => {
     expect(formatKstTime('nope')).toBe('nope');
     expect(formatKstDateShort('nope')).toBe('nope');
+  });
+});
+
+describe('formatKstWeekday', () => {
+  it('KST 요일을 한 글자로 준다 — UTC 로는 전날인 토요일 새벽 경기도 토요일이다', () => {
+    expect(formatKstWeekday('2026-11-20T15:30:00.000Z')).toBe('토'); // 11/21 00:30 KST
+    expect(formatKstWeekday('2026-11-21T14:59:00.000Z')).toBe('토'); // 11/21 23:59 KST
+    expect(formatKstWeekday('2026-11-21T15:00:00.000Z')).toBe('일'); // 11/22 00:00 KST
+  });
+
+  it('값이 없거나 invalid 이면 null', () => {
+    expect(formatKstWeekday(undefined)).toBeNull();
+    expect(formatKstWeekday('nope')).toBeNull();
   });
 });
 

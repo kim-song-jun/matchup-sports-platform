@@ -49,6 +49,7 @@ import {
   createLeagueFixture,
   leagueFixtureTitle,
   leagueFixtureTitles,
+  leagueFixtureWeeks,
   loadLeagueTeamRosters,
   nextOrderInCalendarWeek,
   syncLeagueFixtureWeekTitles,
@@ -1137,6 +1138,13 @@ export class LeagueMatchAdminService {
       ? resolveFixtureTimeSlots(schedule, matchdayStartAts ?? weeklyMatchdayStartAts(league.startsOn, matchdayCount), timing)
       : undefined;
     const place = await resolveLeagueFixturePlace(this.prisma, leagueId, dto);
+    const startAts = schedule.map((fixture, index) =>
+      slots !== undefined
+        ? slots[index].startAt
+        : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round)),
+    );
+    // Same function as the titles of the fixtures this preview becomes (createFixturesInTx).
+    const weeks = leagueFixtureWeeks(startAts);
 
     return {
       leagueId,
@@ -1147,13 +1155,11 @@ export class LeagueMatchAdminService {
       placeName: place.name,
       place,
       fixtures: schedule.map((fixture, index) => {
-        const startAt =
-          slots !== undefined
-            ? slots[index].startAt
-            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round));
+        const startAt = startAts[index];
         return {
           round: fixture.round,
           matchday: slots !== undefined ? slots[index].matchday : fixture.round,
+          week: weeks[index],
           orderInDay: slots !== undefined ? slots[index].orderInDay : null,
           homeTeamId: fixture.homeTeamId,
           awayTeamId: fixture.awayTeamId,

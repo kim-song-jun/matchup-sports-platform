@@ -179,6 +179,7 @@ function createFake() {
       findMany: track('v1Team.findMany', async (args: { where: { id: { in: string[] } } }) =>
         args.where.id.in.map((id) => KNOWN_TEAMS.get(id) ?? teamRow(id, `${id} 팀`, [`${id}-m1`, `${id}-m2`])),
       ),
+      count: track('v1Team.count', async (args: { where: { id: { in: string[] } } }) => args.where.id.in.length),
     },
     // 잠금 뒤 **커밋된** 로스터를 다시 읽는 자리. 테스트가 `state.registeredTeamIds` 를
     // 갈아끼워 "그 사이 팀이 빠졌다" 를 재현한다.
@@ -450,6 +451,7 @@ async function createModule(prisma: PrismaService, games: GamesService) {
         provide: AdminContextService,
         useValue: {
           getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1', userId: adminUser.id, adminRole: 'ops' }),
+          getActiveAdmin: jest.fn().mockResolvedValue({ id: 'admin-1', userId: adminUser.id, adminRole: 'ops' }),
           logAdminAction: jest.fn().mockResolvedValue(undefined),
         },
       },
@@ -676,6 +678,36 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       '테스트 리그 1주차 3경기',
       '테스트 리그 1주차 4경기',
     ]);
+  });
+
+  describe('previewFixtures — week 는 만들어질 대진 제목의 N주차와 같다', () => {
+    const titleWeeks = () => state.teamMatchCreates.map((row) => Number(/ (\d+)주차/.exec(row.title)?.[1]));
+
+    it('토·일은 한 달력 주라 같은 week 이고 다음 주 토요일은 week 2 다 (매치데이 순번은 날마다 오른다)', async () => {
+      const dto = {
+        weeksCount: 5,
+        timing: { gameDurationMinutes: 40, breakMinutes: 0, gamesPerDay: 2 },
+        schedule: { dates: ['2099-11-21', '2099-11-22', '2099-11-28'], time: '09:00' },
+      };
+
+      const preview = await service.previewFixtures(adminUser, 'league-1', dto);
+      await service.generateFixtures(adminUser, 'league-1', dto);
+
+      expect(preview.fixtures.map((fixture) => fixture.matchday)).toEqual([1, 1, 2, 2, 3]);
+      expect(preview.fixtures.map((fixture) => fixture.week)).toEqual([1, 1, 1, 1, 2]);
+      expect(preview.fixtures.map((fixture) => fixture.week)).toEqual(titleWeeks());
+    });
+
+    it('timing 없이 날짜만 고른 미리보기도 제목과 같은 week 를 준다 (round 3 이 week 2)', async () => {
+      const dto = { weeksCount: 3, schedule: { dates: ['2099-11-21', '2099-11-22', '2099-11-28'], time: '09:00' } };
+
+      const preview = await service.previewFixtures(adminUser, 'league-1', dto);
+      await service.generateFixtures(adminUser, 'league-1', dto);
+
+      expect(preview.fixtures.map((fixture) => fixture.round)).toEqual([1, 2, 3]);
+      expect(preview.fixtures.map((fixture) => fixture.week)).toEqual([1, 1, 2]);
+      expect(preview.fixtures.map((fixture) => fixture.week)).toEqual(titleWeeks());
+    });
   });
 
   it('하루 경기 수 없이 토·일에 나눠 만든 대진도 제목 순번이 날짜 순서대로 이어진다 (모두 "1주차" 로 겹치지 않는다)', async () => {

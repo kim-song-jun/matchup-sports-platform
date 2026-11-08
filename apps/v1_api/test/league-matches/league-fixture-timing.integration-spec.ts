@@ -175,6 +175,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(first.endAt).toBe(`${futureDates[0]}T13:15:00.000Z`);
     expect(first.matchday).toBe(1);
     expect(first.orderInDay).toBe(1);
+    expect(res.body.data.fixtures.map((f: { week: number }) => f.week)).toEqual([1, 1, 1, 1, 1, 1]);
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 

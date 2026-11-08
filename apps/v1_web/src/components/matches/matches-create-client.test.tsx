@@ -778,8 +778,8 @@ describe('MatchEditPageClient — 일정·장소 변경 확인', () => {
     vi.clearAllMocks();
     matchEditData.participantCount = 4;
     matchEditData.form.hostParticipates = true;
-    // 화면은 분 단위로만 다루고, 아래 시험들은 시작 시간을 06:05 로 바꾼다. fixture 기본값은 Date.now() 기반이라
-    // 시각을 고정하지 않으면 06:05(UTC)에 도는 시험에서 "일정이 그대로"가 되어 확인 창이 뜨지 않는다.
+    // 아래 시험들이 고르는 값(06:05)과 다른 시각으로 고정한다. fixture 기본값은 Date.now() 기반이라, 고정하지 않으면
+    // 시험이 06:05 에 돌 때 시작 시간이 그대로여서 확인 창이 뜨지 않는다. 입력칸이 로컬 시각이라 setHours 로 맞춘다.
     const start = new Date(original.startsAt);
     start.setHours(10, 0, 0, 0);
     matchEditData.form.startsAt = start.toISOString();

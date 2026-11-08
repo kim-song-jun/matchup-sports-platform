@@ -145,6 +145,7 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
 로그인한 계정에 카카오·Apple 로그인이 연결되거나(`POST /auth/link/{provider}`) 이메일·비밀번호 로그인이 더해지면(`POST /auth/link/email/complete`, 본문 "이메일·비밀번호 로그인이 연결됐어요…") 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
 `/my/settings`)를 남긴다 — 보안 알림이라 알림 설정과 무관하게 항상 남고, 알림함 행은 연결과 같은 트랜잭션 안에서 만든다(푸시·실시간 전달은 커밋 뒤).
+로그인 수단을 직접 떼면(`POST /auth/identities/unlink`) 그 계정에 `social_identity_unlinked`(targetType `system`, 딥링크 `/my/settings`, 본문 "{카카오|Apple|이메일·비밀번호} 로그인이 해제됐어요. 다른 기기는 로그아웃됐어요…")를 같은 방식으로 남긴다 — 해제와 같은 트랜잭션에서 만들고 알림 설정과 무관하다. 해제한 수단을 다시 연결하면 `social_identity_linked` 가 다시 남는다(되살린 행은 id 가 같아 `businessKey` 에 시각을 덧붙인다).
 로그인한 계정의 이메일이 새 주소의 인증을 거쳐 바뀌면(`PATCH /me/profile` + `emailChangeToken`, [계정 이메일 변경](./users.md#계정-이메일-변경)) 그 계정에 `email_changed`(targetType `system`, 딥링크 `/my/settings`, 본문 "이메일이 ab***@example.com(으)로 바뀌었어요. 본인이 아니라면 고객센터로 문의해 주세요.")를 같은 방식으로 남긴다. 주소는 앞 두 글자만 남기고 가려서 싣는다. 이메일을 지우는 저장에는 남기지 않는다.
 운영자가 계정에서 휴대폰 번호를 해제하면(`POST /admin/users/:userId/phone/release`) 그 계정에 `phone_released_by_operator`(targetType `system`, 딥링크 `/my/phone-verify`, 본문 "운영자가 이 계정의 휴대폰 번호를 해제했어요…")를 같은 방식으로 남긴다. 번호는 본문에 싣지 않는다.
 
@@ -182,9 +183,12 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 | 리그 결과 확정 `league_team_match_completed` | 팀장·매니저 + 그 공식 결과의 출전자 | 경기 결과가 확정됐어요 / `(리그명) N주차 · 마포 FC 2 : 1 합정 유나이티드 · 승리. 내 기록 1골이에요.` | `/team-matches/:id/result` |
 | 대회 결과 확정 `tournament_match_completed` | 〃 | 대회 경기 결과가 확정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
 | 대회 결과 정정 `tournament_match_result_corrected` | 〃 (정정된 공식 결과의 출전자 기준) | 대회 경기 결과가 정정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` — 정정된 스코어 (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
+| 출전정지 `player_suspension_notice` | 그 팀의 팀장·매니저 + 그 대회·리그의 대회 총괄(활성 배정). 설정은 팀 경기 알림(`teamMatchEnabled`) | 다음 경기에 못 뛰는 선수가 있어요 / `(대회명) · (팀) 다음 경기(11/14 (토) 18:00 vs (상대))에 출전할 수 없는 선수: 김도윤(퇴장 1회), …` | `/teams/:teamId/games/:gameId/roster` (다음 경기 게임이 아직 없으면 `/teams/:teamId/game-rosters`) |
+| 경고 임박 `player_suspension_warning` | 〃 | 경고 한 장이면 정지인 선수가 있어요 / `… 경고 임박 선수: 박서준. 이번 경기에서 경고를 받으면 다음 경기부터 출전정지예요.` | 〃 |
 
 - 한 사람에게 한 건 — 참가 명단에 든 팀장·매니저는 팀장 문구만 받는다.
 - 확정된 대회 경기 결과를 정정해 다시 확정하면 `tournament_match_result_corrected` 가 정정 리비전마다 수신자당 한 번 간다(완료 알림과 별개 — 이미 완료 알림을 받은 사람도 받는다). 리그 대진·친선은 정정해도 다시 알리지 않는다.
+- 출전정지·경고 임박 알림(MD-QA #191)은 경고·퇴장 정지 규정이 켜진 대회·리그에서 공식 결과가 확정되거나 정정될 때 그 두 팀의 **다음 경기**(아직 시작하지 않은 가장 이른 경기)를 기준으로 판정해 보낸다. 팀마다·리비전마다·수신자마다 한 번(`player-suspension:{리비전}:{팀}:{종류}:{수신자}`)이고, 해당 선수가 없으면 보내지 않는다. 정정으로 판정이 바뀌어도 이미 보낸 알림은 거두지 않고 정정 리비전마다 새로 계산해 보낸다. 친선 경기와 규정이 없는 대회·리그는 보내지 않는다.
 - 시각은 KST 날짜·요일·시각으로 쓰고 "내일" 같은 상대 표현을 쓰지 않는다. 와/과는 상대팀 이름의 받침으로 고른다.
 - **출전자**: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지), 친선 팀매치는 최신 참석명단이
   제출(SUBMITTED·LOCKED)된 경우 그 명단. 참석명단을 아직 안 낸 친선 사이드는 킥오프 알림을 보내지 않는다(팀장·매니저는

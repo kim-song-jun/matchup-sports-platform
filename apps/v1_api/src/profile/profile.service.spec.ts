@@ -524,6 +524,144 @@ describe('ProfileService phone change proof gate', () => {
   });
 });
 
+describe('ProfileService birth date age gate', () => {
+  // Cutoff for an age-14 birthday today is 20121107.
+  const NOW = new Date('2026-11-07T03:00:00Z');
+  const AGE_RESTRICTED = {
+    response: {
+      code: 'SIGNUP_AGE_RESTRICTED',
+      message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
+    },
+  };
+
+  function buildPrisma(storedBirthDate: string | null) {
+    const profile = {
+      displayName: '테스트 사용자',
+      nickname: '테스트닉',
+      profileImageUrl: null,
+      birthDate: storedBirthDate,
+      gender: 'male',
+      updatedAt: new Date(),
+    };
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: user.email,
+          phone: '01011112222',
+          authIdentities: [{ provider: 'email', passwordHash: 'hash' }],
+          profile,
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1AuthIdentity: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1UserProfile: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue(profile),
+      },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    return prisma;
+  }
+
+  function payload(birthDate: string | null | undefined) {
+    return {
+      displayName: '테스트 사용자',
+      nickname: '테스트닉',
+      email: user.email,
+      phone: '01011112222',
+      profileImageUrl: null,
+      birthDate,
+      gender: 'male' as const,
+    };
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it.each([
+    ['13세가 되는 날', '20131107'],
+    ['14세 생일 하루 전', '20121108'],
+    ['미래 날짜', '20301231'],
+  ])('성인 값에서 %s(%s)로 바꾸면 가입과 같은 코드·문구로 거절하고 아무것도 저장하지 않는다', async (_label, next) => {
+    const prisma = buildPrisma('19900101');
+    const service = createProfileService(prisma);
+
+    await expect(service.updateMe(user, payload(next))).rejects.toMatchObject(AGE_RESTRICTED);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+  });
+
+  it('저장된 생년월일이 없는 계정이 처음 넣는 값도 같은 기준으로 거절한다', async () => {
+    const prisma = buildPrisma(null);
+    const service = createProfileService(prisma);
+
+    await expect(service.updateMe(user, payload('20131107'))).rejects.toMatchObject(AGE_RESTRICTED);
+    expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+  });
+
+  it('14세 생일 당일로 바꾸는 저장은 통과한다', async () => {
+    const prisma = buildPrisma('19900101');
+    const service = createProfileService(prisma);
+
+    await service.updateMe(user, payload('20121107'));
+
+    expect(prisma.v1UserProfile.upsert.mock.calls[0][0].update.birthDate).toBe('20121107');
+  });
+
+  it('이미 만 14세 미만으로 저장된 계정이 성인 생년월일로 고치는 저장은 통과한다', async () => {
+    const prisma = buildPrisma('20131107');
+    const service = createProfileService(prisma);
+
+    await service.updateMe(user, payload('19900101'));
+
+    expect(prisma.v1UserProfile.upsert.mock.calls[0][0].update.birthDate).toBe('19900101');
+  });
+
+  it.each([
+    ['숫자만 저장된 값', '20131107'],
+    ['하이픈이 섞인 옛 저장값', '2013-11-07'],
+  ])('만 14세 미만으로 저장된 계정이 같은 날짜를 다시 보내면(%s) 변경이 아니므로 막지 않는다', async (_label, stored) => {
+    const prisma = buildPrisma(stored);
+    const service = createProfileService(prisma);
+
+    await service.updateMe(user, payload('20131107'));
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('생년월일을 보내지 않는 수정은 저장값이 만 14세 미만이어도 나이 검사를 타지 않는다', async () => {
+    const prisma = buildPrisma('20131107');
+    const service = createProfileService(prisma);
+
+    await service.updateMe(user, payload(undefined));
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('달력에 없는 날짜는 나이 거절이 아니라 기존 형식 검증 오류로 남는다', async () => {
+    const prisma = buildPrisma('19900101');
+    const service = createProfileService(prisma);
+
+    await expect(service.updateMe(user, payload('20230230'))).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED' },
+    });
+  });
+});
+
 describe('ProfileService activitySummary', () => {
   it('mannerScore를 V1UserReputationSummary 캐시 대신 v1PostEventReview를 매번 live로 재집계한다 (reveal 필터 적용)', async () => {
     const now = new Date('2026-08-15T12:00:00Z');

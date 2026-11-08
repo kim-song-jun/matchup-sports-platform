@@ -24,7 +24,7 @@ interface FakeWorld {
   unavailabilities?: Array<Record<string, unknown>>;
   rules?: { yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null };
   competitionMatches?: Array<{ id: string; hostTeamId: string; approvedApplicantTeamId: string; game: { id: string } }>;
-  results?: Record<string, Array<{ participantId: string; userId: string; red: number }>>;
+  results?: Record<string, Array<{ participantId: string; userId: string; red: number; yellow?: number }>>;
 }
 
 function fakeTx(world: FakeWorld) {
@@ -80,7 +80,7 @@ function fakeTx(world: FakeWorld) {
           (results[revisionId.replace('rev-', '')] ?? []).map((row) => ({
             resultRevisionId: revisionId,
             participantId: row.participantId,
-            cards: { yellow: 0, red: row.red },
+            cards: { yellow: row.yellow ?? 0, red: row.red },
           })),
         ),
       ),
@@ -198,6 +198,36 @@ describe('loadGameRoster — 대회 경기', () => {
     const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
     expect(loaded?.computation.suspended.map((row) => row.entry.userId)).toEqual(['pa']);
     expect(loaded?.computation.participants.map((row) => row.userId)).toEqual(['pb', 'pc']);
+  });
+
+  it('규정이 있는 대회는 카드가 쌓인 선수의 누적과 규정을 함께 싣고, 카드 기록이 없는 선수는 싣지 않는다', async () => {
+    const matches = [
+      { id: 'm1', hostTeamId: 'team-A', approvedApplicantTeamId: 'team-B', game: { id: 'g1' } },
+      { id: 'm3', hostTeamId: 'team-A', approvedApplicantTeamId: 'team-C', game: { id: 'g3' } },
+    ];
+    const results = { g1: [{ participantId: 'gp-1', userId: 'pa', red: 0, yellow: 1 }] };
+    const withRules = await loadGameRoster(
+      fakeTx({
+        teamMatch: TOURNAMENT_MATCH,
+        sideTeamId: 'team-A',
+        registration: TOURNAMENT_REGISTRATION,
+        rules: { yellowAccumulationLimit: 2, redCardSuspensionMatches: null },
+        competitionMatches: matches,
+        results,
+      }),
+      { gameId: 'game-1', sideId: 'side-1' },
+    );
+    expect(withRules?.discipline.rules).toEqual({ yellowAccumulationLimit: 2, redCardSuspensionMatches: null });
+    expect([...(withRules?.discipline.cardsByUserId ?? [])]).toEqual([['pa', { yellowTotal: 1, redTotal: 0 }]]);
+    expect(withRules?.computation.suspended).toEqual([]);
+
+    // 같은 카드 기록이라도 규정이 없는 대회는 칩이 나오지 않아야 한다.
+    const withoutRules = await loadGameRoster(
+      fakeTx({ teamMatch: TOURNAMENT_MATCH, sideTeamId: 'team-A', registration: TOURNAMENT_REGISTRATION, competitionMatches: matches, results }),
+      { gameId: 'game-1', sideId: 'side-1' },
+    );
+    expect(withoutRules?.discipline.rules).toBeNull();
+    expect(withoutRules?.discipline.cardsByUserId.size).toBe(0);
   });
 
   it('confirmed 참가 신청이 없는 팀은 계산 대상이 아니다(null)', async () => {

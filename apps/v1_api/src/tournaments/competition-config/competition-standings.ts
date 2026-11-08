@@ -52,12 +52,14 @@ function applyFixture(
   }
 }
 
+type DirectStanding = { points: number; goalsFor: number; goalsAgainst: number };
+
 function directStanding(
   registrationIds: Set<string>,
   fixtures: StandingFixture[],
   points: CompetitionConfig['tieBreak']['points'],
 ) {
-  const stats = new Map(
+  const stats = new Map<string, DirectStanding>(
     [...registrationIds].map((registrationId) => [
       registrationId,
       { points: 0, goalsFor: 0, goalsAgainst: 0 },
@@ -91,7 +93,30 @@ function directStanding(
   return stats;
 }
 
-export function calculateCompetitionStandings(input: {
+/**
+ * Tie-break criteria applied to teams level on points, strongest first; the seeded draw always
+ * comes after the last one. A larger value ranks higher, so two teams are separated by the first
+ * criterion whose values differ. Mirrors REQUIRED_TIE_BREAK_ORDER between 'points' and 'seeded_draw'.
+ */
+const PRE_DRAW_CRITERIA: ReadonlyArray<(team: StandingWithoutPosition, direct: DirectStanding) => number> = [
+  (_team, direct) => direct.points,
+  (_team, direct) => direct.goalsFor - direct.goalsAgainst,
+  (_team, direct) => direct.goalsFor,
+  (team) => team.goalsFor - team.goalsAgainst,
+  (team) => team.goalsFor,
+  (team) => -team.fairPlayPoints,
+];
+
+export type CompetitionStandingsWithTies = {
+  standings: CalculatedStanding[];
+  /**
+   * Teams no criterion before the seeded draw could separate, one array per bundle of two or more,
+   * best position first. Their positions are an arbitrary draw result, not a ranking.
+   */
+  drawnTies: string[][];
+};
+
+export function calculateCompetitionStandingsWithTies(input: {
   tournamentId: string;
   configVersionId: string;
   registrationIds: string[];
@@ -102,7 +127,7 @@ export function calculateCompetitionStandings(input: {
    * 주지 않으면 전부 0으로 두어 기존 동작을 유지한다.
    */
   fairPlayByRegistration?: ReadonlyMap<string, number>;
-}): CalculatedStanding[] {
+}): CompetitionStandingsWithTies {
   const stats = new Map<string, StandingWithoutPosition>(
     input.registrationIds.map((registrationId) => [
       registrationId,
@@ -136,6 +161,7 @@ export function calculateCompetitionStandings(input: {
   }
 
   const sorted: StandingWithoutPosition[] = [];
+  const drawnTies: string[][] = [];
   for (const points of [...pointsGroups.keys()].sort((left, right) => right - left)) {
     const tied = pointsGroups.get(points) ?? [];
     const headToHead = directStanding(
@@ -143,32 +169,41 @@ export function calculateCompetitionStandings(input: {
       input.fixtures,
       input.config.tieBreak.points,
     );
+    const keysById = new Map(
+      tied.map((standing) => [
+        standing.registrationId,
+        PRE_DRAW_CRITERIA.map((criterion) => criterion(standing, headToHead.get(standing.registrationId)!)),
+      ]),
+    );
+    const keysOf = (standing: StandingWithoutPosition) => keysById.get(standing.registrationId)!;
     tied.sort((left, right) => {
-      const leftDirect = headToHead.get(left.registrationId);
-      const rightDirect = headToHead.get(right.registrationId);
-      if (leftDirect && rightDirect) {
-        if (leftDirect.points !== rightDirect.points) {
-          return rightDirect.points - leftDirect.points;
-        }
-        const leftDirectDifference = leftDirect.goalsFor - leftDirect.goalsAgainst;
-        const rightDirectDifference = rightDirect.goalsFor - rightDirect.goalsAgainst;
-        if (leftDirectDifference !== rightDirectDifference) {
-          return rightDirectDifference - leftDirectDifference;
-        }
-        if (leftDirect.goalsFor !== rightDirect.goalsFor) {
-          return rightDirect.goalsFor - leftDirect.goalsFor;
-        }
-      }
-      const leftDifference = left.goalsFor - left.goalsAgainst;
-      const rightDifference = right.goalsFor - right.goalsAgainst;
-      if (leftDifference !== rightDifference) return rightDifference - leftDifference;
-      if (left.goalsFor !== right.goalsFor) return right.goalsFor - left.goalsFor;
-      if (left.fairPlayPoints !== right.fairPlayPoints) {
-        return left.fairPlayPoints - right.fairPlayPoints;
+      const leftKeys = keysOf(left);
+      const rightKeys = keysOf(right);
+      for (let index = 0; index < leftKeys.length; index += 1) {
+        if (leftKeys[index] !== rightKeys[index]) return rightKeys[index] - leftKeys[index];
       }
       return seededOrder.indexOf(left.registrationId) - seededOrder.indexOf(right.registrationId);
     });
+    let bundle: string[] = [];
+    tied.forEach((standing, index) => {
+      const sameAsPrevious = index > 0 && keysOf(tied[index - 1]).every((value, at) => value === keysOf(standing)[at]);
+      if (!sameAsPrevious) {
+        if (bundle.length > 1) drawnTies.push(bundle);
+        bundle = [];
+      }
+      bundle.push(standing.registrationId);
+    });
+    if (bundle.length > 1) drawnTies.push(bundle);
     sorted.push(...tied);
   }
-  return sorted.map((standing, index) => ({ ...standing, position: index + 1 }));
+  return {
+    standings: sorted.map((standing, index) => ({ ...standing, position: index + 1 })),
+    drawnTies,
+  };
+}
+
+export function calculateCompetitionStandings(
+  input: Parameters<typeof calculateCompetitionStandingsWithTies>[0],
+): CalculatedStanding[] {
+  return calculateCompetitionStandingsWithTies(input).standings;
 }

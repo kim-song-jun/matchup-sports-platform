@@ -5,13 +5,13 @@ import Foundation
 /// This is not optional decoration — without it the v1 web app has no bottom inset at all
 /// on iOS. `apps/v1_web` declares no `viewport-fit=cover` anywhere (measured: zero
 /// occurrences in the whole app), so `env(safe-area-inset-bottom)` evaluates to `0` inside
-/// `WKWebView`. The page's own definition is
+/// `WKWebView`. The page's own definition ignores `env()` altogether:
 ///
 /// ```css
-/// --v1-shell-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--teameet-native-safe-bottom));
+/// --v1-shell-safe-bottom: var(--teameet-native-safe-bottom);
 /// ```
 ///
-/// which therefore collapses to whatever the shell writes here. Eleven files consume that
+/// so it is exactly what the shell writes here. Eleven files consume that
 /// variable, including `.tm-app-frame-no-bottom .tm-scroll-area` — every detail and form
 /// screen without a bottom nav. Skip the injection and all of them sit under the home
 /// indicator.
@@ -23,7 +23,7 @@ import Foundation
 ///
 /// Both variables are written, matching Android. Setting `--v1-shell-safe-bottom` directly
 /// as well keeps the shell correct against a deployed web build whose CSS predates the
-/// `max()` definition.
+/// `--teameet-native-safe-bottom` definition.
 enum SafeAreaBridge {
 
     static let nativeVariable = "--teameet-native-safe-bottom"

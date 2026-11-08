@@ -39,6 +39,7 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyTournamentFixtures: () => ({ data: undefined }),
+  useV1MyTeams: () => ({ data: undefined }),
   useV1Tournament: vi.fn(),
 }));
 

@@ -1563,7 +1563,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       it('서버 시각 허용 폭(30초)을 넘겨 처음 본문이 거절되면, 같은 clientCommandId 에 지금 시각을 실어 다시 보낸다', async () => {
         testFixtures.sendCommand
-          .mockRejectedValueOnce(rejected(422, 'CLOCK_DRIFT', 'occurredAt has drifted from server time by more than 30 seconds'))
+          .mockRejectedValueOnce(rejected(422, 'CLOCK_DRIFT', '기록 시각이 서버 시각과 30초 넘게 차이 나요. 다시 시도해 주세요. 계속 같은 안내가 나오면 기기의 날짜와 시간을 확인해 주세요.'))
           .mockResolvedValueOnce(gameMutationResult('LIVE'));
         await retryAfterTimeout({}, 40_000);
 

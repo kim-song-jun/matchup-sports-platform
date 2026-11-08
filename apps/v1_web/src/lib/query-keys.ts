@@ -155,6 +155,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', id, 'campaign'] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
+  adminDiscipline: (competitionId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', competitionId, 'discipline'] as const,
   adminTournamentRoster: (registrationId: string) =>
     [...v1Keys.all, 'admin', 'registrations', registrationId, 'players'] as const,
   adminTournamentPlayerRecords: (tournamentId: string) =>
@@ -182,6 +184,8 @@ export const v1Keys = {
   adminLeagueSeriesPromotionPreview: (seriesId: string, seasonNo: number) =>
     [...v1Keys.all, 'admin', 'league-series', seriesId, 'seasons', seasonNo, 'promotions'] as const,
   adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
+  adminLeagueTemplatePreview: (leagueId: string, request: unknown) =>
+    [...v1Keys.all, 'admin', 'league-matches', leagueId, 'template-preview', request] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
   // D2 (E4): 어드민 이의 목록 — status 필터('' = 전체)가 다르면 다른 쿼리로 취급한다.
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를

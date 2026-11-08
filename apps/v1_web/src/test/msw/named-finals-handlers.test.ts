@@ -11,7 +11,7 @@ const server = setupServer(...v1MswHandlers, http.post('*/api/v1/logs/client-err
 const admin = `/admin/tournaments/${NAMED_FINALS_ID}`;
 const path = `${admin}/bracket/multi-finals`;
 const publicPath = `/tournaments/${NAMED_FINALS_ID}`;
-const editable = (view: MultiFinalView) => view.finals.map(({ manual: _m, suggestedRegistrationIds: _s, unresolved: _u, colorIndex: _c, ...row }) => row);
+const editable = (view: MultiFinalView) => view.finals.map(({ manual: _m, standingsChanged: _w, suggestedRegistrationIds: _s, unresolved: _u, tiePicks: _t, colorIndex: _c, ...row }) => row);
 beforeAll(() => { vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1'); server.listen({ onUnhandledRequest: 'error' }); });
 beforeEach(() => namedFinalsMsw.reset());
 afterEach(() => server.resetHandlers());
@@ -36,6 +36,27 @@ describe('공용 MSW — named finals 및 시상 wire 계약', () => {
     expect(publicDetail.fixtures).toHaveLength(6);
     expect(publicDetail.groups[0].groupTeams).toHaveLength(1);
     expect(publicDetail.fixtures.some(f => f.homeRegistrationId === before.registrations[0].id || f.awayRegistrationId === before.registrations[0].id)).toBe(true);
+  });
+  describe('진출 규칙은 서버처럼 순위 먼저·같은 순위는 조 순서로 저장해 응답한다', () => {
+    const rule = (groupId: string, rank: number) => ({ groupId, rank });
+    it('예선 수정은 요청한 조 단위 순서가 아니라 편성한 조 순서로 정렬해 돌려준다', async () => {
+      const before = await v1Get<MultiFinalView>(path);
+      const cleared = await v1Post<MultiFinalView>(`${path}/reset`, { expectedRevision: before.revision });
+      const saved = await v1Put<MultiFinalView>(`${path}/preliminary`, { expectedRevision: cleared.revision,
+        groups: [{ name: 'A조', capacity: 3, legs: 1 }, { name: 'B조', capacity: 3, legs: 1 }],
+        finals: [{ name: '본선', thirdPlace: false, registrationIds: null, rules: [0, 1].flatMap(g => [1, 2, 3].map(rank => rule(String(g), rank))) }] });
+      const [a, b] = saved.groups.map(group => group.id);
+      expect(saved.finals[0].rules).toEqual([rule(a, 1), rule(b, 1), rule(a, 2), rule(b, 2), rule(a, 3), rule(b, 3)]);
+      expect((await v1Get<MultiFinalView>(path)).finals[0].rules).toEqual(saved.finals[0].rules);
+    });
+    it('규칙 저장은 저장된 조 순서를 기준으로 정렬하고 뒤 조부터 보내도 같은 결과다', async () => {
+      const view = await v1Get<MultiFinalView>(path); const [a, b] = view.groups.map(group => group.id);
+      const finals = editable(view); finals[0] = { ...finals[0], registrationIds: null, rules: [rule(b, 2), rule(b, 1), rule(a, 2), rule(a, 1)] };
+      finals[1] = { ...finals[1], registrationIds: null, rules: [] };
+      const saved = await v1Put<MultiFinalView>(`${path}/selection`, { expectedRevision: view.revision, finals });
+      expect(saved.finals[0].rules).toEqual([rule(a, 1), rule(b, 1), rule(a, 2), rule(b, 2)]);
+      expect((await v1Get<MultiFinalView>(path)).finals[0].rules).toEqual(saved.finals[0].rules);
+    });
   });
   it('저장→관리자 재조회→공개 상세가 동일하고 빈 배열 저장으로 모두 초기화한다', async () => {
     const saved = await v1Put<V1AdminTournamentAwardSet[]>(`${admin}/award-sets`, { awardSets: [{ bracketTrack: '챔피언', prizePool: 120000, prizeSummary: '샘플 우승 상금' }, { bracketTrack: '챌린지', prizePool: 0 }] });

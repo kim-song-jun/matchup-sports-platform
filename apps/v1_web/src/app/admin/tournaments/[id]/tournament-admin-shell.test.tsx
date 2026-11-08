@@ -51,6 +51,27 @@ describe('TournamentAdminShell 섹션 내비', () => {
     expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/operations');
     expect(screen.getByRole('region', { name: '공개 설정' })).toBeInTheDocument();
   });
+  it('징계 현황은 플랫폼 어드민 셸에만 있고 대회 스태프 셸·공개 샘플에는 없다', () => {
+    const { unmount } = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+    expect(screen.getByRole('link', { name: /징계 현황/ })).toHaveAttribute('href', '/admin/tournaments/tournament-1/discipline');
+    unmount();
+
+    const staff = render(<TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface><div /></TournamentManagementContent>);
+    expect(screen.queryByRole('link', { name: /징계 현황/ })).not.toBeInTheDocument();
+    staff.unmount();
+
+    render(
+      <TournamentManagementContent
+        id="tournament-1"
+        role="SUPPORT_READONLY"
+        navigation={{ basePath: '/sample/tournaments/tournament-1', listHref: '/sample', operationsBasePath: '/sample/ops', localPopups: true }}
+      >
+        <div />
+      </TournamentManagementContent>,
+    );
+    expect(screen.queryByRole('link', { name: /징계 현황/ })).not.toBeInTheDocument();
+  });
+
   it('팝업은 대회 하위 탭이 아니라 경로를 프리필한 전역 팝업 링크다', () => {
     render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
 

@@ -16,7 +16,7 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { bracketStageLabel } from '@/lib/bracket-stage-label';
-import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
+import { bracketTrackLabel, effectiveBracketTrack, orderedBracketTracks } from '@/lib/bracket-track';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -77,7 +77,7 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Rec
 }
 
 function buildSplitFinalResults(tournament: V1TournamentDetail) {
-  return ([...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).map((track) => {
+  return orderedBracketTracks(tournament.groups).map((track) => {
     const trackGroups = tournament.groups.filter(group => effectiveBracketTrack(group.bracketTrack) === track);
     const trackIds = new Set(trackGroups.map(group => group.id));
     const trackFixtures = tournament.fixtures.filter(fixture => trackIds.has(fixture.groupId ?? ''));

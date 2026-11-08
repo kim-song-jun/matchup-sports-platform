@@ -3,7 +3,7 @@
 import { resolveFixturePlan, weeksPlanLabel, type WeeksPlan } from '@/lib/league-round-robin-plan';
 
 /**
- * 대진 만들기·재생성 폼의 "주차 수"(= 경기 날짜 수) — 팀 수·하루 경기 수로 계산한 제안 칩(단일/홈앤어웨이)과
+ * 대진 만들기·재생성 폼의 "경기일 수"(= 경기 날짜 수. "주차"는 제목의 달력 주라 이 칸에는 쓰지 않는다) — 팀 수·하루 경기 수로 계산한 제안 칩(단일/홈앤어웨이)과
  * 계획 요약 한 줄(F40).
  * 부모 grid 안에서 fragment 자식이 그대로 grid 아이템이 된다(요약은 col-span-full 로 한 줄을 차지).
  */
@@ -34,8 +34,8 @@ export function LeagueWeeksPlanField({
   const lastDayGames = days <= 1 || perDay < 1 ? 0 : games % perDay;
   const chips: Array<{ plan: WeeksPlan; label: string }> = [
     ...(plannedFixtureCount ? [{ plan: { kind: 'fixtures', count: plannedFixtureCount } as const, label: `총 ${plannedFixtureCount}경기` }] : []),
-    { plan: { kind: 'single' }, label: `단일 ${singleWeeks}주` },
-    { plan: { kind: 'double' }, label: `홈앤어웨이 ${doubleWeeks}주` },
+    { plan: { kind: 'single' }, label: `단일 ${singleWeeks}일` },
+    { plan: { kind: 'double' }, label: `홈앤어웨이 ${doubleWeeks}일` },
   ];
 
   return (
@@ -45,7 +45,7 @@ export function LeagueWeeksPlanField({
           <span className="font-semibold">
             {teamCount}팀 · {weeksPlanLabel(plan)}
           </span>{' '}
-          → {days}주차 · {games}경기가 만들어져요
+          → 경기일 {days}일 · {games}경기가 만들어져요
           {plan.kind === 'custom' || plan.kind === 'fixtures' ? null : (
             <span className="tm-badge tm-badge-sm tm-badge-blue ml-2">
               팀 수로 자동 계산
@@ -53,7 +53,7 @@ export function LeagueWeeksPlanField({
           )}
           {lastDayGames > 0 ? (
             <span className="mt-1 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              마지막 주차에는 {lastDayGames}경기만 열려요
+              마지막 경기일에는 {lastDayGames}경기만 열려요
             </span>
           ) : null}
         </p>
@@ -73,7 +73,7 @@ export function LeagueWeeksPlanField({
       </div>
       <div>
         <label htmlFor={inputId} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-          주차 수
+          경기일 수
         </label>
         <input
           id={inputId}

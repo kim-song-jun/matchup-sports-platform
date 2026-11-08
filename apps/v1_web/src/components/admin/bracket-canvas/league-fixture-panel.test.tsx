@@ -63,6 +63,7 @@ function nodeOf(overrides: Partial<V1LeagueFixture> = {}): LeagueBoardNode {
 const showToast = vi.fn();
 const onEditSchedule = vi.fn();
 const onCancelFixture = vi.fn();
+const onDeleteFixture = vi.fn();
 const onClose = vi.fn();
 let queryClient: QueryClient;
 
@@ -78,6 +79,7 @@ function renderPanel(node: LeagueBoardNode, overrides: Partial<LeagueFixturePane
         showToast={showToast}
         onEditSchedule={onEditSchedule}
         onCancelFixture={onCancelFixture}
+        onDeleteFixture={onDeleteFixture}
         onClose={onClose}
         {...overrides}
       />
@@ -212,6 +214,7 @@ describe('LeagueFixturePanel — 결과', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.queryByRole('button', { name: '일정 수정' })).toBeNull();
     expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).toBeNull();
     expect(mocks.resultProps[0]).toMatchObject({ canWrite: false });
   });
 });
@@ -229,7 +232,7 @@ describe('LeagueFixturePanel — 일정 · 취소 · 닫기', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('진행 중 경기에는 취소가 없고(서버가 409), 취소된 경기에는 쓰기 버튼이 모두 없다', () => {
+  it('진행 중 경기에는 취소가 없고(서버가 409), 취소된 경기에는 일정·취소 버튼이 없다', () => {
     const { unmount } = renderPanel(nodeOf({ homeTeamId: 't1', awayTeamId: 't2', game: makeGame({ id: 'g1', state: 'PAUSED' }) }));
     expect(screen.getByRole('button', { name: '일정 수정' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull();
@@ -239,5 +242,57 @@ describe('LeagueFixturePanel — 일정 · 취소 · 닫기', () => {
     expect(screen.getByText('취소된 경기예요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '일정 수정' })).toBeNull();
     expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull();
+  });
+});
+
+describe('LeagueFixturePanel — 경기 삭제', () => {
+  const STARTED_REASON = '시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.';
+
+  it('시작 전 경기는 삭제 버튼이 열려 있고 누르면 부모의 삭제 확인을 연다 — 취소와 삭제를 서로 다른 설명으로 구분한다', () => {
+    renderPanel(nodeOf({ game: READY_GAME }));
+
+    const button = screen.getByRole('button', { name: '경기 삭제' });
+    expect(button).toBeEnabled();
+    expect(button).toHaveAccessibleDescription('대진표에서 숨겨요. 되돌릴 수 없어요.');
+    expect(screen.getByText('순위 집계에서 빼요. 경기 기록은 남아요.')).toBeInTheDocument();
+
+    fireEvent.click(button);
+    expect(onDeleteFixture).toHaveBeenCalledTimes(1);
+    expect(onCancelFixture).not.toHaveBeenCalled();
+  });
+
+  it('결과가 있거나 시작한 경기는 삭제가 막히고 사유가 버튼 설명으로 붙는다 — 시작 전 경기와 대조', () => {
+    const { unmount } = renderPanel(nodeOf({ game: OFFICIAL_GAME }));
+    const blocked = screen.getByRole('button', { name: '경기 삭제' });
+    expect(blocked).toBeDisabled();
+    expect(blocked).toHaveAccessibleDescription(STARTED_REASON);
+    // 취소는 막히지 않는다 — 먼저 취소하라는 안내가 실제로 가능한 길이어야 한다.
+    expect(screen.getByRole('button', { name: '경기 취소' })).toBeEnabled();
+    unmount();
+
+    const { unmount: unmountEnded } = renderPanel(nodeOf({ game: makeGame({ id: 'g1', state: 'ENDED' }) }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeDisabled();
+    unmountEnded();
+
+    renderPanel(nodeOf({ game: READY_GAME }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeEnabled();
+  });
+
+  it('진행 중 경기는 삭제가 막히고 콘솔에서 먼저 끝내라고 안내한다', () => {
+    renderPanel(nodeOf({ game: makeGame({ id: 'g1', state: 'LIVE' }) }));
+    const button = screen.getByRole('button', { name: '경기 삭제' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.');
+  });
+
+  it('취소된 경기는 결과가 있었어도 삭제할 수 있다 — 취소 뒤 삭제의 두 번째 단계', () => {
+    renderPanel(nodeOf({ status: 'cancelled', game: OFFICIAL_GAME }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull();
+  });
+
+  it('자리 없이 만든 수동 경기에도 같은 삭제 입구가 있다', () => {
+    renderPanel(nodeOf({ homeTeamId: 't1', awayTeamId: 't2', homeSlotId: null, awaySlotId: null, game: READY_GAME }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeEnabled();
   });
 });

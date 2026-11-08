@@ -41,6 +41,41 @@ test.describe('mobile safe area and touch', () => {
     await expectAboveSystemBar(business, 48);
   });
 
+  test('a page without a tab bar scrolls under the native inset and ends clear of it', async ({ page }) => {
+    await page.goto('/notices');
+    const scroller = page.locator('.tm-scroll-area');
+    await expect(scroller).toBeVisible();
+    await scroller.evaluate((node) => {
+      const spacer = document.createElement('div');
+      spacer.id = 'e2e-end-spacer';
+      spacer.style.height = '2000px';
+      node.appendChild(spacer);
+    });
+    await setNativeBottom(page, 48);
+    const height = await page.evaluate(() => window.innerHeight);
+    await expect.poll(async () => {
+      const box = await scroller.boundingBox();
+      return box ? Math.abs(box.y + box.height - height) : null;
+    }).toBeLessThanOrEqual(1);
+    await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    const spacer = await page.locator('#e2e-end-spacer').boundingBox();
+    expect(spacer).not.toBeNull();
+    expect(Math.abs(spacer!.y + spacer!.height - (height - 48))).toBeLessThanOrEqual(1);
+  });
+
+  test('a page with fixed actions does not reserve the native inset a second time at its scroller end', async ({ page }) => {
+    await loginAs(page, personas.owner.email);
+    await page.goto('/teams/new');
+    await expect(page.locator('.tm-fixed-cta')).toBeVisible();
+    await setNativeBottom(page, 48);
+    const scroller = page.locator('.tm-scroll-area');
+    const height = await page.evaluate(() => window.innerHeight);
+    await expect.poll(() => scroller.evaluate((node) => getComputedStyle(node).paddingBottom)).toBe('0px');
+    const box = await scroller.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.abs(box!.y + box!.height - height)).toBeLessThanOrEqual(1);
+  });
+
   test('a late native inset keeps the last auth content above its fixed actions', async ({ page }) => {
     await page.goto('/auth/account-conflict');
     const content = page.locator('.tm-auth-scroll');

@@ -79,6 +79,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
       items: [
         { slug: 'schedule', label: '일정', count: series.fixtures.length },
         { slug: 'registrations', label: '신청 관리' },
+        { slug: 'discipline', label: '징계 현황' },
       ],
     },
     {

@@ -2,7 +2,7 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import type { V1TournamentGroupPhase } from '@prisma/client';
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 import type { BracketTemplatePlan, PlanFixture, PlanSlot } from '../templates/bracket-template-plan';
-import type { NamedFinalDto, PreliminaryGroupDto } from './multi-finals.dto';
+import type { FinalRankRuleDto, NamedFinalDto, PreliminaryGroupDto } from './multi-finals.dto';
 
 export const invalidMultiFinal = (message: string): never => {
   throw new UnprocessableEntityException({ code: 'MULTI_FINAL_INVALID', message });
@@ -25,6 +25,14 @@ export function validateNamedFinals(finals: readonly NamedFinalDto[], groups: Re
       teams.add(id);
     }
   }
+}
+/**
+ * Rule order is seed order. Rank comes first so group winners take the lowest seeds (the byes of a short bracket);
+ * equal ranks follow `groupOrder`. Callers validate that every rule's group is listed.
+ */
+export function orderRulesByRank<T extends FinalRankRuleDto>(rules: readonly T[], groupOrder: readonly string[]): T[] {
+  const position = new Map(groupOrder.map((groupId, index) => [groupId, index]));
+  return [...rules].sort((a, b) => a.rank - b.rank || position.get(a.groupId)! - position.get(b.groupId)!);
 }
 const empty = (): BracketTemplatePlan => ({ groups: [], slots: [], fixtures: [], edges: [], byeSlots: [] });
 export function planPreliminaryGroups(groups: readonly PreliminaryGroupDto[]): BracketTemplatePlan {

@@ -706,6 +706,8 @@ model V1AuthIdentity {
   user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserKey])
+  /// 활성(status = 'active') 신원은 (user_id, provider)당 하나 — 부분 unique 인덱스라 마이그레이션 SQL 에만 있다
+  /// (`v1_auth_identities_user_provider_active_key`). 해제된 신원은 같은 제공자로 여러 개 남을 수 있다.
   @@index([userId])
   @@index([status])
   @@map("v1_auth_identities")

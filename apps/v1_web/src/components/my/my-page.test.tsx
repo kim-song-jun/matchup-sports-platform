@@ -307,6 +307,19 @@ describe('설정의 로그인 방법 진입 경로', () => {
   });
 });
 
+describe('설정의 로그인 기기 진입 경로', () => {
+  it('계정 메뉴에서 로그인 방법 바로 다음 줄이 로그인 기기 화면으로 간다', () => {
+    render(<SettingsPageView model={settingsModel} />);
+    const row = screen.getByRole('link', { name: /^로그인 기기/ });
+    expect(row).toHaveAttribute('href', '/my/settings/devices');
+    expect(row).toHaveTextContent('다른 기기의 로그인을 한 번에 끊어요');
+    // 만료 장치가 없는 "새로 생겼어요" 표시는 두지 않는다.
+    expect(row).not.toHaveTextContent('새로 생겼어요');
+    const rows = Array.from(row.closest('section')?.querySelectorAll('a.tm-my-menu-row') ?? []);
+    expect(rows.indexOf(row)).toBe(1);
+  });
+});
+
 describe('설정의 비밀번호·약관 진입 경로', () => {
   it('비밀번호 변경은 본인인증 재설정 화면과 설정 복귀 경로에 연결한다', () => {
     render(<SettingsPageView model={{ ...settingsModel, account: {

@@ -607,7 +607,9 @@ export const gameSchemaSourceManifest = {
   // 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); historical game migration unchanged.
   // 2026-11-02: add V1User.signupEmailLoginRequired; historical game migration is unchanged.
   // 2026-11-03: additive V1Tournament.previousLeagueId; historical game migration unchanged.
-  schema: 'b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960',
+  // 2026-11-06: partial unique v1_auth_identities (user_id, provider) WHERE status = 'active' (20261106120000_v1_auth_identity_provider_active_unique); historical game migration unchanged.
+  // 2026-11-06: additive V1VerificationPurpose.email_change (20261106180000_v1_verification_purpose_email_change); historical game migration unchanged.
+  schema: '2bb6829e361b7486531c407cccb16e24c11f50a77592b1703beb7677ab2e20f6',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

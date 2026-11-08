@@ -668,12 +668,24 @@ describe('TeamsService', () => {
     });
 
     // MD-QA #176 — 생성 시각이 같은 팀이 많으면(시드) 그 사이 순서가 요청마다 달라져 "더 보기"에 같은 팀이 또 나왔다.
-    it.each([undefined, 'latest', 'member_count'] as const)('정렬(%s)의 마지막 기준은 id 다 — 커서로 이어 읽어도 겹치거나 빠지지 않게', async (sort) => {
+    it.each([undefined, 'latest', 'member_count', 'activity'] as const)('정렬(%s)의 마지막 기준은 id 다 — 커서로 이어 읽어도 겹치거나 빠지지 않게', async (sort) => {
       await service.list(null, { sort, cursor: 'team-1' });
 
       const args = prisma.v1Team.findMany.mock.calls.at(-1)[0];
       expect(args.orderBy.at(-1)).toEqual({ id: 'desc' });
       expect(args.cursor).toEqual({ id: 'team-1' });
+    });
+
+    it.each([
+      [undefined, [{ createdAt: 'desc' }, { id: 'desc' }]],
+      ['latest', [{ createdAt: 'desc' }, { id: 'desc' }]],
+      ['member_count', [{ memberCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]],
+      // 팀 매치를 올린 횟수는 관계 _count 로 센다 — 같은 횟수(대부분 0)면 최근 등록순으로 이어진다.
+      ['activity', [{ hostedTeamMatches: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }]],
+    ] as const)('정렬(%s)은 서로 다른 기준으로 순서를 정한다', async (sort, expected) => {
+      await service.list(null, { sort });
+
+      expect(prisma.v1Team.findMany.mock.calls.at(-1)[0].orderBy).toEqual(expected);
     });
 
     it('includes the owner in each list item', async () => {

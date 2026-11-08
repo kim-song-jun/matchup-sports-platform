@@ -49,7 +49,8 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // title/activeTab/topBar는 route-chrome 테이블(fragments/team-matches.ts)이 고정값으로
   // 갖고 있다 — floatingSlot만 ReactNode라 테이블에 담을 수 없어 override로 밀어넣는다
   // (app-shell-promotion.md §1b, 6곳 중 하나).
-  useShellOverride({ floatingSlot: <TeamMatchCreateFloatingButton /> });
+  // 필터 시트가 열려 있으면 FAB 이 시트 하단 버튼·칩을 가리므로 올리지 않는다.
+  useShellOverride({ floatingSlot: model.filterSheet?.open ? undefined : <TeamMatchCreateFloatingButton /> });
   // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
   // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
   const currentHref = useCurrentHref();

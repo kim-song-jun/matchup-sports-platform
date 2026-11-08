@@ -3860,7 +3860,7 @@ query string optional, max 50
 sportId uuid optional
 regionId uuid optional
 joinPolicy string optional, allowed approval_required, closed
-sort string optional, allowed recommended, latest, member_count, trust, default recommended
+sort string optional, allowed latest, member_count, activity, default latest
 view string optional, allowed card, compact
 
 Request body:

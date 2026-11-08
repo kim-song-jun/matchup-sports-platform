@@ -4516,9 +4516,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-muted);
 }
 
-/* 문장 끝에 이어 붙는 인라인 링크 — 줄 높이는 그대로 두고 padding 만으로 44px 터치 영역을 만든다. */
+/* 문장 끝에 이어 붙는 링크 — inline-flex 로 44px 터치 영역이 위 칩 줄과 겹치지 않게 한다. */
 .tm-filter-region-notice-link {
-  padding: 14px 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
   color: var(--blue700);
   font-weight: 700;
   text-decoration: underline;

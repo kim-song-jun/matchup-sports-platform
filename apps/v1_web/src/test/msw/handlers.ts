@@ -953,6 +953,10 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {
+    const sort = new URL(request.url).searchParams.get('sort');
+    if (sort && !['latest', 'member_count', 'activity'].includes(sort)) {
+      return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: 'invalid sort' }, { status: 400 });
+    }
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);

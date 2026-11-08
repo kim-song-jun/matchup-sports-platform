@@ -148,7 +148,7 @@ List items add `stats: { banner: { impressions, clicks }, popup: { impressions, 
 `POST /ads/events` body: `{ "events": [{ "campaignId": "<uuid>", "channel": "banner" | "popup", "type": "impression" | "click" }] }`, 1–20 entries, one entry per occurrence.
 
 - Counted only for a **published** campaign whose channel was configured and is inside `[startAt, endAt + 10 min)`; everything else is dropped silently (still `204`). Previews and test traffic must not be sent.
-- Stored as per-day counters `(campaignId, channel, KST date)`; no user id, IP or user agent is stored. Counts are client-reported and not suitable as an auditable billing basis.
+- Stored as per-day counters `(campaignId, channel, KST date)`; no user id, IP or user agent is stored. Counts are client-reported and not suitable as an auditable billing basis: anyone can submit events for a published campaign, and the rate limit reduces forgery without preventing it. A signed token would not help, because `GET /ads/active` is public and the token would be handed to the forger too; single-use tokens would need the per-event storage that S17 rules out.
 - A database failure returns 5xx (recorded in the error log) instead of `204`.
 
 ## Behaviour to know (not defects)

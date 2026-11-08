@@ -1548,6 +1548,31 @@ describe('AuthService', () => {
       await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ status: 401 });
     });
 
+    it('스스로 해제한 카카오 로그인은 LOGIN_METHOD_UNLINKED, 정지·차단된 계정은 그대로 PERMISSION_DENIED 로 거절한다', async () => {
+      const held = (identityStatus: string, accountStatus: string) => ({
+        id: 'identity-1',
+        status: identityStatus,
+        user: { id: 'user-1', email: null, accountStatus, onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW, sessionEpoch: 2 },
+      });
+      const refusal = async (identityStatus: string, accountStatus: string) => {
+        stubKakao([tokenInfo(123456), me()]);
+        prisma.v1AuthIdentity.findUnique.mockResolvedValue(held(identityStatus, accountStatus));
+        return (await service.kakaoTokenLogin({ accessToken: TOKEN }).catch((error: unknown) => error)) as {
+          getStatus(): number;
+          getResponse(): { code: string };
+        };
+      };
+
+      const unlinked = await refusal('unlinked', 'active');
+      expect([unlinked.getStatus(), unlinked.getResponse().code]).toEqual([403, 'LOGIN_METHOD_UNLINKED']);
+
+      for (const [identityStatus, accountStatus] of [['blocked', 'active'], ['active', 'suspended'], ['unlinked', 'suspended']]) {
+        const blocked = await refusal(identityStatus, accountStatus);
+        expect([blocked.getStatus(), blocked.getResponse().code]).toEqual([403, 'PERMISSION_DENIED']);
+      }
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
     it('KAKAO_APP_ID 가 없으면 카카오를 호출하기 전에 400 OAUTH_NOT_CONFIGURED', async () => {
       delete process.env.KAKAO_APP_ID;
       const fetchMock = stubKakao([]);

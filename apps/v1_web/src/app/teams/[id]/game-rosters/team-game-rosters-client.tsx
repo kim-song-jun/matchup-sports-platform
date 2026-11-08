@@ -20,6 +20,8 @@ import { formatKstMonthDaySlash, formatKstTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
+import { disciplineWarningChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import {
   batchFailureRecovery,
   cellKey,
@@ -190,6 +192,7 @@ function PlayerCard({
   onOpenUnavailability: (() => void) | null;
 }) {
   const summary = playerSummary(player, draft);
+  const warning = playerDisciplineWarning(player, games);
   const labels = gameChipLabels(games);
   return (
     <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -203,6 +206,11 @@ function PlayerCard({
           <span className={`tm-badge tm-badge-sm ${summary.tone === 'red' ? 'tm-badge-red' : 'tm-badge-grey'}`}>{summary.text}</span>
         )}
       </div>
+      {warning === null ? null : (
+        <div>
+          <StatusChip chip={warning} />
+        </div>
+      )}
       <div role="group" aria-label={`${player.displayName} 경기별 출전`} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {games.map((game, index) => {
           const cell = player.cells[index];
@@ -239,6 +247,14 @@ function PlayerCard({
       ) : null}
     </Card>
   );
+}
+
+/** 다음 경기 기준 경고 누적 칩 — 아직 치르지 않은 가장 이른 경기의 값이다(끝난 경기의 누적은 그 뒤 경기가 이어받는다). */
+function playerDisciplineWarning(player: V1TeamRosterMatrixPlayer, games: readonly V1TeamRosterMatrixGame[]) {
+  const index = games.findIndex((game) => game.gameState === 'SCHEDULED');
+  if (index < 0) return null;
+  if (player.cells[index]?.status === 'SUSPENDED') return null;
+  return disciplineWarningChip(player.cells[index]?.cards, games[index].disciplineRules);
 }
 
 /** 카드 오른쪽 배지 — 출전정지가 가장 무겁고, 그다음 결장, 빠짐 순. 모두 출전이면 null. */

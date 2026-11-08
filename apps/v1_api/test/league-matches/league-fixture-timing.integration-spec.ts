@@ -175,6 +175,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(first.endAt).toBe(`${futureDates[0]}T13:15:00.000Z`);
     expect(first.matchday).toBe(1);
     expect(first.orderInDay).toBe(1);
+    expect(res.body.data.fixtures.map((f: { week: number }) => f.week)).toEqual([1, 1, 1, 1, 1, 1]);
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
@@ -187,7 +188,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     return total;
   }
 
-  it('timing 없이 생성하면 같은 주차 동시 시작·주차 제목이고, 종료는 시작 + 전·후반 합계다', async () => {
+  it('timing 없이 생성하면 같은 주차 동시 시작·주차 순번 제목이고, 종료는 시작 + 전·후반 합계다', async () => {
     const leagueId = await createLeague('레거시 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
@@ -204,7 +205,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     const regulation = await regulationOf(fixtures[0].competitionConfigVersionId);
     expect(fixtures.every((f) => f.endAt !== null && f.startAt !== null
       && f.endAt.getTime() - f.startAt.getTime() === regulation * 60_000)).toBe(true);
-    expect(fixtures.every((f) => f.title === '레거시 리그 1주차')).toBe(true);
+    expect(fixtures.map((f) => f.title).sort()).toEqual(['레거시 리그 1주차 1경기', '레거시 리그 1주차 2경기']);
   });
 
   it('경기 시간을 비우고 하루 경기 수만 보내면 전·후반 합계를 경기 시간으로 순차 배치한다', async () => {

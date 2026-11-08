@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNativeAppleSignInAvailable, requestNativeAppleSignIn } from '@/lib/native-apple';
 import { extractErrorMessage } from '@/lib/error-message';
+import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
 import { v1Post } from '@/lib/api-client';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
@@ -67,6 +68,10 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
       router.replace(route);
       router.refresh();
     } catch (err) {
+      if (isUnlinkedLoginError(err)) {
+        setError(unlinkedLoginMessage('apple'));
+        return;
+      }
       const recovery = routeSocialLoginRecovery(err, getSavedRedirectPath());
       if (recovery?.type === 'navigate') {
         router.replace(recovery.path);

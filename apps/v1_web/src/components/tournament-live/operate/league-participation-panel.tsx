@@ -6,6 +6,7 @@ import {
   useV1TeamGameRoster,
   type V1GameRosterPlayerStatus,
 } from '@/hooks/use-v1-game-roster';
+import { GameRosterDisciplineBanners } from '@/components/game-roster/game-roster-discipline-banners';
 import { extractErrorMessage } from '@/lib/error-message';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { rosterPersonLabel } from '@/lib/roster-presentation';
@@ -111,6 +112,7 @@ function LeagueSideParticipation({
           <p className="shrink-0 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">전원 출전</p>
         )}
       </div>
+      <GameRosterDisciplineBanners view={roster.data} />
       {!editable ? (
         <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">경기가 시작돼 출전 선수를 더 바꿀 수 없어요.</p>
       ) : null}

@@ -10,6 +10,7 @@ import { trackEvent } from '@/lib/analytics';
 import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
 import { consumeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { buildLinkResultPath, linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
+import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
@@ -113,6 +114,11 @@ export function KakaoCallbackClient() {
           }
           if (recovery) {
             setError(recovery.message);
+            return;
+          }
+
+          if (isUnlinkedLoginError(nextError)) {
+            setError(unlinkedLoginMessage('kakao'));
             return;
           }
 

@@ -15,7 +15,8 @@ const createFields = [
   'registrationDeadlineAt', 'entryFee', 'bankName', 'bankAccount', 'bankHolder',
 ] as const;
 const BANK_FIELD = /^[^\u0000-\u001f\u007f]+$/;
-const settingsFields = ['expectedUpdatedAt', 'title', 'rulesText', 'regionId', 'startsOn', 'endsOn', 'registrationDeadlineAt', 'plannedFixtureCount', 'maxTeams'] as const;
+const settingsFields = ['expectedUpdatedAt', 'title', 'rulesText', 'regionId', 'startsOn', 'endsOn', 'registrationDeadlineAt', 'plannedFixtureCount', 'maxTeams', 'genderCategory'] as const;
+const genderCategories: readonly unknown[] = ['mixed', 'male', 'female'];
 
 function ok<T>(data: T) {
   return HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
@@ -88,13 +89,15 @@ function parseCreate(value: unknown): V1CreateLeaguePayload | null {
 }
 function parseSettings(value: unknown): SettingsPatch | null {
   if (!isRecord(value) || Object.keys(value).some(key => !settingsFields.some(field => field === key))) return null;
-  const { expectedUpdatedAt, title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount, maxTeams } = value;
+  const { expectedUpdatedAt, title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount, maxTeams, genderCategory } = value;
   if (!isDateString(expectedUpdatedAt) || typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 100
     || typeof rulesText !== 'string' || rulesText.length > 10000 || typeof regionId !== 'string' || regionId.length === 0 || regionId.length > 100
     || !isDateString(startsOn) || !isDateString(endsOn) || !(registrationDeadlineAt === null || isDateString(registrationDeadlineAt))
-    || !isOptionalInteger(plannedFixtureCount, 500) || !isOptionalInteger(maxTeams, 2147483647)) return null;
+    || !isOptionalInteger(plannedFixtureCount, 500) || !isOptionalInteger(maxTeams, 2147483647)
+    || !(genderCategory === undefined || genderCategories.includes(genderCategory))) return null;
   return { expectedUpdatedAt, title: title.trim(), rulesText, regionId, startsOn, endsOn, registrationDeadlineAt,
-    ...(plannedFixtureCount !== undefined ? { plannedFixtureCount } : {}), ...(maxTeams !== undefined ? { maxTeams } : {}) };
+    ...(plannedFixtureCount !== undefined ? { plannedFixtureCount } : {}), ...(maxTeams !== undefined ? { maxTeams } : {}),
+    ...(genderCategory !== undefined ? { genderCategory: genderCategory as UpdateLeagueSettings['genderCategory'] } : {}) };
 }
 
 /** The shared harness starts as an authenticated ops admin; other actors exercise the same auth gates. */
@@ -156,6 +159,7 @@ export function createV1LeagueCapacityMswHandlers(actor: Actor = 'ops') {
           instant(body.registrationDeadlineAt) !== instant(current.registrationDeadlineAt) && 'registrationDeadlineAt',
           body.plannedFixtureCount !== undefined && body.plannedFixtureCount !== current.plannedFixtureCount && 'plannedFixtureCount',
           body.maxTeams !== undefined && body.maxTeams !== current.maxTeams && 'maxTeams',
+          body.genderCategory !== undefined && body.genderCategory !== current.genderCategory && 'genderCategory',
         ].filter(Boolean);
         if (locked.length > 0) return fail(409, 'LEAGUE_ENDED_FIELD_LOCKED', '끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요.');
       }

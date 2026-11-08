@@ -98,7 +98,7 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
   });
   it.each(['completed', 'cancelled'] as const)('%s 리그는 이름·설명·지역만 저장되고 기간·마감·경기 수·정원은 409 로 잠긴다', async (status) => {
     const id = await h.makeLeague();
-    await h.prisma.v1Tournament.update({ where: { id }, data: { status } });
+    await h.prisma.v1Tournament.update({ where: { id }, data: { status, registrationDeadlineAt: new Date('2098-01-01T00:00:00Z'), plannedFixtureCount: 12, maxTeams: 8 } });
     const body = await snapshot(id);
     const saved = await patch(id, { ...body, title: `정정한 ${status} 리그`, rulesText: '정정한 안내' });
     expect(saved.status).toBe(200);

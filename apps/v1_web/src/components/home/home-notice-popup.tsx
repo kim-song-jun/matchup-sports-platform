@@ -20,6 +20,19 @@ export function getHomePopupStorageKey(popupId: string) {
 
 export const getPopupStorageKey = getHomePopupStorageKey;
 
+/** Dimmed backdrop shared by every home popup window. */
+export const HOME_POPUP_SCRIM_BACKGROUND = 'rgba(25, 31, 40, 0.48)';
+
+/** True while the user's "hide for a week" choice for this notice is still in force. Unreadable storage means not hidden. */
+export function isHomePopupHidden(popupId: string): boolean {
+  try {
+    const hiddenUntil = Number(window.localStorage.getItem(getHomePopupStorageKey(popupId)));
+    return Number.isFinite(hiddenUntil) && hiddenUntil > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * location(경로+쿼리)을 주면(전역 팝업) URL 이 바뀔 때 닫는다 — 팝업 링크는 이동만 하고, 닫기는 URL 이
  * 바뀐 뒤라 오버레이 항목을 back 으로 걷지 않는다. 링크는 표식 항목을 replace 로 목적지로 바꾼다.
@@ -45,12 +58,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
       return;
     }
 
-    try {
-      const hiddenUntil = Number(window.localStorage.getItem(getHomePopupStorageKey(popup.id)));
-      setOpen(!Number.isFinite(hiddenUntil) || hiddenUntil <= Date.now());
-    } catch {
-      setOpen(true);
-    }
+    setOpen(!isHomePopupHidden(popup.id));
   }, [popup?.id]);
 
   useOverlayHistory({ open, onClose: () => setOpen(false) });
@@ -107,7 +115,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(25, 31, 40, 0.48)' }}
+      style={{ background: HOME_POPUP_SCRIM_BACKGROUND }}
       onClick={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}

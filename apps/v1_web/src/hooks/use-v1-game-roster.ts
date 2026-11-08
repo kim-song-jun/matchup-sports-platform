@@ -42,6 +42,15 @@ export type V1GameRosterPerson = {
   realName?: string;
 };
 
+/** 이 경기 직전까지 쌓인 카드(레드로 바뀐 옐로 제외). 카드 기록이 없는 선수는 null. */
+export type V1GameRosterCards = { yellowTotal: number; redTotal: number };
+
+/** 대회·리그의 출전정지 규정 — 둘 다 꺼진 곳은 서버가 null 로 보낸다. */
+export type V1GameRosterDisciplineRules = {
+  yellowAccumulationLimit: number | null;
+  redCardSuspensionMatches: number | null;
+};
+
 export type V1GameRosterView = {
   gameId: string;
   sideId: string;
@@ -62,7 +71,8 @@ export type V1GameRosterView = {
   registrationId?: string | null;
   /** 그 신청의 명단이 잠겼거나 제출 마감이 지나 등번호 저장이 막히면 false. */
   jerseyEditable: boolean;
-  base: (V1GameRosterPerson & { status: V1GameRosterPlayerStatus })[];
+  disciplineRules: V1GameRosterDisciplineRules | null;
+  base: (V1GameRosterPerson & { status: V1GameRosterPlayerStatus; cards: V1GameRosterCards | null })[];
   participants: (V1GameRosterPerson & { joinedAfterFixtureCreated: boolean })[];
   excluded: (V1GameRosterPerson & {
     adjustmentId: string;
@@ -70,7 +80,7 @@ export type V1GameRosterView = {
     excludedAt: string;
     actor: V1GameRosterActor;
   })[];
-  suspended: (V1GameRosterPerson & { reason: string | null; remainingMatches: number })[];
+  suspended: (V1GameRosterPerson & { reason: string | null; remainingMatches: number; cards: V1GameRosterCards | null })[];
   unavailable: (V1GameRosterPerson & {
     unavailabilityId: string;
     reason: string | null;
@@ -111,6 +121,8 @@ export type V1TeamRosterCell = {
   adjustmentId: string | null;
   unavailabilityId: string | null;
   remainingMatches: number | null;
+  /** 이 경기 직전까지 쌓인 카드. 카드 기록이 없는 선수는 null. */
+  cards?: V1GameRosterCards | null;
   goalkeeper?: boolean;
 };
 
@@ -126,6 +138,8 @@ export type V1TeamRosterMatrixGame = {
   gameState: V1GameState;
   editable: boolean;
   goalkeeperEditable?: boolean;
+  /** 이 경기가 속한 대회·리그의 정지 규정. 규정이 없거나 기준 명단이 없는 경기는 null. */
+  disciplineRules?: V1GameRosterDisciplineRules | null;
   /** 기준 명단이 없는 경기(대회 확정 신청 없음 등)는 null. */
   summary: V1GameRosterSummary | null;
 };

@@ -124,6 +124,21 @@ describe('경기 명단 관리 — 칩 토글과 일괄 저장', () => {
     for (const chip of card.getAllByRole('button', { name: /출전정지/ })) expect(chip).toBeDisabled();
   });
 
+  it('규정이 있는 대회에서 경고가 쌓인 선수만 다음 경기 기준 경고 칩을 본다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 });
+    mock.setCards('player-2', 1);
+    renderPage();
+    expect(within(await playerCard('박서준')).getByText('경고 1/2장 · 한 장 더 받으면 정지')).toBeInTheDocument();
+    expect(within(await playerCard('김민재')).queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+
+  it('규정이 없는 대회에서는 카드가 있어도 경고 칩이 없다', async () => {
+    mock.setCards('player-2', 1);
+    renderPage();
+    await playerCard('박서준');
+    expect(screen.queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+
   it('그사이 시작된 경기가 섞이면 409 — 그 경기 변경만 빠지고 나머지를 다시 저장할 수 있다', async () => {
     renderPage();
     const card = within(await playerCard('김민재'));

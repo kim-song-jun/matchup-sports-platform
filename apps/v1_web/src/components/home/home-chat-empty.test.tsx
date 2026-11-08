@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({ usePathname: () => '/home', useRouter: () =>
 vi.mock('@/components/v1-ui/shell-override', () => ({ useShellOverride: () => undefined }));
 vi.mock('@/components/lineup/lineup-todo-card', () => ({ LineupTodoCard: () => null }));
 vi.mock('@/components/tournaments/pending-review-card', () => ({ PendingReviewsCard: () => null }));
+vi.mock('@/components/ads/home-ad-banner', () => ({ HomeAdBanner: () => null }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AllTournaments: () => ({ data: undefined, isLoading: false, isError: false }),
   useV1LeagueMatches: () => ({ data: undefined, isLoading: false, isError: false }),

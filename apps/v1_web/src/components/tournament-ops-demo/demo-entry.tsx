@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Play } from 'lucide-react';
 import { FIELD_DEMO_PATH } from '@/lib/field-console-demo';
+import { DEMO_PATH } from '@/lib/tournament-ops-demo';
 import styles from './demo.module.css';
 
 export function TournamentOpsDemoEntry() {
@@ -13,7 +14,7 @@ export function TournamentOpsDemoEntry() {
       </div>
       <div className={styles.actions}>
         <Link className={styles.primary} href={FIELD_DEMO_PATH} target="_blank" rel="noopener noreferrer"><Play size={16} aria-hidden="true" />운영 콘솔 체험하기<span className="sr-only"> (새 탭)</span></Link>
-        <Link className={styles.secondary} href={FIELD_DEMO_PATH} target="_blank" rel="noopener noreferrer">주요 기능 보기<ArrowRight size={16} aria-hidden="true" /><span className="sr-only"> (새 탭)</span></Link>
+        <Link className={styles.secondary} href={`${DEMO_PATH}#demo-guide`} target="_blank" rel="noopener noreferrer">주요 기능 보기<ArrowRight size={16} aria-hidden="true" /><span className="sr-only"> (새 탭)</span></Link>
       </div>
     </section>
   );

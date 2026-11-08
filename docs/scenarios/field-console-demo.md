@@ -17,7 +17,7 @@ Status: Local validation passed — alpha QA pending
 8. 체험 초기화는 확인 후 새 경기로 되돌린다. 새로고침도 기록을 초기화한다.
 
 샘플은 5인제 축구, 팀별 교체 3회이며, 실제 API/소켓·회원 신원·공식 기록을 사용하지 않는다.
-기존 대회 관리 체험 `/tournament-ops-demo`는 별도로 유지한다.
+‘주요 기능 보기’는 기존 `/tournament-ops-demo#demo-guide`로 연결한다. 기존 대회 관리 체험과 기능 안내를 유지한다.
 
 ## 자동 검증
 - 신규 모델/실제 콘솔 UI 6 tests PASS. 시작 전/중단 중 기록 및 오래된 명령 거절, 안내 전환/탈출, 득점/카드/교체/종료와 network 0을 검증했다.

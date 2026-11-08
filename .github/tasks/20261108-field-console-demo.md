@@ -34,7 +34,7 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 기존 대회 관리 체험은 유지하고 상단 체험 버튼만 현장 콘솔로 연결한다.
 ## Progress Snapshot
 - 최신 dev(546add158) 기반 `feat/field-console-demo`, `_worktrees/field-console-demo`에 구현했다. 원래 작업 트리 WIP는 변경하지 않았다.
-- 상단 체험/주요 기능 링크는 `/field-console-demo`. 기존 `/tournament-ops-demo` 대회 관리 체험은 유지한다.
+- 상단 운영 콘솔 체험은 `/field-console-demo`, 주요 기능 보기는 기존 `/tournament-ops-demo#demo-guide`로 연결한다. 기존 대회 관리 체험과 기능 안내를 유지한다.
 - 안내: 팀/점수/시간 → 시작 → 이벤트 → 기록 확인 → 전후반/종료, 5단계. 실제 컴포넌트의 sample preview와 별도 QueryClient를 사용하며 안내 재진입이 연습 기록을 변경하지 않는다.
 - 롤링 종목은 현행 계약상 교체 기록 버튼이 없으므로 5인제 축구·제한 교체 3회 샘플로 명시했다.
 - 신규 6 tests PASS: 안내 다음/이전/종료, Escape, 시작 전 상태, 득점/옐로카드/교체 실제 선택, 중지/재개/전후반/종료, 샘플 API 호출 0, 기록 보존, 잘못된 상태 거절.
@@ -43,3 +43,10 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 - `git diff --check` PASS. touched-path TODO/FIXME/HACK/XXX 신규/기존 marker 없음. 새 route/import 파일은 현재 untracked이며 아래 owned 범위로 함께 전달해야 한다.
 - 미커밋/미배포. alpha after viewport 0/3(390/768/1440), console/network 및 화살표 실제 위치 0/3으로 미검증. 테스트를 시각 QA 완료로 취급하지 않는다.
 - 설치는 격리 worktree의 frozen lockfile + ignore-scripts로 실행했다. 로컬 web 서버/브라우저/실제 경기/DB는 시작·수정하지 않았다.
+
+## Follow-up — 주요 기능 링크 복구
+- 사용자 지시: 주요 기능 보기는 기존 대회 관리 체험 안내를 유지한다. PR #2269에서 두 버튼이 필드 콘솔로 연결된 회귀를 수정한다.
+- Owned: demo-entry.tsx, field-console-demo.test.tsx, 이 작업 문서와 docs/scenarios/field-console-demo.md.
+- 검증: 운영 콘솔 체험과 주요 기능 안내의 서로 다른 href를 기존 렌더 테스트에서 검증한다.
+- PR #2269의 Copilot 생략 승인은 해당 PR에만 적용됐으며 후속 PR에 확대하지 않는다.
+- 후속 검증 결과: 기존 href 상태에서 1개 회귀 테스트 실패(RED), 복구 후 동일 테스트 1 PASS / 무관한 2개 제외(GREEN). 기존 `/tournament-ops-demo`와 `demo-guide` anchor를 코드로 확인했다. `git diff --check` PASS. 전체 빌드/타입 검사 및 alpha 브라우저 검증은 미수행이며 PR CI/머지 후 검증으로 남긴다.

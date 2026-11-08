@@ -19,7 +19,7 @@ import {
 } from '@/hooks/use-v1-ads';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { adCampaignStatusLabel, adCampaignStatusPillKey } from '@/lib/admin-labels';
+import { adCampaignStatusLabel } from '@/lib/admin-labels';
 import { resolveAdLink } from '@/lib/ad-link';
 import type { V1AdCampaign, V1AdCampaignListFilters, V1AdCampaignListItem, V1AdCampaignStatus } from '@/types/ads';
 import { AdDetail } from './ads-view-detail';
@@ -250,7 +250,7 @@ export function AdsView() {
             card={(row) => ({
               title: `${row.title} (${row.advertiserName})`,
               subtitle: `${formatWindowRange(row)} · ${channelSummary(row)}`,
-              statusNode: <AdminStatusPill status={adCampaignStatusPillKey(row.status)} label={adCampaignStatusLabel(row.status)} />,
+              statusNode: <AdminStatusPill status={row.status} label={adCampaignStatusLabel(row.status)} />,
               description: <span className="tabular-nums">{statsLine(row)}</span>,
             })}
           />

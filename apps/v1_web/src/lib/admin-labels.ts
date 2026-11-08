@@ -102,20 +102,6 @@ export function adCampaignStatusLabel(status: V1AdCampaignStatus): string {
   return AD_CAMPAIGN_STATUS_LABEL[status] ?? '—';
 }
 
-/**
- * AdminStatusPill 은 STATUS_META 키로 톤·아이콘을 고른다. 광고의 '중단'은 그 표에 같은 뜻이 없어
- * 같은 톤(주의·정지)의 'suspended' 를 빌리고 말은 위 라벨로 덮는다.
- */
-const AD_CAMPAIGN_STATUS_PILL_KEY: Record<V1AdCampaignStatus, string> = {
-  draft: 'draft',
-  published: 'published',
-  stopped: 'suspended',
-};
-
-export function adCampaignStatusPillKey(status: V1AdCampaignStatus): string {
-  return AD_CAMPAIGN_STATUS_PILL_KEY[status] ?? 'draft';
-}
-
 const AD_CHANNEL_PHASE_LABEL: Record<V1AdChannelPhase, string> = {
   scheduled: '예약',
   live: '노출 중',

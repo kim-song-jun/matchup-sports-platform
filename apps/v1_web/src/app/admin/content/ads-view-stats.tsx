@@ -99,7 +99,7 @@ export function AdStatsPanel({
       </div>
 
       <p className="text-[length:var(--font-size-caption)] leading-5 text-[var(--text-muted)]">
-        집계는 네트워크 오류·호출 제한으로 일부 누락될 수 있어요.{' '}
+        집계는 네트워크 오류·호출 제한으로 일부 누락될 수 있어요. 브라우저가 보낸 값이라 부풀려질 수도 있어서 청구 근거로 쓰지 않아요.{' '}
         {stats.updatedAt ? `집계 갱신: ${formatKstDateTime(stats.updatedAt)}` : '아직 집계된 이벤트가 없어요.'}
       </p>
     </>

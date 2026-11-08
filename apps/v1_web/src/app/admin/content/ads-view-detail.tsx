@@ -5,7 +5,6 @@ import { ExternalLink, Pencil, Power, Rocket } from 'lucide-react';
 import { AdminEmpty, AdminStatusPill, AdminTableSkeleton } from '@/components/admin';
 import {
   adCampaignStatusLabel,
-  adCampaignStatusPillKey,
   adChannelLabel,
   adChannelPhaseLabel,
   adChannelPhasePillKey,
@@ -138,7 +137,7 @@ export function AdDetail({
           <h2 className="mt-1 break-words text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{campaign.title}</h2>
           <p className="mt-0.5 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">광고주 {campaign.advertiserName}</p>
         </div>
-        <AdminStatusPill status={adCampaignStatusPillKey(campaign.status)} label={adCampaignStatusLabel(campaign.status)} />
+        <AdminStatusPill status={campaign.status} label={adCampaignStatusLabel(campaign.status)} />
       </div>
 
       {channels.length === 0 ? (

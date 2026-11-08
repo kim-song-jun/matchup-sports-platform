@@ -4312,6 +4312,8 @@ label.tm-btn:focus-within {
   max-height: min(78dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 키보드로 이동한 입력칸이 고정된 머리 아래에 가려지지 않게 한다. */
+  scroll-padding-top: 88px;
 }
 
 /* 시트가 화면 바닥에 붙을 때만 안전영역을 더한다 — 탭바 위에 얹히면 탭바가 이미 소비했다. */
@@ -4330,9 +4332,11 @@ label.tm-btn:focus-within {
   touch-action: none;
 }
 
+/* 마우스로 끌 때 글자 선택이 시작되면 브라우저가 선택 위치로 시트를 스크롤해 내용이 튄다(alpha 실측 157 → 143). */
 .tm-scrollable-drag-sheet .tm-filter-sheet-handle {
-  position: relative;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tm-scrollable-drag-sheet .tm-filter-sheet-handle::before {
@@ -4484,7 +4488,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   }
 }
 
+/* 시트가 통째로 스크롤해도 손잡이·제목·닫기는 맨 위에 남는다. sticky 기준선은 스크롤 컨테이너의 padding 안쪽이라
+   top 은 제자리 값이다(손잡이 0, 제목은 손잡이 4 + 간격 16). 그 위 padding 띠와 손잡이 양옆은 ::before 가 덮는다. */
 .tm-filter-sheet-handle {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
@@ -4493,10 +4502,28 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-filter-sheet-head {
+  --tm-filter-sheet-head-cover: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  background: var(--bg);
+}
+
+.tm-filter-sheet:has(.tm-filter-sheet-handle) .tm-filter-sheet-head {
+  --tm-filter-sheet-head-cover: 32px;
+  top: 20px;
+}
+
+.tm-filter-sheet-head::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tm-filter-sheet-head-cover)) calc(-1 * var(--v1-shell-page-x)) 0;
+  z-index: -1;
+  background: var(--bg);
 }
 
 .tm-filter-section {
@@ -8416,6 +8443,8 @@ button:has(> .tm-toggle):focus-visible {
   color: var(--text-muted);
   background: var(--grey100);
 }
+/* "공동 n" 칩 — 순위 열이 좁은 폭에서 팀 칸을 밀어내지 않게 좌우 여백만 줄인다. */
+.tm-standings-rank-shared { padding: 0 4px; }
 .tm-standings-rank-gold { background: #FFF3CD; color: #856404; }
 .tm-standings-rank-silver { background: #F1F1F1; color: var(--grey700); }
 :root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }

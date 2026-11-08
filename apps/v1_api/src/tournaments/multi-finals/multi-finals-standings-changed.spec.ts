@@ -99,6 +99,13 @@ describe('확정한 결선 배정 뒤 예선 순위 순서가 바뀐 경우의 �
     swapPositions('b2', 'b3');
     expect(await changed()).toEqual({ 프리미어: false, 챌린지: false });
   });
+  it('배정 뒤 진출 규칙이 순위 기록에 없던 조를 가리키면 그 순위는 바뀐 것으로 알린다', async () => {
+    const { row, assign, changed } = harness();
+    await assign('챌린지', ['b1', 'b2']);
+    // The roster stays, but the rules now read A조 — a group the assign-time snapshot never stored.
+    row.multiFinals.finals[1].rules = [1, 2].map(rank => ({ groupId: 'gA', rank }));
+    expect(await changed()).toEqual({ 프리미어: false, 챌린지: true });
+  });
   it('순위가 그대로인 점수 정정은 알리지 않는다', async () => {
     const { assign, changed, standing } = harness();
     await assign('프리미어', ['a1', 'a2']);

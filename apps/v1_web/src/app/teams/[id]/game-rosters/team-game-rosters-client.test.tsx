@@ -132,6 +132,18 @@ describe('경기 명단 관리 — 칩 토글과 일괄 저장', () => {
     expect(within(await playerCard('김민재')).queryByText(/경고 \d\/\d장/)).toBeNull();
   });
 
+  it('출전정지 중인 선수에게는 경고 한 장 더 받으면 정지라는 칩을 붙이지 않는다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 });
+    mock.suspend('player-3', '레드카드', 1);
+    mock.setCards('player-3', 1);
+    mock.setCards('player-2', 1);
+    renderPage();
+    expect(within(await playerCard('박서준')).getByText('경고 1/2장 · 한 장 더 받으면 정지')).toBeInTheDocument();
+    const suspended = within(await playerCard('한도윤'));
+    expect(suspended.getByText('출전정지 1경기')).toBeInTheDocument();
+    expect(suspended.queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+
   it('규정이 없는 대회에서는 카드가 있어도 경고 칩이 없다', async () => {
     mock.setCards('player-2', 1);
     renderPage();

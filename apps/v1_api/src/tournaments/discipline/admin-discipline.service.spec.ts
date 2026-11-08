@@ -101,6 +101,13 @@ describe('AdminDisciplineService.overview', () => {
     expect('realName' in result.players[1]).toBe(false);
   });
 
+  it('정지 중인 선수가 경고도 한 장 모자라면 정지로만 세고 경고 임박에는 넣지 않는다', async () => {
+    const { service } = build({ competition: {}, results: [{ participantId: 'gp-a', userId: 'pa', yellow: 1, red: 1 }] });
+    const result = await service.overview(USER, 'cup');
+    expect(result.summary).toEqual({ suspended: 1, imminent: 0, withCards: 1 });
+    expect(result.players.map((player) => [player.userId, player.status])).toEqual([['pa', 'SUSPENDED']]);
+  });
+
   it('남은 경기가 없는 팀(B)은 카드 누적만 보이고 정지·임박으로 판정하지 않는다', async () => {
     const { service } = build({ competition: { yellowAccumulationLimit: 1 }, results: RESULTS });
     const result = await service.overview(USER, 'cup');

@@ -253,6 +253,7 @@ function PlayerCard({
 function playerDisciplineWarning(player: V1TeamRosterMatrixPlayer, games: readonly V1TeamRosterMatrixGame[]) {
   const index = games.findIndex((game) => game.gameState === 'SCHEDULED');
   if (index < 0) return null;
+  if (player.cells[index]?.status === 'SUSPENDED') return null;
   return disciplineWarningChip(player.cells[index]?.cards, games[index].disciplineRules);
 }
 

@@ -121,6 +121,13 @@ describe('SuspensionNoticeProjectionService', () => {
     expect(suspension.businessKey).toBe('player-suspension:rev-1:team-A:player_suspension_notice:mgr-A');
   });
 
+  it('정지 중인 선수가 경고도 한 장 모자라면 정지로만 알리고 경고 임박 알림은 싣지 않는다', async () => {
+    const { tx, created } = fakeTx({ ...BASE_WORLD, results: [{ participantId: 'gp-a', userId: 'pa', yellow: 1, red: 1 }] });
+    await new SuspensionNoticeProjectionService().project(tx, REVISION);
+    expect(new Set(created.map((row) => row.title))).toEqual(new Set(['다음 경기에 못 뛰는 선수가 있어요']));
+    expect(String(created[0].body)).toContain('선수pa');
+  });
+
   it('다음 경기가 없는 팀(B)에는 알리지 않고, 알림을 끈 수신자는 거른다', async () => {
     const { tx, created } = fakeTx({ ...BASE_WORLD, optedOut: ['director'] });
     await new SuspensionNoticeProjectionService().project(tx, REVISION);

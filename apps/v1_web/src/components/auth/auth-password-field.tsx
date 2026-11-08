@@ -16,7 +16,7 @@ type Props = {
   feedback?: { kind: 'error' | 'success'; message: string } | null;
 };
 
-/** 보기/숨기기 토글이 붙은 비밀번호 입력칸. 가입과 이메일 로그인 연결이 같은 칸을 쓴다. */
+/** 보기/숨기기 토글이 붙은 비밀번호 입력칸. 가입·이메일 로그인 연결·비밀번호 재설정이 같은 칸을 쓴다. */
 export function AuthPasswordField({ label, value, onChange, placeholder, autoComplete = 'new-password', feedback = null }: Props) {
   const inputId = useId();
   const feedbackId = useId();

@@ -1,6 +1,9 @@
 /** 번호가 이미 다른 계정에 등록돼 있다는 409 코드. */
 export const PHONE_CONFLICT_CODE = 'PHONE_CONFLICT';
 
+/** 탈퇴를 신청해 유예 중인 계정이라는 403 코드(로그인·비밀번호 재설정 거절). 화면이 탈퇴 안내로 이어 주는 설계된 상태다. */
+export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
+
 /** 409 `details.next` — 원래 계정으로 로그인하면 이 소셜 로그인이 그 계정에 연결된다. */
 export const SIGN_IN_THEN_LINK_NEXT = 'sign_in_then_link';
 

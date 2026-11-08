@@ -12,22 +12,29 @@ import {
   useV1FindAccountByEmail,
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
+import { ACCOUNT_WITHDRAWAL_PENDING_CODE } from '@/lib/auth-error-codes';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { AuthStepHeader } from './auth-step-header';
+import { AuthPasswordField } from './auth-password-field';
 import { AuthStepCta } from './auth-step-cta';
 import { describeFoundAccount } from './found-account-login';
 import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
+import { LoginMethodChips } from './login-method-chips';
 import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
+import { usePasswordFeedback } from './use-password-feedback';
 import styles from './account-recovery.module.css';
 
 type Mode = 'find-id' | 'reset-password';
+
 type FindMethod = 'phone' | 'email';
-type RecoveryStep = 'purpose' | 'method' | 'identity' | 'verify' | 'result' | 'password' | 'complete';
+type RecoveryStep = 'purpose' | 'method' | 'identity' | 'verify' | 'result' | 'mailbox' | 'mailbox-verify' | 'password' | 'complete';
+
+const EMAIL_CODE_NOTE = '가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나 스팸함을 확인해 주세요.';
 
 /**
  * 인증 카드를 띄울지 정하는 가벼운 형식 확인. 최종 판정은 서버(class-validator)가 하고,
@@ -45,7 +52,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword,
   onResetPassword: () => void;
   showRecycledNumberHelp: boolean;
 }) {
-  const { label, value, socialNames, appleUnavailable, links } = describeFoundAccount(account, { emailLoginHref, loginHref });
+  const { label, maskedEmail, methods, socialNames, appleUnavailable, links } = describeFoundAccount(account, { emailLoginHref, loginHref });
   let guidance: string | null = null;
   if (!account.hasPassword) {
     guidance = socialNames
@@ -58,7 +65,9 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword,
   return (
     <Card pad={16} className="tm-auth-soft-card">
       <div className="tm-text-body-lg">{label}</div>
-      {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
+      {maskedEmail
+        ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{maskedEmail}</div>
+        : methods.length > 0 ? <LoginMethodChips methods={methods} /> : null}
       {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
       {appleUnavailable ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
@@ -90,6 +99,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
   redirectPath?: string | null;
 }) {
   const fieldId = useId();
+  const mailboxOfferNoteId = useId();
   const redirect = sanitizeRedirectPath(redirectPath);
   const loginHref = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login';
   const emailLoginHref = redirect ? `/login/email?redirect=${encodeURIComponent(redirect)}` : '/login/email';
@@ -111,8 +121,12 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
    * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다. 응답은 어느 제공자인지 알려 주지 않는다.
    */
   const [resetBlockedSocialOnly, setResetBlockedSocialOnly] = useState(false);
+  // 번호 인증 결과에서 "이메일로 한 번 더 확인하기"를 눌러 이메일 단계에 들어와 있는지, 입력한 이메일이 찾은 계정의 것이 아니었는지.
+  const [detailRequested, setDetailRequested] = useState(false);
+  const [mailboxMismatch, setMailboxMismatch] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const passwordRule = usePasswordFeedback(newPassword);
   const [resetDone, setResetDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(false);
@@ -161,10 +175,34 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     setFound(null);
     setEmailProofToken(null);
     setResetBlockedSocialOnly(false);
+    setDetailRequested(false);
+    setMailboxMismatch(false);
     setNewPassword('');
     setPasswordConfirm('');
     setResetDone(false);
     setError(null);
+  };
+
+  // 이메일 증명만 새로 시작한다. 번호 증명과 번호로 찾은 결과는 그대로 둬서 앞 단계로 돌아가도 문자 인증을 다시 하지 않는다.
+  const restartMailboxProof = () => {
+    emailRequestGeneration.current += 1;
+    setEmailFlowGeneration(emailRequestGeneration.current);
+    setEmailProofToken(null);
+  };
+
+  const startMailboxCheck = () => {
+    restartMailboxProof();
+    setError(null);
+    setMailboxMismatch(false);
+    setDetailRequested(true);
+    setStep('mailbox');
+  };
+
+  const changeMailboxEmail = (value: string) => {
+    restartMailboxProof();
+    setError(null);
+    setMailboxMismatch(false);
+    setEmailInput(value);
   };
 
   const switchMode = (next: Mode) => {
@@ -202,15 +240,21 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     if (!token || !mounted.current || emailFlowGeneration !== emailRequestGeneration.current) return;
     setEmailProofToken(token);
     setError(null);
-    if (mode === 'reset-password') {
-      if (!returnToSettings || (currentAccount.data && normalizedEmail === accountEmail.trim().toLowerCase())) setStep('password');
+    if (mode === 'reset-password' && returnToSettings) {
+      // 로그인한 사람의 계정은 탈퇴 신청 중일 수 없어 조회 없이 바로 비밀번호 단계로 간다.
+      if (currentAccount.data && normalizedEmail === accountEmail.trim().toLowerCase()) setStep('password');
       return;
     }
-    if (findMethod !== 'email') return;
+    if (mode === 'find-id' && findMethod !== 'email') return;
     const lookupGeneration = emailRequestGeneration.current;
     try {
       const account = await findAccountByEmail.mutateAsync({ email: normalizedEmail, proofToken: token });
       if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      // 탈퇴 신청 중인 계정은 비밀번호를 바꿀 수 없으므로 비밀번호 단계로 보내지 않고 탈퇴 안내를 보여 준다.
+      if (mode === 'reset-password' && !account.withdrawalPending) {
+        setStep('password');
+        return;
+      }
       setFound(account);
       setStep('result');
     } catch (err) {
@@ -225,6 +269,40 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     }
   };
 
+  // 번호로 찾은 결과에 같은 계정의 이메일 증명을 더해 다시 조회한다.
+  const onMailboxVerified = async (token?: string) => {
+    if (!token || !mounted.current || !proofToken || emailFlowGeneration !== emailRequestGeneration.current) return;
+    setEmailProofToken(token);
+    setError(null);
+    const lookupGeneration = emailRequestGeneration.current;
+    try {
+      const account = await findAccount.mutateAsync({ phone: phoneDigits, proofToken, email: normalizedEmail, emailProofToken: token });
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      if (account.maskedEmail === null) {
+        // 다른 계정의 이메일이면 서버는 이메일 증명이 없는 것과 같은 답을 준다. 어느 쪽이 틀렸는지는 알 수 없고, 알리지도 않는다.
+        restartMailboxProof();
+        setMailboxMismatch(true);
+        setStep('mailbox');
+        return;
+      }
+      setFound(account);
+      setStep('result');
+    } catch (err) {
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      const code = extractErrorCode(err);
+      if (code === 'EMAIL_NOT_VERIFIED') restartMailboxProof();
+      if (code === 'PHONE_NOT_VERIFIED') {
+        // 문자 인증이 만료됐다 — 이메일 쪽을 다시 해도 소용없으니 처음부터 다시 인증하게 한다.
+        const message = extractErrorMessage(err, '휴대폰 본인인증을 다시 진행해 주세요.');
+        resetProgress();
+        setStep('identity');
+        setError(message);
+        return;
+      }
+      setError(extractErrorMessage(err, '계정을 찾지 못했어요.'));
+    }
+  };
+
   const resetting = resetPasswordByEmail.isPending;
   // 날짜를 모르거나 이미 지났으면 일반 결과 카드다 — 그 계정으로 로그인해도 403 이 탈퇴 취소 화면으로 이어 준다.
   const withdrawalGraceEnd = found ? usableWithdrawalDate(found.withdrawalPendingUntil) : null;
@@ -234,7 +312,9 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
   const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data
     && normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase());
   const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !resetBlockedSocialOnly && !resetDone;
-  const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
+  const passwordMismatch = passwordConfirm.length > 0 && newPassword !== passwordConfirm;
+  const passwordMatch = passwordConfirm.length > 0 && newPassword === passwordConfirm;
+  const passwordReady = passwordRule.usable && passwordMatch;
 
   const submitReset = async () => {
     if (!mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current
@@ -253,6 +333,12 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
         setStep('result');
         return;
       }
+      // 인증한 뒤에 탈퇴를 신청한 계정 — 조회를 다시 해서 같은 탈퇴 안내로 간다(그 사이 활성으로 돌아왔다면 비밀번호 단계에 남는다).
+      if (extractErrorCode(err) === ACCOUNT_WITHDRAWAL_PENDING_CODE) {
+        await onEmailVerified(emailProofToken);
+        return;
+      }
+      if (passwordRule.rejectIfTooCommon(err)) return;
       setError(extractErrorMessage(err, '비밀번호를 바꾸지 못했어요.'));
     }
   };
@@ -260,7 +346,8 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
   const flow: RecoveryStep[] = mode === 'find-id'
     ? ['purpose', 'method', 'identity', 'verify', 'result']
     : ['purpose', 'identity', 'verify', 'password', 'complete'];
-  const visibleFlow = initialMode ? flow.filter((item) => item !== 'purpose') : flow;
+  const mailboxFlow: RecoveryStep[] = ['mailbox', 'mailbox-verify', 'result'];
+  const visibleFlow = detailRequested ? mailboxFlow : initialMode ? flow.filter((item) => item !== 'purpose') : flow;
   const progressStep = mode === 'reset-password' && step === 'result' ? 'password' : step;
   const progressIndex = Math.max(0, visibleFlow.indexOf(progressStep));
   const phoneFlow = mode === 'find-id' && findMethod === 'phone';
@@ -274,23 +361,39 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     result: mode === 'find-id'
       ? { title: '가입한 방법을 찾았어요', sub: '확인한 로그인 방법으로 계속해 주세요.' }
       : { title: '로그인 방법을 확인해 주세요' },
+    mailbox: { title: '가입한 이메일을 입력해 주세요', sub: '이메일로 인증번호를 보내 드려요. 이 번호로 찾은 계정의 이메일이어야 해요.' },
+    'mailbox-verify': { title: '인증번호를 입력해 주세요', sub: '입력한 이메일로 인증번호를 받아 주세요.' },
     password: { title: '새 비밀번호를 정해 주세요', sub: '8자 이상으로 입력해 주세요.' },
     complete: { title: '비밀번호를 바꿨어요', sub: returnToSettings ? '현재 계정의 비밀번호를 바꿨어요.' : '새 비밀번호로 로그인해 주세요.' },
   };
   const firstStep = step === 'purpose' || Boolean(initialMode === mode && step === 'identity');
   const previousStep = () => {
+    // 이메일 확인 단계에서는 번호 인증과 번호로 찾은 결과를 지키고 이메일 증명만 걷는다.
+    if (step === 'mailbox-verify' || step === 'mailbox') {
+      restartMailboxProof();
+      setError(null);
+      if (step === 'mailbox') {
+        setMailboxMismatch(false);
+        setDetailRequested(false);
+      }
+      setStep(step === 'mailbox' ? 'result' : 'mailbox');
+      return;
+    }
     resetProgress();
     if (step === 'method') setStep('purpose');
     else if (step === 'identity') setStep(mode === 'find-id' ? 'method' : 'purpose');
     else setStep('identity');
   };
-  const nextDisabled = !ready || (step === 'identity' && (phoneFlow ? phoneDigits.length !== 11 : !looksLikeEmail(emailInput)));
+  const nextDisabled = !ready
+    || (step === 'identity' && (phoneFlow ? phoneDigits.length !== 11 : !looksLikeEmail(emailInput)))
+    || (step === 'mailbox' && !looksLikeEmail(emailInput));
   const next = () => {
     if (step === 'purpose') switchMode(mode);
     else if (step === 'method') setStep('identity');
     else if (step === 'identity' && !nextDisabled) setStep('verify');
+    else if (step === 'mailbox' && !nextDisabled) setStep('mailbox-verify');
   };
-  const fixedAction = ['purpose', 'method', 'identity'].includes(step)
+  const fixedAction = ['purpose', 'method', 'identity', 'mailbox'].includes(step)
     ? <AuthStepCta action={{ label: '다음', disabled: nextDisabled, loading: !ready, onClick: next }} hint={ready ? null : '화면을 준비하고 있어요.'} />
     : undefined;
 
@@ -354,19 +457,52 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
           {step === 'verify' && !phoneFlow && !emailProofToken ? (
             <>
               <EmailVerificationCard key={emailFlowGeneration} email={normalizedEmail} surface="plain" onVerified={(token) => void onEmailVerified(token)} />
-              <p className="tm-text-caption" style={{ margin: 0 }}>가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나 스팸함을 확인해 주세요.</p>
+              <p className="tm-text-caption" style={{ margin: 0 }}>{EMAIL_CODE_NOTE}</p>
             </>
           ) : null}
-          {step === 'verify' && (findAccount.isPending || findAccountByEmail.isPending) ? (
+
+          {step === 'mailbox' ? (
+            <>
+              <label className="tm-auth-field" htmlFor={`${fieldId}-mailbox`}>
+                <span className="tm-text-label">이메일</span>
+                <input id={`${fieldId}-mailbox`} autoComplete="email" className="tm-input tm-auth-input" inputMode="email" placeholder="you@example.com" type="email" value={emailInput} onChange={(event) => changeMailboxEmail(event.target.value)} />
+              </label>
+              {mailboxMismatch ? (
+                <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
+                  <div className="tm-text-body-lg">찾은 계정의 이메일이 아니에요</div>
+                  <div className="tm-text-caption" role="alert">다른 이메일로 다시 입력해 주세요. 이메일이 기억나지 않으면 고객센터에 알려 주세요.</div>
+                  <Link className="tm-btn tm-btn-sm tm-btn-ghost tm-btn-block" href="/contact">고객센터에 알려 주세요</Link>
+                </Card>
+              ) : null}
+            </>
+          ) : null}
+          {step === 'mailbox-verify' && !emailProofToken ? (
+            <>
+              <EmailVerificationCard key={emailFlowGeneration} email={normalizedEmail} surface="plain" submitLabel="인증하고 보기" onVerified={(token) => void onMailboxVerified(token)} />
+              <p className="tm-text-caption" style={{ margin: 0 }}>{EMAIL_CODE_NOTE}</p>
+            </>
+          ) : null}
+
+          {(step === 'verify' || step === 'mailbox-verify') && (findAccount.isPending || findAccountByEmail.isPending) ? (
             <p className="tm-text-body" role="status">가입한 로그인 방법을 확인하고 있어요.</p>
           ) : null}
 
-          {step === 'result' && found && mode === 'find-id' ? (
-            withdrawalGraceEnd !== null ? (
-              <FoundAccountWithdrawalGuide account={found} until={withdrawalGraceEnd} emailLoginHref={emailLoginHref} loginHref={loginHref} />
+          {step === 'result' && found && (mode === 'find-id' || found.withdrawalPending) ? (
+            found.withdrawalPending ? (
+              <FoundAccountWithdrawalGuide account={found} until={withdrawalGraceEnd} emailLoginHref={emailLoginHref} loginHref={loginHref} via={phoneFlow ? 'phone' : 'email'} />
             ) : (
-              <FoundAccountCard account={found} emailLoginHref={emailLoginHref} loginHref={loginHref} onResetPassword={() => switchMode('reset-password')} showRecycledNumberHelp={findMethod === 'phone'} />
+              <FoundAccountCard account={found} emailLoginHref={emailLoginHref} loginHref={loginHref} onResetPassword={() => switchMode('reset-password')} showRecycledNumberHelp={phoneFlow} />
             )
+          ) : null}
+
+          {/* 번호 인증만으로는 마스킹 이메일과 삭제 예정일을 알리지 않는다 — 메일함까지 확인한 사람에게만 상세 결과를 보여 준다. 이메일이 없는 계정은 확인할 메일함이 없어 권하지 않는다. */}
+          {step === 'result' && found && phoneFlow && found.maskedEmail === null && found.emailProofAvailable ? (
+            <div className={styles.mailboxOffer}>
+              <Button aria-describedby={mailboxOfferNoteId} block onClick={startMailboxCheck} size="lg" type="button" variant="neutral">이메일로 한 번 더 확인하기</Button>
+              <p id={mailboxOfferNoteId} className="tm-text-caption">
+                {found.withdrawalPending ? '확인하면 가입한 이메일과 삭제 예정일을 볼 수 있어요.' : '확인하면 가입한 이메일을 볼 수 있어요.'}
+              </p>
+            </div>
           ) : null}
 
           {step === 'result' && mode === 'reset-password' && resetBlockedSocialOnly ? (
@@ -379,15 +515,24 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
 
           {step === 'password' && passwordFormVisible ? (
             <>
-              <label className="tm-auth-field" htmlFor={`${fieldId}-password`}>
-                <span className="tm-text-label">새 비밀번호</span>
-                <input id={`${fieldId}-password`} className="tm-input tm-auth-input" onChange={(event) => setNewPassword(event.target.value)} placeholder="8자 이상" type="password" value={newPassword} />
-              </label>
-              <label className="tm-auth-field" htmlFor={`${fieldId}-password-confirm`}>
-                <span className="tm-text-label">새 비밀번호 확인</span>
-                <input id={`${fieldId}-password-confirm`} className="tm-input tm-auth-input" onChange={(event) => setPasswordConfirm(event.target.value)} placeholder="비밀번호 다시 입력" type="password" value={passwordConfirm} />
-                {passwordConfirm.length > 0 && newPassword !== passwordConfirm ? <span className="tm-text-caption tm-auth-field-helper-error" role="alert">비밀번호가 일치하지 않아요.</span> : null}
-              </label>
+              <AuthPasswordField
+                label="새 비밀번호"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="8자 이상"
+                feedback={passwordRule.feedback}
+              />
+              <AuthPasswordField
+                label="새 비밀번호 확인"
+                value={passwordConfirm}
+                onChange={setPasswordConfirm}
+                placeholder="비밀번호 다시 입력"
+                feedback={passwordMismatch
+                  ? { kind: 'error', message: '비밀번호가 일치하지 않아요.' }
+                  : passwordMatch
+                    ? { kind: 'success', message: '비밀번호가 일치해요.' }
+                    : null}
+              />
               <Button block disabled={!passwordReady} loading={resetting} onClick={() => void submitReset()} size="lg" type="button" variant={passwordReady ? 'primary' : 'neutral'}>비밀번호 바꾸기</Button>
             </>
           ) : null}
@@ -402,7 +547,10 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
             <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
               <div className="tm-text-body-lg">계정을 확인하지 못했어요</div>
               <div className="tm-text-caption" role="alert">{error}</div>
-              {step === 'verify' && mode === 'find-id' && findMethod === 'email' && emailProofToken ? (
+              {step === 'mailbox-verify' && emailProofToken ? (
+                <Button type="button" variant="neutral" size="sm" loading={findAccount.isPending} onClick={() => void onMailboxVerified(emailProofToken)}>다시 확인하기</Button>
+              ) : null}
+              {step === 'verify' && !phoneFlow && !returnToSettings && emailProofToken ? (
                 <Button type="button" variant="neutral" size="sm" loading={findAccountByEmail.isPending} onClick={() => void onEmailVerified(emailProofToken)}>다시 확인하기</Button>
               ) : null}
               {step === 'verify' && phoneFlow && proofToken ? (
@@ -412,7 +560,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
           ) : null}
         </div>
 
-        {(!returnToSettings && step === 'identity') || (step === 'result' && mode === 'find-id' && withdrawalGraceEnd !== null && found?.hasPassword) ? (
+        {(!returnToSettings && step === 'identity') || (step === 'result' && mode === 'find-id' && found?.withdrawalPending && found.hasPassword) ? (
           <div className={styles.alternative}>
             <span>{mode === 'find-id' ? '비밀번호를 잊으셨나요?' : '가입한 로그인 방법이 궁금하신가요?'}</span>
             <button type="button" disabled={!ready} onClick={() => switchMode(mode === 'find-id' ? 'reset-password' : 'find-id')}>

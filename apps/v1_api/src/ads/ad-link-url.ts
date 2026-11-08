@@ -13,6 +13,7 @@ const CARRIER_GRADE_NAT = /^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./u;
 /** First path segments the web app owns for itself; an ad must not send people there. */
 const RESERVED_FIRST_SEGMENTS = new Set(['admin', 'api', 'uploads', 'tournament-ops']);
 const MAX_DECODE_ROUNDS = 4;
+const IN_APP_BASE = 'https://app.invalid';
 
 /**
  * True when the in-app path, once percent-decoding and dot segments are applied the way a browser and the
@@ -36,7 +37,10 @@ function isReservedInternalPath(value: string): boolean {
     path = decoded;
   }
   if (path.startsWith('//') || path.includes('\\') || CONTROL_CHARACTERS.test(path)) return true;
-  const firstSegment = new URL(path, 'https://app.invalid').pathname.split('/')[1] ?? '';
+  // Dot segments can normalize into a protocol-relative path: `/..//evil.example` becomes `//evil.example`.
+  const resolved = new URL(path, IN_APP_BASE);
+  if (resolved.origin !== IN_APP_BASE || resolved.pathname.startsWith('//')) return true;
+  const firstSegment = resolved.pathname.split('/')[1] ?? '';
   return RESERVED_FIRST_SEGMENTS.has(firstSegment.toLowerCase());
 }
 

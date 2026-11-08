@@ -229,3 +229,25 @@ describe('unknown competition kind', () => {
     expect(within(screen.getByRole('dialog', { name: '대회 운영 메뉴' })).queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
   });
 });
+
+describe('TournamentOpsShell 대회 커버 엠블럼', () => {
+  const emblems = (container: HTMLElement) => Array.from(container.querySelectorAll('img'));
+
+  it('업로드한 커버는 엠블럼 크기에 맞춘 폭으로 최적화기를 거쳐 받는다', () => {
+    const { container } = render(
+      <TournamentOpsShell tournamentId="t-1" role="TOURNAMENT_DIRECTOR" origin="staff" tournamentCoverImageUrl="/uploads/2026/11/cover.jpg"><div>content</div></TournamentOpsShell>,
+    );
+    const [emblem] = emblems(container);
+    const src = new URL(emblem.getAttribute('src') ?? '', 'http://localhost');
+    expect(src.pathname).toBe('/_next/image');
+    expect(src.searchParams.get('url')).toBe('/uploads/2026/11/cover.jpg');
+    expect(Number(src.searchParams.get('w'))).toBeLessThanOrEqual(128);
+  });
+
+  it('외부 커버 URL 은 최적화기로 보내지 않는다', () => {
+    const { container } = render(
+      <TournamentOpsShell tournamentId="t-1" role="TOURNAMENT_DIRECTOR" origin="staff" tournamentCoverImageUrl="https://images.example.com/cover.jpg"><div>content</div></TournamentOpsShell>,
+    );
+    expect(emblems(container)[0]).toHaveAttribute('src', 'https://images.example.com/cover.jpg');
+  });
+});

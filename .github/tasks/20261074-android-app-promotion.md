@@ -5,24 +5,24 @@ Status: Review — implementation validated; alpha deployment pending
 **Created**: 2026-10-12
 
 ## Context
-기존 앱 안내 시트는 iPhone만 허용하고 Android Chrome을 제외했다.
+기존 앱 안내 시트는 iPhone만 허용하고 Android Chrome을 제외했다. 이후 MD-QA #223 결정으로 큰 바텀시트는 위쪽 얇은 배너(`open-in-app-banner.tsx`)로 바뀌었고, 두 OS 지원과 스토어 링크 계약은 그대로 이어진다.
 
 ## Goal
-iPhone과 Android 웹에서 기존 안내 시트를 표시하고 각 OS의 공식 스토어로 연결한다.
+iPhone과 Android 웹에서 앱 안내를 표시하고 각 OS의 공식 스토어로 연결한다.
 
 ## Original Conditions
-- [x] Android에도 기존 안내 시트를 제공한다.
+- [x] Android에도 앱 안내를 제공한다.
 - [x] iOS: https://apps.apple.com/kr/app/id6809736050
 - [x] Android: https://play.google.com/store/apps/details?id=kr.co.teameet
 
 ## User Scenarios
-iPhone 또는 Android 브라우저로 일반 화면을 방문하면 1.5초 후 안내가 표시된다. 앱으로 열기를 누르면 OS에 맞는 스토어로 이동한다. 웹으로 계속 보기를 누르면 같은 세션에서 다시 표시되지 않는다.
+iPhone 또는 Android 브라우저로 일반 화면을 방문하면 화면 맨 위에 얇은 배너가 바로 표시된다. 앱으로 열기를 누르면 OS에 맞는 스토어로 이동한다. 닫기나 앱으로 열기를 누르면 7일 동안(localStorage) 다시 표시되지 않는다.
 
 ## Test Scenarios
-- [x] iPhone Safari / Android Chrome의 지연 표시와 실제 링크 href
+- [x] iPhone Safari / Android Chrome의 즉시 표시와 실제 링크 href
 - [x] 양쪽 네이티브 셸 및 데스크톱 제외
-- [x] 인증·운영 경로 제외와 세션 내 닫힘 유지
-- [x] 스토어 링크 클릭 후 시트 닫힘
+- [x] 인증·운영 경로 제외와 7일 닫힘 유지
+- [x] 스토어 링크 클릭 후 배너 닫힘
 - API 및 fixture 변경 없음
 
 ## Parallel Work Breakdown
@@ -48,7 +48,7 @@ dev 배포 전 alpha에는 변경이 반영되지 않는다. 링크는 스토어
 ## Progress Snapshot
 최신 origin/dev(37a06cea0) 기반 fix/android-app-promotion 작업트리에서 구현했다.
 
-- `node node_modules/vitest/vitest.mjs run src/components/app-promotion/open-in-app-sheet.test.tsx --maxWorkers=1 --no-file-parallelism`: 16/16 통과.
+- `node node_modules/vitest/vitest.mjs run src/components/app-promotion/open-in-app-banner.test.tsx --maxWorkers=1 --no-file-parallelism`: 28/28 통과(배너 전환 뒤 기준).
 - `node node_modules/typescript/bin/tsc --noEmit --incremental false`: 종료 코드 0.
 - `git diff --check`: 통과. 삭제한 `isIosMobileUserAgent` 참조 및 touched path 부채 marker 없음.
 - Windows에서 기존 공유 의존성이 실행 불가능하여 작업트리 안에 웹 의존성을 frozen lockfile / ignore-scripts로 설치했다. 기존 공유 파일 및 의존성은 수정하지 않았다.

@@ -229,3 +229,45 @@ describe('assertPenaltyShootoutPersistable — 두 레인이 공유하는 단일
     ).toThrow(UnprocessableEntityException);
   });
 });
+
+// 메시지는 API 호출자가 고칠 필드 이름을 그대로 짚어야 하고, 한국어 해요체여야 한다.
+describe('저장 게이트 거절 응답 — 코드와 한국어 안내', () => {
+  function rejectionOf(operation: () => void): { status: number; code: unknown; message: unknown } {
+    let caught: unknown;
+    try {
+      operation();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(UnprocessableEntityException);
+    const exception = caught as UnprocessableEntityException;
+    const body = exception.getResponse() as { code?: unknown; message?: unknown };
+    return { status: exception.getStatus(), code: body.code, message: body.message };
+  }
+
+  it('킥 수가 없으면 422 TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED 와 보낼 필드를 짚는 안내', () => {
+    expect(
+      rejectionOf(() => assertPenaltyShootoutPersistable({ home: 9, away: 0 }, A2, { requireKickCounts: true })),
+    ).toEqual({
+      status: 422,
+      code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+      message: '승부차기를 기록하려면 양 팀이 찬 킥 수(penalties.takenHome, penalties.takenAway)를 함께 보내 주세요.',
+    });
+  });
+
+  it('규칙상 미결이면 422 TOURNAMENT_PENALTY_UNDECIDED 와 operatorOverride 안내', () => {
+    expect(
+      rejectionOf(() =>
+        assertPenaltyShootoutConcluded(
+          { home: 1, away: 0, takenHome: 1, takenAway: 0, firstKickSideKey: 'HOME' },
+          A2,
+        ),
+      ),
+    ).toEqual({
+      status: 422,
+      code: 'TOURNAMENT_PENALTY_UNDECIDED',
+      message:
+        '이 대회 규칙으로는 승부차기 승자가 아직 정해지지 않았어요. 킥 수와 점수를 확인하거나, 운영자가 결과를 직접 정한다면 penalties.operatorOverride를 true로 보내 주세요.',
+    });
+  });
+});

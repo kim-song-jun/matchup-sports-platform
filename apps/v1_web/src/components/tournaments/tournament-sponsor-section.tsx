@@ -3,10 +3,14 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Card } from '@/components/v1-ui/primitives';
+import { isOptimizableImagePath } from '@/lib/assets';
 import { displayInitials } from '@/lib/display-initials';
 import { Handshake } from 'lucide-react';
 import type { V1TournamentSponsor } from '@/types/api';
 import styles from './tournament-sponsor-section.module.css';
+
+/** `.logo` 의 44×44 — module.css 와 같아야 한다. */
+const LOGO_SIZE = 44;
 
 type SponsorFact = {
   label: string;
@@ -159,16 +163,17 @@ function makeLink(label: string, href: string | null): SponsorLink | null {
  */
 function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
   const [errored, setErrored] = useState(false);
-  const showImage = Boolean(logoUrl) && !errored;
+  const imageUrl = errored ? null : logoUrl;
 
   return (
     <div aria-hidden="true" className={styles.logo}>
-      {showImage ? (
+      {imageUrl ? (
         <Image
-          src={logoUrl as string}
+          src={imageUrl}
           alt=""
-          width={176}
-          height={176}
+          width={LOGO_SIZE}
+          height={LOGO_SIZE}
+          unoptimized={!isOptimizableImagePath(imageUrl)}
           className={styles.logoImage}
           onError={() => setErrored(true)}
         />

@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { getV1ApiBaseUrl, v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
@@ -105,6 +107,9 @@ import type {
   V1LinkEmailVerifyResult,
   V1LinkPendingPayload,
   V1LinkSocialResult,
+  V1RevokeOtherSessionsResult,
+  V1UnlinkLoginMethodPayload,
+  V1UnlinkLoginMethodResult,
   V1PhoneVerifyResult,
   V1EmailLoginResult,
   V1LoginStepUpResendResult,
@@ -434,6 +439,25 @@ export function useV1LinkEmailComplete() {
 }
 
 /**
+ * 로그인 수단을 뗀다. 서버가 다른 기기를 모두 로그아웃시키고 이 기기의 쿠키만 새로 발급하므로 같은 계정으로 계속 쓴다 —
+ * 연결 훅과 같은 곳(로그인 수단 목록을 담은 스냅샷, 서버가 남기는 알림)만 새로 읽는다.
+ */
+export function useV1UnlinkLoginMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UnlinkLoginMethodPayload) => v1Post<V1UnlinkLoginMethodResult>('/auth/identities/unlink', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 이 기기를 뺀 모든 기기에서 로그아웃한다. 읽어 둔 데이터는 그대로라 새로 읽을 것이 없다. */
+export function useV1RevokeOtherSessions() {
+  return useMutation({
+    mutationFn: () => v1Post<V1RevokeOtherSessionsResult>('/auth/sessions/revoke-others'),
+  });
+}
+
+/**
  * 탈퇴 신청을 철회하고 세션을 받는다(로그인 응답과 같은 모양).
  * 로그인 훅과 같은 규칙으로 응답을 인증 스냅샷에 넣는다 — 세션 힌트 저장과 `clearV1IdentityCache` 는 호출한 화면이 한다.
  */
@@ -520,9 +544,13 @@ export function useV1PhoneVerify() {
   });
 }
 
+/**
+ * 번호로 계정을 찾는다. `email`+`emailProofToken`(이메일 인증 `proofToken`)을 함께 보내면, 그 메일함이 찾은 계정
+ * 자신의 이메일일 때에 한해 응답이 마스킹된 이메일과 탈퇴 종료일까지 채운다. 둘 중 하나만 보내면 400이다.
+ */
 export function useV1FindAccountByPhone() {
   return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
+    mutationFn: (body: { phone: string; proofToken: string; email?: string; emailProofToken?: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
   });
 }
@@ -638,6 +666,7 @@ export function useV1DeferOnboarding() {
 }
 
 export function useV1MasterSports(options?: { seed?: V1Sport[] }) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.masterSports(),
     queryFn: async () => {
@@ -1138,6 +1167,7 @@ export function useV1TeamRecentVenues(teamId: string) {
 }
 
 export function useV1Team(teamId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.team(teamId),
     queryFn: () => v1Get<V1Team>(`/teams/${teamId}`),
@@ -2514,6 +2544,7 @@ export function useV1LineupTodos(options?: { enabled?: boolean }) {
  * 라인업 할 일(`useV1LineupTodos`)과 **같은 수집 경로**지만 완료된 라인업도 온다.
  * 할 일 규칙을 그대로 쓰면 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다.
  * 알려진 한계: 서버가 지금 시각 기준 앞으로의 경기만 모은다 — 끝난 경기는 오지 않는다.
+ * 시각이 아직 정해지지 않은 대회 경기는 `scheduledAt` 이 null 이고 시각 있는 경기 뒤에 대회 진행 순서로 온다.
  */
 export type V1TeamUpcomingGame = {
   gameId: string;
@@ -2682,6 +2713,7 @@ export function useV1MyTournamentFixtures(tournamentId: string, options?: { enab
 }
 
 export function useV1GameLineups(gameId: string | null, options?: { enabled?: boolean }) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.gameLineups(gameId ?? ''),
     queryFn: () => v1Get<GameLineup[]>(`/games/${gameId}/lineups`),
@@ -2964,6 +2996,7 @@ export function useV1NotificationsInfinite() {
 }
 
 export function useV1NotificationUnreadSummary(options?: QueryOptions) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.notificationUnreadSummary(),
     queryFn: () => v1Get<V1NotificationsPage>('/notifications', { status: 'unread', limit: 1 }),
@@ -3258,6 +3291,7 @@ export function chatMessageFileUrl(roomId: string, messageId: string) {
 }
 
 export function useV1UploadImages(options?: CompressOptions) {
+  const { v1MultipartPost } = useV1DataSource();
   return useMutation({
     mutationFn: async (files: File | File[] | FileList) => {
       const formData = new FormData();
@@ -3321,6 +3355,7 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
 // ---------------------------------------------------------------------------
 
 export function useV1AdminMe() {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminMe(),
     queryFn: () => v1Get<V1AdminMe>('/admin/me'),
@@ -3390,6 +3425,7 @@ export function useV1AdminTeam(teamId: string) {
 }
 
 export function useV1AdminPopups(filters?: AdminListFilters) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminPopups(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminPopupRow>>('/admin/popups', filters),
@@ -3397,6 +3433,7 @@ export function useV1AdminPopups(filters?: AdminListFilters) {
 }
 
 export function useV1AdminPopupDetail(popupId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminPopup(popupId),
     queryFn: () => v1Get<V1AdminPopupDetailResult>(`/admin/popups/${popupId}`),
@@ -3802,6 +3839,7 @@ export function useV1ChangeTeamMatchStatus() {
 }
 
 export function useV1CreateAdminPopup() {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminPopupCreatePayload) =>
@@ -3814,6 +3852,7 @@ export function useV1CreateAdminPopup() {
 }
 
 export function useV1UpdateAdminPopup() {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ popupId, body }: { popupId: string; body: V1AdminPopupUpdatePayload }) =>
@@ -3827,6 +3866,7 @@ export function useV1UpdateAdminPopup() {
 }
 
 export function useV1DeleteAdminPopup() {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (popupId: string) => v1Delete<V1AdminPopupDeleteResult>(`/admin/popups/${popupId}`),
@@ -4243,6 +4283,7 @@ export function useV1Tournament(
   id: string,
   options?: { livePolling?: boolean; seed?: V1TournamentDetail | null },
 ) {
+  const { v1Get } = useV1DataSource();
   const livePolling = options?.livePolling ?? false;
   return useQuery({
     queryKey: v1Keys.tournament(id),
@@ -4347,6 +4388,7 @@ export function useV1SubmitTournamentReview(tournamentId: string) {
 
 /** 어드민: 어워드 조회 — 어드민 대회 상세 응답에는 awards가 포함되지 않아 별도 조회가 필요하다 */
 export function useV1AdminTournamentAwards(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: ['admin-tournament-awards', tournamentId],
     queryFn: () => v1Get<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`),
@@ -4356,6 +4398,7 @@ export function useV1AdminTournamentAwards(tournamentId: string) {
 
 /** 어드민: 어워드 설정 */
 export function useV1SetTournamentAwards(tournamentId: string) {
+  const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awards: {
@@ -4371,6 +4414,7 @@ export function useV1SetTournamentAwards(tournamentId: string) {
 
 /** 어드민: 상·하위 결선의 팀 시상 안내 조회 */
 export function useV1AdminTournamentAwardSets(tournamentId: string, enabled = true) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: ['admin-tournament-award-sets', tournamentId],
     queryFn: () => v1Get<V1AdminTournamentAwardSet[]>(`/admin/tournaments/${tournamentId}/award-sets`),
@@ -4380,6 +4424,7 @@ export function useV1AdminTournamentAwardSets(tournamentId: string, enabled = tr
 
 /** 어드민: 상·하위 결선 팀 시상 안내 저장 */
 export function useV1SetTournamentAwardSets(tournamentId: string) {
+  const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awardSets: V1TournamentAwardSetInput[]) =>
@@ -4396,6 +4441,7 @@ export function useV1AdminTournamentReviews(
   tournamentId: string,
   params?: { page?: number; pageSize?: number; search?: string },
 ) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: ['admin-tournament-reviews', tournamentId, params ?? {}],
     queryFn: () =>
@@ -4406,6 +4452,7 @@ export function useV1AdminTournamentReviews(
 
 /** 어드민: 리뷰 숨기기 */
 export function useV1HideReview(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ reviewId, reason }: { reviewId: string; reason?: string }) =>
@@ -4421,6 +4468,7 @@ export function useV1HideReview(tournamentId: string) {
 
 /** 어드민: 리뷰 다시 공개하기 */
 export function useV1UnhideReview(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ reviewId }: { reviewId: string }) =>
@@ -4588,6 +4636,7 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
  * 공개 랭킹과 달리 동의 게이팅이 없어 진짜 순위를 보장한다.
  */
 export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentPlayerRecords(tournamentId),
     queryFn: () =>
@@ -4598,6 +4647,7 @@ export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
 
 /** 어드민 전용 로스터 조회 — 팀 비멤버 어드민도 403 없이 조회 가능 (Task 110) */
 export function useV1AdminTournamentPlayers(registrationId: string) {
+  const { v1Api } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentRoster(registrationId),
     // 부모 화면 오류로 모달이 제거돼도 이전 열림의 개인정보 응답을 새 열림에 재사용하지 않는다.
@@ -4617,6 +4667,7 @@ export function useV1AdminTournamentPlayers(registrationId: string) {
  */
 /** 명단에 올릴 수 있는 팀원 목록. 어드민이 UUID 를 직접 입력하지 않아도 되게 한다. */
 export function useV1AdminRosterEligibleMembers(registrationId: string, enabled: boolean) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
     queryFn: () =>
@@ -4629,6 +4680,7 @@ export function useV1AdminRosterEligibleMembers(registrationId: string, enabled:
 }
 
 export function useV1AdminAddPlayer(registrationId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { userId: string; realName: string }) =>
@@ -4645,6 +4697,7 @@ export function useV1AdminAddPlayer(registrationId: string) {
 }
 
 export function useV1AdminRemovePlayer(registrationId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (playerId: string) => v1Delete(`/admin/players/${playerId}`),
@@ -4819,6 +4872,7 @@ type AdminTournamentListFilters = {
 };
 
 export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1AdminTournamentListPage>('/admin/tournaments', params),
@@ -4888,6 +4942,7 @@ export function useV1CreateMockTournament() {
 }
 
 export function useV1AdminTournament(id: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournament(id),
     queryFn: () => v1Get<V1Tournament>(`/admin/tournaments/${id}`),
@@ -4902,6 +4957,7 @@ export function useV1AdminTournament(id: string) {
  * 후보 목록을 하드코딩하지 않는다.
  */
 export function useV1LineupSizeOptions(sportId: string | null) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminLineupSizeOptions(sportId ?? ''),
     queryFn: () => v1Get<V1LineupSizeOptions>('/admin/competition-configs/lineup-size-options', { sportId }),
@@ -4921,6 +4977,7 @@ export function useV1CreateTournament() {
 }
 
 export function useV1UpdateTournament(id: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1UpdateTournamentPayload) =>
@@ -4934,6 +4991,7 @@ export function useV1UpdateTournament(id: string) {
 }
 
 export function useV1ChangeTournamentStatus(id: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1ChangeTournamentStatusPayload) =>
@@ -4952,6 +5010,7 @@ export function useV1ChangeTournamentStatus(id: string) {
  * 과거 시각은 서버가 400 `TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST` 로 거부한다.
  */
 export function useV1PublishTournamentBracket(id: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars?: { scheduledAt?: string }) =>
@@ -4969,6 +5028,7 @@ export function useV1PublishTournamentBracket(id: string) {
 
 /** 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다(비공개 전환). */
 export function useV1UnpublishTournamentBracket(id: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Post<V1UnpublishBracketResult>(`/admin/tournaments/${id}/unpublish-bracket`, {}),
@@ -4993,6 +5053,7 @@ export type V1AdminRegistrationsAll = {
  * 화면에서 통째로 누락되고 상태 칩 카운트·대기 배너도 실제보다 적게 잡혔었다.
  */
 export function useV1AdminTournamentRegistrations(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentRegistrations(tournamentId),
     queryFn: async (): Promise<V1AdminRegistrationsAll> => {
@@ -5017,6 +5078,7 @@ export function useV1AdminTournamentRegistrations(tournamentId: string) {
 }
 
 export function useV1ConfirmPayment() {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5037,6 +5099,7 @@ export function useV1ConfirmPayment() {
 }
 
 export function useV1ConfirmRegistration() {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5059,6 +5122,7 @@ export function useV1ConfirmRegistration() {
 }
 
 export function useV1CancelRegistrationAdmin() {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5082,6 +5146,7 @@ export function useV1CancelRegistrationAdmin() {
 
 /** 취소 요청 거부(잔류) — cancel_requested 상태만 허용, cancelPreviousStatus(없으면 confirmed)로 복원 */
 export function useV1RejectCancelRequest() {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ registrationId }: { registrationId: string }) =>
@@ -5098,6 +5163,7 @@ export function useV1RejectCancelRequest() {
 }
 
 export function useV1RosterLock() {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5118,6 +5184,7 @@ export function useV1RosterLock() {
 }
 
 export function useV1RosterUnlock() {
+  const { v1Api } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (registrationId: string) =>
@@ -5136,6 +5203,7 @@ export function useV1RosterUnlock() {
 
 /** 명단 제출 마감 예외 부여 — 마감이 지나도 해당 신청 팀은 명단을 계속 수정할 수 있게 한다 */
 export function useV1RosterDeadlineOverrideGrant() {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (registrationId: string) =>
@@ -5153,6 +5221,7 @@ export function useV1RosterDeadlineOverrideGrant() {
 
 /** 명단 제출 마감 예외 해제 */
 export function useV1RosterDeadlineOverrideRevoke() {
+  const { v1Api } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (registrationId: string) =>
@@ -5175,6 +5244,7 @@ export function useV1RosterDeadlineOverrideRevoke() {
  * convert `csv` to a Blob and trigger a file download.
  */
 export function useV1ExportRosterCsv(registrationId: string) {
+  const { v1Get } = useV1DataSource();
   return useMutation({
     mutationFn: () =>
       v1Get<V1ExportRosterCsvResult>(
@@ -5185,6 +5255,7 @@ export function useV1ExportRosterCsv(registrationId: string) {
 
 /** 대회(리그) 전체 명단 CSV — 팀별 export 와 같은 lazy 방식·같은 응답 형태. */
 export function useV1ExportTournamentRosterCsv(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useMutation({
     mutationFn: () =>
       v1Get<V1ExportRosterCsvResult>(`/admin/tournaments/${tournamentId}/players/export`),
@@ -5193,6 +5264,7 @@ export function useV1ExportTournamentRosterCsv(tournamentId: string) {
 
 /** 어드민 명단의 번호·GK 설정을 함께 저장한다. */
 export function useV1AdminUpdatePlayerSettings(registrationId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ playerId, ...body }: { playerId: string; jerseyNumber: number | null; goalkeeper?: boolean }) =>
@@ -5203,6 +5275,7 @@ export function useV1AdminUpdatePlayerSettings(registrationId: string) {
 
 /** registrationId로 명단 캐시를 갱신해 자격 변경을 즉시 보여준다. */
 export function useV1UpdatePlayerEligibility(registrationId?: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5228,6 +5301,7 @@ export function useV1UpdatePlayerEligibility(registrationId?: string) {
 // ---------------------------------------------------------------------------
 
 export function useV1CreateGroup(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateGroupPayload) =>
@@ -5242,6 +5316,7 @@ export function useV1CreateGroup(tournamentId: string) {
 }
 
 export function useV1AssignGroupTeam(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateGroupTeamPayload) =>
@@ -5255,6 +5330,7 @@ export function useV1AssignGroupTeam(tournamentId: string) {
 }
 
 export function useV1CreateBracketBye(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: import('@/types/api').V1CreateBracketByePayload) =>
@@ -5266,6 +5342,7 @@ export function useV1CreateBracketBye(tournamentId: string) {
 }
 
 export function useV1CreateFixture(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateFixturePayload) =>
@@ -5289,6 +5366,7 @@ export function useV1CreateFixture(tournamentId: string) {
  * 이 훅에서만 null을 얹어 확장한다.
  */
 export function useV1UpdateFixture(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5307,6 +5385,7 @@ export function useV1UpdateFixture(tournamentId: string) {
 
 /** 경기 삭제 (`DELETE /admin/fixtures/:id`) — 결과 있으면 409 */
 export function useV1DeleteFixture(tournamentId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
@@ -5319,18 +5398,24 @@ export function useV1DeleteFixture(tournamentId: string) {
 
 /** 조 이름·진출 팀 수 수정 (`PATCH /admin/groups/:id`) */
 export function useV1UpdateGroup(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ groupId, ...body }: { groupId: string; name?: string; advanceCount?: number }) =>
       v1Patch<V1AdminBracketGroup>(`/admin/groups/${groupId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: ['multi-finals', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['v1', 'public-game-records', 'schedule', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['v1', 'public-game-records', 'match', tournamentId] });
     },
   });
 }
 
 /** 조 삭제 (`DELETE /admin/groups/:id`) — 팀 배정·경기 있으면 409 */
 export function useV1DeleteGroup(tournamentId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (groupId: string) => v1Delete<{ deleted: boolean }>(`/admin/groups/${groupId}`),
@@ -5342,6 +5427,7 @@ export function useV1DeleteGroup(tournamentId: string) {
 
 /** 조 팀 배정 해제 (`DELETE /admin/group-teams/:id`) — 해당 순위 행도 정리 */
 export function useV1RemoveGroupTeam(tournamentId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (groupTeamId: string) => v1Delete<{ deleted: boolean }>(`/admin/group-teams/${groupTeamId}`),
@@ -5352,6 +5438,7 @@ export function useV1RemoveGroupTeam(tournamentId: string) {
 }
 
 export function useV1RecalculateStandings(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () =>
@@ -5372,9 +5459,10 @@ export function fetchV1AdminBracket(tournamentId: string) {
 }
 
 export function useV1AdminBracket(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentBracket(tournamentId),
-    queryFn: () => fetchV1AdminBracket(tournamentId),
+    queryFn: () => v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`),
     enabled: !!tournamentId,
   });
 }
@@ -5384,6 +5472,7 @@ export function useV1AdminBracket(tournamentId: string) {
 // ---------------------------------------------------------------------------
 
 export function useV1AdminAnnouncements(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentAnnouncements(tournamentId),
     queryFn: () =>
@@ -5395,6 +5484,7 @@ export function useV1AdminAnnouncements(tournamentId: string) {
 }
 
 export function useV1CreateAnnouncement(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateAnnouncementPayload) =>
@@ -5411,6 +5501,7 @@ export function useV1CreateAnnouncement(tournamentId: string) {
 }
 
 export function useV1UpdateAnnouncement(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -5433,6 +5524,7 @@ export function useV1UpdateAnnouncement(tournamentId: string) {
 }
 
 export function useV1PublishAnnouncement(tournamentId?: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (announcementId: string) =>
@@ -5450,6 +5542,7 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
 }
 
 export function useV1AdminTournamentSponsors(tournamentId: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentSponsors(tournamentId),
     queryFn: () =>
@@ -5461,6 +5554,7 @@ export function useV1AdminTournamentSponsors(tournamentId: string) {
 }
 
 export function useV1CreateTournamentSponsor(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateTournamentSponsorPayload) =>
@@ -5477,6 +5571,7 @@ export function useV1CreateTournamentSponsor(tournamentId: string) {
 }
 
 export function useV1UpdateTournamentSponsor(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { sponsorId: string; body: V1UpdateTournamentSponsorPayload }) =>
@@ -5493,6 +5588,7 @@ export function useV1UpdateTournamentSponsor(tournamentId: string) {
 }
 
 export function useV1DeactivateTournamentSponsor(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sponsorId: string) =>
@@ -5511,6 +5607,7 @@ export function useV1DeactivateTournamentSponsor(tournamentId: string) {
 
 /** POST /teams/:teamId/invitations — 이메일로 팀원 초대 발송 */
 export function useV1DeleteAnnouncement(tournamentId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (announcementId: string) =>
@@ -5726,6 +5823,7 @@ export function useV1UpdateSiteInfo() {
  * 보호되므로 공개돼도 안전 — 지도 임베드 컴포넌트가 SDK 스크립트 로드 직전에 호출한다.
  */
 export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.publicKakaoMapsKey(),
     queryFn: () => v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key'),
@@ -5743,6 +5841,7 @@ const PLACE_SEARCH_MAX_PAGE = 45;
  * 재시도하지 않는다. 결과는 10건씩 쪽으로 받고 `fetchNextPage` 로 다음 쪽을 이어 붙인다.
  */
 export function useV1PlaceSearch(query: string, options?: QueryOptions) {
+  const { v1Get } = useV1DataSource();
   const trimmed = query.trim();
   return useInfiniteQuery({
     queryKey: v1Keys.placeSearch(trimmed),
@@ -5760,6 +5859,7 @@ export function useV1PlaceSearch(query: string, options?: QueryOptions) {
 // ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
 
 export function useV1UploadAdminContentAsset() {
+  const { v1MultipartPost } = useV1DataSource();
   return useMutation({
     mutationFn: (file: File) => {
       const formData = new FormData();
@@ -5770,6 +5870,7 @@ export function useV1UploadAdminContentAsset() {
 }
 
 export function useV1DeleteAdminContentAsset() {
+  const { v1Delete } = useV1DataSource();
   return useMutation({
     mutationFn: (assetId: string) =>
       v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
@@ -5791,6 +5892,7 @@ export function useV1TournamentOperationsBoard(
   filters?: V1TournamentOperationsBoardFilters,
   options?: QueryOptions,
 ) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
     queryFn: () =>
@@ -5809,11 +5911,12 @@ export function fetchV1TournamentOperationsBoardPage(
   queryClient: QueryClient,
   tournamentId: string,
   filters: V1TournamentOperationsBoardFilters,
+  get: typeof v1Get = v1Get,
 ) {
   return queryClient.fetchQuery({
     queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
     queryFn: () =>
-      v1Get<V1TournamentOperationsBoardPage>(
+      get<V1TournamentOperationsBoardPage>(
         `/tournament-ops/tournaments/${tournamentId}/operations`,
         filters,
       ),
@@ -5827,6 +5930,7 @@ export function fetchV1TournamentOperationsBoardPage(
  * 성공하면 셸 게이트가 여기서 내 역할을 함께 도출한다.
  */
 export function useV1TournamentStaffAssignments(tournamentId: string, options?: QueryOptions) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
     queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
@@ -5846,6 +5950,7 @@ export function useV1TournamentStaffCandidateSearch(
   query: string,
   options?: QueryOptions,
 ) {
+  const { v1Get } = useV1DataSource();
   const trimmed = query.trim();
   return useQuery({
     queryKey: v1Keys.tournamentOperationsStaffCandidates(tournamentId, trimmed),
@@ -5882,6 +5987,7 @@ export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
 
 /** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
 export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
+  const { v1Get } = useV1DataSource();
   const enabled = Boolean(tournamentId) && (options?.enabled ?? true);
   const query = useQuery({
     queryKey: v1Keys.tournamentOperationsFields(tournamentId),
@@ -5906,6 +6012,7 @@ export function useV1TournamentFields(tournamentId: string, options?: QueryOptio
  * 호출하는 화면에서 역할을 먼저 가려 폼을 열 것.
  */
 export function useV1CreateTournamentField(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: V1CreateTournamentFieldPayload) =>
@@ -5928,6 +6035,7 @@ function invalidateCompetitionFieldViews(queryClient: QueryClient, competitionId
 }
 
 export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Post<{ addedCount: number; existingCount: number; updatedCount: number }>(
@@ -5959,6 +6067,7 @@ export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
  * 보드가 `fieldName` 을 직접 렌더하므로 성공 시 보드 쿼리도 함께 무효화한다.
  */
 export function useV1AssignFixtureField(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ fixtureId, fieldId }: { fixtureId: string; fieldId: string }) =>
@@ -5976,6 +6085,7 @@ export function useV1AssignFixtureField(tournamentId: string) {
 
 /** DELETE /tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field — 배정 해제. */
 export function useV1ClearFixtureField(tournamentId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ fixtureId }: { fixtureId: string }) =>
@@ -5992,6 +6102,7 @@ export function useV1ClearFixtureField(tournamentId: string) {
 
 /** POST /tournament-ops/tournaments/:tournamentId/staff — 스태프 배정(관리자/대회 디렉터). */
 export function useV1GrantTournamentStaff(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: V1GrantTournamentStaffPayload) =>
@@ -6004,6 +6115,7 @@ export function useV1GrantTournamentStaff(tournamentId: string) {
 
 /** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke — 스태프 배정 해제. */
 export function useV1RevokeTournamentStaff(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -6176,6 +6288,7 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
 
 /** 대회 공개 여부 변경 — 리그와 같은 규칙. 관리 데이터는 그대로, 공개 읽기 캐시만 다시 확인한다. */
 export function useV1UpdateTournamentVisibility(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { isPublic: boolean }) =>

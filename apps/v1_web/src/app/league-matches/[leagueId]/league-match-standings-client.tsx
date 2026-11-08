@@ -24,6 +24,13 @@ import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
 import {
+  NEXT_MATCH_BADGE_LABEL,
+  UPCOMING_EMPTY_STATE,
+  UPCOMING_FILTER_LABEL,
+  UPCOMING_QUERY_KEY,
+  UPCOMING_QUERY_VALUE,
+} from '@/lib/upcoming-filter';
+import {
   countLeagueFixturePhases,
   leagueFixtureCountChips,
   leagueFixturePhase,
@@ -529,7 +536,7 @@ export default function LeagueMatchStandingsClient({
 }) {
   const searchParams = useSearchParams();
   const query = searchParams.toString();
-  const upcomingFromUrl = searchParams.get('schedule') === 'upcoming';
+  const upcomingFromUrl = searchParams.get(UPCOMING_QUERY_KEY) === UPCOMING_QUERY_VALUE;
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   const currentHref = useCurrentHref();
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
@@ -614,8 +621,8 @@ export default function LeagueMatchStandingsClient({
     setUpcomingDraft(upcomingOnly);
     // 최신 URL에서 이 필터만 수정한다. replace는 탐색 단계와 현재 스크롤을 유지한다.
     const url = new URL(window.location.href);
-    if (upcomingOnly) url.searchParams.set('schedule', 'upcoming');
-    else url.searchParams.delete('schedule');
+    if (upcomingOnly) url.searchParams.set(UPCOMING_QUERY_KEY, UPCOMING_QUERY_VALUE);
+    else url.searchParams.delete(UPCOMING_QUERY_KEY);
     const href = `${url.pathname}${url.search}${url.hash}`;
     window.history.replaceState(null, '', href);
     // Next query 반영을 기다리지 않아 빠른 선택 직후의 경기 링크도 최신 출처를 가진다.
@@ -958,7 +965,7 @@ export default function LeagueMatchStandingsClient({
                 style={showUpcomingOnly ? { background: 'var(--static-blue)' } : undefined}
                 className={`tm-chip${showUpcomingOnly ? ' tm-chip-active' : ''}`}
               >
-                예정만
+                {UPCOMING_FILTER_LABEL}
               </button>
             </div>
           )}
@@ -971,10 +978,10 @@ export default function LeagueMatchStandingsClient({
           />
         ) : visibleFixtures.length === 0 ? (
           <EmptyState
-            title="예정된 경기가 없어요"
-            sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요."
+            title={UPCOMING_EMPTY_STATE.title}
+            sub={UPCOMING_EMPTY_STATE.sub}
             illustration={{ name: 'matches-empty' }}
-            cta="전체 보기"
+            cta={UPCOMING_EMPTY_STATE.cta}
             onCta={() => setShowUpcomingOnly(false)}
           />
         ) : (
@@ -991,7 +998,7 @@ export default function LeagueMatchStandingsClient({
                   >
                     <span className="inline-flex flex-wrap items-center gap-2">
                       {/* 다음 경기는 컬러(파란 테두리)만으로 구분하지 않는다 — 뱃지 텍스트를 함께 싣는다. */}
-                      {isNextUpcoming && <span className="tm-badge tm-badge-sm tm-badge-blue">다음 경기</span>}
+                      {isNextUpcoming && <span className="tm-badge tm-badge-sm tm-badge-blue">{NEXT_MATCH_BADGE_LABEL}</span>}
                       <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback={fixture.homeTeamId === null ? '홈팀 미정' : '홈팀 정보 없음'} />
                       <span aria-hidden="true" className="text-[var(--text-muted)]">vs</span>
                       <FixtureTeamLabel teamId={fixture.awayTeamId} lookup={teamLookup} fallback="상대팀 미정" />

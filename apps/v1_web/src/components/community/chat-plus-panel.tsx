@@ -5,6 +5,7 @@ import { CalendarDays, Camera, FileText, Image as ImageIcon, X } from 'lucide-re
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { optimizedImageSrc } from '@/lib/assets';
 import { detectNativeShell } from '@/lib/native-bridge';
 import type { ChatShareCandidate, ChatShareSheetModel } from './community.types';
 
@@ -116,6 +117,10 @@ function PlusTile({ label, disabled, onClick, children }: { label: string; disab
   );
 }
 
+// 뷰어 <img> 는 width 가 없어 받은 비트맵의 자연 폭이 곧 레이아웃 폭이다 — 1440 뷰포트(1408px = 1440 − 패딩 16×2)를
+// 2배 밀도로 채우게 받는다(3840 단계, 원본보다 크게 늘리지는 않는다). 확대 보기라 원본보다 흐려지면 안 된다.
+const VIEWER_MAX_WIDTH = 1408;
+
 /** 사진 전체 화면 보기 — ESC·뒤로가기·배경·닫기 버튼으로 닫힌다(포커스 가둠·복원은 useModalA11y). */
 export function ChatImageViewer({ url, onClose }: { url: string | null; onClose: () => void }) {
   const open = url !== null;
@@ -127,8 +132,8 @@ export function ChatImageViewer({ url, onClose }: { url: string | null; onClose:
         <button type="button" className="tm-btn tm-btn-icon tm-chat-image-viewer-close" aria-label="닫기" onClick={onClose}>
           <X size={22} strokeWidth={2.2} />
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element -- 사용자 업로드(/uploads)는 next/image 최적화 대상이 아니다. */}
-        <img src={url} alt="보낸 사진" className="tm-chat-image-viewer-img" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- <img> 를 유지하고 src 만 optimizedImageSrc 로 줄여 받는다. */}
+        <img src={optimizedImageSrc(url, VIEWER_MAX_WIDTH)} alt="보낸 사진" className="tm-chat-image-viewer-img" />
       </div>
     </div>
   );

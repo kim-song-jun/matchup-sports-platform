@@ -17,6 +17,8 @@ import type { V1HomeNextGame } from '@/types/api';
  * 출전 여부는 서버가 판정해 내려 준 값(`viewerParticipating`)만 읽는다. 빠진 경기는 칩 없이 그린다.
  * 팀장·매니저는 같은 카드의 주 버튼이 "명단 확인"이 된다. 링크는 팀원이 열 수 있는 화면만 낸다.
  * 서버는 킥오프 뒤에도 결과가 나가기 전(최대 3시간)이면 그 경기를 내려 준다 — 그때는 "진행 중" 칩을 단다.
+ * 시각 있는 경기가 없을 때는 시각이 아직 정해지지 않은 대회 경기가 오며(`scheduledAt` null),
+ * 시간 자리에는 카운트다운 없이 "일정 미정"만 적고 대회·라운드 이름은 아래 줄에 그대로 나온다.
  */
 export function NextGameCard({ game, now = new Date() }: { game: V1HomeNextGame; now?: Date }) {
   const headingId = useId();

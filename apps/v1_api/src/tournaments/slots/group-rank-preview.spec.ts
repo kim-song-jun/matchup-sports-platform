@@ -1,7 +1,7 @@
 // apps/v1_api/src/tournaments/slots/group-rank-preview.spec.ts
 import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
 import { calculateCompetitionStandings } from '../competition-config/competition-standings';
-import { resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
+import { drawnTieGroups, resolveStoredGroupRank, resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
 
 type Result = readonly [home: string, away: string, homeScore: number, awayScore: number];
 
@@ -14,6 +14,7 @@ function sourceOf(
     unofficialIndex?: number;
     officialAt?: Date | null;
     recalculatedAt?: Date | null;
+    fairPlay?: ReadonlyMap<string, number>;
   } = {},
 ): GroupRankSource {
   const standings = calculateCompetitionStandings({
@@ -27,9 +28,10 @@ function sourceOf(
       awayScore,
     })),
     config: FOOTBALL_V1_CONFIG,
+    fairPlayByRegistration: options.fairPlay,
   })
     .filter((row) => row.registrationId !== options.dropStandingFor)
-    .map((row) => ({ registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses, recalculatedAt: options.recalculatedAt ?? null }));
+    .map((row) => ({ registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses, fairPlayPoints: row.fairPlayPoints, recalculatedAt: options.recalculatedAt ?? null }));
   return {
     registrationIds: ids,
     standings,
@@ -328,5 +330,66 @@ describe('summarizeGroupStanding', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 5, none);
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B', 'C'], undecided: false });
     });
+  });
+});
+
+describe('N개 토너먼트의 공식 저장 순위 추천', () => {
+  it('승자승과 득실차 기준이 갈려도 공식 순위와 같은 팀을 반환한다', () => {
+    const source = sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE);
+    for (const row of source.standings) {
+      expect(resolveStoredGroupRank(source, row.position!, [])).toEqual({ state: 'ready', registrationId: row.registrationId });
+    }
+  });
+  it('완전 동률의 저장 시드 순위도 다른 계산기로 재해석하지 않는다', () => {
+    const source = sourceOf(['A', 'B', 'C'], TIE_THREE);
+    const row = source.standings.find(row => row.position === 1)!;
+    expect(resolveStoredGroupRank(source, 1, [])).toEqual({ state: 'ready', registrationId: row.registrationId });
+  });
+  it('공식 결과 미완료·낡은 표·없는 순위는 추측하지 않는다', () => {
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN, { unofficialIndex: 0 }), 1, [])).toEqual({ state: 'group_incomplete' });
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN), 4, [])).toEqual({ state: 'group_incomplete' });
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN, { officialAt: new Date('2026-11-06T01:00:00Z'), recalculatedAt: new Date('2026-11-06T00:00:00Z') }), 1, [])).toEqual({ state: 'group_incomplete' });
+  });
+});
+
+describe('저장 순위가 추첨으로만 갈린 묶음', () => {
+  const rule = () => ({ tournamentId: 'tournament-1', configVersionId: 'config-1', config: FOOTBALL_V1_CONFIG });
+  const bundles = (source: GroupRankSource) => drawnTieGroups(source, rule).map((group) => [...group].sort());
+
+  it('A·B 가 승점·맞대결·득실·득점·페어플레이까지 같으면 한 묶음이고, 그 자리는 tied 로 돌려준다', () => {
+    const source = sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND);
+    const ties = drawnTieGroups(source, rule);
+    expect(bundles(source)).toEqual([['A', 'B']]);
+    for (const rank of [1, 2]) {
+      const resolution = resolveStoredGroupRank(source, rank, ties);
+      expect(resolution.state).toBe('tied');
+      expect(resolution.state === 'tied' && [...resolution.tiedRegistrationIds].sort()).toEqual(['A', 'B']);
+    }
+    expect(resolveStoredGroupRank(source, 3, ties)).toEqual({ state: 'ready', registrationId: 'C' });
+  });
+
+  it('동률이 없는 조는 묶음이 없고 모든 자리가 ready 다', () => {
+    const source = sourceOf(['A', 'B', 'C'], CLEAN);
+    expect(drawnTieGroups(source, rule)).toEqual([]);
+    expect(resolveStoredGroupRank(source, 1, [])).toEqual({ state: 'ready', registrationId: 'A' });
+  });
+
+  it('페어플레이 벌점이 저장 순위를 갈랐다면 묶음이 아니다 — 같은 경기 결과에서 벌점 유무만 다르다', () => {
+    expect(bundles(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND))).toEqual([['A', 'B']]);
+    expect(bundles(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { fairPlay: new Map([['A', 0], ['B', 3]]) }))).toEqual([]);
+  });
+
+  it('리그 계산기가 동률로 읽는 순환(맞대결 승자승이 같은 3팀)도 저장 비교기가 완전히 같다고 본 만큼만 묶는다', () => {
+    expect(bundles(sourceOf(['A', 'B', 'C'], TIE_THREE))).toEqual([['A', 'B', 'C']]);
+    // The league calculator calls these tied, but the stored order separated them by head-to-head.
+    expect(bundles(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE))).toEqual([]);
+  });
+
+  it('결과가 덜 끝났거나 순위표가 낡았으면 묶음을 만들지 않고 규칙도 읽지 않는다', () => {
+    const unusedRule = jest.fn(rule);
+    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { unofficialIndex: 0 }), unusedRule)).toEqual([]);
+    expect(unusedRule).not.toHaveBeenCalled();
+    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { unofficialIndex: 0 }), rule)).toEqual([]);
+    expect(drawnTieGroups(sourceOf(['A', 'B', 'C'], TIE_FIRST_SECOND, { officialAt: new Date('2026-11-06T01:00:00Z'), recalculatedAt: new Date('2026-11-06T00:00:00Z') }), rule)).toEqual([]);
   });
 });

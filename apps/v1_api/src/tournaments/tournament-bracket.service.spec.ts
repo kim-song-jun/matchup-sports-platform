@@ -297,7 +297,7 @@ describe('TournamentBracketService', () => {
     v1AdminUser: { findUnique: jest.Mock };
 
     v1TournamentStaffAssignment: { findFirst: jest.Mock };
-    v1Tournament: { findFirst: jest.Mock };
+    v1Tournament: { findFirst: jest.Mock; update: jest.Mock };
     v1TournamentSlot: { findMany: jest.Mock; findFirst: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
@@ -334,7 +334,7 @@ describe('TournamentBracketService', () => {
       v1AdminUser: { findUnique: jest.fn() },
 
       v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
-      v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })), update: jest.fn() },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), findUniqueOrThrow: jest.fn(), count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
@@ -520,6 +520,31 @@ describe('TournamentBracketService', () => {
         }),
       }),
     );
+  });
+
+  it.each(['group', 'semi'])('N개 토너먼트 %s 조 이름은 구조 변경 없이 저장하고 설정 revision을 갱신한다', async phase => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const previous = groupRow({ phase, name: '기존 이름', tournament: { format: 'league_knockouts', kind: 'regular_tournament' } });
+    const config = { groups: [{ id: previous.id, name: '기존 이름', capacity: 6, legs: 1 }], finals: [{ name: '프리미어', rules: [{ groupId: previous.id, rank: 1 }] }] };
+    prisma.v1TournamentGroup.findUnique.mockResolvedValue(previous);
+    prisma.v1TournamentGroup.update.mockResolvedValue({ ...previous, name: '새 이름' });
+    prisma.v1Tournament.findFirst.mockResolvedValue({ multiFinals: config });
+    const result = await service.updateGroup(ownerUser, previous.id, { name: ' 새 이름 ' });
+    expect(result.name).toBe('새 이름');
+    const data = prisma.v1Tournament.update.mock.calls[0][0].data;
+    expect(data.multiFinalsRevision).toEqual({ increment: 1 });
+    expect(data.multiFinals.finals).toEqual(config.finals);
+    expect(data.multiFinals.groups[0].name).toBe(phase === 'group' ? '새 이름' : '기존 이름');
+    expect(prisma.v1TournamentGroup.update).toHaveBeenCalledWith({ where: { id: previous.id }, data: { name: '새 이름' } });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
+  });
+
+  it('N개 토너먼트의 이름 수정 경로로 진출 수를 바꾸거나 빈 이름을 저장할 수 없다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentGroup.findUnique.mockResolvedValue(groupRow({ tournament: { format: 'league_knockouts', kind: 'regular_tournament' } }));
+    await expect(service.updateGroup(ownerUser, 'group-1', { advanceCount: 1 })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_SELECTION_REQUIRED' } });
+    await expect(service.updateGroup(ownerUser, 'group-1', { name: '  ' })).rejects.toMatchObject({ response: { code: 'GROUP_NAME_REQUIRED' } });
+    expect(prisma.v1TournamentGroup.update).not.toHaveBeenCalled();
   });
 
   it('상·하위 결선이 사용하는 조는 advanceCount를 2로 유지한다', async () => {
@@ -2121,6 +2146,15 @@ describe('TournamentBracketService', () => {
         details: { teamMatchIds: ['fixture-1'] },
       },
     });
+  });
+
+  it('getBracket: named diagram color is stable even without preliminary standings', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(), multiFinals: { finals: [{name:'챔피언',colorIndex:7,rules:[],thirdPlace:false}] } });
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([{ ...groupRow({id:'named',name:'결승',phase:'final',sortOrder:0}), bracketTrack:'챔피언',groupTeams:[],byeSlots:[] }]);
+    prisma.v1TournamentStanding.findMany.mockResolvedValue([]);
+    const result = await service.getBracket(ownerUser,'tournament-1');
+    expect(result.groups[0]).toMatchObject({bracketColorIndex:7,bracketTrack:'챔피언'});
   });
 
   it('getBracket: displays third-place before final without rewriting stored groups', async () => {

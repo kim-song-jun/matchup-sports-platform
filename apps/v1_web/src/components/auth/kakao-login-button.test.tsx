@@ -153,6 +153,18 @@ describe('KakaoLoginButton', () => {
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'PERMISSION_DENIED' });
     });
 
+    it('tells a removed Kakao login how to get back in, instead of showing the blocked screen', async () => {
+      reply = { accessToken: 'unlinked' };
+      api.v1Post.mockRejectedValue(apiError(403, 'LOGIN_METHOD_UNLINKED'));
+      renderButton();
+      await click();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '이 카카오 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+      );
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'LOGIN_METHOD_UNLINKED' });
+    });
+
     it.each([
       ['unverified email', 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL'],
       ['contact conflict', 'SOCIAL_LINK_CONTACT_CONFLICT'],
@@ -265,6 +277,8 @@ describe('KakaoLoginButton', () => {
       sdk.getInitializedKakaoJsSdk.mockReturnValue(new Promise((resolve) => { release = resolve; }));
       renderButton();
       await click();
+      // The attempt is persisted after an async SHA-256, so wait for it before sampling.
+      await waitFor(() => expect(storedAttempt()?.state).toMatch(/^sha256:/));
       const firstVerifier = storedAttempt()?.state;
       await click();
       expect(storedAttempt()?.state).toBe(firstVerifier);

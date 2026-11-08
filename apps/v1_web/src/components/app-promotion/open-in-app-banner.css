@@ -1,0 +1,91 @@
+.tm-open-in-app-banner {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 4px 8px 4px var(--v1-shell-page-x);
+  background: var(--blue50);
+  animation: tm-open-in-app-banner-in var(--duration-slow) var(--ease-out) both;
+}
+
+.tm-open-in-app-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-open-in-app-banner .tm-open-in-app-banner-title,
+.tm-open-in-app-banner .tm-open-in-app-banner-caption {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-open-in-app-banner .tm-open-in-app-banner-title {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 캡션 기본색(--text-caption)은 --blue50 위에서 AA(4.5:1)에 못 미친다. */
+.tm-open-in-app-banner .tm-open-in-app-banner-caption {
+  color: var(--text);
+}
+
+/*
+ * 셸 안(모바일·태블릿): 스크롤 영역은 상단바 아래에 절대 배치돼 높이가 확정이고, 채팅방·빈 목록처럼
+ * 그 높이의 100% 를 쓰는 화면이 있다. 배너를 형제 요소로 흘리면 그 화면들이 배너 높이만큼 넘치므로,
+ * 배너 자리를 스크롤 영역의 위쪽 여백으로 비우고 그 안에 절대 배치한다 — 콘텐츠와 함께 스크롤돼 사라진다.
+ * 상단바는 44px 버튼 때문에 실제로 61px 이라 스크롤 영역 시작(56px)보다 5px 아래까지 덮는다 —
+ * 배너를 5px 내려 놓고(top), 여백은 4px 격자에 맞춰 64px 로 둔다.
+ */
+@media (max-width: 1023.98px) {
+  .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
+    padding-top: 64px;
+  }
+
+  .tm-scroll-area > .tm-open-in-app-banner {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+    height: 56px;
+  }
+
+  .tm-app-frame-no-topbar .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
+    padding-top: 56px;
+  }
+
+  .tm-app-frame-no-topbar .tm-scroll-area > .tm-open-in-app-banner {
+    top: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tm-scroll-area > .tm-open-in-app-banner {
+    margin-top: 16px;
+    border-radius: var(--radius-control);
+  }
+}
+
+/* 채팅방은 스크롤 영역이 스크롤하지 않아(overflow-y: hidden) 배너가 밀려 올라가 사라질 수 없다 — 입력창 위 공간을 계속 쓰므로 그리지 않는다. */
+.tm-scroll-area:has(.tm-chat-room) > .tm-open-in-app-banner {
+  display: none;
+}
+
+/* 셸이 이미 그려진 화면(전역 404)에서는 셸 안 배너가 맡으므로 문서 맨 위 배너는 숨긴다. */
+html:has(.tm-app-frame) .tm-open-in-app-banner[data-placement='page'] {
+  display: none;
+}
+
+@keyframes tm-open-in-app-banner-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-open-in-app-banner {
+    animation: none;
+  }
+}

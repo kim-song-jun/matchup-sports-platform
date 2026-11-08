@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import { OpenInAppBanner } from '@/components/app-promotion/open-in-app-banner';
 import { AppChrome } from './shell';
 import { resolveRouteChrome } from '@/lib/route-chrome';
 import { useShellOverrideForRoute } from './shell-override';
@@ -9,7 +10,7 @@ import { useShellOverrideForRoute } from './shell-override';
  * 셸의 유일한 마운트 지점. providers.tsx에서 {children} 자리에 끼운다 — 페이지 트리 전체의
  * 조상이므로 pathname이 바뀌어도(라우트 전환) 이 컴포넌트 자신은 리마운트되지 않고, 그
  * 아래 AppChrome도 함께 살아남는다. route-chrome.ts에 없는 경로는 children을 그대로
- * 통과시킨다 — 그 경로들은 원래도 AppChrome이 없었다.
+ * 통과시킨다 — 그 경로들은 원래도 AppChrome이 없었다. 앱 설치 안내 배너만 그 문서 맨 위에 얹는다.
  */
 export function AppShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -22,7 +23,14 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
   // Hooks 규칙: 조건부 return보다 위에서 항상 호출한다.
   const override = useShellOverrideForRoute(pathname);
 
-  if (!resolved) return <>{children}</>;
+  if (!resolved) {
+    return (
+      <>
+        <OpenInAppBanner placement="page" />
+        {children}
+      </>
+    );
+  }
 
   const { chrome, params } = resolved;
   return (

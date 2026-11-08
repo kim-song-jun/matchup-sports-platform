@@ -8,7 +8,7 @@ final class SafeAreaBridgeTests: XCTestCase {
         let script = SafeAreaBridge.script(bottomInsetPoints: 34, keyboardOpen: false)
         XCTAssertTrue(script.contains("'--teameet-native-safe-bottom','34px'"))
         // Android writes the shell variable directly too, so the shell stays correct against
-        // a deployed web build whose CSS predates the max() definition.
+        // a deployed web build whose CSS predates the --teameet-native-safe-bottom definition.
         XCTAssertTrue(script.contains("'--v1-shell-safe-bottom','34px'"))
         XCTAssertTrue(script.contains("document.documentElement.style.setProperty"))
     }
@@ -21,8 +21,8 @@ final class SafeAreaBridgeTests: XCTestCase {
         XCTAssertTrue(SafeAreaBridge.script(bottomInsetPoints: 0, keyboardOpen: false).contains("'0px'"))
     }
 
-    /// A device with no home indicator reports zero, and the page's own `max()` keeps that
-    /// harmless. A negative value should never reach CSS.
+    /// A device with no home indicator reports zero, which the page treats as no inset. A
+    /// negative value should never reach CSS.
     func testNeverEmitsANegativeInset() {
         XCTAssertTrue(SafeAreaBridge.script(bottomInsetPoints: -12, keyboardOpen: false).contains("'0px'"))
     }

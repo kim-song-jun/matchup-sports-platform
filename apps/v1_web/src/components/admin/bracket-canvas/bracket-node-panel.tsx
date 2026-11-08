@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';

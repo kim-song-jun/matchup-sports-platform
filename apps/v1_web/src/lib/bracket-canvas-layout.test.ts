@@ -470,3 +470,20 @@ describe.each(RANK_COMBOS)('순위 연결선 — %s', (_name, groupCount, advanc
     }
   });
 });
+
+// 2026-11-06: N개 토너먼트의 그룹 이름은 이미 토너먼트 이름으로 시작한다 — 열 제목에 같은 이름이 두 번 붙으면 안 된다.
+describe('buildCanvasLayout 열 제목', () => {
+  it('N개 토너먼트의 그룹은 토너먼트 이름을 한 번만 붙이고, 상·하위 결선은 기존처럼 붙인다', () => {
+    const premier = makeGroup({ id: 'g-p', name: '프리미어 · 12강', phase: 'round16', sortOrder: 0, bracketTrack: '프리미어' });
+    const upper = makeGroup({ id: 'g-u', name: '상위 8강', phase: 'quarter', sortOrder: 1, bracketTrack: 'upper' });
+    const layout = buildCanvasLayout({
+      groups: [premier, upper],
+      fixtures: [
+        makeFixture({ id: 'p1', groupId: 'g-p', fixtureNumber: 1, round: '12강' }),
+        makeFixture({ id: 'u1', groupId: 'g-u', fixtureNumber: 2, round: '8강' }),
+      ],
+      slots: [],
+    } as never);
+    expect(layout.columns.map((column) => column.label)).toEqual(['프리미어 · 12강', '상위 결선 · 상위 8강']);
+  });
+});

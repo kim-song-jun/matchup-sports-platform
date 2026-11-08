@@ -372,8 +372,9 @@ describe('최종결과 — 조별/결선 분류는 편성 phase 기준', () => {
     expect(screen.getByRole('heading', { name: '결선 경기' })).toBeInTheDocument();
     // 결선 경기는 조별 목록(3경기)에 포함되지 않는다.
     expect(screen.getByRole('button', { name: /조별리그 경기 3경기/ })).toBeInTheDocument();
-    // 편성 이름이 '준결승1' 이어도 phase 가 final 이므로 결승 카드로 그린다.
-    expect(screen.getByText('결승')).toBeInTheDocument();
+    // 분류는 final을 유지하고, 화면에는 운영자가 저장한 이름을 표시한다.
+    expect(screen.getByText('준결승1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /볼케이노Fc 3 대 3 SOUL FC/ })).toHaveAttribute('href', expect.stringContaining('/matches/fx-final'));
   });
 
   it('편성 phase 가 라운드 라벨을 이긴다 — 라벨이 결선이어도 group 편성이면 조별이다', () => {

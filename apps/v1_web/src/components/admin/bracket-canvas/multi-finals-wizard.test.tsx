@@ -11,12 +11,12 @@ const success = (data: unknown) => HttpResponse.json({ status: 'success', data }
 const registrations = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => ({ id: `reg-${i}`, team: { id: `team-${i}`, name } }));
 const savedView = (): MultiFinalView => ({ revision: 1, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], generated: false, registrations,
   groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
-  finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], unresolved: [] }] });
+  finals: [{ id: 'final-0', colorIndex: 0, name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], tiePicks: [], unresolved: [] }] });
 const server = setupServer(http.post('*/api/v1/logs/client-error', () => success({})));
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => { cleanup(); server.resetHandlers(); });
 afterAll(() => server.close());
-function show(mode: 'create' | 'assign' = 'assign') {
+function show(mode: 'create' | 'rules' | 'assign' = 'assign') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const onApplied = vi.fn(), onClose = vi.fn();
   render(<QueryClientProvider client={client}><MultiFinalsWizard tournamentId="t-1" mode={mode} open onClose={onClose} onApplied={onApplied} /></QueryClientProvider>);
@@ -101,7 +101,7 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
       const body = await request.json() as { groups: MultiFinalView['groups']; finals: MultiFinalView['finals'] };
       setupInput = body;
       view = { ...view, revision: 1, groups: body.groups.map((group, i) => ({ ...group, id: `saved-${i}` })),
-        finals: body.finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: `saved-${rule.groupId}` })), manual: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+        finals: body.finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: `saved-${rule.groupId}` })), manual: false, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       return success(view);
     }), http.post(`${base}/preview`, () => success({ revision: 1, previewHash: 'pending', finals: view.finals,
       counts: { tournaments: 1, fixtures: 1, byes: 0 } })), http.post(`${base}/generate`, async ({ request }) => { generateInput = await request.json(); return success({ revision: 2 }); }));
@@ -112,61 +112,15 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     await screen.findByRole('textbox', { name: '토너먼트 1 이름' });
     expect(content.scrollTop).toBe(0);
+    expect(screen.getByRole('spinbutton', { name: '토너먼트 1 자리 수' })).toHaveValue(2);
+    expect(screen.queryByRole('combobox', { name: 'A조 1위 진출 토너먼트' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '대진 미리보기' }));
     await screen.findByText('상위 토너먼트 · 2자리 · 진출팀 미정');
     expect(screen.queryByRole('checkbox', { name: '가팀' })).not.toBeInTheDocument();
-    expect(setupInput).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ registrationIds: null, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }] })] }));
+    expect(setupInput).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ capacity: 2, registrationIds: null, rules: [] })] }));
     fireEvent.click(screen.getByRole('button', { name: '확인하고 결선 생성' }));
     await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
     expect(generateInput).toEqual(expect.objectContaining({ expectedRevision: 1, previewHash: 'pending' }));
-  });
-  it('조별 공식 순위 반영 전에는 배정 화면에서 결과를 확정하거나 팀을 선택하지 않는다', async () => {
-    const view = savedView(); view.groupStandings![0].complete = false;
-    view.finals[0].suggestedRegistrationIds = [];
-    server.use(http.get(base, () => success(view)));
-    show(); await screen.findByText('조별 전체 순위');
-    expect(screen.getByRole('button', { name: '순위대로 자동 선택' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '명단 저장 후 미리보기' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: '가팀' })).toBeDisabled();
-  });
-  it('전체 순위와 동률 후보를 보여주고 자동 선택 후 동률 팀을 수동 선택해 저장한다', async () => {
-    const view = savedView();
-    view.finals[0].suggestedRegistrationIds = ['reg-0'];
-    view.finals[0].unresolved = [{ groupId: 'g-1', rank: 2, state: 'tied', tiedRegistrationIds: ['reg-1', 'reg-2'] }];
-    view.groupStandings![0].rows[1].tiedRegistrationIds = ['reg-1', 'reg-2'];
-    view.groupStandings![0].rows[2].tiedRegistrationIds = ['reg-1', 'reg-2'];
-    let submitted: unknown;
-    server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => { submitted = await request.json(); return success(view); }),
-      http.post(`${base}/preview`, () => success({ revision: 1, previewHash: 'tied-picked', finals: [{ ...view.finals[0], registrationIds: ['reg-0', 'reg-2'] }], counts: { tournaments: 1, fixtures: 1, byes: 0 } })));
-    show(); await screen.findByText('조별 전체 순위');
-    expect(screen.getByRole('table', { name: 'A조 · 확정 순위표' })).toBeInTheDocument();
-    expect(screen.getByText('A조 · 나팀: 동률 — 나팀, 다팀')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '순위대로 자동 선택' }));
-    expect(screen.getByRole('checkbox', { name: '가팀' })).toBeChecked();
-    fireEvent.click(screen.getByRole('checkbox', { name: '다팀' }));
-    fireEvent.click(screen.getByRole('button', { name: '명단 저장 후 미리보기' }));
-    await screen.findByText('결선 대진 미리보기');
-    expect(submitted).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ registrationIds: ['reg-0', 'reg-2'] })] }));
-  });
-  it('순위 제안의 팀을 제외하고 순위 밖 팀을 추가한 최종 명단으로 미리보기·생성을 요청한다', async () => {
-    let view = savedView(); const selections: unknown[] = []; let generated: unknown;
-    server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => {
-      const body = await request.json() as { finals: MultiFinalView['finals'] }; selections.push(body);
-      view = { ...view, revision: view.revision + 1, finals: body.finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: ['reg-0', 'reg-1'], unresolved: [] })) }; return success(view);
-    }), http.post(`${base}/preview`, () => success({ revision: view.revision, previewHash: 'reviewed', counts: { tournaments: 1, fixtures: 1, byes: 0 }, finals: view.finals })),
-    http.post(`${base}/generate`, async ({ request }) => { generated = await request.json(); return success({ revision: view.revision + 1 }); }));
-    const props = show();
-    const group = await screen.findByRole('group', { name: /챔피언 · 2팀/ });
-    fireEvent.click(within(group).getByRole('checkbox', { name: '가팀' }));
-    fireEvent.click(within(group).getByRole('checkbox', { name: '다팀' }));
-    fireEvent.click(screen.getByRole('button', { name: '명단 저장 후 미리보기' }));
-    await screen.findByText('결선 대진 미리보기');
-    expect(selections[0]).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ registrationIds: ['reg-1', 'reg-2'] })] }));
-    expect(screen.getByText('1번 시드 · 나팀')).toBeInTheDocument();
-    expect(screen.getByText('2번 시드 · 다팀')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '확인하고 진출팀 배정' }));
-    await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
-    expect(generated).toEqual(expect.objectContaining({ expectedRevision: 2, previewHash: 'reviewed', requestId: expect.any(String) }));
   });
   it('조회 실패를 빈 성공으로 숨기지 않고 재시도할 수 있다', async () => {
     let fail = true; server.use(http.get(base, () => fail ? HttpResponse.json({ message: '일시 오류' }, { status: 503 }) : success(savedView())));
@@ -175,31 +129,127 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
     fail = false; fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     await screen.findByText('예선 조 편성');
   });
-  it('대진 생성 API 실패는 성공 콜백 없이 원인을 표시하고 미리보기를 유지한다', async () => {
-    const view = savedView(); view.finals[0].registrationIds = ['reg-2', 'reg-3']; view.finals[0].manual = true;
-    server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, () => success(view)),
-      http.post(`${base}/preview`, () => success({ revision: 1, previewHash: 'old', counts: { tournaments: 1, fixtures: 1, byes: 0 }, finals: view.finals })),
-      http.post(`${base}/generate`, () => HttpResponse.json({ message: '대회 상태가 바뀌었어요.' }, { status: 409 })));
-    const props = show();
-    await screen.findByRole('button', { name: '명단 저장 후 미리보기' });
-    fireEvent.click(screen.getByRole('button', { name: '명단 저장 후 미리보기' }));
-    await screen.findByText('결선 대진 미리보기'); fireEvent.click(screen.getByRole('button', { name: '확인하고 진출팀 배정' }));
-    await screen.findByText('대회 상태가 바뀌었어요.'); expect(props.onApplied).not.toHaveBeenCalled(); expect(props.onClose).not.toHaveBeenCalled();
-  });
 });
 
-it('참가 확정이 해제된 저장 팀을 명시적으로 제외하고 명단 편집을 계속할 수 있다', async () => {
-  const view = savedView(); view.generated = false;
-  view.finals[0].manual = true; view.finals[0].registrationIds = ['reg-0', 'withdrawn-team'];
-  let submitted: unknown;
+it('토너먼트 배정 규칙은 예선 편성 단계 없이 독립 진입한다', async () => {
+  server.use(http.get(base, () => success({ ...savedView(), generated: true, fixtureCount: 7 })));
+  show('rules');
+  expect(await screen.findByText('챔피언 · 2자리 · 2개 순위 연결')).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'A조 1위 진출 토너먼트' })).toHaveValue('0');
+  expect(screen.queryByRole('textbox', { name: '토너먼트 1 이름' })).not.toBeInTheDocument();
+  expect(screen.queryByText('예선 조 편성')).not.toBeInTheDocument();
+});
+
+it('순위 목적지 수정은 확정 명단을 비우지 않고 규칙만 저장한다', async () => {
+  const view = savedView(); view.generated = true; view.fixtureCount = 8;
+  view.finals[0].id = 'd0cca905-ff8d-4598-91c5-13c8e3ee612a';
+  view.finals[0].registrationIds = ['reg-0', 'reg-1']; view.finals[0].manual = true;
+  view.finals.push({ ...view.finals[0], name: '챌린지', rules: [{ groupId: 'g-1', rank: 3 }, { groupId: 'g-1', rank: 4 }], registrationIds: ['reg-2', 'reg-3'] });
+  let submitted: { finals: MultiFinalView['finals'] } | undefined;
   server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => {
-    const body = await request.json() as { finals: MultiFinalView['finals'] }; submitted = body;
-    return success({ ...view, revision: 2, finals: body.finals.map(f => ({ ...f, manual: true, suggestedRegistrationIds: [], unresolved: [] })) });
-  }), http.post(`${base}/preview`, () => success({ revision: 2, previewHash: 'ready', counts: { tournaments: 1, fixtures: 1, byes: 0 }, finals: view.finals })));
-  show(); await screen.findByRole('button', { name: '확정 명단에 없는 팀 제외' });
-  fireEvent.click(screen.getByRole('button', { name: '확정 명단에 없는 팀 제외' }));
-  fireEvent.click(screen.getByRole('checkbox', { name: '나팀' }));
-  fireEvent.click(screen.getByRole('button', { name: '명단 저장 후 미리보기' }));
-  await screen.findByText('결선 대진 미리보기');
-  expect(submitted).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ registrationIds: ['reg-0', 'reg-1'] })] }));
+    submitted = await request.json() as typeof submitted; return success({ ...view, revision: 2 });
+  }), http.post(`${base}/preview`, () => success({ revision: 2, previewHash: 'rules-only', counts: { tournaments: 2, fixtures: 2, byes: 0 }, finals: view.finals })));
+  show('rules');
+  fireEvent.change(await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' }), { target: { value: '1' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'A조 3위 진출 토너먼트' }), { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: '배정 규칙 저장' }));
+  const confirmation = await screen.findByRole('dialog', { name: '진출 규칙 변경' });
+  fireEvent.click(within(confirmation).getByRole('button', { name: '규칙 저장' }));
+  await waitFor(() => expect(submitted).toBeDefined());
+  expect(screen.queryByText('결선 대진 미리보기')).not.toBeInTheDocument();
+  expect(submitted?.finals.map(final => final.registrationIds)).toEqual([['reg-0', 'reg-1'], ['reg-2', 'reg-3']]);
+  expect(submitted?.finals[0].rules).toEqual([{ groupId: 'g-1', rank: 2 }, { groupId: 'g-1', rank: 3 }]);
+  expect(submitted?.finals[0].capacity).toBe(2);
+  expect(submitted?.finals[0].id).toBe(view.finals[0].id);
+});
+
+describe('규칙 화면의 시드 번호', () => {
+  const caption = '저장하면 순위가 높은 팀부터 시드를 받아요. 같은 순위끼리는 조 순서대로예요(임시 기본값). 진출팀 배정 화면에서 바꿀 수 있어요.';
+  const groupNames = ['A', 'B', 'C', 'D'];
+  const viewWith = (groupCount: number, capacity: number): MultiFinalView => ({
+    revision: 1, generated: true, fixtureCount: 3, registrations,
+    groups: groupNames.slice(0, groupCount).map(name => ({ id: `g-${name}`, name: `${name}조`, capacity: 5, legs: 1 as const })),
+    finals: [{ id: 'final-0', colorIndex: 0, name: '본선', capacity, thirdPlace: false, rules: [], registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: [], tiePicks: [], unresolved: [] }],
+  });
+  const seedBadges = () => screen.getAllByText(/^시드 \d+$/).map(node => node.textContent);
+  const rowOf = (groupName: string, rank: number) => screen.getByLabelText(`${groupName}조 ${rank}위 진출 토너먼트`).closest('label') as HTMLElement;
+  async function chooseGroupByGroup(groupCount: number, ranks: number[]) {
+    await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+    // The default walk through the screen: every rank of one group before the next group.
+    for (const name of groupNames.slice(0, groupCount)) for (const rank of ranks) fireEvent.change(screen.getByLabelText(`${name}조 ${rank}위 진출 토너먼트`), { target: { value: '0' } });
+  }
+
+  it('조 단위로 6자리 규칙을 눌러도 시드는 순위 먼저 매겨지고 부전승은 조 1위 둘이다', async () => {
+    server.use(http.get(base, () => success(viewWith(2, 6))));
+    show('rules');
+    await chooseGroupByGroup(2, [1, 2, 3]);
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 5', '시드 2', '시드 4', '시드 6']);
+    for (const [group, rank, bye] of [['A', 1, true], ['B', 1, true], ['A', 2, false], ['B', 2, false], ['A', 3, false], ['B', 3, false]] as const) {
+      const row = within(rowOf(group, rank));
+      expect(row.queryByText('부전승') !== null, `${group}${rank}`).toBe(bye);
+    }
+    expect(screen.getByText(caption)).toBeInTheDocument();
+    expect(screen.getByText('본선 · 6자리 · 6개 순위 연결')).toBeInTheDocument();
+  }, 20_000);
+  it('4개 조×3위 12자리는 조 1위 4팀이 시드 1~4와 부전승을 받는다', async () => {
+    server.use(http.get(base, () => success(viewWith(4, 12))));
+    show('rules');
+    await chooseGroupByGroup(4, [1, 2, 3]);
+    expect(seedBadges()).toEqual(['시드 1', '시드 5', '시드 9', '시드 2', '시드 6', '시드 10', '시드 3', '시드 7', '시드 11', '시드 4', '시드 8', '시드 12']);
+    expect(screen.getAllByText('부전승')).toHaveLength(4);
+    for (const group of groupNames) expect(within(rowOf(group, 1)).getByText('부전승')).toBeInTheDocument();
+  }, 20_000);
+  it('순위가 이미 앞선 순서로 저장된 2자리 규칙은 부전승 없이 시드 1·2 그대로이고 연결 없는 칸에는 시드가 없다', async () => {
+    server.use(http.get(base, () => success({ ...savedView(), generated: true, fixtureCount: 7 })));
+    show('rules');
+    await screen.findByText('챔피언 · 2자리 · 2개 순위 연결');
+    expect(seedBadges()).toEqual(['시드 1', '시드 2']);
+    expect(screen.queryByText('부전승')).not.toBeInTheDocument();
+    expect(within(rowOf('A', 3)).queryByText(/시드/)).not.toBeInTheDocument();
+  });
+  describe('저장 순서가 순위 순이 아닌 옛 대회', () => {
+    const rulesOf = (order: Array<[string, number]>) => order.map(([groupId, rank]) => ({ groupId, rank }));
+    const stored = (order: Array<[string, number]>): MultiFinalView => ({ ...viewWith(2, 6), generated: true, fixtureCount: 7,
+      finals: [{ ...viewWith(2, 6).finals[0], rules: rulesOf(order) }] });
+    const oldOrder: Array<[string, number]> = [['g-A', 1], ['g-A', 2], ['g-A', 3], ['g-B', 1], ['g-B', 2], ['g-B', 3]];
+    const rankFirst: Array<[string, number]> = [['g-A', 1], ['g-B', 1], ['g-A', 2], ['g-B', 2], ['g-A', 3], ['g-B', 3]];
+    const saveButton = () => screen.getByRole('button', { name: '배정 규칙 저장' });
+    it('아무것도 바꾸지 않아도 저장할 수 있고, 저장하면 규칙을 서버로 보내 새 순서로 다시 저장한다', async () => {
+      const view = stored(oldOrder); let submitted: { finals: MultiFinalView['finals'] } | undefined;
+      server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => {
+        submitted = await request.json() as typeof submitted; return success({ ...view, revision: 2 });
+      }));
+      const props = show('rules');
+      await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+      expect(saveButton()).toBeEnabled();
+      fireEvent.click(saveButton());
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '진출 규칙 변경' })).getByRole('button', { name: '규칙 저장' }));
+      await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
+      expect(submitted?.finals[0].rules).toEqual(rulesOf(oldOrder));
+      expect(submitted?.finals[0].registrationIds).toBeNull();
+      expect(props.onClose).toHaveBeenCalledOnce();
+    });
+    it('이미 순위 순으로 저장된 규칙은 바꾼 것이 없으면 저장할 것이 없어 버튼이 꺼져 있다', async () => {
+      server.use(http.get(base, () => success(stored(rankFirst))));
+      show('rules');
+      await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+      expect(saveButton()).toBeDisabled();
+    });
+  });
+  it('예선을 편성하지 않은 대회에는 시드 안내를 보여 주지 않는다', async () => {
+    server.use(http.get(base, () => success({ revision: 0, groups: [], finals: [], registrations, generated: false })));
+    show('rules');
+    await screen.findByText('예선·토너먼트 대진 생성에서 예선을 먼저 편성해 주세요.');
+    expect(screen.queryByText(caption)).not.toBeInTheDocument();
+  });
+  it('목적지를 바꾸면 시드 번호가 바로 다시 매겨진다', async () => {
+    server.use(http.get(base, () => success({ ...viewWith(2, 6), finals: [{ ...viewWith(2, 6).finals[0], rules: [{ groupId: 'g-A', rank: 1 }, { groupId: 'g-B', rank: 1 }, { groupId: 'g-A', rank: 2 }] }] })));
+    show('rules');
+    await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' });
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 2']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'B조 2위 진출 토너먼트' }), { target: { value: '0' } });
+    expect(seedBadges()).toEqual(['시드 1', '시드 3', '시드 2', '시드 4']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'A조 1위 진출 토너먼트' }), { target: { value: '-1' } });
+    expect(seedBadges()).toEqual(['시드 2', '시드 1', '시드 3']);
+  });
 });

@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
+
 /**
  * TournamentProgressStepper
  *
- * 이미지 레퍼런스 (V21-11): 리그 3R 종료 → 준결승 종료 → 결승 (오늘 20:00)
- * 각 단계는 done / active / upcoming 3가지 상태를 가짐.
+ * 각 단계는 done / active / upcoming 3가지 상태를 가진다. 진행 중인 단계가 없는 단계 사이 구간에서는
+ * 다음에 시작할 단계에 "다음" 표시가 붙는다. 칸이 화면보다 넓으면 가로로 스크롤되고, 가려진 쪽 가장자리가
+ * 흐려지며 위쪽 "n / 전체" 가 지금 위치를 알린다.
  */
 
 export type StageStatus = 'done' | 'active' | 'upcoming';
@@ -12,8 +15,8 @@ export type StageStatus = 'done' | 'active' | 'upcoming';
 export interface TournamentStage {
   key: string;
   label: string;
-  /** 날짜/시간 표시 (예: "5.12 (일)", "오늘 20:00") */
-  subLabel?: string;
+  /** 이 단계를 함께 치르는 토너먼트 이름들. 둘 이상일 때만 채운다. */
+  parallelTracks?: string[];
   status: StageStatus;
 }
 
@@ -21,20 +24,157 @@ interface TournamentProgressStepperProps {
   stages: TournamentStage[];
 }
 
+/**
+ * 지금 봐야 할 단계 — 진행 중인 단계, 없으면(단계 사이 구간) 첫 미완료 단계, 모두 끝났으면 마지막 단계.
+ * 단계가 하나도 없으면 -1(findIndex 와 같은 약속).
+ */
+export function pickFocusStageIndex(stages: TournamentStage[]): number {
+  if (stages.length === 0) return -1;
+  const active = stages.findIndex((stage) => stage.status === 'active');
+  if (active !== -1) return active;
+  const firstOpen = stages.findIndex((stage) => stage.status !== 'done');
+  return firstOpen !== -1 ? firstOpen : stages.length - 1;
+}
+
+/** 기준 단계를 스크롤 영역 가운데로 두는 scrollLeft. 양 끝에서는 영역 밖으로 밀지 않는다. */
+export function stepperScrollLeft({
+  viewport,
+  content,
+  itemStart,
+  itemSize,
+}: {
+  viewport: number;
+  content: number;
+  itemStart: number;
+  itemSize: number;
+}): number {
+  const centered = itemStart + itemSize / 2 - viewport / 2;
+  return Math.min(Math.max(centered, 0), Math.max(content - viewport, 0));
+}
+
+/** 가려진 단계가 있는 쪽. 모두 보이면 'none'. */
+export type StepperFade = 'none' | 'start' | 'end' | 'both';
+
+// 소수점 스크롤 위치 오차가 끝 판정을 뒤집지 않게 한다.
+const FADE_EPSILON = 1;
+
+export function stepperFade({
+  scrollLeft,
+  scrollWidth,
+  clientWidth,
+}: {
+  scrollLeft: number;
+  scrollWidth: number;
+  clientWidth: number;
+}): StepperFade {
+  const max = scrollWidth - clientWidth;
+  if (max <= FADE_EPSILON) return 'none';
+  const hiddenBefore = scrollLeft > FADE_EPSILON;
+  const hiddenAfter = scrollLeft < max - FADE_EPSILON;
+  if (hiddenBefore && hiddenAfter) return 'both';
+  if (hiddenBefore) return 'start';
+  return hiddenAfter ? 'end' : 'none';
+}
+
+// 토너먼트 이름 끝의 "토너먼트"·"결선" 은 안내 문장이 다시 붙이므로 뗀다("상위 토너먼트" → "상위").
+const TRACK_NAME_SUFFIX = /\s?(토너먼트|결선)$/;
+
+// 이름은 앞의 둘까지만 읽는다 — 토너먼트가 최대 10개라 다 적으면 한 줄이 칸 위로 여러 줄 쌓인다.
+const NOTE_NAME_LIMIT = 2;
+
+/** 같은 단계를 함께 치르는 토너먼트가 둘 이상일 때 스텝퍼 위에 띄우는 한 줄. */
+export function parallelTracksNote(tracks: string[]): string {
+  const stems = tracks.map((track) => track.replace(TRACK_NAME_SUFFIX, '') || track);
+  const named = stems.slice(0, NOTE_NAME_LIMIT).join('·');
+  const rest = stems.length - NOTE_NAME_LIMIT;
+  return `${rest > 0 ? `${named} 외 ${rest}개` : named} 토너먼트가 같은 단계로 진행돼요`;
+}
+
 export function TournamentProgressStepper({ stages }: TournamentProgressStepperProps) {
-  if (!stages.length) return null;
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
+  const positioned = useRef(false);
+  const [fade, setFade] = useState<StepperFade>('none');
+  const focusIndex = pickFocusStageIndex(stages);
+  const focusKey = stages[focusIndex]?.key;
+  const hasStages = stages.length > 0;
+
+  // 좁은 화면에서는 스텝퍼가 자기 안에서 가로로 스크롤되고 항상 맨 앞에서 시작한다.
+  // scrollIntoView 는 세로 페이지 스크롤까지 움직이므로 쓰지 않고 이 컨테이너의 scrollLeft 만 맞춘다.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const focus = focusRef.current;
+    if (!list || !focus) return;
+
+    const listRect = list.getBoundingClientRect();
+    const focusRect = focus.getBoundingClientRect();
+    const left = stepperScrollLeft({
+      viewport: list.clientWidth,
+      content: list.scrollWidth,
+      itemStart: focusRect.left - listRect.left + list.scrollLeft,
+      itemSize: focusRect.width,
+    });
+    // 처음 자리 잡을 때는 첫 페인트 전이라 움직임이 보이지 않는다 — 이후 단계가 바뀔 때만 부드럽게.
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    list.scrollTo({ left, behavior: positioned.current && !reduced ? 'smooth' : 'auto' });
+    positioned.current = true;
+    setFade(stepperFade(list));
+  }, [focusKey, stages.length]);
+
+  // 사용자가 직접 밀거나 화면 폭이 바뀌면 가려진 쪽이 달라진다.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const sync = () => setFade(stepperFade(list));
+    list.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    return () => {
+      list.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [hasStages]);
+
+  if (!hasStages) return null;
+
+  const activeIndex = stages.findIndex((stage) => stage.status === 'active');
+  // 진행 중인 단계가 없으면 기준 단계는 첫 미완료 단계다 — 단계 사이 구간에서 다음에 시작할 단계.
+  const nextIndex = stages[focusIndex].status === 'upcoming' ? focusIndex : -1;
+  const doneCount = stages.filter((stage) => stage.status === 'done').length;
+  const progress = activeIndex !== -1 ? activeIndex + 1 : doneCount;
+  const tracks = [...new Set(stages.flatMap((stage) => stage.parallelTracks ?? []))];
 
   return (
-    <div className="tm-hub-stages" role="list" aria-label="대회 진행 단계">
-      {stages.map((stage, idx) => (
-        <StageWithConnector
-          key={stage.key}
-          stage={stage}
-          isLast={idx === stages.length - 1}
-          prevDone={idx > 0 && stages[idx - 1].status === 'done'}
-          stepNumber={idx + 1}
-        />
-      ))}
+    <div className="tm-hub-stepper">
+      <div className="tm-hub-stepper-head">
+        {tracks.length > 1 ? <p className="tm-hub-stepper-note">{parallelTracksNote(tracks)}</p> : null}
+        <p className="tm-hub-stepper-count">
+          <span className="sr-only">{`전체 ${stages.length}단계 중 ${progress}단계 ${activeIndex !== -1 ? '진행 중' : '완료'}`}</span>
+          <span aria-hidden="true">
+            {progress}
+            <span className="tm-hub-stepper-count-total"> / {stages.length}</span>
+          </span>
+        </p>
+      </div>
+      <div
+        ref={listRef}
+        className="tm-hub-stages"
+        role="list"
+        aria-label="대회 진행 단계"
+        data-fade={fade}
+        // 넘칠 때만 키보드로 닿게 한다 — 가려진 단계를 방향키로 볼 수 있어야 한다.
+        tabIndex={fade === 'none' ? undefined : 0}
+      >
+        {stages.map((stage, idx) => (
+          <StageWithConnector
+            key={stage.key}
+            stage={stage}
+            isLast={idx === stages.length - 1}
+            stepNumber={idx + 1}
+            isNext={idx === nextIndex}
+            stageRef={idx === focusIndex ? focusRef : undefined}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -42,18 +182,21 @@ export function TournamentProgressStepper({ stages }: TournamentProgressStepperP
 function StageWithConnector({
   stage,
   isLast,
-  prevDone,
   stepNumber,
+  isNext,
+  stageRef,
 }: {
   stage: TournamentStage;
   isLast: boolean;
-  prevDone: boolean;
   stepNumber: number;
+  isNext: boolean;
+  stageRef?: Ref<HTMLDivElement>;
 }) {
   const dotClass = [
     'tm-hub-stage-dot',
     stage.status === 'done' ? 'tm-hub-stage-dot-done' : '',
     stage.status === 'active' ? 'tm-hub-stage-dot-active' : '',
+    isNext ? 'tm-hub-stage-dot-next' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -66,27 +209,27 @@ function StageWithConnector({
     .filter(Boolean)
     .join(' ');
 
-  const subLabelClass = [
-    'tm-hub-stage-sublabel',
-    stage.status === 'active' ? 'tm-hub-stage-sublabel-active' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const state = stage.status === 'done' ? '완료' : stage.status === 'active' ? '진행 중' : isNext ? '다음 단계' : '예정';
+  const marker = stage.status === 'active' ? '진행 중' : isNext ? '다음' : null;
 
   return (
     <>
       <div
+        ref={stageRef}
         className="tm-hub-stage"
         role="listitem"
-        aria-label={`${stage.label}${stage.status === 'done' ? ' (완료)' : stage.status === 'active' ? ' (진행 중)' : ' (예정)'}`}
+        aria-current={stage.status === 'active' ? 'step' : undefined}
+        aria-label={`${stage.label} (${state})`}
       >
         {/* upcoming 상태만 번호 표시 — done/active는 ::after 로 처리.
             [R-T2] 28px 원(테두리 2px 감안 실질 24px)에 숫자 한 자리라 12px 여유. */}
         <div className={dotClass} aria-hidden="true">
-          {stage.status === 'upcoming' && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--grey400)', lineHeight: 1 }}>{stepNumber}</span>}
+          {stage.status === 'upcoming' && (
+            <span style={{ fontSize: 12, fontWeight: 700, color: isNext ? 'var(--blue700)' : 'var(--grey400)', lineHeight: 1 }}>{stepNumber}</span>
+          )}
         </div>
         <span className={labelClass}>{stage.label}</span>
-        {stage.subLabel ? <span className={subLabelClass}>{stage.subLabel}</span> : null}
+        {marker ? <span className="tm-hub-stage-sublabel tm-hub-stage-sublabel-active">{marker}</span> : null}
       </div>
       {!isLast && (
         <div
@@ -104,6 +247,8 @@ import type { V1TournamentDetail, V1TournamentFixture } from '@/types/api';
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { groupFixturesByRound } from './tournament-bracket';
 import { compareTournamentRounds } from '@/lib/tournament-display-order';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 
 /**
  * 라운드 이름 한 개를 단계 분류로 접는다.
@@ -147,7 +292,7 @@ function isStarted(f: { liveStatus: string }): boolean {
   return f.liveStatus !== 'scheduled';
 }
 
-type StageDraft = { key: string; label: string; fixtures: V1TournamentFixture[] };
+type StageDraft = { key: string; label: string; fixtures: V1TournamentFixture[]; parallelTracks?: string[] };
 
 /** 픽스처 묶음 하나의 상태. 취소된 경기는 단계 완료를 막지 않는다(치를 수 없게 된 경기다). */
 function rawStageStatus(fixtures: V1TournamentFixture[]): StageStatus {
@@ -207,19 +352,47 @@ function knockoutStageDrafts(fixtures: V1TournamentFixture[], groups: V1Tourname
     const phase = fixture.groupId ? groupById.get(fixture.groupId)?.phase : undefined;
     return phase !== 'group' && phase !== 'league' && classifyRound(fixture.round) === 'knockout';
   });
-  return groupFixturesByRound(knockoutFixtures, groups)
-    .filter((round) => classifyRound(round.key) === 'knockout')
-    .map((round) => ({ key: round.key, label: round.label, fixtures: round.fixtures }))
+  const rounds = groupFixturesByRound(knockoutFixtures, groups).filter((round) => classifyRound(round.key) === 'knockout');
+  // 토너먼트 이름은 운영자가 만든 순서로 — 경기 번호나 응답 순서가 아니다.
+  const orderedTracks = orderedBracketTracks(groups);
+  const tracksOf = (roundFixtures: V1TournamentFixture[]) => {
+    const present = new Set(roundFixtures.map((fixture) => (fixture.groupId ? groupById.get(fixture.groupId)?.bracketTrack : undefined)));
+    return orderedTracks.filter((track) => present.has(track)).map((track) => bracketTrackLabel(track) ?? track);
+  };
+  // 토너먼트가 둘 이상이면 단계 이름이 "상위 토너먼트 · 12강 · 하위 토너먼트 · 12강" 처럼 이어붙어 칸이 한 화면보다
+  // 넓어진다 — 칸에는 라운드 이름만 쓰고 토너먼트 이름은 따로 알린다. 토너먼트가 하나면 운영자가 정한 조 이름이 단계 이름이다.
+  const parallel = new Set(rounds.flatMap((round) => tracksOf(round.fixtures))).size > 1;
+  return rounds
+    .map((round) => parallel
+      ? { key: round.key, label: roundOnlyLabel(round), fixtures: round.fixtures, parallelTracks: tracksOf(round.fixtures) }
+      : { key: round.key, label: round.label, fixtures: round.fixtures })
     .sort((a, b) => Number(isFinalRound(a.key)) - Number(isFinalRound(b.key))
       || compareTournamentRounds(a.key, b.key)
       || Math.min(...a.fixtures.map((fixture) => fixture.fixtureNumber)) - Math.min(...b.fixtures.map((fixture) => fixture.fixtureNumber)));
 }
 
 /**
+ * 라운드 이름만 — 경기에 적힌 이름을 읽는다. 단계 코드(`key`)는 이름과 다를 수 있다: 부전승이 있는 첫 라운드는
+ * 코드가 `round16` 이고 경기 이름은 `12강` 이다(alpha 실측). 경기가 아직 없는 단계만 코드를 이름으로 푼다.
+ */
+function roundOnlyLabel(round: { key: string; fixtures: V1TournamentFixture[] }): string {
+  const names = [...new Set(round.fixtures.map((fixture) => tournamentRoundLabel(fixture.round)))].sort(compareTournamentRounds);
+  return names.length > 0 ? names.join('·') : tournamentRoundLabel(round.key);
+}
+
+/**
+ * 모든 형식의 마지막 칸. 결승·풀리그가 끝나도 대회가 끝나기 전에는 "다음" 단계이고,
+ * 대회가 끝나면 다른 단계와 같이 완료다 — 끝난 대회에 "진행 중" 표시가 남지 않는다.
+ */
+function awardsStage(tournament: V1TournamentDetail, allDone: boolean): TournamentStage {
+  return { key: 'awards', label: tournament.kind === 'regular_league' ? '시즌 종료' : '시상', status: allDone ? 'done' : 'upcoming' };
+}
+
+/**
  * 대회 포맷과 경기 결과를 분석해 진행 단계 목록을 자동 생성.
  * - league: 리그전 → 시상
- * - knockout: 실제로 존재하는 결선 라운드들(8강 → 4강 → 결승)
- * - group_knockout: 조별리그 → 실제 결선 라운드들
+ * - knockout: 실제로 존재하는 결선 라운드들(8강 → 4강 → 결승) → 시상
+ * - group_knockout: 조별리그 → 실제 결선 라운드들 → 시상
  */
 export function buildTournamentStages(tournament: V1TournamentDetail): TournamentStage[] {
   const { format, fixtures, status } = tournament;
@@ -245,18 +418,21 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
     return [
       // 진행 방식 배지("리그 방식")가 같은 헤더에 이미 있다 — 단계 이름까지 같으면 "리그 방식 리그 방식"으로 읽힌다.
       { key: 'league', label: '풀리그', status: leagueStatus },
-      { key: 'awards', label: tournament.kind === 'regular_league' ? '시즌 종료' : '시상', status: allDone ? 'active' : 'upcoming' },
+      awardsStage(tournament, allDone),
     ];
   }
 
   if (tournament.sixTeamMode || tournament.sixTeamBracket) {
     const namedRounds = groupFixturesByRound(fixtures, tournament.groups ?? []);
     const stageName = (key: string, fallback: string) => namedRounds.find((round) => round.key === key || round.key === fallback)?.label ?? fallback;
-    return makeMonotonic([
-      { key: 'six', label: stageName('quarter', '6강'), fixtures: fixtures.filter(row => row.round === '6강') },
-      { key: 'semi', label: stageName('semi', '준결승'), fixtures: fixtures.filter(row => row.round === '준결승') },
-      { key: 'final', label: stageName('final', '결승'), fixtures: fixtures.filter(row => row.round === '결승') },
-    ].map(stage => ({ key: stage.key, label: stage.label, status: rawStageStatus(stage.fixtures) })), allDone);
+    return [
+      ...makeMonotonic([
+        { key: 'six', label: stageName('quarter', '6강'), fixtures: fixtures.filter(row => row.round === '6강') },
+        { key: 'semi', label: stageName('semi', '준결승'), fixtures: fixtures.filter(row => row.round === '준결승') },
+        { key: 'final', label: stageName('final', '결승'), fixtures: fixtures.filter(row => row.round === '결승') },
+      ].map(stage => ({ key: stage.key, label: stage.label, status: rawStageStatus(stage.fixtures) })), allDone),
+      awardsStage(tournament, allDone),
+    ];
   }
 
   const drafts: StageDraft[] = [];
@@ -285,12 +461,16 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
 
   if (drafts.length === 0) return [];
 
-  return makeMonotonic(
-    drafts.map((draft) => ({
-      key: draft.key,
-      label: draft.label,
-      status: rawStageStatus(draft.fixtures),
-    })),
-    allDone,
-  );
+  return [
+    ...makeMonotonic(
+      drafts.map((draft) => ({
+        key: draft.key,
+        label: draft.label,
+        ...(draft.parallelTracks ? { parallelTracks: draft.parallelTracks } : {}),
+        status: rawStageStatus(draft.fixtures),
+      })),
+      allDone,
+    ),
+    awardsStage(tournament, allDone),
+  ];
 }

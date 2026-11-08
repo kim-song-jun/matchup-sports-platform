@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { formatMonthDay } from '@/lib/date-utils';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
+import { LoginMethodChips, type LoginMethod } from './login-method-chips';
 
 export type WithdrawalGuideStep = { title: string; body?: string };
 
@@ -28,7 +29,12 @@ type Props = {
    */
   passwordHelp?: boolean;
   /** 화면에 제목이 따로 없을 때만 생략한다. 있으면 배지·제목·(계정)·안내 문장을 위에 그린다. */
-  head?: { title: string; lead?: string; account?: { label: string; value: string } };
+  head?: {
+    title: string;
+    lead?: string;
+    /** 계정을 알리는 줄. 값은 글자(마스킹 이메일 등)나 가입한 로그인 수단 칩이다. */
+    account?: { label: string; value: string } | { label: string; methods: readonly LoginMethod[] };
+  };
   /** 번호 인증 칸이 이 안내로 바뀌는 화면에서 제목으로 포커스를 옮겨 바뀐 줄 알게 한다. */
   focusHeadingOnMount?: boolean;
   className?: string;
@@ -85,7 +91,9 @@ export function WithdrawalPendingGuide({
           {head.account ? (
             <div className="tm-wpg-account">
               <span className="tm-text-caption">{head.account.label}</span>
-              <span className="tm-text-body-lg">{head.account.value}</span>
+              {'methods' in head.account
+                ? <LoginMethodChips methods={head.account.methods} />
+                : <span className="tm-text-body-lg">{head.account.value}</span>}
             </div>
           ) : null}
           {head.lead ? <p id={leadId} className="tm-wpg-lead">{head.lead}</p> : null}

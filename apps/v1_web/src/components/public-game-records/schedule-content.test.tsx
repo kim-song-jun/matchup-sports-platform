@@ -22,6 +22,97 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('저장한 결선 조 이름을 필터와 경기 묶음에 표시하고 실제 경기를 선택한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" knockoutOnly finalTracks={[{ id: '프리미어', label: '프리미어', colorIndex: 0, fixtureIds: ['first', 'last'] }]}
+      data={makeData({ items: [fixtureEntry({ fixtureId: 'first', round: '12강', groupId: 'first-group', groupName: '프리미어 · 본선 첫 경기' }),
+        fixtureEntry({ fixtureId: 'last', round: 'final', groupId: 'final-group', groupName: '프리미어 · 우승 결정전' })] })} />);
+    const filter = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    fireEvent.click(filter.getByRole('button', { name: '본선 첫 경기' }));
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link').getAttribute('href')).toContain('/matches/first');
+    expect(screen.getByText('프리미어 · 본선 첫 경기')).toBeInTheDocument();
+  });
+
+  it('N개 일정은 토너먼트와 강수를 독립 선택하고 진행 중·시간 미정 경기까지 거른다', () => {
+    const finalTracks = [
+      { id: '프리미어', label: '프리미어', colorIndex: 0, fixtureIds: ['p-semi', 'p-final'] },
+      { id: '챌린지', label: '챌린지', colorIndex: 1, fixtureIds: ['c-final'] },
+    ];
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames finalTracks={finalTracks}
+      myFixtures={{ teams: [{ fixtures: [{ fixtureId: 'p-final' }] }] } as unknown as Parameters<typeof ScheduleContent>[0]['myFixtures']} data={makeData({
+      items: [fixtureEntry({ fixtureId: 'group' }),
+        fixtureEntry({ fixtureId: 'p-semi', round: 'semi', status: 'live' }),
+        fixtureEntry({ fixtureId: 'c-final', round: 'final' })],
+      unscheduled: [fixtureEntry({ fixtureId: 'p-final', round: 'final', scheduledAt: null })],
+    })} />);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const tracks = within(screen.getByRole('navigation', { name: '일정 토너먼트 선택' }));
+    const rounds = () => within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    const ids = () => screen.getAllByRole('link').map(link => new URL(link.getAttribute('href')!, window.location.origin).pathname.split('/').at(-1)).sort();
+    expect(rounds().getAllByRole('button').map(button => button.textContent)).toEqual(['전체', '4강', '결승']);
+    fireEvent.click(rounds().getByRole('button', { name: '4강' }));
+    expect(ids()).toEqual(['p-semi']);
+    fireEvent.click(tracks.getByRole('button', { name: '챌린지' }));
+    expect(rounds().getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+    expect(rounds().queryByRole('button', { name: '4강' })).not.toBeInTheDocument();
+    expect(ids()).toEqual(['c-final']);
+    fireEvent.click(rounds().getByRole('button', { name: '결승' }));
+    fireEvent.click(tracks.getByRole('button', { name: '프리미어' }));
+    expect(rounds().getByRole('button', { name: '결승' })).toHaveAttribute('aria-pressed', 'true');
+    expect(ids()).toEqual(['p-final']);
+    fireEvent.click(tracks.getByRole('button', { name: '전체' }));
+    expect(ids()).toEqual(['c-final', 'p-final']);
+    fireEvent.click(screen.getByRole('switch', { name: '내 팀만' }));
+    expect(ids()).toEqual(['p-final']);
+    expect(rounds().getByRole('button', { name: '결승' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('navigation', { name: '일정 토너먼트 선택' })).toHaveClass('tm-bracket-filter-scroll');
+    expect(screen.getByRole('navigation', { name: '일정 결선 단계 선택' })).toHaveClass('tm-bracket-filter-scroll');
+  });
+
+  it('N개 일정의 빠른 선택·재진입은 토너먼트와 강수 URL을 보존한다', () => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', `${path}?q=keep#games`);
+    try {
+      const finalTracks = Array.from({ length: 10 }, (_, i) => ({ id: `final-${i}`, label: `토너먼트 ${i + 1}`, colorIndex: i, fixtureIds: [`f${i}`] }));
+      const data = makeData({ items: [fixtureEntry({ fixtureId: 'group' }), ...finalTracks.map((_, i) => fixtureEntry({ fixtureId: `f${i}`, round: 'final', home: { registrationId: 'r', teamId: 'mine', teamName: '내 팀' } }))] });
+      const props = { tournamentId: 'tour-1', finalTracks, data, myTeamIds: new Set(['mine']) };
+      const view = render(<ScheduleContent {...props} fromHref={`${path}?q=keep#games`} />);
+      fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: '일정 토너먼트 선택' })).getByRole('button', { name: '토너먼트 10' }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' })).getByRole('button', { name: '결승' }));
+      const url = new URL(window.location.href);
+      expect(url.searchParams.get('scheduleFinal')).toBe('final-9');
+      expect(url.searchParams.get('scheduleGroup')).toBe('round:final');
+      expect(url.searchParams.get('q')).toBe('keep');
+      expect(url.hash).toBe('#games');
+      const link = new URL(screen.getByRole('link').getAttribute('href')!, window.location.origin);
+      expect(link.pathname.endsWith('/f9')).toBe(true);
+      expect(new URL(link.searchParams.get('from')!, window.location.origin).searchParams.get('scheduleFinal')).toBe('final-9');
+      view.unmount();
+      render(<ScheduleContent {...props} fromHref={`${path}${window.location.search}${window.location.hash}`} />);
+      expect(screen.getByRole('button', { name: '토너먼트 10' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: '결승' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getAllByRole('link')).toHaveLength(1);
+      window.history.replaceState(null, '', `${path}?schedulePhase=knockout&scheduleFinal=final-0&scheduleGroup=round%3Afinal`);
+      fireEvent.popState(window);
+      expect(screen.getByRole('button', { name: '토너먼트 1' })).toHaveAttribute('aria-pressed', 'true');
+      expect(new URL(screen.getByRole('link').getAttribute('href')!, window.location.origin).pathname.endsWith('/f0')).toBe(true);
+    } finally { window.history.replaceState(null, '', original); }
+  });
+
+  it('이름별 결선이 하나면 토너먼트 줄을 숨기고 강수 가로 스크롤은 유지한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" finalTracks={[{ id: 'solo', label: '단일 결선', fixtureIds: ['final'] }]} data={makeData({
+      items: [fixtureEntry({ fixtureId: 'group' }), fixtureEntry({ fixtureId: 'final', round: 'final' })],
+    })} />);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    expect(screen.queryByRole('navigation', { name: '일정 토너먼트 선택' })).not.toBeInTheDocument();
+    const rounds = screen.getByRole('navigation', { name: '일정 결선 단계 선택' });
+    expect(rounds).toHaveClass('tm-bracket-filter-scroll');
+    fireEvent.click(within(rounds).getByRole('button', { name: '결승' }));
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/final');
+  });
+
   it('순수 토너먼트는 전체·라운드만 표시하고 시간 미정 경기까지 선택한다', () => {
     render(<ScheduleContent tournamentId="tour-1" knockoutOnly prioritizeLiveGames data={makeData({
       items: [fixtureEntry({ fixtureId: 'semi', round: 'semi', groupName: '준결승', status: 'live' })],
@@ -1168,5 +1259,192 @@ describe('ScheduleContent — 정규 리그 순위 제목', () => {
 
     expect(screen.getByText('1부')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 팀원에게도 내 팀만·우리 팀', () => {
+  const side = (teamId: string) => ({ registrationId: `reg-${teamId}`, teamId, teamName: `${teamId}-name` });
+  const items = [
+    fixtureEntry({ fixtureId: 'mine-home', fixtureNumber: 1, groupName: 'A조', home: side('my-team'), away: side('rival-1') }),
+    fixtureEntry({ fixtureId: 'mine-away', fixtureNumber: 2, groupName: 'A조', home: side('rival-2'), away: side('my-team') }),
+    fixtureEntry({ fixtureId: 'others-only', fixtureNumber: 3, groupName: 'A조', home: side('rival-1'), away: side('rival-2') }),
+  ];
+  const hrefs = () => screen.getAllByRole('link').map((link) => link.getAttribute('href')?.split('/').at(-1)?.split('?')[0]).sort();
+
+  it('팀장 전용 응답(myFixtures) 없이 소속 팀 id 만 있어도 스위치와 우리 팀 카드가 나오고, 켜면 내 팀 경기만 남고 끄면 돌아온다', () => {
+    const { container } = render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames
+      data={makeData({ items })} myTeamIds={new Set(['my-team'])} />);
+    expect(container.querySelectorAll('.tm-schedule-card-mine')).toHaveLength(2);
+    const toggle = screen.getByRole('switch', { name: '내 팀만' });
+    expect(hrefs()).toEqual(['mine-away', 'mine-home', 'others-only']);
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(hrefs()).toEqual(['mine-away', 'mine-home']);
+    fireEvent.click(toggle);
+    expect(hrefs()).toEqual(['mine-away', 'mine-home', 'others-only']);
+  });
+
+  it('소속 팀이 이 일정에 없는 사용자에게는 스위치도 우리 팀 표시도 없다', () => {
+    const { container } = render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames
+      data={makeData({ items })} myTeamIds={new Set(['unrelated-team'])} />);
+    expect(screen.queryByRole('switch', { name: '내 팀만' })).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-schedule-card-mine')).toBeNull();
+  });
+
+  it('바깥 래퍼가 스위치를 직접 넘기면(filterAction) 내장 스위치를 또 그리지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items })}
+      myTeamIds={new Set(['my-team'])} filterAction={<button type="button" role="switch" aria-checked="false">래퍼 스위치</button>} />);
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.getByRole('switch', { name: '래퍼 스위치' })).toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 예정만·다음 경기', () => {
+  const at = (hour: number) => `2026-08-01T${String(hour).padStart(2, '0')}:00:00.000Z`;
+  const progressItems = [
+    fixtureEntry({ fixtureId: 'ended-1', fixtureNumber: 1, groupName: 'A조', status: 'ended', scheduledAt: at(8) }),
+    fixtureEntry({ fixtureId: 'cancelled-1', fixtureNumber: 2, groupName: 'A조', status: 'cancelled', scheduledAt: at(9) }),
+    fixtureEntry({ fixtureId: 'live-1', fixtureNumber: 3, groupName: 'A조', status: 'live', scheduledAt: at(10) }),
+    fixtureEntry({ fixtureId: 'late', fixtureNumber: 4, groupName: 'B조', status: 'scheduled', scheduledAt: at(14) }),
+    fixtureEntry({ fixtureId: 'early', fixtureNumber: 5, groupName: 'B조', status: 'scheduled', scheduledAt: at(12) }),
+  ];
+  const ids = () => screen.getAllByRole('link').map((link) => link.getAttribute('href')?.split('/').at(-1)?.split('?')[0]).sort();
+  const nextBadgeFixture = () => screen.getByText('다음 경기').closest('a')?.getAttribute('href')?.split('/').at(-1)?.split('?')[0];
+
+  it('켜면 끝난·취소된 경기만 사라지고 진행 중·예정 경기는 남으며, 끄면 전체가 돌아온다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: progressItems })} />);
+    const chip = screen.getByRole('button', { name: '예정만' });
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    expect(ids()).toEqual(['cancelled-1', 'early', 'ended-1', 'late', 'live-1']);
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(ids()).toEqual(['early', 'late', 'live-1']);
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    expect(ids()).toEqual(['cancelled-1', 'early', 'ended-1', 'late', 'live-1']);
+  });
+
+  it('다음 경기 배지는 시각이 가장 이른 예정 경기 한 장에만 붙고, 필터를 켜고 꺼도 그 카드에 남는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: progressItems })} />);
+    expect(screen.getAllByText('다음 경기')).toHaveLength(1);
+    expect(nextBadgeFixture()).toBe('early');
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    expect(screen.getAllByText('다음 경기')).toHaveLength(1);
+    expect(nextBadgeFixture()).toBe('early');
+  });
+
+  it('다음 경기는 지금 보는 팀 범위에서 고른다 — 내 팀만을 켜면 내 팀의 다음 경기로 옮겨 간다', () => {
+    const side = (teamId: string) => ({ registrationId: `reg-${teamId}`, teamId, teamName: teamId });
+    const data = makeData({ items: [
+      fixtureEntry({ fixtureId: 'others-early', fixtureNumber: 1, status: 'scheduled', scheduledAt: at(12), home: side('r1'), away: side('r2') }),
+      fixtureEntry({ fixtureId: 'mine-late', fixtureNumber: 2, status: 'scheduled', scheduledAt: at(14), home: side('my-team'), away: side('r2') }),
+      fixtureEntry({ fixtureId: 'done', fixtureNumber: 3, status: 'ended', home: side('r1'), away: side('r2') }),
+    ] });
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={data} myTeamIds={new Set(['my-team'])} />);
+    expect(nextBadgeFixture()).toBe('others-early');
+    fireEvent.click(screen.getByRole('switch', { name: '내 팀만' }));
+    expect(nextBadgeFixture()).toBe('mine-late');
+    const card = screen.getByText('다음 경기').closest('a') as HTMLElement;
+    expect(within(card).getByText('우리 팀')).toBeInTheDocument();
+  });
+
+  it('끝났거나 취소된 경기가 하나도 없으면 예정만 칩을 두지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: progressItems.filter((entry) => entry.status === 'scheduled' || entry.status === 'live') })} />);
+    expect(screen.queryByRole('button', { name: '예정만' })).not.toBeInTheDocument();
+  });
+
+  it('모든 경기가 끝난 일정에서 예정만을 켜면 빈 상태를 말하고, 전체 보기로 되돌린다', () => {
+    const finished = progressItems.filter((entry) => entry.status === 'ended' || entry.status === 'cancelled');
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: finished })} />);
+    expect(screen.queryByText('다음 경기')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    expect(screen.getByText('예정된 경기가 없어요')).toBeInTheDocument();
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
+    expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    expect(ids()).toEqual(['cancelled-1', 'ended-1']);
+  });
+
+  it('다음 페이지가 남았으면 예정만이 비어 보여도 없다고 말하지 않고, 마지막 페이지까지 비면 그때 빈 상태를 말한다', () => {
+    const finished = progressItems.filter((entry) => entry.status === 'ended' || entry.status === 'cancelled');
+    const view = render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames hasNextPage onLoadMore={() => undefined}
+      data={makeData({ items: finished })} />);
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: '예정된 경기 찾는 중' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '더 보기' })).toBeInTheDocument();
+    view.rerender(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames hasNextPage={false} onLoadMore={() => undefined}
+      data={makeData({ items: finished })} />);
+    expect(screen.getByText('예정된 경기가 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '예정된 경기 찾는 중' })).not.toBeInTheDocument();
+  });
+
+  it('빈 상태가 눌러 보라고 한 컨트롤을 누르면 지난 경기가 돌아온다 — 단계 탭의 전체가 아니다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: [
+      fixtureEntry({ fixtureId: 'group-done', status: 'ended' }),
+      fixtureEntry({ fixtureId: 'final-done', round: 'final', status: 'ended' }),
+    ] })} />);
+    expect(screen.getByRole('tab', { name: '전체' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    const named = /'([^']+)'를 눌러/.exec(screen.getByText(/지난 경기를 다시 볼 수 있어요/).textContent ?? '')?.[1];
+    expect(named).toBeDefined();
+    const control = [...screen.queryAllByRole('button'), ...screen.queryAllByRole('tab')].find((el) => el.textContent === named);
+    expect(control).toBeDefined();
+    fireEvent.click(control!);
+    expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    expect(ids()).toEqual(['final-done', 'group-done']);
+  });
+
+  it('빈 화면의 까닭이 예정만이 아니라 팀 범위면 예정만 빈 상태를 말하지 않는다', () => {
+    const side = (teamId: string) => ({ registrationId: `reg-${teamId}`, teamId, teamName: teamId });
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', `${path}?teamScope=mine&schedule=upcoming`);
+    try {
+      render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={`${path}?teamScope=mine&schedule=upcoming`}
+        myTeamIds={new Set(['my-team'])} data={makeData({ items: [
+          fixtureEntry({ fixtureId: 'done', status: 'ended', home: side('r1'), away: side('r2') }),
+          fixtureEntry({ fixtureId: 'upcoming-others', fixtureNumber: 2, status: 'scheduled', home: side('r1'), away: side('r2') }),
+        ] })} />);
+      expect(screen.getByText('해당하는 경기가 없어요')).toBeInTheDocument();
+      expect(screen.queryByText('예정된 경기가 없어요')).not.toBeInTheDocument();
+    } finally { window.history.replaceState(null, '', original); }
+  });
+
+  it('선택이 주소(schedule=upcoming)에 남고, 그 주소로 다시 열면 켜진 채 시작하며, 경기 링크의 출처에도 실린다', () => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', `${path}?q=keep`);
+    try {
+      const view = render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={`${path}?q=keep`} data={makeData({ items: progressItems })} />);
+      fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+      const url = new URL(window.location.href);
+      expect(url.searchParams.get('schedule')).toBe('upcoming');
+      expect(url.searchParams.get('q')).toBe('keep');
+      const from = new URL(new URL(screen.getAllByRole('link')[0].getAttribute('href')!, window.location.origin).searchParams.get('from')!, window.location.origin);
+      expect(from.searchParams.get('schedule')).toBe('upcoming');
+      view.unmount();
+      render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={`${path}${window.location.search}`} data={makeData({ items: progressItems })} />);
+      expect(screen.getByRole('button', { name: '예정만' })).toHaveAttribute('aria-pressed', 'true');
+      expect(ids()).toEqual(['early', 'late', 'live-1']);
+      fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+      expect(new URL(window.location.href).searchParams.has('schedule')).toBe(false);
+    } finally { window.history.replaceState(null, '', original); }
+  });
+});
+
+describe('ScheduleContent — 끝난 대회 안내', () => {
+  const data = makeData({ items: [fixtureEntry({ fixtureId: 'done', status: 'ended' })] });
+
+  it('최종 결과 주소를 받으면 맨 위에 안내 한 줄과 최종 결과 링크를 둔다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={data} completedResultsHref="/tournaments/tour-1/results" />);
+    expect(screen.getByText('모든 경기가 끝났어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /최종 결과 보기/ })).toHaveAttribute('href', '/tournaments/tour-1/results');
+  });
+
+  it('주소를 받지 않으면(진행 중인 대회) 안내를 그리지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={data} />);
+    expect(screen.queryByText('모든 경기가 끝났어요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /최종 결과 보기/ })).not.toBeInTheDocument();
   });
 });

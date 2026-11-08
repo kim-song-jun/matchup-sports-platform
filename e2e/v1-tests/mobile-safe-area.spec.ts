@@ -18,6 +18,16 @@ async function expectAboveSystemBar(locator: import('@playwright/test').Locator,
   expect(rect!.y + rect!.height).toBeLessThanOrEqual(height - bottom);
 }
 
+async function openManagedTeam(page: import('@playwright/test').Page) {
+  await loginAs(page, personas.owner.email);
+  await page.goto('/my/teams');
+  const managedTeam = page.locator('a[href^="/teams/"]').filter({ has: page.getByText('팀장', { exact: true }) }).first();
+  await expect(managedTeam).toBeVisible();
+  await managedTeam.click();
+  await expect(page).toHaveURL(/\/teams\/[^/?]+(?:\?|$)/);
+  return new URL(page.url()).pathname;
+}
+
 test.describe('mobile safe area and touch', () => {
   test.skip(({ isMobile }) => !isMobile, 'These contracts exercise mobile viewport and touch.');
   test.use({ viewport: { width: 390, height: 640 } });
@@ -29,6 +39,41 @@ test.describe('mobile safe area and touch', () => {
     await setNativeBottom(page, 48);
     await page.locator('.tm-auth-scroll').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expectAboveSystemBar(business, 48);
+  });
+
+  test('a page without a tab bar scrolls under the native inset and ends clear of it', async ({ page }) => {
+    await page.goto('/notices');
+    const scroller = page.locator('.tm-scroll-area');
+    await expect(scroller).toBeVisible();
+    await scroller.evaluate((node) => {
+      const spacer = document.createElement('div');
+      spacer.id = 'e2e-end-spacer';
+      spacer.style.height = '2000px';
+      node.appendChild(spacer);
+    });
+    await setNativeBottom(page, 48);
+    const height = await page.evaluate(() => window.innerHeight);
+    await expect.poll(async () => {
+      const box = await scroller.boundingBox();
+      return box ? Math.abs(box.y + box.height - height) : null;
+    }).toBeLessThanOrEqual(1);
+    await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    const spacer = await page.locator('#e2e-end-spacer').boundingBox();
+    expect(spacer).not.toBeNull();
+    expect(Math.abs(spacer!.y + spacer!.height - (height - 48))).toBeLessThanOrEqual(1);
+  });
+
+  test('a page with fixed actions does not reserve the native inset a second time at its scroller end', async ({ page }) => {
+    await loginAs(page, personas.owner.email);
+    await page.goto('/teams/new');
+    await expect(page.locator('.tm-fixed-cta')).toBeVisible();
+    await setNativeBottom(page, 48);
+    const scroller = page.locator('.tm-scroll-area');
+    const height = await page.evaluate(() => window.innerHeight);
+    await expect.poll(() => scroller.evaluate((node) => getComputedStyle(node).paddingBottom)).toBe('0px');
+    const box = await scroller.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.abs(box!.y + box!.height - height)).toBeLessThanOrEqual(1);
   });
 
   test('a late native inset keeps the last auth content above its fixed actions', async ({ page }) => {
@@ -65,6 +110,51 @@ test.describe('mobile safe area and touch', () => {
     await expectAboveSystemBar(dialog.getByRole('button', { name: '계속 작성' }), 48);
     await expectAboveSystemBar(dialog.getByRole('button', { name: '나가기' }), 48);
     await dialog.getByRole('button', { name: '계속 작성' }).click();
+  });
+
+  test('team jersey number actions remain reachable with a late inset and a short viewport', async ({ page }) => {
+    await openManagedTeam(page);
+    await page.getByRole('link', { name: /^멤버 관리/ }).click();
+    await page.getByRole('button', { name: / 관리$/ }).first().click();
+    await page.getByRole('button', { name: '등번호 지정', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: /님 등번호$/ });
+    const input = dialog.getByRole('spinbutton');
+    const save = dialog.getByRole('button', { name: '저장', exact: true });
+    await expect(input).toBeFocused();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await dialog.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+      await expectAboveSystemBar(save, bottom);
+    }
+    await page.setViewportSize({ width: 320, height: 360 });
+    await input.fill('1000');
+    await expect(dialog.getByText('0부터 999 사이의 숫자를 넣어 주세요.')).toBeVisible();
+    await expect(save).toBeDisabled();
+    await dialog.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await expectAboveSystemBar(save, 64);
+    await dialog.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('team dissolution content remains above its actions when a native inset arrives', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    const teamPath = await openManagedTeam(page);
+    await page.goto(`${teamPath}/dissolve`);
+    const actions = page.locator('.tm-fixed-cta');
+    await expect(actions).toBeVisible();
+    const scroller = page.locator('.tm-scroll-area');
+    const content = scroller.locator('.tm-content-enter').filter({ has: page.getByRole('heading', { level: 2 }) });
+    const lastContent = content.locator(':scope > :last-child');
+    await expect(lastContent).toBeVisible();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await expect.poll(async () => {
+        await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+        const last = await lastContent.boundingBox();
+        const cta = await actions.boundingBox();
+        return last && cta ? Math.round(last.y + last.height - cta.y) : null;
+      }).toBeLessThanOrEqual(0);
+    }
   });
 
   test('withdrawal reason remains above fixed actions as the native inset changes', async ({ page }) => {
@@ -105,15 +195,26 @@ test.describe('mobile safe area and touch', () => {
     }
   });
 
-  test('profile notice remains above a taller validation action bar', async ({ page }) => {
+  test('profile notice remains above actions after the keyboard closes and an inset arrives', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
     await loginAs(page, personas.owner.email);
     await page.goto('/my/profile/edit');
+    await expect(page.locator('#v1-profile-nickname')).toBeVisible();
+    await setNativeBottom(page, 0);
+    await page.evaluate(() => { document.documentElement.dataset.teameetNativeKeyboard = 'open'; });
     await page.locator('#v1-profile-nickname').fill('임시검수이름');
     await expect(page.getByText('변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.')).toBeVisible();
     const notice = page.locator('#v1-profile-edit-form .tm-on-tint');
     const scroller = page.locator('.tm-scroll-area');
     const actions = page.locator('.tm-my-profile-edit-cta');
+    await expect.poll(() => scroller.evaluate((node) => node.style.getPropertyValue('--tm-create-cta-height'))).toBe('0px');
+    await page.evaluate(() => { delete document.documentElement.dataset.teameetNativeKeyboard; });
+    await expect.poll(async () => {
+      await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+      const target = await notice.boundingBox();
+      const cta = await actions.boundingBox();
+      return target && cta ? Math.round(target.y + target.height - cta.y) : null;
+    }).toBeLessThanOrEqual(0);
     await setNativeBottom(page, 48);
     await expect.poll(async () => {
       await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });

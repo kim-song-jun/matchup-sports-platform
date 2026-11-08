@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationsBoardClient } from './operations-board-client';
+import { v1Get } from '@/lib/api-client';
 import type { V1TournamentOperationsBoardItem, V1TournamentOperationsBoardPage } from '@/types/api';
 
 const mocks = vi.hoisted(() => ({
@@ -182,6 +183,18 @@ describe('OperationsBoardClient', () => {
     // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
     // 결과 검토 화면과 같은 라벨을 쓴다.
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
+  });
+
+  it('상단 진행 단계는 단계 이름·상태와 지금 위치를 알린다', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    const stepper = screen.getByRole('list', { name: '대회 진행 단계' });
+    expect(within(stepper).getAllByRole('listitem').map((item) => item.getAttribute('aria-label'))).toEqual([
+      '8강 (진행 중)',
+      '결승 (예정)',
+      '시상 (예정)',
+    ]);
+    expect(screen.getByText('전체 3단계 중 1단계 진행 중')).toBeInTheDocument();
   });
 
   // Task 180 G6(C안) — 경기별 팀 명단 요약(빠짐·정지)과 명단 링크는 운영 보드가 아니라 콘솔의
@@ -531,8 +544,8 @@ describe('OperationsBoardClient', () => {
     expect(screen.queryByText(/8강 1경기/)).not.toBeInTheDocument();
   });
 
-  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 라운드만.
-  it('names a group fixture "A조 · 조별리그 2라운드" and a knockout fixture by round only, in table, card and field label', () => {
+  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 저장한 조 이름.
+  it('names a group fixture "A조 · 조별리그 2라운드" and a knockout fixture by its saved group name, in table, card and field label', () => {
     const groupItem = { ...ITEM_A, fixtureId: 'fixture-g', round: 'league_r2', fixtureNumber: 3, groupName: 'A조' };
     const knockoutItem = { ...ITEM_A, fixtureId: 'fixture-k', round: 'semi', fixtureNumber: 9, groupName: '본선' };
     mocks.useV1TournamentOperationsBoard.mockReturnValue({
@@ -548,8 +561,8 @@ describe('OperationsBoardClient', () => {
     expect(screen.getByText('A조 · 조별리그 2라운드 · 3번 경기')).toBeInTheDocument();
     expect(screen.getByText(/A조 · 조별리그 2라운드 · 3번 경기 ·/)).toBeInTheDocument();
     expect(screen.getAllByLabelText('A조 · 조별리그 2라운드 3번 경기장').length).toBeGreaterThan(0);
-    expect(screen.getByText('4강 · 9번 경기')).toBeInTheDocument();
-    expect(screen.queryByText(/본선/)).not.toBeInTheDocument();
+    expect(screen.getByText('본선 · 9번 경기')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('본선 9번 경기장').length).toBeGreaterThan(0);
   });
 
   it('names a knockout second leg "4강 2차" like the public screens', () => {
@@ -612,6 +625,7 @@ describe('OperationsBoardClient', () => {
       expect.anything(),
       't-1',
       expect.objectContaining({ cursor: 'cursor-2' }),
+      v1Get,
     );
     // 기존 fixture-1 행은 그대로 남아 있고, 새로 불러온 fixture-2(4강) 행이 추가된다.
     expect(screen.getAllByText('레드팀 vs 블루팀').length).toBeGreaterThan(0);

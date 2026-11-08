@@ -53,6 +53,7 @@ import { TournamentInquirySection } from '@/components/tournaments/tournament-in
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
@@ -212,6 +213,20 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
   if (winnerSide === 'home') return finalFixture.homeTeamName || null;
   if (winnerSide === 'away') return finalFixture.awayTeamName || null;
   return null;
+}
+
+/** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
+function getCompletedTrackChampions(tournament: V1TournamentDetail) {
+  if (isLeagueCompetition(tournament)) return [];
+  const tracks = orderedBracketTracks(tournament.groups);
+  if (tracks.length < 2) return [];
+  return tracks.map(track => {
+    const finalGroupIds = new Set(tournament.groups.filter(group => group.bracketTrack === track && group.phase === 'final').map(group => group.id));
+    const fixtures = tournament.fixtures
+      .filter(fixture => finalGroupIds.has(fixture.groupId ?? '') && fixture.status === 'completed')
+      .map(fixture => ({ ...fixture, round: 'final' }));
+    return { track, label: bracketTrackLabel(track), champion: getCompletedChampionName({ ...tournament, fixtures }) };
+  });
 }
 
 /**
@@ -413,6 +428,23 @@ export function showsNextLeagueInvite(
   if (tournament.kind !== 'regular_league' || tournament.status === 'cancelled') return false;
   if (tournament.status === 'completed') return true;
   return blockReason !== null && !hasActiveRegistration;
+}
+
+/**
+ * 이어진 이전 시즌으로 가는 입구. 데스크톱은 우측 레일, 모바일은 '우리 팀 참가' 아래 본문 카드다 — 다음 시즌 입구
+ * ('다음 리그에서 함께 뛰어요')와 같은 자리에 둔다(2026-11-06 사용자 선택, 제목 아래 작은 링크를 대신한다).
+ * 독립 리그는 `previousLeagueId` 로 이은 지난 시즌, 리그 체계 첫 시즌 티어는 전환한 원본 리그다.
+ */
+function PreviousSeasonNav({ season }: { season: { leagueId: string; title: string } }) {
+  return (
+    <section aria-label="이전 시즌" style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
+      <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">이전 시즌</h3>
+      <p className="tm-text-caption text-[var(--text-muted)]" style={{ margin: 0 }}>{season.title}</p>
+      <Link href={`/tournaments/${encodeURIComponent(season.leagueId)}`} className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
+        이전 시즌 보기
+      </Link>
+    </section>
+  );
 }
 
 /** 이 리그에 확정됐던 내 팀 전부(팀원 포함) — 체계로 전환한 리그에서 내 팀이 편성된 티어를 찾는다. */
@@ -825,6 +857,7 @@ export function TournamentDetailView({
           sportCode={tournament.sport?.code ?? ''}
           alt={`${tournament.title} 대표 이미지`}
           className="h-full w-full object-contain"
+          sizes="(min-width: 1024px) 680px, (min-width: 768px) 600px, 100vw"
           eager
         />
       </div>
@@ -887,18 +920,6 @@ export function TournamentDetailView({
             {sportAccent.label}
           </span>
         </div>
-        {/* 독립 리그가 이어 가는 지난 시즌(2026-11-03) — 공개된 지난 리그만 서버가 싣는다. */}
-        {tournament.previousSeason ? (
-          <p className="tm-text-caption" style={{ margin: 'var(--spacing-1) 0 0', color: 'var(--text-muted)' }}>
-            {'지난 시즌 · '}
-            <Link
-              href={`/tournaments/${encodeURIComponent(tournament.previousSeason.leagueId)}`}
-              className="font-medium text-[var(--blue700)] underline underline-offset-2"
-            >
-              {tournament.previousSeason.title}
-            </Link>
-          </p>
-        ) : null}
       </div>
     </div>
     </>
@@ -911,6 +932,11 @@ export function TournamentDetailView({
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
         {!entryInAside ? entrySection : null}
+        {tournament.previousSeason ? (
+          <Card className="tm-hide-desktop" pad={16} style={{ marginBottom: 'var(--spacing-4)' }}>
+            <PreviousSeasonNav season={tournament.previousSeason} />
+          </Card>
+        ) : null}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -1055,6 +1081,11 @@ export function TournamentDetailView({
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
         {entrySection}
+        {tournament.previousSeason ? (
+          <Card className="tm-hide-desktop" pad={16} style={{ marginBottom: 'var(--spacing-4)' }}>
+            <PreviousSeasonNav season={tournament.previousSeason} />
+          </Card>
+        ) : null}
       </section>
 
       <CompletedResultHero tournament={tournament} />
@@ -1232,10 +1263,13 @@ export function TournamentDetailView({
   const nextLeagueInvite = isLeagueMirror && (registrationBlock !== null || tournament.status === 'completed')
     ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} /></div>
     : null;
+  const previousSeasonRail = tournament.previousSeason
+    ? <div className="mb-4"><PreviousSeasonNav season={tournament.previousSeason} /></div>
+    : null;
   const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
   const railCTA = isOpen && !leagueUsesProgressRail ? (
     isLeagueMirror ? (
-      hasActiveRegistration && !showsCapacity ? null : (
+      hasActiveRegistration && !showsCapacity && previousSeasonRail === null ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
           {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
@@ -1262,6 +1296,7 @@ export function TournamentDetailView({
           </div>
         ) : null}
         {!hasActiveRegistration ? <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} /> : null}
+        {previousSeasonRail ? <div className="mt-4">{previousSeasonRail}</div> : null}
       </aside>
       )
     ) : (
@@ -1356,6 +1391,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       {/* Key facts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1410,6 +1446,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
@@ -1443,6 +1480,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
@@ -1534,8 +1572,9 @@ export function TournamentDetailView({
  */
 function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail }) {
   const childHref = useChildHref();
-  const championName = getCompletedChampionName(tournament);
-  const title = championName ? `${championName} 우승!` : '대회가 끝났어요';
+  const trackChampions = getCompletedTrackChampions(tournament);
+  const championName = trackChampions.length ? null : getCompletedChampionName(tournament);
+  const title = trackChampions.length ? '토너먼트별 우승팀' : championName ? `${championName} 우승!` : '대회가 끝났어요';
 
   return (
     <section style={{ marginTop: 16 }}>
@@ -1552,7 +1591,9 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(0,0,0,0.2)',
         }}
-        aria-label={championName ? `${championName} 우승. 경기 결과 보기` : '경기 결과 보기'}
+        aria-label={trackChampions.length
+          ? `토너먼트별 우승팀. ${trackChampions.map(row => `${row.label}: ${row.champion ?? '결과 확정 대기'}`).join('. ')}. 경기 결과 보기`
+          : championName ? `${championName} 우승. 경기 결과 보기` : '경기 결과 보기'}
       >
         <span
           aria-hidden="true"
@@ -1584,6 +1625,16 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           >
             {title}
           </div>
+          {trackChampions.length > 0 && (
+            <dl style={{ display: 'grid', gap: 8, margin: '12px 0', color: '#fff' }}>
+              {trackChampions.map(row => (
+                <div key={row.track} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 5fr)', gap: 8, alignItems: 'baseline' }}>
+                  <dt style={{ fontSize: 'var(--font-size-caption)', color: 'rgba(255,255,255,0.65)', overflowWrap: 'anywhere' }}>{row.label}</dt>
+                  <dd style={{ margin: 0, fontSize: 'var(--font-size-body-sm)', fontWeight: 700, overflowWrap: 'anywhere' }}>{row.champion ?? '결과 확정 대기'}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <div style={{ fontSize: 'var(--font-size-caption)', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
             경기 결과 보기
           </div>

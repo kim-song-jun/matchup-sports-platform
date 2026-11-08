@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'n
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
+import * as ts from 'typescript';
 
 const apiRoot = resolve(__dirname, '../..');
 const jestBin = resolve(apiRoot, 'node_modules/jest/bin/jest.js');
@@ -86,6 +87,25 @@ describe('v1_api Jest integration discovery contract', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  // 재시작되는 단일 워커가 스위트마다 TS 프로그램을 다시 만들면 CI API 잡이 15분에서 50분대로 늘었다.
+  it('keeps the integration transform transpile-only so a recycled worker does not rebuild the TS program', () => {
+    const shown = JSON.parse(runJestResolver(...integrationArgs, '--showConfig', '--json')) as {
+      configs: Array<{ displayName: { name: string }; transform: Array<[string, string, { tsconfig?: string }?]> }>;
+    };
+    const integration = shown.configs.find((project) => project.displayName.name === 'integration');
+    const tsTransforms = (integration?.transform ?? []).filter(([, transformer]) => transformer.includes('ts-jest'));
+    expect(tsTransforms).toHaveLength(1);
+    const tsconfig = tsTransforms[0][2]?.tsconfig?.replace('<rootDir>', apiRoot);
+    expect(tsconfig).toBeDefined();
+    const parsed = ts.getParsedCommandLineOfConfigFile(tsconfig as string, {}, {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+        throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+      },
+    });
+    expect(parsed?.options.isolatedModules).toBe(true);
   });
 
   it('resolves every canonical suite through the isolated serial integration runner', () => {

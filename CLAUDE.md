@@ -244,7 +244,7 @@ infra/load/               → k6 부하 테스트 하네스
 pnpm --filter v1_api dev          # API (8121)
 pnpm --filter v1_web dev          # Web (3013) — 검증 목적으로는 띄우지 않는다(아래 "운영 워크플로" 7)
 pnpm --filter v1_web lint         # tsc --noEmit + scripts/v1-pattern-check.mjs
-pnpm --filter v1_api lint         # tsc --noEmit + scripts/v1-surface-check.mjs
+pnpm --filter v1_api lint         # tsc -p tsconfig.spec.json(테스트 포함) + scripts/v1-surface-check.mjs
 pnpm --filter v1_web build
 pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```
@@ -252,7 +252,7 @@ pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```bash
 pnpm --filter v1_web test              # Vitest(jsdom) — src/**/*.test.{ts,tsx}. 반드시 apps/v1_web 기준으로 실행
 pnpm --filter v1_api test              # Jest unit — src/**/*.spec.ts
-pnpm --filter v1_api test:integration  # Jest integration(--runInBand) — test/**/*.integration-spec.ts, DB 필요
+pnpm --filter v1_api test:integration  # Jest integration(워커 1개, 1GB 넘으면 재시작) — test/**/*.integration-spec.ts, DB 필요
 pnpm v1:test                           # 위 v1_api unit + v1_web test
 pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스택 가동 전제)
 ```
@@ -425,7 +425,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 
 1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` +
    영향받는 테스트 + (시각 변경이면) 아래 4번의 alpha 화면 검증.
-2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`
+2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer "@copilot"`
    또는 공식 REST `POST /repos/{owner}/{repo}/pulls/{number}/requested_reviewers`에
    `reviewers: ["copilot-pull-request-reviewer[bot]"]`를 전달한다(2026-10-16 실제 접수·실행 확인).
    도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은

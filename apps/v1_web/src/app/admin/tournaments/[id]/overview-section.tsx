@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { AlertTriangle, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { AdminKpiCard, AdminKpiGridSkeleton, AdminStatusPill } from '@/components/admin';
 import { useV1AdminTournament } from '@/hooks/use-v1-api';

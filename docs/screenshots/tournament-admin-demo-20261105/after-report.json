@@ -1,0 +1,474 @@
+{
+  "mode": "after",
+  "origin": "https://alpha.teameet.co.kr",
+  "persona": "anonymous sample operator",
+  "pid": 9880,
+  "ppid": 3528,
+  "screenshots": [
+    "after-quick-result-1440.png",
+    "after-overview-1440.png",
+    "after-info-1440.png",
+    "after-registrations-1440.png",
+    "after-bracket-1440.png",
+    "after-announcements-1440.png",
+    "after-sponsors-1440.png",
+    "after-popups-1440.png",
+    "after-campaign-1440.png",
+    "after-reviews-1440.png",
+    "after-awards-1440.png",
+    "after-statistics-1440.png",
+    "after-staff-1440.png",
+    "after-operations-1440.png",
+    "after-overview-768.png",
+    "after-info-768.png",
+    "after-registrations-768.png",
+    "after-bracket-768.png",
+    "after-announcements-768.png",
+    "after-sponsors-768.png",
+    "after-popups-768.png",
+    "after-campaign-768.png",
+    "after-reviews-768.png",
+    "after-awards-768.png",
+    "after-statistics-768.png",
+    "after-staff-768.png",
+    "after-operations-768.png",
+    "after-overview-390.png",
+    "after-info-390.png",
+    "after-registrations-390.png",
+    "after-bracket-390.png",
+    "after-announcements-390.png",
+    "after-sponsors-390.png",
+    "after-popups-390.png",
+    "after-campaign-390.png",
+    "after-reviews-390.png",
+    "after-awards-390.png",
+    "after-statistics-390.png",
+    "after-staff-390.png",
+    "after-operations-390.png"
+  ],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    }
+  ],
+  "errors": [],
+  "verdicts": [
+    {
+      "flow": "confirm four teams, generate and assign bracket, reload, confirm score through actual editor",
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/overview",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/info",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/registrations",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/bracket",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/announcements",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/sponsors",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/popups",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/campaign",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/reviews",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/awards",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/statistics",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/staff",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/operations",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/overview",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/info",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/registrations",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/bracket",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/announcements",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/sponsors",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/popups",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/campaign",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/reviews",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/awards",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/statistics",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/staff",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/operations",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/overview",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/info",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/registrations",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/bracket",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/announcements",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/sponsors",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/popups",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/campaign",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/reviews",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/awards",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/statistics",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/staff",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo/operations",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "flow": "healthy sample reset restores default title and empty bracket",
+      "verdict": "PASS"
+    },
+    {
+      "flow": "corrupt history blocks management and reset preserves unrelated storage",
+      "verdict": "PASS"
+    },
+    {
+      "flow": "clipboard failure exposes a directly copyable share URL",
+      "verdict": "PASS"
+    }
+  ],
+  "cleanup": true,
+  "deployedCommit": "a8cb59951c4b5d9c0c5f8c661698bd6a81e62867"
+}

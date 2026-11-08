@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { MultiFinalDefinition, MultiFinalGroup, MultiFinalPreview } from '@/hooks/use-multi-finals';
+import { orderRulesByRank } from '@/lib/multi-final-seed-order';
 import type { V1AdminTournamentAwardSet, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 import { NAMED_FINALS_ID, namedFinalPublicDetail, namedFinalView } from './named-finals-fixtures';
 
@@ -15,11 +16,12 @@ async function body(request: Request) { try { return await request.json() as unk
 /** Stateful sample of a configured competition. Never intercepts unknown fixture IDs. */
 export function createNamedFinalsMsw(actor: Actor = 'ops') {
   let view = namedFinalView(); let detail = namedFinalPublicDetail(); let awardSets: V1AdminTournamentAwardSet[] = [];
+  let nextColorIndex = view.finals.length;
   const replays = new Map<string, { hash: string; revision: number }>();
   const preliminaryGroups = (): V1TournamentGroup[] => view.groups.map((group, i) => ({ id: group.id, name: group.name, phase: 'group',
     sortOrder: i, advanceCount: null, bracketTrack: 'overall', groupTeams: (group.registrationIds ?? []).map(id => view.registrations.find(reg => reg.id === id)!).map((reg, j) => ({ id: `group-team-${i}-${j}`, registrationId: reg.id, teamId: reg.team.id, teamName: reg.team.name, teamLogoUrl: null, sortOrder: j })), standings: [], qualification: null }));
   function reset() {
-    view = namedFinalView(); detail = namedFinalPublicDetail(); detail.groups = preliminaryGroups();
+    view = namedFinalView(); detail = namedFinalPublicDetail(); detail.groups = preliminaryGroups(); nextColorIndex = view.finals.length;
     detail.fixtures = view.groups.map((group, i) => {
       const [home, away] = view.registrations.slice(i * 2, i * 2 + 2);
       return { id: `pre-fixture-${i}`, groupId: group.id, round: 'league_r1', fixtureNumber: i + 1, legNumber: 1, scheduledAt: null, venue: null,
@@ -39,8 +41,8 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
     const names = new Set<string>(), rules = new Set<string>(), teams = new Set<string>();
     const finals: MultiFinalDefinition[] = [];
     for (const f of value) {
-      if (!record(f) || Object.keys(f).some(key => !['name', 'rules', 'thirdPlace', 'registrationIds'].includes(key))
-        || typeof f.name !== 'string' || !f.name.trim() || f.name.length > 80 || typeof f.thirdPlace !== 'boolean'
+      if (!record(f) || Object.keys(f).some(key => !['id', 'name', 'rules', 'thirdPlace', 'registrationIds'].includes(key))
+        || f.id !== undefined && typeof f.id !== 'string' || typeof f.name !== 'string' || !f.name.trim() || f.name.length > 80 || typeof f.thirdPlace !== 'boolean'
         || ['overall', 'upper', 'lower'].includes(f.name.trim()) || names.has(f.name.trim()) || !Array.isArray(f.rules)) return null;
       names.add(f.name.trim());
       const parsedRules: MultiFinalDefinition['rules'] = [];
@@ -54,9 +56,23 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       if (f.registrationIds != null && (!Array.isArray(f.registrationIds) || f.registrationIds.some(id => typeof id !== 'string' || !view.registrations.some(reg => reg.id === id)))) return null;
       const ids = f.registrationIds as string[] | null | undefined;
       for (const id of ids ?? []) { if (teams.has(id)) return null; teams.add(id); }
-      finals.push({ name: f.name.trim(), rules: parsedRules, thirdPlace: f.thirdPlace, registrationIds: ids });
+      finals.push({ ...(typeof f.id === 'string' ? { id: f.id } : {}), name: f.name.trim(), rules: parsedRules, thirdPlace: f.thirdPlace, registrationIds: ids });
     }
     return finals;
+  }
+  // Same contract as the server: rules are stored rank first, equal ranks in group order.
+  const seeded = <T extends MultiFinalDefinition>(finals: T[], groups: readonly MultiFinalGroup[]) => finals.map(f => ({ ...f, rules: orderRulesByRank(f.rules, groups.map(group => group.id)) }));
+  // Same identity contract as the server: ids keep their color, id-less rows match unclaimed names, the rest get new colors.
+  function identify(finals: MultiFinalDefinition[]) {
+    const claimed = new Set(finals.flatMap(f => f.id ? [f.id] : [])); const seen = new Set<string>();
+    const result: Array<MultiFinalDefinition & { id: string; colorIndex: number }> = [];
+    for (const final of finals) {
+      const match = final.id ? view.finals.find(f => f.id === final.id) : view.finals.find(f => !claimed.has(f.id) && f.name === final.name);
+      if (final.id && !match || match && seen.has(match.id)) return null;
+      if (match) { claimed.add(match.id); seen.add(match.id); }
+      result.push({ ...final, id: match?.id ?? crypto.randomUUID(), colorIndex: match?.colorIndex ?? nextColorIndex++ });
+    }
+    return result;
   }
   // The fixture has no official preliminary results. Manual selections remain
   // available; it never invents resolved ranks or successful result confirmation.
@@ -125,7 +141,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       if (['completed', 'cancelled', 'archived'].includes(detail.status) || detail.fixtures.some(f => f.result != null || f.status !== 'scheduled' || f.liveStatus !== 'scheduled')) return fail(409, 'BRACKET_LOCKED', '시작했거나 기록이 있는 경기는 초기화할 수 없어요.');
       view = { ...view, revision: view.revision + 1, generated: false, fixtureCount: 0, preliminaryFixtureCount: 0,
         groupStandings: view.groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
-        finals: view.finals.map(f => ({ ...f, registrationIds: null, manual: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+        finals: view.finals.map(f => ({ ...f, registrationIds: null, manual: false, standingsChanged: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       detail.groups = preliminaryGroups(); detail.fixtures = []; return ok(view);
     }),
     http.put(`${path}/preliminary`, async ({ request }) => {
@@ -146,12 +162,13 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       }
       if (!Array.isArray(input.finals)) return invalid();
       const mapped = input.finals.map(f => record(f) && Array.isArray(f.rules) ? { ...f, rules: f.rules.map(r => record(r) ? { ...r, groupId: groups[Number(r.groupId)]?.id ?? '' } : r) } : f);
-      const finals = parseFinals(mapped, groups); if (!finals) return invalid();
+      const parsed = parseFinals(mapped, groups); const identified = parsed && identify(parsed); if (!identified) return invalid();
+      const finals = seeded(identified, groups);
       if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
       view = { ...view, revision: view.revision + 1, groups, generated: false,
         preliminaryFixtureCount: groups.reduce((sum, g) => sum + g.capacity * (g.capacity - 1) / 2 * g.legs, 0),
         groupStandings: groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
-        finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+        finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       detail.groups = preliminaryGroups(); detail.fixtures = [];
       for (const group of groups) for (let leg = 0; leg < group.legs; leg++) for (let homeIndex = 0; homeIndex < group.capacity; homeIndex++) for (let awayIndex = homeIndex + 1; awayIndex < group.capacity; awayIndex++) {
         const home = view.registrations.find(reg => reg.id === group.registrationIds?.[leg ? awayIndex : homeIndex]);
@@ -167,14 +184,15 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       const denied = auth(true); if (denied) return denied;
       const input = await body(request); if (!record(input) || Object.keys(input).some(key => !['expectedRevision', 'finals'].includes(key))) return invalid();
       if (input.expectedRevision !== view.revision) return stale();
-      const finals = parseFinals(input.finals); if (!finals) return invalid();
+      const parsed = parseFinals(input.finals); const identified = parsed && identify(parsed); if (!identified) return invalid();
+      const finals = seeded(identified, view.groups);
       if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
       const sameStructure = finals.length === view.finals.length && finals.every((final, i) => {
         const previous = view.finals[i];
         return final.name === previous.name && final.thirdPlace === previous.thirdPlace
           && (final.registrationIds?.length ?? final.rules.length) === (previous.registrationIds?.length ?? previous.rules.length);
       });
-      view = { ...view, revision: view.revision + 1, generated: sameStructure && view.generated, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+      view = { ...view, revision: view.revision + 1, generated: sameStructure && view.generated, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, standingsChanged: false, tiePicks: [], suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       if (!sameStructure) { detail.groups = preliminaryGroups(); detail.fixtures = detail.fixtures.filter(f => f.groupId?.startsWith('group-')); }
       return ok(view);
     }),

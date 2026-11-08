@@ -190,6 +190,12 @@ services:
     image: ${V1_WEB_IMAGE}
     container_name: teameet_v1_web
     restart: always
+    # /_next/image 변환 결과를 배포 사이에 유지한다 — 없으면 배포마다 모든 사진을 다시 변환한다.
+    # 이미지 안에 app 소유로 만들어 둔 폴더라 첫 연결 때 그 소유권을 물려받는다(Dockerfile.v1-web).
+    # 상한은 next.config.ts 의 images.maximumDiskCacheSize. .next/cache 전체가 아니라 images 만 —
+    # 다른 캐시는 빌드마다 달라 남기면 안 된다.
+    volumes:
+      - v1_web_image_cache:/app/apps/v1_web/.next/cache/images
     environment:
       NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
@@ -257,3 +263,4 @@ services:
 volumes:
   v1_postgres_data:
   v1_uploads_data:
+  v1_web_image_cache:

@@ -5,11 +5,14 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { V1TournamentListItem } from '@/types/api';
+
+/** `.tm-featured-media` 가 가장 넓어지는 폭 — 태블릿(프레임 600px − 좌우 20px) 단독 카드. 2배면 1200 폭. */
+export const FEATURED_MEDIA_PX = 560;
 
 /**
  * 홈 "오늘의 추천"에 올릴 수 있나 — **지금 신청할 수 있고(상태·마감·정원) 아직 시작 전**인 대회·리그.
@@ -86,7 +89,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
               <div
                 className="tm-featured-media"
-                style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'var(--brand-hero-gradient)' }}
+                style={{ background: imageUrl ? `${optimizedCssUrl(imageUrl, FEATURED_MEDIA_PX)} center/cover` : 'var(--brand-hero-gradient)' }}
               >
                 {/* 은은한 트로피 워터마크 (장식) — 세로 중앙·우측 살짝 블리드(상단 잘림 방지) */}
                 {!imageUrl ? (

@@ -1,3 +1,4 @@
+import { PHONE_PROOF_TTL_SECONDS } from '../verification/phone-proof-token';
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
 
 describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
@@ -38,7 +39,13 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       expect(phoneVerification.verifyCode).toHaveBeenCalledWith('01012345678', '123456');
       // purpose 를 생략하면 기존 동작 그대로 가입용 토큰이 발급된다(service 기본값 'signup').
       expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678', undefined);
-      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered: false, withdrawalPendingUntil: null });
+      expect(result).toEqual({
+        verified: true,
+        proofToken: 'proof-token-value',
+        proofExpiresInSeconds: PHONE_PROOF_TTL_SECONDS,
+        registered: false,
+        withdrawalPendingUntil: null,
+      });
     });
 
     it.each([true, false])('reports registered=%s from the number lookup next to the proof token', async (registered) => {
@@ -51,7 +58,13 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       const result = await controller.verify({ phone: '01012345678', code: '123456' });
 
       expect(phoneVerification.lookupRegistration).toHaveBeenCalledWith('01012345678');
-      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered, withdrawalPendingUntil: null });
+      expect(result).toEqual({
+        verified: true,
+        proofToken: 'proof-token-value',
+        proofExpiresInSeconds: PHONE_PROOF_TTL_SECONDS,
+        registered,
+        withdrawalPendingUntil: null,
+      });
     });
 
     it('passes on when the grace period of the withdrawal holding the number ends', async () => {
@@ -66,6 +79,7 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       await expect(controller.verify({ phone: '01012345678', code: '123456' })).resolves.toEqual({
         verified: true,
         proofToken: 'proof-token-value',
+        proofExpiresInSeconds: PHONE_PROOF_TTL_SECONDS,
         registered: true,
         withdrawalPendingUntil: '2026-11-30T00:00:00.000Z',
       });

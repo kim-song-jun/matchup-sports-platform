@@ -135,7 +135,7 @@ function Round12Editor({ preview, tournamentId, onClose, showToast, onRefresh }:
       </div>
     </details> : <p role="status">동률인 조별 순위를 모두 선택하면 추천 대진이 나와요.</p>}
     {assignments.length === 12 ? <section className="flex flex-col gap-3">
-      <SectionTitle title="배정 미리보기" />
+      <SectionTitle title="배정 미리보기" compact />
       {edited ? <p className="tm-text-caption text-[var(--orange700)]">추천 시드와 다르게 배치하고 있어요. 부전승팀과 상대팀이 바뀔 수 있으니 저장 전에 확인해 주세요.</p> : null}
       <div className="grid gap-3 md:grid-cols-2">
         {preview.targets.map((target, index) => <label key={target.seed} className="tm-text-label flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4">

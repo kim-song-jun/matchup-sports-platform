@@ -5,11 +5,12 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
-import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
-import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
+import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow, otpInputId } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
 import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';
+import { useProofExpiry } from '@/components/auth/phone-verification/use-proof-expiry';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
@@ -34,7 +35,7 @@ import {
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthPasswordField } from './auth-password-field';
 import { usePasswordFeedback } from './use-password-feedback';
-import { AuthStepCta } from './auth-step-cta';
+import { AuthStepCta, type AuthStepAction } from './auth-step-cta';
 import { AuthStepHeader } from './auth-step-header';
 import { AuthVerifiedInset } from './auth-verified-inset';
 import { SignupPhoneRegisteredCard } from './signup-phone-registered-card';
@@ -52,18 +53,19 @@ import {
 } from './signup-profile-validation';
 import { extractErrorMessage } from '@/lib/error-message';
 
-type WizardStep = 'account' | 'verify' | 'profile';
+type WizardStep = 'verify' | 'account' | 'profile';
 
-const STEP_ORDER: WizardStep[] = ['account', 'verify', 'profile'];
+// 번호를 맨 앞에 둔다: 이미 가입된 번호인지를 아무것도 적기 전에 알려 입력이 헛수고가 되지 않게 한다.
+const STEP_ORDER: WizardStep[] = ['verify', 'account', 'profile'];
 
 const STEP_COPY: Record<WizardStep, { title: string; sub?: string }> = {
-  account: {
-    title: '가입 정보를\n확인해 주세요',
-    sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
-  },
   verify: {
     title: '휴대폰 번호를 인증해 주세요',
-    sub: '인증이 끝나면 자동으로 다음 단계로 넘어가요.',
+    sub: '인증이 끝나면 자동으로 다음 단계로 넘어가요. 이미 가입한 번호인지도 함께 확인해요.',
+  },
+  account: {
+    title: '가입 정보를\n확인해 주세요',
+    sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 다음 단계로 넘어가요.',
   },
   // 부제가 없다: 생년월일 칸까지 첫 화면 안에 들어오게 하려고 제목만 둔다.
   profile: {
@@ -102,7 +104,7 @@ export function SignupClient() {
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
 
-  const [step, setStep] = useState<WizardStep>('account');
+  const [step, setStep] = useState<WizardStep>('verify');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -113,7 +115,13 @@ export function SignupClient() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
-  const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
+  // 증명은 서버가 알려 준 수명(받은 시각 기준)만큼만 쓸 수 있다. 만료 시각을 모르면 null — 서버의 거절(PHONE_NOT_VERIFIED)로만 알게 된다.
+  const [phoneProof, setPhoneProof] = useState<{ token: string; expiresAt: number | null } | null>(null);
+  const proofExpired = useProofExpiry(phoneProof?.expiresAt ?? null);
+  const phoneProofToken = phoneProof !== null && !proofExpired ? phoneProof.token : null;
+  // 받았던 증명이 만료됐거나 서버가 거절했다. 입력은 그대로 두고 그 자리에서 다시 인증받는다.
+  const proofLapsed = phoneProof !== null && phoneProofToken === null;
+  const [reverifying, setReverifying] = useState(false);
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [acceptedTermsDocumentIds, setAcceptedTermsDocumentIds] = useState<string[]>([]);
@@ -153,26 +161,48 @@ export function SignupClient() {
    * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
    * 완료 상태를 잠깐 보여준 뒤 이동한다.
    */
-  const handlePhoneVerified = (token?: string, registered?: boolean, withdrawalPendingUntil?: string | null) => {
+  const handlePhoneVerified = (
+    token?: string,
+    registered?: boolean,
+    withdrawalPendingUntil?: string | null,
+    proofExpiresInSeconds?: number,
+  ) => {
     setProfileError(null);
-    // 가입된 번호의 증명은 가입에 쓸 수 없다 — 쥐고 있지 않고 그 자리에서 안내한다.
+    setReverifying(false);
+    // 가입된 번호의 증명은 가입에 쓸 수 없다 — 쥐고 있지 않고 인증 단계에서 안내한다.
     if (registered) {
-      setPhoneProofToken(null);
+      setPhoneProof(null);
       setRegisteredPhone({ withdrawalPendingUntil: withdrawalPendingUntil ?? null });
+      setStep('verify');
       return;
     }
-    setPhoneProofToken(token ?? null);
-    if (!token) return;
+    if (!token) {
+      setPhoneProof(null);
+      return;
+    }
+    setPhoneProof({ token, expiresAt: proofExpiresInSeconds === undefined ? null : Date.now() + proofExpiresInSeconds * 1000 });
     if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+    // 만료 뒤 다른 단계에서 다시 인증한 경우에는 그 자리에 머문다.
     advanceTimerRef.current = window.setTimeout(() => {
       advanceTimerRef.current = null;
-      setStep('profile');
+      setStep((current) => (current === 'verify' ? 'account' : current));
     }, VERIFY_ADVANCE_DELAY_MS);
   };
 
   const otpIdPrefix = useId();
   const phoneRequests = usePhoneVerificationRequests({ mode: 'public', phone: phoneDigits, onVerified: handlePhoneVerified });
   const otp = useOtpVerification(phoneRequests);
+
+  // 증명이 만료되면 지난 인증의 "완료" 상태를 비워 같은 번호로 처음부터 다시 받을 수 있게 한다.
+  const resetOtp = otp.reset;
+  useEffect(() => {
+    if (proofExpired) resetOtp();
+  }, [proofExpired, resetOtp]);
+
+  // 다시 인증받는 중에는 인증번호 칸이 화면 위쪽에 열리므로, 코드를 보낸 직후 그 칸으로 시선을 옮긴다.
+  useEffect(() => {
+    if (reverifying && otp.phase === 'sent') document.getElementById(otpInputId(otpIdPrefix))?.focus();
+  }, [reverifying, otp.phase, otpIdPrefix]);
 
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
@@ -239,6 +269,7 @@ export function SignupClient() {
   const goBack = () => {
     setError(null);
     setProfileError(null);
+    setReverifying(false);
     // 인증 직후 900ms 안에 뒤로가기를 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
     // 되돌아온 단계를 덮어쓴다. 단계를 바꾸기 전에 예약을 취소한다.
     if (advanceTimerRef.current !== null) {
@@ -247,30 +278,43 @@ export function SignupClient() {
     }
     // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
     // 유료 SMS 를 한 번 더 쓰게 되고 쿨다운에도 걸린다.
-    setStep(step === 'profile' ? 'verify' : 'account');
-  };
-
-  const goVerify = () => {
-    if (!accountReady) return;
-    setError(null);
-    setProfileError(null);
-    setStep('verify');
+    setStep(STEP_ORDER[Math.max(0, stepIndex - 1)]);
   };
 
   /** 가입된 번호 안내에서 다른 번호로 돌아간다 — 번호 칸을 비우면 발급·입력 상태도 함께 초기화된다. */
   const changePhone = () => {
     setRegisteredPhone(null);
-    setPhoneProofToken(null);
+    setPhoneProof(null);
     setPhoneDigits('');
     setProfileError(null);
     phoneInputRef.current?.focus();
   };
 
-  const goProfile = () => {
+  const goAccount = () => {
     if (!phoneProofToken) return;
     setError(null);
     setProfileError(null);
+    setStep('account');
+  };
+
+  const goProfile = () => {
+    if (!accountReady) return;
+    setError(null);
+    setProfileError(null);
     setStep('profile');
+  };
+
+  /** 만료된 증명으로 다시 인증받는다. 번호는 그대로이고 다른 입력은 건드리지 않는다. */
+  const startReverify = () => {
+    setError(null);
+    setProfileError(null);
+    setReverifying(true);
+    void otp.requestCode();
+  };
+
+  /** 서버가 증명을 거절했다 — 클라이언트 시계가 아직 유효하다고 해도 쓸 수 없는 증명이다. */
+  const expireProof = () => {
+    setPhoneProof((current) => (current ? { ...current, expiresAt: Date.now() } : current));
   };
 
   const submitAccount = async () => {
@@ -287,7 +331,7 @@ export function SignupClient() {
     }
 
     if (!phoneProofToken) {
-      setProfileError('휴대폰 본인인증을 완료해 주세요.');
+      startReverify();
       return;
     }
 
@@ -353,7 +397,7 @@ export function SignupClient() {
           return;
         }
         if (nextError.code === PHONE_CONFLICT_CODE) {
-          setPhoneProofToken(null);
+          setPhoneProof(null);
           setRegisteredPhone({ withdrawalPendingUntil: null });
           setStep('verify');
           return;
@@ -367,8 +411,7 @@ export function SignupClient() {
         return;
       }
       if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
-        setProfileError('휴대폰 본인인증을 완료해 주세요.');
-        setPhoneProofToken(null);
+        expireProof();
         return;
       }
       if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
@@ -382,15 +425,32 @@ export function SignupClient() {
       setError(extractErrorMessage(nextError, '회원가입에 실패했어요.'));
     }
   };
-  const primary =
-    step === 'account'
+  /** 인증번호 받기 → 인증번호 확인 하나의 버튼. 인증 단계와 만료 뒤 다시 인증받는 자리가 같이 쓴다. */
+  const otpAction: AuthStepAction =
+    otp.phase === 'idle' || otp.expired
       ? {
-          label: '본인인증 하기',
-          disabled: !accountReady,
-          loading: false,
-          onClick: goVerify,
+          label: otp.expired ? '인증번호 다시 받기' : '인증번호 받기',
+          disabled: !isSendablePhone || phoneRequests.issuing,
+          loading: phoneRequests.issuing,
+          onClick: () => { void otp.requestCode(); },
         }
-      : step === 'verify'
+      : {
+          label: '인증번호 확인',
+          disabled: otp.code.length !== OTP_CODE_LENGTH || phoneRequests.verifying,
+          loading: phoneRequests.verifying,
+          onClick: () => { void otp.submitCode(); },
+        };
+  const otpHint = !isSendablePhone
+    ? '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+    : otp.phase === 'sent' && !otp.expired && otp.code.length !== OTP_CODE_LENGTH
+      ? '인증번호 6자리를 입력해 주세요.'
+      : null;
+
+  // 인증 단계가 아닌데 쓸 수 있는 증명이 없으면 만료된 것이다 — 계정·프로필 입력은 두고 증명만 다시 받는다.
+  const reverifyHere = step !== 'verify' && phoneProofToken === null;
+
+  const primary: AuthStepAction =
+    step === 'verify'
       ? phoneTaken
         ? {
             label: '다른 번호로 인증하기',
@@ -405,21 +465,20 @@ export function SignupClient() {
             label: '다음',
             disabled: false,
             loading: false,
-            onClick: goProfile,
+            onClick: goAccount,
           }
-        : otp.phase === 'idle' || otp.expired
-        ? {
-            label: otp.expired ? '인증번호 다시 받기' : '인증번호 받기',
-            disabled: !isSendablePhone || phoneRequests.issuing,
-            loading: phoneRequests.issuing,
-            onClick: () => { void otp.requestCode(); },
-          }
-        : {
-            label: '인증번호 확인',
-            disabled: otp.code.length !== OTP_CODE_LENGTH || phoneRequests.verifying,
-            loading: phoneRequests.verifying,
-            onClick: () => { void otp.submitCode(); },
-          }
+        : otpAction
+      : reverifyHere
+      ? reverifying
+        ? otpAction
+        : { label: '다시 인증하기', disabled: false, loading: false, onClick: startReverify }
+      : step === 'account'
+      ? {
+          label: '다음',
+          disabled: !accountReady,
+          loading: false,
+          onClick: goProfile,
+        }
       : {
           label: register.isPending ? '가입하는 중...' : '가입하고 계속',
           disabled: profileBlocked,
@@ -428,20 +487,16 @@ export function SignupClient() {
         };
 
   const disabledHint: string | null = primary.disabled
-    ? step === 'account'
-      ? !nicknameCheck.verified
-        ? duplicateHint('닉네임', nicknameCheck.waiting)
-        : !emailCheck.verified
-          ? duplicateHint('이메일', emailCheck.waiting)
-          : !passwordRule.usable
-            ? passwordRule.blockedHint
-            : '비밀번호 확인이 일치해야 해요.'
-      : step === 'verify'
-        ? !isSendablePhone
-          ? '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
-          : otp.phase === 'sent' && !otp.expired && otp.code.length !== OTP_CODE_LENGTH
-            ? '인증번호 6자리를 입력해 주세요.'
-            : null
+    ? step === 'verify' || reverifyHere
+      ? otpHint
+      : step === 'account'
+        ? !nicknameCheck.verified
+          ? duplicateHint('닉네임', nicknameCheck.waiting)
+          : !emailCheck.verified
+            ? duplicateHint('이메일', emailCheck.waiting)
+            : !passwordRule.usable
+              ? passwordRule.blockedHint
+              : '비밀번호 확인이 일치해야 해요.'
         : profileIssue
           ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
           : uploadingProfileImage
@@ -449,14 +504,29 @@ export function SignupClient() {
           : null
     : null;
 
+  /** 인증번호 칸·오류·남은 시간. 인증 단계와 만료 뒤 다시 인증받는 자리가 같은 조각을 쓴다. */
+  const otpParts = (
+    <>
+      {otp.phase === 'sent' ? (
+        <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
+      ) : null}
+      <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
+      {otp.phase === 'sent' ? (
+        <div style={{ marginTop: -4 }}>
+          <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
       // 뒤로가기는 상단 하나뿐이고 목적지는 늘 바로 앞 단계다: 첫 단계는 약관(거기서 다시 /login
       // 으로 나갈 수 있다), 이후 단계는 이전 입력 단계.
       topTitle="회원가입"
-      backHref={step === 'account' ? '/terms?mode=signup' : undefined}
-      onBack={step === 'account' ? undefined : goBack}
+      backHref={step === 'verify' ? '/terms?mode=signup' : undefined}
+      onBack={step === 'verify' ? undefined : goBack}
       fixedAction={<AuthStepCta action={primary} hint={disabledHint} />}
     >
       <div className="tm-auth-body">
@@ -470,8 +540,69 @@ export function SignupClient() {
         </p>
 
         <form className="tm-auth-form tm-auth-signup-form" onSubmit={(event: FormEvent) => event.preventDefault()}>
+          {reverifyHere ? (
+            <>
+              <AlertBanner
+                tone="warning"
+                assertive
+                message="휴대폰 인증이 만료됐어요. 입력한 내용은 그대로 있어요. 다시 인증하면 이어서 가입할 수 있어요."
+              />
+              {reverifying ? (
+                <>
+                  <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)' }}>
+                    {formatPhone(phoneDigits)} 번호로 다시 인증해요.
+                  </p>
+                  {otpParts}
+                </>
+              ) : null}
+            </>
+          ) : null}
+
+          {step === 'verify' ? (
+            <>
+              {proofLapsed ? <AlertBanner tone="warning" assertive message="휴대폰 인증이 만료됐어요. 인증번호를 다시 받아 인증해 주세요." /> : null}
+              <label className="tm-auth-field">
+                <span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
+                <input
+                  ref={phoneInputRef}
+                  className="tm-input tm-auth-input"
+                  inputMode="numeric"
+                  autoFocus={phoneDigits.length === 0}
+                  onChange={(event) => {
+                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
+                    // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
+                    setPhoneProof(null);
+                    setProfileError(null);
+                    setRegisteredPhone(null);
+                  }}
+                  placeholder="010-0000-0000"
+                  required
+                  value={formatPhone(phoneDigits)}
+                />
+              </label>
+
+              {phoneTaken ? (
+                <SignupPhoneRegisteredCard
+                  withdrawalPendingUntil={registeredPhone?.withdrawalPendingUntil ?? null}
+                  loginHref={withRedirect('/login/email')}
+                  socialLoginHref={withRedirect('/login')}
+                  findAccountHref={withRedirect('/auth/find-account')}
+                  // 이메일을 이미 적은 경우에만(인증 단계로 되돌아온 사용자) 이메일을 보관한다. 비밀번호는 가입 화면 밖으로 내보내지 않는다.
+                  onSocialLoginSelect={isPlausibleEmail(normalizedEmail)
+                    ? () => { savePendingEmailLink({ email: normalizedEmail, returnTo: currentRedirect() }); }
+                    : undefined}
+                />
+              ) : isSendablePhone && !phoneProofToken ? (
+                otpParts
+              ) : null}
+
+              {phoneProofToken ? <AuthVerifiedInset message="휴대폰 본인인증이 완료됐어요" /> : null}
+            </>
+          ) : null}
+
           {step === 'account' ? (
             <>
+              {phoneProofToken ? <AuthVerifiedInset message={`${formatPhone(phoneDigits)} 휴대폰 본인인증이 완료됐어요`} /> : null}
               <label className="tm-auth-field">
                 <span className="tm-text-label">닉네임<RequiredMark /></span>
                 <input
@@ -524,54 +655,6 @@ export function SignupClient() {
                     ? { kind: 'success', message: '비밀번호가 일치해요.' }
                     : null}
               />
-            </>
-          ) : null}
-
-          {step === 'verify' ? (
-            <>
-              <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
-                <input
-                  ref={phoneInputRef}
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  onChange={(event) => {
-                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
-                    // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
-                    setPhoneProofToken(null);
-                    setProfileError(null);
-                    setRegisteredPhone(null);
-                  }}
-                  placeholder="010-0000-0000"
-                  required
-                  value={formatPhone(phoneDigits)}
-                />
-              </label>
-
-              {phoneTaken ? (
-                <SignupPhoneRegisteredCard
-                  withdrawalPendingUntil={registeredPhone?.withdrawalPendingUntil ?? null}
-                  loginHref={withRedirect('/login/email')}
-                  socialLoginHref={withRedirect('/login')}
-                  findAccountHref={withRedirect('/auth/find-account')}
-                  // 이메일만 보관한다. 비밀번호는 가입 화면 밖으로 내보내지 않는다.
-                  onSocialLoginSelect={() => { savePendingEmailLink({ email: normalizedEmail, returnTo: currentRedirect() }); }}
-                />
-              ) : isSendablePhone && !phoneProofToken ? (
-                <>
-                  {otp.phase === 'sent' ? (
-                    <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
-                  ) : null}
-                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
-                  {otp.phase === 'sent' ? (
-                    <div style={{ marginTop: -4 }}>
-                      <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
-
-              {phoneProofToken ? <AuthVerifiedInset message="휴대폰 본인인증이 완료됐어요" /> : null}
             </>
           ) : null}
 

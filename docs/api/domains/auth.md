@@ -42,7 +42,7 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, proofExpiresInSeconds, registered, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; `maskedEmail` and `withdrawalPendingUntil` are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
@@ -54,10 +54,27 @@ Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-r
 in [Users](./users.md). Taking it back is `POST /auth/withdrawal/cancel`, described below.
 
 `registered` on `phone/verify` says whether a `v1_users` row still holds that number, whatever its status. It is computed only
-after the code matched, and `phone/issue` still reveals nothing. A number is released only by the final deletion — the admin delete flow
-(`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
-still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
-before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
+after the code matched, and `phone/issue` still reveals nothing. A number is released by the final deletion — the admin delete flow
+(`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it, or, for an abandoned
+social signup, by the lazy release below; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
+still reports `registered=true`. `POST /auth/register` answers `409 PHONE_CONFLICT` with the same lookup, but only after it checked
+the phone proof: a call without a valid, unexpired proof for that number gets `400 PHONE_NOT_VERIFIED` whether or not the number is
+held, and nothing is read about the holder first. A proven call that loses the race for the number to another signup (unique-index
+violation on `v1_users.phone`) gets the same `409 PHONE_CONFLICT` instead of a 500.
+
+`proofExpiresInSeconds` is how long `proofToken` stays valid (600 today, the same constant that signs the token). Signup now starts
+with this verification, so the answer to "did the proof run out?" comes from the server and the web counts down to it; a register
+call that arrives after it still gets `400 PHONE_NOT_VERIFIED`, and the form re-verifies in place without losing its input.
+
+### A number held by an abandoned social signup
+
+A social signup saves its number onto the account the moment an SMS code (or Kakao) confirms it, and phone-first signup makes that
+the first step, so a signup nobody finishes would keep the number from everyone else. When the holder is an empty signup on the
+terms or profile step (no password, no second login, no activity, not an operator) that has not been updated for 24 hours, the number
+is released **only after the caller proved it**: in `phone/verify` (reported as `registered=false`), in `POST /auth/register` with a
+valid `phoneProofToken`, in `/verification/phone/confirm`, and for a Kakao-supplied number in `POST /auth/social-profile`. The release
+writes a `user_phone` status log `signup -> released` with reason `expired_signup_lazy`. Without proof nothing is released and
+nothing changes in the answers above.
 
 ### A number held by a withdrawal waiting out its grace period
 
@@ -391,7 +408,7 @@ When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profil
 
 `social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
 
-A pending signup saves a phone number before it is finished — Kakao's number at creation, a typed one when its SMS code is confirmed — and `v1_users.phone` is unique. The number is released (`phone` and `phoneVerifiedAt` set to null) when the pending signup is reset after the 24h expiry (a login that finds it expired, or `social-terms`/`social-profile`/`social-profile/defer` answering `401 SOCIAL_SIGNUP_EXPIRED`) and when it signs out through `POST /auth/logout` ("가입 그만두기"). Only an empty signup on `social_terms_required` or `social_profile_required` is touched, by the same test the account merge uses (single login, no password, no operator role, no activity); `social_profile_deferred` accounts keep their number. Each release writes a `v1_status_change_logs` row (`target_type=user_phone`, `signup` → `released`, reason `abandoned_signup` for logout or `expired_signup` for the reset; the actor is the user for logout and the system for the reset). Logout never fails because of it: a release error is logged as a warning and the session cookie is still cleared. A signup that is simply abandoned without returning or signing out still holds its number until it comes back or an operator releases it.
+A pending signup saves a phone number before it is finished — Kakao's number at creation, a typed one when its SMS code is confirmed — and `v1_users.phone` is unique. The number is released (`phone` and `phoneVerifiedAt` set to null) when the pending signup is reset after the 24h expiry (a login that finds it expired, or `social-terms`/`social-profile`/`social-profile/defer` answering `401 SOCIAL_SIGNUP_EXPIRED`) and when it signs out through `POST /auth/logout` ("가입 그만두기"). Only an empty signup on `social_terms_required` or `social_profile_required` is touched, by the same test the account merge uses (single login, no password, no operator role, no activity); `social_profile_deferred` accounts keep their number. Each release writes a `v1_status_change_logs` row (`target_type=user_phone`, `signup` → `released`, reason `abandoned_signup` for logout, `expired_signup` for the reset, or `expired_signup_lazy` for the release described in [A number held by an abandoned social signup](#a-number-held-by-an-abandoned-social-signup); the actor is the user for logout and the system for the other two). Logout never fails because of it: a release error is logged as a warning and the session cookie is still cleared. A signup that is simply abandoned without returning or signing out still holds its number until it comes back, or until someone proves the number (see [A number held by an abandoned social signup](#a-number-held-by-an-abandoned-social-signup)) once its 24h window has run out, or an operator releases it.
 
 ### Kakao contact confirmation and automatic account linking
 

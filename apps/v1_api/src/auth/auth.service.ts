@@ -17,7 +17,7 @@ import {
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
-import { isPendingSocialSignup } from './social-signup-access';
+import { isExpiredSocialSignup, isPendingSocialSignup } from './social-signup-access';
 import { isOperatorAccount, linkCallerRestriction, operatorLinkRefusal } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import {
@@ -46,12 +46,10 @@ import type { LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
-import { isPhoneRegistered } from '../verification/phone-registered';
+import { isPhoneRegistered, isPhoneUniqueViolation } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
-import { releaseSignupPhone } from './empty-signup-account';
-
-const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
+import { releaseExpiredSignupPhone, releaseSignupPhone } from './empty-signup-account';
 
 /**
  * Providers whose signup goes through the terms step rather than the email form.
@@ -208,20 +206,21 @@ export class AuthService {
       });
     }
 
-    if (phone && (await isPhoneRegistered(this.prisma, phone))) {
-      throw new ConflictException({
-        code: 'PHONE_CONFLICT',
-        message: 'Phone is already registered',
-      });
-    }
-
+    // Whether a number is taken is told only to a caller who proved they hold it, so a missing or lapsed proof
+    // ends here, before anything is read about the number's holder.
     const phoneVerificationRequired = this.phoneVerification.enabled;
-    if (phoneVerificationRequired && (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone))) {
+    const phoneProven = phoneVerificationRequired && !!dto.phoneProofToken && verifyPhoneProofToken(dto.phoneProofToken, phone);
+    if (phoneVerificationRequired && !phoneProven) {
       throw new BadRequestException({
         code: 'PHONE_NOT_VERIFIED',
         message: '휴대폰 본인인증을 먼저 완료해 주세요.',
       });
     }
+
+    // An expired, abandoned social signup stops holding the number.
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone);
+
+    if (phone && (await isPhoneRegistered(this.prisma, phone))) throw phoneConflict();
 
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
@@ -282,6 +281,10 @@ export class AuthService {
       );
       await recordSignupConsent(transaction, created.id, dto.recordConsent);
       return created;
+    }).catch((error: unknown) => {
+      // Two signups that proved the same number race to the unique index; the loser gets the lookup's answer.
+      if (isPhoneUniqueViolation(error)) throw phoneConflict();
+      throw error;
     });
 
     return this.sessionResponse(user.id, user.email);
@@ -1229,6 +1232,8 @@ export class AuthService {
       phoneProven = true;
     }
 
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone, userId);
+
     if (phone) {
       const existingPhone = await this.prisma.v1User.findFirst({
         where: {
@@ -1770,19 +1775,14 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
   return null;
 }
 
+function phoneConflict() {
+  return new ConflictException({ code: 'PHONE_CONFLICT', message: 'Phone is already registered' });
+}
+
 function draftObject(draftJson: unknown): Prisma.InputJsonObject {
   return draftJson && typeof draftJson === 'object' && !Array.isArray(draftJson)
     ? (draftJson as Prisma.InputJsonObject)
     : {};
-}
-
-function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date; updatedAt: Date }) {
-  if (user.onboardingStatus !== 'social_terms_required' && user.onboardingStatus !== 'social_profile_required') {
-    return false;
-  }
-
-  const referenceTime = user.updatedAt ?? user.createdAt;
-  return Date.now() - referenceTime.getTime() > SOCIAL_SIGNUP_TTL_MS;
 }
 
 function buildTermsConsentCreate(requiredTerms: Array<{ id: string }>) {

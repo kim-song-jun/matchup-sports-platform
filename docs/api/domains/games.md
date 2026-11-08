@@ -127,6 +127,8 @@ raw roster identity fields.
 
 ### 대회·리그 참가 등록 기준과 이력
 
+기본 명단 기준은 경기 종류마다 다르며 정본은 [competition-canonical-flow §3](../../design/competition-canonical-flow.md)이다. 대회는 확정 참가 등록의 활성 선수, 리그는 같은 등록(등록 행이 없던 팀만 자격 가드를 통과한 멤버로 채움), 친선은 활성 팀원 전원(첫 기록 때 고정)이다. 명단을 제출·검수·잠그는 API는 없다 — 경기 시작 전 조정(`roster-adjustments`)과 결과 제출 뒤 어드민 확인이 전부다.
+
 대회·리그의 기본 명단은 기존 confirmed 참가 등록·경기 조정·결장·출전정지 로더와 계산을 유지한다. 친선 기본 팀원 계산으로 참가 등록을 대체하지 않는다. 리그의 `baseSource=REGISTRATION` 여부는 제거된 선수까지 포함한 등록 행의 존재로 구분한다. 등록 선수를 전원 제거했으면 현재 명단이 빈 `REGISTRATION`이며 활성 팀원으로 다시 채우지 않는다. 등록 선수 행이 한 번도 없는 경우만 기존 `TEAM_MEMBERS` fallback을 유지하고, 조회는 참가 명단을 생성하거나 복구하지 않는다. 기존 쓰기 경로의 빈 등록 자동 채움도 등록 행이 아예 없는 경우에만 적용한다.
 
 대회·리그 결과의 side별 기존 selector는 `SUBMITTED`/`LOCKED`가 있으면 그 최신 제출본을 고르고, 제출본이 전혀 없는 side만 최신 revision으로 읽는다. 이후의 미제출 `DRAFT`가 기존 제출본을 대체하지 않는다. 친선의 현재 기본 preview·첫 기록 고정과 혼동하지 않는다.

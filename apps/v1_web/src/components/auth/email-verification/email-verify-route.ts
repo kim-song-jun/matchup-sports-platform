@@ -6,7 +6,7 @@ export const EMAIL_VERIFY_PATH = '/my/email-verify';
 /** 인증을 마치면 돌아갈 곳이 없을 때의 도착지. */
 const DEFAULT_RETURN_PATH = '/my';
 
-/** 인증 화면으로 보내는 링크. 마치면 `redirectTo` 로 돌아오도록 싣는다. */
+/** 인증 화면으로 보내는 링크. 마치면 돌아올 경로를 쿼리 `redirect` 로 싣는다. */
 export function buildEmailVerifyHref(redirectTo?: string | null): string {
   if (!redirectTo || redirectTo === EMAIL_VERIFY_PATH) return EMAIL_VERIFY_PATH;
   return `${EMAIL_VERIFY_PATH}?redirect=${encodeURIComponent(redirectTo)}`;

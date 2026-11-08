@@ -64,7 +64,7 @@ export const v1VerificationEmailMswHandlers = [
   ),
   http.post(`${api}/verification/email/confirm`, async ({ request }) => {
     const { code, ...rest } = await readJson(request);
-    if (Object.keys(rest).length > 0 || typeof code !== 'string' || code.length !== 6) {
+    if (Object.keys(rest).length > 0 || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
       return fail(400, 'VALIDATION_ERROR', '인증번호는 6자리예요.');
     }
     return confirmOutcome(code);

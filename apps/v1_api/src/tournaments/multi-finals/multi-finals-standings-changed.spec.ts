@@ -11,7 +11,7 @@ const user = { id: 'admin', email: 'admin@example.test', accountStatus: 'active'
 const ASSIGN = 'tournament.multi_finals.assign';
 type AuditEntry = { action: string; afterJson: { finalName?: string; registrationIds?: string[]; standingsSnapshot?: unknown } };
 
-// Two 3-team preliminary groups. 프리미어 draws from A조, 챌린지 from B조.
+// Two 3-team preliminary groups. 프리미어 draws ranks 1-2 of A조; 챌린지 ranks 1-2 of B조 unless `challengerRules` replaces its rules.
 function harness(challengerRules?: Array<{ groupId: string; rank: number }>) {
   const members = { gA: ['a1', 'a2', 'a3'], gB: ['b1', 'b2', 'b3'] };
   const all = [...members.gA, ...members.gB];

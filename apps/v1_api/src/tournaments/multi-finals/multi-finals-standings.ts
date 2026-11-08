@@ -18,15 +18,33 @@ export function standingsOrderChanged(saved: StandingsSnapshot, current: Standin
 
 const isIdList = (value: unknown): value is string[] => Array.isArray(value) && value.every(id => typeof id === 'string');
 
+/** The operator's choice of which tied team takes one drawn-tie seat (a group's rank) of a final. */
+export type TiePick = { groupId: string; rank: number; registrationId: string };
+
+/** An assign audit's payload, only while it still describes the roster that is saved now. */
+function currentAssignment(afterJson: unknown, registrationIds: readonly string[]): { standingsSnapshot?: unknown; tiePicks?: unknown } | null {
+  if (typeof afterJson !== 'object' || afterJson === null) return null;
+  const { registrationIds: assigned } = afterJson as { registrationIds?: unknown };
+  if (!isIdList(assigned) || assigned.length !== registrationIds.length || assigned.some((id, index) => id !== registrationIds[index])) return null;
+  return afterJson as { standingsSnapshot?: unknown; tiePicks?: unknown };
+}
+
 /** The snapshot an assign audit stored, only while it still describes the roster that is saved now. */
 export function savedStandingsSnapshot(afterJson: unknown, registrationIds: readonly string[]): StandingsSnapshot | null {
-  if (typeof afterJson !== 'object' || afterJson === null) return null;
-  const { registrationIds: assigned, standingsSnapshot } = afterJson as { registrationIds?: unknown; standingsSnapshot?: unknown };
-  if (!isIdList(assigned) || assigned.length !== registrationIds.length || assigned.some((id, index) => id !== registrationIds[index])) return null;
+  const { standingsSnapshot } = currentAssignment(afterJson, registrationIds) ?? {};
   if (!Array.isArray(standingsSnapshot)) return null;
   const groups = standingsSnapshot as Array<{ groupId?: unknown; registrationIds?: unknown }>;
   if (!groups.every(group => typeof group?.groupId === 'string' && isIdList(group.registrationIds))) return null;
   return groups.map(group => ({ groupId: group.groupId as string, registrationIds: group.registrationIds as string[] }));
+}
+
+/** The tie picks an assign audit stored, only while it still describes the saved roster. Absent, old or malformed entries read as none. */
+export function savedTiePicks(afterJson: unknown, registrationIds: readonly string[]): TiePick[] {
+  const { tiePicks } = currentAssignment(afterJson, registrationIds) ?? {};
+  if (!Array.isArray(tiePicks)) return [];
+  const picks = tiePicks as Array<Partial<Record<keyof TiePick, unknown>> | null>;
+  if (!picks.every(pick => typeof pick?.groupId === 'string' && Number.isInteger(pick.rank) && typeof pick.registrationId === 'string')) return [];
+  return picks.map(pick => ({ groupId: pick!.groupId as string, rank: pick!.rank as number, registrationId: pick!.registrationId as string }));
 }
 
 type Rule = { groupId: string; rank: number };

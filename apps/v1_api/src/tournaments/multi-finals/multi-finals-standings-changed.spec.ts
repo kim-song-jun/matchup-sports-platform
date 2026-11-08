@@ -101,11 +101,12 @@ describe('확정한 결선 배정 뒤 예선 순위 순서가 바뀐 경우의 �
     swapPositions('a2', 'a3');
     expect(await changed()).toEqual({ 프리미어: false, 챌린지: false });
   });
-  it('조회용 알림 값은 대진 생성 미리보기에 실리지 않아 저장 설정으로 새지 않는다', async () => {
+  it('조회용 알림·동률 선택 값은 대진 생성 미리보기에 실리지 않아 저장 설정으로 새지 않는다', async () => {
     const { assign, service } = harness();
     await assign('프리미어', ['a1', 'a2']);
     const preview = await service.preview(user, 't');
     expect(preview.finals.map(final => Object.keys(final))).not.toContainEqual(expect.arrayContaining(['standingsChanged']));
+    expect(preview.finals.map(final => Object.keys(final))).not.toContainEqual(expect.arrayContaining(['tiePicks']));
   });
   it('다시 배정하면 새 순위를 기준으로 알림이 사라진다', async () => {
     const { assign, changed, swapPositions } = harness();

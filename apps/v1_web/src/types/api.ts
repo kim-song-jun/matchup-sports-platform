@@ -394,6 +394,8 @@ export type V1CancelWithdrawalPayload = {
 export type V1PhoneVerifyResult = {
   verified: boolean;
   proofToken?: string;
+  /** `proofToken` 이 발급 시점부터 유효한 시간(초). 화면의 만료 카운트다운은 이 값만 따른다. */
+  proofExpiresInSeconds: number;
   /** 이 번호로 이미 가입한 계정이 있다. */
   registered: boolean;
   /** 그 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 아니거나 탈퇴 신청 기록이 없으면 null. */

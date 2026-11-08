@@ -42,7 +42,7 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, proofExpiresInSeconds, registered, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; `maskedEmail` and `withdrawalPendingUntil` are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
@@ -58,6 +58,20 @@ after the code matched, and `phone/issue` still reveals nothing. A number is rel
 (`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
 still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
 before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
+
+`proofExpiresInSeconds` is how long `proofToken` stays valid (600 today, the same constant that signs the token). Signup now starts
+with this verification, so the answer to "did the proof run out?" comes from the server and the web counts down to it; a register
+call that arrives after it still gets `400 PHONE_NOT_VERIFIED`, and the form re-verifies in place without losing its input.
+
+### A number held by an abandoned social signup
+
+A social signup saves its number onto the account the moment an SMS code (or Kakao) confirms it, and phone-first signup makes that
+the first step, so a signup nobody finishes would keep the number from everyone else. When the holder is an empty signup on the
+terms or profile step (no password, no second login, no activity, not an operator) that has not been updated for 24 hours, the number
+is released **only after the caller proved it**: in `phone/verify` (reported as `registered=false`), in `POST /auth/register` with a
+valid `phoneProofToken`, in `/verification/phone/confirm`, and for a Kakao-supplied number in `POST /auth/social-profile`. The release
+writes a `user_phone` status log `signup -> released` with reason `expired_signup_lazy`. Without proof nothing is released and
+nothing changes in the answers above.
 
 ### A number held by a withdrawal waiting out its grace period
 

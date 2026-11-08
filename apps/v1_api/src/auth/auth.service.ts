@@ -17,7 +17,7 @@ import {
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
-import { isPendingSocialSignup } from './social-signup-access';
+import { isExpiredSocialSignup, isPendingSocialSignup } from './social-signup-access';
 import { isOperatorAccount, linkCallerRestriction, operatorLinkRefusal } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import {
@@ -49,9 +49,7 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneRegistered } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
-import { releaseSignupPhone } from './empty-signup-account';
-
-const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
+import { releaseExpiredSignupPhone, releaseSignupPhone } from './empty-signup-account';
 
 /**
  * Providers whose signup goes through the terms step rather than the email form.
@@ -208,6 +206,11 @@ export class AuthService {
       });
     }
 
+    const phoneVerificationRequired = this.phoneVerification.enabled;
+    const phoneProven = phoneVerificationRequired && !!dto.phoneProofToken && verifyPhoneProofToken(dto.phoneProofToken, phone);
+    // An expired, abandoned social signup stops holding the number — but only for a caller who proved they hold it.
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone);
+
     if (phone && (await isPhoneRegistered(this.prisma, phone))) {
       throw new ConflictException({
         code: 'PHONE_CONFLICT',
@@ -215,8 +218,7 @@ export class AuthService {
       });
     }
 
-    const phoneVerificationRequired = this.phoneVerification.enabled;
-    if (phoneVerificationRequired && (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone))) {
+    if (phoneVerificationRequired && !phoneProven) {
       throw new BadRequestException({
         code: 'PHONE_NOT_VERIFIED',
         message: '휴대폰 본인인증을 먼저 완료해 주세요.',
@@ -1229,6 +1231,8 @@ export class AuthService {
       phoneProven = true;
     }
 
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone, userId);
+
     if (phone) {
       const existingPhone = await this.prisma.v1User.findFirst({
         where: {
@@ -1774,15 +1778,6 @@ function draftObject(draftJson: unknown): Prisma.InputJsonObject {
   return draftJson && typeof draftJson === 'object' && !Array.isArray(draftJson)
     ? (draftJson as Prisma.InputJsonObject)
     : {};
-}
-
-function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date; updatedAt: Date }) {
-  if (user.onboardingStatus !== 'social_terms_required' && user.onboardingStatus !== 'social_profile_required') {
-    return false;
-  }
-
-  const referenceTime = user.updatedAt ?? user.createdAt;
-  return Date.now() - referenceTime.getTime() > SOCIAL_SIGNUP_TTL_MS;
 }
 
 function buildTermsConsentCreate(requiredTerms: Array<{ id: string }>) {

@@ -124,6 +124,11 @@ export type NotificationEventType =
   // 확정된 대회 경기 결과를 어드민이 정정해 다시 확정했을 때(MD-QA #79). 같은 복합 targetId 를 쓰고,
   // 발송은 completed 와 같은 tournament-fixture-completion-notification.service.ts 가 한다.
   | 'tournament_match_result_corrected'
+  // 결과 확정·정정 직후 그 팀의 다음 경기에 못 뛰는 선수(출전정지)와 경고 한 장이면 정지인 선수(경고 임박)를 팀장·매니저와
+  // 대회 운영진에게 알린다(MD-QA #191). 발송은 game-operations/suspension-notice.service.ts 가 outbox tx 로 직접 쓰고,
+  // targetType 'team' · targetId 팀 id · 딥링크는 그 팀의 다음 경기 명단이다.
+  | 'player_suspension_notice'
+  | 'player_suspension_warning'
   // 경기 전 알림(Task 180 G7): 출전자에게 전날 한 번(대회·리그 팀장·매니저는 기존 "명단 확인"을 받는다),
   // 킥오프 2시간 전에 출전자와 팀장·매니저에게 한 번. 발송은 jobs/lineup-reminders 워커가 tx 로 직접 쓴다.
   // 대회 경기는 targetType 'tournament' + "${tournamentId}:${teamMatchId}", 나머지는 'team_match' + teamMatchId.
@@ -282,6 +287,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_fixture_scheduled' ||
     type === 'league_fixture_cancelled' ||
     type === 'league_team_match_completed' ||
+    type === 'player_suspension_notice' ||
+    type === 'player_suspension_warning' ||
     type === 'game_day_before_reminder' ||
     type === 'game_kickoff_reminder' ||
     type === 'team_match_lineup_included' ||
@@ -368,6 +375,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
+    type === 'player_suspension_notice' ||
+    type === 'player_suspension_warning' ||
     SCHEDULE_TARGET_EVENTS.has(type)
   ) {
     return 'team';
@@ -658,6 +667,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_team_match_completed: '경기 결과가 확정됐어요',
   tournament_match_completed: '대회 경기 결과가 확정됐어요',
   tournament_match_result_corrected: '대회 경기 결과가 정정됐어요',
+  player_suspension_notice: '다음 경기에 못 뛰는 선수가 있어요',
+  player_suspension_warning: '경고 한 장이면 정지인 선수가 있어요',
   // 발송 경로가 앞에 "9/30 (수) 01:10 " 을 붙인다 — 자정을 넘긴 경기가 "내일"로 읽히지 않게 날짜를 쓴다.
   game_day_before_reminder: '경기가 있어요',
   game_kickoff_reminder: '2시간 뒤 경기가 시작돼요',
@@ -749,6 +760,8 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_team_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_result_corrected: '정정된 경기 결과를 확인해 보세요.',
+  player_suspension_notice: '다음 경기 명단에서 자동으로 빠졌어요.',
+  player_suspension_warning: '이번 경기에서 경고를 받으면 다음 경기부터 출전정지예요.',
   // 두 경기 전 알림의 본문 끝 문장이다 — 발송 경로가 "vs 상대 · 장소." 뒤에 붙인다.
   game_day_before_reminder: '출전 명단은 경기 전까지 바뀔 수 있어요.',
   game_kickoff_reminder: '지금 출전 명단에 있어요.',

@@ -136,6 +136,13 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
       expect(screen.getByLabelText(label)).toBeDisabled();
     }
     expect(screen.getByText(/이름·설명·지역만 수정할 수 있어요/)).toBeInTheDocument();
+    const gender = within(screen.getByRole('group', { name: '성별 카테고리' }));
+    for (const name of ['혼성', '남성부', '여성부']) {
+      expect(gender.getByRole('radio', { name })).toBeDisabled();
+      expect(gender.getByRole('radio', { name }).closest('label')?.className).toContain('cursor-not-allowed');
+    }
+    fireEvent.click(gender.getByText('남성부'));
+    expect(gender.getByRole('radio', { name: '혼성' })).toBeChecked();
     fireEvent.change(screen.getByLabelText('리그 이름'), { target: { value: '오타를 고친 리그' } });
     fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
     expect(await screen.findByText('리그 정보를 저장했어요.')).toBeInTheDocument();
@@ -149,6 +156,10 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
       expect(await screen.findByLabelText(label)).toBeEnabled();
     }
     expect(screen.queryByText(/이름·설명·지역만 수정할 수 있어요/)).toBeNull();
+    const gender = within(screen.getByRole('group', { name: '성별 카테고리' }));
+    expect(gender.getByRole('radio', { name: '남성부' }).closest('label')?.className).toContain('cursor-pointer');
+    fireEvent.click(gender.getByRole('radio', { name: '남성부' }));
+    expect(gender.getByRole('radio', { name: '남성부' })).toBeChecked();
   });
   it('읽기 전용 계정은 현재 정보를 볼 수 있고 저장할 수 없다', async () => {
     mocks.canWrite = false; mount();

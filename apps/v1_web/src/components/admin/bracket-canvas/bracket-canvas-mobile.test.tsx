@@ -707,3 +707,67 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     expect(screen.queryByRole('button', { name: /팀 (고르기|바꾸기)/ })).not.toBeInTheDocument();
   });
 });
+
+describe('BracketCanvasMobile — 리그 경기 취소·삭제 입구', () => {
+  const leagueHandlers = () => ({ scope: 'league' as const, onCancelFixture: vi.fn(), onDeleteFixture: vi.fn() });
+
+  it('예정·결과 없는 경기는 취소와 삭제가 다른 안내와 함께 보이고 누르면 그 경기를 넘긴 채 시트를 닫는다', async () => {
+    const handlers = leagueHandlers();
+    renderMobile(handlers);
+    fireEvent.click(card(/8강 · 2번 경기/));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByText('순위 집계에서 빼요. 경기 기록은 남아요.')).toBeInTheDocument();
+    const del = within(sheet).getByRole('button', { name: '경기 삭제' });
+    expect(del).toBeEnabled();
+    expect(del).toHaveAccessibleDescription('대진표에서 숨겨요. 되돌릴 수 없어요.');
+
+    fireEvent.click(del);
+    await waitFor(() => expect(handlers.onDeleteFixture).toHaveBeenCalledWith('fx-2'));
+    expect(handlers.onCancelFixture).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('결과가 확정된 경기는 삭제가 막히고 먼저 취소하라는 이유가 버튼 설명으로 이어진다', async () => {
+    const handlers = leagueHandlers();
+    renderMobile(handlers);
+    fireEvent.click(card(/8강 · 3번 경기/));
+    const sheet = screen.getByRole('dialog');
+    const del = within(sheet).getByRole('button', { name: '경기 삭제' });
+    expect(del).toBeDisabled();
+    expect(del).toHaveAccessibleDescription('시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.');
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '경기 취소' }));
+    await waitFor(() => expect(handlers.onCancelFixture).toHaveBeenCalledWith('fx-3'));
+  });
+
+  it('취소된 경기는 취소 버튼 없이 삭제만 켜져 있다', () => {
+    renderMobile(leagueHandlers());
+    fireEvent.click(screen.getByRole('tab', { name: '결승' }));
+    fireEvent.click(card(/결승 · 8번 경기/));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).queryByRole('button', { name: '경기 취소' })).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: '경기 삭제' })).toBeEnabled();
+  });
+
+  it('진행 중인 경기는 취소 입구 없이 삭제 막힘 이유를 보인다', () => {
+    renderMobile(leagueHandlers());
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 9번 경기/));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).queryByRole('button', { name: '경기 취소' })).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: '경기 삭제' })).toBeDisabled();
+    expect(within(sheet).getByText(/경기가 진행 중이에요/)).toBeInTheDocument();
+  });
+
+  it('읽기 전용이거나 핸들러가 없으면(대회 보드) 입구를 그리지 않는다', () => {
+    const { unmount } = renderMobile({ ...leagueHandlers(), canWrite: false });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
+    unmount();
+
+    renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 취소' })).not.toBeInTheDocument();
+  });
+});

@@ -853,6 +853,50 @@ export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   replaceExisting?: boolean;
 }
 
+/** `POST /admin/league-matches/:leagueId/fixtures/template/preview` — nothing is written. */
+export interface V1PreviewLeagueTemplatePayload {
+  teamCount: number;
+  legs: 1 | 2;
+  /** 'HH:mm' (KST) every day starts at. */
+  time: string;
+  gamesPerDay?: number;
+  gameDurationMinutes?: number;
+  breakMinutes?: number;
+}
+
+export interface V1LeagueTemplatePreviewGame {
+  round: number;
+  /** 1-based position inside the day. */
+  order: number;
+  startTime: string;
+  endTime: string | null;
+  homePosition: number;
+  awayPosition: number;
+  /** Seats of this game that also played the game right before it. */
+  backToBack: Array<{ position: number; games: number }>;
+}
+
+export interface V1LeagueTemplatePreviewDay {
+  day: number;
+  startTime: string;
+  endTime: string | null;
+  games: V1LeagueTemplatePreviewGame[];
+}
+
+export interface V1LeagueTemplatePreview {
+  teamCount: number;
+  legs: 1 | 2;
+  totalRounds: number;
+  fixtureCount: number;
+  gamesPerDay: number | null;
+  days: V1LeagueTemplatePreviewDay[];
+  checks: {
+    duplicateMeetings: number;
+    missingMeetings: number;
+    backToBackRuns: Array<{ day: number; position: number; fromOrder: number; toOrder: number; games: number }>;
+  };
+}
+
 export interface V1ApplyLeagueTemplateResult {
   slots: number;
   fixtures: number;

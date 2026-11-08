@@ -4,13 +4,19 @@ import Link from 'next/link';
 import { Button } from '@/components/v1-ui/button';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import type { LinkOutcome } from '@/lib/link-result';
-
-const PROVIDER_NAME = { kakao: '카카오', apple: 'Apple' } as const;
+import { LOGIN_METHOD_NAME } from '@/lib/login-method';
+import type { UnlinkOutcome } from '@/lib/unlink-result';
 
 /** 로그인한 지 오래돼 새 로그인 수단을 붙일 수 없을 때의 안내. 소셜 연결과 이메일 연결이 같은 문구·같은 길(다시 로그인)을 쓴다. */
 export const RECENT_LOGIN_NOTICE = {
   title: '보안을 위해 다시 로그인해 주세요',
   body: '로그인한 지 오래돼서 바로 연결할 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 연결할 수 있어요.',
+} as const;
+
+/** 로그인한 지 오래돼 로그인 수단을 뗄 수 없을 때의 안내. 연결 안내(`RECENT_LOGIN_NOTICE`)와 제목·길(다시 로그인)이 같다. */
+const RECENT_LOGIN_UNLINK_NOTICE = {
+  title: RECENT_LOGIN_NOTICE.title,
+  body: '로그인한 지 오래돼서 바로 해제할 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 해제할 수 있어요.',
 } as const;
 
 type CardNotice = {
@@ -30,7 +36,7 @@ function withNextStep(reason: string, provider: LinkOutcome['provider'], canConn
 }
 
 function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolean): Notice {
-  const name = PROVIDER_NAME[provider];
+  const name = LOGIN_METHOD_NAME[provider];
   switch (linkResult) {
     case 'linked':
       return { kind: 'banner', message: `${name} 로그인이 연결됐어요. 이제 ${name}로도 같은 계정에 들어올 수 있어요.` };
@@ -90,24 +96,16 @@ function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolea
 
 /** 연결이 새로 이뤄졌을 때 배너와 함께 잠깐 띄우는 한 줄. 이미 연결돼 있었거나 실패한 결과에는 없다. */
 export function linkSuccessToast({ linkResult, provider }: LinkOutcome): string | null {
-  return linkResult === 'linked' || linkResult === 'merged' ? `${PROVIDER_NAME[provider]} 로그인이 연결됐어요` : null;
+  return linkResult === 'linked' || linkResult === 'merged' ? `${LOGIN_METHOD_NAME[provider]} 로그인이 연결됐어요` : null;
 }
 
-export function LinkResultNotice({
-  outcome,
-  onDismiss,
-  onRelogin,
-  relogin,
-  canConnectHere,
-}: {
-  outcome: LinkOutcome;
+type NoticeActions = {
   onDismiss: () => void;
   onRelogin: () => void;
   relogin: { pending: boolean; error: string | null };
-  /** 이 결과의 제공자를 연결하는 버튼이 지금 이 화면에 있는가. */
-  canConnectHere: boolean;
-}) {
-  const notice = noticeFor(outcome, canConnectHere);
+};
+
+function NoticeView({ notice, onDismiss, onRelogin, relogin }: NoticeActions & { notice: Notice }) {
   if (notice.kind === 'banner') return <AlertBanner tone="info" message={notice.message} />;
 
   return (
@@ -146,4 +144,68 @@ export function LinkResultNotice({
       ) : null}
     </Card>
   );
+}
+
+export function LinkResultNotice({
+  outcome,
+  canConnectHere,
+  ...actions
+}: NoticeActions & {
+  outcome: LinkOutcome;
+  /** 이 결과의 제공자를 연결하는 버튼이 지금 이 화면에 있는가. */
+  canConnectHere: boolean;
+}) {
+  return <NoticeView notice={noticeFor(outcome, canConnectHere)} {...actions} />;
+}
+
+function unlinkNoticeFor({ unlinkResult, provider }: UnlinkOutcome): Notice {
+  const name = LOGIN_METHOD_NAME[provider];
+  switch (unlinkResult) {
+    case 'unlinked':
+      return { kind: 'banner', message: `${name} 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.` };
+    case 'recent_login':
+      return { kind: 'card', ...RECENT_LOGIN_UNLINK_NOTICE, role: 'status', actions: ['relogin'] };
+    case 'last':
+      return {
+        kind: 'card',
+        title: '마지막 로그인 방법이라 해제할 수 없어요',
+        body: '다른 로그인 방법을 먼저 연결한 뒤에 해제해 주세요.',
+        role: 'status',
+        actions: ['dismiss'],
+      };
+    case 'not_found':
+      return {
+        kind: 'card',
+        title: `이미 해제된 ${name} 로그인이에요`,
+        body: '다른 기기에서 먼저 해제했을 수 있어요. 목록을 새로 불러왔어요.',
+        role: 'status',
+        actions: ['dismiss'],
+      };
+    case 'admin':
+      return {
+        kind: 'card',
+        title: '로그인 방법을 해제할 수 없어요',
+        body: '운영자 계정은 로그인 방법을 직접 해제할 수 없어요. 문의가 필요하면 고객센터에 알려 주세요.',
+        role: 'alert',
+        actions: ['inquiry', 'dismiss'],
+      };
+    case 'failed':
+      return {
+        kind: 'card',
+        title: `${name} 로그인을 해제하지 못했어요`,
+        body: '잠시 후 다시 시도해 주세요. 계속 안 되면 고객센터에 알려 주세요.',
+        role: 'alert',
+        actions: ['inquiry', 'dismiss'],
+      };
+  }
+}
+
+/** 해제가 이뤄졌을 때 배너와 함께 잠깐 띄우는 한 줄. 해제하지 못한 결과에는 없다. */
+export function unlinkSuccessToast({ unlinkResult, provider }: UnlinkOutcome): string | null {
+  return unlinkResult === 'unlinked' ? `${LOGIN_METHOD_NAME[provider]} 로그인을 해제했어요` : null;
+}
+
+/** 로그인 수단을 뗀 결과 안내. 연결 결과 안내(`LinkResultNotice`)와 같은 틀·같은 "다시 로그인" 길을 쓴다. */
+export function UnlinkResultNotice({ outcome, ...actions }: NoticeActions & { outcome: UnlinkOutcome }) {
+  return <NoticeView notice={unlinkNoticeFor(outcome)} {...actions} />;
 }

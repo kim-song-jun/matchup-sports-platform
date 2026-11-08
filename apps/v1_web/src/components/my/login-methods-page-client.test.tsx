@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -47,10 +47,12 @@ afterAll(() => {
 });
 
 let linkCalls: Array<{ provider: 'kakao' | 'apple'; body: unknown }> = [];
+let unlinkCalls: unknown[] = [];
 
 beforeEach(() => {
   vi.clearAllMocks();
   linkCalls = [];
+  unlinkCalls = [];
   nav.params = new URLSearchParams();
   signOut.pending = false;
   signOut.error = null;
@@ -64,6 +66,10 @@ beforeEach(() => {
     }),
     http.post('*/api/v1/auth/link/apple', async ({ request }) => {
       linkCalls.push({ provider: 'apple', body: await request.clone().json() });
+      return undefined;
+    }),
+    http.post('*/api/v1/auth/identities/unlink', async ({ request }) => {
+      unlinkCalls.push(await request.clone().json());
       return undefined;
     }),
   );
@@ -86,6 +92,8 @@ function me(providers: string[] | undefined, email: string | null = 'minsu.kim@e
       onboardingStatus: 'completed',
       canLinkLoginMethods: true,
       ...(providers ? { authProviders: providers } : {}),
+      // 서버는 이메일 로그인 행에 비밀번호가 있을 때만 true 로 내린다.
+      hasPassword: providers?.includes('email') ?? false,
     },
     profile: { displayName: '민수' },
   };
@@ -157,6 +165,8 @@ function rowOf(label: string) {
 
 const KAKAO_BUTTON = '카카오 연결하기';
 const EMAIL_LINK = '이메일 연결하기';
+const UNLINK_ANY = /연결 해제$/;
+const LAST_METHOD_NOTE = '마지막 로그인 방법이라 해제할 수 없어요';
 
 describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
   it('가입 정보를 미룬 계정은 연결 금지 대신 입력 후 돌아올 경로를 보여 준다', async () => {
@@ -179,6 +189,8 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
     expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+    expect(screen.queryByText(LAST_METHOD_NOTE)).not.toBeInTheDocument();
   });
 
   it('운영 권한 계정은 연결할 수 없는 로그인 추가 버튼을 보여 주지 않는다', async () => {
@@ -189,6 +201,9 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
     expect(within(rowOf('이메일·비밀번호')).getByText('연결됨')).toBeInTheDocument();
+    // 서버가 어차피 거절하는 계정이라 해제 버튼도, 마지막 수단이라는 이유도 보이지 않는다.
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+    expect(screen.queryByText(LAST_METHOD_NOTE)).not.toBeInTheDocument();
   });
 
 
@@ -269,10 +284,62 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(within(rowOf('네이버 로그인')).getByText('연결됨')).toBeInTheDocument();
   });
 
-  it('연결 해제 버튼은 어디에도 없다', async () => {
-    await renderLoaded(['email', 'kakao', 'apple']);
+  it('다른 수단이 남는 연결된 줄마다 해제 버튼이 있고, 앱에서만 연결하는 줄에는 없다', async () => {
+    await renderLoaded(['email', 'kakao']);
 
-    expect(screen.queryByRole('button', { name: /해제|끊기|삭제/ })).not.toBeInTheDocument();
+    const email = within(rowOf('이메일·비밀번호')).getByRole('button', { name: '이메일 로그인 연결 해제' });
+    const kakao = within(rowOf('카카오 로그인')).getByRole('button', { name: '카카오 로그인 연결 해제' });
+    for (const button of [email, kakao]) {
+      expect(button).toHaveTextContent('연결 해제');
+      expect(button).toBeEnabled();
+      // 터치 높이 44px 는 .tm-btn-sm 이 맡고, 빨간 글자는 .tm-danger-text 가 입힌다.
+      expect(button).toHaveClass('tm-btn-sm', 'tm-danger-text');
+    }
+    expect(within(rowOf('Apple 로그인')).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByText(LAST_METHOD_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('남은 수단이 하나뿐이면 해제 버튼 대신 이유를 보인다', async () => {
+    await renderLoaded(['kakao']);
+
+    const kakao = rowOf('카카오 로그인');
+    expect(within(kakao).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+  });
+
+  it('Apple 도 서버가 웹에서 떼는 것을 받으므로 연결돼 있으면 해제 버튼이 있다', async () => {
+    await renderLoaded(['email', 'apple']);
+
+    expect(within(rowOf('Apple 로그인')).getByRole('button', { name: 'Apple 로그인 연결 해제' })).toBeEnabled();
+  });
+
+  it('네이버는 서버가 떼지 않는 수단이라 버튼이 없고, 로그인할 길도 없어 남는 수단으로 세지 않는다', async () => {
+    await renderLoaded(['email', 'naver']);
+
+    expect(within(rowOf('네이버 로그인')).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(rowOf('네이버 로그인')).getByText('지금은 네이버로 로그인할 수 없어요')).toBeInTheDocument();
+    expect(within(rowOf('이메일·비밀번호')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+  });
+
+  it('카카오와 네이버뿐인 계정은 카카오를 못 떼고, 카카오와 이메일이 함께 있으면 뗄 수 있다', async () => {
+    await renderLoaded(['kakao', 'naver']);
+    expect(within(rowOf('카카오 로그인')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+    cleanup();
+
+    await renderLoaded(['kakao', 'email', 'naver']);
+    expect(within(rowOf('카카오 로그인')).getByRole('button', { name: '카카오 로그인 연결 해제' })).toBeEnabled();
+  });
+
+  it('비밀번호가 없는 이메일 행은 남는 수단으로 세지 않아, 카카오는 마지막 수단이고 이메일 행은 뗄 수 있다', async () => {
+    server.use(http.get('*/api/v1/auth/me', () => ok({ ...me(['kakao', 'email']), user: { ...me(['kakao', 'email']).user, hasPassword: false } })));
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    expect(within(rowOf('카카오 로그인')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+    expect(within(rowOf('카카오 로그인')).queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+    expect(within(rowOf('이메일·비밀번호')).getByRole('button', { name: '이메일 로그인 연결 해제' })).toBeEnabled();
   });
 
   it('불러오지 못하면 다시 시도로 이어진다', async () => {
@@ -664,5 +731,300 @@ describe('LoginMethodsPageClient - 결과 카드의 다음 행동', () => {
     await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
     expect(screen.queryByText('카카오 로그인을 연결하지 못했어요')).not.toBeInTheDocument();
+  });
+});
+
+function failUnlink(statusCode: number, code: string, message: string, details: Record<string, unknown> | null = null) {
+  // server.use 는 앞에 끼우므로 beforeEach 의 기록용 핸들러보다 먼저 답한다.
+  server.use(http.post('*/api/v1/auth/identities/unlink', async ({ request }) => {
+    unlinkCalls.push(await request.clone().json());
+    return HttpResponse.json(
+      { status: 'error', statusCode, code, message, details, timestamp: '2026-11-07T00:00:00.000Z' },
+      { status: statusCode },
+    );
+  }));
+}
+
+/** 공유 핸들러는 provider 마다 정해진 답만 하므로(이메일은 마지막 수단 거절), 이메일 해제 성공은 여기서 정한다. */
+function succeedUnlink(provider: string, authProviders: string[]) {
+  server.use(http.post('*/api/v1/auth/identities/unlink', async ({ request }) => {
+    unlinkCalls.push(await request.clone().json());
+    return ok({ provider, authProviders });
+  }));
+}
+
+function unlinkButton(label: string, method: string) {
+  return within(rowOf(label)).getByRole('button', { name: `${method} 로그인 연결 해제` });
+}
+
+function dialog() {
+  return screen.getByRole('dialog');
+}
+
+describe('LoginMethodsPageClient - 로그인 수단 해제', () => {
+  it('카카오: 확인 창에서 영향을 알리고, 해제하면 안내와 함께 목록이 새로 바뀐다', async () => {
+    // 해제 뒤 목록 갱신이 읽는 두 번째 응답은 카카오가 빠진 목록이다.
+    serveMe(['email', 'kakao'], ['email']);
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+
+    const modal = within(dialog());
+    expect(modal.getByText('카카오 로그인을 해제할까요?')).toBeInTheDocument();
+    expect(modal.getByText(
+      '카카오 버튼으로는 더 이상 이 계정에 로그인할 수 없어요. 이메일 로그인은 그대로 쓸 수 있어요. 같은 카카오 계정은 다시 연결할 수 있어요.',
+    )).toBeInTheDocument();
+    expect(Array.from(dialog().querySelectorAll('.tm-info-row')).map((row) => row.textContent)).toEqual([
+      '이 기기로그인 유지',
+      '다른 기기모두 로그아웃',
+    ]);
+    // 확인하기 전에는 아무것도 보내지 않는다.
+    expect(unlinkCalls).toEqual([]);
+
+    await userEvent.click(modal.getByRole('button', { name: '카카오 해제' }));
+
+    expect(await screen.findByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.')).toBeInTheDocument();
+    expect(unlinkCalls).toEqual([{ provider: 'kakao' }]);
+    expect(screen.getByText('카카오 로그인을 해제했어요')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 해제된 줄은 다시 "연결하기" 줄이 되고, 남은 이메일은 마지막 수단이라 해제 버튼이 사라진다.
+    const kakao = rowOf('카카오 로그인');
+    expect(within(kakao).queryByText('연결됨')).not.toBeInTheDocument();
+    expect(within(kakao).getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+    expect(within(rowOf('이메일·비밀번호')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+  });
+
+  it('해제하고 확인 창이 닫혀도 포커스가 문서 처음으로 떨어지지 않는다(눌렀던 버튼은 이미 사라졌다)', async () => {
+    serveMe(['email', 'kakao'], ['email']);
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    const trigger = unlinkButton('카카오 로그인', '카카오');
+    await userEvent.click(trigger);
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+    await screen.findByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(trigger.isConnected).toBe(false);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.').closest('[tabindex="-1"]'));
+  });
+
+  it('해제하지 못했을 때는 눌렀던 버튼이 그대로 있으니 포커스가 그 버튼으로 돌아간다', async () => {
+    failUnlink(500, 'INTERNAL_ERROR', '서버 오류');
+    await renderLoaded(['email', 'kakao']);
+
+    const trigger = unlinkButton('카카오 로그인', '카카오');
+    await userEvent.click(trigger);
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+    await screen.findByText('카카오 로그인을 해제하지 못했어요');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('이메일: 계정 이메일이 연락처로 남는다고 알리고, 해제하면 이메일 연결하기 줄로 돌아간다', async () => {
+    serveMe(['email', 'kakao'], ['kakao']);
+    succeedUnlink('email', ['kakao']);
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    await userEvent.click(unlinkButton('이메일·비밀번호', '이메일'));
+
+    const modal = within(dialog());
+    expect(modal.getByText('이메일 로그인을 해제할까요?')).toBeInTheDocument();
+    expect(modal.getByText(
+      '이 이메일과 비밀번호로는 더 이상 로그인할 수 없어요. 카카오 로그인은 그대로 쓸 수 있어요.',
+    )).toBeInTheDocument();
+    expect(Array.from(dialog().querySelectorAll('.tm-info-row')).map((row) => row.textContent)).toEqual([
+      '이 기기로그인 유지',
+      '다른 기기모두 로그아웃',
+      '계정 이메일연락처로 남아요',
+    ]);
+
+    await userEvent.click(modal.getByRole('button', { name: '이메일 해제' }));
+
+    expect(await screen.findByText('이메일 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.')).toBeInTheDocument();
+    expect(unlinkCalls).toEqual([{ provider: 'email' }]);
+    expect(within(rowOf('이메일·비밀번호')).getByRole('link', { name: EMAIL_LINK })).toHaveAttribute(
+      'href',
+      '/my/settings/login-methods/email',
+    );
+    expect(within(rowOf('카카오 로그인')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument();
+  });
+
+  it('확인 창은 로그인할 수 없는 네이버를 그대로 쓸 수 있는 수단으로 말하지 않는다', async () => {
+    await renderLoaded(['kakao', 'email', 'naver']);
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+
+    expect(within(dialog()).getByText(
+      '카카오 버튼으로는 더 이상 이 계정에 로그인할 수 없어요. 이메일 로그인은 그대로 쓸 수 있어요. 같은 카카오 계정은 다시 연결할 수 있어요.',
+    )).toBeInTheDocument();
+    expect(within(dialog()).queryByText(/네이버/)).not.toBeInTheDocument();
+  });
+
+  it('Apple: 웹에서는 다시 연결할 수 없다는 것을 확인 창에서 알린다', async () => {
+    await renderLoaded(['email', 'apple']);
+
+    await userEvent.click(unlinkButton('Apple 로그인', 'Apple'));
+
+    expect(within(dialog()).getByText(
+      'Apple 버튼으로는 더 이상 이 계정에 로그인할 수 없어요. 이메일 로그인은 그대로 쓸 수 있어요. 다시 연결하려면 iOS 앱에서 해야 해요.',
+    )).toBeInTheDocument();
+    expect(within(dialog()).getByRole('button', { name: 'Apple 해제' })).toBeEnabled();
+  });
+
+  it('취소하면 요청도 안내도 없이 목록 그대로 돌아온다', async () => {
+    await renderLoaded(['email', 'kakao']);
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(unlinkCalls).toEqual([]);
+    expect(screen.queryByText(/로그인을 해제했어요/)).not.toBeInTheDocument();
+    expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
+  });
+
+  it('요청이 가는 동안 확인 창이 잠겨 같은 해제를 두 번 보내지 않는다', async () => {
+    serveMe(['email', 'kakao'], ['email']);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.post('*/api/v1/auth/identities/unlink', async ({ request }) => {
+      unlinkCalls.push(await request.clone().json());
+      await gate;
+      return HttpResponse.json({ status: 'success', data: { provider: 'kakao', authProviders: ['email'] }, timestamp: '2026-11-07T00:00:00.000Z' });
+    }));
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    expect(within(dialog()).getByRole('button', { name: '카카오 해제' })).toBeDisabled();
+    expect(within(dialog()).getByRole('button', { name: '취소' })).toBeDisabled();
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+    expect(unlinkCalls).toHaveLength(1);
+
+    release();
+    expect(await screen.findByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.')).toBeInTheDocument();
+    expect(unlinkCalls).toHaveLength(1);
+  });
+
+  it('해제를 시작하면 앞선 연결 결과 안내를 거두고, 새 연결을 시작하면 해제 안내를 거둔다', async () => {
+    setQuery('linkResult=failed&provider=kakao');
+    serveMe(['email', 'kakao'], ['email']);
+    kakaoOAuth.startKakaoLinkAuthorize.mockReturnValue(new Promise(() => {}));
+    render(<LoginMethodsPageClient />);
+    expect(await screen.findByText('카카오 로그인을 연결하지 못했어요')).toBeInTheDocument();
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    expect(screen.queryByText('카카오 로그인을 연결하지 못했어요')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+    expect(await screen.findByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+
+    expect(screen.queryByText('카카오 로그인을 해제했어요. 다른 기기에서는 로그아웃됐어요.')).not.toBeInTheDocument();
+  });
+});
+
+describe('LoginMethodsPageClient - 로그인 수단 해제가 거절될 때', () => {
+  it('최근 로그인이 필요하면 안내 카드로 알리고, 다시 로그인하면 이 화면으로 돌아오게 한다', async () => {
+    failUnlink(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인한 뒤 해제해 주세요.', { maxAgeSeconds: 1800 });
+    await renderLoaded(['email', 'kakao']);
+
+    await userEvent.click(unlinkButton('이메일·비밀번호', '이메일'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '이메일 해제' }));
+
+    expect(await screen.findByText('보안을 위해 다시 로그인해 주세요')).toBeInTheDocument();
+    expect(screen.getByText(
+      '로그인한 지 오래돼서 바로 해제할 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 해제할 수 있어요.',
+    )).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 뗀 것이 없으니 목록도 그대로다.
+    expect(within(rowOf('이메일·비밀번호')).getByText('연결됨')).toBeInTheDocument();
+    expect(screen.queryByText(/로그인을 해제했어요/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: '다시 로그인하기' }));
+
+    expect(signOut.signOutAndLeave).toHaveBeenCalledExactlyOnceWith(
+      '/login?redirect=%2Fmy%2Fsettings%2Flogin-methods',
+      { failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.' },
+    );
+  });
+
+  it('마지막 남은 수단이었다면(화면의 목록이 오래됐을 때) 이유를 알리고 목록을 서버 기준으로 맞춘다', async () => {
+    // 화면은 이메일·카카오를 보여 줬지만 그 사이 다른 기기에서 이메일을 이미 뗐다.
+    serveMe(['email', 'kakao'], ['kakao']);
+    failUnlink(409, 'LAST_LOGIN_METHOD', '마지막 남은 로그인 수단은 해제할 수 없어요. 다른 로그인 수단을 먼저 연결해 주세요.');
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    expect(await screen.findByText('다른 로그인 방법을 먼저 연결한 뒤에 해제해 주세요.')).toBeInTheDocument();
+    await waitFor(() => expect(within(rowOf('카카오 로그인')).getByText(LAST_METHOD_NOTE)).toBeInTheDocument());
+    expect(within(rowOf('이메일·비밀번호')).queryByText('연결됨')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: UNLINK_ANY })).not.toBeInTheDocument();
+    // 눌렀던 버튼이 목록 갱신으로 사라졌으니 포커스는 결과 안내에 있다.
+    expect(document.activeElement).toBe(screen.getByText('다른 로그인 방법을 먼저 연결한 뒤에 해제해 주세요.').closest('[tabindex="-1"]'));
+  });
+
+  it('이미 떼어진 수단이면 그렇게 알리고 목록을 서버 기준으로 맞춘다', async () => {
+    serveMe(['email', 'kakao'], ['email']);
+    failUnlink(404, 'LOGIN_METHOD_NOT_FOUND', '연결돼 있지 않은 로그인 수단이에요.');
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    expect(await screen.findByText('이미 해제된 카카오 로그인이에요')).toBeInTheDocument();
+    expect(screen.getByText('다른 기기에서 먼저 해제했을 수 있어요. 목록을 새로 불러왔어요.')).toBeInTheDocument();
+    await waitFor(() => expect(within(rowOf('카카오 로그인')).getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled());
+  });
+
+  it('운영자 계정이라 거절되면 고객센터로 이어 준다', async () => {
+    failUnlink(403, 'SOCIAL_LINK_ADMIN_FORBIDDEN', '운영 권한이 있는 계정은 로그인 수단을 직접 해제할 수 없어요.');
+    await renderLoaded(['email', 'kakao']);
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    expect(await screen.findByText('로그인 방법을 해제할 수 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '고객센터 문의' })).toHaveAttribute('href', '/my/inquiries/new');
+    expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
+  });
+
+  it('그 밖의 실패는 해제하지 못했다고 알리고, 닫으면 안내가 사라진다', async () => {
+    failUnlink(500, 'INTERNAL_ERROR', '서버 오류');
+    await renderLoaded(['email', 'kakao']);
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    expect(await screen.findByText('카카오 로그인을 해제하지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByText(/로그인을 해제했어요/)).not.toBeInTheDocument();
+    expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    expect(screen.queryByText('카카오 로그인을 해제하지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('가입이 덜 끝난 계정으로 거절되면 가입 이어가기 화면으로 보낸다', async () => {
+    failUnlink(403, 'SIGNUP_INCOMPLETE', '가입을 먼저 마무리해 주세요.', { next: { route: '/signup/social' } });
+    await renderLoaded(['email', 'kakao']);
+
+    await userEvent.click(unlinkButton('카카오 로그인', '카카오'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: '카카오 해제' }));
+
+    await waitFor(() => expect(nav.router.replace).toHaveBeenCalledWith('/signup/social'));
+    expect(screen.queryByText(/해제하지 못했어요/)).not.toBeInTheDocument();
   });
 });

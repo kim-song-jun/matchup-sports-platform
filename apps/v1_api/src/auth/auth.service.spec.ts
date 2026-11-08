@@ -18,7 +18,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { V1AuthProvider } from '@prisma/client';
+import { Prisma, V1AuthProvider } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
@@ -536,7 +536,7 @@ describe('AuthService', () => {
     const validToken = () => issuePhoneProofToken(phone);
 
     /** `v1_users.phone` is unique: the holder row answers every phone lookup until a release write lands. */
-    function arrangeHolder(row: ReturnType<typeof holderRow>) {
+    function arrangeHolder(row: ReturnType<typeof holderRow> | null) {
       let released = false;
       prisma.v1User.updateMany.mockImplementation(async () => {
         released = true;
@@ -572,10 +572,10 @@ describe('AuthService', () => {
       expect(prisma.v1User.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ phone }) }));
     });
 
-    it('증명이 없는 호출은 번호를 풀지 못하고 기존대로 PHONE_CONFLICT 로 끝난다', async () => {
+    it('증명이 없는 호출은 번호를 풀지 못하고 PHONE_NOT_VERIFIED 로 끝난다', async () => {
       arrangeHolder(holderRow());
 
-      await expect(service.register(registerInput({ phone }))).rejects.toMatchObject({ response: { code: 'PHONE_CONFLICT' } });
+      await expect(service.register(registerInput({ phone }))).rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
 
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
       expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
@@ -586,10 +586,56 @@ describe('AuthService', () => {
       const expiredProof = issuePhoneProofToken(phone, 'signup', Date.now() - 11 * 60 * 1000);
 
       await expect(service.register(registerInput({ phone, phoneProofToken: expiredProof }))).rejects.toMatchObject({
-        response: { code: 'PHONE_CONFLICT' },
+        response: { code: 'PHONE_NOT_VERIFIED' },
       });
 
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+
+    // 증명 전에는 번호를 쥔 계정이 있는지 응답으로 알 수 없어야 한다.
+    it.each([
+      ['증명 없음', {}],
+      ['변조된 증명', { phoneProofToken: 'tampered.invalid-signature' }],
+      ['만료된 증명', { phoneProofToken: issuePhoneProofToken(phone, 'signup', Date.now() - 11 * 60 * 1000) }],
+      ['다른 번호의 증명', { phoneProofToken: issuePhoneProofToken('01099998888') }],
+    ])('%s 이면 번호를 쥔 계정이 있든 없든 응답이 같고 보유자를 조회하지 않는다', async (_name, proof) => {
+      const answerFor = async (row: ReturnType<typeof holderRow> | null) => {
+        arrangeHolder(row);
+        const error = await service.register(registerInput({ phone, ...proof })).catch((e) => e);
+        return { status: error.getStatus(), body: error.getResponse() };
+      };
+
+      const held = await answerFor(holderRow({ onboardingStatus: 'completed' }));
+      prisma.v1User.findUnique.mockClear();
+      const free = await answerFor(null);
+
+      expect(held).toEqual(free);
+      expect(held).toMatchObject({ status: 400, body: { code: 'PHONE_NOT_VERIFIED' } });
+      const lookedUpByPhone = prisma.v1User.findUnique.mock.calls.some(([args]) => 'phone' in args.where);
+      expect(lookedUpByPhone).toBe(false);
+    });
+
+    describe('같은 번호로 증명을 마친 두 가입이 동시에 들어올 때', () => {
+      const uniqueViolation = (target: string[]) =>
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test', meta: { target } });
+
+      it('번호 유일 제약에 늦게 걸린 쪽은 조회에서 걸렸을 때와 같은 PHONE_CONFLICT 를 받는다', async () => {
+        arrangeHolder(null);
+        prisma.v1User.create.mockRejectedValue(uniqueViolation(['phone']));
+
+        const error = await service.register(registerInput({ phone, phoneProofToken: validToken() })).catch((e) => e);
+
+        expect(error).toBeInstanceOf(ConflictException);
+        expect(error.getResponse()).toEqual({ code: 'PHONE_CONFLICT', message: 'Phone is already registered' });
+      });
+
+      it('이메일 유일 제약 위반은 PHONE_CONFLICT 로 바꾸지 않는다', async () => {
+        arrangeHolder(null);
+        const violation = uniqueViolation(['email']);
+        prisma.v1User.create.mockRejectedValue(violation);
+
+        await expect(service.register(registerInput({ phone, phoneProofToken: validToken() }))).rejects.toBe(violation);
+      });
     });
 
     it('활동이 남은 계정이 쥔 번호는 증명이 있어도 풀리지 않고 PHONE_CONFLICT 다', async () => {

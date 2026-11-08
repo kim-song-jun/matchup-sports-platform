@@ -91,9 +91,11 @@ function expectProfileInputsKept(): void {
   expect(screen.getByRole('radio', { name: '남' })).toBeChecked();
 }
 
-/** 만료 안내는 비긴급 알림(role=status)으로 나가고, 오류 카드로는 나가지 않는다. */
+/** 만료 안내는 하던 일이 끊긴 알림이라 즉시 읽히는 alert(assertive)로 나가고, 오류 카드로는 나가지 않는다. */
 function expectExpiredBanner(message: string): void {
-  expect(screen.getByText(message)).toHaveAttribute('role', 'status');
+  const banner = screen.getByText(message);
+  expect(banner).toHaveAttribute('role', 'alert');
+  expect(banner).toHaveAttribute('aria-live', 'assertive');
   expect(screen.queryByText('다시 시도해 주세요')).not.toBeInTheDocument();
   expect(screen.queryByText('프로필 정보를 확인해 주세요')).not.toBeInTheDocument();
 }

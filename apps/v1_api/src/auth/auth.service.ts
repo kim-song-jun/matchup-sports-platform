@@ -46,7 +46,7 @@ import type { LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
-import { isPhoneRegistered } from '../verification/phone-registered';
+import { isPhoneRegistered, isPhoneUniqueViolation } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
 import { releaseExpiredSignupPhone, releaseSignupPhone } from './empty-signup-account';
@@ -206,24 +206,21 @@ export class AuthService {
       });
     }
 
+    // Whether a number is taken is told only to a caller who proved they hold it, so a missing or lapsed proof
+    // ends here, before anything is read about the number's holder.
     const phoneVerificationRequired = this.phoneVerification.enabled;
     const phoneProven = phoneVerificationRequired && !!dto.phoneProofToken && verifyPhoneProofToken(dto.phoneProofToken, phone);
-    // An expired, abandoned social signup stops holding the number — but only for a caller who proved they hold it.
-    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone);
-
-    if (phone && (await isPhoneRegistered(this.prisma, phone))) {
-      throw new ConflictException({
-        code: 'PHONE_CONFLICT',
-        message: 'Phone is already registered',
-      });
-    }
-
     if (phoneVerificationRequired && !phoneProven) {
       throw new BadRequestException({
         code: 'PHONE_NOT_VERIFIED',
         message: '휴대폰 본인인증을 먼저 완료해 주세요.',
       });
     }
+
+    // An expired, abandoned social signup stops holding the number.
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone);
+
+    if (phone && (await isPhoneRegistered(this.prisma, phone))) throw phoneConflict();
 
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
@@ -284,6 +281,10 @@ export class AuthService {
       );
       await recordSignupConsent(transaction, created.id, dto.recordConsent);
       return created;
+    }).catch((error: unknown) => {
+      // Two signups that proved the same number race to the unique index; the loser gets the lookup's answer.
+      if (isPhoneUniqueViolation(error)) throw phoneConflict();
+      throw error;
     });
 
     return this.sessionResponse(user.id, user.email);
@@ -1772,6 +1773,10 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
   }
 
   return null;
+}
+
+function phoneConflict() {
+  return new ConflictException({ code: 'PHONE_CONFLICT', message: 'Phone is already registered' });
 }
 
 function draftObject(draftJson: unknown): Prisma.InputJsonObject {

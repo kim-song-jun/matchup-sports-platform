@@ -198,15 +198,18 @@ describe('Signup with phone verification first', () => {
     expect(await prisma.v1User.count({ where: { email: newEmail } })).toBe(0);
   });
 
-  it('never releases a number for a register call that carries no valid proof', async () => {
-    const withoutProof = await register(phones.expiredSignupWithoutProof);
-    const withExpiredProof = await register(
-      phones.expiredSignupWithoutProof,
-      issuePhoneProofToken(phones.expiredSignupWithoutProof, 'signup', Date.now() - 11 * 60 * 1000),
-    );
+  it('answers a register call without a valid proof the same way whether or not the number is held, and releases nothing', async () => {
+    const expiredProof = (phone: string) => issuePhoneProofToken(phone, 'signup', Date.now() - 11 * 60 * 1000);
+    const answers = [
+      await register(phones.expiredSignupWithoutProof),
+      await register(phones.expiredSignupWithoutProof, expiredProof(phones.expiredSignupWithoutProof)),
+      await register(phones.active),
+      await register(phones.free),
+      await register(phones.free, expiredProof(phones.free)),
+    ].map((response) => [response.status, response.body.code, response.body.message]);
 
-    expect([withoutProof.status, withoutProof.body.code]).toEqual([409, 'PHONE_CONFLICT']);
-    expect([withExpiredProof.status, withExpiredProof.body.code]).toEqual([409, 'PHONE_CONFLICT']);
+    expect(new Set(answers.map((answer) => JSON.stringify(answer))).size).toBe(1);
+    expect(answers[0].slice(0, 2)).toEqual([400, 'PHONE_NOT_VERIFIED']);
     expect(await holderPhone(ids.expiredSignupWithoutProof)).toBe(phones.expiredSignupWithoutProof);
     expect(await prisma.v1User.count({ where: { email: newEmail } })).toBe(0);
   });

@@ -544,6 +544,7 @@ export function SignupClient() {
             <>
               <AlertBanner
                 tone="warning"
+                assertive
                 message="휴대폰 인증이 만료됐어요. 입력한 내용은 그대로 있어요. 다시 인증하면 이어서 가입할 수 있어요."
               />
               {reverifying ? (
@@ -559,7 +560,7 @@ export function SignupClient() {
 
           {step === 'verify' ? (
             <>
-              {proofLapsed ? <AlertBanner tone="warning" message="휴대폰 인증이 만료됐어요. 인증번호를 다시 받아 인증해 주세요." /> : null}
+              {proofLapsed ? <AlertBanner tone="warning" assertive message="휴대폰 인증이 만료됐어요. 인증번호를 다시 받아 인증해 주세요." /> : null}
               <label className="tm-auth-field">
                 <span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
                 <input

@@ -645,8 +645,10 @@ Empty rulesText is stored as null. Unknown UI fields and missing/invalid fields 
 uses exact `updatedAt` (`expectedUpdatedAt`) rather than `expectedVersion`.
 
 A tournament row lock, version check, write and `league_match.update_settings` before/after audit
-share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`; completed/cancelled
-leagues return `409 LEAGUE_ENDED`. End before start returns `422 LEAGUE_PERIOD_INVALID`.
+share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`. Completed/cancelled
+leagues accept only `title`, `rulesText` and `regionId` changes; a changed `startsOn`, `endsOn`,
+`registrationDeadlineAt`, `plannedFixtureCount`, `maxTeams` or `genderCategory` returns
+`409 LEAGUE_ENDED_FIELD_LOCKED` with the changed names in `details.fields` (unchanged values pass). End before start returns `422 LEAGUE_PERIOD_INVALID`.
 Changed periods cannot exclude the start/end of a non-cancelled, non-deleted existing fixture
 (`409 LEAGUE_FIXTURES_OUTSIDE_PERIOD`). No fixtures are moved automatically.
 Changed inactive/non-district regions return `422 LEAGUE_REGION_INVALID`.

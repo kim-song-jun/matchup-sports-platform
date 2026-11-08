@@ -148,7 +148,17 @@ export function createV1LeagueCapacityMswHandlers(actor: Actor = 'ops') {
       if (!row) return missing();
       const current = row.settings;
       if (Date.parse(body.expectedUpdatedAt) !== Date.parse(current.updatedAt)) return fail(409, 'LEAGUE_SETTINGS_STALE', '최신 정보를 다시 불러와 주세요.');
-      if (current.status === 'completed' || current.status === 'cancelled') return fail(409, 'LEAGUE_ENDED', '끝났거나 취소된 리그는 수정할 수 없어요.');
+      if (current.status === 'completed' || current.status === 'cancelled') {
+        const instant = (value: string | null) => (value === null ? null : Date.parse(value));
+        const locked = [
+          instant(body.startsOn) !== instant(current.startsOn) && 'startsOn',
+          instant(body.endsOn) !== instant(current.endsOn) && 'endsOn',
+          instant(body.registrationDeadlineAt) !== instant(current.registrationDeadlineAt) && 'registrationDeadlineAt',
+          body.plannedFixtureCount !== undefined && body.plannedFixtureCount !== current.plannedFixtureCount && 'plannedFixtureCount',
+          body.maxTeams !== undefined && body.maxTeams !== current.maxTeams && 'maxTeams',
+        ].filter(Boolean);
+        if (locked.length > 0) return fail(409, 'LEAGUE_ENDED_FIELD_LOCKED', '끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요.');
+      }
       const counts = leagueCapacityCounts(row);
       if (body.maxTeams !== null && body.maxTeams !== undefined && body.maxTeams < counts.confirmedCount + counts.pendingPaymentCount) {
         return fail(409, 'LEAGUE_CAPACITY_BELOW_OCCUPANCY', '참가팀 정원은 확정·입금대기 팀 수보다 작게 설정할 수 없어요.');

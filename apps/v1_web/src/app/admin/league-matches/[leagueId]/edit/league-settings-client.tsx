@@ -60,7 +60,9 @@ function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string
   const dirty = JSON.stringify(draft) !== JSON.stringify(original);
   const ended = snapshot.status === 'completed' || snapshot.status === 'cancelled';
   const busy = save.isPending || reloading;
-  const disabled = !canWrite || ended || busy;
+  // 끝난 리그는 이름·설명·지역만 고칠 수 있다. 나머지는 순위·정산 기록의 근거라 잠근다.
+  const disabled = !canWrite || busy;
+  const lockedDisabled = disabled || ended;
   const change = (key: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [key]: value }));
   const teamCapacityInvalid = leagueTeamCapacityError(draft.maxTeams);
   const plannedFixtureCountInvalid = draft.plannedFixtureCount.trim() !== ''
@@ -97,7 +99,7 @@ function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string
   };
   return <div className="tm-content-enter max-w-2xl">
     {!canWrite && <p role="status">조회 권한으로 접속했어요. 기본 정보를 수정하려면 쓰기 권한이 필요해요.</p>}
-    {ended && <p role="status">끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.</p>}
+    {ended && <p role="status" className="mb-4 tm-text-label text-[var(--text-muted)]">끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요. 기간·신청 마감·총 경기 수·참가팀 정원·성별은 순위와 정산 기록의 근거라서 잠겨 있어요.</p>}
     <form onSubmit={submit} className="space-y-5" aria-busy={busy}>
       <LeagueBasicFields
         value={{ ...draft, sportId: snapshot.sportName }}
@@ -107,18 +109,21 @@ function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string
         sportLocked
         sportHint="리그를 만든 뒤에는 종목을 바꿀 수 없어요."
         disabled={disabled}
+        periodDisabled={lockedDisabled}
       />
-      <GenderCategoryField value={draft.genderCategory} onChange={value => change('genderCategory', value)} disabled={disabled}
+      <GenderCategoryField value={draft.genderCategory} onChange={value => change('genderCategory', value)} disabled={lockedDisabled}
         hint="남성부·여성부는 그 성별 선수만 참가 명단에 올릴 수 있어요. 바꿔도 이미 올린 명단은 그대로예요." />
       {regions.isError && <p role="alert">지역 목록을 불러오지 못했어요. <button className={buttonClass} type="button" disabled={busy} onClick={() => regions.refetch()}>지역 다시 불러오기</button></p>}
-      <LeaguePlannedFixtureField value={draft.plannedFixtureCount} onChange={value => change('plannedFixtureCount', value)} disabled={disabled} />
+      <LeaguePlannedFixtureField value={draft.plannedFixtureCount} onChange={value => change('plannedFixtureCount', value)} disabled={lockedDisabled} />
       <p className="tm-text-caption text-[var(--text-muted)]">총 경기 수나 기간을 바꿔도 기존 경기의 수와 일정은 바뀌지 않아요.</p>
-      <LeagueTeamCapacityField value={draft.maxTeams} onChange={value => change('maxTeams', value)} disabled={disabled} />
-      <fieldset disabled={disabled} className="min-w-0 space-y-5" aria-label="운영 안내 및 모집 조건">
+      <LeagueTeamCapacityField value={draft.maxTeams} onChange={value => change('maxTeams', value)} disabled={lockedDisabled} />
+      <fieldset disabled={disabled} className="min-w-0 space-y-5" aria-label="운영 안내">
         <div>
           <label className={leagueLabelClass} htmlFor={id + '-rules'}>설명·운영 안내</label>
           <textarea id={id + '-rules'} className={leagueInputClass + ' tm-create-input-multiline'} rows={5} maxLength={10000} value={draft.rulesText} onChange={e => change('rulesText', e.target.value)} />
         </div>
+      </fieldset>
+      <fieldset disabled={lockedDisabled} className="min-w-0 space-y-5" aria-label="모집 조건">
         <div>
           <label className={leagueLabelClass} htmlFor={id + '-deadline'}>신청 마감 (한국 시간)</label>
           <input id={id + '-deadline'} className={leagueInputClass} type="datetime-local" max="9999-12-31T23:59" value={draft.deadline} onChange={e => change('deadline', e.target.value)} />

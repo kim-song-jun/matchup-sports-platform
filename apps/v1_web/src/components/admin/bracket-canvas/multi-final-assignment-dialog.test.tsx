@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { MultiFinalView } from '@/hooks/use-multi-finals';
+import type { MultiFinalTiePick, MultiFinalView } from '@/hooks/use-multi-finals';
 import { MultiFinalsWizard } from './multi-finals-wizard';
 
 const path = '*/api/v1/admin/tournaments/t-1/bracket/multi-finals';
@@ -14,7 +14,7 @@ function savedView(): MultiFinalView {
   return { revision: 1, generated: true, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], registrations,
     groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
     finals: ['프리미어', '챌린지'].map((name, i) => ({ id: `final-${i}`, colorIndex: i, name, thirdPlace: false, rules: [i * 2 + 1, i * 2 + 2].map(rank => ({ groupId: 'g-1', rank })), registrationIds: null,
-      manual: false, standingsChanged: false, suggestedRegistrationIds: [`reg-${i * 2}`, `reg-${i * 2 + 1}`], unresolved: [], crossGroupTopThreeAvailable: false })) };
+      manual: false, standingsChanged: false, suggestedRegistrationIds: [`reg-${i * 2}`, `reg-${i * 2 + 1}`], unresolved: [], tiePicks: [], crossGroupTopThreeAvailable: false })) };
 }
 function bracketData() {
   return { groups: ['프리미어', '챌린지'].map((bracketTrack, i) => ({ id: `final-${i}`, name: `${bracketTrack} 결승`, phase: 'final', bracketTrack })),
@@ -51,7 +51,7 @@ function sixTeamTournament(groupOf: string[]) {
   const view: MultiFinalView = { revision: 1, generated: true, groups, registrations: teams,
     groupStandings: groups.map(group => ({ groupId: group.id, name: group.name, complete: true,
       rows: teams.flatMap((reg, i) => groupOf[i] === group.id.slice(2) ? [reg] : []).map((reg, rank) => ({ registrationId: reg.id, teamName: reg.team.name, position: rank + 1, points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, tiedRegistrationIds: [] })) })),
-    finals: [{ id: 'final-0', colorIndex: 0, name: '챌린지', thirdPlace: false, registrationIds: null, manual: false, standingsChanged: false, unresolved: [], crossGroupTopThreeAvailable: false,
+    finals: [{ id: 'final-0', colorIndex: 0, name: '챌린지', thirdPlace: false, registrationIds: null, manual: false, standingsChanged: false, unresolved: [], tiePicks: [], crossGroupTopThreeAvailable: false,
       rules: groups.flatMap(group => [1, 2, 3].map(rank => ({ groupId: group.id, rank }))).slice(0, 6), suggestedRegistrationIds: seeds }] };
   const phases = [['quarter', '6강'], ['semi', '4강'], ['final', '결승']];
   const slot = (position: number) => ({ id: `slot-${position}`, groupId: 'quarter', kind: 'GROUP_RANK', position, byeSortOrder: position <= 2 ? position - 1 : null });
@@ -192,7 +192,7 @@ function tieFixture() {
   const teams = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => ({ id: `reg-${i}`, team: { id: `team-${i}`, name } }));
   const tiedIds = ['reg-2', 'reg-3'];
   const final = (id: number, name: string, ranks: number[], suggested: string[], unresolvedRank: number) => ({ id: `final-${id}`, colorIndex: id, name, thirdPlace: false,
-    rules: ranks.map(rank => ({ groupId: 'g-1', rank })), registrationIds: null as string[] | null, manual: false, standingsChanged: false, suggestedRegistrationIds: suggested,
+    rules: ranks.map(rank => ({ groupId: 'g-1', rank })), registrationIds: null as string[] | null, manual: false, standingsChanged: false, tiePicks: [] as MultiFinalTiePick[], suggestedRegistrationIds: suggested,
     unresolved: [{ groupId: 'g-1', rank: unresolvedRank, state: 'tied', tiedRegistrationIds: tiedIds }], crossGroupTopThreeAvailable: id === 0 });
   const view: MultiFinalView = { revision: 1, generated: true, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], registrations: teams,
     groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: teams.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1,
@@ -206,7 +206,24 @@ function tieFixture() {
   return { view, bracket: bracket as unknown as ReturnType<typeof bracketData> };
 }
 const TIE_BANNER = 'A조 3위·4위가 완전 동률이에요. 3위는 프리미어, 4위는 챌린지로 갈라지는 자리라 직접 골라야 해요.';
-const SEAT_LABEL = '프리미어 3위 자리(3번 시드)에 보낼 팀';
+const SEAT_LABEL = '프리미어 3위 자리에 보낼 팀';
+const CROSS = 'cross_group_top3';
+const PICK = { groupId: 'g-1', rank: 3, registrationId: 'reg-3' };
+/** Records every assignment-preview body and answers with a fixed roster. */
+function previews(registrationIds: Array<string | null>, assignmentPolicy: string, sourceVersion: string) {
+  const bodies: unknown[] = [];
+  server.use(http.post(`${path}/assignment-preview`, async ({ request }) => {
+    bodies.push(await request.json());
+    return success({ revision: 1, finalName: '프리미어', assignmentPolicy, registrationIds, sourceVersion });
+  }));
+  return bodies;
+}
+const seedOrder = () => screen.getAllByRole('listitem').map(item => item.querySelector('span')?.textContent);
+async function enabledPolicySelect() {
+  const policy = await screen.findByRole('combobox', { name: '진출팀 배치 방식' });
+  await waitFor(() => expect(policy).toBeEnabled());
+  return policy;
+}
 
 describe('예선 순위가 추첨으로만 갈린 동률', () => {
   it('동률 팀에 배지를 붙이고, 걸친 자리는 비워 둔 채 창 안에서 고르게 하며 고르기 전엔 대진 확인을 막는다', async () => {
@@ -219,7 +236,8 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     const select = screen.getByRole('combobox', { name: SEAT_LABEL });
     expect(select).toHaveValue('');
     expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '다팀', '라팀']);
-    expect(screen.getByText('고르지 않은 팀은 챌린지 4위 자리(1번 시드)로 가요.')).toBeInTheDocument();
+    expect(screen.getByText('고르지 않은 팀은 챌린지 4위 자리로 가요.')).toBeInTheDocument();
+    expect(screen.getByText('고르면 3번 시드에 들어가요.')).toBeInTheDocument();
     expect(screen.getByText('3번 시드 · 팀 선택 필요')).toBeInTheDocument();
     expect(screen.getByText('프리미어 진출팀 · 2/3팀')).toBeInTheDocument();
     expect(screen.getByText('동률인 3번 시드는 비워 두고 나머지 2자리만 채워요. 위에서 팀을 고르면 그 자리가 채워져요.')).toBeInTheDocument();
@@ -229,10 +247,12 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
 
   it('고른 팀이 비워진 시드를 채우고, 확인·확정까지 그 선택 그대로 저장된다', async () => {
     const { view, bracket } = tieFixture(); handlers(view, bracket);
+    const bodies = previews(['reg-0', 'reg-1'], 'rank_order', 'official-source');
     let saved: unknown; server.use(http.put(`${path}/assignment`, async ({ request }) => { saved = await request.json(); return success(view); }));
     const props = show();
     fireEvent.change(await screen.findByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
     expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.getByText('지금 3번 시드예요.')).toBeInTheDocument();
     expect(screen.getByText('프리미어 진출팀 · 3/3팀')).toBeInTheDocument();
     expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
     expect(screen.queryByText(TIE_BANNER)).not.toBeInTheDocument();
@@ -241,7 +261,8 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     await openReview('프리미어');
     fireEvent.click(screen.getByRole('button', { name: '프리미어 진출팀 확정' }));
     await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
-    expect(saved).toEqual({ expectedRevision: 1, finalName: '프리미어', registrationIds: ['reg-0', 'reg-1', 'reg-3'], assignmentPolicy: 'rank_order', sourceVersion: 'official-source' });
+    expect(bodies).toEqual([{ expectedRevision: 1, finalName: '프리미어', assignmentPolicy: 'rank_order', tiePicks: [PICK] }]);
+    expect(saved).toEqual({ expectedRevision: 1, finalName: '프리미어', registrationIds: ['reg-0', 'reg-1', 'reg-3'], assignmentPolicy: 'rank_order', sourceVersion: 'official-source', tiePicks: [PICK] });
   });
 
   it('추천 배치를 만들어도 막히지 않고 동률 자리는 비워 둔다', async () => {
@@ -258,9 +279,9 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     const { view, bracket } = tieFixture(); view.finals[0].registrationIds = ['reg-0', 'reg-1', 'reg-2'];
     handlers(view, bracket); show();
     fireEvent.change(await screen.findByRole('combobox', { name: '배정할 토너먼트' }), { target: { value: '챌린지' } });
-    const select = await screen.findByRole('combobox', { name: '챌린지 4위 자리(1번 시드)에 보낼 팀' });
+    const select = await screen.findByRole('combobox', { name: '챌린지 4위 자리에 보낼 팀' });
     expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '라팀']);
-    expect(screen.getByText('고르지 않은 팀은 프리미어 3위 자리(3번 시드)로 가요.')).toBeInTheDocument();
+    expect(screen.getByText('고르지 않은 팀은 프리미어 3위 자리로 가요.')).toBeInTheDocument();
   });
 
   it('동률 자리와 그 옆 시드는 위아래로 옮길 수 없다', async () => {
@@ -270,11 +291,134 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     expect(screen.getByRole('button', { name: '나팀 시드 올리기' })).toBeEnabled();
   });
 
-  it('동률이 낀 토너먼트에서는 교차 배치를 고르게 하지 않고 이유를 알린다', async () => {
+  it('공식 순위 추천을 다시 만들어도 고른 팀이 동률 자리로 돌아온다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket);
+    const bodies = previews(['reg-0', 'reg-1', null], 'rank_order', 'tie-source');
+    show();
+    fireEvent.change(await screen.findByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    fireEvent.click(screen.getByRole('button', { name: '공식 순위로 추천 배치 만들기' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '공식 순위로 추천 배치 만들기' })).toBeEnabled());
+    expect(bodies).toEqual([{ expectedRevision: 1, finalName: '프리미어', assignmentPolicy: 'rank_order', tiePicks: [PICK] }]);
+    expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+  });
+
+  it('고른 팀을 시드 순서에서 옮긴 뒤 다시 고르면 옮긴 자리의 팀이 바뀐다', async () => {
     const { view, bracket } = tieFixture(); handlers(view, bracket); show();
-    const policy = await screen.findByRole('combobox', { name: '진출팀 배치 방식' });
-    expect(within(policy).getAllByRole('option').map(option => option.textContent)).toEqual(['기본 순위 순서 · 수동 조정 가능']);
-    expect(screen.getByText('동률인 순위가 있어 교차 배치는 쓸 수 없어요.')).toBeInTheDocument();
+    fireEvent.change(await screen.findByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    const moveUp = screen.getByRole('button', { name: '라팀 시드 올리기' });
+    await waitFor(() => expect(moveUp).toBeEnabled());
+    fireEvent.click(moveUp);
+    expect(seedOrder()).toEqual(['1번 시드 · 가팀', '2번 시드 · 라팀', '3번 시드 · 나팀']);
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(screen.getByText('지금 2번 시드예요.')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-2' } });
+    expect(seedOrder()).toEqual(['1번 시드 · 가팀', '2번 시드 · 다팀', '3번 시드 · 나팀']);
+    expect(screen.getByText('지금 2번 시드예요.')).toBeInTheDocument();
+    expect(screen.getByText('프리미어 진출팀 · 3/3팀')).toBeInTheDocument();
+  });
+
+  it('고른 팀의 선택을 비우면 그 팀이 앉은 자리가 비고 동률 자리를 다시 고르게 한다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    const select = await screen.findByRole('combobox', { name: SEAT_LABEL });
+    fireEvent.change(select, { target: { value: 'reg-3' } });
+    fireEvent.change(select, { target: { value: '' } });
+    expect(screen.getByText('3번 시드 · 팀 선택 필요')).toBeInTheDocument();
+    expect(screen.getByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('고르면 3번 시드에 들어가요.')).toBeInTheDocument();
+  });
+
+  it('동률 후보를 체크하면 동률 자리의 선택으로 기록되고, 체크를 풀면 선택도 사라진다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    const box = await screen.findByRole('checkbox', { name: '라팀' });
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    fireEvent.click(box);
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('');
+    expect(screen.getByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('동률 선택이 저장되지 않은 옛 기본 순위 명단은 규칙 순서 자리의 동률 후보를 선택으로 읽는다', async () => {
+    const { view, bracket } = tieFixture(); view.finals[0].registrationIds = ['reg-0', 'reg-1', 'reg-3']; handlers(view, bracket); show();
+    expect(await screen.findByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(screen.getByText('지금 3번 시드예요.')).toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+  });
+
+  it('동률이 낀 토너먼트에서도 교차 배치를 고를 수 있고, 팀을 고른 뒤에야 추천을 만든다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket);
+    const bodies = previews(['reg-0', 'reg-3', 'reg-1'], CROSS, 'cross-source');
+    show();
+    const policy = await enabledPolicySelect();
+    expect(within(policy).getAllByRole('option').map(option => option.textContent)).toEqual(['기본 순위 순서 · 수동 조정 가능', '1위 부전승 · 2위 교차 고정 · 3위 같은 조 회피']);
+    fireEvent.change(policy, { target: { value: CROSS } });
+    expect(screen.queryByText('동률인 순위가 있어 교차 배치는 쓸 수 없어요.')).not.toBeInTheDocument();
+    expect(screen.getByText('동률 자리에 올릴 팀을 먼저 고르면 고른 순위로 교차 배치해요.')).toBeInTheDocument();
+    const recommend = screen.getByRole('button', { name: '무작위 추천 배치 만들기' });
+    expect(recommend).toBeDisabled();
+    fireEvent.change(screen.getByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    expect(recommend).toBeEnabled();
+    expect(screen.getByText('교차 배치 추천을 만들면 시드가 정해져요.')).toBeInTheDocument();
+    fireEvent.click(recommend);
+    // Rule order would say 3번 시드; the cross draw really put 라팀 at 2번.
+    expect(await screen.findByText('지금 2번 시드예요.')).toBeInTheDocument();
+    expect(screen.getByText('2번 시드 · 라팀')).toBeInTheDocument();
+    expect(bodies).toEqual([{ expectedRevision: 1, finalName: '프리미어', assignmentPolicy: CROSS, tiePicks: [PICK] }]);
+  });
+
+  it('교차 배치에서 고른 팀을 바꾸면 추천을 다시 만들기 전에는 대진 확인으로 넘어갈 수 없다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket);
+    previews(['reg-0', 'reg-3', 'reg-1'], CROSS, 'cross-source');
+    show();
+    fireEvent.change(await enabledPolicySelect(), { target: { value: CROSS } });
+    const select = screen.getByRole('combobox', { name: SEAT_LABEL });
+    fireEvent.change(select, { target: { value: 'reg-3' } });
+    fireEvent.click(screen.getByRole('button', { name: '무작위 추천 배치 만들기' }));
+    await screen.findByText('지금 2번 시드예요.');
+    // The recommended seeds stay on screen, so the old team's seed must not be read as the new pick's.
+    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '다팀', '라팀']);
+    fireEvent.change(select, { target: { value: 'reg-2' } });
+    expect(screen.getByText('교차 배치 추천을 만들면 시드가 정해져요.')).toBeInTheDocument();
+    expect(screen.queryByText('지금 2번 시드예요.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '선택한 토너먼트 대진 확인' }));
+    await screen.findByText('선택한 방식으로 추천 배치를 먼저 만들어 주세요.');
+    expect(screen.queryByText('프리미어 대진 확인')).not.toBeInTheDocument();
+  });
+
+  it('저장된 교차 명단은 고른 팀과 그 팀의 실제 시드를 보여 주고, 확정할 때 선택을 함께 보낸다', async () => {
+    const { view, bracket } = tieFixture();
+    Object.assign(view.finals[0], { registrationIds: ['reg-0', 'reg-3', 'reg-1'], assignmentPolicy: CROSS, tiePicks: [PICK] });
+    handlers(view, bracket);
+    const bodies = previews(['reg-1', 'reg-3', 'reg-0'], CROSS, 'redrawn-source');
+    let saved: unknown; server.use(http.put(`${path}/assignment`, async ({ request }) => { saved = await request.json(); return success(view); }));
+    const props = show();
+    const select = await screen.findByRole('combobox', { name: SEAT_LABEL });
+    expect(select).toHaveValue('reg-3');
+    expect(within(select).getByRole('option', { name: '라팀' })).toBeInTheDocument();
+    expect(screen.getByText('지금 2번 시드예요.')).toBeInTheDocument();
+    expect(screen.getByText('2번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.queryByText(/자리\(\d번 시드\)에 보낼 팀/)).not.toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '진출팀 배치 방식' })).toHaveValue(CROSS);
+    await openReview('프리미어');
+    fireEvent.click(screen.getByRole('button', { name: '프리미어 진출팀 확정' }));
+    await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
+    expect(bodies).toEqual([{ expectedRevision: 1, finalName: '프리미어', assignmentPolicy: CROSS, tiePicks: [PICK] }]);
+    expect(saved).toEqual({ expectedRevision: 1, finalName: '프리미어', registrationIds: ['reg-0', 'reg-3', 'reg-1'], assignmentPolicy: CROSS, sourceVersion: 'redrawn-source', tiePicks: [PICK] });
+  });
+
+  it('시작한 토너먼트에는 동률 안내와 선택창을 아예 그리지 않는다', async () => {
+    const { view, bracket } = tieFixture(); bracket.fixtures[0].game.state = 'LIVE'; handlers(view, bracket); show();
+    await screen.findByText('이 토너먼트는 시작했거나 기록·결과가 있어 진출팀을 다시 배정할 수 없어요.');
+    expect(screen.queryByRole('combobox', { name: SEAT_LABEL })).not.toBeInTheDocument();
+    expect(screen.queryByText(TIE_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(/추첨으로만 갈렸어요/)).not.toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/비워 두고 나머지/)).not.toBeInTheDocument();
   });
 
   it('동률이 없는 대회는 배지·안내·선택창이 하나도 나오지 않는다', async () => {

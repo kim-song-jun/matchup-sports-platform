@@ -605,6 +605,39 @@ describe('AdsAdminService.stop', () => {
     expect((await service.detail(OWNER, 'c1')).stats.banner).toEqual({ impressions: 40, clicks: 3 });
   });
 
+  it('takes the same publishing lock as publish and update', async () => {
+    const { service, fake } = await build({ campaigns: [live()] });
+    await service.stop(OWNER, 'c1');
+    expect(fake.state.lockRequests).toEqual(['ad-campaign-publish']);
+  });
+
+  it('makes a publish that starts while a stop is still committing wait, then see the stopped campaign instead of a stale overlap', async () => {
+    const { service, fake } = await build({
+      campaigns: [
+        row('c1', { status: 'published', version: 2, publishedAt: NOW, ...bannerWindow('2026-11-15T00:00:00Z', '2026-11-25T00:00:00Z') }),
+        row('next', bannerWindow('2026-11-20T00:00:00Z', '2026-11-30T00:00:00Z')),
+      ],
+    });
+    // Hold the stop's write open, the way a slow commit would, while the publish tries to run.
+    const updateMany = fake.prisma.v1AdCampaign.updateMany;
+    const write = updateMany.getMockImplementation() as NonNullable<ReturnType<typeof updateMany.getMockImplementation>>;
+    let commit!: () => void;
+    const slowCommit = new Promise<void>((resolve) => (commit = resolve));
+    updateMany.mockImplementation(async (args) => {
+      if (args.data.status === 'stopped') await slowCommit;
+      return write(args);
+    });
+
+    const stopping = service.stop(OWNER, 'c1');
+    const publishing = service.publish(OWNER, 'next', { expectedVersion: 1 });
+    await new Promise((resolve) => setImmediate(resolve));
+    commit();
+
+    await expect(stopping).resolves.toMatchObject({ campaign: { id: 'c1', status: 'stopped' } });
+    await expect(publishing).resolves.toMatchObject({ campaign: { id: 'next', status: 'published' } });
+    expect(fake.state.campaigns.map((c) => [c.id, c.status])).toEqual([['c1', 'stopped'], ['next', 'published']]);
+  });
+
   it('lets only one of two simultaneous stops record a transition', async () => {
     const { service, fake } = await build({ campaigns: [live()] });
 

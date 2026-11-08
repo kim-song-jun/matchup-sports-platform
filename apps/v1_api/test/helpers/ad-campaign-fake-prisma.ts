@@ -143,6 +143,8 @@ export function createAdCampaignFakePrisma(seed: { admins: FakeAdmin[]; assets?:
     assets: seed.assets ?? ([] as FakeAsset[]),
     actionLogs: [] as Row[],
     statusLogs: [] as Row[],
+    /** Advisory-lock keys in the order transactions asked for them. */
+    lockRequests: [] as string[],
   };
   let nextId = 1;
   const locks = new Map<string, Promise<void>>();
@@ -343,6 +345,7 @@ export function createAdCampaignFakePrisma(seed: { admins: FakeAdmin[]; assets?:
       const tx = {
         ...client,
         $executeRaw: jest.fn(async (_strings: TemplateStringsArray, scope: string) => {
+          state.lockRequests.push(scope);
           await acquire(scope, held);
           return 1;
         }),

@@ -1,6 +1,9 @@
 import { formatKstTime, formatTournamentDateTimeShort } from './date-utils';
 import { toKstDateString } from './kst-calendar';
 
+/** 다가오는 경기 목록들이 킥오프 시각이 없는 대회 경기에 쓰는 말. */
+export const UPCOMING_GAME_TIME_TBD = '일정 미정';
+
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 
@@ -11,11 +14,14 @@ const HOUR_MS = 60 * MINUTE_MS;
  * 자정을 넘긴 새벽 경기가 "내일" 로 읽혀 오늘 밤 경기로 오해되기 때문이다.
  * `countdown` 은 24시간 안일 때만 있다("45분 뒤" · "3시간 뒤"). 이미 시작 시각이 지났으면 null 이고
  * `started` 가 true 다 — 홈 "다음 경기" 는 결과가 나갈 때까지 킥오프 뒤에도 그 경기를 내려 준다.
+ * 대회 경기의 시각이 아직 정해지지 않았으면(`scheduledAt` null) `when` 이 `UPCOMING_GAME_TIME_TBD` 이고
+ * 카운트다운·시작됨은 없다.
  */
 export function describeUpcomingGameTime(
-  scheduledAt: string,
+  scheduledAt: string | null,
   now: Date,
 ): { when: string; countdown: string | null; started: boolean } | null {
+  if (scheduledAt === null) return { when: UPCOMING_GAME_TIME_TBD, countdown: null, started: false };
   const start = new Date(scheduledAt);
   if (Number.isNaN(start.getTime())) return null;
 

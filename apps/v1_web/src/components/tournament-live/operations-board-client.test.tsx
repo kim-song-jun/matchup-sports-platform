@@ -185,6 +185,18 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
   });
 
+  it('상단 진행 단계는 단계 이름·상태와 지금 위치를 알린다', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    const stepper = screen.getByRole('list', { name: '대회 진행 단계' });
+    expect(within(stepper).getAllByRole('listitem').map((item) => item.getAttribute('aria-label'))).toEqual([
+      '8강 (진행 중)',
+      '결승 (예정)',
+      '시상 (예정)',
+    ]);
+    expect(screen.getByText('전체 3단계 중 1단계 진행 중')).toBeInTheDocument();
+  });
+
   // Task 180 G6(C안) — 경기별 팀 명단 요약(빠짐·정지)과 명단 링크는 운영 보드가 아니라 콘솔의
   // "킥오프 준비"에 있다. 보드 행은 경기 · 상태 · 콘솔 열기로 가볍게 남는다.
   describe('명단 요약은 콘솔로 옮겼다', () => {

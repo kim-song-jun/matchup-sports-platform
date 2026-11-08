@@ -13,6 +13,7 @@ import {
   switchPeriodCount,
   TOURNAMENT_PERIOD_PHASES,
   tournamentPeriodPhaseLabel,
+  tournamentPeriodPhaseShortLabel,
 } from '@/app/admin/tournaments/new/tournament-create-model';
 
 interface TournamentPeriodSettingsEditorProps {
@@ -167,7 +168,7 @@ function PeriodSettingsEditor({
       return;
     }
     const phase = stageEditingPhase;
-    const label = tournamentPeriodPhaseLabel(phase);
+    const label = tournamentPeriodPhaseShortLabel(phase);
     const change = {
       phase,
       inheritDefault,
@@ -319,7 +320,7 @@ function PeriodSettingsEditor({
 
           {stageEditingPhase !== null && (
             <div className="mt-4 rounded-xl border border-[var(--border)] p-3">
-              <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{tournamentPeriodPhaseLabel(stageEditingPhase)} 설정</p>
+              <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{tournamentPeriodPhaseShortLabel(stageEditingPhase)} 설정</p>
               <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">이 단계의 새 경기와 아직 시작하지 않은 경기에만 적용돼요.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {stageDraft.map((duration, index) => (

@@ -38,6 +38,7 @@ export interface LeagueScheduleBoardProps {
   focusFixtureId?: string | null;
   onEditSchedule: (teamMatchId: string) => void;
   onCancelFixture: (teamMatchId: string) => void;
+  onDeleteFixture: (teamMatchId: string) => void;
   onShowList: () => void;
   /** 주차 칸의 '이 주에 경기 추가'. 없으면 버튼을 그리지 않는다(읽기 전용·끝난 리그). */
   onAddToWeek?: (column: LeagueBoardColumn) => void;
@@ -83,7 +84,7 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onShowList, onAddToWeek }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onDeleteFixture, onShowList, onAddToWeek }: LeagueScheduleBoardProps) {
   const headingId = useId();
   // 서버 기본값 true — 하이드레이션 전엔 지금 배치를 유지하고 좁은 태블릿만 클라이언트에서 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
@@ -218,6 +219,10 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
         onCancelFixture={() => {
           setOpenFixtureId(null);
           onCancelFixture(openNode.fixtureId);
+        }}
+        onDeleteFixture={() => {
+          setOpenFixtureId(null);
+          onDeleteFixture(openNode.fixtureId);
         }}
         onClose={() => {
           if (sidePanel) focusFixtureOpener(openNode.fixtureId);

@@ -1,4 +1,5 @@
-import type { V1PreviewLeagueFixture } from '@/types/league-match';
+import { formatKstDateShort, formatTournamentDateShort } from '@/lib/date-utils';
+import type { V1PreviewLeagueFixture, V1PreviewLeagueFixturesResult } from '@/types/league-match';
 
 // 서버 DTO(LeagueFixtureTimingDto)의 gamesPerDay @Max(50)와 같은 값 — 역산 제안이
 // 서버가 거부할 값을 만들지 않게 여기서도 같은 상한을 쓴다.
@@ -136,4 +137,91 @@ export function groupPreviewByMatchday(fixtures: V1PreviewLeagueFixture[]): Matc
           a.startAt.localeCompare(b.startAt),
       ),
     }));
+}
+
+/** 서버가 만들어질 제목의 "N주차"(`week`)를 모든 경기에 실어 보냈는지. 구버전 응답은 false. */
+export function hasCalendarWeeks(fixtures: V1PreviewLeagueFixture[]): boolean {
+  return fixtures.length > 0 && fixtures.every((fixture) => fixture.week !== undefined);
+}
+
+/** 한 주 안의 경기일 하나: 'M/D (요일)' 라벨과 그날 경기 수. */
+export interface PreviewWeekDay {
+  label: string;
+  count: number;
+}
+
+export interface PreviewWeekGroup {
+  week: number;
+  days: PreviewWeekDay[];
+  items: V1PreviewLeagueFixture[];
+}
+
+/**
+ * 미리보기를 서버가 준 달력 주(`week`)로 묶는다. 토·일처럼 한 주 안의 날은 한 그룹이고,
+ * 그룹 안에서는 시작 시각순이다(경기일을 넘나드는 순번은 `orderInDay` 로 못 정한다).
+ * `hasCalendarWeeks` 가 참일 때만 부른다.
+ */
+export function groupPreviewByWeek(fixtures: V1PreviewLeagueFixture[]): PreviewWeekGroup[] {
+  const byWeek = new Map<number, V1PreviewLeagueFixture[]>();
+  for (const fixture of fixtures) {
+    const week = fixture.week as number;
+    const bucket = byWeek.get(week);
+    if (bucket === undefined) byWeek.set(week, [fixture]);
+    else bucket.push(fixture);
+  }
+  return [...byWeek.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([week, bucket]) => {
+      const items = [...bucket].sort(
+        (a, b) =>
+          Date.parse(a.startAt) - Date.parse(b.startAt) ||
+          (a.matchday ?? a.round) - (b.matchday ?? b.round) ||
+          (a.orderInDay ?? Number.MAX_SAFE_INTEGER) - (b.orderInDay ?? Number.MAX_SAFE_INTEGER),
+      );
+      const days: PreviewWeekDay[] = [];
+      for (const item of items) {
+        const label = formatTournamentDateShort(item.startAt) ?? item.startAt;
+        const last = days[days.length - 1];
+        if (last?.label === label) last.count += 1;
+        else days.push({ label, count: 1 });
+      }
+      return { week, days, items };
+    });
+}
+
+/** '1주차 · 11/21 (토) 8경기 / 11/22 (일) 7경기' — 그 주에 경기가 있는 날만 날짜순으로. */
+export function weekGroupHeading(group: PreviewWeekGroup): string {
+  return `${group.week}주차 · ${group.days.map((day) => `${day.label} ${day.count}경기`).join(' / ')}`;
+}
+
+export interface PreviewTimingGroup {
+  key: number;
+  heading: string;
+  items: V1PreviewLeagueFixture[];
+  /** 한 주가 여러 경기일에 걸치면 각 행의 시각 앞에 요일을 붙인다. */
+  showWeekday: boolean;
+}
+
+/** timing 미리보기의 묶음. 서버가 `week` 를 주면 달력 주로, 구버전 응답은 매치데이로 묶는다. */
+export function previewTimingGroups(fixtures: V1PreviewLeagueFixture[]): PreviewTimingGroup[] {
+  if (hasCalendarWeeks(fixtures)) {
+    return groupPreviewByWeek(fixtures).map((group) => ({
+      key: group.week,
+      heading: weekGroupHeading(group),
+      items: group.items,
+      showWeekday: group.days.length > 1,
+    }));
+  }
+  return groupPreviewByMatchday(fixtures).map((group) => ({
+    key: group.matchday,
+    heading: `${group.matchday}주차 — ${formatKstDateShort(group.items[0].startAt)} · ${group.items.length}경기`,
+    items: group.items,
+    showWeekday: false,
+  }));
+}
+
+/** 미리보기 요약의 "N주". `week` 가 있으면 달력 주 수, 구버전 응답은 매치데이(없으면 라운드) 수. */
+export function previewWeekCount(result: V1PreviewLeagueFixturesResult): number {
+  if (hasCalendarWeeks(result.fixtures)) return new Set(result.fixtures.map((fixture) => fixture.week)).size;
+  return result.matchdayCount ?? result.rounds;
 }

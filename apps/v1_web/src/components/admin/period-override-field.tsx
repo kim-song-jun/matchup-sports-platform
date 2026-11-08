@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { periodLabels, switchPeriodCount, tournamentPeriodPhaseLabel } from '@/app/admin/tournaments/new/tournament-create-model';
+import { periodLabels, switchPeriodCount, tournamentPeriodPhaseShortLabel } from '@/app/admin/tournaments/new/tournament-create-model';
 import {
   useTournamentMatchPeriods,
   useTournamentPeriodSettings,
@@ -74,7 +74,7 @@ export function useMatchPeriodOverride(tournamentId: string, teamMatchId: string
   const sourceLabel = !data ? '' : data.inherited.source === 'group'
     ? `${data.inherited.groupName ?? '조'} 설정`
     : data.inherited.source === 'stage' && data.inherited.phase
-      ? `${tournamentPeriodPhaseLabel(data.inherited.phase)} 설정`
+      ? `${tournamentPeriodPhaseShortLabel(data.inherited.phase)} 설정`
       : defaultLabel;
   return {
     ...draft,

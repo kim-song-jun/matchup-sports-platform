@@ -138,6 +138,33 @@ describe('CompetitionEntrySection — 팀장', () => {
     expect(within(entry).queryByRole('link', { name: '신청 내역' })).not.toBeInTheDocument();
   });
 
+  it('시각 있는 다음 경기가 없으면 시각 미정 경기로 가고, 시각 있는 경기가 있으면 그쪽이 먼저다', async () => {
+    competition = { ...competition, rosterDeadlineAt: PAST };
+    // 서버 순서: 시각 있는 경기, 시각 미정 경기(대회 진행 순서). 클라이언트가 null 을 맨 앞으로 끌어오면 안 된다.
+    upcoming = [
+      { gameId: 'untimed-first', tournamentId: 'comp-1', scheduledAt: null },
+      { gameId: 'timed-game', tournamentId: 'comp-1', scheduledAt: '2026-10-04T01:00:00.000Z' },
+      { gameId: 'untimed-second', tournamentId: 'comp-1', scheduledAt: null },
+    ];
+    const { unmount } = renderSection();
+    const withTimed = await card('마포 FC');
+    expect(await within(withTimed).findByRole('link', { name: /^다음 경기 명단 열기/ })).toHaveAttribute(
+      'href',
+      `/teams/team-a/games/timed-game/roster${FROM}`,
+    );
+    unmount();
+
+    upcoming = [
+      { gameId: 'other-comp-game', tournamentId: 'comp-2', scheduledAt: '2026-10-02T01:00:00.000Z' },
+      { gameId: 'untimed-first', tournamentId: 'comp-1', scheduledAt: null },
+      { gameId: 'untimed-second', tournamentId: 'comp-1', scheduledAt: null },
+    ];
+    renderSection();
+    const untimedOnly = await card('마포 FC');
+    const next = await within(untimedOnly).findByRole('link', { name: '다음 경기 명단 열기 (일정 미정)' });
+    expect(next).toHaveAttribute('href', `/teams/team-a/games/untimed-first/roster${FROM}`);
+  });
+
   it('마감이 지났어도 운영진 예외가 있으면 고칠 수 있다', async () => {
     competition = { ...competition, rosterDeadlineAt: PAST };
     registrations = [registration({ rosterDeadlineOverrideAt: '2026-09-27T00:00:00.000Z' })];

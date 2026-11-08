@@ -379,3 +379,9 @@ export function formatKstDateShort(dateStr: string): string {
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
 }
+
+/** KST 요일 한 글자('토'). 리그 대진 미리보기가 한 주 안에서 날을 구분할 때 쓴다. 없거나 invalid 이면 null. */
+export function formatKstWeekday(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  return getTournamentKstParts(dateStr)?.weekday ?? null;
+}

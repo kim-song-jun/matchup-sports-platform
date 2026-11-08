@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { hashPassword, verifyPassword } from '../src/auth/password-hash';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { withdrawalGraceEndsAt } from '../src/users/withdrawal-grace';
 import { createV1IntegrationApp } from './integration/integration-app';
 
 const PREFIX = 'integration-recovery-account-proof';
@@ -43,7 +44,7 @@ describe('V1 account recovery requires independent email proof', () => {
   async function cleanupFixtures() {
     if (!prisma) return;
     await prisma.v1Notification.deleteMany({ where: { recipientUserId: { in: USER_IDS } } });
-    await prisma.v1StatusChangeLog.deleteMany({ where: { targetId: { in: [`${PREFIX}-email-identity`, `${PREFIX}-social-identity`] } } });
+    await prisma.v1StatusChangeLog.deleteMany({ where: { targetId: { in: [`${PREFIX}-email-identity`, `${PREFIX}-social-identity`, ...USER_IDS] } } });
     await prisma.v1PhoneVerificationChallenge.deleteMany({ where: { phone: { in: PHONES } } });
     await prisma.v1EmailVerificationChallenge.deleteMany({ where: { email: { in: EMAILS } } });
     await prisma.v1User.deleteMany({ where: { id: { in: USER_IDS } } });
@@ -172,5 +173,143 @@ describe('V1 account recovery requires independent email proof', () => {
     expect({ status: response.status, code: response.body.code }).toEqual({ status: 400, code: 'EMAIL_NOT_VERIFIED' });
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(await accountState()).toEqual(before);
+  });
+
+  async function proveMailbox(email: string) {
+    const issued = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/request').send({ email }).expect(200);
+    const confirmed = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/confirm')
+      .send({ email, code: issued.body.data.devCode }).expect(200);
+    const token: unknown = confirmed.body.data.proofToken;
+    if (typeof token !== 'string') throw new RecoveryFixtureError('Email confirmation did not issue a proof token');
+    return token;
+  }
+
+  /** The SMS proof is reusable for ten minutes; a second issue for the same number within 30 seconds is refused. */
+  function findByPhone(phone: string, proofToken: string, mailbox?: { email: string; emailProofToken: string }) {
+    return request(app.getHttpServer()).post('/api/v1/auth/recovery/find-account').send({ phone, proofToken, ...mailbox });
+  }
+
+  async function startWithdrawal(userId: string, requestedAt: Date) {
+    await prisma.v1User.update({ where: { id: userId }, data: { accountStatus: 'withdrawal_pending' } });
+    await prisma.v1StatusChangeLog.create({
+      data: { targetType: 'user', targetId: userId, fromStatus: 'active', toStatus: 'withdrawal_pending', actorType: 'user', actorUserId: userId, createdAt: requestedAt },
+    });
+  }
+
+  describe('a phone lookup does not hand the account\'s email or withdrawal date to whoever holds the number', () => {
+    it('answers the SMS proof alone with the login methods and no email hint', async () => {
+      const response = await findByPhone(EMAIL_PHONE, await proveCurrentPhone(EMAIL_PHONE));
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
+      expect(JSON.stringify(response.body)).not.toContain('integration.test');
+    });
+
+    it('adds the masked email only for a mailbox proof that belongs to the same account', async () => {
+      const phoneProof = await proveCurrentPhone(EMAIL_PHONE);
+      const own = await findByPhone(EMAIL_PHONE, phoneProof, { email: EMAIL, emailProofToken: await proveMailbox(EMAIL) });
+      expect(own.status).toBe(200);
+      expect(own.body.data).toMatchObject({ providers: ['email'], maskedEmail: 'in***@integration.test' });
+      expect(JSON.stringify(own.body)).not.toContain(EMAIL);
+
+      // A real, valid mailbox proof — but for the other fixture account.
+      const other = await findByPhone(EMAIL_PHONE, phoneProof, { email: SOCIAL_EMAIL, emailProofToken: await proveMailbox(SOCIAL_EMAIL) });
+      expect(other.status).toBe(200);
+      expect(other.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
+    });
+
+    it('tells a number holder whose account has no email that there is no mailbox to prove', async () => {
+      await prisma.v1User.update({ where: { id: SOCIAL_USER }, data: { email: null } });
+
+      const response = await findByPhone(SOCIAL_PHONE, await proveCurrentPhone(SOCIAL_PHONE));
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual({ providers: ['kakao'], hasPassword: false, withdrawalPending: false, maskedEmail: null, emailProofAvailable: false, withdrawalPendingUntil: null });
+    });
+
+    it('refuses a forged mailbox proof and a proof sent without its address', async () => {
+      const phoneProof = await proveCurrentPhone(EMAIL_PHONE);
+      const forged = await findByPhone(EMAIL_PHONE, phoneProof, { email: EMAIL, emailProofToken: 'forged' });
+      expect({ status: forged.status, code: forged.body.code }).toEqual({ status: 400, code: 'EMAIL_NOT_VERIFIED' });
+
+      const half = await request(app.getHttpServer()).post('/api/v1/auth/recovery/find-account')
+        .send({ phone: EMAIL_PHONE, proofToken: phoneProof, emailProofToken: await proveMailbox(EMAIL) });
+      expect({ status: half.status, code: half.body.code }).toEqual({ status: 400, code: 'VALIDATION_ERROR' });
+    });
+  });
+
+  describe('an account waiting out its withdrawal grace', () => {
+    const REQUESTED_AT = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const GRACE_ENDS_AT = withdrawalGraceEndsAt(REQUESTED_AT).toISOString();
+
+    it('is found through the mailbox with its end date, because the code is mailed to it too', async () => {
+      await startWithdrawal(EMAIL_USER, REQUESTED_AT);
+      const proofToken = await proveMailbox(EMAIL);
+
+      const found = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/find-account').send({ email: EMAIL, proofToken });
+
+      expect(found.status).toBe(200);
+      expect(found.body.data).toEqual({
+        providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: 'in***@integration.test', emailProofAvailable: true, withdrawalPendingUntil: GRACE_ENDS_AT,
+      });
+    });
+
+    it('tells the number holder it is pending but not when, until the same mailbox is proven', async () => {
+      await startWithdrawal(EMAIL_USER, REQUESTED_AT);
+      const phoneProof = await proveCurrentPhone(EMAIL_PHONE);
+
+      const smsOnly = await findByPhone(EMAIL_PHONE, phoneProof);
+      expect(smsOnly.body.data).toEqual({ providers: ['email'], hasPassword: true, withdrawalPending: true, maskedEmail: null, emailProofAvailable: true, withdrawalPendingUntil: null });
+
+      const withMailbox = await findByPhone(EMAIL_PHONE, phoneProof, { email: EMAIL, emailProofToken: await proveMailbox(EMAIL) });
+      expect(withMailbox.body.data).toMatchObject({ withdrawalPending: true, maskedEmail: 'in***@integration.test', withdrawalPendingUntil: GRACE_ENDS_AT });
+    });
+
+    it('cannot have its password reset by email, and is told it is withdrawing along with the end date', async () => {
+      await startWithdrawal(EMAIL_USER, REQUESTED_AT);
+      const proofToken = await proveMailbox(EMAIL);
+      const before = await accountState();
+
+      const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/reset-password')
+        .send({ email: EMAIL, proofToken, newPassword: REPLACEMENT_PASSWORD });
+
+      expect({ status: response.status, code: response.body.code, details: response.body.details }).toEqual({
+        status: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil: GRACE_ENDS_AT },
+      });
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(await accountState()).toEqual(before);
+    });
+  });
+
+  describe('common passwords', () => {
+    it('are refused on an email reset with their own code, and nothing is written', async () => {
+      const proofToken = await proveMailbox(EMAIL);
+      const before = await accountState();
+
+      const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/reset-password')
+        .send({ email: EMAIL, proofToken, newPassword: 'Qwer1234' });
+
+      expect({ status: response.status, code: response.body.code, message: response.body.message }).toEqual({
+        status: 400, code: 'PASSWORD_TOO_COMMON', message: '너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.',
+      });
+      expect(response.headers['set-cookie']).toBeUndefined();
+      // The mailbox proof is not consumed by a refused password, so the same proof can set a good one.
+      expect(await accountState()).toEqual(before);
+      await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/reset-password')
+        .send({ email: EMAIL, proofToken, newPassword: REPLACEMENT_PASSWORD }).expect(200);
+    });
+
+    // A complete body, so the only thing wrong is the password; the code tells that apart from any other 400.
+    it('are refused on signup before any account is created', async () => {
+      const signupEmail = `${PREFIX}-signup@integration.test`;
+      const response = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+        nickname: '흔한비번가입', email: signupEmail, password: 'Password123', displayName: '홍길동', phone: '01000000135',
+        birthDate: '20000229', gender: 'male', requiredTermsAccepted: true,
+        acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
+      });
+
+      expect({ status: response.status, code: response.body.code }).toEqual({ status: 400, code: 'PASSWORD_TOO_COMMON' });
+      expect(await prisma.v1User.count({ where: { email: signupEmail } })).toBe(0);
+    });
   });
 });

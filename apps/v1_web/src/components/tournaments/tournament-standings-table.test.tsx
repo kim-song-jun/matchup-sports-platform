@@ -27,6 +27,39 @@ const ROW: TournamentStandingsRow = {
   goalsAgainst: 4,
 };
 
+describe('TournamentStandingsTable — 내 팀 행 표식', () => {
+  const rows: TournamentStandingsRow[] = [
+    { ...ROW, key: 'r1', teamId: 'mine', teamName: '우리 FC', position: 1 },
+    { ...ROW, key: 'r2', teamId: 'rival', teamName: '상대 FC', position: 2 },
+    { ...ROW, key: 'r3', teamId: null, teamName: null, position: 3 },
+  ];
+  const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement;
+
+  it('소속 팀 행에만 우리 팀 배지와 왼쪽 막대를 단다 — 다른 팀·비공개 팀 행은 그대로다', () => {
+    render(<TournamentStandingsTable rows={rows} advancingKeys={null} ariaLabel="테스트 순위표" myTeamIds={new Set(['mine'])} />);
+
+    expect(within(rowOf('우리 FC')).getByText('우리 팀')).toBeInTheDocument();
+    expect(within(rowOf('우리 FC')).getAllByRole('cell')[0]).toHaveStyle({ boxShadow: 'inset 2px 0 0 var(--blue500)' });
+    expect(within(rowOf('상대 FC')).queryByText('우리 팀')).not.toBeInTheDocument();
+    expect(within(rowOf('참가팀 비공개')).queryByText('우리 팀')).not.toBeInTheDocument();
+    expect(screen.getAllByText('우리 팀')).toHaveLength(1);
+  });
+
+  it('소속 팀 정보를 안 주면 어느 행에도 표식이 없다', () => {
+    render(<TournamentStandingsTable rows={rows} advancingKeys={null} ariaLabel="테스트 순위표" />);
+
+    expect(screen.queryByText('우리 팀')).not.toBeInTheDocument();
+  });
+
+  it('우리 팀 배지는 진출 배지와 함께 같은 행에 나란히 보인다', () => {
+    render(<TournamentStandingsTable rows={rows} advancingKeys={new Set(['r1'])} ariaLabel="테스트 순위표" myTeamIds={new Set(['mine'])} />);
+
+    const mine = within(rowOf('우리 FC'));
+    expect(mine.getByText('우리 팀')).toBeInTheDocument();
+    expect(mine.getByText('진출')).toBeInTheDocument();
+  });
+});
+
 describe('TournamentStandingsTable', () => {
   /* #374 — 경기 기록이 0건이어도 조 편성 팀은 보여야 한다. 전 지표가 0인 기준선 행을
      받았을 때 순위표는 팀을 모두 렌더하되, 성적이 아닌 편성 순서에 메달·진출 강조를

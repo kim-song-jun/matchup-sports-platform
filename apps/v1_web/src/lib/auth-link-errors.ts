@@ -1,6 +1,6 @@
 import { V1ApiError } from './api-client';
 import { sanitizeRedirectPath } from './session-storage';
-import { SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
+import { ACCOUNT_WITHDRAWAL_PENDING_CODE, SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
 import { usableWithdrawalDate } from './withdrawal-grace';
 import type {
   V1LinkableProvider,
@@ -12,7 +12,6 @@ import type {
 
 export const RECENT_LOGIN_REQUIRED_CODE = 'RECENT_LOGIN_REQUIRED';
 export const SIGNUP_INCOMPLETE_CODE = 'SIGNUP_INCOMPLETE';
-export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
 export const PASSWORD_LOGIN_UNAVAILABLE_CODE = 'PASSWORD_LOGIN_UNAVAILABLE';
 export const EMAIL_SEND_UNAVAILABLE_CODE = 'EMAIL_SEND_UNAVAILABLE';
 

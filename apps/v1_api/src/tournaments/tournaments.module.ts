@@ -14,6 +14,8 @@ import { MockTournamentSeedService } from './mock-seed/mock-tournament-seed.serv
 import { TournamentsAdminService } from './tournaments-admin.service';
 import { TournamentRegistrationsController } from './tournament-registrations.controller';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
+import { AdminDisciplineController } from './discipline/admin-discipline.controller';
+import { AdminDisciplineService } from './discipline/admin-discipline.service';
 import { AdminRegistrationsController } from './admin-registrations.controller';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { TournamentBracketController } from './tournament-bracket.controller';
@@ -93,6 +95,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentsAdminController,
     MockTournamentSeedController,
     AdminRegistrationsController,
+    AdminDisciplineController,
     TournamentBracketController,
     TournamentSlotStandingsController,
     BracketTemplateController,
@@ -117,6 +120,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentsAdminService,
     TournamentRegistrationsService,
     AdminRegistrationsService,
+    AdminDisciplineService,
     TournamentBracketService,
     BracketTemplateService,
     TournamentSlotService,

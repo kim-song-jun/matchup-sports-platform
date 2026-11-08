@@ -11,7 +11,7 @@ export const RETURN_PATH = '/chat?room=team#latest';
 type WireCalls = {
   logout: number;
   emailIssue: unknown[]; emailVerify: unknown[]; emailReset: unknown[];
-  phoneVerify: unknown[]; findAccount: unknown[];
+  phoneVerify: unknown[]; findAccount: unknown[]; emailFind: unknown[];
 };
 export const wireCalls: WireCalls = {
   logout: 0,
@@ -20,6 +20,7 @@ export const wireCalls: WireCalls = {
   emailReset: [],
   phoneVerify: [],
   findAccount: [],
+  emailFind: [],
 };
 export const scenario = { provider: 'kakao', logoutFails: false };
 export const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
@@ -45,7 +46,7 @@ export const authUiServer = setupServer(
   }),
   http.post('*/api/v1/auth/recovery/find-account', async ({ request }) => {
     wireCalls.findAccount.push(await request.json());
-    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+    return success({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/email/request', async ({ request }) => {
     wireCalls.emailIssue.push(await request.json());
@@ -54,6 +55,11 @@ export const authUiServer = setupServer(
   http.post('*/api/v1/auth/recovery/email/confirm', async ({ request }) => {
     wireCalls.emailVerify.push(await request.json());
     return success({ verified: true, proofToken: 'email-proof' });
+  }),
+  // 비밀번호 재설정은 메일함 증명 뒤에 계정이 탈퇴 대기인지 먼저 확인한다. 기본은 활성 계정이다.
+  http.post('*/api/v1/auth/recovery/email/find-account', async ({ request }) => {
+    wireCalls.emailFind.push(await request.json());
+    return success({ maskedEmail: 'ow***@example.test', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/email/reset-password', async ({ request }) => {
     wireCalls.emailReset.push(await request.json());
@@ -70,6 +76,7 @@ export function resetWireScenario() {
   wireCalls.emailReset = [];
   wireCalls.phoneVerify = [];
   wireCalls.findAccount = [];
+  wireCalls.emailFind = [];
 }
 
 export function renderAuthUi(content: ReactNode) {

@@ -181,6 +181,19 @@ describe('카카오 로그인이 탈퇴 유예 계정과 겹친 경우', () => {
   });
 });
 
+describe('스스로 해제한 카카오 로그인으로 들어오려 할 때', () => {
+  it('차단 화면으로 가지 않고, 오류 안내 자리에서 원래 방법으로 로그인해 다시 연결하라고 알려 준다', async () => {
+    await openCallback(LINK_MSW.loginRefusals.unlinkedMethod);
+
+    expect(await screen.findByText(
+      '이 카카오 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login');
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(requests).toEqual(['POST /api/v1/auth/kakao']);
+  });
+});
+
 describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취소 → 자동 연결', () => {
   // 시계를 얼리지 않는다(조회 캐시·타이머가 같은 시계를 본다) — 날짜는 지금으로부터 일주일 뒤로 잡는다.
   const UNTIL = new Date(Date.now() + 7 * 86_400_000).toISOString();

@@ -157,6 +157,23 @@ describe('AppleLoginButton', () => {
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
   });
 
+  it('tells a removed Apple login how to get back in, and leaves the button usable', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(403, 'LOGIN_METHOD_UNLINKED')));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '이 Apple 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    );
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Apple로 계속하기' })).toBeEnabled();
+  });
+
   /** A shell built before the code was forwarded still signs in; the field is simply absent. */
   it('keeps the saved redirect while the server sends a new account to social terms', async () => {
     reply = { ok: true, identityToken: 'identity.token' };

@@ -24,7 +24,7 @@ import type { LinkPendingDto } from './dto/link-pending.dto';
 import { ACTIVITY_RELATION_COUNTS, isEmptySignupAccount } from './empty-signup-account';
 import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
-import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
+import { SOCIAL_PROVIDER_LABELS, socialProviderExists } from './social-link-conflict';
 import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
 
 export type AccountLinkResult = {
@@ -183,7 +183,7 @@ export class AccountLinkService {
 
     const sameProvider = caller.authIdentities.find((existing) => existing.provider === identity.provider);
     if (sameProvider) {
-      if (sameProvider.providerUserKey !== identity.providerUserKey) throw providerExists(identity.provider);
+      if (sameProvider.providerUserKey !== identity.providerUserKey) throw socialProviderExists(identity.provider);
       return {
         result: {
           provider: identity.provider,
@@ -226,7 +226,17 @@ export class AccountLinkService {
 
     let linkedIdentityId: string;
     let mergedUserId: string | null = null;
-    if (!holder) {
+    let revived = false;
+    if (holder && holder.status === 'unlinked' && holder.user.id === callerId) {
+      // The caller removed this login earlier (POST /auth/identities/unlink); the row kept its key so it comes back as it was.
+      const restored = await tx.v1AuthIdentity.updateMany({
+        where: { id: holder.id, userId: callerId, status: 'unlinked' },
+        data: { status: 'active', unlinkedAt: null, email: identity.email, lastLoginAt: now },
+      });
+      if (restored.count !== 1) throw providerInUse();
+      linkedIdentityId = holder.id;
+      revived = true;
+    } else if (!holder) {
       const created = await tx.v1AuthIdentity.create({
         data: {
           userId: callerId,
@@ -259,7 +269,7 @@ export class AccountLinkService {
         toStatus: 'linked',
         actorType: 'user',
         actorUserId: callerId,
-        reason: `account_link:${identity.provider}${mergedUserId ? ';merged_pending_user' : ''}`,
+        reason: `account_link:${identity.provider}${mergedUserId ? ';merged_pending_user' : ''}${revived ? ';restored_identity' : ''}`,
       },
     });
 
@@ -271,7 +281,8 @@ export class AccountLinkService {
     // A security notice, so it ignores notification settings and is stored with the link or not at all.
     const notification = await this.notifications.createInTransaction(tx, callerId, 'social_identity_linked', {
       vars: { name: SOCIAL_PROVIDER_LABELS[identity.provider] },
-      businessKey: `social-link:${linkedIdentityId}`,
+      // A restored row keeps its id, so each re-link needs a key of its own or its notice would be dropped as a repeat.
+      businessKey: revived ? `social-link:${linkedIdentityId}:${now.getTime()}` : `social-link:${linkedIdentityId}`,
     });
     return {
       result: {
@@ -370,14 +381,6 @@ export class AccountLinkService {
 
 function distinctProviders(identities: { provider: V1AuthProvider }[]): V1AuthProvider[] {
   return [...new Set(identities.map((identity) => identity.provider))];
-}
-
-function providerExists(provider: LinkableSocialProvider) {
-  const label = SOCIAL_PROVIDER_LABELS[provider];
-  return new ConflictException({
-    code: 'SOCIAL_LINK_PROVIDER_EXISTS',
-    message: `이 계정에는 이미 다른 ${label} 계정이 연결돼 있어요.`,
-  });
 }
 
 function providerInUse() {

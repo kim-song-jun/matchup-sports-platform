@@ -129,6 +129,13 @@ describe('maskSensitive', () => {
     });
   });
 
+  // 계정 복구 요청 본문이 에러 로그에 저장될 수 있다 — 10분짜리 소유 증명이 로그에 남으면 열람자가 그 계정의 정보를 조회한다.
+  it('masks the recovery proofs of the phone and the mailbox', () => {
+    expect(
+      maskSensitive({ phone: '01012345678', proofToken: 'signed.phone', email: 'a@example.com', emailProofToken: 'signed.email' }),
+    ).toEqual({ phone: '[REDACTED]', proofToken: '[REDACTED]', email: 'a@example.com', emailProofToken: '[REDACTED]' });
+  });
+
   // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
   it('masks the withdrawal cancel token inside an error response body', () => {
     const body = { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalCancelToken: 'signed.value', expiresInSeconds: 600 } };

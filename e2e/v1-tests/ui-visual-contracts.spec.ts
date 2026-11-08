@@ -104,8 +104,8 @@ test.describe('Teameet shared visual contracts', () => {
       await page.getByRole('button', { name: '중복 확인' }).nth(0).click();
       await page.getByLabel('이메일').fill(`visual-${viewport.width}@example.com`);
       await page.getByRole('button', { name: '중복 확인' }).nth(1).click();
-      await page.getByLabel('비밀번호', { exact: true }).fill('Password1!');
-      await page.getByLabel('비밀번호 확인').fill('Password1!');
+      await page.getByLabel('비밀번호', { exact: true }).fill('Sunny-ride-4');
+      await page.getByLabel('비밀번호 확인').fill('Sunny-ride-4');
       await page.getByRole('button', { name: '프로필 입력하기' }).click();
 
       // When: invalid raw input is attempted, then corrected to a complete profile.

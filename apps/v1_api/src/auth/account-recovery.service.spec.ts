@@ -1,4 +1,4 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { issueEmailProofToken } from '../verification/email-proof-token';
@@ -101,27 +101,116 @@ describe('AccountRecoveryService — 증명 토큰 게이트', () => {
   });
 });
 
-describe('AccountRecoveryService — 계정 찾기', () => {
+describe('AccountRecoveryService — 계정 찾기(휴대폰)', () => {
   beforeEach(() => {
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
   });
 
-  it('마스킹된 이메일과 로그인 수단을 돌려준다', async () => {
+  const smsProof = () => issuePhoneProofToken(PHONE, 'password_reset');
+
+  // 번호는 다른 사람에게 재배정될 수 있다 — SMS 증명만으로는 이전 주인의 이메일 힌트가 나가면 안 된다.
+  it('SMS 증명만 있으면 가입 수단만 돌려주고 이메일 힌트는 싣지 않는다', async () => {
+    const svc = service(prismaMock(emailUser));
+
+    const result = await svc.findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+
+    expect(result).toEqual({
+      providers: ['email'],
+      hasPassword: true,
+      withdrawalPending: false,
+      maskedEmail: null,
+      emailProofAvailable: true,
+      withdrawalPendingUntil: null,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/runner|ru\*\*\*|example\.com/);
+  });
+
+  it('같은 계정의 이메일 증명을 함께 보내면 마스킹된 이메일을 싣는다', async () => {
     const svc = service(prismaMock(emailUser));
 
     const result = await svc.findAccountByPhone({
       phone: PHONE,
-      proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
+      proofToken: smsProof(),
+      email: '  Runner@Example.COM ',
+      emailProofToken: issueEmailProofToken(EMAIL, 'password_reset'),
     });
 
     expect(result).toEqual({
-      maskedEmail: 'ru***@example.com',
       providers: ['email'],
       hasPassword: true,
+      withdrawalPending: false,
+      maskedEmail: 'ru***@example.com',
+      emailProofAvailable: true,
       withdrawalPendingUntil: null,
     });
-    // 전체 주소가 새면 번호만 가진 쪽에 이메일을 넘겨주는 셈이 된다.
+    // 증명을 해도 전체 주소를 되돌려 주지는 않는다.
     expect(JSON.stringify(result)).not.toContain('runner@example.com');
+  });
+
+  // 메일함 증명이 유효해도 이 계정의 것이 아니면 값이 나가면 안 된다 — 이 테스트가 "같은 계정" 조건의 경계다.
+  it('다른 계정의 이메일 증명이면 증명을 보내지 않은 것과 똑같이 답한다', async () => {
+    const svc = service(prismaMock(emailUser));
+    const withoutProof = await svc.findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+
+    const withOtherMailbox = await svc.findAccountByPhone({
+      phone: PHONE,
+      proofToken: smsProof(),
+      email: 'someone-else@example.com',
+      emailProofToken: issueEmailProofToken('someone-else@example.com', 'password_reset'),
+    });
+
+    expect(withOtherMailbox).toEqual(withoutProof);
+    expect(withOtherMailbox.maskedEmail).toBeNull();
+  });
+
+  it('계정에 이메일이 없으면 어떤 이메일 증명으로도 값을 싣지 않는다', async () => {
+    const svc = service(prismaMock({ ...kakaoOnlyUser, email: null }));
+
+    const result = await svc.findAccountByPhone({
+      phone: PHONE,
+      proofToken: smsProof(),
+      email: EMAIL,
+      emailProofToken: issueEmailProofToken(EMAIL, 'password_reset'),
+    });
+
+    expect(result).toMatchObject({ providers: ['kakao'], maskedEmail: null, withdrawalPendingUntil: null });
+  });
+
+  // 화면이 "이메일로 한 번 더 확인하기"를 권해도 되는지 가르는 값이라, 이메일이 없는 계정과 있는 계정이 서로 달라야 한다.
+  it('이메일 증명을 받을 수 있는 계정인지만 알리고 주소는 싣지 않는다', async () => {
+    const withEmail = await service(prismaMock(emailUser)).findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+    const withoutEmail = await service(prismaMock({ ...kakaoOnlyUser, email: null })).findAccountByPhone({ phone: PHONE, proofToken: smsProof() });
+
+    expect(withEmail.emailProofAvailable).toBe(true);
+    expect(withoutEmail.emailProofAvailable).toBe(false);
+    expect(JSON.stringify([withEmail, withoutEmail])).not.toMatch(/example\.com|@/);
+  });
+
+  it.each([
+    ['다른 주소로 발급된 증명', () => issueEmailProofToken('other@example.com', 'password_reset')],
+    ['휴대폰 증명', () => issuePhoneProofToken(PHONE, 'password_reset')],
+    ['서명이 깨진 값', () => 'v1.forged.proof'],
+  ])('이메일 증명으로 %s 을 보내면 계정을 조회하기 전에 EMAIL_NOT_VERIFIED 로 거절한다', async (_label, token) => {
+    const prisma = prismaMock(emailUser);
+
+    await expect(
+      service(prisma).findAccountByPhone({ phone: PHONE, proofToken: smsProof(), email: EMAIL, emailProofToken: token() }),
+    ).rejects.toMatchObject({ response: { code: 'EMAIL_NOT_VERIFIED' } });
+    expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('SMS 증명이 틀리면 이메일 증명이 있어도 계정을 조회하지 않는다', async () => {
+    const prisma = prismaMock(emailUser);
+
+    await expect(
+      service(prisma).findAccountByPhone({
+        phone: PHONE,
+        proofToken: issuePhoneProofToken(PHONE),
+        email: EMAIL,
+        emailProofToken: issueEmailProofToken(EMAIL, 'password_reset'),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
+    expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
   });
 });
 
@@ -132,7 +221,7 @@ describe('AccountRecoveryService — 이메일로 로그인 방법 찾기', () =
     const prisma = prismaByEmail({ 'kakao@example.com': kakaoOnlyUser });
     const svc = service(prisma) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
     await expect(svc.findAccountByEmail({ email: 'kakao@example.com', proofToken: issueEmailProofToken('kakao@example.com', 'password_reset') }))
-      .resolves.toEqual({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: 'ka***@example.com', emailProofAvailable: true, providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
   });
 
@@ -145,7 +234,7 @@ describe('AccountRecoveryService — 이메일로 로그인 방법 찾기', () =
     expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
   });
 
-  it('인증한 주소에 활성 계정이 없으면 조회 결과를 찾을 수 없다고 알린다', async () => {
+  it('인증한 주소에 계정이 없으면 조회 결과를 찾을 수 없다고 알린다', async () => {
     const svc = service(prismaByEmail({})) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
     await expect(svc.findAccountByEmail({ email: EMAIL, proofToken: issueEmailProofToken(EMAIL, 'password_reset') })).rejects.toMatchObject({ response: { code: 'ACCOUNT_NOT_FOUND', message: '이 이메일로 가입된 계정을 찾지 못했어요.' } });
   });
@@ -183,27 +272,78 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
   };
   const proof = () => issuePhoneProofToken(PHONE, 'password_reset');
 
-  it('번호를 증명한 뒤에는 같은 모양으로 답하고 유예가 끝나는 시각을 덧붙인다', async () => {
-    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+  // 번호를 새로 받은 사람도 SMS 증명은 통과한다 — 이전 주인의 탈퇴 종료일까지 보여 주면 안 된다.
+  it('SMS 증명만 있으면 탈퇴 대기라는 사실만 알리고 끝나는 날은 조회도 하지 않는다', async () => {
+    const { prisma, statusLogFindFirst } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
 
     const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
 
     expect(result).toEqual({
-      maskedEmail: 'mo***@example.com',
       providers: ['kakao'],
       hasPassword: false,
+      withdrawalPending: true,
+      maskedEmail: null,
+      emailProofAvailable: true,
+      withdrawalPendingUntil: null,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/moved|2026-10/);
+    expect(statusLogFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('같은 계정의 이메일 증명을 함께 보내면 유예가 끝나는 시각을 덧붙인다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+
+    const result = await service(prisma).findAccountByPhone({
+      phone: PHONE,
+      proofToken: proof(),
+      email: 'moved@example.com',
+      emailProofToken: issueEmailProofToken('moved@example.com', 'password_reset'),
+    });
+
+    expect(result).toEqual({
+      providers: ['kakao'],
+      hasPassword: false,
+      withdrawalPending: true,
+      maskedEmail: 'mo***@example.com',
+      emailProofAvailable: true,
       withdrawalPendingUntil: '2026-10-31T00:00:00.000Z',
     });
     expect(JSON.stringify(result)).not.toContain('moved@example.com');
   });
 
-  it('탈퇴 신청 기록이 없으면 끝나는 시각은 null 이다', async () => {
+  it('다른 계정의 이메일 증명으로는 끝나는 시각을 조회하지 않는다', async () => {
+    const { prisma, statusLogFindFirst } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+
+    const result = await service(prisma).findAccountByPhone({
+      phone: PHONE,
+      proofToken: proof(),
+      email: EMAIL,
+      emailProofToken: issueEmailProofToken(EMAIL, 'password_reset'),
+    });
+
+    expect(result).toMatchObject({ withdrawalPending: true, maskedEmail: null, withdrawalPendingUntil: null });
+    expect(statusLogFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('탈퇴 신청 기록이 없으면 이메일 증명이 있어도 끝나는 시각은 null 이다', async () => {
     const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser }, null);
 
-    await expect(service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() })).resolves.toMatchObject({
-      providers: ['kakao'],
-      withdrawalPendingUntil: null,
-    });
+    await expect(
+      service(prisma).findAccountByPhone({
+        phone: PHONE,
+        proofToken: proof(),
+        email: 'moved@example.com',
+        emailProofToken: issueEmailProofToken('moved@example.com', 'password_reset'),
+      }),
+    ).resolves.toMatchObject({ providers: ['kakao'], withdrawalPending: true, withdrawalPendingUntil: null });
+  });
+
+  it('이메일이 없는 탈퇴 대기 계정은 이메일 증명을 권할 수 없다고 알린다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: { ...withdrawingUser, email: null } });
+
+    const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
+
+    expect(result).toMatchObject({ withdrawalPending: true, maskedEmail: null, emailProofAvailable: false });
   });
 
   it('활성 계정과 탈퇴 유예 계정이 함께 걸리면 활성 계정을 보여 주고 유예는 말하지 않는다', async () => {
@@ -212,9 +352,14 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
       withdrawal_pending: withdrawingUser,
     });
 
-    const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
+    const result = await service(prisma).findAccountByPhone({
+      phone: PHONE,
+      proofToken: proof(),
+      email: EMAIL,
+      emailProofToken: issueEmailProofToken(EMAIL, 'password_reset'),
+    });
 
-    expect(result).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['email'], withdrawalPendingUntil: null });
+    expect(result).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['email'], withdrawalPending: false, withdrawalPendingUntil: null });
     expect(statusLogFindFirst).not.toHaveBeenCalled();
   });
 
@@ -236,7 +381,132 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 �
       NotFoundException,
     );
   });
+});
 
+describe('AccountRecoveryService — 탈퇴 유예 중인 계정의 이메일을 증명했을 때', () => {
+  const REQUESTED_AT = new Date('2026-10-01T00:00:00.000Z');
+  const PENDING_EMAIL = 'moved@example.com';
+  const pendingUser = {
+    id: 'u-withdrawing',
+    email: PENDING_EMAIL,
+    authIdentities: [{ id: 'identity-3', provider: 'email', passwordHash: 'old-hash' }],
+  };
+
+  beforeEach(() => {
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+  });
+
+  /** 상태와 이메일로 계정을 돌려주고, 탈퇴 신청 기록은 사용자 id 로 찾아 주는 데이터베이스. */
+  function prismaWithEmailHolders(
+    holders: { active?: Record<string, unknown>; withdrawal_pending?: Record<string, unknown> },
+    requestedAt: Date | null = REQUESTED_AT,
+  ) {
+    const findFirst = jest.fn(async ({ where }: { where: { email: string; accountStatus: 'active' | 'withdrawal_pending' } }) =>
+      holders[where.accountStatus]?.[where.email] ?? null,
+    );
+    const statusLogFindFirst = jest.fn(async ({ where }: { where: { targetId: string } }) =>
+      requestedAt && where.targetId === pendingUser.id ? { createdAt: requestedAt } : null,
+    );
+    const update = jest.fn();
+    const prisma = {
+      v1User: { findFirst, update },
+      v1AuthIdentity: { update },
+      v1StatusChangeLog: { findFirst: statusLogFindFirst },
+      $transaction: jest.fn(),
+    } as unknown as PrismaService;
+    return { prisma, statusLogFindFirst, update };
+  }
+
+  const proofFor = (email: string) => issueEmailProofToken(email, 'password_reset');
+
+  it('탈퇴 대기 계정도 찾아 유예가 끝나는 시각까지 알려 준다', async () => {
+    const { prisma } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } });
+
+    await expect(service(prisma).findAccountByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL) })).resolves.toEqual({
+      providers: ['email'],
+      hasPassword: true,
+      withdrawalPending: true,
+      maskedEmail: 'mo***@example.com',
+      emailProofAvailable: true,
+      withdrawalPendingUntil: '2026-10-31T00:00:00.000Z',
+    });
+  });
+
+  it('탈퇴 신청 기록이 없으면 대기 중이라는 사실만 알리고 끝나는 시각은 null 이다', async () => {
+    const { prisma } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } }, null);
+
+    await expect(service(prisma).findAccountByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL) })).resolves.toMatchObject({
+      withdrawalPending: true,
+      withdrawalPendingUntil: null,
+    });
+  });
+
+  it('활성 계정이 있으면 그 계정을 보여 주고 탈퇴 기록은 조회하지 않는다', async () => {
+    const { prisma, statusLogFindFirst } = prismaWithEmailHolders({
+      active: { [EMAIL]: emailUser },
+      withdrawal_pending: { [EMAIL]: pendingUser },
+    });
+
+    await expect(service(prisma).findAccountByEmail({ email: EMAIL, proofToken: proofFor(EMAIL) })).resolves.toMatchObject({
+      providers: ['email'],
+      withdrawalPending: false,
+      withdrawalPendingUntil: null,
+    });
+    expect(statusLogFindFirst).not.toHaveBeenCalled();
+  });
+
+  // 증명 전에는 탈퇴 대기 여부가 어디에도 드러나지 않는다 — 활성 계정과 똑같이 메일을 보내고 같은 응답을 준다.
+  it('인증번호 메일은 탈퇴 대기 계정에도 보내고, 응답은 가입되지 않은 주소와 같다', async () => {
+    const pendingMail = emailVerificationMock();
+    const unknownMail = emailVerificationMock();
+
+    const hit = await service(prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } }).prisma, pendingMail)
+      .requestPasswordResetEmail({ email: PENDING_EMAIL });
+    const miss = await service(prismaWithEmailHolders({}).prisma, unknownMail)
+      .requestPasswordResetEmail({ email: 'nobody@example.com' });
+
+    expect(pendingMail.issueChallenge).toHaveBeenCalledWith(PENDING_EMAIL, { deliver: true });
+    expect(unknownMail.issueChallenge).toHaveBeenCalledWith('nobody@example.com', { deliver: false });
+    expect(hit).toEqual(miss);
+  });
+
+  // 메일함 증명을 마쳤으니 날짜를 알려도 된다. 비밀번호는 바꾸지 않고, 화면이 탈퇴 안내로 갈 수 있게 알린다.
+  it('비밀번호 재설정은 탈퇴 대기 계정에 403 ACCOUNT_WITHDRAWAL_PENDING 과 종료일로 답하고 아무것도 바꾸지 않는다', async () => {
+    const { prisma, update } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } });
+
+    const failure = await service(prisma)
+      .resetPasswordByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL), newPassword: 'brand-new-password' })
+      .catch((error: unknown) => error as ForbiddenException);
+
+    expect(failure).toBeInstanceOf(ForbiddenException);
+    expect((failure as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCOUNT_WITHDRAWAL_PENDING',
+      details: { withdrawalPendingUntil: '2026-10-31T00:00:00.000Z' },
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(realtimeGateway.forceDisconnectUser).not.toHaveBeenCalled();
+    expect(loginSecurity.forgetEmail).not.toHaveBeenCalled();
+  });
+
+  it('탈퇴 신청 기록이 없는 탈퇴 대기 계정도 날짜만 null 로 같은 403 을 받는다', async () => {
+    const { prisma } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } }, null);
+
+    await expect(
+      service(prisma).resetPasswordByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL), newPassword: 'brand-new-password' }),
+    ).rejects.toMatchObject({ status: 403, response: { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil: null } } });
+  });
+
+  it('같은 주소에 활성 계정이 있으면 그 계정의 비밀번호를 바꾼다', async () => {
+    const { prisma } = prismaWithEmailHolders({
+      active: { [EMAIL]: emailUser },
+      withdrawal_pending: { [EMAIL]: pendingUser },
+    });
+
+    await expect(
+      service(prisma).resetPasswordByEmail({ email: EMAIL, proofToken: proofFor(EMAIL), newPassword: 'brand-new-password' }),
+    ).resolves.toEqual({ ok: true });
+  });
 });
 
 describe('AccountRecoveryService — 인증번호 메일 요청', () => {

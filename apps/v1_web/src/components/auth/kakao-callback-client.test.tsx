@@ -279,6 +279,26 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/chat' });
   });
 
+  it('스스로 연결을 해제한 카카오(LOGIN_METHOD_UNLINKED)는 차단 화면 대신 다시 연결하는 길을 오류 안내 자리에 보여 준다', async () => {
+    await primeValidOAuthState();
+    api.v1Post.mockRejectedValue(apiError(403, 'LOGIN_METHOD_UNLINKED'));
+    render(<KakaoCallbackClient />);
+    expect(await screen.findByText(
+      '이 카카오 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login');
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'LOGIN_METHOD_UNLINKED' });
+  });
+
+  it('정지·차단된 계정의 403(PERMISSION_DENIED)은 그대로 차단 화면으로 보낸다', async () => {
+    await primeValidOAuthState();
+    api.v1Post.mockRejectedValue(apiError(403, 'PERMISSION_DENIED'));
+    render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
+    expect(screen.queryByText(/연결을 해제했어요/)).not.toBeInTheDocument();
+  });
+
   it('철회 토큰이 없는 403 은 철회 화면으로 보내지 않는다(자격이 틀리면 계정 상태를 알리지 않는다)', async () => {
     await primeValidOAuthState();
     api.v1Post.mockRejectedValue(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING'));

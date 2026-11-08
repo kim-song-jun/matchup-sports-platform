@@ -82,32 +82,37 @@ export interface LeagueFixtureTeam {
 
 /**
  * Fixture title, shared by every creation path so the format cannot drift between them:
- * "<league> N주차 M경기" with `orderInWeek`, "<league> N주차" without it.
+ * "<league> N주차 M경기".
  *
  * `week` is not stored anywhere: screens derive it from `startAt` (`league-week-number.ts`) and
  * `syncLeagueFixtureWeekTitles` rewrites the stored token at the end of the same transaction.
  * `orderInWeek` is written once at creation and never renumbered when a fixture later moves.
  */
-export function leagueFixtureTitle(input: { leagueTitle: string; week: number; orderInWeek?: number }): string {
-  const base = `${input.leagueTitle} ${input.week}주차`;
-  return input.orderInWeek === undefined ? base : `${base} ${input.orderInWeek}경기`;
+export function leagueFixtureTitle(input: { leagueTitle: string; week: number; orderInWeek: number }): string {
+  return `${input.leagueTitle} ${input.week}주차 ${input.orderInWeek}경기`;
 }
 
 /**
  * Titles for a batch created together. Week and order both come from the KST calendar week of each
- * start time, so a second day of the same week continues the first day's numbering.
- * `numbered: false` (one round per week, no `timing`) omits the game number.
+ * start time, so a second day of the same week continues the first day's numbering. Fixtures that
+ * share a start time (every game of a round when no `timing` is given) are numbered in input order.
  */
-export function leagueFixtureTitles(
-  leagueTitle: string,
-  startAts: readonly Date[],
-  options: { numbered?: boolean } = {},
-): string[] {
-  const weekOf = leagueWeekCounter(startAts);
-  const ordinals = options.numbered === false ? [] : leagueWeekOrdinals(startAts);
-  return startAts.map((startAt, index) =>
-    leagueFixtureTitle({ leagueTitle, week: weekOf(startAt), orderInWeek: ordinals[index] }),
+export function leagueFixtureTitles(leagueTitle: string, startAts: readonly Date[]): string[] {
+  const weeks = leagueFixtureWeeks(startAts);
+  const ordinals = leagueWeekOrdinals(startAts);
+  return startAts.map((_, index) =>
+    leagueFixtureTitle({ leagueTitle, week: weeks[index], orderInWeek: ordinals[index] }),
   );
+}
+
+/**
+ * The "N주차" of each start time in a batch created together — the `week` in `leagueFixtureTitles`
+ * and in the fixture preview response, so a preview can never group games differently than the
+ * titles they are created with.
+ */
+export function leagueFixtureWeeks(startAts: readonly Date[]): number[] {
+  const weekOf = leagueWeekCounter(startAts);
+  return startAts.map((startAt) => weekOf(startAt));
 }
 
 /** The M of an auto title "N주차 M경기"; operator-chosen titles never match. */

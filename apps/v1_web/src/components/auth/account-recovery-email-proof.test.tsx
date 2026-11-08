@@ -93,7 +93,7 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     authUiServer.use(http.post<never, { email: string; proofToken: string }>('*/api/v1/auth/recovery/email/find-account', async ({ request }) => {
       const body = await request.json();
       lookups.push(body);
-      return success({ maskedEmail: 'ow***@example.test', providers: [provider], hasPassword: false, withdrawalPendingUntil: null });
+      return success({ maskedEmail: 'ow***@example.test', emailProofAvailable: true, providers: [provider], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null });
     }));
     renderAuthUi(<AccountRecoveryClient />);
     const user = userEvent.setup();
@@ -124,7 +124,8 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     await screen.findByRole('button', { name: '확인' });
     await user.click(screen.getByRole('button', { name: '확인' }));
 
-    expect(await screen.findByText('ow***@example.test')).toBeInTheDocument();
+    expect(await screen.findByText('가입한 로그인 방법')).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*\*@/)).not.toBeInTheDocument();
     expect(wireCalls.phoneVerify).toEqual([{ phone: RECOVERY_PHONE, code: '123456', purpose: 'password_reset' }]);
     expect(wireCalls.findAccount).toEqual([{ phone: RECOVERY_PHONE, proofToken: 'phone-proof' }]);
     expect(wireCalls.emailReset).toHaveLength(0);

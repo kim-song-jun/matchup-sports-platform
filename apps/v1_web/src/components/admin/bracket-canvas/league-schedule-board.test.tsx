@@ -84,6 +84,7 @@ vi.mock('./league-fixture-panel', () => ({
     node: { fixtureId: string; home: { label: string }; away: { label: string } };
     onEditSchedule: () => void;
     onCancelFixture: () => void;
+    onDeleteFixture: () => void;
     onClose: () => void;
   }) => {
     mocks.panelProps.push(props);
@@ -92,6 +93,7 @@ vi.mock('./league-fixture-panel', () => ({
         {`${props.node.home.label} vs ${props.node.away.label}`}
         <button type="button" onClick={props.onEditSchedule}>일정 수정</button>
         <button type="button" onClick={props.onCancelFixture}>경기 취소</button>
+        <button type="button" onClick={props.onDeleteFixture}>경기 삭제</button>
         <button type="button" onClick={props.onClose}>패널 닫기</button>
       </div>
     );
@@ -102,6 +104,7 @@ const showToast = vi.fn();
 const onOpenTemplate = vi.fn();
 const onEditSchedule = vi.fn();
 const onCancelFixture = vi.fn();
+const onDeleteFixture = vi.fn();
 const onShowList = vi.fn();
 
 function renderBoard(overrides: Partial<LeagueScheduleBoardProps> = {}) {
@@ -116,6 +119,7 @@ function renderBoard(overrides: Partial<LeagueScheduleBoardProps> = {}) {
       onOpenTemplate={onOpenTemplate}
       onEditSchedule={onEditSchedule}
       onCancelFixture={onCancelFixture}
+      onDeleteFixture={onDeleteFixture}
       onShowList={onShowList}
       {...overrides}
     />,
@@ -385,7 +389,7 @@ describe('LeagueScheduleBoard — 팀 넣기', () => {
     rerender(
       <LeagueScheduleBoard
         leagueId="league-1" fixtures={FIXTURES} slots={SLOTS} teams={TEAMS} canWrite={false} showToast={showToast}
-        onOpenTemplate={onOpenTemplate} onEditSchedule={onEditSchedule} onCancelFixture={onCancelFixture} onShowList={onShowList}
+        onOpenTemplate={onOpenTemplate} onEditSchedule={onEditSchedule} onCancelFixture={onCancelFixture} onDeleteFixture={onDeleteFixture} onShowList={onShowList}
       />,
     );
     drop(emptyAway());
@@ -394,7 +398,7 @@ describe('LeagueScheduleBoard — 팀 넣기', () => {
 });
 
 describe('LeagueScheduleBoard — 패널', () => {
-  it('경기 머리를 누르면 패널이 열리고, 일정 수정·경기 취소는 패널을 닫고 부모 모달로 넘긴다', () => {
+  it('경기 머리를 누르면 패널이 열리고, 일정 수정·경기 취소·경기 삭제는 패널을 닫고 부모 모달로 넘긴다', () => {
     renderBoard();
 
     fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: /경기 상세 열기/ }));
@@ -407,6 +411,12 @@ describe('LeagueScheduleBoard — 패널', () => {
     fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: /경기 상세 열기/ }));
     fireEvent.click(screen.getByRole('button', { name: '경기 취소' }));
     expect(onCancelFixture).toHaveBeenCalledWith('fx-empty');
+    expect(screen.queryByRole('dialog', { name: '경기 패널' })).toBeNull();
+    expect(onDeleteFixture).not.toHaveBeenCalled();
+
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: /경기 상세 열기/ }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
+    expect(onDeleteFixture).toHaveBeenCalledWith('fx-empty');
     expect(screen.queryByRole('dialog', { name: '경기 패널' })).toBeNull();
   });
 });

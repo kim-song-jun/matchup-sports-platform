@@ -22,6 +22,9 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'emailLinkToken',
   // 탈퇴 신청 중 계정의 로그인 거절 응답(details)에 실리는 철회 토큰 — 가진 쪽이 그 계정의 세션을 받는다.
   'withdrawalCancelToken',
+  // 계정 복구의 휴대폰·이메일 소유 증명 — 10분 동안 계정 찾기(탈퇴 종료일·마스킹 이메일)와 비밀번호 재설정 요청을 통과시킨다.
+  'proofToken',
+  'emailProofToken',
   'code',
   'authorization',
   'cookie',

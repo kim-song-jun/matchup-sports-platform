@@ -6,6 +6,7 @@ import type {
   V1LinkEmailVerifyResult,
   V1LinkSocialResult,
 } from '@/types/api';
+import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { sessionLoginResponse } from './auth-step-up-handlers';
 
 /**
@@ -15,7 +16,7 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  *  - `POST /auth/link/kakao|apple`: LINK_MSW.credentials 의 값이 시나리오를 정한다. 모르는 값은 401 UNAUTHENTICATED
  *    (제공자 토큰 검증 실패). 본문은 서버 DTO(`LinkKakaoDto`, `AppleLoginDto`)와 같은 길이 제한·허용 필드를 따르고, 어기면 400.
  *  - `POST /auth/kakao`·`/auth/kakao/token`·`/auth/apple`: LINK_MSW.loginConflicts 의 값이면 `details.next` 가 붙은
- *    409, 그 외에는 세션.
+ *    409, LINK_MSW.loginRefusals.unlinkedMethod 이면 403 LOGIN_METHOD_UNLINKED(스스로 해제한 로그인), 그 외에는 세션.
  *  - 위 409 의 `details` 에는 `linkToken`·`linkTokenExpiresInSeconds` 가 실린다. `loginConflicts.withdrawalPending` 은 거기에
  *    `withdrawalPendingUntil`(일주일 뒤)도 싣는다. `POST /auth/link/pending` 은
  *    PENDING_LINK_MSW.tokens 의 값으로 시나리오를 고르고(토큰은 20~2048자), 모르는 토큰은 400 SOCIAL_LINK_TOKEN_INVALID.
@@ -49,6 +50,9 @@ export const LINK_MSW = {
     accountProof: 'msw-login-conflict-account-proof',
     /** 같은 연락처를 쥔 계정이 탈퇴 유예 중 — 409 에 유예 종료 시각이 함께 실린다. */
     withdrawalPending: 'msw-login-conflict-withdrawal-pending',
+  },
+  loginRefusals: {
+    unlinkedMethod: 'msw-login-refusal-unlinked-method',
   },
   maxAgeSeconds: 30 * 60,
   signupIncompleteRoute: '/signup/social',
@@ -113,6 +117,14 @@ export const EMAIL_LINK_MSW = {
 export const PASSWORD_UNAVAILABLE_MSW = {
   email: 'kakao-only@example.com',
   providers: ['kakao'],
+} as const;
+
+/** 탈퇴 유예 중인 계정 — 이메일 찾기는 사서함 증명 뒤 종료일까지, 번호 찾기는 이메일 증명을 더해야 종료일을 싣는다. */
+export const WITHDRAWAL_PENDING_RECOVERY_MSW = {
+  email: 'withdrawing-recovery@example.com',
+  phone: '01055550000',
+  /** 사용할 수 있는 날짜로 읽히도록 먼 미래로 둔다(지난 날짜는 화면이 "모른다"로 다룬다). */
+  withdrawalPendingUntil: '2099-01-31T00:00:00.000Z',
 } as const;
 
 export const WITHDRAWAL_MSW = {
@@ -234,6 +246,8 @@ function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
       return signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', provider, undefined, {
         withdrawalPendingUntil: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       });
+    case LINK_MSW.loginRefusals.unlinkedMethod:
+      return fail(403, 'LOGIN_METHOD_UNLINKED', '연결을 해제한 로그인 수단이에요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.');
     default:
       return sessionLoginResponse();
   }
@@ -352,7 +366,10 @@ export const v1AuthLinkMswHandlers = [
   http.post(`${api}/auth/link/email/complete`, async ({ request }) => {
     const { emailLinkToken, password, passwordConfirm, ...rest } = await readJson(request);
     if (Object.keys(rest).length > 0 || !isBounded(emailLinkToken, 20, 2048)) return invalidLinkBody();
-    if (typeof password !== 'string' || password.length < 8 || passwordConfirm !== password) return invalidLinkBody();
+    if (typeof password !== 'string' || passwordConfirm !== password) return invalidLinkBody();
+    const passwordIssue = accountPasswordIssue(password);
+    if (passwordIssue === 'too_short') return invalidLinkBody();
+    if (passwordIssue === 'too_common') return fail(400, COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
     return emailLinkCompleteOutcome(emailLinkToken);
   }),
 

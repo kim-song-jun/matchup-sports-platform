@@ -1,4 +1,8 @@
-import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsAccountPassword } from './account-password.decorator';
+
+/** True when the caller sent any part of the mailbox proof, so the other part becomes required too. */
+const hasMailboxProof = (dto: FindAccountDto) => dto.email !== undefined || dto.emailProofToken !== undefined;
 
 export class FindAccountDto {
   @IsString()
@@ -7,6 +11,21 @@ export class FindAccountDto {
 
   @IsString()
   proofToken!: string;
+
+  /**
+   * Optional mailbox proof for the same account: the address and the `proofToken` of `recovery/email/confirm`.
+   * Only with both, and only when the address is this account's own, does the answer carry the masked email and
+   * the withdrawal end date. Sending one without the other is a 400.
+   */
+  @ValidateIf(hasMailboxProof)
+  @IsEmail({}, { message: '이메일 형식이 올바르지 않아요.' })
+  @MaxLength(254, { message: '이메일이 너무 길어요.' })
+  email?: string;
+
+  @ValidateIf(hasMailboxProof)
+  @IsString()
+  @MaxLength(2048)
+  emailProofToken?: string;
 }
 
 /**
@@ -45,7 +64,6 @@ export class ResetPasswordByEmailDto {
   @IsString()
   proofToken!: string;
 
-  @IsString()
-  @MinLength(8, { message: '비밀번호는 8자 이상이에요.' })
+  @IsAccountPassword()
   newPassword!: string;
 }

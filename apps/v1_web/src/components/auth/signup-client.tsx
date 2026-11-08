@@ -326,7 +326,6 @@ export function SignupClient() {
           await updateProfile.mutateAsync({
             realName: normalizedRealName,
             nickname: normalizedNickname,
-            email: normalizedEmail,
             profileImageUrl: uploadedUrl,
             phone: profileDraft.phone,
             birthDate: profileDraft.birthDate,

@@ -97,6 +97,10 @@ import type {
   V1AuthMe,
   V1AuthSessionResponse,
   V1CancelWithdrawalPayload,
+  V1EmailChangeRequestPayload,
+  V1EmailChangeRequestResult,
+  V1EmailChangeVerifyPayload,
+  V1EmailChangeVerifyResult,
   V1LinkApplePayload,
   V1LinkKakaoPayload,
   V1LinkEmailCompletePayload,
@@ -155,6 +159,7 @@ import type {
   V1OnboardingMutationResult,
   V1OnboardingPreferencePayload,
   V1Profile,
+  V1ProfileUpdateResult,
   V1PopupTargetScreen,
   V1PublicProfile,
   V1Region,
@@ -435,6 +440,20 @@ export function useV1LinkEmailComplete() {
   return useMutation({
     mutationFn: (body: V1LinkEmailCompletePayload) => v1Post<V1LinkEmailCompleteResult>('/auth/link/email/complete', body),
     onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 계정 이메일 변경 1단계: 새 주소로 인증번호를 보낸다. 계정에는 아무것도 쓰지 않는다. */
+export function useV1EmailChangeRequest() {
+  return useMutation({
+    mutationFn: (body: V1EmailChangeRequestPayload) => v1Post<V1EmailChangeRequestResult>('/me/email-change/request', body),
+  });
+}
+
+/** 2단계: 인증번호를 맞추고 `emailChangeToken` 을 받는다. 이 토큰을 `useV1UpdateProfile` 의 `emailChangeToken` 으로 넘겨야 이메일이 바뀐다. */
+export function useV1EmailChangeVerify() {
+  return useMutation({
+    mutationFn: (body: V1EmailChangeVerifyPayload) => v1Post<V1EmailChangeVerifyResult>('/me/email-change/verify', body),
   });
 }
 
@@ -3184,6 +3203,8 @@ export function useV1UpdateProfile() {
       realName?: string | null;
       nickname: string;
       email?: string | null;
+      /** 지금과 다른 주소로 바꿀 때만 필요 — `useV1EmailChangeVerify` 가 준 토큰. 없으면 서버가 400 `EMAIL_CHANGE_PROOF_REQUIRED`. */
+      emailChangeToken?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
       /** 번호를 바꿀 때만 필요 — 서버가 register 와 동일하게 본인인증 증명을 요구한다. */
@@ -3193,13 +3214,17 @@ export function useV1UpdateProfile() {
       /** 한 줄 소개 (Task 154 P1). undefined 로 보내면 기존 값을 건드리지 않는다. */
       bio?: string | null;
     }) =>
-      v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
+      v1Patch<V1ProfileUpdateResult>('/me/profile', body),
     // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
     // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
     // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    // 계정 이메일·번호도 같은 응답으로 맞춘다 — 이메일을 안 보낸 저장이 캐시의 옛 주소를 서버에 되돌려 보내지 않게.
     onSuccess: (result) => {
       queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
-        current ? { ...current, profile: result.profile } : current,
+        current ? { ...current, profile: result.profile, email: result.email, phone: result.phone } : current,
+      );
+      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), (current) =>
+        current ? { ...current, user: { ...current.user, email: result.email, phone: result.phone } } : current,
       );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });

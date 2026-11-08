@@ -8,6 +8,7 @@ export const RECENT_LOGIN_MAX_AGE_SECONDS = 30 * 60;
 
 const RECENT_LOGIN_MESSAGES = {
   link: '보안을 위해 다시 로그인한 뒤 연결해 주세요.',
+  email_change: '이메일을 바꾸려면 다시 로그인해 주세요.',
   unlink: '보안을 위해 다시 로그인한 뒤 해제해 주세요.',
 } as const;
 

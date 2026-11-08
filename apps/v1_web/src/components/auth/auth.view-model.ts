@@ -166,6 +166,22 @@ export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: s
   };
 }
 
+/**
+ * 프로필의 이메일 변경을 마친 완료 화면. 인증과 저장이 한 번에 끝나므로 보여 줄 것은 바뀐 주소와 인증 상태다.
+ * 비밀번호 계정은 이 주소가 로그인 ID 라서 앞으로 새 주소로 로그인한다고 알린다.
+ */
+export function getEmailChangeCompleteViewModel(email: string, hasPassword: boolean, profileHref: string): SignupCompleteViewModel {
+  return {
+    title: '이메일을 바꿨어요',
+    sub: hasPassword ? `앞으로 ${email} 으로 로그인해요. 인증도 끝났어요.` : `계정 이메일이 ${email} 으로 바뀌었어요. 인증도 끝났어요.`,
+    steps: [
+      { title: '계정 이메일', body: email, done: true },
+      { title: '인증 상태', body: '인증 완료', done: true },
+    ],
+    primary: { label: '프로필로 돌아가기', href: profileHref },
+  };
+}
+
 /** 서버가 신규 소셜 계정을 가입 단계로 보낼 때 쓰는 경로. 이 단계에서는 로그인 후 목적지를 아직 쓰지 않는다. */
 export function isSocialOnboardingRoute(route: string | null | undefined) {
   return route === '/terms?mode=social' || route === '/signup/social';

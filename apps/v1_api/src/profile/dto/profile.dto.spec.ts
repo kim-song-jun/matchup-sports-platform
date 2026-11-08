@@ -39,6 +39,18 @@ describe('UpdateProfileDto', () => {
     }
   });
 
+  it('accepts the email change token a save may carry, and refuses a non-string or oversized one', async () => {
+    const base = { nickname: '러너01', gender: 'female', email: 'runner@example.com' };
+    const rejected = async (emailChangeToken: unknown) =>
+      (await validate(plainToInstance(UpdateProfileDto, { ...base, emailChangeToken }))).some((error) => error.property === 'emailChangeToken');
+
+    expect(await rejected('signed.token')).toBe(false);
+    expect(await rejected(null)).toBe(false);
+    expect(await rejected(undefined)).toBe(false);
+    expect(await rejected(123)).toBe(true);
+    expect(await rejected('t'.repeat(1025))).toBe(true);
+  });
+
   it('rejects a missing gender', async () => {
     const dto = plainToInstance(UpdateProfileDto, { nickname: '러너01' });
     const errors = await validate(dto);

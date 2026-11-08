@@ -725,6 +725,8 @@ enum V1VerificationPurpose {
   contact
   /// 이메일 로그인 추가: /auth/link/email/*
   email_login_link
+  /// 계정 이메일 변경: /me/email-change/*
+  email_change
 }
 
 model V1VerificationToken {

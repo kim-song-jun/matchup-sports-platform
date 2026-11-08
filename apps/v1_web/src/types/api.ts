@@ -280,6 +280,29 @@ export type V1LinkEmailCompleteResult = {
   email: string;
 };
 
+/** 직접 뗄 수 있는 로그인 수단. 서버는 이 셋만 받는다. */
+export type V1UnlinkableProvider = 'kakao' | 'apple' | 'email';
+
+/**
+ * `POST /auth/identities/unlink` — 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`, 운영자 계정은 403
+ * `SOCIAL_LINK_ADMIN_FORBIDDEN`, 계정에 없는(이미 뗀) 수단은 404 `LOGIN_METHOD_NOT_FOUND`, 마지막 남은 수단은
+ * 409 `LAST_LOGIN_METHOD`. 성공하면 다른 기기는 모두 로그아웃되고 이 기기의 쿠키만 새로 발급된다.
+ */
+export type V1UnlinkLoginMethodPayload = {
+  provider: V1UnlinkableProvider;
+};
+
+export type V1UnlinkLoginMethodResult = {
+  provider: V1UnlinkableProvider;
+  /** 뗀 뒤 이 계정에 남은 로그인 수단. */
+  authProviders: V1AuthProvider[];
+};
+
+/** `POST /auth/sessions/revoke-others` — 최근 로그인을 요구하지 않는다. 이 기기는 로그인된 채로 남는다. */
+export type V1RevokeOtherSessionsResult = {
+  revoked: true;
+};
+
 /**
  * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
  * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.

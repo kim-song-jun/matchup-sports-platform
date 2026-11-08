@@ -16,7 +16,7 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  *  - `POST /auth/link/kakao|apple`: LINK_MSW.credentials 의 값이 시나리오를 정한다. 모르는 값은 401 UNAUTHENTICATED
  *    (제공자 토큰 검증 실패). 본문은 서버 DTO(`LinkKakaoDto`, `AppleLoginDto`)와 같은 길이 제한·허용 필드를 따르고, 어기면 400.
  *  - `POST /auth/kakao`·`/auth/kakao/token`·`/auth/apple`: LINK_MSW.loginConflicts 의 값이면 `details.next` 가 붙은
- *    409, 그 외에는 세션.
+ *    409, LINK_MSW.loginRefusals.unlinkedMethod 이면 403 LOGIN_METHOD_UNLINKED(스스로 해제한 로그인), 그 외에는 세션.
  *  - 위 409 의 `details` 에는 `linkToken`·`linkTokenExpiresInSeconds` 가 실린다. `POST /auth/link/pending` 은
  *    PENDING_LINK_MSW.tokens 의 값으로 시나리오를 고르고(토큰은 20~2048자), 모르는 토큰은 400 SOCIAL_LINK_TOKEN_INVALID.
  *  - 가입 중인 소셜 계정의 PHONE_CONFLICT: 번호 소유를 증명한 뒤에만 알려 준다. `POST /verification/phone/confirm` 이
@@ -47,6 +47,9 @@ export const LINK_MSW = {
     unverifiedEmail: 'msw-login-conflict-unverified-email',
     contactConflict: 'msw-login-conflict-contact',
     accountProof: 'msw-login-conflict-account-proof',
+  },
+  loginRefusals: {
+    unlinkedMethod: 'msw-login-refusal-unlinked-method',
   },
   maxAgeSeconds: 30 * 60,
   signupIncompleteRoute: '/signup/social',
@@ -234,6 +237,8 @@ function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
       return signInThenLinkConflict('SOCIAL_LINK_CONTACT_CONFLICT', provider);
     case LINK_MSW.loginConflicts.accountProof:
       return signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', provider);
+    case LINK_MSW.loginRefusals.unlinkedMethod:
+      return fail(403, 'LOGIN_METHOD_UNLINKED', '연결을 해제한 로그인 수단이에요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.');
     default:
       return sessionLoginResponse();
   }

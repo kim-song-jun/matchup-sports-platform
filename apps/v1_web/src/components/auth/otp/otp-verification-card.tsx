@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, KeyRound } from 'lucide-react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
-import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from './otp-parts';
+import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow, otpInputId } from './otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification, type OtpVerificationOptions } from './use-otp-verification';
 
 /**
@@ -34,6 +34,8 @@ type Props = OtpVerificationOptions & {
   conflictNotice?: ReactNode;
   /** 인증번호를 넣은 뒤 누르는 버튼의 글자. 인증이 끝나면 무엇이 보이는지 말해 줄 때 바꾼다. */
   submitLabel?: string;
+  /** 발송 직후 입력칸으로 포커스를 옮긴다. '인증번호 받기' 버튼이 사라지며 포커스가 body 로 떨어지는 것을 막는다. */
+  focusCodeOnSent?: boolean;
 };
 
 export function OtpVerificationCard({
@@ -51,6 +53,7 @@ export function OtpVerificationCard({
   surface = 'card',
   conflictNotice,
   submitLabel = '확인',
+  focusCodeOnSent = false,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const otp = useOtpVerification({ resetKey, onRequestCode, onSubmitCode, requestFailureMessage, verifyFailureMessage });
@@ -75,6 +78,10 @@ export function OtpVerificationCard({
     node.scrollIntoView?.({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     // phase 전환(idle→sent)마다 다시 맞춘다 — 입력칸이 새로 생기며 높이가 바뀌기 때문.
   }, [phase, verified, surface]);
+
+  useEffect(() => {
+    if (focusCodeOnSent && phase === 'sent') document.getElementById(otpInputId(idPrefix))?.focus();
+  }, [focusCodeOnSent, phase, idPrefix]);
 
   // 'inset'은 이미 카드인 폼 안에 들어갈 때 쓰는 표면 — 흰 카드 위 흰 카드로 테두리가 겹치지 않게 한다.
   const surfaceClass = surface === 'plain' ? undefined : surface === 'inset' ? 'tm-auth-inset' : 'tm-card';

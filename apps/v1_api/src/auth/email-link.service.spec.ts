@@ -3,6 +3,7 @@
  * AuthService.login and AccountRecoveryService over an in-memory database and real scrypt. Only the mail transport and
  * the collaborators unrelated to these routes are stand-ins.
  */
+import { ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
 import { issueEmailProofToken } from '../verification/email-proof-token';
@@ -221,6 +222,9 @@ async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean;
     }),
     mayEchoCode: jest.fn(async () => options.echo ?? false),
     emailDeliverable: !options.undeliverable,
+    assertDeliveryAvailable: jest.fn(() => {
+      if (options.undeliverable) throw new ServiceUnavailableException({ code: 'EMAIL_SEND_UNAVAILABLE', message: '지금은 인증 메일을 보낼 수 없어요.' });
+    }),
   };
   const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
   const verification = new VerificationService(db.prisma as never, dispatcher as never, smsEventLog as never);

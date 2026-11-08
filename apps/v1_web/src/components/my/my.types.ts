@@ -54,6 +54,8 @@ export type MyHomeViewModel = {
    * false 일 때만 인증 요청 카드를 띄운다.
    */
   phoneVerified?: boolean;
+  /** 이메일 인증 권유 배너 대상 계정의 id. 대상이 아니거나 아직 모를 때는 undefined. */
+  emailVerifyNudgeUserId?: string;
   /**
    * 카드가 설 자리. 카드 내용보다 한 홉 먼저 도착하므로, 그 사이 높이를 잡아 두는 데 쓴다.
    * undefined = 아직 모름(또는 옛 서버) → 예약하지 않는다.

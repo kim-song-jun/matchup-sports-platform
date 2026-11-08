@@ -106,6 +106,7 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     ['my-settings', '/my/settings/devices', '로그인 기기'],
     ['my-secondary', '/my/inquiries', '문의'],
     ['my-secondary', '/my/phone-verify', '휴대폰 본인인증'],
+    ['my-secondary', '/my/email-verify', '이메일 인증'],
   ])('[%s] %s → title=%s', (_fragment, pathname, expectedTitle) => {
     expect(resolveRouteChrome(pathname)?.chrome.title).toBe(expectedTitle);
   });

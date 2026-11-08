@@ -9,6 +9,7 @@ import type { LeagueFixtureListItem } from '../league-matches/league-fixture-lis
 import { normalizeFinalColors } from './multi-finals/multi-finals-colors';
 import type { FinalColorConfig } from './multi-finals/multi-finals-colors';
 import type { TournamentDetailRow } from './tournaments-read.query';
+import { resolveTieBreakOrder } from './competition-config/tournament-tie-break-order';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
 import { publicFixtureSideLabel } from './slots/tournament-slot-label';
@@ -339,6 +340,8 @@ export function presentTournamentDetail(
     // registrationDeadlineAt 이 있는 진짜 대회다). `format === 'league'` 로 정규 리그를
     // 가려내면 그 7건이 신청·참가등록을 잃는다. **종류는 아래 `kind` 를 쓴다.**
     format: row.format,
+    // Regular leagues rank by their own fixed order, so only tournaments carry one.
+    tieBreakOrder: row.kind === 'regular_league' ? null : resolveTieBreakOrder(row.tieBreakOrder),
     /**
      * 단발 대회(regular_tournament) / 정규 리그 시즌(regular_league) 구분.
      *

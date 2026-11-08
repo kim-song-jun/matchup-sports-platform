@@ -87,7 +87,7 @@ Query:
 | `genderRule` | string | No | `성별 무관`, `남`, `여`, `무관` |
 | `levelCodes` | comma string(≤100) | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `joinPolicy` | string | No | `approval_required`, `closed` |
-| `sort` | recommended/latest/member_count/trust | No | 기본 recommended. `member_count`는 멤버 수·생성 시각, 나머지는 생성 시각 내림차순이고 마지막 기준은 언제나 `id` 내림차순이다 — 생성 시각이 같은 팀이 커서 경계에서 겹치거나 빠지지 않는다(MD-QA #176) |
+| `sort` | latest/member_count/activity | No | 기본 latest(최근 등록순). `member_count`는 멤버 많은순, `activity`는 팀 매치를 호스트로 올린 횟수(관계 `_count`, 취소된 매치 포함·상대 팀/리그/대회 경기 제외) 많은순이다. 같은 값이면 최근 등록순으로 이어지고 마지막 기준은 언제나 `id` 내림차순이라 생성 시각이 같은 팀이 커서 경계에서 겹치거나 빠지지 않는다(MD-QA #176). 이전에 허용하던 `recommended`·`trust`는 서버에 분기가 없어 등록순과 같은 결과였으므로 허용값에서 빠졌고, 보내면 400이다 |
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor |
 | `limit` | 1~50 | No | 기본 20 |

@@ -7,10 +7,12 @@ import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
-import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory, V1TournamentTieBreakOrder } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
+import { TieBreakOrderEditor } from '@/components/admin/tournaments/tie-break-order-editor';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER, formatTournamentTieBreakRule, sameTieBreakOrder, tieBreakOrderOf } from '@/lib/tournament-tie-break';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
@@ -64,6 +66,7 @@ export function TournamentInfoSection() {
   const [editTitle, setEditTitle] = useState('');
   const [editSportId, setEditSportId] = useState('');
   const [editSixTeamMode, setEditSixTeamMode] = useState(false);
+  const [editTieBreakOrder, setEditTieBreakOrder] = useState<V1TournamentTieBreakOrder>([...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER]);
   const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
   const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
     ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
@@ -151,6 +154,7 @@ export function TournamentInfoSection() {
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
     setEditSixTeamMode(tournament.sixTeamMode ?? false);
+    setEditTieBreakOrder(tieBreakOrderOf(tournament));
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
     // 빈 문자열로 시작 — "아직 안 바꿈"을 뜻하며, 선택지 그룹은 tournament.lineupMaxPlayers를
@@ -297,6 +301,10 @@ export function TournamentInfoSection() {
     const nextSixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
     if (nextSixTeamMode !== (tournament.sixTeamMode ?? false)) payload.sixTeamMode = nextSixTeamMode;
     if (editFormat !== tournament.format) payload.format = editFormat;
+    // 바뀐 때만 보낸다 — 예선 결과가 확정된 대회에서 다른 칸만 고칠 때 순서 잠금에 걸리지 않게. 기본 순서는 null(되돌리기)로 보낸다.
+    if (editFormat !== 'knockout' && !sameTieBreakOrder(editTieBreakOrder, tieBreakOrderOf(tournament))) {
+      payload.tieBreakOrder = sameTieBreakOrder(editTieBreakOrder, DEFAULT_TOURNAMENT_TIE_BREAK_ORDER) ? null : editTieBreakOrder;
+    }
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {
       payload.scheduledAt = kstDatetimeLocalToIso(editScheduledAt);
@@ -551,14 +559,17 @@ export function TournamentInfoSection() {
               label: '교체 방식',
               value: substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions),
             },
+            ...(tournament.format === 'knockout'
+              ? []
+              : [{ label: '동점 순서', value: formatTournamentTieBreakRule(tieBreakOrderOf(tournament)), wide: true }]),
             {
               label: '입금 계좌',
               value: tournament.bankName
                 ? `${tournament.bankName} ${tournament.bankAccount ?? ''}${tournament.bankHolder ? ` (${tournament.bankHolder})` : ''}`
                 : '미등록',
             },
-          ].map(({ label, value }) => (
-            <div key={label}>
+          ].map(({ label, value, wide }: { label: string; value: string; wide?: boolean }) => (
+            <div key={label} className={wide ? 'col-span-2' : undefined}>
               <dt className="text-xs text-[var(--text-muted)] font-medium mb-0.5">{label}</dt>
               <dd className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">{value}</dd>
             </div>
@@ -992,6 +1003,15 @@ export function TournamentInfoSection() {
               </div>
             )}
           </div>
+
+          {editFormat !== 'knockout' ? (
+            <TieBreakOrderEditor
+              order={editTieBreakOrder}
+              onChange={setEditTieBreakOrder}
+              disabled={updateTournament.isPending}
+              lockedReason={tournament.tieBreakOrderBlockedReason ?? null}
+            />
+          ) : null}
 
           <div className="flex flex-col gap-2">
             <label htmlFor="edit-gender-category" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">

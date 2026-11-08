@@ -22,6 +22,7 @@ import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin'
 import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { GenderCategoryField } from '@/components/admin/gender-category-field';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
+import { TieBreakOrderEditor } from '@/components/admin/tournaments/tie-break-order-editor';
 import {
   PrizeBreakdownEditor,
   type TournamentPrizeRow,
@@ -1188,6 +1189,14 @@ function ParticipationStep({
             className={inputClass}
           />
         </Field>
+      ) : null}
+
+      {state.format !== 'knockout' ? (
+        <TieBreakOrderEditor
+          order={state.tieBreakOrder}
+          onChange={(order) => dispatch({ type: 'set-field', field: 'tieBreakOrder', value: order })}
+          disabled={pending}
+        />
       ) : null}
 
       {state.genderCategory === 'mixed' ? (

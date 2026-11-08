@@ -232,7 +232,7 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     const table = screen.getByRole('table', { name: 'A조 · 확정 순위표' });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows.map(row => within(row).queryByText('동률') !== null)).toEqual([false, false, true, true]);
-    expect(screen.getByText('승점 1 · 골득실 -1 · 득점 1 · 맞대결·페어플레이까지 같아서 추첨으로만 갈렸어요.')).toBeInTheDocument();
+    expect(screen.getByText('승점 1 · 골득실 -1 · 득점 1 · 동점 기준이 모두 같아서 추첨으로만 갈렸어요.')).toBeInTheDocument();
     const select = screen.getByRole('combobox', { name: SEAT_LABEL });
     expect(select).toHaveValue('');
     expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['팀 선택', '다팀', '라팀']);

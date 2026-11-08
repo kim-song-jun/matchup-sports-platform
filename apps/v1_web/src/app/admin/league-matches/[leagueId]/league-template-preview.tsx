@@ -63,30 +63,37 @@ export function LeagueTemplatePreview({ leagueId, request }: LeagueTemplatePrevi
       </div>
       {!busy && data !== undefined ? (
         <>
-          <ol className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card-surface)]">
-            {data.days.map((day) => (
-              <li key={day.day} className="border-t border-[var(--border)] first:border-t-0">
-                <p className="bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)]">
-                  {`${day.day}일째 · ${day.startTime}${day.endTime === null ? '' : `~${day.endTime}`} · ${day.games.length}경기`}
-                </p>
-                <ul>
-                  {day.games.map((game) => (
-                    <li key={game.order} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border)] px-3 py-2 text-[length:var(--font-size-caption)]">
-                      <span className="w-[84px] shrink-0 tabular-nums text-[var(--text-muted)]">
-                        {game.endTime === null ? game.startTime : `${game.startTime}~${game.endTime}`}
-                      </span>
-                      <span className="text-[var(--text-strong)]">{`${seat(game.homePosition)} 대 ${seat(game.awayPosition)}`}</span>
-                      {game.backToBack.map((entry) => (
-                        <span key={entry.position} className="tm-on-tint inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-medium text-[var(--orange700)]">
-                          {`${seat(entry.position)} ${entry.games}번 연속`}
+          <div
+            role="region"
+            aria-label="날짜별 시간표"
+            tabIndex={0}
+            className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <ol>
+              {data.days.map((day) => (
+                <li key={day.day} className="border-t border-[var(--border)] first:border-t-0">
+                  <p className="bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)]">
+                    {`${day.day}일째 · ${day.startTime}${day.endTime === null ? '' : `~${day.endTime}`} · ${day.games.length}경기`}
+                  </p>
+                  <ul>
+                    {day.games.map((game) => (
+                      <li key={game.order} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border)] px-3 py-2 text-[length:var(--font-size-caption)]">
+                        <span className="w-[84px] shrink-0 tabular-nums text-[var(--text-muted)]">
+                          {game.endTime === null ? game.startTime : `${game.startTime}~${game.endTime}`}
                         </span>
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ol>
+                        <span className="text-[var(--text-strong)]">{`${seat(game.homePosition)} 대 ${seat(game.awayPosition)}`}</span>
+                        {game.backToBack.map((entry) => (
+                          <span key={entry.position} className="tm-on-tint inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-medium text-[var(--orange700)]">
+                            {`${seat(entry.position)} ${entry.games}번 연속`}
+                          </span>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          </div>
           <p className="mt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             미리보기는 서버가 실제 생성과 같은 계산으로 만든 결과예요. 날짜는 아래에서 고른 날짜가 차례로 들어가요.
           </p>

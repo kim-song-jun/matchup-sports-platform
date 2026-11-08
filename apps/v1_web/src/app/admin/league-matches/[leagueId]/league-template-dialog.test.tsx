@@ -266,6 +266,10 @@ describe('LeagueTemplateDialog', () => {
       expect(screen.getByText('3번 자리 2번 연속')).toBeInTheDocument();
       expect(screen.getByText(/2곳에서 한 팀이 쉬는 시간 없이 이어서 뛰어요/)).toBeInTheDocument();
       expect(screen.getByText(/중복·누락 없음/)).toBeInTheDocument();
+      // The timetable scrolls inside a box, so keyboard users must be able to focus it.
+      const region = screen.getByRole('region', { name: '날짜별 시간표' });
+      expect(region).toHaveAttribute('tabindex', '0');
+      expect(region).toContainElement(screen.getByText('1일째 · 19:00~20:25 · 3경기'));
     });
 
     it('연속 출전이 없으면 그렇다고 알리고, 중복·누락이 있으면 숫자를 보여 준다', async () => {

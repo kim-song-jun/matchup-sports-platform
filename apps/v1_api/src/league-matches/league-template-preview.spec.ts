@@ -51,21 +51,26 @@ describe('buildLeagueTemplatePreview', () => {
     expect(checks.missingMeetings).toBe(1);
   });
 
-  it('flags a seat that plays consecutive games of a day once per run, and marks the later games', () => {
-    // 4 teams: two adjacent games of different rounds cannot be disjoint pairs again, so a seat repeats.
+  it('reports each run exactly: one ending at the end of a day, one ending mid-day, and marks the later games', () => {
+    // 4 teams, 1 leg, 3 games a day. Game order: 1-4, 2-3, 3-1 | 4-2, 1-2, 3-4.
+    // Day 1: seat 3 plays games 2 and 3 and the day ends. Day 2: seat 2 plays games 1 and 2, then game 3 is 3-4.
     const { preview } = previewOf(4, 1, { gamesPerDay: 3, gameDurationMinutes: 25, breakMinutes: 5 });
 
-    const runs = preview.checks.backToBackRuns;
-    expect(runs.length).toBeGreaterThan(0);
-    for (const run of runs) {
-      const games = preview.days[run.day - 1].games.slice(run.fromOrder - 1, run.toOrder);
-      expect(games).toHaveLength(run.games);
-      expect(games.every((game) => game.homePosition === run.position || game.awayPosition === run.position)).toBe(true);
-      expect(run.games).toBeGreaterThanOrEqual(2);
-    }
-    const marked = preview.days.flatMap((day) => day.games).flatMap((game) => game.backToBack);
-    expect(marked.length).toBeGreaterThanOrEqual(runs.length);
-    expect(marked.every((entry) => entry.games >= 2)).toBe(true);
+    expect(preview.checks.backToBackRuns).toEqual([
+      { day: 1, position: 3, fromOrder: 2, toOrder: 3, games: 2 },
+      { day: 2, position: 2, fromOrder: 1, toOrder: 2, games: 2 },
+    ]);
+    expect(preview.days.map((day) => day.games.map((game) => game.backToBack))).toEqual([
+      [[], [], [{ position: 3, games: 2 }]],
+      [[], [{ position: 2, games: 2 }], []],
+    ]);
+  });
+
+  it('a run ending mid-day is reported once, and a seat that sits out the next game ends it', () => {
+    // 4 games a day: day 1 is 1-4, 2-3, 3-1, 4-2 — seat 3 runs over games 2-3 and game 4 is 4-2.
+    const { preview } = previewOf(4, 1, { gamesPerDay: 4, gameDurationMinutes: 25, breakMinutes: 5 });
+
+    expect(preview.checks.backToBackRuns).toEqual([{ day: 1, position: 3, fromOrder: 2, toOrder: 3, games: 2 }]);
   });
 
   it('does not carry a run across a day boundary', () => {

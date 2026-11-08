@@ -130,8 +130,8 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     expect(previewed.map((g: PreviewGame) => [g.startTime, g.endTime, g.homePosition, g.awayPosition])).toEqual(
       created.map((f) => [clock(f.startAt), clock(f.endAt), f.homeSlot!.position, f.awaySlot!.position]),
     );
-    // 4 teams: the third game of a day always shares a seat with the second.
-    expect(checks.backToBackRuns.length).toBeGreaterThan(0);
+    // Day 1 is 1-4, 2-3, 3-1, 4-2: only seat 3 plays two games in a row.
+    expect(checks.backToBackRuns).toEqual([{ day: 1, position: 3, fromOrder: 2, toOrder: 3, games: 2 }]);
   });
 
   it('미리보기도 지원 어드민은 403이고, 하루 경기 수가 없으면 라운드별 시각표만 나온다', async () => {

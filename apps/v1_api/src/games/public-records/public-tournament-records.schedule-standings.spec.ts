@@ -104,6 +104,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 조별 순위 sharedRank
   it('정규리그+N개 토너먼트 대회도 조별+결선과 같이 조 순위 행에 공동 순위를 싣는다', async () => {
     const result = await schedule(fakePrisma({ format: 'league_knockouts' }));
 
+    expect(loadSummaries).toHaveBeenCalledTimes(1);
     expect(loadSummaries).toHaveBeenCalledWith(expect.anything(), TOURNAMENT_ID, { includeQualification: false });
     expect(result.standings.map((row) => [row.registrationId, row.sharedRank])).toEqual([
       ['a', 1], ['b', 1], ['c', 1], ['d', null], ['e', null],

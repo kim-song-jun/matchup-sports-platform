@@ -188,6 +188,12 @@ describe('TournamentStandingsTable', () => {
     expect(tied.getAllByRole('cell')[0]).toHaveStyle({ paddingLeft: '8px', paddingRight: '4px' });
   });
 
+  // 줄바꿈 결과는 jsdom 이 계산하지 못해 스타일 계약만 본다. 실제 폭 측정은 PR 에 남긴다.
+  it('팀명은 단어 단위로 접고, 공백 없는 긴 이름도 표를 넓히지 않게 칸 안에서 끊는다', () => {
+    renderGroupStandings(TIED_ROWS);
+    expect(rowByTeam('가 FC').getByText('가 FC')).toHaveStyle({ wordBreak: 'keep-all', overflowWrap: 'anywhere' });
+  });
+
   it('공동 순위가 없는 표의 열 폭·여백·최소폭은 그대로다 — 같은 진출 배지·펼침 토글이 있어도', () => {
     renderGroupStandings([ROW, { ...ROW, key: 'reg-2', teamId: 'team-2', teamName: '마포 FC', position: 2 }]);
     const first = rowByTeam('성수 FC');

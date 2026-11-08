@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import { useGroupPeriodOverride, useMatchPeriodOverride } from './period-override-field';
 
-const state = vi.hoisted(() => ({ minutes: 20, save: vi.fn(), inheritedStage: null as null | { source: 'stage'; phase: string } }));
+const state = vi.hoisted(() => ({ minutes: 20, save: vi.fn(), inheritedStage: null as null | { source: 'stage'; phase: TournamentPeriodPhase } }));
 const periods = () => [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: state.minutes, extraTime: false }];
 
 vi.mock('@/hooks/use-tournament-period-settings', () => ({

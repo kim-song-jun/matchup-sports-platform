@@ -198,10 +198,10 @@ describe('TournamentStandingsTable', () => {
     expect(chip).toHaveClass('tm-badge', 'tm-badge-orange');
   });
 
-  it('공동 칩 여백은 .tm-badge-sm(8px)보다 뒤에 선언된 규칙이 6px 로 줄인다', () => {
+  it('공동 칩 여백은 .tm-badge-sm(8px)보다 뒤에 선언된 규칙이 4px 로 줄인다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     const at = (selector: string) => css.search(new RegExp(`(^|\\})\\s*${selector.replace('.', '\\.')}\\s*\\{`));
-    expect(css).toMatch(/\.tm-standings-rank-shared\s*\{\s*padding:\s*0 6px;\s*\}/);
+    expect(css).toMatch(/\.tm-standings-rank-shared\s*\{\s*padding:\s*0 4px;\s*\}/);
     expect(at('.tm-standings-rank-shared')).toBeGreaterThan(at('.tm-badge-sm'));
   });
 

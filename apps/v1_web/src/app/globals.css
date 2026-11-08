@@ -8417,7 +8417,7 @@ button:has(> .tm-toggle):focus-visible {
   background: var(--grey100);
 }
 /* "공동 n" 칩 — 순위 열이 좁은 폭에서 팀 칸을 밀어내지 않게 좌우 여백만 줄인다. */
-.tm-standings-rank-shared { padding: 0 6px; }
+.tm-standings-rank-shared { padding: 0 4px; }
 .tm-standings-rank-gold { background: #FFF3CD; color: #856404; }
 .tm-standings-rank-silver { background: #F1F1F1; color: var(--grey700); }
 :root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }

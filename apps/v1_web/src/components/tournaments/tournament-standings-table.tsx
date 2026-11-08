@@ -196,7 +196,7 @@ export function TournamentStandingsTable({
                   144px 그대로 오른쪽 끝에 붙어 있어 팀명과 전적 사이가 통째로 비었다
                   (768px 실측: 행 558px 중 319px = 57%가 공백). 비율로 주면 넓은 폭에서
                   숫자 블록도 같이 벌어져 그 공백이 줄고, min-width가 좁은 폭에서의
-                  판독성(390px에서 기존과 동일한 56/44/44)을 지킨다. */}
+                  판독성을 지킨다(390px 최소폭은 56/44/44, 공동 순위 표는 48/40/40). */}
               <th style={{ width: hasSharedRank ? 56 : 36, paddingLeft: edgePad, paddingRight: hasSharedRank ? 4 : undefined }}>#</th>
               <th>팀</th>
               <th className="num" style={{ width: '18%', minWidth: hasSharedRank ? 48 : 56 }}>전적</th>

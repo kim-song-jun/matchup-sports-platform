@@ -38,19 +38,6 @@ describe('PendingSocialSignupGate required terms renewal', () => {
     mocks.pathname = '/my';
   });
 
-  it.each(['signup_done', 'social_profile_deferred'])(
-    'ignores a legacy email-setup flag for %s after navigation or reload', async (onboardingStatus) => {
-      mocks.pathname = '/home';
-      mocks.useV1AuthMe.mockReturnValue({ isSuccess: true, isError: false, data: {
-        user: { onboardingStatus, signupEmailLoginRequired: true },
-        termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
-      } });
-      render(<PendingSocialSignupGate><div>홈 화면</div></PendingSocialSignupGate>);
-      expect(await screen.findByText('홈 화면')).toBeInTheDocument();
-      expect(mocks.replace).not.toHaveBeenCalled();
-    },
-  );
-
   it('redirects an authenticated existing user to renewal before rendering the protected page', async () => {
     mocks.useV1AuthMe.mockReturnValue({
       isSuccess: true,

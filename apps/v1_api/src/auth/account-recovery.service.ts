@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -23,7 +22,6 @@ import {
   FindAccountDto,
   FindAccountByEmailDto,
   ResetPasswordByEmailDto,
-  ResetPasswordDto,
 } from './dto/account-recovery.dto';
 
 /**
@@ -158,15 +156,6 @@ export class AccountRecoveryService {
       withdrawalPendingUntil:
         revealPrivate && withdrawalPending ? await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus }) : null,
     };
-  }
-
-  async resetPasswordByPhone(dto: ResetPasswordDto): Promise<{ ok: true }> {
-    await this.assertPhoneOwner(dto.phone, dto.proofToken);
-    // Current SMS possession does not prove ownership of the existing account.
-    throw new ConflictException({
-      code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-      message: '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.',
-    });
   }
 
   /**
@@ -336,18 +325,6 @@ export class AccountRecoveryService {
         },
       },
     });
-  }
-
-  private async assertPhoneOwner(phone: string, proofToken: string) {
-    this.assertPhoneProof(phone, proofToken);
-
-    const user = await this.findPhoneHolder(phone, 'active');
-
-    // 번호 주인임을 이미 증명한 뒤라, 가입 여부를 알려 줘도 남의 정보가 새지 않는다
-    // (증명 없이 조회하게 두면 번호만으로 가입 여부를 훑을 수 있어 그때는 감춰야 한다).
-    if (!user) throw accountNotFound();
-
-    return user;
   }
 }
 

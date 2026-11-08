@@ -49,6 +49,7 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneRegistered } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
+import { releaseSignupPhone } from './empty-signup-account';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -651,12 +652,20 @@ export class AuthService {
         },
       });
       if (!candidate) throw this.kakaoContactConflict(profile, [userId]);
-      this.assertNotWithdrawalPending(candidate.accountStatus);
-      if (candidate.accountStatus !== 'active') {
+      if (candidate.accountStatus !== 'active' && candidate.accountStatus !== 'withdrawal_pending') {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
         throw this.kakaoContactConflict(profile, [userId]);
+      }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // Only a contact Kakao vouches for reveals the withdrawal and its end date. A matching number counts: Kakao's
+        // phone proves possession the way our SMS code does, and signup shows the same date after number verification.
+        const vouched = Boolean((email && candidate.email === email) || (phone && candidate.phone === phone));
+        if (!vouched) throw this.kakaoContactConflict(profile, [userId]);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', kakaoLinkClaims(profile), [userId], {
+          withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate),
+        });
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
@@ -852,6 +861,7 @@ export class AuthService {
         where: { id: user.id },
         data: expired ? { onboardingStatus: 'social_terms_required', lastLoginAt: now } : { lastLoginAt: now },
       });
+      if (expired) await releaseSignupPhone(tx, user.id, 'expired_signup');
 
       const mergeSeed = pending && seed !== null;
       if (!expired && !mergeSeed) return;
@@ -900,8 +910,16 @@ export class AuthService {
       if (!candidate || candidate.email !== input.email) {
         throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // The address is the one the provider vouches for (it just matched `candidate.email`), so the date may be told.
+        throw signInThenLinkConflict(
+          'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          claims,
+          [candidate.id],
+          { withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate) },
+        );
+      }
       if (candidate.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(candidate.accountStatus);
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       assertLinkableByEmail(candidate, claims);
@@ -1520,6 +1538,7 @@ export class AuthService {
         update: { currentStep: 'terms' },
         create: { userId, currentStep: 'terms' },
       });
+      await releaseSignupPhone(tx, userId, 'expired_signup');
     });
   }
 

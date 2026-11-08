@@ -311,23 +311,6 @@ async function resetPasswordByRecoveryEmail(request: Request) {
   return ok({ ok: true });
 }
 
-async function resetPasswordByRecoveryPhone(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken', 'newPassword']);
-  const passwordIssue = accountPasswordIssue(body?.newPassword ?? '');
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string' || passwordIssue === 'too_short') {
-    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
-  }
-  if (passwordIssue === 'too_common') return authProofError(COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
-  if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
-    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
-  }
-  if (body.phone !== authAccountPhoneFixture) {
-    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
-  }
-  return authProofError('ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-    '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.', 409);
-}
-
 function maskRecoveryEmail(email: string): string {
   const [local = '', domain] = email.split('@');
   return domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***';
@@ -822,14 +805,13 @@ export const v1MswHandlers = [
     socialSignupPrefill: null,
     user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
       onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
-      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
+      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true },
     profile: { displayName: v1UserFixture.displayName, nickname: v1UserFixture.displayName },
     verification: { emailVerified: true, phoneVerified: false },
   })),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
   http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
-  http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),

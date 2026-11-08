@@ -2,6 +2,8 @@ import type { INestApplication } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import request = require('supertest');
 import { AuthService, type KakaoProfile } from '../src/auth/auth.service';
+import { V1_SESSION_COOKIE_NAME } from '../src/auth/v1-session';
+import { issueWithdrawalCancelToken } from '../src/auth/withdrawal-cancel-token';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from './integration/integration-app';
@@ -288,6 +290,42 @@ describe('V1 signed-in social account link integration', () => {
       expect(linked.body.data).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
       expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { provider_providerUserKey: { provider: 'kakao', providerUserKey: KAKAO_KEY } } }))
         .toMatchObject({ userId: CALLER, email: `${CALLER}@integration.test` });
+    });
+
+    it('turns a Kakao login refused for a withdrawing account into a link once that account takes the withdrawal back', async () => {
+      const requestedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      const { sessionEpoch } = await prisma.v1User.update({
+        where: { id: CALLER }, data: { accountStatus: 'withdrawal_pending' }, select: { sessionEpoch: true },
+      });
+      await prisma.v1StatusChangeLog.create({
+        data: { targetType: 'user', targetId: CALLER, fromStatus: 'active', toStatus: 'withdrawal_pending', actorType: 'user', actorUserId: CALLER, createdAt: requestedAt },
+      });
+      jest.spyOn(auth, 'fetchKakaoProfileForToken').mockResolvedValue({
+        ...kakaoProfile(), email: `${CALLER}@integration.test`, emailValid: true, emailVerified: true,
+      });
+      const rejected = await request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' }).expect(409);
+      expect(rejected.body).toMatchObject({
+        code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+        details: { next: 'sign_in_then_link', provider: 'kakao', withdrawalPendingUntil: new Date(requestedAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      });
+      expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: KAKAO_KEY } })).toBe(0);
+      // While the withdrawal stands there is no session that could spend the token.
+      await linkPending(CALLER, rejected.body.details.linkToken).expect(403);
+      expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: KAKAO_KEY } })).toBe(0);
+
+      // The token a credential-verified sign-in refusal hands out; cancelling issues the session that spends the link token.
+      const cancelled = await request(app.getHttpServer())
+        .post('/api/v1/auth/withdrawal/cancel').send({ token: issueWithdrawalCancelToken(CALLER, sessionEpoch) }).expect(200);
+      const cookie = ([] as string[]).concat(cancelled.headers['set-cookie'] ?? [])
+        .find((value) => value.startsWith(`${V1_SESSION_COOKIE_NAME}=`))?.split(';')[0];
+      expect(cookie).toBeDefined();
+      const linked = await request(app.getHttpServer())
+        .post('/api/v1/auth/link/pending').set('Cookie', cookie ?? '').send({ linkToken: rejected.body.details.linkToken }).expect(200);
+
+      expect(linked.body.data).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { provider_providerUserKey: { provider: 'kakao', providerUserKey: KAKAO_KEY } } }))
+        .toMatchObject({ userId: CALLER });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).toMatchObject({ accountStatus: 'active' });
     });
 
     /** An unfinished Kakao signup (EMPTY) that asks to verify the number CALLER holds. */

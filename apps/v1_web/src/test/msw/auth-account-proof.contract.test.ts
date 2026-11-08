@@ -38,30 +38,21 @@ afterAll(() => { server.close(); vi.unstubAllEnvs(); });
 afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 
 describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
-  it('phone password reset requires independent email proof', async () => {
-    const { proofToken } = await verifyPhone('password_reset');
-    const body = { phone, proofToken, newPassword };
-    const result = v1Post<unknown>('/auth/recovery/reset-password', body);
-    await expect(result).rejects.toMatchObject({
-      statusCode: 409, code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-    } satisfies Partial<V1ApiError>);
-  });
-
   it('answers a purpose-bound phone lookup with the login methods and no email', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     await expect(v1Post<V1FoundAccount>('/auth/recovery/find-account', { phone, proofToken }))
       .resolves.toEqual({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
+  it('find-account rejects the default signup-purpose proof', async () => {
     const { proofToken } = await verifyPhone();
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s binds the proof to the verified phone', async (path) => {
+  it('find-account binds the proof to the verified phone', async () => {
     const { proofToken } = await verifyPhone('password_reset', '01098765432');
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
@@ -108,11 +99,11 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects an email-channel proof', async (path) => {
+  it('find-account rejects an email-channel proof', async () => {
     const email = v1UserFixture.email;
     await v1Post('/auth/recovery/email/request', { email });
     const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 

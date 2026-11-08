@@ -168,7 +168,7 @@ export function clearSavedRedirectPath() {
 
 function isRequiredAuthPath(path: string) {
   const { pathname, searchParams } = new URL(path, REDIRECT_BASE);
-  return ['/onboarding/sport', '/onboarding/level', '/onboarding/region', '/onboarding/confirm', '/onboarding/resume', '/signup', '/signup/social'].includes(pathname)
+  return ['/onboarding/sport', '/onboarding/level', '/onboarding/region', '/onboarding/confirm', '/signup', '/signup/social'].includes(pathname)
     || (pathname === '/terms' && !searchParams.has('document') && ['signup', 'social', 'renewal'].includes(searchParams.get('mode') ?? ''));
 }
 

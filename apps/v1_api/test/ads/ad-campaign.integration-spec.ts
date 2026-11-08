@@ -158,6 +158,25 @@ describe('ad campaigns against PostgreSQL', () => {
     expect(await prisma.v1AdCampaign.count({ where: { createdByAdminUserId: ownerAdminId, status: 'published' } })).toBe(1);
   });
 
+  it('frees the window as soon as a campaign is stopped, including when the publish runs at the same time', async () => {
+    const live = await draft('banner', 10, 20);
+    const next = await draft('banner', 12, 22);
+    await admin.publish(owner, live.id, { expectedVersion: 1 });
+    await admin.stop(owner, live.id);
+    await expect(admin.publish(owner, next.id, { expectedVersion: 1 })).resolves.toMatchObject({ campaign: { status: 'published' } });
+
+    const again = await draft('popup', 10, 20);
+    const concurrent = await draft('popup', 12, 22);
+    await admin.publish(owner, again.id, { expectedVersion: 1 });
+    const settled = await Promise.allSettled([admin.stop(owner, again.id), admin.publish(owner, concurrent.id, { expectedVersion: 1 })]);
+
+    expect(settled[0].status).toBe('fulfilled');
+    // The publish either ran before the stop (refused as an overlap) or after it (accepted); it never fails any other way.
+    if (settled[1].status === 'rejected') expect(settled[1].reason).toMatchObject({ response: { code: 'AD_CHANNEL_WINDOW_OVERLAP' } });
+    const published = await prisma.v1AdCampaign.count({ where: { id: { in: [again.id, concurrent.id] }, status: 'published' } });
+    expect(published).toBe(settled[1].status === 'fulfilled' ? 1 : 0);
+  });
+
   it('serves only the live published ad, and stops serving it once stopped', async () => {
     const live = await draft('banner', 1, 5);
     const later = await draft('banner', 10, 20);

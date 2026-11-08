@@ -227,6 +227,8 @@ export class AdsAdminService {
     const now = new Date();
 
     const row = await this.prisma.$transaction(async (tx) => {
+      // Same lock as publish: a publish that starts after this stop must see the campaign as stopped, not as a stale overlap.
+      await this.lockPublishing(tx);
       const existing = await this.loadCampaign(tx, id);
       if (existing.status !== 'published') throw invalidState('게시 중인 광고만 중단할 수 있어요.');
       const stopped = await tx.v1AdCampaign.updateMany({

@@ -36,7 +36,13 @@ describe('ad campaigns against PostgreSQL', () => {
   });
 
   async function draft(channel: 'banner' | 'popup', startDay: number, endDay: number) {
-    const creative = { imageUrl: await upload(), altText: '에버데이 행사 안내', linkUrl: '/tournaments/1', ...window(startDay, endDay) };
+    const creative = {
+      imageUrl: await upload(),
+      altText: '에버데이 행사 안내',
+      ...(channel === 'popup' ? { headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' } : {}),
+      linkUrl: '/tournaments/1',
+      ...window(startDay, endDay),
+    };
     const { campaign } = await admin.create(owner, {
       advertiserName: '에버데이',
       title: `${prefix}-${seq}`,
@@ -97,6 +103,27 @@ describe('ad campaigns against PostgreSQL', () => {
       response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ channel: 'banner', missing: ['altText'] }] },
     });
     expect((await prisma.v1AdCampaign.findUniqueOrThrow({ where: { id: noAlt.id } })).status).toBe('draft');
+  });
+
+  it('stores the popup headline and description in their columns, serves them, and refuses a popup without a headline', async () => {
+    const popup = await draft('popup', 1, 5);
+    expect(popup.popup).toMatchObject({ headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' });
+    expect(popup.banner).toBeNull();
+    const [stored] = await prisma.$queryRaw<Array<{ popup_headline: string | null; popup_description: string | null }>>`
+      SELECT popup_headline, popup_description FROM v1_ad_campaigns WHERE id = ${popup.id}`;
+    expect(stored).toEqual({ popup_headline: '에버데이 11월 이벤트', popup_description: '신제품을 먼저 만나 보세요' });
+    await admin.publish(owner, popup.id, { expectedVersion: 1 });
+    expect((await publicAds.findActive()).popup).toMatchObject({ campaignId: popup.id, headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' });
+
+    const { campaign: noHeadline } = await admin.create(owner, {
+      advertiserName: '에버데이',
+      title: `${prefix}-no-headline`,
+      popup: { imageUrl: await upload(), altText: '안내', linkUrl: '/tournaments/1', ...window(10, 20) },
+    } as never);
+    await expect(admin.publish(owner, noHeadline.id, { expectedVersion: 1 })).rejects.toMatchObject({
+      response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ channel: 'popup', missing: ['headline'] }] },
+    });
+    expect((await prisma.v1AdCampaign.findUniqueOrThrow({ where: { id: noHeadline.id } })).status).toBe('draft');
   });
 
   it('keeps one live ad per channel in SQL: overlap refused, touching edges and the other channel allowed', async () => {
@@ -163,6 +190,40 @@ describe('ad campaigns against PostgreSQL', () => {
     const rows = await prisma.$queryRaw<Array<{ campaign_id: string; stat_date: string; impressions: number; clicks: number }>>`
       SELECT campaign_id, stat_date::text AS stat_date, impressions, clicks FROM v1_ad_campaign_daily_stats WHERE campaign_id IN (${live.id}, ${unpublished.id})`;
     expect(rows).toEqual([{ campaign_id: live.id, stat_date: '2026-12-01', impressions: 16, clicks: 8 }]);
+  });
+
+  it('takes concurrent batches that touch the same counter rows in opposite orders without a deadlock or a lost count', async () => {
+    const { campaign } = await admin.create(owner, {
+      advertiserName: '에버데이',
+      title: `${prefix}-both`,
+      banner: { imageUrl: await upload(), altText: '배너 안내', linkUrl: '/tournaments/1', ...window(1, 28) },
+      popup: { imageUrl: await upload(), altText: '팝업 안내', headline: '제목', linkUrl: '/tournaments/1', ...window(1, 28) },
+    } as never);
+    await admin.publish(owner, campaign.id, { expectedVersion: 1 });
+    const banner = { campaignId: campaign.id, channel: 'banner' as const };
+    const forward = [{ ...banner, type: 'impression' as const }, { ...banner, type: 'impression' as const }, { campaignId: campaign.id, channel: 'popup' as const, type: 'click' as const }];
+    const reverse = [...forward].reverse();
+    const days = 12;
+    const requestsPerDay = 8;
+
+    // A new KST day per round means the first requests of each round race to create the rows, the rest race to update them.
+    for (let day = 0; day < days; day += 1) {
+      const now = new Date(Date.UTC(2026, 11, 1 + day, 3, 0, 0));
+      await Promise.all(Array.from({ length: requestsPerDay }, (_, index) => publicAds.recordEvents(index % 2 === 0 ? forward : reverse, now)));
+    }
+
+    const rows = await prisma.$queryRaw<Array<{ channel: string; impressions: number; clicks: number }>>`
+      SELECT channel::text AS channel, impressions, clicks FROM v1_ad_campaign_daily_stats WHERE campaign_id = ${campaign.id}`;
+    expect(rows).toHaveLength(days * 2);
+    expect(rows.filter((row) => row.channel === 'banner').every((row) => row.impressions === requestsPerDay * 2 && row.clicks === 0)).toBe(true);
+    expect(rows.filter((row) => row.channel === 'popup').every((row) => row.impressions === 0 && row.clicks === requestsPerDay)).toBe(true);
+  });
+
+  it('returns an empty page for a list cursor whose campaign no longer exists', async () => {
+    await draft('banner', 10, 20);
+    const page = await admin.list(owner, { cursor: randomUUID() });
+    expect(page.items).toEqual([]);
+    expect(page.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
   });
 
   it('writes the KST calendar date for an event that is still the previous day in UTC', async () => {

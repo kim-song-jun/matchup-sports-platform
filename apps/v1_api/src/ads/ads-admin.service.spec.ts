@@ -37,7 +37,7 @@ const bannerInput = (overrides: Record<string, unknown> = {}) => ({
   startAt: '2026-11-12T00:00:00+09:00', endAt: '2026-11-20T00:00:00+09:00', ...overrides,
 });
 const popupInput = (overrides: Record<string, unknown> = {}) => ({
-  imageUrl: IMG.popup, altText: '에버데이 팝업 안내', linkUrl: 'https://everyday.example.com/event',
+  imageUrl: IMG.popup, altText: '에버데이 팝업 안내', headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', linkUrl: 'https://everyday.example.com/event',
   startAt: '2026-11-12T00:00:00+09:00', endAt: '2026-11-15T00:00:00+09:00', ...overrides,
 });
 const save = (overrides: Record<string, unknown> = {}) =>
@@ -47,7 +47,7 @@ function row(id: string, overrides: Partial<FakeCampaign> = {}): FakeCampaign {
   return {
     id, advertiserName: '에버데이', title: `메모 ${id}`, status: 'draft', version: 1,
     bannerImageUrl: null, bannerAltText: null, bannerLinkUrl: null, bannerStartAt: null, bannerEndAt: null,
-    popupImageUrl: null, popupAltText: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
+    popupImageUrl: null, popupAltText: null, popupHeadline: null, popupDescription: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
     publishedAt: null, stoppedAt: null, createdByAdminUserId: 'admin-owner', updatedByAdminUserId: 'admin-owner',
     createdAt: new Date('2026-11-01T00:00:00Z'), updatedAt: new Date('2026-11-01T00:00:00Z'), ...overrides,
   };
@@ -56,7 +56,7 @@ const bannerWindow = (start: string, end: string, extra: Partial<FakeCampaign> =
   bannerImageUrl: IMG.banner, bannerAltText: '배너 대체 텍스트', bannerLinkUrl: '/tournaments/1', bannerStartAt: new Date(start), bannerEndAt: new Date(end), ...extra,
 });
 const popupWindow = (start: string, end: string, extra: Partial<FakeCampaign> = {}): Partial<FakeCampaign> => ({
-  popupImageUrl: IMG.popup, popupAltText: '팝업 대체 텍스트', popupLinkUrl: '/events/1', popupStartAt: new Date(start), popupEndAt: new Date(end), ...extra,
+  popupImageUrl: IMG.popup, popupAltText: '팝업 대체 텍스트', popupHeadline: '팝업 제목', popupDescription: '팝업 설명', popupLinkUrl: '/events/1', popupStartAt: new Date(start), popupEndAt: new Date(end), ...extra,
 });
 
 async function build(seed: { campaigns?: FakeCampaign[]; assets?: FakeAsset[] } = {}) {
@@ -138,8 +138,10 @@ describe('AdsAdminService.create', () => {
         imageUrl: IMG.banner, altText: '에버데이 신제품 배너', linkUrl: '/tournaments/1',
         startAt: new Date('2026-11-11T15:00:00.000Z'), endAt: new Date('2026-11-19T15:00:00.000Z'), phase: null,
       },
-      popup: { imageUrl: IMG.popup, altText: '에버데이 팝업 안내', linkUrl: 'https://everyday.example.com/event', phase: null },
+      popup: { imageUrl: IMG.popup, altText: '에버데이 팝업 안내', headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', linkUrl: 'https://everyday.example.com/event', phase: null },
     });
+    expect(campaign.banner).not.toHaveProperty('headline');
+    expect(campaign.banner).not.toHaveProperty('description');
     expect(fake.state.assets.filter((candidate) => candidate.adCampaignId === campaign.id).map((candidate) => candidate.url).sort())
       .toEqual([IMG.banner, IMG.popup].sort());
     expect(fake.state.assets.filter((candidate) => candidate.adCampaignId === campaign.id).every((candidate) => candidate.status === 'attached')).toBe(true);
@@ -239,7 +241,7 @@ describe('AdsAdminService.publish', () => {
     const error = await service.publish(OWNER, 'c1', { expectedVersion: 1 }).catch((e: unknown) => e);
 
     expect(error).toMatchObject({
-      response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ code: 'AD_CHANNEL_INCOMPLETE', channel: 'popup', missing: ['altText', 'linkUrl', 'endAt'] }] },
+      response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ code: 'AD_CHANNEL_INCOMPLETE', channel: 'popup', missing: ['altText', 'headline', 'linkUrl', 'endAt'] }] },
     });
     expect(fake.state.campaigns[0].status).toBe('draft');
   });
@@ -294,6 +296,70 @@ describe('AdsAdminService.publish', () => {
     const error = await service.publish(OWNER, 'c1', { expectedVersion: 1 }).catch((e: unknown) => e);
 
     expect(error).toMatchObject({ response: { details: [{ channel: 'popup', missing: ['altText'] }] } });
+  });
+
+  describe('popup headline and description', () => {
+    const popupDraft = (id: string, overrides: Partial<FakeCampaign> = {}) =>
+      row(id, { ...popupWindow('2026-11-12T00:00:00Z', '2026-11-20T00:00:00Z'), ...overrides });
+
+    it('publishes a popup that has a headline, with or without a description', async () => {
+      const { service } = await build({ campaigns: [popupDraft('with', { popupDescription: '설명' }), popupDraft('without', { popupDescription: null, ...popupWindow('2026-11-25T00:00:00Z', '2026-11-30T00:00:00Z', { popupDescription: null }) })] });
+
+      const withDescription = (await service.publish(OWNER, 'with', { expectedVersion: 1 })).campaign;
+      expect(withDescription).toMatchObject({ status: 'published', popup: { headline: '팝업 제목', description: '설명' } });
+      expect(withDescription.banner).toBeNull();
+      expect((await service.publish(OWNER, 'without', { expectedVersion: 1 })).campaign.popup).toMatchObject({ headline: '팝업 제목', description: null });
+    });
+
+    it('refuses a popup that has an image but no headline', async () => {
+      const { service, fake } = await build({ campaigns: [popupDraft('c1', { popupHeadline: null })] });
+
+      const error = await service.publish(OWNER, 'c1', { expectedVersion: 1 }).catch((e: unknown) => e);
+
+      expect(error).toMatchObject({
+        status: 400,
+        response: { code: 'AD_CHANNEL_INCOMPLETE', details: [{ code: 'AD_CHANNEL_INCOMPLETE', channel: 'popup', missing: ['headline'] }] },
+      });
+      expect(fake.state.campaigns[0]).toMatchObject({ status: 'draft', version: 1 });
+    });
+
+    it('records the popup texts in the audit trail and keeps them off the banner snapshot', async () => {
+      const { service, fake } = await build();
+      await service.create(OWNER, save({ popup: popupInput() }));
+
+      const after = fake.state.actionLogs[0].afterJson as { banner: object; popup: object };
+      expect(after.popup).toMatchObject({ headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요' });
+      expect(after.banner).not.toHaveProperty('headline');
+    });
+
+    it('does not ask a banner for a headline', async () => {
+      const { service } = await build({ campaigns: [row('c1', bannerWindow('2026-11-12T00:00:00Z', '2026-11-20T00:00:00Z'))] });
+      expect((await service.publish(OWNER, 'c1', { expectedVersion: 1 })).campaign.status).toBe('published');
+    });
+
+    it('saves the texts trimmed and treats blank ones as empty', async () => {
+      const { service } = await build();
+      const trimmed = await service.create(OWNER, save({ banner: null, popup: popupInput({ headline: '  제목  ', description: '  설명  ' }) }));
+      expect(trimmed.campaign.popup).toMatchObject({ headline: '제목', description: '설명' });
+
+      const blank = await service.create(OWNER, save({ banner: null, popup: popupInput({ imageUrl: IMG.other, headline: '   ', description: '   ' }), title: '공백' }));
+      expect(blank.campaign.popup).toMatchObject({ headline: null, description: null });
+      expect(await codeOf(service.publish(OWNER, blank.campaign.id, { expectedVersion: 1 }))).toBe('AD_CHANNEL_INCOMPLETE');
+    });
+
+    it('refuses to save a published campaign whose popup loses its headline, and lets a description be dropped', async () => {
+      const { service, fake } = await build({
+        campaigns: [row('live', { status: 'published', version: 2, publishedAt: NOW, ...popupWindow('2026-11-09T00:00:00Z', '2026-11-20T00:00:00Z') })],
+        assets: [asset('asset-popup', IMG.popup, { status: 'attached', adCampaignId: 'live' })],
+      });
+      const payload = (popup: object) => ({ ...(save({ banner: null, popup }) as object), expectedVersion: 2 }) as never;
+
+      expect(await codeOf(service.update(OWNER, 'live', payload(popupInput({ headline: null }))))).toBe('AD_CHANNEL_INCOMPLETE');
+      expect(fake.state.campaigns[0]).toMatchObject({ status: 'published', version: 2, popupHeadline: '팝업 제목' });
+
+      const { campaign } = await service.update(OWNER, 'live', payload(popupInput({ description: null })));
+      expect(campaign.popup).toMatchObject({ headline: '에버데이 11월 이벤트', description: null });
+    });
   });
 
   it('refuses a window that has already ended', async () => {
@@ -604,6 +670,13 @@ describe('AdsAdminService.list and detail', () => {
     const second = await service.list(OWNER, { limit: 2, cursor: first.pageInfo.nextCursor as string });
     expect(second.items.map((item) => item.id)).toEqual(['draft-1']);
     expect(second.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+
+  it('returns an empty last page for a cursor whose row no longer exists, as the database does', async () => {
+    const { service } = await build({ campaigns: seed() });
+    const page = await service.list(OWNER, { cursor: 'deleted-campaign' });
+    expect(page.items).toEqual([]);
+    expect(page.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
   });
 
   it('returns the daily breakdown newest day first, totals per channel and when the numbers last changed', async () => {

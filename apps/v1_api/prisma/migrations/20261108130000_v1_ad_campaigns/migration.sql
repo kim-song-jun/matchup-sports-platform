@@ -2,7 +2,7 @@
 -- 전부 additive 다 — 새 테이블, 새 테이블의 인덱스·FK, 기존 테이블의 nullable 컬럼(ad_campaign_id)과 그 FK·인덱스.
 -- v1_content_assets 의 기존 단일 소유자 CHECK(notice_id·popup_id)는 건드리지 않는다. 기존 테이블에 CHECK 를
 -- 더하거나 바꾸는 문장은 expand-contract 게이트가 non-additive 로 보기 때문이다. 광고와 notice·popup 의 배타는
--- 첨부 시점의 앱 검사(AdsService.syncCampaignAssets)가 지킨다.
+-- 첨부 시점의 앱 검사(AdsAdminService.syncCampaignAssets)가 지킨다.
 
 -- CreateEnum
 CREATE TYPE "V1AdCampaignStatus" AS ENUM ('draft', 'published', 'stopped');
@@ -24,6 +24,8 @@ CREATE TABLE "v1_ad_campaigns" (
     "banner_end_at" TIMESTAMP(3),
     "popup_image_url" TEXT,
     "popup_alt_text" TEXT,
+    "popup_headline" TEXT,
+    "popup_description" TEXT,
     "popup_link_url" TEXT,
     "popup_start_at" TIMESTAMP(3),
     "popup_end_at" TIMESTAMP(3),

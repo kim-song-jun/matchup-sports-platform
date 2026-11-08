@@ -2,6 +2,8 @@ import 'reflect-metadata';
 import { createGlobalValidationPipe } from '../../common/global-validation-pipe';
 import {
   AD_ALT_TEXT_MAX_LENGTH,
+  AD_POPUP_DESCRIPTION_MAX_LENGTH,
+  AD_POPUP_HEADLINE_MAX_LENGTH,
   AdminAdCampaignListQueryDto,
   PublishAdCampaignDto,
   SaveAdCampaignDto,
@@ -105,10 +107,53 @@ describe('SaveAdCampaignDto', () => {
     await expect(parse(SaveAdCampaignDto, save({ banner: creative({ altText: 'a'.repeat(AD_ALT_TEXT_MAX_LENGTH) }) }))).resolves.toBeDefined();
   });
 
+  it.each(['banner', 'popup'] as const)('refuses an array or a scalar where the %s object belongs', async (channel) => {
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [creative()] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: [creative(), creative()] })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: 0 })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: true })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: null, [channel]: '' })));
+    await expect(parse(SaveAdCampaignDto, save({ banner: null, [channel]: creative() }))).resolves.toBeDefined();
+    await expect(parse(SaveAdCampaignDto, save({ banner: null, [channel]: null }))).resolves.toBeDefined();
+  });
+
   it('refuses an over-long alt text and non-string fields', async () => {
     await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ altText: 'a'.repeat(AD_ALT_TEXT_MAX_LENGTH + 1) }) })));
     await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ linkUrl: 42 }) })));
     await rejects(parse(SaveAdCampaignDto, save({ banner: 'banner' })));
+  });
+});
+
+describe('popup headline and description', () => {
+  const popup = (overrides: Record<string, unknown> = {}) => creative({ headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', ...overrides });
+
+  it('accepts a popup with both texts, with only a headline, and with neither', async () => {
+    await expect(parse(SaveAdCampaignDto, save({ popup: popup() }))).resolves.toBeDefined();
+    await expect(parse(SaveAdCampaignDto, save({ popup: popup({ description: null }) }))).resolves.toBeDefined();
+    await expect(parse(SaveAdCampaignDto, save({ popup: creative() }))).resolves.toBeDefined();
+  });
+
+  it('trims both texts', async () => {
+    const dto = await parse(SaveAdCampaignDto, save({ popup: popup({ headline: '  제목  ', description: '  설명  ' }) }));
+    expect(dto.popup).toMatchObject({ headline: '제목', description: '설명' });
+  });
+
+  it('allows exactly the maximum length and refuses one more', async () => {
+    await expect(parse(SaveAdCampaignDto, save({ popup: popup({ headline: '가'.repeat(AD_POPUP_HEADLINE_MAX_LENGTH) }) }))).resolves.toBeDefined();
+    await rejects(parse(SaveAdCampaignDto, save({ popup: popup({ headline: '가'.repeat(AD_POPUP_HEADLINE_MAX_LENGTH + 1) }) })));
+    await expect(parse(SaveAdCampaignDto, save({ popup: popup({ description: '가'.repeat(AD_POPUP_DESCRIPTION_MAX_LENGTH) }) }))).resolves.toBeDefined();
+    await rejects(parse(SaveAdCampaignDto, save({ popup: popup({ description: '가'.repeat(AD_POPUP_DESCRIPTION_MAX_LENGTH + 1) }) })));
+  });
+
+  it('uses 40 and 80 characters as the limits', () => {
+    expect([AD_POPUP_HEADLINE_MAX_LENGTH, AD_POPUP_DESCRIPTION_MAX_LENGTH]).toEqual([40, 80]);
+  });
+
+  it('refuses non-string texts and keeps both off the banner', async () => {
+    await rejects(parse(SaveAdCampaignDto, save({ popup: popup({ headline: 7 }) })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ headline: '배너 제목' }) })));
+    await rejects(parse(SaveAdCampaignDto, save({ banner: creative({ description: '배너 설명' }) })));
   });
 });
 

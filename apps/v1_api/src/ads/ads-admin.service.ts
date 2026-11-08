@@ -20,7 +20,14 @@ import {
   type AdChannels,
   type AdPublishProblem,
 } from './ad-campaign';
-import type { AdminAdCampaignListQueryDto, PublishAdCampaignDto, SaveAdCampaignDto, UpdateAdCampaignDto } from './dto/ad-campaign.dto';
+import type {
+  AdChannelCreativeDto,
+  AdPopupCreativeDto,
+  AdminAdCampaignListQueryDto,
+  PublishAdCampaignDto,
+  SaveAdCampaignDto,
+  UpdateAdCampaignDto,
+} from './dto/ad-campaign.dto';
 
 const CAMPAIGN_INCLUDE = {
   createdByAdminUser: {
@@ -33,11 +40,13 @@ type Tx = Prisma.TransactionClient;
 
 const AD_STATUSES = ['draft', 'published', 'stopped'] as const;
 const CHANNEL_LABEL: Record<AdChannel, string> = { banner: '배너', popup: '팝업' };
-const FIELD_LABEL = { imageUrl: '이미지', altText: '대체 텍스트', linkUrl: '링크', startAt: '시작 시각', endAt: '종료 시각' } as const;
+const FIELD_LABEL = { imageUrl: '이미지', altText: '대체 텍스트', headline: '제목', linkUrl: '링크', startAt: '시작 시각', endAt: '종료 시각' } as const;
 /** All ad publishes and edits of published campaigns serialise on this lock so the overlap check cannot race. */
 const PUBLISH_LOCK_KEY = 'ad-campaign-publish';
 
-type ChannelView = AdChannelFields & { phase: ReturnType<typeof channelPhase> };
+type Phase = ReturnType<typeof channelPhase>;
+type BannerView = Omit<AdChannelFields, 'headline' | 'description'> & { phase: Phase };
+type PopupView = AdChannelFields & { phase: Phase };
 type ChannelTotals = { impressions: number; clicks: number };
 
 @Injectable()
@@ -352,10 +361,19 @@ export class AdsAdminService {
 
   private toView(row: CampaignRow, now: Date) {
     const channels = channelsFromRow(row);
-    const channelView = (channel: AdChannel): ChannelView | null => {
-      const fields = channels[channel];
-      return fields ? { ...fields, phase: channelPhase(row.status, fields, now) } : null;
-    };
+    const bannerFields = channels.banner;
+    const popupFields = channels.popup;
+    const banner: BannerView | null = bannerFields
+      ? {
+          imageUrl: bannerFields.imageUrl,
+          altText: bannerFields.altText,
+          linkUrl: bannerFields.linkUrl,
+          startAt: bannerFields.startAt,
+          endAt: bannerFields.endAt,
+          phase: channelPhase(row.status, bannerFields, now),
+        }
+      : null;
+    const popup: PopupView | null = popupFields ? { ...popupFields, phase: channelPhase(row.status, popupFields, now) } : null;
     const profile = row.createdByAdminUser.user.profile;
     return {
       id: row.id,
@@ -363,8 +381,8 @@ export class AdsAdminService {
       title: row.title,
       status: row.status,
       version: row.version,
-      banner: channelView('banner'),
-      popup: channelView('popup'),
+      banner,
+      popup,
       publishedAt: row.publishedAt,
       stoppedAt: row.stoppedAt,
       createdAt: row.createdAt,
@@ -374,11 +392,14 @@ export class AdsAdminService {
   }
 }
 
-function readChannel(channel: AdChannel, input: SaveAdCampaignDto['banner']): AdChannelFields | null {
+function readChannel(channel: AdChannel, input: AdChannelCreativeDto | AdPopupCreativeDto | null | undefined): AdChannelFields | null {
   if (!input) return null;
+  const popupTexts = channel === 'popup' ? (input as AdPopupCreativeDto) : null;
   const fields: AdChannelFields = {
     imageUrl: input.imageUrl ?? null,
     altText: input.altText?.trim() || null,
+    headline: popupTexts?.headline?.trim() || null,
+    description: popupTexts?.description?.trim() || null,
     linkUrl: input.linkUrl ?? null,
     startAt: input.startAt ? new Date(input.startAt) : null,
     endAt: input.endAt ? new Date(input.endAt) : null,
@@ -433,15 +454,15 @@ function auditSnapshot(row: CampaignRow): Prisma.InputJsonValue {
   const channels = channelsFromRow(row);
   const channel = (name: AdChannel): Prisma.InputJsonValue | null => {
     const fields = channels[name];
-    return fields
-      ? {
-          imageUrl: fields.imageUrl,
-          altText: fields.altText,
-          linkUrl: fields.linkUrl,
-          startAt: fields.startAt?.toISOString() ?? null,
-          endAt: fields.endAt?.toISOString() ?? null,
-        }
-      : null;
+    if (!fields) return null;
+    return {
+      imageUrl: fields.imageUrl,
+      altText: fields.altText,
+      ...(name === 'popup' ? { headline: fields.headline, description: fields.description } : {}),
+      linkUrl: fields.linkUrl,
+      startAt: fields.startAt?.toISOString() ?? null,
+      endAt: fields.endAt?.toISOString() ?? null,
+    };
   };
   return {
     advertiserName: row.advertiserName,

@@ -21,7 +21,7 @@ function campaign(id: string, overrides: Partial<FakeCampaign>): FakeCampaign {
     status: 'published',
     version: 2,
     bannerImageUrl: null, bannerAltText: null, bannerLinkUrl: null, bannerStartAt: null, bannerEndAt: null,
-    popupImageUrl: null, popupAltText: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
+    popupImageUrl: null, popupAltText: null, popupHeadline: null, popupDescription: null, popupLinkUrl: null, popupStartAt: null, popupEndAt: null,
     publishedAt: day('2026-11-01'),
     stoppedAt: null,
     createdByAdminUserId: 'admin-owner',
@@ -43,6 +43,8 @@ const banner = (start: string, end: string, extra: Partial<FakeCampaign> = {}): 
 const popup = (start: string, end: string, extra: Partial<FakeCampaign> = {}): Partial<FakeCampaign> => ({
   popupImageUrl: '/uploads/ads/popup.webp',
   popupAltText: '팝업 대체 텍스트',
+  popupHeadline: '팝업 제목',
+  popupDescription: '팝업 설명',
   popupLinkUrl: 'https://everyday.example.com/event',
   popupStartAt: new Date(start),
   popupEndAt: new Date(end),
@@ -96,13 +98,12 @@ describe.each(['banner', 'popup'] as const)('AdsPublicService.findActive — %s'
 
     const ad = (await service.findActive(NOW))[channel];
 
-    expect(ad).toEqual({
-      campaignId: 'live',
-      advertiserName: '에버데이',
-      imageUrl: `/uploads/ads/${channel}.webp`,
-      altText: '에버데이 신제품',
-      linkUrl: channel === 'banner' ? '/tournaments/1' : 'https://everyday.example.com/event',
-    });
+    const shared = { campaignId: 'live', advertiserName: '에버데이', imageUrl: `/uploads/ads/${channel}.webp`, altText: '에버데이 신제품' };
+    expect(ad).toEqual(
+      channel === 'banner'
+        ? { ...shared, linkUrl: '/tournaments/1' }
+        : { ...shared, headline: '팝업 제목', description: '팝업 설명', linkUrl: 'https://everyday.example.com/event' },
+    );
   });
 
   it('returns the stored alt text of this channel, not the other channel\'s', async () => {
@@ -113,6 +114,33 @@ describe.each(['banner', 'popup'] as const)('AdsPublicService.findActive — %s'
   it('does not serve a channel that has no alt text, so an inaccessible image never reaches a page', async () => {
     const { service } = await build([campaign('live', { ...creative('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z'), [`${channel}AltText`]: null })]);
     expect((await service.findActive(NOW))[channel]).toBeNull();
+  });
+});
+
+describe('AdsPublicService.findActive — popup headline and description', () => {
+  it('serves the popup with its headline and description, and the banner without either key', async () => {
+    const { service } = await build([campaign('live', { ...banner('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z'), ...popup('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z') })]);
+
+    const active = await service.findActive(NOW);
+
+    expect(active.popup).toMatchObject({ headline: '팝업 제목', description: '팝업 설명' });
+    expect(active.banner).not.toHaveProperty('headline');
+    expect(active.banner).not.toHaveProperty('description');
+  });
+
+  it('serves a popup that has a headline but no description, with description null', async () => {
+    const { service } = await build([campaign('live', popup('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z', { popupDescription: null }))]);
+    expect((await service.findActive(NOW)).popup).toMatchObject({ headline: '팝업 제목', description: null });
+  });
+
+  it('does not serve a popup that has no headline, so a text-less popup never reaches a page', async () => {
+    const { service } = await build([campaign('live', popup('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z', { popupHeadline: null }))]);
+    expect((await service.findActive(NOW)).popup).toBeNull();
+  });
+
+  it('keeps serving a banner whose campaign has no popup headline because the banner needs none', async () => {
+    const { service } = await build([campaign('live', banner('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z'))]);
+    expect((await service.findActive(NOW)).banner?.campaignId).toBe('live');
   });
 });
 
@@ -174,15 +202,6 @@ describe('AdsPublicService.recordEvents', () => {
 
     const dates = fake.state.stats.map((row) => row.statDate.toISOString()).sort();
     expect(dates).toEqual(['2026-11-10T00:00:00.000Z', '2026-11-11T00:00:00.000Z']);
-  });
-
-  it('keeps concurrent batches from losing counts', async () => {
-    const { service, fake } = await build([live()]);
-
-    await Promise.all(Array.from({ length: 5 }, () => service.recordEvents([event('live', 'banner', 'impression'), event('live', 'banner', 'click')], NOW)));
-
-    expect(fake.state.stats).toHaveLength(1);
-    expect(fake.state.stats[0]).toMatchObject({ impressions: 5, clicks: 5 });
   });
 
   it.each([

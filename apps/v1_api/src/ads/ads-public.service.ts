@@ -6,20 +6,22 @@ import {
   AD_CHANNELS,
   acceptsEvents,
   servingWhere,
-  toPublicAd,
+  toPublicBanner,
+  toPublicPopup,
   type AdChannel,
   type AdEventType,
   type PublicAd,
+  type PublicPopupAd,
 } from './ad-campaign';
 
-export type ActiveAds = Record<AdChannel, PublicAd | null>;
+export type ActiveAds = { banner: PublicAd | null; popup: PublicPopupAd | null };
 export type AdEventInput = { campaignId: string; channel: AdChannel; type: AdEventType };
 
 const PUBLIC_SELECT = {
   id: true,
   advertiserName: true,
   bannerImageUrl: true, bannerAltText: true, bannerLinkUrl: true, bannerStartAt: true, bannerEndAt: true,
-  popupImageUrl: true, popupAltText: true, popupLinkUrl: true, popupStartAt: true, popupEndAt: true,
+  popupImageUrl: true, popupAltText: true, popupHeadline: true, popupDescription: true, popupLinkUrl: true, popupStartAt: true, popupEndAt: true,
 } as const;
 
 @Injectable()
@@ -41,8 +43,8 @@ export class AdsPublicService {
       ),
     );
     return {
-      banner: banner ? toPublicAd(banner, 'banner') : null,
-      popup: popup ? toPublicAd(popup, 'popup') : null,
+      banner: banner ? toPublicBanner(banner) : null,
+      popup: popup ? toPublicPopup(popup) : null,
     };
   }
 
@@ -69,10 +71,14 @@ export class AdsPublicService {
     const byId = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
 
     const statDate = kstCalendarDate(now);
+    // Rows are written in (campaign, channel, date) order. Two requests that touch the same rows in opposite
+    // orders would otherwise wait on each other's row locks and Postgres would abort one with a deadlock.
+    const rowKey = (tally: { campaignId: string; channel: AdChannel }) => `${tally.campaignId}|${tally.channel}|${statDate.toISOString()}`;
+    const ordered = [...tallies.values()].sort((a, b) => (rowKey(a) < rowKey(b) ? -1 : 1));
     const writes = [];
     let accepted = 0;
     let ignored = 0;
-    for (const tally of tallies.values()) {
+    for (const tally of ordered) {
       const count = tally.impressions + tally.clicks;
       const campaign = byId.get(tally.campaignId);
       if (!campaign || !acceptsEvents(campaign, tally.channel, now)) {

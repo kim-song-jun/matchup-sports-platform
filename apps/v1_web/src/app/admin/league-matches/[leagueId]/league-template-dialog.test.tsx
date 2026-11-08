@@ -297,6 +297,22 @@ describe('LeagueTemplateDialog', () => {
       expect(screen.queryByText('생성 미리보기')).toBeNull();
     });
 
+    it('입력이 이어지는 동안은 요청하지 않고 멈춘 뒤 마지막 값으로 한 번만 보낸다', async () => {
+      setup();
+      const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '2' } });
+      await pause(120);
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '3' } });
+      await pause(120);
+      expect(previewCalls()).toHaveLength(0);
+      fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '4' } });
+
+      expect(await screen.findByText(/1일째/)).toBeInTheDocument();
+      expect(previewCalls()).toHaveLength(1);
+      expect(previewCalls()[0][1]).toMatchObject({ gamesPerDay: 4 });
+    });
+
     it('서버가 거부하면 그 메시지를 미리보기 자리에 보여 준다', async () => {
       const { V1ApiError } = await import('@/lib/api-client');
       v1PostMock.mockRejectedValue(new V1ApiError({ status: 'error', timestamp: '2030-01-01T00:00:00.000Z', statusCode: 422, code: 'LEAGUE_FIXTURE_DURATION_REQUIRED', message: '이 리그의 기본 경기 시간을 알 수 없어요. 경기 시간(분)을 입력해 주세요.' }));

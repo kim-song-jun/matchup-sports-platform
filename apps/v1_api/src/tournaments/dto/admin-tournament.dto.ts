@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsDateString,
   IsDefined,
@@ -274,6 +275,7 @@ export class CreateTournamentDto {
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
   @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;
@@ -631,6 +633,7 @@ export class UpdateTournamentDto {
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
   @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;

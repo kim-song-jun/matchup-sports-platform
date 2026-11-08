@@ -136,6 +136,18 @@ describe('AdminDisciplinePanel', () => {
     expect(screen.getByRole('button', { name: '카드 받은 선수 2' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('선택된 보기 칩만 선택 스타일을 가지고, 다른 칩을 누르면 옮겨 가요', async () => {
+    renderPanel();
+    await screen.findByText('김도윤 (도윤)');
+    const suspended = screen.getByRole('button', { name: '정지 중 1' });
+    const imminent = screen.getByRole('button', { name: '경고 임박 1' });
+    expect(suspended).toHaveClass('tm-chip-active');
+    expect(imminent).not.toHaveClass('tm-chip-active');
+    fireEvent.click(imminent);
+    expect(imminent).toHaveClass('tm-chip-active');
+    expect(suspended).not.toHaveClass('tm-chip-active');
+  });
+
   it('정지 규정이 없는 대회는 안내만 보인다', async () => {
     respond = () => HttpResponse.json({ status: 'success', data: overview({ rules: null, summary: { suspended: 0, imminent: 0, withCards: 0 }, players: [] }), timestamp: NOW });
     renderPanel();

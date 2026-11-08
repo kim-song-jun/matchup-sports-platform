@@ -2,6 +2,7 @@
 
 import { useV1DataSource } from '@/components/providers/v1-data-source';
 
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import { V1ApiError, v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
@@ -18,7 +19,12 @@ import type {
   V1QuickResultScore,
   V1RandomFillResult,
 } from '@/types/api';
-import type { V1ApplyLeagueTemplatePayload, V1ApplyLeagueTemplateResult } from '@/types/league-match';
+import type {
+  V1ApplyLeagueTemplatePayload,
+  V1ApplyLeagueTemplateResult,
+  V1LeagueTemplatePreview,
+  V1PreviewLeagueTemplatePayload,
+} from '@/types/league-match';
 import type {
   V1FillSlotsFromStandingsInput,
   V1FillSlotsFromStandingsResult,
@@ -161,6 +167,31 @@ export function useV1ApplyLeagueTemplate(leagueId: string) {
       v1Post<V1ApplyLeagueTemplateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/template`, body),
     onSuccess: () => invalidateCompetitionViews(queryClient, leagueId, 'league'),
   });
+}
+
+const TEMPLATE_PREVIEW_DEBOUNCE_MS = 350;
+
+/**
+ * Timetable the server would create for these inputs (`POST .../fixtures/template/preview`). `request = null`
+ * (inputs not valid yet) disables it; typing settles for a moment before the request goes out.
+ */
+export function useV1LeagueTemplatePreview(leagueId: string, request: V1PreviewLeagueTemplatePayload | null) {
+  const requestKey = request === null ? null : JSON.stringify(request);
+  const [settledKey, setSettledKey] = useState(requestKey);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledKey(requestKey), TEMPLATE_PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [requestKey]);
+  const settled = settledKey === null ? null : (JSON.parse(settledKey) as V1PreviewLeagueTemplatePayload);
+  const query = useQuery({
+    queryKey: v1Keys.adminLeagueTemplatePreview(leagueId, settled),
+    queryFn: () =>
+      v1Post<V1LeagueTemplatePreview>(`/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/template/preview`, settled),
+    enabled: settled !== null,
+    staleTime: 0,
+  });
+  // While the inputs are still settling the data belongs to the previous inputs.
+  return { ...query, isSettling: settledKey !== requestKey };
 }
 
 /** `GET /admin/tournaments/:id/slots/standings-preview` — read fresh each time the dialog opens. */

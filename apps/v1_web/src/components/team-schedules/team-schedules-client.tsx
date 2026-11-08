@@ -33,6 +33,7 @@ import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { extractErrorCode } from '@/lib/error-message';
 import { isHiddenFromViewerError } from '@/lib/access-denied-error';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { teamScheduleCancelReasonLabel } from '@/lib/v1-status-labels';
 import { hydrateLineupEditorState } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
 import { teamGameDetailHref } from '@/lib/team-game-links';
@@ -475,7 +476,8 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const history: ScheduleDetailViewModel['history'] = [];
   if (schedule?.state === 'CANCELLED') {
     history.push({ label: '취소됨', detail: schedule.cancelledAt ? formatTournamentDateTimeLong(schedule.cancelledAt) : null });
-    if (schedule.cancelReason) history.push({ label: '취소 사유', detail: schedule.cancelReason });
+    const cancelReasonLabel = teamScheduleCancelReasonLabel(schedule.cancelReason);
+    if (cancelReasonLabel) history.push({ label: '취소 사유', detail: cancelReasonLabel });
   } else if (schedule?.state === 'COMPLETED') {
     history.push({ label: '완료 처리됨', detail: null });
   }

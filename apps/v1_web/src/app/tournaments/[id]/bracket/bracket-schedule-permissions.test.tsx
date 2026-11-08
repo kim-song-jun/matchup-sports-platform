@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { saveStoredV1Session } from '@/lib/session-storage';
 import { BracketScheduleTab } from './bracket-page-client';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
@@ -16,6 +17,7 @@ function makeFixture(overrides: Pick<V1TournamentFixture, 'id' | 'status' | 'gro
 
 const scheduleMock = vi.fn();
 const myFixturesMock = vi.fn();
+const myTeamsMock = vi.fn();
 const playerRecordsMock = vi.fn();
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
@@ -25,11 +27,17 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyTournamentFixtures: (...args: unknown[]) => myFixturesMock(...args),
+  useV1MyTeams: (...args: unknown[]) => myTeamsMock(...args),
   useV1Tournament: vi.fn(),
 }));
 
 describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
   beforeEach(() => {
+    myTeamsMock.mockReset();
+    myTeamsMock.mockReturnValue({ data: undefined });
     playerRecordsMock.mockClear();
     playerRecordsMock.mockReturnValue({
       data: {
@@ -158,5 +166,60 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/semi');
     fireEvent.click(within(rounds).getByRole('button', { name: '결승' }));
     expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/final');
+  });
+});
+
+describe('BracketScheduleTab — 팀원도 내 팀 일정을 걸러 본다', () => {
+  const entry = (fixtureId: string, home: string, away: string, status = 'scheduled') => ({
+    fixtureId, round: '조별리그', fixtureNumber: 1, legNumber: 1, groupId: null, groupName: null,
+    scheduledAt: '2026-08-15T10:00:00.000Z', venue: null, fieldId: null, fieldName: null,
+    home: { registrationId: `reg-${home}`, teamId: home, teamName: home },
+    away: { registrationId: `reg-${away}`, teamId: away, teamName: away },
+    homeSlotLabel: null, awaySlotLabel: null, visibilityMode: 'live', status, resultState: 'pending',
+    scoreStatus: 'unavailable', score: null, clock: null, periodBreak: null, scorers: [], cards: [], outcome: null, hasVideo: false,
+  });
+
+  beforeEach(() => {
+    myFixturesMock.mockReturnValue({ data: undefined });
+    scheduleMock.mockReturnValue({
+      data: { pages: [{ tournamentId: 'tour-1', tournamentTitle: '테스트 대회', bracketPublished: true,
+        items: [entry('mine', 'member-team', 'rival-a'), entry('others', 'rival-a', 'rival-b')],
+        unscheduled: [], standings: [], nextCursor: null }] },
+      isPending: false, isError: false, error: null, refetch: vi.fn(),
+      hasNextPage: false, isFetching: false, isFetchingNextPage: false, fetchNextPage: vi.fn(),
+    });
+  });
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('팀장이 아닌 팀원(my-fixtures 비어 있음)도 소속 팀으로 스위치와 우리 팀 카드를 받고, 켜면 우리 팀 경기만 남는다', async () => {
+    saveStoredV1Session({ userId: 'member-1' });
+    myTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'member-team', role: 'member' }] } });
+    const { container } = render(<BracketScheduleTab tournamentId="tour-1" />);
+
+    const toggle = await screen.findByRole('switch', { name: '내 팀만' });
+    expect(container.querySelectorAll('.tm-schedule-card-mine')).toHaveLength(1);
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    fireEvent.click(toggle);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/mine');
+  });
+
+  it('로그인하지 않았으면 소속 팀 응답이 있어도(캐시 잔여) 스위치와 우리 팀 표시를 만들지 않는다', async () => {
+    myTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'member-team', role: 'member' }] } });
+    const { container } = render(<BracketScheduleTab tournamentId="tour-1" />);
+
+    await waitFor(() => expect(screen.getAllByRole('link')).toHaveLength(2));
+    expect(screen.queryByRole('switch', { name: '내 팀만' })).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-schedule-card-mine')).toBeNull();
+  });
+
+  it('끝난 대회(status=completed)에서만 최종 결과 안내를 보여 준다', () => {
+    const tournament = { format: 'group_knockout' as const, groups: [], fixtures: [] };
+    const { rerender } = render(<BracketScheduleTab tournamentId="tour-1" tournament={{ ...tournament, status: 'completed' }} />);
+    expect(screen.getByRole('link', { name: /최종 결과 보기/ })).toHaveAttribute('href', '/tournaments/tour-1/results');
+    rerender(<BracketScheduleTab tournamentId="tour-1" tournament={{ ...tournament, status: 'in_progress' }} />);
+    expect(screen.queryByRole('link', { name: /최종 결과 보기/ })).not.toBeInTheDocument();
   });
 });

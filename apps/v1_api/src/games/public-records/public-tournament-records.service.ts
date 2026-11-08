@@ -920,10 +920,10 @@ export class PublicTournamentRecordsService {
       })),
     );
 
-    // 공동 순위는 조별+결선 대회에만 있다 — 「순위·대진표」 탭(대회 상세)과 같은 로더라 두 탭이 어긋나지 않는다.
+    // 공동 순위는 예선 조가 있는 대회(조별+결선, 정규리그+N개 토너먼트)에만 있다 — 「순위·대진표」 탭(대회 상세)과 같은 로더라 두 탭이 어긋나지 않는다.
     // 진출 팀은 이 탭이 안 쓰므로 결선 대진 조회를 건너뛰고, 순위 행이 하나도 없으면 로더를 아예 부르지 않는다.
     const groupStandingSummaries =
-      tournament.format === 'group_knockout' && standings.length > 0
+      (tournament.format === 'group_knockout' || tournament.format === 'league_knockouts') && standings.length > 0
         ? await loadGroupStandingSummaries(this.prisma, tournamentId, { includeQualification: false })
         : new Map<string, GroupStandingSummary>();
 

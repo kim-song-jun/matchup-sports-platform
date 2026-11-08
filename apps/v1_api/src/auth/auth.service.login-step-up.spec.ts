@@ -7,6 +7,7 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as crypto from 'crypto';
 import { createLoginSecurityFakePrisma } from '../../test/helpers/login-security-fake-prisma';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -78,6 +79,7 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
       { provide: AppleIdentityService, useValue: {} },
       { provide: AppleTokenService, useValue: {} },
       { provide: RealtimeGateway, useValue: { forceDisconnectUser: jest.fn() } },
+      { provide: NotificationsService, useValue: {} },
     ],
   }).compile();
   const service = moduleRef.get(AuthService);

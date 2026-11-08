@@ -230,6 +230,78 @@ describe('AccountLinkService.linkKakao', () => {
     });
   });
 
+  describe('a login removed earlier (POST /auth/identities/unlink)', () => {
+    const removedKakao = (userId = CALLER) => identity('kakao-removed', userId, 'kakao', KAKAO_KEY, { status: 'unlinked', email: 'old@example.test' });
+
+    it('brings the caller’s own row back instead of inserting a second one the unique index would refuse', async () => {
+      const seed = callerWithEmailLogin();
+      seed.identities.push(removedKakao());
+      const { service, state, client, notifications } = build(seed);
+
+      const result = await service.linkKakao(CALLER, TOKEN_FORM, 60);
+
+      expect(result).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+      expect(client.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(state.identities).toHaveLength(2);
+      expect(state.identities.find((row) => row.id === 'kakao-removed')).toMatchObject({ userId: CALLER, providerUserKey: KAKAO_KEY, status: 'active', email: null });
+      expect(state.logs).toEqual([
+        expect.objectContaining({ targetId: 'kakao-removed', fromStatus: 'unlinked', toStatus: 'linked', reason: 'account_link:kakao;restored_identity' }),
+      ]);
+      // The row id repeats on every re-link, so the notice key must not: a repeated key would swallow the second notice.
+      const [, , , options] = notifications.createInTransaction.mock.calls[0];
+      expect(options.businessKey).toMatch(/^social-link:kakao-removed:\d+$/);
+      expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
+    });
+
+    it('brings it back through a link token as well', async () => {
+      const seed = callerWithEmailLogin();
+      seed.identities.push(removedKakao());
+      const { service, state } = build(seed);
+      const claims: SocialLinkClaims = { kind: 'verified_identity', provider: 'kakao', providerUserKey: KAKAO_KEY, email: 'me@example.test' };
+
+      await service.linkPending(CALLER, { linkToken: issueSocialLinkToken(claims, [CALLER]) }, 60);
+
+      expect(state.identities).toHaveLength(2);
+      expect(state.identities.find((row) => row.id === 'kakao-removed')).toMatchObject({ status: 'active', email: 'me@example.test' });
+    });
+
+    it('answers a second link of the restored login as already linked', async () => {
+      const seed = callerWithEmailLogin();
+      seed.identities.push(removedKakao());
+      const { service, state } = build(seed);
+
+      await service.linkKakao(CALLER, TOKEN_FORM, 60);
+      const again = await service.linkKakao(CALLER, TOKEN_FORM, 60);
+
+      expect(again).toMatchObject({ alreadyLinked: true });
+      expect(state.logs).toHaveLength(1);
+    });
+
+    it('keeps a login another account removed reserved for that account', async () => {
+      const seed = { users: [user(CALLER), user('user-former-owner')], identities: [emailLogin(CALLER), removedKakao('user-former-owner')] };
+      const { service, state } = build(seed);
+
+      expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, 60))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+
+      expect(state.identities.find((row) => row.id === 'kakao-removed')).toMatchObject({ userId: 'user-former-owner', status: 'unlinked' });
+      expect(state.logs).toHaveLength(0);
+    });
+
+    it('adds a different Kakao login beside the removed one', async () => {
+      const seed = callerWithEmailLogin();
+      seed.identities.push(removedKakao());
+      const { service, state, auth } = build(seed);
+      auth.fetchKakaoProfileForToken.mockResolvedValue(kakaoProfile({ providerUserKey: 'another-kakao' }));
+
+      await service.linkKakao(CALLER, TOKEN_FORM, 60);
+
+      expect(state.identities.filter((row) => row.provider === 'kakao').map((row) => [row.providerUserKey, row.status])).toEqual([
+        [KAKAO_KEY, 'unlinked'],
+        ['another-kakao', 'active'],
+      ]);
+    });
+  });
+
   describe('moving the identity off an empty signup account', () => {
     it.each(['social_terms_required', 'social_profile_required', 'social_profile_deferred'])(
       'moves it from a %s account, retires that account and hands over what it left',
@@ -634,6 +706,20 @@ describe('AccountLinkService.linkApple', () => {
       authorizationCode: 'apple-auth-code',
     });
     expect(notifications.createInTransaction).toHaveBeenCalledWith(expect.anything(), CALLER, 'social_identity_linked', expect.objectContaining({ vars: { name: 'Apple' } }));
+  });
+
+  it('brings an Apple login the caller removed earlier back to life and stores the fresh refresh token on that row', async () => {
+    const seed = callerWithEmailLogin();
+    seed.identities.push(identity('apple-removed', CALLER, 'apple', 'apple-sub-1', { status: 'unlinked' }));
+    const { service, appleIdentity, appleTokens, state } = build(seed);
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+
+    const result = await service.linkApple(CALLER, APPLE_DTO, 30);
+
+    expect(result).toEqual({ provider: 'apple', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'apple'] });
+    expect(state.identities).toHaveLength(2);
+    expect(state.identities.find((row) => row.id === 'apple-removed')).toMatchObject({ userId: CALLER, status: 'active' });
+    expect(appleTokens.storeFromAuthorizationCode).toHaveBeenCalledTimes(1);
   });
 
   it('stores the Apple email only when verified, and skips the token exchange without a code', async () => {

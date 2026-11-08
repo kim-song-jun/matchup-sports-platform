@@ -135,6 +135,7 @@ export function TournamentStandingsTable({
   header,
   keepTeamLink = false,
   tieBreakOrder = null,
+  myTeamIds,
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
@@ -151,6 +152,8 @@ export function TournamentStandingsTable({
   fromHref?: string | null;
   /** 이 대회가 고른 동점 순서. 주면 표 아래에 한 줄로 알린다 — 정규 리그는 주지 않는다. */
   tieBreakOrder?: readonly string[] | null;
+  /** 로그인한 사용자가 소속된 팀 — 그 팀 행에 "우리 팀" 배지와 왼쪽 막대를 단다. 비공개 팀(teamId null) 행은 그대로 그리되 표식 대상에서 제외한다. */
+  myTeamIds?: ReadonlySet<string>;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const tieBreakRule = tieBreakOrder ? formatTournamentTieBreakRule(tieBreakOrder) : '';
@@ -204,6 +207,7 @@ export function TournamentStandingsTable({
                 // 비공개 팀은 로고 없이 기본 팀 아이콘으로 표시한다.
                 const isHidden = row.teamName === null;
                 const promoted = advancingKeys?.has(row.key) ?? false;
+                const isMine = row.teamId !== null && (myTeamIds?.has(row.teamId) ?? false);
                 const teamCell = (
                   <>
                     <TeamAvatar
@@ -223,6 +227,7 @@ export function TournamentStandingsTable({
                       >
                         {isHidden ? '참가팀 비공개' : row.teamName}
                       </span>
+                      {isMine ? <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>우리 팀</span> : null}
                       {promoted ? (
                         advancingLabels?.get(row.key)?.length ? (
                           <span className="flex flex-wrap gap-1">
@@ -246,7 +251,7 @@ export function TournamentStandingsTable({
                     <tr
                       className={`tm-standings-row${promoted && !advancingLabels?.get(row.key)?.length ? ' tm-standings-row-highlight' : ''}`}
                     >
-                      <td style={{ paddingLeft: 12 }}>
+                      <td style={{ paddingLeft: 12, boxShadow: isMine ? 'inset 2px 0 0 var(--blue500)' : undefined }}>
                         <StandingRankBadge pos={row.position} sharedRank={row.sharedRank} promoted={promoted} unranked={unranked} />
                       </td>
                       <td>

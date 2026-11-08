@@ -7,6 +7,8 @@ import { EmailLinkController } from './email-link.controller';
 import { EmailLinkService } from './email-link.service';
 import { AppleTokenModule } from './apple-token.module';
 import { AuthService } from './auth.service';
+import { LoginMethodController } from './login-method.controller';
+import { LoginMethodService } from './login-method.service';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
@@ -22,11 +24,12 @@ import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule, NotificationsServiceModule],
-  controllers: [AuthController, EmailLinkController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
+  controllers: [AuthController, EmailLinkController, LoginMethodController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
   providers: [
     AuthService,
     AccountLinkService,
     EmailLinkService,
+    LoginMethodService,
     AccountRecoveryService,
     WithdrawalRecoveryService,
     LoginSecurityService,

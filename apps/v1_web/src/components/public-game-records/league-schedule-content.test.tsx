@@ -190,10 +190,10 @@ describe('정규 리그 bracket 일정의 전체/내 팀 계약', () => {
     expect(gameIds()).toHaveLength(7);
   });
 
-  it('대회 일정에는 새 소속 팀 필터를 추가하지 않는다', () => {
+  it('대회 일정도 소속 팀(팀원 포함)으로 내 팀만 스위치를 한 벌만 그린다', () => {
     render(<BracketScheduleTab tournamentId="league-1" fromHref={base} />);
-    expect(screen.queryByRole('switch', { name: '내 팀만' })).not.toBeInTheDocument();
-    expect(mocks.teams).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('switch', { name: '내 팀만' })).toHaveLength(1);
+    expect(mocks.teams).toHaveBeenCalledWith(undefined, { enabled: true });
   });
 
   it('공개 전 일정은 내 팀 배정 여부보다 공개 게이트를 우선한다', () => {

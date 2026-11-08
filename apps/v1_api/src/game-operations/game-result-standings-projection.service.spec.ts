@@ -129,4 +129,38 @@ describe('GameResultStandingsProjectionService', () => {
     const rows = (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls.map(([input]) => input.create);
     expect(rows).toHaveLength(2); expect(rows.every((row) => row.points === 0 && row.wins === 0 && row.losses === 0)).toBe(true);
   });
+
+  describe('대회가 고른 동점 순서', () => {
+    // A and B both end on 3 points; A beat B head-to-head but has the worse goal difference (-2 vs +3).
+    const fixtureOf = (home: string, away: string, homeScore: number, awayScore: number) => {
+      const base = canonicalDetail();
+      return canonicalDetail({
+        homeRegistrationId: home, awayRegistrationId: away,
+        teamMatch: { ...base.teamMatch, game: canonicalGame({ currentOfficialRevision: { state: 'OFFICIAL', score: { home: homeScore, away: awayScore }, resultParticipants: [] } }) },
+      });
+    };
+    const details = [fixtureOf('A', 'B', 1, 0), fixtureOf('D', 'A', 3, 0), fixtureOf('B', 'E', 4, 0), fixtureOf('D', 'E', 1, 0)];
+    const projectedOrder = async (tieBreakOrder?: unknown) => {
+      const tx = makeTx();
+      const group = groupBase({
+        groupTeams: ['A', 'B', 'D', 'E'].map((registrationId) => ({ registrationId })),
+        tournament: { id: canonicalIds.tournament, deletedAt: null, competitionConfigVersionId: 'config-version-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder },
+      });
+      tx.v1TournamentMatchDetails.findUnique.mockResolvedValue(details[0]);
+      tx.v1TournamentGroup.findUnique.mockResolvedValue(group);
+      tx.v1TournamentGroup.findMany.mockResolvedValue([group]);
+      tx.v1TournamentMatchDetails.findMany.mockResolvedValue(details);
+      await service.project(tx, revisionRow());
+      const rows = (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls.map(([input]) => input.create);
+      return rows.sort((left, right) => left.position - right.position).map((row) => row.registrationId);
+    };
+
+    it('저장한 순서가 없으면 맞대결 승자가 득실이 나빠도 앞선다 — 기존 대회 순위는 그대로', async () => {
+      expect(await projectedOrder(null)).toEqual(['D', 'A', 'B', 'E']);
+    });
+
+    it('득실차를 맞대결보다 먼저 둔 대회는 저장 순위가 그 순서로 계산된다', async () => {
+      expect(await projectedOrder(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
+    });
+  });
 });

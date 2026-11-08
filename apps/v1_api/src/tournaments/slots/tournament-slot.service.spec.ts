@@ -1,6 +1,7 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
+import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
 import { TournamentSlotService } from './tournament-slot.service';
 
 const user = { id: 'u-1', email: 'u@test.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -71,7 +72,9 @@ describe('TournamentSlotService.assignSlot 권한·존재 확인', () => {
     prisma.v1TournamentSlot.findUnique
       .mockResolvedValueOnce({ tournamentId: 'tournament-1' })
       .mockResolvedValueOnce(slot);
-    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', kind: 'regular_tournament' });
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 'tournament-1', kind: 'regular_tournament', competitionConfigVersionId: 'config-1', competitionConfig: FOOTBALL_V1_CONFIG, tieBreakOrder: null,
+    });
     prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ status: 'confirmed' });
     prisma.v1TournamentSlot.findFirst.mockResolvedValue(null);

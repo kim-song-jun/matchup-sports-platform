@@ -51,19 +51,16 @@ const ORDER_SELECT = {
   id: true,
   hostTeamId: true,
   approvedApplicantTeamId: true,
+  startAt: true,
   game: { select: { id: true } },
   tournamentDetails: { select: { round: true, group: { select: { phase: true } } } },
 } as const;
 
-/**
- * 출전정지 판정에 넘길 `orderedGames`(key = teamMatchId). 정렬은 각 축의 목록 화면 순서다 —
- * 리그는 `leagueFixtureListOrder`, 대회는 단계(조별리그 → 결선) → 시각 → 라운드 → 대진 번호 → 레그 → id.
- */
-export async function loadTeamCompetitionGameOrder(
+/** 대회·리그 전체 경기를 정지 판정이 쓰는 순서로 읽는다 — 리그는 `leagueFixtureListOrder`, 대회는 단계 → 시각 → 라운드 → 대진 번호 → 레그 → id. */
+export async function loadCompetitionMatchOrder(
   tx: Tx,
-  input: { competitionId: string; isLeague: boolean; teamId: string | null },
-): Promise<OrderedCompetitionGame[]> {
-  if (input.teamId === null) return [];
+  input: { competitionId: string; isLeague: boolean },
+): Promise<(CompetitionMatchOrderRow & { readonly startAt: Date | null })[]> {
   const rows = input.isLeague
     ? await tx.v1TeamMatch.findMany({
         where: leagueFixtureListWhere(input.competitionId),
@@ -81,5 +78,16 @@ export async function loadTeamCompetitionGameOrder(
         ],
         select: ORDER_SELECT,
       });
-  return narrowToTeamGames(input.isLeague ? rows : sortByCompetitionStage(rows), input.teamId);
+  return input.isLeague ? rows : sortByCompetitionStage(rows);
+}
+
+/**
+ * 출전정지 판정에 넘길 `orderedGames`(key = teamMatchId). 정렬은 각 축의 목록 화면 순서다.
+ */
+export async function loadTeamCompetitionGameOrder(
+  tx: Tx,
+  input: { competitionId: string; isLeague: boolean; teamId: string | null },
+): Promise<OrderedCompetitionGame[]> {
+  if (input.teamId === null) return [];
+  return narrowToTeamGames(await loadCompetitionMatchOrder(tx, input), input.teamId);
 }

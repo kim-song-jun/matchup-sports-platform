@@ -66,7 +66,6 @@ export function getEmailLoginViewModel(redirectPath?: string | null): EmailLogin
       { label: '비밀번호', placeholder: '비밀번호', type: 'password' },
     ],
     primary: { label: '로그인', tone: 'primary' },
-    forgot: { label: '비밀번호 찾기', href: '/auth/password-reset', tone: 'neutral' },
     signupHref: '/terms?mode=signup',
     notice: undefined,
   };
@@ -90,7 +89,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       title: '현재 계정은 이용할 수 없어요',
       body: '현재 계정은 이용이 제한된 상태예요. 문의가 필요하시면 고객센터를 통해 확인해 주세요.',
       tone: 'red',
-      primary: { label: '고객센터 문의', disabled: true, tone: 'danger' },
+      primary: { label: '고객센터 문의', href: '/contact', tone: 'primary' },
       secondary: { label: '로그인으로 돌아가기', href: '/login', tone: 'neutral' },
     },
     'location-denied': {
@@ -101,15 +100,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       tone: 'orange',
       primary: { label: '지역 직접 선택하기', href: '/onboarding/region' },
       secondary: { label: '설정에서 권한 열기', disabled: true, tone: 'neutral' },
-    },
-    'password-reset': {
-      backHref: '/login/email',
-      badge: '비밀번호 찾기',
-      title: '이메일 로그인으로 다시 시도해 주세요',
-      body: '현재는 비밀번호 재설정 이메일 발송 기능을 준비 중이에요. 가입했던 이메일과 비밀번호로 로그인해 주세요.',
-      tone: 'orange',
-      primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
-      secondary: { label: '간편 로그인으로 이동', href: '/login', tone: 'neutral' },
     },
   };
 
@@ -173,6 +163,22 @@ export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: s
     primary: returnTo
       ? { label: '하던 곳으로 돌아가기', href: returnTo }
       : { label: '로그인 방법으로 돌아가기', href: loginMethodsHref },
+  };
+}
+
+/**
+ * 프로필의 이메일 변경을 마친 완료 화면. 인증과 저장이 한 번에 끝나므로 보여 줄 것은 바뀐 주소와 인증 상태다.
+ * 비밀번호 계정은 이 주소가 로그인 ID 라서 앞으로 새 주소로 로그인한다고 알린다.
+ */
+export function getEmailChangeCompleteViewModel(email: string, hasPassword: boolean, profileHref: string): SignupCompleteViewModel {
+  return {
+    title: '이메일을 바꿨어요',
+    sub: hasPassword ? `앞으로 ${email} 으로 로그인해요. 인증도 끝났어요.` : `계정 이메일이 ${email} 으로 바뀌었어요. 인증도 끝났어요.`,
+    steps: [
+      { title: '계정 이메일', body: email, done: true },
+      { title: '인증 상태', body: '인증 완료', done: true },
+    ],
+    primary: { label: '프로필로 돌아가기', href: profileHref },
   };
 }
 

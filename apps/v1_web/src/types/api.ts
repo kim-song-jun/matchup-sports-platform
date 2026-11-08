@@ -132,7 +132,6 @@ export type V1AuthMe = {
     canLinkLoginMethods?: boolean;
     /** Whether linking would be permitted after required signup is completed. */
     canLinkAfterSignup?: boolean;
-    signupEmailLoginRequired?: boolean;
     hasPassword?: boolean;
   };
   profile: {
@@ -304,6 +303,44 @@ export type V1RevokeOtherSessionsResult = {
 };
 
 /**
+ * 계정 이메일을 바꾸는 두 단계 — 이어서 `PATCH /me/profile` 에 `emailChangeToken` 을 실어 저장한다. 로그인한 세션이 계정을,
+ * 새 주소로 받은 인증번호가 주소를 증명한다. 서버는 증명 없는 변경을 400 `EMAIL_CHANGE_PROOF_REQUIRED` 로 거절한다.
+ */
+
+/**
+ * `POST /me/email-change/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면(모든 계정) 403
+ * `RECENT_LOGIN_REQUIRED`. 지금 쓰는 주소는 400 `EMAIL_UNCHANGED`, 다른 계정이 쓰는 주소는 409 `EMAIL_CONFLICT`.
+ */
+export type V1EmailChangeRequestPayload = {
+  email: string;
+};
+
+export type V1EmailChangeRequestResult = {
+  sent: true;
+  /** 가린 주소(예: `ru***@example.com`). 화면에 "○○로 보냈어요" 로 보여 준다. */
+  maskedTarget: string;
+  /** 인증번호 유효 시간(초). */
+  expiresInSeconds: number;
+  /** 이 시간(초) 뒤에야 같은 주소로 다시 받을 수 있다. 그 전에 요청하면 400 `VERIFICATION_RESEND_COOLDOWN`. */
+  resendAvailableInSeconds: number;
+  /** 인증번호 에코가 켜진 환경(alpha)에서 시험용 주소로 요청했을 때만 온다. */
+  devCode?: string;
+};
+
+/** `POST /me/email-change/verify` */
+export type V1EmailChangeVerifyPayload = {
+  /** 메일로 받은 숫자 6자리. */
+  code: string;
+};
+
+export type V1EmailChangeVerifyResult = {
+  /** 이 계정·이 주소에만 쓸 수 있는 증명. 주소에 싣지 않고 저장 직전까지 메모리로만 넘긴다. */
+  emailChangeToken: string;
+  /** `emailChangeToken` 의 남은 유효 시간(초). */
+  expiresInSeconds: number;
+};
+
+/**
  * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
  * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.
  */
@@ -318,8 +355,8 @@ export type V1SignInThenLinkDetails = {
   /** `linkToken` 의 남은 유효 시간(초). */
   linkTokenExpiresInSeconds?: number;
   /**
-   * 번호를 쥔 계정이 탈퇴 유예 중일 때만 온다(`PHONE_CONFLICT`, 인증번호로 번호를 증명한 뒤의 409). 유예가 끝나는
-   * 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
+   * 충돌한 계정이 탈퇴 유예 중일 때만 온다. 인증번호로 번호를 증명한 뒤의 `PHONE_CONFLICT`, 그리고 제공자가 보증한
+   * 이메일·번호가 그 계정과 겹친 카카오·Apple 로그인 409 에 실린다. 유예가 끝나는 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
    */
   withdrawalPendingUntil?: string | null;
 };
@@ -2663,6 +2700,17 @@ export type V1Profile = {
 };
 
 /**
+ * `PATCH /me/profile` 응답. `email`·`phone` 은 저장 뒤 계정에 남은 값이다 — 이메일을 안 보낸 요청은 지금 값이 그대로 오고,
+ * 소셜 계정이 지우면 null 이다. 프로필·`/auth/me` 캐시의 계정 값은 이 값으로 맞춘다.
+ */
+export type V1ProfileUpdateResult = {
+  profile: V1Profile['profile'];
+  email: string | null;
+  phone: string | null;
+  updatedAt: string;
+};
+
+/**
  * 선수 카드 (Task 155). 산식과 잠금 규칙은 서버가 정하고, 프론트는 **그린다**.
  * 잠긴 능력치는 `value: null` 로 오며, 프론트가 임의로 0 이나 추정값을 채우면 안 된다.
  */
@@ -3959,6 +4007,19 @@ export type V1TournamentListItem = {
   updatedAt: string;
 };
 
+/**
+ * 정규 대회의 동점 순서 기준. 서버 `CompetitionConfig['tieBreak']['order']` 와 같은 값이다.
+ * 승점은 언제나 첫 칸, 추첨은 언제나 마지막 칸이고 가운데 네 기준만 순서를 바꿀 수 있다.
+ */
+export type V1TournamentTieBreakCriterion =
+  | 'points'
+  | 'head_to_head'
+  | 'goal_difference'
+  | 'goals_for'
+  | 'fair_play'
+  | 'seeded_draw';
+export type V1TournamentTieBreakOrder = V1TournamentTieBreakCriterion[];
+
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
   sixTeamMode?: boolean;
@@ -3967,6 +4028,10 @@ export type V1Tournament = {
   canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
   formatChangeBlockedReason?: string | null;
+  /** 지금 쓰는 동점 순서(항상 6칸). 안 고른 대회는 기본 순서다. */
+  tieBreakOrder: V1TournamentTieBreakOrder;
+  /** 관리자 상세 응답: null이면 동점 순서 변경 가능, 예선 결과가 확정됐으면 한국어 사유. */
+  tieBreakOrderBlockedReason?: string | null;
   id: string;
   sportId: string;
   title: string;
@@ -4303,6 +4368,8 @@ export type V1TournamentDetail = {
   format: V1TournamentFormat;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
+  /** 이 대회가 고른 동점 순서(6칸). 정규 리그는 리그 고유 순서를 쓰므로 null. */
+  tieBreakOrder?: V1TournamentTieBreakOrder | null;
   /** 정규 리그에만 내려오는 참가팀 정원. null이면 무제한이다. */
   maxTeams?: number | null;
   registrationDeadlineAt: string | null;
@@ -4985,6 +5052,8 @@ export type V1SubstitutionMode = 'limited' | 'rolling';
 
 export type V1CreateTournamentPayload = {
   sixTeamMode?: boolean;
+  /** 동점 순서(6칸). 생략 = 기본 순서(생성)/변경 없음(수정), null = 기본 순서로 되돌리기. */
+  tieBreakOrder?: V1TournamentTieBreakOrder | null;
   sportId: string;
   title: string;
   format?: V1TournamentFormat;

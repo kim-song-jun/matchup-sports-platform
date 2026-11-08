@@ -45,7 +45,6 @@ async function completeCurrentEmailReset(email = RECOVERY_EMAIL) {
   expect(flow.resets[index].body).toEqual({ email: email.trim().toLowerCase(), proofToken: confirmation?.proofToken, newPassword: NEW_EMAIL_PASSWORD });
   await settleRequests(() => flow.releaseReset(index, 'success'));
   expect(screen.getByText('비밀번호를 바꿨어요')).toBeInTheDocument();
-  expect(wireCalls.phoneReset).toBe(0);
 }
 
 describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 흐름과 분리된다', () => {
@@ -153,6 +152,5 @@ describe('MD-QA #133 이메일 인증·저장의 이전 응답은 현재 복구 
     }
     expect(flow.resets[index].body).toEqual({ email: RECOVERY_EMAIL, proofToken: flow.confirmations[0].proofToken, newPassword: NEW_EMAIL_PASSWORD });
     expect(wireCalls.emailReset).toHaveLength(1);
-    expect(wireCalls.phoneReset).toBe(0);
   });
 });

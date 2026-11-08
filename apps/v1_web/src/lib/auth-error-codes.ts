@@ -29,6 +29,15 @@ export const LOGIN_METHOD_NOT_FOUND_CODE = 'LOGIN_METHOD_NOT_FOUND';
 export const EMAIL_LINK_TOKEN_INVALID_CODE = 'EMAIL_LINK_TOKEN_INVALID';
 
 /**
+ * 프로필 저장이 이메일을 바꾸려는데 새 주소의 인증(`emailChangeToken`)이 없거나, 만료됐거나, 이 계정·주소의 것이 아니라는 400 코드.
+ * 인증번호부터 다시 받아야 한다.
+ */
+export const EMAIL_CHANGE_PROOF_REQUIRED_CODE = 'EMAIL_CHANGE_PROOF_REQUIRED';
+
+/** 이메일 변경 인증번호를 요청한 주소가 지금 계정이 쓰는 주소와 같다는 400 코드. 바꿀 것이 없다. */
+export const EMAIL_UNCHANGED_CODE = 'EMAIL_UNCHANGED';
+
+/**
  * 인증 메일 발송이 이번에 실패했다는 503 코드. 인증번호는 남지 않으므로 바로 다시 받을 수 있다.
  * 메일을 보낼 수단 자체가 없는 503 은 `EMAIL_SEND_UNAVAILABLE`(`auth-link-errors.ts`)이다.
  */

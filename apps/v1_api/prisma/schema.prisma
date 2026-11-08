@@ -725,6 +725,8 @@ enum V1VerificationPurpose {
   contact
   /// 이메일 로그인 추가: /auth/link/email/*
   email_login_link
+  /// 계정 이메일 변경: /me/email-change/*
+  email_change
 }
 
 model V1VerificationToken {
@@ -2707,6 +2709,8 @@ model V1Tournament {
   sixTeamBracket Json? @map("six_team_bracket")
   multiFinals Json? @map("multi_finals")
   multiFinalsRevision Int @default(0) @map("multi_finals_revision")
+  /// 이 대회의 동점 순서(승점 → … → 추첨 6칸). null = 기본 순서. 공유되는 경기 규정 판(content_hash)이 아니라 대회에 둔다.
+  tieBreakOrder Json? @map("tie_break_order")
   bracketDraft Json? @map("bracket_draft")
   bracketDraftRevision Int @default(0) @map("bracket_draft_revision")
   id                         String                      @id @default(uuid())

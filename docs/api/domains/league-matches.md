@@ -482,11 +482,13 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   returns `409 COMMAND_CONCURRENCY_CONFLICT` instead of waiting (retryable).
 - **Game number (`M경기`, 2026-11-07):** the auto title `<league> N주차 M경기` counts `M` within the calendar
   week and keeps counting across the days of that week (Saturday 1–8, Sunday 9–15); a new week restarts at 1.
-  Bulk generation with `timing`, the template (both with and without `gamesPerDay`) and a manual add without
-  `title` all use this rule; a manual add takes the next number of its week (the larger of the week's fixture
-  count and its highest auto-title number, plus one, so a deleted fixture never causes a repeat). `M` is written
-  once at creation: later changes to a fixture's date rewrite `N` only, and generation without `timing`
-  (one round per week) keeps the title without `M경기`. Fixtures created before this rule keep their titles.
+  Bulk generation (with or without `timing`), the template (both with and without `gamesPerDay`) and a manual add
+  without `title` all use this rule. A batch is numbered by start time and then by input order, so the games of
+  a round that share a start time (no `timing`) are numbered in pairing order, and a Saturday round and a Sunday
+  round of one week continue each other. A manual add takes the next number of its week (the larger of the
+  week's fixture count and its highest auto-title number, plus one, so a deleted fixture never causes a repeat).
+  `M` is written once at creation: later changes to a fixture's date rewrite `N` only. Fixtures created before
+  this rule keep their titles (no backfill).
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -496,6 +498,11 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/preview` returns `fixtures[]` with `round`, `matchday`
+  (the n-th game day), `orderInDay`, `homeTeamId`, `awayTeamId`, `startAt`, `endAt` and `week`. `week` is the
+  "N주차" the created fixtures get in their titles (KST Monday–Sunday calendar weeks, only weeks that have games
+  are counted), computed by the same function (`leagueFixtureWeeks`) as the titles. A Saturday + Sunday schedule
+  therefore has two `matchday` values but one `week`. Clients group and count weeks by `week`, not by `matchday`.
 - `weeksCount` (1–104) is the number of round-robin rounds to generate; the optional `roundsCount`
   (1–104) still cuts it down for older clients. `timing.gamesPerDay` (1–50) is the number of games per
   day across all teams: fixtures are split in round-robin order into days of that many games, so the
@@ -570,6 +577,17 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
     only when **every** non-cancelled fixture is unstarted and has no result revision; otherwise
     `409 BRACKET_LOCKED` and nothing changes.
   - Support admins get `403`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/template/preview`
+  (`{ teamCount: 3..20, legs: 1|2, time: 'HH:mm', gamesPerDay?, gameDurationMinutes?, breakMinutes? }` — the apply
+  numbers without dates, place or `replaceExisting`) writes nothing and answers `200` with the timetable creation
+  would write: `{ teamCount, legs, totalRounds, fixtureCount, gamesPerDay, days[], checks }`. `days[]` is
+  `{ day, startTime, endTime, games[] }` with `games[]` = `{ round, order, startTime, endTime, homePosition, awayPosition, backToBack[] }`
+  (KST `HH:mm`, seats by position; `endTime` is `null` without `gamesPerDay`, where a whole round starts together).
+  It runs the same plan / timing / slot functions as creation, so the previewed times and pairings are the created
+  ones. `checks`: `duplicateMeetings` and `missingMeetings` (pair meetings above / below `legs`, summed) and
+  `backToBackRuns[]` = `{ day, position, fromOrder, toOrder, games }`, one per run of a seat playing 2+ consecutive
+  games of a day. Back-to-back is a warning only — creation is never blocked by it. Same errors as apply for the
+  numbers (`422 BRACKET_TEMPLATE_TOO_LARGE`, `422 LEAGUE_FIXTURE_DURATION_REQUIRED`); support admins get `403`.
 - An empty fixture has `hostTeamId = approvedApplicantTeamId = null`, `status = matched`, side names
   `홈 팀 미정` / `어웨이 팀 미정`, and no team schedules, participants or application.
 - `PUT /api/v1/admin/tournament-slots/:slotId/assignment` (shared with tournaments, see
@@ -645,8 +663,10 @@ Empty rulesText is stored as null. Unknown UI fields and missing/invalid fields 
 uses exact `updatedAt` (`expectedUpdatedAt`) rather than `expectedVersion`.
 
 A tournament row lock, version check, write and `league_match.update_settings` before/after audit
-share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`; completed/cancelled
-leagues return `409 LEAGUE_ENDED`. End before start returns `422 LEAGUE_PERIOD_INVALID`.
+share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`. Completed/cancelled
+leagues accept only `title`, `rulesText` and `regionId` changes; a changed `startsOn`, `endsOn`,
+`registrationDeadlineAt`, `plannedFixtureCount`, `maxTeams` or `genderCategory` returns
+`409 LEAGUE_ENDED_FIELD_LOCKED` with the changed names in `details.fields` (unchanged values pass). End before start returns `422 LEAGUE_PERIOD_INVALID`.
 Changed periods cannot exclude the start/end of a non-cancelled, non-deleted existing fixture
 (`409 LEAGUE_FIXTURES_OUTSIDE_PERIOD`). No fixtures are moved automatically.
 Changed inactive/non-district regions return `422 LEAGUE_REGION_INVALID`.

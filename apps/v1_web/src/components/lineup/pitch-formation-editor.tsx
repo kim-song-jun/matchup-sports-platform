@@ -800,17 +800,20 @@ function FormationSheet({
           boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <div
-          aria-hidden="true"
-          style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
-            배치 설정
-          </h3>
-          <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">
-            ×
-          </button>
+        {/* 시트가 통째로 스크롤해도 머리는 남는다. sticky 기준선이 padding 안쪽이라 padding 만큼 음수로 맞춘다. */}
+        <div style={{ position: 'sticky', top: -16, zIndex: 1, margin: '-16px -20px 0', padding: '16px 20px 0', background: 'var(--card-surface)' }}>
+          <div
+            aria-hidden="true"
+            style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12 }}>
+            <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
+              배치 설정
+            </h3>
+            <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">
+              ×
+            </button>
+          </div>
         </div>
         {children}
       </div>

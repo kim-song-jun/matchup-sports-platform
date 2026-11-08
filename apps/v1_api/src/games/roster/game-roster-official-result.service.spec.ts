@@ -66,6 +66,7 @@ function fixture() {
     context: { gameId: 'game', sideId: 'home-side', teamId: 'home', teamMatchId: 'match', competitionId: 'league', tournamentId: null, leagueId: 'league', isLeague: true, gameState: world.state, startAt: AT },
     baseSource: 'REGISTRATION', base,
     computation: computeGameRoster({ base, adjustments: [], unavailabilities: [], gameStartAt: AT, suspensionVerdicts: new Map() }),
+    discipline: { rules: null, cardsByUserId: new Map() },
   }));
   jest.spyOn(rosterLoader, 'loadJerseyRegistration').mockResolvedValue({ id: 'registration', editable: false });
   const officializeCorrection = () => {

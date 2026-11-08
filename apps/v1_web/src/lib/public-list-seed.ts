@@ -54,12 +54,18 @@ const COMMON_LIST_FILTER_PARAMS = ['sportId', 'sort', 'genderRule', 'levelCodes'
 export const MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'regionId'] as const;
 export const TEAM_MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'kind'] as const;
 export const TEAM_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'regionId'] as const;
+/** 기본(최근 등록순)이 아닌 팀 정렬. URL 과 API 가 같은 값을 쓴다. 그 밖의 값은 기본 순서로 연다. */
+export type TeamSort = 'member_count' | 'activity';
+
+export function toTeamSort(value: string | null | undefined): TeamSort | '' {
+  return value === 'member_count' || value === 'activity' ? value : '';
+}
+
 /** The team filters that the list client actually sends after parsing its URL state. */
 export function teamListQueryFilters(params: Record<string, string | string[] | undefined>): {
   sportId?: string;
   query?: string;
-  joinPolicy?: 'approval_required';
-  sort?: 'recommended' | 'latest';
+  sort?: TeamSort;
   genderRule?: string;
   levelCodes?: string;
   regionId?: string;
@@ -71,9 +77,8 @@ export function teamListQueryFilters(params: Record<string, string | string[] | 
   const query = firstSearchParam(params.q)?.trim();
   if (query) filters.query = query;
 
-  const sort = firstSearchParam(params.sort);
-  if (sort === 'deadline') filters.joinPolicy = 'approval_required';
-  if (sort === 'latest' || sort === 'recommended') filters.sort = sort;
+  const sort = toTeamSort(firstSearchParam(params.sort));
+  if (sort) filters.sort = sort;
 
   const genderRule = firstSearchParam(params.genderRule);
   if (genderRule === '성별 무관' || genderRule === '남' || genderRule === '여') filters.genderRule = genderRule;
@@ -125,8 +130,7 @@ export function teamListContinuationPath(params: Record<string, string | string[
 
   const search = firstSearchParam(params.q)?.trim();
   if (search) query.set('q', search);
-  const sort = firstSearchParam(params.sort);
-  if (sort === 'recommended' || sort === 'latest' || sort === 'deadline') query.set('sort', sort);
+  if (filters.sort) query.set('sort', filters.sort);
 
   query.set('cursor', cursor);
   return `/teams?${query.toString()}`;

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 import { validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
+import { withTournamentTieBreakOrder } from '../tournaments/competition-config/tournament-tie-break-order';
 import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
@@ -16,6 +17,7 @@ type GroupForStandingsRow = StandingsSourceGroup & {
     deletedAt: Date | null;
     competitionConfigVersionId: string | null;
     competitionConfig: unknown;
+    tieBreakOrder: unknown;
   } | null;
 };
 
@@ -159,7 +161,7 @@ export class GameResultStandingsProjectionService {
     }
     const tournament = group.tournament;
     if (!tournament || tournament.deletedAt !== null || !tournament.competitionConfigVersionId) return;
-    const config = validateCompetitionConfig(tournament.competitionConfig);
+    const config = withTournamentTieBreakOrder(validateCompetitionConfig(tournament.competitionConfig), tournament.tieBreakOrder);
     const now = new Date();
     // F5: 이 그룹만으로 계산해도 값은 전체 조 기준과 동일하다 — 픽스처는 조별로
     // 분리돼 있어 다른 조 픽스처가 이 그룹 팀의 카드 집계에 섞일 수 없다.
@@ -216,6 +218,7 @@ export class GameResultStandingsProjectionService {
             deletedAt: true,
             competitionConfigVersionId: true,
             competitionConfig: true,
+            tieBreakOrder: true,
           },
         },
       },

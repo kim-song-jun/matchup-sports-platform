@@ -26,6 +26,7 @@ function build(viewer: { adminRole?: 'owner' | 'ops' | 'support'; staffRole?: st
       loaded: {
         context: {}, baseSource: 'REGISTRATION', base: [entry('u1'), entry('guest', false)],
         computation: { participants: [], excluded: [], unavailable: [], suspended: [] },
+        discipline: { rules: null, cardsByUserId: new Map() },
       },
     },
   ] as never);

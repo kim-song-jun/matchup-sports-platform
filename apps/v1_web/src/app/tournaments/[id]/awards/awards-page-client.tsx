@@ -646,7 +646,8 @@ export function ReviewFormModal({
           paddingBottom: 'max(24px, calc(16px + var(--v1-shell-safe-bottom)))',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        {/* 시트가 통째로 스크롤해도 머리는 남는다. sticky 기준선이 padding 안쪽이라 padding 만큼 음수로 맞춘다. */}
+        <div style={{ position: 'sticky', top: -24, zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '-24px -20px 20px', padding: '24px 20px 0', background: 'var(--background)' }}>
           <h3 className="tm-text-body-lg" style={{ margin: 0 }}>{noun} 후기 작성</h3>
           <button type="button" onClick={onClose} disabled={isPending} style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: isPending ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: isPending ? 0.55 : 1 }} aria-label="닫기"><X size={20} /></button>
         </div>

@@ -1,8 +1,9 @@
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 import type { CrossGroupPreview } from '@/types/cross-group-round12';
 
 /** 합성 5조·20팀. 실제 alpha 대회의 ID/결과를 포함하지 않는 테스트 전용 데이터. */
 export function createCrossGroupRound12Fixture(): CrossGroupPreview {
-  const preview: CrossGroupPreview = { version: 'a'.repeat(64), teams: [], ranks: [], targets: [] };
+  const preview: CrossGroupPreview = { version: 'a'.repeat(64), tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER], teams: [], ranks: [], targets: [] };
   for (let group = 0; group < 5; group++) for (let rank = 1; rank <= 4; rank++) {
     const registrationId = `a0000000-0000-4000-8000-${String(group * 4 + rank).padStart(12, '0')}`;
     preview.teams.push({ registrationId, teamName: `${String.fromCharCode(65 + group)}팀${rank}`,

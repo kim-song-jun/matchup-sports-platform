@@ -5,6 +5,7 @@ import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
 import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
+import { readSocialLinkToken, socialLinkAccountDigest } from './social-link-token';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -44,7 +45,7 @@ describe('AuthService.appleSignIn', () => {
     return {
       v1User: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1AuthIdentity: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
-      v1StatusChangeLog: { create: jest.fn() },
+      v1StatusChangeLog: { create: jest.fn(), findFirst: jest.fn() },
       v1UserOnboardingProgress: { upsert: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -295,6 +296,59 @@ describe('AuthService.appleSignIn', () => {
     // account either — V1User.email is unique, so a silent fall-through would be a 500.
     expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The account Apple's verified address points at is waiting out a withdrawal. It cannot be signed in to or linked
+   * on the spot, but the person is not turned away: they get the sign-in-then-link answer plus the grace end, so the
+   * screen can offer "log in and cancel the withdrawal" and the login attaches afterwards.
+   */
+  describe('an address held by a withdrawal-pending account', () => {
+    const holder = (accountStatus: string) => ({
+      id: 'user-9', email: 'someone@example.com', accountStatus, emailVerifiedAt: new Date('2026-01-01'),
+    });
+
+    it('answers with the link token, bound to that account, and when the withdrawal becomes final', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(holder('withdrawal_pending'));
+      prisma.v1StatusChangeLog.findFirst.mockResolvedValue({ createdAt: new Date('2026-10-08T08:28:00.000Z') });
+
+      const error = (await signIn().catch((e: unknown) => e)) as {
+        status: number;
+        getResponse(): { code: string; details: { linkToken: string; withdrawalPendingUntil: string } };
+      };
+
+      expect(error.status).toBe(409);
+      expect(error.getResponse()).toMatchObject({
+        code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+        details: { next: 'sign_in_then_link', provider: 'apple', linkTokenExpiresInSeconds: 1800, withdrawalPendingUntil: '2026-11-07T08:28:00.000Z' },
+      });
+      expect(readSocialLinkToken(error.getResponse().details.linkToken)).toMatchObject({
+        provider: 'apple', providerUserKey: SUBJECT, email: 'someone@example.com', allowedAccounts: [socialLinkAccountDigest('user-9')],
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('stays silent about a withdrawal for an active holder', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue({ ...holder('active'), emailVerifiedAt: null });
+
+      const error = (await signIn().catch((e: unknown) => e)) as { getResponse(): { details: object } };
+
+      expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+      expect(prisma.v1StatusChangeLog.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('still refuses a suspended holder outright', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(holder('suspended'));
+
+      await expect(signIn()).rejects.toMatchObject({ status: 403, response: { code: 'PERMISSION_DENIED' } });
+    });
   });
 
   /**

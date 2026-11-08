@@ -80,6 +80,7 @@ import {
 } from './fixtures';
 import { PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_PENDING_RECOVERY_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthLoginMethodMswHandlers } from './auth-login-method-handlers';
+import { v1EmailChangeMswHandlers } from './profile-email-change-handlers';
 import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
@@ -308,23 +309,6 @@ async function resetPasswordByRecoveryEmail(request: Request) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }
   return ok({ ok: true });
-}
-
-async function resetPasswordByRecoveryPhone(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken', 'newPassword']);
-  const passwordIssue = accountPasswordIssue(body?.newPassword ?? '');
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string' || passwordIssue === 'too_short') {
-    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
-  }
-  if (passwordIssue === 'too_common') return authProofError(COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
-  if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
-    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
-  }
-  if (body.phone !== authAccountPhoneFixture) {
-    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
-  }
-  return authProofError('ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-    '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.', 409);
 }
 
 function maskRecoveryEmail(email: string): string {
@@ -821,19 +805,19 @@ export const v1MswHandlers = [
     socialSignupPrefill: null,
     user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
       onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
-      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
+      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true },
     profile: { displayName: v1UserFixture.displayName, nickname: v1UserFixture.displayName },
     verification: { emailVerified: true, phoneVerified: false },
   })),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
   http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
-  http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
+  ...v1EmailChangeMswHandlers,
   ...v1AuthLoginMethodMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
@@ -953,6 +937,10 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {
+    const sort = new URL(request.url).searchParams.get('sort');
+    if (sort && !['latest', 'member_count', 'activity'].includes(sort)) {
+      return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: 'invalid sort' }, { status: 400 });
+    }
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);

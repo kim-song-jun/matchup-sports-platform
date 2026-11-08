@@ -188,12 +188,14 @@ function GroupStandingsSection({
   myTeamIds,
   fixtures,
   fromHref,
+  tieBreakOrder,
 }: {
   group: V1TournamentGroup;
   isMyGroup: boolean;
   myTeamIds: ReadonlySet<string>;
   fixtures: V1TournamentFixture[];
   fromHref?: string;
+  tieBreakOrder?: V1TournamentDetail['tieBreakOrder'];
 }) {
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   // 진출 팀은 서버가 결선 대진 기준으로 알려 준다(group.qualification) — 완전 동률이면 position 이
@@ -270,6 +272,7 @@ function GroupStandingsSection({
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
         fromHref={fromHref}
+        tieBreakOrder={tieBreakOrder}
         myTeamIds={myTeamIds}
       />
     </section>
@@ -285,6 +288,7 @@ function LeagueStandingsSection({
   label = '리그 순위',
   myTeamIds,
   fromHref,
+  tieBreakOrder,
 }: {
   tournamentId: string;
   isRegularLeague: boolean;
@@ -294,6 +298,8 @@ function LeagueStandingsSection({
   /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
   label?: string;
   fromHref?: string;
+  /** 리그 방식 대회의 동점 순서. 정규 리그는 리그 고유 순서라 null. */
+  tieBreakOrder?: V1TournamentDetail['tieBreakOrder'];
 }) {
   return (
     <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
@@ -304,6 +310,7 @@ function LeagueStandingsSection({
         fromHref={fromHref}
         myTeamIds={myTeamIds}
         keepTeamLink
+        tieBreakOrder={tieBreakOrder}
         header={<LeagueProgressSummary tournamentId={tournamentId} />}
         renderDetail={(row) => isRegularLeague
           ? <LeagueTeamFixturesDetail tournamentId={tournamentId} teamId={row.teamId} />
@@ -849,7 +856,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection tournamentId={tournament.id} isRegularLeague={isRegularLeague} fixtures={fixtures} rows={allLeagueRows} label={leagueStandingsHeading} myTeamIds={myTeamIds} fromHref={bracketSelfHref ?? undefined} />
+                    <LeagueStandingsSection tournamentId={tournament.id} isRegularLeague={isRegularLeague} fixtures={fixtures} rows={allLeagueRows} label={leagueStandingsHeading} myTeamIds={myTeamIds} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={tournament.tieBreakOrder} />
                   )}
                 </section>
               )}
@@ -857,7 +864,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               {!isLeague && hasGroupStage && hasGroupStandings && (
                 <section>
                   {visibleGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
+                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={tournament.tieBreakOrder} />
                   ))}
                 </section>
               )}

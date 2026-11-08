@@ -446,6 +446,8 @@ describe('useV1UpdateProfile', () => {
 
     v1PatchMock.mockResolvedValue({
       profile: { ...initialProfile.profile, nickname: '새닉네임' },
+      email: 'user@test.com',
+      phone: null,
       updatedAt: '2026-07-23T00:00:00.000Z',
     });
 
@@ -467,6 +469,8 @@ describe('useV1UpdateProfile', () => {
     queryClient.setQueryData(v1Keys.adminUser('user-9'), { id: 'user-9' });
     v1PatchMock.mockResolvedValue({
       profile: { displayName: '실명유저', realName: '실명유저', nickname: '닉', profileImageUrl: '/uploads/new.webp', gender: 'male' },
+      email: 'user@test.com',
+      phone: null,
       updatedAt: '2026-10-09T00:00:00.000Z',
     });
 

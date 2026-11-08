@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { withFromPath } from '@/lib/session-storage';
+import { formatTournamentTieBreakRule } from '@/lib/tournament-tie-break';
 
 /**
  * §순위표 지표 통일 — 같은 대회 `/bracket` 화면의 두 탭(순위·대진표 탭의
@@ -71,7 +72,7 @@ function StandingRankBadge({
   // 메달 색도 칠하지 않아야 동률 팀 중 한 팀만 1위처럼 읽히지 않는다.
   if (sharedRank !== null && !unranked) {
     return (
-      <span className="tm-badge tm-badge-orange tm-badge-sm">
+      <span className="tm-badge tm-badge-orange tm-badge-sm tm-standings-rank-shared">
         공동 {sharedRank}
         <span className="sr-only">위</span>
       </span>
@@ -133,6 +134,7 @@ export function TournamentStandingsTable({
   fromHref,
   header,
   keepTeamLink = false,
+  tieBreakOrder = null,
   myTeamIds,
 }: {
   rows: readonly TournamentStandingsRow[];
@@ -148,13 +150,22 @@ export function TournamentStandingsTable({
   keepTeamLink?: boolean;
   /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
   fromHref?: string | null;
+  /** 이 대회가 고른 동점 순서. 주면 표 아래에 한 줄로 알린다 — 정규 리그는 주지 않는다. */
+  tieBreakOrder?: readonly string[] | null;
   /** 로그인한 사용자가 소속된 팀 — 그 팀 행에 "우리 팀" 배지와 왼쪽 막대를 단다. 비공개 팀(teamId null) 행은 그대로 그리되 표식 대상에서 제외한다. */
   myTeamIds?: ReadonlySet<string>;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
+  const tieBreakRule = tieBreakOrder ? formatTournamentTieBreakRule(tieBreakOrder) : '';
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const COLUMN_COUNT = 5;
   const hasSharedRank = sorted.some((row) => row.sharedRank !== null);
+  /**
+   * "공동 n" 칩이 # 열을 늘려, 진출 배지·펼침 화살표가 있는 390px 표가 카드보다 14px 넓어진다.
+   * 칩이 있는 표만 # 열 여백과 숫자 열 최소폭을 줄인다 — 숫자 열의 실제 폭은 비율이 정해서
+   * 카드가 넉넉하면 칩 없는 표와 같다.
+   */
+  const edgePad = hasSharedRank ? 8 : 12;
   /**
    * "아직 한 경기도 집계되지 않았다"는 행 값만으로 정확히 판별된다 — 경기가 한 건이라도
    * 집계되면 최소 한 팀은 승/무/패 중 하나가 1 이상이 되기 때문에, 전 행이 전 지표 0이면
@@ -185,12 +196,12 @@ export function TournamentStandingsTable({
                   144px 그대로 오른쪽 끝에 붙어 있어 팀명과 전적 사이가 통째로 비었다
                   (768px 실측: 행 558px 중 319px = 57%가 공백). 비율로 주면 넓은 폭에서
                   숫자 블록도 같이 벌어져 그 공백이 줄고, min-width가 좁은 폭에서의
-                  판독성(390px에서 기존과 동일한 56/44/44)을 지킨다. */}
-              <th style={{ width: hasSharedRank ? 64 : 36, paddingLeft: 12 }}>#</th>
+                  판독성을 지킨다(390px 최소폭은 56/44/44, 공동 순위 표는 48/40/40). */}
+              <th style={{ width: hasSharedRank ? 56 : 36, paddingLeft: edgePad, paddingRight: hasSharedRank ? 4 : undefined }}>#</th>
               <th>팀</th>
-              <th className="num" style={{ width: '18%', minWidth: 56 }}>전적</th>
-              <th className="num" style={{ width: '13%', minWidth: 44 }}>승점</th>
-              <th className="num" style={{ width: '13%', minWidth: 44, paddingRight: 12 }}>득실</th>
+              <th className="num" style={{ width: '18%', minWidth: hasSharedRank ? 48 : 56 }}>전적</th>
+              <th className="num" style={{ width: '13%', minWidth: hasSharedRank ? 40 : 44 }}>승점</th>
+              <th className="num" style={{ width: '13%', minWidth: hasSharedRank ? 40 : 44, paddingRight: 12 }}>득실</th>
             </tr>
           </thead>
           <tbody>
@@ -246,7 +257,7 @@ export function TournamentStandingsTable({
                     <tr
                       className={`tm-standings-row${promoted && !advancingLabels?.get(row.key)?.length ? ' tm-standings-row-highlight' : ''}`}
                     >
-                      <td style={{ paddingLeft: 12, boxShadow: isMine ? 'inset 2px 0 0 var(--blue500)' : undefined }}>
+                      <td style={{ paddingLeft: edgePad, paddingRight: hasSharedRank ? 4 : undefined, boxShadow: isMine ? 'inset 2px 0 0 var(--blue500)' : undefined }}>
                         <StandingRankBadge pos={row.position} sharedRank={row.sharedRank} promoted={promoted} unranked={unranked} />
                       </td>
                       <td>
@@ -351,6 +362,19 @@ export function TournamentStandingsTable({
         >
           아직 경기 기록이 없어요. 첫 결과가 등록되면 순위가 매겨져요.
         </div>
+      ) : null}
+      {tieBreakRule ? (
+        <p
+          className="tm-text-caption"
+          style={{
+            margin: 0,
+            padding: unranked ? '0 12px 12px' : '12px',
+            borderTop: unranked ? undefined : '1px solid var(--grey100)',
+            color: 'var(--text-caption)',
+          }}
+        >
+          동점이면 {tieBreakRule} 순서로 정해요
+        </p>
       ) : null}
     </Card>
   );

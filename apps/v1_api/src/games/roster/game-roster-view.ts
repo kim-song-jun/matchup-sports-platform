@@ -2,7 +2,7 @@ import type { V1GameState } from '@prisma/client';
 import { compareRosterOrder } from '../../common/roster-order';
 import type { GameActorRole } from '../games.types';
 import type { GameRosterActorRole, GameRosterBaseEntry, GameRosterComputation } from './game-roster-computation';
-import type { GameRosterBaseSource } from './game-roster-loader';
+import type { GameRosterBaseSource, GameRosterDiscipline } from './game-roster-loader';
 
 export type GameRosterViewerRole = 'TEAM_MANAGER' | 'TEAM_MEMBER' | 'ADMIN' | 'STAFF';
 
@@ -56,6 +56,17 @@ export interface GameRosterPersonView {
   readonly realName?: string;
 }
 
+/** 이 경기 직전까지 이 대회·리그에서 쌓인 카드(레드로 바뀐 옐로 제외). 카드 기록이 없는 선수는 null. */
+export interface GameRosterCardsView {
+  readonly yellowTotal: number;
+  readonly redTotal: number;
+}
+
+export interface GameRosterDisciplineRulesView {
+  readonly yellowAccumulationLimit: number | null;
+  readonly redCardSuspensionMatches: number | null;
+}
+
 export interface GameRosterView {
   readonly gameId: string;
   readonly sideId: string;
@@ -79,7 +90,12 @@ export interface GameRosterView {
   readonly registrationId?: string | null;
   /** 그 신청의 명단이 잠겼거나 제출 마감이 지나면 false — 등번호 저장이 409 가 되므로 입력 칸을 열지 않는다. */
   readonly jerseyEditable: boolean;
-  readonly base: (GameRosterPersonView & { status: 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED' })[];
+  /** 경고·퇴장 정지 규정. 둘 다 꺼진 대회·리그는 null — 카드 누적 칩도 나오지 않는다. */
+  readonly disciplineRules: GameRosterDisciplineRulesView | null;
+  readonly base: (GameRosterPersonView & {
+    status: 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED';
+    cards: GameRosterCardsView | null;
+  })[];
   readonly participants: (GameRosterPersonView & { joinedAfterFixtureCreated: boolean })[];
   readonly excluded: (GameRosterPersonView & {
     adjustmentId: string;
@@ -87,7 +103,11 @@ export interface GameRosterView {
     excludedAt: Date;
     actor: GameRosterActorView;
   })[];
-  readonly suspended: (GameRosterPersonView & { reason: string | null; remainingMatches: number })[];
+  readonly suspended: (GameRosterPersonView & {
+    reason: string | null;
+    remainingMatches: number;
+    cards: GameRosterCardsView | null;
+  })[];
   readonly unavailable: (GameRosterPersonView & {
     unavailabilityId: string;
     reason: string | null;
@@ -141,6 +161,7 @@ export interface GameRosterViewInput {
   readonly baseSource: GameRosterBaseSource;
   readonly base: readonly GameRosterBaseEntry[];
   readonly computation: GameRosterComputation;
+  readonly discipline: GameRosterDiscipline;
   /**
    * 대진 생성 때(명단이 처음 채워진 비무효 리비전) 이 사이드에 있던 계정. null 이면 비교할 기준이 없다.
    */
@@ -230,16 +251,17 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
   for (const row of unavailable) statusByUser.set(row.entry.userId, 'UNAVAILABLE');
   for (const row of excluded) statusByUser.set(row.entry.userId, 'EXCLUDED');
 
+  const cardsOf = (userId: string): GameRosterCardsView | null => input.discipline.cardsByUserId.get(userId) ?? null;
   const participants = played ?? computation.participants.map(person);
   // 시작 뒤 기준 명단 = 기록 명단 + 사유가 있어 빠진 사람. 시작 뒤 참가 명단에 들어온 사람은 이 경기와 무관하다.
   const base: GameRosterView['base'] =
     played === null
-      ? input.base.map((entry) => named({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' }))
+      ? input.base.map((entry) => named({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING', cards: cardsOf(entry.userId) }))
       : [
-          ...played.map((row) => named({ ...row, status: 'PARTICIPATING' as const })),
+          ...played.map((row) => named({ ...row, status: 'PARTICIPATING' as const, cards: cardsOf(row.userId) })),
           ...input.base.flatMap((entry) => {
             const status = statusByUser.get(entry.userId);
-            return status === undefined ? [] : [named({ ...person(entry), status })];
+            return status === undefined ? [] : [named({ ...person(entry), status, cards: cardsOf(entry.userId) })];
           }),
         ].sort(byRosterOrder);
 
@@ -260,6 +282,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     jerseyRegistrationId: input.jerseyRegistration?.id ?? null,
     ...(input.rosterRegistrationId !== undefined ? { registrationId: input.rosterRegistrationId } : {}),
     jerseyEditable: input.jerseyRegistration?.editable ?? false,
+    disciplineRules: input.discipline.rules,
     base,
     participants: participants.map((row) =>
       named({ ...row, joinedAfterFixtureCreated: snapshot !== null && row.accountLinked && !snapshot.has(row.userId) }),
@@ -274,7 +297,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
       }),
     ),
     suspended: suspended.map((row) =>
-      named({ ...person(row.entry), reason: row.reason, remainingMatches: row.remainingMatches }),
+      named({ ...person(row.entry), reason: row.reason, remainingMatches: row.remainingMatches, cards: cardsOf(row.entry.userId) }),
     ),
     unavailable: unavailable.map((row) =>
       named({

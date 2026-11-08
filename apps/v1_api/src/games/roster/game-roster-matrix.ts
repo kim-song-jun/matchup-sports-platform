@@ -1,7 +1,7 @@
 import type { V1GameState } from '@prisma/client';
 import type { GameRosterComputation } from './game-roster-computation';
 import type { LoadedGameRoster } from './game-roster-loader';
-import { reconcilePlayedLineup, type PlayedLineupRow } from './game-roster-view';
+import { reconcilePlayedLineup, type GameRosterCardsView, type GameRosterDisciplineRulesView, type PlayedLineupRow } from './game-roster-view';
 
 export interface GameRosterSummary {
   readonly participating: number;
@@ -30,6 +30,8 @@ export interface TeamRosterMatrixGame {
   readonly scheduledAt: Date | null;
   readonly gameState: V1GameState;
   readonly goalkeeperEditable?: boolean;
+  /** 이 경기가 속한 대회·리그의 정지 규정. 규정이 없거나 기준 명단이 없는 경기는 null. */
+  readonly disciplineRules?: GameRosterDisciplineRulesView | null;
 }
 
 export type TeamRosterCellStatus = 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED' | 'NOT_IN_ROSTER';
@@ -42,6 +44,8 @@ export interface TeamRosterCell {
   readonly adjustmentId: string | null;
   readonly unavailabilityId: string | null;
   readonly remainingMatches: number | null;
+  /** 이 경기 직전까지 쌓인 카드. 카드 기록이 없는 선수는 null. */
+  readonly cards?: GameRosterCardsView | null;
   readonly goalkeeper?: boolean;
 }
 
@@ -117,7 +121,13 @@ export function buildTeamRosterMatrix(input: {
         remainingMatches: row.remainingMatches,
       });
     }
-    for (const [userId, cell] of cells) cells.set(userId, { ...cell, goalkeeper: goalkeeperByUser.get(userId) ?? false });
+    for (const [userId, cell] of cells) {
+      cells.set(userId, {
+        ...cell,
+        cards: loaded.discipline.rules === null ? null : (loaded.discipline.cardsByUserId.get(userId) ?? null),
+        goalkeeper: goalkeeperByUser.get(userId) ?? false,
+      });
+    }
     const summary: GameRosterSummary = {
       participating: participants.length,
       excluded: excluded.length,
@@ -130,6 +140,7 @@ export function buildTeamRosterMatrix(input: {
   return {
     games: input.columns.map(({ game, loaded }, index) => ({
       ...game,
+      disciplineRules: loaded?.discipline.rules ?? null,
       editable: input.canWrite && loaded !== null && (game.gameState === 'SCHEDULED' || (input.canEditEnded === true && game.gameState === 'ENDED')),
       goalkeeperEditable: game.goalkeeperEditable !== false && input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
       summary: byGame[index].summary,

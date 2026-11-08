@@ -250,6 +250,17 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     expect(screen.queryByText('로그인을 완료하지 못했어요')).not.toBeInTheDocument();
   });
 
+  it('탈퇴 신청 중인 계정과 겹친 409 는 유예 종료 시각까지 보관하고 안내 화면으로 보낸다', async () => {
+    await primeValidOAuthState();
+    const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', {
+      next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: until,
+    }));
+    render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao', withdrawalPendingUntil: until });
+  });
+
   it('details 가 없는 409 는 안내 화면 대신 서버 문구를 보여 주고 토큰을 만들지 않는다', async () => {
     await primeValidOAuthState();
     api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT'));

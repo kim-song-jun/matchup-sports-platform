@@ -246,6 +246,36 @@ export function gameRosterStatusChip(
   };
 }
 
+/**
+ * 경고 누적 칩 — "경고 1/2장". 한도에 이미 닿은 만큼(정지로 소진된 장수)은 빼고 세므로 3장·한도 2면 1/2장이다.
+ * 규정이 없거나 한도 사이에 쌓인 장수가 없으면 칩이 없다. 한 장 더 받으면 정지인 선수는 같은 칩에 그 사실을 잇는다.
+ */
+export function disciplineWarningChip(
+  cards: { yellowTotal: number } | null | undefined,
+  rules: { yellowAccumulationLimit: number | null } | null | undefined,
+): StatusChipModel | null {
+  const limit = rules?.yellowAccumulationLimit;
+  if (cards === null || cards === undefined || limit === null || limit === undefined || limit < 2) return null;
+  const count = cards.yellowTotal % limit;
+  if (count === 0) return null;
+  const imminent = isDisciplineImminent(cards, rules);
+  return {
+    label: imminent ? `경고 ${count}/${limit}장 · 한 장 더 받으면 정지` : `경고 ${count}/${limit}장`,
+    tone: imminent ? 'orange' : 'grey',
+    icon: null,
+  };
+}
+
+/** 경고를 한 장만 더 받으면 출전정지가 되는 선수인가. */
+export function isDisciplineImminent(
+  cards: { yellowTotal: number } | null | undefined,
+  rules: { yellowAccumulationLimit: number | null } | null | undefined,
+): boolean {
+  const limit = rules?.yellowAccumulationLimit;
+  if (cards === null || cards === undefined || limit === null || limit === undefined || limit < 2) return false;
+  return cards.yellowTotal % limit === limit - 1;
+}
+
 /** 명단을 바꿀 수 없는 사람에게만 누가 바꾸는지 알린다 — 바꿀 수 있는 사람에겐 필요 없는 문장이다. */
 export function rosterPermissionHint(canManage: boolean): string | null {
   return canManage ? null : '팀장·매니저만 명단을 바꿀 수 있어요.';

@@ -8,6 +8,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
+import { releaseSignupPhone } from '../auth/empty-signup-account';
+import { isPendingSocialSignup } from '../auth/social-signup-access';
+import { maskEmail } from '../auth/account-recovery.service';
+import { assertEmailFree, emailConflict, isEmailUniqueViolation, lockEmailIdentity } from '../auth/email-holder';
+import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   countOwnerVisibleParticipations,
@@ -21,6 +26,7 @@ import {
   MIN_REVIEWS_FOR_SHIELD_SHAPE,
   type PlayerCard,
 } from './player-card';
+import { NotificationsService, type DeliveredNotification } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { activityMonth, countMonthlyPersonalMatches, countOfficialGameAppearances } from './activity-counts';
@@ -49,6 +55,7 @@ import {
   WithdrawalRequestDto,
   UpdatePlayerCardShapeDto,
 } from './dto/profile.dto';
+import { readEmailChangeToken } from './email-change-token';
 
 // v1_notification_preferences row가 아직 없는 사용자에게 읽기 전용으로 보여줄 기본값 —
 // Prisma 컬럼 @default 값과 동일하다. 저장 없이 조회만 하는 경로(settings GET, theme-only
@@ -71,6 +78,7 @@ export class ProfileService {
     private readonly prisma: PrismaService,
     @Inject(RealtimeGateway)
     private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async me(user: V1AuthUser) {
@@ -184,23 +192,21 @@ export class ProfileService {
       throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
-    const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([
-      email
-        ? this.prisma.v1User.findFirst({
-            where: { email, id: { not: user.id } },
-            select: { id: true },
-          })
-        : Promise.resolve(null),
-      email
-        ? this.prisma.v1AuthIdentity.findFirst({
-            where: {
-              provider: V1AuthProvider.email,
-              providerUserKey: email,
-              userId: { not: user.id },
-            },
-            select: { id: true },
-          })
-        : Promise.resolve(null),
+    // The proof comes before anything that says whether the address is taken, so a caller without a mailed code
+    // learns nothing about who holds it.
+    // Compared as the canonical form, so an address stored in another letter case is still the same address.
+    const emailChanged = (email === null ? null : normalizeEmail(email)) !== (before?.email ? normalizeEmail(before.email) : null);
+    if (emailChanged && email !== null) {
+      const provenEmail = dto.emailChangeToken ? readEmailChangeToken(dto.emailChangeToken, user.id) : null;
+      if (provenEmail !== email) {
+        throw new BadRequestException({
+          code: 'EMAIL_CHANGE_PROOF_REQUIRED',
+          message: '새 이메일로 받은 인증번호를 먼저 확인해 주세요.',
+        });
+      }
+    }
+
+    const [existingPhone, existingNickname] = await Promise.all([
       phone
         ? this.prisma.v1User.findFirst({
             where: { phone, id: { not: user.id } },
@@ -213,12 +219,7 @@ export class ProfileService {
       }),
     ]);
 
-    if (existingEmail || existingEmailIdentity) {
-      throw new ConflictException({
-        code: 'EMAIL_CONFLICT',
-        message: 'Email is already registered',
-      });
-    }
+    if (emailChanged && email !== null) await assertEmailFree(this.prisma, user.id, email);
 
     if (existingPhone) {
       throw new ConflictException({
@@ -234,7 +235,6 @@ export class ProfileService {
       });
     }
 
-    const emailChanged = email !== (before?.email ?? null);
     const phoneChanged = phone !== (before?.phone ?? null);
 
     // 번호 변경은 인증 상태를 초기화한다(아래 phoneVerifiedAt: null). 증명 없이 허용하면
@@ -250,16 +250,27 @@ export class ProfileService {
       }
     }
 
-    const profile = await this.prisma.$transaction(async (tx) => {
+    // A new address is set only after its mailbox was proven above. Clearing a contact email claims nothing, so it needs no proof.
+    const newEmail = emailChanged ? email : null;
+    const now = new Date();
+
+    const { profile, notification } = await this.prisma.$transaction(async (tx) => {
+      if (newEmail !== null) {
+        // The check above ran before this transaction. The lock is the one adding an email login takes, so the two
+        // cannot both claim the address; signup takes no lock and is caught by the unique indexes.
+        await lockEmailIdentity(tx, newEmail);
+        await assertEmailFree(tx, user.id, newEmail);
+      }
       await tx.v1User.update({
         where: { id: user.id },
         data: {
           email,
           phone,
-          ...(emailChanged ? { emailVerifiedAt: null } : {}),
+          // The mailbox was proven a moment ago, so the new address is verified; a cleared one has nothing to verify.
+          ...(emailChanged ? { emailVerifiedAt: email === null ? null : now } : {}),
           // 증명을 받고 바꾼 번호는 방금 인증된 번호다 — null 로 떨어뜨리면 인증을 막 끝낸
           // 사용자에게 "인증이 필요해요" 배너가 다시 뜬다. 강제가 꺼진 환경에서만 미인증으로 둔다.
-          ...(phoneChanged ? { phoneVerifiedAt: phoneProofRequired ? new Date() : null } : {}),
+          ...(phoneChanged ? { phoneVerifiedAt: phoneProofRequired ? now : null } : {}),
         },
       });
 
@@ -315,11 +326,28 @@ export class ProfileService {
         }).join(',') || 'no_change'}`,
       });
 
-      return nextProfile;
-    });
+      let emailChangedNotice: DeliveredNotification | null = null;
+      if (newEmail !== null) {
+        await writeUserAuditLog(tx, { userId: user.id, targetType: 'user', reason: 'email_changed' });
+        // A security notice: it ignores notification settings and is stored with the change or not at all.
+        emailChangedNotice = await this.notifications.createInTransaction(tx, user.id, 'email_changed', {
+          vars: { name: maskEmail(newEmail) },
+        });
+      }
 
+      return { profile: nextProfile, notification: emailChangedNotice };
+    }).catch((error: unknown) => {
+      // Another account took the address between the check and the write.
+      if (emailChanged && isEmailUniqueViolation(error)) throw emailConflict();
+      throw error;
+    });
+    if (notification) this.notifications.deliverCreated(user.id, 'email_changed', notification);
+
+    // email and phone are account columns, not profile ones; the web keeps them in its profile cache next to `profile`.
     return {
       profile: toProfilePayload(profile),
+      email,
+      phone,
       updatedAt: profile.updatedAt,
     };
   }
@@ -991,8 +1019,22 @@ export class ProfileService {
     // 네트워크 유실로 프론트 호출이 안 가도 이 경로는 세션 쿠키가 유효한 한 항상 탄다).
     if (user) {
       await this.prisma.v1PushSubscription.deleteMany({ where: { userId: user.id } });
+      if (isPendingSocialSignup(user.onboardingStatus)) await this.releaseAbandonedSignupPhone(user.id);
     }
     return { ok: true };
+  }
+
+  /**
+   * A social signup still on its terms or profile step can only leave through logout ("가입 그만두기"); the number it
+   * saved along the way must not stay locked to a signup nobody is finishing. Best effort: the logout interceptor
+   * clears the session cookie only when the handler succeeds, so a failure here must not fail the logout.
+   */
+  private async releaseAbandonedSignupPhone(userId: string) {
+    try {
+      await this.prisma.$transaction((tx) => releaseSignupPhone(tx, userId, 'abandoned_signup'));
+    } catch (error) {
+      this.logger.warn(`Signup phone release on logout failed user=${userId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {
@@ -1272,10 +1314,6 @@ function validationError(message: string, field: string) {
     message,
     details: { field },
   });
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
 }
 
 function formatRegionName(region: { name: string; parent: { name: string } | null }) {

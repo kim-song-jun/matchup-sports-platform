@@ -65,7 +65,7 @@ type AvailabilityCallbacks = {
 type CompleteProfileCallbacks = {
   readonly onSuccess: (result: {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
-    readonly user?: { readonly canLinkLoginMethods: boolean; readonly signupEmailLoginRequired?: boolean };
+    readonly user?: { readonly canLinkLoginMethods: boolean };
     readonly next?: { readonly route: string };
   }) => void;
   readonly onError?: (error: unknown) => void;
@@ -134,7 +134,7 @@ describe('SocialSignupClient required profile contract', () => {
 
   it('소셜 프로필 저장 후 이메일 설정 없이 온보딩으로 이어진다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
-    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true }, next: { route: '/onboarding/sport' } }));
     render(<SocialSignupClient />);
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
@@ -145,7 +145,7 @@ describe('SocialSignupClient required profile contract', () => {
 
   it('이메일 연결 권한이 없어도 가입 후 온보딩으로 계속한다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
-    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: false, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: false }, next: { route: '/onboarding/sport' } }));
     render(<SocialSignupClient />);
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
@@ -179,7 +179,7 @@ describe('SocialSignupClient required profile contract', () => {
 
   it('필수 약관이 남으면 이메일 설정 없이 약관 복구 경로를 따른다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
-    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/terms?mode=renewal' } }));
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true }, next: { route: '/terms?mode=renewal' } }));
     render(<SocialSignupClient />);
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
@@ -693,18 +693,6 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
   const deferResult = {
     session: { userId: 'u-1', userEmail: null },
   };
-
-  it('프로필을 미루면 이전 서버의 이메일 경로를 건너뛰고 원래 가려던 곳으로 돌아간다', () => {
-    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess({
-      session: { userId: 'u-1', userEmail: null },
-      user: { canLinkLoginMethods: false, signupEmailLoginRequired: true },
-      next: { route: '/my/settings/login-methods/email?redirect=%2Fhome' },
-    }));
-    setSearch('?redirect=%2Fteams%2Fnew');
-    render(<SocialSignupClient />);
-    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
-    expect(router.replace).toHaveBeenCalledWith('/teams/new');
-  });
 
   it('나중에 입력하기로 가입을 마쳐도 이메일 가입 화면에서 보관해 둔 이메일은 지운다', () => {
     savePendingEmailLink({ email: 'left-from-email-signup@example.com' });

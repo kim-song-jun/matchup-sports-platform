@@ -164,8 +164,7 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
           {model.primary.label}
         </Button>
         <div className="tm-auth-link-row">
-          {/* /auth/password-reset 은 안내 문구만 있던 자리표시자였다 — 실제로 동작하는
-              계정 찾기 화면으로 연결한다(아이디 찾기·비밀번호 재설정 한 화면). */}
+          {/* 아이디 찾기·비밀번호 재설정은 계정 찾기 한 화면에서 한다. */}
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={recoveryHref}>아이디·비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>

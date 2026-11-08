@@ -4510,6 +4510,26 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 12px;
 }
 
+/* 지역 섹션 안내 한 줄: 문장 + 이동 링크. 링크는 44px 터치 영역을 확보한다. */
+.tm-filter-region-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.tm-filter-region-notice-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--blue700);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .tm-filter-actions {
   display: grid;
   grid-template-columns: 96px 1fr;
@@ -4525,9 +4545,22 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   position: sticky;
   bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));
   z-index: 1;
-  margin: 8px 0 calc(-1 * var(--tm-filter-sheet-pad-bottom));
-  padding: 12px 0 var(--tm-filter-sheet-pad-bottom);
+  margin: 16px 0 calc(-1 * var(--tm-filter-sheet-pad-bottom));
+  padding: 4px 0 var(--tm-filter-sheet-pad-bottom);
   background: var(--bg);
+}
+
+/* 버튼 줄 위의 16px 는 스크롤이 끝났을 때는 마지막 섹션과 버튼 사이의 빈 간격이고, 스크롤 중에는 그 아래로 내용이
+   이어진다는 표시(페이드)다 — 마지막 섹션이 버튼 줄에 잘려 보이던 자리를 끝까지 스크롤하면 온전히 보이게 한다. */
+.tm-filter-sheet > .tm-filter-actions::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
 }
 
 .tm-create-fieldset {

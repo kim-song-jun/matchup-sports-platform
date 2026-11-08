@@ -3154,10 +3154,11 @@ export function useV1UpdateTournamentRealNameVisibility() {
   });
 }
 
-export function useV1Profile() {
+export function useV1Profile(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: v1Keys.profile(),
     queryFn: () => v1Get<V1Profile>('/me/profile'),
+    enabled: options?.enabled,
   });
 }
 

@@ -1320,7 +1320,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(result.region.id);
               setMatchedLabel(label);
               setStatus('matched');
-              setMessage(`${label} 지역으로 확인됐어요. 저장하면 추천 기준 지역으로 사용돼요.`);
+              setMessage(`${label} 지역으로 확인됐어요. 저장하면 팀 목록의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.`);
             },
             onError: () => {
               setStatus('unmatched');
@@ -1378,7 +1378,7 @@ export function LocationSettingsPageClient() {
             <div className="tm-text-label">현재 활동 지역</div>
             <div className="tm-text-heading" style={{ marginTop: 8 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
-              매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
+              팀 목록 필터의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.
             </div>
           </Card>
 
@@ -1399,7 +1399,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(event.target.value);
               setMatchedLabel(regions.find((region) => region.id === event.target.value)?.name ?? null);
               setStatus('idle');
-              setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용돼요.');
+              setMessage("선택한 지역을 저장하면 팀 목록의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.");
             }}>
               <option value="">시/군/구 선택</option>
               {regions.map((region) => (

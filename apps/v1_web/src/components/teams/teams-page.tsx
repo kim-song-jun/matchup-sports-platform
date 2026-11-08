@@ -90,7 +90,8 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
   // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
   useShellOverride({
     // 팀이 없는 새 사용자에게 "+" 만으로는 진입점이 약하다 — 글자를 함께 쓴다(F21).
-    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop tm-team-mobile-create" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
+    // 필터 시트가 열려 있으면 FAB 이 시트 하단 버튼·칩을 가리므로 올리지 않는다.
+    floatingSlot: model.filterSheet?.open ? undefined : <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop tm-team-mobile-create" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
   });
   return (
     <>
@@ -2145,11 +2146,13 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
         ].map(([title, options]) => (
           <div key={title as string} className="tm-filter-section">
             <div className="tm-text-label">{title as string}</div>
+            {title === '지역' && sheet.regionNotice?.placement === 'above' ? <RegionNotice notice={sheet.regionNotice} /> : null}
             <div className="tm-filter-chip-wrap">
               {(options as Array<{ label: string; value: string; href: string; active?: boolean }>).map((option) => (
                 <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? 'page' : undefined}>{option.label}</Link>
               ))}
             </div>
+            {title === '지역' && sheet.regionNotice?.placement === 'below' ? <RegionNotice notice={sheet.regionNotice} /> : null}
           </div>
         ))}
         <div className="tm-filter-actions">
@@ -2158,6 +2161,14 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
         </div>
       </BottomSheet>
     </>
+  );
+}
+
+function RegionNotice({ notice }: { notice: NonNullable<NonNullable<TeamListViewModel['filterSheet']>['regionNotice']> }) {
+  return (
+    <p className="tm-text-caption tm-filter-region-notice">
+      {notice.text} · <Link className="tm-filter-region-notice-link" href={notice.link.href}>{notice.link.label}</Link>
+    </p>
   );
 }
 

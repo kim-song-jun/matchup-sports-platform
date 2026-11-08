@@ -44,14 +44,17 @@ export type TeamListViewModel = {
     closeHref: string;
     resetHref: string;
     applyHref: string;
-    sort: '' | 'recommended' | 'deadline' | 'latest';
+    sort: '' | 'member_count' | 'activity';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     regionId: string;
-    sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
+    /** 기본(최근 등록순)은 sort 가 비어 있는 상태라 value 가 빈 문자열이다. */
+    sortOptions: Array<{ label: string; value: '' | 'member_count' | 'activity'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
+    /** 저장한 활동 지역 안내(내 지역 칩이 있을 때) 또는 설정 유도. 프로필을 아직 못 받았으면 없다. */
+    regionNotice?: { placement: 'above' | 'below'; text: string; link: { label: string; href: string } };
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
   summary: { scope: string; total?: number; totalState?: 'loading' | 'error'; totalRefreshError?: boolean; loaded?: number; recruiting: number; nearby?: number };

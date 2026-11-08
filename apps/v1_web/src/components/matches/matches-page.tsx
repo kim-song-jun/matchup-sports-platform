@@ -103,7 +103,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   // 셸 승격(U27): title/activeTab/topBar는 route-chrome/fragments/matches.ts로 옮겼다.
   // floatingSlot(매치 만들기 FAB)은 이 화면 성공 분기에서만 필요한 런타임 슬롯이라 override로
   // 밀어넣는다(§1b, home-page.tsx의 동일 패턴 참조).
-  useShellOverride({ floatingSlot: <MatchCreateFloatingButton /> });
+  // 필터 시트가 열려 있으면 FAB 이 시트 하단 버튼·칩을 가리므로 올리지 않는다.
+  useShellOverride({ floatingSlot: model.filterSheet?.open ? undefined : <MatchCreateFloatingButton /> });
   // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
   // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
   const currentHref = useCurrentHref();

@@ -5,7 +5,7 @@ import { LeagueWeekSummaryLines, leagueWeekHeading } from '@/components/admin/br
 import { AlertBanner, EmptyState } from '@/components/v1-ui/primitives';
 import type { LeagueBoardColumn } from '@/lib/league-board-model';
 
-interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 'competitionId' | 'scope' | 'onEditFixture' | 'renderRoundHeader'> {
+interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 'competitionId' | 'scope' | 'onEditFixture' | 'fixtureActions' | 'renderRoundHeader'> {
   leagueId: string;
   replaceExisting: boolean;
   templateBlockedReason: string | null;
@@ -13,6 +13,8 @@ interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 
   canEditFixture: boolean;
   onOpenTemplate: () => void;
   onEditFixture: (fixtureId: string) => void;
+  onCancelFixture: (fixtureId: string) => void;
+  onDeleteFixture: (fixtureId: string) => void;
   /** 라운드(주차) 키와 같은 key 의 주차 칸 — 탭 아래에 날짜·요약을 보인다. */
   weeks: readonly LeagueBoardColumn[];
   /** 참가팀 목록을 받았는지 — 받기 전에는 쉬는 팀을 세지 않는다. */
@@ -28,6 +30,8 @@ export function LeagueMobileScheduleBoard({
   canEditFixture,
   onOpenTemplate,
   onEditFixture,
+  onCancelFixture,
+  onDeleteFixture,
   weeks,
   teamsKnown,
   onAddToWeek,
@@ -67,6 +71,7 @@ export function LeagueMobileScheduleBoard({
         competitionId={leagueId}
         scope="league"
         onEditFixture={canEditFixture ? onEditFixture : undefined}
+        fixtureActions={{ onCancel: onCancelFixture, onDelete: onDeleteFixture }}
         renderRoundHeader={(roundKey) => {
           const week = weeks.find((candidate) => candidate.key === roundKey);
           if (week === undefined) return null;

@@ -34,6 +34,7 @@ function teamMatch(input: string): V1TeamMatch {
 
 let startsAt: string | null | undefined = DATES[0][0];
 const requests: URL[] = [];
+const teamRequests: URL[] = [];
 const clients: QueryClient[] = [];
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: '2026-10-08T00:00:00.000Z' });
 const page = (items: unknown[]) => ({ items, pageInfo: { hasNext: false, nextCursor: null } });
@@ -46,7 +47,10 @@ const server = setupServer(
     requests.push(new URL(request.url));
     return ok(page([{ ...teamMatch(DATES[0][0]), startsAt }]));
   }),
-  http.get('*/api/v1/teams', () => ok(page([]))),
+  http.get('*/api/v1/teams', ({ request }) => {
+    teamRequests.push(new URL(request.url));
+    return ok(page([]));
+  }),
   http.get('*/api/v1/league-matches', () => ok(page([]))),
   http.get('*/api/v1/search/recent', () => ok({ items: [] })),
 );
@@ -59,6 +63,7 @@ beforeEach(() => {
   clearStoredV1Session();
   startsAt = DATES[0][0];
   requests.length = 0;
+  teamRequests.length = 0;
   window.history.replaceState({}, '', `/search?q=${encodeURIComponent(SEARCH)}`);
 });
 afterEach(() => {
@@ -100,6 +105,15 @@ describe('MD-QA #62 실제 통합 검색 경기 시각', () => {
     const from = encodeURIComponent(`/search?${new URLSearchParams({ q: SEARCH })}`);
     expect(router.push).toHaveBeenNthCalledWith(1, `/matches/personal-match?from=${from}`);
     expect(router.push).toHaveBeenNthCalledWith(2, `/team-matches/${TEAM_MATCH_ID}?from=${from}`);
+  });
+
+  // 팀 목록 API 의 정렬은 latest/member_count/activity 뿐이다 — 매치 검색과 같은 sort=recommended 를 보내면 400 으로 팀 검색이 빈다.
+  it('팀 검색 요청에는 팀 목록 API 가 모르는 정렬값을 싣지 않는다', async () => {
+    renderSearch();
+    await screen.findByRole('button', { name: /개인 검색 경기/ });
+    await vi.waitFor(() => expect(teamRequests).toHaveLength(1));
+
+    expect(Object.fromEntries(teamRequests[0].searchParams)).toEqual({ query: SEARCH, limit: '5' });
   });
 
   it.each(['invalid-date', '', null, undefined])('잘못되거나 빠진 HTTP 시각 %s는 기존처럼 날짜 조각만 생략한다', async (input) => {

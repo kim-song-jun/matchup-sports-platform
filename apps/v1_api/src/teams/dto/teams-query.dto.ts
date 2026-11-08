@@ -42,8 +42,8 @@ export class TeamsQueryDto {
   joinPolicy?: 'approval_required' | 'closed';
 
   @IsOptional()
-  @IsIn(['recommended', 'latest', 'member_count', 'trust'])
-  sort?: 'recommended' | 'latest' | 'member_count' | 'trust';
+  @IsIn(['latest', 'member_count', 'activity'])
+  sort?: 'latest' | 'member_count' | 'activity';
 
   @IsOptional()
   @IsIn(['card', 'compact'])

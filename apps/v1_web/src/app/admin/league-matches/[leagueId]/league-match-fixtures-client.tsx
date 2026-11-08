@@ -835,6 +835,12 @@ export default function LeagueMatchFixturesClient({
               onEditFixture={(teamMatchId) =>
                 setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
               }
+              onCancelFixture={(teamMatchId) =>
+                setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
+              onDeleteFixture={(teamMatchId) =>
+                setDeleteTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
               rounds={mobileRounds}
               focusFixtureId={mobileFocusFixtureId}
               slots={series.slots ?? []}

@@ -20,7 +20,7 @@ import { formatKstMonthDaySlash, formatKstTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
-import { disciplineWarningChip } from '@/lib/competition-status';
+import { disciplineWarningChip, type StatusChipModel } from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import {
   batchFailureRecovery,
@@ -192,7 +192,7 @@ function PlayerCard({
   onOpenUnavailability: (() => void) | null;
 }) {
   const summary = playerSummary(player, draft);
-  const warning = playerDisciplineWarning(player, games);
+  const warnings = playerDisciplineWarnings(player, games);
   const labels = gameChipLabels(games);
   return (
     <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -206,9 +206,11 @@ function PlayerCard({
           <span className={`tm-badge tm-badge-sm ${summary.tone === 'red' ? 'tm-badge-red' : 'tm-badge-grey'}`}>{summary.text}</span>
         )}
       </div>
-      {warning === null ? null : (
-        <div>
-          <StatusChip chip={warning} />
+      {warnings.length === 0 ? null : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {warnings.map(({ competitionId, chip }) => (
+            <StatusChip key={competitionId} chip={chip} />
+          ))}
         </div>
       )}
       <div role="group" aria-label={`${player.displayName} 경기별 출전`} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -249,12 +251,30 @@ function PlayerCard({
   );
 }
 
-/** 다음 경기 기준 경고 누적 칩 — 아직 치르지 않은 가장 이른 경기의 값이다(끝난 경기의 누적은 그 뒤 경기가 이어받는다). */
-function playerDisciplineWarning(player: V1TeamRosterMatrixPlayer, games: readonly V1TeamRosterMatrixGame[]) {
-  const index = games.findIndex((game) => game.gameState === 'SCHEDULED');
-  if (index < 0) return null;
-  if (player.cells[index]?.status === 'SUSPENDED') return null;
-  return disciplineWarningChip(player.cells[index]?.cards, games[index].disciplineRules);
+/**
+ * 대회·리그마다 아직 치르지 않은 가장 이른 경기 기준의 경고 누적 칩 — 규정과 카드 누적이 대회 단위라
+ * 규정 없는 대회의 경기가 앞서 있어도 다른 대회의 칩을 가리지 않는다. 둘 이상이면 대회 이름을 붙여 가른다.
+ */
+function playerDisciplineWarnings(player: V1TeamRosterMatrixPlayer, games: readonly V1TeamRosterMatrixGame[]) {
+  const seen = new Set<string>();
+  const found: { competitionId: string; competitionTitle: string | null; chip: StatusChipModel }[] = [];
+  games.forEach((game, index) => {
+    if (game.gameState !== 'SCHEDULED' || seen.has(game.competitionId)) return;
+    const cell = player.cells[index];
+    if (cell === undefined) return;
+    if (cell.status === 'SUSPENDED') {
+      seen.add(game.competitionId);
+      return;
+    }
+    const chip = disciplineWarningChip(cell.cards, game.disciplineRules);
+    if (chip === null) return;
+    seen.add(game.competitionId);
+    found.push({ competitionId: game.competitionId, competitionTitle: game.competitionTitle, chip });
+  });
+  return found.map(({ competitionId, competitionTitle, chip }) => ({
+    competitionId,
+    chip: found.length > 1 && competitionTitle !== null ? { ...chip, label: `${competitionTitle} · ${chip.label}` } : chip,
+  }));
 }
 
 /** 카드 오른쪽 배지 — 출전정지가 가장 무겁고, 그다음 결장, 빠짐 순. 모두 출전이면 null. */

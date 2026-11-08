@@ -1043,7 +1043,9 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     hooks.phoneVerifyMutateAsync.mockResolvedValueOnce(registeredResponse());
     render(<SignupClient />);
     await verifyPhone();
-    await screen.findByText(CARD_TITLE);
+    // 카드는 그려진 뒤 effect 로 제목에 포커스를 옮기는데, findByText 는 그 effect 보다 먼저 돌아올 수 있다.
+    // 그 틈에 누르면 밀린 effect 가 포커스를 카드로 가져간 채 카드가 사라져 포커스가 body 로 떨어진다.
+    await waitFor(() => expect(screen.getByText(CARD_TITLE)).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
 

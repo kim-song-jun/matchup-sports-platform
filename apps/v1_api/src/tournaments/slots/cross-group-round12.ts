@@ -5,6 +5,7 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import type { AdminContextService } from '../../common/admin-context.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GamesService } from '../../games/games.service';
+import { resolveTieBreakOrder } from '../competition-config/tournament-tie-break-order';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { loadCanonicalStandingsSource } from '../tournament-standings-source';
 import { loadGroupRankSources } from './load-group-rank-preview';
@@ -19,7 +20,7 @@ function conflict(message: string): never {
 
 async function loadPreview(tx: Tx, tournamentId: string): Promise<CrossGroupPreview> {
   const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
-    where: { id: tournamentId, deletedAt: null }, select: { id: true, format: true },
+    where: { id: tournamentId, deletedAt: null }, select: { id: true, format: true, tieBreakOrder: true },
   });
   if (tournament === null) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
   if (tournament.format !== 'group_knockout') conflict('조별리그 후 결선 방식의 대회에서만 사용할 수 있어요.');
@@ -123,9 +124,10 @@ async function loadPreview(tx: Tx, tournamentId: string): Promise<CrossGroupPrev
   }
   const currentTeams = targets.flatMap((target) => target.currentRegistrationId === null ? [] : [target.currentRegistrationId]);
   if (new Set(currentTeams).size !== currentTeams.length) conflict('현재 결선에 같은 팀이 중복 배정돼 있어요. 중복 배정을 먼저 해제해 주세요.');
-  const version = createHash('sha256').update(JSON.stringify({ teams, ranks, targets, details, standings, edges, slots, byes, byeTeams,
+  const tieBreakOrder = resolveTieBreakOrder(tournament.tieBreakOrder);
+  const version = createHash('sha256').update(JSON.stringify({ tieBreakOrder, teams, ranks, targets, details, standings, edges, slots, byes, byeTeams,
   })).digest('hex');
-  return { version, teams, ranks, targets };
+  return { version, tieBreakOrder, teams, ranks, targets };
 }
 
 type Dependencies = { prisma: PrismaService; adminContext: AdminContextService; games: GamesService };

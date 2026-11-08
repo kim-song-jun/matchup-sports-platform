@@ -145,7 +145,7 @@ export function describeTies(view: MultiFinalView, final: Final): TieNotice[] {
     const banner = `${group.name} ${places.map((place) => `${place.rank}위`).join('·')}가 완전 동률이에요. ${
       splits ? `${split} 갈라지는 자리라 직접 골라야 해요.` : '같은 토너먼트 안에서 시드가 달라지는 자리라 직접 골라야 해요.'}`;
     const first = members[0];
-    const detail = `승점 ${first.points} · 골득실 ${signed(first.goalsFor - first.goalsAgainst)} · 득점 ${first.goalsFor} · 맞대결·페어플레이까지 같아서 추첨으로만 갈렸어요.`;
+    const detail = `승점 ${first.points} · 골득실 ${signed(first.goalsFor - first.goalsAgainst)} · 득점 ${first.goalsFor} · 동점 기준이 모두 같아서 추첨으로만 갈렸어요.`;
     const ownRanks = new Set(seats.map((seat) => seat.rank));
     const others = places.filter((place) => !(place.destination?.finalName === final.name && ownRanks.has(place.rank)));
     const otherLabels = others.map((place) => (place.destination ? `${place.destination.finalName} ${place.rank}위 자리` : null));

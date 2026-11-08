@@ -35,7 +35,7 @@ export class MultiFinalsService {
 
   private async tournament(tx: Tx, id: string) {
     const row = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: {
-      id: true, kind: true, format: true, status: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true, competitionConfig: true,
+      id: true, kind: true, format: true, status: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true,
       multiFinals: true, multiFinalsRevision: true, ...TOURNAMENT_VENUE_SELECT,
     } });
     if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });

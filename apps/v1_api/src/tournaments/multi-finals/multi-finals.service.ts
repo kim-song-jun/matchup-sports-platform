@@ -75,12 +75,14 @@ export class MultiFinalsService {
     await tx.v1TournamentByeSlot.deleteMany({ where: { groupId: { in: groupIds } } });
     for (const group of groups) await deleteTournamentGroupInTx(tx, admin, group.id);
   }
-  /** What the latest assign audit of this final still says about the saved roster: whether a group it drew from was reordered since (rosters assigned before snapshots existed report false), and the tie picks it was assigned with. */
+  /** What the latest assign audit of this final still says about the saved roster: whether a rank its rules point at now holds a different team (rosters assigned before snapshots existed report false), and the tie picks it was assigned with. */
   private async savedAssignment(tx: Tx, id: string, final: NamedFinalDto, groupStandings: Parameters<typeof standingOrder>[0]) {
     if (!final.registrationIds) return { standingsChanged: false, tiePicks: [] };
     const assigned = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: id, action: 'tournament.multi_finals.assign', afterJson: { path: ['finalName'], equals: final.name } });
     const saved = savedStandingsSnapshot(assigned?.afterJson, final.registrationIds);
-    return { standingsChanged: saved !== null && standingsOrderChanged(saved, standingOrder(groupStandings, saved.map(group => group.groupId))),
+    // Current rules may point at a group the snapshot never stored; reading it now makes that rank count as changed.
+    const groupIds = saved === null ? [] : [...new Set([...saved.map(group => group.groupId), ...final.rules.map(rule => rule.groupId)])];
+    return { standingsChanged: saved !== null && standingsOrderChanged(saved, standingOrder(groupStandings, groupIds), final.rules),
       tiePicks: savedTiePicks(assigned?.afterJson, final.registrationIds) };
   }
   private async view(tx: Tx, id: string) {

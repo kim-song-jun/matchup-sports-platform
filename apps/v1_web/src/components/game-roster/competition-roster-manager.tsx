@@ -73,6 +73,8 @@ export function CompetitionRosterManager(entry: Entry) {
   const adminRegistrationsHref = initialRoster.data?.viewerRole === 'ADMIN'
     ? `/admin/${initialRoster.data.competitionKind === 'LEAGUE' ? 'league-matches' : 'tournaments'}/${encodeURIComponent(initialRoster.data.competitionId)}/registrations`
     : null;
+  // 대회 스태프는 admin 콘솔도 팀 전용 참가 명단 API도 없다 — 경기 단위 명단이 유일한 입구다.
+  const staffViewer = initialRoster.data?.viewerRole === 'STAFF';
 
   return <RosterManagerNavigation.Provider value={navigation}>
     <div className={styles.manager}>
@@ -93,7 +95,9 @@ export function CompetitionRosterManager(entry: Entry) {
         /> : <div className={styles.message}>
           <AlertBanner tone="info" message={adminRegistrationsHref
             ? '신청 관리에서 해당 팀의 명단 검토를 열어 참가 선수를 확인해 주세요.'
-            : '등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요.'} />
+            : staffViewer
+              ? '대회 스태프는 이 탭에서 참가 선수를 바꾸지 않아요. 경기별 출전 선수는 위의 경기 출전 탭에서 확인해 주세요.'
+              : '등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요.'} />
           {adminRegistrationsHref ? <Link href={adminRegistrationsHref} className="tm-btn tm-btn-md tm-btn-outline mt-3">신청 관리로 이동</Link> : null}
         </div> : <>
           <div className={styles.picker}>
@@ -103,14 +107,14 @@ export function CompetitionRosterManager(entry: Entry) {
               {!games.some(game => game.gameId === currentGame) && currentGame ? <option value={currentGame}>
                 {formatTournamentDateTimeShort(initialRoster.data?.deadline) ?? '일정 미정'} · vs {initialRoster.data?.opponentName ?? '상대팀 미정'}
               </option> : null}
-              {!currentGame ? <option value="">등록된 경기 없음</option> : null}
+              {!currentGame ? <option value="">출전을 수정할 수 있는 경기 없음</option> : null}
               {games.map(game => <option value={game.gameId} key={game.gameId}>
                 {formatTournamentDateTimeShort(game.scheduledAt) ?? '일정 미정'} · vs {game.opponentName ?? '상대팀 미정'}
               </option>)}
             </select>
             {listQuery.isError ? <ErrorState title="경기 목록을 불러오지 못했어요" message={extractErrorMessage(listQuery.error, '경기 목록 조회에 실패했어요.')} onRetry={() => void listQuery.refetch()} /> : null}
           </div>
-          {currentGame ? <GameRosterClient key={currentGame} teamId={teamId} gameId={currentGame} /> : listQuery.isLoading ? <PageSkeleton variant="list" /> : !listQuery.isError ? <EmptyState title="등록된 경기가 없어요" sub="경기가 배정되면 여기서 출전 선수를 관리할 수 있어요. 참가 선수는 지금 관리할 수 있어요." /> : null}
+          {currentGame ? <GameRosterClient key={currentGame} teamId={teamId} gameId={currentGame} /> : listQuery.isLoading ? <PageSkeleton variant="list" /> : !listQuery.isError ? <EmptyState title="출전을 수정할 수 있는 경기가 없어요" sub="이 탭에는 아직 시작하지 않은 경기만 표시해요. 시작한 경기는 경기 상세에서 출전 명단과 기록을 확인해 주세요." /> : null}
         </>}
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { PickType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
@@ -539,4 +540,20 @@ export class ApplyLeagueTemplateDto extends LeaguePlaceSnapshotDto {
   @IsOptional()
   @IsBoolean()
   replaceExisting?: boolean;
+}
+
+/**
+ * Dry run of `ApplyLeagueTemplateDto` — same numbers, no dates or place: the timetable only depends on the
+ * start time of day. Nothing is written.
+ */
+export class PreviewLeagueTemplateDto extends PickType(ApplyLeagueTemplateDto, [
+  'teamCount',
+  'legs',
+  'gamesPerDay',
+  'gameDurationMinutes',
+  'breakMinutes',
+] as const) {
+  /** 'HH:mm', KST — every day starts here. */
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'time은 HH:mm 형식이어야 해요.' })
+  time!: string;
 }

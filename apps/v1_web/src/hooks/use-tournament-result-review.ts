@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
@@ -247,6 +249,7 @@ export function useTournamentEndedFixtures(tournamentId: string) {
 }
 
 export function useTournamentGame(gameId: string | null) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: gameId ? resultReviewKeys.game(gameId) : (['v1', 'games', '__none__'] as const),
     queryFn: () => v1Get<TournamentGameDetail>(`/games/${encodeURIComponent(gameId as string)}`),
@@ -255,6 +258,7 @@ export function useTournamentGame(gameId: string | null) {
 }
 
 export function useGameResultRevisions(gameId: string | null) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: gameId
       ? resultReviewKeys.revisions(gameId)
@@ -282,13 +286,16 @@ function invalidateGame(
   }
 }
 
-function postGameCommand<T>(path: string, body: Record<string, unknown>) {
-  const clientCommandId = randomUuid();
-  return v1Post<T>(
-    path,
-    { ...body, clientCommandId },
-    { headers: { 'Idempotency-Key': clientCommandId } },
-  );
+function usePostGameCommand() {
+  const { v1Post } = useV1DataSource();
+  return function postGameCommand<T>(path: string, body: Record<string, unknown>) {
+    const clientCommandId = randomUuid();
+    return v1Post<T>(
+      path,
+      { ...body, clientCommandId },
+      { headers: { 'Idempotency-Key': clientCommandId } },
+    );
+  };
 }
 
 // ── Officialize projection-preview hash ─────────────────────────────────────
@@ -361,6 +368,7 @@ export type SupersedeAndSubmitInput = {
  * `409 RESULT_RESUBMISSION_NOT_ALLOWED` otherwise); creates+submits a fresh
  * successor atomically with a new review SLA. */
 export function useSupersedeAndSubmitResult(gameId: string, tournamentId?: string) {
+  const postGameCommand = usePostGameCommand();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: SupersedeAndSubmitInput) => {
@@ -390,6 +398,7 @@ export type OfficializeResultInput = {
  * `projectionPreviewHash` from the exact revision content the caller was
  * shown before submitting. */
 export function useOfficializeResultRevision(gameId: string, tournamentId?: string) {
+  const postGameCommand = usePostGameCommand();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: OfficializeResultInput) => {
@@ -421,6 +430,7 @@ export type VoidResultInput = {
  * fixture that already advanced blocks the void with
  * `409 NEXT_FIXTURE_CONFLICT`. */
 export function useVoidResultRevision(gameId: string, tournamentId?: string) {
+  const postGameCommand = usePostGameCommand();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: VoidResultInput) =>
@@ -451,6 +461,7 @@ export type CreateResultCorrectionInput = {
  * prior official pointer stays authoritative until that draft is separately
  * officialized. */
 export function useCreateResultCorrection(gameId: string, tournamentId?: string) {
+  const postGameCommand = usePostGameCommand();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateResultCorrectionInput) =>

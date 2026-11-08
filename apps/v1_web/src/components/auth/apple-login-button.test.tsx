@@ -109,6 +109,40 @@ describe('AppleLoginButton', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('sends a suspended or blocked account to /auth/blocked instead of showing the server message', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(new V1ApiError({
+          status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: 'This account cannot sign in', timestamp: '2026-10-31T00:00:00.000Z',
+        })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('This account cannot sign in')).toBeNull();
+  });
+
+  it('keeps the grace end date with the link token when the matching account is withdrawing', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(409, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', {
+          next: 'sign_in_then_link', provider: 'apple', linkToken: 'apple-link-token', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: until,
+        })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=apple'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'apple-link-token', provider: 'apple', withdrawalPendingUntil: until });
+  });
+
   it('sends a withdrawal-pending account to the cancel screen with its token', async () => {
     reply = { ok: true, identityToken: 'identity.token' };
     api.v1Post.mockImplementation((path: string) =>
@@ -121,6 +155,23 @@ describe('AppleLoginButton', () => {
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
+  });
+
+  it('tells a removed Apple login how to get back in, and leaves the button usable', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(403, 'LOGIN_METHOD_UNLINKED')));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '이 Apple 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    );
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Apple로 계속하기' })).toBeEnabled();
   });
 
   /** A shell built before the code was forwarded still signs in; the field is simply absent. */

@@ -31,7 +31,7 @@ type TournamentInquiryModalProps = {
   readonly tournamentTitle: string;
   readonly relatedType?: V1InquiryRelatedType;
   readonly relatedId?: string;
-  readonly targetLabel?: '대회' | '경기';
+  readonly targetLabel?: '대회' | '리그' | '경기';
   readonly authUser: V1AuthMe | null;
   readonly isSessionChecking: boolean;
   readonly hasSessionError: boolean;

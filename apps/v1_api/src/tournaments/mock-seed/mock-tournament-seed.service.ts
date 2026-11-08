@@ -23,6 +23,10 @@ import { participantDisplayName } from '../participant-display-name';
  */
 const TEST_ACCOUNT_DOMAIN = '@teameet.test';
 
+/** 명단 동기화가 워커와 겹쳤을 때 다시 하는 횟수와 간격(회차마다 늘린다). 5회면 3초까지 기다린다. */
+const SYNC_RETRY_ATTEMPTS = 5;
+const SYNC_RETRY_BACKOFF_MS = 300;
+
 /** 라인업 제출에 필요한 최소 선발 인원. config.lineup 은 Json 이라 안전하게 읽는다. */
 export function readLineupMinPlayers(lineup: unknown): number {
   const value = (lineup as { minPlayers?: unknown } | null)?.minPlayers;
@@ -412,6 +416,22 @@ export class MockTournamentSeedService {
       await this.prisma.$transaction((tx) => recalculateStandingsInTx(tx, tournamentId));
       const preview = await this.multiFinals.preview(user, tournamentId);
       await this.multiFinals.generate(user, tournamentId, { expectedRevision: preview.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+      // Generation creates the empty graph; each final must explicitly confirm its seeds.
+      let view = await this.multiFinals.get(user, tournamentId);
+      for (const final of view.finals) {
+        const assignment = await this.multiFinals.assignmentPreview(user, tournamentId, {
+          expectedRevision: view.revision, finalName: final.name, assignmentPolicy: 'rank_order',
+        });
+        const seeds = assignment.registrationIds.filter((id): id is string => id !== null);
+        if (seeds.length !== assignment.registrationIds.length) {
+          throw new ConflictException({ code: 'MOCK_RANK_TIED', message: '목업 순위에 동률이 있어 결선 진출팀을 정할 수 없어요.' });
+        }
+        view = await this.multiFinals.assign(user, tournamentId, {
+          expectedRevision: assignment.revision, finalName: final.name,
+          registrationIds: seeds, assignmentPolicy: assignment.assignmentPolicy,
+          sourceVersion: assignment.sourceVersion,
+        });
+      }
       await this.syncSeatedRosters(tournamentId);
     }
     const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({ where: { tournamentId, teamMatch: { deletedAt: null } } });
@@ -426,6 +446,7 @@ export class MockTournamentSeedService {
   /**
    * 자리 배정은 경기 명단 채우기를 워커(outbox)에 맡긴다. 목업은 곧바로 라인업·결과를 넣으므로
    * 워커를 기다리지 않고 같은 동기화 함수로 지금 맞춘다(워커가 나중에 다시 돌아도 바뀐 게 없어 그대로다).
+   * 워커가 같은 경기를 맞추는 중이면 경기 잠금(NOWAIT)이 409 로 돌아온다 — 워커가 끝날 때까지 잠깐 기다려 다시 한다.
    */
   private async syncSeatedRosters(tournamentId: string) {
     const sides = await this.prisma.v1GameSide.findMany({
@@ -434,7 +455,17 @@ export class MockTournamentSeedService {
       orderBy: { id: 'asc' },
     });
     for (const side of sides) {
-      await this.prisma.$transaction((tx) => syncGameSideRoster(tx, { gameId: side.gameId, sideId: side.id }));
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await this.prisma.$transaction((tx) => syncGameSideRoster(tx, { gameId: side.gameId, sideId: side.id }));
+          break;
+        } catch (error) {
+          const busy = error instanceof ConflictException &&
+            (error.getResponse() as { code?: unknown }).code === 'COMMAND_CONCURRENCY_CONFLICT';
+          if (!busy || attempt >= SYNC_RETRY_ATTEMPTS) throw error;
+          await new Promise((resolve) => setTimeout(resolve, SYNC_RETRY_BACKOFF_MS * attempt));
+        }
+      }
     }
   }
 

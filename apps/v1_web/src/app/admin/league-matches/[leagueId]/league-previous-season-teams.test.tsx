@@ -4,9 +4,11 @@ import { LeaguePreviousSeasonTeams } from './league-previous-season-teams';
 
 const mutate = vi.hoisted(() => vi.fn());
 const previousTeams = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+const registrations = vi.hoisted(() => ({ items: [] as Array<{ teamId: string; status: string }> }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueTeams: (leagueId: string) => (leagueId === 'league-0' ? previousTeams.value : { data: undefined, isPending: true }),
   useV1AddPreviousSeasonTeams: () => ({ mutate, isPending: false }),
+  useV1AdminTournamentRegistrations: () => ({ data: { items: registrations.items, truncated: false } }),
 }));
 
 const team = (teamId: string, name: string, status = 'active') => ({ teamId, name, status });
@@ -28,6 +30,7 @@ function renderPicker(currentTeamIds: string[] = ['team-a']) {
 describe('LeaguePreviousSeasonTeams', () => {
   beforeEach(() => {
     mutate.mockReset();
+    registrations.items = [];
     previousTeams.value = {
       data: { teams: [team('team-a', '팀A'), team('team-b', '팀B'), team('team-c', '팀C'), team('team-d', '팀D', 'inactive')] },
       isPending: false, isError: false,
@@ -55,6 +58,15 @@ describe('LeaguePreviousSeasonTeams', () => {
       '2팀을 넣었어요. 지난 시즌 명단 9명을 옮겨 왔어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.',
       'success',
     );
+  });
+
+  // 2026-11-04 알파 QA: 입금 대기 팀을 넣으면 결제가 '대기'인 채 참가 확정이 됐다.
+  it('이미 신청이 진행 중인 팀은 고르지 못하고 신청 관리로 안내한다 — 취소한 신청은 다시 고를 수 있다', () => {
+    registrations.items = [{ teamId: 'team-b', status: 'awaiting_payment' }, { teamId: 'team-c', status: 'cancelled' }];
+    renderPicker();
+    expect(screen.getByRole('checkbox', { name: /팀B/ })).toBeDisabled();
+    expect(screen.getByText('신청 진행 중 · 신청 관리에서 확정')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /팀C/ })).toBeEnabled();
   });
 
   it('지난 시즌 팀이 모두 들어와 있으면 그렇게 알린다', () => {

@@ -5,6 +5,7 @@ import { V1ApiError, v1Post } from '@/lib/api-client';
 import type { V1AuthSessionResponse, V1FoundAccount } from '@/types/api';
 import { v1MswHandlers } from './handlers';
 import { v1UserFixture } from './fixtures';
+import { WITHDRAWAL_PENDING_RECOVERY_MSW } from './auth-link-handlers';
 
 const phone = '01012345678';
 const newPassword = 'synthetic-new-password';
@@ -37,30 +38,21 @@ afterAll(() => { server.close(); vi.unstubAllEnvs(); });
 afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 
 describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
-  it('phone password reset requires independent email proof', async () => {
-    const { proofToken } = await verifyPhone('password_reset');
-    const body = { phone, proofToken, newPassword };
-    const result = v1Post<unknown>('/auth/recovery/reset-password', body);
-    await expect(result).rejects.toMatchObject({
-      statusCode: 409, code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-    } satisfies Partial<V1ApiError>);
-  });
-
-  it('preserves the masked account lookup after purpose-bound phone verification', async () => {
+  it('answers a purpose-bound phone lookup with the login methods and no email', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     await expect(v1Post<V1FoundAccount>('/auth/recovery/find-account', { phone, proofToken }))
-      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
+  it('find-account rejects the default signup-purpose proof', async () => {
     const { proofToken } = await verifyPhone();
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s binds the proof to the verified phone', async (path) => {
+  it('find-account binds the proof to the verified phone', async () => {
     const { proofToken } = await verifyPhone('password_reset', '01098765432');
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
@@ -92,7 +84,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     await v1Post('/auth/recovery/email/request', { email });
     const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
     await expect(v1Post<V1FoundAccount>('/auth/recovery/email/find-account', { email, proofToken }))
-      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
     await expect(v1Post('/auth/recovery/email/find-account', { email: 'other@example.com', proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'EMAIL_NOT_VERIFIED' });
   });
@@ -107,11 +99,11 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects an email-channel proof', async (path) => {
+  it('find-account rejects an email-channel proof', async () => {
     const email = v1UserFixture.email;
     await v1Post('/auth/recovery/email/request', { email });
     const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
+    await expect(v1Post('/auth/recovery/find-account', { phone, proofToken }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
@@ -185,5 +177,91 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     const lookup = v1Post('/auth/recovery/find-account', { phone, proofToken });
     if (outcome === 'accepted') await expect(lookup).resolves.toMatchObject({ providers: ['email'] });
     else await expect(lookup).rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
+  });
+});
+
+function fixtureEmail(): string {
+  if (!v1UserFixture.email) throw new Error('the MSW user fixture has no email');
+  return v1UserFixture.email;
+}
+
+async function proveMailbox(email: string) {
+  await v1Post('/auth/recovery/email/request', { email });
+  const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
+  return proofToken;
+}
+
+describe('phone lookup reveals the masked email and withdrawal date only with the same account\'s mailbox proof', () => {
+  const lookup = async (body: Record<string, unknown>, targetPhone = phone) => {
+    const { proofToken } = await verifyPhone('password_reset', targetPhone);
+    return v1Post<V1FoundAccount>('/auth/recovery/find-account', { phone: targetPhone, proofToken, ...body });
+  };
+
+  it('adds the masked email when the mailbox proof is for this account', async () => {
+    const email = fixtureEmail();
+    await expect(lookup({ email, emailProofToken: await proveMailbox(email) }))
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
+  });
+
+  it('answers a proof for another account\'s mailbox exactly like no proof', async () => {
+    const other = 'someone-else@example.com';
+    const withOtherMailbox = await lookup({ email: other, emailProofToken: await proveMailbox(other) });
+    expect(withOtherMailbox).toEqual(await lookup({}));
+    expect(withOtherMailbox.maskedEmail).toBeNull();
+  });
+
+  it('refuses a mailbox proof that was never issued, and a proof sent without its address', async () => {
+    await expect(lookup({ email: fixtureEmail(), emailProofToken: 'forged' }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'EMAIL_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
+    await expect(lookup({ emailProofToken: await proveMailbox(fixtureEmail()) }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' } satisfies Partial<V1ApiError>);
+    await expect(lookup({ email: fixtureEmail() }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' } satisfies Partial<V1ApiError>);
+  });
+
+  it('tells a withdrawal-pending account\'s number holder only that it is pending, until the mailbox is proven', async () => {
+    const { email, phone: pendingPhone, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
+    await expect(lookup({}, pendingPhone))
+      .resolves.toEqual({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil: null });
+    await expect(lookup({ email, emailProofToken: await proveMailbox(email) }, pendingPhone))
+      .resolves.toMatchObject({ withdrawalPending: true, maskedEmail: 'wi***@example.com', withdrawalPendingUntil });
+  });
+});
+
+describe('email lookup also finds an account waiting out its withdrawal grace', () => {
+  it('carries the pending flag and the end date after the mailbox proof', async () => {
+    const { email, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
+    await expect(v1Post<V1FoundAccount>('/auth/recovery/email/find-account', { email, proofToken: await proveMailbox(email) }))
+      .resolves.toEqual({ maskedEmail: 'wi***@example.com', emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil });
+  });
+
+  it('refuses to reset the password of such an account and says why, with the end date', async () => {
+    const { email, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
+    await expect(v1Post('/auth/recovery/email/reset-password', { email, proofToken: await proveMailbox(email), newPassword }))
+      .rejects.toMatchObject({
+        statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil },
+      } satisfies Partial<V1ApiError>);
+  });
+});
+
+describe('common passwords are refused wherever a login password is set', () => {
+  const COMMON = 'Qwer1234';
+
+  it('on an email password reset, with its own code, and a short one stays a plain validation error', async () => {
+    const email = fixtureEmail();
+    const proofToken = await proveMailbox(email);
+    await expect(v1Post('/auth/recovery/email/reset-password', { email, proofToken, newPassword: COMMON }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'PASSWORD_TOO_COMMON', message: '너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.' } satisfies Partial<V1ApiError>);
+    await expect(v1Post('/auth/recovery/email/reset-password', { email, proofToken, newPassword: 'short12' }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' } satisfies Partial<V1ApiError>);
+  });
+
+  it('on signup', async () => {
+    const body = {
+      nickname: '테스트닉', email: 'signup@example.com', password: COMMON, displayName: '홍길동', phone,
+      birthDate: '20000229', gender: 'male', requiredTermsAccepted: true,
+    };
+    await expect(v1Post('/auth/register', body))
+      .rejects.toMatchObject({ statusCode: 400, code: 'PASSWORD_TOO_COMMON' } satisfies Partial<V1ApiError>);
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TeamRecordsContent } from './team-records-content';
 import type { PublicTeamRecordItem, PublicTeamRecordsResponse } from './types';
@@ -54,6 +54,39 @@ function makeTeamRecords(items: readonly PublicTeamRecordItem[]): PublicTeamReco
     nextCursor: null,
   };
 }
+
+describe('TeamRecordsContent — 펼친 경기 기록의 득점자 이름', () => {
+  it('공개 프로필이 있는 선수는 chevron 이 붙은 링크이고, 열 수 없는 선수는 글자만 보인다', () => {
+    const event = {
+      type: 'GOAL',
+      side: 'own',
+      jerseyNumber: 7,
+      period: 1,
+      clockMs: 600_000,
+      cardColor: null,
+    } as const;
+    render(
+      <TeamRecordsContent
+        data={makeTeamRecords([
+          makeItem({
+            events: [
+              { ...event, id: 'e-1', participantName: '김도윤', profileHref: '/users/u-1' },
+              { ...event, id: 'e-2', participantName: '박서준', profileHref: null },
+            ],
+          }),
+        ])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /경기 기록 펼치기/ }));
+
+    const link = screen.getByRole('link', { name: '김도윤' });
+    expect(link).toHaveAttribute('href', '/users/u-1');
+    expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(screen.getByText('박서준')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '박서준' })).toBeNull();
+  });
+});
 
 describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
   it('정규 리그 대진 행은 대회 경기와 같은 자리에 리그명을 보여준다', () => {

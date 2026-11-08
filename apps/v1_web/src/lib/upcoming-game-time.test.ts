@@ -22,6 +22,14 @@ describe('describeUpcomingGameTime', () => {
     expect(result).toEqual({ when: '10/3 (토) 19:00', countdown: null, started: false });
   });
 
+  it('시각이 아직 정해지지 않은 경기는 날짜 대신 "일정 미정"만 주고 카운트다운도 시작됨도 없다', () => {
+    expect(describeUpcomingGameTime(null, new Date('2026-09-29T15:10:00.000Z'))).toEqual({
+      when: '일정 미정',
+      countdown: null,
+      started: false,
+    });
+  });
+
   it('시작 시각이 지났으면 카운트다운 대신 시작됨으로, 시각이 잘못됐으면 아무것도 만들지 않는다', () => {
     expect(describeUpcomingGameTime('2026-09-29T14:00:00.000Z', new Date('2026-09-29T15:10:00.000Z'))).toMatchObject({
       countdown: null,

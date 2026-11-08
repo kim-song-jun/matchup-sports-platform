@@ -39,6 +39,7 @@ import {
   resolveLeagueChampions,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
+import { findConversionSourceLeague } from '../league-matches/league-season-link';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 
@@ -239,13 +240,17 @@ export class TournamentsReadService {
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();
 
-    // 독립 리그가 이어 가는 지난 시즌(2026-11-03) — 공개 상세의 '지난 시즌' 링크. 공개 조건을 통과한 리그만 싣는다.
-    const previousSeason = row.kind === V1CompetitionKind.regular_league && row.previousLeagueId !== null
+    // 이어진 이전 시즌 — 공개 상세의 '이전 시즌 보기'(데스크톱 레일·모바일 본문 카드, 2026-11-06). 공개된 리그만 싣는다.
+    // 독립 리그는 `previousLeagueId` 로 이은 지난 시즌, 리그 체계로 전환해 만든 첫 시즌 티어는 원본 리그다.
+    // 다음 시즌은 다음 리그 안내(`GET /league-matches/:id` 의 nextRound·nextSeasonTiers)가 맡는다.
+    const isLeague = row.kind === V1CompetitionKind.regular_league;
+    const linkedPrevious = isLeague && row.previousLeagueId !== null
       ? await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
           where: { id: row.previousLeagueId, deletedAt: null },
           select: { id: true, title: true },
         })
       : null;
+    const previousSeason = linkedPrevious ?? (isLeague ? await findConversionSourceLeague(this.prisma, row) : null);
 
     return {
       ...presentTournamentDetail(

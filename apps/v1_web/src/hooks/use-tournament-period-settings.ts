@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -76,6 +78,7 @@ const periodSettingsKey = (tournamentId: string) =>
   [...v1Keys.adminTournament(tournamentId), 'period-settings'] as const;
 
 export function useTournamentPeriodSettings(tournamentId: string, options: { enabled?: boolean } = {}) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: periodSettingsKey(tournamentId),
     queryFn: () => v1Get<TournamentPeriodSettingsResponse>(`/admin/tournaments/${tournamentId}/periods`),
@@ -85,6 +88,7 @@ export function useTournamentPeriodSettings(tournamentId: string, options: { ena
 
 /** 경기 수정 화면용. teamMatchId 가 없으면 부르지 않는다. */
 export function useTournamentMatchPeriods(tournamentId: string, teamMatchId: string | null) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: [...periodSettingsKey(tournamentId), 'match', teamMatchId] as const,
     queryFn: () => v1Get<TournamentMatchPeriodsResponse>(`/admin/tournaments/${tournamentId}/periods/matches/${teamMatchId}`),
@@ -93,6 +97,7 @@ export function useTournamentMatchPeriods(tournamentId: string, teamMatchId: str
 }
 
 export function useUpdateTournamentPeriodSettings(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
 
   return useMutation({

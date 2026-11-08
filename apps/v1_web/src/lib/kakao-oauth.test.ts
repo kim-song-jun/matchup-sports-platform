@@ -4,7 +4,7 @@ import { KAKAO_OAUTH_STATE_STORAGE_KEY } from '@/components/auth/auth.view-model
 import {
   consumeKakaoOAuthAttempt,
   parseKakaoOAuthAttempt,
-  serializeKakaoOAuthAttempt,
+  encodeKakaoStateVerifier,
   startKakaoLinkAuthorize,
   storeKakaoOAuthAttempt,
 } from './kakao-oauth';
@@ -29,7 +29,7 @@ describe('Kakao OAuth attempt storage', () => {
   describe('parseKakaoOAuthAttempt', () => {
     it('round-trips a link attempt with its return path', async () => {
       const attempt = { state: STATE, mode: 'link', returnTo: '/my/settings?tab=login#methods' } as const;
-      expect(parseKakaoOAuthAttempt(await serializeKakaoOAuthAttempt(attempt))).toEqual({ ...attempt, state: `sha256:${createHash('sha256').update(STATE).digest('hex')}` });
+      expect(parseKakaoOAuthAttempt(await encodeKakaoStateVerifier(attempt))).toEqual({ ...attempt, state: `sha256:${createHash('sha256').update(STATE).digest('hex')}` });
     });
 
     it('treats a bare state string from the previous format as a login attempt', async () => {
@@ -60,7 +60,7 @@ describe('Kakao OAuth attempt storage', () => {
       ['a path that normalizes to a protocol-relative URL', '/..//evil.example'],
       ['the login screen', '/login'],
     ])('drops %s from the return path, in what is stored and in what is read back', async (_label, returnTo) => {
-      expect(JSON.parse(await serializeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo })).returnTo).toBeNull();
+      expect(JSON.parse(await encodeKakaoStateVerifier({ state: STATE, mode: 'link', returnTo })).returnTo).toBeNull();
       const tampered = JSON.stringify({ state: STATE, mode: 'link', returnTo });
       expect(parseKakaoOAuthAttempt(tampered)).toEqual({ state: STATE, mode: 'link', returnTo: null });
     });

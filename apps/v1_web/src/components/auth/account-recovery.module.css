@@ -58,3 +58,14 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+.mailboxOffer {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mailboxOffer p {
+  margin: 0;
+  text-align: center;
+}

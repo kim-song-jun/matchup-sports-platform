@@ -4,6 +4,7 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { upcomingWeekend } from './helpers/upcoming-weekend';
 
 // 리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — "한 구장 순차 진행" 모델.
 // 운영자 요구(2026-08-25): 22시 리그에 한 경기장을 쓰면 4팀이 15분 경기·5분 휴식으로
@@ -145,6 +146,21 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(fixtures.every((f) => f.placeName === '베이컨 풋살장')).toBe(true);
   });
 
+  it('이틀이 같은 달력 주면 제목 순번이 날짜를 넘어 이어져 6경기 제목이 모두 다르다', async () => {
+    const leagueId = await createLeague('이틀 리그');
+    const [saturday, sunday] = upcomingWeekend();
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 3, schedule: { dates: [saturday, sunday], time: '10:00' }, timing: { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 3 } });
+    expect(res.status).toBe(201);
+
+    const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    expect(fixtures.map((f) => f.title)).toEqual(
+      [1, 2, 3, 4, 5, 6].map((order) => `이틀 리그 1주차 ${order}경기`),
+    );
+  });
+
   it('preview도 같은 timing 계산으로 endAt·매치데이 정보를 내려준다(DB 무변경)', async () => {
     const leagueId = await createLeague('타이밍 미리보기 리그');
     const res = await request(app.getHttpServer())
@@ -159,6 +175,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(first.endAt).toBe(`${futureDates[0]}T13:15:00.000Z`);
     expect(first.matchday).toBe(1);
     expect(first.orderInDay).toBe(1);
+    expect(res.body.data.fixtures.map((f: { week: number }) => f.week)).toEqual([1, 1, 1, 1, 1, 1]);
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
@@ -171,7 +188,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     return total;
   }
 
-  it('timing 없이 생성하면 같은 주차 동시 시작·주차 제목이고, 종료는 시작 + 전·후반 합계다', async () => {
+  it('timing 없이 생성하면 같은 주차 동시 시작·주차 순번 제목이고, 종료는 시작 + 전·후반 합계다', async () => {
     const leagueId = await createLeague('레거시 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
@@ -188,7 +205,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     const regulation = await regulationOf(fixtures[0].competitionConfigVersionId);
     expect(fixtures.every((f) => f.endAt !== null && f.startAt !== null
       && f.endAt.getTime() - f.startAt.getTime() === regulation * 60_000)).toBe(true);
-    expect(fixtures.every((f) => f.title === '레거시 리그 1주차')).toBe(true);
+    expect(fixtures.map((f) => f.title).sort()).toEqual(['레거시 리그 1주차 1경기', '레거시 리그 1주차 2경기']);
   });
 
   it('경기 시간을 비우고 하루 경기 수만 보내면 전·후반 합계를 경기 시간으로 순차 배치한다', async () => {

@@ -4,16 +4,14 @@ import { NotificationsService, type DeliveredNotification } from '../notificatio
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
 import type { LinkEmailCompleteDto, LinkEmailRequestDto, LinkEmailVerifyDto } from './dto/link-email.dto';
+import { assertEmailFree, emailConflict, lockEmailIdentity } from './email-holder';
 import { EMAIL_LINK_TOKEN_TTL_SECONDS, issueEmailLinkToken, readEmailLinkToken } from './email-link-token';
 import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import { hashPassword } from './password-hash';
 
-/** `Prisma.TransactionClient` and `PrismaService` both satisfy this, so the conflict check runs inside or outside a transaction. */
-type EmailLookupClient = Pick<Prisma.TransactionClient, 'v1User'>;
-
-/** Names the new login in the owner's security notice ("{name} 로그인이 연결됐어요"). */
-const EMAIL_LOGIN_LABEL = '이메일·비밀번호';
+/** Names the login in the owner's security notices ("{name} 로그인이 연결됐어요"). */
+export const EMAIL_LOGIN_LABEL = '이메일·비밀번호';
 
 /**
  * Adds an email + password login to the account the caller is signed in as (the reverse of `AccountLinkService`).
@@ -79,11 +77,10 @@ export class EmailLinkService {
     passwordHash: string,
   ): Promise<DeliveredNotification | null> {
     // Same two locks, caller first, as `AccountLinkService`: one account adds one email login at a time, and two
-    // accounts cannot claim the same address at once. Signup takes no lock; the unique indexes cover that race.
+    // accounts cannot claim the same address at once.
     const callerScope = JSON.stringify(['account-link-caller', callerId, V1AuthProvider.email]);
-    const identityScope = JSON.stringify(['account-link-identity', V1AuthProvider.email, email]);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${callerScope}, 0))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identityScope}, 0))`;
+    await lockEmailIdentity(tx, email);
 
     // Lock the caller's row so a suspension or deletion committing meanwhile is seen, not raced.
     await tx.$queryRaw`SELECT id FROM "v1_users" WHERE id = ${callerId} FOR UPDATE`;
@@ -97,18 +94,15 @@ export class EmailLinkService {
     await assertEmailFree(tx, callerId, email);
 
     const now = new Date();
-    const identity = await tx.v1AuthIdentity.create({
-      data: {
-        userId: callerId,
-        provider: V1AuthProvider.email,
-        providerUserKey: email,
-        email,
-        passwordHash,
-        status: 'active',
-        lastLoginAt: now,
-      },
-      select: { id: true },
-    });
+    // A login this account removed earlier (POST /auth/identities/unlink) is brought back instead of adding a second row.
+    const removed = await findRemovedEmailLogin(tx, callerId);
+    const loginData = { providerUserKey: email, email, passwordHash, status: 'active', unlinkedAt: null, lastLoginAt: now } as const;
+    const identity = removed
+      ? await tx.v1AuthIdentity.update({ where: { id: removed.id }, data: loginData, select: { id: true } })
+      : await tx.v1AuthIdentity.create({
+          data: { userId: callerId, provider: V1AuthProvider.email, ...loginData },
+          select: { id: true },
+        });
     // The address that proved itself becomes the account's email, replacing a contact email the account carried.
     await tx.v1User.update({ where: { id: callerId }, data: { email, emailVerifiedAt: now, signupEmailLoginRequired: false } });
     await tx.v1StatusChangeLog.create({
@@ -125,21 +119,19 @@ export class EmailLinkService {
     // The same security notice a social link leaves: it ignores notification settings and is stored with the link or not at all.
     return this.notifications.createInTransaction(tx, callerId, 'social_identity_linked', {
       vars: { name: EMAIL_LOGIN_LABEL },
-      businessKey: `email-link:${identity.id}`,
+      // A restored row keeps its id, so each re-link needs a key of its own or its notice would be dropped as a repeat.
+      businessKey: removed ? `email-link:${identity.id}:${now.getTime()}` : `email-link:${identity.id}`,
     });
   }
 }
 
-/** Refuses an address another account holds as its email or as its email login key; says nothing else about that account. */
-async function assertEmailFree(db: EmailLookupClient, callerId: string, email: string) {
-  const holder = await db.v1User.findFirst({
-    where: {
-      id: { not: callerId },
-      OR: [{ email }, { authIdentities: { some: { provider: V1AuthProvider.email, providerUserKey: email } } }],
-    },
+/** The caller's removed email login, if any: adding one again brings that row back, so an account never accumulates a second. */
+function findRemovedEmailLogin(tx: Prisma.TransactionClient, callerId: string) {
+  return tx.v1AuthIdentity.findFirst({
+    where: { userId: callerId, provider: V1AuthProvider.email, status: 'unlinked' },
+    orderBy: { createdAt: 'asc' },
     select: { id: true },
   });
-  if (holder) throw emailConflict();
 }
 
 function userNotFound() {
@@ -151,10 +143,6 @@ function emailLoginExists() {
     code: 'SOCIAL_LINK_PROVIDER_EXISTS',
     message: '이 계정에는 이미 이메일 로그인이 연결돼 있어요.',
   });
-}
-
-function emailConflict() {
-  return new ConflictException({ code: 'EMAIL_CONFLICT', message: '이미 다른 계정에서 쓰는 이메일이에요.' });
 }
 
 function emailLinkTokenInvalid() {

@@ -14,6 +14,7 @@ import {
   GameRosterPlayingCheckbox,
   RosterPlayerColumns,
 } from '@/components/game-roster/game-roster-player-row';
+import { GameRosterDisciplineBanners } from '@/components/game-roster/game-roster-discipline-banners';
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
 import { GameRosterJerseySheet, nextPlayerWithoutJersey } from '@/components/game-roster/game-roster-jersey-sheet';
 import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
@@ -28,6 +29,8 @@ import {
 import { V1ApiError } from '@/lib/api-client';
 import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roster-errors';
 import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
+import { disciplineWarningChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
 import { compareRosterPlayers, GAME_ROSTER_SCOPE, GAME_ROSTER_TITLE, ROSTER_SAVE_LABEL, rosterPersonLabel } from '@/lib/roster-presentation';
@@ -144,6 +147,13 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const competitionNoun = data.competitionKind === 'LEAGUE' ? '리그' : '대회';
   const selectionPlayers = [...data.participants, ...data.excluded].sort(compareRosterPlayers);
   const excludedIds = new Set(data.excluded.map((row) => row.userId));
+  const cardsByUserId = new Map(data.base.map((row) => [row.userId, row.cards]));
+  // 시작한 경기의 누적은 그 경기 직전 값이라 경고가 아니다.
+  const warningChipFor = (userId: string) => {
+    if (started) return undefined;
+    const chip = disciplineWarningChip(cardsByUserId.get(userId), data.disciplineRules);
+    return chip === null ? undefined : <StatusChip chip={chip} />;
+  };
 
   // 통합 명단에서 GK는 참가 선수 탭이 맡지만, 그 탭은 팀 전용이다. 팀원이 아닌 운영진은 여기서 바로 GK를 정한다.
   const goalkeeperInPlayersTab = managerNavigation !== null && (data.viewerRole === 'TEAM_MANAGER' || data.viewerRole === 'TEAM_MEMBER');
@@ -198,6 +208,19 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
     </Card>
   ) : null;
 
+  let rosterEntry: ReactNode;
+  if (!managerNavigation) {
+    rosterEntry = <RegistrationRosterEntry view={data} variant="block" />;
+  } else if (data.viewerRole !== 'STAFF') {
+    rosterEntry = (
+      <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>
+        {data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}
+      </Button>
+    );
+  } else {
+    rosterEntry = null;
+  }
+
   return (
     <div
       style={{
@@ -243,6 +266,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           }
         />
       ) : null}
+      <GameRosterDisciplineBanners view={data} />
       {data.legacyLineupPending ? (
         <AlertBanner
           tone="warning"
@@ -300,6 +324,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     jerseyNumber={row.jerseyNumber}
                     displayName={rosterPersonLabel(row)}
                     accountLinked={row.accountLinked}
+                    extraBadges={warningChipFor(row.userId)}
                     status={playing ? 'PARTICIPATING' : 'EXCLUDED'}
                     reason={playing ? null : leaving?.reason ?? ('reason' in row ? row.reason : null)}
                     actorRole={!playing && 'actor' in row ? row.actor.role : undefined}
@@ -344,7 +369,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
-        {managerNavigation ? <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>{data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}</Button> : <RegistrationRosterEntry view={data} variant="block" />}
+        {rosterEntry}
       </RosterSection>
 
       {!canEdit && !managerNavigation && data.excluded.length > 0 ? (

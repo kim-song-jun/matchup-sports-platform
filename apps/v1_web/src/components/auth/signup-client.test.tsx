@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { PENDING_EMAIL_LINK_STORAGE_KEY, readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { consumeSignupPhotoNotice } from '@/lib/signup-photo-notice';
 import { SignupClient } from './signup-client';
 
 const router = vi.hoisted(() => ({
@@ -62,8 +63,8 @@ async function completePhoneVerification(): Promise<void> {
 function fillAccountStep(): void {
   fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '테스트닉' } });
   fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'signup@example.com' } });
-  fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'password123' } });
-  fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'password123' } });
+  fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+  fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
 
   // 칸을 벗어나면 0.5초를 기다리지 않고 바로 중복을 확인한다.
   fireEvent.blur(screen.getByLabelText(/^닉네임/));
@@ -294,6 +295,65 @@ describe('SignupClient required profile contract', () => {
 
     await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
     expect(peekPendingSocialLink()).not.toBeNull();
+  });
+
+  describe('가입은 됐는데 프로필 사진을 올리지 못한 경우', () => {
+    async function submitWithPhoto() {
+      render(<SignupClient />);
+      await advanceToProfile();
+      fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+      fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+      fireEvent.click(screen.getByRole('radio', { name: '남' }));
+      const file = new File(['x'], 'me.png', { type: 'image/png' });
+      fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+      await screen.findByRole('button', { name: '제거' });
+      fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+    }
+
+    it('사진 업로드가 실패해도 가입을 막지 않고 완료 화면으로 가며, 완료 화면이 사진 안내를 띄우게 표시를 남긴다', async () => {
+      hooks.uploadImagesMutateAsync.mockRejectedValue(new Error('upload failed'));
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(1);
+      expect(hooks.updateProfileMutateAsync).not.toHaveBeenCalled();
+      expect(screen.queryByText('회원가입에 실패했어요.')).not.toBeInTheDocument();
+      expect(consumeSignupPhotoNotice()).toBe(true);
+    });
+
+    it('올린 사진을 프로필에 붙이는 요청이 실패해도 같다', async () => {
+      hooks.uploadImagesMutateAsync.mockResolvedValue({ urls: ['/uploads/me.png'] });
+      hooks.updateProfileMutateAsync.mockRejectedValue(new Error('patch failed'));
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(hooks.updateProfileMutateAsync).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('회원가입에 실패했어요.')).not.toBeInTheDocument();
+      expect(consumeSignupPhotoNotice()).toBe(true);
+    });
+
+    it('사진까지 잘 올라가면 안내 표시를 남기지 않는다', async () => {
+      hooks.uploadImagesMutateAsync.mockResolvedValue({ urls: ['/uploads/me.png'] });
+      hooks.updateProfileMutateAsync.mockResolvedValue({});
+
+      await submitWithPhoto();
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/complete'));
+      expect(consumeSignupPhotoNotice()).toBe(false);
+    });
+
+    it('가입 요청 자체가 실패하면 사진은 건드리지 않고 안내 표시도 남기지 않는다', async () => {
+      hooks.registerMutateAsync.mockRejectedValue(new Error('network'));
+
+      await submitWithPhoto();
+
+      expect(await screen.findByText('network')).toBeInTheDocument();
+      expect(hooks.uploadImagesMutateAsync).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalledWith('/signup/complete');
+      expect(consumeSignupPhotoNotice()).toBe(false);
+    });
   });
 
   it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {
@@ -545,12 +605,49 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
     render(<SignupClient />);
     fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '테스트닉' } });
     fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'signup@example.com' } });
-    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
     fireEvent.blur(screen.getByLabelText(new RegExp(`^${label}`)));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(screen.getByRole('button', { name: '본인인증 하기' })).toBeDisabled();
+  });
+
+  // 서버가 거절할 비밀번호에 "사용할 수 있는 비밀번호예요"를 띄우면 안 된다 — 서버와 같은 판정 파일을 쓴다.
+  it('서버가 거절할 흔한 비밀번호는 사용할 수 있다고 하지 않고 입력이 멈추면 이유를 알리며 다음 단계를 바로 막는다', async () => {
+    render(<SignupClient />);
+    fillAccountStep();
+    const next = screen.getByRole('button', { name: '본인인증 하기' });
+    await waitFor(() => expect(next).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Qwer1234' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Qwer1234' } });
+
+    // 문구는 입력이 멈춘 뒤에 나오지만, 버튼은 입력하는 순간 잠기고 이유를 알린다.
+    expect(next).toBeDisabled();
+    expect(screen.getByText('다른 비밀번호를 정해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText('8자 이상')).toHaveAccessibleDescription('너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.'));
+    expect(screen.getByPlaceholderText('8자 이상')).toBeInvalid();
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    expect(next).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
+    expect(await screen.findByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
+    expect(next).toBeEnabled();
+  });
+
+  it('8자가 안 되는 비밀번호도 입력이 멈춘 뒤에 알리고, 그동안 다음 단계는 잠겨 있다', async () => {
+    render(<SignupClient />);
+    fillAccountStep();
+    const next = screen.getByRole('button', { name: '본인인증 하기' });
+    await waitFor(() => expect(next).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'abc12' } });
+
+    expect(next).toBeDisabled();
+    expect(await screen.findByText('8자 이상 입력해 주세요.')).toBeInTheDocument();
   });
 
   it('확인을 마친 값을 고치면 이전 판정이 사라져 다음 단계가 다시 막힌다', async () => {
@@ -651,6 +748,32 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임이에요.');
     expect(screen.getByLabelText(/^닉네임/)).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  // 화면의 목록과 서버의 목록이 어긋나 서버가 거절해도, 이유는 비밀번호 칸 아래에 서버 문구 그대로 남는다.
+  it('가입 요청이 흔한 비밀번호(400)로 거절되면 가입 정보 단계로 돌아가 서버 문구를 비밀번호 칸 아래에 보여 준다', async () => {
+    hooks.registerMutateAsync.mockRejectedValue(new V1ApiError({
+      status: 'error',
+      statusCode: 400,
+      code: 'PASSWORD_TOO_COMMON',
+      message: '서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.',
+      timestamp: '2026-11-07T00:00:00.000Z',
+    }));
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    const password = await screen.findByPlaceholderText('8자 이상');
+    expect(password).toHaveAccessibleDescription('서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.');
+    expect(password).toBeInvalid();
+    expect(screen.getAllByText('서버가 거절한 비밀번호예요. 다른 비밀번호를 정해 주세요.')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '본인인증 하기' })).toBeDisabled();
+    expect(screen.getByText('다른 비밀번호를 정해 주세요.')).toBeInTheDocument();
+    expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -895,7 +1018,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     const everything = [window.sessionStorage, window.localStorage].flatMap((storage) => (
       Object.keys(storage).map((key) => `${key}=${storage.getItem(key)}`)
     )).join('\n');
-    expect(everything).not.toContain('password123');
+    expect(everything).not.toContain('Sunny-ride-4');
   });
 
   it('원래 가려던 곳(redirect)이 있으면 이메일과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {

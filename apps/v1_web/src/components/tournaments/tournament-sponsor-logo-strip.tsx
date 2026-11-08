@@ -2,9 +2,14 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
+import { isOptimizableImagePath } from '@/lib/assets';
 import { displayInitials } from '@/lib/display-initials';
 import type { V1TournamentSponsor } from '@/types/api';
 import styles from './tournament-sponsor-logo-strip.module.css';
+
+/** `.logoImage` 의 112×40 — module.css 와 같아야 한다. */
+const LOGO_WIDTH = 112;
+const LOGO_HEIGHT = 40;
 
 /**
  * 참가 신청 페이지 최하단용 후원사 로고 축약 노출.
@@ -68,9 +73,9 @@ function SponsorLogo({ logoUrl, name }: { logoUrl: string; name: string }) {
       <Image
         src={logoUrl}
         alt={`${name} 로고`}
-        width={112}
-        height={40}
-        unoptimized
+        width={LOGO_WIDTH}
+        height={LOGO_HEIGHT}
+        unoptimized={!isOptimizableImagePath(logoUrl)}
         loading="lazy"
         className={styles.logoImage}
         onError={() => setHasError(true)}

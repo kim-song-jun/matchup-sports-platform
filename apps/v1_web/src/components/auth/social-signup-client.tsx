@@ -18,7 +18,6 @@ import { clearV1IdentityCache } from '@/lib/query-keys';
 import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthStepHeader } from './auth-step-header';
-import { EMAIL_LINK_PATH, parseEmailLinkReturnTo } from '@/lib/link-result';
 import { buildAccountConflictPath } from './login-recovery-route';
 import {
   formatBirthDate,
@@ -202,13 +201,7 @@ export function SocialSignupClient() {
   };
 
   const continuationPath = (nextRoute?: string | null) => {
-    const safeNext = sanitizeRedirectPath(nextRoute);
-    const next = safeNext ? new URL(safeNext, window.location.origin) : null;
-    // Older servers can still return the retired mandatory email route during rollout.
-    const destination = next?.pathname === EMAIL_LINK_PATH
-      ? parseEmailLinkReturnTo(next.searchParams.get('redirect'))
-      : safeNext;
-    return resolveAuthContinuationPath(destination, new URLSearchParams(window.location.search).get('redirect'));
+    return resolveAuthContinuationPath(sanitizeRedirectPath(nextRoute), new URLSearchParams(window.location.search).get('redirect'));
   };
 
   const recoverRequiredTerms = async () => {

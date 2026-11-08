@@ -7,6 +7,7 @@ import {
   getTournamentVenuePrepItems,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { v1Get } from '@/lib/api-client';
+import { namedFinalGroups } from '@/test/named-final-groups';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
 
 // 상세 화면의 실제 팀 역할 조회 훅도 앱과 같은 QueryClient 환경에서 실행한다.
@@ -787,7 +788,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
   });
 
-  it('keeps the season-week explanation for a regular league mirror row (group_knockout format)', () => {
+  it('uses fixture-based guidance and season completion for a regular league mirror row', () => {
     const tournament = makeTournament({
       id: 't1',
       status: 'open',
@@ -799,9 +800,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
-    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.')).toBeInTheDocument();
+    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText('결선 진출')).not.toBeInTheDocument();
-    expect(screen.queryByText(/대진표에서 확인할 수 있어요/)).not.toBeInTheDocument();
+    expect(screen.getByText('시즌 종료')).toBeInTheDocument();
+    expect(screen.queryByText(/최종 순위에 따라 상금/)).not.toBeInTheDocument();
   });
 
   it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {
@@ -869,7 +871,8 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.getByText('팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('선수단 확정')).toBeInTheDocument();
-    expect(screen.getByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText('선수단은 명단이 잠기기 전까지 등록·수정할 수 있어요.', { exact: false })).toHaveLength(2);
+    expect(screen.queryByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).not.toBeInTheDocument();
     expect(screen.queryByText('운영진 검토')).not.toBeInTheDocument();
   });
 
@@ -940,6 +943,44 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
       'href',
       '/tournaments/t1/results',
     );
+  });
+
+  it('shows both track champions even with customized final round labels', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts',
+      groups: [makeGroup({ id: 'a', phase: 'final', bracketTrack: '프리미어' }), makeGroup({ id: 'b', phase: 'final', bracketTrack: '챌린지' })],
+      fixtures: [
+        makeFixture({ id: 'f1', groupId: 'a', round: '최종전', status: 'completed', homeTeamName: '레드 FC', result: makeFixtureResult({ homeScore: 2, awayScore: 0 }) }),
+        makeFixture({ id: 'f2', groupId: 'b', round: '최종전', status: 'completed', awayTeamName: '블루 FC', result: makeFixtureResult({ homeScore: 0, awayScore: 1 }) }),
+      ],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    const hero = screen.getByRole('link', { name: /토너먼트별 우승팀.*경기 결과 보기/ });
+    for (const name of ['프리미어', '레드 FC', '챌린지', '블루 FC']) expect(hero).toHaveTextContent(name);
+    expect(hero).not.toHaveTextContent('공동 우승');
+    expect(hero).toHaveAttribute('href', '/tournaments/t1/results');
+  });
+
+  it('lists track champions in creation order even when track sizes differ', () => {
+    // 프리미어 8팀을 먼저, 챌린지 12팀을 나중에 만들었다. 서버 응답은 12팀의 첫 단계(round16)가 맨 앞이다.
+    const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);
+    const final = (track: string, winner: string) => makeFixture({ id: `${track}-f`, groupId: `${track}-final`, round: 'final', status: 'completed',
+      homeTeamName: winner, result: makeFixtureResult({ homeScore: 2, awayScore: 0 }) });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts', groups,
+      fixtures: [final('챌린지', '블루 FC'), final('프리미어', '레드 FC')] });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    expect(screen.getByRole('link', { name: /프리미어: 레드 FC\. 챌린지: 블루 FC/ })).toBeInTheDocument();
+  });
+
+  it('keeps each unconfirmed track visible without selecting a scheduled fixture winner', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league_knockouts',
+      groups: [makeGroup({ id: 'a', phase: 'final', bracketTrack: '프리미어' }), makeGroup({ id: 'b', phase: 'final', bracketTrack: '챌린지' })],
+      fixtures: [makeFixture({ id: 'f1', groupId: 'b', round: 'final', status: 'scheduled', result: makeFixtureResult({ homeScore: 1, awayScore: 0 }) })],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+    const hero = screen.getByRole('link', { name: /토너먼트별 우승팀.*경기 결과 보기/ });
+    expect(hero).toHaveTextContent('프리미어');
+    expect(hero).toHaveTextContent('챌린지');
+    expect(hero.textContent?.match(/결과 확정 대기/g)).toHaveLength(2);
   });
 
   it('renders the pre-participation checklist exactly once via the accordion and drops the old duplicated copy', () => {

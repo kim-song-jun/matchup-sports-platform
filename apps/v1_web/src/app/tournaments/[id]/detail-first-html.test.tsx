@@ -186,7 +186,9 @@ describe('대회 상세 첫 HTML', () => {
   it('경기 상세는 두 팀 이름을 서버 HTML 에 그린다', async () => {
     const html = await serverHtml(TournamentMatchPage({ params: Promise.resolve({ id: 't-1', fixtureId: 'f-1' }) }));
     expect(html).not.toContain('경기 정보를 찾을 수 없어요');
-    expect(html).toContain('송파 유나이티드');
-    expect(html).toContain('한강 로버스');
+    // 팀 이름 링크는 마지막 글자를 chevron 과 한 span 으로 묶어 원문 HTML 에서는 이름이 태그로 나뉜다 — 읽히는 글자로 본다.
+    const text = new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '';
+    expect(text).toContain('송파 유나이티드');
+    expect(text).toContain('한강 로버스');
   });
 });

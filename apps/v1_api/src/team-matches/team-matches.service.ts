@@ -42,7 +42,7 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
-import { readTeamMatchCompetitionConfig, readTeamMatchRuleDefaults, readTeamMatchTwoPeriodDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchCompetitionConfig, readTeamMatchPeriods, readTeamMatchRuleDefaults, readTeamMatchTwoPeriodDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
 import { readTeamMatchRulesGame, repinTeamMatchRules, teamMatchRulesEditable } from './team-match-rule-repin';
 import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -336,8 +336,8 @@ export class TeamMatchesService {
       computePublicTeamRatingBatch(this.prisma, participantTeamIds),
     ]);
     const viewer = await this.getViewer(teamMatch, user);
-    const competitionConfig = teamMatch.competitionConfigVersionId
-      ? await readTeamMatchCompetitionConfig(this.prisma, teamMatch.competitionConfigVersionId)
+    const periods = teamMatch.competitionConfigVersionId
+      ? await readTeamMatchPeriods(this.prisma, teamMatch.competitionConfigVersionId)
       : null;
     const apiStatus = this.getApiStatus(teamMatch, now);
     const approvedApplication = teamMatch.applications.find(
@@ -384,7 +384,7 @@ export class TeamMatchesService {
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
       rulesText: this.formatMatchConditionsRulesText(teamMatch),
-      periods: competitionConfig?.config.periods ?? null,
+      periods,
       genderRule: normalizeGenderRule(teamMatch.genderRule),
       matchFormat: teamMatch.matchFormat,
       matchStyle: teamMatch.matchStyle,

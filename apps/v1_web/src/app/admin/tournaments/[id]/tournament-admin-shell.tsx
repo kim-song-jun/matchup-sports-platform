@@ -45,6 +45,8 @@ type CountKey = 'registrations' | 'fixtures' | 'announcements';
 interface SectionItem {
   slug: string;
   label: string;
+  /** 플랫폼 어드민 화면에만 둔다 — 대회 스태프(담당 대회 관리) 셸에서는 그리지 않는다. */
+  platformOnly?: boolean;
   /** 탭 옆 숫자에 쓰이는 operationCounts 키. 없으면 숫자를 그리지 않는다. */
   countKey?: CountKey;
   /**
@@ -64,6 +66,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
       { slug: 'registrations', label: '신청 관리', countKey: 'registrations' },
       { slug: 'bracket', label: '대진 관리', countKey: 'fixtures' },
       { slug: 'announcements', label: '공지', countKey: 'announcements' },
+      { slug: 'discipline', label: '징계 현황', platformOnly: true },
     ],
   },
   {
@@ -119,8 +122,10 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
 }
 
 /** Both surfaces use exactly the same forms; the director entry supplies a verified scoped role. */
-export function TournamentManagementContent({ id, role, staffSurface = false, children }: {
+export function TournamentManagementContent({ id, role, staffSurface = false, navigation, children }: {
   id: string; role: TournamentAdminRole; staffSurface?: boolean; children: ReactNode;
+  /** Explicit route dependencies for the isolated public sample; no auth or API behavior changes. */
+  navigation?: { basePath: string; listHref: string; operationsBasePath: string; localPopups?: boolean };
 }) {
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const canWrite = canWriteTournamentAdmin(role);
@@ -131,8 +136,8 @@ export function TournamentManagementContent({ id, role, staffSurface = false, ch
   const pathname = usePathname();
   // '대회 목록으로'는 대회 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
   const adminListHref = useAdminListReturnHref('/admin/tournaments');
-  const listHref = staffSurface ? '/tournament-management' : adminListHref;
-  const basePath = `${staffSurface ? '/tournament-management/tournaments' : '/admin/tournaments'}/${id}`;
+  const listHref = navigation?.listHref ?? (staffSurface ? '/tournament-management' : adminListHref);
+  const basePath = navigation?.basePath ?? `${staffSurface ? '/tournament-management/tournaments' : '/admin/tournaments'}/${id}`;
 
   // ── Status change ────────────────────────────────────────────────────
   const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
@@ -217,12 +222,12 @@ export function TournamentManagementContent({ id, role, staffSurface = false, ch
   const counts = tournament.operationCounts;
   const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
     label: group.label,
-    items: group.items.filter((item) => !staffSurface || !item.externalHref).map((item) => ({
+    items: group.items.filter((item) => !(staffSurface && item.externalHref) && !((staffSurface || navigation !== undefined) && item.platformOnly === true)).map((item) => ({
       slug: item.slug,
       label: item.label,
       count: item.countKey ? counts?.[item.countKey] : undefined,
-      externalHref: item.externalHref?.(id),
-      externalNote: item.externalHref ? '전역 팝업 화면으로 이동' : undefined,
+      externalHref: navigation?.localPopups ? undefined : item.externalHref?.(id),
+      externalNote: item.externalHref && !navigation?.localPopups ? '전역 팝업 화면으로 이동' : undefined,
     })),
   }));
 
@@ -301,7 +306,7 @@ export function TournamentManagementContent({ id, role, staffSurface = false, ch
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 섹션들과 별개인 대회 현장 운영
           콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
           권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
-      <TournamentOpsQuickLinks tournamentId={id} staffSurface={staffSurface} />
+      <TournamentOpsQuickLinks tournamentId={id} staffSurface={staffSurface} basePath={navigation?.operationsBasePath} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}

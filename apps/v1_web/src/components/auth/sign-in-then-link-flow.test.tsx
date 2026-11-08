@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { encodeKakaoStateVerifier } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { LINK_MSW, PENDING_LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
@@ -58,7 +58,7 @@ function Journey({ initialRoute }: { initialRoute: string }) {
 }
 
 async function openCallback(code: string) {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt({ state: 'state-1', mode: 'login', returnTo: null }));
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier({ state: 'state-1', mode: 'login', returnTo: null }));
   const path = `/callback/kakao?code=${code}&state=state-1`;
   window.history.replaceState({}, '', path);
   navigation.pathname = '/callback/kakao';
@@ -166,6 +166,31 @@ describe('카카오 콜백의 탈퇴 철회 갈래', () => {
     await openCallback('any-code');
     await screen.findByRole('heading', { level: 1, name: '탈퇴를 신청한 계정이에요' });
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
+  });
+});
+
+describe('카카오 로그인이 탈퇴 유예 계정과 겹친 경우', () => {
+  it('막다른 길 대신 탈퇴 대기 안내를 보여 주고, 연결 토큰에 유예 종료일을 함께 보관한다', async () => {
+    await openCallback(LINK_MSW.loginConflicts.withdrawalPending);
+
+    expect(await screen.findByRole('list', { name: '기다릴 때의 일정' })).toHaveTextContent(/\d+월 \d+일계정이 삭제돼요/);
+    expect(navigation.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao');
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
+    expect(screen.queryByText(/고객센터로 연락/)).not.toBeInTheDocument();
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: expect.any(String) });
+  });
+});
+
+describe('스스로 해제한 카카오 로그인으로 들어오려 할 때', () => {
+  it('차단 화면으로 가지 않고, 오류 안내 자리에서 원래 방법으로 로그인해 다시 연결하라고 알려 준다', async () => {
+    await openCallback(LINK_MSW.loginRefusals.unlinkedMethod);
+
+    expect(await screen.findByText(
+      '이 카카오 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login');
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(requests).toEqual(['POST /api/v1/auth/kakao']);
   });
 });
 

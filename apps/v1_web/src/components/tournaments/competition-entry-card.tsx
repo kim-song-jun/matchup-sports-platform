@@ -16,6 +16,7 @@ import {
 } from '@/lib/roster-editability';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { UPCOMING_GAME_TIME_TBD } from '@/lib/upcoming-game-time';
 import { tournamentRegistrationStatusConfig } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
 
@@ -102,10 +103,15 @@ function CompetitionEntryCard({
   // 참가 명단이 막혀도 이번 경기에서 빼는 건 경기 명단에서 된다 — 그 길을 같은 자리에 둔다.
   const offersGameRoster = canManage && (blockReason === 'deadline' || blockReason === 'locked');
   const upcoming = useV1TeamUpcomingGames(registration.teamId, { enabled: offersGameRoster });
+  // 시각 있는 경기가 가까운 순으로 먼저, 시각 미정 경기는 그 뒤에 서버가 준 대회 진행 순서 그대로(정렬이 안정적이다).
   const nextGame = offersGameRoster
     ? (upcoming.data?.items ?? [])
-        .filter((game) => game.tournamentId === competition.id && game.scheduledAt !== null)
-        .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''))[0] ?? null
+        .filter((game) => game.tournamentId === competition.id)
+        .sort(
+          (a, b) =>
+            Number(a.scheduledAt === null) - Number(b.scheduledAt === null) ||
+            (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''),
+        )[0] ?? null
     : null;
   const teamName = registration.teamName ?? team?.name ?? '우리 팀';
   const status = tournamentRegistrationStatusConfig(registration.status, registration.cancelOutcome);
@@ -161,7 +167,7 @@ function CompetitionEntryCard({
             href={withFromPath(gameRosterScreenPath(registration.teamId, nextGame.gameId), currentHref)}
             className={secondaryButton}
             style={{ minHeight: 44 }}
-            aria-label={`다음 경기 명단 열기 (${formatTournamentDateTimeShort(nextGame.scheduledAt) ?? '일정 미정'})`}
+            aria-label={`다음 경기 명단 열기 (${formatTournamentDateTimeShort(nextGame.scheduledAt) ?? UPCOMING_GAME_TIME_TBD})`}
           >
             다음 경기 출전 관리
           </Link>

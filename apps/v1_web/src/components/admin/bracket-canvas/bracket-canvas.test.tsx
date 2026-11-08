@@ -255,3 +255,44 @@ it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고
     expect(tile).not.toHaveStyle({ background: 'var(--blue50)' });
   }
 });
+
+describe('named finals are stacked in independent diagrams', () => {
+  it.each([2,10])('renders %i finals as separate sections and keeps every fixture selectable', count => {
+    const groups = Array.from({length: count}, (_,i) => makeGroup({ id: 'g-'+i, name: '결승', phase: 'final', bracketTrack: '토너먼트 '+i, bracketColorIndex: i, sortOrder: i*100 }));
+    const fixtures = groups.map((group,i) => makeFixture({ id: 'f-'+i, groupId: group.id, fixtureNumber: i+1, round: '결승' }));
+    const { container, props } = renderCanvas({ groups, fixtures, slots: [] });
+    const sections = [...container.querySelectorAll('details')];
+    expect(sections).toHaveLength(count);
+    sections.forEach((section,i) => {
+      expect(within(section).getByRole('region', {name:'대진 그림'})).toBeInTheDocument();
+      expect(within(section).getAllByRole('group')).toHaveLength(1);
+      expect(section.querySelector('.tm-final-color-'+i)).toBeInTheDocument();
+      fireEvent.click(within(section).getByRole('button', {name: new RegExp((i+1)+'번 경기 열기')}));
+      expect(props.onSelectFixture).toHaveBeenLastCalledWith('f-'+i);
+    });
+    const last = sections[count-1] as HTMLDetailsElement;
+    last.open = false;
+    fireEvent.click(within(screen.getByRole('navigation', {name:'토너먼트 그림 바로가기'})).getByRole('button', {name:'토너먼트 '+(count-1)}));
+    expect(last.open).toBe(true);
+  });
+  it('retains preliminary rank slot assignment and confines winner paths to their final', () => {
+    const preliminary = makeGroup({ id:'pre', name:'A조', phase:'group' });
+    const first = makeGroup({ id:'a-semi', name:'4강', phase:'semi', bracketTrack:'챔피언' });
+    const last = makeGroup({ id:'a-final', name:'결승', phase:'final', bracketTrack:'챔피언', sortOrder:1 });
+    const other = makeGroup({ id:'b-final', name:'결승', phase:'final', bracketTrack:'챌린지', sortOrder:100 });
+    const rank = makeSlot({ id:'rank', groupId:first.id, kind:'GROUP_RANK', sourceGroupId:preliminary.id, label:'A조 1위' });
+    const entry = makeSlot({ id:'entry', groupId:preliminary.id, kind:'ENTRY', label:'A조 1번' });
+    const fixtures = [makeFixture({id:'a1', groupId:first.id, fixtureNumber:1, homeSlotId:rank.id}),makeFixture({id:'a2',groupId:last.id,fixtureNumber:2,bracketSources:[{fixtureId:'a1',outcome:'WINNER',side:'HOME'}]}),makeFixture({id:'b',groupId:other.id,fixtureNumber:3})];
+    const {container,props} = renderCanvas({groups:[preliminary,first,last,other],fixtures,slots:[entry,rank],pendingRegistrationId:'reg-1'});
+    const sections = [...container.querySelectorAll('details')];
+    expect(sections).toHaveLength(3);
+    expect(sections[1].querySelectorAll('svg path')).toHaveLength(1);
+    expect(sections[2].querySelectorAll('svg path')).toHaveLength(0);
+    fireEvent.click(within(sections[1]).getByRole('button',{name:/홈 A조 1위/}));
+    expect(props.onAssignSlot).not.toHaveBeenCalled();
+    expect(props.onSelectFixture).toHaveBeenCalledWith('a1');
+    fireEvent.click(within(sections[0]).getByRole('button',{name:'A조 1번, 빈 자리, 선택한 팀을 여기에 넣어요'}));
+    expect(props.onAssignSlot).toHaveBeenCalledWith('entry','reg-1');
+    expect(within(sections[0]).getAllByText('A조').length).toBeGreaterThan(0);
+  });
+});

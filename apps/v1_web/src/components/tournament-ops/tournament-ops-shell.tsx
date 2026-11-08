@@ -24,6 +24,7 @@ import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
 import { displayInitials } from '@/lib/display-initials';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
+import { optimizedImageSrc } from '@/lib/assets';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -60,9 +61,9 @@ function TournamentEmblem({
 }) {
   if (coverImageUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- 대회 커버는 외부 업로드 URL, next/image 도메인 화이트리스트 밖일 수 있어 원본 태그를 유지한다.
+      // eslint-disable-next-line @next/next/no-img-element -- 커버는 외부 URL 일 수 있어 <img> 를 유지하고, 업로드만 optimizedImageSrc 로 줄여 받는다.
       <img
-        src={coverImageUrl}
+        src={optimizedImageSrc(coverImageUrl, size)}
         alt=""
         aria-hidden="true"
         width={size}
@@ -340,7 +341,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           </button>
         </div>
 
-        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 pt-2 pb-[calc(var(--spacing-2)+var(--v1-shell-safe-bottom))] overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
             if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
@@ -406,8 +407,10 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
 
   const sectionLabel = navItems.find((item) => isActive(item))?.label ?? competitionOpsTitle(tournamentKind);
 
+  // 문서가 스크롤하는 표면이다. Android 앱은 하단 시스템 바 뒤까지 웹을 그리므로 root 한 곳에서만
+  // 스크롤 끝에 그 높이(--v1-shell-safe-bottom)를 더한다 — main 여백에 다시 더하면 두 번 쌓인다.
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex pb-[var(--v1-shell-safe-bottom)] [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"

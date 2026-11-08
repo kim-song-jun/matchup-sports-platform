@@ -38,6 +38,7 @@ export interface LeagueScheduleBoardProps {
   focusFixtureId?: string | null;
   onEditSchedule: (teamMatchId: string) => void;
   onCancelFixture: (teamMatchId: string) => void;
+  onDeleteFixture: (teamMatchId: string) => void;
   onShowList: () => void;
   /** 주차 칸의 '이 주에 경기 추가'. 없으면 버튼을 그리지 않는다(읽기 전용·끝난 리그). */
   onAddToWeek?: (column: LeagueBoardColumn) => void;
@@ -45,11 +46,11 @@ export interface LeagueScheduleBoardProps {
 
 const TOOLBAR_BUTTON = 'tm-btn tm-btn-sm tm-btn-outline';
 
-/** 주차 칸 제목 — '2주차 · 11/17 (월)~11/23 (일)'. 데스크톱 칸과 모바일 주차 머리가 같이 쓴다. */
+/** Week heading such as '2주차 · 11/21 (토)~11/22 (일)', covering only the days with games; shared by the desktop column and the mobile week header. */
 export function leagueWeekHeading(column: LeagueBoardColumn): string {
   const range = formatTournamentDateRangeShort(
-    new Date(kstMidnightMs(column.startDate)).toISOString(),
-    new Date(kstMidnightMs(column.endDate)).toISOString(),
+    new Date(kstMidnightMs(column.firstGameDate)).toISOString(),
+    new Date(kstMidnightMs(column.lastGameDate)).toISOString(),
   );
   return `${column.weekNumber}주차 · ${range}`;
 }
@@ -83,7 +84,7 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onShowList, onAddToWeek }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onDeleteFixture, onShowList, onAddToWeek }: LeagueScheduleBoardProps) {
   const headingId = useId();
   // 서버 기본값 true — 하이드레이션 전엔 지금 배치를 유지하고 좁은 태블릿만 클라이언트에서 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
@@ -218,6 +219,10 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
         onCancelFixture={() => {
           setOpenFixtureId(null);
           onCancelFixture(openNode.fixtureId);
+        }}
+        onDeleteFixture={() => {
+          setOpenFixtureId(null);
+          onDeleteFixture(openNode.fixtureId);
         }}
         onClose={() => {
           if (sidePanel) focusFixtureOpener(openNode.fixtureId);

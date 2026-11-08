@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
-import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { encodeKakaoStateVerifier } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
@@ -52,7 +52,7 @@ async function primeValidOAuthState(stored: string = 'state-123') {
 }
 
 async function primeLinkAttempt(returnTo: string | null = '/my/settings/login-methods') {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt({ state: 'state-123', mode: 'link', returnTo }));
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier({ state: 'state-123', mode: 'link', returnTo }));
   searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
 }
 
@@ -230,7 +230,7 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
   });
 
   it('새 형식(JSON, mode=login) 저장값도 로그인으로 읽는다', async () => {
-    await primeValidOAuthState(await serializeKakaoOAuthAttempt({ state: 'state-123', mode: 'login', returnTo: null }));
+    await primeValidOAuthState(await encodeKakaoStateVerifier({ state: 'state-123', mode: 'login', returnTo: null }));
     api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
     render(<KakaoCallbackClient />);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
@@ -250,6 +250,17 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     expect(screen.queryByText('로그인을 완료하지 못했어요')).not.toBeInTheDocument();
   });
 
+  it('탈퇴 신청 중인 계정과 겹친 409 는 유예 종료 시각까지 보관하고 안내 화면으로 보낸다', async () => {
+    await primeValidOAuthState();
+    const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', {
+      next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: until,
+    }));
+    render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao', withdrawalPendingUntil: until });
+  });
+
   it('details 가 없는 409 는 안내 화면 대신 서버 문구를 보여 주고 토큰을 만들지 않는다', async () => {
     await primeValidOAuthState();
     api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT'));
@@ -266,6 +277,26 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     render(<KakaoCallbackClient />);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/chat' });
+  });
+
+  it('스스로 연결을 해제한 카카오(LOGIN_METHOD_UNLINKED)는 차단 화면 대신 다시 연결하는 길을 오류 안내 자리에 보여 준다', async () => {
+    await primeValidOAuthState();
+    api.v1Post.mockRejectedValue(apiError(403, 'LOGIN_METHOD_UNLINKED'));
+    render(<KakaoCallbackClient />);
+    expect(await screen.findByText(
+      '이 카카오 로그인은 연결을 해제했어요. 원래 방법으로 로그인한 뒤 설정 > 로그인 방법에서 다시 연결해 주세요.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login');
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'LOGIN_METHOD_UNLINKED' });
+  });
+
+  it('정지·차단된 계정의 403(PERMISSION_DENIED)은 그대로 차단 화면으로 보낸다', async () => {
+    await primeValidOAuthState();
+    api.v1Post.mockRejectedValue(apiError(403, 'PERMISSION_DENIED'));
+    render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
+    expect(screen.queryByText(/연결을 해제했어요/)).not.toBeInTheDocument();
   });
 
   it('철회 토큰이 없는 403 은 철회 화면으로 보내지 않는다(자격이 틀리면 계정 상태를 알리지 않는다)', async () => {

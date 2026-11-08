@@ -500,6 +500,159 @@ describe('LineupTodoService — 대회·리그는 할 일에서 빠진다(R1)', 
   });
 });
 
+/**
+ * 시각이 아직 정해지지 않은 대회 경기(`startAt` null)는 홈 "다음 경기"와 팀 경기 목록만 받는다 —
+ * 라인업 할 일·리마인더·전날 명단 확인은 시각이 있어야 의미가 있으므로 넓히지 않는다.
+ * 쿼리가 실제로 무엇을 거르는지는 통합 스펙(team-game-rosters)이 DB 로 확인한다.
+ */
+describe('LineupTodoService — 시각 미정 대회 경기(includeUntimedTournamentGames)', () => {
+  const NOW = new Date('2026-09-01T00:00:00.000Z');
+  const untimedRow = (id: string, round: string, fixtureNumber: number, phase: string) => ({
+    id,
+    startAt: null,
+    hostTeamId: teamId,
+    hostTeam: { name: '성수 FC' },
+    approvedApplicantTeamId: opponentTeamId,
+    approvedApplicantTeam: { name: '망원 FC' },
+    tournamentId: 'tournament-1',
+    tournament: { title: '퀸즈컵' },
+    tournamentDetails: { round, legNumber: 1, fixtureNumber, group: { name: 'A조', phase } },
+    leagueId: null,
+    league: null,
+    game: { id: `game-${id}` },
+  });
+  type MatchWhere = { status?: string; AND?: Array<{ startAt?: unknown }> };
+  const isUntimedQuery = (where: MatchWhere | undefined) =>
+    where?.status === 'matched' && (where.AND ?? []).some((clause) => clause.startAt === null);
+  const matchedCalls = (prisma: ReturnType<typeof buildPrismaMock>) =>
+    prisma.v1TeamMatch.findMany.mock.calls
+      .map(([args]) => args as { where: MatchWhere; orderBy: unknown; cursor?: unknown; skip?: number })
+      .filter((args) => args.where?.status === 'matched');
+
+  /** 시각 미정 쿼리(`startAt: null`)에만 주어진 행을 돌려주고, 시각 있는 쿼리는 기본 행을 그대로 돌려준다. */
+  function withUntimedRows(
+    prisma: ReturnType<typeof buildPrismaMock>,
+    untimedPages: (cursorId: string | undefined) => unknown[],
+  ) {
+    const base = prisma.v1TeamMatch.findMany.getMockImplementation()!;
+    prisma.v1TeamMatch.findMany.mockImplementation((args: { where?: MatchWhere; cursor?: { id: string } }) =>
+      isUntimedQuery(args.where) ? Promise.resolve(untimedPages(args.cursor?.id)) : base(args),
+    );
+    return prisma;
+  }
+
+  it('시각 미정 경기는 별도 쿼리로 읽고, 대진이 공개된 진행 중 대회의 시작 전 경기에만 연다', async () => {
+    const prisma = withUntimedRows(buildPrismaMock(), () => []);
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      await service.listUpcomingForTeams([teamId], NOW, { startedWithinMs: 3_600_000, includeUntimedTournamentGames: true });
+
+      const [timed, untimed, ...rest] = matchedCalls(prisma);
+      expect(rest).toEqual([]);
+      // 시각 있는 쿼리는 요청하지 않은 소비자와 같다 — 킥오프 유예와 정렬 계약 그대로.
+      expect(timed.where).toMatchObject({ startAt: { gte: new Date(NOW.getTime() - 3_600_000) } });
+      expect(JSON.stringify(timed.where)).not.toContain('"startAt":null');
+      expect(timed.orderBy).toEqual({ startAt: 'asc' });
+      // 시각 미정 쿼리: 리그·친선·종료/취소 대회·취소 경기와 아직 공개되지 않은 대진(예약 공개 시각 전 포함)은 열리지 않는다.
+      expect(untimed.where.AND).toEqual([
+        { startAt: null },
+        {
+          deletedAt: null,
+          leagueId: null,
+          tournamentId: { not: null },
+          tournament: { status: { notIn: ['completed', 'cancelled'] } },
+          game: { is: { state: 'SCHEDULED' } },
+        },
+        { tournament: { OR: [{ bracketPublishedAt: { not: null } }, { bracketPublishScheduledAt: { lte: NOW } }] } },
+      ]);
+      // 상대와 참가 팀이 확정된 매치만 — 자리만 있는 TBD 대진은 후보가 아니다.
+      expect(untimed.where).toMatchObject({
+        status: 'matched',
+        hostTeamId: { not: null },
+        approvedApplicantTeamId: { not: null },
+      });
+      // NULL 은 (startAt, id) 커서 비교에서 빠지므로 id 만으로 정렬한다.
+      expect(untimed.orderBy).toEqual({ id: 'asc' });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('시각 있는 경기 뒤에 붙고 대회 진행 순서로 놓이며, scheduledAt 은 null 로 남는다', async () => {
+    // 받은 순서를 일부러 진행 순서와 어긋나게 둔다 — 결승이 조별 라운드보다 앞이다.
+    const prisma = withUntimedRows(buildPrismaMock(), () => [
+      untimedRow('match-final', 'final', 1, 'final'),
+      untimedRow('match-r10', 'league_r10', 1, 'group'),
+      untimedRow('match-r2', 'league_r2', 1, 'group'),
+    ]);
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const items = await service.listUpcomingForTeams([teamId], NOW, { includeUntimedTournamentGames: true });
+
+      expect(items.map((item) => [item.gameId, item.scheduledAt === null ? null : 'timed'])).toEqual([
+        // 시각 있는 두 경기는 시각순(친선 9/6, 리그 9/8).
+        ['game-friendly', 'timed'],
+        ['game-league', 'timed'],
+        ['game-match-r2', null],
+        ['game-match-r10', null],
+        ['game-match-final', null],
+      ]);
+      expect(items.find((item) => item.gameId === 'game-match-r2')).toMatchObject({
+        competitionKind: 'TOURNAMENT',
+        tournamentId: 'tournament-1',
+        title: '퀸즈컵 · A조 · 조별리그 2라운드',
+        deepLink: `/teams/${teamId}/games/game-match-r2/roster`,
+      });
+      // 시각 있는 리그 경기의 주차 파생은 시각 미정 행이 섞여도 그대로다.
+      expect(items.find((item) => item.gameId === 'game-league')?.title).toBe('가을 정규 리그 2주차');
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('후보가 한 쪽(500행)을 넘어도 id 커서로 끝까지 읽어 뒤쪽 행을 잃지 않는다', async () => {
+    const PAGE = 500;
+    const rowAt = (index: number) => untimedRow(`m${String(index).padStart(4, '0')}`, 'league_r1', index, 'group');
+    const prisma = withUntimedRows(buildPrismaMock(), (cursorId) =>
+      cursorId === undefined
+        ? Array.from({ length: PAGE }, (_, index) => rowAt(index))
+        : [rowAt(PAGE), rowAt(PAGE + 1)],
+    );
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const items = await service.listUpcomingForTeams([teamId], NOW, { includeUntimedTournamentGames: true });
+
+      expect(items.filter((item) => item.scheduledAt === null)).toHaveLength(PAGE + 2);
+      const untimedCalls = matchedCalls(prisma).filter((args) => isUntimedQuery(args.where));
+      expect(untimedCalls.map((args) => [args.cursor, args.skip])).toEqual([
+        [undefined, undefined],
+        [{ id: `m${String(PAGE - 1).padStart(4, '0')}` }, 1],
+      ]);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('할 일·리마인더·전날 명단 확인은 요청하지 않으므로 시각 미정 쿼리가 돌지 않는다', async () => {
+    const prisma = withUntimedRows(buildPrismaMock(), () => [untimedRow('match-final', 'final', 1, 'final')]);
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      await service.listForUser({ id: userId } as never);
+      await service.listAllPending(NOW);
+      await service.listCompetitionRosterChecks(NOW, new Date(NOW.getTime() + 86_400_000));
+
+      const calls = matchedCalls(prisma);
+      expect(calls).toHaveLength(3);
+      for (const { where } of calls) {
+        expect(JSON.stringify(where)).not.toContain('"startAt":null');
+        expect(where).toMatchObject({ startAt: { gte: expect.any(Date) } });
+      }
+    } finally {
+      await moduleRef.close();
+    }
+  });
+});
+
 describe('LineupTodoService.listCompetitionRosterChecks — 전날 명단 확인 대상', () => {
   // KST 9/6 하루 = UTC 9/5 15:00 ~ 9/6 15:00.
   const FROM = new Date('2026-09-05T15:00:00.000Z');

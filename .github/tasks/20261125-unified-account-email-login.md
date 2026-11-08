@@ -5,6 +5,41 @@ Status: In Progress
 **Created**: 2026-11-01
 **Related**: [20261124-auth-recovery-account-linking.md](./20261124-auth-recovery-account-linking.md) (소셜 연결 API·"원래 계정에 로그인하면 자동 연결"까지 끝낸 앞선 작업)
 
+## 2026-11-05 최초 재개 기록
+
+사용자 목표: 모바일 UI/UX 수정부터 카카오·이메일·Apple을 같은 계정의 로그인 수단으로 연결하고 Alpha와 main 배포에서 실제 테스트·확인까지 완료한다. 기존 5B 계정 소유 증명과 B안 단계 화면 결정을 유지한다. 아래의 옛 화면 미구현 체크는 현재 소스와 차이가 있어 이번 검증에서 근거에 맞게 갱신한다.
+
+- Phase 1 진행: 최신 코드·배포·기존 CI·계정 상태 대조. Alpha `0690f89a`, main `de8082bd`; 두 환경 health DB 정상. main CI 41997420630의 실제 DB 통합 테스트에서 이메일 연결/로그인/복구 및 카카오 연결 스펙 PASS 확인.
+- Phase 2 진행: 실제 브라우저 로그인·연결·복구와 모바일 경계 검증. 운영 카카오 실제 로그인 후 원래 목적지(`/my/settings/login-methods`) 복귀 및 auth/me 200 확인. 운영 계정은 `social_profile_deferred`, 카카오만 연결됨. Alpha 계정은 `signup_done`, 카카오만 연결됨.
+- 재현 결함: 운영 서버는 `canLinkLoginMethods=false`, `canLinkAfterSignup=true`로 응답하지만 화면은 영구 금지 안내만 보여 가입 정보 보완으로 이어질 수 없다. 기존 `/signup/social` 경로로 안내하고 완료 뒤 로그인 방법으로 복귀시킨다. 계정 소유 증명·서버 권한은 유지한다.
+- Phase 3 대기: 수정 dev PR/CI/Alpha 재검증, 운영 반영과 실제 계정 연결·복구의 완료 증거. 비밀번호·인증번호 입력이나 Apple 실기기처럼 사용자가 필요한 경계는 별도로 표시하며 전체 완료로 계산하지 않는다.
+- Owned: 로그인 방법 화면/해당 테스트, 이 작업 문서, Changeset. Forbidden: 운영 사용자 데이터 직접 수정, 타 세션 PR·작업트리, 외부 제공자 설정, 사용자만 가능한 main 승격.
+- 현재 관찰은 전용 비공개 QA 증거 디렉터리에 보관한다. 계정 식별자·비밀번호·인증 코드·세션은 공개 문서에 기록하지 않는다.
+- 추가 증거: Alpha의 기존 QA 계정으로 실제 이메일 로그인 201 및 세션 쿠키 발급 확인(자격증명 비공개 파일에서 읽음; 계정 정보 변경 없음). 운영 카카오 로그인과 서로 다른 환경/계정의 증거이므로 동일 계정의 수단 간 로그인 완료로 계산하지 않는다.
+- 수정 검증: 가입 보완 후 돌아올 URL을 검사하는 새 테스트 RED 확인(가입 정보 입력 링크 없음) → 로그인 방법 화면 61/61 GREEN, Web 타입·패턴 검사 PASS. 가입 보완은 서버 `canLinkAfterSignup=true`일 때만 안내하며 연결 권한 자체는 부여하지 않는다.
+- 사용자 확인(2026-11-05): 지금은 실제 계정의 인증번호·비밀번호를 직접 입력하기 어려우므로 나머지 검증을 우선 진행한다. 실계정 이메일 추가 완료와 그 수단으로의 재로그인은 보류이며 전체 완료 조건에 남는다.
+
+## Progress Snapshot — 2026-11-06 (Claude 인계)
+
+- 사용자(11-06): 실계정 이메일 연결 검증 전에 "정책적으로 먼저 파악"하기로 했다. 코드 304곳을 대조한 정책 정리에서 공백 13개(G1~G13)를 찾았고, 결정 페이지(비공개 로컬 HTML)로 선택을 받는 중이다.
+- 실계정 검증의 전제가 바뀌었다: **붙인 로그인 수단을 떼는 API가 사용자·어드민 모두 없다**(G1, `apps/v1_api/src/auth` 에 해제 라우트 0). 실계정에 이메일을 붙이면 DB 직접 수정 외에는 되돌릴 수 없다. 또 **프로필 수정이 이메일을 인증 없이 바꾼다**(G5, `profile.service.ts` — 중복 확인만, 비밀번호 계정은 로그인 아이디까지 변경).
+- alpha 서버에는 SES 권한이 없어 실제 메일 수신은 운영에서만 검증된다. 운영(main 1.13.0)에는 #2165가 없어 정보 입력을 미룬 카카오 계정은 이메일 추가로 넘어가지 못한다.
+- 결정 전까지 실계정 단계는 보류. 추천 순서: G1 결정·구현 → alpha 일회용 QA 계정 리허설(alpha 쓰기 승인 필요) → 다음 승격 후 운영 실계정.
+
+## Progress Snapshot — 2026-11-05 23:25 KST
+
+- 수행: Codex 메인. 서브에이전트·로컬 웹 서버를 시작하지 않았다.
+- PR #2165는 dev `982ca40bc3e9c824ce7e6dfe64c489a69d78b793`에 머지했고 matching CI 42017212392·Alpha 배포 42017212314가 통과했다. 실제 Alpha Web/API 헤더와 DB health를 확인했다. 가입을 미룬 상태는 브라우저 한정 auth/me fixture로 안내 → `/signup/social` → 로그인 방법 왕복을 확인하고 fixture를 제거했다. 실계정의 가입 완료·이메일 연결 완료 증거로 세지 않는다.
+- 실제 인증 증거: Alpha 카카오 인증 후 원래 계정 복원, 운영 카카오 인증 후 지정 목적지 복귀, 일회용 QA 계정의 이메일 로그인·이메일/휴대폰 계정 찾기·이메일 비밀번호 재설정 후 같은 QA 계정 재로그인. 휴대폰만으로 비밀번호 재설정은 409로 거절되며 기존 계정 세션이 유지됐다. 실제 메일/SMS 수신과 카카오+이메일이 연결된 한 실계정의 양쪽 재로그인은 미검증이다.
+- 이메일 연결 보호: 기존 QA 계정의 오래된 세션은 403 `RECENT_LOGIN_REQUIRED`, 재로그인 후 같은 계정으로 연결 화면 복귀, 이미 가진 이메일 수단은 409 `SOCIAL_LINK_PROVIDER_EXISTS` 안내를 확인했다. 인증번호 발송·신원 추가·공유 QA 비밀번호 변경은 하지 않았다.
+- 모바일 후속 PR #2166은 dev `0b7720cb7d068b05735039e3445ef4b374642ed7`에 머지됐다. PR exact-head `74a3f7e32a5261f7896c493be61cb79d130b845e` CI 42023072760, 새 dev 전체 CI 42030531109, Alpha 배포 42030531284가 모두 통과했다. Web/API가 `0b7720cb`와 `1.13.1-alpha.20261105.g0b7720cb7d06`을 서빙하며 DB health 정상이다. 다섯 모바일 수정의 동일 50조건 화면 재검수는 새 검수 공간 확인 대기로 남는다.
+- 릴리스 준비 브랜치: `codex/unified-account-release-20261105`, dev 대상 초안 PR #2167. 공개 head `26ad5c613ca02405cb6245fe008544e5c7e8f6f4`의 CI 42038344742는 API·Web·Gates 모두 통과했고 code scanning 42038352245도 통과했다. PR base dev `0b7720cb`, 파일 9개, unresolved thread 0개, 리뷰 제출 0개, draft 상태를 확인했다. 자동 검사와 리뷰 verdict를 구분한다. API/Web 매니페스트 `1.13.0 → 1.13.1`, CHANGELOG 2개, patch Changeset 3개 소비, 기존 task 2개뿐이며 앱 동작·DB 스키마·워크플로·네이티브 코드는 바꾸지 않았다. 계획 배포 버전은 리졸버 기준 `1.13.2`다. 정본 `--prepare-only` 게이트와 릴리스 계약 24/24 통과. main 이력 `de8082bd`를 `3aaad5ae`로 파일 변경 없이 흡수했다. 동일 50조건의 새 Alpha 화면 재검수가 끝난 뒤 PR을 다음 단계로 진행하며, main 승격은 사용자만 수행한다.
+- 앱·웹 경계 소스 점검: Android는 하단 시스템 영역·키보드 상태를 root CSS 변수/속성으로 쓰고 페이지 로드 후 다시 발행한다. iOS도 두 하단 변수와 키보드 상태를 전달하며 키보드 프레임 변경 때 강제 발행한다. 현재 Web은 브라우저 safe area와 native bottom의 최댓값을 쓴다. 이번 후보의 Android/iOS 소스는 main과 같으며 설치본·스토어 버전·실기기 동작은 추정하지 않는다. 네이티브 빌드·시뮬레이터는 이번 후속 검수에서 실행하지 않았다.
+- 운영 배포 기록: 현재 main `de8082bd`의 성공 push 배포 41997420630 / Deploy job 127165871083에서 230개 migration 체인을 찾았고, 이메일 토큰 purpose 분리를 포함한 9개 migration 적용 로그를 확인했다. 이는 완료된 배포 로그 증거이며 현재 DB 직접 조회나 실제 이메일 연결 완료 증거는 아니다. 23:25 KST public Web/API SHA `de8082bd`, release `1.13.1`, DB health 정상. 새 모바일·가입 보완 수정의 운영 반영은 남는다.
+- 브라우저 재개 조건: 현재 ego 연결에서 기존 TaskSpace 69와 이 목표의 작업공간 이름을 찾지 못했다. 같은 조건을 세 연속 goal turn에서 재확인했고 새 검수 공간 생성 답변은 아직 없다. 다른 사용자 공간은 건드리지 않았고 공간 재생성·다른 브라우저 우회도 하지 않았다. 배포본 50조건, 전체 경로, 실계정·Apple·기기 검수는 완료가 아니다.
+- 사용자 보류는 유지: 실계정 이메일 인증번호·비밀번호 직접 입력, Android·iPhone 실기기, 실제 Apple 인증. 전체 목표를 완료로 표시하지 않는다. main 승격 PR 생성·머지는 저장소 정본에 따라 사용자가 수행한다.
+- 비공개 증거: `teameet-unified-auth-20261105`의 `progress-checkpoint.json`, `mobile-pr-ci-test-proof.json`, `alpha-deferred-state-fixture-results.json`, `alpha-email-link-relogin-and-duplicate.json`, `role-api-preconditions*.json`, `route-coverage-matrix.json`. 자격증명·코드·쿠키·개인 식별자는 커밋하지 않는다.
+
 ## Context
 앞선 작업(20261124)으로 이메일 가입자가 카카오·애플을 자기 계정에 붙일 수 있게 됐다(`POST /auth/link/kakao|apple|pending`).
 반대 방향이 비어 있다. 카카오·애플로 가입한 사람은 **이메일 + 비밀번호 로그인을 더할 길이 없다.**
@@ -33,11 +68,11 @@ Status: In Progress
 - [x] 인증 메일은 전용 문구("로그인 이메일 연결 인증번호")를 쓴다
 - [x] 메일을 보낼 수단이 없으면 `request` 는 `sent: true` 로 속이지 않고 503 `EMAIL_SEND_UNAVAILABLE` 로 답한다
 - [x] 문서(`docs/api/domains/auth.md`·`auth-and-session.md`)와 웹 데이터 계층(타입·MSW·변이 훅)을 같은 PR에서 갱신한다. 화면은 이 PR에 넣지 않는다
-- [ ] 화면: B안 — 전용 단계 흐름 `/my/settings/login-methods/email` (진행 막대, 화면당 질문 하나). **별도 웹 PR**
-- [ ] 화면: 가입 화면의 "이미 가입한 번호" 카드에서 원래 계정으로 로그인한 직후, 입력해 둔 이메일을 채운 채 위 흐름으로 바로 이동한다. **별도 웹 PR**
-- [ ] 화면: 기존 연결된 줄의 라벨 "이메일 로그인"을 "이메일·비밀번호"로 바꾼다. **별도 웹 PR**
-- [ ] 화면: 완료 화면은 가입 완료 그래픽을 재사용한다. **별도 웹 PR**
-- [ ] 화면: "방금 입력한 이메일을 붙일까요?" 제안은 한 번만 보인다. **별도 웹 PR**
+- [x] 화면 구현: B안 — `EmailLinkClient`의 전용 단계 흐름 `/my/settings/login-methods/email` (진행 막대, 화면당 질문 하나). 실제 계정의 전체 완료 검증은 위 재개 상태로 추적한다.
+- [x] 화면 구현: `usePendingEmailLinkOffer`가 원래 계정에 로그인한 뒤 입력했던 이메일을 채운 연결 화면으로 이동시킨다. 이메일만 탭에 보관하고 비밀번호는 저장하지 않는다.
+- [x] 화면 구현: 연결된 줄의 라벨은 "이메일·비밀번호"다.
+- [x] 화면 구현: `SignupCompletePageView`와 `getEmailLinkCompleteViewModel`로 가입 완료 그래픽을 재사용한다.
+- [x] 화면 구현: `offeredRef`와 연결 화면의 보관값 소비로 같은 제안을 한 번만 처리한다. 관련 훅·흐름 테스트가 있다.
 
 ## User Scenarios
 ### Scenario 1: 카카오로 가입한 사람이 이메일 로그인을 더한다
@@ -99,19 +134,19 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 - [x] 전용 메일 문구(`login_email_link`), 발송 불가 503, 완료 시 알림 (`EmailLinkService`)
 ### Frontend (데이터 계층만)
 - [x] 타입·MSW·변이 훅 — 화면 없음
-- [ ] 화면(B안)과 가입 → 로그인 → 이메일 붙이기 진입점은 이 위에 쌓는 **별도 웹 PR**  ← UI 변경이므로 사용자가 B안을 이미 골랐고(아래), 구현 PR 에서 갤러리를 첨부한다
+- [x] B안 화면과 가입 → 로그인 → 이메일 붙이기 진입점 구현은 반영됐다. 최신 실계정·배포 검증 범위는 위 재개 기록을 따른다.
 ### Docs
 - [x] `docs/api/domains/auth.md` (엔드포인트·에러 코드·보안 노트), `docs/api/auth-and-session.md`
 ### Sequential
 - [x] 통합 스펙을 일회용 Postgres 16 컨테이너에서 실행(컨테이너는 끝난 뒤 삭제)
-- [ ] 머지 후 alpha 실측 — 화면 PR 이후 실제 계정으로(데이터를 바꾸므로 사용자 승인 후)
+- [ ] 머지 후 Alpha 실계정 연결 완료 — 사용자 인증번호·비밀번호 직접 입력 대기. 이미 확인한 로그인·복구·보호 흐름과 구분한다.
 
 ## Acceptance Criteria
 - [x] Original conditions 중 서버·데이터 계층·문서 항목 전부 충족, 화면 항목은 별도 PR
 - [x] Test scenarios 전부 green (단위 + 통합 + 웹 훅)
 - [x] 범위 내 tech debt 해결 — 최근 로그인 검사가 소셜 연결 서비스 안에만 있던 것을 공용으로, 비밀번호 규칙을 한 곳으로
 - [x] Security 노트 반영
-- [x] Mock data 업데이트 완료 (스키마 변경 없음)
+- [x] Mock data 업데이트 완료 (`V1VerificationPurpose`와 목적 열 migration 계약 포함)
 - [ ] Code review: Critical=0, Warning=0
 - [ ] 화면 PR: A·B·C 3안 → 사용자 선택(B안 선택 완료) → 구현, 갤러리 첨부
 

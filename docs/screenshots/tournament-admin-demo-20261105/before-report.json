@@ -1,0 +1,53 @@
+{
+  "mode": "before",
+  "origin": "https://alpha.teameet.co.kr",
+  "persona": "anonymous sample operator",
+  "pid": 6164,
+  "ppid": 11760,
+  "screenshots": [
+    "before-entry-1440.png",
+    "before-entry-768.png",
+    "before-entry-390.png"
+  ],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    }
+  ],
+  "errors": [],
+  "verdicts": [
+    {
+      "route": "/tournament-ops-demo",
+      "width": 1440,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo",
+      "width": 768,
+      "overflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "route": "/tournament-ops-demo",
+      "width": 390,
+      "overflow": false,
+      "verdict": "PASS"
+    }
+  ],
+  "cleanup": true,
+  "deployedCommit": "0b7720cb7d068b05735039e3445ef4b374642ed7"
+}

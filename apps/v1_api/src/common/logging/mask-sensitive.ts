@@ -20,8 +20,13 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'linkToken',
   // 이메일 로그인 추가에서 인증번호를 맞춘 증명 — 가진 쪽이 비밀번호만 더해 그 계정에 이메일 로그인을 붙인다.
   'emailLinkToken',
+  // 계정 이메일 변경에서 인증번호를 맞춘 증명 — 가진 쪽이 프로필 저장만으로 그 계정의 이메일(로그인 ID)을 바꾼다.
+  'emailChangeToken',
   // 탈퇴 신청 중 계정의 로그인 거절 응답(details)에 실리는 철회 토큰 — 가진 쪽이 그 계정의 세션을 받는다.
   'withdrawalCancelToken',
+  // 계정 복구의 휴대폰·이메일 소유 증명 — 10분 동안 계정 찾기(탈퇴 종료일·마스킹 이메일)와 비밀번호 재설정 요청을 통과시킨다.
+  'proofToken',
+  'emailProofToken',
   'code',
   'authorization',
   'cookie',

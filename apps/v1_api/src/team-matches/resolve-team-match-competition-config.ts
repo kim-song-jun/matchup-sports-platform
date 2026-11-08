@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { V1CompetitionConfigVersion } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
-import { competitionConfigContentHash, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
+import { competitionConfigContentHash, tryNormalizeCompetitionSportCode, validateCompetitionConfig, validateCompetitionPeriods } from '../tournaments/competition-config/competition-config';
 import { isReusableCompetitionPeriodConfig, normalizeCompetitionPeriods } from '../tournaments/competition-config/competition-config-periods';
 import { MAX_TEAM_MATCH_PERIOD_MINUTES } from './team-match-periods.constants';
 
@@ -31,9 +31,22 @@ export async function resolveTeamMatchCompetitionConfig(
   });
 }
 
+const configVersionMissing = () => new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '연결된 경기 설정 버전을 찾을 수 없어요.' });
+
+/**
+ * 읽기 화면(상세)이 쓰는 건 피리어드뿐이라 `periods` 섹션만 검증한다. 문서 전체를 검증하면 이 화면과
+ * 무관한 라인업 카탈로그가 깨진 버전에 묶인 경기의 상세가 통째로 422 가 된다. 설정을 복제해 새
+ * 버전을 만드는 경로는 전체 검증을 유지하는 `readTeamMatchCompetitionConfig` 를 쓴다.
+ */
+export async function readTeamMatchPeriods(tx: Prisma.TransactionClient, id: string) {
+  const row = await tx.v1CompetitionConfigVersion.findUnique({ where: { id }, select: { periods: true } });
+  if (!row) throw configVersionMissing();
+  return validateCompetitionPeriods(row.periods);
+}
+
 export async function readTeamMatchCompetitionConfig(tx: Prisma.TransactionClient, id: string) {
   const row = await tx.v1CompetitionConfigVersion.findUnique({ where: { id } });
-  if (!row) throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '연결된 경기 설정 버전을 찾을 수 없어요.' });
+  if (!row) throw configVersionMissing();
   const config = validateCompetitionConfig({
     periods: row.periods, events: row.events, lineup: row.lineup,
     result: row.result, tieBreak: row.tieBreak, visibility: row.visibility,

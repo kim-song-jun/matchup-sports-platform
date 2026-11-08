@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { GamesService } from '../games/games.service';
+import { FUTSAL_V1_CONFIG } from '../tournaments/competition-config/competition-config.presets';
 import { TeamMatchesService } from './team-matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 
@@ -155,7 +156,7 @@ describe('TeamMatchesService', () => {
     v1AdminUser: { findFirst: jest.Mock; findMany: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
     v1IdempotencyRecord: { findFirst: jest.Mock };
-    v1CompetitionConfigVersion: { findFirst: jest.Mock };
+    v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -207,7 +208,7 @@ describe('TeamMatchesService', () => {
       v1AdminUser: { findFirst: jest.fn(), findMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
-      v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }) },
+      v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }), findUnique: jest.fn() },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue(undefined),
       $executeRaw: jest.fn().mockResolvedValue(undefined),
@@ -1592,6 +1593,52 @@ describe('TeamMatchesService', () => {
     expect(result.status).toBe('closed');
     expect(result.displayState).toBe('closed');
     expect(result.lifecycle.onHoldReason).toBeNull();
+  });
+
+  describe('detail: 고정된 경기 설정에서는 피리어드만 읽는다', () => {
+    const configRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 'config-pinned',
+      periods: FUTSAL_V1_CONFIG.periods,
+      events: FUTSAL_V1_CONFIG.events,
+      lineup: FUTSAL_V1_CONFIG.lineup,
+      result: FUTSAL_V1_CONFIG.result,
+      tieBreak: FUTSAL_V1_CONFIG.tieBreak,
+      visibility: FUTSAL_V1_CONFIG.visibility,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(publicTeamMatchDetailRow({ competitionConfigVersionId: 'config-pinned' }));
+      prisma.v1Team.findMany.mockResolvedValue([]);
+    });
+
+    it('라인업 포지션 사전이 빈 배열로 저장된 설정이어도 상세는 그 설정의 피리어드를 돌려준다', async () => {
+      prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue(
+        configRow({ lineup: { ...FUTSAL_V1_CONFIG.lineup, positions: [] } }),
+      );
+
+      const result = await service.detail(null, 'tm-1');
+
+      expect(result.periods).toEqual(FUTSAL_V1_CONFIG.periods);
+    });
+
+    it('피리어드 자체가 올바르지 않으면 COMPETITION_CONFIG_INVALID 로 거절한다', async () => {
+      prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue(configRow({ periods: [] }));
+
+      await expect(service.detail(null, 'tm-1')).rejects.toMatchObject({
+        status: 422,
+        response: { code: 'COMPETITION_CONFIG_INVALID' },
+      });
+    });
+
+    it('고정된 설정 버전 행이 없으면 COMPETITION_CONFIG_REQUIRED 로 거절한다', async () => {
+      prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue(null);
+
+      await expect(service.detail(null, 'tm-1')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'COMPETITION_CONFIG_REQUIRED' },
+      });
+    });
   });
 
   it('detail: 미매칭 모집 팀매치는 신청 마감 시각부터 closed로 노출한다', async () => {

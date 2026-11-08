@@ -38,17 +38,26 @@ export const TOURNAMENT_CREATE_STEPS = [
 export const LAST_INPUT_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 2;
 export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
 
-/** 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다. */
-export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
-  { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
-  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강' },
-  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
-  { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
-  { value: 'third_place', label: '3·4위전' },
+/**
+ * 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다.
+ * round16 은 정규리그 + N개 토너먼트에서 12팀 결선의 첫 라운드('12강')도 담는다 — 그 라운드의 단계 코드가 틀 기준(16칸)이다.
+ */
+export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string; shortLabel: string }> = [
+  { value: 'group', label: '조별리그', shortLabel: '조별리그' }, { value: 'round64', label: '64강', shortLabel: '64강' },
+  { value: 'round32', label: '32강', shortLabel: '32강' }, { value: 'round16', label: '16강 · 12팀 결선의 12강', shortLabel: '16강' },
+  { value: 'round12', label: '12강', shortLabel: '12강' }, { value: 'quarter', label: '8강 · 6팀 대진의 6강', shortLabel: '8강' },
+  { value: 'semi', label: '4강', shortLabel: '4강' }, { value: 'final', label: '결승', shortLabel: '결승' },
+  { value: 'third_place', label: '3·4위전', shortLabel: '3·4위전' },
 ];
 
+/** 단계를 고르는 목록과 단계별 카드 제목처럼 목록에서 단계를 구분할 때 쓰는 이름. 문장·알림에는 `tournamentPeriodPhaseShortLabel` 을 쓴다. */
 export function tournamentPeriodPhaseLabel(phase: TournamentPeriodPhase) {
   return TOURNAMENT_PERIOD_PHASES.find((option) => option.value === phase)?.label ?? phase;
+}
+
+/** 문장·알림·설정 제목에 쓰는 짧은 단계 이름 — 6팀 대진·12팀 결선 설명은 붙이지 않는다. */
+export function tournamentPeriodPhaseShortLabel(phase: TournamentPeriodPhase) {
+  return TOURNAMENT_PERIOD_PHASES.find((option) => option.value === phase)?.shortLabel ?? phase;
 }
 
 export type TournamentCreateState = {

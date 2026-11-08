@@ -4,6 +4,12 @@ import { checkLeagueTeamAddAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-tier-label';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { capacityLimitOf, countCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
+import {
+  findTeamGenderBlocker,
+  TEAM_GENDER_INELIGIBLE_CODE,
+  teamGenderBlockerMessage,
+  type TeamGenderBlocker,
+} from '../tournaments/team-gender-eligibility';
 
 /**
  * **팀을 리그 로스터에 넣어도 되는가** 를 DB 를 보고 판정하는 단일 경로 (Task 164 BE-3).
@@ -26,7 +32,8 @@ import { capacityLimitOf, countCapacityReservations, isCapacityFull } from '../t
 export type LeagueAdmissionBlocker =
   | { readonly kind: 'ALREADY_IN_LEAGUE' }
   | { readonly kind: 'TEAM_INVALID' }
-  | { readonly kind: 'SIBLING_TIER'; readonly tier: number | null };
+  | { readonly kind: 'SIBLING_TIER'; readonly tier: number | null }
+  | ({ readonly kind: 'GENDER_INELIGIBLE' } & TeamGenderBlocker);
 
 export async function findLeagueAdmissionBlocker(
   tx: Prisma.TransactionClient,
@@ -39,7 +46,7 @@ export async function findLeagueAdmissionBlocker(
     // `deletedAt: null` — 다른 읽기 경로와 같은 조건이다. 빼면 **소프트 삭제된 리그에도
     // 로스터를 넣을 수 있다**: 이 함수가 통과시키면 호출부가 곧바로 등록을 쓴다.
     where: { id: input.leagueId, deletedAt: null },
-    select: { id: true, sportId: true, seriesId: true, seasonNo: true },
+    select: { id: true, sportId: true, seriesId: true, seasonNo: true, genderCategory: true },
   });
   if (league === null) return { kind: 'TEAM_INVALID' };
 
@@ -67,32 +74,41 @@ export async function findLeagueAdmissionBlocker(
   if (blocked === 'TEAM_INVALID') return { kind: 'TEAM_INVALID' };
 
   // 형제 티어 중복 — 무소속 리그(seriesId === null)엔 형제가 없으므로 볼 필요가 없다.
-  if (league.seriesId === null) return null;
-  const sibling = await findTournamentOnSurface(tx, ['regular_league'], {
-    where: {
-      deletedAt: null,
-      seriesId: league.seriesId,
-      seasonNo: league.seasonNo,
-      id: { not: input.leagueId },
-      // 로스터 기준 — 신청 중인 팀은 형제 티어 중복이 아니다(위와 같은 이유).
-      registrations: { some: { teamId: input.teamId, status: 'confirmed' } },
-    },
-    select: { tier: true },
-  });
-  return sibling === null ? null : { kind: 'SIBLING_TIER', tier: sibling.tier };
+  if (league.seriesId !== null) {
+    const sibling = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: {
+        deletedAt: null,
+        seriesId: league.seriesId,
+        seasonNo: league.seasonNo,
+        id: { not: input.leagueId },
+        // 로스터 기준 — 신청 중인 팀은 형제 티어 중복이 아니다(위와 같은 이유).
+        registrations: { some: { teamId: input.teamId, status: 'confirmed' } },
+      },
+      select: { tier: true },
+    });
+    if (sibling !== null) return { kind: 'SIBLING_TIER', tier: sibling.tier };
+  }
+  // 형제 티어 뒤에 둔다 — 신청 입구의 형제 티어 검사(`assertNotInSiblingTier`)가 이 함수의 첫 사유만 읽는다.
+  const genderBlocker = await findTeamGenderBlocker(tx, { teamId: input.teamId, genderCategory: league.genderCategory });
+  return genderBlocker === null ? null : { kind: 'GENDER_INELIGIBLE', ...genderBlocker };
 }
 
 /**
- * 막힌 이유를 사용자 문구로. 전부 `LEAGUE_TEAM_INVALID` 한 코드 아래 있고 **메시지로만**
- * 갈린다 — 이 저장소가 이미 그렇게 하고 있고(같은 팀 두 번 / 미등록 팀도 같은 코드),
- * 구분 코드를 늘려도 읽는 쪽이 없다.
+ * 막힌 이유를 사용자 문구로. 성별 부문 자격만 `TEAM_GENDER_INELIGIBLE` 로 따로 갈리고(`leagueAdmissionBlockerCode`),
+ * 나머지는 `LEAGUE_TEAM_INVALID` 한 코드 아래 **메시지로만** 갈린다 — 이 저장소가 이미 그렇게 하고 있고
+ * (같은 팀 두 번 / 미등록 팀도 같은 코드), 구분 코드를 늘려도 읽는 쪽이 없다.
  */
 export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): string {
   if (blocker.kind === 'ALREADY_IN_LEAGUE') return '이미 참가 중인 팀이에요.';
   if (blocker.kind === 'TEAM_INVALID') return '리그 종목과 일치하는 활성 팀만 등록할 수 있어요.';
+  if (blocker.kind === 'GENDER_INELIGIBLE') return teamGenderBlockerMessage(blocker, '리그', '참가');
   return blocker.tier === null
     ? '이 팀은 이미 같은 시즌의 다른 리그에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.'
     : `이 팀은 이미 같은 시즌 ${tierLabel(blocker.tier)}에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.`;
+}
+
+export function leagueAdmissionBlockerCode(blocker: LeagueAdmissionBlocker): string {
+  return blocker.kind === 'GENDER_INELIGIBLE' ? TEAM_GENDER_INELIGIBLE_CODE : 'LEAGUE_TEAM_INVALID';
 }
 
 /**
@@ -147,11 +163,11 @@ export async function createLeagueRosterRegistration(
   if (league === null) {
     throw new UnprocessableEntityException({ code: 'LEAGUE_TEAM_INVALID', message: '리그를 찾을 수 없어요.' });
   }
+  const existing = await tx.v1TournamentRegistration.findUnique({
+    where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
+    select: { id: true, status: true },
+  });
   if (capacityLimitOf(league) !== null) {
-    const existing = await tx.v1TournamentRegistration.findUnique({
-      where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
-      select: { id: true },
-    });
     const reservedCount = await countCapacityReservations(tx, input.leagueId, existing?.id);
     if (isCapacityFull(league, reservedCount)) {
       throw new ConflictException({ code: 'TOURNAMENT_CAPACITY_FULL', message: '참가팀 정원이 가득 차 팀을 추가할 수 없어요.' });
@@ -159,7 +175,7 @@ export async function createLeagueRosterRegistration(
   }
   const team = await tx.v1Team.findUnique({
     where: { id: input.teamId },
-    select: { ownerUserId: true },
+    select: { ownerUserId: true, name: true },
   });
   if (team === null) {
     // 로스터 행이 같은 트랜잭션에서 이미 FK 를 통과했으므로 실질적으로 도달하지 않는다.
@@ -167,6 +183,14 @@ export async function createLeagueRosterRegistration(
     throw new UnprocessableEntityException({
       code: 'LEAGUE_TEAM_INVALID',
       message: '없는 팀은 리그에 등록할 수 없어요.',
+    });
+  }
+  // 신청이 진행 중인 행(입금 대기·확인 중 등)은 confirmed 로 올리지 않는다 — 올리면 결제는 '대기'인 채 참가 확정이 된다
+  // (2026-11-04 알파 QA). 그 팀은 신청 관리에서 입금을 확인해 확정한다. 아직 내지 않은 draft 와 취소한 신청은 올린다.
+  if (existing !== null && !['draft', 'cancelled', 'confirmed'].includes(existing.status)) {
+    throw new UnprocessableEntityException({
+      code: 'LEAGUE_TEAM_ALREADY_APPLIED',
+      message: `${team.name}: 이미 참가 신청한 팀이에요. 신청 관리에서 입금을 확인해 확정해 주세요.`,
     });
   }
   // `(tournamentId, teamId)` 는 `@@unique` 다 — **무조건 create 하면 P2002 로 500 이 난다.**

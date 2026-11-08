@@ -19,7 +19,7 @@ import {
   TrophyIcon,
 } from '@/components/v1-ui/icons';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
@@ -29,11 +29,14 @@ import { resultChipStyle } from '@/components/public-game-records/result-emphasi
 import { useV1AllTournaments, useV1LeagueMatches, useV1TeamMatches, useV1Tournaments } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
-import { isRecruitingNow, TournamentHeroCard } from './tournament-hero-card';
+import { FEATURED_MEDIA_PX, isRecruitingNow, TournamentHeroCard } from './tournament-hero-card';
 import { toFeaturedLeague, toFeaturedTeamMatch } from './home-client-model';
 import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 import { homeCapacity } from './home-capacity';
+
+/** `.tm-match-card-media` 가 가장 넓어지는 폭 — 데스크톱 2열 그리드 한 칸(주 컬럼 688px). 모바일 레일은 220px. */
+const HOME_MATCH_CARD_MEDIA_PX = 336;
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const [, refreshClock] = useState(0);
@@ -767,7 +770,7 @@ function FeaturedMatchCard({
           (alpha 실측 2026-09-07: 그래픽 308px vs 사진 152px). */}
       <div
         className={`tm-featured-media${!network && !match.imageUrl ? ' tm-home-featured-stack' : ''}`}
-        style={network ? { background: 'var(--grey100)' } : match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
+        style={network ? { background: 'var(--grey100)' } : match.imageUrl ? { background: `${optimizedCssUrl(match.imageUrl, FEATURED_MEDIA_PX)} center/cover` } : undefined}
       >
         {!network && !match.imageUrl ? (
           <div className="tm-match-hero-graphic">
@@ -1073,7 +1076,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
         <Link key={match.id} className="tm-pressable tm-match-card" href={withFromPath(`/matches/${match.id}`, '/home')}>
           <div
             className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
-            style={match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
+            style={match.imageUrl ? { background: `${optimizedCssUrl(match.imageUrl, HOME_MATCH_CARD_MEDIA_PX)} center/cover` } : undefined}
           >
             {match.imageUrl ? null : <SportIllustration sizes="132px" sport={match.sportLabel} />}
           </div>

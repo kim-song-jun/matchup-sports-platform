@@ -17,9 +17,11 @@ import {
   useV1UpdateProfile,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { reportClientError } from '@/lib/client-error-reporter';
+import { markSignupPhotoNotice } from '@/lib/signup-photo-notice';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
@@ -31,6 +33,7 @@ import {
 } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthPasswordField } from './auth-password-field';
+import { usePasswordFeedback } from './use-password-feedback';
 import { AuthStepCta } from './auth-step-cta';
 import { AuthStepHeader } from './auth-step-header';
 import { AuthVerifiedInset } from './auth-verified-inset';
@@ -71,6 +74,9 @@ const STEP_COPY: Record<WizardStep, { title: string; sub?: string }> = {
 /** 인증 성공 표시를 볼 시간을 준 뒤 다음 단계로 넘긴다 — 즉시 전환하면 무엇이 처리됐는지 알 수 없다. */
 const VERIFY_ADVANCE_DELAY_MS = 900;
 
+/** `.tm-auth-profile-preview` 의 72×72 — globals.css 와 같아야 한다. */
+const PROFILE_PREVIEW_SIZE = 72;
+
 const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 
 /**
@@ -101,6 +107,7 @@ export function SignupClient() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const passwordRule = usePasswordFeedback(password);
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
@@ -191,9 +198,7 @@ export function SignupClient() {
   });
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
-  const passwordTooShort = password.length > 0 && password.length < 8;
-  const passwordLongEnough = password.length >= 8;
-  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordLongEnough && passwordMatch;
+  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordRule.usable && passwordMatch;
   // normalizeSeparatedDigits 는 하이픈·공백만 걷어내므로 'ROLLING10ab' 같은 값도 길이 11이 된다.
   // 길이만 보고 인증을 열면 문자가 섞인 값으로 유료 SMS 발송을 시도하게 되므로 숫자 11자리만 허용한다.
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
@@ -310,21 +315,31 @@ export function SignupClient() {
       trackEvent('sign_up_complete', { method: 'email' });
 
       if (profileImageFile) {
-        const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
-        const uploadedUrl = uploadResult.urls[0];
-        if (!uploadedUrl) {
-          throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
-        }
+        // 계정은 이미 만들어졌다 — 사진만 실패했다고 오류로 멈추면 다시 제출할 때 이메일 중복이 난다.
+        try {
+          const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
+          const uploadedUrl = uploadResult.urls[0];
+          if (!uploadedUrl) {
+            throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
+          }
 
-        await updateProfile.mutateAsync({
-          realName: normalizedRealName,
-          nickname: normalizedNickname,
-          email: normalizedEmail,
-          profileImageUrl: uploadedUrl,
-          phone: profileDraft.phone,
-          birthDate: profileDraft.birthDate,
-          gender: profileDraft.gender,
-        });
+          await updateProfile.mutateAsync({
+            realName: normalizedRealName,
+            nickname: normalizedNickname,
+            profileImageUrl: uploadedUrl,
+            phone: profileDraft.phone,
+            birthDate: profileDraft.birthDate,
+            gender: profileDraft.gender,
+          });
+        } catch (photoError) {
+          reportClientError({
+            message: 'Signup profile photo was not saved',
+            stack: photoError instanceof Error ? photoError.stack : undefined,
+            level: 'warn',
+            context: { reason: photoError instanceof V1ApiError ? photoError.code : 'unknown' },
+          });
+          markSignupPhotoNotice();
+        }
       }
 
       window.sessionStorage.removeItem(onboardingDraftKey);
@@ -344,6 +359,10 @@ export function SignupClient() {
           return;
         }
         emailCheck.markTaken(normalizedEmail);
+        setStep('account');
+        return;
+      }
+      if (passwordRule.rejectIfTooCommon(nextError)) {
         setStep('account');
         return;
       }
@@ -414,8 +433,8 @@ export function SignupClient() {
         ? duplicateHint('닉네임', nicknameCheck.waiting)
         : !emailCheck.verified
           ? duplicateHint('이메일', emailCheck.waiting)
-          : !passwordLongEnough
-            ? '비밀번호는 8자 이상이어야 해요.'
+          : !passwordRule.usable
+            ? passwordRule.blockedHint
             : '비밀번호 확인이 일치해야 해요.'
       : step === 'verify'
         ? !isSendablePhone
@@ -491,11 +510,7 @@ export function SignupClient() {
                 value={password}
                 onChange={setPassword}
                 placeholder="8자 이상"
-                feedback={passwordTooShort
-                  ? { kind: 'error', message: '8자 이상 입력해 주세요.' }
-                  : passwordLongEnough
-                    ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
-                    : null}
+                feedback={passwordRule.feedback}
               />
 
               <AuthPasswordField
@@ -566,7 +581,7 @@ export function SignupClient() {
                 {/* 행 전체가 파일 선택 라벨이다 — 아바타·문구·버튼이 각자 같은 일을 하지 않는다. */}
                 <label className="tm-auth-profile-upload-main tm-pressable">
                   <span className="tm-auth-profile-preview-trigger">
-                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: optimizedCssUrl(profileImageUrl, PROFILE_PREVIEW_SIZE) } : undefined}>
                       {profileImageUrl ? null : <span className="tm-text-caption">{displayInitials(realName || normalizedNickname, { fallback: 'T' })}</span>}
                     </span>
                     {profileImageUrl ? null : (

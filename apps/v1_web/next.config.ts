@@ -68,6 +68,12 @@ const nextConfig: NextConfig = {
     // 유튜브 썸네일(match-videos.tsx의 youtubeThumbnailUrl())만 외부 호스트가 필요하다.
     // /uploads/*·/brand/*·/fonts/*는 같은 origin이라 remotePatterns 없이도 next/image가 동작한다.
     remotePatterns: [{ protocol: 'https', hostname: 'i.ytimg.com', pathname: '/vi/**' }],
+    // 업로드는 UUID 파일명이라 불변이지만, public 자산을 같은 이름으로 교체하면 브라우저와
+    // 서버 변환 저장소(배포 사이에도 유지되는 볼륨)에 최대 7일 옛 이미지가 남는다 — 바꿀 땐 파일 이름을 바꾼다.
+    minimumCacheTTL: 604800,
+    // 기본값은 디스크 여유의 절반이다. 변환 저장소는 배포 사이에 유지되므로(v1_web_image_cache 볼륨)
+    // 상한을 두고, 넘치면 Next 가 가장 오래 안 쓴 것부터 지운다.
+    maximumDiskCacheSize: 256 * 1024 * 1024,
   },
   turbopack: {
     root: path.resolve(__dirname, '../..'),

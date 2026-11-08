@@ -71,6 +71,12 @@ export function normalizeSignupDisplayName(value: string): string {
   return value.replace(/[\u200B-\u200D\uFEFF]/gu, '').trim();
 }
 
+/** Error body for an under-14 birth date; signup and profile edit must reject with the same code and text. */
+export const SIGNUP_AGE_RESTRICTED_RESPONSE = {
+  code: 'SIGNUP_AGE_RESTRICTED',
+  message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
+} as const;
+
 /** UTC calendar age; birthday must have occurred, including leap-day boundaries. */
 export function isSignupAgeEligible(value: string, now = new Date()): boolean {
   if (!isValidBirthDateDigits(value)) return false;

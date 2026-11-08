@@ -255,11 +255,14 @@ const ROSTER_FROZEN_REGISTRATION_STATUSES: ReadonlySet<string> = new Set(['cance
  * - 새 신청에 선수 행이 하나라도 있었으면(팀이 이미 손댔거나 지난 사이클의 행) 건드리지 않는다 — 자동 채움과 같은 계약.
  * - 옮긴 선수도 직접 올린 선수와 같은 심사 대기로 들어간다. 옮길 사람이 없으면 아무것도 안 하고, 그러면 대진 생성 때의
  *   자동 채움(팀원 전원)이 지금처럼 돈다.
+ * - 리그 체계 전환의 첫 시즌 티어는 `previousLeagueId` 가 없다(지난 리그 하나를 여러 티어가 이어받아 1:1 연결을 못 쓴다).
+ *   그래서 전환은 원본 리그를 `sourceLeagueId` 로 넘긴다(2026-11-04 사용자 확정 — 전환도 명단을 옮긴다).
  */
 export async function copyPreviousSeasonRoster(
   tx: Prisma.TransactionClient,
   leagueId: string,
   registration: { id: string; teamId: string },
+  options: { sourceLeagueId?: string } = {},
 ): Promise<{ added: number; skipped: Array<{ userId: string; reason: string }> }> {
   const nothing = { added: 0, skipped: [] };
   await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${registration.id} FOR UPDATE`;
@@ -272,15 +275,16 @@ export async function copyPreviousSeasonRoster(
     where: { id: leagueId },
     select: { previousLeagueId: true, maxPlayers: true, genderCategory: true, status: true },
   });
+  const sourceLeagueId = options.sourceLeagueId ?? league.previousLeagueId;
   if (
-    league.previousLeagueId == null ||
+    sourceLeagueId == null ||
     league.status === V1TournamentStatus.completed ||
     league.status === V1TournamentStatus.cancelled
   ) {
     return nothing;
   }
   const previous = await tx.v1TournamentRegistration.findFirst({
-    where: { tournamentId: league.previousLeagueId, teamId: registration.teamId, status: 'confirmed' },
+    where: { tournamentId: sourceLeagueId, teamId: registration.teamId, status: 'confirmed' },
     select: {
       players: {
         where: { removedAt: null },

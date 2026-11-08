@@ -86,12 +86,20 @@ export type V1User = {
   onboardingStatus: string;
 };
 
-/** 휴대폰 본인인증으로 찾은 계정. 이메일은 마스킹된 값만 내려온다. */
+/**
+ * 계정 찾기로 찾은 계정. 휴대폰 인증만으로는 가입 수단(`providers`·`hasPassword`)과 탈퇴 대기 여부까지만 오고,
+ * `maskedEmail`·`withdrawalPendingUntil` 은 null 이다. 메일함 소유를 증명한 요청(이메일 찾기, 또는 번호 찾기에
+ * 같은 계정의 `email`+`emailProofToken` 을 함께 보낸 요청)에만 채워진다. 이메일은 마스킹된 값만 내려온다.
+ */
 export type V1FoundAccount = {
   maskedEmail: string | null;
+  /** 이 계정에 이메일이 있어 이메일 증명을 받을 수 있는지. 값이 false 면 이메일로 다시 확인하자고 권하지 않는다. 주소는 싣지 않는다. */
+  emailProofAvailable: boolean;
   providers: string[];
   hasPassword: boolean;
-  /** 이 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
+  /** 탈퇴를 신청해 유예 중인 계정이면 true. 끝나는 날은 `withdrawalPendingUntil` 이 메일함 증명 뒤에만 채운다. */
+  withdrawalPending: boolean;
+  /** 탈퇴 유예가 끝나는 시각(ISO). 메일함 증명이 없거나 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
   withdrawalPendingUntil: string | null;
 };
 
@@ -124,7 +132,6 @@ export type V1AuthMe = {
     canLinkLoginMethods?: boolean;
     /** Whether linking would be permitted after required signup is completed. */
     canLinkAfterSignup?: boolean;
-    signupEmailLoginRequired?: boolean;
     hasPassword?: boolean;
   };
   profile: {
@@ -272,6 +279,67 @@ export type V1LinkEmailCompleteResult = {
   email: string;
 };
 
+/** 직접 뗄 수 있는 로그인 수단. 서버는 이 셋만 받는다. */
+export type V1UnlinkableProvider = 'kakao' | 'apple' | 'email';
+
+/**
+ * `POST /auth/identities/unlink` — 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`, 운영자 계정은 403
+ * `SOCIAL_LINK_ADMIN_FORBIDDEN`, 계정에 없는(이미 뗀) 수단은 404 `LOGIN_METHOD_NOT_FOUND`, 마지막 남은 수단은
+ * 409 `LAST_LOGIN_METHOD`. 성공하면 다른 기기는 모두 로그아웃되고 이 기기의 쿠키만 새로 발급된다.
+ */
+export type V1UnlinkLoginMethodPayload = {
+  provider: V1UnlinkableProvider;
+};
+
+export type V1UnlinkLoginMethodResult = {
+  provider: V1UnlinkableProvider;
+  /** 뗀 뒤 이 계정에 남은 로그인 수단. */
+  authProviders: V1AuthProvider[];
+};
+
+/** `POST /auth/sessions/revoke-others` — 최근 로그인을 요구하지 않는다. 이 기기는 로그인된 채로 남는다. */
+export type V1RevokeOtherSessionsResult = {
+  revoked: true;
+};
+
+/**
+ * 계정 이메일을 바꾸는 두 단계 — 이어서 `PATCH /me/profile` 에 `emailChangeToken` 을 실어 저장한다. 로그인한 세션이 계정을,
+ * 새 주소로 받은 인증번호가 주소를 증명한다. 서버는 증명 없는 변경을 400 `EMAIL_CHANGE_PROOF_REQUIRED` 로 거절한다.
+ */
+
+/**
+ * `POST /me/email-change/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면(모든 계정) 403
+ * `RECENT_LOGIN_REQUIRED`. 지금 쓰는 주소는 400 `EMAIL_UNCHANGED`, 다른 계정이 쓰는 주소는 409 `EMAIL_CONFLICT`.
+ */
+export type V1EmailChangeRequestPayload = {
+  email: string;
+};
+
+export type V1EmailChangeRequestResult = {
+  sent: true;
+  /** 가린 주소(예: `ru***@example.com`). 화면에 "○○로 보냈어요" 로 보여 준다. */
+  maskedTarget: string;
+  /** 인증번호 유효 시간(초). */
+  expiresInSeconds: number;
+  /** 이 시간(초) 뒤에야 같은 주소로 다시 받을 수 있다. 그 전에 요청하면 400 `VERIFICATION_RESEND_COOLDOWN`. */
+  resendAvailableInSeconds: number;
+  /** 인증번호 에코가 켜진 환경(alpha)에서 시험용 주소로 요청했을 때만 온다. */
+  devCode?: string;
+};
+
+/** `POST /me/email-change/verify` */
+export type V1EmailChangeVerifyPayload = {
+  /** 메일로 받은 숫자 6자리. */
+  code: string;
+};
+
+export type V1EmailChangeVerifyResult = {
+  /** 이 계정·이 주소에만 쓸 수 있는 증명. 주소에 싣지 않고 저장 직전까지 메모리로만 넘긴다. */
+  emailChangeToken: string;
+  /** `emailChangeToken` 의 남은 유효 시간(초). */
+  expiresInSeconds: number;
+};
+
 /**
  * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
  * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.
@@ -287,8 +355,8 @@ export type V1SignInThenLinkDetails = {
   /** `linkToken` 의 남은 유효 시간(초). */
   linkTokenExpiresInSeconds?: number;
   /**
-   * 번호를 쥔 계정이 탈퇴 유예 중일 때만 온다(`PHONE_CONFLICT`, 인증번호로 번호를 증명한 뒤의 409). 유예가 끝나는
-   * 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
+   * 충돌한 계정이 탈퇴 유예 중일 때만 온다. 인증번호로 번호를 증명한 뒤의 `PHONE_CONFLICT`, 그리고 제공자가 보증한
+   * 이메일·번호가 그 계정과 겹친 카카오·Apple 로그인 409 에 실린다. 유예가 끝나는 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
    */
   withdrawalPendingUntil?: string | null;
 };
@@ -2632,6 +2700,17 @@ export type V1Profile = {
 };
 
 /**
+ * `PATCH /me/profile` 응답. `email`·`phone` 은 저장 뒤 계정에 남은 값이다 — 이메일을 안 보낸 요청은 지금 값이 그대로 오고,
+ * 소셜 계정이 지우면 null 이다. 프로필·`/auth/me` 캐시의 계정 값은 이 값으로 맞춘다.
+ */
+export type V1ProfileUpdateResult = {
+  profile: V1Profile['profile'];
+  email: string | null;
+  phone: string | null;
+  updatedAt: string;
+};
+
+/**
  * 선수 카드 (Task 155). 산식과 잠금 규칙은 서버가 정하고, 프론트는 **그린다**.
  * 잠긴 능력치는 `value: null` 로 오며, 프론트가 임의로 0 이나 추정값을 채우면 안 된다.
  */
@@ -2768,7 +2847,10 @@ export type V1HomeShortcut = {
   disabledReason: string | null;
 };
 
-/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다. */
+/**
+ * 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다.
+ * 시각 있는 경기가 하나도 없을 때만 시각이 아직 정해지지 않은 대회 경기(`scheduledAt` null)가 온다.
+ */
 export type V1HomeNextGame = {
   gameId: string;
   teamMatchId: string | null;
@@ -2777,7 +2859,8 @@ export type V1HomeNextGame = {
   competitionId: string | null;
   title: string;
   opponentName: string | null;
-  scheduledAt: string;
+  /** 킥오프 시각. 대회 경기의 시각이 아직 정해지지 않았으면 null. */
+  scheduledAt: string | null;
   placeName: string | null;
   teamId: string;
   teamName: string;
@@ -4083,6 +4166,8 @@ export type V1TournamentStanding = {
 
 /** 조별리그가 끝난 조의 결선 진출 팀. 동률로 자리가 안 정해졌으면 `undecided`. */
 export type V1TournamentGroupQualification = {
+  /** Stable destination palette index, supplied by the server. */
+  colorIndex?: number;
   advancingRegistrationIds: string[];
   undecided: boolean;
 };
@@ -4100,6 +4185,8 @@ export type V1TournamentGroup = {
   qualification: V1TournamentGroupQualification | null;
   /** Older serialized groups may omit this; omission has the same meaning as overall. */
   bracketTrack?: V1TournamentBracketTrack;
+  /** Stable color available even before preliminary qualification is resolved. */
+  bracketColorIndex?: number;
   qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 
@@ -4250,7 +4337,7 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
-  /** 정규 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 공개된 리그만). 대회·옛 응답은 없음. */
+  /** 이어진 이전 시즌(독립 리그의 지난 시즌, 전환한 체계 첫 시즌 티어는 원본 리그 — 공개된 리그만). 대회·옛 응답은 없음. */
   previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;
   sixTeamBracket?: V1SixTeamBracket | null;
@@ -4593,6 +4680,7 @@ export type V1AdminBracketGroup = {
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
   bracketTrack?: V1TournamentBracketTrack;
+  bracketColorIndex?: number;
 };
 
 export type V1AdminBracketGroupTeam = {
@@ -5073,7 +5161,7 @@ export type V1CancelRegistrationRequestPayload = {
 };
 
 export type V1AddPlayerPayload = {
-  /** 골레이 여부. 생략 시 false. */
+  /** 골키퍼 여부. 생략 시 false. */
   goalkeeper?: boolean;
   userId: string;
   realName: string;

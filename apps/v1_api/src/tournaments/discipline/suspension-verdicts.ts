@@ -4,6 +4,7 @@ import {
   evaluateSuspension,
   suspensionRulesEnabled,
   type PlayedGameCards,
+  type SuspensionRules,
   type SuspensionVerdict,
 } from './card-suspension';
 
@@ -84,8 +85,7 @@ export async function readSuspensionRules(
  *
  * **주입 서비스가 아니라 평범한 export 함수인 이유**: 이 코드를 쓰는 `GamesService`·
  * `TeamMatchLineupService` 의 생성자에 인자를 하나 더하면 그 클래스를 직접 `new` 하는
- * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳 — CI 실측이고, 그 스펙들의
- * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다). `tx` 를
+ * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳). `tx` 를
  * 인자로 받으면 호출부의 트랜잭션을 그대로 쓸 수 있어 **제출과 같은 스냅샷**에서 읽는
  * 이점도 유지된다.
  *
@@ -105,12 +105,20 @@ export async function readSuspensionVerdicts(
   tx: Tx,
   input: SuspensionVerdictInput,
 ): Promise<Map<string, SuspensionVerdict>> {
-  const byUpcomingKey = await readSuspensionVerdictsForUpcomingKeys(tx, {
+  return (await readSuspensionDiscipline(tx, input)).verdicts;
+}
+
+/** `readSuspensionVerdicts` 와 같은 조회에 규정을 더한 것. */
+export async function readSuspensionDiscipline(
+  tx: Tx,
+  input: SuspensionVerdictInput,
+): Promise<{ rules: SuspensionRules; verdicts: Map<string, SuspensionVerdict> }> {
+  const { rules, verdictsByUpcomingKey } = await readDisciplineForUpcomingKeys(tx, {
     competitionId: input.competitionId,
     orderedGames: input.orderedGames,
     upcomingKeys: [input.upcomingKey],
   });
-  return byUpcomingKey.get(input.upcomingKey) ?? new Map(NO_VERDICTS);
+  return { rules, verdicts: verdictsByUpcomingKey.get(input.upcomingKey) ?? new Map(NO_VERDICTS) };
 }
 
 /** Read one competition's disciplinary history once and evaluate several upcoming team games. */
@@ -118,7 +126,30 @@ export async function readSuspensionVerdictsForUpcomingKeys(
   tx: Tx,
   input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
 ): Promise<Map<string, Map<string, SuspensionVerdict>>> {
+  return (await readDisciplineForUpcomingKeys(tx, input)).verdictsByUpcomingKey;
+}
+
+export interface CompetitionDiscipline {
+  /** 규정이 둘 다 꺼져 있으면 `suspensionRulesEnabled` 가 false 다. */
+  readonly rules: SuspensionRules;
+  readonly verdictsByUpcomingKey: Map<string, Map<string, SuspensionVerdict>>;
+}
+
+/** 판정과 그 판정에 쓴 규정을 함께 돌려준다 — 화면이 "경고 1/2장" 처럼 한도를 같이 보여 줄 때 쓴다. */
+export async function readDisciplineForUpcomingKeys(
+  tx: Tx,
+  input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
+): Promise<CompetitionDiscipline> {
   const rules = await readSuspensionRules(tx, input.competitionId);
+  const verdictsByUpcomingKey = await evaluateUpcomingKeys(tx, rules, input);
+  return { rules, verdictsByUpcomingKey };
+}
+
+async function evaluateUpcomingKeys(
+  tx: Tx,
+  rules: SuspensionRules,
+  input: Omit<SuspensionVerdictInput, 'upcomingKey'> & { readonly upcomingKeys: readonly string[] },
+): Promise<Map<string, Map<string, SuspensionVerdict>>> {
   // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회·리그가 그렇다(옵트인).
   if (!suspensionRulesEnabled(rules)) {
     return new Map(input.upcomingKeys.map((key) => [key, emptyVerdicts()]));

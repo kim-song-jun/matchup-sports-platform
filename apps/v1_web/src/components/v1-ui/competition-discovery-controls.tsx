@@ -7,7 +7,7 @@ import { BottomSheet } from './bottom-sheet';
 import { FilterIcon } from './icons';
 import {
   competitionDiscoveryHref,
-  competitionStageOptions,
+  competitionStageRows,
   discoveryRangeError,
   type CompetitionDiscoveryFilters,
 } from '@/lib/competition-discovery';
@@ -24,7 +24,7 @@ type Props = {
   page?: number;
   pending: boolean;
 };
-const GENDER_LABELS = { male: '남성부', female: '여성부', mixed: '혼성', unspecified: '미지정' };
+const GENDER_LABELS = { male: '남성부', female: '여성부', mixed: '혼성' };
 const FORMAT_LABELS = { league: '리그 방식', knockout: '토너먼트', group_knockout: '조별+결선', league_knockouts: '정규리그+복수 결선' };
 
 function FilterChoices({ title, value, options, onChange }: {
@@ -61,7 +61,7 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
   const tournament = filters.kind === 'tournament';
   return <BottomSheet open ariaLabel="대회·리그 필터" closeHref={competitionDiscoveryHref(filters, { page })}>
     <div className="tm-filter-sheet-handle" />
-    <form onSubmit={(event) => {
+    <form id={`${id}-form`} onSubmit={(event) => {
       event.preventDefault();
       const rangeError = discoveryRangeError(draft);
       if (rangeError) { setError(rangeError); return; }
@@ -74,9 +74,14 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
         }}>초기화</button>
       </div>
       <div className={styles.sections}>
-        <FilterChoices title="상태" value={draft.stage} options={competitionStageOptions(filters.kind)} onChange={(value) => set('stage', value as typeof draft.stage)} />
+        {competitionStageRows(filters.kind).map((row) => {
+          // 두 줄은 하나의 선택이다 — 이 줄의 값이면 그 값을, 다른 줄의 값이면 이 줄은 '전체'로 보인다.
+          const own = row.options.some((option) => option.value === draft.stage);
+          return <FilterChoices key={row.title} title={row.title} value={own ? draft.stage : undefined} options={row.options}
+            onChange={(value) => { if (value !== undefined || own) set('stage', value as typeof draft.stage); }} />;
+        })}
         <FilterChoices title="종목" value={draft.sportId} options={sports.map((sport) => ({ value: sport.id, label: sport.label }))} onChange={(value) => set('sportId', value)} />
-        {tournament && <FilterChoices title="성별 부문" value={draft.genderCategory} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('genderCategory', value as typeof draft.genderCategory)} />}
+        <FilterChoices title="성별 부문" value={draft.genderCategory} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('genderCategory', value as typeof draft.genderCategory)} />
         <fieldset className={styles.group}>
           <legend className="tm-text-label">{filters.kind === 'league' ? '시즌 기간' : tournament ? '개최 기간' : '개최·시즌 기간'}</legend>
           <p className="tm-text-caption">선택한 기간과 겹치는 일정을 찾아요. 날짜 미정은 제외해요.</p>
@@ -102,11 +107,12 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
           </fieldset>
         </>}
       </div>
-      <div className={`tm-filter-actions ${styles.actions}`}>
-        <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={competitionDiscoveryHref(filters, { page })}>닫기</Link>
-        <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit">결과 보기</button>
-      </div>
     </form>
+    {/* 시트 바닥 고정은 `.tm-filter-sheet > .tm-filter-actions` 직계 자식에만 걸린다 — 폼 안에 두면 스크롤 끝에서 시트 패딩만큼 뜬다. 제출은 form 속성으로 잇는다. */}
+    <div className={`tm-filter-actions ${styles.actions}`}>
+      <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={competitionDiscoveryHref(filters, { page })}>닫기</Link>
+      <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit" form={`${id}-form`}>결과 보기</button>
+    </div>
   </BottomSheet>;
 }
 

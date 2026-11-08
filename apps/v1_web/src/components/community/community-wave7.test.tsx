@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { formatFileSize } from './chat-plus-panel';
 import type { ChatListViewModel, ChatRoomViewModel, NotificationsViewModel } from './community.types';
 
@@ -213,7 +214,7 @@ describe('채팅방 + 패널 · 사진 (Task 181)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '사진 크게 보기' }));
     const dialog = screen.getByRole('dialog', { name: '사진 크게 보기' });
-    expect(within(dialog).getByRole('img', { name: '보낸 사진' })).toHaveAttribute('src', '/uploads/2026/10/a.jpg');
+    expect(resolveNextImageSrc(within(dialog).getByRole('img', { name: '보낸 사진' }))).toBe('/uploads/2026/10/a.jpg');
 
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog', { name: '사진 크게 보기' })).not.toBeInTheDocument();

@@ -1140,4 +1140,42 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(screen.getByText(new RegExp(description))).toBeInTheDocument();
     });
   });
+  // 성별 부문에 그 성별 팀원이 없는 팀은 서버가 신청 생성에서 거절한다(TEAM_GENDER_INELIGIBLE).
+  // 화면은 팀 선택 단계에 머물며 서버 문구를 그 신청의 이름(대회·리그)으로 보여 준다.
+  describe('성별 부문 거절', () => {
+    const SERVER_MESSAGE = '여성부 대회에는 여성 팀원이 있는 팀만 신청할 수 있어요.';
+
+    function arrangeRejectedCreate(kind: 'regular_league' | 'regular_tournament') {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind, genderCategory: 'female', registrationDeadlineAt: '2099-01-01T00:00:00.000Z' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      const createRegistrationMutateAsync = vi.fn().mockRejectedValue({
+        response: { data: { code: 'TEAM_GENDER_INELIGIBLE', message: SERVER_MESSAGE } },
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: createRegistrationMutateAsync,
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      return createRegistrationMutateAsync;
+    }
+
+    it.each([
+      ['regular_league', '여성부 리그에는 여성 팀원이 있는 팀만 신청할 수 있어요.'],
+      ['regular_tournament', SERVER_MESSAGE],
+    ] as const)('%s 는 팀 선택 단계에서 거절 이유를 알리고 약관 단계로 넘기지 않는다', async (kind, shown) => {
+      const createRegistrationMutateAsync = arrangeRejectedCreate(kind);
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      fireEvent.click(nextButton);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(shown);
+      expect(createRegistrationMutateAsync).toHaveBeenCalledWith({ teamId: 'team-1' });
+      expect(screen.queryByLabelText('전체 동의')).not.toBeInTheDocument();
+    });
+  });
 });

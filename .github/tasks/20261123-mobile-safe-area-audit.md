@@ -31,7 +31,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - Forbidden: 레거시 앱, 무관한 변경, 실제 사용자 데이터 변경, 다른 세션 작업.
 
 ## Acceptance Criteria
-- [ ] 사용자용 144개 경로의 실제 경로/상태·플랫폼별 결과와 근거가 확정되고 미검증이 없다.
+- [ ] 사용자·운영진용 156개 경로의 실제 경로/상태·플랫폼별 결과와 근거가 확정되고 미검증이 없다.
 - [ ] 제보 및 발견된 가림/스크롤 결함이 각 플랫폼에서 해결되고 전후 증거와 console/network 확인이 있다.
 - [ ] 최소 회귀 검증, 리뷰, PR 및 exact-head CI, Alpha serving SHA/health 확인.
 
@@ -39,7 +39,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - 진행 중.
 
 ## Security Notes
-기존 계정과 운영 데이터를 수정하지 않는다. 인증정보와 `.env`를 읽거나 기록하지 않는다.
+기존 계정과 운영 데이터를 수정하지 않는다. 인증정보는 정본 `CLAUDE.md`가 지정한 비공개 QA 자료에서만 읽고 공개 문서·로그에 기록하지 않는다. `.env`는 읽거나 기록하지 않는다.
 
 ## Risks & Dependencies
 - 연결된 Android 기기 없음, 실행 중인 iOS 시뮬레이터 없음(첫 조사). 앱 실기기 증거는 브라우저 크기 재현으로 대체하지 않는다.
@@ -52,6 +52,30 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 | 2026-11-03 | `/admin-content-preview`, `/tournament-ops-demo`의 사용자용 여부 | 소스에서 전자는 관리자 권한 전용 미리보기라 제외, 후자는 공개 체험 페이지라 포함. |
 
 ## Progress Snapshot
+- 2026-11-06 (Claude, Codex 한도 소진 후 인계): 같은 50조건 스크립트를 Alpha `fdd1e204`(#2166 포함)에서 다시 돌려 **50/50 통과**, 원래 카카오 세션 복귀 확인. 수정 전 같은 스크립트는 24건 실패였다. 증거는 비공개 `teameet-unified-auth-20261105/mobile-matched-after-claude-fdd1e20-*`.
+- 2026-11-06 나머지 121개 경로 스윕(390·320, 하단 48px 모사, Chromium — 실기기 아님): 정상 90 · 결함 후보 8 · 목표 화면 아님 14(리다이렉트·권한 안내) · 건너뜀 7(진입만으로 쓰기 가능) · 데이터 없음 2. 후보: `/my/settings/login-methods`·`/my/teams` 320 가로 넘침, 리뷰 작성 마지막 줄 고정 CTA 12px 가림, 대회 운영(`operations`·`videos`)·체험 화면 하단 8~15px 시스템 영역 겹침, 특정 팀매치 상세 렌더 예외. `/landing` 장식 글로우는 가로 스크롤이 없어 제외. 필터 시트 4곳·하단 탭바·FAB 는 전부 안전 영역 안. 진입만으로 쓰기 요청이 나가는 화면(팀매치·팀 상세의 채팅방 자동 resolve, 초대 링크 발급, 채팅 읽음)이 있어 QA 계정으로 그 화면을 열 때 유의. 비공개 증거 `teameet-mobile-sweep-20261106/summary.md`.
+- 2026-11-06 후보 수정 PR: #2175(`.tm-my-shell`·목록 grid 의 암묵 auto 열 → `minmax(0, 1fr)`, 리뷰 작성은 `useCreateCtaSpace` 로 고정 CTA 높이만큼 비움), #2174(대회 운영 셸·필드 콘솔 root 와 체험 화면에 `--v1-shell-safe-bottom`), #2177(팀매치 상세가 경기 설정의 `periods` 만 검증 — alpha 풋살 설정 한 버전의 `lineup.positions` 손상으로 상세 3건이 SSR 422 → 전역 오류 화면이던 것. 운영 공개 팀매치 24건은 전부 200). 손상된 alpha 설정 데이터 자체는 사용자 승인 전이라 그대로다. 같은 날 #2171 로 dev 머지 → alpha 반영이 40~70분에서 19분이 됐다.
+- 2026-11-05 최신 체크포인트: PR #2166의 최종 head `74a3f7e32a5261f7896c493be61cb79d130b845e` exact-head CI 42023072760이 Web·API·Gates 모두 통과해 dev `0b7720cb7d068b05735039e3445ef4b374642ed7`에 머지했다. 새 dev 전체 CI 42030531109와 Alpha 배포 42030531284도 통과했다. 실제 Web/API SHA `0b7720cb`, release `1.13.1-alpha.20261105.g0b7720cb7d06`, DB health 정상을 확인했다. 다섯 수정의 배포본 화면 50조건 재검수는 아직이다.
+- 2026-11-05 전후 조건 고정: 실제 기존 QA 스태프·팀장으로 카드 폭 5개, 시상 버튼 4개, 등번호 창 8개, 해체의 막힘/준비 상태 32개, 키보드 닫기 1개로 같은 50개 조건의 수정 전 증거를 확보했다. 기존 Alpha `982ca40b`에서 24개 실패 조건이 다섯 결함에 대응했다. 원래 카카오 계정 복귀를 확인했고 신청·등번호·해체·프로필 저장은 실행하지 않았다. 새 SHA를 확인한 뒤 같은 스크립트로 실제 배포본을 재검수해야 한다. E2E 파일의 세 회귀 계약은 수집만 했으며 실제 실행 PASS로 세지 않는다.
+- 2026-11-05 23:25 KST 릴리스 준비 관찰: dev 대상 초안 PR #2167의 공개 head `26ad5c613ca02405cb6245fe008544e5c7e8f6f4` CI 42038344742가 API·Web·Gates 모두 통과했고 code scanning 42038352245도 통과했다. 버전·CHANGELOG·소비 Changeset·기존 task 2개, 총 9개 파일이며 앱 동작 코드는 Alpha `0b7720cb`와 같다. 정본 `--prepare-only` 게이트와 릴리스 계약 24/24 통과. 후보 매니페스트 `1.13.1`, 미소비 Changeset 0개, 계획 배포 버전 `1.13.2`다. PR은 draft이며 동일 50조건의 새 Alpha 화면 재검수, 릴리스 dev 반영/Alpha 재확인, 사용자 main 승격/운영 검수는 남는다.
+- 2026-11-05 검수표: 현재 소스 156개 경로와 과거 144개 목록을 대조해 추가 12개가 담당 대회 관리 경로임을 확인했다. 이번 세션의 다중 화면 크기 관찰 묶음을 연결한 경로는 35/156이고, 과거 133개 진입 시도에는 권한 안내·리디렉션·로딩도 포함된다. 역할·상태·플랫폼 전체 완료는 계속 0/156이다. 비공개 `route-coverage-matrix.json`에 이 구분과 증거를 기록했다.
+- 2026-11-05 남은 창 후보: 개인매치 신청, 팀 컨택 신고, 명단 저장/불러오기, 선수 선택, 어시스트 선택, 비정상 종료, 승부차기, 결과 사유/편집의 10개 inline viewport overlay를 좁혔다. 해당 파일에는 native bottom·visual viewport 변수를 직접 소비하는 코드가 없지만 실제 가림으로 확정하지 않았다. `remaining-overlay-candidates.json`의 실제 화면·역할·긴 본문·키보드 조건으로 재현해야 한다.
+- 2026-11-05 조회 권한 선행 확인: 기존 QA 스태프의 실제 로그인 201·auth/me 200, 담당 대회 3개와 `FIELD_OPERATOR`/`TOURNAMENT_DIRECTOR` 배정, QA179 운영 보드 GET 200을 확인했다. 담당 경기 2개는 모두 `SCHEDULED`이고 QA179에는 경기가 없다. QA 팀장의 기존 경기 GET·operations-lineup GET은 200이며 상태는 `SCHEDULED`다. 모집 중 개인매치 첫 20개에는 QA 표시 후보가 없었다. 이 API 조회는 실제 운영창·진행 중 상태의 시각 검증을 대신하지 않는다.
+- 2026-11-05 23:25 KST 브라우저 조건: 현재 연결에서 기존 TaskSpace 69 또는 이 목표의 작업공간 이름을 찾지 못했다. 같은 조건을 세 연속 goal turn에 확인했고 새 검수 공간 생성 답변은 아직 없다. 다른 사용자 공간은 보존했다. 실제 이메일 입력·실기기 보류도 유지하며 전체 목표는 미완료다. 독립적으로 수행할 수 있었던 릴리스 exact-head CI 확인과 운영 배포/마이그레이션 로그 대조는 마쳤다.
+- 2026-11-05: 사용자가 모바일 UI/UX부터 통합 계정 로그인과 Alpha·main 실측까지 목표를 연결했다. 코드 기준으로 담당 대회 관리 12개 경로가 추가되어 인벤토리를 144→156개로 갱신한다. 기본 브라우저 표시 상태와 역할·키보드·네이티브 전체 상태를 구분하며 전 플랫폼 완전 검수는 아직 0/156이다.
+- 2026-11-05: 비공개 자료의 기존 QA 스태프 계정으로 Alpha 이메일 로그인과 실제 디렉터 배정을 확인했다. QA 대회의 담당 대회 관리 12개 경로를 320/768/1440px 36개 표시 상태로 읽기 전용 관찰했다. 운영·대회 데이터 변경 없음. 캠페인 없음 404는 정상 빈 상태로 표시된다.
+- 2026-11-05: 신청 관리 320px에서 카드 목록의 고정 최소 폭 360px 때문에 문서 폭이 376px로 늘어남을 확인했다. `AdminCardList`의 선호 최소 폭을 컨테이너 폭 이하로 제한해 좁은 화면은 한 열로 줄고 넓은 화면의 기존 자동 열 배치는 유지한다. 실제 Alpha DOM 임시 적용에서 문서 376→320px, 카드 360→288px 확인. 배포본 재검수는 별도로 진행한다.
+- 2026-11-05: 수정 식의 실제 Alpha 임시 적용에서 320/360/390/768/1440px 모두 가로 넘침 0을 확인했고 신청 관리 기존 기능 테스트 40/40, Web 타입·패턴 검사를 통과했다. CSS 기하를 jsdom의 클래스 문자열 검사로 대체하지 않으며 배포 후 동일 QA 대회의 실제 화면으로 확인한다.
+- 2026-11-05: 시상 관리의 `+ 항목 추가`가 설명 문구와 같은 flex 행에서 줄어들어 320px에서는 버튼 63×74px/텍스트 67px 높이, 390px에서는 텍스트 43px 높이로 줄바꿈되는 결함을 확인했다. 설명은 줄어들 수 있게 하고 버튼은 줄어들지 않는 한 줄·44px 터치 높이로 조정한다. 실제 Alpha 임시 적용은 320/390/768/1440px에서 버튼 약 99×44px/텍스트 19px, 문서 가로 넘침 0. 서버 저장 없이 전후 캡처했으며 배포 후 재검수는 별도로 진행한다.
+- 2026-11-05: 기존 QA 팀장으로 실제 팀 멤버 관리 → 등번호 지정을 열었다. 320/390×640px, 48px 하단 영역에서 저장 버튼 끝 604px > 안전 경계 592px로 12px 가림을 재현했다. 화면 높이 360px에서 오류 문구가 나오면 패널 전체 높이도 가용 영역보다 커진다. 기존 확인창의 body portal·안전 여백·패널 스크롤 패턴을 적용하고 보이는 viewport 높이를 사용한다. 실제 Alpha DOM 임시 적용은 저장 버튼 604→556px, 320×360px 오류 상태는 패널 316px 콘텐츠를 280px 안에서 스크롤해 저장 버튼 276px < 안전 경계 312px 확인. 번호 저장·팀 데이터 변경 없음.
+- 2026-11-05: 등번호 기존 동작 테스트 2/2와 최종 Web 타입·패턴 검사 PASS. 실제 내 팀 → 멤버 관리에서 입력창을 열고 늦은 0/34/48/64px 인셋 및 작은 높이의 오류 상태를 확인하는 E2E 계약을 추가했다. 테스트 수집은 확인했으며 이 계약의 실제 실행과 배포본 Alpha 재검수는 아직 남는다.
+- 2026-11-05: 기존 QA 팀장의 팀 상세·멤버·수정·전적·일정·일정 생성·경기 명단·전술·컨택 설정·해체 11개 경로를 320/768/1440px, 초기/스크롤 끝으로 추가 관찰했다(33개 표시 상태). 가로 넘침·권한 거부·로드 에러·콘솔 오류·HTTP 실패 없음. 경기·팀 설정·명단 저장이나 해체·취소 버튼은 누르지 않았다. 페이지 기본 동작의 Socket.IO와 채팅방 resolve 요청은 별도로 기록했다.
+- 2026-11-05: 위 팀 해체의 320px 막힘 화면에서는 마지막 안내문이 고정 CTA에 약 23px 가려졌다(0/34/48/64px 인셋 각각). 본문이 고정 148px + 안전 영역만 남기지만 버튼이 두 줄로 쌓이면 CTA가 더 높아지는 원인이다. Footer에 기존 `useCreateCtaSpace`를 붙이고 양쪽 해체 화면의 본문을 실측 높이 + 16px로 맞춘다. Alpha 임시 적용에서 320/390/768/1440px 모두 마지막 내용이 CTA보다 위에 남고 모바일·태블릿 여백은 약 16px로 확인했다. 기존 해체 동작 5/5 및 Web 타입·패턴 검사 PASS, 늦은 인셋의 E2E 계약 수집 확인. 배포본 실제 실행은 남는다.
+- 2026-11-05 증거 보강: 브라우저 CLI 호출 사이에 window 오류 수집기가 유지되지 않아 이전 `errors: []`만으로 콘솔 무오류를 보장할 수 없음을 확인했다. 각 호출에서 Runtime/Log/Network를 켜고 의도한 console probe 수신을 확인한 뒤 실제 흐름을 수집했다. Alpha·운영 계정 찾기 24개와 프로필·대회 필터 16개 표시 상태에서 콘솔 오류·처리되지 않은 예외·HTTP/리소스 실패가 없었다. 탐색에 따른 요청 취소는 실패와 분리해 기록했다. 앞선 기하 측정과 화면 캡처는 유지한다.
+- 2026-11-05: 기존 QA 팀 12개의 해체 전 GET 점검 중 8개가 해체 가능한 상태여서 실제 준비 화면도 확인했다. 320px에서 확인 입력란이 약 39px 가려졌고 같은 실측 여백 적용은 약 16px 간격을 확보한다. 이름 입력·해체 실행 없음. 키보드 영역을 제외한 320×360px 모사에서는 기존 Footer가 absolute 위치로 스크롤되어 사라질 수 있어, 공통 `tm-create-shell`의 키보드 중 일반 흐름 배치를 재사용한다.
+- 2026-11-05: 실제 Alpha 프로필에서 키보드 모사 중 닉네임 안내로 CTA가 89→113px 커지면 예약 높이가 0px이 된다. 창 크기·CTA 크기 변화 없이 키보드 상태만 닫히면 fixed 위치로 복귀해도 0px이 남아 마지막 안내가 9px 겹친다. 루트의 native keyboard 속성과 browser keyboard 클래스를 관찰해 위치 전환 때도 재측정한다. 두 전환의 실제 DOM/CSS 계약 테스트 RED(0px, 기대 113px) → 4/4 GREEN. Alpha 임시 관찰 적용도 예약 113px·간격 16px, 저장 요청 없이 확인했다. 프로필 E2E 계약에 같은 키보드 닫기 전환을 추가했고 최종 Web 타입·패턴 검사와 세 E2E 계약 수집은 PASS, 배포본 실행은 남는다.
+- 2026-11-05: 이메일 연결의 실제 보호 흐름도 확인했다. 기존 QA 세션의 요청은 403 `RECENT_LOGIN_REQUIRED`로 차단되고 재로그인 후 같은 계정이 원래 연결 화면과 복귀 경로로 돌아온다(auth/me 200). 이미 이메일 신원이 있는 계정의 요청은 409 `SOCIAL_LINK_PROVIDER_EXISTS`와 안내 화면으로 종료된다. 인증번호 발송·신원 추가·비밀번호 변경 없음. 이 두 HTTP 오류는 의도한 차단이며 콘솔 예외나 미처리 실패와 구분한다.
+- 추가 검증 연결: 통합 계정 검증과 발견된 가입 보완 진입 결함은 [Task 20261125](./20261125-unified-account-email-login.md), PR #2165에서 추적한다. 실제 카카오 로그인은 Alpha·운영에서 확인했고 일회용 QA 계정으로 이메일 로그인·복구를 검증했다. 실사용자 이메일 추가의 인증번호·비밀번호 입력은 사용자 요청으로 보류 중이다.
 - 2026-11-03: PR #2133·#2134 머지 후 Alpha `84ebe114ebea19973d2cc276b50691c05f8ac33f` 배포와 API DB health 정상 확인. 144개 route 중 133개는 진입 또는 캡처를 시도했으나 권한 거부·로딩·리디렉션도 포함하고 전 플랫폼 검증 PASS는 아니다. 상세 `/Users/sungjun/.codex/qa-evidence/teameet-mobile-20261103/route-attempts.json`.
 - 변경 후 대회 필터는 390x844 Chromium 터치 스와이프에서 scrollTop 0→125; 로그인·약관 관련 10개 화면에서 360x640 및 하단 48px 모사 시 보이는 컨트롤의 안전 경계 침범 후보는 없었다. 화면별 고정 영역에 가려진 본문까지 이 수치로 보장하지 않는다.
 - 배포 후 계정 충돌 화면에서 native inset이 렌더 이후 0→48px로 바뀌면 고정 CTA는 48px 커지지만 ResizeObserver의 기본 content-box 관찰은 padding 변화를 감지하지 않아 본문이 CTA 뒤에 48px 겹쳤다. 실제 Alpha E2E는 겹침 48px로 RED. CTA의 border-box 크기를 관찰하도록 보완하고 수정 후 재검증한다.
@@ -80,8 +104,21 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - 46개 기본 경로에서 Chromium 390x844·CSS native inset 48px 모사 후 화면 내 interactive 요소의 안전경계 침범을 기계적으로 탐색했고 후보 0개였다. 일부 hydration/리디렉션 경계 및 overlay·키보드·역할 상태는 탐색하지 못하므로 전면 검수 PASS가 아니다. 결과 `/tmp/teameet-mobile-audit-20261103/simulated-inset-route-scan.json`.
 - 사용자는 실기기 연결 불가, 시뮬레이션으로 진행하고 실기기는 나중에 확인하기로 했다. Android 에뮬레이터와 iOS Simulator runtime 미설치 상태를 확인했고, iOS 27.1 simulator runtime 다운로드 진행 중. Android/iOS 실기기/OS/키보드는 미실행.
 
-## Route inventory (0/144 fully audited; 67 admin-only exclusions)
+## Route inventory (0/156 fully audited; 67 admin-only exclusions at original inventory)
 각 항목은 route 템플릿이며 객체·권한·상태·플랫폼별 검수는 따로 기록해야 한다. 체크는 전 플랫폼과 필요한 상태 검증이 끝난 경우에만 한다.
+
+- [ ] `/tournament-management` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/announcements` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/awards` — 모바일 항목 추가 버튼의 세로 줄바꿈 확인·수정 검증 진행; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/bracket` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/campaign` — Alpha QA 디렉터 캠페인 없음 상태 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/info` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/overview` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/registrations` — Alpha 320px 카드 가로 넘침 확인; 수정 검증 진행
+- [ ] `/tournament-management/tournaments/[id]/reviews` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/sponsors` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/statistics` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
 
 - [ ] `/account-deletion` — 미검수
 - `/admin-content-preview` — 범위 제외: 관리자 권한 전용 미리보기
@@ -89,7 +126,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/auth/blocked` — 미검수
 - [ ] `/auth/find-account` — 미검수
 - [ ] `/auth/location-denied` — 미검수
-- [ ] `/auth/password-reset` — 미검수
+- [x] `/auth/password-reset` — 정리됨(페이지 삭제, 검수 대상 아님)
 - [ ] `/auth/provider-denied` — 미검수
 - [ ] `/auth/withdrawal-cancel` — 미검수
 - [ ] `/callback/kakao` — 미검수
@@ -162,7 +199,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/onboarding/confirm` — 미검수
 - [ ] `/onboarding/level` — 미검수
 - [ ] `/onboarding/region` — 미검수
-- [ ] `/onboarding/resume` — 미검수
+- [x] `/onboarding/resume` — 정리됨(페이지 삭제, 검수 대상 아님)
 - [ ] `/onboarding/sport` — 미검수
 - [ ] `/` — 미검수
 - [ ] `/search/new` — 미검수

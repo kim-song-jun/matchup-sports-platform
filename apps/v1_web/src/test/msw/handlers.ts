@@ -78,7 +78,10 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
-import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
+import { PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_PENDING_RECOVERY_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
+import { v1AuthLoginMethodMswHandlers } from './auth-login-method-handlers';
+import { v1EmailChangeMswHandlers } from './profile-email-change-handlers';
+import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1AdminUserPhoneReleaseMswHandlers } from './admin-user-phone-release-handlers';
@@ -265,62 +268,90 @@ async function findAccountByRecoveryEmail(request: Request) {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 인증을 다시 진행해 주세요.');
   }
   const social = email === PASSWORD_UNAVAILABLE_MSW.email;
-  if (!social && email !== v1UserFixture.email?.trim().toLowerCase()) {
+  const withdrawing = email === WITHDRAWAL_PENDING_RECOVERY_MSW.email;
+  if (!social && !withdrawing && email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '가입된 계정을 찾지 못했어요.', 404);
   }
-  const [local, domain] = email.split('@');
-  const maskedEmail = domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***';
-  return ok({ maskedEmail, providers: social ? [...PASSWORD_UNAVAILABLE_MSW.providers] : ['email'], hasPassword: !social, withdrawalPendingUntil: null });
+  return ok({
+    maskedEmail: maskRecoveryEmail(email),
+    emailProofAvailable: true,
+    providers: social ? [...PASSWORD_UNAVAILABLE_MSW.providers] : ['email'],
+    hasPassword: !social,
+    withdrawalPending: withdrawing,
+    withdrawalPendingUntil: withdrawing ? WITHDRAWAL_PENDING_RECOVERY_MSW.withdrawalPendingUntil : null,
+  });
 }
 
 async function resetPasswordByRecoveryEmail(request: Request) {
   const body = parseAuthProofInput(await request.json(), ['email', 'proofToken', 'newPassword']);
   const email = recoveryEmail(body);
-  if (!email || typeof body?.proofToken !== 'string' || (body.newPassword?.length ?? 0) < 8) {
+  const passwordIssue = accountPasswordIssue(body?.newPassword ?? '');
+  if (!email || typeof body?.proofToken !== 'string' || passwordIssue === 'too_short') {
     return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
   }
+  if (passwordIssue === 'too_common') return authProofError(COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
   sweepRecoveryEmailState();
   const proof = recoveryEmailProofs.get(body.proofToken);
   if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
   }
   if (email === PASSWORD_UNAVAILABLE_MSW.email) return passwordLoginUnavailableResponse();
+  // 비밀번호는 활성 계정만 바꾼다. 탈퇴 유예 계정은 바꾸지 않고 종료일과 함께 403 으로 알린다(메일함 증명 뒤라 공개해도 된다).
+  if (email === WITHDRAWAL_PENDING_RECOVERY_MSW.email) {
+    return HttpResponse.json({
+      status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING',
+      message: '탈퇴를 신청한 계정이라 비밀번호를 바꿀 수 없어요. 로그인하면 탈퇴를 취소할 수 있어요.',
+      details: { withdrawalPendingUntil: WITHDRAWAL_PENDING_RECOVERY_MSW.withdrawalPendingUntil },
+      timestamp: new Date().toISOString(),
+    }, { status: 403 });
+  }
   if (email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }
   return ok({ ok: true });
 }
 
-async function resetPasswordByRecoveryPhone(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken', 'newPassword']);
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string' || (body.newPassword?.length ?? 0) < 8) {
-    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
-  }
-  if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
-    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
-  }
-  if (body.phone !== authAccountPhoneFixture) {
-    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
-  }
-  return authProofError('ACCOUNT_RECOVERY_REQUIRES_EMAIL',
-    '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.', 409);
+function maskRecoveryEmail(email: string): string {
+  const [local = '', domain] = email.split('@');
+  return domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***';
 }
 
+function hasRecoveryEmailProof(email: string, proofToken: string): boolean {
+  sweepRecoveryEmailState();
+  const proof = recoveryEmailProofs.get(proofToken);
+  return Boolean(proof && proof.email === email && proof.channel === 'email' && proof.purpose === 'password_reset');
+}
+
+// 번호 증명만으로는 가입 수단과 탈퇴 대기 여부까지만 답한다. 마스킹 이메일·탈퇴 종료일은 같은 계정의
+// 이메일 증명(email + emailProofToken)을 함께 보낸 요청에만 싣는다. 둘 중 하나만 보내면 검증 오류다.
 async function findAccountByRecoveryPhone(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken']);
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string') {
+  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken', 'email', 'emailProofToken']);
+  const sentMailboxProof = body !== null && (body.email !== undefined || body.emailProofToken !== undefined);
+  const mailboxEmail = body && sentMailboxProof ? recoveryEmail(body) : null;
+  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string'
+    || (sentMailboxProof && (!mailboxEmail || typeof body.emailProofToken !== 'string' || body.emailProofToken.length > 2048))) {
     return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
   }
   if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
     return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
   }
-  if (body.phone !== authAccountPhoneFixture) {
+  if (mailboxEmail && !hasRecoveryEmailProof(mailboxEmail, body.emailProofToken)) {
+    return authProofError('EMAIL_NOT_VERIFIED', '이메일 인증을 다시 진행해 주세요.');
+  }
+  const withdrawing = body.phone === WITHDRAWAL_PENDING_RECOVERY_MSW.phone;
+  if (!withdrawing && body.phone !== authAccountPhoneFixture) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
   }
-  const email = v1UserFixture.email;
-  const [local = '', domain] = email?.split('@') ?? [];
-  const maskedEmail = email ? (domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***') : null;
-  return ok({ maskedEmail, providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+  const accountEmail = withdrawing ? WITHDRAWAL_PENDING_RECOVERY_MSW.email : v1UserFixture.email?.trim().toLowerCase() ?? null;
+  const ownMailbox = mailboxEmail !== null && mailboxEmail === accountEmail;
+  return ok({
+    maskedEmail: ownMailbox && accountEmail ? maskRecoveryEmail(accountEmail) : null,
+    emailProofAvailable: accountEmail !== null,
+    providers: ['email'],
+    hasPassword: true,
+    withdrawalPending: withdrawing,
+    withdrawalPendingUntil: ownMailbox && withdrawing ? WITHDRAWAL_PENDING_RECOVERY_MSW.withdrawalPendingUntil : null,
+  });
 }
 
 function notFound(message: string) {
@@ -360,7 +391,7 @@ function toSignupProfileDraft(value: unknown): SignupProfileDraft {
   return { displayName, phone, birthDate, gender };
 }
 
-function getRegisterIssue(value: unknown): RegisterField | null {
+function getRegisterIssue(value: unknown): RegisterField | 'passwordTooCommon' | null {
   const profileIssue = getSignupProfileIssue(toSignupProfileDraft(value));
   if (profileIssue) return profileIssue;
 
@@ -372,9 +403,10 @@ function getRegisterIssue(value: unknown): RegisterField | null {
 
   if (nickname.length < 2) return 'nickname';
   if (email.length < 3) return 'email';
-  if (password.length < 8) return 'password';
+  const passwordIssue = accountPasswordIssue(password);
+  if (passwordIssue === 'too_short') return 'password';
   if (!requiredTermsAccepted) return 'requiredTermsAccepted';
-  return null;
+  return passwordIssue === 'too_common' ? 'passwordTooCommon' : null;
 }
 
 function page<T>(items: T[]) {
@@ -773,23 +805,25 @@ export const v1MswHandlers = [
     socialSignupPrefill: null,
     user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
       onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
-      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
+      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true },
     profile: { displayName: v1UserFixture.displayName, nickname: v1UserFixture.displayName },
     verification: { emailVerified: true, phoneVerified: false },
   })),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
   http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
-  http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
+  ...v1EmailChangeMswHandlers,
+  ...v1AuthLoginMethodMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();
     const issue = getRegisterIssue(body);
+    if (issue === 'passwordTooCommon') return authProofError(COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
     if (issue) return validationError(issue);
     return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture });
   }),

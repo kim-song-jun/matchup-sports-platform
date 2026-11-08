@@ -75,7 +75,7 @@ export function AdminCardList<T>({
   pagination,
   renderExpanded,
 }: AdminCardListProps<T>) {
-  const gridStyle = { gridTemplateColumns: `repeat(auto-fill,minmax(${minCardWidth},1fr))` };
+  const gridStyle = { gridTemplateColumns: `repeat(auto-fill,minmax(min(100%,${minCardWidth}),1fr))` };
 
   // Error state
   if (error) {

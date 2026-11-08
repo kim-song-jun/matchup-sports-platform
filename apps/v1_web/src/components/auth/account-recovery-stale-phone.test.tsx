@@ -4,8 +4,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { AccountRecoveryClient } from './account-recovery-client';
 import { authUiServer, RECOVERY_EMAIL, RECOVERY_PHONE, resetWireScenario, wireCalls } from './mdqa133-auth-ui.fixtures';
 import {
-  backToIdentity, EMAIL_ACCOUNT, installDeferredPhoneFlow, OLD_PHONE_ERROR, OTHER_PHONE, renderRecovery,
-  resetIndependentEmailPassword, settleRequests, SOCIAL_ACCOUNT, verifyIndependentEmail, verifyPhone,
+  backToIdentity, EMAIL_ACCOUNT, EMAIL_ACCOUNT_SHOWN, installDeferredPhoneFlow, OLD_PHONE_ERROR, OTHER_PHONE, renderRecovery,
+  resetIndependentEmailPassword, settleRequests, SOCIAL_ACCOUNT, SOCIAL_ACCOUNT_SHOWN, verifyIndependentEmail, verifyPhone,
 } from './account-recovery-stale-phone.fixtures';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), back: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
@@ -62,11 +62,11 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     backToIdentity();
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: OTHER_PHONE } });
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
-    expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
+    expect(screen.queryByText(SOCIAL_ACCOUNT_SHOWN)).not.toBeInTheDocument();
 
     await startPhoneLookup(OTHER_PHONE);
     await settleRequests(() => flow.releaseFind(1, EMAIL_ACCOUNT));
-    expect(screen.getByText(EMAIL_ACCOUNT.maskedEmail)).toBeInTheDocument();
+    expect(screen.getByText(EMAIL_ACCOUNT_SHOWN)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '로그인하러 가기' })).toHaveAttribute('href', '/login/email');
     expect(wireCalls.findAccount).toHaveLength(2);
   });
@@ -76,10 +76,10 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     await startPhoneLookup();
     await startPhoneLookup(OTHER_PHONE);
     flow.releaseFind(1, EMAIL_ACCOUNT);
-    await screen.findByText(EMAIL_ACCOUNT.maskedEmail);
+    await screen.findByText(EMAIL_ACCOUNT_SHOWN);
     await settleRequests(() => flow.releaseFind(0, null));
 
-    expect(screen.getByText(EMAIL_ACCOUNT.maskedEmail)).toBeInTheDocument();
+    expect(screen.getByText(EMAIL_ACCOUNT_SHOWN)).toBeInTheDocument();
     expect(screen.queryByText(OLD_PHONE_ERROR)).not.toBeInTheDocument();
     expect(wireCalls.emailReset).toHaveLength(0);
   });
@@ -92,7 +92,7 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
 
-    expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
+    expect(screen.queryByText(SOCIAL_ACCOUNT_SHOWN)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
     expect(wireCalls.findAccount).toHaveLength(1);
   });
@@ -106,7 +106,7 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
 
-    expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
+    expect(screen.queryByText(SOCIAL_ACCOUNT_SHOWN)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
@@ -116,13 +116,13 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     await settleRequests(() => flow.releaseFind(0, null));
 
     expect(screen.getByText(OLD_PHONE_ERROR)).toBeInTheDocument();
-    expect(screen.queryByText(EMAIL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
+    expect(screen.queryByText(EMAIL_ACCOUNT_SHOWN)).not.toBeInTheDocument();
     expect(wireCalls.emailReset).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
     await waitFor(() => expect(flow.finds).toHaveLength(2));
     expect(flow.finds[1].body).toEqual({ phone: RECOVERY_PHONE, proofToken: `phone-proof:${RECOVERY_PHONE}` });
     await settleRequests(() => flow.releaseFind(1, EMAIL_ACCOUNT));
-    expect(screen.getByText(EMAIL_ACCOUNT.maskedEmail)).toBeInTheDocument();
+    expect(screen.getByText(EMAIL_ACCOUNT_SHOWN)).toBeInTheDocument();
   });
 
   it('휴대폰 인증 대조 중 화면을 떠나면 늦은 인증이 계정 조회를 새로 시작하지 않는다', async () => {
@@ -155,7 +155,7 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     await waitFor(() => expect(flow.finds).toHaveLength(1));
     expect(flow.finds[0].body).toEqual({ phone: currentPhone, proofToken: `phone-proof:${currentPhone}` });
     await settleRequests(() => flow.releaseFind(0, EMAIL_ACCOUNT));
-    expect(screen.getByText(EMAIL_ACCOUNT.maskedEmail)).toBeInTheDocument();
+    expect(screen.getByText(EMAIL_ACCOUNT_SHOWN)).toBeInTheDocument();
     expect(wireCalls.findAccount).toHaveLength(1);
   });
 });

@@ -1,4 +1,8 @@
-import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsAccountPassword } from './account-password.decorator';
+
+/** True when the caller sent any part of the mailbox proof, so the other part becomes required too. */
+const hasMailboxProof = (dto: FindAccountDto) => dto.email !== undefined || dto.emailProofToken !== undefined;
 
 export class FindAccountDto {
   @IsString()
@@ -7,20 +11,21 @@ export class FindAccountDto {
 
   @IsString()
   proofToken!: string;
-}
 
-export class ResetPasswordDto {
-  @IsString()
-  @Matches(/^\d{11}$/, { message: '휴대폰 번호는 숫자 11자리예요.' })
-  phone!: string;
+  /**
+   * Optional mailbox proof for the same account: the address and the `proofToken` of `recovery/email/confirm`.
+   * Only with both, and only when the address is this account's own, does the answer carry the masked email and
+   * the withdrawal end date. Sending one without the other is a 400.
+   */
+  @ValidateIf(hasMailboxProof)
+  @IsEmail({}, { message: '이메일 형식이 올바르지 않아요.' })
+  @MaxLength(254, { message: '이메일이 너무 길어요.' })
+  email?: string;
 
+  @ValidateIf(hasMailboxProof)
   @IsString()
-  proofToken!: string;
-
-  // 가입(RegisterDto)과 같은 8자 하한을 쓴다 — 재설정 경로만 느슨하면 그쪽이 약한 고리가 된다.
-  @IsString()
-  @MinLength(8, { message: '비밀번호는 8자 이상이에요.' })
-  newPassword!: string;
+  @MaxLength(2048)
+  emailProofToken?: string;
 }
 
 /**
@@ -59,7 +64,6 @@ export class ResetPasswordByEmailDto {
   @IsString()
   proofToken!: string;
 
-  @IsString()
-  @MinLength(8, { message: '비밀번호는 8자 이상이에요.' })
+  @IsAccountPassword()
   newPassword!: string;
 }

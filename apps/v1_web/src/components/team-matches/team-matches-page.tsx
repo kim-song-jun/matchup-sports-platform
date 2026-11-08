@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -18,7 +17,6 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { cssUrl } from '@/lib/assets';
 import { formatAmountNumber } from '@/lib/date-utils';
 import { matchGenderRuleLabel, TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
@@ -39,7 +37,7 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
-import { TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
+import { TEAM_MATCH_HERO_WIDTH, TEAM_MATCH_THUMB_WIDTH, TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
 import { TeamMatchLevelRangeField } from './team-match-level-range-field';
 import { TeamMatchRulesFields } from './team-match-rules-fields';
 import { teamMatchRuleSummary, teamMatchSavedRuleSummary } from './team-match-rules-draft';
@@ -182,6 +180,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     // 매치에서 먼저 승인된 팀이 홈팀이 되는 경우에는 아직 상대팀이 없다. 이때 뷰어의
     // 개인 상태("승인 완료")를 상대팀 이름처럼 표시하면 모집 중인 슬롯이 사라진다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    if (!approvedOpponent && match.closed) return '모집 마감';
     return approvedOpponent?.name ?? '모집 중';
   }
   if (mode === 'mine') {
@@ -189,6 +188,8 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     // '승인 완료' 항목)로 실제 상대팀 이름을 보여줘야 한다 — 그 전까지는 '신청팀'
     // placeholder로 바꾸지 않는다. 승인 전 상대팀 슬롯은 다른 뷰어와 동일한 모집 상태다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    // 호스트는 viewerState 때문에 match.status 가 항상 'mine' 으로 계산되므로 마감 여부는 match.closed 로 판정한다.
+    if (!approvedOpponent && match.closed) return '모집 마감';
     return approvedOpponent?.name ?? '모집 중';
   }
   if (match.status === 'closed') {
@@ -207,7 +208,8 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent ? '참가 확정' : '신청 후 승인';
+    if (approvedOpponent) return '참가 확정';
+    return match.closed ? null : '신청 후 승인';
   }
   if (mode === 'mine') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
@@ -215,6 +217,8 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
     // 신청이 들어온 사실을 히어로가 먼저 말한다(H6 A-1).
     const requested = match.applicantTeams.filter((team) => team.applicationStatus === 'requested').length;
     if (requested > 0) return `신청 ${requested}팀 대기`;
+    // 마감된 매치는 더 이상 신청을 받지 않으므로 '신청 후 승인' 안내도 걷는다.
+    if (match.closed) return null;
     // 목록을 못 받았으면 신청 수를 모른다 — '신청 후 승인'(아직 없음)으로 떨어뜨리지 않는다.
     return applicationsFailed ? null : '신청 후 승인';
   }
@@ -432,7 +436,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   const rejectApplicant = async (team: ApplicantTeam) => {
     const accepted = await confirm({
       title: `${team.name} 신청을 거절할까요?`,
-      message: `거절하면 ${team.name}에 알림이 가요. 모집이 계속되는 동안에는 다시 신청할 수 있어요.`,
+      message: `거절하면 ${team.name}에 알림이 가요. ${match.closed ? '모집이 마감돼서 다시 신청할 수 없어요.' : '모집이 계속되는 동안에는 다시 신청할 수 있어요.'}`,
       confirmLabel: '거절하기',
       cancelLabel: '닫기',
       tone: 'danger',
@@ -647,7 +651,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             <div
               className={`tm-team-vs-hero${detailImage ? ' tm-team-vs-hero-photo' : ' tm-team-vs-hero-sport'}`}
               style={detailImage ? {
-                backgroundImage: teamMatchBackgroundImage(detailImage, match.sport),
+                backgroundImage: teamMatchBackgroundImage(detailImage, match.sport, TEAM_MATCH_HERO_WIDTH),
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundSize: 'cover',
@@ -1102,7 +1106,7 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
           같은 토글의 개인 탭은 131px·5.88장).
           그래서 개인 탭과 같은 행 카드(.tm-match-row)로 통일한다 — 새 카드 체계를 만들지 않고
           이미 배포된 규칙을 그대로 쓴다. */}
-      <div className={`tm-match-row-thumb${listImage ? '' : ' tm-match-media-sport'}`} style={listImage ? { backgroundImage: teamMatchBackgroundImage(listImage, match.sport) } : undefined}>
+      <div className={`tm-match-row-thumb${listImage ? '' : ' tm-match-media-sport'}`} style={listImage ? { backgroundImage: teamMatchBackgroundImage(listImage, match.sport, TEAM_MATCH_THUMB_WIDTH) } : undefined}>
         {listImage ? null : <SportIllustration sport={match.sport} sizes="76px" />}
 
       </div>

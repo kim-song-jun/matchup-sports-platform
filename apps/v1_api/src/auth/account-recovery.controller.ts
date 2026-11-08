@@ -7,7 +7,6 @@ import {
   FindAccountDto,
   FindAccountByEmailDto,
   ResetPasswordByEmailDto,
-  ResetPasswordDto,
 } from './dto/account-recovery.dto';
 
 /**
@@ -21,7 +20,8 @@ import {
  * 재설정에 쓸 수 없어, 여기 아래에 공개 OTP 를 따로 둔다. 이쪽 증명 토큰은 비밀번호 재설정
  * 용도로만 발급되며 휴대폰 증명과 서로 통하지 않는다(email-proof-token).
  *
- * 이메일 소유 증명 후에는 해당 계정의 로그인 수단도 조회할 수 있다.
+ * 이메일 소유 증명 후에는 해당 계정의 로그인 수단도 조회할 수 있다. 휴대폰 경로는 SMS 증명만으로 가입 수단과 탈퇴 대기
+ * 여부까지만 답하고, 마스킹 이메일·탈퇴 종료일은 같은 계정의 이메일 증명을 함께 보낸 요청에만 싣는다.
  */
 @Controller('auth/recovery')
 export class AccountRecoveryController {
@@ -39,14 +39,6 @@ export class AccountRecoveryController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async findAccountByEmail(@Body() dto: FindAccountByEmailDto) {
     return this.accountRecovery.findAccountByEmail(dto);
-  }
-
-  // 유효한 휴대폰 증명으로 기존 계정을 찾아도 409 ACCOUNT_RECOVERY_REQUIRES_EMAIL을 반환한다.
-  @Post('reset-password')
-  @HttpCode(200)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.accountRecovery.resetPasswordByPhone(dto);
   }
 
   // 메일을 실제로 내보내는 경로 — 발신 평판·비용이 걸려 있어 발급(휴대폰 issue)과 같은 폭으로 잠근다.

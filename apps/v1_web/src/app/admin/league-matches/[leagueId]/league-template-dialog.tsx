@@ -8,8 +8,9 @@ import { toKstDateString } from '@/lib/kst-calendar';
 import { describeDateSelection } from '@/lib/league-fixture-calendar';
 import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
 import { plannedGameCount, roundRobinRounds, type RoundRobinLegs } from '@/lib/league-round-robin-plan';
-import type { V1ApplyLeagueTemplatePayload } from '@/types/league-match';
+import type { V1ApplyLeagueTemplatePayload, V1PreviewLeagueTemplatePayload } from '@/types/league-match';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
+import { LeagueTemplatePreview } from './league-template-preview';
 import {
   DEFAULT_LEAGUE_PLACE_CHOICE,
   isLeaguePlaceChoiceIncomplete,
@@ -32,6 +33,7 @@ const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
 export interface LeagueTemplateDialogProps {
+  leagueId: string;
   /** 리그 시작일(ISO) — 요일로 채울 때 기준일. */
   leagueStartsOn: string;
   initialTeamCount: number;
@@ -49,6 +51,7 @@ export interface LeagueTemplateDialogProps {
 }
 
 export function LeagueTemplateDialog({
+  leagueId,
   leagueStartsOn,
   initialTeamCount,
   defaultPlace,
@@ -86,6 +89,21 @@ export function LeagueTemplateDialog({
   const durationText = durationInput ?? (defaultGameMinutes === null ? '' : String(defaultGameMinutes));
   // 하루 경기 수가 없으면 하루에 한 라운드 — 필요한 날짜 수가 곧 라운드 수다. 있으면 총 경기 수 ÷ 하루 경기 수(올림).
   const requiredDays = gamesPerDayValid ? Math.ceil(totalGames / gamesPerDay) : rounds;
+  const durationMinutes = parseOptionalCount(durationText);
+  const breakMinutes = parseOptionalCount(breakText);
+  const timingInRange = inRange(durationMinutes, 5, 240) && inRange(breakMinutes, 0, 120);
+  // The timetable only exists once a daily game count is given; until then a round is one start time.
+  const previewRequest: V1PreviewLeagueTemplatePayload | null =
+    teamCountInRange && gamesPerDayValid && timingInRange && time.trim() !== ''
+      ? {
+          teamCount,
+          legs,
+          time: time.trim(),
+          gamesPerDay,
+          ...(durationMinutes === null ? {} : { gameDurationMinutes: durationMinutes }),
+          ...(breakMinutes === null ? {} : { breakMinutes }),
+        }
+      : null;
   const hasStartsOn = !Number.isNaN(new Date(leagueStartsOn).getTime());
 
   const fillByWeekday =
@@ -107,13 +125,11 @@ export function LeagueTemplateDialog({
       setError('시작 시각을 입력해 주세요.');
       return;
     }
-    const durationMinutes = parseOptionalCount(durationText);
-    const breakMinutes = parseOptionalCount(breakText);
     if (gamesPerDayText.trim() !== '' && !gamesPerDayValid) {
       setError(`하루 경기 수는 1~${GAMES_PER_DAY_MAX} 사이로 입력해 주세요.`);
       return;
     }
-    if (gamesPerDayValid && (!inRange(durationMinutes, 5, 240) || !inRange(breakMinutes, 0, 120))) {
+    if (gamesPerDayValid && !timingInRange) {
       setError('경기 시간은 5~240분, 휴식은 0~120분 사이로 입력해 주세요.');
       return;
     }
@@ -291,6 +307,8 @@ export function LeagueTemplateDialog({
             />
           </div>
         </div>
+
+        <LeagueTemplatePreview leagueId={leagueId} request={previewRequest} />
 
         <div className="mb-4 grid md:max-w-xl">
           <LeagueFixturePlaceField

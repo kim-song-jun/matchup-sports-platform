@@ -8,6 +8,7 @@ import { findTournamentOnSurface } from '../tournaments/tournament-surface-looku
 import { leagueMirrorCreateData } from '../tournaments/league-competition-mirror';
 import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/league-roster-autoconfirm.service';
 import { createLeagueRosterRegistration } from './league-team-admission';
+import { copyPreviousSeasonRoster } from './league-roster-autofill';
 import { calculateLeagueStandingsWithTieBreakInfo } from './league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { bucketLeagueFixtures } from './league-standings-source';
@@ -149,6 +150,12 @@ export class LeagueSeriesConversionService {
 
   async commit(user: V1AuthUser, leagueId: string, dto: CommitLeagueConversionDto) {
     const admin = await this.admins.getMutationAdmin(user.id);
+    if (!Array.isArray(dto.tierSizes)) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_CONVERSION_SIZES_INVALID',
+        message: '각 티어에 2팀 이상, 모든 참가팀을 한 번씩 배정해 주세요.',
+      });
+    }
     const tierCount = dto.tierSizes.length;
     if (!Number.isInteger(tierCount) || tierCount < 1 || tierCount > 3) {
       throw new UnprocessableEntityException({
@@ -191,7 +198,8 @@ export class LeagueSeriesConversionService {
             },
           });
           const leagues = [];
-          for (let tier = 1; tier <= tierCount; tier++) {
+          for (let tier = 1; tier <= 3; tier++) {
+            if (tier > tierCount) break;
             const id = randomUUID();
             const title = `${dto.title.trim()} 1시즌 ${tier}부`;
             const data = leagueMirrorCreateData({
@@ -230,8 +238,15 @@ export class LeagueSeriesConversionService {
               },
               { leagueId: id, startsOn },
             );
-            for (const entry of dto.entries.filter((e) => e.tier === tier))
+            for (const entry of dto.entries.filter((e) => e.tier === tier)) {
               await createLeagueRosterRegistration(tx, { leagueId: id, teamId: entry.teamId, entrySource: 'seeded' });
+              // 다음 시즌 잇기처럼 원본 리그의 확정 명단을 옮겨 담는다(2026-11-04 사용자 확정).
+              const registration = await tx.v1TournamentRegistration.findUniqueOrThrow({
+                where: { tournamentId_teamId: { tournamentId: id, teamId: entry.teamId } },
+                select: { id: true },
+              });
+              await copyPreviousSeasonRoster(tx, id, { id: registration.id, teamId: entry.teamId }, { sourceLeagueId: leagueId });
+            }
             leagues.push({ id, title, tier });
           }
           // 감사 로그를 전환 연결과 확정 스냅샷의 영속 기록으로 사용한다. 원본은 독립 배치 리그로 남긴다.

@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { trackEvent } from '@/lib/analytics';
-import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import {
   useV1AuthMe,
@@ -22,7 +21,7 @@ import { AUTH_WELCOME_STAGE, AuthFrame, AuthIllustration, JOURNEY_DONE_STAGE } f
 import { extractErrorMessage } from '@/lib/error-message';
 import { resolveAuthContinuationPath } from '@/lib/session-storage';
 
-type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
+type OnboardingRouteStep = Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
 
 type OnboardingDraft = {
   sports: Array<{ sportId: string; levelId: string | null }>;
@@ -68,11 +67,6 @@ function draftKeyFor(userId: string) {
 }
 
 const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub: string }> = {
-  resume: {
-    stepNo: 0,
-    title: '운동 설정을 이어갈까요?',
-    sub: '저장된 선택값을 불러와 완료하지 않은 단계부터 다시 시작해요.',
-  },
   sport: {
     stepNo: 1,
     title: '관심 종목을 선택해 주세요',
@@ -319,16 +313,15 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
 
   const meta = stepMeta[step];
 
-  const backHref = getBackHref(step);
-  const topTitle = step === 'resume' ? '이어하기' : '운동 설정';
+  const backHref = BACK_HREF[step];
 
   return (
     <AuthFrame
-      topTitle={topTitle}
+      topTitle="운동 설정"
       backHref={backHref}
       fixedAction={fixedAction}
       className="tm-onboarding-frame"
-      /* 1~3단계와 이어하기는 "같이 뛸 사람" 스테이지, 마지막 확인 단계만 "준비 완료" 스테이지. */
+      /* 1~3단계는 "같이 뛸 사람" 스테이지, 마지막 확인 단계만 "준비 완료" 스테이지. */
       stage={step === 'confirm' ? JOURNEY_DONE_STAGE : AUTH_WELCOME_STAGE}
     >
       {/* 데스크톱 뒤로가기는 AuthFrame 이 backHref 로 한 벌 그린다 — 여기서 따로 그리면
@@ -340,10 +333,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
           aria-atomic="true"
           className="sr-only"
         >
-          {meta.stepNo > 0 ? `4단계 중 ${meta.stepNo}단계, ${meta.title}` : meta.title}
+          {`4단계 중 ${meta.stepNo}단계, ${meta.title}`}
         </span>
-        {/* 이어하기(stepNo 0)는 아직 시작 전이라 회색 빈 막대 4칸만 남았다 — 진행 정보가 없으니 숨긴다. */}
-        {meta.stepNo > 0 ? <ProgressHeader stepNo={meta.stepNo} total={4} /> : null}
+        <ProgressHeader stepNo={meta.stepNo} total={4} />
         {step === 'confirm' ? <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop" /> : null}
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
@@ -351,7 +343,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         {/* 마스터 데이터 실패 시 빈 draft로 저장 방지 — 재시도 유도 후 저장 CTA도 disable됨 */}
         {masterError ? <ErrorState message="운동 설정 정보를 불러오지 못했어요. 다시 시도해 주세요." onRetry={retryMasterData} /> : null}
         {error ? <Notice title="저장하지 못했어요" body={error} tone="orange" /> : null}
-        {step === 'resume' ? <ResumePanel onboardingStep={onboarding.data?.currentStep} draft={draft} /> : null}
         {step === 'sport' ? (
           <div className="tm-auth-sport-grid">
             {sports.map((sport) => (
@@ -474,16 +465,6 @@ function OnboardingFixedAction({
   saveAndGo: (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => void;
   step: OnboardingRouteStep;
 }) {
-  if (step === 'resume') {
-    /* #22: 픽셀 스페이서 div → gap으로 교체 */
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={() => saveAndGo('sport', '/onboarding/sport')} type="button">처음부터 다시 선택</button>
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" onClick={() => saveAndGo('confirm', '/onboarding/confirm')} type="button">저장된 선택 확인</button>
-      </div>
-    );
-  }
-
   if (step === 'sport') {
     return (
       <>
@@ -518,19 +499,6 @@ function OnboardingFixedAction({
   }
 
   return <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={complete} type="button">{pending ? '저장 중' : '홈으로 시작하기'}</button>;
-}
-
-function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboardingStep?: V1OnboardingStep }) {
-  return (
-    <div className="tm-auth-stack">
-      {/* #19: 핵심 상태값은 tm-text-body(15px)로 격상, 레이블은 caption 유지 */}
-      <Card pad={16}><div className="tm-text-caption">현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
-      {/* P1 tabular-nums: 숫자 카운트에 폰트 수치 흔들림 방지 */}
-      <Card pad={16}><div className="tm-text-caption">선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{draft.sports.length}개</div></Card>
-      <Card pad={16}><div className="tm-text-caption">선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
-      <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
-    </div>
-  );
 }
 
 function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: OnboardingDraft; emptySports: boolean; regions: OnboardingRegionOption[]; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
@@ -693,14 +661,12 @@ function upsertPrimaryRegion(draft: OnboardingDraft, regionId: string | null): O
   };
 }
 
-function getBackHref(step: OnboardingRouteStep) {
-  if (step === 'sport') return '/signup/complete';
-  if (step === 'level') return '/onboarding/sport';
-  if (step === 'region') return '/onboarding/level';
-  if (step === 'confirm') return '/onboarding/region';
-  /* 이어하기 화면은 진입 전 화면이 정해져 있지 않다 — 홈으로 빠져나갈 길은 남긴다(실측: 뒤로가기 없음). */
-  return '/home';
-}
+const BACK_HREF: Record<OnboardingRouteStep, string> = {
+  sport: '/signup/complete',
+  level: '/onboarding/sport',
+  region: '/onboarding/level',
+  confirm: '/onboarding/region',
+};
 
 function readDraft(userId: string): OnboardingDraft | null {
   try {

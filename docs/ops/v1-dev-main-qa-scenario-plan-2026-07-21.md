@@ -65,9 +65,7 @@ Web Push(VAPID) + 운영 실패 대시보드(#93) · realtime Socket.IO gateway(
   - 단계: 카카오 로그인 클릭(CSRF state 저장) → `kauth.kakao.com` → `/callback/kakao` → `POST /auth/kakao` 응답 `next.route=/terms?mode=social` → 약관 동의(`POST /auth/social-terms`) → `/signup/social`에서 프로필 완성(`POST /auth/social-profile`) → `/onboarding/sport`.
   - 기대 결과: 서버가 강제하는 상태머신(`social_terms_required → social_profile_required → signup_done`)을 순서대로만 통과할 수 있고, 중간 단계 스킵 요청은 거부된다.
 
-- [ ] **온보딩 이어하기(resume) — 도중 이탈 후 재로그인** (P15)
-  - 단계: 온보딩 sport 단계에서 종목 선택만 하고 이탈(sessionStorage draft만 존재) → 재로그인 → `/onboarding/resume` → 저장된 진행 상태 요약 확인 → '저장된 선택 확인'.
-  - 기대 결과: `GET /onboarding` 응답의 `currentStep`/`sportPreferences`가 정확히 반영되고, `sessionStorage` draft가 있으면 그 값이 우선 사용된다. '처음부터 다시 선택' 클릭 시 draft가 초기화된다.
+- [x] ~~온보딩 이어하기(resume) — 도중 이탈 후 재로그인~~ (P15) — **정리됨**: `/onboarding/resume` 페이지를 삭제해 이 시나리오는 더 이상 없다. 복귀 사용자는 `docs/ops/v1-persona-flows.md` P15(재로그인)로 본다.
 
 ### Edge Case (12)
 

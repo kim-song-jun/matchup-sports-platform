@@ -198,12 +198,17 @@ describe('V1 adding an email login to a social account integration', () => {
     const found = await request(app.getHttpServer()).post(api('/auth/recovery/find-account'))
       .send({ phone: CALLER_PHONE, proofToken: verifiedPhone.body.data.proofToken }).expect(200);
     expect([...found.body.data.providers].sort()).toEqual(['email', 'kakao']);
-    expect(found.body.data).toMatchObject({ hasPassword: true, maskedEmail: 'in***@integration.test' });
+    // The phone proof alone never carries the address, only that this account has one to prove.
+    expect(found.body.data).toMatchObject({ hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true });
 
     // Email password reset works, and revokes the cookie issued before it.
     const resetCode = await request(app.getHttpServer()).post(api('/auth/recovery/email/request')).send({ email: NEW_EMAIL }).expect(200);
     const confirmed = await request(app.getHttpServer()).post(api('/auth/recovery/email/confirm'))
       .send({ email: NEW_EMAIL, code: resetCode.body.data.devCode }).expect(200);
+    // The same account's mailbox proof sent along with the phone proof is what fills the masked address.
+    const foundWithMailbox = await request(app.getHttpServer()).post(api('/auth/recovery/find-account'))
+      .send({ phone: CALLER_PHONE, proofToken: verifiedPhone.body.data.proofToken, email: NEW_EMAIL, emailProofToken: confirmed.body.data.proofToken }).expect(200);
+    expect(foundWithMailbox.body.data).toMatchObject({ hasPassword: true, maskedEmail: 'in***@integration.test', emailProofAvailable: true });
     await request(app.getHttpServer()).post(api('/auth/recovery/email/reset-password'))
       .send({ email: NEW_EMAIL, proofToken: confirmed.body.data.proofToken, newPassword: RESET_PASSWORD }).expect(200);
     expect((await request(app.getHttpServer()).get(api('/auth/me')).set('Cookie', cookie)).status).toBe(401);
@@ -246,7 +251,7 @@ describe('V1 adding an email login to a social account integration', () => {
       request(app.getHttpServer()).post(api(path)).set('Cookie', staleCookie()).send(body);
 
     it('a session past the recent-login limit cannot mint a link code through /verification/email/request', async () => {
-      // The account email is whatever the account says it is (PATCH /me/profile sets it freely): here, an address the caller reads.
+      // The contact email is whatever address the account holds (a Kakao-reported or earlier-proven one): here, an address the caller reads.
       const attackerMailbox = `${PREFIX}-attacker@integration.test`;
       await prisma.v1User.update({ where: { id: CALLER }, data: { email: attackerMailbox } });
       const refused = await withStaleSession('/auth/link/email/request', { email: NEW_EMAIL });
@@ -337,17 +342,19 @@ describe('V1 adding an email login to a social account integration', () => {
     expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'email_login_added', actorUserId: { in: [CALLER, RIVAL] } } })).toBe(1);
   });
 
-  it('maps the database unique violation to EMAIL_CONFLICT and writes nothing', async () => {
-    // The pre-check looks at other accounts only; the caller's own retired login on the address reaches the unique index.
+  it('brings back the account’s own removed login, instead of adding a second row', async () => {
+    // A login removed through POST /auth/identities/unlink: the row stays, unlinked, its key freed and without a password.
     await prisma.v1AuthIdentity.create({
-      data: { id: `${CALLER}-retired-email`, userId: CALLER, provider: 'email', providerUserKey: NEW_EMAIL, status: 'unlinked', unlinkedAt: new Date() },
+      data: { id: `${CALLER}-removed-email`, userId: CALLER, provider: 'email', providerUserKey: `deleted:${CALLER}:${CALLER}-removed-email`, status: 'unlinked', unlinkedAt: new Date() },
     });
 
-    const response = await complete(CALLER, issueEmailLinkToken(CALLER, NEW_EMAIL));
+    const response = await complete(CALLER, issueEmailLinkToken(CALLER, NEW_EMAIL)).expect(200);
 
-    expect([response.status, response.body.code]).toEqual([409, 'EMAIL_CONFLICT']);
-    expect(await prisma.v1AuthIdentity.count({ where: { userId: CALLER, provider: 'email', status: 'active' } })).toBe(0);
-    expect(await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).toMatchObject({ email: CALLER_CONTACT, emailVerifiedAt: null });
-    expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'email_login_added', actorUserId: CALLER } })).toBe(0);
+    expect(response.body.data).toEqual({ linked: true, email: NEW_EMAIL });
+    const rows = await prisma.v1AuthIdentity.findMany({ where: { userId: CALLER, provider: 'email' } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: `${CALLER}-removed-email`, providerUserKey: NEW_EMAIL, status: 'active', unlinkedAt: null });
+    expect(await verifyPassword(PASSWORD, rows[0].passwordHash)).toBe(true);
+    expect(await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date) });
   });
 });

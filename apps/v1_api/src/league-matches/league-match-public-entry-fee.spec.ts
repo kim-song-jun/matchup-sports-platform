@@ -39,12 +39,14 @@ describe('MD-QA #145 review follow-up public capacity', () => {
         registrationDeadlineAt: new Date('2098-01-01T00:00:00.000Z'),
         scheduledAt: new Date('2098-02-01T00:00:00.000Z'), scheduledEndAt: new Date('2098-12-01T00:00:00.000Z'),
         kind: 'regular_league', teamCount: 8, maxTeams, _count: { registrations: reservedCount },
+        registrations: [{ teamId: 'team-confirmed' }],
       }]);
       const result = await service.detail('league-1');
       expect(result.nextRound).toMatchObject({ leagueId: 'next-league-1', registrationOpen });
       expect(Object.keys(result.nextRound as NonNullable<typeof result.nextRound>).sort()).toEqual([
-        'endsOn', 'leagueId', 'registrationDeadlineAt', 'registrationOpen', 'seasonNo', 'startsOn', 'title',
+        'endsOn', 'leagueId', 'registrationDeadlineAt', 'registrationOpen', 'seasonNo', 'startsOn', 'teamIds', 'title',
       ]);
+      expect(result.nextRound?.teamIds).toEqual(['team-confirmed']);
       expect(Object.keys(result.seriesSiblings[0]).sort()).toEqual(['leagueId', 'seasonNo', 'state', 'tier', 'tierLabel']);
     },
   );

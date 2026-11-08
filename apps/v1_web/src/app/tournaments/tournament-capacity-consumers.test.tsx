@@ -70,7 +70,7 @@ describe.each(scenarios)('공개 정원 소비자 — $name', ({ overrides, limi
     const item: V1TournamentListItem = capacityTournament(overrides);
     render(<TournamentCard item={item} />);
     // 오른쪽 위 배지는 상태 하나다(2026-11-03). 정원이 차면 접수 중이 접수 마감으로 바뀐다.
-    const label = full ? '접수 마감' : '접수 중';
+    const label = full ? '접수 마감' : '신청 접수 중';
     expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${label}`);
     if (limit === null) {
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();

@@ -11,6 +11,7 @@ import { GameResultStandingsProjectionService } from './game-result-standings-pr
 import { officialRevisionRowSelect } from './official-revision-row.query';
 import { normalizeOfficialRevisionRow } from './official-revision-row.normalizer';
 import { parseOfficialScore } from './parse-official-score';
+import { SuspensionNoticeProjectionService } from './suspension-notice.service';
 import { TeamMatchCompletionNotificationService } from './team-match-completion-notification.service';
 import { TournamentFixtureCompletionNotificationService } from './tournament-fixture-completion-notification.service';
 // 리그 도메인 소유(apps/v1_api/src/league-matches/) -- R6: 리그 대진(team-match)이
@@ -40,10 +41,13 @@ export class GameResultOfficialProjectionService {
   // 회고 REACH-4: 위 팀매치 sibling이 헤더에 문서화해 둔 "TOURNAMENT_FIXTURE에는
   // no-op" 갭의 대칭 — 대회 픽스처가 공식 결과를 얻는 순간 참가팀 운영진에게 알린다.
   private readonly tournamentFixtureCompletion: TournamentFixtureCompletionNotificationService;
+  // MD-QA #191: 확정·정정 직후 다음 경기에 못 뛰는 선수·경고 임박 선수를 팀장·운영진에게 알린다.
+  private readonly suspensionNotice: SuspensionNoticeProjectionService;
 
   constructor(webPush?: WebPushService) {
     this.teamMatchCompletion = new TeamMatchCompletionNotificationService(webPush);
     this.tournamentFixtureCompletion = new TournamentFixtureCompletionNotificationService(webPush);
+    this.suspensionNotice = new SuspensionNoticeProjectionService(webPush);
   }
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
@@ -72,6 +76,7 @@ export class GameResultOfficialProjectionService {
     // 실패해 트랜잭션이 롤백되면 이미 나간 푸시는 되돌릴 수 없다.
     await this.teamMatchCompletion.project(tx, revision, claim);
     await this.tournamentFixtureCompletion.project(tx, revision, claim);
+    await this.suspensionNotice.project(tx, revision, claim);
     await this.terminal.close(tx, revision);
     await this.writeAggregateWatermarks(tx, revision, teamIds);
     await this.watermarks.write(tx, {

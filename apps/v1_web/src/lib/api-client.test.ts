@@ -99,6 +99,35 @@ describe('v1Api error reporting', () => {
     expect(reportSpy).not.toHaveBeenCalled();
   });
 
+  async function failWith(statusCode: number, code: string) {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: statusCode,
+        json: async () => ({ status: 'error', statusCode, code, message: 'Designed state.', timestamp: new Date().toISOString() }),
+      }),
+    );
+    await expect(v1Get('/auth/recovery/email/reset-password')).rejects.toThrow('Designed state.');
+    return reportSpy;
+  }
+
+  it.each([
+    [403, 'ACCOUNT_WITHDRAWAL_PENDING'],
+    [400, 'PASSWORD_TOO_COMMON'],
+  ])('does not report the designed state %i %s', async (statusCode, code) => {
+    expect(await failWith(statusCode, code)).not.toHaveBeenCalled();
+  });
+
+  // The same status with another code is a real failure and must keep reaching the error viewer.
+  it.each([
+    [403, 'PERMISSION_DENIED'],
+    [400, 'VALIDATION_ERROR'],
+  ])('still reports %i %s', async (statusCode, code) => {
+    expect(await failWith(statusCode, code)).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
+  });
+
   it('reports API errors to the client-error reporter before rethrowing', async () => {
     const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
     vi.stubGlobal(

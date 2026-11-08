@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useV1SetGameRosterParticipation, useV1TeamGameRoster, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
 import { extractErrorMessage } from '@/lib/error-message';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
+import { GameRosterDisciplineBanners } from '@/components/game-roster/game-roster-discipline-banners';
 import { rosterPersonLabel } from '@/lib/roster-presentation';
 import { gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import { SectionTitle } from '@/components/v1-ui/primitives';
@@ -90,6 +91,7 @@ function SideParticipation({ gameId, side, disabled, onError }: {
           <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" disabled={locked || stale} onClick={() => void save()}>{saving ? '저장 중…' : '저장'}</button>
         </div> : <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" aria-label={`${side.displayNameSnapshot} 명단 수정하기`} disabled={locked || data.base.length === 0} onClick={() => setDraft({ baseline: signature(data), selected: new Set(data.participants.map((p) => p.userId)) })}>수정하기</button>}
       </div>
+      <GameRosterDisciplineBanners view={data} />
       {stale && !saving ? <p role="alert" className="tm-text-caption">팀에서 명단을 변경했어요. 취소한 뒤 최신 명단으로 다시 수정해 주세요.</p> : null}
       {!data.editable ? <p className="tm-text-caption">현재는 이 경기 명단을 수정할 수 없어요.</p> : null}
       {data.base.length === 0 ? <p className="tm-text-caption">등록된 참가 선수가 없어요.</p> : <ul className="flex flex-col gap-2">

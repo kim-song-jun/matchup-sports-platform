@@ -127,6 +127,58 @@ describe('alpha tournament QA campaign content', () => {
     expect(() => parseCampaignContentJson(persistedContent)).not.toThrow();
   });
 
+  it.each([
+    {
+      caseName: '제보된 UTC 마감 시각',
+      deadlineIso: '2026-09-29T14:00:00.000Z',
+      expectedAnswer: '2026년 9월 29일 (화) 오후 11:00 (한국 시간)',
+    },
+    {
+      caseName: '한국 시간의 다음 날 자정',
+      deadlineIso: '2026-09-29T15:05:00.000Z',
+      expectedAnswer: '2026년 9월 30일 (수) 오전 12:05 (한국 시간)',
+    },
+    {
+      caseName: '한국 시간의 다음 해 첫날',
+      deadlineIso: '2026-12-31T15:05:00.000Z',
+      expectedAnswer: '2027년 1월 1일 (금) 오전 12:05 (한국 시간)',
+    },
+    {
+      caseName: '한국 시간의 오전과 한 자리 분',
+      deadlineIso: '2026-09-29T00:09:00.000Z',
+      expectedAnswer: '2026년 9월 29일 (화) 오전 9:09 (한국 시간)',
+    },
+    {
+      caseName: '한국 시간의 정오와 한 자리 분',
+      deadlineIso: '2026-09-29T03:07:00.000Z',
+      expectedAnswer: '2026년 9월 29일 (화) 오후 12:07 (한국 시간)',
+    },
+  ])('신청 마감 FAQ를 한국 시간으로 저장한다: $caseName', ({ deadlineIso, expectedAnswer }) => {
+    // Given: 실제 공개 QA 캠페인과 UTC instant.
+    const scenario = ALPHA_TOURNAMENT_SCENARIOS.find(
+      (candidate) => candidate.slug === 'alpha-qa-futsal-recruiting',
+    );
+    if (!scenario) throw new Error('The recruiting alpha campaign scenario is required.');
+    const registrationDeadlineAt = new Date(deadlineIso);
+
+    // When: 시드의 실제 builder 결과가 JSON 저장/조회 경계를 통과한다.
+    const content = buildAlphaTournamentCampaignContent(
+      scenario,
+      new Date('2026-10-06T01:00:00.000Z'),
+      registrationDeadlineAt,
+    );
+    const persistedContent: Prisma.JsonValue = JSON.parse(JSON.stringify(content));
+    const publicContent = parseCampaignContentJson(persistedContent);
+
+    // Then: FAQ는 읽기 쉬운 한국 시간이며 원래 instant를 바꾸지 않는다.
+    expect(publicContent).toMatchObject({
+      faq: expect.arrayContaining([
+        { question: '신청 마감은 언제인가요?', answer: expectedAnswer },
+      ]),
+    });
+    expect(registrationDeadlineAt.toISOString()).toBe(deadlineIso);
+  });
+
   it('시드의 canonical 풋살 config id 가 레지스트리 상수와 일치한다', () => {
     // 시드는 배포 이미지 안에서 도는 탓에 `../src/...` 를 import 할 수 없어 값을 복제한다.
     // 그 복제본이 어긋나면 시드가 존재하지 않는 config 를 픽스처에 박게 되므로 여기서 고정한다.
@@ -470,6 +522,35 @@ describe('alpha tournament QA seed — 재실행 시 캠페인 날짜 문구', (
     expect(content.hero.summary).not.toContain('2026-10-22');
     expect(upsert.update.promoHomeDateText).toBe('2026-10-06');
     expect(upsert.update.promoListDateText).toBe('2026-10-06');
+  });
+
+  it('재실행 시 보존된 신청 마감 instant를 캠페인 FAQ에 한국 시간으로 저장한다', async () => {
+    // Given: 실행일에서 새로 계산할 마감과 다른 기존 DB 마감.
+    const existing = {
+      scheduledAt: new Date('2026-10-06T01:00:00.000Z'),
+      scheduledEndAt: new Date('2026-10-06T09:00:00.000Z'),
+      registrationDeadlineAt: new Date('2026-09-29T14:00:00.000Z'),
+    };
+
+    // When: 실제 createScenario가 캠페인 create에 전달한 JSON을 조회한다.
+    const { content, upsert } = await runCreateScenario(existing);
+    const persistedContent: Prisma.JsonValue = JSON.parse(JSON.stringify(content));
+    const publicContent = parseCampaignContentJson(persistedContent);
+
+    // Then: FAQ는 보존된 instant를 표시하고 대회 update는 그 값을 덮어쓰지 않는다.
+    expect(publicContent).toMatchObject({
+      faq: expect.arrayContaining([
+        {
+          question: '신청 마감은 언제인가요?',
+          answer: '2026년 9월 29일 (화) 오후 11:00 (한국 시간)',
+        },
+      ]),
+    });
+    expect(upsert.update).not.toHaveProperty('registrationDeadlineAt');
+    expect(upsert.create).toHaveProperty(
+      'registrationDeadlineAt',
+      new Date('2026-09-29T14:00:00.000Z'),
+    );
   });
 
   it('신규 생성이면 새로 계산한 일정이 DB 값이자 문구 값이다', async () => {

@@ -115,7 +115,7 @@ describe('실제 어드민을 사용하는 공개 대회 체험', () => {
   });
   it('외부 공유 진입은 로그인 없는 새 탭 경로를 유지한다', () => {
     render(<TournamentOpsDemoEntry />);
-    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/tournament-ops-demo');
+    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
   });
   it('실제 관리 셸과 11개 섹션을 샘플 경로 안에서 제공한다', async () => {
     const network = vi.spyOn(globalThis, 'fetch');

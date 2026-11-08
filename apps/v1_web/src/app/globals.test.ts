@@ -1048,3 +1048,80 @@ describe('player card brand mark mask', () => {
     expect([(bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1]).toEqual([markPng.readUInt32BE(16), markPng.readUInt32BE(20)]);
   });
 });
+
+describe('필터 시트의 손잡이·제목·닫기는 스크롤해도 맨 위에 남는다', () => {
+  // 시트는 통째로 스크롤한다(.tm-filter-sheet overflow-y). 머리가 일반 흐름이면 내용과 함께 화면 밖으로 나간다.
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const ruleOf = (selector: string) =>
+    [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, sel]) => sel.trim() === selector)?.[2] ?? '';
+  const px = (rule: string, pattern: RegExp) => Number(rule.match(pattern)?.[1]);
+  const withHandle = '.tm-filter-sheet:has(.tm-filter-sheet-handle) .tm-filter-sheet-head';
+
+  it('손잡이와 머리가 sticky 이고, 내용이 비치지 않게 머리는 불투명하며 손잡이가 그 위에 온다', () => {
+    const handle = ruleOf('.tm-filter-sheet-handle');
+    const head = ruleOf('.tm-filter-sheet-head');
+
+    expect(handle).toMatch(/position:\s*sticky/);
+    expect(handle).toMatch(/top:\s*0/);
+    expect(head).toMatch(/position:\s*sticky/);
+    expect(head).toMatch(/background:\s*var\(--bg\)/);
+    expect(px(handle, /z-index:\s*(\d+)/)).toBeGreaterThan(px(head, /z-index:\s*(\d+)/));
+    expect(px(head, /z-index:\s*(\d+)/)).toBeGreaterThan(px(ruleOf('.tm-filter-sheet > .tm-filter-actions'), /z-index:\s*(\d+)/));
+  });
+
+  it('제자리 값으로 붙어서 스크롤이 없는 시트의 머리 위치는 그대로다', () => {
+    const handle = ruleOf('.tm-filter-sheet-handle');
+    const handleHeight = px(handle, /height:\s*(\d+)px/);
+    const handleBottomGap = px(handle, /margin:\s*0 auto (\d+)px/);
+
+    // sticky 기준선은 padding 안쪽이다. top 이 손잡이 높이+간격과 다르면 스크롤 전부터 제목이 밀리거나 겹친다.
+    expect(px(ruleOf(withHandle), /top:\s*(\d+)px/)).toBe(handleHeight + handleBottomGap);
+    expect(px(ruleOf('.tm-filter-sheet-head'), /top:\s*(\d+)/)).toBe(0);
+  });
+
+  it('머리 위쪽을 시트 끝까지 덮어 padding 띠와 손잡이 양옆으로 내용이 비치지 않는다', () => {
+    const sheetPadTop = px(ruleOf('.tm-filter-sheet'), /padding:\s*(\d+)px/);
+    const handle = ruleOf('.tm-filter-sheet-handle');
+    const cover = ruleOf('.tm-filter-sheet-head::before');
+
+    expect(px(ruleOf('.tm-filter-sheet-head'), /--tm-filter-sheet-head-cover:\s*(\d+)px/)).toBe(sheetPadTop);
+    expect(px(ruleOf(withHandle), /--tm-filter-sheet-head-cover:\s*(\d+)px/)).toBe(
+      sheetPadTop + px(handle, /height:\s*(\d+)px/) + px(handle, /margin:\s*0 auto (\d+)px/),
+    );
+    expect(cover).toMatch(/position:\s*absolute/);
+    expect(cover).toMatch(/inset:\s*calc\(-1 \* var\(--tm-filter-sheet-head-cover\)\) calc\(-1 \* var\(--v1-shell-page-x\)\) 0/);
+    expect(cover).toMatch(/z-index:\s*-1/);
+    expect(cover).toMatch(/background:\s*var\(--bg\)/);
+  });
+
+  it('끌어서 닫는 시트의 규칙이 손잡이의 sticky 를 덮지 않고, 손잡이는 여전히 스크롤 대신 드래그를 받는다', () => {
+    const dragHandle = ruleOf('.tm-scrollable-drag-sheet .tm-filter-sheet-handle');
+
+    expect(dragHandle).not.toMatch(/position:/);
+    expect(dragHandle).toMatch(/touch-action:\s*none/);
+    expect(dragHandle).toMatch(/(^|\s)user-select:\s*none/);
+  });
+
+  it('키보드로 이동한 입력칸이 머리 아래에 가려지지 않게 스크롤 여백을 둔다', () => {
+    expect(px(ruleOf('.tm-filter-sheet'), /scroll-padding-top:\s*(\d+)px/)).toBeGreaterThanOrEqual(80);
+  });
+
+  it('머리를 쓰는 화면은 모두 손잡이를 머리보다 먼저 그린다', () => {
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return sources(path);
+        return /\.tsx$/.test(entry.name) && !/\.test\./.test(entry.name) ? [path] : [];
+      });
+    const consumers = sources(resolve(process.cwd(), 'src'))
+      .map((path) => ({ path, source: readFileSync(path, 'utf8') }))
+      .filter(({ source }) => source.includes('className="tm-filter-sheet-head"'));
+
+    expect(consumers.length).toBeGreaterThanOrEqual(10);
+    for (const { path, source } of consumers) {
+      const handleAt = source.indexOf('tm-filter-sheet-handle');
+      expect(handleAt, path).toBeGreaterThanOrEqual(0);
+      expect(handleAt, path).toBeLessThan(source.indexOf('className="tm-filter-sheet-head"'));
+    }
+  });
+});

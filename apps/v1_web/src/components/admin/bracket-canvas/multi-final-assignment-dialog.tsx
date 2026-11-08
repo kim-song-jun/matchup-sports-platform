@@ -70,8 +70,8 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const ties = view && final && !started ? describeTies(view, final) : [];
   const seated = ids.flatMap(id => (id === null ? [] : [id]));
   const crossPolicy = policy === 'cross_group_top3';
-  // In rank order a pick only settles its seat once its team is on the roster; cross places it on the next draw.
-  const openSeats = seats.filter(entry => { const picked = picks[pickKey(entry)]; return !picked || !crossPolicy && !ids.includes(picked); });
+  // In rank order a pick settles its seat once its team is on the roster; cross, or a recommendation still to make, places it next.
+  const openSeats = seats.filter(entry => { const picked = picks[pickKey(entry)]; return !picked || !crossPolicy && !needsRecommendation && !ids.includes(picked); });
   const openTieSeat = openSeats.length > 0;
   const takenByOtherSeat = (key: string, id: string) => Object.entries(picks).some(([other, picked]) => other !== key && picked === id);
   // A seed with no team yet stays put; a picked team is tracked by identity, so it can be moved like any other.
@@ -131,12 +131,12 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const matesOf = (key: string, candidates: readonly string[]) => candidates.filter(id => !takenByOtherSeat(key, id));
   function edit(next: Array<string | null>, nextPicks: TiePickMap = picks) {
     const kept = keepPicked(nextPicks, ids, next);
-    // A manual edit leaves cross for rank order, so picks still waiting for the redraw go onto the roster now.
-    const placed = crossPolicy ? seats.reduce((rows, entry) => {
+    // A manual edit is rank order with nothing left to recommend: seat any pick still waiting for its team, or drop it.
+    const placed = seats.reduce((rows, entry) => {
       const id = kept[pickKey(entry)];
       return id && !rows.includes(id) ? choosePick(rows, { seat: entry.seat, mates: matesOf(pickKey(entry), entry.tiedRegistrationIds), previous: undefined, id, capacity: slots.length }) : rows;
-    }, next) : next;
-    setIds(placed); setPicks(kept); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true);
+    }, next);
+    setIds(placed); setPicks(Object.fromEntries(Object.entries(kept).filter(([, id]) => placed.includes(id)))); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true);
   }
   // With tied seats open the seat numbers must not shift, so a removed team leaves its seat empty instead of closing the gap.
   const drop = (remove: (id: string) => boolean) => seats.length > 0
@@ -153,7 +153,9 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
     const key = pickKey(seat); const { [key]: previous, ...others } = picks;
     const next = id ? { ...others, [key]: id } : others;
     if (crossPolicy) { setPicks(next); setNeedsRecommendation(true); setSourceVersion(''); setDirty(true); return; }
-    edit(choosePick(ids, { seat: seat.seat, mates: matesOf(key, seat.candidates), previous, id, capacity: slots.length }), next);
+    const rows = choosePick(ids, { seat: seat.seat, mates: matesOf(key, seat.candidates), previous, id, capacity: slots.length });
+    if (id && !rows.includes(id)) { setError('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.'); return; }
+    setError(''); edit(rows, next);
   }
   return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">

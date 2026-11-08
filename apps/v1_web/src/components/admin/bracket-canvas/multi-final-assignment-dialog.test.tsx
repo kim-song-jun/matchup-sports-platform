@@ -440,6 +440,31 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
   });
 
+  it('교차 배치에서 고른 뒤 기본 순위로 바꾸고 명단을 손대면 고른 팀이 동률 자리에 들어간다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    const policy = await enabledPolicySelect();
+    fireEvent.change(policy, { target: { value: CROSS } });
+    fireEvent.change(screen.getByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    fireEvent.change(policy, { target: { value: 'rank_order' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: '가팀' }));
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(screen.getByText('3번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+  });
+
+  it('기본 순위 명단이 다 차 있으면 동률 팀을 고르지 않고 먼저 다른 팀을 빼 달라고 알린다', async () => {
+    const { view, bracket } = tieFixture();
+    view.registrations.push({ id: 'reg-4', team: { id: 'team-4', name: '마팀' } });
+    Object.assign(view.finals[0], { registrationIds: ['reg-0', 'reg-1', 'reg-4'], assignmentPolicy: 'rank_order' });
+    handlers(view, bracket); show();
+    const select = await screen.findByRole('combobox', { name: SEAT_LABEL });
+    await waitFor(() => expect(select).toBeEnabled());
+    fireEvent.change(select, { target: { value: 'reg-3' } });
+    expect(screen.getByText('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.')).toBeInTheDocument();
+    expect(select).toHaveValue('');
+    expect(seedOrder()).toEqual(['1번 시드 · 가팀', '2번 시드 · 나팀', '3번 시드 · 마팀']);
+  });
+
   it('시작한 토너먼트에는 동률 안내와 선택창을 아예 그리지 않는다', async () => {
     const { view, bracket } = tieFixture(); bracket.fixtures[0].game.state = 'LIVE'; handlers(view, bracket); show();
     await screen.findByText('이 토너먼트는 시작했거나 기록·결과가 있어 진출팀을 다시 배정할 수 없어요.');

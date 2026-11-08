@@ -47,7 +47,8 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-06: partial unique v1_auth_identities (user_id, provider) WHERE status = 'active' (20261106120000_v1_auth_identity_provider_active_unique); M11 remains unchanged.
 # 2026-11-08: additive V1VerificationPurpose email_change (20261106180000_v1_verification_purpose_email_change); M11 remains unchanged.
 # 2026-11-08: additive V1Tournament.tieBreakOrder (20261107120000_tournament_tie_break_order); M11 remains unchanged.
-[[ ( "$schema_sha" == 198a61d224431648bd95928cdf2426b3493b3328f9d073677c228c13f1d6a7e3 \
+# 2026-11-08: additive v1_ad_campaigns, v1_ad_campaign_daily_stats and V1ContentAsset.adCampaignId (20261108130000_v1_ad_campaigns); M11 remains unchanged.
+[[ ( "$schema_sha" == e205dab98105b25eae4555a8404f9cf801d5d733303658911ec706d0062c1418 \
   || "$schema_sha" == b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960 \
   || "$schema_sha" == 82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112 \
   || "$schema_sha" == 082bac1bb887f76b131dbd17ac4acbb11979b79fdf2bcc957d18fc06db57b04f ) \

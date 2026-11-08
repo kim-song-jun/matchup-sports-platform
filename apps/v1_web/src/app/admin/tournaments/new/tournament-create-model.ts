@@ -45,7 +45,7 @@ export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
 export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
   { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
   { value: 'round32', label: '32강' }, { value: 'round16', label: '16강 · 12팀 결선의 12강' },
-  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
+  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강 · 6팀 대진의 6강' },
   { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
   { value: 'third_place', label: '3·4위전' },
 ];

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from './app-shell-frame';
 import { AppChrome } from './shell';
 import { useShellOverride } from './shell-override';
@@ -129,5 +129,43 @@ describe('AppShellFrame — 셸 지속성 (진단 #1의 반증)', () => {
     const bottomNavAfter = screen.getByRole('navigation', { name: '주요 메뉴' });
 
     expect(bottomNavAfter).not.toBe(bottomNavBefore);
+  });
+});
+
+describe('AppShellFrame — 앱 설치 안내 배너 자리', () => {
+  const originalUa = window.navigator.userAgent;
+  const setUa = (value: string) =>
+    Object.defineProperty(window.navigator, 'userAgent', { value, configurable: true });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    setUa(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    );
+  });
+
+  afterEach(() => setUa(originalUa));
+
+  it('셸이 있는 화면에서는 스크롤 영역의 첫 직계 자식으로 하나만 그린다 — 배너 CSS 가 그 관계에 기대고 있다', () => {
+    mockPathname = '/home';
+    render(<AppShellFrame><div data-testid="page-content">홈 콘텐츠</div></AppShellFrame>);
+
+    const banners = screen.getAllByRole('region', { name: '팀밋 앱으로 열기' });
+    expect(banners).toHaveLength(1);
+    const main = screen.getByRole('main');
+    expect(main.firstElementChild).toBe(banners[0]);
+    expect(banners[0]).toHaveAttribute('data-placement', 'shell');
+    expect(banners[0].nextElementSibling).toContainElement(screen.getByTestId('page-content'));
+  });
+
+  it('셸이 없는 문서형 페이지에서는 본문 앞에 문서 맨 위 배치로 그린다', () => {
+    mockPathname = '/landing';
+    const { container } = render(<AppShellFrame><div data-testid="page-content">랜딩</div></AppShellFrame>);
+
+    const banner = screen.getByRole('region', { name: '팀밋 앱으로 열기' });
+    expect(banner).toHaveAttribute('data-placement', 'page');
+    expect(container.firstElementChild).toBe(banner);
+    expect(banner.nextElementSibling).toBe(screen.getByTestId('page-content'));
+    expect(screen.queryByRole('main')).toBeNull();
   });
 });

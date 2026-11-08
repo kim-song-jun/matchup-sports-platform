@@ -135,7 +135,7 @@ export function assertPenaltyShootoutPersistable(
       throw new UnprocessableEntityException({
         code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
         message:
-          'penalties.takenHome and penalties.takenAway are required when recording a penalty shootout',
+          '승부차기를 기록하려면 양 팀이 찬 킥 수(penalties.takenHome, penalties.takenAway)를 함께 보내 주세요.',
       });
     }
     return;
@@ -171,7 +171,7 @@ export function assertPenaltyShootoutConcluded(
   throw new UnprocessableEntityException({
     code: 'TOURNAMENT_PENALTY_UNDECIDED',
     message:
-      'The penalty shootout has not been decided under this tournament policy; ' +
-      'set penalties.operatorOverride to record an explicit operator decision',
+      '이 대회 규칙으로는 승부차기 승자가 아직 정해지지 않았어요. ' +
+      '킥 수와 점수를 확인하거나, 운영자가 결과를 직접 정한다면 penalties.operatorOverride를 true로 보내 주세요.',
   });
 }

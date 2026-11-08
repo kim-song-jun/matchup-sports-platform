@@ -1709,10 +1709,33 @@ describe('BracketPageContent — 소속 팀 조 우선 표시', () => {
     if (loggedIn) {
       const labels = await screen.findAllByText('우리 팀이 속한 조예요');
       expect(labels).toHaveLength(2);
-      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--red)' });
+      // 경고처럼 읽히는 빨강이 아니라 '내 것' 표시의 파랑이다.
+      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--blue700)' });
     } else expect(screen.queryByText('우리 팀이 속한 조예요')).not.toBeInTheDocument();
     const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
     expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);
+    window.localStorage.removeItem('teameet.v1.session');
+  });
+
+  it('순위표에서 소속 팀 행에만 우리 팀 배지를 달고, 로그아웃이면 어느 행에도 달지 않는다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+    server.listen({ onUnhandledRequest: 'bypass' });
+    saveStoredV1Session({ userId: 'bracket-member' });
+    const groups = ['A조', 'B조'].map((name, index) => makeGroup({
+      id: `group-${index}`, name, phase: 'group', sortOrder: index,
+      groupTeams: [
+        { id: `gt-${index}-a`, registrationId: `r-${index}-a`, teamId: index === 1 ? 'my-team' : 'other-a', teamName: `${name} 첫팀`, teamLogoUrl: null, sortOrder: 0 },
+        { id: `gt-${index}-b`, registrationId: `r-${index}-b`, teamId: `other-b-${index}`, teamName: `${name} 둘째팀`, teamLogoUrl: null, sortOrder: 1 },
+      ],
+    }));
+    renderBracketStandingsTab(makeTournament({ id: 'mine-row', status: 'in_progress', format: 'group_knockout', groups }));
+
+    const mineSection = await screen.findByRole('region', { name: 'B조 순위' });
+    await within(mineSection).findByText('우리 팀');
+    const rowOf = (section: HTMLElement, teamName: string) => within(section).getByText(teamName).closest('tr') as HTMLElement;
+    expect(within(rowOf(mineSection, 'B조 첫팀')).getByText('우리 팀')).toBeInTheDocument();
+    expect(within(rowOf(mineSection, 'B조 둘째팀')).queryByText('우리 팀')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'A조 순위' })).queryByText('우리 팀')).not.toBeInTheDocument();
     window.localStorage.removeItem('teameet.v1.session');
   });
 });

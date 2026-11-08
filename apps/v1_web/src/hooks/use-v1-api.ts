@@ -544,9 +544,13 @@ export function useV1PhoneVerify() {
   });
 }
 
+/**
+ * 번호로 계정을 찾는다. `email`+`emailProofToken`(이메일 인증 `proofToken`)을 함께 보내면, 그 메일함이 찾은 계정
+ * 자신의 이메일일 때에 한해 응답이 마스킹된 이메일과 탈퇴 종료일까지 채운다. 둘 중 하나만 보내면 400이다.
+ */
 export function useV1FindAccountByPhone() {
   return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
+    mutationFn: (body: { phone: string; proofToken: string; email?: string; emailProofToken?: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
   });
 }
@@ -2540,6 +2544,7 @@ export function useV1LineupTodos(options?: { enabled?: boolean }) {
  * 라인업 할 일(`useV1LineupTodos`)과 **같은 수집 경로**지만 완료된 라인업도 온다.
  * 할 일 규칙을 그대로 쓰면 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다.
  * 알려진 한계: 서버가 지금 시각 기준 앞으로의 경기만 모은다 — 끝난 경기는 오지 않는다.
+ * 시각이 아직 정해지지 않은 대회 경기는 `scheduledAt` 이 null 이고 시각 있는 경기 뒤에 대회 진행 순서로 온다.
  */
 export type V1TeamUpcomingGame = {
   gameId: string;

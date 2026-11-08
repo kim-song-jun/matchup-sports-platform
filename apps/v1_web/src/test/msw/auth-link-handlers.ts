@@ -6,6 +6,7 @@ import type {
   V1LinkEmailVerifyResult,
   V1LinkSocialResult,
 } from '@/types/api';
+import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { sessionLoginResponse } from './auth-step-up-handlers';
 
 /**
@@ -113,6 +114,14 @@ export const EMAIL_LINK_MSW = {
 export const PASSWORD_UNAVAILABLE_MSW = {
   email: 'kakao-only@example.com',
   providers: ['kakao'],
+} as const;
+
+/** 탈퇴 유예 중인 계정 — 이메일 찾기는 사서함 증명 뒤 종료일까지, 번호 찾기는 이메일 증명을 더해야 종료일을 싣는다. */
+export const WITHDRAWAL_PENDING_RECOVERY_MSW = {
+  email: 'withdrawing-recovery@example.com',
+  phone: '01055550000',
+  /** 사용할 수 있는 날짜로 읽히도록 먼 미래로 둔다(지난 날짜는 화면이 "모른다"로 다룬다). */
+  withdrawalPendingUntil: '2099-01-31T00:00:00.000Z',
 } as const;
 
 export const WITHDRAWAL_MSW = {
@@ -348,7 +357,10 @@ export const v1AuthLinkMswHandlers = [
   http.post(`${api}/auth/link/email/complete`, async ({ request }) => {
     const { emailLinkToken, password, passwordConfirm, ...rest } = await readJson(request);
     if (Object.keys(rest).length > 0 || !isBounded(emailLinkToken, 20, 2048)) return invalidLinkBody();
-    if (typeof password !== 'string' || password.length < 8 || passwordConfirm !== password) return invalidLinkBody();
+    if (typeof password !== 'string' || passwordConfirm !== password) return invalidLinkBody();
+    const passwordIssue = accountPasswordIssue(password);
+    if (passwordIssue === 'too_short') return invalidLinkBody();
+    if (passwordIssue === 'too_common') return fail(400, COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE);
     return emailLinkCompleteOutcome(emailLinkToken);
   }),
 

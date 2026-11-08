@@ -422,9 +422,13 @@ export class MockTournamentSeedService {
         const assignment = await this.multiFinals.assignmentPreview(user, tournamentId, {
           expectedRevision: view.revision, finalName: final.name, assignmentPolicy: 'rank_order',
         });
+        const seeds = assignment.registrationIds.filter((id): id is string => id !== null);
+        if (seeds.length !== assignment.registrationIds.length) {
+          throw new ConflictException({ code: 'MOCK_RANK_TIED', message: '목업 순위에 동률이 있어 결선 진출팀을 정할 수 없어요.' });
+        }
         view = await this.multiFinals.assign(user, tournamentId, {
           expectedRevision: assignment.revision, finalName: final.name,
-          registrationIds: assignment.registrationIds, assignmentPolicy: assignment.assignmentPolicy,
+          registrationIds: seeds, assignmentPolicy: assignment.assignmentPolicy,
           sourceVersion: assignment.sourceVersion,
         });
       }

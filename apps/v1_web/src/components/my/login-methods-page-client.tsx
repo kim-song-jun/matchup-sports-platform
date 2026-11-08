@@ -4,13 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Check, Link2, Lock, Mail, MessageCircle } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { Button } from '@/components/v1-ui/button';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { ProviderMark } from '@/components/v1-ui/provider-mark';
+import type { ProviderMarkKind } from '@/components/v1-ui/provider-mark';
 import { Card, ErrorState, InfoRow } from '@/components/v1-ui/primitives';
 import { useToast } from '@/components/v1-ui/toast';
 import { useV1AuthMe, useV1LinkApple, useV1LinkKakao, useV1UnlinkLoginMethod } from '@/hooks/use-v1-api';
@@ -47,39 +49,6 @@ const KAKAO_START_ERRORS = {
   'storage-unavailable': '브라우저 설정 때문에 연결을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.',
 } as const;
 
-const PROVIDER_CIRCLE = {
-  width: 36,
-  height: 36,
-  borderRadius: 'var(--radius-circle)',
-  display: 'grid',
-  placeItems: 'center',
-  flex: 'none',
-} as const;
-
-function ProviderMark({ provider }: { provider: 'email' | 'kakao' | 'apple' | 'other' }) {
-  if (provider === 'apple') {
-    // 마크는 Apple 이 내려준 아트워크 그대로다(public/apple/README.md) — 자르거나 다시 그리지 않는다.
-    return (
-      <span
-        aria-hidden="true"
-        style={{ ...PROVIDER_CIRCLE, backgroundImage: 'url(/apple/sign-in-mark-on-black.png)', backgroundSize: 'cover' }}
-      />
-    );
-  }
-  if (provider === 'kakao') {
-    return (
-      <span aria-hidden="true" style={{ ...PROVIDER_CIRCLE, background: 'var(--kakao-yellow)' }}>
-        <MessageCircle size={18} fill="var(--static-black)" stroke="var(--static-black)" />
-      </span>
-    );
-  }
-  return (
-    <span aria-hidden="true" style={{ ...PROVIDER_CIRCLE, background: 'var(--grey150)', color: 'var(--text-strong)' }}>
-      {provider === 'email' ? <Mail size={18} /> : <Link2 size={18} />}
-    </span>
-  );
-}
-
 function ConnectedBadge() {
   return (
     <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -98,7 +67,7 @@ function ProviderRow({
   action,
   divided = true,
 }: {
-  mark: Parameters<typeof ProviderMark>[0]['provider'];
+  mark: ProviderMarkKind;
   label: string;
   caption: string;
   /** 설명 아래 줄 — 연결된 수단의 "연결 해제" 버튼 또는 해제할 수 없는 이유. */

@@ -198,12 +198,17 @@ describe('V1 adding an email login to a social account integration', () => {
     const found = await request(app.getHttpServer()).post(api('/auth/recovery/find-account'))
       .send({ phone: CALLER_PHONE, proofToken: verifiedPhone.body.data.proofToken }).expect(200);
     expect([...found.body.data.providers].sort()).toEqual(['email', 'kakao']);
-    expect(found.body.data).toMatchObject({ hasPassword: true, maskedEmail: 'in***@integration.test' });
+    // The phone proof alone never carries the address, only that this account has one to prove.
+    expect(found.body.data).toMatchObject({ hasPassword: true, withdrawalPending: false, maskedEmail: null, emailProofAvailable: true });
 
     // Email password reset works, and revokes the cookie issued before it.
     const resetCode = await request(app.getHttpServer()).post(api('/auth/recovery/email/request')).send({ email: NEW_EMAIL }).expect(200);
     const confirmed = await request(app.getHttpServer()).post(api('/auth/recovery/email/confirm'))
       .send({ email: NEW_EMAIL, code: resetCode.body.data.devCode }).expect(200);
+    // The same account's mailbox proof sent along with the phone proof is what fills the masked address.
+    const foundWithMailbox = await request(app.getHttpServer()).post(api('/auth/recovery/find-account'))
+      .send({ phone: CALLER_PHONE, proofToken: verifiedPhone.body.data.proofToken, email: NEW_EMAIL, emailProofToken: confirmed.body.data.proofToken }).expect(200);
+    expect(foundWithMailbox.body.data).toMatchObject({ hasPassword: true, maskedEmail: 'in***@integration.test', emailProofAvailable: true });
     await request(app.getHttpServer()).post(api('/auth/recovery/email/reset-password'))
       .send({ email: NEW_EMAIL, proofToken: confirmed.body.data.proofToken, newPassword: RESET_PASSWORD }).expect(200);
     expect((await request(app.getHttpServer()).get(api('/auth/me')).set('Cookie', cookie)).status).toBe(401);

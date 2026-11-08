@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TournamentBracket } from './tournament-bracket';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 import { queryImageBySrc } from '@/test/next-image';
+import { namedFinalGroups } from '@/test/named-final-groups';
 
 it('팀 없는 부전승 네 자리는 비공개 팀과 구분해 미정으로 표시한다', () => {
   render(<TournamentBracket fixtures={[]} groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
@@ -204,6 +205,15 @@ it('상위·하위 결선은 같은 라운드여도 공개 대진 그림에서 �
   expect(within(upper).getByRole('group', { name: '상위 A 대 상위 B' })).toBeInTheDocument();
   expect(within(lower).getByRole('group', { name: '하위 A 대 하위 B' })).toBeInTheDocument();
 });
+it('N개 토너먼트는 팀 수가 달라 서버 응답에서 큰 토너먼트가 먼저 나와도 만든 순서대로 보여준다', () => {
+  // 8팀(프리미어)을 먼저, 12팀(챌린지)을 나중에 만들었다. 서버는 phase 우선이라 12팀의 첫 단계(round16)가 응답 맨 앞이다.
+  const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);
+  expect(groups.find(group => group.bracketTrack !== 'overall')?.bracketTrack).toBe('챌린지');
+  render(<TournamentBracket groups={groups} fixtures={[]} />);
+
+  expect(screen.getAllByRole('region').map(region => region.getAttribute('aria-label'))).toEqual(['프리미어', '챌린지']);
+});
+
 describe('공개 대진표 — 자리 라벨', () => {
   it('보류 중인 슬롯은 알려진 팀 ID가 있어도 엠블럼 없이 중립 표시한다', () => {
     render(<TournamentBracket groups={[]} fixtures={[

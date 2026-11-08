@@ -86,12 +86,20 @@ export type V1User = {
   onboardingStatus: string;
 };
 
-/** 휴대폰 본인인증으로 찾은 계정. 이메일은 마스킹된 값만 내려온다. */
+/**
+ * 계정 찾기로 찾은 계정. 휴대폰 인증만으로는 가입 수단(`providers`·`hasPassword`)과 탈퇴 대기 여부까지만 오고,
+ * `maskedEmail`·`withdrawalPendingUntil` 은 null 이다. 메일함 소유를 증명한 요청(이메일 찾기, 또는 번호 찾기에
+ * 같은 계정의 `email`+`emailProofToken` 을 함께 보낸 요청)에만 채워진다. 이메일은 마스킹된 값만 내려온다.
+ */
 export type V1FoundAccount = {
   maskedEmail: string | null;
+  /** 이 계정에 이메일이 있어 이메일 증명을 받을 수 있는지. 값이 false 면 이메일로 다시 확인하자고 권하지 않는다. 주소는 싣지 않는다. */
+  emailProofAvailable: boolean;
   providers: string[];
   hasPassword: boolean;
-  /** 이 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
+  /** 탈퇴를 신청해 유예 중인 계정이면 true. 끝나는 날은 `withdrawalPendingUntil` 이 메일함 증명 뒤에만 채운다. */
+  withdrawalPending: boolean;
+  /** 탈퇴 유예가 끝나는 시각(ISO). 메일함 증명이 없거나 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
   withdrawalPendingUntil: string | null;
 };
 
@@ -2791,7 +2799,10 @@ export type V1HomeShortcut = {
   disabledReason: string | null;
 };
 
-/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다. */
+/**
+ * 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다.
+ * 시각 있는 경기가 하나도 없을 때만 시각이 아직 정해지지 않은 대회 경기(`scheduledAt` null)가 온다.
+ */
 export type V1HomeNextGame = {
   gameId: string;
   teamMatchId: string | null;
@@ -2800,7 +2811,8 @@ export type V1HomeNextGame = {
   competitionId: string | null;
   title: string;
   opponentName: string | null;
-  scheduledAt: string;
+  /** 킥오프 시각. 대회 경기의 시각이 아직 정해지지 않았으면 null. */
+  scheduledAt: string | null;
   placeName: string | null;
   teamId: string;
   teamName: string;

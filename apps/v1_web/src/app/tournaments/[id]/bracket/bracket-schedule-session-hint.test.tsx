@@ -64,6 +64,7 @@ describe('BracketScheduleTab — 내 경기 조회는 로그인했을 때만', (
     // 하이드레이션 effect 가 끝난 뒤에도 요청이 나가지 않아야 한다.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(requestedUrls().filter((url) => url.includes('/my-fixtures'))).toEqual([]);
+    expect(requestedUrls().filter((url) => url.includes('/me/teams'))).toEqual([]);
   });
 
   it('로그인한 사용자는 my-fixtures 를 조회한다 (팀장 경기 강조 유지)', async () => {
@@ -73,6 +74,16 @@ describe('BracketScheduleTab — 내 경기 조회는 로그인했을 때만', (
 
     await waitFor(() => {
       expect(requestedUrls().filter((url) => url.includes('/tournaments/tour-1/my-fixtures'))).toHaveLength(1);
+    });
+  });
+
+  it('로그인한 사용자는 팀원까지 포함한 소속 팀(me/teams)도 조회한다 (우리 팀 표시용)', async () => {
+    saveStoredV1Session({ userId: 'user-1', userEmail: 'user@example.com' });
+
+    renderTab();
+
+    await waitFor(() => {
+      expect(requestedUrls().filter((url) => url.includes('/me/teams'))).toHaveLength(1);
     });
   });
 });

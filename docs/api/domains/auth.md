@@ -17,7 +17,7 @@
 | `POST` | `/api/v1/auth/login/step-up/verify` | none | `{ challengeToken, code }` (`code` = 6 digits) | same response and cookie as a completed `login` |
 | `POST` | `/api/v1/auth/login/step-up/resend` | none | `{ challengeToken }` | `{ expiresAt, resendAvailableAt }` |
 | `POST` | `/api/v1/auth/dev-session` | user (header identity) — **404 in production mode** (alpha included) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
-| `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs | session cookie + onboarding/terms route |
+| `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs; `password` follows the [password rule](#password-rule) | session cookie + onboarding/terms route |
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/kakao/token` | none | `{ accessToken }` (10-4096 chars) | same as `/auth/kakao` — both resolve the user through one shared path |
 | `POST` | `/api/v1/auth/apple/nonce` | none | empty body | `{ nonce }` (signed, 5 min TTL) |
@@ -30,7 +30,7 @@
 | `POST` | `/api/v1/auth/link/pending` | user (same) | `{ linkToken }` — the `details.linkToken` of a [sign-in-then-link](#sign-in-then-link) `409` | same as `link/kakao`; `400 SOCIAL_LINK_TOKEN_INVALID` for a forged, expired or other-purpose token |
 | `POST` | `/api/v1/auth/link/email/request` | user (finished signup; session issued ≤ 30 min ago) | `{ email }` | `{ sent: true, maskedTarget, expiresInSeconds, resendAvailableInSeconds, devCode? }` — see [Adding an email login to a social account](#adding-an-email-login-to-a-social-account) |
 | `POST` | `/api/v1/auth/link/email/verify` | user (finished signup) | `{ code }` (6 digits) | `{ emailLinkToken, expiresInSeconds }` |
-| `POST` | `/api/v1/auth/link/email/complete` | user (finished signup) | `{ emailLinkToken, password, passwordConfirm }` | `{ linked: true, email }` |
+| `POST` | `/api/v1/auth/link/email/complete` | user (finished signup) | `{ emailLinkToken, password, passwordConfirm }`; `password` follows the [password rule](#password-rule) | `{ linked: true, email }` |
 | `POST` | `/api/v1/auth/identities/unlink` | user (finished signup, not an operator; session issued ≤ 30 min ago) | `{ provider: "kakao" \| "apple" \| "email" }` | `{ provider, authProviders }` + a re-signed `teameet_v1_session` cookie — see [Removing a login method](#removing-a-login-method-and-signing-out-other-devices) |
 | `POST` | `/api/v1/auth/sessions/revoke-others` | user | empty body | `{ revoked: true }` + a re-signed `teameet_v1_session` cookie — same section |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
@@ -43,12 +43,12 @@
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
-| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil }` |
+| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; `maskedEmail` and `withdrawalPendingUntil` are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
-| `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil: null }` after email proof |
-| `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
+| `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | after email proof: `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; finds an `active` account first, then a `withdrawal_pending` one |
+| `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }`; `newPassword` follows the [password rule](#password-rule) | `{ ok: true }`; changes `active` accounts only. A `withdrawal_pending` holder gets `403 ACCOUNT_WITHDRAWAL_PENDING` with `details: { withdrawalPendingUntil }` (ISO or `null`) and nothing is written — see [Account enumeration](#account-enumeration) |
 | `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
 Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-request`
@@ -67,9 +67,13 @@ A withdrawn account keeps its `phone` for the 30-day grace period (`WITHDRAWAL_G
 the code proved the number is theirs**:
 
 - `phone/verify` adds `withdrawalPendingUntil` (ISO instant, `null` when the holder is not a withdrawal or the number is free). `registered`
-  keeps meaning "a row holds this number".
+  keeps meaning "a row holds this number". This is kept on purpose: the signup screen tells a person who types a held number when it frees
+  up, and only the account-lookup result hides the date. `purpose` is chosen by the caller, so withholding it for `password_reset` alone would
+  protect nothing.
 - `recovery/find-account` finds the `withdrawal_pending` holder when no `active` account has the number (the `active` one wins if both ever
-  matched) and answers with the usual `maskedEmail`, `providers`, `hasPassword` plus `withdrawalPendingUntil`. Active holders get `null`.
+  matched) and answers `withdrawalPending: true`. The end date (`withdrawalPendingUntil`) and `maskedEmail` come back only with a mailbox
+  proof for that account — see [Lookup by phone number](#lookup-by-phone-number). A number can be reassigned to someone else, so the
+  `find-account` answer to an SMS proof alone never carries the previous holder's email hint or end date (`phone/verify` above still carries the date). Active holders get `withdrawalPending: false` and `null` dates.
   `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
@@ -251,6 +255,50 @@ each issue so the table stays short — it grows with addresses tried, not with 
 The phone path does not need this: `find-account` answers `ACCOUNT_NOT_FOUND` openly, but only
 after the caller has proven the number is theirs.
 
+`email/request` mails the code to an address held by a `withdrawal_pending` account as well as an `active` one, and answers every
+address identically. Without that mail a withdrawing member could never prove the mailbox, and so never be told the grace end date.
+Password reset still acts on `active` accounts only. For a `withdrawal_pending` holder `email/reset-password` answers
+`403 ACCOUNT_WITHDRAWAL_PENDING` with `details: { withdrawalPendingUntil }` instead of `404 ACCOUNT_NOT_FOUND`, so the form can send the member to the
+withdrawal guide rather than leave them at a password step that cannot succeed. This is the same mailbox-proof tier as `email/find-account`
+(the proof is already verified, so the date is not revealed to anyone who does not hold the mailbox), and unlike the sign-in refusal of the same
+code it carries no `withdrawalCancelToken`: the member still has to sign in to cancel. Nothing changes — password, `sessionEpoch`, sockets, login
+restrictions — when this refusal is returned.
+
+### Lookup by phone number
+
+`POST /auth/recovery/find-account` answers in two tiers:
+
+| Proof sent | `providers`, `hasPassword`, `withdrawalPending` | `maskedEmail`, `withdrawalPendingUntil` |
+|---|---|---|
+| SMS proof only (`phone` + `proofToken`) | yes | `null` |
+| SMS proof **and** a mailbox proof for the account's own email (`email` + `emailProofToken`, the `proofToken` of `recovery/email/confirm`) | yes | filled (`maskedEmail` keeps its first two characters; the date is `null` for an `active` account or when no withdrawal log exists) |
+
+- The mailbox proof is the one `recovery/email/*` already issues (purpose `password_reset`); the lookup compares the proven address with
+  `v1_users.email` of the account holding the number, after normalization.
+- A proof for **someone else's** mailbox is not an error: the answer is identical to sending no mailbox proof, so the call says nothing about
+  whose mailbox it was. A proof that does not verify (forged, expired, wrong channel, wrong address) is `400 EMAIL_NOT_VERIFIED`; sending only one
+  of `email` / `emailProofToken` is `400 VALIDATION_ERROR`.
+- `emailProofAvailable` is `true` when the account has an email, so a mailbox proof can succeed for it, and `false` when it has none. It is the
+  same on both tiers and never carries the address. The screen offers the mailbox check only when it is `true`; without it an account
+  without an email would send its holder through mailbox proofs that can never match.
+- Whether an account holds the number is still told only after the SMS proof (`404 ACCOUNT_NOT_FOUND` otherwise).
+- `recovery/email/find-account` always carries the second tier, because the mailbox proof is its entry ticket.
+
+### Password rule
+
+Every route that sets a login password — `register`, `link/email/complete`, `recovery/email/reset-password` and the dead-end phone
+`recovery/reset-password` — validates it with `IsAccountPassword`: a string of **8 or more characters** (counted as characters, so an emoji is one) that is **not on the common-password
+list**. Login (`POST /auth/login`) never applies the rule, so an existing account with a common password still signs in.
+
+- The list (`COMMON_PASSWORDS`) is a few hundred lowercase entries — digit runs, keyboard walks, `YYYY0101` birthdays, common English words and
+  service names, and Korean-user habits such as `qwer1234`, `1q2w3e4r` and `qlalfqjsgh` (비밀번호 typed on an English layout). Matching is whole-string and
+  case-insensitive; a password that merely contains a listed word passes.
+- A request whose only problem is a listed password is `400 PASSWORD_TOO_COMMON` with the message `너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.`
+  (`details` still names the field). With anything else also wrong, or a password under 8 characters, it stays `400 VALIDATION_ERROR`.
+- The rule lives in `apps/v1_api/src/auth/account-password-rules.ts`. `apps/v1_web/src/lib/account-password-rules.ts` is a byte-for-byte copy
+  that the signup, email-link and password-reset forms use for their instant hint, so the hint and the server cannot disagree;
+  a web unit test fails when the two files differ. Edit the API file, then copy it over the web one.
+
 ## Request DTOs
 
 `UpdateOnboardingPreferencesDto`:
@@ -352,6 +400,8 @@ Kakao contacts are fetched by the API from `/v2/user/me`; login requests never a
 
 For an unlinked Kakao identity, automatic linking requires a valid, provider-verified email matching an already verified service email. A phone match alone, including a provider-confirmed phone, returns `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`; present possession of a reassigned number does not prove ownership of the earlier account. Both contacts must remain consistent when supplied: contacts belonging to different members or disagreeing with the candidate's stored contacts return `409 SOCIAL_LINK_CONTACT_CONFLICT`. The transaction locks and rechecks the same email ownership before attaching the identity; the existing user ID, memberships, profile and history remain intact. Established Kakao identities remain the primary key for subsequent login and do not require re-linking.
 
+Automatic linking (a new Kakao identity as above, or a new Apple identity whose Apple-verified email equals an already verified service email) follows the same rules as the signed-in links. They are checked in the link's own transaction, after the guarded update that locks the account row: an account with an operator role (`V1AdminUser` not revoked, so a suspended grant counts) is not linked and the sign-in answers `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; an account that already holds an active identity of that provider is not given a second one and the sign-in answers `409 SOCIAL_LINK_PROVIDER_EXISTS`. The operator refusal comes only after the email proof matched, so a phone-only match never reveals who holds the account. A link that goes through writes a `v1_status_change_logs` row (`auth_identity`, `unlinked` → `linked`, reason `kakao_verified_contact:email` or `apple_verified_email`) and the owner's `social_identity_linked` notification, stored with the link and pushed after commit, as an explicit link does.
+
 `GET /auth/me.socialSignupPrefill` includes nullable `name`, `phone`, `gender`, and `birthDate` during pending/deferred profile completion. `birthDate` combines complete `birthyear` and `birthday` only when `birthday_type = SOLAR`; lunar, incomplete or invalid dates require manual input and the existing 14+ gate applies. An unchanged server-stored Kakao phone skips OTP at profile completion and records `kakao_provided_phone` in the status audit log. An edited number or an Apple signup does not inherit that exception. The UI omits the OTP card for the Kakao number.
 
 ### Linking a social login while signed in
@@ -362,7 +412,7 @@ For an unlinked Kakao identity, automatic linking requires a valid, provider-ver
 - **Recent login**: a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` with `details: { maxAgeSeconds: 1800 }`, before any provider call. A request with no session age (non-production header identities only) skips the check outside production and is refused in production.
 - **Success** is `200` with `{ provider, alreadyLinked, mergedPendingAccount, authProviders }`. `alreadyLinked` is the idempotent repeat (same provider identity already on this account): nothing is written and no notification is sent. `authProviders` lists the account's active login methods after the call.
 - **Abandoned signup**: if the provider identity sits on an account that never finished signup — onboarding status `social_terms_required`, `social_profile_required` or `social_profile_deferred`, active, no operator role, no password, that identity as its only active login, and no activity (no team membership or ownership, match or team-match participation or application, tournament registration, player entry or staff assignment, chat participation or message, review) — the identity row moves to the caller and `mergedPendingAccount` is `true`. That account is retired the way an operator deletion retires one (status `deleted`; email, phone, nickname and provider keys replaced by placeholders so the unique values are free again; push devices, regions, preferences, search history and verification tokens removed), and its inquiries, upload assets and waiting team invitations are handed to the caller (an invitation to a team the caller is already in, already invited to, or invited from is cancelled instead of duplicated). All in one transaction; the retire step is a guarded update, so an account that finished signup in the meantime is refused.
-- **Concurrency**: the call locks the caller's row (`FOR UPDATE`, re-checking active and not deleted) and takes two advisory locks (caller + provider, then the external identity), so two accounts cannot claim the same identity and one account cannot end up with two identities of one provider. The loser gets the ordinary `409` below.
+- **Concurrency**: the call locks the caller's row (`FOR UPDATE`, re-checking active and not deleted) and takes two advisory locks (caller + provider, then the external identity), so two accounts cannot claim the same identity and this call never gives one account two identities of one provider. Every path is also bound by the database: the partial unique index `v1_auth_identities_user_provider_active_key` on `(user_id, provider) WHERE status = 'active'` rejects a second active identity of one provider on an account, while unlinked rows are history and stay unrestricted. The loser gets the ordinary `409` below.
 - **Records**: a `v1_status_change_logs` row (`auth_identity`, `unlinked`/`pending_social_account` → `linked`, reason `account_link:<provider>` plus `;merged_pending_user` when an account was retired, or `;restored_identity` when the caller's own removed login came back; a second `user` row records the retired account) and a `social_identity_linked` in-app notification. It is a security notice: it ignores notification settings and its inbox row is written in the link's own transaction; the push is sent after commit and never fails the link.
 
 Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED`; `403 SIGNUP_INCOMPLETE`; `403 PERMISSION_DENIED` (caller not active); `409 SOCIAL_LINK_PROVIDER_EXISTS` (the account already has a *different* Kakao/Apple identity); `409 SOCIAL_LINK_PROVIDER_IN_USE` (the identity belongs to another account that is in real use, or lost a race); `400 VALIDATION_ERROR` (Kakao body mixes both forms), `400 SOCIAL_LINK_TOKEN_INVALID` and `409 SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH` (`link/pending` only); and the login endpoints' token errors (`400 OAUTH_NOT_CONFIGURED`, `401 UNAUTHENTICATED`, `503` when the provider is unreachable).
@@ -388,9 +438,9 @@ The reverse of linking a social login: a Kakao/Apple account adds email + passwo
 
 1. `POST /auth/link/email/request { email }` — mails a 6-digit code to the address (normalized with `normalizeEmail`: trimmed, lower-cased), in a mail of its own ("로그인 이메일 연결 인증번호"). Response `{ sent: true, maskedTarget, expiresInSeconds: 300, resendAvailableInSeconds: 30 }` (`devCode` too where dev-echo allows, test addresses only). Rate limit 5/min. When the address cannot receive mail and cannot use the reserved test-address path, the server answers `503 EMAIL_SEND_UNAVAILABLE` instead of `sent: true`, after refusals that do not depend on mail (stale session, guards, address in use).
 2. `POST /auth/link/email/verify { code }` — checks the caller's newest pending code, spends it and returns `{ emailLinkToken, expiresInSeconds: 600 }`. Rate limit 10/min.
-3. `POST /auth/link/email/complete { emailLinkToken, password, passwordConfirm }` — sets the password and attaches the login. Response `{ linked: true, email }`. Rate limit 10/min. The password rule is signup's (`IsAccountPassword`: a string of 8 or more characters); `passwordConfirm` must equal it (`400 VALIDATION_ERROR`, `details` names `passwordConfirm`). The address is not in the body: it is the one the token vouches for.
+3. `POST /auth/link/email/complete { emailLinkToken, password, passwordConfirm }` — sets the password and attaches the login. Response `{ linked: true, email }`. Rate limit 10/min. The password rule is signup's (`IsAccountPassword`, see [Password rule](#password-rule): 8 or more characters, not a common password — `400 PASSWORD_TOO_COMMON`); `passwordConfirm` must equal it (`400 VALIDATION_ERROR`, `details` names `passwordConfirm`). The address is not in the body: it is the one the token vouches for.
 
-- **Guards** (shared with the social links, `auth/link-caller-guards.ts`): an operator account gets `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; a caller who is not active gets `403 PERMISSION_DENIED`; a social signup that has not finished gets `403 SIGNUP_INCOMPLETE`, except the required email setup for a newly deferred social profile. `request` and `complete` both check them (in `complete`, inside the transaction on the locked row).
+- **Guards** (shared with the social links, `auth/link-caller-guards.ts`): an operator account gets `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; a caller who is not active gets `403 PERMISSION_DENIED`; a social signup that has not finished, including a deferred profile, gets `403 SIGNUP_INCOMPLETE`. `request` and `complete` both check them (in `complete`, inside the transaction on the locked row).
 - **Recent login**: only `request` checks it — a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` (`details: { maxAgeSeconds: 1800 }`) before anything is read or mailed. `verify` and `complete` do not re-check, and that is safe because of the purpose binding below: `verify` accepts only a code that `request` created, so a session past the limit has no other way to obtain one (`/verification/email/request` does not look at the session age and can mail the account's own email, which `PATCH /me/profile` lets the caller choose — its codes are `contact` and `verify` refuses them). The 10 minutes of the `emailLinkToken` then bound the window for the write.
 - **Conflicts**: `409 SOCIAL_LINK_PROVIDER_EXISTS` when the account already has an active email login. `409 EMAIL_CONFLICT` ("이미 다른 계정에서 쓰는 이메일이에요.") when any other user holds the address as `v1_users.email` or as an email login key; nothing else about that account is said. The address the account itself carries as a contact email is allowed. `request` checks this before mailing; `complete` checks it again inside the transaction.
 - **Codes**: the same machinery and error codes as `/verification/*` — 5 minutes TTL, 5 attempts (`400 VERIFICATION_CODE_MISMATCH`, `400 VERIFICATION_TOO_MANY_ATTEMPTS`), an expired or missing code is `400 VERIFICATION_NO_PENDING`, resend cooldown 30 s per address (`400 VERIFICATION_RESEND_COOLDOWN`), and the 24-hour send quota of 5 per address and 10 per account (`429 VERIFICATION_SEND_QUOTA_EXCEEDED`); cooldown and quota count every mail sent to the address or by the account, whatever the code is for. A mail that could not be sent (`503 EMAIL_SEND_FAILED`) leaves no code behind, so the person can ask again at once.

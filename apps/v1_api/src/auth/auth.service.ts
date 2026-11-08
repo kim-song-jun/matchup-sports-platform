@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { Prisma, V1AccountStatus, V1AuthProvider } from '@prisma/client';
+import { NotificationsService, type DeliveredNotification } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { AppleLoginDto } from './dto/apple-login.dto';
@@ -17,13 +18,24 @@ import {
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
 import { isPendingSocialSignup } from './social-signup-access';
-import { linkCallerRestriction } from './link-caller-guards';
+import { isOperatorAccount, linkCallerRestriction, operatorLinkRefusal } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
-import { pendingAccountLinkClaims, signInThenLinkConflict, signInThenLinkHint } from './social-link-conflict';
+import {
+  pendingAccountLinkClaims,
+  signInThenLinkConflict,
+  signInThenLinkHint,
+  SOCIAL_PROVIDER_LABELS,
+  socialProviderExists,
+} from './social-link-conflict';
 import type { LinkableSocialProvider, SocialLinkClaims } from './social-link-token';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
+import {
+  SIGNUP_AGE_RESTRICTED_RESPONSE,
+  isSignupAgeEligible,
+  isValidBirthDateDigits,
+  normalizeSignupDisplayName,
+} from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { recordSignupConsent } from './signup-record-consent';
 import { hashPassword, verifyPasswordConstantCost } from './password-hash';
@@ -137,6 +149,7 @@ export class AuthService {
     private readonly appleTokens: AppleTokenService,
     private readonly loginSecurity: LoginSecurityService,
     private readonly loginStepUp: LoginStepUpService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -156,10 +169,7 @@ export class AuthService {
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
     if (isValidBirthDateDigits(birthDate) && !isSignupAgeEligible(birthDate)) {
-      throw new BadRequestException({
-        code: 'SIGNUP_AGE_RESTRICTED',
-        message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
-      });
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     if (!isValidBirthDateDigits(birthDate)) {
@@ -632,10 +642,13 @@ export class AuthService {
   private async linkExistingKakaoIdentity(userId: string, profile: KakaoProfile, now: Date) {
     const email = kakaoVerifiedEmail(profile);
     const phone = profile.signupPrefill?.phone ?? null;
-    return this.prisma.$transaction(async (tx) => {
+    const linked = await this.prisma.$transaction(async (tx) => {
       const candidate = await tx.v1User.findUnique({
         where: { id: userId },
-        select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true },
+        select: {
+          id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true,
+          adminUser: { select: { status: true } },
+        },
       });
       if (!candidate) throw this.kakaoContactConflict(profile, [userId]);
       this.assertNotWithdrawalPending(candidate.accountStatus);
@@ -655,6 +668,8 @@ export class AuthService {
         }
         throw this.kakaoContactConflict(profile, [userId]);
       }
+      // Only past the email proof above: a phone-only match must not tell the caller who holds the account.
+      if (isOperatorAccount(candidate.adminUser)) throw operatorLinkRefusal('social');
       // Lock and recheck the verified contact. A concurrent profile edit must invalidate this claim.
       const claimed = await tx.v1User.updateMany({
         where: {
@@ -669,14 +684,18 @@ export class AuthService {
         },
       });
       if (claimed.count !== 1) throw this.kakaoContactConflict(profile, [userId]);
+      await this.assertNoActiveLoginOf(tx, userId, V1AuthProvider.kakao);
       const identity = await tx.v1AuthIdentity.create({
         data: { userId, provider: V1AuthProvider.kakao, providerUserKey: profile.providerUserKey, email, status: 'active', lastLoginAt: now },
       });
       await tx.v1StatusChangeLog.create({
         data: { targetType: 'auth_identity', targetId: identity.id, fromStatus: 'unlinked', toStatus: 'linked', actorType: 'user', actorUserId: userId, reason: 'kakao_verified_contact:email' },
       });
-      return { id: userId, email: email ?? candidate.email };
+      const notification = await this.createLinkedNotice(tx, userId, V1AuthProvider.kakao, identity.id);
+      return { id: userId, email: email ?? candidate.email, notification };
     });
+    this.deliverLinkedNotice(linked.id, linked.notification);
+    return { id: linked.id, email: linked.email };
   }
 
   /**
@@ -872,10 +891,10 @@ export class AuthService {
       providerUserKey: input.providerUserKey,
       email: input.email,
     };
-    return this.prisma.$transaction(async (tx) => {
+    const linked = await this.prisma.$transaction(async (tx) => {
       const candidate = await tx.v1User.findUnique({
         where: { id: input.existingUserId },
-        select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true },
+        select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true, adminUser: { select: { status: true } } },
       });
 
       if (!candidate || candidate.email !== input.email) {
@@ -886,6 +905,7 @@ export class AuthService {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       assertLinkableByEmail(candidate, claims);
+      if (isOperatorAccount(candidate.adminUser)) throw operatorLinkRefusal('social');
 
       const claimed = await tx.v1User.updateMany({
         where: {
@@ -899,8 +919,9 @@ export class AuthService {
       if (claimed.count !== 1) {
         throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
+      await this.assertNoActiveLoginOf(tx, candidate.id, input.provider);
 
-      await tx.v1AuthIdentity.create({
+      const identity = await tx.v1AuthIdentity.create({
         data: {
           userId: candidate.id,
           provider: input.provider,
@@ -909,9 +930,42 @@ export class AuthService {
           status: 'active',
           lastLoginAt: input.now,
         },
+        select: { id: true },
       });
-      return { id: candidate.id, email: candidate.email };
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'auth_identity', targetId: identity.id, fromStatus: 'unlinked', toStatus: 'linked',
+          actorType: 'user', actorUserId: candidate.id, reason: `${input.provider}_verified_email`,
+        },
+      });
+      const notification = await this.createLinkedNotice(tx, candidate.id, input.provider, identity.id);
+      return { id: candidate.id, email: candidate.email, notification };
     });
+    this.deliverLinkedNotice(linked.id, linked.notification);
+    return { id: linked.id, email: linked.email };
+  }
+
+  /**
+   * One active login per provider on an account. Call it after the guarded update that locks the user row: a login
+   * another transaction attached to the account meanwhile is then committed and visible here. The partial unique index
+   * on (user_id, provider) is the backstop, not this check.
+   */
+  private async assertNoActiveLoginOf(tx: Prisma.TransactionClient, userId: string, provider: LinkableSocialProvider) {
+    const held = await tx.v1AuthIdentity.findFirst({ where: { userId, provider, status: 'active' }, select: { id: true } });
+    if (held) throw socialProviderExists(provider);
+  }
+
+  /** The security notice an explicit link leaves; it ignores notification settings and is stored with the link or not at all. */
+  private createLinkedNotice(tx: Prisma.TransactionClient, userId: string, provider: LinkableSocialProvider, identityId: string) {
+    return this.notifications.createInTransaction(tx, userId, 'social_identity_linked', {
+      vars: { name: SOCIAL_PROVIDER_LABELS[provider] },
+      businessKey: `social-link:${identityId}`,
+    });
+  }
+
+  /** Realtime and push go out only once the link has committed. */
+  private deliverLinkedNotice(userId: string, notification: DeliveredNotification | null) {
+    if (notification) this.notifications.deliverCreated(userId, 'social_identity_linked', notification);
   }
 
   async completeSocialTerms(userId: string, dto: SocialTermsDto) {
@@ -1038,10 +1092,7 @@ export class AuthService {
     const profileImageOmitted = dto.profileImageUrl === undefined;
 
     if (isValidBirthDateDigits(birthDate) && !isSignupAgeEligible(birthDate)) {
-      throw new BadRequestException({
-        code: 'SIGNUP_AGE_RESTRICTED',
-        message: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
-      });
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     if (!isValidBirthDateDigits(birthDate)) {

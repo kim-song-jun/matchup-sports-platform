@@ -53,7 +53,7 @@ import { TournamentInquirySection } from '@/components/tournaments/tournament-in
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
-import { bracketTrackLabel } from '@/lib/bracket-track';
+import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
@@ -218,7 +218,7 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 /** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
 function getCompletedTrackChampions(tournament: V1TournamentDetail) {
   if (isLeagueCompetition(tournament)) return [];
-  const tracks = [...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))];
+  const tracks = orderedBracketTracks(tournament.groups);
   if (tracks.length < 2) return [];
   return tracks.map(track => {
     const finalGroupIds = new Set(tournament.groups.filter(group => group.bracketTrack === track && group.phase === 'final').map(group => group.id));

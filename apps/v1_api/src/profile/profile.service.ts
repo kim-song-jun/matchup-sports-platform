@@ -37,6 +37,7 @@ import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
+import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible, isValidBirthDateDigits } from '../auth/dto/required-signup-profile.dto';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRecordConsentDto,
@@ -173,8 +174,14 @@ export class ProfileService {
       throw validationError('nickname and gender are required; email is required for password accounts', 'profile');
     }
 
-    if (birthDate && !isValidBirthDate(birthDate)) {
+    if (birthDate && !isValidBirthDateDigits(birthDate)) {
       throw validationError('Birth date must be a valid YYYYMMDD value', 'birthDate');
+    }
+    // Only a changed value is checked, so an account already holding an under-14 date can still edit other fields.
+    // Legacy stored values may carry separators ('YYYY-MM-DD'); compare digits only.
+    const storedBirthDate = (before?.profile?.birthDate ?? '').replace(/\D/g, '');
+    if (birthDate && birthDate !== storedBirthDate && !isSignupAgeEligible(birthDate)) {
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([
@@ -1269,15 +1276,6 @@ function validationError(message: string, field: string) {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function isValidBirthDate(value: string) {
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 function formatRegionName(region: { name: string; parent: { name: string } | null }) {

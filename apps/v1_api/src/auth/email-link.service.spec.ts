@@ -234,7 +234,7 @@ async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean;
     scheduleSprayDetection: jest.fn(),
     forgetEmail: jest.fn().mockResolvedValue(undefined),
   };
-  const auth = new AuthService({} as never, db.prisma as never, {} as never, {} as never, {} as never, loginSecurity as never, {} as never);
+  const auth = new AuthService({} as never, db.prisma as never, {} as never, {} as never, {} as never, loginSecurity as never, {} as never, notifications as never);
   jest.spyOn(auth, 'me').mockResolvedValue({ user: { signupEmailLoginRequired: false }, onboarding: { status: 'completed', missing: [] } } as never);
   const recovery = new AccountRecoveryService(db.prisma as never, {} as never, loginSecurity as never, { forceDisconnectUser: jest.fn() });
 
@@ -691,11 +691,19 @@ describe('EmailLinkService.complete', () => {
 
     it('find-account by phone lists email among the providers and reports a password', async () => {
       const { verified, complete, recovery } = await build(kakaoCaller());
-      const find = () => recovery.findAccountByPhone({ phone: PHONE, proofToken: issuePhoneProofToken(PHONE, 'password_reset') });
-      expect(await find()).toMatchObject({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
+      // The masked address only comes back with a proof for the account's own mailbox.
+      const find = (mailbox: string) => recovery.findAccountByPhone({
+        phone: PHONE,
+        proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
+        email: mailbox,
+        emailProofToken: issueEmailProofToken(mailbox, 'password_reset'),
+      });
+      expect(await find('contact@kakao-mail.example')).toMatchObject({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
       await complete(await verified());
 
-      expect(await find()).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
+      expect(await find(NEW_EMAIL)).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
+      // The old contact address is no longer this account's mailbox.
+      expect(await find('contact@kakao-mail.example')).toMatchObject({ maskedEmail: null, providers: ['kakao', 'email'], hasPassword: true });
     });
   });
 

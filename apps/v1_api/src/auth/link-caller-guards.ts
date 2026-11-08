@@ -43,13 +43,23 @@ const ADMIN_REFUSAL_MESSAGES = {
   unlink: '운영 권한이 있는 계정은 로그인 수단을 직접 해제할 수 없어요.',
 } as const;
 
+/** An operator account is one whose admin grant is not revoked (a suspended grant still counts). */
+export function isOperatorAccount(adminUser: { status: string } | null): boolean {
+  return adminUser !== null && adminUser.status !== 'revoked';
+}
+
+/** The refusal for adding a login method to an operator's account, shared by every path that could do it. */
+export function operatorLinkRefusal(method: keyof typeof ADMIN_REFUSAL_MESSAGES) {
+  return new ForbiddenException({ code: 'SOCIAL_LINK_ADMIN_FORBIDDEN', message: ADMIN_REFUSAL_MESSAGES[method] });
+}
+
 /**
  * Refuses a caller whose login methods may not be changed from a browser session: a restricted account, an operator's
  * account, or a social signup that has not finished.
  */
 export function linkCallerRestriction(caller: LinkCaller): 'account' | 'admin' | 'signup' | null {
   if (caller.accountStatus !== 'active' || caller.deletedAt !== null) return 'account';
-  if (caller.adminUser && caller.adminUser.status !== 'revoked') return 'admin';
+  if (isOperatorAccount(caller.adminUser)) return 'admin';
   if (isUnfinishedSocialSignup(caller.onboardingStatus)) return 'signup';
   return null;
 }
@@ -59,9 +69,7 @@ export function assertLinkableCaller(caller: LinkCaller, method: keyof typeof AD
   if (restriction === 'account') {
     throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이용이 제한된 계정이에요.' });
   }
-  if (restriction === 'admin') {
-    throw new ForbiddenException({ code: 'SOCIAL_LINK_ADMIN_FORBIDDEN', message: ADMIN_REFUSAL_MESSAGES[method] });
-  }
+  if (restriction === 'admin') throw operatorLinkRefusal(method);
   if (restriction === 'signup') {
     throw new ForbiddenException({
       code: 'SIGNUP_INCOMPLETE',

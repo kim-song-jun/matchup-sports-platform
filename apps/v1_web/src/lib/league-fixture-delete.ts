@@ -4,6 +4,8 @@
  * a not-yet-cancelled fixture whose game started or has a result must be cancelled first.
  */
 
+import type { V1GameState } from '@/types/api';
+
 export const LEAGUE_FIXTURE_CANCEL_HINT = '순위 집계에서 빼요. 경기 기록은 남아요.';
 export const LEAGUE_FIXTURE_DELETE_HINT = '대진표에서 숨겨요. 되돌릴 수 없어요.';
 
@@ -12,7 +14,7 @@ const STARTED_OR_RESULT_REASON = '시작했거나 결과가 있는 경기는 바
 
 interface DeleteGateInput {
   cancelled: boolean;
-  gameState: string | null | undefined;
+  gameState: V1GameState | null | undefined;
   /** Official, voided or pending result revision exists. */
   hasResult: boolean;
 }

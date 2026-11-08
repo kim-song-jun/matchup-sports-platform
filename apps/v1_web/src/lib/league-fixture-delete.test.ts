@@ -12,13 +12,13 @@ describe('leagueFixtureDeleteBlockedReason', () => {
     for (const input of [
       { cancelled: false, gameState: 'ENDED', hasResult: false },
       { cancelled: false, gameState: 'SCHEDULED', hasResult: true },
-    ]) {
+    ] as const) {
       expect(leagueFixtureDeleteBlockedReason(input)).toContain('먼저 경기를 취소한 뒤 삭제');
     }
   });
 
   it('진행 중이면 취소로 풀 수 없으니 콘솔에서 끝내라는 사유가 따로 나온다', () => {
-    for (const gameState of ['LIVE', 'PAUSED']) {
+    for (const gameState of ['LIVE', 'PAUSED'] as const) {
       expect(leagueFixtureDeleteBlockedReason({ cancelled: false, gameState, hasResult: false })).toContain('콘솔');
     }
   });

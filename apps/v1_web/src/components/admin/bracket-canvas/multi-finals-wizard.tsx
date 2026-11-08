@@ -104,7 +104,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
       setDirty(false); onApplied(); onClose();
     } catch (e) { setError(extractErrorMessage(e, '설정을 저장하지 못했어요.')); }
   }
-  return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
+  return createPortal(<div className="fixed inset-0 flex items-center justify-center bg-[var(--scrim-dark-32)] p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">
       <div className="shrink-0 border-b border-[var(--border)] p-4">
         <h2 id={titleId} className="tm-text-heading font-bold">{rulesOnly ? '토너먼트 배정 규칙' : '예선·토너먼트 대진 생성'}</h2>

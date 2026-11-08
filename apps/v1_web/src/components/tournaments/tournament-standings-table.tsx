@@ -229,6 +229,9 @@ export function TournamentStandingsTable({
                           fontSize: 13,
                           fontWeight: isHidden ? 500 : 600,
                           color: isHidden ? 'var(--text-caption)' : 'var(--text-strong)',
+                          wordBreak: 'keep-all',
+                          // break-word 는 최소 폭을 줄이지 않아 공백 없는 긴 이름이 표를 넓힌다.
+                          overflowWrap: 'anywhere',
                         }}
                       >
                         {isHidden ? '참가팀 비공개' : row.teamName}

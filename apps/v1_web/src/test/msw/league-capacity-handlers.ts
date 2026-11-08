@@ -21,8 +21,8 @@ const genderCategories: readonly unknown[] = ['mixed', 'male', 'female'];
 function ok<T>(data: T) {
   return HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
 }
-function fail(statusCode: number, code: string, message: string) {
-  return HttpResponse.json({ status: 'error', statusCode, code, message, details: null, timestamp: new Date().toISOString() }, { status: statusCode });
+function fail(statusCode: number, code: string, message: string, details: Record<string, unknown> | null = null) {
+  return HttpResponse.json({ status: 'error', statusCode, code, message, details, timestamp: new Date().toISOString() }, { status: statusCode });
 }
 const invalid = () => fail(400, 'VALIDATION_ERROR', '입력값을 확인해 주세요.');
 const missing = () => fail(404, 'LEAGUE_NOT_FOUND', '리그를 찾을 수 없어요.');
@@ -161,7 +161,7 @@ export function createV1LeagueCapacityMswHandlers(actor: Actor = 'ops') {
           body.maxTeams !== undefined && body.maxTeams !== current.maxTeams && 'maxTeams',
           body.genderCategory !== undefined && body.genderCategory !== current.genderCategory && 'genderCategory',
         ].filter(Boolean);
-        if (locked.length > 0) return fail(409, 'LEAGUE_ENDED_FIELD_LOCKED', '끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요.');
+        if (locked.length > 0) return fail(409, 'LEAGUE_ENDED_FIELD_LOCKED', '끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요.', { fields: locked });
       }
       const counts = leagueCapacityCounts(row);
       if (body.maxTeams !== null && body.maxTeams !== undefined && body.maxTeams < counts.confirmedCount + counts.pendingPaymentCount) {

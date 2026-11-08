@@ -9,13 +9,12 @@ export const RECOVERY_PHONE = '01012345678';
 export const RETURN_PATH = '/chat?room=team#latest';
 
 type WireCalls = {
-  logout: number; phoneReset: number;
+  logout: number;
   emailIssue: unknown[]; emailVerify: unknown[]; emailReset: unknown[];
   phoneVerify: unknown[]; findAccount: unknown[]; emailFind: unknown[];
 };
 export const wireCalls: WireCalls = {
   logout: 0,
-  phoneReset: 0,
   emailIssue: [],
   emailVerify: [],
   emailReset: [],
@@ -49,10 +48,6 @@ export const authUiServer = setupServer(
     wireCalls.findAccount.push(await request.json());
     return success({ maskedEmail: null, emailProofAvailable: true, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null });
   }),
-  http.post('*/api/v1/auth/recovery/reset-password', () => {
-    wireCalls.phoneReset += 1;
-    return failure('ACCOUNT_RECOVERY_REQUIRES_EMAIL', '가입한 이메일로 인증해 비밀번호를 다시 설정해 주세요.');
-  }),
   http.post('*/api/v1/auth/recovery/email/request', async ({ request }) => {
     wireCalls.emailIssue.push(await request.json());
     return issued();
@@ -76,7 +71,6 @@ export function resetWireScenario() {
   scenario.provider = 'kakao';
   scenario.logoutFails = false;
   wireCalls.logout = 0;
-  wireCalls.phoneReset = 0;
   wireCalls.emailIssue = [];
   wireCalls.emailVerify = [];
   wireCalls.emailReset = [];

@@ -94,12 +94,14 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
   );
 }
 
-export function SignupCompletePageView({ model, headingRef, topTitle }: {
+export function SignupCompletePageView({ model, headingRef, topTitle, notice }: {
   model: SignupCompleteViewModel;
   /** 상단 바 제목. 가입 완료는 흐름이 끝났으므로 없지만, 설정 안의 흐름(이메일 변경)은 어떤 흐름인지 남긴다. */
   topTitle?: string;
   /** 이 화면이 앞 화면을 대신해 나타날 때(단계 안에서 완료로 넘어갈 때) 제목으로 포커스를 옮기도록 받는다. */
   headingRef?: Ref<HTMLHeadingElement>;
+  /** 소개 문장과 단계 카드 사이에 놓는 안내(예: 가입은 됐지만 사진만 올리지 못했을 때). */
+  notice?: ReactNode;
 }) {
   return (
     <AuthFrame topTitle={topTitle} fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
@@ -108,6 +110,7 @@ export function SignupCompletePageView({ model, headingRef, topTitle }: {
         <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop tm-complete-check" />
         <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        {notice}
         <div className="tm-auth-stack">
           {model.steps.map((step) => (
             <Card key={step.title} pad={16} className="tm-auth-step-card">

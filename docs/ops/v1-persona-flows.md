@@ -20,7 +20,7 @@
 | P12 | 경기 후 리뷰어 | 리뷰 작성·수신 | my/reviews(pending)→my/reviews/[type]/[id]→my/reviews/received | ⏳ |
 | P13 | 채팅·알림 사용자 | 소통·알림 확인 | notifications→chat→chat/[id] | notifications✅(Rank4) / chat ⏳ |
 | P14 | 설정·탈퇴 사용자 | 알림/지역/종목/탈퇴 | my/settings→{notifications,location,sports,legal,withdrawal} | ⏳ |
-| P15 | 복귀 사용자 | 온보딩 재개·로그인 | onboarding/resume→login/email→matches/participants | ⏳ |
+| P15 | 복귀 사용자 | 재로그인 | login/email→matches/participants | ⏳ |
 | P16 | 플랫폼 admin(owner) | 운영 대시보드·관리 | admin→{users,matches,team-matches,teams,tournaments,audit,admins} | admin 라이브✅(이전 세션, 라벨 한글화) |
 | P17 | 대회 admin | 대진/조/공지 관리 | admin/tournaments/[id](대진관리·공지) | admin 라이브✅(이전 세션) |
 

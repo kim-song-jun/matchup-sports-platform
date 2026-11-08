@@ -28,19 +28,6 @@ export class FindAccountDto {
   emailProofToken?: string;
 }
 
-export class ResetPasswordDto {
-  @IsString()
-  @Matches(/^\d{11}$/, { message: '휴대폰 번호는 숫자 11자리예요.' })
-  phone!: string;
-
-  @IsString()
-  proofToken!: string;
-
-  // 가입(RegisterDto)과 같은 규칙을 쓴다 — 재설정 경로만 느슨하면 그쪽이 약한 고리가 된다.
-  @IsAccountPassword()
-  newPassword!: string;
-}
-
 /**
  * 이메일 경로의 요청 본문에는 **증명 토큰의 용도를 넣지 않는다.** 휴대폰 경로(PhoneVerifyDto)는
  * 호환 때문에 클라이언트가 purpose 를 고르지만, 이메일 경로는 처음부터 비밀번호 재설정 전용이라

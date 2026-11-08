@@ -34,6 +34,13 @@ describe('인증 안내 화면', () => {
     expect(imgs.some((img) => img.classList.contains('tm-auth-stage-illustration'))).toBe(true);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('현재 계정은 이용할 수 없어요');
   });
+
+  it('이용이 제한된 계정 화면의 고객센터 문의는 문의 화면으로 가는 링크다', () => {
+    render(<AuthExceptionPageView model={getAuthExceptionViewModel('blocked')} />);
+    expect(screen.getByRole('link', { name: '고객센터 문의' })).toHaveAttribute('href', '/contact');
+    expect(screen.queryByRole('button', { name: '고객센터 문의' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '로그인으로 돌아가기' })).toHaveAttribute('href', '/login');
+  });
 });
 
 vi.mock('next/navigation', () => ({

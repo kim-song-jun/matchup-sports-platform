@@ -3,7 +3,6 @@ import request = require('supertest');
 import { hashPassword, verifyPassword } from '../src/auth/password-hash';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { withdrawalGraceEndsAt } from '../src/users/withdrawal-grace';
-import { issuePhoneProofToken } from '../src/verification/phone-proof-token';
 import { createV1IntegrationApp } from './integration/integration-app';
 
 const PREFIX = 'integration-recovery-account-proof';
@@ -105,28 +104,6 @@ describe('V1 account recovery requires independent email proof', () => {
     if (typeof token !== 'string') throw new RecoveryFixtureError('Phone verification did not issue a proof token');
     return token;
   }
-
-  it.each([EMAIL_PHONE, SOCIAL_PHONE])('rejects current SMS proof for %s without credential, account, challenge, or session changes', async (phone) => {
-    const proofToken = await proveCurrentPhone(phone);
-    const before = await accountState();
-    const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/reset-password')
-      .send({ phone, proofToken, newPassword: REPLACEMENT_PASSWORD });
-
-    expect({ status: response.status, code: response.body.code }).toEqual({ status: 409, code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL' });
-    expect(response.headers['set-cookie']).toBeUndefined();
-    expect(response.body).not.toHaveProperty('data.session');
-    expect(await accountState()).toEqual(before);
-  });
-
-  it('retains the signup proof-purpose rejection before account lookup or writes', async () => {
-    const before = await accountState();
-    const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/reset-password')
-      .send({ phone: EMAIL_PHONE, proofToken: issuePhoneProofToken(EMAIL_PHONE, 'signup'), newPassword: REPLACEMENT_PASSWORD });
-
-    expect({ status: response.status, code: response.body.code }).toEqual({ status: 400, code: 'PHONE_NOT_VERIFIED' });
-    expect(response.headers['set-cookie']).toBeUndefined();
-    expect(await accountState()).toEqual(before);
-  });
 
   it('revokes every session cookie issued before an email password reset, and the new password signs in again', async () => {
     const sessionCookieOf = (response: request.Response) =>

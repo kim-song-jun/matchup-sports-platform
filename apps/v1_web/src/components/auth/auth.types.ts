@@ -30,12 +30,11 @@ export type EmailLoginViewModel = {
   sub: string;
   fields: Array<{ label: string; placeholder: string; type: 'email' | 'password'; helper?: string; state?: 'default' | 'error' | 'success' }>;
   primary: AuthAction;
-  forgot: AuthAction;
   signupHref: string;
   notice?: { title: string; body: string };
 };
 
-export type AuthExceptionKind = 'provider-denied' | 'blocked' | 'location-denied' | 'password-reset';
+export type AuthExceptionKind = 'provider-denied' | 'blocked' | 'location-denied';
 
 export type AuthExceptionViewModel = {
   backHref: string;
@@ -80,7 +79,7 @@ export type SignupCompleteViewModel = {
   secondary?: AuthAction;
 };
 
-export type OnboardingStep = 'resume' | 'sport' | 'level' | 'region' | 'confirm';
+export type OnboardingStep = 'sport' | 'level' | 'region' | 'confirm';
 
 export type OnboardingOption = {
   label: string;

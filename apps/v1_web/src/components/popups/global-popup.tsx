@@ -2,6 +2,8 @@
 
 import { Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { HOME_AD_POPUP_PATH, HomeAdPopup } from '@/components/ads/home-ad-popup';
+import { useNoticeAllowsHomeAd } from '@/components/ads/home-ad-popup-notice-gate';
 import { HomePopupDialog } from '@/components/home/home-notice-popup';
 import { useV1ActivePopup } from '@/hooks/use-v1-api';
 import { isSafePopupTargetPath, resolvePopupTargetScreen } from '@/lib/popup-targets';
@@ -24,21 +26,27 @@ function GlobalPopupForLocation() {
   const targetPath = pathname && isSafePopupTargetPath(pathname) ? pathname : undefined;
   const popupQuery = useV1ActivePopup(screen, targetPath);
   const popup = popupQuery.data?.popup;
+  // 광고 팝업은 홈에서만, 공지 조회가 끝나 띄울 공지가 없을 때만 순서가 온다(공지 우선).
+  const onHome = pathname === HOME_AD_POPUP_PATH;
+  const noticeAllowsAd = useNoticeAllowsHomeAd({ onHome, notice: popupQuery });
 
   return (
-    <HomePopupDialog
-      location={pathname ? `${pathname}${search ? `?${search}` : ''}` : pathname}
-      popup={popup ? {
-        id: popup.popupId,
-        title: popup.title,
-        body: popup.body,
-        content: popup.content,
-        trailing: popup.publishedAt
-          ? new Date(popup.publishedAt).toLocaleDateString('ko-KR')
-          : '팝업',
-        linkUrl: popup.linkUrl,
-        linkLabel: popup.linkLabel,
-      } : null}
-    />
+    <>
+      <HomePopupDialog
+        location={pathname ? `${pathname}${search ? `?${search}` : ''}` : pathname}
+        popup={popup ? {
+          id: popup.popupId,
+          title: popup.title,
+          body: popup.body,
+          content: popup.content,
+          trailing: popup.publishedAt
+            ? new Date(popup.publishedAt).toLocaleDateString('ko-KR')
+            : '팝업',
+          linkUrl: popup.linkUrl,
+          linkLabel: popup.linkLabel,
+        } : null}
+      />
+      {onHome ? <HomeAdPopup noticeAllowsAd={noticeAllowsAd} /> : null}
+    </>
   );
 }

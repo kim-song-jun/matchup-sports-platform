@@ -62,6 +62,11 @@ import { LeagueTemplateDialog } from './league-template-dialog';
 import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
 import { buildLeagueBoard, type LeagueBoardColumn } from '@/lib/league-board-model';
 import {
+  LEAGUE_FIXTURE_CANCEL_HINT,
+  LEAGUE_FIXTURE_DELETE_HINT,
+  leagueFixtureDeleteBlockedReason,
+} from '@/lib/league-fixture-delete';
+import {
   computeDailyPlan,
   dayOffsetLabel,
   MAX_GAMES_PER_DAY,
@@ -95,8 +100,8 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
 }
 
 /**
- * 서버가 경기 삭제(LEAGUE_FIXTURE_NOT_DELETABLE)·팀 바꾸기(FIXTURE_HAS_RESULT)를 막는 조건 — 경기가 시작됐거나
- * 확정(또는 무효) 결과가 있다.
+ * 서버가 팀 바꾸기(FIXTURE_HAS_RESULT)와 템플릿 교체를 막는 조건 — 경기가 시작됐거나
+ * 확정(또는 무효) 결과가 있다. 경기 삭제 가능 여부는 `leagueFixtureDeleteBlockedReason` 이 정한다.
  */
 function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
   // 무효 처리된 결과도 서버에서는 확정 리비전 포인터가 남아 있어 같은 취급이다.
@@ -413,7 +418,7 @@ export default function LeagueMatchFixturesClient({
     actions.push({
       key: 'cancel',
       label: '대진 취소',
-      description: '이 경기를 순위 집계에서 빼요. 되돌릴 수 없어요',
+      description: LEAGUE_FIXTURE_CANCEL_HINT,
       destructive: true,
       disabled: gameInProgress,
       disabledReason: gameInProgress ? '경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요' : null,
@@ -423,14 +428,18 @@ export default function LeagueMatchFixturesClient({
       },
     });
     // 삭제 = 취소 + 대진표에서 숨김. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다(서버와 같은 규칙).
-    const deleteBlocked = row.status !== 'cancelled' && fixtureHasStartedOrResult(row);
+    const deleteBlockedReason = leagueFixtureDeleteBlockedReason({
+      cancelled: row.status === 'cancelled',
+      gameState: row.gameState,
+      hasResult: row.resultStage === 'official' || row.resultStage === 'voided' || row.game?.latestRevision != null,
+    });
     actions.push({
       key: 'delete',
       label: '경기 삭제',
-      description: '대진표에서 이 경기를 지워요. 순위 집계에서도 빠져요',
+      description: LEAGUE_FIXTURE_DELETE_HINT,
       destructive: true,
-      disabled: deleteBlocked,
-      disabledReason: deleteBlocked ? '시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요' : null,
+      disabled: deleteBlockedReason !== null,
+      disabledReason: deleteBlockedReason,
       onSelect: () => {
         setMenuFixture(null);
         setDeleteTarget(row);
@@ -802,6 +811,9 @@ export default function LeagueMatchFixturesClient({
               }
               onCancelFixture={(teamMatchId) =>
                 setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
+              onDeleteFixture={(teamMatchId) =>
+                setDeleteTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
               }
               onShowList={() => setView('list')}
               onAddToWeek={canWrite && !leagueEnded && canAddManualFixture ? openAddFixtureForWeek : undefined}

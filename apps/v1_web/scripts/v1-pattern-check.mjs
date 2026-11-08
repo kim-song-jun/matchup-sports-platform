@@ -130,7 +130,8 @@ function checkInertFontSizeClasses() {
 
 /* ── 모달 스크림 배경 누락 검사 ───────────────────────────────────── */
 // tm-modal-scrim 은 페이드만 정의한다. 배경색은 창마다 넣어서, 빠뜨리면 뒤 화면이 어두워지지 않는다.
-const DARK_SCRIM_CLASS = /[\s"'`]bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/\d+)(?=[\s"'`])/;
+// className= 부터 tm-modal-scrim 이 있는 줄 끝까지만 읽는 근사 검사라 배경 클래스는 그 범위 안에 둔다.
+const DARK_SCRIM_CLASS = /[\s"'`]bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/[1-9]\d*)(?=[\s"'`]|$)/;
 const SCRIMS_WITH_OWN_CSS_BACKGROUND = ['tm-photo-crop-scrim'];
 function checkModalScrimBackground() {
   const files = execSync("grep -rl 'tm-modal-scrim' src --include='*.tsx' --exclude='*.test.tsx' || true", { encoding: 'utf8' });

@@ -13,7 +13,7 @@
 ## 2. 디자인 토큰 — 하드코딩 색/사이즈 금지
 - 색: `var(--blue500)` 등 토큰. 하드코딩 hex/rgba 금지(정당한 OAuth 브랜드색은 명명 토큰화).
   알파 오버레이/스크림도 `--scrim`·`--overlay-text` 류 토큰으로(값 동일하게 정의 후 var() 참조).
-  모달 배경 요소의 `tm-modal-scrim`은 페이드만 정의한다. 새 창에는 `bg-[var(--scrim-dark-32)]`를 함께 넣는다. 어두운 배경이 빠지면 `v1-pattern-check.mjs`가 막는다(기존 `bg-gray-900/40`도 인정한다).
+  모달 배경 요소의 `tm-modal-scrim`은 페이드만 정의한다. 새 창에는 `bg-[var(--scrim-dark-32)]`를 함께 넣는다. `--scrim-*` 토큰이나 기존 `bg-gray-900/숫자`가 없으면 `v1-pattern-check.mjs`가 막는다.
 - 폰트: `globals.css` `:root`의 `--font-size-*` 토큰(치수 토큰은 `tokens.css` `@theme` — `DESIGN.md` §1). `text-[Npx]`/`font-size:Npx` 임의값 금지.
 - 컴포넌트 CSS가 참조하는 토큰은 반드시 `:root`에 정의(미정의 var는 런타임 silent fail — WS1 사고).
 - 다크모드(2026-08-10 도입, `bb9600797`): 사용자가 라이트/다크/시스템을 고른다. 기본값은 light이고 OS 설정을 자동으로

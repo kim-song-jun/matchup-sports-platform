@@ -137,14 +137,16 @@ describe('가입 화면에서 이어 온 이메일 → 원래 계정 로그인 �
     expect(await screen.findByText('이 계정에는 이미 이메일 로그인이 있어요.')).toBeVisible();
   });
 
-  it('보관한 이메일이 이미 이 계정의 이메일이면 제안하지 않는다', async () => {
+  // 서버는 호출자 자신이 쥔 주소의 이메일 로그인 연결을 받아 준다 — 계정 이메일과 같아도 연결 화면까지 이어 간다.
+  it('보관한 이메일이 이 계정의 이메일과 같아도(이메일 로그인은 없는 계정) 연결 화면으로 이어 간다', async () => {
     savePendingEmailLink({ email: TYPED });
     serveAccount(['kakao'], TYPED.toUpperCase());
     mountJourney();
 
-    expect(await screen.findByRole('heading', { level: 1, name: '/home' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: '이메일을 연결할까요?' })).toBeInTheDocument();
+    expect(screen.getByLabelText('이메일')).toHaveValue(TYPED);
+    expect(navigation.replace).toHaveBeenCalledExactlyOnceWith(EMAIL_LINK_ROUTE);
     await waitFor(() => expect(readPendingEmailLink()).toBeNull());
-    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it('가입 화면을 거치지 않고 로그인한 계정에는 아무 제안도 없다', async () => {

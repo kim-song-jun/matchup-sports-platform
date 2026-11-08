@@ -640,6 +640,7 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
       expect(screen.queryByText(/방금 가입하려던 이메일이에요/)).not.toBeInTheDocument();
       expect(postponeButton()).toBeEnabled();
       expect(screen.getByText(POSTPONE_NOTE)).toBeInTheDocument();
+      expect(postponeButton()).toHaveAccessibleDescription(POSTPONE_NOTE);
       expect(sendButton()).toBeDisabled();
       await waitFor(() => expect(readPendingEmailLink()).toBeNull());
     });

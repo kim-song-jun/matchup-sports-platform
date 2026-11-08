@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Button } from '@/components/v1-ui/button';
 
 export type AuthStepAction = {
@@ -27,6 +28,7 @@ export function AuthStepCta({ action, hint, secondary, formId }: {
   secondary?: { label: string; onClick: () => void; note: string };
   formId?: string;
 }) {
+  const noteId = useId();
   return (
     <>
       <button
@@ -46,10 +48,10 @@ export function AuthStepCta({ action, hint, secondary, formId }: {
       ) : null}
       {secondary ? (
         <>
-          <Button block size="md" style={{ marginTop: 8 }} type="button" variant="ghost" onClick={secondary.onClick}>
+          <Button aria-describedby={noteId} block size="md" style={{ marginTop: 8 }} type="button" variant="ghost" onClick={secondary.onClick}>
             {secondary.label}
           </Button>
-          <p className="tm-text-caption tm-auth-fixed-reason">{secondary.note}</p>
+          <p id={noteId} className="tm-text-caption tm-auth-fixed-reason">{secondary.note}</p>
         </>
       ) : null}
     </>

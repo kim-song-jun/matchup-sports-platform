@@ -67,17 +67,15 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
     router.replace(requiredRoute);
   }, [pathname, requiredRoute, routeAllowed, router]);
 
-  if (hasSessionHint === null) return <>{children}</>;
-  if (!hasSessionHint || authMe.isError) return <>{children}</>;
+  // children 은 providers 가 넘기는 형제 배열이다. 분기마다 감싸는 모양이 다르면 React 가 위치를 달리 읽어 앱 셸 전체를
+  // 다시 마운트하므로(폼 초안 유실), 폴백이 아닌 모든 분기는 이 한 모양을 돌려준다.
+  const passthrough = <>{children}{hasSessionHint === true ? emailLinkToast : null}</>;
+  if (hasSessionHint === null) return passthrough;
+  if (!hasSessionHint || authMe.isError) return passthrough;
   if (!authMe.isSuccess) return <SessionFallback />;
   if (requiredRoute && !routeAllowed) return <SessionFallback />;
 
-  return (
-    <>
-      {children}
-      {emailLinkToast}
-    </>
-  );
+  return passthrough;
 }
 
 function isUnauthenticated(error: unknown) {

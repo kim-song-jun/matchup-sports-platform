@@ -101,19 +101,11 @@ describe('usePendingEmailLinkOffer — 원래 계정으로 로그인한 뒤 가�
     expect(readPendingEmailLink()).toBeNull();
   });
 
-  it.each(['typed@example.com', 'Typed@Example.com'])('보관한 이메일이 이미 이 계정의 이메일(%s)이면 제안하지 않고 칸을 비운다', (accountEmail) => {
+  // 서버는 호출자 자신이 쥔 주소를 이메일 로그인 키로 연결하는 것을 받아 준다 — 같은 주소라고 건너뛰면 연결할 길이 막힌다.
+  it.each(['typed@example.com', 'Typed@Example.com', 'contact@example.com'])('이메일 로그인이 없는 계정이면 계정 이메일(%s)이 무엇이든 제안한다', (accountEmail) => {
     savePendingEmailLink({ email: TYPED });
 
     mount(account({ email: accountEmail }));
-
-    expect(router.replace).not.toHaveBeenCalled();
-    expect(readPendingEmailLink()).toBeNull();
-  });
-
-  it('계정 이메일이 다른 주소면(연락용 이메일) 제안한다', () => {
-    savePendingEmailLink({ email: TYPED });
-
-    mount(account({ email: 'contact@example.com' }));
 
     expect(router.replace).toHaveBeenCalledExactlyOnceWith(EMAIL_LINK_ROUTE);
   });
@@ -228,17 +220,17 @@ describe('usePendingEmailLinkOffer — 건너뛴 이유를 알리는 한 줄', (
     render(<Harness me={account({ providers: ['kakao', 'email'], email: 'owner@example.com' })} routed={socialLinkRouted} />);
 
     expect(await screen.findByText(ALREADY_HAS_EMAIL_LOGIN)).toBeVisible();
+    // 일이 된 것이 아니라 알아 둘 사실이라 성공(초록 체크)이 아닌 정보 표시로 보인다.
+    expect(document.querySelector('.lucide-info')).not.toBeNull();
+    expect(document.querySelector('.lucide-check')).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
     expect(readPendingEmailLink()).toBeNull();
   });
 
-  it.each([
-    ['보관한 이메일이 이 계정의 이메일과 같을 때(이메일 로그인은 없는 계정)', { email: 'Typed@Example.com' }, TYPED],
-    ['로그인 수단 목록을 모르는 응답일 때', { providers: null }, null],
-  ])('%s는 이미 있다고 말할 근거가 없어 알리지 않는다', (_label, overrides, stored) => {
-    savePendingEmailLink({ email: stored });
+  it('로그인 수단 목록을 모르는 응답이면 이미 있다고 말할 근거가 없어 알리지 않는다', () => {
+    savePendingEmailLink({ email: null });
 
-    render(<Harness me={account(overrides)} routed={socialLinkRouted} />);
+    render(<Harness me={account({ providers: null })} routed={socialLinkRouted} />);
 
     expect(router.replace).not.toHaveBeenCalled();
     expect(readPendingEmailLink()).toBeNull();

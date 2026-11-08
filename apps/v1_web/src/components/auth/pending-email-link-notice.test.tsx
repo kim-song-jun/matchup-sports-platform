@@ -2,6 +2,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { PendingEmailLinkNotice } from './pending-email-link-notice';
 
 // 9분 30초 남은 기록 — 저장과 렌더가 같은 밀리초면 정확히 10분이 되는 경계를 피한다.
@@ -41,6 +42,17 @@ describe('PendingEmailLinkNotice', () => {
 
     const message = await screen.findByText(/연결을 이어서 도와요/);
     expect(message.textContent).not.toMatch(/카카오|Apple|애플/);
+  });
+
+  // 로그인 뒤 게이트가 소셜 연결 결과를 먼저 처리하며 이메일 뜻을 버린다 — 이어 간다고 안내하면 거짓이 된다.
+  it('소셜 연결 대기가 함께 있으면 이메일 안내를 숨기고, 보관한 뜻은 그대로 둔다', () => {
+    store('typed@example.com');
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+    const { container } = render(<PendingEmailLinkNotice />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(readPendingEmailLink()).not.toBeNull();
+    expect(peekPendingSocialLink()).not.toBeNull();
   });
 
   it('연결 안 하기를 누르면 안내가 사라지고 보관한 뜻도 지워져 로그인해도 이어지지 않는다', async () => {

@@ -21,7 +21,7 @@ const ALREADY_HAS_EMAIL_LOGIN_MESSAGE = '이 계정에는 이미 이메일 로�
  * 돌아갈 곳을 잃지 않게 한다.
  *
  * 제안하지 않고 칸만 비우는 경우:
- * - 이 계정에 이미 이메일 로그인이 있다(이때만 그 사실을 한 줄로 알린다), 또는 보관한 이메일이 이미 이 계정의 이메일이다.
+ * - 이 계정에 이미 이메일 로그인이 있다(이때만 그 사실을 한 줄로 알린다).
  * - 방금 새 소셜 계정으로 가입 중이다(가입을 이어 가는 계정은 원래 계정이 아니다).
  * - 소셜 연결 결과가 대기 중이거나 이미 보였다 — 자동 이동 둘이 서로의 화면을 덮어쓰지 않도록 연결 결과가 먼저다.
  *   (약관 재동의가 남은 계정만 그 일을 마칠 때까지 기다린다. 소셜 연결 리졸버도 같은 조건에서 기다린다.)
@@ -44,7 +44,7 @@ export function usePendingEmailLinkOffer(
   useEffect(() => {
     if (!account || offeredRef.current) return;
 
-    const { onboardingStatus, authProviders, email } = account.user;
+    const { onboardingStatus, authProviders } = account.user;
     if (getPendingSocialSignupRoute(onboardingStatus) !== null || onboardingStatus === PROFILE_DEFERRED_STATUS) {
       clearPendingEmailLink();
       return;
@@ -68,14 +68,9 @@ export function usePendingEmailLinkOffer(
     }
     if (authProviders.includes('email')) {
       clearPendingEmailLink();
-      showToast(ALREADY_HAS_EMAIL_LOGIN_MESSAGE);
+      showToast(ALREADY_HAS_EMAIL_LOGIN_MESSAGE, 'info');
       return;
     }
-    if (pending.email !== null && email?.trim().toLowerCase() === pending.email) {
-      clearPendingEmailLink();
-      return;
-    }
-
     offeredRef.current = true;
     router.replace(emailLinkPath(pending.returnTo));
   }, [account, router, showToast, socialLinkRouted]);

@@ -1,0 +1,150 @@
+import type { Prisma, V1AdCampaign } from '@prisma/client';
+
+export const AD_CHANNELS = ['banner', 'popup'] as const;
+export type AdChannel = (typeof AD_CHANNELS)[number];
+
+export const AD_EVENT_TYPES = ['impression', 'click'] as const;
+export type AdEventType = (typeof AD_EVENT_TYPES)[number];
+
+/** Events for a channel are still counted this long after its window ends (cached responses, tabs left open). */
+export const AD_EVENT_GRACE_MS = 10 * 60 * 1000;
+
+export type AdChannelFields = {
+  imageUrl: string | null;
+  altText: string | null;
+  linkUrl: string | null;
+  startAt: Date | null;
+  endAt: Date | null;
+};
+
+export type AdChannelFieldName = keyof AdChannelFields;
+export type AdChannels = Record<AdChannel, AdChannelFields | null>;
+
+/** A channel is configured as soon as any of its fields is set; a draft may be incomplete. */
+export function hasAnyChannelField(fields: AdChannelFields): boolean {
+  return Object.values(fields).some((value) => value !== null);
+}
+
+const EMPTY_CHANNEL: AdChannelFields = { imageUrl: null, altText: null, linkUrl: null, startAt: null, endAt: null };
+
+export function channelColumns(channel: AdChannel, fields: AdChannelFields | null) {
+  const f = fields ?? EMPTY_CHANNEL;
+  return channel === 'banner'
+    ? { bannerImageUrl: f.imageUrl, bannerAltText: f.altText, bannerLinkUrl: f.linkUrl, bannerStartAt: f.startAt, bannerEndAt: f.endAt }
+    : { popupImageUrl: f.imageUrl, popupAltText: f.altText, popupLinkUrl: f.linkUrl, popupStartAt: f.startAt, popupEndAt: f.endAt };
+}
+
+export function allChannelColumns(channels: AdChannels) {
+  return { ...channelColumns('banner', channels.banner), ...channelColumns('popup', channels.popup) };
+}
+
+type ChannelRow = Pick<
+  V1AdCampaign,
+  | 'bannerImageUrl' | 'bannerAltText' | 'bannerLinkUrl' | 'bannerStartAt' | 'bannerEndAt'
+  | 'popupImageUrl' | 'popupAltText' | 'popupLinkUrl' | 'popupStartAt' | 'popupEndAt'
+>;
+
+export function channelFromRow(row: ChannelRow, channel: AdChannel): AdChannelFields | null {
+  const fields: AdChannelFields = channel === 'banner'
+    ? { imageUrl: row.bannerImageUrl, altText: row.bannerAltText, linkUrl: row.bannerLinkUrl, startAt: row.bannerStartAt, endAt: row.bannerEndAt }
+    : { imageUrl: row.popupImageUrl, altText: row.popupAltText, linkUrl: row.popupLinkUrl, startAt: row.popupStartAt, endAt: row.popupEndAt };
+  return hasAnyChannelField(fields) ? fields : null;
+}
+
+export function channelsFromRow(row: ChannelRow): AdChannels {
+  return { banner: channelFromRow(row, 'banner'), popup: channelFromRow(row, 'popup') };
+}
+
+export function imageUrlsOf(channels: AdChannels): string[] {
+  const urls = AD_CHANNELS.map((channel) => channels[channel]?.imageUrl).filter((url): url is string => Boolean(url));
+  return [...new Set(urls)];
+}
+
+export type AdPublishProblem =
+  | { code: 'AD_CHANNEL_REQUIRED' }
+  | { code: 'AD_CHANNEL_INCOMPLETE'; channel: AdChannel; missing: Array<'imageUrl' | 'altText' | 'linkUrl' | 'startAt' | 'endAt'> }
+  | { code: 'AD_WINDOW_ENDED'; channel: AdChannel };
+
+const REQUIRED_FIELDS = ['imageUrl', 'altText', 'linkUrl', 'startAt', 'endAt'] as const;
+
+/**
+ * What a campaign must satisfy to be live: one channel at least, and every configured channel carries an
+ * image, its alt text, a link and a window. `requireFutureEnd` is only for the publish transition; editing an already
+ * published campaign whose window has passed must not fail on the date.
+ */
+export function findPublishProblems(channels: AdChannels, now: Date, requireFutureEnd: boolean): AdPublishProblem[] {
+  const problems: AdPublishProblem[] = [];
+  const configured = AD_CHANNELS.filter((channel) => channels[channel] !== null);
+  if (configured.length === 0) return [{ code: 'AD_CHANNEL_REQUIRED' }];
+  for (const channel of configured) {
+    const fields = channels[channel] as AdChannelFields;
+    const missing = REQUIRED_FIELDS.filter((name) => fields[name] === null);
+    if (missing.length > 0) {
+      problems.push({ code: 'AD_CHANNEL_INCOMPLETE', channel, missing: [...missing] });
+    } else if (requireFutureEnd && (fields.endAt as Date).getTime() <= now.getTime()) {
+      problems.push({ code: 'AD_WINDOW_ENDED', channel });
+    }
+  }
+  return problems;
+}
+
+/** Another published campaign whose window on this channel intersects [startAt, endAt). Touching edges do not overlap. */
+export function overlapWhere(
+  channel: AdChannel,
+  window: { startAt: Date; endAt: Date },
+  excludeCampaignId: string,
+): Prisma.V1AdCampaignWhereInput {
+  return channel === 'banner'
+    ? { id: { not: excludeCampaignId }, status: 'published', bannerStartAt: { lt: window.endAt }, bannerEndAt: { gt: window.startAt } }
+    : { id: { not: excludeCampaignId }, status: 'published', popupStartAt: { lt: window.endAt }, popupEndAt: { gt: window.startAt } };
+}
+
+/** `startAt <= now < endAt` on a published campaign. */
+export function servingWhere(channel: AdChannel, now: Date): Prisma.V1AdCampaignWhereInput {
+  return channel === 'banner'
+    ? { status: 'published', bannerImageUrl: { not: null }, bannerAltText: { not: null }, bannerLinkUrl: { not: null }, bannerStartAt: { lte: now }, bannerEndAt: { gt: now } }
+    : { status: 'published', popupImageUrl: { not: null }, popupAltText: { not: null }, popupLinkUrl: { not: null }, popupStartAt: { lte: now }, popupEndAt: { gt: now } };
+}
+
+/** Whether an event for this channel lands inside its window. The caller has already limited rows to published campaigns. */
+export function acceptsEvents(row: ChannelRow, channel: AdChannel, now: Date): boolean {
+  const fields = channelFromRow(row, channel);
+  if (!fields?.imageUrl || !fields.startAt || !fields.endAt) return false;
+  return fields.startAt.getTime() <= now.getTime() && now.getTime() < fields.endAt.getTime() + AD_EVENT_GRACE_MS;
+}
+
+export type AdChannelPhase = 'scheduled' | 'live' | 'ended';
+
+/** Derived, never stored. Only a published campaign has a phase. */
+export function channelPhase(
+  status: V1AdCampaign['status'],
+  fields: AdChannelFields | null,
+  now: Date,
+): AdChannelPhase | null {
+  if (status !== 'published' || !fields?.startAt || !fields.endAt) return null;
+  if (now.getTime() < fields.startAt.getTime()) return 'scheduled';
+  return now.getTime() < fields.endAt.getTime() ? 'live' : 'ended';
+}
+
+export type PublicAd = {
+  campaignId: string;
+  advertiserName: string;
+  imageUrl: string;
+  altText: string;
+  linkUrl: string;
+};
+
+export function toPublicAd(
+  row: Pick<V1AdCampaign, 'id' | 'advertiserName'> & ChannelRow,
+  channel: AdChannel,
+): PublicAd | null {
+  const fields = channelFromRow(row, channel);
+  if (!fields?.imageUrl || !fields.altText || !fields.linkUrl) return null;
+  return {
+    campaignId: row.id,
+    advertiserName: row.advertiserName,
+    imageUrl: fields.imageUrl,
+    altText: fields.altText,
+    linkUrl: fields.linkUrl,
+  };
+}

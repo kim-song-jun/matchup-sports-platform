@@ -267,6 +267,27 @@ describe('NotificationsService', () => {
     expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
   });
 
+  it('이메일 변경 보안 알림은 알림 설정과 무관하게 가린 새 주소를 싣고 설정 화면으로 보낸다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: false });
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
+
+    const created = await service.createInTransaction(prisma as unknown as Prisma.TransactionClient, 'user-1', 'email_changed', {
+      vars: { name: 'ne***@example.com' },
+    });
+
+    expect(created).toMatchObject({ targetType: 'system', targetId: null, deepLink: '/my/settings' });
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        targetType: 'system',
+        title: '계정 이메일이 바뀌었어요',
+        body: '이메일이 ne***@example.com(으)로 바뀌었어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+        deepLink: '/my/settings',
+      }),
+    });
+    expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
+  });
+
   it('같은 businessKey 의 보안 알림이 이미 있으면 두 번 만들지 않는다', async () => {
     prisma.v1Notification.findUnique.mockResolvedValue({ id: 'existing' });
 

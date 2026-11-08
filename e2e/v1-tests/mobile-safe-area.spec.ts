@@ -203,7 +203,7 @@ test.describe('mobile safe area and touch', () => {
     await setNativeBottom(page, 0);
     await page.evaluate(() => { document.documentElement.dataset.teameetNativeKeyboard = 'open'; });
     await page.locator('#v1-profile-nickname').fill('임시검수이름');
-    await expect(page.getByText('변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.')).toBeVisible();
+    await expect(page.getByText('변경한 닉네임은 중복 확인 후 저장할 수 있어요.')).toBeVisible();
     const notice = page.locator('#v1-profile-edit-form .tm-on-tint');
     const scroller = page.locator('.tm-scroll-area');
     const actions = page.locator('.tm-my-profile-edit-cta');

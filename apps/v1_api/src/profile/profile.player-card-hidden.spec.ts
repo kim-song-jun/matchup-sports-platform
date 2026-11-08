@@ -6,7 +6,7 @@ function createProfileService(
   prisma: unknown,
   realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
 ): ProfileService {
-  return new ProfileService(prisma as never, realtimeGateway);
+  return new ProfileService(prisma as never, realtimeGateway, { createInTransaction: jest.fn(), deliverCreated: jest.fn() } as never);
 }
 
 /**

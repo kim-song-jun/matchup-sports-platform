@@ -8,6 +8,7 @@ import { syncGameSideRoster } from '../../src/games/roster/game-roster-sync';
 import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
 import { recordSignupConsent } from '../../src/auth/signup-record-consent';
 import { ProfileService } from '../../src/profile/profile.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 import type { RealtimeGateway } from '../../src/realtime/realtime.gateway';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
@@ -237,7 +238,11 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
     );
 
     // A system default must remain reversible through the actual settings service.
-    const profile = new ProfileService(prisma, { forceDisconnectUser: jest.fn() } as unknown as RealtimeGateway);
+    const profile = new ProfileService(
+      prisma,
+      { forceDisconnectUser: jest.fn() } as unknown as RealtimeGateway,
+      { createInTransaction: jest.fn(), deliverCreated: jest.fn() } as unknown as NotificationsService,
+    );
     await profile.updateMyRecordConsent(authUser(ids.targetUser), { granted: false, policyHash: 'explicit-private' });
     expect((await userRecords.getRecords(ids.targetUser, {})).items).toHaveLength(0);
     await prisma.$transaction(tx => recordSignupConsent(tx, ids.targetUser, undefined));

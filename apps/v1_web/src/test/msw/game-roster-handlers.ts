@@ -95,6 +95,8 @@ export function createV1GameRosterMswHandlers() {
     joinedAfter: new Set<string>(),
     /** 계정 실명 — 서버처럼 운영진(ADMIN·STAFF) 응답에만 싣는다. */
     realNames: new Map<string, string>(),
+    /** 정지 규정이 없는 다른 대회에 속한 경기 — 규정·카드 누적이 null 이고 대회 id 가 다르다. */
+    rulelessGames: new Set<string>(),
     /** 대진 수정으로 이 팀이 더는 뛰지 않는 경기 — 표에서 빠지고 일괄 저장은 404 GAME_SIDE_NOT_FOUND. */
     detached: new Set<string>(),
   };
@@ -213,15 +215,15 @@ export function createV1GameRosterMswHandlers() {
       gameId: game.gameId,
       sideId: game.sideId,
       teamMatchId: roster.teamMatchId,
-      competitionId: roster.competitionId,
+      competitionId: state.rulelessGames.has(game.gameId) ? 'other-competition' : roster.competitionId,
       competitionKind: roster.competitionKind,
-      competitionTitle: '성수 풋살컵',
+      competitionTitle: state.rulelessGames.has(game.gameId) ? '다른 풋살컵' : '성수 풋살컵',
       opponentName: game.opponentName,
       scheduledAt: game.startAt,
       gameState: roster.gameState,
       editable: roster.editable || (roster.gameState === 'ENDED' && state.viewerRole === 'ADMIN' && canWrite()),
       goalkeeperEditable: roster.goalkeeperEditable,
-      disciplineRules: roster.disciplineRules,
+      disciplineRules: state.rulelessGames.has(game.gameId) ? null : roster.disciplineRules,
       summary: {
         participating: roster.counts.participating,
         excluded: roster.counts.excluded,
@@ -236,7 +238,7 @@ export function createV1GameRosterMswHandlers() {
       ...(['ADMIN', 'STAFF'].includes(state.viewerRole) && state.realNames.has(p.userId) ? { realName: state.realNames.get(p.userId) } : {}),
       accountLinked: true,
       cells: views.map(({ roster }): V1TeamRosterCell => {
-        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, cards: cardsOf(p.userId), goalkeeper: state.goalkeepers.get(p.userId) ?? false };
+        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, cards: state.rulelessGames.has(roster.gameId) ? null : cardsOf(p.userId), goalkeeper: state.goalkeepers.get(p.userId) ?? false };
         const ex = roster.excluded.find((e) => e.userId === p.userId);
         if (ex) return { ...empty, gameId: roster.gameId, status: 'EXCLUDED', reason: ex.reason, actorRole: ex.actor.role, adjustmentId: ex.adjustmentId };
         const un = roster.unavailable.find((u) => u.userId === p.userId);
@@ -498,6 +500,10 @@ export function createV1GameRosterMswHandlers() {
     },
     setCards(userId: string, yellowTotal: number, redTotal = 0) {
       state.cards.set(userId, { yellowTotal, redTotal });
+    },
+    /** 이 경기를 규정 없는 다른 대회 소속으로 — 팀 경기 목록에서 규정 있는 대회 경기보다 앞에 놓을 때 쓴다. */
+    setGameWithoutRules(gameId: string) {
+      state.rulelessGames.add(gameId);
     },
     markJoinedAfterFixture(userId: string) {
       state.joinedAfter.add(userId);

@@ -12,6 +12,7 @@ import { Prisma, V1AuthProvider, V1VerificationChannel, V1VerificationPurpose } 
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { releaseExpiredSignupPhone } from '../auth/empty-signup-account';
 import { pendingAccountLinkClaims, signInThenLinkConflict } from '../auth/social-link-conflict';
 import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -159,6 +160,8 @@ export class VerificationService {
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
     const token = await this.checkPendingCode(authUser.id, channel, 'contact', code);
+    // The code proved the number is theirs; an expired, abandoned signup holding it no longer blocks the save below.
+    if (channel === 'phone') await releaseExpiredSignupPhone(this.prisma, token.target, authUser.id);
 
     const now = new Date();
     try {

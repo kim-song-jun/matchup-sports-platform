@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { PHONE_PROOF_TTL_SECONDS } from '../verification/phone-proof-token';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { PhoneIssueDto, PhoneVerifyDto } from './dto/phone-verification.dto';
 
@@ -26,6 +27,7 @@ export class PhoneVerificationPublicController {
     return {
       verified: true,
       proofToken: this.phoneVerification.issueProof(dto.phone, dto.purpose),
+      proofExpiresInSeconds: PHONE_PROOF_TTL_SECONDS,
       registered: registration.registered,
       withdrawalPendingUntil: registration.withdrawalPendingUntil,
     };

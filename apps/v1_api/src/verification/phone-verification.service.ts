@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { releaseExpiredSignupPhone } from '../auth/empty-signup-account';
 import { findPhoneRegistration } from './phone-registered';
 import { isPhoneVerificationEnforced } from './phone-verification-access';
 import { issuePhoneProofToken, type PhoneProofPurpose } from './phone-proof-token';
@@ -120,8 +121,12 @@ export class PhoneVerificationService {
     }
   }
 
-  /** Only answer this after verifyCode() has proven the caller holds the number. */
-  lookupRegistration(phone: string) {
+  /**
+   * Only answer this after verifyCode() has proven the caller holds the number. A number held by an expired,
+   * abandoned social signup is released first, so it is reported as free.
+   */
+  async lookupRegistration(phone: string) {
+    await releaseExpiredSignupPhone(this.prisma, phone);
     return findPhoneRegistration(this.prisma, phone);
   }
 

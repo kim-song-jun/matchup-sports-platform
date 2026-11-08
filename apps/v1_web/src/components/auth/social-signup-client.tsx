@@ -65,8 +65,14 @@ export function SocialSignupClient() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
-  const [step, setStep] = useState<SocialStep>('nickname');
+  // 첫 단계는 가입 상태(/auth/me)를 읽은 뒤에 정한다 — 읽기 전에 닉네임 칸을 그렸다가 번호 단계로 바뀌는 깜빡임을 막는다.
+  const [resolvedStep, setStep] = useState<SocialStep | null>(null);
+  const step: SocialStep = resolvedStep ?? 'nickname';
+  // 번호를 맨 앞에서 받는다. 카카오가 준 번호나 이미 인증을 마친 번호가 있으면 이 단계를 건너뛴다.
+  const [phoneStepRequired, setPhoneStepRequired] = useState(false);
   const [editPhone, setEditPhone] = useState(false);
+  // 확인 화면의 "번호 변경"으로 돌아온 경우 — 번호만 고치고 확인 화면으로 돌아간다.
+  const [returnToReview, setReturnToReview] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState(false);
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 번호 중복 409 가 준 기존 계정 로그인·연결 시도 안내. 토큰이 있어야 연결을 시도할 수 있다.
@@ -111,10 +117,16 @@ export function SocialSignupClient() {
 
   // 정보 입력을 미룬 계정이 활동 시도 중 돌아온 화면 — 가입 모드와 달리 건너뛰기가 없고 입력 뒤 원래 화면으로 간다.
   const activityMode = authMe.data?.user?.onboardingStatus === 'social_profile_deferred';
-  const statusPending = authMe.isPending === true;
   // 건너뛰기는 가입 직후 상태가 확인된 때만 — 조회 실패나 이미 미룬 계정에는 보이지 않는다.
   const signupMode = authMe.data?.user?.onboardingStatus === 'social_profile_required';
   const lockedKakaoPhone = signupMode && authProvider === 'kakao' && Boolean(prefill?.phone);
+  // 번호를 맨 앞에서 받으므로, 인증을 마치고 돌아온 가입(또는 이어 입력)은 인증된 번호를 이미 쥐고 있다.
+  const verifiedPhoneOnFile = authMe.data?.verification?.phoneVerified === true && Boolean(authMe.data.user?.phone);
+  if (resolvedStep === null && authMe.isPending !== true) {
+    const needsPhone = !lockedKakaoPhone && !verifiedPhoneOnFile;
+    setPhoneStepRequired(needsPhone);
+    setStep(needsPhone ? 'phone' : 'nickname');
+  }
   const [activitySeeded, setActivitySeeded] = useState(false);
   useEffect(() => {
     if (!activityMode || activitySeeded || !authMe.data) return;
@@ -128,6 +140,17 @@ export function SocialSignupClient() {
     if (authMe.data.verification?.phoneVerified) setPhoneVerified(true);
     setActivitySeeded(true);
   }, [activityMode, activitySeeded, authMe.data]);
+
+  const [phoneSeeded, setPhoneSeeded] = useState(false);
+  useEffect(() => {
+    // 이어 입력 모드는 위에서 이미 이어받는다. 가입 중에는 카카오가 준 번호가 우선이다.
+    if (!signupMode || phoneSeeded || lockedKakaoPhone || !authMe.data) return;
+    if (verifiedPhoneOnFile && authMe.data.user?.phone) {
+      setPhoneDigits(normalizeSeparatedDigits(authMe.data.user.phone));
+      setPhoneVerified(true);
+    }
+    setPhoneSeeded(true);
+  }, [signupMode, phoneSeeded, lockedKakaoPhone, verifiedPhoneOnFile, authMe.data]);
 
   const [prefillApplied, setPrefillApplied] = useState(false);
   useEffect(() => {
@@ -147,12 +170,13 @@ export function SocialSignupClient() {
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const signupPending = completeProfile.isPending || deferProfile.isPending || termsRecoveryPending;
-  const isBlocked = signupPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
+  // 번호를 고치고 인증 없이 확인 화면으로 돌아올 수 있으므로 인증 상태도 제출 조건이다.
+  const isBlocked = signupPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null || !contactReady;
   const steps: SocialStep[] = [
+    ...(phoneStepRequired || editPhone || step === 'phone' ? ['phone' as const] : []),
     'nickname',
     ...(!lockedGender || step === 'gender' ? ['gender' as const] : []),
     ...(!lockedName || step === 'name' ? ['name' as const] : []),
-    ...(!kakaoPhoneAccepted || editPhone || step === 'phone' ? ['phone' as const] : []),
     ...(!prefill?.birthDate || !isSignupAgeEligible(prefill.birthDate) || editBirthDate || step === 'birthDate' ? ['birthDate' as const] : []),
     'review',
   ];
@@ -161,7 +185,7 @@ export function SocialSignupClient() {
     nickname: { title: '어떤 닉네임으로 활동할까요?', sub: '다른 사람에게 보여 줄 이름이에요.' },
     gender: { title: '성별을 선택해 주세요', sub: '경기와 대회 참가 조건을 확인할 때 사용해요.' },
     name: { title: '이름을 입력해 주세요', sub: '실명 또는 확인 가능한 이름을 알려 주세요.' },
-    phone: { title: '휴대폰 번호를 확인해 주세요', sub: '직접 입력한 번호는 인증이 필요해요.' },
+    phone: { title: '휴대폰 번호를 확인해 주세요', sub: '직접 입력한 번호는 인증이 필요해요. 이미 가입한 번호인지도 함께 확인해요.' },
     birthDate: { title: '생년월일을 입력해 주세요', sub: '만 14세 이상만 가입할 수 있어요.' },
     review: { title: '입력한 정보를 확인해 주세요', sub: '제공받은 정보와 직접 입력한 정보를 함께 확인해 주세요.' },
   };
@@ -172,9 +196,15 @@ export function SocialSignupClient() {
   const nextStep = () => {
     if (!stepReady || signupPending) return;
     setError(null);
+    if (step === 'phone' && returnToReview) {
+      setReturnToReview(false);
+      setStep('review');
+      return;
+    }
     setStep(steps[Math.min(stepIndex + 1, steps.length - 1)]);
   };
   const goBack = () => {
+    if (returnToReview) { setError(null); setReturnToReview(false); setStep('review'); return; }
     if (stepIndex > 0) { setError(null); setStep(steps[stepIndex - 1]); return; }
     if (activityMode) router.replace(continuationPath());
     else void exitFlow.exit();
@@ -321,6 +351,7 @@ export function SocialSignupClient() {
 
           if (nextError instanceof V1ApiError && nextError.code === 'PHONE_CONFLICT') {
             setEditPhone(true);
+            setReturnToReview(true);
             setStep('phone');
             recordConflictHint(nextError);
             setPhoneConflict(true);
@@ -344,6 +375,7 @@ export function SocialSignupClient() {
 
           if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
             setEditPhone(true);
+            setReturnToReview(true);
             setStep('phone');
             setError('휴대폰 본인인증을 완료해 주세요.');
             setPhoneVerified(false);
@@ -367,10 +399,10 @@ export function SocialSignupClient() {
       stage={AUTH_WELCOME_STAGE}
       topTitle={activityMode ? '활동 정보 입력' : providerLabel ? `${providerLabel} 가입` : '간편 가입'}
       onBack={goBack}
-      backLabel={stepIndex > 0 ? '이전 단계' : activityMode ? '돌아가기' : '가입 그만두기'}
+      backLabel={stepIndex > 0 || returnToReview ? '이전 단계' : activityMode ? '돌아가기' : '가입 그만두기'}
     >
-      <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={handleFormSubmit}>
-        {!statusPending ? <AuthStepHeader name="가입" steps={steps} index={stepIndex} title={stepCopy[step].title} sub={stepCopy[step].sub} focusOnChange /> : null}
+      {resolvedStep === null ? null : <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={handleFormSubmit}>
+        <AuthStepHeader name="가입" steps={steps} index={stepIndex} title={stepCopy[step].title} sub={stepCopy[step].sub} focusOnChange />
         <div className="tm-auth-form tm-auth-signup-form">
           {step === 'nickname' ? (
             <label className="tm-auth-field">
@@ -412,7 +444,7 @@ export function SocialSignupClient() {
               <div className={styles.row}><dt>닉네임</dt><dd>{nickname}</dd></div>
               <div className={styles.row}><dt>이름</dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
               <div className={styles.row}><dt>성별</dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
-              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : '인증 완료'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setStep('phone'); }}>번호 변경</button> : null}</div>
+              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : contactReady ? '인증 완료' : '인증 필요'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setReturnToReview(true); setStep('phone'); }}>번호 변경</button> : null}</div>
               <div className={styles.row}><dt>생년월일</dt><dd>{formatBirthDate(birthDateDigits)}</dd><button className={styles.edit} type="button" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</button></div>
             </dl>
             {signupMode ? <p className={styles.next}>다음으로 관심 종목을 선택해요.</p> : null}
@@ -426,7 +458,7 @@ export function SocialSignupClient() {
           </Button>
           {signupMode && step !== 'review' ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div></> : null}
         </div>
-      </form>
+      </form>}
       {exitFlow.ConfirmModal}
     </AuthFrame>
   );

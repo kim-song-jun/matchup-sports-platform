@@ -54,8 +54,8 @@ describe('EmailVerifyBanner — 닫기와 다시 보이기', () => {
     expect(screen.getByText(REASON)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '인증하기' })).toHaveAttribute('href', '/my/email-verify?redirect=%2Fmy');
     // 공지는 문구에만 — 버튼·링크는 라이브 리전 밖에 있어야 낭독기가 조작 요소를 공지로 읽지 않는다.
-    const status = screen.getByRole('status');
-    expect(status).toHaveTextContent(REASON);
+    const status = screen.getByText(REASON);
+    expect(status).toHaveAttribute('role', 'status');
     expect(status).not.toContainElement(screen.getByRole('link', { name: '인증하기' }));
     expect(status).not.toContainElement(screen.getByRole('button', { name: '이메일 인증 안내 닫기' }));
   });

@@ -6,6 +6,7 @@ import {
   createV1SessionToken,
   readV1Session,
   readV1SessionAgeSeconds,
+  reissueV1SessionCookie,
   v1IdentityUserWhere,
   resolveV1RequestIdentity,
   clearV1SessionCookie,
@@ -234,6 +235,58 @@ describe('v1 signed session', () => {
       expect.objectContaining({ domain: 'teameet.co.kr' }),
     );
     expect(response.clearCookie).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('reissueV1SessionCookie', () => {
+  const issuedAt = NOW_MS - 20 * 60 * 1_000;
+  const cookieHeader = `${V1_SESSION_COOKIE_NAME}=${createV1SessionToken({ userId: 'user-1', sessionEpoch: 3, secret: SESSION_SECRET, issuedAtMs: issuedAt })}`;
+  const configuration = { nodeEnv: 'production', sessionSecret: SESSION_SECRET, nowMs: NOW_MS } as const;
+
+  it('re-signs under the new epoch and keeps the issue time, so a re-signed cookie is exactly as old as the one it replaces', () => {
+    const response = { cookie: jest.fn() };
+
+    expect(reissueV1SessionCookie(response, cookieHeader, 4, configuration)).toBe(true);
+
+    const token = response.cookie.mock.calls[0][1] as string;
+    const reissued = `${V1_SESSION_COOKIE_NAME}=${token}`;
+    expect(readV1Session(reissued, { secret: SESSION_SECRET, nowMs: NOW_MS })).toEqual({ userId: 'user-1', sessionEpoch: 4 });
+    // The recent-login rule reads this age; a fresh issue time would hand a stale session a new 30 minutes.
+    expect(readV1SessionAgeSeconds(reissued, { secret: SESSION_SECRET, nowMs: NOW_MS })).toBe(20 * 60);
+    expect(readV1SessionAgeSeconds(cookieHeader, { secret: SESSION_SECRET, nowMs: NOW_MS })).toBe(20 * 60);
+  });
+
+  it('keeps the original expiry: the browser cookie lives only for what is left of the seven days', () => {
+    const response = { cookie: jest.fn() };
+
+    reissueV1SessionCookie(response, cookieHeader, 4, configuration);
+
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1_000;
+    expect(response.cookie).toHaveBeenCalledWith(
+      V1_SESSION_COOKIE_NAME,
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: sevenDaysMs - 20 * 60 * 1_000 }),
+    );
+    const token = response.cookie.mock.calls[0][1] as string;
+    const stillValidJustBeforeExpiry = { secret: SESSION_SECRET, nowMs: issuedAt + sevenDaysMs - 1_000 };
+    const expiredAtOriginalExpiry = { secret: SESSION_SECRET, nowMs: issuedAt + sevenDaysMs };
+    expect(readV1Session(`${V1_SESSION_COOKIE_NAME}=${token}`, stillValidJustBeforeExpiry)).not.toBeNull();
+    expect(readV1Session(`${V1_SESSION_COOKIE_NAME}=${token}`, expiredAtOriginalExpiry)).toBeNull();
+  });
+
+  it('writes nothing for a request without a valid cookie session (a non-production header identity, a forged cookie)', () => {
+    const response = { cookie: jest.fn() };
+    const forged = cookieHeader.slice(0, -3) + 'abc';
+
+    expect(reissueV1SessionCookie(response, undefined, 4, configuration)).toBe(false);
+    expect(reissueV1SessionCookie(response, forged, 4, configuration)).toBe(false);
+    expect(response.cookie).not.toHaveBeenCalled();
+  });
+
+  it('refuses to run without a session secret in production instead of silently skipping the cookie', () => {
+    expect(() => reissueV1SessionCookie({ cookie: jest.fn() }, cookieHeader, 4, { nodeEnv: 'production', sessionSecret: undefined })).toThrow(
+      V1SessionConfigurationError,
+    );
   });
 });
 

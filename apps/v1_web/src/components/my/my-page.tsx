@@ -18,6 +18,7 @@ import { CalendarDays, Award,
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Smartphone,
   Star,
   UserCheck,
   Users,
@@ -74,6 +75,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Send,
   ShieldCheck,
   UserCheck,
+  Smartphone,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {

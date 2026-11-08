@@ -138,6 +138,18 @@ export function readCurrentV1SessionAgeSeconds(cookieHeader: string | undefined)
   return isStrongSessionSecret(sessionSecret) ? readV1SessionAgeSeconds(cookieHeader, { secret: sessionSecret }) : null;
 }
 
+/** What a request's cookie session proves: how long ago it was issued and under which epoch. Null without a valid cookie session. */
+export type V1SessionProof = { readonly ageSeconds: number; readonly sessionEpoch: number };
+
+export function readCurrentV1SessionProof(cookieHeader: string | undefined): V1SessionProof | null {
+  const { sessionSecret } = currentRuntimeConfiguration();
+  if (!isStrongSessionSecret(sessionSecret)) return null;
+  const payload = readVerifiedPayload(cookieHeader, { secret: sessionSecret });
+  if (!payload) return null;
+  const nowSeconds = Math.floor(Date.now() / 1_000);
+  return { ageSeconds: Math.max(0, nowSeconds - payload.iat), sessionEpoch: payload.ep ?? 0 };
+}
+
 function readVerifiedPayload(
   cookieHeader: string | undefined,
   configuration: { readonly secret: string; readonly nowMs?: number },
@@ -219,6 +231,35 @@ export function writeV1SessionCookie(
     issuedAtMs: configuration.nowMs,
   });
   response.cookie(V1_SESSION_COOKIE_NAME, token, cookieOptions(configuration.nodeEnv));
+  return true;
+}
+
+/**
+ * Re-signs the cookie session the request arrived with under a new epoch, for the one device that asked for the epoch
+ * bump. The issue time carries over, so the 30-minute recent-login window and the 7-day lifetime do not restart: only
+ * a real sign-in may do that. Returns false when the request had no cookie session (a non-production header identity).
+ */
+export function reissueV1SessionCookie(
+  response: Pick<V1SessionCookieResponse, 'cookie'>,
+  cookieHeader: string | undefined,
+  sessionEpoch: number,
+  configuration: V1SessionRuntimeConfiguration = currentRuntimeConfiguration(),
+): boolean {
+  if (!isStrongSessionSecret(configuration.sessionSecret)) {
+    assertV1SessionRuntimeConfiguration(configuration);
+    return false;
+  }
+  const payload = readVerifiedPayload(cookieHeader, { secret: configuration.sessionSecret, nowMs: configuration.nowMs });
+  if (!payload) return false;
+
+  const token = createV1SessionToken({
+    userId: payload.sub,
+    sessionEpoch,
+    secret: configuration.sessionSecret,
+    issuedAtMs: payload.iat * 1_000,
+  });
+  const remainingMs = payload.exp * 1_000 - (configuration.nowMs ?? Date.now());
+  response.cookie(V1_SESSION_COOKIE_NAME, token, { ...cookieOptions(configuration.nodeEnv), maxAge: remainingMs });
   return true;
 }
 

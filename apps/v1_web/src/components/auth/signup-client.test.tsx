@@ -946,21 +946,24 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
 
     expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email?redirect=%2Fmatches%2Fabc');
     expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account?redirect=%2Fmatches%2Fabc');
-    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /카카오로만 로그인할래요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
   });
 
-  it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면 안내를 준다(웹에서는 카카오만)', async () => {
+  it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면으로 가는 두 줄을 준다(웹에서는 카카오만)', async () => {
     hooks.phoneVerifyMutateAsync.mockResolvedValue(registeredResponse());
     render(<SignupClient />);
     await verifyPhone();
     await screen.findByText(CARD_TITLE);
 
-    const row = screen.getByRole('link', { name: /카카오.*로 가입했어요/ });
-    expect(row).toHaveAttribute('href', '/login');
-    expect(row).toHaveTextContent('카카오로 가입했어요');
-    expect(row).toHaveTextContent('로그인 첫 화면에서 그 버튼을 눌러요');
+    const linkRow = screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ });
+    const loginOnlyRow = screen.getByRole('link', { name: /카카오로만 로그인할래요/ });
+    expect(linkRow).toHaveAttribute('href', '/login');
+    expect(loginOnlyRow).toHaveAttribute('href', '/login');
+    expect(loginOnlyRow).toHaveTextContent('이메일은 연결하지 않고 로그인만 해요');
     // 웹에는 Apple 버튼이 없어 Apple 을 언급하지 않는다.
-    expect(row).not.toHaveTextContent('Apple');
+    expect(linkRow).not.toHaveTextContent('Apple');
+    expect(loginOnlyRow).not.toHaveTextContent('Apple');
   });
 
   /** 링크 핸들러는 그대로 돌리되 jsdom 이 실제 이동을 시도하지 않게 막는다. */
@@ -969,36 +972,37 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     fireEvent.click(link);
   }
 
-  it('이메일을 적기 전(첫 인증)에는 소셜 줄이 이메일 연결을 약속하지 않고, 눌러도 아무것도 보관하지 않는다', async () => {
+  // 번호 인증이 첫 단계라 보통은 이메일을 적기 전에 겹친다 — 뜻만 보관하고 이메일은 로그인한 뒤 직접 적는다.
+  it('이메일을 적기 전(첫 인증)에는 연결 줄이 이메일을 직접 적는다고 안내하고, 눌러도 이메일 없이 뜻만 보관한다', async () => {
     hooks.phoneVerifyMutateAsync.mockResolvedValue(registeredResponse());
     render(<SignupClient />);
     await verifyPhone();
     await screen.findByText(CARD_TITLE);
 
-    const row = screen.getByRole('link', { name: /카카오.*로 가입했어요/ });
-    expect(row).toHaveTextContent('로그인 첫 화면에서 그 버튼을 눌러요.');
-    expect(row).not.toHaveTextContent('이메일도 연결할 수 있어요');
+    const row = screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ });
+    expect(row).toHaveTextContent('로그인하면 연결할 이메일을 직접 적어요. 비밀번호는 저장하지 않아요.');
+    expect(readPendingEmailLink()).toBeNull();
 
     clickLink(row);
 
-    expect(readPendingEmailLink()).toBeNull();
-    expect(window.sessionStorage.getItem(PENDING_EMAIL_LINK_STORAGE_KEY)).toBeNull();
+    expect(readPendingEmailLink()).toEqual({ email: null, returnTo: null });
   });
 
-  it('이메일을 적고 인증 단계로 되돌아온 경우에만, 소셜 줄이 로그인한 뒤 방금 입력한 이메일도 연결할 수 있다고 알린다', async () => {
+  it('이메일을 적고 인증 단계로 되돌아온 경우에는, 연결 줄이 그 이메일을 바로 이어서 연결한다고 알린다', async () => {
     await reachCardWithEmailTyped();
 
-    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveTextContent('로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.');
-    // 이 문장은 소셜 줄에만 있다 — 다른 두 줄은 그 약속을 하지 않는다.
-    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).not.toHaveTextContent('연결할 수 있어요');
-    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toHaveTextContent('연결할 수 있어요');
+    expect(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ }))
+      .toHaveTextContent('로그인하면 signup@example.com 연결을 바로 이어서 도와요. 비밀번호는 저장하지 않아요.');
+    // 이 약속은 연결 줄에만 있다 — 다른 줄은 하지 않는다.
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).not.toHaveTextContent('연결');
+    expect(screen.getByRole('link', { name: /카카오로만 로그인할래요/ })).not.toHaveTextContent('signup@example.com');
   });
 
-  it('소셜 줄을 눌러 로그인 첫 화면으로 나가면 입력했던 이메일만 이 탭에 보관하고, 비밀번호는 어디에도 쓰지 않는다', async () => {
+  it('연결 줄을 눌러 로그인 첫 화면으로 나가면 입력했던 이메일과 뜻만 이 탭에 보관하고, 비밀번호는 어디에도 쓰지 않는다', async () => {
     await reachCardWithEmailTyped();
     expect(readPendingEmailLink()).toBeNull();
 
-    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+    clickLink(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ }));
 
     expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: null });
     const stored = JSON.parse(window.sessionStorage.getItem(PENDING_EMAIL_LINK_STORAGE_KEY) as string) as Record<string, unknown>;
@@ -1006,21 +1010,26 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     expect(storedText()).not.toContain(ACCOUNT_PASSWORD);
   });
 
-  it('원래 가려던 곳(redirect)이 있으면 이메일과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {
+  it('원래 가려던 곳(redirect)이 있으면 뜻과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {
     window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
     await reachCardWithEmailTyped();
 
-    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+    clickLink(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ }));
 
     expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: '/matches/abc' });
   });
 
-  it('이메일 로그인이나 계정 찾기로 나갈 때는 이메일을 적었어도 보관하지 않는다', async () => {
+  it('이메일 로그인·로그인만·계정 찾기로 나갈 때는 이메일을 적었어도 보관하지 않고, 앞서 보관한 뜻도 거둔다', async () => {
     await reachCardWithEmailTyped();
 
     clickLink(screen.getByRole('link', { name: /이메일로 가입했어요/ }));
+    clickLink(screen.getByRole('link', { name: /카카오로만 로그인할래요/ }));
     clickLink(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ }));
+    expect(readPendingEmailLink()).toBeNull();
 
+    clickLink(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ }));
+    expect(readPendingEmailLink()).not.toBeNull();
+    clickLink(screen.getByRole('link', { name: /카카오로만 로그인할래요/ }));
     expect(readPendingEmailLink()).toBeNull();
   });
 
@@ -1032,8 +1041,8 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       await verifyPhone();
       await screen.findByText(CARD_TITLE);
 
-      const row = screen.getByRole('link', { name: /카카오·Apple로 가입했어요/ });
-      expect(row).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: /카카오·Apple로 로그인하고 이 이메일 연결하기/ })).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: /카카오·Apple로만 로그인할래요/ })).toHaveAttribute('href', '/login');
     } finally {
       delete window.TeameetNative;
     }
@@ -1210,14 +1219,19 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
     });
 
-    it('이메일을 이미 적고 돌아온 길이므로 소셜 줄이 그 이메일도 연결할 수 있다고 알린다', async () => {
+    it('이메일을 이미 적고 돌아온 길이므로 연결 줄이 그 이메일을 미리 채워 이어 간다고 알리고, 누르면 그 이메일을 보관한다', async () => {
       hooks.registerMutateAsync.mockRejectedValue(phoneConflict());
       render(<SignupClient />);
       await advanceToProfile();
       submitProfile();
       await screen.findByText(CARD_TITLE);
 
-      expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveTextContent('로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.');
+      const row = screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ });
+      expect(row).toHaveTextContent('로그인하면 signup@example.com 연결을 바로 이어서 도와요.');
+      row.addEventListener('click', (event) => event.preventDefault(), { once: true });
+      fireEvent.click(row);
+      expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: null });
+      expect(storedText()).not.toContain(ACCOUNT_PASSWORD);
     });
 
     it('다른 번호로 다시 인증하면 이미 적은 가입 정보와 프로필을 그대로 두고 새 번호·새 증명으로 가입한다', async () => {

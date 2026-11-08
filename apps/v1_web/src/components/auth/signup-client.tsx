@@ -24,7 +24,7 @@ import { trackEvent } from '@/lib/analytics';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { markSignupPhotoNotice } from '@/lib/signup-photo-notice';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
+import { clearPendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
@@ -587,10 +587,9 @@ export function SignupClient() {
                   loginHref={withRedirect('/login/email')}
                   socialLoginHref={withRedirect('/login')}
                   findAccountHref={withRedirect('/auth/find-account')}
-                  // 이메일을 이미 적은 경우에만(인증 단계로 되돌아온 사용자) 이메일을 보관한다. 비밀번호는 가입 화면 밖으로 내보내지 않는다.
-                  onSocialLoginSelect={isPlausibleEmail(normalizedEmail)
-                    ? () => { savePendingEmailLink({ email: normalizedEmail, returnTo: currentRedirect() }); }
-                    : undefined}
+                  // 이메일은 이미 적은 경우에만 넘긴다(인증 단계로 되돌아온 사용자). 비밀번호는 가입 화면 밖으로 내보내지 않는다.
+                  typedEmail={isPlausibleEmail(normalizedEmail) ? normalizedEmail : null}
+                  returnTo={currentRedirect()}
                 />
               ) : isSendablePhone && !phoneProofToken ? (
                 otpParts

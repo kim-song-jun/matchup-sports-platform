@@ -235,7 +235,7 @@ describe('SignupClient 휴대폰 인증 만료', () => {
       expect(screen.queryByText(EXPIRED_ON_VERIFY_BANNER)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^닉네임/)).not.toBeInTheDocument();
       // 계정 입력에서 이메일을 이미 적었으니 소셜 줄이 그 이메일 연결을 안내한다.
-      expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveTextContent('로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.');
+      expect(screen.getByRole('link', { name: /카카오로 로그인하고 이 이메일 연결하기/ })).toHaveTextContent('로그인하면 signup@example.com 연결을 바로 이어서 도와요.');
 
       // 다른 번호로 인증하면 가입 정보 단계에 적어 둔 값이 그대로 있다.
       fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));

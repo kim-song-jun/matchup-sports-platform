@@ -1,11 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 
 export const TOAST_DURATION_MS = 3000;
 
-type ToastMessage = { id: number; text: string };
+/** success 는 방금 한 일이 됐다는 확인(초록 체크), info 는 일이 되지 않았지만 알아 둘 사실(파란 정보 표시)이다. */
+export type ToastTone = 'success' | 'info';
+
+type ToastMessage = { id: number; text: string; tone: ToastTone };
 
 /**
  * 확인 창 뒤 "무엇이 바뀌었는지" 한 줄을 화면 아래에 3초 보인다. 새 안내는 앞 안내를 덮는다 —
@@ -25,10 +28,10 @@ export function useToast() {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  const showToast = useCallback((text: string) => {
+  const showToast = useCallback((text: string, tone: ToastTone = 'success') => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const id = ++counterRef.current;
-    setMessage({ id, text });
+    setMessage({ id, text, tone });
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       setMessage((current) => (current?.id === id ? null : current));
@@ -72,7 +75,9 @@ function ToastViewport({ message }: { message: ToastMessage | null }) {
             boxShadow: '0 8px 24px color-mix(in srgb, var(--static-ink) 18%, transparent)',
           }}
         >
-          <Check size={16} strokeWidth={2.6} aria-hidden="true" style={{ color: 'var(--green500)', flexShrink: 0 }} />
+          {message.tone === 'info'
+            ? <Info size={16} strokeWidth={2.6} aria-hidden="true" style={{ color: 'var(--blue500)', flexShrink: 0 }} />
+            : <Check size={16} strokeWidth={2.6} aria-hidden="true" style={{ color: 'var(--green500)', flexShrink: 0 }} />}
           <span className="tm-text-label" style={{ color: 'var(--static-white)', fontWeight: 600 }}>{message.text}</span>
         </div>
       ) : null}

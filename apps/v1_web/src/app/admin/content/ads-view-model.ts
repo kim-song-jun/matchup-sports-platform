@@ -1,7 +1,6 @@
-import { adChannelLabel, adChannelPhaseLabel, adPublishFieldLabel } from '@/lib/admin-labels';
-import { resolveAdLink } from '@/lib/ad-link';
+import { adChannelLabel, adChannelPhaseLabel, adPublishFieldLabel, isAdPublishMissingField } from '@/lib/admin-labels';
 import { extractErrorCode, extractErrorDetails, extractErrorMessage } from '@/lib/error-message';
-import { isoToKstDatetimeLocal, toKstDateString } from '@/lib/kst-calendar';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso, toKstDateString } from '@/lib/kst-calendar';
 import type {
   V1AdCampaign,
   V1AdCampaignListItem,
@@ -12,9 +11,9 @@ import type {
   V1AdDailyStat,
   V1AdPopupCreative,
   V1AdPopupCreativeInput,
-  V1AdPublishMissingField,
   V1SaveAdCampaignPayload,
 } from '@/types/ads';
+import { checkAdLink } from './ads-view-link';
 
 /** Limits mirror `apps/v1_api/src/ads/dto/ad-campaign.dto.ts`; a longer value is a 400 on save. */
 export const AD_TITLE_MAX_LENGTH = 120;
@@ -22,7 +21,6 @@ export const AD_ADVERTISER_MAX_LENGTH = 60;
 export const AD_ALT_TEXT_MAX_LENGTH = 120;
 export const AD_POPUP_HEADLINE_MAX_LENGTH = 40;
 export const AD_POPUP_DESCRIPTION_MAX_LENGTH = 80;
-export const AD_LINK_MAX_LENGTH = 500;
 
 export const CTR_NOT_COMPUTABLE = '계산 불가';
 
@@ -80,19 +78,6 @@ export function adFormFromCampaign(campaign: V1AdCampaign): AdFormState {
   };
 }
 
-const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/;
-
-/**
- * Reads a `datetime-local` value as KST wall-clock time and states the offset. The server rejects a timestamp
- * without an offset, and the browser's own time zone must never decide which instant the owner meant.
- */
-export function toKstOffsetIso(value: string): string | null {
-  if (!DATETIME_LOCAL.test(value)) return null;
-  const withSeconds = value.length === 16 ? `${value}:00` : value;
-  const iso = `${withSeconds}+09:00`;
-  return Number.isNaN(Date.parse(iso)) ? null : iso;
-}
-
 /** `2026. 11. 12. 00:00` on the KST calendar. */
 export function formatKstDateTime(iso: string | null | undefined): string {
   const local = isoToKstDatetimeLocal(iso);
@@ -115,11 +100,13 @@ function buildChannel(
 ): ChannelResult<V1AdChannelCreativeInput> {
   const name = adChannelLabel(channel);
   const linkUrl = state.linkUrl.trim();
-  if (linkUrl && !resolveAdLink(linkUrl)) {
-    return { error: `${name} 이동 링크는 /로 시작하는 앱 안 경로나 https:// 주소여야 해요.` };
+  const linkCheck = linkUrl ? checkAdLink(linkUrl) : null;
+  if (linkCheck && !linkCheck.ok) {
+    return { error: `${name} 이동 링크를 쓸 수 없어요. ${linkCheck.reason}` };
   }
-  const startAt = state.startAt ? toKstOffsetIso(state.startAt) : null;
-  const endAt = state.endAt ? toKstOffsetIso(state.endAt) : null;
+  // The server wants an explicit offset; the browser's own time zone must never decide which instant the owner meant.
+  const startAt = kstDatetimeLocalToIso(state.startAt);
+  const endAt = kstDatetimeLocalToIso(state.endAt);
   if ((state.startAt && !startAt) || (state.endAt && !endAt)) {
     return { error: `${name}의 시작·끝 시각을 올바르게 입력해 주세요.` };
   }
@@ -203,7 +190,8 @@ function incompleteMessage(details: unknown): string | null {
   for (const entry of details) {
     const record = asRecord(entry);
     if (record?.code !== 'AD_CHANNEL_INCOMPLETE' || !isChannel(record.channel) || !Array.isArray(record.missing)) continue;
-    const fields = (record.missing as V1AdPublishMissingField[]).map(adPublishFieldLabel).join(', ');
+    // A field name this screen does not know still gets a line item rather than being dropped.
+    const fields = record.missing.map((field) => (isAdPublishMissingField(field) ? adPublishFieldLabel(field) : '필수 항목')).join(', ');
     lines.push(`${adChannelLabel(record.channel)}에 채우지 않은 항목이 있어요. (${fields})`);
   }
   return lines.length > 0 ? lines.join(' ') : null;

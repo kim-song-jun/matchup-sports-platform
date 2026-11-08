@@ -106,7 +106,3 @@ export function trackAdImpression(campaignId: string, channel: V1AdChannel): voi
 export function trackAdClick(campaignId: string, channel: V1AdChannel): void {
   getSharedBatcher()?.trackClick(campaignId, channel);
 }
-
-export function flushAdEvents(): void {
-  getSharedBatcher()?.flush();
-}

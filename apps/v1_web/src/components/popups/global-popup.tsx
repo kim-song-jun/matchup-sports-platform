@@ -1,12 +1,15 @@
 'use client';
 
 import { Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { HOME_AD_POPUP_PATH, HomeAdPopup } from '@/components/ads/home-ad-popup';
-import { useNoticeAllowsHomeAd } from '@/components/ads/home-ad-popup-notice-gate';
+import { HOME_AD_POPUP_PATH, useNoticeAllowsHomeAd } from '@/components/ads/home-ad-popup-notice-gate';
 import { HomePopupDialog } from '@/components/home/home-notice-popup';
 import { useV1ActivePopup } from '@/hooks/use-v1-api';
 import { isSafePopupTargetPath, resolvePopupTargetScreen } from '@/lib/popup-targets';
+
+// This component mounts on every route, but the ad popup is only for `/home`: its chunk loads when it is first rendered there.
+const HomeAdPopup = dynamic(() => import('@/components/ads/home-ad-popup').then((module) => module.HomeAdPopup), { ssr: false });
 
 export function GlobalPopup() {
   return (

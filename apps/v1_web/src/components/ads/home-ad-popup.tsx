@@ -7,10 +7,8 @@ import { isPopupSuppressed, suppressPopupForToday } from '@/lib/ad-suppression';
 import { resolveAdLink, type AdLink } from '@/lib/ad-link';
 import { reportClientError } from '@/lib/client-error-reporter';
 import type { V1PublicPopupAd } from '@/types/ads';
-import { HomeAdPopupDialog } from './home-ad-popup-dialog';
-
-/** The only screen the ad popup appears on, matched exactly. */
-export const HOME_AD_POPUP_PATH = '/home';
+import { HOME_AD_POPUP_PATH } from './home-ad-popup-notice-gate';
+import { HomeAdPopupDialog, popupCreativeSrc } from './home-ad-popup-dialog';
 
 // A native <dialog> (the app update gate) carries no role attribute, so it is matched by its open state.
 const OTHER_MODAL_SELECTOR = '[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]';
@@ -49,6 +47,8 @@ export function HomeAdPopup({ noticeAllowsAd }: { noticeAllowsAd: boolean }) {
   // so nothing half-empty is shown and the day is not spent on an ad nobody saw.
   const openAfterCreativeLoaded = (ad: ShownAd) => {
     setDecided(true);
+    // Checked again here, not only at render: a second tab may have opened this campaign while the picture loaded.
+    if (isPopupSuppressed(ad.campaign.campaignId)) return;
     if (document.querySelector(OTHER_MODAL_SELECTOR)) return;
     suppressPopupForToday(ad.campaign.campaignId);
     setShown(ad);
@@ -59,7 +59,7 @@ export function HomeAdPopup({ noticeAllowsAd }: { noticeAllowsAd: boolean }) {
       {candidate ? (
         <img
           key={candidate.campaign.campaignId}
-          src={candidate.campaign.imageUrl}
+          src={popupCreativeSrc(candidate.campaign.imageUrl)}
           alt=""
           aria-hidden="true"
           hidden

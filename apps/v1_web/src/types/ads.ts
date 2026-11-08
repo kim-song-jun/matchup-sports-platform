@@ -145,12 +145,5 @@ export type V1AdPublishProblem =
   | { code: 'AD_CHANNEL_INCOMPLETE'; channel: V1AdChannel; missing: V1AdPublishMissingField[] }
   | { code: 'AD_WINDOW_ENDED'; channel: V1AdChannel };
 
-/** `details` of `409 AD_CHANNEL_WINDOW_OVERLAP`. */
-export type V1AdWindowOverlapDetails = {
-  channel: V1AdChannel;
-  conflictingCampaignId: string;
-  conflictingTitle: string;
-};
-
 /** `details` of `409 AD_CAMPAIGN_VERSION_CONFLICT`. */
 export type V1AdVersionConflictDetails = { currentVersion: number };

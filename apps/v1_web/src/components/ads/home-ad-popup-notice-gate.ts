@@ -5,6 +5,9 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { isHomePopupHidden } from '@/components/home/home-notice-popup';
 import type { V1ActivePopupResponse } from '@/types/api';
 
+/** The only screen the ad popup appears on, matched exactly. Lives here so `GlobalPopup` can compare paths without loading the popup. */
+export const HOME_AD_POPUP_PATH = '/home';
+
 type NoticeLookup = Pick<UseQueryResult<V1ActivePopupResponse>, 'data' | 'isError' | 'isFetching' | 'isSuccess'>;
 
 /**

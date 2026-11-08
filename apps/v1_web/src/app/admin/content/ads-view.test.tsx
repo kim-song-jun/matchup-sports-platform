@@ -204,8 +204,8 @@ describe('AdsView create and edit', () => {
         imageUrl: '/uploads/ads/uploaded-1.webp',
         altText: '에버데이 신제품',
         linkUrl: '/tournaments/123',
-        startAt: '2026-11-12T00:00:00+09:00',
-        endAt: '2026-11-20T23:59:00+09:00',
+        startAt: '2026-11-11T15:00:00.000Z',
+        endAt: '2026-11-20T14:59:00.000Z',
       },
       popup: null,
     }]);
@@ -231,7 +231,7 @@ describe('AdsView create and edit', () => {
     expect(bodies[0]).toMatchObject({
       title: '겨울 신상품 (수정)',
       expectedVersion: 1,
-      banner: { startAt: '2026-11-12T00:00:00+09:00', endAt: '2026-11-20T00:00:00+09:00' },
+      banner: { startAt: '2026-11-11T15:00:00.000Z', endAt: '2026-11-19T15:00:00.000Z' },
       popup: null,
     });
   });
@@ -338,6 +338,49 @@ describe('AdsView create and edit', () => {
     await waitFor(() => expect(deletedAssets).toEqual(['asset-1']));
   });
 
+  it('says next to the link field why the server would refuse the link, once the field is left', async () => {
+    useBackend([]);
+    const user = renderAds();
+    const aside = await openCreateForm(user);
+    const banner = within(within(aside).getByRole('group', { name: /^배너/ }));
+    const link = banner.getByLabelText('이동 링크');
+    const reason = '/admin, /api, /uploads, /tournament-ops로 가는 경로는 광고 링크로 쓸 수 없어요.';
+
+    await user.type(link, '/admin/ops/push-send');
+    expect(banner.queryByText(reason)).not.toBeInTheDocument();
+
+    await user.tab();
+
+    expect(await banner.findByText(reason)).toBeInTheDocument();
+    expect(link).toHaveAttribute('aria-invalid', 'true');
+    expect(link).toHaveAccessibleDescription(expect.stringContaining(reason));
+    expect(banner.queryByRole('link', { name: /링크 열어 보기/ })).not.toBeInTheDocument();
+
+    await user.clear(link);
+    await user.type(link, '/tournaments/123');
+    expect(banner.queryByText(reason)).not.toBeInTheDocument();
+    expect(link).not.toHaveAttribute('aria-invalid');
+    expect(banner.getByRole('link', { name: /링크 열어 보기/ })).toHaveAttribute('href', '/tournaments/123');
+  });
+
+  it('shows the link problem on save even if the field was never left, and does not call the server', async () => {
+    useBackend([]);
+    const bodies = captureBodies('post', '/admin/ad-campaigns');
+    const user = renderAds();
+    const aside = await openCreateForm(user);
+    await user.type(within(aside).getByLabelText('캠페인 이름 (내부용)'), '11월 협업');
+    await user.type(within(aside).getByLabelText('광고주 표시 이름'), '에버데이');
+    const popup = within(within(aside).getByRole('group', { name: /^팝업/ }));
+    fireEvent.change(popup.getByLabelText('이동 링크'), { target: { value: 'https://localhost/admin' } });
+
+    await user.click(within(aside).getByRole('button', { name: '초안으로 저장' }));
+
+    const reason = 'localhost와 내부망(사설 IP) 주소는 쓸 수 없어요. 공개된 주소를 써 주세요.';
+    expect(await popup.findByText(reason)).toBeInTheDocument();
+    expect(within(aside).getAllByRole('alert').map((alert) => alert.textContent)).toContain(`팝업 이동 링크를 쓸 수 없어요. ${reason}`);
+    expect(bodies).toHaveLength(0);
+  });
+
   it('refuses a name that is only spaces before calling the server', async () => {
     useBackend([]);
     const bodies = captureBodies('post', '/admin/ad-campaigns');
@@ -413,6 +456,26 @@ describe('AdsView publish and stop', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('refuses a popup without a headline, listing the missing fields in the order the server does', async () => {
+    const popupWithoutHeadline = createV1AdCampaignFixture({
+      id: 'ad-draft',
+      title: '겨울 신상품',
+      banner: null,
+      popup: { ...popupCreative, altText: null, headline: null },
+    });
+    useBackend([popupWithoutHeadline]);
+    const user = renderAds();
+    const card = await cardOf('겨울 신상품');
+    await waitForWriteAccess();
+    await user.click(within(card).getByRole('button', { name: /게시/ }));
+
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: '게시' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('팝업에 채우지 않은 항목이 있어요. (대체 텍스트, 제목)');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('tells which campaign a window overlaps with', async () => {
     useBackend([draft]);
     server.use(http.post(`${api}/admin/ad-campaigns/ad-draft/publish`, () =>
@@ -427,6 +490,20 @@ describe('AdsView publish and stop', () => {
     const alert = await within(screen.getByRole('dialog')).findByRole('alert');
     expect(alert).toHaveTextContent('가을 할인');
     expect(alert).toHaveTextContent('배너');
+  });
+
+  it('tells how long a stopped ad can still be seen: about a minute on new screens, until reopened on open ones', async () => {
+    useBackend([published]);
+    const user = renderAds();
+    const card = await cardOf('가을 할인');
+    await waitForWriteAccess();
+
+    await user.click(within(card).getByRole('button', { name: /중단/ }));
+
+    const dialog = screen.getByRole('dialog', { name: '광고를 중단할까요?' });
+    expect(dialog).toHaveTextContent('새로 여는 화면에서는 최대 1분 안에 사라져요.');
+    expect(dialog).toHaveTextContent('이미 열려 있는 홈 화면에는 새로 들어올 때까지 남아 있을 수 있어요.');
+    expect(dialog).not.toHaveTextContent('30초');
   });
 
   it('stops only after the owner confirms, and the card then offers publishing again', async () => {

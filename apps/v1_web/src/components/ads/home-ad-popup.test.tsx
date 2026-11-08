@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { trackAdImpression } from '@/lib/ad-events';
 import { isPopupSuppressed, suppressPopupForToday } from '@/lib/ad-suppression';
+import { optimizedImageSrc } from '@/lib/assets';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { v1Keys } from '@/lib/query-keys';
 import { waitForOverlayHistory } from '@/lib/overlay-history';
@@ -132,6 +134,32 @@ describe('HomeAdPopup opening', () => {
 
     expect(await screen.findByRole('dialog', { name: campaign.headline ?? '' })).toBeInTheDocument();
     expect(isPopupSuppressed(campaign.campaignId)).toBe(true);
+  });
+
+  it('does not open when another tab used up the day while this one was fetching the creative', async () => {
+    renderPopup();
+    const preloader = await findPreloader();
+
+    // The other tab opened the same campaign after this tab chose it, and wrote the shared mark for today.
+    suppressPopupForToday(campaign.campaignId);
+    fireEvent.load(preloader);
+
+    await waitFor(() => expect(document.querySelectorAll('img')).toHaveLength(0));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trackAdImpression).not.toHaveBeenCalled();
+  });
+
+  it('fetches the creative at the size the window shows, so the window reuses the cached picture', async () => {
+    renderPopup();
+    const preloader = await findPreloader();
+    const preloadedSrc = preloader.getAttribute('src');
+    expect(preloadedSrc).toBe(optimizedImageSrc(campaign.imageUrl, 420));
+    expect(preloadedSrc).toContain('/_next/image');
+
+    fireEvent.load(preloader);
+
+    const dialog = await screen.findByRole('dialog', { name: campaign.headline ?? '' });
+    expect(within(dialog).getByRole('img', { name: campaign.altText })).toHaveAttribute('src', preloadedSrc);
   });
 
   it('stays closed while the notice step does not allow it, and opens as soon as it does', async () => {

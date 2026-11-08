@@ -7,7 +7,6 @@ import {
   AD_EVENT_BATCH_MAX,
   AD_EVENT_FLUSH_DELAY_MS,
   createAdEventBatcher,
-  flushAdEvents,
   trackAdClick,
   trackAdImpression,
 } from './ad-events';
@@ -198,12 +197,12 @@ describe('shared batcher over the network', () => {
     });
   });
 
-  it('sends a queued impression with the next flush', async () => {
+  it('sends a queued impression when the page is hidden', async () => {
     acceptEvents();
 
     trackAdImpression('0d7c1c9e-3f0a-4a52-9a53-0a6f3d7b1001', 'banner');
     expect(received).toHaveLength(0);
-    flushAdEvents();
+    window.dispatchEvent(new Event('pagehide'));
 
     await vi.waitFor(() => expect(received).toHaveLength(1));
     expect(received[0]).toEqual({

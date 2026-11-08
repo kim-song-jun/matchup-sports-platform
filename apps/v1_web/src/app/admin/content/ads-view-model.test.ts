@@ -12,7 +12,6 @@ import {
   formatKstDateTime,
   formatWindowRange,
   statsLine,
-  toKstOffsetIso,
   todayStats,
   type AdFormState,
 } from './ads-view-model';
@@ -33,19 +32,6 @@ function form(overrides: Partial<AdFormState> = {}): AdFormState {
   return { ...EMPTY_AD_FORM, advertiserName: '에버데이', title: '11월 협업', ...overrides };
 }
 
-describe('toKstOffsetIso', () => {
-  it('reads a datetime-local value as KST wall-clock and states the +09:00 offset the server requires', () => {
-    expect(toKstOffsetIso('2026-11-12T00:00')).toBe('2026-11-12T00:00:00+09:00');
-    expect(toKstOffsetIso('2026-11-20T23:59')).toBe('2026-11-20T23:59:00+09:00');
-  });
-
-  it('returns null for an empty or impossible value instead of sending a guess', () => {
-    expect(toKstOffsetIso('')).toBeNull();
-    expect(toKstOffsetIso('2026-13-40T00:00')).toBeNull();
-    expect(toKstOffsetIso('11. 12.')).toBeNull();
-  });
-});
-
 describe('formatKstDateTime', () => {
   it('shows the instant on the KST calendar regardless of the browser time zone', () => {
     // 2026-11-11T15:00Z is already 2026-11-12 00:00 in Seoul.
@@ -65,8 +51,8 @@ describe('buildSavePayload', () => {
           imageUrl: '/uploads/ads/banner.webp',
           altText: '에버데이 신제품',
           linkUrl: '/tournaments/123',
-          startAt: '2026-11-12T00:00:00+09:00',
-          endAt: '2026-11-20T23:59:00+09:00',
+          startAt: '2026-11-11T15:00:00.000Z',
+          endAt: '2026-11-20T14:59:00.000Z',
         },
         popup: null,
       },
@@ -112,13 +98,32 @@ describe('buildSavePayload', () => {
     expect(result).toEqual({ error: '배너의 끝 시각은 시작 시각보다 늦어야 해요.' });
   });
 
-  it.each(['javascript:alert(1)', 'http://example.com', '//evil.example', 'tournaments/1'])(
-    'refuses the unsafe link %s before it reaches the server',
+  it.each([
+    'javascript:alert(1)',
+    'http://example.com',
+    '//evil.example',
+    'tournaments/1',
+    '/admin/ops/push-send',
+    'https://localhost/admin',
+    'https://192.168.0.1/',
+    'https://user:pw@example.com/',
+  ])(
+    'refuses the link %s that the server would refuse, naming the channel',
     (linkUrl) => {
       const result = buildSavePayload(form({ popup: { ...EMPTY_AD_FORM.popup, linkUrl } }));
-      expect(result).toEqual({ error: expect.stringContaining('팝업 이동 링크') });
+      expect(result).toEqual({ error: expect.stringContaining('팝업 이동 링크를 쓸 수 없어요.') });
     },
   );
+
+  it('says in the refusal which part of the link is wrong', () => {
+    const result = buildSavePayload(form({ banner: { ...filledBanner, linkUrl: '  /admin/users  ' } }));
+    expect(result).toEqual({ error: expect.stringContaining('/tournament-ops') });
+  });
+
+  it('refuses a time that does not exist instead of sending a guess', () => {
+    const result = buildSavePayload(form({ banner: { ...filledBanner, startAt: '2026-13-40T00:00' } }));
+    expect(result).toEqual({ error: '배너의 시작·끝 시각을 올바르게 입력해 주세요.' });
+  });
 
   it('accepts an https link and an in-app path', () => {
     expect(buildSavePayload(form({ banner: { ...filledBanner, linkUrl: 'https://everyday.example.com/event' } })))
@@ -142,7 +147,7 @@ describe('adFormFromCampaign', () => {
     const campaign = createV1AdCampaignFixture();
     const result = buildSavePayload(adFormFromCampaign(campaign));
     expect(result).toMatchObject({
-      payload: { banner: { startAt: '2026-11-12T00:00:00+09:00', endAt: '2026-11-20T00:00:00+09:00' } },
+      payload: { banner: { startAt: '2026-11-11T15:00:00.000Z', endAt: '2026-11-19T15:00:00.000Z' } },
     });
   });
 });
@@ -191,6 +196,13 @@ describe('adErrorMessage', () => {
     expect(message).toContain('팝업');
     expect(message).toContain('제목, 끝 시각');
     expect(message).not.toContain('imageUrl');
+  });
+
+  it('names a field it does not know as 필수 항목 instead of dropping it or printing the raw key', () => {
+    const message = adErrorMessage(apiError(400, 'AD_CHANNEL_INCOMPLETE', [
+      { code: 'AD_CHANNEL_INCOMPLETE', channel: 'popup', missing: ['headline', 'callToAction', 42] },
+    ]), '게시하지 못했어요.');
+    expect(message).toBe('팝업에 채우지 않은 항목이 있어요. (제목, 필수 항목, 필수 항목)');
   });
 
   it('says which advertisement a window overlaps with', () => {

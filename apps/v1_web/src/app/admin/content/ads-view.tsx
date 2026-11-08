@@ -298,7 +298,7 @@ export function AdsView() {
           title={pending.kind === 'publish' ? '광고를 게시할까요?' : '광고를 중단할까요?'}
           message={pending.kind === 'publish'
             ? `‘${pendingCampaign.title}’ 광고를 게시해요. 기간이 시작된 채널은 바로 사용자에게 보여요.`
-            : `‘${pendingCampaign.title}’ 광고를 중단해요. 새로 여는 화면부터 사라지고, 이미 열린 화면에는 최대 30초 남을 수 있어요. 다시 게시할 수 있어요.`}
+            : `‘${pendingCampaign.title}’ 광고를 중단해요. 새로 여는 화면에서는 최대 1분 안에 사라져요. 이미 열려 있는 홈 화면에는 새로 들어올 때까지 남아 있을 수 있어요. 다시 게시할 수 있어요.`}
           details={pending.kind === 'publish' ? <PublishChecklist campaign={pendingCampaign} /> : undefined}
           confirmLabel={pending.kind === 'publish' ? '게시' : '중단'}
           tone={pending.kind === 'stop' ? 'danger' : 'default'}

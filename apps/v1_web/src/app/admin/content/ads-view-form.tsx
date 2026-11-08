@@ -48,6 +48,8 @@ export function AdForm({
   const deleteAsset = useV1DeleteAdminContentAsset();
   const [form, setForm] = useState<AdFormState>(() => (campaign ? adFormFromCampaign(campaign) : EMPTY_AD_FORM));
   const [error, setError] = useState('');
+  // Once the owner has tried to save, field-level problems show without waiting for each field to be left.
+  const [submitted, setSubmitted] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [reloading, setReloading] = useState(false);
   const temporaryAssets = useRef<TemporaryAsset[]>([]);
@@ -84,6 +86,7 @@ export function AdForm({
     event.preventDefault();
     setError('');
     setConflict(false);
+    setSubmitted(true);
     const built = buildSavePayload(form);
     if ('error' in built) {
       setError(built.error);
@@ -149,15 +152,15 @@ export function AdForm({
         />
         <AdTextField
           label="광고주 표시 이름"
-          hint="사용자 화면에 ‘광고 · 이름’으로 나와요."
+          hint="팝업에서 제목 위에 나와요. 배너에는 나오지 않고, 배너와 팝업 모두 ‘광고’ 표시가 붙어요."
           value={form.advertiserName}
           onChange={(advertiserName) => setForm((current) => ({ ...current, advertiserName }))}
           maxLength={AD_ADVERTISER_MAX_LENGTH}
           required
           disabled={locked}
         />
-        <AdChannelFields channel="banner" state={form.banner} disabled={locked} upload={uploadImage} onPatch={patchBanner} />
-        <AdChannelFields channel="popup" state={form.popup} disabled={locked} upload={uploadImage} onPatch={patchPopup} />
+        <AdChannelFields channel="banner" state={form.banner} disabled={locked} upload={uploadImage} onPatch={patchBanner} showErrors={submitted} />
+        <AdChannelFields channel="popup" state={form.popup} disabled={locked} upload={uploadImage} onPatch={patchPopup} showErrors={submitted} />
 
         <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] leading-5 text-[var(--text-muted)]">
           {campaign?.status === 'published'

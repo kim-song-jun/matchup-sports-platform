@@ -63,11 +63,16 @@ function ContentHub() {
   const waitingForRole = rolePending && OWNER_ONLY_TABS.some((key) => key === requestedTab);
   const visibleTabs = TABS.filter((tab) => isOwner || !OWNER_ONLY_TABS.includes(tab.key));
 
-  const [activeTab, setActiveTab] = useState<TabKey>(() => pickTab(requestedTab, isOwner));
-  // 뒤로가기/앞으로가기·외부 내비게이션으로 URL 만 바뀐 경우에도 탭을 따라가게 한다.
-  useEffect(() => {
-    setActiveTab(pickTab(requestedTab, isOwner));
-  }, [requestedTab, isOwner]);
+  // 탭을 누르면 URL 이 바뀌기 전에 바로 갈아끼우도록 눌린 탭을 따로 들고 있고, URL 이 가리키는 탭(역할 반영 포함)이
+  // 바뀌면 렌더 중에 그쪽으로 맞춘다 — 뒤로가기·외부 내비게이션, 그리고 역할이 늦게 도착한 owner 의 ?tab=ads 까지.
+  // 이펙트로 맞추면 맞추기 전 한 번의 커밋에서 옛 탭 본문(공지 조회)이 마운트된다.
+  const urlTab = pickTab(requestedTab, isOwner);
+  const [activeTab, setActiveTab] = useState<TabKey>(urlTab);
+  const [syncedUrlTab, setSyncedUrlTab] = useState<TabKey>(urlTab);
+  if (syncedUrlTab !== urlTab) {
+    setSyncedUrlTab(urlTab);
+    setActiveTab(urlTab);
+  }
 
   // owner 가 아닌데 ?tab=ads 로 들어왔으면 주소도 공지사항으로 맞춘다(새로고침해도 같은 자리).
   const deniedOwnerTab = !rolePending && !isOwner && OWNER_ONLY_TABS.some((key) => key === requestedTab);

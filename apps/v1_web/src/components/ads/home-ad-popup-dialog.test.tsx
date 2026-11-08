@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackAdClick, trackAdImpression } from '@/lib/ad-events';
 import { resolveAdLink, type AdLink } from '@/lib/ad-link';
+import { optimizedImageSrc } from '@/lib/assets';
 import { bindSoftNavigator } from '@/lib/navigation-history';
 import { overlayMarkerOf, waitForOverlayHistory } from '@/lib/overlay-history';
 import { createV1PublicPopupAdFixture } from '@/test/msw/ads-fixtures';
@@ -97,7 +98,9 @@ describe('HomeAdPopupDialog layout and semantics', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('광고')).toBeInTheDocument();
     expect(within(dialog).getByText('에버데이')).toBeInTheDocument();
-    expect(creative()).toHaveAttribute('src', campaign.imageUrl);
+    // Shown at the 420px column width, through the same optimizer the banner uses.
+    expect(creative()).toHaveAttribute('src', optimizedImageSrc(campaign.imageUrl, 420));
+    expect(creative().getAttribute('src')).toContain('/_next/image');
     // The creative is not a control: neither a link nor a button wraps it.
     expect(creative().closest('a, button')).toBeNull();
     const links = within(dialog).getAllByRole('link');
@@ -201,6 +204,20 @@ describe('HomeAdPopupDialog detail link', () => {
     expect(onClose).not.toHaveBeenCalled();
     historyBack.mockRestore();
     unbind();
+  });
+
+  it.each([
+    ['an external link', 'https://everyday.example.com/event'],
+    ['an internal link', '/tournaments/tournament-1'],
+  ])('counts a middle-click on %s that opens it in a new tab, and only the middle button', (_name, linkUrl) => {
+    const { onClose } = renderDialog({ campaign: { linkUrl } });
+    const link = screen.getByRole('link', { name: '자세히 보기' });
+
+    fireEvent(link, new MouseEvent('auxclick', { bubbles: true, button: 1 }));
+    fireEvent(link, new MouseEvent('auxclick', { bubbles: true, button: 2 }));
+
+    expect(clickMock).toHaveBeenCalledExactlyOnceWith(campaign.campaignId, 'popup');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('only closes when the internal link points at the page that is already open', () => {

@@ -46,6 +46,11 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   // 대회 — 공지
   'tournament_announcement.create': '공지 작성',
   'tournament_announcement.publish': '공지 발행',
+  // 광고
+  'ad_campaign.create': '광고 초안 생성',
+  'ad_campaign.update': '광고 수정',
+  'ad_campaign.publish': '광고 게시',
+  'ad_campaign.stop': '광고 중단',
 };
 
 export function adminActionLabel(action: string): string {
@@ -78,6 +83,7 @@ const TARGET_TYPE_LABEL_MAP: Record<string, string> = {
   admin: '관리자',
   chat: '채팅',
   chat_room_participant: '채팅 참여자',
+  ad_campaign: '광고 캠페인',
 };
 
 export function adminTargetTypeLabel(targetType: string): string {
@@ -148,6 +154,11 @@ const AD_PUBLISH_FIELD_LABEL: Record<V1AdPublishMissingField, string> = {
   endAt: '끝 시각',
   headline: '제목',
 };
+
+/** Narrows an untyped `details[].missing[]` entry from the server to a field this screen has a name for. */
+export function isAdPublishMissingField(value: unknown): value is V1AdPublishMissingField {
+  return typeof value === 'string' && Object.keys(AD_PUBLISH_FIELD_LABEL).includes(value);
+}
 
 export function adPublishFieldLabel(field: V1AdPublishMissingField): string {
   return AD_PUBLISH_FIELD_LABEL[field] ?? '필수 항목';

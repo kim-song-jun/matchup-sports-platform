@@ -9,7 +9,17 @@ import AdminContentHubPage from './page';
 // 탭 본문 4개는 각자 자기 페이지였던 완결 화면(각자 훅·폼 보유)이라 스텁으로 대체한다 —
 // 이 테스트의 계약은 "허브가 올바른 본문을 갈아끼우고 동반 파라미터를 보존하는가"와
 // "광고 탭이 owner 에게만 열리는가"다.
-vi.mock('./notices-view', () => ({ NoticesView: () => <div>stub-notices</div> }));
+// NoticesView mounting is what starts the notice request, so a mount is recorded to prove it never happens for an ads visit.
+const { noticesMounted } = vi.hoisted(() => ({ noticesMounted: vi.fn() }));
+vi.mock('./notices-view', async () => {
+  const { useEffect } = await import('react');
+  return {
+    NoticesView: () => {
+      useEffect(() => { noticesMounted(); }, []);
+      return <div>stub-notices</div>;
+    },
+  };
+});
 vi.mock('./popups-view', () => ({ PopupsView: () => <div>stub-popups</div> }));
 vi.mock('./terms-view', () => ({ TermsView: () => <div>stub-terms</div> }));
 vi.mock('./ads-view', () => ({ AdsView: () => <div>stub-ads</div> }));
@@ -156,5 +166,35 @@ describe('AdminContentHubPage', () => {
 
     release();
     expect(await screen.findByText('stub-ads')).toBeInTheDocument();
+  });
+
+  it('never mounts the notices body for an owner who opens ?tab=ads, not even for the frame after the role arrives', async () => {
+    let release = () => {};
+    releaseAdminMe = new Promise<void>((resolve) => { release = resolve; });
+    searchParams = new URLSearchParams('tab=ads');
+    renderHub();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(noticesMounted).not.toHaveBeenCalled();
+
+    release();
+    expect(await screen.findByText('stub-ads')).toBeInTheDocument();
+
+    expect(noticesMounted).not.toHaveBeenCalled();
+  });
+
+  it('follows the address when only the URL changes, as the back button does', async () => {
+    searchParams = new URLSearchParams('tab=terms');
+    const view = renderHub();
+    expect(screen.getByText('stub-terms')).toBeInTheDocument();
+
+    searchParams = new URLSearchParams('tab=popups');
+    view.rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <AdminContentHubPage />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('stub-popups')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '팝업' })).toHaveAttribute('aria-selected', 'true');
   });
 });

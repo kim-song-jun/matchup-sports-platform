@@ -24,7 +24,11 @@ import {
 const api = '*/api/v1';
 const TIMESTAMP = '2026-11-08T00:00:00.000Z';
 const EVENT_BATCH_MAX = 20;
-const PUBLISH_REQUIRED_FIELDS = ['imageUrl', 'altText', 'linkUrl', 'startAt', 'endAt'] as const;
+/** Mirrors `REQUIRED_FIELDS` in `apps/v1_api/src/ads/ad-campaign.ts`, in the same order, so `missing` reads like the server's. */
+const PUBLISH_REQUIRED_FIELDS: Record<V1AdChannel, readonly V1AdPublishMissingField[]> = {
+  banner: ['imageUrl', 'altText', 'linkUrl', 'startAt', 'endAt'],
+  popup: ['imageUrl', 'altText', 'headline', 'linkUrl', 'startAt', 'endAt'],
+};
 
 function ok<T>(data: T) {
   return HttpResponse.json({ status: 'success', data, timestamp: TIMESTAMP });
@@ -77,7 +81,8 @@ function findPublishProblems(campaign: V1AdCampaign): V1AdPublishProblem[] {
   if (configured.length === 0) return [{ code: 'AD_CHANNEL_REQUIRED' }];
   const problems: V1AdPublishProblem[] = [];
   for (const [channel, creative] of configured) {
-    const missing: V1AdPublishMissingField[] = PUBLISH_REQUIRED_FIELDS.filter((name) => creative?.[name] === null);
+    const values: Record<string, unknown> = { ...creative };
+    const missing = PUBLISH_REQUIRED_FIELDS[channel].filter((name) => (values[name] ?? null) === null);
     if (missing.length > 0) problems.push({ code: 'AD_CHANNEL_INCOMPLETE', channel, missing });
   }
   return problems;
@@ -91,8 +96,11 @@ function matchesQuery(campaign: V1AdCampaign, q: string | null): boolean {
 
 /**
  * Handlers for the ads API. `scenario` picks what `GET /ads/active` serves; the admin routes keep one in-memory
- * campaign list per call, so tests never share campaigns. Versions, optimistic-lock conflicts and invalid state
- * transitions behave like the server; window overlap and ended-window checks do not (override with `server.use`).
+ * campaign list per call, so tests never share campaigns. Versions, optimistic-lock conflicts, invalid state
+ * transitions and the publish completeness check (per channel, popup headline included) behave like the server.
+ * Not modelled (override with `server.use`): window overlap and `AD_WINDOW_ENDED` on publish, `AD_INVALID_WINDOW`
+ * on save, the completeness check when saving an already published campaign, DTO validation (link rule, field
+ * lengths, timestamp format) and content-asset ownership of `imageUrl`.
  */
 export function createV1AdsMswHandlers(
   scenario: V1AdsScenario = 'none',

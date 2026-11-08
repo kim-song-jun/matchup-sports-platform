@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { HOME_POPUP_SCRIM_BACKGROUND } from '@/components/home/home-notice-popup';
@@ -8,10 +8,22 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useAdImpression } from '@/hooks/use-ad-impression';
 import { trackAdClick } from '@/lib/ad-events';
 import type { AdLink } from '@/lib/ad-link';
+import { optimizedImageSrc } from '@/lib/assets';
 import { overlayLinkClick } from '@/lib/overlay-history';
 import type { V1PublicPopupAd } from '@/types/ads';
 
 const DETAIL_BUTTON_CLASS = 'tm-btn tm-btn-md tm-btn-primary tm-btn-block';
+
+/** The window is at most 420px wide (`max-w-[420px]`); the optimizer picks the 2x size for this width. */
+const POPUP_MEDIA_PX = 420;
+
+/**
+ * The address the creative is fetched and shown from. The preloader and the window must use the same one,
+ * or the browser cache does not carry the picture over and the window opens with an image still loading.
+ */
+export function popupCreativeSrc(imageUrl: string): string {
+  return optimizedImageSrc(imageUrl, POPUP_MEDIA_PX);
+}
 
 export interface HomeAdPopupDialogProps {
   campaign: V1PublicPopupAd;
@@ -46,6 +58,11 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
 
   const description = campaign.description?.trim() || null;
   const followInternalLink = overlayLinkClick(link.href, currentPath, onClose);
+  const countClick = () => trackAdClick(campaign.campaignId, 'popup');
+  // A middle-click opens the link in a new tab and fires `auxclick` instead of `click`; the window stays open.
+  const countMiddleClick = (event: MouseEvent) => {
+    if (event.button === 1) countClick();
+  };
 
   return createPortal(
     <div
@@ -72,7 +89,7 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
       >
         <div ref={creativeRef} style={{ position: 'relative', aspectRatio: '4 / 3' }}>
           <img
-            src={campaign.imageUrl}
+            src={popupCreativeSrc(campaign.imageUrl)}
             alt={campaign.altText}
             onLoad={() => setCreativeLoaded(true)}
             onError={onImageError}
@@ -124,9 +141,10 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => {
-                trackAdClick(campaign.campaignId, 'popup');
+                countClick();
                 onClose();
               }}
+              onAuxClick={countMiddleClick}
             >
               자세히 보기
             </a>
@@ -135,9 +153,10 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
               className={DETAIL_BUTTON_CLASS}
               href={link.href}
               onClick={(event) => {
-                trackAdClick(campaign.campaignId, 'popup');
+                countClick();
                 followInternalLink(event);
               }}
+              onAuxClick={countMiddleClick}
             >
               자세히 보기
             </Link>

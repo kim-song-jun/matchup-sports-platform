@@ -6,6 +6,10 @@ describe('resolveAdLink', () => {
     ['/', '/'],
     ['/tournaments/123', '/tournaments/123'],
     ['/matches?sport=futsal#top', '/matches?sport=futsal#top'],
+    ['/%ED%99%88', '/%ED%99%88'],
+    // The href is the path the browser resolves, so what was checked is what gets followed.
+    ['/a/../tournaments/1', '/tournaments/1'],
+    ['/./tournaments/1?x=1', '/tournaments/1?x=1'],
   ])('treats %s as an in-app path', (value, href) => {
     expect(resolveAdLink(value)).toEqual({ kind: 'internal', href });
   });
@@ -29,6 +33,21 @@ describe('resolveAdLink', () => {
     ['https without a host', 'https://'],
     ['a bare relative path', 'tournaments/1'],
     ['an empty string', ''],
+    ['dot segments that normalise to a protocol-relative url', '/..//evil.example.com'],
+    ['a single dot that normalises to a protocol-relative url', '/.//evil.example.com'],
+    ['a parent segment after a directory', '/a/..//evil.example.com'],
+    ['an encoded parent segment', '/%2e%2e//evil.example.com'],
+    ['a deeper path that climbs back to the root', '/a/b/../..//evil.example.com'],
+    ['a null character in the path', '/tournaments/1\u0000'],
+    ['a unit separator in the path', '/tournaments/\u001f1'],
+    ['a delete character in the path', '/tournaments/\u007f1'],
+    ['a tab hidden inside the host trick', '/\t/evil.example.com'],
+    ['a control character in an https url', 'https://everyday.example.com/\u0000'],
+    ['a user and password before the host', 'https://user:pw@everyday.example.com/event'],
+    ['a user name before the host', 'https://admin@everyday.example.com/'],
+    ['a user name that imitates a host', 'https://everyday.example.com@evil.example.com/'],
+    ['a backslash inside an https url', 'https://everyday.example.com\\@evil.example.com/'],
+    ['the https scheme with a different case and userinfo', 'HTTPS://u:p@everyday.example.com'],
   ])('rejects %s', (_label, value) => {
     expect(resolveAdLink(value)).toBeNull();
   });

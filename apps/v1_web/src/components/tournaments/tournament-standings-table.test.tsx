@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentStandingsTable, type TournamentStandingsRow } from './tournament-standings-table';
@@ -154,20 +156,70 @@ describe('TournamentStandingsTable', () => {
     expect(document.querySelector('.tm-standings-rank-silver')).toBeNull();
   });
 
-  it('공동 순위 행이 하나라도 있으면 # 열을 넓히고, 없으면 36px 그대로다', () => {
-    const { rerender } = render(
-      <TournamentStandingsTable rows={TIED_ROWS} advancingKeys={null} ariaLabel="테스트 순위표" />,
-    );
-    const hashHeader = () => within(screen.getByRole('table', { name: '테스트 순위표' })).getByRole('columnheader', { name: '#' });
-    expect(hashHeader()).toHaveStyle({ width: '64px' });
-    rerender(
+  /* 390px 카드(346px)에서 진출 배지·펼침 화살표가 있는 표는 공동 칩 때문에 # 열이 넓어지면
+     카드보다 14px 넓어져 득실 열이 잘렸다. jsdom 은 레이아웃을 재지 못하므로, 넘침을 만든 것과
+     같은 모양(조별 순위표: 진출 배지 + 펼침 토글)으로 그린 뒤 폭을 정하는 값(# 열 폭·여백, 숫자 열
+     최소폭, 칩 여백)이 칩 있는 표에서만 줄어드는 계약을 고정한다. 실제 폭(표 <= 카드)은 alpha 390px
+     실측으로만 확인된다. */
+  const renderGroupStandings = (rows: readonly TournamentStandingsRow[]) =>
+    render(
       <TournamentStandingsTable
-        rows={[ROW, { ...ROW, key: 'reg-2', teamId: 'team-2', teamName: '마포 FC', position: 2 }]}
-        advancingKeys={null}
+        rows={rows}
+        advancingKeys={new Set(rows.slice(0, 2).map((row) => row.key))}
+        renderDetail={() => <div>팀 경기 상세</div>}
         ariaLabel="테스트 순위표"
       />,
     );
-    expect(hashHeader()).toHaveStyle({ width: '36px' });
+  const columnHeader = (name: string) =>
+    within(screen.getByRole('table', { name: '테스트 순위표' })).getByRole('columnheader', { name });
+  const rowByTeam = (name: string) => within(screen.getByText(name).closest('tr') as HTMLElement);
+
+  it('공동 순위 행이 있는 표만 # 열 폭·여백과 숫자 열 최소폭을 줄여 좁은 카드에 담는다', () => {
+    renderGroupStandings(TIED_ROWS);
+    // 폭을 늘리는 요소(공동 칩·진출 배지·펼침 토글)가 같은 행에 실제로 있는 상태에서 확인한다
+    const tied = rowByTeam('가 FC');
+    expect(tied.getByText('공동 1', { selector: '.tm-standings-rank-shared' })).toBeInTheDocument();
+    expect(tied.getByText('진출')).toBeInTheDocument();
+    expect(tied.getByRole('button', { expanded: false })).toBeInTheDocument();
+    expect(columnHeader('#')).toHaveStyle({ width: '56px', paddingLeft: '8px', paddingRight: '4px' });
+    expect(columnHeader('전적')).toHaveStyle({ minWidth: '48px' });
+    expect(columnHeader('승점')).toHaveStyle({ minWidth: '40px' });
+    expect(columnHeader('득실')).toHaveStyle({ minWidth: '40px', paddingRight: '12px' });
+    expect(tied.getAllByRole('cell')[0]).toHaveStyle({ paddingLeft: '8px', paddingRight: '4px' });
+  });
+
+  it('공동 순위가 없는 표의 열 폭·여백·최소폭은 그대로다 — 같은 진출 배지·펼침 토글이 있어도', () => {
+    renderGroupStandings([ROW, { ...ROW, key: 'reg-2', teamId: 'team-2', teamName: '마포 FC', position: 2 }]);
+    const first = rowByTeam('성수 FC');
+    expect(first.getByText('진출')).toBeInTheDocument();
+    expect(first.getByRole('button', { expanded: false })).toBeInTheDocument();
+    expect(columnHeader('#')).toHaveStyle({ width: '36px', paddingLeft: '12px' });
+    expect(columnHeader('#').style.paddingRight).toBe('');
+    expect(columnHeader('전적')).toHaveStyle({ minWidth: '56px' });
+    expect(columnHeader('승점')).toHaveStyle({ minWidth: '44px' });
+    expect(columnHeader('득실')).toHaveStyle({ minWidth: '44px', paddingRight: '12px' });
+    const rankCell = first.getAllByRole('cell')[0];
+    expect(rankCell).toHaveStyle({ paddingLeft: '12px' });
+    expect(rankCell.style.paddingRight).toBe('');
+  });
+
+  it('칩 문구는 줄이지 않는다 — 공동 순위 칩은 "공동 n" 전체와 스크린리더용 "위"를 그대로 가진다', () => {
+    render(<TournamentStandingsTable rows={TIED_ROWS} advancingKeys={null} ariaLabel="테스트 순위표" />);
+    const chip = screen.getAllByText('공동 1', { selector: '.tm-standings-rank-shared' })[0];
+    expect(chip).toHaveTextContent('공동 1위');
+    expect(chip).toHaveClass('tm-badge', 'tm-badge-orange');
+  });
+
+  it('공동 칩 여백은 .tm-badge-sm(8px)보다 뒤에 선언된 규칙이 4px 로 줄인다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const at = (selector: string) => css.search(new RegExp(`(^|\\})\\s*${selector.replace('.', '\\.')}\\s*\\{`));
+    const badgeSm = at('.tm-badge-sm');
+    const shared = at('.tm-standings-rank-shared');
+    // 규칙이 없으면 search 가 -1 을 돌려줘 순서 단언이 공허하게 통과한다
+    expect(badgeSm).toBeGreaterThanOrEqual(0);
+    expect(shared).toBeGreaterThanOrEqual(0);
+    expect(css).toMatch(/\.tm-standings-rank-shared\s*\{\s*padding:\s*0 4px;\s*\}/);
+    expect(shared).toBeGreaterThan(badgeSm);
   });
 
   it('동률이 없는 행은 순위 번호와 메달 색을 그대로 쓴다', () => {

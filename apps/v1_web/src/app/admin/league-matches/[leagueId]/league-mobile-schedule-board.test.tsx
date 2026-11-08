@@ -32,6 +32,8 @@ function renderBoard(onAddToWeek?: () => void) {
       canEditFixture
       onOpenTemplate={vi.fn()}
       onEditFixture={vi.fn()}
+      onCancelFixture={vi.fn()}
+      onDeleteFixture={vi.fn()}
       weeks={columns}
       teamsKnown
       onAddToWeek={onAddToWeek}

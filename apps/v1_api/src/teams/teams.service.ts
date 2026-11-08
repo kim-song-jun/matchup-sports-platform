@@ -2644,6 +2644,8 @@ export function formatRegionDisplayName(region?: { name: string; parent?: { name
  */
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {
   if (sort === 'member_count') return [{ memberCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }];
+  // 활동 = 팀 매치를 호스트로 올린 횟수(host_team_id 인덱스). 취소된 매치도 센다. 상대 팀·리그·대회 경기는 세지 않는다.
+  if (sort === 'activity') return [{ hostedTeamMatches: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }];
   return [{ createdAt: 'desc' }, { id: 'desc' }];
 }
 

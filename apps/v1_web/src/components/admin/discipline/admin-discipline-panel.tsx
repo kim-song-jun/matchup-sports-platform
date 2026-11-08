@@ -133,7 +133,7 @@ export function AdminDisciplinePanel({ competitionId }: { competitionId: string 
           <button
             key={tab.key}
             type="button"
-            className="tm-chip"
+            className={`tm-chip${active === tab.key ? ' tm-chip-active' : ''}`}
             aria-pressed={active === tab.key}
             onClick={() => setFilter(tab.key)}
           >

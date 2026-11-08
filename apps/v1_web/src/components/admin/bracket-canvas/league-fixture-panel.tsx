@@ -2,19 +2,15 @@
 
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import {
-  LEAGUE_FIXTURE_CANCEL_HINT,
-  LEAGUE_FIXTURE_DELETE_HINT,
-  leagueFixtureDeleteBlockedReason,
-} from '@/lib/league-fixture-delete';
 import type { LeagueBoardNode, LeagueBoardSide } from '@/lib/league-board-model';
 import type { V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { LeagueFixtureDangerActions } from './league-fixture-danger-actions';
 import { useLeagueResultToast } from './use-league-result-toast';
 
 export interface LeagueFixturePanelProps {
@@ -53,12 +49,6 @@ export function LeagueFixturePanel({
   // 서버 SLOT_LOCKED 와 같은 기준 — 게임이 예정이고 결과가 없을 때만 자리를 바꿀 수 있다.
   const locked = game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null);
   const cancelled = node.state === 'cancelled';
-  const deleteBlockedReason = leagueFixtureDeleteBlockedReason({
-    cancelled,
-    gameState: game?.state,
-    hasResult: game?.latestRevision != null,
-  });
-  const deleteReasonId = useId();
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
   const placedIds = new Set(
     slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId),
@@ -227,34 +217,14 @@ export function LeagueFixturePanel({
                 일정 수정
               </button>
             ) : null}
-            {!cancelled && node.state !== 'live' ? (
-              <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={onCancelFixture}
-                  className="tm-btn tm-btn-sm tm-btn-outline self-start"
-                  style={{ minHeight: 44, color: 'var(--red700)' }}
-                >
-                  경기 취소
-                </button>
-                <p className="tm-text-caption" style={MUTED}>{LEAGUE_FIXTURE_CANCEL_HINT}</p>
-              </div>
-            ) : null}
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={onDeleteFixture}
-                disabled={deleteBlockedReason !== null}
-                aria-describedby={deleteReasonId}
-                className="tm-btn tm-btn-sm tm-btn-outline self-start"
-                style={{ minHeight: 44, color: 'var(--red700)' }}
-              >
-                경기 삭제
-              </button>
-              <p id={deleteReasonId} className="tm-text-caption" style={MUTED}>
-                {deleteBlockedReason ?? LEAGUE_FIXTURE_DELETE_HINT}
-              </p>
-            </div>
+            <LeagueFixtureDangerActions
+              cancelled={cancelled}
+              live={node.state === 'live'}
+              gameState={game?.state}
+              hasResult={game?.latestRevision != null}
+              onCancel={onCancelFixture}
+              onDelete={onDeleteFixture}
+            />
           </div>
         ) : null}
       </section>

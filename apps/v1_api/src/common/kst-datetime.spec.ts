@@ -1,4 +1,4 @@
-import { formatKstMonthDayTime, formatKstTime } from './kst-datetime';
+import { formatKstMonthDayTime, formatKstTime, kstCalendarDate } from './kst-datetime';
 
 describe('kst-datetime', () => {
   it('UTC 자정 직전 시각도 KST 날짜·요일로 넘어간다', () => {
@@ -15,5 +15,20 @@ describe('kst-datetime', () => {
   it('같은 순간이라도 KST 날짜가 UTC 날짜와 다를 때 KST 를 쓴다', () => {
     // 2026-12-31 15:00 UTC = 2027-01-01(금) 00:00 KST
     expect(formatKstMonthDayTime(new Date('2026-12-31T15:00:00Z'))).toBe('1/1 (금) 00:00');
+  });
+
+  describe('kstCalendarDate', () => {
+    it('returns the KST calendar date as a UTC-midnight Date (the value a @db.Date column stores)', () => {
+      expect(kstCalendarDate(new Date('2026-11-08T03:00:00Z')).toISOString()).toBe('2026-11-08T00:00:00.000Z');
+    });
+
+    it('rolls to the next KST day at 15:00 UTC, not at UTC midnight', () => {
+      expect(kstCalendarDate(new Date('2026-11-08T14:59:59.999Z')).toISOString()).toBe('2026-11-08T00:00:00.000Z');
+      expect(kstCalendarDate(new Date('2026-11-08T15:00:00.000Z')).toISOString()).toBe('2026-11-09T00:00:00.000Z');
+    });
+
+    it('crosses a year boundary in KST before UTC does', () => {
+      expect(kstCalendarDate(new Date('2026-12-31T15:00:00Z')).toISOString()).toBe('2027-01-01T00:00:00.000Z');
+    });
   });
 });

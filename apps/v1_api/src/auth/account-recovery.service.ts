@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -47,15 +55,34 @@ export function socialLoginGuidance(providers: readonly string[]): string {
 }
 
 export interface FoundAccount {
-  /** 마스킹된 계정 이메일. 이메일 로그인 가능 여부는 hasPassword로 구분한다. */
-  maskedEmail: string | null;
   /** 이 계정으로 로그인할 수 있는 수단 — 화면이 어떤 로그인으로 안내할지 정하는 근거. */
   providers: string[];
   hasPassword: boolean;
+  /** 탈퇴를 신청해 유예 중인 계정이면 true. 끝나는 날은 withdrawalPendingUntil 이 메일함 증명 뒤에만 싣는다. */
+  withdrawalPending: boolean;
   /**
-   * 이 번호를 쥔 계정이 탈퇴 유예 중이면 그 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null.
+   * 마스킹된 계정 이메일. 메일함 소유를 증명한 요청에만 채운다 — 이메일 경로, 또는 번호 경로에서 이 계정 자신의
+   * 이메일 증명을 함께 보냈을 때. 이메일 로그인 가능 여부는 hasPassword로 구분한다.
+   */
+  maskedEmail: string | null;
+  /**
+   * 이 계정에 이메일이 있어 이메일 증명을 받을 수 있는지. 번호로 찾은 화면이 "이메일로 한 번 더 확인하기"를
+   * 권해도 되는지 가르는 값으로, 주소 자체는 싣지 않는다.
+   */
+  emailProofAvailable: boolean;
+  /**
+   * 탈퇴 유예가 끝나는 시각(ISO). maskedEmail 과 같은 조건에서만 채우고, 활성 계정이거나 탈퇴 신청 기록이
+   * 없으면 null.
    */
   withdrawalPendingUntil: string | null;
+}
+
+type AccountStatus = 'active' | 'withdrawal_pending';
+
+interface RecoverableUser {
+  id: string;
+  email: string | null;
+  authIdentities: { id: string; provider: string; passwordHash: string | null }[];
 }
 
 @Injectable()
@@ -70,22 +97,22 @@ export class AccountRecoveryService {
     private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
   ) {}
 
+  /**
+   * SMS 증명만으로는 가입 수단과 탈퇴 대기 여부까지만 알려 준다. 번호는 다른 사람에게 재배정될 수 있어서, 마스킹
+   * 이메일과 탈퇴 종료일은 **이 계정의 이메일 소유**를 따로 증명한 요청(`email` + `emailProofToken`)에만 싣는다.
+   * 증명이 다른 계정의 것이면 오류 없이 증명을 보내지 않은 것과 같은 답을 준다.
+   */
   async findAccountByPhone(dto: FindAccountDto): Promise<FoundAccount> {
     this.assertPhoneProof(dto.phone, dto.proofToken);
+    const mailboxEmail = this.readMailboxProof(dto);
 
     // 번호는 유일해서 두 계정이 같이 걸릴 수 없지만, 걸리면 쓸 수 있는 활성 계정을 먼저 보여 준다.
     const active = await this.findPhoneHolder(dto.phone, 'active');
     const user = active ?? (await this.findPhoneHolder(dto.phone, 'withdrawal_pending'));
     if (!user) throw accountNotFound();
 
-    return {
-      maskedEmail: user.email ? maskEmail(user.email) : null,
-      providers: user.authIdentities.map((identity) => identity.provider),
-      hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
-      withdrawalPendingUntil: active
-        ? null
-        : await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus: 'withdrawal_pending' }),
-    };
+    const ownMailbox = mailboxEmail !== null && user.email !== null && normalizeEmail(user.email) === mailboxEmail;
+    return this.toFoundAccount(user, active ? 'active' : 'withdrawal_pending', ownMailbox);
   }
 
   /** Inbox proof is required before revealing which providers belong to this account. */
@@ -94,15 +121,42 @@ export class AccountRecoveryService {
     if (!verifyEmailProofToken(dto.proofToken, email, 'password_reset')) {
       throw new BadRequestException({ code: 'EMAIL_NOT_VERIFIED', message: '이메일 인증을 다시 진행해 주세요.' });
     }
-    const user = await this.findActiveUserByEmail(email);
-    if (!user) {
+    // 사서함 주인임을 이미 증명한 뒤라, 탈퇴 대기 계정과 유예 종료일을 알려 줘도 남의 정보가 새지 않는다.
+    const holder = await this.findRecoverableByEmail(email);
+    if (!holder) {
       throw new NotFoundException({ code: 'ACCOUNT_NOT_FOUND', message: '이 이메일로 가입된 계정을 찾지 못했어요.' });
     }
+    return this.toFoundAccount(holder.user, holder.accountStatus, true);
+  }
+
+  /**
+   * 이메일 증명을 함께 보냈으면 검증하고 표준형 주소를 돌려준다. 보내지 않았으면 null. 보냈는데 이 주소에 대한
+   * 증명이 아니면 조용히 넘기지 않고 EMAIL_NOT_VERIFIED 로 거절한다(DTO 가 두 필드가 함께 오도록 보장한다).
+   */
+  private readMailboxProof(dto: FindAccountDto): string | null {
+    if (dto.email === undefined || dto.emailProofToken === undefined) return null;
+    const email = normalizeEmail(dto.email);
+    if (!verifyEmailProofToken(dto.emailProofToken, email, 'password_reset')) {
+      throw new BadRequestException({ code: 'EMAIL_NOT_VERIFIED', message: '이메일 인증을 다시 진행해 주세요.' });
+    }
+    return email;
+  }
+
+  /** `revealPrivate` 는 호출자가 이 계정의 이메일 소유를 증명했을 때만 true. */
+  private async toFoundAccount(
+    user: RecoverableUser,
+    accountStatus: AccountStatus,
+    revealPrivate: boolean,
+  ): Promise<FoundAccount> {
+    const withdrawalPending = accountStatus === 'withdrawal_pending';
     return {
-      maskedEmail: user.email ? maskEmail(user.email) : null,
       providers: user.authIdentities.map((identity) => identity.provider),
       hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
-      withdrawalPendingUntil: null,
+      withdrawalPending,
+      maskedEmail: revealPrivate && user.email ? maskEmail(user.email) : null,
+      emailProofAvailable: user.email !== null,
+      withdrawalPendingUntil:
+        revealPrivate && withdrawalPending ? await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus }) : null,
     };
   }
 
@@ -126,12 +180,13 @@ export class AccountRecoveryService {
    *
    * 소셜 전용 계정도 메일은 보낸다. 사서함 주인임을 증명한 다음에 실제 로그인 수단을
    * 안내하는 편이, 요청 단계에서 계정 종류를 흘리는 것보다 안전하면서 안내도 정확하다.
+   * 탈퇴 유예 중인 계정도 같다 — 증명을 마친 뒤에야 유예 안내를 할 수 있어서다.
    */
   async requestPasswordResetEmail(
     dto: EmailRecoveryRequestDto,
   ): Promise<{ sent: true; expiresAt: string; devCode?: string }> {
     const email = normalizeEmail(dto.email);
-    const account = await this.findActiveUserByEmail(email);
+    const account = await this.findRecoverableByEmail(email);
     const issued = await this.emailVerification.issueChallenge(email, {
       deliver: account !== null,
     });
@@ -156,17 +211,25 @@ export class AccountRecoveryService {
       });
     }
 
-    const user = await this.findActiveUserByEmail(email);
-    // 사서함 주인임을 이미 증명한 뒤라, 가입 여부를 알려 줘도 남의 정보가 새지 않는다
+    // 사서함 주인임을 이미 증명한 뒤라, 가입 여부와 탈퇴 대기 여부를 알려 줘도 남의 정보가 새지 않는다
     // (증명 전 단계인 requestPasswordResetEmail 에서는 그래서 아무것도 드러내지 않는다).
-    if (!user) {
+    const holder = await this.findRecoverableByEmail(email);
+    if (!holder) {
       throw new NotFoundException({
         code: 'ACCOUNT_NOT_FOUND',
         message: '이 이메일로 가입된 계정을 찾지 못했어요.',
       });
     }
+    // 비밀번호는 활성 계정에만 만든다. 탈퇴 유예 계정은 바꾸지 않고, 화면이 탈퇴 안내로 갈 수 있게 알린다.
+    if (holder.accountStatus === 'withdrawal_pending') {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_WITHDRAWAL_PENDING',
+        message: '탈퇴를 신청한 계정이라 비밀번호를 바꿀 수 없어요. 로그인하면 탈퇴를 취소할 수 있어요.',
+        details: { withdrawalPendingUntil: await withdrawalPendingUntil(this.prisma, { id: holder.user.id, accountStatus: holder.accountStatus }) },
+      });
+    }
 
-    return this.applyNewPassword(user, email, dto.newPassword);
+    return this.applyNewPassword(holder.user, email, dto.newPassword);
   }
 
   /**
@@ -220,14 +283,14 @@ export class AccountRecoveryService {
   }
 
   /**
-   * 로그인 이메일로 활성 계정을 찾는다. 로그인은 V1AuthIdentity(provider=email) 를 키로 쓰지만
+   * 로그인 이메일로 계정을 찾는다. 로그인은 V1AuthIdentity(provider=email) 를 키로 쓰지만
    * 여기서는 V1User.email 로 찾는다 — 소셜 전용 계정에는 이메일 신원이 없어서, 신원으로만
    * 찾으면 그 계정에 소셜 로그인 안내조차 못 하게 된다.
    * (두 값은 가입·이메일 인증 시 함께 갱신돼 항상 같은 표준형을 가리킨다.)
    */
-  private async findActiveUserByEmail(email: string) {
+  private findEmailHolder(email: string, accountStatus: AccountStatus) {
     return this.prisma.v1User.findFirst({
-      where: { email, accountStatus: 'active' },
+      where: { email, accountStatus },
       select: {
         id: true,
         email: true,
@@ -237,6 +300,14 @@ export class AccountRecoveryService {
         },
       },
     });
+  }
+
+  /** 계정 찾기·인증번호 메일의 대상 — 활성 계정을 먼저, 없으면 탈퇴 유예 계정. */
+  private async findRecoverableByEmail(email: string): Promise<{ user: RecoverableUser; accountStatus: AccountStatus } | null> {
+    const active = await this.findEmailHolder(email, 'active');
+    if (active) return { user: active, accountStatus: 'active' };
+    const pending = await this.findEmailHolder(email, 'withdrawal_pending');
+    return pending ? { user: pending, accountStatus: 'withdrawal_pending' } : null;
   }
 
   /**

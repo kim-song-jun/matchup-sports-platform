@@ -20,7 +20,7 @@ afterAll(() => {
 const REQUESTED = { sent: true, maskedTarget: 'ru***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30 };
 const VERIFIED = { emailLinkToken: 'signed.token', expiresInSeconds: 600 };
 const LINKED = { linked: true, email: 'runner@example.com' };
-const COMPLETE_BODY = { emailLinkToken: 't'.repeat(40), password: 'password123', passwordConfirm: 'password123' };
+const COMPLETE_BODY = { emailLinkToken: 't'.repeat(40), password: 'Sunny-ride-4', passwordConfirm: 'Sunny-ride-4' };
 
 const cookieIssuedAgo = (seconds: number) =>
   `${V1_SESSION_COOKIE_NAME}=${createV1SessionToken({

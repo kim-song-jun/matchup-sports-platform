@@ -107,6 +107,9 @@ import type {
   V1LinkEmailVerifyResult,
   V1LinkPendingPayload,
   V1LinkSocialResult,
+  V1RevokeOtherSessionsResult,
+  V1UnlinkLoginMethodPayload,
+  V1UnlinkLoginMethodResult,
   V1PhoneVerifyResult,
   V1EmailLoginResult,
   V1LoginStepUpResendResult,
@@ -436,6 +439,25 @@ export function useV1LinkEmailComplete() {
 }
 
 /**
+ * 로그인 수단을 뗀다. 서버가 다른 기기를 모두 로그아웃시키고 이 기기의 쿠키만 새로 발급하므로 같은 계정으로 계속 쓴다 —
+ * 연결 훅과 같은 곳(로그인 수단 목록을 담은 스냅샷, 서버가 남기는 알림)만 새로 읽는다.
+ */
+export function useV1UnlinkLoginMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UnlinkLoginMethodPayload) => v1Post<V1UnlinkLoginMethodResult>('/auth/identities/unlink', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 이 기기를 뺀 모든 기기에서 로그아웃한다. 읽어 둔 데이터는 그대로라 새로 읽을 것이 없다. */
+export function useV1RevokeOtherSessions() {
+  return useMutation({
+    mutationFn: () => v1Post<V1RevokeOtherSessionsResult>('/auth/sessions/revoke-others'),
+  });
+}
+
+/**
  * 탈퇴 신청을 철회하고 세션을 받는다(로그인 응답과 같은 모양).
  * 로그인 훅과 같은 규칙으로 응답을 인증 스냅샷에 넣는다 — 세션 힌트 저장과 `clearV1IdentityCache` 는 호출한 화면이 한다.
  */
@@ -522,9 +544,13 @@ export function useV1PhoneVerify() {
   });
 }
 
+/**
+ * 번호로 계정을 찾는다. `email`+`emailProofToken`(이메일 인증 `proofToken`)을 함께 보내면, 그 메일함이 찾은 계정
+ * 자신의 이메일일 때에 한해 응답이 마스킹된 이메일과 탈퇴 종료일까지 채운다. 둘 중 하나만 보내면 400이다.
+ */
 export function useV1FindAccountByPhone() {
   return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
+    mutationFn: (body: { phone: string; proofToken: string; email?: string; emailProofToken?: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
   });
 }

@@ -7,6 +7,7 @@ import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
+import { CROSS_GROUP_LANES } from '../../src/tournaments/multi-finals/multi-finals-seeding';
 import { MultiFinalsService } from '../../src/tournaments/multi-finals/multi-finals.service';
 import { TournamentAwardSetsService } from '../../src/tournaments/tournament-award-sets.service';
 import { recalculateStandingsInTx } from '../../src/tournaments/tournament-bracket-tx';
@@ -31,12 +32,14 @@ function settledSeeds(seeds: ReadonlyArray<string | null>): string[] {
   expect(seeds).not.toContain(null);
   return seeds as string[];
 }
-async function finishPreliminary(tied = false) {
+/** `tied` draws every game 0-0, or only the games whose home team is in the set; all other games are won by the earlier-listed team. */
+async function finishPreliminary(tied: boolean | ReadonlySet<string> = false) {
+  const drawn = (homeId: string | null) => tied === true || tied instanceof Set && homeId !== null && tied.has(homeId);
   const rows = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: 'group' } }, include: { teamMatch: { include: { game: true } } } });
   for (const row of rows) {
     const game = row.teamMatch.game!;
     const revision = await prisma.v1GameResultRevision.create({ data: { gameId: game.id, revision: 1, state: 'OFFICIAL',
-      score: tied ? { home: 0, away: 0 } : { home: 10 - registrationIds.indexOf(row.homeRegistrationId!), away: 10 - registrationIds.indexOf(row.awayRegistrationId!) },
+      score: drawn(row.homeRegistrationId) ? { home: 0, away: 0 } : { home: registrationIds.length - registrationIds.indexOf(row.homeRegistrationId!), away: registrationIds.length - registrationIds.indexOf(row.awayRegistrationId!) },
       goalEvents: [], missingScorer: true, eventsHash: `multi-${game.id}`, createdByActorType: 'SYSTEM', createdBySystemActor: 'GAME_BACKFILL', officialAt: new Date(), submittedAt: new Date() } });
     await prisma.v1Game.update({ where: { id: game.id }, data: { state: 'ENDED', currentOfficialRevisionId: revision.id } });
     await prisma.v1TeamMatch.update({ where: { id: row.teamMatchId }, data: { status: 'completed' } });
@@ -270,6 +273,52 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([registrationIds[2], registrationIds[7]]);
     expect(await prisma.v1TournamentMatchDetails.count({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } } })).toBe(1);
   });
+  it('동률이 낀 12팀 교차 결선은 동률 팀을 고르기 전엔 409, 고른 뒤엔 그 팀이 고른 순위 칸에 앉아 확정되고 조회가 선택을 돌려준다', async () => {
+    for (const number of [11, 12]) {
+      const team = await prisma.v1Team.create({ data: { ownerUserId: user.id, sportId: ids.soccerSportId, regionId: ids.regionId, name: `검증 팀 ${number}` } });
+      registrationIds.push((await prisma.v1TournamentRegistration.create({ data: { tournamentId, teamId: team.id, appliedByUserId: user.id, status: 'confirmed' } })).id);
+    }
+    await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { teamCount: 12 } });
+    const first = await service.setup(user, tournamentId, { expectedRevision: 0,
+      groups: [0, 1, 2, 3].map(i => ({ name: `${i + 1}조`, capacity: 3, legs: 1 as const, registrationIds: registrationIds.slice(i * 3, i * 3 + 3) })),
+      finals: [{ name: '프리미어', thirdPlace: false, rules: [1, 2, 3].flatMap(rank => [0, 1, 2, 3].map(group => ({ groupId: String(group), rank }))), registrationIds: null }] });
+    const pending = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: pending.previewHash, requestId: randomUUID() });
+    // 2조 (index 1) draws every game 0-0, so its three teams share ranks 1-3 and only the drawn order separated them; the other groups are decided.
+    const tiedTeams = registrationIds.slice(3, 6);
+    await finishPreliminary(new Set(tiedTeams));
+    const view = await service.get(user, tournamentId);
+    const groupB = view.groups[1].id;
+    expect(view.finals[0].crossGroupTopThreeAvailable).toBe(true);
+    expect(view.finals[0].unresolved.map(rule => [rule.groupId, rule.rank, rule.state, [...rule.tiedRegistrationIds].sort()])).toEqual(
+      [1, 2, 3].map(rank => [groupB, rank, 'tied', [...tiedTeams].sort()]));
+    expect(view.finals[0].tiePicks).toEqual([]);
+
+    const request = { expectedRevision: view.revision, finalName: '프리미어', assignmentPolicy: 'cross_group_top3' as const };
+    const [winner, runnerUp, third] = [tiedTeams[2], tiedTeams[0], tiedTeams[1]];
+    const picks = [{ groupId: groupB, rank: 1, registrationId: winner }, { groupId: groupB, rank: 2, registrationId: runnerUp }, { groupId: groupB, rank: 3, registrationId: third }];
+    await expect(service.assignmentPreview(user, tournamentId, request)).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_RANK_TIED' } });
+    await expect(service.assignmentPreview(user, tournamentId, { ...request, tiePicks: picks.slice(0, 2) })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_RANK_TIED' } });
+    await expect(service.assignmentPreview(user, tournamentId, { ...request, tiePicks: [{ ...picks[0], registrationId: registrationIds[0] }, ...picks.slice(1)] }))
+      .rejects.toMatchObject({ response: { code: 'MULTI_FINAL_INVALID' } });
+
+    const recommended = await service.assignmentPreview(user, tournamentId, { ...request, tiePicks: picks });
+    const seeds = settledSeeds(recommended.registrationIds);
+    expect(new Set(seeds).size).toBe(12);
+    // Group winners take the byes (seeds 1-4); 2조 is the second lane, so its pick for 2nd place meets 1조's winner.
+    expect([seeds[0], seeds[1], seeds[2], seeds[3]]).toEqual([registrationIds[0], winner, registrationIds[6], registrationIds[9]]);
+    expect(seeds[CROSS_GROUP_LANES[0].second - 1]).toBe(runnerUp);
+    expect(CROSS_GROUP_LANES.map(lane => seeds[lane.third - 1])).toContain(third);
+
+    await expect(service.assign(user, tournamentId, { ...request, registrationIds: seeds, sourceVersion: recommended.sourceVersion }))
+      .rejects.toMatchObject({ response: { code: 'MULTI_FINAL_RANK_TIED' } });
+    const assigned = await service.assign(user, tournamentId, { ...request, registrationIds: seeds, sourceVersion: recommended.sourceVersion, tiePicks: picks });
+    expect(assigned.finals[0].registrationIds).toEqual(seeds);
+    expect(assigned.finals[0].tiePicks).toEqual(picks);
+    expect((await service.get(user, tournamentId)).finals[0].tiePicks).toEqual(picks);
+    const filled = await prisma.v1TournamentSlot.findMany({ where: { tournamentId, kind: 'GROUP_RANK', group: { bracketTrack: '프리미어' } }, orderBy: { position: 'asc' } });
+    expect(filled.map(slot => slot.registrationId)).toEqual(seeds);
+  }, 60000);
   it('다른 대회 팀·중복 팀·중복 순위 목적지를 거절하고 기존 명단을 보존한다', async () => {
     const view = await setup();
     for (const bad of [

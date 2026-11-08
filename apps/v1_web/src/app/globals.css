@@ -1084,6 +1084,30 @@ button:disabled {
   color: var(--text);
 }
 
+/* 가입한 로그인 수단 칩 — 계정 찾기 결과에서 이메일 대신 가입 수단을 알린다. */
+.tm-method-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin: var(--spacing-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-method-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 36px;
+  padding: 0 var(--spacing-3) 0 var(--spacing-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+}
+
 .tm-card.tm-wpg-way {
   display: grid;
   gap: var(--spacing-4);
@@ -2299,6 +2323,11 @@ button:disabled {
 .tm-btn-ghost {
   background: transparent;
   color: var(--text);
+}
+
+/* 배경 없는 파괴 행동 글자 버튼(예: 로그인 방법 연결 해제). 크기·터치 높이는 .tm-btn-sm 이 맡는다. */
+.tm-btn.tm-danger-text {
+  color: var(--red700);
 }
 
 /* 인라인 로딩 스피너 (문자 도착 자동 확인 등). light-only + reduced-motion 대응. */

@@ -31,16 +31,16 @@ describe('LinkEmailVerifyDto', () => {
 });
 
 describe('LinkEmailCompleteDto', () => {
-  const valid = { emailLinkToken: TOKEN, password: 'password123', passwordConfirm: 'password123' };
+  const valid = { emailLinkToken: TOKEN, password: 'Sunny-ride-4', passwordConfirm: 'Sunny-ride-4' };
 
   it('accepts a matching password pair of eight or more characters', async () => {
     expect(await failedProperties(LinkEmailCompleteDto, valid)).toEqual([]);
   });
 
   it('refuses a confirmation that differs, including by case or a trailing space', async () => {
-    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'password124' })).toEqual(['passwordConfirm']);
-    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'Password123' })).toEqual(['passwordConfirm']);
-    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'password123 ' })).toEqual(['passwordConfirm']);
+    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'Sunny-ride-5' })).toEqual(['passwordConfirm']);
+    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'sunny-ride-4' })).toEqual(['passwordConfirm']);
+    expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: 'Sunny-ride-4 ' })).toEqual(['passwordConfirm']);
     expect(await failedProperties(LinkEmailCompleteDto, { ...valid, passwordConfirm: undefined })).toEqual(['passwordConfirm']);
   });
 

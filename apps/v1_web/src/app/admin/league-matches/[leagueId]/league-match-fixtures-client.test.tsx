@@ -32,6 +32,7 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => adminCan
 const canvasMocks = vi.hoisted(() => ({ applyTemplate: vi.fn() }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1ApplyLeagueTemplate: () => ({ mutateAsync: canvasMocks.applyTemplate, isPending: false }),
+  useV1LeagueTemplatePreview: () => ({ data: undefined, error: null, isFetching: false, isSettling: false }),
   useV1AssignTournamentSlot: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1RandomFillSlots: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));

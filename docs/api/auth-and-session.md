@@ -23,9 +23,9 @@
 | POST | `/auth/link/email/request` | Yes | 소셜 계정에 이메일·비밀번호 로그인을 더하기 1단계: 입력한 주소로 인증번호 발송(로그인한 지 30분 이내) — 자세한 계약은 `domains/auth.md` |
 | POST | `/auth/link/email/verify` | Yes | 2단계: 인증번호를 맞추고 10분짜리 `emailLinkToken` 받기 |
 | POST | `/auth/link/email/complete` | Yes | 3단계: `emailLinkToken` + 비밀번호로 이메일 로그인 연결, 그 주소가 계정 이메일이 된다 |
-| POST | `/auth/refresh` | No | refresh token으로 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
-| DELETE | `/auth/withdraw` | Yes | 소프트 삭제 탈퇴 |
+| POST | `/me/withdrawal-request` | Yes | 탈퇴 신청(30일 유예 뒤 삭제) — 자세한 계약은 `domains/users.md` |
+| POST | `/auth/withdrawal/cancel` | No(토큰이 자격) | 탈퇴 신청 철회 — 자세한 계약은 `domains/auth.md` |
 
 ## 토큰 발급 응답 계약
 
@@ -42,35 +42,13 @@
 }
 ```
 
-## refresh 계약
+## 세션 갱신 없음
 
-요청 body:
+`/auth/refresh` 라우트는 없다. 세션은 `teameet_v1_session` 쿠키 하나이고 요청마다 `V1AuthGuard`가 그 쿠키에서 다시 해석한다(`domains/auth.md` "Session Model").
 
-```json
-{
-  "refreshToken": "jwt"
-}
-```
+## 프론트 401 처리
 
-성공 시:
-
-```json
-{
-  "accessToken": "new-jwt",
-  "refreshToken": "new-jwt"
-}
-```
-
-실패 시: `401 Invalid refresh token`
-
-## 프론트 interceptor 동작
-
-`apps/v1_web/src/lib/api-client.ts` 기준:
-
-1. API 응답 `401` 수신
-2. `_retry`가 아니면 `/auth/refresh` 호출
-3. 성공 시 localStorage 토큰 교체 + 원 요청 재시도
-4. refresh도 실패하면 `logout()` 후 `/login` 이동
+`apps/v1_web/src/lib/api-client.ts` 기준: 응답이 `401`(또는 `code = UNAUTHENTICATED`)이면 `isUnauthenticatedError`가 참이 되고, 화면은 재발급 없이 로그아웃으로 처리한다. 5xx·네트워크 오류는 세션 문제가 아니므로 재시도 대상이다.
 
 ## dev-login 계약
 
@@ -93,7 +71,7 @@
 ## Anti-pattern
 
 - 프론트가 `statusCode` 대신 문자열 message만으로 분기
-- refresh 실패 후 원 요청을 무한 재시도
+- 401 응답을 세션 문제로 보지 않고 같은 요청을 반복 재시도
 - dev-login을 운영 분기 없이 노출
 
 ## Source References

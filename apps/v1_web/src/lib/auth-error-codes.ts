@@ -1,6 +1,9 @@
 /** 번호가 이미 다른 계정에 등록돼 있다는 409 코드. */
 export const PHONE_CONFLICT_CODE = 'PHONE_CONFLICT';
 
+/** 탈퇴를 신청해 유예 중인 계정이라는 403 코드(로그인·비밀번호 재설정 거절). 화면이 탈퇴 안내로 이어 주는 설계된 상태다. */
+export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
+
 /** 409 `details.next` — 원래 계정으로 로그인하면 이 소셜 로그인이 그 계정에 연결된다. */
 export const SIGN_IN_THEN_LINK_NEXT = 'sign_in_then_link';
 
@@ -12,6 +15,15 @@ export const SOCIAL_LINK_PROVIDER_EXISTS_CODE = 'SOCIAL_LINK_PROVIDER_EXISTS';
 
 /** 운영자 계정에는 로그인 수단을 연결할 수 없다는 403 코드. */
 export const SOCIAL_LINK_ADMIN_FORBIDDEN_CODE = 'SOCIAL_LINK_ADMIN_FORBIDDEN';
+
+/** 로그인 수단을 떼려는데 그것이 마지막 남은 수단이라는 409 코드. */
+export const LAST_LOGIN_METHOD_CODE = 'LAST_LOGIN_METHOD';
+
+/** 스스로 연결을 해제한 카카오·Apple 로 로그인하려 했다는 403 코드. 정지·차단 계정의 403 `PERMISSION_DENIED` 와 다르다. */
+export const LOGIN_METHOD_UNLINKED_CODE = 'LOGIN_METHOD_UNLINKED';
+
+/** 떼려는 로그인 수단이 이 계정에 연결돼 있지 않다(이미 뗐다)는 404 코드. */
+export const LOGIN_METHOD_NOT_FOUND_CODE = 'LOGIN_METHOD_NOT_FOUND';
 
 /** 이메일 인증 증명(`emailLinkToken`)이 만료됐거나 이 계정·주소의 것이 아니라는 400 코드. */
 export const EMAIL_LINK_TOKEN_INVALID_CODE = 'EMAIL_LINK_TOKEN_INVALID';

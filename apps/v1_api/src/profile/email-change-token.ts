@@ -1,0 +1,21 @@
+import { issueAccountEmailProof, readAccountEmailProof, type AccountEmailProofKind } from '../verification/account-email-proof';
+import { PROOF_TTL_MS } from '../verification/proof-token';
+
+/**
+ * Proof that the signed-in account received the code mailed to a new address, spent when `PATCH /me/profile` changes the
+ * account email to it. Bound to the account and the address, so it opens nothing else — not another address, not
+ * another account, not the email-login link.
+ */
+
+export const EMAIL_CHANGE_TOKEN_TTL_SECONDS = PROOF_TTL_MS / 1000;
+
+const KIND: AccountEmailProofKind = { purpose: 'email_change', accountDigestLabel: 'email_change_account' };
+
+export function issueEmailChangeToken(userId: string, email: string, nowMs: number = Date.now()): string {
+  return issueAccountEmailProof(KIND, userId, email, nowMs);
+}
+
+/** The address a genuine, unexpired token of this account vouches for; null for anything else. */
+export function readEmailChangeToken(token: string, userId: string, nowMs: number = Date.now()): string | null {
+  return readAccountEmailProof(KIND, token, userId, nowMs);
+}

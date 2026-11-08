@@ -165,6 +165,24 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
   });
 });
 
+describe('어드민 경기별 명단 — 경고 누적 칩', () => {
+  it('규정이 있으면 경고가 쌓인 선수의 앞으로 뛸 경기 칸에만 칩이 붙는다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: null });
+    mock.setCards('player-2', 1);
+    renderPanel();
+    await cell('박서준', G1.opponentName, '출전');
+    expect(screen.getAllByText('경고 1/2장 · 한 장 더 받으면 정지')).toHaveLength(2);
+    expect(screen.getAllByText(/경고 \d\/\d장/)).toHaveLength(2);
+  });
+
+  it('규정이 없으면 카드 기록이 있어도 칩이 없다', async () => {
+    mock.setCards('player-2', 1);
+    renderPanel();
+    await cell('박서준', G1.opponentName, '출전');
+    expect(screen.queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+});
+
 describe('어드민 경기별 명단 — 그사이 시작된 경기(409)', () => {
   it('저장 중 409 면 그 경기 변경만 버리고, 나머지는 다시 저장할 수 있다', async () => {
     renderPanel();

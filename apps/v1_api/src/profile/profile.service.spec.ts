@@ -1,14 +1,19 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { issueEmailLinkToken } from '../auth/email-link-token';
 import { PrismaService } from '../prisma/prisma.service';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
+import { issueEmailChangeToken } from './email-change-token';
 import { ProfileService } from './profile.service';
+import type { NotificationsService } from '../notifications/notifications.service';
 import type { RealtimeGateway } from '../realtime/realtime.gateway';
 
 function createProfileService(
   prisma: unknown,
   realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
+  notifications: Pick<NotificationsService, 'createInTransaction' | 'deliverCreated'> = { createInTransaction: jest.fn(), deliverCreated: jest.fn() },
 ): ProfileService {
-  return new ProfileService(prisma as PrismaService, realtimeGateway);
+  return new ProfileService(prisma as PrismaService, realtimeGateway, notifications as NotificationsService);
 }
 
 const user = {
@@ -18,66 +23,257 @@ const user = {
   onboardingStatus: 'completed' as const,
 };
 
-describe('ProfileService identity binding', () => {
-  it('clears stale verification assertions and synchronizes the password login key when email changes', async () => {
-    const profile = {
-      displayName: '테스트 사용자',
-      nickname: '테스트닉',
-      profileImageUrl: null,
-      birthDate: null,
-      gender: 'male',
-      updatedAt: new Date(),
-    };
+describe('ProfileService email change proof gate', () => {
+  const NEW_EMAIL = 'new@teameet.test';
+  const profile = {
+    displayName: '테스트 사용자',
+    nickname: '테스트닉',
+    profileImageUrl: null,
+    birthDate: null,
+    gender: 'male',
+    updatedAt: new Date(),
+  };
+
+  function buildPrisma(overrides: { hasPassword?: boolean; currentEmail?: string | null } = {}) {
+    const hasPassword = overrides.hasPassword ?? true;
     const prisma = {
       v1User: {
         findUnique: jest.fn().mockResolvedValue({
-          email: user.email,
+          email: overrides.currentEmail === undefined ? user.email : overrides.currentEmail,
           phone: '01011112222',
-          authIdentities: [{ provider: 'email', passwordHash: 'hash' }],
+          authIdentities: hasPassword ? [{ provider: 'email', passwordHash: 'hash' }] : [{ provider: 'kakao', passwordHash: null }],
           profile,
         }),
         findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({}),
       },
-      v1AuthIdentity: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-      },
+      v1AuthIdentity: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1UserProfile: {
         findFirst: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockResolvedValue(profile),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
-      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
-    const service = createProfileService(prisma);
+    return prisma;
+  }
 
-    await service.updateMe(user, {
+  /** The lookups for another account holding an address (the phone and nickname lookups share `findFirst` but have no `OR`). */
+  const holderLookups = (prisma: ReturnType<typeof buildPrisma>) =>
+    prisma.v1User.findFirst.mock.calls.filter(([args]: [{ where: { OR?: unknown } }]) => args.where.OR !== undefined);
+
+  function buildNotifications() {
+    const created = { id: 'notification-1', targetType: 'system', targetId: null, title: '계정 이메일이 바뀌었어요', body: null, deepLink: '/my/settings' };
+    return {
+      created,
+      service: { createInTransaction: jest.fn().mockResolvedValue(created), deliverCreated: jest.fn() },
+    };
+  }
+
+  function payload(overrides: Record<string, unknown> = {}) {
+    return {
       displayName: profile.displayName,
       nickname: profile.nickname,
-      email: 'new@teameet.test',
-      // 번호는 그대로 둔다 — 번호 변경은 본인인증 증명을 요구하므로 아래 별도 describe 에서 다룬다.
+      email: NEW_EMAIL,
+      // 번호는 그대로 둔다 — 번호 변경은 본인인증 증명을 요구하므로 별도 describe 에서 다룬다.
       phone: '01011112222',
       profileImageUrl: null,
       birthDate: null,
-      gender: 'male',
-    });
+      gender: 'male' as const,
+      ...overrides,
+    };
+  }
 
+  const originalSecret = process.env.V1_SESSION_SECRET;
+  beforeEach(() => {
+    process.env.V1_SESSION_SECRET = 'test-proof-secret';
+  });
+  afterEach(() => {
+    if (originalSecret === undefined) delete process.env.V1_SESSION_SECRET;
+    else process.env.V1_SESSION_SECRET = originalSecret;
+  });
+
+  it('marks the new address verified, moves the password login key and tells the owner', async () => {
+    const prisma = buildPrisma();
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    const saved = await service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }));
+
+    // The web patches its cached account email from this response, so it must carry the address that was stored.
+    expect(saved).toMatchObject({ email: NEW_EMAIL, phone: '01011112222' });
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
-      data: {
-        email: 'new@teameet.test',
-        phone: '01011112222',
-        emailVerifiedAt: null,
-      },
+      data: { email: NEW_EMAIL, phone: '01011112222', emailVerifiedAt: expect.any(Date) },
     });
     expect(prisma.v1AuthIdentity.updateMany).toHaveBeenCalledWith({
       where: { userId: user.id, provider: 'email', status: 'active' },
-      data: { email: 'new@teameet.test', providerUserKey: 'new@teameet.test' },
+      data: { email: NEW_EMAIL, providerUserKey: NEW_EMAIL },
     });
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ targetType: 'user', targetId: user.id, actorUserId: user.id, reason: 'email_changed' }),
+    });
+    // The notice names the address masked, is created with the change and pushed only after it commits.
+    expect(notifications.service.createInTransaction).toHaveBeenCalledWith(prisma, user.id, 'email_changed', { vars: { name: 'ne***@teameet.test' } });
+    expect(notifications.service.deliverCreated).toHaveBeenCalledWith(user.id, 'email_changed', notifications.created);
+  });
+
+  it('leaves a social account without an email login key and still verifies its new contact address', async () => {
+    const prisma = buildPrisma({ hasPassword: false, currentEmail: null });
+    const service = createProfileService(prisma);
+
+    await service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }));
+
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: expect.objectContaining({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date) }),
+    });
+    expect(prisma.v1AuthIdentity.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses a change with no token and saves nothing', async () => {
+    const prisma = buildPrisma();
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    await expect(service.updateMe(user, payload())).rejects.toMatchObject({ response: { code: 'EMAIL_CHANGE_PROOF_REQUIRED' }, status: 400 });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(notifications.service.createInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('refuses a token minted for another address, another account, the email login link or after it expired', async () => {
+    const prisma = buildPrisma();
+    const service = createProfileService(prisma);
+    const tokens = {
+      otherAddress: issueEmailChangeToken(user.id, 'someone-else@teameet.test'),
+      otherAccount: issueEmailChangeToken('user-2', NEW_EMAIL),
+      loginLink: issueEmailLinkToken(user.id, NEW_EMAIL),
+      expired: issueEmailChangeToken(user.id, NEW_EMAIL, Date.now() - 11 * 60_000),
+      garbage: 'not-a-token',
+    };
+
+    for (const [name, emailChangeToken] of Object.entries(tokens)) {
+      await expect(service.updateMe(user, payload({ emailChangeToken }))).rejects.toMatchObject({
+        response: { code: 'EMAIL_CHANGE_PROOF_REQUIRED' },
+        status: 400,
+      });
+      expect({ name, saved: prisma.v1User.update.mock.calls.length }).toEqual({ name, saved: 0 });
+    }
+  });
+
+  it('asks for the proof before it says whether the address is taken', async () => {
+    const prisma = buildPrisma();
+    prisma.v1User.findFirst.mockResolvedValue({ id: 'someone-else' });
+    const service = createProfileService(prisma);
+
+    await expect(service.updateMe(user, payload())).rejects.toMatchObject({ response: { code: 'EMAIL_CHANGE_PROOF_REQUIRED' } });
+
+    expect(holderLookups(prisma)).toHaveLength(0);
+  });
+
+  it('answers EMAIL_CONFLICT when another account holds the address, even with a valid token', async () => {
+    const prisma = buildPrisma();
+    prisma.v1User.findFirst.mockResolvedValue({ id: 'someone-else' });
+    const service = createProfileService(prisma);
+
+    await expect(service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }))).rejects.toMatchObject({
+      response: { code: 'EMAIL_CONFLICT' },
+      status: 409,
+    });
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the address inside the transaction, where the address lock is held', async () => {
+    const prisma = buildPrisma();
+    // Free when first asked, taken by the time the transaction looks again.
+    let holderLookupCount = 0;
+    prisma.v1User.findFirst.mockImplementation(({ where }: { where: { OR?: unknown } }) =>
+      Promise.resolve(where.OR !== undefined && ++holderLookupCount === 2 ? { id: 'someone-else' } : null),
+    );
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    await expect(service.updateMe(user, payload({ emailChangeToken: issueEmailChangeToken(user.id, NEW_EMAIL) }))).rejects.toMatchObject({
+      response: { code: 'EMAIL_CONFLICT' },
+    });
+    expect(holderLookupCount).toBe(2);
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(notifications.service.deliverCreated).not.toHaveBeenCalled();
+  });
+
+  it('maps a unique-index violation on the address to EMAIL_CONFLICT, and leaves other violations alone', async () => {
+    const violation = (target: string[]) =>
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test', meta: { target } });
+    const emailTaken = buildPrisma();
+    emailTaken.$transaction.mockRejectedValue(violation(['email']));
+    const phoneTaken = buildPrisma();
+    phoneTaken.$transaction.mockRejectedValue(violation(['phone']));
+    const token = issueEmailChangeToken(user.id, NEW_EMAIL);
+
+    await expect(createProfileService(emailTaken).updateMe(user, payload({ emailChangeToken: token }))).rejects.toMatchObject({
+      response: { code: 'EMAIL_CONFLICT' },
+    });
+    await expect(createProfileService(phoneTaken).updateMe(user, payload({ emailChangeToken: token }))).rejects.toBeInstanceOf(
+      Prisma.PrismaClientKnownRequestError,
+    );
+  });
+
+  it('needs no token when the address is the same, however it is written', async () => {
+    const prisma = buildPrisma();
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    const saved = await service.updateMe(user, payload({ email: ' OLD@Teameet.test ' }));
+
+    expect(saved).toMatchObject({ email: user.email });
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: { email: user.email, phone: '01011112222' },
+    });
+    expect(holderLookups(prisma)).toHaveLength(0);
+    expect(notifications.service.createInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('treats an address stored in another letter case as the same address, so saving needs no token and keeps it verified', async () => {
+    const prisma = buildPrisma({ currentEmail: 'Old@Teameet.test' });
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    await service.updateMe(user, payload({ email: 'old@teameet.test' }));
+
+    expect(prisma.v1User.update).toHaveBeenCalledWith({ where: { id: user.id }, data: { email: 'old@teameet.test', phone: '01011112222' } });
+    expect(notifications.service.createInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('lets a social account clear its contact email without a token, leaving nothing verified', async () => {
+    const prisma = buildPrisma({ hasPassword: false });
+    const notifications = buildNotifications();
+    const service = createProfileService(prisma, undefined, notifications.service);
+
+    const saved = await service.updateMe(user, payload({ email: null }));
+
+    expect(saved).toMatchObject({ email: null });
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: { email: null, phone: '01011112222', emailVerifiedAt: null },
+    });
+    expect(notifications.service.createInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps the password account email when the request leaves it out', async () => {
+    const prisma = buildPrisma();
+    const service = createProfileService(prisma);
+
+    const saved = await service.updateMe(user, payload({ email: undefined }));
+
+    // A client that left the email out learns the kept address from the response instead of guessing it.
+    expect(saved).toMatchObject({ email: user.email });
+    expect(prisma.v1User.update).toHaveBeenCalledWith({ where: { id: user.id }, data: { email: user.email, phone: '01011112222' } });
   });
 });
 
@@ -298,8 +494,9 @@ describe('ProfileService phone change proof gate', () => {
     const { prisma } = buildPrisma();
     const service = createProfileService(prisma as unknown as PrismaService);
 
-    await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
+    const saved = await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
 
+    expect(saved).toMatchObject({ phone: NEW_PHONE });
     expect(prisma.v1User.update).toHaveBeenCalledTimes(1);
     const data = prisma.v1User.update.mock.calls[0][0].data;
     expect(data.phone).toBe(NEW_PHONE);

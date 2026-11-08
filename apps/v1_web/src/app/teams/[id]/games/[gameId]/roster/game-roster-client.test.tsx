@@ -207,6 +207,51 @@ describe('읽기 전용', () => {
   });
 });
 
+describe('경고 누적 칩', () => {
+  it('규정이 있는 대회에서 경고가 쌓인 선수의 출전 줄에만 붙고, 정지 한도에 가까우면 그 사실이 같이 보인다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 3, redCardSuspensionMatches: 1 });
+    mock.setCards('player-1', 2);
+    mock.setCards('player-2', 1);
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    const playing = section(/출전 3명/);
+    expect(within(playing).getByText('경고 2/3장 · 한 장 더 받으면 정지')).toBeInTheDocument();
+    expect(within(playing).getByText('경고 1/3장')).toBeInTheDocument();
+    expect(within(playing).getAllByText(/경고 \d\/\d장/)).toHaveLength(2);
+  });
+
+  it('규정이 없는 대회에서는 카드 기록이 있어도 칩이 없다', async () => {
+    mock.setCards('player-1', 2);
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    expect(screen.queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+
+  it('맨 위 안내가 정지 선수와 경고 임박 선수를 먼저 알리고, 규정이 없으면 없다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 });
+    mock.suspend('player-3', '퇴장 1회', 1);
+    mock.setCards('player-2', 1);
+    const { unmount } = renderScreen();
+    expect(await screen.findByText('출전정지 1명은 이 경기에 나설 수 없어요. 한도윤 — 명단에서 자동으로 빠졌어요.')).toBeInTheDocument();
+    expect(screen.getByText('경고 임박 1명 — 박서준. 이번 경기에서 경고를 받으면 다음 경기부터 출전정지예요.')).toBeInTheDocument();
+    unmount();
+
+    mock.setDisciplineRules(null);
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전정지 1명' });
+    expect(screen.queryByText(/경고 임박/)).toBeNull();
+  });
+
+  it('시작한 경기에서는 칩을 보이지 않는다 — 그 경기 직전 누적이라 경고가 아니다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 3, redCardSuspensionMatches: 1 });
+    mock.setCards('player-1', 2);
+    mock.setGameState(G1.gameId, 'LIVE');
+    renderScreen();
+    await screen.findByText('경기 시작됨');
+    expect(screen.queryByText(/경고 \d\/\d장/)).toBeNull();
+  });
+});
+
 describe('자동으로 빠지거나 들어온 선수', () => {
   it('출전정지는 사유·남은 경기와 함께 따로 보이고 되돌릴 조작이 없다', async () => {
     mock.suspend('player-3', '퇴장 1회', 1);

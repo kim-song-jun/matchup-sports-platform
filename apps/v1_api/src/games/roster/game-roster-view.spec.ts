@@ -124,6 +124,7 @@ describe('buildGameRosterView', () => {
       baseSource: 'REGISTRATION',
       base: BASE,
       computation,
+      discipline: { rules: null, cardsByUserId: new Map() },
       fixtureSnapshotUserIds: new Set(['u1', 'u2', 'u3', 'u4']),
       legacyLineupPending: false,
       jerseyRegistration: { id: 'reg-1', editable: true },
@@ -165,6 +166,37 @@ describe('buildGameRosterView', () => {
     expect(result.unavailable).toEqual([
       expect.objectContaining({ userId: 'u3', actor: { userId: 'ops', displayName: '운영자', role: 'ADMIN' } }),
     ]);
+  });
+
+  it('규정과 선수별 카드 누적을 싣는다 — 정지·출전 선수 모두, 카드 기록이 없는 선수는 null', () => {
+    const rules = { yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 };
+    const result = view({
+      discipline: {
+        rules,
+        cardsByUserId: new Map([
+          ['u1', { yellowTotal: 1, redTotal: 0 }],
+          ['u4', { yellowTotal: 0, redTotal: 1 }],
+        ]),
+      },
+    });
+    expect(result.disciplineRules).toEqual(rules);
+    expect(result.base.map((row) => [row.userId, row.cards])).toEqual([
+      ['u1', { yellowTotal: 1, redTotal: 0 }],
+      ['u2', null],
+      ['u3', null],
+      ['u4', { yellowTotal: 0, redTotal: 1 }],
+      ['u5', null],
+    ]);
+    expect(result.suspended[0].cards).toEqual({ yellowTotal: 0, redTotal: 1 });
+    expect(view().disciplineRules).toBeNull();
+  });
+
+  it('시작된 경기도 기록 명단 선수의 카드 누적을 싣는다', () => {
+    const result = view({
+      playedLineup: [{ id: 'gp-1', userId: 'u1', displayNameSnapshot: '선수-u1', jerseyNumber: 7 }],
+      discipline: { rules: { yellowAccumulationLimit: 2, redCardSuspensionMatches: null }, cardsByUserId: new Map([['u1', { yellowTotal: 1, redTotal: 0 }]]) },
+    });
+    expect(result.base.find((row) => row.userId === 'u1')?.cards).toEqual({ yellowTotal: 1, redTotal: 0 });
   });
 
   it('대진 시점 명단에 없던 계정만 "참가 명단에 추가돼 들어옴"으로 표시한다', () => {

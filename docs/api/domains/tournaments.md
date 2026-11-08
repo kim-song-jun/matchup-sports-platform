@@ -536,6 +536,7 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/tournaments/:tournamentId/registrations` | active admin | `status?`, `cursor?`, `limit?` | `items`, `pageInfo: { hasNext, nextCursor }` |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/discipline` | **플랫폼 어드민(owner·ops·support) 전용** — 대회 스태프·팀 역할은 `403 PERMISSION_DENIED`. 리그 id 도 같은 경로 | — | `{ competitionId, title, kind: TOURNAMENT\|LEAGUE, rules: { yellowAccumulationLimit, redCardSuspensionMatches } \| null, summary: { suspended, imminent, withCards }, players[] }`. `rules` 가 null 이면(정지 규정 둘 다 꺼짐) `players` 는 빈 배열. `players[]` = `{ userId, displayName, realName?, teamId, teamName, status: SUSPENDED\|IMMINENT\|CARDS, yellowTotal, redTotal, remainingMatches, reason, nextGame: { teamMatchId, gameId, startAt, opponentName } \| null }` — 정지 중 → 경고 임박 → 카드만 받은 순, 팀·이름순. 판정은 경기 명단과 같은 `evaluateSuspension` 이고 각 팀의 다음 경기(아직 시작하지 않은 가장 이른 경기)가 기준이다. 남은 경기가 없는 팀은 `nextGame: null` 이고 카드 누적만 싣는다(`CARDS`). 카드 기록이 없는 선수와 계정 없는 참가자는 싣지 않는다. |
 | `PATCH` | `/api/v1/admin/registrations/:registrationId/confirm` | owner/ops admin | `{ decision: 'confirm' \| 'waitlist', note? }` | registration; already at the target status adds `alreadyProcessed: true` |
 | `PATCH` | `/api/v1/admin/registrations/:registrationId/reject-cancel` | owner/ops admin | empty body | restored registration |
 

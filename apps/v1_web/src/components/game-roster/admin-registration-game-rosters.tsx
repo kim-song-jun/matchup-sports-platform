@@ -15,6 +15,8 @@ import {
 } from '@/hooks/use-v1-game-roster';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { rosterPersonLabel } from '@/lib/roster-presentation';
+import { disciplineWarningChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterActorRoleLabel, gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -278,9 +280,14 @@ function RosterCell({
   const status = effectiveStatus(cell, draft, player.userId);
   const changed = cellKey(game.gameId, player.userId) in draft;
   const label = cellLabel(cell, status, changed);
+  // 이미 치른 경기 칸의 누적은 그 경기 직전 값이라 경고가 아니다 — 앞으로 뛸 경기에서만 보인다.
+  const warning = game.gameState === 'SCHEDULED' ? disciplineWarningChip(cell.cards, game.disciplineRules) : null;
   const content =
     status === 'PARTICIPATING' ? (
-      <span>{label}</span>
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <span>{label}</span>
+        {warning === null ? null : <StatusChip chip={warning} />}
+      </span>
     ) : status === 'NOT_IN_ROSTER' ? (
       <span className="text-[var(--text-muted)]">{label}</span>
     ) : (

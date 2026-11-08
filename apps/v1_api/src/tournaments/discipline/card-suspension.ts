@@ -76,6 +76,15 @@ export function suspensionRulesEnabled(rules: SuspensionRules): boolean {
   return isPositive(rules.yellowAccumulationLimit) || isPositive(rules.redCardSuspensionMatches);
 }
 
+/**
+ * 경고를 한 장만 더 받으면 정지가 걸리는가 — 한도가 2장 이상이고 이번 한도 구간의 마지막 한 장 앞에 있을 때다.
+ * 한도가 1장이면 첫 경고가 곧 정지라 "임박"이 존재하지 않는다.
+ */
+export function isSuspensionImminent(rules: SuspensionRules, yellowTotal: number): boolean {
+  const limit = rules.yellowAccumulationLimit;
+  return isPositive(limit) && limit >= 2 && yellowTotal % limit === limit - 1;
+}
+
 function isPositive(value: number | null): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }

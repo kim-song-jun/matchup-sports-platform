@@ -1,3 +1,10 @@
+import type {
+  V1AdCampaignStatus,
+  V1AdChannel,
+  V1AdChannelPhase,
+  V1AdPublishMissingField,
+} from '@/types/ads';
+
 /**
  * 관리자 액션 코드를 사람이 읽을 수 있는 한국어 레이블로 변환해요.
  *
@@ -75,4 +82,73 @@ const TARGET_TYPE_LABEL_MAP: Record<string, string> = {
 
 export function adminTargetTypeLabel(targetType: string): string {
   return TARGET_TYPE_LABEL_MAP[targetType] ?? targetType;
+}
+
+// ── 광고 캠페인 ────────────────────────────────────────────────────────────
+
+const AD_CAMPAIGN_STATUS_LABEL: Record<V1AdCampaignStatus, string> = {
+  draft: '초안',
+  published: '게시 중',
+  stopped: '중단',
+};
+
+export function adCampaignStatusLabel(status: V1AdCampaignStatus): string {
+  return AD_CAMPAIGN_STATUS_LABEL[status] ?? '—';
+}
+
+/**
+ * AdminStatusPill 은 STATUS_META 키로 톤·아이콘을 고른다. 광고의 '중단'은 그 표에 같은 뜻이 없어
+ * 같은 톤(주의·정지)의 'suspended' 를 빌리고 말은 위 라벨로 덮는다.
+ */
+const AD_CAMPAIGN_STATUS_PILL_KEY: Record<V1AdCampaignStatus, string> = {
+  draft: 'draft',
+  published: 'published',
+  stopped: 'suspended',
+};
+
+export function adCampaignStatusPillKey(status: V1AdCampaignStatus): string {
+  return AD_CAMPAIGN_STATUS_PILL_KEY[status] ?? 'draft';
+}
+
+const AD_CHANNEL_PHASE_LABEL: Record<V1AdChannelPhase, string> = {
+  scheduled: '예약',
+  live: '노출 중',
+  ended: '종료',
+};
+
+export function adChannelPhaseLabel(phase: V1AdChannelPhase): string {
+  return AD_CHANNEL_PHASE_LABEL[phase] ?? '—';
+}
+
+/** 채널 단계 알약의 톤·아이콘은 경기 단계 알약과 같은 뜻(예정·진행·끝)이라 그 키를 빌린다. */
+const AD_CHANNEL_PHASE_PILL_KEY: Record<V1AdChannelPhase, string> = {
+  scheduled: 'match_scheduled',
+  live: 'match_live',
+  ended: 'completed',
+};
+
+export function adChannelPhasePillKey(phase: V1AdChannelPhase): string {
+  return AD_CHANNEL_PHASE_PILL_KEY[phase] ?? 'match_scheduled';
+}
+
+const AD_CHANNEL_LABEL: Record<V1AdChannel, string> = {
+  banner: '배너',
+  popup: '팝업',
+};
+
+export function adChannelLabel(channel: V1AdChannel): string {
+  return AD_CHANNEL_LABEL[channel] ?? '—';
+}
+
+const AD_PUBLISH_FIELD_LABEL: Record<V1AdPublishMissingField, string> = {
+  imageUrl: '이미지',
+  altText: '대체 텍스트',
+  linkUrl: '이동 링크',
+  startAt: '시작 시각',
+  endAt: '끝 시각',
+  headline: '제목',
+};
+
+export function adPublishFieldLabel(field: V1AdPublishMissingField): string {
+  return AD_PUBLISH_FIELD_LABEL[field] ?? '필수 항목';
 }

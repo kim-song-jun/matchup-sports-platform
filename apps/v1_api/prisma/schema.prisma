@@ -1230,13 +1230,14 @@ model V1AdCampaign {
   version        Int                @default(1)
 
   bannerImageUrl String?   @map("banner_image_url")
-  bannerImageAlt String?   @map("banner_image_alt")
+  /// 스크린리더용 대체 텍스트. 소재가 있는 채널은 이 값이 있어야 게시된다(초안은 비어 있어도 된다).
+  bannerAltText  String?   @map("banner_alt_text")
   bannerLinkUrl  String?   @map("banner_link_url")
   bannerStartAt  DateTime? @map("banner_start_at")
   bannerEndAt    DateTime? @map("banner_end_at")
 
   popupImageUrl String?   @map("popup_image_url")
-  popupImageAlt String?   @map("popup_image_alt")
+  popupAltText  String?   @map("popup_alt_text")
   popupLinkUrl  String?   @map("popup_link_url")
   popupStartAt  DateTime? @map("popup_start_at")
   popupEndAt    DateTime? @map("popup_end_at")

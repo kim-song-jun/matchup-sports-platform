@@ -315,6 +315,17 @@ enum V1ContentAssetStatus {
   attached
 }
 
+enum V1AdCampaignStatus {
+  draft
+  published
+  stopped
+}
+
+enum V1AdChannel {
+  banner
+  popup
+}
+
 enum V1StatusActorType {
   user
   admin
@@ -1185,19 +1196,85 @@ model V1ContentAsset {
   uploadedByAdminUserId String               @map("uploaded_by_admin_user_id")
   noticeId              String?              @map("notice_id")
   popupId               String?              @map("popup_id")
+  /// 광고 캠페인 소재. 소유자는 notice·popup·ad 중 하나다 — 기존 단일 소유자 CHECK 는 notice·popup 만 보므로
+  /// 광고와의 배타는 `AdsService` 의 첨부 가능 검사가 지킨다.
+  adCampaignId          String?              @map("ad_campaign_id")
   attachedAt            DateTime?            @map("attached_at")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
 
-  uploadedByAdminUser V1AdminUser @relation(fields: [uploadedByAdminUserId], references: [id], onDelete: Restrict)
-  notice              V1Notice?   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
-  popup               V1Popup?    @relation(fields: [popupId], references: [id], onDelete: Cascade)
+  uploadedByAdminUser V1AdminUser   @relation(fields: [uploadedByAdminUserId], references: [id], onDelete: Restrict)
+  notice              V1Notice?     @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  popup               V1Popup?      @relation(fields: [popupId], references: [id], onDelete: Cascade)
+  adCampaign          V1AdCampaign? @relation(fields: [adCampaignId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@index([uploadedByAdminUserId, createdAt])
   @@index([noticeId])
   @@index([popupId])
+  @@index([adCampaignId])
   @@map("v1_content_assets")
+}
+
+/// 광고 캠페인 1건 = 배너·팝업 소재를 함께 가진 광고 계약 1건. 채널(배너/팝업)마다 이미지·링크·기간이 따로이고
+/// 한 채널만 있어도 된다. 채널당 동시에 게시된 캠페인은 기간이 겹치지 않는다(게시 시점에 `AdsService` 가
+/// advisory lock 아래서 검사). 이름이 비슷한 `V1TournamentCampaign` 과는 무관하다.
+model V1AdCampaign {
+  id             String             @id @default(uuid())
+  /// 사용자 화면에 "광고 · {이름}" 으로 나가는 광고주 표시 이름.
+  advertiserName String             @map("advertiser_name")
+  /// 운영자만 보는 내부 메모용 제목. 공개 API 로 나가지 않는다.
+  title          String
+  status         V1AdCampaignStatus @default(draft)
+  /// 저장할 때마다 1 씩 오른다. 수정·게시 요청이 보낸 expectedVersion 과 다르면 409 로 막아 다른 운영자의 변경을 덮어쓰지 않는다.
+  version        Int                @default(1)
+
+  bannerImageUrl String?   @map("banner_image_url")
+  bannerImageAlt String?   @map("banner_image_alt")
+  bannerLinkUrl  String?   @map("banner_link_url")
+  bannerStartAt  DateTime? @map("banner_start_at")
+  bannerEndAt    DateTime? @map("banner_end_at")
+
+  popupImageUrl String?   @map("popup_image_url")
+  popupImageAlt String?   @map("popup_image_alt")
+  popupLinkUrl  String?   @map("popup_link_url")
+  popupStartAt  DateTime? @map("popup_start_at")
+  popupEndAt    DateTime? @map("popup_end_at")
+
+  publishedAt          DateTime? @map("published_at")
+  stoppedAt            DateTime? @map("stopped_at")
+  createdByAdminUserId String    @map("created_by_admin_user_id")
+  updatedByAdminUserId String    @map("updated_by_admin_user_id")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  createdByAdminUser V1AdminUser             @relation("V1AdCampaignCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
+  updatedByAdminUser V1AdminUser             @relation("V1AdCampaignUpdatedBy", fields: [updatedByAdminUserId], references: [id], onDelete: Restrict)
+  contentAssets      V1ContentAsset[]
+  dailyStats         V1AdCampaignDailyStat[]
+
+  @@index([status, bannerStartAt, bannerEndAt], map: "v1_ad_campaigns_banner_window_idx")
+  @@index([status, popupStartAt, popupEndAt], map: "v1_ad_campaigns_popup_window_idx")
+  @@index([createdAt, id])
+  @@map("v1_ad_campaigns")
+}
+
+/// 캠페인·채널·한국 날짜(KST) 단위 노출/클릭 합계. 사용자 식별 정보나 원시 이벤트는 저장하지 않는다.
+model V1AdCampaignDailyStat {
+  id          String      @id @default(uuid())
+  campaignId  String      @map("campaign_id")
+  channel     V1AdChannel
+  /// KST 달력 날짜(UTC 자정으로 저장한 날짜 값).
+  statDate    DateTime    @db.Date @map("stat_date")
+  impressions Int         @default(0)
+  clicks      Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  campaign V1AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, channel, statDate])
+  @@map("v1_ad_campaign_daily_stats")
 }
 
 model V1UserSportPreference {
@@ -2474,6 +2551,8 @@ model V1AdminUser {
   confirmedTournamentPayments      V1TournamentPayment[]       @relation("V1TournamentPaymentConfirmedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
+  createdAdCampaigns               V1AdCampaign[]                   @relation("V1AdCampaignCreatedBy")
+  updatedAdCampaigns               V1AdCampaign[]                   @relation("V1AdCampaignUpdatedBy")
   createdLeagueSeries              V1LeagueSeries[]                 @relation("V1LeagueSeriesAdmin")
   decidedLeaguePromotions          V1LeaguePromotion[]              @relation("V1LeaguePromotionAdmin")
 

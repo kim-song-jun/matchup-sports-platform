@@ -7,6 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { issueEmailChangeToken } from '../src/profile/email-change-token';
 import { ManagedTermsRuntimeService } from '../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from './integration/integration-app';
+import { tamperSignature } from './helpers/tamper-signature';
 
 const PREFIX = 'integration-email-change';
 const EMAIL_LOGIN_USER = `${PREFIX}-mailer`;
@@ -330,7 +331,7 @@ describe('V1 changing the account email needs a code mailed to the new address i
     });
 
     it('a token cannot be forged from the code alone', async () => {
-      const forged = issueEmailChangeToken(EMAIL_LOGIN_USER, NEW_EMAIL).replace(/.$/, (last) => (last === 'A' ? 'B' : 'A'));
+      const forged = tamperSignature(issueEmailChangeToken(EMAIL_LOGIN_USER, NEW_EMAIL));
 
       const response = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, emailChangeToken: forged });
 

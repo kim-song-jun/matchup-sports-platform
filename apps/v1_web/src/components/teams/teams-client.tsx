@@ -14,6 +14,7 @@ import {
   useV1MasterRegions,
   useV1MasterSports,
   useV1MyTeams,
+  useV1Profile,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
@@ -47,7 +48,7 @@ import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { CursorPage, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
-import { firstSearchParam, TEAM_LIST_PAGE_SIZE, teamListContinuationPath, teamListQueryFilters, teamListSeedPath, type CursorListSeed } from '@/lib/public-list-seed';
+import { firstSearchParam, TEAM_LIST_PAGE_SIZE, teamListContinuationPath, teamListQueryFilters, teamListSeedPath, toTeamSort, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TOAST_DURATION_MS, useToast } from '@/components/v1-ui/toast';
 import { JerseyNumberDialog } from './jersey-number-dialog';
@@ -94,6 +95,15 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
   }, [initialQuery]);
   const sports = useV1MasterSports({ seed: seed?.sports });
   const regions = useV1MasterRegions();
+  // 위치 권한 없이 저장해 둔 활동 지역만 쓴다 — 미로그인은 프로필을 묻지 않는다.
+  const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
+  const signedIn = Boolean(authMe.data?.user?.id);
+  const profile = useV1Profile({ enabled: signedIn });
+  const myRegion = resolveMyTeamRegion({
+    unresolved: authMe.isPending || (signedIn && (profile.isPending || profile.isError)) || regions.isPending,
+    saved: signedIn ? profile.data?.regions : undefined,
+    master: regions.data ?? [],
+  });
   const teamFilters = useMemo(() => {
     const filters = teamListQueryFilters({
       sportId: selectedSportId,
@@ -208,7 +218,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     filterCount: activeFilterCount,
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
-    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
+    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], myRegion, filterOpen),
     chips: buildTeamSportChips(
       visibleItems,
       base,
@@ -1101,12 +1111,14 @@ function buildTeamFilterSheet(
   levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
   regionId: string | undefined,
   regions: ReadonlyArray<{ id: string; name: string; parentId: string | null }>,
+  myRegion: MyTeamRegion,
   open: boolean,
 ): NonNullable<TeamListViewModel['filterSheet']> {
+  // 기본(최근 등록순)은 sort 파라미터가 없는 상태다 — 서버에서 순서가 실제로 다른 정렬만 메뉴에 둔다.
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
-    { label: '추천순', value: 'recommended', href: buildTeamHref(params, { sort: sort === 'recommended' ? null : 'recommended', filter: '1' }), active: sort === 'recommended' },
-    { label: '가입 가능', value: 'deadline', href: buildTeamHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
-    { label: '최신순', value: 'latest', href: buildTeamHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
+    { label: '최근 등록순', value: '', href: buildTeamHref(params, { sort: null, filter: '1' }), active: sort === '' },
+    { label: '멤버 많은순', value: 'member_count', href: buildTeamHref(params, { sort: sort === 'member_count' ? null : 'member_count', filter: '1' }), active: sort === 'member_count' },
+    { label: '활동 많은순', value: 'activity', href: buildTeamHref(params, { sort: sort === 'activity' ? null : 'activity', filter: '1' }), active: sort === 'activity' },
   ];
   const genderOptions: NonNullable<TeamListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildTeamHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
@@ -1120,10 +1132,20 @@ function buildTeamFilterSheet(
     active: levels.includes(code),
   }));
   // matches-client.tsx buildMatchFilterSheet()와 동일 이유로 시/도(레벨1)만 칩으로 노출한다.
+  // 내 지역 칩은 저장한 활동 지역의 시/도 한 곳이고, 같은 시/도의 일반 칩은 중복이라 뺀다.
+  const mineProvinceId = myRegion.status === 'ready' ? myRegion.provinceId : undefined;
   const regionOptions: NonNullable<TeamListViewModel['filterSheet']>['regionOptions'] = [
     { label: '전체', value: 'all', href: buildTeamHref(params, { regionId: null, filter: '1' }), active: !regionId },
+    ...(myRegion.status === 'ready'
+      ? [{
+        label: `내 지역 · ${myRegion.provinceName}`,
+        value: 'mine',
+        href: buildTeamHref(params, { regionId: regionId === myRegion.provinceId ? null : myRegion.provinceId, filter: '1' }),
+        active: regionId === myRegion.provinceId,
+      }]
+      : []),
     ...regions
-      .filter((region) => region.parentId === null)
+      .filter((region) => region.parentId === null && region.id !== mineProvinceId)
       .map((region) => ({
         label: region.name,
         value: region.id,
@@ -1131,6 +1153,12 @@ function buildTeamFilterSheet(
         active: regionId === region.id,
       })),
   ];
+  const regionNotice: NonNullable<TeamListViewModel['filterSheet']>['regionNotice'] =
+    myRegion.status === 'ready'
+      ? { text: `설정한 활동 지역(${myRegion.savedName})을 시/도 단위로 보여 줘요`, link: { label: '바꾸기', href: LOCATION_SETTINGS_HREF } }
+      : myRegion.status === 'none'
+        ? { text: '활동 지역을 정해 두면 여기서 한 번에 골라요', link: { label: '활동 지역 설정하기 ›', href: LOCATION_SETTINGS_HREF } }
+        : undefined;
 
   return {
     open,
@@ -1145,14 +1173,40 @@ function buildTeamFilterSheet(
     genderOptions,
     levelOptions,
     regionOptions,
+    regionNotice,
   };
 }
 
+const LOCATION_SETTINGS_HREF = '/my/settings/location';
 
-function toTeamSort(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['sort'] {
-  if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
-  return '';
+type MyTeamRegion =
+  | { status: 'unknown' }
+  | { status: 'none' }
+  | { status: 'ready'; provinceId: string; provinceName: string; savedName: string };
+
+/**
+ * 저장한 활동 지역(시/군/구일 수 있다)을 목록 필터가 쓰는 시/도로 올린다. 서버가 regionId 하나만 받아 기본(primary) 한 곳만 쓴다.
+ * 아직 모르는 상태(로딩·프로필 조회 실패·마스터에서 못 찾음)는 'none' 과 달리 안내를 내지 않는다 — 지역이 있는 사람에게 설정을 권하지 않기 위해서다.
+ */
+function resolveMyTeamRegion({ unresolved, saved, master }: {
+  unresolved: boolean;
+  saved: ReadonlyArray<{ regionId: string; primary: boolean }> | undefined;
+  master: ReadonlyArray<{ id: string; name: string; parentId: string | null }>;
+}): MyTeamRegion {
+  if (unresolved) return { status: 'unknown' };
+  const mine = saved?.find((region) => region.primary) ?? saved?.[0];
+  if (!mine) return { status: 'none' };
+  const district = master.find((region) => region.id === mine.regionId);
+  const province = district?.parentId ? master.find((region) => region.id === district.parentId) : district;
+  if (!district || !province) return { status: 'unknown' };
+  return {
+    status: 'ready',
+    provinceId: province.id,
+    provinceName: province.name,
+    savedName: district.id === province.id ? province.name : `${province.name} ${district.name}`,
+  };
 }
+
 
 function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' | '여' {
   if (value === '성별 무관' || value === '남' || value === '여') return value;

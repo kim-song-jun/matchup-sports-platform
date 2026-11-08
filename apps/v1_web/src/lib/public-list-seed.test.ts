@@ -26,7 +26,7 @@ describe('filtered public-list seed requests', () => {
       regionId: 'region-seoul',
       genderRule: '남',
       levels: '입문, novice,unknown',
-      sort: 'deadline',
+      sort: 'activity',
       q: '  마포 FC  ',
       cursor: 'cursor/opaque +value',
     });
@@ -37,7 +37,7 @@ describe('filtered public-list seed requests', () => {
     expect(params.get('regionId')).toBe('region-seoul');
     expect(params.get('genderRule')).toBe('남');
     expect(params.get('levelCodes')).toBe('beginner,novice');
-    expect(params.get('sort')).toBe('deadline');
+    expect(params.get('sort')).toBe('activity');
     expect(params.get('joinPolicy')).toBeNull();
     expect(params.get('q')).toBe('마포 FC');
     expect(params.get('query')).toBeNull();
@@ -64,7 +64,7 @@ describe('filtered public-list seed requests', () => {
     const path = teamListSeedPath({
       sportId: ['sport-futsal', 'ignored'],
       q: '  마포 FC  ',
-      sort: 'deadline',
+      sort: 'member_count',
       genderRule: '남',
       levels: '입문, novice,unknown',
       regionId: 'region-seoul',
@@ -75,14 +75,28 @@ describe('filtered public-list seed requests', () => {
 
     expect(params.get('sportId')).toBe('sport-futsal');
     expect(params.get('query')).toBe('마포 FC');
-    expect(params.get('joinPolicy')).toBe('approval_required');
+    expect(params.get('joinPolicy')).toBeNull();
     expect(params.get('genderRule')).toBe('남');
     expect(params.get('levelCodes')).toBe('beginner,novice');
     expect(params.get('regionId')).toBe('region-seoul');
-    expect(params.get('sort')).toBeNull();
+    expect(params.get('sort')).toBe('member_count');
     expect(params.get('status')).toBeNull();
     expect(params.get('limit')).toBe(String(TEAM_LIST_PAGE_SIZE));
     expect(params.get('includeFacets')).toBe('true');
+  });
+
+  // 서버 정렬은 등록순·멤버 많은순·활동 많은순 셋이다. 예전 메뉴가 만든 값은 공유 링크에 남아 있어도 기본 순서로 연다.
+  it.each(['recommended', 'latest', 'deadline', 'trust', 'unknown'])('옛 정렬값 %s 은 API 쿼리에 싣지 않고 가입 정책 필터로도 바꾸지 않는다', (sort) => {
+    const filters = publicListSeed.teamListQueryFilters({ sort });
+    expect(filters).toEqual({});
+    expect(new URL(teamListSeedPath({ sort }), 'https://teameet.test').searchParams.get('sort')).toBeNull();
+    expect(publicListSeed.teamListContinuationPath({ sort, cursor: 'c1' })).toBe('/teams?cursor=c1');
+  });
+
+  it.each(['member_count', 'activity'])('진짜 정렬값 %s 은 API 쿼리와 이어 보기 링크에 그대로 싣는다', (sort) => {
+    expect(publicListSeed.teamListQueryFilters({ sort })).toEqual({ sort });
+    expect(new URL(teamListSeedPath({ sort }), 'https://teameet.test').searchParams.get('sort')).toBe(sort);
+    expect(publicListSeed.teamListContinuationPath({ sort, cursor: 'c1' })).toBe(`/teams?sort=${sort}&cursor=c1`);
   });
 
   it('uses the effective tournament filters and ignores invalid filter values', () => {

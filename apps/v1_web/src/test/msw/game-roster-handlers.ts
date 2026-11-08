@@ -217,7 +217,11 @@ export function createV1GameRosterMswHandlers() {
       gameId: game.gameId,
       sideId: game.sideId,
       teamMatchId: roster.teamMatchId,
-      competitionId: state.rulelessGames.has(game.gameId) || state.otherCompetitionGames.has(game.gameId) ? 'other-competition' : roster.competitionId,
+      competitionId: state.rulelessGames.has(game.gameId)
+        ? 'ruleless-competition'
+        : state.otherCompetitionGames.has(game.gameId)
+          ? 'other-competition'
+          : roster.competitionId,
       competitionKind: roster.competitionKind,
       competitionTitle: state.rulelessGames.has(game.gameId) || state.otherCompetitionGames.has(game.gameId) ? '다른 풋살컵' : '성수 풋살컵',
       opponentName: game.opponentName,

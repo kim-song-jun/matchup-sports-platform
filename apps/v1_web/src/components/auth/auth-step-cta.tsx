@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/components/v1-ui/button';
+
 export type AuthStepAction = {
   label: string;
   disabled: boolean;
@@ -11,16 +13,18 @@ export type AuthStepAction = {
 };
 
 /**
- * 단계 화면의 하단 고정 버튼(`AuthFrame` 의 `fixedAction` 자리). 버튼이 잠겨 있으면 `hint` 가 이유를 알려 주고,
- * 잠겨 있지 않을 때 덧붙일 말은 `footnote` 로 준다. 둘 다 있으면 이유를 먼저 보여 준다.
+ * 단계 화면의 하단 고정 버튼(`AuthFrame` 의 `fixedAction` 자리). 버튼이 잠겨 있으면 `hint` 가 이유를 알려 준다.
+ *
+ * `secondary` 는 주된 버튼 아래에 놓이는 눈에 보이는 출구(예: 나중에 할게요)이고, 잠금 이유와 무관하게 늘 보인다.
+ * 그 아래의 `note` 는 출구를 누르면 어떻게 되는지를 알린다.
  *
  * `formId` 를 주면 버튼이 그 폼의 제출 버튼이 된다. 버튼이 폼 바깥(하단 고정 영역)에 있어도 입력칸에서 Enter 를 누르면
  * 브라우저가 이 버튼을 눌러 폼을 제출한다 — 잠긴 버튼이면 제출되지 않는다.
  */
-export function AuthStepCta({ action, hint, footnote, formId }: {
+export function AuthStepCta({ action, hint, secondary, formId }: {
   action: AuthStepAction;
   hint?: string | null;
-  footnote?: string | null;
+  secondary?: { label: string; onClick: () => void; note: string };
   formId?: string;
 }) {
   return (
@@ -39,8 +43,14 @@ export function AuthStepCta({ action, hint, footnote, formId }: {
         <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0', textAlign: 'center' }}>
           {hint}
         </p>
-      ) : footnote ? (
-        <p className="tm-text-caption tm-auth-fixed-reason">{footnote}</p>
+      ) : null}
+      {secondary ? (
+        <>
+          <Button block size="md" style={{ marginTop: 8 }} type="button" variant="ghost" onClick={secondary.onClick}>
+            {secondary.label}
+          </Button>
+          <p className="tm-text-caption tm-auth-fixed-reason">{secondary.note}</p>
+        </>
       ) : null}
     </>
   );

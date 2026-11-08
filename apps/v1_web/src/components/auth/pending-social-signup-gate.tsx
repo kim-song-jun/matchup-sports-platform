@@ -40,7 +40,7 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
 
   const confirmedAccount = hasSessionHint === true ? authMe.data : undefined;
   const socialLink = usePendingSocialLinkResolver(confirmedAccount);
-  usePendingEmailLinkOffer(confirmedAccount, socialLink.routed);
+  const { toast: emailLinkToast } = usePendingEmailLinkOffer(confirmedAccount, socialLink.routed);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);
@@ -72,7 +72,12 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   if (!authMe.isSuccess) return <SessionFallback />;
   if (requiredRoute && !routeAllowed) return <SessionFallback />;
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {emailLinkToast}
+    </>
+  );
 }
 
 function isUnauthenticated(error: unknown) {

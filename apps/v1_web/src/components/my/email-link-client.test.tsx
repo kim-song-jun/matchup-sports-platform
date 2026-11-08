@@ -95,6 +95,9 @@ const heading = (name: string) => screen.findByRole('heading', { level: 1, name 
 const emailField = () => screen.getByLabelText('이메일');
 const sendButton = () => screen.getByRole('button', { name: '인증번호 받기' });
 const backButton = () => screen.getAllByRole('button', { name: '뒤로가기' })[0] as HTMLElement;
+const postponeButton = () => screen.getByRole('button', { name: '나중에 할게요' });
+const POSTPONE_NOTE = '나중에는 설정 > 로그인 방법에서 연결할 수 있어요.';
+const INTENT_NOTE = '가입하려던 이메일을 적어 주세요. 비밀번호는 저장하지 않아서 새로 정해 주세요.';
 
 async function typeEmail(user: ReturnType<typeof userEvent.setup>, email: string) {
   await user.clear(emailField());
@@ -580,7 +583,8 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
     expect(await heading('이메일을 연결할까요?')).toBeInTheDocument();
     expect(emailField()).toHaveValue('typed-login@example.com');
     expect(screen.getByText('방금 가입하려던 이메일이에요. 비밀번호는 저장하지 않아서 새로 정해 주세요.')).toBeInTheDocument();
-    expect(screen.getByText('나중에 하려면 뒤로 가기를 눌러 주세요.')).toBeInTheDocument();
+    expect(postponeButton()).toBeEnabled();
+    expect(screen.getByText(POSTPONE_NOTE)).toBeInTheDocument();
     expect(sendButton()).toBeEnabled();
     await waitFor(() => expect(readPendingEmailLink()).toBeNull());
   });
@@ -613,12 +617,88 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
     expect(screen.queryByText(/방금 가입하려던 이메일이에요/)).not.toBeInTheDocument();
   });
 
-  it('보관한 이메일이 없으면 빈 입력칸으로 시작하고 안내는 없다', async () => {
+  it('보관한 이메일이 없으면 빈 입력칸으로 시작하고 안내와 나중에 할게요는 없다', async () => {
     renderClient();
 
     expect(await heading(EMAIL_STEP)).toBeInTheDocument();
     expect(emailField()).toHaveValue('');
     expect(screen.queryByText(/방금 가입하려던 이메일이에요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(INTENT_NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '나중에 할게요' })).not.toBeInTheDocument();
+    expect(screen.queryByText(POSTPONE_NOTE)).not.toBeInTheDocument();
+  });
+
+  describe('이메일 없이 뜻만 이어 온 경우(번호 인증이 먼저라 이메일을 아직 적기 전)', () => {
+    it('빈 입력칸에 포커스를 두고, 가입하려던 이메일을 적어 달라는 안내와 나중에 할게요를 보여 주며, 보관한 칸은 비워진다', async () => {
+      savePendingEmailLink({ email: null });
+      renderClient();
+
+      expect(await heading('이메일을 연결할까요?')).toBeInTheDocument();
+      expect(emailField()).toHaveValue('');
+      expect(emailField()).toHaveFocus();
+      expect(screen.getByText(INTENT_NOTE)).toBeInTheDocument();
+      expect(screen.queryByText(/방금 가입하려던 이메일이에요/)).not.toBeInTheDocument();
+      expect(postponeButton()).toBeEnabled();
+      expect(screen.getByText(POSTPONE_NOTE)).toBeInTheDocument();
+      expect(sendButton()).toBeDisabled();
+      await waitFor(() => expect(readPendingEmailLink()).toBeNull());
+    });
+
+    it('이메일을 적기 시작해도 안내와 제목이 그대로이고, 적은 이메일로 인증번호를 받는다', async () => {
+      const user = userEvent.setup();
+      savePendingEmailLink({ email: null });
+      renderClient();
+      await heading('이메일을 연결할까요?');
+
+      await typeEmail(user, EMAIL_LINK_MSW.emails.ok);
+
+      expect(screen.getByRole('heading', { level: 1, name: '이메일을 연결할까요?' })).toBeInTheDocument();
+      expect(screen.getByText(INTENT_NOTE)).toBeInTheDocument();
+      await user.click(sendButton());
+      await heading(CODE_STEP);
+      expect(calls.request).toEqual([{ email: EMAIL_LINK_MSW.emails.ok }]);
+      // 나중에 할게요는 이메일을 고르는 첫 단계의 출구다 — 인증이 시작된 뒤에는 앞 단계로 돌아가는 뒤로 가기가 맡는다.
+      expect(screen.queryByRole('button', { name: '나중에 할게요' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('나중에 할게요', () => {
+    it('요청을 보내지 않고 로그인 방법 화면으로 돌아간다', async () => {
+      const user = userEvent.setup();
+      savePendingEmailLink({ email: EMAIL_LINK_MSW.emails.ok });
+      renderClient();
+      await heading('이메일을 연결할까요?');
+
+      await user.click(postponeButton());
+
+      expect(nav.router.replace).toHaveBeenCalledExactlyOnceWith(LOGIN_METHODS_PATH);
+      expect(calls.request).toEqual([]);
+      expect(readPendingEmailLink()).toBeNull();
+    });
+
+    it('로그인 전에 가려던 곳이 있으면 그곳으로 돌아간다', async () => {
+      const user = userEvent.setup();
+      nav.params = new URLSearchParams('redirect=%2Fmatches%2Fabc');
+      savePendingEmailLink({ email: null, returnTo: '/matches/abc' });
+      renderClient();
+      await heading('이메일을 연결할까요?');
+
+      await user.click(postponeButton());
+
+      expect(nav.router.replace).toHaveBeenCalledExactlyOnceWith('/matches/abc');
+    });
+
+    it('이메일을 고쳐 썼어도 이어 온 화면이라 계속 보인다', async () => {
+      const user = userEvent.setup();
+      savePendingEmailLink({ email: EMAIL_LINK_MSW.emails.ok });
+      renderClient();
+      await heading('이메일을 연결할까요?');
+
+      await user.type(emailField(), 'x');
+
+      expect(await heading(EMAIL_STEP)).toBeInTheDocument();
+      expect(postponeButton()).toBeEnabled();
+    });
   });
 
   it('만료된 이메일은 채우지 않는다', async () => {

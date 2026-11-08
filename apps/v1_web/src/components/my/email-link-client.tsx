@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AUTH_WELCOME_STAGE, AuthFrame, SignupCompletePageView } from '@/components/auth/auth-page';
 import { getEmailLinkCompleteViewModel } from '@/components/auth/auth.view-model';
 import { AuthPasswordField } from '@/components/auth/auth-password-field';
@@ -42,6 +42,8 @@ const MAX_EMAIL_LENGTH = 254;
 
 const SEND_UNAVAILABLE_MESSAGE = '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.';
 const OFFER_NOTE = '방금 가입하려던 이메일이에요. 비밀번호는 저장하지 않아서 새로 정해 주세요.';
+const INTENT_NOTE = '가입하려던 이메일을 적어 주세요. 비밀번호는 저장하지 않아서 새로 정해 주세요.';
+const POSTPONE_NOTE = '나중에는 설정 > 로그인 방법에서 연결할 수 있어요.';
 const TOKEN_INVALID_MESSAGE = '이메일 인증이 만료돼서 처음부터 다시 해야 해요. 인증번호를 다시 받아 주세요.';
 
 /** 입력을 바꿔도 풀리지 않아 단계 화면 대신 안내를 보여 주는 오류 코드. */
@@ -56,7 +58,8 @@ const INTERRUPTION_BY_CODE = new Map<string, EmailLinkInterruption>([
  * 가입 화면과 같은 틀(진행 바 · 한 화면 한 질문 · 하단 고정 버튼)이고, 상단 뒤로 가기는 바로 앞 단계로 간다.
  *
  * 인증 증명(`emailLinkToken`)과 비밀번호는 이 컴포넌트의 메모리에만 있다 — 주소·스토리지에 두지 않는다.
- * 가입 화면에서 이어 온 이메일(`readPendingEmailLink`)은 처음 그릴 때 한 번 읽어 1단계에 채우고 칸은 비운다.
+ * 번호 겹침 안내에서 이어 온 뜻(`readPendingEmailLink`)은 처음 그릴 때 한 번 읽고 칸은 비운다. 이메일이 함께 있으면 1단계에
+ * 채우고, 뜻만 있으면(null) 빈 칸으로 시작한다. 이어 온 화면에서는 "나중에 할게요"로 연결을 미루고 돌아갈 수 있다.
  * `?redirect=` 는 연결 뒤 돌아갈 곳이다(같은 origin 경로만). 일반 설정에서는 미루기도 가능하지만
  * 새 소셜 가입에서 필수 설정 중이면 이메일을 건너뛰지 않고 로그아웃 또는 고객센터를 이용할 수 있다.
  */
@@ -65,13 +68,18 @@ export function EmailLinkClient() {
   const verifyEmail = useV1LinkEmailVerify();
   const completeLink = useV1LinkEmailComplete();
   const signOut = useSignOutAndLeave();
+  const router = useRouter();
   const returnTo = parseEmailLinkReturnTo(useSearchParams().get('redirect'));
 
   // 렌더 중에는 읽기만 한다(개발 모드의 이중 렌더에서도 같은 값). 칸은 마운트 뒤에 비운다.
-  const [offeredEmail] = useState(() => readPendingEmailLink()?.email ?? null);
+  const [offer] = useState(() => readPendingEmailLink());
   useEffect(() => {
     clearPendingEmailLink();
   }, []);
+  const offeredEmail = offer?.email ?? null;
+  const fromIntent = offer !== null;
+  // 이메일 없이 뜻만 이어 온 화면은 입력을 시작해도 "가입하려던 이메일을 적어 주세요"가 계속 맞다.
+  const intentOnly = fromIntent && offeredEmail === null;
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState(offeredEmail ?? '');
@@ -168,6 +176,10 @@ export function EmailLinkClient() {
     }
   };
 
+  const postpone = () => {
+    router.replace(returnTo ?? LOGIN_METHODS_PATH);
+  };
+
   const goBack = () => {
     setCompleteError(null);
     // 떠나는 단계의 오류(틀린 인증번호 등)가 앞 단계에 남아 보이지 않게 한다.
@@ -255,7 +267,7 @@ export function EmailLinkClient() {
 
   const copy = step === 'email'
     ? {
-        title: offerActive ? '이메일을 연결할까요?' : '이메일을 입력해 주세요',
+        title: offerActive || intentOnly ? '이메일을 연결할까요?' : '이메일을 입력해 주세요',
         sub: '인증번호를 보내 드려요. 이 이메일이 계정 이메일이 돼요.',
       }
     : step === 'code'
@@ -276,7 +288,7 @@ export function EmailLinkClient() {
           formId={formId}
           action={primary}
           hint={disabledHint}
-          footnote={step === 'email' && offerActive ? '나중에 하려면 뒤로 가기를 눌러 주세요.' : null}
+          secondary={step === 'email' && fromIntent ? { label: '나중에 할게요', onClick: postpone, note: POSTPONE_NOTE } : undefined}
         />
       }
     >
@@ -302,6 +314,7 @@ export function EmailLinkClient() {
           {step === 'email' ? (
             <>
               {offerActive ? <AlertBanner tone="info" message={OFFER_NOTE} /> : null}
+              {intentOnly ? <AlertBanner tone="info" message={INTENT_NOTE} /> : null}
               <div className="tm-auth-field">
                 <label className="tm-text-label" htmlFor={emailId}>이메일</label>
                 <input

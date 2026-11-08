@@ -10,7 +10,7 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => mocks.ca
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MasterRegions: () => ({ data: [], isError: false }) }));
 const initial = { leagueId: 'league-test', title: '기존 리그', rulesText: '운영 안내', regionId: 'region-test',
   startsOn: '2097-12-31T15:00:00.123Z', endsOn: '2098-12-31T14:59:59.999Z',
-  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12, maxTeams: null, genderCategory: null as string | null,
+  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12, maxTeams: null as number | null, genderCategory: null as string | null,
   updatedAt: '2026-10-13T00:00:00.123Z', status: 'draft', sportName: '풋살' };
 const path = '*/api/v1/admin/league-matches/league-test/settings';
 let stored = { ...initial };
@@ -127,10 +127,28 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(await screen.findByLabelText('리그 이름')).toHaveValue(initial.title);
   });
-  it('종료된 리그는 쓰기 권한이 있어도 수정할 수 없다', async () => {
-    stored = { ...initial, status: 'completed' }; mount();
-    expect(await screen.findByLabelText('리그 이름')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
+  it.each(['completed', 'cancelled'])('%s 리그는 이름·지역·설명만 고칠 수 있고 나머지는 이유와 함께 잠긴다', async (status) => {
+    stored = { ...initial, status, maxTeams: 8, genderCategory: 'mixed' }; mount();
+    expect(await screen.findByLabelText('리그 이름')).toBeEnabled();
+    expect(screen.getByLabelText('지역')).toBeEnabled();
+    expect(screen.getByLabelText('설명·운영 안내')).toBeEnabled();
+    for (const label of ['시작일', '종료일', '신청 마감 (한국 시간)', '총 경기 수 (선택)', '참가팀 정원 (선택)']) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
+    expect(screen.getByText(/이름·설명·지역만 수정할 수 있어요/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('리그 이름'), { target: { value: '오타를 고친 리그' } });
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    expect(await screen.findByText('리그 정보를 저장했어요.')).toBeInTheDocument();
+    expect(submitted).toMatchObject({ title: '오타를 고친 리그', startsOn: initial.startsOn, endsOn: initial.endsOn,
+      registrationDeadlineAt: initial.registrationDeadlineAt, plannedFixtureCount: 12, maxTeams: 8 });
+    expect(submitted).not.toHaveProperty('genderCategory');
+  });
+  it('끝나지 않은 리그는 모든 칸을 고칠 수 있다', async () => {
+    mount();
+    for (const label of ['리그 이름', '시작일', '종료일', '신청 마감 (한국 시간)', '총 경기 수 (선택)', '참가팀 정원 (선택)']) {
+      expect(await screen.findByLabelText(label)).toBeEnabled();
+    }
+    expect(screen.queryByText(/이름·설명·지역만 수정할 수 있어요/)).toBeNull();
   });
   it('읽기 전용 계정은 현재 정보를 볼 수 있고 저장할 수 없다', async () => {
     mocks.canWrite = false; mount();

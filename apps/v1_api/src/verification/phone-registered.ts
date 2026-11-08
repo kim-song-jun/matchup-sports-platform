@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 
 /**
@@ -22,4 +22,12 @@ export async function findPhoneRegistration(
   const holder = await findPhoneHolder(db, phone);
   if (!holder) return { registered: false, withdrawalPendingUntil: null };
   return { registered: true, withdrawalPendingUntil: await withdrawalPendingUntil(db, holder) };
+}
+
+/** A unique-index violation on `v1_users.phone` — another signup took the number between the lookup and the insert. */
+export function isPhoneUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const target = error.meta?.target;
+  const columns = Array.isArray(target) ? target.join(',') : typeof target === 'string' ? target : '';
+  return /phone/i.test(columns);
 }

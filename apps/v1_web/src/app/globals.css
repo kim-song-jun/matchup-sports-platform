@@ -5475,6 +5475,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0;
 }
 
+/* 모달 본문은 자기 좌우 여백이 있어 페이지용 20px 을 더하면 제목만 안으로 들어간다. */
+.tm-modal-panel .tm-section-title {
+  padding-inline: 0;
+}
+
 .tm-team-info-row {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);

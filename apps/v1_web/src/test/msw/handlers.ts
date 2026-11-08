@@ -198,6 +198,9 @@ function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPur
   return Boolean(proof && proof.phone === phone && proof.channel === 'phone' && proof.purpose === purpose);
 }
 
+/** 서버의 휴대폰 증명 토큰 수명(10분)과 같다. */
+const AUTH_PHONE_PROOF_TTL_MS = 10 * 60 * 1000;
+
 async function issueAuthPhone(request: Request) {
   const body = parseAuthProofInput(await request.json(), ['phone']);
   if (!body || !/^\d{11}$/.test(body.phone ?? '')) {
@@ -225,9 +228,15 @@ async function verifyAuthPhone(request: Request) {
   }
   authPhoneChallenges.set(body.phone, { ...challenge, verified: true });
   const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
-  authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
+  authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + AUTH_PHONE_PROOF_TTL_MS });
   // 번호 소유를 증명한 뒤에만 알려준다. 발급 단계에서는 알리지 않는다.
-  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture, withdrawalPendingUntil: null });
+  return ok({
+    verified: true,
+    proofToken,
+    proofExpiresInSeconds: AUTH_PHONE_PROOF_TTL_MS / 1000,
+    registered: body.phone === authAccountPhoneFixture,
+    withdrawalPendingUntil: null,
+  });
 }
 
 async function requestRecoveryEmail(request: Request) {

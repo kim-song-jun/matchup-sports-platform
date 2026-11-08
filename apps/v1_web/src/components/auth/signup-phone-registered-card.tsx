@@ -14,8 +14,11 @@ type Props = {
   loginHref: string;
   socialLoginHref: string;
   findAccountHref: string;
-  /** "카카오로 가입했어요" 줄을 눌러 로그인 첫 화면으로 나가기 직전에 부른다. */
-  onSocialLoginSelect: () => void;
+  /**
+   * 가입 화면에서 이메일을 이미 적은 경우에만 넘긴다. 넘기면 "카카오로 가입했어요" 줄이 그 이메일도 연결할 수 있다고
+   * 안내하고, 그 줄을 눌러 로그인 첫 화면으로 나가기 직전에 이 함수가 이메일을 보관한다.
+   */
+  onSocialLoginSelect?: () => void;
 };
 
 /**
@@ -23,7 +26,7 @@ type Props = {
  * 번호 소유 증명은 그 계정의 주인이라는 증명이 아니므로 가입 수단·이메일은 싣지 않는다 —
  * 갈래 세 줄과 로그인 버튼은 누구에게나 같은 일반 안내다. "다른 번호로 인증"은 가입 화면의 하단 버튼이 맡는다.
  * 그 계정이 탈퇴 유예 중이면 일반 안내 대신 두 가지 방법(로그인해서 취소 · 기다리기)을 보여 준다.
- * 소셜 줄 문구가 가리키는 "입력한 이메일 연결"은 그 줄로 나갈 때 `onSocialLoginSelect` 가 이메일을 보관해 이어 준다.
+ * 번호 인증이 가입의 첫 단계라 보통은 이메일을 아직 적기 전이다 — 그때는 소셜 줄이 이메일 연결을 말하지 않는다.
  */
 export function SignupPhoneRegisteredCard({ withdrawalPendingUntil, loginHref, socialLoginHref, findAccountHref, onSocialLoginSelect }: Props) {
   const titleRef = useRef<HTMLDivElement>(null);
@@ -73,7 +76,7 @@ export function SignupPhoneRegisteredCard({ withdrawalPendingUntil, loginHref, s
         <ListItem
           href={socialLoginHref}
           title={`${socialLabel}로 가입했어요`}
-          sub="로그인 첫 화면에서 그 버튼을 눌러요. 로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요."
+          sub={`로그인 첫 화면에서 그 버튼을 눌러요.${onSocialLoginSelect ? ' 로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.' : ''}`}
           chev
           onNavigate={onSocialLoginSelect}
         />

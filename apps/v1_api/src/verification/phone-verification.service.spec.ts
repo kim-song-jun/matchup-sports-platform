@@ -284,4 +284,66 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     if (OLD === undefined) delete process.env.V1_PHONE_VERIFICATION_DISABLED;
     else process.env.V1_PHONE_VERIFICATION_DISABLED = OLD;
   });
+
+  describe('lookupRegistration', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const expired = () => new Date(Date.now() - 2 * DAY_MS);
+
+    /** `v1_users.phone` is unique: the holder row answers every lookup until a release write lands. */
+    function prismaWithHolder(holder: Record<string, unknown> | null, activity = 0) {
+      let released = false;
+      const db: Record<string, unknown> = {
+        v1User: {
+          findUnique: jest.fn(async () => (released ? null : holder)),
+          updateMany: jest.fn(async () => {
+            released = true;
+            return { count: 1 };
+          }),
+        },
+        v1AuthIdentity: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'identity-h', status: 'active', passwordHash: null,
+            user: {
+              accountStatus: 'active', onboardingStatus: 'social_profile_required', phone: PHONE, adminUser: null,
+              authIdentities: [{ id: 'identity-h' }], _count: { teamMemberships: activity },
+            },
+          }),
+        },
+        v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}), findFirst: jest.fn().mockResolvedValue(null) },
+      };
+      db.$transaction = jest.fn((run: (client: unknown) => unknown) => run(db));
+      return db as unknown as {
+        v1User: { updateMany: jest.Mock };
+        v1StatusChangeLog: { create: jest.Mock };
+      };
+    }
+    const service = (db: unknown) => new PhoneVerificationService(db as never, dispatcherMock(true), eventLogStub());
+
+    it('reports a number held by an expired, abandoned signup as free, and releases it', async () => {
+      const db = prismaWithHolder({ id: 'holder-1', accountStatus: 'active', onboardingStatus: 'social_profile_required', createdAt: expired(), updatedAt: expired() });
+
+      await expect(service(db).lookupRegistration(PHONE)).resolves.toEqual({ registered: false, withdrawalPendingUntil: null });
+
+      expect(db.v1StatusChangeLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ targetId: 'holder-1', reason: 'expired_signup_lazy' }) });
+    });
+
+    it.each([
+      ['a finished account', { onboardingStatus: 'completed' }, 0],
+      ['a signup still inside its 24h window', { createdAt: new Date(), updatedAt: new Date() }, 0],
+      ['an expired signup that has activity', {}, 1],
+    ])('keeps reporting %s as registered', async (_name, overrides, activity) => {
+      const db = prismaWithHolder(
+        { id: 'holder-1', accountStatus: 'active', onboardingStatus: 'social_profile_required', createdAt: expired(), updatedAt: expired(), ...overrides },
+        activity,
+      );
+
+      await expect(service(db).lookupRegistration(PHONE)).resolves.toMatchObject({ registered: true });
+
+      expect(db.v1User.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('reports an unused number as free', async () => {
+      await expect(service(prismaWithHolder(null)).lookupRegistration(PHONE)).resolves.toEqual({ registered: false, withdrawalPendingUntil: null });
+    });
+  });
 });

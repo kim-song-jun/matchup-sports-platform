@@ -603,6 +603,78 @@ describe('VerificationService.requestPhone (MT)', () => {
       });
     });
 
+    describe('when the holder is an expired, abandoned signup', () => {
+      const expired = () => new Date(Date.now() - 25 * 60 * 60 * 1000);
+      const holderRow = (overrides: Record<string, unknown> = {}) => ({
+        id: HOLDER, onboardingStatus: 'social_profile_required', createdAt: expired(), updatedAt: expired(), ...overrides,
+      });
+
+      function arrangeHolder(row: ReturnType<typeof holderRow>, identityActivity = 0) {
+        const { prisma, handle, service } = arrange(kakaoSignup());
+        const wired = prisma as never as { v1AuthIdentity: Record<string, jest.Mock>; v1StatusChangeLog: Record<string, jest.Mock> };
+        handle.v1User.findUnique.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+          'phone' in where ? row : { id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null, ...kakaoSignup() });
+        wired.v1AuthIdentity.findFirst = jest.fn().mockResolvedValue({
+          id: 'identity-h', status: 'active', passwordHash: null,
+          user: {
+            accountStatus: 'active', onboardingStatus: 'social_profile_required', phone: '01012345678', adminUser: null,
+            authIdentities: [{ id: 'identity-h' }], _count: { teamMemberships: identityActivity },
+          },
+        });
+        wired.v1StatusChangeLog = { create: jest.fn().mockResolvedValue({}) };
+        return { handle, wired, service };
+      }
+
+      it('frees the number once the right code proved it, then saves it to the signup', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow());
+        await pendingCode(handle);
+
+        const result = await service.confirm(authUser, 'phone', '123456');
+
+        expect(result).toMatchObject({ verified: true, channel: 'phone' });
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ id: HOLDER, updatedAt: { lt: expect.any(Date) } }), data: { phone: null, phoneVerifiedAt: null } }),
+        );
+        expect(wired.v1StatusChangeLog.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ targetId: HOLDER, reason: 'expired_signup_lazy' }),
+        });
+        expect(handle.v1User.update).toHaveBeenCalledWith(expect.objectContaining({ data: { phoneVerifiedAt: expect.any(Date), phone: '01012345678' } }));
+      });
+
+      it('frees nothing before the code is right', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow());
+        await pendingCode(handle);
+
+        await expect(service.confirm(authUser, 'phone', '000000')).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['a signup still inside its 24h window', { createdAt: new Date(), updatedAt: new Date() }],
+        ['a finished account', { onboardingStatus: 'completed' }],
+      ])('keeps the number of %s', async (_name, overrides) => {
+        const { handle, wired, service } = arrangeHolder(holderRow(overrides));
+        await pendingCode(handle);
+
+        await service.confirm(authUser, 'phone', '123456');
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      });
+
+      it('keeps the number of an expired signup that has activity', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow(), 1);
+        await pendingCode(handle);
+
+        await service.confirm(authUser, 'phone', '123456');
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      });
+    });
+
     it('keeps the plain answer, at the request, for a finished social account and for an email account', async () => {
       for (const user of [
         { onboardingStatus: 'completed', authIdentities: [{ provider: 'kakao', providerUserKey: 'kakao-key-1' }] },

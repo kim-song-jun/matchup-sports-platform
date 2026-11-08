@@ -226,6 +226,55 @@ describe('VerificationService.requestEmail', () => {
     expect(result).toMatchObject({ sent: false, alreadyVerified: true });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
+
+  function setupUnverified() {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as {
+      v1User: { findUnique: jest.Mock };
+      v1VerificationToken: { create: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
+    };
+    handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null);
+    return { prisma, handle };
+  }
+
+  it('refuses with EMAIL_SEND_UNAVAILABLE, and creates no token, when this environment cannot deliver mail', async () => {
+    const { prisma, handle } = setupUnverified();
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({
+      status: 503,
+      response: { code: 'EMAIL_SEND_UNAVAILABLE' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a second code for the same address inside the resend cooldown', async () => {
+    const { prisma, handle } = setupUnverified();
+    handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 5_000) });
+    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_RESEND_COOLDOWN' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    deliverable.mockRestore();
+  });
+
+  it('issues and mails a contact code once the address can be mailed and the cooldown has passed', async () => {
+    const { prisma, handle } = setupUnverified();
+    handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 60_000) });
+    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
+    const send = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).resolves.toMatchObject({ sent: true, channel: 'email', target: 'a***@b.com' });
+    expect(handle.v1VerificationToken.create).toHaveBeenCalledWith({ data: expect.objectContaining({ channel: 'email', purpose: 'contact', target: 'a@b.com' }) });
+    expect(send).toHaveBeenCalledWith('email', 'a@b.com', expect.stringMatching(/^\d{6}$/), 'verify', 'u1');
+    send.mockRestore();
+    deliverable.mockRestore();
+  });
 });
 
 describe('VerificationService 발송 총량 상한', () => {
@@ -317,6 +366,7 @@ describe('VerificationService 발송 총량 상한', () => {
 
   it('이메일 발송에도 같은 상한이 걸린다', async () => {
     const { prisma, handle } = setup({ target: 5, user: 0 });
+    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(service.requestEmail(authUser)).rejects.toMatchObject({
@@ -324,6 +374,7 @@ describe('VerificationService 발송 총량 상한', () => {
       response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
     });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    deliverable.mockRestore();
   });
 });
 

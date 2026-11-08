@@ -81,6 +81,7 @@ import {
 import { PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_PENDING_RECOVERY_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthLoginMethodMswHandlers } from './auth-login-method-handlers';
 import { v1EmailChangeMswHandlers } from './profile-email-change-handlers';
+import { v1VerificationEmailMswHandlers } from './verification-email-handlers';
 import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
@@ -818,6 +819,7 @@ export const v1MswHandlers = [
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
   ...v1EmailChangeMswHandlers,
+  ...v1VerificationEmailMswHandlers,
   ...v1AuthLoginMethodMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {

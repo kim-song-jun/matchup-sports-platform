@@ -634,6 +634,30 @@ export function useV1AuthedPhoneConfirm() {
   });
 }
 
+export function useV1AuthedEmailRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<{ sent: boolean; channel: 'email'; target?: string; alreadyVerified?: boolean; expiresAt?: string; devCode?: string }>(
+        '/verification/email/request',
+      ),
+    // 이미 인증된 계정이면 캐시된 /auth/me 가 낡은 것이다 — 다시 읽어 권유 배너를 걷어낸다.
+    onSuccess: (result) => (result.alreadyVerified ? queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }) : undefined),
+  });
+}
+
+export function useV1AuthedEmailConfirm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { code: string }) =>
+      v1Post<{ verified: boolean; verification: { emailVerified: boolean; phoneVerified: boolean } }>(
+        '/verification/email/confirm',
+        body,
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
 export function useV1CheckEmail() {
   return useMutation({
     mutationFn: (email: string) => v1Get<{ available: boolean }>('/auth/check-email', { email }),

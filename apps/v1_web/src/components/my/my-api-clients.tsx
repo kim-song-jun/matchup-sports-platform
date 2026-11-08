@@ -16,6 +16,7 @@ import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Check, Lock } from 'lucide-react';
 import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { emailVerifyNudgeTarget } from './email-verify-nudge';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
@@ -160,6 +161,7 @@ export function MyHomePageClient() {
   // 추가 요청이 발생하지 않는다.
   const authMe = useV1AuthMe();
   const phoneVerified = authMe.data?.verification?.phoneVerified;
+  const emailVerifyNudgeUserId = emailVerifyNudgeTarget(authMe.data)?.userId;
   // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
@@ -198,6 +200,7 @@ export function MyHomePageClient() {
       phoneVerified,
       staffAssignments.data?.items.length ?? 0,
       contactSummary.data?.pendingInbound ?? 0,
+      emailVerifyNudgeUserId,
     );
   }, [
     profile.data,
@@ -207,6 +210,7 @@ export function MyHomePageClient() {
     phoneVerified,
     staffAssignments.data,
     contactSummary.data,
+    emailVerifyNudgeUserId,
   ]);
 
   if (profile.isError) {
@@ -2473,6 +2477,7 @@ function toMyHomeModel(
   phoneVerified?: boolean,
   staffTournamentCount = 0,
   pendingContactCount = 0,
+  emailVerifyNudgeUserId?: string,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
@@ -2537,6 +2542,7 @@ function toMyHomeModel(
     ...myHomeModel,
     hasNewNotification,
     phoneVerified,
+    emailVerifyNudgeUserId,
     playerCardSlot: profile.playerCardSlot,
     sections,
     user: {

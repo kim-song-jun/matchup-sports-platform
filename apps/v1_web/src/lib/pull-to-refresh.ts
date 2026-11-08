@@ -17,6 +17,7 @@ const EXCLUDED_PREFIXES = [
   '/account-deletion',
   '/my/settings',
   '/my/phone-verify',
+  '/my/email-verify',
 ];
 
 const EXCLUDED_PATTERNS: readonly RegExp[] = [

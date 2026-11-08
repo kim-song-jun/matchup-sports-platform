@@ -73,6 +73,8 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
+    this.assertEmailDeliverable('contact');
+    await this.assertResendCooldown('email', user.email);
     // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
     // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
     return this.issue('email', user.id, user.email, 'contact');
@@ -303,16 +305,19 @@ export class VerificationService {
     return this.consumePurposeCode(userId, 'email_change', code);
   }
 
+  /** 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다. */
+  private assertEmailDeliverable(purpose: V1VerificationPurpose) {
+    if (this.dispatcher.emailDeliverable) return;
+    this.logger.error(`${purpose} code requested but email delivery is not configured (SES_REGION/EMAIL_FROM)`);
+    throw new ServiceUnavailableException({
+      code: 'EMAIL_SEND_UNAVAILABLE',
+      message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
+    });
+  }
+
   /** 로그인한 계정이 아직 자기 것으로 증명하지 않은 주소로 보내는 목적별 인증번호. 쿨다운·24시간 발송 상한은 목적과 무관하게 센다. */
   private async requestPurposeEmailCode(userId: string, email: string, purpose: Exclude<V1VerificationPurpose, 'contact'>) {
-    // 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다.
-    if (!this.dispatcher.emailDeliverable) {
-      this.logger.error(`${purpose} code requested but email delivery is not configured (SES_REGION/EMAIL_FROM)`);
-      throw new ServiceUnavailableException({
-        code: 'EMAIL_SEND_UNAVAILABLE',
-        message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
-      });
-    }
+    this.assertEmailDeliverable(purpose);
     await this.assertResendCooldown('email', email);
     const issued = await this.issue('email', userId, email, purpose);
     return {

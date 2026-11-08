@@ -12,10 +12,10 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('필드 운영콘솔 안내와 체험', () => {
-  it('체험 진입은 로그인 없는 필드 콘솔 안내로 연결한다', () => {
+  it('운영콘솔 체험과 기존 주요 기능 안내를 각각 연결한다', () => {
     render(<TournamentOpsDemoEntry />);
     expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
-    expect(screen.getByRole('link', { name: /주요 기능 보기/ })).toHaveAttribute('href', '/field-console-demo');
+    expect(screen.getByRole('link', { name: /주요 기능 보기/ })).toHaveAttribute('href', '/tournament-ops-demo#demo-guide');
   });
   it('실제 콘솔 위에서 5단계 안내를 보고 시작 전 체험으로 들어간다', async () => {
     const user = userEvent.setup();

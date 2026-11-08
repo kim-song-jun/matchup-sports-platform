@@ -2463,6 +2463,20 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(within(endedSheet).getByText('시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.')).toBeInTheDocument();
   });
 
+  it('시작 전이어도 확정 전 결과 제출본이 있는 경기는 목록에서 삭제를 막는다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-pending', title: '1주차', startAt: W1,
+        game: { id: 'g-1', state: 'SCHEDULED', version: 1, hasLiveRecords: false, hasOfficialResult: false,
+          latestRevision: { id: 'rev-1', state: 'SUBMITTED', score: { home: 1, away: 0 }, entryMethod: 'quick' } } },
+      { ...base, teamMatchId: 'tm-clean', title: '2주차', startAt: W2 },
+    ]);
+
+    const pendingSheet = openRowMenu('1주차');
+    expect(within(pendingSheet).getByRole('button', { name: /^경기 삭제/ })).toBeDisabled();
+    fireEvent.click(within(pendingSheet).getByRole('button', { name: '닫기' }));
+    expect(within(openRowMenu('2주차')).getByRole('button', { name: /^경기 삭제/ })).toBeEnabled();
+  });
+
   // 자리만 있고 팀이 비어 있는 경기 — 팀을 못 정했으니 콘솔·결과·몰수 대상이 아니다.
   it('팀이 비어 있는 자리 경기는 미정으로 읽히고 콘솔 열기·몰수패가 없다 — 양쪽이 다 찬 경기는 그대로다', () => {
     renderLeague([

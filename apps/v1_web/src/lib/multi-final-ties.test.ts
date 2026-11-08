@@ -161,8 +161,10 @@ describe('동률 선택(picks)', () => {
     });
   });
 
-  it('keepPicked 는 명단에 남은 팀의 선택만 남긴다', () => {
-    expect(keepPicked({ 'gA:3': 'a3', 'gB:3': 'b3' }, ['a1', 'a3', null])).toEqual({ 'gA:3': 'a3' });
+  it('keepPicked 는 이번 편집이 명단에서 뺀 팀의 선택만 지우고, 아직 명단에 오기 전인 선택은 남긴다', () => {
+    expect(keepPicked({ 'gA:3': 'a3', 'gB:3': 'b3' }, ['a1', 'a3', 'b3'], ['a1', 'a3', null])).toEqual({ 'gA:3': 'a3' });
+    // A cross pick waits for the redraw: its team was never on the roster, so moving other seeds keeps it.
+    expect(keepPicked({ 'gB:3': 'b4' }, ['a1', 'b3', 'a2'], ['a1', 'a2', 'b3'])).toEqual({ 'gB:3': 'b4' });
   });
 
   it('tiePicksPayload 는 선택한 동률 자리만 서버 모양으로 보내고, 없으면 보내지 않는다', () => {
@@ -173,22 +175,30 @@ describe('동률 선택(picks)', () => {
   });
 
   describe('choosePick', () => {
+    const at = (seat: number, previous: string | undefined, id: string, mates: string[] = [], capacity = 4) => ({ seat, mates, previous, id, capacity });
     it('이전에 고른 팀이 옮겨 앉은 자리에서 바로 바꾼다', () => {
-      expect(choosePick(['a1', 'a3', 'a2', 'b1'], 2, 'a3', 'a4')).toEqual(['a1', 'a4', 'a2', 'b1']);
+      expect(choosePick(['a1', 'a3', 'a2', 'b1'], at(2, 'a3', 'a4'))).toEqual(['a1', 'a4', 'a2', 'b1']);
+    });
+    it('고른 팀이 이미 명단에 있으면 아무것도 옮기지 않는다', () => {
+      expect(choosePick(['a1', 'b4', 'a2', 'b1'], at(2, undefined, 'b4', ['b3', 'b4']))).toEqual(['a1', 'b4', 'a2', 'b1']);
+    });
+    it('같은 동률의 다른 팀이 명단에 있으면 그 자리를 넘겨받는다', () => {
+      expect(choosePick(['a1', 'b3', 'a2', 'b1'], at(3, undefined, 'b4', ['b3', 'b4']))).toEqual(['a1', 'b4', 'a2', 'b1']);
     });
     it('고른 적이 없으면 비어 있는 동률 자리를 채운다', () => {
-      expect(choosePick(['a1', 'a2', null, 'b1'], 2, undefined, 'a3')).toEqual(['a1', 'a2', 'a3', 'b1']);
+      expect(choosePick(['a1', 'a2', null, 'b1'], at(2, undefined, 'a3'))).toEqual(['a1', 'a2', 'a3', 'b1']);
     });
-    it('동률 자리가 이미 찼으면 첫 빈 시드를, 빈 시드도 없으면 맨 끝을 쓴다', () => {
-      expect(choosePick([null, 'a2', 'x', 'b1'], 2, undefined, 'a3')).toEqual(['a3', 'a2', 'x', 'b1']);
-      expect(choosePick(['a1', 'a2', 'x', 'b1'], 2, undefined, 'a3')).toEqual(['a1', 'a2', 'x', 'b1', 'a3']);
+    it('동률 자리가 이미 찼으면 첫 빈 시드를 쓰고, 명단이 다 차 있으면 자리 수를 넘겨 늘리지 않는다', () => {
+      expect(choosePick([null, 'a2', 'x', 'b1'], at(2, undefined, 'a3'))).toEqual(['a3', 'a2', 'x', 'b1']);
+      expect(choosePick(['a1', 'a2', 'x', 'b1'], at(2, undefined, 'a3'))).toEqual(['a1', 'a2', 'x', 'b1']);
+      expect(choosePick(['a1', 'a2', 'x'], at(1, undefined, 'a3'))).toEqual(['a1', 'a2', 'x', 'a3']);
     });
     it('명단이 동률 자리보다 짧으면 그 자리까지 늘려 채운다', () => {
-      expect(choosePick(['a1'], 2, undefined, 'a3')).toEqual(['a1', null, 'a3']);
+      expect(choosePick(['a1'], at(2, undefined, 'a3'))).toEqual(['a1', null, 'a3']);
     });
     it('선택을 비우면 그 팀이 앉은 시드만 비운다', () => {
-      expect(choosePick(['a1', 'a3', 'a2'], 2, 'a3', '')).toEqual(['a1', null, 'a2']);
-      expect(choosePick(['a1', 'a2'], 2, undefined, '')).toEqual(['a1', 'a2']);
+      expect(choosePick(['a1', 'a3', 'a2'], at(2, 'a3', ''))).toEqual(['a1', null, 'a2']);
+      expect(choosePick(['a1', 'a2'], at(2, undefined, ''))).toEqual(['a1', 'a2']);
     });
   });
 

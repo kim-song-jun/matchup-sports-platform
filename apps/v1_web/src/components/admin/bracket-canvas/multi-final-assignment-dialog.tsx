@@ -69,16 +69,17 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const seats = final && !started ? tiedSeats(final) : [];
   const ties = view && final && !started ? describeTies(view, final) : [];
   const seated = ids.flatMap(id => (id === null ? [] : [id]));
-  const openSeats = seats.filter(entry => !picks[pickKey(entry)]);
-  const openTieSeat = openSeats.length > 0;
   const crossPolicy = policy === 'cross_group_top3';
+  // In rank order a pick only settles its seat once its team is on the roster; cross places it on the next draw.
+  const openSeats = seats.filter(entry => { const picked = picks[pickKey(entry)]; return !picked || !crossPolicy && !ids.includes(picked); });
+  const openTieSeat = openSeats.length > 0;
+  const takenByOtherSeat = (key: string, id: string) => Object.entries(picks).some(([other, picked]) => other !== key && picked === id);
   // A seed with no team yet stays put; a picked team is tracked by identity, so it can be moved like any other.
   const pinned = (index: number) => ids[index] == null;
   // A cross roster is redrawn from the picks, so its current seeds don't rule a candidate out.
   const candidatesOf = (seat: { groupId: string; rank: number; candidates: string[] }) => {
     const own = picks[pickKey(seat)];
-    const takenByOtherSeat = (id: string) => Object.entries(picks).some(([key, picked]) => key !== pickKey(seat) && picked === id);
-    return seat.candidates.filter(id => id === own || !otherIds.has(id) && !takenByOtherSeat(id) && (crossPolicy || !ids.includes(id)));
+    return seat.candidates.filter(id => id === own || !otherIds.has(id) && !takenByOtherSeat(pickKey(seat), id) && (crossPolicy || !ids.includes(id)));
   };
   const lastRoundGroupIds = new Set(groups.filter(group => group.phase === 'final' || group.phase === 'third_place').map(group => group.id));
   const rematches = reviewing && policy === 'rank_order' ? sameGroupPairs({ fixtures, slots, seeds: seated,
@@ -127,21 +128,32 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
       loadFinal(result, name); onApplied();
     } catch (err) { setError(extractErrorMessage(err, '진출팀을 배정하지 못했어요.')); }
   }
-  function edit(next: Array<string | null>, nextPicks: TiePickMap = picks) { setIds(next); setPicks(keepPicked(nextPicks, next)); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true); }
+  const matesOf = (key: string, candidates: readonly string[]) => candidates.filter(id => !takenByOtherSeat(key, id));
+  function edit(next: Array<string | null>, nextPicks: TiePickMap = picks) {
+    const kept = keepPicked(nextPicks, ids, next);
+    // A manual edit leaves cross for rank order, so picks still waiting for the redraw go onto the roster now.
+    const placed = crossPolicy ? seats.reduce((rows, entry) => {
+      const id = kept[pickKey(entry)];
+      return id && !rows.includes(id) ? choosePick(rows, { seat: entry.seat, mates: matesOf(pickKey(entry), entry.tiedRegistrationIds), previous: undefined, id, capacity: slots.length }) : rows;
+    }, next) : next;
+    setIds(placed); setPicks(kept); setPolicy('rank_order'); setNeedsRecommendation(false); setDirty(true);
+  }
   // With tied seats open the seat numbers must not shift, so a removed team leaves its seat empty instead of closing the gap.
   const drop = (remove: (id: string) => boolean) => seats.length > 0
     ? ids.map(id => (id !== null && remove(id) ? null : id))
     : ids.filter(id => id === null || !remove(id));
   function check(id: string) {
     const next = placeTeam(ids, seats, id);
-    const landed = seats.find(entry => !picks[pickKey(entry)] && next[entry.seat] === id && entry.tiedRegistrationIds.includes(id));
+    // Picks follow the team, so a tied team re-added anywhere settles its open seat; prefer the seat it actually landed in.
+    const own = seats.filter(entry => !picks[pickKey(entry)] && entry.tiedRegistrationIds.includes(id));
+    const landed = own.find(entry => next[entry.seat] === id) ?? own[0];
     edit(next, landed ? { ...picks, [pickKey(landed)]: id } : picks);
   }
-  function choose(seat: { seat: number; groupId: string; rank: number }, id: string) {
+  function choose(seat: { seat: number; groupId: string; rank: number; candidates: string[] }, id: string) {
     const key = pickKey(seat); const { [key]: previous, ...others } = picks;
     const next = id ? { ...others, [key]: id } : others;
     if (crossPolicy) { setPicks(next); setNeedsRecommendation(true); setSourceVersion(''); setDirty(true); return; }
-    edit(choosePick(ids, seat.seat, previous, id), next);
+    edit(choosePick(ids, { seat: seat.seat, mates: matesOf(key, seat.candidates), previous, id, capacity: slots.length }), next);
   }
   return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">

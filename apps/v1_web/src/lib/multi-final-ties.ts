@@ -50,9 +50,9 @@ export function initialPicks(final: Final, ids: ReadonlyArray<string | null>): T
   }));
 }
 
-/** Picks that still name a team on the roster. */
-export function keepPicked(picks: TiePickMap, ids: ReadonlyArray<string | null>): TiePickMap {
-  return Object.fromEntries(Object.entries(picks).filter(([, id]) => ids.includes(id)));
+/** Drops the picks whose team this edit took off the roster; a pick still waiting for its team (cross, before the redraw) stays. */
+export function keepPicked(picks: TiePickMap, before: ReadonlyArray<string | null>, after: ReadonlyArray<string | null>): TiePickMap {
+  return Object.fromEntries(Object.entries(picks).filter(([, id]) => after.includes(id) || !before.includes(id)));
 }
 
 /** One pick per tie seat that has one, in the order the server expects them; undefined when there is nothing to send. */
@@ -61,14 +61,23 @@ export function tiePicksPayload(seats: readonly TiedSeat[], picks: TiePickMap): 
   return sent.length > 0 ? sent : undefined;
 }
 
-/** A rank-order roster: swap the previous pick wherever it moved to, else take the tie seat, else the first empty seed, else the end. */
-export function choosePick(ids: ReadonlyArray<string | null>, seat: number, previous: string | undefined, id: string): Array<string | null> {
-  const at = previous ? ids.indexOf(previous) : -1;
-  if (at >= 0) return ids.map((row, index) => (index === at ? id || null : row));
+/**
+ * Puts the chosen tied team on a rank-order roster by identity. Already seated: nothing moves. Otherwise it replaces the
+ * previous pick, then a team of the same tie still on the roster (`mates`, minus teams other seats picked), then takes the
+ * tie seat or the first empty seed, and only appends while the roster is short of `capacity`.
+ */
+export function choosePick(ids: ReadonlyArray<string | null>, input: { seat: number; mates: readonly string[]; previous: string | undefined; id: string; capacity: number }): Array<string | null> {
+  const { seat, mates, previous, id, capacity } = input;
+  if (id && ids.includes(id)) return [...ids];
+  const swap = (from: string) => ids.map((row) => (row === from ? id || null : row));
+  if (previous && ids.includes(previous)) return swap(previous);
   if (!id) return [...ids];
+  const mate = mates.find((candidate) => candidate !== id && ids.includes(candidate));
+  if (mate) return swap(mate);
   if ((ids[seat] ?? null) === null) return Array.from({ length: Math.max(ids.length, seat + 1) }, (_, index) => (index === seat ? id : ids[index] ?? null));
   const empty = ids.indexOf(null);
-  return empty >= 0 ? ids.map((row, index) => (index === empty ? id : row)) : [...ids, id];
+  if (empty >= 0) return ids.map((row, index) => (index === empty ? id : row));
+  return ids.length < capacity ? [...ids, id] : [...ids];
 }
 
 /** A rank-order recommendation leaves tied seats null; the operator's picks go back into them. */

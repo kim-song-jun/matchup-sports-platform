@@ -411,6 +411,35 @@ describe('예선 순위가 추첨으로만 갈린 동률', () => {
     expect(saved).toEqual({ expectedRevision: 1, finalName: '프리미어', registrationIds: ['reg-0', 'reg-3', 'reg-1'], assignmentPolicy: CROSS, sourceVersion: 'redrawn-source', tiePicks: [PICK] });
   });
 
+  it('교차 명단에서 고른 팀을 뺐다가 다시 넣으면 다른 시드에 앉아도 동률 선택이 다시 기록된다', async () => {
+    const { view, bracket } = tieFixture();
+    Object.assign(view.finals[0], { registrationIds: ['reg-0', 'reg-3', 'reg-1'], assignmentPolicy: CROSS, tiePicks: [PICK] });
+    handlers(view, bracket); show();
+    const box = await screen.findByRole('checkbox', { name: '라팀' });
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('');
+    fireEvent.click(box);
+    // 라팀 goes back to 2번 (the seed it left), not its rule-order seat 3번, and the pick follows it.
+    expect(screen.getByText('2번 시드 · 라팀')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(screen.getByText('지금 2번 시드예요.')).toBeInTheDocument();
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+    expect(seedOrder()).toHaveLength(3);
+  });
+
+  it('교차 배치에서 고른 팀이 추천 전에 시드를 손으로 옮기면 선택이 사라지지 않고 명단에 들어간다', async () => {
+    const { view, bracket } = tieFixture(); handlers(view, bracket); show();
+    const policy = await enabledPolicySelect();
+    fireEvent.change(policy, { target: { value: CROSS } });
+    fireEvent.change(screen.getByRole('combobox', { name: SEAT_LABEL }), { target: { value: 'reg-3' } });
+    fireEvent.click(screen.getByRole('button', { name: '가팀 시드 내리기' }));
+    expect(screen.getByRole('combobox', { name: '진출팀 배치 방식' })).toHaveValue('rank_order');
+    expect(screen.getByRole('combobox', { name: SEAT_LABEL })).toHaveValue('reg-3');
+    expect(seedOrder()).toEqual(['1번 시드 · 나팀', '2번 시드 · 가팀', '3번 시드 · 라팀']);
+    expect(screen.queryByText('동률 자리를 골라야 대진을 확인할 수 있어요.')).not.toBeInTheDocument();
+  });
+
   it('시작한 토너먼트에는 동률 안내와 선택창을 아예 그리지 않는다', async () => {
     const { view, bracket } = tieFixture(); bracket.fixtures[0].game.state = 'LIVE'; handlers(view, bracket); show();
     await screen.findByText('이 토너먼트는 시작했거나 기록·결과가 있어 진출팀을 다시 배정할 수 없어요.');

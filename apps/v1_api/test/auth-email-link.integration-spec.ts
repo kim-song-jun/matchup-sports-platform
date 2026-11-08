@@ -342,17 +342,19 @@ describe('V1 adding an email login to a social account integration', () => {
     expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'email_login_added', actorUserId: { in: [CALLER, RIVAL] } } })).toBe(1);
   });
 
-  it('maps the database unique violation to EMAIL_CONFLICT and writes nothing', async () => {
-    // The pre-check looks at other accounts only; the caller's own retired login on the address reaches the unique index.
+  it('brings back the account’s own removed login, instead of adding a second row', async () => {
+    // A login removed through POST /auth/identities/unlink: the row stays, unlinked, its key freed and without a password.
     await prisma.v1AuthIdentity.create({
-      data: { id: `${CALLER}-retired-email`, userId: CALLER, provider: 'email', providerUserKey: NEW_EMAIL, status: 'unlinked', unlinkedAt: new Date() },
+      data: { id: `${CALLER}-removed-email`, userId: CALLER, provider: 'email', providerUserKey: `deleted:${CALLER}:${CALLER}-removed-email`, status: 'unlinked', unlinkedAt: new Date() },
     });
 
-    const response = await complete(CALLER, issueEmailLinkToken(CALLER, NEW_EMAIL));
+    const response = await complete(CALLER, issueEmailLinkToken(CALLER, NEW_EMAIL)).expect(200);
 
-    expect([response.status, response.body.code]).toEqual([409, 'EMAIL_CONFLICT']);
-    expect(await prisma.v1AuthIdentity.count({ where: { userId: CALLER, provider: 'email', status: 'active' } })).toBe(0);
-    expect(await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).toMatchObject({ email: CALLER_CONTACT, emailVerifiedAt: null });
-    expect(await prisma.v1StatusChangeLog.count({ where: { reason: 'email_login_added', actorUserId: CALLER } })).toBe(0);
+    expect(response.body.data).toEqual({ linked: true, email: NEW_EMAIL });
+    const rows = await prisma.v1AuthIdentity.findMany({ where: { userId: CALLER, provider: 'email' } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: `${CALLER}-removed-email`, providerUserKey: NEW_EMAIL, status: 'active', unlinkedAt: null });
+    expect(await verifyPassword(PASSWORD, rows[0].passwordHash)).toBe(true);
+    expect(await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date) });
   });
 });

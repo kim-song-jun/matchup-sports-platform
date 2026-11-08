@@ -141,6 +141,7 @@ function createDatabase(seed: { users: Row[]; identities: Row[] }) {
         apply(found, data);
         return found;
       }),
+      findFirst: jest.fn(async ({ where }: Row) => state.identities.find((row) => matches(row, where)) ?? null),
       updateMany: jest.fn(async ({ where, data }: Row) => {
         const rows = state.identities.filter((row) => matches(row, where));
         rows.forEach((row) => apply(row, data));
@@ -583,6 +584,51 @@ describe('EmailLinkService.complete', () => {
     );
     expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
     expect(notifications.deliverCreated).toHaveBeenCalledWith(CALLER, 'social_identity_linked', expect.objectContaining({ id: 'notice-1' }));
+  });
+
+  describe('after the account removed its email login (POST /auth/identities/unlink)', () => {
+    /** What the removal leaves: the row stays, unlinked, with the address freed from its login key and no password. */
+    const removedEmailLogin = () =>
+      identity('email-removed', CALLER, 'email', `deleted:${CALLER}:email-removed`, { status: 'unlinked', unlinkedAt: new Date('2026-06-01T00:00:00Z') });
+
+    it('brings the same row back with the new address and password, rather than adding a second email login', async () => {
+      const seed = kakaoCaller();
+      seed.identities.push(removedEmailLogin());
+      const { verified, complete, auth, state } = await build(seed);
+
+      await complete(await verified());
+
+      const emailRows = state.identities.filter((row) => row.provider === 'email');
+      expect(emailRows).toHaveLength(1);
+      expect(emailRows[0]).toMatchObject({ id: 'email-removed', userId: CALLER, providerUserKey: NEW_EMAIL, email: NEW_EMAIL, status: 'active', unlinkedAt: null });
+      expect(await verifyPassword(NEW_PASSWORD, emailRows[0].passwordHash)).toBe(true);
+      await expect(auth.login({ email: NEW_EMAIL, password: NEW_PASSWORD }, {})).resolves.toMatchObject({ session: { userId: CALLER } });
+    });
+
+    it('gives the restored row’s notice a key of its own: the row id repeats, a repeated key would swallow the notice', async () => {
+      const seed = kakaoCaller();
+      seed.identities.push(removedEmailLogin());
+      const { verified, complete, notifications } = await build(seed);
+
+      await complete(await verified());
+
+      const [, , , options] = notifications.createInTransaction.mock.calls[0];
+      expect(options.businessKey).toMatch(/^email-link:email-removed:\d+$/);
+      expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets another account claim the address the removal freed', async () => {
+      const seed = kakaoCaller();
+      seed.identities.push(removedEmailLogin());
+      seed.users.push(user(OTHER));
+      seed.identities.push(identity('kakao-other', OTHER, 'kakao', 'kakao-key-other'));
+      const { verified, complete, state } = await build(seed);
+
+      await complete(await verified(NEW_EMAIL, OTHER), OTHER);
+
+      expect(state.identities.find((row) => row.userId === OTHER && row.provider === 'email')).toMatchObject({ providerUserKey: NEW_EMAIL, status: 'active' });
+      expect(state.identities.find((row) => row.id === 'email-removed')).toMatchObject({ userId: CALLER, status: 'unlinked' });
+    });
   });
 
   it('undoes the link when the notice cannot be stored, and delivers nothing', async () => {

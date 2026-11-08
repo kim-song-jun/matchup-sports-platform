@@ -249,10 +249,40 @@ describe('VerificationService.requestEmail', () => {
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
 
+  it('refuses a real address in a dev-echo environment that has no mail sending, before any token exists', async () => {
+    const saved = process.env.V1_VERIFICATION_DEV_ECHO;
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    const echoDispatcher = new VerificationDispatcherService(smsStub, emailStub, eventLogStub(), {} as never);
+    if (saved === undefined) delete process.env.V1_VERIFICATION_DEV_ECHO;
+    else process.env.V1_VERIFICATION_DEV_ECHO = saved;
+    const { prisma, handle } = setupUnverified();
+    const service = new VerificationService(prisma, echoDispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({ status: 503, response: { code: 'EMAIL_SEND_UNAVAILABLE' } });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the resend cooldown under the issue lock, so two simultaneous requests cannot both send', async () => {
+    const { prisma, handle } = setupUnverified();
+    // The fast check outside the lock sees nothing; by the time this request holds the lock the other one has issued.
+    handle.v1VerificationToken.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ createdAt: new Date(Date.now() - 1_000) });
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
+    const send = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    send.mockRestore();
+    deliverable.mockRestore();
+  });
+
   it('refuses a second code for the same address inside the resend cooldown', async () => {
     const { prisma, handle } = setupUnverified();
     handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 5_000) });
-    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(service.requestEmail(authUser)).rejects.toMatchObject({
@@ -265,7 +295,7 @@ describe('VerificationService.requestEmail', () => {
   it('issues and mails a contact code once the address can be mailed and the cooldown has passed', async () => {
     const { prisma, handle } = setupUnverified();
     handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 60_000) });
-    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
     const send = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
@@ -366,7 +396,7 @@ describe('VerificationService 발송 총량 상한', () => {
 
   it('이메일 발송에도 같은 상한이 걸린다', async () => {
     const { prisma, handle } = setup({ target: 5, user: 0 });
-    const deliverable = jest.spyOn(dispatcher, 'emailDeliverable', 'get').mockReturnValue(true);
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(service.requestEmail(authUser)).rejects.toMatchObject({

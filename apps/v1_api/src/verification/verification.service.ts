@@ -74,7 +74,7 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
-    this.assertEmailDeliverable('contact');
+    this.assertEmailDeliverable('contact', user.email);
     await this.assertResendCooldown('email', user.email);
     // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
     // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
@@ -104,8 +104,12 @@ export class VerificationService {
    * 마지막 발송 기록은 발송 실패 시 `issue()` 가 지우므로 실패한 시도는 쿨다운을 걸지 않는다.
    * 쿨다운과 발송 상한은 목적을 가리지 않고 센다 — 막으려는 것은 코드의 종류가 아니라 그 대상에게 나간 메일·문자의 양이다.
    */
-  private async assertResendCooldown(channel: V1VerificationChannel, target: string) {
-    const recent = await this.prisma.v1VerificationToken.findFirst({
+  private async assertResendCooldown(
+    channel: V1VerificationChannel,
+    target: string,
+    db: Pick<Prisma.TransactionClient, 'v1VerificationToken'> = this.prisma,
+  ) {
+    const recent = await db.v1VerificationToken.findFirst({
       where: { channel, target },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
@@ -308,19 +312,22 @@ export class VerificationService {
     return this.consumePurposeCode(userId, 'email_change', code);
   }
 
-  /** 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다. */
-  private assertEmailDeliverable(purpose: V1VerificationPurpose) {
-    if (this.dispatcher.emailDeliverable) return;
-    this.logger.error(`${purpose} code requested but email delivery is not configured (SES_REGION/EMAIL_FROM)`);
-    throw new ServiceUnavailableException({
-      code: 'EMAIL_SEND_UNAVAILABLE',
-      message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
-    });
+  /**
+   * 이 주소로 코드를 전할 길이 없으면 아무도 이 단계를 끝낼 수 없다. 주소를 보고 판정한다 — 코드를 응답에 싣는 개발 환경도
+   * 시험 주소에만 그렇게 하므로, 메일 발송이 없는 환경에서 실제 주소는 여기서 거절된다.
+   */
+  private assertEmailDeliverable(purpose: V1VerificationPurpose, email: string) {
+    try {
+      this.dispatcher.assertDeliveryAvailable('email', email);
+    } catch (err) {
+      this.logger.error(`${purpose} code requested but email delivery is not configured for this address (SES_REGION/EMAIL_FROM)`);
+      throw err;
+    }
   }
 
   /** 로그인한 계정이 아직 자기 것으로 증명하지 않은 주소로 보내는 목적별 인증번호. 쿨다운·24시간 발송 상한은 목적과 무관하게 센다. */
   private async requestPurposeEmailCode(userId: string, email: string, purpose: Exclude<V1VerificationPurpose, 'contact'>) {
-    this.assertEmailDeliverable(purpose);
+    this.assertEmailDeliverable(purpose, email);
     await this.assertResendCooldown('email', email);
     const issued = await this.issue('email', userId, email, purpose);
     return {
@@ -367,6 +374,8 @@ export class VerificationService {
       const targetScope = JSON.stringify(['verification-send-target', channel, target]);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userScope}, 0))`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${targetScope}, 0))`;
+      // 잠금 밖의 쿨다운 확인은 빠른 거절일 뿐이다 — 같은 대상으로 동시에 들어온 요청은 둘 다 그걸 통과하므로 잠금 아래에서 다시 본다.
+      await this.assertResendCooldown(channel, target, tx);
       await this.assertSendQuota(tx, channel, userId, target);
       // 새 코드는 같은 목적의 이전 코드만 폐기한다 — 다른 흐름이 보낸 코드는 그대로 쓸 수 있어야 한다.
       await tx.v1VerificationToken.updateMany({

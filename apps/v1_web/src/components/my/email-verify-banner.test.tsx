@@ -60,11 +60,13 @@ describe('EmailVerifyBanner — 닫기와 다시 보이기', () => {
     expect(status).not.toContainElement(screen.getByRole('button', { name: '이메일 인증 안내 닫기' }));
   });
 
-  it('닫으면 키보드 포커스를 지정한 제목으로 옮긴다', () => {
+  it('닫으면 키보드 포커스를 배너 바로 뒤의 보이는 조작 요소로 옮긴다(숨김 제목이나 body 가 아니라)', () => {
     render(
       <>
-        <h1 id="my-heading" tabIndex={-1}>마이페이지</h1>
-        <EmailVerifyBanner userId="u1" focusAfterCloseId="my-heading" />
+        <a href="/before">앞 링크</a>
+        <EmailVerifyBanner userId="u1" />
+        <div aria-hidden="true"><button type="button">숨은 버튼</button></div>
+        <a href="/next">다음 링크</a>
       </>,
     );
 
@@ -72,7 +74,7 @@ describe('EmailVerifyBanner — 닫기와 다시 보이기', () => {
     close.focus();
     fireEvent.click(close);
 
-    expect(screen.getByRole('heading', { name: '마이페이지' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: '다음 링크' })).toHaveFocus();
   });
 
   it('닫으면 배너가 사라지고, 다시 알려 주겠다는 안내를 한 번 보인다', () => {

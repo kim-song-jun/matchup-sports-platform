@@ -2,6 +2,7 @@
  * Proving a new account email, through the real VerificationService and EmailChangeService over an in-memory token table
  * and real scrypt. Only the mail transport and the user lookups are stand-ins.
  */
+import { ServiceUnavailableException } from '@nestjs/common';
 import { RECENT_LOGIN_MAX_AGE_SECONDS } from '../auth/link-caller-guards';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { PrismaService } from '../prisma/prisma.service';
@@ -115,6 +116,9 @@ function harness(seed: { users: Row[]; identities?: Row[] }) {
   prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => callback(prisma));
   const dispatcher = {
     emailDeliverable: true,
+    assertDeliveryAvailable: jest.fn(() => {
+      if (!dispatcher.emailDeliverable) throw new ServiceUnavailableException({ code: 'EMAIL_SEND_UNAVAILABLE', message: '지금은 인증 메일을 보낼 수 없어요.' });
+    }),
     send: jest.fn(async (_channel: string, target: string, code: string, emailPurpose: string) => {
       mails.push({ target, code, emailPurpose });
     }),

@@ -536,7 +536,7 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.getAllByText('사자FC 부전승').length).toBeGreaterThan(0);
   });
 
-  it('대진이 없으면 요일/시각/장소 없이 팀 수로 제안한 주차 수(2팀 → 단일 1주)만으로 생성할 수 있다', async () => {
+  it('대진이 없으면 요일/시각/장소 없이 팀 수로 제안한 경기일 수(2팀 → 단일 1일)만으로 생성할 수 있다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
@@ -578,13 +578,13 @@ describe('LeagueMatchFixturesClient', () => {
 
     // 4팀 = 라운드당 2경기 → 총 5경기는 3라운드(3주)를 만들고 서버가 5경기에서 자른다.
     expect(screen.getByRole('button', { name: '총 5경기' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText(/3주차 · 5경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(/경기일 3일 · 5경기가 만들어져요/)).toBeInTheDocument();
 
     await generateAndConfirm();
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 3, fixtureCount: 5 }));
   });
 
-  it('F40: 주차 수는 팀 수로 제안한다 — 2팀은 단일 1주(기본)·홈앤어웨이 2주 칩, 요약이 경기 수를 말한다', async () => {
+  it('F40: 경기일 수는 팀 수로 제안한다 — 2팀은 단일 1일(기본)·홈앤어웨이 2일 칩, 요약이 경기 수를 말한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
@@ -601,12 +601,12 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     expect(screen.getByText('2팀 · 단일 라운드로빈')).toBeInTheDocument();
-    expect(screen.getByText(/1주차 · 1경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '단일 1주' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/경기일 1일 · 1경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '단일 1일' })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '홈앤어웨이 2주' }));
-    expect(screen.getByLabelText('주차 수')).toHaveValue(2);
-    expect(screen.getByText(/2주차 · 2경기가 만들어져요/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '홈앤어웨이 2일' }));
+    expect(screen.getByLabelText('경기일 수')).toHaveValue(2);
+    expect(screen.getByText(/경기일 2일 · 2경기가 만들어져요/)).toBeInTheDocument();
 
     await generateAndConfirm();
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 2 }));
@@ -653,7 +653,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     const grid = screen.getByLabelText('시작 시각').parentElement!.parentElement!;
     expect(grid.className).toContain('grid-cols-2');
-    for (const label of ['주차 수', '요일', '시작 시각', '종료 시각', '경기 시간(분)', '휴식(분)', '하루 경기 수']) {
+    for (const label of ['경기일 수', '요일', '시작 시각', '종료 시각', '경기 시간(분)', '휴식(분)', '하루 경기 수']) {
       const input = screen.getByLabelText(label);
       expect(input.className).toContain('w-full');
       expect(input.parentElement!.parentElement).toBe(grid);
@@ -717,8 +717,8 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    // 직접 입력한 주차 수(7)는 제안값을 덮는다 — 요일 전개가 그 수만큼 날짜를 만든다.
-    fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '7' } });
+    // 직접 입력한 경기일 수(7)는 제안값을 덮는다 — 요일 전개가 그 수만큼 날짜를 만든다.
+    fireEvent.change(screen.getByLabelText('경기일 수'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
     fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
@@ -745,7 +745,7 @@ describe('LeagueMatchFixturesClient', () => {
     });
     expect(payload.schedule.time).toBe('19:30');
     expect(payload.schedule).not.toHaveProperty('dayOfWeek');
-    // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
+    // 경기일 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
     expect(payload.schedule.dates).toHaveLength(7);
     // 기준 시각은 **루프 전에 한 번** 잡는다. 루프 안에서 매번 `Date.now()` 를 읽으면
     // 기준선이 반복마다 앞으로 가서, 첫 날짜가 지금 직후인 경계에서 간헐적으로 깨진다.
@@ -785,7 +785,7 @@ describe('LeagueMatchFixturesClient', () => {
         </Providers>,
       );
 
-      fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('경기일 수'), { target: { value: '1' } });
       fireEvent.change(screen.getByLabelText('요일'), { target: { value: '5' } });
       fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
       // 여기까지의 렌더 시점 계산이라면 첫 날은 2026-09-04 다.
@@ -1408,7 +1408,7 @@ describe('LeagueMatchFixturesClient', () => {
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
       // 접혀 있는 동안은 재생성·참가팀 관리가 화면에 없다. 경기 추가는 접이식 밖이라 늘 보인다.
       expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
-      expect(screen.queryByLabelText('주차 수')).toBeNull();
+      expect(screen.queryByLabelText('경기일 수')).toBeNull();
       expect(screen.queryByText('참가팀 관리')).toBeNull();
       expect(screen.getByRole('button', { name: '경기 추가' })).toBeInTheDocument();
 
@@ -1710,8 +1710,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
     fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '4' } });
-    expect(screen.getByText(/2주차 · 6경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.getByText(/마지막 주차에는 2경기만 열려요/)).toBeInTheDocument();
+    expect(screen.getByText(/경기일 2일 · 6경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(/마지막 경기일에는 2경기만 열려요/)).toBeInTheDocument();
     await generateAndConfirm();
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
     const payload = mutateAsync.mock.calls[0][0];
@@ -1722,8 +1722,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     // 대조군: 하루 6경기면 하루에 다 들어가 안내가 없다.
     fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '6' } });
-    expect(screen.getByText(/1주차 · 6경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.queryByText(/마지막 주차에는/)).not.toBeInTheDocument();
+    expect(screen.getByText(/경기일 1일 · 6경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
   });
 
   it('F40: 홈앤어웨이는 경기가 두 배라 같은 하루 경기 수에서 주차와 마지막 주차 경기 수가 달라진다', () => {
@@ -1737,15 +1737,15 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '6' } });
     // 단일: 6경기 · 하루 6경기 → 1주뿐이라 안내가 없다.
-    expect(screen.queryByText(/마지막 주차에는/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /홈앤어웨이/ }));
     // 홈앤어웨이 12경기 · 하루 6경기 → 2주, 딱 나눠떨어져 안내가 없다.
-    expect(screen.getByText(/2주차 · 12경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.queryByText(/마지막 주차에는/)).not.toBeInTheDocument();
+    expect(screen.getByText(/경기일 2일 · 12경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
     // 하루 5경기 → 3주(5 + 5 + 2).
     fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '5' } });
-    expect(screen.getByText(/3주차 · 12경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.getByText(/마지막 주차에는 2경기만 열려요/)).toBeInTheDocument();
+    expect(screen.getByText(/경기일 3일 · 12경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(/마지막 경기일에는 2경기만 열려요/)).toBeInTheDocument();
   });
 
   it('이용 종료 시각까지 넣으면 하루 경기 수를 역산 제안하고 "이대로 적용"이 값을 채운다', () => {

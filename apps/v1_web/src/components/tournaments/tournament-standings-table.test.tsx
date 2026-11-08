@@ -188,8 +188,8 @@ describe('TournamentStandingsTable', () => {
     expect(tied.getAllByRole('cell')[0]).toHaveStyle({ paddingLeft: '8px', paddingRight: '4px' });
   });
 
-  // 줄바꿈 결과는 jsdom 이 계산하지 못해 스타일 계약만 본다. 실제 폭 측정은 PR 에 남긴다.
-  it('팀명은 단어 단위로 접고, 공백 없는 긴 이름도 표를 넓히지 않게 칸 안에서 끊는다', () => {
+  // 줄바꿈 결과는 jsdom 이 계산하지 못해 스타일 계약만 본다. 실제 폭은 브라우저에서 잰다.
+  it('팀명 칸은 단어 단위 줄바꿈과 최소 폭을 줄이는 anywhere 를 쓴다', () => {
     renderGroupStandings(TIED_ROWS);
     expect(rowByTeam('가 FC').getByText('가 FC')).toHaveStyle({ wordBreak: 'keep-all', overflowWrap: 'anywhere' });
   });

@@ -20,7 +20,7 @@
  *     실제 클래스로 만들어 CSS 를 생성한다(`<이름>` 같은 걸 넣었더니 `<` 가 든
  *     CSS 가 나와 **빌드가 깨졌다** — 2026-08-18). 형태는 아래 정규식과 위반
  *     메시지가 이미 정확히 보여준다.
- *  4) 모달 스크림 배경 누락 (checkModalScrimBackground 주석 참고).
+ *  그 밖의 검사는 아래 각 함수의 주석을 본다.
  *
  * 사용: node scripts/v1-pattern-check.mjs   (apps/v1_web에서)
  */
@@ -130,16 +130,14 @@ function checkInertFontSizeClasses() {
 
 /* ── 모달 스크림 배경 누락 검사 ───────────────────────────────────── */
 // tm-modal-scrim 은 페이드만 정의한다. 배경색은 창마다 넣어서, 빠뜨리면 뒤 화면이 어두워지지 않는다.
-const DARK_SCRIM_CLASS = /(^|\s)bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/\d+)(\s|$)/;
+const DARK_SCRIM_CLASS = /[\s"'`]bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/\d+)(?=[\s"'`])/;
 const SCRIMS_WITH_OWN_CSS_BACKGROUND = ['tm-photo-crop-scrim'];
 function checkModalScrimBackground() {
   const files = execSync("grep -rl 'tm-modal-scrim' src --include='*.tsx' --exclude='*.test.tsx' || true", { encoding: 'utf8' });
   for (const f of files.split('\n').filter(Boolean)) {
     const txt = readFileSync(f, 'utf8');
     for (const m of txt.matchAll(/tm-modal-scrim/g)) {
-      let start = m.index;
-      while (start > 0 && !['"', "'", '`'].includes(txt[start - 1])) start--;
-      const classes = txt.slice(start, txt.indexOf(txt[start - 1], m.index));
+      const classes = txt.slice(txt.lastIndexOf('className=', m.index), txt.indexOf('\n', m.index));
       if (DARK_SCRIM_CLASS.test(classes) || SCRIMS_WITH_OWN_CSS_BACKGROUND.some((name) => classes.includes(name))) continue;
       const line = txt.slice(0, m.index).split('\n').length;
       violations.push(`[모달 스크림 배경 누락] ${f}:${line}: tm-modal-scrim 은 페이드만 정의한다. bg-[var(--scrim-dark-32)] 를 함께 넣을 것`);

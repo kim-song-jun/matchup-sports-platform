@@ -315,4 +315,29 @@ test.describe('mobile safe area and touch', () => {
     await expect(dialog).toBeVisible();
     await session.detach();
   });
+
+  test('a scrolled filter sheet keeps its handle and head pinned and hides the content behind them', async ({ page }) => {
+    await page.goto('/tournaments?kind=tournament&filter=1');
+    const dialog = page.getByRole('dialog', { name: '대회·리그 필터' });
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => dialog.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
+    const offsets = () => dialog.evaluate((sheet) => {
+      const top = sheet.getBoundingClientRect().top;
+      const offset = (selector: string) => sheet.querySelector(selector)!.getBoundingClientRect().top - top;
+      return { handle: offset('.tm-filter-sheet-handle'), head: offset('.tm-filter-sheet-head') };
+    });
+    const atRest = await offsets();
+    await dialog.evaluate((sheet) => { sheet.scrollTop = sheet.scrollHeight; });
+    await expect.poll(() => dialog.evaluate((sheet) => sheet.scrollTop)).toBeGreaterThan(0);
+    expect(await offsets()).toEqual(atRest);
+    // The strip above the head and beside the handle must be opaque: no option may be the top element there.
+    const covered = await dialog.evaluate((sheet) => {
+      const box = sheet.getBoundingClientRect();
+      const head = sheet.querySelector('.tm-filter-sheet-head')!;
+      const y = (box.top + head.getBoundingClientRect().top) / 2;
+      const hit = document.elementFromPoint(box.left + box.width / 4, y);
+      return hit === sheet || hit === head;
+    });
+    expect(covered).toBe(true);
+  });
 });

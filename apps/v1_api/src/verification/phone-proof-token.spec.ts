@@ -1,4 +1,5 @@
 import { PHONE_PROOF_TTL_SECONDS, issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 describe('phone-proof-token', () => {
   // 원래 없던 값을 그대로 대입하면 문자열 "undefined" 가 남아 같은 worker 의 다른 테스트가
@@ -74,8 +75,7 @@ describe('phone-proof-token', () => {
 
   it('rejects a tampered signature', () => {
     const token = issuePhoneProofToken('01012345678');
-    const tampered = `${token.slice(0, -2)}xy`;
-    expect(verifyPhoneProofToken(tampered, '01012345678')).toBe(false);
+    expect(verifyPhoneProofToken(tamperSignature(token), '01012345678')).toBe(false);
   });
 
   it('rejects malformed tokens', () => {

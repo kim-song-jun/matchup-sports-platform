@@ -1,5 +1,6 @@
 import { issueEmailProofToken, verifyEmailProofToken } from './email-proof-token';
 import { issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 const EMAIL = 'runner@example.com';
 const PHONE = '01012345678';
@@ -56,7 +57,7 @@ describe('email-proof-token', () => {
 
   it('서명이 변조되면 거부한다', () => {
     const token = issueEmailProofToken(EMAIL);
-    expect(verifyEmailProofToken(`${token.slice(0, -2)}xy`, EMAIL)).toBe(false);
+    expect(verifyEmailProofToken(tamperSignature(token), EMAIL)).toBe(false);
   });
 
   it('형식이 깨진 토큰은 거부한다', () => {

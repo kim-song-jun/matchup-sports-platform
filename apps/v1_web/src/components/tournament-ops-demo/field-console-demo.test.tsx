@@ -1,10 +1,12 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldConsoleDemo } from './field-console-demo';
 import { TournamentOpsDemoEntry } from './demo-entry';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/field-console-demo', useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
+const EXPIRED_NOTICE = /설정된 시간이 끝났어요/;
+
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
@@ -74,4 +76,22 @@ describe('필드 운영콘솔 안내와 체험', () => {
     expect(screen.queryByRole('button', { name: '골' })).not.toBeInTheDocument();
     expect(network).not.toHaveBeenCalled();
   }, 20000);
+  // The core re-reads the game every 5 seconds once a period runs out. Here that read must stay on the sample source.
+  it('기간이 끝나 상세를 다시 읽어도 실제 서버로 요청하지 않는다', async () => {
+    vi.useFakeTimers();
+    try {
+      const network = vi.spyOn(globalThis, 'fetch');
+      render(<FieldConsoleDemo />);
+      fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+      fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '경기 시작' }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.queryByText(EXPIRED_NOTICE)).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20 * 60_000 + 16_000); });
+      expect(screen.getByText(EXPIRED_NOTICE)).toBeInTheDocument();
+      expect(network).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

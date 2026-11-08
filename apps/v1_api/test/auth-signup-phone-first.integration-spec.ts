@@ -20,14 +20,15 @@ describe('Signup with phone verification first', () => {
   const ENV_KEYS = ['V1_PHONE_VERIFICATION_DISABLED', 'V1_VERIFICATION_DEV_ECHO', 'V1_SESSION_SECRET', 'SOLAPI_API_KEY', 'SOLAPI_API_SECRET', 'SOLAPI_SENDER_NUMBER'] as const;
   const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
+  // dev-echo 는 010-0000-XXXX 대역에만 코드를 응답에 싣는다 — 대역 밖 번호는 문자 공급자가 없어 503 이 된다.
   const phones = {
-    active: '01055560001',
-    withdrawing: '01055560002',
-    expiredSignup: '01055560003',
-    freshSignup: '01055560004',
-    free: '01055560005',
-    expiredSignupForRegister: '01055560006',
-    expiredSignupWithoutProof: '01055560007',
+    active: '01000002631',
+    withdrawing: '01000002632',
+    expiredSignup: '01000002633',
+    freshSignup: '01000002634',
+    free: '01000002635',
+    expiredSignupForRegister: '01000002636',
+    expiredSignupWithoutProof: '01000002637',
   } as const;
   const ids = {
     active: 'integration-phone-first-active',

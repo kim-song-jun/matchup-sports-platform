@@ -31,3 +31,17 @@ export function teamMembershipCountFake(members: FakeTeamMember[]) {
     ).length;
   });
 }
+
+/**
+ * `v1TeamProfile.findUnique` backed by a team id -> `genderRule` map. A team id that is not in the map has no
+ * profile row (`null`). Like the membership fake it throws on a `where` it does not understand.
+ */
+export function teamProfileGenderRuleFake(genderRuleByTeamId: Record<string, string | null> = {}) {
+  return jest.fn(async ({ where }: { where: { teamId?: string } }) => {
+    const unknownKeys = Object.keys(where).filter((key) => key !== 'teamId');
+    if (unknownKeys.length > 0 || where.teamId === undefined) {
+      throw new Error(`teamProfileGenderRuleFake: expected where { teamId }, got ${Object.keys(where).join(',')}`);
+    }
+    return where.teamId in genderRuleByTeamId ? { genderRule: genderRuleByTeamId[where.teamId] } : null;
+  });
+}

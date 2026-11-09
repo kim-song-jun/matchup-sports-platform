@@ -12,11 +12,12 @@ const { execFileSync } = require('node:child_process');
   try {
     for (const width of [390, 768, 1440]) {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
-      const page = await context.newPage();
-      const errors = [];
-      page.on('pageerror', err => errors.push(err.message));
-      page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${new URL(response.url()).pathname}`); });
       for (const [name, path] of [['console', '/field-console-demo'], ['guide', '/tournament-ops-demo#demo-guide']]) {
+        const page = await context.newPage();
+        const errors = [];
+        page.on('pageerror', err => errors.push(err.message));
+        page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${new URL(response.url()).pathname}`); });
+        page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
         await page.goto(`https://alpha.teameet.co.kr${path}`, { waitUntil: 'domcontentloaded' });
         if (name === 'console') await page.getByRole('button', { name: '건너뛰기', exact: true }).click();
         else await page.getByRole('region', { name: '대회 관리 내용' }).waitFor();
@@ -30,8 +31,10 @@ const { execFileSync } = require('node:child_process');
           const destination = await returns.getAttribute('href');
           await returns.click();
           await page.waitForURL(url => url.pathname === destination || url.pathname === '/login');
+          await page.waitForTimeout(1000);
           findings.push({ name, width, returnDestination: destination, observedPath: new URL(page.url()).pathname, tabs: context.pages().length });
         }
+        await page.close();
       }
       await context.close();
     }

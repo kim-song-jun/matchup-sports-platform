@@ -12,7 +12,7 @@ import type {
   V1UpdateAdCampaignPayload,
 } from '@/types/ads';
 
-/** nginx marks API responses `no-store`, so this is the only reuse; the admin stop notice ("within 1 minute") relies on it. */
+/** nginx adds `no-store` to successful API responses, so this is the only reuse; the admin stop notice ("within 1 minute") relies on it. */
 const ACTIVE_ADS_STALE_MS = 30_000;
 
 /**

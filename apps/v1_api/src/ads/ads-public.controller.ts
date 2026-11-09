@@ -8,7 +8,7 @@ import { AdEventBatchDto } from './dto/ad-event.dto';
 export class AdsPublicController {
   constructor(private readonly ads: AdsPublicService) {}
 
-  /** No cache header: nginx marks every `/api/v1/` response `no-store`, which would override it. */
+  /** No cache header: nginx adds `no-store` to successful `/api/v1/` responses, which would override it. */
   @Get('active')
   active() {
     return this.ads.findActive();

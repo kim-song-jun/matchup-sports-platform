@@ -92,6 +92,8 @@ describe('Ads HTTP contract', () => {
     expect(published.body.data.campaign).toMatchObject({ status: 'published', version: 2, banner: { phase: 'live' } });
 
     const active = await http().get('/api/v1/ads/active').expect(200);
+    // The API leaves caching to nginx, which adds `no-store`; a header here would only conflict with it.
+    expect(active.headers['cache-control']).toBeUndefined();
     expect(active.body.data).toEqual({
       banner: { campaignId: id, advertiserName: '에버데이', imageUrl: BANNER_URL, altText: '에버데이 신제품', linkUrl: '/tournaments/1' },
       popup: null,

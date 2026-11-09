@@ -116,7 +116,7 @@ Saving an already published campaign re-checks completeness and overlap (not `en
 }
 ```
 
-The banner never carries `headline`/`description`; the popup's `description` is `null` when not set. The API sets no cache header and nginx marks every `/api/v1/` response `no-store`, so each request reads the current state. No memo, author, version or window fields are returned. Cookies are not needed.
+The banner never carries `headline`/`description`; the popup's `description` is `null` when not set. The API sets no cache header, and nginx adds `no-store` to successful `/api/v1/` responses (alpha adds it to error responses too; production does not), so each request reads the current state. No memo, author, version or window fields are returned. Cookies are not needed.
 
 ### Admin campaign
 

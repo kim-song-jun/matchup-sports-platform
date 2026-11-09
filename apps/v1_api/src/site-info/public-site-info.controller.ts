@@ -6,7 +6,7 @@ import { SiteInfoSettingsService } from './site-info-settings.service';
 export class PublicSiteInfoController {
   constructor(private readonly settings: SiteInfoSettingsService) {}
 
-  // No cache header: nginx marks `/api/v1/` responses `no-store`, and the web's own fetch revalidates every 300s.
+  // No cache header: nginx adds `no-store` to successful `/api/v1/` responses, and the web's own fetch revalidates every 300s.
   @Get()
   get() {
     return this.settings.getPublic();

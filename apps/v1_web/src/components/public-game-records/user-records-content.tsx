@@ -13,6 +13,7 @@ import { PersonalMatchRecordsSection } from './personal-match-records-section';
 import { competitionLabel, matchupLabel } from './record-consent-preview';
 import { withFromPath } from '@/lib/session-storage';
 import { bracketTrackLabel } from '@/lib/bracket-track';
+import { FORFEIT_RECORD_STAT_TAG } from '@/lib/match-outcome';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
 
 /**
@@ -60,6 +61,11 @@ function OwnerVisibilityBanner() {
       </div>
     </Card>
   );
+}
+
+/** 골·도움·카드 중 하나라도 있어야 "몰수 전에 남은 기록"이라는 설명이 가리킬 대상이 있다. */
+function hasStatRecords(item: PublicUserRecordItem): boolean {
+  return item.goals + item.assists + item.cards.yellow + item.cards.red > 0;
 }
 
 function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | null {
@@ -158,6 +164,7 @@ export function UserRecordRow({ item, privateBadge = false }: { item: PublicUser
         {item.goals}골 · {item.assists}도움 · 경고 {item.cards.yellow} · 퇴장 {item.cards.red}
         {item.goalkeeper ? ' · 골키퍼' : ''}
         {item.started ? '' : ' · 교체 출전'}
+        {item.isForfeit && hasStatRecords(item) ? ` · ${FORFEIT_RECORD_STAT_TAG}` : ''}
       </div>
     </div>
   );

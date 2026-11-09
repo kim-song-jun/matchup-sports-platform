@@ -1448,3 +1448,33 @@ describe('ScheduleContent — 끝난 대회 안내', () => {
     expect(screen.queryByRole('link', { name: /최종 결과 보기/ })).not.toBeInTheDocument();
   });
 });
+
+describe('ScheduleContent — 몰수 경기의 기록 설명', () => {
+  const scorers = [{ side: 'home' as const, participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 }];
+  const renderEntry = (overrides: Parameters<typeof fixtureEntry>[0]) =>
+    render(<ScheduleContent tournamentId="tour-1" data={makeData({ items: [fixtureEntry(overrides)] })} />);
+
+  it('몰수 경기에 득점·카드 기록이 있으면 기록 목록 위에 짧은 설명이 붙는다', () => {
+    renderEntry({ scorers, outcome: { reason: 'FORFEIT', note: null } });
+
+    const caption = screen.getByText('몰수 전 기록이에요');
+    const list = screen.getByRole('list', { name: '경기 기록' });
+    expect(caption.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([
+    ['정상 종료', null],
+    ['경기 중단', { reason: 'ABANDONED' as const, note: null }],
+  ])('%s 경기에는 설명이 생기지 않는다', (_label, outcome) => {
+    renderEntry({ scorers, outcome });
+
+    expect(screen.queryByText('몰수 전 기록이에요')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '경기 기록' })).toBeInTheDocument();
+  });
+
+  it('몰수여도 기록이 없으면 설명을 만들지 않는다', () => {
+    renderEntry({ scorers: [], cards: [], outcome: { reason: 'FORFEIT', note: null } });
+
+    expect(screen.queryByText('몰수 전 기록이에요')).not.toBeInTheDocument();
+  });
+});

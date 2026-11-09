@@ -14,6 +14,7 @@ import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
+import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { LiveBadge } from './live-badge';
 import {
   eventPresentation,
@@ -240,40 +241,47 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
   ).filter((section) => section.items.length > 0);
 
   return (
-    <div
-      role="list"
-      aria-label="경기 기록"
-      style={{
-        display: 'grid',
-        gap: 8,
-        marginTop: 8,
-        // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
-        fontSize: 12,
-        color: 'var(--text-caption)',
-      }}
-    >
-      {sections.map((section) => (
-        <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
-          {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
-              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다).
-              단판은 경계가 아니라 "기록이 여기서 시작한다"는 구분일 뿐이라 글자 없이 선 하나다. */}
-          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            {section.hideLabel ? null : (
-              <>
-                <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
-                  {section.label}
-                </span>
-                <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              </>
-            )}
+    <>
+      <ForfeitRecordsCaption
+        isForfeit={toDisplayableOutcomeReason(entry.outcome?.reason) === 'FORFEIT'}
+        hasRecords
+        variant="short"
+      />
+      <div
+        role="list"
+        aria-label="경기 기록"
+        style={{
+          display: 'grid',
+          gap: 8,
+          marginTop: 8,
+          // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
+          fontSize: 12,
+          color: 'var(--text-caption)',
+        }}
+      >
+        {sections.map((section) => (
+          <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
+            {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
+                구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다).
+                단판은 경계가 아니라 "기록이 여기서 시작한다"는 구분일 뿐이라 글자 없이 선 하나다. */}
+            <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              {section.hideLabel ? null : (
+                <>
+                  <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
+                    {section.label}
+                  </span>
+                  <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                </>
+              )}
+            </div>
+            {section.items.map((item) => (
+              <ScheduleEventRow key={item.key} item={item} />
+            ))}
           </div>
-          {section.items.map((item) => (
-            <ScheduleEventRow key={item.key} item={item} />
-          ))}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 

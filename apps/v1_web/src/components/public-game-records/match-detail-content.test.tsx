@@ -5,7 +5,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 import { MatchDetailContent } from './match-detail-content';
-import type { PublicMatchDetail } from './types';
+import type { PublicMatchDetail, PublicMatchEvent } from './types';
 
 /**
  * alpha "452′" 실측 사고(2026-08) 회귀 방지 — 경기 상세 타임라인
@@ -601,5 +601,34 @@ describe('MatchDetailContent — 경기 방식 줄(일시·장소 줄 아래)', 
     render(<MatchDetailContent data={makeDetail({ periodMinutes: periodMinutes as never })} />);
 
     expect(screen.queryByText(/단판|전·후반|피리어드/)).toBeNull();
+  });
+});
+
+describe('MatchDetailContent — 몰수 경기의 득점·카드 설명', () => {
+  const CAPTION = '몰수 전에 기록된 득점·카드예요. 공식 점수에는 반영되지 않아요';
+  const goal: PublicMatchEvent = { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', profileHref: null, jerseyNumber: 9, period: 1, clockMs: 600_000 };
+
+  it('몰수 경기에 이벤트가 있으면 득점·카드 목록 위에 설명이 붙는다', () => {
+    render(<MatchDetailContent data={makeDetail({ events: [goal], outcome: { reason: 'FORFEIT', note: null } })} />);
+
+    const caption = screen.getByText(CAPTION);
+    const list = screen.getByRole('list', { name: '득점·카드' });
+    expect(caption.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([
+    ['정상 종료', null],
+    ['경기 중단', { reason: 'ABANDONED' as const, note: null }],
+  ])('%s 경기에는 설명이 생기지 않는다', (_label, outcome) => {
+    render(<MatchDetailContent data={makeDetail({ events: [goal], outcome })} />);
+
+    expect(screen.queryByText(CAPTION)).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '득점·카드' })).toBeInTheDocument();
+  });
+
+  it('몰수여도 보여 줄 이벤트가 없으면 설명을 만들지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({ events: [], outcome: { reason: 'FORFEIT', note: null } })} />);
+
+    expect(screen.queryByText(CAPTION)).not.toBeInTheDocument();
   });
 });

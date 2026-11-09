@@ -48,6 +48,20 @@ describe('resolveAdLink', () => {
     ['a user name that imitates a host', 'https://everyday.example.com@evil.example.com/'],
     ['a backslash inside an https url', 'https://everyday.example.com\\@evil.example.com/'],
     ['the https scheme with a different case and userinfo', 'HTTPS://u:p@everyday.example.com'],
+    // The render guard applies the same rule the server applies on save.
+    ['a loopback address', 'https://127.0.0.1/event'],
+    ['localhost', 'https://localhost/event'],
+    ['a private network address', 'https://192.168.0.10/'],
+    ['a carrier-grade NAT address', 'https://100.64.1.1/'],
+    ['an IPv6 address', 'https://[2001:db8::1]/'],
+    ['a single-label host', 'https://intranet/'],
+    ['an internal-only suffix', 'https://printer.local/'],
+    ['the admin console', '/admin/users'],
+    ['the API', '/api/v1/ads/active'],
+    ['an encoded admin path', '/%61dmin'],
+    ['the uploads folder', '/uploads/ads/a.webp'],
+    ['the tournament operations console', '/tournament-ops/1'],
+    ['a link longer than the stored limit', `/tournaments/${'1'.repeat(500)}`],
   ])('rejects %s', (_label, value) => {
     expect(resolveAdLink(value)).toBeNull();
   });

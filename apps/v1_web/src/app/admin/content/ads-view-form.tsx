@@ -54,8 +54,11 @@ export function AdForm({
   const [reloading, setReloading] = useState(false);
   const temporaryAssets = useRef<TemporaryAsset[]>([]);
 
+  const [imagesBusy, setImagesBusy] = useState({ banner: false, popup: false });
   const saving = createCampaign.isPending || updateCampaign.isPending;
   const locked = !canWrite || saving;
+  // Saving mid-upload would store the previous image and unmount the form before the new one is tracked for cleanup.
+  const uploadingImage = imagesBusy.banner || imagesBusy.popup;
 
   async function releaseTemporaryAssets(keepUrls: string[]) {
     const stale = temporaryAssets.current.filter((asset) => !keepUrls.includes(asset.url));
@@ -159,8 +162,24 @@ export function AdForm({
           required
           disabled={locked}
         />
-        <AdChannelFields channel="banner" state={form.banner} disabled={locked} upload={uploadImage} onPatch={patchBanner} showErrors={submitted} />
-        <AdChannelFields channel="popup" state={form.popup} disabled={locked} upload={uploadImage} onPatch={patchPopup} showErrors={submitted} />
+        <AdChannelFields
+          channel="banner"
+          state={form.banner}
+          disabled={locked}
+          upload={uploadImage}
+          onPatch={patchBanner}
+          showErrors={submitted}
+          onImageBusyChange={(banner) => setImagesBusy((current) => ({ ...current, banner }))}
+        />
+        <AdChannelFields
+          channel="popup"
+          state={form.popup}
+          disabled={locked}
+          upload={uploadImage}
+          onPatch={patchPopup}
+          showErrors={submitted}
+          onImageBusyChange={(popup) => setImagesBusy((current) => ({ ...current, popup }))}
+        />
 
         <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] leading-5 text-[var(--text-muted)]">
           {campaign?.status === 'published'
@@ -186,7 +205,7 @@ export function AdForm({
 
         <button
           type="submit"
-          disabled={locked}
+          disabled={locked || uploadingImage}
           className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           {saving ? '저장 중…' : campaign ? '수정 저장' : '초안으로 저장'}

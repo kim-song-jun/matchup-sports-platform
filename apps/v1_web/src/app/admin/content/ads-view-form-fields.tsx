@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { adChannelLabel } from '@/lib/admin-labels';
 import type { V1AdChannel } from '@/types/ads';
 import { AdImageField } from './ads-view-image-field';
-import { AD_LINK_MAX_LENGTH, checkAdLink } from './ads-view-link';
+import { AD_LINK_MAX_LENGTH, checkAdLink } from '@/lib/ad-link-rule';
 import {
   AD_ALT_TEXT_MAX_LENGTH,
   AD_POPUP_DESCRIPTION_MAX_LENGTH,
@@ -103,10 +103,11 @@ type ChannelFieldsProps = {
   onPatch: (patch: Partial<AdPopupFormState>) => void;
   /** The owner already tried to save, so a link problem shows even if the field was never left. */
   showErrors: boolean;
+  onImageBusyChange: (busy: boolean) => void;
 };
 
 /** One channel's inputs. */
-export function AdChannelFields({ channel, state, disabled, upload, onPatch, showErrors }: ChannelFieldsProps) {
+export function AdChannelFields({ channel, state, disabled, upload, onPatch, showErrors, onImageBusyChange }: ChannelFieldsProps) {
   const name = adChannelLabel(channel);
   const popupState = 'headline' in state ? state : null;
   // A half-typed address is not an error yet: the reason appears once the owner leaves the field or tries to save.
@@ -148,6 +149,7 @@ export function AdChannelFields({ channel, state, disabled, upload, onPatch, sho
         disabled={disabled}
         upload={upload}
         onChange={(imageUrl) => onPatch({ imageUrl })}
+        onBusyChange={onImageBusyChange}
       />
       <AdTextField
         label="대체 텍스트"

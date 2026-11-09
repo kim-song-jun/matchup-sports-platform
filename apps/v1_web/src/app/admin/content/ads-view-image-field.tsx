@@ -24,6 +24,7 @@ export function AdImageField({
   disabled,
   upload,
   onChange,
+  onBusyChange,
 }: {
   channel: V1AdChannel;
   imageUrl: string;
@@ -32,12 +33,18 @@ export function AdImageField({
   /** Uploads the prepared file and returns the stored `/uploads/…` url. */
   upload: (file: File) => Promise<string>;
   onChange: (url: string) => void;
+  /** Called with `true` when checking starts and `false` when the upload settles, so the form can hold its save. */
+  onBusyChange: (busy: boolean) => void;
 }) {
   const inputId = useId();
   const hintId = useId();
   const spec = AD_IMAGE_SPECS[channel];
   const name = adChannelLabel(channel);
-  const [phase, setPhase] = useState<'idle' | 'checking' | 'uploading'>('idle');
+  const [phase, setPhaseState] = useState<'idle' | 'checking' | 'uploading'>('idle');
+  const setPhase = (next: 'idle' | 'checking' | 'uploading') => {
+    setPhaseState(next);
+    onBusyChange(next !== 'idle');
+  };
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
 

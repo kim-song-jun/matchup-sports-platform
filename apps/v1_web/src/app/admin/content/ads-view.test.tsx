@@ -307,6 +307,30 @@ describe('AdsView create and edit', () => {
     expect(banner.getByText(/오른쪽 위에는 「광고」 표시가 붙어요/)).toBeInTheDocument();
   });
 
+  it('does not let the owner save while an image is still uploading', async () => {
+    useBackend([]);
+    let finishUpload = () => {};
+    const uploadHeld = new Promise<void>((resolve) => { finishUpload = resolve; });
+    server.use(
+      http.post(`${api}/admin/content-assets`, async () => {
+        await uploadHeld;
+        return ok({ assetId: 'asset-held', url: '/uploads/ads/held.webp', status: 'temporary' });
+      }),
+    );
+    const user = renderAds();
+    const aside = await openCreateForm(user);
+    const banner = within(within(aside).getByRole('group', { name: /^배너/ }));
+    const save = within(aside).getByRole('button', { name: '초안으로 저장' });
+
+    await user.upload(banner.getByLabelText('배너 이미지 올리기'), imageFile('banner.png'));
+    await banner.findByText('이미지를 올리고 있어요.');
+    expect(save).toBeDisabled();
+
+    finishUpload();
+    await banner.findByAltText('배너 소재');
+    expect(save).toBeEnabled();
+  });
+
   it('deletes an image it uploaded when the editor is closed without saving', async () => {
     const { deletedAssets } = useBackend([]);
     const user = renderAds();

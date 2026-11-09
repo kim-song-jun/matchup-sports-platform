@@ -77,8 +77,8 @@ function internalPathProblem(value: string): 'reserved' | 'leavesTheApp' | null 
 /**
  * Tells the owner, before saving, whether the server will accept an ad link and why not. It follows
  * `isSafeAdLinkUrl` in `apps/v1_api/src/ads/ad-link-url.ts` step by step; the server stays the boundary and
- * `ads-view-link.test.ts` runs that rule's accept/reject lists against this function so the two cannot drift.
- * The public screens' check (`lib/ad-link.ts`) is the render-time guard for stored values, not a save rule, and is not used here.
+ * `ad-link-rule.test.ts` runs that rule's accept/reject lists against this function so the two cannot drift.
+ * `resolveAdLink` applies it again when a stored link is rendered, so a value the server would refuse never becomes a link.
  */
 export function checkAdLink(value: string): AdLinkCheck {
   if (value.length === 0) return fail(REJECT.empty);

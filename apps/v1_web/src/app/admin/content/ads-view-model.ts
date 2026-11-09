@@ -13,7 +13,7 @@ import type {
   V1AdPopupCreativeInput,
   V1SaveAdCampaignPayload,
 } from '@/types/ads';
-import { checkAdLink } from './ads-view-link';
+import { checkAdLink } from '@/lib/ad-link-rule';
 
 /** Limits mirror `apps/v1_api/src/ads/dto/ad-campaign.dto.ts`; a longer value is a 400 on save. */
 export const AD_TITLE_MAX_LENGTH = 120;

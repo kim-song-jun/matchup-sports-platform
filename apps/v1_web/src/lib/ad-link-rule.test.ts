@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AD_LINK_MAX_LENGTH, checkAdLink } from './ads-view-link';
+import { AD_LINK_MAX_LENGTH, checkAdLink } from './ad-link-rule';
 
 // The accept/reject tables below are copied from `apps/v1_api/src/ads/ad-link-url.spec.ts`. When the server
 // rule changes, change both: a link the server refuses must not pass here, and one it accepts must not be blocked.

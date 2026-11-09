@@ -13,6 +13,16 @@ require(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(teameetVersionName)) {
     "versionName must use MAJOR.MINOR.PATCH"
 }
 
+// Alpha is a separate Play app, so its versionCode is the commit count of the built commit: it grows with every
+// dev merge and the same commit always gives the same code. Production keeps version.properties.
+// Lazy: only alpha tasks run git, and a shallow clone fails instead of yielding a too-small code.
+val alphaVersionCode: Provider<Int> = providers.exec { commandLine("git", "rev-parse", "--is-shallow-repository") }
+    .standardOutput.asText.map { it.trim() }
+    .zip(providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.map { it.trim() }) { shallow, count ->
+        if (shallow != "false") throw GradleException("Alpha versionCode counts commits; check out the full history (fetch-depth: 0)")
+        count.toIntOrNull()?.takeIf { it > 0 } ?: throw GradleException("Could not count commits for the alpha versionCode: '$count'")
+    }
+
 val releaseSigningValues = mapOf(
     "ANDROID_RELEASE_KEYSTORE_PATH" to providers.environmentVariable("ANDROID_RELEASE_KEYSTORE_PATH").orNull,
     "ANDROID_RELEASE_KEYSTORE_PASSWORD" to providers.environmentVariable("ANDROID_RELEASE_KEYSTORE_PASSWORD").orNull,
@@ -44,6 +54,25 @@ android {
         versionCode = teameetVersionCode
         versionName = teameetVersionName
     }
+    signingConfigs {
+        if (hasCompleteAlphaSigning) {
+            create("alpha") {
+                storeType = "pkcs12"
+                storeFile = file(alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PATH")!!)
+                storePassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PASSWORD")
+                keyAlias = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_ALIAS")
+                keyPassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_PASSWORD")
+            }
+        }
+        create("release") {
+            if (hasCompleteReleaseSigning) {
+                storeFile = file(releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PATH")!!)
+                storePassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_ALIAS")
+                keyPassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
     flavorDimensions += "environment"
     val javaStringQuote = 34.toChar().toString()
     productFlavors {
@@ -51,6 +80,9 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".alpha"
             versionNameSuffix = "-alpha"
+            // The alpha key is also the Play app-signing key of kr.co.teameet.alpha, so the Play build and the CI APK
+            // share one certificate and one Kakao key hash. The release buildType sets no key in alpha CI, so this applies.
+            if (hasCompleteAlphaSigning) signingConfig = signingConfigs.getByName("alpha")
             resValue("string", "app_name", "팀밋")
             manifestPlaceholders["appHost"] = "alpha.teameet.co.kr"
             manifestPlaceholders["appLinksAutoVerify"] = "false"
@@ -80,25 +112,6 @@ android {
             manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKeyProduction
         }
     }
-    signingConfigs {
-        if (hasCompleteAlphaSigning) {
-            create("alpha") {
-                storeType = "pkcs12"
-                storeFile = file(alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PATH")!!)
-                storePassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PASSWORD")
-                keyAlias = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_ALIAS")
-                keyPassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_PASSWORD")
-            }
-        }
-        create("release") {
-            if (hasCompleteReleaseSigning) {
-                storeFile = file(releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PATH")!!)
-                storePassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PASSWORD")
-                keyAlias = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_ALIAS")
-                keyPassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_PASSWORD")
-            }
-        }
-    }
     buildTypes {
         // The debug buildType carries an implicit debug signingConfig that wins over a flavor's, so the alpha key is set here.
         // Only CI supplies it, and only alpha APKs are distributed from debug builds.
@@ -118,6 +131,12 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants(selector().withFlavor("environment" to "alpha")) { variant ->
+        variant.outputs.forEach { output -> output.versionCode.set(alphaVersionCode) }
     }
 }
 

@@ -42,6 +42,9 @@ jobs:
       EXPECTED_ALPHA_SIGNER_SHA1: cef37c0cf09463f05644d6531d7137aff6ac3ef4
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The alpha versionCode is the commit count, so Gradle needs the full history.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v5
         with:
@@ -141,6 +144,28 @@ jobs:
             exit 1
           fi
 
+      - name: Verify alpha AAB signer
+        if: env.ALPHA_SIGNING == 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          aab=apps/v1_android/app/build/outputs/bundle/alphaRelease/app-alpha-release.aab
+          verified="$(jarsigner -verify "${aab}")"
+          grep -q '^jar verified' <<<"${verified}" || { echo "::error::Alpha AAB is not signed"; exit 1; }
+          certs="$(keytool -printcert -jarfile "${aab}")"
+          sha1="$(sed -n 's/^[[:space:]]*SHA1: //p' <<<"${certs}" | head -1 | tr -d ':' | tr 'A-F' 'a-f')"
+          bits="$(sed -n 's/^.*Subject Public Key Algorithm: \([0-9]*\)-bit RSA key.*$/\1/p' <<<"${certs}" | head -1)"
+          echo "AAB signer SHA-1: ${sha1}, RSA bits: ${bits:-unknown}"
+          if [[ "${sha1}" != "${EXPECTED_ALPHA_SIGNER_SHA1}" ]]; then
+            echo "::error::Alpha AAB is not signed by the alpha app-signing key"
+            exit 1
+          fi
+          # Play App Signing accepts an existing RSA key of 2048 bits or more.
+          if [[ -z "${bits}" ]] || (( bits < 2048 )); then
+            echo "::error::Alpha AAB key must be RSA 2048 bits or more for Play App Signing"
+            exit 1
+          fi
+
       - name: Verify alpha AAB 16 KB page alignment
         shell: bash
         run: |
@@ -175,6 +200,32 @@ jobs:
           path: |
             apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
             apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create alpha AAB checksum and record its version
+        if: steps.firebase.outputs.ready == 'true' && env.ALPHA_SIGNING == 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          (cd apps/v1_android/app/build/outputs/bundle/alphaRelease && sha256sum app-alpha-release.aab > app-alpha-release.aab.sha256)
+          # The APK and the AAB come from the same alpha flavor and commit, so they share versionCode and versionName.
+          badging="$("$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk)"
+          badging="${badging%%$'\n'*}"
+          {
+            echo "### Alpha AAB for Play internal testing"
+            echo "- \`${badging}\`"
+            echo "- sha256: \`$(cut -d' ' -f1 apps/v1_android/app/build/outputs/bundle/alphaRelease/app-alpha-release.aab.sha256)\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload alpha AAB
+        if: steps.firebase.outputs.ready == 'true' && env.ALPHA_SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: teameet-alpha-aab-${{ github.sha }}
+          path: |
+            apps/v1_android/app/build/outputs/bundle/alphaRelease/app-alpha-release.aab
+            apps/v1_android/app/build/outputs/bundle/alphaRelease/app-alpha-release.aab.sha256
           if-no-files-found: error
           retention-days: 14
 

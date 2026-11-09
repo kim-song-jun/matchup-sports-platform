@@ -1,4 +1,4 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { SiteInfoSettingsService } from './site-info-settings.service';
 
 /** 인증 불필요 — 전자상거래법상 사이트에 표시하는 사업자 정보라 공개 대상이다. */
@@ -6,8 +6,8 @@ import { SiteInfoSettingsService } from './site-info-settings.service';
 export class PublicSiteInfoController {
   constructor(private readonly settings: SiteInfoSettingsService) {}
 
+  // No cache header: nginx marks `/api/v1/` responses `no-store`, and the web's own fetch revalidates every 300s.
   @Get()
-  @Header('Cache-Control', 'public, max-age=300')
   get() {
     return this.settings.getPublic();
   }

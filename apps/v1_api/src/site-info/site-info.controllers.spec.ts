@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { GUARDS_METADATA, HEADERS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,10 +55,5 @@ describe('site-info controllers', () => {
       { id: 'admin-row-1', userId: 'user-1', adminRole: role, status: 'active' },
       { companyName: 'x' },
     );
-  });
-
-  it('public GET sets a shared cache header', () => {
-    const headers = Reflect.getMetadata(HEADERS_METADATA, PublicSiteInfoController.prototype.get);
-    expect(headers).toEqual([{ name: 'Cache-Control', value: 'public, max-age=300' }]);
   });
 });

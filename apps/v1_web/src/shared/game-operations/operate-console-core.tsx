@@ -6,6 +6,7 @@ import type { QueryClient, RefetchOptions } from '@tanstack/react-query';
 import {
   WifiOff,
   Wifi,
+  FlaskConical,
   Goal,
   AlertTriangle,
   ArrowLeftRight,
@@ -167,6 +168,8 @@ export interface OperateConsoleCoreProps {
   readonly hostContext?: TeamMatchGameOperationsContext;
   readonly resultHref?: string;
   readonly resultReviewEnabled: boolean;
+  /** Sample hosts drive the console from memory, so the header must not claim a live server connection. */
+  readonly sampleMode?: boolean;
   readonly renderResultReview?: (gameId: string) => ReactNode;
   /** The common Core previously mounted this for both leased operations and ordinary hosts; the ordinary `end` command remains gated. */
   readonly renderAbnormalEndDialog: (props: {
@@ -336,6 +339,7 @@ export function OperateConsoleCore({
   hostContext,
   resultHref,
   resultReviewEnabled,
+  sampleMode = false,
   renderResultReview,
   renderAbnormalEndDialog,
   renderKickoffChecklist,
@@ -1689,18 +1693,25 @@ export function OperateConsoleCore({
               <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
                 {gameState ? STATE_LABEL[gameState] : '-'}
               </span>
-              <span className="flex items-center gap-1" aria-live="polite">
-                {ops.connectionStatus === 'connected' ? (
-                  <Wifi size={13} aria-hidden="true" />
-                ) : (
-                  <WifiOff size={13} aria-hidden="true" />
-                )}
-                {ops.connectionStatus === 'connected'
-                  ? '실시간 연결됨'
-                  : ops.connectionStatus === 'connecting'
-                    ? '연결 중…'
-                    : '연결 끊김'}
-              </span>
+              {sampleMode ? (
+                <span className="flex items-center gap-1">
+                  <FlaskConical size={13} aria-hidden="true" />
+                  체험 중 · 서버 연결 없음
+                </span>
+              ) : (
+                <span className="flex items-center gap-1" aria-live="polite">
+                  {ops.connectionStatus === 'connected' ? (
+                    <Wifi size={13} aria-hidden="true" />
+                  ) : (
+                    <WifiOff size={13} aria-hidden="true" />
+                  )}
+                  {ops.connectionStatus === 'connected'
+                    ? '실시간 연결됨'
+                    : ops.connectionStatus === 'connecting'
+                      ? '연결 중…'
+                      : '연결 끊김'}
+                </span>
+              )}
             </div>
             {!leaseRequired && resultHref ? (
               <Link className="tm-btn tm-btn-md tm-btn-outline mt-3" href={resultHref}>

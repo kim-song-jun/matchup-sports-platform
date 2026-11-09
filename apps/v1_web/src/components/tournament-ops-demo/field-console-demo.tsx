@@ -118,7 +118,7 @@ function FieldConsoleSession({ previewPhase = 'before' }: { previewPhase?: 'befo
         }, gameOperationsErrorMessage: (code) => `샘플 기록을 처리하지 못했어요. (${code})`, isRetryableGameOperationsErrorCode: () => false }}
       gameDetail={detail} lineupsQuery={{ data: state.game.lineups, isLoading: false, isError: false, error: null, refetch: async () => state.game.lineups }}
       leaseRequired takeoverEnabled operatorScopeKey="FIELD_OPERATOR" operationContextKey="sample-field-console"
-      headerTopClass="top-0" requiresLineupBeforeStart={false} allowPenaltyShootout={false} resultReviewEnabled={false}
+      headerTopClass="top-0" requiresLineupBeforeStart={false} allowPenaltyShootout={false} resultReviewEnabled={false} sampleMode
       renderAbnormalEndDialog={(props) => <AbnormalEndDialog {...props} />}
     />
     {state.game.state === 'ENDED' && <p role="status" className={styles.notice}>샘플 경기를 종료했어요. 위 점수와 기록이 체험 결과예요. 실제 결과 확정·공식 기록 반영은 하지 않아요. 체험 초기화로 다시 시작할 수 있어요.</p>}

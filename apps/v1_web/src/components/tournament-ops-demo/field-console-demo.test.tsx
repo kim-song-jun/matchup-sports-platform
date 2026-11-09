@@ -102,6 +102,13 @@ describe('필드 운영콘솔 안내와 체험', () => {
     expect(screen.queryByRole('button', { name: '골' })).not.toBeInTheDocument();
     expect(network).not.toHaveBeenCalled();
   }, 20000);
+  it('샘플 경기는 실제 서버 연결을 표시하지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<FieldConsoleDemo />);
+    await user.click(screen.getByRole('button', { name: '건너뛰기' }));
+    expect(screen.getByText('체험 중 · 서버 연결 없음')).toBeInTheDocument();
+    expect(screen.queryByText('실시간 연결됨')).not.toBeInTheDocument();
+  });
   // The core re-reads the game every 5 seconds once a period runs out. Here that read must stay on the sample source.
   it('기간이 끝나 상세를 다시 읽어도 실제 서버로 요청하지 않는다', async () => {
     vi.useFakeTimers();

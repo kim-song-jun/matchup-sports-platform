@@ -92,7 +92,8 @@ describe('Ads HTTP contract', () => {
     expect(published.body.data.campaign).toMatchObject({ status: 'published', version: 2, banner: { phase: 'live' } });
 
     const active = await http().get('/api/v1/ads/active').expect(200);
-    expect(active.headers['cache-control']).toBe('public, max-age=30');
+    // The API leaves caching to nginx, which adds `no-store`; a header here would only conflict with it.
+    expect(active.headers['cache-control']).toBeUndefined();
     expect(active.body.data).toEqual({
       banner: { campaignId: id, advertiserName: '에버데이', imageUrl: BANNER_URL, altText: '에버데이 신제품', linkUrl: '/tournaments/1' },
       popup: null,
@@ -143,16 +144,6 @@ describe('Ads HTTP contract', () => {
         headline: '에버데이 11월 이벤트', description: '신제품을 먼저 만나 보세요', linkUrl: '/tournaments/1',
       },
     });
-  });
-
-  it('does not mark an error response as publicly cacheable', async () => {
-    jest.spyOn(app.get(AdsPublicService), 'findActive').mockRejectedValueOnce(new Error('database unavailable'));
-
-    const failed = await http().get('/api/v1/ads/active').expect(500);
-
-    expect(failed.headers['cache-control'] ?? '').not.toMatch(/public|max-age/);
-    const recovered = await http().get('/api/v1/ads/active').expect(200);
-    expect(recovered.headers['cache-control']).toBe('public, max-age=30');
   });
 
   it.each(['banner', 'popup'] as const)('refuses an array where %s belongs and leaves a published ad untouched', async (channel) => {

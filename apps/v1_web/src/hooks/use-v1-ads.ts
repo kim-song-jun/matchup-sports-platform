@@ -12,7 +12,7 @@ import type {
   V1UpdateAdCampaignPayload,
 } from '@/types/ads';
 
-/** The server caches `/ads/active` for 30 seconds, so refetching sooner returns the same bytes. */
+/** nginx adds `no-store` to successful API responses, so this is the only reuse; the admin stop notice ("within 1 minute") relies on it. */
 const ACTIVE_ADS_STALE_MS = 30_000;
 
 /**

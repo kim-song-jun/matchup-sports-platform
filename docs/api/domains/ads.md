@@ -116,7 +116,7 @@ Saving an already published campaign re-checks completeness and overlap (not `en
 }
 ```
 
-The banner never carries `headline`/`description`; the popup's `description` is `null` when not set. `Cache-Control: public, max-age=30` — a stopped ad can keep being served for up to 30 seconds. No memo, author, version or window fields are returned. Cookies are not needed.
+The banner never carries `headline`/`description`; the popup's `description` is `null` when not set. The API sets no cache header and nginx marks every `/api/v1/` response `no-store`, so each request reads the current state. No memo, author, version or window fields are returned. Cookies are not needed.
 
 ### Admin campaign
 
@@ -154,9 +154,8 @@ List items add `stats: { banner: { impressions, clicks }, popup: { impressions, 
 
 ## Behaviour to know (not defects)
 
-- **Image swap on a live ad:** `/ads/active` is cached for up to 30 seconds, so after an image is replaced on a published campaign a cached response can still carry the old `/uploads/…` path for that long. The web hides the ad when its image fails to load.
+- **Changes reach open screens late:** the web reuses a `/ads/active` answer for 30 seconds per tab (`staleTime`), and a home screen that is already open keeps the ad it rendered until it is opened again. A stopped ad or a replaced image can therefore stay on such a screen; the stop notice in the admin promises "within 1 minute" for newly opened screens. The web hides the ad when its image fails to load.
 - **Event limits:** `POST /ads/events` is limited to 30 requests per minute per IP, so devices behind one network address can lose events when they all report at once. The client does not resend a batch after a network error, so such a batch is lost.
-- **Error responses are not cacheable:** only a successful `GET /ads/active` carries `Cache-Control: public, max-age=30`.
 - **Event write order:** a batch updates its counter rows in `(campaignId, channel, KST date)` order, so concurrent batches that touch the same rows cannot deadlock.
 
 ## Decision history

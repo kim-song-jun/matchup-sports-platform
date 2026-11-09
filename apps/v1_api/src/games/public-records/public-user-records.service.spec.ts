@@ -121,6 +121,8 @@ function gameResultRow(mvpParticipantId: string | null = null) {
       officialAt: new Date('2026-08-10T00:00:00Z'),
       mvpParticipantId,
       score: { home: 1, away: 0 },
+      outcomeReason: 'NORMAL',
+      reason: null as string | null,
       game: {
         sourceType: 'TEAM_MATCH',
         tournamentFixtureId: null,
@@ -159,6 +161,8 @@ function sourcedResultRow(input: {
       officialAt: new Date('2026-08-10T00:00:00Z'),
       mvpParticipantId: null,
       score: { home: 1, away: 0 },
+      outcomeReason: 'NORMAL',
+      reason: null as string | null,
       game: {
         sourceType: isLegacyTournament ? 'TOURNAMENT_FIXTURE' : 'TEAM_MATCH',
         tournamentFixtureId: input.tournamentFixtureId ?? null,
@@ -264,6 +268,36 @@ describe('PublicUserRecordsService', () => {
       ['result-b', 0],
     ]);
     expect(result.summary.assists).toBe(2);
+  });
+
+  it('몰수 경기 행만 isForfeit 이고, 정상·중단 경기와 섞여도 각 행이 자기 값을 갖는다', async () => {
+    const forfeitByColumn = sourcedResultRow({ suffix: 'f1', participantId: 'participant-1', teamMatchId: 'team-match-1' });
+    forfeitByColumn.resultRevision.outcomeReason = 'FORFEIT';
+    const forfeitByMarker = sourcedResultRow({ suffix: 'f2', participantId: 'participant-2', teamMatchId: 'team-match-1' });
+    forfeitByMarker.resultRevision.reason = '[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 사유';
+    const normal = sourcedResultRow({ suffix: 'n', participantId: 'participant-3', teamMatchId: 'team-match-1' });
+    const abandoned = sourcedResultRow({ suffix: 'a', participantId: 'participant-4', teamMatchId: 'team-match-1' });
+    abandoned.resultRevision.outcomeReason = 'ABANDONED';
+    const prisma = createFakePrisma({
+      links: ['1', '2', '3', '4'].map((n) => ({ participantId: `participant-${n}`, linkId: `link-${n}`, userId: OWNER_ID })),
+      userConsents: [],
+      snapshots: [],
+      resultRows: [forfeitByColumn, forfeitByMarker, normal, abandoned],
+      viewerConsentState: null,
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, OWNER_ID);
+
+    expect(Object.fromEntries(result.items.map((item) => [item.id, item.isForfeit]))).toEqual({
+      'result-f1': true,
+      'result-f2': true,
+      'result-n': false,
+      'result-a': false,
+    });
+    // 몰수 표시는 선수 기록을 지우지 않는다 -- 합계는 네 행 모두 센다.
+    expect(result.summary.appearances).toBe(4);
+    expect(JSON.stringify(result)).not.toContain('사유');
   });
 
   it('존재하지 않는 사용자는 404를 던진다', async () => {

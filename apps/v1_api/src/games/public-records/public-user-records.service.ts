@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveTeamRecordResult } from '../../game-operations/team-record-result';
+import { resolveIsForfeit } from '../../league-matches/league-forfeit-result';
 import { parseTournamentFixtureOfficialScore } from '../../tournaments/tournament-fixture-official-result';
 import { UserRecordsQueryDto } from './dto/public-records-query.dto';
 import { classifyTeamRecordCategory, type TeamRecordCategory } from './team-record-category';
@@ -28,6 +29,7 @@ interface EligibleResultRow {
   readonly goalkeeper: boolean;
   readonly officialAt: Date;
   readonly isMvp: boolean;
+  readonly isForfeit: boolean;
   /**
    * 정규시간 스코어 + (승부차기까지 간 경기만) 페널티 스코어. 페널티는 `goals`/득실에
    * 절대 합산하지 않고 오직 승패 판정(`result`)에만 쓴다 -- 팀 전적(`v1_team_record_facts`)
@@ -263,6 +265,9 @@ export class PublicUserRecordsService {
             officialAt: true,
             mvpParticipantId: true,
             score: true,
+            // 몰수 여부(`resolveIsForfeit`)만 읽는다 — 사유 원문은 응답에 싣지 않는다.
+            outcomeReason: true,
+            reason: true,
             game: {
               select: {
                 // 리그 맥락은 게임에 직접 실려 있지 않다 -- 팀매치를 거쳐야만 얻어진다
@@ -320,6 +325,7 @@ export class PublicUserRecordsService {
         goalkeeper: row.goalkeeper,
         officialAt: revision.officialAt,
         isMvp: revision.mvpParticipantId === row.participantId,
+        isForfeit: resolveIsForfeit(revision),
         score: parseScore(revision.score),
       });
     }
@@ -547,6 +553,7 @@ export class PublicUserRecordsService {
         started: row.started,
         goalkeeper: row.goalkeeper,
         mvp: row.isMvp,
+        isForfeit: row.isForfeit,
         officialAt: row.officialAt.toISOString(),
       };
     });

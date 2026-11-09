@@ -416,6 +416,12 @@ identity/side itself:
   only the reason label; the full note is read on the match view, because a
   schedule row is a one-line summary and the note has no length bound.
 
+  **League fixtures** (`/league-matches/:leagueId/fixtures/:id/record` and the league
+  `schedule`) never publish the operator's free-text reason: `note` is always `null`, and a
+  forfeit is recognised by `resolveIsForfeit` (the `FORFEIT` column or the legacy
+  `[LEAGUE_FORFEIT]` reason marker). Both views build `outcome` through the same
+  `presentPublicOutcome`, so the same fixture reports the same value in each.
+
 - `GET /tournaments/:id/matches/:fixtureId` carries `profileHref: string | null` on every
   place a participant is named -- `lineup.home[]`/`lineup.away[]`, `events[]`, and `mvp`.
   It is the **public profile path** (`/users/:userId`) when the viewer may open it, and
@@ -520,6 +526,14 @@ row for a final that finished 1:1 with a 3:2 shootout was reported as DRAWN
 while the same match showed WON/LOST in team records. `goals` and the
 scoreline stay regulation-only -- shootout kicks are never added to a
 player's goal count.
+
+### Personal record forfeit flag (2026-11-09)
+
+`GET /users/:id/records` `items[].isForfeit: boolean` is `true` when the game's
+current official result is a forfeit (`resolveIsForfeit`, the same predicate team
+records use). `ABANDONED` is `false`. The row's goals, assists and cards stay the
+real events recorded before the forfeit; the flag lets the client say so next to
+them instead of letting them read as part of the official score.
 
 ### Official goal timeline and minute display (2026-08-19)
 

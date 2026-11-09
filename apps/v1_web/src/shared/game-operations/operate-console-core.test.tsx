@@ -309,6 +309,12 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     testFixtures.operations.mockReturnValue(consoleState());
   });
 
+  it('실제 콘솔은 소켓 연결 상태를 그대로 보여 준다', () => {
+    render(<CoreHarness />);
+    expect(screen.getByText('실시간 연결됨')).toBeInTheDocument();
+    expect(screen.queryByText('체험 중 · 서버 연결 없음')).not.toBeInTheDocument();
+  });
+
   it('서버에 확정된 이벤트를 보여준다 — 로컬 큐가 비어 있어도', () => {
     render(<CoreHarness />);
 

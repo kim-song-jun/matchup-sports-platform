@@ -3196,6 +3196,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           createdAt: { lt: cutoff },
           noticeId: null,
           popupId: null,
+          adCampaignId: null,
         },
       });
       if (deleted.count === 1) claimedUrls.push(candidate.url);

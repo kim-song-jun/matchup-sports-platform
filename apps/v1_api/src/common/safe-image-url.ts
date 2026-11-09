@@ -10,7 +10,7 @@ export type SafeImageUrlOptions = {
   localUploadsOnly?: boolean;
 };
 
-function isPrivateHostname(hostname: string): boolean {
+export function isPrivateHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/gu, '');
   if (host === 'localhost' || host.endsWith('.localhost') || host === '::1') return true;
   if (/^(?:0|10|127|169\.254|192\.168)\./u.test(host)) return true;

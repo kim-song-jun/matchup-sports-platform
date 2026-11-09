@@ -6,6 +6,12 @@ function twoDigits(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+/** KST 달력 날짜를 UTC 자정 `Date` 로 돌려준다 — Prisma `@db.Date` 컬럼이 저장하는 값과 같은 모양이다. */
+export function kstCalendarDate(at: Date): Date {
+  const shifted = new Date(at.getTime() + KST_OFFSET_MS);
+  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()));
+}
+
 /** 알림 본문용 시각 — "01:10". */
 export function formatKstTime(at: Date): string {
   const shifted = new Date(at.getTime() + KST_OFFSET_MS);

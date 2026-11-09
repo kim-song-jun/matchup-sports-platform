@@ -91,6 +91,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Notifications](./domains/notifications.md)
 - [Home, search, notices, popups, master data](./domains/home-notices-master.md)
 - [Admin and operations](./domains/admin-and-ops.md)
+- [Ads](./domains/ads.md)
 - [Supporting domains](./domains/supporting-domains.md)
 
 Each domain appears exactly once in this index.

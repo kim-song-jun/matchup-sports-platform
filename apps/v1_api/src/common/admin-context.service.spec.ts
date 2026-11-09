@@ -57,6 +57,41 @@ describe('AdminContextService', () => {
     },
   );
 
+  describe('getOwnerAdmin', () => {
+    const row = (adminRole: 'owner' | 'ops' | 'support') => ({
+      id: 'admin-id',
+      userId: 'user-id',
+      adminRole,
+      status: 'active',
+      user: { accountStatus: 'active' },
+    });
+
+    it('returns the owner', async () => {
+      findUnique.mockResolvedValue(row('owner'));
+      await expect(service.getOwnerAdmin('user-id')).resolves.toEqual({
+        id: 'admin-id',
+        userId: 'user-id',
+        adminRole: 'owner',
+        status: 'active',
+      });
+    });
+
+    it.each(['ops', 'support'] as const)('rejects %s with PERMISSION_DENIED', async (role) => {
+      findUnique.mockResolvedValue(row(role));
+      await expect(service.getOwnerAdmin('user-id')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    });
+
+    it('rejects an owner whose admin grant is no longer active', async () => {
+      findUnique.mockResolvedValue({ ...row('owner'), status: 'revoked' });
+      await expect(service.getOwnerAdmin('user-id')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    });
+
+    it('rejects a user with no admin row', async () => {
+      findUnique.mockResolvedValue(null);
+      await expect(service.getOwnerAdmin('user-id')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    });
+  });
+
   it('keeps support admins read-only after the linked-account check', async () => {
     findUnique.mockResolvedValue({
       id: 'support-admin-id',

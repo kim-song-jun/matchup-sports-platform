@@ -55,6 +55,15 @@ export class AdminContextService {
     return admin;
   }
 
+  /** owner 등급만 통과 — ops·support 는 거부한다. */
+  async getOwnerAdmin(userId: string, tx?: Prisma.TransactionClient): Promise<V1ActiveAdmin> {
+    const admin = await this.getActiveAdmin(userId, tx);
+    if (admin.adminRole !== 'owner') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Owner access is required' });
+    }
+    return admin;
+  }
+
   async getTournamentAdmin(userId: string, resource: TournamentManagementResource, tx?: Prisma.TransactionClient): Promise<V1TournamentManager> {
     try { return await this.getActiveAdmin(userId, tx); }
     catch (error) { if (!(error instanceof ForbiddenException)) throw error; }

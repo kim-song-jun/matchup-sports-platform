@@ -242,7 +242,8 @@ competition-config pin: `409 COMPETITION_CONFIG_REQUIRED` leaves no partial sour
 `SHARED_RECORD_REQUIRED`로 차단된다. 대회·리그의 canonical competition `TEAM_MATCH`는
 쓰기 권한이 있는 배정 스태프와 `platform_ops`가 기존 운영 권한으로 기록한다.
 결과 검증은 `TEAM_MATCH`이며 이벤트가 0건일 때 이벤트 기반 대조(점수·선수 통계·`missingScorer`)만
-생략한다. 이벤트가 있으면 이 대조와 `422 SCORE_EVENT_MISMATCH`가 적용되며,
+생략한다. 이때도 팀(`sideId`)별 개인 골 합이 그 팀 점수를 넘으면 `422 SCORE_EVENT_MISMATCH`로 거절한다
+(합이 점수보다 적거나 같으면 통과). 이벤트가 있으면 이벤트 대조와 `422 SCORE_EVENT_MISMATCH`가 적용되며,
 다른 명단·참가자·값 검증은 계속 적용된다. 근거:
 [GamesService.resolveActor·withCommand·appendEvent](../../../apps/v1_api/src/games/games.service.ts),
 [validateGameResultInvariants](../../../apps/v1_api/src/games/core/game-invariants.ts).

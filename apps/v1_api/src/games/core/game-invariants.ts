@@ -88,6 +88,7 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
 
   const participantById = new Map<string, (typeof input.participants)[number]>();
   const participantGoals = new Map<string, number>();
+  const personalGoalsBySideId = new Map<string, number>();
   const participantCards = new Map<string, { yellow: number; red: number }>();
   const participantAssists = new Map<string, number>();
   const participantFouls = new Map<string, number>();
@@ -111,6 +112,10 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
     }
     participantById.set(participant.id, participant);
     participantGoals.set(participant.id, participant.goals);
+    personalGoalsBySideId.set(
+      participant.sideId,
+      (personalGoalsBySideId.get(participant.sideId) ?? 0) + participant.goals,
+    );
     participantCards.set(participant.id, participant.cards);
   }
 
@@ -223,9 +228,23 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
   // participant uniqueness/side membership, non-negative goals/cards/minutes,
   // MVP referencing a real participant, event shape validation) stays in force
   // for both source types because none of it depends on an event stream.
+  //
+  // Without events the personal records are still bounded by the submitted
+  // score: a side's personal goals can fall short of its score (scorer left
+  // blank, own goals credit the benefiting side only) but never exceed it.
   const teamMatchWithoutEvents =
     input.sourceType === V1GameSourceType.TEAM_MATCH && input.events.length === 0;
-  if (!teamMatchWithoutEvents) {
+  if (teamMatchWithoutEvents) {
+    for (const side of input.sides) {
+      const sideScore = side.sideKey === 'HOME' ? input.score.home : input.score.away;
+      if ((personalGoalsBySideId.get(side.id) ?? 0) > sideScore) {
+        throw new GameContractError(
+          'SCORE_EVENT_MISMATCH',
+          'Participant goal totals exceed the team score',
+        );
+      }
+    }
+  } else {
     if (eventScore.HOME !== input.score.home || eventScore.AWAY !== input.score.away) {
       throw new GameContractError('SCORE_EVENT_MISMATCH', 'Score does not match active goal events');
     }

@@ -198,6 +198,91 @@ describe('validateGameResultInvariants — Task 17 TEAM_MATCH event-vs-score exe
   });
 });
 
+describe('validateGameResultInvariants — TEAM_MATCH without events: per-side personal goals vs score', () => {
+  const sides = [
+    { id: 'side-home', sideKey: 'HOME' as const },
+    { id: 'side-away', sideKey: 'AWAY' as const },
+  ];
+  const noCards = { yellow: 0, red: 0 };
+  const submit = (
+    score: { home: number; away: number },
+    participants: Array<{ id: string; sideId: string; goals: number }>,
+  ) =>
+    validateGameResultInvariants({
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      score,
+      sides,
+      participants: participants.map((participant) => ({ ...participant, cards: noCards })),
+      events: [],
+      scorerPolicy: 'optional_with_warning',
+      missingScorer: false,
+    });
+
+  it('rejects home personal goals above the home score', () => {
+    expect(() =>
+      submit({ home: 1, away: 0 }, [
+        { id: 'h1', sideId: 'side-home', goals: 1 },
+        { id: 'h2', sideId: 'side-home', goals: 1 },
+      ]),
+    ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
+  });
+
+  it('rejects away personal goals above the away score even when the home side is consistent', () => {
+    expect(() =>
+      submit({ home: 1, away: 0 }, [
+        { id: 'h1', sideId: 'side-home', goals: 1 },
+        { id: 'a1', sideId: 'side-away', goals: 1 },
+      ]),
+    ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
+  });
+
+  it('rejects a goal recorded on a side whose score is 0:0', () => {
+    expect(() => submit({ home: 0, away: 0 }, [{ id: 'h1', sideId: 'side-home', goals: 1 }])).toThrow(
+      expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }),
+    );
+  });
+
+  it('accepts personal goals that equal the team score on both sides', () => {
+    expect(() =>
+      submit({ home: 2, away: 1 }, [
+        { id: 'h1', sideId: 'side-home', goals: 1 },
+        { id: 'h2', sideId: 'side-home', goals: 1 },
+        { id: 'a1', sideId: 'side-away', goals: 1 },
+      ]),
+    ).not.toThrow();
+  });
+
+  it('accepts fewer personal goals than the score (scorer left blank, or the rest were own goals)', () => {
+    expect(() =>
+      submit({ home: 3, away: 2 }, [
+        { id: 'h1', sideId: 'side-home', goals: 1 },
+        { id: 'a1', sideId: 'side-away', goals: 0 },
+      ]),
+    ).not.toThrow();
+  });
+
+  it('accepts a 0:0 result with no personal goals', () => {
+    expect(() =>
+      submit({ home: 0, away: 0 }, [
+        { id: 'h1', sideId: 'side-home', goals: 0 },
+        { id: 'a1', sideId: 'side-away', goals: 0 },
+      ]),
+    ).not.toThrow();
+  });
+
+  // Shape sent by team-match-result-client.tsx: only home players are sent,
+  // score.home is the number of home goal drafts and score.away is typed freely.
+  it('accepts the payload the web result form sends (home-only participants, home goals == score.home)', () => {
+    expect(() =>
+      submit({ home: 3, away: 2 }, [
+        { id: 'h1', sideId: 'side-home', goals: 2 },
+        { id: 'h2', sideId: 'side-home', goals: 1 },
+        { id: 'h3', sideId: 'side-home', goals: 0 },
+      ]),
+    ).not.toThrow();
+  });
+});
+
 describe('validateGameResultInvariants — own goal', () => {
   const sides = [
     { id: 'side-home', sideKey: 'HOME' as const },

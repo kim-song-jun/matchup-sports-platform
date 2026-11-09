@@ -64,3 +64,12 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 - PR #2277 reviewer 요청: protocol-relative/backslash/javascript/encoded/traversal/query/hash/허용 경로 suffix를 it.each로 추가하고 저장·렌더 양쪽에서 기본 운영 경로로 제한함을 검증한다. 구현의 정확 일치 allowlist는 유지한다.
 
 - CI Web RED: 948 files 중 담당 대회 목록 호출 테스트 1개가 이전 새 탭 accessible name을 기대해 실패. 해당 호출 테스트의 이름을 같은 탭 계약으로 sync하고 target 부재도 검증한다. 나머지 947 files / 11873 tests PASS.
+
+### Alpha 배포 및 검증 완료 — 모바일 동선 후속
+- 사용자가 2026-11-09 이 작업의 리뷰 생략·Alpha 배포를 명시 승인했다. 다른 작업에 확대하지 않는다.
+- PR #2277은 28e0698cf78397f089cfb57c729ea4f84299d608로 dev 머지됐다. Gates/API/Web 모두 PASS.
+- Alpha deploy run 42544314489 success. 실제 x-teameet-commit이 머지 SHA와 일치하고 release 1.14.1-alpha.20261109.g28e0698cf783, API health DB true를 확인했다.
+- after: 공개 콘솔·가이드 각 390/768/1440 = 6/6 확인. 복귀 링크 1개씩, 가로 overflow 0, pageerror/console error/HTTP 오류 0. 클릭 후 탭 1개 유지.
+- 비로그인 공유 진입 페르소나로 /tournament-management 복귀가 /login으로 이어지는 정상 권한 흐름을 확인했다. 로그인 상태의 관리자/스태프 진입부터의 전체 여정은 이번 실측에 포함하지 않았으며, 경로 3개 및 링크 저장 계약은 단위 테스트로 검증했다.
+- headed Chromium PID 5273/PPID 5254 종료 완료. 첫 시도 PID 5060/PPID 5042도 finally로 종료했다. QA 도구는 각 페이지의 복귀 후 인증 리다이렉트가 다음 검사와 경합하지 않도록 페이지를 분리했다.
+- before/after 증거: docs/visual-qa/demo-navigation/{before,after}/. PR #2277에 3폭 갤러리 게시.

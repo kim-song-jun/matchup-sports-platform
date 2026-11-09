@@ -60,3 +60,5 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 - 대회 관리 체험의 샘플 이동 제한이 명시적 복귀 링크를 막지 않도록 한다.
 - 검증: 관련 2 files / 28 tests PASS, tsc --noEmit PASS, v1 패턴 gate PASS, diff --check PASS, touched-path debt marker 0. 기존 공유 의존성 누락은 격리 worktree의 frozen-lockfile 설치로 해결했다.
 - Alpha before: headed Chromium(PID 2936/PPID 2918, 종료 완료), 공개 콘솔·가이드 각 390/768/1440 = 6/6 캡처. 가로 overflow 0, pageerror/HTTP 오류 0, 기존 복귀 링크 0. after/PR 상태는 진행 중.
+
+- PR #2277 reviewer 요청: protocol-relative/backslash/javascript/encoded/traversal/query/hash/허용 경로 suffix를 it.each로 추가하고 저장·렌더 양쪽에서 기본 운영 경로로 제한함을 검증한다. 구현의 정확 일치 allowlist는 유지한다.

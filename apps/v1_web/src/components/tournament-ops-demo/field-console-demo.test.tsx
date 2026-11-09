@@ -33,8 +33,14 @@ describe('필드 운영콘솔 안내와 체험', () => {
     render(<DemoReturnLink />);
     expect(await screen.findByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', path);
   });
-  it('외부 주소가 저장돼 있어도 내부 운영 화면으로 돌아간다', () => {
-    sessionStorage.setItem('teameet.demo.return-path', 'https://example.com');
+  it.each([
+    'https://example.com', '//evil.example', '/\\evil.example', 'javascript:alert(1)', '%2f%2fevil.example',
+    '/admin/ops/tournaments/../../evil', '/admin/ops/tournaments?next=//evil.example',
+    '/admin/ops/tournaments#x', '/my/tournament-staffx',
+  ])('허용 경로와 정확히 일치하지 않는 %s는 저장과 복귀 모두 거부한다', (path) => {
+    rememberDemoReturnPath(path);
+    expect(sessionStorage.getItem('teameet.demo.return-path')).toBe('/tournament-management');
+    sessionStorage.setItem('teameet.demo.return-path', path);
     render(<DemoReturnLink />);
     expect(screen.getByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-management');
   });

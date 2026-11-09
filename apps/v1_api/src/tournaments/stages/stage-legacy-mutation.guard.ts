@@ -1,3 +1,4 @@
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { CanActivate, ConflictException, ExecutionContext, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminContextService } from '../../common/admin-context.service';
@@ -17,7 +18,7 @@ export class StageLegacyMutationGuard implements CanActivate {
     if (!id && req.params.slotId) id = (await this.prisma.v1TournamentSlot.findUnique({ where: { id: req.params.slotId }, select: { tournamentId: true } }))?.tournamentId ?? '';
     if (!id && req.params.groupTeamId) id = (await this.prisma.v1TournamentGroupTeam.findUnique({ where: { id: req.params.groupTeamId }, select: { group: { select: { tournamentId: true } } } }))?.group.tournamentId ?? '';
     if (!id) return true;
-    const t = await this.prisma.v1Tournament.findUnique({ where: { id }, select: { stagePlan: true } });
+    const t = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, { where: { id }, select: { stagePlan: true } });
     if (t?.stagePlan) {
       await this.admins.getTournamentMutationAdmin(req.v1User?.id ?? '', { tournamentId: id });
       throw new ConflictException({ code: 'STAGE_MANAGEMENT_REQUIRED', message: '단계형 대회의 편성과 참가팀은 단계별 대진 관리에서 변경해 주세요.' });

@@ -1,10 +1,11 @@
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { loadStageView, type StoredStagePlan } from './stage-view';
 export async function assertStageFixtureReady(tx: Prisma.TransactionClient, teamMatchId: string) {
   const detail = await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId }, select: { tournamentId: true, group: { select: { stageKey: true, poolKey: true } } } });
   if (!detail?.group?.stageKey) return;
-  const tournament = await tx.v1Tournament.findUnique({ where: { id: detail.tournamentId }, select: { stagePlan: true } });
+  const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: detail.tournamentId }, select: { stagePlan: true } });
   if (!tournament?.stagePlan) throw new ConflictException({ code: 'STAGE_PLAN_REQUIRED', message: '단계형 대회 구성을 확인해 주세요.' });
   const config = tournament.stagePlan as unknown as StoredStagePlan;
   const view = await loadStageView(tx, detail.tournamentId, config);

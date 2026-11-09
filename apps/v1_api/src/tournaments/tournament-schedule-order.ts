@@ -1,3 +1,4 @@
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import type { StoredStagePlan } from './stages/stage-view';
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -18,7 +19,7 @@ async function assertStartKeepsStageOrder(
   tx: Tx,
   input: { tournamentId: string; excludeTeamMatchId: string | null; stage: Stage; startAt: Date },
 ): Promise<void> {
-  const staged = input.stage.stageKey ? await tx.v1Tournament.findUnique({ where: { id: input.tournamentId }, select: { stagePlan: true } }) : null;
+  const staged = input.stage.stageKey ? await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: input.tournamentId }, select: { stagePlan: true } }) : null;
   const config = staged?.stagePlan as unknown as StoredStagePlan | null;
   const stageIndex = (key: string | null | undefined) => config?.stages.findIndex(s => s.key === key) ?? -1;
   const selfRank = config ? stageIndex(input.stage.stageKey) * 10 : competitionStageRank(input.stage);

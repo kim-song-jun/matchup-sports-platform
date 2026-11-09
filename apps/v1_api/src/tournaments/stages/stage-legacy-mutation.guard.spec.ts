@@ -3,7 +3,7 @@ import { StageLegacyMutationGuard } from './stage-legacy-mutation.guard';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AdminContextService } from '../../common/admin-context.service';
 function setup(staged: boolean) {
-  const prisma = { v1Tournament: { findUnique: jest.fn(async () => ({ stagePlan: staged ? {} : null })) } };
+  const prisma = { v1Tournament: { findFirst: jest.fn(async () => ({ stagePlan: staged ? {} : null })) } };
   const admins = { getTournamentMutationAdmin: jest.fn(async () => ({})) };
   const guard = new StageLegacyMutationGuard(prisma as unknown as PrismaService, admins as unknown as AdminContextService);
   const context = (method: string, path: string, body: object = {}) => ({ switchToHttp: () => ({ getRequest: () => ({ method, route: { path }, params: { tournamentId: 't' }, v1User: { id: 'admin' }, body }) }) }) as unknown as ExecutionContext;

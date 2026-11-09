@@ -20,9 +20,6 @@ export function getHomePopupStorageKey(popupId: string) {
 
 export const getPopupStorageKey = getHomePopupStorageKey;
 
-/** Dimmed backdrop shared by every home popup window. */
-export const HOME_POPUP_SCRIM_BACKGROUND = 'rgba(25, 31, 40, 0.48)';
-
 /** True while the user's "hide for a week" choice for this notice is still in force. Unreadable storage means not hidden. */
 export function isHomePopupHidden(popupId: string): boolean {
   try {
@@ -114,8 +111,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: HOME_POPUP_SCRIM_BACKGROUND }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim-dark-48)] p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}

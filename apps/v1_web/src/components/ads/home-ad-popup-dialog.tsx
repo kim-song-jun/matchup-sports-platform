@@ -3,7 +3,6 @@
 import { useId, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { HOME_POPUP_SCRIM_BACKGROUND } from '@/components/home/home-notice-popup';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useAdImpression } from '@/hooks/use-ad-impression';
 import { trackAdClick } from '@/lib/ad-events';
@@ -66,8 +65,8 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
 
   return createPortal(
     <div
-      className="tm-modal-scrim fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: HOME_POPUP_SCRIM_BACKGROUND, zIndex: 'var(--z-modal)' }}
+      className="tm-modal-scrim fixed inset-0 flex items-center justify-center bg-[var(--scrim-dark-48)] p-4"
+      style={{ zIndex: 'var(--z-modal)' }}
       onClick={onBackdropClick}
     >
       <div

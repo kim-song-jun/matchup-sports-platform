@@ -14,23 +14,9 @@ import { useV1PendingTournamentReviews, useV1Reviews } from '@/hooks/use-v1-api'
 const PENDING_SCAN_LIMIT = 50;
 
 /**
- * 마이페이지 상단 — 아직 남은 후기를 한 카드로 모아 안내한다.
- *
- * 후기는 소스가 둘이고 작성 화면도 갈린다:
- *   - 경기 후기(개인 매치·팀매치·대회 경기) → /my/reviews 허브에서 이어서 작성
- *   - 대회 후기                              → /tournaments/:id/awards (허브에 안 뜬다)
- * 예전에는 이 카드가 대회 후기만 알려줘서, 경기 후기는 마이 메뉴의 서브텍스트 한 줄
- * 말고는 유도 수단이 없었다. 총계를 한 번에 보여주고 소스별로 갈 곳을 나눠 준다.
- */
-/**
- * 남은 후기 총계와 첫 대회를 함께 돌려준다.
- *
- * 카드가 자기 데이터를 직접 가져와 0건이면 스스로 사라지는 구조였는데, 홈 배너 상한
- * 정책(Task 154 P2-1)이 생기면서 **부모가 "이 카드가 뜰 것인가"를 미리 알아야** 하게
- * 됐다 -- 안 뜰 카드에 자리를 내주면 그 방문에는 유도 배너가 하나도 안 보인다.
- *
- * 훅으로 떼어 부모와 카드가 같은 값을 쓰게 한다. React Query 가 같은 키를 dedupe 하므로
- * 두 곳에서 불러도 요청은 한 번이다.
+ * 남은 후기 총계와 첫 대회를 함께 돌려준다. 홈은 유도 배너를 하나만 고르므로 카드가 뜰지
+ * 부모가 미리 알아야 한다 — 부모와 카드가 이 훅을 같이 쓰고, React Query 가 같은 키를
+ * 한 번만 요청한다.
  */
 export function usePendingReviewsSummary() {
   const hasSession = hasStoredV1Session();
@@ -53,8 +39,10 @@ export function usePendingReviewsSummary() {
 type ReviewAction = { href: string; label: string };
 
 /**
- * `banner` 는 마이페이지·시상 화면의 파란 안내 카드다. `row` 는 홈용 흰 카드 한 줄이다 —
- * 홈 위쪽은 다음 경기 카드만 색과 주 버튼을 가져야 해서(DESIGN.md §14) 버튼도 회색으로 낮춘다.
+ * 남은 후기를 한 카드로 모아 안내한다. 작성 화면이 둘이라 CTA 도 둘로 나뉜다:
+ * 경기 후기(개인 매치·팀매치·대회 경기)는 /my/reviews, 대회 후기는 /tournaments/:id/awards(허브에 안 뜬다).
+ * `banner` 는 마이페이지·시상 화면의 파란 안내 카드, `row` 는 홈의 흰 카드 한 줄이다 —
+ * 홈 위쪽에서 다음 경기 카드와 같은 강조를 쓰지 않도록 버튼도 회색으로 낮춘다.
  */
 export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 'row' }) {
   const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
@@ -77,7 +65,8 @@ export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 
     const single = actions.length === 1 ? actions[0] : null;
     return (
       <Card pad={16} style={{ marginBottom: 16, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* 좁은 폭에서 버튼이 제목을 음절 단위로 밀어내지 않도록, 자리가 모자라면 버튼이 다음 줄로 간다. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span
             aria-hidden="true"
             style={{
@@ -87,7 +76,7 @@ export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 
           >
             <Star size={18} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />
           </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: '1 1 120px', minWidth: 0 }}>
             <div className="tm-text-label">
               남은 후기 <span className="tab-num">{total}</span>건
             </div>
@@ -96,15 +85,15 @@ export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 
             </div>
           </div>
           {single ? (
-            <Link href={single.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <Link href={single.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 'auto' }}>
               {single.label}
             </Link>
           ) : null}
         </div>
         {single ? null : (
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             {actions.map((action) => (
-              <Link key={action.href} href={action.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flex: 1, whiteSpace: 'nowrap' }}>
+              <Link key={action.href} href={action.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flex: '1 1 auto', whiteSpace: 'nowrap' }}>
                 {action.label}
               </Link>
             ))}

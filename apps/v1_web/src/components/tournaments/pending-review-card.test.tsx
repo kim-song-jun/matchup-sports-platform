@@ -105,6 +105,31 @@ describe('PendingReviewsCard — 남은 후기 통합 배너', () => {
     expect(screen.queryByRole('link', { name: /경기 후기/ })).not.toBeInTheDocument();
   });
 
+  // 마이페이지·시상 화면의 파란 카드는 첫 CTA 만 주 버튼이다. 홈의 한 줄 모양은 주 버튼을 쓰지 않는다.
+  it('파란 카드는 첫 CTA 만 주 버튼이고 둘째는 테두리 버튼이다', () => {
+    setup({ tournaments: [{ tournamentId: 'tour-3', tournamentTitle: '겨울 컵' }], eventItems: [{ remainingCount: 2 }] });
+
+    render(<PendingReviewsCard />);
+
+    expect(screen.getByRole('link', { name: '경기 후기 2건 쓰기' })).toHaveClass('tm-btn-primary');
+    expect(screen.getByRole('link', { name: '대회 후기 쓰기' })).toHaveClass('tm-btn-outline');
+  });
+
+  it('홈 한 줄 모양은 CTA 가 하나든 둘이든 회색 버튼만 쓴다', () => {
+    setup({ tournaments: [{ tournamentId: 'tour-3', tournamentTitle: '겨울 컵' }] });
+    const { unmount } = render(<PendingReviewsCard layout="row" />);
+    expect(screen.getByRole('link', { name: '대회 후기 쓰기' })).toHaveClass('tm-btn-neutral');
+    unmount();
+
+    setup({ tournaments: [{ tournamentId: 'tour-3', tournamentTitle: '겨울 컵' }], eventItems: [{ remainingCount: 2 }] });
+    render(<PendingReviewsCard layout="row" />);
+    for (const link of screen.getAllByRole('link')) {
+      expect(link).toHaveClass('tm-btn-neutral');
+      expect(link).not.toHaveClass('tm-btn-primary');
+    }
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
   // 비로그인 방문자가 인증 필요한 엔드포인트를 때리지 않아야 한다.
   it('비로그인이면 두 조회 모두 비활성화한다', () => {
     setup({ hasSession: false });

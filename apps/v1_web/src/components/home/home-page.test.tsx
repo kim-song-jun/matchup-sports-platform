@@ -535,7 +535,7 @@ describe('HomePageView — 광고 배너 자리', () => {
   });
 });
 
-describe('HomePageView — 홈 위쪽 강조는 다음 경기 하나 (DESIGN.md §14)', () => {
+describe('HomePageView — 남은 후기는 다음 경기와 같은 주 버튼을 쓰지 않는다', () => {
   const nextGame = {
     gameId: 'game-1',
     teamMatchId: 'tm-1',

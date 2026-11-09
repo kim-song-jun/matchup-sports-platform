@@ -3163,9 +3163,15 @@ label.tm-btn:focus-within {
   color: var(--blue500);
 }
 
+/* 날씨 줄 바탕이 --grey50 이라 같은 회색 칩은 묻힌다. */
 .tm-weather-icon-snow {
-  background: var(--grey50);
+  background: var(--blue50);
   color: var(--blue500);
+}
+
+:root.dark .tm-weather-icon-cloud,
+:root.dark .tm-weather-icon-fog {
+  background: var(--grey150);
 }
 
 .tm-weather-icon-thunderstorm {

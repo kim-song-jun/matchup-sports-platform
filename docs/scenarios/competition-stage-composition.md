@@ -21,8 +21,10 @@ Task: [20261130](../../.github/tasks/20261130-competition-stage-composition.md)
 ## 실행 증거
 - 임시 PostgreSQL18.6에서 전체 migration replay PASS. 실제 사용자 DB에는 접속하지 않았다.
 - API planner+기존 대진·슬롯·일정·순위 projection 5 suites /271 tests PASS.
-- 실제 DB 단계 통합4 cases PASS: 20팀70경기, 3단계 혼합, 단일5팀 리그/토너먼트. 생성·구조 편집/종료 통합을 추가 검증 중.
+- 실제 DB 단계 통합5 cases PASS: 20팀70경기, 3단계 혼합, 단일5팀 리그/토너먼트, 생성·구조 편집/종료 제약.
 - 웹 기존 생성/모델·새 editor 131 tests PASS. manager 실제 payload/서버 오류3 tests PASS.
-- 공개 분리순위·기존 상세/시상/스테퍼 등264 tests PASS, 추가 새 route 테스트의 helper 모호한 버튼 선택을 수정 중.
+- 공개 분리순위·기존 상세/시상/스테퍼 등264 tests PASS, 추가 새 route 테스트는 helper의 모호한 버튼 선택 수정 후1건 PASS.
+- API/Web typecheck, Web patterns 및 API surface PASS. 단계형 일정 순서 회귀3건 포함13건 PASS.
+- PR [#2285](https://github.com/kim-song-jun/matchup-sports-platform/pull/2285): CI·Copilot 리뷰 진행 중.
 - Alpha 기능0/8·viewport0/3: 아직 배포하지 않았다. 로컬 웹 서버는 실행하지 않았다.
 - cleanup: 임시 DB/브라우저 등 이번 작업 소유 자원만 검증 종료 시 정리한다.

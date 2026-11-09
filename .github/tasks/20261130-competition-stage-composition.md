@@ -211,7 +211,8 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 기존 stagePlan=null 대회는 기존 경로와 응답 모양을 유지하며 자동 전환하지 않는다.
 - 검증: 실제 PostgreSQL 전체 migration replay 및 schema diff 0; 실제 DB 통합 5건 PASS(20팀70경기, 3단계 혼합, 단일 리그/KO, 생성·수정·종료 제약); API typecheck PASS.
 - 단위/화면 회귀: backend 관련 271+154+7 PASS; frontend 관련 264 PASS 후 신규 경로 단일 실패를 수정해 해당 1건 PASS. 초기 editor/생성 모델 131 PASS, 배정 화면 3 PASS.
-- 진행 중: frontend 최종 typecheck, 커밋·PR·CI·Copilot 리뷰, Alpha 실제 로그인/3폭 시각 QA. Alpha 미검증을 완료로 간주하지 않는다.
+- 최종 API/Web typecheck 및 Web patterns/API surface PASS. 단계형 일정 순서 회귀3건 포함13건 PASS. PR #2285 생성 및 최신 head Copilot 리뷰 요청 완료.
+- 진행 중: PR CI·Copilot 리뷰, Alpha 실제 로그인/3폭 시각 QA. Alpha 미검증을 완료로 간주하지 않는다.
 - 정책: 승점 이월 없음; 이전 단계 공식 결과와 동률 후보에 한해 배정 가능(동률 사유 필수); 기존 대회 전환 없음; KO는 1·2위만 진출 원천, 단판, 별도 3위전 없음. 일반 구성 상한 8단계/단계당16편성/편성64팀/전체240경기.
 
 ## Approved implementation cursor — 2026-11-09

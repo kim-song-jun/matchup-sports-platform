@@ -1,3 +1,4 @@
+import { StageLegacyMutationGuard } from '../stages/stage-legacy-mutation.guard';
 import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
 import {
   IsBoolean,
@@ -20,7 +21,7 @@ export class SixTeamDecisionDto {
   @IsObject() winners!: Record<string, string>;
 }
 @Controller('admin/tournaments/:tournamentId/bracket/six-team')
-@UseGuards(V1AuthGuard)
+@UseGuards(V1AuthGuard, StageLegacyMutationGuard)
 export class SixTeamController {
   constructor(private readonly service: SixTeamService) {}
   @Get() preview(

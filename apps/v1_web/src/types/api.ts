@@ -1,3 +1,4 @@
+import type { StagePlan } from './stage-plan';
 // 리그 대진 모양은 `league-match.ts` 가 단일 소스다 — 여기서 다시 선언하면 두 모양이
 // 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
 // 않으므로 순환이 없다.)
@@ -3951,6 +3952,9 @@ export type V1TournamentListItem = {
   status: V1TournamentStatus;
   /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  stagePlan?: StagePlan | null;
+  stagePlanRevision?: number;
+  isStaged?: boolean;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
   registrationDeadlineAt: string | null;
@@ -4043,6 +4047,9 @@ export type V1Tournament = {
   /** 대회 종류. `format` 으로 결선 가능 여부를 추론하지 않는다. */
   kind?: V1CompetitionKind | null;
   format: V1TournamentFormat;
+  stagePlan?: StagePlan | null;
+  stagePlanRevision?: number;
+  isStaged?: boolean;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
   rosterDeadlineAt: string | null;
@@ -4194,6 +4201,8 @@ export type V1TournamentGroupQualification = {
 export type V1TournamentBracketTrack = string;
 
 export type V1TournamentGroup = {
+  stageKey?: string | null;
+  poolKey?: string | null;
   id: string;
   name: string;
   phase: string;
@@ -4368,6 +4377,9 @@ export type V1TournamentDetail = {
   status: V1TournamentStatus;
   /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  stagePlan?: StagePlan | null;
+  stagePlanRevision?: number;
+  isStaged?: boolean;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
   /** 이 대회가 고른 동점 순서(6칸). 정규 리그는 리그 고유 순서를 쓰므로 null. */
@@ -5053,6 +5065,7 @@ export type V1LineupSizeOptions = {
 export type V1SubstitutionMode = 'limited' | 'rolling';
 
 export type V1CreateTournamentPayload = {
+  stagePlan?: StagePlan;
   sixTeamMode?: boolean;
   /** 동점 순서(6칸). 생략 = 기본 순서(생성)/변경 없음(수정), null = 기본 순서로 되돌리기. */
   tieBreakOrder?: V1TournamentTieBreakOrder | null;

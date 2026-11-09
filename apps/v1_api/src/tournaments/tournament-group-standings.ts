@@ -23,6 +23,7 @@ import {
  * Results are read exclusively from the canonical Game revision.
  */
 export type StandingsSourceGroup = {
+  stageKey?: string | null;
   id: string;
   groupTeams: readonly { registrationId: string }[];
   fixtures: readonly {
@@ -128,7 +129,7 @@ export async function recalculateAndUpsertGroupStandings(
     registrationIds: params.group.groupTeams.map((team) => team.registrationId),
     fixtures: standingsFixturesFromGroup(params.group),
     config: params.config,
-    fairPlayByRegistration: params.fairPlayByRegistration,
+    fairPlayByRegistration: params.group.stageKey ? fairPlayByRegistrationFromGroups([params.group]) : params.fairPlayByRegistration,
   });
 
   for (const standing of standings) {

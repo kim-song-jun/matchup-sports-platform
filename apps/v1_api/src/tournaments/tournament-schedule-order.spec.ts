@@ -3,7 +3,7 @@ import { assertFixtureScheduleKeepsStageOrder, assertNewFixtureScheduleKeepsStag
 
 const at = (hhmm: string) => new Date(`2026-10-10T${hhmm}:00.000Z`);
 
-type Match = { id: string; startAt: Date | null; phase: string | null; round: string; status?: string };
+type Match = { id: string; startAt: Date | null; phase: string | null; round: string; status?: string; stageKey?: string; poolKey?: string };
 
 // 조별 1·2경기 23:00·23:10, 조별 3경기 23:20, 8강 23:30, 결승 23:40.
 const MATCHES: Match[] = [
@@ -15,12 +15,13 @@ const MATCHES: Match[] = [
   { id: 'free', startAt: at('23:50'), phase: null, round: '친선 한마당' },
 ];
 
-function fakeTx(matches: Match[]) {
+function fakeTx(matches: Match[], stagePlan: unknown = null) {
   const shape = (match: Match) => ({
     startAt: match.startAt,
-    tournamentDetails: { round: match.round, group: match.phase === null ? null : { phase: match.phase } },
+    tournamentDetails: { round: match.round, group: match.phase === null ? null : { phase: match.phase, stageKey: match.stageKey, poolKey: match.poolKey } },
   });
   return {
+    v1Tournament: { findFirst: jest.fn(async () => ({ stagePlan })) },
     v1TeamMatch: {
       findFirst: jest.fn(async ({ where }: { where: { id: string } }) => {
         const match = matches.find((candidate) => candidate.id === where.id);
@@ -106,5 +107,32 @@ describe('assertNewFixtureScheduleKeepsStageOrder', () => {
     await expect(create('group', 'league_r4', at('23:25'))).resolves.toBeUndefined();
     await expect(create('quarter', '8강', null)).resolves.toBeUndefined();
     await expect(create(null, '친선 한마당', at('22:00'))).resolves.toBeUndefined();
+  });
+});
+
+describe('단계형 대회 일정 순서', () => {
+  const plan = { stages: [{ key: 'pre' }, { key: 'main' }] };
+  const run = (matches: Match[], id: string, time: string) => assertFixtureScheduleKeepsStageOrder(fakeTx(matches, plan), { tournamentId: 't', teamMatchId: id, startAt: at(time) });
+  it('앞 단계 토너먼트 뒤의 본선 풀리그도 단계 순서를 따른다', async () => {
+    const matches: Match[] = [
+      { id: 'pre', stageKey: 'pre', poolKey: 'a', phase: 'final', round: '결승', startAt: at('23:10') },
+      { id: 'main', stageKey: 'main', poolKey: 'b', phase: 'group', round: 'league_r1', startAt: at('23:30') },
+    ];
+    await expect(run(matches, 'main', '23:00')).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
+    await expect(run(matches, 'main', '23:20')).resolves.toBeUndefined();
+  });
+  it('같은 단계의 독립 편성끼리는 리그/결승 순서를 강요하지 않는다', async () => {
+    const matches: Match[] = [
+      { id: 'league', stageKey: 'pre', poolKey: 'a', phase: 'group', round: 'league_r1', startAt: at('23:10') },
+      { id: 'final', stageKey: 'pre', poolKey: 'b', phase: 'final', round: '결승', startAt: at('23:30') },
+    ];
+    await expect(run(matches, 'final', '23:00')).resolves.toBeUndefined();
+  });
+  it('한 토너먼트 편성 안의 준결승→결승 순서는 유지한다', async () => {
+    const matches: Match[] = [
+      { id: 'semi', stageKey: 'pre', poolKey: 'a', phase: 'semi', round: '4강', startAt: at('23:10') },
+      { id: 'final', stageKey: 'pre', poolKey: 'a', phase: 'final', round: '결승', startAt: at('23:30') },
+    ];
+    await expect(run(matches, 'final', '23:00')).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
   });
 });

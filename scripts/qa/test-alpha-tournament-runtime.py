@@ -41,6 +41,15 @@ class TournamentRollback(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), '')
 
+    def test_named_finals_epoch_cannot_operate_staged_data(self):
+        path = self.repo / 'deploy/alpha-tournament-runtime.sh'
+        path.write_text(HELPER.read_text().replace('RUNTIME_VERSION=3', 'RUNTIME_VERSION=2'))
+        self.git('add', 'deploy/alpha-tournament-runtime.sh')
+        self.git('commit', '-qm', 'old named finals epoch')
+        predecessor = self.git('rev-parse', 'HEAD').strip()
+        result = self.shell('alpha_tournament_rollback_target "$2" final', predecessor)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, ''))
+
     def test_known_compatible_final_is_preserved(self):
         result = self.shell('alpha_tournament_rollback_target "$2" final', self.new)
         self.assertEqual(result.returncode, 0)
@@ -57,18 +66,18 @@ class TournamentRollback(unittest.TestCase):
     def test_rollback_execution_refuses_missing_or_changed_runtime_even_with_matching_sha(self):
         active = self.repo / 'active.json'
         previous = self.repo / 'previous.json'
-        active.write_text(json.dumps({'database': {'tournamentRuntimeVersion': 2, 'rollbackCompatibleWith': self.old}}))
-        for version in [None, 0, 1, '2', 3, 2]:
+        active.write_text(json.dumps({'database': {'tournamentRuntimeVersion': 3, 'rollbackCompatibleWith': self.old}}))
+        for version in [None, 0, 1, 2, '3', 4, 3]:
             previous.write_text(json.dumps({'release': {'sha': self.old}, 'database': {'tournamentRuntimeVersion': version}}))
             result = self.shell('assert_alpha_tournament_rollback_runtime "$2" "$3"', str(active), str(previous))
-            self.assertEqual(result.returncode == 0, version == 2)
+            self.assertEqual(result.returncode == 0, version == 3)
 
 
     def test_failed_candidate_restore_checks_runtime_before_source_or_images(self):
         candidate = self.repo / 'candidate.json'
         previous = self.repo / 'previous.json'
         marker = self.repo / 'activated'
-        candidate.write_text(json.dumps({'database': {'tournamentRuntimeVersion': 2}}))
+        candidate.write_text(json.dumps({'database': {'tournamentRuntimeVersion': 3}}))
         command = r'''export ALPHA_HOME_DIR="$3"
 source "$2"
 mkdir -p "$ALPHA_RELEASE_STATE_DIR"
@@ -88,7 +97,7 @@ assert_running_release_digests() { return 0; }
 compose=(true)
 restore_active_release
 '''
-        for started, version, allowed in [('true', 0, False), ('true', 2, True), ('false', 0, True)]:
+        for started, version, allowed in [('true', 0, False), ('true', 3, True), ('false', 0, True)]:
             marker.unlink(missing_ok=True)
             previous.write_text(json.dumps({'database': {'tournamentRuntimeVersion': version}}))
             result = self.shell(command, str(ROOT / 'deploy/alpha-release-common.sh'), str(self.repo), str(previous), str(candidate), str(marker), started)

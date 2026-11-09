@@ -1,13 +1,15 @@
+import type { StoredStagePlan } from '../stages/stage-view';
 import { BadRequestException } from '@nestjs/common';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import type { Prisma } from '@prisma/client';
 
 /** Called under the competition lock so renaming/removing a final cannot race an award save. */
 export async function assertNamedAwardScopes(tx: Prisma.TransactionClient, tournamentId: string, scopes: readonly string[]) {
-  const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: tournamentId }, select: { format: true, multiFinals: true } });
+  const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: tournamentId }, select: { format: true, multiFinals: true, stagePlan: true } });
   if (tournament?.format !== 'league_knockouts') return;
   const config = tournament.multiFinals as { finals?: Array<{ name: string }> } | null;
-  const allowed = new Set(['overall', ...(config?.finals?.map(f => f.name) ?? [])]);
+  const stagePlan = tournament.stagePlan as unknown as StoredStagePlan | null;
+  const allowed = new Set(['overall', ...(stagePlan ? stagePlan.stages.flatMap(s => s.pools.map(p => `stage:${p.key}`)) : config?.finals?.map(f => f.name) ?? [])]);
   if (scopes.some(scope => !allowed.has(scope))) throw new BadRequestException({ code: 'AWARD_TRACK_UNSUPPORTED', message: '이 대회에 설정된 토너먼트의 시상 범위를 선택해 주세요.' });
 }
 

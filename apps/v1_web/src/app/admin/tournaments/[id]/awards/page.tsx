@@ -21,6 +21,7 @@ export default function AdminTournamentAwardsPage() {
       </div>
     );
   }
+  if (tournament.stagePlan) return <AwardsTab tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} allowSplitAwards stagePlan={tournament.stagePlan} finalTracks={tournament.stagePlan.stages.flatMap(s => s.pools.map(p => `stage:${p.key}`))} />;
   if (tournament.format === 'league_knockouts') return <NamedFinalAwards tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} />;
   return <AwardsTab tournamentId={tournamentId} canWrite={canWrite} allowSplitAwards={tournament?.kind === 'regular_tournament'} showToast={showToast} />;
 }

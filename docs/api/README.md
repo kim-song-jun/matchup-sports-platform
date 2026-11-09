@@ -168,3 +168,6 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 [대회 운영 계약](./domains/tournament-operations.md)을 따른다. 결과 정정 초안 생성과 공식 확정은 별도 단계다.
 
 - Tournament detail qualification colors and stable named-final identity: see [tournaments](domains/tournaments.md#stable-final-destination-colors).
+
+[단계형 대회 구성](./domains/tournaments.md#단계형-대회-구성-2026-11-09): 별도 생성에서 신규 대회만 단계·편성·진출 출처를 저장한다.
+기존 데이터는 변환하지 않으며 단일 본선·복수 리그/토너먼트·3단계 이상을 지원한다.

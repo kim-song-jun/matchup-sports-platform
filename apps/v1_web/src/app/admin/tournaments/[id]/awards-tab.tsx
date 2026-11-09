@@ -1,4 +1,5 @@
 'use client';
+import type { StagePlan } from '@/types/stage-plan';
 import { bracketTrackLabel } from '@/lib/bracket-track';
 
 import { useState, useEffect } from 'react';
@@ -26,12 +27,14 @@ export function AwardsTab({
   canWrite,
   allowSplitAwards = false,
   finalTracks = ['upper', 'lower'],
+  stagePlan,
   showToast,
 }: {
   readonly tournamentId: string;
   readonly canWrite: boolean;
   readonly allowSplitAwards?: boolean;
   readonly finalTracks?: string[];
+  readonly stagePlan?: StagePlan | null;
   readonly showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const setAwards = useV1SetTournamentAwards(tournamentId);
@@ -205,7 +208,7 @@ export function AwardsTab({
           <>
             <label htmlFor="award-set-track" className="mb-2 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">편집할 결선</label>
             <select id="award-set-track" value={activeAwardSet} onChange={(event) => setActiveAwardSet(event.target.value)} disabled={setAwardSets.isPending} className="mb-4 h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
-              {finalTracks.map(track => <option key={track} value={track}>{bracketTrackLabel(track)}</option>)}
+              {finalTracks.map(track => <option key={track} value={track}>{bracketTrackLabel(track, stagePlan)}</option>)}
             </select>
             <PrizeBreakdownEditor
               rows={(awardSetDrafts[activeAwardSet] ?? emptyAwardSetDraft()).prizeRows}
@@ -261,9 +264,10 @@ export function AwardsTab({
                 teamItems={awardTeamItems}
                 allowSplitAwards={allowSplitAwards}
                 finalTracks={finalTracks}
+                stagePlan={stagePlan}
               />
             ))
-          : rows.map((row, idx) => <AwardRowReadOnly key={idx} row={row} />)}
+          : rows.map((row, idx) => <AwardRowReadOnly key={idx} row={row} stagePlan={stagePlan} />)}
       </div>
 
       <div className="mt-4 pt-4 border-t border-[var(--border)]">
@@ -290,7 +294,7 @@ export function AwardsTab({
 }
 
 // ── 조회 전용 어워드 행 ────────────────────────────────────────────────
-function AwardRowReadOnly({ row }: { readonly row: AwardForm }) {
+function AwardRowReadOnly({ row, stagePlan }: { readonly row: AwardForm; stagePlan?: StagePlan | null }) {
   return (
     <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--card-surface)]">
       <div className="flex items-center gap-2">
@@ -298,7 +302,7 @@ function AwardRowReadOnly({ row }: { readonly row: AwardForm }) {
           <TournamentAwardIcon iconKey={row.iconKey} />
         </span>
         <div className="min-w-0">
-          <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate">{row.awardLabel} · {bracketTrackLabel(row.bracketTrack) ?? '전체'}</p>
+          <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate">{row.awardLabel} · {bracketTrackLabel(row.bracketTrack, stagePlan) ?? '전체'}</p>
           <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
             {row.recipientName}
             {row.teamName ? ` · ${row.teamName}` : ''}
@@ -324,6 +328,7 @@ function AwardRow({
   teamItems,
   allowSplitAwards,
   finalTracks,
+  stagePlan,
 }: {
   idx: number;
   row: AwardForm;
@@ -333,6 +338,7 @@ function AwardRow({
   teamItems: EntityPickerItem[];
   allowSplitAwards: boolean;
   finalTracks: string[];
+  stagePlan?: StagePlan | null;
 }) {
   const teamNameTrimmed = row.teamName.trim();
   const selectedTeamItem: EntityPickerItem | null = teamNameTrimmed
@@ -390,7 +396,7 @@ function AwardRow({
         <label htmlFor={`award-track-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">수상 범위</label>
         <select id={`award-track-${idx}`} value={row.bracketTrack} disabled={!allowSplitAwards} onChange={(event) => update(idx, 'bracketTrack', event.target.value)} className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] disabled:opacity-70">
           {allowSplitAwards || row.bracketTrack === 'overall' ? <option value="overall">대회 전체</option> : null}
-          {[...new Set([...finalTracks, ...(row.bracketTrack !== 'overall' ? [row.bracketTrack] : [])])].filter(track => allowSplitAwards || track === row.bracketTrack).map(track => <option key={track} value={track}>{bracketTrackLabel(track)}</option>)}
+          {[...new Set([...finalTracks, ...(row.bracketTrack !== 'overall' ? [row.bracketTrack] : [])])].filter(track => allowSplitAwards || track === row.bracketTrack).map(track => <option key={track} value={track}>{bracketTrackLabel(track, stagePlan)}</option>)}
         </select>
       </div>
       <div className="grid grid-cols-2 gap-2">

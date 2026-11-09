@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { validate } from 'class-validator';
 import { CreateTournamentDto, UpdateTournamentDto } from './admin-tournament.dto';
 

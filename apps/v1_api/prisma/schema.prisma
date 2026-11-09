@@ -2790,6 +2790,8 @@ model V1Tournament {
   /// Six-team result-ranked advancement; null preserves the standard bracket.
   sixTeamMode Boolean @default(false) @map("six_team_mode")
   sixTeamBracket Json? @map("six_team_bracket")
+  stagePlan Json? @map("stage_plan")
+  stagePlanRevision Int @default(0) @map("stage_plan_revision")
   multiFinals Json? @map("multi_finals")
   multiFinalsRevision Int @default(0) @map("multi_finals_revision")
   /// 이 대회의 동점 순서(승점 → … → 추첨 6칸). null = 기본 순서. 공유되는 경기 규정 판(content_hash)이 아니라 대회에 둔다.
@@ -3200,6 +3202,8 @@ model V1TournamentPayment {
 }
 
 model V1TournamentGroup {
+  stageKey String? @map("stage_key")
+  poolKey String? @map("pool_key")
   id           String                 @id @default(uuid())
   tournamentId String                 @map("tournament_id")
   name         String
@@ -3227,6 +3231,7 @@ model V1TournamentGroup {
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@unique([tournamentId, id], map: "v1_tournament_groups_tournament_id_id_key")
   @@index([tournamentId, phase, sortOrder])
+  @@index([tournamentId, stageKey, poolKey], map: "v1_tournament_groups_stage_pool_idx")
   @@index([competitionConfigVersionId], map: "v1_tournament_groups_competition_config_idx")
   @@map("v1_tournament_groups")
 }
@@ -4319,6 +4324,7 @@ enum V1TournamentSlotKind {
 
 /// 팀이 들어갈 칸의 정본. 대회·정규 리그 공통(둘 다 V1Tournament). 라벨은 저장하지 않고 직렬화에서 계산한다.
 model V1TournamentSlot {
+  entryScope String @default("legacy") @map("entry_scope")
   id             String               @id @default(uuid())
   tournamentId   String               @map("tournament_id")
   kind           V1TournamentSlotKind @default(ENTRY)
@@ -4338,7 +4344,7 @@ model V1TournamentSlot {
   homeTeamMatches V1TeamMatch[]             @relation("V1TeamMatchHomeSlot")
   awayTeamMatches V1TeamMatch[]             @relation("V1TeamMatchAwaySlot")
 
-  @@unique([tournamentId, kind, registrationId])
+  @@unique([tournamentId, entryScope, kind, registrationId], map: "v1_slots_stage_kind_registration_key")
   @@index([tournamentId, groupId])
   @@map("v1_tournament_slots")
 }

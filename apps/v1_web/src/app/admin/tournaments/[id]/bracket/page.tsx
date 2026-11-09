@@ -1,4 +1,5 @@
 'use client';
+import { StagePlanManager } from '@/components/admin/stages/stage-plan-manager';
 import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
@@ -59,6 +60,7 @@ function BracketPageBody() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
+  if (tournament?.stagePlan) return <StagePlanManager tournamentId={tournamentId} canWrite={canWrite} />;
   return (
     <div className="flex flex-col gap-4">
       {tournament?.format === 'league_knockouts' && canWrite ? <>

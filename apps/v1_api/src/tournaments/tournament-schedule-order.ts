@@ -1,3 +1,4 @@
+import type { StoredStagePlan } from './stages/stage-view';
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { competitionStageRank } from './tournament-stage-rank';
@@ -5,19 +6,22 @@ import { TOURNAMENT_PHASE_LABEL, tournamentRoundLabel } from './tournament-round
 
 type Tx = Prisma.TransactionClient;
 
-const STAGE_SELECT = { round: true, group: { select: { phase: true } } } as const;
+const STAGE_SELECT = { round: true, group: { select: { phase: true, stageKey: true, poolKey: true } } } as const;
 
 function stageLabel(phase: string | null | undefined, round: string): string {
   return (phase == null ? undefined : TOURNAMENT_PHASE_LABEL[phase]) ?? tournamentRoundLabel(round);
 }
 
-type Stage = { phase: string | null | undefined; round: string };
+type Stage = { stageKey?: string | null; poolKey?: string | null; phase: string | null | undefined; round: string };
 
 async function assertStartKeepsStageOrder(
   tx: Tx,
   input: { tournamentId: string; excludeTeamMatchId: string | null; stage: Stage; startAt: Date },
 ): Promise<void> {
-  const selfRank = competitionStageRank(input.stage);
+  const staged = input.stage.stageKey ? await tx.v1Tournament.findUnique({ where: { id: input.tournamentId }, select: { stagePlan: true } }) : null;
+  const config = staged?.stagePlan as unknown as StoredStagePlan | null;
+  const stageIndex = (key: string | null | undefined) => config?.stages.findIndex(s => s.key === key) ?? -1;
+  const selfRank = config ? stageIndex(input.stage.stageKey) * 10 : competitionStageRank(input.stage);
   if (selfRank === null) return;
   const others = await tx.v1TeamMatch.findMany({
     where: {
@@ -30,10 +34,13 @@ async function assertStartKeepsStageOrder(
   });
   for (const other of others) {
     if (other.startAt === null || other.tournamentDetails === null) continue;
-    const otherRank = competitionStageRank({ phase: other.tournamentDetails.group?.phase, round: other.tournamentDetails.round });
+    const otherGroup = other.tournamentDetails.group;
+    const samePool = input.stage.poolKey && input.stage.poolKey === otherGroup?.poolKey;
+    const selfOrder = config && samePool ? (competitionStageRank(input.stage) ?? 0) : selfRank;
+    const otherRank = config ? samePool ? (competitionStageRank({ phase: otherGroup?.phase, round: other.tournamentDetails.round }) ?? 0) : stageIndex(otherGroup?.stageKey) * 10 : competitionStageRank({ phase: otherGroup?.phase, round: other.tournamentDetails.round });
     if (otherRank === null) continue;
-    const startsTooEarly = otherRank < selfRank && input.startAt.getTime() < other.startAt.getTime();
-    const startsTooLate = otherRank > selfRank && input.startAt.getTime() > other.startAt.getTime();
+    const startsTooEarly = otherRank < selfOrder && input.startAt.getTime() < other.startAt.getTime();
+    const startsTooLate = otherRank > selfOrder && input.startAt.getTime() > other.startAt.getTime();
     if (startsTooEarly || startsTooLate) {
       const mine = stageLabel(input.stage.phase, input.stage.round);
       const theirs = stageLabel(other.tournamentDetails.group?.phase, other.tournamentDetails.round);
@@ -66,7 +73,7 @@ export async function assertFixtureScheduleKeepsStageOrder(
   await assertStartKeepsStageOrder(tx, {
     tournamentId: input.tournamentId,
     excludeTeamMatchId: input.teamMatchId,
-    stage: { phase: self.tournamentDetails.group?.phase, round: self.tournamentDetails.round },
+    stage: { phase: self.tournamentDetails.group?.phase, stageKey: self.tournamentDetails.group?.stageKey, poolKey: self.tournamentDetails.group?.poolKey, round: self.tournamentDetails.round },
     startAt: input.startAt,
   });
 }

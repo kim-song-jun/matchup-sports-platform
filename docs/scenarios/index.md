@@ -1,3 +1,9 @@
+## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
+
+[시나리오](./competition-stage-composition.md) · [작업](../../.github/tasks/20261130-competition-stage-composition.md).
+기존 생성·데이터를 보존하고 별도 생성 진입에서 단일 본선 또는 여러 리그/토너먼트 단계를 구성한다.
+로컬 임시 DB의70경기/3단계 검증을 진행했으며 Alpha 기능0/8·viewport0/3은 미배포다.
+
 ## 2026-11-08 — 필드 담당자 운영콘솔 체험과 오버레이 안내
 
 [시나리오](./field-console-demo.md) · [작업](../../.github/tasks/20261108-field-console-demo.md). 상단 체험 링크를 `/field-console-demo`로 연결하고 실제 현장 콘솔 위에 회색 반투명 덮개·영역 강조·화살표 5단계 안내를 구현했다. 신규6/영향119 tests·tsc·pattern PASS, 실제 경기 API 호출0을 단위 UI에서 확인했다. 미커밋/미배포이며 alpha after0/3폭·브라우저 console/network는 미검증이다. 기존 대회 관리 체험은 별도로 유지한다.

@@ -1,6 +1,10 @@
+import type { StagePlan } from '@/types/stage-plan';
 import type { V1TournamentBracketTrack, V1TournamentGroup } from '@/types/api';
 
-export function bracketTrackLabel(track: V1TournamentBracketTrack | null | undefined): string | null {
+export function bracketTrackLabel(track: V1TournamentBracketTrack | null | undefined, plan?: StagePlan | null): string | null {
+  if (plan && track?.startsWith('stage:')) {
+    for (const stage of plan.stages) { const pool = stage.pools.find(p => `stage:${p.key}` === track); if (pool) return `${stage.name} · ${pool.name}`; }
+  }
   if (track === 'upper') return '상위 결선';
   if (track === 'lower') return '하위 결선';
   return track && track !== 'overall' ? track : null;

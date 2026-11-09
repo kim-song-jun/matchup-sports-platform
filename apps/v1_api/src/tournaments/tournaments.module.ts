@@ -1,3 +1,6 @@
+import { StageLegacyMutationGuard } from './stages/stage-legacy-mutation.guard';
+import { StagePlanService } from './stages/stage-plan.service';
+import { StagePlanController } from './stages/stage-plan.controller';
 import { MultiFinalsController } from './multi-finals/multi-finals.controller';
 import { MultiFinalsService } from './multi-finals/multi-finals.service';
 import { SixTeamController } from './six-team/six-team.controller';
@@ -88,6 +91,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     PublicRecordsModule,
   ],
   controllers: [
+    StagePlanController,
     MultiFinalsController,
     SixTeamController,
     TournamentCampaignsPublicController,
@@ -114,6 +118,8 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TeamCompetitionEntriesController,
   ],
   providers: [
+    StageLegacyMutationGuard,
+    StagePlanService,
     MultiFinalsService,
     SixTeamService,
     MockTournamentSeedService,

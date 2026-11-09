@@ -2,7 +2,7 @@ import { Card } from '@/components/v1-ui/primitives';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import type { V1TournamentDetail } from '@/types/api';
 
-type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format'>;
+type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format' | 'stagePlan'>;
 
 /* ── TournamentFlowSection — explains how the tournament progresses ──
  * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
@@ -10,10 +10,12 @@ type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format'>;
  */
 function tournamentFormatLabel(competition: FlowCompetition): string {
   if (isLeagueCompetition(competition)) return '리그 방식 (풀리그)';
+  if (competition.stagePlan) return '단계형 대회';
   return competition.format === 'knockout' ? '토너먼트 (단판 승부)' : '조별 리그 후 토너먼트';
 }
 
 function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body: string }> {
+  if (competition.stagePlan) return competition.stagePlan.stages.map(stage => ({ title: stage.name, body: stage.pools.map(pool => `${pool.name} · ${pool.capacity}팀 ${pool.format === 'league' ? `풀리그 ${pool.legs}회전` : '토너먼트'}`).join(' / ') }));
   // 정규 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
   // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다. isLeagueCompetition 은
   // format=league 단발 대회도 참이라 쓰면 안 된다 — 단발 대회는 맨 아래 대진표 안내로 가야 한다.

@@ -346,6 +346,7 @@ export class BracketTemplateService {
       const created = await createGroupInTx(tx, admin, tournament.id, {
         name: group.name, phase: group.phase, sortOrder: group.sortOrder, advanceCount: group.advanceCount,
         bracketTrack: group.bracketTrack ?? 'overall',
+        ...(group.stageKey !== undefined ? { stageKey: group.stageKey, poolKey: group.poolKey } : {}),
       });
       groupIds.set(group.key, created.id);
     }
@@ -358,6 +359,7 @@ export class BracketTemplateService {
         return {
           id,
           tournamentId: tournament.id,
+          ...(slot.entryScope ? { entryScope: slot.entryScope } : {}),
           kind: slot.kind,
           displayLabel: slot.kind === 'GROUP_RANK' && slot.sourceGroupKey === null && plan.groups.some(group => group.key === slot.groupKey && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack)) ? `${slot.position}번 시드` : null,
           groupId: slot.groupKey === null ? null : lookup(groupIds, slot.groupKey, 'group'),

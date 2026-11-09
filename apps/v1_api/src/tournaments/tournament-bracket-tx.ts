@@ -29,11 +29,12 @@ export async function createGroupInTx(
   tx: Tx,
   admin: V1TournamentManager,
   tournamentId: string,
-  input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: string },
+  input: { stageKey?: string; poolKey?: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: string },
 ): Promise<V1TournamentGroup> {
   const group = await tx.v1TournamentGroup.create({
     data: {
       tournamentId,
+      ...(input.stageKey !== undefined ? { stageKey: input.stageKey, poolKey: input.poolKey } : {}),
       name: input.name,
       phase: input.phase,
       sortOrder: input.sortOrder,
@@ -90,11 +91,12 @@ export async function assertNotInOtherGroupInTx(
   input: { tournamentId: string; groupId: string; registrationIds: readonly string[] },
 ): Promise<void> {
   if (input.registrationIds.length === 0) return;
+  const ownGroup = await tx.v1TournamentGroup.findUnique({ where: { id: input.groupId }, select: { stageKey: true } });
   const elsewhere = await tx.v1TournamentGroupTeam.findFirst({
     where: {
       registrationId: { in: [...input.registrationIds] },
       groupId: { not: input.groupId },
-      group: { tournamentId: input.tournamentId, phase: 'group' },
+      group: { tournamentId: input.tournamentId, phase: 'group', ...(ownGroup?.stageKey ? { stageKey: ownGroup.stageKey } : {}) },
     },
     select: { registrationId: true },
   });
@@ -147,7 +149,7 @@ export async function assertNotInOppositeFinalStageInTx(
   if (ids.length === 0) return;
   const own = input.fixtureId === null
     ? null
-    : await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: input.fixtureId }, select: { round: true, homeRegistrationId: true, awayRegistrationId: true } });
+    : await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: input.fixtureId }, select: { round: true, homeRegistrationId: true, awayRegistrationId: true, group: { select: { poolKey: true } } } });
   const stage = finalStageOf(input.groupPhase, input.round ?? own?.round);
   if (stage === null) return;
   const rule = OPPOSITE_FINAL_STAGE[stage];
@@ -156,6 +158,7 @@ export async function assertNotInOppositeFinalStageInTx(
   const clash = await tx.v1TournamentMatchDetails.findFirst({
     where: {
       tournamentId: input.tournamentId,
+      ...(own?.group?.poolKey ? { group: { poolKey: own.group.poolKey } } : {}),
       teamMatch: { deletedAt: null },
       AND: [
         { OR: [{ group: { phase: rule.opposite } }, { groupId: null, round: { in: [...FINAL_STAGE_ROUND_NAMES[rule.opposite]] } }] },
@@ -167,7 +170,7 @@ export async function assertNotInOppositeFinalStageInTx(
   const enrolled = clash
     ? null
     : await tx.v1TournamentGroupTeam.findFirst({
-      where: { registrationId: { in: incoming }, group: { tournamentId: input.tournamentId, phase: rule.opposite } },
+      where: { registrationId: { in: incoming }, group: { tournamentId: input.tournamentId, phase: rule.opposite, ...(own?.group?.poolKey ? { poolKey: own.group.poolKey } : {}) } },
       select: { groupId: true, registrationId: true },
     });
   if (!clash && !enrolled) return;

@@ -45,6 +45,8 @@ export async function recalculateAndUpsertOverallStandings(
   },
   recalculatedAt: Date,
 ): Promise<CalculatedStanding[]> {
+  // Independent stages have independent standings; their points cannot define an overall rank.
+  if (params.groups.some(group => group.stageKey)) return [];
   const { registrationIds, fixtures } = overallStandingsInput(params.groups);
 
   // F4: 더 이상 어느 조에도 속하지 않는 registration(조 배정 해제·조 삭제)의 기존

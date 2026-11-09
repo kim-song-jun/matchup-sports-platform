@@ -1,4 +1,6 @@
 'use client';
+import { StagePlanEditor } from '@/components/admin/stages/stage-plan-editor';
+import { initialStagePlan } from '@/lib/stage-plan';
 import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
 
 import Link from 'next/link';
@@ -76,12 +78,13 @@ const textareaClass =
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const requestedStaged = pathname === '/admin/tournaments/new-staged';
   const searchParams = useSearchParams();
   const draftIdParam = searchParams.get('draftId');
   const { toasts, showToast } = useAdminToast();
   const [state, dispatch] = useReducer(
     tournamentCreateReducer,
-    INITIAL_TOURNAMENT_CREATE_STATE,
+    { ...INITIAL_TOURNAMENT_CREATE_STATE, ...(requestedStaged ? { stagePlan: initialStagePlan(), format: 'league_knockouts' as const, teamCount: '4' } : {}) },
   );
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
@@ -447,7 +450,7 @@ export default function AdminTournamentsNewPage() {
 
       <AdminPageHeader
         eyebrow="플랫폼 · 대회"
-        title="새 대회 만들기"
+        title={state.stagePlan ? "단계형 대회 만들기" : "새 대회 만들기"}
         description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />
 
@@ -489,8 +492,10 @@ export default function AdminTournamentsNewPage() {
                 dispatch={dispatch}
                 setField={setField}
                 onRegularLeagueNavigation={handleRegularLeagueNavigation}
+                staged={Boolean(state.stagePlan)}
               />
             ) : null}
+            {state.step === 0 && state.stagePlan && <div className="mt-6"><StagePlanEditor value={state.stagePlan} onChange={plan => dispatch({ type: 'set-stage-plan', plan })} disabled={pending || Boolean(draftQuery.data?.operationCounts?.fixtures)} /></div>}
             {state.step === 1 ? (
               <ScheduleStep
                 state={state}
@@ -645,7 +650,9 @@ function BasicStep({
   dispatch,
   setField,
   onRegularLeagueNavigation,
+  staged = false,
 }: {
+  staged?: boolean;
   state: TournamentCreateState;
   sports: SportOption[];
   sportsPending: boolean;
@@ -687,7 +694,7 @@ function BasicStep({
         </Field>
       </div>
 
-      <fieldset className="min-w-0">
+      {!staged && <fieldset className="min-w-0">
         <legend className="text-sm font-semibold text-[var(--text-body)]">대회 진행 방식</legend>
         <p className="mt-1 text-xs text-[var(--text-caption)]">대회 안에서 사용할 경기 형식을 골라요. 정규 리그는 별도 화면에서 만들어요.</p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -707,7 +714,7 @@ function BasicStep({
             graphic="league" title="정규 리그 만들기" description="대회와 별도인 시즌 리그를 만들어요. 팀·기간·장소를 설정하는 화면으로 이동해요."
             meta="별도 관리 화면" linkLabel="정규 리그 생성 화면으로 이동" />
         </div>
-      </fieldset>
+      </fieldset>}
 
       <GenderCategoryField
         value={state.genderCategory}
@@ -930,7 +937,7 @@ function ParticipationStep({
           onChange={(value) => setField('teamCount', value)}
           min={2}
           max={state.format === 'league_knockouts' ? undefined : 64}
-          disabled={pending}
+          disabled={pending || Boolean(state.stagePlan)}
           error={errors.teamCount}
           required
         />

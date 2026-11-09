@@ -24,7 +24,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
-import { teamMembershipCountFake, type FakeTeamMember } from '../../test/helpers/team-membership-gender-fake';
+import { teamMembershipCountFake, teamProfileGenderRuleFake, type FakeTeamMember } from '../../test/helpers/team-membership-gender-fake';
 
 jest.mock('../tournaments/slots/tournament-slot.service', () => ({
   releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
@@ -1176,6 +1176,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TeamMembership: { count: teamMembershipCountFake(division.members) },
+      v1TeamProfile: { findUnique: teamProfileGenderRuleFake() },
       // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
       // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
       // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
@@ -1297,10 +1298,11 @@ describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () =
   const NEW_TEAM_ID = 'team-new';
   const maleOnly: FakeTeamMember[] = Array.from({ length: 5 }, () => ({ teamId: NEW_TEAM_ID, status: 'active', gender: 'male' }));
 
-  function makePrisma(genderCategory: string | null, members: FakeTeamMember[]) {
+  function makePrisma(genderCategory: string | null, members: FakeTeamMember[], teamGenderRule: string | null = null) {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TeamMembership: { count: teamMembershipCountFake(members) },
+      v1TeamProfile: { findUnique: teamProfileGenderRuleFake({ [NEW_TEAM_ID]: teamGenderRule }) },
       v1Tournament: {
         findFirst: jest.fn(async () => ({
           id: LEAGUE_ID, title: '테스트 리그', sportId: 'sport-futsal', regionId: 'region-1',
@@ -1339,7 +1341,7 @@ describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () =
     const prisma = makePrisma('female', maleOnly);
     await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).rejects.toMatchObject({
       status: 422,
-      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그는 팀 성별이 여성이거나 프로필 성별이 여성인 팀원이 있는 팀만 참가할 수 있어요.' },
     });
     expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
   });
@@ -1348,6 +1350,20 @@ describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () =
     const prisma = makePrisma('female', [...maleOnly, { teamId: NEW_TEAM_ID, status: 'active', gender: 'female' }]);
     await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
     expect(prisma.v1TournamentRegistration.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('팀 성별이 여성으로 설정된 팀은 팀원 프로필에 성별이 없어도 여성부 리그에 추가된다', async () => {
+    const prisma = makePrisma('female', [{ teamId: NEW_TEAM_ID, status: 'active', gender: null }], '여');
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).resolves.toMatchObject({ teamId: NEW_TEAM_ID });
+    expect(prisma.v1TournamentRegistration.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('팀 성별이 남성으로 설정된 팀은 여성부 리그에 추가되지 않는다', async () => {
+    const prisma = makePrisma('female', [], '남');
+    await expect(makeService(prisma).addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never)).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'TEAM_GENDER_INELIGIBLE' },
+    });
   });
 
   it.each([['mixed'], [null]])('부문이 %s 이면 남자 팀도 추가된다', async (genderCategory) => {
@@ -1361,7 +1377,7 @@ describe('LeagueMatchAdminService.addTeam — 성별 부문의 팀 자격', () =
       makeService(prisma).addPreviousSeasonTeams(adminUser, LEAGUE_ID, { teamIds: [NEW_TEAM_ID] } as never),
     ).rejects.toMatchObject({
       status: 422,
-      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '새 팀: 여성부 리그에는 여성 팀원이 있는 팀만 참가할 수 있어요.' },
+      response: { code: 'TEAM_GENDER_INELIGIBLE', message: '새 팀: 여성부 리그는 팀 성별이 여성이거나 프로필 성별이 여성인 팀원이 있는 팀만 참가할 수 있어요.' },
     });
     expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
   });

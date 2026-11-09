@@ -48,7 +48,7 @@ export function TournamentOverviewSection() {
   const counts = tournament.operationCounts;
 
   return (
-    <div className="tm-content-enter flex flex-col gap-6">
+    <div className="tm-content-enter flex flex-col gap-6 break-keep">
       {/* 상태 밴드 — 상태 pill 과 "지금 무엇을 기다리는가" 한 줄 */}
       <section
         aria-label="대회 진행 상태"
@@ -117,7 +117,8 @@ export function TournamentOverviewSection() {
 function OverviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2 sm:flex-col sm:gap-0.5">
-      <dt className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{label}</dt>
+      {/* 모바일은 라벨과 긴 날짜가 한 줄을 나눠 쓴다. 라벨이 줄어들면 단어 중간에서 접힌다. */}
+      <dt className="shrink-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{label}</dt>
       <dd className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">{value}</dd>
     </div>
   );

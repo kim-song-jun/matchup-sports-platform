@@ -1024,3 +1024,6 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
   stage-plan-manager.test.tsx의 scoped handlers에서 확정·오류를 검증하며, 실제 규칙/저장은 DB 테스트로 증명한다.
 
 단계형 기능은 Alpha tournament runtime epoch 3을 사용한다. manifest 생성·실제 rollback·실패 후보 복구가 epoch 2 이하 이미지를 호환 대상으로 인정하지 않는다. 기존 대회 데이터는 유지하지만 신규 단계형 데이터를 구버전 API로 운영하는 것을 막는다.
+
+### 시작 후 결과 정정 확인
+`PUT .../stages/assignment`에 `acknowledgeStartedCorrection: true`를 명시하면 시작된 stale 편성의 참가팀을 유지한 채 정정 영향을 확인한다. 기존 자리 순서와 registrationIds가 완전히 같고, 앞 단계 공식 결과가 준비되어 있으며, reason이 있어야 한다. 참가팀·경기·결과는 수정하지 않고 sourceVersion/감사 기록/구성 revision만 갱신한다. reason 누락, 팀 교체, 미시작/비stale 편성, 앞 단계 미확정은422다. 일반 배정은 시작 후 계속409다. 조회 스태프는 사용할 수 없다. 화면의 '현재 참가팀 유지 · 정정 확인'이 이 동작을 수행하며 후속 경기 시작·대회 종료의 영구 차단을 해소한다.

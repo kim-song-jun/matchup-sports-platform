@@ -82,6 +82,14 @@ describe('단계별 리그·토너먼트 actual DB contract', () => {
     expect(view.pools.find(p => p.key === 'main0')!.registrationIds.every(Boolean)).toBe(true);
     await prisma.v1Game.update({ where: { teamMatchId: targetId }, data: { state: 'LIVE' } });
     await expect(assign('main0', view.pools.find(p => p.key === 'main0')!.candidates.map(c => c[0]))).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
+    const frozenPool = view.pools.find(p => p.key === 'main0')!;
+    const ack = { expectedRevision: view.revision, poolKey: frozenPool.key, sourceVersion: frozenPool.sourceVersion, registrationIds: frozenPool.registrationIds as string[], acknowledgeStartedCorrection: true };
+    await expect(stages.assign(user, id, ack)).rejects.toMatchObject({ response: { code: 'STAGE_PLAN_INVALID' } });
+    await expect(stages.assign(user, id, { ...ack, registrationIds: [...ack.registrationIds].reverse(), reason: '팀 변경 시도' })).rejects.toMatchObject({ response: { code: 'STAGE_PLAN_INVALID' } });
+    view = await stages.assign(user, id, { ...ack, reason: '이미 시작한 본선 참가팀을 유지하고 예선 정정 영향을 확인' });
+    expect(view.pools.find(p => p.key === 'main0')!.stale).toBe(false);
+    expect(view.pools.find(p => p.key === 'main0')!.registrationIds).toEqual(frozenPool.registrationIds);
+    await prisma.$transaction(tx => assertStageFixtureReady(tx, targetId));
     await assign('main1', view.pools.find(p => p.key === 'main1')!.candidates.map(c => c[0]));
     expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.tournamentId } })).toEqual(beforeOther);
     const support = await seedSupportAdmin(prisma, 'stage-readonly');

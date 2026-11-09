@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested, IsUUID } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested, IsUUID } from 'class-validator';
 export class StageSourceDto {
   @IsString() @MaxLength(40) poolKey!: string;
   @IsInt() @Min(1) @Max(64) rank!: number;
@@ -25,6 +25,7 @@ export class StageVersionDto {
   @IsInt() @Min(0) expectedRevision!: number;
 }
 export class StageAssignDto extends StageVersionDto {
+  @IsOptional() @IsBoolean() acknowledgeStartedCorrection?: boolean;
   @IsString() @MaxLength(40) poolKey!: string;
   @IsArray() @ArrayMinSize(2) @ArrayMaxSize(64) @IsUUID(undefined, { each: true }) registrationIds!: string[];
   @IsString() @MaxLength(64) sourceVersion!: string;

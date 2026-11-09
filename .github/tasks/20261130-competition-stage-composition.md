@@ -214,6 +214,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 최종 API/Web typecheck 및 Web patterns/API surface PASS. 단계형 일정 순서 회귀3건 포함13건 PASS. PR #2285 생성 및 최신 head Copilot 리뷰 요청 완료.
 - DB 배포 gate의 scoped unique 예외는 기존 unique와 legacy default로 기존 데이터 보존을 증명한다. runtime epoch 3으로 이전 epoch 2 rollback/실패 복구를 차단하며 실제 git/manifest 9건·manifest 자체 테스트 PASS.
 - CI에서 발견한 신규 schema hash 고정값 누락 수정: current/historical binding 9건 PASS, Docker/manifest/prepare 입력에 정확한 신규 hash 추가(과거 hash 보존).
+- 시작 후 source 정정의 dead-end를 보완했다: 기존 참가팀·자리 고정 + 사유 필수 acknowledgeStartedCorrection 확인, 감사 기록, CAS 유지. 실제 DB5건과 manager UI4건 PASS. 이전 head Web CI PASS; API CI 201/202 suites PASS 후 source snapshot hash1건 수정·재검증 PASS.
 - 진행 중: PR CI·Copilot 리뷰, Alpha 실제 로그인/3폭 시각 QA. Alpha 미검증을 완료로 간주하지 않는다.
 - 정책: 승점 이월 없음; 이전 단계 공식 결과와 동률 후보에 한해 배정 가능(동률 사유 필수); 기존 대회 전환 없음; KO는 1·2위만 진출 원천, 단판, 별도 3위전 없음. 일반 구성 상한 8단계/단계당16편성/편성64팀/전체240경기.
 

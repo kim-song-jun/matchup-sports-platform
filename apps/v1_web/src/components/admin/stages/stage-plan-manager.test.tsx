@@ -36,6 +36,21 @@ describe('단계별 참가팀 확정', () => {
     expect(await screen.findByRole('combobox', { name: '1번 자리' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '이 편성 참가팀 확정' })).toBeDisabled();
   });
+  it('시작 후 정정은 팀 선택을 잠근 채 사유와 유지 확인만 전송한다', async () => {
+    let view = data(); let payload: unknown;
+    const pool = view.pools[0];
+    Object.assign(pool, { stageIndex: 1, started: true, stale: true, assigned: true, registrationIds: ['r1', 'r2'], candidates: [['r2'], ['r1']] });
+    server.use(http.get(base, () => success(view)), http.put(`${base}/assignment`, async ({ request }) => {
+      payload = await request.json(); view = { ...view, revision: 2, pools: [{ ...pool, stale: false }] }; return success(view);
+    })); show();
+    const button = await screen.findByRole('button', { name: '현재 참가팀 유지 · 정정 확인' });
+    expect(button).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: '1번 자리' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('참가팀 유지 사유'), { target: { value: '본선 시작 이후 정정으로 현재 참가팀 유지' } });
+    fireEvent.click(button);
+    await waitFor(() => expect(payload).toMatchObject({ acknowledgeStartedCorrection: true, registrationIds: ['r1', 'r2'], reason: '본선 시작 이후 정정으로 현재 참가팀 유지', expectedRevision: 1, sourceVersion: 'source-v1' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: '현재 참가팀 유지 · 정정 확인' })).not.toBeInTheDocument());
+  });
   it('확정 실패의 실제 원인을 노출한다', async () => {
     server.use(http.get(base, () => success(data())), http.put(`${base}/assignment`, () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'STAGE_PLAN_STALE', message: '공식 결과가 바뀌었어요.' }, { status: 409 }))); show();
     fireEvent.change(await screen.findByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });

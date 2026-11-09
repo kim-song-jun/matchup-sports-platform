@@ -11,6 +11,6 @@ export function useStagePlan(id: string) {
   };
   const view = useQuery({ queryKey: ['stages', id], queryFn: () => v1Get<StagePlanView>(path), refetchOnWindowFocus: false, refetchOnReconnect: false });
   const generate = useMutation({ mutationFn: (input: { expectedRevision: number }) => v1Post<StagePlanView>(`${path}/generate`, input), onSuccess: refresh });
-  const assign = useMutation({ mutationFn: (input: { expectedRevision: number; poolKey: string; registrationIds: string[]; sourceVersion: string; reason?: string }) => v1Put<StagePlanView>(`${path}/assignment`, input), onSuccess: refresh });
+  const assign = useMutation({ mutationFn: (input: { expectedRevision: number; poolKey: string; registrationIds: string[]; sourceVersion: string; reason?: string; acknowledgeStartedCorrection?: boolean }) => v1Put<StagePlanView>(`${path}/assignment`, input), onSuccess: refresh });
   return { view, generate, assign };
 }

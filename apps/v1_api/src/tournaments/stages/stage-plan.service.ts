@@ -57,21 +57,23 @@ export class StagePlanService {
       const view = await loadStageView(tx, id, config);
       const pool = view.pools.find(p => p.key === dto.poolKey);
       if (!pool || !pool.generated || pool.slots.length !== pool.capacity) return stageInvalid('대진을 먼저 생성하고 배정할 편성을 선택해 주세요.');
-      if (pool.started) throw new ConflictException({ code: 'BRACKET_LOCKED', message: '시작했거나 기록이 있는 편성은 참가팀을 바꿀 수 없어요.' });
+      const acknowledge = dto.acknowledgeStartedCorrection === true;
+      if (acknowledge && (!pool.started || !pool.stale || !pool.assigned || pool.stageIndex === 0 || pool.candidates.some(c => !c.length) || !dto.reason?.trim() || dto.registrationIds.some((r, i) => r !== pool.registrationIds[i]) || dto.registrationIds.length !== pool.capacity)) return stageInvalid('이미 시작한 편성의 참가팀을 그대로 유지할 때만 정정 영향과 사유를 확인할 수 있어요. 이전 단계 결과부터 확정해 주세요.');
+      if (pool.started && !acknowledge) throw new ConflictException({ code: 'BRACKET_LOCKED', message: '시작했거나 기록이 있는 편성은 참가팀을 바꿀 수 없어요.' });
       if (pool.sourceVersion !== dto.sourceVersion) throw stale();
       if (dto.registrationIds.length !== pool.capacity || new Set(dto.registrationIds).size !== pool.capacity) return stageInvalid('모든 자리에 서로 다른 팀을 배정해 주세요.');
       const confirmed = new Set(view.registrations.map(r => r.id));
       if (dto.registrationIds.some(r => !confirmed.has(r))) return stageInvalid('이 대회의 확정 참가팀만 배정할 수 있어요.');
-      if (pool.stageIndex > 0 && dto.registrationIds.some((r, i) => !pool.candidates[i]?.includes(r))) return stageInvalid('이전 단계의 공식 순위와 동률 후보에 맞는 팀을 선택해 주세요.');
+      if (!acknowledge && pool.stageIndex > 0 && dto.registrationIds.some((r, i) => !pool.candidates[i]?.includes(r))) return stageInvalid('이전 단계의 공식 순위와 동률 후보에 맞는 팀을 선택해 주세요.');
       if (pool.stageIndex > 0 && pool.candidates.some(c => c.length > 1) && !dto.reason?.trim()) return stageInvalid('동률 순위의 결정 사유를 입력해 주세요.');
       const duplicate = view.pools.some(p => p.stageKey === pool.stageKey && p.key !== pool.key && p.registrationIds.some(r => r !== null && dto.registrationIds.includes(r)));
       if (duplicate) return stageInvalid('같은 단계의 다른 편성에 이미 배정된 팀이 있어요.');
-      await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, pool.slots.map((slot, i) => ({ slotId: slot.id, registrationId: dto.registrationIds[i] })));
+      if (!acknowledge) await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, pool.slots.map((slot, i) => ({ slotId: slot.id, registrationId: dto.registrationIds[i] })));
       const previous = config.assignments?.[pool.key];
       config.assignments = { ...config.assignments, [pool.key]: { sourceVersion: pool.sourceVersion, registrationIds: dto.registrationIds, reason: dto.reason?.trim() ?? '', at: new Date().toISOString() } };
       await tx.v1Tournament.update({ where: { id }, data: { stagePlan: JSON.parse(JSON.stringify(config)), stagePlanRevision: { increment: 1 } } });
       await recalculateStandingsInTx(tx, id);
-      await this.admins.logAdminAction(admin, { action: 'tournament.stages.assign', targetType: 'tournament', targetId: id, beforeJson: previous ? JSON.parse(JSON.stringify(previous)) : undefined, afterJson: { poolKey: pool.key, ...config.assignments[pool.key] } }, tx);
+      await this.admins.logAdminAction(admin, { action: acknowledge ? 'tournament.stages.acknowledge_started_correction' : 'tournament.stages.assign', targetType: 'tournament', targetId: id, beforeJson: previous ? JSON.parse(JSON.stringify(previous)) : undefined, afterJson: { poolKey: pool.key, ...config.assignments[pool.key] } }, tx);
       return { revision: t.stagePlanRevision + 1, ...await loadStageView(tx, id, config) };
     }, options);
   }

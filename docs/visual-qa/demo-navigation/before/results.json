@@ -1,0 +1,44 @@
+[
+  {
+    "name": "console",
+    "width": 390,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "guide",
+    "width": 390,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "console",
+    "width": 768,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "guide",
+    "width": 768,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "console",
+    "width": 1440,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "guide",
+    "width": 1440,
+    "returnLinks": 0,
+    "overflow": false,
+    "errors": []
+  }
+]

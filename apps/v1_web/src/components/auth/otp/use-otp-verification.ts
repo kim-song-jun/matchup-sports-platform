@@ -60,9 +60,8 @@ export function useOtpVerification({
   const [resendRemainingMs, setResendRemainingMs] = useState(0);
   const [verified, setVerified] = useState(false);
 
-  // 대상이 바뀌면(사용자가 번호·주소를 계속 수정 가능) 이전 대상의 발급/입력 상태를 버린다 —
-  // 같은 인스턴스가 유지될 때 이전 대상으로 발급한 코드로 대조하는 것을 막는다.
-  useEffect(() => {
+  /** 발급·입력·완료 상태를 처음으로 돌린다. 같은 대상을 다시 인증받을 때 부모가 직접 부른다. */
+  const reset = useCallback(() => {
     setPhase('idle');
     setCode('');
     setError(null);
@@ -73,7 +72,13 @@ export function useOtpVerification({
     setRemainingMs(0);
     setResendRemainingMs(0);
     setVerified(false);
-  }, [resetKey]);
+  }, []);
+
+  // 대상이 바뀌면(사용자가 번호·주소를 계속 수정 가능) 이전 대상의 발급/입력 상태를 버린다 —
+  // 같은 인스턴스가 유지될 때 이전 대상으로 발급한 코드로 대조하는 것을 막는다.
+  useEffect(() => {
+    reset();
+  }, [resetKey, reset]);
 
   const showFailure = useCallback((err: unknown, fallback: string) => {
     const code = extractErrorCode(err);
@@ -151,5 +156,6 @@ export function useOtpVerification({
     requestCode,
     submitCode,
     clearError,
+    reset,
   };
 }

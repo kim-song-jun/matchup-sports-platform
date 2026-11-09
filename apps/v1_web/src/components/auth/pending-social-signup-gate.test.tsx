@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
@@ -197,5 +198,53 @@ describe('PendingSocialSignupGate session preservation on transient errors', () 
 
     await waitFor(() => expect(mocks.clearStoredV1Session).toHaveBeenCalled());
     expect(mocks.disconnectV1Socket).toHaveBeenCalled();
+  });
+});
+
+describe('PendingSocialSignupGate child identity', () => {
+  const COMPLETED_ACCOUNT = {
+    user: { onboardingStatus: 'completed', authProviders: ['kakao'] },
+    termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
+  };
+  const authError = (statusCode: number, code: string) => ({
+    isSuccess: false,
+    isError: true,
+    isFetching: false,
+    data: COMPLETED_ACCOUNT,
+    error: new V1ApiError({ status: 'error', statusCode, code, message: 'error', timestamp: new Date().toISOString() }),
+  });
+  const authSuccess = { isSuccess: true, isError: false, isFetching: false, data: COMPLETED_ACCOUNT };
+
+  // providers.tsx 가 넘기는 children 은 형제 여러 개다 — 상태를 가진 자식(작성 중인 폼)을 대신하는 입력칸과 형제 하나.
+  function Draft({ onMount }: { onMount: () => void }) {
+    const [text, setText] = useState('');
+    useEffect(() => { onMount(); }, [onMount]);
+    return <input aria-label="초안" value={text} onChange={(event) => setText(event.target.value)} />;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.pathname = '/my';
+  });
+
+  it.each([
+    ['일시 오류(503)', 503, 'SERVICE_UNAVAILABLE'],
+    ['로그인 풀림(401)', 401, 'UNAUTHORIZED'],
+  ])('/auth/me 조회가 %s 로 실패하고 복구돼도 작성 중이던 자식은 다시 마운트되지 않는다', async (_label, statusCode, code) => {
+    const mounted = vi.fn();
+    const ui = () => <PendingSocialSignupGate><Draft onMount={mounted} /><div>형제</div></PendingSocialSignupGate>;
+    mocks.useV1AuthMe.mockReturnValue(authSuccess);
+    const view = render(ui());
+    fireEvent.change(await screen.findByLabelText('초안'), { target: { value: '작성 중인 초안' } });
+
+    mocks.useV1AuthMe.mockReturnValue(authError(statusCode, code));
+    view.rerender(ui());
+    await waitFor(() => expect(screen.getByLabelText('초안')).toHaveValue('작성 중인 초안'));
+    expect(screen.getByText('형제')).toBeInTheDocument();
+
+    mocks.useV1AuthMe.mockReturnValue(authSuccess);
+    view.rerender(ui());
+    expect(screen.getByLabelText('초안')).toHaveValue('작성 중인 초안');
+    expect(mounted).toHaveBeenCalledTimes(1);
   });
 });

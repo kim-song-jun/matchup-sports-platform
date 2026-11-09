@@ -7,13 +7,14 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { issueEmailChangeToken } from '../src/profile/email-change-token';
 import { ManagedTermsRuntimeService } from '../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from './integration/integration-app';
+import { tamperSignature } from './helpers/tamper-signature';
 
 const PREFIX = 'integration-email-change';
-const PASSWORD_USER = `${PREFIX}-password`;
+const EMAIL_LOGIN_USER = `${PREFIX}-mailer`;
 const SOCIAL_USER = `${PREFIX}-social`;
 const HOLDER = `${PREFIX}-holder`;
-const USER_IDS = [PASSWORD_USER, SOCIAL_USER, HOLDER];
-const PASSWORD_PHONE = '01000000291';
+const USER_IDS = [EMAIL_LOGIN_USER, SOCIAL_USER, HOLDER];
+const EMAIL_LOGIN_PHONE = '01000000291';
 const SOCIAL_PHONE = '01000000292';
 const HOLDER_PHONE = '01000000293';
 const OLD_EMAIL = `${PREFIX}-old@integration.test`;
@@ -86,10 +87,10 @@ describe('V1 changing the account email needs a code mailed to the new address i
   beforeEach(async () => {
     await cleanupFixtures();
     // A finished email signup: its email is its login ID, and nobody has proven the mailbox yet.
-    await seedMember(PASSWORD_USER, PASSWORD_PHONE, OLD_EMAIL);
+    await seedMember(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, OLD_EMAIL);
     await prisma.v1AuthIdentity.create({
       data: {
-        id: `${PASSWORD_USER}-email`, userId: PASSWORD_USER, provider: 'email', providerUserKey: OLD_EMAIL, email: OLD_EMAIL,
+        id: `${EMAIL_LOGIN_USER}-email`, userId: EMAIL_LOGIN_USER, provider: 'email', providerUserKey: OLD_EMAIL, email: OLD_EMAIL,
         passwordHash: await hashPassword(PASSWORD), status: 'active',
       },
     });
@@ -147,37 +148,37 @@ describe('V1 changing the account email needs a code mailed to the new address i
   const userRow = (id: string) => prisma.v1User.findUniqueOrThrow({ where: { id } });
 
   it('refuses to change the email without a token, and saves nothing else either', async () => {
-    const response = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, realName: '바꾸려던 이름' });
+    const response = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, realName: '바꾸려던 이름' });
 
     expect([response.status, response.body.code]).toEqual([400, 'EMAIL_CHANGE_PROOF_REQUIRED']);
-    expect(await userRow(PASSWORD_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: null });
-    expect(await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: PASSWORD_USER } })).toMatchObject({ realName: '이메일 변경' });
-    expect(await prisma.v1AuthIdentity.count({ where: { userId: PASSWORD_USER, provider: 'email', providerUserKey: OLD_EMAIL } })).toBe(1);
+    expect(await userRow(EMAIL_LOGIN_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: null });
+    expect(await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: EMAIL_LOGIN_USER } })).toMatchObject({ realName: '이메일 변경' });
+    expect(await prisma.v1AuthIdentity.count({ where: { userId: EMAIL_LOGIN_USER, provider: 'email', providerUserKey: OLD_EMAIL } })).toBe(1);
   });
 
   it('request -> verify -> save moves the email and the email login, marks it verified and tells the owner', async () => {
-    const { devCode, body } = await requestCode(PASSWORD_USER, NEW_EMAIL);
+    const { devCode, body } = await requestCode(EMAIL_LOGIN_USER, NEW_EMAIL);
     expect(body).toMatchObject({ sent: true, maskedTarget: 'in***@integration.test', expiresInSeconds: 300, resendAvailableInSeconds: 30 });
-    const tooSoon = await post('/me/email-change/request', PASSWORD_USER, { email: NEW_EMAIL });
+    const tooSoon = await post('/me/email-change/request', EMAIL_LOGIN_USER, { email: NEW_EMAIL });
     expect([tooSoon.status, tooSoon.body.code]).toEqual([400, 'VERIFICATION_RESEND_COOLDOWN']);
-    const verified = await post('/me/email-change/verify', PASSWORD_USER, { code: devCode }).expect(200);
+    const verified = await post('/me/email-change/verify', EMAIL_LOGIN_USER, { code: devCode }).expect(200);
     expect(verified.body.data.expiresInSeconds).toBe(600);
     // The code is spent.
-    const replay = await post('/me/email-change/verify', PASSWORD_USER, { code: devCode });
+    const replay = await post('/me/email-change/verify', EMAIL_LOGIN_USER, { code: devCode });
     expect([replay.status, replay.body.code]).toEqual([400, 'VERIFICATION_NO_PENDING']);
 
-    const saved = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, emailChangeToken: verified.body.data.emailChangeToken }).expect(200);
+    const saved = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, emailChangeToken: verified.body.data.emailChangeToken }).expect(200);
 
-    expect(saved.body.data.profile.nickname).toBe(`변경${PASSWORD_USER.slice(-6)}`);
-    expect(saved.body.data).toMatchObject({ email: NEW_EMAIL, phone: PASSWORD_PHONE });
-    expect(await userRow(PASSWORD_USER)).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date), phone: PASSWORD_PHONE });
-    expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${PASSWORD_USER}-email` } })).toMatchObject({
+    expect(saved.body.data.profile.nickname).toBe(`변경${EMAIL_LOGIN_USER.slice(-6)}`);
+    expect(saved.body.data).toMatchObject({ email: NEW_EMAIL, phone: EMAIL_LOGIN_PHONE });
+    expect(await userRow(EMAIL_LOGIN_USER)).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date), phone: EMAIL_LOGIN_PHONE });
+    expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${EMAIL_LOGIN_USER}-email` } })).toMatchObject({
       providerUserKey: NEW_EMAIL, email: NEW_EMAIL, status: 'active',
     });
-    expect(await prisma.v1StatusChangeLog.findFirst({ where: { actorUserId: PASSWORD_USER, reason: 'email_changed' } })).toMatchObject({
-      targetType: 'user', targetId: PASSWORD_USER,
+    expect(await prisma.v1StatusChangeLog.findFirst({ where: { actorUserId: EMAIL_LOGIN_USER, reason: 'email_changed' } })).toMatchObject({
+      targetType: 'user', targetId: EMAIL_LOGIN_USER,
     });
-    expect(await prisma.v1Notification.findFirst({ where: { recipientUserId: PASSWORD_USER, title: '계정 이메일이 바뀌었어요' } })).toMatchObject({
+    expect(await prisma.v1Notification.findFirst({ where: { recipientUserId: EMAIL_LOGIN_USER, title: '계정 이메일이 바뀌었어요' } })).toMatchObject({
       targetType: 'system',
       deepLink: '/my/settings',
       body: '이메일이 in***@integration.test(으)로 바뀌었어요. 본인이 아니라면 고객센터로 문의해 주세요.',
@@ -189,31 +190,31 @@ describe('V1 changing the account email needs a code mailed to the new address i
   });
 
   it('a token is good for one address only, and a second save with the same address needs none', async () => {
-    const token = await verifiedToken(PASSWORD_USER, NEW_EMAIL);
+    const token = await verifiedToken(EMAIL_LOGIN_USER, NEW_EMAIL);
 
-    const other = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: OTHER_NEW_EMAIL, emailChangeToken: token });
+    const other = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: OTHER_NEW_EMAIL, emailChangeToken: token });
     expect([other.status, other.body.code]).toEqual([400, 'EMAIL_CHANGE_PROOF_REQUIRED']);
-    expect((await userRow(PASSWORD_USER)).email).toBe(OLD_EMAIL);
+    expect((await userRow(EMAIL_LOGIN_USER)).email).toBe(OLD_EMAIL);
 
-    await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, emailChangeToken: token }).expect(200);
-    await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, realName: '이름만 바꿈' }).expect(200);
-    expect(await userRow(PASSWORD_USER)).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date) });
+    await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, emailChangeToken: token }).expect(200);
+    await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, realName: '이름만 바꿈' }).expect(200);
+    expect(await userRow(EMAIL_LOGIN_USER)).toMatchObject({ email: NEW_EMAIL, emailVerifiedAt: expect.any(Date) });
   });
 
   it('saving without touching the email needs no token, and leaves what was verified alone', async () => {
     const verifiedAt = new Date('2026-08-01T00:00:00.000Z');
-    await prisma.v1User.update({ where: { id: PASSWORD_USER }, data: { emailVerifiedAt: verifiedAt } });
+    await prisma.v1User.update({ where: { id: EMAIL_LOGIN_USER }, data: { emailVerifiedAt: verifiedAt } });
 
-    await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: OLD_EMAIL.toUpperCase(), realName: '이름만 바꿈' }).expect(200);
-    await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { realName: '이메일 없이' }).expect(200);
+    await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: OLD_EMAIL.toUpperCase(), realName: '이름만 바꿈' }).expect(200);
+    await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { realName: '이메일 없이' }).expect(200);
 
-    expect(await userRow(PASSWORD_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: verifiedAt });
-    expect(await prisma.v1StatusChangeLog.count({ where: { actorUserId: PASSWORD_USER, reason: 'email_changed' } })).toBe(0);
-    expect(await prisma.v1Notification.count({ where: { recipientUserId: PASSWORD_USER } })).toBe(0);
+    expect(await userRow(EMAIL_LOGIN_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: verifiedAt });
+    expect(await prisma.v1StatusChangeLog.count({ where: { actorUserId: EMAIL_LOGIN_USER, reason: 'email_changed' } })).toBe(0);
+    expect(await prisma.v1Notification.count({ where: { recipientUserId: EMAIL_LOGIN_USER } })).toBe(0);
   });
 
   it('a token minted for one account does not work for another', async () => {
-    const token = await verifiedToken(PASSWORD_USER, NEW_EMAIL);
+    const token = await verifiedToken(EMAIL_LOGIN_USER, NEW_EMAIL);
 
     const stolen = await saveProfile(SOCIAL_USER, SOCIAL_PHONE, { email: NEW_EMAIL, emailChangeToken: token });
 
@@ -244,37 +245,37 @@ describe('V1 changing the account email needs a code mailed to the new address i
       ['as its email', HOLDER_EMAIL],
       ['as its email login key', HOLDER_LOGIN_EMAIL],
     ])('is refused at request, %s, without a mail', async (_name, email) => {
-      const response = await post('/me/email-change/request', PASSWORD_USER, { email });
+      const response = await post('/me/email-change/request', EMAIL_LOGIN_USER, { email });
 
       expect([response.status, response.body.code]).toEqual([409, 'EMAIL_CONFLICT']);
-      expect(await prisma.v1VerificationToken.count({ where: { userId: PASSWORD_USER } })).toBe(0);
+      expect(await prisma.v1VerificationToken.count({ where: { userId: EMAIL_LOGIN_USER } })).toBe(0);
     });
 
     it('is refused at save when it was taken after the code was checked, and nothing is half-written', async () => {
-      const token = await verifiedToken(PASSWORD_USER, NEW_EMAIL);
+      const token = await verifiedToken(EMAIL_LOGIN_USER, NEW_EMAIL);
       await prisma.v1User.update({ where: { id: HOLDER }, data: { email: NEW_EMAIL } });
 
-      const response = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, emailChangeToken: token, realName: '충돌 이름' });
+      const response = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, emailChangeToken: token, realName: '충돌 이름' });
 
       expect([response.status, response.body.code]).toEqual([409, 'EMAIL_CONFLICT']);
-      expect(await userRow(PASSWORD_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: null });
-      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${PASSWORD_USER}-email` } })).toMatchObject({ providerUserKey: OLD_EMAIL });
-      expect(await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: PASSWORD_USER } })).toMatchObject({ realName: '이메일 변경' });
-      expect(await prisma.v1StatusChangeLog.count({ where: { actorUserId: PASSWORD_USER, reason: 'email_changed' } })).toBe(0);
+      expect(await userRow(EMAIL_LOGIN_USER)).toMatchObject({ email: OLD_EMAIL, emailVerifiedAt: null });
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${EMAIL_LOGIN_USER}-email` } })).toMatchObject({ providerUserKey: OLD_EMAIL });
+      expect(await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: EMAIL_LOGIN_USER } })).toMatchObject({ realName: '이메일 변경' });
+      expect(await prisma.v1StatusChangeLog.count({ where: { actorUserId: EMAIL_LOGIN_USER, reason: 'email_changed' } })).toBe(0);
     });
 
     it('does not say who holds it to a caller who has no token', async () => {
-      const response = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: HOLDER_EMAIL });
+      const response = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: HOLDER_EMAIL });
 
       expect([response.status, response.body.code]).toEqual([400, 'EMAIL_CHANGE_PROOF_REQUIRED']);
     });
   });
 
   it('the address the account already has is not mailed a code', async () => {
-    const response = await post('/me/email-change/request', PASSWORD_USER, { email: OLD_EMAIL });
+    const response = await post('/me/email-change/request', EMAIL_LOGIN_USER, { email: OLD_EMAIL });
 
     expect([response.status, response.body.code]).toEqual([400, 'EMAIL_UNCHANGED']);
-    expect(await prisma.v1VerificationToken.count({ where: { userId: PASSWORD_USER } })).toBe(0);
+    expect(await prisma.v1VerificationToken.count({ where: { userId: EMAIL_LOGIN_USER } })).toBe(0);
   });
 
   describe('every account needs a recent sign-in to ask for the code', () => {
@@ -282,8 +283,8 @@ describe('V1 changing the account email needs a code mailed to the new address i
       request(app.getHttpServer()).post(api('/me/email-change/request')).set('Cookie', cookieIssuedAgo(userId, seconds)).send({ email });
 
     it('refuses a session past thirty minutes and takes a fresh one', async () => {
-      const stale = await withSession(PASSWORD_USER, 31 * 60, NEW_EMAIL);
-      const fresh = await withSession(PASSWORD_USER, 5 * 60, NEW_EMAIL);
+      const stale = await withSession(EMAIL_LOGIN_USER, 31 * 60, NEW_EMAIL);
+      const fresh = await withSession(EMAIL_LOGIN_USER, 5 * 60, NEW_EMAIL);
 
       expect([stale.status, stale.body.code]).toEqual([403, 'RECENT_LOGIN_REQUIRED']);
       expect(fresh.status).toBe(200);
@@ -301,16 +302,16 @@ describe('V1 changing the account email needs a code mailed to the new address i
 
   describe('codes are bound to their purpose', () => {
     it('a contact verification code does not verify an email change', async () => {
-      await prisma.v1User.update({ where: { id: PASSWORD_USER }, data: { email: `${PREFIX}-contact@integration.test` } });
-      const contact = await post('/verification/email/request', PASSWORD_USER, {}).expect(200);
+      await prisma.v1User.update({ where: { id: EMAIL_LOGIN_USER }, data: { email: `${PREFIX}-contact@integration.test` } });
+      const contact = await post('/verification/email/request', EMAIL_LOGIN_USER, {}).expect(200);
       const contactCode: string = contact.body.data.devCode;
 
-      const attempt = await post('/me/email-change/verify', PASSWORD_USER, { code: contactCode });
+      const attempt = await post('/me/email-change/verify', EMAIL_LOGIN_USER, { code: contactCode });
 
       expect([attempt.status, attempt.body.code]).toEqual([400, 'VERIFICATION_NO_PENDING']);
       expect(attempt.body.data?.emailChangeToken).toBeUndefined();
       // The refusal is about the purpose: the same code still verifies the contact email.
-      await post('/verification/email/confirm', PASSWORD_USER, { code: contactCode }).expect(200);
+      await post('/verification/email/confirm', EMAIL_LOGIN_USER, { code: contactCode }).expect(200);
     });
 
     it('a code mailed to add an email login does not verify an email change', async () => {
@@ -322,17 +323,17 @@ describe('V1 changing the account email needs a code mailed to the new address i
     });
 
     it('asking for an email change code leaves the contact code usable', async () => {
-      await prisma.v1User.update({ where: { id: PASSWORD_USER }, data: { email: `${PREFIX}-contact@integration.test` } });
-      const contact = await post('/verification/email/request', PASSWORD_USER, {}).expect(200);
-      await requestCode(PASSWORD_USER, NEW_EMAIL);
+      await prisma.v1User.update({ where: { id: EMAIL_LOGIN_USER }, data: { email: `${PREFIX}-contact@integration.test` } });
+      const contact = await post('/verification/email/request', EMAIL_LOGIN_USER, {}).expect(200);
+      await requestCode(EMAIL_LOGIN_USER, NEW_EMAIL);
 
-      await post('/verification/email/confirm', PASSWORD_USER, { code: contact.body.data.devCode }).expect(200);
+      await post('/verification/email/confirm', EMAIL_LOGIN_USER, { code: contact.body.data.devCode }).expect(200);
     });
 
     it('a token cannot be forged from the code alone', async () => {
-      const forged = issueEmailChangeToken(PASSWORD_USER, NEW_EMAIL).replace(/.$/, (last) => (last === 'A' ? 'B' : 'A'));
+      const forged = tamperSignature(issueEmailChangeToken(EMAIL_LOGIN_USER, NEW_EMAIL));
 
-      const response = await saveProfile(PASSWORD_USER, PASSWORD_PHONE, { email: NEW_EMAIL, emailChangeToken: forged });
+      const response = await saveProfile(EMAIL_LOGIN_USER, EMAIL_LOGIN_PHONE, { email: NEW_EMAIL, emailChangeToken: forged });
 
       expect([response.status, response.body.code]).toEqual([400, 'EMAIL_CHANGE_PROOF_REQUIRED']);
     });

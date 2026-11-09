@@ -5,6 +5,7 @@ import {
   readWithdrawalCancelToken,
   withdrawalPendingException,
 } from './withdrawal-cancel-token';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 describe('withdrawal cancel token', () => {
   let saved: string | undefined;
@@ -37,7 +38,7 @@ describe('withdrawal cancel token', () => {
 
     expect(readWithdrawalCancelToken(forge(payload.replace('user-1', 'user-2')))).toBeNull();
     expect(readWithdrawalCancelToken(forge(payload.replace(':7:', ':8:')))).toBeNull();
-    expect(readWithdrawalCancelToken(`${encoded}.${signature.slice(0, -2)}AA`)).toBeNull();
+    expect(readWithdrawalCancelToken(tamperSignature(token))).toBeNull();
   });
 
   it.each(['', 'abc', 'a.b', 'a.b.c', '!!!.???'])('refuses malformed input %p', (input) => {

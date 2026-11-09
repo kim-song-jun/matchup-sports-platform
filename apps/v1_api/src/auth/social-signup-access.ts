@@ -59,3 +59,13 @@ export function isPendingSocialSignupRequestAllowed(
 
   return true;
 }
+
+/** A social signup that nobody finishes stops being resumable this long after its last update. */
+export const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
+
+export function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date; updatedAt: Date }) {
+  if (!isPendingSocialSignup(user.onboardingStatus)) return false;
+
+  const referenceTime = user.updatedAt ?? user.createdAt;
+  return Date.now() - referenceTime.getTime() > SOCIAL_SIGNUP_TTL_MS;
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { clearPendingSocialLink, peekPendingSocialLink, type PendingSocialLinkRead } from '@/lib/pending-social-link';
+import { remainingTimePhrase } from './remaining-time-phrase';
 import { linkProviderLabel } from './sign-in-then-link-copy';
 
 const NOTICE_REFRESH_MS = 30_000;
@@ -29,9 +30,7 @@ export function PendingLinkNotice() {
   }, []);
 
   if (!pending || pending.expired) return null;
-  // 모자라게 약속한다 — 9분 30초 남았으면 "9분 안에".
-  const minutesLeft = Math.floor((Date.parse(pending.expiresAt) - now) / 60_000);
-  const timeLimit = minutesLeft >= 1 ? `${minutesLeft}분 안에` : '1분 이내에';
+  const timeLimit = remainingTimePhrase(Date.parse(pending.expiresAt), now);
   // 탈퇴 유예 중인 계정은 로그인만으로는 세션이 열리지 않는다 — 탈퇴 신청을 취소해야 연결까지 이어진다.
   const action = pending.withdrawalPendingUntil === undefined ? '로그인하면' : '로그인하고 탈퇴 신청을 취소하면';
   return (

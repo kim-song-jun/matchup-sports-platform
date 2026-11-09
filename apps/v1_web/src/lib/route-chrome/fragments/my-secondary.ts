@@ -1,5 +1,5 @@
 // apps/v1_web/src/lib/route-chrome/fragments/my-secondary.ts
-// U38 — my-secondary(문의/내 리그/담당 경기/담당 대회 운영/팀 컨택 리다이렉트/휴대폰 본인인증).
+// U38 — my-secondary(문의/내 리그/담당 경기/담당 대회 운영/팀 컨택 리다이렉트/휴대폰 본인인증/이메일 인증).
 //
 // 6개 파일 중 my-staff-fixtures-client.tsx 하나만 동적 제목이다 — 대회명이 fetch
 // (`GET /me/tournament-staff`) 의존이라 로딩/배정없음 상태에서는 "담당 경기" 기본값을
@@ -50,5 +50,9 @@ export const MY_SECONDARY_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/my/phone-verify',
     chrome: { title: '휴대폰 본인인증', activeTab: 'my', bottomNav: false, backHref: '/my', desktopHead: true },
+  },
+  {
+    pattern: '/my/email-verify',
+    chrome: { title: '이메일 인증', activeTab: 'my', bottomNav: false, backHref: '/my', desktopHead: true },
   },
 ];

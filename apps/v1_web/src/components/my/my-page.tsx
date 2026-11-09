@@ -26,6 +26,7 @@ import { CalendarDays, Award,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
+import { EmailVerifyBanner } from './email-verify-banner';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -90,6 +91,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
     <>
       <h1 className="sr-only">마이페이지</h1>
       <div className="tm-my-shell tm-my-home-shell tm-content-enter">
+        {model.emailVerifyNudgeUserId ? (
+          <EmailVerifyBanner userId={model.emailVerifyNudgeUserId} className="tm-my-top-notice" />
+        ) : null}
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}
         <div className="tm-my-desktop-layout">

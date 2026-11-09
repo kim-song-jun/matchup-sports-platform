@@ -19,8 +19,10 @@ describe('assigned director tournament list', () => {
       link.getAttribute('href')?.startsWith('/tournament-management/tournaments/'),
     );
     expect(managementLinks).toHaveLength(1);
-    expect(screen.getByRole('link', { name: '운영 콘솔 체험하기 (새 탭)' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '주요 기능 보기 (새 탭)' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '운영 콘솔 체험하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '주요 기능 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '운영 콘솔 체험하기' })).not.toHaveAttribute('target');
+    expect(screen.getByRole('link', { name: '주요 기능 보기' })).not.toHaveAttribute('target');
     expect(screen.getByRole('link', { name: /담당 대회/ })).toHaveAttribute('href', `/tournament-management/tournaments/${encodeURIComponent('담당 대회')}/overview`);
     expect(screen.queryByText('현장 담당')).not.toBeInTheDocument();
     expect(screen.queryByText('조회 담당')).not.toBeInTheDocument();

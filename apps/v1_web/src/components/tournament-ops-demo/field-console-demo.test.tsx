@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldConsoleDemo } from './field-console-demo';
 import { TournamentOpsDemoEntry } from './demo-entry';
+import { DemoReturnLink, rememberDemoReturnPath } from './demo-return-link';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/field-console-demo', useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 const EXPIRED_NOTICE = /설정된 시간이 끝났어요/;
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
 });
@@ -18,6 +20,29 @@ describe('필드 운영콘솔 안내와 체험', () => {
     render(<TournamentOpsDemoEntry />);
     expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
     expect(screen.getByRole('link', { name: /주요 기능 보기/ })).toHaveAttribute('href', '/tournament-ops-demo#demo-guide');
+    for (const name of [/운영 콘솔 체험하기/, /주요 기능 보기/]) {
+      const link = screen.getByRole('link', { name });
+      expect(link).not.toHaveAttribute('target');
+      link.addEventListener('click', event => event.preventDefault(), { once: true });
+      fireEvent.click(link);
+      expect(sessionStorage.getItem('teameet.demo.return-path')).toBe('/tournament-management');
+    }
+  });
+  it.each(['/tournament-management', '/my/tournament-staff', '/admin/ops/tournaments'])('체험에서 원래 운영 화면 %s로 돌아간다', async (path) => {
+    rememberDemoReturnPath(path);
+    render(<DemoReturnLink />);
+    expect(await screen.findByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', path);
+  });
+  it.each([
+    'https://example.com', '//evil.example', '/\\evil.example', 'javascript:alert(1)', '%2f%2fevil.example',
+    '/admin/ops/tournaments/../../evil', '/admin/ops/tournaments?next=//evil.example',
+    '/admin/ops/tournaments#x', '/my/tournament-staffx',
+  ])('허용 경로와 정확히 일치하지 않는 %s는 저장과 복귀 모두 거부한다', (path) => {
+    rememberDemoReturnPath(path);
+    expect(sessionStorage.getItem('teameet.demo.return-path')).toBe('/tournament-management');
+    sessionStorage.setItem('teameet.demo.return-path', path);
+    render(<DemoReturnLink />);
+    expect(screen.getByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-management');
   });
   it('실제 콘솔 위에서 5단계 안내를 보고 시작 전 체험으로 들어간다', async () => {
     const user = userEvent.setup();
@@ -33,6 +58,7 @@ describe('필드 운영콘솔 안내와 체험', () => {
     expect(screen.getByText('콘솔 사용 안내 · 5/5')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '직접 체험하기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-management');
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.getByLabelText(/스코어 블루 FC 0점, 오렌지 FS 0점/)).toBeInTheDocument();
     expect(network).not.toHaveBeenCalled();

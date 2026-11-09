@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ADMIN_DEMO_ID, ADMIN_DEMO_STORAGE_KEY, createAdminDemoSource, restoreAdminDemo, runAdminDemo } from '@/lib/tournament-admin-demo';
 import { DEMO_PATH } from '@/lib/tournament-ops-demo';
 import styles from './demo.module.css';
+import { DemoReturnLink } from './demo-return-link';
 
 const demoNavigationScope = {
   allow: (pathname: string) => pathname === DEMO_PATH || pathname.startsWith(DEMO_PATH + '/') || pathname.startsWith('#') || pathname.startsWith('?'),
@@ -74,6 +75,7 @@ export function TournamentOpsDemo({ children }: { children: ReactNode }) {
   function containNavigation(event: MouseEvent<HTMLDivElement>) {
     const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
     if (!link) return;
+    if (link.hasAttribute('data-demo-return')) return;
     const url = new URL(link.href, window.location.origin);
     if (url.origin === window.location.origin && (url.pathname === DEMO_PATH || url.pathname.startsWith(DEMO_PATH + '/'))) return;
     event.preventDefault(); event.stopPropagation();
@@ -86,6 +88,7 @@ export function TournamentOpsDemo({ children }: { children: ReactNode }) {
       <Link className={styles.brand} href="/home">teameet</Link>
       <span className={styles.badge}>대회 관리 체험 · 샘플 데이터</span>
       <div className={styles.actions}>
+        <DemoReturnLink />
         <button className={styles.quiet} onClick={copyLink} disabled={!shareUrl}><Copy size={16} aria-hidden="true" />공유 링크 복사</button>
         <button className={styles.quiet} onClick={reset}><RotateCcw size={16} aria-hidden="true" />체험 초기화</button>
       </div>

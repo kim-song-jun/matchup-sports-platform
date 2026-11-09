@@ -1022,3 +1022,5 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
   stage_plan 데이터 지원 버전을 유지하거나 전진 수정한다. 이미 생성된 데이터의 운영/조회는 숨기지 않는다.
 - API actual-DB fixture: test/tournaments/stage-plan.integration-spec.ts. 웹 MSW 계약은
   stage-plan-manager.test.tsx의 scoped handlers에서 확정·오류를 검증하며, 실제 규칙/저장은 DB 테스트로 증명한다.
+
+단계형 기능은 Alpha tournament runtime epoch 3을 사용한다. manifest 생성·실제 rollback·실패 후보 복구가 epoch 2 이하 이미지를 호환 대상으로 인정하지 않는다. 기존 대회 데이터는 유지하지만 신규 단계형 데이터를 구버전 API로 운영하는 것을 막는다.

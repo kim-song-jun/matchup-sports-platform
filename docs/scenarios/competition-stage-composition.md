@@ -25,6 +25,7 @@ Task: [20261130](../../.github/tasks/20261130-competition-stage-composition.md)
 - 웹 기존 생성/모델·새 editor 131 tests PASS. manager 실제 payload/서버 오류3 tests PASS.
 - 공개 분리순위·기존 상세/시상/스테퍼 등264 tests PASS, 추가 새 route 테스트는 helper의 모호한 버튼 선택 수정 후1건 PASS.
 - API/Web typecheck, Web patterns 및 API surface PASS. 단계형 일정 순서 회귀3건 포함13건 PASS.
+- rollback runtime epoch 3: 실제 git/manifest 9 cases PASS, release manifest self-test 및 migration gate/self-test PASS. 이전 epoch 2는 rollback·실패 후보 복구 대상에서 제외.
 - PR [#2285](https://github.com/kim-song-jun/matchup-sports-platform/pull/2285): CI·Copilot 리뷰 진행 중.
 - Alpha 기능0/8·viewport0/3: 아직 배포하지 않았다. 로컬 웹 서버는 실행하지 않았다.
 - cleanup: 임시 DB/브라우저 등 이번 작업 소유 자원만 검증 종료 시 정리한다.

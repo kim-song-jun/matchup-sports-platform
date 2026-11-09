@@ -50,3 +50,13 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 - 검증: 운영 콘솔 체험과 주요 기능 안내의 서로 다른 href를 기존 렌더 테스트에서 검증한다.
 - PR #2269의 Copilot 생략 승인은 해당 PR에만 적용됐으며 후속 PR에 확대하지 않는다.
 - 후속 검증 결과: 기존 href 상태에서 1개 회귀 테스트 실패(RED), 복구 후 동일 테스트 1 PASS / 무관한 2개 제외(GREEN). 기존 `/tournament-ops-demo`와 `demo-guide` anchor를 코드로 확인했다. `git diff --check` PASS. 전체 빌드/타입 검사 및 alpha 브라우저 검증은 미수행이며 PR CI/머지 후 검증으로 남긴다.
+
+## Follow-up — 모바일 같은 탭 이동과 복귀 (2026-11-09)
+- 사용자 승인: 두 링크를 같은 탭으로 통일하고 체험 종료/복귀 동선을 명확히 한다.
+- UI 선택: 직전 제안의 같은 탭 이동을 사용자가 선택. 별도 패널 신설 없이 기존 헤더 링크 스타일을 재사용한다.
+- Owned: demo-entry, demo-return-link, 두 체험 헤더 및 관련 테스트/changeset/이 문서.
+- 두 버튼의 서로 다른 목적지와 가이드 anchor를 유지하고 새 탭 속성·안내를 제거한다.
+- 진입 화면은 허용된 운영 경로 3개만 탭별로 저장한다. 직접 공유 진입/저장 불가는 /tournament-management로 복귀한다.
+- 대회 관리 체험의 샘플 이동 제한이 명시적 복귀 링크를 막지 않도록 한다.
+- 검증: 관련 2 files / 28 tests PASS, tsc --noEmit PASS, v1 패턴 gate PASS, diff --check PASS, touched-path debt marker 0. 기존 공유 의존성 누락은 격리 worktree의 frozen-lockfile 설치로 해결했다.
+- Alpha before: headed Chromium(PID 2936/PPID 2918, 종료 완료), 공개 콘솔·가이드 각 390/768/1440 = 6/6 캡처. 가로 overflow 0, pageerror/HTTP 오류 0, 기존 복귀 링크 0. after/PR 상태는 진행 중.

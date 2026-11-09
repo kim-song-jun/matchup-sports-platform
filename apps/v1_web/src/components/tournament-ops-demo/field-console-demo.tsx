@@ -11,6 +11,7 @@ import { appendFieldDemoEvent, commandFieldDemo, createFieldDemo, fieldDemoComma
 import { v1Keys } from '@/lib/query-keys';
 import { FieldConsoleGuide } from './field-console-guide';
 import styles from './demo.module.css';
+import { DemoReturnLink } from './demo-return-link';
 import guide from './field-console-guide.module.css';
 
 export function FieldConsoleDemo() {
@@ -33,6 +34,7 @@ export function FieldConsoleDemo() {
         <Link className={styles.brand} href="/home">teameet</Link>
         <span className={styles.badge}>필드 담당자 콘솔 · 샘플 체험</span>
         <div className={styles.actions}>
+        <DemoReturnLink />
           <button className={styles.quiet} onClick={() => setStep(0)}>안내 다시 보기</button>
           <button className={styles.quiet} onClick={() => void reset()}>체험 초기화</button>
         </div>

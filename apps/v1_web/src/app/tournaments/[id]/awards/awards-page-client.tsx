@@ -64,6 +64,7 @@ function getWinnerSide(result: V1TournamentFixtureResult): 'home' | 'away' | nul
 }
 
 export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number; name: string }> {
+  if (tournament.stagePlan) return [];
   const allStandings = tournament.groups
     .flatMap((g) => g.standings)
     .filter((s, i, arr) => arr.findIndex((x) => x.registrationId === s.registrationId) === i)
@@ -260,6 +261,7 @@ function hasPrizeData(tournament: V1TournamentDetail): boolean {
 
 function getTrackTopThree(tournament: V1TournamentDetail, track: string): Array<{ pos: number; name: string }> {
   const groups = tournament.groups.filter((group) => group.bracketTrack === track);
+  if (tournament.stagePlan && groups.some(g => g.phase === 'group')) return getTopThree({ ...tournament, stagePlan: null, format: 'league', groups });
   const fixtureByPhase = (phase: string) => {
     const groupIds = new Set(groups.filter((group) => group.phase === phase).map((group) => group.id));
     return tournament.fixtures.find((fixture) => groupIds.has(fixture.groupId ?? '') && fixture.result !== null);
@@ -380,7 +382,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
   const awardGroups = isScoped
     ? ['overall', ...sortByBracketTrackOrder([...new Set(awards.map(award => award.bracketTrack ?? 'overall').filter(track => track !== 'overall'))], tournament.groups, track => track)].map((track) => ({
         track,
-        label: track === 'overall' ? '대회 전체' : bracketTrackLabel(track)!,
+        label: track === 'overall' ? '대회 전체' : bracketTrackLabel(track, tournament.stagePlan)!,
         awards: awards.filter((award) => (award.bracketTrack ?? 'overall') === track),
       })).filter((group) => group.awards.length > 0)
     : [{ track: 'overall' as const, label: '개인 어워드', awards }];
@@ -1087,9 +1089,9 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const showPrizeColumn = isCompleted && (hasPrizeData(tournament) || hasTrackPrizeData);
   const isSplitBracket = tournament.groups.some((group) => Boolean(group.bracketTrack && group.bracketTrack !== 'overall'));
   const splitPodiums = isSplitBracket
-    ? orderedBracketTracks(tournament.groups).map((track) => ({
+    ? orderedBracketTracks(tournament.groups).filter(track => !tournament.stagePlan || tournament.stagePlan.stages.at(-1)?.pools.some(p => `stage:${p.key}` === track)).map((track) => ({
         track,
-        label: bracketTrackLabel(track)!,
+        label: bracketTrackLabel(track, tournament.stagePlan)!,
         rows: getTrackTopThree(tournament, track),
       })).filter((podium) => podium.rows.length > 0)
     : [];
@@ -1117,7 +1119,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             <PrizeSection
               key={awardSet.bracketTrack}
               tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
-              heading={`${bracketTrackLabel(awardSet.bracketTrack)} 시상`}
+              heading={`${bracketTrackLabel(awardSet.bracketTrack, tournament.stagePlan)} 시상`}
             />
           ))}
         </div>
@@ -1163,7 +1165,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
                 key={awardSet.bracketTrack}
                 tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
                 top3={getTrackTopThree(tournament, awardSet.bracketTrack)}
-                heading={`${bracketTrackLabel(awardSet.bracketTrack)} 시상`}
+                heading={`${bracketTrackLabel(awardSet.bracketTrack, tournament.stagePlan)} 시상`}
               />
             ))}
           </div>

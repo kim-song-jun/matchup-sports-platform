@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runtime epoch 2 understands scoped awards, named finals and league_knockouts.
+# Runtime epoch 3 understands stagePlan, per-stage rosters and independent pool standings.
 # A SQL widening alone does not make an earlier application's readers/writers safe.
-readonly ALPHA_TOURNAMENT_RUNTIME_VERSION=2
+readonly ALPHA_TOURNAMENT_RUNTIME_VERSION=3
 
 alpha_tournament_runtime_at_commit() {
   local ref="$1" source

@@ -1,3 +1,4 @@
+import { StageLegacyMutationGuard } from './stages/stage-legacy-mutation.guard';
 import {
   Body,
   Controller,
@@ -40,7 +41,7 @@ import { LeagueFixtureGeneratorService } from './league-fixture-generator.servic
  * AdminContextService.getMutationAdmin / getActiveAdmin 이중 게이트로 보호한다.
  */
 @Controller()
-@UseGuards(V1AuthGuard)
+@UseGuards(V1AuthGuard, StageLegacyMutationGuard)
 export class TournamentBracketController {
   constructor(
     private readonly bracketService: TournamentBracketService,

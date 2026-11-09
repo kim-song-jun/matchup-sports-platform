@@ -1,3 +1,4 @@
+import { assertStageFixtureReady } from '../tournaments/stages/stage-eligibility';
 import { assertCurrentEventParticipants } from './roster/assert-current-event-participants';
 import {
   ConflictException,
@@ -1466,6 +1467,7 @@ export class GamesService {
           endingCancelledFixture = teamMatch.status === V1TeamMatchStatus.cancelled;
         }
         if (command === 'start') {
+          if (game.teamMatchId) await assertStageFixtureReady(tx, game.teamMatchId);
           await this.assertTournamentMatchStartable(tx, game);
         }
         assertClockNotDrifted(dto.occurredAt);

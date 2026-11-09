@@ -1,4 +1,5 @@
 'use client';
+import { StagePublicView } from '@/components/tournaments/stages/stage-public-view';
 
 import { useState, useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
@@ -1100,6 +1101,9 @@ export function GroupStageFixtures({ tournament, fromHref }: { tournament: V1Tou
 
 /* ── 메인 콘텐츠 ── */
 export function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
+  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyResultsPageContent tournament={tournament} />;
+}
+function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
   const [activeTab, setActiveTab] = useState<'results' | 'videos'>('results');
   // 대회 상세로 돌아가는 링크는 이 화면이 받은 from 을 그대로 잇는다.

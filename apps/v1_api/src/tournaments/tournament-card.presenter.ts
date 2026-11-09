@@ -17,6 +17,7 @@ export function presentTournamentCard(row: TournamentListRow, now = new Date()) 
     // registrationDeadlineAt 이 있는 진짜 대회다). `format === 'league'` 로 정규 리그를
     // 가려내면 그 7건이 신청·참가등록을 잃는다. **종류는 아래 `kind` 를 쓴다.**
     format: row.format,
+    ...(row.stagePlan ? { isStaged: true } : {}),
     /**
      * 단발 대회(regular_tournament) / 정규 리그 시즌(regular_league) 구분.
      *

@@ -1,4 +1,5 @@
 'use client';
+import { StagePublicView } from '@/components/tournaments/stages/stage-public-view';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 
 import { useEffect, useState } from 'react';
@@ -539,6 +540,9 @@ export function BracketScheduleTab({
 
 /* ── 메인 콘텐츠 ── */
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
+  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyBracketPageContent tournament={tournament} />;
+}
+function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
   // 정규 리그 거울 행은 format='group_knockout' 이다(백필·dual-write 가 format 을 안 쓴다).
   // 그래서 format 만 보면 ① 리그 순위 칼럼이 안 그려지고 ② 없는 대진표를 그리려 든다.

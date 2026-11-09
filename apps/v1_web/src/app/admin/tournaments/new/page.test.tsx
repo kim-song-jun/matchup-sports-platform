@@ -32,9 +32,10 @@ const routerPush = vi.fn();
 const routerReplace = vi.fn();
 let searchParamsValue = new URLSearchParams();
 
+let pathnameValue = '/admin/tournaments/new';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: routerReplace, back: vi.fn(), prefetch: vi.fn() }),
-  usePathname: () => '/admin/tournaments/new',
+  usePathname: () => pathnameValue,
   useSearchParams: () => searchParamsValue,
 }));
 
@@ -153,6 +154,7 @@ function previousTournament(): V1Tournament {
 // jsdom 은 scrollIntoView 를 구현하지 않는다 — 불가피한 브라우저 API 스텁. 파일 전체에 두고 복구한다.
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 beforeEach(() => {
+  pathnameValue = '/admin/tournaments/new';
   Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => {
@@ -272,6 +274,17 @@ function goToParticipationStep() {
 }
 
 describe('AdminTournamentsNewPage four-step wizard', () => {
+  it('새 경로에서는 기본 본선 리그를 제시하고 기존 형식 선택을 강제하지 않는다', () => {
+    pathnameValue = '/admin/tournaments/new-staged'; renderPage();
+    expect(screen.getByRole('heading', { name: '단계형 대회 만들기' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '경기 방식' })).toHaveValue('league');
+    expect(screen.getByText('모집 4팀 · 1단계 · 예상 6경기')).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /조별리그/ })).not.toBeInTheDocument();
+    fillBasicStep();
+    fireEvent.click(screen.getByRole('button', { name: /^다음$/ }));
+    expect(screen.getByLabelText(/대회 시작/)).toBeInTheDocument();
+  });
+
   // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
   // 자동 제안된 신청 마감(D-3)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
   // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에

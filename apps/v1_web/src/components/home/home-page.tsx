@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, ShieldAlert, X } from 'lucide-react';
+import { HomeAdBanner } from '@/components/ads/home-ad-banner';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
@@ -224,6 +225,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               </div>
             </div>
           </div>
+
+          {/* 광고 배너 — 추천 콘텐츠 유무와 무관하다. 광고가 없으면 아무것도 그리지 않아 자리도 남지 않는다. */}
+          <HomeAdBanner />
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
           {/* aria-busy: 두 슬롯 중 **하나라도** 자리표시를 그리고 있으면 로딩이다.

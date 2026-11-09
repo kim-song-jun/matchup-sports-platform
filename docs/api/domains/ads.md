@@ -32,6 +32,7 @@ Images are uploaded first with `POST /api/v1/admin/content-assets` (see [home-no
 - `status`: `draft` → `published` → `stopped`; `stopped` can be published again. `version` goes up on every save.
 - A channel is live when `status = published` and `startAt <= now < endAt`. `phase` (`scheduled` | `live` | `ended`, `null` unless published) is derived, never stored.
 - **One live ad per channel**: publishing (or saving a published campaign) is refused with `409 AD_CHANNEL_WINDOW_OVERLAP` when another published campaign's window on the same channel intersects `[startAt, endAt)`. Windows that only touch at an edge are fine. The check runs under an advisory lock, so two simultaneous publishes cannot both win.
+- `V1ContentAsset.adCampaignId` and `V1AdCampaignDailyStat.campaignId` are `ON DELETE CASCADE`, the same as the notice and popup asset links. An asset row only records which owner an uploaded file belongs to; it is not creative history (S18). An orphaned "attached" row would never be swept by the temporary-asset cleanup. A future delete path must read the campaign's asset urls before deleting it and remove those files afterwards, as popup deletion does.
 - Times are stored as instants. Send ISO 8601 **with an offset** (`2026-11-10T00:00:00+09:00`); a bare date or a timestamp without offset is a 400. Daily statistics are bucketed by **KST calendar date**.
 
 ### SaveAdCampaign

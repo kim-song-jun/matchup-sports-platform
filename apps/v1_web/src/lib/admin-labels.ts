@@ -1,3 +1,10 @@
+import type {
+  V1AdCampaignStatus,
+  V1AdChannel,
+  V1AdChannelPhase,
+  V1AdPublishMissingField,
+} from '@/types/ads';
+
 /**
  * 관리자 액션 코드를 사람이 읽을 수 있는 한국어 레이블로 변환해요.
  *
@@ -39,6 +46,11 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   // 대회 — 공지
   'tournament_announcement.create': '공지 작성',
   'tournament_announcement.publish': '공지 발행',
+  // 광고
+  'ad_campaign.create': '광고 초안 생성',
+  'ad_campaign.update': '광고 수정',
+  'ad_campaign.publish': '광고 게시',
+  'ad_campaign.stop': '광고 중단',
 };
 
 export function adminActionLabel(action: string): string {
@@ -71,8 +83,69 @@ const TARGET_TYPE_LABEL_MAP: Record<string, string> = {
   admin: '관리자',
   chat: '채팅',
   chat_room_participant: '채팅 참여자',
+  ad_campaign: '광고 캠페인',
 };
 
 export function adminTargetTypeLabel(targetType: string): string {
   return TARGET_TYPE_LABEL_MAP[targetType] ?? targetType;
+}
+
+// ── 광고 캠페인 ────────────────────────────────────────────────────────────
+
+const AD_CAMPAIGN_STATUS_LABEL: Record<V1AdCampaignStatus, string> = {
+  draft: '초안',
+  published: '게시 중',
+  stopped: '중단',
+};
+
+export function adCampaignStatusLabel(status: V1AdCampaignStatus): string {
+  return AD_CAMPAIGN_STATUS_LABEL[status] ?? '—';
+}
+
+const AD_CHANNEL_PHASE_LABEL: Record<V1AdChannelPhase, string> = {
+  scheduled: '예약',
+  live: '노출 중',
+  ended: '종료',
+};
+
+export function adChannelPhaseLabel(phase: V1AdChannelPhase): string {
+  return AD_CHANNEL_PHASE_LABEL[phase] ?? '—';
+}
+
+/** 채널 단계 알약의 톤·아이콘은 경기 단계 알약과 같은 뜻(예정·진행·끝)이라 그 키를 빌린다. */
+const AD_CHANNEL_PHASE_PILL_KEY: Record<V1AdChannelPhase, string> = {
+  scheduled: 'match_scheduled',
+  live: 'match_live',
+  ended: 'completed',
+};
+
+export function adChannelPhasePillKey(phase: V1AdChannelPhase): string {
+  return AD_CHANNEL_PHASE_PILL_KEY[phase] ?? 'match_scheduled';
+}
+
+const AD_CHANNEL_LABEL: Record<V1AdChannel, string> = {
+  banner: '배너',
+  popup: '팝업',
+};
+
+export function adChannelLabel(channel: V1AdChannel): string {
+  return AD_CHANNEL_LABEL[channel] ?? '—';
+}
+
+const AD_PUBLISH_FIELD_LABEL: Record<V1AdPublishMissingField, string> = {
+  imageUrl: '이미지',
+  altText: '대체 텍스트',
+  linkUrl: '이동 링크',
+  startAt: '시작 시각',
+  endAt: '끝 시각',
+  headline: '제목',
+};
+
+/** Narrows an untyped `details[].missing[]` entry from the server to a field this screen has a name for. */
+export function isAdPublishMissingField(value: unknown): value is V1AdPublishMissingField {
+  return typeof value === 'string' && Object.keys(AD_PUBLISH_FIELD_LABEL).includes(value);
+}
+
+export function adPublishFieldLabel(field: V1AdPublishMissingField): string {
+  return AD_PUBLISH_FIELD_LABEL[field] ?? '필수 항목';
 }

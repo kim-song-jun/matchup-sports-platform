@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePageView } from './home-page';
@@ -25,10 +25,23 @@ const useV1TeamMatchesMock = vi.hoisted(() =>
   vi.fn(() => ({ data: { items: [] as V1TeamMatch[] }, isPending: false, isError: false })),
 );
 
+const reviewMocks = vi.hoisted(() => ({
+  hasSession: vi.fn(() => false),
+  tournamentPending: vi.fn(() => ({ data: [] as Array<{ tournamentId: string; tournamentTitle: string }> })),
+  eventPending: vi.fn(() => ({ data: { items: [] as Array<{ remainingCount: number }> } })),
+}));
+
+vi.mock('@/lib/session-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/session-storage')>()),
+  hasStoredV1Session: reviewMocks.hasSession,
+}));
+
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
   return {
     ...actual,
+    useV1PendingTournamentReviews: reviewMocks.tournamentPending,
+    useV1Reviews: reviewMocks.eventPending,
     useV1AllTournaments: useV1AllTournamentsMock,
     useV1Tournaments: useV1TournamentsMock,
     useV1TeamMatches: useV1TeamMatchesMock,
@@ -519,5 +532,57 @@ describe('HomePageView — 광고 배너 자리', () => {
 
     expect(container.querySelector('.tm-home-featured-block')).toBeNull();
     expect(screen.getByTestId('home-ad-banner')).toBeInTheDocument();
+  });
+});
+
+describe('HomePageView — 홈 위쪽 강조는 다음 경기 하나 (DESIGN.md §14)', () => {
+  const nextGame = {
+    gameId: 'game-1',
+    teamMatchId: 'tm-1',
+    competitionKind: 'LEAGUE' as const,
+    competitionId: 'league-1',
+    title: '마포 주말 리그 1주차',
+    opponentName: '합정 유나이티드',
+    scheduledAt: '2099-01-01T10:00:00.000Z',
+    placeName: null,
+    teamId: 'team-a',
+    teamName: '마포 FC',
+    viewerCanManage: true,
+    viewerParticipating: true,
+    participantCount: 10,
+  };
+  const model = buildModel({
+    teamActivity: { hasTeam: true, nextGame, pendingInvitations: null, pendingJoinRequests: null },
+    bannerDecision: { showPhoneVerify: false, nudge: 'pendingReviews', deferred: [] },
+  });
+  const primaryLabels = (root: Element) => [...root.querySelectorAll('.tm-btn-primary')].map((el) => el.textContent);
+
+  beforeEach(() => reviewMocks.hasSession.mockReturnValue(true));
+  afterEach(() => {
+    reviewMocks.hasSession.mockReturnValue(false);
+    reviewMocks.tournamentPending.mockReturnValue({ data: [] });
+    reviewMocks.eventPending.mockReturnValue({ data: { items: [] } });
+  });
+
+  it('남은 후기가 함께 떠도 주 버튼은 다음 경기의 것 하나이고, 후기 링크는 그대로 간다', () => {
+    reviewMocks.tournamentPending.mockReturnValue({ data: [{ tournamentId: 'tour-1', tournamentTitle: '여름 컵' }] });
+    const { container } = render(<HomePageView model={model} />);
+    const slot = container.querySelector<HTMLElement>('.tm-home-banner-slot');
+    if (!slot) throw new Error('배너 자리를 찾지 못했어요.');
+
+    expect(within(slot).getByRole('link', { name: '대회 후기 쓰기' })).toHaveAttribute('href', '/tournaments/tour-1/awards?from=%2Fhome');
+    expect(primaryLabels(slot)).toEqual(['이번 경기 출전 관리']);
+  });
+
+  it('후기가 두 종류라 버튼이 둘이어도 주 버튼을 더하지 않는다', () => {
+    reviewMocks.tournamentPending.mockReturnValue({ data: [{ tournamentId: 'tour-2', tournamentTitle: '가을 리그' }] });
+    reviewMocks.eventPending.mockReturnValue({ data: { items: [{ remainingCount: 3 }] } });
+    const { container } = render(<HomePageView model={model} />);
+    const slot = container.querySelector<HTMLElement>('.tm-home-banner-slot');
+    if (!slot) throw new Error('배너 자리를 찾지 못했어요.');
+
+    expect(within(slot).getByRole('link', { name: '경기 후기 3건 쓰기' })).toHaveAttribute('href', '/my/reviews?from=%2Fhome');
+    expect(within(slot).getByRole('link', { name: '대회 후기 쓰기' })).toBeInTheDocument();
+    expect(primaryLabels(slot)).toEqual(['이번 경기 출전 관리']);
   });
 });

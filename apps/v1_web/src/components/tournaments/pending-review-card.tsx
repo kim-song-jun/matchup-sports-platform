@@ -50,7 +50,13 @@ export function usePendingReviewsSummary() {
   };
 }
 
-export function PendingReviewsCard() {
+type ReviewAction = { href: string; label: string };
+
+/**
+ * `banner` 는 마이페이지·시상 화면의 파란 안내 카드다. `row` 는 홈용 흰 카드 한 줄이다 —
+ * 홈 위쪽은 다음 경기 카드만 색과 주 버튼을 가져야 해서(DESIGN.md §14) 버튼도 회색으로 낮춘다.
+ */
+export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 'row' }) {
   const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
   // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면(받은 출처 포함)으로 돌아오게 한다.
   const pathname = usePathname();
@@ -60,6 +66,53 @@ export function PendingReviewsCard() {
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];
+  // 소스마다 작성 화면이 달라 CTA를 하나로 합칠 수 없다. 둘 다 있으면 둘 다 낸다.
+  const actions = [
+    eventRemaining > 0 ? { href: linkFrom('/my/reviews'), label: `경기 후기 ${eventRemaining}건 쓰기` } : null,
+    firstTournament ? { href: linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`), label: '대회 후기 쓰기' } : null,
+  ].filter((action): action is ReviewAction => action !== null);
+  const sources = describeSources(eventRemaining, tournamentItems.length, firstTournament?.tournamentTitle);
+
+  if (layout === 'row') {
+    const single = actions.length === 1 ? actions[0] : null;
+    return (
+      <Card pad={16} style={{ marginBottom: 16, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-control)', background: 'var(--orange-soft)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Star size={18} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-label">
+              남은 후기 <span className="tab-num">{total}</span>건
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {sources}
+            </div>
+          </div>
+          {single ? (
+            <Link href={single.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {single.label}
+            </Link>
+          ) : null}
+        </div>
+        {single ? null : (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {actions.map((action) => (
+              <Link key={action.href} href={action.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flex: 1, whiteSpace: 'nowrap' }}>
+                {action.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -88,33 +141,24 @@ export function PendingReviewsCard() {
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
-            {describeSources(eventRemaining, tournamentItems.length, firstTournament?.tournamentTitle)}
+            {sources}
           </div>
         </div>
       </div>
 
-      {/* 소스마다 작성 화면이 달라 CTA를 하나로 합칠 수 없다. 둘 다 있으면 두 줄로 나눈다. */}
       <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-        {eventRemaining > 0 ? (
+        {actions.map((action, index) => (
           <Link
-            href={linkFrom('/my/reviews')}
-            className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
-            style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            경기 후기 {eventRemaining}건 쓰기
-          </Link>
-        ) : null}
-        {firstTournament ? (
-          <Link
-            href={linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`)}
+            key={action.href}
+            href={action.href}
             // 배너 배경이 blue500 8% 라 tm-btn-neutral(grey100)은 배경에 묻혀 버튼으로 안 읽힌다.
             // 두 번째 CTA 는 위계를 낮추되 형태는 남아야 하므로 흰 배경 + 테두리로 분리한다.
-            className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-outline' : 'tm-btn-primary'}`}
+            className={`tm-btn tm-btn-sm tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-outline'}`}
             style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            대회 후기 쓰기
+            {action.label}
           </Link>
-        ) : null}
+        ))}
       </div>
     </Card>
   );

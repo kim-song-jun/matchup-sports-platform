@@ -232,6 +232,41 @@ describe('HomeAdPopupDialog detail link', () => {
     expect(routerReplace).not.toHaveBeenCalled();
     unbind();
   });
+
+  it.each([
+    ['a query', '/home?tab=team'],
+    ['a fragment', '/home#recommend'],
+  ])('moves to the same page with %s and closes, because the page does not change under it', async (_name, linkUrl) => {
+    const historyBack = vi.spyOn(window.history, 'back');
+    const routerReplace = vi.fn();
+    const unbind = bindSoftNavigator(routerReplace);
+    const { onClose } = renderDialog({ campaign: { linkUrl }, currentPath: '/home' });
+    await waitFor(() => expect(overlayMarkerOf(window.history.state)).not.toBeNull());
+
+    act(() => {
+      screen.getByRole('link', { name: '자세히 보기' }).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    });
+
+    expect(routerReplace).toHaveBeenCalledWith(linkUrl);
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(historyBack).not.toHaveBeenCalled();
+    historyBack.mockRestore();
+    unbind();
+  });
+
+  it('keeps the window open when a same-page link is opened in a new tab with a modifier key', () => {
+    const { onClose } = renderDialog({ campaign: { linkUrl: '/home?tab=team' }, currentPath: '/home' });
+    const link = screen.getByRole('link', { name: '자세히 보기' });
+    link.addEventListener('click', (event) => event.preventDefault());
+
+    act(() => {
+      link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true }));
+    });
+
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 describe('HomeAdPopupDialog impression measurement', () => {

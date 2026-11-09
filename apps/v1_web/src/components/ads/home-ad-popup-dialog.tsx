@@ -56,8 +56,16 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
   useAdImpression(creativeRef, { campaignId: campaign.campaignId, channel: 'popup', enabled: creativeLoaded });
 
   const description = campaign.description?.trim() || null;
-  const followInternalLink = overlayLinkClick(link.href, currentPath, onClose);
   const countClick = () => trackAdClick(campaign.campaignId, 'popup');
+  const followInternalLink = overlayLinkClick(link.href, currentPath, onClose);
+  // Only a route change unmounts the window, so a link to this page with another query or fragment closes it here.
+  const linksToThisPage = link.kind === 'internal' && link.href !== currentPath && link.href.split(/[?#]/u)[0] === currentPath;
+  const onInternalClick = (event: MouseEvent) => {
+    countClick();
+    followInternalLink(event);
+    const plainClick = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (linksToThisPage && plainClick) onClose();
+  };
   // A middle-click opens the link in a new tab and fires `auxclick` instead of `click`; the window stays open.
   const countMiddleClick = (event: MouseEvent) => {
     if (event.button === 1) countClick();
@@ -151,10 +159,7 @@ export function HomeAdPopupDialog({ campaign, link, currentPath, onClose, onImag
             <Link
               className={DETAIL_BUTTON_CLASS}
               href={link.href}
-              onClick={(event) => {
-                countClick();
-                followInternalLink(event);
-              }}
+              onClick={onInternalClick}
               onAuxClick={countMiddleClick}
             >
               자세히 보기

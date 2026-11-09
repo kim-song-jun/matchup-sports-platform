@@ -81,6 +81,7 @@ import {
 import { PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_PENDING_RECOVERY_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthLoginMethodMswHandlers } from './auth-login-method-handlers';
 import { v1EmailChangeMswHandlers } from './profile-email-change-handlers';
+import { v1VerificationEmailMswHandlers } from './verification-email-handlers';
 import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
@@ -197,6 +198,9 @@ function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPur
   return Boolean(proof && proof.phone === phone && proof.channel === 'phone' && proof.purpose === purpose);
 }
 
+/** 서버의 휴대폰 증명 토큰 수명(10분)과 같다. */
+const AUTH_PHONE_PROOF_TTL_MS = 10 * 60 * 1000;
+
 async function issueAuthPhone(request: Request) {
   const body = parseAuthProofInput(await request.json(), ['phone']);
   if (!body || !/^\d{11}$/.test(body.phone ?? '')) {
@@ -224,9 +228,15 @@ async function verifyAuthPhone(request: Request) {
   }
   authPhoneChallenges.set(body.phone, { ...challenge, verified: true });
   const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
-  authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
+  authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + AUTH_PHONE_PROOF_TTL_MS });
   // 번호 소유를 증명한 뒤에만 알려준다. 발급 단계에서는 알리지 않는다.
-  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture, withdrawalPendingUntil: null });
+  return ok({
+    verified: true,
+    proofToken,
+    proofExpiresInSeconds: AUTH_PHONE_PROOF_TTL_MS / 1000,
+    registered: body.phone === authAccountPhoneFixture,
+    withdrawalPendingUntil: null,
+  });
 }
 
 async function requestRecoveryEmail(request: Request) {
@@ -818,6 +828,7 @@ export const v1MswHandlers = [
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
   ...v1EmailChangeMswHandlers,
+  ...v1VerificationEmailMswHandlers,
   ...v1AuthLoginMethodMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {

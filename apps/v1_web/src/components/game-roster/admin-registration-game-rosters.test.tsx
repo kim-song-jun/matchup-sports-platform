@@ -71,8 +71,10 @@ function batchBodies() {
   return mock.requests.filter((r) => r.method === 'POST' && r.path === BATCH).map((r) => r.body);
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const cell = (player: string, opponent: string, state: string) =>
-  screen.findByRole('button', { name: new RegExp(`^${player} .* vs ${opponent}(?: · 종료)? ${state}, `) });
+  screen.findByRole('button', { name: new RegExp(`^${escapeRegExp(player)} .* vs ${opponent}(?: · 종료)? ${state}, `) });
 
 describe('어드민 경기별 명단 — 운영진 실명', () => {
   it.each([
@@ -83,7 +85,7 @@ describe('어드민 경기별 명단 — 운영진 실명', () => {
     renderPanel();
 
     expect(await screen.findByRole('rowheader', { name })).toBeInTheDocument();
-    expect(await cell(name.replace(/[()]/g, '\\$&'), G1.opponentName, '출전')).toBeInTheDocument();
+    expect(await cell(name, G1.opponentName, '출전')).toBeInTheDocument();
     expect(screen.getByRole('option', { name })).toBeInTheDocument();
   });
 });

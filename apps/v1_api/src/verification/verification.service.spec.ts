@@ -226,6 +226,85 @@ describe('VerificationService.requestEmail', () => {
     expect(result).toMatchObject({ sent: false, alreadyVerified: true });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
+
+  function setupUnverified() {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as {
+      v1User: { findUnique: jest.Mock };
+      v1VerificationToken: { create: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
+    };
+    handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null);
+    return { prisma, handle };
+  }
+
+  it('refuses with EMAIL_SEND_UNAVAILABLE, and creates no token, when this environment cannot deliver mail', async () => {
+    const { prisma, handle } = setupUnverified();
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({
+      status: 503,
+      response: { code: 'EMAIL_SEND_UNAVAILABLE' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a real address in a dev-echo environment that has no mail sending, before any token exists', async () => {
+    const saved = process.env.V1_VERIFICATION_DEV_ECHO;
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    const echoDispatcher = new VerificationDispatcherService(smsStub, emailStub, eventLogStub(), {} as never);
+    if (saved === undefined) delete process.env.V1_VERIFICATION_DEV_ECHO;
+    else process.env.V1_VERIFICATION_DEV_ECHO = saved;
+    const { prisma, handle } = setupUnverified();
+    const service = new VerificationService(prisma, echoDispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({ status: 503, response: { code: 'EMAIL_SEND_UNAVAILABLE' } });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the resend cooldown under the issue lock, so two simultaneous requests cannot both send', async () => {
+    const { prisma, handle } = setupUnverified();
+    // The fast check outside the lock sees nothing; by the time this request holds the lock the other one has issued.
+    handle.v1VerificationToken.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ createdAt: new Date(Date.now() - 1_000) });
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
+    const send = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    send.mockRestore();
+    deliverable.mockRestore();
+  });
+
+  it('refuses a second code for the same address inside the resend cooldown', async () => {
+    const { prisma, handle } = setupUnverified();
+    handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 5_000) });
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_RESEND_COOLDOWN' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    deliverable.mockRestore();
+  });
+
+  it('issues and mails a contact code once the address can be mailed and the cooldown has passed', async () => {
+    const { prisma, handle } = setupUnverified();
+    handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 60_000) });
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
+    const send = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).resolves.toMatchObject({ sent: true, channel: 'email', target: 'a***@b.com' });
+    expect(handle.v1VerificationToken.create).toHaveBeenCalledWith({ data: expect.objectContaining({ channel: 'email', purpose: 'contact', target: 'a@b.com' }) });
+    expect(send).toHaveBeenCalledWith('email', 'a@b.com', expect.stringMatching(/^\d{6}$/), 'verify', 'u1');
+    send.mockRestore();
+    deliverable.mockRestore();
+  });
 });
 
 describe('VerificationService 발송 총량 상한', () => {
@@ -317,6 +396,7 @@ describe('VerificationService 발송 총량 상한', () => {
 
   it('이메일 발송에도 같은 상한이 걸린다', async () => {
     const { prisma, handle } = setup({ target: 5, user: 0 });
+    const deliverable = jest.spyOn(dispatcher, 'assertDeliveryAvailable').mockImplementation(() => undefined);
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(service.requestEmail(authUser)).rejects.toMatchObject({
@@ -324,6 +404,7 @@ describe('VerificationService 발송 총량 상한', () => {
       response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
     });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    deliverable.mockRestore();
   });
 });
 
@@ -549,6 +630,78 @@ describe('VerificationService.requestPhone (MT)', () => {
           expect(JSON.stringify(wrongCode.getResponse())).not.toContain('withdrawalPendingUntil');
           expect(statusLogs.findFirst).not.toHaveBeenCalled();
         }
+      });
+    });
+
+    describe('when the holder is an expired, abandoned signup', () => {
+      const expired = () => new Date(Date.now() - 25 * 60 * 60 * 1000);
+      const holderRow = (overrides: Record<string, unknown> = {}) => ({
+        id: HOLDER, onboardingStatus: 'social_profile_required', createdAt: expired(), updatedAt: expired(), ...overrides,
+      });
+
+      function arrangeHolder(row: ReturnType<typeof holderRow>, identityActivity = 0) {
+        const { prisma, handle, service } = arrange(kakaoSignup());
+        const wired = prisma as never as { v1AuthIdentity: Record<string, jest.Mock>; v1StatusChangeLog: Record<string, jest.Mock> };
+        handle.v1User.findUnique.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+          'phone' in where ? row : { id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null, ...kakaoSignup() });
+        wired.v1AuthIdentity.findFirst = jest.fn().mockResolvedValue({
+          id: 'identity-h', status: 'active', passwordHash: null,
+          user: {
+            accountStatus: 'active', onboardingStatus: 'social_profile_required', phone: '01012345678', adminUser: null,
+            authIdentities: [{ id: 'identity-h' }], _count: { teamMemberships: identityActivity },
+          },
+        });
+        wired.v1StatusChangeLog = { create: jest.fn().mockResolvedValue({}) };
+        return { handle, wired, service };
+      }
+
+      it('frees the number once the right code proved it, then saves it to the signup', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow());
+        await pendingCode(handle);
+
+        const result = await service.confirm(authUser, 'phone', '123456');
+
+        expect(result).toMatchObject({ verified: true, channel: 'phone' });
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ id: HOLDER, updatedAt: { lt: expect.any(Date) } }), data: { phone: null, phoneVerifiedAt: null } }),
+        );
+        expect(wired.v1StatusChangeLog.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ targetId: HOLDER, reason: 'expired_signup_lazy' }),
+        });
+        expect(handle.v1User.update).toHaveBeenCalledWith(expect.objectContaining({ data: { phoneVerifiedAt: expect.any(Date), phone: '01012345678' } }));
+      });
+
+      it('frees nothing before the code is right', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow());
+        await pendingCode(handle);
+
+        await expect(service.confirm(authUser, 'phone', '000000')).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['a signup still inside its 24h window', { createdAt: new Date(), updatedAt: new Date() }],
+        ['a finished account', { onboardingStatus: 'completed' }],
+      ])('keeps the number of %s', async (_name, overrides) => {
+        const { handle, wired, service } = arrangeHolder(holderRow(overrides));
+        await pendingCode(handle);
+
+        await service.confirm(authUser, 'phone', '123456');
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      });
+
+      it('keeps the number of an expired signup that has activity', async () => {
+        const { handle, wired, service } = arrangeHolder(holderRow(), 1);
+        await pendingCode(handle);
+
+        await service.confirm(authUser, 'phone', '123456');
+
+        expect((handle.v1User as unknown as { updateMany: jest.Mock }).updateMany).not.toHaveBeenCalled();
+        expect(wired.v1StatusChangeLog.create).not.toHaveBeenCalled();
       });
     });
 

@@ -157,7 +157,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
     if (id && !rows.includes(id)) { setError('진출팀 자리가 다 차서 고른 팀을 넣을 수 없어요. 먼저 다른 팀을 빼 주세요.'); return; }
     edit(rows, next);
   }
-  return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
+  return createPortal(<div className="fixed inset-0 flex items-center justify-center bg-[var(--scrim-dark-32)] p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--card-surface)]">
       <div className="shrink-0 border-b border-[var(--border)] p-4">
         <h2 id={titleId} className="tm-text-heading">토너먼트별 진출팀 배정</h2>

@@ -2,9 +2,10 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { settingsModel } from './my.view-model';
-import { SettingsPageView, LegalPageView, MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
+import { myHomeModel, settingsModel } from './my.view-model';
+import { SettingsPageView, LegalPageView, MyHomePageView, MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
 import type {
+  MyHomeViewModel,
   MyInvitationsViewModel,
   MyJoinApplicationItem,
   MyJoinApplicationsViewModel,
@@ -20,6 +21,9 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => new URLSearchParams(),
 }));
+
+// 후기 카드는 자기 조회를 따로 하는 별개의 카드다 — 배너 자리를 보는 이 파일에서는 네트워크를 타지 않게 비운다.
+vi.mock('@/components/tournaments/pending-review-card', () => ({ PendingReviewsCard: () => null }));
 
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -337,5 +341,33 @@ describe('설정의 비밀번호·약관 진입 경로', () => {
         'href', `/terms?document=${document}&from=%2Fmy%2Fsettings%2Flegal`,
       );
     });
+  });
+});
+
+describe('MyHomePageView — 이메일 인증 배너 자리', () => {
+  const homeModel = (overrides: Partial<MyHomeViewModel> = {}): MyHomeViewModel => ({
+    ...myHomeModel,
+    user: { ...myHomeModel.user, userId: null },
+    ...overrides,
+  });
+
+  it('권유 대상이면 배너가 화면 맨 위, 두 열 레이아웃 바로 앞에 놓이고 모바일에서 카드보다 앞서게 하는 표식을 단다', () => {
+    window.localStorage.clear();
+    const { container } = render(<MyHomePageView model={homeModel({ emailVerifyNudgeUserId: 'user-1' })} />);
+
+    const shell = container.querySelector('.tm-my-home-shell');
+    const banner = screen.getByText('이메일 인증을 마치면 비밀번호를 잊어도 찾을 수 있어요.').closest('.tm-action-banner');
+    expect(banner).toHaveClass('tm-my-top-notice');
+    // 배너 앞에 올 수 있는 것은 자리를 차지하지 않는 고정 토스트뿐이다.
+    const ahead = Array.from(shell?.children ?? []).slice(0, Array.from(shell?.children ?? []).indexOf(banner as Element));
+    expect(ahead.every((node) => node.classList.contains('tm-native-toast-stack'))).toBe(true);
+    expect(banner?.nextElementSibling).toHaveClass('tm-my-desktop-layout');
+  });
+
+  it('대상이 아니면 배너 없이 두 열 레이아웃이 맨 위다', () => {
+    const { container } = render(<MyHomePageView model={homeModel()} />);
+
+    expect(container.querySelector('.tm-action-banner')).toBeNull();
+    expect(container.querySelector('.tm-my-home-shell')?.firstElementChild).toHaveClass('tm-my-desktop-layout');
   });
 });

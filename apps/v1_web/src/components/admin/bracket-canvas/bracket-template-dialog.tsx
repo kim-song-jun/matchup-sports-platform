@@ -94,7 +94,7 @@ function TemplateAvailabilityDialog({ open, onClose, error, retry }: { open: boo
   const id = useId();
   const { dialogRef, mounted, onBackdropClick } = useModalA11y({ open, onClose });
   if (!mounted || typeof document === 'undefined') return null;
-  return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
+  return createPortal(<div className="fixed inset-0 flex items-center justify-center bg-[var(--scrim-dark-32)] p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={id} className="tm-modal-panel w-full max-w-md rounded-2xl bg-[var(--card-surface)] p-5">
       <h2 id={id} className="tm-text-body-lg font-bold">대진 설정</h2>
       <p className="my-4 tm-text-body" role={error ? 'alert' : 'status'}>{error ? '대진 설정을 불러오지 못했어요.' : '대진 설정을 불러오고 있어요.'}</p>

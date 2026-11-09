@@ -20,6 +20,7 @@
  *     실제 클래스로 만들어 CSS 를 생성한다(`<이름>` 같은 걸 넣었더니 `<` 가 든
  *     CSS 가 나와 **빌드가 깨졌다** — 2026-08-18). 형태는 아래 정규식과 위반
  *     메시지가 이미 정확히 보여준다.
+ *  그 밖의 검사는 아래 각 함수의 주석을 본다.
  *
  * 사용: node scripts/v1-pattern-check.mjs   (apps/v1_web에서)
  */
@@ -123,6 +124,24 @@ function checkInertFontSizeClasses() {
             `Tailwind v4 가 색상으로 해석해 크기가 안 걸린다. text-[length:var(${m[1]})] 로 쓸 것`,
         );
       }
+    }
+  }
+}
+
+/* ── 모달 스크림 배경 누락 검사 ───────────────────────────────────── */
+// tm-modal-scrim 은 페이드만 정의한다. 배경색은 창마다 넣어서, 빠뜨리면 뒤 화면이 어두워지지 않는다.
+// className= 부터 tm-modal-scrim 이 있는 줄 끝까지만 읽는 근사 검사라 배경 클래스는 그 범위 안에 둔다.
+const DARK_SCRIM_CLASS = /[\s"'`]bg-(\[var\(--scrim-[\w-]+\)\]|gray-900\/[1-9]\d*)(?=[\s"'`]|$)/;
+const SCRIMS_WITH_OWN_CSS_BACKGROUND = ['tm-photo-crop-scrim'];
+function checkModalScrimBackground() {
+  const files = execSync("grep -rl 'tm-modal-scrim' src --include='*.tsx' --exclude='*.test.tsx' || true", { encoding: 'utf8' });
+  for (const f of files.split('\n').filter(Boolean)) {
+    const txt = readFileSync(f, 'utf8');
+    for (const m of txt.matchAll(/tm-modal-scrim/g)) {
+      const classes = txt.slice(txt.lastIndexOf('className=', m.index), txt.indexOf('\n', m.index));
+      if (DARK_SCRIM_CLASS.test(classes) || SCRIMS_WITH_OWN_CSS_BACKGROUND.some((name) => classes.includes(name))) continue;
+      const line = txt.slice(0, m.index).split('\n').length;
+      violations.push(`[모달 스크림 배경 누락] ${f}:${line}: tm-modal-scrim 은 페이드만 정의한다. bg-[var(--scrim-dark-32)] 를 함께 넣을 것`);
     }
   }
 }
@@ -342,6 +361,7 @@ function checkLiteralBaseline({ label, baselinePath, count, hint }) {
 checkHapnida();
 checkUndefinedTokens();
 checkInertFontSizeClasses();
+checkModalScrimBackground();
 checkSpacingGrid();
 checkRadiusLiteral();
 checkTsxArbitrarySpacing();
@@ -498,5 +518,5 @@ if (violations.length) {
   process.exit(1);
 }
 console.log(
-  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0(CSS), 글자 크기·TSX radius baseline 유지)',
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 모달 스크림 배경 누락 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0(CSS), 글자 크기·TSX radius baseline 유지)',
 );

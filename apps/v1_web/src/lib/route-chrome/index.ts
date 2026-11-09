@@ -41,7 +41,7 @@ import { COMMUNITY_ROUTES } from './fragments/community'; // /chat, /notificatio
 import { REVIEWS_ROUTES } from './fragments/reviews'; // /my/reviews, /tournaments/:id/reviews
 import { MY_HOME_ROUTES } from './fragments/my-home'; // /my
 import { MY_SETTINGS_ROUTES } from './fragments/my-settings'; // /my/api-clients 등 설정류
-import { MY_SECONDARY_ROUTES } from './fragments/my-secondary'; // /my/inquiries, /leagues, /staff-fixtures, /tournament-staff, /team-contacts, /phone-verify
+import { MY_SECONDARY_ROUTES } from './fragments/my-secondary'; // /my/inquiries, /leagues, /staff-fixtures, /tournament-staff, /team-contacts, /phone-verify, /email-verify
 
 export const ROUTE_CHROME_TABLE: RouteChromeEntry[] = [
   ...HOME_ROUTES,

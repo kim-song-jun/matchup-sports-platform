@@ -43,6 +43,7 @@ describe('isPullToRefreshRoute', () => {
     '/my/profile/edit',
     '/my/settings',
     '/my/settings/notifications',
+    '/my/email-verify',
     '/team-matches/t1/lineup',
     '/team-matches/t1/lineup/opponent',
     '/team-matches/t1/record',

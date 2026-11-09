@@ -113,9 +113,22 @@ describe('실제 어드민을 사용하는 공개 대회 체험', () => {
     expect(screen.queryByText(/아직 체험에서 지원하지 않아요/)).not.toBeInTheDocument();
     expect(network).not.toHaveBeenCalled();
   });
-  it('외부 공유 진입은 로그인 없는 새 탭 경로를 유지한다', () => {
+  it('복귀 링크는 샘플 화면의 이동 제한에 막히지 않는다', async () => {
+    sessionStorage.setItem('teameet.demo.return-path', '/admin/ops/tournaments');
+    render(<TournamentOpsDemo><div>체험</div></TournamentOpsDemo>);
+    const link = await screen.findByRole('link', { name: '대회 운영으로 돌아가기' });
+    expect(link).toHaveAttribute('href', '/admin/ops/tournaments');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    let blockedByDemo = true;
+    const observe = (event: MouseEvent) => { blockedByDemo = event.defaultPrevented; event.preventDefault(); };
+    document.addEventListener('click', observe, { once: true });
+    link.dispatchEvent(click);
+    expect(blockedByDemo).toBe(false);
+    expect(screen.queryByText('이 링크는 실제 서비스의 화면이에요. 샘플 체험 안에서는 이동하지 않아요.')).not.toBeInTheDocument();
+  });
+  it('체험 진입은 로그인 없는 공개 경로를 유지한다', () => {
     render(<TournamentOpsDemoEntry />);
-    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/tournament-ops-demo');
+    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
   });
   it('실제 관리 셸과 11개 섹션을 샘플 경로 안에서 제공한다', async () => {
     const network = vi.spyOn(globalThis, 'fetch');

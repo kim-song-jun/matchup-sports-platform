@@ -90,6 +90,26 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     expect(await screen.findByText(/30분 안에 원래 방법으로 로그인하면 Apple 로그인 연결을 시도해요/)).toBeInTheDocument();
   });
 
+  // 번호 주인은 인증번호를 맞춘 뒤에야 서버가 알려 준다 — 번호를 다 입력한 것만으로는 어떤 요청도 나가지 않아야 한다.
+  it('이미 가입된 번호를 입력만 해서는 요청이 나가지 않고 중복 안내도 뜨지 않는다', async () => {
+    const sent: string[] = [];
+    const record = ({ request }: { request: Request }) => { sent.push(`${request.method} ${new URL(request.url).pathname}`); };
+    renderSignup();
+    await advanceSocialSignupToPhone();
+    server.events.on('request:start', record);
+    try {
+      fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: PHONE_CONFLICT_MSW.phones.kakao } });
+      expect(await screen.findByRole('button', { name: '인증번호 받기' })).toBeEnabled();
+    } finally {
+      server.events.removeListener('request:start', record);
+    }
+
+    expect(sent).toEqual([]);
+    expect(screen.queryByText(/이미 팀밋 계정이 있어요|이 번호로 이미 가입한 계정이 있어요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /로그인하기|기존 계정으로 로그인|계정 찾기/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  });
+
   it('번호 인증을 요청하는 단계에서는 번호 주인 여부를 알리지 않는다', async () => {
     renderSignup();
     await advanceSocialSignupToPhone();

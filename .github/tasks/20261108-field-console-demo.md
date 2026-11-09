@@ -62,3 +62,5 @@ alpha 화면 검증은 배포가 필요하다. 새로고침하면 샘플 기록�
 - Alpha before: headed Chromium(PID 2936/PPID 2918, 종료 완료), 공개 콘솔·가이드 각 390/768/1440 = 6/6 캡처. 가로 overflow 0, pageerror/HTTP 오류 0, 기존 복귀 링크 0. after/PR 상태는 진행 중.
 
 - PR #2277 reviewer 요청: protocol-relative/backslash/javascript/encoded/traversal/query/hash/허용 경로 suffix를 it.each로 추가하고 저장·렌더 양쪽에서 기본 운영 경로로 제한함을 검증한다. 구현의 정확 일치 allowlist는 유지한다.
+
+- CI Web RED: 948 files 중 담당 대회 목록 호출 테스트 1개가 이전 새 탭 accessible name을 기대해 실패. 해당 호출 테스트의 이름을 같은 탭 계약으로 sync하고 target 부재도 검증한다. 나머지 947 files / 11873 tests PASS.

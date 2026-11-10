@@ -43,7 +43,7 @@ describe.each(['mobile', 'sidebar'] as const)('다음 리그 CTA (%s)', (variant
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} />);
     await screen.findByText('다른 리그의 참가 일정도 확인해 보세요.');
     expect(screen.getByRole('link', { name: '다른 리그 둘러보기' }))
-      .toHaveAttribute('href', '/tournaments?kind=league');
+      .toHaveAttribute('href', '/tournaments?kind=league&stage=recruiting');
   });
 
   it('이 리그에 참가했던 팀이면 다음 시즌 재참가 신청이 그 팀을 골라 신청 화면을 연다', async () => {

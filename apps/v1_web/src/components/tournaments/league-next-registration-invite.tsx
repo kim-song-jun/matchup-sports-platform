@@ -29,7 +29,7 @@ export function nextLeagueInviteAction(nextRound: V1LeagueNextRound | null, retu
       description: returningTeamId !== null ? '다음 시즌 신청이 열리면 알려 드릴게요.' : '다음 리그는 아직 신청을 받지 않아요.',
     };
   }
-  return { href: '/tournaments?kind=league', label: '다른 리그 둘러보기', description: '다른 리그의 참가 일정도 확인해 보세요.' };
+  return { href: '/tournaments?kind=league&stage=recruiting', label: '다른 리그 둘러보기', description: '다른 리그의 참가 일정도 확인해 보세요.' };
 }
 
 /**

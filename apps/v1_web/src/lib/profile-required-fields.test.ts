@@ -21,6 +21,12 @@ describe('getMissingRequiredProfileFields', () => {
 });
 
 describe('hasBlockingMissingField', () => {
+  it.each([[''], ['​‌‍﻿']])('빈 문자열·보이지 않는 문자뿐인 이름(%j)도 비어 있다고 본다', (realName) => {
+    const data = { phone: '01011112222', profile: { ...FULL.profile, realName } } as unknown as Pick<V1Profile, 'phone' | 'profile'>;
+
+    expect(getMissingRequiredProfileFields(data)).toEqual(['realName']);
+  });
+
   it('서버가 거절하는 이름·닉네임·성별이 비면 막는다', () => {
     expect(hasBlockingMissingField(['realName'])).toBe(true);
     expect(hasBlockingMissingField(['birthDate', 'gender'])).toBe(true);

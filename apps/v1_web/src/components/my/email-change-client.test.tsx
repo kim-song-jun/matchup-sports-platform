@@ -477,7 +477,7 @@ describe('EmailChangeClient — 프로필 상태', () => {
     expect(calls.request).toEqual([]);
   });
 
-  it.each<[string, string | null]>([['이름이 비어 있는', null], ['이름이 공백뿐인', '   ']])(
+  it.each<[string, string | null]>([['이름이 비어 있는', null], ['이름이 공백뿐인', '   '], ['이름이 비어 있는', ''], ['이름이 보이지 않는 문자뿐인', '​﻿']])(
     '%s 옛 계정은 서버가 저장을 거절하므로 인증번호를 받기 전에 프로필 저장부터 안내한다',
     async (_name, realName) => {
       profile = withProfile({ realName });

@@ -12,7 +12,7 @@ import { AuthStepHeader } from '@/components/auth/auth-step-header';
 import { AuthVerifiedInset } from '@/components/auth/auth-verified-inset';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
-import { isPlausibleEmail, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
+import { isPlausibleEmail, isValidBirthDateDigits, normalizeSeparatedDigits, normalizeSignupDisplayName } from '@/components/auth/signup-profile-validation';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -54,7 +54,7 @@ const LOGIN_ID_NOTE = '이 이메일은 로그인에도 쓰여요. 바꾸면 다
 function profileSavePayload(data: V1Profile) {
   const { profile } = data;
   const nickname = (profile.nickname ?? '').trim();
-  const realName = profile.realName?.trim() || null;
+  const realName = normalizeSignupDisplayName(profile.realName ?? '') || null;
   const bio = profile.bio?.trim() || null;
   const phone = data.phone || null;
   const birthDate = normalizeSeparatedDigits(profile.birthDate ?? '') || null;

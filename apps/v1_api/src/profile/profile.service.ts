@@ -43,7 +43,7 @@ import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
-import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible, isValidBirthDateDigits } from '../auth/dto/required-signup-profile.dto';
+import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from '../auth/dto/required-signup-profile.dto';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRecordConsentDto,
@@ -139,7 +139,7 @@ export class ProfileService {
 
   async updateMe(user: V1AuthUser, dto: UpdateProfileDto) {
     this.assertMutableAccount(user);
-    const realName = dto.realName?.trim() || dto.displayName?.trim() || null;
+    const realName = normalizeSignupDisplayName(dto.realName ?? '') || normalizeSignupDisplayName(dto.displayName ?? '') || null;
     const nickname = dto.nickname.trim();
     const emailProvided = dto.email !== undefined;
     const requestedEmail = dto.email?.trim() ? normalizeEmail(dto.email) : null;

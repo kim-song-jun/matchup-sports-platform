@@ -1,3 +1,4 @@
+import { normalizeSignupDisplayName } from '@/components/auth/signup-profile-validation';
 import type { V1Profile } from '@/types/api';
 
 /** 가입(온보딩)에서 필수로 받는 프로필 정보. 프로필 수정·이메일 변경·사진 변경 화면이 같은 기준으로 비어 있는지 본다. */
@@ -18,7 +19,7 @@ const BLOCKING_FIELDS: readonly RequiredProfileField[] = ['realName', 'nickname'
 export function getMissingRequiredProfileFields(data: Pick<V1Profile, 'phone' | 'profile'>): RequiredProfileField[] {
   const { profile } = data;
   const missing: RequiredProfileField[] = [];
-  if (!profile.realName?.trim()) missing.push('realName');
+  if (!normalizeSignupDisplayName(profile.realName ?? '')) missing.push('realName');
   if (!profile.nickname?.trim()) missing.push('nickname');
   if (!profile.gender) missing.push('gender');
   if (!profile.birthDate?.trim()) missing.push('birthDate');

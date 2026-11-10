@@ -59,7 +59,7 @@ function payload(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ProfileService.updateMe real name', () => {
-  it.each([[null], [''], ['   ']])('refuses a save with an empty name (%j)', async (cleared) => {
+  it.each([[null], [''], ['   '], ['​‌﻿'], [' ​ ']])('refuses a save with an empty name (%j)', async (cleared) => {
     const prisma = buildPrisma('홍길동');
 
     await expect(createService(prisma).updateMe(user, payload({ realName: cleared }))).rejects.toMatchObject({

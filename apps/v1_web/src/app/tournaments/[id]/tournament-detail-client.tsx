@@ -52,7 +52,7 @@ import { CompetitionEntrySection } from '@/components/tournaments/competition-en
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
-import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
+import { competitionFormatLabel, competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 import {
   formatTournamentDateShort,
@@ -99,9 +99,9 @@ function useChildHref() {
   return (path: string) => withFromPath(path, chainFrom);
 }
 
+/** 배지 문구는 대회 진행 방식 섹션과 같은 단일 소스(`competitionFormatLabel`)를 쓴다. */
 function getFormatLabel(competition: V1TournamentDetail): string {
-  if (isLeagueCompetition(competition)) return '리그';
-  return competition.format === 'knockout' ? '토너먼트' : '조별리그 후 토너먼트';
+  return competitionFormatLabel(competition);
 }
 
 /**

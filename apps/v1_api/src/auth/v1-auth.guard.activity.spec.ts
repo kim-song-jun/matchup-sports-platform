@@ -6,7 +6,7 @@ describe('V1AuthGuard activity profile gate', () => {
   const prisma = {
     v1User: { findFirst: jest.fn() },
     v1UserSportPreference: { count: jest.fn() },
-    v1AuthIdentity: { count: jest.fn() },
+    v1AuthIdentity: { findMany: jest.fn() },
   };
   const managedTerms = { signupCompliance: jest.fn() };
   const guard = new V1AuthGuard(
@@ -19,7 +19,7 @@ describe('V1AuthGuard activity profile gate', () => {
     jest.clearAllMocks();
     managedTerms.signupCompliance.mockResolvedValue(compliant);
     prisma.v1UserSportPreference.count.mockResolvedValue(0);
-    prisma.v1AuthIdentity.count.mockResolvedValue(1);
+    prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'kakao' }]);
   });
 
   describe('social_profile_deferred', () => {
@@ -114,7 +114,14 @@ describe('V1AuthGuard activity profile gate', () => {
     });
 
     it('does not touch an email signup that skipped onboarding', async () => {
-      prisma.v1AuthIdentity.count.mockResolvedValue(0);
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'email' }]);
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).resolves.toBe(true);
+    });
+
+    it('does not gate an email signup that later linked Kakao', async () => {
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'email' }, { provider: 'kakao' }]);
       mockUser({ onboardingStatus: 'deferred' });
 
       await expect(guard.canActivate(context('POST', '/api/v1/teams'))).resolves.toBe(true);

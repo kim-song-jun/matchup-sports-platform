@@ -1,11 +1,13 @@
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested, IsUUID } from 'class-validator';
+export const STAGE_KEY_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
+const STAGE_KEY_MESSAGE = '키는 영문·숫자·밑줄·하이픈으로 1~40자까지 입력해 주세요.';
 export class StageSourceDto {
-  @IsString() @MaxLength(40) poolKey!: string;
+  @Matches(STAGE_KEY_PATTERN, { message: STAGE_KEY_MESSAGE }) poolKey!: string;
   @IsInt() @Min(1) @Max(64) rank!: number;
 }
 export class StagePoolDto {
-  @Matches(/^[a-zA-Z0-9_-]{1,40}$/) key!: string;
+  @Matches(STAGE_KEY_PATTERN, { message: STAGE_KEY_MESSAGE }) key!: string;
   @IsString() @MaxLength(60) name!: string;
   @IsIn(['league', 'knockout']) format!: 'league' | 'knockout';
   @IsInt() @Min(2) @Max(64) capacity!: number;
@@ -13,7 +15,7 @@ export class StagePoolDto {
   @IsArray() @ArrayMaxSize(64) @ValidateNested({ each: true }) @Type(() => StageSourceDto) sources!: StageSourceDto[];
 }
 export class CompetitionStageDto {
-  @Matches(/^[a-zA-Z0-9_-]{1,40}$/) key!: string;
+  @Matches(STAGE_KEY_PATTERN, { message: STAGE_KEY_MESSAGE }) key!: string;
   @IsString() @MaxLength(60) name!: string;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(16) @ValidateNested({ each: true }) @Type(() => StagePoolDto) pools!: StagePoolDto[];
 }
@@ -26,7 +28,7 @@ export class StageVersionDto {
 }
 export class StageAssignDto extends StageVersionDto {
   @IsOptional() @IsBoolean() acknowledgeStartedCorrection?: boolean;
-  @IsString() @MaxLength(40) poolKey!: string;
+  @Matches(STAGE_KEY_PATTERN, { message: STAGE_KEY_MESSAGE }) poolKey!: string;
   @IsArray() @ArrayMinSize(2) @ArrayMaxSize(64) @IsUUID(undefined, { each: true }) registrationIds!: string[];
   @IsString() @MaxLength(64) sourceVersion!: string;
   @IsOptional() @IsString() @MaxLength(500) reason?: string;

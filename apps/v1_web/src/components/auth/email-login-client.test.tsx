@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailLoginClient } from './email-login-client';
 import { V1ApiError } from '@/lib/api-client';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, resolveAuthContinuationPath } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
@@ -253,5 +254,16 @@ describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
   it('대기 연결 토큰이 없으면 안내를 그리지 않는다', () => {
     render(<EmailLoginClient />);
     expect(screen.queryByRole('button', { name: '연결 안 하기' })).not.toBeInTheDocument();
+  });
+
+  it('이메일 연결 뜻을 보관해 뒀다면 로그인하면 이어서 도와준다고 알리고, 연결 안 하기로 끊을 수 있다', async () => {
+    savePendingEmailLink({ email: null });
+    render(<EmailLoginClient />);
+
+    expect(await screen.findByText(/로그인하면 이메일 연결을 이어서 도와요\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+
+    expect(screen.queryByText(/이메일 연결을 이어서 도와요/)).not.toBeInTheDocument();
+    expect(readPendingEmailLink()).toBeNull();
   });
 });

@@ -1,3 +1,7 @@
+## 2026-11-08 — 필드 담당자 운영콘솔 체험과 오버레이 안내
+
+[시나리오](./field-console-demo.md) · [작업](../../.github/tasks/20261108-field-console-demo.md). 상단 체험 링크를 `/field-console-demo`로 연결하고 실제 현장 콘솔 위에 회색 반투명 덮개·영역 강조·화살표 5단계 안내를 구현했다. 신규6/영향119 tests·tsc·pattern PASS, 실제 경기 API 호출0을 단위 UI에서 확인했다. 미커밋/미배포이며 alpha after0/3폭·브라우저 console/network는 미검증이다. 기존 대회 관리 체험은 별도로 유지한다.
+
 ## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
 
 [시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. #2181 통합 회귀 API335/Web398 PASS, 격리 PostgreSQL 보정10시나리오/재실행 PASS. 생성기 중복 수정은 제외하고 #2181 의존 Draft PR로 제출한다. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.

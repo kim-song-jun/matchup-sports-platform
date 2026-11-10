@@ -6,6 +6,7 @@ import type { QueryClient, RefetchOptions } from '@tanstack/react-query';
 import {
   WifiOff,
   Wifi,
+  FlaskConical,
   Goal,
   AlertTriangle,
   ArrowLeftRight,
@@ -32,7 +33,8 @@ import {
 } from '@/lib/game-operations-clock';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { isV1NetworkError, v1Api, V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
+import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { v1Keys } from '@/lib/query-keys';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { isSecondYellowWithoutRed } from './second-yellow';
@@ -166,6 +168,8 @@ export interface OperateConsoleCoreProps {
   readonly hostContext?: TeamMatchGameOperationsContext;
   readonly resultHref?: string;
   readonly resultReviewEnabled: boolean;
+  /** Sample hosts drive the console from memory, so the header must not claim a live server connection. */
+  readonly sampleMode?: boolean;
   readonly renderResultReview?: (gameId: string) => ReactNode;
   /** The common Core previously mounted this for both leased operations and ordinary hosts; the ordinary `end` command remains gated. */
   readonly renderAbnormalEndDialog: (props: {
@@ -335,11 +339,13 @@ export function OperateConsoleCore({
   hostContext,
   resultHref,
   resultReviewEnabled,
+  sampleMode = false,
   renderResultReview,
   renderAbnormalEndDialog,
   renderKickoffChecklist,
   renderPenaltyShootoutPanel,
 }: OperateConsoleCoreProps) {
+  const { v1Api } = useV1DataSource();
   const {
     operations: ops,
     queryClient,
@@ -657,7 +663,7 @@ export function OperateConsoleCore({
       clearInterval(interval);
       controller?.abort();
     };
-  }, [periodRefreshNeeded, currentPeriodId, periodStartedAt, periodPausedAt, periodPausedTotalMs, gameState, gameId, myUserId, queryClient, applyCommandResult, periodExpiryRetry]);
+  }, [periodRefreshNeeded, currentPeriodId, periodStartedAt, periodPausedAt, periodPausedTotalMs, gameState, gameId, myUserId, queryClient, applyCommandResult, periodExpiryRetry, v1Api]);
 
   const commandsForState: readonly GameCommandName[] = useMemo(() => {
     // 이슈 #375 — 하프타임은 gameState==='LIVE'인 채로 지속되는 실제 상태라
@@ -1660,6 +1666,7 @@ export function OperateConsoleCore({
           Keep this game context header below it while scrolling; the shell header is
           hidden on desktop, so the console can return to the viewport top at lg. */}
       <header
+        data-console-guide="overview"
         className={[
           'sticky z-10 border-b border-[var(--border)] bg-[var(--card-surface)] px-4 py-3',
           headerTopClass,
@@ -1686,18 +1693,25 @@ export function OperateConsoleCore({
               <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
                 {gameState ? STATE_LABEL[gameState] : '-'}
               </span>
-              <span className="flex items-center gap-1" aria-live="polite">
-                {ops.connectionStatus === 'connected' ? (
-                  <Wifi size={13} aria-hidden="true" />
-                ) : (
-                  <WifiOff size={13} aria-hidden="true" />
-                )}
-                {ops.connectionStatus === 'connected'
-                  ? '실시간 연결됨'
-                  : ops.connectionStatus === 'connecting'
-                    ? '연결 중…'
-                    : '연결 끊김'}
-              </span>
+              {sampleMode ? (
+                <span className="flex items-center gap-1">
+                  <FlaskConical size={13} aria-hidden="true" />
+                  체험 중 · 서버 연결 없음
+                </span>
+              ) : (
+                <span className="flex items-center gap-1" aria-live="polite">
+                  {ops.connectionStatus === 'connected' ? (
+                    <Wifi size={13} aria-hidden="true" />
+                  ) : (
+                    <WifiOff size={13} aria-hidden="true" />
+                  )}
+                  {ops.connectionStatus === 'connected'
+                    ? '실시간 연결됨'
+                    : ops.connectionStatus === 'connecting'
+                      ? '연결 중…'
+                      : '연결 끊김'}
+                </span>
+              )}
             </div>
             {!leaseRequired && resultHref ? (
               <Link className="tm-btn tm-btn-md tm-btn-outline mt-3" href={resultHref}>
@@ -1715,6 +1729,7 @@ export function OperateConsoleCore({
             <div
               role="group"
               aria-label="경기 진행 조작"
+              data-console-guide="commands"
               className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))] sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:justify-end sm:border-0 sm:bg-transparent sm:p-0"
             >
               {secondaryCommands.map((command) => renderCommandButton(command, false))}
@@ -2060,7 +2075,7 @@ export function OperateConsoleCore({
           균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
           다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
       {matchInPlay ? (
-        <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
+        <div data-console-guide="events" className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
           {visibleActionButtons.map((button) => (
             <Button
               // key 에 index 를 쓰지 않는다 — 롤링/제한에 따라 목록이 갈리면 같은 버튼의
@@ -2147,7 +2162,7 @@ export function OperateConsoleCore({
           기록된 경기도 "기록된 이벤트가 아직 없어요" 로 보였다 — 화면이 실제 기록을
           부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
-      <section className="px-4">
+      <section data-console-guide="history" className="px-4">
         <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">
           기록된 이벤트 <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
         </h3>

@@ -31,6 +31,8 @@
 | `POST` | `/api/v1/auth/link/email/request` | user (finished signup; session issued ≤ 30 min ago) | `{ email }` | `{ sent: true, maskedTarget, expiresInSeconds, resendAvailableInSeconds, devCode? }` — see [Adding an email login to a social account](#adding-an-email-login-to-a-social-account) |
 | `POST` | `/api/v1/auth/link/email/verify` | user (finished signup) | `{ code }` (6 digits) | `{ emailLinkToken, expiresInSeconds }` |
 | `POST` | `/api/v1/auth/link/email/complete` | user (finished signup) | `{ emailLinkToken, password, passwordConfirm }`; `password` follows the [password rule](#password-rule) | `{ linked: true, email }` |
+| `POST` | `/api/v1/verification/email/request` | user | empty body | `{ sent: true, channel: "email", target (masked), expiresAt, devCode? }`, or `{ sent: false, alreadyVerified: true, channel: "email" }` — see [Verifying the signed-in account's email](#verifying-the-signed-in-accounts-email) |
+| `POST` | `/api/v1/verification/email/confirm` | user | `{ code }` (6 digits) | `{ verified: true, channel: "email", verification: { emailVerified, phoneVerified } }` |
 | `POST` | `/api/v1/auth/identities/unlink` | user (finished signup, not an operator; session issued ≤ 30 min ago) | `{ provider: "kakao" \| "apple" \| "email" }` | `{ provider, authProviders }` + a re-signed `teameet_v1_session` cookie — see [Removing a login method](#removing-a-login-method-and-signing-out-other-devices) |
 | `POST` | `/api/v1/auth/sessions/revoke-others` | user | empty body | `{ revoked: true }` + a re-signed `teameet_v1_session` cookie — same section |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
@@ -42,9 +44,8 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, proofExpiresInSeconds, registered, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken, email?, emailProofToken? }` — the optional pair is a mailbox proof, both or neither (`400 VALIDATION_ERROR` otherwise) | `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; `maskedEmail` and `withdrawalPendingUntil` are `null` unless the mailbox proof is for this account's own email — see [Lookup by phone number](#lookup-by-phone-number) |
-| `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | after email proof: `{ providers, hasPassword, withdrawalPending, maskedEmail, emailProofAvailable, withdrawalPendingUntil }`; finds an `active` account first, then a `withdrawal_pending` one |
@@ -55,10 +56,27 @@ Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-r
 in [Users](./users.md). Taking it back is `POST /auth/withdrawal/cancel`, described below.
 
 `registered` on `phone/verify` says whether a `v1_users` row still holds that number, whatever its status. It is computed only
-after the code matched, and `phone/issue` still reveals nothing. A number is released only by the final deletion — the admin delete flow
-(`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
-still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
-before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
+after the code matched, and `phone/issue` still reveals nothing. A number is released by the final deletion — the admin delete flow
+(`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it, or, for an abandoned
+social signup, by the lazy release below; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
+still reports `registered=true`. `POST /auth/register` answers `409 PHONE_CONFLICT` with the same lookup, but only after it checked
+the phone proof: a call without a valid, unexpired proof for that number gets `400 PHONE_NOT_VERIFIED` whether or not the number is
+held, and nothing is read about the holder first. A proven call that loses the race for the number to another signup (unique-index
+violation on `v1_users.phone`) gets the same `409 PHONE_CONFLICT` instead of a 500.
+
+`proofExpiresInSeconds` is how long `proofToken` stays valid (600 today, the same constant that signs the token). Signup now starts
+with this verification, so the answer to "did the proof run out?" comes from the server and the web counts down to it; a register
+call that arrives after it still gets `400 PHONE_NOT_VERIFIED`, and the form re-verifies in place without losing its input.
+
+### A number held by an abandoned social signup
+
+A social signup saves its number onto the account the moment an SMS code (or Kakao) confirms it, and phone-first signup makes that
+the first step, so a signup nobody finishes would keep the number from everyone else. When the holder is an empty signup on the
+terms or profile step (no password, no second login, no activity, not an operator) that has not been updated for 24 hours, the number
+is released **only after the caller proved it**: in `phone/verify` (reported as `registered=false`), in `POST /auth/register` with a
+valid `phoneProofToken`, in `/verification/phone/confirm`, and for a Kakao-supplied number in `POST /auth/social-profile`. The release
+writes a `user_phone` status log `signup -> released` with reason `expired_signup_lazy`. Without proof nothing is released and
+nothing changes in the answers above.
 
 ### A number held by a withdrawal waiting out its grace period
 
@@ -74,7 +92,6 @@ the code proved the number is theirs**:
   matched) and answers `withdrawalPending: true`. The end date (`withdrawalPendingUntil`) and `maskedEmail` come back only with a mailbox
   proof for that account — see [Lookup by phone number](#lookup-by-phone-number). A number can be reassigned to someone else, so the
   `find-account` answer to an SMS proof alone never carries the previous holder's email hint or end date (`phone/verify` above still carries the date). Active holders get `withdrawalPending: false` and `null` dates.
-  `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
 - `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
@@ -211,17 +228,15 @@ characters. Every rejection is `400 VALIDATION_ERROR`.
 Finding the signup email and resetting a password happen while logged out, so they cannot reuse
 `/api/v1/verification/*`, which sits behind `V1AuthGuard`. Phone verification proves current
 possession of a number and permits account lookup; it does not prove ownership of an existing
-account. The compatibility phone reset endpoint keeps proof/account preconditions, then returns
-`409 ACCOUNT_RECOVERY_REQUIRES_EMAIL` without changing credentials. Password reset requires
-the separate email proof channel. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
+account. A password can only be reset through the separate email proof channel; there is no phone reset endpoint. Phone proof and email proof can each look up available sign-in methods; both prefer an active account and otherwise find the account in withdrawal grace.
 
 | Concern | Contract |
 |---|---|
-| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
+| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, `email/reset-password` 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
 | Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
 | Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
 | Code TTL | 5 minutes. Proof token TTL 10 minutes. |
-| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. Phone reset answers `ACCOUNT_RECOVERY_REQUIRES_EMAIL` after its existing proof/account preconditions, regardless of whether the account has a password. |
+| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. |
 
 ### Proof tokens do not cross channels
 
@@ -234,6 +249,7 @@ phone  signup          {phone}:{exp}                      ← legacy shape, must
 phone  password_reset  password_reset:{phone}:{exp}
 email  password_reset  email:password_reset:{email}:{exp}  ← channel label
 email  login link      email_login_link:{account digest}:{email}:{exp}  ← adding an email login; bound to the account
+email  change          email_change:{account digest}:{email}:{exp}      ← changing the account email (`PATCH /me/profile`); bound to the account
 ```
 
 `/auth/phone/verify` takes `purpose` from the caller for compatibility. The email path does not:
@@ -286,8 +302,8 @@ restrictions — when this refusal is returned.
 
 ### Password rule
 
-Every route that sets a login password — `register`, `link/email/complete`, `recovery/email/reset-password` and the dead-end phone
-`recovery/reset-password` — validates it with `IsAccountPassword`: a string of **8 or more characters** (counted as characters, so an emoji is one) that is **not on the common-password
+Every route that sets a login password — `register`, `link/email/complete` and `recovery/email/reset-password` — validates it with
+`IsAccountPassword`: a string of **8 or more characters** (counted as characters, so an emoji is one) that is **not on the common-password
 list**. Login (`POST /auth/login`) never applies the rule, so an existing account with a common password still signs in.
 
 - The list (`COMMON_PASSWORDS`) is a few hundred lowercase entries — digit runs, keyboard walks, `YYYY0101` birthdays, common English words and
@@ -321,7 +337,7 @@ Primary tables:
 - `v1_user_regions`
 - `v1_user_terms_consents`
 - `v1_notification_preferences`
-- `v1_verification_tokens` — logged-in verification; requires `user_id`. Every code carries a `purpose` (`V1VerificationPurpose`, default `contact`): `contact` for `/verification/*` (the account's own email or phone), `email_login_link` for [adding an email login](#adding-an-email-login-to-a-social-account). A code is checked, spent and retired only inside its own purpose.
+- `v1_verification_tokens` — logged-in verification; requires `user_id`. Every code carries a `purpose` (`V1VerificationPurpose`, default `contact`): `contact` for `/verification/*` (the account's own email or phone), `email_login_link` for [adding an email login](#adding-an-email-login-to-a-social-account), `email_change` for [changing the account email](./users.md#계정-이메일-변경) (`/me/email-change/*`). A code is checked, spent and retired only inside its own purpose.
 - `v1_phone_verification_challenges` — pre-session phone OTP, keyed by phone
 - `v1_email_verification_challenges` — pre-session email OTP, keyed by email. Separate from
   `v1_verification_tokens` precisely because a row must exist for addresses that belong to no
@@ -394,6 +410,8 @@ When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profil
 
 `social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
 
+A pending signup saves a phone number before it is finished — Kakao's number at creation, a typed one when its SMS code is confirmed — and `v1_users.phone` is unique. The number is released (`phone` and `phoneVerifiedAt` set to null) when the pending signup is reset after the 24h expiry (a login that finds it expired, or `social-terms`/`social-profile`/`social-profile/defer` answering `401 SOCIAL_SIGNUP_EXPIRED`) and when it signs out through `POST /auth/logout` ("가입 그만두기"). Only an empty signup on `social_terms_required` or `social_profile_required` is touched, by the same test the account merge uses (single login, no password, no operator role, no activity); `social_profile_deferred` accounts keep their number. Each release writes a `v1_status_change_logs` row (`target_type=user_phone`, `signup` → `released`, reason `abandoned_signup` for logout, `expired_signup` for the reset, or `expired_signup_lazy` for the release described in [A number held by an abandoned social signup](#a-number-held-by-an-abandoned-social-signup); the actor is the user for logout and the system for the other two). Logout never fails because of it: a release error is logged as a warning and the session cookie is still cleared. A signup that is simply abandoned without returning or signing out still holds its number until it comes back, or until someone proves the number (see [A number held by an abandoned social signup](#a-number-held-by-an-abandoned-social-signup)) once its 24h window has run out, or an operator releases it.
+
 ### Kakao contact confirmation and automatic account linking
 
 Kakao contacts are fetched by the API from `/v2/user/me`; login requests never accept client-supplied contact assertions. A valid/verified Kakao email and a normalized domestic Kakao phone are saved as confirmed contacts on new signup without email/SMS OTP. Existing Kakao identities can confirm an identical stored contact on subsequent login; a different service contact is not overwritten. This is provider contact confirmation, not telecom identity verification or CI certification.
@@ -422,6 +440,7 @@ Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED`; `403 SIGNUP_INCOMPLE
 A social login or signup that collides with an existing account cannot be settled by proving a phone number or an email. These `409` responses carry `details: { next: 'sign_in_then_link', provider: 'kakao' | 'apple', linkToken, linkTokenExpiresInSeconds: 1800 }` and a message that tells the person that signing in to the original account links the provider by itself:
 
 - `/auth/kakao`, `/auth/kakao/token`, `/auth/apple`: `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL`, `SOCIAL_LINK_CONTACT_CONFLICT`, `SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`. The token carries the identity the server just verified with the provider (provider, provider user key, and the provider-verified email if any). No account holds that identity yet.
+  When the account the provider's contact points at is a `withdrawal_pending` one, the answer is `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF` with the same token plus `details.withdrawalPendingUntil` (ISO instant, `null` when no request log exists) instead of a bare `403 ACCOUNT_WITHDRAWAL_PENDING`: the person signs in to that account, cancels the withdrawal (`POST /auth/withdrawal/cancel`), and the new session spends the token. The key appears only when the match rests on a contact the provider vouches for (Kakao's verified email or Kakao-supplied phone, Apple's verified email). A matching number counts on purpose: a first-time Kakao login is the start of a signup, Kakao's number is possession proof like our SMS code, and the signup screen shows the same end date after a number verification. A contact that disagrees with the stored one (including one that changed under the lock) answers `SOCIAL_LINK_CONTACT_CONFLICT` and an unverified provider email `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL`, both without the key. `suspended`/`blocked` holders stay `403 PERMISSION_DENIED`. A login whose own provider identity is on a withdrawal-pending account still gets the `403` (with `withdrawalCancelToken` once the provider token was verified for that identity).
 - `PHONE_CONFLICT` for a social account whose signup is unfinished (`social_profile_required`, `social_profile_deferred`) — `provider` is that account's own provider. It is answered only **after the number is proven**: `/verification/phone/request` sends the code even when another account holds the number (cooldown and 24-hour quota unchanged) and says nothing about the holder; `/verification/phone/confirm` answers `409` with the token once the code is right. `/auth/social-profile` checks a typed number's SMS proof first (`400 PHONE_NOT_VERIFIED`) and only then says anything about its holder, with the token; the number Kakao itself handed over counts as proven, and with SMS proof switched off a typed number gets the same advice **without** `linkToken`. The token carries that signup's login. A finished account asking to change its number still gets the plain `409` at `request`, without `details`.
 
 **Who may spend the token.** It is a bearer value, so it is bound to the accounts it was issued for: the member(s) the rejected login collided with (email owner and/or phone owner; both when they differ) or the owner of the number. The token holds only keyed digests of those account ids (and of the signup's id), never the ids. `POST /auth/link/pending` refuses a session of any other account with `409 SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH` and does not say which account was meant; the person can still link from settings (`link/kakao`, `link/apple`), which verify the provider token on the spot and have no target restriction.
@@ -441,7 +460,7 @@ The reverse of linking a social login: a Kakao/Apple account adds email + passwo
 3. `POST /auth/link/email/complete { emailLinkToken, password, passwordConfirm }` — sets the password and attaches the login. Response `{ linked: true, email }`. Rate limit 10/min. The password rule is signup's (`IsAccountPassword`, see [Password rule](#password-rule): 8 or more characters, not a common password — `400 PASSWORD_TOO_COMMON`); `passwordConfirm` must equal it (`400 VALIDATION_ERROR`, `details` names `passwordConfirm`). The address is not in the body: it is the one the token vouches for.
 
 - **Guards** (shared with the social links, `auth/link-caller-guards.ts`): an operator account gets `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; a caller who is not active gets `403 PERMISSION_DENIED`; a social signup that has not finished, including a deferred profile, gets `403 SIGNUP_INCOMPLETE`. `request` and `complete` both check them (in `complete`, inside the transaction on the locked row).
-- **Recent login**: only `request` checks it — a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` (`details: { maxAgeSeconds: 1800 }`) before anything is read or mailed. `verify` and `complete` do not re-check, and that is safe because of the purpose binding below: `verify` accepts only a code that `request` created, so a session past the limit has no other way to obtain one (`/verification/email/request` does not look at the session age and can mail the account's own email, which `PATCH /me/profile` lets the caller choose — its codes are `contact` and `verify` refuses them). The 10 minutes of the `emailLinkToken` then bound the window for the write.
+- **Recent login**: only `request` checks it — a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` (`details: { maxAgeSeconds: 1800 }`) before anything is read or mailed. `verify` and `complete` do not re-check, and that is safe because of the purpose binding below: `verify` accepts only a code that `request` created, so a session past the limit has no other way to obtain one (`/verification/email/request` does not look at the session age and can mail the account's own email — its codes are `contact` and `verify` refuses them). The 10 minutes of the `emailLinkToken` then bound the window for the write.
 - **Conflicts**: `409 SOCIAL_LINK_PROVIDER_EXISTS` when the account already has an active email login. `409 EMAIL_CONFLICT` ("이미 다른 계정에서 쓰는 이메일이에요.") when any other user holds the address as `v1_users.email` or as an email login key; nothing else about that account is said. The address the account itself carries as a contact email is allowed. `request` checks this before mailing; `complete` checks it again inside the transaction.
 - **Codes**: the same machinery and error codes as `/verification/*` — 5 minutes TTL, 5 attempts (`400 VERIFICATION_CODE_MISMATCH`, `400 VERIFICATION_TOO_MANY_ATTEMPTS`), an expired or missing code is `400 VERIFICATION_NO_PENDING`, resend cooldown 30 s per address (`400 VERIFICATION_RESEND_COOLDOWN`), and the 24-hour send quota of 5 per address and 10 per account (`429 VERIFICATION_SEND_QUOTA_EXCEEDED`); cooldown and quota count every mail sent to the address or by the account, whatever the code is for. A mail that could not be sent (`503 EMAIL_SEND_FAILED`) leaves no code behind, so the person can ask again at once.
 - **Purpose binding**: link codes are stored with `purpose = email_login_link`, the account-contact codes of `/verification/*` with `purpose = contact` (column default; older writers get it too). Reading, spending and retiring are scoped to one purpose: `verify` refuses a code from `/verification/email/request` (`400 VERIFICATION_NO_PENDING`), `/verification/email/confirm` refuses a link code, and asking for one kind of code does not retire a pending code of the other. Asking again retires only the earlier code of the same purpose.
@@ -456,6 +475,16 @@ Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED` (request); `403 SIGNU
 Kakao and Apple signup do not require email/password setup. `user.signupEmailLoginRequired` remains in responses as a compatibility field and is always false; `GET /auth/me` also clears any old true value left by the previous Alpha release. The database column remains for safe rolling deployment and rollback compatibility. No email identity is created unless a member explicitly completes the separate email-login link flow. A deferred social profile must complete the profile before adding any login method.
 
 `GET /api/v1/auth/me` and successful session responses also include `termsCompliance`. After the configured enforcement time, a completed existing user with pending required documents receives `403 TERMS_RECONSENT_REQUIRED` from other protected APIs, with pending document IDs and `next.route=/terms?mode=renewal`. Email login follows that route immediately and preserves a safe original redirect. The global gate does not race the login callback, and the renewal screen has no back action and prevents browser-history bypass until compliance succeeds. The guard keeps `/auth/me`, `/auth/logout`, `/terms/current`, and `/terms/consents` reachable so the user can inspect and complete the requirement. Previously satisfied items remain checked and disabled; only newly required IDs are posted.
+
+### Verifying the signed-in account's email
+
+An email signup never proves its address, so `v1_users.email_verified_at` stays empty until the owner confirms a mailed code. The web asks for it from a banner on the My tab and a signed-in step page (`/my/email-verify`); both use the two `/verification/email/*` routes (`V1AuthGuard`, no recent-login requirement).
+
+- `POST /verification/email/request` — mails a 6-digit code to the account's own `v1_users.email` (the "verify" mail, `purpose = contact`). No body. `{ sent: false, alreadyVerified: true }` when the address is already proven: no code is created.
+  - Refusals, in the order they are checked: `400 EMAIL_REQUIRED` (the account has no email); `503 EMAIL_SEND_UNAVAILABLE` (this address cannot be reached: no mail delivery configured, and dev echo only covers test addresses — answered before any code exists, the same as the other email-code routes); `400 VERIFICATION_RESEND_COOLDOWN` (30 s per address, counted across every purpose, and checked again under the send lock so two simultaneous requests cannot both send); `429 VERIFICATION_SEND_QUOTA_EXCEEDED` (5 per address and 10 per account per 24 hours). A provider failure is `503 EMAIL_SEND_FAILED` and removes the code just created, so retrying is not held back by the cooldown. Rate limit 5/min per IP.
+- `POST /verification/email/confirm { code }` — checks the newest pending `contact` code (5 minutes TTL, 5 attempts: `400 VERIFICATION_CODE_MISMATCH`, `400 VERIFICATION_TOO_MANY_ATTEMPTS`; an expired or missing code is `400 VERIFICATION_NO_PENDING`). It sets `email_verified_at` only while `v1_users.email` still equals the address the code was mailed to (`400 VERIFICATION_TARGET_CHANGED` otherwise) and keeps the email login's key in step. `409 EMAIL_CONFLICT` when another account has taken the address in the meantime.
+- Effects: `GET /auth/me` reports `verification.emailVerified: true`; a Kakao or Apple login whose provider-verified email equals this address links to the account instead of answering `409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL` ([Sign in, then link](#sign-in-then-link)).
+- The My tab banner is shown only for `accountStatus = active`, an `email` login with a password (`user.authProviders` / `user.hasPassword`), `verification.emailVerified = false` and a finished required signup.
 
 ### Removing a login method and signing out other devices
 

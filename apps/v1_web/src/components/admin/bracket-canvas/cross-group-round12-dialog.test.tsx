@@ -80,6 +80,26 @@ describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
     expect(saved!.version).toBe(preview.version);
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('저장했어요'), 'success');
   });
+  it('조 간 비교 안내와 추천 1번 시드가 대회의 동점 순서를 따른다', async () => {
+    const preview = createCrossGroupRound12Fixture();
+    const g0 = preview.teams.find((team) => team.groupId === 'group-0' && team.teamName === 'A팀1')!;
+    const g4 = preview.teams.find((team) => team.groupId === 'group-4' && team.teamName === 'E팀1')!;
+    // 득실차는 A조 1위가 앞서고 득점은 E조 1위가 앞선다.
+    Object.assign(g4, { goalsFor: 30, goalsAgainst: 25 });
+    expect(g0.goalsFor - g0.goalsAgainst).toBeGreaterThan(g4.goalsFor - g4.goalsAgainst);
+    expect(g4.goalsFor).toBeGreaterThan(g0.goalsFor);
+
+    const first = mount(structuredClone(preview));
+    const byDefault = await screen.findByLabelText('1번 시드 · 부전승');
+    expect((byDefault as HTMLSelectElement).value).toBe(g0.registrationId);
+    expect(screen.getByText(/조 간 비교는 승점 → 득실차 → 다득점 순이에요\. 맞대결·페어플레이는 서로 다른 조 사이에서는 보지 않아요/)).toBeInTheDocument();
+    cleanup(); first.client.clear();
+
+    mount({ ...structuredClone(preview), tieBreakOrder: ['points', 'goals_for', 'fair_play', 'goal_difference', 'head_to_head', 'seeded_draw'] });
+    const byGoalsFor = await screen.findByLabelText('1번 시드 · 부전승');
+    expect((byGoalsFor as HTMLSelectElement).value).toBe(g4.registrationId);
+    expect(screen.getByText(/조 간 비교는 승점 → 다득점 → 득실차 순이에요/)).toBeInTheDocument();
+  });
   it('완전 동률 순서는 직접 확인하기 전까지 저장할 수 없다', async () => {
     const preview = createCrossGroupRound12Fixture();
     const first = preview.teams[0], second = preview.teams[4];

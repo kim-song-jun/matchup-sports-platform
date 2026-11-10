@@ -1,4 +1,5 @@
-import { issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token';
+import { PHONE_PROOF_TTL_SECONDS, issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 describe('phone-proof-token', () => {
   // 원래 없던 값을 그대로 대입하면 문자열 "undefined" 가 남아 같은 worker 의 다른 테스트가
@@ -27,6 +28,22 @@ describe('phone-proof-token', () => {
     const past = Date.now() - 20 * 60 * 1000;
     const token = issuePhoneProofToken('01012345678', 'signup', past);
     expect(verifyPhoneProofToken(token, '01012345678')).toBe(false);
+  });
+
+  // The web counts down to the advertised lifetime, so it must be the lifetime the token really has.
+  it('PHONE_PROOF_TTL_SECONDS is exactly how long an issued proof verifies', () => {
+    const issuedAt = Date.now();
+    const token = issuePhoneProofToken('01012345678', 'signup', issuedAt);
+    const ttlMs = PHONE_PROOF_TTL_SECONDS * 1000;
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime(issuedAt + ttlMs - 1000);
+      expect(verifyPhoneProofToken(token, '01012345678')).toBe(true);
+      jest.setSystemTime(issuedAt + ttlMs + 1000);
+      expect(verifyPhoneProofToken(token, '01012345678')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // 용도가 페이로드에 없으면 "가입하려고 받은 증명"으로 남의 비밀번호를 재설정할 수 있다.
@@ -58,8 +75,7 @@ describe('phone-proof-token', () => {
 
   it('rejects a tampered signature', () => {
     const token = issuePhoneProofToken('01012345678');
-    const tampered = `${token.slice(0, -2)}xy`;
-    expect(verifyPhoneProofToken(tampered, '01012345678')).toBe(false);
+    expect(verifyPhoneProofToken(tamperSignature(token), '01012345678')).toBe(false);
   });
 
   it('rejects malformed tokens', () => {

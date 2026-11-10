@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
@@ -170,6 +171,44 @@ describe('Task 17 team-match score invariant (event-vs-score exemption)', () => 
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  it('rejects with 422 SCORE_EVENT_MISMATCH when a side\'s personal goals exceed its score, and stores no revision', async () => {
+    const participants = await prisma.v1GameParticipant.findMany({ where: { gameId } });
+    const hostOne = participants.find((p) => p.displayNameSnapshot === 'Task 17 Host One');
+    const awayOne = participants.find((p) => p.displayNameSnapshot === 'Task 17 Away One');
+    if (hostOne === undefined || awayOne === undefined) {
+      throw new Error('Expected seeded participants to be persisted');
+    }
+    const row = (participant: { id: string; sideId: string }, goals: number) => ({
+      participantId: participant.id,
+      sideId: participant.sideId,
+      started: true,
+      goals,
+      cards: { yellow: 0, red: 0 },
+      goalkeeper: false,
+    });
+    // 1:0 on the scoreboard but one personal goal on each side: the away
+    // goal contradicts the 0 away score. The follow-up test submits matching
+    // totals for the same game as the control.
+    const failure = await service
+      .createResultRevision(authUser(ids.hostUser), gameId, 'task17-goal-excess-draft', {
+        expectedVersion: 0,
+        clientCommandId: 'task17-goal-excess-draft',
+        score: { home: 1, away: 0 },
+        actualParticipants: [row(hostOne, 1), row(awayOne, 1)],
+        eventsHash: 'task17-goal-excess-events',
+      })
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(failure).toBeInstanceOf(HttpException);
+    expect((failure as HttpException).getStatus()).toBe(422);
+    expect((failure as HttpException).getResponse()).toEqual(
+      expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }),
+    );
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(0);
   });
 
   it('drafts, submits, and reaches OFFICIAL with a real 3:1 score and per-participant goals that sum to it, despite zero live game events', async () => {

@@ -27,6 +27,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { AdminModule } from './admin/admin.module';
+import { AdsModule } from './ads/ads.module';
 import { WithdrawalFinalizationModule } from './users/withdrawal-finalization.module';
 import { SearchModule } from './search/search.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -79,6 +80,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
     NotificationsModule,
     ProfileModule,
     AdminModule,
+    AdsModule,
     WithdrawalFinalizationModule,
     SearchModule,
     ReviewsModule,

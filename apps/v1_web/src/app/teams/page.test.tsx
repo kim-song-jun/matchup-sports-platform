@@ -121,7 +121,7 @@ describe('teams list metadata', () => {
       return envelope({ items: [], nextCursor: null, pageInfo: { hasNext: false, totalCount: 0 } });
     }));
 
-    const html = await serverHtml('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=cursor-page-2');
+    const html = await serverHtml('sportId=sport-futsal&regionId=region-seoul&sort=member_count&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=cursor-page-2');
     const body = stripScriptTags(html);
 
     const teamRequests = requests.map((request) => new URL(request)).filter((url) => url.pathname.endsWith('/teams'));
@@ -129,12 +129,12 @@ describe('teams list metadata', () => {
     expect(cursorRequest?.searchParams.get('sportId')).toBe('sport-futsal');
     expect(cursorRequest?.searchParams.get('regionId')).toBe('region-seoul');
     expect(cursorRequest?.searchParams.get('query')).toBe('마포 FC');
-    expect(cursorRequest?.searchParams.get('joinPolicy')).toBe('approval_required');
+    expect(cursorRequest?.searchParams.get('sort')).toBe('member_count');
     const metadataRequest = teamRequests.find((url) => url.searchParams.get('includeFacets') === 'true');
     expect(metadataRequest?.searchParams.get('sportId')).toBe('sport-futsal');
     expect(metadataRequest?.searchParams.get('regionId')).toBe('region-seoul');
     expect(metadataRequest?.searchParams.get('query')).toBe('마포 FC');
-    expect(metadataRequest?.searchParams.get('joinPolicy')).toBe('approval_required');
+    expect(metadataRequest?.searchParams.get('sort')).toBe('member_count');
     expect(metadataRequest?.searchParams.get('cursor')).toBeNull();
     expect(metadataRequest?.searchParams.get('limit')).toBe('1');
     expect(body).toContain('두 번째 페이지 팀');
@@ -149,7 +149,7 @@ describe('teams list metadata', () => {
     expect(continuationUrl.searchParams.get('cursor')).toBe('cursor-page-3');
     expect(continuationUrl.searchParams.get('sportId')).toBe('sport-futsal');
     expect(continuationUrl.searchParams.get('regionId')).toBe('region-seoul');
-    expect(continuationUrl.searchParams.get('sort')).toBe('deadline');
+    expect(continuationUrl.searchParams.get('sort')).toBe('member_count');
     expect(continuationUrl.searchParams.get('q')).toBe('마포 FC');
     expect(continuationUrl.searchParams.get('query')).toBeNull();
     expect(continuationUrl.searchParams.get('joinPolicy')).toBeNull();

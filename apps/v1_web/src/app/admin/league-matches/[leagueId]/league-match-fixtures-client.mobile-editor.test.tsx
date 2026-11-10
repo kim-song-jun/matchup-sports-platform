@@ -214,6 +214,22 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(mobileEditorFixture.templateWrites).toEqual([]);
   });
 
+  it('390 경기 시트의 취소·삭제 입구가 실제 route 에서 같은 확인 모달로 이어져요', async () => {
+    // Given: 결과 없는 예정 경기를 쓰기 권한 운영자가 390 으로 열어요.
+    mobileEditorFixture.league = mobileLeague([mobileFixture({ game: makeGame() })]);
+    await renderMobileConsumer();
+    fireEvent.click(await screen.findByRole('button', { name: /모바일 리그 1주차/ }));
+    const sheet = await screen.findByRole('dialog', { name: '모바일 리그 1주차' });
+    // Then: 취소와 삭제는 서로 다른 안내와 함께 시트에 있어요.
+    expect(within(sheet).getByText('순위 집계에서 빼요. 경기 기록은 남아요.')).toBeVisible();
+    expect(within(sheet).getByRole('button', { name: '경기 삭제' })).toHaveAccessibleDescription('대진표에서 숨겨요. 되돌릴 수 없어요.');
+    // When: 삭제를 누르면 시트가 닫히고 목록과 같은 확인 모달이 떠요.
+    fireEvent.click(within(sheet).getByRole('button', { name: '경기 삭제' }));
+    expect(await screen.findByRole('heading', { name: '경기를 삭제할까요?' })).toBeVisible();
+    expect(screen.queryByRole('dialog', { name: '모바일 리그 1주차' })).not.toBeInTheDocument();
+    expect(mobileEditorFixture.fixtureWrites).toEqual([]);
+  });
+
   it('완료 리그의 실제 결과 정정 출구는 유지하고 경기 구조 편집은 열지 않아요', async () => {
     // Given: 결과가 남은 종료 리그를 쓰기 권한이 있는 운영자가 처음 모바일로 열어요.
     mobileEditorFixture.league = {

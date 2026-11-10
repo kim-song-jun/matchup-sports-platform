@@ -73,6 +73,11 @@ describe('LeagueAdminShell', () => {
   });
 
   describe('섹션 바', () => {
+    it('운영 그룹에 징계 현황이 리그 경로로 걸려 있다', () => {
+      renderShell();
+      expect(screen.getByRole('link', { name: /징계 현황/ })).toHaveAttribute('href', '/admin/league-matches/league-1/discipline');
+    });
+
     it.each([
       ['completed', null, true],
       ['completed', 'series-1', false],

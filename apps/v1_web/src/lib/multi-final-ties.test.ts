@@ -90,7 +90,7 @@ describe('describeTies', () => {
     const [notice] = describeTies(view, view.finals[0]);
     expect(describeTies(view, view.finals[0])).toHaveLength(1);
     expect(notice.banner).toBe('A조 3위·4위가 완전 동률이에요. 3위는 프리미어, 4위는 챌린지로 갈라지는 자리라 직접 골라야 해요.');
-    expect(notice.detail).toBe('승점 7 · 골득실 +2 · 득점 6 · 맞대결·페어플레이까지 같아서 추첨으로만 갈렸어요.');
+    expect(notice.detail).toBe('승점 7 · 골득실 +2 · 득점 6 · 동점 기준이 모두 같아서 추첨으로만 갈렸어요.');
     expect(notice.seats).toEqual([{ seat: 2, groupId: 'gA', rank: 3, label: '프리미어 3위 자리에 보낼 팀', hint: '고르지 않은 팀은 챌린지 4위 자리로 가요.', candidates: ['a3', 'a4'] }]);
   });
   it('반대편 토너먼트에서 보면 같은 동률이 그쪽 자리로 보인다', () => {

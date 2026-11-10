@@ -4,9 +4,10 @@
  * 그래픽이 빠지면 여기서 잡는다.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { AuthExceptionPageView, LoginPageView, SignupCompletePageView } from './auth-page';
 import { getAuthExceptionViewModel, getLoginViewModel, getSignupCompleteViewModel } from './auth.view-model';
@@ -33,6 +34,13 @@ describe('인증 안내 화면', () => {
     expect(imgs.some((img) => img.classList.contains('tm-hide-desktop'))).toBe(true);
     expect(imgs.some((img) => img.classList.contains('tm-auth-stage-illustration'))).toBe(true);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('현재 계정은 이용할 수 없어요');
+  });
+
+  it('이용이 제한된 계정 화면의 고객센터 문의는 문의 화면으로 가는 링크다', () => {
+    render(<AuthExceptionPageView model={getAuthExceptionViewModel('blocked')} />);
+    expect(screen.getByRole('link', { name: '고객센터 문의' })).toHaveAttribute('href', '/contact');
+    expect(screen.queryByRole('button', { name: '고객센터 문의' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '로그인으로 돌아가기' })).toHaveAttribute('href', '/login');
   });
 });
 
@@ -84,6 +92,15 @@ describe('로그인 화면', () => {
     it('토큰이 없으면 평소 로그인 화면 그대로다', () => {
       renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
       expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+    });
+
+    it('이메일 연결 뜻을 보관해 뒀다면 소셜 로그인 버튼 위에 이어 가기 안내와 연결 안 하기를 보여 준다', async () => {
+      savePendingEmailLink({ email: 'typed@example.com' });
+      const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+      const notice = await screen.findByText(/typed@example\.com 연결을 이어서 도와요/);
+      expect(notice.compareDocumentPosition(container.querySelector('.tm-auth-provider-group')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+      expect(readPendingEmailLink()).toBeNull();
     });
   });
 

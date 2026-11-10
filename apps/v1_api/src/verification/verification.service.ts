@@ -12,6 +12,7 @@ import { Prisma, V1AuthProvider, V1VerificationChannel, V1VerificationPurpose } 
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { releaseExpiredSignupPhone } from '../auth/empty-signup-account';
 import { pendingAccountLinkClaims, signInThenLinkConflict } from '../auth/social-link-conflict';
 import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -49,6 +50,7 @@ const MAX_SENDS_PER_USER = 10;
 const EMAIL_PURPOSE_OF: Record<V1VerificationPurpose, OtpEmailPurpose> = {
   contact: 'verify',
   email_login_link: 'login_email_link',
+  email_change: 'email_change',
 };
 
 @Injectable()
@@ -72,6 +74,8 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
+    this.assertEmailDeliverable('contact', user.email);
+    await this.assertResendCooldown('email', user.email);
     // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
     // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
     return this.issue('email', user.id, user.email, 'contact');
@@ -100,8 +104,12 @@ export class VerificationService {
    * 마지막 발송 기록은 발송 실패 시 `issue()` 가 지우므로 실패한 시도는 쿨다운을 걸지 않는다.
    * 쿨다운과 발송 상한은 목적을 가리지 않고 센다 — 막으려는 것은 코드의 종류가 아니라 그 대상에게 나간 메일·문자의 양이다.
    */
-  private async assertResendCooldown(channel: V1VerificationChannel, target: string) {
-    const recent = await this.prisma.v1VerificationToken.findFirst({
+  private async assertResendCooldown(
+    channel: V1VerificationChannel,
+    target: string,
+    db: Pick<Prisma.TransactionClient, 'v1VerificationToken'> = this.prisma,
+  ) {
+    const recent = await db.v1VerificationToken.findFirst({
       where: { channel, target },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
@@ -158,6 +166,8 @@ export class VerificationService {
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
     const token = await this.checkPendingCode(authUser.id, channel, 'contact', code);
+    // The code proved the number is theirs; an expired, abandoned signup holding it no longer blocks the save below.
+    if (channel === 'phone') await releaseExpiredSignupPhone(this.prisma, token.target, authUser.id);
 
     const now = new Date();
     try {
@@ -283,17 +293,43 @@ export class VerificationService {
    * 로그인한 계정에 이메일 로그인을 추가하기 위해, 아직 이 계정의 것이 아닌 주소로 인증번호를 보낸다.
    * 주소를 다른 계정이 쓰는지·계정이 추가할 수 있는 상태인지는 호출자가 이미 확인했다. 여기서는 발송 쿨다운·총량 상한만 건다.
    */
-  async requestEmailLinkCode(userId: string, email: string) {
-    // 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다.
-    if (!this.dispatcher.emailDeliverable) {
-      this.logger.error('email login link requested but email delivery is not configured (SES_REGION/EMAIL_FROM)');
-      throw new ServiceUnavailableException({
-        code: 'EMAIL_SEND_UNAVAILABLE',
-        message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
-      });
+  requestEmailLinkCode(userId: string, email: string) {
+    return this.requestPurposeEmailCode(userId, email, 'email_login_link');
+  }
+
+  /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
+  consumeEmailLinkCode(userId: string, code: string): Promise<string> {
+    return this.consumePurposeCode(userId, 'email_login_link', code);
+  }
+
+  /** 계정 이메일을 바꾸기 위해 새 주소로 인증번호를 보낸다. 주소 충돌·계정 상태·최근 로그인은 호출자가 이미 확인했다. */
+  requestEmailChangeCode(userId: string, email: string) {
+    return this.requestPurposeEmailCode(userId, email, 'email_change');
+  }
+
+  /** `requestEmailChangeCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
+  consumeEmailChangeCode(userId: string, code: string): Promise<string> {
+    return this.consumePurposeCode(userId, 'email_change', code);
+  }
+
+  /**
+   * 이 주소로 코드를 전할 길이 없으면 아무도 이 단계를 끝낼 수 없다. 주소를 보고 판정한다 — 코드를 응답에 싣는 개발 환경도
+   * 시험 주소에만 그렇게 하므로, 메일 발송이 없는 환경에서 실제 주소는 여기서 거절된다.
+   */
+  private assertEmailDeliverable(purpose: V1VerificationPurpose, email: string) {
+    try {
+      this.dispatcher.assertDeliveryAvailable('email', email);
+    } catch (err) {
+      this.logger.error(`${purpose} code requested but email delivery is not configured for this address (SES_REGION/EMAIL_FROM)`);
+      throw err;
     }
+  }
+
+  /** 로그인한 계정이 아직 자기 것으로 증명하지 않은 주소로 보내는 목적별 인증번호. 쿨다운·24시간 발송 상한은 목적과 무관하게 센다. */
+  private async requestPurposeEmailCode(userId: string, email: string, purpose: Exclude<V1VerificationPurpose, 'contact'>) {
+    this.assertEmailDeliverable(purpose, email);
     await this.assertResendCooldown('email', email);
-    const issued = await this.issue('email', userId, email, 'email_login_link');
+    const issued = await this.issue('email', userId, email, purpose);
     return {
       sent: true as const,
       maskedTarget: issued.target,
@@ -303,9 +339,9 @@ export class VerificationService {
     };
   }
 
-  /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
-  async consumeEmailLinkCode(userId: string, code: string): Promise<string> {
-    const token = await this.checkPendingCode(userId, 'email', 'email_login_link', code);
+  /** 같은 목적으로 보낸 가장 최근 이메일 코드를 대조해 한 번만 소비하고, 코드를 받은 주소를 돌려준다. */
+  private async consumePurposeCode(userId: string, purpose: Exclude<V1VerificationPurpose, 'contact'>, code: string): Promise<string> {
+    const token = await this.checkPendingCode(userId, 'email', purpose, code);
     const consumed = await this.prisma.v1VerificationToken.updateMany({
       where: { id: token.id, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -338,6 +374,8 @@ export class VerificationService {
       const targetScope = JSON.stringify(['verification-send-target', channel, target]);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userScope}, 0))`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${targetScope}, 0))`;
+      // 잠금 밖의 쿨다운 확인은 빠른 거절일 뿐이다 — 같은 대상으로 동시에 들어온 요청은 둘 다 그걸 통과하므로 잠금 아래에서 다시 본다.
+      await this.assertResendCooldown(channel, target, tx);
       await this.assertSendQuota(tx, channel, userId, target);
       // 새 코드는 같은 목적의 이전 코드만 폐기한다 — 다른 흐름이 보낸 코드는 그대로 쓸 수 있어야 한다.
       await tx.v1VerificationToken.updateMany({

@@ -1,3 +1,5 @@
+import type { V1TournamentTieBreakOrder } from '@/types/api';
+
 export type CrossGroupTeam = {
   registrationId: string; teamName: string; groupId: string; groupName: string;
   points: number; goalsFor: number; goalsAgainst: number;
@@ -7,7 +9,7 @@ export type CrossGroupTarget = {
   seed: number; label: string; fixtureId: string; side: 'HOME' | 'AWAY';
   slotId: string | null; currentRegistrationId: string | null; byePosition: number | null; groupId: string;
 };
-export type CrossGroupPreview = { version: string; teams: CrossGroupTeam[]; ranks: CrossGroupRank[]; targets: CrossGroupTarget[] };
+export type CrossGroupPreview = { version: string; tieBreakOrder: V1TournamentTieBreakOrder; teams: CrossGroupTeam[]; ranks: CrossGroupRank[]; targets: CrossGroupTarget[] };
 export type CrossGroupApplyInput = {
   version: string; rankPicks: string[]; rankingOrder: string[]; assignments: string[]; reason: string;
 };

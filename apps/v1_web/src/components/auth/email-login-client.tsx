@@ -24,6 +24,7 @@ import {
   STEP_UP_UNAVAILABLE_MESSAGE,
 } from './login-step-up-errors';
 import { routeToWithdrawalCancel } from './login-recovery-route';
+import { PendingEmailLinkNotice } from './pending-email-link-notice';
 import { PendingLinkNotice } from './pending-link-notice';
 import { PasswordResetLink } from './password-reset-link';
 import { describeSocialLoginGuide } from './social-login-guide';
@@ -113,6 +114,7 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         {model.sub ? <p className="tm-text-body tm-auth-sub">{model.sub}</p> : null}
         <PendingLinkNotice />
+        <PendingEmailLinkNotice />
         <div className="tm-auth-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">이메일</span>
@@ -164,8 +166,7 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
           {model.primary.label}
         </Button>
         <div className="tm-auth-link-row">
-          {/* /auth/password-reset 은 안내 문구만 있던 자리표시자였다 — 실제로 동작하는
-              계정 찾기 화면으로 연결한다(아이디 찾기·비밀번호 재설정 한 화면). */}
+          {/* 아이디 찾기·비밀번호 재설정은 계정 찾기 한 화면에서 한다. */}
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={recoveryHref}>아이디·비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>

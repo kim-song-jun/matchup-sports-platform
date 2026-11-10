@@ -1,5 +1,7 @@
 import { calculateCompetitionStandings, calculateCompetitionStandingsWithTies, type StandingFixture } from './competition-standings';
-import { FOOTBALL_V1_CONFIG } from './competition-config.presets';
+import { FOOTBALL_V1_CONFIG, REQUIRED_TIE_BREAK_ORDER } from './competition-config.presets';
+import type { CompetitionConfig } from './competition-config.types';
+import { withTournamentTieBreakOrder } from './tournament-tie-break-order';
 
 function defaultTestConfig() {
   return FOOTBALL_V1_CONFIG;
@@ -138,5 +140,75 @@ describe('calculateCompetitionStandingsWithTies — 추첨으로만 갈린 묶�
     const first = calculateCompetitionStandingsWithTies({ tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ['A', 'B', 'C'], fixtures, config: defaultTestConfig() });
     const second = calculateCompetitionStandingsWithTies({ tournamentId: 't2', configVersionId: 'cfg2', registrationIds: ['A', 'B', 'C'], fixtures, config: defaultTestConfig() });
     expect(sortedTies(second.drawnTies)).toEqual(sortedTies(first.drawnTies));
+  });
+});
+
+describe('calculateCompetitionStandings — 대회가 고른 동점 순서', () => {
+  // A and B both finish on 3 points. A beat B 1-0 (head-to-head winner) but has the worse overall goal
+  // difference (-2 vs +3), fewer goals (1 vs 4) and, in the fair-play case below, the worse discipline.
+  const fixtures = [result('A', 'B', 1, 0), result('D', 'A', 3, 0), result('B', 'E', 4, 0), result('D', 'E', 1, 0)];
+  const registrationIds = ['A', 'B', 'D', 'E'];
+  const orderOf = (tieBreakOrder: CompetitionConfig['tieBreak']['order'], fairPlay?: ReadonlyMap<string, number>) =>
+    calculateCompetitionStandings({
+      tournamentId: 't1', configVersionId: 'cfg1', registrationIds, fixtures, fairPlayByRegistration: fairPlay,
+      config: withTournamentTieBreakOrder(defaultTestConfig(), tieBreakOrder),
+    }).map((row) => row.registrationId);
+
+  it('기본 순서에서는 맞대결에서 이긴 팀이 득실이 나빠도 앞선다 — 순위가 바뀌지 않는 대조군', () => {
+    expect(orderOf(REQUIRED_TIE_BREAK_ORDER)).toEqual(['D', 'A', 'B', 'E']);
+    expect(calculateCompetitionStandings({ tournamentId: 't1', configVersionId: 'cfg1', registrationIds, fixtures, config: defaultTestConfig() })
+      .map((row) => row.registrationId)).toEqual(['D', 'A', 'B', 'E']);
+  });
+
+  it('득실차를 맞대결보다 먼저 두면 득실이 좋은 팀이 앞선다', () => {
+    expect(orderOf(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
+  });
+
+  it('다득점을 맞대결보다 먼저 두면 많이 넣은 팀이 앞선다', () => {
+    expect(orderOf(['points', 'goals_for', 'head_to_head', 'goal_difference', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
+  });
+
+  it('페어플레이를 맨 앞에 두면 벌점이 적은 팀이 앞선다', () => {
+    const fairPlay = new Map([['A', 6], ['B', 0]]);
+    expect(orderOf(REQUIRED_TIE_BREAK_ORDER, fairPlay)).toEqual(['D', 'A', 'B', 'E']);
+    expect(orderOf(['points', 'fair_play', 'head_to_head', 'goal_difference', 'goals_for', 'seeded_draw'], fairPlay)).toEqual(['D', 'B', 'A', 'E']);
+  });
+
+  describe('맞대결이 앞 기준으로 갈리지 않은 팀들끼리만 따진다', () => {
+    // A, B and C all beat D and each other in a cycle (A>B 5-0, B>C 1-0, C>A 1-0): 6 points each, overall
+    // goal difference A +5, B +1, C +1. B and C are still level after goal difference, and B beat C directly.
+    // A mini-table over all three would let the A-C result drag B below C; the direct game decides instead.
+    const cycle = [
+      result('A', 'B', 5, 0), result('B', 'C', 1, 0), result('C', 'A', 1, 0),
+      result('A', 'D', 1, 0), result('B', 'D', 5, 0), result('C', 'D', 1, 0),
+    ];
+    const cycleOrder = (tieBreakOrder: CompetitionConfig['tieBreak']['order']) =>
+      calculateCompetitionStandings({
+        tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ['A', 'B', 'C', 'D'], fixtures: cycle,
+        config: withTournamentTieBreakOrder(defaultTestConfig(), tieBreakOrder),
+      }).map((row) => row.registrationId);
+
+    it('득실차 다음에 맞대결이면 같은 득실의 두 팀은 서로의 경기로 가른다', () => {
+      expect(cycleOrder(['points', 'goal_difference', 'head_to_head', 'goals_for', 'fair_play', 'seeded_draw'])).toEqual(['A', 'B', 'C', 'D']);
+    });
+
+    it('다득점이 먼저여도 같은 결과다 — 앞 기준이 이미 B 를 C 앞에 둔다', () => {
+      expect(cycleOrder(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['A', 'B', 'C', 'D']);
+    });
+
+    it('맞대결이 승점 바로 다음이면 세 팀 전체의 맞대결 성적표를 쓴다 — 기본 순서는 그대로', () => {
+      expect(cycleOrder(REQUIRED_TIE_BREAK_ORDER)).toEqual(['A', 'C', 'B', 'D']);
+    });
+  });
+
+  it('순서를 바꿔도 추첨으로만 갈린 묶음은 같다 — 어느 기준으로도 안 갈린 팀은 순서와 무관하다', () => {
+    const level = [result('A', 'B', 1, 1), result('A', 'C', 1, 0), result('B', 'C', 1, 0)];
+    const input = { tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ['A', 'B', 'C'], fixtures: level };
+    const base = calculateCompetitionStandingsWithTies({ ...input, config: defaultTestConfig() });
+    const reordered = calculateCompetitionStandingsWithTies({
+      ...input, config: withTournamentTieBreakOrder(defaultTestConfig(), ['points', 'fair_play', 'goals_for', 'goal_difference', 'head_to_head', 'seeded_draw']),
+    });
+    expect(sortedTies(reordered.drawnTies)).toEqual(sortedTies(base.drawnTies));
+    expect(sortedTies(reordered.drawnTies)).toEqual([['A', 'B']]);
   });
 });

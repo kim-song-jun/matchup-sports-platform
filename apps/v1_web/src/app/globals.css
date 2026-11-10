@@ -127,6 +127,7 @@
   --tint-blue: rgba(49, 130, 246, 0.08);   /* --blue500(#3182f6) 8% — 파란 안내 카드 배경, var(--blue50) 다크모드 미대응 대체 */
   /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
   --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
+  --scrim-dark-48: rgba(25, 31, 40, 0.48);  /* 홈 공지·광고 팝업 스크림 */
   --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
   --scrim-dark-94: rgba(25, 31, 40, 0.94);  /* 검색 에러 토스트 배경 */
   --navy-scrim-32: rgba(15, 23, 42, 0.32);  /* 채팅 데스크톱 Leave 스크림 */
@@ -1343,6 +1344,33 @@ button:disabled {
   background: var(--blue50);
   color: var(--blue700);
   line-height: 1.55;
+}
+
+/* 문구 한 줄에 행동 버튼이 붙는 안내 띠(AlertBanner 는 문구만 받는다). 색 쌍은 AlertBanner info 톤과 같다.
+   좁은 폭에서는 버튼이 문구 아래로 내려간다. */
+.tm-action-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+}
+
+.tm-action-banner .tm-action-banner-message {
+  flex: 1 1 16rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--blue700);
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.tm-action-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
 }
 
 .tm-auth-guide-links {
@@ -4312,6 +4340,8 @@ label.tm-btn:focus-within {
   max-height: min(78dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 키보드로 이동한 입력칸이 고정된 머리 아래에 가려지지 않게 한다. */
+  scroll-padding-top: 88px;
 }
 
 /* 시트가 화면 바닥에 붙을 때만 안전영역을 더한다 — 탭바 위에 얹히면 탭바가 이미 소비했다. */
@@ -4330,9 +4360,11 @@ label.tm-btn:focus-within {
   touch-action: none;
 }
 
+/* 마우스로 끌 때 글자 선택이 시작되면 브라우저가 선택 위치로 시트를 스크롤해 내용이 튄다(alpha 실측 157 → 143). */
 .tm-scrollable-drag-sheet .tm-filter-sheet-handle {
-  position: relative;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tm-scrollable-drag-sheet .tm-filter-sheet-handle::before {
@@ -4484,7 +4516,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   }
 }
 
+/* 시트가 통째로 스크롤해도 손잡이·제목·닫기는 맨 위에 남는다. sticky 기준선은 스크롤 컨테이너의 padding 안쪽이라
+   top 은 제자리 값이다(손잡이 0, 제목은 손잡이 4 + 간격 16). 그 위 padding 띠와 손잡이 양옆은 ::before 가 덮는다. */
 .tm-filter-sheet-handle {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
@@ -4493,10 +4530,28 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-filter-sheet-head {
+  --tm-filter-sheet-head-cover: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  background: var(--bg);
+}
+
+.tm-filter-sheet:has(.tm-filter-sheet-handle) .tm-filter-sheet-head {
+  --tm-filter-sheet-head-cover: 32px;
+  top: 20px;
+}
+
+.tm-filter-sheet-head::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tm-filter-sheet-head-cover)) calc(-1 * var(--v1-shell-page-x)) 0;
+  z-index: -1;
+  background: var(--bg);
 }
 
 .tm-filter-section {
@@ -4510,6 +4565,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 12px;
 }
 
+/* 지역 섹션 안내 한 줄: 문장 + 이동 링크(칩 아래). */
+.tm-filter-region-notice {
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+
+/* 문장 끝에 이어 붙는 링크 — inline-flex 로 44px 터치 영역이 위 칩 줄과 겹치지 않게 한다. */
+.tm-filter-region-notice-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  color: var(--blue700);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .tm-filter-actions {
   display: grid;
   grid-template-columns: 96px 1fr;
@@ -4520,14 +4593,27 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* 필터 시트의 [닫기][적용하기] 줄은 시트 바닥에 붙여 둔다 — 옵션이 시트 최대 높이를 넘으면 내용만
    그 위에서 스크롤된다(W5-V1: 390×844 에서 버튼 아래 17px 가 접혔다). sticky 기준선은 스크롤
    컨테이너의 padding 안쪽이라, 시트 padding-bottom 만큼 inset·margin 을 음수로 줘 바닥까지 덮고
-   같은 값을 padding 으로 되돌린다(내용이 다 들어갈 때 버튼 위치는 그대로다: 8 + 12 = 기존 20). */
+   같은 값을 padding 으로 되돌린다(내용이 다 들어갈 때 버튼 위치는 그대로다: 16 + 4 = 20). */
 .tm-filter-sheet > .tm-filter-actions {
   position: sticky;
   bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));
   z-index: 1;
-  margin: 8px 0 calc(-1 * var(--tm-filter-sheet-pad-bottom));
-  padding: 12px 0 var(--tm-filter-sheet-pad-bottom);
+  margin: 16px 0 calc(-1 * var(--tm-filter-sheet-pad-bottom));
+  padding: 4px 0 var(--tm-filter-sheet-pad-bottom);
   background: var(--bg);
+}
+
+/* 버튼 줄 위의 16px 는 스크롤이 끝났을 때는 마지막 섹션과 버튼 사이의 빈 간격이고, 스크롤 중에는 그 아래로 내용이
+   이어진다는 표시(페이드)다 — 마지막 섹션이 버튼 줄에 잘려 보이던 자리를 끝까지 스크롤하면 온전히 보이게 한다. */
+.tm-filter-sheet > .tm-filter-actions::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
 }
 
 .tm-create-fieldset {
@@ -5388,6 +5474,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-section-title-compact {
   margin: 0;
   padding: 0;
+}
+
+/* 모달 본문은 자기 좌우 여백이 있어 페이지용 20px 을 더하면 제목만 안으로 들어간다. */
+.tm-modal-panel .tm-section-title {
+  padding-inline: 0;
 }
 
 .tm-team-info-row {
@@ -6954,6 +7045,8 @@ textarea.tm-chat-input-placeholder::placeholder {
   .tm-my-home-shell .tm-player-card,
   .tm-my-home-shell .tm-my-card-slot { order: -2; }
   .tm-my-home-shell [data-primary='true'] { order: -1; }
+  /* 화면 맨 위 안내 띠는 카드보다도 앞이다. */
+  .tm-my-home-shell .tm-my-top-notice { order: -3; }
 }
 
 /* 카드 제목을 h2 로 올리면서 붙는 브라우저 기본 여백만 끈다. `.tm-text-body-lg` 자체에
@@ -8385,6 +8478,8 @@ button:has(> .tm-toggle):focus-visible {
   color: var(--text-muted);
   background: var(--grey100);
 }
+/* "공동 n" 칩 — 순위 열이 좁은 폭에서 팀 칸을 밀어내지 않게 좌우 여백만 줄인다. */
+.tm-standings-rank-shared { padding: 0 4px; }
 .tm-standings-rank-gold { background: #FFF3CD; color: #856404; }
 .tm-standings-rank-silver { background: #F1F1F1; color: var(--grey700); }
 :root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }

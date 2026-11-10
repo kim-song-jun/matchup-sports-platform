@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LOGIN_STEP_UP_STORAGE_KEY, readLoginStepUp, saveLoginStepUp } from '@/lib/login-step-up';
+import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
@@ -210,6 +211,17 @@ describe('LoginStepUpVerifyClient', () => {
       fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
       expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
       expect(peekPendingSocialLink()).toBeNull();
+    });
+
+    it('shows the pending email-link notice while the intent is kept, and lets the reader drop it', async () => {
+      savePendingEmailLink({ email: 'typed@example.com' });
+      storeChallenge();
+      renderVerify();
+
+      expect(await screen.findByText(/typed@example\.com 연결을 이어서 도와요/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+      expect(screen.queryByText(/연결을 이어서 도와요/)).not.toBeInTheDocument();
+      expect(readPendingEmailLink()).toBeNull();
     });
 
     it('ends the attempt when the server says the challenge expired', async () => {

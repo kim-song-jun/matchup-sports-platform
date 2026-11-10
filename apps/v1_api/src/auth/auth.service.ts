@@ -17,7 +17,7 @@ import {
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
-import { isPendingSocialSignup } from './social-signup-access';
+import { isExpiredSocialSignup, isPendingSocialSignup } from './social-signup-access';
 import { isOperatorAccount, linkCallerRestriction, operatorLinkRefusal } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import {
@@ -46,11 +46,10 @@ import type { LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
-import { isPhoneRegistered } from '../verification/phone-registered';
+import { isPhoneRegistered, isPhoneUniqueViolation } from '../verification/phone-registered';
 import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
-
-const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
+import { releaseExpiredSignupPhone, releaseSignupPhone } from './empty-signup-account';
 
 /**
  * Providers whose signup goes through the terms step rather than the email form.
@@ -67,11 +66,11 @@ const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthPro
  * 소셜 로그인이 이메일만 보고 기존 계정을 흡수할 때 우리 쪽 이메일 인증까지 요구한다.
  *
  * 제공자가 "이 이메일은 확인된 것" 이라고 말해도, 그 말은 **제공자 쪽 소유**만 증명한다.
- * 우리 계정의 이메일은 `PATCH /me/profile` 로 소유 증명 없이 바꿀 수 있고(휴대폰은
- * phoneProofToken 으로 막혀 있지만 이메일은 열려 있다) 바뀌는 순간 `emailVerifiedAt` 은
- * null 이 된다. 그래서 우리가 검증한 적 없는 이메일을 신뢰하면 이런 순서가 성립한다:
+ * 이메일 가입은 메일함을 확인하지 않으므로(프로필의 이메일 변경은 인증번호를 거치지만 가입은
+ * 아니다) `emailVerifiedAt` 이 null 인 주소는 입력만 된 것이다. 그래서 우리가 검증한 적 없는
+ * 이메일을 신뢰하면 이런 순서가 성립한다:
  *
- *   1. 공격자가 자기 계정 이메일을 피해자의 Apple ID 주소로 바꿔 둔다
+ *   1. 공격자가 피해자의 Apple ID 주소로 이메일 가입을 해 둔다
  *   2. 피해자가 **처음으로** Apple 로그인을 한다
  *   3. 그 계정이 이메일로 매칭돼 공격자 계정에 피해자의 Apple identity 가 붙는다
  *   4. 피해자는 공격자의 계정으로 들어가고, 공격자는 계속 그 계정에 들어갈 수 있다
@@ -207,20 +206,21 @@ export class AuthService {
       });
     }
 
-    if (phone && (await isPhoneRegistered(this.prisma, phone))) {
-      throw new ConflictException({
-        code: 'PHONE_CONFLICT',
-        message: 'Phone is already registered',
-      });
-    }
-
+    // Whether a number is taken is told only to a caller who proved they hold it, so a missing or lapsed proof
+    // ends here, before anything is read about the number's holder.
     const phoneVerificationRequired = this.phoneVerification.enabled;
-    if (phoneVerificationRequired && (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone))) {
+    const phoneProven = phoneVerificationRequired && !!dto.phoneProofToken && verifyPhoneProofToken(dto.phoneProofToken, phone);
+    if (phoneVerificationRequired && !phoneProven) {
       throw new BadRequestException({
         code: 'PHONE_NOT_VERIFIED',
         message: '휴대폰 본인인증을 먼저 완료해 주세요.',
       });
     }
+
+    // An expired, abandoned social signup stops holding the number.
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone);
+
+    if (phone && (await isPhoneRegistered(this.prisma, phone))) throw phoneConflict();
 
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
@@ -281,6 +281,10 @@ export class AuthService {
       );
       await recordSignupConsent(transaction, created.id, dto.recordConsent);
       return created;
+    }).catch((error: unknown) => {
+      // Two signups that proved the same number race to the unique index; the loser gets the lookup's answer.
+      if (isPhoneUniqueViolation(error)) throw phoneConflict();
+      throw error;
     });
 
     return this.sessionResponse(user.id, user.email);
@@ -651,12 +655,20 @@ export class AuthService {
         },
       });
       if (!candidate) throw this.kakaoContactConflict(profile, [userId]);
-      this.assertNotWithdrawalPending(candidate.accountStatus);
-      if (candidate.accountStatus !== 'active') {
+      if (candidate.accountStatus !== 'active' && candidate.accountStatus !== 'withdrawal_pending') {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
         throw this.kakaoContactConflict(profile, [userId]);
+      }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // Only a contact Kakao vouches for reveals the withdrawal and its end date. A matching number counts: Kakao's
+        // phone proves possession the way our SMS code does, and signup shows the same date after number verification.
+        const vouched = Boolean((email && candidate.email === email) || (phone && candidate.phone === phone));
+        if (!vouched) throw this.kakaoContactConflict(profile, [userId]);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', kakaoLinkClaims(profile), [userId], {
+          withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate),
+        });
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
@@ -852,6 +864,7 @@ export class AuthService {
         where: { id: user.id },
         data: expired ? { onboardingStatus: 'social_terms_required', lastLoginAt: now } : { lastLoginAt: now },
       });
+      if (expired) await releaseSignupPhone(tx, user.id, 'expired_signup');
 
       const mergeSeed = pending && seed !== null;
       if (!expired && !mergeSeed) return;
@@ -900,8 +913,16 @@ export class AuthService {
       if (!candidate || candidate.email !== input.email) {
         throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
+      if (candidate.accountStatus === 'withdrawal_pending') {
+        // The address is the one the provider vouches for (it just matched `candidate.email`), so the date may be told.
+        throw signInThenLinkConflict(
+          'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          claims,
+          [candidate.id],
+          { withdrawalPendingUntil: await withdrawalPendingUntil(tx, candidate) },
+        );
+      }
       if (candidate.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(candidate.accountStatus);
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       assertLinkableByEmail(candidate, claims);
@@ -1210,6 +1231,8 @@ export class AuthService {
       }
       phoneProven = true;
     }
+
+    if (phone && phoneProven) await releaseExpiredSignupPhone(this.prisma, phone, userId);
 
     if (phone) {
       const existingPhone = await this.prisma.v1User.findFirst({
@@ -1520,6 +1543,7 @@ export class AuthService {
         update: { currentStep: 'terms' },
         create: { userId, currentStep: 'terms' },
       });
+      await releaseSignupPhone(tx, userId, 'expired_signup');
     });
   }
 
@@ -1751,19 +1775,14 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
   return null;
 }
 
+function phoneConflict() {
+  return new ConflictException({ code: 'PHONE_CONFLICT', message: 'Phone is already registered' });
+}
+
 function draftObject(draftJson: unknown): Prisma.InputJsonObject {
   return draftJson && typeof draftJson === 'object' && !Array.isArray(draftJson)
     ? (draftJson as Prisma.InputJsonObject)
     : {};
-}
-
-function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date; updatedAt: Date }) {
-  if (user.onboardingStatus !== 'social_terms_required' && user.onboardingStatus !== 'social_profile_required') {
-    return false;
-  }
-
-  const referenceTime = user.updatedAt ?? user.createdAt;
-  return Date.now() - referenceTime.getTime() > SOCIAL_SIGNUP_TTL_MS;
 }
 
 function buildTermsConsentCreate(requiredTerms: Array<{ id: string }>) {

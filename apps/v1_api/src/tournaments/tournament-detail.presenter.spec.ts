@@ -915,6 +915,20 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
     } as unknown as TournamentDetailRow;
   }
 
+  describe('동점 순서', () => {
+    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
+    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+
+    it('대회가 고른 순서를 공개 상세에 싣고, 고른 적 없으면 기본 순서를 싣는다', () => {
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'group_knockout'), tieBreakOrder: GOALS_FIRST } as never, true).tieBreakOrder).toEqual(GOALS_FIRST);
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'group_knockout'), tieBreakOrder: null } as never, true).tieBreakOrder).toEqual(DEFAULT_ORDER);
+    });
+
+    it('정규 리그는 리그 고유 순서를 쓰므로 대회 동점 순서를 싣지 않는다', () => {
+      expect(presentTournamentDetail({ ...rowWith('regular_league', 'league'), tieBreakOrder: null } as never, true).tieBreakOrder).toBeNull();
+    });
+  });
+
   it('정규 리그 시즌은 kind=regular_league 로 내려간다', () => {
     expect(presentTournamentDetail(rowWith('regular_league', 'league'), true).kind).toBe('regular_league');
   });

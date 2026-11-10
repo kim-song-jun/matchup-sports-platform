@@ -6,6 +6,7 @@ import { ProfileEditPageClient } from './my-api-clients';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
+  push: vi.fn(),
   search: '',
 }));
 
@@ -14,7 +15,6 @@ const hooks = vi.hoisted(() => ({
   authMe: vi.fn(),
   updateProfile: vi.fn(),
   uploadImages: vi.fn(),
-  checkEmail: vi.fn(),
   checkNickname: vi.fn(),
 }));
 
@@ -45,7 +45,6 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1AuthMe: hooks.authMe,
     useV1UpdateProfile: hooks.updateProfile,
     useV1UploadImages: hooks.uploadImages,
-    useV1CheckEmail: hooks.checkEmail,
     useV1CheckNickname: hooks.checkNickname,
   };
 });
@@ -66,7 +65,6 @@ describe('ProfileEditPageClient query states', () => {
     router.search = '';
     hooks.updateProfile.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    hooks.checkEmail.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.checkNickname.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
   });
@@ -111,7 +109,6 @@ describe('ProfileEditPageClient 번호 변경 본인인증 게이트', () => {
     mutateAsync.mockResolvedValue({});
     hooks.updateProfile.mockReturnValue({ mutateAsync, isPending: false });
     hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    hooks.checkEmail.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.checkNickname.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
     hooks.profile.mockReturnValue({
@@ -268,5 +265,129 @@ describe('ProfileEditPageClient 번호 변경 본인인증 게이트', () => {
     expect(screen.queryByRole('button', { name: 'stub-인증완료(public)' })).not.toBeInTheDocument();
     expect(mutateAsync).toHaveBeenCalledTimes(1);
     expect(mutateAsync.mock.calls[0][0]).toMatchObject({ phone: '01011112222', phoneProofToken: null });
+  });
+});
+
+describe('ProfileEditPageClient 이메일은 직접 고치지 않고 변경 화면으로 보낸다', () => {
+  const mutateAsync = vi.fn();
+  const profileData = (overrides: Record<string, unknown> = {}) => ({
+    data: {
+      email: 'me@teameet.test',
+      phone: '01011112222',
+      hasPassword: true,
+      profile: {
+        realName: '기존이름',
+        nickname: '기존닉',
+        bio: '기존 소개',
+        profileImageUrl: null,
+        birthDate: '19950115',
+        gender: 'male',
+      },
+      ...overrides,
+    },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    router.search = '';
+    mutateAsync.mockResolvedValue({});
+    hooks.updateProfile.mockReturnValue({ mutateAsync, isPending: false });
+    hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    hooks.checkNickname.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
+    hooks.profile.mockReturnValue(profileData());
+  });
+
+  it('이메일 칸은 읽기 전용이고, 중복 확인 대신 새 주소 인증이 필요하다고 알리며 "변경"으로 이어진다', () => {
+    renderWithClient(<ProfileEditPageClient />);
+
+    const emailField = screen.getByLabelText('이메일');
+    expect(emailField).toHaveValue('me@teameet.test');
+    expect(emailField).toHaveAttribute('readonly');
+    expect(emailField).toHaveAccessibleDescription('이메일을 바꾸려면 새 주소로 인증이 필요해요.');
+    expect(screen.getByRole('button', { name: '이메일 변경' })).toHaveTextContent('변경');
+    expect(screen.queryByRole('button', { name: '이메일 중복 확인' })).not.toBeInTheDocument();
+  });
+
+  it('저장 요청에는 이메일도 증명 토큰도 싣지 않는다 — 서버가 지금 이메일을 그대로 둔다', async () => {
+    renderWithClient(<ProfileEditPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    const payload = mutateAsync.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('email');
+    expect(payload).not.toHaveProperty('emailChangeToken');
+    expect(payload).toMatchObject({ nickname: '기존닉', phone: '01011112222', gender: 'male' });
+  });
+
+  it('폼에 고친 것이 없으면 묻지 않고 바로 이메일 변경 화면으로 간다', async () => {
+    renderWithClient(<ProfileEditPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '이메일 변경' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith('/my/profile/edit/email'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('이 화면의 from 쿼리를 싣고 가서, 돌아올 때 같은 화면으로 되살린다', async () => {
+    router.search = 'from=%2Fmy%2Fsettings';
+    renderWithClient(<ProfileEditPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '이메일 변경' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith(
+      '/my/profile/edit/email?redirect=%2Fmy%2Fprofile%2Fedit%3Ffrom%3D%252Fmy%252Fsettings',
+    ));
+  });
+
+  it('저장하지 않은 변경이 있으면 사라진다고 먼저 묻고, 취소하면 가지 않으며 계속하면 간다', async () => {
+    renderWithClient(<ProfileEditPageClient />);
+    fireEvent.change(screen.getByLabelText('한 줄 소개'), { target: { value: '새 소개로 바꿨어요' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '이메일 변경' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('저장하지 않은 변경이 있어요');
+    expect(dialog).toHaveTextContent('이메일을 바꾸러 가면 지금 고친 내용은 저장되지 않고 사라져요.');
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(router.push).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '이메일 변경' }));
+    fireEvent.click(await screen.findByRole('button', { name: '계속하기' }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith('/my/profile/edit/email'));
+  });
+
+  it('고쳤던 칸을 저장된 값으로 되돌리면 더는 묻지 않는다', async () => {
+    renderWithClient(<ProfileEditPageClient />);
+    const bio = screen.getByLabelText('한 줄 소개');
+    fireEvent.change(bio, { target: { value: '잠깐 바꿨어요' } });
+    fireEvent.change(bio, { target: { value: '기존 소개' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '이메일 변경' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('이메일이 없는 계정은 비어 있는 칸에 "등록"으로 같은 인증 화면에 들어간다', async () => {
+    hooks.profile.mockReturnValue(profileData({ email: null, hasPassword: false }));
+    renderWithClient(<ProfileEditPageClient />);
+
+    expect(screen.getByLabelText('이메일')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '이메일 등록' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith('/my/profile/edit/email'));
+  });
+
+  it('바꾼 닉네임은 중복 확인 전에는 저장할 수 없다고 닉네임만 짚어 알린다', () => {
+    renderWithClient(<ProfileEditPageClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '새닉네임' } });
+
+    expect(screen.getByRole('button', { name: '프로필 저장' })).toBeDisabled();
+    expect(screen.getByText('변경한 닉네임은 중복 확인 후 저장할 수 있어요.')).toBeInTheDocument();
   });
 });

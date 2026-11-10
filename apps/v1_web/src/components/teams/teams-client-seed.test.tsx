@@ -83,7 +83,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
   });
 
   it('필터된 cursor seed는 UI URL dialect를 보존하고 일반 클릭은 기존 append를 유지한다', () => {
-    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
+    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=activity&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
     const page = { items: [seedTeam(20)], nextCursor: 'opaque/cursor +2', pageInfo: { nextCursor: 'opaque/cursor +2', hasNext: true, totalCount: 52 } };
     const fetchNextPage = vi.fn();
     hookMocks.useV1TeamPages.mockReturnValue({
@@ -95,7 +95,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
       isPlaceholderData: false,
       fetchNextPage,
     });
-    const seed = { page, sports: [seedSport], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'deadline', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2' };
+    const seed = { page, sports: [seedSport], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'activity', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2' };
 
     render(<TeamListPageClient seed={seed} />);
 
@@ -104,14 +104,14 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(href.pathname).toBe('/teams');
     expect(href.searchParams.get('sportId')).toBe('sport-futsal');
     expect(href.searchParams.get('regionId')).toBe('region-seoul');
-    expect(href.searchParams.get('sort')).toBe('deadline');
+    expect(href.searchParams.get('sort')).toBe('activity');
     expect(href.searchParams.get('q')).toBe('마포 FC');
     expect(href.searchParams.get('query')).toBeNull();
     expect(href.searchParams.get('joinPolicy')).toBeNull();
     expect(href.searchParams.get('cursor')).toBe('opaque/cursor +2');
 
     const [apiFilters, hookOptions] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>, { seed?: unknown; initialCursor?: string }];
-    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', joinPolicy: 'approval_required' });
+    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', sort: 'activity' });
     expect(hookOptions.seed).toEqual(page);
     expect(hookOptions.initialCursor).toBe('opaque-page-2');
 
@@ -141,7 +141,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
   });
 
   it('직접 진입한 필터 cursor seed의 레코드와 시작 커서를 그대로 화면과 query에 사용한다', () => {
-    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
+    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=activity&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
     hookMocks.useV1MasterSports.mockReturnValue({ data: [seedSport, seedSoccer] });
     const secondPage = {
       items: [{ ...seedTeam(20), id: 'team-page-2', teamId: 'team-page-2', name: '두 번째 페이지 팀' }],
@@ -164,7 +164,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
       isPlaceholderData: false,
       fetchNextPage: vi.fn(),
     });
-    const seed = { page: secondPage, sports: [seedSport, seedSoccer], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'deadline', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2', metadata };
+    const seed = { page: secondPage, sports: [seedSport, seedSoccer], query: teamListSeedPath({ sportId: 'sport-futsal', regionId: 'region-seoul', sort: 'activity', q: '마포 FC', cursor: 'opaque-page-2' }), cursor: 'opaque-page-2', metadata };
 
     render(<TeamListPageClient seed={seed} />);
 
@@ -177,12 +177,12 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(nextPageLink.searchParams.get('cursor')).toBe('opaque-page-3');
     expect(nextPageLink.searchParams.get('sportId')).toBe('sport-futsal');
     expect(nextPageLink.searchParams.get('regionId')).toBe('region-seoul');
-    expect(nextPageLink.searchParams.get('sort')).toBe('deadline');
+    expect(nextPageLink.searchParams.get('sort')).toBe('activity');
     expect(nextPageLink.searchParams.get('q')).toBe('마포 FC');
     expect(nextPageLink.searchParams.get('query')).toBeNull();
     expect(nextPageLink.searchParams.get('joinPolicy')).toBeNull();
     const [apiFilters, options] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>, { seed?: unknown; initialCursor?: string; metadataSeed?: unknown }];
-    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', joinPolicy: 'approval_required' });
+    expect(apiFilters).toMatchObject({ sportId: 'sport-futsal', regionId: 'region-seoul', query: '마포 FC', sort: 'activity' });
     expect(options.seed).toEqual(secondPage);
     expect(options.initialCursor).toBe('opaque-page-2');
     expect(options.metadataSeed).toEqual(metadata);

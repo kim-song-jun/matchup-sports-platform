@@ -283,12 +283,9 @@ describe('대회 ↔ 리그 순위 계산기 동치성 (§11 Q3 결정 근거)',
   });
 
   describe('수렴 방향을 정할 때 알아야 할 사실', () => {
-    it('대회의 tie-break 순서는 설정 가능한 값이 아니다 — 검증기가 정확히 한 배열만 허용한다', () => {
-      // competition-config.validator.ts:201-203 이 tieBreak.order 를
-      // REQUIRED_TIE_BREAK_ORDER 와 원소 단위로 일치하지 않으면 거부한다. 그리고
-      // calculateCompetitionStandings 는 그 배열을 아예 읽지 않고 같은 순서를 코드에
-      // 고정해 두고 있다. 즉 순서를 바꿔 넣어도 결과가 달라지지 않는다 — 대회 엔진으로
-      // 수렴하면 리그가 지금 갖고 있는 "리그마다 다른 tie-break" 능력이 사라진다.
+    it('대회 엔진은 tieBreak.order 를 읽는다 — 대회가 리그와 같은 순서를 고르면 같은 순위가 나온다', () => {
+      // 대회마다 동점 순서를 고르는 설정(2026-11-07 결정)이 이 배열을 대회별로 얹는다.
+      // 리그 순서(승점 → 득실 → 다득점 → 맞대결)와 같은 앞 네 기준을 고르면 두 엔진이 일치한다.
       const teamIds = ['alpha', 'bravo', 'charlie', 'delta'];
       const fixtures: Fixture[] = [
         { home: 'alpha', away: 'bravo', homeScore: 1, awayScore: 0 },
@@ -298,16 +295,16 @@ describe('대회 ↔ 리그 순위 계산기 동치성 (§11 Q3 결정 근거)',
         { home: 'bravo', away: 'delta', homeScore: 4, awayScore: 0 },
         { home: 'charlie', away: 'delta', homeScore: 2, awayScore: 0 },
       ];
-      const reordered: CompetitionConfig = {
+      const leagueLike: CompetitionConfig = {
         ...FUTSAL_V1_CONFIG,
         tieBreak: {
           ...FUTSAL_V1_CONFIG.tieBreak,
           order: ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'],
         },
       };
-      expect(competitionOrder({ teamIds, fixtures, config: reordered })).toEqual(
-        competitionOrder({ teamIds, fixtures }),
-      );
+      expect(competitionOrder({ teamIds, fixtures })).toEqual(['charlie', 'alpha', 'bravo', 'delta']);
+      expect(competitionOrder({ teamIds, fixtures, config: leagueLike })).toEqual(['charlie', 'bravo', 'alpha', 'delta']);
+      expect(competitionOrder({ teamIds, fixtures, config: leagueLike })).toEqual(leagueOrder({ teamIds, fixtures }));
     });
 
     it('리그 엔진은 played 를, 대회 엔진은 fairPlayPoints 를 각각 상대가 갖지 않은 필드로 낸다', () => {

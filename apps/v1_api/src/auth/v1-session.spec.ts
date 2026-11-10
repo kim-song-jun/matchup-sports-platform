@@ -12,6 +12,7 @@ import {
   clearV1SessionCookie,
   writeV1SessionCookie,
 } from './v1-session';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 const NOW_MS = Date.UTC(2026, 6, 15, 4, 0, 0);
 const SESSION_SECRET = 'teameet-test-session-secret-32-bytes-minimum';
@@ -74,8 +75,7 @@ describe('v1 signed session', () => {
       secret: SESSION_SECRET,
       issuedAtMs: NOW_MS,
     });
-    const replacement = token.endsWith('a') ? 'b' : 'a';
-    const tamperedToken = `${token.slice(0, -1)}${replacement}`;
+    const tamperedToken = tamperSignature(token);
 
     // When
     const session = readV1Session(`${V1_SESSION_COOKIE_NAME}=${tamperedToken}`, {
@@ -276,7 +276,7 @@ describe('reissueV1SessionCookie', () => {
 
   it('writes nothing for a request without a valid cookie session (a non-production header identity, a forged cookie)', () => {
     const response = { cookie: jest.fn() };
-    const forged = cookieHeader.slice(0, -3) + 'abc';
+    const forged = tamperSignature(cookieHeader);
 
     expect(reissueV1SessionCookie(response, undefined, 4, configuration)).toBe(false);
     expect(reissueV1SessionCookie(response, forged, 4, configuration)).toBe(false);

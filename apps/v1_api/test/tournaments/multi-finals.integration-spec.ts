@@ -184,7 +184,7 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(filled.map(slot => slot.registrationId)).toEqual(remaining);
     expect((await snapshot('챌린지')).map(row => row.teamMatchId)).toEqual(challengeBefore.map(row => row.teamMatchId));
   });
-  it.each([false, true])('확정한 뒤 한 조의 순위 순서가 바뀌면 그 조를 쓰는 토너먼트만 standingsChanged 로 알린다 (director=%s)', async director => {
+  it.each([false, true])('확정한 뒤 한 조에서 토너먼트가 쓰는 순위(1~2위)가 바뀔 때만 그 토너먼트를 standingsChanged 로 알린다 (director=%s)', async director => {
     const actor = director ? (await assignedDirector()).actor : user;
     const first = await service.setup(user, tournamentId, { expectedRevision: 0,
       groups: [0, 1].map(i => ({ name: `${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
@@ -201,17 +201,23 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(await flags()).toEqual([false, false]);
     const groupId = (await service.get(actor, tournamentId)).groups[0].id;
     const at = (position: number) => prisma.v1TournamentStanding.findFirstOrThrow({ where: { groupId, position } });
-    const [third, fourth] = [await at(3), await at(4)];
+    const [second, third, fourth] = [await at(2), await at(3), await at(4)];
     await prisma.v1TournamentStanding.update({ where: { id: third.id }, data: { points: { increment: 1 } } });
     expect(await flags()).toEqual([false, false]);
-    const swap = (a: string, b: string) => prisma.$transaction([
-      prisma.v1TournamentStanding.update({ where: { id: a }, data: { position: 4 } }),
-      prisma.v1TournamentStanding.update({ where: { id: b }, data: { position: 3 } }),
+    const swap = (upper: { id: string }, lower: { id: string }, upperPosition: number) => prisma.$transaction([
+      prisma.v1TournamentStanding.update({ where: { id: upper.id }, data: { position: upperPosition + 1 } }),
+      prisma.v1TournamentStanding.update({ where: { id: lower.id }, data: { position: upperPosition } }),
     ]);
-    await swap(third.id, fourth.id);
+    const restore = async (...rows: Array<{ id: string; position: number | null }>) => {
+      for (const row of rows) await prisma.v1TournamentStanding.update({ where: { id: row.id }, data: { position: row.position } });
+    };
+    // Both finals draw ranks 1-2 of their own group, so only a swap touching rank 2 or better in the first group warns the first final.
+    await swap(third, fourth, 3);
+    expect(await flags()).toEqual([false, false]);
+    await restore(third, fourth);
+    await swap(second, third, 2);
     expect(await flags()).toEqual([true, false]);
-    await prisma.v1TournamentStanding.update({ where: { id: third.id }, data: { position: 3 } });
-    await prisma.v1TournamentStanding.update({ where: { id: fourth.id }, data: { position: 4 } });
+    await restore(second, third);
     expect(await flags()).toEqual([false, false]);
   }, 60000);
   it('순위 밖 팀을 포함해 3개 결선 명단을 저장하고 재계산 뒤에도 유지하며 예선을 보존한다', async () => {

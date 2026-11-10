@@ -78,6 +78,15 @@
     padding-top: 20px;
   }
 
+  /* 맨 위 안내 띠가 있으면 고정 nav 와의 간격은 띠가 가져가고, 두 열은 shell gap 만큼만 아래로 붙는다. */
+  .tm-my-top-notice {
+    margin-top: 20px;
+  }
+
+  .tm-my-top-notice + .tm-my-desktop-layout {
+    padding-top: 0;
+  }
+
   /* LEFT sticky panel: profile card, stats strip, monthly card. */
   .tm-my-desktop-sidebar {
     display: grid;

@@ -8,7 +8,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useApplyCrossGroupRound12, useCrossGroupRound12Preview } from '@/hooks/use-cross-group-round12';
 import { extractErrorMessage } from '@/lib/error-message';
-import { compareCrossGroupTeams, crossGroupRecommendation, swapRound12Assignment } from '@/lib/cross-group-round12';
+import { compareCrossGroupTeams, crossGroupRecommendation, formatCrossGroupRule, swapRound12Assignment } from '@/lib/cross-group-round12';
 import type { CrossGroupPreview } from '@/types/cross-group-round12';
 
 export function CrossGroupRound12Dialog({ tournamentId, onClose, showToast }: {
@@ -59,7 +59,7 @@ function Round12Editor({ preview, tournamentId, onClose, showToast, onRefresh }:
   const ranked = order ?? recommended;
   const assignments = edited ?? ranked?.slice(0, 12) ?? [];
   const hasTies = preview.ranks.some((rank) => rank.candidates.length > 1) || !!ranked?.some((id, index) =>
-    index % 5 !== 0 && compareCrossGroupTeams(teams.get(ranked[index - 1])!, teams.get(id)!) === 0);
+    index % 5 !== 0 && compareCrossGroupTeams(teams.get(ranked[index - 1])!, teams.get(id)!, preview.tieBreakOrder) === 0);
   const changedCount = preview.targets.filter((target, index) => assignments[index] && assignments[index] !== target.currentRegistrationId).length;
   const name = (id: string | null) => id === null ? '팀 미정' : teams.get(id)?.teamName ?? '다른 배정팀';
   const id = useId();
@@ -94,7 +94,7 @@ function Round12Editor({ preview, tournamentId, onClose, showToast, onRefresh }:
     </div>;
   return <Round12Frame onClose={onClose} pending={apply.isPending} footer={footer}>
     <p className="tm-text-body font-semibold">20팀 → 12팀 진출 · 4팀 8강 직행 · 8팀 12강 경기</p>
-    <p className="tm-text-caption text-[var(--text-muted)]">조 내 순위는 공식 순위를 따르고, 조 간 비교는 승점 → 골득실 → 다득점 순이에요. 같은 조 재대결은 경고하며 시드를 자동으로 바꾸지 않아요.</p>
+    <p className="tm-text-caption text-[var(--text-muted)]">조 내 순위는 공식 순위를 따르고, 조 간 비교는 {formatCrossGroupRule(preview.tieBreakOrder)} 순이에요. 맞대결·페어플레이는 서로 다른 조 사이에서는 보지 않아요. 같은 조 재대결은 경고하며 시드를 자동으로 바꾸지 않아요.</p>
     <details open={preview.ranks.some((rank) => rank.candidates.length > 1)}>
       <summary className="tm-text-label min-h-[44px] cursor-pointer font-semibold">조별 1·2·3위 확인 · 동률 팀 선택</summary>
       <div className="grid gap-3 md:grid-cols-3">
@@ -119,7 +119,7 @@ function Round12Editor({ preview, tournamentId, onClose, showToast, onRefresh }:
               const team = teams.get(teamId)!;
               const index = (rank - 1) * 5 + localIndex;
               const canMove = (offset: number) => localIndex + offset >= 0 && localIndex + offset < 5 &&
-                compareCrossGroupTeams(team, teams.get(ranked[index + offset])!) === 0;
+                compareCrossGroupTeams(team, teams.get(ranked[index + offset])!, preview.tieBreakOrder) === 0;
               return <li key={teamId} className="tm-text-label flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] p-3">
                 <span>{localIndex + 1}. {team.teamName} · {team.groupName}<br />
                   <span className="tm-text-caption text-[var(--text-muted)]">승점 {team.points} · 골득실 {team.goalsFor - team.goalsAgainst} · 득점 {team.goalsFor}{rank === 3 && localIndex > 1 ? ' · 탈락' : ' · 진출'}</span>
@@ -135,7 +135,7 @@ function Round12Editor({ preview, tournamentId, onClose, showToast, onRefresh }:
       </div>
     </details> : <p role="status">동률인 조별 순위를 모두 선택하면 추천 대진이 나와요.</p>}
     {assignments.length === 12 ? <section className="flex flex-col gap-3">
-      <SectionTitle title="배정 미리보기" />
+      <SectionTitle title="배정 미리보기" compact />
       {edited ? <p className="tm-text-caption text-[var(--orange700)]">추천 시드와 다르게 배치하고 있어요. 부전승팀과 상대팀이 바뀔 수 있으니 저장 전에 확인해 주세요.</p> : null}
       <div className="grid gap-3 md:grid-cols-2">
         {preview.targets.map((target, index) => <label key={target.seed} className="tm-text-label flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4">

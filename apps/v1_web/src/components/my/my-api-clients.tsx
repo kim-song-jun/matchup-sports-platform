@@ -16,6 +16,7 @@ import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Check, Lock } from 'lucide-react';
 import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { emailVerifyNudgeTarget } from './email-verify-nudge';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
@@ -25,6 +26,7 @@ import { reportClientError } from '@/lib/client-error-reporter';
 import { clearAuthHandoffStorage } from '@/lib/auth-handoff-storage';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
+import { emailChangePath, PROFILE_EDIT_PATH } from '@/lib/email-change-path';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
@@ -33,7 +35,6 @@ import {
   useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
   useV1AuthMe,
-  useV1CheckEmail,
   useV1CheckNickname,
   useV1ChangeTeamMembershipRole,
   useV1DeclineTeamInvitation,
@@ -95,7 +96,7 @@ import { RecordConsentFirstAnswer } from './record-consent-first-answer';
 import { WithdrawalErrorCard } from './withdrawal-error-card';
 import { WITHDRAWAL_GRACE_NOTICE } from './withdrawal-guidance';
 
-type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
+type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
@@ -160,6 +161,7 @@ export function MyHomePageClient() {
   // 추가 요청이 발생하지 않는다.
   const authMe = useV1AuthMe();
   const phoneVerified = authMe.data?.verification?.phoneVerified;
+  const emailVerifyNudgeUserId = emailVerifyNudgeTarget(authMe.data)?.userId;
   // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
@@ -198,6 +200,7 @@ export function MyHomePageClient() {
       phoneVerified,
       staffAssignments.data?.items.length ?? 0,
       contactSummary.data?.pendingInbound ?? 0,
+      emailVerifyNudgeUserId,
     );
   }, [
     profile.data,
@@ -207,6 +210,7 @@ export function MyHomePageClient() {
     phoneVerified,
     staffAssignments.data,
     contactSummary.data,
+    emailVerifyNudgeUserId,
   ]);
 
   if (profile.isError) {
@@ -356,12 +360,11 @@ export function ProfileEditPageClient() {
   const profileAuthMe = useV1AuthMe();
   const update = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
-  const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
+  const { confirm, ConfirmModal } = useConfirm();
   const [realName, setRealName] = useState('');
   const [nickname, setNickname] = useState('');
   const [bio, setBio] = useState('');
-  const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
@@ -372,7 +375,6 @@ export function ProfileEditPageClient() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
-  const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   /** 번호를 바꿨을 때만 채워지는 본인인증 증명. 번호를 다시 고치면 무효가 되므로 함께 비운다. */
   const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
   /**
@@ -388,14 +390,12 @@ export function ProfileEditPageClient() {
     setRealName(profile.data.profile.realName ?? '');
     setNickname(profile.data.profile.nickname ?? '');
     setBio(profile.data.profile.bio ?? '');
-    setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(normalizeSeparatedDigits(profile.data.profile.birthDate ?? ''));
     setGender(profile.data.profile.gender ?? '');
     setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
     setProfileImageName('');
     setNicknameCheck({ status: 'idle', value: '' });
-    setEmailCheck({ status: 'idle', value: '' });
     setPhoneProofToken(null);
     // 서버에서 다시 읽어온 번호로 폼을 맞추므로, 직전 인라인 인증 표시도 함께 정리한다
     // (authed 인증이 끝났으면 authMe 의 phoneVerified 가 이미 true 라 카드가 다시 뜨지 않는다).
@@ -425,7 +425,7 @@ export function ProfileEditPageClient() {
   }
 
   const originalNickname = profile.data.profile.nickname ?? '';
-  const originalEmail = profile.data.email ?? '';
+  const accountEmail = profile.data.email ?? '';
   const originalPhone = profile.data.phone ?? '';
   const phoneChanged = phoneDigits !== originalPhone;
   /**
@@ -438,14 +438,19 @@ export function ProfileEditPageClient() {
   const phoneNeedsProof = phoneChanged && Boolean(phoneDigits) && !phoneVerifiedInline;
   const showPhoneVerification =
     phoneDigits.length === 11 && !phoneVerifiedInline && (phoneChanged || accountPhoneUnverified);
-  const emailRequired = Boolean(profile.data.hasPassword);
   const normalizedNickname = nickname.trim();
-  const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
-  const emailChanged = normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const emailVerified = !emailChanged || !normalizedEmail || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
-  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified || !gender;
+  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || !nicknameVerified || !gender;
+  // 이메일 변경 화면으로 가면 이 폼에서 고친 값은 저장되지 않고 사라진다 — 저장된 값과 다른 칸이 있을 때만 먼저 묻는다.
+  const storedProfile = profile.data.profile;
+  const formDirty = realName.trim() !== (storedProfile.realName ?? '')
+    || bio.trim() !== (storedProfile.bio ?? '')
+    || nicknameChanged
+    || phoneChanged
+    || birthDateDigits !== normalizeSeparatedDigits(storedProfile.birthDate ?? '')
+    || gender !== (storedProfile.gender ?? '')
+    || profileImageUrl !== (storedProfile.profileImageUrl ?? '');
 
   const runNicknameCheck = () => {
     setFieldErrors((current) => ({ ...current, nickname: undefined, form: undefined }));
@@ -471,36 +476,18 @@ export function ProfileEditPageClient() {
     });
   };
 
-  const runEmailCheck = () => {
-    setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
-    if (!emailChanged) {
-      setEmailCheck({ status: 'available', value: normalizedEmail });
-      return;
+  const startEmailChange = async () => {
+    if (formDirty) {
+      const proceed = await confirm({
+        title: '저장하지 않은 변경이 있어요',
+        message: '이메일을 바꾸러 가면 지금 고친 내용은 저장되지 않고 사라져요. 계속할까요?',
+        confirmLabel: '계속하기',
+      });
+      if (!proceed) return;
     }
-    if (!normalizedEmail) {
-      if (emailRequired) {
-        setFieldErrors((current) => ({ ...current, email: '이메일을 입력해 주세요.' }));
-      } else {
-        setEmailCheck({ status: 'available', value: '' });
-      }
-      return;
-    }
-    if (!normalizedEmail.includes('@')) {
-      setFieldErrors((current) => ({ ...current, email: '이메일 형식을 확인해 주세요.' }));
-      setEmailCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkEmail.mutate(normalizedEmail, {
-      onSuccess: (result) => {
-        setEmailCheck({ status: result.available ? 'available' : 'taken', value: normalizedEmail });
-        setFieldErrors((current) => ({ ...current, email: result.available ? undefined : '이미 가입된 이메일이에요.' }));
-      },
-      onError: () => {
-        setEmailCheck({ status: 'error', value: normalizedEmail });
-        setFieldErrors((current) => ({ ...current, email: '확인하지 못했어요. 다시 시도해 주세요.' }));
-      },
-    });
+    // 돌아올 때 이 화면의 `?from=` 같은 쿼리까지 되살리도록 지금 주소를 그대로 싣는다.
+    const query = searchParams.toString();
+    router.push(emailChangePath(query ? `${PROFILE_EDIT_PATH}?${query}` : PROFILE_EDIT_PATH));
   };
 
   const selectProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -554,18 +541,8 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if ((emailRequired && !normalizedEmail) || (normalizedEmail && !normalizedEmail.includes('@'))) {
-      setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
-      return;
-    }
-
     if (!nicknameVerified) {
       setFieldErrors({ nickname: '닉네임 중복 확인이 필요해요.' });
-      return;
-    }
-
-    if (!emailVerified) {
-      setFieldErrors({ email: '이메일 중복 확인이 필요해요.' });
       return;
     }
 
@@ -600,7 +577,7 @@ export function ProfileEditPageClient() {
         realName: realName.trim() || null,
         nickname: normalizedNickname,
         bio: bio.trim() || null,
-        email: normalizedEmail || null,
+        // 이메일은 보내지 않는다 — 서버가 지금 이메일을 그대로 두고, 바꾸려면 새 주소 인증이 필요한 별도 화면을 거친다.
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         // authed 인증으로 서버 번호가 이미 바뀐 경우엔 서버 기준 phoneChanged 가 false 라 증명이 필요 없다.
@@ -610,14 +587,11 @@ export function ProfileEditPageClient() {
       });
       router.replace(returnTo);
     } catch (nextError) {
-      if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
-        const duplicateField = nextError.code === 'NICKNAME_CONFLICT' ? 'nickname' : nextError.code === 'PHONE_CONFLICT' ? 'phone' : 'email';
+      if (nextError instanceof V1ApiError && nextError.statusCode === 409 && (nextError.code === 'NICKNAME_CONFLICT' || nextError.code === 'PHONE_CONFLICT')) {
         setFieldErrors({
-          [duplicateField]: duplicateField === 'nickname'
+          [nextError.code === 'NICKNAME_CONFLICT' ? 'nickname' : 'phone']: nextError.code === 'NICKNAME_CONFLICT'
             ? '이미 사용 중인 닉네임이에요.'
-            : duplicateField === 'phone'
-              ? '이미 가입된 휴대폰 번호예요.'
-              : '이미 가입된 이메일이에요.',
+            : '이미 가입된 휴대폰 번호예요.',
           form: '이미 가입된 정보가 있어요. 다른 정보를 사용해 주세요.',
         });
         return;
@@ -628,6 +602,7 @@ export function ProfileEditPageClient() {
 
   return (
     <>
+      {ConfirmModal}
       <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop tm-content-enter" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
@@ -730,33 +705,23 @@ export function ProfileEditPageClient() {
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-email">이메일</label>
           <span className="tm-auth-field-with-action">
+            {/* 이메일은 이 폼에서 직접 고치지 않는다 — 새 주소로 인증번호를 받아야 바뀌는 별도 화면으로 간다. */}
             <input
               id="v1-profile-email"
-              className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                setEmailCheck({ status: 'idle', value: '' });
-                setFieldErrors((current) => ({ ...current, email: undefined }));
-              }}
+              className="tm-input"
+              value={accountEmail}
+              placeholder="등록된 이메일이 없어요"
               type="email"
-              required={emailRequired}
-              aria-invalid={fieldErrors.email ? true : undefined}
-              aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
+              readOnly
+              aria-describedby="v1-profile-email-helper"
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
-              {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
+            <button className="tm-btn tm-btn-md tm-btn-neutral" onClick={() => void startEmailChange()} type="button" aria-label={accountEmail ? '이메일 변경' : '이메일 등록'}>
+              {accountEmail ? '변경' : '등록'}
             </button>
           </span>
-          {fieldErrors.email || (emailVerified && emailChanged) ? (
-            <span
-              id="v1-profile-email-helper"
-              role={fieldErrors.email ? 'alert' : undefined}
-              className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-            >
-              {fieldErrors.email ?? '사용 가능한 이메일이에요.'}
-            </span>
-          ) : null}
+          <span id="v1-profile-email-helper" className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            이메일을 바꾸려면 새 주소로 인증이 필요해요.
+          </span>
         </div>
         <label className="tm-create-field">
           <span className="tm-text-label">휴대폰 번호</span>
@@ -875,8 +840,8 @@ export function ProfileEditPageClient() {
         </button>
         {!gender ? (
           <div className="tm-text-micro tm-auth-fixed-reason">성별을 선택해 주세요.</div>
-        ) : isBlocked && (nicknameChanged || emailChanged) ? (
-          <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div>
+        ) : !nicknameVerified ? (
+          <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임은 중복 확인 후 저장할 수 있어요.</div>
         ) : null}
       </div>
     </>
@@ -1320,7 +1285,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(result.region.id);
               setMatchedLabel(label);
               setStatus('matched');
-              setMessage(`${label} 지역으로 확인됐어요. 저장하면 추천 기준 지역으로 사용돼요.`);
+              setMessage(`${label} 지역으로 확인됐어요. 저장하면 팀 목록의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.`);
             },
             onError: () => {
               setStatus('unmatched');
@@ -1378,7 +1343,7 @@ export function LocationSettingsPageClient() {
             <div className="tm-text-label">현재 활동 지역</div>
             <div className="tm-text-heading" style={{ marginTop: 8 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
-              매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
+              팀 목록 필터의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.
             </div>
           </Card>
 
@@ -1399,7 +1364,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(event.target.value);
               setMatchedLabel(regions.find((region) => region.id === event.target.value)?.name ?? null);
               setStatus('idle');
-              setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용돼요.');
+              setMessage("선택한 지역을 저장하면 팀 목록의 '내 지역'과 팀 만들기 기본 지역으로 사용돼요.");
             }}>
               <option value="">시/군/구 선택</option>
               {regions.map((region) => (
@@ -2030,12 +1995,12 @@ function PlayerCardPhotoAdjust() {
       const nextUrl = uploaded.urls[0];
       if (!nextUrl) throw new Error('업로드 응답에 이미지 URL이 없어요.');
       // PATCH /me/profile 은 보내지 않은 필드를 null 로 덮는다(서버 실측 2026-09-02) --
-      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다.
+      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다. 이메일은 예외다: 서버가 지금 값을 유지하므로,
+      // 캐시의 옛 주소를 실으면 다른 기기에서 바꾼 이메일을 "변경"으로 읽어 400 이 난다.
       await update.mutateAsync({
         realName: data.profile.realName ?? null,
         nickname: data.profile.nickname ?? '',
         bio: data.profile.bio ?? null,
-        email: data.email ?? null,
         profileImageUrl: nextUrl,
         phone: data.phone ?? null,
         // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.
@@ -2512,6 +2477,7 @@ function toMyHomeModel(
   phoneVerified?: boolean,
   staffTournamentCount = 0,
   pendingContactCount = 0,
+  emailVerifyNudgeUserId?: string,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
@@ -2576,6 +2542,7 @@ function toMyHomeModel(
     ...myHomeModel,
     hasNewNotification,
     phoneVerified,
+    emailVerifyNudgeUserId,
     playerCardSlot: profile.playerCardSlot,
     sections,
     user: {

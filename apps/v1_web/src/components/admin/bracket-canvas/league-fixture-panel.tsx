@@ -10,6 +10,7 @@ import type { LeagueBoardNode, LeagueBoardSide } from '@/lib/league-board-model'
 import type { V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { LeagueFixtureDangerActions } from './league-fixture-danger-actions';
 import { useLeagueResultToast } from './use-league-result-toast';
 
 export interface LeagueFixturePanelProps {
@@ -21,6 +22,7 @@ export interface LeagueFixturePanelProps {
   showToast: (message: string, variant?: 'success' | 'error') => void;
   onEditSchedule: () => void;
   onCancelFixture: () => void;
+  onDeleteFixture: () => void;
   onClose: () => void;
 }
 
@@ -36,6 +38,7 @@ export function LeagueFixturePanel({
   showToast,
   onEditSchedule,
   onCancelFixture,
+  onDeleteFixture,
   onClose,
 }: LeagueFixturePanelProps) {
   const assignSlot = useV1AssignTournamentSlot(leagueId, 'league');
@@ -207,21 +210,21 @@ export function LeagueFixturePanel({
         <p className="tm-text-label" style={{ color: 'var(--text-body)' }}>
           {`${formatKstDateShort(node.startAt)} ${formatKstTime(node.startAt)} · ${node.placeName}`}
         </p>
-        {canWrite && !cancelled ? (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onEditSchedule} className="tm-btn tm-btn-sm tm-btn-outline" style={{ minHeight: 44 }}>
-              일정 수정
-            </button>
-            {node.state !== 'live' ? (
-              <button
-                type="button"
-                onClick={onCancelFixture}
-                className="tm-btn tm-btn-sm tm-btn-outline"
-                style={{ minHeight: 44, color: 'var(--red700)' }}
-              >
-                경기 취소
+        {canWrite ? (
+          <div className="flex flex-col gap-3">
+            {!cancelled ? (
+              <button type="button" onClick={onEditSchedule} className="tm-btn tm-btn-sm tm-btn-outline self-start" style={{ minHeight: 44 }}>
+                일정 수정
               </button>
             ) : null}
+            <LeagueFixtureDangerActions
+              cancelled={cancelled}
+              live={node.state === 'live'}
+              gameState={game?.state}
+              hasResult={game?.latestRevision != null}
+              onCancel={onCancelFixture}
+              onDelete={onDeleteFixture}
+            />
           </div>
         ) : null}
       </section>

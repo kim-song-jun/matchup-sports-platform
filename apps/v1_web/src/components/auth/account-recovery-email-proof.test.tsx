@@ -51,7 +51,6 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
 
     expect(await screen.findByLabelText('이메일')).toBeInTheDocument();
     expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
-    expect(wireCalls.phoneReset).toBe(0);
   });
 
   it('실제 이메일 발급·확인·재설정 HTTP를 거친 뒤에만 성공 화면을 보여준다', async () => {
@@ -63,7 +62,6 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     expect(wireCalls.emailIssue).toEqual([{ email: RECOVERY_EMAIL }]);
     expect(wireCalls.emailVerify).toEqual([{ email: RECOVERY_EMAIL, code: '123456' }]);
     expect(wireCalls.emailReset).toEqual([{ email: RECOVERY_EMAIL, proofToken: 'email-proof', newPassword: 'synthetic-new-password' }]);
-    expect(wireCalls.phoneReset).toBe(0);
     expect(screen.getByRole('link', { name: '로그인하러 가기' })).toHaveAttribute('href', '/login/email');
   });
 
@@ -76,7 +74,6 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     expect(await screen.findByText('합성 이메일 복구 서비스 오류')).toBeInTheDocument();
     expect(screen.queryByText('비밀번호를 바꿨어요')).not.toBeInTheDocument();
     expect(screen.getByLabelText('새 비밀번호')).toHaveValue('synthetic-new-password');
-    expect(wireCalls.phoneReset).toBe(0);
   });
 
   it('이메일 증명 뒤 소셜 전용 계정은 실제 로그인 출구로 안내한다', async () => {
@@ -131,7 +128,6 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     expect(screen.queryByText(/\*\*\*@/)).not.toBeInTheDocument();
     expect(wireCalls.phoneVerify).toEqual([{ phone: RECOVERY_PHONE, code: '123456', purpose: 'password_reset' }]);
     expect(wireCalls.findAccount).toEqual([{ phone: RECOVERY_PHONE, proofToken: 'phone-proof' }]);
-    expect(wireCalls.phoneReset).toBe(0);
     expect(wireCalls.emailReset).toHaveLength(0);
   });
 });

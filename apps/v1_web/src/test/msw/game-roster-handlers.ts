@@ -88,10 +88,17 @@ export function createV1GameRosterMswHandlers() {
     goalkeeperWritable: true,
     /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
+    /** 정지 규정과 선수별 카드 누적. 규정이 null 이면(규정 없는 대회·리그) 서버처럼 카드도 싣지 않는다. */
+    disciplineRules: null as V1GameRosterView['disciplineRules'],
+    cards: new Map<string, { yellowTotal: number; redTotal: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
     joinedAfter: new Set<string>(),
     /** 계정 실명 — 서버처럼 운영진(ADMIN·STAFF) 응답에만 싣는다. */
     realNames: new Map<string, string>(),
+    /** 정지 규정이 없는 다른 대회에 속한 경기 — 규정·카드 누적이 null 이고 대회 id 가 다르다. */
+    rulelessGames: new Set<string>(),
+    /** 같은 규정을 쓰지만 다른 대회에 속한 경기 — 대회 id·이름만 다르다. */
+    otherCompetitionGames: new Set<string>(),
     /** 대진 수정으로 이 팀이 더는 뛰지 않는 경기 — 표에서 빠지고 일괄 저장은 404 GAME_SIDE_NOT_FOUND. */
     detached: new Set<string>(),
   };
@@ -139,6 +146,8 @@ export function createV1GameRosterMswHandlers() {
     state.requests.push({ method: request.method, path, body: text === '' ? undefined : JSON.parse(text) });
   }
 
+  const cardsOf = (userId: string) => (state.disciplineRules === null ? null : (state.cards.get(userId) ?? null));
+
   function view(game: (typeof GAME_ROSTER_MSW.games)[number]): V1GameRosterView {
     const gameState = state.gameStates.get(game.gameId)!;
     const base = orderedPlayers().map((p) => {
@@ -149,7 +158,7 @@ export function createV1GameRosterMswHandlers() {
         : activeAdjustment(game.gameId, p.userId)
           ? ('EXCLUDED' as const)
           : ('PARTICIPATING' as const);
-      return { ...person(p, game.gameId), status };
+      return { ...person(p, game.gameId), status, cards: cardsOf(p.userId) };
     });
     const excluded = orderedPlayers().flatMap((p) => {
       const adj = activeAdjustment(game.gameId, p.userId);
@@ -163,10 +172,10 @@ export function createV1GameRosterMswHandlers() {
     });
     const participants = base
       .filter((p) => p.status === 'PARTICIPATING')
-      .map(({ status: _status, ...p }) => ({ ...p, joinedAfterFixtureCreated: state.joinedAfter.has(p.userId) }));
+      .map(({ status: _status, cards: _cards, ...p }) => ({ ...p, joinedAfterFixtureCreated: state.joinedAfter.has(p.userId) }));
     const suspended = orderedPlayers().flatMap((p) => {
       const s = state.suspensions.get(p.userId);
-      return s ? [{ ...person(p, game.gameId), reason: s.reason, remainingMatches: s.remainingMatches }] : [];
+      return s ? [{ ...person(p, game.gameId), reason: s.reason, remainingMatches: s.remainingMatches, cards: cardsOf(p.userId) }] : [];
     });
     return {
       gameId: game.gameId,
@@ -185,6 +194,7 @@ export function createV1GameRosterMswHandlers() {
         state.viewerRole === 'TEAM_MANAGER' && !fallback() ? GAME_ROSTER_MSW.registrationId : null,
       registrationId: !fallback() && ['TEAM_MANAGER', 'TEAM_MEMBER'].includes(state.viewerRole) ? GAME_ROSTER_MSW.registrationId : null,
       jerseyEditable: state.viewerRole === 'TEAM_MANAGER' && !fallback() && !state.rosterLocked,
+      disciplineRules: state.disciplineRules,
       base,
       participants,
       excluded,
@@ -207,14 +217,19 @@ export function createV1GameRosterMswHandlers() {
       gameId: game.gameId,
       sideId: game.sideId,
       teamMatchId: roster.teamMatchId,
-      competitionId: roster.competitionId,
+      competitionId: state.rulelessGames.has(game.gameId)
+        ? 'ruleless-competition'
+        : state.otherCompetitionGames.has(game.gameId)
+          ? 'other-competition'
+          : roster.competitionId,
       competitionKind: roster.competitionKind,
-      competitionTitle: '성수 풋살컵',
+      competitionTitle: state.rulelessGames.has(game.gameId) || state.otherCompetitionGames.has(game.gameId) ? '다른 풋살컵' : '성수 풋살컵',
       opponentName: game.opponentName,
       scheduledAt: game.startAt,
       gameState: roster.gameState,
       editable: roster.editable || (roster.gameState === 'ENDED' && state.viewerRole === 'ADMIN' && canWrite()),
       goalkeeperEditable: roster.goalkeeperEditable,
+      disciplineRules: state.rulelessGames.has(game.gameId) ? null : roster.disciplineRules,
       summary: {
         participating: roster.counts.participating,
         excluded: roster.counts.excluded,
@@ -229,7 +244,7 @@ export function createV1GameRosterMswHandlers() {
       ...(['ADMIN', 'STAFF'].includes(state.viewerRole) && state.realNames.has(p.userId) ? { realName: state.realNames.get(p.userId) } : {}),
       accountLinked: true,
       cells: views.map(({ roster }): V1TeamRosterCell => {
-        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, goalkeeper: state.goalkeepers.get(p.userId) ?? false };
+        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, cards: state.rulelessGames.has(roster.gameId) ? null : cardsOf(p.userId), goalkeeper: state.goalkeepers.get(p.userId) ?? false };
         const ex = roster.excluded.find((e) => e.userId === p.userId);
         if (ex) return { ...empty, gameId: roster.gameId, status: 'EXCLUDED', reason: ex.reason, actorRole: ex.actor.role, adjustmentId: ex.adjustmentId };
         const un = roster.unavailable.find((u) => u.userId === p.userId);
@@ -484,6 +499,21 @@ export function createV1GameRosterMswHandlers() {
     },
     suspend(userId: string, reason: string, remainingMatches: number) {
       state.suspensions.set(userId, { reason, remainingMatches });
+    },
+    /** 규정이 있는 대회·리그로 — 선수별 카드 누적(`cards`)은 이 규정이 있을 때만 응답에 실린다. */
+    setDisciplineRules(rules: NonNullable<V1GameRosterView['disciplineRules']> | null) {
+      state.disciplineRules = rules;
+    },
+    setCards(userId: string, yellowTotal: number, redTotal = 0) {
+      state.cards.set(userId, { yellowTotal, redTotal });
+    },
+    /** 이 경기를 규정 없는 다른 대회 소속으로 — 팀 경기 목록에서 규정 있는 대회 경기보다 앞에 놓을 때 쓴다. */
+    setGameWithoutRules(gameId: string) {
+      state.rulelessGames.add(gameId);
+    },
+    /** 이 경기를 규정은 같고 대회만 다른 경기로 — 한 선수에게 대회별 경고 칩이 둘 생기는 상황을 만든다. */
+    setGameInOtherCompetition(gameId: string) {
+      state.otherCompetitionGames.add(gameId);
     },
     markJoinedAfterFixture(userId: string) {
       state.joinedAfter.add(userId);

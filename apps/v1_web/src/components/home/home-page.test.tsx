@@ -11,6 +11,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// HomeAdBanner asks the ads API through React Query; its own test covers the creative. Here only the slot matters.
+vi.mock('@/components/ads/home-ad-banner', () => ({ HomeAdBanner: () => <div data-testid="home-ad-banner" /> }));
+
 const useV1AllTournamentsMock = vi.hoisted(() =>
   vi.fn(() => ({ data: [] as V1TournamentListItem[], isPending: false, isError: false, isLoading: false, refetch: vi.fn() })),
 );
@@ -493,5 +496,28 @@ describe('HomePageView — 사진은 그려지는 폭에 맞춘 최적화 주소
 
     expect(backgroundRequest(model, '.tm-match-card-media'))
       .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '750' });
+  });
+});
+
+describe('HomePageView — 광고 배너 자리', () => {
+  const follows = (earlier: Element | null, later: Element | null) =>
+    Boolean(earlier && later && earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('인사말 뒤, 오늘의 추천 앞의 같은 주 컬럼에 놓인다', () => {
+    const { container } = render(<HomePageView model={buildModel()} />);
+    const banner = screen.getByTestId('home-ad-banner');
+    const featured = container.querySelector('.tm-home-featured-block');
+
+    expect(featured).not.toBeNull();
+    expect(banner.parentElement).toBe(container.querySelector('.tm-home-main'));
+    expect(follows(container.querySelector('.tm-home-greeting-block'), banner)).toBe(true);
+    expect(follows(banner, featured)).toBe(true);
+  });
+
+  it('오늘의 추천이 통째로 없는 날에도 배너 자리는 그대로 있다', () => {
+    const { container } = render(<HomePageView model={buildModel({ featuredMatch: null })} />);
+
+    expect(container.querySelector('.tm-home-featured-block')).toBeNull();
+    expect(screen.getByTestId('home-ad-banner')).toBeInTheDocument();
   });
 });

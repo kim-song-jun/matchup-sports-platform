@@ -27,11 +27,13 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const shouldSearch = state === 'results' && submittedQuery.trim().length > 0;
   const filters = useMemo(() => ({ query: submittedQuery.trim(), limit: 5, sort: 'recommended' }), [submittedQuery]);
+  // 팀 목록 API 는 recommended 정렬을 모른다(기본 최근 등록순).
+  const teamFilters = useMemo(() => ({ query: submittedQuery.trim(), limit: 5 }), [submittedQuery]);
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const matchesQuery = useV1Matches(filters, { enabled: shouldSearch });
   const teamMatchesQuery = useV1TeamMatches(filters, { enabled: shouldSearch });
-  const teamsQuery = useV1Teams(filters, { enabled: shouldSearch });
+  const teamsQuery = useV1Teams(teamFilters, { enabled: shouldSearch });
   // 리그: GET /league-matches 는 매치/팀매치/팀과 달리 서버 쪽 텍스트 query 필터가 없다
   // (ListLeagueMatchesQueryDto — sportId/teamId/regionId/state/cursor/limit 뿐, query 없음).
   // 이 감사 수정은 프론트엔드 표면(홈·검색·sitemap)만 배정돼 있어 백엔드 DTO 확장은

@@ -21,11 +21,11 @@ import { AuthService, kakaoVerifiedEmail, type KakaoProfile } from './auth.servi
 import type { AppleLoginDto } from './dto/apple-login.dto';
 import type { LinkKakaoDto } from './dto/link-kakao.dto';
 import type { LinkPendingDto } from './dto/link-pending.dto';
+import { ACTIVITY_RELATION_COUNTS, isEmptySignupAccount } from './empty-signup-account';
 import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import { SOCIAL_PROVIDER_LABELS, socialProviderExists } from './social-link-conflict';
 import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
-import { isUnfinishedSocialSignup } from './social-signup-access';
 
 export type AccountLinkResult = {
   provider: LinkableSocialProvider;
@@ -377,53 +377,6 @@ export class AccountLinkService {
       },
     });
   }
-}
-
-/**
- * Counts of the relations that mean an account has been used. A signup that was never used has none; it may still
- * hold inquiries and uploads, which move to the account it merges into.
- */
-const ACTIVITY_RELATION_COUNTS = {
-  teamMemberships: true,
-  ownedTeams: true,
-  teamJoinApplications: true,
-  hostedMatches: true,
-  matchApplications: true,
-  matchParticipants: true,
-  createdTeamMatches: true,
-  teamMatchApplications: true,
-  chatParticipations: true,
-  chatMessages: true,
-  tournamentRegistrationsApplied: true,
-  tournamentPlayerEntries: true,
-  tournamentStaffAssignments: true,
-  tournamentReviews: true,
-  postEventReviewsWritten: true,
-} as const;
-
-/** A signup nobody finished: on the signup steps, no admin role, no password, no login but this one, and no activity. */
-function isEmptySignupAccount(holder: {
-  id: string;
-  status: string;
-  passwordHash: string | null;
-  user: {
-    accountStatus: string;
-    onboardingStatus: string;
-    adminUser: { id: string } | null;
-    authIdentities: { id: string }[];
-    _count: Record<string, number>;
-  };
-}): boolean {
-  return (
-    holder.status === 'active' &&
-    holder.passwordHash === null &&
-    holder.user.accountStatus === 'active' &&
-    isUnfinishedSocialSignup(holder.user.onboardingStatus) &&
-    holder.user.adminUser === null &&
-    holder.user.authIdentities.length === 1 &&
-    holder.user.authIdentities[0]?.id === holder.id &&
-    Object.values(holder.user._count).every((count) => count === 0)
-  );
 }
 
 function distinctProviders(identities: { provider: V1AuthProvider }[]): V1AuthProvider[] {

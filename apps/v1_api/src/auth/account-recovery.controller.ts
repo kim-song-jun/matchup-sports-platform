@@ -7,7 +7,6 @@ import {
   FindAccountDto,
   FindAccountByEmailDto,
   ResetPasswordByEmailDto,
-  ResetPasswordDto,
 } from './dto/account-recovery.dto';
 
 /**
@@ -40,14 +39,6 @@ export class AccountRecoveryController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async findAccountByEmail(@Body() dto: FindAccountByEmailDto) {
     return this.accountRecovery.findAccountByEmail(dto);
-  }
-
-  // 유효한 휴대폰 증명으로 기존 계정을 찾아도 409 ACCOUNT_RECOVERY_REQUIRES_EMAIL을 반환한다.
-  @Post('reset-password')
-  @HttpCode(200)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.accountRecovery.resetPasswordByPhone(dto);
   }
 
   // 메일을 실제로 내보내는 경로 — 발신 평판·비용이 걸려 있어 발급(휴대폰 issue)과 같은 폭으로 잠근다.

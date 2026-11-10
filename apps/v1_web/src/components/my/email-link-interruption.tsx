@@ -7,10 +7,15 @@ import { Button } from '@/components/v1-ui/button';
 import { LOGIN_METHODS_PATH } from '@/lib/link-result';
 import { RECENT_LOGIN_NOTICE } from './link-result-notice';
 
-export type EmailLinkInterruption = 'recent-login' | 'exists' | 'admin';
+/** `recent-login-email-change` 는 프로필의 이메일 변경 화면이 쓴다 — 같은 틀에 문구와 상단 제목만 다르다. */
+export type EmailLinkInterruption = 'recent-login' | 'recent-login-email-change' | 'exists' | 'admin';
 
 const COPY: Record<EmailLinkInterruption, { title: string; body: string }> = {
   'recent-login': RECENT_LOGIN_NOTICE,
+  'recent-login-email-change': {
+    title: RECENT_LOGIN_NOTICE.title,
+    body: '로그인한 지 오래돼서 바로 이메일을 바꿀 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 바꿀 수 있어요.',
+  },
   exists: {
     title: '이미 이메일 로그인이 연결돼 있어요',
     body: '이 계정에는 이메일과 비밀번호로 로그인하는 방법이 이미 있어요. 로그인 방법 화면에서 확인해 주세요.',
@@ -21,9 +26,11 @@ const COPY: Record<EmailLinkInterruption, { title: string; body: string }> = {
   },
 };
 
+const RELOGIN_KINDS: ReadonlySet<EmailLinkInterruption> = new Set(['recent-login', 'recent-login-email-change']);
+
 /**
  * 입력을 바꿔도 풀리지 않는 이유로 흐름이 멈췄을 때의 화면. 단계 화면 대신 나타나고, 갈 곳은 하나다.
- * 다시 로그인(recent-login)은 로그아웃한 뒤 이 연결 화면으로 돌아오는 로그인 경로로 보낸다.
+ * 다시 로그인(recent-login*)은 로그아웃한 뒤 이 흐름 화면으로 돌아오는 로그인 경로로 보낸다.
  */
 export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }: {
   kind: EmailLinkInterruption;
@@ -42,11 +49,11 @@ export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
-      topTitle="이메일 로그인 연결"
+      topTitle={kind === 'recent-login-email-change' ? '이메일 변경' : '이메일 로그인 연결'}
       backHref={backHref}
       appBack
       fixedAction={
-        kind === 'recent-login' ? (
+        RELOGIN_KINDS.has(kind) ? (
           <>
             <Button variant="primary" size="lg" block loading={relogin.pending} onClick={onRelogin}>
               다시 로그인하기

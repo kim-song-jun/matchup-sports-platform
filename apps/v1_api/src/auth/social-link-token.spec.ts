@@ -10,6 +10,7 @@ import {
   socialLinkAccountDigest,
   type SocialLinkClaims,
 } from './social-link-token';
+import { tamperSignature } from '../../test/helpers/tamper-signature';
 
 const SECRET = 'x'.repeat(48);
 const NOW = Date.UTC(2026, 9, 31, 4, 0, 0);
@@ -113,7 +114,7 @@ describe('social link token', () => {
     expect(otherClaims).not.toBe(claims);
     const altered = Buffer.from(`${purpose}:${otherClaims}:${exp}`).toString('base64url');
     expect(readSocialLinkToken(`${altered}.${signature}`, NOW)).toBeNull();
-    expect(readSocialLinkToken(`${payload}.${signature.slice(0, -2)}xx`, NOW)).toBeNull();
+    expect(readSocialLinkToken(tamperSignature(`${payload}.${signature}`), NOW)).toBeNull();
   });
 
   it('is refused without a configured secret', () => {

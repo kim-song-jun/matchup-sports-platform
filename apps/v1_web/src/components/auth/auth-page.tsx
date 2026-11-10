@@ -10,6 +10,7 @@ import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/compone
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
+import { PendingEmailLinkNotice } from './pending-email-link-notice';
 import { PendingLinkNotice } from './pending-link-notice';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
@@ -39,6 +40,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
         </div>
         <div>
           <PendingLinkNotice />
+          <PendingEmailLinkNotice />
           {/* 소셜 로그인이 위, 이메일이 아래 — Apple 이 권장하는 배치이고, App Store 심사
               가이드라인 4.8 이 요구하는 "동등한 선택지" 가 눈으로도 그렇게 보인다.
               Apple 버튼은 네이티브 셸에서만 나타난다(웹 리다이렉트 흐름은 임베디드 웹뷰에서
@@ -94,18 +96,23 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
   );
 }
 
-export function SignupCompletePageView({ model, headingRef }: {
+export function SignupCompletePageView({ model, headingRef, topTitle, notice }: {
   model: SignupCompleteViewModel;
+  /** 상단 바 제목. 가입 완료는 흐름이 끝났으므로 없지만, 설정 안의 흐름(이메일 변경)은 어떤 흐름인지 남긴다. */
+  topTitle?: string;
   /** 이 화면이 앞 화면을 대신해 나타날 때(단계 안에서 완료로 넘어갈 때) 제목으로 포커스를 옮기도록 받는다. */
   headingRef?: Ref<HTMLHeadingElement>;
+  /** 소개 문장과 단계 카드 사이에 놓는 안내(예: 가입은 됐지만 사진만 올리지 못했을 때). */
+  notice?: ReactNode;
 }) {
   return (
-    <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
+    <AuthFrame topTitle={topTitle} fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
       <div className="tm-auth-complete">
         {/* 완료 순간의 그래픽(트로피). .tm-complete-check 키프레임은 그대로 살려 등장 피드백으로 쓴다. */}
         <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop tm-complete-check" />
         <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        {notice}
         <div className="tm-auth-stack">
           {model.steps.map((step) => (
             <Card key={step.title} pad={16} className="tm-auth-step-card">

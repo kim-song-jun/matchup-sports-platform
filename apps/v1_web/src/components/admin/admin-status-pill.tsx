@@ -54,6 +54,12 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'amber',
     icon: <AlertCircle size={12} aria-hidden="true" />,
   },
+  // 광고 캠페인의 중단(게시했다가 내린 상태). 감사 로그의 상태 변경 칸이 이 키로 그린다.
+  stopped: {
+    label: '중단',
+    tone: 'amber',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
   blocked: {
     label: '차단',
     tone: 'red',

@@ -38,10 +38,14 @@ export function GenderCategoryField({
           <label
             key={option}
             className={[
-              'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-[length:var(--font-size-body-sm)] font-bold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue-500',
-              value === option
-                ? 'border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
-                : 'border-[var(--border)] text-[var(--text-body)]',
+              'grid min-h-[52px] place-items-center rounded-xl border text-[length:var(--font-size-body-sm)] font-bold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue-500',
+              disabled
+                ? value === option
+                  ? 'cursor-not-allowed border-[var(--border-strong)] bg-[var(--grey100)] text-[var(--text-body)]'
+                  : 'cursor-not-allowed border-[var(--border)] bg-[var(--grey100)] font-medium text-[var(--text-caption)]'
+                : value === option
+                  ? 'cursor-pointer border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
+                  : 'cursor-pointer border-[var(--border)] text-[var(--text-body)]',
             ].join(' ')}
           >
             <input
@@ -49,6 +53,7 @@ export function GenderCategoryField({
               name={groupName}
               checked={value === option}
               onChange={() => onChange(option)}
+              disabled={disabled}
               className="sr-only"
             />
             {label}

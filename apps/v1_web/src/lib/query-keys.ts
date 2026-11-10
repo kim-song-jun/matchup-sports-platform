@@ -14,6 +14,8 @@ export const v1Keys = {
   home: (filters?: Record<string, unknown>) => [...v1Keys.all, 'home', filters ?? {}] as const,
   activePopup: (screen: string | null, path?: string | null) =>
     [...v1Keys.all, 'popups', 'active', screen, path ?? null] as const,
+  /** 홈 광고(`GET /ads/active`) — 공개 응답이라 identity 와 무관하다. persist 화이트리스트에 넣지 않는다(중단된 광고가 캐시로 남는다). */
+  activeAds: () => [...v1Keys.all, 'ads', 'active'] as const,
   recentSearches: () => [...v1Keys.all, 'search', 'recent'] as const,
   notices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'notices', filters ?? {}] as const,
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
@@ -113,6 +115,10 @@ export const v1Keys = {
   adminTeamMatch: (teamMatchId: string) => [...v1Keys.all, 'admin', 'team-matches', teamMatchId] as const,
   adminTeams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'teams', filters ?? {}] as const,
   adminTeam: (id: string) => [...v1Keys.all, 'admin', 'teams', id] as const,
+  /** 광고 캠페인 목록·상세 공통 접두사 — 쓰기 뒤 통째 무효화용. */
+  adminAdCampaignsAll: () => [...v1Keys.all, 'admin', 'ad-campaigns'] as const,
+  adminAdCampaigns: (filters?: Record<string, unknown>) => [...v1Keys.adminAdCampaignsAll(), filters ?? {}] as const,
+  adminAdCampaign: (campaignId: string) => [...v1Keys.adminAdCampaignsAll(), campaignId] as const,
   adminPopups: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'popups', filters ?? {}] as const,
   adminPopup: (id: string) => [...v1Keys.all, 'admin', 'popups', id] as const,
   adminNotices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'notices', filters ?? {}] as const,
@@ -155,6 +161,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', id, 'campaign'] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
+  adminDiscipline: (competitionId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', competitionId, 'discipline'] as const,
   adminTournamentRoster: (registrationId: string) =>
     [...v1Keys.all, 'admin', 'registrations', registrationId, 'players'] as const,
   adminTournamentPlayerRecords: (tournamentId: string) =>
@@ -182,6 +190,8 @@ export const v1Keys = {
   adminLeagueSeriesPromotionPreview: (seriesId: string, seasonNo: number) =>
     [...v1Keys.all, 'admin', 'league-series', seriesId, 'seasons', seasonNo, 'promotions'] as const,
   adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
+  adminLeagueTemplatePreview: (leagueId: string, request: unknown) =>
+    [...v1Keys.all, 'admin', 'league-matches', leagueId, 'template-preview', request] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
   // D2 (E4): 어드민 이의 목록 — status 필터('' = 전체)가 다르면 다른 쿼리로 취급한다.
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를

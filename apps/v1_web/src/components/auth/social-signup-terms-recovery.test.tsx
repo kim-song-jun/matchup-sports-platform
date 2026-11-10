@@ -133,7 +133,8 @@ async function prepareProfile() {
 }
 
 describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복구', () => {
-  it('URL만 가진 중첩 목적지를 약관 복구와 실제 프로필·네 단계 온보딩 뒤에 한 번 소비한다', async () => {
+  // 약관 복구·프로필·온보딩 네 단계를 실제로 밟아 혼자서도 2초 넘게 걸린다 — 묶음 실행 부하에서 기본 5초를 넘지 않게 둔다.
+  it('URL만 가진 중첩 목적지를 약관 복구와 실제 프로필·네 단계 온보딩 뒤에 한 번 소비한다', { timeout: 15_000 }, async () => {
     // Given: OAuth 저장값 없이 가입 URL에만 최종 채팅의 query/hash를 감싼 필수 단계가 있다.
     const destination = '/chat?room=team#latest';
     const nestedRedirect = `/onboarding/sport?redirect=${encodeURIComponent(destination)}`;

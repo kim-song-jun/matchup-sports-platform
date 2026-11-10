@@ -28,6 +28,46 @@
   margin: 0 20px 28px;
 }
 
+/* 홈 광고 배너(HomeAdBanner). 3.5:1 상자가 이미지보다 먼저 자리를 잡아 로딩 중에도 아래가 밀리지 않는다.
+   좌우 20px 는 다른 홈 섹션과 같은 여백선이다. */
+.tm-home-ad-banner {
+  display: block;
+  position: relative;
+  margin: 0 20px 28px;
+  aspect-ratio: 7 / 2;
+  overflow: hidden;
+  border-radius: var(--radius-container);
+  background: var(--grey100);
+}
+
+.tm-home-ad-banner:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-home-ad-banner-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 소재 위에 얹히므로 테마와 무관한 고정 쌍을 쓴다. 어두운 스크림 + 고정 흰 글씨는 흰 이미지 위에서도 6.5:1 이다. */
+.tm-home-ad-banner-badge {
+  position: absolute;
+  top: var(--spacing-2);
+  right: var(--spacing-2);
+  z-index: 1;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-tight);
+  background: var(--scrim-dark-72);
+  color: var(--static-white);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
 .tm-home-matches-error-wrap {
   padding: 0 20px 8px;
 }
@@ -261,6 +301,12 @@
   }
 
   .tm-home-lineup-block {
+    margin: 0;
+  }
+
+  /* 주 컬럼이 이미 폭과 간격을 정한다. */
+  .tm-home-ad-banner {
+    width: 100%;
     margin: 0;
   }
 }

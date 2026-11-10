@@ -27,6 +27,18 @@ function view(row: Awaited<ReturnType<typeof load>>) {
     genderCategory: row.genderCategory,
     updatedAt: row.updatedAt.toISOString(), status: row.status, sportName: row.sport.name };
 }
+/** Fields frozen once a league is completed or cancelled; omitted optional fields mean "unchanged". */
+function changedLockedFields(current: Awaited<ReturnType<typeof load>>, dto: UpdateLeagueSettingsDto) {
+  const sameTime = (next: string | null, prev: Date | null) => (next === null ? null : new Date(next).getTime()) === (prev?.getTime() ?? null);
+  const changed: string[] = [];
+  if (!sameTime(dto.startsOn, current.scheduledAt)) changed.push('startsOn');
+  if (!sameTime(dto.endsOn, current.scheduledEndAt)) changed.push('endsOn');
+  if (!sameTime(dto.registrationDeadlineAt, current.registrationDeadlineAt)) changed.push('registrationDeadlineAt');
+  if (dto.plannedFixtureCount !== undefined && dto.plannedFixtureCount !== current.plannedFixtureCount) changed.push('plannedFixtureCount');
+  if (dto.maxTeams !== undefined && dto.maxTeams !== current.maxTeams) changed.push('maxTeams');
+  if (dto.genderCategory !== undefined && dto.genderCategory !== current.genderCategory) changed.push('genderCategory');
+  return changed;
+}
 export async function getLeagueSettings(prisma: PrismaService, admins: AdminContextService, user: V1AuthUser, id: string) {
   await admins.getActiveAdmin(user.id);
   return view(await load(prisma, id));
@@ -40,7 +52,10 @@ export async function updateLeagueSettings(prisma: PrismaService, admins: AdminC
       throw new ConflictException({ code: 'LEAGUE_SETTINGS_STALE', message: '다른 운영 작업으로 리그 정보가 바뀌었어요. 최신 정보를 다시 불러와 주세요.' });
     }
     if (current.status === 'completed' || current.status === 'cancelled') {
-      throw new ConflictException({ code: 'LEAGUE_ENDED', message: '끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.' });
+      const lockedFields = changedLockedFields(current, dto);
+      if (lockedFields.length > 0) {
+        throw new ConflictException({ code: 'LEAGUE_ENDED_FIELD_LOCKED', message: '끝났거나 취소된 리그는 이름·설명·지역만 수정할 수 있어요. 기간·신청 마감·총 경기 수·참가팀 정원·성별은 순위와 정산 기록 때문에 바꿀 수 없어요.', details: { fields: lockedFields } });
+      }
     }
     if (dto.maxTeams !== undefined && dto.maxTeams !== null
       && dto.maxTeams < await countCapacityReservations(tx, id)) {

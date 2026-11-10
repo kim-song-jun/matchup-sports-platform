@@ -71,8 +71,10 @@ function batchBodies() {
   return mock.requests.filter((r) => r.method === 'POST' && r.path === BATCH).map((r) => r.body);
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const cell = (player: string, opponent: string, state: string) =>
-  screen.findByRole('button', { name: new RegExp(`^${player} .* vs ${opponent}(?: · 종료)? ${state}, `) });
+  screen.findByRole('button', { name: new RegExp(`^${escapeRegExp(player)} .* vs ${opponent}(?: · 종료)? ${state}, `) });
 
 describe('어드민 경기별 명단 — 운영진 실명', () => {
   it.each([
@@ -83,7 +85,7 @@ describe('어드민 경기별 명단 — 운영진 실명', () => {
     renderPanel();
 
     expect(await screen.findByRole('rowheader', { name })).toBeInTheDocument();
-    expect(await cell(name.replace(/[()]/g, '\\$&'), G1.opponentName, '출전')).toBeInTheDocument();
+    expect(await cell(name, G1.opponentName, '출전')).toBeInTheDocument();
     expect(screen.getByRole('option', { name })).toBeInTheDocument();
   });
 });
@@ -162,6 +164,24 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
     expect(screen.getByText('빠짐 · 결장')).toBeInTheDocument();
     expect(screen.getByText('결장 · 부상 · 팀장')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^한도윤 .* vs /  })).not.toBeInTheDocument();
+  });
+});
+
+describe('어드민 경기별 명단 — 경고 누적 칩', () => {
+  it('규정이 있으면 경고가 쌓인 선수의 앞으로 뛸 경기 칸에만 칩이 붙는다', async () => {
+    mock.setDisciplineRules({ yellowAccumulationLimit: 2, redCardSuspensionMatches: null });
+    mock.setCards('player-2', 1);
+    renderPanel();
+    await cell('박서준', G1.opponentName, '출전');
+    expect(screen.getAllByText('경고 1/2장 · 한 장 더 받으면 정지')).toHaveLength(2);
+    expect(screen.getAllByText(/경고 \d\/\d장/)).toHaveLength(2);
+  });
+
+  it('규정이 없으면 카드 기록이 있어도 칩이 없다', async () => {
+    mock.setCards('player-2', 1);
+    renderPanel();
+    await cell('박서준', G1.opponentName, '출전');
+    expect(screen.queryByText(/경고 \d\/\d장/)).toBeNull();
   });
 });
 

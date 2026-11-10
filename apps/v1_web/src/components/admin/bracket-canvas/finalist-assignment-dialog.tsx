@@ -104,7 +104,7 @@ function FinalistEditor({ tournamentId, preview, onClose, showToast, onRefresh }
   </div>}>
     <p className="tm-text-caption text-[var(--text-muted)]">공식 조별 순위를 확인하고 결선 배정안을 조정해요. 순서를 바꾸거나 다른 팀을 선택해도 공식 성적표는 바뀌지 않아요. 저장 뒤 결과가 정정되어도 결선 배정을 자동으로 덮어쓰지 않아요.</p>
     {preview.standingsChanged ? <p role="status" className="tm-text-label text-[var(--orange700)]">마지막 배정 이후 조별 순위나 결과가 바뀌었어요. 현재 결선 배정과 최신 순위를 비교해 다시 확인해 주세요.</p> : null}
-    <section className="flex flex-col gap-3"><SectionTitle title="조별 순위 · 진출팀 선정" />
+    <section className="flex flex-col gap-3"><SectionTitle title="조별 순위 · 진출팀 선정" compact />
       <div className="grid gap-4 md:grid-cols-2">{preview.groups.map((group) => <div key={group.id} className="flex flex-col gap-3 rounded-xl bg-[var(--surface-soft)] p-4">
         <p className="tm-text-label font-semibold">{group.name} · {group.complete ? '공식 결과 반영 완료' : '경기 진행 중 · 순위 확인 필요'}</p>
         <label className="tm-text-label flex items-center gap-2">진출 팀 수
@@ -123,7 +123,7 @@ function FinalistEditor({ tournamentId, preview, onClose, showToast, onRefresh }
         })}</ol>
       </div>)}</div>
     </section>
-    <section className="flex flex-col gap-3"><SectionTitle title="기존 결선에 배정" />
+    <section className="flex flex-col gap-3"><SectionTitle title="기존 결선에 배정" compact />
       <p className="tm-text-caption text-[var(--text-muted)]">자동 배정 후보 {Object.values(counts).reduce((sum, count) => sum + count, 0)}팀 · 배정할 자리 {preview.targets.length}개. 자동 배정 뒤에도 각 자리를 직접 바꿀 수 있어요. 수동 배정에서는 후보 외 조별 참가팀도 선택할 수 있어요. 시드는 조별 배정 순위 → 조 표시 순서이며, 조 간 성적 비교는 하지 않아요. 직행 자리는 배정 미리보기에서 직접 확인해 주세요.</p>
       <div className="flex flex-wrap gap-2"><Button variant="outline" size="md" disabled={preview.blockedReason !== null || apply.isPending} onClick={() => recommend('cross')}>조별 교차 자동 배정</Button>
         <Button variant="outline" size="md" disabled={preview.blockedReason !== null || apply.isPending} onClick={() => recommend('seed')}>시드순 자동 배정</Button></div>

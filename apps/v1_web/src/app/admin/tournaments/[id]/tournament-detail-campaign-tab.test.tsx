@@ -6,6 +6,7 @@ import type { V1Tournament } from '@/types/api';
 import { TournamentInfoSection } from './info-section';
 import { TournamentAdminShell } from './tournament-admin-shell';
 import { TournamentAdminProvider } from './tournament-admin-context';
+import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 type WiringHookMocks = {
   tournamentQuery: {
@@ -112,6 +113,7 @@ const tournament: V1Tournament = {
   bankAccount: null,
   bankHolder: null,
   rulesText: null,
+  tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
   yellowAccumulationLimit: null,
   redCardSuspensionMatches: null,
   refundPolicyText: null,

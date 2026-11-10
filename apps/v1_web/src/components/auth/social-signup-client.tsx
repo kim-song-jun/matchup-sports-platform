@@ -7,7 +7,7 @@ import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
-import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
 import { getSignInThenLinkHint } from '@/lib/auth-link-errors';
 import { clearPendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
@@ -33,13 +33,9 @@ import { extractErrorMessage } from '@/lib/error-message';
 import type { V1SignInThenLinkDetails } from '@/types/api';
 import styles from './social-signup-review.module.css';
 
-type SocialStep = 'nickname' | 'gender' | 'name' | 'phone' | 'birthDate' | 'review';
+type SocialStep = 'gender' | 'name' | 'phone' | 'birthDate' | 'review';
 
-type FieldErrors = Partial<Record<'nickname' | 'gender', string>>;
-type DuplicateCheckState = {
-  status: 'idle' | 'available' | 'taken' | 'error';
-  value: string;
-};
+type FieldErrors = Partial<Record<'gender', string>>;
 
 /** 가입 진행 중인 소셜 계정의 이름. 모르면 null — 문구가 특정 서비스를 단정하지 않게 한다. */
 function socialProviderLabel(provider: string | null | undefined): string | null {
@@ -54,20 +50,17 @@ export function SocialSignupClient() {
   const queryClient = useQueryClient();
   const completeProfile = useV1CompleteSocialProfile();
   const deferProfile = useV1DeferSocialProfile();
-  const checkNickname = useV1CheckNickname();
-  const [nickname, setNickname] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
-  // 첫 단계는 가입 상태(/auth/me)를 읽은 뒤에 정한다 — 읽기 전에 닉네임 칸을 그렸다가 번호 단계로 바뀌는 깜빡임을 막는다.
+  // 첫 단계는 가입 상태(/auth/me)를 읽은 뒤에 정한다 — 읽기 전에 첫 칸을 그렸다가 번호 단계로 바뀌는 깜빡임을 막는다.
   const [resolvedStep, setStep] = useState<SocialStep | null>(null);
-  const step: SocialStep = resolvedStep ?? 'nickname';
+  const step: SocialStep = resolvedStep ?? 'phone';
   // 번호를 맨 앞에서 받는다. 카카오가 준 번호나 이미 인증을 마친 번호가 있으면 이 단계를 건너뛴다.
   const [phoneStepRequired, setPhoneStepRequired] = useState(false);
   const [editPhone, setEditPhone] = useState(false);
@@ -125,17 +118,14 @@ export function SocialSignupClient() {
   if (resolvedStep === null && authMe.isPending !== true) {
     const needsPhone = !lockedKakaoPhone && !verifiedPhoneOnFile;
     setPhoneStepRequired(needsPhone);
-    setStep(needsPhone ? 'phone' : 'nickname');
+    // 닉네임은 서버가 자동으로 만든다 — 번호가 끝나면 아직 비어 있는 첫 입력으로 간다.
+    const firstInput: SocialStep = !lockedGender ? 'gender' : !lockedName ? 'name'
+      : !prefill?.birthDate || !isSignupAgeEligible(prefill.birthDate) ? 'birthDate' : 'review';
+    setStep(needsPhone ? 'phone' : firstInput);
   }
   const [activitySeeded, setActivitySeeded] = useState(false);
   useEffect(() => {
     if (!activityMode || activitySeeded || !authMe.data) return;
-    // 자동 생성된 닉네임은 이미 서버에서 중복 검사를 통과했다. 바꾸면 기존처럼 다시 확인한다.
-    const currentNickname = authMe.data.profile.nickname ?? '';
-    if (currentNickname) {
-      setNickname(currentNickname);
-      setNicknameCheck({ status: 'available', value: currentNickname });
-    }
     if (authMe.data.user.phone) setPhoneDigits(normalizeSeparatedDigits(authMe.data.user.phone));
     if (authMe.data.verification?.phoneVerified) setPhoneVerified(true);
     setActivitySeeded(true);
@@ -166,15 +156,15 @@ export function SocialSignupClient() {
     setPrefillApplied(true);
   }, [prefill, prefillApplied, lockedKakaoPhone]);
 
-  const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
+  // 가입 중에는 약관 단계에서 서버가 정해 둔 닉네임, 미뤘다 돌아온 계정은 이미 가진 닉네임이다. 입력받지 않는다.
+  const autoNickname = authMe.data?.socialSignupNickname ?? authMe.data?.profile?.nickname ?? '';
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const signupPending = completeProfile.isPending || deferProfile.isPending || termsRecoveryPending;
   // 번호를 고치고 인증 없이 확인 화면으로 돌아올 수 있으므로 인증 상태도 제출 조건이다.
-  const isBlocked = signupPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null || !contactReady;
+  const isBlocked = signupPending || profileIssue !== null || !contactReady;
   const steps: SocialStep[] = [
     ...(phoneStepRequired || editPhone || step === 'phone' ? ['phone' as const] : []),
-    'nickname',
     ...(!lockedGender || step === 'gender' ? ['gender' as const] : []),
     ...(!lockedName || step === 'name' ? ['name' as const] : []),
     ...(!prefill?.birthDate || !isSignupAgeEligible(prefill.birthDate) || editBirthDate || step === 'birthDate' ? ['birthDate' as const] : []),
@@ -182,14 +172,13 @@ export function SocialSignupClient() {
   ];
   const stepIndex = Math.max(0, steps.indexOf(step));
   const stepCopy: Record<SocialStep, { title: string; sub: string }> = {
-    nickname: { title: '어떤 닉네임으로 활동할까요?', sub: '다른 사람에게 보여 줄 이름이에요.' },
     gender: { title: '성별을 선택해 주세요', sub: '경기와 대회 참가 조건을 확인할 때 사용해요.' },
     name: { title: '이름을 입력해 주세요', sub: '실명 또는 확인 가능한 이름을 알려 주세요.' },
     phone: { title: '휴대폰 번호를 확인해 주세요', sub: '직접 입력한 번호는 인증이 필요해요. 이미 가입한 번호인지도 함께 확인해요.' },
     birthDate: { title: '생년월일을 입력해 주세요', sub: '만 14세 이상만 가입할 수 있어요.' },
     review: { title: '입력한 정보를 확인해 주세요', sub: '제공받은 정보와 직접 입력한 정보를 함께 확인해 주세요.' },
   };
-  const stepReady = step === 'nickname' ? nicknameVerified : step === 'gender' ? Boolean(gender)
+  const stepReady = step === 'gender' ? Boolean(gender)
     : step === 'name' ? Boolean(normalizeSignupDisplayName(displayName))
     : step === 'phone' ? /^\d{11}$/.test(phoneDigits) && contactReady
     : step === 'birthDate' ? isSignupAgeEligible(birthDateDigits) : !isBlocked;
@@ -209,27 +198,6 @@ export function SocialSignupClient() {
     if (activityMode) router.replace(continuationPath());
     else void exitFlow.exit();
   };
-  const runNicknameCheck = () => {
-    const nextNickname = nickname.trim();
-    setError(null);
-    if (nextNickname.length < 2) {
-      setFieldErrors((current) => ({ ...current, nickname: '2자 이상 입력해 주세요.' }));
-      setNicknameCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkNickname.mutate(nextNickname, {
-      onSuccess: (result) => {
-        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: nextNickname });
-        setFieldErrors((current) => ({ ...current, nickname: result.available ? undefined : '이미 사용 중인 닉네임이에요.' }));
-      },
-      onError: () => {
-        setNicknameCheck({ status: 'error', value: nextNickname });
-        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했어요. 다시 시도해 주세요.' }));
-      },
-    });
-  };
-
   const continuationPath = (nextRoute?: string | null) => {
     return resolveAuthContinuationPath(sanitizeRedirectPath(nextRoute), new URLSearchParams(window.location.search).get('redirect'));
   };
@@ -288,11 +256,6 @@ export function SocialSignupClient() {
     setPhoneConflict(false);
     setFieldErrors({});
 
-    if (!nicknameVerified) {
-      setFieldErrors({ nickname: '닉네임 중복 확인이 필요해요.' });
-      return;
-    }
-
     if (!isCompleteSignupProfile(profileDraft)) {
       const nextProfileIssue = getSignupProfileIssue(profileDraft);
       if (nextProfileIssue) {
@@ -308,7 +271,6 @@ export function SocialSignupClient() {
 
     completeProfile.mutate(
       {
-        nickname: nickname.trim(),
         displayName: normalizeSignupDisplayName(profileDraft.displayName),
         phone: profileDraft.phone,
         birthDate: profileDraft.birthDate,
@@ -341,14 +303,6 @@ export function SocialSignupClient() {
           } else router.replace(destination);
         },
         onError: async (nextError) => {
-          if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
-            setStep('nickname');
-            setNicknameCheck({ status: 'taken', value: nickname.trim() });
-            setFieldErrors({ nickname: '이미 사용 중인 닉네임이에요.' });
-            setError('다른 닉네임으로 다시 시도해 주세요.');
-            return;
-          }
-
           if (nextError instanceof V1ApiError && nextError.code === 'PHONE_CONFLICT') {
             setEditPhone(true);
             setReturnToReview(true);
@@ -404,20 +358,6 @@ export function SocialSignupClient() {
       {resolvedStep === null ? null : <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={handleFormSubmit}>
         <AuthStepHeader name="가입" steps={steps} index={stepIndex} title={stepCopy[step].title} sub={stepCopy[step].sub} focusOnChange />
         <div className="tm-auth-form tm-auth-signup-form">
-          {step === 'nickname' ? (
-            <label className="tm-auth-field">
-              <span className="tm-text-label">닉네임</span>
-              <span className="tm-auth-field-with-action">
-                <input className={`tm-input tm-auth-input ${fieldErrors.nickname ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
-                  minLength={2} onChange={(event) => { setNickname(event.target.value); setNicknameCheck({ status: 'idle', value: '' }); setFieldErrors((current) => ({ ...current, nickname: undefined })); }}
-                  placeholder="사용할 닉네임" required type="text" value={nickname} aria-invalid={fieldErrors.nickname ? true : undefined}
-                  aria-describedby={fieldErrors.nickname || nicknameVerified ? 'social-signup-nickname-helper' : undefined} />
-                <Button disabled={nickname.trim().length < 2} loading={checkNickname.isPending} onClick={runNicknameCheck} size="md" type="button" variant="neutral">중복 확인</Button>
-              </span>
-              {fieldErrors.nickname || nicknameVerified ? <span id="social-signup-nickname-helper" role={fieldErrors.nickname ? 'alert' : undefined}
-                className={`tm-text-caption tm-auth-field-helper ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>{fieldErrors.nickname ?? '사용 가능한 닉네임이에요.'}</span> : null}
-            </label>
-          ) : null}
           {step === 'gender' ? <div className="tm-auth-field">
             <span className="tm-text-label">성별</span>
             <div className="tm-auth-segmented" role="radiogroup" aria-label="성별" aria-invalid={fieldErrors.gender ? true : undefined}>
@@ -441,7 +381,7 @@ export function SocialSignupClient() {
           </label> : null}
           {step === 'review' ? <>
             <dl className={styles.summary}>
-              <div className={styles.row}><dt>닉네임</dt><dd>{nickname}</dd></div>
+              <div className={styles.row}><dt>닉네임</dt><dd>{autoNickname || '가입하면 만들어요'}<span className={styles.source}>자동으로 만들었어요 · 프로필에서 바꿀 수 있어요</span></dd></div>
               <div className={styles.row}><dt>이름</dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
               <div className={styles.row}><dt>성별</dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
               <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : contactReady ? '인증 완료' : '인증 필요'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setReturnToReview(true); setStep('phone'); }}>번호 변경</button> : null}</div>
@@ -453,7 +393,7 @@ export function SocialSignupClient() {
         {error ? <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error"><div className="tm-text-body-lg">가입을 완료하지 못했어요</div><div className="tm-text-caption">{error}</div></Card> : null}
         {exitFlow.error ? <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error"><div className="tm-text-body-lg">가입을 취소하지 못했어요</div><div className="tm-text-caption">{exitFlow.error}</div></Card> : null}
         <div style={{ marginTop: 24 }}>
-          <Button block disabled={!stepReady || signupPending || checkNickname.isPending} loading={completeProfile.isPending || termsRecoveryPending} size="lg" type="submit" variant={stepReady ? 'primary' : 'neutral'}>
+          <Button block disabled={!stepReady || signupPending} loading={completeProfile.isPending || termsRecoveryPending} size="lg" type="submit" variant={stepReady ? 'primary' : 'neutral'}>
             {step === 'review' ? activityMode ? '입력 완료하고 계속하기' : '확인하고 계속' : '다음'}
           </Button>
           {signupMode && step !== 'review' ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div></> : null}

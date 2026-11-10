@@ -121,10 +121,6 @@ async function openSignup() {
 }
 
 async function prepareProfile() {
-  fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '카카오러너' } });
-  fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
-  await screen.findByText('사용 가능한 닉네임이에요.');
-  fireEvent.click(screen.getByRole('button', { name: '다음' }));
   fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
   const submit = await screen.findByRole('button', { name: '확인하고 계속' });
@@ -169,7 +165,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
         return success(authSession(state.auth, '/signup/social'));
       }),
       http.post('*/api/v1/auth/social-profile', async ({ request }) => {
-        expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
+        expect(await request.json()).toEqual({ displayName: '김러너', phone: '01012345678',
           birthDate: '19950115', gender: 'female' });
         profileRequests += 1;
         state.auth = { ...requiredAuth, user: { ...requiredAuth.user, onboardingStatus: 'signup_done' } };
@@ -235,7 +231,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
   });
 
   it('프로필 완료 요청이 TERMS_REQUIRED이면 인증을 재조회하고 약관 화면에 머문다', async () => {
-    // Given: 실제 폼과 닉네임 확인을 완료한 fresh required 캐시다.
+    // Given: 실제 폼을 채운 fresh required 캐시다.
     server.use(http.post('*/api/v1/auth/social-profile', requireCurrentTerms));
     await openSignup();
     const submit = await prepareProfile();

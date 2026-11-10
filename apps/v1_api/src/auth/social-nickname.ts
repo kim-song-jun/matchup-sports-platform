@@ -1,57 +1,45 @@
 import { ConflictException } from '@nestjs/common';
 
 const MAX_NICKNAME_LENGTH = 20;
-const MIN_NICKNAME_LENGTH = 2;
-const SUFFIXED_ATTEMPTS = 8;
-const FALLBACK_ATTEMPTS = 10;
-const FALLBACK_DIGITS = 6;
-const FALLBACK_PREFIX = '팀밋사용자';
+const MAX_ATTEMPTS = 12;
 
-export function normalizeSocialNicknameSeed(seed: string | null | undefined): string | null {
-  const collapsed = (seed ?? '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const cleaned = takeCodePoints(collapsed, MAX_NICKNAME_LENGTH).trim();
-  return Array.from(cleaned).length >= MIN_NICKNAME_LENGTH ? cleaned : null;
+const ADJECTIVES = [
+  '씩씩한', '재빠른', '느긋한', '용감한', '활발한', '다정한', '듬직한', '명랑한', '든든한', '상냥한',
+  '엉뚱한', '부지런한', '당당한', '눈부신', '날쌘', '푸근한', '야무진', '포근한', '의젓한', '반짝이는',
+  '힘센', '똑똑한', '유쾌한', '꾸준한', '빠른', '튼튼한', '해맑은', '느림보', '차분한', '신나는',
+] as const;
+
+const ANIMALS = [
+  '오리너구리', '고라니', '수달', '다람쥐', '고양이', '강아지', '펭귄', '여우', '토끼', '판다',
+  '두루미', '해달', '사슴', '부엉이', '미어캣', '알파카', '캥거루', '돌고래', '코알라', '너구리',
+  '참새', '고슴도치', '청설모', '거북이', '하마', '기린', '앵무새', '오소리', '족제비', '카피바라',
+] as const;
+
+function pick<T>(items: readonly T[], random: () => number): T {
+  return items[Math.min(items.length - 1, Math.floor(random() * items.length))];
 }
 
-function takeCodePoints(value: string, limit: number): string {
-  return Array.from(value).slice(0, limit).join('');
-}
-
-function randomDigits(length: number, random: () => number): string {
-  const max = 10 ** length;
-  return String(Math.floor(random() * max)).padStart(length, '0');
+function randomNumber(attempt: number, random: () => number): string {
+  // 1~2 digits first, widening as collisions pile up: 씩씩한오리너구리4 → …4821.
+  const digits = Math.min(1 + Math.floor(attempt / 3), 4);
+  return String(1 + Math.floor(random() * (10 ** digits - 1)));
 }
 
 /**
- * Picks an unused nickname for a social signup that skipped the profile form.
- * Nicknames have no unique constraint, so the check is best-effort; every returned value was
- * checked, and exhausting the bounded attempts throws instead of returning an unchecked name.
+ * Builds a random Korean nickname (adjective + animal + number) for a social signup.
+ * It is deliberately independent of the Kakao/Apple display name. Every returned value was
+ * checked with `isTaken`; exhausting the bounded retries throws instead of returning an
+ * unchecked name.
  */
 export async function generateSocialNickname(
-  seed: string | null | undefined,
   isTaken: (nickname: string) => Promise<boolean>,
   random: () => number = Math.random,
 ): Promise<string> {
-  const base = normalizeSocialNicknameSeed(seed);
-
-  if (base && !(await isTaken(base))) return base;
-
-  if (base) {
-    for (let attempt = 0; attempt < SUFFIXED_ATTEMPTS; attempt += 1) {
-      // 2 digits for the first tries, widening to 4 as collisions pile up.
-      const digits = randomDigits(Math.min(2 + Math.floor(attempt / 3), 4), random);
-      const candidate = `${takeCodePoints(base, MAX_NICKNAME_LENGTH - digits.length).trim()}${digits}`;
-      if (!(await isTaken(candidate))) return candidate;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const candidate = `${pick(ADJECTIVES, random)}${pick(ANIMALS, random)}${randomNumber(attempt, random)}`;
+    if (Array.from(candidate).length <= MAX_NICKNAME_LENGTH && !(await isTaken(candidate))) {
+      return candidate;
     }
-  }
-
-  for (let attempt = 0; attempt < FALLBACK_ATTEMPTS; attempt += 1) {
-    const candidate = `${FALLBACK_PREFIX}${randomDigits(FALLBACK_DIGITS, random)}`;
-    if (!(await isTaken(candidate))) return candidate;
   }
   throw new ConflictException({
     code: 'NICKNAME_GENERATION_FAILED',

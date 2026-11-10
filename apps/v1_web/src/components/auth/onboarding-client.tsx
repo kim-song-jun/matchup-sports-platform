@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { trackEvent } from '@/lib/analytics';
@@ -465,13 +465,15 @@ function OnboardingFixedAction({
   saveAndGo: (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => void;
   step: OnboardingRouteStep;
 }) {
+  const skipReasonId = useId();
   if (step === 'sport') {
     return (
       <>
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('sport', '/onboarding/level')} type="button">{pending ? '저장 중' : '실력 입력하기'}</button>
         <div className="tm-auth-fixed-skip-row">
-          <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
+          <button aria-describedby={skipReasonId} className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 고를게요</button>
         </div>
+        <div className="tm-text-micro tm-auth-fixed-reason" id={skipReasonId}>팀 만들기·참가 신청할 때 다시 물어볼게요.</div>
       </>
     );
   }

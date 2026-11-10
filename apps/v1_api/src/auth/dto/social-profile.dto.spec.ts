@@ -4,7 +4,6 @@ import { validate } from 'class-validator';
 import { SocialProfileDto, SocialTermsDto } from './social-profile.dto';
 
 const VALID_SOCIAL_PROFILE_INPUT = {
-  nickname: '카카오러너',
   displayName: '김러너',
   phone: '01087654321',
   birthDate: '20000229',
@@ -18,6 +17,17 @@ async function failedProperties(input: Record<string, unknown>): Promise<string[
 }
 
 describe('SocialProfileDto (required signup profile contract)', () => {
+  it('rejects a client-sent nickname — the server generates it', async () => {
+    const dto = plainToInstance(SocialProfileDto, { ...VALID_SOCIAL_PROFILE_INPUT, nickname: '직접입력' });
+    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    expect(errors.map((error) => error.property)).toContain('nickname');
+  });
+
+  it('accepts the payload without a nickname', async () => {
+    const dto = plainToInstance(SocialProfileDto, VALID_SOCIAL_PROFILE_INPUT);
+    expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
+  });
+
   it.each(['displayName', 'phone', 'birthDate', 'gender'] as const)(
     'rejects social signup when %s is missing',
     async (field) => {

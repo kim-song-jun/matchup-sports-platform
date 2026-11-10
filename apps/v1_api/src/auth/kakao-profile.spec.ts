@@ -5,7 +5,6 @@ import {
   normalizeKakaoPhone,
   normalizeKakaoBirthDate,
   readKakaoSignupPrefill,
-  readSocialNicknameSeed,
 } from './kakao-profile';
 
 describe('normalizeKakaoPhone', () => {
@@ -91,19 +90,5 @@ describe('Kakao birth date', () => {
     [undefined, '0101', 'SOLAR'], ['2000', undefined, 'SOLAR'], ['2000', '0101', undefined],
   ])('does not invent a date from %s/%s/%s', (year, birthday, type) => {
     expect(normalizeKakaoBirthDate(year, birthday, type)).toBeNull();
-  });
-});
-
-describe('readSocialNicknameSeed', () => {
-  it('prefers the Kakao nickname over the Apple name', () => {
-    expect(readSocialNicknameSeed({ kakaoNickname: ' 카카오닉 ', appleName: '애플' })).toBe('카카오닉');
-  });
-
-  it('falls back to the Apple name', () => {
-    expect(readSocialNicknameSeed({ appleName: '애플' })).toBe('애플');
-  });
-
-  it.each([null, [], 'x', {}, { kakaoNickname: '  ' }, { kakaoNickname: 3 }])('returns null for %p', (draft) => {
-    expect(readSocialNicknameSeed(draft)).toBeNull();
   });
 });

@@ -137,7 +137,7 @@ describe('V1 social profile deferral integration', () => {
     await prisma.v1User.deleteMany({ where: { id: { in: ids } } });
   }
 
-  it('defers the profile: creates a suffixed nickname and moves to social_profile_deferred', async () => {
+  it('defers the profile: creates a random (Kakao-name independent) nickname and moves to social_profile_deferred', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/social-profile/defer')
       .set('x-v1-user-id', deferringUserId)
@@ -149,7 +149,8 @@ describe('V1 social profile deferral integration', () => {
     });
     expect(user.onboardingStatus).toBe('social_profile_deferred');
     expect(user.signupEmailLoginRequired).toBe(false);
-    expect(user.profile?.nickname).toMatch(/^디퍼카카오\d{2,4}$/);
+    expect(user.profile?.nickname).toMatch(/^[가-힣]+\d{1,4}$/);
+    expect(user.profile?.nickname).not.toContain('디퍼카카오');
     expect(user.profile?.realName).toBeNull();
   });
 
@@ -200,6 +201,7 @@ describe('V1 social profile deferral integration', () => {
 
     expect(response.body.code).toBe('ACTIVITY_PROFILE_REQUIRED');
     expect(response.body.details?.next?.route).toBe('/signup/social');
+    expect(response.body.details?.missing).toEqual(expect.arrayContaining(['basicProfile']));
     expect(await prisma.v1Team.count({ where: { ownerUserId: deferringUserId } })).toBe(0);
   });
 

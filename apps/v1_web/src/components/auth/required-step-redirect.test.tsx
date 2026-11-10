@@ -149,10 +149,10 @@ describe('로그인한 계정의 필수 단계 완료 후 실제 복귀 계약',
     expect(state.completeRequests).toBe(2);
   });
 
-  it('서버가 허용한 온보딩 나중에 설정하기 성공도 복귀 목적지를 소비한다', async () => {
+  it('서버가 허용한 온보딩 나중에 고를게요 성공도 복귀 목적지를 소비한다', async () => {
     saveRedirectPath('/teams/new');
     const user = await loginAccount();
-    await user.click(await screen.findByRole('button', { name: '나중에 설정하기' }));
+    await user.click(await screen.findByRole('button', { name: '나중에 고를게요' }));
     await expectDestination('/teams/new');
   });
 

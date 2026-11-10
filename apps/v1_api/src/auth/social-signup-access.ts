@@ -13,6 +13,40 @@ export function getPendingSocialSignupRoute(status: V1OnboardingStatus | string)
 
 export const ACTIVITY_PROFILE_ROUTE = '/signup/social';
 
+/** Where the gate sends someone whose only missing item is the interest sport. */
+export const ACTIVITY_SPORT_ROUTE = '/onboarding/sport';
+
+export type ActivityMissingItem = 'phone' | 'basicProfile' | 'interestSport';
+
+/**
+ * What a social-signup account still owes before it may act with other people (create/apply/chat...).
+ * Order matters: the first item is where the web sends the user. An empty list means the gate is open.
+ * Email signups and completed accounts never reach this (the caller only asks for the two deferred states).
+ */
+export function listActivityMissingItems(input: {
+  onboardingStatus: V1OnboardingStatus | string;
+  phoneVerified: boolean;
+  hasInterestSport: boolean;
+  hasSocialIdentity: boolean;
+}): ActivityMissingItem[] {
+  const profileDeferred = input.onboardingStatus === 'social_profile_deferred';
+  // 'deferred' is also the state of an email signup that skipped onboarding; only social accounts are gated on it.
+  const sportDeferred = input.onboardingStatus === 'deferred' && input.hasSocialIdentity;
+  if (!profileDeferred && !sportDeferred) return [];
+
+  const missing: ActivityMissingItem[] = [];
+  if (profileDeferred) {
+    if (!input.phoneVerified) missing.push('phone');
+    missing.push('basicProfile');
+  }
+  if (!input.hasInterestSport) missing.push('interestSport');
+  return missing;
+}
+
+export function activityRouteFor(missing: readonly ActivityMissingItem[]): string {
+  return missing[0] === 'interestSport' ? ACTIVITY_SPORT_ROUTE : ACTIVITY_PROFILE_ROUTE;
+}
+
 /** Skipped the profile form at signup: reads are open, writes ask for the profile. */
 export function isActivityProfileRequired(status: V1OnboardingStatus | string) {
   return status === 'social_profile_deferred';

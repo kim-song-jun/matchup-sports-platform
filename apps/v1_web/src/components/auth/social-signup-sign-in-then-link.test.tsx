@@ -330,7 +330,6 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
         verification: { emailVerified: false, phoneVerified: false },
         socialSignupPrefill: { name: '김러너', phone: PHONE_CONFLICT_MSW.phones.kakao, gender: 'female', birthDate: '20000229' },
       })),
-      http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
       http.post('*/api/v1/auth/social-profile', () => HttpResponse.json({
         status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.',
         details: { next: 'sign_in_then_link', provider: 'kakao' },
@@ -338,10 +337,6 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
     );
     renderSignup();
     const user = userEvent.setup();
-    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
-    await user.click(screen.getByRole('button', { name: '중복 확인' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '다음' }));
     const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
@@ -363,14 +358,9 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
         // 카카오가 준 번호는 추가 인증 없이 쓰므로 인증번호 단계 없이 제출 단계에서 충돌을 만난다.
         socialSignupPrefill: { name: '김러너', phone: PHONE_CONFLICT_MSW.phones.kakao, gender: 'female', birthDate: '20000229' },
       })),
-      http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
     );
     renderSignup();
     const user = userEvent.setup();
-    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
-    await user.click(screen.getByRole('button', { name: '중복 확인' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '다음' }));
     const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
@@ -383,11 +373,11 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
 });
 
 describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지운다', () => {
-  const meWithPrefill = (phone: string) => http.get('*/api/v1/auth/me', () => success({
+  const meWithPrefill = (phone: string, gender: 'female' | null = 'female') => http.get('*/api/v1/auth/me', () => success({
     user: { id: 'pending-user', email: null, phone: null, accountStatus: 'active', onboardingStatus: 'social_profile_required', authProvider: 'kakao' },
     profile: { displayName: '가입중회원', nickname: '가입중회원' },
     verification: { emailVerified: false, phoneVerified: false },
-    socialSignupPrefill: { name: '김러너', phone, gender: 'female', birthDate: '20000229' },
+    socialSignupPrefill: { name: '김러너', phone, gender, birthDate: '20000229' },
   }));
   const sessionResponse = () => success({
     user: { id: 'pending-user', email: null, onboardingStatus: 'social_profile_required' },
@@ -400,15 +390,10 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
     savePendingSocialLink(STALE_TOKEN);
     server.use(
       meWithPrefill('01012345678'),
-      http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
       http.post('*/api/v1/auth/social-profile', sessionResponse),
     );
     renderSignup();
     const user = userEvent.setup();
-    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
-    await user.click(screen.getByRole('button', { name: '중복 확인' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '다음' }));
     const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     expect(peekPendingSocialLink()).not.toBeNull();
@@ -420,7 +405,7 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
 
   it('나중에 입력할게요가 성공해도 토큰이 남지 않는다', async () => {
     savePendingSocialLink(STALE_TOKEN);
-    server.use(meWithPrefill('01012345678'), http.post('*/api/v1/auth/social-profile/defer', sessionResponse));
+    server.use(meWithPrefill('01012345678', null), http.post('*/api/v1/auth/social-profile/defer', sessionResponse));
     renderSignup();
 
     await userEvent.setup().click(await screen.findByRole('button', { name: '나중에 입력할게요' }));

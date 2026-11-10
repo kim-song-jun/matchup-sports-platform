@@ -121,7 +121,7 @@ export function createRedirectFixture() {
     }),
     http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
     http.post('*/api/v1/auth/social-profile', async ({ request }) => {
-      expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01087654321',
+      expect(await request.json()).toEqual({ displayName: '김러너', phone: '01087654321',
         birthDate: '20000229', gender: 'female' });
       state.profileRequests += 1;
       state.auth = makeAuth('signup_done', PENDING, true);

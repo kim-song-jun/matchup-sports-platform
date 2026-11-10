@@ -1955,3 +1955,103 @@ describe('ProfileService logout — 웹 푸시 구독 정리', () => {
     });
   });
 });
+
+describe('ProfileService 보류된 소셜 프로필 해제', () => {
+  const NOW = new Date();
+  const baseProfile = {
+    realName: '홍길동',
+    nickname: '테스트닉',
+    profileImageUrl: null,
+    birthDate: '19900101',
+    gender: 'male',
+    bio: null,
+    updatedAt: NOW,
+  };
+
+  function build(opts: {
+    status?: string;
+    profile?: Partial<{ [K in keyof typeof baseProfile]: (typeof baseProfile)[K] | null }>;
+    phoneVerifiedAt?: Date | null;
+    releasedCount?: number;
+  } = {}) {
+    const profile = { ...baseProfile, ...opts.profile };
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: null,
+          phone: '01011112222',
+          onboardingStatus: opts.status ?? 'social_profile_deferred',
+          phoneVerifiedAt: opts.phoneVerifiedAt === undefined ? NOW : opts.phoneVerifiedAt,
+          authIdentities: [{ provider: 'kakao', passwordHash: null }],
+          profile,
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: opts.releasedCount ?? 1 }),
+      },
+      v1AuthIdentity: { updateMany: jest.fn() },
+      v1UserProfile: { findFirst: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue(profile) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+    return prisma;
+  }
+
+  const dto = {
+    realName: '홍길동',
+    nickname: '테스트닉',
+    phone: '01011112222',
+    birthDate: '19900101',
+    gender: 'male' as const,
+  };
+  const deferredUser = { ...user, onboardingStatus: 'social_profile_deferred' as const };
+  const release = { where: { id: 'user-1', onboardingStatus: 'social_profile_deferred' }, data: { onboardingStatus: 'deferred' } };
+
+  afterEach(() => {
+    delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    jest.restoreAllMocks();
+  });
+
+  it('필수 항목이 모두 채워지고 번호가 인증됐으면 조건부로 deferred 로 바꾸고 로그를 남긴다', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    const prisma = build();
+    await createProfileService(prisma).updateMe(deferredUser, dto);
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith(release);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('profile_update_completes_deferred_profile'));
+  });
+
+  it('필수 항목이 비어 있으면 해제하지 않는다', async () => {
+    const prisma = build({ profile: { birthDate: null } });
+    await createProfileService(prisma).updateMe(deferredUser, { ...dto, birthDate: undefined });
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('번호가 인증되지 않았으면 해제하지 않는다', async () => {
+    const prisma = build({ phoneVerifiedAt: null });
+    await createProfileService(prisma).updateMe(deferredUser, dto);
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('보류 상태가 아니면 건드리지 않는다', async () => {
+    const prisma = build({ status: 'completed' });
+    await createProfileService(prisma).updateMe(user, dto);
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('동시에 상태가 바뀌어 0건이면 로그 없이 조용히 넘어간다', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    const prisma = build({ releasedCount: 0 });
+    await expect(createProfileService(prisma).updateMe(deferredUser, dto)).resolves.toBeDefined();
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith(release);
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it('인증 강제가 꺼진 환경에서는 번호만 있으면 미인증이어도 해제한다', async () => {
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    const prisma = build({ phoneVerifiedAt: null });
+    await createProfileService(prisma).updateMe(deferredUser, dto);
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith(release);
+  });
+});

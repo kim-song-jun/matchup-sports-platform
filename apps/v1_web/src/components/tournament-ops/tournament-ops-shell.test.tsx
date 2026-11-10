@@ -48,6 +48,11 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
   });
 
+  it('시트 배경이 앱 틀에 갇히지 않도록 전체 화면 표식을 단다', () => {
+    const { container } = render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin"><div>content</div></TournamentOpsShell>);
+    expect(container.firstElementChild).toHaveClass('tm-fullbleed-sheet-host');
+  });
+
   it('어드민 경기 콘솔에서는 운영 경기 목록으로 돌아간다', () => {
     pathnameMock.value = '/admin/live/t-1/fixtures/fx-1/operate';
     render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin"><div>content</div></TournamentOpsShell>);

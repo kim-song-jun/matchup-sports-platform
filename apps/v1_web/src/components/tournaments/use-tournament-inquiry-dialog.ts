@@ -14,14 +14,14 @@ export function useTournamentInquiryDialog(onClose: () => void) {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const focusableSelector =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
       const first = focusable.at(0);
       const last = focusable.at(-1);
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -36,7 +36,6 @@ export function useTournamentInquiryDialog(onClose: () => void) {
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
     const releaseScroll = lockBodyScroll();
-    dialogRef.current?.querySelector<HTMLSelectElement>('select')?.focus();
     return () => {
       releaseScroll();
       const previousFocus = previousFocusRef.current;

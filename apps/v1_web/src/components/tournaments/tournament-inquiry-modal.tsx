@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { CircleHelp, X } from 'lucide-react';
+import { focusInitialTarget, isCoarsePointer } from '@/components/v1-ui/use-modal-a11y';
 import { TextField } from '@/components/v1-ui/primitives';
 import { useV1CreateInquiry } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
@@ -71,7 +72,9 @@ export function TournamentInquiryModal({
   useEffect(() => {
     const initialControl = dialogRef.current?.querySelector<HTMLButtonElement>('button[role="combobox"]:not(:disabled)')
       ?? dialogRef.current?.querySelector<HTMLInputElement>('input');
-    initialControl?.focus();
+    // 터치 기기에서는 패널에 포커스를 둬 열자마자 키보드가 올라오지 않게 한다(fine 포인터는 기존 그대로).
+    if (isCoarsePointer()) dialogRef.current?.focus();
+    else focusInitialTarget(dialogRef.current, initialControl ?? null);
   }, [dialogRef, isMatchInquiry]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -119,6 +122,7 @@ export function TournamentInquiryModal({
     >
       <div
         ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}

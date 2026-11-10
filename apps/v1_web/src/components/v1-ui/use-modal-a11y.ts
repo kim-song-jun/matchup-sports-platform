@@ -107,6 +107,37 @@ function tabbableElements(dialog: HTMLElement): HTMLElement[] {
   });
 }
 
+/** 터치 기기(주 포인터가 손가락)인지. matchMedia 가 없으면 false(=기존 동작). */
+export function isCoarsePointer(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches === true
+  );
+}
+
+/** 포커스되면 소프트 키보드를 띄우는 컨트롤인지 */
+function opensSoftKeyboard(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  if (el instanceof HTMLTextAreaElement || el.isContentEditable) return true;
+  if (!(el instanceof HTMLInputElement)) return false;
+  return !['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color', 'image'].includes(el.type);
+}
+
+/**
+ * 열릴 때 초기 포커스를 건다. 터치 기기에서 첫 대상이 텍스트 입력이면 패널(tabIndex=-1)로 대신 보낸다 —
+ * 열자마자 키보드가 올라와 화면을 가리는 것을 막는다. 포인터가 fine 이면 기존대로 첫 컨트롤.
+ * role=dialog·focus trap·복원은 그대로다(트랩은 패널 포커스도 경계로 취급).
+ */
+export function focusInitialTarget(dialog: HTMLElement | null, target: HTMLElement | null): void {
+  if (dialog && opensSoftKeyboard(target) && isCoarsePointer()) {
+    if (!dialog.hasAttribute('tabindex')) dialog.tabIndex = -1;
+    dialog.focus();
+    return;
+  }
+  target?.focus();
+}
+
 export function useModalA11y<
   TInitial extends HTMLElement = HTMLElement,
   TDialog extends HTMLElement = HTMLDivElement,
@@ -223,7 +254,7 @@ export function useModalA11y<
       initialFocus === 'dialog'
         ? dialogRef.current
         : (initialFocusRef.current ?? dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? null);
-    target?.focus();
+    focusInitialTarget(dialogRef.current, target);
   };
 
   // 열리면 첫 컨트롤로 포커스 이동 (미지정 시 패널 안 첫 focusable).
@@ -233,7 +264,15 @@ export function useModalA11y<
   useEffect(() => {
     if (!open) return;
     const id = setTimeout(() => {
-      if (dialogRef.current?.contains(document.activeElement)) return;
+      const dialog = dialogRef.current;
+      const active = document.activeElement;
+      if (dialog?.contains(active)) {
+        // 입력칸 autoFocus 는 마운트 커밋에서 이미 적용돼 키보드가 올라온다 — 터치 기기에서는 패널로 옮긴다.
+        if (active instanceof HTMLElement && active !== dialog && opensSoftKeyboard(active) && isCoarsePointer()) {
+          focusInitialTarget(dialog, active);
+        }
+        return;
+      }
       focusFirstControl();
     }, 60);
     return () => clearTimeout(id);

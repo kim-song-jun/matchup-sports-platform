@@ -1431,23 +1431,43 @@ function PrizeCard({
     })),
   );
 
-  const handleSave = () => {
-    const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
+  // 저장 기준선 — 마지막으로 저장했거나 불러온 값을 payload 와 같은 방식으로 정규화해 둔다.
+  // 달라진 게 없을 때 PATCH 를 보내면 updatedAt 만 올라가 다른 편집자가 버전 충돌을 겪는다.
+  const buildPrizePayload = (): Omit<V1UpdateTournamentPayload, 'expectedVersion'> | null => {
     const pool = prizePool.trim();
+    let prizePoolValue: number | null = null;
     if (pool !== '') {
       const n = Number(pool);
-      if (Number.isNaN(n) || n < 0) {
-        showToast('총상금은 0 이상의 숫자로 입력해주세요.', 'error');
-        return;
-      }
-      payload.prizePool = Math.floor(n);
+      if (Number.isNaN(n) || n < 0) return null;
+      prizePoolValue = Math.floor(n);
     }
-    if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
     // 금액 행은 "1,234,567원" 형태로 정규화, 물품 행은 입력한 자유 텍스트 그대로 저장한다.
-    const breakdownText = serializeTournamentPrizeRows(prizeRows);
-    payload.prizeBreakdown = breakdownText || null;
+    return {
+      prizePool: prizePoolValue,
+      prizeSummary: prizeSummary.trim() || null,
+      prizeBreakdown: serializeTournamentPrizeRows(prizeRows) || null,
+    };
+  };
+  // 저장 기준선 — 마지막으로 저장했거나 불러온 값을 payload 와 같은 정규화 결과로 둔다.
+  // 달라진 게 없을 때 PATCH 를 보내면 updatedAt 만 올라가 다른 편집자가 버전 충돌을 겪는다.
+  const [savedKey, setSavedKey] = useState(() => JSON.stringify(buildPrizePayload()));
+
+  const handleSave = () => {
+    const payload = buildPrizePayload();
+    if (!payload) {
+      showToast('총상금은 0 이상의 숫자로 입력해주세요.', 'error');
+      return;
+    }
+    const currentKey = JSON.stringify(payload);
+    if (currentKey === savedKey) {
+      showToast('바뀐 내용이 없어요.');
+      return;
+    }
     updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
-      onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
+      onSuccess: () => {
+        setSavedKey(currentKey);
+        showToast('상금 정보를 저장했어요.', 'success');
+      },
       onError: (err) => {
         if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
           queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournament.id) });

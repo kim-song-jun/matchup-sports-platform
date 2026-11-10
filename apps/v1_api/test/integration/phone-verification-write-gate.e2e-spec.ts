@@ -114,7 +114,7 @@ describe('V1 phone verification write gate integration', () => {
     await request(app.getHttpServer())
       .patch('/api/v1/me/profile')
       .set('x-v1-user-id', unverifiedUserId)
-      .send({ nickname: '게이트미인증', gender: 'male' })
+      .send({ nickname: '게이트미인증', realName: '게이트 테스트', gender: 'male' })
       .expect(200);
   });
 
@@ -126,7 +126,7 @@ describe('V1 phone verification write gate integration', () => {
     const response = await request(app.getHttpServer())
       .patch('/api/v1/me/profile')
       .set('x-v1-user-id', unverifiedUserId)
-      .send({ nickname: '게이트미인증', gender: 'male', phone: '01077776666' })
+      .send({ nickname: '게이트미인증', realName: '게이트 테스트', gender: 'male', phone: '01077776666' })
       .expect(400);
 
     expect(response.body.code).toBe('PHONE_NOT_VERIFIED');
@@ -178,7 +178,7 @@ describe('V1 phone verification write gate integration', () => {
     await request(app.getHttpServer())
       .patch('/api/v1/me/profile')
       .set('x-v1-user-id', verifiedUserId)
-      .send({ nickname: '게이트인증완료', gender: 'male' })
+      .send({ nickname: '게이트인증완료', realName: '게이트 테스트', gender: 'male' })
       .expect(200);
   });
 });

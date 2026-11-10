@@ -4719,6 +4719,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-create-field {
   margin-top: 24px;
+  /* 검증 실패로 입력칸에 포커스가 가도 고정 상단바 밑에 라벨이 가려지지 않게 한다(MD-QA #128). */
+  scroll-margin-top: calc(var(--v1-shell-topbar-height) + 16px);
+}
+
+.tm-create-field input,
+.tm-create-field textarea,
+.tm-create-field select {
+  scroll-margin-top: calc(var(--v1-shell-topbar-height) + 48px);
 }
 
 .tm-team-logo-picker {
@@ -4849,6 +4857,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-description-input {
   min-height: 112px;
+}
+
+.tm-create-native-input::placeholder {
+  /* 구형 Android WebView(113)는 preflight 의 color-mix 를 transparent 로 계산해 placeholder 가 사라진다. */
+  color: var(--input-placeholder);
+  opacity: 1;
 }
 
 .tm-create-native-input {

@@ -242,6 +242,7 @@ describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기
     renderSheet({ summary: '옐로카드 · 선수03 (E2E선수03) · E2E 알파 A팀' });
     const summary = screen.getByText('옐로카드 · 선수03 (E2E선수03) · E2E 알파 A팀');
     expect(summary.className).not.toContain('truncate');
-    expect(summary.className).toContain('break-words');
+    expect(summary.className).toContain('break-keep');
+    expect(summary.style.overflowWrap).toBe('anywhere');
   });
 });

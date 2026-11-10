@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { namedFinalGroups } from '@/test/named-final-groups';
 import type { V1TournamentGroup } from '@/types/api';
-import { bracketGroupLabel, isNamedBracketTrack, orderedBracketTracks, sortByBracketTrackOrder } from './bracket-track';
+import { bracketGroupLabel, bracketTrackLabel, isNamedBracketTrack, orderedBracketTracks, sortByBracketTrackOrder } from './bracket-track';
 
 describe('bracketGroupLabel', () => {
   it('트랙 이름으로 이미 시작하는 그룹 이름에는 다시 붙이지 않는다', () => {
@@ -76,5 +76,13 @@ describe('sortByBracketTrackOrder', () => {
   it('같은 트랙 항목은 받은 순서를 지킨다', () => {
     const rows = [{ id: '1', track: '챌린지' }, { id: '2', track: '프리미어' }, { id: '3', track: '챌린지' }, { id: '4', track: '프리미어' }];
     expect(sortByBracketTrackOrder(rows, groups, row => row.track).map(row => row.id)).toEqual(['2', '4', '1', '3']);
+  });
+});
+
+describe('bracketTrackLabel stage plan', () => {
+  const plan = { version: 1, stages: [{ key: 's1', name: '본선', pools: [{ key: 'p1', name: 'A리그', format: 'league', capacity: 4, legs: 1, sources: [] }] }] } as never;
+  it('편성 계획에서 단계·편성 이름을 찾고 없으면 기존 규칙으로 돌아간다', () => {
+    expect(bracketTrackLabel('stage:p1', plan)).toBe('본선 · A리그');
+    expect(bracketTrackLabel('stage:zzz', plan)).toBe('stage:zzz');
   });
 });

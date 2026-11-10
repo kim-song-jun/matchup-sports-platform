@@ -501,7 +501,7 @@ export function GameResultCorrectionPanel({
           open
           mode="admin"
           title="기록 시각 정정"
-          summary={eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], eventTypeLabel(timeTarget))}
+          summary={[eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
           periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
           currentClockMs={
             collectEventTimeCorrections(eventsQuery.data?.events ?? []).get(timeTarget.id)?.currentClockMs ??

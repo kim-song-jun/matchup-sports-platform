@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { namedFinalGroups } from '@/test/named-final-groups';
+import type { StagePlan } from '@/types/stage-plan';
 import type { V1TournamentGroup } from '@/types/api';
 import { bracketGroupLabel, bracketTrackLabel, isNamedBracketTrack, orderedBracketTracks, sortByBracketTrackOrder } from './bracket-track';
 
@@ -80,7 +81,7 @@ describe('sortByBracketTrackOrder', () => {
 });
 
 describe('bracketTrackLabel stage plan', () => {
-  const plan = { version: 1, stages: [{ key: 's1', name: '본선', pools: [{ key: 'p1', name: 'A리그', format: 'league', capacity: 4, legs: 1, sources: [] }] }] } as never;
+  const plan = { version: 1, stages: [{ key: 's1', name: '본선', pools: [{ key: 'p1', name: 'A리그', format: 'league', capacity: 4, legs: 1, sources: [] }] }] } satisfies StagePlan;
   it('편성 계획에서 단계·편성 이름을 찾고 없으면 기존 규칙으로 돌아간다', () => {
     expect(bracketTrackLabel('stage:p1', plan)).toBe('본선 · A리그');
     expect(bracketTrackLabel('stage:zzz', plan)).toBe('stage:zzz');

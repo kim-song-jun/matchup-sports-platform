@@ -445,7 +445,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
    - 머지 전에는 코드로 안전성을 확인한다(로딩·에러·빈 목록에서 렌더가 깨지지 않는지 등).
    - 브라우저 검증·QA는 **항상 `ego-browser` 스킬(ego-lite)** 로 한다(2026-11-10 사용자 지시 — 전역 지침).
      Playwright MCP·내장 브라우저·Claude in Chrome 등 다른 browser-use 도구는 쓰지 않고, 서브에이전트·
-     워크플로 에이전트에게 QA를 맡길 때도 프롬프트에 ego-lite 사용을 명시한다. MD-QA 보드
+     워크플로 에이전트에게 QA를 맡길 때도 프롬프트에 ego-lite 사용을 명시한다. `.codex/qa-rules.md`의 "Headed Playwright MCP only" 절은 이 규칙과 충돌하는 옛 지침이므로 이 규칙이 우선하며, 해당 절은 후속 정리 대상이다. MD-QA 보드
      (`teameet.jmandu.kr/projects/1`) 조회·댓글도 같은 ego-lite 세션으로 한다. alpha에 실제 로그인해 사용자 흐름을
      클릭으로 밟고 단계별 스크린샷·판정을 남긴다. API 실측은 보조 근거이고 PASS 판정은 화면으로 한다.
      여러 장을 반복 캡처하는 스크립트는 `scripts/` 내부에 둔다(`/tmp`는 모듈 해석 실패).

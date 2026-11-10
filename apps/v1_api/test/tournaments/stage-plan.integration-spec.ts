@@ -75,7 +75,10 @@ describe('단계별 리그·토너먼트 actual DB contract', () => {
     expect(new Set(view.pools.flatMap(p => p.fixtureIds))).toEqual(new Set(fixtureIds));
     const targetId = view.pools.find(p => p.key === 'main0')!.fixtureIds[0];
     await prisma.$transaction(tx => assertStageFixtureReady(tx, targetId));
-    const source = fixtures[0]; await official(source.teamMatchId, 9, 0);
+    // findMany has no stable order, so pin a fixture whose home side is the better-seeded team: 9-0 then keeps every pool ranking
+    // (only goal difference changes) and no rank-2 team becomes a former rank-1 team already frozen in main0.
+    const source = fixtures.find(f => seed.registrationIds.indexOf(f.homeRegistrationId!) < seed.registrationIds.indexOf(f.awayRegistrationId!))!;
+    await official(source.teamMatchId, 9, 0);
     await prisma.$transaction(tx => recalculateStandingsInTx(tx, id)); view = await stages.get(user, id);
     expect(view.pools.find(p => p.key === 'main0')!.stale).toBe(true);
     await expect(prisma.$transaction(tx => assertStageFixtureReady(tx, targetId))).rejects.toMatchObject({ response: { code: 'STAGE_ASSIGNMENT_REQUIRED' } });

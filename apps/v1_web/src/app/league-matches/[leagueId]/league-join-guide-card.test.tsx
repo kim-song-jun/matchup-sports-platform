@@ -25,7 +25,7 @@ const renderCard = (over: Partial<Props> = {}) =>
   render(<LeagueJoinGuideCard {...base} {...over} />);
 
 const APPLY = 'a[href="/tournaments/lg-1/apply"]';
-const OTHER_LEAGUES = 'a[href="/tournaments?kind=league"]';
+const OTHER_LEAGUES = 'a[href="/tournaments?kind=league&stage=recruiting"]';
 
 beforeEach(() => {
   clearStoredV1Session();
@@ -173,7 +173,7 @@ describe('참가팀 정원 마감 안내', () => {
     expect(screen.getByText(new RegExp(capacityNote))).toBeInTheDocument();
     expect(screen.queryByText(/10월 12일.*에 마감됐어요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '참가 신청' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league');
+    expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league&stage=recruiting');
   });
 
   it('정원이 남고 기한이 지났으면 기존 마감 시각을 안내한다', () => {

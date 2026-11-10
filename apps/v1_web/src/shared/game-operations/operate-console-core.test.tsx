@@ -12,6 +12,13 @@ import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 import * as overlayHistory from '@/lib/overlay-history';
 
+// MD-QA #187: 기록 "수정" 시트(BottomSheet)가 라우터 훅을 쓴다.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const queryClients: QueryClient[] = [];
 function render(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -205,6 +212,7 @@ function consoleState(overrides: Partial<MockedOperations> = {}): MockedOperatio
     retryFailedEvent: vi.fn<OperationsContract['retryFailedEvent']>(),
     requestTakeover: vi.fn<OperationsContract['requestTakeover']>(),
     reverseEvent: vi.fn<OperationsContract['reverseEvent']>(),
+    correctEventTime: vi.fn<NonNullable<OperationsContract['correctEventTime']>>(),
     assignAssist: vi.fn<OperationsContract['assignAssist']>(),
     applyCommandResult: vi.fn<OperationsContract['applyCommandResult']>(() => true),
     ...overrides,
@@ -396,6 +404,96 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     render(<CoreHarness />);
 
     expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+  });
+
+  // MD-QA #187 -- 기록 "수정" 시트: 시각 정정은 콘솔 커맨드 경로(ops.correctEventTime)로 간다.
+  it('"수정"에서 시각을 고쳐 정정하면 ops.correctEventTime 이 이벤트 id·새 시각·사유로 불린다', async () => {
+    const correctEventTime = vi.fn<NonNullable<OperationsContract['correctEventTime']>>().mockResolvedValue(undefined);
+    const ops = consoleState({ liveEvents: [goal(1)], correctEventTime });
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    fireEvent.click(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: '기록 수정 (골)' }));
+    const dialog = await screen.findByRole('dialog', { name: '골 기록 수정' });
+    expect(within(dialog).getByText(/정우진/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 정정' }));
+
+    await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(1));
+    expect(correctEventTime).toHaveBeenCalledWith({
+      eventId: 'event-1',
+      clockMs: 5 * 60000,
+      reason: '경기 중 기록 시각 정정 (6:00 → 5:00)',
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '골 기록 수정' })).toBeNull());
+  });
+
+  it('정정된 줄은 새 시각과 "정정됨"을 보이고, 시트의 기준 시각도 새 시각이다', async () => {
+    const correction: GameEventRecord = {
+      ...goal(2),
+      id: 'tc-1',
+      type: 'TIME_CORRECTION',
+      sideId: null,
+      participantId: null,
+      clockMs: 5 * 60000,
+      correctsEventId: 'event-1',
+      payload: { previousClockMs: 6 * 60000, clockMs: 5 * 60000, reason: '자동', lane: 'OPERATOR' },
+    };
+    testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [goal(1), correction] }));
+    render(<CoreHarness />);
+
+    const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(list).toHaveTextContent('후반 5:00');
+    expect(within(list).getByRole('button', { name: /정정됨/ })).toBeInTheDocument();
+
+    fireEvent.click(within(list).getByRole('button', { name: '기록 수정 (골)' }));
+    const dialog = await screen.findByRole('dialog', { name: '골 기록 수정' });
+    expect(within(dialog).getByRole('button', { name: /정정할 시각 5:00/ })).toBeInTheDocument();
+  });
+
+  it('정정 실패는 시트 안에 해요체로 남고 시트는 열려 있다', async () => {
+    const correctEventTime = vi.fn<NonNullable<OperationsContract['correctEventTime']>>().mockRejectedValue(
+      new V1ApiError({ status: 'error', message: 'x', statusCode: 409, code: 'EVENT_ALREADY_REVERSED', timestamp: '2026-11-10T01:00:00Z' }),
+    );
+    const ops = consoleState({ liveEvents: [goal(1)], correctEventTime });
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: '기록 수정 (골)' }));
+    const dialog = await screen.findByRole('dialog', { name: '골 기록 수정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 정정' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 취소된 기록은 시각을 고칠 수 없어요.');
+    expect(screen.getByRole('dialog', { name: '골 기록 수정' })).toBeInTheDocument();
+  });
+
+  it('"기록 취소" 탭은 기존 취소 확인 흐름(ops.reverseEvent)으로 이어진다', async () => {
+    const ops = consoleState({ liveEvents: [goal(1)] });
+    ops.reverseEvent.mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: '기록 수정 (골)' }));
+    const dialog = await screen.findByRole('dialog', { name: '골 기록 수정' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: '기록 취소' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '이 기록 취소하기' }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: /골 기록을 취소할까요/ });
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '기록 취소' }));
+    await waitFor(() => expect(ops.reverseEvent).toHaveBeenCalledWith({ eventId: 'event-1', reason: '골 기록 수정·취소' }));
+  });
+
+  it('ops.correctEventTime 이 없는 런타임은 기존 "수정·취소"로 물러난다', () => {
+    const ops = consoleState({ liveEvents: [goal(1)] });
+    delete (ops as { correctEventTime?: unknown }).correctEventTime;
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    expect(screen.queryByRole('button', { name: '기록 수정 (골)' })).toBeNull();
+    expect(screen.getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
   });
 
   it('takeover가 비활성화되면 기록 조회만 허용한다', () => {

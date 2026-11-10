@@ -110,6 +110,73 @@ describe('useV1GameOperationsConsole — reverseEvent must never enter the offli
   });
 });
 
+describe('useV1GameOperationsConsole — correctEventTime (MD-QA #187)', () => {
+  it('sends a direct REST correction with takeover token, expectedVersion and Idempotency-Key = clientEventId', async () => {
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () =>
+        useV1GameOperationsConsole({
+          gameId: 'game-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
+          initialLastSequence: 0,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.gameSnapshot).not.toBeNull());
+    await waitFor(() => expect(result.current.takeover.status).toBe('held'));
+
+    await act(async () => {
+      await result.current.correctEventTime({ eventId: 'event-1', clockMs: 540_000, reason: '기록 대조' });
+    });
+
+    expect(mockV1Post).toHaveBeenCalledTimes(1);
+    const [path, body, options] = mockV1Post.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+      { headers: Record<string, string> },
+    ];
+    expect(path).toBe('/games/game-1/events/event-1/correct-time');
+    expect(body).toMatchObject({ expectedVersion: 5, takeoverToken: 'tok-1', clockMs: 540_000, reason: '기록 대조' });
+    expect(options.headers['Idempotency-Key']).toBe(body.clientEventId);
+    expect(result.current.queue.items).toHaveLength(0);
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('game.event.append', expect.anything(), expect.anything());
+    unmount();
+  });
+
+  it('refuses without write access instead of calling the server', async () => {
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () =>
+        useV1GameOperationsConsole({
+          gameId: 'game-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
+          gameSourceType: 'TEAM_MATCH',
+          gameActorRole: 'team_manager',
+          operationMode: 'ordinary-host',
+          teamMatchContext: { teamMatchId: 'tm-1', gameId: 'game-1', status: 'completed', isStandalone: true, viewerCanManageHost: true },
+          initialLastSequence: 0,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.gameSnapshot).not.toBeNull());
+    await act(async () => {
+      await expect(
+        result.current.correctEventTime({ eventId: 'event-1', clockMs: 1000, reason: '사유' }),
+      ).rejects.toThrow('경기 운영 권한이 없어 시각을 정정할 수 없어요.');
+    });
+    expect(mockV1Post).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
 describe('useV1GameOperationsConsole — source-aware operation modes', () => {
   const ordinaryHostContext = {
     teamMatchId: 'team-match-1',

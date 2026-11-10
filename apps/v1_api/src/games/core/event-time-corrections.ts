@@ -90,6 +90,49 @@ export function overlayEventTimeCorrections<T extends FoldableGameEvent>(events:
   });
 }
 
+/** 공개 화면이 "정정" 표시를 그리는 데 쓰는 요약 — 원본 사건 id 별 처음 기록 시각과 마지막 정정 시각. */
+export type PublicEventTimeCorrection = {
+  /** 처음 기록된 시각(ms). 정정이 여러 번이어도 가장 처음 값이다. */
+  originalClockMs: number;
+  /** 마지막 정정이 기록된 시각(ISO). */
+  correctedAt: string | null;
+};
+
+/**
+ * 원본 사건 id → 처음 기록 시각과 마지막 정정 시각. 정정 행의 `payload.previousClockMs` 중
+ * sequence 가 가장 이른 것이 "처음 기록"이다. 현재 시각이 처음 기록과 같아졌으면(되돌려 정정)
+ * 보여 줄 변경이 없으므로 뺀다. sequence 가 없으면 배열 순서를 쓴다.
+ */
+export function summarizeEventTimeCorrections(
+  events: ReadonlyArray<FoldableGameEvent & { payload?: unknown; receivedAt?: Date | null }>,
+): ReadonlyMap<string, PublicEventTimeCorrection> {
+  const rows = new Map<string, { first: { order: number; previous: number }; last: { order: number; clockMs: number; at: Date | null } }>();
+  events.forEach((event, index) => {
+    if (!isTimeCorrectionEvent(event) || typeof event.correctsEventId !== 'string') return;
+    const order = event.sequence ?? index;
+    const payload = event.payload;
+    const previous =
+      payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>).previousClockMs
+        : undefined;
+    const entry = rows.get(event.correctsEventId);
+    const first = typeof previous === 'number' ? { order, previous } : null;
+    const last = { order, clockMs: event.clockMs, at: event.receivedAt ?? null };
+    if (entry === undefined) {
+      if (first !== null) rows.set(event.correctsEventId, { first, last });
+      return;
+    }
+    if (first !== null && order < entry.first.order) entry.first = first;
+    if (order > entry.last.order) entry.last = last;
+  });
+  const summary = new Map<string, PublicEventTimeCorrection>();
+  for (const [eventId, row] of rows) {
+    if (row.first.previous === row.last.clockMs) continue;
+    summary.set(eventId, { originalClockMs: row.first.previous, correctedAt: row.last.at?.toISOString() ?? null });
+  }
+  return summary;
+}
+
 /** 공개 타임라인의 정렬 규칙(피리어드 → 시각 → sequence) — DB `orderBy` 를 정정 뒤에 다시 적용한다. */
 export function sortEventsByMatchTime<T extends { period: number; clockMs: number; sequence?: number }>(
   events: readonly T[],

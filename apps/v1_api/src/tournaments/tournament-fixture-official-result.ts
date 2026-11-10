@@ -1,3 +1,4 @@
+import { foldEventTimeCorrections } from '../games/core/event-time-corrections';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -130,6 +131,9 @@ export type TournamentFixtureGoalEventRow = {
   participantId: string | null;
   clockMs: number;
   reversesEventId: string | null;
+  /** MD-QA #187: 시각 정정 행(TIME_CORRECTION)이면 원본 사건 id. 읽지 않은 호출자는 생략한다. */
+  correctsEventId?: string | null;
+  sequence?: number;
   /**
    * 골 이벤트 백필이 남긴 표식(`source` / `minuteKnown`)만 이 파일이 payload에서
    * 읽는다 — 그 외 키는 보지 않는다. 아래 `isBackfilledGoalEvent` 주석 참고.
@@ -212,7 +216,8 @@ export function deriveTournamentFixtureOfficialGoals(
   const reversedIds = new Set(
     events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
   );
-  return events
+  // MD-QA #187: 정정된 사건 시각을 반영한다(정정 행은 골이 아니라 걸러진다).
+  return foldEventTimeCorrections(events)
     .filter(
       (event) =>
         (event.type === 'GOAL' || event.type === 'OWN_GOAL') &&

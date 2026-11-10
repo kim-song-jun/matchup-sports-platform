@@ -319,6 +319,8 @@ function eventTypeLabel(event: GameEventRecord): string {
       return '교체';
     case 'CORRECTION':
       return '정정';
+    case 'TIME_CORRECTION':
+      return '시각 정정';
     default:
       return event.type;
   }

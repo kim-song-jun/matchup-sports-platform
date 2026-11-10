@@ -47,7 +47,8 @@ export type RevisionSupersessionPurpose =
   | 'TOURNAMENT_RESUBMISSION'
   | 'CORRECTION'
   | 'VOID_REENTRY'
-  | 'ASSIST_SYNC';
+  | 'ASSIST_SYNC'
+  | 'EVENT_TIME_SYNC';
 
 export interface RevisionSupersessionInput {
   baseGameId: string;
@@ -166,7 +167,11 @@ export function assertRevisionSupersession(input: RevisionSupersessionInput): vo
     // for why, and for how officializeResultRevision independently refuses
     // to officialize a SUBMITTED revision that ASSIST_SYNC has since
     // superseded.
-    (input.purpose === 'ASSIST_SYNC' && input.baseState === V1GameResultRevisionState.SUBMITTED);
+    (input.purpose === 'ASSIST_SYNC' && input.baseState === V1GameResultRevisionState.SUBMITTED) ||
+    // MD-QA #187: 확정 전 운영자가 사건 시각을 고치면 이미 제출된(SUBMITTED) 리비전의
+    // 골·카드 분 스냅샷이 낡는다. ASSIST_SYNC 와 같은 이유로 제출본을 제자리에서 못 고치므로
+    // 새 DRAFT 후속을 만들어 다시 제출한다(점수·선수 기록은 그대로 승계).
+    (input.purpose === 'EVENT_TIME_SYNC' && input.baseState === V1GameResultRevisionState.SUBMITTED);
   if (
     !validBase ||
     input.successorState !== V1GameResultRevisionState.DRAFT ||

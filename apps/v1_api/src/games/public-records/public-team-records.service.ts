@@ -1,3 +1,4 @@
+import { TIME_CORRECTION_ROW_FILTER, foldEventTimeCorrectionsInMatchOrder } from '../core/event-time-corrections';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { resolveResultCardEvents } from '../core/result-card-events';
 import { Prisma } from '@prisma/client';
@@ -402,7 +403,7 @@ export class PublicTeamRecordsService {
     const gameIds = Array.from(new Set(currentRows.map((row) => row.gameId)));
     if (gameIds.length === 0) return new Map();
 
-    const events = await this.prisma.v1GameEvent.findMany({
+    const recordedEvents = await this.prisma.v1GameEvent.findMany({
       // 화면에 그리는 건 GOAL/CARD 뿐이지만 취소 이벤트도 함께 읽어야 한다 -- 아래
       // `reversedIds` 가 그 `reversesEventId` 로 취소된 골·카드를 걸러내기 때문에,
       // 타입만으로 좁히면 취소 사실 자체가 사라져 이미 취소된 골이 되살아난다.
@@ -412,7 +413,8 @@ export class PublicTeamRecordsService {
       // 아예 읽지 않는다(페이지 단위로 여러 경기를 한 번에 읽으므로 payload 까지 딸려온다).
       where: {
         gameId: { in: gameIds },
-        OR: [{ type: { in: ['GOAL', 'OWN_GOAL', 'CARD'] } }, { reversesEventId: { not: null } }],
+        // MD-QA #187: 시각 정정 행도 읽어야 정정된 분이 반영된다.
+        OR: [{ type: { in: ['GOAL', 'OWN_GOAL', 'CARD'] } }, { reversesEventId: { not: null } }, TIME_CORRECTION_ROW_FILTER],
       },
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       select: {
@@ -425,8 +427,11 @@ export class PublicTeamRecordsService {
         period: true,
         clockMs: true,
         reversesEventId: true,
+        sequence: true,
+        correctsEventId: true,
       },
     });
+    const events = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );

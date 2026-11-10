@@ -1,4 +1,6 @@
 import { closeRevisionReviewSla } from './close-review-sla';
+import { appendEventTimeCorrection, syncRevisionEventTimes } from '../../games/event-time-correction';
+import { foldEventTimeCorrections } from '../../games/core/event-time-corrections';
 import {
   ConflictException,
   ForbiddenException,
@@ -80,6 +82,7 @@ import type { QuickResultDto } from './quick-result.dto';
 import { V1AuthUser } from '../../auth/v1-auth-user';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import type {
+  AdminCorrectGameEventTimeDto,
   CreateGameResultCorrectionDto,
   GameResultCorrectionChangesDto,
   OfficializeGameResultRevisionDto,
@@ -165,6 +168,16 @@ type ResultRevisionContentInput = {
 };
 
 type QuickResultMutation = GameRevisionMutationResult & { score: GameScore };
+
+export type AdminEventTimeCorrectionDetail = {
+  eventId: string;
+  correctionEventId: string;
+  period: number;
+  previousClockMs: number;
+  clockMs: number;
+  /** 골·카드 분 스냅샷이 바뀌어 새 공식 리비전이 섰을 때 대체된 리비전. 분이 그대로면 null. */
+  supersededRevisionId: string | null;
+};
 export type QuickResultResponse = { gameId: string; revisionId: string; version: number; score: GameScore };
 
 function quickResultConflict(code: string, message: string): ConflictException {
@@ -177,6 +190,13 @@ type ResultCommandBoundaryInput = {
   staffAction: 'result_review' | 'result_officialize';
   /** 지정하면 권한 검사가 돌려준 역할이 이것일 때만 통과한다(어드민 전용 명령). */
   requiredRole?: 'platform_ops';
+  /**
+   * true 면 `requiredRole` 에 대회 디렉터 예외를 두지 않는다 — 확정 뒤 사건 시각 정정처럼
+   * 플랫폼 운영자(owner·ops)만 할 수 있다고 정한 명령(MD-QA #187).
+   */
+  requiredRoleExclusive?: boolean;
+  /** 감사 기록의 사유 칸. */
+  auditReason?: string;
   userId: string;
   expectedVersion: number;
   headerIdempotencyKey: string | undefined;
@@ -844,6 +864,91 @@ export class TournamentResultReviewService {
   }
 
   /**
+   * MD-QA #187 — 결과 확정(OFFICIAL) 뒤 사건 시각 정정. 플랫폼 운영자(owner·ops)만, 사유와 함께.
+   *
+   * 대회 디렉터도 확정 뒤에는 이 명령을 쓸 수 없다(`requiredRoleExclusive`). 경계는 다른 결과 명령과
+   * 같다(경기 행 잠금 · expectedVersion · Idempotency-Key = clientCommandId · 감사 기록). 원본 사건은
+   * 고치지 않고 TIME_CORRECTION 행을 덧붙인 뒤, 공식 리비전의 골·카드 분 스냅샷이 바뀌면 같은 점수·
+   * 같은 선수 기록의 후속 OFFICIAL 리비전으로 대체한다(`syncRevisionEventTimes`, 경기별 명단 출전 정정과
+   * 같은 방식). 점수가 그대로라 진출·순위는 바뀌지 않는다. 확정 전 경기는 409 — 운영 콘솔 경로를 쓴다.
+   */
+  async correctOfficialEventTime(
+    user: V1AuthUser,
+    gameId: string,
+    eventId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: AdminCorrectGameEventTimeDto,
+  ): Promise<GameRevisionMutationResult & { replayed: boolean; eventTimeCorrection: AdminEventTimeCorrectionDetail }> {
+    return this.withResultCommand(
+      {
+        gameId,
+        action: 'event_time_correct_official',
+        staffAction: 'result_review',
+        requiredRole: 'platform_ops',
+        requiredRoleExclusive: true,
+        auditReason: dto.reason.trim(),
+        userId: user.id,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { eventId, ...dto },
+      },
+      async (tx, game, context) => {
+        const official =
+          game.currentOfficialRevisionId === null
+            ? null
+            : await tx.v1GameResultRevision.findUnique({ where: { id: game.currentOfficialRevisionId } });
+        if (official === null || official.state !== V1GameResultRevisionState.OFFICIAL) {
+          throw new ConflictException({
+            code: 'RESULT_NOT_OFFICIAL',
+            message: '아직 확정되지 않은 결과예요. 운영 콘솔에서 시각을 고쳐 주세요.',
+          });
+        }
+        const sequenceRow = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { lastSequence: true },
+        });
+        const appended = await appendEventTimeCorrection(tx, {
+          gameId,
+          eventId,
+          clockMs: dto.clockMs,
+          reason: dto.reason,
+          lane: 'PLATFORM_ADMIN',
+          clientEventId: dto.clientCommandId,
+          payloadHash: context.payloadHash,
+          actorUserId: user.id,
+          lastSequence: sequenceRow.lastSequence,
+          competitionConfigVersionId: game.competitionConfigVersionId,
+        });
+        const synced = await syncRevisionEventTimes(tx, {
+          gameId,
+          base: official,
+          reason: `어드민 사건 시각 정정: ${dto.reason.trim()}`,
+          createdBy: { actorType: 'USER', userId: user.id },
+        });
+        return {
+          gameId,
+          state: appended.state as GameRevisionMutationResult['state'],
+          version: appended.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          revisionId: synced?.revisionId ?? official.id,
+          revision: synced?.revision ?? official.revision,
+          revisionState: V1GameResultRevisionState.OFFICIAL,
+          eventTimeCorrection: {
+            eventId: appended.target.id,
+            correctionEventId: appended.correction.id,
+            period: appended.target.period,
+            previousClockMs: appended.previousClockMs,
+            clockMs: dto.clockMs,
+            supersededRevisionId: synced?.supersedesRevisionId ?? null,
+          },
+        };
+      },
+    );
+  }
+
+  /**
    * 플랫폼 어드민이 점수만으로 경기를 곧바로 공식 확정한다(대진 편집기의 빠른 입력).
    *
    * 득점 기록이 없는 경기에서만 열린다 — 기록이 있으면 정정 화면의 몫이다. 확정 이후의 모든 후속 처리
@@ -1158,7 +1263,11 @@ export class TournamentResultReviewService {
           );
           // Active, scoped tournament directors manage all tournament results. League policy remains separate.
           const fullTournamentDirector = principal.role === 'tournament_director' && source.tournamentKind !== 'regular_league';
-          if (input.requiredRole !== undefined && principal.role !== input.requiredRole && !fullTournamentDirector) {
+          if (
+            input.requiredRole !== undefined &&
+            principal.role !== input.requiredRole &&
+            (input.requiredRoleExclusive === true || !fullTournamentDirector)
+          ) {
             throw new ForbiddenException({
               code: 'PERMISSION_DENIED',
               message: '플랫폼 운영자만 쓸 수 있는 기능이에요.',
@@ -1282,7 +1391,11 @@ export class TournamentResultReviewService {
               authorizationSubject: principal.authorizationSubject,
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
               ...(fullTournamentDirector ? { authorizationPolicy: 'assigned_tournament_full_management' } : {}),
+              ...('eventTimeCorrection' in response
+                ? { eventTimeCorrection: response.eventTimeCorrection as AdminEventTimeCorrectionDetail }
+                : {}),
             },
+            ...(input.auditReason === undefined ? {} : { reason: input.auditReason }),
             tournamentId: source.tournamentId,
             teamMatchId: game.teamMatchId,
           });
@@ -1865,7 +1978,7 @@ export class TournamentResultReviewService {
     game: LockedTournamentGame,
     dto: ResultRevisionContentInput,
   ): Promise<GameResultInvariantInput> {
-    const [sides, events, config] = await Promise.all([
+    const [sides, rawEvents, config] = await Promise.all([
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1CompetitionConfigVersion.findUnique({
@@ -1873,6 +1986,8 @@ export class TournamentResultReviewService {
         select: { result: true },
       }),
     ]);
+    // MD-QA #187: 시각 정정 행은 경기 사실이 아니다 — 검증에서 빼고 원본 시각만 바꾼다.
+    const events = foldEventTimeCorrections(rawEvents);
     const reversedIds = new Set(
       events
         .map((event) => event.reversesEventId)

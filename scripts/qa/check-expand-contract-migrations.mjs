@@ -44,6 +44,11 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20261110090000_v1_game_event_time_correction/migration.sql',
+    statement: 'CREATE OR REPLACE TRIGGER v1_game_event_time_correction_guard BEFORE INSERT OR UPDATE ON v1_game_events FOR EACH ROW EXECUTE FUNCTION v1_guard_game_event_time_correction()',
+    reason: 'MD-QA #187 event time correction (user-approved append-only policy, 2026-11-10). The guard only constrains rows that carry the new nullable corrects_event_id column or the new TIME_CORRECTION enum value added in this same migration: a row with corrects_event_id IS NULL and any pre-existing type returns immediately. Old app instances during a rolling deploy never write either, so none of their inserts or updates can be rejected; existing rows all have corrects_event_id NULL, so re-validation on update is a no-op for them. CREATE OR REPLACE keeps the migration idempotent.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20261109020000_staged_tournament_composition/migration.sql',
     statement: 'CREATE UNIQUE INDEX v1_slots_stage_kind_registration_key ON v1_tournament_slots(tournament_id, entry_scope, kind, registration_id)',
     reason: 'PR #2285 replacement slot uniqueness. entry_scope is added NOT NULL DEFAULT legacy immediately before this index, so every existing row has the same scope and the pre-existing (tournament_id, kind, registration_id) unique proves the replacement cannot encounter duplicates. Existing writers omit the new column and retain that same legacy scope. New staged writes use the stage key and remain unique within a stage. Full PostgreSQL replay, Prisma drift=0 and repeated-team multi-stage integration pass. No table data or identities are rewritten; same new-data application rollback restriction as the paired DROP INDEX entry applies.',

@@ -463,6 +463,11 @@ enum V1GameEventType {
   RESUME
   CORRECTION
   FOUL
+  /// MD-QA #187: 이미 기록된 사건(골·카드·파울·교체)의 경기 시각을 바로잡는 정정 행.
+  /// 원본 행은 고치지 않고(append-only) 이 행이 `correctsEventId` 로 원본을 가리키며
+  /// `clockMs` 에 새 시각을, `payload` 에 이전 시각·사유를 남긴다. 읽는 쪽은
+  /// `games/core/event-time-corrections.ts` 의 fold 로 원본마다 가장 최근 정정만 적용한다.
+  TIME_CORRECTION
 }
 
 enum V1GameResultRevisionState {
@@ -3710,12 +3715,17 @@ model V1GameEvent {
   receivedAt          DateTime        @default(now()) @map("received_at")
   actorUserId         String          @map("actor_user_id")
   reversesEventId     String?         @unique @map("reverses_event_id")
+  /// TIME_CORRECTION 행만 채운다 — 시각을 바로잡는 원본 사건의 id. 한 사건을 여러 번
+  /// 정정할 수 있어 unique 가 아니다(가장 큰 sequence 가 현재 값). 같은 경기·자기 자신 금지·
+  /// 정정 가능한 원본 타입은 DB 트리거 `v1_guard_game_event_time_correction` 이 지킨다.
+  correctsEventId     String?         @map("corrects_event_id")
   payload             Json
   game                V1Game          @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_events_game_fk")
 
   @@unique([gameId, sequence], map: "v1_game_events_game_sequence_key")
   @@unique([gameId, clientEventId], map: "v1_game_events_game_client_event_key")
   @@index([gameId, period, sequence], map: "v1_game_events_game_id_period_sequence_idx")
+  @@index([gameId, correctsEventId], map: "v1_game_events_game_id_corrects_event_id_idx")
   @@map("v1_game_events")
 }
 

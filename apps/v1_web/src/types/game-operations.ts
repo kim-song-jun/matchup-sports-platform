@@ -57,7 +57,11 @@ export type GameEventType =
   | 'PERIOD_END'
   | 'PAUSE'
   | 'RESUME'
-  | 'CORRECTION';
+  | 'CORRECTION'
+  /** MD-QA #187: 기록된 사건의 시각 정정 행. `correctsEventId` 가 원본을 가리키고
+   * `clockMs` 가 새 시각, `payload.previousClockMs`/`reason` 이 이전 시각·사유다.
+   * 점수·카드 수에는 영향이 없다 — 원본 행은 그대로 남는다(append-only). */
+  | 'TIME_CORRECTION';
 
 /** `payload.card` is the established backend convention (see
  * `apps/v1_api/src/games/games.service.ts`'s `deriveTournamentRevision()` /
@@ -254,6 +258,8 @@ export interface GameEventRecord {
   receivedAt: string;
   actorUserId: string;
   reversesEventId: string | null;
+  /** MD-QA #187: TIME_CORRECTION 행만 채운다. 이 필드가 생기기 전 응답·픽스처에는 없다. */
+  correctsEventId?: string | null;
   payload: Record<string, unknown>;
 }
 

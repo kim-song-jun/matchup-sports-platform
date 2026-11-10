@@ -113,4 +113,43 @@ describe('카드 사진 위치 맞추기 저장', () => {
     await waitFor(() => expect(client.getQueryData<V1Profile>(v1Keys.profile())?.email).toBe(EMAIL_CHANGE_MSW.currentEmail));
     expect(screen.queryByText('저장하지 못했어요')).not.toBeInTheDocument();
   });
+
+  it('필수 정보가 비어 있는 계정은 사진을 올리기 전에 막고, 비어 있는 항목을 모두 알리며 프로필 수정으로 가는 버튼을 보여 준다', async () => {
+    server.use(
+      http.get('*/api/v1/me/profile', () => HttpResponse.json({
+        status: 'success',
+        data: { ...SERVER_PROFILE, phone: null, profile: { ...SERVER_PROFILE.profile, realName: null, birthDate: null } },
+        timestamp: '2026-11-06T00:00:00.000Z',
+      })),
+    );
+    const user = userEvent.setup();
+    render(<QueryClientProvider client={client}><PlayerCardHiddenSettingsPageClient /></QueryClientProvider>);
+
+    await user.click(await screen.findByRole('button', { name: /사진 위치 맞추기/ }));
+    await user.click(await screen.findByRole('button', { name: '카드 사진 위치 맞추기' }));
+
+    expect(await screen.findByText('필수 정보를 먼저 입력해 주세요')).toBeInTheDocument();
+    expect(screen.getByText(/비어 있는 정보: 이름, 생년월일, 휴대폰 번호\./)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '프로필 수정으로 가기' })).toHaveAttribute('href', expect.stringContaining('/my/profile/edit'));
+    expect(upload.mutateAsync).not.toHaveBeenCalled();
+    expect(patchBodies).toHaveLength(0);
+  });
+
+  it('생년월일·휴대폰만 비어 있으면 서버가 거절하지 않으므로 막지 않고 그대로 저장한다', async () => {
+    server.use(
+      http.get('*/api/v1/me/profile', () => HttpResponse.json({
+        status: 'success',
+        data: { ...SERVER_PROFILE, phone: null, profile: { ...SERVER_PROFILE.profile, birthDate: null } },
+        timestamp: '2026-11-06T00:00:00.000Z',
+      })),
+    );
+    const user = userEvent.setup();
+    render(<QueryClientProvider client={client}><PlayerCardHiddenSettingsPageClient /></QueryClientProvider>);
+
+    await user.click(await screen.findByRole('button', { name: /사진 위치 맞추기/ }));
+    await user.click(await screen.findByRole('button', { name: '카드 사진 위치 맞추기' }));
+
+    await waitFor(() => expect(patchBodies).toHaveLength(1));
+    expect(screen.queryByText('필수 정보를 먼저 입력해 주세요')).not.toBeInTheDocument();
+  });
 });

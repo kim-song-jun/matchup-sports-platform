@@ -186,7 +186,9 @@ export function EventTimeCorrectionSheet({
                 onKeyDown={(event) => {
                   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
                     event.preventDefault();
-                    setTab(key === 'time' ? 'cancel' : 'time');
+                    const next = key === 'time' ? 'cancel' : 'time';
+                    setTab(next);
+                    document.getElementById(next === 'time' ? tabIdTime : tabIdCancel)?.focus();
                   }
                 }}
                 className={`min-h-[44px] rounded-[var(--radius-chip)] text-[length:var(--font-size-body-sm)] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)] ${

@@ -3,6 +3,7 @@ import { CurrentUser } from '../../auth/current-user.decorator';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import { AdminContextService } from '../../common/admin-context.service';
+import { GameBroadcastRegistry } from '../../games/game-broadcast.registry';
 import { AdminCorrectGameEventTimeDto } from './tournament-result-review.dto';
 import { TournamentResultReviewService } from './tournament-result-review.service';
 
@@ -17,6 +18,7 @@ export class AdminEventTimeCorrectionController {
   constructor(
     private readonly adminContext: AdminContextService,
     private readonly resultReview: TournamentResultReviewService,
+    private readonly gameBroadcast: GameBroadcastRegistry,
   ) {}
 
   @Post(':gameId/events/:eventId/correct-time')
@@ -28,6 +30,11 @@ export class AdminEventTimeCorrectionController {
     @Body() dto: AdminCorrectGameEventTimeDto,
   ) {
     await this.adminContext.getMutationAdmin(user.id);
-    return this.resultReview.correctOfficialEventTime(user, gameId, eventId, idempotencyKey, dto);
+    const result = await this.resultReview.correctOfficialEventTime(user, gameId, eventId, idempotencyKey, dto);
+    // 콘솔·관전 화면이 정정 전 시각을 들고 있지 않도록 구독자에게 새 스냅샷을 보낸다(재전송 응답은 제외).
+    if (!result.replayed) {
+      void this.gameBroadcast.refreshGameSubscribers(gameId, result.version);
+    }
+    return result;
   }
 }

@@ -4,6 +4,7 @@ import type { AdminContextService } from '../../common/admin-context.service';
 import type { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
+import type { GameBroadcastRegistry } from '../../games/game-broadcast.registry';
 import { AdminEventTimeCorrectionController } from './admin-event-time-correction.controller';
 import type { AdminCorrectGameEventTimeDto } from './tournament-result-review.dto';
 import { TournamentResultReviewService } from './tournament-result-review.service';
@@ -123,10 +124,12 @@ describe('AdminEventTimeCorrectionController', () => {
   it('requires a mutation admin (support is refused) before calling the service', async () => {
     const order: string[] = [];
     const adminContext = { getMutationAdmin: jest.fn(async () => { order.push('admin'); }) } as unknown as AdminContextService;
-    const resultReview = { correctOfficialEventTime: jest.fn(async () => { order.push('service'); return {}; }) } as unknown as TournamentResultReviewService;
-    const controller = new AdminEventTimeCorrectionController(adminContext, resultReview);
+    const resultReview = { correctOfficialEventTime: jest.fn(async () => { order.push('service'); return { version: 9, replayed: false }; }) } as unknown as TournamentResultReviewService;
+    const gameBroadcast = { refreshGameSubscribers: jest.fn(async () => undefined) } as unknown as GameBroadcastRegistry;
+    const controller = new AdminEventTimeCorrectionController(adminContext, resultReview, gameBroadcast);
     await controller.correctTime(user, 'game-1', 'card-1', 'cmd-1', dto);
     expect(adminContext.getMutationAdmin).toHaveBeenCalledWith('admin-1');
     expect(order).toEqual(['admin', 'service']);
+    expect(gameBroadcast.refreshGameSubscribers).toHaveBeenCalledWith('game-1', 9);
   });
 });

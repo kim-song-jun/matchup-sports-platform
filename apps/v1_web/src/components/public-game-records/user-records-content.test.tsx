@@ -35,6 +35,7 @@ function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordIt
     started: true,
     goalkeeper: false,
     mvp: false,
+    isForfeit: false,
     officialAt: '2026-08-10T00:00:00.000Z',
     ...overrides,
   };
@@ -220,5 +221,29 @@ describe('UserRecordsContent — 도움 표시', () => {
 
     rerender(<UserRecordsContent data={withAssists} activeType="league" onChangeType={vi.fn()} />);
     expect(screen.getByText('도움').nextElementSibling).toHaveTextContent('3회');
+  });
+});
+
+describe('UserRecordsContent — 몰수 경기 기록 표시', () => {
+  const tag = '몰수 경기 기록';
+  const renderItems = (items: readonly PublicUserRecordItem[]) =>
+    render(<UserRecordsContent data={data(items)} activeType="all" onChangeType={vi.fn()} />);
+
+  it('몰수 경기 행의 통계 줄 끝에만 표시가 붙고, 같은 화면의 정상 경기 행에는 없다', () => {
+    renderItems([
+      item({ id: 'forfeit', gameId: 'g-f', isForfeit: true, goals: 1, result: 'LOST' }),
+      item({ id: 'normal', gameId: 'g-n', isForfeit: false, goals: 2 }),
+    ]);
+
+    const forfeitStats = screen.getByText(/1골 · 0도움/);
+    expect(forfeitStats).toHaveTextContent('1골 · 0도움 · 경고 0 · 퇴장 0 · 몰수 경기 기록');
+    expect(screen.getByText(/2골 · 0도움/)).not.toHaveTextContent(tag);
+    expect(screen.getAllByText(new RegExp(tag))).toHaveLength(1);
+  });
+
+  it('몰수 경기여도 남은 골·도움·카드가 없으면 표시를 붙이지 않는다', () => {
+    renderItems([item({ isForfeit: true, goals: 0, assists: 0 })]);
+
+    expect(screen.queryByText(new RegExp(tag))).not.toBeInTheDocument();
   });
 });

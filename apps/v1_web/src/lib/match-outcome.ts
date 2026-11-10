@@ -34,3 +34,8 @@ export function matchOutcomeReasonLabel(reason: MatchOutcomeReason): string {
 export function toDisplayableOutcomeReason(reason: string | null | undefined): MatchOutcomeReason | null {
   return reason === 'FORFEIT' || reason === 'ABANDONED' ? reason : null;
 }
+
+/** 몰수 경기에서 이벤트·통계가 공식 점수와 별개로 남은 기록임을 알리는 문구. 기록이 나오는 모든 화면이 이 상수를 쓴다. */
+export const FORFEIT_RECORDS_NOTE_DETAIL = '몰수 전에 기록된 득점·카드예요. 공식 점수에는 반영되지 않아요';
+export const FORFEIT_RECORDS_NOTE_SHORT = '몰수 전 기록이에요';
+export const FORFEIT_RECORD_STAT_TAG = '몰수 경기 기록';

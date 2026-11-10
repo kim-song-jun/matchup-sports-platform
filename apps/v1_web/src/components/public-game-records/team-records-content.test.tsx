@@ -235,3 +235,34 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
     });
   });
 });
+
+describe('TeamRecordsContent — 몰수 경기의 펼침 패널 설명', () => {
+  const goal = {
+    id: 'e-1',
+    type: 'GOAL',
+    side: 'own',
+    jerseyNumber: 7,
+    period: 1,
+    clockMs: 600_000,
+    cardColor: null,
+    participantName: '김도윤',
+    profileHref: null,
+  } as const;
+  const open = (item: PublicTeamRecordItem) => {
+    render(<TeamRecordsContent data={makeTeamRecords([item])} activeType="all" onChangeType={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: /경기 기록 펼치기/ }));
+  };
+
+  it('몰수 경기를 펼치면 패널 머리에 설명이 붙는다', () => {
+    open(makeItem({ isForfeit: true, goalsFor: 1, goalsAgainst: 0, events: [goal] }));
+
+    expect(screen.getByText('몰수 전 기록이에요')).toBeInTheDocument();
+  });
+
+  it('정상 경기를 펼치면 설명이 없다', () => {
+    open(makeItem({ isForfeit: false, events: [goal] }));
+
+    expect(screen.getByText('김도윤')).toBeInTheDocument();
+    expect(screen.queryByText('몰수 전 기록이에요')).not.toBeInTheDocument();
+  });
+});

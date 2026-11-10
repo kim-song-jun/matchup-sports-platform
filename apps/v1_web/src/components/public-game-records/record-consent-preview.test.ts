@@ -7,7 +7,7 @@ function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordIt
     id: 'record-1', gameId: 'game-1', teamMatchId: 'match-1', type: 'league', matchType: 'team_match', tournamentId: null,
     tournamentTitle: null, leagueId: 'league-1', leagueTitle: '마포 주말 리그', round: null, teamId: 'team-1', teamName: '마포 FC',
     opponentTeamId: 'team-2', opponentTeamName: '합정 유나이티드', result: 'WON', goals: 1, assists: 1, cards: { yellow: 0, red: 0 },
-    minutesPlayed: 90, started: true, goalkeeper: false, mvp: false, officialAt: '2026-09-30T01:10:00.000Z', ...overrides,
+    minutesPlayed: 90, started: true, goalkeeper: false, mvp: false, isForfeit: false, officialAt: '2026-09-30T01:10:00.000Z', ...overrides,
   };
 }
 

@@ -9,6 +9,7 @@ import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
+import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import {
   eventPresentation,
   formatGoalMinute,
@@ -147,6 +148,7 @@ function TeamRecordEventsPanel({
       aria-label={`${teamName} 대 ${item.opponentTeamName ?? '상대 미상'} 경기 기록`}
       style={{ padding: '0 16px 16px', borderTop: '1px solid var(--grey100)' }}
     >
+      <ForfeitRecordsCaption isForfeit={item.isForfeit} hasRecords={item.events.length > 0} variant="short" />
       {/* 이벤트 행(`TeamRecordEventRow`)과 **같은 grid·gap·가운데 폭**을 쓴다 — 머리글만
        * gap 없이 두면 두 팀명이 `…01팀(테스트) QA 스쿼드 02팀` 처럼 맞붙어 한 덩어리로
        * 읽히고(알파 1440 실측), 아래 이벤트의 좌/우 열과 머리글이 어긋난다. */}

@@ -24,6 +24,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { InlineChevronLink } from './inline-chevron-link';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
@@ -221,11 +222,13 @@ function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
 function EventsSection({
   events,
   isStatusOnly,
+  isForfeit,
   from,
   periodCount,
 }: {
   events: readonly PublicMatchEvent[];
   isStatusOnly: boolean;
+  isForfeit: boolean;
   from?: string;
   periodCount?: number | null;
 }) {
@@ -269,27 +272,30 @@ function EventsSection({
       ];
 
   return (
-    <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {groups.map((group) => (
-        <div key={group.id} role="group" aria-labelledby={group.id}>
-          {group.hideLabel ? (
-            <>
-              <span id={group.id} className="sr-only">{group.label}</span>
-              <div aria-hidden="true" style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
-            </>
-          ) : (
-            <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
-              {group.label}
+    <>
+      <ForfeitRecordsCaption isForfeit={isForfeit} hasRecords={events.length > 0} variant="detail" />
+      <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {groups.map((group) => (
+          <div key={group.id} role="group" aria-labelledby={group.id}>
+            {group.hideLabel ? (
+              <>
+                <span id={group.id} className="sr-only">{group.label}</span>
+                <div aria-hidden="true" style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
+              </>
+            ) : (
+              <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
+                {group.label}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {group.events.map((event, index) => (
+                <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
+              ))}
             </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {group.events.map((event, index) => (
-              <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
-            ))}
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -481,7 +487,13 @@ export function MatchDetailContent({
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
-          <EventsSection events={data.events} isStatusOnly={isStatusOnly} from={from} periodCount={data.periodCount} />
+          <EventsSection
+            events={data.events}
+            isStatusOnly={isStatusOnly}
+            isForfeit={toDisplayableOutcomeReason(data.outcome?.reason) === 'FORFEIT'}
+            from={from}
+            periodCount={data.periodCount}
+          />
         </Card>
       </section>
 

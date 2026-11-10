@@ -507,6 +507,8 @@ export interface PublicUserRecordItem {
   readonly started: boolean;
   readonly goalkeeper: boolean;
   readonly mvp: boolean;
+  /** 공식 결과가 몰수(FORFEIT)인 경기. 중단(ABANDONED)은 false. */
+  readonly isForfeit: boolean;
   readonly officialAt: string;
 }
 

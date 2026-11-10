@@ -6,6 +6,7 @@ import {
   overlayEventTimeCorrections,
   revisionMinuteFromClock,
   sortEventsByMatchTime,
+  summarizeEventTimeCorrections,
 } from './event-time-corrections';
 
 const card = { id: 'card-1', type: 'CARD', period: 1, clockMs: 11 * 60_000, sequence: 1, correctsEventId: null };
@@ -113,6 +114,32 @@ describe('event time corrections (MD-QA #187)', () => {
       expect(revisionMinuteFromClock(0)).toBe(0);
       expect(revisionMinuteFromClock(60_000)).toBe(1);
       expect(revisionMinuteFromClock(60_001)).toBe(2);
+    });
+  });
+  describe('summarizeEventTimeCorrections (공개 "정정" 표시)', () => {
+    const withPayload = (id: string, target: string, previous: number, clockMs: number, sequence: number, at: string) => ({
+      ...correction(id, target, clockMs, sequence),
+      payload: { previousClockMs: previous, clockMs, reason: '사유', lane: 'OPERATOR' },
+      receivedAt: new Date(at),
+    });
+
+    it('keeps the very first recorded clock across several corrections and the last correction time', () => {
+      const summary = summarizeEventTimeCorrections([
+        card,
+        withPayload('c-1', 'card-1', 11 * 60_000, 9 * 60_000, 3, '2026-11-10T03:00:00.000Z'),
+        withPayload('c-2', 'card-1', 9 * 60_000, 8 * 60_000, 4, '2026-11-10T03:05:00.000Z'),
+      ]);
+      expect(summary.get('card-1')).toEqual({ originalClockMs: 11 * 60_000, correctedAt: '2026-11-10T03:05:00.000Z' });
+      expect(summary.has('goal-1')).toBe(false);
+    });
+
+    it('drops a correction that ended back at the original clock', () => {
+      const summary = summarizeEventTimeCorrections([
+        card,
+        withPayload('c-1', 'card-1', 11 * 60_000, 9 * 60_000, 3, '2026-11-10T03:00:00.000Z'),
+        withPayload('c-2', 'card-1', 9 * 60_000, 11 * 60_000, 4, '2026-11-10T03:05:00.000Z'),
+      ]);
+      expect(summary.size).toBe(0);
     });
   });
 });

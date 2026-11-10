@@ -35,13 +35,15 @@ type OrderSpec = Record<string, 'asc' | 'desc'>;
 type FakeEvent = {
   id: string;
   gameId: string;
-  type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
+  type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION' | 'TIME_CORRECTION';
   sideId: string;
   participantId: string | null;
   period: number;
   clockMs: number;
   sequence: number;
   reversesEventId: string | null;
+  correctsEventId?: string | null;
+  receivedAt?: Date;
   // CARD 색상(`{ card }`)뿐 아니라 골 이벤트 백필이 남기는 표식
   // (`{ source, minuteKnown }`)도 담아야 해서 자유형이다.
   payload?: Record<string, unknown>;
@@ -395,5 +397,26 @@ describe('official card corrections on public routes', () => {
     }), NO_ASSIGNMENTS_ACCESS);
     expect((await deleted.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).events).toEqual([]);
     expect((await deleted.getSchedule(TOURNAMENT_ID, {})).items[0].cards).toEqual([]);
+  });
+  // MD-QA #187: 시각 정정 행은 타임라인의 한 줄이 아니라 원본 사건의 정정 표시가 된다.
+  it('getMatch 는 시각이 정정된 사건에 처음 기록 시각과 정정 시각을 싣고, 정정 행은 줄로 내보내지 않는다', async () => {
+    const prisma = buildFakePrisma([
+      { id: 'card-1', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 11 * 60_000, sequence: 1, reversesEventId: null, payload: { card: 'YELLOW' } },
+      { id: 'goal-1', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 5 * 60_000, sequence: 2, reversesEventId: null },
+      {
+        id: 'tc-1', gameId: GAME_ID, type: 'TIME_CORRECTION', sideId: 'side-home', participantId: null, period: 1, clockMs: 9 * 60_000, sequence: 3,
+        reversesEventId: null, correctsEventId: 'card-1', receivedAt: new Date('2026-11-10T03:41:00.000Z'),
+        payload: { previousClockMs: 11 * 60_000, clockMs: 9 * 60_000, reason: '대조', lane: 'OPERATOR' },
+      },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events).toHaveLength(2);
+    const card = result.events.find((event) => event.type === 'CARD');
+    expect(card?.clockMs).toBe(9 * 60_000);
+    expect(card?.timeCorrection).toEqual({ originalClockMs: 11 * 60_000, correctedAt: '2026-11-10T03:41:00.000Z' });
+    expect(result.events.find((event) => event.type === 'GOAL')?.timeCorrection).toBeNull();
   });
 });

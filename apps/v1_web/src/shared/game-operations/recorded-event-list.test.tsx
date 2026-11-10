@@ -210,25 +210,107 @@ describe('RecordedEventList', () => {
     expect(onReverseEvent).toHaveBeenCalledWith(unrelatedUndefinedReference);
   });
 
-  // MD-QA #187: 시각 정정 행은 영문 enum 대신 한국어 라벨로 보이고, 취소 대상이 아니다.
-  it('labels a TIME_CORRECTION row as 시각 정정 and offers no reverse action on it', () => {
-    const original = goal(1, HOME_SIDE_ID, 'p-jung', 3 * 60000);
-    const timeCorrection = {
-      ...goal(2, HOME_SIDE_ID, null, 3 * 60000),
+  // MD-QA #187: 시각 정정 행(TIME_CORRECTION)은 목록의 별도 줄이 아니라 원본 줄의 "정정됨" 이력이다.
+  describe('시각 정정 (MD-QA #187)', () => {
+    const original = { ...goal(1, HOME_SIDE_ID, 'p-jung', 11 * 60000), id: 'goal-orig' };
+    const timeCorrection: GameEventRecord = {
+      ...goal(2, HOME_SIDE_ID, null, 9 * 60000),
+      id: 'tc-1',
       sideId: null,
-      type: 'TIME_CORRECTION' as const,
-      correctsEventId: original.id,
-      payload: { previousClockMs: 11 * 60000, clockMs: 3 * 60000, reason: '기록 대조', lane: 'OPERATOR' },
+      type: 'TIME_CORRECTION',
+      correctsEventId: 'goal-orig',
+      receivedAt: '2026-11-10T03:41:00.000Z',
+      payload: { previousClockMs: 11 * 60000, clockMs: 9 * 60000, reason: '기록 대조', lane: 'OPERATOR' },
     };
-    render(
-      <RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />,
-    );
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
-    expect(rows[1]).toHaveTextContent('시각 정정');
-    expect(rows[1]).not.toHaveTextContent('TIME_CORRECTION');
-    expect(within(rows[1]).queryByRole('button', { name: '수정·취소' })).toBeNull();
-    expect(within(rows[0]).getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
+    it('정정 행은 줄로 그리지 않고, 원본 줄이 정정된 시각과 "정정됨"을 보여준다', () => {
+      // 증분 수신 직후처럼 원본의 clockMs 가 아직 옛 값(11분)이어도 정정 행의 시각이 이긴다.
+      render(<RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
+
+      const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toHaveTextContent('후반 9:00');
+      expect(rows[0]).not.toHaveTextContent('후반 11:00');
+      expect(rows[0]).not.toHaveTextContent('TIME_CORRECTION');
+      expect(within(rows[0]).getByRole('button', { name: /정정됨/ })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('"정정됨"을 열면 처음 기록·정정 주체·시각이 보이고, 44px 높이의 버튼이다', async () => {
+      render(<RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} />);
+
+      const toggle = screen.getByRole('button', { name: /정정됨/ });
+      expect(toggle.className).toContain('min-h-[44px]');
+      await userEvent.click(toggle);
+
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+      expect(panel).not.toBeNull();
+      expect(panel).toHaveTextContent('11:00 → 9:00');
+      expect(panel).toHaveTextContent('운영진');
+      expect(panel).toHaveTextContent('오후 12:41');
+      expect(panel).toHaveTextContent('처음 기록: 후반 11:00');
+
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('플랫폼 관리자 정정은 사유까지 보여준다', async () => {
+      const adminCorrection: GameEventRecord = {
+        ...timeCorrection,
+        payload: { previousClockMs: 11 * 60000, clockMs: 9 * 60000, reason: '심판 기록지 대조', lane: 'PLATFORM_ADMIN' },
+      };
+      render(<RecordedEventList events={[original, adminCorrection]} sides={SIDES} lineups={LINEUPS} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /정정됨/ }));
+      expect(screen.getByText(/플랫폼 관리자/)).toHaveTextContent('사유: 심판 기록지 대조');
+    });
+
+    it('onEditEvent 가 있으면 시각을 고칠 수 있는 줄에 "수정"이 뜨고 원본 이벤트를 넘긴다', async () => {
+      const onEditEvent = vi.fn();
+      const onReverseEvent = vi.fn();
+      render(
+        <RecordedEventList
+          events={[original, timeCorrection]}
+          sides={SIDES}
+          lineups={LINEUPS}
+          onEditEvent={onEditEvent}
+          onReverseEvent={onReverseEvent}
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: '수정·취소' })).toBeNull();
+      const edit = screen.getByRole('button', { name: '기록 수정 (골)' });
+      expect(edit.className).toContain('min-h-[44px]');
+      await userEvent.click(edit);
+      expect(onEditEvent).toHaveBeenCalledWith(original);
+      expect(onReverseEvent).not.toHaveBeenCalled();
+    });
+
+    it('취소된 기록·확정된 결과·레거시 백필 골에는 "수정"을 내지 않는다', () => {
+      const reversal: GameEventRecord = {
+        ...goal(5, HOME_SIDE_ID, 'p-jung', 1),
+        id: 'rev-1',
+        type: 'CORRECTION',
+        reversesEventId: original.id,
+      };
+      const backfilled = { ...goal(3, HOME_SIDE_ID, null, 0), payload: { source: GOAL_BACKFILL_EVENT_SOURCE } };
+      const { rerender } = render(
+        <RecordedEventList events={[original, reversal, backfilled]} sides={SIDES} lineups={LINEUPS} onEditEvent={vi.fn()} onReverseEvent={vi.fn()} />,
+      );
+      expect(screen.queryAllByRole('button', { name: '기록 수정 (골)' })).toHaveLength(0);
+      // 백필 골은 시각 정정이 막혀 있어 기존 "수정·취소"로 물러난다.
+      expect(screen.getAllByRole('button', { name: '수정·취소' })).toHaveLength(1);
+
+      rerender(
+        <RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onEditEvent={vi.fn()} resultOfficialized />,
+      );
+      expect(screen.queryByRole('button', { name: '기록 수정 (골)' })).toBeNull();
+    });
+
+    it('onEditEvent 가 없으면 기존 "수정·취소"가 그대로다', () => {
+      render(<RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
+      expect(screen.getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
+    });
   });
 
   // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.

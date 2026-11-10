@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  useCorrectOfficialEventTime,
   useCreateResultCorrection,
   useGameResultRevisions,
   useOfficializeResultRevision,
@@ -26,7 +27,9 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
-import { regularPeriodCountOf } from '@/shared/game-operations';
+import { EventTimeCorrectionSheet, RecordedEventList, eventTypeLabel, periodLabel as periodNameOf, regularPeriodCountOf } from '@/shared/game-operations';
+import { collectEventTimeCorrections } from '@/lib/event-time-correction';
+import type { GameEventRecord } from '@/types/game-operations';
 import { josa } from '@/lib/korean';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
@@ -105,6 +108,9 @@ export function GameResultCorrectionPanel({
   const createCorrection = useCreateResultCorrection(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
   const voidRevision = useVoidResultRevision(gameId, tournamentId);
+  const correctEventTime = useCorrectOfficialEventTime(gameId, tournamentId);
+  // MD-QA #187: 확정된 결과의 사건 시각 정정 시트 대상.
+  const [timeTarget, setTimeTarget] = useState<GameEventRecord | null>(null);
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
   const [correctionFormOpen, setCorrectionFormOpen] = useState(autoOpen);
@@ -454,12 +460,72 @@ export function GameResultCorrectionPanel({
         </div>
       ) : null}
 
+      {currentOfficial && game.actorRole === 'platform_ops' && !(inline && correctionFormOpen) ? (
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 정정</p>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            골·카드·파울·교체가 기록된 시각만 고쳐요. 점수와 카드 수는 바뀌지 않고, 공개 화면과 결과 변경 이력에 남아요.
+          </p>
+          {eventsQuery.isPending ? (
+            <AdminListSkeleton rows={2} />
+          ) : eventsQuery.isError ? (
+            <ErrorState
+              title="경기 기록을 불러오지 못했어요"
+              message={describeResultReviewError(eventsQuery.error)}
+              onRetry={() => void eventsQuery.refetch()}
+            />
+          ) : (
+            <RecordedEventList
+              events={eventsQuery.data?.events ?? []}
+              sides={game.sides}
+              lineups={lineupsQuery.data ?? []}
+              periodCount={regularPeriodCountOf(game.periods.length, game.periodDurations)}
+              onEditEvent={(event) => {
+                correctEventTime.reset();
+                setTimeTarget(event);
+              }}
+            />
+          )}
+        </div>
+      ) : null}
+
       <div>
         <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 8 }}>처리 이력</p>
         <RevisionTimeline revisions={revisions} />
       </div>
 
       {officializeConfirmModal}
+
+      {timeTarget !== null ? (
+        <EventTimeCorrectionSheet
+          open
+          mode="admin"
+          title="기록 시각 정정"
+          summary={`${eventTypeLabel(timeTarget)}${
+            timeTarget.sideId !== null
+              ? ` · ${game.sides.find((side) => side.id === timeTarget.sideId)?.displayNameSnapshot ?? ''}`
+              : ''
+          }`}
+          periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
+          currentClockMs={
+            collectEventTimeCorrections(eventsQuery.data?.events ?? []).get(timeTarget.id)?.currentClockMs ??
+            timeTarget.clockMs
+          }
+          // 확정된 경기의 피리어드 상세에는 실제 경과 시간이 없어 상한을 클라이언트가 단정하지 않는다.
+          // 추가 시간에 기록된 사건이 설정 길이 밖일 수 있어서다 — 범위 판정은 서버가 한다(EVENT_CLOCK_OUT_OF_RANGE).
+          maxClockMs={null}
+          onSubmit={async ({ clockMs, reason }) => {
+            await correctEventTime.mutateAsync({
+              eventId: timeTarget.id,
+              expectedVersion: game.version,
+              clockMs,
+              reason,
+            });
+            onSaved?.();
+          }}
+          onClose={() => setTimeTarget(null)}
+        />
+      ) : null}
 
       {!inline && correctionFormOpen ? renderCorrectionEditor() : null}
 

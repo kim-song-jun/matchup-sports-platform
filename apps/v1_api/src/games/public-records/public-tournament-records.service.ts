@@ -1,4 +1,4 @@
-import { foldEventTimeCorrectionsInMatchOrder } from '../core/event-time-corrections';
+import { foldEventTimeCorrectionsInMatchOrder, summarizeEventTimeCorrections } from '../core/event-time-corrections';
 import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { resolveResultCardEvents } from '../core/result-card-events';
 import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
@@ -1555,10 +1555,13 @@ export class PublicTournamentRecordsService {
         reversesEventId: true,
         sequence: true,
         correctsEventId: true,
+        receivedAt: true,
       },
     });
     // MD-QA #187: 정정된 사건 시각을 반영하고 시각순을 다시 맞춘다(정정 행 자체는 사건이 아니다).
     const liveEvents = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
+    // 접기 전에 "처음 기록 시각"을 챙긴다 — 접은 뒤에는 정정 행이 없다. 공개 화면의 "정정" 표시용이다.
+    const timeCorrections = summarizeEventTimeCorrections(recordedEvents);
     // Explicit correction snapshots replace live cards, including deletions.
     const events = officialParticipants === undefined ? liveEvents : [
       ...liveEvents.filter((event) => event.type !== 'CARD'),
@@ -1637,6 +1640,7 @@ export class PublicTournamentRecordsService {
           // (`PublicMatchEvent.clockMs`는 이미 `number | null`이고, 프론트
           // `formatClock`/`isClockAbnormal`도 null을 "표시 없음"으로 다룬다).
           clockMs: 'officialClockMs' in event ? event.officialClockMs : isMinuteUnknown(event.payload) ? null : event.clockMs,
+          timeCorrection: timeCorrections.get(event.id) ?? null,
         };
       })
       .sort(byUnknownLast);
@@ -1665,6 +1669,8 @@ export class PublicTournamentRecordsService {
           : presentEventAssist(assistParticipantIdByEventId.get(event.id), assistCtx),
         period: event.period,
         clockMs: event.minute === null ? null : event.minute * 60000,
+        // 공식 리비전 스냅샷의 골 id 는 종료 시 복사된 사건 id 라 같은 키로 정정 요약을 찾는다.
+        timeCorrection: timeCorrections.get(event.id) ?? null,
       };
     });
     return [...eventRows, ...revisionRows].sort(byUnknownLast);

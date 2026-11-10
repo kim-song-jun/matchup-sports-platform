@@ -344,6 +344,19 @@ real public broadcast channel -- not a shorter interval.
 (`components/public-game-records/penalty-scoreline.tsx`), 승부차기가 없는 경기에는
 아무것도 렌더하지 않는다.
 
+### Event time correction marker (MD-QA #187, 2026-11)
+
+- `GET /tournaments/:id/matches/:fixtureId` and the league twin `events[]` carry
+  `timeCorrection: { originalClockMs: number; correctedAt: string | null } | null`.
+  `clockMs` is already the corrected clock; `originalClockMs` is the very first
+  recorded clock (the earliest `TIME_CORRECTION.payload.previousClockMs`) and
+  `correctedAt` is the last correction's `receivedAt`. `null` when the event was
+  never corrected or the corrections ended back at the original clock. `TIME_CORRECTION`
+  rows themselves are never emitted as timeline rows. Official-revision goal rows resolve
+  the marker through the copied event id. The web renders a "정정" badge next to the minute
+  and one "기록 시각 정정 · 옐로카드 한달 11′ → 9′" line in the 결과 변경 이력 section from these
+  rows (names already pass the consent/hiding gates; `status_only` emits no events at all).
+
 ### Scorer timeline/summary addition -- spectator-facing goal identity (2026-08)
 
 Two additions so a spectator (not just the participating teams) can see who

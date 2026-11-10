@@ -244,6 +244,12 @@ export interface UseV1GameOperationsConsoleResult {
    * 이슈 #376). */
   reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
   /**
+   * MD-QA #187 — 기록된 사건의 시각 정정(확정 전). `reverseEvent` 와 같은 이유로 큐를 거치지 않는
+   * 온라인 전용 REST 호출이고, 같은 권한 게이트(쓰기 권한·takeover 토큰)와 낙관적 버전을 쓴다.
+   * `Idempotency-Key` 는 body 의 `clientEventId` 와 같다.
+   */
+  correctEventTime(input: { eventId: string; clockMs: number; reason: string }): Promise<void>;
+  /**
    * 이슈 #376 — 이미 기록된 GOAL 이벤트의 assistParticipantId를 원자적으로
    * 채우거나(참가자 id) 지우는(null) 커맨드. `reverseEvent`와 같은 이유로 큐를
    * 거치지 않는 온라인 전용 REST 호출이다(D-10). 예전 `attachAssist`가 하던
@@ -1282,6 +1288,47 @@ export function useV1GameOperationsConsole(
     [gameId, realtimeAuthorizationReady, gameSnapshot, takeover, queryClient, advanceGameVersion],
   );
 
+  const correctEventTime = useCallback(
+    async (input: { eventId: string; clockMs: number; reason: string }) => {
+      const requiresLease = operationModeRef.current === 'tournament-leased';
+      const leaseToken = takeover.status === 'held' ? takeover.token : null;
+      if (
+        !isMountedRef.current ||
+        !writeAccessRef.current ||
+        !gameId ||
+        activeGameIdRef.current !== gameId ||
+        !gameSnapshot ||
+        (requiresLease && (
+          heldTakeoverGameIdRef.current !== gameId ||
+          !isTakeoverHeld(takeover) ||
+          takeoverStatusRef.current !== 'held' ||
+          leaseToken === null ||
+          takeoverTokenRef.current !== leaseToken
+        ))
+      ) {
+        throw new Error('경기 운영 권한이 없어 시각을 정정할 수 없어요.');
+      }
+      const clientEventId = randomUuid();
+      const result = await v1Post<{ gameId: string; state: GameState; version: number }>(
+        `/games/${gameId}/events/${input.eventId}/correct-time`,
+        {
+          expectedVersion: acceptedVersionRef.current,
+          clientEventId,
+          ...(requiresLease && leaseToken !== null ? { takeoverToken: leaseToken } : {}),
+          clockMs: input.clockMs,
+          reason: input.reason,
+        },
+        { headers: { 'Idempotency-Key': clientEventId } },
+      );
+      if (!isMountedRef.current || activeGameIdRef.current !== gameId) return;
+      advanceGameVersion(result.version);
+      void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      // 원본 행의 시각이 바뀌는 정정이라 증분 이벤트만으로는 이미 받은 행이 갱신되지 않는다 — 전체를 다시 읽는다.
+      resyncEventsRef.current?.();
+    },
+    [gameId, realtimeAuthorizationReady, gameSnapshot, takeover, queryClient, advanceGameVersion],
+  );
+
   // 이슈 #376 — 큐를 거치지 않는 온라인 전용 REST 호출(reverseEvent와 동일한 이유,
   // 위 주석 참고). 하나의 커맨드로 assistParticipantId를 in-place로 갱신하므로
   // reverseEvent+submitEvent 두 단계 대신 한 번의 온라인 명령으로 저장한다.
@@ -1354,6 +1401,7 @@ export function useV1GameOperationsConsole(
     retryFailedEvent,
     requestTakeover,
     reverseEvent,
+    correctEventTime,
     assignAssist,
     applyCommandResult,
   };

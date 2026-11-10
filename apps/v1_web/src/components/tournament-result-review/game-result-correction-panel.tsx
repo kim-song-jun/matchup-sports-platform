@@ -27,7 +27,7 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
-import { EventTimeCorrectionSheet, RecordedEventList, eventTypeLabel, periodLabel as periodNameOf, regularPeriodCountOf } from '@/shared/game-operations';
+import { EventTimeCorrectionSheet, RecordedEventList, eventTimeSummary, eventTypeLabel, periodLabel as periodNameOf, regularPeriodCountOf } from '@/shared/game-operations';
 import { collectEventTimeCorrections } from '@/lib/event-time-correction';
 import type { GameEventRecord } from '@/types/game-operations';
 import { josa } from '@/lib/korean';
@@ -501,11 +501,7 @@ export function GameResultCorrectionPanel({
           open
           mode="admin"
           title="기록 시각 정정"
-          summary={`${eventTypeLabel(timeTarget)}${
-            timeTarget.sideId !== null
-              ? ` · ${game.sides.find((side) => side.id === timeTarget.sideId)?.displayNameSnapshot ?? ''}`
-              : ''
-          }`}
+          summary={[eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
           periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
           currentClockMs={
             collectEventTimeCorrections(eventsQuery.data?.events ?? []).get(timeTarget.id)?.currentClockMs ??

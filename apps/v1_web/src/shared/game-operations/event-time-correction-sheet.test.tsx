@@ -213,3 +213,28 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     expect(screen.getByRole('tab', { name: '시간 정정' }).className).toContain('min-h-[44px]');
   });
 });
+
+/**
+ * globals.css 의 unlayered `button { font: inherit }` 리셋은 Tailwind 레이어 유틸을 이긴다
+ * (pagination-bar.test.tsx 참고). 큰 시각·탭 라벨은 인라인 style 로만 크기·굵기가 먹는다.
+ */
+describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기)', () => {
+  it('큰 시각 버튼이 인라인으로 heading×1.75 / 800 을 지정한다', () => {
+    renderSheet();
+    const clock = screen.getByRole('button', { name: /정정할 시각 11:00/ });
+    expect(clock.style.fontSize).toBe('calc(var(--font-size-heading) * 1.75)');
+    expect(clock.style.fontWeight).toBe('800');
+    expect(clock.className).not.toContain('font-extrabold');
+    expect(clock.className).not.toContain('text-[length:calc');
+  });
+
+  it('탭 라벨 버튼이 인라인으로 body-sm / 700 을 지정한다', () => {
+    renderSheet();
+    for (const name of ['시간 정정', '기록 취소']) {
+      const tab = screen.getByRole('tab', { name });
+      expect(tab.style.fontSize).toBe('var(--font-size-body-sm)');
+      expect(tab.style.fontWeight).toBe('700');
+      expect(tab.className).not.toContain('font-bold');
+    }
+  });
+});

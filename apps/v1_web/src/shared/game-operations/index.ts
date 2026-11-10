@@ -9,7 +9,7 @@ export { AssistPickerSheet, type AssistPickerSheetProps } from './assist-picker-
 export { MatchProgressStrip } from './match-progress-strip';
 export { RestTimer } from './rest-timer';
 export { endPeriodLabel, isSinglePeriod, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
-export { commandConfirmCopy, commitActionConfirmCopy, secondYellowConfirmCopy, penaltyShootoutFinishConfirmCopy, penaltyShootoutOverrideFinishConfirmCopy, penaltyShootoutStartConfirmCopy, playerLabel, sideLabel, type ConfirmCopy } from './confirm-copy';
+export { commandConfirmCopy, commitActionConfirmCopy, secondYellowConfirmCopy, penaltyShootoutFinishConfirmCopy, penaltyShootoutOverrideFinishConfirmCopy, penaltyShootoutStartConfirmCopy, eventTimeSummary, playerLabel, sideLabel, type ConfirmCopy } from './confirm-copy';
 export { participantIdentityCopyText, participantIdentityName, participantIdentityPhone } from './participant-identity';
 export { formatPlayerLabel, jerseyText } from './player-label';
 export { AbnormalEndDialog, type AbnormalEndReason, type AbnormalEndDialogProps } from './abnormal-end-dialog';

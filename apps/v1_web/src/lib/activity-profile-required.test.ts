@@ -64,6 +64,7 @@ describe('activity gate checklist helpers', () => {
 
   it('leaves email signups, completed accounts and guests alone', () => {
     expect(activityMissingFromAuthMe(me('deferred', { user: { onboardingStatus: 'deferred', authProviders: ['email'] }, onboarding: { missing: ['sports'] } }))).toEqual([]);
+    expect(activityMissingFromAuthMe(me('deferred', { user: { onboardingStatus: 'deferred', authProviders: ['email', 'kakao'] }, onboarding: { missing: ['sports'] } }))).toEqual([]);
     expect(activityMissingFromAuthMe(me('completed', { onboarding: { missing: ['sports'] } }))).toEqual([]);
     expect(activityMissingFromAuthMe(me('deferred'))).toEqual([]);
     expect(activityMissingFromAuthMe(undefined)).toEqual([]);

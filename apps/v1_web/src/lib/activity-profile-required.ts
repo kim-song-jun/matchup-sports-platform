@@ -40,6 +40,11 @@ export function parseActivityMissing(details: unknown): ActivityMissingItem[] {
   return ACTIVITY_ITEM_ORDER.filter((item) => raw.includes(item));
 }
 
+/** 서버 게이트와 같은 기준 — 소셜 로그인만 있고 이메일 로그인이 없는 계정만 종목 게이트 대상이다. */
+function isSocialOnly(providers: readonly string[] | undefined): boolean {
+  return Boolean(providers?.some((p) => p === 'kakao' || p === 'apple')) && !providers?.includes('email');
+}
+
 /** `/auth/me` 만으로 남은 항목을 계산한다 — 만들기·신청 화면이 폼을 그리기 전에 먼저 막을 때 쓴다. */
 export function activityMissingFromAuthMe(me: {
   user: { onboardingStatus: string; authProviders?: readonly string[] };
@@ -54,7 +59,7 @@ export function activityMissingFromAuthMe(me: {
   if (status === 'social_profile_deferred') {
     if (me.verification?.phoneVerified !== true) missing.push('phone');
     missing.push('basicProfile');
-  } else if (status !== 'deferred' || !me.user.authProviders?.some((provider) => provider === 'kakao' || provider === 'apple')) {
+  } else if (status !== 'deferred' || !isSocialOnly(me.user.authProviders)) {
     return [];
   }
   if (noSport) missing.push('interestSport');

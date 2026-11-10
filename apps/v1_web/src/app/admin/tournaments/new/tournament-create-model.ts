@@ -1,3 +1,5 @@
+import type { StagePlan } from '@/types/stage-plan';
+import { stagePlanCounts, stagePlanError } from '@/lib/stage-plan';
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
@@ -63,6 +65,7 @@ export function tournamentPeriodPhaseShortLabel(phase: TournamentPeriodPhase) {
 }
 
 export type TournamentCreateState = {
+  stagePlan: StagePlan | null;
   step: number;
   /** 초안이 이미 생성된 뒤의 대회 id. null이면 아직 서버에 아무것도 만들지 않은 상태 —
    * "참가 조건" 다음 단계에서 이 값의 유무로 생성(POST)인지 수정(PATCH)인지를 가른다. */
@@ -150,6 +153,7 @@ const EMPTY_PROMO: TournamentPromoCardValue = {
 };
 
 export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
+  stagePlan: null,
   step: 0,
   draftId: null,
   draftUpdatedAt: null,
@@ -211,11 +215,12 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' |
+  'stagePlan' | 'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' |
   'periodMinutes' | 'periodMinutesDirty' | 'stagePeriodMinutes' | 'stagePeriodMinutesDirty'
 >;
 
 export type TournamentCreateAction =
+  | { type: 'set-stage-plan'; plan: StagePlan }
   | { type: 'set-step'; step: number }
   | { type: 'set-field'; field: FormField; value: TournamentCreateState[FormField] }
   | { type: 'set-scheduled-at'; value: string }
@@ -253,6 +258,7 @@ export function tournamentCreateReducer(
   action: TournamentCreateAction,
 ): TournamentCreateState {
   switch (action.type) {
+    case 'set-stage-plan': return { ...state, stagePlan: action.plan, format: 'league_knockouts', sixTeamMode: false, teamCount: String(stagePlanCounts(action.plan).teams) };
     case 'set-step':
       return { ...state, step: Math.max(0, Math.min(TOURNAMENT_CREATE_STEPS.length - 1, action.step)) };
     case 'set-field':
@@ -448,6 +454,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
 
   const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
+    stagePlan: tournament.stagePlan ?? null,
     draftId: tournament.id,
     draftUpdatedAt: tournament.updatedAt,
     sportId: tournament.sportId,
@@ -597,6 +604,7 @@ export function buildTournamentPreviewItem(
     // 이 위저드는 단발 대회만 만든다(정규 리그 시즌은 리그 어드민에서 만들어진다).
     // state.format 이 'league' 여도 그건 "리그 방식으로 치른다"는 뜻이지 리그 시즌이 아니다.
     kind: 'regular_tournament',
+    stagePlan: state.stagePlan,
     entryFeeConfigured: true,
     registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt),
     scheduledAt: kstDatetimeLocalToIso(state.scheduledAt),
@@ -642,6 +650,7 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   const errors: Record<string, string> = {};
 
   if (step === 0) {
+    if (state.stagePlan) { const error = stagePlanError(state.stagePlan); if (error) errors.stagePlan = error; }
     if (!state.sportId) errors.sportId = '종목을 선택해 주세요.';
     if (!state.title.trim()) errors.title = '대회명을 입력해 주세요.';
   }
@@ -812,6 +821,7 @@ export function buildTournamentCreatePayload(
   state: TournamentCreateState,
 ): V1CreateTournamentPayload {
   const payload: V1CreateTournamentPayload = {
+    ...(state.stagePlan ? { stagePlan: state.stagePlan } : {}),
     sportId: state.sportId,
     title: state.title.trim(),
     sixTeamMode: state.sixTeamMode && state.format === 'knockout' && Number(state.teamCount) === 6,

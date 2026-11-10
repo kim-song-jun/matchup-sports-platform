@@ -79,7 +79,10 @@ export function isLeagueCompetition(competition: {
 export function competitionFormatLabel(competition: {
   format: V1TournamentFormat;
   kind: V1CompetitionKind | null;
+  stagePlan?: unknown;
+  isStaged?: boolean;
 }): string {
+  if (competition.stagePlan || competition.isStaged) return '단계형 대회';
   if (isLeagueCompetition(competition)) return '리그 방식';
   if (competition.format === 'league_knockouts') return '정규리그 + N개 토너먼트';
   return competition.format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트';

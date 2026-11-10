@@ -59,6 +59,8 @@ const hookMocks = vi.hoisted(() => ({
   officialize: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   voidRevision: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   createCorrection: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
+  // MD-QA #187: 확정 뒤 사건 시각 정정(어드민).
+  correctEventTime: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() },
   // `ResultEditModal`의 참가자 실명 표시(라인업 데이터)용 -- 기본값 `data: undefined`는
   // 두 패널의 `lineupsQuery.data ?? []` 폴백을 그대로 거치므로 대부분의 테스트는
   // 빈 라인업(= 기존 id-접미어 폴백)을 보는 실제 로딩-중 상태와 동일하게 동작한다.
@@ -81,12 +83,20 @@ vi.mock('@/hooks/use-tournament-result-review', async () => {
     useOfficializeResultRevision: () => hookMocks.officialize,
     useVoidResultRevision: () => hookMocks.voidRevision,
     useCreateResultCorrection: () => hookMocks.createCorrection,
+    useCorrectOfficialEventTime: () => hookMocks.correctEventTime,
   };
 });
 
 // 두 패널이 참가자 실명 표시용으로 새로 호출하는 `useV1GameLineups`도 목한다 --
 // 안 그러면 이 모듈의 진짜 `useQuery`가 실행되면서 아래 `renderWithClient`가
 // 기대하는 "QueryClientProvider 불필요" 전제가 깨진다.
+// MD-QA #187: 시각 정정 시트(BottomSheet)가 라우터 훅을 쓴다.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1GameLineups: () => hookMocks.lineups,
 }));
@@ -198,6 +208,7 @@ beforeEach(() => {
   Object.assign(hookMocks.officialize, freshMutationMock());
   Object.assign(hookMocks.voidRevision, freshMutationMock());
   Object.assign(hookMocks.createCorrection, freshMutationMock());
+  Object.assign(hookMocks.correctEventTime, freshMutationMock(), { mutateAsync: vi.fn().mockResolvedValue({ version: 5, replayed: false }) });
   Object.assign(hookMocks.lineups, freshQueryMock());
   Object.assign(hookMocks.events, freshQueryMock());
   // alpha 실사고(2026-08) 수정: `GameResultReviewPanel.handleOfficialize`가
@@ -419,6 +430,77 @@ describe('director officialize/void visibility follows the DIRECTOR_OFFICIALIZE 
       expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
+  });
+});
+
+describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)', () => {
+  const yellowCard = {
+    id: 'event-card-1',
+    gameId: 'game-1',
+    sequence: 4,
+    clientEventId: 'c-4',
+    payloadHash: 'h',
+    type: 'CARD' as const,
+    sideId: 'side-away',
+    participantId: null,
+    assistParticipantId: null,
+    period: 1,
+    clockMs: 11 * 60_000,
+    occurredAt: '2026-08-01T10:11:00.000Z',
+    receivedAt: '2026-08-01T10:11:00.000Z',
+    actorUserId: 'u-1',
+    reversesEventId: null,
+    correctsEventId: null,
+    payload: { card: 'YELLOW' },
+  };
+
+  function officialGame(role: GameActorRole) {
+    hookMocks.game.data = buildGame(role, { version: 4, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', officialAt: '2026-08-01T12:00:00.000Z' })];
+    hookMocks.events.data = { events: [yellowCard], lastSequence: 4, gap: null };
+  }
+
+  it('플랫폼 어드민은 사유를 적어 확정된 사건의 시각을 정정한다 (expectedVersion = 경기 버전)', async () => {
+    officialGame('platform_ops');
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    expect(screen.getByText('기록 시각 정정')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    expect(within(dialog).getByText('확정된 결과')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    expect(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 정정' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/정정 사유/), '심판 기록지 대조 결과 9분 경고');
+    await user.click(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 정정' }));
+
+    await waitFor(() =>
+      expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenCalledWith({
+        eventId: 'event-card-1',
+        expectedVersion: 4,
+        clockMs: 9 * 60_000,
+        reason: '심판 기록지 대조 결과 9분 경고',
+      }),
+    );
+  });
+
+  it('대회 디렉터에게는 시각 정정 카드를 보이지 않는다 (서버가 어드민 전용으로 막는다)', () => {
+    officialGame('tournament_director');
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '기록 수정 (옐로카드)' })).not.toBeInTheDocument();
+  });
+
+  it('공식 결과가 없으면(무효 포함) 정정 카드를 보이지 않는다', () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 4, currentOfficialRevisionId: null });
+    hookMocks.revisions.data = [];
+    hookMocks.events.data = { events: [yellowCard], lastSequence: 4, gap: null };
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
   });
 });
 

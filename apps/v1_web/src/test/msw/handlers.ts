@@ -813,6 +813,7 @@ export const v1MswHandlers = [
   ...v1TeamMatchRulesMsw.handlers,
   http.get(`${api}/auth/me`, () => ok({
     socialSignupPrefill: null,
+    socialSignupNickname: null,
     user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
       onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
       hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true },

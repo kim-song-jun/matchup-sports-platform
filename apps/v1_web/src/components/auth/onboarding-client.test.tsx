@@ -323,6 +323,17 @@ describe('OnboardingClient 지역 단계', () => {
     expect(screen.getByRole('button', { name: '나중에 설정하기' })).toBeEnabled();
   });
 
+  it('종목 단계의 건너뛰기는 "나중에 고를게요"이고 활동할 때 다시 묻는다는 이유를 한 줄로 알려 준다', () => {
+    render(<OnboardingClient step="sport" />);
+
+    const skip = screen.getByRole('button', { name: '나중에 고를게요' });
+    expect(screen.queryByRole('button', { name: '나중에 설정하기' })).not.toBeInTheDocument();
+    expect(skip).toHaveAccessibleDescription('팀 만들기·참가 신청할 때 다시 물어볼게요.');
+    fireEvent.click(skip);
+
+    expect(hooks.deferOnboardingMutate).toHaveBeenCalledWith({ reason: 'later' }, expect.anything());
+  });
+
   it('"나중에 설정하기"는 하단에 하나뿐이고 누르면 온보딩을 미룬다', () => {
     render(<OnboardingClient step="region" />);
 

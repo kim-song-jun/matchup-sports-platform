@@ -1,3 +1,4 @@
+import { TIME_CORRECTION_ROW_FILTER, foldEventTimeCorrectionsInMatchOrder } from '../games/core/event-time-corrections';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
@@ -257,11 +258,13 @@ export class TeamMatchRecordService {
         .map((goal) => ({ ...goal, subMatchId: null }));
     }
     // Current v1 event-based results have no revision JSON goals. Read reversals too so cancelled goals stay cancelled.
-    const events = await tx.v1GameEvent.findMany({
-      where: { gameId: game.id, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
+    // MD-QA #187: 시각 정정 행도 읽어 정정된 분을 반영하고 시각순을 다시 맞춘다.
+    const recordedEvents = await tx.v1GameEvent.findMany({
+      where: { gameId: game.id, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }, TIME_CORRECTION_ROW_FILTER] },
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
-      select: { id: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, payload: true, reversesEventId: true },
+      select: { id: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, payload: true, reversesEventId: true, sequence: true, correctsEventId: true },
     });
+    const events = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
     const reversedIds = new Set(events.flatMap((event) => event.reversesEventId ? [event.reversesEventId] : []));
     return events.flatMap((event) => {
       if ((event.type !== 'GOAL' && event.type !== 'OWN_GOAL') || reversedIds.has(event.id)

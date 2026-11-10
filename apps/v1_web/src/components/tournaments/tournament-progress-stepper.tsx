@@ -396,6 +396,11 @@ function awardsStage(tournament: V1TournamentDetail, allDone: boolean): Tourname
  */
 export function buildTournamentStages(tournament: V1TournamentDetail): TournamentStage[] {
   const { format, fixtures, status } = tournament;
+  if (tournament.stagePlan) return tournament.stagePlan.stages.map(stage => {
+    const groupIds = new Set(tournament.groups.filter(g => g.stageKey === stage.key).map(g => g.id));
+    const matches = fixtures.filter(f => f.groupId && groupIds.has(f.groupId));
+    return { key: stage.key, label: stage.name, status: matches.length > 0 && matches.every(isEnded) ? 'done' as const : matches.some(isStarted) ? 'active' as const : 'upcoming' as const };
+  });
   // 정규 리그 거울 행은 format='group_knockout' 이라 format 만 보면 아래 리그 분기를
   // 못 타고 조별+결선 단계를 그린다.
   const isLeague = isLeagueCompetition(tournament);

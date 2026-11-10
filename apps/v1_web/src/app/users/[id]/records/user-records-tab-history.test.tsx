@@ -34,7 +34,7 @@ function item(type: TeamRecordCategory, index: number): PublicUserRecordItem {
     leagueId: type === 'league' ? 'fixture-league' : null, leagueTitle: type === 'league' ? '합성 리그' : null,
     round: null, teamId: 'fixture-team', teamName: '합성 홈팀', opponentTeamId: 'fixture-opponent', opponentTeamName: '합성 원정팀',
     result: 'WON', goals: 1, assists: 0, cards: { yellow: 0, red: 0 }, minutesPlayed: 90,
-    started: true, goalkeeper: false, mvp: false, officialAt: '2026-09-20T00:00:00.000Z',
+    started: true, goalkeeper: false, mvp: false, isForfeit: false, officialAt: '2026-09-20T00:00:00.000Z',
   };
 }
 const allItems = [item('league', 1), item('tournament', 2), item('tournament', 3), item('friendly', 4), item('friendly', 5)];

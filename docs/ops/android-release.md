@@ -23,6 +23,12 @@ The Gradle configuration fails immediately when either value is missing or malfo
 overrides are intentionally not accepted, preventing the same commit from producing differently
 versioned artifacts.
 
+Alpha is the exception for `versionCode` only. `kr.co.teameet.alpha` is its own Play app, so its
+`versionCode` is the commit count of the built commit (`git rev-list --count HEAD`). It grows with
+every `dev` merge, the same commit still yields the same code, and production keeps `version.properties`.
+Alpha builds need the full git history; a shallow clone fails the build instead of producing a
+too-small code. `versionName` still comes from `version.properties` with the `-alpha` suffix.
+
 ## Production inputs
 
 Configure these public identifiers in the protected `production` environment:
@@ -56,6 +62,24 @@ Keep the original keystore in two access-controlled backups outside GitHub. Reco
 certificate fingerprints separately from its passwords. Prefer Play App Signing: the locally held key
 is the upload key, while `assetlinks.json` must use the Play app-signing certificate fingerprint shown
 by Play Console after enrollment.
+
+## Alpha on Play internal testing
+
+The alpha app is shared through the Play **Internal testing** track (no Google review, up to 100 testers).
+
+- Signing: the fixed alpha key (`ANDROID_ALPHA_*` secrets, RSA 2048) is also the **Play app-signing key**
+  of `kr.co.teameet.alpha`, enrolled with "use a different app signing key → export from keystore (PEPK)"
+  on the first release (user decision 2026-11-09). The Play build and the CI APK therefore share one
+  certificate and one Kakao key hash. This cannot be undone; keep the keystore backups described above.
+- Every `dev` push of **Android Alpha** signs `bundleAlphaRelease` with that key, checks the signer and key
+  size, and keeps `teameet-alpha-aab-<sha>` (AAB + `.sha256`, 14 days). The run summary shows its
+  `versionCode`. Nothing is uploaded to Play automatically.
+- To release: download that artifact, verify the checksum, then in Play Console open
+  **Test and release → Testing → Internal testing → Create new release** and upload the AAB.
+- Testers join through the link under the **Testers** tab, which appears only after the release is published.
+  The Play build is a release (R8) build, unlike the debug APK, so check login, push and photo upload once
+  after each upload that changes native code.
+- The alpha app does not use verified App Links, so `assetlinks.json` needs no alpha fingerprint.
 
 ## Build and verification
 

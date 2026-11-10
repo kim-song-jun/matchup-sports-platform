@@ -472,3 +472,32 @@ export function useCreateResultCorrection(gameId: string, tournamentId?: string)
     onSuccess: () => invalidateGame(queryClient, gameId, tournamentId),
   });
 }
+
+export type CorrectOfficialEventTimeInput = {
+  eventId: string;
+  expectedVersion: number;
+  clockMs: number;
+  reason: string;
+};
+
+/**
+ * `POST /admin/games/:gameId/events/:eventId/correct-time` -- MD-QA #187. 결과 확정 뒤 사건(골·카드·
+ * 파울·교체) 시각 정정. 플랫폼 어드민 owner·ops 만 열리고(`403 PERMISSION_DENIED` 그 밖), 대회
+ * 디렉터 예외가 없다. 공식 리비전의 분 스냅샷이 바뀌면 서버가 후속 OFFICIAL 리비전을 세우므로
+ * 리비전·공개 화면 캐시를 함께 무효화한다. `Idempotency-Key` 는 `clientCommandId` 와 같다.
+ */
+export function useCorrectOfficialEventTime(gameId: string, tournamentId?: string) {
+  const postGameCommand = usePostGameCommand();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, ...body }: CorrectOfficialEventTimeInput) =>
+      postGameCommand<{ gameId: string; version: number; replayed: boolean }>(
+        `/admin/games/${encodeURIComponent(gameId)}/events/${encodeURIComponent(eventId)}/correct-time`,
+        body,
+      ),
+    onSuccess: () => {
+      invalidateGame(queryClient, gameId, tournamentId);
+      void queryClient.invalidateQueries({ queryKey: v1Keys.gameEvents(gameId) });
+    },
+  });
+}

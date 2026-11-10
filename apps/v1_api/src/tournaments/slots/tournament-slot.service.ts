@@ -61,7 +61,7 @@ const alreadyPlaced = () =>
 
 async function assertPlaceable(
   tx: Tx,
-  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null; group?: { phase: string; bracketTrack: string } | null },
+  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; entryScope?: string; groupId: string | null; group?: { phase: string; bracketTrack: string } | null },
   registrationId: string,
 ): Promise<void> {
   const registration = await tx.v1TournamentRegistration.findFirst({
@@ -83,7 +83,7 @@ async function assertPlaceable(
   // 조별 ENTRY를 가진 팀도 결선 BYE로 진출할 수 있다. 결선 안의 중복은 계속 막는다.
   const stageEntry = slot.kind === 'ENTRY' && group?.phase === 'group';
   const placed = await tx.v1TournamentSlot.findFirst({
-    where: { tournamentId: slot.tournamentId, registrationId, kind: { in: exclusiveKinds }, id: { not: slot.id },
+    where: { tournamentId: slot.tournamentId, ...(slot.entryScope && slot.entryScope !== 'legacy' ? { entryScope: slot.entryScope } : {}), registrationId, kind: { in: exclusiveKinds }, id: { not: slot.id },
       ...(slot.kind === 'BYE' ? { NOT: { kind: 'ENTRY', group: { is: { phase: 'group' } } } }
         : stageEntry ? { kind: 'ENTRY' as const } : {}),
     },
@@ -117,6 +117,7 @@ async function assignSlotCore(
       id: true,
       tournamentId: true,
       kind: true,
+      entryScope: true,
       groupId: true,
       position: true,
       byeSortOrder: true,

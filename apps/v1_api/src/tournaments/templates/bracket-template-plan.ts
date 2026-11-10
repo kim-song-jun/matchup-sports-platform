@@ -10,8 +10,8 @@ export type BracketTemplateInput =
   | ({ kind: 'knockout'; size: number; thirdPlace: boolean } & FlexibleBracketSettings)
   | ({ kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: number; legs: 1 | 2; thirdPlace: boolean; lowerBracket?: boolean; qualificationMode?: 'cross_group_round12' } & FlexibleBracketSettings)
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
-export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: string };
-export type PlanSlot = { key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null; byeSortOrder?: number };
+export type PlanGroup = { stageKey?: string; poolKey?: string; key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: string };
+export type PlanSlot = { entryScope?: string; key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null; byeSortOrder?: number };
 export type PlanFixture = { key: string; groupKey: string; round: string; fixtureNumber: number; legNumber: number; homeSlotKey: string | null; awaySlotKey: string | null };
 export type PlanEdge = { sourceFixtureKey: string; outcome: 'WINNER' | 'LOSER'; targetFixtureKey: string; targetSide: 'HOME' | 'AWAY' };
 export type PlanByeSlot = { groupKey: string; sortOrder: number };

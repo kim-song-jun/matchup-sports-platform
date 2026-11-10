@@ -1,3 +1,4 @@
+import { StageLegacyMutationGuard } from '../stages/stage-legacy-mutation.guard';
 import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
@@ -6,7 +7,7 @@ import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGene
 import { MultiFinalsService } from './multi-finals.service';
 
 @Controller('admin/tournaments/:tournamentId/bracket/multi-finals')
-@UseGuards(V1AuthGuard)
+@UseGuards(V1AuthGuard, StageLegacyMutationGuard)
 export class MultiFinalsController {
   constructor(private readonly finals: MultiFinalsService) {}
   @Get() get(@CurrentUser() user: V1AuthUser, @Param('tournamentId') id: string) { return this.finals.get(user, id); }

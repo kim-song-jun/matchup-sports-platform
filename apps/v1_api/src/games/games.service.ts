@@ -1,3 +1,4 @@
+import { assertStageFixtureReady } from '../tournaments/stages/stage-eligibility';
 import { assertCurrentEventParticipants } from './roster/assert-current-event-participants';
 import {
   ConflictException,
@@ -125,8 +126,15 @@ import type { CancelGameDto, GameCommandDto } from './dto/game-command.dto';
 import type {
   AppendGameEventDto,
   AssignGoalAssistDto,
+  CorrectGameEventTimeDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
+import {
+  foldEventTimeCorrections,
+  isTimeCorrectionEvent,
+  overlayEventTimeCorrections,
+} from './core/event-time-corrections';
+import { appendEventTimeCorrection, syncRevisionEventTimes } from './event-time-correction';
 import type {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
@@ -337,6 +345,10 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     // everywhere it's checked (resolveActor, decideTournamentStaffAccess).
     case 'event_assist_assign':
       return 'event_reverse';
+    // MD-QA #187: 사건 시각 정정도 이미 기록된 사건을 바로잡는 일이라 취소·어시스트와 같은
+    // 권한 묶음이다(팀 매치는 호스트 owner/manager, 대회는 event_reverse 를 가진 스태프).
+    case 'event_time_correct':
+      return 'event_reverse';
     case 'result_revision_create':
     case 'result_revision_submit':
       return 'team_result_submit';
@@ -483,6 +495,7 @@ function toPersistedGameEvent(row: V1GameEvent): PersistedGameEvent {
     receivedAt: row.receivedAt.toISOString(),
     actorUserId: row.actorUserId,
     reversesEventId: row.reversesEventId ?? null,
+    correctsEventId: row.correctsEventId ?? null,
     payload: jsonObject(row.payload),
   };
 }
@@ -1360,20 +1373,22 @@ export class GamesService {
       throw this.notFound();
     }
     const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
+    // MD-QA #187: 공개 응답은 정정 행을 사건으로 내보내지 않고, 원본에 현재 시각을 반영한다.
+    const visibleEvents = foldEventTimeCorrections(game.events);
     const serialized = serializeGameVisibility(
       {
         gameId: game.id,
         state: game.state,
         lineup: game.lineups,
-        liveScore: this.scoreFromEvents(game.events, game.sides),
-        liveEvents: game.events,
+        liveScore: this.scoreFromEvents(visibleEvents, game.sides),
+        liveEvents: visibleEvents,
         // A VOID pointer (voided or discarded result) is not an official result.
         officialScore:
           game.currentOfficialRevision?.state === 'OFFICIAL'
             ? scoreFromJson(game.currentOfficialRevision.score)
             : null,
         officialEvents:
-          game.currentOfficialRevision?.state === 'OFFICIAL' ? game.events : [],
+          game.currentOfficialRevision?.state === 'OFFICIAL' ? visibleEvents : [],
         officialRecords: [],
       },
       {
@@ -1466,6 +1481,7 @@ export class GamesService {
           endingCancelledFixture = teamMatch.status === V1TeamMatchStatus.cancelled;
         }
         if (command === 'start') {
+          if (game.teamMatchId) await assertStageFixtureReady(tx, game.teamMatchId);
           await this.assertTournamentMatchStartable(tx, game);
         }
         assertClockNotDrifted(dto.occurredAt);
@@ -2046,8 +2062,11 @@ export class GamesService {
           }
           expectedSequence = event.sequence + 1;
         }
+        // MD-QA #187: 콘솔 스냅샷은 sequence 연속성으로 누락을 감지하므로 정정 행을 빼지 않는다.
+        // 원본 행의 clockMs 만 가장 최근 정정 시각으로 보여 준다(정정 행이 이전 시각·사유를 갖고 있다).
+        // afterSequence 이후만 읽는 증분 조회는 원본이 범위 밖이라 그대로다 — 클라이언트가 정정 행을 적용한다.
         return {
-          events,
+          events: overlayEventTimeCorrections(events),
           lastSequence: snapshotLastSequence,
           version: game.version,
           state: game.state,
@@ -2365,6 +2384,13 @@ export class GamesService {
         if (target === null) {
           throw this.notFound('GAME_EVENT_NOT_FOUND');
         }
+        // MD-QA #187: 정정 행은 취소할 사건이 아니다. 시각을 되돌리려면 다시 정정한다.
+        if (isTimeCorrectionEvent(target)) {
+          throw new UnprocessableEntityException({
+            code: 'EVENT_NOT_REVERSIBLE',
+            message: '시각 정정 기록은 취소할 수 없어요. 시각을 다시 고쳐 주세요.',
+          });
+        }
         const alreadyReversed = await tx.v1GameEvent.findFirst({
           where: { gameId, reversesEventId: target.id },
           select: { id: true },
@@ -2431,6 +2457,104 @@ export class GamesService {
           replayed: false,
           clientEventId: dto.clientEventId,
           sequence,
+        };
+      },
+    );
+  }
+
+  /**
+   * MD-QA #187 — 확정 전 사건 시각 정정(운영 콘솔 커맨드 경로).
+   *
+   * `reverseEvent` 와 같은 경계(`withCommand`: 경기 행 잠금 · expectedVersion · Idempotency-Key =
+   * clientEventId · 대회 경기는 takeover 토큰 · 감사 기록)를 지난다. 원본은 고치지 않고
+   * TIME_CORRECTION 행을 덧붙인다(`appendEventTimeCorrection`). 점수·카드 수는 타입·선수가 그대로라
+   * 바뀌지 않는다.
+   *
+   * 결과가 이미 OFFICIAL 로 확정됐으면 409 `RESULT_ALREADY_OFFICIAL` — 확정 뒤에는 플랫폼 어드민만
+   * 사유와 함께 고칠 수 있다(`POST /admin/games/:gameId/events/:eventId/correct-time`). 확정 전이지만
+   * 이미 제출(SUBMITTED)된 결과가 있으면 그 골·카드 분 스냅샷이 낡지 않도록 같은 내용의 후속 리비전으로
+   * 다시 제출한다(`syncRevisionEventTimes`, EVENT_TIME_SYNC).
+   */
+  async correctEventTime(
+    user: V1AuthUser,
+    gameId: string,
+    eventId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: CorrectGameEventTimeDto,
+  ): Promise<GameEventAppendResult> {
+    return this.withCommand(
+      {
+        gameId,
+        action: 'event_time_correct',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'event_reverse'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientEventId,
+        takeoverToken: dto.takeoverToken,
+        payload: { eventId, ...dto },
+      },
+      async (tx, game, context) => {
+        this.requireTakeover(game.id, game.sourceType, context);
+        if (game.state === V1GameState.CANCELLED) {
+          throw new ConflictException({
+            code: 'TERMINAL_GAME_IMMUTABLE',
+            message: '취소된 경기는 기록을 바꿀 수 없어요.',
+          });
+        }
+        const pointer = await tx.v1Game.findUnique({
+          where: { id: gameId },
+          select: { currentOfficialRevision: { select: { state: true } } },
+        });
+        if (pointer?.currentOfficialRevision?.state === V1GameResultRevisionState.OFFICIAL) {
+          throw new ConflictException({
+            code: 'RESULT_ALREADY_OFFICIAL',
+            message: '이미 확정된 결과예요. 확정 뒤 시각 정정은 플랫폼 운영자에게 요청해 주세요.',
+          });
+        }
+        const appended = await appendEventTimeCorrection(tx, {
+          gameId,
+          eventId,
+          clockMs: dto.clockMs,
+          reason: dto.reason,
+          lane: 'OPERATOR',
+          clientEventId: dto.clientEventId,
+          payloadHash: context.payloadHash,
+          actorUserId: actorStorageId(context.actor),
+          lastSequence: game.lastSequence,
+          competitionConfigVersionId: game.competitionConfigVersionId,
+        });
+        const submitted = await tx.v1GameResultRevision.findFirst({
+          where: { gameId, state: V1GameResultRevisionState.SUBMITTED, supersededBy: { none: {} } },
+          orderBy: { revision: 'desc' },
+        });
+        const revisionEventTimeSync =
+          submitted === null
+            ? null
+            : await syncRevisionEventTimes(tx, {
+                gameId,
+                base: submitted,
+                reason: '시스템: 사건 시각 정정을 반영해 새 리비전을 제출했어요',
+                createdBy:
+                  context.actor.actorType === 'USER'
+                    ? { actorType: 'USER', userId: context.actor.actorUserId }
+                    : { actorType: 'SYSTEM', systemActor: context.actor.systemActor },
+              });
+        return {
+          gameId,
+          state: appended.state,
+          version: appended.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          clientEventId: dto.clientEventId,
+          sequence: appended.sequence,
+          event: toPersistedGameEvent(appended.correction),
+          eventTimeCorrection: {
+            eventId: appended.target.id,
+            period: appended.target.period,
+            previousClockMs: appended.previousClockMs,
+            clockMs: dto.clockMs,
+          },
+          ...(revisionEventTimeSync === null ? {} : { revisionEventTimeSync }),
         };
       },
     );
@@ -5915,6 +6039,13 @@ export class GamesService {
   ): Promise<{
     substitutionInheritedPlacement?: { position: string | null; positionX: number | null; positionY: number | null };
   }> {
+    // MD-QA #187: 시각 정정은 원본을 가리켜야 하는 행이라 일반 기록 경로로는 받지 않는다.
+    if (dto.type === V1GameEventType.TIME_CORRECTION) {
+      throw new UnprocessableEntityException({
+        code: 'EVENT_INVALID',
+        message: '시각 정정은 사건 시각 정정 API로만 기록할 수 있어요.',
+      });
+    }
     const period = await tx.v1GamePeriod.findFirst({
       where: { gameId: game.id, number: dto.period },
     });
@@ -6136,7 +6267,7 @@ export class GamesService {
     game: LockedGame,
     dto: CreateGameResultRevisionDto,
   ) {
-    const [sides, events, config] = await Promise.all([
+    const [sides, rawEvents, config] = await Promise.all([
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1CompetitionConfigVersion.findUnique({
@@ -6144,6 +6275,8 @@ export class GamesService {
         select: { result: true },
       }),
     ]);
+    // MD-QA #187: 시각 정정 행은 경기 사실이 아니다 — 검증 대상에서 빼고 원본에 시각만 반영한다.
+    const events = foldEventTimeCorrections(rawEvents);
     const reversedIds = new Set(
       events
         .map((event) => event.reversesEventId)
@@ -6292,7 +6425,7 @@ export class GamesService {
       note: null,
     },
   ): Promise<GameRevisionMutationResult> {
-    const [events, participantCandidates, lineups, sides, config] = await Promise.all([
+    const [rawEvents, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameLineup.findMany({
@@ -6315,6 +6448,9 @@ export class GamesService {
     // 리그 결과 입력이 같은 이유로 이미 이 셀렉터를 쓴다. 원래 보호(제출본이 있는
     // 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지 못한다)는 그대로다.
     const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
+    // MD-QA #187: 결과 스냅샷의 골 분은 정정된 시각을 쓴다. eventsHash 는 정정 행까지 포함한
+    // 원본 로그 전체의 지문이라 접기 전 행으로 계산한다(아래).
+    const events = foldEventTimeCorrections(rawEvents);
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
@@ -6393,7 +6529,7 @@ export class GamesService {
               ownGoal: event.type === V1GameEventType.OWN_GOAL,
             })),
         ),
-        eventsHash: canonicalGameCommandPayloadHash(events.map((event) => event.payloadHash)),
+        eventsHash: canonicalGameCommandPayloadHash(rawEvents.map((event) => event.payloadHash)),
         missingScorer,
         createdByActorType: context.actor.actorType,
         createdByUserId:

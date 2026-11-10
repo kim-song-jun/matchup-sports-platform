@@ -177,7 +177,7 @@ allows guests and hydrates a user only when a valid signed session is present.
 Common auth errors: `401 UNAUTHENTICATED`, `403 PERMISSION_DENIED`, `403 SIGNUP_INCOMPLETE` for
 authenticated social sessions that still require terms or profile completion, `403
 ACTIVITY_PROFILE_REQUIRED` for writes by a social user who skipped the profile form (`POST
-/auth/social-profile/defer`; reads stay open), `422
+/auth/social-profile/defer`) or the interest sport (`details.missing` lists what is left; reads stay open), `422
 PROFILE_COMPLETION_REQUIRED` for the creator-profile gate (see [Users](./domains/users.md)).
 
 ## Pagination (Outside The Frozen Command Surface)
@@ -267,3 +267,7 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 ### Qualification display metadata
 Tournament qualification destinations may carry a server-owned colorIndex. Editors round-trip the returned named-final id; colors are persisted independently of labels/order. Existing auth, publication and qualification gates apply (see domains/tournaments.md).
+
+단계형 대회는 `stagePlan`이 있는 신규 정규대회에만 적용된다. 기존 format만으로 엔진을 바꾸지 않는다.
+구조/진출 변경은 대회별 mutation 권한, revision 및 공식 결과 출처 버전을 함께 검증하며 실제 API envelope를 그대로 따른다.
+[단계별 생성·배정 계약](./domains/tournaments.md#단계형-대회-구성-2026-11-09).

@@ -24,7 +24,15 @@ import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-r
 const LEAGUE_ID = 'c1000000-0000-4000-8000-000000000001';
 let firstTournamentWhere: unknown;
 
-function makeGame(id: string, score: { home: number; away: number } | null) {
+function makeGame(
+  id: string,
+  score: { home: number; away: number } | null,
+  outcome: { outcomeReason: string; outcomeNote: string | null; reason: string | null } = {
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
+    reason: null,
+  },
+) {
   return {
     id,
     state: 'ENDED',
@@ -42,8 +50,7 @@ function makeGame(id: string, score: { home: number; away: number } | null) {
             officialAt: new Date('2026-09-05T11:00:00.000Z'),
             score,
             goalEvents: null,
-            outcomeReason: 'NORMAL',
-            outcomeNote: null,
+            ...outcome,
           },
   };
 }
@@ -122,6 +129,28 @@ function buildService(options: {
 }
 
 describe('getSchedule — 정규 리그 갈래', () => {
+  it('몰수 경기의 outcome 은 리그 상세와 같은 값이다 — 운영자 사유 원문은 note 로 나가지 않는다', async () => {
+    const [base] = makeTeamMatches();
+    const rows = [
+      { ...base, id: 'tm-column', game: makeGame('g-column', { home: 1, away: 0 }, { outcomeReason: 'FORFEIT', outcomeNote: '비공개 사유', reason: null }) },
+      {
+        ...base,
+        id: 'tm-marker',
+        startAt: new Date('2026-09-19T10:00:00.000Z'),
+        game: makeGame('g-marker', { home: 1, away: 0 }, { outcomeReason: 'NORMAL', outcomeNote: null, reason: '[LEAGUE_FORFEIT] 비공개 사유' }),
+      },
+      { ...base, id: 'tm-abandoned', startAt: new Date('2026-09-26T10:00:00.000Z'), game: makeGame('g-abandoned', { home: 0, away: 0 }, { outcomeReason: 'ABANDONED', outcomeNote: '비공개 사유', reason: null }) },
+      { ...base, id: 'tm-normal', startAt: new Date('2026-10-03T10:00:00.000Z'), game: makeGame('g-normal', { home: 2, away: 1 }) },
+    ];
+    const result = await buildService({ teamMatches: rows }).getSchedule(LEAGUE_ID, {});
+    const outcomeOf = (id: string) => result.items.find((item) => item.fixtureId === id)?.outcome;
+    expect(outcomeOf('tm-column')).toEqual({ reason: 'FORFEIT', note: null });
+    expect(outcomeOf('tm-marker')).toEqual({ reason: 'FORFEIT', note: null });
+    expect(outcomeOf('tm-abandoned')).toEqual({ reason: 'ABANDONED', note: null });
+    expect(outcomeOf('tm-normal')).toBeNull();
+    expect(JSON.stringify(result.items)).not.toContain('비공개 사유');
+  });
+
   it.each(['SCHEDULED', 'LIVE', 'ENDED'])('취소된 리그 경기는 게임이 %s여도 예정·진행·종료로 되돌리지 않는다', async (state) => {
     const rows = makeTeamMatches();
     rows[0].status = 'cancelled';

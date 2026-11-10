@@ -344,6 +344,19 @@ real public broadcast channel -- not a shorter interval.
 (`components/public-game-records/penalty-scoreline.tsx`), 승부차기가 없는 경기에는
 아무것도 렌더하지 않는다.
 
+### Event time correction marker (MD-QA #187, 2026-11)
+
+- `GET /tournaments/:id/matches/:fixtureId` and the league twin `events[]` carry
+  `timeCorrection: { originalClockMs: number; correctedAt: string | null } | null`.
+  `clockMs` is already the corrected clock; `originalClockMs` is the very first
+  recorded clock (the earliest `TIME_CORRECTION.payload.previousClockMs`) and
+  `correctedAt` is the last correction's `receivedAt`. `null` when the event was
+  never corrected or the corrections ended back at the original clock. `TIME_CORRECTION`
+  rows themselves are never emitted as timeline rows. Official-revision goal rows resolve
+  the marker through the copied event id. The web renders a "정정" badge next to the minute
+  and one "기록 시각 정정 · 옐로카드 한달 11′ → 9′" line in the 결과 변경 이력 section from these
+  rows (names already pass the consent/hiding gates; `status_only` emits no events at all).
+
 ### Scorer timeline/summary addition -- spectator-facing goal identity (2026-08)
 
 Two additions so a spectator (not just the participating teams) can see who
@@ -415,6 +428,12 @@ identity/side itself:
   schema for games ended before that rule existed. The schedule card renders
   only the reason label; the full note is read on the match view, because a
   schedule row is a one-line summary and the note has no length bound.
+
+  **League fixtures** (`/league-matches/:leagueId/fixtures/:id/record` and the league
+  `schedule`) never publish the operator's free-text reason: `note` is always `null`, and a
+  forfeit is recognised by `resolveIsForfeit` (the `FORFEIT` column or the legacy
+  `[LEAGUE_FORFEIT]` reason marker). Both views build `outcome` through the same
+  `presentPublicOutcome`, so the same fixture reports the same value in each.
 
 - `GET /tournaments/:id/matches/:fixtureId` carries `profileHref: string | null` on every
   place a participant is named -- `lineup.home[]`/`lineup.away[]`, `events[]`, and `mvp`.
@@ -520,6 +539,14 @@ row for a final that finished 1:1 with a 3:2 shootout was reported as DRAWN
 while the same match showed WON/LOST in team records. `goals` and the
 scoreline stay regulation-only -- shootout kicks are never added to a
 player's goal count.
+
+### Personal record forfeit flag (2026-11-09)
+
+`GET /users/:id/records` `items[].isForfeit: boolean` is `true` when the game's
+current official result is a forfeit (`resolveIsForfeit`, the same predicate team
+records use). `ABANDONED` is `false`. The row's goals, assists and cards stay the
+real events recorded before the forfeit; the flag lets the client say so next to
+them instead of letting them read as part of the official score.
 
 ### Official goal timeline and minute display (2026-08-19)
 

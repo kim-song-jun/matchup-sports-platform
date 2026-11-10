@@ -211,6 +211,7 @@ export class GameResultStandingsProjectionService {
       select: {
         id: true,
         phase: true,
+        stageKey: true,
         groupTeams: { select: { registrationId: true } },
         tournament: {
           select: {

@@ -600,6 +600,7 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
         started: true,
         goalkeeper: false,
         mvp: true,
+        isForfeit: false,
         officialAt: '2026-08-10T11:00:00.000Z',
       },
     ],

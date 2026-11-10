@@ -114,6 +114,7 @@ function AdminTournamentsPageContent() {
         description="플랫폼 내 모든 대회의 상태를 필터링하고 관리해요."
         action={
           canWrite ? (
+            <div className="flex flex-wrap gap-2">
             <Link
               href="/admin/tournaments/new"
               className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
@@ -124,6 +125,8 @@ function AdminTournamentsPageContent() {
               <Plus size={16} aria-hidden="true" />
               대회 만들기
             </Link>
+            <Link href="/admin/tournaments/new-staged" className="tm-btn tm-btn-md tm-btn-neutral">단계형 대회 만들기</Link>
+            </div>
           ) : undefined
         }
       />

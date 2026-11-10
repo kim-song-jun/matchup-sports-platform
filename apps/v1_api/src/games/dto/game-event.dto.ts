@@ -10,6 +10,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   ValidateIf,
 } from 'class-validator';
@@ -112,6 +113,38 @@ export class ReverseGameEventDto {
 
   @IsString()
   @IsNotEmpty()
+  reason!: string;
+}
+
+/**
+ * MD-QA #187 — 확정 전 운영 콘솔의 사건 시각 정정. 다른 콘솔 커맨드와 같은 경계를 지난다:
+ * `expectedVersion`(낙관적 동시성) · `clientEventId` = `Idempotency-Key` · 대회 경기는 takeover 토큰.
+ * 피리어드는 받지 않는다 — 시각은 원본과 **같은 피리어드 안에서만** 바뀐다. 상한(피리어드 길이·실제
+ * 경과 시간)은 경기마다 달라 서버가 검사한다(`EVENT_CLOCK_OUT_OF_RANGE`).
+ */
+export class CorrectGameEventTimeDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  clientEventId!: string;
+
+  @ValidateIf((_dto, value) => value !== undefined)
+  @IsString()
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
+  takeoverToken?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  clockMs!: number;
+
+  @IsString()
+  @Matches(/\S/, { message: 'reason must contain a non-whitespace character' })
+  @MaxLength(200)
   reason!: string;
 }
 

@@ -43,7 +43,7 @@ import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
-import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible, isValidBirthDateDigits } from '../auth/dto/required-signup-profile.dto';
+import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from '../auth/dto/required-signup-profile.dto';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRecordConsentDto,
@@ -139,7 +139,7 @@ export class ProfileService {
 
   async updateMe(user: V1AuthUser, dto: UpdateProfileDto) {
     this.assertMutableAccount(user);
-    const realName = dto.realName?.trim() || dto.displayName?.trim() || null;
+    const realName = normalizeSignupDisplayName(dto.realName ?? '') || normalizeSignupDisplayName(dto.displayName ?? '') || null;
     const nickname = dto.nickname.trim();
     const emailProvided = dto.email !== undefined;
     const requestedEmail = dto.email?.trim() ? normalizeEmail(dto.email) : null;
@@ -153,6 +153,8 @@ export class ProfileService {
       select: {
         email: true,
         phone: true,
+        phoneVerifiedAt: true,
+        onboardingStatus: true,
         emailVerifiedAt: true,
         authIdentities: {
           where: { status: 'active' },
@@ -180,6 +182,11 @@ export class ProfileService {
 
     if (!nickname || !gender || (hasPassword && !email)) {
       throw validationError('nickname and gender are required; email is required for password accounts', 'profile');
+    }
+
+    // Signup requires a name, so a profile save without one is refused, including for legacy accounts that never had one.
+    if (!realName) {
+      throw validationError('이름을 입력해 주세요. 마이페이지의 프로필 수정에서 입력할 수 있어요.', 'realName');
     }
 
     if (birthDate && !isValidBirthDateDigits(birthDate)) {
@@ -303,6 +310,27 @@ export class ProfileService {
           visibility: 'public',
         },
       });
+
+      // 소셜 가입에서 '나중에 입력'을 고른 계정이 프로필 편집으로 필수 항목을 모두 채우면 보류를 푼다.
+      // 동의 기록은 보류 시점(deferSocialProfile)에 이미 남아 있어 새로 쓰지 않는다.
+      // 같은 순간 /auth/social-profile 이 상태를 바꿨다면 조건부 updateMany 가 0건이라 덮어쓰지 않는다.
+      // 상태는 읽은 뒤 바뀔 수 있어 아래 조건부 updateMany 가 최종 판정한다.
+      const phoneVerifiedAfter = phoneChanged ? (phoneProofRequired ? now : null) : before?.phoneVerifiedAt ?? null;
+      if (before?.onboardingStatus === 'social_profile_deferred' && hasDeferredProfileRequirements({
+        realName: nextProfile.realName,
+        gender: nextProfile.gender,
+        birthDate: nextProfile.birthDate,
+        phone,
+        phoneVerifiedAt: phoneVerifiedAfter,
+      })) {
+        const released = await tx.v1User.updateMany({
+          where: { id: user.id, onboardingStatus: 'social_profile_deferred' },
+          data: { onboardingStatus: 'deferred' },
+        });
+        if (released.count === 1) {
+          this.logger.log(`profile_update_completes_deferred_profile userId=${user.id}`);
+        }
+      }
 
       await writeUserAuditLog(tx, {
         userId: user.id,
@@ -1446,6 +1474,20 @@ function toSettingsNotifications(preferences: {
     noticeEnabled: preferences.noticeEnabled ?? preferences.activityEnabled,
     marketingEnabled: preferences.marketingEnabled,
   };
+}
+
+/** 보류 해제 조건: 이름·성별·생년월일·휴대폰이 모두 있고, 휴대폰 인증 강제 환경에서는 인증까지 끝났어야 한다. */
+function hasDeferredProfileRequirements(input: {
+  realName?: string | null;
+  gender?: string | null;
+  birthDate?: string | null;
+  phone?: string | null;
+  phoneVerifiedAt?: Date | null;
+}) {
+  const filled = [input.realName, input.gender, input.birthDate, input.phone].every(
+    (value) => typeof value === 'string' && value.trim() !== '',
+  );
+  return filled && (!isPhoneVerificationEnforced() || Boolean(input.phoneVerifiedAt));
 }
 
 async function writeUserAuditLog(

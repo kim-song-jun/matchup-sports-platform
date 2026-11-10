@@ -14,23 +14,9 @@ import { useV1PendingTournamentReviews, useV1Reviews } from '@/hooks/use-v1-api'
 const PENDING_SCAN_LIMIT = 50;
 
 /**
- * 마이페이지 상단 — 아직 남은 후기를 한 카드로 모아 안내한다.
- *
- * 후기는 소스가 둘이고 작성 화면도 갈린다:
- *   - 경기 후기(개인 매치·팀매치·대회 경기) → /my/reviews 허브에서 이어서 작성
- *   - 대회 후기                              → /tournaments/:id/awards (허브에 안 뜬다)
- * 예전에는 이 카드가 대회 후기만 알려줘서, 경기 후기는 마이 메뉴의 서브텍스트 한 줄
- * 말고는 유도 수단이 없었다. 총계를 한 번에 보여주고 소스별로 갈 곳을 나눠 준다.
- */
-/**
- * 남은 후기 총계와 첫 대회를 함께 돌려준다.
- *
- * 카드가 자기 데이터를 직접 가져와 0건이면 스스로 사라지는 구조였는데, 홈 배너 상한
- * 정책(Task 154 P2-1)이 생기면서 **부모가 "이 카드가 뜰 것인가"를 미리 알아야** 하게
- * 됐다 -- 안 뜰 카드에 자리를 내주면 그 방문에는 유도 배너가 하나도 안 보인다.
- *
- * 훅으로 떼어 부모와 카드가 같은 값을 쓰게 한다. React Query 가 같은 키를 dedupe 하므로
- * 두 곳에서 불러도 요청은 한 번이다.
+ * 남은 후기 총계와 첫 대회를 함께 돌려준다. 홈은 유도 배너를 하나만 고르므로 카드가 뜰지
+ * 부모가 미리 알아야 한다 — 부모와 카드가 이 훅을 같이 쓰고, React Query 가 같은 키를
+ * 한 번만 요청한다.
  */
 export function usePendingReviewsSummary() {
   const hasSession = hasStoredV1Session();
@@ -50,7 +36,15 @@ export function usePendingReviewsSummary() {
   };
 }
 
-export function PendingReviewsCard() {
+type ReviewAction = { href: string; label: string };
+
+/**
+ * 남은 후기를 한 카드로 모아 안내한다. 작성 화면이 둘이라 CTA 도 둘로 나뉜다:
+ * 경기 후기(개인 매치·팀매치·대회 경기)는 /my/reviews, 대회 후기는 /tournaments/:id/awards(허브에 안 뜬다).
+ * `banner` 는 마이페이지·시상 화면의 파란 안내 카드, `row` 는 홈의 흰 카드 한 줄이다 —
+ * 홈 위쪽에서 다음 경기 카드와 같은 강조를 쓰지 않도록 버튼도 회색으로 낮춘다.
+ */
+export function PendingReviewsCard({ layout = 'banner' }: { layout?: 'banner' | 'row' }) {
   const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
   // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면(받은 출처 포함)으로 돌아오게 한다.
   const pathname = usePathname();
@@ -60,6 +54,54 @@ export function PendingReviewsCard() {
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];
+  // 소스마다 작성 화면이 달라 CTA를 하나로 합칠 수 없다. 둘 다 있으면 둘 다 낸다.
+  const actions = [
+    eventRemaining > 0 ? { href: linkFrom('/my/reviews'), label: `경기 후기 ${eventRemaining}건 쓰기` } : null,
+    firstTournament ? { href: linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`), label: '대회 후기 쓰기' } : null,
+  ].filter((action): action is ReviewAction => action !== null);
+  const sources = describeSources(eventRemaining, tournamentItems.length, firstTournament?.tournamentTitle);
+
+  if (layout === 'row') {
+    const single = actions.length === 1 ? actions[0] : null;
+    return (
+      <Card pad={16} style={{ marginBottom: 16, minWidth: 0 }}>
+        {/* 좁은 폭에서 버튼이 제목을 음절 단위로 밀어내지 않도록, 자리가 모자라면 버튼이 다음 줄로 간다. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span
+            aria-hidden="true"
+            style={{
+              flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-control)', background: 'var(--orange-soft)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Star size={18} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />
+          </span>
+          <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+            <div className="tm-text-label">
+              남은 후기 <span className="tab-num">{total}</span>건
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {sources}
+            </div>
+          </div>
+          {single ? (
+            <Link href={single.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 'auto' }}>
+              {single.label}
+            </Link>
+          ) : null}
+        </div>
+        {single ? null : (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            {actions.map((action) => (
+              <Link key={action.href} href={action.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flex: '1 1 auto', whiteSpace: 'nowrap' }}>
+                {action.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -88,33 +130,24 @@ export function PendingReviewsCard() {
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
-            {describeSources(eventRemaining, tournamentItems.length, firstTournament?.tournamentTitle)}
+            {sources}
           </div>
         </div>
       </div>
 
-      {/* 소스마다 작성 화면이 달라 CTA를 하나로 합칠 수 없다. 둘 다 있으면 두 줄로 나눈다. */}
       <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-        {eventRemaining > 0 ? (
+        {actions.map((action, index) => (
           <Link
-            href={linkFrom('/my/reviews')}
-            className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
-            style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            경기 후기 {eventRemaining}건 쓰기
-          </Link>
-        ) : null}
-        {firstTournament ? (
-          <Link
-            href={linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`)}
+            key={action.href}
+            href={action.href}
             // 배너 배경이 blue500 8% 라 tm-btn-neutral(grey100)은 배경에 묻혀 버튼으로 안 읽힌다.
             // 두 번째 CTA 는 위계를 낮추되 형태는 남아야 하므로 흰 배경 + 테두리로 분리한다.
-            className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-outline' : 'tm-btn-primary'}`}
+            className={`tm-btn tm-btn-sm tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-outline'}`}
             style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            대회 후기 쓰기
+            {action.label}
           </Link>
-        ) : null}
+        ))}
       </div>
     </Card>
   );

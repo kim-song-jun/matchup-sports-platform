@@ -610,7 +610,11 @@ export const gameSchemaSourceManifest = {
   // 2026-11-06: partial unique v1_auth_identities (user_id, provider) WHERE status = 'active' (20261106120000_v1_auth_identity_provider_active_unique); historical game migration unchanged.
   // 2026-11-06: additive V1VerificationPurpose.email_change (20261106180000_v1_verification_purpose_email_change); historical game migration unchanged.
   // 2026-11-08: additive v1_ad_campaigns + v1_ad_campaign_daily_stats and V1ContentAsset.adCampaignId (20261108130000_v1_ad_campaigns); historical game migration unchanged.
-  schema: 'e205dab98105b25eae4555a8404f9cf801d5d733303658911ec706d0062c1418',
+  // 2026-11-09: stagePlan/stage keys/entry scope with legacy-preserving unique replacement; historical game migration unchanged.
+  // 2026-11-10: game domain change (MD-QA #187) — additive V1GameEventType.TIME_CORRECTION and nullable
+  // V1GameEvent.correctsEventId + (game_id, corrects_event_id) index + guard trigger
+  // (20261110090000_v1_game_event_time_correction). Append-only: no existing column changes; historical game migration unchanged.
+  schema: 'd33e16e5c14bdb09c43422a6216a7362bc3ff5c612c7d575e21c57047a3e4836',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

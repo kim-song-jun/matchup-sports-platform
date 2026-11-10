@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -7,6 +7,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
@@ -170,8 +171,9 @@ export class ChangeAdminTermsDocumentStatusDto {
   @IsIn(['published', 'archived'])
   status!: 'published' | 'archived';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }

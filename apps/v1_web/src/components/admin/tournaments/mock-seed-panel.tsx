@@ -33,6 +33,9 @@ export function mockSeedBlockReason(input: Pick<CreateMockTournamentInput, 'form
     return '정규리그+N개 토너먼트는 결선 결과를 채우지 않아 모집중·진행중으로만 만들 수 있어요.';
   }
   const withResults = input.withResults || input.reviewReady || input.status === 'completed';
+  if (input.status === 'open' && withResults) {
+    return '모집중 목업은 경기 결과나 후기 작성 가능 상태로 만들 수 없어요. 상태를 진행중이나 종료로 바꿔 주세요.';
+  }
   if (withResults && (input.format === 'league' || input.format === 'group_knockout') && (input.teamCount ?? 0) > MAX_TEAMS_WITH_RESULTS) {
     return `리그·조별리그+토너먼트는 결과까지 채우면 ${MAX_TEAMS_WITH_RESULTS}팀까지만 만들 수 있어요.`;
   }

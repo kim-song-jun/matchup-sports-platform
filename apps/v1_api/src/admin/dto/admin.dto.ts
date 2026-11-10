@@ -436,13 +436,17 @@ export class ChangeUserStatusDto {
   @IsIn(['active', 'suspended', 'blocked', 'deleted'])
   status!: 'active' | 'suspended' | 'blocked' | 'deleted';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
 
 export class DeleteAdminUserDto {
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -459,7 +463,9 @@ export class ChangeMatchStatusDto {
   @IsIn(['recruiting', 'closed', 'cancelled', 'completed', 'archived'])
   status!: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -468,7 +474,9 @@ export class ChangeTeamStatusDto {
   @IsIn(['active', 'suspended', 'archived'])
   status!: 'active' | 'suspended' | 'archived';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -479,7 +487,9 @@ export class RenameArchivedTeamDto {
   @MaxLength(50)
   name!: string;
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -488,7 +498,9 @@ export class ChangeTeamMatchStatusDto {
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status!: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -533,7 +545,9 @@ export class GrantAdminDto {
   @IsIn(['ops', 'support'])
   adminRole!: 'ops' | 'support';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }
@@ -547,7 +561,9 @@ export class UpdateAdminDto {
   @IsIn(['active', 'revoked'])
   status?: 'active' | 'revoked';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }

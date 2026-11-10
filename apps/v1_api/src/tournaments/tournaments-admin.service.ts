@@ -1,3 +1,5 @@
+import { loadStageView, stagePlanDefinition, type StoredStagePlan } from './stages/stage-view';
+import { validateStagePlan } from './stages/stage-plan';
 import {
   BadRequestException,
   ConflictException,
@@ -289,6 +291,11 @@ export class TournamentsAdminService {
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    if (dto.stagePlan === null) throw new BadRequestException({ code: 'STAGE_PLAN_INVALID', message: '단계 구성을 입력해 주세요.' });
+    if (dto.stagePlan) {
+      validateStagePlan(dto.stagePlan, dto.teamCount ?? 0);
+      if (dto.format !== 'league_knockouts' || dto.sixTeamMode) throw new BadRequestException({ code: 'STAGE_PLAN_INVALID', message: '단계형 대회는 전용 생성 화면에서 만들어 주세요.' });
+    }
     if (dto.teamCount === undefined) {
       throw new BadRequestException({
         code: 'TOURNAMENT_TEAM_COUNT_REQUIRED',
@@ -348,6 +355,7 @@ export class TournamentsAdminService {
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
+          ...(dto.stagePlan ? { stagePlan: JSON.parse(JSON.stringify(dto.stagePlan)), stagePlanRevision: 1 } : {}),
           sportId: dto.sportId,
           title: dto.title,
           competitionConfigVersionId,
@@ -445,6 +453,14 @@ export class TournamentsAdminService {
     if ((dto.format ?? existing.format) !== 'league_knockouts' && (dto.teamCount ?? existing.teamCount) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
     const sixTeamMode = dto.sixTeamMode ?? (existing.sixTeamMode && (dto.teamCount ?? existing.teamCount) === 6 && (dto.format ?? existing.format) === 'knockout');
     if (sixTeamMode && ((dto.teamCount ?? existing.teamCount) !== 6 || (dto.format ?? existing.format) !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 방식은 모집 정원 6팀의 토너먼트에서만 선택할 수 있어요.' });
+    if (dto.stagePlan === null) throw new BadRequestException({ code: 'STAGE_PLAN_INVALID', message: '단계 구성을 제거할 수 없어요.' });
+    const existingPlan = existing.stagePlan as unknown as StoredStagePlan | null;
+    if (existingPlan && (dto.format && dto.format !== existing.format || dto.sixTeamMode)) throw new ConflictException({ code: 'STAGE_PLAN_INVALID', message: '단계형 대회의 생성 방식은 변경할 수 없어요.' });
+    if (dto.stagePlan && !existingPlan) throw new ConflictException({ code: 'STAGE_PLAN_INVALID', message: '기존 대회는 단계형으로 자동 변환하지 않아요.' });
+    const stagePlanChanged = dto.stagePlan !== undefined && JSON.stringify(dto.stagePlan) !== JSON.stringify(stagePlanDefinition(existingPlan));
+    if (dto.stagePlan) validateStagePlan(dto.stagePlan, dto.teamCount ?? existing.teamCount);
+    if (existingPlan && dto.teamCount !== undefined) validateStagePlan(dto.stagePlan ?? existingPlan, dto.teamCount);
+    if (stagePlanChanged && await this.prisma.v1TournamentGroup.count({ where: { tournamentId } })) throw new ConflictException({ code: 'BRACKET_LOCKED', message: '대진 생성 후에는 단계 구성을 바꿀 수 없어요. 기존 경기와 일정을 유지해요.' });
     const formatChanged = dto.format !== undefined && dto.format !== existing.format;
     if (formatChanged) await this.assertFormatChangeAllowed(this.prisma, tournamentId, existing.status);
     // Resending the current order (or the default for an untouched tournament) is not a change, so it never trips the lock.
@@ -580,6 +596,7 @@ export class TournamentsAdminService {
     const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
+    if (stagePlanChanged) { data.stagePlan = JSON.parse(JSON.stringify(dto.stagePlan)); data.stagePlanRevision = { increment: 1 }; }
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
     if (sportChanged) data.competitionConfigVersionId = sportChangeConfigVersionId;
     if (dto.title !== undefined) data.title = dto.title;
@@ -651,7 +668,8 @@ export class TournamentsAdminService {
     await this.prisma.$transaction(async (tx) => {
       // 설정 핀과 일반 필드를 같은 트랜잭션에 둔다. 구조 검사나 CAS가 거부되면
       // 설정 리포인트와 감사 기록까지 함께 롤백되어야 한다.
-      if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged) await lockTournamentForConfigChange(tx, tournamentId);
+      if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged || stagePlanChanged) await lockTournamentForConfigChange(tx, tournamentId);
+      if (stagePlanChanged && await tx.v1TournamentGroup.count({ where: { tournamentId } })) throw new ConflictException({ code: 'BRACKET_LOCKED', message: '대진 생성 후에는 단계 구성을 변경할 수 없어요.' });
       if (formatChanged) await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
       if (tieBreakOrderChanged) {
         // Result confirmation holds its Game row until the OFFICIAL revision commits; wait for it so the check sees that result.
@@ -867,6 +885,11 @@ export class TournamentsAdminService {
             message: '이미 시작했거나 기록·결과가 있는 경기가 있어 접수 마감으로 되돌릴 수 없어요.',
           });
         }
+      }
+      if (existing.stagePlan && to === 'completed') {
+        await lockCompetitionFixtureRows(tx, existing.kind, tournamentId);
+        const stages = await loadStageView(tx, tournamentId, existing.stagePlan as unknown as StoredStagePlan);
+        if (!stages.pools.length || stages.pools.some(pool => !pool.complete || pool.stale)) throw new ConflictException({ code: 'STAGE_RESULTS_INCOMPLETE', message: '모든 단계의 경기 결과와 참가팀 배정을 확인한 뒤 대회를 종료해 주세요.' });
       }
       if (to === 'open') this.assertPaidTournamentPaymentInstructions(existing);
       const alreadyCompletedBefore = to === 'completed' && (await tx.v1StatusChangeLog.count({
@@ -1448,6 +1471,7 @@ export class TournamentsAdminService {
       title: row.title,
       status: row.status,
       format: row.format,
+      ...(row.stagePlan ? { stagePlan: stagePlanDefinition(row.stagePlan as unknown as StoredStagePlan), stagePlanRevision: row.stagePlanRevision } : {}),
       sixTeamBracket: row.sixTeamBracket,
       sixTeamMode: row.sixTeamMode,
       tieBreakOrder: resolveTieBreakOrder(row.tieBreakOrder),

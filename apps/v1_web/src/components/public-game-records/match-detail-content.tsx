@@ -24,6 +24,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { InlineChevronLink } from './inline-chevron-link';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
@@ -212,6 +213,27 @@ function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
           {formatClock(event.clockMs)}
           {isClockAbnormal(event.clockMs) ? <AbnormalClockBadge /> : null}
         </span>
+        {event.timeCorrection ? (
+          /* 기록 시각이 정정된 사건. 색만으로 전하지 않는다 -- "정정" 글자가 항상 함께 나온다. 이전 시각은
+             스크린리더에도 읽히도록 sr-only 로 덧붙인다. */
+          <span
+            className="tm-on-tint"
+            style={{
+              fontSize: 'var(--font-size-micro)',
+              lineHeight: 1.4,
+              padding: '0 4px',
+              borderRadius: 'var(--radius-tight)',
+              fontWeight: 700,
+              color: 'var(--blue700)',
+              background: 'var(--blue50)',
+            }}
+          >
+            정정
+            <span className="sr-only">
+              , 처음 기록은 {formatClock(event.timeCorrection.originalClockMs)}
+            </span>
+          </span>
+        ) : null}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>{event.side === 'away' ? content : null}</div>
     </div>
@@ -221,11 +243,13 @@ function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
 function EventsSection({
   events,
   isStatusOnly,
+  isForfeit,
   from,
   periodCount,
 }: {
   events: readonly PublicMatchEvent[];
   isStatusOnly: boolean;
+  isForfeit: boolean;
   from?: string;
   periodCount?: number | null;
 }) {
@@ -269,40 +293,85 @@ function EventsSection({
       ];
 
   return (
-    <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {groups.map((group) => (
-        <div key={group.id} role="group" aria-labelledby={group.id}>
-          {group.hideLabel ? (
-            <>
-              <span id={group.id} className="sr-only">{group.label}</span>
-              <div aria-hidden="true" style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
-            </>
-          ) : (
-            <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
-              {group.label}
+    <>
+      <ForfeitRecordsCaption isForfeit={isForfeit} hasRecords={events.length > 0} variant="detail" />
+      <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {groups.map((group) => (
+          <div key={group.id} role="group" aria-labelledby={group.id}>
+            {group.hideLabel ? (
+              <>
+                <span id={group.id} className="sr-only">{group.label}</span>
+                <div aria-hidden="true" style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
+              </>
+            ) : (
+              <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
+                {group.label}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {group.events.map((event, index) => (
+                <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
+              ))}
             </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {group.events.map((event, index) => (
-              <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
-            ))}
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
-function HistorySection({ history, isStatusOnly }: { history: PublicMatchDetail['history']; isStatusOnly: boolean }) {
-  if (history.length === 0) return null;
+/**
+ * MD-QA #187 -- 기록 시각이 정정된 사건을 "기록 시각 정정 · 옐로카드 한달 11′ → 9′" 한 줄로 이력에 올린다.
+ * 사건 행이 이미 동의·가림 규칙을 거친 이름을 들고 있어 별도 필드를 만들지 않고 거기서 읽는다.
+ */
+function timeCorrectionLines(events: readonly PublicMatchEvent[]) {
+  return events.flatMap((event, index) => {
+    const correction = event.timeCorrection;
+    if (!correction || event.clockMs === null) return [];
+    return [
+      {
+        key: `${event.type}-${event.sideId}-${index}`,
+        text: `${eventPresentation(event).label} ${presentGameEventParticipantName(event.type, event.participantName)} ${formatClock(correction.originalClockMs)} → ${formatClock(event.clockMs)}`,
+        at: correction.correctedAt,
+      },
+    ];
+  });
+}
+
+function HistorySection({
+  history,
+  events,
+  isStatusOnly,
+}: {
+  history: PublicMatchDetail['history'];
+  events: readonly PublicMatchEvent[];
+  isStatusOnly: boolean;
+}) {
+  const corrections = isStatusOnly ? [] : timeCorrectionLines(events);
+  if (history.length === 0 && corrections.length === 0) return null;
   return (
     <section>
       <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결과 변경 이력</h3>
       <Card pad={0}>
+        {corrections.map((line, index) => (
+          <div
+            key={line.key}
+            style={{ padding: '12px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 'var(--font-size-label)', color: 'var(--text-strong)' }}>
+                <span style={{ fontWeight: 700 }}>기록 시각 정정</span> · {line.text}
+              </span>
+              <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)', flexShrink: 0 }}>
+                {line.at ? formatTournamentDateTimeLong(line.at) : ''}
+              </span>
+            </div>
+          </div>
+        ))}
         {history.map((revision, index) => (
           <div
             key={revision.revision}
-            style={{ padding: '12px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
+            style={{ padding: '12px 16px', borderTop: corrections.length + index > 0 ? '1px solid var(--grey100)' : 'none' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
@@ -481,7 +550,13 @@ export function MatchDetailContent({
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
-          <EventsSection events={data.events} isStatusOnly={isStatusOnly} from={from} periodCount={data.periodCount} />
+          <EventsSection
+            events={data.events}
+            isStatusOnly={isStatusOnly}
+            isForfeit={toDisplayableOutcomeReason(data.outcome?.reason) === 'FORFEIT'}
+            from={from}
+            periodCount={data.periodCount}
+          />
         </Card>
       </section>
 
@@ -494,7 +569,7 @@ export function MatchDetailContent({
         </section>
       ) : null}
 
-      <HistorySection history={data.history} isStatusOnly={isStatusOnly} />
+      <HistorySection history={data.history} events={data.events} isStatusOnly={isStatusOnly} />
 
       {data.nextMatch ? (
         <Link

@@ -1,7 +1,15 @@
 'use client';
 
-import { Handshake, Undo2 } from 'lucide-react';
+import { useId, useState } from 'react';
+import { ChevronDown, Handshake, Pencil, Undo2 } from 'lucide-react';
 import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
+import { formatKstMeridiemTime } from '@/lib/date-utils';
+import {
+  collectEventTimeCorrections,
+  isTimeCorrectableType,
+  isTimeCorrectionRow,
+  type EventTimeCorrectionInfo,
+} from '@/lib/event-time-correction';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodPrefix } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
@@ -74,6 +82,7 @@ export function RecordedEventList({
   sides,
   lineups,
   onAttachAssist,
+  onEditEvent,
   onReverseEvent,
   onReverseSubstitution,
   resultOfficialized,
@@ -91,6 +100,11 @@ export function RecordedEventList({
   /** 정규 피리어드 수. 1이면 기록 시각 앞에 "전반"을 붙이지 않는다. */
   readonly periodCount?: number | null;
   readonly onAttachAssist?: (event: GameEventRecord) => void;
+  /**
+   * MD-QA #187: "수정" — 시각 정정(과 기록 취소)을 한 시트에서 고르는 진입점. 시각을 고칠 수 있는 기록에만
+   * 뜨고, 그렇지 않은 기록(레거시 백필 골 등)은 `onReverseEvent` 의 "수정·취소"로 물러난다.
+   */
+  readonly onEditEvent?: (event: GameEventRecord) => void;
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
    * `GamesService.reverseEvent`(CORRECTION) 를 그대로 호출한다. */
@@ -152,14 +166,20 @@ export function RecordedEventList({
     events.flatMap((event) => (typeof event.reversesEventId === 'string' ? [event.reversesEventId] : [])),
   );
 
-  const orderedEvents = order === 'newest-first' ? [...events].reverse() : events;
+  // MD-QA #187: 시각 정정 행(TIME_CORRECTION)은 목록의 한 줄이 아니라 원본 줄의 "정정됨" 이력이다.
+  const corrections = collectEventTimeCorrections(events);
+  const visibleEvents = events.filter((event) => !isTimeCorrectionRow(event));
+  const orderedEvents = order === 'newest-first' ? [...visibleEvents].reverse() : visibleEvents;
 
   return (
     <ul
       className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
       aria-label="기록된 이벤트 목록"
     >
-      {orderedEvents.map((event) => {
+      {orderedEvents.map((listedEvent) => {
+        const correction = corrections.get(listedEvent.id) ?? null;
+        // 증분 수신 직후엔 원본의 clockMs 가 옛 값일 수 있어 가장 최근 정정 행의 시각을 우선한다.
+        const event = correction === null ? listedEvent : { ...listedEvent, clockMs: correction.currentClockMs };
         const canAttachAssist =
           onAttachAssist !== undefined &&
           resultOfficialized !== true &&
@@ -173,6 +193,12 @@ export function RecordedEventList({
           resultOfficialized !== true &&
           (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
           ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
+          !reversedIds.has(event.id);
+        const canEditTime =
+          onEditEvent !== undefined &&
+          resultOfficialized !== true &&
+          isTimeCorrectableType(event.type) &&
+          !isBackfilledEvent(event.payload) &&
           !reversedIds.has(event.id);
         const isReversed = reversedIds.has(event.id);
         return (
@@ -245,7 +271,18 @@ export function RecordedEventList({
                     어시스트
                   </button>
                 ) : null}
-                {canReverse ? (
+                {canEditTime ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onEditEvent?.(listedEvent)}
+                    aria-label={`기록 수정 (${eventTypeLabel(event)})`}
+                    className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    수정
+                  </button>
+                ) : canReverse ? (
                   <button
                     type="button"
                     disabled={disabled}
@@ -273,11 +310,73 @@ export function RecordedEventList({
                 </span>
               </div>
             </div>
+            {correction !== null ? (
+              <EventTimeCorrectionDisclosure
+                correction={correction}
+                originalLabel={`${periodPrefix(event.period, periodCount)}${formatMatchClock(correction.originalClockMs)}`}
+              />
+            ) : null}
             </div>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function correctionActorLabel(lane: 'OPERATOR' | 'PLATFORM_ADMIN' | null): string {
+  return lane === 'PLATFORM_ADMIN' ? '플랫폼 관리자' : '운영진';
+}
+
+/**
+ * MD-QA #187 — "정정됨" 펼침. 처음 기록 시각과 정정 이력(누가·언제)을 보여 준다.
+ * 44px 터치 타깃, 상태는 `aria-expanded` 와 글자("정정됨")로 전한다 — 색에 기대지 않는다.
+ */
+function EventTimeCorrectionDisclosure({
+  correction,
+  originalLabel,
+}: {
+  readonly correction: EventTimeCorrectionInfo;
+  readonly originalLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+      >
+        정정됨
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open ? (
+        <div id={panelId} className="flex w-full flex-col gap-1 rounded-lg bg-[var(--surface-soft)] px-3 py-2.5">
+          {correction.steps.map((step) => {
+            const when = formatKstMeridiemTime(step.at);
+            return (
+              <p key={`${step.at}-${step.clockMs}`} className="text-[length:var(--font-size-caption)] text-[var(--text-body)]">
+                <span className="font-bold tabular-nums">
+                  {formatMatchClock(step.previousClockMs)} → {formatMatchClock(step.clockMs)}
+                </span>
+                {' · '}
+                {correctionActorLabel(step.lane)}
+                {when !== null ? ` · ${when}` : ''}
+                {step.lane === 'PLATFORM_ADMIN' && step.reason !== null ? ` · 사유: ${step.reason}` : ''}
+              </p>
+            );
+          })}
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">처음 기록: {originalLabel}</p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -305,7 +404,7 @@ function assistSuffix(event: GameEventRecord, playerName: Map<string, string>): 
   return name === undefined ? '' : ` (도움 ${name})`;
 }
 
-function eventTypeLabel(event: GameEventRecord): string {
+export function eventTypeLabel(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
       return '골';
@@ -319,6 +418,8 @@ function eventTypeLabel(event: GameEventRecord): string {
       return '교체';
     case 'CORRECTION':
       return '정정';
+    case 'TIME_CORRECTION':
+      return '시각 정정';
     default:
       return event.type;
   }

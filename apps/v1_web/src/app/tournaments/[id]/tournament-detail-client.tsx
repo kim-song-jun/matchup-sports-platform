@@ -52,7 +52,7 @@ import { CompetitionEntrySection } from '@/components/tournaments/competition-en
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
-import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
+import { competitionFormatLabel, competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import { bracketTrackLabel, orderedBracketTracks } from '@/lib/bracket-track';
 import {
   formatTournamentDateShort,
@@ -99,9 +99,9 @@ function useChildHref() {
   return (path: string) => withFromPath(path, chainFrom);
 }
 
+/** 배지 문구는 대회 진행 방식 섹션과 같은 단일 소스(`competitionFormatLabel`)를 쓴다. */
 function getFormatLabel(competition: V1TournamentDetail): string {
-  if (isLeagueCompetition(competition)) return '리그';
-  return competition.format === 'knockout' ? '토너먼트' : '조별리그 후 토너먼트';
+  return competitionFormatLabel(competition);
 }
 
 /**
@@ -190,6 +190,7 @@ function getGenderQuotaLabel(
  * 히어로가 기존 "대회가 끝났어요" 문구로 안전하게 폴백하도록 한다(과설계 방지).
  */
 export function getCompletedChampionName(tournament: V1TournamentDetail): string | null {
+  if (tournament.stagePlan) return null;
   if (isLeagueCompetition(tournament)) {
     const leagueGroup = tournament.groups.find((g) => g.phase === 'group');
     if (!leagueGroup) return null;
@@ -217,6 +218,7 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 
 /** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
 function getCompletedTrackChampions(tournament: V1TournamentDetail) {
+  if (tournament.stagePlan) return [];
   if (isLeagueCompetition(tournament)) return [];
   const tracks = orderedBracketTracks(tournament.groups);
   if (tracks.length < 2) return [];

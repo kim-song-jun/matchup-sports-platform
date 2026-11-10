@@ -108,6 +108,10 @@ export class MockTournamentSeedService {
     if (format === 'league_knockouts' && status === 'completed') {
       throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '정규리그+N개 토너먼트 목업은 모집중·진행중으로만 만들 수 있어요.' });
     }
+    // 모집중(시작 전) 대회에 경기 결과를 채우면 조별리그는 끝났는데 시상은 '시작 전'으로 나오는 모순된 대회가 생긴다.
+    if (status === 'open' && withResults) {
+      throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '모집중 목업은 경기 결과나 후기 작성 가능 상태로 만들 수 없어요. 상태를 진행중이나 종료로 바꿔 주세요.' });
+    }
     if (withResults && (format === 'league' || format === 'group_knockout') && teamCount > MOCK_SEED_MAX_TEAMS_WITH_RESULTS) {
       throw new BadRequestException({
         code: 'MOCK_SEED_TOO_MANY_RESULTS',

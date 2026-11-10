@@ -61,6 +61,23 @@ export function playerLabel(
   return '선수';
 }
 
+/** 시간 정정 시트 요약 한 줄 — 운영 콘솔·어드민 결과 정정이 같이 쓴다. "선수 · 팀", 비면 `fallback`. */
+export function eventTimeSummary(
+  event: { readonly participantId: string | null; readonly sideId: string | null },
+  sides: readonly Pick<GameSide, 'id' | 'displayNameSnapshot'>[],
+  lineups: readonly GameLineup[],
+  fallback: string,
+): string {
+  return (
+    [
+      event.participantId !== null ? playerLabel(event.participantId, lineups) : null,
+      sides.find((side) => side.id === event.sideId)?.displayNameSnapshot ?? null,
+    ]
+      .filter((part): part is string => part !== null && part.length > 0)
+      .join(' · ') || fallback
+  );
+}
+
 function eventActionNoun(input: Pick<EventCaptureCommitInput, 'type' | 'payload'>): {
   readonly noun: string;
   readonly tone: ConfirmTone;

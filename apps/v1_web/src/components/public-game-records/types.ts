@@ -272,6 +272,16 @@ export interface PublicMatchEvent {
   readonly assist: PublicMatchEventAssist | null;
   readonly period: number | null;
   readonly clockMs: number | null;
+  /**
+   * MD-QA #187: 기록 시각이 정정된 사건이면 처음 기록된 시각과 마지막 정정 시각. `clockMs` 는 이미
+   * 정정된 값이다. 정정이 없거나(`null`) 이 필드가 생기기 전 응답이면 없다.
+   */
+  readonly timeCorrection?: PublicMatchEventTimeCorrection | null;
+}
+
+export interface PublicMatchEventTimeCorrection {
+  readonly originalClockMs: number;
+  readonly correctedAt: string | null;
 }
 
 export interface PublicMatchEventAssist {
@@ -507,6 +517,8 @@ export interface PublicUserRecordItem {
   readonly started: boolean;
   readonly goalkeeper: boolean;
   readonly mvp: boolean;
+  /** 공식 결과가 몰수(FORFEIT)인 경기. 중단(ABANDONED)은 false. */
+  readonly isForfeit: boolean;
   readonly officialAt: string;
 }
 

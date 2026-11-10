@@ -160,7 +160,16 @@ Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc
 - No fake tests: 실제 route/API/action/user-visible contract가 깨져도 통과하는 테스트는 검증으로 인정하지 않는다. 가능한 경우 RED -> GREEN 증거를 남긴다.
 - Minimal validation load: 이 규칙은 코드 분석·수정·리팩토링을 중단시키는 규칙이 아니다. 구현은 계속 진행하고, 변경 계약을 증명하는 가장 좁은 검증을 1회 실행한다. typecheck·build·전체 test·lint 같은 고부하 검증은 커밋 직전 변경 범위에 한해 1회만 실행하며, CI가 수행할 반복 전체 검증을 로컬에서 중복하지 않는다.
 - Host load preflight: 사용자 지시 없이 스스로 고부하 작업(풀스위트·고병렬)을 띄우기 전에 CPU/load, 메모리, Node/브라우저 프로세스 수, Docker·대상 서비스 상태를 확인한다. 실행 시 직렬·최소 worker를 사용하고 내가 만든 프로세스만 정리한다. 사용자가 실행을 지시했으면 호스트 지표를 이유로 멈추지 않는다.
-- Browser QA tool: 기본은 `ego-browser`로 alpha에 실제 로그인해 사용자 흐름을 클릭으로 밟는 것이다. Playwright MCP를 대신 쓸 때는 headed 세션만 쓰고, 시작한 MCP·브라우저의 PID/PPID를 기록해 QA 종료 시 해당 트리만 정리한다. CI 전용 비대화형 브라우저 검증은 이 수명주기 규칙과 별도다.
+- Browser QA tool: 브라우저 검증·QA는 **항상 `ego-browser`(ego-lite)** 로 alpha에 실제 로그인해 사용자 흐름을 클릭으로 밟는다(2026-11-10 사용자 지시 — 전역 지침). Playwright MCP 등 다른 browser-use 도구는 쓰지 않고, 하위 에이전트에게 QA를 맡길 때도 ego-lite 사용을 명시한다. `.codex/qa-rules.md`의 "Headed Playwright MCP only" 절은 충돌하는 옛 지침이므로 이 규칙이 우선한다. MD-QA 보드(`teameet.jmandu.kr/projects/1`) 조회·댓글도 ego-lite로 한다. CI 전용 비대화형 브라우저 검증은 이 규칙과 별도다.
+- Model assignment (병렬 에이전트, 2026-11-10 사용자 지시 — 정본은 `CLAUDE.md` "Agent Team 운영 > 모델 배정"):
+  - 버그 수정·명세가 분명한 기능 → Sonnet 5.5
+  - 분류·라우팅·추출·잔업 → Haiku 5.5
+  - 대화형 → Sonnet 5.5 low/medium
+  - 문서 → Sonnet 5.5 (복잡한 재무 모델 Opus 5.5)
+  - 컴퓨터 사용·이미지 많은 작업(ego-lite QA·목업) → Opus 5.5. 읽기 전용 정적 QA 페르소나(`.claude/agents/qa-*`)는 ego-lite를 구동하지 않으므로 sonnet 유지
+  - 대형 리팩터링·아키텍처·깊은 리서치 → Fable 5.2
+  - 명세가 분명해도 DB 마이그레이션·성능 최적화 → Opus 5.5
+  - Codex 세션은 같은 원칙을 상응하는 모델 티어로 적용한다.
 - Visual verification before completion: UI/레이아웃/반응형/admin surface 변경은 tests pass is not completion이다. alpha 화면 스크린샷, console/network 확인, before/after evidence, viewport별 verdict가 필요하다.
 - Layout rebalance: UI 요소 제거/재배치 뒤에는 spacing, scroll, sticky chrome, focus order, desktop/tablet/mobile 레이아웃을 다시 맞춘다.
 - No scope retreat: `전체`, `모든 라우트`, `모든 페이지`, 고정 agent 수, comprehensive QA 요청은 전체 수를 확정하고 processed M/N으로 보고한다.

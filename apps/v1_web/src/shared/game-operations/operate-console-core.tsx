@@ -42,7 +42,9 @@ import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
-import { RecordedEventList } from './recorded-event-list';
+import { RecordedEventList, eventTypeLabel } from './recorded-event-list';
+import { EventTimeCorrectionSheet } from './event-time-correction-sheet';
+import { collectEventTimeCorrections, eventClockUpperBoundMs } from '@/lib/event-time-correction';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
 import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
@@ -62,6 +64,7 @@ import {
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
+  eventTimeSummary,
   playerLabel,
 } from './confirm-copy';
 import {
@@ -138,6 +141,8 @@ export interface OperateConsoleRuntime {
     retryFailedEvent(clientEventId: string): void;
     requestTakeover(options?: { readonly force?: boolean }): void;
     reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
+    /** MD-QA #187: 시각 정정. 없는 런타임(데모·구형 어댑터)은 "수정"이 기존 "수정·취소"로 물러난다. */
+    correctEventTime?(input: { eventId: string; clockMs: number; reason: string }): Promise<void>;
     assignAssist(input: { eventId: string; assistParticipantId: string | null }): Promise<void>;
     applyCommandResult(result: { state: GameState; version: number }): boolean;
   };
@@ -990,6 +995,8 @@ export function OperateConsoleCore({
 
   const { toasts, showToast, dismiss } = useEventToast();
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
+  // MD-QA #187: "수정" 시트의 대상. 시각 정정과 기록 취소를 한 시트에서 고른다.
+  const [editTarget, setEditTarget] = useState<GameEventRecord | null>(null);
 
   // Copilot review (PR #276): the toast's action.onClick used to close over
   // `ops.liveEvents` from the render that submitted the GOAL -- before the
@@ -2173,6 +2180,7 @@ export function OperateConsoleCore({
           lineups={lineups}
           periodCount={periodCount}
           onAttachAssist={canOperate ? (event) => setAssistTarget({ event }) : undefined}
+          onEditEvent={canOperate && ops.correctEventTime !== undefined ? (event) => setEditTarget(event) : undefined}
           onReverseEvent={canOperate ? (event) => void handleReverseEvent(event) : undefined}
           disabled={commandBlocked}
           resultOfficialized={resultOfficialized}
@@ -2210,6 +2218,30 @@ export function OperateConsoleCore({
           onCancel={() => setPendingAction(null)}
         />
       )}
+      {editTarget !== null && ops.correctEventTime !== undefined ? (
+        <EventTimeCorrectionSheet
+          open
+          mode="operator"
+          title={`${eventTypeLabel(editTarget)} 기록 수정`}
+          summary={eventTimeSummary(editTarget, sides, lineups, eventTypeLabel(editTarget))}
+          periodLabel={periodLabel(editTarget.period, periodCount)}
+          currentClockMs={collectEventTimeCorrections(ops.liveEvents).get(editTarget.id)?.currentClockMs ?? editTarget.clockMs}
+          maxClockMs={eventClockUpperBoundMs({
+            configuredMinutes: gameDetail.data?.periodDurations?.[editTarget.period - 1]?.durationMinutes ?? null,
+            period: gameDetail.data?.periods.find((period) => period.number === editTarget.period) ?? null,
+            nowMs: Date.now(),
+          })}
+          onSubmit={async ({ clockMs, reason }) => {
+            await ops.correctEventTime?.({ eventId: editTarget.id, clockMs, reason });
+          }}
+          onRequestCancelRecord={() => {
+            const target = editTarget;
+            setEditTarget(null);
+            void handleReverseEvent(target);
+          }}
+          onClose={() => setEditTarget(null)}
+        />
+      ) : null}
       {assistTarget ? (
         <AssistPickerSheet
           open

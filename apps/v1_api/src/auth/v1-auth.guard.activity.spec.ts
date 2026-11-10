@@ -3,7 +3,11 @@ import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.servi
 import { V1AuthGuard } from './v1-auth.guard';
 
 describe('V1AuthGuard activity profile gate', () => {
-  const prisma = { v1User: { findFirst: jest.fn() } };
+  const prisma = {
+    v1User: { findFirst: jest.fn() },
+    v1UserSportPreference: { count: jest.fn() },
+    v1AuthIdentity: { findMany: jest.fn() },
+  };
   const managedTerms = { signupCompliance: jest.fn() };
   const guard = new V1AuthGuard(
     prisma as unknown as PrismaService,
@@ -14,6 +18,8 @@ describe('V1AuthGuard activity profile gate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     managedTerms.signupCompliance.mockResolvedValue(compliant);
+    prisma.v1UserSportPreference.count.mockResolvedValue(0);
+    prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'kakao' }]);
   });
 
   describe('social_profile_deferred', () => {
@@ -27,8 +33,17 @@ describe('V1AuthGuard activity profile gate', () => {
       await expect(guard.canActivate(context(method, url))).rejects.toMatchObject({
         response: {
           code: 'ACTIVITY_PROFILE_REQUIRED',
-          details: { next: { route: '/signup/social' } },
+          details: { missing: ['basicProfile', 'interestSport'], next: { route: '/signup/social' } },
         },
+      });
+    });
+
+    it('lists the phone too when it is unverified, and drops the sport once one is chosen', async () => {
+      prisma.v1UserSportPreference.count.mockResolvedValue(2);
+      mockUser({ onboardingStatus: 'social_profile_deferred', phoneVerifiedAt: null });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).rejects.toMatchObject({
+        response: { details: { missing: ['phone', 'basicProfile'], next: { route: '/signup/social' } } },
       });
     });
 
@@ -76,6 +91,47 @@ describe('V1AuthGuard activity profile gate', () => {
       await expect(guard.canActivate(context('POST', '/api/v1/teams'))).rejects.toMatchObject({
         response: { code: 'ACTIVITY_PROFILE_REQUIRED' },
       });
+    });
+  });
+
+  describe('deferred (interest sport skipped)', () => {
+    it('blocks a social account without a sport and sends it to the sport step', async () => {
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).rejects.toMatchObject({
+        response: {
+          code: 'ACTIVITY_PROFILE_REQUIRED',
+          details: { missing: ['interestSport'], next: { route: '/onboarding/sport' } },
+        },
+      });
+    });
+
+    it('lets it through once a sport exists', async () => {
+      prisma.v1UserSportPreference.count.mockResolvedValue(1);
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).resolves.toBe(true);
+    });
+
+    it('does not touch an email signup that skipped onboarding', async () => {
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'email' }]);
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).resolves.toBe(true);
+    });
+
+    it('does not gate an email signup that later linked Kakao', async () => {
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'email' }, { provider: 'kakao' }]);
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('POST', '/api/v1/teams'))).resolves.toBe(true);
+    });
+
+    it('keeps the sport step itself reachable', async () => {
+      mockUser({ onboardingStatus: 'deferred' });
+
+      await expect(guard.canActivate(context('PATCH', '/api/v1/onboarding/preferences'))).resolves.toBe(true);
+      await expect(guard.canActivate(context('GET', '/api/v1/teams'))).resolves.toBe(true);
     });
   });
 

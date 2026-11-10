@@ -970,3 +970,60 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 `PATCH /admin/groups/:groupId`의 `name`은 `league_knockouts`에서도 구조/경기 진행 상태를 바꾸지 않고 수정할 수 있다. 공백 이름은 400 `GROUP_NAME_REQUIRED`, 진출 수 동시 수정은 409 `MULTI_FINAL_SELECTION_REQUIRED`다. 기존 관리자 mutation 권한과 대진 advisory lock·감사 로그를 적용한다. 예선 이름은 `multiFinals.groups[].name`에 원자적으로 동기화하고 이름 변경 시 `multiFinalsRevision`을 증가시켜 기존 진출팀 편집의 revision 검증을 유지한다. 결선 단계 조 이름 변경은 토너먼트 identity/bracketTrack/규칙/팀 배정/시상 범위를 바꾸지 않는다.
 
 새 N개 토너먼트의 강수 생성 규칙은 선행 PR #2181이 담당한다(짝수 6팀 이상, 2의 제곱 제외; 홀수는 기존 명칭 유지). 이 후속 변경에는 생성기 중복 수정을 포함하지 않는다. 12팀의 대진은 내부 round16 구조·4팀 부전승·8강 연결을 유지하면서 표시 round/name만 12강으로 저장한다. 기존 대진의 자동 생성 이름/round는 migration으로 보정하며 운영자 지정 이름과 phase·경기 ID·결과·edge·slot은 보존한다. 사용자 일정·대진·경기 이름은 저장한 그룹 이름을 우선하며 단계 판정은 이름 변경과 분리한다.
+
+## 단계형 대회 구성 (2026-11-09)
+
+기존 생성 형식·데이터는 유지한다. 새 `/admin/tournaments/new-staged` 진입에서만 `stagePlan`을 추가해 생성한다.
+DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은 `stagePlan != null`이다. 이를 기존 N개 토너먼트로 재해석하지 않는다.
+
+### 생성·초안 변경
+- 기존 `POST /admin/tournaments`에 선택 입력 `stagePlan: {version:1, stages:[{key,name,pools:[{key,name,format,capacity,legs,sources:[{poolKey,rank}]}]}]}`.
+- `format=league_knockouts`, `sixTeamMode=false`, 첫 단계 정원 합계=`teamCount`가 필수다. 기존 입력에 `stagePlan`을 자동 추가하지 않는다.
+- 1~8단계, 단계당1~16편성, 편성당2~64팀, 총240경기 이하. 리그1/2회전, 토너먼트는 단판(3·4위전 없음).
+- 첫 단계는 sources=[]이고 참가팀을 직접 배정한다. 이후 단계의 sources는 정원만큼 지정한다.
+  이전 단계의 리그 모든 순위 또는 토너먼트1/2위만 출처로 지원한다. 같은 출처 순위는 같은 대상 단계에서 중복할 수 없다.
+- 단계·편성의 안정 key를 연결에 사용하고 이름은 표시용이다. 동일 단계의 편성 이름과 단계 이름은 각각 중복을 거부한다.
+- 일반 `PATCH /admin/tournaments/:id`의 기존 `expectedVersion` CAS로 대진 생성 전 구성 변경 가능.
+  기존 대회에 stagePlan 추가, stagePlan 제거(null), 생성 후 구조 변경은 거부한다. 같은 구성을 재전송하면 확정 스냅샷을 덮어쓰지 않는다.
+- 관리자 조회에는 단계형 행에만 `stagePlan`(구조 정의)과 `stagePlanRevision`이 추가된다. 원시 확정 사유/내부 스냅샷은 내보내지 않는다.
+
+### 단계별 관리 API
+| 경로 | 계약 |
+|---|---|
+| GET /admin/tournaments/:id/stages | 대회별 admin/director 조회 권한. config, revision, pools, 확정 참가팀 목록 반환 |
+| POST /admin/tournaments/:id/stages/generate | 대회 mutation 권한. `{expectedRevision}`. 미정 대진 전체 생성; 이미 대진이 있으면 거부 |
+| PUT /admin/tournaments/:id/stages/assignment | 대회 mutation 권한. `{expectedRevision,poolKey,registrationIds,sourceVersion,reason?}`. 해당 편성 전체 참가팀만 원자적 확정 |
+
+- 조회 pool: stageKey/stageName/stageIndex, generated/assigned/complete/started/stale, slots,
+  registrationIds, candidates(자리별 가능한 팀), sourceVersion, standings, fixtureIds를 제공한다.
+- 서로 다른 단계에서 동일 참가팀이 다시 참가하는 것은 허용하며, 같은 단계의 편성 간 중복은 거부한다.
+- 이전 편성의 모든 공식 결과가 반영돼야 추천 후보를 반환한다. 동률은 후보 중 선택하고 reason이 필수다.
+  순위 출처 밖의 팀을 고르는 임의 override는 이 버전에서 지원하지 않는다.
+- expectedRevision/sourceVersion으로 409 STAGE_PLAN_STALE, 잘못된 구성/출처/팀은 422 STAGE_PLAN_INVALID,
+  시작/기록 있는 편성은 409 BRACKET_LOCKED, 일반 구조 편집 API를 통한 변경은 409 STAGE_MANAGEMENT_REQUIRED.
+- mutation은 competition advisory lock과 Game 행 순서 잠금으로 직렬화한다. 중복 클릭/구버전 재시도는409이며
+  클라이언트는 GET으로 현재 확정 결과를 확인한다. 성공한 쓰기 결과의 조회도 같은 tx에서 수행한다.
+- 예선 결과 정정은 저장한 참가팀을 자동 교체하지 않는다. sourceVersion이 달라지면 stale로 표시하고
+  시작 전 편성은 최신 후보로 재확정한다. 시작한 편성의 배정은 유지하고 운영자가 정정 영향을 확인한다.
+- 경기 시작은 해당 편성 배정 확정·유효성을 검증하며, 미확정/철회 팀/정정 stale은409 STAGE_ASSIGNMENT_REQUIRED.
+- 대회 종료는 모든 편성의 공식 경기 완료 및 유효 배정을 확인한다. 미완료는409 STAGE_RESULTS_INCOMPLETE.
+- 그룹 순위는 편성별 독립 계산(승점/페어플레이도 해당 편성만). 대회 전체 승점 합산을 최종 순위로 제공하지 않는다.
+- 경기 일정은 기존 PATCH /admin/fixtures/:id를 재사용한다. 단계 순서 및 같은 토너먼트 라운드 순서를 검증한다.
+- 시상 범위는 overall 또는 `stage:<poolKey>`이며 존재하는 편성만 허용한다. 표시명은 단계·편성 이름에서 계산한다.
+
+### 공개·호환·검증
+- 공개 대회 카드에 단계형만 isStaged=true. 공개 상세에 구조 정의 stagePlan 및 공개된 그룹의 stageKey/poolKey가 추가된다.
+  그룹·경기·팀 신원·공식 점수의 기존 공개/개인정보 게이트는 그대로 적용한다.
+- 공개 대진/결과는 단계와 편성으로 분리한다. 전역 우승팀을 예선 결승에서 임의 선택하지 않으며 마지막 단계의 편성별 시상만 표시한다.
+- 기존 TeamMatch/Details/Game과 운영/결과/감사 정본을 재사용한다. 경기 재생성이나 기존 대회 자동 변환은 없다.
+- migration `20261109020000_staged_tournament_composition`: nullable stage_plan, revision,
+  그룹 stage_key/pool_key, 슬롯 entry_scope(default legacy)와 단계별 unique. 기존 행은 기존 scope로 유지한다.
+- 새 단계형 데이터 생성 후에는 이를 모르는 구버전으로의 단순 rollback을 피해야 한다. 복구 시 신규 생성 노출을 닫고
+  stage_plan 데이터 지원 버전을 유지하거나 전진 수정한다. 이미 생성된 데이터의 운영/조회는 숨기지 않는다.
+- API actual-DB fixture: test/tournaments/stage-plan.integration-spec.ts. 웹 MSW 계약은
+  stage-plan-manager.test.tsx의 scoped handlers에서 확정·오류를 검증하며, 실제 규칙/저장은 DB 테스트로 증명한다.
+
+단계형 기능은 Alpha tournament runtime epoch 3을 사용한다. manifest 생성·실제 rollback·실패 후보 복구가 epoch 2 이하 이미지를 호환 대상으로 인정하지 않는다. 기존 대회 데이터는 유지하지만 신규 단계형 데이터를 구버전 API로 운영하는 것을 막는다.
+
+### 시작 후 결과 정정 확인
+`PUT .../stages/assignment`에 `acknowledgeStartedCorrection: true`를 명시하면 시작된 stale 편성의 참가팀을 유지한 채 정정 영향을 확인한다. 기존 자리 순서와 registrationIds가 완전히 같고, 앞 단계 공식 결과가 준비되어 있으며, reason이 있어야 한다. 참가팀·경기·결과는 수정하지 않고 sourceVersion/감사 기록/구성 revision만 갱신한다. reason 누락, 팀 교체, 미시작/비stale 편성, 앞 단계 미확정은422다. 일반 배정은 시작 후 계속409다. 조회 스태프는 사용할 수 없다. 화면의 '현재 참가팀 유지 · 정정 확인'이 이 동작을 수행하며 후속 경기 시작·대회 종료의 영구 차단을 해소한다.

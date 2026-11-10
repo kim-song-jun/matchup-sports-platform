@@ -1,3 +1,4 @@
+import { stagePlanDefinition, type StoredStagePlan } from './stages/stage-view';
 import { parseSixTeamState } from './six-team/six-team-state';
 import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
 import { effectivePublicVisibilityMode, publicFixtureStatus } from '../games/public-records/public-visibility';
@@ -340,6 +341,7 @@ export function presentTournamentDetail(
     // registrationDeadlineAt 이 있는 진짜 대회다). `format === 'league'` 로 정규 리그를
     // 가려내면 그 7건이 신청·참가등록을 잃는다. **종류는 아래 `kind` 를 쓴다.**
     format: row.format,
+    ...(row.stagePlan ? { stagePlan: stagePlanDefinition(row.stagePlan as unknown as StoredStagePlan) } : {}),
     // Regular leagues rank by their own fixed order, so only tournaments carry one.
     tieBreakOrder: row.kind === 'regular_league' ? null : resolveTieBreakOrder(row.tieBreakOrder),
     /**
@@ -462,6 +464,7 @@ export function presentTournamentDetail(
       id: group.id,
       name: group.name,
       phase: group.phase,
+      ...(group.stageKey ? { stageKey: group.stageKey, poolKey: group.poolKey } : {}),
       bracketTrack: group.bracketTrack,
       ...(group.phase !== 'group' && finalColors.has(group.bracketTrack) ? { bracketColorIndex: finalColors.get(group.bracketTrack) } : {}),
       sortOrder: group.sortOrder,

@@ -1,3 +1,4 @@
+import { foldEventTimeCorrectionsInMatchOrder, summarizeEventTimeCorrections } from '../core/event-time-corrections';
 import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { resolveResultCardEvents } from '../core/result-card-events';
 import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
@@ -65,6 +66,7 @@ import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slo
 import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 import { regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
+import { FORFEIT_REASON_MARKER, resolveIsForfeit } from '../../league-matches/league-forfeit-result';
 import { PLACE_SELECT } from '../../places/place-select';
 import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
@@ -79,18 +81,25 @@ const NOT_FOUND = { code: 'TOURNAMENT_MATCH_NOT_FOUND', message: '경기 정보�
 // 리그 대진 공개 기록(getLeagueFixtureRecord)의 404 — 위 NOT_FOUND 와 같은 fail-closed
 // 원칙(존재하지 않는 것과 숨겨진 것을 구분해 주지 않는다)을 리그 도메인 코드로 낸다.
 const LEAGUE_FIXTURE_NOT_FOUND = { code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
-// getLeagueFixtureRecord 전용 — league-match-forfeit.service.ts 가 export 하는
-// `FORFEIT_REASON_MARKER`(값: '[LEAGUE_FORFEIT]')와 **의도적으로 동일한 리터럴을
-// 여기 복제**한다. import 로 그 상수를 끌어오면 이 파일(비인증 공개 read 경로)이
-// `league-match-forfeit.service.ts → GamesService → team-schedules.service.ts` 로
-// 이어지는 거대한 어드민/게임 엔진 mutation 모듈 그래프를 전부 끌고 들어온다 —
-// 문자열 하나 때문에 이 read-only 프로젝션의 컴파일 단위가 그 그래프의 아무 파일
-// (심지어 무관한 팀 일정 모듈)에도 깨질 수 있게 된다(실측: 이 값을 정정 중이던
-// 세션이 team-schedules.service.ts 를 동시에 고치고 있어 그 경유로 ts-jest 컴파일이
-// 막혔다). 값이 바뀌면 두 파일이 갈릴 수 있으나, 그 리스크보다 이 파일의 격리가
-// 더 크다 — 몰수 판정 로직 자체는 다른 파일(league-match-public.service.ts 의
-// isForfeit)도 같은 리터럴을 재사용하는 기존 패턴이다.
-const LEAGUE_FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
+
+type PublicOutcomeRevision = { outcomeReason: string; outcomeNote: string | null; reason: string | null };
+
+/**
+ * 공개 응답의 몰수·중단 표시. 리그는 운영자가 쓴 사유 원문(`outcomeNote`)을 공개하지 않고
+ * 몰수 판정은 `resolveIsForfeit`(컬럼 + 과거 reason 마커)를 따른다. 일정과 상세가 같은 함수를
+ * 지나야 같은 경기가 두 화면에서 다른 사유를 내지 않는다.
+ */
+function presentPublicOutcome(
+  revision: PublicOutcomeRevision,
+  scope: 'tournament' | 'league',
+): { reason: string; note: string | null } | null {
+  if (scope === 'tournament') {
+    return revision.outcomeReason !== 'NORMAL' ? { reason: revision.outcomeReason, note: revision.outcomeNote } : null;
+  }
+  if (revision.outcomeReason !== 'NORMAL') return { reason: revision.outcomeReason, note: null };
+  return resolveIsForfeit(revision) ? { reason: 'FORFEIT', note: null } : null;
+}
+
 // 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
 const PLAYER_RECORDS_LIMIT = 30;
 // 어드민 추천 근거는 상위 후보만 필요하다 — 단 컷오프 지점의 동점자는 끊지 않는다(`takeTopWithTies`).
@@ -830,6 +839,7 @@ export class PublicTournamentRecordsService {
           nameProfileByUserId,
           now,
           hideIdentity && !scopedIdentityFixtureIds.has(fixture.id),
+          'tournament',
         ),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -845,6 +855,7 @@ export class PublicTournamentRecordsService {
           nameProfileByUserId,
           now,
           hideIdentity && !scopedIdentityFixtureIds.has(fixture.id),
+          'tournament',
         ),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -1074,6 +1085,7 @@ export class PublicTournamentRecordsService {
           nameProfileByUserId,
           now,
           hideIdentity,
+          'league',
         ),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -1337,12 +1349,8 @@ export class PublicTournamentRecordsService {
       outcome:
         mode !== 'status_only' &&
         showOfficialResult &&
-        fixture.game?.currentOfficialRevision != null &&
-        fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
-          ? {
-              reason: fixture.game.currentOfficialRevision.outcomeReason,
-              note: fixture.game.currentOfficialRevision.outcomeNote,
-            }
+        fixture.game?.currentOfficialRevision != null
+          ? presentPublicOutcome(fixture.game.currentOfficialRevision, 'tournament')
           : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
       history: history.map((revision) => ({
@@ -1528,7 +1536,7 @@ export class PublicTournamentRecordsService {
     officialParticipants?: readonly { participantId: string; sideId: string; cards: unknown }[],
   ) {
     if (gameId === null) return [];
-    const liveEvents = await this.prisma.v1GameEvent.findMany({
+    const recordedEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId },
       // 타임라인은 입력(append) 순서가 아니라 경기 시각순이어야 한다 -- sequence 는
       // 서버가 이벤트를 "받은" 순서일 뿐 경기 중 실제 발생 순서와 다를 수 있다
@@ -1545,8 +1553,15 @@ export class PublicTournamentRecordsService {
         period: true,
         clockMs: true,
         reversesEventId: true,
+        sequence: true,
+        correctsEventId: true,
+        receivedAt: true,
       },
     });
+    // MD-QA #187: 정정된 사건 시각을 반영하고 시각순을 다시 맞춘다(정정 행 자체는 사건이 아니다).
+    const liveEvents = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
+    // 접기 전에 "처음 기록 시각"을 챙긴다 — 접은 뒤에는 정정 행이 없다. 공개 화면의 "정정" 표시용이다.
+    const timeCorrections = summarizeEventTimeCorrections(recordedEvents);
     // Explicit correction snapshots replace live cards, including deletions.
     const events = officialParticipants === undefined ? liveEvents : [
       ...liveEvents.filter((event) => event.type !== 'CARD'),
@@ -1625,10 +1640,14 @@ export class PublicTournamentRecordsService {
           // (`PublicMatchEvent.clockMs`는 이미 `number | null`이고, 프론트
           // `formatClock`/`isClockAbnormal`도 null을 "표시 없음"으로 다룬다).
           clockMs: 'officialClockMs' in event ? event.officialClockMs : isMinuteUnknown(event.payload) ? null : event.clockMs,
+          timeCorrection: timeCorrections.get(event.id) ?? null,
         };
       })
       .sort(byUnknownLast);
     if (revisionGoals === null) return eventRows;
+    // 공식 리비전 스냅샷은 분 단위(올림)만 저장하므로, 정정된 정확한 시각(예 9:30)은 접힌 사건 시각에서 되찾는다.
+    // 스냅샷 분과 어긋나면(스냅샷이 다른 값으로 확정된 경우) 스냅샷 분을 그대로 쓴다.
+    const liveClockById = new Map(liveEvents.map((live) => [live.id, live.clockMs] as const));
     const revisionRows = revisionGoals.map((event) => {
       const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
       const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
@@ -1652,7 +1671,15 @@ export class PublicTournamentRecordsService {
           ? null
           : presentEventAssist(assistParticipantIdByEventId.get(event.id), assistCtx),
         period: event.period,
-        clockMs: event.minute === null ? null : event.minute * 60000,
+        clockMs:
+          event.minute === null
+            ? null
+            : (() => {
+                const live = liveClockById.get(event.id);
+                return live !== undefined && Math.ceil(live / 60000) === event.minute ? live : event.minute * 60000;
+              })(),
+        // 공식 리비전 스냅샷의 골 id 는 종료 시 복사된 사건 id 라 같은 키로 정정 요약을 찾는다.
+        timeCorrection: timeCorrections.get(event.id) ?? null,
       };
     });
     return [...eventRows, ...revisionRows].sort(byUnknownLast);
@@ -1684,14 +1711,16 @@ export class PublicTournamentRecordsService {
     // 경기에서 GOAL 4행 중 2행이 CORRECTION 으로 취소됐는데 요약에 4개가 다 떴다).
     // 같은 파일의 buildEvents 는 전체를 읽고 *나중에* 타입을 거르는데, 여기만
     // 쿼리에서 걸러 규칙이 갈라졌던 것이다 — buildEvents 와 같은 순서로 맞춘다.
-    const events = await this.prisma.v1GameEvent.findMany({
+    const recordedEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId: { in: gameIds } },
       // buildEvents 와 같은 이유로 시각순 -- sequence 는 tiebreak 용으로만 남긴다.
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       // `payload`는 백필의 `minuteKnown: false` 표식을 읽기 위한 것 -- buildEvents가
       // 이미 같은 이유로 payload를 읽는다. 빠뜨리면 일정 카드에서만 "0′"가 뜬다.
-      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true, payload: true },
+      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true, payload: true, sequence: true, correctsEventId: true },
     });
+    // MD-QA #187: buildEvents 와 같은 규칙 — 정정 시각을 반영해 시각순을 다시 맞춘다.
+    const events = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );
@@ -2039,36 +2068,9 @@ export class PublicTournamentRecordsService {
       mvp,
       // getMatch 와 동일한 게이트 — 공식 결과가 공개된 몰수·중단만 사유를 내보낸다.
       // finding #58: mode !== 'status_only' 도 같은 이유로 함께 요구한다(getMatch 참고).
-      //
-      // getMatch(대회 경로)와 달리 이 리그 경로는 outcomeNote 를 절대 그대로 내보내지
-      // 않는다. 대회의 outcomeReason/outcomeNote 는 처음부터 공개용으로 설계된 채널이지만,
-      // 리그 대진의 이 컬럼을 채우는 유일한 writer 는 league-match-forfeit.service 이고
-      // 그 서비스의 명시 계약은 정반대다: "사유 원문은 공개하지 않는다 — 운영자가 쓴
-      // 자유 텍스트라 그대로 노출하면 내부 메모가 새어 나간다. 읽는 쪽은 boolean 만
-      // 만들고 문자열은 버려야 한다." 그 서비스는 컬럼(outcomeReason='FORFEIT' +
-      // outcomeNote=사유 원문)과 레거시 `[LEAGUE_FORFEIT]` reason 마커 두 채널을 함께
-      // 쓰므로(과거 리비전 호환), 몰수 감지도 두 채널을 모두 인정하되 응답에는 boolean
-      // 만 싣는다 — note 는 항상 null. 사유 원문은 아래 history 매핑에서도 걸러낸다
-      // (같은 발견의 두 증상, 한 커밋으로 함께 해결).
-      //
-      // `.includes` (not `.startsWith`, reason 마커 판정): 몰수 결과가 정정되면 reason 이
-      // `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ...` 로 마커가 앞이 아니게
-      // 바뀐다(league-match-result-entry.service.ts:707-709, 몰수 표식을 정정 후에도
-      // 잃지 않으려는 의도적 설계). isForfeit 배지(league-match-public.service.ts:348)도
-      // 같은 `.includes` 판정을 쓰므로, 순위표·대진 목록의 "몰수" 배지와 이 상세 화면의
-      // 안내가 정정 이후에도 계속 같은 결론을 내야 한다.
       outcome:
         mode !== 'status_only' && showOfficialResult && teamMatch.game?.currentOfficialRevision != null
-          ? teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL' ||
-            (teamMatch.game.currentOfficialRevision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER) ?? false)
-            ? {
-                reason:
-                  teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
-                    ? teamMatch.game.currentOfficialRevision.outcomeReason
-                    : ('FORFEIT' as const),
-                note: null,
-              }
-            : null
+          ? presentPublicOutcome(teamMatch.game.currentOfficialRevision, 'league')
           : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
       history: history.map((revision) => {
@@ -2082,7 +2084,7 @@ export class PublicTournamentRecordsService {
         // 되어 마커가 맨 앞이 아니다 — startsWith 로는 이 경우가 아래 분기로 떨어져
         // 마커만 벗겨진 운영자 원문이 그대로 공개됐다. 바로 위 outcome.isForfeit 판정이
         // 이미 `.includes` 를 쓰고 있어서 같은 파일 안에서 판정 기준이 어긋나 있었다.
-        if (revision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER)) {
+        if (revision.reason?.includes(FORFEIT_REASON_MARKER)) {
           return {
             revision: revision.revision,
             state: revision.state,
@@ -2389,6 +2391,7 @@ function presentScheduleEntry(
   nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
   now: Date,
   hideIdentity: boolean,
+  scope: 'tournament' | 'league',
 ) {
   const policyMode: V1VisibilityMode = fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN';
   const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
@@ -2523,12 +2526,8 @@ function presentScheduleEntry(
     outcome:
       mode !== 'status_only' &&
       showOfficialResult &&
-      fixture.game?.currentOfficialRevision != null &&
-      fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
-        ? {
-            reason: fixture.game.currentOfficialRevision.outcomeReason,
-            note: fixture.game.currentOfficialRevision.outcomeNote,
-          }
+      fixture.game?.currentOfficialRevision != null
+        ? presentPublicOutcome(fixture.game.currentOfficialRevision, scope)
         : null,
     hasVideo: fixture.videos.length > 0,
   };

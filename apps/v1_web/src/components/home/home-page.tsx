@@ -173,7 +173,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
               써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
-            {model.bannerDecision.nudge === 'pendingReviews' ? <PendingReviewsCard /> : null}
+            {model.bannerDecision.nudge === 'pendingReviews' ? <PendingReviewsCard layout="row" /> : null}
           </div>
 
           {/* Greeting + activity stats */}

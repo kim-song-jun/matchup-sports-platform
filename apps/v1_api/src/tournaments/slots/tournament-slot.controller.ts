@@ -1,3 +1,4 @@
+import { StageLegacyMutationGuard } from '../stages/stage-legacy-mutation.guard';
 import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
@@ -7,7 +8,7 @@ import { TournamentSlotService } from './tournament-slot.service';
 
 /** 어드민 전용. 인증은 V1AuthGuard, 쓰기 권한(support 거부)은 서비스의 getMutationAdmin 이 다시 본다. */
 @Controller()
-@UseGuards(V1AuthGuard)
+@UseGuards(V1AuthGuard, StageLegacyMutationGuard)
 export class TournamentSlotController {
   constructor(private readonly slots: TournamentSlotService) {}
 

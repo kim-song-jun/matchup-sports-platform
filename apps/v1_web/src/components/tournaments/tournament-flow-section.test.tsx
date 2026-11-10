@@ -8,6 +8,7 @@ describe('TournamentFlowSection', () => {
     ['league', ['풀리그', '순위 집계', '시상']],
     ['group_knockout', ['조별 리그', '결선 진출', '결선 토너먼트']],
     ['knockout', ['대진 편성', '토너먼트', '결승 · 시상']],
+    ['league_knockouts', ['조별 리그', '토너먼트 배정', '결선 토너먼트']],
   ] as const)('%s는 선택한 방식의 단계만 보여준다', (format, titles) => {
     render(<TournamentFlowSection tournament={{ format, kind: 'regular_tournament' }} />);
     const region = screen.getByRole('region', { name: '대회 진행 방식' });
@@ -21,6 +22,13 @@ describe('TournamentFlowSection', () => {
       expect(screen.queryByText('결선 진출', { exact: true }) !== null).toBe(format === 'group_knockout');
       expect(screen.queryByText('순위 집계', { exact: true }) !== null).toBe(format === 'league');
     }
+  });
+
+  it('정규리그 + N개 토너먼트는 풀리그 안내와 조별 리그 후 토너먼트 라벨을 쓰지 않는다', () => {
+    render(<TournamentFlowSection tournament={{ format: 'league_knockouts', kind: 'regular_tournament' }} />);
+    expect(screen.getByText('정규리그 + N개 토너먼트')).toBeInTheDocument();
+    expect(screen.queryByText('풀리그', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('조별 리그 후 토너먼트')).not.toBeInTheDocument();
   });
 
   it('정규 리그의 기본 format이 group_knockout이어도 리그 안내를 유지한다', () => {

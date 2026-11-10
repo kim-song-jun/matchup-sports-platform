@@ -2,7 +2,7 @@ import { Card } from '@/components/v1-ui/primitives';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import type { V1TournamentDetail } from '@/types/api';
 
-type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format'>;
+type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format' | 'stagePlan'>;
 
 /* ── TournamentFlowSection — explains how the tournament progresses ──
  * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
@@ -10,10 +10,13 @@ type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format'>;
  */
 function tournamentFormatLabel(competition: FlowCompetition): string {
   if (isLeagueCompetition(competition)) return '리그 방식 (풀리그)';
+  if (competition.stagePlan) return '단계형 대회';
+  if (competition.format === 'league_knockouts') return '정규리그 + N개 토너먼트';
   return competition.format === 'knockout' ? '토너먼트 (단판 승부)' : '조별 리그 후 토너먼트';
 }
 
 function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body: string }> {
+  if (competition.stagePlan) return competition.stagePlan.stages.map(stage => ({ title: stage.name, body: stage.pools.map(pool => `${pool.name} · ${pool.capacity}팀 ${pool.format === 'league' ? `풀리그 ${pool.legs}회전` : '토너먼트'}`).join(' / ') }));
   // 정규 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
   // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다. isLeagueCompetition 은
   // format=league 단발 대회도 참이라 쓰면 안 된다 — 단발 대회는 맨 아래 대진표 안내로 가야 한다.
@@ -30,6 +33,13 @@ function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body
       { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
       { title: '결선 진출', body: '각 조 상위 팀이 결선 토너먼트에 올라가요.' },
       { title: '결선 토너먼트', body: '편성된 16강·12강·8강·4강 중 해당하는 단계를 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.' },
+    ];
+  }
+  if (format === 'league_knockouts') {
+    return [
+      { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 순위를 정해요.' },
+      { title: '토너먼트 배정', body: '조별 순위를 바탕으로 팀이 참가할 토너먼트가 정해져요.' },
+      { title: '결선 토너먼트', body: '토너먼트마다 편성된 단계를 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.' },
     ];
   }
   if (format === 'knockout') {

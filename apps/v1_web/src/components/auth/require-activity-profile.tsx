@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { buildActivityProfileHref, currentReturnPath } from '@/lib/activity-profile-required';
+import { activityMissingFromAuthMe, buildActivityGateHref, currentReturnPath } from '@/lib/activity-profile-required';
+import { ActivityGateChecklist } from './activity-gate-checklist';
 import { hasPreviousInAppEntry, markAppInitiatedBack } from '@/lib/navigation-history';
 
 /**
@@ -15,10 +16,11 @@ export function RequireActivityProfile({ title, children }: { title: string; chi
   const router = useRouter();
   const authMe = useV1AuthMe();
 
-  if (authMe.data?.user.onboardingStatus !== 'social_profile_deferred') return <>{children}</>;
+  const missing = activityMissingFromAuthMe(authMe.data);
+  if (missing.length === 0) return <>{children}</>;
 
   const enter = () => {
-    router.push(buildActivityProfileHref(currentReturnPath()));
+    router.push(buildActivityGateHref(currentReturnPath(), missing));
   };
 
   const dismiss = () => {
@@ -33,9 +35,10 @@ export function RequireActivityProfile({ title, children }: { title: string; chi
   return (
     <ConfirmModal
       open
-      title={title}
-      message="이름·생년월일·성별과 휴대폰 인증을 한 번만 입력하면 바로 이어서 할 수 있어요."
-      confirmLabel="정보 입력하기"
+      title={title.replace('정보가 필요해요', `${missing.length}가지가 더 필요해요`)}
+      message="남은 항목만 입력하면 바로 이어서 할 수 있어요."
+      details={<ActivityGateChecklist missing={missing} />}
+      confirmLabel={missing[0] === 'interestSport' ? '관심 종목 고르기' : '정보 입력하기'}
       cancelLabel="다음에 할게요"
       onConfirm={enter}
       onCancel={dismiss}

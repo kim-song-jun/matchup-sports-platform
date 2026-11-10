@@ -4310,9 +4310,13 @@ label.tm-btn:focus-within {
   bottom: 0;
 }
 
-/* 어드민 셸은 앱 틀(가운데 고정 폭)도 하단 탭바도 없다 — 시트·배경이 화면 전체를 덮어야 한다. */
+/* 어드민 셸과 대회 운영 셸(어드민 현장 콘솔 /admin/live 포함)은 앱 틀(가운데 고정 폭)도 하단 탭바도 없다 —
+   시트·배경이 화면 전체를 덮어야 한다. 운영 셸은 .tm-admin-shell 밖에서 앱 틀 안에 마운트되므로 별도 표식을 쓴다. */
 .tm-admin-shell .tm-filter-scrim,
-.tm-admin-shell .tm-filter-layer {
+.tm-admin-shell .tm-filter-layer,
+.tm-fullbleed-sheet-host .tm-filter-scrim,
+.tm-fullbleed-sheet-host .tm-filter-layer {
+  top: 0; /* 데스크톱 규칙(_shell.css)이 걸어 둔 64px 상단 여백도 함께 걷어 낸다 */
   bottom: 0;
   left: 0;
   right: 0;

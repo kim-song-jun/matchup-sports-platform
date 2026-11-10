@@ -410,7 +410,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   // 문서가 스크롤하는 표면이다. Android 앱은 하단 시스템 바 뒤까지 웹을 그리므로 root 한 곳에서만
   // 스크롤 끝에 그 높이(--v1-shell-safe-bottom)를 더한다 — main 여백에 다시 더하면 두 번 쌓인다.
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex pb-[var(--v1-shell-safe-bottom)] [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
+    <div className="tm-fullbleed-sheet-host min-h-screen bg-[var(--surface-soft)] flex pb-[var(--v1-shell-safe-bottom)] [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"

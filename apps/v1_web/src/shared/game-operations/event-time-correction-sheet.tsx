@@ -152,7 +152,7 @@ export function EventTimeCorrectionSheet({
     <BottomSheet open onClose={pending ? () => undefined : onClose} title={title}>
       <div className="flex flex-col gap-3.5 pt-1">
         <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">
+          <p style={{ overflowWrap: 'anywhere' }} className="min-w-0 flex-1 break-keep text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">
             {summary}
           </p>
           {isAdmin ? (

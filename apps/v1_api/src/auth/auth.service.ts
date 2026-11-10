@@ -13,7 +13,6 @@ import {
   normalizeKakaoBirthDate,
   normalizeKakaoNickname,
   readKakaoSignupPrefill,
-  readSocialNicknameSeed,
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
@@ -1054,6 +1053,9 @@ export class AuthService {
       userId,
     );
 
+    // Picked now so the review screen can show the nickname the account will get (shown as read-only, editable later).
+    const autoNickname = await this.resolveAutoNickname(userId, null);
+
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_terms_required' },
@@ -1078,6 +1080,7 @@ export class AuthService {
       const draft = {
         ...draftObject(progress?.draftJson),
         ageConfirmedAt: new Date().toISOString(),
+        autoNickname,
       };
       await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
@@ -1103,8 +1106,20 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
+  /** A random nickname nobody else uses; `preferred` (the one already previewed to the user) wins while it is still free. */
+  private async resolveAutoNickname(userId: string, preferred: string | null): Promise<string> {
+    const isTaken = async (candidate: string) =>
+      Boolean(
+        await this.prisma.v1UserProfile.findFirst({
+          where: { nickname: candidate, deletedAt: null, userId: { not: userId } },
+          select: { id: true },
+        }),
+      );
+    if (preferred && !(await isTaken(preferred))) return preferred;
+    return generateSocialNickname(isTaken);
+  }
+
   async completeSocialProfile(userId: string, dto: SocialProfileDto) {
-    const nickname = dto.nickname.trim();
     const displayName = normalizeSignupDisplayName(dto.realName ?? dto.displayName ?? '');
     const realName = displayName;
     const phone = dto.phone.trim();
@@ -1132,6 +1147,7 @@ export class AuthService {
         onboardingStatus: true,
         createdAt: true,
         updatedAt: true,
+        profile: { select: { nickname: true } },
         onboardingProgress: { select: { draftJson: true } },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
@@ -1188,21 +1204,11 @@ export class AuthService {
       });
     }
 
-    const existingNickname = await this.prisma.v1UserProfile.findFirst({
-      where: {
-        nickname,
-        deletedAt: null,
-        userId: { not: userId },
-      },
-      select: { id: true },
-    });
-
-    if (existingNickname) {
-      throw new ConflictException({
-        code: 'NICKNAME_CONFLICT',
-        message: 'Nickname is already registered',
-      });
-    }
+    // The nickname is never typed in: a deferred account keeps the one it already has (it may have changed it in
+    // the profile), a fresh signup takes the one shown on the review screen unless somebody took it meanwhile.
+    const nickname = wasDeferred && user.profile?.nickname
+      ? user.profile.nickname
+      : await this.resolveAutoNickname(userId, readAutoNickname(user.onboardingProgress?.draftJson));
 
     const kakaoPhone = user.authIdentities.some((identity) => identity.provider === V1AuthProvider.kakao)
       ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)?.phone
@@ -1286,7 +1292,7 @@ export class AuthService {
       await transaction.v1UserProfile.upsert({
         where: { userId },
         update: {
-          nickname,
+          ...(wasDeferred ? {} : { nickname }),
           displayName,
           realName,
           gender: dto.gender,
@@ -1381,14 +1387,7 @@ export class AuthService {
       });
     }
 
-    const nickname = await generateSocialNickname(
-      readSocialNicknameSeed(user.onboardingProgress?.draftJson),
-      async (candidate) =>
-        (await this.prisma.v1UserProfile.findFirst({
-          where: { nickname: candidate, deletedAt: null, userId: { not: userId } },
-          select: { id: true },
-        })) !== null,
-    );
+    const nickname = await this.resolveAutoNickname(userId, readAutoNickname(user.onboardingProgress?.draftJson));
 
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
@@ -1490,9 +1489,14 @@ export class AuthService {
     const socialSignupPrefill = (isPendingSocialSignup(user.onboardingStatus) || user.onboardingStatus === 'social_profile_deferred')
       ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)
       : null;
+    // The nickname picked at the terms step, shown read-only on the review screen while signup is still pending.
+    const socialSignupNickname = isPendingSocialSignup(user.onboardingStatus)
+      ? readAutoNickname(user.onboardingProgress?.draftJson)
+      : null;
 
     return {
       socialSignupPrefill,
+      socialSignupNickname,
       user: {
         id: user.id,
         email: user.email,
@@ -1777,6 +1781,11 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
 
 function phoneConflict() {
   return new ConflictException({ code: 'PHONE_CONFLICT', message: 'Phone is already registered' });
+}
+
+function readAutoNickname(draftJson: unknown): string | null {
+  const value = draftObject(draftJson).autoNickname;
+  return typeof value === 'string' && value.trim().length >= 2 ? value : null;
 }
 
 function draftObject(draftJson: unknown): Prisma.InputJsonObject {

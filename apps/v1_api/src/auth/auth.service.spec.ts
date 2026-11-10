@@ -174,6 +174,9 @@ afterAll(() => {
   else process.env.V1_SESSION_SECRET = savedSessionSecret;
 });
 
+/** adjective + animal + number, e.g. 씩씩한오리너구리4 */
+const NICKNAME_SHAPE = /^[가-힣]+\d{1,4}$/;
+
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof buildPrismaMock>;
@@ -1035,7 +1038,7 @@ describe('AuthService', () => {
       where: { id: 'user-1', onboardingStatus: 'social_terms_required' },
       data: { onboardingStatus: 'social_profile_required' },
     });
-    const ageDraft = { ageConfirmedAt: expect.any(String) };
+    const ageDraft = { ageConfirmedAt: expect.any(String), autoNickname: expect.stringMatching(NICKNAME_SHAPE) };
     expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
       update: { currentStep: 'signup', draftJson: ageDraft },
@@ -1059,7 +1062,7 @@ describe('AuthService', () => {
 
     await service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
 
-    const draft = { kakaoName: '홍길동', kakaoNickname: '새닉네임', ageConfirmedAt: expect.any(String) };
+    const draft = { kakaoName: '홍길동', kakaoNickname: '새닉네임', ageConfirmedAt: expect.any(String), autoNickname: expect.stringMatching(NICKNAME_SHAPE) };
     expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
       update: { currentStep: 'signup', draftJson: draft },
@@ -1093,7 +1096,6 @@ describe('AuthService', () => {
     }
 
     const socialInput = {
-      nickname: '소셜유저',
       gender: 'female' as const,
       displayName: '소셜 유저',
       phone: '01087654321',
@@ -1168,7 +1170,7 @@ describe('AuthService', () => {
   });
 
   describe('Kakao signup without duplicate phone verification', () => {
-    const input = { nickname: '카카오회원', displayName: '회원', phone: '01012345678', gender: 'female' as const, birthDate: '20000229' };
+    const input = { displayName: '회원', phone: '01012345678', gender: 'female' as const, birthDate: '20000229' };
     function arrange(
       draft: Record<string, unknown>,
       provider: V1AuthProvider = V1AuthProvider.kakao,
@@ -1343,7 +1345,6 @@ describe('AuthService', () => {
     prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
     const result = await service.completeSocialProfile('user-1', {
-      nickname: '소셜유저',
       gender: 'female',
       displayName: '  소셜 유저  ',
       phone: '01087654321',
@@ -1356,7 +1357,7 @@ describe('AuthService', () => {
       expect.objectContaining({
         where: { userId: 'user-1' },
         update: {
-          nickname: '소셜유저',
+          nickname: expect.stringMatching(NICKNAME_SHAPE),
           displayName: '소셜 유저',
           realName: '소셜 유저',
           gender: 'female',
@@ -1366,7 +1367,7 @@ describe('AuthService', () => {
         },
         create: {
           userId: 'user-1',
-          nickname: '소셜유저',
+          nickname: expect.stringMatching(NICKNAME_SHAPE),
           displayName: '소셜 유저',
           realName: '소셜 유저',
           gender: 'female',
@@ -1392,7 +1393,6 @@ describe('AuthService', () => {
 
     // When
     const action = service.completeSocialProfile('user-1', {
-      nickname: '소셜유저',
       gender: 'female',
       displayName: '소셜 유저',
       phone: '01087654321',
@@ -1421,7 +1421,6 @@ describe('AuthService', () => {
 
     // When
     const action = service.completeSocialProfile('user-1', {
-      nickname: '소셜유저',
       gender: 'female',
       displayName: '소셜 유저',
       phone: '01087654321',
@@ -1446,7 +1445,6 @@ describe('AuthService', () => {
 
     await expect(
       service.completeSocialProfile('user-1', {
-        nickname: '소셜유저',
         gender: 'female',
         displayName: '소셜 유저',
         phone: '01087654321',
@@ -1483,7 +1481,6 @@ describe('AuthService', () => {
       });
     };
     const socialProfileInput = {
-      nickname: '카카오닉',
       gender: 'female' as const,
       displayName: '소셜 유저',
       phone: '01087654321',
@@ -1517,13 +1514,14 @@ describe('AuthService', () => {
       expect(call.update.draftJson).toEqual({
         kakaoNickname: '카카오닉',
         ageConfirmedAt: expect.any(String),
+        autoNickname: expect.stringMatching(NICKNAME_SHAPE),
       });
       expect(Number.isNaN(Date.parse(call.update.draftJson.ageConfirmedAt))).toBe(false);
     });
 
-    it('deferSocialProfile: 카카오 닉네임으로 프로필을 만들고 social_profile_deferred 로 전이한다', async () => {
+    it('deferSocialProfile: 가입 때 정해 둔 자동 닉네임으로 프로필을 만들고 social_profile_deferred 로 전이한다', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
@@ -1535,8 +1533,8 @@ describe('AuthService', () => {
       });
       expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
-        update: { nickname: '카카오닉', visibility: 'public' },
-        create: { userId: 'user-1', nickname: '카카오닉', visibility: 'public' },
+        update: { nickname: '씩씩한수달3', visibility: 'public' },
+        create: { userId: 'user-1', nickname: '씩씩한수달3', visibility: 'public' },
       });
       expect(result.next).toBeUndefined();
       expect(result.onboarding.status).toBe('social_profile_deferred');
@@ -1546,9 +1544,9 @@ describe('AuthService', () => {
       });
     });
 
-    it('deferSocialProfile: 닉네임이 겹치면 숫자 접미를 붙인다', async () => {
+    it('deferSocialProfile: 정해 둔 닉네임을 그새 누가 쓰면 새 랜덤 닉네임을 만든다 (카카오 닉네임은 쓰지 않는다)', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst
         .mockResolvedValueOnce({ id: 'someone' })
@@ -1557,18 +1555,22 @@ describe('AuthService', () => {
       await service.deferSocialProfile('user-1');
 
       const { create } = prisma.v1UserProfile.upsert.mock.calls[0][0];
-      expect(create.nickname).toMatch(/^카카오닉\d{2}$/);
+      expect(create.nickname).toMatch(NICKNAME_SHAPE);
+      expect(create.nickname).not.toBe('씩씩한수달3');
+      expect(create.nickname).not.toContain('카카오닉');
     });
 
-    it('deferSocialProfile: 시드가 없으면 팀밋사용자 계열 닉네임을 쓴다', async () => {
+    it('deferSocialProfile: 미리 정한 닉네임이 없어도 카카오 이름과 무관한 랜덤 닉네임을 만든다', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
+        .mockResolvedValueOnce(freshProfileRequired())
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
       await service.deferSocialProfile('user-1');
 
-      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].create.nickname).toMatch(/^팀밋사용자\d{6}$/);
+      const { create } = prisma.v1UserProfile.upsert.mock.calls[0][0];
+      expect(create.nickname).toMatch(NICKNAME_SHAPE);
+      expect(create.nickname).not.toContain('카카오닉');
     });
 
     it.each([
@@ -1648,7 +1650,7 @@ describe('AuthService', () => {
       expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
     });
 
-    it('completeSocialProfile: deferred 에서 완료하면 상태가 deferred 로 가고 자기 닉네임은 중복이 아니다', async () => {
+    it('completeSocialProfile: deferred 에서 완료하면 상태가 deferred 로 가고 기존 닉네임을 그대로 둔다', async () => {
       const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
       prisma.v1User.findUnique
         .mockResolvedValueOnce(freshProfileRequired({
@@ -1662,9 +1664,8 @@ describe('AuthService', () => {
 
       await service.completeSocialProfile('user-1', socialProfileInput);
 
-      expect(prisma.v1UserProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({ userId: { not: 'user-1' } }),
-      }));
+      // The deferred account keeps the nickname it already has (it may have changed it); nothing is re-generated.
+      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].update).not.toHaveProperty('nickname');
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_deferred' },
         data: { onboardingStatus: 'deferred', phone: '01087654321', signupEmailLoginRequired: false },

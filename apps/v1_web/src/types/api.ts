@@ -119,6 +119,8 @@ export type V1AuthMe = {
     gender: 'male' | 'female' | null;
     birthDate?: string | null;
   } | null;
+  /** 약관 단계에서 서버가 정해 둔 자동 닉네임 — 가입 진행 중에만 오고, 확인 화면에 읽기 전용으로 보여 준다. */
+  socialSignupNickname?: string | null;
   user: {
     id: string;
     email: string | null;

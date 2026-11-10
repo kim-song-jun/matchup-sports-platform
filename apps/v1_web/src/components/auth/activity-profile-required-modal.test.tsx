@@ -14,7 +14,7 @@ function setLocation(pathname: string, search = '', hash = '') {
   vi.stubGlobal('location', { pathname, search, hash, assign } as unknown as Location);
 }
 
-function stubApiError(code: string) {
+function stubApiError(code: string, details?: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
@@ -25,6 +25,7 @@ function stubApiError(code: string) {
         status: 'error',
         statusCode: 403,
         code,
+        details,
         message: '활동하려면 정보를 먼저 입력해 주세요.',
         timestamp: new Date().toISOString(),
       }),
@@ -55,6 +56,39 @@ describe('ActivityProfileRequiredModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
     expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fmatches%2Fm-1%3Ftab%3Dinfo%23roster');
+  });
+
+  it('서버가 알려 준 남은 항목을 체크리스트로 보여 주고 첫 항목 화면으로 보낸 뒤 원래 화면으로 돌아오게 한다', async () => {
+    setLocation('/teams/new', '?from=home');
+    stubApiError('ACTIVITY_PROFILE_REQUIRED', { missing: ['interestSport'], next: { route: '/onboarding/sport' } });
+    render(<ActivityProfileRequiredModal />);
+
+    await act(async () => {
+      await expect(v1Post('/teams', {})).rejects.toThrow();
+    });
+
+    expect(await screen.findByText('1가지가 더 필요해요')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      '휴대폰 인증완료',
+      '이름·성별·생년월일완료',
+      '관심 종목필요',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: '관심 종목 고르기' }));
+    expect(assign).toHaveBeenCalledWith('/onboarding/sport?redirect=%2Fteams%2Fnew%3Ffrom%3Dhome');
+  });
+
+  it('휴대폰이 먼저 남았으면 정보 입력 화면으로 보낸다', async () => {
+    setLocation('/teams/new');
+    stubApiError('ACTIVITY_PROFILE_REQUIRED', { missing: ['phone', 'basicProfile', 'interestSport'] });
+    render(<ActivityProfileRequiredModal />);
+
+    await act(async () => {
+      await expect(v1Post('/teams', {})).rejects.toThrow();
+    });
+
+    expect(await screen.findByText('3가지가 더 필요해요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
+    expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fteams%2Fnew');
   });
 
   it('다음에 할게요로 닫으면 이동하지 않는다', async () => {

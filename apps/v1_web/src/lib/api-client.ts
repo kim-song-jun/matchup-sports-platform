@@ -11,6 +11,7 @@ import {
 import {
   ACTIVITY_PROFILE_REQUIRED_CODE,
   notifyActivityProfileRequired,
+  parseActivityMissing,
 } from './activity-profile-required';
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -192,7 +193,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
     // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
     if (phoneVerificationRequired) notifyPhoneVerificationRequired();
-    if (activityProfileRequired) notifyActivityProfileRequired();
+    if (activityProfileRequired) notifyActivityProfileRequired({ missing: parseActivityMissing(error.details) });
     throw error;
   }
 

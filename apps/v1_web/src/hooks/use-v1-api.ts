@@ -515,7 +515,6 @@ export function useV1CompleteSocialProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      nickname: string;
       gender: 'male' | 'female';
       realName?: string;
       displayName?: string;

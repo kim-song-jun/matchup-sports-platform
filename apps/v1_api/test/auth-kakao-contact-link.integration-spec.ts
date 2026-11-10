@@ -254,7 +254,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
       acceptedTermsDocumentIds: terms.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
     }).expect(201);
     await request(app.getHttpServer()).post('/api/v1/auth/social-profile').set('x-v1-user-id', id).send({
-      nickname: '카카오번호자동확인', realName: '신규 회원', phone: '01055550993', birthDate: '20000229', gender: 'female',
+      realName: '신규 회원', phone: '01055550993', birthDate: '20000229', gender: 'female',
     }).expect(201);
     const stored = await prisma.v1User.findUniqueOrThrow({ where: { id }, include: { profile: true } });
     expect(stored.phoneVerifiedAt).not.toBeNull();

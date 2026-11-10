@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsString, IsUUID, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsUUID } from 'class-validator';
 import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
 export class SocialTermsDto {
@@ -16,9 +16,5 @@ export class SocialTermsDto {
   acceptedTermsDocumentIds?: string[];
 }
 
-export class SocialProfileDto extends RequiredSignupProfileDto {
-  @IsString()
-  @MinLength(2)
-  nickname!: string;
-
-}
+/** The nickname is generated server-side, so it is not part of this payload (forbidNonWhitelisted rejects it). */
+export class SocialProfileDto extends RequiredSignupProfileDto {}

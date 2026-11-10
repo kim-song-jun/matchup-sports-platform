@@ -177,7 +177,7 @@ allows guests and hydrates a user only when a valid signed session is present.
 Common auth errors: `401 UNAUTHENTICATED`, `403 PERMISSION_DENIED`, `403 SIGNUP_INCOMPLETE` for
 authenticated social sessions that still require terms or profile completion, `403
 ACTIVITY_PROFILE_REQUIRED` for writes by a social user who skipped the profile form (`POST
-/auth/social-profile/defer`; reads stay open), `422
+/auth/social-profile/defer`) or the interest sport (`details.missing` lists what is left; reads stay open), `422
 PROFILE_COMPLETION_REQUIRED` for the creator-profile gate (see [Users](./domains/users.md)).
 
 ## Pagination (Outside The Frozen Command Surface)

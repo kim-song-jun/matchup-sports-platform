@@ -81,10 +81,6 @@ afterEach(() => { cleanup(); client.clear(); server.resetHandlers(); vi.unstubAl
 
 const newSignupPrefill = { name: '김러너', phone: '01087654321', gender: 'female', birthDate: '20000229' } as const;
 async function completeSignup(user: ReturnType<typeof userEvent.setup>) {
-  fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
-  await user.click(screen.getByRole('button', { name: '중복 확인' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-  await user.click(screen.getByRole('button', { name: '다음' }));
   const submit = await screen.findByRole('button', { name: '확인하고 계속' });
   await waitFor(() => expect(submit).toBeEnabled());
   await user.click(submit);
@@ -125,11 +121,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       }),
     );
     const user = openJourney('/signup/social');
-    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
-    await user.click(screen.getByRole('button', { name: '중복 확인' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '다음' }));
-    await user.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await user.click(await screen.findByRole('button', { name: '확인하고 계속' }));
     await user.click(await screen.findByRole('button', { name: /전체 동의/ }));
     await user.click(screen.getByRole('button', { name: '동의하고 계속하기' }));
     await finishOnboarding(user);
@@ -168,7 +160,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     expect(parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY))?.state).toMatch(/^sha256:/);
     if (!oauthState) throw new Error('OAuth state가 실제 버튼에서 저장되지 않았어요.');
     act(() => navigation.replace(`/callback/kakao?code=fixture-code&state=${encodeURIComponent(oauthState)}`));
-    await screen.findByRole('button', { name: '나중에 입력할게요' });
+    await screen.findByRole('button', { name: '확인하고 계속' });
     expect(oauthRequests).toBe(1);
     expect(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)).toBeNull();
     await completeSignup(user);
@@ -190,12 +182,12 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
   it.each(['defer', 'activity'])('%s 성공 응답의 필수 renewal next를 먼저 따르고 query/hash 목적지는 동의 후 소비한다', async (mode) => {
     const destination = '/chat?room=team#latest';
     state.auth = makeAuth(mode === 'defer' ? 'social_profile_required' : 'social_profile_deferred', PENDING, true);
-    state.auth.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    state.auth.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: mode === 'defer' ? null : 'female', birthDate: '20000229' };
     saveStoredV1Session({ userId: PENDING });
     saveRedirectPath(destination);
     const endpoint = mode === 'defer' ? '/auth/social-profile/defer' : '/auth/social-profile';
     server.use(http.post(`*/api/v1${endpoint}`, async ({ request }) => {
-      if (mode === 'activity') expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
+      if (mode === 'activity') expect(await request.json()).toEqual({ displayName: '김러너', phone: '01012345678',
         birthDate: '20000229', gender: 'female' });
       profileRequests += 1;
       state.auth = { ...state.auth, user: { ...state.auth.user, onboardingStatus: mode === 'defer' ? 'social_profile_deferred' : 'deferred' },
@@ -203,11 +195,6 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       return success(authSession(state.auth, '/terms?mode=renewal'));
     }));
     const user = openJourney('/signup/social');
-    if (mode === 'activity') {
-      await screen.findByRole('heading', { name: '어떤 닉네임으로 활동할까요?' });
-      await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
-      await user.click(screen.getByRole('button', { name: '다음' }));
-    }
     const submit = await screen.findByRole('button', { name: mode === 'defer' ? '나중에 입력할게요' : '입력 완료하고 계속하기' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);

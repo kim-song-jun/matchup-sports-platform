@@ -11,6 +11,7 @@ import {
   RenameArchivedTeamDto,
   UpdateAdminDto,
 } from './admin.dto';
+import { ChangeAdminTermsDocumentStatusDto } from './admin-terms.dto';
 
 type Ctor = new () => object;
 
@@ -22,6 +23,8 @@ const cases: Array<[string, Ctor, Record<string, unknown>]> = [
   ['RenameArchivedTeamDto', RenameArchivedTeamDto, { name: '새 이름' }],
   ['ChangeTeamMatchStatusDto', ChangeTeamMatchStatusDto, { status: 'closed' }],
   ['UpdateAdminDto', UpdateAdminDto, { status: 'revoked' }],
+  ['GrantAdminDto', GrantAdminDto, { userId: '3f1c2b9e-6f0a-4c1e-8f4d-1a2b3c4d5e6f', adminRole: 'ops' }],
+  ['ChangeAdminTermsDocumentStatusDto', ChangeAdminTermsDocumentStatusDto, { status: 'published' }],
 ];
 
 describe.each(cases)('%s reason', (_name, Dto, base) => {
@@ -39,12 +42,5 @@ describe.each(cases)('%s reason', (_name, Dto, base) => {
     const { dto, errors } = await check('  운영 사유  ');
     expect(errors).toHaveLength(0);
     expect(dto.reason).toBe('운영 사유');
-  });
-});
-
-describe('GrantAdminDto reason', () => {
-  it('rejects a whitespace-only reason', async () => {
-    const dto = plainToInstance(GrantAdminDto, { userId: 'u1', adminRole: 'ops', reason: '   ' });
-    expect((await validate(dto)).some((e) => e.property === 'reason')).toBe(true);
   });
 });

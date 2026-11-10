@@ -87,3 +87,18 @@ test('shared-tree and review safety rules are enforced', async () => {
     'committed-tree',
   ]);
 });
+
+test('browser QA is ego-lite only and model assignment is documented', async () => {
+  const agents = await readFile('AGENTS.md', 'utf8');
+  const claude = await readFile('CLAUDE.md', 'utf8');
+
+  for (const text of [agents, claude]) {
+    assert.match(text, /항상 `ego-browser`/);
+    assert.match(text, /ego-lite/);
+    assert.match(text, /Opus 5\.5/);
+    assert.match(text, /Fable 5\.2/);
+    assert.match(text, /Haiku 5\.5/);
+  }
+  assert.match(claude, /### 모델 배정/);
+  assert.match(agents, /Model assignment/);
+});

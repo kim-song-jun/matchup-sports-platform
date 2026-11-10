@@ -477,6 +477,21 @@ describe('EmailChangeClient — 프로필 상태', () => {
     expect(calls.request).toEqual([]);
   });
 
+  it.each<[string, string | null]>([['이름이 비어 있는', null], ['이름이 공백뿐인', '   ']])(
+    '%s 옛 계정은 서버가 저장을 거절하므로 인증번호를 받기 전에 프로필 저장부터 안내한다',
+    async (_name, realName) => {
+      profile = withProfile({ realName });
+      renderClient();
+
+      expect(await heading('프로필을 먼저 저장해 주세요')).toBeInTheDocument();
+      expect(screen.getByText(/이름·닉네임·성별이 저장돼 있고/)).toBeInTheDocument();
+      expect(screen.getByText(/비어 있는 정보: 이름/)).toBeInTheDocument();
+      expect(screen.queryByLabelText('이메일')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '프로필로 돌아가기' })).toHaveAttribute('href', PROFILE_EDIT);
+      expect(calls.request).toEqual([]);
+    },
+  );
+
   it('성별이 저장돼 있지 않은 옛 계정은 서버가 저장을 거절하므로 인증번호를 받기 전에 프로필 저장부터 안내한다', async () => {
     profile = { ...STORED_PROFILE, profile: { ...STORED_PROFILE.profile, gender: null } };
     renderClient();

@@ -184,6 +184,11 @@ export class ProfileService {
       throw validationError('nickname and gender are required; email is required for password accounts', 'profile');
     }
 
+    // Signup requires a name, so a profile save without one is refused, including for legacy accounts that never had one.
+    if (!realName) {
+      throw validationError('이름을 입력해 주세요. 마이페이지의 프로필 수정에서 입력할 수 있어요.', 'realName');
+    }
+
     if (birthDate && !isValidBirthDateDigits(birthDate)) {
       throw validationError('Birth date must be a valid YYYYMMDD value', 'birthDate');
     }

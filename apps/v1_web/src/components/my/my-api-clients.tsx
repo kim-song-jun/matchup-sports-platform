@@ -14,7 +14,8 @@ import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitiv
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Check, Lock } from 'lucide-react';
-import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
+import { formatMissingProfileFields, getMissingRequiredProfileFields, hasBlockingMissingField } from '@/lib/profile-required-fields';
+import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits, normalizeSignupDisplayName } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { emailVerifyNudgeTarget } from './email-verify-nudge';
 import { useTheme } from '@/components/providers/theme-provider';
@@ -439,9 +440,10 @@ export function ProfileEditPageClient() {
   const showPhoneVerification =
     phoneDigits.length === 11 && !phoneVerifiedInline && (phoneChanged || accountPhoneUnverified);
   const normalizedNickname = nickname.trim();
+  const normalizedRealName = normalizeSignupDisplayName(realName);
   const nicknameChanged = normalizedNickname !== originalNickname;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || !nicknameVerified || !gender;
+  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || !nicknameVerified || !gender || !normalizedRealName;
   // 이메일 변경 화면으로 가면 이 폼에서 고친 값은 저장되지 않고 사라진다 — 저장된 값과 다른 칸이 있을 때만 먼저 묻는다.
   const storedProfile = profile.data.profile;
   const formDirty = realName.trim() !== (storedProfile.realName ?? '')
@@ -536,6 +538,12 @@ export function ProfileEditPageClient() {
     event.preventDefault();
     setFieldErrors({});
 
+    // 가입(온보딩)에서 필수로 받는 값이라 프로필 수정에서도 비울 수 없다.
+    if (!normalizedRealName) {
+      setFieldErrors({ realName: '이름을 입력해 주세요.' });
+      return;
+    }
+
     if (normalizedNickname.length < 2) {
       setFieldErrors({ nickname: '닉네임은 2자 이상 입력해 주세요.' });
       return;
@@ -574,7 +582,7 @@ export function ProfileEditPageClient() {
 
     try {
       await update.mutateAsync({
-        realName: realName.trim() || null,
+        realName: normalizedRealName,
         nickname: normalizedNickname,
         bio: bio.trim() || null,
         // 이메일은 보내지 않는다 — 서버가 지금 이메일을 그대로 두고, 바꾸려면 새 주소 인증이 필요한 별도 화면을 거친다.
@@ -640,12 +648,17 @@ export function ProfileEditPageClient() {
           />
         ) : null}
         <label className="tm-create-field">
-          <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
+          <span className="tm-text-label">이름</span>
           <input
             className={`tm-input ${fieldErrors.realName ? 'tm-auth-input-error' : ''}`}
             value={realName}
-            onChange={(event) => setRealName(event.target.value)}
+            onChange={(event) => {
+              setRealName(event.target.value);
+              setFieldErrors((current) => ({ ...current, realName: undefined }));
+            }}
             maxLength={40}
+            required
+            aria-required="true"
             aria-invalid={fieldErrors.realName ? true : undefined}
             aria-describedby={fieldErrors.realName ? 'profile-realName-error' : undefined}
           />
@@ -838,7 +851,9 @@ export function ProfileEditPageClient() {
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
-        {!gender ? (
+        {!normalizedRealName ? (
+          <div className="tm-text-micro tm-auth-fixed-reason">이름을 입력해 주세요.</div>
+        ) : !gender ? (
           <div className="tm-text-micro tm-auth-fixed-reason">성별을 선택해 주세요.</div>
         ) : !nicknameVerified ? (
           <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임은 중복 확인 후 저장할 수 있어요.</div>
@@ -1975,6 +1990,8 @@ function PlayerCardPhotoAdjust() {
   const update = useV1UpdateProfile();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 이름·성별이 없는 기존 계정은 서버가 프로필 저장을 거절한다 -- 올리기 전에 막고, 비어 있는 필수 정보를 모두 알리며 프로필 수정으로 안내한다.
+  const [missingFields, setMissingFields] = useState<ReturnType<typeof getMissingRequiredProfileFields>>([]);
 
   const current = profile.data?.profile.profileImageUrl ?? null;
   const pending = uploadImages.isPending || update.isPending;
@@ -1983,13 +2000,15 @@ function PlayerCardPhotoAdjust() {
     const data = profile.data;
     if (!data) return;
     setError(null);
-    // 서버 저장 API 는 성별이 필수다. 아직 성별을 고르지 않은(legacy) 계정에서 사진만 바꾸자고
+    const missing = getMissingRequiredProfileFields(data);
+    setMissingFields(missing);
+    // 서버 저장 API 는 이름·성별이 필수다. 아직 비어 있는(legacy) 계정에서 사진만 바꾸자고
     // 임의의 값을 채워 보내면 개인정보를 조용히 바꾸는 셈이다 -- 프로필 수정으로 안내하고 멈춘다.
-    if (data.profile.gender !== 'male' && data.profile.gender !== 'female') {
-      setError('프로필 수정에서 성별을 먼저 골라 주세요. 그 다음 사진 위치를 맞출 수 있어요.');
+    if (hasBlockingMissingField(missing) || (data.profile.gender !== 'male' && data.profile.gender !== 'female')) {
       setOpen(false);
       return;
     }
+    setMissingFields([]);
     try {
       const uploaded = await uploadImages.mutateAsync([file]);
       const nextUrl = uploaded.urls[0];
@@ -2017,6 +2036,15 @@ function PlayerCardPhotoAdjust() {
   return (
     <section style={{ marginTop: 16 }}>
       <div className="tm-my-section-label">사진</div>
+      {missingFields.length > 0 ? (
+        <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>필수 정보를 먼저 입력해 주세요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>비어 있는 정보: {formatMissingProfileFields(missingFields)}. 프로필에 필수 정보가 있어야 사진을 저장할 수 있어요.</div>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral" style={{ marginTop: 12 }} href={withFromPath('/my/profile/edit', source)}>
+            프로필 수정으로 가기
+          </Link>
+        </Card>
+      ) : null}
       {error ? (
         <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
           <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
@@ -2031,6 +2059,7 @@ function PlayerCardPhotoAdjust() {
             disabled={profile.isLoading || pending}
             onClick={() => {
               setError(null);
+              setMissingFields([]);
               setOpen(true);
             }}
             style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}

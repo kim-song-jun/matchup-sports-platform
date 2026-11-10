@@ -26,6 +26,7 @@ import {
 import { EMAIL_SEND_UNAVAILABLE_CODE, RECENT_LOGIN_REQUIRED_CODE } from '@/lib/auth-link-errors';
 import { emailChangePath, parseEmailChangeReturnTo } from '@/lib/email-change-path';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { formatMissingProfileFields, getMissingRequiredProfileFields } from '@/lib/profile-required-fields';
 import { getLoginPathForRedirect } from '@/lib/session-storage';
 import type { V1Profile } from '@/types/api';
 import { EmailLinkInterruptionView } from './email-link-interruption';
@@ -47,7 +48,7 @@ const LOGIN_ID_NOTE = '이 이메일은 로그인에도 쓰여요. 바꾸면 다
 
 /**
  * 프로필 저장(`PATCH /me/profile`)은 보내지 않은 칸을 비운다(이메일·소개 제외). 이메일만 바꿔도 나머지는 서버에 저장된 값 그대로 다시 보낸다.
- * 서버가 저장을 거절할 값(성별·닉네임이 없거나, 생년월일·휴대폰 번호·길이가 `UpdateProfileDto` 규칙에 어긋남)이 저장돼 있으면 `null` 을 돌려준다 —
+ * 서버가 저장을 거절할 값(이름·성별·닉네임이 없거나, 생년월일·휴대폰 번호·길이가 `UpdateProfileDto` 규칙에 어긋남)이 저장돼 있으면 `null` 을 돌려준다 —
  * 그대로 시작하면 인증번호만 쓰고 마지막 저장에서 막히고, 같은 증명으로 다시 해도 같은 이유로 실패한다.
  */
 function profileSavePayload(data: V1Profile) {
@@ -57,8 +58,8 @@ function profileSavePayload(data: V1Profile) {
   const bio = profile.bio?.trim() || null;
   const phone = data.phone || null;
   const birthDate = normalizeSeparatedDigits(profile.birthDate ?? '') || null;
-  if (!profile.gender || nickname.length < NICKNAME_MIN_LENGTH || nickname.length > NICKNAME_MAX_LENGTH) return null;
-  if ((realName?.length ?? 0) > REAL_NAME_MAX_LENGTH || (bio?.length ?? 0) > BIO_MAX_LENGTH) return null;
+  if (!realName || !profile.gender || nickname.length < NICKNAME_MIN_LENGTH || nickname.length > NICKNAME_MAX_LENGTH) return null;
+  if (realName.length > REAL_NAME_MAX_LENGTH || (bio?.length ?? 0) > BIO_MAX_LENGTH) return null;
   if (phone !== null && !/^\d{11}$/.test(phone)) return null;
   if (birthDate !== null && !isValidBirthDateDigits(birthDate)) return null;
   return {
@@ -94,11 +95,11 @@ export function EmailChangeClient() {
     );
   }
   const savePayload = profileSavePayload(profile.data);
-  if (!savePayload) return <ProfileIncompleteView returnTo={returnTo} />;
+  if (!savePayload) return <ProfileIncompleteView returnTo={returnTo} missing={getMissingRequiredProfileFields(profile.data)} />;
   return <EmailChangeFlow profile={profile.data} savePayload={savePayload} returnTo={returnTo} />;
 }
 
-function ProfileIncompleteView({ returnTo }: { returnTo: string }) {
+function ProfileIncompleteView({ returnTo, missing }: { returnTo: string; missing: ReturnType<typeof getMissingRequiredProfileFields> }) {
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
@@ -110,7 +111,8 @@ function ProfileIncompleteView({ returnTo }: { returnTo: string }) {
       <div className="tm-auth-body">
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">프로필을 먼저 저장해 주세요</h1>
-          <p className="tm-text-body tm-auth-sub">이메일을 바꾸려면 닉네임·성별이 저장돼 있고 생년월일·휴대폰 번호가 올바르게 입력돼 있어야 해요. 프로필 수정에서 확인해 저장한 뒤 다시 시도해 주세요.</p>
+          <p className="tm-text-body tm-auth-sub">이메일을 바꾸려면 이름·닉네임·성별이 저장돼 있고 생년월일·휴대폰 번호가 올바르게 입력돼 있어야 해요. 프로필 수정에서 확인해 저장한 뒤 다시 시도해 주세요.</p>
+          {missing.length > 0 ? <p className="tm-text-body tm-auth-sub">비어 있는 정보: {formatMissingProfileFields(missing)}</p> : null}
         </div>
       </div>
     </AuthFrame>

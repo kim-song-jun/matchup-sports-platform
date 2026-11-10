@@ -464,7 +464,7 @@ export function GameResultCorrectionPanel({
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 정정</p>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-            골·카드·파울·교체가 기록된 시각만 고쳐요. 점수와 카드 수는 바뀌지 않고, 공개 화면과 결과 변경 이력에 남아요.
+            골·카드·파울·교체가 기록된 시각만 고쳐요. 점수와 카드 수는 바뀌지 않아요. 골·카드는 공개 화면과 결과 변경 이력에도 남아요.
           </p>
           {eventsQuery.isPending ? (
             <AdminListSkeleton rows={2} />

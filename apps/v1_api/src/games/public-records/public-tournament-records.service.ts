@@ -1645,6 +1645,9 @@ export class PublicTournamentRecordsService {
       })
       .sort(byUnknownLast);
     if (revisionGoals === null) return eventRows;
+    // 공식 리비전 스냅샷은 분 단위(올림)만 저장하므로, 정정된 정확한 시각(예 9:30)은 접힌 사건 시각에서 되찾는다.
+    // 스냅샷 분과 어긋나면(스냅샷이 다른 값으로 확정된 경우) 스냅샷 분을 그대로 쓴다.
+    const liveClockById = new Map(liveEvents.map((live) => [live.id, live.clockMs] as const));
     const revisionRows = revisionGoals.map((event) => {
       const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
       const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
@@ -1668,7 +1671,13 @@ export class PublicTournamentRecordsService {
           ? null
           : presentEventAssist(assistParticipantIdByEventId.get(event.id), assistCtx),
         period: event.period,
-        clockMs: event.minute === null ? null : event.minute * 60000,
+        clockMs:
+          event.minute === null
+            ? null
+            : (() => {
+                const live = liveClockById.get(event.id);
+                return live !== undefined && Math.ceil(live / 60000) === event.minute ? live : event.minute * 60000;
+              })(),
         // 공식 리비전 스냅샷의 골 id 는 종료 시 복사된 사건 id 라 같은 키로 정정 요약을 찾는다.
         timeCorrection: timeCorrections.get(event.id) ?? null,
       };

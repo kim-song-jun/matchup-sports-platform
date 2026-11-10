@@ -163,17 +163,21 @@ export class V1AuthGuard implements CanActivate {
   }
 
   private async activityMissingItems(user: { id: string; onboardingStatus: string; phoneVerifiedAt: Date | null }) {
-    const [sportCount, socialIdentityCount] = await Promise.all([
-      this.prisma.v1UserSportPreference.count({ where: { userId: user.id } }),
-      this.prisma.v1AuthIdentity.count({
-        where: { userId: user.id, status: 'active', provider: { in: ['kakao', 'apple'] } },
-      }),
-    ]);
+    const profileDeferred = user.onboardingStatus === 'social_profile_deferred';
+    if (!profileDeferred && user.onboardingStatus !== 'deferred') return [];
+    // social_profile_deferred is social by definition; 'deferred' needs the identity check first.
+    const hasSocialIdentity = profileDeferred
+      ? true
+      : (await this.prisma.v1AuthIdentity.count({
+          where: { userId: user.id, status: 'active', provider: { in: ['kakao', 'apple'] } },
+        })) > 0;
+    if (!hasSocialIdentity) return [];
+    const sportCount = await this.prisma.v1UserSportPreference.count({ where: { userId: user.id } });
     return listActivityMissingItems({
       onboardingStatus: user.onboardingStatus,
       phoneVerified: Boolean(user.phoneVerifiedAt),
       hasInterestSport: sportCount > 0,
-      hasSocialIdentity: socialIdentityCount > 0,
+      hasSocialIdentity,
     });
   }
 }

@@ -343,7 +343,8 @@ describe('after result confirmation', () => {
 
     const match = await publicRecords.getMatch(ids.tournament, ids.fixture, undefined);
     const goal = match.events.find((event) => event.type === 'GOAL');
-    expect(goal?.clockMs).toBe(minute(correctedGoal) * 60_000);
+    // 공식 스냅샷은 분(올림)만 저장하지만 공개 행은 정정된 정확한 시각을 싣는다.
+    expect(goal?.clockMs).toBe(correctedGoal);
     const cardRow = match.events.find((event) => event.type === 'CARD');
     expect(cardRow?.clockMs).toBe(Math.floor(periodOneMs * 0.1));
     expect(match.events.some((event) => (event.type as string) === 'TIME_CORRECTION')).toBe(false);

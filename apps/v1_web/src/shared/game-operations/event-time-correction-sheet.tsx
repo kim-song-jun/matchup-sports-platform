@@ -79,6 +79,7 @@ export function EventTimeCorrectionSheet({
   const [reason, setReason] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const draftMessageId = useId();
   const typedInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
@@ -236,6 +237,7 @@ export function EventTimeCorrectionSheet({
                       maxLength={6}
                       aria-label="정정할 시각 숫자로 입력 (예: 930은 9분 30초)"
                       aria-invalid={draftInvalid}
+                      aria-describedby={draftMessageId}
                       placeholder={formatMatchClock(clockMs)}
                       onChange={(event) => {
                         setDraft(event.target.value.replace(/\D/g, ''));
@@ -251,6 +253,7 @@ export function EventTimeCorrectionSheet({
                       className="h-14 w-40 rounded-xl border border-[var(--blue500)] bg-[var(--card-surface)] text-center text-[length:var(--font-size-heading)] font-extrabold tabular-nums text-[var(--text-strong)] outline-none"
                     />
                     <span
+                      id={draftMessageId}
                       className={`text-[length:var(--font-size-caption)] ${draftInvalid ? 'font-semibold text-[var(--red700)]' : 'text-[var(--text-muted)]'}`}
                     >
                       {draftInvalid ? '초는 59까지만 쓸 수 있어요.' : '숫자만 입력해요. 예) 930 → 9:30'}

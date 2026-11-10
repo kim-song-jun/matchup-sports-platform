@@ -224,6 +224,14 @@ describe('MockTournamentSeedService', () => {
     expect(created.data.bracketPublishedAt).toBeInstanceOf(Date);
   });
 
+  it.each([{ withResults: true }, { reviewReady: true }])('모집중 목업에 결과를 채우면 400 MOCK_SEED_STATUS_UNSUPPORTED 로 막는다 (%j)', async (extra) => {
+    const { service, prisma } = makeWorld();
+    const err = await service.createTournament(user, { format: 'group_knockout', teamCount: 4, status: 'open', ...extra }).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect((err.getResponse() as { code: string }).code).toBe('MOCK_SEED_STATUS_UNSUPPORTED');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('모집중 목업은 대진표를 아직 공개하지 않는다', async () => {
     const { service, tx } = makeWorld();
     await service.createTournament(user, { format: 'league', teamCount: 4, status: 'open' });

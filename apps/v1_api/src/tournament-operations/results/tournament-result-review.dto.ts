@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -252,3 +253,29 @@ export class CreateGameResultCorrectionDto {
 }
 
 
+
+/**
+ * MD-QA #187 — 결과 확정(OFFICIAL) 뒤 사건 시각 정정. 플랫폼 운영자(owner·ops)만 쓰며 사유가 필수다.
+ * 다른 결과 명령과 같은 경계(expectedVersion · `Idempotency-Key` = clientCommandId)를 지난다.
+ * 피리어드는 받지 않는다 — 원본과 같은 피리어드 안에서만 시각이 바뀐다.
+ */
+export class AdminCorrectGameEventTimeDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  clientCommandId!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  clockMs!: number;
+
+  @IsString()
+  @Matches(/\S/, { message: 'reason must contain a non-whitespace character' })
+  @MaxLength(200)
+  reason!: string;
+}

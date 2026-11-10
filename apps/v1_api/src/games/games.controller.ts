@@ -21,6 +21,7 @@ import {
   AssignGoalAssistDto,
   ListGameEventsQueryDto,
   ReverseGameEventDto,
+  CorrectGameEventTimeDto,
 } from './dto/game-event.dto';
 import { SetParticipantArrivalDto } from './dto/game-lineup.dto';
 import {
@@ -155,6 +156,29 @@ export class GamesController {
     return this.gamesService
       .reverseEvent(user, gameId, eventId, idempotencyKey, dto)
       .then((result) => this.broadcastCommitted(gameId, result));
+  }
+
+  /**
+   * MD-QA #187 — 확정 전 사건 시각 정정. 정정 행을 구독자에게 보내고, 원본 행의 시각이 바뀐 콘솔
+   * 스냅샷(`listEvents` overlay)도 다시 받게 한다 — 증분 이벤트만으로는 이미 받은 원본이 갱신되지 않는다.
+   */
+  @Post(':gameId/events/:eventId/correct-time')
+  @UseGuards(V1AuthGuard)
+  async correctEventTime(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('eventId') eventId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CorrectGameEventTimeDto,
+  ) {
+    const result = this.broadcastCommitted(
+      gameId,
+      await this.gamesService.correctEventTime(user, gameId, eventId, idempotencyKey, dto),
+    );
+    if (!result.replayed) {
+      void this.gameBroadcast.refreshGameSubscribers(gameId, result.version);
+    }
+    return result;
   }
 
   @Post(':gameId/events/:eventId/assist')

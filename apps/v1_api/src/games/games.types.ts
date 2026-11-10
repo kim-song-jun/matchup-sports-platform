@@ -160,6 +160,8 @@ export interface PersistedGameEvent {
   receivedAt: string;
   actorUserId: string;
   reversesEventId: string | null;
+  /** MD-QA #187: TIME_CORRECTION 행만 채운다 — 시각을 바로잡은 원본 사건 id. */
+  correctsEventId: string | null;
   payload: Record<string, unknown>;
 }
 
@@ -206,6 +208,26 @@ export interface GameEventAppendResult extends GameMutationResult {
    * rendered by the existing `RevisionTimeline` UI like any other
    * revision).
    */
+  /**
+   * MD-QA #187 — 사건 시각 정정 응답에만 있다. 원본 사건과 이전/새 시각(같은 피리어드).
+   * 감사 기록(`after: response`)에도 그대로 남는다.
+   */
+  eventTimeCorrection?: {
+    eventId: string;
+    period: number;
+    previousClockMs: number;
+    clockMs: number;
+  };
+  /**
+   * MD-QA #187 — 시각 정정이 결과 리비전의 골·카드 분 스냅샷을 바꿔 후속 리비전을 세웠을 때만 있다
+   * (`syncRevisionEventTimes`). 바뀔 분이 없거나 제출된 리비전이 없으면 생략한다.
+   */
+  revisionEventTimeSync?: {
+    revisionId: string;
+    revision: number;
+    revisionState: 'SUBMITTED' | 'OFFICIAL';
+    supersedesRevisionId: string;
+  };
   revisionAssistSync?: {
     revisionId: string;
     revision: number;

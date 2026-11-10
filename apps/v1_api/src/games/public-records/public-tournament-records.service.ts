@@ -1,3 +1,4 @@
+import { foldEventTimeCorrectionsInMatchOrder } from '../core/event-time-corrections';
 import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { resolveResultCardEvents } from '../core/result-card-events';
 import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
@@ -1535,7 +1536,7 @@ export class PublicTournamentRecordsService {
     officialParticipants?: readonly { participantId: string; sideId: string; cards: unknown }[],
   ) {
     if (gameId === null) return [];
-    const liveEvents = await this.prisma.v1GameEvent.findMany({
+    const recordedEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId },
       // 타임라인은 입력(append) 순서가 아니라 경기 시각순이어야 한다 -- sequence 는
       // 서버가 이벤트를 "받은" 순서일 뿐 경기 중 실제 발생 순서와 다를 수 있다
@@ -1552,8 +1553,12 @@ export class PublicTournamentRecordsService {
         period: true,
         clockMs: true,
         reversesEventId: true,
+        sequence: true,
+        correctsEventId: true,
       },
     });
+    // MD-QA #187: 정정된 사건 시각을 반영하고 시각순을 다시 맞춘다(정정 행 자체는 사건이 아니다).
+    const liveEvents = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
     // Explicit correction snapshots replace live cards, including deletions.
     const events = officialParticipants === undefined ? liveEvents : [
       ...liveEvents.filter((event) => event.type !== 'CARD'),
@@ -1691,14 +1696,16 @@ export class PublicTournamentRecordsService {
     // 경기에서 GOAL 4행 중 2행이 CORRECTION 으로 취소됐는데 요약에 4개가 다 떴다).
     // 같은 파일의 buildEvents 는 전체를 읽고 *나중에* 타입을 거르는데, 여기만
     // 쿼리에서 걸러 규칙이 갈라졌던 것이다 — buildEvents 와 같은 순서로 맞춘다.
-    const events = await this.prisma.v1GameEvent.findMany({
+    const recordedEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId: { in: gameIds } },
       // buildEvents 와 같은 이유로 시각순 -- sequence 는 tiebreak 용으로만 남긴다.
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       // `payload`는 백필의 `minuteKnown: false` 표식을 읽기 위한 것 -- buildEvents가
       // 이미 같은 이유로 payload를 읽는다. 빠뜨리면 일정 카드에서만 "0′"가 뜬다.
-      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true, payload: true },
+      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true, payload: true, sequence: true, correctsEventId: true },
     });
+    // MD-QA #187: buildEvents 와 같은 규칙 — 정정 시각을 반영해 시각순을 다시 맞춘다.
+    const events = foldEventTimeCorrectionsInMatchOrder(recordedEvents);
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );

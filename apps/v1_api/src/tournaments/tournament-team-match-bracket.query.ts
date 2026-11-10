@@ -1,3 +1,4 @@
+import { TIME_CORRECTION_ROW_FILTER } from '../games/core/event-time-corrections';
 import { Prisma } from '@prisma/client';
 import { serializeAdminBracketGame } from './slots/admin-bracket-view';
 import { PLACE_SELECT } from '../places/place-select';
@@ -47,8 +48,8 @@ export const tournamentTeamMatchBracketInclude = {
             select: { id: true, state: true, score: true, goalEvents: true, outcomeReason: true, outcomeNote: true, officialAt: true, createdAt: true, updatedAt: true, tournamentResultLineages: { select: { note: true } } },
           },
           events: {
-            where: { OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
-            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true },
+            where: { OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }, TIME_CORRECTION_ROW_FILTER] },
+            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true, sequence: true, correctsEventId: true },
           },
         },
       },

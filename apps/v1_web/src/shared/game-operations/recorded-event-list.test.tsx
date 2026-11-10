@@ -210,6 +210,27 @@ describe('RecordedEventList', () => {
     expect(onReverseEvent).toHaveBeenCalledWith(unrelatedUndefinedReference);
   });
 
+  // MD-QA #187: 시각 정정 행은 영문 enum 대신 한국어 라벨로 보이고, 취소 대상이 아니다.
+  it('labels a TIME_CORRECTION row as 시각 정정 and offers no reverse action on it', () => {
+    const original = goal(1, HOME_SIDE_ID, 'p-jung', 3 * 60000);
+    const timeCorrection = {
+      ...goal(2, HOME_SIDE_ID, null, 3 * 60000),
+      sideId: null,
+      type: 'TIME_CORRECTION' as const,
+      correctsEventId: original.id,
+      payload: { previousClockMs: 11 * 60000, clockMs: 3 * 60000, reason: '기록 대조', lane: 'OPERATOR' },
+    };
+    render(
+      <RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />,
+    );
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows[1]).toHaveTextContent('시각 정정');
+    expect(rows[1]).not.toHaveTextContent('TIME_CORRECTION');
+    expect(within(rows[1]).queryByRole('button', { name: '수정·취소' })).toBeNull();
+    expect(within(rows[0]).getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
+  });
+
   // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.
   it('does not invent an unknown scorer and labels a participant-less goal as anonymous', () => {
     render(

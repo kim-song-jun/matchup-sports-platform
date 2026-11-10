@@ -128,7 +128,7 @@ describe('V1 changing the account email needs a code mailed to the new address i
   const as = (userId: string) => ({ 'x-v1-user-id': userId });
   const post = (path: string, userId: string, body: Record<string, unknown>) => request(app.getHttpServer()).post(api(path)).set(as(userId)).send(body);
   const saveProfile = (userId: string, phone: string, body: Record<string, unknown>) =>
-    request(app.getHttpServer()).patch(api('/me/profile')).set(as(userId)).send({ nickname: `변경${userId.slice(-6)}`, gender: 'male', phone, ...body });
+    request(app.getHttpServer()).patch(api('/me/profile')).set(as(userId)).send({ nickname: `변경${userId.slice(-6)}`, realName: '이메일 변경', gender: 'male', phone, ...body });
   const cookieIssuedAgo = (userId: string, seconds: number) =>
     `${V1_SESSION_COOKIE_NAME}=${createV1SessionToken({ userId, sessionEpoch: 0, secret: SESSION_SECRET, issuedAtMs: Date.now() - seconds * 1_000 })}`;
 

@@ -1796,7 +1796,7 @@ describe('리그 참가 신청 입구', () => {
       expect(screen.getByRole('link', { name: '다음 회차로 신청하기' })).toHaveAttribute('href', '/tournaments/league-2/apply');
     } else {
       expect(screen.queryByRole('link', { name: '다음 회차로 신청하기' })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league');
+      expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league&stage=recruiting');
     }
   });
 
@@ -1895,7 +1895,7 @@ describe('리그 참가 신청 입구', () => {
     await waitFor(() => expect(screen.getByText('신청이 마감됐어요')).toBeInTheDocument());
     expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
-    expect(container.querySelector('a[href="/tournaments?kind=league"]')).toBeInTheDocument();
+    expect(container.querySelector('a[href="/tournaments?kind=league&stage=recruiting"]')).toBeInTheDocument();
   });
 
   it('마감도 참가비도 정하지 않은 리그는 참가 안내 카드를 그리지 않는다', async () => {

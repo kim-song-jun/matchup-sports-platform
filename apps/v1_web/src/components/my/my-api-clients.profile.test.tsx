@@ -383,6 +383,26 @@ describe('ProfileEditPageClient 이메일은 직접 고치지 않고 변경 화�
     await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith('/my/profile/edit/email'));
   });
 
+  it('이름은 필수라 라벨에 선택 표시가 없고, 비우면 저장 버튼이 막히며 이유를 알린다', () => {
+    renderWithClient(<ProfileEditPageClient />);
+    expect(screen.queryByText('(선택)')).not.toBeInTheDocument();
+
+    const nameInput = screen.getByRole('textbox', { name: '이름' });
+    expect(nameInput).toBeRequired();
+    fireEvent.change(nameInput, { target: { value: ' ​ ' } });
+
+    expect(screen.getByRole('button', { name: '프로필 저장' })).toBeDisabled();
+    expect(screen.getByText('이름을 입력해 주세요.')).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('바꾼 이름은 앞뒤 공백을 정리해 저장한다', async () => {
+    renderWithClient(<ProfileEditPageClient />);
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '  새이름 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ realName: '새이름' })));
+  });
+
   it('바꾼 닉네임은 중복 확인 전에는 저장할 수 없다고 닉네임만 짚어 알린다', () => {
     renderWithClient(<ProfileEditPageClient />);
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '새닉네임' } });

@@ -149,7 +149,7 @@ export function LeagueJoinGuideCard({
               다음 회차로 신청하기
             </Link>
           ) : (
-            <Link href="/tournaments?kind=league" className="tm-btn tm-btn-md tm-btn-neutral" style={{ minHeight: 44 }}>
+            <Link href="/tournaments?kind=league&stage=recruiting" className="tm-btn tm-btn-md tm-btn-neutral" style={{ minHeight: 44 }}>
               다른 리그 둘러보기
             </Link>
           )}

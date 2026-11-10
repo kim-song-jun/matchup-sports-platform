@@ -272,6 +272,25 @@ describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual calle
     }, expect.anything());
   });
 
+  it('바뀐 게 없으면 저장 요청을 보내지 않고 안내만 한다', async () => {
+    const user = userEvent.setup();
+    renderSection(true);
+    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
+    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
+    expect(hooks.mutate).not.toHaveBeenCalled();
+    expect(hooks.showToast).toHaveBeenCalledWith('바뀐 내용이 없어요.');
+  });
+
+  it('값을 바꾸면 저장 요청을 보낸다', async () => {
+    const user = userEvent.setup();
+    renderSection(true);
+    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
+    const summary = card.getByRole('textbox', { name: '상품 및 상금' });
+    await user.type(summary, '!');
+    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith(expect.objectContaining({ prizeSummary: '우승 트로피 + 상금!' }), expect.anything());
+  });
+
   it('시상 항목을 모두 삭제해 저장하면 null을 보내 기존 시상을 비운다', async () => {
     const user = userEvent.setup();
     renderSection(true);

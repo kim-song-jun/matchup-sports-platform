@@ -1431,6 +1431,12 @@ function PrizeCard({
     })),
   );
 
+  // 저장 기준선 — 마지막으로 저장했거나 불러온 값을 payload 와 같은 방식으로 정규화해 둔다.
+  // 달라진 게 없을 때 PATCH 를 보내면 updatedAt 만 올라가 다른 편집자가 버전 충돌을 겪는다.
+  const prizeFormKey = (pool: string, summary: string, rows: TournamentPrizeRow[]) =>
+    JSON.stringify([pool.trim(), summary.trim(), serializeTournamentPrizeRows(rows)]);
+  const [savedKey, setSavedKey] = useState(() => prizeFormKey(prizePool, prizeSummary, prizeRows));
+
   const handleSave = () => {
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     const pool = prizePool.trim();
@@ -1446,8 +1452,16 @@ function PrizeCard({
     // 금액 행은 "1,234,567원" 형태로 정규화, 물품 행은 입력한 자유 텍스트 그대로 저장한다.
     const breakdownText = serializeTournamentPrizeRows(prizeRows);
     payload.prizeBreakdown = breakdownText || null;
+    const currentKey = prizeFormKey(prizePool, prizeSummary, prizeRows);
+    if (currentKey === savedKey) {
+      showToast('바뀐 내용이 없어요.');
+      return;
+    }
     updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
-      onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
+      onSuccess: () => {
+        setSavedKey(currentKey);
+        showToast('상금 정보를 저장했어요.', 'success');
+      },
       onError: (err) => {
         if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
           queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournament.id) });

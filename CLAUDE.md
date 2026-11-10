@@ -445,9 +445,12 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
    - 머지 전에는 코드로 안전성을 확인한다(로딩·에러·빈 목록에서 렌더가 깨지지 않는지 등).
    - 브라우저 검증·QA는 **항상 `ego-browser` 스킬(ego-lite)** 로 한다(2026-11-10 사용자 지시 — 전역 지침).
      Playwright MCP·내장 브라우저·Claude in Chrome 등 다른 browser-use 도구는 쓰지 않고, 서브에이전트·
-     워크플로 에이전트에게 QA를 맡길 때도 프롬프트에 ego-lite 사용을 명시한다. `.codex/qa-rules.md`의 "Headed Playwright MCP only" 절은 이 규칙과 충돌하는 옛 지침이므로 이 규칙이 우선하며, 해당 절은 후속 정리 대상이다. MD-QA 보드
-     (`teameet.jmandu.kr/projects/1`) 조회·댓글도 같은 ego-lite 세션으로 한다. alpha에 실제 로그인해 사용자 흐름을
-     클릭으로 밟고 단계별 스크린샷·판정을 남긴다. API 실측은 보조 근거이고 PASS 판정은 화면으로 한다.
+     워크플로 에이전트에게 QA를 맡길 때도 프롬프트에 ego-lite 사용을 명시한다.
+     `.codex/qa-rules.md`의 "Headed Playwright MCP only" 절은 이 규칙과 충돌하는 옛 지침이므로
+     이 규칙이 우선하며, 해당 절은 후속 정리 대상이다.
+     MD-QA 보드(`teameet.jmandu.kr/projects/1`) 조회·댓글도 같은 ego-lite 세션으로 한다.
+     alpha에 실제 로그인해 사용자 흐름을 클릭으로 밟고 단계별 스크린샷·판정을 남긴다.
+     API 실측은 보조 근거이고 PASS 판정은 화면으로 한다.
      여러 장을 반복 캡처하는 스크립트는 `scripts/` 내부에 둔다(`/tmp`는 모듈 해석 실패).
    - 갤러리는 페이지별 3열 + raw URL 200 확인 후 게시. PR을 올린 뒤 UI 변경을 뒤늦게 인지했다면
      그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
@@ -579,6 +582,8 @@ alpha는 배포마다 QA 시드가 다시 돈다. 시드의 `deleteMany`는 **�
 | 대형 리팩터링, 아키텍처 설계, 깊은 리서치 | Fable 5.2 (`fable`) |
 
 - 명세가 분명해도 **DB 마이그레이션·성능 최적화는 Opus 5.5**.
+- `.claude/agents/qa-*` 페르소나는 읽기 전용 정적 시나리오 검토라 ego-lite를 구동하지 않으므로 `sonnet`을 유지한다.
+  ego-lite로 alpha를 직접 조작하는 QA 에이전트에만 위 Opus 행을 적용한다.
 - 병렬 작업 흐름은 항목별로 `격리 worktree 구현 → dev 대상 PR → Copilot 리뷰 루프 → dev 머지 → alpha 배포 확인 →
   ego-lite QA → MD-QA 보드 댓글` 순서이고, main 승격은 위 "Git 브랜치 정책"을 따른다.
 

@@ -18,6 +18,11 @@ import {
 
 export const EVENT_TIME_REASON_MAX_LENGTH = 200;
 
+// globals.css 의 unlayered `button { font: inherit }` 리셋이 Tailwind 레이어 유틸(text-[...]·font-bold)을
+// 눌러 버튼 글자가 16px/400 으로 렌더된다(pagination-bar.test.tsx 와 같은 원인). 인라인 style 로 지정한다.
+export const TAB_FONT = { fontSize: 'var(--font-size-body-sm)', fontWeight: 700 } as const;
+export const CLOCK_FONT = { fontSize: 'calc(var(--font-size-heading) * 1.75)', fontWeight: 800 } as const;
+
 type SheetTab = 'time' | 'cancel';
 
 export interface EventTimeCorrectionSheetProps {
@@ -183,6 +188,7 @@ export function EventTimeCorrectionSheet({
                 aria-controls={panelId}
                 tabIndex={tab === key ? 0 : -1}
                 disabled={pending}
+                style={TAB_FONT}
                 onClick={() => setTab(key)}
                 onKeyDown={(event) => {
                   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -192,7 +198,7 @@ export function EventTimeCorrectionSheet({
                     document.getElementById(next === 'time' ? tabIdTime : tabIdCancel)?.focus();
                   }
                 }}
-                className={`min-h-[44px] rounded-[var(--radius-chip)] text-[length:var(--font-size-body-sm)] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)] ${
+                className={`min-h-[44px] rounded-[var(--radius-chip)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)] ${
                   tab === key
                     ? 'bg-[var(--card-surface)] text-[var(--text-strong)]'
                     : 'text-[var(--text-muted)]'
@@ -265,7 +271,8 @@ export function EventTimeCorrectionSheet({
                     onClick={beginTyping}
                     disabled={pending}
                     aria-label={`정정할 시각 ${formatMatchClock(clockMs)}. 눌러서 숫자로 직접 입력`}
-                    className="min-h-[56px] rounded-xl px-3 text-[length:calc(var(--font-size-heading)*1.75)] font-extrabold leading-none tracking-tight tabular-nums text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
+                    style={CLOCK_FONT}
+                    className="min-h-[56px] rounded-xl px-3 leading-none tracking-tight tabular-nums text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
                   >
                     {formatMatchClock(clockMs)}
                   </button>

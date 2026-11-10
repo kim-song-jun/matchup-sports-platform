@@ -64,6 +64,7 @@ import {
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
+  eventTimeSummary,
   playerLabel,
 } from './confirm-copy';
 import {
@@ -2222,10 +2223,7 @@ export function OperateConsoleCore({
           open
           mode="operator"
           title={`${eventTypeLabel(editTarget)} 기록 수정`}
-          summary={[
-            editTarget.participantId !== null ? playerLabel(editTarget.participantId, lineups) : null,
-            sides.find((side) => side.id === editTarget.sideId)?.displayNameSnapshot ?? null,
-          ].filter((part): part is string => part !== null && part.length > 0).join(' · ') || eventTypeLabel(editTarget)}
+          summary={eventTimeSummary(editTarget, sides, lineups, eventTypeLabel(editTarget))}
           periodLabel={periodLabel(editTarget.period, periodCount)}
           currentClockMs={collectEventTimeCorrections(ops.liveEvents).get(editTarget.id)?.currentClockMs ?? editTarget.clockMs}
           maxClockMs={eventClockUpperBoundMs({

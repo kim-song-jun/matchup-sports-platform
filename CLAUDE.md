@@ -443,13 +443,16 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
    렌더하지 않으므로(7번) 순서는 **머지 → alpha 배포 확인(아래 "Alpha 실측 검증" 2) → 캡처 → 같은 PR에
    갤러리 코멘트 사후 게시**다. PR 본문에 "갤러리를 머지 후에 채우는 이유"를 남긴다.
    - 머지 전에는 코드로 안전성을 확인한다(로딩·에러·빈 목록에서 렌더가 깨지지 않는지 등).
-   - 브라우저 검증·QA의 기본 도구는 **`ego-browser` 스킬**이다 — alpha에 실제 로그인해 사용자 흐름을
+   - 브라우저 검증·QA는 **항상 `ego-browser` 스킬(ego-lite)** 로 한다(2026-11-10 사용자 지시 — 전역 지침).
+     Playwright MCP·내장 브라우저·Claude in Chrome 등 다른 browser-use 도구는 쓰지 않고, 서브에이전트·
+     워크플로 에이전트에게 QA를 맡길 때도 프롬프트에 ego-lite 사용을 명시한다. MD-QA 보드
+     (`teameet.jmandu.kr/projects/1`) 조회·댓글도 같은 ego-lite 세션으로 한다. alpha에 실제 로그인해 사용자 흐름을
      클릭으로 밟고 단계별 스크린샷·판정을 남긴다. API 실측은 보조 근거이고 PASS 판정은 화면으로 한다.
      여러 장을 반복 캡처하는 스크립트는 `scripts/` 내부에 둔다(`/tmp`는 모듈 해석 실패).
    - 갤러리는 페이지별 3열 + raw URL 200 확인 후 게시. PR을 올린 뒤 UI 변경을 뒤늦게 인지했다면
      그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
-5. **전체 검수/피드백**은 built-in `Workflow` 적대 검증으로 한다. 모델 배정은 전역 `~/.claude/CLAUDE.md`
-   규칙 11.
+5. **전체 검수/피드백**은 built-in `Workflow` 적대 검증으로 한다. 모델 배정은 아래 "Agent Team 운영 >
+   모델 배정"을 따른다.
 6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`.
    머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
 7. **런타임·화면 동작은 로컬 next 서버가 아니라 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).**
@@ -561,7 +564,23 @@ alpha는 배포마다 QA 시드가 다시 돈다. 시드의 `deleteMany`는 **�
 
 - 프로젝트 에이전트 정의: `.claude/agents/*.md`(frontmatter `name:`이 있는 19개) — 팀 구성은
   `.claude/agents/team-config.md`, 파이프라인은 `.claude/agents/workflow.md`. Codex 쪽 정본은 `.codex/agents/`.
-- 오케스트레이션·모델 배정은 전역 `~/.claude/CLAUDE.md` 규칙 11("모델 배정과 병렬 오케스트레이션")을 따른다.
+- 오케스트레이션은 전역 `~/.claude/CLAUDE.md` 규칙 11("모델 배정과 병렬 오케스트레이션")을 따르고, 이 저장소의
+  모델 배정은 아래 표가 정본이다(2026-11-10 사용자 지시).
+
+### 모델 배정 (Workflow·Agent 병렬 작업)
+
+| 작업 | 모델 |
+|---|---|
+| 버그 수정, 명세가 분명한 기능 개발 | Sonnet 5.5 (`sonnet`) |
+| 분류·라우팅·추출처럼 양이 많은 일, 서브에이전트 잔업 | Haiku 5.5 (`haiku`) |
+| 대화형 세션 | Sonnet 5.5 low/medium |
+| 문서·슬라이드·스프레드시트 | Sonnet 5.5 (복잡한 재무 모델은 Opus 5.5) |
+| 컴퓨터 사용·이미지가 많은 작업(ego-lite alpha QA·스크린샷 판독·목업) | Opus 5.5 (`opus`) |
+| 대형 리팩터링, 아키텍처 설계, 깊은 리서치 | Fable 5.2 (`fable`) |
+
+- 명세가 분명해도 **DB 마이그레이션·성능 최적화는 Opus 5.5**.
+- 병렬 작업 흐름은 항목별로 `격리 worktree 구현 → dev 대상 PR → Copilot 리뷰 루프 → dev 머지 → alpha 배포 확인 →
+  ego-lite QA → MD-QA 보드 댓글` 순서이고, main 승격은 위 "Git 브랜치 정책"을 따른다.
 
 ## 알려진 제약 (v1)
 

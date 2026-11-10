@@ -446,7 +446,7 @@ export function ProfileEditPageClient() {
   const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || !nicknameVerified || !gender || !normalizedRealName;
   // 이메일 변경 화면으로 가면 이 폼에서 고친 값은 저장되지 않고 사라진다 — 저장된 값과 다른 칸이 있을 때만 먼저 묻는다.
   const storedProfile = profile.data.profile;
-  const formDirty = realName.trim() !== (storedProfile.realName ?? '')
+  const formDirty = normalizedRealName !== normalizeSignupDisplayName(storedProfile.realName ?? '')
     || bio.trim() !== (storedProfile.bio ?? '')
     || nicknameChanged
     || phoneChanged

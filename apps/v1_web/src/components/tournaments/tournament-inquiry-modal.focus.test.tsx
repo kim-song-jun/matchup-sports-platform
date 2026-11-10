@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TournamentInquiryModal } from './tournament-inquiry-modal';
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -37,9 +37,12 @@ function renderModal(relatedType: 'team_match' | 'tournament') {
 }
 
 describe('TournamentInquiryModal 초기 포커스', () => {
+  const originalMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
   afterEach(() => {
-    // @ts-expect-error 테스트 정리
-    delete window.matchMedia;
+    window.matchMedia = originalMatchMedia;
   });
 
   it('터치 기기에서는 패널에 포커스가 가고 입력칸은 포커스되지 않아요', () => {

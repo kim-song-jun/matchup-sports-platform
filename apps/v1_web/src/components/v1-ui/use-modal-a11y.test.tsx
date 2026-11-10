@@ -340,6 +340,25 @@ describe('useModalA11y 터치 기기 초기 포커스', () => {
     }
   });
 
+  it('coarse 포인터에서 입력칸 autoFocus 로 이미 들어간 포커스도 패널로 옮겨요', async () => {
+    setPointer(true);
+    function AutoFocusModal() {
+      const { dialogRef } = useModalA11y({ open: true, onClose: () => {} });
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true">
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+          <input aria-label="자동 입력" autoFocus />
+        </div>
+      );
+    }
+    try {
+      render(<AutoFocusModal />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('fine 포인터에서는 기존대로 첫 입력에 포커스가 가요', async () => {
     setPointer(false);
     try {

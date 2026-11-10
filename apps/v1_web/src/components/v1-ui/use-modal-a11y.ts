@@ -264,7 +264,15 @@ export function useModalA11y<
   useEffect(() => {
     if (!open) return;
     const id = setTimeout(() => {
-      if (dialogRef.current?.contains(document.activeElement)) return;
+      const dialog = dialogRef.current;
+      const active = document.activeElement;
+      if (dialog?.contains(active)) {
+        // 입력칸 autoFocus 는 마운트 커밋에서 이미 적용돼 키보드가 올라온다 — 터치 기기에서는 패널로 옮긴다.
+        if (active instanceof HTMLElement && active !== dialog && opensSoftKeyboard(active) && isCoarsePointer()) {
+          focusInitialTarget(dialog, active);
+        }
+        return;
+      }
       focusFirstControl();
     }, 60);
     return () => clearTimeout(id);

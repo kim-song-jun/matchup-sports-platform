@@ -314,3 +314,39 @@ describe('useModalA11y', () => {
   });
   });
 });
+
+describe('useModalA11y 터치 기기 초기 포커스', () => {
+  const original = window.matchMedia;
+  const setPointer = (coarse: boolean) => {
+    window.matchMedia = ((query: string) => ({
+      matches: coarse && query === '(pointer: coarse)',
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  };
+
+  it('coarse 포인터에서는 텍스트 입력 대신 패널로 포커스가 가요', async () => {
+    setPointer(true);
+    try {
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('fine 포인터에서는 기존대로 첫 입력에 포커스가 가요', async () => {
+    setPointer(false);
+    try {
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('첫 입력')));
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});

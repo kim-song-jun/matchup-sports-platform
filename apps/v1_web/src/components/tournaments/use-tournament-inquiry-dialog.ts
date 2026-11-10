@@ -21,7 +21,7 @@ export function useTournamentInquiryDialog(onClose: () => void) {
       const first = focusable.at(0);
       const last = focusable.at(-1);
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -36,7 +36,6 @@ export function useTournamentInquiryDialog(onClose: () => void) {
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
     const releaseScroll = lockBodyScroll();
-    dialogRef.current?.querySelector<HTMLSelectElement>('select')?.focus();
     return () => {
       releaseScroll();
       const previousFocus = previousFocusRef.current;

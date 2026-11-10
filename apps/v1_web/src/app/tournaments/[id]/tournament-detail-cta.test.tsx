@@ -267,6 +267,18 @@ describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 �
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
     expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
   });
+  it.each([
+    ['league_knockouts', 'regular_tournament', '정규리그 + N개 토너먼트'],
+    ['group_knockout', 'regular_tournament', '조별리그 + 토너먼트'],
+    ['knockout', 'regular_tournament', '토너먼트'],
+    ['group_knockout', 'regular_league', '리그 방식'],
+  ] as const)('히어로 형식 배지는 단일 라벨 소스를 따른다 (%s/%s → %s)', (format, kind, label) => {
+    const tournament = makeTournament({ id: 'format-badge', status: 'open', format, kind });
+    render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+    expect(screen.getByLabelText(`대회 형식: ${label}`)).toHaveTextContent(label);
+    expect(screen.queryByText('조별리그 후 토너먼트')).not.toBeInTheDocument();
+  });
+
   it('in_progress 대회는 화면에 "진행 중인 대회 보기" CTA를 보여준다', () => {
     const tournament = makeTournament({ id: 't-live', status: 'in_progress', format: 'knockout' });
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);

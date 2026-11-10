@@ -14,7 +14,7 @@ export function useTournamentInquiryDialog(onClose: () => void) {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const focusableSelector =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));

@@ -3,6 +3,7 @@ import { cleanup, render as renderWithProviders, screen, within } from '@testing
 import userEvent from '@testing-library/user-event';
 import { useState, type ReactElement, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JOINKFA_CERTIFICATE_GUIDE } from '@/components/tournaments/player-eligibility';
 import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { RosterModal } from './registrations-tab';
@@ -293,12 +294,11 @@ describe('admin tournament roster modal', () => {
     const user = userEvent.setup();
     render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
 
-    const guide = "선수 본인이 JoinKFA에 로그인한 뒤 상단 '증명서 → 증명서 신청'에서 경력·실적 증명서를 받을 수 있어요.";
-    expect(screen.getByText(guide)).toBeInTheDocument();
+    expect(screen.getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
     const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
-    expect(within(panel).getByText(guide)).toBeInTheDocument();
+    expect(within(panel).getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
   });
 
   it('필터: 확인 전 / 선출 / 본인 신고만 으로 좁힌다', async () => {

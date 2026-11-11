@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JOINKFA_CERTIFICATE_GUIDE } from '@/components/tournaments/player-eligibility';
 import {
   useV1AddPlayer,
   useV1Registration,
@@ -102,7 +103,7 @@ describe('팀장 명단 — 선출 기준 안내와 운영진 확인 잠금 (MD-
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(within(link).getByText('(새 탭에서 열려요)')).toHaveClass('sr-only');
-    expect(screen.getByText("선수 본인이 JoinKFA에 로그인한 뒤 상단 '증명서 → 증명서 신청'에서 경력·실적 증명서를 받을 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
     expect(screen.getByText('Teameet은 JoinKFA에 선수 정보를 보내지 않아요.')).toBeInTheDocument();
   });
 

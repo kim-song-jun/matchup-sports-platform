@@ -10,7 +10,7 @@ import {
   UpdateAdCampaignDto,
 } from './dto/ad-campaign.dto';
 
-/** Owner-only; the service re-checks the role, so the guard only establishes who is calling. */
+/** Any active admin may read; owner and ops may write (support is read-only). The service checks the role; the guard only establishes who is calling. */
 @Controller('admin/ad-campaigns')
 @UseGuards(V1AuthGuard)
 export class AdsAdminController {

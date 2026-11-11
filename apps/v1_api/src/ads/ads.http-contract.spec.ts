@@ -164,7 +164,7 @@ describe('Ads HTTP contract', () => {
     expect((await http().get('/api/v1/ads/active').expect(200)).body.data[channel]).not.toBeNull();
   });
 
-  it('turns every admin route down for an ops admin and for a caller the guard rejects', async () => {
+  it('lets an ops admin through every admin route and turns down a caller the guard rejects', async () => {
     const ops = { 'x-test-user': 'user-ops' };
     const routes: Array<[string, string, object?]> = [
       ['get', '/api/v1/admin/ad-campaigns'],
@@ -175,12 +175,13 @@ describe('Ads HTTP contract', () => {
       ['post', '/api/v1/admin/ad-campaigns/c1/stop'],
     ];
     for (const [method, path, payload] of routes) {
+      // 2026-11-11: ops 는 권한에서 막히지 않는다(없는 캠페인·남이 올린 이미지는 그 도메인 오류로 거절된다).
       const asOps = await (http() as never as Record<string, (p: string) => request.Test>)[method](path).set(ops).send(payload);
-      expect([method, path, asOps.status, asOps.body.code]).toEqual([method, path, 403, 'PERMISSION_DENIED']);
+      expect([method, path, asOps.body.code]).not.toEqual([method, path, 'PERMISSION_DENIED']);
       const anonymous = await (http() as never as Record<string, (p: string) => request.Test>)[method](path).send(payload);
       expect([method, path, anonymous.status]).toEqual([method, path, 403]);
     }
-    expect(fake.state.campaigns).toHaveLength(0);
+    expect((await http().get('/api/v1/admin/ad-campaigns').set(ops).expect(200)).body.data.items).toEqual([]);
   });
 
   it('rejects an unsafe payload with VALIDATION_ERROR before any service runs', async () => {

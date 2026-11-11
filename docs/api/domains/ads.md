@@ -17,12 +17,14 @@ Not related to `V1TournamentCampaign` / `V1TournamentSponsor`.
 |---|---|---|---|---|
 | GET | `/api/v1/ads/active` | public | none | `{ banner: PublicAd \| null, popup: PublicAd \| null }` |
 | POST | `/api/v1/ads/events` | public, throttled 30/min | `{ events: [{ campaignId, channel, type }] }` (1–20) | `204` no body |
-| GET | `/api/v1/admin/ad-campaigns` | **owner only** | `status?`, `q?`, `page?` or `cursor?`, `limit?` (≤50) | `{ items, pageInfo, summary }` |
-| GET | `/api/v1/admin/ad-campaigns/:campaignId` | owner only | path id | `{ campaign, stats }` |
-| POST | `/api/v1/admin/ad-campaigns` | owner only | `SaveAdCampaign` | `{ campaign }` (draft, `version: 1`) |
-| PUT | `/api/v1/admin/ad-campaigns/:campaignId` | owner only | `SaveAdCampaign` + `expectedVersion` | `{ campaign }` |
-| POST | `/api/v1/admin/ad-campaigns/:campaignId/publish` | owner only | `{ expectedVersion }` | `{ campaign }` |
-| POST | `/api/v1/admin/ad-campaigns/:campaignId/stop` | owner only | none | `{ campaign }` |
+| GET | `/api/v1/admin/ad-campaigns` | **any active admin** (owner · ops · support) | `status?`, `q?`, `page?` or `cursor?`, `limit?` (≤50) | `{ items, pageInfo, summary }` |
+| GET | `/api/v1/admin/ad-campaigns/:campaignId` | any active admin | path id | `{ campaign, stats }` |
+| POST | `/api/v1/admin/ad-campaigns` | **owner · ops** (support is read-only, 403) | `SaveAdCampaign` | `{ campaign }` (draft, `version: 1`) |
+| PUT | `/api/v1/admin/ad-campaigns/:campaignId` | **owner · ops** (support is read-only, 403) | `SaveAdCampaign` + `expectedVersion` | `{ campaign }` |
+| POST | `/api/v1/admin/ad-campaigns/:campaignId/publish` | **owner · ops** (support is read-only, 403) | `{ expectedVersion }` | `{ campaign }` |
+| POST | `/api/v1/admin/ad-campaigns/:campaignId/stop` | **owner · ops** (support is read-only, 403) | none | `{ campaign }` |
+
+Access (2026-11-11): reads are open to every active admin; writes use the same rule as notices and popups (`getMutationAdmin`: owner and ops, not support). Before this the whole surface was owner-only. The content hub shows the ads tab to every admin and the ads screen locks its buttons without the `status:write` capability.
 
 Images are uploaded first with `POST /api/v1/admin/content-assets` (see [home-notices-master](./home-notices-master.md)); the returned `/uploads/…` url goes into `imageUrl`. There is no delete endpoint; a campaign is stopped, not removed.
 
@@ -85,7 +87,7 @@ Saving an already published campaign re-checks completeness and overlap (not `en
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | DTO violation (`details[].field`) |
 | 400 | `AD_INVALID_WINDOW` | `endAt <= startAt`; `details: { channel }` |
-| 403 | `PERMISSION_DENIED` | caller is not an active **owner** (ops and support are refused, reads included) |
+| 403 | `PERMISSION_DENIED` | caller is not an active admin, or `support` tried a write (reads are open to every active admin; writes need owner or ops) |
 | 404 | `AD_CAMPAIGN_NOT_FOUND` | unknown id |
 | 409 | `AD_CAMPAIGN_VERSION_CONFLICT` | `expectedVersion` differs from the stored one; `details: { currentVersion }` |
 | 409 | `AD_CAMPAIGN_INVALID_STATE` | publish of a published campaign; stop of a draft/stopped one |
@@ -169,4 +171,4 @@ List items add `stats: { banner: { impressions, clicks }, popup: { impressions, 
 
 ## Audit
 
-Every owner mutation writes `V1AdminActionLog` (`ad_campaign.create|update|publish|stop`, `targetType: ad_campaign`) with before/after snapshots; create/publish/stop also write `V1StatusChangeLog`.
+Every mutation writes `V1AdminActionLog` (`ad_campaign.create|update|publish|stop`, `targetType: ad_campaign`) with before/after snapshots; create/publish/stop also write `V1StatusChangeLog`.

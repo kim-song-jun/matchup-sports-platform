@@ -59,7 +59,7 @@ export class AdsAdminService {
   ) {}
 
   async list(user: V1AuthUser, query: AdminAdCampaignListQueryDto) {
-    await this.adminContext.getOwnerAdmin(user.id);
+    await this.adminContext.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const searchWhere: Prisma.V1AdCampaignWhereInput = query.q
       ? {
@@ -103,7 +103,7 @@ export class AdsAdminService {
   }
 
   async detail(user: V1AuthUser, id: string) {
-    await this.adminContext.getOwnerAdmin(user.id);
+    await this.adminContext.getActiveAdmin(user.id);
     const row = await this.prisma.v1AdCampaign.findUnique({ where: { id }, include: CAMPAIGN_INCLUDE });
     if (!row) throw notFound();
 
@@ -134,7 +134,7 @@ export class AdsAdminService {
   }
 
   async create(user: V1AuthUser, dto: SaveAdCampaignDto) {
-    const admin = await this.adminContext.getOwnerAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
     const channels = this.readChannels(dto);
     const now = new Date();
 
@@ -162,7 +162,7 @@ export class AdsAdminService {
   }
 
   async update(user: V1AuthUser, id: string, dto: UpdateAdCampaignDto) {
-    const admin = await this.adminContext.getOwnerAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
     const channels = this.readChannels(dto);
     const now = new Date();
 
@@ -200,7 +200,7 @@ export class AdsAdminService {
   }
 
   async publish(user: V1AuthUser, id: string, dto: PublishAdCampaignDto) {
-    const admin = await this.adminContext.getOwnerAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
     const now = new Date();
 
     const row = await this.prisma.$transaction(async (tx) => {
@@ -223,7 +223,7 @@ export class AdsAdminService {
   }
 
   async stop(user: V1AuthUser, id: string) {
-    const admin = await this.adminContext.getOwnerAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
     const now = new Date();
 
     const row = await this.prisma.$transaction(async (tx) => {

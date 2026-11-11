@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoLoginButton } from './kakao-login-button';
 import { V1ApiError } from '@/lib/api-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
-import { parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { consumeKakaoOAuthAttempt, parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
-import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
+import { getSavedRedirectPath, V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -79,6 +79,9 @@ const renderButton = () => render(
   </QueryClientProvider>,
 );
 const click = () => userEvent.click(screen.getByRole('link', { name: '카카오' }));
+const HANDOFF_TEXT = '카카오 계정 로그인 화면으로 이동할게요';
+/** 카카오 인가 화면으로 넘어간 URL 이 실은 state 를 콜백이 하듯 저장된 시도와 대조한다. */
+const handedOffState = () => new URL(assigned ?? 'about:blank').searchParams.get('state');
 
 describe('KakaoLoginButton', () => {
   describe('native shell', () => {
@@ -122,17 +125,128 @@ describe('KakaoLoginButton', () => {
       await click();
       await waitFor(() => expect(window.TeameetNative?.postMessage).toHaveBeenCalled());
       expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(assigned).toBeNull();
+      expect(storedAttempt()).toBeNull();
       expect(api.v1Post).not.toHaveBeenCalled();
+      expect(reporter.reportClientError).not.toHaveBeenCalled();
+
+      reply = { accessToken: 'kakao-token' };
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
     });
 
-    it('shows a Korean message and logs when the shell reports an error', async () => {
-      reply = { error: 'KOE101' };
-      renderButton();
-      await click();
-      expect(await screen.findByRole('alert')).toHaveTextContent('카카오 로그인에 실패했어요');
-      expect(reporter.reportClientError).toHaveBeenCalled();
-      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'KOE101' });
-      expect(api.v1Post).not.toHaveBeenCalled();
+    describe('when the native step fails', () => {
+      it.each([
+        ['an SDK error reply', { error: 'failed("The operation couldn’t be completed. (KakaoSDKCommon.SdkError error 0.)")' }, 'failed("The operation couldn’t be completed. (KakaoSDKCommon.SdkError error 0.)")'],
+        ['an already-in-progress reply', { error: 'failed("Kakao sign-in is already in progress")' }, 'failed("Kakao sign-in is already in progress")'],
+        ['a reply without a token', {}, 'missing-token'],
+      ])('moves on to the Kakao account page after %s', async (_label, shellReply, reason) => {
+        reply = shellReply;
+        window.location.search = '?redirect=%2Fteams%2Fnew';
+        renderButton();
+        await click();
+
+        expect(await screen.findByRole('status')).toHaveTextContent(HANDOFF_TEXT);
+        await waitFor(() => expect(assigned).not.toBeNull());
+        expect(assigned).toBe(`${HREF}&state=${handedOffState()}`);
+        // The callback accepts the state only if it matches the attempt stored here.
+        expect(await consumeKakaoOAuthAttempt(handedOffState())).toEqual({ state: handedOffState(), mode: 'login', returnTo: null });
+        expect(getSavedRedirectPath()).toBe('/teams/new');
+        expect(api.v1Post).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({
+          message: 'Native Kakao sign-in failed', level: 'warn', context: { reason, fallback: 'web_authorize' },
+        }));
+        expect(analytics.trackEvent).not.toHaveBeenCalledWith('login_failed', expect.anything());
+      });
+
+      it('moves on when the shell never answers (timeout)', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+          (window.TeameetNative as { postMessage: unknown }).postMessage = vi.fn();
+          renderButton();
+          await click();
+          expect(assigned).toBeNull();
+          await act(() => vi.advanceTimersByTimeAsync(120_000));
+          await waitFor(() => expect(assigned).not.toBeNull());
+          expect(assigned).toBe(`${HREF}&state=${handedOffState()}`);
+          expect(screen.getByRole('status')).toHaveTextContent(HANDOFF_TEXT);
+          expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({
+            context: { reason: 'timeout', fallback: 'web_authorize' },
+          }));
+          expect(api.v1Post).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('moves on when the bridge refuses the request', async () => {
+        (window.TeameetNative as { postMessage: unknown }).postMessage = vi.fn(() => { throw new Error('bridge closed'); });
+        renderButton();
+        await click();
+
+        await waitFor(() => expect(assigned).not.toBeNull());
+        expect(screen.getByRole('status')).toHaveTextContent(HANDOFF_TEXT);
+        expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({
+          context: { reason: 'native-request-error', fallback: 'web_authorize' },
+        }));
+        expect(api.v1Post).not.toHaveBeenCalled();
+      });
+
+      it('ignores taps while the hand-off is under way', async () => {
+        reply = { error: 'failed("Kakao sign-in is already in progress")' };
+        renderButton();
+        await click();
+        await waitFor(() => expect(assigned).not.toBeNull());
+        const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+
+        await click();
+        await click();
+
+        expect(window.TeameetNative?.postMessage).toHaveBeenCalledTimes(1);
+        expect(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)).toBe(stored);
+      });
+
+      it('lets the reader start over after coming back from the Kakao page', async () => {
+        reply = { error: 'failed("Kakao sign-in is already in progress")' };
+        renderButton();
+        await click();
+        await waitFor(() => expect(assigned).not.toBeNull());
+
+        act(() => { window.dispatchEvent(new Event('pageshow')); });
+        expect(screen.queryByRole('status')).toBeNull();
+
+        reply = { accessToken: 'kakao-token' };
+        await click();
+        await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+        expect(api.v1Post).toHaveBeenCalledWith('/auth/kakao/token', { accessToken: 'kakao-token' });
+      });
+
+      it('stays on the page with the failure message when the attempt cannot be stored', async () => {
+        reply = { error: 'failed("Kakao sign-in is already in progress")' };
+        const setItem = Storage.prototype.setItem;
+        const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+          if (key === KAKAO_OAUTH_STATE_STORAGE_KEY) throw new DOMException('full', 'QuotaExceededError');
+          setItem.call(this, key, value);
+        });
+        try {
+          renderButton();
+          await click();
+
+          expect(await screen.findByRole('alert')).toHaveTextContent('카카오 로그인에 실패했어요');
+          expect(screen.queryByRole('status')).toBeNull();
+          expect(assigned).toBeNull();
+          expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'state_storage_unavailable' });
+        } finally {
+          blocked.mockRestore();
+        }
+
+        // The failed attempt released the button: with storage working again the same tap hands off.
+        await click();
+        await waitFor(() => expect(assigned).not.toBeNull());
+        expect(screen.getByRole('status')).toHaveTextContent(HANDOFF_TEXT);
+      });
     });
 
     it('shows the server error when the token is rejected', async () => {
@@ -141,6 +255,26 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       expect(await screen.findByRole('alert')).toHaveTextContent('로그인 정보를 확인할 수 없어요.');
+      expect(assigned).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    // 네이티브 토큰을 받은 뒤의 거절은 같은 계정 판정이 웹에서도 반복될 뿐이라 인가 화면으로 넘기지 않는다.
+    it.each([
+      ['a server error', apiError(500, 'INTERNAL_ERROR')],
+      ['a rejected token', apiError(401, 'KAKAO_TOKEN_INVALID')],
+    ])('does not hand off to the web page after %s from the token exchange', async (_label, failure) => {
+      reply = { accessToken: 'kakao-token' };
+      api.v1Post.mockRejectedValue(failure);
+      renderButton();
+      await click();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('실패');
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(assigned).toBeNull();
+      expect(storedAttempt()).toBeNull();
+      expect(reporter.reportClientError).not.toHaveBeenCalled();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: failure.code });
     });
 
     it('routes a blocked account to /auth/blocked like the callback path', async () => {
@@ -150,6 +284,7 @@ describe('KakaoLoginButton', () => {
       await click();
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
       expect(screen.queryByRole('alert')).toBeNull();
+      expect(assigned).toBeNull();
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'PERMISSION_DENIED' });
     });
 
@@ -178,6 +313,7 @@ describe('KakaoLoginButton', () => {
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
       expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
       expect(screen.queryByRole('alert')).toBeNull();
+      expect(assigned).toBeNull();
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: code });
     });
 
@@ -219,20 +355,6 @@ describe('KakaoLoginButton', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('실패');
       expect(router.replace).not.toHaveBeenCalled();
       expect(peekPendingSocialLink()).toBeNull();
-    });
-
-    it('shows a Korean message when the shell never answers (timeout)', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        reply = {};
-        (window.TeameetNative as { postMessage: unknown }).postMessage = vi.fn();
-        renderButton();
-        await click();
-        await act(() => vi.advanceTimersByTimeAsync(120_000));
-        expect(await screen.findByRole('alert')).toHaveTextContent('카카오 로그인에 실패했어요');
-      } finally {
-        vi.useRealTimers();
-      }
     });
   });
 

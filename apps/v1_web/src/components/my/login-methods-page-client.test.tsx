@@ -468,20 +468,128 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled());
     expect(linkCalls).toEqual([]);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('카카오 계정 로그인 화면으로 이동할게요')).not.toBeInTheDocument();
     expect(screen.queryByText(/연결하지 못했어요|연결됐어요/)).not.toBeInTheDocument();
+    expect(kakaoOAuth.startKakaoLinkAuthorize).not.toHaveBeenCalled();
   });
 
-  it('앱이 토큰 없이 오류로 답하면 연결하지 못했다고 알리고 원인을 기록한다', async () => {
-    installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { error: 'sdk-failed' } } });
-    await renderLoaded(['email']);
+  describe('앱의 카카오 인증이 실패하면 웹 연결로 넘어간다', () => {
+    const HANDOFF = '카카오 계정 로그인 화면으로 이동할게요';
 
-    await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+    it.each([
+      ['오류로 답하면', { error: 'sdk-failed' }, 'sdk-failed'],
+      ['이미 진행 중이라고 답하면', { error: 'failed("Kakao sign-in is already in progress")' }, 'failed("Kakao sign-in is already in progress")'],
+      ['토큰 없이 답하면', {}, 'missing-token'],
+    ])('앱이 %s 실패 안내 없이 이 화면으로 돌아오는 웹 카카오 인가를 시작하고 원인을 기록한다', async (_label, kakao, reason) => {
+      installShell({ supports: ['sign-in-with-kakao'], reply: { kakao } });
+      await renderLoaded(['email']);
 
-    expect(await screen.findByText('카카오 로그인을 연결하지 못했어요')).toBeInTheDocument();
-    expect(linkCalls).toEqual([]);
-    expect(reporter.reportClientError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Native kakao link failed', context: { reason: 'sdk-failed' } }),
-    );
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+
+      expect(await screen.findByText(HANDOFF)).toHaveAttribute('role', 'status');
+      expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledExactlyOnceWith({ returnTo: '/my/settings/login-methods' });
+      expect(linkCalls).toEqual([]);
+      expect(screen.queryByText('카카오 로그인을 연결하지 못했어요')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(reporter.reportClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Native kakao link failed', context: { reason, fallback: 'web_authorize' } }),
+      );
+    });
+
+    it('넘어가는 동안 버튼은 잠긴 채 남고 다시 눌러도 앱에 다시 묻지 않는다', async () => {
+      kakaoOAuth.startKakaoLinkAuthorize.mockReturnValue(new Promise(() => {}));
+      const shell = installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { error: 'sdk-failed' } } });
+      await renderLoaded(['email']);
+
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+      await waitFor(() => expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
+      await userEvent.click(screen.getByRole('button', { name: '연결 중이에요…' }));
+
+      expect(shell.postMessage).toHaveBeenCalledTimes(1);
+      expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1);
+    });
+
+    it('앱이 끝내 답하지 않아도(시간 초과) 같은 웹 연결로 넘어간다', async () => {
+      installShell({ supports: ['sign-in-with-kakao'] });
+      await renderLoaded(['email']);
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+        expect(kakaoOAuth.startKakaoLinkAuthorize).not.toHaveBeenCalled();
+        await act(() => vi.advanceTimersByTimeAsync(120_000));
+
+        expect(await screen.findByText(HANDOFF)).toHaveAttribute('role', 'status');
+        expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1);
+        expect(reporter.reportClientError).toHaveBeenCalledWith(
+          expect.objectContaining({ context: { reason: 'timeout', fallback: 'web_authorize' } }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('앱 브리지가 요청을 거절해도 같은 웹 연결로 넘어간다', async () => {
+      installShell({ supports: ['sign-in-with-kakao'] });
+      (window.TeameetNative as { postMessage: unknown }).postMessage = vi.fn(() => { throw new Error('bridge closed'); });
+      await renderLoaded(['email']);
+
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+
+      expect(await screen.findByText(HANDOFF)).toHaveAttribute('role', 'status');
+      expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1);
+      expect(reporter.reportClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { reason: 'native-request-error', fallback: 'web_authorize' } }),
+      );
+    });
+
+    it('웹 인가를 시작할 수 없으면 그 이유를 알리고 버튼을 다시 쓸 수 있게 한다', async () => {
+      kakaoOAuth.startKakaoLinkAuthorize.mockResolvedValue({ status: 'unavailable', reason: 'storage-unavailable' });
+      installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { error: 'sdk-failed' } } });
+      await renderLoaded(['email']);
+
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('브라우저 설정 때문에 연결을 진행할 수 없어요');
+      expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+    });
+
+    it('카카오 화면에서 돌아오면 안내가 사라지고 버튼을 다시 쓸 수 있다', async () => {
+      installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { error: 'sdk-failed' } } });
+      await renderLoaded(['email']);
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+      expect(await screen.findByText(HANDOFF)).toHaveAttribute('role', 'status');
+
+      setVisibility('hidden');
+      setVisibility('visible');
+
+      expect(await screen.findByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+      expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+    });
+
+    it('앱 인증은 받았는데 연결 API 가 거절하면 웹으로 넘어가지 않고 그 결과를 알린다', async () => {
+      installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { accessToken: LINK_MSW.credentials.providerInUse } } });
+      await renderLoaded(['email']);
+
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+
+      expect(await screen.findByText('이미 다른 계정에 연결된 카카오 계정이에요')).toBeInTheDocument();
+      expect(kakaoOAuth.startKakaoLinkAuthorize).not.toHaveBeenCalled();
+      expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+      expect(reporter.reportClientError).not.toHaveBeenCalledWith(expect.objectContaining({ message: 'Native kakao link failed' }));
+    });
+
+    it('Apple 은 앱 인증이 실패해도 웹으로 넘어가지 않고 실패를 알린다', async () => {
+      installShell({ supports: ['sign-in-with-apple'], reply: { apple: { ok: false, error: 'apple-failed' } } });
+      await renderLoaded(['email']);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Apple 연결하기' }));
+
+      expect(await screen.findByText('Apple 로그인을 연결하지 못했어요')).toBeInTheDocument();
+      expect(kakaoOAuth.startKakaoLinkAuthorize).not.toHaveBeenCalled();
+      expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+    });
   });
 
   it('카카오 연결 중에는 두 번째 요청을 보내지 않고 Apple 버튼도 함께 잠긴다', async () => {

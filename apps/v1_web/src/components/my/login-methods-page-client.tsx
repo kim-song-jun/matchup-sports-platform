@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -32,7 +33,7 @@ import {
 import type { LinkOutcome } from '@/lib/link-result';
 import { LOGIN_METHOD_NAME, signInMethods } from '@/lib/login-method';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
-import { isNativeKakaoSignInAvailable } from '@/lib/native-kakao';
+import { isNativeKakaoSignInAvailable, KAKAO_WEB_HANDOFF_MESSAGE, NativeKakaoSignInError } from '@/lib/native-kakao';
 import { requestNativeAppleLinkPayload, requestNativeKakaoLinkPayload } from '@/lib/native-social-credentials';
 import type { NativeCredentialResult } from '@/lib/native-social-credentials';
 import { unlinkResultFromError } from '@/lib/unlink-result';
@@ -48,6 +49,15 @@ const KAKAO_START_ERRORS = {
   'not-configured': '카카오 연결을 지금은 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
   'storage-unavailable': '브라우저 설정 때문에 연결을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.',
 } as const;
+
+/** 브리지가 던지는 오류(시간 초과·브리지 없음)도 앱 인증 실패로 보고 웹 연결로 넘어가게 한다. */
+async function requestKakaoCredential(): Promise<NativeCredentialResult<{ accessToken: string }>> {
+  try {
+    return await requestNativeKakaoLinkPayload();
+  } catch (error) {
+    return { status: 'failed', reason: error instanceof NativeKakaoSignInError ? error.reason : 'native-request-error' };
+  }
+}
 
 function ConnectedBadge() {
   return (
@@ -166,6 +176,8 @@ export function LoginMethodsPageClient() {
   const unlinkNoticeRef = useRef<HTMLDivElement>(null);
   const [activeProvider, setActiveProvider] = useState<V1LinkableProvider | null>(null);
   const [nativeApple, setNativeApple] = useState(false);
+  // 앱 인증이 실패해 웹 인가로 넘어가는 중. 셸 안의 인가는 곧바로 화면을 떠나므로 이동 전에 켜고, 시작하지 못하거나 돌아오면 끈다.
+  const [nativeFellBack, setNativeFellBack] = useState(false);
 
   // 브리지 존재 여부는 브라우저에서만 알 수 있다 — 서버 렌더에는 Apple 버튼이 없고 하이드레이션 뒤에 나타난다.
   useEffect(() => setNativeApple(isNativeAppleSignInAvailable()), []);
@@ -178,6 +190,7 @@ export function LoginMethodsPageClient() {
   useEffect(() => {
     const release = () => {
       setLeavingForAuthorize(false);
+      setNativeFellBack(false);
       setActiveProvider(null);
     };
     window.addEventListener('pageshow', release);
@@ -190,6 +203,7 @@ export function LoginMethodsPageClient() {
     const release = () => {
       if (document.visibilityState !== 'visible') return;
       setLeavingForAuthorize(false);
+      setNativeFellBack(false);
       setActiveProvider(null);
     };
     document.addEventListener('visibilitychange', release);
@@ -223,21 +237,45 @@ export function LoginMethodsPageClient() {
     setOutcome(null);
     setUnlinkOutcome(null);
     setStartError(null);
+    setNativeFellBack(false);
     hideToast();
   };
 
   const finish = () => setActiveProvider(null);
 
+  // 앱 인증이 실패했을 때 쓰는 대체 경로. 웹 인가가 시작돼 화면을 떠나면 true 를 돌려주고, 그 동안은 busy 를 유지한다.
+  const linkKakaoOnWeb = async (): Promise<boolean> => {
+    const started = await startKakaoLinkAuthorize({ returnTo: LOGIN_METHODS_PATH });
+    if (started.status === 'unavailable') {
+      setStartError(KAKAO_START_ERRORS[started.reason]);
+      return false;
+    }
+    setLeavingForAuthorize(true);
+    return true;
+  };
+
   const linkWithNativeCredential = async <Payload,>(
     provider: V1LinkableProvider,
     request: () => Promise<NativeCredentialResult<Payload>>,
     link: (payload: Payload) => Promise<V1LinkSocialResult>,
+    webFallback?: () => Promise<boolean>,
   ) => {
+    let leaving = false;
     try {
       const credential = await request();
       if (credential.status === 'cancelled') return;
       if (credential.status === 'failed') {
-        reportClientError({ message: `Native ${provider} link failed`, level: 'warn', context: { reason: credential.reason } });
+        reportClientError({
+          message: `Native ${provider} link failed`,
+          level: 'warn',
+          context: { reason: credential.reason, ...(webFallback ? { fallback: 'web_authorize' } : {}) },
+        });
+        if (webFallback) {
+          flushSync(() => setNativeFellBack(true));
+          leaving = await webFallback();
+          if (!leaving) setNativeFellBack(false);
+          return;
+        }
         present({ linkResult: 'failed', provider });
         return;
       }
@@ -258,24 +296,18 @@ export function LoginMethodsPageClient() {
       }
       present({ linkResult: linkResultFromError(error), provider });
     } finally {
-      finish();
+      if (!leaving) finish();
     }
   };
 
   const connectKakao = async () => {
     begin('kakao');
     if (isNativeKakaoSignInAvailable()) {
-      await linkWithNativeCredential('kakao', requestNativeKakaoLinkPayload, (payload) => linkKakao.mutateAsync(payload));
+      await linkWithNativeCredential('kakao', requestKakaoCredential, (payload) => linkKakao.mutateAsync(payload), linkKakaoOnWeb);
       return;
     }
-    const started = await startKakaoLinkAuthorize({ returnTo: LOGIN_METHODS_PATH });
     // 인가가 시작되면 화면을 떠나므로 busy 를 유지한다(돌아오면 위 효과가 푼다).
-    if (started.status === 'unavailable') {
-      setStartError(KAKAO_START_ERRORS[started.reason]);
-      finish();
-      return;
-    }
-    setLeavingForAuthorize(true);
+    if (!(await linkKakaoOnWeb())) finish();
   };
 
   const connectApple = async () => {
@@ -397,6 +429,9 @@ export function LoginMethodsPageClient() {
           ) : null}
           {startError ? (
             <p className="tm-text-label" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{startError}</p>
+          ) : null}
+          {nativeFellBack ? (
+            <p className="tm-text-label" role="status" style={{ margin: 0, color: 'var(--blue700)' }}>{KAKAO_WEB_HANDOFF_MESSAGE}</p>
           ) : null}
           <Card pad={16}>
             <ul role="list" aria-label="로그인 방법 목록" style={{ margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>

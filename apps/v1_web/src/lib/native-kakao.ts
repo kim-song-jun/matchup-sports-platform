@@ -24,6 +24,9 @@ const RESPONSE_TIMEOUT_MS = 120_000;
 /** The action name in the shared bridge contract; also what the shell lists in `supports`. */
 const KAKAO_ACTION = 'sign-in-with-kakao';
 
+/** Shown while the web falls back from a failed native sign-in to the Kakao account page. */
+export const KAKAO_WEB_HANDOFF_MESSAGE = '카카오 계정 로그인 화면으로 이동할게요';
+
 /** `message` stays empty so an English reason never reaches the Korean alert (see `NativeAppleSignInError`). */
 export class NativeKakaoSignInError extends Error {
   constructor(readonly reason: 'bridge-unavailable' | 'timeout') {

@@ -1551,6 +1551,11 @@ button:disabled {
   order: 1;
 }
 
+/* 같은 자리에 오류가 아닌 진행 안내(role="status")를 보일 때. --blue700 은 다크에서 밝은 값으로 덮여 두 테마 모두 AA 를 넘는다. */
+.tm-auth-provider-status {
+  color: var(--blue700);
+}
+
 .tm-auth-provider-disabled,
 .tm-auth-provider-disabled:disabled {
   border: 1px solid var(--grey100);

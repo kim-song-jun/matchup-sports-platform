@@ -710,6 +710,8 @@ extension WebShellViewController: WKScriptMessageHandler {
             await replyToKakao(request, accessToken: accessToken)
         } catch KakaoSignInController.Failure.cancelled {
             await replyToKakao(request, cancelled: true)
+        } catch KakaoSignInController.Failure.failed(let report) {
+            await replyToKakao(request, error: report)
         } catch {
             await replyToKakao(request, error: "\(error)")
         }

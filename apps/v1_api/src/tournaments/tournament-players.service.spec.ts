@@ -98,6 +98,11 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     jerseyNumber: null,
     eligibilityStatus: 'needs_review',
     eligibilityNote: null,
+    eligibilityVerificationMethod: null,
+    eligibilityVerifiedAt: null,
+    eligibilityVerifiedByUserId: null,
+    selfDeclaredStatus: null,
+    selfDeclaredAt: null,
     addedAt: new Date('2026-06-14T00:00:00Z'),
     removedAt: null,
     createdAt: new Date('2026-06-14T00:00:00Z'),
@@ -156,9 +161,9 @@ describe('TournamentPlayersService', () => {
     v1AdminUser: { findUnique: jest.Mock };
 
     v1TournamentStaffAssignment: { findFirst: jest.Mock };
-    v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
-    v1OperationAudit: { create: jest.Mock; findFirst: jest.Mock };
+    v1OperationAudit: { create: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
     v1GameRosterAdjustment: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
@@ -191,9 +196,15 @@ describe('TournamentPlayersService', () => {
         create: jest.fn().mockResolvedValue({ id: 'action-log-1' }),
         // 기본은 "어드민이 아직 선출 여부를 확정하지 않음".
         findFirst: jest.fn().mockResolvedValue(null),
+        // 목록의 "판정 있음" 일괄 조회(MD-QA #192). 기본은 판정 없음.
+        findMany: jest.fn().mockResolvedValue([]),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
-      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }), findFirst: jest.fn().mockResolvedValue(null) },
+      v1OperationAudit: {
+        create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       v1GameRosterAdjustment: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
@@ -909,10 +920,11 @@ describe('TournamentPlayersService', () => {
     const MEMO = '2018 프로 등록 이력 확인 필요';
     const OWN_MEMO = '본인 이력 재확인 필요';
     // 명단은 두 명: 남(홍길동)과 member 본인(김본인).
-    const otherRow = () =>
-      playerRow({ id: 'player-other', userId: 'other-user-id', eligibilityNote: MEMO });
-    const ownRow = () =>
+    const otherRow = (overrides: Record<string, unknown> = {}) =>
+      playerRow({ id: 'player-other', userId: 'other-user-id', eligibilityNote: MEMO, ...overrides });
+    const ownRow = (overrides: Record<string, unknown> = {}) =>
       playerRow({
+        ...overrides,
         id: 'player-own',
         userId: 'member-user-id',
         realName: '김본인',
@@ -1030,6 +1042,37 @@ describe('TournamentPlayersService', () => {
         personalInfoVisible: true,
       });
       expect(JSON.stringify(result)).not.toContain(OWN_MEMO);
+    });
+
+    it('MD-QA #192: 판정 근거는 팀장·매니저까지, 본인 신고는 본인 행까지, 판정 여부는 모두에게', async () => {
+      const verifiedAt = new Date('2026-11-10T00:00:00Z');
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+        otherRow({ eligibilityStatus: 'non_pro', eligibilityVerificationMethod: 'joinkfa', eligibilityVerifiedAt: verifiedAt,
+          selfDeclaredStatus: 'pro', selfDeclaredAt: verifiedAt }),
+        ownRow({ selfDeclaredStatus: 'non_pro', selfDeclaredAt: verifiedAt }),
+      ]);
+
+      const asMember = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
+      expect(rowOf(asMember, 'player-other')).toMatchObject({
+        eligibilityAdminReviewed: true,
+        eligibilityVerificationMethod: null,
+        eligibilityVerifiedAt: null,
+        selfDeclaredStatus: null,
+        isViewer: false,
+      });
+      expect(rowOf(asMember, 'player-own')).toMatchObject({
+        eligibilityAdminReviewed: false,
+        selfDeclaredStatus: 'non_pro',
+        isViewer: true,
+      });
+
+      const asOwner = await service.listPlayers(owner, 'tournament-1', 'reg-1');
+      expect(rowOf(asOwner, 'player-other')).toMatchObject({
+        eligibilityAdminReviewed: true,
+        eligibilityVerificationMethod: 'joinkfa',
+        eligibilityVerifiedAt: verifiedAt.toISOString(),
+        selfDeclaredStatus: 'pro',
+      });
     });
 
     it('일반 팀원에게 프로필이 없는 남의 행의 닉네임은 실명으로 대체하지 않고 null 이다', async () => {
@@ -1230,6 +1273,7 @@ describe('TournamentPlayersService', () => {
 
     const result = await service.updateEligibility(adminUser, 'player-1', {
       eligibilityStatus: 'non_pro',
+      verificationMethod: 'joinkfa',
       note: '확인완료',
     });
 
@@ -1245,12 +1289,268 @@ describe('TournamentPlayersService', () => {
     );
   });
 
+  // ─── MD-QA #192 ① 판정 근거 ───────────────────────────────────────────────
+
+  it('updateEligibility: 확인 방법·확인일·확인자를 서버가 채우고 감사 afterJson 에도 남긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) =>
+      playerRow(data));
+
+    const result = await service.updateEligibility(adminUser, 'player-1', {
+      eligibilityStatus: 'pro',
+      verificationMethod: 'certificate',
+      note: '고교 등록 이력',
+    });
+
+    const data = prisma.v1TournamentPlayer.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      eligibilityStatus: 'pro',
+      eligibilityVerificationMethod: 'certificate',
+      eligibilityNote: '고교 등록 이력',
+      eligibilityVerifiedByUserId: 'admin-user-id',
+    });
+    expect(data.eligibilityVerifiedAt).toBeInstanceOf(Date);
+    expect(result).toMatchObject({ eligibilityVerificationMethod: 'certificate' });
+    expect(result.eligibilityVerifiedAt).toEqual(expect.any(String));
+    const log = prisma.v1AdminActionLog.create.mock.calls[0][0].data;
+    expect(log.afterJson).toMatchObject({
+      eligibilityStatus: 'pro',
+      eligibilityVerificationMethod: 'certificate',
+      eligibilityVerifiedByUserId: 'admin-user-id',
+      eligibilityVerifiedAt: expect.any(String),
+    });
+    expect(log.beforeJson).toMatchObject({ eligibilityStatus: 'needs_review', eligibilityVerificationMethod: null });
+  });
+
+  it('updateEligibility: 메모를 보내지 않으면 기존 메모를 덮어쓰지 않는다(옛 결함: null 로 지워짐)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({ eligibilityNote: '앞서 남긴 근거' }));
+    prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) =>
+      playerRow({ eligibilityNote: '앞서 남긴 근거', ...data }));
+
+    await service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'non_pro', verificationMethod: 'joinkfa' });
+
+    const data = prisma.v1TournamentPlayer.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('eligibilityNote');
+  });
+
+  it('updateEligibility: 빈 메모는 메모 지우기다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({ eligibilityNote: '지울 메모' }));
+    prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
+
+    await service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'non_pro', verificationMethod: 'joinkfa', note: '  ' });
+
+    expect(prisma.v1TournamentPlayer.update.mock.calls[0][0].data).toMatchObject({ eligibilityNote: null });
+  });
+
+  it('updateEligibility: 선출·아마추어 판정에 확인 방법이 없으면 400 ELIGIBILITY_METHOD_REQUIRED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+
+    await expect(
+      service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'pro' }),
+    ).rejects.toMatchObject({ response: { code: 'ELIGIBILITY_METHOD_REQUIRED' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('updateEligibility: 확인 중으로 되돌리면 요청에 확인 방법이 실려 있어도 방법·확인일·확인자를 비운다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({
+      eligibilityStatus: 'pro', eligibilityVerificationMethod: 'joinkfa',
+      eligibilityVerifiedAt: new Date('2026-11-10T00:00:00Z'), eligibilityVerifiedByUserId: 'someone',
+    }));
+    prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
+
+    await service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'needs_review', verificationMethod: 'joinkfa' });
+
+    expect(prisma.v1TournamentPlayer.update.mock.calls[0][0].data).toMatchObject({
+      eligibilityStatus: 'needs_review',
+      eligibilityVerificationMethod: null,
+      eligibilityVerifiedAt: null,
+      eligibilityVerifiedByUserId: null,
+    });
+  });
+
+  it('updateEligibility: support 어드민은 판정할 수 없다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue({ ...opsAdminRecord, adminRole: 'support' });
+
+    await expect(
+      service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'pro', verificationMethod: 'joinkfa' }),
+    ).rejects.toMatchObject({ response: { code: expect.stringMatching(/PERMISSION_DENIED|STAFF_SCOPE_DENIED/) } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  // ─── MD-QA #192 ② 이전 판정 이어 쓰기 ─────────────────────────────────────
+
+  it('listPlayersForAdmin: 판정 전 선수에게 같은 계정의 가장 최근 이전 판정을 제안한다(자동 적용 없음)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1', teamId: 'team-1', rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' }, tournament: { minPlayers: 1 },
+    });
+    prisma.v1TournamentPlayer.findMany
+      .mockResolvedValueOnce([playerRow({ user: { phone: null, profile: { nickname: '길동이' } }, eligibilityVerifiedBy: null })])
+      .mockResolvedValueOnce([
+        {
+          id: 'old-player', userId: 'player-user-id', eligibilityStatus: 'non_pro',
+          eligibilityVerificationMethod: 'joinkfa', eligibilityVerifiedAt: new Date('2026-10-20T03:00:00Z'),
+          registration: { tournament: { id: 'old-t', title: '가을 컵' } },
+        },
+        {
+          id: 'older-player', userId: 'player-user-id', eligibilityStatus: 'pro',
+          eligibilityVerificationMethod: 'other', eligibilityVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+          registration: { tournament: { id: 'older-t', title: '봄 컵' } },
+        },
+      ]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players[0]).toMatchObject({
+      eligibilityStatus: 'needs_review',
+      eligibilityAdminReviewed: false,
+      previousEligibilityRuling: {
+        sourcePlayerId: 'old-player', eligibilityStatus: 'non_pro', verificationMethod: 'joinkfa',
+        verifiedAt: '2026-10-20T03:00:00.000Z', competitionTitle: '가을 컵',
+      },
+    });
+    // 사람을 잇는 열쇠는 userId 하나다 — 이름·생년월일로 찾지 않는다.
+    const where = prisma.v1TournamentPlayer.findMany.mock.calls[1][0].where;
+    expect(where).toMatchObject({ userId: { in: ['player-user-id'] }, registrationId: { notIn: ['reg-1'] } });
+    expect(where).not.toHaveProperty('realName');
+    expect(where).not.toHaveProperty('birthDateSnapshot');
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('listPlayersForAdmin: 이미 판정한 선수는 이전 판정을 찾지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1', teamId: 'team-1', rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' }, tournament: { minPlayers: 1 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValueOnce([playerRow({
+      eligibilityStatus: 'pro', eligibilityVerificationMethod: 'joinkfa',
+      eligibilityVerifiedAt: new Date('2026-11-10T00:00:00Z'), eligibilityVerifiedByUserId: 'admin-user-id',
+      eligibilityVerifiedBy: { profile: { nickname: '운영김', displayName: null } },
+      user: { phone: null, profile: { nickname: '길동이' } },
+    })]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players[0]).toMatchObject({
+      eligibilityAdminReviewed: true,
+      eligibilityVerifiedByName: '운영김',
+      previousEligibilityRuling: null,
+    });
+    expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('carryOverEligibility: 같은 계정의 이전 판정을 옮기고 확인자는 지금 누른 운영자다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.findUnique.mockResolvedValue({
+      id: 'old-player', userId: 'player-user-id', registrationId: 'old-reg',
+      eligibilityStatus: 'non_pro', eligibilityVerificationMethod: 'joinkfa',
+      eligibilityVerifiedAt: new Date('2026-10-20T03:00:00Z'),
+      registration: { tournament: { title: '가을 컵' } },
+    });
+    prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
+
+    await service.carryOverEligibility(adminUser, 'player-1', { sourcePlayerId: 'old-player' });
+
+    const data = prisma.v1TournamentPlayer.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      eligibilityStatus: 'non_pro',
+      eligibilityVerificationMethod: 'joinkfa',
+      eligibilityNote: '이전 대회(가을 컵) 판정 유지',
+      eligibilityVerifiedByUserId: 'admin-user-id',
+    });
+    expect(data.eligibilityVerifiedAt).toBeInstanceOf(Date);
+    expect(prisma.v1AdminActionLog.create.mock.calls[0][0].data).toMatchObject({
+      action: 'player.eligibility',
+      targetId: 'player-1',
+      afterJson: expect.objectContaining({ carriedOverFromPlayerId: 'old-player' }),
+    });
+  });
+
+  it.each([
+    { label: '다른 사람의 판정', source: { userId: 'someone-else' } },
+    { label: '근거 없는 판정(확인일 없음)', source: { eligibilityVerifiedAt: null } },
+    { label: '확인 중 상태', source: { eligibilityStatus: 'needs_review' } },
+    { label: '같은 명단의 행', source: { registrationId: 'reg-1' } },
+  ])('carryOverEligibility: $label 은 옮기지 않는다(400)', async ({ source }) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.findUnique.mockResolvedValue({
+      id: 'old-player', userId: 'player-user-id', registrationId: 'old-reg',
+      eligibilityStatus: 'non_pro', eligibilityVerificationMethod: 'joinkfa',
+      eligibilityVerifiedAt: new Date('2026-10-20T03:00:00Z'),
+      registration: { tournament: { title: '가을 컵' } },
+      ...source,
+    });
+
+    await expect(
+      service.carryOverEligibility(adminUser, 'player-1', { sourcePlayerId: 'old-player' }),
+    ).rejects.toMatchObject({ response: { code: 'ELIGIBILITY_PREVIOUS_RULING_NOT_FOUND' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  // ─── MD-QA #192 ③ 선수 본인 신고 ──────────────────────────────────────────
+
+  describe('selfDeclareEligibility', () => {
+    const playerUser = { ...adminUser, id: 'player-user-id' };
+    beforeEach(() => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-1', tournamentId: 't-1', teamId: 'team-1', status: 'confirmed' });
+      prisma.v1Tournament.findFirst.mockResolvedValue({ status: 'open', kind: 'tournament' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'member' });
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+      prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
+    });
+
+    it('명단 행의 계정 주인이 신고하면 신고값·신고 시각만 저장하고 판정은 그대로다', async () => {
+      const result = await service.selfDeclareEligibility(playerUser, 't-1', 'reg-1', 'player-1', {
+        selfDeclaredStatus: 'pro', consent: true,
+      });
+
+      const data = prisma.v1TournamentPlayer.update.mock.calls[0][0].data;
+      expect(Object.keys(data).sort()).toEqual(['selfDeclaredAt', 'selfDeclaredStatus']);
+      expect(data.selfDeclaredStatus).toBe('pro');
+      expect(result).toEqual({ id: 'player-1', selfDeclaredStatus: 'pro', selfDeclaredAt: expect.any(String) });
+    });
+
+    it('다른 사람(팀장 포함)은 대신 신고할 수 없다 — 403', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'owner' });
+
+      await expect(service.selfDeclareEligibility({ ...adminUser, id: 'captain-id' }, 't-1', 'reg-1', 'player-1', {
+        selfDeclaredStatus: 'non_pro', consent: true,
+      })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    });
+
+    it('운영진이 이미 판정했으면 409 ELIGIBILITY_ADMIN_REVIEWED', async () => {
+      prisma.v1AdminActionLog.findFirst.mockResolvedValue({ id: 'log-1', createdAt: new Date() });
+
+      await expect(service.selfDeclareEligibility(playerUser, 't-1', 'reg-1', 'player-1', {
+        selfDeclaredStatus: 'non_pro', consent: true,
+      })).rejects.toMatchObject({ response: { code: 'ELIGIBILITY_ADMIN_REVIEWED' } });
+      expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    });
+
+    it('취소된 신청에서는 신고할 수 없다 — 409 SELF_DECLARATION_CLOSED', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-1', tournamentId: 't-1', teamId: 'team-1', status: 'cancelled' });
+
+      await expect(service.selfDeclareEligibility(playerUser, 't-1', 'reg-1', 'player-1', {
+        selfDeclaredStatus: 'non_pro', consent: true,
+      })).rejects.toMatchObject({ response: { code: 'SELF_DECLARATION_CLOSED' } });
+    });
+  });
+
   it('updateEligibility: unknown player → 404 PLAYER_NOT_FOUND', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.updateEligibility(adminUser, 'ghost-player', { eligibilityStatus: 'pro' }),
+      service.updateEligibility(adminUser, 'ghost-player', { eligibilityStatus: 'pro', verificationMethod: 'joinkfa' }),
     ).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
   });
 
@@ -1303,9 +1603,12 @@ describe('TournamentPlayersService', () => {
       .mockResolvedValueOnce([
         playerRow({ user: { phone: null, profile: { nickname: '변경전닉네임' } } }),
       ])
+      // 두 번째 조회는 이전 대회 판정 찾기(MD-QA #192) — 없음.
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         playerRow({ user: { phone: null, profile: { nickname: '변경후닉네임' } } }),
-      ]);
+      ])
+      .mockResolvedValueOnce([]);
 
     const before = await service.listPlayersForAdmin(adminUser, 'reg-1');
     const after = await service.listPlayersForAdmin(adminUser, 'reg-1');
@@ -1352,6 +1655,7 @@ describe('TournamentPlayersService', () => {
               profile: { select: { nickname: true, deletedAt: true } },
             },
           },
+          eligibilityVerifiedBy: { select: { profile: { select: { nickname: true, displayName: true } } } },
         },
       }),
     );
@@ -1550,9 +1854,9 @@ describe('TournamentPlayersService', () => {
     const { csv } = await service.exportCsv(adminUser, 'reg-1');
 
     expect(csv.split('\n')).toEqual([
-      'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone',
-      '홍길동,1995-03-15,male,needs_review,번개맨,7,010-1234-5678',
-      '김철수,1995-03-15,male,needs_review,,,',
+      'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone,verificationMethod,verifiedAt',
+      '홍길동,1995-03-15,male,needs_review,번개맨,7,010-1234-5678,,',
+      '김철수,1995-03-15,male,needs_review,,,,,',
     ]);
     // 명단(PII) 내려받기는 감사 로그에 남는다 — 개인정보 없이 행 수만.
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
@@ -1574,7 +1878,7 @@ describe('TournamentPlayersService', () => {
 
     const { csv } = await service.exportCsv(adminUser, 'reg-1');
 
-    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",,`);
+    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",,,,`);
   });
 
   it('exportCsv: 전화번호는 엑셀이 앞 0 을 지우지 않게 하이픈 표기, 탈퇴 회원·미등록은 빈칸', async () => {
@@ -1589,7 +1893,7 @@ describe('TournamentPlayersService', () => {
 
     const { csv } = await service.exportCsv(adminUser, 'reg-1');
 
-    expect(csv.split('\n').slice(1).map((line) => line.split(',').at(-1))).toEqual([
+    expect(csv.split('\n').slice(1).map((line) => line.split(',').at(-3))).toEqual([
       '010-1234-5678',
       '011-123-4567',
       '',
@@ -1647,9 +1951,9 @@ describe('TournamentPlayersService', () => {
         '신청 팀,2팀 · 선수 2명',
         '',
         '[1] 번개팀 · 참가 확정 · 2명',
-        '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호',
-        '1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장,010-1234-5678',
-        '2,,이영희,1995-03-15,여성,선출,,,',
+        '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호,확인 방법,확인일',
+        '1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장,010-1234-5678,,',
+        '2,,이영희,1995-03-15,여성,선출,,,,,',
         '',
         '"[2] 천둥, ""번개"" · 입금 대기 · 명단 미등록"',
       ]);

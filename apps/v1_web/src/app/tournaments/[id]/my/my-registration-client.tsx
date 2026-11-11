@@ -51,6 +51,7 @@ import {
   tournamentRegistrationStatusConfig as registrationStatusConfig,
 } from '@/lib/v1-status-labels';
 import { rosterLimitText } from '@/lib/roster-limit';
+import { PlayerSelfDeclarationCard } from '@/components/tournaments/player-self-declaration-card';
 
 /** 정규 리그를 "대회"라고 부르지 않는다("리그 상세 보기"). 종류를 모르면(로딩 실패) 대회 말투를 쓴다. */
 function competitionNoun(isLeague: boolean): string {
@@ -667,6 +668,8 @@ function RegistrationDetailView({
   const statusConfig = registrationStatusConfig(registration.status, registration.cancelOutcome);
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
+  // 본인 신고(MD-QA #192 ③) — 명단에 내가 있을 때만. 팀장·매니저도 남의 행은 신고하지 못한다.
+  const myRosterPlayer = players.find((player) => player.isViewer === true) ?? null;
   const isRosterLocked = Boolean(registration.rosterLockedAt);
   // 감사 finding #47 방어선 — shouldShowConfirmedAt 주석 참조.
   const showConfirmedAt = shouldShowConfirmedAt(registration.status, registration.confirmedAt);
@@ -907,6 +910,15 @@ function RegistrationDetailView({
               minPlayers={tournament.minPlayers}
               belowMinimum={belowMinimum}
             />
+
+            {/* 끝난 대회·취소된 신청에는 신고를 받지 않는다(서버도 409 SELF_DECLARATION_CLOSED). */}
+            {myRosterPlayer && rosterBlockReason !== 'closed' && rosterBlockReason !== 'cancelled' ? (
+              <PlayerSelfDeclarationCard
+                tournamentId={tournamentId}
+                registrationId={registration.id}
+                player={myRosterPlayer}
+              />
+            ) : null}
 
             {/* Roster — surface before 신청 내역 so users notice roster registration early. */}
             {!passShowsRoster ? (

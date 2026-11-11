@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AdminPlayerSettingsEditor } from '@/components/admin/admin-player-settings-editor';
 import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
-import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
-import type { V1AdminTournamentRegistration } from '@/types/api';
+import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1CarryOverPlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
+import type { V1AdminTournamentRegistration, V1UpdatePlayerEligibilityPayload } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
@@ -15,6 +15,16 @@ import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { AdminRegistrationGameRosters } from '@/components/game-roster/admin-registration-game-rosters';
+import {
+  EligibilityEvidence,
+  EligibilityFilterChips,
+  EligibilityRulingPanel,
+  PreviousEligibilityRuling,
+  isEligibilityReviewed,
+  matchesEligibilityFilter,
+  type EligibilityFilter,
+} from '@/components/admin/admin-player-eligibility-review';
+import { JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
 import { formatDate } from './tournament-admin-shared';
 import {
   ADMIN_CANCELLABLE,
@@ -67,6 +77,10 @@ export function RosterModal({
     if (visibleRegistrationId) void refetch({ cancelRefetch: false });
   }, [visibleRegistrationId, refetch, queryClient]);
   const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
+  const carryOverEligibility = useV1CarryOverPlayerEligibility(registration?.id ?? '');
+  // 판정 패널은 한 번에 한 선수만 연다 — 여러 패널이 열리면 "판정 저장" 이 여럿 보인다.
+  const [rulingPlayerId, setRulingPlayerId] = useState<string | null>(null);
+  const [eligibilityFilter, setEligibilityFilter] = useState<EligibilityFilter>('all');
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
 
@@ -89,6 +103,8 @@ export function RosterModal({
   useEffect(() => {
     setSelectedUserId('');
     setAddError(null);
+    setRulingPlayerId(null);
+    setEligibilityFilter('all');
   }, [registration?.id, open]);
 
   // 고른 팀원이 목록에서 사라지거나 자격을 잃으면 선택을 비운다 — select 는 없는 값을 못
@@ -147,16 +163,24 @@ export function RosterModal({
     });
   };
 
-  const handleEligibilityChange = (playerId: string, status: string) => {
-    updateEligibility.mutate(
-      { playerId, eligibilityStatus: status as 'non_pro' | 'pro' | 'needs_review' },
+  // 판정 + 확인 방법 + 메모를 한 번에 저장한다. 실패는 패널이 문구로 보여 주도록 다시 던진다.
+  const handleSaveRuling = async (playerId: string, body: V1UpdatePlayerEligibilityPayload) => {
+    await updateEligibility.mutateAsync({ playerId, ...body });
+    setRulingPlayerId(null);
+    showToast('선출 판정을 저장했어요.', 'success');
+  };
+
+  const handleKeepPreviousRuling = (playerId: string, sourcePlayerId: string) => {
+    carryOverEligibility.mutate(
+      { playerId, sourcePlayerId },
       {
-        onSuccess: () => showToast('자격 상태를 변경했어요.', 'success'),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '자격 상태를 변경하지 못했어요.'), 'error'),
+        onSuccess: () => showToast('이전 판정을 이 대회 판정으로 남겼어요.', 'success'),
+        onError: (err) => showToast(extractErrorMessage(err, '이전 판정을 유지하지 못했어요.'), 'error'),
       },
     );
   };
+
+  const visiblePlayers = players.filter((player) => matchesEligibilityFilter(player, eligibilityFilter));
 
   return (
     <SimpleModal
@@ -165,10 +189,13 @@ export function RosterModal({
       onClose={onClose}
     >
       {!isPending && !isError && players.length > 0 ? (
-        <p className="mb-2 text-xs text-[var(--text-muted)]">
-          {`현재 성별 구성 · 남 ${maleCount}명 · 여 ${femaleCount}명`}
-          {unknownGenderCount > 0 ? ` · 성별 미등록 ${unknownGenderCount}명` : ''}
-        </p>
+        <>
+          <p className="mb-2 text-xs text-[var(--text-muted)]">
+            {`현재 성별 구성 · 남 ${maleCount}명 · 여 ${femaleCount}명`}
+            {unknownGenderCount > 0 ? ` · 성별 미등록 ${unknownGenderCount}명` : ''}
+          </p>
+          <EligibilityFilterChips players={players} value={eligibilityFilter} onChange={setEligibilityFilter} />
+        </>
       ) : null}
       {isPending ? (
         <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>
@@ -185,9 +212,11 @@ export function RosterModal({
         </div>
       ) : players.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">등록된 선수가 없어요.</p>
+      ) : visiblePlayers.length === 0 ? (
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">이 조건에 맞는 선수가 없어요.</p>
       ) : (
         <ul className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto" role="list">
-          {players.map((p) => (
+          {visiblePlayers.map((p) => (
             <li
               key={`${registration?.id}-${p.id}-${open}`}
               className="flex flex-wrap items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"
@@ -221,18 +250,25 @@ export function RosterModal({
                 <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                   {PHONE_LABEL} {formatPhoneNumber(p.phone)}
                 </p>
+                <p className="mt-1 flex items-center gap-2">
+                  <span
+                    className={`tm-badge ${p.eligibilityStatus === 'pro' ? 'tm-badge-orange' : p.eligibilityStatus === 'non_pro' ? 'tm-badge-green' : 'tm-badge-grey'}`}
+                  >
+                    {ELIGIBILITY_LABEL[p.eligibilityStatus]}
+                  </span>
+                </p>
+                <EligibilityEvidence player={p} />
               </div>
-              <select
-                value={p.eligibilityStatus}
-                onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
-                disabled={!canWrite || updateEligibility.isPending}
-                aria-label={`${p.realName} 자격 상태`}
-                className="h-[44px] px-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+              <button
+                type="button"
+                onClick={() => setRulingPlayerId((current) => (current === p.id ? null : p.id))}
+                disabled={!canWrite}
+                aria-expanded={rulingPlayerId === p.id}
+                aria-label={`${p.realName} 선출 판정`}
+                className="h-[44px] shrink-0 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
               >
-                {(Object.entries(ELIGIBILITY_LABEL) as [string, string][]).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+                {isEligibilityReviewed(p) ? '다시 판정' : '판정하기'}
+              </button>
               <button
                 type="button"
                 onClick={() => handleRemovePlayer(p.id, p.realName)}
@@ -248,6 +284,27 @@ export function RosterModal({
                 canWrite={canWrite}
                 showToast={showToast}
               />
+              {p.previousEligibilityRuling ? (
+                <div className="w-full">
+                  <PreviousEligibilityRuling
+                    player={p}
+                    canWrite={canWrite}
+                    isPending={carryOverEligibility.isPending}
+                    onKeep={() => {
+                      const previous = p.previousEligibilityRuling;
+                      if (previous) handleKeepPreviousRuling(p.id, previous.sourcePlayerId);
+                    }}
+                  />
+                </div>
+              ) : null}
+              {canWrite && rulingPlayerId === p.id ? (
+                <EligibilityRulingPanel
+                  player={p}
+                  isSaving={updateEligibility.isPending}
+                  onCancel={() => setRulingPlayerId(null)}
+                  onSave={(body) => handleSaveRuling(p.id, body)}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
@@ -325,6 +382,10 @@ export function RosterModal({
           ) : null}
         </div>
       ) : null}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE} 대한축구협회 공식 사이트에서 직접 확인해 주세요.</p>
+        <JoinKfaLink label="JoinKFA 열기" />
+      </div>
       <button
         type="button"
         onClick={onClose}

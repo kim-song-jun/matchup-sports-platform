@@ -614,7 +614,8 @@ export const gameSchemaSourceManifest = {
   // 2026-11-10: game domain change (MD-QA #187) — additive V1GameEventType.TIME_CORRECTION and nullable
   // V1GameEvent.correctsEventId + (game_id, corrects_event_id) index + guard trigger
   // (20261110090000_v1_game_event_time_correction). Append-only: no existing column changes; historical game migration unchanged.
-  schema: 'd33e16e5c14bdb09c43422a6216a7362bc3ff5c612c7d575e21c57047a3e4836',
+  // 2026-11-11: tournament player eligibility evidence (MD-QA #192, 20261111090000); historical game migration unchanged.
+  schema: '063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

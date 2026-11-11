@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
+import type { V1InquiryReportReason, V1PlayerEligibilityMethod, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -505,12 +505,27 @@ export function tournamentRegistrationStatusConfig(
   return { ...REGISTRATION_TONE[entry.tone], label: entry.label };
 }
 
-/** 선수 자격(선출 여부) 라벨 — 팀 명단·어드민 명단 검토가 같은 말을 쓴다. 어드민은 `needs_review` 만 따로 쓴다. */
+/**
+ * 선수 자격(선출 여부) 라벨 — 팀 명단·어드민 명단 검토·명단 CSV(API `ELIGIBILITY_LABEL`)가 같은 말을 쓴다.
+ * 예전엔 어드민과 CSV 만 `needs_review` 를 '검토 필요' 로 따로 불렀다(MD-QA #192 에서 '확인 중' 하나로 맞춤).
+ */
 export const PLAYER_ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string> = {
   non_pro: '아마추어',
   pro: '선출',
   needs_review: '확인 중',
 };
+
+/** 운영진 판정 확인 방법 라벨(MD-QA #192). API CSV 의 `ELIGIBILITY_METHOD_LABEL` 과 같은 말이다. */
+export const PLAYER_ELIGIBILITY_METHOD_LABEL: Record<V1PlayerEligibilityMethod, string> = {
+  joinkfa: 'JoinKFA',
+  certificate: '경력·실적 증명서',
+  self_presented: '본인 화면 제시',
+  self_declared: '본인 신고',
+  other: '기타',
+};
+
+/** 선출 기준 안내 — 사용자 확정 문구(2026-11-11). 등급·기간을 하드코딩하지 않고 대회 요강에 맡긴다. */
+export const PLAYER_ELIGIBILITY_CRITERIA_TEXT = 'KFA 등록 이력(JoinKFA)으로 확인하고, 세부 기준은 대회 요강을 따라요.';
 
 /** 참가 명단에 표시하는 선수 프로필 성별. */
 export function rosterGenderLabel(value: 'male' | 'female' | null | undefined): string {

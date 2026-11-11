@@ -57,6 +57,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ExportTournamentRosterCsv: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminTournamentPlayers: vi.fn(),
   useV1UpdatePlayerEligibility: vi.fn(),
+  useV1CarryOverPlayerEligibility: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   // RosterModal 이 이 탭에서 렌더되므로 모달이 쓰는 훅도 함께 mock 해야 한다.
   useV1AdminAddPlayer: vi.fn(),
   useV1AdminRemovePlayer: vi.fn(),

@@ -26,6 +26,7 @@ afterEach(() => {
 
 const refetch = vi.fn();
 const updateEligibility = vi.fn();
+const carryOver = vi.fn();
 let queryState: Record<string, unknown>;
 
 const addPlayer = vi.fn();
@@ -45,7 +46,8 @@ let eligibleState: Record<string, unknown>;
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
   useV1AdminUpdatePlayerSettings: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
+  useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, mutateAsync: updateEligibility, isPending: false }),
+  useV1CarryOverPlayerEligibility: () => ({ mutate: carryOver, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
   useV1AdminRosterEligibleMembers: () => eligibleState,
   useV1AdminRemovePlayer: () => ({ mutate: removePlayer, isPending: false }),
@@ -209,27 +211,144 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.getByText('1995.03.15 · 성별 미등록')).toBeInTheDocument();
     expect(screen.getByText('휴대폰 미등록')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
   });
 
-  // 팀 화면(명단 편집)의 자격 라벨은 아마추어 / 선출 이다 — 어드민 선택지가 같은 말을 써야 한다.
-  it('자격 상태 선택지는 팀 화면과 같은 "아마추어 / 선출" 이름을 쓴다', () => {
-    render(
-      <RosterModal
-        open
-        onClose={() => undefined}
-        registration={registration}
-        showToast={() => undefined}
-        canWrite
-      />,
-    );
+  // 팀 화면(명단 편집)의 자격 라벨은 아마추어 / 선출 / 확인 중이다 — 어드민 판정 패널이 같은 말을 써야 한다.
+  // MD-QA #192: needs_review 는 어디서나 '확인 중' 하나다(예전 어드민만 '검토 필요').
+  it('판정 패널의 판정 선택지는 팀 화면과 같은 "아마추어 / 선출 / 확인 중" 이름을 쓴다', async () => {
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
 
-    const select = screen.getByRole('combobox', { name: '홍길동 자격 상태' });
-    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+    await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
+    const statusGroup = within(panel).getByRole('group', { name: '판정' });
+    expect(within(statusGroup).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent)).toEqual([
       '아마추어',
       '선출',
-      '검토 필요',
+      '확인 중',
     ]);
+    expect(screen.queryByText('검토 필요')).not.toBeInTheDocument();
+  });
+
+  // ─── MD-QA #192 ① 판정 + 확인 방법 + 메모 ───────────────────────────────────
+
+  it('판정·확인 방법·메모를 한 번에 저장하고, 확인 방법 없이는 보내지 않는다', async () => {
+    updateEligibility.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
+    await user.click(within(panel).getByRole('radio', { name: '아마추어' }));
+    await user.click(within(panel).getByRole('button', { name: '판정 저장' }));
+    expect(within(panel).getByRole('alert')).toHaveTextContent('무엇으로 확인했는지 골라 주세요.');
+    expect(updateEligibility).not.toHaveBeenCalled();
+
+    await user.click(within(panel).getByRole('radio', { name: 'JoinKFA' }));
+    await user.type(within(panel).getByRole('textbox', { name: /메모/ }), '소속내역 동호인 팀만 있음');
+    await user.click(within(panel).getByRole('button', { name: '판정 저장' }));
+
+    expect(updateEligibility).toHaveBeenCalledWith({
+      playerId: 'player-1',
+      eligibilityStatus: 'non_pro',
+      verificationMethod: 'joinkfa',
+      note: '소속내역 동호인 팀만 있음',
+    });
+  });
+
+  it('메모를 건드리지 않으면 note 를 보내지 않는다 — 서버가 기존 메모를 지우지 않게', async () => {
+    updateEligibility.mockResolvedValue({});
+    const roster = queryState.data as { players: Array<Record<string, unknown>> };
+    roster.players[0] = { ...roster.players[0], eligibilityStatus: 'pro', eligibilityNote: '고교 등록 이력',
+      eligibilityVerificationMethod: 'certificate', eligibilityVerifiedAt: '2026-11-09T01:00:00.000Z',
+      eligibilityAdminReviewed: true, eligibilityVerifiedByName: '운영김' };
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    expect(screen.getByText('경력·실적 증명서 확인 · 11.09 · 확인자 운영김')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
+    await user.click(within(panel).getByRole('radio', { name: 'JoinKFA' }));
+    await user.click(within(panel).getByRole('button', { name: '판정 저장' }));
+
+    expect(updateEligibility).toHaveBeenCalledWith({ playerId: 'player-1', eligibilityStatus: 'pro', verificationMethod: 'joinkfa' });
+  });
+
+  it('JoinKFA 링크는 새 탭·noopener 로 루트만 열고, 선수 정보를 보내지 않는다고 알린다', () => {
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    const links = screen.getAllByRole('link', { name: /JoinKFA 열기/ });
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', 'https://www.joinkfa.com');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveTextContent('(새 탭에서 열려요)');
+    }
+    expect(screen.getByText(/Teameet은 JoinKFA에 선수 정보를 보내지 않아요\./)).toBeInTheDocument();
+  });
+
+  it('필터: 확인 전 / 선출 / 본인 신고만 으로 좁힌다', async () => {
+    const roster = queryState.data as { players: Array<Record<string, unknown>> };
+    const base = roster.players[0];
+    roster.players = [
+      base,
+      { ...base, id: 'player-2', userId: 'user-2', realName: '강별', eligibilityStatus: 'pro',
+        eligibilityVerificationMethod: 'joinkfa', eligibilityVerifiedAt: '2026-11-10T00:00:00.000Z', eligibilityAdminReviewed: true },
+      { ...base, id: 'player-3', userId: 'user-3', realName: '정우진', eligibilityStatus: 'non_pro',
+        eligibilityVerificationMethod: 'self_declared', eligibilityVerifiedAt: '2026-11-08T00:00:00.000Z', eligibilityAdminReviewed: true },
+    ];
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+    const names = () => within(screen.getByRole('list')).getAllByRole('listitem').map((row) =>
+      ['홍길동', '강별', '정우진'].find((name) => row.textContent?.includes(name)));
+
+    expect(screen.getByText('선출 확인 2/3명')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /확인 전/ }));
+    expect(names()).toEqual(['홍길동']);
+    await user.click(screen.getByRole('button', { name: /^선출/ }));
+    expect(names()).toEqual(['강별']);
+    await user.click(screen.getByRole('button', { name: /본인 신고만/ }));
+    expect(names()).toEqual(['정우진']);
+    expect(screen.getByRole('button', { name: /본인 신고만/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  // ─── MD-QA #192 ② 이전 판정 · ③ 본인 신고 ───────────────────────────────────
+
+  it('이전 대회 판정은 제안만 하고, "이전 판정 유지" 를 눌러야 그 원본으로 요청한다', async () => {
+    const roster = queryState.data as { players: Array<Record<string, unknown>> };
+    roster.players[0] = { ...roster.players[0], eligibilityAdminReviewed: false, previousEligibilityRuling: {
+      sourcePlayerId: 'old-player', eligibilityStatus: 'non_pro', verificationMethod: 'joinkfa',
+      verifiedAt: '2026-10-20T03:00:00.000Z', competitionId: 't-old', competitionTitle: '가을 컵',
+    } };
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    expect(screen.getByText('이전 판정: 아마추어 · JoinKFA 확인 · 2026.10.20 · 가을 컵')).toBeInTheDocument();
+    expect(carryOver).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '홍길동 이전 판정 유지' }));
+    expect(carryOver).toHaveBeenCalledWith({ playerId: 'player-1', sourcePlayerId: 'old-player' }, expect.anything());
+  });
+
+  it('팀장 선택과 본인 신고를 함께 보여 주고, 다르면 표시한다', () => {
+    const roster = queryState.data as { players: Array<Record<string, unknown>> };
+    roster.players[0] = { ...roster.players[0], eligibilityStatus: 'non_pro', selfDeclaredStatus: 'pro', eligibilityAdminReviewed: false };
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    expect(screen.getByText('팀장 선택 아마추어 · 본인 신고 선출')).toBeInTheDocument();
+    expect(screen.getByText('팀장 선택과 본인 신고가 달라요')).toBeInTheDocument();
+  });
+
+  it('읽기 전용 어드민은 판정·이전 판정 유지를 누를 수 없다', () => {
+    const roster = queryState.data as { players: Array<Record<string, unknown>> };
+    roster.players[0] = { ...roster.players[0], previousEligibilityRuling: {
+      sourcePlayerId: 'old-player', eligibilityStatus: 'pro', verificationMethod: null,
+      verifiedAt: '2026-10-20T03:00:00.000Z', competitionId: 't-old', competitionTitle: '가을 컵',
+    } };
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite={false} />);
+
+    expect(screen.getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '홍길동 이전 판정 유지' })).toBeDisabled();
   });
 
   it('shows a retryable error instead of an empty roster when the request fails', async () => {

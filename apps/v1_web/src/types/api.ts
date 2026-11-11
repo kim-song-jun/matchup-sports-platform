@@ -3927,6 +3927,12 @@ export type V1TournamentPaymentStatus =
 
 export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 
+/**
+ * 운영진이 선출 여부를 **무엇으로** 확인했는가(MD-QA #192). Teameet 은 JoinKFA 에 요청을 보내지 않는다 —
+ * `joinkfa` 는 사람이 JoinKFA 화면을 직접 보고 확인했다는 기록이다.
+ */
+export type V1PlayerEligibilityMethod = 'joinkfa' | 'certificate' | 'self_presented' | 'self_declared' | 'other';
+
 export type V1TournamentGroupPhase = 'group' | 'round64' | 'round32' | 'round16' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
@@ -4645,6 +4651,12 @@ export type V1TournamentPlayer = {
   genderSnapshot: 'male' | 'female' | null;
   eligibilityStatus: V1PlayerEligibilityStatus;
   eligibilityNote: string | null;
+  /** 운영진 판정 근거(MD-QA #192). 팀 명단 응답에서는 팀장·매니저에게만 값이 있다. 구버전 서버 응답에는 없다. */
+  eligibilityVerificationMethod?: V1PlayerEligibilityMethod | null;
+  eligibilityVerifiedAt?: string | null;
+  /** 선수 본인 신고(non_pro | pro). 팀 명단 응답에서는 팀장·매니저와 본인 행에만 값이 있다. */
+  selfDeclaredStatus?: Exclude<V1PlayerEligibilityStatus, 'needs_review'> | null;
+  selfDeclaredAt?: string | null;
   addedAt: string;
   removedAt: string | null;
 };
@@ -4664,6 +4676,10 @@ export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
   nickname: string | null;
   /** false 면 이 행의 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */
   personalInfoVisible: boolean;
+  /** 운영진이 선출 여부를 판정했는가 — true 면 팀장도 본인도 고칠 수 없다(MD-QA #192). */
+  eligibilityAdminReviewed?: boolean;
+  /** 이 행이 지금 보고 있는 사용자 본인인가 — 본인 신고 카드가 자기 행을 찾는다. */
+  isViewer?: boolean;
 };
 
 export type V1TournamentRosterResponse = {
@@ -4677,6 +4693,21 @@ export type V1AdminTournamentPlayer = V1TournamentPlayer & {
   nickname: string | null;
   phone: string | null;
   isTeamCaptain: boolean;
+  /** 운영진 판정 있음(근거 컬럼 이전 판정은 감사 로그로 판정). */
+  eligibilityAdminReviewed?: boolean;
+  /** 확인자 표시 이름 — 판정자 계정이 지워졌으면 null. */
+  eligibilityVerifiedByName?: string | null;
+  /** 같은 사용자 계정이 다른 대회·리그에서 받은 가장 최근 판정. 판정 전 선수에게만 실린다. */
+  previousEligibilityRuling?: V1PreviousEligibilityRuling | null;
+};
+
+export type V1PreviousEligibilityRuling = {
+  sourcePlayerId: string;
+  eligibilityStatus: Exclude<V1PlayerEligibilityStatus, 'needs_review'>;
+  verificationMethod: V1PlayerEligibilityMethod | null;
+  verifiedAt: string;
+  competitionId: string;
+  competitionTitle: string;
 };
 
 /** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
@@ -5209,9 +5240,29 @@ export type V1AddPlayerPayload = {
   jerseyNumber?: number;
 };
 
+/** 어드민 판정 — 판정 + 확인 방법 + 메모. `note` 를 생략하면 기존 메모가 그대로 남는다. */
 export type V1UpdatePlayerEligibilityPayload = {
   eligibilityStatus: V1PlayerEligibilityStatus;
+  /** 아마추어·선출 판정에는 필수. */
+  verificationMethod?: V1PlayerEligibilityMethod;
   note?: string;
+};
+
+/** 팀장·매니저의 선출 여부 선택 — 판정 근거는 실을 수 없다. */
+export type V1UpdateTeamPlayerEligibilityPayload = {
+  eligibilityStatus: V1PlayerEligibilityStatus;
+};
+
+/** 선수 본인 신고 — 허위 신고 고지 동의(`consent: true`)가 필수다. */
+export type V1SelfDeclareEligibilityPayload = {
+  selfDeclaredStatus: Exclude<V1PlayerEligibilityStatus, 'needs_review'>;
+  consent: true;
+};
+
+export type V1SelfDeclareEligibilityResult = {
+  id: string;
+  selfDeclaredStatus: Exclude<V1PlayerEligibilityStatus, 'needs_review'> | null;
+  selfDeclaredAt: string | null;
 };
 
 export type V1AdminConfirmPaymentPayload = {

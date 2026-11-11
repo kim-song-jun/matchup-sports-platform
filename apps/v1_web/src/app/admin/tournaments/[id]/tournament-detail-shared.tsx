@@ -12,11 +12,8 @@ import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-export const ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string> = {
-  non_pro: PLAYER_ELIGIBILITY_LABEL.non_pro,
-  pro: PLAYER_ELIGIBILITY_LABEL.pro,
-  needs_review: '검토 필요',
-};
+/** 팀 화면·명단 CSV 와 같은 라벨 하나를 쓴다(MD-QA #192 — 예전엔 needs_review 만 '검토 필요'였다). */
+export const ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string> = PLAYER_ELIGIBILITY_LABEL;
 
 export const GENDER_LABEL: Record<string, string> = {
   male: '남성',

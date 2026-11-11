@@ -57,6 +57,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     createdAt?: Date;
     updatedAt?: Date;
     fieldId?: string | null;
+    displayTitle?: string | null;
     homeDisplayLabel?: string | null;
     awayDisplayLabel?: string | null;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -91,6 +92,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       parentTeamMatchId: fixture.parentFixtureId ?? null,
       homeRegistrationId: fixture.homeRegistrationId ?? null,
       awayRegistrationId: fixture.awayRegistrationId ?? null,
+      displayTitle: fixture.displayTitle ?? null,
       homeDisplayLabel: fixture.homeDisplayLabel ?? null,
       awayDisplayLabel: fixture.awayDisplayLabel ?? null,
       homeRegistration: fixture.homeRegistration,
@@ -217,6 +219,12 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       byeTarget: { fixtureId: detail.teamMatchId, side } });
     const hidden = presentTournamentDetail({ ...row, bracketPublishedAt: null, bracketPublishScheduledAt: null }, false);
     expect(hidden.groups).toEqual([]);
+  });
+
+  it('경기별 제목을 공개 상세의 최종 fixtures 응답까지 보존한다', () => {
+    const row = baseRow({ detailSeeds: [{ ...fixtureRow({ state: 'SCHEDULED', sides: [], participants: [], events: [], currentOfficialRevision: null }, 'scheduled'), displayTitle: 'A조 2차전' }] });
+    expect(presentTournamentDetail(row, true).fixtures[0]).toMatchObject({ displayTitle: 'A조 2차전' });
+    expect(presentTournamentDetail(row, false).fixtures[0]).toMatchObject({ displayTitle: 'A조 2차전' });
   });
 
   it('공개 상세는 사진 두 장과 숨김 설정을 지우거나 목록 사진으로 덮어쓰지 않는다', () => {

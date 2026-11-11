@@ -655,14 +655,14 @@ describe('빠른 결과 — 정규 리그 경기', () => {
     expect((await quickResult(normal.gameId, users.ops, { home: 1, away: 0 })).status).toBe(201);
   });
 
-  it('출전자가 0명인 사이드가 있으면 QUICK_RESULT_ROSTER_SYNCING — 출전자 0명 확정본을 남기지 않는다', async () => {
+  it('출전자가 0명인 사이드가 있으면 QUICK_RESULT_ROSTER_EMPTY — 출전자 0명 확정본을 남기지 않는다', async () => {
     const leagueId = await createLeague();
     const empty = await createLeagueMatch(leagueId, { awayPlayer: false });
 
     const rejected = await quickResult(empty.gameId, users.ops, { home: 1, away: 0 });
 
     expect(rejected.status).toBe(409);
-    expect(rejected.body.code).toBe('QUICK_RESULT_ROSTER_SYNCING');
+    expect(rejected.body.code).toBe('QUICK_RESULT_ROSTER_EMPTY');
     expect(await revisionCount(empty.gameId)).toBe(0);
   });
 

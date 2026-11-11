@@ -323,7 +323,8 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 | `409` | `QUICK_RESULT_FIXTURE_CANCELLED` | 팀매치가 취소됐어요 |
 | `409` | `QUICK_RESULT_HAS_LIVE_RECORDS` | 득점 기록이 있어요 |
 | `409` | `QUICK_RESULT_TEAMS_REQUIRED` | 한쪽이라도 팀이 정해지지 않았어요 |
-| `409` | `QUICK_RESULT_ROSTER_SYNCING` | 한 사이드의 출전자가 0명이거나 이 경기의 명단 재계산이 끝나지 않았어요 |
+| `409` | `QUICK_RESULT_ROSTER_SYNCING` | 이 경기의 명단 재계산이 끝나지 않았어요(잠시 뒤 다시 시도) |
+| `409` | `QUICK_RESULT_ROSTER_EMPTY` | 재계산이 끝났는데도 한 사이드의 출전자가 0명이에요(팀에 등록된 선수가 없어요 — 기다려도 달라지지 않아요) |
 | `409` | `NEXT_FIXTURE_CONFLICT` \| `VERSION_CONFLICT` \| `IDEMPOTENCY_PAYLOAD_CONFLICT` | 다음 경기 시작 / 낡은 `expectedVersion` / 같은 키에 다른 본문 |
 | `422` | `COMMAND_IDEMPOTENCY_KEY_MISMATCH` | `Idempotency-Key` 가 `clientCommandId` 와 달라요 |
 

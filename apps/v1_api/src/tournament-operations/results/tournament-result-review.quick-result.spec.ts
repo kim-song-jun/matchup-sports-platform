@@ -411,13 +411,17 @@ describe('quickResult — 입장 조건 거부(거부된 요청은 아무 행도
     await reject({ sideTeamIds: [null, null] }, 409, 'QUICK_RESULT_TEAMS_REQUIRED');
   });
 
-  it('한 사이드의 출전자가 0명이면 QUICK_RESULT_ROSTER_SYNCING — 출전자 0명 확정본이 남으면 안 된다', async () => {
+  it('한 사이드의 출전자가 0명이면 QUICK_RESULT_ROSTER_EMPTY — 출전자 0명 확정본이 남으면 안 된다', async () => {
     await reject(
       { participants: defaultParticipants.filter((row) => row.sideId !== ids.awaySide) },
       409,
-      'QUICK_RESULT_ROSTER_SYNCING',
+      'QUICK_RESULT_ROSTER_EMPTY',
     );
-    await reject({ participants: [] }, 409, 'QUICK_RESULT_ROSTER_SYNCING');
+    await reject({ participants: [] }, 409, 'QUICK_RESULT_ROSTER_EMPTY');
+  });
+
+  it('출전자가 0명이어도 재계산 이벤트가 처리 전이면 일시적 QUICK_RESULT_ROSTER_SYNCING', async () => {
+    await reject({ participants: [], pendingResync: 1 }, 409, 'QUICK_RESULT_ROSTER_SYNCING');
   });
 
   it('그 경기의 명단 재계산 이벤트가 처리 전이면 QUICK_RESULT_ROSTER_SYNCING', async () => {

@@ -73,12 +73,19 @@ export function makeDeletedNicknamePrisma(user: PlayerUser) {
       team: { name: '기록 보존 팀', ownerUserId: 'owner-user-id' },
       tournament: { minPlayers: 1 },
     }) },
-    v1TournamentPlayer: { findMany: jest.fn().mockImplementation(async ({ include }: PlayerQuery) => {
+    // MD-QA #192: 판정 여부(감사 로그)·이전 판정 조회. 이 픽스처는 판정이 없는 선수다.
+    v1AdminActionLog: { findMany: jest.fn().mockResolvedValue([]) },
+    v1OperationAudit: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TournamentPlayer: { findMany: jest.fn().mockImplementation(async ({ include }: Partial<PlayerQuery>) => {
+      // include 없는 조회는 이전 대회 판정 찾기다 — 이전 판정이 없는 선수로 둔다.
+      if (!include) return [];
       const select = include.user.select;
       return [{
         id: 'player-1', registrationId: 'reg-1', userId: 'player-user-id',
         realName: '등록 당시 실명', birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
         eligibilityStatus: 'needs_review', eligibilityNote: null, removedAt: null,
+        eligibilityVerificationMethod: null, eligibilityVerifiedAt: null, eligibilityVerifiedByUserId: null,
+        selfDeclaredStatus: null, selfDeclaredAt: null, eligibilityVerifiedBy: null,
         addedAt: new Date('2026-06-14T00:00:00.000Z'),
         user: {
           ...(select.phone ? { phone: user.phone } : {}),

@@ -11,6 +11,7 @@ import { parseJerseyInput } from '@/lib/jersey-number';
 import { extractErrorMessage } from '@/lib/error-message';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { PLAYER_ELIGIBILITY_LABEL } from '@/lib/v1-status-labels';
+import { EligibilityCriteriaHelp, EligibilityLockedNote } from '@/components/tournaments/player-eligibility';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { AlertBanner, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
@@ -190,10 +191,12 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
       {info ? <div className={styles.sheet}>
         {info.personalInfoVisible ? <p className="tm-text-caption">등록 이름 {info.realName} · {formatRosterBirthDate(info.birthDateSnapshot)}</p> : null}
         <label className="tm-text-label" htmlFor={`${id}-eligibility`}>선출 여부</label>
-        <select id={`${id}-eligibility`} className="tm-input" value={eligibility} disabled={!editable || busy}
+        {/* 운영진이 판정한 선수는 잠근다 — 서버도 409 ELIGIBILITY_ADMIN_REVIEWED 로 막는다(MD-QA #192). */}
+        <select id={`${id}-eligibility`} className="tm-input" value={eligibility} disabled={!editable || busy || info.eligibilityAdminReviewed === true}
           onChange={event => setEligibility(event.target.value as V1PlayerEligibilityStatus)}>
           {(['needs_review','non_pro','pro'] as const).map(value => <option key={value} value={value}>{PLAYER_ELIGIBILITY_LABEL[value]}</option>)}
         </select>
+        {info.eligibilityAdminReviewed ? <EligibilityLockedNote method={info.eligibilityVerificationMethod} /> : <EligibilityCriteriaHelp />}
         {sheetError ? <AlertBanner tone="error" message={sheetError} /> : null}
         {editable ? <>
           <Button block loading={updateEligibility.isPending} disabled={eligibility === info.eligibilityStatus || busy}

@@ -661,6 +661,7 @@ model V1User {
   postEventUserReviewsReceived   V1PostEventReview[]           @relation("V1PostEventReviewTargetUser")
   tournamentRegistrationsApplied V1TournamentRegistration[]    @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
+  verifiedTournamentPlayerEligibilities V1TournamentPlayer[] @relation("V1TournamentPlayerEligibilityVerifier")
   tournamentReviews              V1TournamentReview[]          @relation("V1TournamentReviewAuthor")
   tournamentAwardsReceived       V1TournamentAward[]           @relation("V1TournamentAwardRecipient")
   tournamentStaffAssignments     V1TournamentStaffAssignment[] @relation("V1TournamentStaffUser")
@@ -2755,6 +2756,16 @@ enum V1TournamentPlayerEligibility {
   needs_review
 }
 
+/// 선출 여부를 운영진이 **무엇으로** 확인했는가(MD-QA #192). Teameet 은 JoinKFA 에 요청을 보내지
+/// 않는다 — 사람이 JoinKFA·증명서 등을 직접 보고 그 수단을 남긴다. 공식 연동이 허락되면 값을 더한다.
+enum V1TournamentPlayerEligibilityMethod {
+  joinkfa
+  certificate
+  self_presented
+  self_declared
+  other
+}
+
 enum V1TournamentGroupPhase {
   group
   round64
@@ -3165,6 +3176,16 @@ model V1TournamentPlayer {
   goalkeeper        Boolean?
   eligibilityStatus V1TournamentPlayerEligibility @default(needs_review) @map("eligibility_status")
   eligibilityNote   String?                       @map("eligibility_note")
+  /// 운영진 판정 근거(MD-QA #192). 어드민·대회 운영자 판정 경로만 쓴다 — 팀장 경로는 건드리지 않는다.
+  /// null 이면 이 컬럼이 생기기 전 판정이거나 아직 판정 전이다(판정 여부의 정본은 여전히 감사 로그다).
+  eligibilityVerificationMethod V1TournamentPlayerEligibilityMethod? @map("eligibility_verification_method")
+  eligibilityVerifiedAt         DateTime?                            @map("eligibility_verified_at")
+  /// 판정한 사람의 **사용자 계정**. 플랫폼 어드민과 대회 운영자(director)가 같은 경로로 판정하는데
+  /// 운영자는 V1AdminUser 행이 없어서 어드민 FK 로는 담을 수 없다.
+  eligibilityVerifiedByUserId   String?                              @map("eligibility_verified_by_user_id")
+  /// 선수 본인 신고(non_pro | pro). 팀장 선택(eligibilityStatus)과 별개이고 판정을 바꾸지 않는다.
+  selfDeclaredStatus            V1TournamentPlayerEligibility?       @map("self_declared_status")
+  selfDeclaredAt                DateTime?                            @map("self_declared_at")
   addedAt           DateTime                      @default(now()) @map("added_at")
   removedAt         DateTime?                     @map("removed_at")
   createdAt         DateTime                      @default(now()) @map("created_at")
@@ -3172,6 +3193,7 @@ model V1TournamentPlayer {
 
   registration V1TournamentRegistration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   user         V1User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  eligibilityVerifiedBy V1User?          @relation("V1TournamentPlayerEligibilityVerifier", fields: [eligibilityVerifiedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([registrationId, userId])
   /// 부분 인덱스(살아 있는 행 + 번호 있는 행)라 Prisma 스키마로는 표현할 수 없다 —
@@ -3179,6 +3201,8 @@ model V1TournamentPlayer {
   @@index([registrationId, removedAt])
   @@index([userId])
   @@index([eligibilityStatus])
+  @@index([userId, eligibilityVerifiedAt])
+  @@index([eligibilityVerifiedByUserId])
   @@map("v1_tournament_players")
 }
 

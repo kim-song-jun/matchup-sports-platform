@@ -50,6 +50,7 @@ import {
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
 import { PLAYER_ELIGIBILITY_LABEL, rosterGenderLabel, teamRoleLabel } from '@/lib/v1-status-labels';
+import { EligibilityCriteriaHelp, EligibilityLockedNote } from '@/components/tournaments/player-eligibility';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { compareRosterPlayers, rosterDisplayName } from '@/lib/roster-presentation';
@@ -785,6 +786,7 @@ export function AddPlayerForm({
               );
             })}
           </div>
+          <EligibilityCriteriaHelp />
         </FormField>
       </div>
 
@@ -914,6 +916,7 @@ function PlayerRow({
   );
   const [editError, setEditError] = useState<string | null>(null);
   const playerName = rosterPlayerName(player);
+  const eligibilityLocked = player.eligibilityAdminReviewed === true;
 
   // 이 행이 (다시) 열릴 때마다 최신 서버 값으로 초기화한다 — 부모가 편집 상태를
   // 컨트롤하므로 "수정" 버튼 onClick 대신 여기서 동기화한다.
@@ -1018,6 +1021,12 @@ function PlayerRow({
               {eligibilityLabel(player.eligibilityStatus)}
             </span>
           </div>
+          {/* 운영진이 판정한 선수는 자물쇠로 잠근다 — 팀이 고치면 서버가 409 로 막는다(ELIGIBILITY_ADMIN_REVIEWED). */}
+          {eligibilityLocked ? (
+            <div style={{ marginTop: 2 }}>
+              <EligibilityLockedNote method={player.eligibilityVerificationMethod} />
+            </div>
+          ) : null}
           {/* 행마다 서버가 정한다 — 가려진 행은 "미입력"이 아니라 줄 자체를 그리지 않는다.
               필드가 없으면(배포 중 구버전 서버) 가린 쪽이다. */}
           {player.personalInfoVisible ? (
@@ -1082,6 +1091,17 @@ function PlayerRow({
             />
           </FormField>
 
+          {eligibilityLocked ? (
+            <div>
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '0 0 4px' }}>선출 여부</p>
+              <p className="tm-text-caption" style={{ color: 'var(--text-body)', margin: 0 }}>
+                {eligibilityLabel(player.eligibilityStatus)} · <EligibilityLockedNote method={player.eligibilityVerificationMethod} />
+              </p>
+              <p className="tm-text-micro" style={{ color: 'var(--text-caption)', margin: '4px 0 0' }}>
+                변경이 필요하면 운영진에게 문의해 주세요.
+              </p>
+            </div>
+          ) : (
           <FormField id={`player-${player.id}-eligibility`} label="선출 여부" labelId={`player-${player.id}-eligibility-label`}>
             <div
               role="radiogroup"
@@ -1137,7 +1157,9 @@ function PlayerRow({
                 );
               })}
             </div>
+            <EligibilityCriteriaHelp />
           </FormField>
+          )}
           {editError ? (
             <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
               {editError}

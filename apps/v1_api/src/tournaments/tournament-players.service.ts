@@ -19,7 +19,14 @@ import { AdminContextService, type V1TournamentManager } from '../common/admin-c
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { AddPlayerDto, UpdatePlayerEligibilityDto, UpdatePlayerRosterSettingsDto } from './dto/tournament-player.dto';
+import {
+  AddPlayerDto,
+  CarryOverPlayerEligibilityDto,
+  SelfDeclarePlayerEligibilityDto,
+  UpdatePlayerEligibilityDto,
+  UpdatePlayerRosterSettingsDto,
+  UpdateTeamPlayerEligibilityDto,
+} from './dto/tournament-player.dto';
 import {
   assertJerseyAvailable,
   readJerseyNumbers,
@@ -60,10 +67,10 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 const ROSTER_MANAGEMENT_ROLES: readonly V1TeamMembershipRole[] = ['owner', 'manager'];
 
 /** 팀별 명단 CSV 의 선수 열. 기존 열 위치를 유지하고 전화번호를 마지막에 붙인다. */
-const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone';
+const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone,verificationMethod,verifiedAt';
 
 /** 전체 명단 CSV(운영자가 엑셀로 여는 파일)의 팀 블록 머리글. */
-const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호';
+const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호,확인 방법,확인일';
 
 // 전체 명단 CSV 의 값 라벨 — 어드민 화면과 같은 말을 쓴다. 신청 상태는 신청 카드의 상태 배지
 // (`components/admin/admin-status-pill.tsx`), 선출 여부·성별은 명단 검토 모달
@@ -77,7 +84,29 @@ const REGISTRATION_STATUS_LABEL: Record<string, string> = {
   waitlisted: '대기',
   cancel_requested: '취소 요청',
 };
-const ELIGIBILITY_LABEL: Record<string, string> = { non_pro: '아마추어', pro: '선출', needs_review: '검토 필요' };
+// needs_review 는 웹 `PLAYER_ELIGIBILITY_LABEL` 과 같은 '확인 중'이다(예전엔 CSV 만 '검토 필요'였다).
+const ELIGIBILITY_LABEL: Record<string, string> = { non_pro: '아마추어', pro: '선출', needs_review: '확인 중' };
+/** 판정 확인 방법 라벨 — 웹 `PLAYER_ELIGIBILITY_METHOD_LABEL` 과 같은 말이다. */
+const ELIGIBILITY_METHOD_LABEL: Record<string, string> = {
+  joinkfa: 'JoinKFA',
+  certificate: '경력·실적 증명서',
+  self_presented: '본인 화면 제시',
+  self_declared: '본인 신고',
+  other: '기타',
+};
+const KST_DATE = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** 감사 로그에 남기는 판정 근거 모양 — 판정·이월 경로가 같은 키를 쓴다. */
+function eligibilityAuditSnapshot(row: Pick<V1TournamentPlayer,
+  'eligibilityStatus' | 'eligibilityNote' | 'eligibilityVerificationMethod' | 'eligibilityVerifiedAt' | 'eligibilityVerifiedByUserId'>) {
+  return {
+    eligibilityStatus: row.eligibilityStatus,
+    eligibilityNote: row.eligibilityNote ?? null,
+    eligibilityVerificationMethod: row.eligibilityVerificationMethod ?? null,
+    eligibilityVerifiedAt: row.eligibilityVerifiedAt?.toISOString() ?? null,
+    eligibilityVerifiedByUserId: row.eligibilityVerifiedByUserId ?? null,
+  };
+}
 const GENDER_LABEL: Record<string, string> = { male: '남성', female: '여성' };
 
 /** KST 기준 `YYYY-MM-DD HH:mm` — sv-SE 로캘이 ISO 모양 날짜를 준다. */
@@ -192,6 +221,35 @@ export class TournamentPlayersService {
     return ruling !== null;
   }
 
+  /**
+   * 여러 선수의 "운영진 판정 있음" 을 한 번에 본다(목록용 — 행마다 조회하면 N+1).
+   * 판정 근거 컬럼(verifiedAt)이 생기기 전 판정은 감사 로그에만 있으므로 로그도 함께 본다.
+   * 기준은 `hasAdminEligibilityRuling` 과 같다(어드민 로그 + 대회 운영자 감사).
+   */
+  private async adminRuledPlayerIds(
+    db: PrismaService | Prisma.TransactionClient,
+    players: readonly Pick<V1TournamentPlayer, 'id' | 'eligibilityVerifiedAt'>[],
+  ): Promise<Set<string>> {
+    const ruled = new Set(players.filter((p) => p.eligibilityVerifiedAt != null).map((p) => p.id));
+    const unknown = players.filter((p) => !ruled.has(p.id)).map((p) => p.id);
+    if (unknown.length === 0) return ruled;
+    const [adminLogs, directorLogs] = await Promise.all([
+      db.v1AdminActionLog.findMany({
+        where: { action: 'player.eligibility', targetType: 'tournament_player', targetId: { in: unknown } },
+        select: { targetId: true },
+        distinct: ['targetId'],
+      }),
+      db.v1OperationAudit.findMany({
+        where: { action: 'player.eligibility', resourceType: 'tournament_player', resourceId: { in: unknown }, actorType: 'USER' },
+        select: { resourceId: true },
+        distinct: ['resourceId'],
+      }),
+    ]);
+    (adminLogs ?? []).forEach((log) => ruled.add(log.targetId));
+    (directorLogs ?? []).forEach((log) => { if (log.resourceId) ruled.add(log.resourceId); });
+    return ruled;
+  }
+
   private assertRosterMutable(
     registration: V1TournamentRegistration,
     tournament: { rosterDeadlineAt: Date | null } & Parameters<typeof isRosterMutableTournament>[0],
@@ -262,6 +320,7 @@ export class TournamentPlayersService {
     // 등번호는 raw 로 한 번에 읽어 붙인다 — 행마다 조회하면 N+1 이고, 생성된 클라이언트에
     // 컬럼이 없어 애초에 위 findMany 의 select 로는 못 가져온다.
     const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
+    const adminRuled = await this.adminRuledPlayerIds(this.prisma, players);
 
     return {
       players: players.map(({ user: playerUser, ...player }) =>
@@ -269,7 +328,12 @@ export class TournamentPlayersService {
           player,
           jerseyByPlayerId.get(player.id) ?? null,
           playerUser.profile?.nickname ?? null,
-          { personalInfo: isManagement || player.userId === user.id, reviewNote: isManagement },
+          {
+            personalInfo: isManagement || player.userId === user.id,
+            reviewNote: isManagement,
+            isViewer: player.userId === user.id,
+            adminReviewed: adminRuled.has(player.id),
+          },
           participantDisplayName({ user: playerUser }),
         ),
       ),
@@ -669,7 +733,7 @@ export class TournamentPlayersService {
     tournamentId: string,
     registrationId: string,
     playerId: string,
-    dto: UpdatePlayerEligibilityDto,
+    dto: UpdateTeamPlayerEligibilityDto,
   ) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
@@ -776,20 +840,31 @@ export class TournamentPlayersService {
             profile: { select: { nickname: true, deletedAt: true } },
           },
         },
+        eligibilityVerifiedBy: { select: { profile: { select: { nickname: true, displayName: true } } } },
       },
       orderBy: { addedAt: 'asc' },
     });
 
     const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
+    const adminRuled = await this.adminRuledPlayerIds(this.prisma, players);
+    const previousRulings = await this.findPreviousRulings(
+      players.filter((p) => !adminRuled.has(p.id)),
+    );
 
     const serializedPlayers = players
-      .map(({ user: playerUser, ...player }) => ({
+      .map(({ user: playerUser, eligibilityVerifiedBy, ...player }) => ({
         ...this.serializePlayer(player, jerseyByPlayerId.get(player.id) ?? null),
         nickname: playerUser.deletedAt || playerUser.profile?.deletedAt
           ? null
           : (playerUser.profile?.nickname ?? null),
         phone: playerUser.phone?.trim() || null,
         isTeamCaptain: player.userId === registration.team.ownerUserId,
+        eligibilityAdminReviewed: adminRuled.has(player.id),
+        // 확인자 표시 이름. 판정자 계정이 지워졌으면(SetNull) null 이다.
+        eligibilityVerifiedByName: eligibilityVerifiedBy
+          ? (eligibilityVerifiedBy.profile?.nickname ?? eligibilityVerifiedBy.profile?.displayName ?? null)
+          : null,
+        previousEligibilityRuling: previousRulings.get(player.userId) ?? null,
       }))
       .sort((left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain));
 
@@ -801,6 +876,55 @@ export class TournamentPlayersService {
       players: serializedPlayers,
       belowMinimum: players.length < registration.tournament.minPlayers,
     };
+  }
+
+  /**
+   * 같은 **사용자 계정**이 다른 대회·리그 명단에서 받은 가장 최근 운영진 판정(MD-QA #192 ②).
+   *
+   * 사람을 잇는 열쇠는 `userId` 하나다 — 명단 행은 항상 계정에 묶여 있고(non-null FK), 이름·생년월일로
+   * 같은 사람을 추정하지 않는다. 판정 근거 컬럼(verifiedAt)이 있는 판정만 본다: 그 전 판정은 감사 로그에만
+   * 있고 확인 방법이 없어서 "무엇으로 확인했는지" 를 이어 줄 수 없다. 자동으로 적용하지 않는다 —
+   * 운영자가 "이전 판정 유지" 를 눌러야 이 대회 판정이 된다.
+   */
+  private async findPreviousRulings(players: readonly Pick<V1TournamentPlayer, 'id' | 'userId' | 'registrationId'>[]) {
+    const result = new Map<string, {
+      sourcePlayerId: string;
+      eligibilityStatus: string;
+      verificationMethod: string | null;
+      verifiedAt: string;
+      competitionId: string;
+      competitionTitle: string;
+    }>();
+    if (players.length === 0) return result;
+    const rows = (await this.prisma.v1TournamentPlayer.findMany({
+      where: {
+        userId: { in: [...new Set(players.map((p) => p.userId))] },
+        registrationId: { notIn: [...new Set(players.map((p) => p.registrationId))] },
+        eligibilityVerifiedAt: { not: null },
+        eligibilityStatus: { in: ['non_pro', 'pro'] },
+      },
+      select: {
+        id: true,
+        userId: true,
+        eligibilityStatus: true,
+        eligibilityVerificationMethod: true,
+        eligibilityVerifiedAt: true,
+        registration: { select: { tournament: { select: { id: true, title: true } } } },
+      },
+      orderBy: [{ eligibilityVerifiedAt: 'desc' }, { id: 'desc' }],
+    })) ?? [];
+    for (const row of rows) {
+      if (result.has(row.userId) || !row.eligibilityVerifiedAt) continue;
+      result.set(row.userId, {
+        sourcePlayerId: row.id,
+        eligibilityStatus: row.eligibilityStatus,
+        verificationMethod: row.eligibilityVerificationMethod ?? null,
+        verifiedAt: row.eligibilityVerifiedAt.toISOString(),
+        competitionId: row.registration.tournament.id,
+        competitionTitle: row.registration.tournament.title,
+      });
+    }
+    return result;
   }
 
   /**
@@ -912,6 +1036,10 @@ export class TournamentPlayersService {
             this.escapeCsvField(p.user.profile?.nickname ?? ''),
             p.userId === reg.team.ownerUserId ? '팀장' : '',
             this.escapeCsvField(rosterCsvPhone(p.user)),
+            p.eligibilityVerificationMethod
+              ? (ELIGIBILITY_METHOD_LABEL[p.eligibilityVerificationMethod] ?? p.eligibilityVerificationMethod)
+              : '',
+            p.eligibilityVerifiedAt ? KST_DATE.format(p.eligibilityVerifiedAt) : '',
           ].join(','),
         );
       });
@@ -949,6 +1077,8 @@ export class TournamentPlayersService {
     birthDateSnapshot: string | null;
     genderSnapshot: string | null;
     eligibilityStatus: string;
+    eligibilityVerificationMethod?: string | null;
+    eligibilityVerifiedAt?: Date | null;
     jerseyNumber: number | null;
     user: { profile: { nickname: string } | null; phone: string | null; deletedAt: Date | null };
   }): string[] {
@@ -961,6 +1091,8 @@ export class TournamentPlayersService {
       // 정본 §3 "명단은 등번호와 이름" — 기존 열 위치는 그대로 둔다.
       String(p.jerseyNumber ?? ''),
       this.escapeCsvField(rosterCsvPhone(p.user)),
+      this.escapeCsvField(p.eligibilityVerificationMethod ?? ''),
+      p.eligibilityVerifiedAt ? KST_DATE.format(p.eligibilityVerifiedAt) : '',
     ];
   }
 
@@ -1195,24 +1327,49 @@ export class TournamentPlayersService {
     return this.serializePlayer(removed);
   }
 
+  /**
+   * 운영진 판정 — 판정 + 확인 방법 + 메모를 한 번에 저장한다(MD-QA #192 ①).
+   *
+   * - 확인일·확인자는 서버가 채운다(요청으로 받지 않는다).
+   * - 메모는 **보낸 경우에만** 바꾼다. 예전엔 `dto.note ?? null` 이라, 화면이 판정만 보내면 앞서 남긴
+   *   근거 메모가 매번 지워졌다. 빈 문자열은 "메모 지우기" 다.
+   * - `needs_review` 로 되돌리면 확인일·확인자를 비운다 — "확인 전" 이 근거를 들고 있으면 목록의 근거
+   *   줄이 거짓말을 한다. 감사 로그는 남으므로 팀장 수정 잠금(ELIGIBILITY_ADMIN_REVIEWED)은 유지된다.
+   */
   async updateEligibility(user: V1AuthUser, playerId: string, dto: UpdatePlayerEligibilityDto) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { playerId });
-
-    const player = await this.prisma.v1TournamentPlayer.findFirst({
-      where: { id: playerId, removedAt: null },
-    });
-    if (!player) {
-      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+    const resetsToReview = dto.eligibilityStatus === 'needs_review';
+    if (!resetsToReview && !dto.verificationMethod) {
+      throw new BadRequestException({
+        code: 'ELIGIBILITY_METHOD_REQUIRED',
+        message: '무엇으로 확인했는지 골라 주세요.',
+      });
     }
 
-    const before = { eligibilityStatus: player.eligibilityStatus, eligibilityNote: player.eligibilityNote };
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, removedAt: null },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      const note = dto.note === undefined ? undefined : (dto.note.trim() || null);
       const p = await tx.v1TournamentPlayer.update({
         where: { id: playerId },
         data: {
           eligibilityStatus: dto.eligibilityStatus,
-          eligibilityNote: dto.note ?? null,
+          ...(note !== undefined ? { eligibilityNote: note } : {}),
+          ...(resetsToReview
+            ? {
+                eligibilityVerificationMethod: dto.verificationMethod ?? null,
+                eligibilityVerifiedAt: null,
+                eligibilityVerifiedByUserId: null,
+              }
+            : {
+                eligibilityVerificationMethod: dto.verificationMethod,
+                eligibilityVerifiedAt: new Date(),
+                eligibilityVerifiedByUserId: admin.userId,
+              }),
         },
       });
       await this.adminContext.logAdminAction(
@@ -1221,8 +1378,8 @@ export class TournamentPlayersService {
           action: 'player.eligibility',
           targetType: 'tournament_player',
           targetId: playerId,
-          beforeJson: before,
-          afterJson: { eligibilityStatus: dto.eligibilityStatus, eligibilityNote: dto.note ?? null },
+          beforeJson: eligibilityAuditSnapshot(player),
+          afterJson: eligibilityAuditSnapshot(p),
         },
         tx,
       );
@@ -1231,6 +1388,137 @@ export class TournamentPlayersService {
 
     const jerseyByPlayerId = await readJerseyNumbers(this.prisma, updated.registrationId);
     return this.serializePlayer(updated, jerseyByPlayerId.get(updated.id) ?? null);
+  }
+
+  /**
+   * 이전 대회·리그 판정 유지(MD-QA #192 ②) — 운영자가 한 번 눌러 확정한다. 자동으로 적용하지 않는다.
+   *
+   * 원본은 **같은 사용자 계정**의 다른 명단 행이어야 하고, 확인 근거가 있는 운영진 판정이어야 한다.
+   * 판정·확인 방법을 그대로 옮기고 메모에 출처를 적는다. 확인일·확인자는 지금 누른 사람이다 —
+   * "이 대회에서 누가 이 판정을 받아들였는가" 가 기록돼야 하기 때문이다.
+   */
+  async carryOverEligibility(user: V1AuthUser, playerId: string, dto: CarryOverPlayerEligibilityDto) {
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { playerId });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const player = await tx.v1TournamentPlayer.findFirst({ where: { id: playerId, removedAt: null } });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      const source = await tx.v1TournamentPlayer.findUnique({
+        where: { id: dto.sourcePlayerId },
+        select: {
+          id: true,
+          userId: true,
+          registrationId: true,
+          eligibilityStatus: true,
+          eligibilityVerificationMethod: true,
+          eligibilityVerifiedAt: true,
+          registration: { select: { tournament: { select: { title: true } } } },
+        },
+      });
+      if (
+        !source ||
+        source.id === player.id ||
+        source.userId !== player.userId ||
+        source.registrationId === player.registrationId ||
+        source.eligibilityVerifiedAt === null ||
+        source.eligibilityStatus === 'needs_review'
+      ) {
+        throw new BadRequestException({
+          code: 'ELIGIBILITY_PREVIOUS_RULING_NOT_FOUND',
+          message: '이어 쓸 이전 판정을 찾을 수 없어요. 직접 판정해 주세요.',
+        });
+      }
+      const p = await tx.v1TournamentPlayer.update({
+        where: { id: playerId },
+        data: {
+          eligibilityStatus: source.eligibilityStatus,
+          eligibilityVerificationMethod: source.eligibilityVerificationMethod,
+          eligibilityNote: `이전 대회(${source.registration.tournament.title}) 판정 유지`.slice(0, 500),
+          eligibilityVerifiedAt: new Date(),
+          eligibilityVerifiedByUserId: admin.userId,
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'player.eligibility',
+          targetType: 'tournament_player',
+          targetId: playerId,
+          beforeJson: eligibilityAuditSnapshot(player),
+          afterJson: { ...eligibilityAuditSnapshot(p), carriedOverFromPlayerId: source.id },
+        },
+        tx,
+      );
+      return p;
+    });
+
+    const jerseyByPlayerId = await readJerseyNumbers(this.prisma, updated.registrationId);
+    return this.serializePlayer(updated, jerseyByPlayerId.get(updated.id) ?? null);
+  }
+
+  /**
+   * 선수 본인 선출 여부 신고(MD-QA #192 ③). **명단 행의 계정 주인만** 부를 수 있다 — 팀장·매니저도
+   * 남의 신고를 대신 하지 못한다. 판정(eligibilityStatus)은 바꾸지 않고 참고 기록만 남는다.
+   * 운영진이 이미 판정했으면 바꾸지 못한다(판정이 최종이다).
+   */
+  async selfDeclareEligibility(
+    user: V1AuthUser,
+    tournamentId: string,
+    registrationId: string,
+    playerId: string,
+    dto: SelfDeclarePlayerEligibilityDto,
+  ) {
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+      where: { id: tournamentId, deletedAt: null },
+      select: { status: true, kind: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, registrationId, removedAt: null },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      if (player.userId !== user.id) {
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: '본인만 선출 여부를 신고할 수 있어요.',
+        });
+      }
+      await this.requireTeamMemberRole(registration.teamId, user.id);
+      if (
+        registration.status === 'cancel_requested' ||
+        registration.status === 'cancelled' ||
+        !isRosterMutableTournament(tournament)
+      ) {
+        throw new ConflictException({
+          code: 'SELF_DECLARATION_CLOSED',
+          message: '지금은 선출 여부를 신고할 수 없어요.',
+        });
+      }
+      if (await this.hasAdminEligibilityRuling(tx, playerId)) {
+        throw new ConflictException({
+          code: 'ELIGIBILITY_ADMIN_REVIEWED',
+          message: '운영진이 확정한 선출 여부예요. 변경이 필요하면 운영진에게 문의해 주세요.',
+        });
+      }
+      const saved = await tx.v1TournamentPlayer.update({
+        where: { id: playerId },
+        data: { selfDeclaredStatus: dto.selfDeclaredStatus, selfDeclaredAt: new Date() },
+      });
+      return {
+        id: saved.id,
+        selfDeclaredStatus: saved.selfDeclaredStatus ?? null,
+        selfDeclaredAt: saved.selfDeclaredAt?.toISOString() ?? null,
+      };
+    });
   }
 
   // ─── 직렬화 ───────────────────────────────────────────────────────────────────
@@ -1251,6 +1539,10 @@ export class TournamentPlayersService {
       genderSnapshot: normalizeGender(row.genderSnapshot),
       eligibilityStatus: row.eligibilityStatus,
       eligibilityNote: row.eligibilityNote ?? null,
+      eligibilityVerificationMethod: row.eligibilityVerificationMethod ?? null,
+      eligibilityVerifiedAt: row.eligibilityVerifiedAt?.toISOString() ?? null,
+      selfDeclaredStatus: row.selfDeclaredStatus ?? null,
+      selfDeclaredAt: row.selfDeclaredAt?.toISOString() ?? null,
       addedAt: row.addedAt.toISOString(),
       removedAt: row.removedAt?.toISOString() ?? null,
     };
@@ -1264,7 +1556,7 @@ export class TournamentPlayersService {
     row: V1TournamentPlayer,
     jerseyNumber: number | null,
     nickname: string | null,
-    access: { personalInfo: boolean; reviewNote: boolean },
+    access: { personalInfo: boolean; reviewNote: boolean; isViewer: boolean; adminReviewed: boolean },
     displayName: string,
   ) {
     const player = this.serializePlayer(row, jerseyNumber);
@@ -1274,7 +1566,15 @@ export class TournamentPlayersService {
       ...(access.personalInfo
         ? {}
         : { realName: null, birthDateSnapshot: null, genderSnapshot: null }),
-      ...(access.reviewNote ? {} : { eligibilityNote: null }),
+      // 판정 근거(방법·확인일)는 심사 메모와 같은 선(팀장·매니저)까지만 싣는다.
+      ...(access.reviewNote
+        ? {}
+        : { eligibilityNote: null, eligibilityVerificationMethod: null, eligibilityVerifiedAt: null }),
+      // 본인 신고는 개인정보와 같은 선(팀장·매니저 + 본인 행)이다.
+      ...(access.personalInfo ? {} : { selfDeclaredStatus: null, selfDeclaredAt: null }),
+      // 판정 여부 자체는 상태 배지처럼 팀원 모두가 본다 — 잠금 표시와 본인 신고 가능 여부에 쓴다.
+      eligibilityAdminReviewed: access.adminReviewed,
+      isViewer: access.isViewer,
       nickname,
       displayName,
       personalInfoVisible: access.personalInfo,

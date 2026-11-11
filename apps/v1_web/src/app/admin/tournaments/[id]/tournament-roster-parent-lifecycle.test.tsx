@@ -202,7 +202,7 @@ describe('MD-QA #140 실제 대회 셸의 오류·재시도와 명단 요청 수
       expect(within(recoveredDialog).queryByText('닉네임 처음 조회 닉네임')).not.toBeInTheDocument();
       expect(client.getQueryData<V1AdminTournamentRosterResponse>(v1Keys.adminTournamentRoster(registration.id))?.players[0]?.nickname).toBe(nickname);
       expect(rosterRequests).toHaveLength(cached ? 3 : 2);
-      expect(within(recoveredDialog).getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+      expect(within(recoveredDialog).getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
     } finally {
       held.resolve(oldSnapshot);
     }

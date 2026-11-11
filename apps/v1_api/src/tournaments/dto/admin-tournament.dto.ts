@@ -279,8 +279,8 @@ export class CreateTournamentDto {
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
-  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준이에요.' })
-  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준이에요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
+  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;
 
@@ -639,8 +639,8 @@ export class UpdateTournamentDto {
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
-  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준이에요.' })
-  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준이에요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
+  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;
 

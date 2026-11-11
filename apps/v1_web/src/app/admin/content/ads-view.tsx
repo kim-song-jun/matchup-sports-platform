@@ -94,8 +94,8 @@ function PublishChecklist({ campaign }: { campaign: V1AdCampaign }) {
 }
 
 /**
- * 광고 탭 본문 — 배너·팝업 캠페인 목록과 오른쪽 상세·편집 칸. 허브가 owner 에게만 탭을 보여 주고,
- * 서버가 owner 만 받는 진짜 경계다(여기는 화면 정리).
+ * 광고 탭 본문 — 배너·팝업 캠페인 목록과 오른쪽 상세·편집 칸. 모든 운영자에게 보이고, 변경은 owner·ops 만
+ * (`status:write` 가 없는 support 는 버튼이 잠긴다). 서버가 진짜 경계다(여기는 화면 정리).
  */
 export function AdsView() {
   const { search, setSearch, activeStatus, setActiveStatus, setPage, filters: listFilters, buildPagination } =

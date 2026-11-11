@@ -17,7 +17,7 @@ describe('ad campaigns against PostgreSQL', () => {
   const prefix = `ads-${randomUUID().slice(0, 8)}`;
   const userIds: string[] = [];
   let owner: V1AuthUser;
-  let ops: V1AuthUser;
+  let support: V1AuthUser;
   let ownerAdminId: string;
   let seq = 0;
 
@@ -53,10 +53,10 @@ describe('ad campaigns against PostgreSQL', () => {
 
   beforeAll(async () => {
     const ownerRow = await prisma.v1User.create({ data: { adminUser: { create: { adminRole: 'owner' } } }, include: { adminUser: true } });
-    const opsRow = await prisma.v1User.create({ data: { adminUser: { create: { adminRole: 'ops' } } } });
-    userIds.push(ownerRow.id, opsRow.id);
+    const supportRow = await prisma.v1User.create({ data: { adminUser: { create: { adminRole: 'support' } } } });
+    userIds.push(ownerRow.id, supportRow.id);
     owner = actor(ownerRow.id);
-    ops = actor(opsRow.id);
+    support = actor(supportRow.id);
     ownerAdminId = ownerRow.adminUser!.id;
   });
 
@@ -82,8 +82,8 @@ describe('ad campaigns against PostgreSQL', () => {
     await prisma.$disconnect();
   });
 
-  it('refuses a non-owner before touching any row', async () => {
-    await expect(admin.create(ops, { advertiserName: 'x', title: 'y' } as never)).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+  it('refuses a support admin (read-only) before touching any row', async () => {
+    await expect(admin.create(support, { advertiserName: 'x', title: 'y' } as never)).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
     expect(await prisma.v1AdCampaign.count({ where: { createdByAdminUserId: ownerAdminId } })).toBe(0);
   });
 

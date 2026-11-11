@@ -108,7 +108,7 @@ export function formatTournamentDateRangeShort(
   return `${start}~${end}`;
 }
 
-/** 판정 근거 줄처럼 좁은 슬롯용: 'MM.DD'(두 자리). KST 벽시계 고정. 없거나 invalid 이면 null. */
+/** 판정 근거 줄처럼 좁은 슬롯용: 'MM.DD'(월·일 두 자리). KST 벽시계 고정. 없거나 invalid 이면 null. */
 export function formatKstDotMonthDay(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
   const parts = getTournamentKstParts(dateStr);
@@ -116,7 +116,7 @@ export function formatKstDotMonthDay(dateStr: string | null | undefined): string
   return `${parts.month.padStart(2, '0')}.${parts.day.padStart(2, '0')}`;
 }
 
-/** 다른 해일 수 있는 이력용: 'YYYY.MM.DD'(두 자리). KST 벽시계 고정. 없거나 invalid 이면 null. */
+/** 다른 해일 수 있는 이력용: 'YYYY.MM.DD'(월·일 두 자리). KST 벽시계 고정. 없거나 invalid 이면 null. */
 export function formatKstDotDate(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
   const parts = getTournamentKstParts(dateStr);

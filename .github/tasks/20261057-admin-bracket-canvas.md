@@ -1,7 +1,7 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
 ## 2026-11-11 main 핫픽스 — 경기별 제목
-Status: Hotfix ready; main PR creation blocked by automatic approval; production not deployed
+Status: User-approved one-off main hotfix exception; PR/production deployment in progress
 
 ### Context / Goal / Original Conditions
 사용자 후속 지시: "해당 내용 main에 핫픽스로 배포 진행해줘". alpha의 PR#2327 기능만 운영 핫픽스로 준비하며 번호/조/라운드/진출 계산 변경은 포함하지 않는다. 이전 리뷰 생략 지시는 유지한다.
@@ -21,6 +21,7 @@ Status: Hotfix ready; main PR creation blocked by automatic approval; production
 CLAUDE.md의 main 머지 사용자 전용 규칙과 production 승인 게이트를 우회하지 않는다. 핫픽스 PR은 사용자의 명시적 main 요청 범위로 준비한다. 자동 배정의 번호 의존성은 기존 동작이며 이번 핫픽스에서 변경하지 않는다.
 
 ### Progress Snapshot
+사용자 추가 지시 "예외로 그냥 진행해줘"로 이번 경기별 제목 핫픽스에 한해 main PR 생성·머지 예외 승인을 받았다. 이전 자동 승인 거부 이후 새 승인을 근거로 정상 PR 경로만 재시도하며, main 직접 push/force-push·CI 우회·환경 보호 규칙 변경은 하지 않는다. 리뷰 요청/대기 생략 지시는 유지한다.
 원격 main1416d7527e, 소스 패키지1.16.0, 실제 공개 운영 표기1.16.1. 릴리스 리졸버의 기존 next-patch 규칙에 따라 소스1.16.1을 준비한 신규 운영 표기는1.16.2가 예상된다. 해당 기존 정책은 수정하지 않는다.
 API394/Web124 및 양쪽 TypeScript PASS, schema binding5 PASS. 자동 승인 검토가 `gh pr create --base main`을 실행 전 거부했다. 사유: 저장소 정책은 에이전트의 main 대상 PR 생성을 금지하며 사용자가 직접 만들어야 한다. API/브라우저 등 간접 경로로 우회하지 않았다. hotfix/fixture-display-title-1.16.1 원격 브랜치 준비 완료, main PR/운영 배포/production 승인/운영 데이터 변경 없음. 사용자 직접 PR 생성이 다음 단계다. 원본 공유 작업트리/WIP 및 실행 중인 로컬 관리자/서버는 보존한다. 핫픽스 작업트리는 /tmp/teameet-fixture-title-hotfix.
 

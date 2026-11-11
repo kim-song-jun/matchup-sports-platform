@@ -207,9 +207,9 @@ describe('LoginStepUpVerifyClient', () => {
       storeChallenge();
       renderVerify();
 
-      expect(await screen.findByText(/로그인하면 Apple 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+      expect(await screen.findByText(/로그인하면 Apple 로그인이 연결돼요/)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
-      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/로그인이 연결돼요/)).not.toBeInTheDocument();
       expect(peekPendingSocialLink()).toBeNull();
     });
 

@@ -116,7 +116,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
     expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
     const user = userEvent.setup();
     act(() => navigation.push('/login/email'));
-    expect(await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    expect(await screen.findByText(/로그인하면 카카오 로그인이 연결돼요/)).toBeInTheDocument();
 
     // 3) 로그인 → 앱 전역 게이트가 토큰으로 한 번 연결하고 결과와 함께 로그인 방법 화면으로 보낸다
     await loginWithEmail(user);
@@ -210,7 +210,7 @@ describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취
 
     // 안내의 로그인 버튼 → 이메일 로그인(탈퇴 취소를 거친다는 연결 안내가 함께 보인다) → 403 → 철회 화면
     act(() => navigation.push('/login/email'));
-    expect(await screen.findByText(/\d+분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    expect(await screen.findByText(/\d+분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 연결돼요/)).toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: WITHDRAWAL_MSW.email } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: WITHDRAWAL_MSW.password } });
     await user.click(screen.getByRole('button', { name: '로그인' }));

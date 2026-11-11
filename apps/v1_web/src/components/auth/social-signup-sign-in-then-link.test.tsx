@@ -77,7 +77,10 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
   it('번호 인증을 맞춘 뒤에야 안내가 뜨고, 로그인하면 자동 연결된다고 약속한다', async () => {
     await confirmConflictingCode();
 
-    expect(await screen.findByText(/이미 팀밋 계정이 있어요\. 30분 안에 원래 방법으로 로그인하면 카카오 로그인 연결을 시도해요/)).toBeInTheDocument();
+    expect(await screen.findByText('이미 팀밋 계정이 있어요. 30분 안에 원래 방법으로 로그인하면 카카오 로그인 연결을 시도해요.')).toBeInTheDocument();
+    // 드문 경우(다른 카카오 계정이 이미 연결됨) 설명과 이동 안내 줄은 싣지 않는다 — 결과는 로그인 뒤 연결 화면이 알린다.
+    expect(screen.queryByText(/결과를 알려 드려요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/로그인이 끝나면/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '원래 방법으로 로그인하기' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
@@ -437,8 +440,8 @@ describe('토큰을 보관할 수 없는 브라우저', () => {
 
     await user.click(await screen.findByRole('button', { name: '원래 방법으로 로그인하기' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/설정의 "로그인 방법"에서 카카오 로그인을 연결해 주세요/)).toBeInTheDocument();
-    expect(within(dialog).queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/원래 방법으로 로그인한 뒤 설정 › 로그인 방법에서 카카오 로그인을 연결해 주세요\./)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/연결을 시도해요/)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: '로그인하러 가기' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));

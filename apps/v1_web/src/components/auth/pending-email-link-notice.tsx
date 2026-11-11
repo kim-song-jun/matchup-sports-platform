@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { clearPendingEmailLink, readPendingEmailLinkWithExpiry } from '@/lib/pending-email-link';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
@@ -17,6 +17,7 @@ type Notice = { email: string | null; expiresAtMs: number };
  * 주기적으로 다시 읽는다. 소셜 연결 대기가 함께 있으면 로그인 뒤 그 결과가 먼저 처리되고 이메일 뜻은 버려지므로 안내하지 않는다.
  */
 export function PendingEmailLinkNotice() {
+  const messageId = useId();
   const [notice, setNotice] = useState<Notice | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -44,17 +45,19 @@ export function PendingEmailLinkNotice() {
   const timeLimit = remainingTimePhrase(notice.expiresAtMs, now);
   return (
     <div className="tm-auth-pending-link">
-      <p className="tm-text-label tm-auth-pending-link-message">
+      <p className="tm-auth-pending-link-message" id={messageId}>
         {notice.email === null
           ? `${timeLimit} 로그인하면 이메일 연결을 이어서 도와요. 연결할 이메일은 로그인한 뒤에 직접 적어요.`
           : `${timeLimit} 로그인하면 ${notice.email} 연결을 이어서 도와요. 시간이 지나면 이 안내는 사라져요.`}
       </p>
       <Button
+        aria-describedby={messageId}
+        className="tm-auth-pending-link-action"
         onClick={() => {
           clearPendingEmailLink();
           setNotice(null);
         }}
-        size="md"
+        size="sm"
         type="button"
         variant="ghost"
       >

@@ -34,7 +34,7 @@ describe('PendingLinkNotice', () => {
     );
     render(<PendingLinkNotice />);
 
-    expect(await screen.findByText(/9분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    expect(await screen.findByText(/9분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 연결돼요/)).toBeInTheDocument();
     expect(screen.queryByText(/9분 안에 로그인하면/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '연결 안 하기' })).toBeEnabled();
   });
@@ -45,8 +45,13 @@ describe('PendingLinkNotice', () => {
   ] as const)('%s 토큰이 있으면 어떤 로그인이 연결되는지 알리고 연결 안 하기를 준다', async (provider, label) => {
     store(provider);
     render(<PendingLinkNotice />);
-    expect(await screen.findByText(new RegExp(`9분 안에 로그인하면 ${label} 로그인이 이 계정에 연결돼요\\.`))).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '연결 안 하기' })).toBeEnabled();
+    const message = await screen.findByText(new RegExp(`9분 안에 로그인하면 ${label} 로그인이 연결돼요`));
+    const button = screen.getByRole('button', { name: '연결 안 하기' });
+    expect(button).toBeEnabled();
+    // 버튼은 같은 안내 상자 안에 있고, 무엇을 안 하는지는 그 문장으로 읽힌다.
+    expect(message.parentElement).toBe(button.parentElement);
+    expect(button).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.queryByText(/직접 요청한 게 아니라면/)).not.toBeInTheDocument();
   });
 
   it.each([
@@ -73,14 +78,14 @@ describe('PendingLinkNotice', () => {
       vi.advanceTimersByTime(31_000);
     });
 
-    expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/로그인이 연결돼요/)).not.toBeInTheDocument();
   });
 
   it('연결 안 하기를 누르면 안내가 사라지고 보관한 토큰도 지워진다', async () => {
     store('kakao');
     render(<PendingLinkNotice />);
     await userEvent.setup().click(await screen.findByRole('button', { name: '연결 안 하기' }));
-    expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/로그인이 연결돼요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '연결 안 하기' })).not.toBeInTheDocument();
     expect(peekPendingSocialLink()).toBeNull();
   });

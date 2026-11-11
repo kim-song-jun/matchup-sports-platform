@@ -177,7 +177,11 @@ describe('Ads HTTP contract', () => {
     for (const [method, path, payload] of routes) {
       // 2026-11-11: ops 는 권한에서 막히지 않는다(없는 캠페인·남이 올린 이미지는 그 도메인 오류로 거절된다).
       const asOps = await (http() as never as Record<string, (p: string) => request.Test>)[method](path).set(ops).send(payload);
+      // 권한 거절(403)도, 서버 오류(5xx)도 아니고 정규화된 오류 코드나 성공 응답이어야 한다.
+      expect([method, path, asOps.status >= 500]).toEqual([method, path, false]);
+      expect([method, path, asOps.status]).not.toEqual([method, path, 403]);
       expect([method, path, asOps.body.code]).not.toEqual([method, path, 'PERMISSION_DENIED']);
+      if (asOps.status >= 400) expect([method, path, typeof asOps.body.code]).toEqual([method, path, 'string']);
       const anonymous = await (http() as never as Record<string, (p: string) => request.Test>)[method](path).send(payload);
       expect([method, path, anonymous.status]).toEqual([method, path, 403]);
     }

@@ -61,7 +61,8 @@ describe('팀장 — 모아서 저장', () => {
   it('체크를 풀고 사유를 고르면 저장할 때 한 번의 일괄 요청으로 빠지고, 빠짐 섹션으로 옮겨진다', async () => {
     renderScreen();
     expect(await screen.findByRole('heading', { name: '출전 3명' })).toBeInTheDocument();
-    expect(screen.getByText(`vs ${G1.opponentName}`)).toBeInTheDocument();
+    // 경기 선택이 상대를 말하므로 요약 카드(vs 상대)는 두지 않는다.
+    expect(screen.queryByText(`vs ${G1.opponentName}`)).toBeNull();
     expect(screen.getByText('수정 가능')).toBeInTheDocument();
     const save = screen.getByRole('button', { name: '변경사항 저장' });
     expect(save).toBeDisabled();
@@ -283,10 +284,32 @@ describe('자동으로 빠지거나 들어온 선수', () => {
     const unavailable = section(/결장 1명/);
     expect(within(unavailable).getByText('결장 · 부상')).toBeInTheDocument();
     expect(within(unavailable).getByText(/10\/1 \(목\)~10\/4 \(일\) 결장/)).toBeInTheDocument();
-    expect(within(unavailable).getByText(/여기서 바꿀 수 없고/)).toBeInTheDocument();
+    expect(within(unavailable).getByText(/기간은 경기 명단 관리에서 바꿔요/)).toBeInTheDocument();
+    expect(within(unavailable).queryByText(/팀 멤버 관리/)).toBeNull();
+    expect(within(unavailable).getByRole('link', { name: '결장 기간 관리' })).toHaveAttribute('href', `/teams/${teamId}/game-rosters`);
     expect(within(unavailable).queryByRole('button', { name: /되돌리기|결장.*변경/ })).toBeNull();
     expect(within(unavailable).getByRole('button', { name: '김민재 골키퍼로 지정' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
+  });
+});
+
+describe('결장 기간 관리 링크 — 권한별', () => {
+  it('팀원에게는 링크 없이 팀장·매니저가 바꾼다고만 알린다', async () => {
+    mock.setViewerRole('TEAM_MEMBER');
+    mock.markUnavailable('player-1', '2026-09-30T15:00:00.000Z', '2026-10-04T15:00:00.000Z', 'INJURY');
+    renderScreen();
+    await screen.findByRole('heading', { name: '결장 1명' });
+    const unavailable = section(/결장 1명/);
+    expect(within(unavailable).getByText(/결장 기간은 팀장·매니저가 바꿀 수 있어요/)).toBeInTheDocument();
+    expect(within(unavailable).queryByRole('link', { name: '결장 기간 관리' })).toBeNull();
+  });
+
+  it('요약 카드가 없어져 상태 배지와 변경 기록 링크가 경기 선택 줄에 남는다', async () => {
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    expect(screen.getByText('수정 가능')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^변경 기록/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 });
 
@@ -302,7 +325,7 @@ describe('권한별 — 팀·경기 명단 한 번의 조회로 연다', () => {
     mock.setGameState(G1.gameId, 'LIVE');
     renderScreen();
     expect(await screen.findByText('경기 시작됨')).toBeInTheDocument();
-    expect(screen.getByText(`vs ${G1.opponentName}`)).toBeInTheDocument();
+    expect(screen.queryByText(`vs ${G1.opponentName}`)).toBeNull();
     expect(screen.getByText('7 김민재')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /저장|참가 명단대로|되돌리기/ })).toBeNull();

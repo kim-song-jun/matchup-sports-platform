@@ -515,6 +515,7 @@ export function presentTournamentDetail(
       ? []
       : mergedPublicFixtures(row, staffBypass, publicLiveEnabled).map((fixture) => ({
       id: fixture.id,
+      displayTitle: fixture.displayTitle,
       groupId: fixture.groupId,
       round: fixture.round,
       fixtureNumber: fixture.fixtureNumber,

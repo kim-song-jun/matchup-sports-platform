@@ -116,6 +116,8 @@ describe('AccountExistsGuide', () => {
     renderGuide({ provider: null, redirectPath: null });
     expect(screen.getByText(/소셜로는 새로 가입할 수 없어요/)).toBeInTheDocument();
     expect(screen.getByText('이메일이나 카카오·Apple처럼 처음 가입한 방법이에요.')).toBeInTheDocument();
+    // 설정에서 누를 항목은 실제 이름으로 알려 준다.
+    expect(screen.getByText('설정 › 로그인 방법에서 카카오나 Apple 로그인을 연결해 주세요.')).toBeInTheDocument();
   });
 });
 

@@ -1362,6 +1362,8 @@ button:disabled {
   font-weight: 600;
   color: var(--blue700);
   word-break: keep-all;
+  /* 이메일 연결 안내는 공백 없는 주소를 싣는다 — 버튼 옆 좁은 칸에서 넘치지 않게 끊는다. */
+  overflow-wrap: anywhere;
 }
 
 /* .tm-btn-ghost 의 글자색(--text)보다 앞서도록 두 클래스로 올린다. 크기·터치 높이는 .tm-btn-sm 이 맡는다. */

@@ -12,7 +12,9 @@ export const LINK_TOKEN_WINDOW_MINUTES = 30;
 
 /** 자동 연결이 안 될 때 사람이 직접 하는 일. 안내 단계와 약속 문장이 같은 말을 쓴다. */
 export function settingsLinkInstruction(provider: V1LinkableProvider | null): string {
-  return `설정 › 로그인 방법에서 ${linkProviderLabel(provider)} 로그인을 연결해 주세요.`;
+  // 제공자를 모르면 설정 화면의 실제 항목을 대 준다 — "소셜 로그인"이라는 항목은 없다.
+  const target = provider === null ? '카카오나 Apple' : linkProviderLabel(provider);
+  return `설정 › 로그인 방법에서 ${target} 로그인을 연결해 주세요.`;
 }
 
 /** 연결 토큰을 보관할 수 없는 브라우저에서 자동 연결 대신 하는 약속. */

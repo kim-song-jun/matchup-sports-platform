@@ -6,32 +6,6 @@ import XCTest
 @MainActor
 final class KakaoSignInHandoffWatchTests: XCTestCase {
 
-    /// Time only moves when a test moves it.
-    @MainActor
-    private final class ManualClock {
-        private var now: TimeInterval = 0
-        private var nextID = 0
-        private var timers: [Int: (due: TimeInterval, fire: @MainActor () -> Void)] = [:]
-
-        var schedule: KakaoSignInHandoffWatch.Schedule {
-            { [self] delay, fire in
-                let id = nextID
-                nextID += 1
-                timers[id] = (now + delay, fire)
-                return { [self] in timers[id] = nil }
-            }
-        }
-
-        func advance(by seconds: TimeInterval) {
-            now += seconds
-            for id in timers.keys.sorted() {
-                guard let timer = timers[id], timer.due <= now else { continue }
-                timers[id] = nil
-                timer.fire()
-            }
-        }
-    }
-
     private let clock = ManualClock()
     private var abandoned = 0
 

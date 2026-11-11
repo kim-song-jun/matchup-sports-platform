@@ -69,8 +69,8 @@ final class KakaoNativeLogin {
             callback.onSuccess(token.getAccessToken());
             return;
         }
-        // Ask once for the same optional scopes as the web. A declined optional item must
-        // not loop or prevent a successful token from being exchanged at our API.
+        // Ask once for the same optional scopes as the web, never again. Unchecking some items
+        // still returns a token and completes; declining the whole prompt is a cancel, as elsewhere.
         sdk.loginWithNewScopes(missing, (next, failure) -> {
             OAuthToken usable = usableToken(KakaoLoginFailure.Step.CONSENT, next, failure, List.of(), callback);
             if (usable != null) callback.onSuccess(usable.getAccessToken());

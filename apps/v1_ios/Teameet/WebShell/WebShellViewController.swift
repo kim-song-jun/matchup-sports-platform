@@ -713,7 +713,11 @@ extension WebShellViewController: WKScriptMessageHandler {
         } catch KakaoSignInController.Failure.failed(let report) {
             await replyToKakao(request, error: report)
         } catch {
-            await replyToKakao(request, error: "\(error)")
+            // Not expected from the controller; still nothing reaches the page unsanitised.
+            await replyToKakao(
+                request,
+                error: KakaoSignInFailure.sanitized(
+                    "unexpected \(type(of: error)): \(error)", limit: KakaoSignInFailure.reportLimit))
         }
     }
 

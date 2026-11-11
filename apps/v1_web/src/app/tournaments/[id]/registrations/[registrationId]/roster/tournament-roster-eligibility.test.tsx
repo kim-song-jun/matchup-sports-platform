@@ -96,7 +96,7 @@ describe('팀장 명단 — 선출 기준 안내와 운영진 확인 잠금 (MD-
     fireEvent.click(screen.getByRole('button', { name: '길동이 수정' }));
 
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(CRITERIA.replace(/[()]/g, '\\$&')))).toBeInTheDocument();
+    expect(screen.getByText(CRITERIA, { exact: false })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /JoinKFA에서 등록 이력 보기/ });
     expect(link).toHaveAttribute('href', 'https://www.joinkfa.com');
     expect(link).toHaveAttribute('target', '_blank');

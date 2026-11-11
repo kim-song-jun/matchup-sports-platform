@@ -288,6 +288,19 @@ describe('admin tournament roster modal', () => {
     expect(screen.getByText(/Teameet은 JoinKFA에 선수 정보를 보내지 않아요\./)).toBeInTheDocument();
   });
 
+  // MD-QA #192 후속: 증명서가 JoinKFA 어디 있는지(2026-11-11 실측 메뉴 경로) 모달 하단과 판정 패널이 같은 문구로 알려 준다.
+  it('JoinKFA 증명서 위치 안내를 모달 하단과 판정 패널에 보여 준다', async () => {
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    const guide = "선수 본인이 JoinKFA에 로그인한 뒤 상단 '증명서 → 증명서 신청'에서 경력·실적 증명서를 받을 수 있어요.";
+    expect(screen.getByText(guide)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
+    expect(within(panel).getByText(guide)).toBeInTheDocument();
+  });
+
   it('필터: 확인 전 / 선출 / 본인 신고만 으로 좁힌다', async () => {
     const roster = queryState.data as { players: Array<Record<string, unknown>> };
     const base = roster.players[0];

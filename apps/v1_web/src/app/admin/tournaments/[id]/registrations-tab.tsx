@@ -24,7 +24,7 @@ import {
   matchesEligibilityFilter,
   type EligibilityFilter,
 } from '@/components/admin/admin-player-eligibility-review';
-import { JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
+import { JOINKFA_CERTIFICATE_GUIDE, JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
 import { formatDate } from './tournament-admin-shared';
 import {
   ADMIN_CANCELLABLE,
@@ -385,6 +385,7 @@ export function RosterModal({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE} 대한축구협회 공식 사이트에서 직접 확인해 주세요.</p>
         <JoinKfaLink label="JoinKFA 열기" />
+        <p className="m-0 w-full text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{JOINKFA_CERTIFICATE_GUIDE}</p>
       </div>
       <button
         type="button"

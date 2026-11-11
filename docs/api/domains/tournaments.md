@@ -647,6 +647,8 @@ The stored roster snapshot uses the server-side member profile values for `realN
 
 선출 기준은 대회마다 다르므로 코드에 등급·기간을 넣지 않는다. 화면 문구는 사용자 확정(2026-11-11) **"KFA 등록 이력(JoinKFA)으로 확인하고, 세부 기준은 대회 요강을 따라요."** 이고, Teameet 은 JoinKFA 와 **링크로만** 이어진다 — 서버·클라이언트 어디서도 joinkfa.com 에 요청을 보내지 않는다(공식 API 없음, robots.txt 전면 차단). 화면은 루트 `https://www.joinkfa.com` 을 새 탭(`rel="noopener noreferrer"`)으로 열고 "Teameet은 JoinKFA에 선수 정보를 보내지 않아요." 를 함께 적는다. KFA 로고는 쓰지 않는다. 증빙 파일 업로드도 없다(텍스트 메모까지만).
 
+**증명서 위치 안내**(MD-QA #192 후속): 팀장·선수 기준 안내(`EligibilityCriteriaHelp` — 팀장 명단 수정·경기 명단·본인 신고 카드)와 어드민 명단 모달 하단·선출 판정 패널에 같은 한 줄 **"선수 본인이 JoinKFA에 로그인한 뒤 상단 '증명서 → 증명서 신청'에서 경력·실적 증명서를 받을 수 있어요."** 를 보여 준다(`JOINKFA_CERTIFICATE_GUIDE`, `components/tournaments/player-eligibility.tsx`). 메뉴 경로는 2026-11-11 joinkfa.com 실측이고 회원 전용(비로그인 시 "회원전용 페이지입니다.")이라 선수 본인만 발급한다. KFA 쪽 메뉴가 바뀌면 이 문구만 고친다 — 링크는 여전히 루트 주소만 열고, 하위 경로로 딥링크하지 않는다.
+
 `V1TournamentPlayer` 의 nullable 컬럼(마이그레이션 `20261111090000_v1_tournament_player_eligibility_evidence`, expand-only):
 
 | Column | Writer | Meaning |

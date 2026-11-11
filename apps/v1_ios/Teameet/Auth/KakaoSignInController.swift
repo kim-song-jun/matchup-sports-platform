@@ -11,8 +11,8 @@ import UIKit
 final class KakaoSignInController {
 
     enum Failure: Error {
-        /// The reader backed out of KakaoTalk or the account page, or the attempt was
-        /// replaced. Not something to report.
+        /// The reader backed out of KakaoTalk or the account page, declined consent, or the
+        /// attempt was replaced. Not something to report.
         case cancelled
         /// A `KakaoSignInFailure.report` for the page to log.
         case failed(String)
@@ -40,15 +40,17 @@ final class KakaoSignInController {
     }
 
     private func authorize(scopes: [String]) async throws -> String {
-        let token = try await authenticate()
+        let deadline = KakaoSignInDeadline()
+        defer { deadline.stop() }
+        let token = try await authenticate(deadline: deadline)
         let missing = KakaoSignInPolicy.additionalScopes(requested: scopes, granted: token.scopes)
         guard !missing.isEmpty else { return token.accessToken }
         // One additional-consent request. A successful response may omit optional items
         // the reader declined; it still completes sign-in without prompting again.
-        return try await requestConsent(scopes: missing).accessToken
+        return try await requestConsent(scopes: missing, deadline: deadline).accessToken
     }
 
-    private func authenticate() async throws -> Credentials {
+    private func authenticate(deadline: KakaoSignInDeadline) async throws -> Credentials {
         var talkFailure: KakaoSignInFailure?
         if UserApi.isKakaoTalkLoginAvailable() {
             do {
@@ -61,7 +63,7 @@ final class KakaoSignInController {
             }
         }
         do {
-            return try await loginWithKakaoAccount()
+            return try await loginWithKakaoAccount(deadline: deadline)
         } catch let step as StepFailure {
             throw Failure.failed(KakaoSignInFailure.report([talkFailure, step.failure].compactMap { $0 }))
         }
@@ -80,19 +82,25 @@ final class KakaoSignInController {
         }
     }
 
-    private func loginWithKakaoAccount() async throws -> Credentials {
+    private func loginWithKakaoAccount(deadline: KakaoSignInDeadline) async throws -> Credentials {
         let step = KakaoSignInStep<Credentials>()
-        return try await run(step) {
+        return try await runAuthenticationSession(step, as: .account, deadline: deadline) {
+            let previous = AuthController.shared.authenticationSession
             UserApi.shared.loginWithKakaoAccount { token, error in
                 step.deliver(Self.result(token: token, error: error, step: .account))
+            }
+            // The SDK stores the session it starts before returning. With no authorize URL it
+            // returns without a session and without ever calling back.
+            if AuthController.shared.authenticationSession === previous {
+                step.deliver(.failure(StepFailure(failure: Self.shellFailure(.account, "NotStarted"))))
             }
         }
     }
 
-    private func requestConsent(scopes: [String]) async throws -> Credentials {
+    private func requestConsent(scopes: [String], deadline: KakaoSignInDeadline) async throws -> Credentials {
         let step = KakaoSignInStep<Credentials>()
         do {
-            return try await run(step) {
+            return try await runAuthenticationSession(step, as: .consent, deadline: deadline) {
                 UserApi.shared.loginWithKakaoAccount(scopes: scopes) { token, error in
                     step.deliver(Self.result(token: token, error: error, step: .consent))
                 }
@@ -100,6 +108,24 @@ final class KakaoSignInController {
         } catch let failed as StepFailure {
             throw Failure.failed(KakaoSignInFailure.report([failed.failure]))
         }
+    }
+
+    /// `run` for a step that waits on the SDK's authentication session. Two of the SDK's paths
+    /// finish without calling back (no authorize URL; the additional-consent wrapper finding no
+    /// top view controller), so the step is also failed when the page is about to give up.
+    private func runAuthenticationSession(
+        _ step: KakaoSignInStep<Credentials>, as kind: KakaoSignInFailure.Step,
+        deadline: KakaoSignInDeadline, start: () -> Void
+    ) async throws -> Credentials {
+        if Task.isCancelled { throw Failure.cancelled }
+        let unwatch = deadline.watch {
+            step.deliver(.failure(StepFailure(failure: Self.shellFailure(kind, "NoCallback"))))
+            // The page has stopped listening; a sheet still open would answer nobody.
+            AuthController.shared.authenticationSession?.cancel()
+        }
+        guard let unwatch else { throw StepFailure(failure: Self.shellFailure(kind, "NotStarted")) }
+        defer { unwatch() }
+        return try await run(step, start: start)
     }
 
     /// Starts an SDK step and waits for the SDK callback or a cancellation, whichever settles it.
@@ -118,17 +144,20 @@ final class KakaoSignInController {
         token: OAuthToken?, error: Error?, step: KakaoSignInFailure.Step
     ) -> Result<Credentials, Error> {
         if let error {
-            if let sdkError = error as? SdkError, sdkError.isClientFailed,
-               sdkError.getClientError().reason == .Cancelled {
-                return .failure(Failure.cancelled)
-            }
-            return .failure(StepFailure(failure: summary(of: error, step: step)))
+            let failure = summary(of: error, step: step)
+            return .failure(failure.isReaderDecision ? Failure.cancelled : StepFailure(failure: failure))
         }
         guard let token, !token.accessToken.isEmpty else {
-            let missing = KakaoSignInFailure(step: step, family: "Other", reason: "MissingAccessToken")
-            return .failure(StepFailure(failure: missing))
+            return .failure(StepFailure(failure: shellFailure(step, "MissingAccessToken")))
         }
         return .success(Credentials(accessToken: token.accessToken, scopes: token.scopes ?? []))
+    }
+
+    /// A failure the shell itself detected, as opposed to one the SDK reported.
+    private nonisolated static func shellFailure(
+        _ step: KakaoSignInFailure.Step, _ reason: String
+    ) -> KakaoSignInFailure {
+        KakaoSignInFailure(step: step, family: "Other", reason: reason)
     }
 
     private nonisolated static func summary(of error: Error, step: KakaoSignInFailure.Step) -> KakaoSignInFailure {

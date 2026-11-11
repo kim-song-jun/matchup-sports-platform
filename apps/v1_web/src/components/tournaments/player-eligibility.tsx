@@ -1,4 +1,5 @@
 import { ExternalLink, Lock } from 'lucide-react';
+import { formatKstDotDate, formatKstDotMonthDay } from '@/lib/date-utils';
 import type {
   V1PlayerEligibilityMethod,
   V1PlayerEligibilityStatus,
@@ -71,21 +72,14 @@ export function EligibilityLockedNote({ method }: { method: V1PlayerEligibilityM
   );
 }
 
-/** `MM.DD` — 근거 줄은 짧아야 한 줄에 들어간다. */
+/** `MM.DD` — 근거 줄은 짧아야 한 줄에 들어간다. 포맷 정의는 `lib/date-utils.ts`가 단일 소스다. */
 export function formatEvidenceDate(iso: string): string {
-  const parts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit' })
-    .formatToParts(new Date(iso));
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-  return `${month}.${day}`;
+  return formatKstDotMonthDay(iso) ?? '';
 }
 
 /** `YYYY.MM.DD` — 이전 판정은 다른 해일 수 있어 연도를 붙인다. */
 export function formatEvidenceFullDate(iso: string): string {
-  const parts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
-    .formatToParts(new Date(iso));
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${pick('year')}.${pick('month')}.${pick('day')}`;
+  return formatKstDotDate(iso) ?? '';
 }
 
 /** 팀장 선택과 본인 신고가 엇갈리는가 — 둘 다 값이 있고 다를 때만. */

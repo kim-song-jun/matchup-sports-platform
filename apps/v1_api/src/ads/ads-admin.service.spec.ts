@@ -91,10 +91,9 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 
-describe('AdsAdminService — owner-only access', () => {
+describe('AdsAdminService — access by admin role', () => {
+  // 2026-11-11: 조회는 활성 운영자 누구나, 변경은 owner·ops 만(공지·팝업과 같은 기준). support 는 읽기 전용이다.
   it.each([
-    ['ops', OPS],
-    ['support', SUPPORT],
     ['a revoked owner', REVOKED_OWNER],
     ['a signed-in user with no admin row', { id: 'user-nobody' } as never],
   ])('rejects %s on every operation and changes nothing', async (_label, actor) => {
@@ -116,9 +115,31 @@ describe('AdsAdminService — owner-only access', () => {
     expect(fake.state.assets.every((candidate) => candidate.adCampaignId === null)).toBe(true);
   });
 
-  it('lets an owner through', async () => {
-    const { service } = await build();
-    await expect(service.list(OWNER, {})).resolves.toMatchObject({ items: [] });
+  it('lets support read but rejects every write and changes nothing', async () => {
+    const { service, fake } = await build({ campaigns: [row('c1', { status: 'published', version: 3, ...bannerWindow('2026-11-09T00:00:00Z', '2026-11-12T00:00:00Z') })] });
+    const before = JSON.stringify(fake.state.campaigns);
+
+    await expect(service.list(SUPPORT, {})).resolves.toMatchObject({ items: [expect.objectContaining({ id: 'c1' })] });
+    await expect(service.detail(SUPPORT, 'c1')).resolves.toMatchObject({ campaign: expect.objectContaining({ id: 'c1' }) });
+    const results = await Promise.all([
+      codeOf(service.create(SUPPORT, save())),
+      codeOf(service.update(SUPPORT, 'c1', { ...(save() as object), expectedVersion: 3 } as never)),
+      codeOf(service.publish(SUPPORT, 'c1', { expectedVersion: 3 })),
+      codeOf(service.stop(SUPPORT, 'c1')),
+    ]);
+
+    expect(results).toEqual(Array(4).fill('PERMISSION_DENIED'));
+    expect(JSON.stringify(fake.state.campaigns)).toBe(before);
+    expect(fake.state.actionLogs).toHaveLength(0);
+  });
+
+  // 이미지는 올린 운영자 본인만 쓸 수 있다 — ops 는 자기가 올린 이미지로 만든다.
+  it.each([['an owner', OWNER, 'admin-owner'], ['an ops admin', OPS, 'admin-ops']])('lets %s read and write', async (_label, actor, uploader) => {
+    const { service } = await build({ assets: [asset('asset-banner', IMG.banner, { uploadedByAdminUserId: uploader }), asset('asset-popup', IMG.popup, { uploadedByAdminUserId: uploader })] });
+    await expect(service.list(actor, {})).resolves.toMatchObject({ items: [] });
+    const { campaign } = await service.create(actor, save({ popup: popupInput() }));
+    expect(campaign.status).toBe('draft');
+    await expect(service.detail(actor, campaign.id)).resolves.toMatchObject({ campaign: expect.objectContaining({ id: campaign.id }) });
   });
 });
 

@@ -30,6 +30,19 @@ struct KakaoSignInFailure: Equatable, Sendable {
         self.detail = cleaned?.isEmpty == false ? cleaned : nil
     }
 
+    /// Whether the reader chose to stop rather than something failing.
+    ///
+    /// `ClientFailed/Cancelled` is backing out of KakaoTalk or the account page.
+    /// `AuthFailed/AccessDenied` is OAuth's `access_denied`: declining on Kakao's consent
+    /// screen, whichever step shows it. Neither deserves a fallback to another login method.
+    /// The names are the SDK's enum case names, as `String(describing:)` renders them.
+    var isReaderDecision: Bool {
+        switch (family, reason) {
+        case ("ClientFailed", "Cancelled"), ("AuthFailed", "AccessDenied"): return true
+        default: return false
+        }
+    }
+
     /// The text the page logs as the failure reason.
     ///
     /// Classifications come first and details after, so the leading characters identify every

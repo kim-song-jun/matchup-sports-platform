@@ -604,8 +604,8 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void onCancelled() {
                 reportKakaoResult(KakaoLoginPolicy.cancelledScript(requestId));
             }
-            @Override public void onError(String code) {
-                reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, code));
+            @Override public void onError(String reason) {
+                reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, reason));
             }
         });
     }

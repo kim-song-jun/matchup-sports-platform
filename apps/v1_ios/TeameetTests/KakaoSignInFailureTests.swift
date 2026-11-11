@@ -11,6 +11,43 @@ final class KakaoSignInFailureTests: XCTestCase {
         KakaoSignInFailure(step: step, family: family, reason: reason, detail: detail)
     }
 
+    // MARK: - Reader decisions
+
+    /// Tapping cancel on KakaoTalk's consent screen comes back as `AuthFailed/AccessDenied`,
+    /// on whichever step shows that screen. It must end the sign-in, not fall back to another
+    /// login or be reported as a fault.
+    func testBackingOutAndDecliningConsentAreTheReadersDecisionOnEveryStep() {
+        for step in [KakaoSignInFailure.Step.talk, .account, .consent] {
+            XCTAssertTrue(failure(step, family: "ClientFailed", reason: "Cancelled").isReaderDecision, "\(step)")
+            XCTAssertTrue(failure(step, family: "AuthFailed", reason: "AccessDenied").isReaderDecision, "\(step)")
+        }
+    }
+
+    func testEveryOtherAuthorizationFailureIsStillAFailure() {
+        let reasons = [
+            "Unknown", "InvalidRequest", "InvalidClient", "InvalidScope", "InvalidGrant", "Misconfigured",
+            "Unauthorized", "UnauthorizedClient", "LoginRequired", "ConsentRequired", "InteractionRequired",
+            "ServerError", "AutoLogin",
+        ]
+        for reason in reasons {
+            XCTAssertFalse(failure(family: "AuthFailed", reason: reason).isReaderDecision, reason)
+        }
+    }
+
+    /// A KakaoTalk that refuses the handoff is what sends the Talk step on to the account login.
+    func testAClientFailureOtherThanCancellingIsStillAFailure() {
+        for reason in ["NotSupported", "Unknown", "BadParameter", "IllegalState"] {
+            XCTAssertFalse(failure(family: "ClientFailed", reason: reason).isReaderDecision, reason)
+        }
+    }
+
+    func testTheReasonsAreTiedToTheirOwnFamily() {
+        XCTAssertFalse(failure(family: "ClientFailed", reason: "AccessDenied").isReaderDecision)
+        XCTAssertFalse(failure(family: "ApiFailed", reason: "AccessDenied").isReaderDecision)
+        XCTAssertFalse(failure(family: "Other", reason: "Cancelled").isReaderDecision)
+        XCTAssertFalse(failure(family: "AuthFailed", reason: "Cancelled").isReaderDecision)
+    }
+
     // MARK: - Report shape
 
     /// A Talk failure followed by an account failure must show both, classification first.

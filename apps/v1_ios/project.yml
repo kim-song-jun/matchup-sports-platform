@@ -185,6 +185,8 @@ targets:
       - path: Teameet/Auth/KakaoSignInFailure.swift
       - path: Teameet/Auth/KakaoSignInAttempt.swift
       - path: Teameet/Auth/KakaoSignInHandoffWatch.swift
+      - path: Teameet/Auth/KakaoSignInTimer.swift
+      - path: Teameet/Auth/KakaoSignInDeadline.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

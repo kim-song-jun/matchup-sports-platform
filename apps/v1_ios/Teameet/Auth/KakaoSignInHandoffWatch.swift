@@ -9,38 +9,22 @@ import Foundation
 @MainActor
 final class KakaoSignInHandoffWatch {
 
-    typealias Cancel = @MainActor () -> Void
-    typealias Schedule = @MainActor (_ delay: TimeInterval, _ fire: @escaping @MainActor () -> Void) -> Cancel
-
     /// The redirect and the return to the foreground are delivered separately and in no
     /// guaranteed order, so a redirect may follow the activation by a moment.
     static let defaultGrace: TimeInterval = 2
 
-    static let mainActorSchedule: Schedule = { delay, fire in
-        let task = Task { @MainActor in
-            do {
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            fire()
-        }
-        return { task.cancel() }
-    }
-
     private let grace: TimeInterval
-    private let schedule: Schedule
+    private let schedule: KakaoSignInTimer.Schedule
     private let onAbandoned: @MainActor () -> Void
 
     private var wentToBackground = false
     private var redirected = false
     private var finished = false
-    private var cancelTimer: Cancel?
+    private var cancelTimer: KakaoSignInTimer.Cancel?
 
     init(
         grace: TimeInterval = KakaoSignInHandoffWatch.defaultGrace,
-        schedule: @escaping Schedule = KakaoSignInHandoffWatch.mainActorSchedule,
+        schedule: @escaping KakaoSignInTimer.Schedule = KakaoSignInTimer.mainActor,
         onAbandoned: @escaping @MainActor () -> Void
     ) {
         self.grace = grace

@@ -32,3 +32,11 @@ Task: [.github/tasks/20261057-admin-bracket-canvas.md](../../.github/tasks/20261
 최신 dev817d4fb88a 기준 API338/Web124 및 API TypeScript PASS, schema binding5 PASS. 기존 로컬 버전의 Web 타입 오류는 최신 dev에서 재평가한다. 사용자 지시로 리뷰 요청/대기 생략, 필수 CI 유지. 로컬 전용 계정/Chrome 자동화 도구는 배포하지 않는다.
 
 최신 배포 브랜치 Web TypeScript도 PASS(이전 로컬 버전의 타입 오류는 해당 없음).
+
+## 운영 핫픽스 배포 완료 — PR #2329
+- 사용자 일회성 예외 승인으로 main PR 생성·머지 및 기존 production 승인 경로를 진행했다. 별도 리뷰 요청/대기는 생략했고 CI·보안·이미지·환경 보호 규칙은 유지했다.
+- main merge95198fb649a0f41086a762d416cab83d6f73f03f. PR CI43005571659·운영 CI/Build/Deploy43007633057·main CodeQL43007633745 모두 성공.
+- 실제 운영 release1.16.2/위 commit 서빙, health db=true. 공개 상세21개·일정20개·경기 상세에 displayTitle 필드 반영. 샘플 경기 수21→21, 검증 중 운영 데이터 수동 변경0. 운영 엔티티 식별자나 계정 정보는 문서에 기록하지 않는다.
+- main→dev는 PR#2333으로 완료, 조상 관계 확인. 중복 본인 PR#2332는 종료했다. 로컬 dev fast-forward 및 공유 WIP/로컬 실행 서비스 보존.
+- title metadata/nullable migration만 배포하며 실제 조·라운드·번호·점수·순위·진출/자동 배정 알고리즘은 변경하지 않는다. 기존 API394/Web124·양쪽 타입·실제 로컬 저장/감사 및 alpha 공개3폭 증거는 #2327 갤러리를 따른다.
+- 운영 검증은 공개 읽기 계약과 상태 확인에 한정한다. 관리자 인증 편집/저장 UI 실측은 미실행이다.

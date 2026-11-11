@@ -1354,7 +1354,7 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
   });
 
-  it('updateEligibility: 확인 중으로 되돌리면 확인일·확인자를 비운다', async () => {
+  it('updateEligibility: 확인 중으로 되돌리면 요청에 확인 방법이 실려 있어도 방법·확인일·확인자를 비운다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({
       eligibilityStatus: 'pro', eligibilityVerificationMethod: 'joinkfa',
@@ -1362,7 +1362,7 @@ describe('TournamentPlayersService', () => {
     }));
     prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => playerRow(data));
 
-    await service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'needs_review' });
+    await service.updateEligibility(adminUser, 'player-1', { eligibilityStatus: 'needs_review', verificationMethod: 'joinkfa' });
 
     expect(prisma.v1TournamentPlayer.update.mock.calls[0][0].data).toMatchObject({
       eligibilityStatus: 'needs_review',

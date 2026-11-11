@@ -1361,7 +1361,7 @@ export class TournamentPlayersService {
           ...(note !== undefined ? { eligibilityNote: note } : {}),
           ...(resetsToReview
             ? {
-                eligibilityVerificationMethod: dto.verificationMethod ?? null,
+                eligibilityVerificationMethod: null,
                 eligibilityVerifiedAt: null,
                 eligibilityVerifiedByUserId: null,
               }

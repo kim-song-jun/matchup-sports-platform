@@ -4,10 +4,13 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddPlayerDto,
+  CarryOverPlayerEligibilityDto,
+  SelfDeclarePlayerEligibilityDto,
   UpdateAdminPlayerSettingsDto,
   UpdatePlayerEligibilityDto,
   UpdatePlayerJerseyDto,
   UpdatePlayerRosterSettingsDto,
+  UpdateTeamPlayerEligibilityDto,
 } from './dto/tournament-player.dto';
 import { TournamentPlayersService } from './tournament-players.service';
 
@@ -82,13 +85,28 @@ export class TournamentPlayersController {
     return this.playersService.updatePlayerRosterSettings(user, tournamentId, registrationId, playerId, dto);
   }
 
+  /**
+   * 선수 본인 선출 여부 신고(MD-QA #192 ③). 명단 행의 계정 주인만 부를 수 있다(서비스가 확인).
+   * `:playerId` 보다 먼저 선언해 경로가 겹치지 않게 한다.
+   */
+  @Patch(':playerId/self-declaration')
+  selfDeclareEligibility(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('registrationId') registrationId: string,
+    @Param('playerId') playerId: string,
+    @Body() dto: SelfDeclarePlayerEligibilityDto,
+  ) {
+    return this.playersService.selfDeclareEligibility(user, tournamentId, registrationId, playerId, dto);
+  }
+
   @Patch(':playerId')
   updatePlayer(
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Param('registrationId') registrationId: string,
     @Param('playerId') playerId: string,
-    @Body() dto: UpdatePlayerEligibilityDto,
+    @Body() dto: UpdateTeamPlayerEligibilityDto,
   ) {
     return this.playersService.updatePlayer(user, tournamentId, registrationId, playerId, dto);
   }
@@ -148,6 +166,16 @@ export class TournamentPlayersAdminController {
     @Body() dto: UpdatePlayerEligibilityDto,
   ) {
     return this.playersService.updateEligibility(user, playerId, dto);
+  }
+
+  /** 이전 대회·리그 판정 유지(MD-QA #192 ②). 같은 사용자 계정의 운영진 판정만 옮긴다. */
+  @Post('players/:playerId/eligibility/carry-over')
+  carryOverEligibility(
+    @CurrentUser() user: V1AuthUser,
+    @Param('playerId') playerId: string,
+    @Body() dto: CarryOverPlayerEligibilityDto,
+  ) {
+    return this.playersService.carryOverEligibility(user, playerId, dto);
   }
 
   /**

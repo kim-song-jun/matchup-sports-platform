@@ -107,13 +107,41 @@ function tabbableElements(dialog: HTMLElement): HTMLElement[] {
   });
 }
 
-/** 터치 기기(주 포인터가 손가락)인지. matchMedia 가 없으면 false(=기존 동작). */
-export function isCoarsePointer(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(pointer: coarse)').matches === true
+/**
+ * 마지막 pointerdown 의 종류. S-Pen·에뮬레이터처럼 터치스크린이 TOUCHSCREEN|STYLUS 로 등록된 기기는
+ * Chromium 이 `(pointer: coarse)` 대신 fine 을 보고하므로(MD-QA #224) 실제 입력 종류를 따로 추적한다.
+ */
+let lastPointerType: string | null = null;
+let pointerTrackerInstalled = false;
+
+function installPointerTracker(): void {
+  if (pointerTrackerInstalled || typeof window === 'undefined') return;
+  pointerTrackerInstalled = true;
+  window.addEventListener(
+    'pointerdown',
+    (event) => {
+      lastPointerType = event.pointerType || null;
+    },
+    { capture: true, passive: true },
   );
+}
+installPointerTracker();
+
+function mediaMatches(query: string): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia(query).matches === true;
+}
+
+/** 터치 기기(손가락·펜이 주 입력)인지. 마지막 포인터가 mouse 면 미디어 쿼리보다 우선해 false. */
+export function isCoarsePointer(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (lastPointerType === 'touch' || lastPointerType === 'pen') return true;
+  if (lastPointerType === 'mouse') return false;
+  return mediaMatches('(pointer: coarse)') || mediaMatches('(any-pointer: coarse)') || mediaMatches('(hover: none)');
+}
+
+/** 테스트용: 추적한 포인터 종류를 초기화한다. */
+export function resetLastPointerTypeForTest(): void {
+  lastPointerType = null;
 }
 
 /** 포커스되면 소프트 키보드를 띄우는 컨트롤인지 */

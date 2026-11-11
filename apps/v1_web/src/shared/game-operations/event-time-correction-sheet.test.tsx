@@ -237,4 +237,12 @@ describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기
       expect(tab.className).not.toContain('font-bold');
     }
   });
+
+  it('좁은 화면에서 요약 문구를 말줄임 없이 줄바꿈해 팀 이름까지 보여준다', () => {
+    renderSheet({ summary: '옐로카드 · 선수03 (E2E선수03) · E2E 알파 A팀' });
+    const summary = screen.getByText('옐로카드 · 선수03 (E2E선수03) · E2E 알파 A팀');
+    expect(summary.className).not.toContain('truncate');
+    expect(summary.className).toContain('break-keep');
+    expect(summary.style.overflowWrap).toBe('anywhere');
+  });
 });

@@ -8,3 +8,8 @@
 .picker { display:grid; gap:var(--spacing-2); padding:var(--spacing-4) var(--v1-shell-page-x) 0; }
 .message,.leave { padding:var(--spacing-4) var(--v1-shell-page-x); }
 .leave { display:grid; gap:var(--spacing-3); }
+/* 넓은 화면에서는 이름과 체크 사이가 멀어지지 않게 720px 로 묶어 가운데 둔다. 하단 고정 저장 바도 같은 폭을 쓴다. */
+@media (min-width:768px) {
+  .manager { max-width:720px; }
+  .manager :global(.tm-fixed-cta) { width:min(100%, 720px); }
+}

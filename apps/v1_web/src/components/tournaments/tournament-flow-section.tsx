@@ -2,7 +2,7 @@ import { Card } from '@/components/v1-ui/primitives';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
 import type { V1TournamentDetail } from '@/types/api';
 
-type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format' | 'stagePlan'>;
+type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format' | 'stagePlan' | 'sixTeamMode'>;
 
 /* ── TournamentFlowSection — explains how the tournament progresses ──
  * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
@@ -46,7 +46,7 @@ function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body
     return [
       { title: '대진 편성', body: '참가 팀을 토너먼트 대진표에 배치해요.' },
       { title: '토너먼트', body: '단판 승부로 이긴 팀만 다음 라운드에 올라가요.' },
-      { title: '결승 · 시상', body: '마지막까지 이긴 팀이 우승해요. 3·4위전도 함께 진행돼요.' },
+      { title: '결승 · 시상', body: competition.sixTeamMode ? '마지막까지 이긴 팀이 우승해요. 6팀 방식은 3·4위전 없이 결승으로 마무리해요.' : '마지막까지 이긴 팀이 우승해요. 3·4위전도 함께 진행돼요.' },
     ];
   }
   // 단발 대회의 리그 방식에는 시즌·주차가 없다 — 몇 번 맞붙는지는 대진 생성 때 정한 회전 수다.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { CSSProperties, MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ import { reportClientError } from '@/lib/client-error-reporter';
 import { getInitializedKakaoJsSdk } from '@/lib/kakao-js-sdk';
 import { storeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
-import { isNativeKakaoSignInAvailable, requestNativeKakaoSignIn } from '@/lib/native-kakao';
+import { isNativeKakaoSignInAvailable, KAKAO_WEB_HANDOFF_MESSAGE, NativeKakaoSignInError, requestNativeKakaoSignIn } from '@/lib/native-kakao';
 import { detectNativeShell } from '@/lib/native-bridge';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
@@ -27,6 +28,8 @@ const SDK_PREFLIGHT_TIMEOUT_MS = 8_000;
 // state 저장이 SSR 시점이 아닌 실제 브라우저에서 일어나야 kakao-callback-client.tsx의
 // 대조 검증이 성립한다(로그인 CSRF/세션 고정 방지).
 //   1) 셸이 sign-in-with-kakao 를 광고하면 네이티브 SDK 토큰 → POST /auth/kakao/token
+//      네이티브 단계가 실패하면(오류 응답·토큰 없음·무응답) 안내 한 줄과 함께 3) 으로 이어진다.
+//      서버가 토큰을 거절한 경우는 이어 가지 않는다 — 같은 계정 판정이 웹 경로에서도 반복될 뿐이다.
 //   2) 셸이 아니면 JS SDK 톡 로그인(같은 redirectUri·scope·state → /callback/kakao)
 //   3) SDK/키를 쓸 수 없으면 기존 authorize URL 이동(경고 로그를 남기는 명시적 폴백)
 //   capability 를 광고하지 않는 옛 셸은 톡 앱 핸드오프(커스텀 스킴)를 허용 목록이 막으므로 1·2 를 건너뛰고 3 만 쓴다.
@@ -44,12 +47,16 @@ export function KakaoLoginButton({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [webHandoff, setWebHandoff] = useState(false);
   // SDK 로드가 끝나기 전 재탭하면 state 가 덮어써져 콜백의 CSRF 대조가 깨진다.
   const busyRef = useRef(false);
 
   // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
   useEffect(() => {
-    const release = () => { busyRef.current = false; };
+    const release = () => {
+      busyRef.current = false;
+      setWebHandoff(false);
+    };
     window.addEventListener('pageshow', release);
     return () => window.removeEventListener('pageshow', release);
   }, []);
@@ -59,18 +66,47 @@ export function KakaoLoginButton({
     setError(message);
   };
 
-  const signInNative = async () => {
+  const requestNativeToken = async (): Promise<
+    | { status: 'token'; accessToken: string }
+    | { status: 'cancelled' }
+    | { status: 'failed'; reason: string; error?: unknown }
+  > => {
     try {
       saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
       const scopes = new URL(href).searchParams.get('scope')?.split(',').filter(Boolean) ?? [];
       const result = await requestNativeKakaoSignIn(scopes);
-      if (result.cancelled) return;
-      if (result.error || !result.accessToken) {
-        reportClientError({ message: 'Native Kakao sign-in failed', level: 'warn', context: { reason: result.error ?? 'missing-token' } });
-        failNative(result.error ?? 'missing_token', NATIVE_FAILURE_MESSAGE);
-        return;
-      }
-      const session = await v1Post<V1AuthSessionResponse>('/auth/kakao/token', { accessToken: result.accessToken });
+      if (result.cancelled) return { status: 'cancelled' };
+      if (result.error || !result.accessToken) return { status: 'failed', reason: result.error ?? 'missing-token' };
+      return { status: 'token', accessToken: result.accessToken };
+    } catch (error) {
+      return { status: 'failed', reason: error instanceof NativeKakaoSignInError ? error.reason : 'native-request-error', error };
+    }
+  };
+
+  // 네이티브 단계가 끝내 토큰을 못 줬을 때 웹 인가 화면으로 넘어간다. 이동이 시작되면 busyRef 를 유지해 재탭이 새 시도를 만들지 않게 한다.
+  const continueOnWeb = async (reason: string, cause?: unknown) => {
+    reportClientError({
+      message: 'Native Kakao sign-in failed',
+      stack: cause instanceof Error ? cause.stack : undefined,
+      level: 'warn',
+      context: { reason, fallback: 'web_authorize' },
+    });
+    const state = generateKakaoOAuthState();
+    try {
+      await storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
+    } catch {
+      busyRef.current = false;
+      failNative('state_storage_unavailable', NATIVE_FAILURE_MESSAGE);
+      return;
+    }
+    // 셸 안에서는 이동이 곧바로 시작되므로 안내를 먼저 DOM 에 반영한다.
+    flushSync(() => setWebHandoff(true));
+    navigateToAuthorizeUrl(state);
+  };
+
+  const exchangeNativeToken = async (accessToken: string) => {
+    try {
+      const session = await v1Post<V1AuthSessionResponse>('/auth/kakao/token', { accessToken });
       saveStoredV1Session(session.session);
       clearV1IdentityCache(queryClient);
       const route = session.next?.route ?? getSavedRedirectPath() ?? '/home';
@@ -103,6 +139,19 @@ export function KakaoLoginButton({
     } finally {
       busyRef.current = false;
     }
+  };
+
+  const signInNative = async () => {
+    const native = await requestNativeToken();
+    if (native.status === 'failed') {
+      await continueOnWeb(native.reason, native.error);
+      return;
+    }
+    if (native.status === 'cancelled') {
+      busyRef.current = false;
+      return;
+    }
+    await exchangeNativeToken(native.accessToken);
   };
 
   const navigateToAuthorizeUrl = (state: string) => {
@@ -180,6 +229,8 @@ export function KakaoLoginButton({
       </a>
       {error ? (
         <p className="tm-text-caption tm-auth-provider-note tm-auth-provider-error" role="alert">{error}</p>
+      ) : webHandoff ? (
+        <p className="tm-text-caption tm-auth-provider-note tm-auth-provider-error tm-auth-provider-status" role="status">{KAKAO_WEB_HANDOFF_MESSAGE}</p>
       ) : null}
     </>
   );

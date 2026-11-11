@@ -115,14 +115,19 @@ for (const layer of layers) {
     assert.ok(layer.visible > 0 && layer.transparent > 0, `Symbol/transparent pixels missing: ${JSON.stringify(layer)}`);
     assert.equal(layer.colored, 0, `Baked blue tile is being treated as symbol pixels: ${JSON.stringify(layer)}`);
     assert.ok(layer.radius <= 33, `Symbol can be clipped by the OEM mask: ${JSON.stringify(layer)}`);
-    assert.ok(Math.max(layer.width, layer.height) >= 48, `Symbol has become too small: ${JSON.stringify(layer)}`);
+    // MD-QA #132: foreground 25% inset (~42dp), monochrome 28% inset (~37dp) so themed icons match system icons.
+    const minimum = layer.kind === 'monochrome' ? 34 : 40;
+    assert.ok(Math.max(layer.width, layer.height) >= minimum, `Symbol has become too small: ${JSON.stringify(layer)}`);
   });
 }
 
-test('default and round icons expose the same foreground and monochrome alpha geometry', () => {
+test('default and round icons expose the same alpha geometry per layer kind', () => {
   const geometry = ({ icon, kind, ...metrics }) => metrics;
   assert.equal(layers.length, 4);
-  for (const layer of layers.slice(1)) assert.deepEqual(geometry(layer), geometry(layers[0]));
+  for (const kind of ['foreground', 'monochrome']) {
+    const sameKind = layers.filter(layer => layer.kind === kind);
+    for (const layer of sameKind.slice(1)) assert.deepEqual(geometry(layer), geometry(sameKind[0]));
+  }
 });
 
 test('Android launcher reuses the canonical transparent Teameet mark without redrawing pixels', () => {

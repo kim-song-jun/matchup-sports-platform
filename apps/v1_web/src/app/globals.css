@@ -126,6 +126,7 @@
   --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
   --tint-blue: rgba(49, 130, 246, 0.08);   /* --blue500(#3182f6) 8% — 파란 안내 카드 배경, var(--blue50) 다크모드 미대응 대체 */
   /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
+  --scrim-dark-dim: rgba(0, 0, 0, 0.56);    /* 다크모드 시트(BottomSheet) 스크림 */
   --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
   --scrim-dark-48: rgba(25, 31, 40, 0.48);  /* 홈 공지·광고 팝업 스크림 */
   --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
@@ -1548,6 +1549,12 @@ button:disabled {
 .tm-auth-provider-error {
   flex: 1 1 100%;
   order: 1;
+}
+
+/* 같은 자리에 오류가 아닌 진행 안내(role="status")를 보일 때. --blue700 은 다크에서 밝은 값으로 덮여 두 테마 모두 AA 를 넘는다.
+   아래에 선언된 .tm-text-caption 의 색에 지지 않게 두 클래스로 올린다. */
+.tm-auth-provider-note.tm-auth-provider-status {
+  color: var(--blue700);
 }
 
 .tm-auth-provider-disabled,
@@ -4289,6 +4296,12 @@ label.tm-btn:focus-within {
   animation: tm-filter-scrim-fade .18s ease-out;
 }
 
+/* 다크 페이지에서는 라이트용 0.18 막이 거의 보이지 않아 시트가 배경과 분리되지 않는다.
+   순수 검정 계열로 더 짙게 깔아 준다(풀블리드 규칙은 background 를 건드리지 않아 함께 적용된다). */
+:root.dark .tm-filter-scrim {
+  background: var(--scrim-dark-dim);
+}
+
 .tm-filter-layer {
   position: fixed;
   top: 0;
@@ -4310,9 +4323,13 @@ label.tm-btn:focus-within {
   bottom: 0;
 }
 
-/* 어드민 셸은 앱 틀(가운데 고정 폭)도 하단 탭바도 없다 — 시트·배경이 화면 전체를 덮어야 한다. */
+/* 어드민 셸과 대회 운영 셸(어드민 현장 콘솔 /admin/live 포함)은 앱 틀(가운데 고정 폭)도 하단 탭바도 없다 —
+   시트·배경이 화면 전체를 덮어야 한다. 운영 셸은 .tm-admin-shell 밖에서 앱 틀 안에 마운트되므로 별도 표식을 쓴다. */
 .tm-admin-shell .tm-filter-scrim,
-.tm-admin-shell .tm-filter-layer {
+.tm-admin-shell .tm-filter-layer,
+.tm-fullbleed-sheet-host .tm-filter-scrim,
+.tm-fullbleed-sheet-host .tm-filter-layer {
+  top: 0; /* 데스크톱 규칙(_shell.css)이 걸어 둔 64px 상단 여백도 함께 걷어 낸다 */
   bottom: 0;
   left: 0;
   right: 0;
@@ -4715,6 +4732,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-create-field {
   margin-top: 24px;
+  /* 검증 실패로 입력칸에 포커스가 가도 고정 상단바 밑에 라벨이 가려지지 않게 한다(MD-QA #128). */
+  scroll-margin-top: calc(var(--v1-shell-topbar-height) + 16px);
+}
+
+.tm-create-field input,
+.tm-create-field textarea,
+.tm-create-field select {
+  scroll-margin-top: calc(var(--v1-shell-topbar-height) + 48px);
 }
 
 .tm-team-logo-picker {
@@ -4845,6 +4870,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-description-input {
   min-height: 112px;
+}
+
+.tm-create-native-input::placeholder {
+  /* 구형 Android WebView(113)는 preflight 의 color-mix 를 transparent 로 계산해 placeholder 가 사라진다. */
+  color: var(--input-placeholder);
+  opacity: 1;
 }
 
 .tm-create-native-input {

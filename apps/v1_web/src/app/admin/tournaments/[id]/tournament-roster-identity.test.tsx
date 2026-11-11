@@ -178,7 +178,7 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
     expect(await within(reopened).findByText(expected)).toBeInTheDocument();
     expect(within(reopened).queryByText('닉네임 번개 선수')).not.toBeInTheDocument();
     expect(within(reopened).getByText('홍길동')).toBeInTheDocument();
-    expect(within(reopened).getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+    expect(within(reopened).getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
     expect(eligibilityRequests).toEqual([]);
     expect(removedPlayers).toEqual([]);
   });
@@ -343,7 +343,7 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
       expect(within(reopened).queryByText('닉네임 닫기 전 조회 닉네임')).not.toBeInTheDocument();
       expect(within(reopened).queryByText('닉네임 번개 선수')).not.toBeInTheDocument();
       expect(client.getQueryData<V1AdminTournamentRosterResponse>(v1Keys.adminTournamentRoster(registration.id))?.players[0]?.nickname).toBe(nickname);
-      expect(within(reopened).getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+      expect(within(reopened).getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
       expect(eligibleRequests).toBe(0);
       expect(eligibilityRequests).toEqual([]);
       expect(removedPlayers).toEqual([]);
@@ -432,7 +432,7 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
       expect(rosterRequests).toEqual([registration.id, registration.id, registration.id]);
       expect(pendingRequests.filter(({ request }) => request.signal.aborted)).toHaveLength(1);
       expect(pendingRequests.filter(({ request }) => !request.signal.aborted)).toHaveLength(1);
-      expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
       expect(eligibleRequests).toBe(0);
       expect(eligibilityRequests).toEqual([]);
       expect(removedPlayers).toEqual([]);
@@ -455,8 +455,15 @@ describe('MD-QA #140 관리자 명단 실명·닉네임 A안', () => {
     expect(within(rows[1]).getByText('닉네임 번개 선수')).toBeInTheDocument();
     expect(within(rows[1]).getByLabelText('등번호 0번')).toBeInTheDocument();
     expect(rows[1]).toHaveTextContent('1995.03.15 · 남성');
-    await user.selectOptions(within(rows[1]).getByRole('combobox', { name: '홍길동 자격 상태' }), 'pro');
-    await waitFor(() => expect(eligibilityRequests).toEqual([{ playerId: 'player-member', body: { eligibilityStatus: 'pro' } }]));
+    // MD-QA #192: 즉시 저장 select 대신 판정 + 확인 방법 + 메모를 한 번에 저장하는 패널이다.
+    await user.click(within(rows[1]).getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = within(rows[1]).getByRole('region', { name: '홍길동 선출 판정' });
+    await user.click(within(panel).getByRole('radio', { name: '선출' }));
+    await user.click(within(panel).getByRole('radio', { name: 'JoinKFA' }));
+    await user.click(within(panel).getByRole('button', { name: '판정 저장' }));
+    await waitFor(() => expect(eligibilityRequests).toEqual([
+      { playerId: 'player-member', body: { eligibilityStatus: 'pro', verificationMethod: 'joinkfa' } },
+    ]));
     await user.click(within(rows[1]).getByRole('button', { name: '홍길동 선수를 명단에서 제외' }));
     await waitFor(() => expect(removedPlayers).toEqual(['player-member']));
   });
@@ -489,7 +496,7 @@ describe('MD-QA #140 관리자 명단 실명·닉네임 A안', () => {
     const row = within(await screen.findByRole('list')).getByRole('listitem');
     expect(within(row).getByText('홍길동')).toBeInTheDocument();
     expect(within(row).getByText('닉네임 번개 선수')).toBeInTheDocument();
-    expect(within(row).getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+    expect(within(row).getByRole('button', { name: '홍길동 선출 판정' })).toBeDisabled();
     expect(within(row).getByRole('button', { name: '홍길동 선수를 명단에서 제외' })).toBeDisabled();
     expect(eligibleRequests).toBe(0);
     expect(eligibilityRequests).toEqual([]);

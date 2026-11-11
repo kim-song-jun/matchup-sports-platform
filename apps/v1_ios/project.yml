@@ -182,6 +182,9 @@ targets:
       - path: Teameet/Push/PushRegistrationLedger.swift
       - path: Teameet/Auth/AppleNonceHash.swift
       - path: Teameet/Auth/KakaoSignInPolicy.swift
+      - path: Teameet/Auth/KakaoSignInFailure.swift
+      - path: Teameet/Auth/KakaoSignInAttempt.swift
+      - path: Teameet/Auth/KakaoSignInHandoffWatch.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

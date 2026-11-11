@@ -107,7 +107,7 @@ describe('scroll area bottom edge and system inset', () => {
 
 describe('Android bottom inset layout', () => {
   it('lets sheets in the admin shell cover the whole viewport (no app-frame width, no tab-bar gap)', () => {
-    const rule = globalsCss.match(/\.tm-admin-shell \.tm-filter-scrim,\s*\.tm-admin-shell \.tm-filter-layer\s*\{([^}]*)\}/)?.[1];
+    const rule = globalsCss.match(/\.tm-admin-shell \.tm-filter-scrim,\s*\.tm-admin-shell \.tm-filter-layer(?:,[^{]*)?\{([^}]*)\}/)?.[1];
 
     expect(rule).toBeDefined();
     expect(rule).toMatch(/bottom:\s*0;/);
@@ -1123,5 +1123,19 @@ describe('필터 시트의 손잡이·제목·닫기는 스크롤해도 맨 위�
       expect(handleAt, path).toBeGreaterThanOrEqual(0);
       expect(handleAt, path).toBeLessThan(source.indexOf('className="tm-filter-sheet-head"'));
     }
+  });
+});
+
+describe('bottom sheet scrim in operations shells', () => {
+  it('covers the whole viewport (top included) inside the admin shell and the tournament-ops shell', () => {
+    const rule = globalsCss.match(
+      /\.tm-admin-shell \.tm-filter-scrim,\s*\.tm-admin-shell \.tm-filter-layer,\s*\.tm-fullbleed-sheet-host \.tm-filter-scrim,\s*\.tm-fullbleed-sheet-host \.tm-filter-layer\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/top:\s*0/);
+    expect(rule).toMatch(/bottom:\s*0/);
+    expect(rule).toMatch(/width:\s*100%/);
+    expect(rule).toMatch(/transform:\s*none/);
   });
 });

@@ -276,6 +276,9 @@ import type {
   V1CancelRegistrationRequestPayload,
   V1AddPlayerPayload,
   V1UpdatePlayerEligibilityPayload,
+  V1UpdateTeamPlayerEligibilityPayload,
+  V1SelfDeclareEligibilityPayload,
+  V1SelfDeclareEligibilityResult,
   V1AdminConfirmPaymentPayload,
   V1AdminConfirmRegistrationPayload,
   V1AdminCancelRegistrationPayload,
@@ -4870,9 +4873,25 @@ export function patchPlayerJersey(input: {
 export function useV1UpdatePlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ playerId, body }: { playerId: string; body: V1UpdatePlayerEligibilityPayload }) =>
+    mutationFn: ({ playerId, body }: { playerId: string; body: V1UpdateTeamPlayerEligibilityPayload }) =>
       v1Patch<V1TournamentPlayer>(
         `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}`,
+        body,
+      ),
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
+  });
+}
+
+/**
+ * 선수 본인 선출 여부 신고(MD-QA #192 ③). 서버가 "명단 행의 계정 주인" 인지 다시 본다.
+ * 판정을 바꾸지 않는 참고 기록이라 명단 캐시만 턴다.
+ */
+export function useV1SelfDeclareEligibility(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, body }: { playerId: string; body: V1SelfDeclareEligibilityPayload }) =>
+      v1Patch<V1SelfDeclareEligibilityResult>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}/self-declaration`,
         body,
       ),
     onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
@@ -5319,6 +5338,25 @@ export function useV1AdminUpdatePlayerSettings(registrationId: string) {
     mutationFn: ({ playerId, ...body }: { playerId: string; jerseyNumber: number | null; goalkeeper?: boolean }) =>
       v1Patch(`/admin/registrations/${registrationId}/players/${playerId}/settings`, body),
     onSuccess: () => invalidateRosterViews(queryClient, null, registrationId),
+  });
+}
+
+/**
+ * 이전 대회·리그 판정 유지(MD-QA #192 ②) — 운영자가 눌러야만 적용된다.
+ * 판정과 같은 캐시를 턴다(명단·선택목록·소비자 명단).
+ */
+export function useV1CarryOverPlayerEligibility(registrationId?: string) {
+  const { v1Post } = useV1DataSource();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, sourcePlayerId }: { playerId: string; sourcePlayerId: string }) =>
+      v1Post<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility/carry-over`, { sourcePlayerId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'tournaments'] }),
+        ...(registrationId ? [invalidateRosterViews(queryClient, null, registrationId)] : []),
+      ]);
+    },
   });
 }
 

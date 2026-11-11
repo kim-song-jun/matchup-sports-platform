@@ -33,7 +33,7 @@ export function FieldOperatorConsoleFrame({
       : `/my/tournament-staff/${encodeURIComponent(tournamentId)}`;
   // TournamentOpsShell 과 같은 규칙: 문서 스크롤 끝에 하단 시스템 바 높이를 root 에서 한 번만 더한다.
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex flex-col pb-[var(--v1-shell-safe-bottom)]">
+    <div className="tm-fullbleed-sheet-host min-h-screen bg-[var(--surface-soft)] flex flex-col pb-[var(--v1-shell-safe-bottom)]">
       <header className="sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] min-h-[52px] flex items-center gap-2 px-2">
         <Link
           href={backHref}

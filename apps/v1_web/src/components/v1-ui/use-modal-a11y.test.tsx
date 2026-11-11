@@ -5,8 +5,8 @@
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode, useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { useModalA11y } from './use-modal-a11y';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resetLastPointerTypeForTest, useModalA11y } from './use-modal-a11y';
 
 function TestModal({
   open,
@@ -317,9 +317,9 @@ describe('useModalA11y', () => {
 
 describe('useModalA11y 터치 기기 초기 포커스', () => {
   const original = window.matchMedia;
-  const setPointer = (coarse: boolean) => {
+  const setPointer = (coarse: boolean, query0: string = '(pointer: coarse)') => {
     window.matchMedia = ((query: string) => ({
-      matches: coarse && query === '(pointer: coarse)',
+      matches: coarse && query === query0,
       media: query,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -367,5 +367,50 @@ describe('useModalA11y 터치 기기 초기 포커스', () => {
     } finally {
       window.matchMedia = original;
     }
+  });
+
+  describe('마지막 포인터 종류·미디어 폴백', () => {
+    const press = (pointerType: string) => {
+      const evt = new Event('pointerdown', { bubbles: true });
+      Object.defineProperty(evt, 'pointerType', { value: pointerType });
+      document.body.dispatchEvent(evt);
+    };
+    afterEach(() => {
+      resetLastPointerTypeForTest();
+      window.matchMedia = original;
+    });
+
+    it('pointer:fine 이어도 마지막 포인터가 touch 면 패널로 가요', async () => {
+      setPointer(false);
+      press('touch');
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    });
+
+    it('마지막 포인터가 pen 이면 패널로 가요', async () => {
+      setPointer(false);
+      press('pen');
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    });
+
+    it('마지막 포인터가 mouse 면 첫 입력에 포커스가 가요', async () => {
+      setPointer(true, '(hover: none)');
+      press('mouse');
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('첫 입력')));
+    });
+
+    it('포인터 기록이 없으면 (hover: none) 폴백으로 패널로 가요', async () => {
+      setPointer(true, '(hover: none)');
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    });
+
+    it('포인터 기록이 없으면 (any-pointer: coarse) 폴백으로 패널로 가요', async () => {
+      setPointer(true, '(any-pointer: coarse)');
+      render(<TestModal open onClose={() => {}} />);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    });
   });
 });

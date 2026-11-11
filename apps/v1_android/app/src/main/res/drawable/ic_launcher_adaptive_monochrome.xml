@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="28%">
+    <!-- Themed icons are tinted by the system; a larger inset keeps the symbol the same optical size as system icons. -->
+    <bitmap
+        android:src="@drawable/ic_launcher_symbol"
+        android:gravity="fill"
+        android:tint="#FFFFFFFF"
+        android:tintMode="src_in" />
+</inset>

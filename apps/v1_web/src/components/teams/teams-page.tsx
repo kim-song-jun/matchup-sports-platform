@@ -14,6 +14,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { FieldErrorText } from '@/components/v1-ui/create-form-fields';
+import { readTopbarHeight } from '@/components/v1-ui/focus-below-topbar';
 import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { optimizedCssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
@@ -1070,12 +1071,16 @@ export function TeamFormPageView({
     const descriptionRects = descriptionIds
       .map((id) => document.getElementById(id)?.getBoundingClientRect())
       .filter((rect): rect is DOMRect => Boolean(rect && rect.height > 0));
-    const contentTop = Math.min(field.top, ...descriptionRects.map((rect) => rect.top));
+    // 라벨은 입력 위 래퍼에 있다 — 래퍼 윗면까지 상단바 아래로 드러내야 라벨이 가려지지 않는다.
+    const wrapperRect = target.closest<HTMLElement>('.tm-create-field')?.getBoundingClientRect();
+    const wrapperTop = wrapperRect && wrapperRect.height > 0 ? wrapperRect.top : field.top;
+    const contentTop = Math.min(field.top, wrapperTop, ...descriptionRects.map((rect) => rect.top));
     const contentBottom = Math.max(field.bottom, ...descriptionRects.map((rect) => rect.bottom));
     const scrollport = scroller.getBoundingClientRect();
     if (scrollport.height === 0) return;
     const viewport = window.visualViewport;
-    let visibleTop = Math.max(scrollport.top, viewport?.offsetTop ?? 0);
+    // 고정 상단바 뒤 영역은 보이는 영역이 아니다(WebView 는 scroll-margin 을 무시한다).
+    let visibleTop = Math.max(scrollport.top, viewport?.offsetTop ?? 0, readTopbarHeight());
     let visibleBottom = Math.min(scrollport.bottom, viewport ? viewport.offsetTop + viewport.height : window.innerHeight);
     if (ctaPosition === 'fixed') {
       const bar = cta.getBoundingClientRect();

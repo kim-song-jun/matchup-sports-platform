@@ -22,11 +22,6 @@ final class KakaoLoginPolicy {
             + "if(!s.includes('" + ACTION + "'))b.supports=s.concat('" + ACTION + "');})()";
     }
 
-    /** A cancelled KakaoTalk attempt ends the flow; any other talk failure may retry with the account page. */
-    static boolean shouldFallBackToAccountLogin(boolean cancelled) {
-        return !cancelled;
-    }
-
     static List<String> additionalScopes(List<String> requested, List<String> granted) {
         List<String> missing = new ArrayList<>();
         for (String scope : requested) {
@@ -44,8 +39,8 @@ final class KakaoLoginPolicy {
         return resultScript(requestId, "\"cancelled\":true");
     }
 
-    static String errorScript(String requestId, String code) {
-        return resultScript(requestId, "\"error\":" + quote(code));
+    static String errorScript(String requestId, String reason) {
+        return resultScript(requestId, "\"error\":" + quote(reason));
     }
 
     private static String resultScript(String requestId, String field) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { focusBelowTopbar } from '@/components/v1-ui/focus-below-topbar';
 import { DAY_MS, isoToKstDatetimeLocal, kstDatetimeLocalToIso, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
@@ -178,7 +179,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     const el = pendingFocusField === 'grade' || pendingFocusField === 'rules'
       ? document.querySelector<HTMLElement>(`[data-team-match-field="${pendingFocusField}"]`)
       : document.getElementById(`field-${pendingFocusField}`);
-    el?.focus();
+    focusBelowTopbar(el);
     setPendingFocusField(null);
   }, [pendingFocusField]);
 

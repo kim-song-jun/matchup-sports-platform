@@ -128,3 +128,19 @@ describe('필드 운영콘솔 안내와 체험', () => {
     }
   });
 });
+
+describe('DemoReturnLink — 스와이프 뒤로가 체험 화면으로 튀지 않는다', () => {
+  it('복귀 링크는 push 하지 않고 뒤로가기 규칙(back 또는 replace)으로 이동한다', async () => {
+    const { installNavigationHistory, __resetNavigationHistoryForTests } = await import('@/lib/navigation-history');
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+    window.history.pushState({}, '', '/tournament-management');
+    window.history.pushState({}, '', '/field-console-demo');
+    render(<DemoReturnLink />);
+
+    const link = await screen.findByRole('link', { name: '대회 운영으로 돌아가기' });
+    expect(link).toHaveAttribute('data-nav-back', 'true');
+    expect(fireEvent.click(link)).toBe(false); // 기본 push(Link 이동)를 가로챘다
+    __resetNavigationHistoryForTests();
+  });
+});

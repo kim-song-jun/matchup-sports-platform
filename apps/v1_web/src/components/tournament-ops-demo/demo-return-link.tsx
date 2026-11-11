@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useAppBackClick } from '@/components/v1-ui/app-back-link';
 import styles from './demo.module.css';
 
 const STORAGE_KEY = 'teameet.demo.return-path';
@@ -26,5 +27,7 @@ export function DemoReturnLink() {
       // The default destination remains available without browser storage.
     }
   }, []);
-  return <Link className={styles.quiet} href={href} data-demo-return>대회 운영으로 돌아가기</Link>;
+  const onClick = useAppBackClick(href);
+  // push 하면 복귀 뒤 스와이프·하드웨어 뒤로가 방금 떠난 체험 화면으로 튄다 — 뒤로가기 규칙으로 이동한다.
+  return <Link className={styles.quiet} href={href} data-demo-return data-nav-back="true" onClick={onClick}>대회 운영으로 돌아가기</Link>;
 }

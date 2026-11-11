@@ -32,16 +32,17 @@ export function TieBreakPresetPicker({ order, onChange, disabled = false, locked
   const selected = matched?.key ?? CUSTOM_VALUE;
 
   return (
-    <section aria-labelledby={headingId} className="grid gap-2">
+    <section aria-labelledby={headingId} className="@container grid gap-2">
       <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">동점일 때 순서</h3>
       <p id={hintId} className="tm-text-caption text-[var(--text-muted)]">
         승점이 같을 때 어떤 규정으로 순위를 가를지 골라요. 모든 조별리그가 이 규정을 따라요.
       </p>
+      {/* 뷰포트가 아니라 놓인 자리의 폭으로 칸 수를 정한다 — 좁은 수정 모달에서 4칸이 되면 글자가 세로로 깨진다(MD-QA #186 alpha QA). */}
       <div
         role="radiogroup"
         aria-labelledby={headingId}
         aria-describedby={lockedReason !== null ? `${hintId} ${lockId}` : hintId}
-        className="grid gap-2 xl:grid-cols-4"
+        className="grid gap-2 @md:grid-cols-2 @3xl:grid-cols-4"
       >
         {TOURNAMENT_TIE_BREAK_PRESETS.map((preset, index) => (
           <PresetCard

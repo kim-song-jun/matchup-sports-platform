@@ -1018,7 +1018,7 @@ button:disabled {
   flex-shrink: 0;
 }
 
-/* 계정 연결 안내(3단계) — 숫자 칩은 .tm-auth-feature-icon 을 쓰고, 글 두 줄이 위로 붙도록 정렬한다. */
+/* 계정 연결 안내(2단계) — 숫자 칩은 .tm-auth-feature-icon 을 쓰고, 글 두 줄이 위로 붙도록 정렬한다. */
 .tm-auth-steps {
   margin-top: 0;
   gap: 20px;
@@ -1034,14 +1034,26 @@ button:disabled {
   font-weight: 800;
 }
 
+/* 제목·본문 타이포는 이 클래스들이 전부 맡는다. 타이포 유틸(.tm-text-*)을 같이 달면 뒤에 선언된 그쪽 줄높이가 이긴다. */
 .tm-auth-step-title,
 .tm-auth-step-body {
   display: block;
+  word-break: keep-all;
+}
+
+.tm-auth-step-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
 .tm-auth-step-body {
   margin-top: 2px;
-  line-height: 1.5;
+  font-size: var(--font-size-body-sm);
+  line-height: 21px;
+  font-weight: 400;
+  color: var(--text-caption);
 }
 
 /*
@@ -1330,21 +1342,34 @@ button:disabled {
   word-break: keep-all;
 }
 
-/* 로그인 화면들의 대기 연결 안내(토큰이 있을 때만 그려진다). */
+/* 로그인 화면들의 대기 연결 안내(토큰이 있을 때만 그려진다) — 문구와 "연결 안 하기"가 한 상자 안에 나란히 놓인다. */
 .tm-auth-pending-link {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
+  align-items: center;
+  gap: var(--spacing-2);
   margin: var(--spacing-4) 0;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-control);
+  background: var(--blue50);
 }
 
 .tm-auth-pending-link-message {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  padding: var(--spacing-3) var(--spacing-4);
-  border-radius: var(--radius-control);
-  background: var(--blue50);
+  font-size: var(--font-size-body-sm);
+  line-height: 21px;
+  font-weight: 600;
   color: var(--blue700);
-  line-height: 1.55;
+  word-break: keep-all;
+  /* 이메일 연결 안내는 공백 없는 주소를 싣는다 — 버튼 옆 좁은 칸에서 넘치지 않게 끊는다. */
+  overflow-wrap: anywhere;
+}
+
+/* .tm-btn-ghost 의 글자색(--text)보다 앞서도록 두 클래스로 올린다. 크기·터치 높이는 .tm-btn-sm 이 맡는다. */
+.tm-auth-pending-link .tm-auth-pending-link-action {
+  flex-shrink: 0;
+  color: var(--blue700);
 }
 
 /* 문구 한 줄에 행동 버튼이 붙는 안내 띠(AlertBanner 는 문구만 받는다). 색 쌍은 AlertBanner info 톤과 같다.

@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 interface AdminPageHeaderProps {
   eyebrow?: string;
   title: string;
   description?: string;
   action?: ReactNode;
+  /** 제목 왼쪽 뒤로가기 버튼. 스와이프와 같은 뒤로가기 규칙(AppBackLink)으로 간다. */
+  back?: { fallbackHref: string; label: string };
 }
 
-export function AdminPageHeader({ eyebrow, title, description, action }: AdminPageHeaderProps) {
+export function AdminPageHeader({ eyebrow, title, description, action, back }: AdminPageHeaderProps) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 mb-6 md:mb-7">
       {/* 제목 칸에 최소 폭을 주고 행을 wrap 가능하게 둔다. 그래야 좁은 화면에서 넓은
@@ -22,7 +26,18 @@ export function AdminPageHeader({ eyebrow, title, description, action }: AdminPa
             {eyebrow}
           </p>
         )}
-        <h1 className="text-[length:var(--font-size-subhead)] md:text-[length:var(--font-size-heading)] font-bold text-[var(--text-strong)]">{title}</h1>
+        <div className={back ? 'flex items-center gap-1 -ml-3' : undefined}>
+          {back && (
+            <AppBackLink
+              fallbackHref={back.fallbackHref}
+              label={back.label}
+              className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
+            >
+              <ChevronLeftIcon size={24} strokeWidth={2} />
+            </AppBackLink>
+          )}
+          <h1 className="text-[length:var(--font-size-subhead)] md:text-[length:var(--font-size-heading)] font-bold text-[var(--text-strong)]">{title}</h1>
+        </div>
         {description && (
           <p className="text-[length:var(--font-size-label)] md:text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] mt-1">{description}</p>
         )}

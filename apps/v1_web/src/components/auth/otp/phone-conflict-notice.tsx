@@ -11,8 +11,8 @@ type Props = {
   onFindAccount: () => void;
   pending?: boolean;
   /**
-   * 소셜 가입 중 번호 중복에서 서버가 연결 토큰을 준 경우의 제공자. 주면 "원래 방법으로 로그인하면
-   * 이 소셜 로그인 연결을 시도한다는 안내로 바뀐다. 생략하면 연결 약속 없는 기본 안내다.
+   * 소셜 가입 중 번호 중복에서 서버가 연결 토큰을 준 경우의 제공자. 주면 원래 방법으로 로그인하면
+   * 이 소셜 로그인이 연결된다는 안내로 바뀐다. 생략하면 연결 약속 없는 기본 안내다.
    */
   linkProvider?: V1LinkableProvider;
   /** 번호를 쥔 계정이 탈퇴 유예 중이다. 로그인 버튼은 두 가지 방법을 보여 주는 안내 화면으로 이어진다. */
@@ -36,11 +36,6 @@ export function PhoneConflictNotice({ onLogin, onFindAccount, pending = false, l
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <AlertBanner tone="warning" message={bannerMessage} />
-      {linkProvider && !withdrawal ? (
-        <p className="tm-text-caption" style={{ margin: 0, lineHeight: 1.5 }}>
-          로그인이 끝나면 설정의 &quot;로그인 방법&quot; 화면으로 이동해요.
-        </p>
-      ) : null}
       <Button block disabled={pending} onClick={onLogin} size="lg" type="button" variant="primary">
         {loginLabel}
       </Button>

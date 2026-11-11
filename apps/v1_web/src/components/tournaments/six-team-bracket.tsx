@@ -1,5 +1,6 @@
 'use client';
-import type { V1SixTeamBracket, V1TournamentFixture } from '@/types/api';
+import type { V1SixTeamBracket, V1SixTeamCriterion, V1TournamentFixture } from '@/types/api';
+import { formatSixTeamDirectFinalRule } from '@/lib/tournament-tie-break';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { MatchCard } from './tournament-bracket';
 import { SixTeamBracketLayout, SixTeamBye, type SixTeamStageKey } from './six-team-bracket-layout';
@@ -13,12 +14,15 @@ export function SixTeamBracket({
   fixtures,
   selectedRoundKey,
   stageLabels = {},
+  directFinalOrder = null,
 }: {
   tournamentId: string;
   state: V1SixTeamBracket;
   fixtures: V1TournamentFixture[];
   selectedRoundKey?: string | null;
   stageLabels?: Partial<Record<'quarter' | 'semi' | 'final', string>>;
+  /** 결승 직행팀 비교 순서. 없으면 기본 순서로 안내한다. */
+  directFinalOrder?: readonly V1SixTeamCriterion[] | null;
 }) {
   const rounds = state.rounds.map((id) =>
     fixtures.find((row) => row.id === id)
@@ -121,7 +125,7 @@ export function SixTeamBracket({
             선정 기준과 기록 보기
           </summary>
           <p className="tm-text-caption mb-3">
-            최다 득점 → 최대 득실차 → 최소 실점 순이에요. 승부차기 득점은
+            {formatSixTeamDirectFinalRule(directFinalOrder)} 순이에요. 승부차기 득점은
             제외해요.
           </p>
           <div className="overflow-x-auto">

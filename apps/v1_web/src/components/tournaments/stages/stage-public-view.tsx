@@ -25,7 +25,7 @@ export function StagePublicView({ tournament }: { tournament: V1TournamentDetail
       return <section key={pool.key} className="space-y-4">
         <SectionTitle title={`${pool.name} · ${pool.format === 'league' ? '풀리그' : '토너먼트'}`} />
         <p className="tm-text-caption">{pool.capacity}팀{pool.format === 'league' ? ` · ${pool.legs}회전` : ''}{pool.sources.length ? ` · 진출 출처: ${pool.sources.map(source => `${plan.stages.flatMap(s => s.pools).find(p => p.key === source.poolKey)?.name ?? '이전 편성'} ${source.rank}위`).join(', ')}` : ''}</p>
-        {pool.format === 'league' && group && <TournamentStandingsTable advancingKeys={null} tieBreakOrder={tournament.tieBreakOrder} rows={rows} ariaLabel={`${selected.name} ${pool.name} 순위표`} />}
+        {pool.format === 'league' && group && <TournamentStandingsTable advancingKeys={null} tieBreakOrder={tournament.stageTieBreakOrders?.[selected.key] ?? tournament.tieBreakOrder} rows={rows} ariaLabel={`${selected.name} ${pool.name} 순위표`} />}
         {pool.format === 'knockout' && fixtures.length > 0 && <TournamentBracket fixtures={fixtures} groups={groups} />}
         <ul className="divide-y divide-[var(--border)]">{fixtures.map(f => <li key={f.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-3 tm-text-label" href={`/tournaments/${encodeURIComponent(tournament.id)}/matches/${encodeURIComponent(f.id)}`}><span>{f.fixtureNumber}경기 · {f.homeTeamName} vs {f.awayTeamName}</span><span className="tm-text-caption">{f.result ? `${f.result.homeScore} : ${f.result.awayScore}` : f.scheduledAt ? formatTournamentDateTimeShort(f.scheduledAt) : '일정 미정'}</span></Link></li>)}</ul>
       </section>;

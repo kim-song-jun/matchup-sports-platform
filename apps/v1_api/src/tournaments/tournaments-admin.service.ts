@@ -30,7 +30,9 @@ import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, valida
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { lockCompetitionFixtureRows, lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
-import { normalizeTieBreakOrderForStorage, resolveTieBreakOrder } from './competition-config/tournament-tie-break-order';
+import { normalizeSixTeamDirectFinalOrderForStorage, normalizeTieBreakOrderForStorage, resolveSixTeamDirectFinalOrder, resolveTieBreakOrder, sameTieBreakOrder } from './competition-config/tournament-tie-break-order';
+import { loadStageTieBreakView } from './stages/stage-tie-break';
+import { parseSixTeamState } from './six-team/six-team-state';
 
 /**
  * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
@@ -221,9 +223,12 @@ export class TournamentsAdminService {
     const lineup = await this.loadLineupInfo(row.sport?.code, row.competitionConfigVersionId);
     const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
     const tieBreakOrderBlockedReason = await this.getTieBreakOrderBlockedReason(this.prisma, tournamentId);
+    const sixTeamDirectFinalOrderBlockedReason = await this.getSixTeamOrderBlockedReason(this.prisma, tournamentId, row.sixTeamBracket);
     return {
       formatChangeBlockedReason,
       tieBreakOrderBlockedReason,
+      sixTeamDirectFinalOrderBlockedReason,
+      ...(row.stagePlan ? { stageTieBreak: await loadStageTieBreakView(this.prisma, row) } : {}),
       canRevertStart: row.status === 'in_progress' && !(await this.hasStartedTournamentFixture(this.prisma, tournamentId)),
       ...this.serialize(
         row,
@@ -468,6 +473,13 @@ export class TournamentsAdminService {
     const tieBreakOrderChanged = nextTieBreakOrder !== undefined
       && resolveTieBreakOrder(nextTieBreakOrder).join() !== resolveTieBreakOrder(existing.tieBreakOrder).join();
     if (tieBreakOrderChanged) await this.assertTieBreakOrderEditable(this.prisma, tournamentId);
+    const nextSixTeamDirectFinalOrder = dto.sixTeamDirectFinalOrder === undefined ? undefined : normalizeSixTeamDirectFinalOrderForStorage(dto.sixTeamDirectFinalOrder);
+    const sixTeamDirectFinalOrderChanged = nextSixTeamDirectFinalOrder !== undefined
+      && !sameTieBreakOrder(resolveSixTeamDirectFinalOrder(nextSixTeamDirectFinalOrder), resolveSixTeamDirectFinalOrder(existing.sixTeamDirectFinalOrder));
+    if (sixTeamDirectFinalOrderChanged && !sixTeamMode) {
+      throw new BadRequestException({ code: 'SIX_TEAM_ORDER_INVALID', message: '결승 직행팀 고르는 순서는 6강 방식 대회에서만 정할 수 있어요.' });
+    }
+    if (sixTeamDirectFinalOrderChanged) await this.assertSixTeamOrderEditable(this.prisma, tournamentId, existing.sixTeamBracket);
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
     // pin되는 설정이라 변경 정책도 동일해야 한다(오너 지시 #4) — 아래 게이트를 두
@@ -603,6 +615,7 @@ export class TournamentsAdminService {
     data.sixTeamMode = sixTeamMode;
     if (dto.format !== undefined) data.format = dto.format;
     if (tieBreakOrderChanged) data.tieBreakOrder = nextTieBreakOrder ?? Prisma.DbNull;
+    if (sixTeamDirectFinalOrderChanged) data.sixTeamDirectFinalOrder = nextSixTeamDirectFinalOrder ?? Prisma.DbNull;
     if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
@@ -668,13 +681,14 @@ export class TournamentsAdminService {
     await this.prisma.$transaction(async (tx) => {
       // 설정 핀과 일반 필드를 같은 트랜잭션에 둔다. 구조 검사나 CAS가 거부되면
       // 설정 리포인트와 감사 기록까지 함께 롤백되어야 한다.
-      if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged || stagePlanChanged) await lockTournamentForConfigChange(tx, tournamentId);
+      if (formatChanged || lineupConfigChangeRequested || tieBreakOrderChanged || sixTeamDirectFinalOrderChanged || stagePlanChanged) await lockTournamentForConfigChange(tx, tournamentId);
       if (stagePlanChanged && await tx.v1TournamentGroup.count({ where: { tournamentId } })) throw new ConflictException({ code: 'BRACKET_LOCKED', message: '대진 생성 후에는 단계 구성을 변경할 수 없어요.' });
       if (formatChanged) await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
-      if (tieBreakOrderChanged) {
+      if (tieBreakOrderChanged || sixTeamDirectFinalOrderChanged) {
         // Result confirmation holds its Game row until the OFFICIAL revision commits; wait for it so the check sees that result.
         await lockCompetitionFixtureRows(tx, existing.kind, tournamentId);
-        await this.assertTieBreakOrderEditable(tx, tournamentId);
+        if (tieBreakOrderChanged) await this.assertTieBreakOrderEditable(tx, tournamentId);
+        if (sixTeamDirectFinalOrderChanged) await this.assertSixTeamOrderEditable(tx, tournamentId, existing.sixTeamBracket);
       }
       if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
       let casBaseline = existing.updatedAt;
@@ -758,6 +772,7 @@ export class TournamentsAdminService {
           beforeJson: {
             title: existing.title,
             ...(tieBreakOrderChanged && { tieBreakOrder: resolveTieBreakOrder(existing.tieBreakOrder) }),
+            ...(sixTeamDirectFinalOrderChanged && { sixTeamDirectFinalOrder: resolveSixTeamDirectFinalOrder(existing.sixTeamDirectFinalOrder) }),
             ...(formatChanged && { format: existing.format }),
             ...(sportChanged && {
               sportId: existing.sportId,
@@ -767,6 +782,7 @@ export class TournamentsAdminService {
           afterJson: {
             title: data.title ?? existing.title,
             ...(tieBreakOrderChanged && { tieBreakOrder: resolveTieBreakOrder(nextTieBreakOrder) }),
+            ...(sixTeamDirectFinalOrderChanged && { sixTeamDirectFinalOrder: resolveSixTeamDirectFinalOrder(nextSixTeamDirectFinalOrder) }),
             ...(formatChanged && { format: dto.format }),
             ...(sportChanged && {
               sportId: dto.sportId,
@@ -1229,25 +1245,57 @@ export class TournamentsAdminService {
     if (message) throw new ConflictException({ code: 'TOURNAMENT_FORMAT_LOCKED', message });
   }
 
-  /** 예선(phase=group) 경기에 공식 결과가 있으면 순서를 바꿀 수 없는 사유를 돌려준다. */
+  /**
+   * 대회 설정을 따르는 조별 경기(phase=group)에 공식 결과가 있으면 순서를 바꿀 수 없는 사유를 돌려준다.
+   * MD-QA #186: 단계 설정(`V1TournamentStageTieBreakSetting`)이 있는 단계의 조는 대회 설정을 따르지 않으므로 잠금에서 뺀다.
+   */
   private async getTieBreakOrderBlockedReason(
-    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentStageTieBreakSetting'>,
     tournamentId: string,
   ): Promise<string | null> {
+    const ownStageKeys = (await client.v1TournamentStageTieBreakSetting.findMany({ where: { tournamentId }, select: { stageKey: true } }))
+      .map((row) => row.stageKey);
     const official = await client.v1TournamentMatchDetails.findFirst({
       where: {
         tournamentId,
-        group: { is: { phase: 'group' } },
+        group: { is: { phase: 'group', ...(ownStageKeys.length > 0 && { OR: [{ stageKey: null }, { stageKey: { notIn: ownStageKeys } }] }) } },
         teamMatch: { is: { deletedAt: null, game: { is: { currentOfficialRevision: { is: { state: 'OFFICIAL' } } } } } },
       },
       select: { teamMatchId: true },
     });
-    return official === null ? null : '예선 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 결과를 확정하기 전에 정해 주세요.';
+    if (official === null) return null;
+    return ownStageKeys.length > 0
+      ? '대회 설정을 따르는 단계의 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 아직 결과가 없는 단계는 단계별 동점 순서에서 따로 정해 주세요.'
+      : '예선 경기 결과가 확정된 뒤에는 동점일 때 순서를 바꿀 수 없어요. 결과를 확정하기 전에 정해 주세요.';
   }
 
-  private async assertTieBreakOrderEditable(client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>, tournamentId: string) {
+  private async assertTieBreakOrderEditable(client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentStageTieBreakSetting'>, tournamentId: string) {
     const message = await this.getTieBreakOrderBlockedReason(client, tournamentId);
     if (message) throw new ConflictException({ code: 'TIE_BREAK_ORDER_LOCKED', message });
+  }
+
+  /** 6강 첫 세 경기(직행 판정의 근거) 중 하나라도 공식 결과가 있으면 직행 비교 순서를 바꿀 수 없다. */
+  private async getSixTeamOrderBlockedReason(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    tournamentId: string,
+    sixTeamBracket: Prisma.JsonValue | null,
+  ): Promise<string | null> {
+    const state = parseSixTeamState(sixTeamBracket);
+    if (state === null) return null;
+    const official = await client.v1TournamentMatchDetails.findFirst({
+      where: {
+        tournamentId,
+        teamMatchId: { in: state.rounds.slice(0, 3) },
+        teamMatch: { is: { deletedAt: null, game: { is: { currentOfficialRevision: { is: { state: 'OFFICIAL' } } } } } },
+      },
+      select: { teamMatchId: true },
+    });
+    return official === null ? null : '6강 경기 결과가 확정된 뒤에는 결승 직행팀 고르는 순서를 바꿀 수 없어요.';
+  }
+
+  private async assertSixTeamOrderEditable(client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>, tournamentId: string, sixTeamBracket: Prisma.JsonValue | null) {
+    const message = await this.getSixTeamOrderBlockedReason(client, tournamentId, sixTeamBracket);
+    if (message) throw new ConflictException({ code: 'SIX_TEAM_ORDER_LOCKED', message });
   }
 
   /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
@@ -1475,6 +1523,7 @@ export class TournamentsAdminService {
       sixTeamBracket: row.sixTeamBracket,
       sixTeamMode: row.sixTeamMode,
       tieBreakOrder: resolveTieBreakOrder(row.tieBreakOrder),
+      sixTeamDirectFinalOrder: resolveSixTeamDirectFinalOrder(row.sixTeamDirectFinalOrder),
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,

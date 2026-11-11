@@ -24,7 +24,7 @@ import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin'
 import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { GenderCategoryField } from '@/components/admin/gender-category-field';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
-import { TieBreakOrderEditor } from '@/components/admin/tournaments/tie-break-order-editor';
+import { TieBreakPresetPicker } from '@/components/admin/tournaments/tie-break-preset-picker';
 import {
   PrizeBreakdownEditor,
   type TournamentPrizeRow,
@@ -1199,7 +1199,7 @@ function ParticipationStep({
       ) : null}
 
       {state.format !== 'knockout' ? (
-        <TieBreakOrderEditor
+        <TieBreakPresetPicker
           order={state.tieBreakOrder}
           onChange={(order) => dispatch({ type: 'set-field', field: 'tieBreakOrder', value: order })}
           disabled={pending}

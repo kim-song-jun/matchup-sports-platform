@@ -5,7 +5,7 @@ import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
 import { TournamentSlotService } from '../../src/tournaments/slots/tournament-slot.service';
-import { REQUIRED_TIE_BREAK_ORDER } from '../../src/tournaments/competition-config/competition-config.presets';
+import { DEFAULT_TIE_BREAK_ORDER } from '../../src/tournaments/competition-config/tournament-tie-break-order';
 import { compareCrossGroupTeams } from '../../src/tournaments/slots/cross-group-round12-plan';
 import { runTournamentStandingsRecalculation } from '../../src/tournaments/tournament-standings-recalculation';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
@@ -58,7 +58,7 @@ async function settledTournament(label: string, direct = false) {
 
 async function selection(tournamentId: string) {
   const preview = await slots.round12Preview(user, tournamentId);
-  expect(preview.tieBreakOrder).toEqual(REQUIRED_TIE_BREAK_ORDER);
+  expect(preview.tieBreakOrder).toEqual(DEFAULT_TIE_BREAK_ORDER);
   const rankPicks = preview.ranks.map((rank) => {
     expect(rank.candidates).toHaveLength(1);
     return rank.candidates[0];

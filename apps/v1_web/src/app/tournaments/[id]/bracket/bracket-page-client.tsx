@@ -183,6 +183,12 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
   );
 }
 
+/** 조가 속한 단계의 동점 순서 — 단계별 설정이 없는 응답은 대회 순서다. */
+function groupTieBreakOrder(tournament: V1TournamentDetail, group: V1TournamentGroup): V1TournamentDetail['tieBreakOrder'] {
+  const stageKey = tournament.stagePlan?.stages.find((stage) => stage.pools.some((pool) => pool.key === group.poolKey))?.key;
+  return (stageKey ? tournament.stageTieBreakOrders?.[stageKey] : undefined) ?? tournament.tieBreakOrder;
+}
+
 function GroupStandingsSection({
   group,
   isMyGroup,
@@ -868,7 +874,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
               {!isLeague && hasGroupStage && hasGroupStandings && (
                 <section>
                   {visibleGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={tournament.tieBreakOrder} />
+                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={groupTieBreakOrder(tournament, g)} />
                   ))}
                 </section>
               )}
@@ -892,7 +898,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
                   </h3>
                   {showBracket ? (
                     <div className="tm-bk-wrap">
-                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={tournament.sixTeamBracket} fixtures={bracketFixtures} selectedRoundKey={activeRoundKey} stageLabels={Object.fromEntries(knockoutRounds.map((round) => [round.key, round.label]))} /> : <TournamentBracket
+                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} directFinalOrder={tournament.sixTeamDirectFinalOrder} state={tournament.sixTeamBracket} fixtures={bracketFixtures} selectedRoundKey={activeRoundKey} stageLabels={Object.fromEntries(knockoutRounds.map((round) => [round.key, round.label]))} /> : <TournamentBracket
                         fixtures={bracketFixtures}
                         groups={bracketGroups}
                         selectedRoundKey={activeRoundKey}

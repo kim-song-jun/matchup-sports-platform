@@ -5,7 +5,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BracketTemplateDialog } from './bracket-template-dialog';
 
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminTournamentRegistrations: () => ({ data: { items: [] }, isPending: false }) }));
+vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminTournamentRegistrations: () => ({ data: { items: [] }, isPending: false }), useV1AdminTournament: () => ({ data: undefined }) }));
 const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
 const base = '*/api/v1/admin/tournaments/t-1/bracket/template';
 const plan = { groups: [{ key: 'final', name: '결승', phase: 'final', advanceCount: null }],

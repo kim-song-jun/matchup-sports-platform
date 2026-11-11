@@ -10,6 +10,8 @@ import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { parseTournamentFixtureOfficialScore } from '../tournament-fixture-official-result';
 import { replaceRankedBracketAssignments } from '../../game-operations/tournament-team-match-advancement';
+import { DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER, type SixTeamDirectFinalCriterion } from '../competition-config/tournament-tie-break-presets';
+import { resolveSixTeamDirectFinalOrder } from '../competition-config/tournament-tie-break-order';
 
 export type SixTeamState = {
   rounds: [string, string, string, string, string];
@@ -48,9 +50,17 @@ export type SixTeamResult = {
   revisionId: string | null;
   score: Prisma.JsonValue | null;
 };
+/** Larger is better for every key, so the comparator below can read the configured order generically. */
+const SIX_TEAM_KEYS: Record<SixTeamDirectFinalCriterion, (row: { goalsFor: number | null; goalsAgainst: number | null }) => number> = {
+  goals_for: (row) => row.goalsFor!,
+  goal_difference: (row) => row.goalsFor! - row.goalsAgainst!,
+  fewest_goals_against: (row) => -row.goalsAgainst!,
+};
+
 export function rankSixTeamWinners(
   results: SixTeamResult[],
-  overrides: Record<string, string>
+  overrides: Record<string, string>,
+  order: readonly SixTeamDirectFinalCriterion[] = DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER
 ) {
   const candidates = results.map((result) => {
     const score = parseTournamentFixtureOfficialScore(result.score);
@@ -93,10 +103,13 @@ export function rankSixTeamWinners(
     ready &&
     results.every((row) => row.revisionId !== null) &&
     rows.every((row) => row.goalsFor !== null && row.goalsAgainst !== null);
-  const compare = (a: (typeof rows)[number], b: (typeof rows)[number]) =>
-    b.goalsFor! - a.goalsFor! ||
-    b.goalsFor! - b.goalsAgainst! - (a.goalsFor! - a.goalsAgainst!) ||
-    a.goalsAgainst! - b.goalsAgainst!;
+  const compare = (a: (typeof rows)[number], b: (typeof rows)[number]) => {
+    for (const criterion of order) {
+      const difference = SIX_TEAM_KEYS[criterion](b) - SIX_TEAM_KEYS[criterion](a);
+      if (difference !== 0) return difference;
+    }
+    return 0;
+  };
   const ranked = comparable ? [...rows].sort(compare) : rows;
   const bye =
     comparable && ranked.length === 3 && compare(ranked[0], ranked[1]) !== 0
@@ -159,7 +172,7 @@ export async function syncSixTeamBracket(
     });
   const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
     where: { id: tournamentId },
-    select: { sixTeamBracket: true },
+    select: { sixTeamBracket: true, sixTeamDirectFinalOrder: true },
   });
   const state = parseSixTeamState(tournament?.sixTeamBracket);
   if (!state) {
@@ -188,7 +201,7 @@ export async function syncSixTeamBracket(
     });
     return;
   }
-  const ranked = rankSixTeamWinners(results.slice(0, 3), state.winners);
+  const ranked = rankSixTeamWinners(results.slice(0, 3), state.winners, resolveSixTeamDirectFinalOrder(tournament?.sixTeamDirectFinalOrder));
   const bye = state.manual ? state.bye : ranked.automaticBye;
   const remaining =
     ranked.ready && bye

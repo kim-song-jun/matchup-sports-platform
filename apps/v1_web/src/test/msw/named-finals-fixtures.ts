@@ -69,7 +69,7 @@ export function namedFinalPublicDetail(): V1TournamentDetail {
     promoListPrizeText: null,
     promoListPriority: 0,
     campaignSlug: null,
-    tieBreakOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'],
+    tieBreakOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'],
     yellowAccumulationLimit: null,
     redCardSuspensionMatches: null,
     rulesText: null,

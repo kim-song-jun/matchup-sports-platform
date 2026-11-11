@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { withFromPath } from '@/lib/session-storage';
-import { formatTournamentTieBreakRule } from '@/lib/tournament-tie-break';
+import { describeTieBreakRuleParts } from '@/lib/tournament-tie-break';
 
 /**
  * §순위표 지표 통일 — 같은 대회 `/bracket` 화면의 두 탭(순위·대진표 탭의
@@ -156,7 +156,7 @@ export function TournamentStandingsTable({
   myTeamIds?: ReadonlySet<string>;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
-  const tieBreakRule = tieBreakOrder ? formatTournamentTieBreakRule(tieBreakOrder) : '';
+  const tieBreakRule = tieBreakOrder ? describeTieBreakRuleParts(tieBreakOrder) : null;
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const COLUMN_COUNT = 5;
   const hasSharedRank = sorted.some((row) => row.sharedRank !== null);
@@ -376,7 +376,8 @@ export function TournamentStandingsTable({
             color: 'var(--text-caption)',
           }}
         >
-          동점이면 {tieBreakRule} 순서로 정해요
+          {tieBreakRule.presetName ? <><strong>{tieBreakRule.presetName}</strong> 규정이에요. </> : null}
+          {tieBreakRule.sentence}
         </p>
       ) : null}
     </Card>

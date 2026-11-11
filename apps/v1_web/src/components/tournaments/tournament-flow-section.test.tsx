@@ -35,6 +35,8 @@ describe('TournamentFlowSection', () => {
     render(<TournamentFlowSection tournament={{ format: 'group_knockout', kind: 'regular_league' }} />);
     expect(screen.getByText('풀리그', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText('결선 진출', { exact: true })).not.toBeInTheDocument();
+    // 정규 리그는 대회 설정이 아니라 리그 공통 순서로 가린다(MD-QA #186 Copilot 지적).
+    expect(screen.getByText(/리그 공통 규정\(골득실 → 다득점 → 승자승 → 최소 실점\)/)).toBeInTheDocument();
   });
 
   it('6강 · 결승 직행 방식은 3·4위전이 있다고 안내하지 않는다', () => {

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 import { validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
 import { withTournamentTieBreakOrder } from '../tournaments/competition-config/tournament-tie-break-order';
+import { loadStageTieBreakOrders, stageTieBreakOverride } from '../tournaments/competition-config/stage-tie-break-order';
 import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
@@ -282,8 +283,10 @@ export class GameResultStandingsProjectionService {
       });
       fixturesByGroup.set(detail.groupId, fixtures);
     }
+    const stageOrders = await loadStageTieBreakOrders(tx, tournamentId, groups.map((group) => group.stageKey));
     return groups.map((group) => ({
       ...group,
+      tieBreakOrder: stageTieBreakOverride(stageOrders, group.stageKey),
       fixtures: fixturesByGroup.get(group.id) ?? [],
     })) as GroupForStandingsRow[];
   }

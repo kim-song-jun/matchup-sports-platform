@@ -118,6 +118,7 @@ describe('TournamentsAdminService', () => {
     v1TournamentMatchDetails: { count: jest.Mock; findFirst: jest.Mock };
     v1TournamentGroup: { count: jest.Mock; updateMany: jest.Mock };
     v1TournamentStagePeriodSetting: { deleteMany: jest.Mock };
+    v1TournamentStageTieBreakSetting: { findMany: jest.Mock };
     $executeRaw: jest.Mock;
     $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
@@ -150,6 +151,7 @@ describe('TournamentsAdminService', () => {
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentStagePeriodSetting: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TournamentStageTieBreakSetting: { findMany: jest.fn().mockResolvedValue([]) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1100,8 +1102,9 @@ describe('TournamentsAdminService', () => {
   });
 
   describe('동점 순서 (대회별 설정)', () => {
-    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
-    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+    const LEGACY_GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
     // The "official group result" probe is the only match-details lookup that filters on group phase.
     const officialGroupResultProbe = (exists: boolean) =>
       prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: { group?: unknown } }) =>
@@ -1251,6 +1254,87 @@ describe('TournamentsAdminService', () => {
       arrange();
       officialGroupResultProbe(false);
       expect((await service.get(ownerAuthUser, 'tournament-1')).tieBreakOrder).toEqual(DEFAULT_ORDER);
+    });
+
+    it('create: 옛 6칸 순서는 추첨 앞에 최소 실점을 넣은 7칸으로 저장한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+      prisma.v1Tournament.create.mockImplementation(async ({ data }) => tournamentRow(data));
+      await service.create(ownerAuthUser, { sportId: 'sport-1', title: '대회', teamCount: 8, tieBreakOrder: LEGACY_GOALS_FIRST });
+      expect(prisma.v1Tournament.create.mock.calls[0][0].data.tieBreakOrder).toEqual(GOALS_FIRST);
+    });
+
+    it('update: 단계 설정이 있는 단계의 결과는 대회 순서를 잠그지 않는다(MD-QA #186)', async () => {
+      arrange();
+      prisma.v1TournamentStageTieBreakSetting.findMany.mockResolvedValue([{ stageKey: 'main' }]);
+      // Only the stage with its own order has results; the probe excludes it, so nothing inheriting has a confirmed result.
+      prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: { group?: { is?: { OR?: unknown } } } }) =>
+        where.group?.is?.OR !== undefined ? null : { teamMatchId: 'fixture-1' });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST });
+      expect(prisma.v1TournamentMatchDetails.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+        group: { is: { phase: 'group', OR: [{ stageKey: null }, { stageKey: { notIn: ['main'] } }] } },
+      }) }));
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { tieBreakOrder: GOALS_FIRST } }));
+    });
+
+    it('update: 대회 순서를 따르는 단계에 결과가 있으면 여전히 409 이고 사유가 단계 설정을 안내한다', async () => {
+      arrange();
+      prisma.v1TournamentStageTieBreakSetting.findMany.mockResolvedValue([{ stageKey: 'main' }]);
+      officialGroupResultProbe(true);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, tieBreakOrder: GOALS_FIRST }))
+        .rejects.toMatchObject({ response: { code: 'TIE_BREAK_ORDER_LOCKED', message: expect.stringContaining('단계별 동점 순서') } });
+    });
+  });
+
+  describe('6강 결승 직행 순서 (MD-QA #186)', () => {
+    const SIX_STATE = { rounds: ['r1', 'r2', 'r3', 'semi', 'final'], winners: {}, bye: null, manual: false, sourceVersion: null, needsReview: false };
+    const GD_FIRST = ['goal_difference', 'goals_for', 'fewest_goals_against'];
+    function arrangeSixTeam(overrides: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({
+        ...tournamentRow({ format: 'knockout', teamCount: 6, sixTeamMode: true, sixTeamBracket: SIX_STATE, ...overrides }),
+        _count: { registrations: 6, announcements: 0 },
+      });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it('update: 결과가 없으면 순서를 저장하고 감사 기록에 남긴다', async () => {
+      arrangeSixTeam();
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sixTeamDirectFinalOrder: GD_FIRST });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ sixTeamDirectFinalOrder: GD_FIRST }) }));
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        beforeJson: expect.objectContaining({ sixTeamDirectFinalOrder: ['goals_for', 'goal_difference', 'fewest_goals_against'] }),
+        afterJson: expect.objectContaining({ sixTeamDirectFinalOrder: GD_FIRST }),
+      }) }));
+    });
+
+    it('update: 6강 첫 세 경기 중 하나라도 확정되면 409 SIX_TEAM_ORDER_LOCKED', async () => {
+      arrangeSixTeam();
+      prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: { teamMatchId?: { in: string[] } } }) =>
+        where.teamMatchId?.in?.join() === 'r1,r2,r3' ? { teamMatchId: 'r1' } : null);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sixTeamDirectFinalOrder: GD_FIRST }))
+        .rejects.toMatchObject({ response: { code: 'SIX_TEAM_ORDER_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('update: 같은 순서를 다시 보내면 잠겨 있어도 통과하고, 6강 방식이 아니면 400', async () => {
+      arrangeSixTeam({ sixTeamDirectFinalOrder: GD_FIRST });
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'r1' });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sixTeamDirectFinalOrder: GD_FIRST, title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany.mock.calls[0][0].data).not.toHaveProperty('sixTeamDirectFinalOrder');
+
+      prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(), _count: { registrations: 0, announcements: 0 } });
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sixTeamDirectFinalOrder: GD_FIRST }))
+        .rejects.toMatchObject({ response: { code: 'SIX_TEAM_ORDER_INVALID' } });
+    });
+
+    it('get: 지금 쓰는 순서와 잠긴 이유를 돌려준다', async () => {
+      arrangeSixTeam();
+      prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: { teamMatchId?: unknown } }) =>
+        where.teamMatchId !== undefined ? { teamMatchId: 'r1' } : null);
+      const result = await service.get(ownerAuthUser, 'tournament-1');
+      expect(result.sixTeamDirectFinalOrder).toEqual(['goals_for', 'goal_difference', 'fewest_goals_against']);
+      expect(result.sixTeamDirectFinalOrderBlockedReason).toContain('6강 경기 결과');
     });
   });
 

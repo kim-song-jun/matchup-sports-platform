@@ -510,13 +510,12 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     goToParticipationStep();
 
     expect(screen.getByRole('heading', { name: '동점일 때 순서' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '득실차 한 칸 위로' }));
-    fireEvent.click(screen.getByRole('button', { name: '다득점 한 칸 위로' }));
+    fireEvent.click(screen.getByRole('radio', { name: /득실차 우선/ }));
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
     expect(createMutate.mock.calls[0][0]).toMatchObject({
-      tieBreakOrder: ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'],
+      tieBreakOrder: ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'],
     });
   });
 

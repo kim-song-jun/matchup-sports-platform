@@ -267,6 +267,8 @@ import type {
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
+  V1StageTieBreakView,
+  V1TournamentTieBreakOrder,
   V1CreateTournamentPayload,
   V1UpdateTournamentPayload,
   V1LineupSizeOptions,
@@ -5054,6 +5056,24 @@ export function useV1UpdateTournament(id: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** 단계 하나의 동점 순서를 저장한다. order=null 은 대회 설정 따름. expectedRevision 은 단계 구성의 stagePlanRevision 이다. */
+export function useV1SetStageTieBreakOrder(tournamentId: string) {
+  const { v1Put } = useV1DataSource();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { stageKey: string; expectedRevision: number; order: V1TournamentTieBreakOrder | null }) =>
+      v1Put<{ revision: number; stageTieBreak: V1StageTieBreakView }>(
+        `/admin/tournaments/${encodeURIComponent(tournamentId)}/stages/${encodeURIComponent(input.stageKey)}/tie-break-order`,
+        { expectedRevision: input.expectedRevision, order: input.order },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: ['stages', tournamentId] });
     },
   });
 }

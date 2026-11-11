@@ -168,6 +168,26 @@ describe('calculateCompetitionStandings — 대회가 고른 동점 순서', () 
     expect(orderOf(['points', 'goals_for', 'head_to_head', 'goal_difference', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
   });
 
+  it('MD-QA #186: 최소 실점을 맞대결보다 먼저 두면 덜 먹은 팀이 앞선다', () => {
+    expect(orderOf(['points', 'fewest_goals_against', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'])).toEqual(['D', 'B', 'A', 'E']);
+  });
+
+  it('MD-QA #186: 득실차가 같으면 최소 실점이 다득점과 반대로 가를 수 있다', () => {
+    // X 2-1 Z, Y 1-0 Z, X 2-2 Y: X and Y both 4 points, goal difference +1, X scored more (4 vs 3) but conceded more (3 vs 2).
+    const ids = ['X', 'Y', 'Z'];
+    const games = [result('X', 'Z', 2, 1), result('Y', 'Z', 1, 0), result('X', 'Y', 2, 2)];
+    const rank = (order: CompetitionConfig['tieBreak']['order']) => calculateCompetitionStandings({
+      tournamentId: 't1', configVersionId: 'cfg1', registrationIds: ids, fixtures: games, config: withTournamentTieBreakOrder(defaultTestConfig(), order),
+    }).map((row) => row.registrationId);
+    expect(rank(['points', 'goal_difference', 'goals_for', 'fewest_goals_against', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['X', 'Y', 'Z']);
+    expect(rank(['points', 'goal_difference', 'fewest_goals_against', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'])).toEqual(['Y', 'X', 'Z']);
+  });
+
+  it('MD-QA #186: 옛 6칸 순서와 7칸으로 읽은 순서는 같은 순위를 낸다', () => {
+    expect(orderOf(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw']))
+      .toEqual(orderOf(['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw']));
+  });
+
   it('페어플레이를 맨 앞에 두면 벌점이 적은 팀이 앞선다', () => {
     const fairPlay = new Map([['A', 6], ['B', 0]]);
     expect(orderOf(REQUIRED_TIE_BREAK_ORDER, fairPlay)).toEqual(['D', 'A', 'B', 'E']);

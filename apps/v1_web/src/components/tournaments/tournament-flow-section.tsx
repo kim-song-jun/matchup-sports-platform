@@ -1,5 +1,6 @@
 import { Card } from '@/components/v1-ui/primitives';
 import { competitionNounOf, isLeagueCompetition } from '@/lib/competition-kind';
+import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import type { V1TournamentDetail } from '@/types/api';
 
 type FlowCompetition = Pick<V1TournamentDetail, 'kind' | 'format' | 'stagePlan' | 'sixTeamMode'>;
@@ -23,7 +24,7 @@ function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body
   if (competition.kind === 'regular_league') {
     return [
       { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.' },
-      { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
+      { title: '순위 집계', body: `승점으로 순위를 가리고, 동점이면 리그 공통 규정(${formatTieBreakRule(LEAGUE_TIE_BREAK_ORDER.filter((criterion) => criterion !== 'points'))}) 순서로 가려요.` },
       { title: '시즌 종료', body: '확정된 경기 결과와 최종 순위를 확인해요. 시상이 있는 경우 리그 안내를 확인해 주세요.' },
     ];
   }
@@ -52,7 +53,7 @@ function getFlowSteps(competition: FlowCompetition): Array<{ title: string; body
   // 단발 대회의 리그 방식에는 시즌·주차가 없다 — 몇 번 맞붙는지는 대진 생성 때 정한 회전 수다.
   return [
     { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.' },
-    { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
+    { title: '순위 집계', body: '승점으로 순위를 가리고, 동점이면 대회가 정한 순서(맞대결·득실차 등)로 가려요.' },
     { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
   ];
 }

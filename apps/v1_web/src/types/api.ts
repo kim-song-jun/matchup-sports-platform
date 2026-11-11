@@ -4030,9 +4030,28 @@ export type V1TournamentTieBreakCriterion =
   | 'head_to_head'
   | 'goal_difference'
   | 'goals_for'
+  | 'fewest_goals_against'
   | 'fair_play'
   | 'seeded_draw';
 export type V1TournamentTieBreakOrder = V1TournamentTieBreakCriterion[];
+
+/** 6강 결승 직행팀을 고르는 비교 기준. 운영자 선택은 언제나 마지막이라 배열에 담지 않는다. */
+export type V1SixTeamCriterion = 'goals_for' | 'goal_difference' | 'fewest_goals_against';
+
+/** 단계별 동점 순서 한 줄. order=null 은 대회 설정을 따른다는 뜻이다. */
+export type V1StageTieBreakItem = {
+  stageKey: string;
+  stageName: string;
+  /** false 면 토너먼트 편성만 있는 단계라 동점 순서가 없다. */
+  ranked: boolean;
+  order: V1TournamentTieBreakOrder | null;
+  resolvedOrder: V1TournamentTieBreakOrder;
+  lockedReason: string | null;
+};
+export type V1StageTieBreakView = {
+  tournamentOrder: V1TournamentTieBreakOrder;
+  stages: V1StageTieBreakItem[];
+};
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
@@ -4042,10 +4061,15 @@ export type V1Tournament = {
   canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
   formatChangeBlockedReason?: string | null;
-  /** 지금 쓰는 동점 순서(항상 6칸). 안 고른 대회는 기본 순서다. */
+  /** 지금 쓰는 동점 순서(항상 7칸). 안 고른 대회는 기본 순서다. */
   tieBreakOrder: V1TournamentTieBreakOrder;
-  /** 관리자 상세 응답: null이면 동점 순서 변경 가능, 예선 결과가 확정됐으면 한국어 사유. */
+  /** 관리자 상세 응답: null이면 동점 순서 변경 가능, 이 순서를 상속한 단계에 확정 결과가 있으면 한국어 사유. */
   tieBreakOrderBlockedReason?: string | null;
+  /** 6강 결승 직행팀 비교 순서(항상 3칸). 안 고른 대회는 기본 순서다. */
+  sixTeamDirectFinalOrder?: V1SixTeamCriterion[];
+  sixTeamDirectFinalOrderBlockedReason?: string | null;
+  /** 단계형 대회에만 온다. */
+  stageTieBreak?: V1StageTieBreakView;
   id: string;
   sportId: string;
   title: string;
@@ -4391,8 +4415,12 @@ export type V1TournamentDetail = {
   isStaged?: boolean;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
-  /** 이 대회가 고른 동점 순서(6칸). 정규 리그는 리그 고유 순서를 쓰므로 null. */
+  /** 이 대회가 고른 동점 순서(7칸). 정규 리그는 리그 고유 순서를 쓰므로 null. */
   tieBreakOrder?: V1TournamentTieBreakOrder | null;
+  /** 단계별로 해석된 동점 순서(조별리그가 있는 단계만). 단계형 대회에만 온다. */
+  stageTieBreakOrders?: Record<string, V1TournamentTieBreakOrder>;
+  /** 6강 방식일 때 결승 직행 비교 순서. */
+  sixTeamDirectFinalOrder?: V1SixTeamCriterion[] | null;
   /** 정규 리그에만 내려오는 참가팀 정원. null이면 무제한이다. */
   maxTeams?: number | null;
   registrationDeadlineAt: string | null;
@@ -5102,8 +5130,10 @@ export type V1SubstitutionMode = 'limited' | 'rolling';
 export type V1CreateTournamentPayload = {
   stagePlan?: StagePlan;
   sixTeamMode?: boolean;
-  /** 동점 순서(6칸). 생략 = 기본 순서(생성)/변경 없음(수정), null = 기본 순서로 되돌리기. */
+  /** 동점 순서(7칸). 생략 = 기본 순서(생성)/변경 없음(수정), null = 기본 순서로 되돌리기. */
   tieBreakOrder?: V1TournamentTieBreakOrder | null;
+  /** 6강 결승 직행 비교 순서(수정 전용). 생략 = 변경 없음, null = 기본 순서. */
+  sixTeamDirectFinalOrder?: V1SixTeamCriterion[] | null;
   sportId: string;
   title: string;
   format?: V1TournamentFormat;

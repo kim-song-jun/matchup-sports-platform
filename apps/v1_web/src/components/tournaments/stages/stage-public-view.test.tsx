@@ -15,4 +15,17 @@ describe('공개 단계별 순위 범위', () => {
     expect(screen.getByRole('table', { name: '본선 1위 리그 순위표' })).toHaveTextContent('0');
     expect(screen.queryByRole('table', { name: '예선 A조 순위표' })).not.toBeInTheDocument();
   });
+  it('단계별로 해석된 동점 순서가 있으면 그 단계 순위표 안내에 쓰고, 없으면 대회 순서를 쓴다', () => {
+    const plan = rankedLeagueStagePlan();
+    const group = (id: string, poolKey: string, stageKey: string) => ({ id, poolKey, stageKey, name: id, phase: 'group', groupTeams: [], standings: [{ registrationId: 'a', teamId: null, teamName: '동일팀', position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 1, goalsAgainst: 0 }] });
+    const tournamentOrder = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+    render(<StagePublicView tournament={{
+      id: 't', stagePlan: plan, groups: [group('pre', 'pre-0', 'preliminary'), group('main', 'main-0', 'main')], fixtures: [],
+      tieBreakOrder: tournamentOrder,
+      stageTieBreakOrders: { main: ['points', 'goals_for', 'goal_difference', 'fewest_goals_against', 'head_to_head', 'fair_play', 'seeded_draw'] },
+    } as unknown as V1TournamentDetail} />);
+    expect(screen.getByText('맞대결 우선', { selector: 'strong' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: '진행 단계' }), { target: { value: 'main' } });
+    expect(screen.getByText('다득점 우선', { selector: 'strong' })).toBeInTheDocument();
+  });
 });

@@ -66,6 +66,7 @@ export type CompetitionConfig = {
       | 'head_to_head'
       | 'goal_difference'
       | 'goals_for'
+      | 'fewest_goals_against'
       | 'fair_play'
       | 'seeded_draw'
     >;

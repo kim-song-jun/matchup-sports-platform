@@ -17,18 +17,26 @@ type TieBreakOrderEditorProps = {
   disabled?: boolean;
   /** 예선 결과가 확정돼 순서를 못 바꿀 때 서버가 준 사유. 있으면 모든 버튼이 꺼진다. */
   lockedReason?: string | null;
+  /** 바텀시트처럼 바깥이 이미 제목을 보여 줄 때 끈다. 접근 가능한 이름은 그대로 남는다. */
+  showHeading?: boolean;
 };
 
 /** 대회 만들기·정보 수정이 함께 쓰는 「동점일 때 순서」 칸. 승점은 처음, 추첨은 마지막에 고정이다. */
-export function TieBreakOrderEditor({ order, onChange, disabled = false, lockedReason = null }: TieBreakOrderEditorProps) {
+export function TieBreakOrderEditor({ order, onChange, disabled = false, lockedReason = null, showHeading = true }: TieBreakOrderEditorProps) {
   const headingId = useId();
   const hintId = useId();
   const frozen = disabled || lockedReason !== null;
   const isDefault = sameTieBreakOrder(order, DEFAULT_TOURNAMENT_TIE_BREAK_ORDER);
 
   return (
-    <section aria-labelledby={headingId} aria-describedby={hintId} className="grid gap-2">
-      <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">동점일 때 순서</h3>
+    <section
+      {...(showHeading ? { 'aria-labelledby': headingId } : { 'aria-label': '동점일 때 순서' })}
+      aria-describedby={hintId}
+      className="grid gap-2"
+    >
+      {showHeading ? (
+        <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">동점일 때 순서</h3>
+      ) : null}
       <p id={hintId} className="tm-text-caption text-[var(--text-muted)]">
         승점이 같으면 위에서부터 차례로 가려요. 끝까지 같으면 추첨으로 정해요.
       </p>

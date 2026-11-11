@@ -2037,7 +2037,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
 
   const sixTeamState = tournament.sixTeamMode ? tournament.sixTeamBracket : null;
   const bracketContent = sixTeamState ? (
-    <SixTeamBracket tournamentId={tournament.id} state={sixTeamState} fixtures={knockoutFixtures}
+    <SixTeamBracket tournamentId={tournament.id} directFinalOrder={tournament.sixTeamDirectFinalOrder} state={sixTeamState} fixtures={knockoutFixtures}
       stageLabels={Object.fromEntries(groupFixturesByRound(knockoutFixtures, groups).map(round => [round.key, round.label]))} />
   ) : <TournamentBracket fixtures={knockoutFixtures} groups={groups} />;
   const connectedBracketWide = !sixTeamState && knockoutFixtures.length > 1 ? 'true' : undefined;

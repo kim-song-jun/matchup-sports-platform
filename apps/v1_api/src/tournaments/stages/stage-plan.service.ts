@@ -12,14 +12,18 @@ import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { recalculateStandingsInTx } from '../tournament-bracket-tx';
 import { planCompetitionStages, stageInvalid, validateStagePlan } from './stage-plan';
 import { loadStageView, type StoredStagePlan } from './stage-view';
-import type { StageAssignDto, StageVersionDto } from './stage-plan.dto';
+import type { StageAssignDto, StageTieBreakOrderDto, StageVersionDto } from './stage-plan.dto';
+import { STAGE_KEY_PATTERN } from './stage-plan.dto';
+import { loadStageTieBreakView, STAGE_TIE_BREAK_LOCKED_MESSAGE } from './stage-tie-break';
+import { assertValidTieBreakOrder, resolveStageTieBreakOrder, sameTieBreakOrder } from '../competition-config/tournament-tie-break-order';
+import { lockCompetitionFixtureRows, lockTournamentForConfigChange } from '../competition-config/tournament-competition-config';
 const options = { timeout: 45_000, maxWait: 5_000 };
 const stale = () => new ConflictException({ code: 'STAGE_PLAN_STALE', message: '대회 구성이나 공식 결과가 바뀌었어요. 최신 정보를 다시 불러와 주세요.' });
 @Injectable()
 export class StagePlanService {
   constructor(private readonly prisma: PrismaService, private readonly admins: AdminContextService, private readonly templates: BracketTemplateService, private readonly games: GamesService) {}
   private async tournament(tx: Prisma.TransactionClient, id: string) {
-    const row = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: { id: true, kind: true, format: true, status: true, title: true, sportId: true, regionId: true, teamCount: true, stagePlan: true, stagePlanRevision: true, competitionConfigVersionId: true, ...TOURNAMENT_VENUE_SELECT } });
+    const row = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: { id: true, kind: true, format: true, status: true, title: true, sportId: true, regionId: true, teamCount: true, stagePlan: true, stagePlanRevision: true, tieBreakOrder: true, competitionConfigVersionId: true, ...TOURNAMENT_VENUE_SELECT } });
     if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     if (!row.stagePlan || row.kind !== 'regular_tournament') return stageInvalid('단계형 대회에서만 사용할 수 있어요.');
     return row;
@@ -75,6 +79,43 @@ export class StagePlanService {
       await recalculateStandingsInTx(tx, id);
       await this.admins.logAdminAction(admin, { action: acknowledge ? 'tournament.stages.acknowledge_started_correction' : 'tournament.stages.assign', targetType: 'tournament', targetId: id, beforeJson: previous ? JSON.parse(JSON.stringify(previous)) : undefined, afterJson: { poolKey: pool.key, ...config.assignments[pool.key] } }, tx);
       return { revision: t.stagePlanRevision + 1, ...await loadStageView(tx, id, config) };
+    }, options);
+  }
+  /**
+   * MD-QA #186: 조별리그 단계 하나의 동점 순서를 정하거나(order) 대회 설정 따름으로 되돌린다(null).
+   * 플랫폼 owner·ops 만 바꾼다(대회 디렉터·support 는 403). 그 단계 조별 경기에 공식 결과가 하나라도 있으면 409.
+   */
+  async updateTieBreakOrder(user: V1AuthUser, id: string, stageKey: string, dto: StageTieBreakOrderDto) {
+    const admin = await this.admins.getMutationAdmin(user.id);
+    if (!STAGE_KEY_PATTERN.test(stageKey)) return stageInvalid('단계를 찾을 수 없어요.');
+    const next = dto.order === null || dto.order === undefined ? null : assertValidTieBreakOrder(dto.order);
+    return this.prisma.$transaction(async tx => {
+      const first = await this.tournament(tx, id);
+      // Same order as the tournament-level change: tournament row, then its Game → TeamMatch rows, so a result being confirmed commits first.
+      await lockTournamentForConfigChange(tx, id);
+      await lockCompetitionFixtureRows(tx, first.kind, id);
+      const t = await this.tournament(tx, id); this.mutable(t.status);
+      if (t.stagePlanRevision !== dto.expectedRevision) throw stale();
+      const stage = (t.stagePlan as unknown as StoredStagePlan).stages.find(candidate => candidate.key === stageKey);
+      if (!stage) return stageInvalid('단계를 찾을 수 없어요.');
+      if (!stage.pools.some(pool => pool.format === 'league')) return stageInvalid('토너먼트 단계는 승부로 가려서 동점 순서가 없어요.');
+      const current = await tx.v1TournamentStageTieBreakSetting.findUnique({ where: { tournamentId_stageKey: { tournamentId: id, stageKey } }, select: { order: true } });
+      const before = current ? assertValidTieBreakOrder(current.order) : null;
+      const unchanged = before === null ? next === null : next !== null && sameTieBreakOrder(before, next);
+      if (unchanged) return { revision: t.stagePlanRevision, stageTieBreak: await loadStageTieBreakView(tx, t) };
+      const view = await loadStageTieBreakView(tx, t);
+      if (view.stages.find(candidate => candidate.stageKey === stageKey)?.lockedReason) {
+        throw new ConflictException({ code: 'TIE_BREAK_ORDER_LOCKED', message: STAGE_TIE_BREAK_LOCKED_MESSAGE });
+      }
+      if (next === null) await tx.v1TournamentStageTieBreakSetting.delete({ where: { tournamentId_stageKey: { tournamentId: id, stageKey } } });
+      else await tx.v1TournamentStageTieBreakSetting.upsert({ where: { tournamentId_stageKey: { tournamentId: id, stageKey } }, create: { tournamentId: id, stageKey, order: next }, update: { order: next } });
+      await tx.v1Tournament.update({ where: { id }, data: { stagePlanRevision: { increment: 1 } } });
+      await this.admins.logAdminAction(admin, {
+        action: 'tournament.stage_tie_break.update', targetType: 'tournament', targetId: id,
+        beforeJson: { stageKey, inherit: before === null, order: before, resolvedOrder: resolveStageTieBreakOrder(t.tieBreakOrder, before) },
+        afterJson: { stageKey, inherit: next === null, order: next, resolvedOrder: resolveStageTieBreakOrder(t.tieBreakOrder, next) },
+      }, tx);
+      return { revision: t.stagePlanRevision + 1, stageTieBreak: await loadStageTieBreakView(tx, t) };
     }, options);
   }
 }

@@ -2811,8 +2811,10 @@ model V1Tournament {
   stagePlanRevision Int @default(0) @map("stage_plan_revision")
   multiFinals Json? @map("multi_finals")
   multiFinalsRevision Int @default(0) @map("multi_finals_revision")
-  /// 이 대회의 동점 순서(승점 → … → 추첨 6칸). null = 기본 순서. 공유되는 경기 규정 판(content_hash)이 아니라 대회에 둔다.
+  /// 이 대회의 동점 순서(승점 → … → 추첨 7칸, MD-QA #186 전에 저장된 6칸은 추첨 앞에 최소 실점을 넣어 읽는다). null = 기본 순서. 공유되는 경기 규정 판(content_hash)이 아니라 대회에 둔다.
   tieBreakOrder Json? @map("tie_break_order")
+  /// 6강 결승 직행팀 비교 순서(다득점·득실차·최소 실점, 운영자 선택은 언제나 마지막). null = 기본 순서(다득점 → 득실차 → 최소 실점).
+  sixTeamDirectFinalOrder Json? @map("six_team_direct_final_order")
   bracketDraft Json? @map("bracket_draft")
   bracketDraftRevision Int @default(0) @map("bracket_draft_revision")
   id                         String                      @id @default(uuid())
@@ -2948,6 +2950,7 @@ model V1Tournament {
   region               V1Region?                            @relation("V1TournamentRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_tournaments_region_fk")
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
   stagePeriodSettings  V1TournamentStagePeriodSetting[]
+  stageTieBreakSettings V1TournamentStageTieBreakSetting[]
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
   /// BE-5 drop: 리그 대진과 승강 기록이 `V1League` 대신 여기를 가리킨다(kind='regular_league'
@@ -3004,6 +3007,20 @@ model V1TournamentStagePeriodSetting {
   @@unique([tournamentId, phase], map: "v1_tournament_stage_period_settings_tournament_phase_key")
   @@index([competitionConfigVersionId], map: "v1_tournament_stage_period_settings_config_idx")
   @@map("v1_tournament_stage_period_settings")
+}
+
+/// 조별리그 단계 하나의 동점 순서(MD-QA #186). 행이 없으면 대회 설정(`V1Tournament.tieBreakOrder`) → 기본값을 따른다.
+model V1TournamentStageTieBreakSetting {
+  id           String       @id @default(uuid())
+  tournamentId String       @map("tournament_id")
+  stageKey     String       @map("stage_key")
+  order        Json
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  tournament   V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_tournament_stage_tie_break_settings_tournament_fk")
+
+  @@unique([tournamentId, stageKey], map: "v1_tournament_stage_tie_break_settings_tournament_stage_key")
+  @@map("v1_tournament_stage_tie_break_settings")
 }
 
 model V1TournamentCampaign {

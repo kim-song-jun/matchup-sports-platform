@@ -924,8 +924,31 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
   }
 
   describe('동점 순서', () => {
-    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
-    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+    const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+    const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+    const FEWEST_FIRST = ['points', 'fewest_goals_against', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
+    const STAGE_PLAN = { version: 1, stages: [
+      { key: 'pre', name: '예선', pools: [{ key: 'A', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] },
+      { key: 'main', name: '본선', pools: [{ key: 'U', name: '상위', format: 'league', capacity: 4, legs: 1, sources: [] }] },
+      { key: 'final', name: '결선', pools: [{ key: 'K', name: '토너먼트', format: 'knockout', capacity: 4, legs: 1, sources: [] }] },
+    ] };
+
+    it('MD-QA #186: 풀리그 단계마다 해석된 순서를 싣는다 — 단계 설정 → 대회 설정', () => {
+      const detail = presentTournamentDetail({
+        ...rowWith('regular_tournament', 'league_knockouts'), stagePlan: STAGE_PLAN, tieBreakOrder: GOALS_FIRST,
+        stageTieBreakSettings: [{ stageKey: 'main', order: FEWEST_FIRST }],
+      } as never, true);
+      expect(detail.stageTieBreakOrders).toEqual({ pre: GOALS_FIRST, main: FEWEST_FIRST });
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'group_knockout'), tieBreakOrder: null } as never, true)).not.toHaveProperty('stageTieBreakOrders');
+    });
+
+    it('MD-QA #186: 6강 방식이면 결승 직행 비교 순서를 싣고, 아니면 null', () => {
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'knockout'), sixTeamMode: true, sixTeamDirectFinalOrder: null } as never, true).sixTeamDirectFinalOrder)
+        .toEqual(['goals_for', 'goal_difference', 'fewest_goals_against']);
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'knockout'), sixTeamMode: true, sixTeamDirectFinalOrder: ['goal_difference', 'goals_for', 'fewest_goals_against'] } as never, true).sixTeamDirectFinalOrder)
+        .toEqual(['goal_difference', 'goals_for', 'fewest_goals_against']);
+      expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'knockout'), sixTeamMode: false } as never, true).sixTeamDirectFinalOrder).toBeNull();
+    });
 
     it('대회가 고른 순서를 공개 상세에 싣고, 고른 적 없으면 기본 순서를 싣는다', () => {
       expect(presentTournamentDetail({ ...rowWith('regular_tournament', 'group_knockout'), tieBreakOrder: GOALS_FIRST } as never, true).tieBreakOrder).toEqual(GOALS_FIRST);

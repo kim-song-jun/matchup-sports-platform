@@ -256,10 +256,33 @@ describe('TournamentStandingsTable', () => {
         rows={[ROW]}
         advancingKeys={null}
         ariaLabel="테스트 순위표"
-        tieBreakOrder={['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw']}
+        tieBreakOrder={['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw']}
       />,
     );
-    expect(screen.getByText('동점이면 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요')).toBeInTheDocument();
+    expect(screen.getByText(/동점이면 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요\./)).toBeInTheDocument();
+  });
+
+  it('프리셋과 같은 순서는 이름을 굵게 앞세우고, 직접 정한 순서는 이름 없이 순서만 알린다', () => {
+    const { rerender } = render(
+      <TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표"
+        tieBreakOrder={['points', 'goals_for', 'goal_difference', 'fewest_goals_against', 'head_to_head', 'fair_play', 'seeded_draw']} />,
+    );
+    expect(screen.getByText('다득점 우선', { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.getByText(/동점이면 다득점 → 득실차 → 맞대결 → 페어플레이 → 추첨 순서로 정해요\./)).toBeInTheDocument();
+    rerender(
+      <TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표"
+        tieBreakOrder={['points', 'head_to_head', 'goal_difference', 'fair_play', 'goals_for', 'fewest_goals_against', 'seeded_draw']} />,
+    );
+    expect(screen.queryByText(/규정이에요/)).toBeNull();
+    expect(screen.getByText(/동점이면 맞대결 → 득실차 → 페어플레이 → 다득점 → 추첨 순서로/)).toBeInTheDocument();
+  });
+
+  it('옛 6칸 순서도 7칸으로 읽어 같은 프리셋 이름을 보여준다', () => {
+    render(
+      <TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표"
+        tieBreakOrder={['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw']} />,
+    );
+    expect(screen.getByText('맞대결 우선', { selector: 'strong' })).toBeInTheDocument();
   });
 
   it('동점 순서를 안 받은 표(정규 리그·옛 응답)에는 안내 줄이 없다', () => {
@@ -276,10 +299,10 @@ describe('TournamentStandingsTable', () => {
         rows={[{ ...ROW, ...zero }]}
         advancingKeys={null}
         ariaLabel="테스트 순위표"
-        tieBreakOrder={['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw']}
+        tieBreakOrder={['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw']}
       />,
     );
-    const rule = screen.getByText(/동점이면 승점 → 맞대결/);
+    const rule = screen.getByText(/동점이면 맞대결/);
     expect(screen.getByRole('table', { name: '테스트 순위표' })).not.toContainElement(rule);
     expect(screen.getByText(/아직 경기 기록이 없어요/)).toBeInTheDocument();
   });
@@ -463,10 +486,10 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
   });
 
   it('순위·대진표 탭이 대회 동점 순서를 조별 순위표 아래에 알려준다', () => {
-    const tieBreakOrder = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as const;
-    const rule = '동점이면 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요';
+    const tieBreakOrder = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'] as const;
+    const rule = '동점이면 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨 순서로 정해요.';
     const bracket = renderBracketStandingsTab({ ...makeTournament(), tieBreakOrder: [...tieBreakOrder] });
-    expect(within(bracket.container).getByText(rule)).toBeInTheDocument();
+    expect(within(bracket.container).getByText(new RegExp(rule))).toBeInTheDocument();
   });
 
   it('동점 순서를 모르는 응답이면 안내 줄을 만들지 않는다', () => {

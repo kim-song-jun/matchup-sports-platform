@@ -5,7 +5,7 @@ import type { V1TournamentTieBreakOrder } from '@/types/api';
 import type { CrossGroupPreview, CrossGroupTeam } from '@/types/cross-group-round12';
 
 const DEFAULT_ORDER = DEFAULT_TOURNAMENT_TIE_BREAK_ORDER;
-const GOALS_FOR_FIRST: V1TournamentTieBreakOrder = ['points', 'head_to_head', 'goals_for', 'goal_difference', 'fair_play', 'seeded_draw'];
+const GOALS_FOR_FIRST: V1TournamentTieBreakOrder = ['points', 'head_to_head', 'goals_for', 'goal_difference', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
 const entry = (points: number, goalsFor: number, goalsAgainst: number, registrationId = 'a'): CrossGroupTeam =>
   ({ registrationId, teamName: registrationId, groupId: 'g', groupName: 'g', points, goalsFor, goalsAgainst });
 

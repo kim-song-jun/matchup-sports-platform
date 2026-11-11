@@ -5,7 +5,7 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import type { AdminContextService } from '../../common/admin-context.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GamesService } from '../../games/games.service';
-import { resolveTieBreakOrder } from '../competition-config/tournament-tie-break-order';
+import { loadStageTieBreakOrders, resolvedOrderForStage } from '../competition-config/stage-tie-break-order';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { loadCanonicalStandingsSource } from '../tournament-standings-source';
 import { loadGroupRankSources } from './load-group-rank-preview';
@@ -124,7 +124,11 @@ async function loadPreview(tx: Tx, tournamentId: string): Promise<CrossGroupPrev
   }
   const currentTeams = targets.flatMap((target) => target.currentRegistrationId === null ? [] : [target.currentRegistrationId]);
   if (new Set(currentTeams).size !== currentTeams.length) conflict('현재 결선에 같은 팀이 중복 배정돼 있어요. 중복 배정을 먼저 해제해 주세요.');
-  const tieBreakOrder = resolveTieBreakOrder(tournament.tieBreakOrder);
+  // The five source groups compare across groups, so they use their (shared) stage's order; mixed stages fall back to the tournament's.
+  const stageKeys = new Set(sourceGroups.map((group) => group.stageKey ?? null));
+  const sharedStageKey = stageKeys.size === 1 ? [...stageKeys][0] : null;
+  const stageOrders = await loadStageTieBreakOrders(tx, tournamentId, [sharedStageKey]);
+  const tieBreakOrder = resolvedOrderForStage(tournament.tieBreakOrder, stageOrders, sharedStageKey);
   const version = createHash('sha256').update(JSON.stringify({ tieBreakOrder, teams, ranks, targets, details, standings, edges, slots, byes, byeTeams,
   })).digest('hex');
   return { version, tieBreakOrder, teams, ranks, targets };

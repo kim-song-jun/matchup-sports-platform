@@ -1,5 +1,30 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-11-11 main 핫픽스 — 경기별 제목
+Status: Main-target hotfix prepared; production not deployed
+
+### Context / Goal / Original Conditions
+사용자 후속 지시: "해당 내용 main에 핫픽스로 배포 진행해줘". alpha의 PR#2327 기능만 운영 핫픽스로 준비하며 번호/조/라운드/진출 계산 변경은 포함하지 않는다. 이전 리뷰 생략 지시는 유지한다.
+- [x] 최신 main1416d7527e에서 격리 브랜치 hotfix/fixture-display-title-1.16.1 생성.
+- [x] alpha 검증 커밋 ef2bc84369·4d34c4eaf9 두 개만 cherry-pick, 기타 dev 변경 제외.
+- [x] 고정 Changesets CLI2.30.0으로 해당 Changeset 소비, API/Web 패키지1.16.0→1.16.1 및 두 CHANGELOG 생성.
+- [ ] main PR 릴리스 게이트: 실제 소비 이력·두 버전 증가·두 CHANGELOG·additive migration·schema pin 검증.
+- [ ] main 대상 PR CI 통과.
+- [ ] 사용자 main PR 머지 및 production environment 승인 후 운영 배포 확인.
+
+### User / Test Scenarios / Ownership
+기존 제목 수정 시나리오 유지. main 대비 기능·마이그레이션·공개 조회·편집 테스트·문서와 버전 변경만 소유한다. 다른 dev 기능, 실제 결과/자동 배정 알고리즘, 운영 데이터 수동 수정, main 직접 push는 범위 밖이다.
+단일 에이전트 순차: 변경 격리→Changeset 소비→좁은 검증/타입→main PR CI→사람의 머지/배포 승인 경계.
+
+### Security / Risks / Ambiguity Log
+기존 대회 관리자 권한/잠금/감사 유지, nullable varchar(120) 추가만 포함한다. alpha c4ae34c7e9b1에서 DB정상·공개 상세/일정 각9개·경기 상세 displayTitle 및 공개3폭(console/API오류0) 확인. 관리자 인증 저장 QA는 미실행이다.
+CLAUDE.md의 main 머지 사용자 전용 규칙과 production 승인 게이트를 우회하지 않는다. 핫픽스 PR은 사용자의 명시적 main 요청 범위로 준비한다. 자동 배정의 번호 의존성은 기존 동작이며 이번 핫픽스에서 변경하지 않는다.
+
+### Progress Snapshot
+원격 main1416d7527e, 소스 패키지1.16.0, 실제 공개 운영 표기1.16.1. 릴리스 리졸버의 기존 next-patch 규칙에 따라 소스1.16.1을 준비한 신규 운영 표기는1.16.2가 예상된다. 해당 기존 정책은 수정하지 않는다.
+API394/Web124 및 양쪽 TypeScript PASS, schema binding5 PASS. 원본 공유 작업트리/WIP 및 실행 중인 로컬 관리자/서버는 보존한다. 핫픽스 작업트리는 /tmp/teameet-fixture-title-hotfix.
+
+
 ## 2026-11-11 후속 — 경기별 제목 수정
 Status: Implementation complete; local runtime running; alpha UI QA pending
 

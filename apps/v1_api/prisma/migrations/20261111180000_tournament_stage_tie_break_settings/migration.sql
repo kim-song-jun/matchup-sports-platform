@@ -16,11 +16,6 @@ CREATE TABLE IF NOT EXISTS "v1_tournament_stage_tie_break_settings" (
 CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_stage_tie_break_settings_tournament_stage_key"
 ON "v1_tournament_stage_tie_break_settings"("tournament_id", "stage_key");
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'v1_tournament_stage_tie_break_settings_tournament_fk') THEN
-    ALTER TABLE "v1_tournament_stage_tie_break_settings"
-    ADD CONSTRAINT "v1_tournament_stage_tie_break_settings_tournament_fk"
-    FOREIGN KEY ("tournament_id") REFERENCES "v1_tournaments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END $$;
+ALTER TABLE "v1_tournament_stage_tie_break_settings"
+ADD CONSTRAINT "v1_tournament_stage_tie_break_settings_tournament_fk"
+FOREIGN KEY ("tournament_id") REFERENCES "v1_tournaments"("id") ON DELETE CASCADE ON UPDATE CASCADE;

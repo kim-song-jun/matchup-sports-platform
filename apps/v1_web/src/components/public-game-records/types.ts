@@ -116,6 +116,7 @@ export interface PublicScheduleCard {
 
 /** One row of `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]`. */
 export interface PublicScheduleEntry {
+  readonly displayTitle?: string | null;
   readonly fixtureId: string;
   readonly round: string;
   readonly fixtureNumber: number;
@@ -321,6 +322,7 @@ export interface PublicNextMatch {
 
 /** `GET /tournaments/:id/matches/:fixtureId` response. */
 export interface PublicMatchDetail {
+  readonly displayTitle?: string | null;
   readonly tournamentId: string;
   readonly tournamentTitle: string;
   readonly fixtureId: string;

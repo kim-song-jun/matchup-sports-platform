@@ -1048,3 +1048,7 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 
 ### 시작 후 결과 정정 확인
 `PUT .../stages/assignment`에 `acknowledgeStartedCorrection: true`를 명시하면 시작된 stale 편성의 참가팀을 유지한 채 정정 영향을 확인한다. 기존 자리 순서와 registrationIds가 완전히 같고, 앞 단계 공식 결과가 준비되어 있으며, reason이 있어야 한다. 참가팀·경기·결과는 수정하지 않고 sourceVersion/감사 기록/구성 revision만 갱신한다. reason 누락, 팀 교체, 미시작/비stale 편성, 앞 단계 미확정은422다. 일반 배정은 시작 후 계속409다. 조회 스태프는 사용할 수 없다. 화면의 '현재 참가팀 유지 · 정정 확인'이 이 동작을 수행하며 후속 경기 시작·대회 종료의 영구 차단을 해소한다.
+
+### 경기별 제목 수정 (2026-11-11)
+
+`PATCH /admin/fixtures/:fixtureId`의 `displayTitle`은 경기별 표시 제목(선택, nullable string, trim 후 최대120자)이다. 생략은 보존, null/빈 문구는 자동 제목 복원이다. 기존 관리자 쓰기 권한과 대회/경기 잠금·감사를 적용하고, 제목만 변경하면 팀·진출 연결·결과를 변경하지 않는다. `V1TournamentMatchDetails.displayTitle` (`v1_tournament_match_details.display_title`)에 저장하며 additive migration을 동반한다. 관리자 bracket·수정 응답과 공개 detail/schedule에 동일 값을 반환한다. 목록 수정창과 그림/모바일 편집은 같은 폼·PATCH 및 bracket query invalidation을 사용한다.

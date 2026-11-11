@@ -48,7 +48,8 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-08: additive V1VerificationPurpose email_change (20261106180000_v1_verification_purpose_email_change); M11 remains unchanged.
 # 2026-11-08: additive V1Tournament.tieBreakOrder (20261107120000_tournament_tie_break_order); M11 remains unchanged.
 # 2026-11-08: additive v1_ad_campaigns, v1_ad_campaign_daily_stats and V1ContentAsset.adCampaignId (20261108130000_v1_ad_campaigns); M11 remains unchanged.
-[[ ( "$schema_sha" == 063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8 \
+[[ ( "$schema_sha" == e6fa0c33ed33f7d3cbda7e83a4373338a801edfd8acc2e02cc6db6b38f20fe01 \
+  || "$schema_sha" == 063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8 \
   || "$schema_sha" == d33e16e5c14bdb09c43422a6216a7362bc3ff5c612c7d575e21c57047a3e4836 \
   || "$schema_sha" == a0d738fb7bd910b4d95ab07eac9b05946cd7d9821fde0e62782a3f57980e3bae \
   || "$schema_sha" == e205dab98105b25eae4555a8404f9cf801d5d733303658911ec706d0062c1418 \

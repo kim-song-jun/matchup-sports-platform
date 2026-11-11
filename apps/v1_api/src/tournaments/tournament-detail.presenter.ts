@@ -138,7 +138,7 @@ function presentOfficialResult(
 
 type CanonicalTournamentMatchDetail = TournamentDetailRow['tournamentMatchDetails'][number];
 
-type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' | 'homeRegistrationId' | 'awayRegistrationId' | 'homeRegistration' | 'awayRegistration'> & {
+type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'displayTitle' | 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' | 'homeRegistrationId' | 'awayRegistrationId' | 'homeRegistration' | 'awayRegistration'> & {
   id: string;
   parentFixtureId: string | null;
   bracketSources: Array<{ fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' }>;
@@ -198,6 +198,7 @@ function presentCanonicalFixture(
   }));
   return {
     id: details.teamMatchId,
+    displayTitle: details.displayTitle ?? null,
     tournamentId: details.tournamentId,
     groupId: details.groupId,
     round: details.round,

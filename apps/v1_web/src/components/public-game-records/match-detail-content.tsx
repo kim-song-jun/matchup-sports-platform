@@ -415,7 +415,7 @@ export function MatchDetailContent({
       <header>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)' }}>
-            {competitionMatchLabel({ groupName: data.groupName, round: data.round, legNumber: data.legNumber })}
+            {data.displayTitle || competitionMatchLabel({ groupName: data.groupName, round: data.round, legNumber: data.legNumber })}
           </span>
           <ResultStateBadge state={data.resultState} />
         </div>

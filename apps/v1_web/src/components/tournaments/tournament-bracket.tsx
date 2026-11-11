@@ -760,7 +760,7 @@ function ConnectedBracket({ rounds, groups, champion, sourceRounds = rounds, sho
           const byeHasPublicTeam = node.bye !== undefined && node.bye.registrationId !== null && byeName !== null && !byeName.isPlaceholder;
           return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
             {fixture ? <>
-              <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
+              <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.displayTitle || `${fixture.fixtureNumber}번 경기`}</p>
               <MatchCard fixture={withBracketSourceNames(fixture, sourceRounds)} />
             </> : node.bye ? <div className="tm-bk2-card tm-on-tint" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12, background: byeHasPublicTeam ? 'var(--blue50)' : undefined }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>

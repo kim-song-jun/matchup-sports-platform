@@ -126,6 +126,7 @@ export function describeLeagueReplace(details: unknown): { replaceable: boolean;
 
 /** "경기 일정 전체보기" 는 모든 조를 한 표에 섞는다 — 조 이름까지 붙인 경기 이름으로 행을 가린다. */
 function bracketFixtureLabel(f: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
+  if (f.displayTitle?.trim()) return f.displayTitle;
   const groupName = groups.find((group) => group.id === f.groupId)?.name ?? null;
   return `${competitionMatchLabel({ groupName, round: f.round, legNumber: f.legNumber })} ${f.fixtureNumber}번 경기`;
 }
@@ -183,7 +184,7 @@ export function BracketTab({
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
   const editNumberId = useId();
   const [editFxNumber, setEditFxNumber] = useState('');
-  const [editFxLabels, setEditFxLabels] = useState<LabelDraft>({ homeDisplayLabel: '', awayDisplayLabel: '' });
+  const [editFxLabels, setEditFxLabels] = useState<LabelDraft>({ displayTitle: '', homeDisplayLabel: '', awayDisplayLabel: '' });
   const [editFxFieldId, setEditFxFieldId] = useState('');
   const [editFxError, setEditFxError] = useState<string | null>(null);
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
@@ -885,10 +886,10 @@ export function BracketTab({
             columns={[
               {
                 key: 'round',
-                header: '라운드',
+                header: '경기 제목',
                 render: (f) => (
                   <span className="text-[var(--text-muted)] break-words">
-                    {competitionMatchLabel({
+                    {f.displayTitle || competitionMatchLabel({
                       groupName: groups.find((group) => group.id === f.groupId)?.name ?? null,
                       round: f.round,
                       legNumber: f.legNumber,

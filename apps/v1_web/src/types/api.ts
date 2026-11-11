@@ -4272,6 +4272,7 @@ export type V1TournamentFixtureVideo = {
 export type V1BracketSource = { fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' };
 
 export type V1TournamentFixture = {
+  displayTitle?: string | null;
   fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
@@ -4761,6 +4762,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  displayTitle?: string | null;
   homeDisplayLabel?: string | null;
   awayDisplayLabel?: string | null;
   fieldId?: string | null;
@@ -5298,6 +5300,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  displayTitle?: string | null;
   homeDisplayLabel?: string | null;
   awayDisplayLabel?: string | null;
   fieldId?: string | null;

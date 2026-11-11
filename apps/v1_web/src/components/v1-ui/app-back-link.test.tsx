@@ -109,3 +109,18 @@ describe('AppBackLink 클릭 — 핑퐁 없는 뒤로가기', () => {
     expect(navigation.router.replace).not.toHaveBeenCalled();
   });
 });
+
+describe('AppBackLink label — 보이는 글자와 접근 가능한 이름을 맞춘다', () => {
+  it('label 을 주면 aria-label 이 그 값이고, 직전 항목이면 push 없이 back 한다', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/my');
+    window.history.pushState({}, '', '/tournament-management');
+    render(<AppBackLink fallbackHref="/my" label="마이페이지로">마이페이지로</AppBackLink>);
+
+    const link = screen.getByRole('link', { name: '마이페이지로' });
+    fireEvent.click(link);
+
+    expect(navigation.router.back).toHaveBeenCalledTimes(1);
+    expect(navigation.router.push).not.toHaveBeenCalled();
+  });
+});

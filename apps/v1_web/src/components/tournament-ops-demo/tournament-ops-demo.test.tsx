@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TournamentOpsDemo } from './tournament-ops-demo';
@@ -118,12 +118,12 @@ describe('실제 어드민을 사용하는 공개 대회 체험', () => {
     render(<TournamentOpsDemo><div>체험</div></TournamentOpsDemo>);
     const link = await screen.findByRole('link', { name: '대회 운영으로 돌아가기' });
     expect(link).toHaveAttribute('href', '/admin/ops/tournaments');
-    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-    let blockedByDemo = true;
-    const observe = (event: MouseEvent) => { blockedByDemo = event.defaultPrevented; event.preventDefault(); };
-    document.addEventListener('click', observe, { once: true });
-    link.dispatchEvent(click);
-    expect(blockedByDemo).toBe(false);
+    nav.replace.mockClear();
+    nav.push.mockClear();
+    fireEvent.click(link);
+    // 복귀 링크는 push 가 아니라 뒤로가기 규칙(replace)으로 가고, 체험 화면의 이동 제한 안내는 뜨지 않는다.
+    expect(nav.replace).toHaveBeenCalledWith('/admin/ops/tournaments');
+    expect(nav.push).not.toHaveBeenCalled();
     expect(screen.queryByText('이 링크는 실제 서비스의 화면이에요. 샘플 체험 안에서는 이동하지 않아요.')).not.toBeInTheDocument();
   });
   it('체험 진입은 로그인 없는 공개 경로를 유지한다', () => {

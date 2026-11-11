@@ -175,7 +175,7 @@ export function LoginMethodsPageClient() {
   const unlinkNoticeRef = useRef<HTMLDivElement>(null);
   const [activeProvider, setActiveProvider] = useState<V1LinkableProvider | null>(null);
   const [nativeApple, setNativeApple] = useState(false);
-  // 앱 인증이 실패해 웹 인가로 넘어가는 중. `leavingForAuthorize` 와 함께 켜져 있을 때만 안내를 보인다.
+  // 앱 인증이 실패해 웹 인가로 넘어가는 중. 셸 안의 인가는 곧바로 화면을 떠나므로 이동 전에 켜고, 시작하지 못하거나 돌아오면 끈다.
   const [nativeFellBack, setNativeFellBack] = useState(false);
 
   // 브리지 존재 여부는 브라우저에서만 알 수 있다 — 서버 렌더에는 Apple 버튼이 없고 하이드레이션 뒤에 나타난다.
@@ -189,6 +189,7 @@ export function LoginMethodsPageClient() {
   useEffect(() => {
     const release = () => {
       setLeavingForAuthorize(false);
+      setNativeFellBack(false);
       setActiveProvider(null);
     };
     window.addEventListener('pageshow', release);
@@ -201,6 +202,7 @@ export function LoginMethodsPageClient() {
     const release = () => {
       if (document.visibilityState !== 'visible') return;
       setLeavingForAuthorize(false);
+      setNativeFellBack(false);
       setActiveProvider(null);
     };
     document.addEventListener('visibilitychange', release);
@@ -270,6 +272,7 @@ export function LoginMethodsPageClient() {
         if (webFallback) {
           setNativeFellBack(true);
           leaving = await webFallback();
+          if (!leaving) setNativeFellBack(false);
           return;
         }
         present({ linkResult: 'failed', provider });
@@ -426,7 +429,7 @@ export function LoginMethodsPageClient() {
           {startError ? (
             <p className="tm-text-label" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{startError}</p>
           ) : null}
-          {leavingForAuthorize && nativeFellBack ? (
+          {nativeFellBack ? (
             <p className="tm-text-label" role="status" style={{ margin: 0, color: 'var(--blue700)' }}>{KAKAO_WEB_HANDOFF_MESSAGE}</p>
           ) : null}
           <Card pad={16}>

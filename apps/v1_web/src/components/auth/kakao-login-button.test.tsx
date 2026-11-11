@@ -33,6 +33,8 @@ const HREF = 'https://kauth.kakao.com/oauth/authorize?client_id=rest&redirect_ur
 const authorize = vi.fn();
 let reply: Record<string, unknown> = {};
 let assigned: string | null = null;
+// What the page showed at the moment navigation started; inside the shell the page leaves right away.
+let statusAtNavigation: string | null = null;
 
 function installShell() {
   window.TeameetNative = {
@@ -51,9 +53,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   queryClient = new QueryClient();
   assigned = null;
+  statusAtNavigation = null;
   Object.defineProperty(window, 'location', {
     configurable: true,
-    value: { search: '', pathname: '/login', set href(value: string) { assigned = value; } },
+    value: { search: '', pathname: '/login', set href(value: string) { assigned = value; statusAtNavigation = document.querySelector('[role="status"]')?.textContent ?? null; } },
   });
   vi.stubEnv('NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY', 'login-js-key');
   vi.stubEnv('NEXT_PUBLIC_KAKAO_MAPS_JS_KEY', 'different-maps-app-key');
@@ -150,6 +153,7 @@ describe('KakaoLoginButton', () => {
         expect(await screen.findByRole('status')).toHaveTextContent(HANDOFF_TEXT);
         await waitFor(() => expect(assigned).not.toBeNull());
         expect(assigned).toBe(`${HREF}&state=${handedOffState()}`);
+        expect(statusAtNavigation).toBe(HANDOFF_TEXT);
         // The callback accepts the state only if it matches the attempt stored here.
         expect(await consumeKakaoOAuthAttempt(handedOffState())).toEqual({ state: handedOffState(), mode: 'login', returnTo: null });
         expect(getSavedRedirectPath()).toBe('/teams/new');

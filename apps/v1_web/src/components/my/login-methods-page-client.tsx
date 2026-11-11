@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -270,7 +271,7 @@ export function LoginMethodsPageClient() {
           context: { reason: credential.reason, ...(webFallback ? { fallback: 'web_authorize' } : {}) },
         });
         if (webFallback) {
-          setNativeFellBack(true);
+          flushSync(() => setNativeFellBack(true));
           leaving = await webFallback();
           if (!leaving) setNativeFellBack(false);
           return;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { CSSProperties, MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -98,7 +99,8 @@ export function KakaoLoginButton({
       failNative('state_storage_unavailable', NATIVE_FAILURE_MESSAGE);
       return;
     }
-    setWebHandoff(true);
+    // 셸 안에서는 이동이 곧바로 시작되므로 안내를 먼저 DOM 에 반영한다.
+    flushSync(() => setWebHandoff(true));
     navigateToAuthorizeUrl(state);
   };
 

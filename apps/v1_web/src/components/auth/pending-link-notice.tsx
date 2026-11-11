@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { clearPendingSocialLink, peekPendingSocialLink, type PendingSocialLinkRead } from '@/lib/pending-social-link';
 import { remainingTimePhrase } from './remaining-time-phrase';
@@ -15,6 +15,7 @@ const NOTICE_REFRESH_MS = 30_000;
  * (이 화면들은 이미 role=status 안내를 따로 쓴다) 스크린리더는 화면을 읽으며 만난다.
  */
 export function PendingLinkNotice() {
+  const messageId = useId();
   const [pending, setPending] = useState<PendingSocialLinkRead | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // 만료 표식은 로그인 뒤 리졸버가 소비한다 — 여기서는 보기만 하고, 쓸 수 있는 토큰이 있을 때만 알린다.
@@ -35,15 +36,17 @@ export function PendingLinkNotice() {
   const action = pending.withdrawalPendingUntil === undefined ? '로그인하면' : '로그인하고 탈퇴 신청을 취소하면';
   return (
     <div className="tm-auth-pending-link">
-      <p className="tm-text-label tm-auth-pending-link-message">
-        {timeLimit} {action} {linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.
+      <p className="tm-auth-pending-link-message" id={messageId}>
+        {timeLimit} {action} {linkProviderLabel(pending.provider)} 로그인이 연결돼요
       </p>
       <Button
+        aria-describedby={messageId}
+        className="tm-auth-pending-link-action"
         onClick={() => {
           clearPendingSocialLink();
           setPending(null);
         }}
-        size="md"
+        size="sm"
         type="button"
         variant="ghost"
       >

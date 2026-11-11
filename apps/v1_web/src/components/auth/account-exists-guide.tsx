@@ -10,36 +10,41 @@ import { buildKakaoAuthUrl } from './auth.view-model';
 import { ACCOUNT_CONFLICT_PATH, buildAccountConflictPath } from './login-recovery-route';
 import { KakaoLoginButton } from './kakao-login-button';
 import { RecycledNumberHelp } from './recycled-number-help';
-import { LINK_TOKEN_WINDOW_MINUTES, linkProviderLabel } from './sign-in-then-link-copy';
+import { LINK_TOKEN_WINDOW_MINUTES, linkProviderLabel, settingsLinkInstruction } from './sign-in-then-link-copy';
 import { WithdrawalPendingGuide, type WithdrawalGuideStep } from './withdrawal-pending-guide';
 import type { V1LinkableProvider } from '@/types/api';
 
 type Step = { title: string; body: string };
 
-function buildSteps(label: string, autoLink: boolean): Step[] {
+const ORIGINAL_LOGIN_TITLE = '원래 가입한 방법으로 로그인해요';
+
+/** 방금 쓴 소셜은 예시에서 뺀다 — 이미 막힌 길을 다시 권하지 않는다. */
+function originalLoginBody(provider: V1LinkableProvider | null): string {
+  if (provider === 'apple') return '이메일이나 카카오처럼 처음 가입한 방법이에요.';
+  if (provider === 'kakao') return '이메일이나 Apple처럼 처음 가입한 방법이에요.';
+  return '이메일이나 카카오·Apple처럼 처음 가입한 방법이에요.';
+}
+
+/** 연결 단계. 원래 계정에 다른 같은 소셜이 붙어 있으면 연결되지 않으므로 "시도"로 약속한다. 토큰이 없으면 설정 안내로 바뀐다. */
+function linkStep(provider: V1LinkableProvider | null, autoLink: boolean, autoBody: string): Step {
+  return autoLink
+    ? { title: `${linkProviderLabel(provider)} 로그인 연결을 시도해요`, body: autoBody }
+    : { title: '로그인한 뒤 설정에서 연결해요', body: settingsLinkInstruction(provider) };
+}
+
+function buildSteps(provider: V1LinkableProvider | null, autoLink: boolean): Step[] {
   return [
-    {
-      title: '원래 가입한 방법으로 로그인해요',
-      body: '처음 가입할 때 쓴 방법으로 로그인해요. 이메일로 가입했다면 이메일 로그인을, 소셜로 가입했다면 해당 로그인 버튼을 눌러요.',
-    },
-    autoLink
-      ? { title: `${label} 로그인 연결을 시도해요`, body: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인해 주세요. 이미 다른 ${label} 계정이 연결돼 있으면 결과를 알려 드려요.` }
-      : { title: '로그인한 뒤 설정에서 연결해요', body: `설정의 "로그인 방법"에서 ${label} 로그인을 연결해 주세요.` },
-    {
-      title: '연결 결과를 확인해요',
-      body: `연결이 완료되면 ${label} 버튼으로도 원래 계정에 로그인할 수 있어요.`,
-    },
+    { title: ORIGINAL_LOGIN_TITLE, body: originalLoginBody(provider) },
+    linkStep(provider, autoLink, `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인해 주세요.`),
   ];
 }
 
 /** 번호를 쥔 계정이 탈퇴 유예 중일 때의 방법 1. 로그인이 곧바로 연결되지 않고 탈퇴 철회를 한 번 거친다. */
-function buildWithdrawalSteps(label: string, autoLink: boolean): WithdrawalGuideStep[] {
+function buildWithdrawalSteps(provider: V1LinkableProvider | null, autoLink: boolean): WithdrawalGuideStep[] {
   return [
-    { title: '원래 가입한 방법으로 로그인해요', body: '아래 버튼에서 골라요.' },
+    { title: ORIGINAL_LOGIN_TITLE, body: '아래 버튼에서 골라요.' },
     { title: '탈퇴 신청을 취소해요', body: '로그인하면 취소할 수 있는 화면이 나와요.' },
-    autoLink
-      ? { title: `${label} 로그인 연결을 시도해요`, body: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인하고 탈퇴 신청을 취소해 주세요. 이미 다른 ${label} 계정이 연결돼 있으면 결과를 알려 드려요.` }
-      : { title: '로그인한 뒤 설정에서 연결해요', body: `설정의 "로그인 방법"에서 ${label} 로그인을 연결해 주세요.` },
+    linkStep(provider, autoLink, `${LINK_TOKEN_WINDOW_MINUTES}분 안에 마쳐 주세요.`),
   ];
 }
 
@@ -52,14 +57,14 @@ const readWithdrawalPendingUntil = () => peekPendingSocialLink()?.withdrawalPend
 const serverWithdrawalPendingUntil = () => undefined;
 
 /**
- * 카카오·Apple 로그인이 "이미 팀밋 계정이 있어요"(409)로 막혔을 때의 3단계 안내.
+ * 카카오·Apple 로그인이 "이미 팀밋 계정이 있어요"(409)로 막혔을 때의 2단계 안내.
  * 로그인 버튼은 여기서 다시 시작하고, 연결은 로그인 직후 앱 전역 게이트가 대기 토큰으로 이어 준다.
  */
 export function AccountExistsGuide({ provider, redirectPath }: { provider: V1LinkableProvider | null; redirectPath: string | null }) {
   const autoLink = useSyncExternalStore(subscribeNothing, readAutoLinkAvailable, serverAutoLinkAvailable);
   const withdrawalPendingUntil = useSyncExternalStore(subscribeNothing, readWithdrawalPendingUntil, serverWithdrawalPendingUntil);
   const label = linkProviderLabel(provider);
-  const steps = buildSteps(label, autoLink !== false);
+  const steps = buildSteps(provider, autoLink !== false);
   const withdrawalPending = withdrawalPendingUntil !== undefined;
   const hasWays = usableWithdrawalDate(withdrawalPendingUntil) !== null;
   const redirectQuery = redirectPath ? `redirect=${encodeURIComponent(redirectPath)}` : '';
@@ -103,22 +108,22 @@ export function AccountExistsGuide({ provider, redirectPath }: { provider: V1Lin
             <WithdrawalPendingGuide
               until={withdrawalPendingUntil}
               finishIcon="link"
-              steps={buildWithdrawalSteps(label, autoLink !== false)}
+              steps={buildWithdrawalSteps(provider, autoLink !== false)}
               waitedText={`${label}로 새로 가입할 수 있어요`}
             />
           </>
         ) : (
           <>
             <p className="tm-text-body tm-auth-sub">
-              같은 정보로 만든 계정이 있어서 {label}로 새로 가입할 수 없어요. 아래 순서로 계정을 이어 주세요.
+              같은 정보로 가입한 계정이 있어서 {label}로는 새로 가입할 수 없어요.
             </p>
             <ol className="tm-auth-features tm-auth-steps">
               {steps.map((step, index) => (
                 <li className="tm-auth-feature tm-auth-step" key={step.title}>
                   <span className="tm-auth-feature-icon tm-auth-step-number" aria-hidden="true">{index + 1}</span>
                   <span>
-                    <span className="tm-text-body-lg tm-auth-step-title">{step.title}</span>
-                    <span className="tm-text-caption tm-auth-step-body">{step.body}</span>
+                    <span className="tm-auth-step-title">{step.title}</span>
+                    <span className="tm-auth-step-body">{step.body}</span>
                   </span>
                 </li>
               ))}

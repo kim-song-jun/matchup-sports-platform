@@ -10,9 +10,14 @@ export function linkProviderLabel(provider: V1LinkableProvider | null): string {
 /** 서버가 연결 토큰을 받아 주는 시간(`linkTokenExpiresInSeconds` 1800). 문구가 이 숫자를 약속한다. */
 export const LINK_TOKEN_WINDOW_MINUTES = 30;
 
+/** 자동 연결이 안 될 때 사람이 직접 하는 일. 안내 단계와 약속 문장이 같은 말을 쓴다. */
+export function settingsLinkInstruction(provider: V1LinkableProvider | null): string {
+  return `설정 › 로그인 방법에서 ${linkProviderLabel(provider)} 로그인을 연결해 주세요.`;
+}
+
 /** 연결 토큰을 보관할 수 없는 브라우저에서 자동 연결 대신 하는 약속. */
 export function manualLinkPromise(provider: V1LinkableProvider | null): string {
-  return `원래 방법으로 로그인한 뒤 설정의 "로그인 방법"에서 ${linkProviderLabel(provider)} 로그인을 연결해 주세요.`;
+  return `원래 방법으로 로그인한 뒤 ${settingsLinkInstruction(provider)}`;
 }
 
 /**
@@ -21,5 +26,5 @@ export function manualLinkPromise(provider: V1LinkableProvider | null): string {
  */
 export function autoLinkPromise(provider: V1LinkableProvider | null, { withdrawalPending = false }: { withdrawalPending?: boolean } = {}): string {
   const login = withdrawalPending ? '원래 방법으로 로그인하고 탈퇴 신청을 취소하면' : '원래 방법으로 로그인하면';
-  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 ${login} ${linkProviderLabel(provider)} 로그인 연결을 시도해요. 이미 다른 ${linkProviderLabel(provider)} 계정이 연결돼 있으면 결과를 알려 드려요.`;
+  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 ${login} ${linkProviderLabel(provider)} 로그인 연결을 시도해요.`;
 }

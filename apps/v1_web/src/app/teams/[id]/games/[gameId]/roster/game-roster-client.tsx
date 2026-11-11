@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RosterManagerNavigation, useRosterEditorNavigation } from '@/components/game-roster/roster-manager-navigation';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -33,7 +34,7 @@ import { disciplineWarningChip } from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
-import { compareRosterPlayers, GAME_ROSTER_SCOPE, GAME_ROSTER_TITLE, ROSTER_SAVE_LABEL, rosterPersonLabel } from '@/lib/roster-presentation';
+import { compareRosterPlayers, GAME_ROSTER_SCOPE, ROSTER_SAVE_LABEL, rosterPersonLabel } from '@/lib/roster-presentation';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -154,8 +155,16 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
     const chip = disciplineWarningChip(cardsByUserId.get(userId), data.disciplineRules);
     return chip === null ? undefined : <StatusChip chip={chip} />;
   };
+  const rowBadges = (userId: string, joinedAfterCreated: boolean) => (
+    <>
+      {warningChipFor(userId)}
+      {joinedAfterCreated ? <span className="tm-badge tm-badge-sm tm-badge-blue">새로 추가</span> : null}
+    </>
+  );
 
   // 통합 명단에서 GK는 참가 선수 탭이 맡지만, 그 탭은 팀 전용이다. 팀원이 아닌 운영진은 여기서 바로 GK를 정한다.
+  // 결장 기간은 경기 명단 관리(팀 화면)에서 고친다 — 그 화면을 열 수 있는 팀장·매니저에게만 길을 준다.
+  const canManageUnavailability = data.viewerRole === 'TEAM_MANAGER';
   const goalkeeperInPlayersTab = managerNavigation !== null && (data.viewerRole === 'TEAM_MANAGER' || data.viewerRole === 'TEAM_MEMBER');
 
   function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
@@ -228,31 +237,32 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         flexDirection: 'column',
         gap: 12,
         // 아래 고정 저장 바(.tm-fixed-cta)는 안전영역만큼 커진다 — 여백도 같이 늘린다.
-        padding: `16px var(--v1-shell-page-x) ${canEdit && !managerNavigation ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
+        padding: `16px var(--v1-shell-page-x) ${canEdit ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
       }}
     >
-      <Card pad={16}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <h1 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0, overflowWrap: 'anywhere' }}>
-            {data.opponentName === null ? GAME_ROSTER_TITLE : `vs ${data.opponentName}`}
-          </h1>
+      {/* 경기 선택(위 드롭다운)이 상대·시각을 이미 말한다 — 여기는 상태 배지·안내·변경 기록 링크만 한 줄에 둔다. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: '1 1 auto' }}>
           <StateBadge view={data} />
+          <p className="tm-text-caption" style={{ margin: 0 }}>
+            {started
+              ? '경기가 시작돼 명단을 바꿀 수 없어요.'
+              : `경기 시작 전까지 ${canEdit ? '바꿀 수 있어요.' : '명단이 바뀔 수 있어요.'}`}
+            {data.baseSource === 'TEAM_MEMBERS' ? ' 참가 명단이 없어 팀원 전체가 기준이에요.' : ''}
+          </p>
         </div>
-        <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
-          {started
-            ? '경기가 시작돼 명단을 바꿀 수 없어요.'
-            : `${formatTournamentDateTimeShort(data.deadline) ?? '경기'} 시작 전까지 ${canEdit ? '바꿀 수 있어요.' : '명단이 바뀔 수 있어요.'}`}
-          {data.baseSource === 'TEAM_MEMBERS' ? ' 참가 명단이 없어 팀원 전체가 기준이에요.' : ''}
-        </p>
         {started ? null : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-            <button type="button" className="tm-section-action" onClick={openHistory} style={linkButtonStyle}>
-              변경 기록{events === undefined ? '' : ` ${events.length}건`}
-              <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="tm-section-action"
+            onClick={openHistory}
+            style={{ ...linkButtonStyle, minHeight: 'var(--size-control-sm)', alignItems: 'center' }}
+          >
+            변경 기록{events === undefined ? '' : ` ${events.length}건`}
+            <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
+          </button>
         )}
-      </Card>
+      </div>
 
       {started ? (
         <AlertBanner tone="info" message="현장 변동은 운영진에게 알려 주세요. 경기 중 바뀐 출전은 운영진이 결과 정정으로 고쳐요." />
@@ -284,15 +294,6 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             <>
               {GAME_ROSTER_PLAYING_HINT}
               <br />{GAME_ROSTER_SCOPE}
-              <br />{goalkeeperInPlayersTab ? '번호·GK는 참가 선수 탭의 공통 설정이에요.' : data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
-              {!managerNavigation && data.jerseyRegistrationId !== null ? (
-                <>
-                  <br />
-                  {data.jerseyEditable
-                    ? `등번호도 ${competitionNoun} 참가 명단에 공통으로 저장돼요. 번호 칸을 눌러 등록해 주세요.`
-                    : `${competitionNoun} 참가 명단이 마감돼 번호를 바꿀 수 없어요. 운영진에게 문의해 주세요.`}
-                </>
-              ) : null}
             </>
           ) : jerseyLocked ? (
             '경기가 시작돼 이 경기의 번호는 바꿀 수 없어요.'
@@ -324,7 +325,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     jerseyNumber={row.jerseyNumber}
                     displayName={rosterPersonLabel(row)}
                     accountLinked={row.accountLinked}
-                    extraBadges={warningChipFor(row.userId)}
+                    extraBadges={rowBadges(row.userId, 'joinedAfterFixtureCreated' in row && row.joinedAfterFixtureCreated)}
                     status={playing ? 'PARTICIPATING' : 'EXCLUDED'}
                     reason={playing ? null : leaving?.reason ?? ('reason' in row ? row.reason : null)}
                     actorRole={!playing && 'actor' in row ? row.actor.role : undefined}
@@ -332,7 +333,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                       ? '저장하면 이번 경기에서 빠져요'
                       : entry?.op === 'REVOKE'
                         ? '저장하면 출전으로 돌아가요'
-                        : 'joinedAfterFixtureCreated' in row && row.joinedAfterFixtureCreated ? '새로 추가' : null}
+                        : null}
                     onJerseyPress={jerseyPressable ? () => setJersey({ userId: row.userId, open: true }) : undefined}
                     trailing={
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)' }}>
@@ -369,6 +370,19 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
+        {canEdit && selectionPlayers.length > 0 ? (
+          <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+            {goalkeeperInPlayersTab ? '번호·GK는 참가 선수 탭의 공통 설정이에요.' : data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
+            {!managerNavigation && data.jerseyRegistrationId !== null ? (
+              <>
+                <br />
+                {data.jerseyEditable
+                  ? `등번호도 ${competitionNoun} 참가 명단에 공통으로 저장돼요. 번호 칸을 눌러 등록해 주세요.`
+                  : `${competitionNoun} 참가 명단이 마감돼 번호를 바꿀 수 없어요. 운영진에게 문의해 주세요.`}
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {rosterEntry}
       </RosterSection>
 
@@ -397,7 +411,17 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       {data.unavailable.length > 0 ? (
         <RosterSection
           title={`결장 ${data.unavailable.length}명`}
-          sub="결장 기간 안의 경기에서는 자동으로 빠져요. 기간은 여기서 바꿀 수 없고, 팀 멤버 관리에서 바꿔요."
+          sub={`결장 기간 안의 경기에서는 자동으로 빠져요. ${canManageUnavailability ? '기간은 경기 명단 관리에서 바꿔요.' : '결장 기간은 팀장·매니저가 바꿀 수 있어요.'}`}
+          action={canManageUnavailability ? (
+            <Link
+              href={`/teams/${encodeURIComponent(teamId)}/game-rosters`}
+              className="tm-section-action"
+              style={{ ...linkButtonStyle, minHeight: 'var(--size-control-sm)', alignItems: 'center', textDecoration: 'none' }}
+            >
+              결장 기간 관리
+              <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
+            </Link>
+          ) : null}
         >
           <ul style={listStyle}>
             {data.unavailable.map((row) => (
@@ -444,7 +468,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       {started ? null : historySection}
 
       {canEdit ? (
-        <div className={managerNavigation ? undefined : 'tm-fixed-cta'}>
+        <div className="tm-fixed-cta">
           <Button
             variant="primary"
             size="lg"

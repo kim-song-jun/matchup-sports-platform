@@ -88,3 +88,15 @@ describe('UpdateFixtureDto 표시 문구', () => {
     expect(errors.some(error => error.property === 'awayDisplayLabel')).toBe(true);
   });
 });
+
+
+describe('UpdateFixtureDto 경기 제목', () => {
+  it.each(['개막전', ' A조 2차전 ', '', '  ', null])('제목 및 복원 %s', async value => {
+    const dto = plainToInstance(UpdateFixtureDto, { displayTitle: value });
+    expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
+    expect(dto.displayTitle).toBe(typeof value === 'string' ? value.trim() || null : null);
+  });
+  it.each([123, true, {}, '가'.repeat(121)])('잘못된 제목 거절', async value => {
+    expect((await validate(plainToInstance(UpdateFixtureDto, { displayTitle: value }))).some(error => error.property === 'displayTitle')).toBe(true);
+  });
+});

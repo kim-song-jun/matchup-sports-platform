@@ -73,6 +73,7 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
         : 'scheduled';
   return {
     id: row.teamMatchId,
+    displayTitle: row.displayTitle ?? null,
     tournamentId: row.tournamentId,
     groupId: row.groupId,
     round: row.round,

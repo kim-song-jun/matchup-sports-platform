@@ -1,3 +1,7 @@
+## 2026-11-11 — 경기별 제목 수정
+
+[시나리오](./fixture-display-title.md). 경기 제목을 개별 저장하고 목록·그림에 함께 표시한다. 최신 dev 기준 PR 검증 및 alpha 배포 진행 중.
+
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 
 [시나리오](./competition-stage-composition.md) · [작업](../../.github/tasks/20261130-competition-stage-composition.md).

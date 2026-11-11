@@ -171,3 +171,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 [단계형 대회 구성](./domains/tournaments.md#단계형-대회-구성-2026-11-09): 별도 생성에서 신규 대회만 단계·편성·진출 출처를 저장한다.
 기존 데이터는 변환하지 않으며 단일 본선·복수 리그/토너먼트·3단계 이상을 지원한다.
+
+경기별 제목 `displayTitle` 수정과 목록·그림·공개 일정 동기화: [대회 계약](./domains/tournaments.md#경기별-제목-수정-2026-11-11).

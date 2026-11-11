@@ -428,8 +428,8 @@ describe('TournamentBracketService', () => {
     const detail = { ...row, homeDisplayLabel: null, awayDisplayLabel: null, teamMatch: { ...row.teamMatch, homeSlot: null, awaySlot: null } };
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
-    const result = await service.updateFixture(ownerUser, 'fixture-1', { homeDisplayLabel: '준결승 A 승자' });
-    expect(result).toMatchObject({ id: 'fixture-1', homeDisplayLabel: '준결승 A 승자', startedTeamChange: null });
+    const result = await service.updateFixture(ownerUser, 'fixture-1', { displayTitle: '개막전', homeDisplayLabel: '준결승 A 승자' });
+    expect(result).toMatchObject({ id: 'fixture-1', displayTitle: '개막전', homeDisplayLabel: '준결승 A 승자', startedTeamChange: null });
     expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture-1' }, data: { homeDisplayLabel: '준결승 A 승자' } });
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
     expect(prisma.v1Game.update).not.toHaveBeenCalled();

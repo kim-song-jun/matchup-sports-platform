@@ -188,6 +188,7 @@ const CANONICAL_SCHEDULE_SELECT = {
   legNumber: true,
   homeRegistrationId: true,
   awayRegistrationId: true,
+  displayTitle: true,
   homeDisplayLabel: true,
   awayDisplayLabel: true,
   advancementTargets: {
@@ -235,6 +236,7 @@ type FixtureScheduleRow = {
   awayRegistration: CanonicalScheduleRow['awayRegistration'];
   group: CanonicalScheduleRow['group'];
   field: CanonicalScheduleRow['teamMatch']['field'];
+  displayTitle?: string | null;
   homeDisplayLabel: string | null;
   awayDisplayLabel: string | null;
   homeSourceLabel: string | null;
@@ -270,6 +272,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     awayRegistration: row.awayRegistration,
     group: row.group,
     field: row.teamMatch.field,
+    displayTitle: row.displayTitle ?? null,
     homeDisplayLabel: row.homeDisplayLabel,
     awayDisplayLabel: row.awayDisplayLabel,
     homeSourceLabel: sourceLabel('HOME'),
@@ -282,6 +285,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
 }
 
 type PublicFixtureMatchRow = {
+  displayTitle?: string | null;
   id: string;
   tournamentId: string;
   round: string;
@@ -306,6 +310,7 @@ type PublicFixtureMatchRow = {
 type FixtureMatchRow = PublicFixtureMatchRow;
 
 const CANONICAL_MATCH_SELECT = {
+  displayTitle: true,
   teamMatchId: true,
   tournamentId: true,
   groupId: true,
@@ -346,6 +351,7 @@ function canonicalFixtureStatus(status: V1TeamMatchStatus): TournamentFixtureSta
 
 function presentCanonicalMatch(row: CanonicalMatchRow): FixtureMatchRow {
   return {
+    displayTitle: row.displayTitle ?? null,
     id: row.teamMatchId,
     tournamentId: row.tournamentId,
     round: row.round,
@@ -1316,6 +1322,7 @@ export class PublicTournamentRecordsService {
       tournamentTitle: tournament.title,
       fixtureId: fixture.id,
       gameId: fixture.game?.id ?? null,
+      displayTitle: fixture.displayTitle ?? null,
       round: fixture.round,
       fixtureNumber: fixture.fixtureNumber,
       legNumber: fixture.legNumber,
@@ -2478,6 +2485,7 @@ function presentScheduleEntry(
 
   return {
     fixtureId: fixture.id,
+    displayTitle: fixture.displayTitle ?? null,
     round: fixture.round,
     fixtureNumber: fixture.fixtureNumber,
     legNumber: fixture.legNumber,

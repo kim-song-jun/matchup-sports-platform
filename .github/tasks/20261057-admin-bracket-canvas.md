@@ -1,7 +1,7 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
 ## 2026-11-11 후속 — 경기별 제목 수정
-Status: Implementation complete; local runtime running; alpha UI QA pending
+Status: Deployed to alpha; authenticated editor QA pending
 
 ### Context / Goal / Original Conditions
 - [x] 경기일정 전체보기의 각 경기 수정창에서 제목을 개별 입력한다.
@@ -71,6 +71,8 @@ Alpha 관리자 세션/브라우저 도구가 현재 제공되지 않았다. 실
 
 
 배포 준비(2026-11-11): 사용자 dev PR·alpha 배포 지시 및 리뷰 생략 지시 반영. 최신 dev 기반의 기존 bracketTrack·BYE·기간 편집·대회 관리자 권한 변경을 보존하며 충돌 통합했다. 최신 기준 API338/Web124 PASS, API/Web tsc PASS, release schema binding5/5 PASS. 로컬 전용 QA 도구·계정은 PR에서 제외한다.
+
+Alpha 배포 완료: PR#2327 dev merge=c4ae34c7e9b1951fce6a9f5790565b4ce6d6661e. PR CI42995882818·dev CI42998154708·Deploy Alpha42998154711 success. 실제 release 1.16.1-alpha.20261111.gc4ae34c7e9b1, db=true, 공개 상세/일정 각9개·경기 상세 displayTitle 조회 PASS, 원격 데이터 변경0. Headed 공개3폭/console-network 증거는 docs/scenarios/fixture-display-title.md 및 PR 갤러리 참조. 인증된 alpha 편집 QA는 로그인 정보 부재로 미실행. main 변경0, 로컬 dev 참조는 fast-forward 동기화하고 기존 공유 feature 트리는 보존했다.
 
 ## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
 Status: Implementation complete; draft PR / alpha QA pending

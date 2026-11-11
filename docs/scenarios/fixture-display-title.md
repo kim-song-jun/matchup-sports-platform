@@ -32,3 +32,11 @@ Task: [.github/tasks/20261057-admin-bracket-canvas.md](../../.github/tasks/20261
 최신 dev817d4fb88a 기준 API338/Web124 및 API TypeScript PASS, schema binding5 PASS. 기존 로컬 버전의 Web 타입 오류는 최신 dev에서 재평가한다. 사용자 지시로 리뷰 요청/대기 생략, 필수 CI 유지. 로컬 전용 계정/Chrome 자동화 도구는 배포하지 않는다.
 
 최신 배포 브랜치 Web TypeScript도 PASS(이전 로컬 버전의 타입 오류는 해당 없음).
+
+## Alpha 배포 결과 — PR #2327
+- 사용자 지시에 따라 리뷰 요청/대기 없이 dev에 머지했다. PR CI42995882818과 dev CI42998154708 모두 성공, Deploy Alpha42998154711 성공.
+- 머지/실제 서빙 commit: c4ae34c7e9b1951fce6a9f5790565b4ce6d6661e. release: 1.16.1-alpha.20261111.gc4ae34c7e9b1. main 쓰기 없음.
+- 공개 health db=true. 공개 테스트 대회 상세9개·일정9개·경기 상세의 displayTitle 필드를 실제 응답에서 확인했다. 원격 데이터 변경0.
+- 실제 headed Chrome에서 공개 일정 및 순위·대진표→결선 탭을 클릭, 390/768/1440 확인. 소유한 QA 탭은 닫고 사용자가 요청한 기존 로컬 관리자 창/서버는 유지했다.
+- 일정 before/after3폭 캡처를 보존한다. 결선 그림 탭의 before 캡처는 없으며 after3폭만 남긴다(배포 전 캡처는 조별 순위 탭에 머물러 비교 근거에서 제외).
+- 이 검증은 공개 화면 회귀와 조회 계약에 한정한다. 사용 가능한 alpha 관리자 로그인 정보가 없어 인증된 관리자 편집/저장/새로고침 여정은 미실행이다. 로컬 실제 저장·감사 rollback 및 API394/Web124 테스트와 구분한다.

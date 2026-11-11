@@ -13,12 +13,12 @@ import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1UpdateFixturePayload } from '@/types/api';
 
-export type LabelDraft = { homeDisplayLabel: string; awayDisplayLabel: string };
+export type LabelDraft = { displayTitle: string; homeDisplayLabel: string; awayDisplayLabel: string };
 export function fixtureLabelDraft(fixture: V1AdminBracketFixture): LabelDraft {
-  return { homeDisplayLabel: fixture.homeDisplayLabel ?? '', awayDisplayLabel: fixture.awayDisplayLabel ?? '' };
+  return { displayTitle: fixture.displayTitle ?? '', homeDisplayLabel: fixture.homeDisplayLabel ?? '', awayDisplayLabel: fixture.awayDisplayLabel ?? '' };
 }
-export function fixtureLabelPatch(draft: LabelDraft, fixture: V1AdminBracketFixture): Pick<V1UpdateFixturePayload, 'homeDisplayLabel' | 'awayDisplayLabel'> {
-  return Object.fromEntries((['homeDisplayLabel', 'awayDisplayLabel'] as const)
+export function fixtureLabelPatch(draft: LabelDraft, fixture: V1AdminBracketFixture): Pick<V1UpdateFixturePayload, 'displayTitle' | 'homeDisplayLabel' | 'awayDisplayLabel'> {
+  return Object.fromEntries((['displayTitle', 'homeDisplayLabel', 'awayDisplayLabel'] as const)
     .filter(key => (draft[key].trim() || null) !== (fixture[key] ?? null))
     .map(key => [key, draft[key].trim() || null]));
 }
@@ -30,6 +30,13 @@ export function FixtureLabelFields({ fixture, groups, fixtures, slots, value, on
   const id = useId();
   const context = buildSideLabelContext(groups, fixtures, slots);
   return <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1">
+      <label htmlFor={`${id}-title`} className="tm-text-label">경기 제목</label>
+      <input id={`${id}-title`} className="tm-input" maxLength={120} value={value.displayTitle}
+        placeholder="예: 개막전, A조 2차전" aria-describedby={`${id}-title-hint`} disabled={disabled}
+        onChange={event => onChange({ ...value, displayTitle: event.target.value })} />
+      <p id={`${id}-title-hint`} className="tm-text-caption text-[var(--text-muted)]">비워 두면 조·라운드·경기 번호로 자동 표시해요. 목록과 그림에 함께 반영돼요.</p>
+    </div>
     {(['HOME', 'AWAY'] as const).map(side => {
       const key = side === 'HOME' ? 'homeDisplayLabel' : 'awayDisplayLabel';
       const label = side === 'HOME' ? '홈 표시 문구' : '어웨이 표시 문구';
@@ -68,7 +75,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     if (dirty.current) return;
     setNumber(String(fixture.fixtureNumber)); setLabels(fixtureLabelDraft(fixture));
     setTime(isoToKstDatetimeLocal(fixture.scheduledAt)); setFieldId(fixture.fieldId ?? ''); setClearPlace(false); setVenue(fixtureVenueValue(fixture));
-  }, [fixture.id, fixture.fixtureNumber, fixture.homeDisplayLabel, fixture.awayDisplayLabel, fixture.scheduledAt, fixture.fieldId]);
+  }, [fixture.id, fixture.fixtureNumber, fixture.displayTitle, fixture.homeDisplayLabel, fixture.awayDisplayLabel, fixture.scheduledAt, fixture.fieldId]);
   const pending = mutation.isPending || periods.pending;
   const disabled = !canWrite || pending;
   const edit = (action: () => void) => { dirty.current = true; setMessage(null); action(); };

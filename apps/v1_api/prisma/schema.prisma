@@ -2087,6 +2087,7 @@ model V1TournamentMatchDetails {
   parentTeamMatchId    String?  @map("parent_team_match_id")
   homeRegistrationId   String?  @map("home_registration_id")
   awayRegistrationId   String?  @map("away_registration_id")
+  displayTitle         String?  @map("display_title") @db.VarChar(120)
   homeDisplayLabel     String?  @map("home_display_label") @db.VarChar(120)
   awayDisplayLabel     String?  @map("away_display_label") @db.VarChar(120)
   createdAt            DateTime @default(now()) @map("created_at")

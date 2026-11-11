@@ -374,7 +374,7 @@ function ScheduleRow({
   const venue = venueLabel(entry);
   // 경기 방식("단판 20분"·"전·후반 15분") — 길이를 모르는 경기는 null 이라 줄 자체가 없다.
   const periodFormat = formatPeriodFormat(entry.periodMinutes);
-  const matchLabel = competitionMatchLabel({
+  const matchLabel = entry.displayTitle || competitionMatchLabel({
     groupName: entry.groupName,
     round: entry.round,
     legNumber: entry.legNumber,

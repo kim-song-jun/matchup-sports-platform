@@ -189,6 +189,13 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  /** Per-fixture title. Omission preserves it; null/blank restores the automatic title. */
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() || null : value)
+  @IsString()
+  @MaxLength(120)
+  displayTitle?: string | null;
+
   /** Presentation only. Omission preserves the override; null/blank restores automatic text. */
   @IsOptional()
   @Transform(({ value }) => typeof value === 'string' ? value.trim() || null : value)

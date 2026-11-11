@@ -118,6 +118,18 @@ describe('BracketCanvas', () => {
   });
 });
 
+describe('BracketCanvas — 경기 제목', () => {
+  it('renders the saved title on only its fixture and restores the generated title when cleared', () => {
+    const renamed = { ...fixtures[0], displayTitle: '개막전' };
+    const view = render(<BracketCanvas groups={[semi]} fixtures={[renamed]} slots={slots} selectedFixtureId={null} pendingRegistrationId={null} canWrite onSelectFixture={vi.fn()} onAssignSlot={vi.fn()} onAssignDirect={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '개막전 열기' })).toBeInTheDocument();
+    expect(fixtureTitle(fixtures[1], [semi])).toBe('4강 2번 경기');
+    view.rerender(<BracketCanvas groups={[semi]} fixtures={[{ ...renamed, displayTitle: null }]} slots={slots} selectedFixtureId={null} pendingRegistrationId={null} canWrite onSelectFixture={vi.fn()} onAssignSlot={vi.fn()} onAssignDirect={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '4강 1번 경기 열기' })).toBeInTheDocument();
+    view.unmount();
+  });
+});
+
 describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
   const gA = makeGroup({ id: 'gA', name: 'A조', phase: 'group', sortOrder: 0, advanceCount: 2 });
   const gB = makeGroup({ id: 'gB', name: 'B조', phase: 'group', sortOrder: 1, advanceCount: 2 });

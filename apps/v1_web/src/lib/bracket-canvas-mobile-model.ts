@@ -132,7 +132,7 @@ export function bracketMobileNode(
     fixtureId: fixture.id,
     ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
     groupId: fixture.groupId,
-    title: `${groupName ? `${bracketGroupLabel(bracketTrack, groupName)} · ` : bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${fixture.fixtureNumber}번 경기`,
+    title: fixture.displayTitle || `${groupName ? `${bracketGroupLabel(bracketTrack, groupName)} · ` : bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${fixture.fixtureNumber}번 경기`,
     state,
     home: bracketMobileSide(fixture, 'HOME', labels),
     away: bracketMobileSide(fixture, 'AWAY', labels),

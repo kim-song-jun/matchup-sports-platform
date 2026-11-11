@@ -78,7 +78,7 @@ export function BracketLeagueGrid({
                       <BracketCanvasNode
                         key={fixture.id}
                         fixture={fixture}
-                        title={`${fixture.fixtureNumber}번 경기`}
+                        title={fixture.displayTitle || `${fixture.fixtureNumber}번 경기`}
                         fullTitle={fixtureTitle(fixture, groups)}
                         sideLabels={{ HOME: fixtureSideLabel(fixture, 'HOME', labelContext), AWAY: fixtureSideLabel(fixture, 'AWAY', labelContext) }}
                         slots={{

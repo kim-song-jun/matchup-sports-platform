@@ -153,6 +153,7 @@ function assertReplayableFixture(aggregate: FixtureReplayAggregate, tournamentId
 
 /** 경기 생성 응답(serializeCanonicalFixture 결과). 키 기록에 그대로 저장돼 재전송 때 돌려준다. */
 export interface SerializedCanonicalFixture {
+  displayTitle?: string | null;
   id: string;
   tournamentId: string;
   groupId: string | null;
@@ -1094,7 +1095,7 @@ export class TournamentBracketService {
       if (canonical.teamMatch.game === null || canonical.teamMatch.game.sourceType !== V1GameSourceType.TEAM_MATCH) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
       }
-      const changesLabels = dto.homeDisplayLabel !== undefined || dto.awayDisplayLabel !== undefined;
+      const changesLabels = dto.displayTitle !== undefined || dto.homeDisplayLabel !== undefined || dto.awayDisplayLabel !== undefined;
       const labelsOnly = changesLabels && [dto.fixtureNumber, dto.scheduledAt, dto.fieldId, dto.venue, dto.homeRegistrationId, dto.awayRegistrationId].every(value => value === undefined);
       if (labelsOnly) return this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
@@ -1190,8 +1191,8 @@ export class TournamentBracketService {
           allowStartedTeamChange: true,
           teamChangeReason: dto.teamChangeReason,
         });
-        if (changesLabels) await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto);
-        return row;
+        const labels = changesLabels ? await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto) : {};
+        return { ...row, ...labels };
       });
       const startedTeamChange = updated.startedTeamChange === null
         ? null
@@ -1585,6 +1586,7 @@ export class TournamentBracketService {
    * Keep the admin DTO stable while the canonical read path is authoritative.
    */
   private serializeCanonicalFixture(row: {
+    displayTitle?: string | null;
     id: string;
     tournamentId: string;
     groupId: string | null;
@@ -1609,6 +1611,7 @@ export class TournamentBracketService {
           : 'scheduled';
     return {
       id: row.id,
+      displayTitle: row.displayTitle ?? null,
       tournamentId: row.tournamentId,
       groupId: row.groupId,
       round: row.round,

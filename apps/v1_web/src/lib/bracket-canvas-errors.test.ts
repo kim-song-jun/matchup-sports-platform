@@ -16,6 +16,7 @@ function apiError(code: string, message = '서버 원문이에요.') {
 describe('describeBracketCanvasError', () => {
   it.each([
     ['NEXT_FIXTURE_CONFLICT', '다음 경기가 이미 시작돼서 바꿀 수 없어요.'],
+    ['QUICK_RESULT_ROSTER_EMPTY', '참가 명단에 선수가 없는 팀이 있어요. 선수를 먼저 등록해 주세요.'],
     ['QUICK_RESULT_ROSTER_SYNCING', '명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.'],
     ['SLOT_LOCKED', '이미 시작했거나 결과가 있는 경기라 팀을 바꿀 수 없어요.'],
     ['SLOT_TEAM_ALREADY_PLACED', '이미 다른 자리에 들어간 팀이에요.'],

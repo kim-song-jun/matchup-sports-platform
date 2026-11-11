@@ -36,4 +36,15 @@ describe('TournamentFlowSection', () => {
     expect(screen.getByText('풀리그', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText('결선 진출', { exact: true })).not.toBeInTheDocument();
   });
+
+  it('6강 · 결승 직행 방식은 3·4위전이 있다고 안내하지 않는다', () => {
+    render(<TournamentFlowSection tournament={{ format: 'knockout', kind: 'regular_tournament', sixTeamMode: true }} />);
+    expect(screen.queryByText(/3·4위전도 함께 진행돼요/)).not.toBeInTheDocument();
+    expect(screen.getByText(/3·4위전 없이 결승/)).toBeInTheDocument();
+  });
+
+  it('일반 토너먼트는 3·4위전 안내를 유지한다', () => {
+    render(<TournamentFlowSection tournament={{ format: 'knockout', kind: 'regular_tournament', sixTeamMode: false }} />);
+    expect(screen.getByText(/3·4위전도 함께 진행돼요/)).toBeInTheDocument();
+  });
 });

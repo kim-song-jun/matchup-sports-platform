@@ -1083,10 +1083,17 @@ export class TournamentResultReviewService {
       }),
     ]);
     const roster = selectLineupParticipantsWithDraftFallback(candidates, lineups);
-    if (pendingResync > 0 || !sides.every((side) => roster.some((player) => player.sideId === side.id))) {
+    if (pendingResync > 0) {
       throw quickResultConflict(
         'QUICK_RESULT_ROSTER_SYNCING',
         '명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.',
+      );
+    }
+    // 재계산이 끝났는데도 출전자가 없으면 기다려도 달라지지 않는다 — 팀에 등록된 선수가 없는 경우다.
+    if (!sides.every((side) => roster.some((player) => player.sideId === side.id))) {
+      throw quickResultConflict(
+        'QUICK_RESULT_ROSTER_EMPTY',
+        '참가 명단에 선수가 없는 팀이 있어요. 선수를 먼저 등록해 주세요.',
       );
     }
 

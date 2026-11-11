@@ -36,6 +36,7 @@ export function makeFixture(
     homeTeamName: '홈 팀 미정',
     awayRegistrationId: null,
     awayTeamName: '어웨이 팀 미정',
+    displayTitle: null,
     homeDisplayLabel: null,
     awayDisplayLabel: null,
     scheduledAt: null,

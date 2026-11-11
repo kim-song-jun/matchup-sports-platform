@@ -1,5 +1,44 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-11-11 후속 — 경기별 제목 수정
+Status: Implementation complete; local runtime running; alpha UI QA pending
+
+### Context / Goal / Original Conditions
+- [x] 경기일정 전체보기의 각 경기 수정창에서 제목을 개별 입력한다.
+- [x] 저장된 제목을 목록·그림·모바일에 함께 반영하고 공개 일정·상세에도 반환한다.
+- [ ] 로컬 Web/API를 실행하고 저장 round-trip을 확인한다.
+
+### User Scenarios / Test Scenarios / Acceptance Criteria
+- [x] 기존 공유 수정 폼 재사용안 사용자 확정(라운드 전체가 아닌 개별 경기).
+- [ ] 경기 A만 이름 변경 → PATCH → bracket GET → 목록/그림 동일 제목 → 재진입 유지, 경기 B 불변.
+- [ ] 빈 문자열/null은 자동 제목 복원, 생략은 보존, 120자 초과/비문자열 거절.
+- [ ] 관리자 권한·감사·대회/경기 잠금 유지; 제목만 바꾸면 실제 팀/진출/결과는 불변.
+- [ ] 실패 시 입력 유지·오류 노출; desktop/tablet/mobile alpha QA(미배포 시 별도 pending).
+
+### Parallel Work Breakdown / Ownership
+단일 에이전트 순차. Phase A DB nullable display_title/migration·DTO·저장/조회·API 문서 → Phase B 공유 수정 폼·목록/그림/모바일·공개 표시 → Phase C 단위/타입·로컬 실행.
+Owned: 위 기능 관련 v1 API/Web, additive migration, schema pin, task/scenario/API docs와 changeset. Forbidden: unrelated WIP, main 쓰기, destructive seed/reset. 사용자 후속 요청으로 dev PR/머지·alpha 배포 허용, 리뷰 요청·대기 생략.
+
+### Security Notes / Tech Debt Resolved / Risks & Dependencies
+120자 plain text, trim, null 복원. 사용자 입력을 HTML로 해석하지 않는다. 기존 관리자 쓰기 gate·잠금·감사 재사용. 조/라운드/번호/진출 계약은 유지한다.
+V1TournamentMatchDetails(v1_tournament_match_details)에 nullable varchar(120) display_title 추가, 기존 행 변경 없음. 생성된 Prisma client와 runtime schema pin/manifest 허용 목록을 동기화한다.
+공유 트리 전체에 기존 CRLF diff가 있고 원격 dev와 차이가 있어 checkout/reset/merge하지 않는다. env 파일을 직접 읽거나 출력하지 않고 기존 앱 설정 로더만 사용한다.
+
+### Ambiguity Log
+2026-11-11 사용자: 라운드 전체가 아니라 경기마다 제목 수정. 기존 전체보기 수정창과 그림 동기화 확정, 로컬 서버 실행 명시 요청(alpha QA 원칙의 사용자 요청 예외).
+
+### Progress Snapshot
+최초 로컬 Base HEAD26db31b33. 배포 브랜치는 최신 origin/dev817d4fb88a에서 격리 생성(/tmp/teameet-fixture-title-release), 이전 공유 트리 보존. 사용자 요청에 따라 리뷰 요청/대기 생략, 필수 CI 유지.
+Phase A/B 구현. Prisma generate 성공. Web 기존 관련20/20 PASS, API DTO/저장/조회49 PASS. 신규 제목 회귀 및 서비스/타입 검증 진행 중.
+로컬 Web http://localhost:3013/login HTTP200. API 최초 실행 DATABASE_URL 누락(앱 cwd); root cwd로 재시도 중. Docker Desktop daemon 최초 미가동, 기동 시도 중. 실제 DB/alpha QA는 미검증.
+
+최종: API 고유267 / Web60 PASS, API tsc PASS. 실제 PostgreSQL 한글 제목 저장·공용 조회·경기별 격리·생략 보존·빈 값 복원·실제 감사 로그 PASS(모든 검증 데이터 rollback). Web tsc는 기존 admin/league-matches/page.tsx:299 LeagueStateChip props 오류1개로 실패하며 관련 없는 화면은 수정하지 않았다.
+로컬 Web3013 로그인200, API8121 직접 및 Web rewrite health db=true. Docker Desktop·기존 postgres 컨테이너를 기동했다. 기존 DB는 이전 스키마와 migration history 부재(P3005)로 보존, 별도 빈 DB migration replay는 기존 privacy v1.2 prerequisite 자료 누락(P3018)에서 실패했다. 이를 우회해 성공으로 표시하지 않고, 다른 새 빈 preview DB에 현재 schema만 생성해 요청된 로컬 API를 실행했다. shipping용 additive migration과 runtime schema pin은 준비했다. 계정/대회 seed는 실행하지 않았다.
+상세: docs/scenarios/fixture-display-title.md. Alpha viewport0/3·실제 관리자 화면 저장 미검증; PR-ready/배포 완료로 주장하지 않는다. 사용자 요청에 따라 Web/API/DB는 유지한다.
+
+로컬 관리자 표시 후속: HTTP200 이후 실제 브라우저 React/SWC exports 오류를 확인했다. 소유한 Next 종료→생성 캐시 `.next` 정리→재실행으로 해소. 사용자 요청에 따라 별도 preview DB의 로컬 관리자1개와 격리된 headed Chrome 창을 생성했다. 실제 `/admin`1440×1000 대시보드 렌더, pageerror0/API오류0 PASS. 화면은 사용자 요청으로 유지. 증거 tmp/local-admin-preview/admin.png, 재확인 도구 scripts/qa/local-admin-preview.cjs. 원격/기존 DB 변경0. 제목 편집 UI 및 alpha 3폭 QA는 여전히 별도다.
+
+
 ## 2026-10-28 후속 — 전체 대진 만들기 팝업 동작 복구
 Status: Implemented / dev PR and Alpha deployment in progress
 
@@ -30,6 +69,8 @@ Alpha 관리자 세션/브라우저 도구가 현재 제공되지 않았다. 실
 
 2026-10-28 사용자 배포 요청으로 이 후속 범위의 dev 대상 PR·리뷰·머지·alpha 배포를 진행한다. main 승격은 포함하지 않는다. 최신 origin/dev=b71a5d031로 코드 차이 없음 확인; 앞선 59계약·타입·패턴 검증 이후 런타임 소스 변경 없음. Alpha 관리자 세션/브라우저 도구 미제공으로 배포 후 시각 QA는 별도 미완료로 추적한다.
 
+
+배포 준비(2026-11-11): 사용자 dev PR·alpha 배포 지시 및 리뷰 생략 지시 반영. 최신 dev 기반의 기존 bracketTrack·BYE·기간 편집·대회 관리자 권한 변경을 보존하며 충돌 통합했다. 최신 기준 API338/Web124 PASS, API/Web tsc PASS, release schema binding5/5 PASS. 로컬 전용 QA 도구·계정은 PR에서 제외한다.
 
 ## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
 Status: Implementation complete; draft PR / alpha QA pending

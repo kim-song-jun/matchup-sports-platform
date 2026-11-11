@@ -36,6 +36,7 @@ export type BracketCanvasProps = {
 };
 
 export function fixtureTitle(fixture: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
+  if (fixture.displayTitle?.trim()) return fixture.displayTitle;
   const group = groups.find((candidate) => candidate.id === fixture.groupId);
   const groupName = group?.name ?? null;
   const trackLabel = bracketTrackLabel(group?.bracketTrack);

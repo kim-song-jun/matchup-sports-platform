@@ -5,14 +5,30 @@ function setup(bye = false) {
     homeSlot: bye ? { id: 'bye', kind: 'BYE', displayLabel: null } : null, awaySlot: null } };
   const tx = { $queryRaw: jest.fn(), v1TournamentMatchDetails: { findUniqueOrThrow: jest.fn().mockResolvedValue(current), update: jest.fn() }, v1TournamentSlot: { update: jest.fn() } };
   const context = { logAdminAction: jest.fn() };
-  const save = (input: { homeDisplayLabel?: string | null; awayDisplayLabel?: string | null }) => updateFixtureDisplayLabelsInTx(tx as never, context as never, {} as never, 'fixture', input);
+  const save = (input: { displayTitle?: string | null; homeDisplayLabel?: string | null; awayDisplayLabel?: string | null }) => updateFixtureDisplayLabelsInTx(tx as never, context as never, {} as never, 'fixture', input);
   return { tx, context, current, save };
 }
 
 describe('fixture display labels', () => {
+  it('persists a trimmed title on this fixture and audits it without changing the bracket', async () => {
+    const { tx, context, save } = setup();
+    await expect(save({ displayTitle: '  개막전  ' })).resolves.toMatchObject({ displayTitle: '개막전' });
+    expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture' }, data: { displayTitle: '개막전' } });
+    expect(tx.v1TournamentSlot.update).not.toHaveBeenCalled();
+    expect(context.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      beforeJson: expect.objectContaining({ displayTitle: null }), afterJson: expect.objectContaining({ displayTitle: '개막전' }),
+    }), tx);
+  });
+  it('restores an automatic title when cleared', async () => {
+    const { tx, current, save } = setup();
+    Object.assign(current, { displayTitle: '개막전' });
+    await expect(save({ displayTitle: '  ' })).resolves.toMatchObject({ displayTitle: null });
+    expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture' }, data: { displayTitle: null } });
+  });
+
   it('changes only presentation fields, leaving team assignment and advancement untouched', async () => {
     const { tx, context, save } = setup();
-    await expect(save({ homeDisplayLabel: ' 준결승 A 승자 ' })).resolves.toEqual({ homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '직접 입력' });
+    await expect(save({ homeDisplayLabel: ' 준결승 A 승자 ' })).resolves.toEqual({ displayTitle: null, homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '직접 입력' });
     expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture' }, data: { homeDisplayLabel: '준결승 A 승자' } });
     expect(tx.v1TournamentSlot.update).not.toHaveBeenCalled();
     expect(context.logAdminAction).toHaveBeenCalledTimes(1);
@@ -25,7 +41,7 @@ describe('fixture display labels', () => {
   });
   it('clears custom text to null and leaves unedited sides intact', async () => {
     const { tx, save } = setup();
-    await expect(save({ awayDisplayLabel: '   ' })).resolves.toEqual({ homeDisplayLabel: null, awayDisplayLabel: null });
+    await expect(save({ awayDisplayLabel: '   ' })).resolves.toEqual({ displayTitle: null, homeDisplayLabel: null, awayDisplayLabel: null });
     expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture' }, data: { awayDisplayLabel: null } });
   });
   it('keeps a group-rank bye label on its shared slot without changing its source', async () => {

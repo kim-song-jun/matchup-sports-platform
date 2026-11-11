@@ -23,6 +23,19 @@ const fixture = makeFixture({ id: 'final', groupId: null, fixtureNumber: 13, sch
 function editor(f = fixture, s = source) { return <FixtureMetadataEditor tournamentId="t-1" fixture={f} fixtures={[s, f]} groups={[group]} slots={[]} canWrite />; }
 
 describe('shared fixture metadata editor', () => {
+  it('saves a per-fixture title, hydrates it on reopen and restores automatic text when cleared', async () => {
+    const view = render(editor());
+    fireEvent.change(screen.getByLabelText('경기 제목'), { target: { value: '  A조 2차전  ' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', displayTitle: 'A조 2차전' }));
+    view.unmount();
+    render(editor({ ...fixture, displayTitle: 'A조 2차전' }));
+    expect(screen.getByLabelText('경기 제목')).toHaveValue('A조 2차전');
+    fireEvent.change(screen.getByLabelText('경기 제목'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith({ fixtureId: 'final', displayTitle: null }));
+  });
+
   it('hydrates existing list metadata, clears time explicitly, and restores the automatic label without changing edges', async () => {
     render(editor());
     expect(screen.getByLabelText('경기 시각')).toHaveValue('2026-10-25T14:00');

@@ -615,7 +615,7 @@ export const gameSchemaSourceManifest = {
   // V1GameEvent.correctsEventId + (game_id, corrects_event_id) index + guard trigger
   // (20261110090000_v1_game_event_time_correction). Append-only: no existing column changes; historical game migration unchanged.
   // 2026-11-11: tournament player eligibility evidence (MD-QA #192, 20261111090000); historical game migration unchanged.
-  schema: '063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8',
+  schema: 'e6fa0c33ed33f7d3cbda7e83a4373338a801edfd8acc2e02cc6db6b38f20fe01',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

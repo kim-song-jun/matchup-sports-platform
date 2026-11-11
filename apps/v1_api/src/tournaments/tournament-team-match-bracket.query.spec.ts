@@ -2,7 +2,7 @@ import { serializeTournamentTeamMatchBracket, type TournamentTeamMatchBracketRow
 
 function row() {
   const stamp = new Date('2026-10-17T00:00:00Z');
-  return { teamMatchId: 'match', tournamentId: 't', groupId: 'qf', round: '8강', fixtureNumber: 5, legNumber: 1,
+  return { displayTitle: '개막전', teamMatchId: 'match', tournamentId: 't', groupId: 'qf', round: '8강', fixtureNumber: 5, legNumber: 1,
     parentTeamMatchId: null, homeRegistrationId: null, awayRegistrationId: null, homeDisplayLabel: null, awayDisplayLabel: null,
     advancementTargets: [{ sourceTeamMatchId: 'r12-match', sourceOutcome: 'WINNER', targetSide: 'AWAY' }],
     createdAt: stamp, updatedAt: stamp, homeRegistration: null, awayRegistration: null,
@@ -13,7 +13,7 @@ function row() {
 describe('shared bracket fixture query', () => {
   it('returns the existing canonical time and field without canvas-specific data or migration', () => {
     const result = serializeTournamentTeamMatchBracket(row() as unknown as TournamentTeamMatchBracketRow);
-    expect(result).toMatchObject({ id: 'match', scheduledAt: '2026-10-25T05:00:00.000Z', venue: 'A구장', fieldId: 'field-a', homeDisplayLabel: '조 1위 중 5위' });
+    expect(result).toMatchObject({ id: 'match', displayTitle: '개막전', scheduledAt: '2026-10-25T05:00:00.000Z', venue: 'A구장', fieldId: 'field-a', homeDisplayLabel: '조 1위 중 5위' });
   });
   it('uses the registered field name when the place snapshot is stale', () => {
     const input = row();

@@ -32,6 +32,12 @@
 - 이번 diff는 새 additive migration이며 과거 Task168 Stage A/B 전환을 다시 실행할 근거가 아니다. 승인된 main 배포의 실제 모드·상태·migration base는 기존 운영 런북을 따라 확인한다. 이 준비 작업은 SSM/운영 DB/비밀값에 접근하지 않는다.
 - main에만 있던 커밋은 과거 승격 merge 3개이며, 런타임 tree의 추가 변경은 없었다. 준비 브랜치에 `origin/main`을 merge해 main→dev 방향으로만 이력을 흡수했다. net dev 대상 PR에는 기능 구현을 다시 넣지 않는다.
 
+## 준비 PR
+
+[dev 대상 Draft PR #2352](https://github.com/kim-song-jun/matchup-sports-platform/pull/2352). Copilot 공식 API는 HTTP 422 `ACTOR_INELIGIBLE`(라이선스 또는 조직 정책)로 차단됐다. 기존 PR의 예외를 새 PR에 재사용하지 않았고 clean 리뷰로 표시하지 않는다.
+
+최종 사용자용 [main…dev 비교 링크](https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev)는 버전 PR dev 반영과 새 alpha 검증 후 다시 확인한다. 에이전트는 main 대상 PR을 만들지 않았다.
+
 ## 검증 및 남은 게이트
 
 완료:

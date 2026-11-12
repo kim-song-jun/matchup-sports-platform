@@ -33,8 +33,8 @@ Forbidden: 기능 구현·schema/migration 변경·main PR 개설/머지·운영
 - [x] 변경 경로 67/67 분류, 포함 PR 4/4·DB migration 확인
 - [x] 미완료 로그인 QA를 완료로 표시하지 않음
 - [x] 현재 alpha 1.18.0-alpha와 준비 후 계산될 1.18.1-alpha/운영 1.18.1을 매니페스트 1.18.0과 구분
-- [ ] dev 대상 준비 PR과 최신 CI 상태 제공
-- [ ] 최종 main compare 링크는 사용자용으로만 제공
+- [x] dev 대상 Draft PR #2352 및 최신 CI 진행 상태 제공
+- [x] 최종 main compare 링크는 사용자용으로만 제공 (버전 PR 반영 후 사용)
 
 ## Tech Debt Resolved
 main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset 4개 정리. 기존 task의 stale 미머지/미배포 표기는 새 고정 SHA 보고서로 설명하며 타 기능 task를 임의 완료하지 않는다.
@@ -50,3 +50,8 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 
 ## Progress Snapshot
 비교 main `6d12d118ebf3fee7f7c970b7a7f18c72c9fe5edf`, alpha/dev `c339f1ee9901b6393c3aaa9d026d30ac4fe1043d`. dev CI 43246621638, alpha 배포 43246621387 모두 success. prepare-only PASS. version commit `d90c723a3`, main 흡수 merge `cf5d777be`는 runtime tree 변경 없음. 시스템 jq 부재는 `/tmp`의 공식 바이너리를 SHA256 검증해 사용하여 해결했으며 시스템/프로젝트 도구 설정은 변경하지 않았다. 보고서 및 PR 게시/검증 단계. 이후 CI/리뷰/배포 상태는 준비 PR에서 최신 head 기준으로 기록한다.
+
+## 준비 PR / 외부 차단
+- Draft PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2352 (base dev). 공식 Copilot API는 HTTP 422 `ACTOR_INELIGIBLE`: 연결 계정 라이선스 또는 조직 정책으로 code review 불가. 요청 반복·정책 변경 없이 기록하며 clean으로 표시하지 않는다.
+- 준비 PR은 버전/변경 이력/문서 10개 파일만 포함하며 main은 미변경. 최신 CI는 PR checks에서 확인한다.
+- 사용자용 비교 링크: https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev (버전 PR dev 반영 및 새 alpha 확인 후 재검토).

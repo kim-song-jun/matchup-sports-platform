@@ -102,6 +102,43 @@ PDF 참고 링크에는 SAP 문서 및 CVE-2026-120017이 섞여 있다. 본문 
 - [ ] 사용자 승격 뒤 공개 SHA·배포 성공·실행 버전·health·핵심 흐름을 재확인한다. 계획 PR 또는 Alpha 패치만으로 운영 조치 완료라 표시하지 않는다.
 - [ ] 회귀가 생기면 증상·로그를 확인하고 사용자에게 알린다. 취약 버전 rollback은 보안 위험을 재도입하므로 자동 대응으로 두지 않는다.
 
+## Upgrade Impact Review — 실제 코드 변경과 회귀 검증
+
+2026-11-12 사용자 보완 요청: 업데이트 뒤 실제 코드가 변경되면서 생기는 문제와 주변 영향을 함께 확인한다. 패치 버전 적용과 기존 서비스 계약 보존을 각각 증명해야 한다. 아래는 **검증 계획이며 아직 실행 결과가 아니다**.
+
+### 착수 전 기준선 및 변경 영향 분석
+
+- [ ] 정확한 목표 버전을 정하기 전에 현재 버전부터 목표 버전까지 공식 릴리스 노트·migration/deprecation·알려진 회귀·peer/Node 요구사항을 확인하고 우리 코드의 해당 사용 지점과 연결한다. 문서화되지 않은 모든 프레임워크 내부 변경이 안전하다고 추정하지 않는다.
+- [ ] 업데이트 전 Alpha의 SHA·persona·route·viewport·행동·화면/HTTP 결과·console/network 상태를 기준선으로 남긴다. 후속 Alpha에서 같은 조건으로 비교한다. 기존 실패는 별도로 기록해 업데이트 회귀와 구분한다.
+- [ ] manifest/lockfile의 직접·전이 의존성 변경을 분류한다. Next 관련 SWC/compiled RSC·React·타입·서드파티 peer 변화를 확인하고, React 중복 설치·타입 불일치·불필요한 lockfile 대량 변경을 해소한다.
+- [ ] 실제로 수정한 앱 코드마다 “변경 전 계약 → 변경 이유 → 변경 후 동작 → 영향 consumer → 회귀 증거”를 PR에 남긴다. 앱 코드를 바꾸지 않아도 프레임워크 런타임은 바뀌므로 아래 항목을 생략하지 않는다.
+
+### 코드 근거에 연결한 검증표 (10개 영역)
+
+| # | 실제 코드/계약 | 업데이트로 확인해야 할 문제 | 검증 방법 및 통과 기준 |
+|---|---|---|---|
+| 1 | next.config.ts의 html-bots 내부 import, bundle analyzer, standalone Docker 빌드 | 내부 경로 이동·config 옵션 타입 변화·빌드/실행 산출물 누락 | frozen install, lint/typecheck, CI production 이미지 빌드와 Alpha 시작 성공. 배포 이미지에서 정적 chunk/font 및 실행 버전 확인 |
+| 2 | src/app/layout.tsx, providers.tsx, Suspense를 쓰는 chat/page.tsx·callback/kakao/page.tsx | SSR/client 경계·hydration 불일치·빈 화면·무한 로딩 | 직접 URL 진입/새로고침과 Link 이동을 모두 확인. hydration/runtime 오류 및 무한 skeleton 없음. Kakao callback은 성공/실패 복귀 경로 확인 |
+| 3 | src/proxy.ts의 공개 상세 404 처리, next.config.ts의 redirect/rewrite | 실제 없는 상세가 HTTP 200이 되거나 정상 정적 경로가 404, redirect loop | 존재/미존재 ID, 잘못된 ID, /notices/feed.xml 정적 예외는 실제 NOTICES_FEED_PATH 값을 먼저 확인하고 검사. /v1 및 league legacy redirect의 Location·쿼리 보존 확인. HTML과 client navigation 모두 결과 일치 |
+| 4 | landing/page.tsx의 revalidate, lib/landing/landing-v4-data.ts의 no-store, SEO/feed route | 정적/동적 판정 변화·오래된 공개 목록·메타데이터 누락 | 일반 UA와 crawler UA의 원본 HTML head 확인, 게시 상태 변경 시 실제 목록 갱신 확인. 공개하지 않은 항목 노출 및 사용자 데이터 캐시 혼입 없음. 알려진 cache 정책 유지 |
+| 5 | lib/api-client.ts의 credentials include, providers의 인증 gate·query persist | 로그인 쿠키 전달 누락·로그아웃 뒤 이전 계정 데이터 잔존·인증 hydrate 전 잘못된 차단 | 익명/로그인/로그아웃/다른 계정 재로그인, 보호 상세 직접 진입. 실제 401/403과 UI 일치, 계정 간 데이터 누출 없음. 인증 UI hydrate 뒤 다음 보호 route 이동 |
+| 6 | useSearchParams 사용 화면, navigation history·scroll restoration | 필터 쿼리 유실·뒤로가기 복원 실패·클릭 후 navigation 유실 | 대회 목록 필터 연속 변경 → 상세 → 뒤로/앞으로 → 새로고침. URL/조회 payload/선택 UI 일치, 중복 이동 및 scroll/focus 회귀 없음 |
+| 7 | lib/assets.ts의 getImageProps, content/rich-content-renderer.tsx의 next/image, uploads rewrite | 이미지 변환 400/404·크기/비율 변화·업로드 파일 proxy 오류 | 기존 업로드/로컬 mock/허용 원격 이미지/실패 fallback과 확대 확인. 지원하는 업로드·수정 폼은 실제 저장 후 재진입해 값·이미지 보존 검증 |
+| 8 | socket.io rewrite, providers의 NotificationSocketBridge, chat | trailing slash redirect 재발·polling/upgrade 실패·재연결·중복 구독 | 실제 Alpha 채팅/알림 수신·화면 왕복·재연결 확인. polling/upgrade 정상, 메시지 중복/누락 및 console/network 오류 없음 |
+| 9 | @tiptap/react 편집기, react-dom createPortal 대화상자, persisted query provider | peer 호환·편집기 mount·portal/focus/effect 순서 변화 | 편집 → 저장 → 상세 재조회, dialog 열기/닫기/Escape/포커스 복귀. 중복 요청·이벤트 누수·콘텐츠 손실 없음. 실제 사용 흐름으로 확인 |
+| 10 | admin/tournament-ops·shared/game-operations, native app surface/update gate | 권한 분기·운영 command 중복 제출·WebView 복귀 및 기존 열린 탭 chunk 오류 | 일반 사용자 권한 차단과 허용된 운영자 흐름을 확인. 변경을 수반하는 대표 흐름은 Alpha 전용 테스트 엔티티에서 저장·재조회·정리까지 검증. 배포 전 열린 탭에서 배포 후 이동/새로고침, Android/iOS 기본 진입·로그인·복귀 확인 |
+
+표의 정적 경로·테스트 엔티티·허용 액션은 실행 직전 현재 v1 route/API와 대조해 고정한다. 실패하는 경로를 유사한 정상 화면으로 바꿔 통과 처리하지 않는다. 미검증 영역은 반드시 별도로 남긴다.
+
+### 테스트 선택과 결과 기록
+
+- 기존 테스트 후보: e2e/v1-tests/account-recovery-hydration.spec.ts, chat-notifications.spec.ts, tournament-staff-authorization.spec.ts, tournament-live-operations.spec.ts, responsive.spec.ts 및 apps/v1_web/src/lib/query-client.test.ts, public-competition-discovery.test.ts. 후보 전체를 무조건 실행하지 않고 실제 변경 계약과 기존 assertion을 읽어 필요한 최소 집합을 고정한다.
+- 단위 테스트의 Next router/image/fetch mock이 실제 프레임워크 회귀를 숨길 수 있다. 해당 mock 테스트가 green이어도 CI production 빌드 및 Alpha 실제 동작 확인을 대체하지 않는다. CI E2E가 mock인지 실제 API인지도 증거에 명시한다.
+- 앱 호환성 수정을 추가하면 가능한 경우 해당 동작의 RED → GREEN 증거를 남긴다. build/lint 통과와 사용자 시나리오 통과는 각각 기록한다.
+- 증거 표 필수 열: 영역 번호, 기준/수정 SHA와 의존성 버전, persona/route/viewport, 실제 행동·HTTP/API 결과, console/network, PASS/FAIL/BLOCKED, 원인/수정/재검증, cleanup. 진행 상태는 **검증 완료 M/10, 실패 F, 미검증 B**로 보고한다. 영역별 대표 사례 검증이며 전체 route 전수 QA라고 표현하지 않는다.
+- 주요 흐름을 막는 신규 회귀·권한/데이터 누출·저장 유실·빌드/기동 실패는 해결 전 머지 게이트 실패다. Alpha에서 발견되면 운영 승격을 보류하고 최소 수정 후 실패 영역과 직접 영향 영역을 재검증한다. 실행 환경 부재는 PASS가 아니다.
+- 메모리/응답 시간·chunk 요청 실패·5xx는 동일 endpoint/조건의 업데이트 전후를 비교한다. 부하 테스트를 자동 추가하지 않으며 관측 악화가 있으면 원인과 사용자 영향부터 분석한다.
+
 ## User Scenarios
 
 1. 운영자는 이 문서에서 취약 버전 배포 여부, 악용 전제의 확인 범위, 패치 우선순위를 구분해 판단한다.
@@ -156,6 +193,7 @@ API/DTO/Prisma 변경이 없어 fixture/MSW/public mock 갱신은 기본적으�
 ### 후속 보안 조치 완료
 
 - [ ] 정확한 목표 버전과 bundled RSC 패치 근거가 기록되고 CI/리뷰를 통과한다.
+- [ ] 변경 영향 분석과 10개 영역의 검증 결과 M/10·실패·미검증 및 앱 코드 수정별 회귀 증거가 기록된다. 주요 신규 회귀는 해결되어야 한다.
 - [ ] dev 머지 및 Alpha 수정 SHA·실행 버전·브라우저 회귀 증거가 확보된다.
 - [ ] 사용자 운영 승격 이후 운영 SHA·실행 버전·health·핵심 흐름 증거가 확보된다.
 - [ ] 미검증 범위가 없거나 소유자·사유·후속 경로가 명시된다.
@@ -187,6 +225,7 @@ API/DTO/Prisma 변경이 없어 fixture/MSW/public mock 갱신은 기본적으�
 ## Progress Snapshot
 
 - Phase 0: PDF 전체 본문·공식 권고·최신 origin/dev·운영 SHA·배포 기록·공개 헤더 확인 및 계획 작성 완료. 단일 문서 committed diff·공백 검사 통과, 새 tech-debt marker 없음. 계획 PR #2349 게시 완료. 실행 코드 변경이 없어 테스트/빌드는 생략.
+- 2026-11-12 보완: 실제 v1 프레임워크 사용 지점에 연결한 10개 회귀 검증 영역·업데이트 전후 기준선·코드 수정별 증거·머지/승격 차단 기준을 추가했다. 검증 실행 결과로 간주하지 않는다.
 - Phase 1–4: 미착수. 이 문서의 체크박스가 후속 resume cursor다.
 - 계획 기준 Git cursor: 4a53b95b1 (PR #2347), 직전 f0679eef1 (PR #2345 release/version-1.17.0).
 - 로컬 원본 tree의 기존 미추적 문서·worktree는 보존. 전용 worktree/branch에서 이 문서만 커밋한다.

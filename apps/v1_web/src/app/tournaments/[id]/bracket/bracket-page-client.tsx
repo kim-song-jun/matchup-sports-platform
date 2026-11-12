@@ -1,4 +1,5 @@
 'use client';
+import { useMemberBracketIdentity } from '@/components/tournaments/member-bracket-identity';
 import { StagePublicView } from '@/components/tournaments/stages/stage-public-view';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 
@@ -448,15 +449,16 @@ export function BracketScheduleTab({
   // owner/manager에게만 자기 팀 경기 강조가 열린다.
   // 비로그인 관전자는 세션 힌트가 없으니 요청 자체를 보내지 않는다(보내면 매번 401).
   // 힌트는 SSR 하이드레이션 불일치를 피하려고 effect 에서 읽는다.
+  const previewIdentity = useMemberBracketIdentity();
   const [hasSessionHint, setHasSessionHint] = useState(false);
   useEffect(() => {
     setHasSessionHint(hasStoredV1Session());
   }, []);
-  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint && !isRegularLeague });
+  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: !previewIdentity && hasSessionHint && !isRegularLeague });
   // 팀장 전용인 위 응답과 별개로, 팀원까지 포함한 소속 팀으로 "우리 팀" 표시와 "내 팀만" 스위치를 연다.
   // 요청은 순위 탭·리그 래퍼와 같은 쿼리 키라 React Query 가 합친다.
-  const myTeams = useV1MyTeams(undefined, { enabled: hasSessionHint && !isRegularLeague });
-  const myTeamIds = new Set(hasSessionHint ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []);
+  const myTeams = useV1MyTeams(undefined, { enabled: !previewIdentity && hasSessionHint && !isRegularLeague });
+  const myTeamIds = new Set(previewIdentity?.teamIds ?? (hasSessionHint ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []));
   // A live game can be on any cursor page; load them sequentially before claiming all live games are shown.
   useEffect(() => {
     if (hasNextPage && !isFetching && !isError) void fetchNextPage();
@@ -532,7 +534,7 @@ export function BracketScheduleTab({
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
-      myFixtures={myFixtures.data}
+      myFixtures={previewIdentity?.myFixtures ?? myFixtures.data}
       myTeamIds={myTeamIds}
       fromHref={fromHref}
       completedResultsHref={tournament?.status === 'completed' ? `/tournaments/${tournamentId}/results` : undefined}
@@ -581,8 +583,9 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
   // 넘겨 끄는 방식은 쓰지 않는다(캐시 키가 오염되고 조용히 잘못된 요청이 갈 수 있다).
   // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
   // 브라우저에만 남아 있는 순위 캐시는 첫 HTML과 다를 수 있어 마운트 후에 반영한다.
+  const previewIdentity = useMemberBracketIdentity();
   const [hydrated, setHydrated] = useState(false);
-  const myTeams = useV1MyTeams(undefined, { enabled: hydrated && hasStoredV1Session() });
+  const myTeams = useV1MyTeams(undefined, { enabled: !previewIdentity && hydrated && hasStoredV1Session() });
   useEffect(() => setHydrated(true), []);
   const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
   const leagueScheduleStandings = isRegularLeague && hydrated
@@ -623,7 +626,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
-  const myTeamIds = new Set(hydrated && hasStoredV1Session() ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []);
+  const myTeamIds = new Set(previewIdentity?.teamIds ?? (hydrated && hasStoredV1Session() ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []));
   const isMyGroup = (group: V1TournamentGroup) => group.groupTeams.some((team) => team.teamId !== null && myTeamIds.has(team.teamId));
   // Stable sort preserves the configured order within both sets of groups.
   const orderedGroups = [...groupPhaseGroups].sort((a, b) => Number(isMyGroup(b)) - Number(isMyGroup(a)));

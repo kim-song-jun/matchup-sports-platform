@@ -271,3 +271,5 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 단계형 대회는 `stagePlan`이 있는 신규 정규대회에만 적용된다. 기존 format만으로 엔진을 바꾸지 않는다.
 구조/진출 변경은 대회별 mutation 권한, revision 및 공식 결과 출처 버전을 함께 검증하며 실제 API envelope를 그대로 따른다.
 [단계별 생성·배정 계약](./domains/tournaments.md#단계형-대회-구성-2026-11-09).
+
+관리자 회원 대진표 조회 응답은 `private, no-store`이며 일반 envelope를 따른다. 관리자 감사 기록에 바인딩된 10분 조회 ID는 로그인 토큰이 아니며 일반 사용자 API의 인증 수단으로 사용할 수 없다.

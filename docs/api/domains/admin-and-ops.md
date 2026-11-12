@@ -352,3 +352,5 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - 두 응답 모두 `Cache-Control: private, no-store`. 일반 success/error envelope 적용. 감사 저장 실패 시 조회 ID를 반환하지 않는다. 새 Prisma 모델/마이그레이션 없음(`V1AdminActionLog` 재사용).
 - 프론트 `/admin/users/:id/bracket-preview/:previewId`는 독립 메모리 query cache와 기존 `BracketPageClient`를 사용한다. 대상 팀 정보로만 개인화를 주입하고 관리자 `/me/teams`·`my-fixtures` 요청은 비활성화한다. 공개 대회·일정 요청은 `credentials: omit`으로 관리자 staff visibility bypass를 제외한다. 10분 또는 권한 오류 시 콘텐츠를 제거한다. 30초마다 재인가한다.
 - 조회 화면은 링크 탐색을 막고 회원 상세 복귀만 제공한다. 회원의 기기/쿠키/브라우저 상태나 가입·인증 게이트 전체를 재현하지 않는다. 원본 링크의 대진표 필터만 허용 목록으로 전달한다. 정규 리그·미공개 대진표는 범위 밖이다.
+
+- MSW/demo에서는 실제 관리자 감사 기록을 만들 수 없으므로 두 endpoint 모두 503 `MEMBER_PREVIEW_REQUIRES_LIVE_API`로 명시적으로 거절한다. 가짜 성공이나 회원 조회 ID를 만들지 않는다.

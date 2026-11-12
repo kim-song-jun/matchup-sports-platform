@@ -99,6 +99,6 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
       <div className="min-w-0">{children}</div>
       {wide && open ? <aside id={id + '-panel'} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}
     </div>
-    {!wide ? <BottomSheet open={open} onClose={close} ariaLabel="시간 배정"><div className="tm-filter-sheet-handle" aria-hidden="true" /><div id={id + '-panel'}>{panel}</div></BottomSheet> : null}
+    {!wide && open ? <BottomSheet open={open} onClose={close} ariaLabel="시간 배정"><div className="tm-filter-sheet-handle" aria-hidden="true" /><div id={id + '-panel'}>{panel}</div></BottomSheet> : null}
   </div>;
 }

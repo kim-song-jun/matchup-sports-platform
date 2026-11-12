@@ -1,7 +1,7 @@
 # League registered time choices
 Status: Local contract checks passed; alpha browser pending.
 
-Persona: platform ops; support reads only. Route: /admin/league-matches/:leagueId/fixtures.
+Persona: platform ops; support reads only. Route: /admin/league-matches/:leagueId/schedule.
 
 1. Open time assignment on desktop; verify the side panel, existing game starts and preset counts.
 2. Add a KST datetime. Reload; verify the unassigned time remains.

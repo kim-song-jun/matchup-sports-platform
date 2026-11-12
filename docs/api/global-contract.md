@@ -271,3 +271,7 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 단계형 대회는 `stagePlan`이 있는 신규 정규대회에만 적용된다. 기존 format만으로 엔진을 바꾸지 않는다.
 구조/진출 변경은 대회별 mutation 권한, revision 및 공식 결과 출처 버전을 함께 검증하며 실제 API envelope를 그대로 따른다.
 [단계별 생성·배정 계약](./domains/tournaments.md#단계형-대회-구성-2026-11-09).
+
+### 대진 배정용 시간 목록
+
+어드민 `league_knockouts` 시간 목록은 UUID 대회 범위와 활성 관리자/담당 총괄 권한을 서버에서 검증한다. ISO8601 offset 필수이며 동일 instant 등록은 대회별 unique로 재시도 가능하다. 신규 시간 행만 감사에 기록하고 실제 경기 일정은 기존 fixture PATCH로만 변경한다. [대회 계약](./domains/tournaments.md#대진-시간구장-독립-배정-2026-11-12)을 따른다.

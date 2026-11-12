@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
+import { FixtureTimePicker } from '@/components/admin/bracket-canvas/fixture-time-picker';
 import { onlyDigits } from '@/lib/number-format';
 import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
 import type {
@@ -1070,7 +1071,8 @@ export function BracketTab({
           </div>
           {editFixture ? <FixtureLabelFields fixture={editFixture} groups={groups} fixtures={bracket?.fixtures ?? []} slots={bracket?.slots ?? []} value={editFxLabels} onChange={setEditFxLabels} disabled={savingFixtureEdit || updateFixture.isPending} /> : null}
           <div className="flex flex-col gap-1">
-            <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
+            <FixtureTimePicker tournamentId={tournamentId} fixtures={fixtures} value={editFxScheduledAt} onChange={setEditFxScheduledAt} disabled={savingFixtureEdit || updateFixture.isPending} />
+          <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
             <input
               id="edit-fx-scheduled"
               type="datetime-local"

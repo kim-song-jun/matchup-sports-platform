@@ -651,3 +651,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리, dev/alpha 검증 진행 — Task 20261080 후속.
 
 - 2026-10-16: [참가팀 상세 우측 안내와 참가 카드](./tournament-participant-sidebar.md) — 로컬 검증 완료, Alpha 배포/실제 로그인 검증 대기.
+
+- [League registered time choices](league-schedule-time-picker.md): local API/Web checks; alpha 0/10 flows and 0/3 viewports pending deployment.

@@ -6,7 +6,7 @@ export type AssignmentMode = 'time' | 'court';
 export type CourtChoice = { key: string; name: string; fieldId: string | null; place: PlaceValue | null; active: boolean };
 export const instant = (value: string) => new Date(value).toISOString();
 
-export function assignmentTimes(fixtures: readonly V1AdminBracketFixture[], presets: readonly { scheduledAt: string }[]) {
+export function assignmentTimes(fixtures: readonly Pick<V1AdminBracketFixture, 'scheduledAt'>[], presets: readonly { scheduledAt: string }[]) {
   return [...new Set([...presets.map(row => instant(row.scheduledAt)), ...fixtures.flatMap(f => f.scheduledAt ? [instant(f.scheduledAt)] : [])])].sort();
 }
 export function fixtureCourtKey(fixture: V1AdminBracketFixture) {

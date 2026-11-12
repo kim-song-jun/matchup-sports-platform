@@ -177,3 +177,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 경기별 제목 `displayTitle` 수정과 목록·그림·공개 일정 동기화: [대회 계약](./domains/tournaments.md#경기별-제목-수정-2026-11-11).
 
 회원 대진표 조회는 관리자 세션을 유지하는 별도 `/admin/users/:id/bracket-preview` 계약이며 회원 세션을 발급하지 않는다. 상세는 [관리자·운영 계약](domains/admin-and-ops.md)의 회원 대진표 조회 절을 따른다.
+
+- Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).

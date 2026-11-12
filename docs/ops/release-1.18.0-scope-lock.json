@@ -1,0 +1,25 @@
+{
+  "sourceSnapshotSha": "c339f1ee9901b6393c3aaa9d026d30ac4fe1043d",
+  "mainBaselineSha": "6d12d118ebf3fee7f7c970b7a7f18c72c9fe5edf",
+  "includedFeaturePrs": [
+    2347,
+    2350,
+    2348,
+    2351
+  ],
+  "candidateBranch": "release/prepare-1.18.0",
+  "allowedPostSnapshotPaths": [
+    ".changeset/admin-member-bracket-preview.md",
+    ".changeset/fixture-time-court-assignment.md",
+    ".changeset/hide-standing-team-rule.md",
+    ".changeset/odd-participant-teams.md",
+    "apps/v1_api/package.json",
+    "apps/v1_web/package.json",
+    "apps/v1_api/CHANGELOG.md",
+    "apps/v1_web/CHANGELOG.md",
+    ".github/tasks/20261133-production-release-1.18.0.md",
+    "docs/ops/release-readiness-1.18.0-2026-11-13.md",
+    "docs/ops/release-1.18.0-scope-lock.json"
+  ],
+  "policy": "Exclude all feature, API, schema, migration, dependency and deployment changes after sourceSnapshotSha. Only listed release metadata and preparation documentation may differ. Do not merge later dev changes or consume later Changesets. If dev advances with excluded changes, do not promote all of dev; verify the frozen candidate separately before the user handles main promotion."
+}

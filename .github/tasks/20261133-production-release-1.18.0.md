@@ -34,7 +34,7 @@ Forbidden: 기능 구현·schema/migration 변경·main PR 개설/머지·운영
 - [x] 미완료 로그인 QA를 완료로 표시하지 않음
 - [x] 현재 alpha 1.18.0-alpha와 준비 후 계산될 1.18.1-alpha/운영 1.18.1을 매니페스트 1.18.0과 구분
 - [x] dev 대상 Draft PR #2352 및 최신 CI 진행 상태 제공
-- [x] 최종 main compare 링크는 사용자용으로만 제공 (버전 PR 반영 후 사용)
+- [x] 사용자용 비교는 고정 후보 SHA 기준으로 제공하며 움직이는 main…dev 승격 링크는 사용하지 않음
 
 ## Tech Debt Resolved
 main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset 4개 정리. 기존 task의 stale 미머지/미배포 표기는 새 고정 SHA 보고서로 설명하며 타 기능 task를 임의 완료하지 않는다.
@@ -43,7 +43,7 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 인증정보/세션/.env 읽기·노출 없음. 프로덕션은 공개 헤더만 조회. Copilot 예외는 PR별 사용자 승인이고 이전 예외를 이번 PR에 확대하지 않음.
 
 ## Risks & Dependencies
-신규 시간 테이블 migration 필요. 홀수팀 생성·관리자 회원 조회·시간/구장 배정의 로그인 QA 증거 미완료. 버전 PR 이후 새 dev CI/alpha 검증 필요. 실제 승격은 사용자만 수행.
+신규 시간 테이블 migration 필요. 홀수팀 생성·관리자 회원 조회·시간/구장 배정의 로그인 QA 증거 미완료. 버전 PR 이후 고정 후보 CI/alpha 증거 재확인 필요. 후속 dev 변경이 있으면 전체 dev 승격 금지. 실제 승격은 사용자만 수행.
 
 ## Ambiguity Log
 준비 요청은 main 승격 실행 권한이 아니다. 현재 준비 PR은 메타데이터/문서만 포함하고 기존 alpha 배포 기능을 새로 수정하지 않는다. 공식 resolver의 no-changeset patch 규칙으로 다음 운영 표시는 1.18.1 예상이다.
@@ -54,4 +54,10 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 ## 준비 PR / 외부 차단
 - Draft PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2352 (base dev). 공식 Copilot API는 HTTP 422 `ACTOR_INELIGIBLE`: 연결 계정 라이선스 또는 조직 정책으로 code review 불가. 요청 반복·정책 변경 없이 기록하며 clean으로 표시하지 않는다.
 - 준비 PR은 버전/변경 이력/문서 10개 파일만 포함하며 main은 미변경. 최신 CI는 PR checks에서 확인한다.
-- 사용자용 비교 링크: https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev (버전 PR dev 반영 및 새 alpha 확인 후 재검토).
+- 이후 최신 dev 전체를 승격하지 않는다. 사용자용 비교는 main과 고정된 release 후보 전체 SHA 사이의 diff다.
+
+## 사용자 범위 고정 — 2026-11-13
+- 기능 기준 `c339f1ee9901b6393c3aaa9d026d30ac4fe1043d`, 포함 PR #2347/#2350/#2348/#2351. 이후 dev 기능·API·migration·의존성·배포 변경 및 Changeset 제외.
+- `release/prepare-1.18.0`에 후속 dev merge/rebase/cherry-pick 금지. 허용 차이는 scope-lock JSON의 release metadata/docs 경로뿐이며 package.json은 version 외 변경 불가.
+- 새 Changeset이 생겼다는 이유로 이번 릴리스에 재소비하지 않는다. dev가 범위 밖으로 전진하면 최신 dev→main 승격을 중단하고 고정 후보 검증/사용자 승격 경로를 분리해 준비한다.
+- Owned에 `docs/ops/release-1.18.0-scope-lock.json` 추가. 범위 고정은 기존 QA/리뷰 게이트 면제가 아니며 main은 변경하지 않는다.

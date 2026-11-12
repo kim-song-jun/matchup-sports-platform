@@ -2,6 +2,15 @@
 
 판정: **버전·비교 자료 준비 완료, 운영 승격은 보류**. 로그인 기반 alpha QA 증거와 준비 PR의 최신 CI/리뷰를 확인한 뒤 사용자가 main 승격을 판단한다. 이 작업은 main PR 개설·머지·운영 배포를 실행하지 않는다.
 
+## 사용자 확정: 이번 승격 범위 고정
+
+- 기능 기준 SHA는 **`c339f1ee9901b6393c3aaa9d026d30ac4fe1043d`**로 고정한다. 사용자 지시: “앞으로 추가적으로 올라온 거 말고 지금까지 올라간거만 main에”.
+- 포함 PR은 **#2347 / #2350 / #2348 / #2351**이며 이후 dev에 들어오는 기능·API·DB·의존성·배포 코드 변경은 제외한다. 후속 Changeset도 이번 릴리스에 합치거나 재소비하지 않는다.
+- 고정 후보는 `release/prepare-1.18.0` 브랜치다. 이 브랜치에 최신 dev를 merge/rebase/cherry-pick하지 않는다. 고정 이후 허용되는 차이는 버전/CHANGELOG/기존 4개 Changeset 소비/이 준비 문서뿐이다.
+- 허용 경로와 SHA는 [`release-1.18.0-scope-lock.json`](release-1.18.0-scope-lock.json)에 기록한다. 승격 직전 전체 diff를 고정 SHA와 비교해 허용 경로 밖 변경이 있으면 중단한다. package.json은 version 외 변경을 허용하지 않는다.
+- **dev에 이후 변경이 추가되면 최신 dev 전체를 main에 올리지 않는다.** 움직이는 main…dev 비교 링크는 범위 확정 근거가 아니다. 고정 후보의 CI·QA·실제 배포 증거를 따로 확인하고 사용자에게 해당 후보 비교 링크를 제공한다. 최신 dev만 지원하는 준비 도구에 맞추기 위해 후속 변경을 섞거나 새 dev를 기준으로 범위를 넓히지 않는다.
+- main PR 개설·머지는 계속 사용자 전용이며, 이 범위 고정은 미완료 QA나 리뷰/배포 게이트의 면제가 아니다.
+
 ## 고정한 비교 기준
 
 | 구분 | SHA / 버전 | 확인 |
@@ -36,7 +45,7 @@
 
 [dev 대상 Draft PR #2352](https://github.com/kim-song-jun/matchup-sports-platform/pull/2352). Copilot 공식 API는 HTTP 422 `ACTOR_INELIGIBLE`(라이선스 또는 조직 정책)로 차단됐다. 기존 PR의 예외를 새 PR에 재사용하지 않았고 clean 리뷰로 표시하지 않는다.
 
-최종 사용자용 [main…dev 비교 링크](https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev)는 버전 PR dev 반영과 새 alpha 검증 후 다시 확인한다. 에이전트는 main 대상 PR을 만들지 않았다.
+사용자용 후보 비교는 `main…release/prepare-1.18.0`이며, 최종 인계 때는 그 시점 후보의 전체 SHA로 링크를 고정한다. `main…dev`는 이후 변경이 섞일 수 있으므로 이번 승격 링크로 사용하지 않는다. 에이전트는 main 대상 PR을 만들지 않았다.
 
 ## 검증 및 남은 게이트
 
@@ -49,8 +58,8 @@
 승격 전 필수:
 1. 이 준비 PR의 최신 head에서 CI/정책 검사와 리뷰 상태 확인. 기존 PR의 Copilot 예외 승인은 이 새 PR에 자동 적용하지 않는다.
 2. 위 3개 기능의 로그인 기반 alpha 시나리오·권한·만료/에러·390/768/1440 화면 검증 증거 보완. 이 세션에는 인증정보가 없어 수행한 것으로 표시하지 않는다. 공유 대회/경기는 QA 용도로 수정하지 않는다.
-3. dev 대상 버전 PR 머지 후 **새 dev SHA의 CI와 alpha 서빙 SHA/버전** 재확인. 그때의 릴리스 리졸버와 main promotion gate를 다시 실행한다. 새 Changeset이 추가됐다면 재소비해야 한다.
-4. 최종 dev/main diff와 위 증거를 확인한 사용자가 직접 main 승격 PR을 개설·머지하고 production 승인을 처리한다. 에이전트가 main 승격을 대신하지 않는다.
+3. 준비 PR 반영 후 후보의 **고정 범위 검사·CI와 실제 배포 SHA/버전**을 재확인한다. dev가 후속 기능 없이 이 범위만 담는 경우에만 dev/alpha 증거를 사용한다. 후속 dev 변경이 있으면 고정 후보 검증을 따로 준비하고 최신 dev 전체를 승격하지 않는다. 후속 Changeset은 다음 릴리스로 이월한다.
+4. 고정 후보 SHA와 main의 최종 diff 및 위 증거를 확인한 사용자가 직접 main 승격 PR을 개설·머지하고 production 승인을 처리한다. 에이전트가 main 승격을 대신하지 않는다.
 
 ## 변경 경로 인벤토리
 

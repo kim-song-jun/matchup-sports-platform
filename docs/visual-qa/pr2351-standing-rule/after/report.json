@@ -1,0 +1,38 @@
+[
+  {
+    "width": 390,
+    "ruleCount": 0,
+    "table": "#\t팀\t전적\t승점\t득실\n1\t\n곰빵은 가면가\n\t1-2-0\t5점\t+1\n2\t\nVORTEX FS\n\t1-1-0\t4점\t+2\n3\t\n종점FS\n\t0-2-1\t2점\t-2\n4\t\n베스트 FC\n\t0-1-1\t1점\t-1",
+    "layout": {
+      "width": 390,
+      "scrollWidth": 390
+    },
+    "errors": [],
+    "failed": [],
+    "expanded": "true"
+  },
+  {
+    "width": 768,
+    "ruleCount": 0,
+    "table": "#\t팀\t전적\t승점\t득실\n1\t\n곰빵은 가면가\n\t1-2-0\t5점\t+1\n2\t\nVORTEX FS\n\t1-1-0\t4점\t+2\n3\t\n종점FS\n\t0-2-1\t2점\t-2\n4\t\n베스트 FC\n\t0-1-1\t1점\t-1",
+    "layout": {
+      "width": 768,
+      "scrollWidth": 768
+    },
+    "errors": [],
+    "failed": [],
+    "expanded": "true"
+  },
+  {
+    "width": 1440,
+    "ruleCount": 0,
+    "table": "#\t팀\t전적\t승점\t득실\n1\t\n곰빵은 가면가\n\t1-2-0\t5점\t+1\n2\t\nVORTEX FS\n\t1-1-0\t4점\t+2\n3\t\n종점FS\n\t0-2-1\t2점\t-2\n4\t\n베스트 FC\n\t0-1-1\t1점\t-1",
+    "layout": {
+      "width": 1440,
+      "scrollWidth": 1440
+    },
+    "errors": [],
+    "failed": [],
+    "expanded": "true"
+  }
+]

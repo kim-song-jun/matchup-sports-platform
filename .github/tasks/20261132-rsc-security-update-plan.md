@@ -36,7 +36,7 @@ PDF 참고 링크에는 SAP 문서 및 CVE-2026-120017이 섞여 있다. 본문 
 - [x] 무엇을 해야 하는지 최소 패치 버전과 변경 파일을 명시한다.
 - [x] 우리 상황을 최신 dev·운영 배포 소스·실제 공개 배포 식별자로 대조한다.
 - [x] 진행 순서·검증·완료 조건·남은 불확실성을 남긴다.
-- [ ] 이 문서만 담은 dev 대상 계획 PR을 생성한다.
+- [x] 이 문서만 담은 dev 대상 계획 PR을 생성한다: https://github.com/kim-song-jun/matchup-sports-platform/pull/2349
 
 ## Current Situation — 우리 상황
 
@@ -69,7 +69,7 @@ PDF 참고 링크에는 SAP 문서 및 CVE-2026-120017이 섞여 있다. 본문 
 
 - [x] PDF·공식 권고 대조, 최신 dev·운영 소스 및 공개 배포 SHA 확인.
 - [x] 변경 범위·후속 검증·운영 승격 책임 기록.
-- [ ] dev 대상 PR 생성. 이번 요청의 종료 지점은 계획 PR 게시이며 자동 머지하지 않는다.
+- [x] dev 대상 계획 PR #2349 게시. 이번 요청의 종료 지점은 계획 PR 게시이며 자동 머지하지 않는다.
 
 ### Phase 1: 의존성 패치 (후속 구현 PR)
 
@@ -151,7 +151,7 @@ API/DTO/Prisma 변경이 없어 fixture/MSW/public mock 갱신은 기본적으�
 
 - [x] CVE·패치 버전·출처·현재 의존성·알려진 악용 조건·배포 근거와 한계가 구분되어 있다.
 - [x] 구현 파일·단계·검증·운영 승격 책임·오류 경로가 정리되어 있다.
-- [ ] 단일 문서 diff를 검증하고 dev 대상 PR 링크를 사용자에게 제공한다.
+- [x] 단일 문서 committed diff 및 git diff --check 검증. dev 대상 PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2349
 
 ### 후속 보안 조치 완료
 
@@ -186,7 +186,7 @@ API/DTO/Prisma 변경이 없어 fixture/MSW/public mock 갱신은 기본적으�
 
 ## Progress Snapshot
 
-- Phase 0: PDF 전체 본문·공식 권고·최신 origin/dev·운영 SHA·배포 기록·공개 헤더 확인 및 계획 작성 완료. 문서 diff 검증과 PR 게시 진행 중.
+- Phase 0: PDF 전체 본문·공식 권고·최신 origin/dev·운영 SHA·배포 기록·공개 헤더 확인 및 계획 작성 완료. 단일 문서 committed diff·공백 검사 통과, 새 tech-debt marker 없음. 계획 PR #2349 게시 완료. 실행 코드 변경이 없어 테스트/빌드는 생략.
 - Phase 1–4: 미착수. 이 문서의 체크박스가 후속 resume cursor다.
 - 계획 기준 Git cursor: 4a53b95b1 (PR #2347), 직전 f0679eef1 (PR #2345 release/version-1.17.0).
 - 로컬 원본 tree의 기존 미추적 문서·worktree는 보존. 전용 worktree/branch에서 이 문서만 커밋한다.

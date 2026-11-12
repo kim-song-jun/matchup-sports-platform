@@ -34,7 +34,7 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 ## Acceptance Criteria
 - [x] A/B/C 제시 → 사용자 A안 및 항목별 접기 확정.
 - [x] 원본 조건 및 API259/Web33 좁은 회귀·양쪽 타입/규칙 검사 통과.
-- [ ] diff/새 debt marker/커밋 트리 확인.
+- [x] diff/새 debt marker/커밋 트리 확인.
 - [ ] dev 대상 PR 및 CI/리뷰 상태 기록.
 - [ ] alpha 390/768/1440 화면 증거 (머지·배포 후, 자격증명 필요).
 
@@ -52,3 +52,10 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 
 ## Progress Snapshot
 최신 origin/dev 4a53b95b1 격리 worktree. 구현 및 API259/Web33 회귀 통과. 양쪽 tsc와 API surface/Web pattern PASS. Prisma from-empty 생성 SQL의 새 테이블·unique·FK가 migration과 일치함을 확인했다(실제 replay 아님). 로컬 Docker CLI/Windows daemon이 미가동이라 PostgreSQL integration은 실행하지 못했고 CI용 동시성/권한/cascade 통합 spec을 추가했다. 변경 경로 debt marker 없음, diff check PASS. PR 제출 단계. alpha 기능0/8·3폭0/3, console/network는 미검증이며 관리자 로그인·머지·배포 필요. 로컬 목업의 screenshot을 실제 서비스 완료 증거로 사용하지 않는다.
+
+## PR #2348 마무리 (2026-11-12)
+- Phase 1 — 완료: 원격 PR/CI 확인 및 격리 worktree `/tmp/teameet-pr2348` 생성. 기준 dev `4a53b95b12`, 최초 head `b79eade6f9`. 공유 작업 트리 변경은 보존.
+- Phase 2 — 완료: API 실패는 `SOURCE_SNAPSHOT_DRIFT`, Gates 실패는 final schema binding 4건. 새 additive 시간 테이블의 SHA256 `5c1f131cad5acefe13408405bdd222141cfaffdcf53de6a1599ed6a7008baf7d`를 Docker 클라이언트 증명/manifest writer·validator/source binder/game fixture에 동기화. 기존 릴리스 허용 해시는 유지.
+- Phase 3 — 진행: CI·Copilot 최신 head 검토 후 dev 머지. alpha 실제 로그인 및 3폭 갤러리는 자격증명 대기.
+- 좁은 검증: final binding RED 4실패 → GREEN 9/9; manifest self-test, production deploy security, DB guardrails, API build boundary PASS. API 시간 목록·source snapshot 15/15, Web 배정/편집 회귀 15/15 PASS. API/Web tsc PASS, surface/pattern 검사 PASS(하위 셸의 sandbox 제한 때문에 규칙 검사만 승격 실행).
+- 최초 CI는 새 시간 목록 PostgreSQL integration을 포함해 205 suite/1561 case 통과했으며 유일한 API 실패가 schema snapshot이었다. 실제 통합/마이그레이션 최종 판정은 수정 head의 CI에서 확인한다.

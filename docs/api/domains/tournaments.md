@@ -1061,3 +1061,21 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 ### 경기별 제목 수정 (2026-11-11)
 
 `PATCH /admin/fixtures/:fixtureId`의 `displayTitle`은 경기별 표시 제목(선택, nullable string, trim 후 최대120자)이다. 생략은 보존, null/빈 문구는 자동 제목 복원이다. 기존 관리자 쓰기 권한과 대회/경기 잠금·감사를 적용하고, 제목만 변경하면 팀·진출 연결·결과를 변경하지 않는다. `V1TournamentMatchDetails.displayTitle` (`v1_tournament_match_details.display_title`)에 저장하며 additive migration을 동반한다. 관리자 bracket·수정 응답과 공개 detail/schedule에 동일 값을 반환한다. 목록 수정창과 그림/모바일 편집은 같은 폼·PATCH 및 bracket query invalidation을 사용한다.
+
+## 대진 시간·구장 독립 배정 (2026-11-12)
+
+`league_knockouts`의 어드민 대진에서 시간/구장을 독립 배정한다. 실제 일정·장소·필드는 기존 `V1TeamMatch.startAt`, `fieldId`, 장소 스냅샷이 정본이다. 목록·그림·수동 편집·배정 패널은 기존 `GET /admin/tournaments/:id/bracket`을 읽으며 배정도 기존 `PATCH /admin/fixtures/:fixtureId`를 사용한다.
+
+| Method | Path | 계약 |
+|---|---|---|
+| GET | `/api/v1/admin/tournaments/:tournamentId/schedule-times` | `{ items: [{ id, tournamentId, scheduledAt, createdAt }] }`, scheduledAt 오름차순 |
+| POST | 같은 경로 | `{ scheduledAt: ISO8601-with-offset }` → `{ item }`. 기본 POST 201, 같은 instant 재요청도 같은 행 반환 |
+
+- `V1AuthGuard` 인증 + 서비스 `getTournamentAdmin`(조회)/`getTournamentMutationAdmin`(등록). 활성 owner/ops는 쓰기, support는 조회, 배정된 활성 대회 총괄은 담당 대회만 허용한다. 철회/만료/타 대회는 `403 PERMISSION_DENIED`.
+- 대회 종류·미삭제·`format === league_knockouts` 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`, 다른 format은 409 `SCHEDULE_TIMES_FORMAT_UNSUPPORTED`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.
+- 신규 `V1TournamentScheduleTime`은 재사용 선택지만 저장한다. `(tournamentId, scheduledAt)` unique 및 createMany skipDuplicates로 동시 등록/응답 유실 재시도에도 중복을 만들지 않는다. 실제 새 행만 `tournament.schedule_time.create` 관리자/대회 감사에 기록한다. 시간 목록 등록은 기존 경기 시간을 바꾸지 않는다.
+- 시간 배정/해제는 `{ scheduledAt: ISO | null }`만 보내 fieldId/장소를 보존한다. 구장 배정은 `{ fieldId }`, 기존 직접 입력 장소는 `{ fieldId: null, venue, ...snapshot }`, 구장 해제는 `{ fieldId: null, venue: '' }`로 시간을 보존한다. 기존 경기 수정의 권한·필드 범위·단계/경기 상태 검사와 오류를 그대로 적용한다.
+- 구장 목록/등록은 기존 `/tournament-ops/tournaments/:id/fields`를 재사용한다. 필드 생성은 기존대로 플랫폼 운영자만, 배정은 owner/ops 및 담당 총괄이다. support/담당자에게 새로운 필드 등록 권한을 주지 않는다.
+- 패널은 저장된 시간 선택지와 실제 경기의 수동 입력 시간을 합쳐 표시한다. 구장도 등록 필드와 경기의 기존 장소 스냅샷을 표시하며 서로 다른 주소·좌표를 같은 이름만으로 합치지 않는다. 비활성/목록에서 빠진 필드는 기존 배정 조회·해제만 제공한다.
+- 날짜/시각 입력은 한국 시간이며 UTC ISO로 변환한다. 같은 시각에 여러 구장 진행은 허용한다. 동일 시간·동일 구장의 중복은 화면 경고(자동 차단/다른 경기 이동 없음). 저장 실패는 기존 배정 유지와 실제 원인을 표시한다. 저장 후 재조회 실패는 저장 성공 여부와 최신 조회 실패를 구분한다.
+- 각 시간/구장 제목의 접기/펼치기는 UI 상태만 변경한다. 경기 데이터·선택지·다른 배정을 변경하지 않는다. 실제 단일 경기 편집의 직접 입력은 유지한다. 새로고침 후에도 저장된 선택지와 실제 경기 값은 서버에서 복원한다.

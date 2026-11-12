@@ -91,3 +91,14 @@ describe('shared fixture metadata editor', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('저장했어요');
   });
 });
+
+  it('keeps a label draft while pristine time and place follow external assignment changes', async () => {
+    const current = { ...fixture, fieldId: null, venue: '옛 구장' };
+    const view = render(editor(current));
+    fireEvent.change(screen.getByLabelText('경기 제목'), { target: { value: '편집 중인 제목' } });
+    view.rerender(editor({ ...current, scheduledAt: '2026-10-25T06:30:00.000Z', fieldId: 'field-a', venue: 'A구장' }));
+    expect(screen.getByLabelText('경기 시각')).toHaveValue('2026-10-25T15:30');
+    expect(screen.getByLabelText('경기 제목')).toHaveValue('편집 중인 제목');
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', displayTitle: '편집 중인 제목' }));
+  });

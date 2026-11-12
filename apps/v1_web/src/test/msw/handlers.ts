@@ -1,3 +1,4 @@
+import { scheduleTimeHandlers } from './schedule-time-handlers';
 import { memberBracketPreviewMswHandlers } from './member-bracket-preview-handlers';
 import { namedFinalsMsw } from './named-finals-handlers';
 import { http, HttpResponse } from 'msw';
@@ -804,6 +805,7 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
 
 export const v1MswHandlers = [
   ...namedFinalsMsw.handlers,
+  ...scheduleTimeHandlers,
   http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
   ...v1AdminUserPhoneReleaseMswHandlers,

@@ -1,5 +1,6 @@
 'use client';
 
+import { FixtureTimePicker } from './fixture-time-picker';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import type { PlaceValue } from '@/lib/place';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
@@ -69,16 +70,25 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const dirty = useRef(false);
+  const timeDirty = useRef(false);
+  const placeDirty = useRef(false);
   // 경기 방식은 이 경기에만 저장한다 — 조·단계·대회 기본 설정은 바뀌지 않는다.
   const periods = useMatchPeriodOverride(tournamentId, fixture.id, '대회 기본값');
   useEffect(() => {
     if (dirty.current) return;
     setNumber(String(fixture.fixtureNumber)); setLabels(fixtureLabelDraft(fixture));
-    setTime(isoToKstDatetimeLocal(fixture.scheduledAt)); setFieldId(fixture.fieldId ?? ''); setClearPlace(false); setVenue(fixtureVenueValue(fixture));
-  }, [fixture.id, fixture.fixtureNumber, fixture.displayTitle, fixture.homeDisplayLabel, fixture.awayDisplayLabel, fixture.scheduledAt, fixture.fieldId]);
+  }, [fixture.id, fixture.fixtureNumber, fixture.displayTitle, fixture.homeDisplayLabel, fixture.awayDisplayLabel]);
+  // A label draft must not freeze pristine time/place fields while the assignment panel changes them.
+  useEffect(() => { if (!timeDirty.current) setTime(isoToKstDatetimeLocal(fixture.scheduledAt)); }, [fixture.id, fixture.scheduledAt]);
+  useEffect(() => {
+    if (placeDirty.current) return;
+    setFieldId(fixture.fieldId ?? ''); setClearPlace(false); setVenue(fixtureVenueValue(fixture));
+  }, [fixture.id, fixture.fieldId, fixture.venue, fixture.place]);
   const pending = mutation.isPending || periods.pending;
   const disabled = !canWrite || pending;
   const edit = (action: () => void) => { dirty.current = true; setMessage(null); action(); };
+  const editTime = (value: string) => edit(() => { timeDirty.current = true; setTime(value); });
+  const editPlace = (action: () => void) => edit(() => { placeDirty.current = true; action(); });
   async function save(event: FormEvent) {
     event.preventDefault(); setError(null); setMessage(null);
     if (periods.payload && periods.error) { setError(periods.error); return; }
@@ -99,7 +109,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     } catch (err) { setError(extractErrorMessage(err, '경기 정보를 저장하지 못했어요. 다시 시도해 주세요.')); return; }
     try {
       await periods.save();
-      dirty.current = false; setMessage('경기 정보를 저장했어요.');
+      dirty.current = false; timeDirty.current = false; placeDirty.current = false; setMessage('경기 정보를 저장했어요.');
     } catch (err) {
       const reason = extractErrorMessage(err, '경기 방식을 저장하지 못했어요. 다시 시도해 주세요.');
       setError(fixtureChanged ? `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${reason}` : reason);
@@ -110,10 +120,11 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       <input id={`${id}-number`} className="tm-input" type="number" min={1} max={2147483647} step={1} value={number} disabled={disabled} onChange={event => edit(() => setNumber(event.target.value))} />
     </label>
     <FixtureLabelFields fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} value={labels} onChange={value => edit(() => setLabels(value))} disabled={disabled} />
+    <FixtureTimePicker tournamentId={tournamentId} fixtures={fixtures} value={time} onChange={editTime} disabled={disabled} />
     <label className="flex flex-col gap-1 tm-text-label" htmlFor={`${id}-time`}>경기 시각
-      <input id={`${id}-time`} className="tm-input" type="datetime-local" value={time} disabled={disabled} onChange={event => edit(() => setTime(event.target.value))} />
+      <input id={`${id}-time`} className="tm-input" type="datetime-local" value={time} disabled={disabled} onChange={event => editTime(event.target.value)} />
     </label>
-    <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || !time} onClick={() => edit(() => setTime(''))}>시각 비우기</button>
+    <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || !time} onClick={() => editTime('')}>시각 비우기</button>
     <PeriodOverrideField
       inheritedSummary={periods.inheritedSummary}
       customLabel="이 경기만 따로"
@@ -124,11 +135,11 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       disabled={disabled}
       lockedReason={periods.lockedReason}
     />
-    <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={value => edit(() => { setFieldId(value); setClearPlace(!value); if (!value) setVenue(null); })}
+    <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={value => editPlace(() => { setFieldId(value); setClearPlace(!value); if (!value) setVenue(null); })}
       disabled={disabled} allowNew={false} allowEmpty emptyLabel="경기장 미정" />
-    {!fieldId ? <PlacePicker id={`${id}-venue`} label="장소" maxLength={PLACE_NAME_MAX_LENGTH.tournament} value={clearPlace ? null : venue} onChange={value => edit(() => { setClearPlace(false); setVenue(value); })} disabled={disabled} /> : null}
+    {!fieldId ? <PlacePicker id={`${id}-venue`} label="장소" maxLength={PLACE_NAME_MAX_LENGTH.tournament} value={clearPlace ? null : venue} onChange={value => editPlace(() => { setClearPlace(false); setVenue(value); })} disabled={disabled} /> : null}
     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || (!fieldId && !fixture.venue)}
-      onClick={() => edit(() => { setFieldId(''); setClearPlace(true); setVenue(null); })}>경기장 비우기</button>
+      onClick={() => editPlace(() => { setFieldId(''); setClearPlace(true); setVenue(null); })}>경기장 비우기</button>
     {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     {message ? <p role="status" className="tm-text-caption text-[var(--text-muted)]">{message}</p> : null}
     {canWrite ? <button type="submit" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending}>{pending ? '저장 중…' : '경기 정보 저장'}</button> : null}

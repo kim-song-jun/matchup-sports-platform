@@ -38,3 +38,5 @@ Branch feat/league-schedule-time-picker based on origin/dev c339f1ee9 in isolate
 
 ## Deployment verification
 PR #2353 targets dev. Initial CI API/Gates/security passed; Web found closed sheet router use and missing time-query test context/fixture. Corrected sheet mounting and synchronized existing field/mobile/page test boundaries. RED: initial CI 111 failed. GREEN: affected 4 files / 136 tests passed locally. Before alpha 1440/768/390 captured with no console/network errors. New CI and alpha rollout pending.
+
+Pre-deploy review: unset place placeholders must not warn as an actual court collision. Reused isUnsetPlace and added both placeholder/real-court cases; new league suite 9/9 passed.

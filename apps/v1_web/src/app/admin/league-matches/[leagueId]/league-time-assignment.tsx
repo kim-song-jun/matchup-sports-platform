@@ -11,6 +11,7 @@ import { useV1UpdateLeagueFixture } from '@/hooks/use-v1-api';
 import { assignmentTimes, instant } from '@/lib/fixture-assignment';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { isUnsetPlace } from '@/lib/place';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture } from '@/types/league-match';
 
@@ -75,7 +76,7 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
         const assigned = fixtures.filter(f => instant(f.startAt) === time);
         const candidates = fixtures.filter(f => instant(f.startAt) !== time && f.status !== 'cancelled');
         const label = formatKstDateShort(time) + ' ' + formatKstTime(time);
-        const courtKeys = assigned.filter(f => f.status !== 'cancelled').flatMap(f => f.fieldId ? ['field:' + f.fieldId] : f.placeName ? [JSON.stringify(f.place ?? { name: f.placeName, address: f.placeAddress ?? null })] : []);
+        const courtKeys = assigned.filter(f => f.status !== 'cancelled' && (f.fieldId || !isUnsetPlace(f.place ?? { name: f.placeName, address: f.placeAddress ?? null, latitude: null, longitude: null }))).flatMap(f => f.fieldId ? ['field:' + f.fieldId] : f.placeName ? [JSON.stringify(f.place ?? { name: f.placeName, address: f.placeAddress ?? null })] : []);
         return <details key={time} className="py-3" open={!collapsed.has(time)}>
           <summary className="min-h-11 cursor-pointer tm-text-label" onClick={event => {
             event.preventDefault(); setCollapsed(previous => { const next = new Set(previous); if (next.has(time)) next.delete(time); else next.add(time); return next; });

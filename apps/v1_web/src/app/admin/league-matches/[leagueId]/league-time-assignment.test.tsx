@@ -38,10 +38,10 @@ beforeEach(() => {
   items = [{ id: 'preset', scheduledAt: stamp }]; patches = []; fail = false;
   fixture = { teamMatchId: 'f1', title: '개막전', startAt: '2026-11-20T01:00:00.000Z', placeName: 'A구장', fieldId: 'court1', homeTeamId: 'home', awayTeamId: 'away', status: 'matched' };
 });
-function show(canWrite = true, refreshFail = false) {
+function show(canWrite = true, refreshFail = false, additional: V1LeagueFixture[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   function Page() {
-    const [fixtures, setFixtures] = useState([fixture]);
+    const [fixtures, setFixtures] = useState([fixture, ...additional]);
     return <LeagueTimeAssignment leagueId="l1" fixtures={fixtures} canWrite={canWrite} fixtureName={f => f.title}
       refresh={async () => { setFixtures([fixture]); return { isError: refreshFail }; }} showToast={vi.fn()} />;
   }
@@ -102,6 +102,14 @@ describe('league time assignment through the league API', () => {
     expect(dialog.querySelector('.tm-filter-sheet-handle')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '시간 배정 닫기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+  it.each([false, true])('warns only for actual courts, not unset placeholders (actual court: %s)', async actualCourt => {
+    if (!actualCourt) fixture = { ...fixture, fieldId: null, placeName: '장소 미정' };
+    show(true, false, [{ ...fixture, teamMatchId: 'f2', title: '두번째 경기' }]);
+    await screen.findByText('두번째 경기 · ' + fixture.placeName);
+    const warning = screen.queryByText('같은 시간·구장에 여러 경기가 있어요. 일정을 확인해 주세요.');
+    if (actualCourt) expect(warning).toBeInTheDocument();
+    else expect(warning).not.toBeInTheDocument();
   });
   it('uses league presets in the shared selector without offering an unset start time', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

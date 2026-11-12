@@ -57,7 +57,7 @@ export function planFlexibleBracket(input: Input, offset: number): BracketTempla
   let number = offset;
   const sources: Source[] = [];
   if (input.kind === 'knockout') {
-    if (!integer(input.size, 4, 64) || input.size % 2) invalid('참가 팀 수는 4~64팀 사이의 짝수로 입력해 주세요.');
+    if (!integer(input.size, 4, 64)) invalid('참가 팀 수는 4~64팀 사이의 정수로 입력해 주세요.');
     if (input.participantCount !== undefined && input.participantCount !== input.size) invalid('참가 팀 수와 대진 팀 수를 맞춰 주세요.');
     for (let i = 1; i <= input.size; i++) sources.push({ key: `entry-${i}`, rank: 1, groupKey: null, position: i });
   } else {
@@ -68,8 +68,8 @@ export function planFlexibleBracket(input: Input, offset: number): BracketTempla
     }));
     if (!integer(groups.length, 2, 16) || ![1, 2].includes(input.legs)) invalid('조는 2~16개, 회전은 1~2회로 설정해 주세요.');
     const total = groups.reduce((sum, group) => sum + group.capacity, 0);
-    if (!integer(total, 4, 64) || total % 2 || (input.participantCount !== undefined && input.participantCount !== total)) {
-      invalid('조별 팀 수의 합계를 참가 팀 수(4~64팀의 짝수)와 맞춰 주세요.');
+    if (!integer(total, 4, 64) || (input.participantCount !== undefined && input.participantCount !== total)) {
+      invalid('조별 팀 수의 합계를 참가 팀 수(4~64팀의 정수)와 맞춰 주세요.');
     }
     const names = new Set<string>();
     groups.forEach((group, i) => {

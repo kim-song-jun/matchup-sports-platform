@@ -1,4 +1,4 @@
-﻿import { IsString, IsUUID, Length } from 'class-validator';
+import { IsString, IsUUID, Length } from 'class-validator';
 
 export class StartMemberBracketPreviewDto {
   @IsUUID()

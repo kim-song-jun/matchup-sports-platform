@@ -1,4 +1,4 @@
-﻿import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemberBracketPreviewButton } from './member-bracket-preview-button';
 const mocks = vi.hoisted(() => ({ push: vi.fn(), post: vi.fn(), canWrite: true }));

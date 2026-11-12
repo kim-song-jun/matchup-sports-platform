@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { createContext, useContext, type ReactNode } from 'react';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 

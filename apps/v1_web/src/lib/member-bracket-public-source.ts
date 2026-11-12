@@ -1,4 +1,4 @@
-﻿import { liveV1DataSource, type V1DataSource } from '@/components/providers/v1-data-source';
+import { liveV1DataSource, type V1DataSource } from '@/components/providers/v1-data-source';
 
 /** Public projections must not inherit the operator's optional staff visibility bypass. */
 export function memberBracketPublicSource(tournamentId: string): V1DataSource {

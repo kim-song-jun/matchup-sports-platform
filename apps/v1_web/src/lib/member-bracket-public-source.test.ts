@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { memberBracketPublicSource } from './member-bracket-public-source';
 
 describe('memberBracketPublicSource', () => {

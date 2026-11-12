@@ -59,3 +59,4 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - Phase 3 — 진행: CI·Copilot 최신 head 검토 후 dev 머지. alpha 실제 로그인 및 3폭 갤러리는 자격증명 대기.
 - 좁은 검증: final binding RED 4실패 → GREEN 9/9; manifest self-test, production deploy security, DB guardrails, API build boundary PASS. API 시간 목록·source snapshot 15/15, Web 배정/편집 회귀 15/15 PASS. API/Web tsc PASS, surface/pattern 검사 PASS(하위 셸의 sandbox 제한 때문에 규칙 검사만 승격 실행).
 - 최초 CI는 새 시간 목록 PostgreSQL integration을 포함해 205 suite/1561 case 통과했으며 유일한 API 실패가 schema snapshot이었다. 실제 통합/마이그레이션 최종 판정은 수정 head의 CI에서 확인한다.
+- 모바일 보정: 새 패널에 기존 BottomSheet 손잡이가 없어 본문 pointerdown을 드래그로 잡고 CSS가 `touch-action:none`이 됨. 공통 손잡이를 연결. 실제 컴포넌트 회귀 RED 1실패 → GREEN 5/5(본문 capture 없음·summary 접기·dialog 유지). alpha 시각 검증과 구별되는 단위 근거.

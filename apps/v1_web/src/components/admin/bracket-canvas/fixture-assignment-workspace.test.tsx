@@ -10,7 +10,9 @@ import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import type { V1AdminBracketFixture, V1TournamentField } from '@/types/api';
 
-vi.mock('@/hooks/use-media-query', () => ({ useMediaQuery: () => true }));
+const viewport = vi.hoisted(() => ({ wide: true }));
+vi.mock('@/hooks/use-media-query', () => ({ useMediaQuery: () => viewport.wide }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ back: vi.fn(), replace: vi.fn() }) }));
 vi.mock('@/components/admin/period-override-field', () => ({ PeriodOverrideField: () => null,
   useMatchPeriodOverride: () => ({ payload: null, save: async () => {}, pending: false }) }));
 vi.mock('@/components/v1-ui/place-picker', () => ({ PlacePicker: ({ value, onChange }: { value: { name: string } | null; onChange: (value: unknown) => void }) =>
@@ -49,7 +51,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => { cleanup(); server.resetHandlers(); });
 beforeEach(() => {
-  fail = false; patches = []; times = [{ id: 'time1', scheduledAt: stamp }, { id: 'time2', scheduledAt: '2026-11-21T01:30:00.000Z' }];
+  viewport.wide = true; fail = false; patches = []; times = [{ id: 'time1', scheduledAt: stamp }, { id: 'time2', scheduledAt: '2026-11-21T01:30:00.000Z' }];
   fields = [{ id: 'field-a', tournamentId: 't-1', name: 'A구장', active: true, version: 0, sortOrder: 0, scopeKey: 'a' }, { id: 'field-b', tournamentId: 't-1', name: 'B구장', active: true, version: 0, sortOrder: 1, scopeKey: 'b' }];
   fixtures = [makeFixture({ id: 'f1', fixtureNumber: 1, groupId: 'g1', homeTeamName: '서울', awayTeamName: '부산', homeRegistrationId: 'r1', awayRegistrationId: 'r2', scheduledAt: stamp, fieldId: 'field-a', venue: 'A구장' }),
     makeFixture({ id: 'f2', fixtureNumber: 2, groupId: 'g1' })];
@@ -67,6 +69,25 @@ function show(canWrite = true, canManageFields = true, editor = false) {
 const timeLabel = (stamp: string) => `${formatKstDateShort(stamp)} ${formatKstTime(stamp)}`;
 
 describe('real fixture assignment API and shared editor', () => {
+  it('leaves mobile panel content gestures to scrolling and summary controls', async () => {
+    viewport.wide = false;
+    const originalCapture = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'setPointerCapture');
+    const capture = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', { configurable: true, value: capture });
+    try {
+      show();
+      fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
+      const summary = (await screen.findByText(timeLabel(stamp), { selector: 'summary > span' })).closest('summary')!;
+      fireEvent.pointerDown(summary);
+      expect(capture).not.toHaveBeenCalled();
+      fireEvent.click(summary);
+      expect(summary.parentElement).not.toHaveAttribute('open');
+      expect(screen.getByRole('dialog', { name: '시간 배정' })).toBeInTheDocument();
+    } finally {
+      if (originalCapture) Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', originalCapture);
+      else delete (HTMLElement.prototype as Partial<HTMLElement>).setPointerCapture;
+    }
+  });
   it('changes time and court independently, rehydrates the existing manual editor, and keeps collapsed sections', async () => {
     show(true, true, true);
     expect(await screen.findByLabelText('경기 시각')).toHaveValue('2026-11-21T10:00');

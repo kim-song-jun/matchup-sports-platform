@@ -148,6 +148,6 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
       <div className="min-w-0">{children}</div>
       {mode && wide ? <aside id={`${id}-panel`} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}
     </div>
-    {!wide ? <BottomSheet open={mode !== null} onClose={close} ariaLabel={`${label} 배정`}><div id={`${id}-panel`}>{panel}</div></BottomSheet> : null}
+    {!wide ? <BottomSheet open={mode !== null} onClose={close} ariaLabel={`${label} 배정`}><div className="tm-filter-sheet-handle" aria-hidden="true" /><div id={`${id}-panel`}>{panel}</div></BottomSheet> : null}
   </div></FixtureAssignmentContext.Provider>;
 }

@@ -65,6 +65,26 @@ describe('ScheduleTimesService', () => {
     await expect(service.list(user, 't1')).rejects.toThrow(ForbiddenException);
     expect(db.v1TournamentScheduleTime.findMany).not.toHaveBeenCalled();
   });
+  it('stores league times with platform permissions and the league kind filter', async () => {
+    const { service, db, rows, logs } = setup();
+    db.v1Tournament.findFirst.mockResolvedValue({ id: 't1', format: 'league' });
+    await service.create(user, 't1', { scheduledAt: '2026-11-21T10:00:00+09:00' }, 'league-matches');
+    await service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' }, 'league-matches');
+    expect((await service.list(user, 't1', 'league-matches')).items).toHaveLength(1);
+    expect(rows).toHaveLength(1); expect(logs).toHaveLength(1);
+    expect(db.v1Tournament.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      AND: [{ OR: [{ kind: 'regular_league' }] }, { id: 't1', deletedAt: null }],
+    } }));
+  });
+  it('does not grant league time access to tournament directors and blocks support writes', async () => {
+    const director = setup(null, 't1');
+    await expect(director.service.list(user, 't1', 'league-matches')).rejects.toThrow(ForbiddenException);
+    await expect(director.service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' }, 'league-matches')).rejects.toThrow(ForbiddenException);
+    const support = setup('support');
+    expect(await support.service.list(user, 't1', 'league-matches')).toEqual({ items: [] });
+    await expect(support.service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' }, 'league-matches')).rejects.toThrow(ForbiddenException);
+    expect(support.rows).toHaveLength(0);
+  });
   it('rejects missing or unsupported tournaments without creating times', async () => {
     const { service, db, rows } = setup();
     db.v1Tournament.findFirst.mockResolvedValueOnce(null as never);

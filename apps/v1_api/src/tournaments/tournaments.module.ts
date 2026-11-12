@@ -1,4 +1,4 @@
-import { ScheduleTimesController } from './scheduling/schedule-times.controller';
+import { ScheduleTimesController, LeagueScheduleTimesController } from './scheduling/schedule-times.controller';
 import { ScheduleTimesService } from './scheduling/schedule-times.service';
 import { StageLegacyMutationGuard } from './stages/stage-legacy-mutation.guard';
 import { StagePlanService } from './stages/stage-plan.service';
@@ -95,6 +95,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
   ],
   controllers: [
     ScheduleTimesController,
+    LeagueScheduleTimesController,
     StagePlanController,
     MultiFinalsController,
     SixTeamController,

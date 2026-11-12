@@ -20,3 +20,17 @@ export class ScheduleTimesController {
     return this.times.create(user, id, dto);
   }
 }
+
+@Controller('admin/league-matches/:leagueId/schedule-times')
+@UseGuards(V1AuthGuard)
+export class LeagueScheduleTimesController {
+  constructor(private readonly times: ScheduleTimesService) {}
+  @Get()
+  list(@CurrentUser() user: V1AuthUser, @Param('leagueId', ParseUUIDPipe) id: string) {
+    return this.times.list(user, id, 'league-matches');
+  }
+  @Post()
+  create(@CurrentUser() user: V1AuthUser, @Param('leagueId', ParseUUIDPipe) id: string, @Body() dto: CreateScheduleTimeDto) {
+    return this.times.create(user, id, dto, 'league-matches');
+  }
+}

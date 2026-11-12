@@ -29,7 +29,7 @@ describe('flexible bracket', () => {
     expect(() => plan({ ...input, groups: input.groups.map(group => ({ ...group, legs: 3 as 1 })) })).toThrow();
   });
 
-  it.each(Array.from({ length: 31 }, (_, i) => 4 + i * 2))('%i teams have a complete playable path to the final', (size) => {
+  it.each(Array.from({ length: 61 }, (_, i) => 4 + i))('%i teams have a complete playable path to the final', (size) => {
     const p = plan({ kind: 'knockout', schemaVersion: 2, size, thirdPlace: true, drawSeed: 7 });
     expect(p.fixtures).toHaveLength(size);
     expect(p.slots).toHaveLength(size);
@@ -75,6 +75,27 @@ describe('flexible bracket', () => {
     expect(byes.every((slot) => slot.kind === 'GROUP_RANK' && slot.position === 1 && slot.sourceGroupKey)).toBe(true);
   });
 
+  it('9 teams in 5+4 groups generate only real games and a 5-team final', () => {
+    const p = plan({ kind: 'group_knockout', schemaVersion: 2, participantCount: 9,
+      groupCount: 2, teamsPerGroup: 5, advancePerGroup: 2, legs: 1, thirdPlace: false,
+      groups: [{ name: 'A', capacity: 5, advanceCount: 3 }, { name: 'B', capacity: 4, advanceCount: 2 }] });
+    expect(p.fixtures).toHaveLength(20); // 10 + 6 group games, 4 knockout games
+    expect(p.byeSlots).toHaveLength(3);
+    for (const [index, count] of [5, 4].entries()) {
+      const key = `group:${index}`;
+      const slots = p.slots.filter(slot => slot.groupKey === key);
+      const games = p.fixtures.filter(game => game.groupKey === key);
+      expect(games).toHaveLength(count * (count - 1) / 2);
+      expect(new Set(games.map(game => [game.homeSlotKey, game.awaySlotKey].sort().join('|'))).size).toBe(games.length);
+      for (const game of games) {
+        expect(slots.some(slot => slot.key === game.homeSlotKey)).toBe(true);
+        expect(slots.some(slot => slot.key === game.awaySlotKey)).toBe(true);
+        expect(game.homeSlotKey).not.toBe(game.awaySlotKey);
+      }
+      for (const slot of slots) expect(games.filter(game => game.homeSlotKey === slot.key || game.awaySlotKey === slot.key)).toHaveLength(count - 1);
+    }
+  });
+
   it('enforces the combined 240-game limit', () => {
     const input = { kind: 'group_knockout' as const, schemaVersion: 2 as const, groupCount: 8, teamsPerGroup: 8,
       advancePerGroup: 2, legs: 1 as const, thirdPlace: true };
@@ -90,7 +111,7 @@ describe('flexible bracket', () => {
     expect(p.slots.filter(row => row.kind === 'GROUP_RANK')).toHaveLength(size);
   });
 
-  it.each([0, 3, 5, 65, 66, 4.5])('rejects invalid standalone count %i', (size) => {
+  it.each([0, 3, 65, 66, 4.5])('rejects invalid standalone count %i', (size) => {
     expect(() => plan({ kind: 'knockout', schemaVersion: 2, size, thirdPlace: false })).toThrow();
   });
 });

@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { EmailLinkController } from './email-link.controller';
 import { EmailLinkService } from './email-link.service';
 import { AppleTokenModule } from './apple-token.module';
+import { KakaoUnlinkModule } from './kakao-unlink.module';
 import { AuthService } from './auth.service';
 import { LoginMethodController } from './login-method.controller';
 import { LoginMethodService } from './login-method.service';
@@ -23,7 +24,7 @@ import { TermsModule } from '../terms/terms.module';
 import { VerificationModule } from '../verification/verification.module';
 
 @Module({
-  imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule, NotificationsServiceModule],
+  imports: [TermsModule, VerificationModule, AppleTokenModule, KakaoUnlinkModule, RealtimeModule, NotificationsServiceModule],
   controllers: [AuthController, EmailLinkController, LoginMethodController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
   providers: [
     AuthService,

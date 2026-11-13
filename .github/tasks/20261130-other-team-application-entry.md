@@ -1,5 +1,5 @@
 # 대회 상세 다른 팀 신청 진입
-Status: Review
+Status: Deployment Verification
 
 ## Context
 한 팀을 신청하면 대회 상세의 신청 CTA가 사라져 다른 팀 신청을 발견하기 어렵다.
@@ -28,3 +28,11 @@ Alpha는 dev 머지 후 변경을 렌더한다. 이번 요청은 PR 생성까지
 사용자가 제안한 방향을 승인했으므로 별도 디자인 선택 절차를 반복하지 않음.
 ## Progress Snapshot
 origin/dev 974ac541b 기반 fix/tournament-other-team-apply. 상세 CTA 테스트 83/83 PASS (추가 9개 포함). 기존 LeagueSections act 경고가 있으나 테스트는 통과. tsc --noEmit --incremental false PASS. git diff --check PASS. 초기 의존성 누락은 작업 전용 /tmp/teameet-other-team-qa로 보완; 다른 세션 의존성 불변.
+
+## Hotfix follow-up
+- 사용자 요청으로 main 1.17.2 핫픽스 PR #2362를 분리하고 #2361과 함께 머지.
+- 2026-11-13 사용자가 Copilot 리뷰 생략 및 진행 승인.
+- dev merge a346b246c, main merge 6675a8a00. 두 PR 최신 API/Web/Gates와 main CodeQL PASS.
+- CI에서 기존 상세 fixture sport 누락을 발견해 보완. 상세 페이지 46/46 및 CTA 83/83 PASS.
+- main 이력 흡수: dev의 고정 API/Web 1.19.0 유지, 운영 핫픽스 1.17.2 변경 이력 보존. 런타임 코드 diff 없음.
+- Alpha/운영 배포 확인 진행 중. 브라우저 host unavailable 및 native 접근 승인 시간 초과로 화면 검증 미완료.

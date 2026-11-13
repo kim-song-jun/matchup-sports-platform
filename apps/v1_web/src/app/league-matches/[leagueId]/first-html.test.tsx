@@ -6,6 +6,7 @@ import { IsRestoringProvider, QueryClient, QueryClientProvider } from '@tanstack
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stripScriptTags } from '@/test/html-sanitize';
+import { parseNextImageSrc } from '@/test/next-image';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -82,8 +83,9 @@ describe('리그 상세 링크 미리보기', () => {
   it('대표 이미지가 있으면 OG·트위터 이미지로 쓰고, 없으면 기본 이미지로 둔다', async () => {
     LEAGUE.coverImageUrl = '/uploads/2026/10/cover.webp';
     const withCover = await meta();
-    expect(withCover.openGraph?.images).toEqual([expect.objectContaining({ url: '/uploads/2026/10/cover.webp' })]);
-    expect(withCover.twitter?.images).toEqual(['/uploads/2026/10/cover.webp']);
+    const [og] = withCover.openGraph?.images as Array<{ url: string }>;
+    expect(parseNextImageSrc(og.url)).toMatchObject({ pathname: '/_next/image', url: '/uploads/2026/10/cover.webp', w: '1200' });
+    expect(withCover.twitter?.images).toEqual([og.url]);
 
     LEAGUE.coverImageUrl = null;
     const without = await meta();

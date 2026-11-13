@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseNextImageSrc } from '@/test/next-image';
 
 const mocks = vi.hoisted(() => ({
   fetchPublicV1: vi.fn(),
@@ -60,6 +61,10 @@ function ogImageUrl(meta: { openGraph?: unknown }): string | undefined {
   return images?.[0]?.url;
 }
 
+function optimizedOgImage(meta: { openGraph?: unknown }) {
+  return parseNextImageSrc(ogImageUrl(meta) ?? '');
+}
+
 describe('대회 결과·시상 화면의 색인 조건', () => {
   it.each([
     ['결과', resultsMetadata],
@@ -82,10 +87,10 @@ describe('대회 하위 화면의 공유 이미지', () => {
     ['후기', reviewsMetadata],
   ])('%s: 커버 없이 포스터만 있는 대회도 상세 화면과 같은 이미지를 쓴다', async (_screen, generate) => {
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament({ promoHomeImageUrl: '/uploads/poster.png' }));
-    expect(ogImageUrl(await generate(params))).toBe('/uploads/poster.png');
+    expect(optimizedOgImage(await generate(params))).toMatchObject({ pathname: '/_next/image', url: '/uploads/poster.png', w: '1200' });
 
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament({ coverImageUrl: '/uploads/cover.png', promoHomeImageUrl: '/uploads/poster.png' }));
-    expect(ogImageUrl(await generate(params))).toBe('/uploads/cover.png');
+    expect(optimizedOgImage(await generate(params))).toMatchObject({ pathname: '/_next/image', url: '/uploads/cover.png', w: '1200' });
 
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament());
     expect(ogImageUrl(await generate(params))).toBe('/opengraph-image');

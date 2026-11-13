@@ -1,18 +1,18 @@
 'use client';
 
-import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ChevronDown, Clock3, MapPin, X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { useV1AdminBracket, useV1CreateTournamentField, useV1TournamentFields, useV1UpdateFixture } from '@/hooks/use-v1-api';
-import { useCreateFixtureScheduleTime, useFixtureScheduleTimes } from '@/hooks/use-fixture-schedule-times';
+import { useV1AdminBracket, useV1CreateTournamentField, useV1RenameTournamentField, useV1TournamentFields, useV1UpdateFixture } from '@/hooks/use-v1-api';
+import { useCreateFixtureScheduleTime, useFixtureScheduleTimes, useUpdateFixtureScheduleTime } from '@/hooks/use-fixture-schedule-times';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { randomUuid } from '@/lib/uuid';
-import { assignmentCourts, assignmentPatch, assignmentTimes, fixtureCourtKey, hasAssignmentCollision, isAssigned,
+import { assignmentCourts, assignmentPatch, assignmentTimes, fixtureCourtKey, hasAssignmentCollision, instant, isAssigned,
   type AssignmentMode, type CourtChoice } from '@/lib/fixture-assignment';
 import type { V1AdminBracketFixture } from '@/types/api';
 import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
@@ -30,6 +30,11 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
   const [courtDraft, setCourtDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<{ key: string; value: string; initialValue: string; fixtureIds: string[]; scheduleTimeId?: string | null; fieldId?: string; expectedVersion?: number } | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const editTrigger = useRef<HTMLButtonElement | null>(null);
+  const editInput = useRef<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   const fieldRequest = useRef<{ name: string; scopeKey: string } | null>(null);
   const wide = useMediaQuery('(min-width: 1440px)');
   const bracket = useV1AdminBracket(tournamentId);
@@ -37,18 +42,53 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
   const fields = useV1TournamentFields(tournamentId);
   const addTime = useCreateFixtureScheduleTime(tournamentId);
   const addField = useV1CreateTournamentField(tournamentId);
+  const editTime = useUpdateFixtureScheduleTime(tournamentId);
+  const editField = useV1RenameTournamentField(tournamentId);
   const update = useV1UpdateFixture(tournamentId);
   const fixtures = bracket.data?.fixtures ?? [];
   const groups = bracket.data?.groups ?? [];
   const context = useMemo(() => buildSideLabelContext(groups, fixtures, bracket.data?.slots ?? []), [bracket.data]);
   const courts = assignmentCourts(fixtures, fields.data?.items ?? []);
   const timeChoices = assignmentTimes(fixtures, times.data?.items ?? []);
-  const busy = saving || addTime.isPending || addField.isPending;
+  const busy = saving || addTime.isPending || addField.isPending || editTime.isPending || editField.isPending;
   const label = mode === 'court' ? '구장' : '시간';
   const assignedCount = fixtures.filter(f => mode === 'court' ? fixtureCourtKey(f) : f.scheduledAt).length;
   const fixtureName = (f: V1AdminBracketFixture) => `${fixtureSideLabel(f, 'HOME', context)} vs ${fixtureSideLabel(f, 'AWAY', context)}`;
-  const close = () => { if (!busy) { setMode(null); setError(null); } };
-  const open = (next: AssignmentMode) => { if (!busy) { setMode(mode === next ? null : next); setError(null); } };
+  const cancelEdit = () => { if (!busy) {
+    setEditing(null); setEditError(null);
+    if (editTrigger.current?.isConnected) editTrigger.current.focus(); else panelRef.current?.focus();
+  } };
+  const close = () => { if (!busy) { setMode(null); setError(null); setEditing(null); setEditError(null); } };
+  const open = (next: AssignmentMode) => { if (!busy) { setMode(mode === next ? null : next); setError(null); setEditing(null); setEditError(null); } };
+
+  async function saveEntry(event: FormEvent) {
+    event.preventDefault();
+    if (!editing || busy || !mode || !canWrite || mode === 'court' && !canManageFields) return;
+    if (editing.value === editing.initialValue) { cancelEdit(); return; }
+    const value = mode === 'time' ? kstDatetimeLocalToIso(editing.value) : editing.value.trim();
+    if (!value) { setEditError(mode === 'time' ? '날짜와 시간을 확인해 주세요.' : '구장 이름을 입력해 주세요.'); return; }
+    if (mode === 'time' ? value === editing.key : courts.find(court => court.key === editing.key)?.name === value) {
+      cancelEdit(); return;
+    }
+    setSaving(true); setEditError(null);
+    try {
+      if (mode === 'time') {
+        const expectedScheduleTimeId = editing.scheduleTimeId ?? null;
+        await editTime.mutateAsync({ expectedScheduleTimeId, expectedScheduledAt: editing.key, scheduledAt: value,
+          ...(expectedScheduleTimeId === null ? { expectedFixtureIds: editing.fixtureIds } : {}) });
+      } else {
+        if (editing.fieldId === undefined || editing.expectedVersion === undefined) throw new Error('등록된 구장을 다시 불러온 뒤 수정해 주세요.');
+        await editField.mutateAsync({ fieldId: editing.fieldId, expectedVersion: editing.expectedVersion, name: value });
+      }
+      const [freshBracket, freshSource] = await Promise.all([bracket.refetch(), mode === 'time' ? times.refetch() : fields.refetch()]);
+      if (freshBracket.isError || freshSource.isError) {
+        setEditing(null); setError('수정은 저장됐지만 최신 목록을 불러오지 못했어요. 다시 불러와 확인해 주세요.'); return;
+      }
+      setEditing(null); panelRef.current?.focus();
+      showToast(mode === 'time' ? '시간과 배정된 경기 일정을 수정했어요.' : '구장 이름과 배정된 경기 표시를 수정했어요.', 'success');
+    } catch (err) { setEditError(extractErrorMessage(err, `${label}을 수정하지 못했어요.`)); }
+    finally { setSaving(false); }
+  }
 
   async function assign(fixtureId: string, value: string | CourtChoice | null) {
     if (!mode || !canWrite || busy) return;
@@ -89,7 +129,10 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
   const unavailable = bracket.isPending || bracket.isError || source.isPending || source.isError;
   const entries = mode === 'court' ? courts.map(court => ({ key: court.key, title: court.name, value: court, active: court.active }))
     : timeChoices.map(value => ({ key: value, title: `${formatKstDateShort(value)} ${formatKstTime(value)}`, value, active: true }));
-  const panel = <section className="flex min-h-0 flex-col" aria-label={`${label} 배정`}>
+  const editSourceMissing = Boolean(editing && !busy && (unavailable || !entries.some(entry => entry.key === editing.key)));
+  const editExpanded = editing ? !collapsed.has(`${mode}:${editing.key}`) : false;
+  useEffect(() => { if (editExpanded) editInput.current?.focus(); }, [editing?.key, editSourceMissing, editExpanded]);
+  const panel = <section ref={panelRef} tabIndex={-1} className="flex min-h-0 flex-col" aria-label={`${label} 배정`}>
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
       <div><h2 className="tm-text-body-lg font-bold">{label} 배정</h2><p className="tm-text-caption text-[var(--text-muted)]">{label}을 등록하고 경기를 골라 넣어요.</p></div>
       <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost min-h-11" aria-label={`${label} 배정 닫기`} onClick={close} disabled={busy}><X size={18} aria-hidden="true" /></button>
@@ -110,6 +153,12 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
       {bracket.isError ? <ErrorState compact message={extractErrorMessage(bracket.error, '대진을 불러오지 못했어요.')} onRetry={() => void bracket.refetch()} /> : null}
       {source.isError ? <ErrorState compact message={extractErrorMessage(source.error, `${label} 목록을 불러오지 못했어요.`)} onRetry={() => void source.refetch()} /> : null}
       {bracket.isPending || source.isPending ? <p role="status" className="tm-text-caption">불러오는 중이에요.</p> : null}
+      {editing && editSourceMissing ? <div className="flex flex-col gap-2 py-3">
+        <p role="alert" className="tm-text-caption text-[var(--red700)]">수정 중이던 항목을 최신 목록에서 확인할 수 없어요. 입력값을 남겨 두었으니 확인 후 취소하고 항목을 다시 선택해 주세요.</p>
+        <label htmlFor={`${id}-unavailable-edit`} className="tm-text-label">{mode === 'time' ? '시간 수정 (한국 시간)' : '구장 이름 수정'}</label>
+        <input ref={editInput} id={`${id}-unavailable-edit`} className="tm-input w-full" type={mode === 'time' ? 'datetime-local' : 'text'} value={editing.value} readOnly />
+        <Button type="button" variant="outline" onClick={cancelEdit}>취소</Button>
+      </div> : null}
       {!unavailable ? <div className="flex flex-col divide-y divide-[var(--border)]">
         {entries.length === 0 ? <p className="py-4 tm-text-caption text-[var(--text-muted)]">등록된 {label}이 없어요.</p> : null}
         {entries.map((entry, index) => {
@@ -117,12 +166,26 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
           const candidates = fixtures.filter(f => !isAssigned(f, mode!, entry.key));
           const stateKey = `${mode}:${entry.key}`;
           const expanded = !collapsed.has(stateKey);
-          return <details key={stateKey} open={expanded} className="py-3">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-blue-500"
-              onClick={event => { event.preventDefault(); setCollapsed(previous => { const next = new Set(previous); if (expanded) next.add(stateKey); else next.delete(stateKey); return next; }); }}>
+          const field = mode === 'court' ? fields.data?.items.find(item => `field:${item.id}` === entry.key) : undefined;
+          const editable = canWrite && (mode === 'time' || canManageFields && field !== undefined);
+          const editingEntry = editing?.key === entry.key;
+          return <div key={stateKey} className="relative py-3"><details open={expanded}>
+            <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-blue-500 ${editable ? 'pr-16' : ''}`}
+              onClick={event => { event.preventDefault(); if (busy) return; setCollapsed(previous => { const next = new Set(previous); if (expanded) next.add(stateKey); else next.delete(stateKey); return next; }); }}>
               <span className="min-w-0 break-words tm-text-body font-bold">{entry.title}{!entry.active ? ' (사용 안 함)' : ''}</span>
               <span className="flex shrink-0 items-center gap-2"><span className="tm-text-caption text-[var(--text-muted)]">{assigned.length}경기</span><ChevronDown size={16} aria-hidden="true" className={expanded ? '' : '-rotate-90'} /></span>
             </summary>
+            {editingEntry && editing && !editSourceMissing ? <form id={`${id}-edit-form-${index}`} onSubmit={event => void saveEntry(event)} className="flex flex-col gap-2 py-3">
+              <label htmlFor={`${id}-edit-${index}`} className="tm-text-label">{mode === 'time' ? '시간 수정 (한국 시간)' : '구장 이름 수정'}</label>
+              <input ref={editInput} id={`${id}-edit-${index}`} className="tm-input w-full" type={mode === 'time' ? 'datetime-local' : 'text'}
+                value={editing.value} maxLength={mode === 'court' ? 120 : undefined} required disabled={busy}
+                onChange={event => setEditing(previous => previous ? { ...previous, value: event.target.value } : null)}
+                onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelEdit(); } }} />
+              <p className="tm-text-caption text-[var(--text-muted)]">이 항목에 배정된 {assigned.length}경기의 {mode === 'time' ? '시간' : '구장 이름'}도 함께 바뀌어요.</p>
+              {editError ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{editError}</p> : null}
+              <div className="flex gap-2"><Button type="submit" loading={saving} disabled={busy}>저장</Button>
+                <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>취소</Button></div>
+            </form> : null}
             {expanded ? <div className="flex flex-col gap-2 pt-2">
               {hasAssignmentCollision(assigned) ? <p className="tm-text-caption text-[var(--orange700)]">같은 시간·구장에 여러 경기가 있어요. 일정을 확인해 주세요.</p> : null}
               {assigned.map(fixture => <div key={fixture.id} className="flex items-center justify-between gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
@@ -136,7 +199,17 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
                   {candidates.map(fixture => <option key={fixture.id} value={fixture.id}>{fixtureTitle(fixture, groups)} · {fixtureName(fixture)}</option>)}
                 </select></> : null}
             </div> : null}
-          </details>;
+          </details>{editable ? <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost absolute right-0 top-3 min-h-11"
+            aria-label={`${entry.title} ${mode === 'court' ? '이름' : '시간'} 수정`} aria-expanded={editingEntry} aria-controls={`${id}-edit-form-${index}`} disabled={busy}
+            onClick={event => {
+              setCollapsed(previous => { const next = new Set(previous); next.delete(stateKey); return next; });
+              if (editingEntry) { editInput.current?.focus(); return; }
+              editTrigger.current = event.currentTarget; setEditError(null);
+              const initialValue = mode === 'time' ? isoToKstDatetimeLocal(String(entry.value)) : entry.title;
+              setEditing({ key: entry.key, value: initialValue, initialValue, fixtureIds: assigned.map(fixture => fixture.id),
+                ...(mode === 'time' ? { scheduleTimeId: times.data?.items.find(item => instant(item.scheduledAt) === entry.key)?.id ?? null } : {}),
+                ...(field ? { fieldId: field.id, expectedVersion: field.version } : {}) });
+            }}>수정</button> : null}</div>;
         })}
       </div> : null}
     </div>

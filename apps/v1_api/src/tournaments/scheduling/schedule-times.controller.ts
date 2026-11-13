@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import { V1AuthUser } from '../../auth/v1-auth-user';
-import { CreateScheduleTimeDto } from './schedule-times.dto';
+import { CreateScheduleTimeDto, UpdateScheduleTimeDto } from './schedule-times.dto';
 import { ScheduleTimesService } from './schedule-times.service';
 
 @Controller('admin/tournaments/:tournamentId/schedule-times')
@@ -19,6 +19,11 @@ export class ScheduleTimesController {
   create(@CurrentUser() user: V1AuthUser, @Param('tournamentId', ParseUUIDPipe) id: string, @Body() dto: CreateScheduleTimeDto) {
     return this.times.create(user, id, dto);
   }
+
+  @Patch()
+  update(@CurrentUser() user: V1AuthUser, @Param('tournamentId', ParseUUIDPipe) id: string, @Body() dto: UpdateScheduleTimeDto) {
+    return this.times.update(user, id, dto);
+  }
 }
 
 @Controller('admin/league-matches/:leagueId/schedule-times')
@@ -32,5 +37,9 @@ export class LeagueScheduleTimesController {
   @Post()
   create(@CurrentUser() user: V1AuthUser, @Param('leagueId', ParseUUIDPipe) id: string, @Body() dto: CreateScheduleTimeDto) {
     return this.times.create(user, id, dto, 'league-matches');
+  }
+  @Patch()
+  update(@CurrentUser() user: V1AuthUser, @Param('leagueId', ParseUUIDPipe) id: string, @Body() dto: UpdateScheduleTimeDto) {
+    return this.times.update(user, id, dto, 'league-matches');
   }
 }

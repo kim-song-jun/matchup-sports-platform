@@ -7,6 +7,23 @@ Created: 2026-11-12
 ## Context
 리그 + N개 토너먼트에서 시간·구장을 미리 등록하고 각 항목에 경기를 배정한다. 사용자가 로컬 A안 목업을 검수하고 실제 구현·PR을 요청했다.
 
+## 2026-11-13 후속 — 등록 항목 수정
+
+- Scope: backend + frontend + docs. 브랜치 `feat/edit-assignment-options-20261113`, base `974ac541b7a2`. 2026-11-13 사용자가 이 수정까지 main 승격 범위에 포함하도록 명시 승인했다. 기존 1.19.1 고정 후보는 이력으로 보존하고 #2364 검증 후 새 후보를 고정한다.
+- 사용자 선택: A 항목 안에서 수정. B 별도 창/C 목록 관리 화면과 장단점·규모 비교 후 명시 선택 받음.
+- 시간 항목의 기존 시각 → 새 시각 변경은 같은 항목에 배정된 경기에도 원자적으로 반영한다. 구장·팀·경기 길이·팀 일정 정본을 보존한다. 등록 항목 없는 기존 직접 입력 시각도 지원한다.
+- 등록 구장 이름 변경은 기존 fieldId와 주소·좌표·시간을 보존하고 연결된 경기의 이름도 동기화한다. 구장 관리 권한과 expectedVersion/멱등 계약을 유지한다. 등록되지 않은 레거시 직접 입력 장소는 기존 개별 경기 편집 경로를 유지한다.
+- 시간 이동에 시작/종료된 경기가 섞이면 전체 거부한다. 중복 시간/구장 이름과 stale source/version은 실제 오류를 보여주며 부분 성공·자동 합치기를 하지 않는다.
+- UI: 항목 제목의 접기와 별도 수정 버튼, label/input + 저장/취소, 반영 경기 수 안내, 저장 중 중복 조작 차단, 실패 시 입력 유지. shared Button/tm-input과 기존 BottomSheet/aside 재사용.
+- Owned: scheduling controller/DTO/service/tests, 내부 schedule-order helper 및 회귀, field DTO/service/tests, Web hooks/types/panel/tests/MSW, API/scenario/task 문서, Changeset. Forbidden: schema/migration/seed, 팀·결과·진출 정책, 운영 main, 기존 고정 릴리스 문서/lock, 타 세션 WIP.
+- 순차 Phase 1 계약·기획 [x] → Phase 2 API/데이터 [x] → Phase 3 훅/UI [x] → Phase 4 좁은 검증/리뷰 [ ] → Phase 5 dev PR/CI/Alpha QA/정리 [ ]. 에이전트 병렬화 없음.
+- Acceptance: [x] A/B/C → A 선택; [ ] 실제 저장·배정 경기 동기화; [ ] 권한/중복/stale/상태/단계 순서/rollback 회귀; [ ] 390/768/1440 before/after 및 오류/console/network; [ ] API·fixture/MSW 문서 sync; [ ] committed diff 확인.
+- DB impact: V1TournamentScheduleTime, V1TournamentField, V1TeamMatch와 기존 일정 정본. 현재 schema 그대로 사용하며 migration 불필요.
+- Security: 시간은 기존 대회 총괄 mutation 권한, 구장 이름은 기존 platform ops 관리 권한. 인증/감사/동시 수정 방어 유지. 이전 PR별 리뷰/QA 예외를 새 PR에 자동 확대하지 않는다.
+- Progress Snapshot: 최신 dev fetch 후 전용 worktree 생성, 실제 canonical match update/schedule helper와 field CRUD 확인. UI A 승인, 구현 시작. 기존 #2348 핵심 Alpha QA 근거는 PR #2356 댓글 6845422443 및 QA evidence 브랜치에 있으며, 이 후속 변경의 after 근거는 별도 수집한다.
+- 2026-11-13 구현 cursor: API 항목 PATCH/기존 field CAS+명시 동기화, A안 inline 편집/실패 입력 보존/외부 변경 draft 보호/키보드 focus 구현. 좁은 API 50 PASS, Web 기존+새 흐름 12 PASS와 정밀 시각·접근성 추가 2 PASS. API 타입 PASS. Web 타입에서 테스트 ByRole 옵션 오류 7건 발견 후 수정, 최신 좁은 회귀/타입/정책을 직렬 확인 중. 실제 DB 원자성 spec 추가(로컬 Docker 미가동, CI 필요). 자체 의존성은 lockfile대로 worktree에만 설치, shared client/의존성 유지.
+- 원격 drift: 작업 도중 dev a346b246c(#2361), main 6675a8a00(#2362 별도 핫픽스) 확인. 새 dev 경로 5개는 이번 변경과 겹치지 않음. 검증·내 파일 커밋 뒤 최신 origin/dev를 이 브랜치에 merge해 통합하고 새 PR CI를 기준으로 확인한다. 기존 1.19.1 후보의 scope lock/운영 승격에는 손대지 않는다.
+
 ## Goal
 실제 대진 화면에서 시간·구장 독립 배정과 항목별 접기/펼치기를 기존 경기 데이터에 연결해 dev 대상 PR을 제공한다.
 
@@ -45,7 +62,7 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 시간 목록도 활성 관리자/해당 대회 총괄 범위를 서버에서 검증한다. support는 읽기만, 필드 등록은 기존 플랫폼 운영 권한 유지. 경기 배정은 기존 PATCH의 권한·상태·필드 검사를 사용한다. 입력 DTO 검증, 등록 감사 로그.
 
 ## Risks & Dependencies
-새 시간 목록 테이블은 additive migration. 실제 일정은 기존 V1TeamMatch.startAt/fieldId/장소가 정본. 시간 preset 수정이 기존 경기를 자동 변경하지 않는다. 새 항목 등록만 제공하고 일괄 이동·삭제는 범위 밖. 단계형 대회는 기존 관리 화면 유지.
+새 시간 목록 테이블은 additive migration. 실제 일정은 기존 V1TeamMatch.startAt/fieldId/장소가 정본. 최초 구현은 새 항목 등록만 제공했다. 2026-11-13 후속 PATCH는 시간 항목과 배정 경기를 함께 이동하며 구장 이름 동기화를 명시 옵션으로 추가한다. 삭제는 범위 밖이며 단계형 대회는 기존 관리 화면을 유지한다.
 
 ## Ambiguity Log
 승인된 최종안: 별도 시간/구장 버튼, 각 항목별 접기/펼치기. 잘못 추가했던 시간별/구장별 보기 토글은 포함하지 않음. 같은 시간에 여러 경기 허용하되 동일 구장 중복은 경고. 실제 구장 등록 권한은 기존 서버 정책 유지.
@@ -63,3 +80,11 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - 통합 갱신: 첫 수정 head `efeacd317`의 CI 43229169805는 API/Gates/Web 모두 PASS(API integration 206 suite/1562 PASS + 3 skip, API unit 547 suite/9010 PASS, Web 982 files PASS). 직후 dev에 #2350(`13c70d7db`)이 머지되어 공통 MSW import와 API 문서 append 2곳을 양쪽 보존으로 해결했다. Prisma schema에는 동시 변경 없음. 새 merge head의 CI 재확인 필요.
 - Copilot 차단 확정: 공식 `POST /repos/kim-song-jun/matchup-sports-platform/pulls/2348/copilot-code-review`가 HTTP 422 `ACTOR_INELIGIBLE`(연결 계정 라이선스 또는 조직 정책상 코드 리뷰 불가)을 반환했다. reviewer 요청의 HTTP 성공은 실제 실행이 아니었다. 최신 리뷰 0/스레드 0이며 clean으로 대체하지 않음. 이 PR에 대한 사용자 예외 지시 없이는 머지 보류.
 - 최신 통합 로컬 회귀: 배정 패널·회원 대진 미리보기 버튼·공개 소스 계약 12/12 PASS. 관리자 owner 실제 UI 로그인 및 alpha 변경 전 390/768/1440 캡처 PASS(가로 넘침/console/API 오류 없음), 브라우저 종료 확인. 기존 대회 데이터 변경 없음. 캡처는 /tmp/pr2348-alpha/, 계정/세션은 저장하지 않았다.
+
+- 2026-11-13 검증 cursor: API 3 suites/53 tests PASS, Web inline 편집 HTTP 계약 14 tests PASS. preset UUID와 legacy 경기 ID 목록을 편집 시작 시 고정해 동일 시각에 재생성된 다른 항목을 수정하지 않도록 ABA 회귀 추가. API/Web 최종 타입 검사 모두 PASS, API surface 규칙 PASS. 실제 PostgreSQL rollback/일정 동기화 spec은 Docker 미가동으로 CI에서 실행한다. check-api-contract-tree는 Task127의 별도 frozen plan 검증기이며 이 기능의 실행 계약이 아니므로 해당 명령의 인자 누락을 기능 실패로 집계하지 않는다. API 문서는 실제 controller/DTO/service/hooks와 교차 확인했다.
+
+- PR cursor: dev 대상 #2364, head ef407d929156e8c820b2545da77d003757a59fb5. 최신 dev bc1d92475를 충돌 없이 통합했고 diff는 이번 소유 25개 파일뿐이다. API/Web 타입 및 두 패턴 검사 PASS. Copilot 전용 API는 422 ACTOR_INELIGIBLE, 새 PR 한정 사용자 예외 답변 대기. Alpha 테스트 생성·수정·취소/숨김도 구체 범위로 승인 요청했고 미응답이므로 아직 실행하지 않았다. CI 43385977285 진행 중. 접은 편집 항목을 다시 수정할 때 draft/포커스 복원 회귀 1 PASS 보완 후 최신 head CI로 재검증한다.
+
+- 사용자 범위 확장(2026-11-13): '해당 내용까지 main 승격에 포함해줘'. #2364를 이번 승격의 포함 기능으로 추가한다. 기존 고정 후보에 최신 dev 전체를 무조건 합치지 않는다. 새 source/final SHA, Changeset 소비·버전·main 핫픽스 보존은 dev 반영 및 Alpha QA 후 별도 준비 PR에서 검증한다. 이 범위 승인은 아직 응답되지 않은 #2364 리뷰 예외/새 Alpha 테스트 데이터 승인이나 실제 main 실행을 대신하지 않는다.
+
+- 최신 cursor: 사용자 이번 승격 리뷰 예외 및 main 운영 적용까지 명시 승인(위임 범위는 production-release task 최신 절). CI 신규 DB fixture 준비 오류를 실제 MultiFinalsService.setup 경로로 수정, API 타입/DTO 6 PASS. 추가 경기 수 제한 없이 기존 N개 예선 규모 유지. 별도 QA Chrome 실행 방식은 자동 승인 검토 거절로 구체 승인 대기이며 아직 화면 QA 통과 아님.

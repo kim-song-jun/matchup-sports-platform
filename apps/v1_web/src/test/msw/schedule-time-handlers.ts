@@ -9,6 +9,9 @@ export const scheduleTimeHandlers = ['tournaments', 'league-matches'].flatMap(su
   const scopedPath = path.replace('tournaments', surface);
   return [
   http.get(scopedPath, ({ params }) => success({ items: rows.get(surface + ':' + String(params.tournamentId)) ?? [] })),
+  // This fixture has no canonical match/team-calendar store: never fake a successful bulk move.
+  http.patch(scopedPath, () => HttpResponse.json({ status: 'error', statusCode: 503,
+    code: 'SCHEDULE_TIME_EDIT_REQUIRES_REAL_API', message: '샘플 화면에서는 배정된 경기 시간을 함께 수정할 수 없어요.' }, { status: 503 })),
   http.post(scopedPath, async ({ params, request }) => {
     const body = await request.json() as { scheduledAt?: unknown };
     if (Object.keys(body).some(key => key !== 'scheduledAt') || typeof body.scheduledAt !== 'string' || !/(Z|[+-]\d{2}:\d{2})$/.test(body.scheduledAt) || !Number.isFinite(Date.parse(body.scheduledAt))) {

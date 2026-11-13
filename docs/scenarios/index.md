@@ -4,7 +4,7 @@
 
 ## 2026-11-12 — 시간·구장 독립 배정 (PR 준비)
 
-[시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 승인된 A안과 항목별 접기/펼치기를 실제 canonical 경기 PATCH에 연결한다. 시간 선택지는 additive 테이블, 구장은 기존 registry를 재사용한다. alpha 기능 0/8·viewport 0/3은 머지·배포 및 관리자 인증 대기다.
+[시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 기존 배정의 핵심 Alpha QA와 3폭 근거는 [#2356 기록](https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443)을 따른다(세부 권한 예외는 당시 후보 한정). 2026-11-13 후속은 사용자 A안인 항목 내부 시간·등록 구장 이름 수정이며, 새 시나리오 9~13의 구현/회귀를 진행 중이다. 변경 후 Alpha QA는 새 PR 머지·배포 후 별도로 기록한다.
 
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 

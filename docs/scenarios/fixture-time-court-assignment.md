@@ -16,6 +16,18 @@ Task: [20261132](../../.github/tasks/20261132-fixture-time-court-assignment.md)
 7. 같은 시간 다른 구장은 경고 없음. 같은 시간 같은 구장 중복은 경고. 실패 응답은 기존 배정과 실제 오류 유지.
 8. support/철회/타 대회 총괄의 쓰기 차단. 비활성 구장 새 배정 차단, 기존 배정 해제 가능.
 
+## 2026-11-13 후속 — 등록 시간·구장 이름 수정
+
+기존 핵심 배정 QA는 PR #2356 댓글 https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443 에 있다. 이전의 권한 CI 근거 예외 승인은 후보 974ac541b7a2 한정이며 이 후속 변경에 확대하지 않는다.
+
+9. 시간 항목 옆 수정 → 현재 KST hydrate → 새 시각 저장. 같은 시각의 모든 배정 경기·팀 일정·경기 길이가 함께 이동하고 구장/주소/팀은 유지. 직접 입력에서 유래한 시각과 미배정 preset도 확인.
+10. 등록 구장 옆 수정 → 이름 저장. 같은 fieldId의 배정 경기 이름과 목록/운영 보드 갱신. 시간·주소·좌표·fieldId 유지. 기존 플랫폼 운영 권한 유지.
+11. 취소/Escape는 요청 없이 입력 닫기. 저장 중 중복 조작 차단. 중복 시각·이름/예전 시각·버전/실제 API 실패에서 입력·원 데이터 유지. 저장 후 조회 실패는 별도 경고.
+12. 진행/종료 경기 포함 시간 이동 전체 거부. 단계 순서 위반·감사 실패는 전체 rollback. 같은 시간 여러 단계의 정상 일괄 이동은 중간 상태 때문에 잘못 거절하지 않음.
+13. 항목 접기와 수정은 별도 컨트롤. 접은 상태에서도 수정 가능. 저장·취소 후 포커스 유지, 긴 이름·390/768/1440 및 aside/bottom sheet 검증.
+
+후속 진행: API 단위 회귀 및 실제 DB 통합 spec 추가. 실제 DB replay/원자성은 CI 검증 대상(로컬 Docker/DB 미가동). 변경 후 Alpha 기능/3폭/console/network는 새 PR 머지·배포 후 기록한다. 기존 캡처를 변경 후 PASS로 사용하지 않는다.
+
 ## Evidence
 API 단위/DTO 및 기존 경기 수정·구장 서비스 259 PASS. Web API 연결·수동 편집·라우트 회귀 33 PASS. 양쪽 tsc 및 규칙 검사 PASS. 새 테이블 생성 SQL 모델 대조 PASS(실제 DB replay 아님).
 새 migration 실제 PostgreSQL 재생/동시성 검증은 로컬 Docker daemon 부재로 미실행. CI에 integration spec 추가.

@@ -1070,6 +1070,19 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 |---|---|---|
 | GET | `/api/v1/admin/tournaments/:tournamentId/schedule-times` | `{ items: [{ id, tournamentId, scheduledAt, createdAt }] }`, scheduledAt 오름차순 |
 | POST | 같은 경로 | `{ scheduledAt: ISO8601-with-offset }` → `{ item }`. 기본 POST 201, 같은 instant 재요청도 같은 행 반환 |
+| PATCH | 같은 경로 | `{ expectedScheduleTimeId, expectedScheduledAt, scheduledAt, expectedFixtureIds? }`(둘 다 offset 포함 ISO8601) → `{ item, affectedFixtureCount }`. 항목과 같은 기존 시각에 배정된 경기·팀 일정을 한 트랜잭션에서 이동 |
+
+### 등록 항목 수정 (2026-11-13)
+
+- expectedScheduleTimeId는 편집 시작 시 조회한 preset UUID이며 필수다. preset 없이 경기에서 파생된 항목은 명시적으로 null과 당시 경기 UUID 목록 expectedFixtureIds(1개 이상)를 보낸다. 같은 이전 시각에 다른 preset이나 경기 그룹이 재생성됐어도 409 SCHEDULE_TIME_STALE로 거절한다. 저장 직전에 최신 ID로 덮어쓰거나 자동 재시도하지 않는다.
+
+- PATCH는 등록된 preset뿐 아니라 실제 경기에서 직접 입력한 시간 항목도 수정한다. 기존 preset ID는 유지하며 직접 입력 항목은 성공 시 새 preset을 저장한다. 새 시각이 같으면 데이터·감사를 추가하지 않는 no-op다.
+- 기존 시각에 더 이상 preset/경기가 없으면 `409 SCHEDULE_TIME_STALE`. 다른 preset 또는 경기에서 쓰는 새 시각은 `409 SCHEDULE_TIME_DUPLICATE`로 거절하며 자동 합치지 않는다. 클라이언트 자동 재시도는 하지 않으며 응답 유실/충돌 때 목록을 다시 조회한다.
+- 배정된 경기 중 SCHEDULED가 아닌 게임이 있으면 `409 SCHEDULE_TIME_FIXTURE_STARTED`로 전체 거절한다. 정본 게임이 없으면 `409 TOURNAMENT_MATCH_GAME_MISSING`. 기존 단계 순서 위반은 `FIXTURE_SCHEDULE_STAGE_ORDER`. Game → TeamMatch 잠금과 기존 대진 advisory lock을 사용하며 같은 시각 전체 이동의 최종 위치를 기준으로 순서를 검증한다.
+- 기존 정본 match updater로 경기 길이·팀 일정·명단 재계산 이벤트를 유지한다. fieldId/장소/팀/결과는 변경하지 않는다. 최종 `tournament.schedule_time.update` 감사 실패를 포함해 모두 rollback한다. 등록/수정 모두 같은 대회 잠금으로 직렬화한다. 조회/등록과 같은 auth/권한/format/DTO 검증을 적용한다.
+- 구장 이름 수정은 기존 `PATCH /api/v1/tournament-ops/tournaments/:id/fields/:fieldId`에 `{ expectedVersion, name, syncAssignedFixtures: true }`를 전달한다. 기존 플랫폼 구장 관리 권한과 버전·멱등 키·중복 이름 계약을 유지한다. 명시 flag가 있으면 같은 대회·fieldId의 미삭제 경기 placeName만 원자적으로 동기화하며 주소·좌표·시간과 fieldId는 보존한다. 감사에 반영 경기 수를 기록한다. flag 없는 기존 수정 동작은 유지된다.
+- UI는 사용자 선택 A안(항목 내부 입력/저장/취소)을 사용하고 배정 경기 수를 안내한다. 시간 수정은 대회 쓰기 권한, 등록 구장 이름은 기존 구장 관리 권한이 필요하다. 미등록 레거시 직접 입력 장소는 기존 개별 경기 편집을 사용한다. 서버 실패 시 draft를 유지하고, 저장 후 조회 실패는 별도 경고로 표시한다.
+- 공유 MSW는 정본 경기·팀 일정 저장소가 없는 시간 일괄 수정을 가짜 성공으로 만들지 않고 `503 SCHEDULE_TIME_EDIT_REQUIRES_REAL_API`로 명시한다. 컴포넌트 계약 테스트는 별도 stateful HTTP 핸들러로 실제 훅의 요청과 화면 반영·실패 보존을 검증한다. 구장 mock은 목록·연결된 fixture 장소·운영 보드 이름을 함께 갱신한다.
 
 - `V1AuthGuard` 인증 + 서비스 `getTournamentAdmin`(조회)/`getTournamentMutationAdmin`(등록). 활성 owner/ops는 쓰기, support는 조회, 배정된 활성 대회 총괄은 담당 대회만 허용한다. 철회/만료/타 대회는 `403 PERMISSION_DENIED`.
 - 대회 종류·미삭제·`format === league_knockouts` 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`, 다른 format은 409 `SCHEDULE_TIMES_FORMAT_UNSUPPORTED`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.

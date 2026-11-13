@@ -86,7 +86,7 @@ Response: `{platformRole, items[]}`. Each group includes `tournamentKind` (store
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/fields/import-places` | empty body; `Idempotency-Key` | `{addedCount,existingCount,updatedCount}` | `platform_ops` only; same real idempotency contract as field mutations |
 
 가져오기는 기존 필드의 장소 스냅샷도 갱신한다. 같은 이름/기존 배정 경기의 주소가 서로 다르면 공용 스냅샷을 비워 임의 핀을 공유하지 않는다. `updatedCount`는 이 메타데이터 갱신 수이며, 경기의 장소·필드 배정은 바꾸지 않는다.
-| `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | `{expectedVersion,name?,sortOrder?,active?}` — **at least one of `name`/`sortOrder`/`active` is required** | updated field, CAS'd | `platform_ops` only |
+| `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | `{expectedVersion,name?,sortOrder?,active?,syncAssignedFixtures?}` — **at least one of `name`/`sortOrder`/`active` is required** | updated field, CAS'd | `platform_ops` only |
 
 Standalone catalogue create/update/import remain `platform_ops`-only. Authorized admin fixture creation/edit also registers a submitted venue and links it in the same transaction, with fixture-route authorization preserved. Field operators cannot use the admin fixture route.
 
@@ -105,6 +105,8 @@ Standalone catalogue create/update/import remain `platform_ops`-only. Authorized
 **List ordering is now total** (Task 18 review finding #16.2): `id asc` is a final tie-breaker after `sortOrder`/`createdAt`, so two fields sharing both values still resolve to one deterministic, repeatable order instead of whatever order Postgres happens to return.
 
 **An empty PATCH body is rejected** (Task 18 review finding #16.1): a request carrying only `expectedVersion` (no `name`/`sortOrder`/`active`) returns `422 FIELD_UPDATE_EMPTY` instead of manufacturing a version bump and an audit row for a request that changes nothing.
+
+`syncAssignedFixtures: true` is an explicit name-correction option and requires `name` (`422 FIELD_NAME_REQUIRED` otherwise). It locks the competition's canonical games/matches before the field-name advisory lock, then updates the same tournament/fieldId's non-deleted match placeName in the same transaction. Match address, coordinates, provider, kickoff and fieldId remain intact. This also corrects labels on historical matches without changing results. The operation audit records `updatedFixtureCount`; authorization, expectedVersion CAS and Idempotency-Key replay/payload-conflict behavior are unchanged. Omission preserves existing field-only edits. See [assignment option editing](./tournaments.md#등록-항목-수정-2026-11-13).
 
 ### Fixture field assignment
 

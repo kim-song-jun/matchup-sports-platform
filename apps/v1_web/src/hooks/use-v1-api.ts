@@ -3522,12 +3522,19 @@ export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
 
 export function useV1CurrentTerms(
   context: 'signup' | 'tournament_application' | 'footer',
-  options?: { enabled?: boolean },
+  options?: {
+    enabled?: boolean;
+    /** 서버가 받아 둔 응답. initialDataUpdatedAt 을 서버가 받은 때로 줘야 staleTime 이 지난 값을 다시 받는다. */
+    initialData?: V1CurrentTerms;
+    initialDataUpdatedAt?: number;
+  },
 ) {
   return useQuery({
     queryKey: v1Keys.currentTerms(context),
     queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
     enabled: options?.enabled,
+    initialData: options?.initialData,
+    initialDataUpdatedAt: options?.initialDataUpdatedAt,
   });
 }
 

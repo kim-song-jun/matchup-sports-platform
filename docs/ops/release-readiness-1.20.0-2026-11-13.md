@@ -1,7 +1,25 @@
 # Teameet 1.20.0 승격 준비 — #2364 포함
 
-Status: 기능 CI·Alpha QA 및 공식 prepare-only PASS. 버전 준비 PR·새 Alpha 검증·main 승격·운영 적용 진행 중.
+Status: 운영 적용 완료 — 2026-11-13T09:56:17Z, teameet.co.kr 1.20.1. 아래 준비 기록은 당시 고정 후보 이력이다.
 
+## 실제 운영 적용 결과
+
+- [main 승격 PR #2367](https://github.com/kim-song-jun/matchup-sports-platform/pull/2367) MERGED. Main SHA **17ae2d713db40a2b50dfa1266941a4ddc3afd950**, 고정 후보3a0ee067f15b와 tree diff0.
+- [운영 CI·이미지·배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/43402189039) 및 [CodeQL](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/43402187212) 모두 SUCCESS. 기존 production reviewer 승인 게이트로 배포했다.
+- 적용 로그에서 `20261112000100_v1_tournament_schedule_times`와 `All migrations have been successfully applied` 확인. 운영에 새 시간 테이블이 적용됐다.
+- **운영 표시1.20.1 / manifest1.20.0**. 2026-11-13T09:56:17.885Z(한국18:56) 점검 결과:
+
+| 운영 점검 | 실제 결과 |
+|---|---|
+| 웹 /landing | HTTP200, SHA17ae2d713db4, release1.20.1 |
+| API /api/v1/health | HTTP200, 같은 SHA·release, checks.db=true |
+| 공개 대회 목록 | HTTP200, 정상 items 응답 |
+| 시간 PATCH 비인증 | HTTP401 |
+| 구장 PATCH 비인증 | HTTP401 |
+
+서버 교체 중502 응답을 한 번 관측했으며 다음 점검에서 새 SHA의200/DBtrue로 회복했다. 최종 배포·점검은 정상이다. 운영 smoke는 공개 GET과 존재하지 않는 UUID의 비인증 거절만 수행했고, 실제 수정 기능은 아래 Alpha 테스트 데이터로 검증했다.
+
+main→dev 이력 흡수는 runtime tree diff0의 별도 문서 PR로 전달한다. 포함 기능은 승인된6개로 유지하며, main 이후 열린 다른 dev 기능은 이번 운영 범위에 자동 추가하지 않았다. 작업 소유의 기능/준비/승격 worktree·브랜치와 QA Chrome/helper는 정리했고 결과 기록 자원은 문서 PR 반영 후 정리한다.
 ## 승인과 고정 범위
 
 2026-11-13 사용자가 “해당 내용까지 main 승격에 포함해줘”로 #2364를 추가했고, “전체 main 운영적용까지 바로 해줘 급해서 계속 승인 못해줘”로 이번 6개 기능의 main PR 생성·머지·production 배포 승인과 결과 확인까지 위임했다. Copilot 422 ACTOR_INELIGIBLE은 이번 승격에 한해 사용자 예외를 적용한다. 보호 규칙·CI·실제 QA·릴리스 검사는 유지한다.
@@ -65,7 +83,7 @@ application exception 0, 예상하지 않은 HTTP 실패 0. 중복 테스트에�
 
 추가: [중복 시간](../screenshots/assignment-edit-2364-20261113/time-duplicate-390.png), [중복 구장](../screenshots/assignment-edit-2364-20261113/court-duplicate-390.png), [저장 후](../screenshots/assignment-edit-2364-20261113/after-saved-1440.png), [정리](../screenshots/assignment-edit-2364-20261113/cleanup-cancelled-private.png).
 
-## 정리와 남은 운영 절차
+## 정리와 운영 절차 — 준비 당시 이력
 
 테스트 대회 `e8a86b72-1694-49cb-806e-2039c20e9e67`는 cancelled/isPublic=false, 실제 참가팀 등록 0이다. 경기·감사 기록은 승인된 범위로 남는다. QA Chrome PID38408/helper PID51176 종료 확인, 인증 state 파일 없음. 이전 #2356 테스트/타 세션 WIP는 변경하지 않았다.
 

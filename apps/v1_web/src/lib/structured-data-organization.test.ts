@@ -33,21 +33,24 @@ describe('Organization JSON-LD', () => {
 
 type IdentityNode = Record<string, unknown>;
 
-function identityGraph(): IdentityNode[] {
-  return buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as IdentityNode[];
+function identityNode(type: string): IdentityNode {
+  const graph = buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as IdentityNode[];
+  const node = graph.find((entry) => entry['@type'] === type);
+  if (!node) throw new Error(`@graph 에 ${type} 노드가 없어요`);
+  return node;
 }
 
 describe('사이트 이름과 공식 채널', () => {
   it('WebSite 도 한글 대체 이름을 갖는다 — Organization 에만 있으면 사이트 이름 신호가 한쪽으로 쏠린다', () => {
-    const [organization, website] = identityGraph();
+    const organization = identityNode('Organization');
+    const website = identityNode('WebSite');
 
-    expect(website['@type']).toBe('WebSite');
     expect(website.alternateName).toEqual(['팀밋']);
     expect(organization.alternateName).toBe('팀밋');
   });
 
   it('Organization.sameAs 는 인스타그램과 두 앱 스토어 주소를 싣는다', () => {
-    const [organization] = identityGraph();
+    const organization = identityNode('Organization');
 
     expect(organization.sameAs).toEqual([
       'https://www.instagram.com/teameet_official/',

@@ -12,17 +12,22 @@ import {
   useV1CurrentTerms,
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import type { V1CurrentTerms } from '@/types/api';
 import { trackEvent } from '@/lib/analytics';
 import { resolveAuthContinuationPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
+import { isLegalDocumentKey, LEGAL_DOCUMENT_TITLES, type LegalDocumentKey } from './legal-documents';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { extractErrorMessage } from '@/lib/error-message';
 
 const AGREEMENT_TITLE_STYLE = { fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' } as const;
 
-export function TermsClient() {
+/** 서버가 로그인 없이 받아 둔 푸터 약관과 그것을 받은 시각(ms). 시각이 있어야 오래된 값을 브라우저가 다시 받는다. */
+export type FooterTermsFirstValue = { readonly data: V1CurrentTerms; readonly fetchedAt: number };
+
+export function TermsClient({ initialFooterTerms }: { initialFooterTerms?: FooterTermsFirstValue }) {
   const model = getTermsViewModel();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -40,6 +45,8 @@ export function TermsClient() {
   const currentTerms = useV1CurrentSignupTerms({ enabled: !document });
   const footerTerms = useV1CurrentTerms('footer', {
     enabled: Boolean(document) || wantsPublicDocument,
+    initialData: initialFooterTerms?.data,
+    initialDataUpdatedAt: initialFooterTerms?.fetchedAt,
   });
   const isRenewalMode = mode === 'renewal'
     || (!isSocialMode && currentTerms.data?.compliance?.compliant === false);
@@ -394,29 +401,14 @@ export function TermsClient() {
   );
 }
 
-type LegalDocumentKey = 'terms' | 'privacy' | 'location' | 'tournament-policy' | 'support';
-
 type LegalDocument = {
   key: LegalDocumentKey;
   title: string;
 };
 
-// 본문은 서버가 내려 주는 약관 문서를 쓰고, 이 제목은 문서를 불러오는 동안 보여 주는 값이다.
-const LEGAL_DOCUMENT_TITLES = {
-  terms: '서비스 이용약관',
-  privacy: '개인정보처리방침',
-  location: '위치기반서비스 이용약관',
-  'tournament-policy': '대회 운영정책',
-  support: '고객센터',
-} satisfies Record<LegalDocumentKey, string>;
-
 function resolveLegalDocument(document: string | null): LegalDocument | null {
   if (!document || !isLegalDocumentKey(document)) return null;
   return { key: document, title: LEGAL_DOCUMENT_TITLES[document] };
-}
-
-function isLegalDocumentKey(value: string): value is LegalDocumentKey {
-  return value === 'terms' || value === 'privacy' || value === 'location' || value === 'tournament-policy' || value === 'support';
 }
 
 // 체크 표시는 동의했을 때만 그린다 — 미동의 원 안에 회색 ✓ 가 남으면 이미 동의한 것으로 읽힌다.

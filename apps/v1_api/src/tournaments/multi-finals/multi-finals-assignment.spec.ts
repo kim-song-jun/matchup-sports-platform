@@ -1,5 +1,6 @@
 import type { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
+import type { NotificationsService } from '../../notifications/notifications.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { BracketTemplateService } from '../templates/bracket-template.service';
 import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config.presets';
@@ -31,10 +32,11 @@ function harness() {
     v1AdminActionLog: { findFirst: jest.fn(async () => null) }, v1OperationAudit: { findFirst: jest.fn(async () => null) },
   };
   const admins = { getTournamentMutationAdmin: jest.fn(async () => ({ id: 'admin' })), logAdminAction: jest.fn() };
-  const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
-  const service = new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService, {} as GamesService, {} as BracketTemplateService);
+  const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)), v1TeamMembership: { findMany: jest.fn(async () => [{ userId: 'owner' }, { userId: 'manager' }, { userId: 'owner' }]) } };
+  const notifications = { emitToManyDeferred: jest.fn() };
+  const service = new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService, {} as GamesService, {} as BracketTemplateService, notifications as unknown as NotificationsService);
   const input = { expectedRevision: 4, finalName: '프리미어', registrationIds: ['r1', 'r2'] };
-  return { row, tx, admins, service, input, fixture, incomplete: () => { complete = false; } };
+  return { row, tx, admins, service, input, fixture, notifications, prisma, incomplete: () => { complete = false; } };
 }
 afterEach(() => jest.clearAllMocks());
 describe('토너먼트 하나의 독립 진출팀 확정', () => {
@@ -68,6 +70,28 @@ describe('토너먼트 하나의 독립 진출팀 확정', () => {
     expect(result.finals[1]).toMatchObject({ colorIndex: 1, id: expect.any(String) });
     expect(assignSlotsBatchInTx).toHaveBeenCalledWith(tx, expect.anything(), [{ slotId: 's1', registrationId: 'r1' }, { slotId: 's2', registrationId: 'r2' }]);
     expect(tx.v1TournamentMatchDetails.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ group: { phase: { not: 'group' }, bracketTrack: '프리미어' } }) }));
+  });
+  it('새로 진출한 팀마다 자리 번호(시드)와 함께 진출 알림을 한 번씩 보낸다', async () => {
+    const { service, input, notifications, prisma } = harness();
+    await service.assign(user, 't', input);
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledTimes(2);
+    const [resolveUserIds, type, targetId, body, options] = notifications.emitToManyDeferred.mock.calls[1];
+    expect(type).toBe('tournament_finals_advanced');
+    expect(targetId).toBe('t');
+    expect(body).toContain('프리미어');
+    expect(body).toContain('2번 시드');
+    expect(options).toEqual({ businessKey: 'tournament-finals-advanced:t:프리미어:r2' });
+    // 받는 사람은 그 팀의 팀장·매니저이고 같은 사람이 겹쳐도 한 번만 나온다.
+    await expect(resolveUserIds()).resolves.toEqual(['owner', 'manager']);
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: 'active', role: { in: ['owner', 'manager'] } }) }));
+  });
+  it('이미 진출해 있던 팀은 순서만 바뀌어도 다시 알리지 않고, 거절된 배정도 알리지 않는다', async () => {
+    const { row, service, input, notifications } = harness();
+    row.multiFinals.finals[0].registrationIds = ['r2', 'r1'];
+    await service.assign(user, 't', input);
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+    await expect(service.assign(user, 't', { ...input, registrationIds: ['r1'] })).rejects.toThrow();
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
   it.each([
     { expectedRevision: 3 }, { finalName: '없는 결선' }, { registrationIds: ['r1'] },

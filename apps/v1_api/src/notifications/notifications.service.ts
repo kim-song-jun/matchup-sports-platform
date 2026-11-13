@@ -44,6 +44,8 @@ export type NotificationEventType =
   | 'tournament_payment_confirmed'
   | 'tournament_announcement_published'
   | 'tournament_completed_review_request'
+  /** 정규리그+N개 토너먼트에서 운영자가 진출팀을 확정했을 때, 진출한 팀의 팀장·매니저에게. */
+  | 'tournament_finals_advanced'
   /**
    * 대회 개인 수상자 본인에게 보내는 알림. 1차 대회(2026-08-15~16) 회고
    * "시상식에 딱 1,2,3등 팀만 남음" — 실은 통지 문제였다. 수상자가 저장돼도
@@ -314,6 +316,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'tournament_payment_confirmed' ||
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request' ||
+    type === 'tournament_finals_advanced' ||
     // 수상 알림도 대회 활동이다 — 나머지 대회 알림 7종과 같은 축으로 게이트한다.
     // importantEnabled 는 "놓치면 안 되는 1:1 문의 답변" 전용이라 성격이 다르고,
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
@@ -401,6 +404,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_payment_confirmed' ||
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request' ||
+    type === 'tournament_finals_advanced' ||
     type === 'tournament_award_received' ||
     type === 'tournament_match_completed' ||
     type === 'tournament_match_result_corrected' ||
@@ -534,6 +538,10 @@ function deepLinkForEvent(
   if (type === 'team_match_completed' && targetId) {
     return `/my/reviews/team_match/${targetId}`;
   }
+  // 진출 알림은 대회 상세가 아니라 진출한 토너먼트의 대진이 보이는 순위·대진표 화면으로 보낸다.
+  if (type === 'tournament_finals_advanced' && targetId) {
+    return `/tournaments/${targetId}/bracket`;
+  }
   // 대회 후기는 상호 후기(/my/reviews)가 아니라 대회별 시상·후기 화면에서 쓴다.
   if (
     (type === 'tournament_completed_review_request' || type === 'tournament_award_received') &&
@@ -643,6 +651,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_match_updated: '팀매치 일정·장소가 변경됐어요',
   team_match_completed: '팀매치가 완료됐어요. 리뷰를 남겨보세요!',
   tournament_completed_review_request: '대회가 끝났어요. 후기를 남겨주세요!',
+  tournament_finals_advanced: '토너먼트에 진출했어요',
   tournament_award_received: '수상을 축하해요! 🏆',
   tournament_registration_confirmed: '대회 참가가 확정됐어요',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
@@ -736,6 +745,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_match_updated: '변경 내용을 확인하고 다시 신청해 주세요.',
   team_match_completed: '팀매치 리뷰를 남겨보세요.',
   tournament_completed_review_request: '함께한 대회는 어땠나요? 참가팀 후기를 남겨주세요.',
+  tournament_finals_advanced: '대진표에서 첫 경기를 확인해 보세요.',
   tournament_award_received: '대회 시상 결과가 공개됐어요. 눌러서 확인해 보세요.',
   tournament_registration_confirmed: '대회 참가가 확정됐어요.',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요.',

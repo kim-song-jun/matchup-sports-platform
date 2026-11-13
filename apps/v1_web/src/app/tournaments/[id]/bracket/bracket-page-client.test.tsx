@@ -319,6 +319,20 @@ describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
     renderBracketStandingsTab(tournament);
     expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toHaveClass('tm-final-color-7');
   });
+  it('진출팀 확정 전에는 「운영자가 확정해요」 안내를 보이고, 확정돼 진출 표시가 붙으면 숨긴다', () => {
+    const before = namedTournament();
+    before.groups[0].qualificationByTrack = { '챔피언': null } as never;
+    const { unmount } = renderBracketStandingsTab(before);
+    expect(screen.getByText('진출 토너먼트와 참가팀은 운영자가 확정해요.')).toBeInTheDocument();
+    unmount();
+
+    const after = namedTournament();
+    after.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false, colorIndex: 7 } };
+    after.fixtures.push(makeFixture({ id: 'pre-a-finished', groupId: 'pre-a', status: 'completed', homeRegistrationId: 'r-a', awayRegistrationId: 'other-a' }));
+    renderBracketStandingsTab(after);
+    expect(screen.getByText('챔피언 진출')).toBeInTheDocument();
+    expect(screen.queryByText('진출 토너먼트와 참가팀은 운영자가 확정해요.')).not.toBeInTheDocument();
+  });
   it('filters named finals first, shows canonical rounds, preserves common rounds and resets missing rounds', () => {
     const tournament = namedTournament();
     tournament.groups.push(makeGroup({ id: 'champ-semi', phase: 'semi', name: '챔피언 · 4강', bracketTrack: '챔피언' }));

@@ -228,7 +228,7 @@ export function RosterModal({
                       `0` 은 유효한 번호라 falsy 검사로 거르면 0번이 "—" 로 사라진다. */}
                   <span
                     className="shrink-0 tab-num text-sm font-semibold text-[var(--text-muted)]"
-                    style={{ minWidth: 24 }}
+                    style={{ minWidth: 24, textAlign: 'right' }}
                     aria-label={p.jerseyNumber === null ? '등번호 없음' : `등번호 ${p.jerseyNumber}번`}
                   >
                     {p.jerseyNumber === null ? '—' : p.jerseyNumber}

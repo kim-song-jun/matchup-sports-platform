@@ -208,8 +208,15 @@ interface TournamentOpsShellProps {
  * 리그도 같은 콘솔(`/admin/live/<리그id>`)을 쓰는데 예전엔 무조건 `/admin/tournaments/<id>` 로
  * 보냈다 — 그 화면의 어드민 상세 API 는 대회 종류만 받아 리그면 "대회 정보를 불러오지 못했어요"가 떴다.
  */
-function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null) {
-  if (origin === 'staff') return { href: `/my/tournament-staff/${encodeURIComponent(tournamentId)}`, label: '담당 경기 목록으로 돌아가기' };
+function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null, role?: V1TournamentStaffRole) {
+  // 지원(조회 전용)에게 `/my/tournament-staff/<대회>`(담당 경기 목록)는 필드 담당자의 배정 경기만 보여 줘서 늘
+  // "담당 경기가 배정되지 않았어요"로 끝나는 막다른 길이다 — 지원은 담당 대회 목록(`/my/tournament-staff`)으로 돌린다.
+  if (origin === 'staff') {
+    return {
+      href: role === 'SUPPORT_READONLY' ? '/my/tournament-staff' : `/my/tournament-staff/${encodeURIComponent(tournamentId)}`,
+      label: '담당 경기 목록으로 돌아가기',
+    };
+  }
   if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
   // 종류를 알기 전에 대회 관리 링크를 그리면 리그 어드민이 그걸 눌러 열리지 않는 화면으로 간다.
   // `null`(옛 대회 행)까지 숨기면 그 대회들에서 링크가 영영 사라지므로 `undefined` 만 본다.
@@ -394,9 +401,10 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   });
   const back = directorManagement && !isFixtureConsole
     ? { href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`, label: '대회 관리로 돌아가기' }
-    : isFixtureConsole && origin !== 'staff'
-    ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
-    : returnTarget(origin, tournamentId, tournamentKind);
+    : isFixtureConsole && (origin !== 'staff' || role === 'SUPPORT_READONLY')
+    // 지원이 담당 대회에서 운영 보드를 거쳐 콘솔을 열었으면 바로 앞 화면(운영 보드)으로 돌아간다.
+    ? { href: `${basePath}/operations`, label: origin === 'staff' ? '운영 보드로 돌아가기' : '경기 목록으로 돌아가기' }
+    : returnTarget(origin, tournamentId, tournamentKind, role);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);

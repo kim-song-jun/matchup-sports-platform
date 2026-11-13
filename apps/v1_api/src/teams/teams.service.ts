@@ -220,7 +220,9 @@ export class TeamsService {
         levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
         minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
         maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
-        genderRule: team.profile?.genderRule ?? '성별 무관',
+        // 저장값이 없으면 `null` 그대로 — 신청 자격 판정(`findTeamGenderBlocker`)은 원본 값을 읽어 비어 있으면 "미설정"으로 막는다.
+        // 예전엔 여기서 '성별 무관'으로 꾸며 내려서 화면은 "무관"인데 서버는 "미설정"이라 신청이 거절됐다.
+        genderRule: team.profile?.genderRule ?? null,
         joinPolicy: team.joinPolicy,
         memberGoalCount: team.profile?.memberGoalCount ?? null,
       },
@@ -2397,7 +2399,7 @@ export class TeamsService {
       levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
       minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
       maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
-      genderRule: team.profile?.genderRule ?? '성별 무관',
+      genderRule: team.profile?.genderRule ?? null,
       memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,

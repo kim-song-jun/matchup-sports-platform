@@ -1133,7 +1133,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     });
     render(<TeamDetailPageClient teamId="team-1" />);
     screen.getAllByText('성별 조건').forEach((el) =>
-      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미정'}`),
+      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미설정'}`),
     );
     expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' }).length).toBeGreaterThan(0);
   });

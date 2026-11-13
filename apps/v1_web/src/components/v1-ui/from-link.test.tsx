@@ -126,6 +126,22 @@ describe('FromLink', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
+  it('download={false} 는 속성이 없는 것과 같아 일반 링크처럼 출처를 붙여 이동한다', () => {
+    const link = renderLink({ download: false });
+    expect(link.hasAttribute('download')).toBe(false);
+    fireEvent.click(link);
+    expect(router.push).toHaveBeenCalledWith('/terms?document=privacy&from=%2Ftournaments');
+  });
+
+  it('download="" 도 다운로드 링크라 가로채지 않는다', () => {
+    const link = renderLink({ download: '' });
+    expect(link.hasAttribute('download')).toBe(true);
+    const observed = observeDefaultAction();
+    fireEvent.click(link);
+    expect(observed.prevented).toBe(false);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it('호출한 쪽 onClick 이 기본 동작을 막았으면 이동하지 않는다', () => {
     const link = renderLink({ onClick: (event) => event.preventDefault() });
     fireEvent.click(link);

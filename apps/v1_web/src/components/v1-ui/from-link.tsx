@@ -18,7 +18,8 @@ export function FromLink({ href, onClick, target, download, ...props }: FromLink
     onClick?.(event);
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if ((target && target !== '_self') || download !== undefined) return;
+    const isDownload = download !== undefined && download !== null && download !== false;
+    if ((target && target !== '_self') || isDownload) return;
     event.preventDefault();
     const { pathname, search, hash } = window.location;
     router.push(withFromPath(href, `${pathname}${search}${hash}`));

@@ -47,9 +47,12 @@ describe('buildLeagueEventLd', () => {
   });
 });
 
+const TOURNAMENT_KIND = { isRegularLeague: false } as const;
+const LEAGUE_KIND = { isRegularLeague: true } as const;
+
 describe('buildFixtureEventLd', () => {
   it('경기 자체의 공개 사실과 팀 연결은 싣되 미완성 상위 Event 를 참조하지 않는다', () => {
-    const ld = buildFixtureEventLd(fixture());
+    const ld = buildFixtureEventLd(fixture(), TOURNAMENT_KIND);
 
     expect(ld).toMatchObject({ name: '송파 유나이티드 vs 한강 로버스 | 가을 풋살컵 결승', startDate: '2026-10-03T01:00:00.000Z' });
     expect(ld).not.toHaveProperty('superEvent');
@@ -59,24 +62,50 @@ describe('buildFixtureEventLd', () => {
 
   it('장소 스냅샷에 좌표가 있으면 geo 와 도로명 주소를 싣고, 없으면 geo 를 지어내지 않는다', () => {
     const place = { name: '송파 풋살파크', address: '서울 송파구 올림픽로 1', latitude: 37.51, longitude: 127.1, provider: 'kakao' as const, providerPlaceId: 'k1' };
-    const withGeo = buildFixtureEventLd(fixture({ place }))?.location as Record<string, unknown>;
+    const withGeo = buildFixtureEventLd(fixture({ place }), TOURNAMENT_KIND)?.location as Record<string, unknown>;
     expect(withGeo.geo).toEqual({ '@type': 'GeoCoordinates', latitude: 37.51, longitude: 127.1 });
     expect(withGeo.address).toMatchObject({ streetAddress: '서울 송파구 올림픽로 1' });
 
-    const nameOnly = buildFixtureEventLd(fixture({ place: { ...place, latitude: null, longitude: null, provider: null, providerPlaceId: null } }))?.location as Record<string, unknown>;
+    const nameOnly = buildFixtureEventLd(fixture({ place: { ...place, latitude: null, longitude: null, provider: null, providerPlaceId: null } }), TOURNAMENT_KIND)?.location as Record<string, unknown>;
     expect(nameOnly).not.toHaveProperty('geo');
-    expect(buildFixtureEventLd(fixture())?.location).not.toHaveProperty('geo');
+    expect(buildFixtureEventLd(fixture(), TOURNAMENT_KIND)?.location).not.toHaveProperty('geo');
   });
 
   it('확정된 점수만 싣고, 진행 중·확정 전 점수는 싣지 않는다', () => {
-    expect(buildFixtureEventLd(fixture())?.description).toBe('최종 스코어 송파 유나이티드 2 : 1 한강 로버스');
-    expect(buildFixtureEventLd(fixture({ scoreStatus: 'pending' }))).not.toHaveProperty('description');
-    expect(buildFixtureEventLd(fixture({ scoreStatus: 'live' }))).not.toHaveProperty('description');
+    expect(buildFixtureEventLd(fixture(), TOURNAMENT_KIND)?.description).toBe('최종 스코어 송파 유나이티드 2 : 1 한강 로버스');
+    expect(buildFixtureEventLd(fixture({ scoreStatus: 'pending' }), TOURNAMENT_KIND)).not.toHaveProperty('description');
+    expect(buildFixtureEventLd(fixture({ scoreStatus: 'live' }), TOURNAMENT_KIND)).not.toHaveProperty('description');
+  });
+
+  it('대회 경기는 대회 경기 주소를, 리그 경기는 리그 경기 주소를 url 과 @id 로 쓴다', () => {
+    const tournamentLd = buildFixtureEventLd(fixture(), TOURNAMENT_KIND);
+    const leagueLd = buildFixtureEventLd(fixture(), LEAGUE_KIND);
+
+    expect(tournamentLd).toMatchObject({
+      url: 'https://teameet.co.kr/tournaments/t1/matches/f1',
+      '@id': 'https://teameet.co.kr/tournaments/t1/matches/f1#event',
+    });
+    expect(leagueLd).toMatchObject({
+      url: 'https://teameet.co.kr/league-matches/t1/fixtures/f1',
+      '@id': 'https://teameet.co.kr/league-matches/t1/fixtures/f1#event',
+    });
+    // 주소 말고는 두 종류의 내용이 같다 — 종류가 바꾸는 것은 대표 주소뿐이다.
+    expect({ ...leagueLd, url: null, '@id': null }).toEqual({ ...tournamentLd, url: null, '@id': null });
+  });
+
+  it('리그 경기의 SportsEvent url 은 리그 경기 페이지가 자기 canonical 로 내는 주소와 같다', () => {
+    const teamMatch = {
+      teamMatchId: 'f1', title: '1주차', sportName: '풋살', startsAt: '2026-10-03T01:00:00.000Z',
+      placeName: '송파 풋살파크', status: 'matched', hostTeam: { teamId: 'team-a', name: '송파 유나이티드' },
+    } as unknown as V1TeamMatch;
+    const leagueFixturePageLd = buildTeamMatchEventLd(teamMatch, 'f1', { path: '/league-matches/t1/fixtures/f1' });
+
+    expect(buildFixtureEventLd(fixture(), LEAGUE_KIND)?.url).toBe(leagueFixturePageLd?.url);
   });
 
   it('일정 미정 경기는 LD 를 내지 않고, 취소 경기는 취소 상태로 적는다', () => {
-    expect(buildFixtureEventLd(fixture({ scheduledAt: null }))).toBeNull();
-    expect(buildFixtureEventLd(fixture({ status: 'cancelled' }))?.eventStatus).toBe('https://schema.org/EventCancelled');
+    expect(buildFixtureEventLd(fixture({ scheduledAt: null }), TOURNAMENT_KIND)).toBeNull();
+    expect(buildFixtureEventLd(fixture({ status: 'cancelled' }), TOURNAMENT_KIND)?.eventStatus).toBe('https://schema.org/EventCancelled');
   });
 });
 

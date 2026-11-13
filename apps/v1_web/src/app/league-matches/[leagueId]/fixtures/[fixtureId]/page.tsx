@@ -60,7 +60,7 @@ export default async function LeagueFixturePage({ params }: Props) {
   if (!fixture.ok) {
     throw new Error('리그 경기 상세에 필요한 공개 경기 정보를 불러오지 못했어요');
   }
-  // 이 경로는 proxy.ts matcher 밖이라 없는 경기의 HTTP 404 를 여기서 낸다(조회 실패는 404 가 아니다).
+  // 없는 경기의 HTTP 404 는 proxy.ts 가 정하고 여기서는 안내 화면을 낸다(loading.tsx 때문에 상태 코드는 여기서 못 바꾼다). 조회 실패는 404 가 아니다.
   if (!fixture.data) notFound();
   const detail = fixture.data;
   // 존재하는 친선 팀매치가 잘못된 리그 fixture URL로 들어온 것은 upstream 장애가 아니라 route 404다.

@@ -113,3 +113,73 @@ describe('TournamentOperationsBoardService — 조 이름·차수', () => {
     expect(itemOf(renamed, KNOCKOUT_FIXTURE).stableRevision).toBe(itemOf(before, KNOCKOUT_FIXTURE).stableRevision);
   });
 });
+
+// 운영 보드는 경기 번호 → 차수(1차전 → 2차전) 순이다. 라운드 이름은 문자열이라(`4강` < `league_r1` < `결승`) 번호와 어긋나 11·12번이 맨 위에 나왔다.
+describe('TournamentOperationsBoardService — 경기 번호 순 정렬·커서', () => {
+  function capture(rows: ReturnType<typeof teamMatchRow>[]) {
+    // 호출 인자(orderBy·where)를 검사하므로 타입에 싣는다 — 로컬 jest 는 타입을 안 보지만 CI `tsc -p tsconfig.spec.json` 은 본다.
+    const findMany = jest.fn(async ({ select }: { select: Record<string, unknown>; orderBy?: unknown; where?: unknown }) => rows.map((row) => pick(select, row)));
+    const tx = {
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ kind: 'regular_tournament' }) },
+      v1TeamMatch: { findMany },
+      v1TournamentStaffAssignment: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const prisma = { $transaction: async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx) };
+    return { service: new TournamentOperationsBoardService(prisma as unknown as PrismaService), findMany };
+  }
+
+  const now = new Date('2026-10-02T00:00:00.000Z');
+  // DB 가 (경기 번호, id) 순으로 준 행을 흉내 낸다 — 라운드 이름 순이었다면 `semi` 가 먼저였다. mock 은 orderBy 를 적용하지 않으므로 순서를 직접 맞춘다.
+  const twoRows = () => [
+    teamMatchRow('fx-b', { round: 'league_r1', fixtureNumber: 2, legNumber: 1, group: null }),
+    teamMatchRow('fx-a', { round: 'semi', fixtureNumber: 11, legNumber: 1, group: null }),
+  ];
+  const decode = (cursor: string | null) => JSON.parse(Buffer.from(cursor ?? '', 'base64url').toString('utf8')) as Record<string, unknown>;
+
+  it('경기 번호, 차수, id 순으로 정렬하고 라운드 이름으로는 정렬하지 않는다', async () => {
+    const { service, findMany } = capture(twoRows());
+
+    await service.list(tournamentId, { limit: 20 }, now);
+
+    expect(findMany.mock.calls[0][0].orderBy).toEqual([
+      { tournamentDetails: { fixtureNumber: 'asc' } },
+      { tournamentDetails: { legNumber: 'asc' } },
+      { id: 'asc' },
+    ]);
+  });
+
+  it('다음 페이지 커서는 (경기 번호, 차수, id)만 싣는다 — 라운드는 싣지 않는다', async () => {
+    const { service } = capture(twoRows());
+
+    const page = await service.list(tournamentId, { limit: 1 }, now);
+
+    expect(decode(page.nextCursor)).toEqual({ kind: 'fixture', tournamentId, fixtureNumber: 2, legNumber: 1, id: 'fx-b' });
+  });
+
+  it('커서 다음 페이지는 번호가 더 큰 경기, 같은 번호의 더 큰 차수, 같은 번호·차수의 더 큰 id 만 찾는다', async () => {
+    const { service, findMany } = capture(twoRows());
+    const cursor = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, fixtureNumber: 5, legNumber: 1, id: 'fx-5' }), 'utf8').toString('base64url');
+
+    await service.list(tournamentId, { limit: 20, cursor }, now);
+
+    expect(findMany.mock.calls[0][0].where).toMatchObject({
+      OR: [
+        { tournamentDetails: { is: { fixtureNumber: { gt: 5 } } } },
+        { tournamentDetails: { is: { fixtureNumber: 5, legNumber: { gt: 1 } } } },
+        { tournamentDetails: { is: { fixtureNumber: 5, legNumber: 1 } }, id: { gt: 'fx-5' } },
+      ],
+    });
+  });
+
+  it('옛 커서(round 를 싣고 차수가 없음)도 빈 페이지가 되지 않고 (경기 번호, id)로 이어진다', async () => {
+    const { service, findMany } = capture(twoRows());
+    const legacy = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, round: 'league_r2', fixtureNumber: 7, id: 'fx-7' }), 'utf8').toString('base64url');
+
+    const page = await service.list(tournamentId, { limit: 20, cursor: legacy }, now);
+
+    expect(page.items.length).toBeGreaterThan(0);
+    const where = JSON.stringify(findMany.mock.calls[0][0].where);
+    expect(where).toContain('"fixtureNumber":{"gt":7}');
+    expect(where).not.toContain('league_r2');
+  });
+});

@@ -69,7 +69,7 @@ function canonicalizeForHash(value: unknown): unknown {
  *   changed) between two page requests -- the next page's `findUnique` would find nothing, and
  *   the walk silently lost every remaining row instead of continuing from where it left off.
  *
- * The fix: `cursor`/`nextCursor` now carry the full `(tournamentId, round, fixtureNumber, id)`
+ * The fix: `cursor`/`nextCursor` now carry the full `(tournamentId, fixtureNumber, legNumber, id)` (order is by game number then leg, not round name)
  * sort-position tuple, opaque-encoded (base64url JSON) rather than embedded in a re-lookup-able
  * row id. This makes the cursor durable against the anchor row being deleted or re-sorted (the
  * NEXT page's WHERE predicate is built directly from the tuple the cursor carries, never by
@@ -98,8 +98,14 @@ type OperationsBoardCursorPayload =
   | {
       readonly kind: 'fixture';
       readonly tournamentId: string;
-      readonly round: string;
+      /**
+       * 옛 커서에만 있다 — 정렬이 `(round, fixtureNumber, id)` 이던 때 찍은 값이다. 지금 정렬은 `(fixtureNumber, id)` 라
+       * 새 커서는 싣지 않고, 옛 커서가 오면 읽기만 하고 쓰지 않는다(이 배포를 사이에 두고 페이지를 넘기던 운영자가 빈 페이지를 만나지 않게).
+       */
+      readonly round?: string;
       readonly fixtureNumber: number;
+      /** 차수. 경기 번호가 같은 1차전·2차전의 순서를 정한다. 차수 정렬 이전에 찍은 옛 커서에는 없다. */
+      readonly legNumber?: number;
       readonly id: string;
     }
   | {
@@ -132,18 +138,15 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
   // 운영자의 커서가 전부 "빈 페이지" 가 된다 — 목록이 통째로 사라진 것처럼 보인다.
   const kind = candidate.kind === undefined ? 'fixture' : candidate.kind;
   if (kind === 'fixture') {
-    if (
-      typeof candidate.round !== 'string' ||
-      typeof candidate.fixtureNumber !== 'number' ||
-      !Number.isInteger(candidate.fixtureNumber)
-    ) {
+    if (typeof candidate.fixtureNumber !== 'number' || !Number.isInteger(candidate.fixtureNumber)) {
       return null;
     }
     return {
       kind: 'fixture',
       tournamentId: candidate.tournamentId,
-      round: candidate.round,
+      ...(typeof candidate.round === 'string' ? { round: candidate.round } : {}),
       fixtureNumber: candidate.fixtureNumber,
+      ...(typeof candidate.legNumber === 'number' && Number.isInteger(candidate.legNumber) ? { legNumber: candidate.legNumber } : {}),
       id: candidate.id,
     };
   }
@@ -268,7 +271,7 @@ type BoardRow = {
  * - `items[].version`              <- `V1Game.version`
  * - `items[].revisionId`           <- `V1Game.currentOfficialRevisionId`
  * - `items[].stableRevision`       <- see "incremental key" section below (review finding #5)
- * - `nextCursor`                   <- opaque-encoded `(tournamentId, round, fixtureNumber, id)` of
+ * - `nextCursor`                   <- opaque-encoded `(tournamentId, fixtureNumber, legNumber, id)` of
  *                                     the last page row (see `OperationsBoardCursorPayload`, Task
  *                                     18 review P1-1/P1-2 fix -- no longer a bare fixture id)
  * - `watermark`                    <- hash of the page's ordered `(fixtureId, stableRevision)`
@@ -316,11 +319,11 @@ type BoardRow = {
  * dead/unmaintained and would silently under/over-match.
  *
  * ## Pagination (review finding #7, hardened again by Task 18 review P1-1/P1-2)
- * Deterministic keyset cursor on `(round, fixtureNumber, id)` -- `id` is a total tie-breaker so
+ * Deterministic keyset cursor on `(fixtureNumber, legNumber, id)` -- `id` is a total tie-breaker so
  * the sort order itself is total. `cursor`/`nextCursor` carry an opaque-encoded
- * `OperationsBoardCursorPayload` (`{tournamentId, round, fixtureNumber, id}, see that type's doc
+ * `OperationsBoardCursorPayload` (`{tournamentId, fixtureNumber, legNumber, id}, see that type's doc
  * comment) rather than a bare `V1TournamentFixture.id`: the NEXT page's WHERE predicate is built
- * directly from the tuple the cursor itself carries (`(round, fixtureNumber, id) > cursor tuple`,
+ * directly from the tuple the cursor itself carries (`(fixtureNumber, legNumber, id) > cursor tuple`,
  * lexicographically), never by re-reading a row that may have been deleted or re-sorted since the
  * cursor was minted (P1-2), and a cursor decoded for a DIFFERENT tournament than the one being
  * queried is treated exactly the same as a cursor that fails to decode at all -- both collapse to
@@ -500,7 +503,7 @@ export class TournamentOperationsBoardService {
         const lastRow = pageRows[pageRows.length - 1];
         const nextCursor = hasNext
           ? // 커서 튜플은 **그 페이지를 정렬한 축과 같아야 한다** — 리그는 `(startAt, id)`,
-            // 대회는 `(round, fixtureNumber, id)`. 한 목록 요청은 한 축만 내므로 섞이지 않는다.
+            // 대회는 `(fixtureNumber, legNumber, id)`. 한 목록 요청은 한 축만 내므로 섞이지 않는다.
             lastRow.isLeague
             ? encodeOperationsBoardCursor({
                 kind: 'teamMatch',
@@ -513,8 +516,8 @@ export class TournamentOperationsBoardService {
             : encodeOperationsBoardCursor({
                 kind: 'fixture',
                 tournamentId,
-                round: lastRow.round ?? '',
                 fixtureNumber: lastRow.fixtureNumber ?? 0,
+                legNumber: lastRow.legNumber ?? 1,
                 id: lastRow.id,
               })
           : null;
@@ -991,19 +994,16 @@ export class TournamentOperationsBoardService {
     const cursorPredicate: Prisma.V1TeamMatchWhereInput | undefined =
       cursor != null && cursor.kind === 'fixture'
         ? {
+            // 경기 번호 → 차수(1차전 → 2차전) → id 순 — 라운드 이름은 문자열이라(`4강` < `league_r1` < `결승`) 번호와 어긋난다.
+            // `id` 는 번호·차수가 같을 때의 tie-breaker. 차수 정렬 이전에 찍은 옛 커서(`legNumber` 없음)는 `(번호, id)` 로만 이어 간다.
             OR: [
-              { tournamentDetails: { is: { round: { gt: cursor.round } } } },
-              {
-                tournamentDetails: {
-                  is: { round: cursor.round, fixtureNumber: { gt: cursor.fixtureNumber } },
-                },
-              },
-              {
-                tournamentDetails: {
-                  is: { round: cursor.round, fixtureNumber: cursor.fixtureNumber },
-                },
-                id: { gt: cursor.id },
-              },
+              { tournamentDetails: { is: { fixtureNumber: { gt: cursor.fixtureNumber } } } },
+              ...(cursor.legNumber === undefined
+                ? [{ tournamentDetails: { is: { fixtureNumber: cursor.fixtureNumber } }, id: { gt: cursor.id } }]
+                : [
+                    { tournamentDetails: { is: { fixtureNumber: cursor.fixtureNumber, legNumber: { gt: cursor.legNumber } } } },
+                    { tournamentDetails: { is: { fixtureNumber: cursor.fixtureNumber, legNumber: cursor.legNumber } }, id: { gt: cursor.id } },
+                  ]),
             ],
           }
         : undefined;
@@ -1018,8 +1018,8 @@ export class TournamentOperationsBoardService {
     const rows = await tx.v1TeamMatch.findMany({
       where: cursorPredicate === undefined ? base : { ...base, ...cursorPredicate },
       orderBy: [
-        { tournamentDetails: { round: 'asc' } },
         { tournamentDetails: { fixtureNumber: 'asc' } },
+        { tournamentDetails: { legNumber: 'asc' } },
         { id: 'asc' },
       ],
       take: limit + 1,

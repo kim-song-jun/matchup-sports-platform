@@ -2665,8 +2665,9 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
         name: 'P1-6 Out Of Page Field',
       },
     });
-    // Sorts after every one of the 100 page fixtures (round/fixtureNumber-wise) so it is never
-    // itself part of the `limit: 100` page this test queries below.
+    // Sorts after every one of the 100 page fixtures so it is never itself part of the
+    // `limit: 100` page this test queries below. The board orders by `(fixtureNumber, legNumber, id)`, so the
+    // fixtureNumber must be larger than every page fixture's (1..100) — the round name no longer matters.
     await perfPrisma.v1TeamMatch.create({
       data: {
         id: outOfPageFixtureId,
@@ -2686,7 +2687,7 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
         teamMatchId: outOfPageFixtureId,
         tournamentId: perfIds.tournament,
         round: 'zzz-out-of-page',
-        fixtureNumber: 1,
+        fixtureNumber: 100_000,
       },
     });
     await perfPrisma.v1TournamentStaffAssignment.create({

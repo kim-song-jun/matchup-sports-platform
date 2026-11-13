@@ -179,16 +179,38 @@ describe('단계별 대진 설정', () => {
     await waitFor(() => expect(ids).toHaveLength(2));
     expect(ids[0]).toBe(ids[1]); expect(props.onClose).not.toHaveBeenCalled();
   });
-  it('조 합계가 틀리거나 참가 수가 홀수이면 다음 단계로 진행하지 못한다', async () => {
+  it('홀수 참가 수를 허용하고 조 합계가 틀리면 다음 단계로 진행하지 못한다', async () => {
     show({ format: 'group_knockout' });
     await screen.findByLabelText('참가 팀 수');
     fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '7' } });
-    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    expect(screen.getByLabelText('참가 팀 수')).toHaveAttribute('step', '1');
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
     fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '6' } }); next();
     fireEvent.change(screen.getByLabelText('1번째 조 팀 수'), { target: { value: '4' } });
     expect(screen.getByRole('alert')).toHaveTextContent('합계');
     expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
   });
+  it.each(['knockout', 'group_knockout'] as const)('홀수 7팀 %s를 미리보고 동일한 참가 수로 생성한다', async (format) => {
+    const payloads: Record<string, unknown>[] = [];
+    server.use(http.post(`${base}/preview`, async ({ request }) => {
+      payloads.push(await request.json() as Record<string, unknown>); return success(plan);
+    }), http.post(base, async ({ request }) => {
+      payloads.push(await request.json() as Record<string, unknown>); return success(plan.counts);
+    }));
+    const props = show({ format, confirmedTeamCount: 7 });
+    await screen.findByLabelText('참가 팀 수');
+    expect(screen.getByLabelText('참가 팀 수')).toHaveValue(7);
+    await preview();
+    fireEvent.click(screen.getByRole('button', { name: '이 설정으로 대진 만들기' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledOnce());
+    expect(payloads).toHaveLength(2);
+    for (const input of payloads) {
+      expect(input).toMatchObject({ kind: format, participantCount: 7, schemaVersion: 2 });
+      if (format === 'knockout') expect(input.size).toBe(7);
+      else expect((input.groups as { capacity: number }[]).reduce((sum, group) => sum + group.capacity, 0)).toBe(7);
+    }
+  });
+
   it('생성 응답이 유실되면 요청 상태를 확인하고 같은 키의 저장 결과를 복구한다', async () => {
     const ids: string[] = [];
     let checked = false;

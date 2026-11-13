@@ -6141,6 +6141,18 @@ function invalidateCompetitionFieldViews(queryClient: QueryClient, competitionId
   ]) void queryClient.invalidateQueries({ queryKey });
 }
 
+/** Correct a registered court's label and explicitly synchronize its assigned match names. */
+export function useV1RenameTournamentField(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fieldId, expectedVersion, name }: { fieldId: string; expectedVersion: number; name: string }) =>
+      v1Patch<V1TournamentField>(`/tournament-ops/tournaments/${tournamentId}/fields/${fieldId}`,
+        { expectedVersion, name, syncAssignedFixtures: true }, idempotencyInit()),
+    onSuccess: () => { invalidateCompetitionFieldViews(queryClient, tournamentId); },
+  });
+}
+
 export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
   const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();

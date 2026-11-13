@@ -1,3 +1,5 @@
+import { scheduleTimeHandlers } from './schedule-time-handlers';
+import { memberBracketPreviewMswHandlers } from './member-bracket-preview-handlers';
 import { namedFinalsMsw } from './named-finals-handlers';
 import { http, HttpResponse } from 'msw';
 import isISO8601 from 'validator/lib/isISO8601';
@@ -804,9 +806,11 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
 
 export const v1MswHandlers = [
   ...namedFinalsMsw.handlers,
+  ...scheduleTimeHandlers,
   http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
   ...v1AdminUserPhoneReleaseMswHandlers,
+  ...memberBracketPreviewMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueCapacityMswHandlers,
@@ -2035,6 +2039,29 @@ export const v1MswHandlers = [
       if (item) { item.fieldId = field.id; item.fieldName = field.name; item.stableRevision = randomUuid(); }
     }
     return ok({ addedCount, existingCount, updatedCount: 0 });
+  }),
+  http.patch(`${api}/tournament-ops/tournaments/:tournamentId/fields/:fieldId`, async ({ params, request }) => {
+    const body = await request.json() as { expectedVersion?: number; name?: string; syncAssignedFixtures?: boolean };
+    if (Object.keys(body).some(key => !['expectedVersion', 'name', 'syncAssignedFixtures'].includes(key)) ||
+      !Number.isInteger(body.expectedVersion) || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120 ||
+      body.syncAssignedFixtures !== undefined && typeof body.syncAssignedFixtures !== 'boolean') {
+      return HttpResponse.json({ status: 'error', code: 'VALIDATION_ERROR', message: '경기장 이름과 버전을 확인해 주세요.' }, { status: 400 });
+    }
+    const field = v1TournamentFields.find(row => row.id === params.fieldId && row.tournamentId === params.tournamentId);
+    if (!field) return notFound('경기장을 찾을 수 없어요.');
+    if (field.version !== body.expectedVersion) return HttpResponse.json({ status: 'error', code: 'STALE_FIELD_VERSION', message: '필드 정보가 이미 변경됐어요.' }, { status: 409 });
+    const name = body.name.trim();
+    if (v1TournamentFields.some(row => row.tournamentId === params.tournamentId && row.id !== field.id && row.name.trim().toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json({ status: 'error', code: 'FIELD_NAME_DUPLICATE', message: '이미 같은 이름의 경기장이 있어요.' }, { status: 409 });
+    }
+    field.name = name; field.version += 1; field.place = { ...field.place, name };
+    if (body.syncAssignedFixtures) for (const fixture of v1CompetitionFixturePlaces) {
+      if (fixture.tournamentId === params.tournamentId && fixture.fieldId === field.id) fixture.place = { ...fixture.place, name };
+    }
+    for (const item of v1TournamentOperationsBoardItems) if (item.fieldId === field.id) {
+      item.fieldName = name; item.stableRevision = randomUuid();
+    }
+    return ok(field);
   }),
   http.patch(`${api}/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field`, async ({ params, request }) => {
     const body = await request.json() as { fieldId?: string };

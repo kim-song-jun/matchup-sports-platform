@@ -2,6 +2,10 @@
 
 [시나리오](./fixture-display-title.md). 경기 제목을 개별 저장하고 목록·그림에 함께 표시한다. 최신 dev 기준 PR 검증 및 alpha 배포 진행 중.
 
+## 2026-11-12 — 시간·구장 독립 배정 (PR 준비)
+
+[시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 기존 배정의 핵심 Alpha QA와 3폭 근거는 [#2356 기록](https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443)을 따른다(세부 권한 예외는 당시 후보 한정). 2026-11-13 후속은 사용자 A안인 항목 내부 시간·등록 구장 이름 수정이며, 새 inline 기능은 #2364 dev/Alpha 7c288bd0985b에서 실제 저장·취소·중복/stale/401/404와 2패널×3폭 before/after 6/6 PASS. 실제 팀 일정·핀·rollback 등은 PostgreSQL CI로 구분해 검증했다. [현행 근거](../ops/release-readiness-1.20.0-2026-11-13.md), 테스트 cancelled/private·브라우저 종료.
+
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 
 [시나리오](./competition-stage-composition.md) · [작업](../../.github/tasks/20261130-competition-stage-composition.md).
@@ -647,3 +651,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리, dev/alpha 검증 진행 — Task 20261080 후속.
 
 - 2026-10-16: [참가팀 상세 우측 안내와 참가 카드](./tournament-participant-sidebar.md) — 로컬 검증 완료, Alpha 배포/실제 로그인 검증 대기.
+
+- [League registered time choices](league-schedule-time-picker.md): local API/Web checks; alpha 0/10 flows and 0/3 viewports pending deployment.

@@ -13,6 +13,7 @@ import { TeamsService } from './teams.service';
 
 @Module({
   imports: [NotificationsModule, ChatModule],
+  exports: [TeamsService],
   controllers: [TeamsController, TeamDissolutionController, TeamInviteLinksController],
   providers: [TeamsService, TeamDissolutionService, TeamInviteLinksService, OptionalV1AuthGuard, V1AuthGuard, CreatorProfileGuard],
 })

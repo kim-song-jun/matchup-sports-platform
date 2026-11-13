@@ -1,3 +1,6 @@
+리그+N개 토너먼트 대진의 시간·구장 독립 배정 및 대회별 재사용 시간 목록은 [대회 계약](./domains/tournaments.md#대진-시간구장-독립-배정-2026-11-12)을 따른다. 실제 경기 값과 기존 수동 편집 경로는 동일하다.
+등록 항목의 시간/구장 이름 수정은 [수정 계약](./domains/tournaments.md#등록-항목-수정-2026-11-13)을 따른다. 시간 PATCH는 배정 경기·팀 일정을 함께 이동하며, 구장 이름 동기화는 기존 버전·멱등 API의 명시 옵션이다.
+
 리그+토너먼트의 조 이름 수정은 구조 편집과 분리한다. 저장 이름은 공개 일정·대진·경기 결과에 반영하며 예선 설정과 revision을 원자적으로 갱신한다. 기존 N개 토너먼트의 자동 생성 명칭은 선행 PR #2181의 짝수 6팀 이상 강수 규칙에 맞춰 보정한다. [대회 계약](./domains/tournaments.md#조-이름과-결선-규모-표시-2026-11-06).
 
 배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
@@ -173,3 +176,7 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 기존 데이터는 변환하지 않으며 단일 본선·복수 리그/토너먼트·3단계 이상을 지원한다.
 
 경기별 제목 `displayTitle` 수정과 목록·그림·공개 일정 동기화: [대회 계약](./domains/tournaments.md#경기별-제목-수정-2026-11-11).
+
+회원 대진표 조회는 관리자 세션을 유지하는 별도 `/admin/users/:id/bracket-preview` 계약이며 회원 세션을 발급하지 않는다. 상세는 [관리자·운영 계약](domains/admin-and-ops.md)의 회원 대진표 조회 절을 따른다.
+
+- Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).

@@ -87,7 +87,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const total = groups.reduce((sum, group) => sum + group.capacity, 0);
   const finalists = format === 'knockout' ? count : groups.reduce((sum, group) => sum + group.advanceCount, 0);
   useEffect(() => { if (finalists < 4) setThirdPlace(false); }, [finalists]);
-  const validCount = Number.isInteger(count) && count >= 4 && count <= 64 && count % 2 === 0;
+  const validCount = Number.isInteger(count) && count >= 4 && count <= 64;
   const validGroups = format === 'knockout' || (total === count && groups.length >= 2 && groups.length <= 16
     && new Set(groups.map((group) => group.name.trim())).size === groups.length
     && groups.every((group) => group.name.trim() && Number.isInteger(group.capacity) && group.capacity >= 2 && group.capacity <= 8
@@ -166,9 +166,9 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
         {recovering && <p role="status" className="tm-text-caption">서버에 저장된 생성 결과를 확인하고 있어요.</p>}
         {draft.isError && <p role="alert">저장된 초안을 불러오지 못했어요. <button className="min-h-11 underline" onClick={() => void draft.refetch()}>다시 불러오기</button></p>}
         {step === 0 && <div className="space-y-4">
-          <label className="block tm-text-label">참가 팀 수<input aria-label="참가 팀 수" className={inputClass} type="number" min={4} max={64} step={2} value={count || ''} onChange={(e) => { setCount(Number(e.target.value)); mark(); }} /></label>
-          <p className="tm-text-caption">계획 {count || 0}팀 · 확정 참가 {props.confirmedTeamCount ?? 0}팀 · 4~64팀의 짝수로 만들 수 있어요.</p>
-          {!validCount && <p role="alert" className="tm-text-caption text-[var(--red700)]">4~64 사이의 짝수를 입력해 주세요.</p>}
+          <label className="block tm-text-label">참가 팀 수<input aria-label="참가 팀 수" className={inputClass} type="number" min={4} max={64} step={1} value={count || ''} onChange={(e) => { setCount(Number(e.target.value)); mark(); }} /></label>
+          <p className="tm-text-caption">계획 {count || 0}팀 · 확정 참가 {props.confirmedTeamCount ?? 0}팀 · 4~64팀으로 만들 수 있어요.</p>
+          {!validCount && <p role="alert" className="tm-text-caption text-[var(--red700)]">4~64 사이의 정수를 입력해 주세요.</p>}
           {draft.data?.input?.schemaVersion === 2 && <Button variant="outline" disabled={draft.isFetching} onClick={() => void restore()}>저장한 설정 불러오기</Button>}
           {format === 'group_knockout' && <button className="min-h-11 text-[var(--blue700)] underline" onClick={onLegacy}>기존 20팀 조 간 비교 12강 설정</button>}
         </div>}

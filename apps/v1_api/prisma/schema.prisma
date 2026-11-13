@@ -2967,6 +2967,7 @@ model V1Tournament {
   campaign             V1TournamentCampaign?
   popups               V1TournamentPopup[]
   fields               V1TournamentField[]
+  scheduleTimes        V1TournamentScheduleTime[]
   staffAssignments     V1TournamentStaffAssignment[]
   operationAudits      V1OperationAudit[]
   tournamentMatchDetails V1TournamentMatchDetails[]
@@ -4415,4 +4416,16 @@ model V1GameRosterRole {
   user V1User @relation(fields: [userId], references: [id], onDelete: Restrict)
   @@id([gameId, sideId, teamId, userId])
   @@map("v1_game_roster_roles")
+}
+
+/// Reusable choices only. Actual kickoff remains V1TeamMatch.startAt.
+model V1TournamentScheduleTime {
+  id           String       @id @default(uuid())
+  tournamentId String       @map("tournament_id")
+  scheduledAt  DateTime     @map("scheduled_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  tournament   V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, scheduledAt])
+  @@map("v1_tournament_schedule_times")
 }

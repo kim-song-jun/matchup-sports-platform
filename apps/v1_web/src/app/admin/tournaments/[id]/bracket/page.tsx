@@ -1,4 +1,5 @@
 'use client';
+import { FixtureAssignmentWorkspace } from '@/components/admin/bracket-canvas/fixture-assignment-workspace';
 import { StagePlanManager } from '@/components/admin/stages/stage-plan-manager';
 import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
 import { useState } from 'react';
@@ -31,7 +32,7 @@ export default function AdminTournamentBracketPage() {
 }
 
 function BracketPageBody() {
-  const { tournamentId, canWrite, showToast } = useTournamentAdmin();
+  const { tournamentId, role, canWrite, showToast } = useTournamentAdmin();
   const [multiFinalsOpen, setMultiFinalsOpen] = useState(false);
   const [multiFinalsMode, setMultiFinalsMode] = useState<'create' | 'rules' | 'assign'>('create');
   const { data: tournament } = useV1AdminTournament(tournamentId);
@@ -61,16 +62,16 @@ function BracketPageBody() {
   };
 
   if (tournament?.stagePlan) return <StagePlanManager tournamentId={tournamentId} canWrite={canWrite} />;
-  return (
-    <div className="flex flex-col gap-4">
-      {tournament?.format === 'league_knockouts' && canWrite ? <>
-        <div className="flex flex-wrap gap-2">
+  const assignmentToolbar = (tournament?.format === 'league_knockouts' && canWrite ? <>
+        <div className="contents">
           <Button variant="primary" onClick={() => { setMultiFinalsMode('create'); setMultiFinalsOpen(true); }}>예선·토너먼트 대진 생성</Button>
           <Button variant="neutral" onClick={() => { setMultiFinalsMode('rules'); setMultiFinalsOpen(true); }}>토너먼트 배정 규칙</Button>
           <Button variant="neutral" onClick={() => { setMultiFinalsMode('assign'); setMultiFinalsOpen(true); }}>토너먼트별 진출팀 배정</Button>
         </div>
         <MultiFinalsWizard tournamentId={tournamentId} mode={multiFinalsMode} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast(multiFinalsMode === 'assign' ? '진출팀을 대진에 배정했어요.' : multiFinalsMode === 'rules' ? '토너먼트 배정 규칙을 저장했어요.' : '토너먼트 대진을 생성했어요.', 'success')} />
-      </> : null}
+      </> : null);
+  const content = (
+    <div className="flex flex-col gap-4">
       <SegmentedTabs
         ariaLabel="대진 보기 방식"
         role="tablist"
@@ -124,4 +125,6 @@ function BracketPageBody() {
       )}
     </div>
   );
+  return tournament?.format === 'league_knockouts' ? <FixtureAssignmentWorkspace tournamentId={tournamentId} canWrite={canWrite}
+    canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} toolbar={assignmentToolbar}>{content}</FixtureAssignmentWorkspace> : content;
 }

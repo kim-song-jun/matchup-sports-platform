@@ -17,7 +17,7 @@ type Stage = { stageKey?: string | null; poolKey?: string | null; phase: string 
 
 async function assertStartKeepsStageOrder(
   tx: Tx,
-  input: { tournamentId: string; excludeTeamMatchId: string | null; stage: Stage; startAt: Date },
+  input: { tournamentId: string; excludeTeamMatchId: string | null; stage: Stage; startAt: Date; movingTeamMatchIds?: readonly string[] },
 ): Promise<void> {
   const staged = input.stage.stageKey ? await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: input.tournamentId }, select: { stagePlan: true } }) : null;
   const config = staged?.stagePlan as unknown as StoredStagePlan | null;
@@ -29,7 +29,8 @@ async function assertStartKeepsStageOrder(
       // 취소·보관된 경기는 치르지 않으니 남은 옛 시각이 다른 경기의 시각을 막으면 안 된다.
       tournamentId: input.tournamentId, deletedAt: null, status: { notIn: ['cancelled', 'archived'] },
       startAt: { not: null }, tournamentDetails: { isNot: null },
-      ...(input.excludeTeamMatchId === null ? {} : { id: { not: input.excludeTeamMatchId } }),
+      ...(input.movingTeamMatchIds?.length ? { id: { notIn: [...input.movingTeamMatchIds] } }
+        : input.excludeTeamMatchId === null ? {} : { id: { not: input.excludeTeamMatchId } }),
     },
     select: { startAt: true, tournamentDetails: { select: STAGE_SELECT } },
   });
@@ -62,7 +63,7 @@ async function assertStartKeepsStageOrder(
  */
 export async function assertFixtureScheduleKeepsStageOrder(
   tx: Tx,
-  input: { tournamentId: string; teamMatchId: string; startAt: Date | null },
+  input: { tournamentId: string; teamMatchId: string; startAt: Date | null; movingTeamMatchIds?: readonly string[] },
 ): Promise<void> {
   if (input.startAt === null) return;
   const self = await tx.v1TeamMatch.findFirst({
@@ -76,6 +77,7 @@ export async function assertFixtureScheduleKeepsStageOrder(
     excludeTeamMatchId: input.teamMatchId,
     stage: { phase: self.tournamentDetails.group?.phase, stageKey: self.tournamentDetails.group?.stageKey, poolKey: self.tournamentDetails.group?.poolKey, round: self.tournamentDetails.round },
     startAt: input.startAt,
+    movingTeamMatchIds: input.movingTeamMatchIds,
   });
 }
 

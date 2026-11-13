@@ -184,6 +184,13 @@ describe('registered assignment option editing', () => {
     fireEvent.click(screen.getByRole('button', { name: `${timeLabel(stamp)} 시간 수정` }));
     expect(summary.parentElement).toHaveAttribute('open');
     expect(screen.getByLabelText('시간 수정 (한국 시간)')).toHaveFocus();
+    fireEvent.change(screen.getByLabelText('시간 수정 (한국 시간)'), { target: { value: '2026-11-21T11:45' } });
+    fireEvent.click(summary);
+    expect(summary.parentElement).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button', { name: `${timeLabel(stamp)} 시간 수정` }));
+    expect(summary.parentElement).toHaveAttribute('open');
+    expect(screen.getByLabelText('시간 수정 (한국 시간)')).toHaveValue('2026-11-21T11:45');
+    expect(screen.getByLabelText('시간 수정 (한국 시간)')).toHaveFocus();
     fireEvent.keyDown(screen.getByLabelText('시간 수정 (한국 시간)'), { key: 'Escape' });
     expect(screen.queryByLabelText('시간 수정 (한국 시간)')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));

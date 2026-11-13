@@ -82,3 +82,5 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - 최신 통합 로컬 회귀: 배정 패널·회원 대진 미리보기 버튼·공개 소스 계약 12/12 PASS. 관리자 owner 실제 UI 로그인 및 alpha 변경 전 390/768/1440 캡처 PASS(가로 넘침/console/API 오류 없음), 브라우저 종료 확인. 기존 대회 데이터 변경 없음. 캡처는 /tmp/pr2348-alpha/, 계정/세션은 저장하지 않았다.
 
 - 2026-11-13 검증 cursor: API 3 suites/53 tests PASS, Web inline 편집 HTTP 계약 14 tests PASS. preset UUID와 legacy 경기 ID 목록을 편집 시작 시 고정해 동일 시각에 재생성된 다른 항목을 수정하지 않도록 ABA 회귀 추가. API/Web 최종 타입 검사 모두 PASS, API surface 규칙 PASS. 실제 PostgreSQL rollback/일정 동기화 spec은 Docker 미가동으로 CI에서 실행한다. check-api-contract-tree는 Task127의 별도 frozen plan 검증기이며 이 기능의 실행 계약이 아니므로 해당 명령의 인자 누락을 기능 실패로 집계하지 않는다. API 문서는 실제 controller/DTO/service/hooks와 교차 확인했다.
+
+- PR cursor: dev 대상 #2364, head ef407d929156e8c820b2545da77d003757a59fb5. 최신 dev bc1d92475를 충돌 없이 통합했고 diff는 이번 소유 25개 파일뿐이다. API/Web 타입 및 두 패턴 검사 PASS. Copilot 전용 API는 422 ACTOR_INELIGIBLE, 새 PR 한정 사용자 예외 답변 대기. Alpha 테스트 생성·수정·취소/숨김도 구체 범위로 승인 요청했고 미응답이므로 아직 실행하지 않았다. CI 43385977285 진행 중. 접은 편집 항목을 다시 수정할 때 draft/포커스 복원 회귀 1 PASS 보완 후 최신 head CI로 재검증한다.

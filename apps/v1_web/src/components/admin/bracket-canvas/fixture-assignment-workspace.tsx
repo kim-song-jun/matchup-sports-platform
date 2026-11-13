@@ -130,7 +130,8 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
   const entries = mode === 'court' ? courts.map(court => ({ key: court.key, title: court.name, value: court, active: court.active }))
     : timeChoices.map(value => ({ key: value, title: `${formatKstDateShort(value)} ${formatKstTime(value)}`, value, active: true }));
   const editSourceMissing = Boolean(editing && !busy && (unavailable || !entries.some(entry => entry.key === editing.key)));
-  useEffect(() => { editInput.current?.focus(); }, [editing?.key, editSourceMissing]);
+  const editExpanded = editing ? !collapsed.has(`${mode}:${editing.key}`) : false;
+  useEffect(() => { if (editExpanded) editInput.current?.focus(); }, [editing?.key, editSourceMissing, editExpanded]);
   const panel = <section ref={panelRef} tabIndex={-1} className="flex min-h-0 flex-col" aria-label={`${label} 배정`}>
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
       <div><h2 className="tm-text-body-lg font-bold">{label} 배정</h2><p className="tm-text-caption text-[var(--text-muted)]">{label}을 등록하고 경기를 골라 넣어요.</p></div>
@@ -201,13 +202,13 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
           </details>{editable ? <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost absolute right-0 top-3 min-h-11"
             aria-label={`${entry.title} ${mode === 'court' ? '이름' : '시간'} 수정`} aria-expanded={editingEntry} aria-controls={`${id}-edit-form-${index}`} disabled={busy}
             onClick={event => {
+              setCollapsed(previous => { const next = new Set(previous); next.delete(stateKey); return next; });
               if (editingEntry) { editInput.current?.focus(); return; }
               editTrigger.current = event.currentTarget; setEditError(null);
               const initialValue = mode === 'time' ? isoToKstDatetimeLocal(String(entry.value)) : entry.title;
               setEditing({ key: entry.key, value: initialValue, initialValue, fixtureIds: assigned.map(fixture => fixture.id),
                 ...(mode === 'time' ? { scheduleTimeId: times.data?.items.find(item => instant(item.scheduledAt) === entry.key)?.id ?? null } : {}),
                 ...(field ? { fieldId: field.id, expectedVersion: field.version } : {}) });
-              setCollapsed(previous => { const next = new Set(previous); next.delete(stateKey); return next; });
             }}>수정</button> : null}</div>;
         })}
       </div> : null}

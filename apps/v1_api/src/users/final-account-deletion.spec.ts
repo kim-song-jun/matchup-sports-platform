@@ -2,9 +2,12 @@ import { buildDeletedProviderUserKey, finalizeAccountDeletion } from './final-ac
 
 // Invented member numbers: they never match a real Kakao account.
 const KAKAO_KEY = '9000000001';
+// Digit-only keys on other providers: only the provider check keeps these out of the Kakao targets.
+const APPLE_DIGITS_KEY = '9000000002';
+const NAVER_DIGITS_KEY = '9000000003';
 const USER_ID = 'user-1';
 
-type IdentityRow = { id: string; provider: 'kakao' | 'apple' | 'email'; providerUserKey: string };
+type IdentityRow = { id: string; provider: 'kakao' | 'naver' | 'apple' | 'email'; providerUserKey: string };
 
 function fakeTransaction(identities: IdentityRow[]) {
   const stored = identities.map((row) => ({ ...row }));
@@ -47,7 +50,8 @@ describe('finalizeAccountDeletion — Kakao unlink targets', () => {
   it('hands back the Kakao login row and its member number as they were before the key is replaced', async () => {
     const { tx, stored } = fakeTransaction([
       { id: 'identity-kakao', provider: 'kakao', providerUserKey: KAKAO_KEY },
-      { id: 'identity-apple', provider: 'apple', providerUserKey: '001234.apple-subject' },
+      { id: 'identity-apple', provider: 'apple', providerUserKey: APPLE_DIGITS_KEY },
+      { id: 'identity-naver', provider: 'naver', providerUserKey: NAVER_DIGITS_KEY },
       { id: 'identity-email', provider: 'email', providerUserKey: 'a@example.test' },
     ]);
 
@@ -60,7 +64,8 @@ describe('finalizeAccountDeletion — Kakao unlink targets', () => {
 
   it('hands back nothing for an account without a Kakao login', async () => {
     const { tx } = fakeTransaction([
-      { id: 'identity-apple', provider: 'apple', providerUserKey: '001234.apple-subject' },
+      { id: 'identity-apple', provider: 'apple', providerUserKey: APPLE_DIGITS_KEY },
+      { id: 'identity-naver', provider: 'naver', providerUserKey: NAVER_DIGITS_KEY },
       { id: 'identity-email', provider: 'email', providerUserKey: 'a@example.test' },
     ]);
 

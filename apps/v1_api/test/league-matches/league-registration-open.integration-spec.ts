@@ -80,7 +80,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
         },
       });
       await prisma.v1Team.create({
-        data: {
+        data: { profile: { create: { genderRule: '성별 무관' } },
           id: teamId(n),
           name: `검증 팀 ${n}`,
           sportId: ids.sportId,
@@ -256,7 +256,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       },
     });
     await prisma.v1Team.create({
-      data: {
+      data: { profile: { create: { genderRule: '성별 무관' } },
         id: extraTeam,
         name: `검증 팀 추가${n}`,
         sportId: ids.sportId,

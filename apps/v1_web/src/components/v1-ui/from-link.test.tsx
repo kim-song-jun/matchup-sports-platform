@@ -154,6 +154,13 @@ describe('FromLink', () => {
     },
   );
 
+  it('이동에는 검증을 통과한 정규화 경로를 쓰고 렌더한 href 는 그대로 둔다', () => {
+    const link = renderLink({ href: '/legal/../terms?document=privacy' });
+    expect(link.getAttribute('href')).toBe('/legal/../terms?document=privacy');
+    fireEvent.click(link);
+    expect(router.push).toHaveBeenCalledWith('/terms?document=privacy&from=%2Ftournaments');
+  });
+
   it('호출한 쪽 onClick 이 기본 동작을 막았으면 이동하지 않는다', () => {
     const link = renderLink({ onClick: (event) => event.preventDefault() });
     fireEvent.click(link);

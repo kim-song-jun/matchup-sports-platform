@@ -4,7 +4,7 @@
 
 ## 2026-11-12 — 시간·구장 독립 배정 (PR 준비)
 
-[시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 기존 배정의 핵심 Alpha QA와 3폭 근거는 [#2356 기록](https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443)을 따른다(세부 권한 예외는 당시 후보 한정). 2026-11-13 후속은 사용자 A안인 항목 내부 시간·등록 구장 이름 수정이며, 새 시나리오 9~13의 구현/회귀를 진행 중이다. 변경 후 Alpha QA는 새 PR 머지·배포 후 별도로 기록한다.
+[시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 기존 배정의 핵심 Alpha QA와 3폭 근거는 [#2356 기록](https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443)을 따른다(세부 권한 예외는 당시 후보 한정). 2026-11-13 후속은 사용자 A안인 항목 내부 시간·등록 구장 이름 수정이며, 새 inline 기능은 #2364 dev/Alpha 7c288bd0985b에서 실제 저장·취소·중복/stale/401/404와 2패널×3폭 before/after 6/6 PASS. 실제 팀 일정·핀·rollback 등은 PostgreSQL CI로 구분해 검증했다. [현행 근거](../ops/release-readiness-1.20.0-2026-11-13.md), 테스트 cancelled/private·브라우저 종료.
 
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 

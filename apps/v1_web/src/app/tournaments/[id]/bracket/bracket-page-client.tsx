@@ -204,6 +204,7 @@ function GroupStandingsSection({
   const hasSplitQualificationTracks = trackQualifications !== undefined &&
     Object.keys(trackQualifications).length > 0;
   const hasResolvedTrackQualifications = Object.values(trackQualifications ?? {}).some(value => value != null);
+  const legacySplitTracks = Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower');
   const advancingLabels = new Map<string, string[]>();
   const advancingColors = new Map<string, number>();
   if (stageComplete && hasResolvedTrackQualifications) {
@@ -248,8 +249,9 @@ function GroupStandingsSection({
           </span>
         )}
       </div>
-      {hasSplitQualificationTracks ? <p className="tm-text-caption text-[var(--text-muted)]">
-        {Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower')
+      {/* 이름 있는 토너먼트의 「운영자가 확정해요」는 확정 전 안내다 — 진출 표시가 붙은 뒤에도 남으면 모순이라 숨긴다. */}
+      {hasSplitQualificationTracks && (legacySplitTracks || !(stageComplete && hasResolvedTrackQualifications)) ? <p className="tm-text-caption text-[var(--text-muted)]">
+        {legacySplitTracks
           ? '각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.'
           : '진출 토너먼트와 참가팀은 운영자가 확정해요.'}
       </p> : null}

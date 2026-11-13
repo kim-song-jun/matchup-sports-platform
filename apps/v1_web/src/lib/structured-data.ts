@@ -1,3 +1,5 @@
+import { OFFICIAL_SURFACES } from '@/lib/official-surfaces';
+import { maskContactNumbers } from '@/lib/public-text';
 import { absoluteSiteUrl, DEFAULT_SOCIAL_IMAGE, getSiteOrigin } from '@/lib/seo';
 import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { canStartTournamentRegistration } from '@/lib/tournament-registration-availability';
@@ -26,9 +28,6 @@ import type {
 
 export const ORGANIZATION_NAME = 'Teameet';
 export const ORGANIZATION_ALTERNATE_NAME = '팀밋';
-
-/** 실제로 운영 중인 공식 표면만 넣는다 — 없는 계정을 적으면 엔티티 신뢰가 깨진다. */
-const OFFICIAL_SURFACES = ['https://www.instagram.com/teameet_official/'] as const;
 
 export function organizationId(): string {
   return `${getSiteOrigin()}/#organization`;
@@ -84,6 +83,7 @@ export function buildSiteIdentityLd({ contactEmail }: { readonly contactEmail: s
         '@id': websiteId(),
         url: absoluteSiteUrl('/'),
         name: ORGANIZATION_NAME,
+        alternateName: [ORGANIZATION_ALTERNATE_NAME],
         inLanguage: 'ko-KR',
         publisher: { '@id': organizationId() },
       },
@@ -107,13 +107,13 @@ function placeNode(tournament: V1TournamentDetail): JsonLdNode | null {
     '@type': 'Place',
     name: tournament.venue,
   };
+  // 매치·팀 장소와 같이 국가는 늘 싣고, 도로명은 등록된 값이 있을 때만 싣는다.
   const venueAddress = tournament.venueAddress?.trim();
-  if (venueAddress) {
-    place.address = {
-      '@type': 'PostalAddress',
-      streetAddress: venueAddress,
-    };
-  }
+  place.address = {
+    '@type': 'PostalAddress',
+    addressCountry: 'KR',
+    ...(venueAddress ? { streetAddress: venueAddress } : {}),
+  };
   // 좌표는 지오코딩에 성공한 대회만 갖는다(카카오 로컬 API 미설정/검색 실패 시 null).
   if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
     place.geo = {
@@ -159,8 +159,9 @@ export function buildSportsEventLd(
   const image = options.image ?? tournament.coverImageUrl;
   if (image) node.image = absoluteImageUrl(image);
 
-  const description = tournament.promoListSubtitle || tournament.prizeSummary;
-  if (description) node.description = description.replace(/\s+/g, ' ').trim();
+  // 상세 화면은 상금 문구만 그린다(홍보 부제는 홍보 캐러셀에만 뜬다).
+  const description = tournament.prizeSummary?.replace(/\s+/g, ' ').trim();
+  if (description) node.description = description;
 
   // 참가비는 화면(참가 안내)에 그대로 노출되는 값이다. 무료 대회도 price 0으로 명시해야
   // 답변엔진이 "참가비 얼마"라는 질문에 이 페이지를 근거로 쓸 수 있다.
@@ -225,7 +226,7 @@ function buildMatchEventBase(match: V1Match | V1TeamMatch, path: string): JsonLd
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     '@id': `${url}#event`,
-    name: match.title,
+    name: maskContactNumbers(match.title),
     url,
     sport: match.sport?.name ?? match.sportName,
     startDate: match.startsAt,
@@ -360,7 +361,7 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
       address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: regionName },
     };
   }
-  const description = team.profile?.introduction?.replace(/\s+/g, ' ').trim();
+  const description = maskContactNumbers(team.profile?.introduction?.replace(/\s+/g, ' ').trim());
   // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
   if (description) node.description = description;
   const logoUrl = resolveTeamLogoUrl({ teamId: id, logoUrl: team.profile?.logoUrl });

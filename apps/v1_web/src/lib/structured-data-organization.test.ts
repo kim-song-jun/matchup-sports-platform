@@ -5,6 +5,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ANDROID_PLAY_STORE_URL, IOS_APP_STORE_URL } from './app-store-links';
+import { buildSiteIdentityLd } from './structured-data';
 
 const SRC_ROOT = path.resolve(__dirname, '..');
 const OWNER = path.join(SRC_ROOT, 'lib', 'structured-data.ts');
@@ -26,5 +28,39 @@ describe('Organization JSON-LD', () => {
 
     const duplicates = files.filter((file) => file !== OWNER && ORGANIZATION_TYPE.test(readFileSync(file, 'utf8')));
     expect(duplicates.map((file) => path.relative(SRC_ROOT, file))).toEqual([]);
+  });
+});
+
+type IdentityNode = Record<string, unknown>;
+
+function identityGraph(): IdentityNode[] {
+  return buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as IdentityNode[];
+}
+
+describe('사이트 이름과 공식 채널', () => {
+  it('WebSite 도 한글 대체 이름을 갖는다 — Organization 에만 있으면 사이트 이름 신호가 한쪽으로 쏠린다', () => {
+    const [organization, website] = identityGraph();
+
+    expect(website['@type']).toBe('WebSite');
+    expect(website.alternateName).toEqual(['팀밋']);
+    expect(organization.alternateName).toBe('팀밋');
+  });
+
+  it('Organization.sameAs 는 인스타그램과 두 앱 스토어 주소를 싣는다', () => {
+    const [organization] = identityGraph();
+
+    expect(organization.sameAs).toEqual([
+      'https://www.instagram.com/teameet_official/',
+      IOS_APP_STORE_URL,
+      ANDROID_PLAY_STORE_URL,
+    ]);
+  });
+
+  it('인스타그램 주소는 official-surfaces.ts 한 곳에서만 적는다', () => {
+    const owner = path.join(SRC_ROOT, 'lib', 'official-surfaces.ts');
+    const files = sourceFiles(SRC_ROOT);
+    const holders = files.filter((file) => /instagram\.com\/teameet_official/.test(readFileSync(file, 'utf8')));
+
+    expect(holders.map((file) => path.relative(SRC_ROOT, file))).toEqual([path.relative(SRC_ROOT, owner)]);
   });
 });

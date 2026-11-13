@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Instagram, Mail, MessageCircleQuestion } from 'lucide-react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { isUnauthenticatedError } from '@/lib/api-client';
+import { OFFICIAL_INSTAGRAM } from '@/lib/official-surfaces';
 import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
 import type { V1InquiryRelatedType } from '@/types/api';
 import { TournamentInquiryModal } from './tournament-inquiry-modal';
 import styles from './tournament-inquiry-section.module.css';
 
 const TOURNAMENT_CONTACT = {
-  instagramHandle: '@teameet_official',
-  instagramUrl: 'https://www.instagram.com/teameet_official/',
+  instagramHandle: OFFICIAL_INSTAGRAM.handle,
+  instagramUrl: OFFICIAL_INSTAGRAM.url,
   email: 'teameetsports@naver.com',
 } as const;
 

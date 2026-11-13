@@ -81,6 +81,8 @@ import type {
   V1TournamentRegistration,
   V1TournamentStatus,
 } from '@/types/api';
+import { normalizeMyTeamsResponse, isTeamOperatorRole } from '@/lib/team-role';
+import { filterTournamentTeamsBySport } from '@/lib/tournament-team-eligibility';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 
@@ -464,6 +466,25 @@ function useReturningTeamId(registrations: readonly V1TournamentRegistration[]):
   return registrations.find((registration) => registration.status === 'confirmed' && managedTeamIds.has(registration.teamId))?.teamId ?? null;
 }
 
+export function OtherTeamApplicationLink({ tournament, registrations }: {
+  tournament: V1TournamentDetail;
+  registrations: readonly V1TournamentRegistration[];
+}) {
+  const hasActiveRegistration = registrations.some((registration) => registration.status !== 'cancelled');
+  const teams = useV1MyTeams(undefined, { enabled: hasActiveRegistration });
+  const childHref = useChildHref();
+  if (!hasActiveRegistration || teams.isError || resolveTournamentRegistrationBlock(tournament) !== null) return null;
+  const registeredTeamIds = new Set(registrations.filter((registration) => registration.status !== 'cancelled').map((registration) => registration.teamId));
+  const hasOtherTeam = filterTournamentTeamsBySport(normalizeMyTeamsResponse(teams.data), tournament.sportId)
+    .some((team) => isTeamOperatorRole(team.role) && !registeredTeamIds.has(team.teamId));
+  if (!hasOtherTeam) return null;
+  return (
+    <Link href={childHref(`/tournaments/${tournament.id}/my`)} className="tm-btn tm-btn-md tm-btn-outline tm-btn-block" style={{ marginBottom: 16 }}>
+      다른 팀으로 신청하기
+    </Link>
+  );
+}
+
 export function ApplyCTA({
   tournament,
   myRegistration,
@@ -697,7 +718,10 @@ export function TournamentDetailPageClient({
         myRegistrations={myRegistrations}
         backHref="/tournaments"
         entrySection={
-          <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
+          <>
+            <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
+            <OtherTeamApplicationLink tournament={displayData} registrations={myRegistrations} />
+          </>
         }
       />
     </DetailChainFromContext.Provider>

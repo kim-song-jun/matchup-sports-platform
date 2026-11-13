@@ -1,8 +1,48 @@
 # Teameet 1.19.0 승격 준비 — #2353 포함
 
-Status: Prepared; dev 준비 PR 게시/CI 확인 단계. **main 승격과 운영 배포는 이번 요청 범위 밖이다.**
+Status: Alpha 핵심 기능 QA 확인; 사용자 승격 판단 대기. **main 승격과 운영 배포는 이번 요청 범위 밖이다.**
 
 작성 관측 시각: 2026-11-13T03:06:40+00:00. 이후 CI 결과는 준비 PR의 최신 head 상태를 우선한다.
+
+## 후속 Alpha QA — 2026-11-13
+
+현재 판정: **고정 후보의 핵심 기능 3/3 흐름, 3폭 9/9 조합 확인. CI/Alpha 배포/공식 승격 정책 PASS. main 승격은 사용자 실행 대기.**
+이 절은 아래 준비 시작 당시의 상태를 갱신한다. 전체 권한 조합이나 모든 4~64팀 수를 Alpha에서 재실행했다는 뜻은 아니다.
+
+### 고정 후보와 검증
+- 후보/current dev/Alpha: `974ac541b7a2e5e82f2e9687840ce5bca26e462e`.
+- PR #2356은 2026-11-13T04:21:32Z dev merge 완료. 사용자 승인 Copilot 예외는 #2356 한정이다.
+- [머지 후 CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/43364998525)와 [Alpha 배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/43364998649) 모두 success, 동일 후보 SHA.
+- 최종 Alpha HTTP 200, release `1.19.1-alpha.20261113.g974ac541b7a2`; `/api/v1/health` DB true.
+- source snapshot 이후 허용 경로 10/10, 범위 이탈 0. package version 외 변경 0. main 핫픽스 TS/TSX 12/12 동일. main 대비 82/82 경로, 미소비 Changeset 0.
+- 공식 `check-changeset-policy.mjs --release-promotion true` PASS. main 이후 Changeset 삭제 이력 포함. resolver stableVersion `1.19.1`과 실제 Alpha prerelease 일치.
+- 이번 QA 기록/PNG는 별도 evidence 브랜치에 보존한다. 해당 브랜치를 승격 대상으로 삼거나 고정 후보에 섞지 않는다. dev/main과 런타임 소스는 변경하지 않았다.
+
+### 실제 사용자 흐름
+보이는 Edge(headless:false), 별도 브라우저 프로필에서 실제 이메일 로그인 후 owner UI로 검증했다. API 검증은 화면 판정의 보조 근거다. 초기 도구 장애 때문에 저장소가 허용한 headed Playwright 1.58.2를 임시 경로에서 사용했다.
+
+| 기능 | 관측 결과 | 390 / 768 / 1440 |
+|---|---|---|
+| #2347 홀수 참가팀 | 승인된 9팀 비공개 초안에서 A조 5/B조 4 생성. 실제 예선 10+6=16경기, 5자리 결선 4경기, 부전승 3자리. 휴식용 가짜 경기 없음. 서버 재조회 후 20경기와 5·4 슬롯 유지 | PASS / PASS / PASS |
+| #2350 회원 대진표 | 회원 상세 하단에서 사유 입력 후 기존 공개 테스트 대회의 대진 조회. admin shell·조회 전용·만료 시각·돌아가기 유지. 대회 정보 링크 클릭 시 이동 차단과 안내. 실제 10분 경과 뒤 서버 403과 화면 만료 안내. 다시 회원 상세에서 재발급 가능, 원 계정 auth/me 200 유지 | PASS / PASS / PASS |
+| #2348 시간·구장 | KST 10:00/10:30 등록·중복 안내. 시간 변경/해제 시 구장 보존, 구장 변경/해제 시 시간 보존. 새로고침 복원. 수동 경기 편집의 등록 시간 선택·저장. 같은 시간+같은 구장 경고, 다른 구장 경고 없음. 패널 전환 후 접힘 유지. 별도 context의 쿠키만 지운 실제 저장 요청은 401, UI 오류와 원 서버 값 보존 | PASS / PASS / PASS |
+
+3폭 모두 document 가로 넘침 없음. 패널은 desktop aside / tablet·mobile bottom sheet를 직접 확인했다. PNG 12개를 육안 검토했다. 이전 before 캡처는 없으며, 이번에는 이미 배포된 기능에 대한 after 및 실제 오류 상태를 수집했다.
+
+### 권한·console/network 범위
+- 실제 owner 로그인, admin/me·admin 대회·정규 리그 조회 200. 비인증 시간/회원 열람·개발용 신원 헤더는 401. 별도 context의 실제 fixture PATCH도 401 `UNAUTHENTICATED`, 실패를 성공으로 표시하지 않음.
+- owner 이외 support/철회/타 대회 총괄 및 비활성 구장 시나리오는 이번 세션에서 실계정으로 재실행하지 않았다. 기존 service/controller 단위·통합 CI 증거와 구분한다. 따라서 assignment 시나리오 1~7은 실제 흐름으로 확인, 8은 비인증 차단만 실제 확인한 PARTIAL이다. 이 제한은 숨기거나 전체 권한 QA PASS로 집계하지 않는다.
+- pageerror 0. 정상 저장에서 예기치 않은 API 실패 없음. 예상 오류: 10분 만료 열람 403, 쿠키 제거 context 저장 401, 비공개/취소 대회 공개 조회 404. Next 공개 링크 prefetch도 비공개 대회 페이지에서 404를 기록했으므로 console/network 완전 무오류로 표현하지 않는다.
+
+### 승인과 cleanup
+- 사용자가 이번 세션의 기존 QA 계정 사용과 프로젝트 루트/.git의 현재 사용자 ACL 보정, 아래 테스트 대회 생성·QA·취소·숨김을 명시 승인했다. 자격증명/쿠키는 파일이나 PR에 기록하지 않았다.
+- Windows ACL: 두 디렉터리에만 `LEESEUNGMIN\seungmin`의 ReadPermissions/ChangePermissions ACE 추가. 소유자 및 하위 폴더 권한은 별도로 변경하지 않음. UAC 실행 성공 확인. CUA kernel 초기화와 native 앱 inventory는 복구됐으나 browser provider는 `The browser access host is unavailable`을 별도로 반환했다. headed QA 결과와 구분한다.
+- 소유 테스트 대회: `cf4c362e-5a0f-44b1-b4a9-4c1e622d63fe`, `[QA2356 1113] 홀수팀 시간구장 검증`. 최종 `status=cancelled`, `isPublic=false`, 참가 신청 0, 공개 API 404. 다른 대회/팀/회원 데이터는 변경하지 않음.
+- 잔여 승인된 QA 기록: 취소된 대회의 20경기·슬롯·두 시간 선택지·대회 전용 A/B 구장 및 열람/변경 감사 로그. 영구 기록 가능성을 승인받았으며 삭제/초기화하지 않음.
+- 프로세스: node 17336(parent 44516), 별도 Edge 11980(parent 17336) 기록 후 browser/server 정상 종료, 두 PID 부재 확인. 실패 검증 context도 닫음. 기존 사용자 브라우저는 유지.
+
+### 사용자 승격 인계
+검토 diff는 main baseline `0a4a1b268f5c6612da6fd51fdeffc2e6d5179a1c`에서 후보 `974ac541b7a2e5e82f2e9687840ce5bca26e462e`까지다. 사용자가 main 대상 PR을 열기 직전 dev와 Alpha SHA가 이 후보인지 확인해야 한다. 후속 dev 변경을 섞지 않는다. main PR 개설/머지와 production environment 승인은 사용자 전용이며 에이전트가 실행하지 않았다. 위 세부 권한 실계정 재검증 제한을 릴리스 판단에 포함한다.
 
 ## 범위와 고정 근거
 

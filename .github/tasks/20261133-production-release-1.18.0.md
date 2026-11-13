@@ -92,3 +92,11 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 
 ### Progress Snapshot (current)
 Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-20261113`. Main absorption merge `120490f26`. Metadata/docs 작성 및 계약 검증 완료; dev 준비 PR 게시 단계. 기존 root shared WIP 미변경.
+## 2026-11-13 최종 후속 QA / Progress Snapshot
+
+- 후보/dev/Alpha `974ac541b7a2e5e82f2e9687840ce5bca26e462e`, 표시 `1.19.1-alpha.20261113.g974ac541b7a2`. CI/Alpha 배포 success와 공식 승격 gate PASS, 10/10 허용 경로·main 핫픽스 12/12·main diff 82/82 재확인.
+- 사용자 승인 후 기존 QA 계정의 실제 owner 로그인과 headed Edge 클릭 QA 수행. 핵심 기능 3/3, 3폭 9/9 조합 확인. 홀수 9팀 예선16/5자리 결선4/부전승3, 조회 전용·실제10분만료403, 시간/구장 독립 저장·해제·복원·충돌·접힘·401실패 원값보존 확인. before 없음/after 12PNG 육안 확인.
+- assignment 시나리오 1~7은 실제 확인, 8은 비인증 차단만 확인한 PARTIAL. support/철회/타 대회 총괄·비활성 구장 실제 계정 조합은 미재실행이며 기존 단위·통합 CI 근거와 구분한다. 전체 권한 QA 완료로 표시하지 않는다.
+- 사용자 승인된 테스트 대회 cf4c362e-5a0f-44b1-b4a9-4c1e622d63fe는 cancelled/isPublic=false/신청0/공개404로 정리. 승인된 20경기·두 시간·전용A/B구장·감사 기록은 남는다. owner 세션은 유지, 별도 QA 브라우저 PID17336/11980 종료 확인.
+- 승인된 두 폴더 ACL 보정 성공. CUA kernel/native inventory 복구, browser access host unavailable은 별도 잔여 도구 이슈. 실제 화면 QA는 허용된 headed Playwright 대안으로 수행.
+- 근거 정본: docs/ops/release-readiness-1.19.0-2026-11-13.md의 후속 QA 절. 증거 브랜치를 후보에 혼합하지 않는다. main PR/merge와 production 승인은 사용자 전용.

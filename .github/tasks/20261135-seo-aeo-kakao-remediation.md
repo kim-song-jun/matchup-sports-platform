@@ -232,7 +232,9 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 - [ ] (G23 결정됨 — `kakao-unlink`) 카카오 연결 해제: 시간 초과·5xx·네트워크 오류에도 탈퇴 신청과 로그인 방법 해제가 성공으로 끝난다. 로그에 토큰·전화번호·이름이 없다. 관리자 키가 없으면 카카오로 요청을 보내지 않는다
 
 ### Mock data updates needed
-- [ ] 스키마·DTO·API 응답 모양 변경 없음 — `apps/v1_api/test/fixtures/`·`apps/v1_web/src/test/msw/` 수정 대상 없음. 레인 `fixture-canonical-404` 가 응답 필드를 더하는 쪽으로 구현을 바꾸면 그 PR 에서 MSW·fixture 를 함께 고친다.
+- [ ] (첫 묶음 기준) 스키마·DTO·API 응답 모양 변경 없음 — `apps/v1_api/test/fixtures/`·`apps/v1_web/src/test/msw/` 수정 대상 없음. 레인 `fixture-canonical-404` 가 응답 필드를 더하는 쪽으로 구현을 바꾸면 그 PR 에서 MSW·fixture 를 함께 고친다.
+- [ ] (두 번째 묶음 `social-signup-kakao-confirm`) `/auth/me` 응답에 `socialSignupCanDefer` 를 더한다. 웹 타입과 MSW 핸들러·fixture·시험 자료의 `/auth/me` 목 응답(`git grep -l socialSignupNickname` 으로 찾은 자리 전부)을 같은 커밋에서 고치고, 건너뛰기를 누르던 기존 시험이 새 필드가 빠져 다른 화면을 보지 않는지 하나씩 확인한다.
+- [ ] (두 번째 묶음 `kakao-unlink-webhook`) 새 공개 엔드포인트 `POST /api/v1/webhooks/kakao/unlink` 가 생긴다. 웹이 부르는 주소가 아니라 기존 MSW·fixture 수정 대상은 없고, 계약은 `docs/api/domains/webhooks.md`(새 파일)에 적는다.
 - [ ] `robots.test.ts` 의 `/home` 헤더 단언(지금은 `noindex, nofollow, noarchive` 로 고정)을 새 계약으로 바꾼다
 - [ ] `sitemap.test.ts` 의 기본 mock(지금은 null = 404)을 「빈 목록 응답」으로 바꾸고, 기존 5개 시험 fixture 에 대회 `status` 양쪽(completed / in_progress)을 넣는다
 - [ ] 카카오 닉네임·사진 키를 기대하는 서버 시험 4개(`auth.service.spec.ts`·`kakao-profile.spec.ts`·`onboarding.service.spec.ts`·`auth-social-profile-deferred.integration-spec.ts`)를 새 계약(키 없음)으로 고친다
@@ -302,8 +304,8 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 - [ ] Test scenarios 전부 green (`pnpm --filter v1_web lint`·영향받는 Vitest, `pnpm --filter v1_api lint`·영향받는 Jest, CI 통합 스펙)
 - [ ] 범위 내 tech debt 해결됨 (새로운 부채 0) — 효력이 갈리는 robots 줄, 고아 `/schedule` 페이지 파일, 읽지 않는 저장 값, 세 곳에 복사된 채널 주소를 같은 PR 에서 지운다
 - [ ] Security 리뷰 통과 (아래 노트 참조)
-- [ ] Mock data 업데이트 완료, schema와 sync (스키마 변경 없음 — migration 불필요)
-- [ ] 디자인 시스템 준수 — 이번 레인은 화면 배치·컴포넌트를 바꾸지 않는다. 레인마다 alpha 에서 390·768·1440 전후 캡처와 계산값(위치·크기)을 대조해 「변화 없음」을 확인한다(약관 화면은 `mode=signup`·`mode=social` 만 「변화 없음」 대상이고, `document=…` 화면은 로딩 줄이 사라지는 전·후를 승인 페이지에 싣는다). UI 가 바뀌는 후속 레인은 「3안 제시 → 선택」이 구현보다 먼저다
+- [ ] Mock data 업데이트 완료, schema와 sync (스키마 변경 없음 — migration 불필요). 첫 묶음은 응답 모양이 그대로라 갱신할 목이 없고, 두 번째 묶음은 `social-signup-kakao-confirm` 이 `/auth/me` 필드를 더하므로 위 「Mock data updates needed」 의 두 번째 묶음 줄대로 MSW·fixture 를 같은 커밋에서 고친다
+- [ ] (첫 묶음 기준) 디자인 시스템 준수 — 이번 레인은 화면 배치·컴포넌트를 바꾸지 않는다. 레인마다 alpha 에서 390·768·1440 전후 캡처와 계산값(위치·크기)을 대조해 「변화 없음」을 확인한다(약관 화면은 `mode=signup`·`mode=social` 만 「변화 없음」 대상이고, `document=…` 화면은 로딩 줄이 사라지는 전·후를 승인 페이지에 싣는다). UI 가 바뀌는 후속 레인은 「3안 제시 → 선택」이 구현보다 먼저다. 두 번째 묶음에서는 `kakao-login-button`·`social-signup-kakao-confirm` 만 화면을 바꾸며 「변화 없음」 대신 아래 (두 번째 묶음) 줄의 승인 절차를 따른다
 - [ ] Code review: Critical=0, Warning=0 (Copilot 리뷰 clean 까지)
 - [ ] 확인은 세 곳으로 나뉜다(alpha 는 `/sitemap.xml` 이 404 이고 모든 응답에 검색 제외 헤더를 붙여, 사이트맵·robots·헤더는 alpha 에서 잴 수 없다)
   - 시험으로 확인: 사이트맵(실패 시 오류, 끝난 대회만 결과·시상, lastmod), robots 실효, 검색 제외 헤더의 양쪽 단언, `/schedule` 이동 규칙, 전화번호 가림(alpha 에 번호가 든 시험 매치를 만드는 것은 데이터 쓰기라 사용자 확인 뒤)

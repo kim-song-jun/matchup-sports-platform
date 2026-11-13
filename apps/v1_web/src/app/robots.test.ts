@@ -124,10 +124,14 @@ describe('robots', () => {
     expect(homeMetadata.robots).toEqual({ index: false, follow: true });
   });
 
-  it('옛 대회 일정 주소는 대진 허브로 영구 이동한다', async () => {
-    expect(await nextConfig.redirects!()).toContainEqual({
-      source: '/tournaments/:id/schedule', destination: '/tournaments/:id/bracket', permanent: true,
-    });
+  it('옛 대회 일정 주소는 대진 허브로 영구 이동하고, 슬러그가 schedule 인 캠페인은 건드리지 않는다', async () => {
+    const redirect = (await nextConfig.redirects!()).find(({ destination }) => destination === '/tournaments/:id/bracket');
+    expect(redirect).toMatchObject({ permanent: true });
+    const match = getPathMatch(redirect!.source);
+    expect(match('/tournaments/t-1/schedule')).toEqual({ id: 't-1' });
+    expect(match('/tournaments/campaigns2/schedule')).toEqual({ id: 'campaigns2' });
+    expect(match('/tournaments/campaigns/schedule')).toBe(false);
+    expect(match('/tournaments/t-1/schedule/extra')).toBe(false);
   });
 
   it('브라우저가 먼저 찾는 아이콘 주소는 이미 있는 파일로 이어진다', async () => {

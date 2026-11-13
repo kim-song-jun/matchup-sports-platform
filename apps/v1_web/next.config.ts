@@ -106,7 +106,8 @@ const nextConfig: NextConfig = {
       { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: false },
       { source: '/leagues/:id', destination: '/tournaments/:id', permanent: false },
       // 대회 일정은 대진 허브의 탭으로 접혔다. 페이지의 redirect 는 상위 loading 이 먼저 흘러 나가 200 으로 응답되므로 설정으로 처리한다.
-      { source: '/tournaments/:id/schedule', destination: '/tournaments/:id/bracket', permanent: true },
+      // 설정 redirect 는 파일 라우트보다 먼저 맞으므로, 슬러그가 schedule 인 캠페인(/tournaments/campaigns/schedule)은 :id 에서 뺀다.
+      { source: '/tournaments/:id((?!campaigns/)[^/]+)/schedule', destination: '/tournaments/:id/bracket', permanent: true },
       // 구 basePath(/v1) 시대의 URL — 북마크·외부 링크·카카오 redirect_uri(/v1/callback/kakao)가
       // 아직 살아있어서 현재 경로로 넘겨준다. 쿼리스트링은 Next가 그대로 이어붙인다.
       { source: '/v1', destination: '/', permanent: true },

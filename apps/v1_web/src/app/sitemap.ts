@@ -141,6 +141,7 @@ async function requireInventory<T>(pending: Promise<PublicDiscoveryResult<T>>, p
 }
 
 // 대회 상세는 건수가 많아 한 건의 일시 실패로 사이트맵 전체를 거부하지 않는다 — 실패한 것만 한 번 더 읽고, 그래도 실패하면 거부한다.
+// 상세가 404 인 대회는 실패로 보지 않는다 — 대회 주소는 목록 기준으로 싣고 상세에서 얻는 후기·경기 주소만 빠진다.
 async function collectTournamentDetailsOrFail(tournaments: V1TournamentListItem[]) {
   const first = await collectPublicTournamentDetails(tournaments);
   if (first.failedSources.length === 0) return first.items ?? [];

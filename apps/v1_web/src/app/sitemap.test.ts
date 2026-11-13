@@ -188,6 +188,20 @@ describe('sitemap 대회 상세 조회 재시도', () => {
     await expect(sitemap()).rejects.toThrow();
     expect(detailReads('b')).toHaveLength(2);
   });
+
+  it('상세가 404 인 대회는 실패가 아니다 — 다시 읽지 않고 대회·대진 주소는 싣고 후기 주소만 뺀다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      if (path.startsWith('/tournaments?')) return page([tournament('a'), tournament('b')]);
+      if (path === '/tournaments/a') return { fixtures: [], reviewsTotalCount: 1 };
+      return emptyApi(path);
+    });
+    const urls = (await sitemap()).map((entry) => entry.url);
+    expect(urls).toContain(siteUrl('/tournaments/b'));
+    expect(urls).toContain(siteUrl('/tournaments/b/bracket'));
+    expect(urls).not.toContain(siteUrl('/tournaments/b/reviews'));
+    expect(urls).toContain(siteUrl('/tournaments/a/reviews'));
+    expect(detailReads('b')).toHaveLength(1);
+  });
 });
 
 describe('sitemap 대회 하위 주소와 갱신 시각', () => {

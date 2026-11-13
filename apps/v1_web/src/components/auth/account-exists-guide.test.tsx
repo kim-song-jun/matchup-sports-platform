@@ -102,13 +102,24 @@ describe('AccountExistsGuide', () => {
 
   it('원래 수단이 카카오일 수도 있어 카카오 로그인 버튼도 준다', () => {
     renderGuide({ provider: 'apple', redirectPath: null });
-    expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오 로그인' })).toBeInTheDocument();
+  });
+
+  it('카카오 버튼은 심볼과 「카카오 로그인」 문구를 달고 색은 클래스가 맡는다', () => {
+    renderGuide({ provider: 'apple', redirectPath: null });
+    const kakao = screen.getByRole('link', { name: '카카오 로그인' });
+    expect(kakao).toHaveClass('tm-btn-block', 'tm-auth-kakao');
+    expect(kakao).not.toHaveClass('tm-btn-outline');
+    expect(kakao.getAttribute('style')).toBeNull();
+    expect(kakao.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    // 다른 로그인 버튼에는 카카오 심볼이 없다.
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' }).querySelector('svg')).toBeNull();
   });
 
   it('카카오 설정이 없는 환경에서는 카카오 버튼을 그리지 않는다', () => {
     vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', '');
     renderGuide({ provider: 'kakao', redirectPath: null });
-    expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '카카오 로그인' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toBeInTheDocument();
   });
 
@@ -226,7 +237,7 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     renderGuide({ provider: 'kakao', redirectPath: '/teams/new' });
 
     expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email?redirect=%2Fteams%2Fnew');
-    expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오 로그인' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '계정 찾기' })).toBeInTheDocument();
   });
 });

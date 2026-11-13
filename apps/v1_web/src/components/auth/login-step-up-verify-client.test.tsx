@@ -85,7 +85,7 @@ describe('LoginStepUpVerifyClient', () => {
       renderVerify();
 
       const help = await screen.findByText(/메일이 오지 않으면/);
-      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.");
+      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오 로그인' 버튼으로 로그인해 주세요.");
       expect(help).not.toHaveTextContent('Apple');
       expect(help).toHaveTextContent('비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요');
       expect(screen.getByRole('link', { name: '비밀번호 재설정하기' }))
@@ -100,7 +100,7 @@ describe('LoginStepUpVerifyClient', () => {
 
       const help = await screen.findByText(/메일이 오지 않으면/);
 
-      expect(help).toHaveTextContent("카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.");
+      expect(help).toHaveTextContent("카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오 로그인' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.");
     });
 
     it('keeps only digits, at most six, and enables the button once the code is complete', async () => {

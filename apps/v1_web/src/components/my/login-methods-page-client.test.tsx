@@ -159,11 +159,15 @@ async function renderLoaded(...providers: Array<string[] | undefined>) {
   return me;
 }
 
+// 줄 제목과 같은 글자의 버튼(「카카오 로그인」)이 있어 글자만으로는 줄을 못 찾는다 — 제목 칸으로 고른다.
 function rowOf(label: string) {
-  return screen.getByText(label).closest('li') as HTMLElement;
+  const rows = within(screen.getByRole('list', { name: '로그인 방법 목록' })).getAllByRole('listitem');
+  const row = rows.find((item) => item.querySelector('.tm-text-label')?.textContent === label);
+  if (!row) throw new Error(`no login method row titled ${label}`);
+  return row;
 }
 
-const KAKAO_BUTTON = '카카오 연결하기';
+const KAKAO_BUTTON = '카카오 로그인';
 const EMAIL_LINK = '이메일 연결하기';
 const UNLINK_ANY = /연결 해제$/;
 const LAST_METHOD_NOTE = '마지막 로그인 방법이라 해제할 수 없어요';
@@ -229,6 +233,7 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     // 브랜드색은 클래스가 입힌다 — 인라인 배경은 hover 색 변화를 막는다.
     expect(kakao).toHaveClass('tm-auth-kakao');
     expect(kakao.style.background).toBe('');
+    expect(kakao.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     const apple = rowOf('Apple 로그인');
     expect(within(apple).getByText('Apple 연결은 iOS 앱에서 할 수 있어요')).toBeInTheDocument();
     expect(within(apple).getByText('앱에서만')).toBeInTheDocument();
@@ -244,6 +249,7 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(within(email).queryByText('연결됨')).not.toBeInTheDocument();
     // 버튼이 아니라 단계 화면으로 가는 링크다 — 눌러도 이 화면에서 요청이 나가지 않는다.
     expect(within(email).getByRole('link', { name: EMAIL_LINK })).toHaveAttribute('href', '/my/settings/login-methods/email');
+    expect(within(email).getByRole('link', { name: EMAIL_LINK }).querySelector('svg')).toBeNull();
     expect(screen.getByText(/이메일을 연결하면 계정 이메일이 그 주소로 바뀌어요\. 팀과 경기 기록은 그대로예요\./)).toBeInTheDocument();
     expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
@@ -387,6 +393,9 @@ describe('LoginMethodsPageClient - 웹에서 카카오 연결', () => {
     const busy = screen.getByRole('button', { name: '연결 중이에요…' });
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute('aria-busy', 'true');
+    // 처리 중에는 심볼 자리를 스피너가 맡는다.
+    expect(busy.querySelectorAll('svg')).toHaveLength(1);
+    expect(busy.querySelector('.tm-auth-kakao-label')).toBeNull();
   });
 
   it('카카오톡 앱으로 넘어갔다가 인증을 취소하고 돌아오면(페이지는 그대로) 버튼이 다시 풀린다', async () => {

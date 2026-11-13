@@ -122,11 +122,6 @@
     margin-bottom: 16px;
   }
 
-  /* Provider buttons row — they look better slightly larger in the card */
-  .tm-auth-provider-row {
-    gap: 12px;
-  }
-
   /* Policy text — less top space needed */
   .tm-auth-policy {
     margin-top: 12px;

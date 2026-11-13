@@ -18,6 +18,13 @@ export function resolveNextImageSrc(img: Element | null | undefined): string | n
   }
 }
 
+/** `/_next/image?url=…&w=…&q=…` 주소 문자열(메타데이터 등 <img> 밖)을 파라미터별로 쪼갠다. */
+export function parseNextImageSrc(src: string) {
+  const parsed = new URL(src, 'http://localhost');
+  const { searchParams } = parsed;
+  return { pathname: parsed.pathname, url: searchParams.get('url'), w: searchParams.get('w'), q: searchParams.get('q') };
+}
+
 /** container 안의 <img> 중 next/image 최적화 전 원본 경로가 `path`인 것을 찾는다. */
 export function queryImageBySrc(container: ParentNode, path: string): HTMLImageElement | null {
   const imgs = Array.from(container.querySelectorAll('img'));

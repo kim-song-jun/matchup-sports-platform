@@ -1,23 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { parseNextImageSrc } from '@/test/next-image';
 import { socialImageSrc } from './og-image';
 import { DEFAULT_SOCIAL_IMAGE } from './seo';
 
-function optimizerParams(src: string) {
-  const url = new URL(src, 'http://localhost');
-  return { pathname: url.pathname, url: url.searchParams.get('url'), w: url.searchParams.get('w') };
-}
-
 describe('socialImageSrc', () => {
-  it('같은 origin 업로드·정적 이미지는 원본 대신 가로 1200 사본 주소로 바꾼다', () => {
-    expect(optimizerParams(socialImageSrc('/uploads/2026/07/cover.jpg'))).toEqual({
+  it('같은 origin 업로드·정적 이미지는 원본 대신 가로 1200·품질 75 사본 주소로 바꾼다', () => {
+    expect(parseNextImageSrc(socialImageSrc('/uploads/2026/07/cover.jpg'))).toEqual({
       pathname: '/_next/image',
       url: '/uploads/2026/07/cover.jpg',
       w: '1200',
+      q: '75',
     });
-    expect(optimizerParams(socialImageSrc('/images/team-logos/team-logo-02.jpg'))).toEqual({
+    expect(parseNextImageSrc(socialImageSrc('/images/team-logos/team-logo-02.jpg'))).toEqual({
       pathname: '/_next/image',
       url: '/images/team-logos/team-logo-02.jpg',
       w: '1200',
+      q: '75',
     });
   });
 

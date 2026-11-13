@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeMetadataRoute } from 'next/dist/lib/metadata/get-metadata-route';
 import { describe, expect, it, vi } from 'vitest';
 import { buildPublicMetadata, DEFAULT_SOCIAL_IMAGE } from '@/lib/seo';
+import { parseNextImageSrc } from '@/test/next-image';
 import * as defaultOgImage from './opengraph-image';
 
 /** PNG IHDR 청크의 가로·세로(빅엔디언 4바이트씩, 오프셋 16·20). */
@@ -28,13 +29,17 @@ describe('기본 링크 미리보기 이미지', () => {
   it('커버가 있으면 커버를 쓰고, 모르는 커버 크기를 지어내지 않는다', () => {
     const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: '/uploads/cover.png' });
 
-    expect(metadata.openGraph?.images).toEqual([{ url: '/_next/image?url=%2Fuploads%2Fcover.png&w=1200&q=75', alt: '대회' }]);
+    const [og] = metadata.openGraph?.images as Array<{ url: string }>;
+    expect(parseNextImageSrc(og.url)).toMatchObject({ pathname: '/_next/image', url: '/uploads/cover.png', w: '1200' });
+    expect(metadata.openGraph?.images).toEqual([{ url: og.url, alt: '대회' }]);
   });
 
   it('정사각 이미지(팀 로고)는 X 에서 작은 카드로 보낸다 — 큰 카드는 위아래를 잘라낸다', () => {
     const metadata = buildPublicMetadata({ title: '팀', description: '설명', path: '/teams/t-1', image: '/uploads/logo.png', squareImage: true });
 
-    expect(metadata.twitter).toMatchObject({ card: 'summary', images: ['/_next/image?url=%2Fuploads%2Flogo.png&w=1200&q=75'] });
+    const [image] = (metadata.twitter as { images: string[] }).images;
+    expect(metadata.twitter).toMatchObject({ card: 'summary' });
+    expect(parseNextImageSrc(image)).toMatchObject({ pathname: '/_next/image', url: '/uploads/logo.png', w: '1200' });
   });
 
   it('메타데이터가 가리키는 경로가 Next 가 이 파일을 서빙하는 경로와 같다', () => {

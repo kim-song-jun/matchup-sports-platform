@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
+import { parseNextImageSrc } from '@/test/next-image';
 import { absoluteSiteUrl, buildPublicMetadata, buildTournamentDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
@@ -248,16 +249,12 @@ describe('buildTournamentTitle', () => {
 describe('buildPublicMetadata 공유 이미지', () => {
   const ogImages = (metadata: ReturnType<typeof buildPublicMetadata>) =>
     metadata.openGraph?.images as Array<{ url: string; width?: number; height?: number; alt?: string }>;
-  const optimizerParams = (src: string) => {
-    const url = new URL(src, 'http://localhost');
-    return { pathname: url.pathname, url: url.searchParams.get('url'), w: url.searchParams.get('w') };
-  };
 
   it('업로드 커버는 원본 대신 가로 1200 사본을 og:image·twitter:image 로 내보내고, 모르는 크기를 적지 않는다', () => {
     const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: '/uploads/2026/07/cover.png' });
     const [og] = ogImages(metadata);
 
-    expect(optimizerParams(og.url)).toEqual({ pathname: '/_next/image', url: '/uploads/2026/07/cover.png', w: '1200' });
+    expect(parseNextImageSrc(og.url)).toMatchObject({ pathname: '/_next/image', url: '/uploads/2026/07/cover.png', w: '1200' });
     expect(og).toEqual({ url: og.url, alt: '대회' });
     expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [og.url] });
   });
@@ -265,7 +262,7 @@ describe('buildPublicMetadata 공유 이미지', () => {
   it('정사각 로고도 같은 사본으로 내보내고 X 작은 카드는 그대로 둔다', () => {
     const metadata = buildPublicMetadata({ title: '팀', description: '설명', path: '/teams/t-1', image: '/uploads/2026/07/logo.png', squareImage: true });
 
-    expect(optimizerParams(ogImages(metadata)[0].url).url).toBe('/uploads/2026/07/logo.png');
+    expect(parseNextImageSrc(ogImages(metadata)[0].url).url).toBe('/uploads/2026/07/logo.png');
     expect(metadata.twitter).toMatchObject({ card: 'summary', images: [ogImages(metadata)[0].url] });
   });
 

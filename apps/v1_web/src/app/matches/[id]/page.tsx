@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchDetailPageClient } from '@/components/matches/matches-client';
 import { JsonLd } from '@/components/seo/json-ld';
+import { maskContactNumbers } from '@/lib/public-text';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
 import { buildMatchEventLd } from '@/lib/structured-data';
 import type { V1Match } from '@/types/api';
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!match) return buildNoIndexMetadata('매치를 찾을 수 없어요');
 
   return buildPublicMetadata({
-    title: match.title,
+    title: maskContactNumbers(match.title),
     description: metadataDescription(
       match.description,
       matchDescriptionFallback('개인 매치', match.sport?.name ?? match.sportName, match.place?.name ?? match.placeName),

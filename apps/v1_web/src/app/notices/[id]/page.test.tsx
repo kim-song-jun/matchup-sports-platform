@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPublicV1 } from '@/lib/seo';
 import { buildNoticeArticleLd } from '@/lib/structured-data';
-import NoticeDetailPage from './page';
+import NoticeDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
@@ -9,11 +9,9 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/seo', () => ({
+vi.mock('@/lib/seo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/seo')>()),
   fetchPublicV1: vi.fn(),
-  buildNoIndexMetadata: vi.fn(),
-  buildPublicMetadata: vi.fn(),
-  metadataDescription: vi.fn(),
 }));
 
 vi.mock('@/lib/structured-data', () => ({ buildNoticeArticleLd: vi.fn(() => ({ '@type': 'Article' })) }));
@@ -53,5 +51,51 @@ describe('NoticeDetailPage (server)', () => {
     fetchPublicV1Mock.mockResolvedValue(null as never);
 
     await expect(NoticeDetailPage({ params: Promise.resolve({ id: 'nope' }) })).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+});
+
+describe('NoticeDetailPage generateMetadata', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const NOTICE_FALLBACK = 'Teameet 공지사항을 확인하세요.';
+  const describeNotice = async (notice: Record<string, unknown>) => {
+    fetchPublicV1Mock.mockResolvedValue({ notice: { noticeId: 'n1', title: '점검 안내', ...notice } } as never);
+    return generateMetadata({ params: Promise.resolve({ id: 'n1' }) });
+  };
+
+  it('본문 속 이미지 자리표시 줄은 검색·공유 설명에 싣지 않는다', async () => {
+    const meta = await describeNotice({
+      body: '[이미지: 11]\n12일 02:00~04:00 서비스 점검이 있어요. 이용에 참고해 주세요.\n[이미지: 12]',
+    });
+
+    const expected = '12일 02:00~04:00 서비스 점검이 있어요. 이용에 참고해 주세요.';
+    expect(meta.description).toBe(expected);
+    expect(meta.openGraph?.description).toBe(expected);
+    expect(meta.twitter?.description).toBe(expected);
+  });
+
+  it('이미지뿐인 공지는 자리표시 글자 대신 기본 문구로 나간다', async () => {
+    const imageOnlyBody = '[이미지: 11]\n[이미지: 12]\n[이미지: 13]';
+    expect((await describeNotice({ body: imageOnlyBody })).description).toBe(NOTICE_FALLBACK);
+    const withDocument = await describeNotice({
+      body: imageOnlyBody,
+      content: { type: 'doc', content: [{ type: 'image', attrs: { src: '/uploads/a.png' } }] },
+    });
+    expect(withDocument.description).toBe(NOTICE_FALLBACK);
+  });
+
+  it('본문이 서식 문서로 오면 그 글자를 설명으로 쓴다', async () => {
+    const meta = await describeNotice({
+      body: '[이미지: 3]',
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '이번 주말 대회 운영 안내를 드려요.' }] }] },
+    });
+
+    expect(meta.description).toBe('이번 주말 대회 운영 안내를 드려요.');
+  });
+
+  it('공지 본문에 적힌 전화번호는 설명에서 가려진다', async () => {
+    const meta = await describeNotice({ body: '현장 문의는 010-1234-5678 로 연락 주세요. 접수는 19:00 에 마감해요.' });
+
+    expect(meta.description).toBe('현장 문의는 ***-****-**** 로 연락 주세요. 접수는 19:00 에 마감해요.');
   });
 });

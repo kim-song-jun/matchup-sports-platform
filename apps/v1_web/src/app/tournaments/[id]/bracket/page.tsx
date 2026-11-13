@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BracketPageClient } from './bracket-page-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: `${tournament.title} 대진표`,
     description: `${tournament.title}의 조별 순위와 토너먼트 대진표를 확인하세요.`,
     path: `/tournaments/${id}/bracket`,
-    image: tournament.coverImageUrl,
+    image: resolveTournamentImage(tournament, 'cover'),
   });
 }
 

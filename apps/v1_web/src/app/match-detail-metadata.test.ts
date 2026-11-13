@@ -30,4 +30,26 @@ describe('매치·팀매치 상세 메타 설명', () => {
     expect(meta.description).toBe('풋살 개인 매치 정보를 확인해 보세요.');
     expect(String(meta.description)).not.toContain('undefined');
   });
+
+  it.each([
+    ['팀매치', teamMatchMetadata, 'tm-1'],
+    ['개인 매치', matchMetadata, 'm-1'],
+  ])('%s: 제목·설명에 든 전화번호는 description·og·twitter 모두에서 가려지고 시각은 남는다', async (_kind, generate, id) => {
+    fetchPublicV1.mockResolvedValue({
+      ...detail,
+      title: '010-1234-5678 팀장 주최 친선전',
+      description: '참가 문의는 010-1234-5678 로 주세요. 토요일 19:00 킥오프예요.',
+    });
+
+    const meta = await generate({ params: Promise.resolve({ id }) });
+
+    const description = '참가 문의는 ***-****-**** 로 주세요. 토요일 19:00 킥오프예요.';
+    expect(meta.description).toBe(description);
+    expect(meta.openGraph?.description).toBe(description);
+    expect(meta.twitter?.description).toBe(description);
+    expect(meta.title).toBe('***-****-**** 팀장 주최 친선전');
+    expect(meta.openGraph?.title).toBe('***-****-**** 팀장 주최 친선전 | Teameet');
+    expect(meta.twitter?.title).toBe('***-****-**** 팀장 주최 친선전 | Teameet');
+    expect(JSON.stringify(meta)).not.toMatch(/010-1234-5678|1234-5678/);
+  });
 });

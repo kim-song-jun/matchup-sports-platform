@@ -1,10 +1,10 @@
-# Task 20261133: 운영 승격 준비 — 1.18.0 이력 및 #2353 포함 1.19.0 후보
+# Task 20261133: 운영 승격 — #2364 포함 1.20.0 후보
 
 Status: Review
 
 **최신 범위 확장(2026-11-13)**: 사용자가 '해당 내용까지 main 승격에 포함해줘'라고 지시해 등록 시간·구장 이름 인라인 수정 PR #2364를 이번 운영 승격 범위에 추가했다. 아래 1.19.0/표시 1.19.1 잠금은 이전 후보 이력이며, 확장 후보의 완료 근거로 재사용하지 않는다. 새 후보 SHA·버전은 #2364 dev 반영·CI·Alpha QA와 Changeset 소비 후 고정한다.
 
-**현행 범위 (2026-11-13 사용자 추가 승인)**: 기존 4개 기능에 #2353을 포함하고 main 성별 핫픽스 #2355를 보존한다. 현행 보고서: `docs/ops/release-readiness-1.19.0-2026-11-13.md`, 잠금: `docs/ops/release-1.19.0-scope-lock.json`. 아래 1.18.0 기록은 당시의 고정 후보 이력이며 현행 범위는 이 추가 승인 절을 따른다.
+**현행 범위 (2026-11-13 최종 사용자 위임)**: 기존 5개 기능 + #2364 인라인 수정, main 핫픽스 #2355/#2362 보존. 현행 보고서 `docs/ops/release-readiness-1.20.0-2026-11-13.md`, 잠금 `docs/ops/release-1.20.0-scope-lock.json`. 아래 1.18.0/1.19.0 제한은 당시 준비 이력이며 이번 main·운영 실행 위임은 최신 승인 절을 따른다.
 Owner: Codex
 Created: 2026-11-13
 
@@ -118,3 +118,9 @@ Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-202611
 - 정규 N개 예선은 표준 템플릿과 달리 240경기 초과도 지원하므로 legacy expectedFixtureIds의 불필요한 240개 제한 제거, 275 UUID DTO 회귀 PASS. 최종 실제 DB 결과는 다음 CI에서 확인한다.
 - 브라우저: CUA host unavailable, 일반 격리 headed Chrome은 ERR_NETWORK_ACCESS_DENIED. 별도 권한 상승 QA Chrome 실행이 자동 승인 검토에서 거절돼 사용자에게 해당 실행 방식의 구체 승인을 요청했다. 거절을 우회하지 않고 화면 QA는 이 승인 대기 상태로 유지한다. 일반 QA 브라우저는 close했고 사용자 Chrome은 유지했다.
 - 현재 관측: Alpha bc1d92475/1.19.1-alpha, production 6675a8a00/1.17.3 HTTP200. 아직 기능 dev 머지·main 승격·운영 변경 없음.
+
+## 1.20.0 현행 준비 cursor
+- #2364 사용자 전체 실행 위임에 따라 dev 머지 및 Alpha QA 완료. Source 7c288bd0985bd58beb68f7f72155107c0c58d377, main baseline6675a8a00ec80b54af0674ebf366bfd7865c0d33. source CI 43392588398/Alpha43392588395 SUCCESS.
+- 2패널×3폭 before/after 6/6 및 실제 저장·취소·중복/stale/auth PASS. 테스트 cancelled/private·실제등록0, 전용Chrome38408/helper51176 종료. 이전 브라우저 실행 차단은 사용자 구체 승인 후 해결됐다.
+- 공식 prepare-only PASS. API/Web1.20.0 및 두 Changeset 소비, 기존 main 핫픽스/CHANGELOG 유지. 현행 보고서 docs/ops/release-readiness-1.20.0-2026-11-13.md, 새 scope lock release-1.20.0-scope-lock.json. 이전1.19.0 잠금은 이력 보존.
+- 다음: metadata/docs 준비 PR CI→dev/Alpha 검증→고정 main PR/CI/머지→production 승인/배포→실제운영 SHA/버전/health 대조. 사용자 승인 재요청 없이 정상 게이트로 진행한다. 아직 main/production 미변경.

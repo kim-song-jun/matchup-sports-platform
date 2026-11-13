@@ -1,6 +1,6 @@
 # 대진 시간·구장 독립 배정
 
-Status: In Progress
+Status: Done
 Owner: Codex
 Created: 2026-11-12
 
@@ -16,8 +16,8 @@ Created: 2026-11-12
 - 시간 이동에 시작/종료된 경기가 섞이면 전체 거부한다. 중복 시간/구장 이름과 stale source/version은 실제 오류를 보여주며 부분 성공·자동 합치기를 하지 않는다.
 - UI: 항목 제목의 접기와 별도 수정 버튼, label/input + 저장/취소, 반영 경기 수 안내, 저장 중 중복 조작 차단, 실패 시 입력 유지. shared Button/tm-input과 기존 BottomSheet/aside 재사용.
 - Owned: scheduling controller/DTO/service/tests, 내부 schedule-order helper 및 회귀, field DTO/service/tests, Web hooks/types/panel/tests/MSW, API/scenario/task 문서, Changeset. Forbidden: schema/migration/seed, 팀·결과·진출 정책, 운영 main, 기존 고정 릴리스 문서/lock, 타 세션 WIP.
-- 순차 Phase 1 계약·기획 [x] → Phase 2 API/데이터 [x] → Phase 3 훅/UI [x] → Phase 4 좁은 검증/리뷰 [ ] → Phase 5 dev PR/CI/Alpha QA/정리 [ ]. 에이전트 병렬화 없음.
-- Acceptance: [x] A/B/C → A 선택; [ ] 실제 저장·배정 경기 동기화; [ ] 권한/중복/stale/상태/단계 순서/rollback 회귀; [ ] 390/768/1440 before/after 및 오류/console/network; [ ] API·fixture/MSW 문서 sync; [ ] committed diff 확인.
+- 순차 Phase 1 계약·기획 [x] → Phase 2 API/데이터 [x] → Phase 3 훅/UI [x] → Phase 4 좁은 검증/리뷰 [x] → Phase 5 dev PR/CI/Alpha QA/정리 [x]. 에이전트 병렬화 없음.
+- Acceptance: [x] A/B/C → A 선택; [x] 실제 저장·배정 경기 동기화; [x] 권한/중복/stale/상태/단계 순서/rollback 회귀; [x] 390/768/1440 before/after 및 오류/console/network; [x] API·fixture/MSW 문서 sync; [x] committed diff 확인.
 - DB impact: V1TournamentScheduleTime, V1TournamentField, V1TeamMatch와 기존 일정 정본. 현재 schema 그대로 사용하며 migration 불필요.
 - Security: 시간은 기존 대회 총괄 mutation 권한, 구장 이름은 기존 platform ops 관리 권한. 인증/감사/동시 수정 방어 유지. 이전 PR별 리뷰/QA 예외를 새 PR에 자동 확대하지 않는다.
 - Progress Snapshot: 최신 dev fetch 후 전용 worktree 생성, 실제 canonical match update/schedule helper와 field CRUD 확인. UI A 승인, 구현 시작. 기존 #2348 핵심 Alpha QA 근거는 PR #2356 댓글 6845422443 및 QA evidence 브랜치에 있으며, 이 후속 변경의 after 근거는 별도 수집한다.
@@ -52,8 +52,8 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - [x] A/B/C 제시 → 사용자 A안 및 항목별 접기 확정.
 - [x] 원본 조건 및 API259/Web33 좁은 회귀·양쪽 타입/규칙 검사 통과.
 - [x] diff/새 debt marker/커밋 트리 확인.
-- [ ] dev 대상 PR 및 CI/리뷰 상태 기록.
-- [ ] alpha 390/768/1440 화면 증거 (머지·배포 후, 자격증명 필요).
+- [x] dev 대상 PR 및 CI/리뷰 상태 기록.
+- [x] alpha 390/768/1440 화면 증거 (머지·배포 후, 자격증명 필요).
 
 ## Tech Debt Resolved
 일정 복사본을 만들지 않는다. 수동 편집의 pristine 장소 hydrate 누락을 관련 변경에서 보완한다.
@@ -88,3 +88,14 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - 사용자 범위 확장(2026-11-13): '해당 내용까지 main 승격에 포함해줘'. #2364를 이번 승격의 포함 기능으로 추가한다. 기존 고정 후보에 최신 dev 전체를 무조건 합치지 않는다. 새 source/final SHA, Changeset 소비·버전·main 핫픽스 보존은 dev 반영 및 Alpha QA 후 별도 준비 PR에서 검증한다. 이 범위 승인은 아직 응답되지 않은 #2364 리뷰 예외/새 Alpha 테스트 데이터 승인이나 실제 main 실행을 대신하지 않는다.
 
 - 최신 cursor: 사용자 이번 승격 리뷰 예외 및 main 운영 적용까지 명시 승인(위임 범위는 production-release task 최신 절). CI 신규 DB fixture 준비 오류를 실제 MultiFinalsService.setup 경로로 수정, API 타입/DTO 6 PASS. 추가 경기 수 제한 없이 기존 N개 예선 규모 유지. 별도 QA Chrome 실행 방식은 자동 승인 검토 거절로 구체 승인 대기이며 아직 화면 QA 통과 아님.
+
+
+## #2364 최종 기능 완료 — 2026-11-13
+- PR #2364 dev merge 7c288bd0985bd58beb68f7f72155107c0c58d377. PR CI 43390758504, dev CI 43392588398, Alpha 43392588395 모두 SUCCESS. 사용자 이번 승격 Copilot 예외 및 main 운영 적용 전체 위임 기록은 release task 최신 절을 따른다.
+- 동일 SHA의 Alpha API/Web 1.20.0-alpha에서 실제 owner 로그인으로 2개 패널 × 390/768/1440 before/after 6/6 조합 PASS. 시간 10:00→10:30은 두 경기·preset ID를 유지, 구장 QA A구장→QA 메인 구장은 두 경기 이름·field ID·시각 유지, reload 저장 확인.
+- 취소/Escape 미저장, 접기 후 draft 복원, 중복 시간·구장 409 및 draft 보존, stale 시간·구장 409, 비인증/개발 헤더 401, 비공개 상세 404 PASS. 실제 팀 일정·핀·rollback·started guard는 CI 실제 PostgreSQL integration PASS로 보완(Alpha는 참가팀 없는 4자리/2경기 test).
+- application exception 0, unexpected HTTP 0. 의도한 duplicate 409 두 건과 대응 resource error 두 건, Next CSS unused-preload warning은 숨기지 않고 after.json에 기록. 3폭 document width=viewport, 폼·저장·취소·sheet scroll 확인.
+- 증거: docs/screenshots/assignment-edit-2364-20261113/before.json, after.json 및 PNG 16장. 테스트 대회 e8a86b72-1694-49cb-806e-2039c20e9e67는 cancelled/isPublic=false, 참가팀 등록 0. QA Chrome 38408/helper 51176 종료 확인, 사용자 Chrome 유지.
+- main 승격은 후속 release/prepare-1.20.0-2364에서 별도 고정 후보로 진행하며 기능 완료와 운영 적용을 구분한다.
+
+- 구현 worktree/브랜치는 최종 릴리스 작업의 소유권 확인 후 정리할 때까지 유지한다. QA 브라우저·helper 정리는 완료했으며 worktree 제거 완료로 표시하지 않는다.

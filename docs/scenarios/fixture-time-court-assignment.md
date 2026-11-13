@@ -1,6 +1,6 @@
 # 리그 + N개 토너먼트 시간·구장 배정
 
-Status: Implementation / PR validation
+Status: Core Alpha QA verified; detailed state/permission regressions verified in CI
 Task: [20261132](../../.github/tasks/20261132-fixture-time-court-assignment.md)
 
 ## Persona / route
@@ -35,3 +35,9 @@ Alpha 변경 후 기능 0/8, viewport 0/3 (390/768/1440), console/network 미검
 
 ## Cleanup
 기능 QA를 위해 생성하는 대진은 영구 데이터가 될 수 있어 사용자 대회에 쓰지 않는다. 실제 QA 데이터/브라우저의 소유 범위와 cleanup 결과를 후속 기록한다.
+
+
+## 현행 완료 근거 — #2364 (2026-11-13)
+- 위 초기 미검증 표기를 대체한다. #2364 dev/Alpha 7c288bd0985bd58beb68f7f72155107c0c58d377, CI/배포 SUCCESS. 새 inline 수정은 2개 패널 × 3폭 before/after 6/6, 실제 두 경기 시간·이름 저장/reload·취소·중복/stale·401/404 PASS.
+- Alpha는 팀 미배정 4자리/2경기로 검증했다. 실제 팀 일정·경기 길이·좌표/출처·started guard·rollback은 실제 PostgreSQL integration PASS 근거로 구분한다. 모든 역할·13개 항목을 이번 Alpha에서 전부 재실행한 것은 아니다.
+- application exception/unexpected HTTP 0, 의도한409 두 건 및 CSS preload warning 기록. 증거와 제한: ../ops/release-readiness-1.20.0-2026-11-13.md. 테스트 대회 cancelled/private, 전용 Chrome/helper 종료.

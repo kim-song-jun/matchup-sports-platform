@@ -9,7 +9,7 @@ Created: 2026-11-12
 
 ## 2026-11-13 후속 — 등록 항목 수정
 
-- Scope: backend + frontend + docs. 브랜치 `feat/edit-assignment-options-20261113`, base `974ac541b7a2`. 기존 1.19.1 고정 승격 후보에 자동 포함하지 않는다.
+- Scope: backend + frontend + docs. 브랜치 `feat/edit-assignment-options-20261113`, base `974ac541b7a2`. 2026-11-13 사용자가 이 수정까지 main 승격 범위에 포함하도록 명시 승인했다. 기존 1.19.1 고정 후보는 이력으로 보존하고 #2364 검증 후 새 후보를 고정한다.
 - 사용자 선택: A 항목 안에서 수정. B 별도 창/C 목록 관리 화면과 장단점·규모 비교 후 명시 선택 받음.
 - 시간 항목의 기존 시각 → 새 시각 변경은 같은 항목에 배정된 경기에도 원자적으로 반영한다. 구장·팀·경기 길이·팀 일정 정본을 보존한다. 등록 항목 없는 기존 직접 입력 시각도 지원한다.
 - 등록 구장 이름 변경은 기존 fieldId와 주소·좌표·시간을 보존하고 연결된 경기의 이름도 동기화한다. 구장 관리 권한과 expectedVersion/멱등 계약을 유지한다. 등록되지 않은 레거시 직접 입력 장소는 기존 개별 경기 편집 경로를 유지한다.
@@ -84,3 +84,5 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - 2026-11-13 검증 cursor: API 3 suites/53 tests PASS, Web inline 편집 HTTP 계약 14 tests PASS. preset UUID와 legacy 경기 ID 목록을 편집 시작 시 고정해 동일 시각에 재생성된 다른 항목을 수정하지 않도록 ABA 회귀 추가. API/Web 최종 타입 검사 모두 PASS, API surface 규칙 PASS. 실제 PostgreSQL rollback/일정 동기화 spec은 Docker 미가동으로 CI에서 실행한다. check-api-contract-tree는 Task127의 별도 frozen plan 검증기이며 이 기능의 실행 계약이 아니므로 해당 명령의 인자 누락을 기능 실패로 집계하지 않는다. API 문서는 실제 controller/DTO/service/hooks와 교차 확인했다.
 
 - PR cursor: dev 대상 #2364, head ef407d929156e8c820b2545da77d003757a59fb5. 최신 dev bc1d92475를 충돌 없이 통합했고 diff는 이번 소유 25개 파일뿐이다. API/Web 타입 및 두 패턴 검사 PASS. Copilot 전용 API는 422 ACTOR_INELIGIBLE, 새 PR 한정 사용자 예외 답변 대기. Alpha 테스트 생성·수정·취소/숨김도 구체 범위로 승인 요청했고 미응답이므로 아직 실행하지 않았다. CI 43385977285 진행 중. 접은 편집 항목을 다시 수정할 때 draft/포커스 복원 회귀 1 PASS 보완 후 최신 head CI로 재검증한다.
+
+- 사용자 범위 확장(2026-11-13): '해당 내용까지 main 승격에 포함해줘'. #2364를 이번 승격의 포함 기능으로 추가한다. 기존 고정 후보에 최신 dev 전체를 무조건 합치지 않는다. 새 source/final SHA, Changeset 소비·버전·main 핫픽스 보존은 dev 반영 및 Alpha QA 후 별도 준비 PR에서 검증한다. 이 범위 승인은 아직 응답되지 않은 #2364 리뷰 예외/새 Alpha 테스트 데이터 승인이나 실제 main 실행을 대신하지 않는다.

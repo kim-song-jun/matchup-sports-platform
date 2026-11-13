@@ -2,6 +2,8 @@
 
 Status: Review
 
+**최신 범위 확장(2026-11-13)**: 사용자가 '해당 내용까지 main 승격에 포함해줘'라고 지시해 등록 시간·구장 이름 인라인 수정 PR #2364를 이번 운영 승격 범위에 추가했다. 아래 1.19.0/표시 1.19.1 잠금은 이전 후보 이력이며, 확장 후보의 완료 근거로 재사용하지 않는다. 새 후보 SHA·버전은 #2364 dev 반영·CI·Alpha QA와 Changeset 소비 후 고정한다.
+
 **현행 범위 (2026-11-13 사용자 추가 승인)**: 기존 4개 기능에 #2353을 포함하고 main 성별 핫픽스 #2355를 보존한다. 현행 보고서: `docs/ops/release-readiness-1.19.0-2026-11-13.md`, 잠금: `docs/ops/release-1.19.0-scope-lock.json`. 아래 1.18.0 기록은 당시의 고정 후보 이력이며 현행 범위는 이 추가 승인 절을 따른다.
 Owner: Codex
 Created: 2026-11-13
@@ -92,3 +94,20 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 
 ### Progress Snapshot (current)
 Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-20261113`. Main absorption merge `120490f26`. Metadata/docs 작성 및 계약 검증 완료; dev 준비 PR 게시 단계. 기존 root shared WIP 미변경.
+
+## #2364 추가 승인 — 확장 승격 후보 준비
+
+- 사용자 승인: 2026-11-13 “해당 내용까지 main 승격에 포함해줘”. 기존 포함 기능 #2347/#2350/#2348/#2351/#2353 + #2364 등록 시간·구장 이름 수정.
+- 기능 PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2364 (base dev). 구현 task: `.github/tasks/20261132-fixture-time-court-assignment.md`.
+- #2364는 시간 항목과 연결 경기·팀 일정을 원자적으로 이동하고 구장 이름과 배정 경기 표시를 동기화한다. 구장 ID/주소/좌표/시간·기존 권한/감사는 보존하며 추가 migration은 없다.
+- 관측 기준: dev `bc1d92475e03b876d23023cb13fba623611b5b24`, main `6675a8a00ec80b54af0674ebf366bfd7865c0d33`. main 성별 핫픽스 #2355와 타 팀 신청 핫픽스 #2362를 보존한다. #2361은 #2362와 동등한 dev 변경으로, 새 운영 기능으로 중복 집계하지 않는다. 최종 diff에서 동등성과 main 전용 변경 유실 여부를 다시 확인한다.
+- 이전 scope-lock JSON/준비 브랜치는 이력으로 유지한다. 미완료 #2364를 이전 QA 완료/범위 잠금에 덧붙여 승인된 고정 SHA처럼 표시하지 않는다. 이후 무관한 dev 기능을 자동 포함하지 않는다.
+- 로컬 API 53/Web 14 테스트와 양쪽 타입·패턴 검사 PASS. 접기 후 편집 복원 회귀 1 PASS. 최신 기능 head `23c1ef2d5b87e3656e447faf2385300eb0f78e28`의 CI 43386715474 진행 중(아래 문서 커밋 반영 시 최신 PR head를 기준으로 재확인).
+- Copilot 전용 API 422 ACTOR_INELIGIBLE로 #2364 한정 리뷰 예외 답변 대기. 새 Alpha 테스트 대회 생성/수정/취소/숨김 승인 답변 대기. 기존 PR2356의 예외와 QA 증거를 새 기능의 완료로 확대하지 않는다.
+- [x] 사용자 범위 확장 기록 및 #2364 연결
+- [ ] #2364 최신 CI(실제 PostgreSQL 일정/rollback 통합 포함), 리뷰 조건 충족, dev 머지
+- [ ] 정확한 새 Alpha SHA에서 로그인·실제 저장과 390/768/1440 화면/console/network 검증 및 테스트 cleanup
+- [ ] source snapshot/main baseline과 최종 후보 SHA 고정, 변경 경로 전수 분류 및 기존 main 핫픽스 보존
+- [ ] 공식 prepare-only로 Changeset 소비, API/Web 버전·CHANGELOG 및 main 릴리스 게이트 검증, dev 대상 새 준비 PR
+- [ ] 준비 PR CI·새 Alpha 버전/SHA 확인 후 사용자에게 고정 후보 비교와 승격 근거 전달
+- main PR 생성·머지 및 production 승인은 저장소 사용자 전용 규칙을 따른다. 범위 포함 지시는 운영 승격 완료를 뜻하지 않는다.

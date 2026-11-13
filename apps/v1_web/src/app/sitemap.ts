@@ -2,7 +2,13 @@ import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
-import { collectPublicMatchInventory, collectPublicTournamentDetails, publicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
+import {
+  collectPublicMatchInventory,
+  collectPublicTournamentDetails,
+  fetchPublicPages,
+  publicTournamentFixtures,
+  type PublicDiscoveryResult,
+} from '@/lib/public-competition-discovery';
 import type {
   V1Match,
   V1Notice,
@@ -49,21 +55,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     sitemapEntry(route.path, route.sitemapPriority, 'monthly', route.lastModified),
   );
 
-  const results = await Promise.allSettled([
-    collectPublicMatchInventory<V1Match>('/matches').then((result) => result.items ?? []),
+  // 목록 하나라도 실패하면 거부한다 — 일부만 담은 사이트맵은 빠진 주소를 "사라진 주소"로 읽게 한다(공지 RSS 와 같은 규칙).
+  const reads = [
+    requireInventory(collectPublicMatchInventory<V1Match>('/matches'), '/matches'),
     fetchPublicPages<V1Team>('/teams'),
-    collectPublicMatchInventory<V1TeamMatch>('/team-matches').then((result) => result.items ?? []),
+    requireInventory(collectPublicMatchInventory<V1TeamMatch>('/team-matches'), '/team-matches'),
     fetchPublicPages<V1TournamentListItem>('/tournaments', { cache: 'no-store', query: { kind: 'all' } }),
     fetchNoticeItems(),
     fetchLeagueItems(),
-  ]);
-  const matches = settledItems<V1Match>(results[0]);
-  const teams = settledItems<V1Team>(results[1]);
-  const teamMatches = settledItems<V1TeamMatch>(results[2]);
-  const tournaments = settledItems<V1TournamentListItem>(results[3]);
-  const notices = settledItems<V1Notice>(results[4]);
-  const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
-  const tournamentDetails = (await collectPublicTournamentDetails(tournaments)).items ?? [];
+  ] as const;
+  const [matches, teams, teamMatches, tournaments, notices, leagues] = await Promise.all(reads).catch(async (error) => {
+    await Promise.allSettled(reads); // 응답을 정한 뒤에 남는 조회를 두지 않는다.
+    throw error;
+  });
+  const tournamentDetails = await collectTournamentDetailsOrFail(tournaments);
   const tournamentFixtures = publicTournamentFixtures(tournamentDetails);
   const reviewedTournamentIds = new Set(tournamentDetails
     .filter(({ detail }) => detail.reviewsTotalCount > 0).map(({ item }) => item.id));
@@ -93,8 +98,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return [
         root,
         sitemapEntry(`/tournaments/${item.id}/bracket`, 0.6, 'daily', item.updatedAt),
-        sitemapEntry(`/tournaments/${item.id}/results`, 0.6, 'daily', item.updatedAt),
-        sitemapEntry(`/tournaments/${item.id}/awards`, 0.5, 'weekly', item.updatedAt),
+        // 결과·시상 화면은 끝난 대회에서만 내용이 채워진다(llms-full 도 같은 조건으로 결과 주소를 싣는다).
+        ...(item.status === 'completed' ? [
+          sitemapEntry(`/tournaments/${item.id}/results`, 0.6, 'daily', item.updatedAt),
+          sitemapEntry(`/tournaments/${item.id}/awards`, 0.5, 'weekly', item.updatedAt),
+        ] : []),
         ...reviews,
         ...(item.campaignSlug
           ? [sitemapEntry(`/tournaments/campaigns/${item.campaignSlug}`, 0.9, 'daily', item.updatedAt)]
@@ -124,15 +132,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 }
 
-function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
-  if (result.status === 'fulfilled') return result.value;
-  console.error('[seo] sitemap 공개 목록 조회 실패', result.reason);
-  return [];
+async function requireInventory<T>(pending: Promise<PublicDiscoveryResult<T>>, path: string): Promise<T[]> {
+  const { items, failedSources } = await pending;
+  if (!items || failedSources.length > 0) {
+    throw new Error(`SEO sitemap source failed: ${path} (${failedSources.join(', ') || 'no successful read'})`);
+  }
+  return items;
 }
 
+// 대회 상세는 건수가 많아 한 건의 일시 실패로 사이트맵 전체를 거부하지 않는다 — 실패한 것만 한 번 더 읽고, 그래도 실패하면 거부한다.
+// 상세가 404 인 대회는 실패로 보지 않는다 — 대회 주소는 목록 기준으로 싣고 상세에서 얻는 후기·경기 주소만 빠진다.
+async function collectTournamentDetailsOrFail(tournaments: V1TournamentListItem[]) {
+  const first = await collectPublicTournamentDetails(tournaments);
+  if (first.failedSources.length === 0) return first.items ?? [];
+
+  const failed = new Set(first.failedSources);
+  const retried = await collectPublicTournamentDetails(
+    tournaments.filter((item) => failed.has(`/tournaments/${encodeURIComponent(item.id)}`)),
+  );
+  if (retried.failedSources.length > 0) {
+    throw new Error(`SEO sitemap source failed: ${retried.failedSources.join(', ')}`);
+  }
+  const byId = new Map([...(first.items ?? []), ...(retried.items ?? [])].map((row) => [row.item.id, row]));
+  return tournaments.flatMap((item) => byId.get(item.id) ?? []);
+}
+
+// fetchPublicV1 은 404 를 null 로 돌려준다 — 목록 엔드포인트의 404 는 "공지 0건"이 아니라 경로 오류다.
 async function fetchNoticeItems(): Promise<V1Notice[]> {
   const page = await fetchPublicV1<V1NoticesResponse>('/notices');
-  return page?.notices ?? [];
+  if (!page) throw new Error('SEO metadata request failed: /notices (404)');
+  return page.notices;
 }
 
 // 리그 공개 여부는 매번 확인한다. V1PublicLeagueListResponse의 pageInfo 커서를 따른다.
@@ -144,7 +173,7 @@ async function fetchLeagueItems(): Promise<V1PublicLeagueListItem[]> {
     const query = new URLSearchParams({ limit: '50' });
     if (cursor) query.set('cursor', cursor);
     const page = await fetchPublicV1<V1PublicLeagueListResponse>(`/league-matches?${query.toString()}`, { cache: 'no-store' });
-    if (!page) break;
+    if (!page) throw new Error('SEO metadata request failed: /league-matches (404)');
     items.push(...page.items);
     cursor = page.pageInfo.hasNext ? page.pageInfo.nextCursor : null;
   } while (cursor);

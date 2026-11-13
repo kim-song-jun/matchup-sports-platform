@@ -8,6 +8,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const emptyListResponse = () => new Response(
+  JSON.stringify({ status: 'success', data: { items: [], notices: [], nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } } }),
+  { status: 200, headers: { 'content-type': 'application/json' } },
+);
+
 describe('SEO site origin', () => {
   it('uses the production Teameet host when no override is configured', () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
@@ -42,7 +47,7 @@ describe('SEO site origin', () => {
   });
 
   it('publishes canonical metadata and a sitemap entry for the public events hub', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => emptyListResponse()));
 
     expect(eventsMetadata.alternates).toMatchObject({ canonical: '/events' });
     expect(eventsMetadata.robots).toMatchObject({ index: true, follow: true });
@@ -56,24 +61,15 @@ describe('SEO site origin', () => {
     );
   });
 
-  it('keeps the static sitemap available when one public API domain is unavailable', async () => {
+  it('refuses to publish a partial sitemap when one public API domain is unavailable', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation((input: string | URL | Request) => {
-        const url = String(input);
-        return Promise.resolve(
-          new Response(null, {
-            status: url.includes('/api/v1/matches?') ? 503 : 404,
-          }),
-        );
-      }),
+      vi.fn().mockImplementation(async (input: string | URL | Request) => (
+        String(input).includes('/api/v1/matches?') ? new Response(null, { status: 503 }) : emptyListResponse()
+      )),
     );
 
-    const entries = await sitemap();
-
-    expect(entries).toContainEqual(
-      expect.objectContaining({ url: 'https://teameet.co.kr/events' }),
-    );
+    await expect(sitemap()).rejects.toThrow('/matches');
   });
 });
 

@@ -1,4 +1,6 @@
+import { V1AuthProvider } from '@prisma/client';
 import {
+  canDeferSocialSignup,
   getPendingSocialSignupRoute,
   isActivityProfileRequired,
   isPendingSocialSignup,
@@ -61,5 +63,31 @@ describe('social signup access contract', () => {
     expect(isUnfinishedSocialSignup('signup_done')).toBe(false);
     expect(isUnfinishedSocialSignup('completed')).toBe(false);
     expect(isUnfinishedSocialSignup('deferred')).toBe(false);
+  });
+
+  describe('canDeferSocialSignup', () => {
+    const identities = (...providers: V1AuthProvider[]) => providers.map((provider) => ({ provider }));
+
+    it('refuses while a Kakao login row is attached, whatever the draft holds', () => {
+      expect(canDeferSocialSignup({ onboardingStatus: 'social_profile_required', identities: identities(V1AuthProvider.kakao) })).toBe(false);
+    });
+
+    it('allows an Apple signup in progress', () => {
+      expect(canDeferSocialSignup({ onboardingStatus: 'social_profile_required', identities: identities(V1AuthProvider.apple) })).toBe(true);
+    });
+
+    it('refuses when a Kakao row sits next to another provider', () => {
+      expect(canDeferSocialSignup({
+        onboardingStatus: 'social_profile_required',
+        identities: identities(V1AuthProvider.apple, V1AuthProvider.kakao),
+      })).toBe(false);
+    });
+
+    it.each(['social_terms_required', 'social_profile_deferred', 'signup_done', 'completed', 'deferred'])(
+      'is false outside the profile step (%s)',
+      (onboardingStatus) => {
+        expect(canDeferSocialSignup({ onboardingStatus, identities: identities(V1AuthProvider.apple) })).toBe(false);
+      },
+    );
   });
 });

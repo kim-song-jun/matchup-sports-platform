@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
@@ -19,6 +19,7 @@ import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthStepHeader } from './auth-step-header';
 import { buildAccountConflictPath } from './login-recovery-route';
+import { RequiredFieldsNote, RequiredMark } from './required-mark';
 import {
   formatBirthDate,
   formatPhone,
@@ -36,6 +37,17 @@ import styles from './social-signup-review.module.css';
 type SocialStep = 'gender' | 'name' | 'phone' | 'birthDate' | 'review';
 
 type FieldErrors = Partial<Record<'gender', string>>;
+
+/** 카카오가 값을 모두 준 가입의 확인 화면 문구. */
+const KAKAO_REVIEW_COPY = {
+  title: '카카오에서 받은 정보를 확인해 주세요',
+  sub: '카카오 동의 화면에서 필수로 동의한 정보예요. 확인하면 가입이 끝나요.',
+};
+const KAKAO_PHONE_COPY = {
+  title: '휴대폰 번호를 입력해 주세요',
+  sub: '카카오에서 받지 못한 필수 정보만 입력해요. 입력한 번호는 문자로 인증해요.',
+};
+const DEFER_REASON = '필수 정보예요. 건너뛰면 팀 만들기·참가 신청 전에 꼭 입력해야 해요.';
 
 /** 가입 진행 중인 소셜 계정의 이름. 모르면 null — 문구가 특정 서비스를 단정하지 않게 한다. */
 function socialProviderLabel(provider: string | null | undefined): string | null {
@@ -67,6 +79,7 @@ export function SocialSignupClient() {
   // 확인 화면의 "번호 변경"으로 돌아온 경우 — 번호만 고치고 확인 화면으로 돌아간다.
   const [returnToReview, setReturnToReview] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState(false);
+  const genderLabelId = useId();
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 번호 중복 409 가 준 기존 계정 로그인·연결 시도 안내. 토큰이 있어야 연결을 시도할 수 있다.
   const [conflictHint, setConflictHint] = useState<V1SignInThenLinkDetails | null>(null);
@@ -110,8 +123,10 @@ export function SocialSignupClient() {
 
   // 정보 입력을 미룬 계정이 활동 시도 중 돌아온 화면 — 가입 모드와 달리 건너뛰기가 없고 입력 뒤 원래 화면으로 간다.
   const activityMode = authMe.data?.user?.onboardingStatus === 'social_profile_deferred';
-  // 건너뛰기는 가입 직후 상태가 확인된 때만 — 조회 실패나 이미 미룬 계정에는 보이지 않는다.
   const signupMode = authMe.data?.user?.onboardingStatus === 'social_profile_required';
+  // 건너뛸 수 있는지는 서버가 정한다 — 값이 없거나 조회에 실패했거나 이미 미룬 계정이면 그리지 않는다.
+  const canDefer = signupMode && authMe.data?.socialSignupCanDefer === true;
+  const kakaoSignup = signupMode && authProvider === 'kakao';
   const lockedKakaoPhone = signupMode && authProvider === 'kakao' && Boolean(prefill?.phone);
   // 번호를 맨 앞에서 받으므로, 인증을 마치고 돌아온 가입(또는 이어 입력)은 인증된 번호를 이미 쥐고 있다.
   const verifiedPhoneOnFile = authMe.data?.verification?.phoneVerified === true && Boolean(authMe.data.user?.phone);
@@ -156,6 +171,10 @@ export function SocialSignupClient() {
     setPrefillApplied(true);
   }, [prefill, prefillApplied, lockedKakaoPhone]);
 
+  // 생년월일이 아직 입력 전이거나 카카오가 준 값 그대로일 때만 출처를 붙인다 — 고치면 사라진다.
+  const birthDateFromProvider = Boolean(prefill?.birthDate) && (!prefillApplied || birthDateDigits === prefill?.birthDate);
+  // 네 줄이 모두 카카오가 준 값 그대로일 때만 「카카오에서 받은 정보」라고 부른다.
+  const kakaoGaveEverything = kakaoSignup && Boolean(prefill?.name && prefill.gender && prefill.phone) && birthDateFromProvider;
   // 가입 중에는 약관 단계에서 서버가 정해 둔 닉네임, 미뤘다 돌아온 계정은 이미 가진 닉네임이다. 입력받지 않는다.
   const autoNickname = authMe.data?.socialSignupNickname ?? authMe.data?.profile?.nickname ?? '';
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
@@ -174,9 +193,13 @@ export function SocialSignupClient() {
   const stepCopy: Record<SocialStep, { title: string; sub: string }> = {
     gender: { title: '성별을 선택해 주세요', sub: '경기와 대회 참가 조건을 확인할 때 사용해요.' },
     name: { title: '이름을 입력해 주세요', sub: '실명 또는 확인 가능한 이름을 알려 주세요.' },
-    phone: { title: '휴대폰 번호를 확인해 주세요', sub: '직접 입력한 번호는 인증이 필요해요. 이미 가입한 번호인지도 함께 확인해요.' },
+    phone: kakaoSignup && !prefill?.phone
+      ? KAKAO_PHONE_COPY
+      : { title: '휴대폰 번호를 확인해 주세요', sub: '직접 입력한 번호는 인증이 필요해요. 이미 가입한 번호인지도 함께 확인해요.' },
     birthDate: { title: '생년월일을 입력해 주세요', sub: '만 14세 이상만 가입할 수 있어요.' },
-    review: { title: '입력한 정보를 확인해 주세요', sub: '제공받은 정보와 직접 입력한 정보를 함께 확인해 주세요.' },
+    review: kakaoGaveEverything
+      ? KAKAO_REVIEW_COPY
+      : { title: '입력한 정보를 확인해 주세요', sub: '제공받은 정보와 직접 입력한 정보를 함께 확인해 주세요.' },
   };
   const stepReady = step === 'gender' ? Boolean(gender)
     : step === 'name' ? Boolean(normalizeSignupDisplayName(displayName))
@@ -241,6 +264,12 @@ export function SocialSignupClient() {
         }
         if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
           setError(`가입 가능 시간이 지났어요. ${providerLabel ? `${providerLabel} 로그인부터` : '로그인 화면에서 처음부터'} 다시 시작해 주세요.`);
+          return;
+        }
+        if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_PROFILE_DEFER_UNAVAILABLE') {
+          // 서버가 건너뛰기를 닫은 가입이다 — 다시 읽은 값이 건너뛰기 버튼을 걷는다.
+          setError(extractErrorMessage(nextError, '이 가입은 나중에 입력할 수 없어요.'));
+          void authMe.refetch();
           return;
         }
         setError(extractErrorMessage(nextError, '나중에 입력하기를 처리하지 못했어요.'));
@@ -357,35 +386,36 @@ export function SocialSignupClient() {
     >
       {resolvedStep === null ? null : <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={handleFormSubmit}>
         <AuthStepHeader name="가입" steps={steps} index={stepIndex} title={stepCopy[step].title} sub={stepCopy[step].sub} focusOnChange />
+        {step === 'review' ? <RequiredFieldsNote>표시는 필수 정보예요.</RequiredFieldsNote> : <RequiredFieldsNote />}
         <div className="tm-auth-form tm-auth-signup-form">
           {step === 'gender' ? <div className="tm-auth-field">
-            <span className="tm-text-label">성별</span>
-            <div className="tm-auth-segmented" role="radiogroup" aria-label="성별" aria-invalid={fieldErrors.gender ? true : undefined}>
+            <span className="tm-text-label" id={genderLabelId}>성별<RequiredMark /></span>
+            <div className="tm-auth-segmented" role="radiogroup" aria-labelledby={genderLabelId} aria-required="true" aria-invalid={fieldErrors.gender ? true : undefined}>
               {(['male', 'female'] as const).map((value) => <button key={value} className={`tm-auth-segment ${gender === value ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === value} disabled={lockedGender} onClick={() => { setGender(value); setFieldErrors((current) => ({ ...current, gender: undefined })); }}>{value === 'male' ? '남' : '여'}</button>)}
             </div>
           </div> : null}
-          {step === 'name' ? <label className="tm-auth-field"><span className="tm-text-label">이름</span>
+          {step === 'name' ? <label className="tm-auth-field"><span className="tm-text-label">이름<RequiredMark /></span>
             <input className="tm-input tm-auth-input" maxLength={40} onChange={(event) => setDisplayName(event.target.value)} placeholder="실명 또는 확인 가능한 이름" readOnly={lockedName} required type="text" value={displayName} />
           </label> : null}
           {step === 'phone' ? <>
-            <label className="tm-auth-field"><span className="tm-text-label">휴대폰 번호</span>
+            <label className="tm-auth-field"><span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
               <input className="tm-input tm-auth-input" inputMode="numeric" onChange={(event) => { if (lockedKakaoPhone) return; setPhoneDigits(normalizeSeparatedDigits(event.target.value)); setPhoneVerified(false); setPhoneConflict(false); }} placeholder="010-0000-0000" readOnly={lockedKakaoPhone} required value={formatPhone(phoneDigits)} />
             </label>
             {phoneDigits.length === 11 && !contactReady ? <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} onFailure={recordConflictHint} /> : null}
             {contactReady ? <div className="tm-text-caption" role="status" style={{ color: 'var(--blue700)' }}>{kakaoPhoneAccepted ? '카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.' : '휴대폰 본인인증이 완료됐어요'}</div> : null}
             {phoneConflict ? phoneConflictNotice : null}
           </> : null}
-          {step === 'birthDate' ? <label className="tm-auth-field"><span className="tm-text-label">생년월일</span>
+          {step === 'birthDate' ? <label className="tm-auth-field"><span className="tm-text-label">생년월일<RequiredMark /></span>
             <DatePickerTextInput dateValue={formatBirthDate(birthDateDigits)} inputClassName="tm-auth-input" onDateChange={(value) => setBirthDateDigits(normalizeSeparatedDigits(value))} onTextChange={(value) => setBirthDateDigits(normalizeSeparatedDigits(value))} placeholder="예: 1995-01-15" required value={formatBirthDate(birthDateDigits)} />
             <span className="tm-text-caption" role="status" style={{ color: birthDateDigits.length === 8 && !isSignupAgeEligible(birthDateDigits) ? 'var(--red700)' : 'var(--text-caption)' }}>만 14세 이상만 가입할 수 있어요.</span>
           </label> : null}
           {step === 'review' ? <>
             <dl className={styles.summary}>
               <div className={styles.row}><dt>닉네임</dt><dd>{autoNickname || '가입하면 만들어요'}<span className={styles.source}>자동으로 만들었어요 · 프로필에서 바꿀 수 있어요</span></dd></div>
-              <div className={styles.row}><dt>이름</dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
-              <div className={styles.row}><dt>성별</dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
-              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : contactReady ? '인증 완료' : '인증 필요'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setReturnToReview(true); setStep('phone'); }}>번호 변경</button> : null}</div>
-              <div className={styles.row}><dt>생년월일</dt><dd>{formatBirthDate(birthDateDigits)}</dd><button className={styles.edit} type="button" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</button></div>
+              <div className={styles.row}><dt>이름<RequiredMark /></dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
+              <div className={styles.row}><dt>성별<RequiredMark /></dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
+              <div className={styles.row}><dt>휴대폰<RequiredMark /></dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : contactReady ? '인증 완료' : '인증 필요'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setReturnToReview(true); setStep('phone'); }}>번호 변경</button> : null}</div>
+              <div className={styles.row}><dt>생년월일<RequiredMark /></dt><dd>{formatBirthDate(birthDateDigits)}{birthDateFromProvider ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd><button className={styles.edit} type="button" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</button></div>
             </dl>
             {signupMode ? <p className={styles.next}>다음으로 관심 종목을 선택해요.</p> : null}
           </> : null}
@@ -396,7 +426,7 @@ export function SocialSignupClient() {
           <Button block disabled={!stepReady || signupPending} loading={completeProfile.isPending || termsRecoveryPending} size="lg" type="submit" variant={stepReady ? 'primary' : 'neutral'}>
             {step === 'review' ? activityMode ? '입력 완료하고 계속하기' : '확인하고 계속' : '다음'}
           </Button>
-          {signupMode && step !== 'review' ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div></> : null}
+          {canDefer && step !== 'review' ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">{DEFER_REASON}</div></> : null}
         </div>
       </form>}
       {exitFlow.ConfirmModal}

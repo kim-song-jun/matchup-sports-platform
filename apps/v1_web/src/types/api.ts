@@ -121,6 +121,11 @@ export type V1AuthMe = {
   } | null;
   /** 약관 단계에서 서버가 정해 둔 자동 닉네임 — 가입 진행 중에만 오고, 확인 화면에 읽기 전용으로 보여 준다. */
   socialSignupNickname?: string | null;
+  /**
+   * 가입 화면에서 「나중에 입력할게요」를 보일 수 있는지 — 서버가 정하고 카카오 가입은 항상 false.
+   * 배포 직후 브라우저에 남은 이전 응답에는 키가 없어 optional 이며, `=== true` 로만 읽는다.
+   */
+  socialSignupCanDefer?: boolean;
   user: {
     id: string;
     email: string | null;

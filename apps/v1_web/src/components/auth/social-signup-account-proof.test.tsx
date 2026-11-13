@@ -26,6 +26,7 @@ const auth = (): V1AuthMe => ({
     accountStatus: 'active', onboardingStatus: signupStatus, authProvider: provider },
   profile: { displayName: '가입중회원', nickname: '가입중회원' },
   verification: { emailVerified: false, phoneVerified: false }, socialSignupPrefill: null,
+  socialSignupCanDefer: provider === 'apple' && signupStatus === 'social_profile_required',
 });
 const server = setupServer(
   http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
@@ -60,7 +61,7 @@ afterEach(() => { cleanup(); client.clear(); server.resetHandlers(); });
 async function requestConflict() {
   render(<QueryClientProvider client={client}><SocialSignupClient /></QueryClientProvider>);
   await advanceSocialSignupToPhone();
-  fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
+  fireEvent.change(await screen.findByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
   await userEvent.setup().click(await screen.findByRole('button', { name: '인증번호 받기' }));
 }
 describe('소셜 가입의 현재 번호 소유와 기존 계정 소유를 구분하는 실제 계약', () => {

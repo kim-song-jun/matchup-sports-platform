@@ -38,6 +38,7 @@ import { usePasswordFeedback } from './use-password-feedback';
 import { AuthStepCta, type AuthStepAction } from './auth-step-cta';
 import { AuthStepHeader } from './auth-step-header';
 import { AuthVerifiedInset } from './auth-verified-inset';
+import { RequiredFieldsNote, RequiredMark } from './required-mark';
 import { SignupPhoneRegisteredCard } from './signup-phone-registered-card';
 import { useDuplicateCheck, type DuplicateCheckStatus } from './use-duplicate-check';
 import {
@@ -80,20 +81,6 @@ const VERIFY_ADVANCE_DELAY_MS = 900;
 const PROFILE_PREVIEW_SIZE = 72;
 
 const onboardingDraftKey = 'teameet.v1.onboardingDraft';
-
-/**
- * 필수 입력 표시. 별표는 장식(aria-hidden)이고 실제 의미는 sr-only 텍스트가 전달한다 —
- * 빨간 별 하나만 두면 색으로만 정보를 주게 되어 색각 이상·스크린리더 사용자에게는 사라진다.
- * 어드민 폼(admin/admins, tournaments/new)이 쓰는 표기와 같은 형태다.
- */
-function RequiredMark() {
-  return (
-    <>
-      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red700)' }}>*</span>
-      <span className="sr-only">(필수)</span>
-    </>
-  );
-}
 
 export function SignupClient() {
   const router = useRouter();
@@ -532,12 +519,7 @@ export function SignupClient() {
       <div className="tm-auth-body">
         <AuthStepHeader name="회원가입" steps={STEP_ORDER} index={stepIndex} title={copy.title} sub={copy.sub} />
 
-        {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
-            사라진다. 시각 사용자는 기호로, 보조공학은 sr-only 단어로 같은 문장을 받게 한다. */}
-        <p className="tm-text-caption" style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>
-          <span aria-hidden="true" style={{ color: 'var(--red700)' }}>*</span>
-          <span className="sr-only">별표</span> 표시는 필수 입력이에요.
-        </p>
+        <RequiredFieldsNote />
 
         <form className="tm-auth-form tm-auth-signup-form" onSubmit={(event: FormEvent) => event.preventDefault()}>
           {reverifyHere ? (

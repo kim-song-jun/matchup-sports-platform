@@ -183,6 +183,7 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 | 리그 결과 확정 `league_team_match_completed` | 팀장·매니저 + 그 공식 결과의 출전자 | 경기 결과가 확정됐어요 / `(리그명) N주차 · 마포 FC 2 : 1 합정 유나이티드 · 승리. 내 기록 1골이에요.` | `/team-matches/:id/result` |
 | 대회 결과 확정 `tournament_match_completed` | 〃 | 대회 경기 결과가 확정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
 | 대회 결과 정정 `tournament_match_result_corrected` | 〃 (정정된 공식 결과의 출전자 기준) | 대회 경기 결과가 정정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` — 정정된 스코어 (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
+| 토너먼트 진출 `tournament_finals_advanced` | 진출한 팀의 팀장·매니저(활성) | 토너먼트에 진출했어요 / `"(대회명)" · (토너먼트 이름) · N번 시드로 진출했어요. 대진표에서 첫 경기를 확인해 보세요.` — 정규리그+N개 토너먼트에서 운영자가 진출팀을 확정(`PUT …/multi-finals/assignment`)할 때, 이번에 새로 들어간 팀에만 한 번(같은 명단 재확정·순서만 바뀐 경우는 보내지 않음). 대회 알림 설정(`activityEnabled`) | `/tournaments/:id/bracket` |
 | 출전정지 `player_suspension_notice` | 그 팀의 팀장·매니저 + 그 대회·리그의 대회 총괄(활성 배정). 설정은 팀 경기 알림(`teamMatchEnabled`) | 다음 경기에 못 뛰는 선수가 있어요 / `(대회명) · (팀) 다음 경기(11/14 (토) 18:00 vs (상대))에 출전할 수 없는 선수: 김도윤(퇴장 1회), …` | `/teams/:teamId/games/:gameId/roster` (다음 경기 게임이 아직 없으면 `/teams/:teamId/game-rosters`) |
 | 경고 임박 `player_suspension_warning` | 〃 | 경고 한 장이면 정지인 선수가 있어요 / `… 경고 임박 선수: 박서준. 이번 경기에서 경고를 받으면 다음 경기부터 출전정지예요.` | 〃 |
 

@@ -1074,7 +1074,7 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 
 ### 등록 항목 수정 (2026-11-13)
 
-- expectedScheduleTimeId는 편집 시작 시 조회한 preset UUID이며 필수다. preset 없이 경기에서 파생된 항목은 명시적으로 null과 당시 경기 UUID 목록 expectedFixtureIds(1–240개)를 보낸다. 같은 이전 시각에 다른 preset이나 경기 그룹이 재생성됐어도 409 SCHEDULE_TIME_STALE로 거절한다. 저장 직전에 최신 ID로 덮어쓰거나 자동 재시도하지 않는다.
+- expectedScheduleTimeId는 편집 시작 시 조회한 preset UUID이며 필수다. preset 없이 경기에서 파생된 항목은 명시적으로 null과 당시 경기 UUID 목록 expectedFixtureIds(1개 이상)를 보낸다. 같은 이전 시각에 다른 preset이나 경기 그룹이 재생성됐어도 409 SCHEDULE_TIME_STALE로 거절한다. 저장 직전에 최신 ID로 덮어쓰거나 자동 재시도하지 않는다.
 
 - PATCH는 등록된 preset뿐 아니라 실제 경기에서 직접 입력한 시간 항목도 수정한다. 기존 preset ID는 유지하며 직접 입력 항목은 성공 시 새 preset을 저장한다. 새 시각이 같으면 데이터·감사를 추가하지 않는 no-op다.
 - 기존 시각에 더 이상 preset/경기가 없으면 `409 SCHEDULE_TIME_STALE`. 다른 preset 또는 경기에서 쓰는 새 시각은 `409 SCHEDULE_TIME_DUPLICATE`로 거절하며 자동 합치지 않는다. 클라이언트 자동 재시도는 하지 않으며 응답 유실/충돌 때 목록을 다시 조회한다.

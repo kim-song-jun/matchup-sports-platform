@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsISO8601, IsUUID, Matches, ValidateIf } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsISO8601, IsUUID, Matches, ValidateIf } from 'class-validator';
 
 export class CreateScheduleTimeDto {
   @IsISO8601({ strict: true })
@@ -14,7 +14,6 @@ export class UpdateScheduleTimeDto extends CreateScheduleTimeDto {
   @ValidateIf((object: UpdateScheduleTimeDto, value) => object.expectedScheduleTimeId === null || value !== undefined)
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(240)
   @IsUUID(undefined, { each: true })
   expectedFixtureIds?: string[];
 

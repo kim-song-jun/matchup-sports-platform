@@ -111,3 +111,10 @@ Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-202611
 - [ ] 공식 prepare-only로 Changeset 소비, API/Web 버전·CHANGELOG 및 main 릴리스 게이트 검증, dev 대상 새 준비 PR
 - [ ] 준비 PR CI·새 Alpha 버전/SHA 확인 후 사용자에게 고정 후보 비교와 승격 근거 전달
 - main PR 생성·머지 및 production 승인은 저장소 사용자 전용 규칙을 따른다. 범위 포함 지시는 운영 승격 완료를 뜻하지 않는다.
+### 최신 실행 승인 / CI 수정 cursor
+- 사용자가 “리뷰가 아마 안될거야 그러니까 단계별로 문제 없으면 바로바로 진행해줘”라고 지시해 이번 승격의 Copilot 리뷰 예외를 승인했다. 이어 “전체 main 운영적용까지 바로 해줘 급해서 계속 승인 못해줘”라고 명시해 이번 고정 6개 기능의 main PR 생성·머지·production 배포 승인과 결과 검증까지 위임했다. 이는 앞의 사용자 전용 실행 제한에 대한 이번 세션의 명시적 예외다. 전역/저장소 정책을 영구 변경하거나 보호 규칙을 우회하지 않는다.
+- 앞서 구체적으로 안내한 QA2364 테스트 생성·수정·취소/숨김도 단계별 진행 범위로 진행한다. CI·실제 Alpha QA·릴리스/보안 게이트는 생략하지 않는다.
+- 501cfe07c CI 43387338076: Web/Gates/security PASS. DB integration 207 suites 중 신규 assignment-option-edit 준비 코드 1 suite/2 tests 실패, 나머지 206 suites/1562 tests PASS. league_knockouts에서 금지된 일반 createGroup 호출이 원인이므로 실제 MultiFinalsService.setup → TournamentBracketService.updateFixture 경로로 수정했다. 관련 API 타입 PASS, DTO 검증 6 PASS.
+- 정규 N개 예선은 표준 템플릿과 달리 240경기 초과도 지원하므로 legacy expectedFixtureIds의 불필요한 240개 제한 제거, 275 UUID DTO 회귀 PASS. 최종 실제 DB 결과는 다음 CI에서 확인한다.
+- 브라우저: CUA host unavailable, 일반 격리 headed Chrome은 ERR_NETWORK_ACCESS_DENIED. 별도 권한 상승 QA Chrome 실행이 자동 승인 검토에서 거절돼 사용자에게 해당 실행 방식의 구체 승인을 요청했다. 거절을 우회하지 않고 화면 QA는 이 승인 대기 상태로 유지한다. 일반 QA 브라우저는 close했고 사용자 Chrome은 유지했다.
+- 현재 관측: Alpha bc1d92475/1.19.1-alpha, production 6675a8a00/1.17.3 HTTP200. 아직 기능 dev 머지·main 승격·운영 변경 없음.

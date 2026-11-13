@@ -86,3 +86,5 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - PR cursor: dev 대상 #2364, head ef407d929156e8c820b2545da77d003757a59fb5. 최신 dev bc1d92475를 충돌 없이 통합했고 diff는 이번 소유 25개 파일뿐이다. API/Web 타입 및 두 패턴 검사 PASS. Copilot 전용 API는 422 ACTOR_INELIGIBLE, 새 PR 한정 사용자 예외 답변 대기. Alpha 테스트 생성·수정·취소/숨김도 구체 범위로 승인 요청했고 미응답이므로 아직 실행하지 않았다. CI 43385977285 진행 중. 접은 편집 항목을 다시 수정할 때 draft/포커스 복원 회귀 1 PASS 보완 후 최신 head CI로 재검증한다.
 
 - 사용자 범위 확장(2026-11-13): '해당 내용까지 main 승격에 포함해줘'. #2364를 이번 승격의 포함 기능으로 추가한다. 기존 고정 후보에 최신 dev 전체를 무조건 합치지 않는다. 새 source/final SHA, Changeset 소비·버전·main 핫픽스 보존은 dev 반영 및 Alpha QA 후 별도 준비 PR에서 검증한다. 이 범위 승인은 아직 응답되지 않은 #2364 리뷰 예외/새 Alpha 테스트 데이터 승인이나 실제 main 실행을 대신하지 않는다.
+
+- 최신 cursor: 사용자 이번 승격 리뷰 예외 및 main 운영 적용까지 명시 승인(위임 범위는 production-release task 최신 절). CI 신규 DB fixture 준비 오류를 실제 MultiFinalsService.setup 경로로 수정, API 타입/DTO 6 PASS. 추가 경기 수 제한 없이 기존 N개 예선 규모 유지. 별도 QA Chrome 실행 방식은 자동 승인 검토 거절로 구체 승인 대기이며 아직 화면 QA 통과 아님.

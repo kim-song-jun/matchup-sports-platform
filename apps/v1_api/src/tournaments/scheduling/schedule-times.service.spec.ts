@@ -203,6 +203,9 @@ describe('CreateScheduleTimeDto', () => {
     expect(await validate(plainToInstance(UpdateScheduleTimeDto, { ...valid, expectedScheduleTimeId: undefined }), options)).not.toHaveLength(0);
     expect(await validate(plainToInstance(UpdateScheduleTimeDto, { ...valid, expectedScheduleTimeId: null }), options)).not.toHaveLength(0);
     expect(await validate(plainToInstance(UpdateScheduleTimeDto, { ...valid, expectedScheduleTimeId: null, expectedFixtureIds: ['00000000-0000-4000-8000-000000000002'] }), options)).toHaveLength(0);
+    // N-final competitions support more than the old standard-template 240-game cap.
+    expect(await validate(plainToInstance(UpdateScheduleTimeDto, { ...valid, expectedScheduleTimeId: null,
+      expectedFixtureIds: Array.from({ length: 275 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`) }), options)).toHaveLength(0);
   });
   it.each(['2026-11-21', '2026-11-21T10:00', '2026-02-30T10:00:00+09:00', 'bad'])('rejects invalid or offset-free input %s', async scheduledAt => {
     expect((await validate(plainToInstance(CreateScheduleTimeDto, { scheduledAt }))).length).toBeGreaterThan(0);

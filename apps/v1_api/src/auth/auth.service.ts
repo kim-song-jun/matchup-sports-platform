@@ -11,8 +11,8 @@ import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import {
   buildKakaoSignupPrefill,
   normalizeKakaoBirthDate,
-  normalizeKakaoNickname,
   readKakaoSignupPrefill,
+  withoutSocialPrefill,
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
@@ -105,8 +105,6 @@ export type KakaoProfile = {
   email: string | null;
   emailValid: boolean;
   emailVerified: boolean;
-  profileImageUrl: string | null;
-  nickname: string | null;
   /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
   signupPrefill: KakaoSignupPrefill | null;
 };
@@ -503,7 +501,6 @@ export class AuthService {
         existingIdentity,
         now,
         {
-          ...(profile.nickname ? { kakaoNickname: profile.nickname } : {}),
           kakaoName: profile.signupPrefill?.name ?? null,
           kakaoPhone: profile.signupPrefill?.phone ?? null,
           kakaoGender: profile.signupPrefill?.gender ?? null,
@@ -575,18 +572,14 @@ export class AuthService {
             currentStep: 'terms',
             // 카카오가 준 값은 가입 완료 전까지 여기 보관했다가 프로필 입력 화면에서 자동 채움에 쓴다
             // (별도 테이블 없이 기존 draftJson 을 확장 — 동의항목 미승인이면 kakao* 키가 아예 없다).
-            draftJson: {
-              kakaoProfileImageUrl: profile.profileImageUrl,
-              ...(profile.nickname ? { kakaoNickname: profile.nickname } : {}),
-              ...(profile.signupPrefill
-                ? {
-                    kakaoName: profile.signupPrefill.name,
-                    kakaoPhone: profile.signupPrefill.phone,
-                    kakaoGender: profile.signupPrefill.gender,
-                    kakaoBirthDate: profile.signupPrefill.birthDate,
-                  }
-                : {}),
-            },
+            draftJson: profile.signupPrefill
+              ? {
+                  kakaoName: profile.signupPrefill.name,
+                  kakaoPhone: profile.signupPrefill.phone,
+                  kakaoGender: profile.signupPrefill.gender,
+                  kakaoBirthDate: profile.signupPrefill.birthDate,
+                }
+              : {},
           },
         },
         notificationPreference: {
@@ -1312,10 +1305,18 @@ export class AuthService {
           visibility: 'public',
         },
       });
+      // What the provider handed over served the form; the confirmed values now live on the profile. Re-read inside the
+      // transaction so a login that merged a seed since the outer read is cleared too, and other draft keys survive.
+      const progress = await transaction.v1UserOnboardingProgress.findUnique({
+        where: { userId },
+        select: { draftJson: true },
+      });
+      const draftJson = withoutSocialPrefill(progress?.draftJson) as Prisma.InputJsonObject;
+      const currentStep = wasDeferred ? 'confirm' : 'sport';
       await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: { currentStep: wasDeferred ? 'confirm' : 'sport' },
-        create: { userId, currentStep: wasDeferred ? 'confirm' : 'sport' },
+        update: { currentStep, draftJson },
+        create: { userId, currentStep, draftJson },
       });
       await recordSignupConsent(transaction, userId, dto.recordConsent);
     });
@@ -1708,14 +1709,6 @@ export class AuthService {
         birthday?: string;
         birthyear?: string;
         birthday_type?: string;
-        profile?: {
-          nickname?: string;
-          profile_image_url?: string;
-        };
-      };
-      properties?: {
-        nickname?: string;
-        profile_image?: string;
       };
     };
 
@@ -1732,13 +1725,6 @@ export class AuthService {
       email: userData.kakao_account?.email ?? null,
       emailValid: userData.kakao_account?.is_email_valid === true,
       emailVerified: userData.kakao_account?.is_email_verified === true,
-      profileImageUrl:
-        userData.kakao_account?.profile?.profile_image_url ??
-        userData.properties?.profile_image ??
-        null,
-      nickname: normalizeKakaoNickname(
-        userData.kakao_account?.profile?.nickname ?? userData.properties?.nickname,
-      ),
       signupPrefill: buildKakaoSignupPrefill({
         name: userData.kakao_account?.name,
         phone: userData.kakao_account?.phone_number,

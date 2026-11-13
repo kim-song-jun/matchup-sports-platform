@@ -5,6 +5,7 @@ import {
   normalizeKakaoPhone,
   normalizeKakaoBirthDate,
   readKakaoSignupPrefill,
+  withoutSocialPrefill,
 } from './kakao-profile';
 
 describe('normalizeKakaoPhone', () => {
@@ -63,7 +64,6 @@ describe('readKakaoSignupPrefill', () => {
   it('draftJson 에 저장된 카카오 값을 읽어온다', () => {
     expect(
       readKakaoSignupPrefill({
-        kakaoProfileImageUrl: 'https://img.example/a.png',
         kakaoName: '홍길동',
         kakaoPhone: '01012345678',
         kakaoGender: 'male',
@@ -75,8 +75,43 @@ describe('readKakaoSignupPrefill', () => {
     expect(readKakaoSignupPrefill(null)).toBeNull();
     expect(readKakaoSignupPrefill('nope')).toBeNull();
     expect(readKakaoSignupPrefill([1, 2])).toBeNull();
-    // 이미지 URL 만 있던 기존 가입 건(이 기능 이전 데이터)도 안전하게 null.
-    expect(readKakaoSignupPrefill({ kakaoProfileImageUrl: 'https://img.example/a.png' })).toBeNull();
+    // 제공자 값이 없는 draft(예: 가입을 끝내 값을 지운 뒤)는 프리필이 없는 것으로 읽는다.
+    expect(readKakaoSignupPrefill({ ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3' })).toBeNull();
+  });
+});
+
+describe('withoutSocialPrefill', () => {
+  const rest = { ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3', currentStep: 'sport' };
+
+  it('removes every provider value the form reads and keeps the other draft keys', () => {
+    const draft = {
+      ...rest,
+      kakaoName: '홍길동',
+      kakaoPhone: '01012345678',
+      kakaoGender: null,
+      kakaoBirthDate: '20000229',
+      appleName: '김애플',
+    };
+    expect(readKakaoSignupPrefill(draft)).not.toBeNull();
+
+    const stripped = withoutSocialPrefill(draft);
+
+    expect(stripped).toEqual(rest);
+    expect(readKakaoSignupPrefill(stripped)).toBeNull();
+  });
+
+  it('does not mutate the draft it was given', () => {
+    const draft = { ...rest, kakaoName: '홍길동' };
+    withoutSocialPrefill(draft);
+    expect(draft).toEqual({ ...rest, kakaoName: '홍길동' });
+  });
+
+  it('returns the other keys untouched when no provider value is present', () => {
+    expect(withoutSocialPrefill(rest)).toEqual(rest);
+  });
+
+  it.each([null, undefined, 'draft', [1, 2]])('yields an empty draft for the non-object %p', (draft) => {
+    expect(withoutSocialPrefill(draft)).toEqual({});
   });
 });
 

@@ -109,7 +109,7 @@ describe('V1 signed-in email verification integration', () => {
   const kakaoLoginWithVerifiedEmail = () => {
     const profile: KakaoProfile = {
       providerUserKey: KAKAO_KEY, email: emailOf(MEMBER), emailValid: true, emailVerified: true,
-      profileImageUrl: null, nickname: null, signupPrefill: null,
+      signupPrefill: null,
     };
     jest.spyOn(auth, 'fetchKakaoProfileForToken').mockResolvedValue(profile);
     return request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' });

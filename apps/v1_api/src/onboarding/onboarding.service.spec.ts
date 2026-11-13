@@ -210,7 +210,7 @@ describe('OnboardingService with the profile gate still closed (social_profile_d
     progress.findUnique.mockResolvedValue({
       draftJson: {
         ageConfirmedAt: '2026-10-11T00:00:00.000Z',
-        kakaoNickname: '카카오닉',
+        autoNickname: '씩씩한수달3',
         kakaoName: '홍길동',
         currentStep: 'terms',
       },
@@ -223,7 +223,7 @@ describe('OnboardingService with the profile gate still closed (social_profile_d
       for (const draft of [update.draftJson, create.draftJson]) {
         expect(draft).toMatchObject({
           ageConfirmedAt: '2026-10-11T00:00:00.000Z',
-          kakaoNickname: '카카오닉',
+          autoNickname: '씩씩한수달3',
           kakaoName: '홍길동',
           currentStep: 'sport',
         });

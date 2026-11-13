@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TournamentReviewsPageClient } from './reviews-page-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: `${tournament.title} 참가 후기`,
     description: `${tournament.title}에 참가한 팀들의 실제 후기를 확인하세요.`,
     path: `/tournaments/${id}/reviews`,
-    image: tournament.coverImageUrl,
+    image: resolveTournamentImage(tournament, 'cover'),
   });
   return tournament.reviewsTotalCount > 0 ? metadata : { ...metadata, robots: { index: false, follow: true } };
 }

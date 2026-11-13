@@ -147,6 +147,22 @@ describe('metadataDescription', () => {
     expect(long).toHaveLength(153);
     expect(long.endsWith('…')).toBe(true);
   });
+
+  it('설명 속 전화번호는 가려서 내보내고 날짜·시각은 그대로 둔다', () => {
+    expect(metadataDescription('참가 문의는 010-1234-5678 로 주세요. 토요일 19:00 킥오프', fallback)).toBe(
+      '참가 문의는 ***-****-**** 로 주세요. 토요일 19:00 킥오프',
+    );
+  });
+
+  it('번호만 적은 설명은 가린 뒤 길이로 판정해 기본 문구로 떨어진다', () => {
+    expect(metadataDescription('010-1234-5678', fallback)).toBe(fallback);
+    expect(metadataDescription('  010 1234 5678  ', fallback)).toBe(fallback);
+  });
+
+  it('155자 자르기 경계에 걸린 번호가 앞자리만 남아 드러나지 않는다', () => {
+    const description = metadataDescription(`${'가'.repeat(148)} 010-1234-5678`, fallback);
+    expect(description).not.toMatch(/010|1234|5678/);
+  });
 });
 
 describe('buildTournamentDescription', () => {

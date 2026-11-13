@@ -1,4 +1,5 @@
 import type { V1TeamDetail } from '@/types/api';
+import { maskContactNumbers } from '@/lib/public-text';
 import { teamDescriptionFallback } from '@/lib/seo';
 
 const TITLE_LIMIT = 60;
@@ -49,7 +50,7 @@ export function buildTeamDiscoveryMetadata(team: V1TeamDetail): { title: string;
 }
 
 function normalize(value: string | null | undefined): string {
-  return value?.replace(/\s+/g, ' ').trim() ?? '';
+  return maskContactNumbers(value?.replace(/\s+/g, ' ')).trim();
 }
 
 function dedupe(clauses: string[]): string[] {

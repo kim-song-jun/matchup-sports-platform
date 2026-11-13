@@ -1,3 +1,4 @@
+import { richContentPreviewText } from '@/lib/rich-content';
 import { absoluteSiteUrl, fetchPublicV1, metadataDescription, NOTICES_FEED_PATH } from '@/lib/seo';
 import type { V1Notice, V1NoticesResponse } from '@/types/api';
 
@@ -38,6 +39,7 @@ function renderItem(notice: V1Notice): string[] {
   if (!id) return [];
   const url = absoluteSiteUrl(`/notices/${encodeURIComponent(id)}`);
   const publishedAt = notice.publishedAt ? new Date(notice.publishedAt) : null;
+  const description = metadataDescription(richContentPreviewText(notice.content, notice.body, ''), notice.title);
 
   return [
     [
@@ -46,7 +48,7 @@ function renderItem(notice: V1Notice): string[] {
       `<link>${escapeXml(url)}</link>`,
       `<guid isPermaLink="true">${escapeXml(url)}</guid>`,
       // RSS 의 description 은 리더가 HTML 로 해석한다 — 평문을 HTML 로 한 번, XML 로 한 번 이스케이프한다.
-      `<description>${escapeXml(escapeXml(metadataDescription(notice.body, notice.title)))}</description>`,
+      `<description>${escapeXml(escapeXml(description))}</description>`,
       ...(notice.category ? [`<category>${escapeXml(notice.category)}</category>`] : []),
       ...(publishedAt && !Number.isNaN(publishedAt.getTime()) ? [`<pubDate>${publishedAt.toUTCString()}</pubDate>`] : []),
       '</item>',

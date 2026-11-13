@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
+import { maskContactNumbers } from '@/lib/public-text';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { buildTeamMatchEventLd } from '@/lib/structured-data';
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!teamMatch) return buildNoIndexMetadata('팀매치를 찾을 수 없어요');
 
   return buildPublicMetadata({
-    title: teamMatch.title,
+    title: maskContactNumbers(teamMatch.title),
     description: metadataDescription(
       teamMatch.description,
       matchDescriptionFallback('팀매치', teamMatch.sport?.name ?? teamMatch.sportName, teamMatch.place?.name ?? teamMatch.placeName),

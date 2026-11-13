@@ -371,8 +371,8 @@ function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }
                 {step.icon}
               </div>
               <div className="tm-tournament-promo-step-text">
-                <span className="tm-tournament-promo-step-label">{step.label}</span>
-                <span className="tm-tournament-promo-step-sub" aria-hidden="true">{step.sub}</span>
+                <span className="tm-tournament-promo-step-label">{step.label}</span>{' '}
+                <span className="tm-tournament-promo-step-sub" aria-hidden="true">{step.sub}</span>{' '}
                 <span className="tm-tournament-promo-step-desc" aria-hidden="true">{step.desc}</span>
               </div>
             </div>

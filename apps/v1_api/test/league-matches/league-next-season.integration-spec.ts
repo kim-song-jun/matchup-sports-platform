@@ -65,7 +65,7 @@ describe('독립 리그 다음 시즌 잇기', () => {
     regionId = (await prisma.v1Region.create({ data: { code: `next-season-region-${suiteId}`, name: '테스트 지역', level: 2 } })).id;
     for (const key of ['a', 'b', 'c'] as const) {
       team[key] = (await prisma.v1Team.create({
-        data: { ownerUserId: owner[key], sportId, regionId, name: `next-season-${key}-${suiteId}` },
+        data: { profile: { create: { genderRule: '성별 무관' } }, ownerUserId: owner[key], sportId, regionId, name: `next-season-${key}-${suiteId}` },
       })).id;
       await prisma.v1TeamMembership.create({ data: { teamId: team[key], userId: owner[key], role: 'owner', status: 'active' } });
     }
@@ -179,7 +179,7 @@ describe('독립 리그 다음 시즌 잇기', () => {
 
   it('어드민이 지난 시즌 팀을 한 번에 넣으면 참가 확정되고 명단을 이어받는다 — 지난 시즌에 없던 팀은 거절한다', async () => {
     const stranger = (await prisma.v1Team.create({
-      data: { ownerUserId: owner.c, sportId, regionId, name: `next-season-stranger-${suiteId}` },
+      data: { profile: { create: { genderRule: '성별 무관' } }, ownerUserId: owner.c, sportId, regionId, name: `next-season-stranger-${suiteId}` },
     })).id;
     const rejected = await http().post(`/api/v1/admin/league-matches/${season2}/previous-season-teams`)
       .set('x-v1-user-id', admin).send({ teamIds: [team.b, stranger] }).expect(422);

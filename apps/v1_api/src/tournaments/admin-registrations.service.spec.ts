@@ -102,7 +102,7 @@ describe('AdminRegistrationsService', () => {
       v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Team: { findFirst: jest.fn().mockResolvedValue({ id: 'team-1', sportId: 'sport-futsal' }) },
       v1TeamMembership: { count: jest.fn() },
-      v1TeamProfile: { findUnique: jest.fn() },
+      v1TeamProfile: { findUnique: jest.fn().mockResolvedValue({ genderRule: '성별 무관' }) },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -1301,7 +1301,7 @@ describe('AdminRegistrationsService', () => {
       genderCategory: string | null,
       members: FakeTeamMember[],
       registrationStatus = 'payment_checking',
-      teamGenderRule: string | null = null,
+      teamGenderRule: string | null = '남',
     ) {
       prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
       prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
@@ -1319,17 +1319,17 @@ describe('AdminRegistrationsService', () => {
       prisma.v1TeamProfile.findUnique = teamProfileGenderRuleFake({ 'team-1': teamGenderRule });
     }
 
-    it('여성부 대회에 여성 팀원이 없는 팀은 확정되지 않는다', async () => {
+    it('여성부 대회에 남성팀은 확정되지 않는다', async () => {
       arrange('regular_tournament', 'female', maleOnlyTeam);
       await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 대회는 팀 성별이 여성이거나 프로필 성별이 여성인 팀원이 있는 팀만 참가할 수 있어요.' },
+        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 대회에는 남성팀이 참가할 수 없어요.' },
       });
       expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
     });
 
-    it('여성 팀원이 1명이라도 있으면 확정된다', async () => {
-      arrange('regular_tournament', 'female', [...maleOnlyTeam, { teamId: 'team-1', status: 'active', gender: 'female' }]);
+    it('성별 무관 팀은 여성부에도 확정된다', async () => {
+      arrange('regular_tournament', 'female', [...maleOnlyTeam, { teamId: 'team-1', status: 'active', gender: 'female' }], 'payment_checking', '성별 무관');
       await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).resolves.toMatchObject({ status: 'confirmed' });
     });
 
@@ -1345,7 +1345,7 @@ describe('AdminRegistrationsService', () => {
       });
     });
 
-    it('신청 뒤 여성 팀원이 모두 나갔으면 확정되지 않는다 — 활성 팀원만 센다', async () => {
+    it('여성 팀원의 탈퇴 상태와 무관하게 남성팀은 확정되지 않는다', async () => {
       arrange('regular_tournament', 'female', [...maleOnlyTeam, { teamId: 'team-1', status: 'left', gender: 'female' }]);
       await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
         response: { code: 'TEAM_GENDER_INELIGIBLE' },
@@ -1374,13 +1374,13 @@ describe('AdminRegistrationsService', () => {
       arrange('regular_league', 'female', maleOnlyTeam);
       await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그는 팀 성별이 여성이거나 프로필 성별이 여성인 팀원이 있는 팀만 참가할 수 있어요.' },
+        response: { code: 'TEAM_GENDER_INELIGIBLE', message: '여성부 리그에는 남성팀이 참가할 수 없어요.' },
       });
       expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
     });
 
-    it('여성 팀원이 있는 팀은 여성부 리그에서도 확정된다', async () => {
-      arrange('regular_league', 'female', [{ teamId: 'team-1', status: 'active', gender: 'female' }]);
+    it('성별 무관 팀은 여성부 리그에서도 확정된다', async () => {
+      arrange('regular_league', 'female', [{ teamId: 'team-1', status: 'active', gender: 'female' }], 'payment_checking', '성별 무관');
       await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).resolves.toMatchObject({ status: 'confirmed' });
     });
   });

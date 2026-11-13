@@ -76,7 +76,8 @@ export function planNamedFinals(finals: readonly NamedFinalDto[], offset = 0): B
     const width = 2 ** Math.ceil(Math.log2(size));
     // 부전승이 있는 첫 라운드는 틀의 칸 수(12팀 → 16칸)가 아니라 실제 팀 수로 부른다 — 대회 규정의 '12강'·'6강'과 같다.
     // 단계 코드(phase)는 틀 기준(round16·quarter)으로 그대로 둔다: 순서·시드 검증·경기 방식 설정이 그 코드를 쓴다.
-    // 홀수 팀(5·7·9…)은 부르는 이름이 없어 틀 기준 이름을 유지한다.
+    // 홀수 팀(5·7·9…)은 부르는 이름이 없어 틀 기준 이름을 유지한다. 다만 3팀은 첫 라운드가 1경기(2·3위)뿐이고 1위가 부전승으로
+    // 결승에 가므로 '4강'이 아니라 '준결승'이다(2026-11-13 사용자 확정).
     const firstRoundCount = size < width && size >= 6 && size % 2 === 0 ? size : width;
     let seedOrder = [1, 2];
     while (seedOrder.length < width) { const sum = seedOrder.length * 2 + 1; seedOrder = seedOrder.flatMap(seed => [seed, sum - seed]); }
@@ -86,7 +87,7 @@ export function planNamedFinals(finals: readonly NamedFinalDto[], offset = 0): B
     let origins: Array<Origin | null> = seedOrder.map(seed => seed <= size ? { slot: slots[seed - 1] } : null);
     for (let roundWidth = width, roundIndex = 0; roundWidth >= 2; roundWidth /= 2, roundIndex++) {
       const phase: V1TournamentGroupPhase = roundWidth >= 64 ? 'round64' : roundWidth === 32 ? 'round32' : roundWidth === 16 ? 'round16' : roundWidth === 8 ? 'quarter' : roundWidth === 4 ? 'semi' : 'final';
-      const key = `final:${trackIndex}:${roundWidth}`; const label = roundWidth === 2 ? '결승' : `${roundIndex === 0 ? firstRoundCount : roundWidth}강`;
+      const key = `final:${trackIndex}:${roundWidth}`; const label = roundWidth === 2 ? '결승' : size === 3 && roundIndex === 0 ? '준결승' : `${roundIndex === 0 ? firstRoundCount : roundWidth}강`;
       plan.groups.push({ key, name: `${final.name} · ${label}`, phase, sortOrder: trackIndex * 100 + roundIndex, advanceCount: null, bracketTrack: final.name.trim() });
       const next: Origin[] = [];
       for (let pair = 0; pair < origins.length / 2; pair++) {

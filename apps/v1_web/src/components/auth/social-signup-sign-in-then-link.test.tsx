@@ -47,6 +47,7 @@ beforeEach(() => {
       profile: { displayName: '가입중회원', nickname: '가입중회원' },
       verification: { emailVerified: false, phoneVerified: false },
       socialSignupPrefill: null,
+      socialSignupCanDefer: provider === 'apple',
     })),
     http.post('*/api/v1/logs/client-error', () => success({})),
     http.post('*/api/v1/auth/logout', () => {
@@ -67,7 +68,7 @@ function renderSignup() {
 async function confirmConflictingCode(code: string = PHONE_CONFLICT_MSW.codes[provider]) {
   renderSignup();
   await advanceSocialSignupToPhone();
-  fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
+  fireEvent.change(await screen.findByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
   await userEvent.setup().click(await screen.findByRole('button', { name: '인증번호 받기' }));
   fireEvent.change(await screen.findByLabelText('인증번호 6자리'), { target: { value: code } });
   await userEvent.setup().click(screen.getByRole('button', { name: '확인' }));
@@ -101,7 +102,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     await advanceSocialSignupToPhone();
     server.events.on('request:start', record);
     try {
-      fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: PHONE_CONFLICT_MSW.phones.kakao } });
+      fireEvent.change(await screen.findByLabelText(/^휴대폰 번호/), { target: { value: PHONE_CONFLICT_MSW.phones.kakao } });
       expect(await screen.findByRole('button', { name: '인증번호 받기' })).toBeEnabled();
     } finally {
       server.events.removeListener('request:start', record);
@@ -116,7 +117,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
   it('번호 인증을 요청하는 단계에서는 번호 주인 여부를 알리지 않는다', async () => {
     renderSignup();
     await advanceSocialSignupToPhone();
-    fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
+    fireEvent.change(await screen.findByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     await userEvent.setup().click(await screen.findByRole('button', { name: '인증번호 받기' }));
     expect(await screen.findByLabelText('인증번호 6자리')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '원래 방법으로 로그인하기' })).not.toBeInTheDocument();
@@ -332,6 +333,7 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
         profile: { displayName: '가입중회원', nickname: '가입중회원' },
         verification: { emailVerified: false, phoneVerified: false },
         socialSignupPrefill: { name: '김러너', phone: PHONE_CONFLICT_MSW.phones.kakao, gender: 'female', birthDate: '20000229' },
+        socialSignupCanDefer: false,
       })),
       http.post('*/api/v1/auth/social-profile', () => HttpResponse.json({
         status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.',
@@ -360,6 +362,7 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
         verification: { emailVerified: false, phoneVerified: false },
         // 카카오가 준 번호는 추가 인증 없이 쓰므로 인증번호 단계 없이 제출 단계에서 충돌을 만난다.
         socialSignupPrefill: { name: '김러너', phone: PHONE_CONFLICT_MSW.phones.kakao, gender: 'female', birthDate: '20000229' },
+        socialSignupCanDefer: false,
       })),
     );
     renderSignup();
@@ -376,11 +379,12 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
 });
 
 describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지운다', () => {
-  const meWithPrefill = (phone: string, gender: 'female' | null = 'female') => http.get('*/api/v1/auth/me', () => success({
+  const meWithPrefill = (phone: string) => http.get('*/api/v1/auth/me', () => success({
     user: { id: 'pending-user', email: null, phone: null, accountStatus: 'active', onboardingStatus: 'social_profile_required', authProvider: 'kakao' },
     profile: { displayName: '가입중회원', nickname: '가입중회원' },
     verification: { emailVerified: false, phoneVerified: false },
-    socialSignupPrefill: { name: '김러너', phone, gender, birthDate: '20000229' },
+    socialSignupPrefill: { name: '김러너', phone, gender: 'female', birthDate: '20000229' },
+    socialSignupCanDefer: false,
   }));
   const sessionResponse = () => success({
     user: { id: 'pending-user', email: null, onboardingStatus: 'social_profile_required' },
@@ -408,7 +412,8 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
 
   it('나중에 입력할게요가 성공해도 토큰이 남지 않는다', async () => {
     savePendingSocialLink(STALE_TOKEN);
-    server.use(meWithPrefill('01012345678', null), http.post('*/api/v1/auth/social-profile/defer', sessionResponse));
+    provider = 'apple';
+    server.use(http.post('*/api/v1/auth/social-profile/defer', sessionResponse));
     renderSignup();
 
     await userEvent.setup().click(await screen.findByRole('button', { name: '나중에 입력할게요' }));

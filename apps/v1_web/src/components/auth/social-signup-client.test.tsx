@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
@@ -17,6 +17,7 @@ const hooks = vi.hoisted(() => ({
   authedPhoneRequestMutateAsync: vi.fn(),
   authedPhoneConfirmMutateAsync: vi.fn(),
   logoutMutateAsync: vi.fn(),
+  authMeRefetch: vi.fn(),
   authMeFailed: false,
   authMePending: false,
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
@@ -24,6 +25,8 @@ const hooks = vi.hoisted(() => ({
     socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null; birthDate?: string | null },
     user: { authProvider: 'kakao' as string | null, onboardingStatus: 'social_profile_required', phone: null as string | null, canLinkAfterSignup: true as boolean | undefined },
     socialSignupNickname: null as string | null,
+    // 건너뛸 수 있는지는 서버가 정한다 — 화면은 이 값만 읽는다.
+    socialSignupCanDefer: false as boolean,
     profile: { nickname: null as string | null },
     verification: { phoneVerified: false },
   },
@@ -46,7 +49,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     if (hooks.authMePending) return { data: undefined, isPending: true, isError: false };
     return hooks.authMeFailed
       ? { data: undefined, isPending: false, isError: true }
-      : { data: hooks.authMe };
+      : { data: hooks.authMe, refetch: hooks.authMeRefetch };
   },
   useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
@@ -78,6 +81,12 @@ vi.mock('@/components/auth/phone-verification/phone-verification-card', () => ({
     </button>
   ),
 }));
+
+beforeEach(() => {
+  hooks.authMe.socialSignupCanDefer = false;
+  hooks.authMeRefetch.mockReset();
+  hooks.authMeRefetch.mockResolvedValue({ isError: false });
+});
 
 async function completePhoneVerification(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
@@ -143,7 +152,7 @@ describe('SocialSignupClient required profile contract', () => {
     expect(screen.queryByLabelText(/^휴대폰 번호/)).not.toBeInTheDocument();
     expect(screen.getByText('씩씩한오리너구리4')).toBeVisible();
     expect(screen.getByText('자동으로 만들었어요 · 프로필에서 바꿀 수 있어요')).toBeVisible();
-    expect(await screen.findByText('입력한 정보를 확인해 주세요')).toBeVisible();
+    expect(await screen.findByText('카카오에서 받은 정보를 확인해 주세요')).toBeVisible();
     expect(screen.getByText('김러너')).toBeVisible();
     expect(screen.getByText('010-1234-5678')).toBeVisible();
     expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
@@ -207,7 +216,7 @@ describe('SocialSignupClient required profile contract', () => {
     expect(currentHeading()).toBe('성별을 선택해 주세요');
 
     fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(phoneInput()).toHaveValue('010-8765-4321');
     expect(screen.getByText('휴대폰 본인인증이 완료됐어요')).toBeVisible();
     expect(nextButton()).toBeEnabled();
@@ -232,7 +241,7 @@ describe('SocialSignupClient required profile contract', () => {
     visited.push(currentHeading());
 
     expect(visited).toEqual([
-      '휴대폰 번호를 확인해 주세요',
+      '휴대폰 번호를 입력해 주세요',
       '성별을 선택해 주세요',
       '이름을 입력해 주세요',
       '생년월일을 입력해 주세요',
@@ -377,7 +386,7 @@ describe('SocialSignupClient required profile contract', () => {
     // 버튼이 막혀 있어도 Enter 같은 폼 제출 경로로 다음 단계가 열리면 안 된다.
     fireEvent.submit(document.getElementById('v1-social-signup-form')!);
 
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(hooks.completeProfileMutate).not.toHaveBeenCalled();
   });
 
@@ -606,10 +615,12 @@ const setSearch = (search: string) => {
   });
 };
 
+// 건너뛰기는 Apple 가입에만 남아 있다 — 카카오 가입은 서버가 닫는다.
 describe('SocialSignupClient 나중에 입력할게요', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.authMe.socialSignupCanDefer = true;
     hooks.authMe.user.onboardingStatus = 'social_profile_required';
     hooks.authMe.user.phone = null;
     hooks.authMe.profile.nickname = null;
@@ -639,12 +650,12 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
     render(<SocialSignupClient />);
 
-    expect(screen.getByText('팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.')).toBeInTheDocument();
+    expect(screen.getByText('필수 정보예요. 건너뛰면 팀 만들기·참가 신청 전에 꼭 입력해야 해요.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
 
     expect(hooks.deferMutate).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/home');
-    expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao', profile: 'deferred' });
+    expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'apple', profile: 'deferred' });
   });
 
   it('가입 상태를 읽지 못했거나 이미 미룬 계정에는 건너뛰기를 보이지 않는다', () => {
@@ -722,6 +733,8 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
   });
 
   it('이어 입력 모드 완료는 activity_profile_complete 를 남기고 redirect 로 돌아간다', async () => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.socialSignupCanDefer = false;
     hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
     hooks.authMe.profile.nickname = '카카오러너';
     setSearch('?redirect=%2Fteams%2Fnew');
@@ -778,7 +791,7 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
     hooks.authMePending = false;
     rerender(<SocialSignupClient />);
 
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(screen.getByRole('progressbar', { name: '가입 진행 단계 1 / 5' })).toBeInTheDocument();
   });
 
@@ -844,7 +857,7 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
     hooks.authMe.verification.phoneVerified = verified;
     render(<SocialSignupClient />);
 
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('');
     expect(nextButton()).toBeDisabled();
   });
@@ -877,7 +890,7 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
     await reachReview();
 
     fireEvent.click(screen.getByRole('button', { name: '번호 변경' }));
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     fireEvent.change(phoneInput(), { target: { value: '01022223333' } });
     // 바꾼 번호는 다시 인증해야 한다.
     expect(nextButton()).toBeDisabled();
@@ -953,7 +966,7 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(screen.getByText(/이 번호로 이미 가입한 계정이 있어요/)).toBeVisible();
     fireEvent.change(phoneInput(), { target: { value: '01022223333' } });
     expect(screen.queryByText(/이 번호로 이미 가입한 계정이 있어요/)).not.toBeInTheDocument();
@@ -975,7 +988,7 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
     expect(screen.getByText('휴대폰 본인인증을 완료해 주세요.')).toBeVisible();
     expect(nextButton()).toBeDisabled();
     await completePhoneVerification();
@@ -993,14 +1006,14 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
     await user.click(await screen.findByRole('button', { name: '계속 쓰기' }));
 
     expect(hooks.logoutMutateAsync).not.toHaveBeenCalled();
-    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
   });
 
   it('번호 단계가 없는 가입은 확인 화면이 첫 단계라 뒤로가기도 가입 그만두기다', async () => {
     const user = userEvent.setup();
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     render(<SocialSignupClient />);
-    expect(currentHeading()).toBe('입력한 정보를 확인해 주세요');
+    expect(currentHeading()).toBe('카카오에서 받은 정보를 확인해 주세요');
     expect(screen.queryByRole('button', { name: '이전 단계' })).not.toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: '가입 그만두기' })[0]);
@@ -1039,5 +1052,228 @@ describe('SocialSignupClient 번호를 가장 먼저 받는 순서', () => {
       hooks.completeProfileMutate, hooks.deferMutate]) {
       expect(calls).not.toHaveBeenCalled();
     }
+  });
+});
+
+const kakaoAllValues = { name: '김팀밋', phone: '01000001234', gender: 'male' as const, birthDate: '19950115' };
+const rowOf = (label: string) => {
+  const term = screen.getAllByRole('term').find((node) => node.textContent?.startsWith(label));
+  if (!term) throw new Error(`summary row not found: ${label}`);
+  return term.parentElement as HTMLElement;
+};
+
+describe('SocialSignupClient 카카오가 준 정보는 확인만 한다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.user.phone = null;
+    hooks.authMe.profile.nickname = null;
+    hooks.authMe.socialSignupNickname = '달리는다람쥐';
+    hooks.authMe.verification.phoneVerified = false;
+    hooks.authMe.socialSignupPrefill = null;
+    hooks.authMeFailed = false;
+    hooks.authMePending = false;
+  });
+
+  it('값을 모두 받은 카카오 가입은 확인 단계 하나뿐이고 건너뛰기가 없으며 네 줄이 필수·카카오 제공이다', () => {
+    hooks.authMe.socialSignupPrefill = kakaoAllValues;
+    render(<SocialSignupClient />);
+
+    expect(screen.getByRole('progressbar', { name: '가입 진행 단계 1 / 1' })).toBeInTheDocument();
+    expect(currentHeading()).toBe('카카오에서 받은 정보를 확인해 주세요');
+    expect(screen.getByText('카카오 동의 화면에서 필수로 동의한 정보예요. 확인하면 가입이 끝나요.')).toBeVisible();
+    expect(screen.getByText(/표시는 필수 정보예요\./)).toHaveTextContent('별표 표시는 필수 정보예요.');
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+
+    for (const label of ['이름', '성별', '휴대폰', '생년월일']) {
+      const row = rowOf(label);
+      expect(within(row).getByRole('term')).toHaveTextContent(`${label}*(필수)`);
+      expect(within(row).getByText('카카오 제공')).toBeVisible();
+    }
+    expect(within(rowOf('닉네임')).getByRole('term')).toHaveTextContent(/^닉네임$/);
+    expect(screen.getAllByText('카카오 제공')).toHaveLength(4);
+    expect(screen.getByText('다음으로 관심 종목을 선택해요.')).toBeVisible();
+  });
+
+  it('생년월일을 고치면 그 줄의 「카카오 제공」만 사라지고 나머지 출처는 남는다', () => {
+    hooks.authMe.socialSignupPrefill = kakaoAllValues;
+    render(<SocialSignupClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '생년월일 변경' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '19960220' } });
+    fireEvent.click(nextButton());
+
+    expect(within(rowOf('생년월일')).getByText('1996-02-20')).toBeVisible();
+    expect(within(rowOf('생년월일')).queryByText('카카오 제공')).not.toBeInTheDocument();
+    expect(screen.getAllByText('카카오 제공')).toHaveLength(3);
+  });
+
+  it('번호만 못 받은 카카오 가입은 번호 → 확인 두 단계이고 건너뛰기가 없다', async () => {
+    hooks.authMe.socialSignupPrefill = { ...kakaoAllValues, phone: null };
+    render(<SocialSignupClient />);
+
+    expect(screen.getByRole('progressbar', { name: '가입 진행 단계 1 / 2' })).toBeInTheDocument();
+    expect(currentHeading()).toBe('휴대폰 번호를 입력해 주세요');
+    expect(screen.getByText('카카오에서 받지 못한 필수 정보만 입력해요. 입력한 번호는 문자로 인증해요.')).toBeVisible();
+    expect(screen.getByText(/표시는 필수 입력이에요\./)).toHaveTextContent('별표 표시는 필수 입력이에요.');
+    expect(screen.getByLabelText(/^휴대폰 번호/).closest('label')).toHaveTextContent('휴대폰 번호*(필수)');
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+
+    fireEvent.change(phoneInput(), { target: { value: '01087654321' } });
+    await completePhoneVerification();
+    fireEvent.click(nextButton());
+
+    expect(screen.getByRole('progressbar', { name: '가입 진행 단계 2 / 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+    expect(within(rowOf('휴대폰')).getByText('인증 완료')).toBeVisible();
+    expect(screen.getAllByText('카카오 제공')).toHaveLength(3);
+  });
+
+  it('값을 하나도 못 받은 카카오 가입도 건너뛰기 없이 다섯 단계를 모두 거치고 단계마다 필수 표시가 있다', async () => {
+    render(<SocialSignupClient />);
+    const skip = () => screen.queryByRole('button', { name: '나중에 입력할게요' });
+    const note = () => expect(screen.getByText(/표시는 필수 입력이에요\./)).toBeVisible();
+
+    expect(screen.getByRole('progressbar', { name: '가입 진행 단계 1 / 5' })).toBeInTheDocument();
+    expect(skip()).not.toBeInTheDocument();
+    note();
+    await passPhoneStep();
+
+    expect(currentHeading()).toBe('성별을 선택해 주세요');
+    expect(skip()).not.toBeInTheDocument();
+    note();
+    expect(screen.getByRole('radiogroup', { name: '성별 (필수)' })).toHaveAttribute('aria-required', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: '여' }));
+    fireEvent.click(nextButton());
+
+    expect(currentHeading()).toBe('이름을 입력해 주세요');
+    expect(skip()).not.toBeInTheDocument();
+    note();
+    expect(screen.getByLabelText(/^이름/).closest('label')).toHaveTextContent('이름*(필수)');
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(nextButton());
+
+    expect(currentHeading()).toBe('생년월일을 입력해 주세요');
+    expect(skip()).not.toBeInTheDocument();
+    note();
+    expect(screen.getByLabelText(/^생년월일/).closest('label')).toHaveTextContent('생년월일*(필수)');
+  });
+});
+
+describe('SocialSignupClient Apple 가입은 건너뛸 수 있다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.user.phone = null;
+    hooks.authMe.profile.nickname = null;
+    hooks.authMe.socialSignupNickname = null;
+    hooks.authMe.verification.phoneVerified = false;
+    hooks.authMe.socialSignupPrefill = null;
+    hooks.authMe.socialSignupCanDefer = true;
+    hooks.authMeFailed = false;
+    hooks.authMePending = false;
+  });
+
+  afterEach(() => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.socialSignupCanDefer = false;
+  });
+
+  it('단계는 그대로이고 건너뛰기에 새 설명이 붙으며 단계마다 필수 표시가 있다', async () => {
+    render(<SocialSignupClient />);
+
+    expect(screen.getByRole('button', { name: '나중에 입력할게요' })).toBeVisible();
+    expect(screen.getByText('필수 정보예요. 건너뛰면 팀 만들기·참가 신청 전에 꼭 입력해야 해요.')).toBeVisible();
+    expect(screen.queryByText('팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.')).not.toBeInTheDocument();
+    expect(screen.getByText(/표시는 필수 입력이에요\./)).toBeVisible();
+    expect(currentHeading()).toBe('휴대폰 번호를 확인해 주세요');
+    expect(screen.getByLabelText(/^휴대폰 번호/).closest('label')).toHaveTextContent('휴대폰 번호*(필수)');
+
+    await passPhoneStep();
+    expect(screen.getByRole('radiogroup', { name: '성별 (필수)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '나중에 입력할게요' })).toBeVisible();
+  });
+
+  it('서버가 건너뛰기를 알리기 전·조회에 실패한 동안에는 건너뛰기를 그리지 않는다', () => {
+    hooks.authMe.socialSignupCanDefer = false;
+    const { unmount } = render(<SocialSignupClient />);
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+    unmount();
+
+    hooks.authMeFailed = true;
+    hooks.authMe.socialSignupCanDefer = true;
+    render(<SocialSignupClient />);
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+  });
+
+  it('확인 화면의 필수 표시와 안내는 Apple 에서도 같다', async () => {
+    render(<SocialSignupClient />);
+    await reachReview();
+
+    expect(within(rowOf('이름')).getByRole('term')).toHaveTextContent('이름*(필수)');
+    expect(within(rowOf('생년월일')).getByRole('term')).toHaveTextContent('생년월일*(필수)');
+    expect(screen.getByText(/표시는 필수 정보예요\./)).toBeVisible();
+    expect(screen.queryByText('카카오 제공')).not.toBeInTheDocument();
+  });
+});
+
+describe('SocialSignupClient 미루기가 거절되거나 이미 미룬 계정', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.user.phone = null;
+    hooks.authMe.profile.nickname = null;
+    hooks.authMe.socialSignupNickname = null;
+    hooks.authMe.verification.phoneVerified = false;
+    hooks.authMe.socialSignupPrefill = null;
+    hooks.authMeFailed = false;
+    hooks.authMePending = false;
+  });
+
+  afterEach(() => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.socialSignupCanDefer = false;
+    hooks.authMe.user.phone = null;
+    hooks.authMe.verification.phoneVerified = false;
+  });
+
+  it('옛 화면의 미루기가 409 로 거절되면 이유를 알리고 가입 상태를 다시 읽으며, 읽은 값이 건너뛰기를 걷는다', async () => {
+    hooks.authMe.socialSignupCanDefer = true;
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) =>
+      cb.onError?.(new V1ApiError({
+        status: 'error', statusCode: 409, code: 'SOCIAL_PROFILE_DEFER_UNAVAILABLE',
+        message: '카카오로 가입할 때는 나중에 입력할 수 없어요. 필수 정보를 입력해 주세요.', timestamp: '2026-11-13T00:00:00.000Z',
+      })));
+    const { rerender } = render(<SocialSignupClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+
+    expect(screen.getByText('카카오로 가입할 때는 나중에 입력할 수 없어요. 필수 정보를 입력해 주세요.')).toBeVisible();
+    expect(hooks.authMeRefetch).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
+
+    hooks.authMe.socialSignupCanDefer = false;
+    rerender(<SocialSignupClient />);
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+  });
+
+  it('미룬 계정이 돌아온 화면은 건너뛰기 없이 「입력 완료하고 계속하기」로 끝나고 필수 표시가 있다', () => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
+    hooks.authMe.user.phone = '01000001234';
+    hooks.authMe.verification.phoneVerified = true;
+    hooks.authMe.profile.nickname = '달리는다람쥐';
+    hooks.authMe.socialSignupPrefill = kakaoAllValues;
+    render(<SocialSignupClient />);
+
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('활동 정보 입력').length).toBeGreaterThan(0);
+    expect(currentHeading()).toBe('입력한 정보를 확인해 주세요');
+    expect(screen.getByRole('button', { name: '입력 완료하고 계속하기' })).toBeInTheDocument();
+    expect(within(rowOf('이름')).getByRole('term')).toHaveTextContent('이름*(필수)');
   });
 });

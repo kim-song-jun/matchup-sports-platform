@@ -26,7 +26,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
   const otherId = 'integration-kakao-contact-other';
   const email = 'kakao-contact-holder@integration.test';
   const phone = '01055550991';
-  const keys = Array.from({ length: 12 }, (_, i) => String(945100001 + i));
+  const keys = Array.from({ length: 14 }, (_, i) => String(945100001 + i));
   const signupPhone = '01055550996';
   const signupId = {
     profile: 'integration-kakao-contact-signup-profile',
@@ -293,9 +293,31 @@ describe('Kakao confirmed contacts and existing membership', () => {
     expect(await draftOf(id)).toEqual({ ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
   });
 
-  it('keeps the Kakao values while the profile is deferred and clears them when the deferred profile is finished', async () => {
+  it('refuses to defer a Kakao signup even when Kakao handed over every value', async () => {
     const id = await signUpThroughTerms(kakaoAccount);
-    await request(app.getHttpServer()).post('/api/v1/auth/social-profile/defer').set('x-v1-user-id', id).expect(201);
+    const before = await draftOf(id);
+
+    const response = await request(app.getHttpServer()).post('/api/v1/auth/social-profile/defer').set('x-v1-user-id', id).expect(409);
+
+    expect(response.body.code).toBe('SOCIAL_PROFILE_DEFER_UNAVAILABLE');
+    expect((await prisma.v1User.findUniqueOrThrow({ where: { id } })).onboardingStatus).toBe('social_profile_required');
+    expect(await draftOf(id)).toEqual(before);
+  });
+
+  it('refuses to defer a Kakao signup that received no values, and /auth/me says so', async () => {
+    const id = await signUpThroughTerms({});
+
+    const me = await request(app.getHttpServer()).get('/api/v1/auth/me').set('x-v1-user-id', id).expect(200);
+    expect(me.body.data.socialSignupCanDefer).toBe(false);
+    await request(app.getHttpServer()).post('/api/v1/auth/social-profile/defer').set('x-v1-user-id', id).expect(409);
+    expect((await prisma.v1User.findUniqueOrThrow({ where: { id } })).onboardingStatus).toBe('social_profile_required');
+  });
+
+  it('keeps the Kakao values while the profile is deferred and clears them when the deferred profile is finished', async () => {
+    // A Kakao account that deferred before deferral was closed to Kakao signups is seeded directly.
+    const id = await signUpThroughTerms(kakaoAccount);
+    await prisma.v1UserProfile.create({ data: { userId: id, nickname: '미룬카카오회원', visibility: 'public' } });
+    await prisma.v1User.update({ where: { id }, data: { onboardingStatus: 'social_profile_deferred' } });
     expect(await draftOf(id)).toEqual({ ...kakaoValues, ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
 
     await request(app.getHttpServer()).post('/api/v1/auth/social-profile').set('x-v1-user-id', id).send({

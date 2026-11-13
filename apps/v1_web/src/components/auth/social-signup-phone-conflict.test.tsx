@@ -50,7 +50,7 @@ async function requestPhoneCode() {
     </QueryClientProvider>,
   );
   await advanceSocialSignupToPhone();
-  fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
+  fireEvent.change(await screen.findByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
   fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 }
 
@@ -130,5 +130,41 @@ describe('소셜 가입 휴대폰 인증 번호 중복', () => {
     expect(await screen.findByText('조금 뒤에 다시 요청해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+  });
+});
+
+describe('번호가 겹칠 때 건너뛰기는 카카오 가입에서 출구가 되지 않는다', () => {
+  const conflictingPhoneRequest = http.post('*/api/v1/verification/phone/request', () =>
+    failure('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409),
+  );
+  const pendingSignup = (authProvider: 'kakao' | 'apple') => http.get('*/api/v1/auth/me', () =>
+    HttpResponse.json({
+      status: 'success',
+      data: {
+        user: { onboardingStatus: 'social_profile_required', authProvider },
+        socialSignupPrefill: null,
+        socialSignupCanDefer: authProvider === 'apple',
+      },
+    }),
+  );
+
+  it('카카오 가입은 겹침 카드의 로그인·계정 찾기·고객센터 세 출구만 남기고 건너뛰기를 그리지 않는다', async () => {
+    server.use(pendingSignup('kakao'), conflictingPhoneRequest);
+
+    await requestPhoneCode();
+
+    expect(await screen.findByRole('button', { name: '기존 계정으로 로그인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/contact');
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+  });
+
+  it('같은 자리에서 Apple 가입은 건너뛰기가 그대로 남는다', async () => {
+    server.use(pendingSignup('apple'), conflictingPhoneRequest);
+
+    await requestPhoneCode();
+
+    expect(await screen.findByRole('button', { name: '기존 계정으로 로그인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '나중에 입력할게요' })).toBeVisible();
   });
 });

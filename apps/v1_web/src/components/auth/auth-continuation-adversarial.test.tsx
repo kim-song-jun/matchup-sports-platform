@@ -183,6 +183,11 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     const destination = '/chat?room=team#latest';
     state.auth = makeAuth(mode === 'defer' ? 'social_profile_required' : 'social_profile_deferred', PENDING, true);
     state.auth.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: mode === 'defer' ? null : 'female', birthDate: '20000229' };
+    // 미루기는 Apple 가입에만 열려 있다.
+    if (mode === 'defer') {
+      state.auth.user.authProvider = 'apple';
+      state.auth.socialSignupCanDefer = true;
+    }
     saveStoredV1Session({ userId: PENDING });
     saveRedirectPath(destination);
     const endpoint = mode === 'defer' ? '/auth/social-profile/defer' : '/auth/social-profile';

@@ -1,4 +1,4 @@
-import type { V1OnboardingStatus } from '@prisma/client';
+import { V1AuthProvider, type V1OnboardingStatus } from '@prisma/client';
 
 export type PendingSocialSignupStatus = Extract<
   V1OnboardingStatus,
@@ -50,6 +50,18 @@ export function activityRouteFor(missing: readonly ActivityMissingItem[]): strin
 /** Skipped the profile form at signup: reads are open, writes ask for the profile. */
 export function isActivityProfileRequired(status: V1OnboardingStatus | string) {
   return status === 'social_profile_deferred';
+}
+
+/**
+ * A signup with a Kakao login row never skips the profile step (Kakao's consent screen marks these items required).
+ * Do not read the draft here: a later Kakao login overwrites it and an unlink notice can clear it.
+ */
+export function canDeferSocialSignup(input: {
+  onboardingStatus: V1OnboardingStatus | string;
+  identities: ReadonlyArray<{ provider: V1AuthProvider | string }>;
+}) {
+  return input.onboardingStatus === 'social_profile_required'
+    && !input.identities.some((identity) => identity.provider === V1AuthProvider.kakao);
 }
 
 /** Social signup not finished: still pending, or the profile step was skipped. */

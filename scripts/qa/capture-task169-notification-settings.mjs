@@ -46,6 +46,7 @@ const SESSION = {
   termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
   verification: { emailVerified: true, phoneVerified: true },
   socialSignupPrefill: null,
+  socialSignupCanDefer: false,
 };
 const VIEWPORTS = [
   { key: 'mobile', width: 390, height: 844, isMobile: true, hasTouch: true },

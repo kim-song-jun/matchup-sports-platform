@@ -610,6 +610,8 @@ jobs:
           SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.ALPHA_KAKAO_CLIENT_SECRET }}
           SECRET_ALPHA_KAKAO_REDIRECT_URI: ${{ secrets.ALPHA_KAKAO_REDIRECT_URI }}
           SECRET_KAKAO_APP_ID: ${{ secrets.ALPHA_KAKAO_APP_ID }}
+          # Optional: left out of the required list below, so an unset secret skips this name instead of failing the deploy.
+          SECRET_KAKAO_ADMIN_KEY: ${{ secrets.ALPHA_KAKAO_ADMIN_KEY }}
         run: |
           missing=()
           for name in SECRET_KAKAO_CLIENT_ID SECRET_KAKAO_CLIENT_SECRET SECRET_ALPHA_KAKAO_REDIRECT_URI SECRET_KAKAO_APP_ID; do

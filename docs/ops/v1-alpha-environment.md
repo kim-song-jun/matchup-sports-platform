@@ -19,6 +19,25 @@ test-app members can sign in, and test-only consent grants do not approve produc
 Native builds use the alpha test-app key for `kr.co.teameet.alpha` and the production app key
 for `kr.co.teameet`. See the Android and iOS release runbooks.
 
+The Kakao admin key (`ALPHA_KAKAO_ADMIN_KEY`, delivered as `KAKAO_ADMIN_KEY`) is optional and
+reaches the API container only. It authenticates unlink calls and the Kakao unlink webhook; while it
+is empty both stay off and the sync step reports `KAKAO_ADMIN_KEY not provided; skipped` without
+failing the deploy. Rules for handling it (no values in this repository):
+
+- Use the "대표 어드민 키" of the **test app** here and the production app's key in production; the apps
+  number members differently, so a swapped key fails or points at another app's members.
+- Only the app owner can see the key in the Kakao console. Besides unlinking, it can read user
+  information and lists and revoke consent, so narrow its "사용 가능 API" to unlink and register the
+  server's egress address under "호출 허용 IP 주소" as Kakao recommends (check in the console that
+  this works on the representative key; an allowed-IP list blocks calls when the address changes).
+- The alpha deploy job uses no GitHub environment, so this is a repository secret. Production should
+  keep its own key as a `production` environment secret (see `deploy/DEPLOY_GUIDE.md`).
+- Rotating the representative key in the console makes the unlink webhook answer 401 until the secret
+  matches again, and notifications rejected in between are not resent.
+- Order matters: apply the two IAM policies rendered by `scripts/infra/render-alpha-immutable-deploy-policies.mjs`
+  (deploy role writes, instance role reads) before adding the secret, otherwise the sync step ends
+  with a permission error and every alpha deploy fails until the policies are applied.
+
 Both deployment workflows validate required login build keys and the environment callback
 before resolving immutable image tags. After changing any build-time Kakao configuration,
 deploy a new source revision; rerunning an existing SHA deliberately reuses its existing image.
@@ -157,7 +176,7 @@ GitHub repository variables:
 
 IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 정확한 `refs/heads/dev` subject와 수동 rollback용 정확한 `environment:alpha` subject, `sts.amazonaws.com` audience만 허용한다. GitHub의 `alpha` environment 배포 branch policy도 반드시 `dev`만 허용해야 하며, required reviewer 승인 없이 rollback job을 시작하지 않는다. GitHub role은 alpha artifact/manifest prefix와 두 alpha ECR repository push, 해당 인스턴스의 SSM 명령만 허용한다. EC2 instance role은 SSM core, alpha artifact version 읽기, 두 alpha ECR repository pull만 가진다. provisioning은 account ID, 정확한 bucket 이름/owner, EC2 `Name`·`Environment=alpha`·`Branch=dev`, SSM online 상태를 mutation 전에 확인한다. 전용 role의 과거 inline policy는 canonical policy로 교체하며 예상 밖 attached policy가 있으면 자동 삭제하지 않고 중지한다. 초기 또는 drift 복구 시 AWS CLI 로그인 후 아래 멱등 스크립트를 실행한다.
 
-런타임 비밀값(문의 Slack Webhook, APNs, 카카오 로그인)은 `/teameet/alpha/env/<이름>` SecureString으로만 전달한다. 허용 이름은 `scripts/infra/render-alpha-immutable-deploy-policies.mjs`의 목록이 정본이다: `SLACK_INQUIRY_WEBHOOK_URL`, `APNS_BUNDLE_ID`·`APNS_KEY_ID`·`APNS_PRIVATE_KEY`·`APNS_TEAM_ID`, `KAKAO_CLIENT_ID`·`KAKAO_CLIENT_SECRET`·`KAKAO_REDIRECT_URI`·`KAKAO_APP_ID`. GitHub role은 이 이름들에 대한 `ssm:PutParameter`, EC2 role은 같은 이름의 `ssm:GetParameter`만 허용하며(와일드카드 금지 — `scripts/qa/check-alpha-immutable-deploy.mjs`가 막는다), SSM 명령 이력에는 비밀값 대신 Parameter 경로만 남긴다. 값을 쓰는 쪽은 `scripts/release/sync-alpha-*-env.sh`이고, 새 sync 스크립트가 쓰는 이름은 이 목록과 검사기 목록에 함께 추가해야 한다.
+런타임 비밀값(문의 Slack Webhook, APNs, 카카오 로그인)은 `/teameet/alpha/env/<이름>` SecureString으로만 전달한다. 허용 이름은 `scripts/infra/render-alpha-immutable-deploy-policies.mjs`의 목록이 정본이다: `SLACK_INQUIRY_WEBHOOK_URL`, `APNS_BUNDLE_ID`·`APNS_KEY_ID`·`APNS_PRIVATE_KEY`·`APNS_TEAM_ID`, `KAKAO_CLIENT_ID`·`KAKAO_CLIENT_SECRET`·`KAKAO_REDIRECT_URI`·`KAKAO_APP_ID`·`KAKAO_ADMIN_KEY`(선택 값 — 비어 있으면 쓰지 않는다). GitHub role은 이 이름들에 대한 `ssm:PutParameter`, EC2 role은 같은 이름의 `ssm:GetParameter`만 허용하며(와일드카드 금지 — `scripts/qa/check-alpha-immutable-deploy.mjs`가 막는다), SSM 명령 이력에는 비밀값 대신 Parameter 경로만 남긴다. 값을 쓰는 쪽은 `scripts/release/sync-alpha-*-env.sh`이고, 새 sync 스크립트가 쓰는 이름은 이 목록과 검사기 목록에 함께 추가해야 한다.
 
 ```bash
 ALPHA_AWS_REGION=ap-northeast-2 \

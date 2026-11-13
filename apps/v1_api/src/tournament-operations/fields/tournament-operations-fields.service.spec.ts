@@ -188,6 +188,31 @@ async function buildHarness(options: {
 }
 
 describe('TournamentOperationsFieldsService', () => {
+  it('requires a name for explicit assigned-name synchronization before opening a transaction', async () => {
+    const { service, moduleRef, prisma } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()) });
+    try {
+      await expect(service.update(actorUserId, tournamentId, fieldId, { expectedVersion: 0, syncAssignedFixtures: true }, audit('name-required')))
+        .rejects.toMatchObject({ response: { code: 'FIELD_NAME_REQUIRED' } });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    } finally { await moduleRef.close(); }
+  });
+  it('explicit rename synchronizes assigned names, preserving location/time and idempotent replay', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()), fixtureFieldId: fieldId });
+    const before = { id: fieldId, tournamentId, scopeKey: 'court-a', name: 'Court A', sortOrder: 0, active: true, version: 0 };
+    tx.v1TournamentField.findUnique.mockResolvedValueOnce(before).mockResolvedValueOnce({ ...before, name: '새 구장', version: 1 });
+    tx.v1TournamentField.updateMany.mockResolvedValue({ count: 1 });
+    const match = Object.assign(tx.fixture, { placeName: 'Court A', placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, startAt: new Date('2026-11-21T01:00:00Z') });
+    const input = { expectedVersion: 0, name: ' 새 구장 ', syncAssignedFixtures: true };
+    try {
+      const first = await service.update(actorUserId, tournamentId, fieldId, input, audit('rename-assigned'));
+      const replay = await service.update(actorUserId, tournamentId, fieldId, input, audit('rename-assigned'));
+      expect(replay).toEqual(first);
+      expect(first).toMatchObject({ id: fieldId, name: '새 구장', version: 1 });
+      expect(match).toMatchObject({ fieldId, placeName: '새 구장', placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, startAt: new Date('2026-11-21T01:00:00Z') });
+      expect(tx.v1TeamMatch.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.v1TeamMatch.updateMany).toHaveBeenCalledWith({ where: { tournamentId, fieldId, deletedAt: null }, data: { placeName: '새 구장' } });
+    } finally { await moduleRef.close(); }
+  });
   it('경기 장소를 이름별로 가져오며 재실행·다른 주소·미정 장소·기존 배정을 보존한다', async () => {
     const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()), fixtureFieldId: fieldId });
     tx.v1TeamMatch.findMany.mockResolvedValue([

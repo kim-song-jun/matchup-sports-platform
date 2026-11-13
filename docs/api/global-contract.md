@@ -279,3 +279,6 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 관리자 회원 대진표 조회 응답은 `private, no-store`이며 일반 envelope를 따른다. 관리자 감사 기록에 바인딩된 10분 조회 ID는 로그인 토큰이 아니며 일반 사용자 API의 인증 수단으로 사용할 수 없다.
 
 - Registered time choices use competition-scoped storage, separate tournament/league HTTP surfaces and cache keys. League choices require platform admin; tournament director access stays tournament-scoped. See [league time contract](domains/league-matches.md#registered-fixture-times-2026-11-13).
+# 등록 항목 수정의 일괄 반영
+
+시간 목록 PATCH는 편집 시작 시점의 expectedScheduleTimeId와 expectedScheduledAt을 검증한다. preset 없는 파생 항목은 명시적인 null ID와 expectedFixtureIds(1–240개)를 요구하며 같은 시각의 대체 항목도 stale로 거절한다. 중복 목적지/삭제된 원본/진행된 경기/단계 순서 오류를 성공으로 숨기거나 일부 경기만 저장하지 않는다. 기존 정본 match updater와 트랜잭션으로 팀 일정을 동기화하며 구장·팀·결과는 보존한다. 구장 이름의 배정 경기 동기화는 기존 field PATCH의 `syncAssignedFixtures: true`에 한하고 expectedVersion·멱등 키와 기존 플랫폼 권한을 유지한다. 상세: [대회 계약](./domains/tournaments.md#등록-항목-수정-2026-11-13).

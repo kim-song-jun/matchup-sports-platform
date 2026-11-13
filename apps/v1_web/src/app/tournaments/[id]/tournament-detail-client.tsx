@@ -26,7 +26,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { KNOCKOUT_PHASES, competitionFixtureName, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
 import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
@@ -2146,9 +2146,11 @@ export function partitionTournamentSections(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
 
-  const groupFixtures = fixtures.filter((f) =>
-    f.groupId !== null && !knockoutGroupIds.has(f.groupId),
-  );
+  // 경기 번호 순 — 운영자가 어드민에서 번호를 바꾸면 서버의 라운드 순서가 아니라 그 번호가 목록 순서를 정한다.
+  // 번호가 같으면 서버가 준 순서를 그대로 둔다(sort 는 stable).
+  const groupFixtures = fixtures
+    .filter((f) => f.groupId !== null && !knockoutGroupIds.has(f.groupId))
+    .sort((a, b) => a.fixtureNumber - b.fixtureNumber);
 
   // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
   // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
@@ -2308,8 +2310,9 @@ function FixtureStatusBadge({ liveStatus }: { liveStatus: V1TournamentFixture['l
  */
 export function FixtureCard({ fixture, groupName = null }: { fixture: V1TournamentFixture; groupName?: string | null }) {
   // 이 목록은 조별로 묶지 않고 "조별 일정" 한 줄로 흐른다 — 조 이름을 카드마다 붙인다.
+  // 운영자가 정한 경기 제목이 있으면 그것을 먼저 쓴다 — 일정·대진표·경기 상세·어드민과 같은 순서다.
   const roundLabel = fixture.round
-    ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+    ? competitionFixtureName({ displayTitle: fixture.displayTitle, groupName, round: fixture.round, legNumber: fixture.legNumber })
     : `${fixture.fixtureNumber}경기`;
   // 일정 라벨: 날짜 + **시각**. 참가자는 이 카드로 "내 경기가 몇 시인지"를 판단하므로
   // 날짜만으로는 쓸모가 없다(오너 지적: "조별 일정에도 각 경기 시간들 나타나야하고").

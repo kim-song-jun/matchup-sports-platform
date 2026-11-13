@@ -97,6 +97,8 @@ export type MyTournamentStaffFixtureItem = {
   readonly legNumber: number | null;
   /** 조에 속하지 않은 경기(결선 등)는 `null`. */
   readonly groupName: string | null;
+  /** 운영자가 정한 경기 제목. 없으면 `null` — 화면은 이때만 라운드·조 이름으로 만든 이름을 쓴다. */
+  readonly displayTitle: string | null;
   readonly fieldId: string | null;
   readonly fieldName: string | null;
 };
@@ -273,7 +275,7 @@ export class TournamentOperationsStaffService {
             field: { select: { name: true } },
             game: { select: { id: true, state: true, sourceType: true, sides: { select: { sideKey: true, displayNameSnapshot: true } } } },
             tournamentDetails: {
-              select: { tournamentId: true, round: true, fixtureNumber: true, legNumber: true, group: { select: { name: true } } },
+              select: { tournamentId: true, round: true, fixtureNumber: true, legNumber: true, displayTitle: true, group: { select: { name: true } } },
             },
           },
           orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
@@ -316,6 +318,7 @@ export class TournamentOperationsStaffService {
               fixtureNumber: details?.fixtureNumber ?? null,
               legNumber: details?.legNumber ?? null,
               groupName: details?.group?.name ?? null,
+              displayTitle: details?.displayTitle ?? null,
               fieldId: fixture.fieldId,
               fieldName: fixture.field?.name ?? null,
             }];

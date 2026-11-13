@@ -19,7 +19,7 @@ function pick(select: Record<string, unknown>, value: Record<string, unknown>): 
   return out;
 }
 
-type DetailsRow = { round: string; fixtureNumber: number; legNumber: number; group: { name: string } | null };
+type DetailsRow = { round: string; fixtureNumber: number; legNumber: number; group: { name: string } | null; displayTitle?: string | null };
 
 function teamMatchRow(id: string, details: DetailsRow) {
   return {
@@ -68,6 +68,22 @@ describe('TournamentOperationsBoardService — 조 이름·차수', () => {
 
     expect(itemOf(snapshot, GROUP_FIXTURE)).toMatchObject({ round: 'league_r2', groupName: 'A조' });
     expect(itemOf(snapshot, KNOCKOUT_FIXTURE)).toMatchObject({ round: 'semi', groupName: null });
+  });
+
+  it('운영자가 정한 경기 제목(displayTitle)을 싣고, 없으면 null 이며, 제목만 바뀌어도 그 경기의 stableRevision 이 움직인다', async () => {
+    const withTitle = (displayTitle: string | null) => boardOver([
+      teamMatchRow(GROUP_FIXTURE, { round: 'league_r2', fixtureNumber: 3, legNumber: 1, group: { name: 'A조' }, displayTitle }),
+      teamMatchRow(KNOCKOUT_FIXTURE, { round: 'semi', fixtureNumber: 9, legNumber: 1, group: null }),
+    ]).list(tournamentId, { limit: 20 }, new Date('2026-10-02T00:00:00.000Z'));
+
+    const untitled = await withTitle(null);
+    const titled = await withTitle('풀리그 1라운드');
+
+    expect(itemOf(untitled, GROUP_FIXTURE).displayTitle).toBeNull();
+    expect(itemOf(titled, GROUP_FIXTURE).displayTitle).toBe('풀리그 1라운드');
+    expect(itemOf(titled, KNOCKOUT_FIXTURE).displayTitle).toBeNull();
+    expect(itemOf(titled, GROUP_FIXTURE).stableRevision).not.toBe(itemOf(untitled, GROUP_FIXTURE).stableRevision);
+    expect(itemOf(titled, KNOCKOUT_FIXTURE).stableRevision).toBe(itemOf(untitled, KNOCKOUT_FIXTURE).stableRevision);
   });
 
   it('차수를 싣고, 차수만 바뀌어도 그 경기의 stableRevision 이 움직인다', async () => {

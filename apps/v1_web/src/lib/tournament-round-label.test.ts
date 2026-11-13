@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentGroupPhase } from '@/types/api';
-import { KNOCKOUT_PHASES, competitionMatchLabel, isKnockoutPhase, tournamentRoundLabel, type CompetitionMatchLabelInput } from './tournament-round-label';
+import { KNOCKOUT_PHASES, competitionFixtureName, competitionMatchLabel, isKnockoutPhase, tournamentRoundLabel, type CompetitionMatchLabelInput } from './tournament-round-label';
 
 // 서버 tournament-round-label.spec.ts 와 같은 표 — 두 규칙이 갈리면 알림과 화면이 다른 이름을 쓴다.
 describe('tournamentRoundLabel', () => {
@@ -46,6 +46,24 @@ describe('competitionMatchLabel', () => {
     ['16강 2차전은 차수만 붙는다', { groupName: '16강', round: '16강', legNumber: 2 }, '16강 2차'],
   ])('%s', (_case, input, label) => {
     expect(competitionMatchLabel(input)).toBe(label);
+  });
+});
+
+// 어드민에서 고친 경기 제목이 어느 화면에서나 같은 이름으로 보여야 한다 — 새 화면이 competitionMatchLabel 을 바로 불러
+// 제목이 빠지는 일(MD-QA 대회 상세 조별 일정)을 이 함수 하나로 막는다.
+describe('competitionFixtureName', () => {
+  const base = { groupName: 'A조', round: 'league_r1', legNumber: 1 };
+
+  it('운영자가 정한 경기 제목이 있으면 그것을 쓴다', () => {
+    expect(competitionFixtureName({ ...base, displayTitle: '풀리그 1라운드' })).toBe('풀리그 1라운드');
+  });
+
+  it('제목 앞뒤 공백은 지운다', () => {
+    expect(competitionFixtureName({ ...base, displayTitle: '  개막전  ' })).toBe('개막전');
+  });
+
+  it.each([[undefined], [null], [''], ['   ']])('제목이 %j 이면 라운드·조 이름으로 만든 이름을 쓴다', (displayTitle) => {
+    expect(competitionFixtureName({ ...base, displayTitle })).toBe('A조 · 조별리그 1라운드');
   });
 });
 

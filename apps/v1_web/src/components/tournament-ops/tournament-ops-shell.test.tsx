@@ -41,6 +41,28 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(screen.queryByRole('link', { name: '서비스로 돌아가기' })).not.toBeInTheDocument();
   });
 
+  // 지원(조회 전용)만: 담당 경기 목록은 필드 담당자의 배정 경기만 보여 줘서 지원에게는 막다른 길이다.
+  it('담당 대회에서 들어온 지원은 경기 콘솔에서 운영 보드로 돌아간다 — 담당 대회·담당 경기 목록 링크는 두지 않는다', () => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
+    render(<TournamentOpsShell tournamentId="t-1" role="SUPPORT_READONLY" origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '운영 보드로 돌아가기' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+    expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '담당 대회 목록으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it('담당 대회에서 온 지원의 운영 보드 화면은 담당 대회 목록 화면으로 돌아간다 — 빈 담당 경기 목록으로 가지 않는다', () => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/operations';
+    render(<TournamentOpsShell tournamentId="t-1" role="SUPPORT_READONLY" origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '담당 경기 목록으로 돌아가기' })).toHaveAttribute('href', '/my/tournament-staff');
+    expect(screen.queryByRole('link', { name: '운영 보드로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it('지원이 아닌 역할은 담당 대회에서 들어와도 지금처럼 담당 경기 목록으로 돌아간다', () => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/operations';
+    render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '담당 경기 목록으로 돌아가기' })).toHaveAttribute('href', '/my/tournament-staff/t-1');
+  });
+
   it.each(['TOURNAMENT_DIRECTOR', 'SUPPORT_READONLY'] as const)('운영 보드에서 들어온 %s는 경기 콘솔에서 운영 보드로 돌아간다 (MD-QA #195)', (role) => {
     pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
     render(<TournamentOpsShell tournamentId="t-1" role={role} origin="home"><div>content</div></TournamentOpsShell>);

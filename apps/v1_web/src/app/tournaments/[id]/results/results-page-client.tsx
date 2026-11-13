@@ -18,6 +18,7 @@ import { withFromPath } from '@/lib/session-storage';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
 import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { bracketTrackLabel, effectiveBracketTrack, orderedBracketTracks } from '@/lib/bracket-track';
+import { threeTeamBracketThird } from '@/lib/three-team-bracket';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -89,6 +90,11 @@ function buildSplitFinalResults(tournament: V1TournamentDetail) {
       .filter(fixture => phases.has(fixture.groupId ?? '') && fixture.status === 'completed' && fixture.result !== null)
       .map(fixture => ({ ...fixture, round: phases.get(fixture.groupId!)! }));
     const rows = buildKnockoutFinalRanking(fixtures, tournament.sixTeamBracket?.winners);
+    // 3팀 토너먼트는 3·4위전이 없다 — 결승 결과가 나온 뒤 준결승에서 진 팀이 3위다.
+    const third = rows.length > 0
+      ? threeTeamBracketThird(trackFixtures.map(fixture => ({ phase: trackGroups.find(group => group.id === fixture.groupId)!.phase, fixture })))
+      : null;
+    if (third !== null) rows.push({ pos: 3, name: third });
     return { track, label: bracketTrackLabel(track)!, rows, fixtures: trackFixtures,
       winner: rows.find(row => row.pos === 1)?.name ?? null,
       runnerUp: rows.find(row => row.pos === 2)?.name ?? null,

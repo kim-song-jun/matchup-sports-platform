@@ -39,6 +39,7 @@ async function fixtureGroup(label: string) {
     await bracket.updateFixture(user, fixtureId, {
       scheduledAt: original,
       venue: `${label} A구장`, venueAddress: '보존할 주소', venueLatitude: 37.5, venueLongitude: 127,
+      venueProvider: 'kakao', venueProviderId: `assignment-edit-${label}`,
     });
   }
   const { item } = await times.create(user, seeded.tournamentId, { scheduledAt: original });
@@ -60,7 +61,8 @@ describe('등록 시간·구장 수정 (PostgreSQL)', () => {
       expect(after[index].startAt?.toISOString()).toBe(moved);
       expect(after[index].endAt!.getTime() - after[index].startAt!.getTime()).toBe(before[index].endAt!.getTime() - before[index].startAt!.getTime());
       expect(after[index]).toMatchObject({ fieldId: before[index].fieldId, placeName: before[index].placeName,
-        placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, hostTeamId: before[index].hostTeamId, approvedApplicantTeamId: before[index].approvedApplicantTeamId });
+        placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, placeProvider: 'kakao', placeProviderId: before[index].placeProviderId,
+        hostTeamId: before[index].hostTeamId, approvedApplicantTeamId: before[index].approvedApplicantTeamId });
     }
     const schedules = await prisma.v1TeamSchedule.findMany({ where: { teamMatchId: { in: fixtureIds }, state: 'SCHEDULED' } });
     expect(schedules).toHaveLength(4);
@@ -70,7 +72,7 @@ describe('등록 시간·구장 수정 (PostgreSQL)', () => {
     const renamed = await prisma.v1TeamMatch.findMany({ where: { id: { in: fixtureIds } } });
     expect(renamed).toHaveLength(2);
     for (const row of renamed) expect(row).toMatchObject({ fieldId: field.id, placeName: '수정된 A구장',
-      placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, startAt: new Date(moved) });
+      placeAddress: '보존할 주소', placeLatitude: 37.5, placeLongitude: 127, placeProvider: 'kakao', placeProviderId: before[0].placeProviderId, startAt: new Date(moved) });
     await expect(fields.update(user.id, tournamentId, field.id, { expectedVersion: field.version, name: '오래된 수정', syncAssignedFixtures: true }, { requestId: 'assignment-rename-stale' }))
       .rejects.toMatchObject({ response: { code: 'STALE_FIELD_VERSION' } });
     expect(await prisma.v1TeamMatch.count({ where: { id: { in: fixtureIds }, placeName: '수정된 A구장' } })).toBe(2);

@@ -83,12 +83,7 @@ export function AccountExistsGuide({ provider, redirectPath }: { provider: V1Lin
           <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={emailHref}>이메일로 로그인하기</Link>
           <AppleLoginButton className="tm-btn tm-btn-lg tm-btn-block tm-auth-apple" />
           {kakaoHref ? (
-            <KakaoLoginButton
-              className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-pressable"
-              href={kakaoHref}
-              label="카카오로 로그인하기"
-              style={{ background: 'var(--kakao-yellow)', color: 'var(--static-black)', borderColor: 'transparent' }}
-            />
+            <KakaoLoginButton className="tm-btn tm-btn-lg tm-btn-block tm-auth-kakao tm-pressable" href={kakaoHref} />
           ) : null}
           <div className="tm-auth-guide-links">
             <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={`/auth/find-account?${recoveryQuery}`}>계정 찾기</Link>

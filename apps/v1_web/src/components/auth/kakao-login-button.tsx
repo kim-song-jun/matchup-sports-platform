@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { V1ApiError, v1Post } from '@/lib/api-client';
@@ -18,7 +18,8 @@ import { detectNativeShell } from '@/lib/native-bridge';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
-import { generateKakaoOAuthState, isSocialOnboardingRoute } from './auth.view-model';
+import { generateKakaoOAuthState, isSocialOnboardingRoute, KAKAO_LOGIN_LABEL } from './auth.view-model';
+import { KakaoButtonFace } from './kakao-symbol';
 import { routeSocialLoginRecovery } from './login-recovery-route';
 
 const NATIVE_FAILURE_MESSAGE = '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
@@ -35,14 +36,12 @@ const SDK_PREFLIGHT_TIMEOUT_MS = 8_000;
 //   capability 를 광고하지 않는 옛 셸은 톡 앱 핸드오프(커스텀 스킴)를 허용 목록이 막으므로 1·2 를 건너뛰고 3 만 쓴다.
 export function KakaoLoginButton({
   href,
-  label,
+  label = KAKAO_LOGIN_LABEL,
   className,
-  style,
 }: {
   href: string;
-  label: string;
+  label?: string;
   className?: string;
-  style?: CSSProperties;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -224,13 +223,13 @@ export function KakaoLoginButton({
 
   return (
     <>
-      <a className={className} href={href} style={style} onClick={handleClick}>
-        {label}
+      <a className={className} href={href} onClick={handleClick}>
+        <KakaoButtonFace label={label} />
       </a>
       {error ? (
-        <p className="tm-text-caption tm-auth-provider-note tm-auth-provider-error" role="alert">{error}</p>
+        <p className="tm-text-caption tm-auth-provider-note" role="alert">{error}</p>
       ) : webHandoff ? (
-        <p className="tm-text-caption tm-auth-provider-note tm-auth-provider-error tm-auth-provider-status" role="status">{KAKAO_WEB_HANDOFF_MESSAGE}</p>
+        <p className="tm-text-caption tm-auth-provider-note tm-auth-provider-status" role="status">{KAKAO_WEB_HANDOFF_MESSAGE}</p>
       ) : null}
     </>
   );

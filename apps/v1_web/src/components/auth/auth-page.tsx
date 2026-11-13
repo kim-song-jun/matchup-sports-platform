@@ -10,6 +10,7 @@ import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/compone
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
+import { KakaoButtonFace } from './kakao-symbol';
 import { PendingEmailLinkNotice } from './pending-email-link-notice';
 import { PendingLinkNotice } from './pending-link-notice';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
@@ -47,14 +48,10 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
               막힌다) — 눌리지 않는 버튼을 "준비 중" 으로 두지 않는다. */}
           <div className="tm-auth-provider-group">
             <AppleLoginButton className="tm-btn tm-btn-lg tm-btn-block tm-auth-apple" />
-            {model.providers.length > 0 ? (
-              <div className="tm-auth-provider-row">
-                {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
-              </div>
-            ) : null}
-            {model.providers.some((provider) => provider.disabled) ? (
+            {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+            {model.preparingProviderNames.length > 0 ? (
               <p className="tm-text-caption tm-auth-provider-note">
-                {model.providers.filter((provider) => provider.disabled).map((provider) => provider.label).join('·')} 로그인은 준비 중이에요
+                {model.preparingProviderNames.join('·')} 로그인은 준비 중이에요
               </p>
             ) : null}
           </div>
@@ -279,47 +276,19 @@ function AuthActionButton({ action }: { action: AuthAction }) {
 }
 
 function ProviderButton({ provider }: { provider: LoginProvider }) {
-  // Fill 패턴: 브랜드 배경(background) + 대비 충족 전경 텍스트(foreground).
-  // 이전 outline 리팩터(border/color에 브랜드색 재사용)는 카카오 1.28:1 / 네이버 2.25:1로
-  // WCAG 2.1 AA(4.5:1) FAIL — 격상 전 fill 패턴으로 복원.
-  // disabled(준비 중)도 브랜드 배경은 유지하고 opacity로 비활성 상태를 구분한다.
-  const activeStyle = { background: provider.background, color: provider.foreground, borderColor: 'transparent' };
+  // 브랜드 색·심볼·문구 색은 .tm-auth-kakao 가 맡는다 — 비활성(로그인 설정이 없는 빌드)도 같은 클래스의 :disabled 규칙이다.
+  const className = 'tm-btn tm-btn-lg tm-btn-block tm-auth-kakao tm-pressable';
 
-  if (provider.disabled) {
+  if (provider.disabled || !provider.href) {
     return (
-      <button
-        className="tm-btn tm-btn-md tm-auth-provider-disabled"
-        style={{ ...activeStyle, opacity: 0.58 }}
-        disabled
-        aria-label={`${provider.label} 로그인 (준비 중)`}
-        type="button"
-      >
-        {provider.label}
+      <button className={className} disabled aria-label={`${provider.label} (준비 중)`} type="button">
+        <KakaoButtonFace label={provider.label} />
       </button>
     );
   }
 
-  if (provider.href?.startsWith('http')) {
-    // OAuth(카카오): 클릭 시점에 CSRF 방지 state를 생성·저장해야 하므로 클라이언트 버튼 사용.
-    return (
-      <KakaoLoginButton
-        className="tm-btn tm-btn-md tm-btn-outline tm-pressable"
-        href={provider.href}
-        style={activeStyle}
-        label={provider.label}
-      />
-    );
-  }
-
-  return provider.href ? (
-    <Link className="tm-btn tm-btn-md tm-btn-outline tm-pressable" href={provider.href} prefetch={false} style={activeStyle}>
-      {provider.label}
-    </Link>
-  ) : (
-    <button className="tm-btn tm-btn-md tm-btn-outline tm-pressable" style={activeStyle} type="button">
-      {provider.label}
-    </button>
-  );
+  // 클릭 시점에 CSRF 방지 state를 생성·저장해야 하므로 클라이언트 버튼을 쓴다.
+  return <KakaoLoginButton className={className} href={provider.href} label={provider.label} />;
 }
 
 function ExceptionActions({ model }: { model: AuthExceptionViewModel }) {

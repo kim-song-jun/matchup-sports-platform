@@ -1,4 +1,5 @@
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
+import { KAKAO_LOGIN_LABEL } from './auth.view-model';
 
 /**
  * "카카오(나 Apple)로 가입하셨다면 로그인 첫 화면의 … 버튼으로 로그인해 주세요" 안내의 가변 부분.
@@ -7,6 +8,6 @@ import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 export function describeSocialLoginGuide(): string {
   const withApple = isNativeAppleSignInAvailable();
   const signupMethods = withApple ? '카카오나 Apple' : '카카오';
-  const buttons = withApple ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
+  const buttons = withApple ? `'${KAKAO_LOGIN_LABEL}' 또는 'Apple로 계속하기'` : `'${KAKAO_LOGIN_LABEL}'`;
   return `${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.`;
 }

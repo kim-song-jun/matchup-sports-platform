@@ -19,12 +19,10 @@ describe('auth view models', () => {
     expect(model.guestHref).toBe('/home');
     expect(model.signupHref).toBe('/terms?mode=signup');
     // Apple 은 목록에 없다 — 네이티브 셸에서만 동작하므로 AppleLoginButton 이 브리지를 보고
-    // 스스로 나타난다. 목록에 두면 브라우저에서 영영 "준비 중" 으로 남는다.
-    expect(model.providers.map(({ label, disabled }) => ({ label, disabled }))).toEqual([
-      { label: '카카오', disabled: true },
-      { label: '네이버', disabled: true },
-    ]);
-    expect(model.providers.every((provider) => !('href' in provider))).toBe(true);
+    // 스스로 나타난다. 네이버는 버튼 없이 안내 줄로만 알린다.
+    expect(model.providers).toEqual([{ label: '카카오 로그인', disabled: true }]);
+    // 카카오 로그인 설정이 없는 빌드는 카카오도 준비 중으로 함께 알린다.
+    expect(model.preparingProviderNames).toEqual(['카카오', '네이버']);
   });
 
   it('enables Kakao when Kakao OAuth env is configured', () => {
@@ -33,17 +31,13 @@ describe('auth view models', () => {
 
     const model = getLoginViewModel();
 
-    expect(model.providers).toHaveLength(2);
-    expect(model.providers[0]).toMatchObject({
-      label: '카카오',
-      background: 'var(--kakao-yellow)',
-      foreground: 'var(--static-black)',
+    expect(model.providers).toHaveLength(1);
+    expect(model.providers[0]).toEqual({
+      label: '카카오 로그인',
+      href: 'https://kauth.kakao.com/oauth/authorize?client_id=kakao-rest-key&redirect_uri=https%3A%2F%2Fteameet.co.kr%2Fcallback%2Fkakao&response_type=code',
       disabled: false,
     });
-    expect(model.providers[0].href).toBe(
-      'https://kauth.kakao.com/oauth/authorize?client_id=kakao-rest-key&redirect_uri=https%3A%2F%2Fteameet.co.kr%2Fcallback%2Fkakao&response_type=code',
-    );
-    expect(model.providers.slice(1).every((provider) => provider.disabled === true)).toBe(true);
+    expect(model.preparingProviderNames).toEqual(['네이버']);
   });
 
   it('keeps email login on a submit-driven real API flow', () => {

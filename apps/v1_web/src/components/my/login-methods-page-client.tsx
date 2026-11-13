@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Check, Lock } from 'lucide-react';
+import { KakaoButtonFace } from '@/components/auth/kakao-symbol';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { Button } from '@/components/v1-ui/button';
@@ -480,7 +481,7 @@ export function LoginMethodsPageClient() {
                       disabled={busy}
                       onClick={() => void connectKakao()}
                     >
-                      {activeProvider === 'kakao' ? '연결 중이에요…' : '카카오 연결하기'}
+                      {activeProvider === 'kakao' ? '연결 중이에요…' : <KakaoButtonFace />}
                     </Button>
                   ) : undefined}
                 />

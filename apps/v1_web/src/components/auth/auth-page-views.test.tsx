@@ -109,6 +109,61 @@ describe('로그인 화면', () => {
     renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
     expect(screen.queryByRole('button', { name: 'Apple로 계속하기' })).toBeNull();
   });
+
+  describe('소셜 로그인 버튼', () => {
+    const configureKakao = () => {
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', 'kakao-rest-key');
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', 'https://teameet.test/callback/kakao');
+    };
+    const unconfigureKakao = () => {
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', '');
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', '');
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      delete window.TeameetNative;
+    });
+
+    it('브라우저: 카카오가 심볼과 문구를 단 전체 폭 버튼이고, 네이버는 버튼 없이 안내 줄로만 알린다', () => {
+      configureKakao();
+      const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+
+      const kakao = screen.getByRole('link', { name: '카카오 로그인' });
+      expect(kakao).toHaveClass('tm-btn', 'tm-btn-lg', 'tm-btn-block', 'tm-auth-kakao', 'tm-pressable');
+      expect(kakao).not.toHaveClass('tm-btn-outline');
+      expect(kakao.getAttribute('style')).toBeNull();
+      expect(kakao.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      expect(screen.queryByRole('button', { name: /네이버/ })).toBeNull();
+      expect(container.querySelector('.tm-auth-provider-row')).toBeNull();
+      expect(screen.getByText('네이버 로그인은 준비 중이에요')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Apple로 계속하기' })).toBeNull();
+    });
+
+    it('앱: Apple 이 카카오보다 위에 놓이고 두 버튼 모두 전체 폭이다', async () => {
+      configureKakao();
+      window.TeameetNative = { supports: ['sign-in-with-apple'], postMessage: vi.fn() };
+      renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+
+      const apple = await screen.findByRole('button', { name: 'Apple로 계속하기' });
+      const kakao = screen.getByRole('link', { name: '카카오 로그인' });
+      expect(apple).toHaveClass('tm-btn-block');
+      expect(kakao).toHaveClass('tm-btn-block');
+      expect(apple.compareDocumentPosition(kakao) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('카카오 로그인 설정이 없는 빌드: 카카오 버튼은 비활성이고 안내 줄에 카카오도 함께 나온다', () => {
+      unconfigureKakao();
+      renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+
+      const kakao = screen.getByRole('button', { name: '카카오 로그인 (준비 중)' });
+      expect(kakao).toBeDisabled();
+      expect(kakao).toHaveClass('tm-btn-block', 'tm-auth-kakao');
+      expect(kakao.getAttribute('style')).toBeNull();
+      expect(screen.queryByRole('link', { name: '카카오 로그인' })).toBeNull();
+      expect(screen.getByText('카카오·네이버 로그인은 준비 중이에요')).toBeInTheDocument();
+    });
+  });
 });
 
 describe('가입 완료 화면', () => {

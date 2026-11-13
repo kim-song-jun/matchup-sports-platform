@@ -78,15 +78,27 @@ const apiError = (statusCode: number, code: string, details?: Record<string, unk
   new V1ApiError({ status: 'error', statusCode, code, message: '실패', details, timestamp: '2026-10-31T00:00:00.000Z' });
 const renderButton = () => render(
   <QueryClientProvider client={queryClient}>
-    <KakaoLoginButton href={HREF} label="카카오" />
+    <KakaoLoginButton href={HREF} />
   </QueryClientProvider>,
 );
-const click = () => userEvent.click(screen.getByRole('link', { name: '카카오' }));
+const click = () => userEvent.click(screen.getByRole('link', { name: '카카오 로그인' }));
 const HANDOFF_TEXT = '카카오 계정 로그인 화면으로 이동할게요';
 /** 카카오 인가 화면으로 넘어간 URL 이 실은 state 를 콜백이 하듯 저장된 시도와 대조한다. */
 const handedOffState = () => new URL(assigned ?? 'about:blank').searchParams.get('state');
 
 describe('KakaoLoginButton', () => {
+  describe('appearance', () => {
+    it('is named by its label while the speech-bubble symbol stays decorative', () => {
+      renderButton();
+      const link = screen.getByRole('link', { name: '카카오 로그인' });
+      const symbol = link.querySelector('svg');
+      expect(symbol).not.toBeNull();
+      expect(symbol).toHaveAttribute('aria-hidden', 'true');
+      expect(symbol).toHaveAttribute('focusable', 'false');
+      expect(link.querySelector('.tm-auth-kakao-label')).toHaveTextContent('카카오 로그인');
+    });
+  });
+
   describe('native shell', () => {
     beforeEach(installShell);
 

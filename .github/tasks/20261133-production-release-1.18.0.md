@@ -100,3 +100,5 @@ Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-202611
 - 사용자 승인된 테스트 대회 cf4c362e-5a0f-44b1-b4a9-4c1e622d63fe는 cancelled/isPublic=false/신청0/공개404로 정리. 승인된 20경기·두 시간·전용A/B구장·감사 기록은 남는다. owner 세션은 유지, 별도 QA 브라우저 PID17336/11980 종료 확인.
 - 승인된 두 폴더 ACL 보정 성공. CUA kernel/native inventory 복구, browser access host unavailable은 별도 잔여 도구 이슈. 실제 화면 QA는 허용된 headed Playwright 대안으로 수행.
 - 근거 정본: docs/ops/release-readiness-1.19.0-2026-11-13.md의 후속 QA 절. 증거 브랜치를 후보에 혼합하지 않는다. main PR/merge와 production 승인은 사용자 전용.
+
+- 사용자 최종 승인: 이번 후보 974ac541b7a2에 한해 미재실행 세부 권한 항목은 기존 CI 근거 인정. 실제 수동 PASS로 바꾸지 않으며 이번 후보의 QA 준비 조건은 승인과 함께 충족. main 실행은 사용자 전용.

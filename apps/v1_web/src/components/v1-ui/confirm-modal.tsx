@@ -126,6 +126,8 @@ interface ConfirmModalProps {
    */
   confirmLabel?: string;
   cancelLabel?: string;
+  /** true 면 취소 버튼을 그리지 않는다 — 읽고 닫기만 하는 안내창(예: 신청이 거절된 사유). 닫기(ESC·바깥 클릭·뒤로가기)는 그대로 `onCancel` 이다. */
+  hideCancel?: boolean;
   tone?: ConfirmTone;
   acknowledgement?: string;
   /** 확인 창 안에서 사유를 받는다 — 값은 호출자가 들고(제출 실패 뒤에도 남게) 창은 보여 주기만 한다. */
@@ -161,6 +163,7 @@ export function ConfirmModal({
   details,
   confirmLabel = '확인',
   cancelLabel = '취소',
+  hideCancel = false,
   tone = 'default',
   acknowledgement,
   reasonField,
@@ -290,15 +293,17 @@ export function ConfirmModal({
 
         {/* Footer */}
         <div style={{ display: 'flex', gap: 8, padding: '0 24px 24px' }}>
-          <button
-            type="button"
-            className="tm-btn tm-btn-md tm-btn-neutral"
-            style={{ flex: 1, minHeight: 44 }}
-            disabled={busy}
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
+          {hideCancel ? null : (
+            <button
+              type="button"
+              className="tm-btn tm-btn-md tm-btn-neutral"
+              style={{ flex: 1, minHeight: 44 }}
+              disabled={busy}
+              onClick={onCancel}
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             type="button"
             className={`tm-btn tm-btn-md ${isDanger ? 'tm-btn-danger' : 'tm-btn-primary'}`}

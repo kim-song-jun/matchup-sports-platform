@@ -117,7 +117,8 @@ describe('TournamentOperationsBoardService — 조 이름·차수', () => {
 // 운영 보드는 경기 번호 → 차수(1차전 → 2차전) 순이다. 라운드 이름은 문자열이라(`4강` < `league_r1` < `결승`) 번호와 어긋나 11·12번이 맨 위에 나왔다.
 describe('TournamentOperationsBoardService — 경기 번호 순 정렬·커서', () => {
   function capture(rows: ReturnType<typeof teamMatchRow>[]) {
-    const findMany = jest.fn(async ({ select }: { select: Record<string, unknown> }) => rows.map((row) => pick(select, row)));
+    // 호출 인자(orderBy·where)를 검사하므로 타입에 싣는다 — 로컬 jest 는 타입을 안 보지만 CI `tsc -p tsconfig.spec.json` 은 본다.
+    const findMany = jest.fn(async ({ select }: { select: Record<string, unknown>; orderBy?: unknown; where?: unknown }) => rows.map((row) => pick(select, row)));
     const tx = {
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ kind: 'regular_tournament' }) },
       v1TeamMatch: { findMany },

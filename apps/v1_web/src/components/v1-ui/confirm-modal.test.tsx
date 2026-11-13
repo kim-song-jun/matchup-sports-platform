@@ -6,6 +6,35 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmModal } from './confirm-modal';
 
+// 읽고 닫기만 하는 안내창(예: 신청이 거절된 사유) — 취소 버튼 없이 확인 하나만 둔다.
+describe('ConfirmModal hideCancel', () => {
+  it('취소 버튼을 그리지 않고 확인 버튼만 둔다', () => {
+    render(<ConfirmModal open title="신청하지 못했어요" message="사유" hideCancel onConfirm={() => undefined} onCancel={() => undefined} />);
+
+    expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+  });
+
+  it('ESC 와 확인 버튼은 각각 onCancel · onConfirm 으로 간다', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(<ConfirmModal open title="신청하지 못했어요" message="사유" hideCancel onConfirm={onConfirm} onCancel={onCancel} />);
+
+    await user.click(screen.getByRole('button', { name: '확인' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await user.keyboard('{Escape}');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('기본값은 지금처럼 취소와 확인 둘 다 그린다', () => {
+    render(<ConfirmModal open title="t" message="m" onConfirm={() => undefined} onCancel={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+  });
+});
+
 describe('ConfirmModal acknowledgement', () => {
   function renderAck(open: boolean, onConfirm = vi.fn()) {
     return (

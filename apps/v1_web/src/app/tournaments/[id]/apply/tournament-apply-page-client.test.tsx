@@ -1178,4 +1178,49 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(screen.queryByLabelText('전체 동의')).not.toBeInTheDocument();
     });
   });
+
+  // 서버가 신청을 거절하면 아래 배너만으로는 놓치기 쉬워 화면 가운데 확인 창으로도 사유를 알린다.
+  describe('신청 거절 사유 안내', () => {
+    const MESSAGE = '팀 성별을 설정한 뒤 대회에 신청할 수 있어요. 팀 설정에서 성별을 선택해 주세요.';
+
+    function arrangeRejectedCreate() {
+      const create = vi.fn().mockRejectedValue({ response: { data: { code: 'TEAM_GENDER_INELIGIBLE', message: MESSAGE } } });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: create, isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      return create;
+    }
+
+    it('팀 선택 단계에서 거절되면 확인 창이 사유를 알리고, 확인을 누르면 닫힌다', async () => {
+      arrangeRejectedCreate();
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      fireEvent.click(nextButton);
+
+      const dialog = await screen.findByRole('dialog', { name: '신청하지 못했어요' });
+      expect(dialog).toHaveTextContent(MESSAGE);
+      expect(within(dialog).queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+      expect(screen.queryByRole('dialog', { name: '신청하지 못했어요' })).not.toBeInTheDocument();
+    });
+
+    // 회귀: `?team=` 진입 effect 가 렌더마다 다시 돌며 submitError 를 지워, 서버가 이유를 줘도 화면에 아무것도 남지 않았다.
+    it('`?team=` 로 들어와 제출이 거절돼도 사유가 사라지지 않는다 — 확인 창을 닫아도 배너에 남는다', async () => {
+      searchParams = new URLSearchParams('team=team-1');
+      const create = arrangeRejectedCreate();
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      fireEvent.click(await screen.findByLabelText('전체 동의'));
+      const [submitButton] = screen.getAllByRole('button', { name: '신청 제출하기' });
+      fireEvent.click(submitButton);
+      fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '신청하지 못했어요' });
+      expect(dialog).toHaveTextContent(MESSAGE);
+      expect(create).toHaveBeenCalledWith({ teamId: 'team-1' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+      expect(screen.queryByRole('dialog', { name: '신청하지 못했어요' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGE);
+    });
+  });
 });

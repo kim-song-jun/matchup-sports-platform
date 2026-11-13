@@ -22,10 +22,10 @@ const browserSecurityHeaders = [
 
 const noIndexRoutes = [
   '/admin/:path*',
+  '/admin-content-preview',
   '/auth/:path*',
   '/callback/:path*',
   '/chat/:path*',
-  '/home',
   '/login/:path*',
   '/matches/new/:path*',
   '/matches/:id/applications',
@@ -36,11 +36,24 @@ const noIndexRoutes = [
   '/search/:path*',
   '/signup/:path*',
   '/team-matches/new/:path*',
-  '/team-matches/:id/edit',
+  '/team-matches/:id/edit/:path*',
+  '/team-matches/:id/lineup/:path*',
+  '/team-matches/:id/operate',
+  '/team-matches/:id/result/:path*',
   '/teams/new',
+  '/teams/:id/contact/:path*',
+  '/teams/:id/dissolve',
   '/teams/:id/edit',
+  '/teams/:id/game-rosters',
+  '/teams/:id/games/:path*',
+  '/teams/:id/invite',
   '/teams/:id/members',
+  '/teams/:id/schedules/new',
+  '/teams/:id/schedules/:scheduleId/edit',
+  '/teams/:id/tactics/:path*',
   '/terms',
+  '/tournament-management/:path*',
+  '/tournament-ops/:path*',
   '/tournaments/:id/apply',
   '/tournaments/:id/my',
   '/tournaments/:id/registrations/:path*',
@@ -92,6 +105,8 @@ const nextConfig: NextConfig = {
       // Historical public detail links. Query strings are preserved by Next.
       { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: false },
       { source: '/leagues/:id', destination: '/tournaments/:id', permanent: false },
+      // 대회 일정은 대진 허브의 탭으로 접혔다. 페이지의 redirect 는 상위 loading 이 먼저 흘러 나가 200 으로 응답되므로 설정으로 처리한다.
+      { source: '/tournaments/:id/schedule', destination: '/tournaments/:id/bracket', permanent: true },
       // 구 basePath(/v1) 시대의 URL — 북마크·외부 링크·카카오 redirect_uri(/v1/callback/kakao)가
       // 아직 살아있어서 현재 경로로 넘겨준다. 쿼리스트링은 Next가 그대로 이어붙인다.
       { source: '/v1', destination: '/', permanent: true },
@@ -111,6 +126,9 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // 브라우저·검색엔진이 선언 없이 먼저 찾는 아이콘 주소. 새 파일을 두지 않고 선언된 파일로 잇는다.
+      { source: '/favicon.ico', destination: '/favicon.png' },
+      { source: '/apple-touch-icon.png', destination: '/brand/apple-touch-icon.png' },
       {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,

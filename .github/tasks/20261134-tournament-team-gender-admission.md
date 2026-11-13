@@ -50,3 +50,6 @@ Base origin/dev 0f1f93621. Branch fix/tournament-team-gender-20261113. Worktree 
 
 ## CI fix round 1
 PR #2354 API CI: 205/206 DB integration suites passed. Two capacity race scenarios used shared `makeTeam` directly without a gender setting, so new admission correctly rejected them before the capacity race. Moved explicit gender setup into shared league-slot-harness team creation, covering applicants, seeded waitlist teams and direct additions. Real gender restriction remains unchanged.
+
+## Scoped main hotfix (user-authorized 2026-11-13)
+User explicitly requested dev merge followed by only this change on main. Dev PR #2354 passed Gates/API/Web, including the DB integration rerun, and was merged. Main hotfix is based on origin/main 6d12d118e (1.17.0), cherry-picks only the three task commits, and consumes only its own changeset into API/Web 1.17.1. No other dev features are included. Production environment approval remains enforced.

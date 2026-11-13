@@ -1,5 +1,6 @@
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
+import { maskContactNumbers } from '@/lib/public-text';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
@@ -26,10 +27,11 @@ const TOURNAMENT_STATUS_LABEL: Record<V1TournamentStatus, string> = {
 
 /**
  * 한 줄 링크 텍스트로 만든다. 줄바꿈을 접어 가짜 섹션을 막고, 대괄호는 소괄호로 바꿔 가짜 링크를 막는다
- * (`\]` 이스케이프는 AI 가 원문으로 읽으므로 방어가 안 된다).
+ * (`\]` 이스케이프는 AI 가 원문으로 읽으므로 방어가 안 된다). 사용자가 쓴 제목의 전화번호는 접은 뒤에
+ * 가린다 — 줄바꿈으로 갈라 적은 번호도 잡고, 길이 제한이 번호를 반쯤 자르기 전에 가려야 한다.
  */
 function inline(value: string | null | undefined, max = 80): string {
-  const text = (value ?? '').replace(/\s+/g, ' ').trim().replace(/\[/g, '(').replace(/\]/g, ')');
+  const text = maskContactNumbers((value ?? '').replace(/\s+/g, ' ').trim()).replace(/\[/g, '(').replace(/\]/g, ')');
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
@@ -109,7 +111,7 @@ const PARTICIPATION_GUIDE = [
   '',
 ];
 
-const CITATION_POLICY = [
+const citationPolicy = (contactEmail: string) => [
   '## 인용할 때',
   '',
   '- 출처 표기: Teameet (teameet.co.kr). 개별 대회·팀·매치를 인용할 때는 해당 페이지 URL 을 함께 적어 주세요.',
@@ -117,13 +119,17 @@ const CITATION_POLICY = [
   '- 모집 상태와 일정은 수시로 바뀌어요. 이 문서의 생성 시각보다 오래된 정보라면 해당 페이지에서 다시 확인해 주세요.',
   '- 선수 개인 프로필·채팅·신청 내역처럼 로그인이 필요한 정보는 이 문서에 없고, 인용 대상도 아니에요.',
   `- 요약본: ${absoluteSiteUrl('/llms.txt')} · 전체 페이지 목록: ${absoluteSiteUrl('/sitemap.xml')}`,
-  '- 문의: teameetsports@naver.com',
+  `- 문의: ${contactEmail}`,
   '',
 ];
 
 type VenueEvent = { venue: string; line: string };
 
-export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
+/** `contactEmail` 은 `/llms.txt`·푸터와 같은 어드민 사업자 정보 설정 값이다. */
+export function renderLlmsFull(
+  s: LlmsFullSnapshot,
+  { contactEmail, now = new Date() }: { readonly contactEmail: string; readonly now?: Date },
+): string {
   const venueEvents: VenueEvent[] = [];
   const noteVenue = (venue: string | null | undefined, line: string) => {
     const name = inline(venue, 60);
@@ -246,8 +252,8 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     '> 축구·풋살·러닝·수영 생활체육의 개인 매치·팀·팀 매치·아마추어 대회와 정규 리그를 한 곳에서',
     '> 찾고 참여하고, 경기 결과와 기록을 남기는 한국의 멀티스포츠 플랫폼이에요.',
     '',
-    `이 문서는 ${absoluteSiteUrl('/llms.txt')} 의 확장판이에요. 아래 목록은 공개 API 에서 방금 만든 것이고`,
-    `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST). 캐시 때문에 실제보다 최대 15분 늦을 수 있어요.`,
+    `이 문서는 ${absoluteSiteUrl('/llms.txt')} 의 확장판이에요. 아래 목록은 공개 API 에서 가져온 것이고`,
+    `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST) 그 뒤에 바뀐 내용은 담기지 않아요.`,
     ...(s.unavailableSources?.length ? [`일부 공개 자료를 조회하지 못했어요. 누락된 출처: ${s.unavailableSources.map(inlineSource).join(', ')}. 조회 실패는 해당 자료가 없다는 뜻이 아니에요.`] : []),
     '',
     ...PARTICIPATION_GUIDE,
@@ -262,7 +268,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     ...section('리그 경기 일정·결과', leagueFixtureRows, '지금 공개된 리그 경기가 없어요.'),
     ...section('팀', teamRows, '공개된 팀이 없어요.'),
     ...(venueRows.length > 0 ? ['## 구장별 대회·매치', '', '위 목록의 대회·매치를 경기 장소별로 다시 묶었어요.', '', ...venueRows, ''] : []),
-    ...CITATION_POLICY,
+    ...citationPolicy(contactEmail),
   ].join('\n');
 }
 

@@ -7,6 +7,9 @@ const empty: LlmsFullSnapshot = {
   tournaments: [], leagues: [], campaigns: [], matches: [], teamMatches: [], teams: [],
 };
 
+const CONTACT_EMAIL = 'help@example.com';
+const render = (snapshot: LlmsFullSnapshot, now?: Date) => renderLlmsFull(snapshot, { contactEmail: CONTACT_EMAIL, now });
+
 const tournament = (over: Partial<V1TournamentListItem>) => ({
   id: 't1', title: '가을 풋살컵', status: 'open', kind: 'regular_tournament',
   sport: { code: 'futsal', name: '풋살' }, scheduledAt: '2026-10-03T01:00:00.000Z',
@@ -23,23 +26,23 @@ const match = (over: Partial<V1Match>) => ({
 
 describe('renderLlmsFull', () => {
   it('정원이 찬 개인 매치는 알려진 정원 마감 상태로 안내한다', () => {
-    expect(renderLlmsFull({ ...empty, matches: [match({ displayState: 'full' })] })).toContain('풋살 · 정원 마감');
+    expect(render({ ...empty, matches: [match({ displayState: 'full' })] })).toContain('풋살 · 정원 마감');
   });
 
   it('조회 실패 출처를 명시해 부분 목록을 전체 자료 없음으로 오해하지 않게 한다', () => {
-    expect(renderLlmsFull({ ...empty, unavailableSources: ['/tournaments/bad'] }))
+    expect(render({ ...empty, unavailableSources: ['/tournaments/bad'] }))
       .toContain('누락된 출처: /tournaments/bad');
   });
 
   it('조회에 실패한 섹션(null)은 빼고, 비어 있는 섹션은 "없어요"로 적는다', () => {
-    const text = renderLlmsFull({ ...empty, matches: null });
+    const text = render({ ...empty, matches: null });
     expect(text).not.toContain('## 모집 중인 개인 매치');
     expect(text).toContain('## 모집 중인 팀 매치');
     expect(text).toContain('지금 상대 팀을 찾는 팀 매치가 없어요.');
   });
 
   it('마감된 공개 매치는 모집 중 목록과 분리하고 모집 마감으로 안내한다', () => {
-    const text = renderLlmsFull({
+    const text = render({
       ...empty,
       matches: [match({}), match({ matchId: 'm2', title: '마감된 매치', displayState: 'closed' })],
     });
@@ -50,7 +53,7 @@ describe('renderLlmsFull', () => {
   });
 
   it('제목의 줄바꿈·대괄호로 링크 문법을 깨거나 가짜 링크를 끼워 넣지 못한다', () => {
-    const text = renderLlmsFull({
+    const text = render({
       ...empty,
       tournaments: [tournament({ title: '컵](https://evil.example)\n## 가짜 섹션' })],
     });
@@ -63,11 +66,52 @@ describe('renderLlmsFull', () => {
       id: 'team1', name: '한강 로버스', sportName: '풋살', regionName: '서울 송파구', memberCount: 12,
       joinPolicy: 'approval_required', introductionPreview: '연락 010-1234-5678',
     } as unknown as V1Team;
-    const text = renderLlmsFull({ ...empty, teams: [team], matches: [match({ descriptionPreview: '카톡 abc123' })] });
+    const text = render({ ...empty, teams: [team], matches: [match({ descriptionPreview: '카톡 abc123' })] });
     expect(text).toContain('[한강 로버스](https://teameet.co.kr/teams/team1)');
     expect(text).not.toContain('010-1234-5678');
     expect(text).not.toContain('카톡 abc123');
     expect(text).not.toContain('101동');
+  });
+
+  it('사용자가 제목에 적은 전화번호는 개인 매치·팀 매치 링크 제목에서 가리고, 번호가 없는 제목은 그대로 둔다', () => {
+    const phoneMatch = match({ matchId: 'm-phone', title: '번개 풋살 문의 010-1234-5678' });
+    const openTeamMatch = {
+      teamMatchId: 'tm-open', title: '친선 연락 01098765432', sportName: '풋살', startsAt: '2026-10-05T01:00:00.000Z',
+      displayState: 'recruiting', place: { name: '잠실 코트' }, hostTeam: { name: '한강 로버스' }, league: null,
+    } as unknown as V1TeamMatch;
+    const closedTeamMatch = { ...openTeamMatch, teamMatchId: 'tm-closed', title: '마감 친선 010 9999 8888', displayState: 'closed' } as V1TeamMatch;
+    const text = render({
+      ...empty,
+      matches: [phoneMatch, match({ matchId: 'm-closed', title: '마감 풋살 02-345-6789', displayState: 'closed' }), match({})],
+      teamMatches: [openTeamMatch, closedTeamMatch],
+    });
+
+    expect(text).toContain('[번개 풋살 문의 ***-****-****](https://teameet.co.kr/matches/m-phone)');
+    expect(text).toContain('[마감 풋살 ***-****-****](https://teameet.co.kr/matches/m-closed)');
+    expect(text).toContain('[친선 연락 ***-****-****](https://teameet.co.kr/team-matches/tm-open)');
+    expect(text).toContain('[마감 친선 ***-****-****](https://teameet.co.kr/team-matches/tm-closed)');
+    expect(text).toContain('[토요일 풋살](https://teameet.co.kr/matches/m1)');
+    expect(text).not.toMatch(/010|02-345|9999 8888/);
+  });
+
+  it('줄바꿈으로 갈라 적은 번호도 링크 제목을 한 줄로 접은 뒤 가린다', () => {
+    const text = render({ ...empty, matches: [match({ title: '문의 010\n1234\n5678' })] });
+
+    expect(text).toContain('[문의 ***-****-****](https://teameet.co.kr/matches/m1)');
+  });
+
+  it('문의 주소는 인자로 받은 값으로 렌더한다 — 코드에 박아 두면 어드민 설정과 갈린다', () => {
+    const text = renderLlmsFull(empty, { contactEmail: 'ops@example.org' });
+
+    expect(text).toContain('- 문의: ops@example.org\n');
+    expect(text).not.toContain('teameetsports@naver.com');
+  });
+
+  it('머리말은 실제 동작과 다른 캐시 지연 수치를 약속하지 않고 생성 시각만 알린다', () => {
+    const head = render(empty, new Date('2026-09-27T03:00:00.000Z')).split('\n## ')[0];
+
+    expect(head).toContain('생성 시각 2026년 9월 27일');
+    expect(head).not.toMatch(/캐시|\d+분/);
   });
 
   it('같은 구장의 대회와 매치를 구장별 일정으로 묶는다', () => {
@@ -75,7 +119,7 @@ describe('renderLlmsFull', () => {
       teamMatchId: 'tm1', title: '친선 한 판', sportName: '풋살', startsAt: '2026-10-05T01:00:00.000Z',
       displayState: 'recruiting', place: { name: '잠실 코트' }, hostTeam: { name: '한강 로버스' }, league: null,
     } as unknown as V1TeamMatch;
-    const text = renderLlmsFull({ ...empty, tournaments: [tournament({})], matches: [match({})], teamMatches: [teamMatch] });
+    const text = render({ ...empty, tournaments: [tournament({})], matches: [match({})], teamMatches: [teamMatch] });
     const venueLine = text.split('\n').find((line) => line.startsWith('- **송파 풋살파크**'));
     expect(venueLine).toContain('/tournaments/t1');
     expect(venueLine).toContain('/matches/m1');
@@ -83,7 +127,7 @@ describe('renderLlmsFull', () => {
   });
 
   it('리그 거울 행은 대회 목록에서 빼고(리그 섹션이 정본), 준비 중 대회도 싣지 않는다', () => {
-    const text = renderLlmsFull({
+    const text = render({
       ...empty,
       tournaments: [
         tournament({}),
@@ -98,7 +142,7 @@ describe('renderLlmsFull', () => {
 
   it('status 가 open 이어도 마감이 지났거나 정원이 찼으면 신청 받는 중이라고 적지 않는다', () => {
     const now = new Date('2026-09-27T00:00:00.000Z');
-    const text = renderLlmsFull({
+    const text = render({
       ...empty,
       tournaments: [
         tournament({ id: 'ok' }),
@@ -114,7 +158,7 @@ describe('renderLlmsFull', () => {
 
   it('61번째 항목도 원래 목록과 구장별 안내에서 조회할 수 있다', () => {
     const many = Array.from({ length: 61 }, (_, i) => match({ matchId: `m${i}`, title: `매치 ${i}`, place: { name: `구장 ${i}`, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }));
-    const text = renderLlmsFull({ ...empty, matches: many });
+    const text = render({ ...empty, matches: many });
     expect(text).toContain('/matches/m59)');
     expect(text).toContain('/matches/m60)');
     expect(text).toContain('- **구장 60**: [매치 60]');
@@ -127,7 +171,7 @@ describe('renderLlmsFull', () => {
       hostTeam: { name: '홈 팀' }, approvedOpponentTeam: { name: '원정 팀' },
       league: { leagueId: 'league-1', title: '여성부 리그' },
     } as unknown as V1TeamMatch;
-    const text = renderLlmsFull({ ...empty, teamMatches: [fixture] });
+    const text = render({ ...empty, teamMatches: [fixture] });
     expect(text).toContain('## 리그 경기 일정·결과');
     expect(text).toContain('https://teameet.co.kr/league-matches/league-1/fixtures/fixture-1');
     expect(text).toContain('경기 확정');
@@ -136,7 +180,7 @@ describe('renderLlmsFull', () => {
   });
 
   it('공개 대회 경기는 실제 진행 상태와 기존 상세 주소로 안내한다', () => {
-    const text = renderLlmsFull({ ...empty, tournamentFixtures: [{
+    const text = render({ ...empty, tournamentFixtures: [{
       tournamentId: 'cup-1', tournamentTitle: '풋살컵', sportName: '풋살',
       fixture: { id: 'game-1', homeTeamName: 'A팀', awayTeamName: 'B팀', liveStatus: 'ended', scheduledAt: '2026-10-01T01:00:00Z', venue: '송파 풋살파크' } as never,
     }] });

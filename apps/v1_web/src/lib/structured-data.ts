@@ -1,3 +1,5 @@
+import { OFFICIAL_SURFACES } from '@/lib/official-surfaces';
+import { maskContactNumbers } from '@/lib/public-text';
 import { absoluteSiteUrl, DEFAULT_SOCIAL_IMAGE, getSiteOrigin } from '@/lib/seo';
 import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { canStartTournamentRegistration } from '@/lib/tournament-registration-availability';
@@ -19,6 +21,8 @@ import type {
  *    판정한다. 여기 들어가는 필드는 전부 해당 화면이 실제로 렌더하는 값이다
  *    (대회 상세: 종목·일정·장소·참가비·참가 팀 / 팀 상세: 종목·지역·소개 /
  *    매치·팀매치: 종목·일정·구장·구 단위 지역·상태·팀 / 공지: 제목·날짜).
+ *    예외 하나: 자유 입력(매치·팀매치 제목, 팀 소개)에 든 연락처 번호는 `maskContactNumbers`
+ *    로 가려 싣는다 — 이 필드만 화면 값과 다를 수 있다.
  * 2. **엔티티는 전역에서 하나의 `@id`.** 페이지마다 Organization을 새로 선언하면
  *    검색엔진·LLM 안에서 같은 실체가 여러 개로 쪼개진다. 조직·사이트는 루트 레이아웃에서
  *    한 번만 선언하고, 개별 페이지는 `@id`로 참조만 한다.
@@ -26,9 +30,6 @@ import type {
 
 export const ORGANIZATION_NAME = 'Teameet';
 export const ORGANIZATION_ALTERNATE_NAME = '팀밋';
-
-/** 실제로 운영 중인 공식 표면만 넣는다 — 없는 계정을 적으면 엔티티 신뢰가 깨진다. */
-const OFFICIAL_SURFACES = ['https://www.instagram.com/teameet_official/'] as const;
 
 export function organizationId(): string {
   return `${getSiteOrigin()}/#organization`;
@@ -84,6 +85,7 @@ export function buildSiteIdentityLd({ contactEmail }: { readonly contactEmail: s
         '@id': websiteId(),
         url: absoluteSiteUrl('/'),
         name: ORGANIZATION_NAME,
+        alternateName: [ORGANIZATION_ALTERNATE_NAME],
         inLanguage: 'ko-KR',
         publisher: { '@id': organizationId() },
       },
@@ -107,13 +109,13 @@ function placeNode(tournament: V1TournamentDetail): JsonLdNode | null {
     '@type': 'Place',
     name: tournament.venue,
   };
+  // 매치·팀 장소와 같이 국가는 늘 싣고, 도로명은 등록된 값이 있을 때만 싣는다.
   const venueAddress = tournament.venueAddress?.trim();
-  if (venueAddress) {
-    place.address = {
-      '@type': 'PostalAddress',
-      streetAddress: venueAddress,
-    };
-  }
+  place.address = {
+    '@type': 'PostalAddress',
+    addressCountry: 'KR',
+    ...(venueAddress ? { streetAddress: venueAddress } : {}),
+  };
   // 좌표는 지오코딩에 성공한 대회만 갖는다(카카오 로컬 API 미설정/검색 실패 시 null).
   if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
     place.geo = {
@@ -159,8 +161,9 @@ export function buildSportsEventLd(
   const image = options.image ?? tournament.coverImageUrl;
   if (image) node.image = absoluteImageUrl(image);
 
-  const description = tournament.promoListSubtitle || tournament.prizeSummary;
-  if (description) node.description = description.replace(/\s+/g, ' ').trim();
+  // 상세 화면은 상금 문구만 그린다(홍보 부제는 홍보 캐러셀에만 뜬다).
+  const description = tournament.prizeSummary?.replace(/\s+/g, ' ').trim();
+  if (description) node.description = description;
 
   // 참가비는 화면(참가 안내)에 그대로 노출되는 값이다. 무료 대회도 price 0으로 명시해야
   // 답변엔진이 "참가비 얼마"라는 질문에 이 페이지를 근거로 쓸 수 있다.
@@ -214,6 +217,11 @@ function matchPlaceNode(match: V1Match | V1TeamMatch): JsonLdNode | null {
   return place;
 }
 
+/** 줄바꿈·연속 공백을 한 칸으로 줄인 뒤 번호를 가린다 — 줄바꿈으로 끊어 쓴 번호도 마스킹이 잡도록. */
+function maskedSingleLine(value: string | null | undefined): string {
+  return maskContactNumbers(value?.replace(/\s+/g, ' ').trim());
+}
+
 /**
  * 호스트·참가자 이름과 설명·규칙·비용 메모는 싣지 않는다. 전부 사용자가 직접 적는 자유
  * 입력이라 실명·연락처가 섞일 수 있고, 개인 호스트는 공개 프로필(`/users/*`)도 색인 밖이다.
@@ -225,7 +233,7 @@ function buildMatchEventBase(match: V1Match | V1TeamMatch, path: string): JsonLd
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     '@id': `${url}#event`,
-    name: match.title,
+    name: maskedSingleLine(match.title),
     url,
     sport: match.sport?.name ?? match.sportName,
     startDate: match.startsAt,
@@ -360,7 +368,7 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
       address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: regionName },
     };
   }
-  const description = team.profile?.introduction?.replace(/\s+/g, ' ').trim();
+  const description = maskedSingleLine(team.profile?.introduction);
   // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
   if (description) node.description = description;
   const logoUrl = resolveTeamLogoUrl({ teamId: id, logoUrl: team.profile?.logoUrl });

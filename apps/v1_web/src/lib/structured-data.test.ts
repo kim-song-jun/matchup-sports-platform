@@ -71,8 +71,11 @@ describe('buildSportsEventLd', () => {
       .toMatchObject({ availability: 'https://schema.org/SoldOut' });
   });
 
-  it('구장 이름을 우편 주소로 지어내지 않는다', () => {
-    expect(buildSportsEventLd(tournament())?.location).not.toHaveProperty('address');
+  it('장소 이름만 있는 대회도 매치·팀과 같은 모양으로 국가가 든 address 를 싣고, 구장 이름을 도로명으로 지어내지 않는다', () => {
+    const location = buildSportsEventLd(tournament())?.location as Record<string, unknown>;
+
+    expect(location.name).toBe('서울 강남 풋살파크');
+    expect(location.address).toEqual({ '@type': 'PostalAddress', addressCountry: 'KR' });
   });
 
   it('실제 등록된 대회 주소를 PostalAddress 로 제공한다', () => {
@@ -83,13 +86,17 @@ describe('buildSportsEventLd', () => {
       name: '서울 강남 풋살파크',
       address: {
         '@type': 'PostalAddress',
+        addressCountry: 'KR',
         streetAddress: '서울특별시 강남구 테헤란로 1',
       },
     });
   });
 
-  it.each([null, '', '   '])('등록 주소가 %j이면 PostalAddress 를 내보내지 않는다', (venueAddress) => {
-    expect(buildSportsEventLd(tournament({ venueAddress }))?.location).not.toHaveProperty('address');
+  it.each([null, '', '   '])('등록 주소가 %j이면 도로명 없이 국가만 든 PostalAddress 를 내보낸다', (venueAddress) => {
+    const location = buildSportsEventLd(tournament({ venueAddress }))?.location as { address: Record<string, unknown> };
+
+    expect(location.address).toEqual({ '@type': 'PostalAddress', addressCountry: 'KR' });
+    expect(location.address).not.toHaveProperty('streetAddress');
   });
 
   it('일정이 확정된 대회는 화면에 보이는 값 그대로 SportsEvent 를 만든다', () => {
@@ -154,6 +161,15 @@ describe('buildSportsEventLd', () => {
 
   it('장소 미정이면 location 을 붙이지 않는다', () => {
     expect(buildSportsEventLd(tournament({ venue: null }))).not.toHaveProperty('location');
+  });
+
+  it('description 은 상세 화면에 보이는 상금 문구만 쓰고, 홍보 캐러셀에만 뜨는 부제는 싣지 않는다', () => {
+    expect(buildSportsEventLd(tournament())?.description).toBe('우승 100만원');
+    expect(buildSportsEventLd(tournament({ prizeSummary: '  우승 \n 100만원 ' }))?.description).toBe('우승 100만원');
+  });
+
+  it.each([null, '', '   '])('상금 문구가 %j이면 홍보 부제가 있어도 description 키를 내지 않는다', (prizeSummary) => {
+    expect(buildSportsEventLd(tournament({ prizeSummary }))).not.toHaveProperty('description');
   });
 
   it('참가 팀 수를 참석 인원 필드에 넣지 않는다 — 값의 의미가 다르다', () => {
@@ -231,6 +247,17 @@ describe('buildSportsTeamLd', () => {
     const ld = buildSportsTeamLd({ ...base, regionName: undefined } as unknown as V1TeamDetail);
 
     expect(ld.location).toMatchObject({ name: '서울 송파구' });
+  });
+
+  it('소개에 적은 전화번호는 가리고, 번호가 없는 소개는 글자를 그대로 둔다', () => {
+    expect(buildSportsTeamLd(team({ introduction: '가입 문의는 010-1234-5678 로 주세요' })).description)
+      .toBe('가입 문의는 ***-****-**** 로 주세요');
+    expect(buildSportsTeamLd(team({ introduction: '매주 토요일 7시, 연락은 인스타 DM 으로' })).description)
+      .toBe('매주 토요일 7시, 연락은 인스타 DM 으로');
+  });
+
+  it('줄바꿈으로 갈라 적은 번호도 한 줄로 접은 뒤 가린다', () => {
+    expect(buildSportsTeamLd(team({ introduction: '문의 010 1234\n5678 환영' })).description).toBe('문의 ***-****-**** 환영');
   });
 
   it('공백만 있는 소개는 description 을 아예 넣지 않는다', () => {

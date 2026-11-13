@@ -48,7 +48,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
               막힌다) — 눌리지 않는 버튼을 "준비 중" 으로 두지 않는다. */}
           <div className="tm-auth-provider-group">
             <AppleLoginButton className="tm-btn tm-btn-lg tm-btn-block tm-auth-apple" />
-            {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+            {model.providers.map((provider) => <KakaoProviderButton key={provider.label} provider={provider} />)}
             {model.preparingProviderNames.length > 0 ? (
               <p className="tm-text-caption tm-auth-provider-note">
                 {model.preparingProviderNames.join('·')} 로그인은 준비 중이에요
@@ -275,7 +275,7 @@ function AuthActionButton({ action }: { action: AuthAction }) {
   return action.href && !action.disabled ? <Link className={className} href={action.href}>{action.label}</Link> : <button className={className} type="button" disabled={action.disabled}>{action.label}</button>;
 }
 
-function ProviderButton({ provider }: { provider: LoginProvider }) {
+function KakaoProviderButton({ provider }: { provider: LoginProvider }) {
   // 브랜드 색·심볼·문구 색은 .tm-auth-kakao 가 맡는다 — 비활성(로그인 설정이 없는 빌드)도 같은 클래스의 :disabled 규칙이다.
   const className = 'tm-btn tm-btn-lg tm-btn-block tm-auth-kakao tm-pressable';
 

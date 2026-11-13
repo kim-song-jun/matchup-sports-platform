@@ -10,6 +10,8 @@ import {
   findPrivilegedAwsInScript,
   findUnwiredComposeVariables,
   findUnreadRuntimeEnvVariables,
+  findApprovedOnlySecretProblems,
+  composeServiceDeclares,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
@@ -467,4 +469,87 @@ test('실제 deploy.yml 의 build-images 는 이 경계를 지킨다', () => {
   const real = normalizeWorkflowSource(readFileSync('.github/workflows/deploy.yml', 'utf8'));
   assert.deepEqual(findProdRoleWithoutApproval(real), []);
   assert.deepEqual(findPrivilegedAwsWithoutApproval(real), []);
+});
+
+// 승인 전 build-images 는 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다. 앱 전체의
+// 회원 연결을 끊고 조회할 수 있는 카카오 관리자 키는 승인된 deploy job 의 Sync runtime env 로만 간다.
+const twoJobs = ({ buildStep = 'echo build', deployEnv = '          SECRET_KAKAO_ADMIN_KEY: ${{ secrets.KAKAO_ADMIN_KEY }}' } = {}) => `
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: ${buildStep}
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Sync runtime env
+        env:
+${deployEnv}
+        run: bash scripts/release/sync-prod-runtime-env.sh
+`;
+
+test('관리자 키를 승인된 deploy job 에서만 읽으면 통과한다', () => {
+  assert.deepEqual(findApprovedOnlySecretProblems(twoJobs()), []);
+});
+
+test('승인 전 job 이 관리자 키를 읽으면 형태와 무관하게 탐지한다', () => {
+  for (const step of [
+    'echo ${{ secrets.KAKAO_ADMIN_KEY }}',
+    'env KEY=${{ secrets.KAKAO_ADMIN_KEY}} ./build.sh',
+  ]) {
+    const problems = findApprovedOnlySecretProblems(twoJobs({ buildStep: step }));
+    assert.equal(problems.length, 1, `${step} 를 놓쳤습니다`);
+    assert.match(problems[0], /build-images/);
+  }
+});
+
+test('승인된 job 에 관리자 키 배선이 없으면 탐지한다', () => {
+  const problems = findApprovedOnlySecretProblems(twoJobs({ deployEnv: '          SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}' }));
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /SECRET_KAKAO_ADMIN_KEY/);
+});
+
+test('주석 속 언급과 이름이 비슷한 secret 은 오탐하지 않는다', () => {
+  const wf = twoJobs({ buildStep: 'echo ok  # secrets.KAKAO_ADMIN_KEY 는 deploy job 에서만 읽는다' })
+    .replace('      - name: Build\n', '      # secrets.KAKAO_ADMIN_KEY 는 여기서 읽지 않는다\n      - name: Build\n')
+    .replace('        run: echo ok', '        env:\n          OTHER: ${{ secrets.ALPHA_KAKAO_ADMIN_KEY }}\n        run: echo ok');
+  assert.deepEqual(findApprovedOnlySecretProblems(wf), []);
+});
+
+test('실제 deploy.yml 은 관리자 키를 승인된 job 에만 넘긴다', () => {
+  const real = normalizeWorkflowSource(readFileSync('.github/workflows/deploy.yml', 'utf8'));
+  assert.deepEqual(findApprovedOnlySecretProblems(real), []);
+});
+
+// 동기화가 .env 에 값을 써도 compose 가 컨테이너로 넘기지 않으면 키는 조용히 비어 있다.
+const composeWith = (apiLines, workerLines = '') => `services:
+  v1_api:
+    environment:
+${apiLines}
+    healthcheck:
+      test: ["CMD", "true"]
+
+  v1_game_operations_worker:
+    environment:
+${workerLines || '      NODE_ENV: production'}
+`;
+
+test('compose 서비스가 변수를 컨테이너로 넘기는 줄을 찾는다', () => {
+  assert.equal(composeServiceDeclares(composeWith('      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}'), 'v1_api', 'KAKAO_ADMIN_KEY'), true);
+});
+
+test('다른 서비스에만 있거나 주석·미선언이면 넘기는 것으로 치지 않는다', () => {
+  const onlyWorker = composeWith('      KAKAO_APP_ID: ${KAKAO_APP_ID:-}', '      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}');
+  assert.equal(composeServiceDeclares(onlyWorker, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+  const commented = composeWith('      # KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}');
+  assert.equal(composeServiceDeclares(commented, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+  const missing = composeWith('      KAKAO_APP_ID: ${KAKAO_APP_ID:-}');
+  assert.equal(composeServiceDeclares(missing, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+});
+
+test('실제 prod compose 는 API 서비스로 관리자 키를 넘긴다', () => {
+  const compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  assert.equal(composeServiceDeclares(compose, 'v1_api', 'KAKAO_ADMIN_KEY'), true);
 });

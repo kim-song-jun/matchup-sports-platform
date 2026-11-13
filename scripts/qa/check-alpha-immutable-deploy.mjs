@@ -19,6 +19,7 @@ const expectedRuntimeParameterNames = [
   'GABIA_API_KEY',
   'GABIA_SENDER_NUMBER',
   'GABIA_SMS_ID',
+  'KAKAO_ADMIN_KEY',
   'KAKAO_APP_ID',
   'KAKAO_CLIENT_ID',
   'KAKAO_CLIENT_SECRET',
@@ -91,6 +92,7 @@ requirePatterns(workflowPath, [
   [/SECRET_KAKAO_CLIENT_ID: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_ID \}\}/, 'API must use the same alpha Kakao app as the web'],
   [/SECRET_KAKAO_CLIENT_SECRET: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_SECRET \}\}/, 'API secret must be isolated from production'],
   [/SECRET_KAKAO_APP_ID: \$\{\{ secrets\.ALPHA_KAKAO_APP_ID \}\}/, 'native token audience must use the alpha app ID'],
+  [/SECRET_KAKAO_ADMIN_KEY: \$\{\{ secrets\.ALPHA_KAKAO_ADMIN_KEY \}\}/, 'Kakao admin key must reach the sync step from the alpha-only secret'],
   [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
   [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (push runs of the exact release SHA only)'],
 ]);
@@ -111,6 +113,7 @@ forbidPatterns(firebaseRuntimeSyncPath, [
 ]);
 
 forbidPatterns(workflowPath, [
+  [/for name in [^\n]*SECRET_KAKAO_ADMIN_KEY/, 'Kakao admin key must stay optional; a required check fails every alpha deploy until the secret exists'],
   [/imageTag=latest/, 'must not deploy a mutable latest tag'],
   [/uses:\s*[^\n]+@v[0-9]/, 'privileged actions must be pinned to full commits'],
 ]);
@@ -262,8 +265,9 @@ function validateSyncScriptParameterParity(targetErrors) {
     if (!/^sync-alpha-.+-env\.sh$/.test(file) || syncScriptsOutsideIam.has(file)) continue;
     const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
     const written = new Set();
-    const namesArray = source.match(/^names=\(([^)]*)\)/m);
-    if (namesArray) namesArray[1].trim().split(/\s+/).forEach((name) => written.add(name));
+    for (const namesArray of source.matchAll(/^\s*names\+?=\(([^)]*)\)/gm)) {
+      namesArray[1].trim().split(/\s+/).filter(Boolean).forEach((name) => written.add(name));
+    }
     const literal = source.match(/parameter_name='\/teameet\/alpha\/env\/([A-Z0-9_]+)'/);
     if (literal) written.add(literal[1]);
     if (written.size === 0) {
@@ -279,10 +283,14 @@ function validateSyncScriptParameterParity(targetErrors) {
 
 // Runs the Kakao sync against a stubbed aws/jq: well-formed secrets must reach put-parameter, malformed
 // ones must leave AWS untouched. A guard that rejects everything still exits 0, so only this catches it.
+// The jq stub keeps the script that would run on the host, so the names the runner writes and the names
+// the host reads can be compared; a name present in only one of the two loops fails the real deploy.
 function validateKakaoSyncBehaviour(targetErrors) {
   const script = resolve(sourceRoot, 'scripts/release/sync-alpha-kakao-env.sh');
   const stubDir = mkdtempSync(join(tmpdir(), 'kakao-sync-stub-'));
   const callLog = join(stubDir, 'aws-calls.log');
+  const remoteFile = join(stubDir, 'remote-script.sh');
+  const label = 'scripts/release/sync-alpha-kakao-env.sh';
   try {
     writeFileSync(join(stubDir, 'aws'), [
       '#!/usr/bin/env bash',
@@ -290,9 +298,18 @@ function validateKakaoSyncBehaviour(targetErrors) {
       'case "$2" in send-command) echo cmd-0;; get-command-invocation) echo Success;; esac',
       '',
     ].join('\n'));
-    writeFileSync(join(stubDir, 'jq'), '#!/usr/bin/env bash\necho "{}"\n');
+    writeFileSync(join(stubDir, 'jq'), [
+      '#!/usr/bin/env bash',
+      'while [[ $# -gt 0 ]]; do',
+      `  if [[ "$1" == --arg && "$2" == script ]]; then printf '%s' "$3" > '${remoteFile}'; fi`,
+      '  shift',
+      'done',
+      'echo "{}"',
+      '',
+    ].join('\n'));
     chmodSync(join(stubDir, 'aws'), 0o755);
     chmodSync(join(stubDir, 'jq'), 0o755);
+    const adminKey = 'fedcba9876543210fedcba9876543210';
     const valid = {
       INSTANCE_ID: 'i-0123456789abcdef0',
       AWS_REGION: 'ap-northeast-2',
@@ -300,33 +317,65 @@ function validateKakaoSyncBehaviour(targetErrors) {
       SECRET_KAKAO_CLIENT_SECRET: 'AbCdEf0123456789AbCdEf0123456789',
       SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://alpha.teameet.co.kr/callback/kakao',
       SECRET_KAKAO_APP_ID: '1234567',
+      SECRET_KAKAO_ADMIN_KEY: '',
     };
     const run = (overrides) => {
       rmSync(callLog, { force: true });
+      rmSync(remoteFile, { force: true });
       const result = spawnSync('bash', [script], {
         encoding: 'utf8',
         env: { ...process.env, ...valid, ...overrides, PATH: `${stubDir}:${process.env.PATH}` },
       });
       let calls = '';
       try { calls = readFileSync(callLog, 'utf8'); } catch { calls = ''; }
+      let remote = '';
+      try { remote = readFileSync(remoteFile, 'utf8'); } catch { remote = ''; }
       const written = [...calls.matchAll(/put-parameter .*--name \/teameet\/alpha\/env\/([A-Z_]+)/g)].map((match) => match[1]);
-      return { result, calls, written };
+      const remoteNames = remote.match(/^for name in (.*); do$/m)?.[1].trim().split(/\s+/) ?? [];
+      const remoteSyntax = remote ? spawnSync('bash', ['-n'], { input: remote, encoding: 'utf8' }) : null;
+      return { result, calls, written, remote, remoteNames, remoteSyntax };
+    };
+    const sorted = (names) => [...names].sort().join(',');
+
+    const required = ['KAKAO_CLIENT_ID', 'KAKAO_CLIENT_SECRET', 'KAKAO_REDIRECT_URI', 'KAKAO_APP_ID'];
+    const checkRun = (description, outcome, expected, expectAdminInRemote) => {
+      if (outcome.result.status !== 0 || sorted(outcome.written) !== sorted(expected)) {
+        targetErrors.push(`${label}: ${description} must write exactly ${expected.join(', ')} (exit ${outcome.result.status}, wrote [${outcome.written.join(', ')}])`);
+        return;
+      }
+      if (sorted(outcome.remoteNames) !== sorted(expected)) {
+        targetErrors.push(`${label}: ${description}: the host must read exactly the names the runner wrote (host reads [${outcome.remoteNames.join(', ')}])`);
+      }
+      if (outcome.remoteSyntax?.status !== 0) {
+        targetErrors.push(`${label}: ${description}: the generated host script is not valid bash`);
+      }
+      if (/KAKAO_ADMIN_KEY/.test(outcome.remote) !== expectAdminInRemote) {
+        targetErrors.push(`${label}: ${description}: KAKAO_ADMIN_KEY must ${expectAdminInRemote ? '' : 'not '}appear in the host script`);
+      }
     };
 
-    const happy = run({});
-    const expected = ['KAKAO_CLIENT_ID', 'KAKAO_CLIENT_SECRET', 'KAKAO_REDIRECT_URI', 'KAKAO_APP_ID'];
-    if (happy.result.status !== 0 || expected.some((name) => !happy.written.includes(name))) {
-      targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: well-formed secrets did not write ${expected.join(', ')} (exit ${happy.result.status}, wrote [${happy.written.join(', ')}])`);
+    // Without the optional admin key the other four still sync and the admin key is absent everywhere.
+    checkRun('empty admin key', run({}), required, false);
+    checkRun('unset admin key', run({ SECRET_KAKAO_ADMIN_KEY: undefined }), required, false);
+    const withKey = run({ SECRET_KAKAO_ADMIN_KEY: adminKey });
+    checkRun('well-formed admin key', withKey, [...required, 'KAKAO_ADMIN_KEY'], true);
+    const sendCommandCalls = withKey.calls.split('\n').filter((line) => /ssm send-command/.test(line));
+    if (sendCommandCalls.some((line) => line.includes(adminKey)) || withKey.remote.includes(adminKey)) {
+      targetErrors.push(`${label}: the admin key value must reach the host through Parameter Store only, never the SSM command`);
     }
-    for (const [label, overrides] of [
+
+    for (const [rejectLabel, overrides] of [
       ['foreign redirect host', { SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://evil.example/callback/kakao' }],
       ['short client id', { SECRET_KAKAO_CLIENT_ID: 'abc' }],
       ['invalid native app id', { SECRET_KAKAO_APP_ID: 'not-an-app-id' }],
       ['missing native app id', { SECRET_KAKAO_APP_ID: '' }],
+      ['admin key with a space', { SECRET_KAKAO_ADMIN_KEY: 'fedcba9876543210 fedcba9876543210' }],
+      ['admin key with a quote', { SECRET_KAKAO_ADMIN_KEY: "fedcba9876543210fedcba98765'3210" }],
+      ['short admin key', { SECRET_KAKAO_ADMIN_KEY: 'abc' }],
     ]) {
       const rejected = run(overrides);
       if (rejected.result.status === 0 || rejected.calls !== '') {
-        targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: ${label} must fail and leave AWS untouched (exit ${rejected.result.status})`);
+        targetErrors.push(`${label}: ${rejectLabel} must fail and leave AWS untouched (exit ${rejected.result.status})`);
       }
     }
   } finally {
@@ -511,6 +560,14 @@ function verifyNegativeControls(renderedPolicies) {
   assertPolicyRejected('missing runtime Parameter name', renderedPolicies, (policies) => {
     runtimeStatement(policies.instance).Resource.pop();
   });
+  for (const [role, label] of [['github', 'GitHub deploy role'], ['instance', 'Alpha EC2 role']]) {
+    assertPolicyRejected(`${label} without KAKAO_ADMIN_KEY`, renderedPolicies, (policies) => {
+      const resource = runtimeStatement(policies[role]).Resource;
+      const index = resource.findIndex((arn) => arn.endsWith('/KAKAO_ADMIN_KEY'));
+      if (index < 0) throw new Error(`${label} policy has no KAKAO_ADMIN_KEY ARN to remove`);
+      resource.splice(index, 1);
+    });
+  }
 
   errors.length = 0;
   validateRuntimeSecretTransport(

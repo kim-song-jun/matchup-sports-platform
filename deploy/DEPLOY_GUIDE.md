@@ -70,6 +70,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `KAKAO_CLIENT_ID` | Kakao OAuth client id, 선택 |
 | `KAKAO_CLIENT_SECRET` | Kakao OAuth client secret, 선택 |
 | `KAKAO_APP_ID` | 카카오 콘솔 "앱 ID"(숫자), 선택. 네이티브 앱 토큰 로그인(`POST /auth/kakao/token`)이 `access_token_info.app_id`와 대조한다. 비면 그 엔드포인트는 400 `OAUTH_NOT_CONFIGURED` |
+| `KAKAO_ADMIN_KEY` | 카카오 콘솔 "대표 어드민 키", 선택. 연결 해제 요청과 카카오가 보내는 연결 해제 웹훅의 인증에 쓴다. 비면 둘 다 꺼진다. **production 환경 secret 으로 넣는 것을 권한다** — 아래 "카카오 관리자 키" |
 | `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
 | `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |
 | `GA_PROD` | production GA4 Measurement ID, 선택 |
@@ -79,6 +80,14 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `VAPID_SUBJECT` | Web Push VAPID subject (`mailto:` 또는 `https:` URI), 선택 |
 | `V1_PUSH_ENVIRONMENT` | Android 기기 격리 값. Alpha=`alpha`, production=`production` |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Android FCM 서버 자격증명. 세 값 전체가 없으면 disabled, 일부만 있으면 fail-fast. `docs/ops/android-fcm-setup.md` 참조 |
+
+**카카오 관리자 키** (`KAKAO_ADMIN_KEY`, alpha 는 `ALPHA_KAKAO_ADMIN_KEY`)
+
+- **어느 키를**: 카카오 콘솔 앱 키의 "대표 어드민 키". 운영에는 운영 앱의 키, alpha 에는 테스트 앱의 키다. 앱마다 회원번호 체계가 달라 바꿔 넣으면 호출이 실패하거나 다른 앱의 회원을 가리킨다.
+- **어디에**: 운영은 GitHub **production 환경 secret** `KAKAO_ADMIN_KEY` 를 권한다. 환경 secret 은 승인된 `deploy` job 만 읽고 승인 전 `build-images` job 은 읽지 못한다(`pnpm qa:production-deploy-security` 가 `build-images` 의 참조를 막는다). 저장소 secret 으로 넣으면 `build-images` 도 읽을 수 있다. 값이 비어 있으면 동기화가 이 이름만 건너뛰어 서버의 기존 값을 지우지 않는다.
+- **어떤 권한으로**: 어드민 키는 앱 오너만 볼 수 있다. 이 키로는 연결 해제 말고도 사용자 정보·목록 조회와 동의 철회까지 부를 수 있으므로, 카카오 문서가 권하는 대로 콘솔의 "사용 가능 API"를 연결 해제로 좁히고 "호출 허용 IP 주소"에 서버가 나가는 주소를 등록한다. 대표 키에 그대로 걸 수 있는지는 콘솔에서 확인한다. 허용 IP 를 걸면 서버 주소가 바뀔 때 호출이 막힌다.
+- **바꿀 때**: 콘솔에서 대표 키를 바꾸면 서버 값을 맞출 때까지 연결 해제 웹훅이 401 로 거절되고, 그 사이 거절된 알림은 다시 오지 않는다. 키를 바꾼 직후 같은 값으로 secret 을 고치고 배포한다.
+- **컨테이너**: `v1_api` 에만 전달한다. 연결 해제 호출과 웹훅 수신이 모두 API 프로세스에서 돌아 game-operations worker 에는 주지 않는다.
 
 GitHub Actions의 OAuth·관리자·GA 값은 SSM 명령 문자열(CloudTrail·명령 이력에 남는다)에 싣지 않고 Parameter Store(SecureString)를 거쳐서만 전달한다. EC2는 자기 IAM role로 복호화해 `.env`를 재구성한다.
 
@@ -155,12 +164,13 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 | `V1_INTERNAL_API_ORIGIN` | Next.js server-side API origin; 기본값 `http://v1_api:8121` |
 | `DEPLOY_SYNC_V1_SEED_DATA` | 검토된 v1 seed sync opt-in; 기본 비활성 |
 | `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_APP_ID` | Kakao OAuth |
+| `KAKAO_ADMIN_KEY` | 카카오 연결 해제 호출·웹훅 인증(선택, 비면 꺼진다). 4절 "카카오 관리자 키" 참조 |
 | `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET` | 결제 연동 |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (`WebPushService`); 셋 중 하나라도 비어 있으면 graceful disable. 생성·회전 절차는 `docs/ops/vapid-setup.md` 참조 |
 
 `v1_web`의 브라우저 API URL은 이미지 빌드 시 `/api/v1`로 고정한다. 배포 환경에 별도 Web base path를 설정하지 않는다.
 
-`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`는 **production(`deploy.yml`)에서만** GitHub Actions secret → `deploy/.env` 동기화 대상이다(4절 표, `sync_env_from_github_secret` 패턴). **Alpha(`deploy-alpha.yml` / `deploy/deploy-alpha.sh`)에는 의도적으로 배선하지 않는다** — alpha의 `deploy/.env`는 operator-managed 파일이고, CI는 `scripts/release/sync-alpha-*-env.sh`가 맡은 키(문의 Slack·APNs·카카오 로그인 `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`/`KAKAO_REDIRECT_URI`/`KAKAO_APP_ID`)만 SSM을 거쳐 고쳐 쓴다. `GA_ALPHA`가 따로인 이유는 Web 빌드 시점에 `NEXT_PUBLIC_GA_MEASUREMENT_ID` build-arg로 번들에 굽기 위해 SSM 파라미터로 직접 전달되는 것일 뿐 `deploy/.env`에 쓰이지 않기 때문이다. VAPID는 build-arg가 아니라 `v1_api` 컨테이너 런타임 secret이므로 이 경로를 재사용할 수 없다. Alpha에서 Web Push를 켜려면 운영자가 alpha EC2의 `~/teameet/deploy/.env`에 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`를 직접 추가한다(미설정 시 `WebPushService`가 graceful disable되므로 배포 자체는 안전).
+`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`는 **production(`deploy.yml`)에서만** GitHub Actions secret → `deploy/.env` 동기화 대상이다(4절 표, `sync_env_from_github_secret` 패턴). **Alpha(`deploy-alpha.yml` / `deploy/deploy-alpha.sh`)에는 의도적으로 배선하지 않는다** — alpha의 `deploy/.env`는 operator-managed 파일이고, CI는 `scripts/release/sync-alpha-*-env.sh`가 맡은 키(문의 Slack·APNs·카카오 로그인 `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`/`KAKAO_REDIRECT_URI`/`KAKAO_APP_ID`, 선택으로 `KAKAO_ADMIN_KEY`)만 SSM을 거쳐 고쳐 쓴다. `GA_ALPHA`가 따로인 이유는 Web 빌드 시점에 `NEXT_PUBLIC_GA_MEASUREMENT_ID` build-arg로 번들에 굽기 위해 SSM 파라미터로 직접 전달되는 것일 뿐 `deploy/.env`에 쓰이지 않기 때문이다. VAPID는 build-arg가 아니라 `v1_api` 컨테이너 런타임 secret이므로 이 경로를 재사용할 수 없다. Alpha에서 Web Push를 켜려면 운영자가 alpha EC2의 `~/teameet/deploy/.env`에 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`를 직접 추가한다(미설정 시 `WebPushService`가 graceful disable되므로 배포 자체는 안전).
 
 ## 6. 컨테이너 구성
 

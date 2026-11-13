@@ -1,6 +1,8 @@
-# Task 20261133: 현재 alpha와 main 비교 및 1.18.0 승격 준비
+# Task 20261133: 운영 승격 준비 — 1.18.0 이력 및 #2353 포함 1.19.0 후보
 
 Status: Review
+
+**현행 범위 (2026-11-13 사용자 추가 승인)**: 기존 4개 기능에 #2353을 포함하고 main 성별 핫픽스 #2355를 보존한다. 현행 보고서: `docs/ops/release-readiness-1.19.0-2026-11-13.md`, 잠금: `docs/ops/release-1.19.0-scope-lock.json`. 아래 1.18.0 기록은 당시의 고정 후보 이력이며 현행 범위는 이 추가 승인 절을 따른다.
 Owner: Codex
 Created: 2026-11-13
 
@@ -61,3 +63,32 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 - `release/prepare-1.18.0`에 후속 dev merge/rebase/cherry-pick 금지. 허용 차이는 scope-lock JSON의 release metadata/docs 경로뿐이며 package.json은 version 외 변경 불가.
 - 새 Changeset이 생겼다는 이유로 이번 릴리스에 재소비하지 않는다. dev가 범위 밖으로 전진하면 최신 dev→main 승격을 중단하고 고정 후보 검증/사용자 승격 경로를 분리해 준비한다.
 - Owned에 `docs/ops/release-1.18.0-scope-lock.json` 추가. 범위 고정은 기존 QA/리뷰 게이트 면제가 아니며 main은 변경하지 않는다.
+
+## #2353 추가 승인 — 1.19.0 승격 준비
+
+사용자: “추가된 2353내용 포함해서 준비해줘”. 기존 4개 기능 + 정규 리그 시간 선택·경기 배정 #2353. main 성별 핫픽스 #2355(동등 dev #2354)는 보존한다. 기존 release/prepare-1.18.0 브랜치는 수정하지 않고 새 후보를 만든다.
+
+### Scope / Ownership
+- Source snapshot: `a5496263242ab72a51e1ca420b85bf6a8b351ed6`.
+- Main baseline: `0a4a1b268f5c6612da6fd51fdeffc2e6d5179a1c`.
+- Owned: 새 scope-lock의 metadata/docs 10개 경로. 앱 package는 version만 변경.
+- Forbidden: 기능 코드·Prisma·migration·dependency·배포/workflow 수정, 후속 dev 변경 혼합, main PR/머지·운영 승인·DB 작업. #2355 한정 main 예외를 이번 승격에 재사용하지 않는다.
+
+### Acceptance / Test Evidence
+- [x] main→준비 브랜치 merge로 성별 핫픽스 이력 흡수; 충돌은 버전·CHANGELOG·기존 task 기록만, 런타임 차이 0.
+- [x] 공식 prepare-only PASS (실제 Alpha가 source snapshot과 일치).
+- [x] API/Web 1.19.0, 미소비 Changeset 2개 소비, 양쪽 CHANGELOG 및 main 1.17.1 변경 이력 보존.
+- [x] main 릴리스 게이트 PASS, versioning 계약 24/24 PASS.
+- [x] 준비 트리의 런타임/API/DB/배포 코드는 source snapshot과 동일.
+- [ ] dev 대상 준비 PR 게시 및 최신 CI 상태 기록.
+- [ ] 준비 PR 머지 후 새로운 dev/Alpha SHA 재확인 (현재 요청은 준비).
+- [ ] 기존 #2347/#2350/#2348의 미완료 로그인 QA를 승격 전에 보완.
+
+### Ambiguity / Risks
+- #2353 최신 PR 본문은 CI·Alpha·headed 3폭 QA 완료를 기록한다. 소스에 남은 이전 “미배포” 기록을 현행 blocker로 오인하지 않는다.
+- #2354 Changeset도 dev 릴리스에서 소비하지만 main에 이미 반영된 성별 수정이며 새 운영 기능으로 세지 않는다.
+- no-changeset patch 계약상 manifest 1.19.0의 다음 배포 표시 예상은 1.19.1이다. 실제 승인 시 resolver와 serving SHA 재확인.
+- main 핫픽스 머지는 완료됐지만 준비 시작 시 운영 공개 헤더는 이전 SHA였다. main 저장소와 실배포를 동일시하지 않는다.
+
+### Progress Snapshot (current)
+Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-20261113`. Main absorption merge `120490f26`. Metadata/docs 작성 및 계약 검증 완료; dev 준비 PR 게시 단계. 기존 root shared WIP 미변경.

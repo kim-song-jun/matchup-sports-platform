@@ -217,6 +217,11 @@ function matchPlaceNode(match: V1Match | V1TeamMatch): JsonLdNode | null {
   return place;
 }
 
+/** 줄바꿈·연속 공백을 한 칸으로 줄인 뒤 번호를 가린다 — 줄바꿈으로 끊어 쓴 번호도 마스킹이 잡도록. */
+function maskedSingleLine(value: string | null | undefined): string {
+  return maskContactNumbers(value?.replace(/\s+/g, ' ').trim());
+}
+
 /**
  * 호스트·참가자 이름과 설명·규칙·비용 메모는 싣지 않는다. 전부 사용자가 직접 적는 자유
  * 입력이라 실명·연락처가 섞일 수 있고, 개인 호스트는 공개 프로필(`/users/*`)도 색인 밖이다.
@@ -228,7 +233,7 @@ function buildMatchEventBase(match: V1Match | V1TeamMatch, path: string): JsonLd
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     '@id': `${url}#event`,
-    name: maskContactNumbers(match.title),
+    name: maskedSingleLine(match.title),
     url,
     sport: match.sport?.name ?? match.sportName,
     startDate: match.startsAt,
@@ -363,7 +368,7 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
       address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: regionName },
     };
   }
-  const description = maskContactNumbers(team.profile?.introduction?.replace(/\s+/g, ' ').trim());
+  const description = maskedSingleLine(team.profile?.introduction);
   // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
   if (description) node.description = description;
   const logoUrl = resolveTeamLogoUrl({ teamId: id, logoUrl: team.profile?.logoUrl });

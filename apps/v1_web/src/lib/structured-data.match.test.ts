@@ -113,6 +113,11 @@ describe('buildMatchEventLd', () => {
     expect(buildMatchEventLd(match({ title: '토요일 6:30 풋살 5vs5' }), 'match-1')?.name).toBe('토요일 6:30 풋살 5vs5');
   });
 
+  it('줄바꿈으로 끊어 적은 전화번호도 이벤트 이름에서 가린다', () => {
+    expect(buildMatchEventLd(match({ title: '토요일 풋살 문의 010\n1234\n5678' }), 'match-1')?.name)
+      .toBe('토요일 풋살 문의 ***-****-****');
+  });
+
   it('지역을 모르면 구장 이름만 싣고, 지역 미정 문구를 주소로 만들지 않는다', () => {
     const ld = buildMatchEventLd(match({ region: null, regionName: null }), 'match-1');
 

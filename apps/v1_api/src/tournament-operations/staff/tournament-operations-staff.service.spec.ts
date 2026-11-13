@@ -203,6 +203,7 @@ type FakeTeamMatchRow = {
     fixtureNumber: number;
     legNumber: number;
     group?: { name: string } | null;
+    displayTitle?: string | null;
   } | null;
 };
 
@@ -482,6 +483,33 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
     expect(result.items[0]?.fixtures.map(({ fixtureId, groupName }) => ({ fixtureId, groupName }))).toEqual([
       { fixtureId: 'fx-group', groupName: 'A조' },
       { fixtureId: 'fx-final', groupName: null },
+    ]);
+  });
+
+  it('담당 경기에 운영자가 정한 경기 제목을 싣는다 — 정하지 않은 경기는 null', async () => {
+    const fixture = (id: string, startAt: string, displayTitle: string | null): FakeTeamMatchRow => ({
+      id,
+      tournamentId,
+      title: '담당 경기',
+      startAt: new Date(startAt),
+      status: 'matched',
+      fieldId: null,
+      field: null,
+      deletedAt: null,
+      game: { id: `game-${id}`, state: 'SCHEDULED', sourceType: 'TEAM_MATCH', sides: [] },
+      tournamentDetails: { tournamentId, round: 'league_r5', fixtureNumber: 1, legNumber: 1, group: { name: 'A조' }, displayTitle },
+    });
+    const { service } = buildMyAssignmentsHarness(
+      [assignmentRow({ fixtureScopes: [{ teamMatchId: 'fx-titled' }, { teamMatchId: 'fx-plain' }] })],
+      null,
+      [fixture('fx-titled', '2026-10-03T10:00:00.000Z', '풀리그 1라운드'), fixture('fx-plain', '2026-10-04T10:00:00.000Z', null)],
+    );
+
+    const result = await service.myAssignments(targetUserId);
+
+    expect(result.items[0]?.fixtures.map(({ fixtureId, displayTitle }) => ({ fixtureId, displayTitle }))).toEqual([
+      { fixtureId: 'fx-titled', displayTitle: '풀리그 1라운드' },
+      { fixtureId: 'fx-plain', displayTitle: null },
     ]);
   });
 

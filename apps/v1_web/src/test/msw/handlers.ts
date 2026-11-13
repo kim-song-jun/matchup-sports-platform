@@ -759,6 +759,7 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     fixtureNumber: 1,
     legNumber: 1,
     groupName: null,
+    displayTitle: null,
     gameId: 'game-1',
     gameState: 'SCHEDULED',
     fieldId: 'field-1',

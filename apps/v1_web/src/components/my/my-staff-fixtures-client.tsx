@@ -8,7 +8,7 @@ import { GameStateBadge, PublicFixtureStateBadge, staffRoleLabel } from '@/compo
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 import type { V1GameState, V1MyTournamentStaffAssignment, V1MyTournamentStaffFixture } from '@/types/api';
 
 const STAFF_GAME_STATE_BY_STATUS: Readonly<Record<string, V1GameState>> = {
@@ -168,7 +168,7 @@ function StaffFixtureRow({
   tournamentId: string;
   fixture: V1MyTournamentStaffFixture;
 }) {
-  const matchName = fixture.round === null ? fixture.title : competitionMatchLabel({ groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
+  const matchName = fixture.round === null ? fixture.title : competitionFixtureName({ displayTitle: fixture.displayTitle, groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
   // 서버가 붙이는 `title` 은 "대회 · 조 · 라운드" 순번이라 어느 경기인지 알려 주지 못한다.
   const teamTitle = fixture.homeTeamName && fixture.awayTeamName ? `${fixture.homeTeamName} vs ${fixture.awayTeamName}` : fixture.title;
   const meta = [matchName, fixture.fixtureNumber === null ? null : `${fixture.fixtureNumber}번 경기`, formatTournamentDateTimeShort(fixture.scheduledAt) ?? '일정 미정'].filter(Boolean).join(' · ');

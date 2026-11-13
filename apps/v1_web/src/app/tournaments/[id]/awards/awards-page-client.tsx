@@ -406,7 +406,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
             <Star size={28} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.4} />
           </div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-            MVP · 득점왕 등 개인 어워드는<br />집계 중이에요.
+            MVP · 득점왕 등 개인 어워드는<br />아직 발표되지 않았어요.
           </p>
         </Card>
       </section>

@@ -13,19 +13,42 @@ import { leagueStateChip } from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { competitionRanks } from '@/lib/competition-ranks';
 // tournaments/[id]/awards/awards-page-client.tsx 의 구조(포디움 히어로 → 개인 어워드 →
 // 하단 네비)와 카피 관례("○○, 우승을 축하드려요! 🎉")를 그대로 따른다 — 그 파일은 읽기만
-// 하고 수정하지 않는다(그룹 C 배정 범위 밖). PromotionBadge/competitionRanks는 순위표
-// 화면(league-match-standings-client.tsx, 같은 그룹 C 배정)이 이미 검증된 형태로 갖고
-// 있어 새로 만들지 않고 그대로 가져다 쓴다 — 같은 정보가 두 화면에서 다르게 그려지면
-// 같은 제품으로 보이지 않는다.
-import { PromotionBadge, competitionRanks } from '../league-match-standings-client';
+// 하고 수정하지 않는다(그룹 C 배정 범위 밖).
 import type {
   V1LeagueChampionTeam,
   V1LeaguePlayerRecordRow,
   V1LeagueStandingRow,
 } from '@/types/league-match';
 import { playerRecordEmptySub, playerRecordEmptyTitle } from '@/lib/player-record-empty-copy';
+
+/**
+ * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
+ * 기호(↑/↓/–/×)와 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
+ * 네 종류를 모두 담은 전수 Record라 `stayed`도 '잔류'로 표시된다.
+ */
+const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', { label: string; glyph: string; className: string }> = {
+  promoted: { label: '승격', glyph: '↑', className: 'text-blue-700 dark:text-blue-300' },
+  relegated: { label: '강등', glyph: '↓', className: 'text-red-700 dark:text-red-300' },
+  stayed: { label: '잔류', glyph: '–', className: 'text-[var(--text-muted)]' },
+  withdrawn: { label: '불참', glyph: '×', className: 'text-amber-700 dark:text-amber-300' },
+};
+
+/** 승격/강등/잔류/불참 뱃지 — 아이콘+텍스트를 함께 실어 컬러만으로 뜻을 전달하지 않는다. */
+function PromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn'; toTierLabel: string | null }) {
+  const meta = PROMOTION_META[kind];
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${meta.className}`}>
+      <span aria-hidden="true">{meta.glyph}</span>
+      {meta.label}
+      {(kind === 'promoted' || kind === 'relegated') && toTierLabel !== null && (
+        <span className="font-normal text-[var(--text-muted)]">({toTierLabel})</span>
+      )}
+    </span>
+  );
+}
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
 function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' | 'on_hold' }) {
@@ -97,10 +120,9 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
 }
 
 /**
- * 최종 순위 + 승강 결과. 순위표 화면(league-match-standings-client.tsx)의 표를 그대로
- * 옮기지 않는다 — 이 화면은 시즌의 "결론"을 보여주는 요약이지 전적(승-무-패) 통계
- * 화면이 아니다. 그래서 순위/팀/승점/승강만 남긴 압축 리스트를 쓴다(전체 전적은 순위표
- * 화면에서 이미 볼 수 있다). 우승팀은 트로피 아이콘으로 다시 한번 표시해, 위 히어로와
+ * 최종 순위 + 승강 결과. 이 화면은 시즌의 "결론"을 보여주는 요약이지 전적(승-무-패)
+ * 통계 화면이 아니다. 그래서 순위/팀/승점/승강만 남긴 압축 리스트를 쓴다(전체 전적은
+ * 리그 상세의 순위표에서 볼 수 있다). 우승팀은 트로피 아이콘으로 다시 한번 표시해, 위 히어로와
  * 이 리스트가 "같은 팀 이야기"임을 스크롤해도 계속 알 수 있게 한다.
  */
 function FinalStandingsSection({
@@ -159,10 +181,7 @@ function FinalStandingsSection({
           ))}
         </ul>
       </Card>
-      {/* 컬러만으로 정보를 전달하지 않는다는 프로젝트 규칙과 별개로, 뱃지 자체의 기호
-          범례는 순위표 화면에 이미 있다 — 이 화면은 최종 결과만 압축해 보여주는 요약이라
-          범례를 다시 싣지 않고 승강 뱃지 컴포넌트(PromotionBadge)가 이미 텍스트+기호를
-          함께 쓴다는 사실에 기댄다. */}
+      {/* 승강 뱃지(PromotionBadge)가 텍스트+기호를 함께 쓰므로 범례는 따로 싣지 않는다. */}
     </section>
   );
 }
@@ -246,7 +265,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
   const series = seriesQuery.data;
 
-  // 잘못된 leagueId 딥링크(404 등) — 순위표 화면과 동일한 처리(ErrorState + 재시도).
+  // 잘못된 leagueId 딥링크(404 등) — ErrorState + 재시도.
   if (seriesQuery.isError) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6">
@@ -310,7 +329,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <>
           {/*
             순위가 비는 이유가 두 가지이고 처방이 다르다 — 동의 게이팅으로 가려진 것인지,
-            아직 확정 결과가 없는 것인지. 순위표 화면과 **같은 문구**를 쓰도록 단일 소스
+            아직 확정 결과가 없는 것인지. 대회 기록 화면과 **같은 문구**를 쓰도록 단일 소스
             (playerRecordEmptySub)를 거친다.
           */}
           <LeaderboardSection

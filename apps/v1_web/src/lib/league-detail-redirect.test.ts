@@ -6,7 +6,7 @@ describe('historical league detail redirects', () => {
   it('redirects only detail roots to the canonical page', async () => {
     const redirects = await config.redirects!();
     expect(redirects).toEqual(expect.arrayContaining([
-      { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: false },
+      { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: true },
       { source: '/leagues/:id', destination: '/tournaments/:id', permanent: false },
     ]));
     expect(redirects.filter(r => r.source.startsWith('/league')).map(r => r.source)).toEqual(['/league-matches/:id', '/leagues/:id']);

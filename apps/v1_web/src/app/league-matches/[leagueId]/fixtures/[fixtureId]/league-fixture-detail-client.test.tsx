@@ -187,8 +187,7 @@ describe('LeagueFixtureDetailClient', () => {
   // 그렇게 됐다(CI red → alpha 배포 차단). 실패 시점이 픽스처를 쓴 날과 멀어서 원인이
   // 안 보였다 — 09:46 UTC 배포는 통과하고 10:05 배포만 실패했다.
   //
-  // Date 만 얼린다 — setTimeout 까지 얼리면 Testing Library 의 waitFor 가 진행하지 못한다
-  // (league-match-standings-client.test.tsx 의 같은 처방).
+  // Date 만 얼린다 — setTimeout 까지 얼리면 Testing Library 의 waitFor 가 진행하지 못한다.
   beforeAll(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-05T00:00:00.000Z')); // 1주차(9/1) 뒤 · 2주차(9/8) 앞
@@ -646,6 +645,51 @@ describe('LeagueFixtureDetailClient', () => {
 
     expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/lg-1/bracket?tab=standings&from=%2Fusers%2Fu1%2Frecords');
     navigation.searchParams = new URLSearchParams();
+  });
+
+  describe('리그 상세 복귀 링크 — 받은 출처(from)에 따라 달라진다', () => {
+    const upstream = '/tournaments?kind=league&page=2#league-list';
+    const parentLink = () => screen.getByRole('link', { name: '가을 리그' });
+    const renderFrom = (from: string | null) => {
+      navigation.searchParams = from === null ? new URLSearchParams() : new URLSearchParams({ from });
+      mockLeague();
+      mockViewer('none');
+      render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    };
+    afterEach(() => {
+      navigation.searchParams = new URLSearchParams();
+    });
+
+    it('같은 리그에서 온 출처는 일정 필터·hash·상위 출처를 그대로 가진 채 리그 상세로 돌아간다', () => {
+      const source = `/tournaments/lg-1?schedule=upcoming&from=${encodeURIComponent(upstream)}&extra=keep#league-schedule`;
+      renderFrom(source);
+
+      expect(parentLink()).toHaveAttribute('href', source);
+    });
+
+    it('옛 /league-matches 주소로 받은 같은 리그 출처도 /tournaments 주소로 바꿔 그대로 돌려준다', () => {
+      renderFrom(`/league-matches/lg-1?schedule=upcoming&from=${encodeURIComponent(upstream)}#league-schedule`);
+
+      expect(parentLink()).toHaveAttribute('href', `/tournaments/lg-1?schedule=upcoming&from=${encodeURIComponent(upstream)}#league-schedule`);
+    });
+
+    it.each([
+      ['출처가 없으면', null],
+      ['외부 주소면', 'https://unsafe.example/league'],
+      ['프로토콜 상대 주소면', '//unsafe.example/league'],
+      ['경로 우회 주소면', '/..//unsafe.example/league'],
+    ])('%s 리그 상세 기본 주소로만 돌아간다', (_label, from) => {
+      renderFrom(from);
+
+      expect(parentLink()).toHaveAttribute('href', '/tournaments/lg-1');
+    });
+
+    it('다른 리그에서 온 출처는 현재 리그 링크를 바꾸지 않고 상위 체인으로만 잇는다', () => {
+      const other = '/tournaments/other-league?schedule=upcoming#league-schedule';
+      renderFrom(other);
+
+      expect(parentLink()).toHaveAttribute('href', `/tournaments/lg-1?from=${encodeURIComponent(other)}`);
+    });
   });
 });
 

@@ -103,7 +103,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       // Historical public detail links. Query strings are preserved by Next.
-      { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: false },
+      { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: true },
       { source: '/leagues/:id', destination: '/tournaments/:id', permanent: false },
       // 대회 일정은 대진 허브의 탭으로 접혔다. 페이지의 redirect 는 상위 loading 이 먼저 흘러 나가 200 으로 응답되므로 설정으로 처리한다.
       // 설정 redirect 는 파일 라우트보다 먼저 맞으므로, 슬러그가 schedule 인 캠페인(/tournaments/campaigns/schedule)은 :id 에서 뺀다.

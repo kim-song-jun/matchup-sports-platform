@@ -34,8 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // league-matches.ts)이 정적으로 그린다. backHref로 리그 상세를 명시한다(딥링크로
 // 바로 들어온 사용자도 시즌 결산 화면 밖으로 나갈 길이 있어야 한다). 없는 리그도
 // notFound()로 미리 막지 않는다 — 응답은 200이고 메타만 검색 제외다. 잘못된 leagueId는
-// 클라이언트가 이미 ErrorState+재시도로 처리한다(league-match-standings-client.tsx와 동일한
-// seriesQuery.isError 분기, 아래 클라이언트도 동일 패턴을 재사용한다).
+// 클라이언트가 seriesQuery.isError 분기에서 ErrorState+재시도로 처리한다.
 export default async function LeagueAwardsPage({ params }: Props) {
   const { leagueId } = await params;
   return <LeagueAwardsPageClient leagueId={leagueId} />;

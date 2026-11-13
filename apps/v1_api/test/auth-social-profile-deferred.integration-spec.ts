@@ -60,10 +60,10 @@ describe('V1 social profile deferral integration', () => {
         {
           userId: deferringUserId,
           currentStep: 'signup',
-          draftJson: { kakaoNickname: '디퍼카카오', ageConfirmedAt: new Date().toISOString() },
+          draftJson: { kakaoName: '디퍼카카오', kakaoGender: 'female', ageConfirmedAt: new Date().toISOString() },
         },
         // Accepted terms before the 14+ checkbox existed: no ageConfirmedAt in the draft.
-        { userId: noAgeUserId, currentStep: 'signup', draftJson: { kakaoNickname: '나이미확인' } },
+        { userId: noAgeUserId, currentStep: 'signup', draftJson: { kakaoName: '나이미확인' } },
       ],
     });
     // The nickname the deferring user would pick is already taken, forcing the numeric suffix.
@@ -152,6 +152,11 @@ describe('V1 social profile deferral integration', () => {
     expect(user.profile?.nickname).toMatch(/^[가-힣]+\d{1,4}$/);
     expect(user.profile?.nickname).not.toContain('디퍼카카오');
     expect(user.profile?.realName).toBeNull();
+  });
+
+  it('keeps the provider values in the draft while the profile is deferred', async () => {
+    const progress = await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: deferringUserId } });
+    expect(progress.draftJson).toMatchObject({ kakaoName: '디퍼카카오', kakaoGender: 'female', ageConfirmedAt: expect.any(String) });
   });
 
   it('allows deferred profile reads without linking an email login', async () => {

@@ -89,7 +89,13 @@ export function readKakaoSignupPrefill(draftJson: unknown): KakaoSignupPrefill |
   });
 }
 
-export function normalizeKakaoNickname(nickname: string | null | undefined): string | null {
-  const trimmed = (nickname ?? '').trim();
-  return trimmed.length > 0 ? trimmed : null;
+/** The draft keys holding what a provider handed over for the profile form: the keys the reader above consumes. */
+const SOCIAL_PREFILL_DRAFT_KEYS = ['kakaoName', 'kakaoPhone', 'kakaoGender', 'kakaoBirthDate', 'appleName'] as const;
+
+/** The draft without the provider values, for when signup no longer needs them. Other keys are kept as they are. */
+export function withoutSocialPrefill(draftJson: unknown): Record<string, unknown> {
+  if (!draftJson || typeof draftJson !== 'object' || Array.isArray(draftJson)) return {};
+  const rest = { ...(draftJson as Record<string, unknown>) };
+  for (const key of SOCIAL_PREFILL_DRAFT_KEYS) delete rest[key];
+  return rest;
 }

@@ -9,6 +9,7 @@ type KakaoAccount = {
   readonly email?: string; readonly is_email_valid?: boolean; readonly is_email_verified?: boolean;
   readonly phone_number?: string; readonly name?: string; readonly gender?: string;
   readonly birthyear?: string; readonly birthday?: string; readonly birthday_type?: string;
+  readonly profile?: { readonly nickname?: string; readonly profile_image_url?: string };
 };
 class KakaoContactFixtureError extends Error {}
 
@@ -25,7 +26,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
   const otherId = 'integration-kakao-contact-other';
   const email = 'kakao-contact-holder@integration.test';
   const phone = '01055550991';
-  const keys = Array.from({ length: 8 }, (_, i) => String(945100001 + i));
+  const keys = Array.from({ length: 12 }, (_, i) => String(945100001 + i));
   const signupPhone = '01055550996';
   const signupId = {
     profile: 'integration-kakao-contact-signup-profile',
@@ -100,6 +101,22 @@ describe('Kakao confirmed contacts and existing membership', () => {
     };
     return request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'integration-kakao-contact-token' });
   }
+  async function signUpThroughTerms(account: KakaoAccount) {
+    const response = await kakao(account).expect(201);
+    const id: unknown = response.body.data.session.userId;
+    if (typeof id !== 'string') throw new KakaoContactFixtureError('Kakao signup did not issue a user identity');
+    const terms = await app.get(ManagedTermsRuntimeService).currentSignupTerms();
+    await request(app.getHttpServer()).post('/api/v1/auth/social-terms').set('x-v1-user-id', id).send({
+      requiredTermsAccepted: true, ageConfirmed: true,
+      acceptedTermsDocumentIds: terms.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
+    }).expect(201);
+    return id;
+  }
+  const draftOf = async (id: string) => (await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: id } })).draftJson;
+  const kakaoValues = { kakaoName: '신규 회원', kakaoPhone: '01055550993', kakaoGender: 'female', kakaoBirthDate: '20000229' };
+  const kakaoAccount = {
+    phone_number: '+82 10-5555-0993', name: '신규 회원', gender: 'female', birthyear: '2000', birthday: '0229', birthday_type: 'SOLAR',
+  } as const;
 
   function memberState() {
     return Promise.all([
@@ -243,16 +260,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
   });
 
   it('completes a new Kakao profile without creating a phone challenge, even with phone verification enforced', async () => {
-    const response = await kakao({
-      phone_number: '+82 10-5555-0993', name: '신규 회원', gender: 'female', birthyear: '2000', birthday: '0229', birthday_type: 'SOLAR',
-    }).expect(201);
-    const id: unknown = response.body.data.session.userId;
-    if (typeof id !== 'string') throw new KakaoContactFixtureError('Kakao signup did not issue a user identity');
-    const terms = await app.get(ManagedTermsRuntimeService).currentSignupTerms();
-    await request(app.getHttpServer()).post('/api/v1/auth/social-terms').set('x-v1-user-id', id).send({
-      requiredTermsAccepted: true, ageConfirmed: true,
-      acceptedTermsDocumentIds: terms.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
-    }).expect(201);
+    const id = await signUpThroughTerms(kakaoAccount);
     await request(app.getHttpServer()).post('/api/v1/auth/social-profile').set('x-v1-user-id', id).send({
       realName: '신규 회원', phone: '01055550993', birthDate: '20000229', gender: 'female',
     }).expect(201);
@@ -261,5 +269,39 @@ describe('Kakao confirmed contacts and existing membership', () => {
     expect(stored.profile?.birthDate).toBe('20000229');
     expect(await prisma.v1PhoneVerificationChallenge.count({ where: { phone: '01055550993' } })).toBe(0);
     expect(await prisma.v1StatusChangeLog.count({ where: { actorUserId: id, reason: 'kakao_provided_phone' } })).toBe(1);
+  });
+
+  it('keeps only the Kakao values the profile form fills in — never the nickname or the profile photo — across a repeat login', async () => {
+    const key = takeKakaoKey();
+    const account = { ...kakaoAccount, profile: { nickname: '카카오닉네임', profile_image_url: 'https://img.example/kakao.png' } };
+    const response = await kakao(account, key).expect(201);
+    const id: string = response.body.data.session.userId;
+
+    expect(await draftOf(id)).toEqual(kakaoValues);
+    await kakao(account, key).expect(201);
+    expect(await draftOf(id)).toEqual(kakaoValues);
+  });
+
+  it('clears the Kakao values once the profile is finished and keeps the rest of the draft', async () => {
+    const id = await signUpThroughTerms(kakaoAccount);
+    expect(await draftOf(id)).toEqual({ ...kakaoValues, ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
+
+    await request(app.getHttpServer()).post('/api/v1/auth/social-profile').set('x-v1-user-id', id).send({
+      realName: '신규 회원', phone: '01055550993', birthDate: '20000229', gender: 'female',
+    }).expect(201);
+
+    expect(await draftOf(id)).toEqual({ ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
+  });
+
+  it('keeps the Kakao values while the profile is deferred and clears them when the deferred profile is finished', async () => {
+    const id = await signUpThroughTerms(kakaoAccount);
+    await request(app.getHttpServer()).post('/api/v1/auth/social-profile/defer').set('x-v1-user-id', id).expect(201);
+    expect(await draftOf(id)).toEqual({ ...kakaoValues, ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
+
+    await request(app.getHttpServer()).post('/api/v1/auth/social-profile').set('x-v1-user-id', id).send({
+      realName: '신규 회원', phone: '01055550993', birthDate: '20000229', gender: 'female',
+    }).expect(201);
+
+    expect(await draftOf(id)).toEqual({ ageConfirmedAt: expect.any(String), autoNickname: expect.any(String) });
   });
 });

@@ -31,7 +31,7 @@ describe('V1 signed-in social account link integration', () => {
   const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   const kakaoProfile = (providerUserKey = KAKAO_KEY): KakaoProfile => ({
-    providerUserKey, email: null, emailValid: false, emailVerified: false, profileImageUrl: null, nickname: null, signupPrefill: null,
+    providerUserKey, email: null, emailValid: false, emailVerified: false, signupPrefill: null,
   });
 
   beforeAll(async () => {

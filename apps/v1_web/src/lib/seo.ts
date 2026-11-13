@@ -164,8 +164,10 @@ export function buildTournamentTitle(tournament: Pick<V1TournamentDetail, 'title
 
 export function metadataDescription(value: string | null | undefined, fallback: string): string {
   // 번호는 길이 판정과 자르기 전에 가린다 — 자르기 경계에서 앞자리만 남아 드러나는 일을 막는다.
-  const normalized = maskContactNumbers(value?.replace(/\s+/g, ' ')).trim();
-  if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return fallback;
+  // fallback 도 제목처럼 사용자 글일 수 있어 같은 정리를 거친다.
+  const clean = (text: string | null | undefined) => maskContactNumbers(text?.replace(/\s+/g, ' ')).trim();
+  const normalized = clean(value);
+  if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return clean(fallback);
   return normalized.length > 155 ? `${normalized.slice(0, 152).trimEnd()}…` : normalized;
 }
 

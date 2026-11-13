@@ -159,6 +159,11 @@ describe('metadataDescription', () => {
     expect(metadataDescription('  010 1234 5678  ', fallback)).toBe(fallback);
   });
 
+  it('기본 문구로 떨어질 때도 그 안의 전화번호는 가린다', () => {
+    expect(metadataDescription('dfd', '공지 문의 010-1234-5678 안내')).toBe('공지 문의 ***-****-**** 안내');
+    expect(metadataDescription(null, '풋살  대회\n안내')).toBe('풋살 대회 안내');
+  });
+
   it('155자 자르기 경계에 걸린 번호가 앞자리만 남아 드러나지 않는다', () => {
     const description = metadataDescription(`${'가'.repeat(148)} 010-1234-5678`, fallback);
     expect(description).not.toMatch(/010|1234|5678/);

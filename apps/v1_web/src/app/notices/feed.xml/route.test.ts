@@ -73,6 +73,7 @@ describe('GET /notices/feed.xml', () => {
           publishedAt: null,
         },
         { noticeId: 'n-4', title: '연락처 공지', body: '현장 문의는 010-1234-5678 로 연락 주세요.', publishedAt: null },
+        { noticeId: 'n-5', title: '문의 010-1234-5678 포스터', body: '[이미지: 15]', publishedAt: null },
       ],
     });
 
@@ -86,6 +87,7 @@ describe('GET /notices/feed.xml', () => {
       '포스터 공지',
       '서식 문서로 쓴 본문이에요.',
       '현장 문의는 ***-****-**** 로 연락 주세요.',
+      '문의 ***-****-**** 포스터',
     ]);
   });
 

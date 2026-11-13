@@ -47,3 +47,6 @@ Status: In Progress
 
 ## Progress Snapshot
 Base origin/dev 0f1f93621. Branch fix/tournament-team-gender-20261113. Worktree /tmp/teameet-tournament-team-gender-20261113. 구현 및 계약 동기화 완료. 단위 334/334 PASS, API tsc PASS, surface gate PASS. 통합 fixture 성별 설정 명시. Docker가 없어 DB 통합은 로컬 미실행. dev PR/alpha 대기.
+
+## CI fix round 1
+PR #2354 API CI: 205/206 DB integration suites passed. Two capacity race scenarios used shared `makeTeam` directly without a gender setting, so new admission correctly rejected them before the capacity race. Moved explicit gender setup into shared league-slot-harness team creation, covering applicants, seeded waitlist teams and direct additions. Real gender restriction remains unchanged.

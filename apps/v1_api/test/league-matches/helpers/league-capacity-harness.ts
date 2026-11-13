@@ -38,7 +38,6 @@ export async function createLeagueCapacityHarness(app: INestApplication) {
   }
   async function applicant(name: string) {
     const team = await h.makeTeam(name);
-    await h.prisma.v1TeamProfile.upsert({ where: { teamId: team.id }, create: { teamId: team.id, genderRule: '성별 무관' }, update: { genderRule: '성별 무관' } });
     const owner = await h.prisma.v1Team.findUniqueOrThrow({ where: { id: team.id }, select: { ownerUserId: true } });
     await h.prisma.v1User.update({ where: { id: owner.ownerUserId }, data: { phoneVerifiedAt: new Date('2026-08-01T00:00:00Z') } });
     await terms.acceptSignupTerms(owner.ownerUserId, signupIds);

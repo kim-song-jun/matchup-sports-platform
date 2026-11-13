@@ -82,10 +82,10 @@ describe('대회 하위 화면의 공유 이미지', () => {
     ['후기', reviewsMetadata],
   ])('%s: 커버 없이 포스터만 있는 대회도 상세 화면과 같은 이미지를 쓴다', async (_screen, generate) => {
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament({ promoHomeImageUrl: '/uploads/poster.png' }));
-    expect(ogImageUrl(await generate(params))).toBe('/uploads/poster.png');
+    expect(ogImageUrl(await generate(params))).toBe('/_next/image?url=%2Fuploads%2Fposter.png&w=1200&q=75');
 
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament({ coverImageUrl: '/uploads/cover.png', promoHomeImageUrl: '/uploads/poster.png' }));
-    expect(ogImageUrl(await generate(params))).toBe('/uploads/cover.png');
+    expect(ogImageUrl(await generate(params))).toBe('/_next/image?url=%2Fuploads%2Fcover.png&w=1200&q=75');
 
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament());
     expect(ogImageUrl(await generate(params))).toBe('/opengraph-image');

@@ -89,7 +89,7 @@ describe('TeamDetailPage (server)', () => {
 
     expect(TEAM_LOGO_PRESETS).toContain(generatedLocalLogo);
     expect(publicMetadata?.squareImage).toBe(true);
-    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: generatedLocalLogo }));
+    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: `/_next/image?url=${encodeURIComponent(String(generatedLocalLogo))}&w=1200&q=75` }));
   });
 
   it('공개 팀의 실제 종목·지역·활동·수준을 검색 메타에 전달하고 기존 canonical/image 흐름을 보존한다', async () => {
@@ -120,7 +120,7 @@ describe('TeamDetailPage (server)', () => {
     expect(metadata.description).toContain('가입은 운영진 승인 방식이에요.');
     expect(metadata.alternates?.canonical).toBe('/teams/team-1');
     expect(metadata.robots).toMatchObject({ index: true, follow: true });
-    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: '/uploads/team.png' }));
+    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: '/_next/image?url=%2Fuploads%2Fteam.png&w=1200&q=75' }));
     expect(vi.mocked(buildPublicMetadata)).toHaveBeenCalledWith(expect.objectContaining({ image: '/uploads/team.png', squareImage: true }));
   });
 

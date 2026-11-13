@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, buildTournamentDescription, buildTournamentTitle, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildPublicMetadata, buildTournamentDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -242,5 +242,46 @@ describe('buildTournamentTitle', () => {
     ['축구', 'regular_league', '서울 축구 리그', '서울 축구 리그'],
   ] as const)('실제 %s 종목과 %s 유형을 보존한다', (sport, kind, title, expected) => {
     expect(buildTournamentTitle({ title, sport: { name: sport } as never, kind })).toBe(expected);
+  });
+});
+
+describe('buildPublicMetadata 공유 이미지', () => {
+  const ogImages = (metadata: ReturnType<typeof buildPublicMetadata>) =>
+    metadata.openGraph?.images as Array<{ url: string; width?: number; height?: number; alt?: string }>;
+  const optimizerParams = (src: string) => {
+    const url = new URL(src, 'http://localhost');
+    return { pathname: url.pathname, url: url.searchParams.get('url'), w: url.searchParams.get('w') };
+  };
+
+  it('업로드 커버는 원본 대신 가로 1200 사본을 og:image·twitter:image 로 내보내고, 모르는 크기를 적지 않는다', () => {
+    const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: '/uploads/2026/07/cover.png' });
+    const [og] = ogImages(metadata);
+
+    expect(optimizerParams(og.url)).toEqual({ pathname: '/_next/image', url: '/uploads/2026/07/cover.png', w: '1200' });
+    expect(og).toEqual({ url: og.url, alt: '대회' });
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [og.url] });
+  });
+
+  it('정사각 로고도 같은 사본으로 내보내고 X 작은 카드는 그대로 둔다', () => {
+    const metadata = buildPublicMetadata({ title: '팀', description: '설명', path: '/teams/t-1', image: '/uploads/2026/07/logo.png', squareImage: true });
+
+    expect(optimizerParams(ogImages(metadata)[0].url).url).toBe('/uploads/2026/07/logo.png');
+    expect(metadata.twitter).toMatchObject({ card: 'summary', images: [ogImages(metadata)[0].url] });
+  });
+
+  it('외부 주소 커버는 변환 주소로 감싸지 않는다', () => {
+    const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: 'https://cdn.example.com/poster.jpg' });
+
+    expect(ogImages(metadata)).toEqual([{ url: 'https://cdn.example.com/poster.jpg', alt: '대회' }]);
+    expect(metadata.twitter).toMatchObject({ images: ['https://cdn.example.com/poster.jpg'] });
+  });
+
+  it('이미지가 없으면 지금처럼 기본 이미지와 크기 메타를 낸다', () => {
+    const metadata = buildPublicMetadata({ title: '공지', description: '설명', path: '/notices/n-1', image: null });
+
+    expect(ogImages(metadata)).toEqual([
+      { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: '공지' },
+    ]);
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [DEFAULT_SOCIAL_IMAGE.path] });
   });
 });

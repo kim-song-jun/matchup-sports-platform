@@ -28,13 +28,13 @@ describe('기본 링크 미리보기 이미지', () => {
   it('커버가 있으면 커버를 쓰고, 모르는 커버 크기를 지어내지 않는다', () => {
     const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: '/uploads/cover.png' });
 
-    expect(metadata.openGraph?.images).toEqual([{ url: '/uploads/cover.png', alt: '대회' }]);
+    expect(metadata.openGraph?.images).toEqual([{ url: '/_next/image?url=%2Fuploads%2Fcover.png&w=1200&q=75', alt: '대회' }]);
   });
 
   it('정사각 이미지(팀 로고)는 X 에서 작은 카드로 보낸다 — 큰 카드는 위아래를 잘라낸다', () => {
     const metadata = buildPublicMetadata({ title: '팀', description: '설명', path: '/teams/t-1', image: '/uploads/logo.png', squareImage: true });
 
-    expect(metadata.twitter).toMatchObject({ card: 'summary', images: ['/uploads/logo.png'] });
+    expect(metadata.twitter).toMatchObject({ card: 'summary', images: ['/_next/image?url=%2Fuploads%2Flogo.png&w=1200&q=75'] });
   });
 
   it('메타데이터가 가리키는 경로가 Next 가 이 파일을 서빙하는 경로와 같다', () => {

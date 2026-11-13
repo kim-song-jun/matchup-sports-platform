@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { competitionFormatLabel } from '@/lib/competition-kind';
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
+import { socialImageSrc } from '@/lib/og-image';
 import { maskContactNumbers } from '@/lib/public-text';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
@@ -79,11 +80,11 @@ export function buildPublicMetadata({
   type = 'website',
 }: PublicMetadataInput): Metadata {
   const socialTitle = `${title} | Teameet`;
-  const imageUrl = image || DEFAULT_SOCIAL_IMAGE.path;
+  const imageUrl = socialImageSrc(image || DEFAULT_SOCIAL_IMAGE.path);
   // 크기를 아는 건 기본 이미지뿐이다 — 업로드 커버는 비율이 제각각이라 추측해 적지 않는다.
   const ogImage = image
-    ? { url: image, alt: title }
-    : { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: title };
+    ? { url: imageUrl, alt: title }
+    : { url: imageUrl, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: title };
 
   return {
     title,

@@ -13,6 +13,7 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
+import { KakaoUnlinkService } from '../auth/kakao-unlink.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AdminService } from './admin.service';
@@ -301,6 +302,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
   };
   let realtimeGateway: { forceDisconnectUser: jest.Mock };
   let logger: { warn: jest.Mock; info: jest.Mock };
+  let kakaoUnlink: { unlinkKeys: jest.Mock };
 
   function targetUser(accountStatus: string) {
     return { id: targetUserId, accountStatus, email: 'target@teameet.v1', phone: null, deletedAt: null };
@@ -374,12 +376,14 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
 
     realtimeGateway = { forceDisconnectUser: jest.fn() };
     logger = { warn: jest.fn(), info: jest.fn() };
+    kakaoUnlink = { unlinkKeys: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
         { provide: PrismaService, useValue: prisma },
         { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: KakaoUnlinkService, useValue: kakaoUnlink },
         { provide: getLoggerToken(AdminService.name), useValue: logger },
       ],
     }).compile();
@@ -604,6 +608,72 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
       expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
       expect(realtimeGateway.forceDisconnectUser).not.toHaveBeenCalled();
+    });
+  });
+  describe('Kakao unlink after an operator delete', () => {
+    const KAKAO_MEMBER_NUMBER = '9000000001';
+
+    function arrangeDeletableTarget() {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+      prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+      prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([
+        { id: 'identity-kakao', provider: 'kakao', providerUserKey: KAKAO_MEMBER_NUMBER },
+        { id: 'identity-apple', provider: 'apple', providerUserKey: 'apple-subject' },
+      ]);
+    }
+
+    it('asks Kakao once, after the deletion has been written, with the member number read before the key was replaced', async () => {
+      arrangeDeletableTarget();
+      const writtenWhenAsked: boolean[] = [];
+      kakaoUnlink.unlinkKeys.mockImplementation(async () => {
+        writtenWhenAsked.push(prisma.v1StatusChangeLog.create.mock.calls.length > 0);
+      });
+
+      await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+      expect(kakaoUnlink.unlinkKeys).toHaveBeenCalledTimes(1);
+      expect(kakaoUnlink.unlinkKeys).toHaveBeenCalledWith(
+        targetUserId,
+        [{ identityId: 'identity-kakao', memberNumber: KAKAO_MEMBER_NUMBER }],
+        'account_deleted',
+      );
+      expect(writtenWhenAsked).toEqual([true]);
+      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'identity-kakao' }, data: expect.objectContaining({ providerUserKey: `deleted:${targetUserId}:identity-kakao` }) }),
+      );
+    });
+
+    it('keeps the targets out of the operator response', async () => {
+      arrangeDeletableTarget();
+
+      const result = await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+      expect(result).not.toHaveProperty('kakaoUnlinkTargets');
+      expect(JSON.stringify(result)).not.toContain(KAKAO_MEMBER_NUMBER);
+    });
+
+    it('answers the operator even if the Kakao request never ends', async () => {
+      arrangeDeletableTarget();
+      kakaoUnlink.unlinkKeys.mockReturnValue(new Promise<void>(() => undefined));
+
+      const outcome = await Promise.race([
+        service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' }),
+        new Promise((resolve) => setTimeout(() => resolve('waited'), 100)),
+      ]);
+
+      expect(outcome).toMatchObject({ userId: targetUserId, status: 'deleted' });
+    });
+
+    it('does not ask Kakao when the deletion is refused', async () => {
+      arrangeDeletableTarget();
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'owner', team: { id: 'team-1', name: '한강FC' } });
+
+      await expect(
+        service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' }),
+      ).rejects.toMatchObject({ response: { code: 'USER_HAS_TEAM_AUTHORITY' } });
+
+      expect(kakaoUnlink.unlinkKeys).not.toHaveBeenCalled();
     });
   });
 });

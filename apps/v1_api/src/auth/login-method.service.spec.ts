@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AppleTokenService } from './apple-token.service';
+import { KakaoUnlinkService } from './kakao-unlink.service';
 import { LoginMethodService } from './login-method.service';
 import { RECENT_LOGIN_MAX_AGE_SECONDS } from './link-caller-guards';
 import type { V1SessionProof } from './v1-session';
@@ -134,9 +135,10 @@ function build(seed: { users: Row[]; identities: Row[] }) {
   const notice = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 해제됐어요', body: null, deepLink: '/my/settings' };
   const notifications = { createInTransaction: jest.fn().mockResolvedValue(notice), deliverCreated: jest.fn() };
   const appleTokens = { revokeForUser: jest.fn().mockResolvedValue(undefined) };
+  const kakaoUnlink = { unlinkAllForUser: jest.fn().mockResolvedValue(undefined) };
   const realtime = { forceDisconnectUser: jest.fn() };
-  const service = new LoginMethodService(db.prisma as never, notifications as never, appleTokens as never, realtime);
-  return { service, notifications, appleTokens, realtime, ...db };
+  const service = new LoginMethodService(db.prisma as never, notifications as never, appleTokens as never, kakaoUnlink as never, realtime);
+  return { service, notifications, appleTokens, kakaoUnlink, realtime, ...db };
 }
 
 const kakaoAndEmail = () => ({ users: [user(CALLER, { email: `${CALLER}@example.test` })], identities: [kakao(), emailLogin()] });
@@ -352,6 +354,44 @@ describe('LoginMethodService.unlink', () => {
     });
   });
 
+  describe('Kakao', () => {
+    it('asks Kakao to drop the app connection once the removal has committed', async () => {
+      const { service, kakaoUnlink, state } = build(kakaoAndEmail());
+      const rowWhenAsked: Row[] = [];
+      kakaoUnlink.unlinkAllForUser.mockImplementation(async () => {
+        rowWhenAsked.push({ ...rowOf(state, 'kakao-user-1') });
+      });
+
+      await service.unlink(CALLER, 'kakao', proofOf());
+
+      expect(kakaoUnlink.unlinkAllForUser).toHaveBeenCalledTimes(1);
+      expect(kakaoUnlink.unlinkAllForUser).toHaveBeenCalledWith(CALLER, 'login_method_removed');
+      expect(rowWhenAsked).toEqual([expect.objectContaining({ status: 'unlinked', providerUserKey: 'kakao-key-user-1' })]);
+    });
+
+    it('does not wait for Kakao: the removal is answered even if the request never ends', async () => {
+      const { service, kakaoUnlink } = build(kakaoAndEmail());
+      kakaoUnlink.unlinkAllForUser.mockReturnValue(new Promise<void>(() => undefined));
+
+      const outcome = await Promise.race([service.unlink(CALLER, 'kakao', proofOf()), new Promise((resolve) => setTimeout(() => resolve('waited'), 100))]);
+
+      expect(outcome).toEqual({ provider: 'kakao', authProviders: ['email'], sessionEpoch: 1 });
+    });
+
+    it('leaves Kakao alone when an email or Apple login is removed, or when the removal is refused', async () => {
+      const removeEmail = build({ users: [user(CALLER)], identities: [kakao(), emailLogin()] });
+      await removeEmail.service.unlink(CALLER, 'email', proofOf());
+      const removeApple = build({ users: [user(CALLER)], identities: [kakao(), apple()] });
+      await removeApple.service.unlink(CALLER, 'apple', proofOf());
+      const refused = build({ users: [user(CALLER)], identities: [kakao()] });
+      await failure(refused.service.unlink(CALLER, 'kakao', proofOf()));
+
+      expect(removeEmail.kakaoUnlink.unlinkAllForUser).not.toHaveBeenCalled();
+      expect(removeApple.kakaoUnlink.unlinkAllForUser).not.toHaveBeenCalled();
+      expect(refused.kakaoUnlink.unlinkAllForUser).not.toHaveBeenCalled();
+    });
+  });
+
   describe('who may call', () => {
     it('refuses a session older than 30 minutes before touching the database', async () => {
       const { service, prisma } = build(kakaoAndEmail());
@@ -459,6 +499,7 @@ describe('LoginMethodService wiring', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: {} },
         { provide: AppleTokenService, useValue: {} },
+        { provide: KakaoUnlinkService, useValue: {} },
         { provide: RealtimeGateway, useValue: gateway },
       ],
     }).compile();

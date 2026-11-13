@@ -21,6 +21,13 @@ export const JOINKFA_URL = 'https://www.joinkfa.com';
 
 export const JOINKFA_PRIVACY_NOTE = 'Teameet은 JoinKFA에 선수 정보를 보내지 않아요.';
 
+/**
+ * 증명서 위치 안내(MD-QA #192 후속). 2026-11-11 joinkfa.com 실측: 상단 '증명서 → 증명서 신청'이고
+ * 회원 전용(로그인 필요)이라 선수 본인만 발급한다. KFA 쪽 메뉴가 바뀌면 이 문구만 고친다 — 링크는 계속 루트만.
+ */
+export const JOINKFA_CERTIFICATE_GUIDE =
+  "선수 본인이 JoinKFA에 로그인한 뒤 상단 '증명서 → 증명서 신청'에서 경력·실적 증명서를 받을 수 있어요.";
+
 export const SELF_DECLARATION_CONSENT_TEXT = '허위로 신고하면 대회 규정에 따라 출전 제한·실격이 될 수 있어요.';
 
 export const ELIGIBILITY_METHODS: readonly V1PlayerEligibilityMethod[] = [
@@ -49,7 +56,7 @@ export function JoinKfaLink({ label = 'JoinKFA에서 등록 이력 보기', clas
   );
 }
 
-/** 팀장·선수 화면의 선출 기준 안내 — 기준 문장 + JoinKFA 링크 + 정보 전송 없음 고지. */
+/** 팀장·선수 화면의 선출 기준 안내 — 기준 문장 + JoinKFA 링크 + 증명서 위치 + 정보 전송 없음 고지. */
 export function EligibilityCriteriaHelp({ id }: { id?: string }) {
   return (
     <div id={id} className="mt-2 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
@@ -57,6 +64,7 @@ export function EligibilityCriteriaHelp({ id }: { id?: string }) {
         {PLAYER_ELIGIBILITY_CRITERIA_TEXT} 운영진이 다시 확인하고, 확인한 선수는 자물쇠가 표시돼요.
       </p>
       <JoinKfaLink />
+      <p className="m-0 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{JOINKFA_CERTIFICATE_GUIDE}</p>
       <p className="m-0 text-[length:var(--font-size-micro)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE}</p>
     </div>
   );

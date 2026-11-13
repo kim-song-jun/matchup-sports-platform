@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JOINKFA_CERTIFICATE_GUIDE } from '@/components/tournaments/player-eligibility';
 import { useV1TournamentPlayers } from '@/hooks/use-v1-api';
 import {
   createV1PlayerEligibilityMswHandlers,
@@ -84,6 +85,7 @@ describe('PlayerSelfDeclarationCard', () => {
 
     expect(await screen.findByText(/KFA 등록 이력\(JoinKFA\)으로 확인하고, 세부 기준은 대회 요강을 따라요\./)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /JoinKFA에서 등록 이력 보기/ })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
   });
 
   it('운영진이 판정한 뒤에는 신고 폼 대신 잠금 표시만 보인다', async () => {

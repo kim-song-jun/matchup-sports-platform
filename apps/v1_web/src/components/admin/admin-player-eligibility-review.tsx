@@ -12,6 +12,7 @@ import type {
 import { PLAYER_ELIGIBILITY_LABEL, PLAYER_ELIGIBILITY_METHOD_LABEL } from '@/lib/v1-status-labels';
 import {
   ELIGIBILITY_METHODS,
+  JOINKFA_CERTIFICATE_GUIDE,
   JOINKFA_PRIVACY_NOTE,
   JoinKfaLink,
   eligibilityDeclarationMismatch,
@@ -297,6 +298,7 @@ export function EligibilityRulingPanel({
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           확인일과 확인자는 저장할 때 자동으로 남아요. 캡처·증명서 파일은 올리지 않아요.
         </p>
+        <p className="m-0 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{JOINKFA_CERTIFICATE_GUIDE}</p>
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE}</p>
         {error ? (
           <p role="alert" className="m-0 text-[length:var(--font-size-caption)] text-[var(--red700)]">

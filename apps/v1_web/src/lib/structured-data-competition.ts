@@ -1,4 +1,5 @@
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { absoluteImageUrl, organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
@@ -47,11 +48,19 @@ function officialScoreText(match: PublicMatchDetail, home: string, away: string)
   return `최종 스코어 ${home} ${match.score.home} : ${match.score.away} ${away}${penalties}`;
 }
 
-export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null {
+/** `isRegularLeague` 는 canonical 을 정한 판정과 같은 값이어야 한다 — url 이 canonical 과 다른 주소를 가리키면 안 된다. */
+export function buildFixtureEventLd(
+  match: PublicMatchDetail,
+  { isRegularLeague }: { readonly isRegularLeague: boolean },
+): JsonLdNode | null {
   // SportsEvent 의 사실상 필수 필드. 일정 미정 경기에 가짜 날짜를 채우지 않는다.
   if (!match.scheduledAt) return null;
 
-  const url = absoluteSiteUrl(`/tournaments/${match.tournamentId}/matches/${match.fixtureId}`);
+  const url = absoluteSiteUrl(fixtureDetailHref({
+    isRegularLeague,
+    competitionId: match.tournamentId,
+    fixtureId: match.fixtureId,
+  }));
   const homeName = match.home?.teamName ?? '미정';
   const awayName = match.away?.teamName ?? '미정';
   const node: JsonLdNode = {

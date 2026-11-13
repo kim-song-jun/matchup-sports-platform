@@ -338,7 +338,9 @@ function ParticipantTeamRow({
                   style={{ display: 'grid', gridTemplateColumns: '32px 1fr', alignItems: 'baseline', gap: 8 }}
                 >
                   {/* 등번호가 없는 선수는 `—` — 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다. */}
-                  <span className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)' }}>
+                  {/* `tab-num`(고정폭 숫자)만으로는 왼쪽 정렬이라 한 자리·두 자리 번호의 끝이 들쭉날쭉하다
+                      (특히 `1` 은 글자 안쪽 여백이 커서 들어가 보인다). 오른쪽 정렬로 일의 자리를 세로로 맞춘다. */}
+                  <span className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)', textAlign: 'right' }}>
                     {player.jerseyNumber ?? '—'}
                   </span>
                   {/* 닉네임을 못 찾으면(탈퇴·프로필 삭제) 서버 경기 명단과 같은 자리표시자 '팀원'이다.

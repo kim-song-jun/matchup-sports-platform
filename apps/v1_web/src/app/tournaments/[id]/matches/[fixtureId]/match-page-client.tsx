@@ -39,6 +39,8 @@ export function MatchPageClient({
   const rosterTeam = useMyMatchRosterTeam({
     teamIds: [data?.home?.teamId ?? null, data?.away?.teamId ?? null],
     gameId: data?.gameId ?? null,
+    // 4강·결승처럼 두 자리 모두 아직 팀이 없는 경기는 명단이 없다 — 내 팀마다 명단을 부르면 404 만 쌓인다.
+    sidesUnassigned: data !== undefined && data.home === null && data.away === null,
   });
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).

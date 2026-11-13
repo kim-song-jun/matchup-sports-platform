@@ -38,6 +38,7 @@ import { displayInitials } from '@/lib/display-initials';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { bracketTrackLabel, orderedBracketTracks, sortByBracketTrackOrder } from '@/lib/bracket-track';
+import { threeTeamBracketThird } from '@/lib/three-team-bracket';
 
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
@@ -286,6 +287,15 @@ function getTrackTopThree(tournament: V1TournamentDetail, track: string): Array<
       rows.push({ pos: 3, name: (winner === 'home' ? third.homeTeamName : third.awayTeamName) ?? '비공개' });
       rows.push({ pos: 4, name: (winner === 'home' ? third.awayTeamName : third.homeTeamName) ?? '비공개' });
     }
+  }
+  // 3팀 토너먼트는 3·4위전이 없다 — 결승 결과가 나온 뒤 준결승에서 진 팀이 3위다.
+  if (rows.length > 0 && !rows.some((row) => row.pos === 3)) {
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const thirdName = threeTeamBracketThird(tournament.fixtures.flatMap((fixture) => {
+      const group = groupById.get(fixture.groupId ?? '');
+      return group ? [{ phase: group.phase, fixture }] : [];
+    }));
+    if (thirdName !== null) rows.push({ pos: 3, name: thirdName });
   }
   return rows;
 }

@@ -552,6 +552,23 @@ it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승
   expect(ranking.getByText('4위')).toBeInTheDocument();
 });
 
+it('3팀 토너먼트는 3·4위전이 없어도 준결승에서 진 팀을 3위로 최종 순위에 올린다', () => {
+  const groups = ['semi', 'final'].map((phase, i) => ({
+    id: `three-${phase}`, name: `토너먼트 · ${phase}`, phase, sortOrder: i, advanceCount: null, groupTeams: [], standings: [], qualification: null, bracketTrack: '토너먼트',
+  } as V1TournamentGroup));
+  const result = (homeScore: number, awayScore: number) => ({ ...leagueFixtureWithVideo().result!, homeScore, awayScore, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null });
+  const fixtures = [
+    { ...leagueFixtureWithVideo(), id: 'three-semi-match', groupId: 'three-semi', round: '준결승', homeTeamName: '준결승패배팀', awayTeamName: '준우승팀', result: result(1, 2), videos: [] },
+    { ...leagueFixtureWithVideo(), id: 'three-final-match', groupId: 'three-final', round: 'final', homeTeamName: '우승팀', awayTeamName: '준우승팀', result: result(2, 0), videos: [] },
+  ];
+  render(<ResultsPageContent tournament={baseTournament({ format: 'league_knockouts', groups, fixtures })} />);
+  const ranking = within(screen.getByRole('region', { name: '토너먼트 순위' }));
+  expect(ranking.getByText('우승팀')).toBeInTheDocument();
+  expect(ranking.getByText('준우승팀')).toBeInTheDocument();
+  expect(ranking.getByText('준결승패배팀')).toBeInTheDocument();
+  expect(ranking.getByText('3위')).toBeInTheDocument();
+});
+
 it('N개 토너먼트의 결과·순위·경기 구역이 팀 수와 무관하게 만든 순서(프리미어 → 챌린지)로 나온다', () => {
   // 프리미어 8팀을 먼저, 챌린지 12팀을 나중에 만들었다. 서버 응답은 12팀의 첫 단계가 맨 앞이다.
   const groups = namedFinalGroups([{ name: '프리미어', teams: 8 }, { name: '챌린지', teams: 12 }]);

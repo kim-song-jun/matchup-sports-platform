@@ -5,6 +5,7 @@ import { useMyMatchRosterTeam } from '@/components/game-roster/use-my-match-rost
 import { MatchPageClient } from './match-page-client';
 
 const navigation = vi.hoisted(() => ({ search: '' }));
+const match = vi.hoisted(() => ({ unassigned: false }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/t1/matches/fx-1',
   useSearchParams: () => new URLSearchParams(navigation.search),
@@ -15,8 +16,8 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
       gameId: 'g1',
       tournamentTitle: '대회',
       scheduledAt: '2026-09-08T10:00:00.000Z',
-      home: { registrationId: 'r1', teamId: 'team-h', teamName: '홈' },
-      away: { registrationId: 'r2', teamId: 'team-a', teamName: '원정' },
+      home: match.unassigned ? null : { registrationId: 'r1', teamId: 'team-h', teamName: '홈' },
+      away: match.unassigned ? null : { registrationId: 'r2', teamId: 'team-a', teamName: '원정' },
     },
     isLoading: false,
     isError: false,
@@ -57,7 +58,15 @@ describe('MatchPageClient', () => {
 
   it('두 팀 id·gameId 로 우리 팀을 찾고, 우리 팀 출전 카드를 기록 헤더 바로 아래에 둔다', () => {
     render(<MatchPageClient tournamentId="t1" fixtureId="fx-1" />);
-    expect(vi.mocked(useMyMatchRosterTeam)).toHaveBeenLastCalledWith({ teamIds: ['team-h', 'team-a'], gameId: 'g1' });
+    expect(vi.mocked(useMyMatchRosterTeam)).toHaveBeenLastCalledWith({ teamIds: ['team-h', 'team-a'], gameId: 'g1', sidesUnassigned: false });
     expect(screen.getByTestId('detail-after-header')).toContainElement(screen.getByTestId('roster-card'));
+  });
+
+  // 4강·결승처럼 두 자리 모두 팀이 아직 없는 경기는 명단이 없다 — 내 팀마다 명단을 부르면 404 만 쌓인다.
+  it('두 자리가 모두 비어 있으면 명단 조회를 건너뛰도록 알린다', () => {
+    match.unassigned = true;
+    render(<MatchPageClient tournamentId="t1" fixtureId="fx-1" />);
+    expect(vi.mocked(useMyMatchRosterTeam)).toHaveBeenLastCalledWith({ teamIds: [null, null], gameId: 'g1', sidesUnassigned: true });
+    match.unassigned = false;
   });
 });

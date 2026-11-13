@@ -142,6 +142,18 @@ describe('FromLink', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
+  it.each(['https://example.com/terms', '//example.com/terms', '/\\example.com/terms'])(
+    '사이트 밖을 가리키는 href(%s)는 가로채지도 현재 주소를 붙이지도 않는다',
+    (href) => {
+      window.history.replaceState(null, '', '/tournaments?status=open#list');
+      const link = renderLink({ href });
+      const observed = observeDefaultAction();
+      fireEvent.click(link);
+      expect(observed.prevented).toBe(false);
+      expect(router.push).not.toHaveBeenCalled();
+    },
+  );
+
   it('호출한 쪽 onClick 이 기본 동작을 막았으면 이동하지 않는다', () => {
     const link = renderLink({ onClick: (event) => event.preventDefault() });
     fireEvent.click(link);

@@ -1,0 +1,43 @@
+# 리그 + N개 토너먼트 시간·구장 배정
+
+Status: Core Alpha QA verified; detailed state/permission regressions verified in CI
+Task: [20261132](../../.github/tasks/20261132-fixture-time-court-assignment.md)
+
+## Persona / route
+플랫폼 운영자(owner/ops), 담당 대회 총괄, 조회 전용. `/admin/tournaments/:id/bracket`, format `league_knockouts`.
+
+## Scenarios
+1. 기존 시간/구장이 있는 경기에서 시간 배정 패널 열기. 기존 값 확인, 새 한국시간 등록 및 새로고침 복원.
+2. 시간 항목에 경기 배정. 그림·목록·수동 편집이 같은 값을 보이고 기존 구장은 유지.
+3. 구장 패널에서 기존 구장 배정. 기존 시간 유지. 플랫폼 운영자만 새 구장 등록 가능.
+4. 단일 경기에서 시간/장소 직접 수정. 패널에 실제 값 반영. 다른 미저장 표시 문구가 있어도 수정하지 않은 일정/장소는 최신 서버 값을 반영.
+5. 시간/구장 각각 해제. 반대 필드는 보존.
+6. 제목 접기/펼치기. 하위 경기·선택란만 숨기고 배정 수 표시. 다른 배정/패널 전환 후 접힘 유지.
+7. 같은 시간 다른 구장은 경고 없음. 같은 시간 같은 구장 중복은 경고. 실패 응답은 기존 배정과 실제 오류 유지.
+8. support/철회/타 대회 총괄의 쓰기 차단. 비활성 구장 새 배정 차단, 기존 배정 해제 가능.
+
+## 2026-11-13 후속 — 등록 시간·구장 이름 수정
+
+기존 핵심 배정 QA는 PR #2356 댓글 https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443 에 있다. 이전의 권한 CI 근거 예외 승인은 후보 974ac541b7a2 한정이며 이 후속 변경에 확대하지 않는다.
+
+9. 시간 항목 옆 수정 → 현재 KST hydrate → 새 시각 저장. 같은 시각의 모든 배정 경기·팀 일정·경기 길이가 함께 이동하고 구장/주소/팀은 유지. 직접 입력에서 유래한 시각과 미배정 preset도 확인.
+10. 등록 구장 옆 수정 → 이름 저장. 같은 fieldId의 배정 경기 이름과 목록/운영 보드 갱신. 시간·주소·좌표·fieldId 유지. 기존 플랫폼 운영 권한 유지.
+11. 취소/Escape는 요청 없이 입력 닫기. 저장 중 중복 조작 차단. 중복 시각·이름/예전 시각·버전/실제 API 실패에서 입력·원 데이터 유지. 저장 후 조회 실패는 별도 경고.
+12. 진행/종료 경기 포함 시간 이동 전체 거부. 단계 순서 위반·감사 실패는 전체 rollback. 같은 시간 여러 단계의 정상 일괄 이동은 중간 상태 때문에 잘못 거절하지 않음.
+13. 항목 접기와 수정은 별도 컨트롤. 접은 상태에서도 수정 가능. 저장·취소 후 포커스 유지, 긴 이름·390/768/1440 및 aside/bottom sheet 검증.
+
+후속 진행: API 단위 회귀 및 실제 DB 통합 spec 추가. 실제 DB replay/원자성은 CI 검증 대상(로컬 Docker/DB 미가동). 변경 후 Alpha 기능/3폭/console/network는 새 PR 머지·배포 후 기록한다. 기존 캡처를 변경 후 PASS로 사용하지 않는다.
+
+## Evidence
+API 단위/DTO 및 기존 경기 수정·구장 서비스 259 PASS. Web API 연결·수동 편집·라우트 회귀 33 PASS. 양쪽 tsc 및 규칙 검사 PASS. 새 테이블 생성 SQL 모델 대조 PASS(실제 DB replay 아님).
+새 migration 실제 PostgreSQL 재생/동시성 검증은 로컬 Docker daemon 부재로 미실행. CI에 integration spec 추가.
+Alpha 변경 후 기능 0/8, viewport 0/3 (390/768/1440), console/network 미검증. 머지·배포와 관리자 로그인 필요. 로컬 목업 결과를 실제 서비스 QA로 대체하지 않는다.
+
+## Cleanup
+기능 QA를 위해 생성하는 대진은 영구 데이터가 될 수 있어 사용자 대회에 쓰지 않는다. 실제 QA 데이터/브라우저의 소유 범위와 cleanup 결과를 후속 기록한다.
+
+
+## 현행 완료 근거 — #2364 (2026-11-13)
+- 위 초기 미검증 표기를 대체한다. #2364 dev/Alpha 7c288bd0985bd58beb68f7f72155107c0c58d377, CI/배포 SUCCESS. 새 inline 수정은 2개 패널 × 3폭 before/after 6/6, 실제 두 경기 시간·이름 저장/reload·취소·중복/stale·401/404 PASS.
+- Alpha는 팀 미배정 4자리/2경기로 검증했다. 실제 팀 일정·경기 길이·좌표/출처·started guard·rollback은 실제 PostgreSQL integration PASS 근거로 구분한다. 모든 역할·13개 항목을 이번 Alpha에서 전부 재실행한 것은 아니다.
+- application exception/unexpected HTTP 0, 의도한409 두 건 및 CSS preload warning 기록. 증거와 제한: ../ops/release-readiness-1.20.0-2026-11-13.md. 테스트 대회 cancelled/private, 전용 Chrome/helper 종료.

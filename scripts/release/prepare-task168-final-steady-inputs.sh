@@ -49,7 +49,8 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-08: additive V1Tournament.tieBreakOrder (20261107120000_tournament_tie_break_order); M11 remains unchanged.
 # 2026-11-08: additive v1_ad_campaigns, v1_ad_campaign_daily_stats and V1ContentAsset.adCampaignId (20261108130000_v1_ad_campaigns); M11 remains unchanged.
 # 2026-11-12: additive V1TournamentStageTieBreakSetting and V1Tournament.sixTeamDirectFinalOrder (20261111180000_tournament_stage_tie_break_settings, MD-QA #186); M11 remains unchanged.
-[[ ( "$schema_sha" == 65f3640c6129b81e1a503c6c5a2c11cbc79154e4e35acc598bed34f6110d50c1 \
+[[ ( "$schema_sha" == 5c1f131cad5acefe13408405bdd222141cfaffdcf53de6a1599ed6a7008baf7d \
+  || "$schema_sha" == 65f3640c6129b81e1a503c6c5a2c11cbc79154e4e35acc598bed34f6110d50c1 \
   || "$schema_sha" == e6fa0c33ed33f7d3cbda7e83a4373338a801edfd8acc2e02cc6db6b38f20fe01 \
   || "$schema_sha" == 063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8 \
   || "$schema_sha" == d33e16e5c14bdb09c43422a6216a7362bc3ff5c612c7d575e21c57047a3e4836 \

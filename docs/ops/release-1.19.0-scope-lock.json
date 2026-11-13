@@ -1,0 +1,30 @@
+{
+  "sourceSnapshotSha": "a5496263242ab72a51e1ca420b85bf6a8b351ed6",
+  "mainBaselineSha": "0a4a1b268f5c6612da6fd51fdeffc2e6d5179a1c",
+  "previousPreparationPr": 2352,
+  "includedFeaturePrs": [
+    2347,
+    2350,
+    2348,
+    2351,
+    2353
+  ],
+  "preservedMainHotfixPr": 2355,
+  "equivalentDevHotfixPr": 2354,
+  "candidateBranch": "release/prepare-1.19.0-2353",
+  "manifestVersion": "1.19.0",
+  "expectedResolvedStableVersion": "1.19.1",
+  "allowedPostSnapshotPaths": [
+    ".changeset/clean-tournament-team-gender.md",
+    ".changeset/league-schedule-time-picker.md",
+    "apps/v1_api/package.json",
+    "apps/v1_web/package.json",
+    "apps/v1_api/CHANGELOG.md",
+    "apps/v1_web/CHANGELOG.md",
+    ".github/tasks/20261133-production-release-1.18.0.md",
+    ".github/tasks/20261134-tournament-team-gender-admission.md",
+    "docs/ops/release-readiness-1.19.0-2026-11-13.md",
+    "docs/ops/release-1.19.0-scope-lock.json"
+  ],
+  "policy": "User explicitly expanded the previous scope by PR2353. Preserve main hotfix2355. No feature/API/schema/migration/dependency/deploy/workflow changes after sourceSnapshotSha. package.json may differ only by version. Freeze the full candidate SHA before handoff; do not merge future dev changes. This is preparation only; the one-time exception for main hotfix2355 is not reused."
+}

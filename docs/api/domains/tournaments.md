@@ -53,7 +53,7 @@ Task 20261122: `/tournament-management`는 디렉터 전용 담당 대회 목록
 | POST (suffix 없음) | 설정 + `previewHash` + `requestId` + 선택 `replaceExisting`, `acknowledgeRematches`. 실제 생성은 하나의 대회 잠금/트랜잭션 안에서 수행한다. |
 | GET `/requests/:requestId` | `{ completed, result }`. 감사 로그에 커밋된 생성 결과가 있으면 completed=true. false는 진행 중/미완료를 구분하지 않으며 동일 키로 재시도할 수 있다. |
 
-설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 짝수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수와 같아야 한다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
+설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 정수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수(4~64 정수)와 같아야 한다. 홀수 조도 실제 팀 간 경기만 생성하며 별도 휴식 경기는 만들지 않는다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
 
 배정 배열은 단독에서는 position(시드 번호) 순서, 조별에서는 조 배열과 조 안 자리 순서다. 제공 시 모든 자리에 서로 다른 confirmed 등록을 넣어야 한다. 생략하면 빈 골격을 생성한다. 조별 결선은 높은 조별 순위를 우선하여 부전승을 주며 동일 순위는 drawSeed로 추첨한다. 같은 조 분리는 128회 이내 결정적 탐색으로 개선하고, 첫 경기 재대결 가능성은 warnings로 알려 확인 후 생성한다.
 
@@ -1061,3 +1061,34 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 ### 경기별 제목 수정 (2026-11-11)
 
 `PATCH /admin/fixtures/:fixtureId`의 `displayTitle`은 경기별 표시 제목(선택, nullable string, trim 후 최대120자)이다. 생략은 보존, null/빈 문구는 자동 제목 복원이다. 기존 관리자 쓰기 권한과 대회/경기 잠금·감사를 적용하고, 제목만 변경하면 팀·진출 연결·결과를 변경하지 않는다. `V1TournamentMatchDetails.displayTitle` (`v1_tournament_match_details.display_title`)에 저장하며 additive migration을 동반한다. 관리자 bracket·수정 응답과 공개 detail/schedule에 동일 값을 반환한다. 목록 수정창과 그림/모바일 편집은 같은 폼·PATCH 및 bracket query invalidation을 사용한다.
+
+## 대진 시간·구장 독립 배정 (2026-11-12)
+
+`league_knockouts`의 어드민 대진에서 시간/구장을 독립 배정한다. 실제 일정·장소·필드는 기존 `V1TeamMatch.startAt`, `fieldId`, 장소 스냅샷이 정본이다. 목록·그림·수동 편집·배정 패널은 기존 `GET /admin/tournaments/:id/bracket`을 읽으며 배정도 기존 `PATCH /admin/fixtures/:fixtureId`를 사용한다.
+
+| Method | Path | 계약 |
+|---|---|---|
+| GET | `/api/v1/admin/tournaments/:tournamentId/schedule-times` | `{ items: [{ id, tournamentId, scheduledAt, createdAt }] }`, scheduledAt 오름차순 |
+| POST | 같은 경로 | `{ scheduledAt: ISO8601-with-offset }` → `{ item }`. 기본 POST 201, 같은 instant 재요청도 같은 행 반환 |
+| PATCH | 같은 경로 | `{ expectedScheduleTimeId, expectedScheduledAt, scheduledAt, expectedFixtureIds? }`(둘 다 offset 포함 ISO8601) → `{ item, affectedFixtureCount }`. 항목과 같은 기존 시각에 배정된 경기·팀 일정을 한 트랜잭션에서 이동 |
+
+### 등록 항목 수정 (2026-11-13)
+
+- expectedScheduleTimeId는 편집 시작 시 조회한 preset UUID이며 필수다. preset 없이 경기에서 파생된 항목은 명시적으로 null과 당시 경기 UUID 목록 expectedFixtureIds(1개 이상)를 보낸다. 같은 이전 시각에 다른 preset이나 경기 그룹이 재생성됐어도 409 SCHEDULE_TIME_STALE로 거절한다. 저장 직전에 최신 ID로 덮어쓰거나 자동 재시도하지 않는다.
+
+- PATCH는 등록된 preset뿐 아니라 실제 경기에서 직접 입력한 시간 항목도 수정한다. 기존 preset ID는 유지하며 직접 입력 항목은 성공 시 새 preset을 저장한다. 새 시각이 같으면 데이터·감사를 추가하지 않는 no-op다.
+- 기존 시각에 더 이상 preset/경기가 없으면 `409 SCHEDULE_TIME_STALE`. 다른 preset 또는 경기에서 쓰는 새 시각은 `409 SCHEDULE_TIME_DUPLICATE`로 거절하며 자동 합치지 않는다. 클라이언트 자동 재시도는 하지 않으며 응답 유실/충돌 때 목록을 다시 조회한다.
+- 배정된 경기 중 SCHEDULED가 아닌 게임이 있으면 `409 SCHEDULE_TIME_FIXTURE_STARTED`로 전체 거절한다. 정본 게임이 없으면 `409 TOURNAMENT_MATCH_GAME_MISSING`. 기존 단계 순서 위반은 `FIXTURE_SCHEDULE_STAGE_ORDER`. Game → TeamMatch 잠금과 기존 대진 advisory lock을 사용하며 같은 시각 전체 이동의 최종 위치를 기준으로 순서를 검증한다.
+- 기존 정본 match updater로 경기 길이·팀 일정·명단 재계산 이벤트를 유지한다. fieldId/장소/팀/결과는 변경하지 않는다. 최종 `tournament.schedule_time.update` 감사 실패를 포함해 모두 rollback한다. 등록/수정 모두 같은 대회 잠금으로 직렬화한다. 조회/등록과 같은 auth/권한/format/DTO 검증을 적용한다.
+- 구장 이름 수정은 기존 `PATCH /api/v1/tournament-ops/tournaments/:id/fields/:fieldId`에 `{ expectedVersion, name, syncAssignedFixtures: true }`를 전달한다. 기존 플랫폼 구장 관리 권한과 버전·멱등 키·중복 이름 계약을 유지한다. 명시 flag가 있으면 같은 대회·fieldId의 미삭제 경기 placeName만 원자적으로 동기화하며 주소·좌표·시간과 fieldId는 보존한다. 감사에 반영 경기 수를 기록한다. flag 없는 기존 수정 동작은 유지된다.
+- UI는 사용자 선택 A안(항목 내부 입력/저장/취소)을 사용하고 배정 경기 수를 안내한다. 시간 수정은 대회 쓰기 권한, 등록 구장 이름은 기존 구장 관리 권한이 필요하다. 미등록 레거시 직접 입력 장소는 기존 개별 경기 편집을 사용한다. 서버 실패 시 draft를 유지하고, 저장 후 조회 실패는 별도 경고로 표시한다.
+- 공유 MSW는 정본 경기·팀 일정 저장소가 없는 시간 일괄 수정을 가짜 성공으로 만들지 않고 `503 SCHEDULE_TIME_EDIT_REQUIRES_REAL_API`로 명시한다. 컴포넌트 계약 테스트는 별도 stateful HTTP 핸들러로 실제 훅의 요청과 화면 반영·실패 보존을 검증한다. 구장 mock은 목록·연결된 fixture 장소·운영 보드 이름을 함께 갱신한다.
+
+- `V1AuthGuard` 인증 + 서비스 `getTournamentAdmin`(조회)/`getTournamentMutationAdmin`(등록). 활성 owner/ops는 쓰기, support는 조회, 배정된 활성 대회 총괄은 담당 대회만 허용한다. 철회/만료/타 대회는 `403 PERMISSION_DENIED`.
+- 대회 종류·미삭제·`format === league_knockouts` 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`, 다른 format은 409 `SCHEDULE_TIMES_FORMAT_UNSUPPORTED`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.
+- 신규 `V1TournamentScheduleTime`은 재사용 선택지만 저장한다. `(tournamentId, scheduledAt)` unique 및 createMany skipDuplicates로 동시 등록/응답 유실 재시도에도 중복을 만들지 않는다. 실제 새 행만 `tournament.schedule_time.create` 관리자/대회 감사에 기록한다. 시간 목록 등록은 기존 경기 시간을 바꾸지 않는다.
+- 시간 배정/해제는 `{ scheduledAt: ISO | null }`만 보내 fieldId/장소를 보존한다. 구장 배정은 `{ fieldId }`, 기존 직접 입력 장소는 `{ fieldId: null, venue, ...snapshot }`, 구장 해제는 `{ fieldId: null, venue: '' }`로 시간을 보존한다. 기존 경기 수정의 권한·필드 범위·단계/경기 상태 검사와 오류를 그대로 적용한다.
+- 구장 목록/등록은 기존 `/tournament-ops/tournaments/:id/fields`를 재사용한다. 필드 생성은 기존대로 플랫폼 운영자만, 배정은 owner/ops 및 담당 총괄이다. support/담당자에게 새로운 필드 등록 권한을 주지 않는다.
+- 패널은 저장된 시간 선택지와 실제 경기의 수동 입력 시간을 합쳐 표시한다. 구장도 등록 필드와 경기의 기존 장소 스냅샷을 표시하며 서로 다른 주소·좌표를 같은 이름만으로 합치지 않는다. 비활성/목록에서 빠진 필드는 기존 배정 조회·해제만 제공한다.
+- 날짜/시각 입력은 한국 시간이며 UTC ISO로 변환한다. 같은 시각에 여러 구장 진행은 허용한다. 동일 시간·동일 구장의 중복은 화면 경고(자동 차단/다른 경기 이동 없음). 저장 실패는 기존 배정 유지와 실제 원인을 표시한다. 저장 후 재조회 실패는 저장 성공 여부와 최신 조회 실패를 구분한다.
+- 각 시간/구장 제목의 접기/펼치기는 UI 상태만 변경한다. 경기 데이터·선택지·다른 배정을 변경하지 않는다. 실제 단일 경기 편집의 직접 입력은 유지한다. 새로고침 후에도 저장된 선택지와 실제 경기 값은 서버에서 복원한다.

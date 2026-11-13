@@ -65,6 +65,11 @@ describe('resolveFixtureLabel — 경기 이름', () => {
       .toBe('4강 2차 · 10번 경기');
   });
 
+  it('운영자가 정한 경기 제목이 있으면 부제에 그것을 쓰고, 번호는 그대로 붙인다', () => {
+    expect(resolveFixtureLabel({ ...item({}), displayTitle: '풀리그 1라운드' }, teams, new Map()).subtitle)
+      .toBe('풀리그 1라운드 · 3번 경기');
+  });
+
   it('조가 없으면 라운드만 쓴다 — 팀 이름을 모를 때도 같다', () => {
     expect(resolveFixtureLabel(item({ groupName: null }), undefined, new Map())).toEqual({
       title: '3번 경기',

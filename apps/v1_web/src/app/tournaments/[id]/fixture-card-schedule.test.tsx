@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentFixture } from '@/types/api';
-import { FixtureCard } from './tournament-detail-client';
+import { FixtureCard, partitionTournamentSections } from './tournament-detail-client';
 
 function makeGroupFixture(scheduledAt: string | null, round = 'group'): V1TournamentFixture {
   return {
@@ -45,6 +45,46 @@ describe('FixtureCard 조별 일정 시간', () => {
     render(<FixtureCard fixture={makeGroupFixture(null)} />);
 
     expect(screen.getByText('시간 미정')).toBeInTheDocument();
+  });
+});
+
+// 어드민에서 경기 제목·번호를 고치면 일정·대진표처럼 대회 상세 조별 일정에도 그대로 보여야 한다.
+describe('FixtureCard 경기 제목', () => {
+  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 보여준다', () => {
+    render(<FixtureCard fixture={{ ...makeGroupFixture(null, 'league_r1'), displayTitle: '풀리그 1라운드' }} groupName="A조" />);
+
+    expect(screen.getByText('풀리그 1라운드')).toBeInTheDocument();
+    expect(screen.queryByText('A조 · 조별리그 1라운드')).not.toBeInTheDocument();
+  });
+
+  it.each([[null], [''], ['  ']])('제목이 %j 이면 라운드·조 이름으로 만든 이름을 쓴다', (displayTitle) => {
+    render(<FixtureCard fixture={{ ...makeGroupFixture(null, 'league_r1'), displayTitle }} groupName="A조" />);
+
+    expect(screen.getByText('A조 · 조별리그 1라운드')).toBeInTheDocument();
+  });
+});
+
+describe('partitionTournamentSections 조별 일정 순서', () => {
+  const group = { id: 'group-a', name: 'A조', phase: 'group' } as never;
+  const fixture = (id: string, fixtureNumber: number, round: string): V1TournamentFixture => ({ ...makeGroupFixture(null, round), id, fixtureNumber });
+
+  it('서버가 준 라운드 순서가 아니라 경기 번호 순으로 정렬한다', () => {
+    // 서버는 league_r1…league_r5 순으로 내려주지만 운영자가 마지막 라운드 경기를 1번으로 바꾼 경우.
+    const { groupFixtures } = partitionTournamentSections(
+      'league_knockouts',
+      [fixture('r1', 2, 'league_r1'), fixture('r2', 3, 'league_r2'), fixture('r5', 1, 'league_r5')],
+      [group],
+    );
+
+    expect(groupFixtures.map((item) => item.id)).toEqual(['r5', 'r1', 'r2']);
+  });
+
+  it('입력 배열은 바꾸지 않는다', () => {
+    const input = [fixture('r1', 2, 'league_r1'), fixture('r5', 1, 'league_r5')];
+
+    partitionTournamentSections('league_knockouts', input, [group]);
+
+    expect(input.map((item) => item.id)).toEqual(['r1', 'r5']);
   });
 });
 

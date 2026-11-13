@@ -15,7 +15,7 @@ import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { bracketTrackLabel, effectiveBracketTrack, orderedBracketTracks } from '@/lib/bracket-track';
 import type {
@@ -831,7 +831,8 @@ function VideoGallerySection({
             <div key={f.id}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-strong)' }}>
-                  {competitionMatchLabel({
+                  {competitionFixtureName({
+                    displayTitle: f.displayTitle,
                     groupName: groups.find((group) => group.id === f.groupId)?.name ?? null,
                     round: f.round,
                     legNumber: f.legNumber,

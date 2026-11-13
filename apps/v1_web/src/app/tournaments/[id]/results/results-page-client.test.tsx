@@ -161,6 +161,16 @@ describe('ResultsPageContent — 우승팀 없는 완료 대회의 경기 영상
     expect(screen.getByText('하이라이트')).toBeInTheDocument();
   });
 
+  // 어드민에서 고친 경기 제목은 경기 영상 모아보기에도 같은 이름으로 보여야 한다.
+  it('경기 영상 모아보기는 운영자가 정한 경기 제목을 쓴다', () => {
+    const tournament = baseTournament({ fixtures: [{ ...leagueFixtureWithVideo(), displayTitle: '풀리그 1라운드' }] });
+    render(<ResultsPageContent tournament={tournament} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 영상 1' }));
+
+    expect(screen.getByText('풀리그 1라운드')).toBeInTheDocument();
+  });
+
   it('영상이 없으면(videosTotal===0) 탭 자체를 렌더하지 않는다', () => {
     const tournament = baseTournament({ fixtures: [{ ...leagueFixtureWithVideo(), videos: [] }] });
     render(<ResultsPageContent tournament={tournament} />);

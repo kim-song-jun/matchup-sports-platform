@@ -51,6 +51,16 @@ export type CompetitionMatchLabelInput = {
  * `league_r{n}` 은 회전을 넘어 번호가 이어지므로 회전(`legNumber`)을 붙이지 않는다; 결선 2차전만 "4강 2차".
  * 서버 `competitionMatchLabel`·시드 복사본과 같은 규칙이다 — 바꾸면 셋 다.
  */
+/**
+ * 화면에 쓰는 경기 이름 — 운영자가 정한 경기 제목(`displayTitle`)이 있으면 그것을, 없으면 `competitionMatchLabel` 을 쓴다.
+ * 어드민 대진표·일정·경기 상세가 이미 이 순서다. 새 화면은 `competitionMatchLabel` 을 바로 부르지 말고 이걸 쓴다 —
+ * 그러면 어드민이 고친 제목이 그 화면만 빠지는 일(MD-QA 대회 상세 조별 일정)이 생기지 않는다.
+ */
+export function competitionFixtureName(input: CompetitionMatchLabelInput & { displayTitle?: string | null }): string {
+  const custom = input.displayTitle?.trim();
+  return custom ? custom : competitionMatchLabel(input);
+}
+
 export function competitionMatchLabel({ groupName, round, legNumber, withinGroup = false }: CompetitionMatchLabelInput): string {
   const leg = legNumber != null && legNumber > 1 && !LEAGUE_ROUND.test(round.trim()) ? ` ${legNumber}차` : '';
   const roundPart = `${tournamentRoundLabel(round)}${leg}`;

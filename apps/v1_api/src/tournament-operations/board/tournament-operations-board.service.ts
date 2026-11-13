@@ -191,6 +191,8 @@ type BoardRow = {
   fixtureNumber: number | null;
   legNumber: number | null;
   groupName: string | null;
+  /** 운영자가 정한 경기 제목(`V1TournamentMatchDetails.displayTitle`). 없거나 리그 행이면 `null`. */
+  displayTitle: string | null;
   fieldId: string | null;
   field: { name: string; version: number } | null;
   homeRegistrationId: string | null;
@@ -628,6 +630,7 @@ export class TournamentOperationsBoardService {
             row.updatedAt.getTime(),
             row.legNumber,
             row.groupName,
+            row.displayTitle,
             fieldVersion,
             gameVersion,
             gameUpdatedAtMs,
@@ -649,6 +652,7 @@ export class TournamentOperationsBoardService {
           fixtureNumber: row.fixtureNumber,
           legNumber: row.legNumber,
           groupName: row.groupName,
+          displayTitle: row.displayTitle,
           gameId: row.game?.id ?? null,
           gameState: row.game?.state ?? null,
           fieldId: row.fieldId,
@@ -1031,6 +1035,7 @@ export class TournamentOperationsBoardService {
             round: true,
             fixtureNumber: true,
             legNumber: true,
+            displayTitle: true,
             homeRegistrationId: true,
             awayRegistrationId: true,
             group: { select: { name: true } },
@@ -1047,6 +1052,7 @@ export class TournamentOperationsBoardService {
       fixtureNumber: row.tournamentDetails?.fixtureNumber ?? null,
       legNumber: row.tournamentDetails?.legNumber ?? null,
       groupName: row.tournamentDetails?.group?.name ?? null,
+      displayTitle: row.tournamentDetails?.displayTitle ?? null,
       fieldId: row.fieldId,
       field: row.field,
       homeRegistrationId: row.tournamentDetails?.homeRegistrationId ?? null,
@@ -1151,6 +1157,7 @@ export class TournamentOperationsBoardService {
       fixtureNumber: null,
       legNumber: null,
       groupName: null,
+      displayTitle: null,
       fieldId: row.fieldId,
       field: row.field,
       // A legacy league row can have no host team while it is still recruiting. Keep that

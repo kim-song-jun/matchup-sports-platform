@@ -20,9 +20,12 @@ Native builds use the alpha test-app key for `kr.co.teameet.alpha` and the produ
 for `kr.co.teameet`. See the Android and iOS release runbooks.
 
 The Kakao admin key (`ALPHA_KAKAO_ADMIN_KEY`, delivered as `KAKAO_ADMIN_KEY`) is optional and
-reaches the API container only. It authenticates unlink calls and the Kakao unlink webhook; while it
-is empty both stay off and the sync step reports `KAKAO_ADMIN_KEY not provided; skipped` without
-failing the deploy. Rules for handling it (no values in this repository):
+reaches the API container only. It authenticates unlink calls and the Kakao unlink webhook; both stay
+off while the host's runtime env has no value. An unset or empty secret makes the sync step report
+`KAKAO_ADMIN_KEY not provided; skipped` and leave the host's `deploy/.env` untouched without failing
+the deploy, so a value synced earlier stays in effect. Removing the secret therefore does not turn the
+feature off; delete the `KAKAO_ADMIN_KEY` line from the host's `deploy/.env` (and the
+`/teameet/alpha/env/KAKAO_ADMIN_KEY` parameter) by hand. Rules for handling it (no values in this repository):
 
 - Use the "대표 어드민 키" of the **test app** here and the production app's key in production; the apps
   number members differently, so a swapped key fails or points at another app's members.

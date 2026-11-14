@@ -1,12 +1,12 @@
 import { webcrypto } from 'node:crypto';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoLoginButton } from './kakao-login-button';
 import { V1ApiError } from '@/lib/api-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
-import { consumeKakaoOAuthAttempt, parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { consumeKakaoOAuthAttempt, parseKakaoOAuthAttempt, prepareKakaoAuthorize, resetKakaoAuthorizeAttempt } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { getSavedRedirectPath, V1_SESSION_HINT_KEY } from '@/lib/session-storage';
@@ -25,7 +25,10 @@ vi.mock('@/lib/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api-client')>()),
   v1Post: api.v1Post,
 }));
-vi.mock('@/lib/kakao-js-sdk', () => ({ getInitializedKakaoJsSdk: sdk.getInitializedKakaoJsSdk }));
+vi.mock('@/lib/kakao-js-sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/kakao-js-sdk')>()),
+  getInitializedKakaoJsSdk: sdk.getInitializedKakaoJsSdk,
+}));
 vi.mock('@/lib/analytics', () => ({ trackEvent: analytics.trackEvent }));
 vi.mock('@/lib/client-error-reporter', () => ({ reportClientError: reporter.reportClientError }));
 
@@ -51,6 +54,7 @@ beforeEach(() => {
 
   vi.stubGlobal('crypto', webcrypto);
   vi.clearAllMocks();
+  resetKakaoAuthorizeAttempt();
   queryClient = new QueryClient();
   assigned = null;
   statusAtNavigation = null;
@@ -67,7 +71,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   delete window.TeameetNative;
+  delete window.Kakao;
   window.sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 
 let queryClient: QueryClient;
@@ -81,7 +87,7 @@ const renderButton = () => render(
     <KakaoLoginButton href={HREF} />
   </QueryClientProvider>,
 );
-const click = () => userEvent.click(screen.getByRole('link', { name: '카카오 로그인' }));
+const click = () => userEvent.click(screen.getByRole('button', { name: '카카오 로그인' }));
 const HANDOFF_TEXT = '카카오 계정 로그인 화면으로 이동할게요';
 /** 카카오 인가 화면으로 넘어간 URL 이 실은 state 를 콜백이 하듯 저장된 시도와 대조한다. */
 const handedOffState = () => new URL(assigned ?? 'about:blank').searchParams.get('state');
@@ -90,7 +96,8 @@ describe('KakaoLoginButton', () => {
   describe('appearance', () => {
     it('is named by its label while the speech-bubble symbol stays decorative', () => {
       renderButton();
-      const link = screen.getByRole('link', { name: '카카오 로그인' });
+      const link = screen.getByRole('button', { name: '카카오 로그인' });
+      expect(link).not.toHaveAttribute('href');
       const symbol = link.querySelector('svg');
       expect(symbol).not.toBeNull();
       expect(symbol).toHaveAttribute('aria-hidden', 'true');
@@ -455,6 +462,166 @@ describe('KakaoLoginButton', () => {
       await click();
       await waitFor(() => expect(assigned).toContain('state='));
       expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('on a mobile browser', () => {
+    const ANDROID = 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+    const tap = () => fireEvent.click(screen.getByRole('button', { name: '카카오 로그인' }));
+    const flush = () => act(async () => { await Promise.resolve(); });
+
+    beforeEach(() => {
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(ANDROID);
+      Object.defineProperty(window.navigator, 'maxTouchPoints', { configurable: true, value: 5 });
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', 'rest');
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', 'https://teameet.test/callback/kakao');
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_SCOPE', 'name,phone_number');
+      authorize.mockReset();
+      const fakeSdk = { init: vi.fn(), isInitialized: () => true, Auth: { authorize } };
+      sdk.getInitializedKakaoJsSdk.mockImplementation(async () => { window.Kakao = fakeSdk; return fakeSdk; });
+      window.location.search = '?redirect=%2Fteams%2Fnew';
+    });
+
+    async function renderPrepared() {
+      renderButton();
+      await act(async () => { await prepareKakaoAuthorize(); });
+    }
+
+    it('reaches authorize inside the tap itself and remembers where the reader was going', async () => {
+      await renderPrepared();
+      tap();
+
+      expect(authorize).toHaveBeenCalledTimes(1);
+      expect(authorize).toHaveBeenCalledWith({
+        redirectUri: 'https://teameet.test/callback/kakao',
+        scope: 'name,phone_number',
+        state: expect.stringMatching(/^[0-9a-f]{32}$/),
+        throughTalk: true,
+      });
+      expect(storedAttempt()).toEqual({ state: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), mode: 'login', returnTo: null });
+      expect(getSavedRedirectPath()).toBe('/teams/new');
+      await flush();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_start', { method: 'kakao', login_path: 'talk', sdk_ready: true });
+      expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+    });
+
+    describe('tapping again', () => {
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => {
+        vi.useRealTimers();
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      });
+
+      it('is ignored for two seconds, then opens Kakao Talk again with the same state', async () => {
+        await renderPrepared();
+        tap();
+        await flush();
+
+        await act(() => vi.advanceTimersByTimeAsync(1_000));
+        tap();
+        expect(authorize).toHaveBeenCalledTimes(1);
+
+        await act(() => vi.advanceTimersByTimeAsync(1_000));
+        tap();
+        expect(authorize).toHaveBeenCalledTimes(2);
+        expect(authorize.mock.calls[1][0].state).toBe(authorize.mock.calls[0][0].state);
+        await flush();
+        expect(analytics.trackEvent).toHaveBeenCalledTimes(2);
+        expect(assigned).toBeNull();
+      });
+
+      it('counts the two seconds only while the page is visible', async () => {
+        const setVisibility = (value: DocumentVisibilityState) => Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+        await renderPrepared();
+        tap();
+        await flush();
+
+        await act(() => vi.advanceTimersByTimeAsync(500));
+        setVisibility('hidden');
+        act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+        await act(() => vi.advanceTimersByTimeAsync(4_500));
+        setVisibility('visible');
+        act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+
+        await act(() => vi.advanceTimersByTimeAsync(1_000));
+        tap();
+        expect(authorize).toHaveBeenCalledTimes(1);
+
+        await act(() => vi.advanceTimersByTimeAsync(1_000));
+        tap();
+        expect(authorize).toHaveBeenCalledTimes(2);
+      });
+
+      it('stays locked after moving to the authorize URL until the page is shown again', async () => {
+        sdk.getInitializedKakaoJsSdk.mockRejectedValue(new Error('script blocked'));
+        renderButton();
+        tap();
+        await flush();
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(assigned).not.toBeNull();
+        const first = assigned;
+
+        await act(() => vi.advanceTimersByTimeAsync(10_000));
+        tap();
+        expect(assigned).toBe(first);
+        expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
+
+        act(() => { window.dispatchEvent(new Event('pageshow')); });
+        tap();
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(reporter.reportClientError).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('starts over with a new state after coming back from the back-forward cache', async () => {
+      await renderPrepared();
+      tap();
+      const firstState = authorize.mock.calls[0][0].state;
+
+      act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+      await act(async () => { await prepareKakaoAuthorize(); });
+      tap();
+
+      expect(authorize).toHaveBeenCalledTimes(2);
+      expect(authorize.mock.calls[1][0].state).not.toBe(firstState);
+    });
+
+    it('tells the storage failure to the reader and releases the button', async () => {
+      const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      await renderPrepared();
+      const failing = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError'); });
+      tap();
+      await waitFor(() => expect(alert).toHaveBeenCalledWith('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.'));
+      expect(authorize).not.toHaveBeenCalled();
+      failing.mockRestore();
+      tap();
+      expect(authorize).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('login_start', () => {
+    it('reports the SDK account path from a desktop browser as not prepared', async () => {
+      renderButton();
+      await click();
+      await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_start', { method: 'kakao', login_path: 'sdk_account', sdk_ready: false });
+    });
+
+    it('reports the authorize URL path when the SDK cannot load', async () => {
+      sdk.getInitializedKakaoJsSdk.mockRejectedValue(new Error('Failed to load Kakao JS SDK script'));
+      renderButton();
+      await click();
+      await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('login_start', { method: 'kakao', login_path: 'account_url', sdk_ready: false }));
+    });
+
+    it('reports the native path for the shell token flow', async () => {
+      installShell();
+      reply = { accessToken: 'kakao-token' };
+      renderButton();
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_start', { method: 'kakao', login_path: 'native' });
+      expect(analytics.trackEvent.mock.calls.filter(([name]) => name === 'login_start')).toHaveLength(1);
     });
   });
 });

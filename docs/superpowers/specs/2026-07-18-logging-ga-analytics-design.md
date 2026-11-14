@@ -61,6 +61,7 @@ GA4 명명 규칙(snake_case) 준수. 카테고리별 이벤트 카탈로그:
 **계정**
 - `sign_up_start { method }` / `sign_up_complete { method, sportType? }`
 - `login { method }` / `login_failed { method, reason }`
+- `login_start { method, login_path, sdk_ready? }` — 카카오 로그인 버튼을 누를 때마다 한 번. `login_path` 는 `talk`(카카오톡으로 넘어가는 간편로그인) / `sdk_account`(SDK 가 여는 카카오계정 화면) / `account_url`(인가 주소로 직접 이동) / `native`(앱 셸의 네이티브 토큰) 중 하나이고, `sdk_ready`(boolean)는 탭 시점에 SDK 가 이미 준비돼 있었는지이며 `native` 에서는 보내지 않는다. state·경로·오류·주소는 보내지 않는다. `login_path`·`sdk_ready` 는 맞춤 측정기준으로 등록하기 전에는 이벤트 수만 보인다.
 - `logout {}`
 
 **온보딩**

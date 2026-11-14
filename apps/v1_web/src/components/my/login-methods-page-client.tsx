@@ -22,7 +22,7 @@ import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import { V1ApiError } from '@/lib/api-client';
 import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
 import { reportClientError } from '@/lib/client-error-reporter';
-import { startKakaoLinkAuthorize } from '@/lib/kakao-oauth';
+import { prepareKakaoAuthorize, startKakaoLinkAuthorize } from '@/lib/kakao-oauth';
 import {
   EMAIL_LINK_PATH,
   LOGIN_METHODS_PATH,
@@ -356,6 +356,12 @@ export function LoginMethodsPageClient() {
   };
 
   const providers = authMe.data?.user.authProviders;
+  // 카카오 연결 버튼이 그려지는 계정이면 눌리기 전에 카카오 인가 준비를 시작한다.
+  const kakaoConnectable = authMe.data?.user.canLinkLoginMethods === true && providers?.includes('kakao') === false;
+  useEffect(() => {
+    if (kakaoConnectable) void prepareKakaoAuthorize();
+  }, [kakaoConnectable]);
+
   if (authMe.isError || (authMe.data && !providers)) {
     return <ErrorState message="로그인 방법을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void authMe.refetch()} />;
   }

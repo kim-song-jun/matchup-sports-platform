@@ -76,3 +76,23 @@ describe('Kakao JS SDK loader', () => {
     expect(init).toHaveBeenCalledWith('js-key');
   });
 });
+
+describe('getReadyKakaoJsSdk', () => {
+  it('returns the SDK only once it is initialised', async () => {
+    const { getReadyKakaoJsSdk } = await freshLoader();
+    expect(getReadyKakaoJsSdk()).toBeNull();
+
+    let initialised = false;
+    window.Kakao = { init: vi.fn(), isInitialized: () => initialised, Auth: { authorize: vi.fn() } };
+    expect(getReadyKakaoJsSdk()).toBeNull();
+
+    initialised = true;
+    expect(getReadyKakaoJsSdk()).toBe(window.Kakao);
+  });
+
+  it('does not add a script of its own', async () => {
+    const { getReadyKakaoJsSdk } = await freshLoader();
+    getReadyKakaoJsSdk();
+    expect(scripts()).toHaveLength(0);
+  });
+});

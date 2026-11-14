@@ -331,6 +331,15 @@ describe('Kakao authorize preparation and start', () => {
       await prepareKakaoAuthorize();
       expect(window.sessionStorage).toHaveLength(0);
     });
+
+    it('resolves and prepares again on the next call when the SDK global misbehaves', async () => {
+      window.Kakao = { isInitialized: () => { throw new Error('broken global'); } } as unknown as typeof window.Kakao;
+      await expect(prepareKakaoAuthorize()).resolves.toBeUndefined();
+
+      delete window.Kakao;
+      await prepareKakaoAuthorize();
+      expect(sdk.getInitializedKakaoJsSdk).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('startKakaoAuthorize', () => {

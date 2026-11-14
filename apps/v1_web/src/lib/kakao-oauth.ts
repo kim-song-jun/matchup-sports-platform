@@ -145,8 +145,8 @@ async function prepareState(): Promise<void> {
 }
 
 async function prepareSdk(jsKey: string): Promise<void> {
-  if (getReadyKakaoJsSdk()) return;
   try {
+    if (getReadyKakaoJsSdk()) return;
     await getInitializedKakaoJsSdk(jsKey);
   } catch {
     // 탭에서 다시 싣고, 그때의 실패를 알린다. 화면을 열기만 한 방문마다 오류를 쌓지 않는다.
@@ -160,7 +160,13 @@ async function prepareSdk(jsKey: string): Promise<void> {
 export function prepareKakaoAuthorize(): Promise<void> {
   const jsKey = preparationJsKey();
   if (!jsKey) return Promise.resolve();
-  preparing ??= Promise.all([prepareSdk(jsKey), prepareState()]).then(() => { preparing = null; });
+  preparing ??= (async () => {
+    try {
+      await Promise.all([prepareSdk(jsKey), prepareState()]);
+    } finally {
+      preparing = null;
+    }
+  })();
   return preparing;
 }
 

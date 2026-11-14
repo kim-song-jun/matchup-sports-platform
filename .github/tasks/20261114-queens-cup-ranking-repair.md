@@ -52,4 +52,5 @@ Created: 2026-11-14
 - `tsc --noEmit -p tsconfig.spec.json`: PASS. `bash -n deploy/deploy-alpha.sh`와 `bash -n deploy/deploy-prod.sh`: PASS.
 - 수동 CLI 시나리오: 공개 사용자, viewport N/A. 운영 24팀의 집계 대조는 모두 일치(첫 조회); 순위는 B조 야수파FS/BSA와 C조 서울 이랜드 FC/리브wfc의 차이 확인. 후속 조회는 아래 404. 시작한 서버/브라우저/DB 컨테이너 없음.
 - PR/배포 증거는 후속 갱신.
+- PR #2393, 첫 head 6030b9afb: CI surface 검사에서 원시 조회/행 잠금 추가를 거부했다. 공통 `findTournamentOnSurface`/`lockTournamentForConfigChange` 재사용으로 수정. 로컬 surface gate, 10 tests, API typecheck 재통과. baseline 예외는 추가하지 않았다.
 - 운영 공개 API가 2026-11-14 08:55 UTC부터 반복 404(TOURNAMENT_NOT_FOUND)를 반환하며 DB health는 정상. 비공개/취소/삭제 여부는 공개 API만으로 판별하지 않는다. 이 상태에서 운영 보정을 실행/성공했다고 말하지 않는다.

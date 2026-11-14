@@ -74,7 +74,7 @@ describe('MD-QA #145 review follow-up public capacity', () => {
     ['open', null, 10, 5, true],
     // 접수를 시작하지 않은 초안은 정원이 남아도 받지 않는다(2026-10-27, 대회와 같은 규칙).
     ['draft', null, 0, 0, false],
-  ] as const)('detail %s maxTeams=%s confirmed=%s pending=%s exposes registrationOpen=%s to the public join guide', async (
+  ] as const)('detail %s maxTeams=%s confirmed=%s pending=%s exposes registrationOpen=%s in the public detail', async (
     status, maxTeams, confirmedCount, pendingPaymentCount, registrationOpen,
   ) => {
     const registrations = Array.from({ length: confirmedCount }, (_, index) => ({
@@ -83,7 +83,7 @@ describe('MD-QA #145 review follow-up public capacity', () => {
     const { service, findFirst, prisma } = makeService({
       status, maxTeams, registrations, registrationDeadlineAt: new Date('2098-01-01T00:00:00.000Z'),
     }, pendingPaymentCount);
-    // The actual public detail response drives LeagueJoinGuideCard's recruiting badge and application link.
+    // The public detail response carries the registration state: capacity counts and the derived registrationOpen flag.
     const result = await service.detail('league-1');
     expect(result).toMatchObject({ maxTeams, confirmedCount, pendingPaymentCount, registrationOpen });
     expect(findFirst.mock.calls[0][0].select.registrations.where).toEqual({ status: 'confirmed' });

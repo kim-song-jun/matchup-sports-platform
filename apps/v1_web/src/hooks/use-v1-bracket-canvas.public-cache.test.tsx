@@ -22,7 +22,6 @@ const publicKeys = (id: string) => [
   v1Keys.leagueMatch(id),
   v1Keys.leagueMatchStandings(id),
   v1Keys.leagueMatchPlayerRecords(id),
-  v1Keys.leagueClaimableFixtures(id),
   v1Keys.tournament(id),
   publicGameRecordsKeys.leagueFixtureRecord(id, `${id}-fixture`),
 ];

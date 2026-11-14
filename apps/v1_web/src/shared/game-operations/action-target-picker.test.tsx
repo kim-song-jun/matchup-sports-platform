@@ -151,7 +151,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
   });
 
-  it('GOAL은 선수 없이 익명으로 팀 득점을 기록한다', async () => {
+  it.each([{ lineups: LINEUPS }, { lineups: [] }])('GOAL은 명단 유무와 무관하게 익명으로 팀 득점을 기록한다', async ({ lineups }) => {
     const onCommitGoal = vi.fn();
     render(
       <ActionTargetPicker
@@ -160,7 +160,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         actionType="GOAL"
         frozen={FROZEN}
         sides={SIDES}
-        lineups={LINEUPS}
+        lineups={lineups}
         allowTeamOnly
         onCommit={onCommitGoal}
         onCancel={vi.fn()}

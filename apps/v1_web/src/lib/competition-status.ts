@@ -9,11 +9,9 @@ import {
   competitionKindLabel,
   gameRosterReasonLabel,
   gameRosterStatusLabel,
-  leagueSeasonStageLabel,
   leagueStateLabel,
   matchPhaseLabel,
   type CompetitionKindKey,
-  type LeagueSeasonStage,
   type LeagueStateKey,
   type MatchPhase,
 } from './v1-status-labels';
@@ -59,13 +57,9 @@ const MATCH_PHASE_CHIP: Record<MatchPhase, Omit<StatusChipModel, 'label'>> = {
   cancelled: { tone: 'red', icon: 'cancel' },
 };
 
-export function matchPhaseChip(
-  phase: MatchPhase,
-  options: { withSubject?: boolean; count?: number } = {},
-): StatusChipModel {
-  const base = matchPhaseLabel(phase);
-  const counted = options.count === undefined ? base : `${base} ${options.count}`;
-  return { ...MATCH_PHASE_CHIP[phase], label: options.withSubject ? `${MATCH_SUBJECT_LABEL} · ${counted}` : counted };
+export function matchPhaseChip(phase: MatchPhase, options: { withSubject?: boolean } = {}): StatusChipModel {
+  const label = matchPhaseLabel(phase);
+  return { ...MATCH_PHASE_CHIP[phase], label: options.withSubject ? `${MATCH_SUBJECT_LABEL} · ${label}` : label };
 }
 
 /** 운영 상태(GameState)로 읽는 경기 칩. 모르는 값은 칩 없이 둔다(영문 코드 노출 방지). */
@@ -147,77 +141,6 @@ const PUBLIC_STATUS_GAME_STATE: Record<string, NonNullable<LeagueFixturePhaseInp
 export function withPublicRecordGameState<T extends LeagueFixturePhaseInput>(fixture: T, recordStatus: string | undefined): T {
   const gameState = recordStatus === undefined ? undefined : PUBLIC_STATUS_GAME_STATE[recordStatus];
   return gameState === undefined ? fixture : { ...fixture, gameState };
-}
-
-export interface LeagueFixturePhaseCounts {
-  readonly scheduled: number;
-  readonly awaitingResult: number;
-  readonly live: number;
-  readonly ended: number;
-}
-
-/** 취소 대진은 순위 집계에서 빠지므로 세지 않는다. */
-export function countLeagueFixturePhases(
-  fixtures: readonly LeagueFixturePhaseInput[],
-  nowMs: number = Date.now(),
-): LeagueFixturePhaseCounts {
-  const counts = { scheduled: 0, awaitingResult: 0, live: 0, ended: 0 };
-  for (const fixture of fixtures) {
-    const phase = leagueFixturePhase(fixture, nowMs);
-    if (phase === 'scheduled') counts.scheduled += 1;
-    else if (phase === 'awaiting_result') counts.awaitingResult += 1;
-    else if (phase === 'live' || phase === 'paused') counts.live += 1;
-    else if (phase === 'ended') counts.ended += 1;
-  }
-  return counts;
-}
-
-/** 순위표 자리의 집계 칩 — 예정·결과 대기·종료는 0 이어도 늘 싣고, 진행 중은 있을 때만. */
-export function leagueFixtureCountChips(counts: LeagueFixturePhaseCounts): StatusChipModel[] {
-  return [
-    matchPhaseChip('scheduled', { count: counts.scheduled }),
-    ...(counts.live > 0 ? [matchPhaseChip('live', { count: counts.live })] : []),
-    matchPhaseChip('awaiting_result', { count: counts.awaitingResult }),
-    matchPhaseChip('ended', { count: counts.ended }),
-  ];
-}
-
-export function leagueSeasonStage(leagueState: LeagueStateKey, counts: LeagueFixturePhaseCounts): LeagueSeasonStage {
-  if (leagueState === 'completed') return 'completed';
-  if (counts.awaitingResult > 0) return 'awaiting_result';
-  if (counts.ended === 0 && counts.live === 0) return 'preseason';
-  return 'in_progress';
-}
-
-/**
- * 순위표 자리의 한 줄(옛 "확인 중" 상자와 동률 안내를 대신한다). 종료된 시즌은 "최종 순위"
- * 표기와 시즌 결산 카드가 이미 말하므로 줄이 없다.
- */
-export function leagueSeasonStageLine(
-  stage: LeagueSeasonStage,
-  context: { counts: LeagueFixturePhaseCounts; nextStartLabel: string | null },
-): { title: string; text: string | null } | null {
-  const title = leagueSeasonStageLabel(stage);
-  switch (stage) {
-    case 'completed':
-      return null;
-    case 'preseason':
-      return {
-        title,
-        text: context.nextStartLabel === null
-          ? '첫 경기가 끝나면 순위가 생겨요'
-          : `첫 경기 ${context.nextStartLabel}부터 순위가 생겨요`,
-      };
-    case 'awaiting_result':
-      return { title, text: `킥오프가 지난 ${context.counts.awaitingResult}경기의 결과를 기다려요` };
-    case 'in_progress':
-      return { title, text: context.nextStartLabel === null ? null : `다음 경기 ${context.nextStartLabel}` };
-  }
-}
-
-/** 한 팀이라도 치른 경기가 있어야 순위가 뜻을 갖는다 — 그 전엔 동점자 사전순 폴백일 뿐이라 참가 팀 목록을 보여 준다. */
-export function leagueStandingsHaveResults(rows: readonly { played: number }[]): boolean {
-  return rows.some((row) => row.played > 0);
 }
 
 // ── 경기 명단 ────────────────────────────────────────────────────────────────

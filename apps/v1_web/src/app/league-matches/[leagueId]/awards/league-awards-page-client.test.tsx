@@ -24,8 +24,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1LeagueMatch: vi.fn(),
   useV1LeagueMatchStandings: vi.fn(),
   useV1LeagueMatchPlayerRecords: vi.fn(),
-  // Providers 안의 ThemeProvider가 전역으로 호출한다 — league-match-standings-client.test.tsx와
-  // 동일한 이유로 필요하다(<Providers>로 렌더하는 모든 테스트가 이 두 훅을 mocking해야 한다).
+  // Providers 안의 ThemeProvider가 전역으로 호출한다(<Providers>로 렌더하는 모든 테스트가 이 두 훅을 mocking해야 한다).
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   // 경로가 있으면 Providers 안의 알림 배지가 이 훅을 부른다.
@@ -202,6 +201,31 @@ describe('LeagueAwardsPageClient', () => {
 
     const parentWithChain = '/tournaments/league-1?from=%2Ftournaments';
     expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', parentWithChain);
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
+  });
+
+  it.each([
+    ['일정 필터와 hash', '/tournaments/league-1?schedule=upcoming#league-schedule', '/tournaments/league-1?schedule=upcoming#league-schedule'],
+    ['상위 출처까지', '/tournaments/league-1?schedule=upcoming&from=%2Fmy%2Fleagues#league-schedule', '/tournaments/league-1?schedule=upcoming&from=%2Fmy%2Fleagues#league-schedule'],
+    ['옛 /league-matches 주소', '/league-matches/league-1?schedule=upcoming#league-schedule', '/tournaments/league-1?schedule=upcoming#league-schedule'],
+  ])('받은 from 의 %s 를 리그 상세 링크가 그대로 돌려준다', async (_label, from, expected) => {
+    useSearchParamsMock.mockReturnValue(new URLSearchParams({ from }) as never);
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [], champions: [], promotionDecided: false },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    renderAwards();
+
+    expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', expected);
     useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
   });
 

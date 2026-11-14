@@ -58,7 +58,7 @@ function roundLabel(fixtures: V1LeagueFixture[], target: V1LeagueFixture): strin
 function recordLine(row: V1LeagueStandingRow | undefined): string | null {
   if (!row) return null;
   // 아직 한 경기도 안 치른 팀의 "N위"는 동점자 사전순 폴백이라 순위 정보가 아니다 —
-  // 순위표 화면(ParticipantTeamList 분기)과 같은 이유로 전적이 생기기 전엔 숨긴다.
+  // 아직 한 경기도 안 치른 팀은 전적이 생기기 전엔 숨긴다.
   if (row.played === 0) return null;
   return `${row.position}위 · ${row.wins}승 ${row.draws}무 ${row.losses}패`;
 }

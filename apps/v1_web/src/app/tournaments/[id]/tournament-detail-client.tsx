@@ -1986,9 +1986,7 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
       ) : (
         /* 대회용 `FixturesPlaceholder` 를 쓰지 않는다 — 그건 "대회 시작 전에 대진표가
            공개돼요" 라고 적는데, 진행 중인 리그 시즌에 그 말이 뜨면 **틀린 말을 확신 있게**
-           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다.
-           문구는 리그 일정 목록(league-match-standings-client.tsx)이 같은 상황에 쓰는 것을
-           그대로 가져왔다 — 두 화면이 같은 상황을 다르게 부르지 않게. */
+           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다. */
         <section aria-labelledby="fixtures-empty-heading" style={{ marginTop: 24 }}>
           <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             일정 · 대진

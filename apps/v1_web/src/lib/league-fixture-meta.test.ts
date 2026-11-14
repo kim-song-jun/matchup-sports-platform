@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1LeagueFixture } from '@/types/league-match';
 import { leagueFixturePhase } from './competition-status';
-import { fixtureResultLabel, isUpcomingFixture, leagueFixtureMatchupLabel, leagueSideLabel } from './league-fixture-meta';
+import { fixtureResultLabel, leagueFixtureMatchupLabel, leagueSideLabel } from './league-fixture-meta';
 
 function fixture(overrides: Partial<V1LeagueFixture>): V1LeagueFixture {
   return {
@@ -16,7 +16,7 @@ function fixture(overrides: Partial<V1LeagueFixture>): V1LeagueFixture {
   };
 }
 
-describe('fixtureResultLabel / isUpcomingFixture', () => {
+describe('fixtureResultLabel', () => {
   beforeEach(() => {
     // "지금"을 고정해 startAt 비교가 실행 시각에 흔들리지 않게 한다.
     vi.useFakeTimers();
@@ -35,8 +35,6 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
     expect(result.text).toBe('점수 비공개');
     expect(result.text).not.toContain('1');
     expect(result).toMatchObject({ hasScore: false, isForfeit: false });
-    // '예정' 필터가 이 대진을 주워 담으면 "예정만 보기"에 이미 끝난 경기가 섞인다.
-    expect(isUpcomingFixture(f)).toBe(false);
   });
 
   it('scoreHidden 이 없으면 기존 판정 그대로다', () => {
@@ -47,7 +45,6 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
   it('킥오프가 미래인 status="matched" 대진은 "예정"이다', () => {
     const f = fixture({ startAt: '2026-09-01T20:00:00.000Z', status: 'matched' });
     expect(fixtureResultLabel(f).text).toBe('예정');
-    expect(isUpcomingFixture(f)).toBe(true);
   });
 
   /**
@@ -60,13 +57,11 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
   it('킥오프가 과거인데 결과가 아예 제출되지 않은(status="matched") 대진은 "결과 대기"다 — 예정 아님', () => {
     const f = fixture({ startAt: '2026-08-20T20:00:00.000Z', status: 'matched' });
     expect(fixtureResultLabel(f).text).toBe('결과 대기');
-    expect(isUpcomingFixture(f)).toBe(false);
   });
 
   it('킥오프가 과거이고 status="completed"인데 스코어 미확정인 대진은 "결과 대기"다(기존 동작 유지)', () => {
     const f = fixture({ startAt: '2026-08-20T20:00:00.000Z', status: 'completed' });
     expect(fixtureResultLabel(f).text).toBe('결과 대기');
-    expect(isUpcomingFixture(f)).toBe(false);
   });
 
   it('킥오프 시각이 정확히 지금이면 "결과 대기"로 본다(경계값)', () => {
@@ -77,13 +72,11 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
   it('스코어가 확정된 대진은 킥오프 시각과 무관하게 점수 문구를 보여준다', () => {
     const f = fixture({ startAt: '2026-08-01T20:00:00.000Z', status: 'completed', homeScore: 3, awayScore: 1 });
     expect(fixtureResultLabel(f).text).toBe('3 : 1');
-    expect(isUpcomingFixture(f)).toBe(false);
   });
 
   it('취소된 대진은 킥오프가 지나도 "집계 제외"를 유지한다', () => {
     const f = fixture({ startAt: '2026-08-01T20:00:00.000Z', status: 'cancelled' });
     expect(fixtureResultLabel(f).text).toBe('집계 제외');
-    expect(isUpcomingFixture(f)).toBe(false);
   });
 
   it('무효화된 대진은 "결과 대기"가 아니라 끝난 경기의 "무효 · 집계 제외"다', () => {

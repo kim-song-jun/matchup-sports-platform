@@ -943,15 +943,23 @@ describe('GamesService start — 취소된 대진의 경기', () => {
     await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
   });
 
+  it('라인업 행과 참가자가 전혀 없어도 배정된 양 팀으로 시작할 수 있다', async () => {
+    await expect(assertStartable(makeTx('matched', 'in_progress', true, { lineups: [], participants: [] }))).resolves.toBeUndefined();
+  });
+
+  it('빈 명단이어도 같은 팀이 양쪽에 배정되면 시작할 수 없다', async () => {
+    const tx = makeTx('matched', 'in_progress', true, { lineups: [], participants: [] });
+    tx.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-h' });
+    await expect(assertStartable(tx)).rejects.toMatchObject({ response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_TEAMS_REQUIRED' }) });
+  });
+
   it.each([
     ['홈', [{ id: 'away-player', sideId: 'side-away', lineupId: 'away-lineup' }]],
     ['원정', [{ id: 'home-player', sideId: 'side-home', lineupId: 'home-lineup' }]],
     ['양쪽', []],
-  ])('유효 명단에 %s 팀 출전 선수가 없으면 일반 시작을 거부한다', async (_label, participants) => {
+  ])('유효 명단에 %s 팀 출전 선수가 없어도 익명 운영을 위해 시작할 수 있다', async (_label, participants) => {
     const tx = makeTx('matched', 'in_progress', true, { participants });
-    await expect(assertStartable(tx)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'GAME_START_LINEUP_EMPTY' }),
-    });
+    await expect(assertStartable(tx)).resolves.toBeUndefined();
   });
 
   it('제출본이 있는 사이드에서는 그 위의 빈 DRAFT가 기존 유효 명단을 지우지 않는다', async () => {
@@ -970,7 +978,7 @@ describe('GamesService start — 취소된 대진의 경기', () => {
     await expect(assertStartable(tx)).resolves.toBeUndefined();
   });
 
-  it('제출본 없이 가장 최신 DRAFT가 비었으면 이전 DRAFT 참가자로 시작을 허용하지 않는다', async () => {
+  it('최신 DRAFT가 비어도 이전 참가자 없이 익명 운영을 시작할 수 있다', async () => {
     const tx = makeTx('matched', 'in_progress', true, {
       lineups: [
         { id: 'home-old', sideId: 'side-home', revision: 1, state: 'DRAFT', invalidatedAt: null },
@@ -983,9 +991,7 @@ describe('GamesService start — 취소된 대진의 경기', () => {
       ],
     });
 
-    await expect(assertStartable(tx)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'GAME_START_LINEUP_EMPTY' }),
-    });
+    await expect(assertStartable(tx)).resolves.toBeUndefined();
   });
 });
 

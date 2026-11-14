@@ -13,6 +13,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
 export const KAKAO_ADMIN_KEY_ENV = 'KAKAO_ADMIN_KEY';
 
+/** The one reader of the representative admin key: the unlink call and the unlink webhook both use it. */
+export function readKakaoAdminKey(): string | null {
+  return process.env[KAKAO_ADMIN_KEY_ENV]?.trim() || null;
+}
+
 /** Withdrawal and login-method removal call from the request path's tail, so the call is bounded. */
 const KAKAO_UNLINK_TIMEOUT_MS = 5_000;
 /** -101: the member is not connected to the app. -103: the Kakao account is dormant or gone. Nothing is left to unlink. */
@@ -133,17 +138,17 @@ export class KakaoUnlinkService {
 
   private resolveAdminKey(): string | null {
     if (this.adminKey !== undefined) return this.adminKey;
-    const key = process.env[KAKAO_ADMIN_KEY_ENV]?.trim();
+    const key = readKakaoAdminKey();
     if (!key) {
       this.logger.warn(`Kakao unlink disabled — missing ${KAKAO_ADMIN_KEY_ENV}. Withdrawal and login-method removal still work.`);
     }
-    this.adminKey = key || null;
+    this.adminKey = key;
     return this.adminKey;
   }
 }
 
 /** Error messages can quote the request (the key, the member number), so only the class and code are logged. */
-function describeError(err: unknown): string {
+export function describeError(err: unknown): string {
   if (!(err instanceof Error)) return typeof err;
   const code = (err as { code?: unknown }).code;
   return typeof code === 'string' ? `${err.name}(${code})` : err.name;

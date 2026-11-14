@@ -1,4 +1,4 @@
-import { webcrypto } from 'node:crypto';
+import { createHash, webcrypto } from 'node:crypto';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -476,6 +476,12 @@ describe('KakaoLoginButton', () => {
       vi.stubEnv('NEXT_PUBLIC_KAKAO_CLIENT_ID', 'rest');
       vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', 'https://teameet.test/callback/kakao');
       vi.stubEnv('NEXT_PUBLIC_KAKAO_SCOPE', 'name,phone_number');
+      // The real digest settles on a libuv thread, so how many timer turns the start sequence needs depends on host
+      // load. Same SHA-256 over microtasks only: one timer turn then drains the whole sequence.
+      vi.spyOn(webcrypto.subtle, 'digest').mockImplementation(async (_algorithm, data) => {
+        const bytes = createHash('sha256').update(data as Uint8Array).digest();
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      });
       authorize.mockReset();
       const fakeSdk = { init: vi.fn(), isInitialized: () => true, Auth: { authorize } };
       sdk.getInitializedKakaoJsSdk.mockImplementation(async () => { window.Kakao = fakeSdk; return fakeSdk; });
@@ -556,7 +562,6 @@ describe('KakaoLoginButton', () => {
         sdk.getInitializedKakaoJsSdk.mockRejectedValue(new Error('script blocked'));
         renderButton();
         tap();
-        await flush();
         await act(() => vi.advanceTimersByTimeAsync(0));
         expect(assigned).not.toBeNull();
         const first = assigned;
@@ -581,6 +586,7 @@ describe('KakaoLoginButton', () => {
       act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
       await act(async () => { await prepareKakaoAuthorize(); });
       tap();
+      await flush();
 
       expect(authorize).toHaveBeenCalledTimes(2);
       expect(authorize.mock.calls[1][0].state).not.toBe(firstState);

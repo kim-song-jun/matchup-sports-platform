@@ -5,7 +5,7 @@ import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 const BRACKET_CANVAS_MESSAGES: Readonly<Record<string, string>> = {
   NEXT_FIXTURE_CONFLICT: '다음 경기가 이미 시작돼서 바꿀 수 없어요.',
   QUICK_RESULT_ROSTER_SYNCING: '명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.',
-  QUICK_RESULT_ROSTER_EMPTY: '참가 명단에 선수가 없는 팀이 있어요. 선수를 먼저 등록해 주세요.',
+  QUICK_RESULT_ROSTER_EMPTY: '참가 명단에 선수가 없는 팀이 있어요. 선수를 등록하거나, 경기를 시작해 운영 콘솔에서 익명으로 기록해 주세요.',
   QUICK_RESULT_NOT_AVAILABLE: '이 경기는 점수를 바로 넣을 수 없어요. 진행 중이거나 이미 결과가 있는지 확인해 주세요.',
   QUICK_RESULT_HAS_LIVE_RECORDS: '라이브로 기록한 경기예요. 결과 정정 화면에서 고쳐 주세요.',
   QUICK_RESULT_TEAMS_REQUIRED: '양쪽 팀이 정해진 뒤에 점수를 넣을 수 있어요.',

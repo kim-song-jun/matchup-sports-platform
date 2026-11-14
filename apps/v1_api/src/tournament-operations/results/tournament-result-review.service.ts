@@ -1093,7 +1093,7 @@ export class TournamentResultReviewService {
     if (!sides.every((side) => roster.some((player) => player.sideId === side.id))) {
       throw quickResultConflict(
         'QUICK_RESULT_ROSTER_EMPTY',
-        '참가 명단에 선수가 없는 팀이 있어요. 선수를 먼저 등록해 주세요.',
+        '참가 명단에 선수가 없는 팀이 있어요. 선수를 등록하거나, 경기를 시작해 운영 콘솔에서 익명으로 기록해 주세요.',
       );
     }
 

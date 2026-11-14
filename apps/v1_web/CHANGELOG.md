@@ -1,5 +1,11 @@
 # v1_web
 
+## 1.20.3
+
+### Patch Changes
+
+- 9047969: Allow tournament and league operators to start and finish games with empty rosters using anonymous team records, while preserving current-roster checks for personal statistics.
+
 ## 1.20.2
 
 ### Patch Changes

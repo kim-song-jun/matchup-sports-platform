@@ -273,7 +273,7 @@ function CoreHarness({
       operatorScopeKey={operatorScopeKey}
       operationContextKey={JSON.stringify(['operation', fixtureId])}
       headerTopClass="top-[52px]"
-      requiresLineupBeforeStart={data?.sourceType === 'TEAM_MATCH'}
+      showEmptyRosterNotice={data?.sourceType === 'TEAM_MATCH'}
       allowPenaltyShootout={data?.isKnockoutFixture === true}
       resultReviewEnabled
       renderResultReview={(gameId) => (
@@ -1918,21 +1918,12 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     return fixtureLineupResponse;
   }
 
-  /**
-   * [P1-c] 이 테스트는 원래 **반대**를 못박고 있었다 -- "한쪽이 미제출이면 시작 버튼이
-   * 비활성". 그 차단을 걷어냈으므로 계약이 뒤집혔다: **경고는 뜨되 시작은 된다.**
-   *
-   * 단언을 뒤집는 것이지 지우는 것이 아니다. 차단이 사라졌다고 경고까지 없애면
-   * "왜 명단이 비어 있지"를 운영자가 현장에서 알 수 없다.
-   */
-  it('한쪽 팀만 라인업을 제출했어도 "경기 시작"은 활성이고, 미제출 경고는 그대로 뜬다', () => {
+  it('경기별 제출 단계가 없어 한쪽 제출본만 있어도 시작하고 제출을 요구하지 않는다', () => {
     setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null }]);
     render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
-    expect(screen.getByText(/성수 풋살 클럽.*아직 출전 명단을 제출하지 않았어요/)).toBeInTheDocument();
-    // [P1-d/웨이브8] 제출 링크 단언은 뺐다 — 링크를 그릴 수 있는 코드가 남아 있지 않아
-    // 무조건 통과하는 단언이었다. 경고 문구 단언(위)이 이 계약의 실제 보호막이다.
+    expect(screen.queryByText(/아직 출전 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
   });
 
   /**
@@ -1976,12 +1967,12 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     ['홈', { home: 0, away: 1 }, '강남 풋살 클럽'],
     ['원정', { home: 1, away: 0 }, '성수 풋살 클럽'],
     ['양쪽', { home: 0, away: 0 }, '강남 풋살 클럽, 성수 풋살 클럽'],
-  ] as const)('유효 경기 출전자가 %s 팀에 없으면 시작을 막고 팀 이름을 안내한다', (_side, counts, teamNames) => {
+  ] as const)('유효 경기 출전자가 %s 팀에 없어도 시작할 수 있고 익명 기록을 안내한다', (_side, counts, teamNames) => {
     setup([], 'TEAM_MATCH', counts);
     render(<CoreHarness />);
 
-    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
-    expect(screen.getByText(`${teamNames} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.getByText(`${teamNames} 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.`)).toBeInTheDocument();
   });
 
   it('명단 불러오기에서 완료 상태로 바뀌어도 시작 전환이 계속 렌더된다', () => {
@@ -2006,8 +1997,8 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     expect(screen.getByText('불러오는 중이에요…')).toBeInTheDocument();
     fixtureLineupState = loadedLineup;
     expect(() => rerender(<CoreHarness />)).not.toThrow();
-    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
-    expect(screen.getByText('강남 풋살 클럽 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.getByText('강남 풋살 클럽 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.')).toBeInTheDocument();
   });
 
   it('같은 fixture에서 lease 만료 중 command 응답이 끝나도 pending을 풀어 재획득 후 시작을 허용한다', async () => {

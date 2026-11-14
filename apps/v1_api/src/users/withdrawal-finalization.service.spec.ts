@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import { KAKAO_ADMIN_KEY_ENV, KAKAO_UNLINK_URL, KakaoUnlinkService, type KakaoUnlinkTarget } from '../auth/kakao-unlink.service';
 import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from './withdrawal-finalization-report';
 import { MAX_FINALIZATIONS_PER_RUN } from './withdrawal-grace';
 import { WITHDRAWAL_GRACE_ELAPSED_REASON, WithdrawalFinalizationService } from './withdrawal-finalization.service';
@@ -54,13 +56,20 @@ type State = {
 function createDatabase(initial: Partial<State> = {}) {
   let state: State = { users: [], logs: [], identities: [], admins: [], memberships: [], teams: [], outbox: [], onboarding: [], ...initial };
   let nextLogId = 1;
-  const hooks: { afterScan?: () => void; onIdentityLookup?: (userId: string) => void; failIdentityLookupFor?: string; failReport?: Error } = {};
+  const hooks: {
+    afterScan?: () => void;
+    onIdentityLookup?: (userId: string) => void;
+    failIdentityLookupFor?: string;
+    failIdentityUpdateFor?: string;
+    failReport?: Error;
+  } = {};
   const cleanup = {
     pushSubscription: jest.fn().mockResolvedValue({ count: 1 }),
     pushDevice: jest.fn().mockResolvedValue({ count: 1 }),
     profile: jest.fn().mockResolvedValue({ count: 1 }),
   };
   let queue: Promise<unknown> = Promise.resolve();
+  let transactionOpen = false;
 
   const latestLog = (userId: string, where: { targetType: string; toStatus: string }) =>
     state.logs
@@ -148,10 +157,18 @@ function createDatabase(initial: Partial<State> = {}) {
       findMany: jest.fn(async ({ where }: { where: { userId: string } }) => {
         hooks.onIdentityLookup?.(where.userId);
         if (hooks.failIdentityLookupFor === where.userId) throw new Error('identity lookup failed');
-        return state.identities.filter((row) => row.userId === where.userId).map((row) => ({ id: row.id, provider: row.provider }));
+        return state.identities
+          .filter((row) => row.userId === where.userId)
+          .map((row) => ({ id: row.id, provider: row.provider, providerUserKey: row.providerUserKey }));
+      }),
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
+        const row = state.identities.find((identity) => identity.id === where.id);
+        return row ? { status: row.status } : null;
       }),
       update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<Identity> }) => {
-        Object.assign(state.identities.find((row) => row.id === where.id) ?? {}, data);
+        const row = state.identities.find((identity) => identity.id === where.id);
+        if (row && hooks.failIdentityUpdateFor === row.userId) throw new Error('identity update failed');
+        Object.assign(row ?? {}, data);
         return {};
       }),
     },
@@ -188,11 +205,14 @@ function createDatabase(initial: Partial<State> = {}) {
     $transaction: jest.fn(<T>(callback: (tx: unknown) => Promise<T>): Promise<T> => {
       const run = queue.then(async () => {
         const snapshot = structuredClone(state);
+        transactionOpen = true;
         try {
           return await callback(prisma);
         } catch (error) {
           state = snapshot;
           throw error;
+        } finally {
+          transactionOpen = false;
         }
       });
       queue = run.catch(() => undefined);
@@ -206,6 +226,9 @@ function createDatabase(initial: Partial<State> = {}) {
     cleanup,
     get state() {
       return state;
+    },
+    get transactionOpen() {
+      return transactionOpen;
     },
     user: (id: string) => state.users.find((user) => user.id === id)!,
   };
@@ -246,11 +269,53 @@ function merge(...parts: Partial<State>[]): Partial<State> {
   return merged;
 }
 
-function createService(db: ReturnType<typeof createDatabase>) {
+type Database = ReturnType<typeof createDatabase>;
+type UnlinkCall = {
+  userId: string;
+  targets: readonly KakaoUnlinkTarget[];
+  reason: string;
+  transactionOpen: boolean;
+  accountStatus: string;
+  kakaoLoginKeys: string[];
+};
+
+/** Records what the database looked like at the moment the unlink was requested. */
+function recordingUnlink(db: Database) {
+  const calls: UnlinkCall[] = [];
+  const unlinkKeys = jest.fn(async (userId: string, targets: readonly KakaoUnlinkTarget[], reason: string) => {
+    calls.push({
+      userId,
+      targets,
+      reason,
+      transactionOpen: db.transactionOpen,
+      accountStatus: db.user(userId).accountStatus,
+      kakaoLoginKeys: db.state.identities
+        .filter((row) => row.userId === userId && row.provider === 'kakao')
+        .map((row) => row.providerUserKey),
+    });
+  });
+  return { unlinkKeys, calls };
+}
+
+function newService(db: Database, kakaoUnlink: object) {
   const logger = { info: jest.fn(), error: jest.fn(), warn: jest.fn() };
-  const service = new WithdrawalFinalizationService(db.prisma as never, logger as never);
+  const service = new WithdrawalFinalizationService(db.prisma as never, logger as never, kakaoUnlink as never);
   return { service, logger };
 }
+
+function createService(db: Database) {
+  const kakaoUnlink = recordingUnlink(db);
+  return { ...newService(db, kakaoUnlink), kakaoUnlink };
+}
+
+// Invented numbers: they never match a real Kakao account.
+let memberSeq = 0;
+const nextMemberNumber = () => String(9_000_000_000_000 + ++memberSeq);
+
+function withLogin(id: string, provider: 'kakao' | 'apple', providerUserKey: string): Partial<State> {
+  return { identities: [{ id: `${provider}-${id}`, userId: id, provider, status: 'active', providerUserKey, passwordHash: null }] };
+}
+const withKakao = (id: string, memberNumber = nextMemberNumber()) => withLogin(id, 'kakao', memberNumber);
 
 describe('WithdrawalFinalizationService', () => {
   describe('grace period', () => {
@@ -378,6 +443,184 @@ describe('WithdrawalFinalizationService', () => {
         actorType: 'system',
         actorUserId: null,
         reason: WITHDRAWAL_GRACE_ELAPSED_REASON,
+      });
+    });
+  });
+
+  describe('Kakao connection after the deletion', () => {
+    const due = (count: number, from = 1) =>
+      merge(
+        ...Array.from({ length: count }, (_, index) => {
+          const id = `u${String(from + index).padStart(2, '0')}`;
+          return merge(withdrawing(id, PAST_GRACE), withKakao(id));
+        }),
+      );
+
+    it('asks Kakao to unlink the member number read before the deletion, once that deletion has committed', async () => {
+      const memberNumber = nextMemberNumber();
+      const db = createDatabase(
+        merge(
+          withdrawing('kakao', PAST_GRACE),
+          withKakao('kakao', memberNumber),
+          withdrawing('mail', PAST_GRACE),
+          withdrawing('apple', PAST_GRACE),
+          withLogin('apple', 'apple', 'apple-subject'),
+        ),
+      );
+      const { service, kakaoUnlink } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      expect(result.finalizedUserIds.sort()).toEqual(['apple', 'kakao', 'mail']);
+      expect(kakaoUnlink.calls).toEqual([
+        {
+          userId: 'kakao',
+          targets: [{ identityId: 'kakao-kakao', memberNumber }],
+          reason: WITHDRAWAL_GRACE_ELAPSED_REASON,
+          transactionOpen: false,
+          accountStatus: 'deleted',
+          kakaoLoginKeys: [buildDeletedProviderUserKey('kakao', 'kakao-kakao')],
+        },
+      ]);
+    });
+
+    it('sends nothing for a Kakao account the run did not delete, and still sends for one it did', async () => {
+      const kakaoUsers = ['admin', 'manager', 'nolog', 'inside', 'restored', 'fine'];
+      const db = createDatabase(
+        merge(
+          withdrawing('admin', PAST_GRACE),
+          withdrawing('manager', PAST_GRACE),
+          withdrawing('nolog', null),
+          withdrawing('inside', INSIDE_GRACE),
+          withdrawing('restored', PAST_GRACE),
+          withdrawing('fine', PAST_GRACE),
+          ...kakaoUsers.map((id) => withKakao(id)),
+          {
+            admins: [{ userId: 'admin', status: 'active' }],
+            teams: [{ id: 't1', name: 'Team One', ownerUserId: 'someone-else', status: 'active', deletedAt: null, memberCount: 3 }],
+            memberships: [{ id: 'm1', userId: 'manager', teamId: 't1', role: 'manager', status: 'active' }],
+          },
+        ),
+      );
+      db.hooks.afterScan = () => {
+        db.user('restored').accountStatus = 'active';
+      };
+      const { service, kakaoUnlink } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toEqual(['fine']);
+      expect(result.skipped).toHaveLength(3);
+      expect(kakaoUnlink.calls.map((call) => call.userId)).toEqual(['fine']);
+    });
+
+    it('does not unlink an account it left for the next run because of the cap, and does once it is deleted', async () => {
+      const db = createDatabase(due(MAX_FINALIZATIONS_PER_RUN + 1));
+      const { service, kakaoUnlink } = createService(db);
+      const last = `u${MAX_FINALIZATIONS_PER_RUN + 1}`;
+
+      await service.finalizeDue(NOW);
+      expect(kakaoUnlink.calls).toHaveLength(MAX_FINALIZATIONS_PER_RUN);
+      expect(kakaoUnlink.calls.map((call) => call.userId)).not.toContain(last);
+
+      await service.finalizeDue(new Date(NOW.getTime() + 60 * 60_000));
+      expect(kakaoUnlink.calls.map((call) => call.userId)).toContain(last);
+      expect(kakaoUnlink.calls).toHaveLength(MAX_FINALIZATIONS_PER_RUN + 1);
+    });
+
+    it('does not unlink an account whose deletion was rolled back, wherever in the deletion it failed', async () => {
+      const db = createDatabase(
+        merge(
+          withdrawing('lookup-fails', PAST_GRACE),
+          withdrawing('update-fails', PAST_GRACE),
+          withdrawing('fine', PAST_GRACE),
+          ...['lookup-fails', 'update-fails', 'fine'].map((id) => withKakao(id)),
+        ),
+      );
+      db.hooks.failIdentityLookupFor = 'lookup-fails';
+      db.hooks.failIdentityUpdateFor = 'update-fails';
+      const { service, kakaoUnlink } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toEqual(['fine']);
+      expect(result.skipped.map((entry) => entry.reason)).toEqual(['finalization_failed', 'finalization_failed']);
+      expect(kakaoUnlink.calls.map((call) => call.userId)).toEqual(['fine']);
+      // Still holding the member number: unlinking it would cut a connection of an account that is not deleted.
+      expect(db.state.identities.find((row) => row.id === 'kakao-update-fails')?.providerUserKey).toMatch(/^\d+$/);
+    });
+
+    describe('with the real unlink service', () => {
+      const savedKey = process.env[KAKAO_ADMIN_KEY_ENV];
+      let fetchSpy: jest.SpyInstance;
+
+      beforeEach(() => {
+        process.env[KAKAO_ADMIN_KEY_ENV] = 'test-admin-key';
+        fetchSpy = jest.spyOn(globalThis, 'fetch');
+        for (const level of ['log', 'warn', 'error'] as const) jest.spyOn(Logger.prototype, level).mockImplementation(() => undefined);
+      });
+      afterEach(() => {
+        if (savedKey === undefined) delete process.env[KAKAO_ADMIN_KEY_ENV];
+        else process.env[KAKAO_ADMIN_KEY_ENV] = savedKey;
+        jest.restoreAllMocks();
+      });
+
+      /** One Kakao account and one e-mail account past the grace period, with Kakao answering as given. */
+      async function runWith(answer: () => Promise<Response>) {
+        const memberNumber = nextMemberNumber();
+        const db = createDatabase(merge(withdrawing('a', PAST_GRACE), withKakao('a', memberNumber), withdrawing('b', PAST_GRACE)));
+        fetchSpy.mockReset().mockImplementation(answer);
+        const { service } = newService(db, new KakaoUnlinkService(db.prisma as never));
+        const result = await service.finalizeDue(NOW);
+        const kakaoCalls = fetchSpy.mock.calls.filter(([url]: [unknown]) => String(url) === KAKAO_UNLINK_URL);
+        const failures = db.state.logs.filter((row) => row.toStatus === 'provider_unlink_failed');
+        return { db, result, memberNumber, kakaoCalls, failures };
+      }
+      const answer = (status: number, body: object = {}) => () => Promise.resolve(new Response(JSON.stringify(body), { status }));
+
+      it('requests the unlink for the member number the deletion replaced', async () => {
+        const { memberNumber, kakaoCalls, failures } = await runWith(answer(200));
+
+        expect(kakaoCalls).toHaveLength(1);
+        expect(new URLSearchParams(String(kakaoCalls[0][1]?.body)).get('target_id')).toBe(memberNumber);
+        expect(failures).toEqual([]);
+      });
+
+      it.each([
+        ['an error answer', answer(503), 'withdrawal_grace_elapsed:failed'],
+        ['a refusal', answer(401, { code: -401 }), 'withdrawal_grace_elapsed:refused'],
+        ['no answer', () => Promise.reject(new TypeError('fetch failed')), 'withdrawal_grace_elapsed:failed'],
+      ])('ends the same as when Kakao succeeds when it gives %s, leaving only a countable failure row', async (_name, reply, failureReason) => {
+        const ok = await runWith(answer(200));
+        const failed = await runWith(reply);
+
+        expect(failed.result).toEqual(ok.result);
+        expect(failed.result).toEqual({ finalizedUserIds: ['a', 'b'], skipped: [], remainingDue: 0 });
+        expect(failed.db.state.outbox).toEqual(ok.db.state.outbox);
+        expect(failed.db.state.users.map((user) => user.accountStatus)).toEqual(['deleted', 'deleted']);
+        expect(failed.failures).toEqual([
+          expect.objectContaining({ targetType: 'auth_identity', targetId: 'kakao-a', actorType: 'system', reason: failureReason }),
+        ]);
+      });
+
+      it('counts a member Kakao says is already unlinked as done', async () => {
+        const { result, kakaoCalls, failures } = await runWith(answer(400, { code: -101 }));
+
+        expect(kakaoCalls).toHaveLength(1);
+        expect(result.finalizedUserIds).toEqual(['a', 'b']);
+        expect(failures).toEqual([]);
+      });
+
+      it('sends nothing without the admin key, and the run ends the same', async () => {
+        const ok = await runWith(answer(200));
+        delete process.env[KAKAO_ADMIN_KEY_ENV];
+
+        const disabled = await runWith(answer(200));
+
+        expect(disabled.kakaoCalls).toHaveLength(0);
+        expect(disabled.failures).toEqual([]);
+        expect(disabled.result).toEqual(ok.result);
+        expect(disabled.db.state.outbox).toEqual(ok.db.state.outbox);
       });
     });
   });
@@ -630,6 +873,28 @@ describe('WithdrawalFinalizationService', () => {
       finishRun();
       await destroying;
       expect(destroyed).toBe(true);
+    });
+
+    it('waits for an unlink in flight before onModuleDestroy returns, and records the run after it', async () => {
+      const db = createDatabase(merge(withdrawing('a', PAST_GRACE), withKakao('a')));
+      const { service, kakaoUnlink } = createService(db);
+      let answerKakao: () => void = () => undefined;
+      kakaoUnlink.unlinkKeys.mockImplementation(() => new Promise<void>((resolve) => (answerKakao = resolve)));
+      service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(10);
+      expect(kakaoUnlink.unlinkKeys).toHaveBeenCalledTimes(1);
+      let destroyed = false;
+
+      const destroying = service.onModuleDestroy().then(() => {
+        destroyed = true;
+      });
+      await jest.advanceTimersByTimeAsync(10);
+      expect(destroyed).toBe(false);
+      expect(db.state.outbox).toEqual([]);
+
+      answerKakao();
+      await destroying;
+      expect(db.state.outbox[0].payload).toMatchObject({ finalizedCount: 1 });
     });
 
     it('starts no new account once shutdown began, and still records what it left', async () => {

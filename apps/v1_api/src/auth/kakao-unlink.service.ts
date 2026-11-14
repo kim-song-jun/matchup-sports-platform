@@ -4,10 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Drops the app connection Kakao keeps for a member (the entry under the member's connected services) when the
- * member withdraws, an operator deletes the account, or the member removes Kakao as a login method.
+ * member withdraws, an operator deletes the account, the member removes Kakao as a login method, or the withdrawal
+ * grace period ends and the account is destroyed.
  *
- * It is a side effect on Kakao's side and never decides whether the caller succeeds: callers start it without
- * awaiting or catching, so every public method logs and returns instead of throwing, database access included.
+ * It is a side effect on Kakao's side and never decides whether the caller succeeds, so every public method logs
+ * and returns instead of throwing, database access included. The request-path callers start it without awaiting or
+ * catching; the grace-period job awaits it, because shutdown waits for that job and nothing can redo a cut-off call.
  */
 
 export const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
@@ -18,13 +20,13 @@ export function readKakaoAdminKey(): string | null {
   return process.env[KAKAO_ADMIN_KEY_ENV]?.trim() || null;
 }
 
-/** Withdrawal and login-method removal call from the request path's tail, so the call is bounded. */
+/** Bounds one call: the request-path callers must not hang on Kakao, and the grace-period job waits at most this long per account. */
 const KAKAO_UNLINK_TIMEOUT_MS = 5_000;
 /** -101: the member is not connected to the app. -103: the Kakao account is dormant or gone. Nothing is left to unlink. */
 const NOT_CONNECTED_CODES: ReadonlySet<number> = new Set([-101, -103]);
 const MEMBER_NUMBER = /^\d+$/;
 
-export type KakaoUnlinkReason = 'withdrawal_request' | 'login_method_removed' | 'account_deleted';
+export type KakaoUnlinkReason = 'withdrawal_request' | 'login_method_removed' | 'account_deleted' | 'withdrawal_grace_elapsed';
 
 /** A Kakao login row and the member number it holds. */
 export type KakaoUnlinkTarget = { identityId: string; memberNumber: string };

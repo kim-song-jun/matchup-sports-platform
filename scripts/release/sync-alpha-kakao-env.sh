@@ -7,6 +7,10 @@
 # Same transport and quoting as sync-alpha-apple-sign-in-env.sh: values go to SSM as
 # SecureString and are written into the host's protected `deploy/.env` over SSM.
 #
+# SECRET_KAKAO_ADMIN_KEY is optional. Unset or empty leaves KAKAO_ADMIN_KEY out of both name lists below
+# (the runner writes them, the host reads them), so the other four values sync unchanged and any existing
+# value is kept. A set but malformed value stops the whole sync before anything is written.
+#
 # THIS REPOSITORY IS PUBLIC. No credentials may appear in it; values come from the
 # environment only and are never echoed.
 set -Eeuo pipefail
@@ -27,14 +31,23 @@ leave_unchanged() {
 }
 client_id_pattern='^[0-9a-f]{32}$'
 client_secret_pattern='^[A-Za-z0-9]{16,64}$'
+admin_key_pattern='^[A-Za-z0-9]{16,64}$'
 redirect_pattern='^https://alpha\.teameet\.co\.kr/[A-Za-z0-9._~/-]*$'
 [[ "${SECRET_KAKAO_CLIENT_ID}" =~ ${client_id_pattern} ]] || leave_unchanged KAKAO_CLIENT_ID "${#SECRET_KAKAO_CLIENT_ID}"
 [[ "${SECRET_KAKAO_CLIENT_SECRET}" =~ ${client_secret_pattern} ]] || leave_unchanged KAKAO_CLIENT_SECRET "${#SECRET_KAKAO_CLIENT_SECRET}"
 [[ "${SECRET_ALPHA_KAKAO_REDIRECT_URI}" =~ ${redirect_pattern} ]] || leave_unchanged KAKAO_REDIRECT_URI "${#SECRET_ALPHA_KAKAO_REDIRECT_URI}"
 
 [[ "${SECRET_KAKAO_APP_ID}" =~ ^[0-9]+$ ]] || leave_unchanged KAKAO_APP_ID "${#SECRET_KAKAO_APP_ID}"
+admin_key="${SECRET_KAKAO_ADMIN_KEY-}"
+[[ -z "${admin_key}" || "${admin_key}" =~ ${admin_key_pattern} ]] || leave_unchanged KAKAO_ADMIN_KEY "${#admin_key}"
 names=(KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI KAKAO_APP_ID)
 values=("${SECRET_KAKAO_CLIENT_ID}" "${SECRET_KAKAO_CLIENT_SECRET}" "${SECRET_ALPHA_KAKAO_REDIRECT_URI}" "${SECRET_KAKAO_APP_ID}")
+if [[ -n "${admin_key}" ]]; then
+  names+=(KAKAO_ADMIN_KEY)
+  values+=("${admin_key}")
+else
+  echo '[alpha-kakao-env] KAKAO_ADMIN_KEY not provided; skipped'
+fi
 
 for index in "${!names[@]}"; do
   aws ssm put-parameter --region "${AWS_REGION}" \

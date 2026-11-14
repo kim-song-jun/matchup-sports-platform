@@ -16,7 +16,7 @@ import {
   type KakaoSignupPrefill,
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
-import { isExpiredSocialSignup, isPendingSocialSignup } from './social-signup-access';
+import { canDeferSocialSignup, isExpiredSocialSignup, isPendingSocialSignup } from './social-signup-access';
 import { isOperatorAccount, linkCallerRestriction, operatorLinkRefusal } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import {
@@ -1337,7 +1337,7 @@ export class AuthService {
         onboardingProgress: { select: { draftJson: true } },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
-          select: { id: true },
+          select: { id: true, provider: true },
         },
       },
     });
@@ -1385,6 +1385,13 @@ export class AuthService {
       throw new BadRequestException({
         code: 'TERMS_REQUIRED',
         message: 'Required terms must be accepted before social profile registration',
+      });
+    }
+
+    if (!canDeferSocialSignup({ onboardingStatus: user.onboardingStatus, identities: user.authIdentities })) {
+      throw new ConflictException({
+        code: 'SOCIAL_PROFILE_DEFER_UNAVAILABLE',
+        message: '카카오로 가입할 때는 나중에 입력할 수 없어요. 필수 정보를 입력해 주세요.',
       });
     }
 
@@ -1498,6 +1505,7 @@ export class AuthService {
     return {
       socialSignupPrefill,
       socialSignupNickname,
+      socialSignupCanDefer: canDeferSocialSignup({ onboardingStatus: user.onboardingStatus, identities: user.authIdentities }),
       user: {
         id: user.id,
         email: user.email,

@@ -35,6 +35,7 @@ export const makeAuth = (status: FixtureStatus, id = PENDING, phoneVerified = fa
   profile: { displayName: '김러너', nickname: '카카오러너' },
   verification: { emailVerified: false, phoneVerified },
   socialSignupPrefill: null,
+  socialSignupCanDefer: false,
   termsCompliance: compliance(true),
 });
 export const authSession = (auth: V1AuthMe, nextRoute?: string): V1AuthSessionResponse => ({

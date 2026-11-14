@@ -1480,6 +1480,9 @@ describe('AuthService', () => {
         ...overrides,
       });
     };
+    const appleIdentity = [{ id: 'identity-1', provider: V1AuthProvider.apple, passwordHash: null }];
+    const freshAppleProfileRequired = (overrides: Record<string, unknown> = {}) =>
+      freshProfileRequired({ authIdentities: appleIdentity, ...overrides });
     const socialProfileInput = {
       gender: 'female' as const,
       displayName: '소셜 유저',
@@ -1521,7 +1524,7 @@ describe('AuthService', () => {
 
     it('deferSocialProfile: 가입 때 정해 둔 자동 닉네임으로 프로필을 만들고 social_profile_deferred 로 전이한다', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoName: '홍길동', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
+        .mockResolvedValueOnce(freshAppleProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoName: '홍길동', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
@@ -1552,7 +1555,7 @@ describe('AuthService', () => {
 
     it('deferSocialProfile: 정해 둔 닉네임을 그새 누가 쓰면 새 랜덤 닉네임을 만든다 (카카오 이름은 쓰지 않는다)', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoName: '홍길동', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
+        .mockResolvedValueOnce(freshAppleProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { kakaoName: '홍길동', autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst
         .mockResolvedValueOnce({ id: 'someone' })
@@ -1568,7 +1571,7 @@ describe('AuthService', () => {
 
     it('deferSocialProfile: 미리 정한 닉네임이 없어도 카카오 이름과 무관한 랜덤 닉네임을 만든다', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValueOnce(freshAppleProfileRequired())
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
@@ -1593,6 +1596,54 @@ describe('AuthService', () => {
       });
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    });
+
+    describe('deferSocialProfile: 카카오 가입은 미룰 수 없다', () => {
+      const completeDraft = { kakaoName: '홍길동', kakaoPhone: '01012345678', kakaoGender: 'female', kakaoBirthDate: '20000229', ageConfirmedAt: '2026-10-11T00:00:00.000Z' };
+      const emptyDraft = { ageConfirmedAt: '2026-10-11T00:00:00.000Z' };
+      const unlinkedDraft = { autoNickname: '씩씩한수달3', ageConfirmedAt: '2026-10-11T00:00:00.000Z' };
+
+      it.each([
+        ['카카오가 값을 모두 준 가입', completeDraft],
+        ['카카오가 값을 하나도 주지 않은 가입', emptyDraft],
+        ['카카오 값 키가 지워진 임시 저장 칸 (연결 해제 알림 뒤)', unlinkedDraft],
+      ])('%s → 409 SOCIAL_PROFILE_DEFER_UNAVAILABLE, 상태와 임시 저장 칸이 그대로다', async (_label, draftJson) => {
+        prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson } }));
+
+        await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({
+          status: 409,
+          response: { code: 'SOCIAL_PROFILE_DEFER_UNAVAILABLE' },
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+        expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+        expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
+      });
+
+      it('기존 검사의 순서를 바꾸지 않는다 — 약관 단계는 TERMS_REQUIRED, 만료는 401 로 먼저 거절된다', async () => {
+        prisma.v1User.findUnique.mockResolvedValueOnce(freshProfileRequired({ onboardingStatus: 'social_terms_required' }));
+        await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({ status: 400, response: { code: 'TERMS_REQUIRED' } });
+
+        const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+        const expired = freshProfileRequired({ createdAt: old, updatedAt: old });
+        prisma.v1User.findUnique.mockResolvedValueOnce(expired);
+        prisma.v1User.update.mockResolvedValue(expired);
+        await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({ status: 401, response: { code: 'SOCIAL_SIGNUP_EXPIRED' } });
+      });
+
+      it('Apple 가입은 같은 임시 저장 칸으로도 미룰 수 있다', async () => {
+        prisma.v1User.findUnique
+          .mockResolvedValueOnce(freshAppleProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: emptyDraft } }))
+          .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
+        prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+        const result = await service.deferSocialProfile('user-1');
+
+        expect(result.onboarding.status).toBe('social_profile_deferred');
+        expect(prisma.v1User.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+          data: expect.objectContaining({ onboardingStatus: 'social_profile_deferred' }),
+        }));
+      });
     });
 
     it('deferSocialProfile: 소셜 identity 가 없는 계정은 403', async () => {
@@ -1648,7 +1699,7 @@ describe('AuthService', () => {
     });
 
     it('deferSocialProfile: 상태 CAS 실패 시 프로필을 만들지 않는다', async () => {
-      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired());
+      prisma.v1User.findUnique.mockResolvedValue(freshAppleProfileRequired());
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
       prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
 
@@ -2784,6 +2835,31 @@ describe('AuthService', () => {
     const result = await service.me('user-1');
     expect(result.user.canLinkLoginMethods).toBe(allowed);
     expect(result.user.canLinkAfterSignup).toBe(adminUser === null || adminUser.status === 'revoked');
+  });
+
+  describe('me: socialSignupCanDefer', () => {
+    const kakaoRow = [{ id: 'identity-1', provider: V1AuthProvider.kakao, passwordHash: null }];
+    const appleRow = [{ id: 'identity-2', provider: V1AuthProvider.apple, passwordHash: null }];
+    const stateOf = (overrides: Record<string, unknown>) => completedUserRow({
+      email: null, termsConsents: [], onboardingProgress: { currentStep: 'signup', draftJson: {} }, ...overrides,
+    });
+
+    it.each([
+      ['카카오 가입 진행 — 값이 온 임시 저장 칸', 'social_profile_required', kakaoRow, { kakaoName: '홍길동', kakaoPhone: '01012345678' }, false],
+      ['카카오 가입 진행 — 빈 임시 저장 칸', 'social_profile_required', kakaoRow, {}, false],
+      ['카카오 가입 진행 — 카카오 키가 지워진 임시 저장 칸', 'social_profile_required', kakaoRow, { autoNickname: '씩씩한수달3' }, false],
+      ['Apple 가입 진행', 'social_profile_required', appleRow, {}, true],
+      ['Apple 가입 진행 — Apple 이름이 든 임시 저장 칸', 'social_profile_required', appleRow, { kakaoName: '김애플' }, true],
+      ['약관 단계', 'social_terms_required', appleRow, {}, false],
+      ['이미 미룬 계정', 'social_profile_deferred', appleRow, {}, false],
+      ['가입이 끝난 계정', 'completed', kakaoRow, {}, false],
+    ])('%s', async (_label, onboardingStatus, authIdentities, draftJson, expected) => {
+      prisma.v1User.findUnique.mockResolvedValue(stateOf({
+        onboardingStatus, authIdentities, onboardingProgress: { currentStep: 'signup', draftJson },
+      }));
+
+      expect((await service.me('user-1')).socialSignupCanDefer).toBe(expected);
+    });
   });
 
   it('me: 정상 완료 사용자 → onboarding.status=completed, next route 없음', async () => {

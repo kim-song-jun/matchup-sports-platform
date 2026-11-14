@@ -362,6 +362,14 @@ describe('SignupClient required profile contract', () => {
     }
   });
 
+  it('별표 안내 줄이 단계 제목 아래에 별표 단어와 함께 읽힌다', () => {
+    render(<SignupClient />);
+
+    const note = screen.getByText(/표시는 필수 입력이에요\./);
+    expect(note).toHaveTextContent('별표 표시는 필수 입력이에요.');
+    expect(note.querySelector('[aria-hidden="true"]')).toHaveTextContent('*');
+  });
+
   it('성별 라디오그룹도 필수임을 접근성 이름으로 알린다', async () => {
     // Given — label 로 감싸지지 않는 radiogroup 은 aria-labelledby 로 라벨을 물려야 한다
     render(<SignupClient />);

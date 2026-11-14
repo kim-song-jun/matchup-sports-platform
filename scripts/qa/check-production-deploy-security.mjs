@@ -245,6 +245,43 @@ export function findPrivilegedAwsWithoutApproval(workflow, readScript = readFile
   return problems;
 }
 
+// compose 서비스 블록(들여쓰기 2칸 키 아래)에 `NAME: ${NAME:-}` 전달 줄이 있는지. 동기화가 호스트 .env 에
+// 값을 써도 이 줄이 없으면 컨테이너의 변수는 조용히 비어 있다.
+export function composeServiceDeclares(compose, service, variable) {
+  const block = compose.match(new RegExp(String.raw`^  ${service}:\n((?:(?:[ ]{3,}.*)?\n)*)`, 'm'))?.[1] ?? '';
+  return new RegExp(String.raw`^\s+${variable}:\s*\$\{${variable}:-\}\s*$`, 'm').test(block);
+}
+
+// 앱 전체의 회원 연결을 끊고 조회할 수 있는 키는 승인된 deploy job 의 Sync runtime env 로만 넘긴다.
+// 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다.
+const APPROVED_ONLY_SECRETS = ['KAKAO_ADMIN_KEY'];
+
+export function findApprovedOnlySecretProblems(workflow, names = APPROVED_ONLY_SECRETS) {
+  const problems = [];
+  const jobs = splitJobs(workflow).map(({ name, body }) => ({
+    name,
+    approved: isApprovedJob(body),
+    code: stripShellComments(body),
+  }));
+  for (const secret of names) {
+    const read = new RegExp(String.raw`\bsecrets\.${secret}\b`);
+    const wired = new RegExp(String.raw`^\s*SECRET_${secret}:\s*\$\{\{\s*secrets\.${secret}\s*\}\}\s*$`, 'm');
+    for (const { name, approved, code } of jobs) {
+      if (!approved && read.test(code)) {
+        problems.push(
+          `job '${name}': 승인(environment) 없이 도는 job 이 secrets.${secret} 를 읽습니다 — 승인된 deploy job 의 Sync runtime env 에서만 읽으세요`,
+        );
+      }
+    }
+    if (!jobs.some(({ approved, code }) => approved && wired.test(code))) {
+      problems.push(
+        `승인된 deploy job 의 Sync runtime env 에 SECRET_${secret}: \${{ secrets.${secret} }} 가 없습니다`,
+      );
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
@@ -256,6 +293,7 @@ for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
 for (const problem of [
   ...findProdRoleWithoutApproval(workflow),
   ...findPrivilegedAwsWithoutApproval(workflow),
+  ...findApprovedOnlySecretProblems(workflow),
 ]) {
   errors.push(`${workflowPath}: ${problem}`);
 }
@@ -454,6 +492,21 @@ export function findUnreadRuntimeEnvVariables(script) {
           `.env 를 source 하지 않으므로 셸에서는 항상 미설정이고, 이 변수로 갈리는 분기는 죽은 코드가 됩니다`,
       );
     }
+  }
+}
+
+{
+  let compose = '';
+  try {
+    compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  } catch {
+    compose = '';
+  }
+  if (compose && !composeServiceDeclares(compose, 'v1_api', 'KAKAO_ADMIN_KEY')) {
+    errors.push(
+      'deploy/docker-compose.prod.yml: v1_api 에 KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-} 가 없습니다 — ' +
+        '동기화가 호스트 .env 에 값을 써도 컨테이너로 전달되지 않습니다',
+    );
   }
 }
 

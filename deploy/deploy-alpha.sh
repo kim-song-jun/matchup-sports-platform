@@ -354,6 +354,9 @@ fi
 # 배열 순서로 순위를 만들어 실제 결과와 모순되는 데이터를 넣지 않는다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/tournament-standings-recalculation.cli.js'
+# Event-scoped, receipt-backed correction; absent on alpha is an explicit no-op.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/queens-cup-ranking-repair.cli.js'
 
 "${compose[@]}" up -d
 "${compose[@]}" up -d --force-recreate --no-deps \

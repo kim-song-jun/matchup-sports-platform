@@ -69,7 +69,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `TOSS_WEBHOOK_SECRET` | 결제 webhook 검증 key, 선택 |
 | `KAKAO_CLIENT_ID` | Kakao OAuth client id, 선택 |
 | `KAKAO_CLIENT_SECRET` | Kakao OAuth client secret, 선택 |
-| `KAKAO_APP_ID` | 카카오 콘솔 "앱 ID"(숫자), 선택. 네이티브 앱 토큰 로그인(`POST /auth/kakao/token`)이 `access_token_info.app_id`와 대조한다. 비면 그 엔드포인트는 400 `OAUTH_NOT_CONFIGURED`. 카카오가 보내는 연결 해제 웹훅(`POST /webhooks/kakao/unlink`)도 알림의 `app_id`를 이 값과 대조하며, 비면(`KAKAO_ADMIN_KEY`가 비어도 마찬가지) 웹훅은 503 `KAKAO_WEBHOOK_NOT_CONFIGURED`로 닫힌다 |
+| `KAKAO_APP_ID` | 카카오 콘솔 "앱 ID"(숫자), 선택. 네이티브 앱 토큰 로그인(`POST /api/v1/auth/kakao/token`)이 `access_token_info.app_id`와 대조한다. 비면 그 엔드포인트는 400 `OAUTH_NOT_CONFIGURED`. 카카오가 보내는 연결 해제 웹훅(`POST /api/v1/webhooks/kakao/unlink`)도 알림의 `app_id`를 이 값과 대조하며, `KAKAO_APP_ID`와 `KAKAO_ADMIN_KEY` 중 하나라도 비면 웹훅은 503 `KAKAO_WEBHOOK_NOT_CONFIGURED`로 닫힌다 |
 | `KAKAO_ADMIN_KEY` | 카카오 콘솔 "대표 어드민 키", 선택. 연결 해제 요청과 카카오가 보내는 연결 해제 웹훅의 인증에 쓴다. 비면 둘 다 꺼진다. **production 환경 secret 으로 넣는 것을 권한다** — 아래 "카카오 관리자 키" |
 | `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
 | `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |

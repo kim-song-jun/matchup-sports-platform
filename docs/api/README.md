@@ -92,6 +92,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Public records](./domains/public-records.md)
 - [Chat](./domains/chat.md)
 - [Notifications](./domains/notifications.md)
+- [Webhooks](./domains/webhooks.md) — Kakao unlink notification: `POST /api/v1/webhooks/kakao/unlink` (Kakao's servers call it with the representative admin key; GET is not served)
 - [Home, search, notices, popups, master data](./domains/home-notices-master.md)
 - [Admin and operations](./domains/admin-and-ops.md)
 - [Ads](./domains/ads.md)

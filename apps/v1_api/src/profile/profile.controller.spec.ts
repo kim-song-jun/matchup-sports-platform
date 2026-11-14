@@ -6,6 +6,7 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { AppleIdentityService } from '../auth/apple-identity.service';
 import { sealAppleToken } from '../auth/apple-token-cipher';
 import { APPLE_REVOKE_URL, APPLE_TOKEN_ENV, AppleTokenService } from '../auth/apple-token.service';
+import { KakaoUnlinkService } from '../auth/kakao-unlink.service';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,9 +36,11 @@ describe('ProfileController', () => {
   const prisma = {
     v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
   };
+  const kakaoUnlink = { unlinkAllForUser: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    kakaoUnlink.unlinkAllForUser.mockResolvedValue(undefined);
     const moduleRef = await Test.createTestingModule({
       controllers: [ProfileController],
       providers: [
@@ -45,6 +48,7 @@ describe('ProfileController', () => {
         AppleTokenService,
         // Only sign-in verifies Apple tokens; withdrawal never reaches it.
         { provide: AppleIdentityService, useValue: {} },
+        { provide: KakaoUnlinkService, useValue: kakaoUnlink },
         { provide: PrismaService, useValue: prisma },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
@@ -171,6 +175,18 @@ describe('ProfileController', () => {
       });
     });
 
+    it('starts the Kakao unlink only after the Apple revoke has finished', async () => {
+      fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+      const appleDone: boolean[] = [];
+      kakaoUnlink.unlinkAllForUser.mockImplementation(async () => {
+        appleDone.push(prisma.v1AuthIdentity.update.mock.calls.length > 0);
+      });
+
+      await controller.withdrawalRequest(user, {});
+
+      expect(appleDone).toEqual([true]);
+    });
+
     it('still completes the withdrawal when Apple cannot be reached', async () => {
       fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
 
@@ -186,6 +202,39 @@ describe('ProfileController', () => {
 
       await expect(controller.withdrawalRequest(user, {})).rejects.toThrow('ADMIN_WITHDRAWAL_FORBIDDEN');
       expect(fetchSpy).not.toHaveBeenCalled();
+      expect(kakaoUnlink.unlinkAllForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Kakao unlink on withdrawal', () => {
+    it('asks Kakao to drop the app connection once the withdrawal is recorded', async () => {
+      profileService.withdrawalRequest.mockResolvedValue({ userId: 'user-1', accountStatus: 'withdrawal_pending' });
+
+      await controller.withdrawalRequest(user, {});
+
+      expect(kakaoUnlink.unlinkAllForUser).toHaveBeenCalledTimes(1);
+      expect(kakaoUnlink.unlinkAllForUser).toHaveBeenCalledWith('user-1', 'withdrawal_request');
+      expect(profileService.withdrawalRequest.mock.invocationCallOrder[0])
+        .toBeLessThan(kakaoUnlink.unlinkAllForUser.mock.invocationCallOrder[0]);
+    });
+
+    it('does not wait for Kakao: the withdrawal is answered even if the request never ends', async () => {
+      profileService.withdrawalRequest.mockResolvedValue({ userId: 'user-1', accountStatus: 'withdrawal_pending' });
+      kakaoUnlink.unlinkAllForUser.mockReturnValue(new Promise<void>(() => undefined));
+
+      const outcome = await Promise.race([
+        controller.withdrawalRequest(user, {}),
+        new Promise((resolve) => setTimeout(() => resolve('waited'), 100)),
+      ]);
+
+      expect(outcome).toEqual({ userId: 'user-1', accountStatus: 'withdrawal_pending' });
+    });
+
+    it('does not call Kakao when the withdrawal itself is refused', async () => {
+      profileService.withdrawalRequest.mockRejectedValue(new Error('ADMIN_WITHDRAWAL_FORBIDDEN'));
+
+      await expect(controller.withdrawalRequest(user, {})).rejects.toThrow('ADMIN_WITHDRAWAL_FORBIDDEN');
+      expect(kakaoUnlink.unlinkAllForUser).not.toHaveBeenCalled();
     });
   });
 });
@@ -206,6 +255,7 @@ describe('Profile withdrawal HTTP session contract', () => {
       providers: [
         { provide: ProfileService, useValue: { withdrawalRequest } },
         { provide: AppleTokenService, useValue: { revokeForUser: jest.fn().mockResolvedValue(undefined) } },
+        { provide: KakaoUnlinkService, useValue: { unlinkAllForUser: jest.fn().mockResolvedValue(undefined) } },
       ],
     })
       .overrideGuard(V1AuthGuard)

@@ -1,7 +1,10 @@
+import type { Metadata } from 'next';
 import { LoginPageView } from '@/components/auth/auth-page';
 import { SessionEntryGate } from '@/components/auth/session-entry-gate';
 import { getLoginViewModel } from '@/components/auth/auth.view-model';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
+
+export const metadata: Metadata = { title: '로그인' };
 
 // searchParams는 Next.js App Router Server Component에서 동적으로 제공됨.
 // redirect 파라미터를 sanitize해 이메일 로그인 href에 전파 → 세션 만료 후 복귀 흐름 보존.

@@ -7,10 +7,18 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { shouldServeStreamingMetadata } from 'next/dist/server/lib/streaming-metadata';
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
+import { publicSeoApi, REGULAR_LEAGUE_ID } from '@/test/public-seo-fixtures';
 import nextConfig from '../../next.config';
 import robots from './robots';
+import sitemap from './sitemap';
 
+const mocks = vi.hoisted(() => ({ fetchPublicV1: vi.fn() }));
+vi.mock('@/lib/seo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/seo')>()),
+  fetchPublicV1: mocks.fetchPublicV1,
+}));
 vi.mock('@/components/home/home-client', () => ({ HomePageClient: () => null }));
 const { metadata: homeMetadata } = await import('./home/page');
 
@@ -190,6 +198,65 @@ describe('robots', () => {
       'https://teameet.co.kr/notices/feed.xml',
     ]);
     expect(result).not.toHaveProperty('host');
+  });
+});
+
+/**
+ * 사이트맵에 올린 주소를 같은 사이트의 수집 차단·검색 제외 헤더가 도로 막으면, 크롤러는 "찾아가라"와
+ * "가지 마라"를 동시에 받는다. 두 규칙이 서로 다른 파일(robots.ts · next.config.ts)에 있어 한쪽만 고쳐도 겹친다.
+ */
+describe('사이트맵 주소와 수집 차단·검색 제외 헤더의 교차', () => {
+  beforeEach(() => {
+    mocks.fetchPublicV1.mockReset().mockImplementation(async (apiPath: string) => publicSeoApi(apiPath));
+  });
+
+  async function sitemapTargets() {
+    return (await sitemap()).map(({ url }) => {
+      const { origin, pathname, search } = new URL(url);
+      return { url, origin, pathname, withQuery: `${pathname}${search}` };
+    });
+  }
+
+  const PUBLIC_SITE_PATHS = new Set(PUBLIC_SITE_ROUTES.map((route) => route.path));
+  const ADDRESS_KINDS: Array<[string, (pathname: string, withQuery: string) => boolean]> = [
+    ['정적 목록', (pathname) => /^\/(landing|matches|teams|team-matches|events|notices)$/.test(pathname)],
+    ['대회 유형 목록', (_pathname, withQuery) => /^\/tournaments(\?kind=(tournament|league))?$/.test(withQuery)],
+    ['도움말·이용 대상·문의', (pathname) => PUBLIC_SITE_PATHS.has(pathname)],
+    ['매치', (pathname) => /^\/matches\/[^/]+$/.test(pathname)],
+    ['팀', (pathname) => /^\/teams\/[^/]+$/.test(pathname)],
+    ['친선 팀 매치', (pathname) => /^\/team-matches\/[^/]+$/.test(pathname)],
+    ['리그 경기', (pathname) => /^\/league-matches\/[^/]+\/fixtures\/[^/]+$/.test(pathname)],
+    ['대회 루트', (pathname) => /^\/tournaments\/(?!campaigns\/)[^/]+$/.test(pathname)],
+    ['정규 리그', (pathname) => pathname === `/tournaments/${REGULAR_LEAGUE_ID}`],
+    ['대회 대진', (pathname) => /^\/tournaments\/[^/]+\/bracket$/.test(pathname)],
+    ['대회 결과', (pathname) => /^\/tournaments\/[^/]+\/results$/.test(pathname)],
+    ['대회 시상', (pathname) => /^\/tournaments\/[^/]+\/awards$/.test(pathname)],
+    ['대회 후기', (pathname) => /^\/tournaments\/[^/]+\/reviews$/.test(pathname)],
+    ['대회 캠페인', (pathname) => /^\/tournaments\/campaigns\/[^/]+$/.test(pathname)],
+    ['대회 경기', (pathname) => /^\/tournaments\/[^/]+\/matches\/[^/]+$/.test(pathname)],
+    ['공지', (pathname) => /^\/notices\/[^/]+$/.test(pathname)],
+  ];
+
+  it('자료가 사이트맵의 주소 종류를 하나도 빠뜨리지 않고 낸다 — 빠지면 아래 두 시험이 그 종류를 못 본다', async () => {
+    const targets = await sitemapTargets();
+    for (const [kind, matches] of ADDRESS_KINDS) {
+      expect(targets.some(({ pathname, withQuery }) => matches(pathname, withQuery)), `${kind} 주소가 사이트맵에 없다`).toBe(true);
+    }
+  });
+
+  it('사이트맵에 실린 모든 주소는 모든 user-agent 의 수집이 허용된다(경로+쿼리, 최장 일치)', async () => {
+    for (const { url, origin, withQuery } of await sitemapTargets()) {
+      expect(origin, url).toBe('https://teameet.co.kr');
+      for (const rule of rules()) {
+        expect(crawlAllowed(rule, withQuery), `${String(rule.userAgent)} 가 사이트맵 주소 ${withQuery} 수집을 막는다`).toBe(true);
+      }
+    }
+  });
+
+  it('사이트맵에 실린 모든 주소에는 검색 제외 헤더가 걸리지 않는다(경로만)', async () => {
+    for (const { pathname } of await sitemapTargets()) {
+      expect(await robotsTagsFor(pathname), `사이트맵 주소 ${pathname} 에 검색 제외 헤더가 걸린다`).toEqual([]);
+    }
   });
 });
 

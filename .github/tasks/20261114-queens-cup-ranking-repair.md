@@ -1,6 +1,6 @@
 # 퀸즈컵 예선 동점 순위 보정
 
-Status: In Progress
+Status: Review
 Owner: Codex (single agent)
 Created: 2026-11-14
 
@@ -26,7 +26,7 @@ Created: 2026-11-14
 - 계산 실패 시 트랜잭션이 실패하고 완료 receipt를 기록하지 않는다.
 
 ## Parallel Work Breakdown
-병렬 에이전트 없음. Owned: 새 migration CLI/logic/spec/공개 fixture, deploy-alpha/prod의 CLI 호출, changeset, 이 문서. Forbidden: 플랫폼 기본 규칙, 일반 관리자 잠금, 결선/점수 변경, 운영 승격.
+병렬 에이전트 없음. Owned: 새 migration CLI/logic/spec, deploy-alpha/prod의 CLI 호출 및 scripts/qa/test-prod-deploy-post-migrate-steps.sh, changeset, 이 문서. Forbidden: 플랫폼 기본 규칙, 일반 관리자 잠금, 결선/점수 변경, 운영 승격.
 
 ## Acceptance Criteria
 - [x] 합성 예선 회귀 테스트(10 tests)와 API typecheck 통과.
@@ -40,7 +40,7 @@ Created: 2026-11-14
 고정 ID·이름·종류·형식·기존 규칙·단계 override·예선 완결성 검증. 기존 canonical lock 순서와 serializable transaction. SYSTEM 감사기록에 전후 규칙/승인 사유/고정 requestId 기록. 재배포는 receipt가 있으면 아무것도 덮어쓰지 않는다. 비밀값 저장 없음.
 
 ## Risks & Dependencies
-알파에는 해당 ID가 없어 공개 API 404. 실제 성적 회귀 테스트와 배포 no-op를 구분한다. 운영 데이터 보정은 미래 사용자 승인 운영 릴리스에서 실행된다. 운영 promote/직접 DB 쓰기는 이 작업에서 실행하지 않는다. Prisma schema 변경 없음: v1_tournaments.tie_break_order, v1_tournament_standings, v1_tournament_overall_standings, v1_operation_audits만 기록한다. 안내문 미명시 완전 동률 후속 기준은 기존 플랫폼 페어플레이/최소 실점/추첨을 유지한다.
+알파 공개 API는 해당 ID에 404(실제 DB 부재는 배포 CLI 결과로 확인 예정). 합성 성적 회귀 테스트와 배포 결과를 구분한다. 운영 데이터 보정은 미래 사용자 승인 운영 릴리스에서 실행된다. 운영 promote/직접 DB 쓰기는 이 작업에서 실행하지 않는다. Prisma schema 변경 없음: v1_tournaments.tie_break_order, v1_tournament_standings, v1_tournament_overall_standings, v1_operation_audits만 기록한다. 안내문 미명시 완전 동률 후속 기준은 기존 플랫폼 페어플레이/최소 실점/추첨을 유지한다.
 
 ## Ambiguity Log
 2026-11-14: 사용자 확인으로 공지 기준 채택. 결선이 이미 진행되어 순위 수정으로 결선 재배정하지 않는다.
@@ -53,4 +53,6 @@ Created: 2026-11-14
 - 수동 CLI 시나리오: 공개 사용자, viewport N/A. 운영 24팀의 집계 대조는 모두 일치(첫 조회); 순위는 B조 야수파FS/BSA와 C조 서울 이랜드 FC/리브wfc의 차이 확인. 후속 조회는 아래 404. 시작한 서버/브라우저/DB 컨테이너 없음.
 - PR/배포 증거는 후속 갱신.
 - PR #2393, 첫 head 6030b9afb: CI surface 검사에서 원시 조회/행 잠금 추가를 거부했다. 공통 `findTournamentOnSurface`/`lockTournamentForConfigChange` 재사용으로 수정. 로컬 surface gate, 10 tests, API typecheck 재통과. baseline 예외는 추가하지 않았다.
+- 다음 CI의 배포 순서 계약이 새 단건 CLI를 unknown으로 거부했다. scripts/qa/test-prod-deploy-post-migrate-steps.sh에 정확한 단건 보정 이름·순서와 실패 전파 테스트를 추가한다. 전체 batch 재계산 금지 정책은 유지한다.
+- 현재 GitHub 계정 seeungmin의 CLI/REST Copilot 요청은 성공 응답이나 timeline 접수 이벤트·제출 리뷰 없음. 사용자에게 PR의 Copilot 요청을 부탁했고, 브라우저 host도 unavailable. 완료 리뷰로 대체 판정하지 않는다.
 - 운영 공개 API가 2026-11-14 08:55 UTC부터 반복 404(TOURNAMENT_NOT_FOUND)를 반환하며 DB health는 정상. 비공개/취소/삭제 여부는 공개 API만으로 판별하지 않는다. 이 상태에서 운영 보정을 실행/성공했다고 말하지 않는다.

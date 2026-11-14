@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { describeFoundAccount } from './found-account-login';
+import { KakaoButtonFace } from './kakao-symbol';
 import { WithdrawalPendingGuide } from './withdrawal-pending-guide';
 
 /** 방법 1 의 첫 단계 보충 문구 — 이 계정이 실제로 쓰는 로그인 수단을 말한다. */
@@ -65,7 +66,7 @@ export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, lo
               className={`tm-btn tm-btn-lg tm-btn-block ${link.kakao ? 'tm-auth-kakao' : 'tm-btn-neutral'}`}
               href={link.href}
             >
-              {link.label}
+              {link.kakao ? <KakaoButtonFace label={link.label} /> : link.label}
             </Link>
           ))}
           {summary.appleUnavailable ? <p className="tm-text-caption tm-wpg-note">Apple 로그인은 iOS 앱에서 쓸 수 있어요.</p> : null}

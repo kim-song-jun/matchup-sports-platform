@@ -324,9 +324,10 @@ describe('AccountRecoveryClient', () => {
       await findAccount({ providers: ['kakao'], hasPassword: false });
 
       expect(screen.getByText('이 계정은 카카오 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
-      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
-      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toHaveClass('tm-auth-kakao');
-      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).not.toHaveClass('tm-btn-primary');
+      expect(hrefOf('카카오 로그인')).toBe('/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' })).toHaveClass('tm-auth-kakao');
+      expect(screen.getByRole('link', { name: '카카오 로그인' })).not.toHaveClass('tm-btn-primary');
+      expect(screen.getByRole('link', { name: '카카오 로그인' }).querySelector('svg[aria-hidden="true"]')).not.toBeNull();
       expect(screen.queryByRole('link', { name: '로그인하러 가기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '이메일로 로그인하기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
@@ -371,7 +372,7 @@ describe('AccountRecoveryClient', () => {
       await findAccount({ providers: ['email'], hasPassword: true });
 
       expect(hrefOf('로그인하러 가기')).toBe('/login/email');
-      expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '카카오 로그인' })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정하기' }));
       expect(screen.getByRole('heading', { name: '가입한 이메일을 입력해 주세요' })).toBeVisible();
       expect(screen.getByLabelText('이메일')).toBeInTheDocument();
@@ -398,7 +399,8 @@ describe('AccountRecoveryClient', () => {
       await findAccount({ providers: ['email', 'kakao'], hasPassword: true });
 
       expect(hrefOf('이메일로 로그인하기')).toBe('/login/email');
-      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(hrefOf('카카오 로그인')).toBe('/login');
+      expect(screen.getByRole('link', { name: '이메일로 로그인하기' }).querySelector('svg')).toBeNull();
       expect(screen.queryByRole('link', { name: 'Apple로 로그인하기' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '비밀번호 재설정하기' })).toBeInTheDocument();
     });
@@ -408,15 +410,17 @@ describe('AccountRecoveryClient', () => {
       await findAccount({ providers: ['kakao', 'apple'], hasPassword: false });
 
       expect(screen.getByText('이 계정은 카카오·Apple 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
-      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(hrefOf('카카오 로그인')).toBe('/login');
       expect(hrefOf('Apple로 로그인하기')).toBe('/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' }).querySelector('svg')).not.toBeNull();
+      expect(screen.getByRole('link', { name: 'Apple로 로그인하기' }).querySelector('svg')).toBeNull();
     });
 
     it('돌아갈 경로는 이메일 로그인과 소셜 로그인 첫 화면 양쪽에 이어진다', async () => {
       await findAccount({ providers: ['email', 'kakao'], hasPassword: true }, { redirectPath: '/my' });
 
       expect(hrefOf('이메일로 로그인하기')).toBe('/login/email?redirect=%2Fmy');
-      expect(hrefOf('카카오로 로그인하기')).toBe('/login?redirect=%2Fmy');
+      expect(hrefOf('카카오 로그인')).toBe('/login?redirect=%2Fmy');
     });
   });
 
@@ -494,7 +498,8 @@ describe('AccountRecoveryClient', () => {
       await findPendingAccount({ providers: ['email', 'kakao'], hasPassword: true });
 
       expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email');
-      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' })).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' }).querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     });
 
     it('이 환경에서 쓸 수 있는 로그인 수단이 없으면 막다른 길 대신 문의 창구로 보낸다', async () => {
@@ -616,7 +621,9 @@ describe('AccountRecoveryClient', () => {
       expect(screen.getByText('가입한 로그인 방법')).toBeInTheDocument();
       expect(chipsUnder('가입한 로그인 방법')).toEqual(['이메일·비밀번호', '카카오']);
       expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email');
-      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' })).toHaveAttribute('href', '/login');
+      expect(screen.getByRole('link', { name: '카카오 로그인' }).querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' }).querySelector('svg')).toBeNull();
       expect(screen.queryByText(/\*\*\*@/)).not.toBeInTheDocument();
       expect(screen.queryByText('가입한 이메일')).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: '방법 2 기다리기' })).not.toBeInTheDocument();
@@ -646,7 +653,7 @@ describe('AccountRecoveryClient', () => {
 
       expect(await screen.findByText('가입한 로그인 방법')).toBeInTheDocument();
       expect(chipsUnder('가입한 로그인 방법')).toEqual(['카카오']);
-      expect(screen.getByRole('link', { name: pending ? '로그인하고 탈퇴 취소하기' : '카카오로 로그인하기' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: pending ? '로그인하고 탈퇴 취소하기' : '카카오 로그인' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '이메일로 한 번 더 확인하기' })).not.toBeInTheDocument();
       expect(screen.queryByText(/확인하면 가입한 이메일/)).not.toBeInTheDocument();
     });

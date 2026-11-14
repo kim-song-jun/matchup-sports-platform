@@ -46,7 +46,7 @@ function Journey({ initialRoute }: { initialRoute: string }) {
   navigation.push.mockImplementation(navigate);
   const pathname = new URL(route, window.location.origin).pathname;
   const step = stepForRoute(pathname);
-  return <PendingSocialSignupGate>{pathname === '/login' ? <KakaoLoginButton href={AUTHORIZE_URL} label="카카오로 로그인" />
+  return <PendingSocialSignupGate>{pathname === '/login' ? <KakaoLoginButton href={AUTHORIZE_URL} />
     : pathname === '/callback/kakao' ? <KakaoCallbackClient />
       : pathname === '/signup/social' ? <SocialSignupClient />
         : pathname === '/terms' ? <TermsClient />
@@ -150,10 +150,10 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     }));
     const nested = '/onboarding/confirm?redirect=%2Fteams%2Fnew';
     const user = openJourney(nested);
-    await screen.findByRole('link', { name: '카카오로 로그인' });
+    await screen.findByRole('link', { name: '카카오 로그인' });
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(nested);
     expect(getSavedRedirectPath()).toBeNull();
-    await user.click(screen.getByRole('link', { name: '카카오로 로그인' }));
+    await user.click(screen.getByRole('link', { name: '카카오 로그인' }));
     await waitFor(() => expect(sdk.authorize).toHaveBeenCalledTimes(1));
     expect(getSavedRedirectPath()).toBe(nested);
     const oauthState = sdk.authorize.mock.calls[0]?.[0]?.state;

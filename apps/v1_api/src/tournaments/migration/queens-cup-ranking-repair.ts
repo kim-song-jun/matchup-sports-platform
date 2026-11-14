@@ -4,6 +4,8 @@ import { fairPlayByRegistrationFromGroups, recalculateAndUpsertGroupStandings, s
 import { recalculateAndUpsertOverallStandings } from '../tournament-overall-standings';
 import { resolveTieBreakOrder, sameTieBreakOrder, withTournamentTieBreakOrder } from '../competition-config/tournament-tie-break-order';
 import { TOURNAMENT_TIE_BREAK_PRESETS } from '../competition-config/tournament-tie-break-presets';
+import { lockTournamentForConfigChange } from '../competition-config/tournament-competition-config';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 
 export const QUEENS_CUP_ID = '178e0e13-2f1f-4e29-a21f-90f756fe1891';
 export const QUEENS_CUP_REPAIR_ID = 'queens-cup-ranking-20261114';
@@ -16,9 +18,8 @@ export const QUEENS_CUP_ORDER = [...TOURNAMENT_TIE_BREAK_PRESETS[1].order];
  */
 export async function repairQueensCupRanking(prisma: PrismaClient) {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${QUEENS_CUP_ID}`}, 0))`;
-    await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${QUEENS_CUP_ID} FOR UPDATE`;
-    const event = await tx.v1Tournament.findFirst({
+    await lockTournamentForConfigChange(tx, QUEENS_CUP_ID);
+    const event = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id: QUEENS_CUP_ID, deletedAt: null },
       select: { title: true, kind: true, format: true, tieBreakOrder: true },
     });

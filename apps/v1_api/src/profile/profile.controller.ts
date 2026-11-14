@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AppleTokenService } from '../auth/apple-token.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { KakaoUnlinkService } from '../auth/kakao-unlink.service';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -33,6 +34,7 @@ export class ProfileController {
   constructor(
     private readonly profileService: ProfileService,
     private readonly appleTokens: AppleTokenService,
+    private readonly kakaoUnlink: KakaoUnlinkService,
   ) {}
 
   @Get('me/profile')
@@ -151,6 +153,8 @@ export class ProfileController {
     // App Store 5.1.1(v): Apple 로그인 계정은 삭제 요청 시점에 토큰을 폐기한다. 운영자 최종 삭제는
     // 기한이 없고 거치지 않는 경로도 있어 여기서 한다. 커밋 후에 부르고, 실패해도 탈퇴는 성공이다.
     await this.appleTokens.revokeForUser(user.id);
+    // 카카오 연결 해제는 응답을 기다리지 않는다. 실패해도 탈퇴는 성공이고, 던지지 않는 계약은 서비스가 진다.
+    void this.kakaoUnlink.unlinkAllForUser(user.id, 'withdrawal_request');
     return result;
   }
 }

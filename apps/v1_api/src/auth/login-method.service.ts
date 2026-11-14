@@ -7,6 +7,7 @@ import { buildDeletedProviderUserKey } from '../users/final-account-deletion';
 import { AppleTokenService } from './apple-token.service';
 import type { UnlinkableLoginProvider } from './dto/unlink-login-method.dto';
 import { EMAIL_LOGIN_LABEL } from './email-link.service';
+import { KakaoUnlinkService } from './kakao-unlink.service';
 import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
 import type { V1SessionProof } from './v1-session';
@@ -41,6 +42,7 @@ export class LoginMethodService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly appleTokens: AppleTokenService,
+    private readonly kakaoUnlink: KakaoUnlinkService,
     @Inject(RealtimeGateway)
     private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
   ) {}
@@ -53,6 +55,8 @@ export class LoginMethodService {
     // Sign in with Apple expects an app to revoke the grant when the person disconnects it; a failure is logged and
     // leaves the sealed token on the row, where account deletion revokes it.
     if (provider === V1AuthProvider.apple) void this.appleTokens.revokeForUser(callerId);
+    // A removed Kakao row keeps its member number, so the unlink can read it after the commit; a failure is logged and recorded.
+    if (provider === V1AuthProvider.kakao) void this.kakaoUnlink.unlinkAllForUser(callerId, 'login_method_removed');
     return result;
   }
 

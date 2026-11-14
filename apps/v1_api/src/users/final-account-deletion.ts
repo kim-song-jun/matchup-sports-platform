@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { V1AuthProvider, type Prisma } from '@prisma/client';
+import { toKakaoUnlinkTargets } from '../auth/kakao-unlink.service';
 import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 
@@ -196,8 +197,10 @@ export async function finalizeAccountDeletion(
   await detachUserFromActiveCommitments(tx, userId, actor, { reason, at: deletedAt, logger: input.logger });
   const identities = await tx.v1AuthIdentity.findMany({
     where: { userId },
-    select: { id: true, provider: true },
+    select: { id: true, provider: true, providerUserKey: true },
   });
+  // The update below replaces the member number, so whoever asks Kakao to unlink needs it from here.
+  const kakaoUnlinkTargets = toKakaoUnlinkTargets(identities.filter((identity) => identity.provider === V1AuthProvider.kakao));
   await Promise.all(
     identities.map((identity) =>
       tx.v1AuthIdentity.update({
@@ -256,5 +259,6 @@ export async function finalizeAccountDeletion(
     status: updated.accountStatus,
     actionLogId: actionLog?.id ?? null,
     statusChangeLogId: statusChangeLog.id,
+    kakaoUnlinkTargets,
   };
 }

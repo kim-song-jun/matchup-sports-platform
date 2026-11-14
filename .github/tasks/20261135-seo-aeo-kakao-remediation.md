@@ -281,10 +281,10 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 | `task-doc-decisions` (`docs/seo-aeo-kakao-decisions`) | docs | — | 아니오 | 답 기록(이 문서) | 바로. changeset 없음 |
 | `kakao-admin-key-wiring` (`infra/kakao-admin-key-wiring`) | deploy | — | 아니오 | G6 A | dev 머지 완료. 관리자 키 값을 비워 둔 채 서버까지 전달하는 길만 만들었다(키 값 입력과 alpha 권한 정책 반영은 실행 직전 확인, 권한 정책 반영 주체는 Q9c 대기) |
 | `kakao-unlink` (`feat/kakao-unlink`) | v1_api | — | 아니오 | G23 A · G23-2 ㄱ | dev 머지 완료(#2388). 탈퇴 신청·운영자 삭제·로그인 방법 해제 세 자리. Q4a B 의 네 번째 자리(탈퇴 30일 자동 삭제 직전)는 이 레인에 넣지 않고 세 번째 묶음의 `kakao-unlink-on-finalization` 으로 갈랐다 |
-| `kakao-unlink-webhook` (`feat/kakao-unlink-webhook`) | v1_api | `kakao-unlink` | 아니오 | G7 A · Q3a A · Q9d A | `kakao-unlink` PR 이 열린 뒤(그 브랜치 위에 쌓는다). 끊긴 사실은 기록만 하고 화면에 보이지 않는다 |
+| `kakao-unlink-webhook` (`feat/kakao-unlink-webhook`) | v1_api | `kakao-unlink` | 아니오 | G7 A · Q3a A · Q9d A | dev 머지 완료(#2391). 끊긴 사실은 기록만 하고 화면에 보이지 않는다 |
 | `kakao-login-button` (`feat/kakao-login-button-guide`) | v1_web | — | 예 | G4 A · G4-1 A · G4-2 B · Q1 A · Q5a~b A | dev 머지 완료(#2387). 앱 배치(Q1 A)는 확인이 끝났다. 처리 중에도 연결 버튼 글자 유지(Q5c B)와 로그인 수단 표시의 공식 심볼(Q5d B)은 이 레인에 넣지 않고 세 번째 묶음의 `kakao-link-button-busy`·`kakao-provider-mark-symbol` 로 갈랐다 |
-| `social-signup-kakao-confirm` (`feat/social-signup-kakao-confirm`) | v1_web + v1_api | `kakao-unlink` | 예 | G3 B (G2 A · G8 A 와 한 묶음) · Q2a~c A | `kakao-unlink` PR 이 열린 뒤. dev 머지는 이번 묶음의 마지막. 겹침 카드의 출구 셋·부제·잠긴 값 안내(없음)는 Q2 답대로 현행 |
-| `remove-shadowed-league-detail` (`chore/remove-shadowed-league-detail`) | v1_web | — | 아니오 | G28 | 바로. 첫 단계가 읽기 전용 전수 확인이고, 쓰이는 곳이 나오면 지우지 않고 멈춘다 |
+| `social-signup-kakao-confirm` (`feat/social-signup-kakao-confirm`) | v1_web + v1_api | `kakao-unlink` | 예 | G3 B (G2 A · G8 A 와 한 묶음) · Q2a~c A | dev 머지 완료(#2389, 2026-11-14). 운영 요청 범위 변경(G8)과 같은 운영 반영으로만 나간다. 겹침 카드의 출구 셋·부제·잠긴 값 안내(없음)는 Q2 답대로 현행 |
+| `remove-shadowed-league-detail` (`chore/remove-shadowed-league-detail`) | v1_web | — | 아니오 | G28 | dev 머지 완료(#2390). 첫 단계가 읽기 전용 전수 확인이었다 |
 | `resolve-location-key` (`fix/resolve-location-key`) | v1_api | — | 아니오 | G10-2 A | 조건부 — 운영에 지도 키가 있는 것을 읽어 확인한 뒤에만 연다(없으면 열지 않는다) |
 | `policy-v18` (`feat/privacy-policy-v18`) | v1_api (데이터 마이그레이션) | — | 약관 본문 | G5 A · G19 · Q6c A | 대기 — 법무 답과 재동의 여부·효력일(Q6a·Q6b 대기)이 정해진 뒤. 문안은 승인됐고 가입 동의서도 새 판(안: v1.4, Q6c A)으로 낸다. 새 판은 마이그레이션이 곧 게시라 문안이 굳기 전에는 PR 도 열지 않는다 |
 
@@ -296,17 +296,17 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 
 ### 세 번째 묶음 — 2차 결정이 만든 코드와 남은 정리 (2026-11-14)
 
-두 번째 묶음을 올리는 동안 남은 일 조사에서 나온 후속이다. 2차 결정으로 코드가 더 필요해진 답(Q4a B·Q5c B·Q5d B)은 해당 두 번째 묶음 PR(#2388·#2387)이 이미 dev 에 머지돼 거기에 얹지 못하고 별도 PR 로 간다. 레인 하나 = dev 대상 PR 하나이고, 파일 범위·시험·alpha 확인 항목은 각 PR 본문에 적는다. 상태 열은 2026-11-14 쓰는 시점에 열린 PR 목록으로 읽은 값이다.
+두 번째 묶음을 올리는 동안 남은 일 조사에서 나온 후속이다. 2차 결정으로 코드가 더 필요해진 답(Q4a B·Q5c B·Q5d B)은 해당 두 번째 묶음 PR(#2388·#2387)이 이미 dev 에 머지돼 거기에 얹지 못하고 별도 PR 로 간다. 레인 하나 = dev 대상 PR 하나이고, 파일 범위·시험·alpha 확인 항목은 각 PR 본문에 적는다. 상태 열은 2026-11-14 에 PR 목록을 다시 읽은 값이다.
 
 | 레인 (브랜치) | 앱 | 의존 | 화면 변경 | 근거 | 상태 |
 |---|---|---|---|---|---|
-| `kakao-unlink-on-finalization` (`feat/kakao-unlink-on-finalization`) | v1_api | — (#2388·#2391 dev 머지됨) | 아니오 | Q4a B · Q4c A (KD-12·KP-11) | 대기 — PR 이 아직 열리지 않았다. 탈퇴 30일 뒤 자동 삭제가 커밋된 뒤 카카오 연결 해제를 요청한다(네 번째 자리). 실패해도 삭제는 끝나고, 키가 없으면 부르지 않는다 |
-| `kakao-link-button-busy` (`fix/kakao-link-button-busy`) | v1_web | — (#2387 dev 머지됨) | 예 — 처리 중에도 연결 버튼 글자 「카카오 로그인」 유지, 진행 표시만 더한다 | Q5b A · Q5c B (SR-11·KD-13·KP-20) | PR #2400 열림 |
+| `kakao-unlink-on-finalization` (`feat/kakao-unlink-on-finalization`) | v1_api | — (#2388·#2391 dev 머지됨) | 아니오 | Q4a B · Q4c A (KD-12·KP-11) | PR #2404 열림. 탈퇴 30일 뒤 자동 삭제가 커밋된 뒤 카카오 연결 해제를 요청한다(네 번째 자리). 실패해도 삭제는 끝나고, 키가 없으면 부르지 않는다 |
+| `kakao-link-button-busy` (`fix/kakao-link-button-busy`) | v1_web | — (#2387 dev 머지됨) | 예 — 처리 중에도 연결 버튼 글자 「카카오 로그인」 유지, 진행 표시만 더한다 | Q5b A · Q5c B (SR-11·KD-13·KP-20) | dev 머지 완료(#2400) |
 | `kakao-provider-mark-symbol` (브랜치는 열 때 정한다) | v1_web | #2387 dev 머지됨 + 시안 선택 | 예 — 로그인 수단 표시 세 곳의 카카오 아이콘을 공식 심볼로 | Q5d B | 대기 — 노란 원 안 심볼의 크기·여백 시안을 사용자가 고른 뒤에 연다(구현보다 선택이 먼저) |
-| `seo-meta-leftovers` (`fix/seo-meta-leftovers`) | v1_web | — | 아니오 — 검색·공유 글과 탭 제목만 | SR-05 · SR-17(`/login` 한 화면) · CD-24 ③ | PR #2402 열림 |
-| `remove-claimable-fixtures-endpoint` (`chore/remove-claimable-fixtures-endpoint`) | v1_api | #2390 dev 머지됨 | 아니오 | #2390 본문의 「이 PR 이 하지 않은 것」 — 호출하는 곳이 없는 리그 「내 기록 연결 대진」 조회 주소 | PR #2401 열림. 쓰는 곳이 하나라도 나오면 지우지 않고 멈춘다 |
+| `seo-meta-leftovers` (`fix/seo-meta-leftovers`) | v1_web | — | 아니오 — 검색·공유 글과 탭 제목만 | SR-05 · SR-17(`/login` 한 화면) · CD-24 ③ | dev 머지 완료(#2402) |
+| `remove-claimable-fixtures-endpoint` (`chore/remove-claimable-fixtures-endpoint`) | v1_api | #2390 dev 머지됨 | 아니오 | #2390 본문의 「이 PR 이 하지 않은 것」 — 호출하는 곳이 없는 리그 「내 기록 연결 대진」 조회 주소 | dev 머지 완료(#2401). 쓰는 곳이 하나라도 나오면 지우지 않고 멈추는 조건이었다 |
 | `public-detail-upstream-failure` (`fix/public-detail-upstream-failure-status`) | v1_web | #2390 dev 머지됨 | 아니오 | SA-01 권장 ② | 대기 — 이번에는 재현과 보고까지만이다. 조회가 실패한 순간의 응답을 5xx 로 바꾸면 Android·iOS 셸이 웹 화면 대신 자체 실패 화면을 띄워 사람이 보는 화면이 바뀌므로, 어느 코드로 답할지를 사용자가 정한 뒤에 고친다 |
-| `docs-leftovers` (`docs/seo-kakao-leftovers`) | docs | #2386·#2391 dev 머지됨 | 아니오 | 남은 일 조사의 문서 한 줄들 · CD-10 · G17·G18 | 이 PR. changeset 없음 |
+| `docs-leftovers` (`docs/seo-kakao-leftovers`) | docs | #2386·#2391 dev 머지됨 | 아니오 | 남은 일 조사의 문서 한 줄들 · CD-10 · G17·G18 | 이 PR(#2403). changeset 없음 |
 
 - `kakao-link-button-busy` 와 `kakao-provider-mark-symbol` 은 같은 화면·같은 선행 PR 이라 한 PR 로 합칠 수도 있다. 뒤쪽이 시안 선택을 기다리므로 나눴고, 합치면 앞쪽도 같이 기다린다.
 - 코드를 고치는 레인은 `.changeset/*.md` 가 필요하다(첫 묶음과 같은 규칙). 이 문서 레인과 보고만 하는 레인은 필요 없다.
@@ -319,8 +319,9 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 다시 읽으면 아래 줄을 지우지 말고 날짜를 붙인 새 줄을 더한다.
 
 - 버전: `origin/main`·`origin/dev` 의 `apps/v1_api`·`apps/v1_web` 이 모두 1.20.3 이다. 열린 버전 PR·승격 PR 은 없다 — 버전 PR #2394 는 닫혔고, 빈 명단 운영·퀸즈컵 순위 보정 두 기능만 골라 main 으로 올린 승격 PR #2396 이 머지돼 1.20.3 이 됐으며 #2397 이 dev 를 맞췄다.
-- 운영에 나가지 않은 것: 첫 묶음 10건(#2371~#2380)과 두 번째 묶음에서 dev 에 머지된 #2385·#2386·#2387·#2388·#2390·#2391 은 각 머지 커밋이 `origin/main` 의 조상이 아니다(dev 에만 있다). 두 번째 묶음의 `social-signup-kakao-confirm` 은 #2389 로 열려 있고(dev 머지는 묶음의 마지막), `policy-v18`·`resolve-location-key` 는 PR 이 아직 없다. 세 번째 묶음의 PR 은 위 표와 같다.
-- alpha: dev 머지마다 배포되고, 연속 머지가 같은 커밋의 CI 를 취소하면 그 배포는 `Wait for matching CI success` 단계에서 실패로 끝난다. 이 시점에 마지막 성공 배포는 #2385 의 머지 커밋이고, 그 뒤 연속 머지 5건(#2387·#2388·#2390·#2391·#2398)의 배포가 이 단계에서 실패했으며 #2386 머지의 배포가 진행 중이었다. alpha 에 올라 있는 커밋은 `x-teameet-commit` 응답 헤더로 확인한다.
+- 운영에 나가지 않은 것: 첫 묶음 10건(#2371~#2380), 두 번째 묶음에서 dev 에 머지된 #2385·#2386·#2387·#2388·#2389·#2390·#2391, 세 번째 묶음에서 dev 에 머지된 #2400·#2401·#2402 는 각 머지 커밋이 `origin/main` 의 조상이 아니다(dev 에만 있다). `policy-v18`·`resolve-location-key` 는 PR 이 아직 없고, 세 번째 묶음의 나머지 PR(#2403·#2404)은 열려 있다(위 표).
+- 2026-11-14 가입 화면 레인(`social-signup-kakao-confirm`, #2389)이 dev 에 머지됐다. 「진행 제약」의 마지막 문장과 Acceptance Criteria 의 두 번째 묶음 마지막 줄이 말하는 짝 제약이 이 날부터 걸린다 — 이 코드가 dev 에 있는 동안의 모든 승격은 운영 카카오 요청 범위 변경(G8)과 같은 운영 반영이어야 하므로, 승격 전에 그 변경이 같은 반영에 들어 있는지 먼저 확인한다.
+- alpha: dev 머지마다 배포되고, 연속 머지가 같은 커밋의 CI 를 취소하면 그 배포는 `Wait for matching CI success` 단계에서 실패로 끝날 수 있다. alpha 에 올라 있는 커밋은 `x-teameet-commit` 응답 헤더로 확인한다.
 - 운영 승격(dev→main)은 사용자만 한다.
 
 ### Sequential (병렬 작업 이후에 실행)

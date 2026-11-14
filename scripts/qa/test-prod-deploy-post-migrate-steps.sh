@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # deploy-prod.sh 일반 배포 분기의 migrate 이후 단계 계약:
-# migrate -> award 백필 순서로 각 1회, 어느 단계든 실패하면 뒤 단계 없이 중단(ERR trap 경로).
-# 순위 재계산은 배포 단계가 아니다(사용자 결정 2026-10-08, #1684) — 호출되면 unexpected 로 실패한다.
+# migrate -> award 백필 -> 퀸즈컵 단건 보정 순서로 각 1회, 실패하면 뒤 단계 없이 중단.
+# 전체 순위 재계산은 배포 단계가 아니다(2026-10-08, #1684). 2026-11-14 사용자 승인
+# 퀸즈컵 보정은 고정 ID와 완료 receipt로 한정하며, 일반 batch 재계산은 여전히 unexpected다.
 # 실제 스크립트의 해당 구간을 앵커로 잘라 스텁 compose 로 실행한다.
 set -Eeuo pipefail
 
@@ -25,6 +26,7 @@ run_segment() {
       case "$*" in
         *prisma*migrate*) echo migrate >> "$LOG" ;;
         *award-recipient-backfill*) echo award >> "$LOG" ;;
+        *queens-cup-ranking-repair.cli.js*) echo queens >> "$LOG" ;;
         *) echo "unexpected: $*" >> "$LOG" ;;
       esac
       [[ "$(tail -n1 "$LOG")" != "$FAIL_ON" ]]
@@ -45,7 +47,8 @@ check() {
   fi
 }
 
-run_segment none;    check "정상: migrate,award 순서 각 1회" "migrate,award" 0
+run_segment none;    check "정상: migrate,award,queens 순서 각 1회" "migrate,award,queens" 0
+run_segment queens;  check "퀸즈컵 보정 실패: 배포 실패(rc!=0)" "migrate,award,queens" 1
 run_segment award;   check "award 실패: 배포 실패(rc!=0)" "migrate,award" 1
 run_segment migrate; check "migrate 실패: award 로 넘어가지 않음" "migrate" 1
 

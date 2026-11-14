@@ -1665,6 +1665,16 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
   });
 });
 
+describe('BracketPageContent — 안내 문구(비리그)', () => {
+  // 리그의 「경기 일정과 순위를 확인하세요.」 와 짝을 이루는 대조군 — 소개 줄을 공용 함수로 옮겨도 글자가 같다.
+  it('조별+토너먼트 대회는 조별 순위와 결선을 말한다', () => {
+    renderBracketPage(makeTournament({ id: 'tour-intro', status: 'in_progress', format: 'group_knockout' }));
+
+    expect(screen.getByText('경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.')).toBeInTheDocument();
+    expect(screen.queryByText('경기 일정과 순위를 확인하세요.')).not.toBeInTheDocument();
+  });
+});
+
 // 대회 상세로 되돌아가는 in-page 링크(flownav 이전 pill · 빈 대진표 CTA)는
 // 이 화면이 받은 from 을 그대로 실어야 한다.
 describe('BracketPageContent — 대회 상세로 돌아가는 링크는 받은 from 을 싣는다', () => {

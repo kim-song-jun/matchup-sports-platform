@@ -37,7 +37,7 @@ import {
   standingsAriaLabel,
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
-import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketIntroLine, competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { isKnockoutRound, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
@@ -738,12 +738,8 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
               sr-only h1 이 맡고, 보이는 대회 제목은 기존 스타일(h2)을 그대로 쓴다. */}
           <h1 className="sr-only">{tournament.title} 순위·대진표</h1>
           <h2>{tournament.title}</h2>
-          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
-          <p>
-            {isLeague
-              ? '경기 일정과 순위를 확인하세요.'
-              : '경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.'}
-          </p>
+          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. 검색 설명과 같은 함수를 쓴다. */}
+          <p>{bracketIntroLine(tournament)}</p>
         </div>
         <span className="tm-bracket-page-format">
           {competitionFormatLabel(tournament)}

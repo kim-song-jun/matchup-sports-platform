@@ -24,6 +24,12 @@ Status: Review
 - Manual QA: Alpha browser, screenshots (1440/768/390), console/network and live authenticated operation are pending deployment/login. No local Next server or browser was started. No RED evidence is claimed: the initial web attempt failed dependency resolution before tests; final tests used isolated dependencies. No independent review/CI/Alpha PASS is claimed.
 - Cleanup: no runtime services were started. Keep the unmerged worktree/branch for the open PR; remove only task-owned temporary dependencies/caches after handoff if needed.
 
+## Main promotion preparation — 2026-11-14
+
+사용자 요청: “메인 승격준비해줘”. 기능 #2392는 사용자 Copilot 예외 승인 후 dev merge ac0382c89, matching CI43573354566와 Alpha43573354547 SUCCESS, 공개 SHA/HTTP200/DBtrue를 확인했고 소유 자원을 정리했다. 실제 로그인/3폭 QA는 미검증이다.
+
+공식 promote-main workflow43579716865가 Changeset 1개를 소비해 버전 PR #2394를 생성했다. manifest API/Web1.20.3, 후보 운영 표시1.20.4, 미소비0이며 기능 소스는 Alpha ac0382c89와 동일하다. 준비 SSOT: `docs/ops/release-readiness-1.20.3-2026-11-14.md`. 변경 소유는 릴리스 메타데이터 5개와 이 task/준비 문서뿐이다. main/운영 실행은 금지한다. #2392 리뷰 예외를 새 PR에 전용하지 않는다. 남은 항목: 버전 PR 최신 CI/리뷰·dev 반영·새 Alpha 검증 → 사용자 main 승격 판단.
+
 ## Historical Context (superseded where it requires a populated roster)
 
 MD-QA #175 reports that a tournament or regular-league game can start after all players have been removed from one team's matchday lineup. The persisted official result can then contain zero participants for that team. The server currently validates team assignment, not the effective current lineup. A prior user decision permits starting when a team has not submitted a lineup, because the generated draft already contains the registered roster; this task must preserve that contract.

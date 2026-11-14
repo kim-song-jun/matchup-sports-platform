@@ -67,7 +67,8 @@
 
 ## 5. 준비 (한 번)
 
-모든 것을 **작업 폴더 안에만** 둬요. 저장소 안이나 홈 폴더(`~/.tapflow`)에는 쌓지 않아요.
+tapflow 설치·데이터·로그·빌드 산출물은 **작업 폴더 안에만** 둬요. 저장소 안이나 홈 폴더(`~/.tapflow`)에는 쌓지 않아요.
+유일한 예외는 4번의 앱 빌드가 worktree 안에 만드는 gitignore 생성물이고, 10절에서 지워요.
 전역 설치(`npm install -g`), `sudo`, `brew install`, `tapflow setup`, 시스템 설정 변경, 접근성 권한 부여, 기기 프로필 설치는 하지 않아요.
 
 1. 버전을 **정확히** 고정해 설치해요. 캐럿(`^0.32.0`)이면 다음 설치 때 다른 버전이 들어와요.
@@ -79,9 +80,11 @@
    chmod 755 node_modules/@tapflowio/ios-agent/bin/* node_modules/@tapflowio/android-agent/bin/emulator-encoder
    ```
    `--ignore-scripts` 로 설치 훅을 건너뛰고 필요한 두 가지(네이티브 모듈 빌드, 동봉 바이너리 실행 권한)만 직접 해요.
-   빈 폴더에서 위 줄을 그대로 돌려 확인했어요(2026-11-14): `package.json` 에 `"tapflow": "0.32.0"`(캐럿 없음)이
-   적히고 `better-sqlite3` 는 소스에서 컴파일돼요. 이때 npm 11.12 가 `Unknown cli config`·`devdir` 경고를 내지만
-   빌드는 끝나요. 다음 npm 메이저에서 이 옵션이 거절되면 멈추고 보고해요 — 미리 빌드된 바이너리를 내려받는 쪽으로 돌리지 않아요.
+   빈 폴더에서 위 줄을 그대로 돌려 확인했어요(2026-11-14, 출력은 로그로 남겼어요): `package.json` 에
+   `"tapflow": "0.32.0"`(캐럿 없음)이 적히고, `better-sqlite3` 는 소스에서 컴파일돼 `build/Release/better_sqlite3.node` 가
+   생기고, `tapflow --version` 이 `tapflow/0.32.0` 을 내요. 이때 npm 11.12.1 이 `Unknown cli config "--build-from-source"`·
+   `Unknown env config "devdir"` 경고를 내지만 rebuild 는 `rebuilt dependencies successfully` 로 끝나요.
+   다음 npm 메이저에서 이 옵션이 거절되면 멈추고 보고해요 — 미리 빌드된 바이너리를 내려받는 쪽으로 돌리지 않아요.
 
    `package-lock.json` 은 작업 폴더에 남기고(저장소에는 넣지 않아요), 같은 버전을 다시 설치할 때는 아래처럼 해요.
    ```bash
@@ -110,10 +113,12 @@
      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES
    ditto -c -k --keepParent "$D/build/Build/Products/Alpha Debug-iphonesimulator/Teameet.app" "$D/Teameet-alpha.app.zip"
    ```
-   위 명령을 그대로 돌려 확인했어요(2026-11-14): `** BUILD SUCCEEDED **`(약 45초), 결과 `Info.plist` 는
-   `kr.co.teameet.alpha`·`0.1.8 (12)`·`TeameetWebOrigin=https://alpha.teameet.co.kr` 이고, relay 가 이 zip 을 받아들였어요.
+   위 명령을 그대로 돌려 확인했어요(2026-11-14, 출력은 로그로 남겼어요): `** BUILD SUCCEEDED **`(이날 호스트 load 15 안팎에서
+   53초), 결과 `Info.plist` 는 `kr.co.teameet.alpha`·`0.1.8 (12)`·`TeameetWebOrigin=https://alpha.teameet.co.kr` 이고,
+   이 zip 을 6절 스크립트로 빈 relay 에 올리면 relay 가 `kr.co.teameet.alpha` 0.1.8 (12) 빌드로 받아들여요(`build id 1`).
    **이 새 빌드로 흐름을 돌려 보지는 않았어요** — 7절 흐름의 통과는 이미 있던 0.1.6 (10) 빌드로 확인한 거예요.
-   빌드가 만드는 `Version.generated.xcconfig`·`Teameet.xcodeproj` 등은 gitignore 대상이라 커밋되지 않아요.
+   빌드가 worktree 안에 만드는 `apps/v1_ios/Config/Version.generated.xcconfig`·`Generated-Info.plist`·`Teameet.xcodeproj/`·
+   `TeameetTests-Info.plist` 는 gitignore 대상이라 커밋되지 않아요(10절에서 지워요).
    올리기 전에 `Info.plist` 의 `CFBundleIdentifier`·`TeameetWebOrigin`·버전을 확인해요 — 오래된 빌드일 수 있어요.
 
 ## 6. 실행
@@ -199,21 +204,24 @@ echo $! > "$D/tapflow.pid"      # 끌 때 이 PID 만 써요
   TAPFLOW_TOKEN="$(cat "$D/.local-pat")" "$T" flow run "$D/flows/" --device "TapflowQA <날짜>" --build <id> \
     --artifacts "$D/artifacts" --junit "$D/artifacts/junit.xml"
   ```
-  토큰을 안 주면 `app check skipped (no token)` 가 나와요.
-- **어디까지 확인했나.** 위 스크립트는 `tapflow relay start` 로 띄운 빈 relay 에 그대로 돌려 관리자 생성·로그인·토큰 발급·
-  빌드 업로드(`build id 1`)를 확인했고, 그 relay 에서 `flow run` 은 기기가 없어 멈췄지만 토큰을 주면 앱 확인이 통과했어요.
+  토큰을 안 주면 `app check skipped (no token)` 가 나온다고 0.32.0 소스의 테스트에 적혀 있어요(이번에 돌려 보지는 않았어요).
+- **어디까지 확인했나.** 위 스크립트를 이 문서에서 그대로 떼어 `tapflow relay start` 로 띄운 빈 relay 에 돌려 관리자 생성·로그인·
+  토큰 발급·빌드 업로드(`build id 1`)가 되고, 토큰 없이 올리면 401 인 것을 확인했어요(2026-11-14, 출력은 로그로 남겼어요).
   기기까지 붙인 전체 실행은 같은 API 를 부르던 임시 스크립트로 통과시켰고, 이 스크립트로 처음부터 끝까지 이어서 돌려 보지는 않았어요.
 - 사람이 직접 볼 때: `ego-browser` 로 `http://localhost:4000` 에 로그인 → Start QA → 기기 선택.
   ego task space 는 쓰고 나서 `finish({ keep: [] })` 로 닫아요.
 - 호스트가 바쁠 때(`uptime` 의 load 가 높을 때) 요소 조회가 시간 초과로 실패하면 먼저 부하를 보고 한 번 재시도해요.
   새 기기 첫 실행의 `reset failed: app-uninstall` 경고는 앱이 아직 없어서 나오는 무해한 경고였어요.
 
-## 7. 흐름 예시 (2026-11-14 통과)
+## 7. 흐름 예시
 
 로그인 없이 열리는 화면만 써요. 첫 화면은 로그인이 아니라 게스트 홈이에요(0.1.6 기준).
+두 예시 모두 2026-11-14 에 이미 있던 0.1.6 (10) 빌드로 돌려 통과한 흐름이에요. 다만 첫 예시는 통과한 6단계 흐름에서
+끝의 두 단계(매치 탭 누르기와 마지막 `assertNotVisible`)를 뺀 것이고, 남은 단계는 통과 기록에 모두 ✓ 로 남아 있어요.
+뺀 마지막 `assertNotVisible` 은 앞 단계에서 이미 사라진 글자를 다시 확인하는 줄이라 매치 탭을 눌러도 안 눌러도 통과해서요.
 
 ```yaml
-# 탭 이동 — 눌러서 화면이 바뀐 것을 "사라진 글자"로 확인
+# 탭 이동 — 눌렀더니 앞 화면의 글자가 사라진 것까지만 확인
 name: teameet-guest-tabs
 appId: kr.co.teameet.alpha
 steps:
@@ -221,9 +229,9 @@ steps:
   - assertVisible: { label: "오늘의 추천", timeout: 60 }
   - tapOn: { label: "대회", role: other }
   - assertNotVisible: { label: "오늘의 추천", timeout: 20 }
-  - tapOn: { label: "매치", role: other }
-  - assertNotVisible: { label: "오늘의 추천", timeout: 20 }
 ```
+
+탭 이동은 화면이 바뀐 것까지만 확인해요. 도착한 화면이 맞는지는 아래 두 번째 예시처럼 그 화면에서만 보이는 글자로 확인해요.
 
 ```yaml
 # 입력 — "입력한 뒤에만 보이는 것"으로 확인
@@ -247,7 +255,8 @@ steps:
 - `label:` 선택자는 입력칸의 placeholder 를 보지 않아요. 입력칸은 따옴표만 있는 문자열로 눌러요.
 - `--no-reset` 이면 앱이 이전 화면에서 다시 열려요. 첫 화면을 가정하는 흐름은 초기화와 함께 돌려요.
 - **확인은 "동작한 뒤에만 보이는 것"으로.** 입력 전에도 목록에 있던 글자(예: 검색어 "마포")를 `assertVisible`
-  하면 입력이 안 돼도 통과해요.
+  하면 입력이 안 돼도 통과해요. 사라진 글자를 확인하는 `assertNotVisible` 도 같아요 — 이미 사라진 글자를 다시
+  확인하면 직전 동작이 안 돼도 통과해요.
 - 실패하면 마지막 화면 스크린샷이 남아요. 가정이 틀렸는지(화면이 다른지) 먼저 그 화면을 봐요.
 
 ## 9. 안전 수칙
@@ -275,7 +284,8 @@ steps:
 1. tapflow: 6절에서 `$!` 로 받아 둔 PID 에 `kill -TERM "$(cat "$D/tapflow.pid")"`(자식 TreeRunner `xcodebuild`·도우미도 같이 끝나요). `ps -p <PID>` 로 사라졌는지 확인해요.
 2. 전용 기기: `xcrun simctl shutdown <내 UDID>` → `xcrun simctl delete <내 UDID>`.
 3. ego task space `finish({ keep: [] })`, 일회용 토큰·비밀번호 파일(`$D/.local-pat`·`$D/.local-pass`) 삭제, 작업 폴더의 설치·데이터 정리.
-   앱을 빌드했다면 worktree 의 gitignore 생성물(`apps/v1_ios/Teameet.xcodeproj`·`Config/Version.generated.xcconfig` 등)도 내가 만든 것만 지워요.
+   앱을 빌드했다면 worktree 의 gitignore 생성물(5절 4번에 적은 4개)도 내가 만든 것만 지워요 — 빌드 전후의
+   `git status --short --ignored` 를 비교해, 빌드 전에 없던 것만 경로를 지정해 지워요(`git clean` 은 쓰지 않아요).
 4. 시작 전과 같은지 비교해요: 부팅된 기기 수, 포트 4000 리스너(`lsof -nP -iTCP:4000 -sTCP:LISTEN`), `xcodebuild`·오디오 도우미 프로세스 수.
 
 ## 11. 한계 (지금 방식이 계속 필요한 것)

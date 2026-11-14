@@ -23,6 +23,7 @@ import { AuthPasswordField } from './auth-password-field';
 import { AuthStepCta } from './auth-step-cta';
 import { describeFoundAccount } from './found-account-login';
 import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
+import { KakaoButtonFace } from './kakao-symbol';
 import { LoginMethodChips } from './login-method-chips';
 import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
@@ -77,7 +78,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword,
             className={`tm-btn tm-btn-lg tm-btn-block ${link.kakao ? 'tm-auth-kakao' : index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
             href={link.href}
           >
-            {link.label}
+            {link.kakao ? <KakaoButtonFace label={link.label} /> : link.label}
           </Link>
         ))}
         {/* 이 환경에서 쓸 수 있는 로그인 버튼이 없으면 막다른 길이 되지 않게 문의 창구를 준다. */}

@@ -50,16 +50,6 @@ export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; ha
   return { text: matchPhaseLabel(leagueFixturePhase(fixture)), hasScore: false, isForfeit: false };
 }
 
-/** "예정만 보기"·"다음 경기" 기준 — 행에 '예정'이라고 찍히는 대진과 같은 판정(결과 대기는 예정이 아니다). */
-export function isUpcomingFixture(fixture: V1LeagueFixture): boolean {
-  return leagueFixturePhase(fixture) === 'scheduled';
-}
-
-export interface TeamLookupEntry {
-  name: string;
-  logoUrl: string | null;
-}
-
 export interface LeagueSideLabels {
   /** 자리는 있는데 팀이 아직 없을 때. */
   tbd: string;

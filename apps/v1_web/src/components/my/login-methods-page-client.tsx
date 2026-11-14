@@ -481,7 +481,7 @@ export function LoginMethodsPageClient() {
                       disabled={busy}
                       onClick={() => void connectKakao()}
                     >
-                      {activeProvider === 'kakao' ? '연결 중이에요…' : <KakaoButtonFace />}
+                      <KakaoButtonFace />
                     </Button>
                   ) : undefined}
                 />

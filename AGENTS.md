@@ -409,6 +409,10 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - **UI 변경 PR은 예외 없이 📱390 / 📲768 / 🖥1440 3폭 갤러리를 PR 코멘트로 첨부한다 — 머지 후 alpha에서 찍어
   그 PR에 사후 게시한다**(로컬 next로 렌더하지 않으므로). 순서: 머지 → alpha 배포 확인(S8) → `ego-browser`로
   캡처 → 같은 PR에 갤러리 코멘트. PR 본문에 사후 게시 이유를 남긴다. (로직/백엔드 전용 PR은 대상 아님.)
+- **iOS 앱 셸을 시뮬레이터로 시험하는 자리에 한해 tapflow(0.32.0 고정)를 제한적으로 쓸 수 있다**(웹 화면 QA는
+  `ego-browser` 그대로). 로그인 없는 화면의 짧은 확인·사람이 보며 누르는 용도만이고, 키보드·푸시·카카오 로그인·실기기는
+  기존 방식이다. Android 는 이 도구로 아직 확인하지 못해 기존 방식 그대로다. 전용 시뮬레이터에서만 `TAPFLOW_AUDIO=off` 로 돌리고 `tapflow reset`·`init`·`setup` 은 쓰지 않는다.
+  정본: `CLAUDE.md` "운영 워크플로" 4번, 상세: `docs/guides/app-shell-tapflow.md`.
 - 와이드(1440~2560) 반응형 검증은 스크린샷 썸네일이 아니라 **치수 측정**이 신뢰할 수 있다.
 
 ## S6) PR · 리뷰 워크플로

@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   arrivalCheckInUsed,
   bracketNodeStateChip,
-  countLeagueFixturePhases,
   disciplineWarningChip,
   gameRosterStatusChip,
   gameStateChip,
-  leagueFixtureCountChips,
   leagueFixturePhase,
-  leagueSeasonStage,
-  leagueSeasonStageLine,
   leagueStateChip,
   matchPhaseChip,
   rosterPermissionHint,
@@ -42,11 +38,6 @@ describe('leagueFixturePhase — 리그 대진 한 경기의 단계', () => {
     ['게임이 시작 전이면 시각대로', fixture({ gameState: 'SCHEDULED' }), 'scheduled'],
   ] as const)('%s → %s', (_, input, expected) => {
     expect(leagueFixturePhase(input, NOW)).toBe(expected);
-  });
-
-  it('일찍 시작한 경기는 "예정" 집계에 들지 않는다 — 시즌 줄·칩이 같은 함수를 탄다', () => {
-    const counts = countLeagueFixturePhases([fixture({ gameState: 'LIVE' }), fixture({ gameState: 'ENDED' }), fixture()], NOW);
-    expect(counts).toEqual({ scheduled: 1, awaitingResult: 1, live: 1, ended: 0 });
   });
 });
 
@@ -119,45 +110,6 @@ describe('기본 상태는 무표시 — 바뀐 것만 칩', () => {
   it('명단을 바꿀 수 있는 사람에겐 권한 안내가 없다', () => {
     expect(rosterPermissionHint(true)).toBeNull();
     expect(rosterPermissionHint(false)).toBe('팀장·매니저만 명단을 바꿀 수 있어요.');
-  });
-});
-
-describe('순위표 자리의 시즌 단계', () => {
-  const two = [fixture(), fixture({ startAt: '2026-10-14T12:00:00Z' })];
-
-  it('한 경기도 안 치렀으면 시즌 시작 전 — 첫 경기 시각을 말한다(옛 "확인 중" 상자 대신)', () => {
-    const counts = countLeagueFixturePhases(two, NOW);
-    expect(counts).toEqual({ scheduled: 2, awaitingResult: 0, live: 0, ended: 0 });
-    const stage = leagueSeasonStage('active', counts);
-    expect(stage).toBe('preseason');
-    expect(leagueSeasonStageLine(stage, { counts, nextStartLabel: '10/7 (수) 21:00' })).toEqual({
-      title: '시즌 시작 전',
-      text: '첫 경기 10/7 (수) 21:00부터 순위가 생겨요',
-    });
-    expect(leagueFixtureCountChips(counts).map((chip) => chip.label)).toEqual(['예정 2', '결과 대기 0', '종료 0']);
-  });
-
-  it('킥오프가 지났는데 결과가 없으면 결과 대기 — 그 경기 수를 센다', () => {
-    const counts = countLeagueFixturePhases([fixture({ startAt: PAST }), fixture()], NOW);
-    const stage = leagueSeasonStage('active', counts);
-    expect(stage).toBe('awaiting_result');
-    expect(leagueSeasonStageLine(stage, { counts, nextStartLabel: null })?.text).toBe('킥오프가 지난 1경기의 결과를 기다려요');
-  });
-
-  it('결과가 쌓이면 진행 중, 리그가 끝나면 줄이 없다', () => {
-    const counts = countLeagueFixturePhases([fixture({ startAt: PAST, homeScore: 2, awayScore: 1 }), fixture()], NOW);
-    expect(leagueSeasonStage('active', counts)).toBe('in_progress');
-    expect(leagueSeasonStage('completed', counts)).toBe('completed');
-    expect(leagueSeasonStageLine('completed', { counts, nextStartLabel: null })).toBeNull();
-  });
-
-  it('취소 대진은 집계에서 빠지고, 진행 중 칩은 있을 때만 붙는다', () => {
-    const counts = countLeagueFixturePhases(
-      [fixture({ status: 'cancelled' }), fixture({ startAt: PAST, gameState: 'LIVE' })],
-      NOW,
-    );
-    expect(counts).toEqual({ scheduled: 0, awaitingResult: 0, live: 1, ended: 0 });
-    expect(leagueFixtureCountChips(counts).map((chip) => chip.label)).toContain('진행 중 1');
   });
 });
 

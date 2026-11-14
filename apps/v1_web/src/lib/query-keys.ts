@@ -201,7 +201,6 @@ export const v1Keys = {
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
   // R4: 내 리그. leagueMatch(leagueId) 와 같은 네임스페이스지만 'me' 는 UUID 가 아니라
   // 실제 리그 id 와 절대 충돌하지 않는다.
-  leagueClaimableFixtures: (leagueId: string) => [...v1Keys.all, 'league-claimable-fixtures', leagueId] as const,
   myLeagues: () => [...v1Keys.all, 'league-matches', 'me'] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
@@ -260,7 +259,6 @@ export function leagueViewKeys(leagueId: string) {
     v1Keys.adminLeagueMatchList(),
     v1Keys.leagueMatches(),
     v1Keys.leagueMatch(leagueId),
-    v1Keys.leagueClaimableFixtures(leagueId),
     v1Keys.tournament(leagueId),
     v1Keys.teamMatchesAll(),
     publicGameRecordsKeys.leagueFixtureRecords(leagueId),

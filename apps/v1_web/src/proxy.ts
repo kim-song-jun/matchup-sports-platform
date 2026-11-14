@@ -4,7 +4,7 @@ import { NOTICES_FEED_PATH } from '@/lib/seo';
 
 const CAMPAIGN_PATH_PREFIX = '/tournaments/campaigns/';
 const PUBLIC_DETAIL_PATH =
-  /^\/(matches|teams|team-matches|tournaments|notices|league-matches)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
+  /^\/(matches|teams|team-matches|tournaments|notices)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
 const TOURNAMENT_FIXTURE_PATH = /^\/tournaments\/([^/]+)\/matches\/([^/]+)$/;
 // 리그 경기 페이지는 주소의 leagueId 가 틀려도 경기가 속한 실제 리그로 열린다 — 판정에는 경기 id 만 쓴다.
 const LEAGUE_FIXTURE_PATH = /^\/league-matches\/[^/]+\/fixtures\/([^/]+)$/;
@@ -63,7 +63,6 @@ export const config = {
     '/tournaments/:id/reviews',
     '/tournaments/campaigns/:slug',
     '/notices/:id',
-    '/league-matches/:id',
     '/tournaments/:id/matches/:fixtureId',
     '/league-matches/:leagueId/fixtures/:fixtureId',
   ],

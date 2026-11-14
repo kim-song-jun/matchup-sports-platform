@@ -1,10 +1,30 @@
-# Task MD-QA #175: Block match start when either current lineup is empty
+# Task MD-QA #175: Allow anonymous operations without a matchday roster
 
-Status: In Progress  
+Status: Review
 **Owner**: Codex implementation → independent review by root-assigned gpt-6-sol  
 **Created**: 2026-10-26
 
-## Context
+## Current request — 2026-11-14 (supersedes the historical start-blocking requirements below)
+
+- Scope: backend + frontend + API/domain documentation. No schema or infrastructure change.
+- User decision: permit start, anonymous team score recording, and end with either/both rosters empty. Named records remain available only for effective roster participants.
+- Goal: remove empty-roster blocking from server and console while retaining distinct/confirmed teams, authorization, takeover, version/transaction, canceled-fixture, and league lifecycle checks.
+- Acceptance: home empty / away empty / both empty all start; anonymous goals persist and contribute to the result without fake personal records; valid named opposing players still work; stale/invalidated participant IDs remain rejected.
+- User scenario: tournament operator opens an assigned fixture, starts without a roster, records an anonymous goal, and ends with the correct team score and empty personal records for the missing side.
+- Tests: focused API start guards, console start/action tests, target picker anonymous/no-player test, database lifecycle regression in CI.
+- Owned: GamesService + its unit/integration specs; shared console and callers/tests; anonymous picker spec; this task; canonical competition flow; API README/global/domain; patch changeset. Forbidden: schema/migrations, environment files, unrelated worktrees, production promotion.
+- Parallel work: none; sequential implementation and review.
+- Tech debt: remove obsolete submission warning and start-blocking prop so the console does not ask operators to perform a retired submission step.
+- Security: retain role/scope/current-roster identity validation; never invent players or expose identities.
+- Risks: empty results must preserve team scores and not credit anonymous goals to a player; Alpha browser verification requires a real authorized login.
+- Ambiguity: user explicitly chose empty-roster operation with anonymous records, then requested an Alpha/dev PR.
+- Progress: implementation complete on an isolated branch from origin/dev `7b280a260`; dev-target PR requested, not yet merged/deployed. No historical blocking requirements below apply to the new contract.
+- Validation: `GamesService` unit suite 114/114 passed; shared console + real action-target picker 117/117 passed. API and web TypeScript checks passed. Web pattern gate passed separately after sandbox `spawnSync /bin/sh EPERM`; API surface gate passed separately for the same reason. Changeset policy and `git diff --check` passed; touched-path debt scan found no new markers.
+- CI-only: database integration covers home-empty, away-empty, both-empty lifecycle, anonymous score/missingScorer, populated opposing player's goal, no fake participants, and retains the invalidated-roster regression. Local Docker is unavailable, so database execution is not claimed.
+- Manual QA: Alpha browser, screenshots (1440/768/390), console/network and live authenticated operation are pending deployment/login. No local Next server or browser was started. No RED evidence is claimed: the initial web attempt failed dependency resolution before tests; final tests used isolated dependencies. No independent review/CI/Alpha PASS is claimed.
+- Cleanup: no runtime services were started. Keep the unmerged worktree/branch for the open PR; remove only task-owned temporary dependencies/caches after handoff if needed.
+
+## Historical Context (superseded where it requires a populated roster)
 
 MD-QA #175 reports that a tournament or regular-league game can start after all players have been removed from one team's matchday lineup. The persisted official result can then contain zero participants for that team. The server currently validates team assignment, not the effective current lineup. A prior user decision permits starting when a team has not submitted a lineup, because the generated draft already contains the registered roster; this task must preserve that contract.
 

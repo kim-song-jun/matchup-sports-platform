@@ -701,6 +701,32 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
   });
 });
 
+describe('SignupClient 가입 정보 단계 자동 완성 표시', () => {
+  beforeEach(resetSignupMocks);
+
+  it('이메일 칸은 이메일 주소로 알려요', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByLabelText(/^이메일/)).toHaveAttribute('autocomplete', 'email');
+  });
+
+  it('비밀번호와 비밀번호 확인 칸은 새 비밀번호로 알려요', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByPlaceholderText('8자 이상')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByPlaceholderText('비밀번호 다시 입력')).toHaveAttribute('autocomplete', 'new-password');
+  });
+
+  it('닉네임 칸에는 자동 완성 표시를 붙이지 않아요 — 닉네임이 로그인 아이디로 저장되지 않게', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByLabelText(/^닉네임/)).not.toHaveAttribute('autocomplete');
+  });
+});
+
 describe('SignupClient 단계 순서: 번호 인증 → 가입 정보 → 프로필', () => {
   beforeEach(resetSignupMocks);
 

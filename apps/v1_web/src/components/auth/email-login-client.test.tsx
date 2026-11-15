@@ -267,3 +267,36 @@ describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
     expect(readPendingEmailLink()).toBeNull();
   });
 });
+
+describe('EmailLoginClient 입력 칸 자동 완성 표시', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/login/email');
+  });
+
+  it('이메일 칸은 로그인 아이디로, 비밀번호 칸은 저장된 비밀번호로 알려요', () => {
+    render(<EmailLoginClient />);
+
+    expect(screen.getByLabelText('이메일')).toHaveAttribute('autocomplete', 'username');
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('autocomplete', 'current-password');
+  });
+
+  it('엔터가 곧 제출인 비밀번호 칸에만 이동 키 표시가 붙어요', () => {
+    render(<EmailLoginClient />);
+
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('enterkeyhint', 'go');
+    expect(screen.getByLabelText('이메일')).not.toHaveAttribute('enterkeyhint');
+  });
+
+  it('비밀번호 보기를 눌러 글자가 드러나도 표시가 그대로 남아요', () => {
+    render(<EmailLoginClient />);
+    const password = screen.getByLabelText('비밀번호');
+
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 보기' }));
+
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
+    expect(password).toHaveAttribute('enterkeyhint', 'go');
+  });
+});

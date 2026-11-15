@@ -391,7 +391,7 @@ steps:
    ```bash
    export ANDROID_SDK_ROOT=<SDK 위치> JAVA_HOME=<JDK 17 위치>
    export ANDROID_HOME="$ANDROID_SDK_ROOT"
-   export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
+   export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
    "$T" doctor android     # SDK·adb·aapt·AVD·Lean mode 점검. 전부 ✓ 이어야 해요
    ```
    `doctor` 가 다른 AVD 이름을 목록으로 보여 줘도 보기만 하는 거예요. 그 AVD 는 켜지도 고르지도 않아요.

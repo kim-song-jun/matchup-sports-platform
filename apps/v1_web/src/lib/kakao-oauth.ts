@@ -107,14 +107,18 @@ const ANDROID_META_IN_APP = /instagram|fb_iab|fbios|barcelona/;
 
 let preparedState: KakaoStatePair | null = null;
 let preparing: Promise<void> | null = null;
+// reset 마다 올린다. 준비가 시작할 때 값을 잡아 두었다가 달라졌으면 결과를 버린다.
+let generation = 0;
 // 이 문서가 저장 칸에 넣은 시도. SDK 는 톡 길로 다시 부를 때만 앞 확인을 멈추므로, 이미 나간 확인 요청의 답이
 // 옛 state 로 콜백에 올 수 있다. 같은 시도를 다시 시작하면 그 state 를 이어 써서 늦은 답이 거절되지 않게 한다.
 let liveAttempt: (KakaoStatePair & { mode: KakaoOAuthAttempt['mode']; returnTo: string | null }) | null = null;
 
-/** 기억한 시도와 예비 state 를 버린다. 뒤로가기 복원처럼 이전 시도가 끝난 뒤에 부른다. */
+/** 기억한 시도와 예비 state, 진행 중인 준비를 버린다. 뒤로가기 복원처럼 이전 시도가 끝난 뒤에 부른다. */
 export function resetKakaoAuthorizeAttempt(): void {
   liveAttempt = null;
   preparedState = null;
+  preparing = null;
+  generation += 1;
 }
 
 /** SDK 2.8.3 의 isSupportEasyLogin·checkOs 와 같은 판정이다. SDK 버전을 올릴 때 다시 대조한다. */
@@ -134,11 +138,12 @@ function preparationJsKey(): string | null {
   return supportsKakaoTalkEasyLogin(window.navigator.userAgent, window.navigator.maxTouchPoints) ? jsKey : null;
 }
 
-async function prepareState(): Promise<void> {
+async function prepareState(runGeneration: number): Promise<void> {
   if (preparedState) return;
   try {
     const state = generateKakaoOAuthState();
-    preparedState = { state, fingerprint: await fingerprintState(state) };
+    const pair = { state, fingerprint: await fingerprintState(state) };
+    if (runGeneration === generation) preparedState = pair;
   } catch {
     // 탭에서 다시 만들고, 그때의 실패를 알린다.
   }
@@ -160,11 +165,13 @@ async function prepareSdk(jsKey: string): Promise<void> {
 export function prepareKakaoAuthorize(): Promise<void> {
   const jsKey = preparationJsKey();
   if (!jsKey) return Promise.resolve();
-  preparing ??= (async () => {
+  if (preparing) return preparing;
+  const runGeneration = generation;
+  preparing = (async () => {
     try {
-      await Promise.all([prepareSdk(jsKey), prepareState()]);
+      await Promise.all([prepareSdk(jsKey), prepareState(runGeneration)]);
     } finally {
-      preparing = null;
+      if (runGeneration === generation) preparing = null;
     }
   })();
   return preparing;

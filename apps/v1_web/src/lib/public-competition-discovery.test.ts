@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
-import { collectPublicTournamentDetails } from './public-competition-discovery';
+import { collectPublicTournamentDetails, publicLeagueFixtures } from './public-competition-discovery';
 import type { V1TournamentListItem } from '@/types/api';
 
 const page = (items: unknown[]) => ({ items, pageInfo: { hasNext: false, nextCursor: null } });
@@ -64,5 +64,24 @@ describe('공개 대회 발견성 HTTP 계약', () => {
     } finally {
       drain = true; for (const release of [...releases.values()]) release(); await pending;
     }
+  });
+});
+
+describe('publicLeagueFixtures', () => {
+  const fixture = (teamMatchId: string, leagueId: string | null) => ({ teamMatchId, league: leagueId ? { leagueId } : null });
+
+  it('공개 리그 목록에 있는 리그의 경기만 남기고 친선 경기는 남기지 않는다', () => {
+    const rows = [
+      fixture('a1', 'public-a'), fixture('b1', 'public-b'), fixture('b2', 'public-b'),
+      fixture('c1', 'hidden-c'), fixture('d1', 'hidden-d'), fixture('friendly', null),
+    ];
+
+    const kept = publicLeagueFixtures(rows, [{ leagueId: 'public-a' }, { leagueId: 'public-b' }]);
+
+    expect(kept.map((row) => row.teamMatchId)).toEqual(['a1', 'b1', 'b2']);
+  });
+
+  it('공개 리그가 하나도 없으면 리그 경기를 하나도 남기지 않는다', () => {
+    expect(publicLeagueFixtures([fixture('a1', 'public-a')], [])).toEqual([]);
   });
 });

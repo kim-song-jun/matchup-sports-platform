@@ -592,16 +592,23 @@ describe('KakaoLoginButton', () => {
       expect(authorize.mock.calls[1][0].state).not.toBe(firstState);
     });
 
-    it('tells the storage failure to the reader and releases the button', async () => {
+    it('tells the storage failure inline under the button, not in a modal, and releases the button', async () => {
       const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await renderPrepared();
       const failing = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError'); });
       tap();
-      await waitFor(() => expect(alert).toHaveBeenCalledWith('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.'));
+
+      const notice = await screen.findByRole('alert');
+      expect(notice).toHaveTextContent('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.');
+      expect(notice).toHaveClass('tm-auth-provider-note');
+      expect(screen.getByRole('button', { name: '카카오 로그인' }).nextElementSibling).toBe(notice);
+      expect(alert).not.toHaveBeenCalled();
       expect(authorize).not.toHaveBeenCalled();
+
       failing.mockRestore();
       tap();
       expect(authorize).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('alert')).toBeNull();
     });
   });
 

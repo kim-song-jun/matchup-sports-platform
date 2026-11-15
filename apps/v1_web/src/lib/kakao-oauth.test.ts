@@ -160,7 +160,7 @@ describe('startKakaoLinkAuthorize', () => {
   });
 
   it('records a link attempt and hands the same state to the Kakao JS SDK, without login-only scopes', async () => {
-    await expect(startKakaoLinkAuthorize({ returnTo: '/my/settings' })).resolves.toEqual({ status: 'redirecting' });
+    await expect(startKakaoLinkAuthorize({ returnTo: '/my/settings' })).resolves.toEqual({ status: 'redirecting', path: 'sdk_account' });
 
     const attempt = JSON.parse(stored()!);
     expect(attempt).toMatchObject({ mode: 'link', returnTo: '/my/settings' });
@@ -185,7 +185,7 @@ describe('startKakaoLinkAuthorize', () => {
 
   it('navigates to the authorize URL with the state inside a native shell', async () => {
     window.TeameetNative = { postMessage: vi.fn(), supports: [] };
-    await startKakaoLinkAuthorize({ returnTo: null });
+    await expect(startKakaoLinkAuthorize({ returnTo: null })).resolves.toEqual({ status: 'redirecting', path: 'account_url' });
 
     const attempt = JSON.parse(stored()!);
     const target = new URL(assigned!);
@@ -203,11 +203,18 @@ describe('startKakaoLinkAuthorize', () => {
 
   it('falls back to the authorize URL and reports when the SDK cannot start', async () => {
     sdk.getInitializedKakaoJsSdk.mockRejectedValue(new Error('script blocked'));
-    await expect(startKakaoLinkAuthorize({ returnTo: null })).resolves.toEqual({ status: 'redirecting' });
+    await expect(startKakaoLinkAuthorize({ returnTo: null })).resolves.toEqual({ status: 'redirecting', path: 'account_url' });
 
     expect(authorize).not.toHaveBeenCalled();
     expect(JSON.parse(stored()!).state).toBe(`sha256:${createHash('sha256').update(new URL(assigned!).searchParams.get('state')!).digest('hex')}`);
     expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
+  });
+
+  it('reports the Kakao Talk path where the browser can open Kakao Talk', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(UA.androidChrome);
+
+    await expect(startKakaoLinkAuthorize({ returnTo: null })).resolves.toEqual({ status: 'redirecting', path: 'talk' });
+    expect(authorize).toHaveBeenCalledTimes(1);
   });
 
   it('does not start without the OAuth keys', async () => {

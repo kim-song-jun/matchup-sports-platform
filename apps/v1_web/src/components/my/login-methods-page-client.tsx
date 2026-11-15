@@ -17,6 +17,7 @@ import { ProviderMark } from '@/components/v1-ui/provider-mark';
 import type { ProviderMarkKind } from '@/components/v1-ui/provider-mark';
 import { Card, ErrorState, InfoRow } from '@/components/v1-ui/primitives';
 import { useToast } from '@/components/v1-ui/toast';
+import { useKakaoRetapRelease } from '@/hooks/use-kakao-retap-release';
 import { useV1AuthMe, useV1LinkApple, useV1LinkKakao, useV1UnlinkLoginMethod } from '@/hooks/use-v1-api';
 import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import { V1ApiError } from '@/lib/api-client';
@@ -183,33 +184,11 @@ export function LoginMethodsPageClient() {
   // 브리지 존재 여부는 브라우저에서만 알 수 있다 — 서버 렌더에는 Apple 버튼이 없고 하이드레이션 뒤에 나타난다.
   useEffect(() => setNativeApple(isNativeAppleSignInAvailable()), []);
 
-  // 카카오 인가 화면으로 넘어가는 중. 이 동안만 돌아옴(visibilitychange)을 시도의 끝으로 본다 —
-  // 앱 인증(브리지)은 자기 응답으로 끝나므로 화면이 다시 보인다는 이유로 풀면 진행 중인 요청 위에 다시 시작하게 된다.
-  const [leavingForAuthorize, setLeavingForAuthorize] = useState(false);
-
-  // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
-  useEffect(() => {
-    const release = () => {
-      setLeavingForAuthorize(false);
-      setNativeFellBack(false);
-      setActiveProvider(null);
-    };
-    window.addEventListener('pageshow', release);
-    return () => window.removeEventListener('pageshow', release);
-  }, []);
-
-  // 카카오톡 앱으로 넘어갔다가 인증을 취소하고 돌아오면 페이지는 그대로(pageshow 없음)인데 버튼이 잠긴 채 남는다.
-  useEffect(() => {
-    if (!leavingForAuthorize) return;
-    const release = () => {
-      if (document.visibilityState !== 'visible') return;
-      setLeavingForAuthorize(false);
-      setNativeFellBack(false);
-      setActiveProvider(null);
-    };
-    document.addEventListener('visibilitychange', release);
-    return () => document.removeEventListener('visibilitychange', release);
-  }, [leavingForAuthorize]);
+  // 인가를 시작한 뒤 연결 버튼을 다시 풀어 주는 때는 로그인 버튼과 같은 규칙이다. 앱 인증(브리지)은 자기 응답으로 끝나므로 arm 하지 않는다.
+  const { arm } = useKakaoRetapRelease(() => {
+    setNativeFellBack(false);
+    setActiveProvider(null);
+  });
 
   // 눌렀던 "연결 해제" 버튼은 해제된 뒤(이미 해제됐거나 마지막 수단이라 목록이 바뀐 경우 포함) 사라져 확인 창이 포커스를 돌려줄 곳이 없다.
   // 문서 처음으로 떨어지지 않게 결과 안내로 옮긴다. 버튼이 남는 거절에서는 확인 창이 그 버튼으로 돌려준다.
@@ -251,7 +230,7 @@ export function LoginMethodsPageClient() {
       setStartError(KAKAO_START_ERRORS[started.reason]);
       return false;
     }
-    setLeavingForAuthorize(true);
+    arm(started.path);
     return true;
   };
 
@@ -307,7 +286,7 @@ export function LoginMethodsPageClient() {
       await linkWithNativeCredential('kakao', requestKakaoCredential, (payload) => linkKakao.mutateAsync(payload), linkKakaoOnWeb);
       return;
     }
-    // 인가가 시작되면 화면을 떠나므로 busy 를 유지한다(돌아오면 위 효과가 푼다).
+    // 인가가 시작되면 busy 를 유지한다(풀리는 때는 위 useKakaoRetapRelease 가 정한다).
     if (!(await linkKakaoOnWeb())) finish();
   };
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { V1ApiError, v1Post } from '@/lib/api-client';
@@ -10,29 +9,29 @@ import { trackEvent } from '@/lib/analytics';
 import { LOGIN_METHOD_UNLINKED_CODE } from '@/lib/auth-error-codes';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
-import { getInitializedKakaoJsSdk } from '@/lib/kakao-js-sdk';
-import { storeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { prepareKakaoAuthorize, resetKakaoAuthorizeAttempt, startKakaoAuthorize } from '@/lib/kakao-oauth';
 import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
 import { isNativeKakaoSignInAvailable, KAKAO_WEB_HANDOFF_MESSAGE, NativeKakaoSignInError, requestNativeKakaoSignIn } from '@/lib/native-kakao';
-import { detectNativeShell } from '@/lib/native-bridge';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
-import { generateKakaoOAuthState, isSocialOnboardingRoute, KAKAO_LOGIN_LABEL } from './auth.view-model';
+import { isSocialOnboardingRoute, KAKAO_LOGIN_LABEL } from './auth.view-model';
 import { KakaoButtonFace } from './kakao-symbol';
 import { routeSocialLoginRecovery } from './login-recovery-route';
 
 const NATIVE_FAILURE_MESSAGE = '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
-const SDK_PREFLIGHT_TIMEOUT_MS = 8_000;
+// 카카오톡을 다녀와 결과가 없어도 이만큼 화면이 보이면 다시 누를 수 있다. 그 사이 도착하는 답이 먼저 처리될 틈이다.
+const KAKAO_RETAP_LOCK_MS = 2_000;
+const STORAGE_UNAVAILABLE_MESSAGE = '브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.';
 
-// 카카오 로그인 버튼(클라이언트). 클릭 시점에 CSRF 방지 state를 생성·저장(mode: 'login')한 뒤 경로를 고른다.
-// state 저장이 SSR 시점이 아닌 실제 브라우저에서 일어나야 kakao-callback-client.tsx의
-// 대조 검증이 성립한다(로그인 CSRF/세션 고정 방지).
+// 카카오 로그인 버튼(클라이언트). 누르면 CSRF 방지 state 를 저장(mode: 'login')한 뒤 경로를 고른다.
+// 저장은 SSR 이 아닌 실제 브라우저에서 일어나야 kakao-callback-client.tsx 의 대조 검증이 성립한다(로그인 CSRF/세션 고정 방지).
 //   1) 셸이 sign-in-with-kakao 를 광고하면 네이티브 SDK 토큰 → POST /auth/kakao/token
 //      네이티브 단계가 실패하면(오류 응답·토큰 없음·무응답) 안내 한 줄과 함께 3) 으로 이어진다.
 //      서버가 토큰을 거절한 경우는 이어 가지 않는다 — 같은 계정 판정이 웹 경로에서도 반복될 뿐이다.
-//   2) 셸이 아니면 JS SDK 톡 로그인(같은 redirectUri·scope·state → /callback/kakao)
-//   3) SDK/키를 쓸 수 없으면 기존 authorize URL 이동(경고 로그를 남기는 명시적 폴백)
+//   2) 셸이 아니면 JS SDK 간편로그인(같은 redirectUri·scope·state → /callback/kakao).
+//      모바일 브라우저에서는 마운트 때 SDK 와 state 를 미리 준비해, 탭 안에서 authorize 까지 끝낸다.
+//   3) SDK/키를 쓸 수 없으면 경고 로그를 남기고 인가 주소로 이동한다.
 //   capability 를 광고하지 않는 옛 셸은 톡 앱 핸드오프(커스텀 스킴)를 허용 목록이 막으므로 1·2 를 건너뛰고 3 만 쓴다.
 export function KakaoLoginButton({
   href,
@@ -47,17 +46,61 @@ export function KakaoLoginButton({
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [webHandoff, setWebHandoff] = useState(false);
-  // SDK 로드가 끝나기 전 재탭하면 state 가 덮어써져 콜백의 CSRF 대조가 깨진다.
+  // 시작한 시도가 끝나기 전에 다시 누르면 시도가 겹친다.
   const busyRef = useRef(false);
+  // SDK 를 부른 뒤의 잠금은 시간으로 푼다. 카카오톡이 열리지 않거나 승인 없이 돌아와도 페이지는 그대로라 pageshow 가 없다.
+  const retapArmedRef = useRef(false);
+  const retapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearRetapTimer = () => {
+    if (retapTimerRef.current !== null) clearTimeout(retapTimerRef.current);
+    retapTimerRef.current = null;
+  };
+  const startRetapTimer = () => {
+    clearRetapTimer();
+    retapTimerRef.current = setTimeout(() => {
+      retapTimerRef.current = null;
+      retapArmedRef.current = false;
+      busyRef.current = false;
+    }, KAKAO_RETAP_LOCK_MS);
+  };
+  const armRetapRelease = () => {
+    retapArmedRef.current = true;
+    if (document.visibilityState !== 'hidden') startRetapTimer();
+  };
+
+  useEffect(() => {
+    void prepareKakaoAuthorize();
+  }, []);
 
   // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
   useEffect(() => {
-    const release = () => {
+    const release = (event: Event) => {
+      clearRetapTimer();
+      retapArmedRef.current = false;
       busyRef.current = false;
       setWebHandoff(false);
+      if ((event as PageTransitionEvent).persisted) {
+        resetKakaoAuthorizeAttempt();
+        void prepareKakaoAuthorize();
+      }
     };
     window.addEventListener('pageshow', release);
     return () => window.removeEventListener('pageshow', release);
+  }, []);
+
+  // 화면이 가려진 시간(카카오톡에 있는 동안)은 세지 않고, 다시 보이면 2초를 새로 센다.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!retapArmedRef.current) return;
+      if (document.visibilityState === 'visible') startRetapTimer();
+      else clearRetapTimer();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearRetapTimer();
+    };
   }, []);
 
   const failNative = (reason: string, message: string) => {
@@ -90,17 +133,17 @@ export function KakaoLoginButton({
       level: 'warn',
       context: { reason, fallback: 'web_authorize' },
     });
-    const state = generateKakaoOAuthState();
-    try {
-      await storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
-    } catch {
+    // 셸 안에서는 이동이 곧바로 시작되므로 안내를 저장 직후, 이동 전에 DOM 에 반영한다.
+    const started = await startKakaoAuthorize({
+      mode: 'login',
+      returnTo: null,
+      authorizeUrl: new URL(href),
+      onCommitted: () => flushSync(() => setWebHandoff(true)),
+    });
+    if (started.status === 'unavailable') {
       busyRef.current = false;
       failNative('state_storage_unavailable', NATIVE_FAILURE_MESSAGE);
-      return;
     }
-    // 셸 안에서는 이동이 곧바로 시작되므로 안내를 먼저 DOM 에 반영한다.
-    flushSync(() => setWebHandoff(true));
-    navigateToAuthorizeUrl(state);
   };
 
   const exchangeNativeToken = async (accessToken: string) => {
@@ -153,79 +196,42 @@ export function KakaoLoginButton({
     await exchangeNativeToken(native.accessToken);
   };
 
-  const navigateToAuthorizeUrl = (state: string) => {
-    const separator = href.includes('?') ? '&' : '?';
-    window.location.href = `${href}${separator}state=${encodeURIComponent(state)}`;
-  };
-
-  const signInWithJsSdk = async (state: string) => {
-    const authorizeUrl = new URL(href);
-    const redirectUri = authorizeUrl.searchParams.get('redirect_uri');
-    const scope = authorizeUrl.searchParams.get('scope') ?? undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    const deadline = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error('Kakao login SDK preparation timed out'));
-      }, SDK_PREFLIGHT_TIMEOUT_MS);
+  const signInOnWeb = async () => {
+    const started = await startKakaoAuthorize({
+      mode: 'login',
+      returnTo: null,
+      authorizeUrl: new URL(href),
+      onCommitted: () => saveRedirectPath(new URLSearchParams(window.location.search).get('redirect')),
     });
-    try {
-      if (!redirectUri) throw new Error('Kakao redirect_uri is missing from the authorize URL');
-      const prepare = async () => {
-        // Maps can move independently to another app. Login must use the JS key
-        // paired with the OAuth REST key embedded in this same web build.
-        const loginJsKey = process.env.NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY;
-        if (!loginJsKey) throw new Error('Kakao login JS key is not configured');
-        return getInitializedKakaoJsSdk(loginJsKey);
-      };
-      const sdk = await Promise.race([prepare(), deadline]);
-      sdk.Auth.authorize({ redirectUri, state, ...(scope ? { scope } : {}), throughTalk: true });
-    } catch (err) {
-      reportClientError({
-        message: 'Kakao JS SDK login unavailable, falling back to authorize URL',
-        stack: err instanceof Error ? err.stack : undefined,
-        level: 'warn',
-        context: { reason: err instanceof Error ? err.message : String(err) },
-      });
-      navigateToAuthorizeUrl(state);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    if (busyRef.current) return;
-    setError(null);
-    if (isNativeKakaoSignInAvailable()) {
-      busyRef.current = true;
-      void signInNative();
-      return;
-    }
-    busyRef.current = true;
-    const state = generateKakaoOAuthState();
-    try {
-      await storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
-      saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
-    } catch {
+    if (started.status === 'unavailable') {
       busyRef.current = false;
       // sessionStorage 사용 불가(프라이빗 모드/quota 초과) 시 CSRF 방지 state를 저장할 수 없어
       // 안전한 로그인이 불가능하다. 조용히 실패하지 않고 사용자에게 알린 뒤 중단한다(fail-closed).
-      window.alert('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.');
+      window.alert(STORAGE_UNAVAILABLE_MESSAGE);
       return;
     }
+    trackEvent('login_start', { method: 'kakao', login_path: started.path, sdk_ready: started.sdkReady });
+    if (started.path !== 'account_url') armRetapRelease();
+  };
+
+  const handleClick = () => {
+    if (busyRef.current) return;
+    setError(null);
     busyRef.current = true;
-    if (detectNativeShell()) {
-      navigateToAuthorizeUrl(state);
+    if (isNativeKakaoSignInAvailable()) {
+      trackEvent('login_start', { method: 'kakao', login_path: 'native' });
+      void signInNative();
       return;
     }
-    void signInWithJsSdk(state);
+    // 준비가 끝나 있으면 이 호출 안에서 authorize 까지 간다 — 앞에 await 를 두지 않는다.
+    void signInOnWeb();
   };
 
   return (
     <>
-      <a className={className} href={href} onClick={handleClick}>
+      <button type="button" className={className} onClick={handleClick}>
         <KakaoButtonFace label={label} />
-      </a>
+      </button>
       {error ? (
         <p className="tm-text-caption tm-auth-provider-note" role="alert">{error}</p>
       ) : webHandoff ? (

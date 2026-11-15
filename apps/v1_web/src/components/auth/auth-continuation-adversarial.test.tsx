@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => navigation, usePathname: ()
 vi.mock('@/lib/navigation-history', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/navigation-history')>(), replaceDocument: navigation.replace,
 }));
-vi.mock('@/lib/kakao-js-sdk', () => ({ getInitializedKakaoJsSdk: async () => ({ Auth: { authorize: sdk.authorize } }) }));
+vi.mock('@/lib/kakao-js-sdk', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/kakao-js-sdk')>(), getInitializedKakaoJsSdk: async () => ({ Auth: { authorize: sdk.authorize } }) }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 const AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize?client_id=fixture&redirect_uri=https%3A%2F%2Fteameet.test%2Fcallback%2Fkakao';
 const { state, server, reset } = createRedirectFixture();
@@ -150,10 +150,10 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     }));
     const nested = '/onboarding/confirm?redirect=%2Fteams%2Fnew';
     const user = openJourney(nested);
-    await screen.findByRole('link', { name: '카카오 로그인' });
+    await screen.findByRole('button', { name: '카카오 로그인' });
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(nested);
     expect(getSavedRedirectPath()).toBeNull();
-    await user.click(screen.getByRole('link', { name: '카카오 로그인' }));
+    await user.click(screen.getByRole('button', { name: '카카오 로그인' }));
     await waitFor(() => expect(sdk.authorize).toHaveBeenCalledTimes(1));
     expect(getSavedRedirectPath()).toBe(nested);
     const oauthState = sdk.authorize.mock.calls[0]?.[0]?.state;

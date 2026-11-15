@@ -18,7 +18,7 @@ const signOut = vi.hoisted(() => ({
   pending: false,
   error: null as string | null,
 }));
-const kakaoOAuth = vi.hoisted(() => ({ startKakaoLinkAuthorize: vi.fn() }));
+const kakaoOAuth = vi.hoisted(() => ({ startKakaoLinkAuthorize: vi.fn(), prepareKakaoAuthorize: vi.fn() }));
 const reporter = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
@@ -393,6 +393,16 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
 });
 
 describe('LoginMethodsPageClient - 웹에서 카카오 연결', () => {
+  it('카카오가 연결되지 않은 계정에서만 눌리기 전에 카카오 인가 준비를 시작한다', async () => {
+    await renderLoaded(['email']);
+    expect(kakaoOAuth.prepareKakaoAuthorize).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    kakaoOAuth.prepareKakaoAuthorize.mockClear();
+    await renderLoaded(['email', 'kakao']);
+    expect(kakaoOAuth.prepareKakaoAuthorize).not.toHaveBeenCalled();
+  });
+
   it('앱 셸이 없으면 이 화면으로 돌아오는 카카오 인가를 시작하고 연결 API는 부르지 않는다', async () => {
     await renderLoaded(['email']);
 

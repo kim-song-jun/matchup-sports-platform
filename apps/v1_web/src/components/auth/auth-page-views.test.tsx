@@ -129,7 +129,7 @@ describe('로그인 화면', () => {
       configureKakao();
       const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
 
-      const kakao = screen.getByRole('link', { name: '카카오 로그인' });
+      const kakao = screen.getByRole('button', { name: '카카오 로그인' });
       expect(kakao).toHaveClass('tm-btn', 'tm-btn-lg', 'tm-btn-block', 'tm-auth-kakao', 'tm-pressable');
       expect(kakao).not.toHaveClass('tm-btn-outline');
       expect(kakao.getAttribute('style')).toBeNull();
@@ -146,7 +146,7 @@ describe('로그인 화면', () => {
       renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
 
       const apple = await screen.findByRole('button', { name: 'Apple로 계속하기' });
-      const kakao = screen.getByRole('link', { name: '카카오 로그인' });
+      const kakao = screen.getByRole('button', { name: '카카오 로그인' });
       expect(apple).toHaveClass('tm-btn-block');
       expect(kakao).toHaveClass('tm-btn-block');
       expect(apple.compareDocumentPosition(kakao) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -160,7 +160,7 @@ describe('로그인 화면', () => {
       expect(kakao).toBeDisabled();
       expect(kakao).toHaveClass('tm-btn-block', 'tm-auth-kakao');
       expect(kakao.getAttribute('style')).toBeNull();
-      expect(screen.queryByRole('link', { name: '카카오 로그인' })).toBeNull();
+      expect(screen.queryByRole('button', { name: '카카오 로그인' })).toBeNull();
       expect(screen.getByText('카카오·네이버 로그인은 준비 중이에요')).toBeInTheDocument();
     });
   });

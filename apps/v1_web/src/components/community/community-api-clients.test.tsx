@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError, V1_OFFLINE_WRITE_MESSAGE } from '@/lib/api-client';
 import * as clientErrorReporter from '@/lib/client-error-reporter';
+import { hasStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
 import type { NotificationsViewModel } from './community.types';
 import { ChatListPageClient, ChatRoomPageClient, NotificationsPageClient } from './community-api-clients';
 
@@ -168,11 +169,16 @@ describe('NotificationsPageClient', () => {
 describe('ChatRoomPageClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     // 데스크톱 목록 pane(useChatListPageModel)이 내부적으로 쓰는 훅들 — 이 스위트의 관심사가 아니므로 안정된 빈 상태로 고정.
     hooks.chatRooms.mockReturnValue({ data: { items: [] }, isPending: false, isError: false, refetch: vi.fn() });
     hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
     hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn() });
     hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
   });
 
   it('채팅방을 열면 실시간 수신을 구독하고, 나가면 해제한다', () => {
@@ -247,6 +253,45 @@ describe('ChatRoomPageClient', () => {
 
     expect(navigationHistory.replaceDocument).toHaveBeenCalledTimes(1);
     expect(navigationHistory.replaceDocument.mock.calls[0][0]).toContain('/login');
+  });
+
+  describe('session_expired 계측', () => {
+    const sessionExpiredEvents = () => analytics.trackEvent.mock.calls.filter(([name]) => name === 'session_expired');
+    const failRoomLoad = (error: V1ApiError) => {
+      hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+      hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+    };
+
+    it('로그인 표시가 켜진 채 401 이 오면 표시를 지우며 한 번 보낸다', () => {
+      saveStoredV1Session({ userId: 'user-1' });
+      failRoomLoad(apiError(401, 'UNAUTHENTICATED'));
+
+      const { rerender } = renderWithClient(<ChatRoomPageClient roomId="room-401" />);
+      rerender(<ChatRoomPageClient roomId="room-401" />);
+
+      expect(sessionExpiredEvents()).toEqual([['session_expired', { gate: 'chat_room', app_shell: 'web' }]]);
+      expect(hasStoredV1Session()).toBe(false);
+    });
+
+    it('로그인 표시가 꺼져 있던 방문자의 401 은 보내지 않는다', () => {
+      failRoomLoad(apiError(401, 'UNAUTHENTICATED'));
+
+      renderWithClient(<ChatRoomPageClient roomId="room-401" />);
+
+      expect(sessionExpiredEvents()).toEqual([]);
+    });
+
+    it('401 이 아닌 실패(403·5xx)는 보내지 않고 표시도 지우지 않는다', () => {
+      saveStoredV1Session({ userId: 'user-1' });
+      failRoomLoad(apiError(403, 'PERMISSION_DENIED'));
+      const { unmount } = renderWithClient(<ChatRoomPageClient roomId="room-403" />);
+      unmount();
+      failRoomLoad(apiError(503, 'UNAVAILABLE'));
+      renderWithClient(<ChatRoomPageClient roomId="room-503" />);
+
+      expect(sessionExpiredEvents()).toEqual([]);
+      expect(hasStoredV1Session()).toBe(true);
+    });
   });
 
   it('대조군 — 403 은 로그인으로 보내지 않는다', () => {

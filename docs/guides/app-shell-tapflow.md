@@ -169,9 +169,14 @@ D=<5절의 작업 폴더>/tapflow           # 5절과 같은 값
 T="$D/node_modules/.bin/tapflow"      # PATH 에 없어요. 항상 이 경로로 불러요
 mkdir -p "$D/home"                    # TAPFLOW_HOME 폴더는 미리 있어야 해요(없으면 시작을 거부해요)
 export TAPFLOW_HOME="$D/home" TAPFLOW_AUDIO=off
+lsof -nP -iTCP:4000 -sTCP:LISTEN      # 비어 있어야 해요. 차 있으면 시작하지 않아요(아래 첫 항목)
 "$T" start --platform ios --device <내 UDID> > "$D/start.log" 2>&1 < /dev/null &
 echo $! > "$D/tapflow.pid"      # 끌 때 이 PID 만 써요
 ```
+
+- **`start` 전에 포트 4000 이 비어 있는지 봐요.** 위 `lsof` 가 아무것도 보여 주지 않아야 해요. 리스너가 있으면 내가 띄운 것이
+  아닌 이상 다른 세션이 쓰는 중이니, 건드리지 않고 비기를 기다린 뒤 시작해요(이 확인은 Android 시작인 13-1절 4번과 16절
+  시작 1번도 같아요). 끝난 뒤 같은 명령으로 다시 비교하는 것은 10절 4번이에요.
 
 - **`npx tapflow`·`npm exec` 로 띄우지 않아요.** 그러면 `$!` 가 tapflow 가 아니라 `npm exec` 의 PID 가 돼요
   (`tapflow relay start` 로 확인: 포트를 연 것은 `npm exec` 의 자식 node 였어요). 위처럼 `node_modules/.bin/tapflow`
@@ -333,7 +338,9 @@ steps:
 내가 띄운 것만, 띄울 때 받은 PID·UDID 로 끝내요. 이름 패턴으로 프로세스를 찾아 죽이는 명령(`pkill`·`killall`)과
 패턴 검색 결과의 PID 를 넘기는 `kill` 은 쓰지 않아요.
 
-1. tapflow: 6절에서 `$!` 로 받아 둔 PID 에 `kill -TERM "$(cat "$D/tapflow.pid")"`(자식 TreeRunner `xcodebuild`·도우미도 같이 끝나요). `ps -p <PID>` 로 사라졌는지 확인해요.
+1. tapflow: 6절에서 `$!` 로 받아 둔 PID 에 `kill -TERM "$(cat "$D/tapflow.pid")"`(자식 TreeRunner `xcodebuild`·도우미도 같이 끝나요).
+   파일에 적힌 PID 는 재부팅·PID 재사용 뒤에는 남의 프로세스일 수 있어서, 끄기 전에 `ps -p "$(cat "$D/tapflow.pid")" -o command=` 가
+   내 `node …/node_modules/.bin/tapflow start …` 를 보여 주는지 먼저 확인하고 아니면 끄지 않아요. 끈 뒤 `ps -p <PID>` 로 사라졌는지 확인해요.
 2. 전용 기기: `xcrun simctl shutdown <내 UDID>` → `xcrun simctl delete <내 UDID>`.
 3. ego task space `finish({ keep: [] })`, 일회용 토큰·비밀번호 파일(`$D/.local-pat`·`$D/.local-pass`) 삭제, 작업 폴더의 설치·데이터 정리.
    앱을 빌드했다면 worktree 의 gitignore 생성물(5절 4번에 적은 4개)도 내가 만든 것만 지워요 — 빌드 전후의
@@ -365,7 +372,7 @@ steps:
 - 대시보드에서 사람이 에뮬레이터를 만지는 절차를 시작부터 종료까지 돌렸어요(16절). 에뮬레이터를 껐다 켜도 기기 데이터가 남는 것을
   Chrome 첫 실행 안내가 다시 안 뜨는 것으로 확인했어요.
 
-시간은 대표값이 아니라 그날의 관찰이에요. 부팅과 설치를 포함한 첫 실행이 약 100초, 이후 같은 흐름은 14~18초였고,
+시간은 대표값이 아니라 그날의 관찰이에요. 부팅과 설치를 포함한 첫 실행이 약 100초, 이후 같은 흐름은 14~27초(위 5번 통과 기준 — 처음 3번은 14~18초, 다른 시점의 2번은 20초와 27초)였고,
 호스트가 바쁠 때(`waiting …: the Mac is over its CPU or memory limit`)는 시작이 미뤄져 한 번에 최대 약 160초까지 걸렸어요.
 이런 지연은 결함이 아니라 부하예요. `uptime` 으로 부하를 보고 다시 해요.
 
@@ -400,10 +407,12 @@ steps:
    shasum -a 256 "$D/alpha-apk/app-alpha-debug.apk"     # 같은 폴더의 .sha256 값과 같은지 봐요
    ```
 4. 시작은 6절의 iOS 시작과 같고 플랫폼과 기기만 달라요. `--device` 에 내 AVD 이름만 줘서 tapflow 가 그 AVD 하나만 보게 해요
-   (로그에 「1 device(s)」). `TAPFLOW_AUDIO=off`·`node_modules/.bin/tapflow` 직접 실행·시작 전 포트 4000 확인도 6절과 같아요.
+   (로그에 「1 device(s)」). `TAPFLOW_AUDIO=off`·`node_modules/.bin/tapflow` 직접 실행은 6절과 같고, 시작 전 포트 4000 확인은
+   아래 `lsof` 줄이에요(6절 첫 항목: 비어 있어야 하고, 남이 쓰면 건드리지 않고 기다려요).
    ```bash
    mkdir -p "$D/home"                                   # 6절처럼 미리 있어야 해요
    export TAPFLOW_HOME="$D/home" TAPFLOW_AUDIO=off      # 위 1번의 환경변수가 같은 셸에 있어야 해요
+   lsof -nP -iTCP:4000 -sTCP:LISTEN                     # 비어 있어야 해요
    "$T" start --platform android --device tapflow-teameet-<이름> > "$D/start.log" 2>&1 < /dev/null &
    echo $! > "$D/tapflow.pid"
    ```

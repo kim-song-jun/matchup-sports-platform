@@ -331,15 +331,6 @@ describe('Kakao authorize preparation and start', () => {
       await prepareKakaoAuthorize();
       expect(window.sessionStorage).toHaveLength(0);
     });
-
-    it('resolves and prepares again on the next call when the SDK global misbehaves', async () => {
-      window.Kakao = { isInitialized: () => { throw new Error('broken global'); } } as unknown as typeof window.Kakao;
-      await expect(prepareKakaoAuthorize()).resolves.toBeUndefined();
-
-      delete window.Kakao;
-      await prepareKakaoAuthorize();
-      expect(sdk.getInitializedKakaoJsSdk).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('startKakaoAuthorize', () => {
@@ -395,6 +386,14 @@ describe('Kakao authorize preparation and start', () => {
       device(UA.windowsDesktop, 0);
       await expect(start()).resolves.toEqual({ status: 'redirecting', path: 'sdk_account', sdkReady: false });
       expect(authorize).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes to the authorize URL with a warning when the SDK global throws on the readiness check', async () => {
+      window.Kakao = { isInitialized: () => { throw new Error('broken global'); } } as unknown as typeof window.Kakao;
+      sdk.getInitializedKakaoJsSdk.mockRejectedValue(new Error('broken global'));
+      await expect(start()).resolves.toEqual({ status: 'redirecting', path: 'account_url', sdkReady: false });
+      expect(authorize).not.toHaveBeenCalled();
+      expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
     });
 
     it('goes to the authorize URL with a warning when the SDK cannot start', async () => {

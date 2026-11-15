@@ -90,6 +90,12 @@ describe('getReadyKakaoJsSdk', () => {
     expect(getReadyKakaoJsSdk()).toBe(window.Kakao);
   });
 
+  it('treats a global that throws as not ready instead of throwing', async () => {
+    const { getReadyKakaoJsSdk } = await freshLoader();
+    window.Kakao = { init: vi.fn(), isInitialized: () => { throw new Error('broken global'); }, Auth: { authorize: vi.fn() } };
+    expect(getReadyKakaoJsSdk()).toBeNull();
+  });
+
   it('does not add a script of its own', async () => {
     const { getReadyKakaoJsSdk } = await freshLoader();
     getReadyKakaoJsSdk();

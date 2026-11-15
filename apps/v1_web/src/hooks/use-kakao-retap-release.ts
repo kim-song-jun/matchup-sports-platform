@@ -46,10 +46,10 @@ export function useKakaoRetapRelease(release: (cause: KakaoRetapRelease) => void
   }, [startTimer]);
 
   useEffect(() => {
-    const onPageShow = (event: Event) => {
+    const onPageShow = (event: PageTransitionEvent) => {
       clearTimer();
       armedRef.current = false;
-      releaseRef.current({ reason: 'pageshow', persisted: (event as PageTransitionEvent).persisted === true });
+      releaseRef.current({ reason: 'pageshow', persisted: event.persisted });
     };
     const onVisibilityChange = () => {
       if (!armedRef.current) return;

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { IntegrationSettingsService } from '../integrations/integration-settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
 import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
@@ -11,9 +12,17 @@ type KakaoRegionDocument = {
   region_2depth_name?: string;
 };
 
+const KAKAO_COORD2REGION_URL = 'https://dapi.kakao.com/v2/local/geo/coord2regioncode.json';
+const KAKAO_TIMEOUT_MS = 3000;
+
 @Injectable()
 export class MasterService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(MasterService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly integrationSettings: IntegrationSettingsService,
+  ) {}
 
   async getSports() {
     const sports = await this.prisma.v1Sport.findMany({
@@ -112,23 +121,30 @@ export class MasterService {
     };
   }
 
+  /** Without a map REST key Kakao is not called; the caller answers from the nearest region instead. */
   private async resolveByKakao(longitude: number, latitude: number) {
-    const clientId = process.env.KAKAO_CLIENT_ID;
-    if (!clientId) return null;
+    const apiKey = await this.integrationSettings.getKakaoRestApiKey();
+    if (!apiKey) return null;
 
     try {
-      const url = new URL('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json');
+      const url = new URL(KAKAO_COORD2REGION_URL);
       url.searchParams.set('x', String(longitude));
       url.searchParams.set('y', String(latitude));
 
       const response = await fetch(url, {
-        headers: { Authorization: `KakaoAK ${clientId}` },
+        headers: { Authorization: `KakaoAK ${apiKey}` },
+        signal: AbortSignal.timeout(KAKAO_TIMEOUT_MS),
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        this.logger.warn(`Kakao coord2regioncode failed with status ${response.status}`);
+        return null;
+      }
       const data = (await response.json()) as { documents?: KakaoRegionDocument[] };
       return data.documents?.find((document) => document.region_type === 'H') ?? data.documents?.[0] ?? null;
-    } catch {
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Kakao coord2regioncode error: ${reason}`);
       return null;
     }
   }

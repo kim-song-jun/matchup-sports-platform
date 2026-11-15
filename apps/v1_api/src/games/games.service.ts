@@ -6014,6 +6014,28 @@ export class GamesService {
    * participants/events/config for a SUBSTITUTION, so both call sites stay
    * exactly as cheap as every other event type.
    */
+  /**
+   * 모든 피리어드가 ENDED인 "정규 시간 종료" 상태(경기는 아직 LIVE)에서 마지막 피리어드에 들어오는 골만 받는다.
+   * 정규 시간 자동 종료 뒤에 운영자가 빠진 골을 넣는 길이다 — 카드·교체 등은 그대로 막는다.
+   * 시각은 그 피리어드의 정규 시간(분) 이하여야 한다. 길이를 읽지 못하면 상한 없이 받는다
+   * (`validateEventShape`가 상한을 두지 않는 이유와 같다).
+   */
+  private async isGoalAfterRegulationAllowed(
+    tx: Transaction,
+    game: LockedGame,
+    dto: AppendGameEventDto,
+    periodNumber: number,
+  ): Promise<boolean> {
+    if (dto.type !== V1GameEventType.GOAL && dto.type !== V1GameEventType.OWN_GOAL) return false;
+    if (game.state !== V1GameState.LIVE) return false;
+    const periods = await tx.v1GamePeriod.findMany({ where: { gameId: game.id }, select: { number: true, state: true } });
+    if (periods.length === 0 || periods.some((p) => p.state !== V1GamePeriodState.ENDED)) return false;
+    if (periods.some((p) => p.number > periodNumber)) return false;
+    const config = await tx.v1Game.findUnique({ where: { id: game.id }, select: { competitionConfig: { select: { periods: true } } } });
+    const durationMinutes = parsePeriodDurations(config?.competitionConfig.periods)?.[periodNumber - 1]?.durationMinutes;
+    return durationMinutes === undefined || dto.clockMs <= durationMinutes * 60_000;
+  }
+
   private async assertEventReferences(
     tx: Transaction,
     game: LockedGame,
@@ -6053,10 +6075,13 @@ export class GamesService {
       });
     }
     if (period.state === V1GamePeriodState.ENDED) {
-      throw new ConflictException({
-        code: 'PERIOD_ALREADY_ENDED',
-        message: '이미 종료된 피리어드예요',
-      });
+      // 정규 시간이 끝났어도 경기 종료 전에는 빠진 골을 넣을 수 있다 — 시각은 정규 시간 안이어야 한다.
+      if (!(await this.isGoalAfterRegulationAllowed(tx, game, dto, period.number))) {
+        throw new ConflictException({
+          code: 'PERIOD_ALREADY_ENDED',
+          message: '이미 종료된 피리어드예요',
+        });
+      }
     }
     if (dto.sideId !== undefined) {
       const side = await tx.v1GameSide.findFirst({ where: { gameId: game.id, id: dto.sideId } });

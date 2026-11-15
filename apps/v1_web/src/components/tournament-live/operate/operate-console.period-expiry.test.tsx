@@ -201,6 +201,20 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     expect(fixture.resultRevisions).toMatchObject([{ state: 'SUBMITTED', officialAt: null }]);
   });
 
+  it('정규 시간이 끝난 뒤에도 경기 종료 전에는 골 버튼이 열려 있고 카드·파울은 막혀 있어요', async () => {
+    await openConsole();
+    fixture.endPeriod();
+    await tick(5_000);
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '골' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '자책골' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '옐로카드' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '파울' })).toBeDisabled();
+    // 시각은 정규 시간 끝(설정 1분)으로 굳는다 — 실제로 흐른 시간이 아니다.
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    expect(await screen.findByText(/1:00 시점 기록/)).toBeInTheDocument();
+  });
+
   it('초기 소켓 구독 뒤 worker가 끝낸 최신 상세를 받으면 수동 종료도 그 버전으로 보내요', async () => {
     const held = fixture.delayNextRead(undefined, { captureAfterRelease: true });
     // Seed the exact detail fixture so realtime has authoritative same-game

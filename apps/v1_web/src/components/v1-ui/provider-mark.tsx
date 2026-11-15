@@ -1,4 +1,5 @@
-import { Link2, Mail, MessageCircle } from 'lucide-react';
+import { Link2, Mail } from 'lucide-react';
+import { KAKAO_SYMBOL_PATH } from './kakao-symbol-path';
 
 export type ProviderMarkKind = 'email' | 'kakao' | 'apple' | 'other';
 
@@ -26,9 +27,12 @@ export function ProviderMark({ provider, size = 'md' }: { provider: ProviderMark
     );
   }
   if (provider === 'kakao') {
+    // 심볼 좌표가 카카오가 준 48 칸 원형 그림 그대로라, 원과 같은 크기로 그리면 비율(46%)과 위치가 계산 없이 맞는다.
     return (
       <span aria-hidden="true" style={{ ...circle, background: 'var(--kakao-yellow)' }}>
-        <MessageCircle size={icon} fill="var(--static-black)" stroke="var(--static-black)" />
+        <svg width={box} height={box} viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+          <path d={KAKAO_SYMBOL_PATH} fill="var(--static-black)" />
+        </svg>
       </span>
     );
   }

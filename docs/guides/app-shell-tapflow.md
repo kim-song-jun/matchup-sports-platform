@@ -389,7 +389,8 @@ steps:
 1. 필요한 것: JDK 17, Android SDK(platform-tools·emulator·build-tools·cmdline-tools·시스템 이미지).
    SDK 와 JDK 위치는 환경변수로 줘요. 값은 맥마다 달라서 이 문서에 적지 않아요.
    ```bash
-   export ANDROID_SDK_ROOT=<SDK 위치> ANDROID_HOME="$ANDROID_SDK_ROOT" JAVA_HOME=<JDK 17 위치>
+   export ANDROID_SDK_ROOT=<SDK 위치> JAVA_HOME=<JDK 17 위치>
+   export ANDROID_HOME="$ANDROID_SDK_ROOT"
    export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
    "$T" doctor android     # SDK·adb·aapt·AVD·Lean mode 점검. 전부 ✓ 이어야 해요
    ```

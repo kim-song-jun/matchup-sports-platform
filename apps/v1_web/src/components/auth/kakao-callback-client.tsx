@@ -27,6 +27,10 @@ function loginPathFor(savedRedirect: string | null) {
   return savedRedirect ? `/login?redirect=${encodeURIComponent(savedRedirect)}` : '/login';
 }
 
+// 카카오 동의 화면에서 취소했을 때(access_denied)와 JS SDK 가 10분 뒤 스스로 콜백으로 옮길 때(timeout)의 error 값.
+const KAKAO_CANCELLED_ERROR = 'access_denied';
+const KAKAO_TIMED_OUT_ERROR = 'timeout';
+
 export function KakaoCallbackClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -69,6 +73,11 @@ export function KakaoCallbackClient() {
           return;
         }
         trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
+        // 이 탭이 시작한 로그인의 답일 때만 취소로 본다. 그 밖의 error 는 그대로 오류 화면이다.
+        if (attempt?.mode === 'login' && (providerError === KAKAO_CANCELLED_ERROR || providerError === KAKAO_TIMED_OUT_ERROR)) {
+          router.replace(loginPathFor(getSavedRedirectPath()));
+          return;
+        }
         setError('카카오 로그인을 완료하지 못했어요.');
         return;
       }

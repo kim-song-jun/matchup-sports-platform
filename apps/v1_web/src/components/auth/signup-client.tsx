@@ -605,6 +605,7 @@ export function SignupClient() {
               <label className="tm-auth-field">
                 <span className="tm-text-label">이메일<RequiredMark /></span>
                 <input
+                  autoComplete="email"
                   className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailCheck.verified ? 'tm-auth-input-success' : ''}`}
                   onChange={(event) => setEmail(event.target.value)}
                   onBlur={emailCheck.onBlur}

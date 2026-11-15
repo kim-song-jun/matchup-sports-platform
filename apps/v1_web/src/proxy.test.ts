@@ -243,24 +243,52 @@ describe('league fixture detail proxy', () => {
   });
 
   const path = (leagueId: string, fixtureId: string) => `/league-matches/${leagueId}/fixtures/${fixtureId}`;
+  const API = 'http://localhost:8121/api/v1';
+  const TEAM_MATCH_URL = `${API}/team-matches/${FIXTURE_ID}`;
+  const leagueUrl = (leagueId: string) => `${API}/league-matches/${leagueId}`;
+  const leagueFixture = () => teamMatchBody({ teamMatchId: FIXTURE_ID, league: { leagueId: LEAGUE_ID, title: '리그' } });
+
+  // 두 조회에 주소별로 답한다. 모르는 주소는 던져서, 엉뚱한 리그로 묻는 코드를 그대로 드러낸다.
+  function stubApi(handlers: { teamMatch: () => Response; league?: (url: string) => Response }) {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === TEAM_MATCH_URL) return handlers.teamMatch();
+      if (url.startsWith(`${API}/league-matches/`) && handlers.league) return handlers.league(url);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
 
   it('sets a missing team match to a real 404', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubApi({ teamMatch: () => new Response(null, { status: 404 }) });
 
     const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
 
     expect(response.status).toBe(404);
-    expect(fetchMock).toHaveBeenCalledWith(
-      `http://localhost:8121/api/v1/team-matches/${FIXTURE_ID}`,
-      { cache: 'no-store', headers: { accept: 'application/json' } },
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(TEAM_MATCH_URL, { cache: 'no-store', headers: { accept: 'application/json' } });
+  });
+
+  it('sets a fixture whose league has no public page to a real 404 and asks the fixture\'s own league', async () => {
+    const fetchMock = stubApi({
+      teamMatch: leagueFixture,
+      league: () => new Response(null, { status: 404 }),
+    });
+
+    const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      leagueUrl(LEAGUE_ID),
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
     );
   });
 
-  it('keeps a team match that belongs to a league as 200', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      teamMatchBody({ teamMatchId: FIXTURE_ID, league: { leagueId: LEAGUE_ID, title: '리그' } }),
-    ));
+  it('keeps a fixture whose league has a public page as 200', async () => {
+    stubApi({ teamMatch: leagueFixture, league: () => new Response(null, { status: 200 }) });
 
     const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
 
@@ -268,35 +296,69 @@ describe('league fixture detail proxy', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
-  it.each([
-    ['without a league key', { teamMatchId: FIXTURE_ID }],
-    ['with a null league', { teamMatchId: FIXTURE_ID, league: null }],
-  ])('sets a friendly team match %s to a real 404', async (_label, data) => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(teamMatchBody(data)));
-
-    const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
-
-    expect(response.status).toBe(404);
-  });
-
   it('judges by the fixture only: a wrong league id in the URL still opens the real league', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      teamMatchBody({ teamMatchId: FIXTURE_ID, league: { leagueId: LEAGUE_ID, title: '리그' } }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubApi({ teamMatch: leagueFixture, league: () => new Response(null, { status: 200 }) });
 
     const wrongLeague = await proxy(detailRequest(path('wrong-league', FIXTURE_ID)));
 
     expect(wrongLeague.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledWith(
-      `http://localhost:8121/api/v1/team-matches/${FIXTURE_ID}`,
-      expect.anything(),
-    );
+    expect(fetchMock).toHaveBeenCalledWith(leagueUrl(LEAGUE_ID), expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith(leagueUrl('wrong-league'), expect.anything());
+  });
+
+  it('judges a wrong league id in the URL by the real league even when that league is gone', async () => {
+    stubApi({ teamMatch: leagueFixture, league: () => new Response(null, { status: 404 }) });
+
+    const response = await proxy(detailRequest(path('wrong-league', FIXTURE_ID)));
+
+    expect(response.status).toBe(404);
+  });
+
+  it('encodes the league id taken from the API response before putting it in the URL', async () => {
+    const fetchMock = stubApi({
+      teamMatch: () => teamMatchBody({ teamMatchId: FIXTURE_ID, league: { leagueId: '../x?y=1', title: '리그' } }),
+      league: () => new Response(null, { status: 200 }),
+    });
+
+    await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, leagueUrl('..%2Fx%3Fy%3D1'), expect.anything());
+  });
+
+  it.each([429, 500, 503])('does not turn league lookup status %s into a fake fixture 404', async (status) => {
+    const fetchMock = stubApi({ teamMatch: leagueFixture, league: () => new Response(null, { status }) });
+
+    const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('propagates a league lookup transport failure instead of returning a fake 404', async () => {
+    const transportError = new TypeError('league lookup failed');
+    stubApi({
+      teamMatch: leagueFixture,
+      league: () => { throw transportError; },
+    });
+
+    await expect(proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)))).rejects.toBe(transportError);
+  });
+
+  it.each([
+    ['without a league key', { teamMatchId: FIXTURE_ID }],
+    ['with a null league', { teamMatchId: FIXTURE_ID, league: null }],
+  ])('sets a friendly team match %s to a real 404 without asking for a league', async (_label, data) => {
+    const fetchMock = stubApi({ teamMatch: () => teamMatchBody(data) });
+
+    const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
+
+    expect(response.status).toBe(404);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it.each([429, 500, 503])('does not turn upstream status %s into a fake fixture 404', async (status) => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status }));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubApi({ teamMatch: () => new Response(null, { status }) });
 
     const response = await proxy(detailRequest(path(LEAGUE_ID, FIXTURE_ID)));
 

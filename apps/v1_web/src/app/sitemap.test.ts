@@ -63,17 +63,46 @@ describe('sitemap', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('리그 경기는 최종 상세 주소로 싣고 친선 경기는 기존 주소를 유지한다', async () => {
-    vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/team-matches?') ? {
-      items: [
-        { teamMatchId: 'fixture-1', league: { leagueId: 'league-1' } },
-        { teamMatchId: 'friendly-1', league: null },
-      ], nextCursor: null,
-    } : emptyApi(path));
+  it('공개 리그의 경기는 최종 상세 주소로 싣고 친선 경기는 기존 주소를 유지한다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      if (path.startsWith('/league-matches?')) return page([{ leagueId: 'league-1' }]);
+      if (path.startsWith('/team-matches?')) return {
+        items: [
+          { teamMatchId: 'fixture-1', league: { leagueId: 'league-1' } },
+          { teamMatchId: 'friendly-1', league: null },
+        ], nextCursor: null,
+      };
+      return emptyApi(path);
+    });
     const urls = (await sitemap()).map((entry) => entry.url);
     expect(urls).toContain('https://teameet.co.kr/league-matches/league-1/fixtures/fixture-1');
     expect(urls).not.toContain('https://teameet.co.kr/team-matches/fixture-1');
     expect(urls).toContain('https://teameet.co.kr/team-matches/friendly-1');
+  });
+
+  it('공개 페이지가 없는 리그의 경기는 리그 경기 주소로도 팀 매치 주소로도 싣지 않는다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      if (path.startsWith('/league-matches?')) return page([{ leagueId: 'public-a' }, { leagueId: 'public-b' }]);
+      if (path.startsWith('/team-matches?')) return page([
+        { teamMatchId: 'fx-a', league: { leagueId: 'public-a' } },
+        { teamMatchId: 'fx-b', league: { leagueId: 'public-b' } },
+        { teamMatchId: 'fx-c', league: { leagueId: 'hidden-c' } },
+        { teamMatchId: 'fx-d', league: { leagueId: 'hidden-d' } },
+        { teamMatchId: 'friendly-1', league: null },
+        { teamMatchId: 'friendly-2', league: null },
+      ]);
+      return emptyApi(path);
+    });
+    const urls = (await sitemap()).map((entry) => entry.url);
+    for (const [league, fixture] of [['public-a', 'fx-a'], ['public-b', 'fx-b']]) {
+      expect(urls).toContain(siteUrl(`/league-matches/${league}/fixtures/${fixture}`));
+    }
+    for (const [league, fixture] of [['hidden-c', 'fx-c'], ['hidden-d', 'fx-d']]) {
+      expect(urls).not.toContain(siteUrl(`/league-matches/${league}/fixtures/${fixture}`));
+      expect(urls).not.toContain(siteUrl(`/team-matches/${fixture}`));
+    }
+    expect(urls).toContain(siteUrl('/team-matches/friendly-1'));
+    expect(urls).toContain(siteUrl('/team-matches/friendly-2'));
   });
 
   it('공개 대회에 실제 생성된 경기만 기존 상세 주소로 싣는다', async () => {

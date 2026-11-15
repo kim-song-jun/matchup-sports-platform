@@ -1,5 +1,6 @@
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
+import { publicLeagueFixtures } from '@/lib/public-competition-discovery';
 import { maskContactNumbers } from '@/lib/public-text';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
@@ -200,16 +201,20 @@ export function renderLlmsFull(
     ]);
   }) ?? null;
 
-  const leagueFixtureRows = s.teamMatches?.filter((m) => m.league && (m.teamMatchId ?? m.id)).map((m) => {
+  // 공개 리그 목록을 못 읽었으면 어느 리그가 공개인지 모른다 — 절을 뺀다.
+  const leagueFixtures = s.teamMatches && s.leagues
+    ? publicLeagueFixtures(s.teamMatches, s.leagues).filter((m) => m.teamMatchId ?? m.id)
+    : null;
+  const leagueFixtureRows = leagueFixtures?.map((m) => {
     const head = link(m.title, fixtureDetailHref({
-      isRegularLeague: true, competitionId: m.league!.leagueId, fixtureId: (m.teamMatchId ?? m.id)!,
+      isRegularLeague: true, competitionId: m.league.leagueId, fixtureId: (m.teamMatchId ?? m.id)!,
     }));
     noteVenue(m.place?.name, head);
     return row(head, [
       m.sport?.name ?? m.sportName,
       m.isLive ? '진행 중' : teamMatchState(m.displayState),
       formatTournamentDateTimeLong(m.startsAt),
-      m.league?.title && `리그 ${inline(m.league.title, 40)}`,
+      m.league.title && `리그 ${inline(m.league.title, 40)}`,
       m.hostTeam?.name && m.approvedOpponentTeam?.name && `${inline(m.hostTeam.name, 40)} vs ${inline(m.approvedOpponentTeam.name, 40)}`,
       m.place?.name && `장소 ${inline(m.place.name, 60)}`,
     ]);

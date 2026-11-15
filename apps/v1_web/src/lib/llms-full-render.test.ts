@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { renderLlmsFull } from '@/lib/llms-full-render';
 import type { V1Match, V1Team, V1TeamMatch, V1TournamentListItem } from '@/types/api';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
 
 const empty: LlmsFullSnapshot = {
   tournaments: [], leagues: [], campaigns: [], matches: [], teamMatches: [], teams: [],
@@ -23,6 +24,16 @@ const match = (over: Partial<V1Match>) => ({
   status: 'open', displayState: 'recruiting', place: { name: '송파 풋살파크', addressText: '서울 송파구 어딘가 101동' },
   approvalRequired: true, ...over,
 }) as unknown as V1Match;
+
+const publicLeague = (leagueId: string) => ({
+  leagueId, title: `리그 ${leagueId}`, state: 'active', startsOn: '2026-09-01T00:00:00.000Z',
+  endsOn: '2026-12-01T00:00:00.000Z', sport: { name: '풋살' }, region: { name: '서울' },
+}) as unknown as V1PublicLeagueListItem;
+
+const leagueFixture = (teamMatchId: string, leagueId: string) => ({
+  teamMatchId, title: `${teamMatchId} 경기`, sportName: '풋살', startsAt: '2026-10-14T11:00:00.000Z',
+  displayState: 'matched', league: { leagueId, title: `리그 ${leagueId}` },
+}) as unknown as V1TeamMatch;
 
 describe('renderLlmsFull', () => {
   it('정원이 찬 개인 매치는 알려진 정원 마감 상태로 안내한다', () => {
@@ -171,12 +182,35 @@ describe('renderLlmsFull', () => {
       hostTeam: { name: '홈 팀' }, approvedOpponentTeam: { name: '원정 팀' },
       league: { leagueId: 'league-1', title: '여성부 리그' },
     } as unknown as V1TeamMatch;
-    const text = render({ ...empty, teamMatches: [fixture] });
+    const text = render({ ...empty, leagues: [publicLeague('league-1')], teamMatches: [fixture] });
     expect(text).toContain('## 리그 경기 일정·결과');
     expect(text).toContain('https://teameet.co.kr/league-matches/league-1/fixtures/fixture-1');
     expect(text).toContain('경기 확정');
     expect(text).toContain('홈 팀 vs 원정 팀');
     expect(text).not.toContain('https://teameet.co.kr/team-matches/fixture-1');
+  });
+
+  it('공개 페이지가 없는 리그의 경기는 싣지 않고 공개 리그의 경기는 그대로 싣는다', () => {
+    const text = render({
+      ...empty,
+      leagues: [publicLeague('public-a'), publicLeague('public-b')],
+      teamMatches: [
+        leagueFixture('fx-a', 'public-a'), leagueFixture('fx-b', 'public-b'),
+        leagueFixture('fx-c', 'hidden-c'), leagueFixture('fx-d', 'hidden-d'),
+      ],
+    });
+    expect(text).toContain('/league-matches/public-a/fixtures/fx-a)');
+    expect(text).toContain('/league-matches/public-b/fixtures/fx-b)');
+    expect(text).not.toContain('fx-c');
+    expect(text).not.toContain('fx-d');
+    expect(text).toContain('## 리그 경기 일정·결과');
+  });
+
+  it('리그 목록을 읽지 못했으면 공개 여부를 모르므로 리그 경기 절을 통째로 뺀다', () => {
+    const text = render({ ...empty, leagues: null, teamMatches: [leagueFixture('fx-a', 'public-a')] });
+    expect(text).not.toContain('## 리그 경기 일정·결과');
+    expect(text).not.toContain('fx-a');
+    expect(text).toContain('## 친선 경기 일정·결과');
   });
 
   it('공개 대회 경기는 실제 진행 상태와 기존 상세 주소로 안내한다', () => {

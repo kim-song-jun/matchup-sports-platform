@@ -7,7 +7,7 @@
 
 - `api/` — 현재 API 계약 색인(`README.md` 진입). 도메인별 계약은 `api/domains/*.md`.
 - `design/` — 디자인·경쟁 흐름 설계 문서(대회·리그 정본 포함).
-- `guides/` — 운영자·개발자용 사용법 가이드(관리자 화면, 팀 컨택 메시지, v1 코딩 패턴, Playwright 런북, 앱 셸 시뮬레이터 시험 `app-shell-tapflow.md`).
+- `guides/` — 운영자·개발자용 사용법 가이드(관리자 화면, 팀 컨택 메시지, v1 코딩 패턴, Playwright 런북, 앱 셸 시뮬레이터·에뮬레이터 시험 `app-shell-tapflow.md`).
 - `manual/` — 사용자 매뉴얼류.
 - `ops/` — 배포·운영 런북, 가독성 감사 로그.
 - `product/` — 현재 기획·전략 문서(Teameet 브랜드).

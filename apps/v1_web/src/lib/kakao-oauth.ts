@@ -86,7 +86,7 @@ export async function consumeKakaoOAuthAttempt(returnedState: string | null): Pr
 }
 
 export type KakaoLinkStartResult =
-  | { status: 'redirecting' }
+  | { status: 'redirecting'; path: KakaoAuthorizePath }
   | { status: 'unavailable'; reason: 'not-configured' | 'storage-unavailable' };
 
 /** talk: 카카오톡으로 넘어가는 간편로그인, sdk_account: SDK 가 여는 카카오계정 화면, account_url: 인가 주소로 직접 이동. */
@@ -282,5 +282,5 @@ export async function startKakaoLinkAuthorize(options: { returnTo: string | null
   authorizeUrl.searchParams.delete('scope');
 
   const started = await startKakaoAuthorize({ mode: 'link', returnTo: options.returnTo, authorizeUrl });
-  return started.status === 'unavailable' ? started : { status: 'redirecting' };
+  return started.status === 'unavailable' ? started : { status: 'redirecting', path: started.path };
 }

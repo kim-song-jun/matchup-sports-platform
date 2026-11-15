@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useKakaoRetapRelease } from '@/hooks/use-kakao-retap-release';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { LOGIN_METHOD_UNLINKED_CODE } from '@/lib/auth-error-codes';
@@ -20,8 +21,6 @@ import { KakaoButtonFace } from './kakao-symbol';
 import { routeSocialLoginRecovery } from './login-recovery-route';
 
 const NATIVE_FAILURE_MESSAGE = '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
-// 카카오톡을 다녀와 결과가 없어도 이만큼 화면이 보이면 다시 누를 수 있다. 그 사이 도착하는 답이 먼저 처리될 틈이다.
-const KAKAO_RETAP_LOCK_MS = 2_000;
 const STORAGE_UNAVAILABLE_MESSAGE = '브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.';
 
 // 카카오 로그인 버튼(클라이언트). 누르면 CSRF 방지 state 를 저장(mode: 'login')한 뒤 경로를 고른다.
@@ -48,59 +47,20 @@ export function KakaoLoginButton({
   const [webHandoff, setWebHandoff] = useState(false);
   // 시작한 시도가 끝나기 전에 다시 누르면 시도가 겹친다.
   const busyRef = useRef(false);
-  // SDK 를 부른 뒤의 잠금은 시간으로 푼다. 카카오톡이 열리지 않거나 승인 없이 돌아와도 페이지는 그대로라 pageshow 가 없다.
-  const retapArmedRef = useRef(false);
-  const retapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearRetapTimer = () => {
-    if (retapTimerRef.current !== null) clearTimeout(retapTimerRef.current);
-    retapTimerRef.current = null;
-  };
-  const startRetapTimer = () => {
-    clearRetapTimer();
-    retapTimerRef.current = setTimeout(() => {
-      retapTimerRef.current = null;
-      retapArmedRef.current = false;
-      busyRef.current = false;
-    }, KAKAO_RETAP_LOCK_MS);
-  };
-  const armRetapRelease = () => {
-    retapArmedRef.current = true;
-    if (document.visibilityState !== 'hidden') startRetapTimer();
-  };
+  const { arm } = useKakaoRetapRelease((cause) => {
+    busyRef.current = false;
+    if (cause.reason !== 'pageshow') return;
+    setWebHandoff(false);
+    // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
+    if (cause.persisted) {
+      resetKakaoAuthorizeAttempt();
+      void prepareKakaoAuthorize();
+    }
+  });
 
   useEffect(() => {
     void prepareKakaoAuthorize();
-  }, []);
-
-  // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
-  useEffect(() => {
-    const release = (event: Event) => {
-      clearRetapTimer();
-      retapArmedRef.current = false;
-      busyRef.current = false;
-      setWebHandoff(false);
-      if ((event as PageTransitionEvent).persisted) {
-        resetKakaoAuthorizeAttempt();
-        void prepareKakaoAuthorize();
-      }
-    };
-    window.addEventListener('pageshow', release);
-    return () => window.removeEventListener('pageshow', release);
-  }, []);
-
-  // 화면이 가려진 시간(카카오톡에 있는 동안)은 세지 않고, 다시 보이면 2초를 새로 센다.
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (!retapArmedRef.current) return;
-      if (document.visibilityState === 'visible') startRetapTimer();
-      else clearRetapTimer();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      clearRetapTimer();
-    };
   }, []);
 
   const failNative = (reason: string, message: string) => {
@@ -205,13 +165,12 @@ export function KakaoLoginButton({
     });
     if (started.status === 'unavailable') {
       busyRef.current = false;
-      // sessionStorage 사용 불가(프라이빗 모드/quota 초과) 시 CSRF 방지 state를 저장할 수 없어
-      // 안전한 로그인이 불가능하다. 조용히 실패하지 않고 사용자에게 알린 뒤 중단한다(fail-closed).
-      window.alert(STORAGE_UNAVAILABLE_MESSAGE);
+      // state 를 저장할 수 없으면 콜백이 대조할 수 없으므로 인가를 시작하지 않는다.
+      setError(STORAGE_UNAVAILABLE_MESSAGE);
       return;
     }
     trackEvent('login_start', { method: 'kakao', login_path: started.path, sdk_ready: started.sdkReady });
-    if (started.path !== 'account_url') armRetapRelease();
+    arm(started.path);
   };
 
   const handleClick = () => {

@@ -338,7 +338,7 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 | `kakao-provider-mark-symbol` (`fix/kakao-provider-mark-symbol`) | v1_web | #2387 dev 머지됨 | 예 — 로그인 수단 표시 세 곳의 카카오 아이콘을 공식 심볼로 | 3차 `kakao-symbol-size` A | dev 머지 완료(#2410). 세 번째 묶음 표의 같은 레인 줄 참조 |
 | `kakao-cancel-quiet-return` (`fix/kakao-cancel-quiet-return`) | v1_web | — | 예 — 취소·시간 초과 뒤 오류 화면 대신 로그인 화면 | 3차 `login-cancel-timeout` A | dev 머지 완료(#2411). 3안을 먼저 만들고 추천 A(아무 말 없음)로 구현했다 |
 | `league-fixture-public-gate` (`fix/league-fixture-public-gate`) | v1_web | — | 아니오 — 응답 코드·사이트맵·AI 안내 문서만 | 3차 `N14b` A | dev 머지 완료(#2412). 공개 페이지가 없는 리그의 경기 주소는 404 로 답하고 사이트맵·`llms-full.txt` 에서 뺀다 |
-| `docs-round3-decisions` (`docs/seo-kakao-round3-decisions`) | docs | 위 다섯 PR 의 번호 | 아니오 | 3차 답·조사 결론 기록(이 문서) | 이 PR. changeset 없음 |
+| `docs-round3-decisions` (`docs/seo-kakao-round3-decisions`) | docs | 위 다섯 PR 의 번호 | 아니오 | 3차 답·조사 결론 기록(이 문서) | 이 PR(#2415). changeset 없음 |
 
 - 화면이 바뀌는 레인(`kakao-button-retap-storage`·`kakao-provider-mark-symbol`·`kakao-cancel-quiet-return`)은 머지 → alpha 배포 확인 → 3폭 갤러리(PR 코멘트) → 전·후 승인 페이지 → 승인된 것만 다음 운영 반영 순이다. 이 표는 PR 상태(머지)만 적고 alpha 확인·갤러리·승인 결과는 적지 않는다(각 PR 과 승인 페이지가 정본). 나머지 둘은 화면 모양을 바꾸지 않는다.
 - 취소·시간 초과 레인은 3안이 구현보다 먼저였다. 3안은 A 아무 말 없음 / B 돌아온 로그인 화면에 늘 한 줄 안내 / C 시간 초과로 끌려온 때만 한 줄 안내이고, 추천 A 로 구현했다. 사용자가 3안을 직접 고른 것이 아니라 「모두 추천안」을 읽은 뜻이라 최종 보고의 전·후 승인에서 B·C 로 바꿀 수 있다(B·C 는 A 의 콜백 판정 위에 부품을 더하면 된다). 심볼 레인의 시안(원 안 크기 3안)은 2차 답 Q5d B 뒤에 만들었고 3차 답 A 로 골랐다.
@@ -358,7 +358,7 @@ Expected result: 뒤로가기는 지금처럼 대회 목록으로 돌아온다. 
 
 - 버전: `apps/v1_api`·`apps/v1_web` 매니페스트가 `origin/main`·`origin/dev` 모두 1.20.3 이다. 운영 표시 버전은 매니페스트에 patch 하나를 더한 1.20.4 다(`docs/ops/release-two-features-1.20.3-2026-11-14.md` 가 같은 규칙을 적는다 — 운영 화면에서 읽은 값은 아니다). main 을 향한 열린 PR 은 없고 `release/version-*` 열린 PR 도 없다.
 - dev 에만 있는 것: 위 11-14 줄의 목록에 더해 그 뒤 dev 에 머지된 #2403·#2404·#2405·#2406·#2407·#2408·#2409 와 네 번째 묶음의 코드 레인 다섯(#2410·#2411·#2412·#2413·#2414)이다. 모두 머지 커밋이 `origin/main` 의 조상이 아니다. 이번 묶음의 변경은 운영에 하나도 없다.
-- 네 번째 묶음 PR: 코드 레인 다섯은 모두 dev 에 머지됐다(위 표). 이 문서 레인은 이 PR 이다. 위 다섯의 base 는 모두 `dev` 였다.
+- 네 번째 묶음 PR: 코드 레인 다섯은 모두 dev 에 머지됐다(위 표). 이 문서 레인은 이 PR(#2415, base `dev`)이다. 위 다섯의 base 는 모두 `dev` 였다.
 - alpha 가 서빙하는 커밋은 이 줄에서 읽지 않았다. `x-teameet-commit` 응답 헤더로 확인한다.
 
 ### Sequential (병렬 작업 이후에 실행)

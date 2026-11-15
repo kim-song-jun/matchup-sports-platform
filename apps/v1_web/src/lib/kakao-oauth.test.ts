@@ -491,4 +491,56 @@ describe('Kakao authorize preparation and start', () => {
       expect(await consumeKakaoOAuthAttempt(stateOf(0))).not.toBeNull();
     });
   });
+
+  describe('resetting while a preparation is in flight', () => {
+    const start = () => startKakaoAuthorize({ mode: 'login', returnTo: null, authorizeUrl: authorizeUrl() });
+
+    // Resolves once every SHA-256 started so far has finished and its continuation has run.
+    function trackFingerprints() {
+      const real = webcrypto.subtle.digest.bind(webcrypto.subtle);
+      const digests: Array<Promise<ArrayBuffer>> = [];
+      vi.spyOn(crypto.subtle, 'digest').mockImplementation((...args: Parameters<typeof real>) => {
+        const digest = real(...args);
+        digests.push(digest);
+        return digest;
+      });
+      return async () => {
+        await Promise.all(digests);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      };
+    }
+
+    it('prepares a fresh state for the next preparation while the SDK is still loading, so the first tap after a back-forward restore authorizes synchronously', async () => {
+      // The real loader hands every caller the same pending download.
+      let releaseSdk!: () => void;
+      const download = new Promise((resolve) => {
+        releaseSdk = () => { window.Kakao = fakeSdk; resolve(fakeSdk); };
+      });
+      sdk.getInitializedKakaoJsSdk.mockReturnValue(download);
+      const fingerprintsDone = trackFingerprints();
+
+      const first = prepareKakaoAuthorize();
+      await fingerprintsDone();
+      resetKakaoAuthorizeAttempt();
+      const second = prepareKakaoAuthorize();
+      await fingerprintsDone();
+      releaseSdk();
+      await Promise.all([first, second]);
+
+      const result = start();
+      expect(authorize).toHaveBeenCalledTimes(1);
+      await expect(result).resolves.toEqual({ status: 'redirecting', path: 'talk', sdkReady: true });
+    });
+
+    it('does not let a state whose fingerprint was still pending at the reset come back as prepared', async () => {
+      const first = prepareKakaoAuthorize();
+      resetKakaoAuthorizeAttempt();
+      await first;
+
+      const result = start();
+      expect(authorize).not.toHaveBeenCalled();
+      await expect(result).resolves.toMatchObject({ status: 'redirecting', sdkReady: true });
+      expect(authorize).toHaveBeenCalledTimes(1);
+    });
+  });
 });

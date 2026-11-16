@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
 import { NotificationBellLink, buildAriaLabel, formatUnreadCount } from './notification-bell';
@@ -7,10 +8,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1NotificationUnreadSummary: vi.fn(),
 }));
 
-const navigation = vi.hoisted(() => ({ path: '/home', search: '' as string | null }));
+const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({
-  usePathname: () => navigation.path,
-  useSearchParams: () => navigation.search === null ? null : new URLSearchParams(navigation.search),
+  useRouter: () => router,
 }));
 
 const useV1NotificationUnreadSummaryMock = vi.mocked(useV1NotificationUnreadSummary);
@@ -51,27 +51,37 @@ describe('buildAriaLabel', () => {
 describe('NotificationBellLink', () => {
   afterEach(() => {
     vi.clearAllMocks();
-    navigation.path = '/home';
-    navigation.search = '';
+    window.history.replaceState(null, '', '/');
     window.localStorage.clear();
   });
 
-  it('알림 진입 때 출발 화면의 필터와 이전 출처를 보존한다', () => {
-    navigation.path = '/my/matches/joined';
-    navigation.search = 'type=team&from=%2Fmy';
+  it('서버 HTML 과 마운트 뒤 DOM 모두 알림 링크에 출처 꼬리를 싣지 않는다', () => {
+    window.history.replaceState(null, '', '/my/matches/joined?type=team&from=%2Fmy');
     mockUnreadCount(0);
+    const serverHtml = renderToStaticMarkup(<NotificationBellLink className="bell" />);
+    expect(new DOMParser().parseFromString(serverHtml, 'text/html').querySelector('a')?.getAttribute('href'))
+      .toBe('/notifications');
     render(<NotificationBellLink className="bell" />);
-    const href = screen.getByRole('link', { name: '알림' }).getAttribute('href')!;
-    expect(new URL(href, 'https://teameet.test').searchParams.get('from'))
-      .toBe('/my/matches/joined?type=team&from=%2Fmy');
+    expect(screen.getByRole('link', { name: '알림' })).toHaveAttribute('href', '/notifications');
   });
 
-  it('검색 파라미터가 아직 없으면 현재 경로를 출발 화면으로 보존한다', () => {
-    navigation.path = '/my';
-    navigation.search = null;
+  it('알림 진입 때 출발 화면의 필터와 이전 출처를 클릭 시점에 출처로 붙인다', () => {
+    window.history.replaceState(null, '', '/my/matches/joined?type=team&from=%2Fmy#joined');
     mockUnreadCount(0);
     render(<NotificationBellLink className="bell" />);
-    expect(screen.getByRole('link', { name: '알림' })).toHaveAttribute('href', '/notifications?from=%2Fmy');
+    fireEvent.click(screen.getByRole('link', { name: '알림' }));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    const target = new URL(router.push.mock.calls[0][0] as string, 'https://teameet.test');
+    expect(target.pathname).toBe('/notifications');
+    expect(target.searchParams.get('from')).toBe('/my/matches/joined?type=team&from=%2Fmy#joined');
+  });
+
+  it('쿼리가 없는 화면은 현재 경로만 출처로 붙인다', () => {
+    window.history.replaceState(null, '', '/my');
+    mockUnreadCount(0);
+    render(<NotificationBellLink className="bell" />);
+    fireEvent.click(screen.getByRole('link', { name: '알림' }));
+    expect(router.push).toHaveBeenCalledWith('/notifications?from=%2Fmy');
   });
 
   it('does not request the protected unread summary without a stored session', () => {

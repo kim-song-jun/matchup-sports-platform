@@ -21,6 +21,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 vi.mock('@/lib/session-storage', () => ({
   clearStoredV1Session: mocks.clearStoredV1Session,
+  hasStoredV1Session: () => true,
   shouldProbeV1Session: () => true,
   sanitizeRedirectPath: () => null,
 }));

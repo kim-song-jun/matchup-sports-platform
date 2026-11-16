@@ -4,7 +4,7 @@ import { NOTICES_FEED_PATH } from '@/lib/seo';
 
 const CAMPAIGN_PATH_PREFIX = '/tournaments/campaigns/';
 const PUBLIC_DETAIL_PATH =
-  /^\/(matches|teams|team-matches|tournaments|notices|league-matches)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
+  /^\/(matches|teams|team-matches|tournaments|notices)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
 const TOURNAMENT_FIXTURE_PATH = /^\/tournaments\/([^/]+)\/matches\/([^/]+)$/;
 // 리그 경기 페이지는 주소의 leagueId 가 틀려도 경기가 속한 실제 리그로 열린다 — 판정에는 경기 id 만 쓴다.
 const LEAGUE_FIXTURE_PATH = /^\/league-matches\/[^/]+\/fixtures\/([^/]+)$/;
@@ -63,7 +63,6 @@ export const config = {
     '/tournaments/:id/reviews',
     '/tournaments/campaigns/:slug',
     '/notices/:id',
-    '/league-matches/:id',
     '/tournaments/:id/matches/:fixtureId',
     '/league-matches/:leagueId/fixtures/:fixtureId',
   ],
@@ -83,6 +82,8 @@ async function judgeTournamentFixture(tournamentId: string, fixtureId: string): 
 }
 
 // 리그 경기는 팀 매치 행이다 — 친선 팀 매치 id 로 열면 서버는 200 으로 답하지만 이 주소에 보여줄 경기는 없다.
+// 팀 매치 쪽 공개 조건은 리그가 공개인지만 보므로, 삭제됐거나 일정·지역이 빈 리그의 경기도 200 으로 나온다.
+// 그래서 경기가 실제로 속한 리그의 공개 상세까지 확인한다. 429·5xx 는 통과시킨다.
 async function judgeLeagueFixture(fixtureId: string): Promise<NextResponse> {
   if (!UUID_PATH_SEGMENT.test(fixtureId)) return NextResponse.next({ status: 404 });
   const response = await fetch(
@@ -91,8 +92,14 @@ async function judgeLeagueFixture(fixtureId: string): Promise<NextResponse> {
   );
   if (response.status === 404) return NextResponse.next({ status: 404 });
   if (!response.ok) return NextResponse.next();
-  const envelope = (await response.json()) as { data?: { league?: unknown } | null };
-  return envelope.data?.league ? NextResponse.next() : NextResponse.next({ status: 404 });
+  const envelope = (await response.json()) as { data?: { league?: { leagueId?: string } | null } | null };
+  const leagueId = envelope.data?.league?.leagueId;
+  if (!leagueId) return NextResponse.next({ status: 404 });
+  const league = await fetch(
+    `${getInternalApiOrigin()}/api/v1/league-matches/${encodeURIComponent(leagueId)}`,
+    { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+  );
+  return league.status === 404 ? NextResponse.next({ status: 404 }) : NextResponse.next();
 }
 
 function getInternalApiOrigin(): string {

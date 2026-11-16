@@ -6,7 +6,8 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
-import { clearStoredV1Session, getCurrentRedirectPath, getLoginPathForRedirect, withFromPath } from '@/lib/session-storage';
+import { getCurrentRedirectPath, getLoginPathForRedirect, withFromPath } from '@/lib/session-storage';
+import { clearStoredV1SessionAfterAuthLoss } from '@/lib/session-expiry';
 import { isUnauthenticatedError } from '@/lib/api-client';
 import { replaceDocument } from '@/lib/navigation-history';
 import { disconnectV1Socket } from '@/lib/v1-socket';
@@ -220,7 +221,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   // 만료된 세션은 RequireAuth 와 같이 정리하고 로그인으로 보낸다(채팅 레이아웃은 캐시된 /auth/me 로 계속 마운트돼 있다).
   useEffect(() => {
     if (!sessionExpired) return;
-    clearStoredV1Session();
+    clearStoredV1SessionAfterAuthLoss('chat_room', loadErrorCause);
     disconnectV1Socket();
     replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
   }, [sessionExpired]);

@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { KakaoUnlinkService, type KakaoUnlinkTarget } from '../auth/kakao-unlink.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { finalizeAccountDeletion, lockUserRow } from './final-account-deletion';
 import {
@@ -24,7 +25,10 @@ export const WITHDRAWAL_GRACE_ELAPSED_REASON = 'withdrawal_grace_elapsed';
 // somebody must hand over. Only archived and deleted teams are let go.
 const TEAM_STILL_RUNNING = { status: { not: 'archived' }, deletedAt: null } satisfies Prisma.V1TeamWhereInput;
 
-type Outcome = { kind: 'finalized' } | { kind: 'skipped'; reason: WithdrawalSkipReason } | { kind: 'unchanged' };
+type Outcome =
+  | { kind: 'finalized'; kakaoUnlinkTargets: KakaoUnlinkTarget[] }
+  | { kind: 'skipped'; reason: WithdrawalSkipReason }
+  | { kind: 'unchanged' };
 
 /**
  * Destroys accounts whose withdrawal request is older than the grace period (privacy policy: kept 30 days, then
@@ -35,6 +39,9 @@ type Outcome = { kind: 'finalized' } | { kind: 'skipped'; reason: WithdrawalSkip
  * Accounts that need a person (an active admin record, team authority, no request log, or a failed attempt) are
  * left untouched and listed in the run's report. A run destroys at most `MAX_FINALIZATIONS_PER_RUN` accounts; the
  * count of due accounts it left for the next run is in the report too.
+ *
+ * Once an account's deletion has committed, the run asks Kakao to drop the member's app connection. That request
+ * never decides the account's outcome and is not retried: the member number is gone with the deletion.
  */
 @Injectable()
 export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDestroy {
@@ -45,6 +52,7 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
   constructor(
     private readonly prisma: PrismaService,
     @InjectPinoLogger(WithdrawalFinalizationService.name) private readonly logger: PinoLogger,
+    private readonly kakaoUnlink: KakaoUnlinkService,
   ) {}
 
   onModuleInit() {
@@ -100,13 +108,23 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
         continue;
       }
 
+      let outcome: Outcome;
       try {
-        const outcome = await this.finalizeOne(userId, now);
-        if (outcome.kind === 'finalized') result.finalizedUserIds.push(userId);
-        else if (outcome.kind === 'skipped') result.skipped.push({ userId, reason: outcome.reason });
+        outcome = await this.finalizeOne(userId, now);
       } catch (error) {
         this.logger.error({ err: error, userId }, '탈퇴 유예 기간이 지난 계정 삭제 실패');
         result.skipped.push({ userId, reason: 'finalization_failed' });
+        continue;
+      }
+      if (outcome.kind === 'skipped') {
+        result.skipped.push({ userId, reason: outcome.reason });
+      } else if (outcome.kind === 'finalized') {
+        result.finalizedUserIds.push(userId);
+        // Outside the try above: the deletion is committed, so this call can never move the account into `skipped`.
+        // Awaited so shutdown waits for it; the member number is gone with the deletion, so a cut-off call is not redone.
+        if (outcome.kakaoUnlinkTargets.length > 0) {
+          await this.kakaoUnlink.unlinkKeys(userId, outcome.kakaoUnlinkTargets, WITHDRAWAL_GRACE_ELAPSED_REASON);
+        }
       }
     }
 
@@ -153,14 +171,14 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
       ]);
       if (authority || ownedTeam) return { kind: 'skipped', reason: 'team_authority' };
 
-      await finalizeAccountDeletion(tx, {
+      const { kakaoUnlinkTargets } = await finalizeAccountDeletion(tx, {
         target,
         actor: { type: 'system' },
         reason: WITHDRAWAL_GRACE_ELAPSED_REASON,
         deletedAt: now,
         logger: this.logger,
       });
-      return { kind: 'finalized' };
+      return { kind: 'finalized', kakaoUnlinkTargets };
     });
   }
 }

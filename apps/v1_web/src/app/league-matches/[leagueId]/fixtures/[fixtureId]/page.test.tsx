@@ -58,6 +58,7 @@ describe('리그 경기 상세 JSON-LD', () => {
       params: Promise.resolve({ leagueId: 'lg1', fixtureId: 'f9' }),
     });
 
+    expect(metadata.title).toBe('리그 경기 정보를 확인할 수 없어요');
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 
@@ -76,6 +77,24 @@ describe('리그 경기 상세 JSON-LD', () => {
       params: Promise.resolve({ leagueId: 'lg1', fixtureId: 'f9' }),
     });
 
+    expect(metadata.title).toBe('리그 경기 정보를 확인할 수 없어요');
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
+  });
+
+  it('리그 공개 페이지가 없으면 검색에서 빼고 없는 경기와 같은 제목을 낸다', async () => {
+    loadPublic.mockImplementation(async (path: string) => {
+      if (path === '/team-matches/f9') return {
+        ok: true,
+        data: { teamMatchId: 'f9', title: '1주차', startsAt: '2026-09-20T01:00:00.000Z', league: { leagueId: 'lg1', title: '송파 풋살 리그' } },
+      };
+      return { ok: true, data: null };
+    });
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ leagueId: 'lg1', fixtureId: 'f9' }),
+    });
+
+    expect(metadata.title).toBe('경기를 찾을 수 없어요');
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 
@@ -85,5 +104,6 @@ describe('리그 경기 상세 JSON-LD', () => {
     });
 
     expect(metadata.alternates?.canonical).toBe('/league-matches/lg1/fixtures/f9');
+    expect(metadata.robots).not.toMatchObject({ index: false });
   });
 });

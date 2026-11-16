@@ -66,7 +66,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       operatorScopeKey={tournamentOpsRole}
       operationContextKey={JSON.stringify([tournamentId, fixtureId])}
       headerTopClass={tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0'}
-      requiresLineupBeforeStart={gameDetail.data?.sourceType === 'TEAM_MATCH'}
+      showEmptyRosterNotice={gameDetail.data?.sourceType === 'TEAM_MATCH'}
       allowPenaltyShootout={gameDetail.data?.isKnockoutFixture === true}
       resultReviewEnabled={Boolean(tournamentId && fixtureId)}
       renderResultReview={(resultGameId) => (

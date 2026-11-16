@@ -1517,10 +1517,8 @@ export class GamesService {
           end: V1GameState.ENDED,
         }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
-        // 제출 자체는 시작 조건이 아니다. 위 start guard는 같은 대회 명단 셀렉터로
-        // 각 사이드에 유효 출전자가 있는지만 확인한다. 제출되지 않은 초안도 선수가 있으면
-        // 시작할 수 있고, 빈 최신 명단은 서버에서 거절한다. 종료 결과 역시 같은 폴백
-        // 셀렉터를 사용하므로 시작 허용 여부와 공식 출전자 목록이 일치한다.
+        // 경기 명단과 제출 여부는 시작 조건이 아니다. 빈 팀은 익명 팀 기록으로
+        // 운영하며, 선수별 기록은 이벤트 검증에서 현재 유효 명단을 확인한다.
         // 이슈 #375 — HALFTIME이 실제로 영속되는 상태가 되면서 "game.state
         // === LIVE인데 LIVE인 피리어드는 없다"(하프타임 도중)가 처음으로
         // 정상 상태가 됐다. `pause`는 LIVE 피리어드가 있어야만 뜻이 통하는
@@ -5348,24 +5346,8 @@ export class GamesService {
       });
     }
 
-    const lineups = await tx.v1GameLineup.findMany({
-      where: { gameId: game.id, invalidatedAt: null },
-      select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
-    });
-    const participantCandidates = await tx.v1GameParticipant.findMany({
-      where: { gameId: game.id },
-      select: { id: true, sideId: true, lineupId: true },
-    });
-    const currentParticipants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
-    const sidesWithoutParticipants = sides.filter((side) =>
-      !currentParticipants.some((participant) => participant.sideId === side.id),
-    );
-    if (sidesWithoutParticipants.length > 0) {
-      throw new ConflictException({
-        code: 'GAME_START_LINEUP_EMPTY',
-        message: `${sidesWithoutParticipants.map((side) => side.displayNameSnapshot).join(', ')} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.`,
-      });
-    }
+    // A missing roster permits anonymous team records; player events still validate
+    // against the effective current roster. Never create placeholder participants.
   }
 
   private assertExplicitLeagueStarted(competition: TeamMatchCompetitionContext | null): void {
@@ -6432,7 +6414,7 @@ export class GamesService {
         where: { gameId: game.id, invalidatedAt: null },
         // `state` 를 함께 읽어 셀렉터가 사이드별로 제출본을 우선하도록 한다 — 정정
         // 요청으로 새로 열린 초안이 직전 제출을 밀어내지 않는다. 무효화된 이전 팀의
-        // 제출본은 경기 결과에 다시 선택되지 않도록 시작 게이트와 같은 집합만 읽는다.
+        // 제출본은 경기 결과에 다시 선택되지 않도록 현재 유효 명단만 읽는다.
         select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
       }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),

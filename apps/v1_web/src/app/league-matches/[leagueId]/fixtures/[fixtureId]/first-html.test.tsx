@@ -118,6 +118,18 @@ describe('리그 경기 상세 첫 HTML', () => {
     })).rejects.toThrow('리그 경기 상세에 필요한 공개 경기 정보를 불러오지 못했어요');
   });
 
+  it('리그 공개 페이지가 없으면(리그 조회 404) 없는 fixture 로 처리한다', async () => {
+    loadPublic.mockImplementation(async (path: string) => {
+      if (path === '/team-matches/fx-1') return { ok: true, data: FIXTURE };
+      if (path === '/league-matches/lg-1') return { ok: true, data: null };
+      return { ok: true, data: STANDINGS };
+    });
+
+    await expect(LeagueFixturePage({
+      params: Promise.resolve({ leagueId: 'lg-1', fixtureId: 'fx-1' }),
+    })).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+
   it('필수 공개 리그 조회 실패는 빈 성공 화면 대신 서버 오류로 드러낸다', async () => {
     loadPublic.mockImplementation(async (path: string) => {
       if (path === '/team-matches/fx-1') return { ok: true, data: FIXTURE };

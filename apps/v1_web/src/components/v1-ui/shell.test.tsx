@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
 import { AppChrome } from './shell';
@@ -9,6 +10,15 @@ import { AppChrome } from './shell';
 // 동일 패턴).
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1NotificationUnreadSummary: vi.fn(() => ({ data: { unreadCount: 0 } })),
+}));
+
+// 기본은 라우터 밖(경로 모름)과 같다. 공통 링크 시험만 현재 경로를 정해, 링크가 그 경로를 href 에 싣지 않는지 본다.
+const navigation = vi.hoisted(() => ({ pathname: null as string | null, search: '' }));
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => navigation.pathname,
+  useSearchParams: () => (navigation.pathname ? new URLSearchParams(navigation.search) : null),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 const EXPECTED_TABS: Array<{ label: string; href: string }> = [
@@ -250,6 +260,53 @@ describe('AppChrome 데스크톱 상단 탭 — 밑줄이 트랙에 하나뿐인
 
     const indicator = container.querySelector<HTMLElement>('.tm-desktop-nav-tab-indicator');
     expect(indicator?.style.opacity).toBe('0');
+  });
+});
+
+describe('AppChrome 공통 링크 — 출처(from) 꼬리 없는 href', () => {
+  // 서버 HTML 에 화면마다 다른 `?from=` 이 실리면 같은 약관·알림 문서가 화면 수만큼의 변형 주소로 퍼진다.
+  const sharedHrefs = (root: ParentNode) =>
+    Array.from(root.querySelectorAll<HTMLAnchorElement>('a[href^="/terms"], a[href^="/notifications"]'))
+      .map((anchor) => anchor.getAttribute('href'));
+  const renderChrome = () => (
+    <AppChrome title="테스트" desktopHead>
+      <div>본문</div>
+    </AppChrome>
+  );
+
+  const enterReceivedPage = () => {
+    navigation.pathname = '/tournaments';
+    navigation.search = 'status=open&from=%2Fhome';
+    window.history.replaceState(null, '', '/tournaments?status=open&from=%2Fhome#list');
+  };
+
+  afterEach(() => {
+    navigation.pathname = null;
+    navigation.search = '';
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('약관 5종·알림 링크가 서버 HTML 에 꼬리 없이 나온다', () => {
+    enterReceivedPage();
+    const parsed = new DOMParser().parseFromString(renderToStaticMarkup(renderChrome()), 'text/html');
+    const hrefs = sharedHrefs(parsed);
+    expect(hrefs.filter((href) => href?.startsWith('/terms'))).toEqual([
+      '/terms?document=terms',
+      '/terms?document=privacy',
+      '/terms?document=location',
+      '/terms?document=tournament-policy',
+      '/terms?document=support',
+    ]);
+    // 상단 바의 알림 + 데스크톱 상단 내비의 알림
+    expect(hrefs.filter((href) => href?.startsWith('/notifications'))).toEqual(['/notifications', '/notifications']);
+  });
+
+  it('하이드레이션 뒤 DOM 에도 같은 링크가 꼬리 없이 남는다', () => {
+    enterReceivedPage();
+    const { container } = render(renderChrome());
+    const hrefs = sharedHrefs(container);
+    expect(hrefs).toHaveLength(7);
+    expect(hrefs.every((href) => !href?.includes('from='))).toBe(true);
   });
 });
 

@@ -60,6 +60,18 @@ export function loadKakaoJsSdk(): Promise<KakaoJsSdk> {
   return sdkLoadPromise;
 }
 
+/** The SDK if it is already loaded and initialised, without loading anything. Null on the server. */
+export function getReadyKakaoJsSdk(): KakaoJsSdk | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const sdk = window.Kakao;
+    return sdk?.isInitialized() ? sdk : null;
+  } catch {
+    // A broken global counts as not ready; the click path loads the SDK again and reports that failure.
+    return null;
+  }
+}
+
 /** Loads the SDK and initialises it once with the public JS key. */
 export async function getInitializedKakaoJsSdk(appKey: string): Promise<KakaoJsSdk> {
   const sdk = await loadKakaoJsSdk();

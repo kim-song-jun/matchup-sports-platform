@@ -15,7 +15,7 @@ import type { V1CurrentTerms } from '@/types/api';
 import { AppShellFrame } from './app-shell-frame';
 import { AppChrome } from './shell';
 
-const navigation = vi.hoisted(() => ({ suspendSearch: false, missingPathname: false }));
+const navigation = vi.hoisted(() => ({ suspendSearch: false }));
 const nativeRouter = createHistoryRouter();
 const currentHref = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 const notifyNavigation = () => window.dispatchEvent(new Event('legal-return-navigation'));
@@ -37,7 +37,7 @@ function useHistoryHref() {
 
 // Next 경계만 연결한다. 문서 HTTP/hooks/View·상단 Back·실제 앱 history는 바꾸지 않는다.
 vi.mock('next/navigation', () => ({
-  usePathname: () => { useHistoryHref(); return navigation.missingPathname ? null : window.location.pathname; },
+  usePathname: () => { useHistoryHref(); return window.location.pathname; },
   useSearchParams: () => {
     useHistoryHref();
     if (navigation.suspendSearch) throw new Promise<never>(() => undefined);
@@ -86,7 +86,7 @@ let writes: string[] = [];
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   vi.clearAllMocks();
-  navigation.suspendSearch = false; navigation.missingPathname = false;
+  navigation.suspendSearch = false;
   clearStoredV1Session();
   saveStoredV1Session({ userId: 'qa65-synthetic-user' });
   __resetNavigationHistoryForTests();
@@ -113,7 +113,7 @@ afterEach(() => {
   server.close();
   __resetNavigationHistoryForTests();
   clearStoredV1Session();
-  navigation.suspendSearch = false; navigation.missingPathname = false;
+  navigation.suspendSearch = false;
   vi.unstubAllEnvs();
 });
 
@@ -177,26 +177,28 @@ describe('QA65 앱 푸터의 실제 문서 읽기와 상단 복귀', () => {
     expect(window.location.hash).toBe('#legal-list');
   });
 
-  it.each(['ctrlKey', 'metaKey'] as const)('%s 수정 클릭에도 새 탭이 사용할 출처 포함 href를 유지한다', (modifier) => {
+  it.each(['ctrlKey', 'metaKey'] as const)('%s 수정 클릭은 가로채지 않고 꼬리 없는 href 를 새 탭에 맡긴다', (modifier) => {
     renderAt(richSource);
     const entry = footerLink('개인정보처리방침');
-    expect(new URL(entry.href).searchParams.get('from')).toBe(richSource);
+    expect(entry.getAttribute('href')).toBe('/terms?document=privacy');
     // 실제 브라우저 새 탭의 기본 동작만 jsdom 밖이다. React handler 뒤에서 기본 탐색을 막는다.
-    document.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    let preventedByLink: boolean | undefined;
+    document.addEventListener('click', (event) => { preventedByLink = event.defaultPrevented; event.preventDefault(); }, { once: true });
     fireEvent.click(entry, { [modifier]: true });
+    expect(preventedByLink).toBe(false);
     expect(router.push).not.toHaveBeenCalled();
     expect(currentHref()).toBe(richSource);
     expect(termsRequests).toHaveLength(0);
   });
 
-  it('같은 셸에서 바뀐 query와 hash도 다음 문서의 출처로 전달한다', async () => {
+  it('같은 셸에서 바뀐 query와 hash도 누르는 순간 다음 문서의 출처로 전달한다', async () => {
     renderAt(settingsPath);
     act(() => {
       window.history.replaceState(null, '', richSource);
       notifyNavigation();
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
-    await waitFor(() => expect(new URL(footerLink('개인정보처리방침').href).searchParams.get('from')).toBe(richSource));
+    expect(footerLink('개인정보처리방침').getAttribute('href')).toBe('/terms?document=privacy');
     fireEvent.click(footerLink('개인정보처리방침'));
     await readDocument('privacy');
     await topBackTo(richSource);
@@ -237,14 +239,18 @@ describe('QA65 앱 푸터의 실제 문서 읽기와 상단 복귀', () => {
     expect(writes).toEqual([]);
   });
 
-  it('SSR 첫 footer는 query만 담고 클라이언트 마운트 뒤 hash를 전달한다', () => {
+  it('서버 HTML 과 마운트 뒤 footer 는 출처 꼬리가 없고 누르는 순간의 query와 hash 를 담아 이동한다', async () => {
     const { client } = renderAt(richSource);
     const html = renderToStaticMarkup(<QueryClientProvider client={client}><AppChrome title="정적 본문" showNotifications={false}><p>정적 본문</p></AppChrome></QueryClientProvider>);
     const parsed = new DOMParser().parseFromString(html, 'text/html');
-    const serverLink = parsed.querySelector<HTMLAnchorElement>('footer a[href*="document=privacy"]');
-    const source = new URL(serverLink?.getAttribute('href') ?? '/', window.location.origin).searchParams.get('from');
-    expect(source).toBe(richSource.replace('#legal-list', ''));
-    expect(new URL(footerLink('개인정보처리방침').href).searchParams.get('from')).toBe(richSource);
+    for (const document of documents) {
+      const serverLink = parsed.querySelector<HTMLAnchorElement>(`footer a[href*="document=${document.key}"]`);
+      expect(serverLink?.getAttribute('href')).toBe(`/terms?document=${document.key}`);
+      expect(footerLink(document.title).getAttribute('href')).toBe(`/terms?document=${document.key}`);
+    }
+    fireEvent.click(footerLink('개인정보처리방침'));
+    await readDocument('privacy');
+    expect(new URLSearchParams(window.location.search).get('from')).toBe(richSource);
   });
 
   it('실제 searchParams suspension이 정적404 본문과 나머지 셸을 지우지 않는다', () => {
@@ -260,15 +266,5 @@ describe('QA65 앱 푸터의 실제 문서 읽기와 상단 복귀', () => {
       expect(entry?.getAttribute('data-prefetch')).toBe('false');
     }
     expect(parsed.querySelector('footer a[href="/notices"]')?.textContent).toBe('공지사항');
-  });
-
-  it('라우터 경로를 모르면 정적 footer 기본 href를 유지한다', () => {
-    navigation.missingPathname = true;
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    clients.push(client);
-    // AppShellFrame은 경로가 없으면 children만 통과시킨다. 경로 없는 Chrome 자체의 계약을 본다.
-    render(<QueryClientProvider client={client}><AppChrome title="정적 본문" showNotifications={false}><p>정적 본문</p></AppChrome></QueryClientProvider>);
-    for (const document of documents) expect(footerLink(document.title)).toHaveAttribute('href', `/terms?document=${document.key}`);
-    expect(footerLink('공지사항')).toHaveAttribute('href', '/notices');
   });
 });

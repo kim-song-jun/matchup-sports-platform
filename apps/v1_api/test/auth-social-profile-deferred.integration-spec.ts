@@ -10,9 +10,10 @@ const finishedUserId = 'integration-social-defer-finished';
 const emailUserId = 'integration-social-defer-email';
 const takenNicknameUserId = 'integration-social-defer-taken';
 const noAgeUserId = 'integration-social-defer-no-age';
+const kakaoUserId = 'integration-social-defer-kakao';
 const sportId = '5a1f0c3e-7b52-4d0a-9c11-0000000d3f01';
 const regionId = 'integration-social-defer-region';
-const ids = [deferringUserId, finishedUserId, emailUserId, takenNicknameUserId, noAgeUserId];
+const ids = [deferringUserId, finishedUserId, emailUserId, takenNicknameUserId, noAgeUserId, kakaoUserId];
 
 /**
  * Social signup that skips the profile form: the state machine plus the V1AuthGuard write gate,
@@ -33,6 +34,7 @@ describe('V1 social profile deferral integration', () => {
       data: [
         { id: deferringUserId, onboardingStatus: 'social_profile_required' },
         { id: noAgeUserId, onboardingStatus: 'social_profile_required' },
+        { id: kakaoUserId, onboardingStatus: 'social_profile_required' },
         {
           id: finishedUserId,
           onboardingStatus: 'deferred',
@@ -51,7 +53,8 @@ describe('V1 social profile deferral integration', () => {
     });
     await prisma.v1AuthIdentity.createMany({
       data: [
-        { userId: deferringUserId, provider: 'kakao', providerUserKey: 'integration-social-defer-kakao', status: 'active' },
+        { userId: deferringUserId, provider: 'apple', providerUserKey: 'integration-social-defer-apple', status: 'active' },
+        { userId: kakaoUserId, provider: 'kakao', providerUserKey: 'integration-social-defer-kakao', status: 'active' },
         { userId: noAgeUserId, provider: 'kakao', providerUserKey: 'integration-social-defer-no-age', status: 'active' },
       ],
     });
@@ -59,6 +62,11 @@ describe('V1 social profile deferral integration', () => {
       data: [
         {
           userId: deferringUserId,
+          currentStep: 'signup',
+          draftJson: { appleName: '디퍼애플', ageConfirmedAt: new Date().toISOString() },
+        },
+        {
+          userId: kakaoUserId,
           currentStep: 'signup',
           draftJson: { kakaoName: '디퍼카카오', kakaoGender: 'female', ageConfirmedAt: new Date().toISOString() },
         },
@@ -68,7 +76,7 @@ describe('V1 social profile deferral integration', () => {
     });
     // The nickname the deferring user would pick is already taken, forcing the numeric suffix.
     await prisma.v1UserProfile.create({
-      data: { userId: takenNicknameUserId, nickname: '디퍼카카오', visibility: 'public' },
+      data: { userId: takenNicknameUserId, nickname: '디퍼애플', visibility: 'public' },
     });
     const creatorProfile = { realName: '디퍼실명', gender: 'male', birthDate: '1990-01-01' };
     await prisma.v1UserProfile.create({
@@ -137,7 +145,35 @@ describe('V1 social profile deferral integration', () => {
     await prisma.v1User.deleteMany({ where: { id: { in: ids } } });
   }
 
-  it('defers the profile: creates a random (Kakao-name independent) nickname and moves to social_profile_deferred', async () => {
+  it('tells the web whether the profile step may be skipped: Apple yes, Kakao no', async () => {
+    const apple = await request(app.getHttpServer()).get('/api/v1/auth/me').set('x-v1-user-id', deferringUserId).expect(200);
+    const kakao = await request(app.getHttpServer()).get('/api/v1/auth/me').set('x-v1-user-id', kakaoUserId).expect(200);
+
+    expect(apple.body.data.socialSignupCanDefer).toBe(true);
+    expect(kakao.body.data.socialSignupCanDefer).toBe(false);
+  });
+
+  it('refuses to defer a Kakao signup and leaves its state and draft untouched', async () => {
+    const before = await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: kakaoUserId } });
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/social-profile/defer')
+      .set('x-v1-user-id', kakaoUserId)
+      .expect(409);
+
+    expect(response.body.code).toBe('SOCIAL_PROFILE_DEFER_UNAVAILABLE');
+    const user = await prisma.v1User.findUniqueOrThrow({
+      where: { id: kakaoUserId },
+      select: { onboardingStatus: true, profile: { select: { id: true } } },
+    });
+    expect(user.onboardingStatus).toBe('social_profile_required');
+    expect(user.profile).toBeNull();
+    const after = await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: kakaoUserId } });
+    expect(after.draftJson).toEqual(before.draftJson);
+    expect(after.currentStep).toBe(before.currentStep);
+  });
+
+  it('defers the profile: creates a random (provider-name independent) nickname and moves to social_profile_deferred', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/social-profile/defer')
       .set('x-v1-user-id', deferringUserId)
@@ -150,13 +186,13 @@ describe('V1 social profile deferral integration', () => {
     expect(user.onboardingStatus).toBe('social_profile_deferred');
     expect(user.signupEmailLoginRequired).toBe(false);
     expect(user.profile?.nickname).toMatch(/^[가-힣]+\d{1,4}$/);
-    expect(user.profile?.nickname).not.toContain('디퍼카카오');
+    expect(user.profile?.nickname).not.toContain('디퍼애플');
     expect(user.profile?.realName).toBeNull();
   });
 
   it('keeps the provider values in the draft while the profile is deferred', async () => {
     const progress = await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: deferringUserId } });
-    expect(progress.draftJson).toMatchObject({ kakaoName: '디퍼카카오', kakaoGender: 'female', ageConfirmedAt: expect.any(String) });
+    expect(progress.draftJson).toMatchObject({ appleName: '디퍼애플', ageConfirmedAt: expect.any(String) });
   });
 
   it('allows deferred profile reads without linking an email login', async () => {

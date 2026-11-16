@@ -7,8 +7,7 @@
 // 어차피 클라이언트 청크에 들어 있었고, 이 지시어는 404 화면의 셸도 같은 청크를 쓰게 할 뿐이다.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { createContext, Suspense, useContext, useRef } from 'react';
-import { withFromPath } from '@/lib/session-storage';
+import { createContext, useContext, useRef } from 'react';
 import { OpenInAppBanner } from '@/components/app-promotion/open-in-app-banner';
 import { useSlidingIndicatorRect } from './use-sliding-indicator';
 import {
@@ -23,8 +22,8 @@ import {
 import { DesktopScrollTop } from './desktop-scroll-top';
 import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
+import { FromLink } from './from-link';
 import { NotificationBellLink } from './notification-bell';
-import { useCurrentHref } from './use-current-href';
 import { PullToRefresh } from './pull-to-refresh';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
@@ -212,10 +211,7 @@ function AppChromeInner({
         ) : null}
         {children}
       </main>
-      {/* 정적 404의 셸은 남기고, query를 읽는 푸터만 Suspense 경계 안에 둔다. */}
-      <Suspense fallback={<DesktopFooter />}>
-        <DesktopFooterWithSource />
-      </Suspense>
+      <DesktopFooter />
       <DesktopScrollTop />
       {floatingSlot}
       {bottomNav ? <BottomNav activeTab={activeTab} /> : null}
@@ -226,12 +222,7 @@ function AppChromeInner({
 // Desktop-only site footer. Hidden on mobile (.tm-desktop-footer is display:none
 // below 1024px). Adds a familiar web-app footer and fills the lower viewport on
 // short pages — a desktop convention that the mobile app intentionally omits.
-function DesktopFooterWithSource() {
-  const from = useCurrentHref();
-  return <DesktopFooter from={from} />;
-}
-
-function DesktopFooter({ from }: { from?: string | null }) {
+function DesktopFooter() {
   return (
     <footer className="tm-desktop-footer" aria-label="사이트 정보">
       <div className="tm-desktop-footer-inner">
@@ -248,11 +239,11 @@ function DesktopFooter({ from }: { from?: string | null }) {
             prefetch를 꺼도 클릭 시 정상적으로 그때 받아오므로 기능 손실은 없다. */}
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
           <Link href="/notices" prefetch={false}>공지사항</Link>
-          <Link href={withFromPath('/terms?document=terms', from)} prefetch={false}>서비스 이용약관</Link>
-          <Link href={withFromPath('/terms?document=privacy', from)} prefetch={false}>개인정보처리방침</Link>
-          <Link href={withFromPath('/terms?document=location', from)} prefetch={false}>위치기반서비스 이용약관</Link>
-          <Link href={withFromPath('/terms?document=tournament-policy', from)} prefetch={false}>대회 운영정책</Link>
-          <Link href={withFromPath('/terms?document=support', from)} prefetch={false}>고객센터</Link>
+          <FromLink href="/terms?document=terms" prefetch={false}>서비스 이용약관</FromLink>
+          <FromLink href="/terms?document=privacy" prefetch={false}>개인정보처리방침</FromLink>
+          <FromLink href="/terms?document=location" prefetch={false}>위치기반서비스 이용약관</FromLink>
+          <FromLink href="/terms?document=tournament-policy" prefetch={false}>대회 운영정책</FromLink>
+          <FromLink href="/terms?document=support" prefetch={false}>고객센터</FromLink>
         </nav>
         <p className="tm-desktop-footer-copy">© 2026 Teameet</p>
       </div>

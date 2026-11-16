@@ -29,6 +29,7 @@ import { hasPendingWork, isTakeoverHeld, type GameOperationsQueueState, type Gam
 import {
   freezeCapture,
   isClockSuspicious,
+  serverAlignedNowMs,
   type FrozenEventCapture,
 } from '@/lib/game-operations-clock';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
@@ -227,6 +228,10 @@ const COMMAND_LABEL: Record<
  * `periodLabel`(UX 감사 item 4)을 그대로 써서 "전반 종료"/"후반 시작"/
  * "N피리어드 종료"를 만든다(이슈 #375: 구 `nextPeriodCommandLabel` 하나가
  * 종료+시작 라벨을 겸했던 것을 명령이 둘로 나뉜 만큼 함수도 나눈다). */
+function isGoalAction(type: string): boolean {
+  return type === 'GOAL' || type === 'OWN_GOAL';
+}
+
 function endPeriodCommandLabel(currentPeriodNumber: number, periodCount: number | null): string {
   return endPeriodLabel(currentPeriodNumber, periodCount);
 }
@@ -589,6 +594,24 @@ export function OperateConsoleCore({
     const entry = durations?.[currentPeriod.number - 1] ?? null;
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
+
+  // 정규 시간이 끝났어도(모든 피리어드 ENDED, 경기는 아직 LIVE) 경기 종료 전에는
+  // 빠진 골을 넣을 수 있어야 한다. 그때 골의 시각은 마지막 피리어드의 정규 시간 끝으로 굳힌다
+  // (설정 길이와 실제로 뛴 시간 중 짧은 쪽). 서버도 같은 상한을 검사한다
+  // (`assertEventReferences`의 PERIOD_ALREADY_ENDED 예외).
+  const regulationEndCapture = useMemo(() => {
+    if (!regulationEnded) return null;
+    const last = [...(gameDetail.data?.periods ?? [])].sort((a, b) => b.number - a.number)[0];
+    if (last === undefined) return null;
+    const configuredMs = (gameDetail.data?.periodDurations?.[last.number - 1]?.durationMinutes ?? null);
+    const playedMs = last.startedAt !== null && last.endedAt !== null
+      ? Math.max(0, new Date(last.endedAt).getTime() - new Date(last.startedAt).getTime() - Math.max(0, last.pausedTotalMs))
+      : null;
+    const clockMs = configuredMs !== null
+      ? Math.min(configuredMs * 60_000, playedMs ?? Number.POSITIVE_INFINITY)
+      : playedMs;
+    return clockMs === null ? null : { period: last.number, clockMs };
+  }, [regulationEnded, gameDetail.data?.periods, gameDetail.data?.periodDurations]);
 
   const [expiredPeriodId, setExpiredPeriodId] = useState<string | null>(null);
   const [periodExpiryError, setPeriodExpiryError] = useState<string | null>(null);
@@ -956,6 +979,20 @@ export function OperateConsoleCore({
       // Date.now(), which is exactly why every captured event read
       // clockMs≈0. The persistent "경기를 시작해 주세요." banner already
       // explains why the tap did nothing, so this guard needs no message.
+      if (currentPeriod === null && regulationEndCapture !== null && isGoalAction(button.type)) {
+        setPendingAction({
+          actionType: button.type,
+          actionLabel: button.label,
+          cardColor: button.cardColor,
+          allowTeamOnly: button.allowTeamOnly,
+          frozen: {
+            period: regulationEndCapture.period,
+            clockMs: regulationEndCapture.clockMs,
+            occurredAt: new Date(serverAlignedNowMs(Date.now(), ops.clockOffsetMs)).toISOString(),
+          },
+        });
+        return;
+      }
       if (currentPeriod === null || currentPeriod.startedAt === null) return;
       const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
       // 액션 우선 리오더의 핵심: 여기서 얼린다 — "누구"를 고르는 다음 화면이
@@ -976,7 +1013,7 @@ export function OperateConsoleCore({
         frozen,
       });
     },
-    [commandBlocked, ops.clockOffsetMs, currentPeriod],
+    [commandBlocked, ops.clockOffsetMs, currentPeriod, regulationEndCapture],
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
@@ -2058,7 +2095,7 @@ export function OperateConsoleCore({
               size="lg"
               variant="outline"
               className="h-16 flex-col gap-1 lg:h-20"
-              disabled={!canOperate || currentPeriod === null || commandBlocked}
+              disabled={!canOperate || (currentPeriod === null && !(regulationEndCapture !== null && isGoalAction(button.type))) || commandBlocked}
               onClick={() => handleSelectAction(button)}
             >
               {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (

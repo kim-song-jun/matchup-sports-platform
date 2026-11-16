@@ -336,9 +336,68 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
     expectHttpCode(rejected, 409, 'NO_NEXT_PERIOD');
   });
 
+  describe('정규 시간 종료 뒤(경기는 아직 LIVE) 골 기록', () => {
+    const currentVersion = async () => (await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).version;
+    const goalAt = async (id: string, clockMs: number, type: V1GameEventType = V1GameEventType.GOAL) =>
+      service.appendEvent(authUser(ids.director), gameId, id, {
+        expectedVersion: await currentVersion(),
+        clientEventId: id,
+        takeoverToken,
+        type,
+        sideId: homeSideId,
+        participantId: type === V1GameEventType.GOAL ? homeParticipantId : undefined,
+        period: 2,
+        clockMs,
+        occurredAt: new Date().toISOString(),
+        payload: type === V1GameEventType.GOAL ? {} : { anonymous: true },
+      });
+
+    it('마지막 피리어드를 end-period로 닫으면 모든 피리어드가 ENDED이고 경기는 LIVE다', async () => {
+      await service.executeCommand(authUser(ids.director), gameId, 'end-period', 'reg-end-p2', {
+        expectedVersion: await currentVersion(),
+        clientCommandId: 'reg-end-p2',
+        takeoverToken,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      const periods = await prisma.v1GamePeriod.findMany({ where: { gameId } });
+      expect(periods.every((period) => period.state === 'ENDED')).toBe(true);
+      expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).state).toBe(V1GameState.LIVE);
+    });
+
+    it('정규 시간 안의 시각이면 마지막 피리어드에 골을 받는다', async () => {
+      const recorded = await goalAt('reg-goal-in', 1_000);
+      expect(recorded.replayed).toBe(false);
+      const stored = await prisma.v1GameEvent.findFirstOrThrow({ where: { gameId, clientEventId: 'reg-goal-in' } });
+      expect(stored).toEqual(expect.objectContaining({ period: 2, clockMs: 1_000 }));
+    });
+
+    it('정규 시간을 넘는 시각의 골은 PERIOD_ALREADY_ENDED로 막는다', async () => {
+      expectHttpCode(await captureFailure(() => goalAt('reg-goal-late', 10 * 60 * 60_000)), 409, 'PERIOD_ALREADY_ENDED');
+    });
+
+    it('골이 아닌 기록은 계속 막는다', async () => {
+      const rejected = await captureFailure(async () =>
+        service.appendEvent(authUser(ids.director), gameId, 'reg-foul', {
+          expectedVersion: await currentVersion(),
+          clientEventId: 'reg-foul',
+          takeoverToken,
+          type: V1GameEventType.FOUL,
+          sideId: homeSideId,
+          participantId: homeParticipantId,
+          period: 2,
+          clockMs: 1_000,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        }),
+      );
+      expectHttpCode(rejected, 409, 'PERIOD_ALREADY_ENDED');
+    });
+  });
+
   it('end closes the still-LIVE period 2', async () => {
     await service.executeCommand(authUser(ids.director), gameId, 'end', 't1-0-end', {
-      expectedVersion: 4,
+      expectedVersion: (await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).version,
       clientCommandId: 't1-0-end',
       takeoverToken,
       occurredAt: new Date().toISOString(),

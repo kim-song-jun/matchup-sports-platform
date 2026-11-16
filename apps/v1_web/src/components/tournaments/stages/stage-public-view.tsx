@@ -56,11 +56,11 @@ export function StagePublicView({ tournament, mode = 'results' }: { tournament: 
   return <div className="min-w-0 space-y-6">
     <BracketFilterRow padded={false} label="진행 단계 선택" items={plan.stages.map(stage => ({ id: stage.key, label: stage.name }))} activeId={selected.key} onSelect={value => { setKey(value); select('stage', value); }} />
     <BracketFilterRow padded={false} label="편성 선택" items={[{ id: '', label: '전체 편성' }, ...selected.pools.map(pool => ({ id: pool.key, label: pool.name }))]} activeId={activePool} onSelect={value => { setPoolKey(value); select('pool', value); }} />
-    <div className="grid gap-3 sm:grid-cols-2">
+    {mode === 'bracket' && <SegmentedTabs ariaLabel="보기 방식" role="tablist" items={[{ id: 'schedule', label: '경기 일정' }, { id: 'standings', label: '순위 · 대진표' }]} activeId={tab} onSelect={value => { setTab(value); select('tab', value); }} />}
+    {(mode === 'results' || tab === 'schedule') && <div className="grid gap-3 sm:grid-cols-2">
       <label className="block tm-text-label">참가팀<select className={control} value={activeTeam} onChange={e => { setTeam(e.target.value); select('team', e.target.value); }}><option value="">전체 팀</option>{teams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="block tm-text-label">경기 라운드<select className={control} value={activeRound} onChange={e => { setRound(e.target.value); select('round', e.target.value); }}><option value="">전체 라운드</option>{rounds.map(r => <option key={r} value={r}>{tournamentRoundLabel(r)}</option>)}</select></label>
-    </div>
-    {mode === 'bracket' && <SegmentedTabs ariaLabel="보기 방식" role="tablist" items={[{ id: 'schedule', label: '경기 일정' }, { id: 'standings', label: '순위 · 대진표' }]} activeId={tab} onSelect={value => { setTab(value); select('tab', value); }} />}
+    </div>}
     <p className="tm-text-caption text-[var(--text-muted)]">각 편성의 순위를 따로 계산해요. 서로 다른 단계·리그의 승점을 합쳐 전체 순위로 표시하지 않아요.</p>
     {tournament.status === 'completed' && <StageOverallRanks tournament={tournament} />}
     {!tournament.groups.length && <p className="tm-text-label">대진 공개를 기다리고 있어요.</p>}

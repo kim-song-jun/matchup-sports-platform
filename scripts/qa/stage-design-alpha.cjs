@@ -81,8 +81,8 @@ async function exercise(page, report, name, width) {
     await expect(page.getByRole('table')).toHaveCount(4);
     await page.getByRole('navigation', { name: '편성 선택' }).getByRole('button').nth(1).click();
     await expect(page.getByRole('table')).toHaveCount(1);
-    await page.getByRole('combobox', { name: '참가팀', exact: true }).selectOption({ index: 1 });
     await page.getByRole('tab', { name: '경기 일정', exact: true }).click();
+    await page.getByRole('combobox', { name: '참가팀', exact: true }).selectOption({ index: 1 });
     const matches = page.locator(`a[href*="/tournaments/${tournamentId}/matches/"]`);
     await expect(matches).toHaveCount(4);
     await interactionShot(page, report, 'filtered-final-team-matches', width);
@@ -174,7 +174,19 @@ async function main() {
           console.log(JSON.stringify({ name, width, status: response.status(), overflow: geometry.horizontalOverflow }));
           fs.writeFileSync(path.join(destination, 'report.json'), JSON.stringify(report, null, 2));
         }
-        if (phase === 'after') await captureLegacyReference(page, context, report, width);
+        if (phase === 'after') {
+          const detail = await context.request.get(`${origin}/api/v1/tournaments/${tournamentId}`);
+          if (!detail.ok()) throw Error('Cannot verify completed QA competition preservation');
+          const competition = (await detail.json()).data;
+          const original = JSON.parse(fs.readFileSync('docs/scenarios/evidence/sm-ranked-leagues-20261116.json', 'utf8'));
+          expect(competition.status).toBe('completed'); expect(competition.fixtures).toHaveLength(70);
+          for (const expected of original.games) {
+            const fixture = competition.fixtures.find(item => item.id === expected.fixtureId);
+            expect(fixture?.result?.homeScore).toBe(expected.homeScore); expect(fixture?.result?.awayScore).toBe(expected.awayScore);
+          }
+          report.preservation = { status: 'completed', originalFixtureIds: 70, officialScoresUnchanged: 70 };
+          await captureLegacyReference(page, context, report, width);
+        }
       } finally { await context.close(); }
     }
     if (phase === 'after' && report.checks.some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');

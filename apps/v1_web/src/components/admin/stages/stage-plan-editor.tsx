@@ -8,7 +8,8 @@ import type { StagePlan, StagePool } from '@/types/stage-plan';
 import { StageSourceEditor } from './stage-source-editor';
 import { SixTeamOrderEditor } from '@/components/admin/tournaments/six-team-order-editor';
 import { DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER } from '@/lib/tournament-tie-break';
-export const stageControl = 'min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label text-[var(--text-strong)]';
+import { ChevronDown } from 'lucide-react';
+export const stageControl = 'tm-input min-h-11 min-w-0 w-full';
 export function StagePlanEditor({ value, onChange, disabled = false }: { value: StagePlan; onChange: (plan: StagePlan) => void; disabled?: boolean }) {
   const { confirm, ConfirmModal } = useConfirm();
   const counts = stagePlanCounts(value), error = stagePlanError(value);
@@ -23,9 +24,10 @@ export function StagePlanEditor({ value, onChange, disabled = false }: { value: 
     <fieldset disabled={disabled} className="space-y-5 min-w-0">
       <label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={value.autoAdvance === true} onChange={e => onChange({ ...value, autoAdvance: e.target.checked })} />공식 순위가 확정되면 다음 단계 참가팀 자동 확정 · 동률은 운영자가 결정</label>
       <div className="flex flex-wrap gap-2"><Button variant="neutral" onClick={() => void preset(false)}>단일 리그로 시작</Button><Button variant="neutral" onClick={() => void preset(true)}>20팀 순위별 리그 템플릿</Button></div>
-      {value.stages.map((stage, si) => <section key={stage.key} className="space-y-4 rounded-xl bg-[var(--surface-soft)] p-4">
+      {value.stages.map((stage, si) => <section key={stage.key} className="min-w-0 space-y-4 border-t border-[var(--border)] pt-4">
         <label className="block tm-text-label">{si + 1}단계 이름<input className={stageControl} maxLength={60} value={stage.name} onChange={e => onChange({ ...value, stages: value.stages.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} /></label>
-        {stage.pools.map((pool, pi) => <div key={pool.key} className="space-y-3 rounded-xl bg-[var(--card-surface)] p-4">
+        {stage.pools.map((pool, pi) => <details key={pool.key} open={stage.pools.length === 1} className="group min-w-0 space-y-3 rounded-xl bg-[var(--surface-soft)] p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 tm-text-label"><span>{pool.name} · {pool.capacity}팀 · {pool.format === 'league' ? '풀리그' : '토너먼트'}</span><ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" /></summary>
           <div className="grid gap-3 sm:grid-cols-2"><label className="tm-text-label">편성 이름<input className={stageControl} maxLength={60} value={pool.name} onChange={e => edit(si, pi, { name: e.target.value })} /></label>
           <label className="tm-text-label">경기 방식<select className={stageControl} value={pool.format} onChange={e => edit(si, pi, { format: e.target.value as StagePool['format'], legs: 1, thirdPlace: false, sixTeamFinalBye: false, sixTeamDirectFinalOrder: undefined, seeding: 'fixed' })}><option value="league">풀리그</option><option value="knockout">토너먼트</option></select></label>
           <label className="tm-text-label">참가 자리 수<input className={stageControl} type="number" min={2} max={64} value={pool.capacity} onChange={e => { const capacity = Number(e.target.value); edit(si, pi, { capacity, ...(capacity !== 6 ? { sixTeamFinalBye: false, sixTeamDirectFinalOrder: undefined } : {}), ...(capacity !== 12 ? { seeding: 'fixed' } : {}), ...(capacity < 4 ? { thirdPlace: false } : {}), sources: si === 0 ? [] : Array.from({ length: Math.min(64, Math.max(0, capacity)) }, (_, i) => pool.sources[i] ?? { poolKey: '', rank: 1 }) }); }} /></label>
@@ -37,7 +39,7 @@ export function StagePlanEditor({ value, onChange, disabled = false }: { value: 
           {si > 0 && <fieldset className="space-y-3"><legend className="tm-text-label">진출 출처 · 시드 순서</legend>{pool.sources.map((source, index) => <StageSourceEditor key={index} source={source} index={index} origins={value.stages.slice(0, si).flatMap(stage => stage.pools.map(pool => ({ ...pool, name: `${stage.name} · ${pool.name}` })))} onChange={next => edit(si, pi, { sources: pool.sources.map((old, i) => i === index ? next : old) })} />)}</fieldset>}
           {si > 0 && pool.format === 'knockout' && pool.capacity === 12 && <label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={pool.seeding === 'cross_group_top_three'} onChange={event => edit(si, pi, { seeding: event.target.checked ? 'cross_group_top_three' : 'fixed' })} />4개 조 1~3위 교차 시드 · 조 1위 부전승 · 같은 조 재대결 회피</label>}
           <Button variant="neutral" disabled={stage.pools.length === 1} onClick={() => onChange({ ...value, stages: value.stages.map((s, i) => i === si ? { ...s, pools: s.pools.filter(p => p.key !== pool.key) } : s) })}>편성 삭제</Button>
-        </div>)}
+        </details>)}
         <div className="flex flex-wrap gap-2"><Button variant="neutral" disabled={stage.pools.length >= 16} onClick={() => onChange({ ...value, stages: value.stages.map((s, i) => i === si ? { ...s, pools: [...s.pools, makePool(`편성 ${s.pools.length + 1}`, si)] } : s) })}>편성 추가</Button>
         <Button variant="neutral" disabled={value.stages.length === 1} onClick={() => onChange({ ...value, stages: value.stages.filter(s => s.key !== stage.key) })}>단계 삭제</Button></div>
       </section>)}

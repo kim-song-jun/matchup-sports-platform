@@ -1,29 +1,44 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { SectionTitle } from '@/components/v1-ui/primitives';
+import { EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { TournamentStandingsTable, type TournamentStandingsRow } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1TournamentDetail } from '@/types/api';
 import { StageScopedRecords } from './stage-scoped-records';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
-export function StagePublicView({ tournament }: { tournament: V1TournamentDetail }) {
+import { BracketFilterRow } from '@/components/tournaments/bracket-filter-row';
+import { CompetitionFixtureCard, CompetitionFixtureVenue } from '@/components/tournaments/competition-fixture-card';
+import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
+import { competitionFixtureName, tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { fixtureStatusLabel } from '@/components/public-game-records/format';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
+export function StagePublicView({ tournament, mode = 'results' }: { tournament: V1TournamentDetail; mode?: 'bracket' | 'results' }) {
   const [key, setKey] = useState('');
   const [poolKey, setPoolKey] = useState('');
   const [team, setTeam] = useState('');
   const [round, setRound] = useState('');
   const [showRecords, setShowRecords] = useState(false);
+  const [tab, setTab] = useState(mode === 'bracket' ? 'schedule' : 'standings');
   const plan = tournament.stagePlan;
+  const selfHref = useCurrentHref();
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setKey(params.get('stage') ?? ''); setPoolKey(params.get('pool') ?? '');
-    setTeam(params.get('team') ?? ''); setRound(params.get('round') ?? '');
-  }, []);
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setKey(params.get('stage') ?? ''); setPoolKey(params.get('pool') ?? '');
+      setTeam(params.get('team') ?? ''); setRound(params.get('round') ?? '');
+      setTab(params.get('tab') === 'standings' ? 'standings' : mode === 'bracket' ? 'schedule' : 'standings');
+    };
+    restore(); window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, [mode]);
   if (!plan) return null;
   const selected = plan.stages.find(s => s.key === key) ?? (tournament.status === 'completed' ? plan.stages.at(-1)! : plan.stages[0]);
   const activePool = selected.pools.some(pool => pool.key === poolKey) ? poolKey : '';
-  const control = 'min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3';
+  const control = 'tm-input min-w-0 w-full';
   const select = (field: string, value: string) => {
     const params = new URLSearchParams(window.location.search);
     if (value) params.set(field, value); else params.delete(field);
@@ -38,13 +53,14 @@ export function StagePublicView({ tournament }: { tournament: V1TournamentDetail
   const rounds = [...new Set(fixturesInScope.map(f => f.round))];
   const teams = [...new Map(selectedGroups.flatMap(g => g.groupTeams.filter(t => t.registrationId).map(t => [t.registrationId!, t.teamName] as const))).entries()];
   const activeTeam = teams.some(([id]) => id === team) ? team : '', activeRound = rounds.includes(round) ? round : '';
-  return <div className="space-y-6">
+  return <div className="min-w-0 space-y-6">
+    <BracketFilterRow padded={false} label="진행 단계 선택" items={plan.stages.map(stage => ({ id: stage.key, label: stage.name }))} activeId={selected.key} onSelect={value => { setKey(value); select('stage', value); }} />
+    <BracketFilterRow padded={false} label="편성 선택" items={[{ id: '', label: '전체 편성' }, ...selected.pools.map(pool => ({ id: pool.key, label: pool.name }))]} activeId={activePool} onSelect={value => { setPoolKey(value); select('pool', value); }} />
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="block tm-text-label">진행 단계<select className={control} value={selected.key} onChange={e => { setKey(e.target.value); select('stage', e.target.value); }}>{plan.stages.map(s => <option key={s.key} value={s.key}>{s.name}</option>)}</select></label>
-      <label className="block tm-text-label">편성<select className={control} value={activePool} onChange={e => { setPoolKey(e.target.value); select('pool', e.target.value); }}><option value="">전체 편성</option>{selected.pools.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</select></label>
       <label className="block tm-text-label">참가팀<select className={control} value={activeTeam} onChange={e => { setTeam(e.target.value); select('team', e.target.value); }}><option value="">전체 팀</option>{teams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
-      <label className="block tm-text-label">경기 라운드<select className={control} value={activeRound} onChange={e => { setRound(e.target.value); select('round', e.target.value); }}><option value="">전체 라운드</option>{rounds.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
+      <label className="block tm-text-label">경기 라운드<select className={control} value={activeRound} onChange={e => { setRound(e.target.value); select('round', e.target.value); }}><option value="">전체 라운드</option>{rounds.map(r => <option key={r} value={r}>{tournamentRoundLabel(r)}</option>)}</select></label>
     </div>
+    {mode === 'bracket' && <SegmentedTabs ariaLabel="보기 방식" role="tablist" items={[{ id: 'schedule', label: '경기 일정' }, { id: 'standings', label: '순위 · 대진표' }]} activeId={tab} onSelect={value => { setTab(value); select('tab', value); }} />}
     <p className="tm-text-caption text-[var(--text-muted)]">각 편성의 순위를 따로 계산해요. 서로 다른 단계·리그의 승점을 합쳐 전체 순위로 표시하지 않아요.</p>
     {tournament.status === 'completed' && <StageOverallRanks tournament={tournament} />}
     {!tournament.groups.length && <p className="tm-text-label">대진 공개를 기다리고 있어요.</p>}
@@ -63,9 +79,17 @@ export function StagePublicView({ tournament }: { tournament: V1TournamentDetail
         {progress && <p className="tm-text-label" role="status">{progress.stale ? '이전 단계 정정 확인 중 · 참가팀 배정 검토 필요' : progress.complete ? '공식 결과 완료' : progress.assigned ? '참가팀 확정' : '참가팀 배정 대기'}</p>}
         <p className="tm-text-caption">{pool.capacity}팀{pool.format === 'league' ? ` · ${pool.legs}회전` : ''}{pool.sources.length ? ` · 진출 출처: ${pool.sources.map(source => `${plan.stages.flatMap(s => s.pools).find(p => p.key === source.poolKey)?.name ?? '이전 편성'} ${source.rank}위`).join(', ')}` : ''}</p>
         {advancingRanks.size > 0 && <p className="tm-text-caption">강조한 순위는 다음 단계 진출 대상이에요. 공식 결과와 참가팀 배정이 확정되면 다음 편성에 반영돼요.</p>}
-        {pool.format === 'league' && group && <TournamentStandingsTable advancingKeys={advancingKeys.size ? advancingKeys : null} rows={rows} ariaLabel={`${selected.name} ${pool.name} 순위표`} />}
-        {pool.sixTeamFinalBye && progress?.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={progress.sixTeamBracket} fixtures={fixtures} directFinalOrder={pool.sixTeamDirectFinalOrder} /> : pool.format === 'knockout' && !pool.sixTeamFinalBye && fixtures.length > 0 ? <TournamentBracket fixtures={fixtures} groups={groups} /> : null}
-        <ul className="divide-y divide-[var(--border)]">{fixtures.map(f => <li key={f.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-3 tm-text-label" href={`/tournaments/${encodeURIComponent(tournament.id)}/matches/${encodeURIComponent(f.id)}`}><span>{f.fixtureNumber}경기 · {f.homeTeamName} vs {f.awayTeamName}</span><span className="tm-text-caption">{f.result ? `${f.result.homeScore} : ${f.result.awayScore}` : f.scheduledAt ? formatTournamentDateTimeShort(f.scheduledAt) : '일정 미정'}</span></Link></li>)}</ul>
+        {(mode === 'results' || tab === 'standings') && <div className="min-w-0 overflow-x-auto">
+          {pool.format === 'league' && group && <TournamentStandingsTable advancingKeys={advancingKeys.size ? advancingKeys : null} rows={rows} ariaLabel={`${selected.name} ${pool.name} 순위표`} />}
+          {pool.sixTeamFinalBye && progress?.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={progress.sixTeamBracket} fixtures={fixtures} directFinalOrder={pool.sixTeamDirectFinalOrder} /> : pool.format === 'knockout' && !pool.sixTeamFinalBye && fixtures.length > 0 ? <TournamentBracket fixtures={fixtures} groups={groups} /> : null}
+        </div>}
+        {(mode === 'results' || tab === 'schedule') && <div className="grid min-w-0 gap-3 lg:grid-cols-2">{fixtures.map(f => <Link key={f.id} className="block min-w-0" href={withFromPath(`/tournaments/${encodeURIComponent(tournament.id)}/matches/${encodeURIComponent(f.id)}`, selfHref)}>
+          <CompetitionFixtureCard header={{ label: competitionFixtureName({ displayTitle: f.displayTitle, groupName: pool.name, round: f.round, legNumber: f.legNumber, withinGroup: true }), caption: formatTournamentDateTimeShort(f.scheduledAt) ?? '시간 미정' }}
+            badge={<span className={`tm-badge ${f.result ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{fixtureStatusLabel(f.liveStatus)}</span>}
+            homeLabel={publicFixtureSideLabel(f.homeTeamName, f.homeSlotLabel)} awayLabel={publicFixtureSideLabel(f.awayTeamName, f.awaySlotLabel)}
+            center={<span className="tm-text-body-lg font-bold">{f.result ? `${f.result.homeScore} : ${f.result.awayScore}` : 'vs'}</span>}
+            caption={f.venue ? <CompetitionFixtureVenue venue={f.venue} /> : undefined} />
+        </Link>)}{fixtures.length === 0 && <EmptyState title="표시할 경기가 없어요." sub="선택한 편성과 필터를 확인해 주세요." />}</div>}
       </section>;
     })}
     <button type="button" className="tm-btn tm-btn-md tm-btn-neutral" aria-expanded={showRecords} onClick={() => setShowRecords(!showRecords)}>선택한 단계·편성 개인 기록{showRecords ? ' 닫기' : ' 보기'}</button>

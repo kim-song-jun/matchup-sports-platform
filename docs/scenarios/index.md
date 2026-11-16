@@ -8,6 +8,8 @@
 
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 
+최신 UI 후속: 기존 대회의 도구 패널·페이지 틀·경기 카드·우승/영상 요약을 재사용한다. 사용자 승인 headed Playwright로 Alpha before7 routes×3폭=21/21 캡처. 코드 회귀104건 및 worker 상태 fixture 검증 PASS, after0/21은 새 dev 배포 뒤 진행한다. [현행 UI cursor](./competition-stage-composition.md#2026-11-16--기존-대회-화면과-디자인-통일).
+
 후속 동등성 수정 [PR #2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419): 감사40/40 추적, 실제DB15건+worker1건·6강 정정RED→GREEN, 최종Web65건·타입/규칙 검사 PASS. CI·Copilot 확인 중이며 새로운 코드의 Alpha 시각 검증0/3은 차단 상태다.
 
 [시나리오](./competition-stage-composition.md) · [작업](../../.github/tasks/20261130-competition-stage-composition.md).

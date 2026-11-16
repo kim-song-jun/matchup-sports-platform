@@ -1,27 +1,26 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useStagePlan } from '@/hooks/use-stage-plan';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
-import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { Button } from '@/components/v1-ui/button';
 import { AlertBanner, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { stagePlanCounts } from '@/lib/stage-plan';
 import { extractErrorMessage } from '@/lib/error-message';
-import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import type { StagePlanView, StagePoolView } from '@/types/stage-plan';
-import type { V1AdminBracketFixture } from '@/types/api';
 import { stageControl } from './stage-plan-editor';
 import { StagePeriodSettings } from './stage-period-settings';
 import { StageStructureEditor } from './stage-structure-editor';
 import { StageFixtureRepair } from './stage-fixture-repair';
 import { StageSixTeamControl } from './stage-six-team-control';
-export function StagePlanManager({ tournamentId, canWrite, canOverride = false, showSchedules = true }: { tournamentId: string; canWrite: boolean; canOverride?: boolean; showSchedules?: boolean }) {
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+export function StagePlanManager({ tournamentId, canWrite, canOverride = false, compactNavigation = false, tournamentStatus }: { tournamentId: string; canWrite: boolean; canOverride?: boolean; compactNavigation?: boolean; tournamentStatus?: string }) {
   const api = useStagePlan(tournamentId), bracket = useV1AdminBracket(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const [key, setKey] = useState(''), [error, setError] = useState('');
+  const [panel, setPanel] = useState('teams');
+  const editable = canWrite && tournamentStatus !== 'completed' && tournamentStatus !== 'cancelled';
   const view = api.view.data;
   if (!view) return api.view.isError ? <ErrorState message={extractErrorMessage(api.view.error, '단계 구성을 불러오지 못했어요.')} onRetry={() => void api.view.refetch()} /> : <p role="status">단계 구성을 불러오고 있어요.</p>;
   const pool = view.pools.find(p => p.key === key) ?? view.pools[0];
@@ -39,33 +38,42 @@ export function StagePlanManager({ tournamentId, canWrite, canOverride = false, 
     try { setError(''); await api.automation.mutateAsync({ expectedRevision: view.revision, enabled }); } catch (e) { setError(extractErrorMessage(e, '자동 진출 설정에 실패했어요.')); }
   }
   return <div className="space-y-5">
-    <SectionTitle title="단계별 대진 관리" />
+    {!compactNavigation && <SectionTitle title="단계별 대진 관리" />}
     <p className="tm-text-label">{counts.teams}팀 · {view.config.stages.length}단계 · {counts.fixtures}경기. 풀리그 승점은 편성마다 새로 시작해요.</p>
-    {canWrite && <Button variant="neutral" disabled={api.automation?.isPending || api.view.isError} onClick={() => void setAutomation(!view.config.autoAdvance)}>공식 순위 자동 진출: {view.config.autoAdvance ? '켜짐' : '꺼짐'}</Button>}
+    {compactNavigation && <SegmentedTabs ariaLabel="단계 관리 항목" role="tablist" items={[{ id: 'teams', label: '참가팀 배정' }, { id: 'settings', label: '경기 설정' }, ...(editable ? [{ id: 'structure', label: '구성 수정' }] : [])]} activeId={panel} onSelect={setPanel} />}
+    <div hidden={compactNavigation && panel !== 'teams'} className="space-y-4">
+    {editable && <Button variant="neutral" disabled={api.automation?.isPending || api.view.isError} onClick={() => void setAutomation(!view.config.autoAdvance)}>공식 순위 자동 진출: {view.config.autoAdvance ? '켜짐' : '꺼짐'}</Button>}
     {error && <AlertBanner tone="error" message={error} />}
     {api.view.isError && <AlertBanner tone="warning" message="최신 정보를 불러오지 못했어요. 새로 불러온 뒤 진행해 주세요." />}
     <div className="flex flex-wrap gap-2">
-      {canWrite && !view.pools.some(p => p.generated) && <Button variant="primary" disabled={api.generate.isPending || api.view.isError} onClick={() => void generate()}>{api.generate.isPending ? '생성 중…' : '단계별 대진 생성'}</Button>}
-      {canWrite && view.pools.some(p => p.generated) && <Button variant="neutral" disabled={api.randomize?.isPending || view.pools.some(p => p.stageIndex === 0 && p.started)} onClick={() => void randomize()}>첫 단계 무작위 배정</Button>}
+      {editable && !view.pools.some(p => p.generated) && <Button variant="primary" disabled={api.generate.isPending || api.view.isError} onClick={() => void generate()}>{api.generate.isPending ? '생성 중…' : '단계별 대진 생성'}</Button>}
+      {editable && view.pools.some(p => p.generated) && <Button variant="neutral" disabled={api.randomize?.isPending || view.pools.some(p => p.stageIndex === 0 && p.started)} onClick={() => void randomize()}>첫 단계 무작위 배정</Button>}
       <Button variant="neutral" onClick={() => void api.view.refetch()}>최신 구성 불러오기</Button>
       <Link className="tm-btn tm-btn-md tm-btn-neutral" href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`}>경기 운영 보드</Link>
     </div>
     <label className="block tm-text-label">관리할 편성<select className={stageControl} value={pool?.key ?? ''} onChange={e => setKey(e.target.value)}>{view.config.stages.map(s => <optgroup key={s.key} label={s.name}>{s.pools.map(p => <option key={p.key} value={p.key}>{p.name} · {p.format === 'league' ? '풀리그' : '토너먼트'}</option>)}</optgroup>)}</select></label>
-    {pool && <StagePoolAssignment key={`assignment:${pool.key}:${view.revision}`} pool={pool} view={view} canWrite={canWrite && !api.view.isError} canOverride={canOverride} onRename={names => api.rename.mutateAsync({ ...names, poolKey: pool.key, expectedRevision: view.revision })} onSave={registrationIds => api.assign.mutateAsync({ ...registrationIds, poolKey: pool.key, expectedRevision: view.revision, sourceVersion: pool.sourceVersion })} />}
-    {canWrite && pool?.generated && bracket.data && <StageFixtureRepair key={`repair:${pool.key}:${view.revision}`} tournamentId={tournamentId} view={view} pool={pool} fixtures={bracket.data.fixtures} />}
-    {pool?.sixTeamFinalBye && <StageSixTeamControl key={`six:${pool.key}:${view.revision}`} tournamentId={tournamentId} view={view} pool={pool} canWrite={canWrite} />}
-    {showSchedules && pool?.generated && <section className="space-y-3"><SectionTitle title="경기 일정" />{bracket.isError ? <ErrorState message="경기 일정을 불러오지 못했어요." onRetry={() => void bracket.refetch()} /> : bracket.isPending ? <p role="status">경기 일정을 불러오고 있어요.</p> : bracket.data?.fixtures.filter(f => pool.fixtureIds.includes(f.id)).map(f => <StageFixtureSchedule key={`${f.id}:${f.scheduledAt}`} fixture={f} tournamentId={tournamentId} canWrite={canWrite} />)}</section>}
-    <StagePeriodSettings tournamentId={tournamentId} plan={view.config} canWrite={canWrite} />
-    {canWrite && <StageStructureEditor key={view.revision} tournamentId={tournamentId} view={view} />}
+    {pool && <StagePoolAssignment key={`assignment:${pool.key}:${view.revision}`} pool={pool} view={view} canWrite={canWrite && !api.view.isError} canAssign={editable && !api.view.isError} canOverride={canOverride} onRename={names => api.rename.mutateAsync({ ...names, poolKey: pool.key, expectedRevision: view.revision })} onSave={registrationIds => api.assign.mutateAsync({ ...registrationIds, poolKey: pool.key, expectedRevision: view.revision, sourceVersion: pool.sourceVersion })} />}
+    </div>
+    {compactNavigation && panel === 'settings' && <label className="block tm-text-label">관리할 편성<select className={stageControl} value={pool?.key ?? ''} onChange={e => setKey(e.target.value)}>{view.config.stages.map(s => <optgroup key={s.key} label={s.name}>{s.pools.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</optgroup>)}</select></label>}
+    <div hidden={compactNavigation && panel !== 'settings'} className="space-y-4">
+    {editable && pool?.generated && bracket.data && <StageFixtureRepair key={`repair:${pool.key}:${view.revision}`} tournamentId={tournamentId} view={view} pool={pool} fixtures={bracket.data.fixtures} />}
+    {pool?.sixTeamFinalBye && <StageSixTeamControl key={`six:${pool.key}:${view.revision}`} tournamentId={tournamentId} view={view} pool={pool} canWrite={editable} />}
+    <StagePeriodSettings tournamentId={tournamentId} plan={view.config} canWrite={editable} />
+    </div>
+    {editable && <div hidden={compactNavigation && panel !== 'structure'}><StageStructureEditor key={view.revision} tournamentId={tournamentId} view={view} /></div>}
     {ConfirmModal}
   </div>;
 }
-function StagePoolAssignment({ pool, view, canWrite, canOverride, onRename, onSave }: { pool: StagePoolView; view: StagePlanView; canWrite: boolean; canOverride: boolean; onRename: (names: { name: string; stageName: string }) => Promise<unknown>; onSave: (input: { registrationIds: Array<string | null>; reason?: string; acknowledgeStartedCorrection?: boolean; draft?: boolean; overrideCandidates?: boolean }) => Promise<unknown> }) {
+function StagePoolAssignment({ pool, view, canWrite, canAssign, canOverride, onRename, onSave }: { pool: StagePoolView; view: StagePlanView; canWrite: boolean; canAssign: boolean; canOverride: boolean; onRename: (names: { name: string; stageName: string; overallRankStart?: number | null }) => Promise<unknown>; onSave: (input: { registrationIds: Array<string | null>; reason?: string; acknowledgeStartedCorrection?: boolean; draft?: boolean; overrideCandidates?: boolean }) => Promise<unknown> }) {
   const [ids, setIds] = useState(() => Array.from({ length: pool.capacity }, (_, i) => pool.registrationIds[i] ?? ''));
   const [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false);
   const [name, setName] = useState(pool.name), [stageName, setStageName] = useState(pool.stageName), [override, setOverride] = useState(false);
+  const [rankStart, setRankStart] = useState(pool.overallRankStart === undefined ? '' : String(pool.overallRankStart));
+  const finalStage = pool.stageIndex === view.config.stages.length - 1;
+  const rankChanged = rankStart !== (pool.overallRankStart === undefined ? '' : String(pool.overallRankStart));
+  const rankInvalid = rankStart !== '' && (!Number.isInteger(Number(rankStart)) || Number(rankStart) < 1 || Number(rankStart) > stagePlanCounts(view.config).teams);
   const { confirm, ConfirmModal } = useConfirm();
-  const disabled = !canWrite || !pool.generated || pool.started || busy;
+  const disabled = !canAssign || !pool.generated || pool.started || busy;
   const others = new Set(view.pools.filter(p => p.stageKey === pool.stageKey && p.key !== pool.key).flatMap(p => p.registrationIds));
   const teamName = (id: string) => view.registrations.find(r => r.id === id)?.team.name ?? '확정 명단에 없는 팀';
   const ready = ids.every(Boolean) && new Set(ids).size === pool.capacity;
@@ -77,7 +85,7 @@ function StagePoolAssignment({ pool, view, canWrite, canOverride, onRename, onSa
     try { setBusy(true); setError(''); await onSave({ registrationIds: ids.map(id => id || null), reason, draft: true, ...(override ? { overrideCandidates: true } : {}) }); } catch (e) { setError(extractErrorMessage(e, '배정 초안을 저장하지 못했어요.')); } finally { setBusy(false); }
   }
   async function saveNames() {
-    try { setBusy(true); setError(''); await onRename({ name, stageName }); } catch (e) { setError(extractErrorMessage(e, '이름을 저장하지 못했어요.')); } finally { setBusy(false); }
+    try { setBusy(true); setError(''); await onRename({ name, stageName, ...(finalStage ? { overallRankStart: rankStart === '' ? null : Number(rankStart) } : {}) }); } catch (e) { setError(extractErrorMessage(e, '표시 설정을 저장하지 못했어요.')); } finally { setBusy(false); }
   }
   async function acknowledgeCorrection() {
     if (!reason.trim() || !await confirm({ title: '현재 참가팀을 유지하고 정정 영향을 확인할까요?', message: '이미 시작한 편성의 참가팀과 경기 기록을 유지해요. 이전 단계의 변경된 공식 결과를 확인한 사유를 감사 기록에 남겨요.', confirmLabel: '참가팀 유지 확인' })) return;
@@ -85,14 +93,16 @@ function StagePoolAssignment({ pool, view, canWrite, canOverride, onRename, onSa
   }
   return <section className="space-y-4">
     <SectionTitle title={`${pool.stageName} · ${pool.name}`} />
-    {canWrite && <div className="grid gap-3 sm:grid-cols-2"><label className="tm-text-label">단계 이름<input className={stageControl} value={stageName} maxLength={60} disabled={busy} onChange={e => setStageName(e.target.value)} /></label><label className="tm-text-label">편성 이름<input className={stageControl} value={name} maxLength={60} disabled={busy} onChange={e => setName(e.target.value)} /></label><Button variant="neutral" disabled={busy || !name.trim() || !stageName.trim() || name === pool.name && stageName === pool.stageName} onClick={() => void saveNames()}>이름 저장</Button></div>}
+    {canWrite && <div className="grid gap-3 sm:grid-cols-2"><label className="tm-text-label">단계 이름<input className={stageControl} value={stageName} maxLength={60} disabled={busy} onChange={e => setStageName(e.target.value)} /></label><label className="tm-text-label">편성 이름<input className={stageControl} value={name} maxLength={60} disabled={busy} onChange={e => setName(e.target.value)} /></label>
+      {finalStage && <label className="tm-text-label">전체 순위 시작 번호<input className={stageControl} type="number" min={1} max={stagePlanCounts(view.config).teams} value={rankStart} disabled={busy} onChange={event => setRankStart(event.target.value)} /><span className="tm-text-caption text-[var(--text-muted)]">비워 두면 이 편성의 순위만 표시해요.</span></label>}
+      <Button variant="neutral" disabled={busy || !name.trim() || !stageName.trim() || rankInvalid || name === pool.name && stageName === pool.stageName && !rankChanged} onClick={() => void saveNames()}>표시 설정 저장</Button></div>}
     {pool.stale && <AlertBanner tone="warning" message="배정 이후 이전 단계 결과나 참가팀이 바뀌었어요. 시작 전이라면 공식 순위로 추천하고 다시 확정해 주세요. 이미 시작했다면 현재 참가팀을 유지하는 사유를 남겨 정정 영향을 확인해 주세요." />}
     {!pool.generated && <p className="tm-text-label">단계별 대진을 생성한 뒤 참가팀을 배정해요.</p>}
     {pool.started && <p className="tm-text-label">시작했거나 기록이 있는 편성이에요. 참가팀 배정은 고정돼요.</p>}
     {pool.stageIndex > 0 && <p className="tm-text-label">이전 단계의 공식 결과가 모두 반영돼야 추천할 수 있어요. 동률 자리는 후보 중에서 결정하고 사유를 남겨요.</p>}
     {error && <AlertBanner tone="error" message={error} />}{saved && <p role="status">참가팀을 확정했어요.</p>}
-    {canWrite && pool.started && pool.stale && pool.assigned && pool.stageIndex > 0 && <div className="space-y-3"><label className="block tm-text-label">참가팀 유지 사유<textarea className={stageControl} maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><Button variant="neutral" disabled={busy || !reason.trim() || pool.candidates.some(c => !c.length)} onClick={() => void acknowledgeCorrection()}>현재 참가팀 유지 · 정정 확인</Button></div>}
-    <fieldset disabled={disabled} className="space-y-3 min-w-0">
+    {canAssign && pool.started && pool.stale && pool.assigned && pool.stageIndex > 0 && <div className="space-y-3"><label className="block tm-text-label">참가팀 유지 사유<textarea className={stageControl} maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><Button variant="neutral" disabled={busy || !reason.trim() || pool.candidates.some(c => !c.length)} onClick={() => void acknowledgeCorrection()}>현재 참가팀 유지 · 정정 확인</Button></div>}
+    <fieldset disabled={disabled} className="grid min-w-0 gap-3 sm:grid-cols-2 [&>button]:sm:col-span-2 [&>div]:sm:col-span-2">
       {canOverride && pool.stageIndex > 0 && <label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={override} onChange={e => setOverride(e.target.checked)} />공식 후보 밖 예외 배정 · 사유 필수</label>}
       {pool.stageIndex > 0 && <Button variant="neutral" disabled={pool.candidates.some(c => !c.length)} onClick={() => setIds(pool.candidates.map(c => c.length === 1 ? c[0] : ''))}>공식 순위로 추천 배정</Button>}
       {ids.map((id, index) => {
@@ -104,19 +114,7 @@ function StagePoolAssignment({ pool, view, canWrite, canOverride, onRename, onSa
         </select></label>;
       })}
       {(override || pool.candidates.some(c => c.length > 1)) && <label className="block tm-text-label">{override ? '예외 배정 사유' : '동률 결정 사유'}<textarea className={stageControl} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} /></label>}
-      {canWrite && <div className="flex flex-wrap gap-2"><Button variant="neutral" disabled={!pool.generated || pool.started || busy || override && !reason.trim()} onClick={() => void saveDraft()}>미정 자리 포함 초안 저장</Button><Button variant="primary" disabled={!ready || !pool.generated || pool.started || busy || (override || pool.candidates.some(c => c.length > 1)) && !reason.trim()} onClick={() => void save()}>{busy ? '확정 중…' : '이 편성 참가팀 확정'}</Button></div>}
+      {canAssign && <div className="flex flex-wrap gap-2"><Button variant="neutral" disabled={!pool.generated || pool.started || busy || override && !reason.trim()} onClick={() => void saveDraft()}>미정 자리 포함 초안 저장</Button><Button variant="primary" disabled={!ready || !pool.generated || pool.started || busy || (override || pool.candidates.some(c => c.length > 1)) && !reason.trim()} onClick={() => void save()}>{busy ? '확정 중…' : '이 편성 참가팀 확정'}</Button></div>}
     </fieldset>{ConfirmModal}
   </section>;
-}
-function StageFixtureSchedule({ fixture, tournamentId, canWrite }: { fixture: V1AdminBracketFixture; tournamentId: string; canWrite: boolean }) {
-  const { v1Patch } = useV1DataSource(), client = useQueryClient();
-  const [date, setDate] = useState(isoToKstDatetimeLocal(fixture.scheduledAt)), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  async function save() {
-    try { setBusy(true); setError(''); await v1Patch(`/admin/fixtures/${encodeURIComponent(fixture.id)}`, { scheduledAt: date ? kstDatetimeLocalToIso(date) : null }); await client.invalidateQueries({ predicate: q => q.queryKey.some(k => k === tournamentId) }); } catch (e) { setError(extractErrorMessage(e, '일정을 저장하지 못했어요.')); } finally { setBusy(false); }
-  }
-  return <div className="space-y-2 rounded-xl bg-[var(--surface-soft)] p-4">
-    <p className="tm-text-label">{fixture.fixtureNumber}경기 · {fixture.homeTeamName ?? '진출팀 미정'} vs {fixture.awayTeamName ?? '진출팀 미정'}</p>
-    <div className="flex flex-wrap items-end gap-2"><label className="min-w-0 flex-1 tm-text-label">경기 시작 · 한국 시간<input type="datetime-local" className={stageControl} value={date} disabled={!canWrite || busy} onChange={e => setDate(e.target.value)} /></label>{canWrite && <Button variant="neutral" disabled={busy} onClick={() => void save()}>일정 저장</Button>}</div>
-    {error && <AlertBanner tone="error" message={error} />}
-  </div>;
 }

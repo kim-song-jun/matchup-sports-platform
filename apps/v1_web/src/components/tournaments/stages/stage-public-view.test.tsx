@@ -12,7 +12,7 @@ describe('공개 단계별 순위 범위', () => {
     render(<StagePublicView tournament={{ id: 't', status: 'completed', stagePlan: plan, groups: [group('pre', 'pre-0', 'preliminary', 9), group('main', 'main-0', 'main', 12)], fixtures: [] } as unknown as V1TournamentDetail} />);
     expect(screen.getByRole('table', { name: '본선 1위 리그 순위표' })).toHaveTextContent('12');
     expect(screen.queryByRole('table', { name: '예선 A조 순위표' })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: '진행 단계' }), { target: { value: 'preliminary' } });
+    fireEvent.click(screen.getByRole('button', { name: '예선' }));
     expect(screen.getByRole('table', { name: '예선 A조 순위표' })).toHaveTextContent('9');
     expect(new URLSearchParams(window.location.search).get('stage')).toBe('preliminary');
     window.history.replaceState(null, '', '/');
@@ -23,7 +23,7 @@ describe('공개 단계별 순위 범위', () => {
     render(<StagePublicView tournament={{ id: 't', stagePlan: plan, groups: [group('pre', 'pre-0', 'preliminary', 9), group('main', 'main-0', 'main', 0)], fixtures: [], tieBreakOrder: [] } as unknown as V1TournamentDetail} />);
     expect(screen.getByRole('table', { name: '예선 A조 순위표' })).toHaveTextContent('9');
     expect(screen.queryByRole('table', { name: '본선 1위 리그 순위표' })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: '진행 단계' }), { target: { value: 'main' } });
+    fireEvent.click(screen.getByRole('button', { name: '본선' }));
     expect(screen.getByRole('table', { name: '본선 1위 리그 순위표' })).toHaveTextContent('0');
     expect(screen.queryByRole('table', { name: '예선 A조 순위표' })).not.toBeInTheDocument();
   });
@@ -38,7 +38,7 @@ describe('공개 단계별 순위 범위', () => {
     } as unknown as V1TournamentDetail} />);
     expect(screen.getByRole('table', { name: '예선 A조 순위표' })).toHaveTextContent('동일팀');
     expect(screen.queryByText(/규정이에요|동점이면/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: '진행 단계' }), { target: { value: 'main' } });
+    fireEvent.click(screen.getByRole('button', { name: '본선' }));
     expect(screen.getByRole('table', { name: '본선 1위 리그 순위표' })).toHaveTextContent('동일팀');
     expect(screen.queryByText(/규정이에요|동점이면/)).not.toBeInTheDocument();
   });

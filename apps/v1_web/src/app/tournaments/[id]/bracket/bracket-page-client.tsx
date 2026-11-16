@@ -537,7 +537,15 @@ export function BracketScheduleTab({
 
 /* ── 메인 콘텐츠 ── */
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
-  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyBracketPageContent tournament={tournament} />;
+  return tournament.stagePlan ? <div className="tm-tourn-sub-page flex min-h-full min-w-0 flex-col pb-4">
+    <header className="tm-bracket-page-intro"><div>
+      <h1 className="sr-only">{tournament.title} 순위·대진표</h1><h2>{tournament.title}</h2>
+      <p>단계를 선택해 경기 일정과 편성별 순위를 확인해요.</p>
+    </div><span className="tm-bracket-page-format">{tournament.stagePlan.stages.length}단계 대회</span></header>
+    <div className="tm-tourn-sub-header"><TournamentProgressStepper stages={buildTournamentStages(tournament)} /></div>
+    <div className="min-w-0 flex-1 px-5 py-4"><StagePublicView tournament={tournament} mode="bracket" /></div>
+    <TournamentFlowNav prev={{ href: `/tournaments/${tournament.id}`, label: '대회 상세' }} next={{ href: `/tournaments/${tournament.id}/results`, label: '최종 결과', enabled: tournament.status === 'completed', disabledHint: '대회 종료 후 공개' }} />
+  </div> : <LegacyBracketPageContent tournament={tournament} />;
 }
 function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;

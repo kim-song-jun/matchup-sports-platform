@@ -1,6 +1,6 @@
 'use client';
 import { FixtureAssignmentWorkspace } from '@/components/admin/bracket-canvas/fixture-assignment-workspace';
-import { StagePlanManager } from '@/components/admin/stages/stage-plan-manager';
+import { StagePlanToolbar } from '@/components/admin/stages/stage-plan-toolbar';
 import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
@@ -61,7 +61,7 @@ function BracketPageBody() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const assignmentToolbar = tournament?.stagePlan ? <StagePlanManager tournamentId={tournamentId} canWrite={canWrite} canOverride={role === 'PLATFORM_OPS'} showSchedules={false} /> : (tournament?.format === 'league_knockouts' && canWrite ? <>
+  const assignmentToolbar = tournament?.stagePlan ? <StagePlanToolbar tournamentId={tournamentId} tournamentStatus={tournament.status} canWrite={canWrite} canOverride={role === 'PLATFORM_OPS'} /> : (tournament?.format === 'league_knockouts' && canWrite ? <>
         <div className="contents">
           <Button variant="primary" onClick={() => { setMultiFinalsMode('create'); setMultiFinalsOpen(true); }}>예선·토너먼트 대진 생성</Button>
           <Button variant="neutral" onClick={() => { setMultiFinalsMode('rules'); setMultiFinalsOpen(true); }}>토너먼트 배정 규칙</Button>

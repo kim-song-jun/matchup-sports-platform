@@ -241,7 +241,7 @@ export function BracketTab({
   };
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
-  const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
+  const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled' || tournamentFormat === 'league_knockouts';
   const slotSideLocked = (side: 'HOME' | 'AWAY') => editFixtureAccess === 'started' && editFixture !== null && (side === 'HOME' ? editFixture.homeSlotId : editFixture.awaySlotId) !== null;
 
   function openFixtureEditor(fixture: V1AdminBracketFixture) {
@@ -1003,7 +1003,7 @@ export function BracketTab({
                       그대로 두고, 서버가 409 FIXTURE_NOT_DELETABLE 로 **무엇이 막는지** 알려
                       주면 그 문구를 아래 onError 가 토스트로 그대로 보여 준다. 예전에는 같은
                       클릭이 매핑 없는 500("서버 오류")으로 끝났다. */}
-                  {!f.result && (
+                  {!f.result && !groups.some(group => group.id === f.groupId && group.bracketTrack?.startsWith('stage:')) && (
                     <button
                       type="button"
                       onClick={() => void handleDeleteFixture(f)}

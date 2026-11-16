@@ -183,3 +183,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 회원 대진표 조회는 관리자 세션을 유지하는 별도 `/admin/users/:id/bracket-preview` 계약이며 회원 세션을 발급하지 않는다. 상세는 [관리자·운영 계약](domains/admin-and-ops.md)의 회원 대진표 조회 절을 따른다.
 
 - Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).
+
+단계형 대회의 자동 진출·초안/예외 배정·편성/경기 복구·단계별 경기 시간·교차 시드/6강/3위전·명시적 전체 순위는 [단계형 운영 확장 계약](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)을 따른다. 개인 기록의 stageKey/poolKey 필터는 [기록 계약](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)을 따른다.

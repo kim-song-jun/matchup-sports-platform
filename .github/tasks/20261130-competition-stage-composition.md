@@ -1,6 +1,6 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: In Progress — 구현·로컬 검증 완료, PR #2285 CI/리뷰·Alpha QA 대기
+Status: In Progress — 동등성40항목 수정·확장 및 실제 DB/회귀 검증, dev PR 준비; Alpha 시각 QA 미완료
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
@@ -207,6 +207,9 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 | 기존 대회 전환 | 자동 전환 없음, 시작 전 명시적 전환만 검토 | 호환 설계 확정 전 |
 
 ## Progress Snapshot
+- 2026-11-16 사용자 `싹 다 수정해서 PR` 승인. 구현 브랜치 `fix/stage-competition-parity-20261116` (origin/dev 1acdeb40a), 기존 QA worktree 재사용. 40개 감사 계약을 전체 수정·회귀 범위로 고정하고 토너먼트 전용 격차도 임의 제외하지 않는다. Wave1 공개/표시정보/편집 연결 진행중; Wave2 진출/알림/시간/정정 pending; Wave3 특수대진/전체순위·기록/권한·예외검증/문서·devPR pending. 기존 순차 편집 A안과 공유 컴포넌트 재사용, 기존70경기 Alpha 대회 보존. 이번 요청은 PR 생성까지이며 운영main 승격은 하지 않는다.
+- 2026-11-16 사용자 요청 후속 동등성 감사: 운영 계약40개 정적 비교40/40. 유지16/기능 격차19/추가 확장1/예외·권한·시각 미검증4로 구분. Alpha 무변경 PATCH로 경기 제목·사이드 라벨·조 이름의 STAGE_MANAGEMENT_REQUIRED409 3/3 재현. 공개 UI 누락·진출 알림·시간 단계 의미·결과 첫 선택·징계 순서 등 상세는 scenario의 동일 날짜 동등성 감사 표 참조. 앱 소스 수정·새 배포 없음, 완료 대회70경기 결과 보존.
+- 2026-11-16 사용자 지정 S2 Alpha 실측: 새 sm20팀×7명(140계정), 팀장 실제 신청·접수20/20, 예선30+본선40 Game 공식결과70/70, 대회completed, 팀당7경기·본선0점 시작·경기ID보존·공개 누적70골 확인. 대회 `ee1675e5-264e-43ec-9a36-bd2f0a3099d9`. 완전자동 진출은 assigned=false로 미지원(정확한 순위 후보 추천 후4편성 확정). 결과/시상HTTP200와 시상1~3위 서버HTML 확인; 브라우저host불가/앱승인timeout으로3폭·클릭·console/network 미검증. 전체 QA 완료로 재분류하지 않는다. 상세·fixture 방식·cleanup은 [시나리오](../../docs/scenarios/competition-stage-composition.md)와 비밀값 없는 evidence JSON 참조.
 - Phase A/B 구현 완료: 별도 생성 경로, versioned stagePlan, 단계/편성별 경기·슬롯, 공식 순위 기반 배정, 운영·공개·시상 연결.
 - 기존 stagePlan=null 대회는 기존 경로와 응답 모양을 유지하며 자동 전환하지 않는다.
 - 검증: 실제 PostgreSQL 전체 migration replay 및 schema diff 0; 실제 DB 통합 5건 PASS(20팀70경기, 3단계 혼합, 단일 리그/KO, 생성·수정·종료 제약); API typecheck PASS.
@@ -224,3 +227,12 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - Phase B completed: 새 생성 진입/편집·운영·공개 조회 연결, 공유 계약 동기화.
 - Phase C in_progress: 실제 DB·단위/UI/기존 회귀·typecheck, PR/CI/리뷰·Alpha QA·문서/정리.
 - 구조 저장은 기존 multiFinals와 독립인 versioned stagePlan으로 한다. 기존 그룹에는 stageKey/poolKey를 추가하고, 경기 정본은 그대로 재사용한다. 기존 행의 stagePlan=null/entryScope=legacy는 동작을 유지한다.
+
+## 2026-11-16 동등성 수정 Progress Snapshot
+- 최종 로컬 검증: 실제DB15건+실제worker1건 PASS, 6강 종료 후 정정 완료 판정 RED1→GREEN1, API/Web 타입·surface/pattern PASS, Web 최종4 suites65건 PASS. 상세와 이전 회귀 실행은 시나리오 최종 검증 기록 참조. 구현 커밋과 dev PR 생성 단계이며 Alpha 시각0/3 차단은 유지한다.
+- 범위: 감사40/40. 기존16 유지, 수정/확장22, 권한·경쟁1, 시각 차단1을 동일 시나리오에 추적한다.
+- 브랜치: fix/stage-competition-parity-20261116, 최신 origin/dev 1acdeb40a 기준. 원격 main은 dev보다156커밋 뒤이며 main 전용 커밋0. 승격·main 쓰기 없음.
+- 구현: 기존 작업공간/공개/표시 편집, 초안·무작위·예외 배정·진출 알림·durable 자동 진출, 단계별 시간·의존 일정·징계 순서, 미시작 편성 교체·경기 복구,3위전·12강·와일드카드·6강, 전체 순위·우승/시상·개인 기록 범위 반영.
+- 검증: 격리 PostgreSQL16/LF241 migration 재생, 원래 Alpha20팀70경기 증거 보존, 새 실제DB/단위/UI/타입/surface 검증. 최신 세부 결과는 시나리오의 동등성 전체 수정 cursor 및 최종 검증 기록 참조.
+- 남은 gate: dev PR/최신 head CI·Copilot, 머지 후 Alpha 배포·390/768/1440 갤러리·console/network/focus. 브라우저 host unavailable 재확인,0/3폭을 통과로 표시하지 않는다.
+- 소유 자원: 작업 전용 DB 컨테이너·clone·임시 의존성/스크립트만 정리한다. 미병합 worktree와 사용자가 요청한 Alpha 테스트 팀/계정/대회는 보존한다.

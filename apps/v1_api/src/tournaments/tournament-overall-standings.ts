@@ -6,6 +6,7 @@ import {
   type StandingFixture,
 } from './competition-config/competition-config';
 import { standingsFixturesFromGroup, type StandingsSourceGroup } from './tournament-group-standings';
+import { recalculateStageOverallStandingsInTx } from './stages/stage-overall-standings';
 
 /**
  * 여러 조를 하나의 통합 순위 입력으로 합친다.
@@ -46,7 +47,7 @@ export async function recalculateAndUpsertOverallStandings(
   recalculatedAt: Date,
 ): Promise<CalculatedStanding[]> {
   // Independent stages have independent standings; their points cannot define an overall rank.
-  if (params.groups.some(group => group.stageKey)) return [];
+  if (params.groups.some(group => group.stageKey)) return recalculateStageOverallStandingsInTx(tx, params.tournamentId, params.config, recalculatedAt);
   const { registrationIds, fixtures } = overallStandingsInput(params.groups);
 
   // F4: 더 이상 어느 조에도 속하지 않는 registration(조 배정 해제·조 삭제)의 기존

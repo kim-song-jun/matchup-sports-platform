@@ -220,7 +220,21 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 
 /** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
 function getCompletedTrackChampions(tournament: V1TournamentDetail) {
-  if (tournament.stagePlan) return [];
+  if (tournament.stagePlan) return tournament.stagePlan.stages.at(-1)!.pools.map(pool => {
+    const progress = tournament.stageProgress?.find(row => row.poolKey === pool.key);
+    if (progress && (!progress.complete || progress.stale)) return { track: pool.key, label: pool.name, champion: null };
+    const groups = tournament.groups.filter(group => group.poolKey === pool.key);
+    let champion: string | null = null;
+    if (pool.format === 'league') {
+      const leaders = groups.flatMap(group => group.standings).filter(row => (row.sharedRank ?? row.position) === 1);
+      if (leaders.length) champion = `${leaders.map(row => row.teamName).join(' · ')}${leaders.length > 1 ? ' 공동 우승' : ''}`;
+    } else {
+      const finalIds = new Set(groups.filter(group => group.phase === 'final').map(group => group.id));
+      const fixtures = tournament.fixtures.filter(fixture => finalIds.has(fixture.groupId ?? '') && fixture.status === 'completed').map(fixture => ({ ...fixture, round: 'final' }));
+      champion = getCompletedChampionName({ ...tournament, stagePlan: undefined, fixtures });
+    }
+    return { track: pool.key, label: pool.name, champion };
+  });
   if (isLeagueCompetition(tournament)) return [];
   const tracks = orderedBracketTracks(tournament.groups);
   if (tracks.length < 2) return [];

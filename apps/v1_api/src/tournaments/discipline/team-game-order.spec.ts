@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { readSuspensionVerdicts, readSuspensionVerdictsForUpcomingKeys } from './suspension-verdicts';
-import { loadTeamCompetitionGameOrder, narrowToTeamGames, type CompetitionMatchOrderRow } from './team-game-order';
+import { loadTeamCompetitionGameOrder, narrowToTeamGames, sortByCompetitionStage, type CompetitionMatchOrderRow } from './team-game-order';
 
 // 네 팀 · 다섯 경기(대회 전체 순서). 같은 날 다른 팀 경기가 사이에 낀다.
 //   m1 A-B · m2 C-D · m3 A-C · m4 B-D · m5 A-D
@@ -54,6 +54,15 @@ function fakeTx(rules: { yellowAccumulationLimit: number | null; redCardSuspensi
 }
 
 const RED_ONE = { yellowAccumulationLimit: null, redCardSuspensionMatches: 1 };
+
+describe('staged suspension chronology', () => {
+  it('orders a preliminary knockout before a later league even when the legacy phase order is opposite', () => {
+    const row = (id: string, stageKey: string, phase: string): CompetitionMatchOrderRow => ({ id, hostTeamId: 'A', approvedApplicantTeamId: 'B', game: { id }, tournamentDetails: { round: phase, group: { stageKey, phase } } });
+    const rows = [row('main', 'main', 'group'), row('pre', 'pre', 'final')];
+    expect(sortByCompetitionStage(rows, ['pre', 'main']).map(r => r.id)).toEqual(['pre', 'main']);
+    expect(sortByCompetitionStage(rows).map(r => r.id)).toEqual(['main', 'pre']);
+  });
+});
 
 async function verdictsFor(teamId: string, upcomingKey: string) {
   const tx = fakeTx(RED_ONE);

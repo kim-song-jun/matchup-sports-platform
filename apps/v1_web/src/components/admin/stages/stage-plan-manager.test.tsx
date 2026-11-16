@@ -8,7 +8,7 @@ import type { StagePlanView } from '@/types/stage-plan';
 vi.mock('@/components/v1-ui/confirm-modal', () => ({ useConfirm: () => ({ confirm: async () => true, ConfirmModal: null }) }));
 const base = '*/api/v1/admin/tournaments/staged/stages';
 const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
-const server = setupServer(http.get('*/api/v1/admin/tournaments/staged/bracket', () => success({ groups: [], fixtures: [], standings: [], slots: [] })), http.post('*/api/v1/logs/client-error', () => success({})));
+const server = setupServer(http.get('*/api/v1/admin/tournaments/staged/periods', () => success({ expectedVersion: '2026-11-16T00:00:00Z', periods: [{ code: 'P1', label: '단판', durationMinutes: 20, extraTime: false }], compositionOverrides: [], stageOverrides: [], groupOverrides: [] })), http.get('*/api/v1/admin/tournaments/staged/bracket', () => success({ groups: [], fixtures: [], standings: [], slots: [] })), http.post('*/api/v1/logs/client-error', () => success({})));
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => { cleanup(); server.resetHandlers(); });
@@ -19,6 +19,18 @@ function data(): StagePlanView {
 }
 function show(canWrite = true) { const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }); render(<QueryClientProvider client={client}><StagePlanManager tournamentId="staged" canWrite={canWrite} /></QueryClientProvider>); }
 describe('단계별 참가팀 확정', () => {
+  it('미정 자리를 null로 저장한 초안을 확정 성공으로 표시하지 않는다', async () => {
+    let view = data(), payload: unknown;
+    server.use(http.get(base, () => success(view)), http.put(`${base}/assignment`, async ({ request }) => {
+      payload = await request.json(); view = { ...view, revision: 2, pools: view.pools.map(pool => ({ ...pool, assigned: false, registrationIds: ['r1', null] })) }; return success(view);
+    })); show();
+    fireEvent.change(await screen.findByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });
+    fireEvent.click(screen.getByRole('button', { name: '미정 자리 포함 초안 저장' }));
+    await waitFor(() => expect(payload).toMatchObject({ draft: true, registrationIds: ['r1', null], expectedRevision: 1 }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue('r1'));
+    expect(screen.getByRole('combobox', { name: '2번 자리' })).toHaveValue('');
+    expect(screen.queryByText('참가팀을 확정했어요.')).not.toBeInTheDocument();
+  });
   it('실제 선택·확정 payload를 보내고 서버의 확정 배정으로 갱신한다', async () => {
     let view = data(), payload: unknown;
     server.use(http.get(base, () => success(view)), http.put(`${base}/assignment`, async ({ request }) => {

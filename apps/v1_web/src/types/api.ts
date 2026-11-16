@@ -4403,6 +4403,7 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
+  stageProgress?: Array<{ poolKey: string; assigned: boolean; stale: boolean; complete: boolean; sixTeamBracket?: V1SixTeamBracket }>;
   /** 이어진 이전 시즌(독립 리그의 지난 시즌, 전환한 체계 첫 시즌 티어는 원본 리그 — 공개된 리그만). 대회·옛 응답은 없음. */
   previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;

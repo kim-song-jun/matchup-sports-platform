@@ -9,6 +9,8 @@ import {
   type StandingsSourceGroup,
 } from '../tournaments/tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from '../tournaments/tournament-overall-standings';
+import { recalculateStageOverallStandingsInTx } from '../tournaments/stages/stage-overall-standings';
+import type { StoredStagePlan } from '../tournaments/stages/stage-view';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 type GroupForStandingsRow = StandingsSourceGroup & {
@@ -141,6 +143,7 @@ export class GameResultStandingsProjectionService {
             deletedAt: true,
             competitionConfigVersionId: true,
             competitionConfig: true,
+            stagePlan: true,
           },
         },
       },
@@ -151,7 +154,16 @@ export class GameResultStandingsProjectionService {
         message: 'The canonical tournament group could not be resolved.',
       });
     }
-    if (targetGroup.phase !== 'group') return;
+    const stagePlan = targetGroup.tournament.stagePlan as unknown as StoredStagePlan | null;
+    if (stagePlan && (stagePlan.autoAdvance || stagePlan.stages.some(stage => stage.pools.some(pool => pool.sixTeamFinalBye)))) {
+      // A separate tournament aggregate acquires its own tournament→game locks after
+      // this result projection commits. Do not assign another game's roster here.
+      await tx.v1OutboxEvent.createMany({ data: [{ businessKey: `stage-auto-result:${detail.tournamentId}:${revision.revisionId}`, aggregateType: 'TOURNAMENT', aggregateId: detail.tournamentId, revisionId: revision.revisionId, type: 'STAGE_AUTO_ADVANCE', payload: { tournamentId: detail.tournamentId } }], skipDuplicates: true });
+    }
+    if (targetGroup.phase !== 'group') {
+      if (stagePlan && targetGroup.tournament.competitionConfig) await recalculateStageOverallStandingsInTx(tx, detail.tournamentId, validateCompetitionConfig(targetGroup.tournament.competitionConfig), new Date(), stagePlan);
+      return;
+    }
     const allGroups = await this.loadCanonicalGroups(tx, detail.tournamentId);
     const group = allGroups.find((candidate) => candidate.id === detail.groupId);
     if (group === undefined) {

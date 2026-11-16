@@ -1,0 +1,72 @@
+{
+  "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+  "checks": [
+    {
+      "name": "fixture-title",
+      "status": 409,
+      "code": "STAGE_MANAGEMENT_REQUIRED",
+      "message": "단계형 대회의 편성과 참가팀은 단계별 대진 관리에서 변경해 주세요."
+    },
+    {
+      "name": "side-label",
+      "status": 409,
+      "code": "STAGE_MANAGEMENT_REQUIRED",
+      "message": "단계형 대회의 편성과 참가팀은 단계별 대진 관리에서 변경해 주세요."
+    },
+    {
+      "name": "group-name",
+      "status": 409,
+      "code": "STAGE_MANAGEMENT_REQUIRED",
+      "message": "단계형 대회의 편성과 참가팀은 단계별 대진 관리에서 변경해 주세요."
+    }
+  ],
+  "officialFixtures": 70,
+  "pools": [
+    {
+      "key": "pre0",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "pre1",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "pre2",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "pre3",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "pre4",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "main0",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "main1",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "main2",
+      "complete": true,
+      "stale": false
+    },
+    {
+      "key": "main3",
+      "complete": true,
+      "stale": false
+    }
+  ],
+  "overallStandings": null
+}

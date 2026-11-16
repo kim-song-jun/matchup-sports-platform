@@ -128,6 +128,7 @@ export function BracketCanvasWorkspace({
 
   const showStandings = leagueGrid && standingsGroups.length > 0;
   const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
+  const staged = bracket.groups.some(group => group.bracketTrack?.startsWith('stage:'));
   const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
   const confirmedTeams = registrations.filter((registration) => registration.status === 'confirmed');
   const placedIds = new Set(bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
@@ -244,7 +245,7 @@ export function BracketCanvasWorkspace({
   const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && (slot.kind === 'BYE' || slot.byeSortOrder != null));
   const selectFixture = (id: string) => { setSelectedByeSlotId(null); setSelectedFixtureId(id); };
   const selectBye = (slotId: string) => { const fixture = bracket.fixtures.find(f => f.homeSlotId === slotId || f.awaySlotId === slotId); if (fixture) { setSelectedByeSlotId(slotId); setSelectedFixtureId(fixture.id); } };
-  const panel = selectedBye && selectedFixture ? <ByeSlotEditor key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :
+  const panel = selectedBye && selectedFixture ? <ByeSlotEditor key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite && !staged} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :
     selectedFixture !== null && selectedLabels !== null ? (
       <BracketNodePanel
         key={selectedFixture.id}
@@ -282,7 +283,7 @@ export function BracketCanvasWorkspace({
                 템플릿으로 다시 만들기
               </Button>
             ) : null}
-            {!isEmpty ? (
+            {!isEmpty && format !== 'league_knockouts' ? (
               <Button
                 variant="outline"
                 size="md"
@@ -383,7 +384,7 @@ export function BracketCanvasWorkspace({
             slots={bracket.slots}
             directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
             pendingRegistrationId={pendingRegistrationId}
-            canWrite={canWrite}
+            canWrite={canWrite && !staged}
             collapsible={leagueGrid || !sidePanel}
             onPick={setPendingRegistrationId}
           />
@@ -408,8 +409,8 @@ export function BracketCanvasWorkspace({
                 fixtures={bracket.fixtures}
                 slots={bracket.slots}
                 selectedFixtureId={selectedFixture?.id ?? null}
-                pendingRegistrationId={canWrite ? pendingRegistrationId : null}
-                canWrite={canWrite}
+                pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
+                canWrite={canWrite && !staged}
                 onSelectFixture={selectFixture}
                 onAssignSlot={handleAssign}
                 onAssignDirect={handleAssignDirect}
@@ -423,8 +424,8 @@ export function BracketCanvasWorkspace({
               fixtures={bracket.fixtures}
               slots={bracket.slots}
               selectedFixtureId={selectedFixture?.id ?? null}
-              pendingRegistrationId={canWrite ? pendingRegistrationId : null}
-              canWrite={canWrite}
+              pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
+              canWrite={canWrite && !staged}
               onSelectFixture={selectFixture} onSelectBye={selectBye}
               onAssignSlot={handleAssign}
               onAssignDirect={handleAssignDirect}

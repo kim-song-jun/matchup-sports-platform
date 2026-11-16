@@ -1,0 +1,3347 @@
+{
+  "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+  "enrollments": [
+    {
+      "teamNo": 1,
+      "teamId": "f9d991ef-8d17-417d-8a3c-b385ebd41aeb",
+      "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 2,
+      "teamId": "cb21b10c-0d5f-4248-8a58-ead6b4c6f6b5",
+      "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 3,
+      "teamId": "2c7902f3-3eb3-4eb9-8ef1-524f992146e4",
+      "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 4,
+      "teamId": "d4fdb342-54b8-40af-8c2f-ce5fd6ac15a8",
+      "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 5,
+      "teamId": "847f57e5-c248-4ed3-8b69-64d1d90a8d9c",
+      "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 6,
+      "teamId": "0f8849c3-a4bb-4cb1-84c3-1555d6a392df",
+      "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 7,
+      "teamId": "0b1ec846-fdaa-4adf-8cd2-0e5a892f928d",
+      "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 8,
+      "teamId": "a156bdcd-bfa0-4d5c-82ef-463205831216",
+      "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 9,
+      "teamId": "eba171a4-c790-49ab-8ea6-d5dced4db088",
+      "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 10,
+      "teamId": "95ec5919-afa5-45e6-8b13-5cba19706eeb",
+      "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 11,
+      "teamId": "45bb9ffe-231f-49f8-8aee-7b6979a84126",
+      "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 12,
+      "teamId": "6da43c1e-bd42-4293-8463-113c9a5aafb2",
+      "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 13,
+      "teamId": "653552fa-5c87-4b75-813d-1d8b8abec950",
+      "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 14,
+      "teamId": "27ab4b33-782a-454a-8f13-cc9c06a62b06",
+      "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 15,
+      "teamId": "740e39de-b93c-4ea7-89a5-cf363c44ffc4",
+      "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 16,
+      "teamId": "b46104dd-4ebe-4acb-8982-42cb54e04cad",
+      "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 17,
+      "teamId": "8ff3c428-8d38-407c-8916-35661acdcd8f",
+      "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 18,
+      "teamId": "6232d595-a593-4e92-8aa8-fcd87375f8a3",
+      "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 19,
+      "teamId": "e08fbca1-d7b8-4e8f-8bfd-21593a9e725f",
+      "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+      "status": "confirmed",
+      "playerCount": 7
+    },
+    {
+      "teamNo": 20,
+      "teamId": "b017d88e-6d60-4334-8eb6-bf8c2e569917",
+      "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+      "status": "confirmed",
+      "playerCount": 7
+    }
+  ],
+  "games": [
+    {
+      "fixtureId": "faa4b746-a6e5-5c45-8919-e688005b4306",
+      "gameId": "0d88b3e2-e868-4a3f-80b3-987ea0cad1b2",
+      "officialRevisionId": "dfb6b18c-1de9-49f5-b798-a6b91b162ca3",
+      "homeTeamNo": 1,
+      "awayTeamNo": 4,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "5768809e-b1a4-5a1a-8b7d-3d7a15ee874e",
+      "gameId": "56874a14-af23-4ad1-a25a-3654e525c032",
+      "officialRevisionId": "792b5086-22fc-415f-84d0-d1b7d9bf1b4f",
+      "homeTeamNo": 2,
+      "awayTeamNo": 3,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "08c108f3-d9ef-55d4-8d9d-39dfbb5ffe93",
+      "gameId": "28289f39-b146-49f1-91c5-b79041de906c",
+      "officialRevisionId": "31624f7d-aea6-45c8-ada0-7d48df62d65a",
+      "homeTeamNo": 3,
+      "awayTeamNo": 1,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "492133d0-1700-5e43-9775-551fce10c7eb",
+      "gameId": "8769f3bc-8367-4bc5-a823-b57c006016cc",
+      "officialRevisionId": "66a069d3-9c4a-49c2-95f9-9d35dcd0b7eb",
+      "homeTeamNo": 4,
+      "awayTeamNo": 2,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "fee3e09d-2910-554c-9e9e-1255acab93f9",
+      "gameId": "b1f13f42-89f4-47c3-9187-39e883690a40",
+      "officialRevisionId": "8147ec19-f713-4e2c-b591-6dd3c29565c1",
+      "homeTeamNo": 1,
+      "awayTeamNo": 2,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "d52be6ab-f0cd-59c1-9f7f-804166305a78",
+      "gameId": "a2abf7d9-2f3e-4493-9976-4cb9ea662923",
+      "officialRevisionId": "e64c39b4-b1e1-446f-a67b-88fdcee263d0",
+      "homeTeamNo": 3,
+      "awayTeamNo": 4,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "c6f62c5f-607e-56d8-b719-052b8aa05ecf",
+      "gameId": "c9966d33-78bf-45c6-a362-e8a7b15c624c",
+      "officialRevisionId": "dbba684a-7db2-4ced-82ec-284491028669",
+      "homeTeamNo": 5,
+      "awayTeamNo": 8,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "2866095d-8b10-570e-b960-8db55befccba",
+      "gameId": "8c94826f-162a-40c9-817c-82c87d0ca6fe",
+      "officialRevisionId": "84c76923-09bf-474f-9476-18105d13fd6a",
+      "homeTeamNo": 6,
+      "awayTeamNo": 7,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "417d9304-e0d6-512b-8ed4-a285a4c7a974",
+      "gameId": "c4eb857b-807b-4ca4-9a66-df8c8a1b8028",
+      "officialRevisionId": "a2935c3a-a800-43ae-a5a0-5d7b74a7e44b",
+      "homeTeamNo": 7,
+      "awayTeamNo": 5,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "7476dce9-72a6-56fd-9211-76400f001b5d",
+      "gameId": "9cf13f52-fc95-4653-82e2-9328bad9a37c",
+      "officialRevisionId": "e727c821-fed6-4f76-9c1e-05238dbaf3e3",
+      "homeTeamNo": 8,
+      "awayTeamNo": 6,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "669ecfc1-b581-51a4-9ed2-a179321776c9",
+      "gameId": "b6ce0a4f-257d-4a86-9afb-9d093fc4b987",
+      "officialRevisionId": "1ecc60b8-7089-40cd-a0ef-13d30350f052",
+      "homeTeamNo": 5,
+      "awayTeamNo": 6,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "8fd3f756-76d2-55bd-bf2e-5dd13103192a",
+      "gameId": "c51b709f-6cf3-4f7e-8c62-997272a1532e",
+      "officialRevisionId": "2b07664e-ae2e-4199-ba72-2e530a360cb8",
+      "homeTeamNo": 7,
+      "awayTeamNo": 8,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "467b0ca2-db5c-578b-93f0-697cf444fc8c",
+      "gameId": "9446fdb8-a40d-49c1-b9aa-85c8cd0048ad",
+      "officialRevisionId": "4ffb824b-80d1-42d4-b1bb-90d4537d7b80",
+      "homeTeamNo": 9,
+      "awayTeamNo": 12,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "5d8d82a6-db9d-5fa2-a0e9-9c1aed3be53f",
+      "gameId": "3481eebc-9e2d-43ec-8493-7718560266a6",
+      "officialRevisionId": "2d0b09ea-9c75-444a-8dae-5e152bedad10",
+      "homeTeamNo": 10,
+      "awayTeamNo": 11,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "7728c82f-0d4f-5bb9-8ad3-90cffb22e1de",
+      "gameId": "8cef67e7-6765-4b50-88a8-09fa7fe0007f",
+      "officialRevisionId": "ac568300-b7bc-47d5-b92c-4459e4be6009",
+      "homeTeamNo": 11,
+      "awayTeamNo": 9,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "5b1012e0-e241-50f0-874b-510975edcb80",
+      "gameId": "ad326c74-2544-4108-aa4e-681a4adf172b",
+      "officialRevisionId": "6b4da9bf-add7-43e5-abad-881246106f55",
+      "homeTeamNo": 12,
+      "awayTeamNo": 10,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "cab8b35b-d13b-587d-92c6-4209557ecd38",
+      "gameId": "4523637a-0e15-48be-a789-ebb7a9c9bf25",
+      "officialRevisionId": "f0f42250-a6ca-4665-8fe2-c8e7efa2addd",
+      "homeTeamNo": 9,
+      "awayTeamNo": 10,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "4cd2ebe3-63ab-5708-aaae-4fe89b03c4b0",
+      "gameId": "c1427339-e676-4914-ad44-d5211b44fcec",
+      "officialRevisionId": "56e1cd0f-7f76-4011-9a95-e3bf551a6d92",
+      "homeTeamNo": 11,
+      "awayTeamNo": 12,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "193035e0-cb9a-5996-9964-cf1582c1c494",
+      "gameId": "ee31b50f-2445-4e74-8997-c58d5d380b76",
+      "officialRevisionId": "edc37ef3-f7dd-4cdc-b3e0-01a706830b5c",
+      "homeTeamNo": 13,
+      "awayTeamNo": 16,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "4f1cc912-9b89-5cd8-9ec3-9b464a06bddd",
+      "gameId": "88d1a1ba-e8b1-41ed-b6a9-7972a7bd5b4b",
+      "officialRevisionId": "86a9f816-932e-4a07-94f6-5fe28585866d",
+      "homeTeamNo": 14,
+      "awayTeamNo": 15,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "3c34af08-c057-50df-a205-eae077d66877",
+      "gameId": "cdb056ae-d10d-4fe1-b1ee-2b6c50ee758d",
+      "officialRevisionId": "6436e76a-0d2b-4c4c-9c14-e2526af83edc",
+      "homeTeamNo": 15,
+      "awayTeamNo": 13,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "bed640a2-cb7e-5c14-aef3-11beb0015a58",
+      "gameId": "c1d9a824-42f4-4b2d-abb1-dca92cdce5f6",
+      "officialRevisionId": "e469af16-c1a5-454e-bdec-1452d85db19c",
+      "homeTeamNo": 16,
+      "awayTeamNo": 14,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "8d93b614-682f-553e-a373-ab227250e2a2",
+      "gameId": "8116b330-3e28-432c-b3b2-531883545193",
+      "officialRevisionId": "05ac7f3b-40d6-4e11-a6db-cc77b5f60125",
+      "homeTeamNo": 13,
+      "awayTeamNo": 14,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "a7c58ec5-7ed1-5944-9355-2b185f07c66d",
+      "gameId": "e5434289-ff99-4211-b3d3-6de8f503d839",
+      "officialRevisionId": "36b4ca15-2b60-4b83-aede-193efe8c30bd",
+      "homeTeamNo": 15,
+      "awayTeamNo": 16,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "a57247e5-03f2-548b-81a8-1186d0424de1",
+      "gameId": "4d7c0f9f-3060-468c-bd07-680d19827f28",
+      "officialRevisionId": "dcd7c211-7f8f-4330-bd57-6a6179c3271b",
+      "homeTeamNo": 17,
+      "awayTeamNo": 20,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "69b610b4-22f4-50cf-a515-1e3e9fb2b487",
+      "gameId": "f75d8aab-aaa9-4948-afad-4d52d1ad2ebd",
+      "officialRevisionId": "563492b8-95ce-4ad9-9d89-df9afe514777",
+      "homeTeamNo": 18,
+      "awayTeamNo": 19,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "86bdd56e-ab26-5218-9ba0-acf092fdabb3",
+      "gameId": "a066de7a-df09-4772-9a5f-654c8feca2b5",
+      "officialRevisionId": "e7b4babc-b015-4b6c-8ebf-7c1e6c9980ee",
+      "homeTeamNo": 19,
+      "awayTeamNo": 17,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "536d63d4-9fb2-5296-98de-a42b2dfc36ca",
+      "gameId": "6a475213-8418-4dc5-82ad-7205aaee3b7e",
+      "officialRevisionId": "69c6617d-818f-490b-9343-f5867946e5fc",
+      "homeTeamNo": 20,
+      "awayTeamNo": 18,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "18e982e8-1324-54ec-8dd8-427ad98a93a4",
+      "gameId": "c0012079-6661-43da-a016-b4b5e13c073a",
+      "officialRevisionId": "15b908b2-ded3-4983-9228-496059811608",
+      "homeTeamNo": 17,
+      "awayTeamNo": 18,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "f5a0b066-846e-5f66-9c13-04210a877e16",
+      "gameId": "f4ea2ea8-4c7f-48e8-8db1-2dc9b00615e9",
+      "officialRevisionId": "938e3c13-eb48-40bf-ae7b-15de70d18da3",
+      "homeTeamNo": 19,
+      "awayTeamNo": 20,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "58ede8af-f711-54e5-918a-2031ca373da6",
+      "gameId": "716b4e18-0458-4198-881d-309af752af83",
+      "officialRevisionId": "69beccdf-d47c-41f3-b24c-79a18fdef478",
+      "homeTeamNo": 5,
+      "awayTeamNo": 17,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "3ca5f9e5-7e81-53ed-acdd-e813348c3bf8",
+      "gameId": "6665fe7b-6aad-43e0-8f3f-a3b5b21471cf",
+      "officialRevisionId": "68409e14-c760-4d10-a8c0-84401a2c24be",
+      "homeTeamNo": 9,
+      "awayTeamNo": 13,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "52809272-2594-55ed-9364-60f50a7262b0",
+      "gameId": "7c400fad-23b3-41b7-b44c-c9b7d3e61f90",
+      "officialRevisionId": "17ed05ad-1818-4452-83cb-1af9be7e13fb",
+      "homeTeamNo": 1,
+      "awayTeamNo": 17,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "fcf5059d-7894-586c-8fb0-5c970f6a1dc9",
+      "gameId": "d828590b-20e4-4e06-b9b1-a0307932221a",
+      "officialRevisionId": "a684e37e-15de-4fa9-8ecd-6cd3d0df6f17",
+      "homeTeamNo": 5,
+      "awayTeamNo": 9,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "b4130936-ca6e-5f35-85bc-d0d292757525",
+      "gameId": "cd1a1c7d-c819-40fa-a272-ee6e99b2c6ce",
+      "officialRevisionId": "ab9a2d3f-ef42-4c59-825d-5287425dc3af",
+      "homeTeamNo": 13,
+      "awayTeamNo": 1,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "7f12c1fd-a33e-5d63-a7eb-4115387b0fee",
+      "gameId": "9a08642f-2d59-4ca4-98ff-8746418e2334",
+      "officialRevisionId": "72084ecb-4418-4dee-a058-6a8e10f24fd6",
+      "homeTeamNo": 17,
+      "awayTeamNo": 9,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "65609c91-abf9-5a8e-9164-0555981400d5",
+      "gameId": "e085cf05-3541-4f59-956e-3efe5137e416",
+      "officialRevisionId": "860c96b1-a30e-4f7e-9294-f6b678b01b0b",
+      "homeTeamNo": 1,
+      "awayTeamNo": 9,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "cb7d4a96-9a85-5319-beb6-3de6b59723b8",
+      "gameId": "8213fafb-43c4-4e7b-9db6-af05ea378105",
+      "officialRevisionId": "b7f54c52-a3f1-4613-976f-287e1c0a64a6",
+      "homeTeamNo": 13,
+      "awayTeamNo": 5,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "653d9556-7ff9-52c9-9d68-2b936a2f608c",
+      "gameId": "9720343c-92fa-452c-b2ee-8a1687bc093f",
+      "officialRevisionId": "195dd84c-edbf-4e43-a736-2e6712c6c28f",
+      "homeTeamNo": 1,
+      "awayTeamNo": 5,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "fe44d13c-5973-561b-9e31-a3108aa9966c",
+      "gameId": "f35c40d2-8853-4103-a3ef-58279f7893f3",
+      "officialRevisionId": "0a4d7bcf-ea88-4a65-8cf6-8825a75f077d",
+      "homeTeamNo": 17,
+      "awayTeamNo": 13,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "573ff641-e08b-52cf-8670-fa6a753bc405",
+      "gameId": "9402adee-a715-49b6-88e3-b3ceca5cb829",
+      "officialRevisionId": "9d16c1ec-d9b9-4335-9f67-5a9b64330c77",
+      "homeTeamNo": 6,
+      "awayTeamNo": 18,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "680195c3-0188-5b84-89e7-0a92cc8f04cf",
+      "gameId": "a4cc09e5-68d3-4274-ba97-bb0a856aea3b",
+      "officialRevisionId": "6c51882d-95e8-482d-bbe6-36a8bceea921",
+      "homeTeamNo": 10,
+      "awayTeamNo": 14,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "a645c874-3034-5057-ad71-98d2ce9705ce",
+      "gameId": "158e5e82-5ee6-4ba3-9a01-d92096bc2d86",
+      "officialRevisionId": "4ce7eb01-8655-4ef7-a0dd-394a28b9c645",
+      "homeTeamNo": 2,
+      "awayTeamNo": 18,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "aebe9232-615a-5ce6-be97-02ba2b78c1c3",
+      "gameId": "7a5053e5-d4c8-45bd-b264-308463913b34",
+      "officialRevisionId": "06524c83-f4d9-4fc1-b255-0cdfd1ee89c6",
+      "homeTeamNo": 6,
+      "awayTeamNo": 10,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "e6ad8284-3f55-5b36-b766-37d51997262d",
+      "gameId": "46b216b8-8968-4827-8736-c9d60ff1f6d7",
+      "officialRevisionId": "302e9d8c-0e4c-4301-8e87-51ade9e3c882",
+      "homeTeamNo": 14,
+      "awayTeamNo": 2,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "b9404504-32be-50e5-a8fd-44e8f445137b",
+      "gameId": "2530dce5-fb3e-4d6e-b70f-3e3b127f9048",
+      "officialRevisionId": "9f835100-7b14-40a1-8054-32fe16960e67",
+      "homeTeamNo": 18,
+      "awayTeamNo": 10,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "cf19d749-16f5-5280-85ac-cf4c9aa90e17",
+      "gameId": "caba9a6a-1bb6-4810-b5e6-d2fc4b3e5712",
+      "officialRevisionId": "e5cc8fee-ea0b-4d88-85ee-d2054adeb490",
+      "homeTeamNo": 2,
+      "awayTeamNo": 10,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "d7d67d36-95b2-5142-abc7-cf612c3ba0db",
+      "gameId": "9b93618c-2e39-4160-9d5f-e5cb789d0516",
+      "officialRevisionId": "246bc7cd-fb9c-407b-b2dc-e275bfcabfe7",
+      "homeTeamNo": 14,
+      "awayTeamNo": 6,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "3f5a4e4d-2948-59e0-b313-881bb2beeb32",
+      "gameId": "60ad8615-83cb-4267-be57-d127adf4e840",
+      "officialRevisionId": "469c5d79-8ca8-4102-a528-16fb5faf496c",
+      "homeTeamNo": 2,
+      "awayTeamNo": 6,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "596f926e-879d-5dd8-a7d5-8cce12b93866",
+      "gameId": "42946e4e-1fea-4f4b-a5af-5d50026486cf",
+      "officialRevisionId": "05fdda74-2d5d-4e72-a485-87ded71dd48f",
+      "homeTeamNo": 18,
+      "awayTeamNo": 14,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "6e7d61b8-29d8-5fa8-9e49-298afad074fe",
+      "gameId": "d9a2db85-5bdb-4682-befe-5051c7756ee4",
+      "officialRevisionId": "7463e58b-a0f3-4e9c-9f8b-da1ade4d981d",
+      "homeTeamNo": 7,
+      "awayTeamNo": 19,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "a91e660c-ce6c-5aa0-bbe6-6cb4863ae7aa",
+      "gameId": "553e5377-2980-4fb0-8f11-703801a4550c",
+      "officialRevisionId": "0f3b0573-cd01-4bd1-96fb-b920fd8010db",
+      "homeTeamNo": 11,
+      "awayTeamNo": 15,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "cebf7740-e996-5acd-b515-d72eda022bcb",
+      "gameId": "9e662176-724f-49da-8ed3-9b0021ba46b7",
+      "officialRevisionId": "27ab360f-5e6d-41d8-aafe-fc9c4b8e2558",
+      "homeTeamNo": 3,
+      "awayTeamNo": 19,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "f4fb25c0-d173-5d70-aff0-cf683e971519",
+      "gameId": "112eeb66-6b84-4a8c-8658-6dc7352e52e0",
+      "officialRevisionId": "bcf46ec9-b400-4146-8f5f-4a95def43f36",
+      "homeTeamNo": 7,
+      "awayTeamNo": 11,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "dd9f7b0c-b5af-5ab1-bde1-b4e5e83a2c2d",
+      "gameId": "e70e19c0-8725-41d3-9696-5cf961bcc6cd",
+      "officialRevisionId": "d2924d66-04ba-4003-a41d-709e50c5b330",
+      "homeTeamNo": 15,
+      "awayTeamNo": 3,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "bc81a1eb-9b4a-5502-af21-117d64149bdc",
+      "gameId": "89b4350b-ae16-4edc-8df8-5165bdedd88b",
+      "officialRevisionId": "52d6f6c9-dacf-40d9-ab57-4b8dfaba3495",
+      "homeTeamNo": 19,
+      "awayTeamNo": 11,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "c4a5df27-6f1e-5f52-98bb-3fc4bf68a781",
+      "gameId": "1aa47613-f792-4908-af10-c1a4db959fef",
+      "officialRevisionId": "679a256c-b835-45aa-a5d2-16dcb05908e9",
+      "homeTeamNo": 3,
+      "awayTeamNo": 11,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "ee39aa2b-03c2-5505-81f6-20ff45bfdeca",
+      "gameId": "8c917e99-8b32-4b82-8bcf-3eb1014436e3",
+      "officialRevisionId": "6a6cc8ad-6f67-4f5b-8dd1-2eeb107205d3",
+      "homeTeamNo": 15,
+      "awayTeamNo": 7,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "c25204c4-b6b9-5fac-a53d-0c3506ec28ec",
+      "gameId": "cde9efac-675c-4513-a0b8-a121e000df7a",
+      "officialRevisionId": "70283089-fcd2-4156-916f-b4a9c2bdbe10",
+      "homeTeamNo": 3,
+      "awayTeamNo": 7,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "142be204-9c5b-5644-ae0c-e3079a9bce07",
+      "gameId": "1b44e9f4-2ad6-4425-ab14-24a1dcee7b59",
+      "officialRevisionId": "5050684c-0b4a-4012-ae2d-460befa451f6",
+      "homeTeamNo": 19,
+      "awayTeamNo": 15,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "22baef57-ffbc-5f62-80d3-70373949b29e",
+      "gameId": "7e6a31e1-22e7-4578-a466-a43622b864e1",
+      "officialRevisionId": "6f8b2cf0-e185-4e88-a916-b78cc556cedf",
+      "homeTeamNo": 8,
+      "awayTeamNo": 20,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "59ab45e9-bd97-5a48-943f-5d003e5432f6",
+      "gameId": "dcbaa797-680a-454a-81a4-c1f04a2a1dcc",
+      "officialRevisionId": "ec0d6ff2-d7e6-477b-968f-6a59bf8b5d4c",
+      "homeTeamNo": 12,
+      "awayTeamNo": 16,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "ea9e51f3-b2af-5bcd-ab4c-6a4f1da307ea",
+      "gameId": "6d28eece-0ee5-4e8f-b797-bbbd14dc357a",
+      "officialRevisionId": "370b91fb-683d-4d70-91a3-f74412e1f1c6",
+      "homeTeamNo": 4,
+      "awayTeamNo": 20,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "d19ff926-4273-5f0d-911c-4f645afb679b",
+      "gameId": "4255edc8-bb0d-4774-b61b-afea7c9c69e3",
+      "officialRevisionId": "51dbe336-1dd9-4e76-ba26-182231e13e4b",
+      "homeTeamNo": 8,
+      "awayTeamNo": 12,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "1a7b0f30-4f51-5d58-bb8f-7c8c060ba8c1",
+      "gameId": "ed24dbcd-179f-4853-a837-0723974d3d6a",
+      "officialRevisionId": "2741e341-c197-4fd5-9493-4315ff341cba",
+      "homeTeamNo": 16,
+      "awayTeamNo": 4,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "8016ea96-dbc1-5f25-98ff-b04d115592d0",
+      "gameId": "dcc70861-cfb7-4295-8452-9e8b9db09c19",
+      "officialRevisionId": "9e98f1f1-dad0-4656-a874-70a17e089b5b",
+      "homeTeamNo": 20,
+      "awayTeamNo": 12,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "dd0906b7-a414-5902-96ae-6ee98da57b90",
+      "gameId": "3db75ba3-90b0-402d-a33b-4e00ce75ee83",
+      "officialRevisionId": "7a891cd5-cc15-4c51-b108-3421978785f5",
+      "homeTeamNo": 4,
+      "awayTeamNo": 12,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "71c0b68a-e698-5632-a03a-e61f8a92061e",
+      "gameId": "d964eeb3-c516-4b6e-bc63-9426dbc812d8",
+      "officialRevisionId": "9cdf4f15-12d9-47ba-9cbe-00c68110b4f2",
+      "homeTeamNo": 16,
+      "awayTeamNo": 8,
+      "homeScore": 0,
+      "awayScore": 1
+    },
+    {
+      "fixtureId": "b23b951e-8e10-537f-bb7b-1c5609140719",
+      "gameId": "b3ec4225-ddd9-4bb0-bf39-d3dfc40b7f6e",
+      "officialRevisionId": "7e6c5802-3c08-42c5-9b4e-4d7c278b4ea4",
+      "homeTeamNo": 4,
+      "awayTeamNo": 8,
+      "homeScore": 1,
+      "awayScore": 0
+    },
+    {
+      "fixtureId": "7407a714-0929-5c71-88d1-47d2c032cc3f",
+      "gameId": "8dd15890-2e5f-4879-8a9b-39e6478573ea",
+      "officialRevisionId": "03a5be4f-04f5-4f8a-a692-2f20e35e18b3",
+      "homeTeamNo": 20,
+      "awayTeamNo": 16,
+      "homeScore": 0,
+      "awayScore": 1
+    }
+  ],
+  "findings": [],
+  "preliminaryAssignments": [
+    {
+      "key": "pre0",
+      "registrationIds": [
+        "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+        "093c3666-2151-4f5a-8280-b5bd71606247",
+        "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+        "046667d8-c803-4d0c-8b62-41a4c4564472"
+      ]
+    },
+    {
+      "key": "pre1",
+      "registrationIds": [
+        "f225835f-3e95-4333-9e4b-56f35d748fde",
+        "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+        "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+        "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+      ]
+    },
+    {
+      "key": "pre2",
+      "registrationIds": [
+        "66110cac-0ca6-450d-8056-61ee4c40a303",
+        "6d6011af-f93c-4e31-a608-d242bc6e1333",
+        "377006d7-a702-4f59-b82f-b7e098af9932",
+        "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+      ]
+    },
+    {
+      "key": "pre3",
+      "registrationIds": [
+        "56e3b84f-85ee-4d20-8765-866755a6c526",
+        "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+        "64134b51-3a08-450d-b34d-62b47f6787d1",
+        "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+      ]
+    },
+    {
+      "key": "pre4",
+      "registrationIds": [
+        "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+        "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+        "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+        "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+      ]
+    }
+  ],
+  "fixtureIds": [
+    "08c108f3-d9ef-55d4-8d9d-39dfbb5ffe93",
+    "492133d0-1700-5e43-9775-551fce10c7eb",
+    "5768809e-b1a4-5a1a-8b7d-3d7a15ee874e",
+    "d52be6ab-f0cd-59c1-9f7f-804166305a78",
+    "faa4b746-a6e5-5c45-8919-e688005b4306",
+    "fee3e09d-2910-554c-9e9e-1255acab93f9",
+    "2866095d-8b10-570e-b960-8db55befccba",
+    "417d9304-e0d6-512b-8ed4-a285a4c7a974",
+    "669ecfc1-b581-51a4-9ed2-a179321776c9",
+    "7476dce9-72a6-56fd-9211-76400f001b5d",
+    "8fd3f756-76d2-55bd-bf2e-5dd13103192a",
+    "c6f62c5f-607e-56d8-b719-052b8aa05ecf",
+    "467b0ca2-db5c-578b-93f0-697cf444fc8c",
+    "4cd2ebe3-63ab-5708-aaae-4fe89b03c4b0",
+    "5b1012e0-e241-50f0-874b-510975edcb80",
+    "5d8d82a6-db9d-5fa2-a0e9-9c1aed3be53f",
+    "7728c82f-0d4f-5bb9-8ad3-90cffb22e1de",
+    "cab8b35b-d13b-587d-92c6-4209557ecd38",
+    "193035e0-cb9a-5996-9964-cf1582c1c494",
+    "3c34af08-c057-50df-a205-eae077d66877",
+    "4f1cc912-9b89-5cd8-9ec3-9b464a06bddd",
+    "8d93b614-682f-553e-a373-ab227250e2a2",
+    "a7c58ec5-7ed1-5944-9355-2b185f07c66d",
+    "bed640a2-cb7e-5c14-aef3-11beb0015a58",
+    "18e982e8-1324-54ec-8dd8-427ad98a93a4",
+    "536d63d4-9fb2-5296-98de-a42b2dfc36ca",
+    "69b610b4-22f4-50cf-a515-1e3e9fb2b487",
+    "86bdd56e-ab26-5218-9ba0-acf092fdabb3",
+    "a57247e5-03f2-548b-81a8-1186d0424de1",
+    "f5a0b066-846e-5f66-9c13-04210a877e16",
+    "3ca5f9e5-7e81-53ed-acdd-e813348c3bf8",
+    "52809272-2594-55ed-9364-60f50a7262b0",
+    "58ede8af-f711-54e5-918a-2031ca373da6",
+    "653d9556-7ff9-52c9-9d68-2b936a2f608c",
+    "65609c91-abf9-5a8e-9164-0555981400d5",
+    "7f12c1fd-a33e-5d63-a7eb-4115387b0fee",
+    "b4130936-ca6e-5f35-85bc-d0d292757525",
+    "cb7d4a96-9a85-5319-beb6-3de6b59723b8",
+    "fcf5059d-7894-586c-8fb0-5c970f6a1dc9",
+    "fe44d13c-5973-561b-9e31-a3108aa9966c",
+    "3f5a4e4d-2948-59e0-b313-881bb2beeb32",
+    "573ff641-e08b-52cf-8670-fa6a753bc405",
+    "596f926e-879d-5dd8-a7d5-8cce12b93866",
+    "680195c3-0188-5b84-89e7-0a92cc8f04cf",
+    "a645c874-3034-5057-ad71-98d2ce9705ce",
+    "aebe9232-615a-5ce6-be97-02ba2b78c1c3",
+    "b9404504-32be-50e5-a8fd-44e8f445137b",
+    "cf19d749-16f5-5280-85ac-cf4c9aa90e17",
+    "d7d67d36-95b2-5142-abc7-cf612c3ba0db",
+    "e6ad8284-3f55-5b36-b766-37d51997262d",
+    "142be204-9c5b-5644-ae0c-e3079a9bce07",
+    "6e7d61b8-29d8-5fa8-9e49-298afad074fe",
+    "a91e660c-ce6c-5aa0-bbe6-6cb4863ae7aa",
+    "bc81a1eb-9b4a-5502-af21-117d64149bdc",
+    "c25204c4-b6b9-5fac-a53d-0c3506ec28ec",
+    "c4a5df27-6f1e-5f52-98bb-3fc4bf68a781",
+    "cebf7740-e996-5acd-b515-d72eda022bcb",
+    "dd9f7b0c-b5af-5ab1-bde1-b4e5e83a2c2d",
+    "ee39aa2b-03c2-5505-81f6-20ff45bfdeca",
+    "f4fb25c0-d173-5d70-aff0-cf683e971519",
+    "1a7b0f30-4f51-5d58-bb8f-7c8c060ba8c1",
+    "22baef57-ffbc-5f62-80d3-70373949b29e",
+    "59ab45e9-bd97-5a48-943f-5d003e5432f6",
+    "71c0b68a-e698-5632-a03a-e61f8a92061e",
+    "7407a714-0929-5c71-88d1-47d2c032cc3f",
+    "8016ea96-dbc1-5f25-98ff-b04d115592d0",
+    "b23b951e-8e10-537f-bb7b-1c5609140719",
+    "d19ff926-4273-5f0d-911c-4f645afb679b",
+    "dd0906b7-a414-5902-96ae-6ee98da57b90",
+    "ea9e51f3-b2af-5bcd-ab4c-6a4f1da307ea"
+  ],
+  "incompleteEndRejected": true,
+  "finalsBeforeConfirmation": [
+    {
+      "key": "main0",
+      "assigned": false,
+      "candidates": [
+        [
+          "9d4e1648-0cd7-4981-9e30-215ee411f4a4"
+        ],
+        [
+          "f225835f-3e95-4333-9e4b-56f35d748fde"
+        ],
+        [
+          "66110cac-0ca6-450d-8056-61ee4c40a303"
+        ],
+        [
+          "56e3b84f-85ee-4d20-8765-866755a6c526"
+        ],
+        [
+          "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+        ]
+      ]
+    },
+    {
+      "key": "main1",
+      "assigned": false,
+      "candidates": [
+        [
+          "093c3666-2151-4f5a-8280-b5bd71606247"
+        ],
+        [
+          "b8307e57-e815-48ff-9565-eb9bdf375ccc"
+        ],
+        [
+          "6d6011af-f93c-4e31-a608-d242bc6e1333"
+        ],
+        [
+          "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0"
+        ],
+        [
+          "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+        ]
+      ]
+    },
+    {
+      "key": "main2",
+      "assigned": false,
+      "candidates": [
+        [
+          "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2"
+        ],
+        [
+          "7329233a-6855-44f1-bd89-41f6a4ac0d59"
+        ],
+        [
+          "377006d7-a702-4f59-b82f-b7e098af9932"
+        ],
+        [
+          "64134b51-3a08-450d-b34d-62b47f6787d1"
+        ],
+        [
+          "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+        ]
+      ]
+    },
+    {
+      "key": "main3",
+      "assigned": false,
+      "candidates": [
+        [
+          "046667d8-c803-4d0c-8b62-41a4c4564472"
+        ],
+        [
+          "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+        ],
+        [
+          "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+        ],
+        [
+          "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+        ],
+        [
+          "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+        ]
+      ]
+    }
+  ],
+  "finalsAssigned": [
+    {
+      "key": "main0",
+      "registrationIds": [
+        "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+        "f225835f-3e95-4333-9e4b-56f35d748fde",
+        "66110cac-0ca6-450d-8056-61ee4c40a303",
+        "56e3b84f-85ee-4d20-8765-866755a6c526",
+        "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+      ],
+      "standings": [
+        {
+          "id": "9f472805-dfad-4d92-b5b0-a0a82008d610",
+          "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+          "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 1,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:44.433Z",
+          "updatedAt": "2026-11-16T04:33:51.238Z"
+        },
+        {
+          "id": "b0669914-9a07-47cf-ae36-ed17afe01f64",
+          "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+          "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 2,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:44.438Z",
+          "updatedAt": "2026-11-16T04:33:51.241Z"
+        },
+        {
+          "id": "ce6eb097-7cf7-411b-b709-c5a15954d29e",
+          "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+          "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 3,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:44.440Z",
+          "updatedAt": "2026-11-16T04:33:51.243Z"
+        },
+        {
+          "id": "25fc1ed1-5c6d-4907-9688-fee3a4f74799",
+          "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+          "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 4,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:44.444Z",
+          "updatedAt": "2026-11-16T04:33:51.246Z"
+        },
+        {
+          "id": "ae85fb26-4c24-4716-9607-80e4a1f9aff1",
+          "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+          "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 5,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:44.446Z",
+          "updatedAt": "2026-11-16T04:33:51.249Z"
+        }
+      ]
+    },
+    {
+      "key": "main1",
+      "registrationIds": [
+        "093c3666-2151-4f5a-8280-b5bd71606247",
+        "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+        "6d6011af-f93c-4e31-a608-d242bc6e1333",
+        "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+        "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+      ],
+      "standings": [
+        {
+          "id": "7dd1da84-4f73-4e7c-bdd7-f0f071b8c178",
+          "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+          "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 1,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:46.541Z",
+          "updatedAt": "2026-11-16T04:33:51.251Z"
+        },
+        {
+          "id": "02b162f8-4539-4111-8ba0-aab7fd51ca7a",
+          "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+          "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 2,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:46.544Z",
+          "updatedAt": "2026-11-16T04:33:51.253Z"
+        },
+        {
+          "id": "2302a0c7-0bd8-44b7-97bf-2a552044c583",
+          "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+          "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 3,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:46.546Z",
+          "updatedAt": "2026-11-16T04:33:51.256Z"
+        },
+        {
+          "id": "5e3d712e-48a2-4ef7-b6cf-b59c1ebd2c0b",
+          "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+          "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 4,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:46.548Z",
+          "updatedAt": "2026-11-16T04:33:51.259Z"
+        },
+        {
+          "id": "daf19899-e6fd-47dc-a9c0-fbca806d811e",
+          "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+          "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 5,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:46.551Z",
+          "updatedAt": "2026-11-16T04:33:51.261Z"
+        }
+      ]
+    },
+    {
+      "key": "main2",
+      "registrationIds": [
+        "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+        "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+        "377006d7-a702-4f59-b82f-b7e098af9932",
+        "64134b51-3a08-450d-b34d-62b47f6787d1",
+        "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+      ],
+      "standings": [
+        {
+          "id": "861fd57b-e1c2-47fd-bcd0-0419a2094da2",
+          "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+          "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 1,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:49.068Z",
+          "updatedAt": "2026-11-16T04:33:51.264Z"
+        },
+        {
+          "id": "b17d1974-5f8b-4067-aa7d-f744870ca99a",
+          "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+          "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 2,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:49.071Z",
+          "updatedAt": "2026-11-16T04:33:51.266Z"
+        },
+        {
+          "id": "1e145319-2f82-4f2d-807b-2da28833a503",
+          "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+          "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 3,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:49.073Z",
+          "updatedAt": "2026-11-16T04:33:51.269Z"
+        },
+        {
+          "id": "8a56e3c2-88de-4b8e-840b-8ff3d6430255",
+          "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+          "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 4,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:49.076Z",
+          "updatedAt": "2026-11-16T04:33:51.272Z"
+        },
+        {
+          "id": "69430816-8a35-48e7-a874-b4a4b0ac4cd5",
+          "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+          "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 5,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:49.080Z",
+          "updatedAt": "2026-11-16T04:33:51.275Z"
+        }
+      ]
+    },
+    {
+      "key": "main3",
+      "registrationIds": [
+        "046667d8-c803-4d0c-8b62-41a4c4564472",
+        "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+        "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+        "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+        "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+      ],
+      "standings": [
+        {
+          "id": "5e40788d-723e-4810-8e93-d8c4e60ce315",
+          "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+          "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 1,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:51.279Z",
+          "updatedAt": "2026-11-16T04:33:51.279Z"
+        },
+        {
+          "id": "efbbdd36-8d47-4988-bd2a-ee2de1614a03",
+          "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+          "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 2,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:51.283Z",
+          "updatedAt": "2026-11-16T04:33:51.283Z"
+        },
+        {
+          "id": "3c8515be-f244-46ad-ad67-d1052e83f7bb",
+          "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+          "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 3,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:51.287Z",
+          "updatedAt": "2026-11-16T04:33:51.287Z"
+        },
+        {
+          "id": "9546d2cc-b6c7-4a34-9fb4-e83d8be5652a",
+          "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+          "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 4,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:51.290Z",
+          "updatedAt": "2026-11-16T04:33:51.290Z"
+        },
+        {
+          "id": "00e8f940-2c57-4d1a-ab20-0606a9c5806c",
+          "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+          "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472",
+          "points": 0,
+          "wins": 0,
+          "draws": 0,
+          "losses": 0,
+          "goalsFor": 0,
+          "goalsAgainst": 0,
+          "fairPlayPoints": 0,
+          "position": 5,
+          "recalculatedAt": "2026-11-16T04:33:51.236Z",
+          "createdAt": "2026-11-16T04:33:51.294Z",
+          "updatedAt": "2026-11-16T04:33:51.294Z"
+        }
+      ]
+    }
+  ],
+  "completed": {
+    "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+    "previousStatus": "in_progress",
+    "status": "completed",
+    "alreadyInStatus": false
+  },
+  "finalView": {
+    "revision": 11,
+    "config": {
+      "version": 1,
+      "stages": [
+        {
+          "key": "pre",
+          "name": "Preliminary",
+          "pools": [
+            {
+              "key": "pre0",
+              "legs": 1,
+              "name": "A",
+              "format": "league",
+              "sources": [],
+              "capacity": 4
+            },
+            {
+              "key": "pre1",
+              "legs": 1,
+              "name": "B",
+              "format": "league",
+              "sources": [],
+              "capacity": 4
+            },
+            {
+              "key": "pre2",
+              "legs": 1,
+              "name": "C",
+              "format": "league",
+              "sources": [],
+              "capacity": 4
+            },
+            {
+              "key": "pre3",
+              "legs": 1,
+              "name": "D",
+              "format": "league",
+              "sources": [],
+              "capacity": 4
+            },
+            {
+              "key": "pre4",
+              "legs": 1,
+              "name": "E",
+              "format": "league",
+              "sources": [],
+              "capacity": 4
+            }
+          ]
+        },
+        {
+          "key": "main",
+          "name": "Final leagues",
+          "pools": [
+            {
+              "key": "main0",
+              "legs": 1,
+              "name": "Rank 1 league",
+              "format": "league",
+              "sources": [
+                {
+                  "rank": 1,
+                  "poolKey": "pre0"
+                },
+                {
+                  "rank": 1,
+                  "poolKey": "pre1"
+                },
+                {
+                  "rank": 1,
+                  "poolKey": "pre2"
+                },
+                {
+                  "rank": 1,
+                  "poolKey": "pre3"
+                },
+                {
+                  "rank": 1,
+                  "poolKey": "pre4"
+                }
+              ],
+              "capacity": 5
+            },
+            {
+              "key": "main1",
+              "legs": 1,
+              "name": "Rank 2 league",
+              "format": "league",
+              "sources": [
+                {
+                  "rank": 2,
+                  "poolKey": "pre0"
+                },
+                {
+                  "rank": 2,
+                  "poolKey": "pre1"
+                },
+                {
+                  "rank": 2,
+                  "poolKey": "pre2"
+                },
+                {
+                  "rank": 2,
+                  "poolKey": "pre3"
+                },
+                {
+                  "rank": 2,
+                  "poolKey": "pre4"
+                }
+              ],
+              "capacity": 5
+            },
+            {
+              "key": "main2",
+              "legs": 1,
+              "name": "Rank 3 league",
+              "format": "league",
+              "sources": [
+                {
+                  "rank": 3,
+                  "poolKey": "pre0"
+                },
+                {
+                  "rank": 3,
+                  "poolKey": "pre1"
+                },
+                {
+                  "rank": 3,
+                  "poolKey": "pre2"
+                },
+                {
+                  "rank": 3,
+                  "poolKey": "pre3"
+                },
+                {
+                  "rank": 3,
+                  "poolKey": "pre4"
+                }
+              ],
+              "capacity": 5
+            },
+            {
+              "key": "main3",
+              "legs": 1,
+              "name": "Rank 4 league",
+              "format": "league",
+              "sources": [
+                {
+                  "rank": 4,
+                  "poolKey": "pre0"
+                },
+                {
+                  "rank": 4,
+                  "poolKey": "pre1"
+                },
+                {
+                  "rank": 4,
+                  "poolKey": "pre2"
+                },
+                {
+                  "rank": 4,
+                  "poolKey": "pre3"
+                },
+                {
+                  "rank": 4,
+                  "poolKey": "pre4"
+                }
+              ],
+              "capacity": 5
+            }
+          ]
+        }
+      ]
+    },
+    "pools": [
+      {
+        "key": "pre0",
+        "legs": 1,
+        "name": "A",
+        "format": "league",
+        "sources": [],
+        "capacity": 4,
+        "stageKey": "pre",
+        "stageName": "Preliminary",
+        "stageIndex": 0,
+        "generated": true,
+        "slots": [
+          {
+            "id": "c11a4472-7c30-4431-b4cd-ba545b82a11a",
+            "position": 1,
+            "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4"
+          },
+          {
+            "id": "d07e6082-6892-4956-a6d1-5e97b610712c",
+            "position": 2,
+            "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247"
+          },
+          {
+            "id": "ff97e887-4e52-4865-aaf1-afc86b82b8d4",
+            "position": 3,
+            "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2"
+          },
+          {
+            "id": "49efd314-ba1e-42af-9f7e-35faeb8f00cf",
+            "position": 4,
+            "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472"
+          }
+        ],
+        "registrationIds": [
+          "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+          "093c3666-2151-4f5a-8280-b5bd71606247",
+          "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+          "046667d8-c803-4d0c-8b62-41a4c4564472"
+        ],
+        "candidates": [],
+        "sourceVersion": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "8bb81823-7b71-4224-8a51-f271b37d5000",
+            "groupId": "654eaa6b-73ac-4de9-a3f8-bd64014f67bc",
+            "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 3,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:02.783Z",
+            "updatedAt": "2026-11-16T04:33:51.301Z"
+          },
+          {
+            "id": "dc44ceec-cd54-45c4-89b2-16892c8c3778",
+            "groupId": "654eaa6b-73ac-4de9-a3f8-bd64014f67bc",
+            "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 2,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:02.797Z",
+            "updatedAt": "2026-11-16T04:33:51.306Z"
+          },
+          {
+            "id": "13fadcb8-017a-498d-8698-4d943be6886c",
+            "groupId": "654eaa6b-73ac-4de9-a3f8-bd64014f67bc",
+            "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 1,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:02.800Z",
+            "updatedAt": "2026-11-16T04:33:51.308Z"
+          },
+          {
+            "id": "8afe6056-d186-40bb-82ab-3c7b5e3bebaf",
+            "groupId": "654eaa6b-73ac-4de9-a3f8-bd64014f67bc",
+            "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 0,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:02.794Z",
+            "updatedAt": "2026-11-16T04:33:51.310Z"
+          }
+        ],
+        "fixtureIds": [
+          "08c108f3-d9ef-55d4-8d9d-39dfbb5ffe93",
+          "492133d0-1700-5e43-9775-551fce10c7eb",
+          "5768809e-b1a4-5a1a-8b7d-3d7a15ee874e",
+          "d52be6ab-f0cd-59c1-9f7f-804166305a78",
+          "faa4b746-a6e5-5c45-8919-e688005b4306",
+          "fee3e09d-2910-554c-9e9e-1255acab93f9"
+        ]
+      },
+      {
+        "key": "pre1",
+        "legs": 1,
+        "name": "B",
+        "format": "league",
+        "sources": [],
+        "capacity": 4,
+        "stageKey": "pre",
+        "stageName": "Preliminary",
+        "stageIndex": 0,
+        "generated": true,
+        "slots": [
+          {
+            "id": "bd7a92a7-8c28-4541-b7be-a1e8d72d31ca",
+            "position": 1,
+            "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde"
+          },
+          {
+            "id": "88ff609c-6074-4dc6-9af1-ad1cb1f6606e",
+            "position": 2,
+            "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc"
+          },
+          {
+            "id": "d53b76ef-381b-411d-b1ee-27b2ab514a03",
+            "position": 3,
+            "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59"
+          },
+          {
+            "id": "08830c51-c777-41dd-b359-15d36c0a1837",
+            "position": 4,
+            "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+          }
+        ],
+        "registrationIds": [
+          "f225835f-3e95-4333-9e4b-56f35d748fde",
+          "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+          "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+          "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+        ],
+        "candidates": [],
+        "sourceVersion": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "3170246c-d351-42be-9c2e-c9e1ed743547",
+            "groupId": "d9cc505b-4910-4d27-88f5-3866125a88e3",
+            "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 3,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:04.261Z",
+            "updatedAt": "2026-11-16T04:33:51.313Z"
+          },
+          {
+            "id": "d6041e59-da32-4d76-acb8-1bf58c2b9ce5",
+            "groupId": "d9cc505b-4910-4d27-88f5-3866125a88e3",
+            "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 2,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:04.270Z",
+            "updatedAt": "2026-11-16T04:33:51.315Z"
+          },
+          {
+            "id": "38a48daf-bead-45d0-89bc-14c17202d426",
+            "groupId": "d9cc505b-4910-4d27-88f5-3866125a88e3",
+            "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 1,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:04.266Z",
+            "updatedAt": "2026-11-16T04:33:51.317Z"
+          },
+          {
+            "id": "3b4402b4-60f0-4712-b432-e4047ede1657",
+            "groupId": "d9cc505b-4910-4d27-88f5-3866125a88e3",
+            "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 0,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:04.268Z",
+            "updatedAt": "2026-11-16T04:33:51.319Z"
+          }
+        ],
+        "fixtureIds": [
+          "2866095d-8b10-570e-b960-8db55befccba",
+          "417d9304-e0d6-512b-8ed4-a285a4c7a974",
+          "669ecfc1-b581-51a4-9ed2-a179321776c9",
+          "7476dce9-72a6-56fd-9211-76400f001b5d",
+          "8fd3f756-76d2-55bd-bf2e-5dd13103192a",
+          "c6f62c5f-607e-56d8-b719-052b8aa05ecf"
+        ]
+      },
+      {
+        "key": "pre2",
+        "legs": 1,
+        "name": "C",
+        "format": "league",
+        "sources": [],
+        "capacity": 4,
+        "stageKey": "pre",
+        "stageName": "Preliminary",
+        "stageIndex": 0,
+        "generated": true,
+        "slots": [
+          {
+            "id": "7d8011a9-9397-459e-8d21-704f08385ed6",
+            "position": 1,
+            "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303"
+          },
+          {
+            "id": "db60296f-e537-4182-a11b-9947a5d06655",
+            "position": 2,
+            "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333"
+          },
+          {
+            "id": "e209b420-14f0-4f6f-b139-4823cdd46f3c",
+            "position": 3,
+            "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932"
+          },
+          {
+            "id": "3275ecbb-52e7-48bc-a8c4-21a35a52c831",
+            "position": 4,
+            "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+          }
+        ],
+        "registrationIds": [
+          "66110cac-0ca6-450d-8056-61ee4c40a303",
+          "6d6011af-f93c-4e31-a608-d242bc6e1333",
+          "377006d7-a702-4f59-b82f-b7e098af9932",
+          "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+        ],
+        "candidates": [],
+        "sourceVersion": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "2dedb851-0b08-4e35-a728-c582ee090d45",
+            "groupId": "96332ef1-912d-4807-a80d-dd256ace064b",
+            "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 3,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:06.731Z",
+            "updatedAt": "2026-11-16T04:33:51.321Z"
+          },
+          {
+            "id": "e95a1928-fed6-487f-8761-ddc68a420f5b",
+            "groupId": "96332ef1-912d-4807-a80d-dd256ace064b",
+            "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 2,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:06.733Z",
+            "updatedAt": "2026-11-16T04:33:51.323Z"
+          },
+          {
+            "id": "44a623bd-e736-4dcc-ba2b-3abf8c3e4888",
+            "groupId": "96332ef1-912d-4807-a80d-dd256ace064b",
+            "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 1,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:06.728Z",
+            "updatedAt": "2026-11-16T04:33:51.325Z"
+          },
+          {
+            "id": "86d0dbd7-393d-48f4-ae25-6e547b585094",
+            "groupId": "96332ef1-912d-4807-a80d-dd256ace064b",
+            "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 0,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:06.735Z",
+            "updatedAt": "2026-11-16T04:33:51.327Z"
+          }
+        ],
+        "fixtureIds": [
+          "467b0ca2-db5c-578b-93f0-697cf444fc8c",
+          "4cd2ebe3-63ab-5708-aaae-4fe89b03c4b0",
+          "5b1012e0-e241-50f0-874b-510975edcb80",
+          "5d8d82a6-db9d-5fa2-a0e9-9c1aed3be53f",
+          "7728c82f-0d4f-5bb9-8ad3-90cffb22e1de",
+          "cab8b35b-d13b-587d-92c6-4209557ecd38"
+        ]
+      },
+      {
+        "key": "pre3",
+        "legs": 1,
+        "name": "D",
+        "format": "league",
+        "sources": [],
+        "capacity": 4,
+        "stageKey": "pre",
+        "stageName": "Preliminary",
+        "stageIndex": 0,
+        "generated": true,
+        "slots": [
+          {
+            "id": "0bdf69be-a968-449f-b6e0-7ec0aefafb80",
+            "position": 1,
+            "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526"
+          },
+          {
+            "id": "a8e29e90-9d0b-49ac-8df9-bf329ab37134",
+            "position": 2,
+            "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0"
+          },
+          {
+            "id": "250a2cb1-29d9-4390-ab59-158cb1fe336c",
+            "position": 3,
+            "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1"
+          },
+          {
+            "id": "3c06551a-b74e-4ba5-934c-f182ca438ea8",
+            "position": 4,
+            "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+          }
+        ],
+        "registrationIds": [
+          "56e3b84f-85ee-4d20-8765-866755a6c526",
+          "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+          "64134b51-3a08-450d-b34d-62b47f6787d1",
+          "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+        ],
+        "candidates": [],
+        "sourceVersion": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "40f75573-d953-4cfe-9846-ab92689f2c0e",
+            "groupId": "90b9c5fc-1c07-4377-a7e1-b9d5f642c2b8",
+            "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 3,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:08.806Z",
+            "updatedAt": "2026-11-16T04:33:51.329Z"
+          },
+          {
+            "id": "329cba64-df80-44f4-9943-83d2500b5a36",
+            "groupId": "90b9c5fc-1c07-4377-a7e1-b9d5f642c2b8",
+            "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 2,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:08.817Z",
+            "updatedAt": "2026-11-16T04:33:51.331Z"
+          },
+          {
+            "id": "7ffd3d5f-447e-4b47-863a-410e711664b8",
+            "groupId": "90b9c5fc-1c07-4377-a7e1-b9d5f642c2b8",
+            "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 1,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:08.810Z",
+            "updatedAt": "2026-11-16T04:33:51.333Z"
+          },
+          {
+            "id": "4ca9cf90-12f6-4b51-8ead-5ce30696d98a",
+            "groupId": "90b9c5fc-1c07-4377-a7e1-b9d5f642c2b8",
+            "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 0,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:08.813Z",
+            "updatedAt": "2026-11-16T04:33:51.335Z"
+          }
+        ],
+        "fixtureIds": [
+          "193035e0-cb9a-5996-9964-cf1582c1c494",
+          "3c34af08-c057-50df-a205-eae077d66877",
+          "4f1cc912-9b89-5cd8-9ec3-9b464a06bddd",
+          "8d93b614-682f-553e-a373-ab227250e2a2",
+          "a7c58ec5-7ed1-5944-9355-2b185f07c66d",
+          "bed640a2-cb7e-5c14-aef3-11beb0015a58"
+        ]
+      },
+      {
+        "key": "pre4",
+        "legs": 1,
+        "name": "E",
+        "format": "league",
+        "sources": [],
+        "capacity": 4,
+        "stageKey": "pre",
+        "stageName": "Preliminary",
+        "stageIndex": 0,
+        "generated": true,
+        "slots": [
+          {
+            "id": "80edf6c0-8cf5-4adb-84b4-046315232236",
+            "position": 1,
+            "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+          },
+          {
+            "id": "66bb8f7c-cbd3-4f08-999a-bd2483e452f0",
+            "position": 2,
+            "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+          },
+          {
+            "id": "45dec5b1-44fe-45e2-a030-d420b6105b35",
+            "position": 3,
+            "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+          },
+          {
+            "id": "49dc05c6-ac96-49e3-ba0d-680827d54c2a",
+            "position": 4,
+            "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+          }
+        ],
+        "registrationIds": [
+          "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+          "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+          "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+          "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+        ],
+        "candidates": [],
+        "sourceVersion": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "99064cc4-9b16-404a-8292-077c75e094bc",
+            "groupId": "c033314f-7df1-4b27-87b5-50d2681f3585",
+            "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 3,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:10.421Z",
+            "updatedAt": "2026-11-16T04:33:51.339Z"
+          },
+          {
+            "id": "d29243ca-26bc-4051-9b81-6d84696fface",
+            "groupId": "c033314f-7df1-4b27-87b5-50d2681f3585",
+            "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 2,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:10.419Z",
+            "updatedAt": "2026-11-16T04:33:51.341Z"
+          },
+          {
+            "id": "23d241a1-31a4-42e3-84a1-072d6851845d",
+            "groupId": "c033314f-7df1-4b27-87b5-50d2681f3585",
+            "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 1,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:10.423Z",
+            "updatedAt": "2026-11-16T04:33:51.343Z"
+          },
+          {
+            "id": "539dbeb0-bd93-41ed-90ef-90fb54bf218e",
+            "groupId": "c033314f-7df1-4b27-87b5-50d2681f3585",
+            "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 0,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:33:51.236Z",
+            "createdAt": "2026-11-16T04:20:10.416Z",
+            "updatedAt": "2026-11-16T04:33:51.345Z"
+          }
+        ],
+        "fixtureIds": [
+          "18e982e8-1324-54ec-8dd8-427ad98a93a4",
+          "536d63d4-9fb2-5296-98de-a42b2dfc36ca",
+          "69b610b4-22f4-50cf-a515-1e3e9fb2b487",
+          "86bdd56e-ab26-5218-9ba0-acf092fdabb3",
+          "a57247e5-03f2-548b-81a8-1186d0424de1",
+          "f5a0b066-846e-5f66-9c13-04210a877e16"
+        ]
+      },
+      {
+        "key": "main0",
+        "legs": 1,
+        "name": "Rank 1 league",
+        "format": "league",
+        "sources": [
+          {
+            "rank": 1,
+            "poolKey": "pre0"
+          },
+          {
+            "rank": 1,
+            "poolKey": "pre1"
+          },
+          {
+            "rank": 1,
+            "poolKey": "pre2"
+          },
+          {
+            "rank": 1,
+            "poolKey": "pre3"
+          },
+          {
+            "rank": 1,
+            "poolKey": "pre4"
+          }
+        ],
+        "capacity": 5,
+        "stageKey": "main",
+        "stageName": "Final leagues",
+        "stageIndex": 1,
+        "generated": true,
+        "slots": [
+          {
+            "id": "e9c7f342-7a2a-4ab6-a34f-68170d342d91",
+            "position": 1,
+            "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4"
+          },
+          {
+            "id": "8aac0d48-644a-4d06-81b9-0c1fa387f664",
+            "position": 2,
+            "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde"
+          },
+          {
+            "id": "7407541d-fe21-4d2f-8ce6-ae769d0cdad9",
+            "position": 3,
+            "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303"
+          },
+          {
+            "id": "97875489-2f87-4e26-91d6-5bb4ed7d2bb3",
+            "position": 4,
+            "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526"
+          },
+          {
+            "id": "b38284b5-9ce6-4aa4-8619-d995fef2e706",
+            "position": 5,
+            "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+          }
+        ],
+        "registrationIds": [
+          "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+          "f225835f-3e95-4333-9e4b-56f35d748fde",
+          "66110cac-0ca6-450d-8056-61ee4c40a303",
+          "56e3b84f-85ee-4d20-8765-866755a6c526",
+          "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+        ],
+        "candidates": [
+          [
+            "9d4e1648-0cd7-4981-9e30-215ee411f4a4"
+          ],
+          [
+            "f225835f-3e95-4333-9e4b-56f35d748fde"
+          ],
+          [
+            "66110cac-0ca6-450d-8056-61ee4c40a303"
+          ],
+          [
+            "56e3b84f-85ee-4d20-8765-866755a6c526"
+          ],
+          [
+            "14dc9ee8-5e85-4e03-886a-57d3152d4dd7"
+          ]
+        ],
+        "sourceVersion": "571f27b2f574c66fa6068e4e266ff41c5de99b96e5f3f91875c2a36e35089de9",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "ae85fb26-4c24-4716-9607-80e4a1f9aff1",
+            "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+            "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+            "points": 12,
+            "wins": 4,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 4,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:34:38.501Z",
+            "createdAt": "2026-11-16T04:33:44.446Z",
+            "updatedAt": "2026-11-16T04:34:38.502Z"
+          },
+          {
+            "id": "9f472805-dfad-4d92-b5b0-a0a82008d610",
+            "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+            "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 3,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:34:38.501Z",
+            "createdAt": "2026-11-16T04:33:44.433Z",
+            "updatedAt": "2026-11-16T04:34:38.505Z"
+          },
+          {
+            "id": "25fc1ed1-5c6d-4907-9688-fee3a4f74799",
+            "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+            "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 2,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:34:38.501Z",
+            "createdAt": "2026-11-16T04:33:44.444Z",
+            "updatedAt": "2026-11-16T04:34:38.506Z"
+          },
+          {
+            "id": "ce6eb097-7cf7-411b-b709-c5a15954d29e",
+            "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+            "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 1,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:34:38.501Z",
+            "createdAt": "2026-11-16T04:33:44.440Z",
+            "updatedAt": "2026-11-16T04:34:38.508Z"
+          },
+          {
+            "id": "b0669914-9a07-47cf-ae36-ed17afe01f64",
+            "groupId": "81db6375-c4ba-4e22-bee1-b2a60194ffb8",
+            "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 4,
+            "goalsFor": 0,
+            "goalsAgainst": 4,
+            "fairPlayPoints": 0,
+            "position": 5,
+            "recalculatedAt": "2026-11-16T04:34:38.501Z",
+            "createdAt": "2026-11-16T04:33:44.438Z",
+            "updatedAt": "2026-11-16T04:34:38.510Z"
+          }
+        ],
+        "fixtureIds": [
+          "3ca5f9e5-7e81-53ed-acdd-e813348c3bf8",
+          "52809272-2594-55ed-9364-60f50a7262b0",
+          "58ede8af-f711-54e5-918a-2031ca373da6",
+          "653d9556-7ff9-52c9-9d68-2b936a2f608c",
+          "65609c91-abf9-5a8e-9164-0555981400d5",
+          "7f12c1fd-a33e-5d63-a7eb-4115387b0fee",
+          "b4130936-ca6e-5f35-85bc-d0d292757525",
+          "cb7d4a96-9a85-5319-beb6-3de6b59723b8",
+          "fcf5059d-7894-586c-8fb0-5c970f6a1dc9",
+          "fe44d13c-5973-561b-9e31-a3108aa9966c"
+        ]
+      },
+      {
+        "key": "main1",
+        "legs": 1,
+        "name": "Rank 2 league",
+        "format": "league",
+        "sources": [
+          {
+            "rank": 2,
+            "poolKey": "pre0"
+          },
+          {
+            "rank": 2,
+            "poolKey": "pre1"
+          },
+          {
+            "rank": 2,
+            "poolKey": "pre2"
+          },
+          {
+            "rank": 2,
+            "poolKey": "pre3"
+          },
+          {
+            "rank": 2,
+            "poolKey": "pre4"
+          }
+        ],
+        "capacity": 5,
+        "stageKey": "main",
+        "stageName": "Final leagues",
+        "stageIndex": 1,
+        "generated": true,
+        "slots": [
+          {
+            "id": "29f0bf86-e347-4568-b00b-d826d4dfaa33",
+            "position": 1,
+            "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247"
+          },
+          {
+            "id": "c12a933a-a5a5-4edb-99ae-f14fc728f940",
+            "position": 2,
+            "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc"
+          },
+          {
+            "id": "3f818b1b-4703-42a0-a4a7-6d28c538ef3d",
+            "position": 3,
+            "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333"
+          },
+          {
+            "id": "d329140c-a513-4ce0-aab8-385770d6efec",
+            "position": 4,
+            "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0"
+          },
+          {
+            "id": "130f2aad-6379-4617-9c42-ed629c2c4a68",
+            "position": 5,
+            "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+          }
+        ],
+        "registrationIds": [
+          "093c3666-2151-4f5a-8280-b5bd71606247",
+          "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+          "6d6011af-f93c-4e31-a608-d242bc6e1333",
+          "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+          "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+        ],
+        "candidates": [
+          [
+            "093c3666-2151-4f5a-8280-b5bd71606247"
+          ],
+          [
+            "b8307e57-e815-48ff-9565-eb9bdf375ccc"
+          ],
+          [
+            "6d6011af-f93c-4e31-a608-d242bc6e1333"
+          ],
+          [
+            "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0"
+          ],
+          [
+            "62aa581b-1cc4-455b-bed1-d6a7687613ea"
+          ]
+        ],
+        "sourceVersion": "76ea6db8d375ba5540439111de9a3d789349913022d22eef13a5d035033d7f21",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "2302a0c7-0bd8-44b7-97bf-2a552044c583",
+            "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+            "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247",
+            "points": 12,
+            "wins": 4,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 4,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:35:25.387Z",
+            "createdAt": "2026-11-16T04:33:46.546Z",
+            "updatedAt": "2026-11-16T04:35:25.389Z"
+          },
+          {
+            "id": "7dd1da84-4f73-4e7c-bdd7-f0f071b8c178",
+            "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+            "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 3,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:35:25.387Z",
+            "createdAt": "2026-11-16T04:33:46.541Z",
+            "updatedAt": "2026-11-16T04:35:25.391Z"
+          },
+          {
+            "id": "daf19899-e6fd-47dc-a9c0-fbca806d811e",
+            "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+            "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 2,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:35:25.387Z",
+            "createdAt": "2026-11-16T04:33:46.551Z",
+            "updatedAt": "2026-11-16T04:35:25.393Z"
+          },
+          {
+            "id": "02b162f8-4539-4111-8ba0-aab7fd51ca7a",
+            "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+            "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 1,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:35:25.387Z",
+            "createdAt": "2026-11-16T04:33:46.544Z",
+            "updatedAt": "2026-11-16T04:35:25.395Z"
+          },
+          {
+            "id": "5e3d712e-48a2-4ef7-b6cf-b59c1ebd2c0b",
+            "groupId": "dd6fda04-ba8e-4fb4-9e5c-b4cfebd3a8ee",
+            "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 4,
+            "goalsFor": 0,
+            "goalsAgainst": 4,
+            "fairPlayPoints": 0,
+            "position": 5,
+            "recalculatedAt": "2026-11-16T04:35:25.387Z",
+            "createdAt": "2026-11-16T04:33:46.548Z",
+            "updatedAt": "2026-11-16T04:35:25.397Z"
+          }
+        ],
+        "fixtureIds": [
+          "3f5a4e4d-2948-59e0-b313-881bb2beeb32",
+          "573ff641-e08b-52cf-8670-fa6a753bc405",
+          "596f926e-879d-5dd8-a7d5-8cce12b93866",
+          "680195c3-0188-5b84-89e7-0a92cc8f04cf",
+          "a645c874-3034-5057-ad71-98d2ce9705ce",
+          "aebe9232-615a-5ce6-be97-02ba2b78c1c3",
+          "b9404504-32be-50e5-a8fd-44e8f445137b",
+          "cf19d749-16f5-5280-85ac-cf4c9aa90e17",
+          "d7d67d36-95b2-5142-abc7-cf612c3ba0db",
+          "e6ad8284-3f55-5b36-b766-37d51997262d"
+        ]
+      },
+      {
+        "key": "main2",
+        "legs": 1,
+        "name": "Rank 3 league",
+        "format": "league",
+        "sources": [
+          {
+            "rank": 3,
+            "poolKey": "pre0"
+          },
+          {
+            "rank": 3,
+            "poolKey": "pre1"
+          },
+          {
+            "rank": 3,
+            "poolKey": "pre2"
+          },
+          {
+            "rank": 3,
+            "poolKey": "pre3"
+          },
+          {
+            "rank": 3,
+            "poolKey": "pre4"
+          }
+        ],
+        "capacity": 5,
+        "stageKey": "main",
+        "stageName": "Final leagues",
+        "stageIndex": 1,
+        "generated": true,
+        "slots": [
+          {
+            "id": "98c1fd1e-8965-4801-8f99-f8833ec11eed",
+            "position": 1,
+            "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2"
+          },
+          {
+            "id": "32fad069-4635-4bb5-b165-0a3d137f5dde",
+            "position": 2,
+            "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59"
+          },
+          {
+            "id": "49992a3d-ee3e-4a1a-8c71-5aef85cbaa15",
+            "position": 3,
+            "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932"
+          },
+          {
+            "id": "425a5434-e020-4fc5-8240-b2243a33e30d",
+            "position": 4,
+            "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1"
+          },
+          {
+            "id": "0287a02b-b2da-4d39-8fb5-ec91835904b3",
+            "position": 5,
+            "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+          }
+        ],
+        "registrationIds": [
+          "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+          "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+          "377006d7-a702-4f59-b82f-b7e098af9932",
+          "64134b51-3a08-450d-b34d-62b47f6787d1",
+          "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+        ],
+        "candidates": [
+          [
+            "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2"
+          ],
+          [
+            "7329233a-6855-44f1-bd89-41f6a4ac0d59"
+          ],
+          [
+            "377006d7-a702-4f59-b82f-b7e098af9932"
+          ],
+          [
+            "64134b51-3a08-450d-b34d-62b47f6787d1"
+          ],
+          [
+            "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad"
+          ]
+        ],
+        "sourceVersion": "a0b31d819bbaeeba9b2cd47506af3eac2cf52302353f7e8040894e5a8ce91fc3",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "1e145319-2f82-4f2d-807b-2da28833a503",
+            "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+            "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+            "points": 12,
+            "wins": 4,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 4,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:36:11.512Z",
+            "createdAt": "2026-11-16T04:33:49.073Z",
+            "updatedAt": "2026-11-16T04:36:11.513Z"
+          },
+          {
+            "id": "b17d1974-5f8b-4067-aa7d-f744870ca99a",
+            "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+            "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 3,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:36:11.512Z",
+            "createdAt": "2026-11-16T04:33:49.071Z",
+            "updatedAt": "2026-11-16T04:36:11.515Z"
+          },
+          {
+            "id": "8a56e3c2-88de-4b8e-840b-8ff3d6430255",
+            "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+            "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 2,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:36:11.512Z",
+            "createdAt": "2026-11-16T04:33:49.076Z",
+            "updatedAt": "2026-11-16T04:36:11.517Z"
+          },
+          {
+            "id": "861fd57b-e1c2-47fd-bcd0-0419a2094da2",
+            "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+            "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 1,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:36:11.512Z",
+            "createdAt": "2026-11-16T04:33:49.068Z",
+            "updatedAt": "2026-11-16T04:36:11.519Z"
+          },
+          {
+            "id": "69430816-8a35-48e7-a874-b4a4b0ac4cd5",
+            "groupId": "7e179a12-9fa4-40e6-98a8-6c80b9b3cab4",
+            "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 4,
+            "goalsFor": 0,
+            "goalsAgainst": 4,
+            "fairPlayPoints": 0,
+            "position": 5,
+            "recalculatedAt": "2026-11-16T04:36:11.512Z",
+            "createdAt": "2026-11-16T04:33:49.080Z",
+            "updatedAt": "2026-11-16T04:36:11.521Z"
+          }
+        ],
+        "fixtureIds": [
+          "142be204-9c5b-5644-ae0c-e3079a9bce07",
+          "6e7d61b8-29d8-5fa8-9e49-298afad074fe",
+          "a91e660c-ce6c-5aa0-bbe6-6cb4863ae7aa",
+          "bc81a1eb-9b4a-5502-af21-117d64149bdc",
+          "c25204c4-b6b9-5fac-a53d-0c3506ec28ec",
+          "c4a5df27-6f1e-5f52-98bb-3fc4bf68a781",
+          "cebf7740-e996-5acd-b515-d72eda022bcb",
+          "dd9f7b0c-b5af-5ab1-bde1-b4e5e83a2c2d",
+          "ee39aa2b-03c2-5505-81f6-20ff45bfdeca",
+          "f4fb25c0-d173-5d70-aff0-cf683e971519"
+        ]
+      },
+      {
+        "key": "main3",
+        "legs": 1,
+        "name": "Rank 4 league",
+        "format": "league",
+        "sources": [
+          {
+            "rank": 4,
+            "poolKey": "pre0"
+          },
+          {
+            "rank": 4,
+            "poolKey": "pre1"
+          },
+          {
+            "rank": 4,
+            "poolKey": "pre2"
+          },
+          {
+            "rank": 4,
+            "poolKey": "pre3"
+          },
+          {
+            "rank": 4,
+            "poolKey": "pre4"
+          }
+        ],
+        "capacity": 5,
+        "stageKey": "main",
+        "stageName": "Final leagues",
+        "stageIndex": 1,
+        "generated": true,
+        "slots": [
+          {
+            "id": "d746c4af-3f51-4dd9-8f6f-d67c9294e8ac",
+            "position": 1,
+            "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472"
+          },
+          {
+            "id": "4aa6f14c-02d6-40ef-bab9-142d4b452a6b",
+            "position": 2,
+            "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+          },
+          {
+            "id": "328ed51b-fd4a-4650-9878-8d39e3b6f5ff",
+            "position": 3,
+            "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+          },
+          {
+            "id": "23d00d4a-0d59-4676-b6e3-184eb6de219d",
+            "position": 4,
+            "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+          },
+          {
+            "id": "26c101e1-db98-4098-8ac8-ac826de21936",
+            "position": 5,
+            "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+          }
+        ],
+        "registrationIds": [
+          "046667d8-c803-4d0c-8b62-41a4c4564472",
+          "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+          "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+          "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+          "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+        ],
+        "candidates": [
+          [
+            "046667d8-c803-4d0c-8b62-41a4c4564472"
+          ],
+          [
+            "8aeeafde-c819-4a26-8e5b-c62fef3bf08a"
+          ],
+          [
+            "b63702c3-61e3-4175-99b0-4dd2fd68fbd7"
+          ],
+          [
+            "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2"
+          ],
+          [
+            "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8"
+          ]
+        ],
+        "sourceVersion": "1ce1f41f9672598f70b1548e3d04dc758dbf7a02e0ef58a3fd235d1a652db5be",
+        "stale": false,
+        "assigned": true,
+        "complete": true,
+        "started": true,
+        "standings": [
+          {
+            "id": "00e8f940-2c57-4d1a-ab20-0606a9c5806c",
+            "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+            "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472",
+            "points": 12,
+            "wins": 4,
+            "draws": 0,
+            "losses": 0,
+            "goalsFor": 4,
+            "goalsAgainst": 0,
+            "fairPlayPoints": 0,
+            "position": 1,
+            "recalculatedAt": "2026-11-16T04:36:57.999Z",
+            "createdAt": "2026-11-16T04:33:51.294Z",
+            "updatedAt": "2026-11-16T04:36:58.001Z"
+          },
+          {
+            "id": "efbbdd36-8d47-4988-bd2a-ee2de1614a03",
+            "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+            "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+            "points": 9,
+            "wins": 3,
+            "draws": 0,
+            "losses": 1,
+            "goalsFor": 3,
+            "goalsAgainst": 1,
+            "fairPlayPoints": 0,
+            "position": 2,
+            "recalculatedAt": "2026-11-16T04:36:57.999Z",
+            "createdAt": "2026-11-16T04:33:51.283Z",
+            "updatedAt": "2026-11-16T04:36:58.003Z"
+          },
+          {
+            "id": "9546d2cc-b6c7-4a34-9fb4-e83d8be5652a",
+            "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+            "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+            "points": 6,
+            "wins": 2,
+            "draws": 0,
+            "losses": 2,
+            "goalsFor": 2,
+            "goalsAgainst": 2,
+            "fairPlayPoints": 0,
+            "position": 3,
+            "recalculatedAt": "2026-11-16T04:36:57.999Z",
+            "createdAt": "2026-11-16T04:33:51.290Z",
+            "updatedAt": "2026-11-16T04:36:58.005Z"
+          },
+          {
+            "id": "3c8515be-f244-46ad-ad67-d1052e83f7bb",
+            "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+            "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+            "points": 3,
+            "wins": 1,
+            "draws": 0,
+            "losses": 3,
+            "goalsFor": 1,
+            "goalsAgainst": 3,
+            "fairPlayPoints": 0,
+            "position": 4,
+            "recalculatedAt": "2026-11-16T04:36:57.999Z",
+            "createdAt": "2026-11-16T04:33:51.287Z",
+            "updatedAt": "2026-11-16T04:36:58.007Z"
+          },
+          {
+            "id": "5e40788d-723e-4810-8e93-d8c4e60ce315",
+            "groupId": "7081618d-1fc7-4155-8dc0-64abbce23273",
+            "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+            "points": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 4,
+            "goalsFor": 0,
+            "goalsAgainst": 4,
+            "fairPlayPoints": 0,
+            "position": 5,
+            "recalculatedAt": "2026-11-16T04:36:57.999Z",
+            "createdAt": "2026-11-16T04:33:51.279Z",
+            "updatedAt": "2026-11-16T04:36:58.009Z"
+          }
+        ],
+        "fixtureIds": [
+          "1a7b0f30-4f51-5d58-bb8f-7c8c060ba8c1",
+          "22baef57-ffbc-5f62-80d3-70373949b29e",
+          "59ab45e9-bd97-5a48-943f-5d003e5432f6",
+          "71c0b68a-e698-5632-a03a-e61f8a92061e",
+          "7407a714-0929-5c71-88d1-47d2c032cc3f",
+          "8016ea96-dbc1-5f25-98ff-b04d115592d0",
+          "b23b951e-8e10-537f-bb7b-1c5609140719",
+          "d19ff926-4273-5f0d-911c-4f645afb679b",
+          "dd0906b7-a414-5902-96ae-6ee98da57b90",
+          "ea9e51f3-b2af-5bcd-ab4c-6a4f1da307ea"
+        ]
+      }
+    ],
+    "registrations": [
+      {
+        "id": "046667d8-c803-4d0c-8b62-41a4c4564472",
+        "team": {
+          "name": "(테스트) sm 04팀"
+        }
+      },
+      {
+        "id": "093c3666-2151-4f5a-8280-b5bd71606247",
+        "team": {
+          "name": "(테스트) sm 02팀"
+        }
+      },
+      {
+        "id": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+        "team": {
+          "name": "(테스트) sm 17팀"
+        }
+      },
+      {
+        "id": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+        "team": {
+          "name": "(테스트) sm 03팀"
+        }
+      },
+      {
+        "id": "377006d7-a702-4f59-b82f-b7e098af9932",
+        "team": {
+          "name": "(테스트) sm 11팀"
+        }
+      },
+      {
+        "id": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+        "team": {
+          "name": "(테스트) sm 19팀"
+        }
+      },
+      {
+        "id": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+        "team": {
+          "name": "(테스트) sm 20팀"
+        }
+      },
+      {
+        "id": "56e3b84f-85ee-4d20-8765-866755a6c526",
+        "team": {
+          "name": "(테스트) sm 13팀"
+        }
+      },
+      {
+        "id": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+        "team": {
+          "name": "(테스트) sm 18팀"
+        }
+      },
+      {
+        "id": "64134b51-3a08-450d-b34d-62b47f6787d1",
+        "team": {
+          "name": "(테스트) sm 15팀"
+        }
+      },
+      {
+        "id": "66110cac-0ca6-450d-8056-61ee4c40a303",
+        "team": {
+          "name": "(테스트) sm 09팀"
+        }
+      },
+      {
+        "id": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+        "team": {
+          "name": "(테스트) sm 10팀"
+        }
+      },
+      {
+        "id": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+        "team": {
+          "name": "(테스트) sm 07팀"
+        }
+      },
+      {
+        "id": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+        "team": {
+          "name": "(테스트) sm 08팀"
+        }
+      },
+      {
+        "id": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+        "team": {
+          "name": "(테스트) sm 01팀"
+        }
+      },
+      {
+        "id": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+        "team": {
+          "name": "(테스트) sm 16팀"
+        }
+      },
+      {
+        "id": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+        "team": {
+          "name": "(테스트) sm 12팀"
+        }
+      },
+      {
+        "id": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+        "team": {
+          "name": "(테스트) sm 06팀"
+        }
+      },
+      {
+        "id": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+        "team": {
+          "name": "(테스트) sm 14팀"
+        }
+      },
+      {
+        "id": "f225835f-3e95-4333-9e4b-56f35d748fde",
+        "team": {
+          "name": "(테스트) sm 05팀"
+        }
+      }
+    ]
+  },
+  "publicFinalRankings": [
+    {
+      "poolKey": "main0",
+      "name": "2-1 · Final leagues · Rank 1 league",
+      "standings": [
+        {
+          "position": 1,
+          "teamName": "(테스트) sm 01팀",
+          "registrationId": "9d4e1648-0cd7-4981-9e30-215ee411f4a4",
+          "points": 12,
+          "wins": 4,
+          "losses": 0
+        },
+        {
+          "position": 2,
+          "teamName": "(테스트) sm 05팀",
+          "registrationId": "f225835f-3e95-4333-9e4b-56f35d748fde",
+          "points": 9,
+          "wins": 3,
+          "losses": 1
+        },
+        {
+          "position": 3,
+          "teamName": "(테스트) sm 09팀",
+          "registrationId": "66110cac-0ca6-450d-8056-61ee4c40a303",
+          "points": 6,
+          "wins": 2,
+          "losses": 2
+        },
+        {
+          "position": 4,
+          "teamName": "(테스트) sm 13팀",
+          "registrationId": "56e3b84f-85ee-4d20-8765-866755a6c526",
+          "points": 3,
+          "wins": 1,
+          "losses": 3
+        },
+        {
+          "position": 5,
+          "teamName": "(테스트) sm 17팀",
+          "registrationId": "14dc9ee8-5e85-4e03-886a-57d3152d4dd7",
+          "points": 0,
+          "wins": 0,
+          "losses": 4
+        }
+      ]
+    },
+    {
+      "poolKey": "main1",
+      "name": "2-2 · Final leagues · Rank 2 league",
+      "standings": [
+        {
+          "position": 1,
+          "teamName": "(테스트) sm 02팀",
+          "registrationId": "093c3666-2151-4f5a-8280-b5bd71606247",
+          "points": 12,
+          "wins": 4,
+          "losses": 0
+        },
+        {
+          "position": 2,
+          "teamName": "(테스트) sm 06팀",
+          "registrationId": "b8307e57-e815-48ff-9565-eb9bdf375ccc",
+          "points": 9,
+          "wins": 3,
+          "losses": 1
+        },
+        {
+          "position": 3,
+          "teamName": "(테스트) sm 10팀",
+          "registrationId": "6d6011af-f93c-4e31-a608-d242bc6e1333",
+          "points": 6,
+          "wins": 2,
+          "losses": 2
+        },
+        {
+          "position": 4,
+          "teamName": "(테스트) sm 14팀",
+          "registrationId": "ef28ad2d-0f66-4ff8-b347-2d8ef9d8b9c0",
+          "points": 3,
+          "wins": 1,
+          "losses": 3
+        },
+        {
+          "position": 5,
+          "teamName": "(테스트) sm 18팀",
+          "registrationId": "62aa581b-1cc4-455b-bed1-d6a7687613ea",
+          "points": 0,
+          "wins": 0,
+          "losses": 4
+        }
+      ]
+    },
+    {
+      "poolKey": "main2",
+      "name": "2-3 · Final leagues · Rank 3 league",
+      "standings": [
+        {
+          "position": 1,
+          "teamName": "(테스트) sm 03팀",
+          "registrationId": "3475b99e-3a0d-4eff-a8d9-9e059f99cdc2",
+          "points": 12,
+          "wins": 4,
+          "losses": 0
+        },
+        {
+          "position": 2,
+          "teamName": "(테스트) sm 07팀",
+          "registrationId": "7329233a-6855-44f1-bd89-41f6a4ac0d59",
+          "points": 9,
+          "wins": 3,
+          "losses": 1
+        },
+        {
+          "position": 3,
+          "teamName": "(테스트) sm 11팀",
+          "registrationId": "377006d7-a702-4f59-b82f-b7e098af9932",
+          "points": 6,
+          "wins": 2,
+          "losses": 2
+        },
+        {
+          "position": 4,
+          "teamName": "(테스트) sm 15팀",
+          "registrationId": "64134b51-3a08-450d-b34d-62b47f6787d1",
+          "points": 3,
+          "wins": 1,
+          "losses": 3
+        },
+        {
+          "position": 5,
+          "teamName": "(테스트) sm 19팀",
+          "registrationId": "4d9ae755-eb08-40a6-9cb9-6f1c223c66ad",
+          "points": 0,
+          "wins": 0,
+          "losses": 4
+        }
+      ]
+    },
+    {
+      "poolKey": "main3",
+      "name": "2-4 · Final leagues · Rank 4 league",
+      "standings": [
+        {
+          "position": 1,
+          "teamName": "(테스트) sm 04팀",
+          "registrationId": "046667d8-c803-4d0c-8b62-41a4c4564472",
+          "points": 12,
+          "wins": 4,
+          "losses": 0
+        },
+        {
+          "position": 2,
+          "teamName": "(테스트) sm 08팀",
+          "registrationId": "8aeeafde-c819-4a26-8e5b-c62fef3bf08a",
+          "points": 9,
+          "wins": 3,
+          "losses": 1
+        },
+        {
+          "position": 3,
+          "teamName": "(테스트) sm 12팀",
+          "registrationId": "b63702c3-61e3-4175-99b0-4dd2fd68fbd7",
+          "points": 6,
+          "wins": 2,
+          "losses": 2
+        },
+        {
+          "position": 4,
+          "teamName": "(테스트) sm 16팀",
+          "registrationId": "a8f4d79a-4c4f-402a-8cfe-7d113c81e4e2",
+          "points": 3,
+          "wins": 1,
+          "losses": 3
+        },
+        {
+          "position": 5,
+          "teamName": "(테스트) sm 20팀",
+          "registrationId": "4e2efcd3-a9ce-4fc2-a511-c2a8b12cc9c8",
+          "points": 0,
+          "wins": 0,
+          "losses": 4
+        }
+      ]
+    }
+  ],
+  "publicFixtureCount": 70,
+  "pageResponses": [
+    {
+      "route": "results",
+      "status": 200,
+      "bytes": 225261,
+      "containsTournamentId": true,
+      "serverText": " teameet 홈 매치 대회 팀 마이 최종결과 최종결과 teameet 같이 뛸 사람을 한 번에 공지사항 서비스 이용약관 개인정보처리방침 위치기반서비스 이용약관 대회 운영정책 고객센터 © 2026 Teameet 홈 매치 대회 팀 마이 (테스트) sm 20teams ranked leagues 20261116 경기 결과 | Teameet 진행 단계 Preliminary Final leagues 각 편성의 순위를 따로 계산해요. 서로 다른 단계·리그의 승점을 합쳐 전체 순위로 표시하지 않아요. A · 풀리그 4 팀 · 1회전 # 팀 전적 승점 득실 1 (테스트) sm 01팀 3 - 0 - 0 9 점 + 3 2 (테스트) sm 02팀 2 - 0 - 1 6 점 + 1 3 (테스트) sm 03팀 1 - 0 - 2 3 점 -1 4 (테스트) sm 04팀 0 - 0 - 3 0 점 -3 1 경기 · (테스트) sm 01팀 vs (테스트) sm 04팀 1 : 0 2 경기 · (테스트) sm 02팀 vs (테스트) sm 03팀 1 : 0 3 경기 · (테스트) sm 03팀 vs (테스트) sm 01팀 0 : 1 4 경기 · (테스트) sm 04팀 vs (테스트) sm 02팀 0 : 1 5 경기 · (테스트) sm 01팀 vs (테스트) sm 02팀 1 : 0 6 경기 · (테스트) sm 03팀 vs (테스트) sm 04팀 1 : 0 B · 풀리그 4 팀 · 1회전 # 팀 전적 승점 득실 1 (테스트) sm 05팀 3 - 0 - 0 9 점 + 3 2 (테스트) sm 06팀 2 - 0 - 1 6 점 + 1 3 (테스트) sm 07팀 1 - 0 - 2 3 점 -1 4 (테스트) sm 08팀 0 - 0 - 3 0 점 -3 7 경기 · (테스트) sm 05팀 vs (테스트) sm 08팀 1 : 0 8 경기 · (테스트) sm 06팀 vs (테스트) sm 07팀 1 : 0 9 경기 · (테스트) sm 07팀 vs (테스트) sm 05팀 0 : 1 10 경기 · (테스트) sm 08팀 vs (테스트) sm 06팀 0 : 1 11 경기 · (테스트) sm 05팀 vs (테스트) sm 06팀 1 : 0 12 경기 · (테스트) sm 07팀 vs (테스트) sm 08팀 1 : 0 C · 풀리그 4 팀 · 1회전 # 팀 전적 승점 득실 1 (테스트) sm 09팀 3 - 0 - 0 9 점 + 3 2 (테스트) sm 10팀 2 - 0 - 1 6 점 + 1 3 (테스트) sm 11팀 1 - 0 - 2 3 점 -1 4 (테스트) sm 12팀 0 - 0 - 3 0 점 -3 13 경기 · (테스트) sm 09팀 vs (테스트) sm 12팀 1 : 0 14 경기 · (테스트) sm 10팀 vs (테스트) sm 11팀 1 : 0 15 경기 · (테스트) sm 11팀 vs (테스트) sm 09팀 0 : 1 16 경기 · (테스트) sm 12팀 vs (테스트) sm 10팀 0 : 1 17 경기 · (테스트) sm 09팀 vs (테스트) sm 10팀 1 : 0 18 경기 · (테스트) sm 11팀 vs (테스트) sm 12팀 1 : 0 D · 풀리그 4 팀 · 1회전 # 팀 전적 승점 득실 1 (테스트) sm 13팀 3 - 0 - 0 9 점 + 3 2 (테스트) sm 14팀 2 - 0 - 1 6 점 + 1 3 (테스트) sm 15팀 1 - 0 - 2 3 점 -1 4 (테스트) sm 16팀 0 - 0 - 3 0 점 -3 19 경기 · (테스트) sm 13팀 vs (테스트) sm 16팀 1 : 0 20 경기 · (테스트) sm 14팀 vs (테스트) sm 15팀 1 : 0 21 경기 · (테스트) sm 15팀 vs (테스트) sm 13팀 0 : 1 22 경기 · (테스트) sm 16팀 vs (테스트) sm 14팀 0 : 1 23 경기 · (테스트) sm 13팀 vs (테스트) sm 14팀 1 : 0 24 경기 · (테스트) sm 15팀 vs (테스트) sm 16팀 1 : 0 E · 풀리그 4 팀 · 1회전 # 팀 전적 승점 득실 1 (테스트) sm 17팀 3 - 0 - 0 9 점 + 3 2 (테스트) sm 18팀 2 - 0 - 1 6 점 + 1 3 (테스트) sm 19팀 1 - 0 - 2 3 점 -1 4 (테스트) sm 20팀 0 - 0 - 3 0 점 -3 25 경기 · (테스트) sm 17팀 vs (테스트) sm 20팀 1 : 0 26 경기 · (테스트) sm 18팀 vs (테스트) sm 19팀 1 : 0 27 경기 · (테스트) sm 19팀 vs (테스트) sm 17팀 0 : 1 28 경기 · (테스트) sm 20팀 vs (테스트) sm 18팀 0 : 1 29 경기 · (테스트) sm 17팀 vs (테스트) sm 18팀 1 : 0 30 경기 · (테스트) sm 19팀 vs (테스트) sm 20팀 1 : 0 순위·브래킷 시상·리뷰 "
+    },
+    {
+      "route": "awards",
+      "status": 200,
+      "bytes": 189480,
+      "containsTournamentId": true,
+      "serverText": " teameet 홈 매치 대회 팀 마이 시상·리뷰 시상·리뷰 teameet 같이 뛸 사람을 한 번에 공지사항 서비스 이용약관 개인정보처리방침 위치기반서비스 이용약관 대회 운영정책 고객센터 © 2026 Teameet 홈 매치 대회 팀 마이 (테스트) sm 20teams ranked leagues 20261116 개인 시상 | Teameet (테스트) sm 20teams ranked leagues 20261116 시상과 리뷰 Final leagues · Rank 1 league 시상 결과 (테스트) sm 01팀 , 우승을 축하드려요! 🎉 (테스트) sm 05팀 2 (테스트) sm 01팀 1 (테스트) sm 09팀 3 Final leagues · Rank 2 league 시상 결과 (테스트) sm 02팀 , 우승을 축하드려요! 🎉 (테스트) sm 06팀 2 (테스트) sm 02팀 1 (테스트) sm 10팀 3 Final leagues · Rank 3 league 시상 결과 (테스트) sm 03팀 , 우승을 축하드려요! 🎉 (테스트) sm 07팀 2 (테스트) sm 03팀 1 (테스트) sm 11팀 3 Final leagues · Rank 4 league 시상 결과 (테스트) sm 04팀 , 우승을 축하드려요! 🎉 (테스트) sm 08팀 2 (테스트) sm 04팀 1 (테스트) sm 12팀 3 개인 어워드 MVP · 득점왕 등 개인 어워드는 아직 발표되지 않았어요. 개인 기록 아직 기록이 없어요 확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요. 참가팀 후기 아직 등록된 후기가 없어요 후기 작성 자격을 확인하고 있어요. 다른 대회 보기 결과 공유 최종결과 "
+    }
+  ],
+  "awardScopeTracks": [
+    "stage:main0",
+    "stage:main1",
+    "stage:main2",
+    "stage:main3"
+  ],
+  "awardSets": [],
+  "visualQA": {
+    "completed": false,
+    "reason": "Browser access host unavailable; native app approval timed out",
+    "viewportsVerified": 0
+  },
+  "playerRecords": {
+    "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+    "goals": [
+      {
+        "userId": "ab72c17d-1618-4286-8f6e-18e920f83f40",
+        "nickname": "sm20261116t01p02",
+        "profileHref": "/users/ab72c17d-1618-4286-8f6e-18e920f83f40",
+        "goals": 7,
+        "assists": 0
+      },
+      {
+        "userId": "9b3d8e8d-bb15-4b2a-80ba-decbce26871d",
+        "nickname": "sm20261116t02p02",
+        "profileHref": "/users/9b3d8e8d-bb15-4b2a-80ba-decbce26871d",
+        "goals": 6,
+        "assists": 0
+      },
+      {
+        "userId": "538b0cff-b207-4d11-8f87-b16904f1beab",
+        "nickname": "sm20261116t05p02",
+        "profileHref": "/users/538b0cff-b207-4d11-8f87-b16904f1beab",
+        "goals": 6,
+        "assists": 0
+      },
+      {
+        "userId": "91878f6e-669f-451c-80a7-10338fddef68",
+        "nickname": "sm20261116t03p02",
+        "profileHref": "/users/91878f6e-669f-451c-80a7-10338fddef68",
+        "goals": 5,
+        "assists": 0
+      },
+      {
+        "userId": "859a59a6-7d5f-453a-80e5-475fa75899f7",
+        "nickname": "sm20261116t06p02",
+        "profileHref": "/users/859a59a6-7d5f-453a-80e5-475fa75899f7",
+        "goals": 5,
+        "assists": 0
+      },
+      {
+        "userId": "c5ee03f8-4dbc-4df8-82c4-8ed08e6c5907",
+        "nickname": "sm20261116t09p02",
+        "profileHref": "/users/c5ee03f8-4dbc-4df8-82c4-8ed08e6c5907",
+        "goals": 5,
+        "assists": 0
+      },
+      {
+        "userId": "53e43ec1-dfe7-489b-8b9c-9232f4a3255c",
+        "nickname": "sm20261116t07p02",
+        "profileHref": "/users/53e43ec1-dfe7-489b-8b9c-9232f4a3255c",
+        "goals": 4,
+        "assists": 0
+      },
+      {
+        "userId": "ce7b0849-7e48-4654-80e6-151c6efe321d",
+        "nickname": "sm20261116t10p02",
+        "profileHref": "/users/ce7b0849-7e48-4654-80e6-151c6efe321d",
+        "goals": 4,
+        "assists": 0
+      },
+      {
+        "userId": "92298a4e-6afa-46a5-80a9-208fc08754f1",
+        "nickname": "sm20261116t13p02",
+        "profileHref": "/users/92298a4e-6afa-46a5-80a9-208fc08754f1",
+        "goals": 4,
+        "assists": 0
+      },
+      {
+        "userId": "88fea55a-16ed-420d-897f-28458b05469c",
+        "nickname": "sm20261116t04p02",
+        "profileHref": "/users/88fea55a-16ed-420d-897f-28458b05469c",
+        "goals": 4,
+        "assists": 0
+      },
+      {
+        "userId": "c3bacccd-c38d-41d8-8f2f-f85c6f96c90d",
+        "nickname": "sm20261116t11p02",
+        "profileHref": "/users/c3bacccd-c38d-41d8-8f2f-f85c6f96c90d",
+        "goals": 3,
+        "assists": 0
+      },
+      {
+        "userId": "9b7718fe-7263-447b-8e41-afce5f64b34f",
+        "nickname": "sm20261116t14p02",
+        "profileHref": "/users/9b7718fe-7263-447b-8e41-afce5f64b34f",
+        "goals": 3,
+        "assists": 0
+      },
+      {
+        "userId": "64368996-5b7d-400e-84da-72ce9f640c5e",
+        "nickname": "sm20261116t17p02",
+        "profileHref": "/users/64368996-5b7d-400e-84da-72ce9f640c5e",
+        "goals": 3,
+        "assists": 0
+      },
+      {
+        "userId": "f2627c21-2c20-4f55-86ab-18b88b103028",
+        "nickname": "sm20261116t08p02",
+        "profileHref": "/users/f2627c21-2c20-4f55-86ab-18b88b103028",
+        "goals": 3,
+        "assists": 0
+      },
+      {
+        "userId": "f266c6ab-dd8e-49ae-82ca-58b0c6c62f0d",
+        "nickname": "sm20261116t15p02",
+        "profileHref": "/users/f266c6ab-dd8e-49ae-82ca-58b0c6c62f0d",
+        "goals": 2,
+        "assists": 0
+      },
+      {
+        "userId": "e11d8021-a04e-434f-8837-f8571679ec7d",
+        "nickname": "sm20261116t18p02",
+        "profileHref": "/users/e11d8021-a04e-434f-8837-f8571679ec7d",
+        "goals": 2,
+        "assists": 0
+      },
+      {
+        "userId": "30cdff26-1245-421a-83ee-7ae1cd34db89",
+        "nickname": "sm20261116t12p02",
+        "profileHref": "/users/30cdff26-1245-421a-83ee-7ae1cd34db89",
+        "goals": 2,
+        "assists": 0
+      },
+      {
+        "userId": "1941969d-c054-44ed-89eb-ba6ae21d5efb",
+        "nickname": "sm20261116t19p02",
+        "profileHref": "/users/1941969d-c054-44ed-89eb-ba6ae21d5efb",
+        "goals": 1,
+        "assists": 0
+      },
+      {
+        "userId": "8de95990-6126-453f-896a-0369abdf4a99",
+        "nickname": "sm20261116t16p02",
+        "profileHref": "/users/8de95990-6126-453f-896a-0369abdf4a99",
+        "goals": 1,
+        "assists": 0
+      }
+    ],
+    "assists": [],
+    "hiddenByEligibility": false
+  }
+}

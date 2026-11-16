@@ -8,9 +8,13 @@
 
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 
+최신 UI 후속: 기존 대회의 도구 패널·페이지 틀·경기 카드·우승/영상 요약을 재사용한다. 사용자 승인 headed Playwright로 Alpha before7 routes×3폭=21/21 캡처. 코드 회귀104건 및 worker 상태 fixture 검증 PASS, after0/21은 새 dev 배포 뒤 진행한다. [현행 UI cursor](./competition-stage-composition.md#2026-11-16--기존-대회-화면과-디자인-통일).
+
+후속 동등성 수정 [PR #2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419): 감사40/40 추적, 실제DB15건+worker1건·6강 정정RED→GREEN, 최종Web65건·타입/규칙 검사 PASS. CI·Copilot 확인 중이며 새로운 코드의 Alpha 시각 검증0/3은 차단 상태다.
+
 [시나리오](./competition-stage-composition.md) · [작업](../../.github/tasks/20261130-competition-stage-composition.md).
 기존 생성·데이터를 보존하고 별도 생성 진입에서 단일 본선 또는 여러 리그/토너먼트 단계를 구성한다.
-로컬 임시 DB의70경기/3단계 검증을 진행했으며 Alpha 기능0/8·viewport0/3은 미배포다.
+2026-11-16 최신 Alpha에서 사용자 지정20팀×7명·예선5조→순위별 본선4리그를 실제 신청·접수·Game 운영으로70경기 공식 확정하고completed까지 확인했다. 공개 순위·팀당7경기·개인70골·결과/시상HTTP200 및 시상 서버HTML 검증. 완전자동 배정은 없고 후보 추천 뒤4편성 확정 필요. 브라우저 접근 실패로viewport0/3·클릭/console/network는 미검증. [실측 증거/한계](./competition-stage-composition.md#2026-11-16-최신-실행-결과-앞선-대기-cursor-대체).
 
 ## 2026-11-08 — 필드 담당자 운영콘솔 체험과 오버레이 안내
 
@@ -653,3 +657,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 2026-10-16: [참가팀 상세 우측 안내와 참가 카드](./tournament-participant-sidebar.md) — 로컬 검증 완료, Alpha 배포/실제 로그인 검증 대기.
 
 - [League registered time choices](league-schedule-time-picker.md): local API/Web checks; alpha 0/10 flows and 0/3 viewports pending deployment.
+
+2026-11-16 후속: 사용자 승인으로 동등성 감사40항목 전체를 수정·확장했다. 새20팀 자동 본선/70경기/전체1~20위·종료 실제DB 및 운영 UI125건 검증. 기존 Alpha70경기는 그대로다. 새 변경의3폭 시각 검증은 브라우저 host unavailable로0/3이며 완료로 표시하지 않는다. [수정 cursor](./competition-stage-composition.md#2026-11-16-동등성-전체-수정--최신-cursor).

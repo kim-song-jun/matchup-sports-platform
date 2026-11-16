@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../../auth/optional-v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
+import { PublicTournamentScheduleQueryDto, TournamentRecordScopeQueryDto } from './dto/public-records-query.dto';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
 
 /**
@@ -34,8 +34,8 @@ export class PublicTournamentRecordsController {
    * 리그의 `GET /league-matches/:leagueId/player-records`와 같은 계약.
    */
   @Get(':tournamentId/player-records')
-  getPlayerRecords(@Param('tournamentId') tournamentId: string) {
-    return this.tournamentRecords.getPlayerRecords(tournamentId);
+  getPlayerRecords(@Param('tournamentId') tournamentId: string, @Query() scope: TournamentRecordScopeQueryDto = {}) {
+    return this.tournamentRecords.getPlayerRecords(tournamentId, scope);
   }
 
   @Get(':tournamentId/matches/:fixtureId')

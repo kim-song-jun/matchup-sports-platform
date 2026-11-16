@@ -4668,12 +4668,12 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
  * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹(비게이팅).
  * 공개 랭킹과 달리 동의 게이팅이 없어 진짜 순위를 보장한다.
  */
-export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
+export function useV1AdminTournamentPlayerRecords(tournamentId: string, scope: { stageKey?: string; poolKey?: string } = {}) {
   const { v1Get } = useV1DataSource();
   return useQuery({
-    queryKey: v1Keys.adminTournamentPlayerRecords(tournamentId),
+    queryKey: [...v1Keys.adminTournamentPlayerRecords(tournamentId), scope.stageKey ?? '', scope.poolKey ?? ''],
     queryFn: () =>
-      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records`),
+      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records${scope.stageKey || scope.poolKey ? `?${new URLSearchParams({ ...(scope.stageKey ? { stageKey: scope.stageKey } : {}), ...(scope.poolKey ? { poolKey: scope.poolKey } : {}) })}` : ''}`),
     enabled: !!tournamentId,
   });
 }

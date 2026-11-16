@@ -42,7 +42,7 @@ import {
 } from './public-score-presentation';
 import { isPublicLiveEnabled } from './public-live-flag';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
-import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
+import type { PublicTournamentScheduleQueryDto, TournamentRecordScopeQueryDto } from './dto/public-records-query.dto';
 import {
   byUnknownLast,
   isTournamentParticipantNameGatingReverted,
@@ -416,7 +416,7 @@ export class PublicTournamentRecordsService {
    * 몰수·중단 경기는 별도 제외하지 않는다: 운영자가 스코어만 입력한 경기는
    * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
    */
-  async getPlayerRecords(tournamentId: string) {
+  async getPlayerRecords(tournamentId: string, scope: TournamentRecordScopeQueryDto = {}) {
     const tournament = await findPublicTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
@@ -440,7 +440,7 @@ export class PublicTournamentRecordsService {
           tournamentId,
           leagueId: null,
           deletedAt: null,
-          tournamentDetails: { is: { tournamentId } },
+          tournamentDetails: { is: { tournamentId, ...(scope.stageKey || scope.poolKey ? { group: { is: { ...(scope.stageKey ? { stageKey: scope.stageKey } : {}), ...(scope.poolKey ? { poolKey: scope.poolKey } : {}) } } } : {}) } },
         },
       },
       select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
@@ -549,7 +549,7 @@ export class PublicTournamentRecordsService {
    * 동일인 판단 근거가 없다(어드민 통계 탭이 이미 같은 폴백을 쓴다). 이름·팀은
    * 마지막으로 본 스냅샷을 쓴다.
    */
-  async getPlayerRecordsForAdmin(tournamentId: string) {
+  async getPlayerRecordsForAdmin(tournamentId: string, scope: TournamentRecordScopeQueryDto = {}) {
     // 없는 대회 id에 빈 200을 주면 클라이언트 오배선이 "데이터 없음"으로 위장된다
     // (리뷰 지적) — 공개 라우트와 달리 어드민 표면이라 명시적 코드를 쓴다.
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
@@ -569,7 +569,7 @@ export class PublicTournamentRecordsService {
           tournamentId,
           leagueId: null,
           deletedAt: null,
-          tournamentDetails: { is: { tournamentId } },
+          tournamentDetails: { is: { tournamentId, ...(scope.stageKey || scope.poolKey ? { group: { is: { ...(scope.stageKey ? { stageKey: scope.stageKey } : {}), ...(scope.poolKey ? { poolKey: scope.poolKey } : {}) } } } : {}) } },
         },
       },
       select: { currentOfficialRevisionId: true },

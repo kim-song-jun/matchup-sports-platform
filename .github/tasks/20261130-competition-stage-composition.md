@@ -229,6 +229,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 구조 저장은 기존 multiFinals와 독립인 versioned stagePlan으로 한다. 기존 그룹에는 stageKey/poolKey를 추가하고, 경기 정본은 그대로 재사용한다. 기존 행의 stagePlan=null/entryScope=legacy는 동작을 유지한다.
 
 ## 2026-11-16 동등성 수정 Progress Snapshot
+- 사용자 재리뷰 후 P1 수정: GamesService → stage-view → multi-finals-seeding → multi-finals-plan → LeagueFixtureGeneratorService → GamesService 순환으로 기존 API CI의 실제 앱 초기화가 실패했다. 읽기용 크기·오류 정의를 multi-finals-definition.ts로 분리해 planner의 기존 export 호환성을 유지했다. 냉시작 Nest 주입 RED1→GREEN1 및 대진 계산 포함34건, 실제 HTTP/DB76건(운영 보드58·health2·단계15·worker1) PASS. 운영 보드 첫 로컬 실행의 프리셋 누락58건은 CI와 같은 competition-config-backfill CLI를 소유 DB에 적용한 뒤 재검증해 PASS. 최종 API 타입·surface PASS. 새 head CI·Copilot은 후속 확인한다.
 - dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현 커밋2e3e6e793. CI Gates/API/Web 및 최신 head Copilot 확인 중. 사용자 요청 범위는 PR 생성까지이며 머지·main 승격 없음. 소유 PostgreSQL 컨테이너2개 실행분과 전용 볼륨, 공유 의존성 링크를 정리했다. 미병합 브랜치/worktree·재현용 ignored 의존성·Alpha 테스트 데이터는 보존한다.
 - 최종 로컬 검증: 실제DB15건+실제worker1건 PASS, 6강 종료 후 정정 완료 판정 RED1→GREEN1, API/Web 타입·surface/pattern PASS, Web 최종4 suites65건 PASS. 상세와 이전 회귀 실행은 시나리오 최종 검증 기록 참조. 구현 커밋과 dev PR 생성 단계이며 Alpha 시각0/3 차단은 유지한다.
 - 범위: 감사40/40. 기존16 유지, 수정/확장22, 권한·경쟁1, 시각 차단1을 동일 시나리오에 추적한다.

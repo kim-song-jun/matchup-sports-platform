@@ -1,12 +1,10 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { invalidMultiFinal, namedFinalSize } from './multi-finals-definition';
+export { invalidMultiFinal, namedFinalSize } from './multi-finals-definition';
 import type { V1TournamentGroupPhase } from '@prisma/client';
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 import type { BracketTemplatePlan, PlanFixture, PlanSlot } from '../templates/bracket-template-plan';
 import type { FinalRankRuleDto, NamedFinalDto, PreliminaryGroupDto } from './multi-finals.dto';
 
-export const invalidMultiFinal = (message: string): never => {
-  throw new UnprocessableEntityException({ code: 'MULTI_FINAL_INVALID', message });
-};
 export function validateNamedFinals(finals: readonly NamedFinalDto[], groups: ReadonlyMap<string, number>) {
   if (!finals.length) invalidMultiFinal('토너먼트를 하나 이상 추가해 주세요.');
   const names = new Set<string>(); const rules = new Set<string>(); const teams = new Set<string>();
@@ -53,10 +51,6 @@ export function planPreliminaryGroups(groups: readonly PreliminaryGroupDto[]): B
   return plan;
 }
 
-/** Explicit capacity lets creation precede rank rules; legacy definitions keep their original size. */
-export function namedFinalSize(final: NamedFinalDto): number {
-  return final.capacity ?? (final.registrationIds == null ? final.rules.length : final.registrationIds.length);
-}
 
 /** Team changes with identical topology can fill existing games without losing their schedule. */
 export function sameNamedFinalStructure(left: readonly NamedFinalDto[], right: readonly NamedFinalDto[]): boolean {

@@ -185,6 +185,7 @@ Cleanup: 이번 임시 SecureString 삭제(ParameterNotFound 확인), Alpha 컨�
 
 ### 최종 검증 기록 — 동등성 수정 PR
 
+- 재리뷰 P1: 읽기 전용 stage-view가 교차 시드 계산을 통해 decorated LeagueFixtureGeneratorService까지 불러와 GamesService constructor metadata를 undefined로 고정했다. API CI에서 반복된 공통 Nest 초기화 실패를 냉시작 테스트로 재현(RED1), 순수 multi-finals-definition 분리 후 Nest 주입·기존 대진 계산34건 PASS. 실제 DB/HTTP는 health2·단계15·worker1 및 운영 보드58건 PASS. 운영 보드 첫 실행은 CI 선행 절차인 경기 규칙 프리셋 초기화를 빠뜨려58건 실패했으며, 공식 backfill CLI를 이 작업 소유 DB에 실행한 뒤 해당58건 전부 PASS. 제품 실패를 환경 성공으로 대체하지 않았다. 변경하지 않은 Web/Gates는 기존 head CI PASS이고 API 전체 CI는 수정 head에서 다시 확인한다.
 - dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현2e3e6e793. CI·Copilot 확인 중, Alpha 시각0/3 차단. 검증 전용 PostgreSQL 컨테이너·볼륨과 공유 의존성 링크 정리 완료; 미병합 worktree와 Alpha 원본 테스트 데이터 보존.
 - 6강 완료 후 첫 경기 성적 정정으로 직행팀이 달라지는 실제DB 회귀: 수정 전 complete=true 오판 RED1 → 최신 실제 준결승·결승 배정 일치를 완료 조건에 추가 → 같은 경로 GREEN1. 마지막 boolean 조건 변경은 해당 실제DB/TypeScript 컴파일 경로로 재검증했다.
 - 격리 PostgreSQL16/LF241 migration 재생 PASS. `stage-plan.integration-spec.ts` 15/15 PASS: 20팀 자동 본선 진출·70경기·1~20위·종료, 혼합3단계, 예선 없는 리그/KO, 초안/CAS, 부분교체, 시간 상속, 경기 복원/취소 재경기,6강·와일드카드, 권한, 마지막 경기 복원, 무작위 배정. 취소 표시로 유효한 공식 결과를 재경기 처리하는 우회도 거부하는지 검증했다.

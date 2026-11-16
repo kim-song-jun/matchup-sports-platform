@@ -2507,10 +2507,16 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     // constant round-trip per page -- it does not grow with page size, which is exactly what
     // this test defends. The count moving 4 -> 5 is the intended new contract, not a regression;
     // an N+1 regression would show up as a per-row multiple, not a fixed +1.
-    expect(queryLog).toHaveLength(5);
+    //
+    // 운영 보드 정렬(끝나지 않은 경기 먼저, 끝난 경기 나중): 대회 경기를 두 구간으로 나눠 읽는다. 한 페이지가 끝나지 않은
+    // 구간(open)만으로 차지 않으면 끝난 구간(done)을 처음부터 이어 읽으므로 `V1TeamMatch.findMany` 가 한 번 더 나가 5 -> 6 이 된다.
+    // 이 페이지(limit 100, 끝나지 않은 경기 100건)는 정확히 그 경계 — 100 < limit + 1 이라 done 구간을 한 번 읽는다.
+    // 페이지 크기·행 수와 무관한 고정 +1 이다(행마다 늘어나는 N+1 이 아니다).
+    expect(queryLog).toHaveLength(6);
     expect([...queryLog].sort()).toEqual(
       [
         'V1Tournament.findFirst',
+        'V1TeamMatch.findMany',
         'V1TeamMatch.findMany',
         'V1GameLineup.findMany',
         'V1GameSide.findMany',

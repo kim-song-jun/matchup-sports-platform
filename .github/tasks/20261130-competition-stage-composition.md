@@ -1,6 +1,6 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: In Progress — 동등성40항목 수정·확장 및 실제 DB/회귀 검증, dev PR 준비; Alpha 시각 QA 미완료
+Status: In Progress — 동등성40항목 수정·확장 및 실제 DB/회귀 검증, dev PR #2419; CI·Copilot 확인 중, Alpha 시각 QA 미완료
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
@@ -229,6 +229,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 구조 저장은 기존 multiFinals와 독립인 versioned stagePlan으로 한다. 기존 그룹에는 stageKey/poolKey를 추가하고, 경기 정본은 그대로 재사용한다. 기존 행의 stagePlan=null/entryScope=legacy는 동작을 유지한다.
 
 ## 2026-11-16 동등성 수정 Progress Snapshot
+- dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현 커밋2e3e6e793. CI Gates/API/Web 및 최신 head Copilot 확인 중. 사용자 요청 범위는 PR 생성까지이며 머지·main 승격 없음. 소유 PostgreSQL 컨테이너2개 실행분과 전용 볼륨, 공유 의존성 링크를 정리했다. 미병합 브랜치/worktree·재현용 ignored 의존성·Alpha 테스트 데이터는 보존한다.
 - 최종 로컬 검증: 실제DB15건+실제worker1건 PASS, 6강 종료 후 정정 완료 판정 RED1→GREEN1, API/Web 타입·surface/pattern PASS, Web 최종4 suites65건 PASS. 상세와 이전 회귀 실행은 시나리오 최종 검증 기록 참조. 구현 커밋과 dev PR 생성 단계이며 Alpha 시각0/3 차단은 유지한다.
 - 범위: 감사40/40. 기존16 유지, 수정/확장22, 권한·경쟁1, 시각 차단1을 동일 시나리오에 추적한다.
 - 브랜치: fix/stage-competition-parity-20261116, 최신 origin/dev 1acdeb40a 기준. 원격 main은 dev보다156커밋 뒤이며 main 전용 커밋0. 승격·main 쓰기 없음.

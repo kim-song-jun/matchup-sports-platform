@@ -185,6 +185,7 @@ Cleanup: 이번 임시 SecureString 삭제(ParameterNotFound 확인), Alpha 컨�
 
 ### 최종 검증 기록 — 동등성 수정 PR
 
+- dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현2e3e6e793. CI·Copilot 확인 중, Alpha 시각0/3 차단. 검증 전용 PostgreSQL 컨테이너·볼륨과 공유 의존성 링크 정리 완료; 미병합 worktree와 Alpha 원본 테스트 데이터 보존.
 - 6강 완료 후 첫 경기 성적 정정으로 직행팀이 달라지는 실제DB 회귀: 수정 전 complete=true 오판 RED1 → 최신 실제 준결승·결승 배정 일치를 완료 조건에 추가 → 같은 경로 GREEN1. 마지막 boolean 조건 변경은 해당 실제DB/TypeScript 컴파일 경로로 재검증했다.
 - 격리 PostgreSQL16/LF241 migration 재생 PASS. `stage-plan.integration-spec.ts` 15/15 PASS: 20팀 자동 본선 진출·70경기·1~20위·종료, 혼합3단계, 예선 없는 리그/KO, 초안/CAS, 부분교체, 시간 상속, 경기 복원/취소 재경기,6강·와일드카드, 권한, 마지막 경기 복원, 무작위 배정. 취소 표시로 유효한 공식 결과를 재경기 처리하는 우회도 거부하는지 검증했다.
 - `stage-auto-worker.integration-spec.ts` 1/1 PASS. 실제 공식 순위 projection을 두 번 실행해 outbox가 하나인지 검사하고 실제 worker가 본선을 배정한 뒤 재처리해도 revision을 바꾸지 않는지 검증했다.

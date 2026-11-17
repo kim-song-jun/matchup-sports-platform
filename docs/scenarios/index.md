@@ -8,7 +8,7 @@
 
 ## 2026-11-09 — 단계형 대회 구성 (구현/검증 중)
 
-최신 UI 후속 완료(2026-11-17): PR #2419/#2420 dev 반영 및 Alpha 최종39/39(대상21+기존 두 형식 비교18), 390/768/1440 시각 검토·실제 조작 PASS. console/network/문서 넘침0, 원래70경기 ID·점수 보존. [최종 증거/정확한 검증 범위](./competition-stage-composition.md#2026-11-17--최종-alpha-화면-검증-완료).
+최신 UI 리뷰 보완(2026-11-17): 편성별 미저장 입력, 다른 SHA의 resume 재사용, 관리자 하단6쌍 중복 캡처를 수정 중이다. 기존39개 HTTP/console/network 기록은 보존하고 하단 시각 완료 판정은 재촬영 전까지 보류한다. UI 회귀10건·재개 검사5건 PASS. [현행 보완 cursor](./competition-stage-composition.md#2026-11-17--리뷰3건-후속).
 
 후속 동등성 수정 [PR #2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419): 감사40/40 추적, 실제DB15건+worker1건·6강 정정RED→GREEN, 최종Web65건·타입/규칙 검사 PASS. CI·Copilot 확인 중이며 새로운 코드의 Alpha 시각 검증0/3은 차단 상태다.
 

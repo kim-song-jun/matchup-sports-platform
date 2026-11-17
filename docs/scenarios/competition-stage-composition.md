@@ -1,8 +1,12 @@
 # 단계형 대회 구성
 
-Status: UI 후속 완료 — dev 반영 및 Alpha39/39, 최종 갤러리 증거 기록
+Status: 리뷰3건 보완 중 — 입력 보존·재개 SHA 검증·관리자 하단 재촬영
 
-## 2026-11-17 — 최종 Alpha 화면 검증 완료
+## 2026-11-17 — 리뷰3건 후속
+
+편성 전환·표시 저장 때 미저장 입력 초기화, 다른 SHA의 resume 결과 재사용, 관리자 모바일·태블릿 상하단6쌍 동일 문제를 수정한다. 이전39개의 HTTP/console/network 측정은 원본대로 유지하되 관리자 하단까지 시각 검증 완료라는 판정은 재촬영 전까지 보류한다. UI 회귀10건 및 재개 검증5건 PASS. 새 배포와 보완 스크린샷 검증을 후속 기록한다.
+
+## 2026-11-17 — 최초 Alpha 화면 검증 (리뷰 후 하단 보완 대상)
 
 수정 PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419)와 실제 화면에서 발견한 모바일 배치 보완 PR [#2420](https://github.com/kim-song-jun/matchup-sports-platform/pull/2420)을 dev에 반영했다. 두 PR의 Gates/API/Web 전체 CI PASS. 최종 Alpha 배포 커밋은 `2f77a3c9a789fccf9822d6633d0f48280c2f38ef`이며 배포 workflow43988326982 SUCCESS다. main 변경·운영 승격은 없다.
 

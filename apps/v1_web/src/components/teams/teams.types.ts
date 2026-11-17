@@ -44,12 +44,12 @@ export type TeamListViewModel = {
     closeHref: string;
     resetHref: string;
     applyHref: string;
-    sort: '' | 'member_count' | 'activity';
+    sort: '' | 'latest' | 'member_count';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     regionId: string;
-    /** 기본(최근 등록순)은 sort 가 비어 있는 상태라 value 가 빈 문자열이다. */
-    sortOptions: Array<{ label: string; value: '' | 'member_count' | 'activity'; href: string; active?: boolean }>;
+    /** 기본(활동 많은순)은 sort 가 비어 있는 상태라 value 가 빈 문자열이다. */
+    sortOptions: Array<{ label: string; value: '' | 'latest' | 'member_count'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;

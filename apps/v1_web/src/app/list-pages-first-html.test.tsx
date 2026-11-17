@@ -220,7 +220,7 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
   it('/teams 는 필터된 첫 페이지 카드를 렌더하고 필터 URL 에 ItemList 를 내지 않는다', async () => {
     const html = await serverHtml(TeamsPage, 'sportId=sport-futsal-uuid');
 
-    expect(requested).toContain('/teams?sportId=sport-futsal-uuid&limit=20&includeFacets=true');
+    expect(requested).toContain('/teams?sportId=sport-futsal-uuid&sort=activity&limit=20&includeFacets=true');
     expect(html).toContain('href="/teams/team-1?from=');
     expect(html).toContain('강남 유나이티드');
     expect(itemList(html)).toBeNull();

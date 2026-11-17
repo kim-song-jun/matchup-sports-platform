@@ -21,7 +21,7 @@ export function StagePlanToolbar({ tournamentId, canWrite, canOverride, tourname
     <Button variant="neutral" onClick={() => setOpen(true)}>단계·진출팀 관리</Button>
     {mounted && typeof document !== 'undefined' && createPortal(
       <div className="tm-modal-scrim fixed inset-0 flex items-end justify-center bg-[var(--scrim-dark-32)] sm:items-center sm:p-4" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
-        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-t-2xl bg-[var(--card-surface)] sm:rounded-2xl">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="tm-modal-panel flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-t-2xl bg-[var(--card-surface)] pb-[var(--v1-shell-safe-bottom,0px)] sm:rounded-2xl">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] p-4">
             <h2 id={titleId} className="tm-text-body-lg font-bold">단계·진출팀 관리</h2>
             <Button variant="ghost" disabled={pending} onClick={() => void close()} aria-label="단계 관리 닫기">닫기</Button>

@@ -109,7 +109,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
         role="dialog"
         aria-modal="true"
         aria-labelledby="assist-picker-title"
-        className="flex max-h-[85vh] w-full max-w-[440px] flex-col rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
+        className="flex max-h-[85vh] w-full max-w-[440px] flex-col rounded-t-2xl bg-[var(--card-surface)] p-5 pb-[calc(1.25rem+var(--v1-shell-safe-bottom,0px))] sm:rounded-2xl"
       >
         <div className="mb-1 flex items-start justify-between gap-2">
           <div className="min-w-0">

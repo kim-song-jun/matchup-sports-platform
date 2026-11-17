@@ -37,6 +37,7 @@ test('mobile admin reuse requires an actual display save, while desktop does not
   assert.equal(resumeEvidence({ ...report([admin]), interactions }, adminScope).checks.length, 0);
   interactions.find(item => item.name === 'drafts-survive-pool-switch').displaySaveExercised = true;
   assert.equal(resumeEvidence({ ...report([admin]), interactions }, adminScope).checks.length, 1);
+  assert.equal(resumeEvidence({ ...report([{ ...admin, width: 768 }]), interactions: names.map(name => ({ name, width: 768, passed: true })) }, adminScope).checks.length, 1);
 });
 test('focused screenshots cannot substitute for full interaction evidence', () => {
   const focused = { ...report([check]), captureScope: 'admin-bottom', interactions: [] };

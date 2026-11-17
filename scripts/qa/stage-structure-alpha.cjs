@@ -67,6 +67,9 @@ async function main() {
         await page.getByRole('button', { name: '단계·진출팀 관리', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: '단계·진출팀 관리', exact: true });
         await expect(dialog.getByRole('combobox', { name: '관리할 편성' })).toBeVisible();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        // Let the real page finish its initial query burst before preservation reads.
+        await page.waitForTimeout(1500);
         const apiPath = `${origin}/api/v1/admin/tournaments/${fixture.id}/stages`;
         const initial = await json(await context.request.get(apiPath));
         const initialConfig = JSON.stringify(initial.config);
@@ -93,6 +96,7 @@ async function main() {
             await structure.locator(':scope > summary').click();
             await structure.locator('summary').filter({ hasText: `${pool.name} · 저장 확인 · 4팀 · 풀리그` }).click();
             await expect(structure.getByRole('combobox', { name: /^회전 수/ }).first()).toHaveValue('1');
+            await structure.getByLabel('구성 변경 사유').scrollIntoViewIfNeeded();
             await page.screenshot({ path: path.join(destination, `structure-${width}-lost.png`) });
             report.checks.push({ width, reproducedDraftLoss: true });
           } else {
@@ -121,6 +125,8 @@ async function main() {
           await dialog.getByRole('tab', { name: '참가팀 배정' }).click();
           await dialog.getByRole('textbox', { name: '편성 이름', exact: true }).fill(pool.name);
           await saveNames();
+          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+          await page.waitForTimeout(1500);
           expect(JSON.stringify((await json(await context.request.get(apiPath))).config)).toBe(initialConfig);
         }
         const evidence = JSON.parse(fs.readFileSync('docs/scenarios/evidence/sm-ranked-leagues-20261116.json', 'utf8'));

@@ -6,8 +6,8 @@ import { useNavigationIntent, type NavigationIntentKind } from './use-navigation
 // 이 파일이 지키는 것은 하나다 — **어떤 클릭이 'tab' 으로 분류되는가**.
 //
 // 'tab' 으로 분류되면 page-transition-controller 는 data-nav-kind="tab" 만 심고 View Transition 을
-// 걸지 않는다. 'tab' 이 아니면 경로가 바뀌는 이동은 push 로 잡혀 슬라이드 전환이 걸리므로,
-// 하단 탭·데스크톱 상단 탭·화면 안 세부 탭이 모두 'tab' 으로 분류되는지를 여기서 못박는다.
+// 걸지 않는다. 그래서 하단 탭·데스크톱 상단 탭·화면 안 세부 탭의 클릭이 모두 'tab' 으로
+// 분류되는지를 여기서 못박는다.
 
 function Harness({ onIntent }: { onIntent: (kind: NavigationIntentKind) => void }) {
   useNavigationIntent({ onIntent });

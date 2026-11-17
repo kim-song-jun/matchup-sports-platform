@@ -4,12 +4,10 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { V1ApiError } from '@/lib/api-client';
+import { isUnauthenticatedError } from '@/lib/api-client';
 import { browserAppRoute } from '@/lib/app-route';
-import {
-  clearStoredV1Session,
-  hasStoredV1Session,
-} from '@/lib/session-storage';
+import { clearStoredV1SessionAfterAuthLoss } from '@/lib/session-expiry';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
 import { usePendingEmailLinkOffer } from './use-pending-email-link-offer';
@@ -31,9 +29,9 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (hasSessionHint !== true) return;
-    if (!authMe.isError || authMe.isFetching || !isUnauthenticated(authMe.error)) return;
+    if (!authMe.isError || authMe.isFetching || !isUnauthenticatedError(authMe.error)) return;
 
-    clearStoredV1Session();
+    clearStoredV1SessionAfterAuthLoss('app_gate', authMe.error);
     disconnectV1Socket();
     setHasSessionHint(false);
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
@@ -71,14 +69,13 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   // 다시 마운트하므로(폼 초안 유실), 폴백이 아닌 모든 분기는 이 한 모양을 돌려준다.
   const passthrough = <>{children}{hasSessionHint === true ? emailLinkToast : null}</>;
   if (hasSessionHint === null) return passthrough;
-  if (!hasSessionHint || authMe.isError) return passthrough;
+  // A retry after a failed first answer puts the query back to `pending`; unmounting the children for it makes
+  // their own observers ask again on remount, forever. `errorUpdatedAt` lives on the cached query, so
+  // clearing the identity cache (sign-out, another account) makes the next first answer wait again.
+  const failedBefore = authMe.isPending && authMe.errorUpdatedAt > 0;
+  if (!hasSessionHint || authMe.isError || failedBefore) return passthrough;
   if (!authMe.isSuccess) return <SessionFallback />;
   if (requiredRoute && !routeAllowed) return <SessionFallback />;
 
   return passthrough;
-}
-
-function isUnauthenticated(error: unknown) {
-  return error instanceof V1ApiError
-    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
 }

@@ -3,6 +3,7 @@ import { cleanup, render as renderWithProviders, screen, within } from '@testing
 import userEvent from '@testing-library/user-event';
 import { useState, type ReactElement, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JOINKFA_CERTIFICATE_GUIDE } from '@/components/tournaments/player-eligibility';
 import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { RosterModal } from './registrations-tab';
@@ -286,6 +287,18 @@ describe('admin tournament roster modal', () => {
       expect(link).toHaveTextContent('(새 탭에서 열려요)');
     }
     expect(screen.getByText(/Teameet은 JoinKFA에 선수 정보를 보내지 않아요\./)).toBeInTheDocument();
+  });
+
+  // MD-QA #192 후속: 증명서가 JoinKFA 어디 있는지(2026-11-11 실측 메뉴 경로) 모달 하단과 판정 패널이 같은 문구로 알려 준다.
+  it('JoinKFA 증명서 위치 안내를 모달 하단과 판정 패널에 보여 준다', async () => {
+    const user = userEvent.setup();
+    render(<RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite />);
+
+    expect(screen.getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '홍길동 선출 판정' }));
+    const panel = screen.getByRole('region', { name: '홍길동 선출 판정' });
+    expect(within(panel).getByText(JOINKFA_CERTIFICATE_GUIDE)).toBeInTheDocument();
   });
 
   it('필터: 확인 전 / 선출 / 본인 신고만 으로 좁힌다', async () => {

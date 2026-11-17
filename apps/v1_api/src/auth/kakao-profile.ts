@@ -89,13 +89,24 @@ export function readKakaoSignupPrefill(draftJson: unknown): KakaoSignupPrefill |
   });
 }
 
-/** The draft keys holding what a provider handed over for the profile form: the keys the reader above consumes. */
-const SOCIAL_PREFILL_DRAFT_KEYS = ['kakaoName', 'kakaoPhone', 'kakaoGender', 'kakaoBirthDate', 'appleName'] as const;
+/** The draft keys holding what Kakao handed over for the profile form: the keys the reader above consumes. */
+const KAKAO_PREFILL_DRAFT_KEYS = ['kakaoName', 'kakaoPhone', 'kakaoGender', 'kakaoBirthDate'] as const;
+/** Apple's name lands in the same form slot but is not Kakao data, and Apple sends it only once. */
+const SOCIAL_PREFILL_DRAFT_KEYS = [...KAKAO_PREFILL_DRAFT_KEYS, 'appleName'] as const;
+
+function withoutDraftKeys(draftJson: unknown, keys: readonly string[]): Record<string, unknown> {
+  if (!draftJson || typeof draftJson !== 'object' || Array.isArray(draftJson)) return {};
+  const rest = { ...(draftJson as Record<string, unknown>) };
+  for (const key of keys) delete rest[key];
+  return rest;
+}
 
 /** The draft without the provider values, for when signup no longer needs them. Other keys are kept as they are. */
 export function withoutSocialPrefill(draftJson: unknown): Record<string, unknown> {
-  if (!draftJson || typeof draftJson !== 'object' || Array.isArray(draftJson)) return {};
-  const rest = { ...(draftJson as Record<string, unknown>) };
-  for (const key of SOCIAL_PREFILL_DRAFT_KEYS) delete rest[key];
-  return rest;
+  return withoutDraftKeys(draftJson, SOCIAL_PREFILL_DRAFT_KEYS);
+}
+
+/** The draft without what Kakao handed over; the Apple name and every other key stay. */
+export function withoutKakaoPrefill(draftJson: unknown): Record<string, unknown> {
+  return withoutDraftKeys(draftJson, KAKAO_PREFILL_DRAFT_KEYS);
 }

@@ -1,5 +1,7 @@
+import type { Metadata } from 'next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseNextImageSrc } from '@/test/next-image';
+import { COMPLETED_CUP_ID, LIVE_CUP_ID, publicSeoApi, REGULAR_LEAGUE_ID } from '@/test/public-seo-fixtures';
 
 const mocks = vi.hoisted(() => ({
   fetchPublicV1: vi.fn(),
@@ -24,6 +26,7 @@ vi.mock('./users/[id]/records/user-records-page-client', () => ({ UserRecordsPag
 vi.mock('./users/[id]/card/fetch-profile', () => ({ fetchPublicProfileForOg: mocks.fetchPublicProfileForOg }));
 vi.mock('@/components/users/player-card-share-client', () => ({ PlayerCardShareClient: () => null }));
 
+const { default: sitemap } = await import('./sitemap');
 const { generateMetadata: bracketMetadata } = await import('./tournaments/[id]/bracket/page');
 const { generateMetadata: resultsMetadata } = await import('./tournaments/[id]/results/page');
 const { generateMetadata: awardsMetadata } = await import('./tournaments/[id]/awards/page');
@@ -79,6 +82,54 @@ describe('대회 결과·시상 화면의 색인 조건', () => {
   });
 });
 
+describe('대진 화면 설명', () => {
+  const LEAGUE_STYLE = `가을 풋살컵의 경기 일정과 순위를 확인하세요.`;
+  const TOURNAMENT_STYLE = `가을 풋살컵의 조별 순위와 토너먼트 대진표를 확인하세요.`;
+
+  // 리그처럼 그리는 두 모양 — 정규 리그 거울 행은 format 이 group_knockout 이라 format 만 보면 못 잡는다.
+  it.each([
+    ['리그 방식 대회', { format: 'league', kind: 'regular_tournament' }],
+    ['정규 리그', { format: 'group_knockout', kind: 'regular_league' }],
+  ])('%s: 화면 소개 줄과 같은 문장이고 og 설명도 같다', async (_name, shape) => {
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament(shape));
+
+    const meta = await bracketMetadata(params);
+
+    expect(meta.description).toBe(LEAGUE_STYLE);
+    expect(meta.openGraph?.description).toBe(LEAGUE_STYLE);
+  });
+
+  it.each([
+    ['조별+토너먼트 대회', { format: 'group_knockout', kind: 'regular_tournament' }],
+    ['정규리그 + N개 토너먼트 대회', { format: 'league_knockouts', kind: 'regular_tournament' }],
+    ['토너먼트 대회', { format: 'knockout', kind: 'regular_tournament' }],
+    ['kind 없는 옛 행', { format: 'group_knockout', kind: null }],
+  ])('%s: 설명 문장은 그대로다', async (_name, shape) => {
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament(shape));
+
+    const meta = await bracketMetadata(params);
+
+    expect(meta.description).toBe(TOURNAMENT_STYLE);
+    expect(meta.openGraph?.description).toBe(TOURNAMENT_STYLE);
+  });
+
+  it.each([
+    { format: 'league', kind: 'regular_tournament' },
+    { format: 'group_knockout', kind: 'regular_league' },
+    { format: 'group_knockout', kind: 'regular_tournament' },
+    { format: 'league_knockouts', kind: 'regular_tournament' },
+    { format: 'knockout', kind: 'regular_tournament' },
+    { format: 'group_knockout', kind: null },
+  ])('제목과 canonical 은 형식과 무관하게 같다: %o', async (shape) => {
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament(shape));
+
+    const meta = await bracketMetadata(params);
+
+    expect(meta.title).toBe('가을 풋살컵 대진표');
+    expect(meta.alternates?.canonical).toBe('/tournaments/t-1/bracket');
+  });
+});
+
 describe('대회 하위 화면의 공유 이미지', () => {
   it.each([
     ['대진표', bracketMetadata],
@@ -94,6 +145,62 @@ describe('대회 하위 화면의 공유 이미지', () => {
 
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament());
     expect(ogImageUrl(await generate(params))).toBe('/opengraph-image');
+  });
+});
+
+/**
+ * 사이트맵이 "여기를 색인해 달라"고 올린 대회 하위 주소를 그 화면 자신의 메타가 검색 제외로 내면
+ * 크롤러가 받는 신호가 서로 엇갈린다. 사이트맵의 조건(sitemap.ts)과 화면 메타의 조건(각 page.tsx)은
+ * 따로 쓰여 있어 한쪽만 고쳐도 어긋난다.
+ */
+describe('사이트맵과 대회 하위 화면 메타의 교차', () => {
+  const SUBROUTES = {
+    bracket: bracketMetadata,
+    results: resultsMetadata,
+    awards: awardsMetadata,
+    reviews: reviewsMetadata,
+  } as const;
+  type Subroute = keyof typeof SUBROUTES;
+
+  const indexAllowed = ({ robots }: Metadata) => typeof robots !== 'object' || robots === null || robots.index !== false;
+  const tournamentAddress = (id: string, subroute: Subroute) => `https://teameet.co.kr/tournaments/${id}/${subroute}`;
+  const metaFor = (id: string, subroute: Subroute) => SUBROUTES[subroute]({ params: Promise.resolve({ id }) });
+
+  async function sitemapUrls() {
+    mocks.fetchPublicV1.mockImplementation(async (apiPath: string) => publicSeoApi(apiPath));
+    return (await sitemap()).map((entry) => entry.url);
+  }
+
+  it('사이트맵에 실린 대회 하위 주소는 모두 그 화면의 메타가 색인을 허용한다', async () => {
+    const urls = await sitemapUrls();
+    const listed = urls.flatMap((url) => {
+      const match = /^https:\/\/teameet\.co\.kr\/tournaments\/([^/]+)\/(bracket|results|awards|reviews)$/.exec(url);
+      return match ? [{ id: match[1]!, subroute: match[2] as Subroute }] : [];
+    });
+    // 네 화면이 모두 한 번 이상 나와야 이 시험이 네 화면의 메타를 다 본다.
+    expect(new Set(listed.map(({ subroute }) => subroute))).toEqual(new Set(Object.keys(SUBROUTES)));
+
+    for (const { id, subroute } of listed) {
+      expect(indexAllowed(await metaFor(id, subroute)), `${id} ${subroute}: 사이트맵에 있는데 메타가 검색 제외다`).toBe(true);
+    }
+  });
+
+  it('메타가 검색 제외로 내는 대회 하위 주소는 사이트맵에 없다', async () => {
+    const urls = await sitemapUrls();
+    const excluded: string[] = [];
+    for (const id of [COMPLETED_CUP_ID, LIVE_CUP_ID, REGULAR_LEAGUE_ID]) {
+      for (const subroute of Object.keys(SUBROUTES) as Subroute[]) {
+        if (indexAllowed(await metaFor(id, subroute))) continue;
+        excluded.push(tournamentAddress(id, subroute));
+        expect(urls, `${id} ${subroute}: 메타가 검색 제외인데 사이트맵에 있다`).not.toContain(tournamentAddress(id, subroute));
+      }
+    }
+    // 끝나지 않은 대회의 결과·시상, 후기 없는 대회의 후기 — 자료가 이 조합을 실제로 만든다.
+    expect(excluded).toEqual(expect.arrayContaining([
+      tournamentAddress(LIVE_CUP_ID, 'results'),
+      tournamentAddress(LIVE_CUP_ID, 'awards'),
+      tournamentAddress(LIVE_CUP_ID, 'reviews'),
+    ]));
   });
 });
 

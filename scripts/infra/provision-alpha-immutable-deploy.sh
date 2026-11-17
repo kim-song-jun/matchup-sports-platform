@@ -12,6 +12,7 @@ readonly ALPHA_GITHUB_REPOSITORY=kim-song-jun/matchup-sports-platform
 readonly API_REPOSITORY=teameet-alpha-v1-api
 readonly WEB_REPOSITORY=teameet-alpha-v1-web
 readonly policy_renderer='scripts/infra/render-alpha-immutable-deploy-policies.mjs'
+readonly lifecycle_renderer='scripts/infra/render-alpha-ecr-lifecycle-policies.mjs'
 
 render_github_policy() {
   local account_id="$1"
@@ -102,7 +103,8 @@ aws iam update-assume-role-policy --role-name "${ALPHA_GITHUB_ROLE_NAME}" \
   --policy-document "${trust_policy}"
 
 registry="${account_id}.dkr.ecr.${ALPHA_AWS_REGION}.amazonaws.com"
-for repository in "${API_REPOSITORY}" "${WEB_REPOSITORY}"; do
+for repository_kind in api web; do
+  if [[ "${repository_kind}" == api ]]; then repository="${API_REPOSITORY}"; else repository="${WEB_REPOSITORY}"; fi
   if ! aws ecr describe-repositories --region "${ALPHA_AWS_REGION}" \
     --repository-names "${repository}" >/dev/null 2>&1; then
     aws ecr create-repository --region "${ALPHA_AWS_REGION}" \
@@ -115,9 +117,10 @@ for repository in "${API_REPOSITORY}" "${WEB_REPOSITORY}"; do
     --repository-name "${repository}" --image-tag-mutability IMMUTABLE >/dev/null
   aws ecr put-image-scanning-configuration --region "${ALPHA_AWS_REGION}" \
     --repository-name "${repository}" --image-scanning-configuration scanOnPush=true >/dev/null
+  lifecycle_policy="$(node "${lifecycle_renderer}" --repository "${repository_kind}")"
   aws ecr put-lifecycle-policy --region "${ALPHA_AWS_REGION}" \
     --repository-name "${repository}" \
-    --lifecycle-policy-text '{"rules":[{"rulePriority":1,"description":"Remove only untagged build remnants after seven days","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}}]}' >/dev/null
+    --lifecycle-policy-text "${lifecycle_policy}" >/dev/null
 done
 
 aws s3api put-bucket-versioning --bucket "${ALPHA_DEPLOY_BUCKET}" \

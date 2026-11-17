@@ -19,6 +19,7 @@ vi.mock('@/lib/session-storage', () => ({
   clearStoredV1Session: mocks.clearStoredV1Session,
   getCurrentRedirectPath: () => '/v1/my',
   getLoginPathForRedirect: () => '/login?redirect=%2Fmy',
+  hasStoredV1Session: () => true,
   shouldProbeV1Session: () => true,
 }));
 

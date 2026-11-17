@@ -129,7 +129,7 @@ describe('EmailLoginClient GA events', () => {
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'email', reason: 'UNAUTHENTICATED' }),
     );
     expect(screen.getByRole('alert')).toHaveTextContent(
-      "이메일 또는 비밀번호가 맞지 않아요. 카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.",
+      "이메일 또는 비밀번호가 맞지 않아요. 카카오로 가입하셨다면 로그인 첫 화면의 '카카오 로그인' 버튼으로 로그인해 주세요.",
     );
     expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-login-error');
     expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-describedby', 'email-login-error');
@@ -154,7 +154,7 @@ describe('EmailLoginClient GA events', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
-        "이메일 또는 비밀번호가 맞지 않아요. 카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
+        "이메일 또는 비밀번호가 맞지 않아요. 카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오 로그인' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
       ),
     );
   });
@@ -265,5 +265,38 @@ describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
 
     expect(screen.queryByText(/이메일 연결을 이어서 도와요/)).not.toBeInTheDocument();
     expect(readPendingEmailLink()).toBeNull();
+  });
+});
+
+describe('EmailLoginClient 입력 칸 자동 완성 표시', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/login/email');
+  });
+
+  it('이메일 칸은 로그인 아이디로, 비밀번호 칸은 저장된 비밀번호로 알려요', () => {
+    render(<EmailLoginClient />);
+
+    expect(screen.getByLabelText('이메일')).toHaveAttribute('autocomplete', 'username');
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('autocomplete', 'current-password');
+  });
+
+  it('엔터가 곧 제출인 비밀번호 칸에만 이동 키 표시가 붙어요', () => {
+    render(<EmailLoginClient />);
+
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('enterkeyhint', 'go');
+    expect(screen.getByLabelText('이메일')).not.toHaveAttribute('enterkeyhint');
+  });
+
+  it('비밀번호 보기를 눌러 글자가 드러나도 표시가 그대로 남아요', () => {
+    render(<EmailLoginClient />);
+    const password = screen.getByLabelText('비밀번호');
+
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 보기' }));
+
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
+    expect(password).toHaveAttribute('enterkeyhint', 'go');
   });
 });

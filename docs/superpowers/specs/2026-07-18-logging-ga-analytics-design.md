@@ -61,7 +61,9 @@ GA4 명명 규칙(snake_case) 준수. 카테고리별 이벤트 카탈로그:
 **계정**
 - `sign_up_start { method }` / `sign_up_complete { method, sportType? }`
 - `login { method }` / `login_failed { method, reason }`
+- `login_start { method, login_path, sdk_ready? }` — 카카오 로그인 버튼을 누를 때마다 한 번. `login_path` 는 `talk`(카카오톡으로 넘어가는 간편로그인) / `sdk_account`(SDK 가 여는 카카오계정 화면) / `account_url`(인가 주소로 직접 이동) / `native`(앱 셸의 네이티브 토큰) 중 하나이고, `sdk_ready`(boolean)는 탭 시점에 SDK 가 이미 준비돼 있었는지이며 `native` 에서는 보내지 않는다. state·경로·오류·주소는 보내지 않는다. `login_path`·`sdk_ready` 는 맞춤 측정기준으로 등록하기 전에는 이벤트 수만 보인다.
 - `logout {}`
+- `session_expired { gate, app_shell }` — 이 브라우저에 로그인 표시가 켜져 있는데 서버가 401 로 답해 웹이 표시를 지울 때 한 번. `gate` 는 먼저 본 자리로 `app_gate`(앱 전체 문지기) / `require_auth`(보호 화면) / `entry_gate`(로그인 진입 화면) / `chat_room`(채팅방) 중 하나이고, `app_shell` 은 `ios` / `android` / `web` 이다. 사용자·주소·돌아갈 경로·오류 내용은 보내지 않는다. 직접 로그아웃·탈퇴, 401 이 아닌 실패, 표시가 꺼져 있던 방문자는 보내지 않는다. 브라우저 저장소 정리로 표시가 먼저 사라진 사람은 빠지고, 비밀번호 재설정이나 다른 기기 로그아웃처럼 계정 쪽에서 끊긴 경우는 같은 숫자에 섞인다. `gate`·`app_shell` 은 맞춤 측정기준으로 등록하기 전에는 이벤트 수만 보인다.
 
 **온보딩**
 - `onboarding_step_complete { step, sportType? }`

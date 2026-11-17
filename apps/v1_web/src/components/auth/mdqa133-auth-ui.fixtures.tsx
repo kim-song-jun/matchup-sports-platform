@@ -31,7 +31,7 @@ const issued = () => success({ sent: true, expiresAt: new Date(Date.now() + 300_
 export const authUiServer = setupServer(
   http.get('*/api/v1/auth/me', () => success({
     user: { id: 'pending-person', email: RECOVERY_EMAIL, phone: RECOVERY_PHONE, onboardingStatus: 'social_profile_required', authProvider: scenario.provider },
-    profile: { nickname: '합성 신규 사용자' }, socialSignupPrefill: null,
+    profile: { nickname: '합성 신규 사용자' }, socialSignupPrefill: null, socialSignupCanDefer: scenario.provider !== 'kakao',
   })),
   http.post('*/api/v1/logs/client-error', () => success({})),
   http.post('*/api/v1/verification/phone/request', () => failure('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.')),

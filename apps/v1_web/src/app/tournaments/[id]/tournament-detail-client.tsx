@@ -220,7 +220,21 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 
 /** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
 function getCompletedTrackChampions(tournament: V1TournamentDetail) {
-  if (tournament.stagePlan) return [];
+  if (tournament.stagePlan) return tournament.stagePlan.stages.at(-1)!.pools.map(pool => {
+    const progress = tournament.stageProgress?.find(row => row.poolKey === pool.key);
+    if (progress && (!progress.complete || progress.stale)) return { track: pool.key, label: pool.name, champion: null };
+    const groups = tournament.groups.filter(group => group.poolKey === pool.key);
+    let champion: string | null = null;
+    if (pool.format === 'league') {
+      const leaders = groups.flatMap(group => group.standings).filter(row => (row.sharedRank ?? row.position) === 1);
+      if (leaders.length) champion = `${leaders.map(row => row.teamName).join(' · ')}${leaders.length > 1 ? ' 공동 우승' : ''}`;
+    } else {
+      const finalIds = new Set(groups.filter(group => group.phase === 'final').map(group => group.id));
+      const fixtures = tournament.fixtures.filter(fixture => finalIds.has(fixture.groupId ?? '') && fixture.status === 'completed').map(fixture => ({ ...fixture, round: 'final' }));
+      champion = getCompletedChampionName({ ...tournament, stagePlan: undefined, fixtures });
+    }
+    return { track: pool.key, label: pool.name, champion };
+  });
   if (isLeagueCompetition(tournament)) return [];
   const tracks = orderedBracketTracks(tournament.groups);
   if (tracks.length < 2) return [];
@@ -1986,9 +2000,7 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
       ) : (
         /* 대회용 `FixturesPlaceholder` 를 쓰지 않는다 — 그건 "대회 시작 전에 대진표가
            공개돼요" 라고 적는데, 진행 중인 리그 시즌에 그 말이 뜨면 **틀린 말을 확신 있게**
-           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다.
-           문구는 리그 일정 목록(league-match-standings-client.tsx)이 같은 상황에 쓰는 것을
-           그대로 가져왔다 — 두 화면이 같은 상황을 다르게 부르지 않게. */
+           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다. */
         <section aria-labelledby="fixtures-empty-heading" style={{ marginTop: 24 }}>
           <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             일정 · 대진

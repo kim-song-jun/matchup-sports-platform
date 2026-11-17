@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionFormatLabel, competitionNounOf, isLeagueCompetition, withCompetitionNoun } from './competition-kind';
+import { bracketIntroLine, competitionFormatLabel, competitionNounOf, isLeagueCompetition, withCompetitionNoun } from './competition-kind';
 
 /**
  * **픽스처가 거울 행의 실제 모양이어야 한다.**
@@ -57,6 +57,24 @@ describe('competitionFormatLabel', () => {
   it('조별+토너먼트 / 토너먼트 라벨은 그대로다', () => {
     expect(competitionFormatLabel(GROUP_KNOCKOUT)).toBe('조별리그 + 토너먼트');
     expect(competitionFormatLabel(KNOCKOUT)).toBe('토너먼트');
+  });
+});
+
+describe('bracketIntroLine', () => {
+  // format 만 보면 거울 행(group_knockout)에 조별·결선 문장이 나간다 — 두 리그 모양 모두 리그 문장이어야 한다.
+  it.each([
+    ['정규 리그(거울 행)', MIRROR_LEAGUE],
+    ['리그 방식 대회', LEAGUE_FORMAT_TOURNAMENT],
+  ])('%s 는 조별리그·결선을 말하지 않는다', (_name, competition) => {
+    expect(bracketIntroLine(competition)).toBe('경기 일정과 순위를 확인하세요.');
+  });
+
+  it.each([
+    ['조별+토너먼트 대회', GROUP_KNOCKOUT],
+    ['토너먼트 대회', KNOCKOUT],
+    ['kind=null 옛 행', LEGACY_NULL_KIND],
+  ])('%s 는 조별 순위와 결선을 말한다', (_name, competition) => {
+    expect(bracketIntroLine(competition)).toBe('경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.');
   });
 });
 

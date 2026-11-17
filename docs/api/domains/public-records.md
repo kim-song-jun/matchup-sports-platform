@@ -623,3 +623,7 @@ the response still omits `consentGranted` for non-owners.
 ### 경기별 제목 (2026-11-11)
 
 대회 일정 items/unscheduled 및 경기 상세 응답은 선택 nullable `displayTitle`을 포함한다. 저장된 경기별 제목이 있으면 일정·상세에서 이를 표시하고, 없으면 기존 조/라운드/차전 자동 문구를 표시한다. 정규 리그 행에는 제목 override가 없어 기존 문구를 유지한다. 공개 여부·결과 공개 정책·필터 및 순서는 바뀌지 않는다.
+
+## 단계·편성별 대회 개인 기록 — 2026-11-16
+
+GET /tournaments/:id/player-records 및 GET /admin/tournaments/:id/player-records는 선택 query stageKey/poolKey(영문·숫자·밑줄·하이픈1~40자)를 받는다. 생략하면 기존 대회 누적 집계이며 둘 다 보내면 교집합이다. 실제 canonical TeamMatch→Details→Group의 stageKey/poolKey로 공식 리비전 집합을 좁힌 뒤 집계하므로 다른 단계의 동일 선수 기록을 중복 합산하지 않는다. 응답 모양은 유지한다. 공개는 대진 공개·Game visibility·공식 결과·개인 공개 자격 게이트를 유지하며, 관리자 추천은 담당 대회 권한 검증 후 기존 비게이팅 집계를 사용한다. query cache key는 대회+단계+편성이고, 운영 시상 추천 화면과 공개 단계별 개인 기록 화면에서 같은 범위를 선택한다.

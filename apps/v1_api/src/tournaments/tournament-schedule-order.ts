@@ -1,5 +1,6 @@
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import type { StoredStagePlan } from './stages/stage-view';
+import { stagePoolDependsOn } from './stages/stage-dependencies';
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { competitionStageRank } from './tournament-stage-rank';
@@ -38,6 +39,12 @@ async function assertStartKeepsStageOrder(
     if (other.startAt === null || other.tournamentDetails === null) continue;
     const otherGroup = other.tournamentDetails.group;
     const samePool = input.stage.poolKey && input.stage.poolKey === otherGroup?.poolKey;
+    if (config && !samePool && input.stage.poolKey && otherGroup?.poolKey) {
+      const pools = new Set(config.stages.flatMap(s => s.pools.map(p => p.key)));
+      if (pools.has(input.stage.poolKey) && pools.has(otherGroup.poolKey) &&
+        !stagePoolDependsOn(config, input.stage.poolKey, otherGroup.poolKey) &&
+        !stagePoolDependsOn(config, otherGroup.poolKey, input.stage.poolKey)) continue;
+    }
     const selfOrder = config && samePool ? (competitionStageRank(input.stage) ?? 0) : selfRank;
     const otherRank = config ? samePool ? (competitionStageRank({ phase: otherGroup?.phase, round: other.tournamentDetails.round }) ?? 0) : stageIndex(otherGroup?.stageKey) * 10 : competitionStageRank({ phase: otherGroup?.phase, round: other.tournamentDetails.round });
     if (otherRank === null) continue;

@@ -1,5 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
+import { KAKAO_ADMIN_KEY_ENV, KAKAO_UNLINK_URL, KakaoUnlinkService } from '../src/auth/kakao-unlink.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { buildDeletedProviderUserKey } from '../src/users/final-account-deletion';
 import { WithdrawalFinalizationService } from '../src/users/withdrawal-finalization.service';
 import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from '../src/users/withdrawal-finalization-report';
 
@@ -9,7 +11,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 describe('withdrawal grace finalization against PostgreSQL', () => {
   const prisma = new PrismaService();
   const logger = { info: jest.fn(), error: jest.fn(), warn: jest.fn() };
-  const newService = () => new WithdrawalFinalizationService(prisma, logger as never);
+  // The unlink service reads the admin key on its first call, so set the environment before building a service.
+  const newService = () => new WithdrawalFinalizationService(prisma, logger as never, new KakaoUnlinkService(prisma));
   const prefix = `wgf-${randomUUID().slice(0, 8)}`;
   // Midday UTC keeps the hourly re-run below on the same report day whenever this file runs.
   const NOW = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
@@ -167,5 +170,62 @@ describe('withdrawal grace finalization against PostgreSQL', () => {
       await expect(prisma.v1StatusChangeLog.count({ where: { targetId: racer.id, toStatus: 'deleted' } })).resolves.toBe(1);
       await expect(prisma.v1User.findUniqueOrThrow({ where: { id: racer.id } })).resolves.toMatchObject({ accountStatus: 'deleted' });
     }
+  });
+
+  describe('Kakao connection after the deletion', () => {
+    const savedKey = process.env[KAKAO_ADMIN_KEY_ENV];
+    let kakaoCalls: () => RequestInit[];
+
+    // Invented member numbers: they never match a real Kakao account.
+    async function kakaoMember(key: string) {
+      const memberNumber = `9${String(randomInt(0, 1_000_000_000)).padStart(9, '0')}`;
+      const user = await withdrawingUser(key, 31 * DAY_MS);
+      const login = await prisma.v1AuthIdentity.create({ data: { userId: user.id, provider: 'kakao', providerUserKey: memberNumber } });
+      return { user, login, memberNumber };
+    }
+
+    beforeEach(() => {
+      const realFetch = globalThis.fetch.bind(globalThis);
+      const spy = jest.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+        String(input) === KAKAO_UNLINK_URL ? Promise.resolve(new Response('{}', { status: 200 })) : realFetch(input, init),
+      );
+      kakaoCalls = () => spy.mock.calls.filter(([input]) => String(input) === KAKAO_UNLINK_URL).map(([, init]) => init ?? {});
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      if (savedKey === undefined) delete process.env[KAKAO_ADMIN_KEY_ENV];
+      else process.env[KAKAO_ADMIN_KEY_ENV] = savedKey;
+    });
+
+    it('asks Kakao to unlink the member number the deletion replaced', async () => {
+      process.env[KAKAO_ADMIN_KEY_ENV] = 'test-admin-key';
+      const { user, login, memberNumber } = await kakaoMember('kakao-keyed');
+
+      const result = await newService().finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toContain(user.id);
+      const calls = kakaoCalls();
+      expect(calls).toHaveLength(1);
+      expect(new URLSearchParams(String(calls[0].body)).get('target_id')).toBe(memberNumber);
+      await expect(prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: login.id } })).resolves.toMatchObject({
+        status: 'unlinked',
+        providerUserKey: buildDeletedProviderUserKey(user.id, login.id),
+      });
+    });
+
+    it('deletes the account and sends nothing to Kakao without the admin key', async () => {
+      delete process.env[KAKAO_ADMIN_KEY_ENV];
+      const { user, login } = await kakaoMember('kakao-keyless');
+
+      const result = await newService().finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toContain(user.id);
+      expect(kakaoCalls()).toHaveLength(0);
+      await expect(prisma.v1User.findUniqueOrThrow({ where: { id: user.id } })).resolves.toMatchObject({ accountStatus: 'deleted' });
+      await expect(prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: login.id } })).resolves.toMatchObject({
+        providerUserKey: buildDeletedProviderUserKey(user.id, login.id),
+      });
+    });
   });
 });

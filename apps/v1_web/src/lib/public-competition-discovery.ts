@@ -102,3 +102,16 @@ export async function collectPublicTournamentFixtures(tournaments: V1TournamentL
   const details = await collectPublicTournamentDetails(tournaments.filter((item) => item.kind !== 'regular_league'));
   return { items: details.items ? publicTournamentFixtures(details.items) : null, failedSources: details.failedSources };
 }
+
+/**
+ * 공개 리그 목록에 있는 리그의 경기만 남긴다. 팀 매치 목록은 리그가 공개이기만 하면 경기를 내주지만,
+ * 경기 화면은 리그의 공개 상세가 있어야 열리므로(없으면 404) 발견 목록은 같은 기준을 따라야 한다.
+ */
+export function publicLeagueFixtures<T extends { league?: { leagueId: string } | null }>(
+  teamMatches: readonly T[],
+  publicLeagues: ReadonlyArray<{ leagueId: string }>,
+): Array<T & { league: { leagueId: string } }> {
+  const publicIds = new Set(publicLeagues.map(({ leagueId }) => leagueId));
+  return teamMatches.filter((item): item is T & { league: { leagueId: string } } =>
+    item.league != null && publicIds.has(item.league.leagueId));
+}

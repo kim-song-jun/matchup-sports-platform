@@ -360,7 +360,7 @@ export class TournamentsAdminService {
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
-          ...(dto.stagePlan ? { stagePlan: JSON.parse(JSON.stringify(dto.stagePlan)), stagePlanRevision: 1 } : {}),
+          ...(dto.stagePlan ? { stagePlan: JSON.parse(JSON.stringify({ ...dto.stagePlan, ...(dto.stagePlan.autoAdvance ? { automation: { configuredByUserId: user.id } } : {}) })), stagePlanRevision: 1 } : {}),
           sportId: dto.sportId,
           title: dto.title,
           competitionConfigVersionId,
@@ -608,7 +608,7 @@ export class TournamentsAdminService {
     const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
-    if (stagePlanChanged) { data.stagePlan = JSON.parse(JSON.stringify(dto.stagePlan)); data.stagePlanRevision = { increment: 1 }; }
+    if (stagePlanChanged) { data.stagePlan = JSON.parse(JSON.stringify({ ...dto.stagePlan, ...(dto.stagePlan?.autoAdvance ? { automation: { configuredByUserId: user.id } } : {}) })); data.stagePlanRevision = { increment: 1 }; }
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
     if (sportChanged) data.competitionConfigVersionId = sportChangeConfigVersionId;
     if (dto.title !== undefined) data.title = dto.title;

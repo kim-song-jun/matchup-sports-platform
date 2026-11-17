@@ -148,6 +148,19 @@ function leagueFixtureWithVideo(): V1TournamentFixture {
   };
 }
 
+it('단계형 결과도 기존 우승 요약·영상 탭을 유지하고 정정 검토 중인 우승은 확정 표시하지 않는다', () => {
+  const pool = { key: 'main', name: '본선 리그', format: 'league' as const, capacity: 2, legs: 1 as const, sources: [] };
+  const group = leagueGroup({ id: 'main-group', name: '본선 리그', stageKey: 'main', poolKey: 'main', standings: [standing({ registrationId: 'r1', teamName: '성수 FC', position: 1 })] });
+  const tournament = baseTournament({ format: 'league_knockouts', stagePlan: { version: 1, stages: [{ key: 'main', name: '본선', pools: [pool] }] }, groups: [group], fixtures: [{ ...leagueFixtureWithVideo(), groupId: group.id }], stageProgress: [{ poolKey: 'main', complete: true, assigned: true, stale: false }] });
+  const { rerender } = render(<ResultsPageContent tournament={tournament} />);
+  expect(within(screen.getByRole('region', { name: '본선 리그 결과' })).getAllByText('성수 FC').length).toBeGreaterThan(0);
+  expect(screen.getByRole('table', { name: '본선 본선 리그 순위표' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: '경기 영상 1' }));
+  expect(screen.getByText('하이라이트')).toBeVisible();
+  rerender(<ResultsPageContent tournament={{ ...tournament, stageProgress: [{ poolKey: 'main', complete: false, assigned: true, stale: true }] }} />);
+  expect(within(screen.getByRole('region', { name: '본선 리그 결과' })).queryByText('성수 FC')).not.toBeInTheDocument();
+});
+
 describe('ResultsPageContent — 우승팀 없는 완료 대회의 경기 영상 탭', () => {
   it('리그전(championName===null)이어도 영상이 있으면 "경기 영상" 탭이 보이고 진입할 수 있다', () => {
     const tournament = baseTournament({ fixtures: [leagueFixtureWithVideo()] });

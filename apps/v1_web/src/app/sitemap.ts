@@ -6,6 +6,7 @@ import {
   collectPublicMatchInventory,
   collectPublicTournamentDetails,
   fetchPublicPages,
+  publicLeagueFixtures,
   publicTournamentFixtures,
   type PublicDiscoveryResult,
 } from '@/lib/public-competition-discovery';
@@ -81,13 +82,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return id ? [sitemapEntry(`/matches/${id}`, 0.7, 'daily')] : [];
     }),
     ...teams.map((item) => sitemapEntry(`/teams/${item.id}`, 0.6, 'weekly')),
-    ...teamMatches.flatMap((item) => {
-      const id = item.teamMatchId ?? item.matchId ?? item.id;
-      if (!id) return [];
-      const path = item.league
-        ? fixtureDetailHref({ isRegularLeague: true, competitionId: item.league.leagueId, fixtureId: id })
-        : `/team-matches/${encodeURIComponent(id)}`;
-      return [sitemapEntry(path, 0.7, 'daily')];
+    // 리그 경기는 리그의 공개 상세가 있을 때만 열린다 — 없는 리그의 경기는 어느 주소로도 싣지 않는다.
+    ...teamMatches.filter((item) => !item.league).flatMap((item) => {
+      const id = teamMatchId(item);
+      return id ? [sitemapEntry(`/team-matches/${encodeURIComponent(id)}`, 0.7, 'daily')] : [];
+    }),
+    ...publicLeagueFixtures(teamMatches, leagues).flatMap((item) => {
+      const id = teamMatchId(item);
+      return id ? [sitemapEntry(fixtureDetailHref({
+        isRegularLeague: true, competitionId: item.league.leagueId, fixtureId: id,
+      }), 0.7, 'daily')] : [];
     }),
     ...tournaments.flatMap((item) => {
       const root = sitemapEntry(`/tournaments/${item.id}`, 0.8, 'daily', item.updatedAt);
@@ -131,6 +135,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return true;
   });
 }
+
+const teamMatchId = (item: V1TeamMatch) => item.teamMatchId ?? item.matchId ?? item.id;
 
 async function requireInventory<T>(pending: Promise<PublicDiscoveryResult<T>>, path: string): Promise<T[]> {
   const { items, failedSources } = await pending;

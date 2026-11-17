@@ -9,8 +9,6 @@ export type AuthAction = {
 
 export type LoginProvider = {
   label: string;
-  background: string;
-  foreground: string;
   href?: string;
   disabled?: boolean;
 };
@@ -22,6 +20,8 @@ export type LoginViewModel = {
   guestHref: string;
   signupHref: string;
   providers: LoginProvider[];
+  /** 안내 줄(「… 로그인은 준비 중이에요」)에 이름만 오르는 제공자. */
+  preparingProviderNames: string[];
 };
 
 export type EmailLoginViewModel = {

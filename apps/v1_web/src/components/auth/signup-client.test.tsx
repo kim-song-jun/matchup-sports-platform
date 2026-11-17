@@ -362,6 +362,14 @@ describe('SignupClient required profile contract', () => {
     }
   });
 
+  it('별표 안내 줄이 단계 제목 아래에 별표 단어와 함께 읽힌다', () => {
+    render(<SignupClient />);
+
+    const note = screen.getByText(/표시는 필수 입력이에요\./);
+    expect(note).toHaveTextContent('별표 표시는 필수 입력이에요.');
+    expect(note.querySelector('[aria-hidden="true"]')).toHaveTextContent('*');
+  });
+
   it('성별 라디오그룹도 필수임을 접근성 이름으로 알린다', async () => {
     // Given — label 로 감싸지지 않는 radiogroup 은 aria-labelledby 로 라벨을 물려야 한다
     render(<SignupClient />);
@@ -690,6 +698,32 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
     expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
     expect(screen.getByText('다른 비밀번호를 정해 주세요.')).toBeInTheDocument();
     expect(hooks.registerMutateAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SignupClient 가입 정보 단계 자동 완성 표시', () => {
+  beforeEach(resetSignupMocks);
+
+  it('이메일 칸은 이메일 주소로 알려요', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByLabelText(/^이메일/)).toHaveAttribute('autocomplete', 'email');
+  });
+
+  it('비밀번호와 비밀번호 확인 칸은 새 비밀번호로 알려요', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByPlaceholderText('8자 이상')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByPlaceholderText('비밀번호 다시 입력')).toHaveAttribute('autocomplete', 'new-password');
+  });
+
+  it('닉네임 칸에는 자동 완성 표시를 붙이지 않아요 — 닉네임이 로그인 아이디로 저장되지 않게', async () => {
+    render(<SignupClient />);
+    await advanceToAccount();
+
+    expect(screen.getByLabelText(/^닉네임/)).not.toHaveAttribute('autocomplete');
   });
 });
 

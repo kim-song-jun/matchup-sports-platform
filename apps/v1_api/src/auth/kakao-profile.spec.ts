@@ -5,6 +5,7 @@ import {
   normalizeKakaoPhone,
   normalizeKakaoBirthDate,
   readKakaoSignupPrefill,
+  withoutKakaoPrefill,
   withoutSocialPrefill,
 } from './kakao-profile';
 
@@ -112,6 +113,43 @@ describe('withoutSocialPrefill', () => {
 
   it.each([null, undefined, 'draft', [1, 2]])('yields an empty draft for the non-object %p', (draft) => {
     expect(withoutSocialPrefill(draft)).toEqual({});
+  });
+});
+
+describe('withoutKakaoPrefill', () => {
+  const rest = { ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3', currentStep: 'sport' };
+  // One valid value per key the reader consumes; dropping a key from the strip list leaves that value readable.
+  const kakaoValues = { kakaoName: '홍길동', kakaoPhone: '01012345678', kakaoGender: 'female', kakaoBirthDate: '20000229' };
+
+  it.each(Object.entries(kakaoValues))('removes %s so the reader no longer sees it', (key, value) => {
+    const draft = { ...rest, [key]: value };
+    expect(readKakaoSignupPrefill(draft)).not.toBeNull();
+
+    const stripped = withoutKakaoPrefill(draft);
+
+    expect(stripped).toEqual(rest);
+    expect(readKakaoSignupPrefill(stripped)).toBeNull();
+  });
+
+  it('keeps the Apple name, which arrives only once and is not Kakao data (control for withoutSocialPrefill)', () => {
+    const draft = { ...rest, ...kakaoValues, appleName: '김애플' };
+
+    const kakaoStripped = withoutKakaoPrefill(draft);
+    const socialStripped = withoutSocialPrefill(draft);
+
+    expect(kakaoStripped).toEqual({ ...rest, appleName: '김애플' });
+    expect(readKakaoSignupPrefill(kakaoStripped)).toEqual({ name: '김애플', phone: null, gender: null, birthDate: null });
+    expect(socialStripped).toEqual(rest);
+  });
+
+  it('does not mutate the draft it was given', () => {
+    const draft = { ...rest, ...kakaoValues };
+    withoutKakaoPrefill(draft);
+    expect(draft).toEqual({ ...rest, ...kakaoValues });
+  });
+
+  it.each([null, undefined, 'draft', [1, 2]])('yields an empty draft for the non-object %p', (draft) => {
+    expect(withoutKakaoPrefill(draft)).toEqual({});
   });
 });
 

@@ -119,6 +119,7 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
           <label className="tm-auth-field">
             <span className="tm-text-label">이메일</span>
             <input
+              autoComplete="username"
               className={`tm-input tm-auth-input${error ? ' tm-auth-input-error' : ''}`}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="예: me@email.com"
@@ -133,7 +134,9 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
             <span className="tm-text-label">비밀번호</span>
             <span className="tm-auth-password-field">
               <input
+                autoComplete="current-password"
                 className={`tm-input tm-auth-input${error ? ' tm-auth-input-error' : ''}`}
+                enterKeyHint="go"
                 minLength={8}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="비밀번호"

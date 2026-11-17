@@ -2,6 +2,11 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import type { TeamRecordCategory } from '../team-record-category';
 
+export class TournamentRecordScopeQueryDto {
+  @IsOptional() @Matches(/^[a-zA-Z0-9_-]{1,40}$/) stageKey?: string;
+  @IsOptional() @Matches(/^[a-zA-Z0-9_-]{1,40}$/) poolKey?: string;
+}
+
 /** `GET /tournaments/:id/schedule` -- cursor/round/group filter. */
 export class PublicTournamentScheduleQueryDto {
   @IsOptional()

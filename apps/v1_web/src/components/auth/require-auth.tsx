@@ -6,11 +6,11 @@ import { usePathname } from 'next/navigation';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
 import {
-  clearStoredV1Session,
   getCurrentRedirectPath,
   getLoginPathForRedirect,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
+import { clearStoredV1SessionAfterAuthLoss } from '@/lib/session-expiry';
 import { markEntryAuthGated, replaceDocument } from '@/lib/navigation-history';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
@@ -43,7 +43,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (hasSessionHint !== true) return;
     if (!authMe.isError || authMe.isFetching || !isUnauthenticatedError(authMe.error)) return;
 
-    clearStoredV1Session();
+    clearStoredV1SessionAfterAuthLoss('require_auth', authMe.error);
     disconnectV1Socket();
     replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);

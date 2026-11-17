@@ -79,6 +79,17 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Rec
 }
 
 function buildSplitFinalResults(tournament: V1TournamentDetail) {
+  if (tournament.stagePlan) return tournament.stagePlan.stages.at(-1)!.pools.map(pool => {
+    const groups = tournament.groups.filter(group => group.poolKey === pool.key);
+    const ids = new Set(groups.map(group => group.id));
+    const fixtures = tournament.fixtures.filter(fixture => ids.has(fixture.groupId ?? ''));
+    const progress = tournament.stageProgress?.find(item => item.poolKey === pool.key);
+    const ready = progress?.complete === true && !progress.stale;
+    const rows: FinalRankRow[] = !ready ? [] : pool.format === 'league'
+      ? groups.flatMap(group => group.standings).sort((a, b) => a.position - b.position).filter(row => row.teamName).map(row => ({ pos: row.sharedRank ?? row.position, name: row.teamName! }))
+      : buildKnockoutFinalRanking(fixtures.map(fixture => ({ ...fixture, round: groups.find(group => group.id === fixture.groupId)?.phase ?? fixture.round })));
+    return { track: pool.key, label: pool.name, rows, fixtures, winner: rows.filter(row => row.pos === 1).map(row => row.name).join(' · ') || null, runnerUp: rows.find(row => row.pos === 2)?.name ?? null };
+  });
   return orderedBracketTracks(tournament.groups).map((track) => {
     const trackGroups = tournament.groups.filter(group => effectiveBracketTrack(group.bracketTrack) === track);
     const trackIds = new Set(trackGroups.map(group => group.id));
@@ -1108,7 +1119,7 @@ export function GroupStageFixtures({ tournament, fromHref }: { tournament: V1Tou
 
 /* ── 메인 콘텐츠 ── */
 export function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
-  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyResultsPageContent tournament={tournament} />;
+  return <LegacyResultsPageContent tournament={tournament} />;
 }
 function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
@@ -1123,7 +1134,7 @@ function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDeta
   );
   const isCompleted  = tournament.status === 'completed';
   const isInProgress = tournament.status === 'in_progress';
-  const isSplitBracket = tournament.groups.some((group) =>
+  const isSplitBracket = Boolean(tournament.stagePlan) || tournament.groups.some((group) =>
     effectiveBracketTrack(group.bracketTrack) !== 'overall',
   );
   const splitFinalResults = isSplitBracket ? buildSplitFinalResults(tournament) : [];
@@ -1185,9 +1196,11 @@ function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDeta
               <section key={result.track} aria-label={`${result.label} 결과`} className="min-w-0">
                 <h2 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{result.label}</h2>
                 {result.winner ? <>
-                  <DesktopChampionHero compact champion={result.winner} tournament={tournament} />
-                  <MobileChampionBanner champion={result.winner} tournament={tournament} />
-                </> : <EmptyState title="결승 결과가 아직 등록되지 않았어요." sub="운영진이 결과를 확정하면 우승팀이 표시돼요." />}
+                    {result.rows.filter(row => row.pos === 1).length > 1 ? <CoChampionBanner names={result.rows.filter(row => row.pos === 1).map(row => row.name)} /> : <>
+                      <DesktopChampionHero compact champion={result.winner} tournament={tournament} />
+                      <MobileChampionBanner champion={result.winner} tournament={tournament} />
+                    </>}
+                </> : <EmptyState title={tournament.stagePlan ? '편성의 공식 결과를 확인 중이에요.' : '결승 결과가 아직 등록되지 않았어요.'} sub="운영진이 결과를 확정하면 우승팀이 표시돼요." />}
               </section>
             ))}
           </div>
@@ -1264,7 +1277,7 @@ function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDeta
         </div>
       )}
 
-      {isCompleted && activeTab === 'results' && (
+      {isCompleted && activeTab === 'results' && (tournament.stagePlan ? <div className="min-w-0 px-5 pt-4"><StagePublicView tournament={tournament} /></div> : (
         <div className={isSplitBracket ? "flex flex-col" : "tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid"}>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>최종 순위</h3>
@@ -1308,7 +1321,7 @@ function LegacyResultsPageContent({ tournament }: { tournament: V1TournamentDeta
             <GroupStageFixtures tournament={tournament} fromHref={resultsSelfHref ?? undefined} />
           </div>
         </div>
-      )}
+      ))}
 
       {isCompleted && activeTab === 'videos' && <VideoGallerySection fixtures={tournament.fixtures} groups={tournament.groups} />}
 

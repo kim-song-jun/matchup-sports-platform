@@ -18,6 +18,7 @@ export interface TournamentPeriodSettingsResponse {
   kind: 'regular_tournament' | 'regular_league';
   competitionConfigVersionId: string | null;
   expectedVersion: string | null;
+  compositionOverrides?: Array<{ scope: 'stage' | 'pool'; key: string; competitionConfigVersionId: string; periods: TournamentPeriodSetting[] }>;
   periods: TournamentPeriodSetting[] | null;
   legacyPeriodCount: number | null;
   requiresDurationInput: boolean;
@@ -56,7 +57,7 @@ export interface TournamentMatchPeriodsResponse {
   periods: TournamentPeriodSetting[] | null;
   legacyPeriodCount: number | null;
   inherited: {
-    source: 'group' | 'stage' | 'default';
+    source: 'group' | 'stage' | 'default' | 'competition_stage' | 'pool';
     phase: TournamentPeriodPhase | null;
     groupName: string | null;
     periods: TournamentPeriodSetting[] | null;
@@ -68,6 +69,8 @@ export interface UpdateTournamentPeriodSettingsPayload {
   expectedVersion: string;
   /** phase·groupId·teamMatchId 중 하나만 보낸다. 없으면 대회 기본값이다. */
   phase?: TournamentPeriodPhase;
+  stageKey?: string;
+  poolKey?: string;
   groupId?: string;
   teamMatchId?: string;
   inheritDefault?: boolean;
@@ -103,9 +106,10 @@ export function useUpdateTournamentPeriodSettings(tournamentId: string) {
   return useMutation({
     mutationFn: (payload: UpdateTournamentPeriodSettingsPayload) =>
       v1Patch<TournamentPeriodSettingsResponse>(`/admin/tournaments/${tournamentId}/periods`, payload),
-    onSuccess: async () => {
+    onSuccess: async (_data, payload) => {
       await queryClient.invalidateQueries({ queryKey: periodSettingsKey(tournamentId) });
       await queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      if (payload.stageKey || payload.poolKey) await queryClient.invalidateQueries({ queryKey: ['stages', tournamentId] });
     },
     // 버전 충돌 뒤 같은 낡은 버전으로 다시 보내지 않게 설정을 다시 읽는다.
     onError: () => queryClient.invalidateQueries({ queryKey: periodSettingsKey(tournamentId) }),

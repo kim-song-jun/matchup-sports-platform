@@ -1,11 +1,21 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: In Progress — 구현·로컬 검증 완료, PR #2285 CI/리뷰·Alpha QA 대기
+Status: 추가 리뷰 완료 — P2 2건 dev PR #2427 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 통과
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
 
 ## Context
+최신 resume cursor(2026-11-17): `fix/stage-structure-draft-resume-20261117`, base dev `9f157aa57`.
+Owned: stage-plan-manager/structure-editor와 해당 테스트, stage-design QA 도구/검사, structure Alpha 증거, changeset 및 이 task/scenario/index. Forbidden: 다른 worktree/WIP, 기존20팀70경기 결과 변경, main 승격.
+- [x] 구성 editor의 revision key 제거, 초안 baseline/CAS 및 충돌 저장 차단·확인 재조회.
+- [x] 재개 format3 + full/filter/admin-bottom scope 분리, route/viewport별 필수 조작 검사.
+- [x] UI 회귀13/13·재개9/9, Web 타입/패턴·커밋 diff 검토 및 dev PR #2427 전체CI/머지.
+- [x] 별도 비공개20팀 초안 대회로 390/768/1440 실제 UI 재현3/3→수정3/3·PNG9개, 원래70경기 보존 확인.
+- [x] Alpha dbea6a5f585ec2eff60d212e9fbf5036ab00ab61에서 기존39/39, 필수 조작 기록 제거 후 실제 --resume의 관리자3개 재검사 확인.
+최신 Progress Snapshot: #2427은2f5c166ff로 dev 머지됐다. 다른 PR #2424 후속 머지로2f5c CI가 취소돼 해당 Alpha job은 matching-CI gate에서 중단됐고, 수정을 포함한 최신 dbea6a5f5의 전체CI·Alpha 배포 성공 후 검증했다. 구조 before/after·필수 재개 조작·기존39 화면·원래70경기 모두 PASS. 증거는 시나리오 최신 절과 JSON을 따른다. 아래 최초 계획 체크리스트는 이번 P2 후속에서 새로 전 항목을 수행했다고 표시하지 않는다.
+Ambiguity: 완료 대회는 구성 탭이 없어 기존39개 화면만으로 해당 결함을 증명할 수 없다. 실 API로 별도 초안 fixture를 준비하고 실제 UI로 조작한다. 대회 DELETE API가 없어 비공개 재사용 초안으로 보존하며 선수/경기는 만들지 않는다.
+
 사용자는 정규리그 + N개 토너먼트와 기존 조별리그 + 토너먼트의 통합을 검토하며,
 20팀 → 4팀씩 5개 예선 풀리그 → 각 조 동일 순위끼리 5팀씩 4개 본선 풀리그를 요청했다.
 이 사례만 위한 진행 방식을 추가하지 않고 여러 단계·복수 리그·복수 토너먼트를 조합해야 한다.
@@ -154,7 +164,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 공유 훅·타입·MSW·schema는 한 작업 단위에서 소유해 계약 드리프트를 막는다. PR마다 exact file scope를 명시한다.
 - Forbidden: 실제 사용자 대회 변환/시드·reset, 독립 리그 시즌 정책 변경, 무관한 WIP, 운영 main 승격.
 
-## Test Scenarios
+## Test Scenarios (최초 계획 체크리스트)
 - [ ] S1: 20팀, 예선5×6=30경기/본선4×10=40경기, 팀당7경기, 각 단계에 팀 정확히 한 번 등장.
 - [ ] S2: 3단계와 리그/토너먼트 혼합, 단일 단계 리그/토너먼트, 다른 조 수·홀수 팀·1/2회전.
 - [ ] 예선 승점이 본선에 섞이지 않음, 단계별 순위와 개인 대회 누적 기록의 중복 집계 없음.
@@ -169,9 +179,9 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - [ ] Alpha 실제 운영자·담당 디렉터·조회 스태프·참가팀·비로그인 각 권한 흐름.
 - [ ] 390/768/1440에서 초안 저장→예선 진행→진출 확정→본선 진행→공개 결과, console/network와 before/after 갤러리.
 - [ ] 생성량 상한과 초과 거절·성능, 불필요한 전체 suite 반복 없이 단계별 좁은 검증.
-실행 시나리오는 Phase 0에서 docs/scenarios에 작성하고 index에 Planning으로 등록한다. 이번에는 미실행.
+최초 계획 시점에는 미실행이었다. 현재 실행 범위·성공·한계는 `docs/scenarios/competition-stage-composition.md`의 최신 절과 원본 증거를 기준으로 판정한다.
 
-## Acceptance Criteria
+## Acceptance Criteria (최초 계획 체크리스트)
 - [ ] Original Conditions와 S1/S2 모두 충족. 특정 조 수/단계 이름 하드코딩 없음.
 - [ ] 사용자 UI 선택 후 구현, schema/API/hook/fixture 계약 동기화.
 - [ ] 참가·순위·진출·공개·시상 범위가 단계/편성 ID로 일치.
@@ -207,6 +217,9 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 | 기존 대회 전환 | 자동 전환 없음, 시작 전 명시적 전환만 검토 | 호환 설계 확정 전 |
 
 ## Progress Snapshot
+- 2026-11-16 사용자 `싹 다 수정해서 PR` 승인. 구현 브랜치 `fix/stage-competition-parity-20261116` (origin/dev 1acdeb40a), 기존 QA worktree 재사용. 40개 감사 계약을 전체 수정·회귀 범위로 고정하고 토너먼트 전용 격차도 임의 제외하지 않는다. Wave1 공개/표시정보/편집 연결 진행중; Wave2 진출/알림/시간/정정 pending; Wave3 특수대진/전체순위·기록/권한·예외검증/문서·devPR pending. 기존 순차 편집 A안과 공유 컴포넌트 재사용, 기존70경기 Alpha 대회 보존. 이번 요청은 PR 생성까지이며 운영main 승격은 하지 않는다.
+- 2026-11-16 사용자 요청 후속 동등성 감사: 운영 계약40개 정적 비교40/40. 유지16/기능 격차19/추가 확장1/예외·권한·시각 미검증4로 구분. Alpha 무변경 PATCH로 경기 제목·사이드 라벨·조 이름의 STAGE_MANAGEMENT_REQUIRED409 3/3 재현. 공개 UI 누락·진출 알림·시간 단계 의미·결과 첫 선택·징계 순서 등 상세는 scenario의 동일 날짜 동등성 감사 표 참조. 앱 소스 수정·새 배포 없음, 완료 대회70경기 결과 보존.
+- 2026-11-16 사용자 지정 S2 Alpha 실측: 새 sm20팀×7명(140계정), 팀장 실제 신청·접수20/20, 예선30+본선40 Game 공식결과70/70, 대회completed, 팀당7경기·본선0점 시작·경기ID보존·공개 누적70골 확인. 대회 `ee1675e5-264e-43ec-9a36-bd2f0a3099d9`. 완전자동 진출은 assigned=false로 미지원(정확한 순위 후보 추천 후4편성 확정). 결과/시상HTTP200와 시상1~3위 서버HTML 확인; 브라우저host불가/앱승인timeout으로3폭·클릭·console/network 미검증. 전체 QA 완료로 재분류하지 않는다. 상세·fixture 방식·cleanup은 [시나리오](../../docs/scenarios/competition-stage-composition.md)와 비밀값 없는 evidence JSON 참조.
 - Phase A/B 구현 완료: 별도 생성 경로, versioned stagePlan, 단계/편성별 경기·슬롯, 공식 순위 기반 배정, 운영·공개·시상 연결.
 - 기존 stagePlan=null 대회는 기존 경로와 응답 모양을 유지하며 자동 전환하지 않는다.
 - 검증: 실제 PostgreSQL 전체 migration replay 및 schema diff 0; 실제 DB 통합 5건 PASS(20팀70경기, 3단계 혼합, 단일 리그/KO, 생성·수정·종료 제약); API typecheck PASS.
@@ -224,3 +237,38 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - Phase B completed: 새 생성 진입/편집·운영·공개 조회 연결, 공유 계약 동기화.
 - Phase C in_progress: 실제 DB·단위/UI/기존 회귀·typecheck, PR/CI/리뷰·Alpha QA·문서/정리.
 - 구조 저장은 기존 multiFinals와 독립인 versioned stagePlan으로 한다. 기존 그룹에는 stageKey/poolKey를 추가하고, 경기 정본은 그대로 재사용한다. 기존 행의 stagePlan=null/entryScope=legacy는 동작을 유지한다.
+
+## 2026-11-16 동등성 수정 Progress Snapshot
+- Copilot 실제 차단 원인: 최신 공식 `POST /pulls/2419/copilot-code-review`가 HTTP422 `ACTOR_INELIGIBLE`(현재 actor의 코드리뷰 라이선스/조직 정책 자격 불충족)를 반환했다. 기존 requested_reviewers 요청의 성공 응답·리뷰0건을 clean으로 판정하지 않는다. 계정·요금제·정책 변경 없이 사용자에게 이번 작업 한정 수동 적대 검토+전체CI 대체를 설명한 뒤 2026-11-17 “스크린샷 찍어서 pr 까지 다 해줘” 후속 진행 지시를 해당 대체 승인으로 적용했다. Copilot clean으로 표시하지 않는다. 커밋5a77bd034의 Gates/API/Web 전체 CI 통과 및 MERGEABLE/CLEAN 확인 후 PR #2419를 dev에 merge(b4c9726cf)했다. Alpha after 검증을 진행한다.
+- 최신 사용자 지시: 기존 대회 디자인에 맞춘 수정과 모바일 포함 Alpha 화면 검증까지 완료한 뒤 반영. 기존 'PR까지만' 제한을 이 후속에 적용하지 않고 저장소의 dev PR→머지→Alpha 검증 순서를 따른다(main 승격 제외). 기존 컴포넌트 재사용 A안 유지. 검증 대상7 routes×390/768/1440=21 route/viewport. 관리자 생성·대진·시상, 공개 상세·대진·결과·시상. native CUA 브라우저 host unavailable/승인 timeout 재현 뒤 사용자가 Playwright 전용 headed 창을 명시 승인. 코드 회귀104건·Web 타입/패턴 PASS, before21/21 캡처 완료. 새 head CI/Alpha after21폭 검증은 남아 있어 완료로 선언하지 않는다.
+- 사용자 재리뷰 후 P1 수정: GamesService → stage-view → multi-finals-seeding → multi-finals-plan → LeagueFixtureGeneratorService → GamesService 순환으로 기존 API CI의 실제 앱 초기화가 실패했다. 읽기용 크기·오류 정의를 multi-finals-definition.ts로 분리해 planner의 기존 export 호환성을 유지했다. 냉시작 Nest 주입 RED1→GREEN1 및 대진 계산 포함34건, 실제 HTTP/DB76건(운영 보드58·health2·단계15·worker1) PASS. 운영 보드 첫 로컬 실행의 프리셋 누락58건은 CI와 같은 competition-config-backfill CLI를 소유 DB에 적용한 뒤 재검증해 PASS. 최종 API 타입·surface PASS. 새 head CI·Copilot은 후속 확인한다.
+- dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현 커밋2e3e6e793. CI Gates/API/Web 및 최신 head Copilot 확인 중. 사용자 요청 범위는 PR 생성까지이며 머지·main 승격 없음. 소유 PostgreSQL 컨테이너2개 실행분과 전용 볼륨, 공유 의존성 링크를 정리했다. 미병합 브랜치/worktree·재현용 ignored 의존성·Alpha 테스트 데이터는 보존한다.
+- 최종 로컬 검증: 실제DB15건+실제worker1건 PASS, 6강 종료 후 정정 완료 판정 RED1→GREEN1, API/Web 타입·surface/pattern PASS, Web 최종4 suites65건 PASS. 상세와 이전 회귀 실행은 시나리오 최종 검증 기록 참조. 구현 커밋과 dev PR 생성 단계이며 Alpha 시각0/3 차단은 유지한다.
+- 범위: 감사40/40. 기존16 유지, 수정/확장22, 권한·경쟁1, 시각 차단1을 동일 시나리오에 추적한다.
+- 브랜치: fix/stage-competition-parity-20261116, 최신 origin/dev 1acdeb40a 기준. 원격 main은 dev보다156커밋 뒤이며 main 전용 커밋0. 승격·main 쓰기 없음.
+- 구현: 기존 작업공간/공개/표시 편집, 초안·무작위·예외 배정·진출 알림·durable 자동 진출, 단계별 시간·의존 일정·징계 순서, 미시작 편성 교체·경기 복구,3위전·12강·와일드카드·6강, 전체 순위·우승/시상·개인 기록 범위 반영.
+- 검증: 격리 PostgreSQL16/LF241 migration 재생, 원래 Alpha20팀70경기 증거 보존, 새 실제DB/단위/UI/타입/surface 검증. 최신 세부 결과는 시나리오의 동등성 전체 수정 cursor 및 최종 검증 기록 참조.
+- 남은 gate: dev PR/최신 head CI·Copilot, 머지 후 Alpha 배포·390/768/1440 갤러리·console/network/focus. 브라우저 host unavailable 재확인,0/3폭을 통과로 표시하지 않는다.
+- 소유 자원: 작업 전용 DB 컨테이너·clone·임시 의존성/스크립트만 정리한다. 미병합 worktree와 사용자가 요청한 Alpha 테스트 팀/계정/대회는 보존한다.
+
+## 2026-11-17 Alpha 화면 보완
+- PR #2419 dev 머지 및 Alpha b4c9726cf 실측. 모바일·태블릿 일정 상단에 전체 순위20행이 반복돼 경기가 밀리는 시각 결함 발견. 최종 순위를 결과 하단으로 옮기고 모바일 팀/라운드 필터를2열로 정리. 관련 공개 단계3 tests PASS. 기존 두 형식 비교까지39개 화면 및 실제 조작을 검증하며 최종 갤러리는 보완 배포 후 촬영한다.
+
+## 2026-11-17 UI 후속 완료 cursor
+- PR #2419/#2420 dev 반영, 최종 Alpha 2f77a3c9a789fccf9822d6633d0f48280c2f38ef. Gates/API/Web 및 Alpha 배포 PASS. 최종39/39(대상21+기존 두 형식 비교18), 세 폭 직접 시각 검토 PASS, console/network/문서 넘침0. 실제 필터/모달/상세 복귀/20팀 템플릿 조작 및70경기 ID·점수 보존. 원본75PNG+before42+모바일 관찰 결함1, 최종 및 첫 실행 JSON을 함께 기록. Copilot 자격 차단은 사용자 후속 지시로 수동 검토·전체 CI 대체했고 clean으로 표기하지 않음. 상세와 잔여 원래 범위는 현행 시나리오의 최종 완료 section 참조.
+
+## 2026-11-17 리뷰3건 보완 진행
+- 편성별 입력 캐시와 표시 저장 뒤 참가팀 유지, 서버 배정 변경 시 덮어쓰기 차단: UI 회귀10건 PASS. 입력을 버리는 최신 구성 재조회는 명시 확인 후 수행한다.
+- 재개 결과는 배포 SHA/대회/측정형식2가 일치하는 성공 route만 재사용하며 실패·중단 route는 재실행한다. 순수 검사5건 PASS.
+- 모바일·태블릿 관리자 하단6쌍이 상단과 동일했던 이전 증거의 하단 완료 판정은 보완 전까지 보류한다. 보이는 본문 scroll surface만 끝으로 이동하고 실제 좌표를 검증·기록한 뒤 재촬영한다. UI 변경의 새 dev/Alpha 검증은 후속이다.
+
+## 2026-11-17 리뷰 보완 완료 cursor
+- PR #2421 dev 반영 및 Alpha a839b6939179ba2091cd6a86dc7fe896250ebb14에서39/39, 관리자 하단9/9·상하단 해시중복0/9. 편성 왕복 미저장 입력3폭 보존 및 표시 저장 후 타 편성 입력 유지/원상 복구 실측. UI 회귀10·재개6·실제 CLI 타 SHA 거절·Web 타입/패턴·전체 CI PASS. 보고된3개 문제 해소. 최종78PNG와 측정형식2 JSON, 현재 시나리오 및 허브를 갱신했다.
+
+2026-11-17 로컬 보완 검증: 관리자 UI 회귀13/13, 증거 재개 검사9/9, Web TypeScript 및 v1 패턴 검사 PASS. 임시 의존성의 React/타입 연결 누락을 해결한 뒤 검사했다. Alpha 모바일 수정 전 초안 소실 재현을 확보했고 나머지 폭/배포 후 검증은 진행 중이다.
+
+수정 전 Alpha 실측 완료: 배포9f157aa571514fe4bc62c2104fd4f22a670d23a2, 390/768/1440 모두3/3에서 구성 회전2→1·사유 소실을 실제 이름 저장 후 재현. PNG3개와 stage-structure-before-20261117.json에 기록. 원래70경기·초안 서버 구성 복원 확인, console/network/가로 넘침0, 전용 브라우저15315 종료. 준비 중 잘못된 종목ID/선택자·저장 후 버튼 기대값을 교정했고, 중단된503·network-idle 대기는 성공 증거로 쓰지 않았다.
+
+PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN을 확인하고 dev2f5c166ffbab45f2dcfe8ffd7a5f50c39d3349bf로 머지했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지한다. Alpha matching-SHA 배포 후 구조3+기존39 화면을 검증하고 증거 PR로 마무리한다.
+
+구조 QA 보존 검사를 조작 종료 후 실제 GET으로 강화해 수정 전3/3을 재측정했다(브라우저15838 종료). 테스트 초안에 등록0·경기0도 확인했다. 초기 사전 조회 스냅샷 대신 실행 후 completed/70 fixture ID·공식 점수를 확인한 최신 before JSON으로 교체한다.

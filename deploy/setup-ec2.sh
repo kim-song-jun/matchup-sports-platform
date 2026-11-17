@@ -62,6 +62,7 @@ fi
 # 4. Git 설치
 echo "📂 Git 설치..."
 sudo yum install -y git 2>/dev/null || sudo apt-get install -y git 2>/dev/null
+bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/qa/check-git-security.sh"
 
 # 4.1 jq 설치
 echo "🧰 jq 설치..."

@@ -20,6 +20,12 @@ import {
 } from './v1-game-operations-worker.controller';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
 import { VideoUploadCleanupService } from './video-upload-cleanup.service';
+import { StagePlanService } from '../tournaments/stages/stage-plan.service';
+import { BracketTemplateService } from '../tournaments/templates/bracket-template.service';
+import { GamesService } from '../games/games.service';
+import { GameTakeoverService } from '../games/game-takeover.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
+import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 
 @Module({
   // LoggerModule.forRoot() is required here (mirrors app.module.ts) because
@@ -67,6 +73,14 @@ import { VideoUploadCleanupService } from './video-upload-cleanup.service';
     PlatformResultEscalationController,
   ],
   providers: [
+    // Standalone services only: importing GamesModule/TournamentsModule would
+    // attach HTTP gateways to the worker and require FRONTEND_URL at module load.
+    StagePlanService,
+    BracketTemplateService,
+    GamesService,
+    GameTakeoverService,
+    TournamentStaffAccessService,
+    OperationAuditWriterService,
     V1GameOperationsWorkerService,
     VideoUploadCleanupService,
     // Cleanup needs storage operations, not the public upload HTTP controller.

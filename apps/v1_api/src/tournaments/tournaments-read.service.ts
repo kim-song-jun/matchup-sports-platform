@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1CompetitionKind, V1GameSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { loadStageView, type StoredStagePlan } from './stages/stage-view';
 import { buildPageInfo } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
@@ -252,7 +253,11 @@ export class TournamentsReadService {
       : null;
     const previousSeason = linkedPrevious ?? (isLeague ? await findConversionSourceLeague(this.prisma, row) : null);
 
+    const stageProgress = row.stagePlan && isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now)
+      ? (await loadStageView(this.prisma, tournamentId, row.stagePlan as unknown as StoredStagePlan)).pools.map(pool => ({ poolKey: pool.key, assigned: pool.assigned, stale: pool.stale, complete: pool.complete, ...(pool.sixTeam ? { sixTeamBracket: { rounds: pool.sixTeam.rounds, bye: hideIdentity ? null : pool.sixTeam.bye, winners: {}, manual: pool.sixTeam.manual, needsReview: pool.sixTeam.needsReview } } : {}) }))
+      : undefined;
     return {
+      ...(stageProgress ? { stageProgress } : {}),
       ...presentTournamentDetail(
         row,
         publicLiveEnabled,

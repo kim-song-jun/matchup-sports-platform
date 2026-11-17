@@ -1,11 +1,19 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: In Progress — 동등성40항목 수정·확장 및 실제 DB/회귀 검증, dev PR #2419; CI·Copilot 확인 중, Alpha 시각 QA 미완료
+Status: In Progress — 기존 동등성/화면39건 완료 후 리뷰 P2 2건(구성 초안·검증 재개 증거) 보완 및 Alpha 재검증
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
 
 ## Context
+최신 resume cursor(2026-11-17): `fix/stage-structure-draft-resume-20261117`, base dev `9f157aa57`.
+Owned: stage-plan-manager/structure-editor와 해당 테스트, stage-design QA 도구/검사, structure Alpha 증거, changeset 및 이 task/scenario/index. Forbidden: 다른 worktree/WIP, 기존20팀70경기 결과 변경, main 승격.
+- [x] 구성 editor의 revision key 제거, 초안 baseline/CAS 및 충돌 저장 차단·확인 재조회.
+- [x] 재개 format3 + full/filter/admin-bottom scope 분리, route/viewport별 필수 조작 검사.
+- [ ] UI 회귀·Web 타입/패턴·커밋 diff 검토 및 dev PR/CI/머지.
+- [ ] 별도 비공개20팀 초안 대회로 390/768/1440 실제 UI 재현/수정 검증·PNG, 원래70경기 보존 확인.
+Ambiguity: 완료 대회는 구성 탭이 없어 기존39개 화면만으로 해당 결함을 증명할 수 없다. 실 API로 별도 초안 fixture를 준비하고 실제 UI로 조작한다. 대회 DELETE API가 없어 비공개 재사용 초안으로 보존하며 선수/경기는 만들지 않는다.
+
 사용자는 정규리그 + N개 토너먼트와 기존 조별리그 + 토너먼트의 통합을 검토하며,
 20팀 → 4팀씩 5개 예선 풀리그 → 각 조 동일 순위끼리 5팀씩 4개 본선 풀리그를 요청했다.
 이 사례만 위한 진행 방식을 추가하지 않고 여러 단계·복수 리그·복수 토너먼트를 조합해야 한다.
@@ -254,3 +262,5 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 
 ## 2026-11-17 리뷰 보완 완료 cursor
 - PR #2421 dev 반영 및 Alpha a839b6939179ba2091cd6a86dc7fe896250ebb14에서39/39, 관리자 하단9/9·상하단 해시중복0/9. 편성 왕복 미저장 입력3폭 보존 및 표시 저장 후 타 편성 입력 유지/원상 복구 실측. UI 회귀10·재개6·실제 CLI 타 SHA 거절·Web 타입/패턴·전체 CI PASS. 보고된3개 문제 해소. 최종78PNG와 측정형식2 JSON, 현재 시나리오 및 허브를 갱신했다.
+
+2026-11-17 로컬 보완 검증: 관리자 UI 회귀13/13, 증거 재개 검사9/9, Web TypeScript 및 v1 패턴 검사 PASS. 임시 의존성의 React/타입 연결 누락을 해결한 뒤 검사했다. Alpha 모바일 수정 전 초안 소실 재현을 확보했고 나머지 폭/배포 후 검증은 진행 중이다.

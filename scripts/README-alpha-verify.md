@@ -1,5 +1,7 @@
 # alpha 실측 검증 스크립트
 
+`scripts/qa/stage-structure-alpha.cjs --before|--after --expected-commit <40자리 SHA>`는 구성 초안 보존 회귀를 Alpha headed 창의390/768/1440에서 확인한다. 자격증명은 JSON stdin으로만 받는다. 실 관리자 API로 별도20팀 비공개 초안을 준비하며 편집·이름 저장·충돌·취소·확인 재조회는 실제 UI로 조작한다. 원본70경기와 초안 설정 복원을 확인하고 소유 브라우저를 종료한다. 대회 DELETE API가 없으므로 선수/경기 없는 비공개 초안을 재사용용으로 보존하며, 재실행 시 `tmp/stage-structure-alpha/fixture.json`의 ID·정확한 제목·draft 상태를 확인한다. 측정/PNG는 같은 tmp 경로의 before/after에 저장한다.
+
 이 문서에 적힌 `scripts/` 의 alpha 스크립트(`verify_alpha_*` · `verify-alpha-*` · `capture*` 등 — 파일명 구분자가
 밑줄/하이픈으로 섞여 있으니 표에 적힌 이름 그대로 쓴다)는 **alpha 배포본을 실제 렌더해 관측**하는 회귀 확인용 스크립트다.
 단위 테스트가 잡지 못하는 것 — 라우팅이 실제로 이어지는지, 링크가 404 로 죽는지,

@@ -1,6 +1,13 @@
 # 단계형 대회 구성
 
-Status: 리뷰3건 보완 완료 — dev/Alpha 반영, 최종39/39 및 관리자 하단9/9
+Status: 추가 리뷰 P2 2건 보완 중 — 구성 초안 보존 및 필수 조작 증거 재개 검사
+
+## 2026-11-17 — 구성 초안·재개 조작 증거 보완
+
+- 추가 검토에서 구조 editor가 전체 revision으로 remount되어 다른 탭 이름 저장 시 구성·사유를 잃는 문제와, 같은 SHA의 성공 캡처만 있으면 필수 조작 기록 없이 재개되는 문제를 확인했다.
+- 구조 초안은 명시적 재조회 전까지 유지한다. 서버 revision/config 변경 시 미저장 입력을 남기고 저장을 차단하며, 확인 후 최신값을 불러온다. 깨끗한 editor는 서버 변경을 반영하고 저장은 자기 baseline revision으로 요청한다.
+- 증거 format3에서 full/filter/admin-bottom scope를 분리하고 route/viewport별 필수 조작·모바일 실제 이름 저장 기록을 요구한다. 누락/실패/다른 폭의 기록은 해당 화면을 재실행한다. 최종 성공 판정에도 같은 검사를 적용한다.
+- 검증 진행 중: 기존 완료 대회의39개 화면과 별개로 비공개20팀 초안 대회를 준비해 구성 탭을390/768/1440에서 확인한다. 원래70경기와20팀140계정은 보존한다.
 
 ## 2026-11-17 — 리뷰3건 보완 완료
 
@@ -234,3 +241,5 @@ Cleanup: 이번 임시 SecureString 삭제(ParameterNotFound 확인), Alpha 컨�
 - Web 기존 workspace/node-panel/awards/manager4 suites125건, editor/public7건 PASS. 최종 변경 후 Web `tsc --noEmit`·`v1-pattern-check.mjs` PASS, workspace/manager/editor/public4 suites65/65 PASS(이전 실행과 중복되므로 합산하지 않는다).
 - 소유 변경76개 경로만 스테이징 검토, `git diff --check` PASS. 비밀 literal 검사0건, touched 단계/QA 도구의 TODO/FIXME/HACK/XXX0건. `.env*`를 읽거나 출력하지 않았다. 테스트 계정 비밀번호·로그인 쿠키는 증거·PR에서 제외했다.
 - Alpha 시각 검증0/3 차단. 기존 완료 대회70경기와140명·20팀은 보존하며 새로운 코드의 Alpha UI 성공으로 대체 표시하지 않는다.
+
+2026-11-17 로컬 보완 검증: 관리자 UI 회귀13/13, 증거 재개 검사9/9, Web TypeScript 및 v1 패턴 검사 PASS. 임시 의존성의 React/타입 연결 누락을 해결한 뒤 검사했다. Alpha 모바일 수정 전 초안 소실 재현을 확보했고 나머지 폭/배포 후 검증은 진행 중이다.

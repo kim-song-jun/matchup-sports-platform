@@ -59,6 +59,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Git security baseline
+        run: |
+          bash scripts/qa/check-git-security.sh
+          bash scripts/qa/test-git-security.sh
+
       - name: Verify release changeset
         if: >-
           github.event_name == 'pull_request' ||
@@ -532,6 +537,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Git security baseline
+        run: bash scripts/qa/check-git-security.sh
+
       - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v5
@@ -671,6 +679,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Git security baseline
+        run: bash scripts/qa/check-git-security.sh
+
       - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v5
@@ -740,6 +751,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Git security baseline
+        run: bash scripts/qa/check-git-security.sh
 
       # Resolves the Task168 stage for every step below. Values are read
       # through env (never interpolated into the run body) so a
@@ -987,6 +1001,9 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+
+      - name: Git security baseline
+        run: bash scripts/qa/check-git-security.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6

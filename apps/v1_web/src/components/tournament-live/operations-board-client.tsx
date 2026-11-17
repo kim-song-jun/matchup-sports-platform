@@ -246,6 +246,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   // 이 화면은 스태프 표면과 어드민 표면 양쪽에서 렌더된다 — 본문 링크도 nav 와 같이
   // 지금 표면을 따라가야 한다(하드코딩하면 어드민에서 누를 때 스태프 경로로 튕긴다).
   const liveBase = resolveTournamentLiveBase(pathname, tournamentId);
+  // 스태프 표면(`/tournament-ops`)에서 연 콘솔은 돌아갈 곳이 이 보드라는 걸 콘솔에 알린다. 어드민 표면은 경로만
+  // 보면 출처를 알 수 있어 쿼리를 붙이지 않는다.
+  const consoleOriginQuery = liveBase.startsWith('/admin/') ? '' : '?from=board';
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
@@ -686,7 +689,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                            href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate${consoleOriginQuery}`}
                             aria-label={`${rowControlName(item)} 운영 콘솔`}
                             className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                           >
@@ -757,7 +760,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <div className="mt-2 flex items-center gap-2">
                   <Link
-                    href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                    href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate${consoleOriginQuery}`}
                     aria-label={`${rowControlName(item)} 운영 콘솔로 이동`}
                     className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >

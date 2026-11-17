@@ -29,3 +29,5 @@ GHSA-vp2w-7xxj-jvxr 페이지의 `Patched versions: none` 표기는 릴리스 �
 ## 이번 세션 증거
 
 개발 PC `git version 2.56.1.windows.1` 확인. Alpha는 Git 2.50.1 / git-core 및 git RPM `2.50.1-1.amzn2023.0.1`로 확인되어 공식 수정 release보다 낮다. production은 미확인이다. Alpha 업데이트 후 패키지 release 및 검사 결과를 별도로 기록한다.
+
+2026-11-17 Alpha 적용 결과: git/git-core/git-core-doc/perl-Git을 공식 `.0.2`로, 패키지 관리자가 요구한 expat을 2.8.3으로 갱신했다. 보안 검사기의 검증된 backport 판정 PASS. API health의 DB true 및 landing HTTP 200 확인. 서비스 재시작이나 DB 변경은 없었다. production 조치 완료를 의미하지 않는다.

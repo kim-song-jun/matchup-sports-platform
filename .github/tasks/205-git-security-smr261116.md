@@ -1,6 +1,6 @@
 # Task 205: Git SMR261116 보안 검증
 
-Status: In Progress
+Status: Review
 Owner: Codex
 Created: 2026-11-17
 
@@ -29,7 +29,7 @@ Node.js PR과 분리하여 실제 Git 실행 버전을 검증하고 CI·초기 �
 
 ## Acceptance Criteria
 - [x] 취약 버전이 silent success로 통과하지 않음.
-- [ ] 실제 CLI 및 경계 테스트 통과.
+- [x] 실제 CLI 및 경계 테스트 통과.
 - [ ] CI·리뷰 통과와 dev 머지.
 - [ ] 기존 서버 증거 또는 정확한 접근 blocker 기록.
 
@@ -52,3 +52,5 @@ origin/dev 9f157aa57에서 별도 worktree 생성. 개발 PC Git은 패치 기�
 - LF committed-tree에서 production security guard와 20개 shell 계약 통과.
 - Alpha 읽기 전용 SSM 실측: Git 2.50.1, RPM git-2.50.1-1.amzn2023.0.1.x86_64. 설치 패키지 changelog에서 두 CVE/2.50.2 수정 근거를 찾지 못했다. 캐시된 업데이트 목록에도 후보가 없었다(실시간 공급자 업데이트 확인은 별도). 기존 호스트의 패치 완료로 표시하지 않는다.
 - Amazon 공식 ALAS2023-2026-3445에서 수정 backport `2.50.1-1.amzn2023.0.2`, release snapshot `2023.12.20261112` 확인. 실제 실행 파일 RPM 소유자·공급자·release·파일 무결성을 모두 검증하는 좁은 backport 허용과 26개 계약 테스트를 추가했다. Alpha의 `.0.1`은 기준 미달이다.
+- Alpha에 공식 advisory update 적용 완료: git/git-core/git-core-doc/perl-Git `.0.2`, 필수 의존성 expat 2.8.3 갱신. 실제 바이너리 RPM 소유자·공급자·release·무결성 검사 PASS. 서비스 재시작·DB 변경 없음. 공개 API health DB true, landing HTTP 200 확인. production은 접근·갱신하지 않았다.
+- API·Web·worker 컨테이너 healthy 및 모두 Node v22.23.5 확인. SSM 명령 완료, 임시 컨테이너는 --rm으로 종료. PR #2426(dev)의 최신 head CI/Copilot 제출 리뷰는 확인 중이며 머지 완료로 표시하지 않는다.

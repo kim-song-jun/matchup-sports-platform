@@ -176,48 +176,60 @@ describe('TeamListPageClient — 필터 시트', () => {
   describe('정렬 — 실제로 다른 순서만', () => {
     beforeEach(() => signedOut());
 
-    it('기본에서는 최근 등록순이 켜져 있고 메뉴는 서버가 구분하는 세 가지뿐이다', () => {
+    it('기본에서는 활동 많은순이 켜져 있고 메뉴는 서버가 구분하는 세 가지뿐이다', () => {
       render(<TeamListPageClient />);
 
-      expect(chipLabels('정렬')).toEqual(['최근 등록순', '멤버 많은순', '활동 많은순']);
-      expect(chip('정렬', '최근 등록순').getAttribute('aria-current')).toBe('page');
+      expect(chipLabels('정렬')).toEqual(['활동 많은순', '최근 등록순', '멤버 많은순']);
+      expect(chip('정렬', '활동 많은순').getAttribute('aria-current')).toBe('page');
       expect(screen.queryByRole('link', { name: '추천순' })).toBeNull();
       expect(screen.queryByRole('link', { name: '가입 가능' })).toBeNull();
       expect(screen.queryByRole('link', { name: '최신순' })).toBeNull();
+      const [filters] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>];
+      expect(filters).toMatchObject({ sort: 'activity' });
     });
 
-    it.each([['member_count', '멤버 많은순'], ['activity', '활동 많은순']])('sort=%s 이면 %s 만 켜지고, 같은 칩을 다시 누르면 기본으로 돌아간다', (value, label) => {
+    it.each([['member_count', '멤버 많은순'], ['latest', '최근 등록순']])('sort=%s 이면 %s 만 켜지고, 같은 칩을 다시 누르면 기본으로 돌아간다', (value, label) => {
       searchParamsMock.value = new URLSearchParams(`filter=1&sort=${value}`);
       render(<TeamListPageClient />);
 
       expect(chip('정렬', label).getAttribute('aria-current')).toBe('page');
-      expect(chip('정렬', '최근 등록순').getAttribute('aria-current')).toBeNull();
+      expect(chip('정렬', '활동 많은순').getAttribute('aria-current')).toBeNull();
       expect(new URL(chip('정렬', label).getAttribute('href')!, 'https://t.test').searchParams.has('sort')).toBe(false);
+      const [filters] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>];
+      expect(filters).toMatchObject({ sort: value });
     });
 
-    it('정렬 칩은 URL 의 sort 값과 API 요청을 같은 값으로 바꾼다', () => {
+    it('정렬 칩은 URL 의 sort 값을 바꾸고 기본 칩은 sort 를 지운다', () => {
+      searchParamsMock.value = new URLSearchParams('filter=1&sort=member_count');
       render(<TeamListPageClient />);
 
-      const hrefs = Object.fromEntries(['멤버 많은순', '활동 많은순'].map((label) => [label, new URL(chip('정렬', label).getAttribute('href')!, 'https://t.test').searchParams.get('sort')]));
-      expect(hrefs).toEqual({ '멤버 많은순': 'member_count', '활동 많은순': 'activity' });
+      const hrefs = Object.fromEntries(['활동 많은순', '최근 등록순', '멤버 많은순'].map((label) => [label, new URL(chip('정렬', label).getAttribute('href')!, 'https://t.test').searchParams.get('sort')]));
+      expect(hrefs).toEqual({ '활동 많은순': null, '최근 등록순': 'latest', '멤버 많은순': null });
     });
 
-    it.each(['recommended', 'latest', 'deadline'])('공유돼 있던 옛 링크(sort=%s)는 기본 순서로 열리고 정렬 배지·API 정렬에 잡히지 않는다', (old) => {
+    it.each(['recommended', 'deadline'])('공유돼 있던 옛 링크(sort=%s)는 기본 순서로 열리고 정렬 배지에 잡히지 않는다', (old) => {
       searchParamsMock.value = new URLSearchParams(`filter=1&sort=${old}`);
       render(<TeamListPageClient />);
 
-      expect(chip('정렬', '최근 등록순').getAttribute('aria-current')).toBe('page');
+      expect(chip('정렬', '활동 많은순').getAttribute('aria-current')).toBe('page');
       const [filters] = hookMocks.useV1TeamPages.mock.calls[0] as [Record<string, unknown>];
-      expect(filters).not.toHaveProperty('sort');
+      expect(filters).toMatchObject({ sort: 'activity' });
       expect(filters).not.toHaveProperty('joinPolicy');
       expect(screen.queryByLabelText('필터')?.textContent ?? '').not.toMatch(/1/);
     });
 
-    it('정렬을 고르면 필터 개수 배지가 1 올라간다', () => {
-      searchParamsMock.value = new URLSearchParams('sort=activity');
+    it('기본이 아닌 정렬을 고르면 필터 개수 배지가 1 올라간다', () => {
+      searchParamsMock.value = new URLSearchParams('sort=latest');
       render(<TeamListPageClient />);
 
       expect(screen.getByLabelText('필터').textContent).toBe('1');
+    });
+
+    it('기본 정렬(sort=activity)은 배지에 잡히지 않는다', () => {
+      searchParamsMock.value = new URLSearchParams('sort=activity');
+      render(<TeamListPageClient />);
+
+      expect(screen.getByLabelText('필터').textContent ?? '').not.toMatch(/1/);
     });
   });
 });

@@ -57,12 +57,11 @@ export function StagePublicView({ tournament, mode = 'results' }: { tournament: 
     <BracketFilterRow padded={false} label="진행 단계 선택" items={plan.stages.map(stage => ({ id: stage.key, label: stage.name }))} activeId={selected.key} onSelect={value => { setKey(value); select('stage', value); }} />
     <BracketFilterRow padded={false} label="편성 선택" items={[{ id: '', label: '전체 편성' }, ...selected.pools.map(pool => ({ id: pool.key, label: pool.name }))]} activeId={activePool} onSelect={value => { setPoolKey(value); select('pool', value); }} />
     {mode === 'bracket' && <SegmentedTabs ariaLabel="보기 방식" role="tablist" items={[{ id: 'schedule', label: '경기 일정' }, { id: 'standings', label: '순위 · 대진표' }]} activeId={tab} onSelect={value => { setTab(value); select('tab', value); }} />}
-    {(mode === 'results' || tab === 'schedule') && <div className="grid gap-3 sm:grid-cols-2">
+    {(mode === 'results' || tab === 'schedule') && <div className="grid grid-cols-2 gap-3">
       <label className="block tm-text-label">참가팀<select className={control} value={activeTeam} onChange={e => { setTeam(e.target.value); select('team', e.target.value); }}><option value="">전체 팀</option>{teams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="block tm-text-label">경기 라운드<select className={control} value={activeRound} onChange={e => { setRound(e.target.value); select('round', e.target.value); }}><option value="">전체 라운드</option>{rounds.map(r => <option key={r} value={r}>{tournamentRoundLabel(r)}</option>)}</select></label>
     </div>}
     <p className="tm-text-caption text-[var(--text-muted)]">각 편성의 순위를 따로 계산해요. 서로 다른 단계·리그의 승점을 합쳐 전체 순위로 표시하지 않아요.</p>
-    {tournament.status === 'completed' && <StageOverallRanks tournament={tournament} />}
     {!tournament.groups.length && <p className="tm-text-label">대진 공개를 기다리고 있어요.</p>}
     {selected.pools.filter(p => !activePool || p.key === activePool).map(pool => {
       const groups = tournament.groups.filter(g => g.poolKey === pool.key), groupIds = new Set(groups.map(g => g.id));
@@ -92,6 +91,7 @@ export function StagePublicView({ tournament, mode = 'results' }: { tournament: 
         </Link>)}{fixtures.length === 0 && <EmptyState title="표시할 경기가 없어요." sub="선택한 편성과 필터를 확인해 주세요." />}</div>}
       </section>;
     })}
+    {mode === 'results' && tournament.status === 'completed' && <StageOverallRanks tournament={tournament} />}
     <button type="button" className="tm-btn tm-btn-md tm-btn-neutral" aria-expanded={showRecords} onClick={() => setShowRecords(!showRecords)}>선택한 단계·편성 개인 기록{showRecords ? ' 닫기' : ' 보기'}</button>
     {showRecords && <StageScopedRecords tournamentId={tournament.id} stageKey={selected.key} poolKey={activePool || undefined} />}
   </div>;

@@ -56,3 +56,34 @@ export function signupStage(row: { onboardingStatus: string; profile: { nickname
     || !row.profile?.nickname) return 'profile_required';
   return row.onboardingStatus === 'completed' ? 'onboarding_complete' : 'required_complete';
 }
+
+const PHONE_QUERY_MIN_DIGITS = 4;
+const PHONE_LIKE_QUERY = /^[\d\s-]+$/;
+
+/**
+ * 검색어가 전화번호처럼 보이면(숫자·하이픈·공백뿐, 숫자 4자리 이상) 하이픈을 뺀 숫자만 돌려준다.
+ * 저장된 번호는 하이픈 없는 11자리라, `010-1234-5678` 도 `01012345678` 도 같은 조건으로 찾는다.
+ * 닉네임이 숫자뿐이어도 기존 이름·이메일 조건은 그대로 두고 OR 로 합치므로 놓치지 않는다.
+ */
+export function phoneSearchDigits(q: string): string | null {
+  const text = q.trim();
+  if (!PHONE_LIKE_QUERY.test(text)) return null;
+  const digits = text.replace(/\D/g, '');
+  return digits.length >= PHONE_QUERY_MIN_DIGITS ? digits : null;
+}
+
+/** 회원 목록 검색 조건: 닉네임·실명·표시 이름·이메일·전화번호(부분 일치). */
+export function userSearchWhere(q?: string): Prisma.V1UserWhereInput {
+  if (!q) return {};
+  const contains = { contains: q, mode: 'insensitive' as const };
+  const phoneDigits = phoneSearchDigits(q);
+  return {
+    OR: [
+      { profile: { nickname: contains } },
+      { profile: { realName: contains } },
+      { profile: { displayName: contains } },
+      { email: contains },
+      ...(phoneDigits ? [{ phone: { contains: phoneDigits } }] : []),
+    ],
+  };
+}

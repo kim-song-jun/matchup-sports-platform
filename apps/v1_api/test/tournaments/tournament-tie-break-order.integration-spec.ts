@@ -18,9 +18,9 @@ const adminContext = new AdminContextService(prisma);
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const admin = new TournamentsAdminService(prisma, adminContext, {} as NotificationsService);
 
-const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'];
-const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'];
-const FAIR_PLAY_FIRST = ['points', 'fair_play', 'head_to_head', 'goal_difference', 'goals_for', 'seeded_draw'];
+const DEFAULT_ORDER = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
+const FAIR_PLAY_FIRST = ['points', 'fair_play', 'head_to_head', 'goal_difference', 'goals_for', 'fewest_goals_against', 'seeded_draw'];
 
 async function versionOf(tournamentId: string) {
   return (await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, select: { updatedAt: true } })).updatedAt.toISOString();

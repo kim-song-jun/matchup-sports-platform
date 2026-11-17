@@ -22,7 +22,7 @@ import {
   type TournamentPostEventCard,
   type TournamentVenuePrepItem,
 } from './tournament-venue-retention-model';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 
 export {
   getTournamentPostEventCards,
@@ -274,7 +274,7 @@ function TournamentFixtureReviewEntryList({
           const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
           const result = fixture.result!;
           const roundLabel = fixture.round
-            ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+            ? competitionFixtureName({ displayTitle: fixture.displayTitle, groupName, round: fixture.round, legNumber: fixture.legNumber })
             : `${fixture.fixtureNumber}경기`;
           const hasPenaltyResult =
             result.hasPenalty && result.homePenaltyScore !== null && result.awayPenaltyScore !== null;

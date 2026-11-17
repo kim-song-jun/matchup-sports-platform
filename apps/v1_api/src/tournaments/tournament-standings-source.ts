@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { Prisma, V1GameSourceType } from '@prisma/client';
 import { validateCompetitionConfig } from './competition-config/competition-config';
 import { withTournamentTieBreakOrder } from './competition-config/tournament-tie-break-order';
+import { loadStageTieBreakOrders, stageTieBreakOverride } from './competition-config/stage-tie-break-order';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import type { StandingsSourceGroup } from './tournament-group-standings';
 
@@ -105,8 +106,10 @@ export async function loadCanonicalStandingsSource(
     entries.push(row);
     byGroup.set(row.groupId, entries);
   }
+  const stageOrders = await loadStageTieBreakOrders(tx, tournamentId, groupRows.map((group) => group.stageKey));
   const groups = groupRows.map((group) => ({
     ...group,
+    tieBreakOrder: stageTieBreakOverride(stageOrders, group.stageKey),
     fixtures: (byGroup.get(group.id) ?? []).map((row) => ({
       homeRegistrationId: row.homeRegistrationId,
       awayRegistrationId: row.awayRegistrationId,

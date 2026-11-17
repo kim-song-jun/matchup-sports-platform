@@ -21,4 +21,12 @@ describe('기존 구조 편집 API의 단계형 보호', () => {
     await expect(h.guard.canActivate(h.context('POST', '/admin/tournaments/:tournamentId/standings/recalculate'))).resolves.toBe(true);
     await expect(h.guard.canActivate(h.context('PATCH', '/admin/fixtures/:fixtureId', { scheduledAt: null }))).resolves.toBe(true);
   });
+  it.each(['displayTitle', 'homeDisplayLabel', 'awayDisplayLabel', 'fixtureNumber'])('구조를 바꾸지 않는 경기 표시 필드 %s 편집을 허용한다', async field => {
+    const h = setup(true);
+    await expect(h.guard.canActivate(h.context('PATCH', '/admin/fixtures/:fixtureId', { [field]: field === 'fixtureNumber' ? 3 : '경기 안내' }))).resolves.toBe(true);
+  });
+  it('표시 필드와 팀 교체를 섞으면 기존 구조 편집 경로로 우회할 수 없다', async () => {
+    const h = setup(true);
+    await expect(h.guard.canActivate(h.context('PATCH', '/admin/fixtures/:fixtureId', { displayTitle: '결승', homeRegistrationId: 'other' }))).rejects.toMatchObject({ response: { code: 'STAGE_MANAGEMENT_REQUIRED' } });
+  });
 });

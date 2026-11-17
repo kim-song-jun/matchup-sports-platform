@@ -13,7 +13,7 @@ import { FixtureVideoAddForm } from '@/components/fixture-videos/fixture-video-a
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 import {
   useCreateFixtureVideoLink,
   useDeleteFixtureVideo,
@@ -30,7 +30,7 @@ interface Props {
 }
 
 function fixtureLabel(fixture: TournamentVideoFixture): string {
-  const name = competitionMatchLabel({ groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
+  const name = competitionFixtureName({ displayTitle: fixture.displayTitle, groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
   const home = fixture.homeTeamName ?? '미정';
   const away = fixture.awayTeamName ?? '미정';
   // 다른 운영 화면과 같은 "N번 경기" — "4강 9경기"는 "4강의 9번째 경기"로 읽힌다(번호는 대회 전체 연번).

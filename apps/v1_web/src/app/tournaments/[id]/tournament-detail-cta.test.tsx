@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render as rtlRender, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel, showsNextLeagueInvite } from './tournament-detail-client';
+import { OtherTeamApplicationLink, ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel, showsNextLeagueInvite } from './tournament-detail-client';
 import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
 
 /**
@@ -603,5 +603,28 @@ describe('참가팀 상세 우측 정보와 반응형 참가 카드', () => {
     render(<TournamentDetailView tournament={league({ status: 'completed' })} myRegistration={registration} entrySection={entry} />);
     expect(screen.getByRole('region', { name: '대회 기본 정보' })).toContainElement(screen.getByRole('region', { name: '우리 팀 참가' }));
     expect(screen.queryByRole('region', { name: '참가 전 꼭 확인해 주세요' })).not.toBeInTheDocument();
+  });
+});
+
+describe('다른 팀으로 신청하기', () => {
+  const registration = { id: 'reg-a', teamId: 'team-a', status: 'confirmed' } as V1TournamentRegistration;
+  function arrange(condition = 'available') {
+    const data = [{ teamId: 'team-a', role: 'owner', sport: { sportId: 'sport-futsal' } }];
+    if (condition !== 'single') data.push({ teamId: 'team-b', role: condition === 'member' ? 'member' : 'owner', sport: { sportId: condition === 'sport' ? 'basketball' : 'sport-futsal' } });
+    myTeamsMock.mockReturnValue({ data: data as never, isError: condition === 'error' });
+    const tournament = makeTournament({ id: 't-other', status: 'open', format: 'knockout', teamCount: 8, confirmedCount: 1 });
+    if (condition === 'closed') tournament.status = 'completed';
+    if (condition === 'deadline') tournament.registrationDeadlineAt = '2020-01-01T00:00:00Z';
+    if (condition === 'full') tournament.confirmedCount = 8;
+    const registrations = condition === 'registered' ? [registration, { ...registration, id: 'reg-b', teamId: 'team-b' }] : [registration];
+    render(<OtherTeamApplicationLink tournament={tournament} registrations={registrations} />);
+  }
+  it('미신청 운영 팀이 있으면 팀별 신청 목록으로 연결한다', () => {
+    arrange();
+    expect(screen.getByRole('link', { name: '다른 팀으로 신청하기' })).toHaveAttribute('href', '/tournaments/t-other/my');
+  });
+  it.each(['single', 'member', 'sport', 'registered', 'closed', 'deadline', 'full', 'error'])('%s 상태에서는 표시하지 않는다', (condition) => {
+    arrange(condition);
+    expect(screen.queryByRole('link', { name: '다른 팀으로 신청하기' })).not.toBeInTheDocument();
   });
 });

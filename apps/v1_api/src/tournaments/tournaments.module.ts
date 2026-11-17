@@ -1,3 +1,5 @@
+import { ScheduleTimesController, LeagueScheduleTimesController } from './scheduling/schedule-times.controller';
+import { ScheduleTimesService } from './scheduling/schedule-times.service';
 import { StageLegacyMutationGuard } from './stages/stage-legacy-mutation.guard';
 import { StagePlanService } from './stages/stage-plan.service';
 import { StagePlanController } from './stages/stage-plan.controller';
@@ -92,6 +94,8 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     PublicRecordsModule,
   ],
   controllers: [
+    ScheduleTimesController,
+    LeagueScheduleTimesController,
     StagePlanController,
     MultiFinalsController,
     SixTeamController,
@@ -120,6 +124,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TeamCompetitionEntriesController,
   ],
   providers: [
+    ScheduleTimesService,
     StageLegacyMutationGuard,
     StagePlanService,
     MultiFinalsService,

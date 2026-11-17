@@ -109,6 +109,18 @@ describe('VideosPageClient', () => {
     expect(screen.getByText('본선 · 9번 경기 · 서울FC vs 부산FC')).toBeInTheDocument();
   });
 
+  // 어드민에서 고친 경기 제목은 영상 관리 목록에도 같은 이름으로 보여야 한다.
+  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 쓴다', () => {
+    setVideos([
+      { ...FIXTURE, fixtureId: 'fixture-t', round: 'league_r5', fixtureNumber: 1, groupName: 'A조', displayTitle: '풀리그 1라운드', videos: [] },
+    ]);
+
+    render(<VideosPageClient tournamentId="t-1" />);
+
+    expect(screen.getByText('풀리그 1라운드 · 1번 경기 · 서울FC vs 부산FC')).toBeInTheDocument();
+    expect(screen.queryByText(/조별리그 5라운드/)).not.toBeInTheDocument();
+  });
+
   it('업로드 한도와 허용 형식을 미리 알려준다', () => {
     render(<VideosPageClient tournamentId="t-1" />);
 

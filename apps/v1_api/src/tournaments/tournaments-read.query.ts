@@ -55,6 +55,8 @@ export const TOURNAMENT_LIST_INCLUDE = {
 
 export const TOURNAMENT_DETAIL_INCLUDE = {
   sport: { select: { code: true, name: true } },
+  // MD-QA #186: 단계별 동점 순서 — 공개 순위표 안내가 단계마다 해석된 순서를 쓴다.
+  stageTieBreakSettings: { select: { stageKey: true, order: true } },
   groups: {
     orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }, { bracketTrack: 'asc' }],
     include: {

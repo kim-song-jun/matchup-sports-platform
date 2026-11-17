@@ -44,6 +44,7 @@ type TeamMatchRow = {
     round: string;
     fixtureNumber: number;
     legNumber: number;
+    displayTitle?: string | null;
     group: { name: string } | null;
     homeRegistration: { team: { name: string } } | null;
     awayRegistration: { team: { name: string } } | null;
@@ -559,6 +560,37 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
     expect(result.items.map(({ fixtureId: id, groupName }) => ({ id, groupName }))).toEqual([
       { id: fixtureId, groupName: 'A조' },
       { id: otherFixtureId, groupName: null },
+    ]);
+  });
+});
+
+describe('TournamentFixtureVideosService — 경기 제목', () => {
+  it('경기마다 운영자가 정한 경기 제목을 싣는다 — 정하지 않은 경기는 null', async () => {
+    const row = (id: string, displayTitle: string | null): TeamMatchRow => ({
+      id,
+      startAt: null,
+      status: 'completed',
+      tournamentDetails: {
+        round: 'league_r5',
+        fixtureNumber: 1,
+        legNumber: 1,
+        displayTitle,
+        group: { name: 'A조' },
+        homeRegistration: { team: { name: '서울FC' } },
+        awayRegistration: { team: { name: '부산FC' } },
+      },
+      videos: [],
+    });
+    const harness = createHarness({
+      assignments: [{ userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] }],
+      teamMatchRows: [row(fixtureId, '풀리그 1라운드'), row(otherFixtureId, null)],
+    });
+
+    const result = await harness.service.listTournamentVideos(user('director'), tournamentId);
+
+    expect(result.items.map(({ fixtureId: id, displayTitle }) => ({ id, displayTitle }))).toEqual([
+      { id: fixtureId, displayTitle: '풀리그 1라운드' },
+      { id: otherFixtureId, displayTitle: null },
     ]);
   });
 });

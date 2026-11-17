@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { scheduleTimesKey } from '@/hooks/use-fixture-schedule-times';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CompetitionFieldPicker } from './competition-field-picker';
@@ -39,10 +41,12 @@ describe('경기 설정의 등록 경기장 선택', () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
   it('실제 리그 수정 폼에서 선택한 필드만 전송하고 장소 입력과 충돌하지 않는다', async () => {
-    render(<LeagueFixtureScheduleModal leagueId="league" fixture={{ teamMatchId: 'fixture', title: '1경기', homeTeamId: 'h',
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(scheduleTimesKey('league', 'league-matches'), { items: [] });
+    render(<QueryClientProvider client={client}><LeagueFixtureScheduleModal leagueId="league" fixture={{ teamMatchId: 'fixture', title: '1경기', homeTeamId: 'h',
       awayTeamId: 'a', startAt: '2026-10-20T10:00:00Z', placeName: '기존 구장', status: 'matched' }}
       defaultPlace={null} matchupLabel="홈 vs 원정" teams={[]} teamLockedReason={null} isSubmitting={false}
-      onSubmit={mocks.submit} onPeriodsSaved={vi.fn()} onClose={vi.fn()} />);
+      onSubmit={mocks.submit} onPeriodsSaved={vi.fn()} onClose={vi.fn()} /></QueryClientProvider>);
     fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'a' } });
     expect(screen.queryByText('다른 장소 사용')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '저장' }));

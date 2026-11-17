@@ -242,7 +242,7 @@ export class AdminRegistrationsService {
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
           });
         }
-        // 신청 뒤 그 성별 팀원이 모두 나갔을 수 있다. 리그는 아래 `findLeagueAdmissionBlocker` 가 같은 판정을 한다.
+        // 신청 뒤 팀 성별 설정이 바뀌었을 수 있다. 리그는 아래 `findLeagueAdmissionBlocker` 가 같은 판정을 한다.
         if (tournament && tournament.kind !== V1CompetitionKind.regular_league) {
           await assertTeamGenderEligible(tx, {
             teamId: current.teamId,

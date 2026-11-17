@@ -123,6 +123,8 @@ function criterionKeys(
       return (team) => [team.goalsFor - team.goalsAgainst];
     case 'goals_for':
       return (team) => [team.goalsFor];
+    case 'fewest_goals_against':
+      return (team) => [-team.goalsAgainst];
     case 'fair_play':
       return (team) => [-team.fairPlayPoints];
   }

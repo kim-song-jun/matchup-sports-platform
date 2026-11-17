@@ -34,6 +34,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     alternates: { canonical: absoluteSiteUrl(`/users/${id}/card`) },
+    // /users/ 는 robots.txt 와 X-Robots-Tag 로 막혀 있다 — 메타도 같은 값으로 맞춘다.
+    robots: { index: false, follow: false },
     openGraph: {
       type: 'profile',
       locale: 'ko_KR',

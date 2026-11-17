@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SixTeamTemplateDialog } from './six-team-template-dialog';
 
 const mocks = vi.hoisted(() => ({ apply: vi.fn(), post: vi.fn() }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminTournamentRegistrations: () => ({ data: { items: Array.from({ length: 6 }, (_, index) => ({ id: `r${index}`, teamName: `팀 ${index + 1}`, status: 'confirmed' })) }, isPending: false, isError: false }) }));
+vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminTournament: () => ({ data: { sixTeamDirectFinalOrder: ['goal_difference', 'goals_for', 'fewest_goals_against'] } }), useV1AdminTournamentRegistrations: () => ({ data: { items: Array.from({ length: 6 }, (_, index) => ({ id: `r${index}`, teamName: `팀 ${index + 1}`, status: 'confirmed' })) }, isPending: false, isError: false }) }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({ useV1ApplyBracketTemplate: () => ({ mutate: mocks.apply, isPending: false }) }));
 vi.mock('@/lib/api-client', () => ({ v1Post: mocks.post }));
 

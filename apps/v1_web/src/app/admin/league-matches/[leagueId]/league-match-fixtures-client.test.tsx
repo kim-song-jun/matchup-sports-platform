@@ -22,6 +22,11 @@ import {
 import { installViewport, resizeViewport } from '@/test/viewport';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
 
+vi.mock('@/hooks/use-fixture-schedule-times', () => ({
+  useFixtureScheduleTimes: () => ({ data: { items: [] }, isPending: false, isError: false }),
+  useCreateFixtureScheduleTime: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
 }));

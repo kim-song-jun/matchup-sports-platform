@@ -190,6 +190,12 @@ re-evaluates the same kick counts before persisting the result.
   계속 처리한다. 경기 수·DB 경합·worker 상태에 따라 지연될 수 있으므로 만료 시각 직후의
   확정 처리 시간을 보장하지 않는다. 콘솔은 만료 안내와 기존 수동 기간 종료를 함께 제공한다.
 
+- 모든 기간이 `ENDED`이고 Game이 아직 `LIVE`인 정규 시간 종료 상태에서는 마지막 기간에 한해
+  `GOAL`·`OWN_GOAL` 이벤트를 받는다(`POST /games/:gameId/events`). 시각(`clockMs`)은 그 기간의
+  설정 길이 이하여야 하고(길이를 읽지 못하면 상한 없음), 넘으면 `PERIOD_ALREADY_ENDED`다.
+  카드·파울·교체 등 다른 이벤트와 마지막이 아닌 기간은 그대로 `PERIOD_ALREADY_ENDED`다.
+  콘솔은 이때 골 시각을 정규 시간 끝(설정 길이와 실제로 뛴 시간 중 짧은 쪽)으로 고정해 보낸다.
+
 `GET /api/v1/games/:gameId`의 `periods`, nullable `periodDurations`, `state`, `version`이
 운영 콘솔의 확인 기준이다. 기간 자동 종료는 `V1GameEvent`나 새 sequence를 만들지 않으며,
 콘솔의 일반 상세 상태·버전 수락, 만료·상세 버전 지연 복구와 오류 재확인 계약은
@@ -366,9 +372,13 @@ GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한
 
 Game `start` in a regular league with `requiresExplicitStart=true` and stored as `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` before game state changes. An authorized admin starts the league through the existing league state endpoint first; friendly matches and regular tournaments retain their current rules. See [league lifecycle](./league-matches.md#new-league-lifecycle-2026-10-18).
 
-## Tournament and league start roster prerequisite (MD-QA #175)
+## Tournament and league operation without a roster (2026-11-14)
 
-Starting a scheduled tournament or regular-league game requires confirmed, distinct teams on both sides and at least one participant in each side's effective current matchday lineup. Missing, duplicate, or mismatched team assignment returns `409 TOURNAMENT_MATCH_TEAMS_REQUIRED`; when team assignment is valid but an effective lineup is empty, the API returns `409 GAME_START_LINEUP_EMPTY` before the game state changes. The latter response names the side and asks the operator to check its matchday lineup. If a side has a non-invalidated `SUBMITTED` or `LOCKED` lineup, its latest operable revision is effective; otherwise the latest non-invalidated revision is effective. Submission is not required: a generated draft with at least one participant on each side remains startable. Official result snapshots use that same effective lineup set and exclude invalidated revisions retained for history, so replacing a side cannot reintroduce its previous submitted players. Team assignment, actor authorization, league lifecycle, and the existing game-row lock/serializable command boundary remain in force. This guard does not define a no-show or forfeit outcome.
+Starting a scheduled tournament or regular-league game requires confirmed, distinct teams on both sides. Missing, duplicate, or mismatched team assignment still returns `409 TOURNAMENT_MATCH_TEAMS_REQUIRED`. An empty effective roster on either or both sides no longer returns `GAME_START_LINEUP_EMPTY`: authorized operators can start, record anonymous team scores, and end without registering or submitting a per-game lineup. The console names empty sides and explains anonymous recording; roster lookup failures remain real errors, not empty-roster success.
+
+A goal without a player uses `payload.anonymous=true`, including when the scorer policy is `required`. It contributes to the team score and does not set `missingScorer` or create a placeholder participant/personal appearance. Named goal/card/assist/substitution records retain their existing current-roster validation; the populated opposing side can still record its players. Ending snapshots only existing effective participants, and an empty side stays empty. No post-start player-registration route or retroactive attribution is introduced.
+
+The effective roster still prefers the latest non-invalidated `SUBMITTED`/`LOCKED` revision, otherwise the latest non-invalidated draft. Invalidated historical players never reappear in result snapshots. Actor authorization, takeover, league lifecycle, canceled-fixture checks, and game-row lock/version/serializable command boundaries remain in force. This change supersedes MD-QA #175's populated-roster start requirement and does not define a no-show or forfeit outcome.
 
 ## 운영콘솔 경기 출전 명단 (2026-10-20)
 

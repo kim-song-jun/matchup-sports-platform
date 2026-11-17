@@ -1,0 +1,28 @@
+{
+  "expectedCommit": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+  "evidenceVersion": 3,
+  "source": "stage-review-complete-format3-20261117.json",
+  "sourceSha256": "d30c9a52576fd2d954d0a60b464f74b97725b36a73de7edf994f4e0fa8d7569c",
+  "contractRecheck": {
+    "completeCheckpointReused": 21,
+    "removedProof": "admin-draft-preserved",
+    "incompleteCheckpointReused": 18,
+    "adminRoutesToRerun": 3,
+    "wrongShaRejected": true,
+    "focusedScopeRejected": true,
+    "version2Rejected": true
+  },
+  "actualLiveResume": {
+    "reusedTargetChecks": 18,
+    "reexecutedTargetChecks": 3,
+    "reexecutedReferenceChecks": 18,
+    "closed": true,
+    "lifecycle": {
+      "nodePid": 17426,
+      "browserPid": 17445,
+      "parentPid": 17426
+    }
+  },
+  "sourceLimitation": "The initial full-run JSON and temporary checkpoint became unreadable (WSL filesystem EIO) after successful full and live resume QA. This retained final report contains the actual reused18/reexecuted3 records and lifecycle. No first-run JSON was reconstructed.",
+  "passed": true
+}

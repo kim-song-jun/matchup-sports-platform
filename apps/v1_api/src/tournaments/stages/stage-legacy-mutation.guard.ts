@@ -10,8 +10,11 @@ export class StageLegacyMutationGuard implements CanActivate {
     if (req.method === 'GET') return true;
     const path = req.route?.path ?? '';
     if (path.endsWith('/result') || path.endsWith('/standings/recalculate') || path.includes('competition-config')) return true;
-    // Schedule/place edits remain in the ordinary fixture editor; roster and topology edits do not.
-    if (req.method === 'PATCH' && path.endsWith('/fixtures/:fixtureId') && Object.keys(req.body ?? {}).every(k => ['scheduledAt', 'venue', 'venueAddress', 'venueLatitude', 'venueLongitude', 'venueProvider', 'venueProviderId', 'fieldId', 'expectedVersion'].includes(k))) return true;
+    // Presentation/schedule changes use their existing permission and service guards.
+    // A mixed request must not smuggle roster or topology changes through this allowlist.
+    if (req.method === 'PATCH' && path.endsWith('/fixtures/:fixtureId') && Object.keys(req.body ?? {}).every(k => ['displayTitle', 'homeDisplayLabel', 'awayDisplayLabel', 'fixtureNumber', 'scheduledAt', 'venue', 'venueAddress', 'venueLatitude', 'venueLongitude', 'venueProvider', 'venueProviderId', 'fieldId', 'expectedVersion'].includes(k))) return true;
+    if (req.method === 'PATCH' && path.endsWith('/groups/:groupId') && Object.keys(req.body ?? {}).every(k => k === 'name')) return true;
+    if (req.method === 'PATCH' && path.endsWith('/fixtures/:fixtureId/bracket-sources')) return true;
     let id = req.params.tournamentId;
     if (!id && req.params.fixtureId) id = (await this.prisma.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: req.params.fixtureId }, select: { tournamentId: true } }))?.tournamentId ?? '';
     if (!id && req.params.groupId) id = (await this.prisma.v1TournamentGroup.findUnique({ where: { id: req.params.groupId }, select: { tournamentId: true } }))?.tournamentId ?? '';

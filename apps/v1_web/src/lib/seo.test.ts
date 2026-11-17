@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, buildTournamentDescription, buildTournamentTitle, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { parseNextImageSrc } from '@/test/next-image';
+import { absoluteSiteUrl, buildPublicMetadata, buildTournamentDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
+
+const emptyListResponse = () => new Response(
+  JSON.stringify({ status: 'success', data: { items: [], notices: [], nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } } }),
+  { status: 200, headers: { 'content-type': 'application/json' } },
+);
 
 describe('SEO site origin', () => {
   it('uses the production Teameet host when no override is configured', () => {
@@ -42,7 +48,7 @@ describe('SEO site origin', () => {
   });
 
   it('publishes canonical metadata and a sitemap entry for the public events hub', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => emptyListResponse()));
 
     expect(eventsMetadata.alternates).toMatchObject({ canonical: '/events' });
     expect(eventsMetadata.robots).toMatchObject({ index: true, follow: true });
@@ -56,24 +62,15 @@ describe('SEO site origin', () => {
     );
   });
 
-  it('keeps the static sitemap available when one public API domain is unavailable', async () => {
+  it('refuses to publish a partial sitemap when one public API domain is unavailable', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation((input: string | URL | Request) => {
-        const url = String(input);
-        return Promise.resolve(
-          new Response(null, {
-            status: url.includes('/api/v1/matches?') ? 503 : 404,
-          }),
-        );
-      }),
+      vi.fn().mockImplementation(async (input: string | URL | Request) => (
+        String(input).includes('/api/v1/matches?') ? new Response(null, { status: 503 }) : emptyListResponse()
+      )),
     );
 
-    const entries = await sitemap();
-
-    expect(entries).toContainEqual(
-      expect.objectContaining({ url: 'https://teameet.co.kr/events' }),
-    );
+    await expect(sitemap()).rejects.toThrow('/matches');
   });
 });
 
@@ -146,6 +143,27 @@ describe('metadataDescription', () => {
     const long = metadataDescription('가'.repeat(200), fallback);
     expect(long).toHaveLength(153);
     expect(long.endsWith('…')).toBe(true);
+  });
+
+  it('설명 속 전화번호는 가려서 내보내고 날짜·시각은 그대로 둔다', () => {
+    expect(metadataDescription('참가 문의는 010-1234-5678 로 주세요. 토요일 19:00 킥오프', fallback)).toBe(
+      '참가 문의는 ***-****-**** 로 주세요. 토요일 19:00 킥오프',
+    );
+  });
+
+  it('번호만 적은 설명은 가린 뒤 길이로 판정해 기본 문구로 떨어진다', () => {
+    expect(metadataDescription('010-1234-5678', fallback)).toBe(fallback);
+    expect(metadataDescription('  010 1234 5678  ', fallback)).toBe(fallback);
+  });
+
+  it('기본 문구로 떨어질 때도 그 안의 전화번호는 가린다', () => {
+    expect(metadataDescription('dfd', '공지 문의 010-1234-5678 안내')).toBe('공지 문의 ***-****-**** 안내');
+    expect(metadataDescription(null, '풋살  대회\n안내')).toBe('풋살 대회 안내');
+  });
+
+  it('155자 자르기 경계에 걸린 번호가 앞자리만 남아 드러나지 않는다', () => {
+    const description = metadataDescription(`${'가'.repeat(148)} 010-1234-5678`, fallback);
+    expect(description).not.toMatch(/010|1234|5678/);
   });
 });
 
@@ -225,5 +243,42 @@ describe('buildTournamentTitle', () => {
     ['축구', 'regular_league', '서울 축구 리그', '서울 축구 리그'],
   ] as const)('실제 %s 종목과 %s 유형을 보존한다', (sport, kind, title, expected) => {
     expect(buildTournamentTitle({ title, sport: { name: sport } as never, kind })).toBe(expected);
+  });
+});
+
+describe('buildPublicMetadata 공유 이미지', () => {
+  const ogImages = (metadata: ReturnType<typeof buildPublicMetadata>) =>
+    metadata.openGraph?.images as Array<{ url: string; width?: number; height?: number; alt?: string }>;
+
+  it('업로드 커버는 원본 대신 가로 1200 사본을 og:image·twitter:image 로 내보내고, 모르는 크기를 적지 않는다', () => {
+    const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: '/uploads/2026/07/cover.png' });
+    const [og] = ogImages(metadata);
+
+    expect(parseNextImageSrc(og.url)).toMatchObject({ pathname: '/_next/image', url: '/uploads/2026/07/cover.png', w: '1200' });
+    expect(og).toEqual({ url: og.url, alt: '대회' });
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [og.url] });
+  });
+
+  it('정사각 로고도 같은 사본으로 내보내고 X 작은 카드는 그대로 둔다', () => {
+    const metadata = buildPublicMetadata({ title: '팀', description: '설명', path: '/teams/t-1', image: '/uploads/2026/07/logo.png', squareImage: true });
+
+    expect(parseNextImageSrc(ogImages(metadata)[0].url).url).toBe('/uploads/2026/07/logo.png');
+    expect(metadata.twitter).toMatchObject({ card: 'summary', images: [ogImages(metadata)[0].url] });
+  });
+
+  it('외부 주소 커버는 변환 주소로 감싸지 않는다', () => {
+    const metadata = buildPublicMetadata({ title: '대회', description: '설명', path: '/tournaments/t-1', image: 'https://cdn.example.com/poster.jpg' });
+
+    expect(ogImages(metadata)).toEqual([{ url: 'https://cdn.example.com/poster.jpg', alt: '대회' }]);
+    expect(metadata.twitter).toMatchObject({ images: ['https://cdn.example.com/poster.jpg'] });
+  });
+
+  it('이미지가 없으면 지금처럼 기본 이미지와 크기 메타를 낸다', () => {
+    const metadata = buildPublicMetadata({ title: '공지', description: '설명', path: '/notices/n-1', image: null });
+
+    expect(ogImages(metadata)).toEqual([
+      { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: '공지' },
+    ]);
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [DEFAULT_SOCIAL_IMAGE.path] });
   });
 });

@@ -273,13 +273,14 @@ export class CreateTournamentDto {
   bankHolder?: string | null;
 
   /**
-   * Tie-break order (six slots, points first, seeded draw last). Omitted keeps the default (create) or the
-   * current order (update); null resets to the default. The service validates the slots with `assertValidTieBreakOrder`.
+   * Tie-break order (seven slots, points first, seeded draw last; the pre-MD-QA #186 six-slot order without fewest goals
+   * against is still accepted). Omitted keeps the default (create) or the current order (update); null resets to the
+   * default. The service validates the slots with `assertValidTieBreakOrder`.
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
-  @ArrayMinSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
-  @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
+  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;
 
@@ -632,15 +633,27 @@ export class UpdateTournamentDto {
   bankHolder?: string | null;
 
   /**
-   * Tie-break order (six slots, points first, seeded draw last). Omitted keeps the default (create) or the
-   * current order (update); null resets to the default. The service validates the slots with `assertValidTieBreakOrder`.
+   * Tie-break order (seven slots, points first, seeded draw last; the pre-MD-QA #186 six-slot order without fewest goals
+   * against is still accepted). Omitted keeps the default (create) or the current order (update); null resets to the
+   * default. The service validates the slots with `assertValidTieBreakOrder`.
    */
   @IsOptional()
   @IsArray({ message: '동점일 때 순서는 목록이어야 해요.' })
-  @ArrayMinSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
-  @ArrayMaxSize(6, { message: '동점일 때 순서는 6가지 기준이에요.' })
+  @ArrayMinSize(6, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
+  @ArrayMaxSize(7, { message: '동점일 때 순서는 7가지 기준(예전에 저장한 6가지 순서도 받아요)이에요.' })
   @IsString({ each: true, message: '동점일 때 순서의 기준은 문자열이어야 해요.' })
   tieBreakOrder?: string[] | null;
+
+  /**
+   * 6강 결승 직행팀 비교 순서(다득점·득실차·최소 실점을 한 번씩, 운영자 선택은 언제나 마지막이라 배열에 없다).
+   * 생략 = 현재 순서 유지, null = 기본 순서. 서비스가 `resolveSixTeamDirectFinalOrder` 로 검증한다.
+   */
+  @IsOptional()
+  @IsArray({ message: '결승 직행팀 고르는 순서는 목록이어야 해요.' })
+  @ArrayMinSize(3, { message: '결승 직행팀 고르는 순서는 3가지 기준이에요.' })
+  @ArrayMaxSize(3, { message: '결승 직행팀 고르는 순서는 3가지 기준이에요.' })
+  @IsString({ each: true, message: '결승 직행팀 고르는 순서의 기준은 문자열이어야 해요.' })
+  sixTeamDirectFinalOrder?: string[] | null;
 
   /**
    * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.

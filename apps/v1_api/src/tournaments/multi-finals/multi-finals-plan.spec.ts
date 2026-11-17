@@ -60,7 +60,8 @@ describe('정규리그 + N개 토너먼트 plans', () => {
     [8, ['8강', '4강', '결승'], ['quarter', 'semi', 'final']],
     [16, ['16강', '8강', '4강', '결승'], ['round16', 'quarter', 'semi', 'final']],
     [5, ['8강', '4강', '결승'], ['quarter', 'semi', 'final']],
-    [3, ['4강', '결승'], ['semi', 'final']],
+    [3, ['준결승', '결승'], ['semi', 'final']],
+    [4, ['4강', '결승'], ['semi', 'final']],
   ] as const)('%i팀 결선의 라운드 이름은 %j 이고 단계 코드는 그대로다', (size, labels, phases) => {
     const plan = planNamedFinals([{ name: '프리미어', rules: [], thirdPlace: false, registrationIds: Array.from({ length: size }, (_, i) => `t${i}`) }]);
     expect(plan.groups.map(g => g.name)).toEqual(labels.map(label => `프리미어 · ${label}`));

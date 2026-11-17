@@ -29,6 +29,7 @@ import { hasPendingWork, isTakeoverHeld, type GameOperationsQueueState, type Gam
 import {
   freezeCapture,
   isClockSuspicious,
+  serverAlignedNowMs,
   type FrozenEventCapture,
 } from '@/lib/game-operations-clock';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
@@ -38,7 +39,7 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { v1Keys } from '@/lib/query-keys';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { isSecondYellowWithoutRed } from './second-yellow';
-import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
+import { latestLineupForDisplay } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
@@ -168,7 +169,7 @@ export interface OperateConsoleCoreProps {
   readonly operatorScopeKey: string | null;
   readonly operationContextKey: string | null;
   readonly headerTopClass: string;
-  readonly requiresLineupBeforeStart: boolean;
+  readonly showEmptyRosterNotice: boolean;
   readonly allowPenaltyShootout: boolean;
   readonly hostContext?: TeamMatchGameOperationsContext;
   readonly resultHref?: string;
@@ -227,6 +228,10 @@ const COMMAND_LABEL: Record<
  * `periodLabel`(UX 감사 item 4)을 그대로 써서 "전반 종료"/"후반 시작"/
  * "N피리어드 종료"를 만든다(이슈 #375: 구 `nextPeriodCommandLabel` 하나가
  * 종료+시작 라벨을 겸했던 것을 명령이 둘로 나뉜 만큼 함수도 나눈다). */
+function isGoalAction(type: string): boolean {
+  return type === 'GOAL' || type === 'OWN_GOAL';
+}
+
 function endPeriodCommandLabel(currentPeriodNumber: number, periodCount: number | null): string {
   return endPeriodLabel(currentPeriodNumber, periodCount);
 }
@@ -339,7 +344,7 @@ export function OperateConsoleCore({
   operatorScopeKey,
   operationContextKey,
   headerTopClass,
-  requiresLineupBeforeStart,
+  showEmptyRosterNotice,
   allowPenaltyShootout,
   hostContext,
   resultHref,
@@ -590,6 +595,24 @@ export function OperateConsoleCore({
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
 
+  // 정규 시간이 끝났어도(모든 피리어드 ENDED, 경기는 아직 LIVE) 경기 종료 전에는
+  // 빠진 골을 넣을 수 있어야 한다. 그때 골의 시각은 마지막 피리어드의 정규 시간 끝으로 굳힌다
+  // (설정 길이와 실제로 뛴 시간 중 짧은 쪽). 서버도 같은 상한을 검사한다
+  // (`assertEventReferences`의 PERIOD_ALREADY_ENDED 예외).
+  const regulationEndCapture = useMemo(() => {
+    if (!regulationEnded) return null;
+    const last = [...(gameDetail.data?.periods ?? [])].sort((a, b) => b.number - a.number)[0];
+    if (last === undefined) return null;
+    const configuredMs = (gameDetail.data?.periodDurations?.[last.number - 1]?.durationMinutes ?? null);
+    const playedMs = last.startedAt !== null && last.endedAt !== null
+      ? Math.max(0, new Date(last.endedAt).getTime() - new Date(last.startedAt).getTime() - Math.max(0, last.pausedTotalMs))
+      : null;
+    const clockMs = configuredMs !== null
+      ? Math.min(configuredMs * 60_000, playedMs ?? Number.POSITIVE_INFINITY)
+      : playedMs;
+    return clockMs === null ? null : { period: last.number, clockMs };
+  }, [regulationEnded, gameDetail.data?.periods, gameDetail.data?.periodDurations]);
+
   const [expiredPeriodId, setExpiredPeriodId] = useState<string | null>(null);
   const [periodExpiryError, setPeriodExpiryError] = useState<string | null>(null);
   const [periodExpiryPending, setPeriodExpiryPending] = useState(false);
@@ -749,20 +772,6 @@ export function OperateConsoleCore({
     [gameDetail.data?.substitutionPolicy?.mode, ops.liveEvents],
   );
 
-
-  // UX 감사 item 2 — 라인업 없이 경기를 시작하면 복구 불가능한 막다른 길이
-  // 된다(시작 후에는 LineupGrid가 "제출된 출전 명단이 없어요"만 보여줄 뿐
-  // 되돌릴 수단이 없었다).
-  //
-  // [P1-c 후속] **여기만 `latestOperableLineup`(제출본 전용)을 계속 쓴다.** 표시·검인은
-  // 폴백으로 옮겼지만 이 판정은 "아직 제출 안 했어요" 경고의 근거라, 폴백으로 바꾸면
-  // 초안이 늘 잡혀서 **경고가 영영 안 뜬다.** 두 규칙이 다른 것이 의도다 — 합치지 마라
-  // (lineup-grid.tsx 의 `latestLineupForDisplay` 주석에 표로 정리해 뒀다).
-  const sidesMissingLineup = useMemo(() => {
-    const sidesList = gameDetail.data?.sides ?? [];
-    const lineupsList = lineupsQuery.data ?? [];
-    return sidesList.filter((side) => latestOperableLineup(lineupsList, side.id) === null);
-  }, [gameDetail.data?.sides, lineupsQuery.data]);
 
   // UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데도 헤더에
   // 점수가 아예 없었다. 확정 이벤트에서 파생하되, `on-pitch-state.ts`가 쓰는
@@ -970,6 +979,20 @@ export function OperateConsoleCore({
       // Date.now(), which is exactly why every captured event read
       // clockMs≈0. The persistent "경기를 시작해 주세요." banner already
       // explains why the tap did nothing, so this guard needs no message.
+      if (currentPeriod === null && regulationEndCapture !== null && isGoalAction(button.type)) {
+        setPendingAction({
+          actionType: button.type,
+          actionLabel: button.label,
+          cardColor: button.cardColor,
+          allowTeamOnly: button.allowTeamOnly,
+          frozen: {
+            period: regulationEndCapture.period,
+            clockMs: regulationEndCapture.clockMs,
+            occurredAt: new Date(serverAlignedNowMs(Date.now(), ops.clockOffsetMs)).toISOString(),
+          },
+        });
+        return;
+      }
       if (currentPeriod === null || currentPeriod.startedAt === null) return;
       const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
       // 액션 우선 리오더의 핵심: 여기서 얼린다 — "누구"를 고르는 다음 화면이
@@ -990,7 +1013,7 @@ export function OperateConsoleCore({
         frozen,
       });
     },
-    [commandBlocked, ops.clockOffsetMs, currentPeriod],
+    [commandBlocked, ops.clockOffsetMs, currentPeriod, regulationEndCapture],
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
@@ -1523,13 +1546,13 @@ export function OperateConsoleCore({
   const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
   const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
   const lineups = lineupsQuery.data ?? [];
-  const sidesWithoutCurrentPlayers = requiresLineupBeforeStart
+  const sidesWithoutCurrentPlayers = showEmptyRosterNotice
     ? sides.filter((side) => {
         const lineup = latestLineupForDisplay(lineups, side.id);
         return lineup === null || lineup.participants.length === 0;
       })
     : [];
-  const startBlockedByLineup = sidesWithoutCurrentPlayers.length > 0;
+  const hasEmptyRoster = sidesWithoutCurrentPlayers.length > 0;
 
   if (lineupsQuery.isLoading || (gameId && gameDetail.isLoading)) {
     return (
@@ -1635,8 +1658,8 @@ export function OperateConsoleCore({
           'whitespace-nowrap max-sm:!min-h-12',
           primary ? 'flex-1 enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 sm:flex-none' : '',
         ].join(' ')}
-        // 제출 여부는 허용하되, 현재 유효 명단에 참가자가 없는 대회 경기는 시작하지 않는다.
-        disabled={commandUnavailable || (command === 'start' && (startBlockedByTeams || startBlockedByLineup))}
+        // 빈 명단은 익명 기록으로 운영한다. 시작에는 양 팀 배정만 필요하다.
+        disabled={commandUnavailable || (command === 'start' && startBlockedByTeams)}
         loading={commandPending}
         // 확인 없이 실행하는 명령은 `revert-period` 하나뿐이다 — 그 자체가 되돌리기다.
         onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
@@ -1923,28 +1946,12 @@ export function OperateConsoleCore({
                 : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
           </Banner>
         )}
-        {/* 대회 운영에서는 미제출이어도 시작할 수 있어 각 팀의 명단 상황을 경고로 안내한다.
-            일반 팀매치는 호스트 명단만 응답될 수 있으므로 상대 명단을 누락으로 단정하지 않는다. */}
-        {/* 레거시 TOURNAMENT_FIXTURE 는 제외한다 — 거기엔 라인업 제출 단계가 없어
-            자동 생성된 초안이 영영 SUBMITTED 가 되지 않는다. 명단 검인에 선수가 다 차 있는데
-            "아직 제출하지 않았어요" 가 뜨던 자리다(alpha 실측). */}
         {gameState === 'SCHEDULED' && startBlockedByTeams && (
           <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
         )}
-        {gameState === 'SCHEDULED' && !startBlockedByTeams && startBlockedByLineup && (
-          <Banner tone="warning">
-            {sidesWithoutCurrentPlayers.map((side) => side.displayNameSnapshot).join(', ')} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.
-          </Banner>
-        )}
-        {leaseRequired &&
-          requiresLineupBeforeStart &&
-          !startBlockedByTeams &&
-          !startBlockedByLineup &&
-          gameState === 'SCHEDULED' &&
-          sidesMissingLineup.length > 0 && (
-          <Banner tone="warning">
-            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 출전 명단을
-            제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.
+        {gameState !== 'ENDED' && gameState !== 'CANCELLED' && !startBlockedByTeams && hasEmptyRoster && (
+          <Banner tone="info">
+            {sidesWithoutCurrentPlayers.map((side) => side.displayNameSnapshot).join(', ')} 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.
           </Banner>
         )}
         {/* 이슈 #375 — halftimePeriod가 있을 때도 currentPeriod는 null이라
@@ -1990,12 +1997,8 @@ export function OperateConsoleCore({
           !regulationEnded &&
           !gameDetailBehind &&
           !startBlockedByTeams &&
-          !startBlockedByLineup &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' && (
-            // [P1-c] 예전에는 라인업 미제출일 때 이 안내를 숨겼다(시작이 막혀 있었으므로).
-            // 이제 미제출이어도 시작할 수 있으니 숨길 이유가 없다 -- 위 경고 배너가
-            // "아직 안 냈다"를 알리고, 이 배너가 "그래도 시작하면 된다"를 알린다.
             <Banner tone="info">경기를 시작해 주세요.</Banner>
           )}
         {/*
@@ -2092,7 +2095,7 @@ export function OperateConsoleCore({
               size="lg"
               variant="outline"
               className="h-16 flex-col gap-1 lg:h-20"
-              disabled={!canOperate || currentPeriod === null || commandBlocked}
+              disabled={!canOperate || (currentPeriod === null && !(regulationEndCapture !== null && isGoalAction(button.type))) || commandBlocked}
               onClick={() => handleSelectAction(button)}
             >
               {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (

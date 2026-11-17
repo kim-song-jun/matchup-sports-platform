@@ -3,6 +3,7 @@ import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { validateCompetitionConfig } from '../competition-config/competition-config';
 import { withTournamentTieBreakOrder } from '../competition-config/tournament-tie-break-order';
+import { loadStageTieBreakOrders, stageTieBreakOverride, withStageTieBreakOrder } from '../competition-config/stage-tie-break-order';
 import { resolveTournamentFixtureOfficialScore } from '../tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import {
@@ -126,7 +127,7 @@ export async function loadGroupRankSources(
 ): Promise<Map<string, LoadedGroupRankSource>> {
   const groupTeams = await client.v1TournamentGroupTeam.findMany({
     where: { groupId: { in: [...groupIds] }, isBye: false },
-    select: { groupId: true, registrationId: true, registration: { select: { team: { select: { name: true } } } } },
+    select: { groupId: true, registrationId: true, registration: { select: { team: { select: { name: true } } } }, group: { select: { stageKey: true } } },
   });
   const standings = await client.v1TournamentStanding.findMany({
     where: { groupId: { in: [...groupIds] } },
@@ -169,9 +170,15 @@ export async function loadGroupRankSources(
   const storedRule = [...inputByGroup.values()].some(hasSettledResults)
     ? await loadStoredRankRule(client, tournamentId)
     : null;
-  const rule = storedRule === null ? NO_SETTLED_GROUP_RULE : () => storedRule;
+  // MD-QA #186: a group in a stage with its own order ranks by that order; the stage key rides on the group-team rows.
+  const stageKeyByGroup = new Map(groupTeams.map((row) => [row.groupId, row.group?.stageKey ?? null] as const));
+  const stageOrders = storedRule === null ? new Map() : await loadStageTieBreakOrders(client, tournamentId, stageKeyByGroup.values());
   const sourceByGroup = new Map<string, LoadedGroupRankSource>();
-  for (const [groupId, input] of inputByGroup) sourceByGroup.set(groupId, { ...input, rule });
+  for (const [groupId, input] of inputByGroup) {
+    const override = stageTieBreakOverride(stageOrders, stageKeyByGroup.get(groupId));
+    const groupRule = storedRule === null ? null : override === undefined ? storedRule : { ...storedRule, config: withStageTieBreakOrder(storedRule.config, override) };
+    sourceByGroup.set(groupId, { ...input, rule: groupRule === null ? NO_SETTLED_GROUP_RULE : () => groupRule });
+  }
   return sourceByGroup;
 }
 

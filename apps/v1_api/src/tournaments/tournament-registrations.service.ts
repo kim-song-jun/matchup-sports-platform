@@ -190,7 +190,7 @@ export class TournamentRegistrationsService {
       ]);
       return this.serialize(existing, payment, playerCount, tournament);
     }
-    // 이미 낸 신청은 위에서 그대로 돌려준다 — 팀원이 나간 뒤에도 내 신청은 보여야 해서 새 신청에만 건다.
+    // 이미 낸 신청은 위에서 그대로 돌려준다 — 팀 성별 설정이 바뀐 뒤에도 내 신청은 보여야 해서 새 신청에만 건다.
     await assertTeamGenderEligible(this.prisma, {
       teamId: dto.teamId,
       genderCategory: tournament.genderCategory,
@@ -382,7 +382,7 @@ export class TournamentRegistrationsService {
       }
       // 초안을 둔 사이에 형제 티어에 확정됐을 수 있다 — 입금 안내 전에 다시 본다.
       await this.assertNotInSiblingTier(tx, lockedTournament, registration.teamId);
-      // 초안을 둔 사이 그 성별 팀원이 모두 나갔을 수 있다 — 입금 안내 전에 다시 본다.
+      // 초안을 둔 사이 팀 성별 설정이 바뀌었을 수 있다 — 입금 안내 전에 다시 본다.
       await assertTeamGenderEligible(tx, {
         teamId: registration.teamId,
         genderCategory: lockedTournament.genderCategory,

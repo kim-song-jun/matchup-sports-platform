@@ -5,6 +5,8 @@ import {
   type CompetitionConfig,
   type StandingFixture,
 } from './competition-config/competition-config';
+import { withStageTieBreakOrder } from './competition-config/stage-tie-break-order';
+import type { TieBreakOrder } from './competition-config/tournament-tie-break-order';
 import { fairPlayPointsOf, parseFairPlayCards } from './league-fair-play';
 import {
   resolveTournamentFixtureOfficialScore,
@@ -24,6 +26,8 @@ import {
  */
 export type StandingsSourceGroup = {
   stageKey?: string | null;
+  /** MD-QA #186: 이 조의 단계에 따로 정한 동점 순서. 없으면 호출자가 넘긴 대회 규칙의 순서를 쓴다. */
+  tieBreakOrder?: TieBreakOrder;
   id: string;
   groupTeams: readonly { registrationId: string }[];
   fixtures: readonly {
@@ -128,7 +132,7 @@ export async function recalculateAndUpsertGroupStandings(
     configVersionId: params.configVersionId,
     registrationIds: params.group.groupTeams.map((team) => team.registrationId),
     fixtures: standingsFixturesFromGroup(params.group),
-    config: params.config,
+    config: withStageTieBreakOrder(params.config, params.group.tieBreakOrder),
     fairPlayByRegistration: params.group.stageKey ? fairPlayByRegistrationFromGroups([params.group]) : params.fairPlayByRegistration,
   });
 

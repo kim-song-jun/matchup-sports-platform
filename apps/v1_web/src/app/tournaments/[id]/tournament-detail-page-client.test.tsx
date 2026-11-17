@@ -169,7 +169,7 @@ describe('TournamentDetailPageClient GA events', () => {
     const { container } = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
     await screen.findByRole('heading', { name: `결승 직행 · ${bye ? '가팀' : '선정 대기'}` });
     expect(screen.getByText('준결승 부전승 1팀 · 6강 승리팀 중 선정')).toBeInTheDocument();
-    expect(screen.getByText(/최다 득점 → 최대 득실차 → 최소 실점/)).toBeInTheDocument();
+    expect(screen.getByText(/다득점 → 득실차 → 최소 실점 → 운영자 선택 순이에요/)).toBeInTheDocument();
     const bracket = screen.getByRole('region', { name: '6강부터 결승까지 대진' });
     expect(within(bracket).getAllByRole('group', { name: / 대 / })).toHaveLength(5);
     expect(within(bracket).queryByRole('link', { name: '경기 상세' })).not.toBeInTheDocument();
@@ -469,7 +469,7 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     window.localStorage.setItem('teameet.v1.userId', 'captain');
     tournamentApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isPending: false, isError: false, error: null, refetch: vi.fn() });
     tournamentApiMocks.useV1Reviews.mockReturnValue({ data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn() });
-    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [{ teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null }] }, isPending: false } as never);
+    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [{ teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null, sport: { sportId: 'sport-futsal', code: 'futsal', name: '풋살' } }] }, isPending: false } as never);
   });
 
   afterEach(() => {
@@ -489,6 +489,21 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
       'href',
       `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
     );
+  });
+
+  it('기존 참가 카드와 다른 팀 신청 입구를 함께 표시한다', async () => {
+    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [
+      { teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null, sport: { sportId: 'sport-futsal' } },
+      { teamId: 'team-b', role: 'owner', name: '마포 2군', logoUrl: null, sport: { sportId: 'sport-futsal' } },
+    ] }, isPending: false } as never);
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [
+      { id: 'reg-1', teamId: 'team-a', teamName: '마포 FC', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null, playerCount: 7 },
+    ] });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    expect(await screen.findByRole('link', { name: '다른 팀으로 신청하기' })).toHaveAttribute(
+      'href', '/tournaments/tournament-1/my',
+    );
+    expect(screen.getByRole('link', { name: '마포 FC 참가 선수 관리' })).toBeInTheDocument();
   });
 
   it('신청이 없으면 카드가 없다', async () => {
@@ -621,12 +636,12 @@ describe('TournamentDetailPageClient — 리그 방식 일정', () => {
 describe('TournamentDetailPageClient — 대회 종류별 진행 안내', () => {
   const tournamentLeagueSteps = [
     ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.'],
-    ['순위 집계', '승점과 득실차로 최종 순위를 가려요.'],
+    ['순위 집계', '승점으로 순위를 가리고, 동점이면 대회가 정한 순서(맞대결·득실차 등)로 가려요.'],
     ['시상', '최종 순위에 따라 상금과 순위를 시상해요.'],
   ] as const;
   const seasonLeagueSteps = [
     ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.'],
-    ['순위 집계', '승점과 득실차로 최종 순위를 가려요.'],
+    ['순위 집계', '승점으로 순위를 가리고, 동점이면 리그 공통 규정(골득실 → 다득점 → 승자승 → 최소 실점) 순서로 가려요.'],
     ['시즌 종료', '확정된 경기 결과와 최종 순위를 확인해요. 시상이 있는 경우 리그 안내를 확인해 주세요.'],
   ] as const;
   const groupSteps = [

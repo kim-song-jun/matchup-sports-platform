@@ -63,7 +63,7 @@ describe('리그 참가비 설정 HTTP/DB 계약', () => {
     const sport = await prisma.v1Sport.upsert({ where: { code: 'futsal' }, update: {}, create: { code: 'futsal', name: '풋살' } });
     const region = await prisma.v1Region.create({ data: { code: `fee-region-${suiteId}`, name: '참가비 테스트 지역', level: 2 } });
     const makeTeam = async (suffix: string, ownerUserId: string) => {
-      const team = await prisma.v1Team.create({ data: { ownerUserId, sportId: sport.id, regionId: region.id, name: `fee-${suffix}-${suiteId}` } });
+      const team = await prisma.v1Team.create({ data: { profile: { create: { genderRule: '성별 무관' } }, ownerUserId, sportId: sport.id, regionId: region.id, name: `fee-${suffix}-${suiteId}` } });
       await prisma.v1TeamMembership.create({ data: { teamId: team.id, userId: ownerUserId, role: 'owner', status: 'active' } });
       return team.id;
     };

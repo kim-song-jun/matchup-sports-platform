@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -18,7 +18,7 @@ const signOut = vi.hoisted(() => ({
   pending: false,
   error: null as string | null,
 }));
-const kakaoOAuth = vi.hoisted(() => ({ startKakaoLinkAuthorize: vi.fn() }));
+const kakaoOAuth = vi.hoisted(() => ({ startKakaoLinkAuthorize: vi.fn(), prepareKakaoAuthorize: vi.fn() }));
 const reporter = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
@@ -56,7 +56,7 @@ beforeEach(() => {
   nav.params = new URLSearchParams();
   signOut.pending = false;
   signOut.error = null;
-  kakaoOAuth.startKakaoLinkAuthorize.mockResolvedValue({ status: 'redirecting' });
+  kakaoOAuth.startKakaoLinkAuthorize.mockResolvedValue({ status: 'redirecting', path: 'talk' });
   server.use(
     http.post('*/api/v1/auth/apple/nonce', () => ok({ nonce: 'server-nonce-1234' })),
     // 공유 핸들러가 응답을 정하고, 이 화면이 실제로 어떤 본문을 보냈는지만 옆에서 기록한다.
@@ -159,11 +159,45 @@ async function renderLoaded(...providers: Array<string[] | undefined>) {
   return me;
 }
 
+// 줄 제목과 같은 글자의 버튼(「카카오 로그인」)이 있어 글자만으로는 줄을 못 찾는다 — 제목 칸으로 고른다.
 function rowOf(label: string) {
-  return screen.getByText(label).closest('li') as HTMLElement;
+  const rows = within(screen.getByRole('list', { name: '로그인 방법 목록' })).getAllByRole('listitem');
+  const row = rows.find((item) => item.querySelector('.tm-text-label')?.textContent === label);
+  if (!row) throw new Error(`no login method row titled ${label}`);
+  return row;
 }
 
-const KAKAO_BUTTON = '카카오 연결하기';
+const KAKAO_BUTTON = '카카오 로그인';
+
+// 카카오 버튼은 처리 중에도 이름이 같다 — 처리 중인지는 이름이 아니라 aria-busy·disabled 로 가른다.
+function kakaoButton() {
+  return screen.getByRole('button', { name: KAKAO_BUTTON });
+}
+
+function expectKakaoBusy() {
+  const button = kakaoButton();
+  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute('aria-busy', 'true');
+  return button;
+}
+
+async function expectKakaoReleased() {
+  await waitFor(() => expect(kakaoButton()).toBeEnabled());
+  expect(kakaoButton()).not.toHaveAttribute('aria-busy');
+}
+
+// 가짜 시계 아래에서는 waitFor 가 돌지 않는다 — 같은 판정을 바로 한다.
+function expectKakaoReleasedNow() {
+  expect(kakaoButton()).toBeEnabled();
+  expect(kakaoButton()).not.toHaveAttribute('aria-busy');
+}
+
+/** 가짜 시계 아래에서 연결 버튼을 누르고, 인가 시작 결과가 돌아와 처리될 때까지 비동기 작업을 비운다. */
+async function tapKakaoUnderFakeClock() {
+  fireEvent.click(kakaoButton());
+  await act(() => vi.advanceTimersByTimeAsync(0));
+}
+
 const EMAIL_LINK = '이메일 연결하기';
 const UNLINK_ANY = /연결 해제$/;
 const LAST_METHOD_NOTE = '마지막 로그인 방법이라 해제할 수 없어요';
@@ -229,6 +263,10 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     // 브랜드색은 클래스가 입힌다 — 인라인 배경은 hover 색 변화를 막는다.
     expect(kakao).toHaveClass('tm-auth-kakao');
     expect(kakao.style.background).toBe('');
+    // 처리 중이 아닐 때는 심볼 하나뿐이고 진행 표시가 없다.
+    expect(kakao).not.toHaveAttribute('aria-busy');
+    expect(kakao.querySelectorAll('svg')).toHaveLength(1);
+    expect(kakao.querySelector('svg.tm-auth-kakao-symbol[aria-hidden="true"]')).not.toBeNull();
     const apple = rowOf('Apple 로그인');
     expect(within(apple).getByText('Apple 연결은 iOS 앱에서 할 수 있어요')).toBeInTheDocument();
     expect(within(apple).getByText('앱에서만')).toBeInTheDocument();
@@ -244,6 +282,7 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(within(email).queryByText('연결됨')).not.toBeInTheDocument();
     // 버튼이 아니라 단계 화면으로 가는 링크다 — 눌러도 이 화면에서 요청이 나가지 않는다.
     expect(within(email).getByRole('link', { name: EMAIL_LINK })).toHaveAttribute('href', '/my/settings/login-methods/email');
+    expect(within(email).getByRole('link', { name: EMAIL_LINK }).querySelector('svg')).toBeNull();
     expect(screen.getByText(/이메일을 연결하면 계정 이메일이 그 주소로 바뀌어요\. 팀과 경기 기록은 그대로예요\./)).toBeInTheDocument();
     expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
@@ -366,6 +405,16 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
 });
 
 describe('LoginMethodsPageClient - 웹에서 카카오 연결', () => {
+  it('카카오가 연결되지 않은 계정에서만 눌리기 전에 카카오 인가 준비를 시작한다', async () => {
+    await renderLoaded(['email']);
+    expect(kakaoOAuth.prepareKakaoAuthorize).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    kakaoOAuth.prepareKakaoAuthorize.mockClear();
+    await renderLoaded(['email', 'kakao']);
+    expect(kakaoOAuth.prepareKakaoAuthorize).not.toHaveBeenCalled();
+  });
+
   it('앱 셸이 없으면 이 화면으로 돌아오는 카카오 인가를 시작하고 연결 API는 부르지 않는다', async () => {
     await renderLoaded(['email']);
 
@@ -379,37 +428,85 @@ describe('LoginMethodsPageClient - 웹에서 카카오 연결', () => {
     kakaoOAuth.startKakaoLinkAuthorize.mockReturnValue(new Promise(() => {}));
     await renderLoaded(['email']);
 
-    const button = screen.getByRole('button', { name: KAKAO_BUTTON });
+    const button = kakaoButton();
     await userEvent.click(button);
     await userEvent.click(button);
 
     expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1);
-    const busy = screen.getByRole('button', { name: '연결 중이에요…' });
-    expect(busy).toBeDisabled();
-    expect(busy).toHaveAttribute('aria-busy', 'true');
+    const busy = expectKakaoBusy();
+    expect(screen.queryByText('연결 중이에요…')).not.toBeInTheDocument();
+    // 처리 중에는 심볼 옆에 스피너가 더해지고 글자는 그대로다.
+    expect(busy.querySelectorAll('svg')).toHaveLength(2);
+    expect(busy.querySelector('svg.tm-auth-kakao-symbol')).not.toBeNull();
+    expect(busy.querySelector('.tm-auth-kakao-label')).toHaveTextContent(KAKAO_BUTTON);
   });
 
-  it('카카오톡 앱으로 넘어갔다가 인증을 취소하고 돌아오면(페이지는 그대로) 버튼이 다시 풀린다', async () => {
-    await renderLoaded(['email']);
-    await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
-    expect(await screen.findByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
+  describe('카카오톡 앱으로 넘어갔다가 돌아오면(페이지는 그대로) 화면이 보이는 채로 2초 뒤 버튼이 풀린다', () => {
+    afterEach(() => vi.useRealTimers());
 
-    setVisibility('hidden');
-    expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
-    setVisibility('visible');
+    // 화면은 진짜 시계로 불러오고, 누르는 순간부터 시계를 멈춰 시간 경계를 정확히 잰다.
+    async function renderAndTap() {
+      await renderLoaded(['email']);
+      vi.useFakeTimers();
+      await tapKakaoUnderFakeClock();
+      expectKakaoBusy();
+    }
 
-    expect(await screen.findByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+    it('다시 보인 직후에는 아직 처리 중이고 2초가 지나면 풀린다', async () => {
+      await renderAndTap();
+
+      setVisibility('hidden');
+      expectKakaoBusy();
+      setVisibility('visible');
+      expectKakaoBusy();
+
+      await act(() => vi.advanceTimersByTimeAsync(1_999));
+      expectKakaoBusy();
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expectKakaoReleasedNow();
+    });
+
+    it('카카오톡이 열리지 않아 화면이 한 번도 가려지지 않아도 2초 뒤에 풀린다', async () => {
+      await renderAndTap();
+
+      await act(() => vi.advanceTimersByTimeAsync(1_999));
+      expectKakaoBusy();
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expectKakaoReleasedNow();
+    });
+
+    it('가려진 시간은 세지 않는다', async () => {
+      await renderAndTap();
+
+      await act(() => vi.advanceTimersByTimeAsync(500));
+      setVisibility('hidden');
+      await act(() => vi.advanceTimersByTimeAsync(4_500));
+      expectKakaoBusy();
+      setVisibility('visible');
+
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expectKakaoBusy();
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expectKakaoReleasedNow();
+    });
   });
 
-  it('카카오 인가를 시작하기 전(SDK 준비 중)에는 화면이 다시 보여도 풀리지 않는다', async () => {
+  it('카카오 인가를 시작하기 전(SDK 준비 중)에는 화면이 다시 보여도, 시간이 지나도 풀리지 않는다', async () => {
     kakaoOAuth.startKakaoLinkAuthorize.mockReturnValue(new Promise(() => {}));
     await renderLoaded(['email']);
-    await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
-    setVisibility('hidden');
-    setVisibility('visible');
+      setVisibility('hidden');
+      setVisibility('visible');
+      expectKakaoBusy();
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
 
-    expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
+      expectKakaoBusy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([
@@ -422,7 +519,7 @@ describe('LoginMethodsPageClient - 웹에서 카카오 연결', () => {
     await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
-    expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+    await expectKakaoReleased();
   });
 });
 
@@ -446,17 +543,24 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
     expect(meCalls.calls()).toBe(2);
   });
 
-  it('앱 인증이 진행 중일 때 화면이 다시 보여도 버튼을 풀지 않는다(요청은 앱의 응답으로 끝난다)', async () => {
+  it('앱 인증이 진행 중일 때는 화면이 다시 보여도, 시간이 지나도 버튼을 풀지 않는다(요청은 앱의 응답으로 끝난다)', async () => {
     const shell = installShell({ supports: ['sign-in-with-kakao'] });
     await renderLoaded(['email']);
-    await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
-    setVisibility('hidden');
-    setVisibility('visible');
+      setVisibility('hidden');
+      setVisibility('visible');
+      expectKakaoBusy();
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
+      expectKakaoBusy();
 
-    expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
-    shell.answer({ cancelled: true });
-    await waitFor(() => expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled());
+      shell.answer({ cancelled: true });
+      await expectKakaoReleased();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('카카오 인증을 닫으면 안내도 오류도 없이 버튼만 다시 쓸 수 있다', async () => {
@@ -465,7 +569,7 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
 
     await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled());
+    await expectKakaoReleased();
     expect(linkCalls).toEqual([]);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('카카오 계정 로그인 화면으로 이동할게요')).not.toBeInTheDocument();
@@ -503,8 +607,8 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
 
       await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
       await waitFor(() => expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1));
-      expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
-      await userEvent.click(screen.getByRole('button', { name: '연결 중이에요…' }));
+      expectKakaoBusy();
+      await userEvent.click(kakaoButton());
 
       expect(shell.postMessage).toHaveBeenCalledTimes(1);
       expect(kakaoOAuth.startKakaoLinkAuthorize).toHaveBeenCalledTimes(1);
@@ -552,20 +656,30 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
 
       expect(await screen.findByRole('alert')).toHaveTextContent('브라우저 설정 때문에 연결을 진행할 수 없어요');
       expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+      await expectKakaoReleased();
     });
 
-    it('카카오 화면에서 돌아오면 안내가 사라지고 버튼을 다시 쓸 수 있다', async () => {
+    it('카카오 주소로 직접 넘어간 뒤에는 화면이 다시 보여도, 시간이 지나도 풀리지 않고 뒤로 돌아오면(pageshow) 안내가 사라지며 풀린다', async () => {
+      kakaoOAuth.startKakaoLinkAuthorize.mockResolvedValue({ status: 'redirecting', path: 'account_url' });
       installShell({ supports: ['sign-in-with-kakao'], reply: { kakao: { error: 'sdk-failed' } } });
       await renderLoaded(['email']);
-      await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
-      expect(await screen.findByText(HANDOFF)).toHaveAttribute('role', 'status');
+      vi.useFakeTimers();
+      try {
+        await tapKakaoUnderFakeClock();
+        expect(screen.getByText(HANDOFF)).toHaveAttribute('role', 'status');
 
-      setVisibility('hidden');
-      setVisibility('visible');
+        setVisibility('hidden');
+        setVisibility('visible');
+        await act(() => vi.advanceTimersByTimeAsync(60_000));
+        expectKakaoBusy();
+        expect(screen.getByText(HANDOFF)).toBeInTheDocument();
 
-      expect(await screen.findByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
-      expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+        act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false })); });
+        expectKakaoReleasedNow();
+        expect(screen.queryByText(HANDOFF)).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('앱 인증은 받았는데 연결 API 가 거절하면 웹으로 넘어가지 않고 그 결과를 알린다', async () => {
@@ -602,8 +716,11 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
     await userEvent.click(kakao);
 
     expect(shell.postMessage).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: '연결 중이에요…' })).toBeDisabled();
+    expectKakaoBusy();
     expect(apple).toBeDisabled();
+    // 카카오 연결 중에도 Apple 버튼은 글자를 바꾸지 않고 진행 표시도 받지 않는다.
+    expect(apple).toHaveTextContent('Apple 연결하기');
+    expect(apple).not.toHaveAttribute('aria-busy');
 
     shell.answer({ accessToken: LINK_MSW.credentials.ok });
 
@@ -627,6 +744,22 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
       body: { identityToken: LINK_MSW.credentials.ok, nonce: 'server-nonce-1234', authorizationCode: 'auth-code-1234' },
     }]);
     expect(within(rowOf('Apple 로그인')).queryByText('앱에서만')).not.toBeInTheDocument();
+  });
+
+  it('Apple 연결 중에는 Apple 버튼이 글자를 바꿔 처리 중임을 알리고, 카카오 버튼은 잠기기만 한다', async () => {
+    const shell = installShell({ supports: ['sign-in-with-kakao', 'sign-in-with-apple'] });
+    await renderLoaded(['email']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple 연결하기' }));
+
+    const apple = await screen.findByRole('button', { name: '연결 중이에요…' });
+    expect(apple).toBeDisabled();
+    expect(apple).toHaveAttribute('aria-busy', 'true');
+    await waitFor(() => expect(shell.postMessage).toHaveBeenCalledTimes(1));
+    const kakao = kakaoButton();
+    expect(kakao).toBeDisabled();
+    expect(kakao).not.toHaveAttribute('aria-busy');
+    expect(kakao.querySelectorAll('svg')).toHaveLength(1);
   });
 
   it('앱이 Apple을 지원하지 않으면(안드로이드 등) Apple 버튼 없이 iOS 앱 안내만 보인다', async () => {
@@ -663,7 +796,7 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
     await userEvent.click(screen.getByRole('button', { name: KAKAO_BUTTON }));
 
     expect(await screen.findByText(text)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled());
+    await expectKakaoReleased();
   });
 });
 

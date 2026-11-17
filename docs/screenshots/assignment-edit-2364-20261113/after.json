@@ -1,0 +1,285 @@
+{
+  "sourceSha": "7c288bd0985bd58beb68f7f72155107c0c58d377",
+  "tournamentId": "e8a86b72-1694-49cb-806e-2039c20e9e67",
+  "verdicts": [
+    "Time Escape: no write",
+    "Duplicate time 409; draft retained",
+    "Collapsed editor reopens with draft",
+    "Time save 200: both fixtures moved; court/ID preserved",
+    "Court Escape: no write",
+    "Duplicate court 409; draft retained",
+    "Court save 200 and reload: both names updated; fixture/field ID and time preserved",
+    "Stale/anonymous/header denials preserved saved fixture data"
+  ],
+  "viewports": [
+    {
+      "mode": "time",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "mode": "time",
+      "width": 768,
+      "documentWidth": 768
+    },
+    {
+      "mode": "time",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "mode": "court",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "mode": "court",
+      "width": 768,
+      "documentWidth": 768
+    },
+    {
+      "mode": "court",
+      "width": 1440,
+      "documentWidth": 1440
+    }
+  ],
+  "apiChecks": [
+    {
+      "scenario": "stale time",
+      "status": 409
+    },
+    {
+      "scenario": "stale court",
+      "status": 409
+    },
+    {
+      "scenario": "time unauthenticated",
+      "status": 401
+    },
+    {
+      "scenario": "court unauthenticated",
+      "status": 401
+    },
+    {
+      "scenario": "dev identity header rejected",
+      "status": 401
+    },
+    {
+      "scenario": "hidden public detail",
+      "status": 404
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "88db714b-d83c-50e5-8ffe-33d1b7141ba5",
+      "scheduledAt": "2026-12-20T01:30:00.000Z",
+      "fieldId": "a1eef5e5-0a94-4408-8e53-f10496ae95e6",
+      "venue": "QA 메인 구장",
+      "place": {
+        "name": "QA 메인 구장",
+        "address": null,
+        "latitude": null,
+        "longitude": null,
+        "provider": null,
+        "providerPlaceId": null
+      }
+    },
+    {
+      "id": "edeb58d7-a5e7-59b2-ba07-0a229d8419bd",
+      "scheduledAt": "2026-12-20T01:30:00.000Z",
+      "fieldId": "a1eef5e5-0a94-4408-8e53-f10496ae95e6",
+      "venue": "QA 메인 구장",
+      "place": {
+        "name": "QA 메인 구장",
+        "address": null,
+        "latitude": null,
+        "longitude": null,
+        "provider": null,
+        "providerPlaceId": null
+      }
+    }
+  ],
+  "fields": [
+    {
+      "id": "a1eef5e5-0a94-4408-8e53-f10496ae95e6",
+      "name": "QA 메인 구장",
+      "version": 1,
+      "place": {
+        "name": "QA 메인 구장",
+        "address": null,
+        "latitude": null,
+        "longitude": null,
+        "provider": null,
+        "providerPlaceId": null
+      }
+    },
+    {
+      "id": "284b6610-4ed8-4f7c-b7fb-b200b5c32576",
+      "name": "QA B구장",
+      "version": 0,
+      "place": {
+        "name": "QA B구장",
+        "address": null,
+        "latitude": null,
+        "longitude": null,
+        "provider": null,
+        "providerPlaceId": null
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "expectedNetworkErrors": [
+    {
+      "status": 409,
+      "url": "https://alpha.teameet.co.kr/api/v1/admin/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/schedule-times"
+    },
+    {
+      "status": 409,
+      "url": "https://alpha.teameet.co.kr/api/v1/tournament-ops/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/fields/a1eef5e5-0a94-4408-8e53-f10496ae95e6"
+    }
+  ],
+  "browserConsole": [
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 409 ()"
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 409 ()"
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://alpha.teameet.co.kr/_next/static/chunks/3cutq3eypv0-6.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+    }
+  ],
+  "apiMutations": [
+    {
+      "method": "PATCH",
+      "url": "https://alpha.teameet.co.kr/api/v1/admin/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/schedule-times",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "url": "https://alpha.teameet.co.kr/api/v1/logs/client-error",
+      "status": 204
+    },
+    {
+      "method": "PATCH",
+      "url": "https://alpha.teameet.co.kr/api/v1/admin/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/schedule-times",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://alpha.teameet.co.kr/api/v1/tournament-ops/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/fields/a1eef5e5-0a94-4408-8e53-f10496ae95e6",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "url": "https://alpha.teameet.co.kr/api/v1/logs/client-error",
+      "status": 204
+    },
+    {
+      "method": "PATCH",
+      "url": "https://alpha.teameet.co.kr/api/v1/tournament-ops/tournaments/e8a86b72-1694-49cb-806e-2039c20e9e67/fields/a1eef5e5-0a94-4408-8e53-f10496ae95e6",
+      "status": 200
+    }
+  ],
+  "cleanup": {
+    "tournamentId": "e8a86b72-1694-49cb-806e-2039c20e9e67",
+    "status": "cancelled",
+    "isPublic": false,
+    "responseStatus": 201
+  }
+}

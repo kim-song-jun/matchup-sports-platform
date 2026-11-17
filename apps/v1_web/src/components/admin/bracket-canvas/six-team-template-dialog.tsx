@@ -10,7 +10,8 @@ import { SixTeamBracketLayout, SixTeamBye } from '@/components/tournaments/six-t
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
+import { useV1AdminTournament, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
+import { formatSixTeamDirectFinalRule } from '@/lib/tournament-tie-break';
 import { useV1ApplyBracketTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { v1Get, v1Post, v1Put } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -29,6 +30,7 @@ export function SixTeamTemplateDialog(
   const { v1Post } = useV1DataSource();
   const id = useId();
   const teams = useV1AdminTournamentRegistrations(props.tournamentId);
+  const tournament = useV1AdminTournament(props.tournamentId);
   const confirmed = (teams.data?.items ?? []).filter(
     (row) => row.status === 'confirmed'
   );
@@ -89,7 +91,7 @@ export function SixTeamTemplateDialog(
             직행해요. 나머지 두 팀은 준결승에서 만나요.
           </p>
           <p className="tm-text-caption text-[var(--text-muted)]">
-            최다 득점 → 최대 득실차 → 최소 실점 · 운영자가 모든 단계에서
+            {formatSixTeamDirectFinalRule(tournament.data?.sixTeamDirectFinalOrder)} 순으로 가려요. 운영자가 모든 단계에서
             진출팀을 지정할 수 있어요.
           </p>
           <fieldset disabled={busy} className="my-5 space-y-3">

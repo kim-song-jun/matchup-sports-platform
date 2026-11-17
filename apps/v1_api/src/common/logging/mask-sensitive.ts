@@ -42,6 +42,12 @@ export const SENSITIVE_KEYS: readonly string[] = [
   // 리그 참가비 입금 계좌(entry-fee 요청 본문). bankName 은 공개 가능한 은행명이라 제외.
   'bankAccount',
   'bankHolder',
+  // 가입·프로필 요청 본문(/auth/social-profile·/auth/register)의 개인정보. 키가 완전 일치로 비교되므로
+  // 이름이 같은 다른 필드도 가려진다 — genderRule 같은 별개 이름은 영향이 없다.
+  'realName',
+  'displayName',
+  'gender',
+  'email',
 ];
 
 const REDACTED = '[REDACTED]' as const;

@@ -354,7 +354,7 @@ export class TournamentOperationsFieldsService {
   ): Promise<TournamentFieldResult> {
     // Reject a no-op patch instead of silently manufacturing a new version
     // and audit row for a request that changes nothing (finding #16.1).
-    if (dto.name === undefined && dto.sortOrder === undefined && dto.active === undefined) {
+    if (dto.name === undefined && dto.sortOrder === undefined && dto.active === undefined && dto.syncAssignedFixtures !== true) {
       throw new UnprocessableEntityException({
         code: 'FIELD_UPDATE_EMPTY',
         message: '변경할 값을 하나 이상 입력해주세요.',
@@ -362,6 +362,9 @@ export class TournamentOperationsFieldsService {
     }
     const nextName = dto.name?.trim();
     if (nextName === '') throw new UnprocessableEntityException({ code: 'FIELD_NAME_EMPTY', message: '경기장 이름을 입력해 주세요.' });
+    if (dto.syncAssignedFixtures && nextName === undefined) throw new UnprocessableEntityException({
+      code: 'FIELD_NAME_REQUIRED', message: '경기장 이름을 입력해 주세요.',
+    });
 
     const action = 'tournament.field.update';
     const resourceType = 'TOURNAMENT_FIELD';
@@ -370,11 +373,13 @@ export class TournamentOperationsFieldsService {
       name: dto.name ?? null,
       sortOrder: dto.sortOrder ?? null,
       active: dto.active ?? null,
+      ...(dto.syncAssignedFixtures ? { syncAssignedFixtures: true } : {}),
     });
 
     return this.prisma.$transaction(async (tx) => {
       // Recheck as the first statement inside the transaction (P0-3) -- see create()'s comment.
       const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
+      if (dto.syncAssignedFixtures) await lockCompetitionFieldMatches(tx, tournamentId);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`competition-field-names:${tournamentId}`}, 0))`;
       const replay = await this.consumeIdempotency<TournamentFieldResult>(
         tx,
@@ -427,16 +432,19 @@ export class TournamentOperationsFieldsService {
         });
       }
 
+      let updatedFixtureCount = 0;
+      if (dto.syncAssignedFixtures && nextName !== undefined && nextName !== before.name) {
+        // Correct only the label. Every game's address, coordinates, assignment and kickoff survive.
+        const changed = await tx.v1TeamMatch.updateMany({
+          where: { tournamentId, fieldId, deletedAt: null }, data: { placeName: nextName },
+        });
+        updatedFixtureCount = changed.count;
+      }
       await this.writeAudit(tx, principal, audit, {
-        action,
-        targetType: resourceType,
-        targetId: fieldId,
-        tournamentId,
-        fieldId,
+        action, targetType: resourceType, targetId: fieldId, tournamentId, fieldId,
         before: this.auditSnapshot(before),
-        after: this.auditSnapshot(after),
+        after: { ...this.auditSnapshot(after), ...(dto.syncAssignedFixtures ? { updatedFixtureCount } : {}) },
       });
-
       const response = this.serialize(after);
       await this.recordIdempotency(
         tx,
@@ -847,7 +855,7 @@ export class TournamentOperationsFieldsService {
       : { type: 'TOURNAMENT_STAFF', id: principal.userId };
   }
 
-  private auditSnapshot(field: V1TournamentField): JsonValue {
+  private auditSnapshot(field: V1TournamentField) {
     return {
       id: field.id,
       tournamentId: field.tournamentId,

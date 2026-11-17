@@ -15,6 +15,7 @@
 | GET | `/api/v1/health` | public | none | runtime health |
 | GET | `/api/v1/master/sports` | public | none | sports and levels |
 | GET | `/api/v1/master/regions` | public | none | region tree/list |
+| POST | `/api/v1/master/regions/resolve-location` | public | `{ locationConsentAccepted: true, latitude, longitude }` | `{ region, source: 'kakao' \| 'nearest' \| 'none', distanceMeters? }` |
 | GET | `/api/v1/home` | optional user | `sportId?`, `regionId?` | aggregate with independent popup and notices |
 | GET | `/api/v1/home/recommendations` | optional user | `sportId?`, `regionId?`, `limit?` max 20 | recommendation list |
 | GET | `/api/v1/popups/active` | public | `screen`, `path?` | `{ popup: active popup or null }` |
@@ -59,6 +60,7 @@
 - 홈 공지는 최근 published + public 공지를 담으며 팝업 콘텐츠는 함께 제공하지 않는다.
 - 팝업 삭제는 `popup.delete`, 공지 삭제는 `notice.delete` 감사 이벤트를 남긴다.
 - 마스터 데이터(`master/sports`, `master/regions`)는 v1 사용자 API에서 read-only다.
+- `POST /master/regions/resolve-location`은 DB를 쓰지 않는다. 좌표를 지역으로 바꿀 때 카카오 로컬 API(`coord2regioncode`)를 부르는 키는 장소 검색과 같은 출처인 `IntegrationSettingsService.getKakaoRestApiKey()`(어드민 연동 설정 값, 없으면 `KAKAO_REST_API_KEY`)다. 로그인용 `KAKAO_CLIENT_ID`는 쓰지 않는다. 키가 없으면 카카오를 부르지 않고 가장 가까운 지역 계산으로 답하며(`source: 'nearest'`, 가까운 지역도 없으면 `'none'`), 호출이 3초 안에 끝나지 않거나 실패해도 같은 경로로 답하고 서버 로그에 warn 한 줄(상태 코드·사유, 좌표와 키는 남기지 않음)을 남긴다.
 
 ## `GET /api/v1/home` — `summary.monthlyMatches` (Task 180 F85)
 

@@ -19,7 +19,7 @@ function pick(select: Record<string, unknown>, value: Record<string, unknown>): 
   return out;
 }
 
-type DetailsRow = { round: string; fixtureNumber: number; legNumber: number; group: { name: string } | null };
+type DetailsRow = { round: string; fixtureNumber: number; legNumber: number; group: { name: string } | null; displayTitle?: string | null };
 
 function teamMatchRow(id: string, details: DetailsRow) {
   return {
@@ -38,7 +38,9 @@ function boardOver(rows: ReturnType<typeof teamMatchRow>[]) {
   const tx = {
     v1Tournament: { findFirst: jest.fn().mockResolvedValue({ kind: 'regular_tournament' }) },
     v1TeamMatch: {
-      findMany: jest.fn(async ({ select }: { select: Record<string, unknown> }) => rows.map((row) => pick(select, row))),
+      // 끝난 구간(done) 읽기에는 빈 결과 — 이 파일의 행은 전부 게임이 없는 open 행이다. 안 막으면 두 번째 읽기가 같은 행을 또 돌려준다.
+      findMany: jest.fn(async ({ select, where }: { select: Record<string, unknown>; where?: unknown }) =>
+        JSON.stringify(where ?? {}).includes('"state":{"in":["ENDED","CANCELLED"]}') ? [] : rows.map((row) => pick(select, row))),
     },
     v1TournamentStaffAssignment: { findMany: jest.fn().mockResolvedValue([]) },
   };
@@ -70,6 +72,22 @@ describe('TournamentOperationsBoardService — 조 이름·차수', () => {
     expect(itemOf(snapshot, KNOCKOUT_FIXTURE)).toMatchObject({ round: 'semi', groupName: null });
   });
 
+  it('운영자가 정한 경기 제목(displayTitle)을 싣고, 없으면 null 이며, 제목만 바뀌어도 그 경기의 stableRevision 이 움직인다', async () => {
+    const withTitle = (displayTitle: string | null) => boardOver([
+      teamMatchRow(GROUP_FIXTURE, { round: 'league_r2', fixtureNumber: 3, legNumber: 1, group: { name: 'A조' }, displayTitle }),
+      teamMatchRow(KNOCKOUT_FIXTURE, { round: 'semi', fixtureNumber: 9, legNumber: 1, group: null }),
+    ]).list(tournamentId, { limit: 20 }, new Date('2026-10-02T00:00:00.000Z'));
+
+    const untitled = await withTitle(null);
+    const titled = await withTitle('풀리그 1라운드');
+
+    expect(itemOf(untitled, GROUP_FIXTURE).displayTitle).toBeNull();
+    expect(itemOf(titled, GROUP_FIXTURE).displayTitle).toBe('풀리그 1라운드');
+    expect(itemOf(titled, KNOCKOUT_FIXTURE).displayTitle).toBeNull();
+    expect(itemOf(titled, GROUP_FIXTURE).stableRevision).not.toBe(itemOf(untitled, GROUP_FIXTURE).stableRevision);
+    expect(itemOf(titled, KNOCKOUT_FIXTURE).stableRevision).toBe(itemOf(untitled, KNOCKOUT_FIXTURE).stableRevision);
+  });
+
   it('차수를 싣고, 차수만 바뀌어도 그 경기의 stableRevision 이 움직인다', async () => {
     const firstLeg = await page('A조', 1);
     const secondLeg = await page('A조', 2);
@@ -95,5 +113,158 @@ describe('TournamentOperationsBoardService — 조 이름·차수', () => {
     expect(renamed.watermark).not.toBe(before.watermark);
     // 조와 무관한 경기의 키는 그대로다.
     expect(itemOf(renamed, KNOCKOUT_FIXTURE).stableRevision).toBe(itemOf(before, KNOCKOUT_FIXTURE).stableRevision);
+  });
+});
+
+// 운영 보드는 경기 번호 → 차수(1차전 → 2차전) 순이다. 라운드 이름은 문자열이라(`4강` < `league_r1` < `결승`) 번호와 어긋나 11·12번이 맨 위에 나왔다.
+describe('TournamentOperationsBoardService — 경기 번호 순 정렬·커서', () => {
+  // 끝난 구간(done) 읽기인지 — 구간 조건이 `game.state in [ENDED, CANCELLED]` 이다.
+  const isDoneRead = (where: unknown) => JSON.stringify(where ?? {}).includes('"state":{"in":["ENDED","CANCELLED"]}');
+  function capture(rows: ReturnType<typeof teamMatchRow>[], doneRows: ReturnType<typeof teamMatchRow>[] = []) {
+    // 호출 인자(orderBy·where)를 검사하므로 타입에 싣는다 — 로컬 jest 는 타입을 안 보지만 CI `tsc -p tsconfig.spec.json` 은 본다.
+    const findMany = jest.fn(async ({ select, where }: { select: Record<string, unknown>; orderBy?: unknown; where?: unknown }) =>
+      isDoneRead(where) ? doneRows.map((row) => pick(select, row)) : rows.map((row) => pick(select, row)));
+    const tx = {
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ kind: 'regular_tournament' }) },
+      v1TeamMatch: { findMany },
+      v1TournamentStaffAssignment: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const prisma = { $transaction: async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx) };
+    return { service: new TournamentOperationsBoardService(prisma as unknown as PrismaService), findMany };
+  }
+
+  const now = new Date('2026-10-02T00:00:00.000Z');
+  // DB 가 (경기 번호, id) 순으로 준 행을 흉내 낸다 — 라운드 이름 순이었다면 `semi` 가 먼저였다. mock 은 orderBy 를 적용하지 않으므로 순서를 직접 맞춘다.
+  const twoRows = () => [
+    teamMatchRow('fx-b', { round: 'league_r1', fixtureNumber: 2, legNumber: 1, group: null }),
+    teamMatchRow('fx-a', { round: 'semi', fixtureNumber: 11, legNumber: 1, group: null }),
+  ];
+  const decode = (cursor: string | null) => JSON.parse(Buffer.from(cursor ?? '', 'base64url').toString('utf8')) as Record<string, unknown>;
+
+  it('경기 번호, 차수, id 순으로 정렬하고 라운드 이름으로는 정렬하지 않는다', async () => {
+    const { service, findMany } = capture(twoRows());
+
+    await service.list(tournamentId, { limit: 20 }, now);
+
+    expect(findMany.mock.calls[0][0].orderBy).toEqual([
+      { tournamentDetails: { fixtureNumber: 'asc' } },
+      { tournamentDetails: { legNumber: 'asc' } },
+      { id: 'asc' },
+    ]);
+  });
+
+  it('다음 페이지 커서는 (구간, 경기 번호, 차수, id)만 싣는다 — 라운드는 싣지 않는다', async () => {
+    const { service } = capture(twoRows());
+
+    const page = await service.list(tournamentId, { limit: 1 }, now);
+
+    expect(decode(page.nextCursor)).toEqual({ kind: 'fixture', tournamentId, fixtureNumber: 2, legNumber: 1, phase: 'open', id: 'fx-b' });
+  });
+
+  it('커서 다음 페이지는 번호가 더 큰 경기, 같은 번호의 더 큰 차수, 같은 번호·차수의 더 큰 id 만 찾는다', async () => {
+    const { service, findMany } = capture(twoRows());
+    const cursor = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, fixtureNumber: 5, legNumber: 1, id: 'fx-5' }), 'utf8').toString('base64url');
+
+    await service.list(tournamentId, { limit: 20, cursor }, now);
+
+    const { AND } = findMany.mock.calls[0][0].where as { AND: unknown[] };
+    expect(AND).toContainEqual({
+      OR: [
+        { tournamentDetails: { is: { fixtureNumber: { gt: 5 } } } },
+        { tournamentDetails: { is: { fixtureNumber: 5, legNumber: { gt: 1 } } } },
+        { tournamentDetails: { is: { fixtureNumber: 5, legNumber: 1 } }, id: { gt: 'fx-5' } },
+      ],
+    });
+  });
+
+  it('옛 커서(round 를 싣고 차수가 없음)도 빈 페이지가 되지 않고 (경기 번호, id)로 이어진다', async () => {
+    const { service, findMany } = capture(twoRows());
+    const legacy = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, round: 'league_r2', fixtureNumber: 7, id: 'fx-7' }), 'utf8').toString('base64url');
+
+    const page = await service.list(tournamentId, { limit: 20, cursor: legacy }, now);
+
+    expect(page.items.length).toBeGreaterThan(0);
+    const where = JSON.stringify(findMany.mock.calls[0][0].where);
+    expect(where).toContain('"fixtureNumber":{"gt":7}');
+    expect(where).not.toContain('league_r2');
+  });
+});
+
+// 끝난 경기(종료·취소)는 번호가 앞이어도 뒤로 간다 — 번호가 앞인 종료 경기가 보드 맨 위를 차지해 지금 해야 할 경기가 아래로 밀리지 않게.
+describe('TournamentOperationsBoardService — 끝난 경기는 뒤로', () => {
+  const now = new Date('2026-10-02T00:00:00.000Z');
+  const isDoneRead = (where: unknown) => JSON.stringify(where ?? {}).includes('"state":{"in":["ENDED","CANCELLED"]}');
+  const isOpenRead = (where: unknown) => JSON.stringify(where ?? {}).includes('"state":{"notIn":["ENDED","CANCELLED"]}');
+  const openRow = (id: string, fixtureNumber: number) => teamMatchRow(id, { round: 'league_r1', fixtureNumber, legNumber: 1, group: null });
+  const decode = (cursor: string | null) => JSON.parse(Buffer.from(cursor ?? '', 'base64url').toString('utf8')) as Record<string, unknown>;
+
+  function capture(openRows: ReturnType<typeof teamMatchRow>[], doneRows: ReturnType<typeof teamMatchRow>[] = []) {
+    const findMany = jest.fn(async ({ select, where }: { select: Record<string, unknown>; orderBy?: unknown; take?: number; where?: unknown }) =>
+      (isDoneRead(where) ? doneRows : openRows).map((row) => pick(select, row)));
+    const tx = {
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ kind: 'regular_tournament' }) },
+      v1TeamMatch: { findMany },
+      v1TournamentStaffAssignment: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const prisma = { $transaction: async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx) };
+    return { service: new TournamentOperationsBoardService(prisma as unknown as PrismaService), findMany };
+  }
+
+  it('끝나지 않은 경기 구간을 먼저 읽고, 바닥나면 끝난 경기 구간을 처음부터 이어 읽는다', async () => {
+    const { service, findMany } = capture([openRow('open-9', 9)], [openRow('done-1', 1), openRow('done-2', 2)]);
+
+    const page = await service.list(tournamentId, { limit: 20 }, now);
+
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(isOpenRead(findMany.mock.calls[0][0].where)).toBe(true);
+    expect(isDoneRead(findMany.mock.calls[1][0].where)).toBe(true);
+    // 끝난 구간은 처음부터(커서 조건 없이) 남은 자리만큼 읽는다: limit 21 - 이미 읽은 1건.
+    expect(findMany.mock.calls[1][0].take).toBe(20);
+    expect(page.items.map((item) => item.fixtureId)).toEqual(['open-9', 'done-1', 'done-2']);
+  });
+
+  it('끝나지 않은 경기가 한 페이지를 채우면 끝난 경기 구간은 읽지 않는다', async () => {
+    const { service, findMany } = capture([openRow('open-1', 1), openRow('open-2', 2)], [openRow('done-1', 1)]);
+
+    const page = await service.list(tournamentId, { limit: 1 }, now);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(page.items.map((item) => item.fixtureId)).toEqual(['open-1']);
+    expect(decode(page.nextCursor)).toMatchObject({ phase: 'open', fixtureNumber: 1, id: 'open-1' });
+  });
+
+  it('끝난 구간 커서는 끝난 경기 구간만 읽는다', async () => {
+    const { service, findMany } = capture([openRow('open-1', 1)], [openRow('done-3', 3)]);
+    const cursor = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, fixtureNumber: 2, legNumber: 1, phase: 'done', id: 'done-2' }), 'utf8').toString('base64url');
+
+    const page = await service.list(tournamentId, { limit: 20, cursor }, now);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(isDoneRead(findMany.mock.calls[0][0].where)).toBe(true);
+    expect(page.items.map((item) => item.fixtureId)).toEqual(['done-3']);
+  });
+
+  it.each([
+    ['ENDED', 'done'],
+    ['CANCELLED', 'done'],
+    ['SCHEDULED', 'open'],
+    ['LIVE', 'open'],
+    ['PAUSED', 'open'],
+  ] as const)('상태 필터 %s 는 %s 구간만 읽는다', async (status, phase) => {
+    const { service, findMany } = capture([openRow('open-1', 1)], [openRow('done-1', 1)]);
+
+    await service.list(tournamentId, { limit: 20, status }, now);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(isDoneRead(findMany.mock.calls[0][0].where)).toBe(phase === 'done');
+  });
+
+  it('옛 커서(구간 없음)는 끝나지 않은 경기 구간으로 이어진다', async () => {
+    const { service, findMany } = capture([openRow('open-8', 8)]);
+    const legacy = Buffer.from(JSON.stringify({ kind: 'fixture', tournamentId, fixtureNumber: 7, legNumber: 1, id: 'fx-7' }), 'utf8').toString('base64url');
+
+    await service.list(tournamentId, { limit: 20, cursor: legacy }, now);
+
+    expect(isOpenRead(findMany.mock.calls[0][0].where)).toBe(true);
   });
 });

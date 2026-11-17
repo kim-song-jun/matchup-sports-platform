@@ -1,4 +1,5 @@
 'use client';
+import { useMemberBracketIdentity } from '@/components/tournaments/member-bracket-identity';
 import { StagePublicView } from '@/components/tournaments/stages/stage-public-view';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 
@@ -36,7 +37,7 @@ import {
   standingsAriaLabel,
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
-import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketIntroLine, competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { isKnockoutRound, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
@@ -189,14 +190,12 @@ function GroupStandingsSection({
   myTeamIds,
   fixtures,
   fromHref,
-  tieBreakOrder,
 }: {
   group: V1TournamentGroup;
   isMyGroup: boolean;
   myTeamIds: ReadonlySet<string>;
   fixtures: V1TournamentFixture[];
   fromHref?: string;
-  tieBreakOrder?: V1TournamentDetail['tieBreakOrder'];
 }) {
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   // 진출 팀은 서버가 결선 대진 기준으로 알려 준다(group.qualification) — 완전 동률이면 position 이
@@ -205,6 +204,7 @@ function GroupStandingsSection({
   const hasSplitQualificationTracks = trackQualifications !== undefined &&
     Object.keys(trackQualifications).length > 0;
   const hasResolvedTrackQualifications = Object.values(trackQualifications ?? {}).some(value => value != null);
+  const legacySplitTracks = Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower');
   const advancingLabels = new Map<string, string[]>();
   const advancingColors = new Map<string, number>();
   if (stageComplete && hasResolvedTrackQualifications) {
@@ -249,8 +249,9 @@ function GroupStandingsSection({
           </span>
         )}
       </div>
-      {hasSplitQualificationTracks ? <p className="tm-text-caption text-[var(--text-muted)]">
-        {Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower')
+      {/* 이름 있는 토너먼트의 「운영자가 확정해요」는 확정 전 안내다 — 진출 표시가 붙은 뒤에도 남으면 모순이라 숨긴다. */}
+      {hasSplitQualificationTracks && (legacySplitTracks || !(stageComplete && hasResolvedTrackQualifications)) ? <p className="tm-text-caption text-[var(--text-muted)]">
+        {legacySplitTracks
           ? '각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.'
           : '진출 토너먼트와 참가팀은 운영자가 확정해요.'}
       </p> : null}
@@ -273,7 +274,6 @@ function GroupStandingsSection({
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
         fromHref={fromHref}
-        tieBreakOrder={tieBreakOrder}
         myTeamIds={myTeamIds}
       />
     </section>
@@ -289,7 +289,6 @@ function LeagueStandingsSection({
   label = '리그 순위',
   myTeamIds,
   fromHref,
-  tieBreakOrder,
 }: {
   tournamentId: string;
   isRegularLeague: boolean;
@@ -299,8 +298,6 @@ function LeagueStandingsSection({
   /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
   label?: string;
   fromHref?: string;
-  /** 리그 방식 대회의 동점 순서. 정규 리그는 리그 고유 순서라 null. */
-  tieBreakOrder?: V1TournamentDetail['tieBreakOrder'];
 }) {
   return (
     <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
@@ -311,7 +308,6 @@ function LeagueStandingsSection({
         fromHref={fromHref}
         myTeamIds={myTeamIds}
         keepTeamLink
-        tieBreakOrder={tieBreakOrder}
         header={<LeagueProgressSummary tournamentId={tournamentId} />}
         renderDetail={(row) => isRegularLeague
           ? <LeagueTeamFixturesDetail tournamentId={tournamentId} teamId={row.teamId} />
@@ -442,15 +438,16 @@ export function BracketScheduleTab({
   // owner/manager에게만 자기 팀 경기 강조가 열린다.
   // 비로그인 관전자는 세션 힌트가 없으니 요청 자체를 보내지 않는다(보내면 매번 401).
   // 힌트는 SSR 하이드레이션 불일치를 피하려고 effect 에서 읽는다.
+  const previewIdentity = useMemberBracketIdentity();
   const [hasSessionHint, setHasSessionHint] = useState(false);
   useEffect(() => {
     setHasSessionHint(hasStoredV1Session());
   }, []);
-  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint && !isRegularLeague });
+  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: !previewIdentity && hasSessionHint && !isRegularLeague });
   // 팀장 전용인 위 응답과 별개로, 팀원까지 포함한 소속 팀으로 "우리 팀" 표시와 "내 팀만" 스위치를 연다.
   // 요청은 순위 탭·리그 래퍼와 같은 쿼리 키라 React Query 가 합친다.
-  const myTeams = useV1MyTeams(undefined, { enabled: hasSessionHint && !isRegularLeague });
-  const myTeamIds = new Set(hasSessionHint ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []);
+  const myTeams = useV1MyTeams(undefined, { enabled: !previewIdentity && hasSessionHint && !isRegularLeague });
+  const myTeamIds = new Set(previewIdentity?.teamIds ?? (hasSessionHint ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []));
   // A live game can be on any cursor page; load them sequentially before claiming all live games are shown.
   useEffect(() => {
     if (hasNextPage && !isFetching && !isError) void fetchNextPage();
@@ -526,7 +523,7 @@ export function BracketScheduleTab({
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
-      myFixtures={myFixtures.data}
+      myFixtures={previewIdentity?.myFixtures ?? myFixtures.data}
       myTeamIds={myTeamIds}
       fromHref={fromHref}
       completedResultsHref={tournament?.status === 'completed' ? `/tournaments/${tournamentId}/results` : undefined}
@@ -540,7 +537,16 @@ export function BracketScheduleTab({
 
 /* ── 메인 콘텐츠 ── */
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
-  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyBracketPageContent tournament={tournament} />;
+  const source = useSearchParams().get('from');
+  return tournament.stagePlan ? <div className="tm-tourn-sub-page flex min-h-full min-w-0 flex-col pb-4">
+    <header className="tm-bracket-page-intro"><div>
+      <h1 className="sr-only">{tournament.title} 순위·대진표</h1><h2>{tournament.title}</h2>
+      <p>단계를 선택해 경기 일정과 편성별 순위를 확인해요.</p>
+    </div><span className="tm-bracket-page-format">{tournament.stagePlan.stages.length}단계 대회</span></header>
+    <div className="tm-tourn-sub-header"><TournamentProgressStepper stages={buildTournamentStages(tournament)} /></div>
+    <div className="min-w-0 flex-1 px-5 py-4"><StagePublicView tournament={tournament} mode="bracket" /></div>
+    <TournamentFlowNav prev={{ href: withFromPath(`/tournaments/${tournament.id}`, source), label: '대회 상세' }} next={{ href: withFromPath(`/tournaments/${tournament.id}/results`, source), label: '최종 결과', enabled: tournament.status === 'completed', disabledHint: '대회 종료 후 공개' }} />
+  </div> : <LegacyBracketPageContent tournament={tournament} />;
 }
 function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
@@ -575,8 +581,9 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
   // 넘겨 끄는 방식은 쓰지 않는다(캐시 키가 오염되고 조용히 잘못된 요청이 갈 수 있다).
   // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
   // 브라우저에만 남아 있는 순위 캐시는 첫 HTML과 다를 수 있어 마운트 후에 반영한다.
+  const previewIdentity = useMemberBracketIdentity();
   const [hydrated, setHydrated] = useState(false);
-  const myTeams = useV1MyTeams(undefined, { enabled: hydrated && hasStoredV1Session() });
+  const myTeams = useV1MyTeams(undefined, { enabled: !previewIdentity && hydrated && hasStoredV1Session() });
   useEffect(() => setHydrated(true), []);
   const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
   const leagueScheduleStandings = isRegularLeague && hydrated
@@ -617,7 +624,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
-  const myTeamIds = new Set(hydrated && hasStoredV1Session() ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []);
+  const myTeamIds = new Set(previewIdentity?.teamIds ?? (hydrated && hasStoredV1Session() ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []));
   const isMyGroup = (group: V1TournamentGroup) => group.groupTeams.some((team) => team.teamId !== null && myTeamIds.has(team.teamId));
   // Stable sort preserves the configured order within both sets of groups.
   const orderedGroups = [...groupPhaseGroups].sort((a, b) => Number(isMyGroup(b)) - Number(isMyGroup(a)));
@@ -740,12 +747,8 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
               sr-only h1 이 맡고, 보이는 대회 제목은 기존 스타일(h2)을 그대로 쓴다. */}
           <h1 className="sr-only">{tournament.title} 순위·대진표</h1>
           <h2>{tournament.title}</h2>
-          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
-          <p>
-            {isLeague
-              ? '경기 일정과 순위를 확인하세요.'
-              : '경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.'}
-          </p>
+          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. 검색 설명과 같은 함수를 쓴다. */}
+          <p>{bracketIntroLine(tournament)}</p>
         </div>
         <span className="tm-bracket-page-format">
           {competitionFormatLabel(tournament)}
@@ -860,7 +863,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection tournamentId={tournament.id} isRegularLeague={isRegularLeague} fixtures={fixtures} rows={allLeagueRows} label={leagueStandingsHeading} myTeamIds={myTeamIds} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={tournament.tieBreakOrder} />
+                    <LeagueStandingsSection tournamentId={tournament.id} isRegularLeague={isRegularLeague} fixtures={fixtures} rows={allLeagueRows} label={leagueStandingsHeading} myTeamIds={myTeamIds} fromHref={bracketSelfHref ?? undefined} />
                   )}
                 </section>
               )}
@@ -868,7 +871,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
               {!isLeague && hasGroupStage && hasGroupStandings && (
                 <section>
                   {visibleGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} tieBreakOrder={tournament.tieBreakOrder} />
+                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} myTeamIds={myTeamIds} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
                 </section>
               )}
@@ -892,7 +895,7 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
                   </h3>
                   {showBracket ? (
                     <div className="tm-bk-wrap">
-                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={tournament.sixTeamBracket} fixtures={bracketFixtures} selectedRoundKey={activeRoundKey} stageLabels={Object.fromEntries(knockoutRounds.map((round) => [round.key, round.label]))} /> : <TournamentBracket
+                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} directFinalOrder={tournament.sixTeamDirectFinalOrder} state={tournament.sixTeamBracket} fixtures={bracketFixtures} selectedRoundKey={activeRoundKey} stageLabels={Object.fromEntries(knockoutRounds.map((round) => [round.key, round.label]))} /> : <TournamentBracket
                         fixtures={bracketFixtures}
                         groups={bracketGroups}
                         selectedRoundKey={activeRoundKey}

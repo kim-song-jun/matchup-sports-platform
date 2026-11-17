@@ -26,7 +26,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { KNOCKOUT_PHASES, competitionFixtureName, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
 import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
@@ -81,6 +81,8 @@ import type {
   V1TournamentRegistration,
   V1TournamentStatus,
 } from '@/types/api';
+import { normalizeMyTeamsResponse, isTeamOperatorRole } from '@/lib/team-role';
+import { filterTournamentTeamsBySport } from '@/lib/tournament-team-eligibility';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 
@@ -218,7 +220,21 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 
 /** 여러 결선의 우승은 각각 독립적이다. 사용자 지정 round 대신 그룹 phase로 결승을 찾는다. */
 function getCompletedTrackChampions(tournament: V1TournamentDetail) {
-  if (tournament.stagePlan) return [];
+  if (tournament.stagePlan) return tournament.stagePlan.stages.at(-1)!.pools.map(pool => {
+    const progress = tournament.stageProgress?.find(row => row.poolKey === pool.key);
+    if (progress && (!progress.complete || progress.stale)) return { track: pool.key, label: pool.name, champion: null };
+    const groups = tournament.groups.filter(group => group.poolKey === pool.key);
+    let champion: string | null = null;
+    if (pool.format === 'league') {
+      const leaders = groups.flatMap(group => group.standings).filter(row => (row.sharedRank ?? row.position) === 1);
+      if (leaders.length) champion = `${leaders.map(row => row.teamName).join(' · ')}${leaders.length > 1 ? ' 공동 우승' : ''}`;
+    } else {
+      const finalIds = new Set(groups.filter(group => group.phase === 'final').map(group => group.id));
+      const fixtures = tournament.fixtures.filter(fixture => finalIds.has(fixture.groupId ?? '') && fixture.status === 'completed').map(fixture => ({ ...fixture, round: 'final' }));
+      champion = getCompletedChampionName({ ...tournament, stagePlan: undefined, fixtures });
+    }
+    return { track: pool.key, label: pool.name, champion };
+  });
   if (isLeagueCompetition(tournament)) return [];
   const tracks = orderedBracketTracks(tournament.groups);
   if (tracks.length < 2) return [];
@@ -464,6 +480,25 @@ function useReturningTeamId(registrations: readonly V1TournamentRegistration[]):
   return registrations.find((registration) => registration.status === 'confirmed' && managedTeamIds.has(registration.teamId))?.teamId ?? null;
 }
 
+export function OtherTeamApplicationLink({ tournament, registrations }: {
+  tournament: V1TournamentDetail;
+  registrations: readonly V1TournamentRegistration[];
+}) {
+  const hasActiveRegistration = registrations.some((registration) => registration.status !== 'cancelled');
+  const teams = useV1MyTeams(undefined, { enabled: hasActiveRegistration });
+  const childHref = useChildHref();
+  if (!hasActiveRegistration || teams.isError || resolveTournamentRegistrationBlock(tournament) !== null) return null;
+  const registeredTeamIds = new Set(registrations.filter((registration) => registration.status !== 'cancelled').map((registration) => registration.teamId));
+  const hasOtherTeam = filterTournamentTeamsBySport(normalizeMyTeamsResponse(teams.data), tournament.sportId)
+    .some((team) => isTeamOperatorRole(team.role) && !registeredTeamIds.has(team.teamId));
+  if (!hasOtherTeam) return null;
+  return (
+    <Link href={childHref(`/tournaments/${tournament.id}/my`)} className="tm-btn tm-btn-md tm-btn-outline tm-btn-block" style={{ marginBottom: 16 }}>
+      다른 팀으로 신청하기
+    </Link>
+  );
+}
+
 export function ApplyCTA({
   tournament,
   myRegistration,
@@ -697,7 +732,10 @@ export function TournamentDetailPageClient({
         myRegistrations={myRegistrations}
         backHref="/tournaments"
         entrySection={
-          <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
+          <>
+            <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
+            <OtherTeamApplicationLink tournament={displayData} registrations={myRegistrations} />
+          </>
         }
       />
     </DetailChainFromContext.Provider>
@@ -1962,9 +2000,7 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
       ) : (
         /* 대회용 `FixturesPlaceholder` 를 쓰지 않는다 — 그건 "대회 시작 전에 대진표가
            공개돼요" 라고 적는데, 진행 중인 리그 시즌에 그 말이 뜨면 **틀린 말을 확신 있게**
-           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다.
-           문구는 리그 일정 목록(league-match-standings-client.tsx)이 같은 상황에 쓰는 것을
-           그대로 가져왔다 — 두 화면이 같은 상황을 다르게 부르지 않게. */
+           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다. */
         <section aria-labelledby="fixtures-empty-heading" style={{ marginTop: 24 }}>
           <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             일정 · 대진
@@ -2037,7 +2073,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
 
   const sixTeamState = tournament.sixTeamMode ? tournament.sixTeamBracket : null;
   const bracketContent = sixTeamState ? (
-    <SixTeamBracket tournamentId={tournament.id} state={sixTeamState} fixtures={knockoutFixtures}
+    <SixTeamBracket tournamentId={tournament.id} directFinalOrder={tournament.sixTeamDirectFinalOrder} state={sixTeamState} fixtures={knockoutFixtures}
       stageLabels={Object.fromEntries(groupFixturesByRound(knockoutFixtures, groups).map(round => [round.key, round.label]))} />
   ) : <TournamentBracket fixtures={knockoutFixtures} groups={groups} />;
   const connectedBracketWide = !sixTeamState && knockoutFixtures.length > 1 ? 'true' : undefined;
@@ -2122,9 +2158,11 @@ export function partitionTournamentSections(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
 
-  const groupFixtures = fixtures.filter((f) =>
-    f.groupId !== null && !knockoutGroupIds.has(f.groupId),
-  );
+  // 경기 번호 순 — 운영자가 어드민에서 번호를 바꾸면 서버의 라운드 순서가 아니라 그 번호가 목록 순서를 정한다.
+  // 번호가 같으면 서버가 준 순서를 그대로 둔다(sort 는 stable).
+  const groupFixtures = fixtures
+    .filter((f) => f.groupId !== null && !knockoutGroupIds.has(f.groupId))
+    .sort((a, b) => a.fixtureNumber - b.fixtureNumber);
 
   // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
   // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
@@ -2284,8 +2322,9 @@ function FixtureStatusBadge({ liveStatus }: { liveStatus: V1TournamentFixture['l
  */
 export function FixtureCard({ fixture, groupName = null }: { fixture: V1TournamentFixture; groupName?: string | null }) {
   // 이 목록은 조별로 묶지 않고 "조별 일정" 한 줄로 흐른다 — 조 이름을 카드마다 붙인다.
+  // 운영자가 정한 경기 제목이 있으면 그것을 먼저 쓴다 — 일정·대진표·경기 상세·어드민과 같은 순서다.
   const roundLabel = fixture.round
-    ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+    ? competitionFixtureName({ displayTitle: fixture.displayTitle, groupName, round: fixture.round, legNumber: fixture.legNumber })
     : `${fixture.fixtureNumber}경기`;
   // 일정 라벨: 날짜 + **시각**. 참가자는 이 카드로 "내 경기가 몇 시인지"를 판단하므로
   // 날짜만으로는 쓸모가 없다(오너 지적: "조별 일정에도 각 경기 시간들 나타나야하고").

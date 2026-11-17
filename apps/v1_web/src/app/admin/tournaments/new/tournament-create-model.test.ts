@@ -497,7 +497,7 @@ it('정규리그 + N개 토너먼트는 65팀 이상을 허용하고 기존 방�
 });
 
 describe('동점 순서 초안 왕복', () => {
-  const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'seeded_draw'] as const;
+  const GOALS_FIRST = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'] as const;
 
   it('기본 순서는 null 로, 고른 순서는 그대로 payload 에 싣는다', () => {
     const base = { ...INITIAL_TOURNAMENT_CREATE_STATE, sportId: 'sport-1', title: '대회' };

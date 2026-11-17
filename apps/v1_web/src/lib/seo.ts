@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { competitionFormatLabel } from '@/lib/competition-kind';
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
+import { socialImageSrc } from '@/lib/og-image';
+import { maskContactNumbers } from '@/lib/public-text';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
@@ -78,11 +80,11 @@ export function buildPublicMetadata({
   type = 'website',
 }: PublicMetadataInput): Metadata {
   const socialTitle = `${title} | Teameet`;
-  const imageUrl = image || DEFAULT_SOCIAL_IMAGE.path;
+  const imageUrl = socialImageSrc(image || DEFAULT_SOCIAL_IMAGE.path);
   // 크기를 아는 건 기본 이미지뿐이다 — 업로드 커버는 비율이 제각각이라 추측해 적지 않는다.
   const ogImage = image
-    ? { url: image, alt: title }
-    : { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: title };
+    ? { url: imageUrl, alt: title }
+    : { url: imageUrl, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: title };
 
   return {
     title,
@@ -162,8 +164,11 @@ export function buildTournamentTitle(tournament: Pick<V1TournamentDetail, 'title
 }
 
 export function metadataDescription(value: string | null | undefined, fallback: string): string {
-  const normalized = value?.replace(/\s+/g, ' ').trim();
-  if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return fallback;
+  // 번호는 길이 판정과 자르기 전에 가린다 — 자르기 경계에서 앞자리만 남아 드러나는 일을 막는다.
+  // fallback 도 제목처럼 사용자 글일 수 있어 같은 정리를 거친다.
+  const clean = (text: string | null | undefined) => maskContactNumbers(text?.replace(/\s+/g, ' ')).trim();
+  const normalized = clean(value);
+  if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return clean(fallback);
   return normalized.length > 155 ? `${normalized.slice(0, 152).trimEnd()}…` : normalized;
 }
 

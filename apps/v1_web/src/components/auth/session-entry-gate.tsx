@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import {
-  clearStoredV1Session,
   sanitizeRedirectPath,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
+import { clearStoredV1SessionAfterAuthLoss } from '@/lib/session-expiry';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
@@ -56,7 +56,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
 
     if (authMe.isError && !authMe.isFetching && isLoginEntryAuthError(authMe.error)) {
       try {
-        clearStoredV1Session();
+        clearStoredV1SessionAfterAuthLoss('entry_gate', authMe.error);
       } catch {
         reportClientError({
           message: '인증이 만료된 뒤 저장된 로그인 정보를 정리하지 못했어요.',

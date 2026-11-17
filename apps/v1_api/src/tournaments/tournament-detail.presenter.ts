@@ -10,7 +10,7 @@ import type { LeagueFixtureListItem } from '../league-matches/league-fixture-lis
 import { normalizeFinalColors } from './multi-finals/multi-finals-colors';
 import type { FinalColorConfig } from './multi-finals/multi-finals-colors';
 import type { TournamentDetailRow } from './tournaments-read.query';
-import { resolveTieBreakOrder } from './competition-config/tournament-tie-break-order';
+import { resolveSixTeamDirectFinalOrder, resolveStageTieBreakOrder, resolveTieBreakOrder } from './competition-config/tournament-tie-break-order';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
 import { publicFixtureSideLabel } from './slots/tournament-slot-label';
@@ -345,6 +345,9 @@ export function presentTournamentDetail(
     ...(row.stagePlan ? { stagePlan: stagePlanDefinition(row.stagePlan as unknown as StoredStagePlan) } : {}),
     // Regular leagues rank by their own fixed order, so only tournaments carry one.
     tieBreakOrder: row.kind === 'regular_league' ? null : resolveTieBreakOrder(row.tieBreakOrder),
+    // MD-QA #186: 풀리그 편성이 있는 단계마다 실제로 쓰는 순서(단계 설정 → 대회 설정 → 기본값).
+    ...(row.stagePlan ? { stageTieBreakOrders: presentStageTieBreakOrders(row) } : {}),
+    sixTeamDirectFinalOrder: row.sixTeamMode ? resolveSixTeamDirectFinalOrder(row.sixTeamDirectFinalOrder) : null,
     /**
      * 단발 대회(regular_tournament) / 정규 리그 시즌(regular_league) 구분.
      *
@@ -642,4 +645,12 @@ export function presentTournamentDetail(
       startAt: fixture.startAt.toISOString(),
     })),
   };
+}
+
+function presentStageTieBreakOrders(row: Pick<TournamentDetailRow, 'stagePlan' | 'tieBreakOrder' | 'stageTieBreakSettings'>) {
+  const plan = row.stagePlan as unknown as StoredStagePlan;
+  const own = new Map((row.stageTieBreakSettings ?? []).map((setting) => [setting.stageKey, setting.order] as const));
+  return Object.fromEntries(plan.stages
+    .filter((stage) => stage.pools.some((pool) => pool.format === 'league'))
+    .map((stage) => [stage.key, resolveStageTieBreakOrder(row.tieBreakOrder, own.get(stage.key))]));
 }

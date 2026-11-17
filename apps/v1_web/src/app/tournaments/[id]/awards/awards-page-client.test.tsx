@@ -194,6 +194,16 @@ describe('AwardsPageClient — 존재하는 결선 시상대', () => {
     v1GetMock.mockResolvedValue(emptyOverallStandings);
   });
 
+  it('끝난 대회에 개인 어워드가 없으면 「집계 중」이 아니라 아직 발표되지 않았다고 알린다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ fixtures: [finishedFixture('final', '우승팀', '준우승팀')] }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    expect(screen.getByText(/개인 어워드는\s*아직 발표되지 않았어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/집계 중이에요/)).not.toBeInTheDocument();
+  });
+
   it('3·4위전이 없으면 우승·준우승만 표시하고 빈 3위 단상을 만들지 않는다', () => {
     awardsApiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament({ fixtures: [finishedFixture('final', '우승팀', '준우승팀')] }),
@@ -939,6 +949,30 @@ describe('AwardsPageClient — N개 토너먼트의 구역별 순서', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     v1GetMock.mockResolvedValue(emptyOverallStandings);
+  });
+
+  it('3팀 토너먼트는 3·4위전이 없어도 준결승에서 진 팀이 시상대 3위에 오른다', () => {
+    const groups = ['semi', 'final'].map((phase, index) => ({
+      id: `three-${phase}`, name: `토너먼트 · ${phase}`, phase, sortOrder: index, advanceCount: null, groupTeams: [], standings: [], qualification: null, bracketTrack: '토너먼트',
+    }));
+    const match = (id: string, groupId: string, round: string, home: string, away: string, score: [number, number]) => ({
+      ...finalFixture('토너먼트', home, away), id, groupId, round,
+      result: { homeScore: score[0], awayScore: score[1], hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null, note: null, recordedAt: '2026-11-13T00:00:00Z', goals: [] },
+    });
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        groups,
+        fixtures: [
+          match('three-semi-match', 'three-semi', '준결승', '준결승패배팀', '준우승팀', [1, 2]),
+          match('three-final-match', 'three-final', 'final', '우승팀', '준우승팀', [2, 0]),
+        ],
+        awardSets: [{ bracketTrack: '토너먼트', prizePool: 100000, prizeSummary: '상금 안내', prizeBreakdown: null }],
+      }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    const podium = within(screen.getByRole('region', { name: '토너먼트 시상 결과' }));
+    for (const name of ['우승팀', '준우승팀', '준결승패배팀']) expect(podium.getAllByText(name).length).toBeGreaterThan(0);
   });
 
   it('시상 결과·상금 안내·개인 어워드가 모두 같은 순서(프리미어 → 챌린지)로 나온다', () => {

@@ -72,7 +72,7 @@ export async function createLeagueSlotHarness(app: INestApplication, label: stri
         data: { id: ownerId, email: `${ownerId}@integration.test`, onboardingStatus: 'completed', accountStatus: 'active' },
       });
       const team = await prisma.v1Team.create({
-        data: { ownerUserId: ownerId, sportId: sport.id, regionId: region.id, name: `${name}-${suiteId}-${seq}` },
+        data: { ownerUserId: ownerId, sportId: sport.id, regionId: region.id, name: `${name}-${suiteId}-${seq}`, profile: { create: { genderRule: '성별 무관' } } },
       });
       await prisma.v1TeamMembership.create({ data: { teamId: team.id, userId: ownerId, role: 'owner', status: 'active' } });
       return { id: team.id, name: team.name };

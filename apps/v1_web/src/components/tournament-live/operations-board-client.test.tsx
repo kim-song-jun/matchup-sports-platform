@@ -185,6 +185,22 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
   });
 
+  // 어드민에서 고친 경기 제목은 운영 보드에도 같은 이름으로 보여야 한다.
+  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 쓴다', () => {
+    mocks.useV1TournamentOperationsBoard.mockReturnValue({
+      data: { ...PAGE, items: [{ ...ITEM_A, round: 'league_r5', groupName: 'A조', displayTitle: '풀리그 1라운드' }] },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.getAllByText(/풀리그 1라운드 · 1번 경기/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/조별리그 5라운드/)).not.toBeInTheDocument();
+  });
+
   it('상단 진행 단계는 단계 이름·상태와 지금 위치를 알린다', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 

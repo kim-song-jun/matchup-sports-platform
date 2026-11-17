@@ -4,7 +4,7 @@ import type { V1AdminLeagueDetail, V1AdminLeagueListItem, V1PublicLeagueDetail, 
 const api = '*/api/v1';
 const leagueId = 'league-visibility-fixture';
 
-export const v1LeagueVisibilityFixture: {
+const v1LeagueVisibilityFixture: {
   isPublic: boolean;
   adminDetail: V1AdminLeagueDetail;
   adminListItem: V1AdminLeagueListItem;

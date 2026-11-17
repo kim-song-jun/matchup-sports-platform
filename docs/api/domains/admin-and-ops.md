@@ -344,3 +344,13 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - `cancelled`: stamp cancelledAt, reject pending applications, cancel SCHEDULED games and connected schedules in the same transaction, then notify team managers. Already-started matched games require the game operations flow. Cancelled matches remain in admin list/detail/audits and are absent from user lists/my matches/detail/eligibility and linked schedules. User direct links return 404.
 - `archived`: matched games must first be cancelled. Past cancellation cannot be revived by first archiving it. Existing application/result history is retained.
 - Web status mutations invalidate admin list/detail, public team-match list/detail, my team matches, schedules, teams and home query families. The status modal retains recruitment/close/cancel/archive; team confirmation is handled by the existing application approval flow.
+
+## 회원 대진표 조회 (관리자 전용)
+
+- `POST /admin/users/:userId/bracket-preview`: body `{ tournamentId: UUID, reason: string(5..500) }`. 활성 owner/ops만 허용(support 403). 대상 회원 active 및 공개된 대회 대진표를 검증하고 `V1AdminActionLog`에 `user.bracket_preview`를 기록한 뒤 `{ previewId, tournamentId, expiresAt }`를 반환한다. 분당 10회 제한. 회원 세션/토큰 발급·변경 없음.
+- `GET /admin/users/:userId/bracket-preview/:previewId`: 관리자 세션 인증과 현재 owner/ops 권한을 매번 확인한다. 감사 기록의 관리자/대상 회원 및 생성 후 10분을 검증한다. 다른 관리자/회원 및 만료는 403 `MEMBER_PREVIEW_EXPIRED`. 대상 active 상태도 매번 검증한다. 반환 `{ tournamentId, member: { id, name }, expiresAt, teamIds, myFixtures }`의 팀·경기는 기존 `TeamsService.myTeams`/`GamesService.listMyTournamentFixtures` 조회를 재사용한다.
+- 두 응답 모두 `Cache-Control: private, no-store`. 일반 success/error envelope 적용. 감사 저장 실패 시 조회 ID를 반환하지 않는다. 새 Prisma 모델/마이그레이션 없음(`V1AdminActionLog` 재사용).
+- 프론트 `/admin/users/:id/bracket-preview/:previewId`는 독립 메모리 query cache와 기존 `BracketPageClient`를 사용한다. 대상 팀 정보로만 개인화를 주입하고 관리자 `/me/teams`·`my-fixtures` 요청은 비활성화한다. 공개 대회·일정 요청은 `credentials: omit`으로 관리자 staff visibility bypass를 제외한다. 10분 또는 권한 오류 시 콘텐츠를 제거한다. 30초마다 재인가한다.
+- 조회 화면은 링크 탐색을 막고 회원 상세 복귀만 제공한다. 회원의 기기/쿠키/브라우저 상태나 가입·인증 게이트 전체를 재현하지 않는다. 원본 링크의 대진표 필터만 허용 목록으로 전달한다. 정규 리그·미공개 대진표는 범위 밖이다.
+
+- MSW/demo에서는 실제 관리자 감사 기록을 만들 수 없으므로 두 endpoint 모두 503 `MEMBER_PREVIEW_REQUIRES_LIVE_API`로 명시적으로 거절한다. 가짜 성공이나 회원 조회 ID를 만들지 않는다.

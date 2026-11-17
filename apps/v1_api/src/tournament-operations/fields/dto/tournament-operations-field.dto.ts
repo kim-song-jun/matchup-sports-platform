@@ -44,6 +44,11 @@ export class UpdateTournamentFieldDto {
   @MaxLength(120)
   name?: string;
 
+  /** Explicit name correction for already assigned fixtures; their location pins stay unchanged. */
+  @IsOptional()
+  @IsBoolean()
+  syncAssignedFixtures?: boolean;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

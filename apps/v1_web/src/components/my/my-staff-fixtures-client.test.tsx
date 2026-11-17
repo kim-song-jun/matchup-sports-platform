@@ -99,6 +99,7 @@ function fixtureFromEntry(item: PublicScheduleEntry): V1MyTournamentStaffFixture
     fixtureNumber: item.fixtureNumber,
     legNumber: item.legNumber,
     groupName: item.groupName,
+    displayTitle: item.displayTitle ?? null,
     fieldId: item.fieldId,
     fieldName: item.fieldName,
   };
@@ -224,6 +225,19 @@ describe('MyStaffFixturesPageClient', () => {
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
     expect(screen.getByText(`${name} · 일정 미정`)).toBeInTheDocument();
+  });
+
+  // 어드민에서 고친 경기 제목은 담당 경기 목록에도 같은 이름으로 보여야 한다.
+  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 쓴다', () => {
+    mockData(
+      [assignment({ fixtureIds: ['fx-1'] })],
+      [entry({ fixtureId: 'fx-1', round: 'league_r5', groupName: 'A조', displayTitle: '풀리그 1라운드' })],
+    );
+
+    render(<MyStaffFixturesPageClient tournamentId="t-1" />);
+
+    expect(screen.getByText('풀리그 1라운드 · 1번 경기 · 일정 미정')).toBeInTheDocument();
+    expect(screen.queryByText(/조별리그 5라운드/)).not.toBeInTheDocument();
   });
 
   it('담당 경기가 없으면 이유를 정직하게 알린다', () => {

@@ -4,8 +4,6 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { OperationAuditModule } from '../common/audit/operation-audit.module';
 import { WebPushModule } from '../notifications/web-push.module';
 import { GamesController } from './games.controller';
-import { LeagueClaimableFixturesController } from './league-claimable-fixtures.controller';
-import { LeagueClaimableFixturesService } from './league-claimable-fixtures.service';
 import { LeagueFixtureClaimAccessController } from './league-fixture-claim-access.controller';
 import {
   MyTournamentFixturesController,
@@ -34,14 +32,12 @@ import { TournamentStaffAccessService } from '../tournaments/staff/tournament-st
     MyTournamentFixturesController,
     LeagueFixtureClaimAccessController,
     TeamMatchClaimableParticipantsController,
-    LeagueClaimableFixturesController,
     GameRosterController,
     TeamGameRosterController,
     AdminGameRosterController,
   ],
   providers: [
     GamesService,
-    LeagueClaimableFixturesService,
     GameRosterService,
     TeamGameRosterService,
     MemberUnavailabilityService,

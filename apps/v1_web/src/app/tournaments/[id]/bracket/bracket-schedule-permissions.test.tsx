@@ -1,3 +1,4 @@
+import { MemberBracketIdentityProvider } from '@/components/tournaments/member-bracket-identity';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveStoredV1Session } from '@/lib/session-storage';
@@ -130,6 +131,20 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     expect(within(myCard as HTMLElement).queryByText('라인업 미작성')).not.toBeInTheDocument();
   });
 
+  it('관리자 미리보기는 관리자 팀을 요청하지 않고 대상 팀 경기의 구장·시간·상대를 그대로 표시한다', () => {
+    myFixturesMock.mockReturnValue({ data: { teams: [] } });
+    myTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'operator-team' }] } });
+    const { container } = render(<MemberBracketIdentityProvider value={{ teamIds: ['team-home'], myFixtures: { teams: [] } }}>
+      <BracketScheduleTab tournamentId="tour-1" />
+    </MemberBracketIdentityProvider>);
+    const card = container.querySelector('.tm-schedule-card-mine') as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(within(card).getByText('테스트 구장')).toBeInTheDocument();
+    expect(within(card).getByText('상대 팀')).toBeInTheDocument();
+    expect(within(card).getByText(/8\/15.*19:00/)).toBeInTheDocument();
+    expect(myTeamsMock).toHaveBeenLastCalledWith(undefined, { enabled: false });
+    expect(myFixturesMock).toHaveBeenLastCalledWith('tour-1', { enabled: false });
+  });
   it('공개 순위·브래킷 일정 탭에서는 개인 득점 순위를 조회하거나 표시하지 않는다', () => {
     render(<BracketScheduleTab tournamentId="tour-1" />);
 

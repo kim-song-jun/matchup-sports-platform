@@ -277,6 +277,20 @@ describe('TournamentFixtureReviewEntrySection', () => {
     expect(screen.getByText('남은 리뷰 5개')).toBeInTheDocument();
   });
 
+  // 어드민에서 고친 경기 제목은 리뷰할 수 있는 경기 목록에도 같은 이름으로 보여야 한다.
+  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 쓴다', () => {
+    render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [{ ...COMPLETED_FIXTURE, displayTitle: '풀리그 1라운드' }],
+        groups: [{ id: 'group-a', name: 'A조' }],
+        state: { status: 'ready', items: [reviewItem()] },
+      }),
+    );
+
+    expect(screen.getByText('풀리그 1라운드')).toBeInTheDocument();
+    expect(screen.queryByText('A조 · 조별 1라운드')).not.toBeInTheDocument();
+  });
+
   it('남길 리뷰가 없으면 섹션째 렌더하지 않는다 (빈 껍데기로 자리 차지하지 않음)', () => {
     const { container } = render(
       createElement(TournamentFixtureReviewEntrySection, {

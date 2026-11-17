@@ -4,6 +4,7 @@
  * 안내서 본문은 반드시 나가야 한다는 것이 이 라우트의 핵심 계약이다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ANDROID_PLAY_STORE_URL, IOS_APP_STORE_URL } from '@/lib/app-store-links';
 import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 
 const fetchPublicV1 = vi.fn();
@@ -62,7 +63,7 @@ describe('GET /llms.txt', () => {
 
     expect(body).toContain('https://teameet.co.kr/tournaments/open-1');
     expect(body).toContain('https://teameet.co.kr/tournaments/live-1');
-    // 종료된 대회를 "현재 모집 중" 목록에 올리면 AI 가 낡은 대회를 열려 있다고 답한다.
+    // 종료된 대회를 모집·진행 중 목록에 올리면 AI 가 낡은 대회를 열려 있다고 답한다.
     expect(body).not.toContain('tournaments/done-1');
     // 일정·장소가 없는 대회도 빈 구분자 없이 깔끔하게 나가야 한다.
     expect(body).toContain('- [진행 중 리그](https://teameet.co.kr/tournaments/live-1): 농구\n');
@@ -85,6 +86,42 @@ describe('GET /llms.txt', () => {
     expectNoNonFootballCompetitionClaim(body.slice(0, body.indexOf('\n## ')));
   });
 
+  it('공식 채널 줄에 인스타그램과 두 앱 스토어 주소를 싣는다', async () => {
+    fetchPublicV1.mockResolvedValue(null);
+
+    const body = await (await GET()).text();
+
+    expect(body).toContain('- 인스타그램: https://www.instagram.com/teameet_official/\n');
+    expect(body).toContain(`${IOS_APP_STORE_URL}\n`);
+    expect(body).toContain(`${ANDROID_PLAY_STORE_URL}\n`);
+  });
+
+  it('상태가 모집인 대회는 정원이 찼어도 싣기 때문에, 목록 제목이 지금 신청할 수 있다고 약속하지 않는다', async () => {
+    fetchPublicV1.mockResolvedValue({
+      items: [
+        {
+          id: 'full-1',
+          title: '정원 찬 대회',
+          status: 'open',
+          teamCount: 8,
+          confirmedCount: 8,
+          pendingPaymentCount: 0,
+          sport: { code: 'futsal', name: '풋살' },
+          scheduledAt: '2026-11-14T01:00:00.000Z',
+          venue: '서울 강남 풋살파크',
+        },
+      ],
+      pageInfo: { hasNext: false, nextCursor: null },
+    });
+
+    const body = await (await GET()).text();
+
+    expect(body).toContain('tournaments/full-1');
+    expect(body).toContain('## 모집 단계이거나 진행 중인 대회');
+    expect(body).not.toContain('현재 모집 중이거나');
+    expect(body).toContain('신청할 수 있는지는 각 대회 페이지에서 확인해 주세요');
+  });
+
   it('대회 목록 조회가 실패해도 200 과 안내서 본문을 내고, 실패를 로그에 남긴다', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -98,7 +135,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('# Teameet');
     expect(body).toContain('https://teameet.co.kr/sitemap.xml');
     // 목록 섹션은 통째로 빠지되 안내서는 살아 있어야 한다.
-    expect(body).not.toContain('## 현재 모집 중이거나 진행 중인 대회');
+    expect(body).not.toContain('## 모집 단계이거나 진행 중인 대회');
     // 조용히 삼키면 upstream 장애를 관측할 방법이 없다.
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('llms.txt'), expect.any(Error));
   });

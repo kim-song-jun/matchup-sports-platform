@@ -26,6 +26,7 @@ import { WebPushService } from '../notifications/web-push.service';
 import { VideoUploadCleanupService } from './video-upload-cleanup.service';
 import { VIDEO_UPLOAD_CLEANUP_TYPE } from '../games/video-url-lock';
 import { GameClockExpiryService } from './game-clock-expiry.service';
+import { StagePlanService } from '../tournaments/stages/stage-plan.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -117,6 +118,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // WorkerNotificationsModule이 내보내는 WebPushService가 DI로 자동 주입된다.
     @Optional() private readonly webPush?: WebPushService,
     @Optional() private readonly videoUploadCleanup?: VideoUploadCleanupService,
+    @Optional() private readonly stagePlans?: StagePlanService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
     this.clockExpiry = new GameClockExpiryService(prisma, () => this.acceptingClaims);
@@ -128,6 +130,13 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // 명단 트리거가 남기는 COMPETITION_ROSTER_RESYNC 이벤트가 맡는다(roster-resync-events.ts).
     const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', withCompetitionRosterResync(officialProjection.handler));
+    this.registerHandler('STAGE_AUTO_ADVANCE', async (claim, tx) => {
+      if (!this.stagePlans) throw new Error('Stage auto-advancement service is not configured');
+      if (claim.aggregateType !== 'TOURNAMENT') throw new Error('Stage auto-advancement requires a tournament aggregate');
+      const effects = await this.stagePlans.advanceReadyInTx(tx, claim.aggregateId);
+      if (claim.afterCommit) claim.afterCommit.push(...effects);
+      else for (const effect of effects) await effect();
+    });
     const voidProjection = new GameResultVoidProjectionService();
     this.registerHandler('GAME_RESULT_VOIDED', withCompetitionRosterResync(voidProjection.handler));
     const submittedEscalation = new GameResultSubmittedEscalationService();

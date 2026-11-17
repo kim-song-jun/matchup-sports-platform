@@ -32,6 +32,12 @@ describe('6강 기록 기반 직행과 수동 진출', () => {
       ).automaticBye
     ).toBe('b-h');
   });
+  it('MD-QA #186: 대회가 고른 순서(득실차 우선)로 비교한다', () => {
+    const rows = [result('a', 5, 4), result('b', 4, 0), result('c', 2, 1)];
+    expect(rankSixTeamWinners(rows, {}, ['goal_difference', 'goals_for', 'fewest_goals_against']).automaticBye).toBe('b-h');
+    expect(rankSixTeamWinners(rows, {}, ['fewest_goals_against', 'goals_for', 'goal_difference']).automaticBye).toBe('b-h');
+    expect(rankSixTeamWinners(rows, {}).automaticBye).toBe('a-h');
+  });
   it('완전 동률은 임의 경기번호나 팀 id로 결정하지 않는다', () => {
     expect(
       rankSixTeamWinners(

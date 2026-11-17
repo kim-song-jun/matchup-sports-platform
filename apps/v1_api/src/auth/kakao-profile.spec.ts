@@ -5,6 +5,8 @@ import {
   normalizeKakaoPhone,
   normalizeKakaoBirthDate,
   readKakaoSignupPrefill,
+  withoutKakaoPrefill,
+  withoutSocialPrefill,
 } from './kakao-profile';
 
 describe('normalizeKakaoPhone', () => {
@@ -63,7 +65,6 @@ describe('readKakaoSignupPrefill', () => {
   it('draftJson 에 저장된 카카오 값을 읽어온다', () => {
     expect(
       readKakaoSignupPrefill({
-        kakaoProfileImageUrl: 'https://img.example/a.png',
         kakaoName: '홍길동',
         kakaoPhone: '01012345678',
         kakaoGender: 'male',
@@ -75,8 +76,80 @@ describe('readKakaoSignupPrefill', () => {
     expect(readKakaoSignupPrefill(null)).toBeNull();
     expect(readKakaoSignupPrefill('nope')).toBeNull();
     expect(readKakaoSignupPrefill([1, 2])).toBeNull();
-    // 이미지 URL 만 있던 기존 가입 건(이 기능 이전 데이터)도 안전하게 null.
-    expect(readKakaoSignupPrefill({ kakaoProfileImageUrl: 'https://img.example/a.png' })).toBeNull();
+    // 제공자 값이 없는 draft(예: 가입을 끝내 값을 지운 뒤)는 프리필이 없는 것으로 읽는다.
+    expect(readKakaoSignupPrefill({ ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3' })).toBeNull();
+  });
+});
+
+describe('withoutSocialPrefill', () => {
+  const rest = { ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3', currentStep: 'sport' };
+
+  it('removes every provider value the form reads and keeps the other draft keys', () => {
+    const draft = {
+      ...rest,
+      kakaoName: '홍길동',
+      kakaoPhone: '01012345678',
+      kakaoGender: null,
+      kakaoBirthDate: '20000229',
+      appleName: '김애플',
+    };
+    expect(readKakaoSignupPrefill(draft)).not.toBeNull();
+
+    const stripped = withoutSocialPrefill(draft);
+
+    expect(stripped).toEqual(rest);
+    expect(readKakaoSignupPrefill(stripped)).toBeNull();
+  });
+
+  it('does not mutate the draft it was given', () => {
+    const draft = { ...rest, kakaoName: '홍길동' };
+    withoutSocialPrefill(draft);
+    expect(draft).toEqual({ ...rest, kakaoName: '홍길동' });
+  });
+
+  it('returns the other keys untouched when no provider value is present', () => {
+    expect(withoutSocialPrefill(rest)).toEqual(rest);
+  });
+
+  it.each([null, undefined, 'draft', [1, 2]])('yields an empty draft for the non-object %p', (draft) => {
+    expect(withoutSocialPrefill(draft)).toEqual({});
+  });
+});
+
+describe('withoutKakaoPrefill', () => {
+  const rest = { ageConfirmedAt: '2026-10-11T00:00:00.000Z', autoNickname: '씩씩한수달3', currentStep: 'sport' };
+  // One valid value per key the reader consumes; dropping a key from the strip list leaves that value readable.
+  const kakaoValues = { kakaoName: '홍길동', kakaoPhone: '01012345678', kakaoGender: 'female', kakaoBirthDate: '20000229' };
+
+  it.each(Object.entries(kakaoValues))('removes %s so the reader no longer sees it', (key, value) => {
+    const draft = { ...rest, [key]: value };
+    expect(readKakaoSignupPrefill(draft)).not.toBeNull();
+
+    const stripped = withoutKakaoPrefill(draft);
+
+    expect(stripped).toEqual(rest);
+    expect(readKakaoSignupPrefill(stripped)).toBeNull();
+  });
+
+  it('keeps the Apple name, which arrives only once and is not Kakao data (control for withoutSocialPrefill)', () => {
+    const draft = { ...rest, ...kakaoValues, appleName: '김애플' };
+
+    const kakaoStripped = withoutKakaoPrefill(draft);
+    const socialStripped = withoutSocialPrefill(draft);
+
+    expect(kakaoStripped).toEqual({ ...rest, appleName: '김애플' });
+    expect(readKakaoSignupPrefill(kakaoStripped)).toEqual({ name: '김애플', phone: null, gender: null, birthDate: null });
+    expect(socialStripped).toEqual(rest);
+  });
+
+  it('does not mutate the draft it was given', () => {
+    const draft = { ...rest, ...kakaoValues };
+    withoutKakaoPrefill(draft);
+    expect(draft).toEqual({ ...rest, ...kakaoValues });
+  });
+
+  it.each([null, undefined, 'draft', [1, 2]])('yields an empty draft for the non-object %p', (draft) => {
+    expect(withoutKakaoPrefill(draft)).toEqual({});
   });
 });
 

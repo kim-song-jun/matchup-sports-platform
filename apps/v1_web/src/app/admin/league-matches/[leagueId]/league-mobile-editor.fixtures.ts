@@ -75,6 +75,7 @@ export function resetMobileEditorFixture() {
   mobileEditorFixture.fixtureWrites = [];
   mobileEditorFixture.hiddenFixtures = [];
   mobileEditorServer.use(
+    http.get(`*/api/v1/admin/league-matches/${MOBILE_LEAGUE_ID}/schedule-times`, () => success({ items: [] })),
     http.get('*/api/v1/admin/me', () => success({
       userId: 'synthetic-admin-138', adminUserId: 'synthetic-admin-user-138', adminRole: 'ops',
       status: 'active', capabilities: mobileEditorFixture.canWrite ? ['status:write'] : [], lastActiveAt: null,

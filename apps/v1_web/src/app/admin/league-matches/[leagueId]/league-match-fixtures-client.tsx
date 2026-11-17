@@ -29,6 +29,7 @@ import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal, nextKickoffTime } from './league-manual-fixture-modal';
 import { LeaguePreviousSeasonTeams } from './league-previous-season-teams';
+import { LeagueTimeAssignment } from './league-time-assignment';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
@@ -781,6 +782,8 @@ export default function LeagueMatchFixturesClient({
   );
 
   return (
+    <LeagueTimeAssignment leagueId={leagueId} fixtures={series.fixtures} canWrite={canWrite && !leagueEnded}
+        fixtureName={matchupLabelOf} refresh={refetch} showToast={showToast}>
     <div className="tm-content-enter">
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs
@@ -1481,6 +1484,7 @@ export default function LeagueMatchFixturesClient({
           leagueId={leagueId}
           key={scheduleFixture.teamMatchId}
           fixture={scheduleFixture}
+          scheduleFixtures={series.fixtures}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
           matchupLabel={matchupLabelOf(scheduleFixture)}
@@ -1595,6 +1599,7 @@ export default function LeagueMatchFixturesClient({
         onClose={() => setRegenerateModalOpen(false)}
       />
     </div>
+    </LeagueTimeAssignment>
   );
 }
 

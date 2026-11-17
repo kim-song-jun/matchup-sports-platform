@@ -21,13 +21,17 @@ export type MyMatchRosterTeam =
  * 공개 응답이 참가팀을 가리면(접수 중 대회) 내 팀 전부다. 후보가 하나로 정해지지 않을 때만 후보마다 팀 명단을 불러(404 =
  * 이 경기 팀 아님) 기준 명단에 내가 있는 팀 → 내가 관리하는 팀 → 첫 팀 순으로 고른다 — 두 팀에 다 속한 선수도 자기 팀을
  * 본다. 정해지면 조회하지 않는다(카드가 한 번 부른다). 쓰기 권한은 명단 응답의 `editable`(서버 판정)이 정한다.
+ * `sidesUnassigned` — 두 자리 모두 아직 팀이 정해지지 않은 결선 경기(승자·순위 대기). 명단이 없으니 팀 명단을 부르지 않는다
+ * (참가팀을 가린 경우와 달리 공개 응답의 두 자리 자체가 비어 있다 — 부르면 내 팀마다 404 가 난다).
  */
 export function useMyMatchRosterTeam({
   teamIds,
   gameId,
+  sidesUnassigned = false,
 }: {
   teamIds: readonly (string | null)[];
   gameId: string | null;
+  sidesUnassigned?: boolean;
 }): MyMatchRosterTeam {
   // 비로그인 관전자에게 401 을 만들지 않는다 — 세션 힌트가 있을 때만 확인한다(SSR 불일치를 피해 effect 에서 읽는다).
   const [hasSessionHint, setHasSessionHint] = useState(false);
@@ -41,7 +45,7 @@ export function useMyMatchRosterTeam({
   const candidates = (myTeams.data?.items ?? []).filter(
     (team) => knownTeamIds.length === 0 || knownTeamIds.includes(team.teamId),
   );
-  const probe = knownTeamIds.length === 0 || candidates.length > 1;
+  const probe = !sidesUnassigned && (knownTeamIds.length === 0 || candidates.length > 1);
   const rosters = useQueries({
     queries: (probe ? candidates : []).map((team) => ({
       queryKey: v1Keys.teamGameRoster(team.teamId, gameId ?? ''),
@@ -51,7 +55,7 @@ export function useMyMatchRosterTeam({
     })),
   });
 
-  if (!hasSessionHint || me.isError) return { status: 'none' };
+  if (!hasSessionHint || me.isError || sidesUnassigned) return { status: 'none' };
   if (me.data === undefined || myTeams.isPending) return { status: 'loading' };
   if (myTeams.isError) return { status: 'error', error: myTeams.error };
   if (candidates.length === 0 || gameId === null) return { status: 'none' };

@@ -267,6 +267,8 @@ import type {
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
+  V1StageTieBreakView,
+  V1TournamentTieBreakOrder,
   V1CreateTournamentPayload,
   V1UpdateTournamentPayload,
   V1LineupSizeOptions,
@@ -2319,34 +2321,6 @@ export function useV1LeagueClaimableParticipants(
 }
 
 /**
- * 리그 상세(순위·득점·도움)의 "내 기록 연결" 배너용 목록 (F8, 2026-08-26).
- *
- * 리그 상세의 득점·도움 빈 상태는 "신원 연동과 기록 공개에 동의하면 순위가 공개돼요"라고
- * 이유를 말하면서 **연동을 시작할 수단은 주지 않았다**. 이 목록이 그 길이다 — 내 팀이
- * 참가했고 아직 연결되지 않은 참가자가 남은 대진만 돌려준다(서버 필터).
- */
-export type V1LeagueClaimableFixtures = {
-  leagueId: string;
-  fixtures: {
-    teamMatchId: string;
-    title: string;
-    startAt: string;
-    claimableCount: number;
-  }[];
-};
-
-export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: v1Keys.leagueClaimableFixtures(leagueId),
-    queryFn: () =>
-      v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
-    enabled: Boolean(leagueId) && (options?.enabled ?? true),
-    // 비로그인(401)·세션 만료는 정상 응답이다 -- 재시도해도 달라지지 않는다.
-    retry: false,
-  });
-}
-
-/**
  * 승인함 목록 (attest UI C안) — 이 경기에서 내가 승인할 수 있는 대기 중 신원 연결 요청.
  * game 경로라 대회·리그(팀매치) 어느 소스든 같은 훅을 쓴다.
  */
@@ -3520,12 +3494,19 @@ export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
 
 export function useV1CurrentTerms(
   context: 'signup' | 'tournament_application' | 'footer',
-  options?: { enabled?: boolean },
+  options?: {
+    enabled?: boolean;
+    /** 서버가 받아 둔 응답. initialDataUpdatedAt 을 서버가 받은 때로 줘야 staleTime 이 지난 값을 다시 받는다. */
+    initialData?: V1CurrentTerms;
+    initialDataUpdatedAt?: number;
+  },
 ) {
   return useQuery({
     queryKey: v1Keys.currentTerms(context),
     queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
     enabled: options?.enabled,
+    initialData: options?.initialData,
+    initialDataUpdatedAt: options?.initialDataUpdatedAt,
   });
 }
 
@@ -4687,12 +4668,12 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
  * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹(비게이팅).
  * 공개 랭킹과 달리 동의 게이팅이 없어 진짜 순위를 보장한다.
  */
-export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
+export function useV1AdminTournamentPlayerRecords(tournamentId: string, scope: { stageKey?: string; poolKey?: string } = {}) {
   const { v1Get } = useV1DataSource();
   return useQuery({
-    queryKey: v1Keys.adminTournamentPlayerRecords(tournamentId),
+    queryKey: [...v1Keys.adminTournamentPlayerRecords(tournamentId), scope.stageKey ?? '', scope.poolKey ?? ''],
     queryFn: () =>
-      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records`),
+      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records${scope.stageKey || scope.poolKey ? `?${new URLSearchParams({ ...(scope.stageKey ? { stageKey: scope.stageKey } : {}), ...(scope.poolKey ? { poolKey: scope.poolKey } : {}) })}` : ''}`),
     enabled: !!tournamentId,
   });
 }
@@ -5054,6 +5035,24 @@ export function useV1UpdateTournament(id: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** 단계 하나의 동점 순서를 저장한다. order=null 은 대회 설정 따름. expectedRevision 은 단계 구성의 stagePlanRevision 이다. */
+export function useV1SetStageTieBreakOrder(tournamentId: string) {
+  const { v1Put } = useV1DataSource();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { stageKey: string; expectedRevision: number; order: V1TournamentTieBreakOrder | null }) =>
+      v1Put<{ revision: number; stageTieBreak: V1StageTieBreakView }>(
+        `/admin/tournaments/${encodeURIComponent(tournamentId)}/stages/${encodeURIComponent(input.stageKey)}/tie-break-order`,
+        { expectedRevision: input.expectedRevision, order: input.order },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: ['stages', tournamentId] });
     },
   });
 }
@@ -6121,6 +6120,18 @@ function invalidateCompetitionFieldViews(queryClient: QueryClient, competitionId
   ]) void queryClient.invalidateQueries({ queryKey });
 }
 
+/** Correct a registered court's label and explicitly synchronize its assigned match names. */
+export function useV1RenameTournamentField(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fieldId, expectedVersion, name }: { fieldId: string; expectedVersion: number; name: string }) =>
+      v1Patch<V1TournamentField>(`/tournament-ops/tournaments/${tournamentId}/fields/${fieldId}`,
+        { expectedVersion, name, syncAssignedFixtures: true }, idempotencyInit()),
+    onSuccess: () => { invalidateCompetitionFieldViews(queryClient, tournamentId); },
+  });
+}
+
 export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
   const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
@@ -6359,7 +6370,6 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueClaimableFixtures(leagueId) });
       for (const fixtureId of fixtureIds) {
         queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
       }

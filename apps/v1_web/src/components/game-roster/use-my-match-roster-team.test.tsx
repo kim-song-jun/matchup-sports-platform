@@ -34,10 +34,10 @@ vi.mock('@/lib/api-client', async (importOriginal) => {
 
 import { useMyMatchRosterTeam } from './use-my-match-roster-team';
 
-function render(teamIds: (string | null)[]) {
+function render(teamIds: (string | null)[], sidesUnassigned = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
-  return renderHook(() => useMyMatchRosterTeam({ teamIds, gameId: 'g1' }), { wrapper });
+  return renderHook(() => useMyMatchRosterTeam({ teamIds, gameId: 'g1', sidesUnassigned }), { wrapper });
 }
 
 beforeEach(() => {
@@ -55,6 +55,14 @@ describe('useMyMatchRosterTeam', () => {
     api.rosters = { 'team-a': [ME] };
     const { result } = render([null, null]);
     await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1', viewerUserId: ME }));
+  });
+
+  it('두 자리 모두 아직 팀이 정해지지 않은 경기는 팀 명단을 부르지 않고 우리 팀 카드가 없다', async () => {
+    api.myTeams = [{ teamId: 'team-x', role: 'owner' }, { teamId: 'team-a', role: 'owner' }];
+    api.rosters = { 'team-a': [ME] };
+    const { result } = render([null, null], true);
+    await waitFor(() => expect(result.current).toEqual({ status: 'none' }));
+    expect(api.calls.filter((path) => path.includes('/roster'))).toEqual([]);
   });
 
   it('두 팀에 다 속하면 /me/teams 순서가 아니라 기준 명단에 내가 있는 팀을 고른다', async () => {

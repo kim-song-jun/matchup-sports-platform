@@ -19,6 +19,7 @@ import {
   sixTeamSourceVersion,
   syncSixTeamBracket,
 } from './six-team-state';
+import { resolveSixTeamDirectFinalOrder } from '../competition-config/tournament-tie-break-order';
 import type { SixTeamDecisionDto } from './six-team.controller';
 import type { Prisma } from '@prisma/client';
 @Injectable()
@@ -30,7 +31,7 @@ export class SixTeamService {
   private async load(tx: Prisma.TransactionClient, id: string) {
     const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id, deletedAt: null },
-      select: { sixTeamBracket: true, status: true },
+      select: { sixTeamBracket: true, status: true, sixTeamDirectFinalOrder: true },
     });
     const state = parseSixTeamState(tournament?.sixTeamBracket);
     if (!tournament || !state)
@@ -43,14 +44,16 @@ export class SixTeamService {
       where: { tournamentId: id, status: 'confirmed' },
       select: { id: true, team: { select: { name: true } } },
     });
+    const directFinalOrder = resolveSixTeamDirectFinalOrder(tournament.sixTeamDirectFinalOrder);
     return {
       state,
       status: tournament.status,
       results,
       teams,
-      ...rankSixTeamWinners(results.slice(0, 3), state.winners),
+      directFinalOrder,
+      ...rankSixTeamWinners(results.slice(0, 3), state.winners, directFinalOrder),
       version: createHash('sha256')
-        .update(JSON.stringify({ state, results }))
+        .update(JSON.stringify({ state, results, directFinalOrder }))
         .digest('hex'),
     };
   }

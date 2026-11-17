@@ -7,12 +7,22 @@ import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
-import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory, V1TournamentTieBreakOrder } from '@/types/api';
+import type { V1SixTeamCriterion, V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory, V1TournamentTieBreakOrder } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
-import { TieBreakOrderEditor } from '@/components/admin/tournaments/tie-break-order-editor';
-import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER, formatTournamentTieBreakRule, sameTieBreakOrder, tieBreakOrderOf } from '@/lib/tournament-tie-break';
+import { TieBreakPresetPicker } from '@/components/admin/tournaments/tie-break-preset-picker';
+import { SixTeamOrderEditor } from '@/components/admin/tournaments/six-team-order-editor';
+import { StageTieBreakSettings } from '@/components/admin/tournaments/stage-tie-break-settings';
+import {
+  DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER,
+  DEFAULT_TOURNAMENT_TIE_BREAK_ORDER,
+  formatTournamentTieBreakRule,
+  sameSixTeamOrder,
+  sameTieBreakOrder,
+  tieBreakOrderName,
+  tieBreakOrderOf,
+} from '@/lib/tournament-tie-break';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
@@ -67,6 +77,7 @@ export function TournamentInfoSection() {
   const [editSportId, setEditSportId] = useState('');
   const [editSixTeamMode, setEditSixTeamMode] = useState(false);
   const [editTieBreakOrder, setEditTieBreakOrder] = useState<V1TournamentTieBreakOrder>([...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER]);
+  const [editSixTeamOrder, setEditSixTeamOrder] = useState<V1SixTeamCriterion[]>([...DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER]);
   const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
   const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
     ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
@@ -155,6 +166,7 @@ export function TournamentInfoSection() {
     setEditTeamCount(String(tournament.teamCount));
     setEditSixTeamMode(tournament.sixTeamMode ?? false);
     setEditTieBreakOrder(tieBreakOrderOf(tournament));
+    setEditSixTeamOrder([...(tournament.sixTeamDirectFinalOrder ?? DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER)]);
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
     // 빈 문자열로 시작 — "아직 안 바꿈"을 뜻하며, 선택지 그룹은 tournament.lineupMaxPlayers를
@@ -301,6 +313,11 @@ export function TournamentInfoSection() {
     const nextSixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
     if (nextSixTeamMode !== (tournament.sixTeamMode ?? false)) payload.sixTeamMode = nextSixTeamMode;
     if (editFormat !== tournament.format) payload.format = editFormat;
+    // 6강 방식을 켠 채 저장할 때만, 바뀐 때만 보낸다. 기본 순서는 null(되돌리기)이다.
+    const currentSixTeamOrder = tournament.sixTeamDirectFinalOrder ?? DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER;
+    if (nextSixTeamMode && !sameSixTeamOrder(editSixTeamOrder, currentSixTeamOrder)) {
+      payload.sixTeamDirectFinalOrder = sameSixTeamOrder(editSixTeamOrder, DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER) ? null : editSixTeamOrder;
+    }
     // 바뀐 때만 보낸다 — 예선 결과가 확정된 대회에서 다른 칸만 고칠 때 순서 잠금에 걸리지 않게. 기본 순서는 null(되돌리기)로 보낸다.
     if (editFormat !== 'knockout' && !sameTieBreakOrder(editTieBreakOrder, tieBreakOrderOf(tournament))) {
       payload.tieBreakOrder = sameTieBreakOrder(editTieBreakOrder, DEFAULT_TOURNAMENT_TIE_BREAK_ORDER) ? null : editTieBreakOrder;
@@ -561,7 +578,7 @@ export function TournamentInfoSection() {
             },
             ...(tournament.format === 'knockout'
               ? []
-              : [{ label: '동점 순서', value: formatTournamentTieBreakRule(tieBreakOrderOf(tournament)), wide: true }]),
+              : [{ label: '동점 순서', value: `${tieBreakOrderName(tieBreakOrderOf(tournament))} · ${formatTournamentTieBreakRule(tieBreakOrderOf(tournament))}`, wide: true }]),
             {
               label: '입금 계좌',
               value: tournament.bankName
@@ -596,6 +613,16 @@ export function TournamentInfoSection() {
           <p className="mt-3 text-xs text-[var(--text-muted)]">대회 규정과 환불 정책을 아직 입력하지 않았어요.</p>
         )}
       </div>
+
+      {tournament.stageTieBreak ? (
+        <StageTieBreakSettings
+          tournamentId={id}
+          stageTieBreak={tournament.stageTieBreak}
+          stagePlanRevision={tournament.stagePlanRevision ?? 0}
+          canWrite={canWrite}
+          showToast={showToast}
+        />
+      ) : null}
 
       <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
 
@@ -1005,11 +1032,20 @@ export function TournamentInfoSection() {
           </div>
 
           {editFormat !== 'knockout' ? (
-            <TieBreakOrderEditor
+            <TieBreakPresetPicker
               order={editTieBreakOrder}
               onChange={setEditTieBreakOrder}
               disabled={updateTournament.isPending}
               lockedReason={tournament.tieBreakOrderBlockedReason ?? null}
+            />
+          ) : null}
+
+          {editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6 ? (
+            <SixTeamOrderEditor
+              order={editSixTeamOrder}
+              onChange={setEditSixTeamOrder}
+              disabled={updateTournament.isPending}
+              lockedReason={tournament.sixTeamDirectFinalOrderBlockedReason ?? null}
             />
           ) : null}
 

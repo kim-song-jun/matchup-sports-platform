@@ -487,7 +487,7 @@ function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team
           <div className="tm-text-label">가입 조건</div>
           <div className="tm-team-detail-info-grid">
             <InfoRow label="레벨" value={team.level} />
-            <InfoRow label="성별 조건" value={team.genderRule || '성별 미정'} />
+            <InfoRow label="성별 조건" value={team.genderRule || '성별 미설정'} />
             <InfoRow label="정원" value={capacity} />
             <InfoRow label="가입 신청" value={team.statusLabel} />
           </div>
@@ -1744,7 +1744,7 @@ function TeamFormPreview({
   const region = regionName || team.region || '지역 미정';
   const level = team.level.trim() || (editing ? '레벨 미설정' : '전체 레벨');
   const capacity = team.capacity ? `${team.capacity}명` : '정원 미정';
-  const gender = team.genderRule || '성별 무관';
+  const gender = team.genderRule || '성별 미설정';
   const intro = team.description.trim();
   const activity = formatActivityPreview(team);
   return (
@@ -2313,6 +2313,11 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
           </button>
         ))}
       </div>
+      {value ? null : (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
+          성별 조건을 선택해 주세요. 선택하지 않으면 대회·리그에 신청할 수 없어요.
+        </p>
+      )}
     </div>
   );
 }

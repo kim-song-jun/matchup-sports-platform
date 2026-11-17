@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { NoticeDetailPageClient } from '@/components/notices/notices-client';
 import { JsonLd } from '@/components/seo/json-ld';
+import { richContentPreviewText } from '@/lib/rich-content';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
 import { buildNoticeArticleLd } from '@/lib/structured-data';
 import type { V1NoticeResponse } from '@/types/api';
@@ -13,7 +14,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   return buildPublicMetadata({
     title: result.notice.title,
-    description: metadataDescription(result.notice.body, 'Teameet 공지사항을 확인하세요.'),
+    description: metadataDescription(
+      richContentPreviewText(result.notice.content, result.notice.body, ''),
+      'Teameet 공지사항을 확인하세요.',
+    ),
     path: `/notices/${id}`,
     type: 'article',
   });

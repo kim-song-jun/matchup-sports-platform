@@ -107,6 +107,17 @@ describe('buildMatchEventLd', () => {
     expect(buildMatchEventLd(onlineMatch, 'match-1')).toBeNull();
   });
 
+  it('제목에 적은 전화번호는 이벤트 이름에서 가리고, 번호가 없는 제목은 그대로 둔다', () => {
+    expect(buildMatchEventLd(match({ title: '토요일 풋살 문의 010-1234-5678' }), 'match-1')?.name)
+      .toBe('토요일 풋살 문의 ***-****-****');
+    expect(buildMatchEventLd(match({ title: '토요일 6:30 풋살 5vs5' }), 'match-1')?.name).toBe('토요일 6:30 풋살 5vs5');
+  });
+
+  it('줄바꿈으로 끊어 적은 전화번호도 이벤트 이름에서 가린다', () => {
+    expect(buildMatchEventLd(match({ title: '토요일 풋살 문의 010\n1234\n5678' }), 'match-1')?.name)
+      .toBe('토요일 풋살 문의 ***-****-****');
+  });
+
   it('지역을 모르면 구장 이름만 싣고, 지역 미정 문구를 주소로 만들지 않는다', () => {
     const ld = buildMatchEventLd(match({ region: null, regionName: null }), 'match-1');
 
@@ -129,6 +140,12 @@ describe('buildTeamMatchEventLd', () => {
       awayTeam: { '@type': 'SportsTeam', name: '강동 유나이티드' },
     });
     expect(ld).not.toHaveProperty('superEvent');
+  });
+
+  it('제목에 적은 전화번호는 팀매치 이벤트 이름에서도 가린다', () => {
+    expect(buildTeamMatchEventLd(teamMatch({ title: '송파 FC 친선전 연락 01012345678' }), 'tm-1')?.name)
+      .toBe('송파 FC 친선전 연락 ***-****-****');
+    expect(buildTeamMatchEventLd(teamMatch({ title: '송파 FC 친선전' }), 'tm-1')?.name).toBe('송파 FC 친선전');
   });
 
   it('팀 참조의 @id 가 팀 상세의 SportsTeam @id 와 같다 — 같은 팀이 두 엔티티로 쪼개지지 않는다', () => {

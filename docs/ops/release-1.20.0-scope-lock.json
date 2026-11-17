@@ -1,0 +1,57 @@
+{
+    "sourceSnapshotSha":  "7c288bd0985bd58beb68f7f72155107c0c58d377",
+    "mainBaselineSha":  "6675a8a00ec80b54af0674ebf366bfd7865c0d33",
+    "previousPreparationPr":  2356,
+    "includedFeaturePrs":  [
+                               2347,
+                               2350,
+                               2348,
+                               2351,
+                               2353,
+                               2364
+                           ],
+    "preservedMainHotfixPrs":  [
+                                   2355,
+                                   2362
+                               ],
+    "equivalentDevHotfixPrs":  [
+                                   2354,
+                                   2361
+                               ],
+    "candidateBranch":  "release/prepare-1.20.0-2364",
+    "manifestVersion":  "1.20.0",
+    "expectedResolvedStableVersion":  "1.20.1",
+    "allowedPostSnapshotPaths":  [
+                                     ".changeset/edit-assignment-time-court.md",
+                                     ".changeset/other-team-application-entry.md",
+                                     ".github/tasks/20261132-fixture-time-court-assignment.md",
+                                     ".github/tasks/20261133-production-release-1.18.0.md",
+                                     "apps/v1_api/CHANGELOG.md",
+                                     "apps/v1_api/package.json",
+                                     "apps/v1_web/CHANGELOG.md",
+                                     "apps/v1_web/package.json",
+                                     "docs/ops/release-1.20.0-scope-lock.json",
+                                     "docs/ops/release-readiness-1.20.0-2026-11-13.md",
+                                     "docs/scenarios/fixture-time-court-assignment.md",
+                                     "docs/scenarios/index.md",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after.json",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-court-1440.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-court-390.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-court-768.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-saved-1440.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-time-1440.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-time-390.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/after-time-768.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before.json",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-court-1440.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-court-390.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-court-768.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-time-1440.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-time-390.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/before-time-768.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/cleanup-cancelled-private.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/court-duplicate-390.png",
+                                     "docs/screenshots/assignment-edit-2364-20261113/time-duplicate-390.png"
+                                 ],
+    "policy":  "User explicitly included PR2364 and delegated this six-feature main PR/merge/production application in this session. Preserve both main hotfixes. No runtime/API/schema/migration/dependency/deploy/workflow changes after sourceSnapshotSha. Only listed version/Changeset/docs/evidence paths may differ; package.json version only. Freeze final candidate SHA; do not include future dev changes. User Copilot exception does not bypass CI, QA or branch/environment protections."
+}

@@ -1,0 +1,162 @@
+{
+  "phase": "after",
+  "origin": "https://alpha.teameet.co.kr",
+  "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+  "lifecycle": {
+    "nodePid": 4029,
+    "browserPid": 4054,
+    "parentPid": 4029
+  },
+  "checks": [
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 390,
+      "status": 200,
+      "release": "2f77a3c9a789fccf9822d6633d0f48280c2f38ef",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "network": [
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        },
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        }
+      ],
+      "screenshot": "bracket-390-top.png",
+      "passed": false
+    },
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 768,
+      "status": 200,
+      "release": "2f77a3c9a789fccf9822d6633d0f48280c2f38ef",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "network": [
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        },
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        }
+      ],
+      "screenshot": "bracket-768-top.png",
+      "passed": false
+    },
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 1440,
+      "status": 200,
+      "release": "2f77a3c9a789fccf9822d6633d0f48280c2f38ef",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "network": [
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        },
+        {
+          "path": "/tournaments/7f9517de-394a-433f-9525-f8639b830523/matches/a4ee396c-b2fd-5d91-8147-169bda9a4bc4",
+          "status": 404,
+          "page": "/home",
+          "resourceType": "fetch",
+          "referrer": "/home"
+        }
+      ],
+      "screenshot": "bracket-1440-top.png",
+      "passed": false
+    }
+  ],
+  "interactions": [
+    {
+      "name": "filtered-final-team-matches",
+      "width": 390,
+      "screenshot": "filtered-final-team-matches-390.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 390,
+      "passed": true
+    },
+    {
+      "name": "filtered-final-team-matches",
+      "width": 768,
+      "screenshot": "filtered-final-team-matches-768.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 768,
+      "passed": true
+    },
+    {
+      "name": "filtered-final-team-matches",
+      "width": 1440,
+      "screenshot": "filtered-final-team-matches-1440.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 1440,
+      "passed": true
+    }
+  ],
+  "closed": true,
+  "preservation": {
+    "status": "completed",
+    "originalFixtureIds": 70,
+    "officialScoresUnchanged": 70
+  },
+  "failure": "Alpha route evidence contains an HTTP, console, network, or viewport failure"
+}

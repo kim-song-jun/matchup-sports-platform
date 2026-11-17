@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { invalidMultiFinal, namedFinalSize } from './multi-finals-plan';
+import { invalidMultiFinal, namedFinalSize } from './multi-finals-definition';
 import type { NamedFinalDto } from './multi-finals.dto';
 
 export type SeedGroup = { id: string; ranks: string[] };

@@ -7,7 +7,8 @@
   apply는 기존 `previewHash`/`requestId` 필수. 확정 참가팀이 정확히6팀이며 중복 없는6자리 배정 필요.
   일반 v2 rollout flag와 별개로 위 조건이 게이트다. 일반6팀 템플릿과 결과 비교형6강은 별도 선택이다.
 - 생성: 6강3/준결승1/결승1, 정확히5개 TeamMatch/Game. V1Tournament.sixTeamBracket에 경기 식별자/진출 선택/직행 출처/기준 버전 저장.
-- `GET /admin/tournaments/:id/bracket/six-team`: active admin, state/results/teams/candidates/automaticBye/version 조회.
+- `GET /admin/tournaments/:id/bracket/six-team`: active admin, state/results/teams/candidates/automaticBye/directFinalOrder/version 조회.
+- 결승 직행 비교 순서(2026-11-11, MD-QA #186): `PATCH /admin/tournaments/:id` 의 `sixTeamDirectFinalOrder: string[] | null` — `goals_for`·`goal_difference`·`fewest_goals_against` 를 한 번씩(운영자 선택은 언제나 마지막이라 배열에 없다). 생략 = 유지, `null` = 기본(다득점 → 득실차 → 최소 실점, `null` 로 저장). 6강 방식이 아니면 `400 SIX_TEAM_ORDER_INVALID`, 6강 첫 세 경기 중 하나라도 공식 결과가 있으면 `409 SIX_TEAM_ORDER_LOCKED`(같은 순서 재전송은 허용). 관리자 상세는 `sixTeamDirectFinalOrder`(항상 3칸)·`sixTeamDirectFinalOrderBlockedReason`, 공개 상세는 6강 방식일 때 `sixTeamDirectFinalOrder`(아니면 `null`). 감사 `tournament.update` before/after 에 `sixTeamDirectFinalOrder`.
 - `PUT /admin/tournaments/:id/bracket/six-team`: mutation admin(owner/ops), `{version,reason,manual,bye?,swapSemi?,swapFinal?,winners:{[fixtureId]:registrationId}}`.
   사유 필수. winners는 각 경기 참가팀 내 선택, bye는6강 진출팀3팀 내 선택. 외부팀/중복/구버전 거절.
   `manual:false`는 직행 성적 자동 선정, winners override는 그대로 유지(각 경기 선택에서 공식 결과 따르기로 해제).
@@ -52,7 +53,7 @@ Task 20261122: `/tournament-management`는 디렉터 전용 담당 대회 목록
 | POST (suffix 없음) | 설정 + `previewHash` + `requestId` + 선택 `replaceExisting`, `acknowledgeRematches`. 실제 생성은 하나의 대회 잠금/트랜잭션 안에서 수행한다. |
 | GET `/requests/:requestId` | `{ completed, result }`. 감사 로그에 커밋된 생성 결과가 있으면 completed=true. false는 진행 중/미완료를 구분하지 않으며 동일 키로 재시도할 수 있다. |
 
-설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 짝수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수와 같아야 한다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
+설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 정수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수(4~64 정수)와 같아야 한다. 홀수 조도 실제 팀 간 경기만 생성하며 별도 휴식 경기는 만들지 않는다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
 
 배정 배열은 단독에서는 position(시드 번호) 순서, 조별에서는 조 배열과 조 안 자리 순서다. 제공 시 모든 자리에 서로 다른 confirmed 등록을 넣어야 한다. 생략하면 빈 골격을 생성한다. 조별 결선은 높은 조별 순위를 우선하여 부전승을 주며 동일 순위는 drawSeed로 추첨한다. 같은 조 분리는 128회 이내 결정적 탐색으로 개선하고, 첫 경기 재대결 가능성은 warnings로 알려 확인 후 생성한다.
 
@@ -411,7 +412,15 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 대회 형식 변경: 관리자 상세 응답의 `formatChangeBlockedReason`은 변경 가능하면 `null`, 제한 중이면 한국어 사유다. `PATCH /api/v1/admin/tournaments/:tournamentId`의 `format`은 `league` / `knockout` / `group_knockout`을 받으며, 참가 신청만 있으면 변경 가능하다. 조 또는 삭제되지 않은 경기가 있거나 상태가 `in_progress` / `completed`이면 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`로 거절한다. 같은 형식 재전송과 다른 정보 수정은 허용한다. 조/대진 생성과 같은 잠금 안에서 구조를 재검사하고 CAS로 저장하며 감사 로그의 before/after에 형식을 남긴다. 형식 변경은 대진을 자동 삭제·변환하지 않는다.
 
-동점일 때 순서(2026-11-07): `POST`·`PATCH /api/v1/admin/tournaments`의 `tieBreakOrder: string[] | null`은 정규 대회의 조별 순위 동점 순서다. 6칸 배열로 `points`가 처음, `seeded_draw`가 마지막이고 사이에 `head_to_head`·`goal_difference`·`goals_for`·`fair_play`를 한 번씩 놓는다(칸 구성이 틀리면 `400 TIE_BREAK_ORDER_INVALID`). 생략하면 생성은 기본 순서, 수정은 변경 없음이고 `null`은 기본 순서로 되돌린다. 기본 순서(`points, head_to_head, goal_difference, goals_for, fair_play, seeded_draw`)는 `null`로 저장하므로 순서를 안 건드린 대회와 같다. `head_to_head`는 앞 칸으로 이미 갈린 팀을 뺀 나머지 팀들끼리의 직접 경기(승점·득실·득점)로 가른다 — 승점 바로 다음 칸이면 승점이 같은 모든 팀의 맞대결 성적표다. 관리자 상세·생성 응답과 공개 상세(`GET /tournaments/:id`)는 지금 쓰는 순서를 `tieBreakOrder`(항상 6칸)로 싣는다. 정규 리그(`kind = regular_league`) 응답은 리그 고유 순서를 쓰므로 `null`이다. 관리자 상세의 `tieBreakOrderBlockedReason`은 바꿀 수 있으면 `null`, 예선(`phase = group`) 경기에 공식 결과가 하나라도 있으면 한국어 사유다. 그 상태에서 지금과 다른 순서를 보내면 `409 TIE_BREAK_ORDER_LOCKED`로 거절하고(같은 순서 재전송은 허용), 조/대진 변경과 같은 대회 잠금에 이 대회의 경기 행 잠금을 더해, 커밋 전인 결과 확정이 끝나길 기다린 뒤 한 번 더 검사한다. 순서가 바뀌면 감사 로그(`tournament.update`)의 before/after에 `tieBreakOrder`를 남긴다. 이 순서는 저장 순위(조별·통합)의 계산, 공개 「공동 n위」, 조별 진출 판정, N개 토너먼트의 동률 감지, 5개 조 12강 배정의 조 간 비교(득실차·다득점만)가 함께 쓴다 — 저장은 `v1_tournaments.tie_break_order`(JSONB)이며 공유 경기 규정 판은 건드리지 않는다.
+동점일 때 순서(2026-11-07): `POST`·`PATCH /api/v1/admin/tournaments`의 `tieBreakOrder: string[] | null`은 정규 대회의 조별 순위 동점 순서다. 7칸 배열로 `points`가 처음, `seeded_draw`가 마지막이고 사이에 `head_to_head`·`goal_difference`·`goals_for`·`fewest_goals_against`(최소 실점, 2026-11-11 MD-QA #186)·`fair_play`를 한 번씩 놓는다(칸 구성이 틀리면 `400 TIE_BREAK_ORDER_INVALID`). MD-QA #186 전의 6칸 배열(최소 실점 없음)도 받고, 추첨 바로 앞에 최소 실점을 넣은 7칸으로 저장한다 — 득실차·다득점 뒤라 순위는 바뀌지 않는다. 생략하면 생성은 기본 순서, 수정은 변경 없음이고 `null`은 기본 순서로 되돌린다. 기본 순서(`points, head_to_head, goal_difference, goals_for, fair_play, fewest_goals_against, seeded_draw`)는 `null`로 저장하므로 순서를 안 건드린 대회와 같다. `head_to_head`는 앞 칸으로 이미 갈린 팀을 뺀 나머지 팀들끼리의 직접 경기(승점·득실·득점)로 가른다 — 승점 바로 다음 칸이면 승점이 같은 모든 팀의 맞대결 성적표다. 관리자 상세·생성 응답과 공개 상세(`GET /tournaments/:id`)는 지금 쓰는 순서를 `tieBreakOrder`(항상 7칸, 저장돼 있던 6칸도 7칸으로 읽는다)로 싣는다. 정규 리그(`kind = regular_league`) 응답은 리그 고유 순서를 쓰므로 `null`이다. 관리자 상세의 `tieBreakOrderBlockedReason`은 바꿀 수 있으면 `null`, 대회 설정을 따르는 예선(`phase = group`) 경기에 공식 결과가 하나라도 있으면 한국어 사유다(2026-11-11부터 단계 설정이 있는 단계의 조는 제외). 그 상태에서 지금과 다른 순서를 보내면 `409 TIE_BREAK_ORDER_LOCKED`로 거절하고(같은 순서 재전송은 허용), 조/대진 변경과 같은 대회 잠금에 이 대회의 경기 행 잠금을 더해, 커밋 전인 결과 확정이 끝나길 기다린 뒤 한 번 더 검사한다. 순서가 바뀌면 감사 로그(`tournament.update`)의 before/after에 `tieBreakOrder`를 남긴다. 이 순서는 저장 순위(조별·통합)의 계산, 공개 「공동 n위」, 조별 진출 판정, N개 토너먼트의 동률 감지, 5개 조 12강 배정의 조 간 비교(득실차·다득점만)가 함께 쓴다 — 저장은 `v1_tournaments.tie_break_order`(JSONB)이며 공유 경기 규정 판은 건드리지 않는다.
+
+프리셋(2026-11-11, MD-QA #186): 어드민 화면은 프리셋 `head_to_head_first`(맞대결 우선, 기본값) · `goal_difference_first`(득실차 우선) · `goals_for_first`(다득점 우선) 중 하나를 고르거나 직접 순서를 정한다. API 는 언제나 순서 배열만 주고받는다 — 프리셋 정의는 `apps/v1_api/src/tournaments/competition-config/tournament-tie-break-presets.ts` 한 곳이고 웹 사본은 이 파일을 읽는 테스트로 대조한다.
+
+단계별 동점 순서(2026-11-11, MD-QA #186): 단계형 대회(`stagePlan` 이 있는 대회)는 풀리그 편성이 있는 단계마다 순서를 따로 둘 수 있다. 해석 순서는 단계 설정(`v1_tournament_stage_tie_break_settings`, 대회·단계 키당 한 행) → 대회 `tieBreakOrder` → 기본값이다.
+- `PUT /api/v1/admin/tournaments/:tournamentId/stages/:stageKey/tie-break-order`: 플랫폼 owner·ops 만(support·대회 디렉터는 `403 PERMISSION_DENIED`). 본문 `{ expectedRevision: number, order: string[] | null }` — `expectedRevision` 은 단계 구성의 `stagePlanRevision`, `order: null` 은 대회 설정 따름(행 삭제)이다. 응답 `{ revision, stageTieBreak }`. 같은 값 재전송은 아무것도 바꾸지 않는다(revision 그대로). 오류: 구버전 `409 STAGE_PLAN_STALE`, 그 단계 조별 경기에 공식 결과가 있으면 `409 TIE_BREAK_ORDER_LOCKED`, 없는 단계·토너먼트만 있는 단계 `422 STAGE_PLAN_INVALID`, 칸 구성 오류 `400 TIE_BREAK_ORDER_INVALID`. 대회 잠금 + 경기 행 잠금 뒤 다시 확인한다. 감사 `tournament.stage_tie_break.update` 의 before/after 에 `{ stageKey, inherit, order, resolvedOrder }`.
+- 관리자 상세(`GET /admin/tournaments/:id`)는 단계형 대회에 `stageTieBreak: { tournamentOrder, stages: [{ stageKey, stageName, ranked, order, resolvedOrder, lockedReason }] }` 를 싣는다(`ranked=false` 는 토너먼트만 있는 단계, `order=null` 은 대회 설정 따름).
+- 공개 상세(`GET /tournaments/:id`)는 단계형 대회에 `stageTieBreakOrders: { [stageKey]: string[] }`(풀리그 단계마다 실제로 쓰는 7칸 순서)를 싣는다.
+- 저장 순위 계산(결과 확정 자동 반영·어드민 재계산)·조별 순위 미리보기·공개 「공동 n위」·12강 교차 비교가 조의 `stageKey` 로 같은 순서를 쓴다.
 
 종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
 
@@ -564,7 +573,7 @@ The first two mean *the tournament changed while the request was in flight* — 
 
 Registration create and submit both require the team's current `sportId` to match the tournament `sportId`. A mismatch is rejected with `409 TEAM_SPORT_MISMATCH`; clients must only offer same-sport teams as new registration candidates. Submit repeats the check so a saved draft cannot bypass a later team or tournament sport change.
 
-A male-only (`genderCategory: 'male'`) or female-only (`'female'`) tournament or league takes only teams that have at least one **active** member whose profile gender is that gender **or** whose team gender setting (`V1TeamProfile.genderRule`: `'남'` for male, `'여'` for female) is that gender. Members without a profile gender do not count, and `'성별 무관'`, an unset setting or the other gender is not a match; the member count runs first and the team setting is read only when it finds nobody. Mixed and unset divisions are not checked. The check runs on registration create (new or reactivated registrations only — an existing registration is returned as before), on submit (re-checked under the tournament row lock) and on admin `confirm` (including promoting a waitlisted team; `decision: 'waitlist'` is not blocked). All three reject with `409 TEAM_GENDER_INELIGIBLE` and a message such as `여성부 대회는 팀 성별이 여성이거나 프로필 성별이 여성인 팀원이 있는 팀만 신청할 수 있어요.` (`참가할 수 있어요` for operator actions; leagues say `리그`). It is a team-level gate only: each player is still checked on roster add (`PLAYER_GENDER_MISMATCH`, so a team admitted by its team setting still cannot roster a member whose profile gender is empty), and an empty roster or a roster below `minPlayers` is still accepted at submit.
+Team admission uses only `V1TeamProfile.genderRule`: male divisions reject female teams (`여`), female divisions reject male teams (`남`), and every division rejects missing/unrecognized team gender settings. `성별 무관` teams (including stored aliases `무관`/`any`) may apply to every division; male and female teams may both apply to mixed/unset divisions. Member profile genders never override the team setting. Registration create (new/reactivated), submit under the tournament row lock, and admin confirm share this gate (`409 TEAM_GENDER_INELIGIBLE`); existing registrations remain readable and waitlist decisions are unchanged. Example: `여성부 대회에는 남성팀이 신청할 수 없어요.` Missing settings explain how to set the team gender. Leagues use `리그`, operator actions use `참가`. Individual roster eligibility, quotas, sport, deadlines, capacity and permissions remain unchanged; an empty roster or one below `minPlayers` is still accepted at submit.
 
 Registration uniqueness is `tournamentId + teamId`. If the database still has an older user-scoped or tournament-scoped unique index, creating another team registration may fail with `409 TOURNAMENT_REGISTRATION_UNIQUE_SCOPE_MISMATCH`; apply the v1 tournament registration team-unique migration before treating the API as ready.
 
@@ -959,7 +968,7 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 공개 `/tournaments/:id/bracket`의 순위·대진표는 `league_knockouts`에도 조별리그/결선 보기를 제공한다. 공개 상세의 `groups[].phase`, `standings`, `qualificationByTrack`, `bracketTrack`, `fixtures`를 그대로 사용하며 팀 미정 결선도 표시한다. 예선에 아직 팀·성적이 없으면 조별 영역을 유지하고 순위 행은 지어내지 않는다. 기존 대진 공개 시각·신원 가림 계약은 유지한다.
 
-결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다(다시 생성은 기존 슬롯을 `bracketTrack + phase + position` 으로 짝지어 이름이 달라도 기존 대진·일정을 지우지 않는다).
+결선 라운드 이름(2026-11-06): 부전승이 있는 첫 라운드는 틀 칸 수가 아니라 실제 팀 수로 부른다(12팀 `12강`, 6팀 `6강`, 짝수 6팀 이상이고 2의 제곱이 아닐 때만). 결선 그룹 이름(`프리미어 · 12강`)과 경기 `round` 값에 들어가고, 그룹 `phase`(round16·quarter…)는 틀 기준 그대로다 — 순서·시드 검증·단계별 경기 방식이 그 코드를 쓴다. 홀수 팀(5·7·9…)은 틀 기준 이름을 유지한다. 단 3팀 토너먼트의 첫 라운드(2·3위전, 1위는 부전승)는 `4강` 대신 `준결승`이다(2026-11-13, 그룹 `phase`는 `semi` 그대로). 이미 생성된 결선은 이름이 그대로라 대진 초기화 후 다시 만들어야 바뀐다(다시 생성은 기존 슬롯을 `bracketTrack + phase + position` 으로 짝지어 이름이 달라도 기존 대진·일정을 지우지 않는다).
 
 예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
 
@@ -970,7 +979,7 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 ### 토너먼트별 최종 순위와 공용 mock 계약 (2026-11-03)
 
-분리·이름 결선의 공개 결과 화면은 각 `groups[].bracketTrack` 안에서 공식 완료된 `final` 및 `third_place` 경기만 사용한다. 결승의 우승/준우승과 3·4위전의 3/4위를 각각 표시하며 정규 점수가 같으면 공식 승부차기 점수를 따른다. 표시용 round 이름이 달라도 group phase가 판정 기준이며 다른 토너먼트의 결과와 섞지 않는다.
+분리·이름 결선의 공개 결과 화면은 각 `groups[].bracketTrack` 안에서 공식 완료된 `final` 및 `third_place` 경기만 사용한다. 단 결승 이전 경기가 정확히 1개인 3팀 토너먼트(1위 부전승, 3·4위전 없음)는 그 준결승에서 진 팀을 3위로 함께 싣는다(웹 계산 — 응답 필드는 그대로). 4팀 이상 대진에 3·4위전이 없으면 3위 이하는 싣지 않는다. 결승의 우승/준우승과 3·4위전의 3/4위를 각각 표시하며 정규 점수가 같으면 공식 승부차기 점수를 따른다. 표시용 round 이름이 달라도 group phase가 판정 기준이며 다른 토너먼트의 결과와 섞지 않는다.
 
 공용 MSW의 named-finals fixture는 샘플 4팀·예선 2개 조로 이미 설정된 대회다. `named-finals-fixtures.ts`와 `named-finals-handlers.ts`가 시상 GET/PUT 및 공개 상세를 같은 상태로 제공하며 빈 배열 저장은 두 응답 모두 초기화한다. 실제 api-client wire 검증은 MSW 공용 등록을 사용해 실패 시 이전 상태 보존·권한·시상 범위·수동 명단·stale preview·중복 생성 재생을 확인한다. 미확정 순위는 성공으로 꾸미지 않고 409로 반환한다. 샘플에는 새 예선 생성이 없으며 setup은 실제 이미 설정된 대회처럼 409다. 이는 실제 DB/alpha QA를 대체하지 않는다.
 
@@ -1021,9 +1030,9 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
   registrationIds, candidates(자리별 가능한 팀), sourceVersion, standings, fixtureIds를 제공한다.
 - 서로 다른 단계에서 동일 참가팀이 다시 참가하는 것은 허용하며, 같은 단계의 편성 간 중복은 거부한다.
 - 이전 편성의 모든 공식 결과가 반영돼야 추천 후보를 반환한다. 동률은 후보 중 선택하고 reason이 필수다.
-  순위 출처 밖의 팀을 고르는 임의 override는 이 버전에서 지원하지 않는다.
+  순위 출처 밖 배정은 아래 명시적 `overrideCandidates` 계약으로만 허용한다.
 - expectedRevision/sourceVersion으로 409 STAGE_PLAN_STALE, 잘못된 구성/출처/팀은 422 STAGE_PLAN_INVALID,
-  시작/기록 있는 편성은 409 BRACKET_LOCKED, 일반 구조 편집 API를 통한 변경은 409 STAGE_MANAGEMENT_REQUIRED.
+  시작/기록 있는 편성은 409 BRACKET_LOCKED, 단계 전용 API를 거치지 않는 팀·구조 변경은 409 STAGE_MANAGEMENT_REQUIRED.
 - mutation은 competition advisory lock과 Game 행 순서 잠금으로 직렬화한다. 중복 클릭/구버전 재시도는409이며
   클라이언트는 GET으로 현재 확정 결과를 확인한다. 성공한 쓰기 결과의 조회도 같은 tx에서 수행한다.
 - 예선 결과 정정은 저장한 참가팀을 자동 교체하지 않는다. sourceVersion이 달라지면 stale로 표시하고
@@ -1054,3 +1063,67 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 ### 경기별 제목 수정 (2026-11-11)
 
 `PATCH /admin/fixtures/:fixtureId`의 `displayTitle`은 경기별 표시 제목(선택, nullable string, trim 후 최대120자)이다. 생략은 보존, null/빈 문구는 자동 제목 복원이다. 기존 관리자 쓰기 권한과 대회/경기 잠금·감사를 적용하고, 제목만 변경하면 팀·진출 연결·결과를 변경하지 않는다. `V1TournamentMatchDetails.displayTitle` (`v1_tournament_match_details.display_title`)에 저장하며 additive migration을 동반한다. 관리자 bracket·수정 응답과 공개 detail/schedule에 동일 값을 반환한다. 목록 수정창과 그림/모바일 편집은 같은 폼·PATCH 및 bracket query invalidation을 사용한다.
+
+## 대진 시간·구장 독립 배정 (2026-11-12)
+
+`league_knockouts`의 어드민 대진에서 시간/구장을 독립 배정한다. 실제 일정·장소·필드는 기존 `V1TeamMatch.startAt`, `fieldId`, 장소 스냅샷이 정본이다. 목록·그림·수동 편집·배정 패널은 기존 `GET /admin/tournaments/:id/bracket`을 읽으며 배정도 기존 `PATCH /admin/fixtures/:fixtureId`를 사용한다.
+
+| Method | Path | 계약 |
+|---|---|---|
+| GET | `/api/v1/admin/tournaments/:tournamentId/schedule-times` | `{ items: [{ id, tournamentId, scheduledAt, createdAt }] }`, scheduledAt 오름차순 |
+| POST | 같은 경로 | `{ scheduledAt: ISO8601-with-offset }` → `{ item }`. 기본 POST 201, 같은 instant 재요청도 같은 행 반환 |
+| PATCH | 같은 경로 | `{ expectedScheduleTimeId, expectedScheduledAt, scheduledAt, expectedFixtureIds? }`(둘 다 offset 포함 ISO8601) → `{ item, affectedFixtureCount }`. 항목과 같은 기존 시각에 배정된 경기·팀 일정을 한 트랜잭션에서 이동 |
+
+### 등록 항목 수정 (2026-11-13)
+
+- expectedScheduleTimeId는 편집 시작 시 조회한 preset UUID이며 필수다. preset 없이 경기에서 파생된 항목은 명시적으로 null과 당시 경기 UUID 목록 expectedFixtureIds(1개 이상)를 보낸다. 같은 이전 시각에 다른 preset이나 경기 그룹이 재생성됐어도 409 SCHEDULE_TIME_STALE로 거절한다. 저장 직전에 최신 ID로 덮어쓰거나 자동 재시도하지 않는다.
+
+- PATCH는 등록된 preset뿐 아니라 실제 경기에서 직접 입력한 시간 항목도 수정한다. 기존 preset ID는 유지하며 직접 입력 항목은 성공 시 새 preset을 저장한다. 새 시각이 같으면 데이터·감사를 추가하지 않는 no-op다.
+- 기존 시각에 더 이상 preset/경기가 없으면 `409 SCHEDULE_TIME_STALE`. 다른 preset 또는 경기에서 쓰는 새 시각은 `409 SCHEDULE_TIME_DUPLICATE`로 거절하며 자동 합치지 않는다. 클라이언트 자동 재시도는 하지 않으며 응답 유실/충돌 때 목록을 다시 조회한다.
+- 배정된 경기 중 SCHEDULED가 아닌 게임이 있으면 `409 SCHEDULE_TIME_FIXTURE_STARTED`로 전체 거절한다. 정본 게임이 없으면 `409 TOURNAMENT_MATCH_GAME_MISSING`. 기존 단계 순서 위반은 `FIXTURE_SCHEDULE_STAGE_ORDER`. Game → TeamMatch 잠금과 기존 대진 advisory lock을 사용하며 같은 시각 전체 이동의 최종 위치를 기준으로 순서를 검증한다.
+- 기존 정본 match updater로 경기 길이·팀 일정·명단 재계산 이벤트를 유지한다. fieldId/장소/팀/결과는 변경하지 않는다. 최종 `tournament.schedule_time.update` 감사 실패를 포함해 모두 rollback한다. 등록/수정 모두 같은 대회 잠금으로 직렬화한다. 조회/등록과 같은 auth/권한/format/DTO 검증을 적용한다.
+- 구장 이름 수정은 기존 `PATCH /api/v1/tournament-ops/tournaments/:id/fields/:fieldId`에 `{ expectedVersion, name, syncAssignedFixtures: true }`를 전달한다. 기존 플랫폼 구장 관리 권한과 버전·멱등 키·중복 이름 계약을 유지한다. 명시 flag가 있으면 같은 대회·fieldId의 미삭제 경기 placeName만 원자적으로 동기화하며 주소·좌표·시간과 fieldId는 보존한다. 감사에 반영 경기 수를 기록한다. flag 없는 기존 수정 동작은 유지된다.
+- UI는 사용자 선택 A안(항목 내부 입력/저장/취소)을 사용하고 배정 경기 수를 안내한다. 시간 수정은 대회 쓰기 권한, 등록 구장 이름은 기존 구장 관리 권한이 필요하다. 미등록 레거시 직접 입력 장소는 기존 개별 경기 편집을 사용한다. 서버 실패 시 draft를 유지하고, 저장 후 조회 실패는 별도 경고로 표시한다.
+- 공유 MSW는 정본 경기·팀 일정 저장소가 없는 시간 일괄 수정을 가짜 성공으로 만들지 않고 `503 SCHEDULE_TIME_EDIT_REQUIRES_REAL_API`로 명시한다. 컴포넌트 계약 테스트는 별도 stateful HTTP 핸들러로 실제 훅의 요청과 화면 반영·실패 보존을 검증한다. 구장 mock은 목록·연결된 fixture 장소·운영 보드 이름을 함께 갱신한다.
+
+- `V1AuthGuard` 인증 + 서비스 `getTournamentAdmin`(조회)/`getTournamentMutationAdmin`(등록). 활성 owner/ops는 쓰기, support는 조회, 배정된 활성 대회 총괄은 담당 대회만 허용한다. 철회/만료/타 대회는 `403 PERMISSION_DENIED`.
+- 대회 종류·미삭제·`format === league_knockouts` 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`, 다른 format은 409 `SCHEDULE_TIMES_FORMAT_UNSUPPORTED`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.
+- 신규 `V1TournamentScheduleTime`은 재사용 선택지만 저장한다. `(tournamentId, scheduledAt)` unique 및 createMany skipDuplicates로 동시 등록/응답 유실 재시도에도 중복을 만들지 않는다. 실제 새 행만 `tournament.schedule_time.create` 관리자/대회 감사에 기록한다. 시간 목록 등록은 기존 경기 시간을 바꾸지 않는다.
+- 시간 배정/해제는 `{ scheduledAt: ISO | null }`만 보내 fieldId/장소를 보존한다. 구장 배정은 `{ fieldId }`, 기존 직접 입력 장소는 `{ fieldId: null, venue, ...snapshot }`, 구장 해제는 `{ fieldId: null, venue: '' }`로 시간을 보존한다. 기존 경기 수정의 권한·필드 범위·단계/경기 상태 검사와 오류를 그대로 적용한다.
+- 구장 목록/등록은 기존 `/tournament-ops/tournaments/:id/fields`를 재사용한다. 필드 생성은 기존대로 플랫폼 운영자만, 배정은 owner/ops 및 담당 총괄이다. support/담당자에게 새로운 필드 등록 권한을 주지 않는다.
+- 패널은 저장된 시간 선택지와 실제 경기의 수동 입력 시간을 합쳐 표시한다. 구장도 등록 필드와 경기의 기존 장소 스냅샷을 표시하며 서로 다른 주소·좌표를 같은 이름만으로 합치지 않는다. 비활성/목록에서 빠진 필드는 기존 배정 조회·해제만 제공한다.
+- 날짜/시각 입력은 한국 시간이며 UTC ISO로 변환한다. 같은 시각에 여러 구장 진행은 허용한다. 동일 시간·동일 구장의 중복은 화면 경고(자동 차단/다른 경기 이동 없음). 저장 실패는 기존 배정 유지와 실제 원인을 표시한다. 저장 후 재조회 실패는 저장 성공 여부와 최신 조회 실패를 구분한다.
+- 각 시간/구장 제목의 접기/펼치기는 UI 상태만 변경한다. 경기 데이터·선택지·다른 배정을 변경하지 않는다. 실제 단일 경기 편집의 직접 입력은 유지한다. 새로고침 후에도 저장된 선택지와 실제 경기 값은 서버에서 복원한다.
+
+### 단계형 대회 운영 동등성 보완 — 2026-11-16
+
+이 절은 위 최초 버전의 제한을 확장한다. 기존 대회에 stagePlan을 자동 추가하지 않으며, 일반 대회 PATCH의 생성 후 구조 잠금도 유지한다. 전용 경로만 다음 작업을 허용한다. 모든 쓰기는 담당 대회 mutation 권한(owner/ops 또는 활성 디렉터), expectedRevision, 대회 advisory lock, 필요한 Game→TeamMatch 잠금, 트랜잭션 감사 로그를 사용한다.
+
+| 경로 | 본문과 결과 |
+|---|---|
+| PUT /admin/tournaments/:id/stages/names | expectedRevision, poolKey, name, stageName?, overallRankStart?(null=해제). 경기 ID·결과를 바꾸지 않는다. 개별 KO 라운드의 사용자 지정 이름은 보존한다. |
+| PUT /admin/tournaments/:id/stages/structure | expectedRevision, plan, reason. 모집 정원 유지. 방식·정원·회전·3위전·6강 방식이 바뀐 미시작 편성만 보관 후 생성한다. 변경하지 않은 편성의 경기 ID·일정·기록은 보존한다. 연결된 후속 편성이 시작했으면409. 변경한 편성의 배정·일정·경기별 설정은 다시 입력한다. |
+| POST /admin/tournaments/:id/stages/randomize | expectedRevision. 전체 확정 참가팀이 정원과 같고 첫 단계 모든 편성이 미시작일 때 암호학적 셔플 후 일괄 배정. 자리·경기 ID 보존. |
+| PUT /admin/tournaments/:id/stages/automation | expectedRevision, enabled. 자동 진출 설정 운영자도 저장하며 기존 초안·배정을 덮어쓰지 않는다. |
+| POST /admin/tournaments/:id/stages/fixtures/repair | expectedRevision, fixtureId, action(remove/restore/replay), reason. 미시작 경기 삭제·삭제 경기 복원·취소/VOID 재경기. 복원/재경기는 replacementId를 추가 반환한다. 옛 Game·이벤트·리비전은 보존하고 새 경기 ID를 사용한다. 다른 경기 ID·일정은 보존한다. 누락 경기가 있으면 편성 완료/자동 진출을 막는다. 진행된 후속 경기와 유효한 공식 결과는 보호한다. |
+| PUT /admin/tournaments/:id/stages/six-team | expectedRevision, poolKey, sourceVersion, byeRegistrationId?(null=자동), reason. 6강 공식 승자 3팀 중 결승 직행 결정. 결과 변경 후 수동 결정은 needsReview이며 새 사유로 확인한다. 시작한 후속 경기의 팀을 바꾸는 요청은409. |
+
+assignment 확장: registrationIds는 자리 수만큼의 (UUID|null) 목록이다. draft:true이면 미정 자리를 포함해 저장하지만 경기 시작은 금지된다. 확정은 전원 배정·중복 금지·공식 후보 검증을 유지한다. overrideCandidates:true는 별도 플랫폼 owner/ops 권한과 사유가 필수이고 디렉터/조회 스태프/참가자는 사용할 수 없다. 다른 단계의 재참가는 허용하되 같은 단계의 중복은 거부한다. 진출 확정 후 팀 owner/manager에게 tournament_finals_advanced 알림을 businessKey(대회·편성·등록)로 중복 방지해 발행한다. 알림 전달은 기존 NotificationsService의 커밋 후 best-effort 계약이다.
+
+자동 진출: autoAdvance:true인 새 구성 또는 automation 설정을 사용한다. 공식 결과 projection은 STAGE_AUTO_ADVANCE outbox를 원자적으로 발행하고, 별도 TOURNAMENT aggregate worker가 대회→경기 잠금 후 최신 공식 순위를 다시 읽는다. 모든 자리 후보가 한 팀으로 결정된 미배정 편성만 확정한다. 동률·미완료·stale·초안·기존 배정·시작한 편성은 대기한다. 한 작업은 최대 한 편성을 처리하고 후속 outbox로 이어가며 재처리는 기존 확정을 변경하지 않는다. worker는 GamesModule/RealtimeModule을 import하지 않는다. 6강 편성 내부 승자 비교는 autoAdvance(단계 사이 진출) 설정과 독립적으로 같은 durable 경로를 사용한다.
+
+구성 확장:
+- 6강 완료 판정은 모든 공식 결과뿐 아니라 최신 성적에 따른 실제 준결승·결승 참가팀 일치도 요구한다. 종료 후 성적 정정으로 진출팀이 달라지면 검토 전까지 완료·다음 단계 후보로 공개하지 않는다.
+- pool.thirdPlace:true: 4팀 이상 KO의 3·4위전 생성, 준결승 LOSER 연결, 공식3·4위 출처 허용.
+- pool.sixTeamFinalBye:true: 6팀 KO·3위전 없음. 첫3경기→준결승1경기→결승1경기. 승자3팀의 득점→득실차→최소실점으로 결승 직행을 비교하고 동률은 운영자가 결정한다. pool.sixTeamDirectFinalOrder는 goals_for·goal_difference·fewest_goals_against를 한 번씩 포함한 3칸 배열로 비교 순서를 바꾼다(생략 시 기본 순서). 후속 편성이 시작한 뒤의 변경은 거부한다. sourceVersion은 비교 순서도 포함하며 실제 후속 팀이 맞기 전에는 경기 시작을 막는다.
+- pool.seeding:cross_group_top_three: 4개 조 공식1~3위가 진출하는12팀 KO. 조1위4팀 부전승 및 최초 대결에서 같은 조 회피. 이 모드와 6강 모드의 고정 연결은 임의 bracket-sources 변경을 거부한다. 일반 KO 편성은 기존 bracket-sources 경로의 같은 track·바로 이전 round·미시작·중복 연결 검증을 재사용한다.
+- source.comparisonPoolKeys + comparisonPosition: 같은 이전 단계의 풀리그에서 같은 rank끼리 비교한다. poolKey는 비교 집합에 포함되어야 한다. 경기당 승점→득실차→득점→최소실점→페어플레이(모두 경기 수로 정규화)를 비교하고 최종 동률은 후보 전체를 반환한다. 직접 진출과 동일 출처를 중복 예약할 수 없다.
+- pool.overallRankStart: 마지막 편성만 전체 순위 구간을 명시할 수 있다. 리그 정원 또는 KO2위(3위전이면4위)까지의 구간이 정원 안에서 겹치면 안 된다. 예선 점수를 합산하지 않으며 최종 편성의 공식 순위를 구간에 매핑한다. 동률은 공동 순위를 유지한다. 20팀 템플릿은1~5/6~10/11~15/16~20위로 설정한다.
+
+경기 시간 PATCH /admin/tournaments/:id/periods는 stageKey 또는 poolKey를 추가 지원한다. phase/groupId/teamMatchId/stageKey/poolKey 중 하나만 보내며 expectedVersion은 대회 updatedAt이다. GET은 compositionOverrides[{scope:stage|pool,key,competitionConfigVersionId,periods}]를 추가한다. 우선순위는 경기→조→편성→구성 단계→기존 phase→대회 기본값. inheritDefault:true는 바로 위 설정으로 복원한다. 시작·이벤트·결과가 있는 경기와 별도 규칙에 고정된 경기는 옮기지 않는다. 대회 규칙 변경 시 구성 단계/편성 시간도 피리어드를 유지해 새 규칙에 재기반한다.
+
+표시·공개: 경기 제목/사이드명/번호와 조 이름은 기존 PATCH가 허용되며 팀 교체를 섞으면 거부한다. 관리자 그림/목록/모바일·공개/예약/취소·시간/구장 workspace를 유지하고 단계 배정은 전용 관리에서 수행한다. 일정은 실제 진출 출처의 전이 의존관계와 같은 KO 편성의 라운드 순서를 검사하며 무관한 편성의 시각으로 막지 않는다. 징계 경기 순서도 구성 단계 순서를 우선한다.
+
+공개 상세는 대진 공개 후에만 stageProgress[{poolKey,assigned,stale,complete,sixTeamBracket?}]를 반환한다. 내부 선택 사유·권한 주체·시간 버전 ID·스냅샷은 공개하지 않는다. 결과 화면은 완료 대회에서 마지막 단계를 기본으로 열고 stage/pool/team/round URL 선택, 편성별 우승 요약, 진출 순위 강조를 제공한다. 개인 기록 API의 stageKey/poolKey 필터는 public-records 계약을 따른다.
+
+실제 DB 검증은 test/tournaments/stage-plan.integration-spec.ts, 원래20팀 Alpha 증거와40개 비교 상태는 docs/scenarios/competition-stage-composition.md에 둔다. 새 JSON 옵션·수동 결정이 저장된 뒤에는 이를 지원하지 않는 API로 단순 롤백하지 말고 해당 지원 버전을 유지하거나 전진 수정한다. 이 변경은 기존 데이터를 자동 변환하거나 기존70경기 테스트 결과를 수정하지 않는다.

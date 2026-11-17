@@ -1,42 +1,14 @@
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { absoluteSiteUrl } from '@/lib/seo';
-import { absoluteImageUrl, organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
-import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
+import { organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 
 /**
  * 리그·대회 경기 단위 JSON-LD. `structured-data.ts` 와 같은 두 규약을 따른다 — 화면에 보이는 값만,
  * 엔티티는 전역 `@id` 로 연결. 팀은 팀 상세의 `…/teams/:id#team`, 대회는 대회 상세의
  * `…/tournaments/:id#event` 와 같은 `@id` 를 써서 검색엔진·LLM 이 같은 실체로 잇게 한다.
  */
-
-export function buildLeagueEventLd(
-  league: V1PublicLeagueDetail,
-  standings: V1LeagueStandingsResponse | null,
-): JsonLdNode {
-  const url = absoluteSiteUrl(`/tournaments/${league.leagueId}`);
-  const node: JsonLdNode = {
-    '@context': 'https://schema.org',
-    '@type': 'SportsEvent',
-    '@id': `${url}#event`,
-    name: league.title,
-    url,
-    startDate: league.startsOn,
-    endDate: league.endsOn,
-    eventStatus: 'https://schema.org/EventScheduled',
-    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    inLanguage: 'ko-KR',
-    organizer: { '@id': organizationId() },
-  };
-  // JSON-LD 는 metadataBase 가 상대 경로를 풀어 주지 않아 절대 URL 로 싣는다. 이미지가 없으면 키 자체를 넣지 않는다.
-  if (league.coverImageUrl) node.image = absoluteImageUrl(league.coverImageUrl);
-  // 순위표에 이름이 보이는 팀만 참가 팀으로 싣는다(대진 없는 준비 중 리그는 순위표가 비어 있다).
-  const competitors = (standings?.standings ?? [])
-    .map((row) => teamReference(row.teamId, row.teamName))
-    .filter((ref): ref is JsonLdNode => ref !== null);
-  if (competitors.length > 0) node.competitor = competitors;
-  return node;
-}
 
 /** schema.org 에 점수 필드가 없어 description 으로 싣는다 — 확정 결과만(진행 중·확정 전 점수는 인용되면 안 된다). */
 function officialScoreText(match: PublicMatchDetail, home: string, away: string): string | null {
@@ -47,18 +19,26 @@ function officialScoreText(match: PublicMatchDetail, home: string, away: string)
   return `최종 스코어 ${home} ${match.score.home} : ${match.score.away} ${away}${penalties}`;
 }
 
-export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null {
+/** `isRegularLeague` 는 canonical 을 정한 판정과 같은 값이어야 한다 — url 이 canonical 과 다른 주소를 가리키면 안 된다. */
+export function buildFixtureEventLd(
+  match: PublicMatchDetail,
+  { isRegularLeague }: { readonly isRegularLeague: boolean },
+): JsonLdNode | null {
   // SportsEvent 의 사실상 필수 필드. 일정 미정 경기에 가짜 날짜를 채우지 않는다.
   if (!match.scheduledAt) return null;
 
-  const url = absoluteSiteUrl(`/tournaments/${match.tournamentId}/matches/${match.fixtureId}`);
+  const url = absoluteSiteUrl(fixtureDetailHref({
+    isRegularLeague,
+    competitionId: match.tournamentId,
+    fixtureId: match.fixtureId,
+  }));
   const homeName = match.home?.teamName ?? '미정';
   const awayName = match.away?.teamName ?? '미정';
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     '@id': `${url}#event`,
-    name: `${homeName} vs ${awayName} | ${match.tournamentTitle} ${competitionMatchLabel(match)}`,
+    name: `${homeName} vs ${awayName} | ${match.tournamentTitle} ${competitionFixtureName(match)}`,
     url,
     startDate: match.scheduledAt,
     eventStatus: match.status === 'cancelled'

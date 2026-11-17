@@ -1,4 +1,5 @@
 'use client';
+import { RegisteredFixtureTimePicker } from '@/components/admin/bracket-canvas/fixture-time-picker';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { PeriodOverrideField, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 
@@ -49,6 +50,7 @@ const fieldClass =
  */
 export function LeagueFixtureScheduleModal({
   leagueId,
+  scheduleFixtures = [],
   fixture,
   defaultPlace,
   recentVenues,
@@ -61,6 +63,7 @@ export function LeagueFixtureScheduleModal({
   onClose,
 }: {
   leagueId: string;
+  scheduleFixtures?: readonly V1LeagueFixture[];
   fixture: V1LeagueFixture;
   defaultPlace: V1PlaceView | null;
   recentVenues?: ReadonlyArray<V1PlaceView>;
@@ -220,6 +223,9 @@ export function LeagueFixtureScheduleModal({
           </label>
           <input id={titleId} value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} className={fieldClass} />
         </div>
+        <RegisteredFixtureTimePicker tournamentId={leagueId} surface="league-matches" allowUnset={false}
+          fixtures={scheduleFixtures.map(item => ({ scheduledAt: item.startAt }))} value={startsAtLocal}
+          onChange={setStartsAtLocal} disabled={saving} />
         <div>
           <label htmlFor={startsAtId} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
             일시

@@ -60,6 +60,37 @@ describe('GET /notices/feed.xml', () => {
     expect(items[1].getElementsByTagName('pubDate')).toHaveLength(0);
   });
 
+  it('설명에는 이미지 자리표시를 싣지 않고, 이미지뿐인 공지는 제목으로 채운다', async () => {
+    fetchPublicV1.mockResolvedValue({
+      notices: [
+        { noticeId: 'n-1', title: '점검 안내', body: '[이미지: 11]\n12일 02:00~04:00 서비스 점검이 있어요.', publishedAt: null },
+        { noticeId: 'n-2', title: '포스터 공지', body: '[이미지: 12]\n[이미지: 13]\n[이미지: 14]', publishedAt: null },
+        {
+          noticeId: 'n-3',
+          title: '문서 공지',
+          body: '[이미지: 13]',
+          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '서식 문서로 쓴 본문이에요.' }] }] },
+          publishedAt: null,
+        },
+        { noticeId: 'n-4', title: '연락처 공지', body: '현장 문의는 010-1234-5678 로 연락 주세요.', publishedAt: null },
+        { noticeId: 'n-5', title: '문의 010-1234-5678 포스터', body: '[이미지: 15]', publishedAt: null },
+      ],
+    });
+
+    const xml = await (await GET()).text();
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const descriptions = [...doc.getElementsByTagName('item')].map((item) => item.getElementsByTagName('description')[0].textContent);
+
+    expect(xml).not.toContain('[이미지');
+    expect(descriptions).toEqual([
+      '12일 02:00~04:00 서비스 점검이 있어요.',
+      '포스터 공지',
+      '서식 문서로 쓴 본문이에요.',
+      '현장 문의는 ***-****-**** 로 연락 주세요.',
+      '문의 ***-****-**** 포스터',
+    ]);
+  });
+
   it('공지 API 가 실패하면 빈 피드 대신 오류로 끝난다', async () => {
     fetchPublicV1.mockRejectedValue(new Error('SEO metadata request failed: /notices (503)'));
     await expect(GET()).rejects.toThrow('/notices (503)');

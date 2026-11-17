@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { MemberBracketPreviewButton } from '@/components/admin/member-bracket-preview-button';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronRight, PhoneOff, Trash2 } from 'lucide-react';
@@ -313,6 +314,7 @@ export default function AdminUserDetailPage() {
         onClose={() => setReleaseOpen(false)}
       />
 
+      <MemberBracketPreviewButton userId={userId} enabled={user.accountStatus === 'active'} />
       <AdminToasts toasts={toasts} />
     </>
   );

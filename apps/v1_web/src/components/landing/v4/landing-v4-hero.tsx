@@ -27,6 +27,7 @@ function Headline() {
     <h1 id="hero-heading" className="tm-landing-hero-heading tm-landing-v4-heading">
       {HEADLINE.map((line, lineIndex) => (
         <span key={lineIndex} className="tm-landing-v4-line">
+          {lineIndex > 0 ? ' ' : null}
           {line.map((word, wordIndex) => (
             <span key={word.key}>
               {wordIndex > 0 ? ' ' : null}

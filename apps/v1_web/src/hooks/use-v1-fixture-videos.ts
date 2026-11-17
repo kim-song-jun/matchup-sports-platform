@@ -40,6 +40,8 @@ export interface TournamentVideoFixture {
   legNumber: number;
   /** 대회 영상 응답만 싣는다(조 밖이면 `null`) — 리그 영상 응답에는 조가 없어 빠진다. */
   groupName?: string | null;
+  /** 운영자가 정한 경기 제목. 없으면 `null` — 리그 영상 응답에는 빠진다. */
+  displayTitle?: string | null;
   scheduledAt: string | null;
   status: string;
   homeTeamName: string | null;

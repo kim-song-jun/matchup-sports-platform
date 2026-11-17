@@ -58,8 +58,6 @@ const kakaoProfile = (overrides: Partial<KakaoProfile> = {}): KakaoProfile => ({
   email: null,
   emailValid: false,
   emailVerified: false,
-  profileImageUrl: null,
-  nickname: null,
   signupPrefill: null,
   ...overrides,
 });

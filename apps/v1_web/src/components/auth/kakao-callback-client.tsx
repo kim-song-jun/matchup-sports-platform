@@ -12,7 +12,7 @@ import { consumeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { buildLinkResultPath, linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
 import { isUnlinkedLoginError, unlinkedLoginMessage } from '@/lib/login-method';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearSavedRedirectPath, getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { clearSavedRedirectPath, getSavedRedirectPath, hasStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { isSocialOnboardingRoute } from './auth.view-model';
@@ -23,18 +23,29 @@ function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
 }
 
+function loginPathFor(savedRedirect: string | null) {
+  return savedRedirect ? `/login?redirect=${encodeURIComponent(savedRedirect)}` : '/login';
+}
+
+// 카카오 동의 화면에서 취소했을 때(access_denied)와 JS SDK 가 10분 뒤 스스로 콜백으로 옮길 때(timeout)의 error 값.
+const KAKAO_CANCELLED_ERROR = 'access_denied';
+const KAKAO_TIMED_OUT_ERROR = 'timeout';
+
 export function KakaoCallbackClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const { mutate: linkKakao } = useV1LinkKakao();
   const calledRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+  // 오류를 세울 때 가려던 화면도 함께 잡아 둔다 — 다시 로그인해도 그 화면으로 돌아가게.
+  const [failure, setFailure] = useState<{ message: string; loginPath: string } | null>(null);
   const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     if (calledRef.current) return;
     calledRef.current = true;
+
+    const setError = (message: string) => setFailure({ message, loginPath: loginPathFor(getSavedRedirectPath()) });
 
     const code = searchParams.get('code');
     const providerError = searchParams.get('error');
@@ -49,12 +60,24 @@ export function KakaoCallbackClient() {
       const attempt = await consumeKakaoOAuthAttempt(returnedState);
       const returnTo = attempt?.returnTo ?? null;
 
+      // 카카오톡에 다녀오는 사이 다른 방법으로 이미 로그인했다면, 늦게 온 답(오류 포함)이 세션을 바꾸지 못하게 한다.
+      if (attempt?.mode === 'login' && hasStoredV1Session()) {
+        trackEvent('login_failed', { method: 'kakao', reason: 'already_signed_in' });
+        router.replace('/home');
+        return;
+      }
+
       if (providerError || !code) {
         if (attempt?.mode === 'link') {
           router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
           return;
         }
         trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
+        // 이 탭이 시작한 로그인의 답일 때만 취소로 본다. 그 밖의 error 는 그대로 오류 화면이다.
+        if (attempt?.mode === 'login' && (providerError === KAKAO_CANCELLED_ERROR || providerError === KAKAO_TIMED_OUT_ERROR)) {
+          router.replace(loginPathFor(getSavedRedirectPath()));
+          return;
+        }
         setError('카카오 로그인을 완료하지 못했어요.');
         return;
       }
@@ -144,14 +167,14 @@ export function KakaoCallbackClient() {
     })();
   }, [linkKakao, queryClient, router, searchParams]);
 
-  if (error) {
+  if (failure) {
     return (
-      <AuthFrame topTitle="카카오 로그인" backHref="/login" stage={AUTH_NOTICE_STAGE}>
+      <AuthFrame topTitle="카카오 로그인" backHref={failure.loginPath} stage={AUTH_NOTICE_STAGE}>
         <div className="tm-auth-body">
           <span className="tm-badge tm-badge-orange">로그인 오류</span>
           <h1 className="tm-text-heading tm-auth-heading">로그인을 완료하지 못했어요</h1>
-          <p className="tm-text-body tm-auth-sub">{error}</p>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login">
+          <p className="tm-text-body tm-auth-sub">{failure.message}</p>
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={failure.loginPath}>
             다시 로그인하기
           </Link>
         </div>

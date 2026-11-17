@@ -70,7 +70,7 @@ export function StagePlanManager({ tournamentId, canWrite, canOverride = false, 
     {pool?.sixTeamFinalBye && <StageSixTeamControl key={`six:${pool.key}:${view.revision}`} tournamentId={tournamentId} view={view} pool={pool} canWrite={editable} />}
     <StagePeriodSettings tournamentId={tournamentId} plan={view.config} canWrite={editable} />
     </div>
-    {editable && <div hidden={compactNavigation && panel !== 'structure'}><StageStructureEditor key={view.revision} tournamentId={tournamentId} view={view} /></div>}
+    {editable && <div hidden={compactNavigation && panel !== 'structure'}><StageStructureEditor key={`structure:${tournamentId}:${editorEpoch}`} tournamentId={tournamentId} view={view} /></div>}
     {ConfirmModal}
   </div>;
 }

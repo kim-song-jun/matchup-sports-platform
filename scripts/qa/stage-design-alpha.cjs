@@ -2,13 +2,14 @@
 const { chromium, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
-const { resumeEvidence, scrollContentToBottom } = require('./stage-design-evidence.cjs');
+const { EVIDENCE_VERSION, hasRequiredInteractions, resumeEvidence, scrollContentToBottom } = require('./stage-design-evidence.cjs');
 const origin = 'https://alpha.teameet.co.kr';
 const tournamentId = 'ee1675e5-264e-43ec-9a36-bd2f0a3099d9';
 const phase = process.argv.includes('--after') ? 'after' : 'before';
 const filterCaptures = process.argv.includes('--filter-captures');
 const bottomCaptures = process.argv.includes('--admin-bottom-captures');
 if (filterCaptures && bottomCaptures) throw Error('Choose one focused capture scope');
+const captureScope = filterCaptures ? 'filter' : bottomCaptures ? 'admin-bottom' : 'full';
 const destination = path.resolve('tmp/stage-design-alpha', filterCaptures ? 'filter-captures' : bottomCaptures ? 'admin-bottom-captures' : phase);
 const routes = [
   ['admin-create', '/admin/tournaments/new-staged'],
@@ -204,11 +205,11 @@ async function main() {
   const expectedCommit = expectedIndex < 0 ? undefined : process.argv[expectedIndex + 1];
   if (phase === 'after' && !/^[a-f0-9]{40}$/.test(expectedCommit ?? '')) throw Error('After evidence requires a full expected deployment SHA');
   const resumed = process.argv.includes('--resume') && fs.existsSync(path.join(destination, 'report.json'))
-    ? resumeEvidence(JSON.parse(fs.readFileSync(path.join(destination, 'report.json'), 'utf8')), { phase, origin, tournamentId, expectedCommit, routes }) : { checks: [], interactions: [] };
+    ? resumeEvidence(JSON.parse(fs.readFileSync(path.join(destination, 'report.json'), 'utf8')), { phase, origin, tournamentId, expectedCommit, routes, captureScope }) : { checks: [], interactions: [] };
   if (resumed.checks.some(check => !fs.existsSync(path.join(destination, check.screenshot)) || !fs.existsSync(path.join(destination, check.screenshot.replace('-top.png', '-bottom.png')))) || resumed.interactions.some(item => item.screenshot && !fs.existsSync(path.join(destination, item.screenshot)))) throw Error('Resume screenshot files are missing; run without --resume');
   const server = await chromium.launchServer({ headless: false, args: ['--disable-dev-shm-usage', '--disable-gpu', '--disable-quic'] });
   const browser = await chromium.connect(server.wsEndpoint());
-  const report = { evidenceVersion: 2, phase, origin, tournamentId, expectedCommit, lifecycle: { nodePid: process.pid, browserPid: server.process().pid, parentPid: process.pid }, checks: resumed.checks, interactions: resumed.interactions, loginDiagnostics: [], closed: false };
+  const report = { evidenceVersion: EVIDENCE_VERSION, captureScope, phase, origin, tournamentId, expectedCommit, lifecycle: { nodePid: process.pid, browserPid: server.process().pid, parentPid: process.pid }, checks: resumed.checks, interactions: resumed.interactions, loginDiagnostics: [], closed: false };
   console.log(JSON.stringify({ phase, browserPid: report.lifecycle.browserPid, headed: true }));
   try {
     for (const width of [390, 768, 1440]) {
@@ -277,6 +278,7 @@ async function main() {
       } finally { await context.close(); }
     }
     if (report.checks.length !== (filterCaptures ? 3 : bottomCaptures ? 9 : routes.length * 3)) throw Error('Route coverage is incomplete');
+    if (report.checks.some(check => !hasRequiredInteractions(check, report.interactions, { phase, captureScope }))) throw Error('Required route interactions are incomplete');
     if (phase === 'after' && [...report.checks, ...(report.references ?? [])].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
   } catch (error) { report.failure = error.message; throw error; }
   finally {

@@ -9,6 +9,10 @@
   animation: tm-open-in-app-banner-in var(--duration-slow) var(--ease-out) both;
 }
 
+.tm-open-in-app-banner > .tm-btn {
+  flex-shrink: 0;
+}
+
 .tm-open-in-app-banner-text {
   flex: 1;
   min-width: 0;
@@ -32,32 +36,18 @@
   color: var(--text);
 }
 
-/*
- * 셸 안(모바일·태블릿): 스크롤 영역은 상단바 아래에 절대 배치돼 높이가 확정이고, 채팅방·빈 목록처럼
- * 그 높이의 100% 를 쓰는 화면이 있다. 배너를 형제 요소로 흘리면 그 화면들이 배너 높이만큼 넘치므로,
- * 배너 자리를 스크롤 영역의 위쪽 여백으로 비우고 그 안에 절대 배치한다 — 콘텐츠와 함께 스크롤돼 사라진다.
- * 상단바는 44px 버튼 때문에 실제로 61px 이라 스크롤 영역 시작(56px)보다 5px 아래까지 덮는다 —
- * 배너를 5px 내려 놓고(top), 여백은 4px 격자에 맞춰 64px 로 둔다.
- */
+/* 배너와 본문의 시작점은 같은 실제 높이를 사용한다. 절대 배치는 콘텐츠와 함께
+ * 스크롤되며, 패딩 안에 배너 자리를 확보해 100% 높이 화면의 기준을 유지한다. */
 @media (max-width: 1023.98px) {
   .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
-    padding-top: 64px;
+    padding-top: var(--tm-open-in-app-banner-height, 56px);
   }
 
   .tm-scroll-area > .tm-open-in-app-banner {
     position: absolute;
-    top: 5px;
+    top: 0;
     left: 0;
     width: 100%;
-    height: 56px;
-  }
-
-  .tm-app-frame-no-topbar .tm-scroll-area:has(> .tm-open-in-app-banner):not(:has(.tm-chat-room)) {
-    padding-top: 56px;
-  }
-
-  .tm-app-frame-no-topbar .tm-scroll-area > .tm-open-in-app-banner {
-    top: 0;
   }
 }
 

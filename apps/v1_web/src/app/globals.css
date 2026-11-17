@@ -561,7 +561,8 @@ button:disabled {
 
 .tm-topbar {
   min-height: var(--v1-shell-topbar-height);
-  padding: 8px var(--v1-shell-topbar-x);
+  /* 44px controls + 8px padding + border fit the shared 56px scroll offset. */
+  padding: 4px var(--v1-shell-topbar-x);
   display: flex;
   align-items: center;
   justify-content: space-between;

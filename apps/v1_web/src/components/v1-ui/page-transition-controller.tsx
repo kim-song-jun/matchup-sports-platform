@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useNavigationIntent, type NavigationIntentKind } from './use-navigation-intent';
 
+const WRAPPER_SELECTOR = '.tm-page-transition-enter';
 const MAX_PENDING_MS = 150;
 // ↑ VT 콜백 프로미스가 pending인 동안 브라우저는 "old" 스냅샷을 정지 화면으로 보여준다
 //   (RouteProgressBar를 포함해 화면 전체가 그 순간엔 갱신되지 않는다 — app-motion-system.md §2.5).
@@ -15,7 +16,8 @@ const MAX_PENDING_MS = 150;
 
 /**
  * 라우트 전환 시 View Transitions API를 시작/종료하는 컨트롤러.
- * `useNavigationIntent`로 push/pop/tab을 판별해 `document.startViewTransition()`을 걸고,
+ * `useNavigationIntent`로 판별한 push/pop/native 이동에 `document.startViewTransition()`을 걸고
+ * (search·tab 은 kind 만 심고 전환을 걸지 않는다),
  * `template.tsx`가 새로 마운트되는 시점(pathname 변경 커밋)에 즉시 resolve한다 — 데이터
  * 도착까지 기다리면 "정지 화면"이 길어져 진행바까지 얼어붙는다(app-motion-system.md §2.5).
  * VT 미지원 환경(구형 Android WebView, iOS 16/17)에서는 `data-nav-kind`만 설정하고 그친다 —
@@ -30,6 +32,16 @@ export function PageTransitionController() {
   } | null>(null);
   const activeTransitionRef = useRef<ViewTransition | null>(null);
   const firstRender = useRef(true);
+  const oldWrapperTopRef = useRef(0);
+
+  // 데스크톱 push 는 옛 스냅샷을 누르기 전 자리에 두려고 옛·새 래퍼의 화면상 위쪽 위치 차이가 필요하다
+  // (globals.css 의 --tm-vt-old-shift). 새 화면은 스크롤·셸 머리·해시 이동에 따라 다른 자리에 놓인다.
+  const syncOldShift = () => {
+    const wrapper = document.querySelector(WRAPPER_SELECTOR);
+    if (!wrapper) return;
+    const shift = oldWrapperTopRef.current - wrapper.getBoundingClientRect().top;
+    document.documentElement.style.setProperty('--tm-vt-old-shift', `${shift}px`);
+  };
 
   const settlePending = (skip = false) => {
     const pending = pendingRef.current;
@@ -38,6 +50,7 @@ export function PageTransitionController() {
     if (pending.timeout) clearTimeout(pending.timeout);
     // 새 화면이 없는 timeout에는 old → old 애니메이션을 재생하지 않는다.
     if (skip) pending.transition?.skipTransition();
+    else syncOldShift();
     pending.resolve?.();
   };
 
@@ -63,8 +76,7 @@ export function PageTransitionController() {
     // 래퍼의 view-transition-name 은 이 표시가 있는 동안에만 붙는다(globals.css) — 상시로 두면
     // 래퍼가 스태킹 컨텍스트가 되어 페이지 안 시트가 셸 아래에 깔린다. old 스냅샷 캡처 전에 달아야 한다.
     document.documentElement.dataset.pageTransition = 'active';
-    // 데스크톱은 문서가 스크롤돼서 옛 화면 스냅샷이 스크롤 값만큼 위에 있다 — globals.css 가 이 값으로 제자리에 둔다.
-    document.documentElement.style.setProperty('--tm-vt-scroll-y', String(window.scrollY));
+    oldWrapperTopRef.current = document.querySelector(WRAPPER_SELECTOR)?.getBoundingClientRect().top ?? 0;
     const pending: NonNullable<typeof pendingRef.current> = {};
     pendingRef.current = pending;
     const transition = document.startViewTransition(
@@ -87,11 +99,14 @@ export function PageTransitionController() {
       if (activeTransitionRef.current !== transition) return;
       activeTransitionRef.current = null;
       delete document.documentElement.dataset.pageTransition;
-      document.documentElement.style.removeProperty('--tm-vt-scroll-y');
+      document.documentElement.style.removeProperty('--tm-vt-old-shift');
     };
     void transition.finished.then(release, release);
-    // skipTransition()은 ready를 reject할 수 있지만 navigation 실패는 아니다.
-    void transition.ready.catch(() => undefined);
+    // 새 스냅샷이 잡힌 뒤 위치가 더 바뀐 경우(해시 스크롤 등)를 다시 맞춘다. skipTransition()은 ready를
+    // reject할 수 있지만 navigation 실패는 아니다.
+    void transition.ready.then(() => {
+      if (activeTransitionRef.current === transition) syncOldShift();
+    }, () => undefined);
   };
 
   useNavigationIntent({ onIntent: beginTransition });

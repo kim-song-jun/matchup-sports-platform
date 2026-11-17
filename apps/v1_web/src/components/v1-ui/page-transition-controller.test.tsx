@@ -213,36 +213,63 @@ describe('PageTransitionController — 래퍼 이름 표시(data-page-transition
     expect(document.documentElement.dataset.pageTransition).toBeUndefined();
   });
 
-  // 데스크톱은 문서가 스크롤돼서 옛 스냅샷이 스크롤 값만큼 위에 있다 — globals.css 가 이 값으로 제자리에 둔다.
-  it('push 는 누른 순간의 스크롤 값을 --tm-vt-scroll-y 로 심고, 전환이 끝나면 뗀다', async () => {
-    Object.defineProperty(window, 'scrollY', { value: 1200, configurable: true });
-    try {
-      render(<PageTransitionController />);
-      clickAnchor('/tournaments/abc');
+  // 데스크톱 push 는 옛 스냅샷을 누르기 전 자리에 둔다 — globals.css 가 --tm-vt-old-shift(옛 래퍼 위치 − 새 래퍼
+  // 위치)만큼 옮긴다. 스크롤·셸 머리 유무·해시 이동으로 새 래퍼가 다른 자리에 놓여도 그 값이 맞아야 한다.
+  function mountWrapper(top: number) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tm-page-transition-enter';
+    wrapper.getBoundingClientRect = () => ({ top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) });
+    document.body.appendChild(wrapper);
+    return wrapper;
+  }
 
-      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('1200');
+  it('push 는 옛·새 래퍼의 위쪽 위치 차이를 --tm-vt-old-shift 로 심고, 전환이 끝나면 뗀다', async () => {
+    const oldWrapper = mountWrapper(-890);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
 
-      fakes[0].finish();
-      await fakes[0].finished;
-      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('');
-    } finally {
-      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
-    }
+    // 커밋: 옛 래퍼가 사라지고 셸 머리(88px)가 있는 새 화면의 래퍼가 152px 에 놓인다.
+    oldWrapper.remove();
+    mountWrapper(152);
+    route.pathname = '/tournaments/abc';
+    result.rerender(<PageTransitionController />);
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-1042px');
+
+    fakes[0].finish();
+    await fakes[0].finished;
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('');
   });
 
-  it('연타로 앞 전환이 skip 돼 끝나도 뒤 전환의 스크롤 값은 남는다', async () => {
-    Object.defineProperty(window, 'scrollY', { value: 300, configurable: true });
-    try {
-      render(<PageTransitionController />);
-      clickAnchor('/tournaments/abc');
-      Object.defineProperty(window, 'scrollY', { value: 700, configurable: true });
-      clickAnchor('/tournaments/def');
-      await fakes[0].finished;
+  it('새 스냅샷이 잡힌 뒤 새 래퍼가 더 움직이면(해시 스크롤) ready 시점에 다시 맞춘다', async () => {
+    const oldWrapper = mountWrapper(-211);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+    oldWrapper.remove();
+    mountWrapper(64);
+    route.pathname = '/tournaments/abc';
+    result.rerender(<PageTransitionController />);
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-275px');
 
-      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('700');
-    } finally {
-      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
-      document.documentElement.style.removeProperty('--tm-vt-scroll-y');
-    }
+    document.querySelector('.tm-page-transition-enter')!.getBoundingClientRect = () => ({ top: -945, bottom: -945, left: 0, right: 0, width: 0, height: 0, x: 0, y: -945, toJSON: () => ({}) });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('734px');
+  });
+
+  it('연타로 앞 전환이 skip 돼 끝나도 뒤 전환의 값은 남는다', async () => {
+    const oldWrapper = mountWrapper(-300);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+    clickAnchor('/tournaments/def');
+    oldWrapper.remove();
+    mountWrapper(64);
+    route.pathname = '/tournaments/def';
+    result.rerender(<PageTransitionController />);
+    await fakes[0].finished;
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-364px');
+    document.documentElement.style.removeProperty('--tm-vt-old-shift');
   });
 });

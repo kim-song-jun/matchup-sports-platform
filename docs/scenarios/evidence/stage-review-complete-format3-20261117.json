@@ -1,0 +1,1066 @@
+{
+  "evidenceVersion": 3,
+  "captureScope": "full",
+  "phase": "after",
+  "origin": "https://alpha.teameet.co.kr",
+  "tournamentId": "ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+  "expectedCommit": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+  "lifecycle": {
+    "nodePid": 17426,
+    "browserPid": 17445,
+    "parentPid": 17426
+  },
+  "checks": [
+    {
+      "name": "admin-create",
+      "route": "/admin/tournaments/new-staged",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/new-staged",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "단계형 대회 만들기",
+        "기본 정보"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-create-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 1208,
+          "max": 1208
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-awards",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-awards-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 1508,
+          "max": 1508
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "detail",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "detail-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 1922,
+          "max": 1922
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "bracket-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 4924,
+          "max": 4924
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 최종 결과",
+        "1위 리그",
+        "2위 리그",
+        "3위 리그",
+        "4위 리그"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "results-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 8298,
+          "max": 8298
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "awards",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 시상과 리뷰"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "awards-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 2126,
+          "max": 2126
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-create",
+      "route": "/admin/tournaments/new-staged",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/new-staged",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "단계형 대회 만들기",
+        "기본 정보"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-create-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 917,
+          "max": 917
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-awards",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-awards-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 1341,
+          "max": 1341
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "detail",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "detail-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 1991,
+          "max": 1991
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "bracket-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 4916,
+          "max": 4916
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 최종 결과",
+        "1위 리그",
+        "2위 리그",
+        "3위 리그",
+        "4위 리그"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "results-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 8282,
+          "max": 8282
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "awards",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 시상과 리뷰"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "awards-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 0,
+          "max": 0
+        },
+        {
+          "tag": "MAIN",
+          "id": null,
+          "before": 0,
+          "after": 2028,
+          "max": 2028
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-create",
+      "route": "/admin/tournaments/new-staged",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/new-staged",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "단계형 대회 만들기",
+        "기본 정보"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-create-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 860,
+          "max": 860
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-awards",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-awards-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 1189,
+          "max": 1189
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "detail",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "detail-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 2117,
+          "max": 2117
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 순위·대진표",
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "bracket-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 2923,
+          "max": 2923
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/results",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 최종 결과",
+        "1위 리그",
+        "2위 리그",
+        "3위 리그",
+        "4위 리그"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "results-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 5687,
+          "max": 5687
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "awards",
+      "route": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/awards",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116 시상과 리뷰"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "awards-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 2220,
+          "max": 2220
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 390,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 390,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-bracket-390-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 10695,
+          "max": 10695
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 768,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 768,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-bracket-768-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 2103,
+          "max": 2103
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "route": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "width": 1440,
+      "status": 200,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "url": "/admin/tournaments/ee1675e5-264e-43ec-9a36-bd2f0a3099d9/bracket",
+      "documentWidth": 1440,
+      "horizontalOverflow": 0,
+      "headings": [
+        "(테스트) sm 20teams ranked leagues 20261116"
+      ],
+      "console": [],
+      "network": [],
+      "screenshot": "admin-bracket-1440-top.png",
+      "scroll": [
+        {
+          "tag": "HTML",
+          "id": null,
+          "before": 0,
+          "after": 1943,
+          "max": 1943
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "interactions": [
+    {
+      "name": "create-20-team-editor",
+      "width": 390,
+      "screenshot": "create-20-team-editor-390.png",
+      "passed": true
+    },
+    {
+      "name": "filtered-final-team-matches",
+      "width": 390,
+      "screenshot": "filtered-final-team-matches-390.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 390,
+      "passed": true
+    },
+    {
+      "name": "final-league-results",
+      "width": 390,
+      "screenshot": "final-league-results-390.png",
+      "passed": true
+    },
+    {
+      "name": "create-20-team-editor",
+      "width": 768,
+      "screenshot": "create-20-team-editor-768.png",
+      "passed": true
+    },
+    {
+      "name": "filtered-final-team-matches",
+      "width": 768,
+      "screenshot": "filtered-final-team-matches-768.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 768,
+      "passed": true
+    },
+    {
+      "name": "final-league-results",
+      "width": 768,
+      "screenshot": "final-league-results-768.png",
+      "passed": true
+    },
+    {
+      "name": "create-20-team-editor",
+      "width": 1440,
+      "screenshot": "create-20-team-editor-1440.png",
+      "passed": true
+    },
+    {
+      "name": "filtered-final-team-matches",
+      "width": 1440,
+      "screenshot": "filtered-final-team-matches-1440.png",
+      "passed": true
+    },
+    {
+      "name": "match-detail-back-restores-filters",
+      "width": 1440,
+      "passed": true
+    },
+    {
+      "name": "final-league-results",
+      "width": 1440,
+      "screenshot": "final-league-results-1440.png",
+      "passed": true
+    },
+    {
+      "name": "admin-draft-preserved",
+      "width": 390,
+      "screenshot": "admin-draft-preserved-390.png",
+      "passed": true
+    },
+    {
+      "name": "drafts-survive-pool-switch",
+      "width": 390,
+      "displaySaveExercised": true,
+      "passed": true
+    },
+    {
+      "name": "owned-fixture-labels-restored",
+      "width": 390,
+      "passed": true
+    },
+    {
+      "name": "admin-stage-panel",
+      "width": 390,
+      "screenshot": "admin-stage-panel-390.png",
+      "passed": true
+    },
+    {
+      "name": "admin-period-scope",
+      "width": 390,
+      "screenshot": "admin-period-scope-390.png",
+      "passed": true
+    },
+    {
+      "name": "admin-draft-preserved",
+      "width": 768,
+      "screenshot": "admin-draft-preserved-768.png",
+      "passed": true
+    },
+    {
+      "name": "drafts-survive-pool-switch",
+      "width": 768,
+      "displaySaveExercised": false,
+      "passed": true
+    },
+    {
+      "name": "owned-fixture-labels-restored",
+      "width": 768,
+      "passed": true
+    },
+    {
+      "name": "admin-stage-panel",
+      "width": 768,
+      "screenshot": "admin-stage-panel-768.png",
+      "passed": true
+    },
+    {
+      "name": "admin-period-scope",
+      "width": 768,
+      "screenshot": "admin-period-scope-768.png",
+      "passed": true
+    },
+    {
+      "name": "admin-draft-preserved",
+      "width": 1440,
+      "screenshot": "admin-draft-preserved-1440.png",
+      "passed": true
+    },
+    {
+      "name": "drafts-survive-pool-switch",
+      "width": 1440,
+      "displaySaveExercised": false,
+      "passed": true
+    },
+    {
+      "name": "owned-fixture-labels-restored",
+      "width": 1440,
+      "passed": true
+    },
+    {
+      "name": "admin-stage-panel",
+      "width": 1440,
+      "screenshot": "admin-stage-panel-1440.png",
+      "passed": true
+    },
+    {
+      "name": "admin-period-scope",
+      "width": 1440,
+      "screenshot": "admin-period-scope-1440.png",
+      "passed": true
+    }
+  ],
+  "loginDiagnostics": [
+    {
+      "width": 390,
+      "console": [],
+      "network": []
+    },
+    {
+      "width": 768,
+      "console": [],
+      "network": []
+    },
+    {
+      "width": 1440,
+      "console": [],
+      "network": []
+    }
+  ],
+  "closed": true,
+  "preservation": {
+    "status": "completed",
+    "originalFixtureIds": 70,
+    "officialScoresUnchanged": 70
+  },
+  "referenceIds": {
+    "league_knockouts": "12b4f6d0-8daf-473a-8f8c-d5018d04d3a1",
+    "group_knockout": "7bb9cb67-375c-41cb-b54f-4d71434ad9d0"
+  },
+  "references": [
+    {
+      "name": "bracket",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-bracket-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/results",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-results-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "league_knockouts",
+      "route": "/admin/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-admin-bracket-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-bracket-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/results",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-results-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "group_knockout",
+      "route": "/admin/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 390,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-admin-bracket-390.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-bracket-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/results",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-results-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "league_knockouts",
+      "route": "/admin/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-admin-bracket-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-bracket-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/results",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-results-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "group_knockout",
+      "route": "/admin/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 768,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-admin-bracket-768.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-bracket-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "league_knockouts",
+      "route": "/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/results",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-results-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "league_knockouts",
+      "route": "/admin/tournaments/12b4f6d0-8daf-473a-8f8c-d5018d04d3a1/bracket",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-league_knockouts-admin-bracket-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "bracket",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-bracket-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "results",
+      "format": "group_knockout",
+      "route": "/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/results",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-results-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "name": "admin-bracket",
+      "format": "group_knockout",
+      "route": "/admin/tournaments/7bb9cb67-375c-41cb-b54f-4d71434ad9d0/bracket",
+      "width": 1440,
+      "release": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+      "status": 200,
+      "screenshot": "existing-group_knockout-admin-bracket-1440.png",
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    }
+  ],
+  "revalidation": {
+    "checkpointModification": "Removed admin-draft-preserved interaction records from the successful version3 checkpoint without changing SHA or passed screenshots",
+    "reusedTargetChecks": 18,
+    "reexecutedTargetChecks": 3,
+    "reexecutedReferenceChecks": 18,
+    "adminTopBottomDuplicatePairs": 0,
+    "initialReportUnavailable": "The initial full-run JSON and temporary checkpoint became unreadable (WSL filesystem EIO) after successful full and live resume QA. This retained final report contains the actual reused18/reexecuted3 records and lifecycle. No first-run JSON was reconstructed.",
+    "retainedCompleteCheckpoint": "stage-review-complete-format3-20261117.json",
+    "artifactIntegrity": "All78 PNG files were copied and byte-compared before temporary source files became unreadable; retained files also pass PNG signature/readability checks."
+  }
+}

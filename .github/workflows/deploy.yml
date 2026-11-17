@@ -188,6 +188,7 @@ jobs:
         run: |
           node scripts/qa/check-node-security.mjs
           node --test --test-concurrency=1 scripts/qa/check-node-security.test.mjs
+          bash scripts/qa/test-nodesource-integrity.sh
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

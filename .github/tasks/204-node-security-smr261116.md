@@ -51,3 +51,6 @@ https://nodejs.org/en/blog/release/v22.23.5 및 https://nodejs.org/en/blog/vulne
 - 로컬 전체 앱 빌드는 반복하지 않고 좁은 보안 계약과 CI를 사용한다.
 - 공식 Alpine/Bookworm digest 실행 결과 모두 v22.23.5. 패치된 Bookworm에서 보안 검사와 3개 계약 테스트 통과. 개발 PC 22.17.0은 실제 검사에서 거부됨.
 - DB guardrail 통과. production security guard는 Windows CRLF checkout에서 기존 KAKAO_ADMIN_KEY를 미탐하므로 LF committed-tree로 재검증한다(원본 compose에 키 존재 확인).
+- core.autocrlf=false archive의 Linux committed-tree에서 production security guard 통과.
+- Alpha 사전 실측: API·Web·worker 모두 v22.23.5. 고정 버전 회귀 방지 PR로 진행한다.
+- 보안 리뷰 지적에 따라 기존 remote curl-to-root 설치를 고정 커밋·SHA256 검증 후 실행으로 변경하고 변조 payload 차단 테스트 추가.

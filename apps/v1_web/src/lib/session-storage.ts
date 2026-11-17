@@ -224,11 +224,15 @@ export function getLoginPathForRedirect(target: string) {
 // 등)으로 이동해 쿼리가 사라진 뒤에도 "돌아가기" 목적지가 유지된다.
 // sessionStorage를 쓰는 이유는 탭을 닫으면 자연히 사라져야 하기 때문 —
 // 다른 대회의 admin 화면을 나중에 열었을 때 엉뚱한 출처가 남아있으면 안 된다.
+//
+// 출처는 **마지막으로 들어온 경로**가 이긴다. 담당 경기 목록(`staff`)과 운영 보드(`board`)는 같은
+// 사람이 둘 다 쓸 수 있어서(디렉터 + 필드 담당자), 목록으로 들어간 기록이 남아 있는 채로 운영 보드에서
+// 콘솔을 열면 바로 앞 화면이 아니라 가 본 적 없는 담당 경기 목록으로 돌아가던 문제가 있었다.
 const TOURNAMENT_OPS_ORIGIN_PREFIX = 'teameet.v1.tournamentOpsOrigin.';
 
-export type TournamentOpsOrigin = 'admin' | 'staff' | 'home';
+export type TournamentOpsOrigin = 'admin' | 'staff' | 'board' | 'home';
 
-export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin' | 'staff') {
+export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin' | 'staff' | 'board') {
   if (typeof window === 'undefined') return;
   window.sessionStorage.setItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`, origin);
 }
@@ -236,7 +240,7 @@ export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin' | 
 export function getTournamentOpsOrigin(tournamentId: string): TournamentOpsOrigin {
   if (typeof window === 'undefined') return 'home';
   const origin = window.sessionStorage.getItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`);
-  return origin === 'admin' || origin === 'staff' ? origin : 'home';
+  return origin === 'admin' || origin === 'staff' || origin === 'board' ? origin : 'home';
 }
 
 /**

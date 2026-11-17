@@ -70,6 +70,22 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
   });
 
+  // 디렉터 + 필드 담당자는 담당 경기 목록으로도, 운영 보드로도 콘솔에 들어간다. 보드에서 열었으면(`board`)
+  // 예전 담당 경기 진입 기록과 무관하게 바로 앞 화면인 보드로 돌아가야 한다.
+  it.each(['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR', 'SUPPORT_READONLY'] as const)('운영 보드에서 연 콘솔의 %s는 담당 경기 목록이 아니라 운영 보드로 돌아간다', (role) => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
+    render(<TournamentOpsShell tournamentId="t-1" role={role} origin="board"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '경기 목록으로 돌아가기' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+    expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it('보드 출처는 콘솔 밖 화면에서 직접 진입과 같이 다룬다', () => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/operations';
+    render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="board"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '서비스로 돌아가기' })).toHaveAttribute('href', '/home');
+    expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
   it('시트 배경이 앱 틀에 갇히지 않도록 전체 화면 표식을 단다', () => {
     const { container } = render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin"><div>content</div></TournamentOpsShell>);
     expect(container.firstElementChild).toHaveClass('tm-fullbleed-sheet-host');

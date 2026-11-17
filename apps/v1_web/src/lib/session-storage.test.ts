@@ -130,6 +130,14 @@ describe('tournament-ops 진입 출처 (T6-2)', () => {
     saveTournamentOpsOrigin('t-1', 'admin');
     expect(getTournamentOpsOrigin('t-2')).toBe('home');
   });
+
+  it('운영 보드(board)로 기록하면 그대로 조회되고, 마지막으로 기록한 출처가 이긴다', () => {
+    saveTournamentOpsOrigin('t-1', 'staff');
+    saveTournamentOpsOrigin('t-1', 'board');
+    expect(getTournamentOpsOrigin('t-1')).toBe('board');
+    saveTournamentOpsOrigin('t-1', 'staff');
+    expect(getTournamentOpsOrigin('t-1')).toBe('staff');
+  });
 });
 
 /**

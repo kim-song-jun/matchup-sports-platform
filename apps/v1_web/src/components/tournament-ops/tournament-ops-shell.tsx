@@ -217,7 +217,8 @@ function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: 
       label: '담당 경기 목록으로 돌아가기',
     };
   }
-  if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
+  // `board`(운영 보드에서 콘솔을 연 기록)는 경기 콘솔에서만 의미가 있다 — 콘솔 밖 화면에서는 직접 진입(`home`)과 같다.
+  if (origin === 'home' || origin === 'board') return { href: '/home', label: '서비스로 돌아가기' };
   // 종류를 알기 전에 대회 관리 링크를 그리면 리그 어드민이 그걸 눌러 열리지 않는 화면으로 간다.
   // `null`(옛 대회 행)까지 숨기면 그 대회들에서 링크가 영영 사라지므로 `undefined` 만 본다.
   if (kind === undefined) return null;

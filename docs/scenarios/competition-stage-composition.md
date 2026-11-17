@@ -1,13 +1,25 @@
 # 단계형 대회 구성
 
-Status: 추가 리뷰 P2 2건 보완 중 — 구성 초안 보존 및 필수 조작 증거 재개 검사
+Status: 추가 리뷰 P2 2건 보완 완료 — dev 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 PASS
 
 ## 2026-11-17 — 구성 초안·재개 조작 증거 보완
 
 - 추가 검토에서 구조 editor가 전체 revision으로 remount되어 다른 탭 이름 저장 시 구성·사유를 잃는 문제와, 같은 SHA의 성공 캡처만 있으면 필수 조작 기록 없이 재개되는 문제를 확인했다.
 - 구조 초안은 명시적 재조회 전까지 유지한다. 서버 revision/config 변경 시 미저장 입력을 남기고 저장을 차단하며, 확인 후 최신값을 불러온다. 깨끗한 editor는 서버 변경을 반영하고 저장은 자기 baseline revision으로 요청한다.
 - 증거 format3에서 full/filter/admin-bottom scope를 분리하고 route/viewport별 필수 조작·모바일 실제 이름 저장 기록을 요구한다. 누락/실패/다른 폭의 기록은 해당 화면을 재실행한다. 최종 성공 판정에도 같은 검사를 적용한다.
-- 검증 진행 중: 기존 완료 대회의39개 화면과 별개로 비공개20팀 초안 대회를 준비해 구성 탭을390/768/1440에서 확인한다. 원래70경기와20팀140계정은 보존한다.
+- 수정 [PR #2427](https://github.com/kim-song-jun/matchup-sports-platform/pull/2427) head832e3b33d의 Gates/API/Web PASS 후 dev2f5c166ff로 머지했다. 후속 PR #2424가 머지되며 이전 dev CI가 취소돼 해당 배포가 중단됐고, 수정을 포함한 최신 dev `dbea6a5f585ec2eff60d212e9fbf5036ab00ab61`의 전체CI·Alpha 배포 성공 후 아래를 검증했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지하며 clean으로 표시하지 않는다.
+- **42/42 PASS**: 별도 비공개20팀 초안의 구성 편집3개와 기존 대상21+두 형식 비교18개다. 구조 before3개에서 이름 저장 후 회전2→1·사유 소실을 재현했고, after3개에서 회전2/사유·details 유지, 충돌 저장 차단, 재조회 취소 보존, 확인 후 최신값, 깨끗한 editor의 이름 복원을 실제 UI로 검증했다. 원래20팀140계정·완료70경기는 유지했다.
+- 실 관리자 API로 별도 초안 `1fa13d46-ab8a-4760-9cdf-934fb48bc2aa`를 준비했고, 이후 조작은 실제 UI였다. 제목·draft·등록0/경기0을 확인했다. 대회 DELETE API가 없어 해당 초안은 비공개 재사용 fixture로 남겼다. 각 폭의 조작 뒤 새 GET으로 원래70 fixture ID·공식 점수·completed와 초안 구성 원복을 확인했다. 기존 완료 대회는 구성 탭이 숨겨져 이 새 회귀를 대신할 수 없다.
+- 실제 version3 전체 성공 체크포인트에서 `admin-draft-preserved` 기록만 제거했다. SHA/성공 캡처가 같아도 재사용은21→18개가 됐고, 실제 `--resume`이 관리자3개를 다시 조작했다. 나머지18개 대상은 보존하고 비교18개는 재촬영해 최종39/39를 확인했다. 첫 전체 실행과 최종 실행을 구별하며 중복 합산하지 않는다. 다른 SHA/측정 scope/format2 재개도 거절했다.
+- 최종 대상·비교39개의 HTTP200·console/network/문서 넘침0, 새 구조3개도 console/network/넘침0. 이번 로그인 진단도 세 폭 모두 오류0이었다. 이전 타 대회 홈 프리패치404 관찰은 아래 역사 증거로 유지하며 수정했다고 주장하지 않는다. 관리자 상/하단9쌍 중복0/9다.
+- [구조 before](./evidence/stage-structure-before-20261117.json), [구조 after](./evidence/stage-structure-after-20261117.json), [보존된 완료 체크포인트](./evidence/stage-review-complete-format3-20261117.json), [최종39개](./evidence/stage-design-after-20261116.json), [재개 검사](./evidence/stage-resume-final-guard-20261117.json). 구조 PNG9개는 `docs/screenshots/stage-structure-20261117/`, 기존 after78개도 갱신했다. 첫 전체 browser16802, 재개17445, 구조16466과 before15838 모두 종료했고 자격증명·쿠키는 저장하지 않았다. 최종 사진은 유지된18개 대상과 재검사3개·재촬영 비교18개의 출처를 report.revalidation으로 구분한다.
+- 증거 보관 한계: 검증 완료 후 WSL filesystem EIO로 최초 전체 실행 JSON과 임시 체크포인트를 다시 읽을 수 없게 됐다. 최종 성공 JSON과 PNG78개는 Windows 경로에 보존했으며, 복사 당시78개 바이트 일치와 보존 PNG의 읽기/형식을 확인했다. 실제 `--resume`의3개 관리자 재실행 및 종료 기록은 최종 report에 남았다. 재개 조건은 보존된 최종 체크포인트를 기준으로 다시21→18/다른SHA·scope·format 거절을 확인했다. 읽지 못한 최초 JSON을 복원·재구성했다고 주장하지 않는다.
+
+| 폭 | 직접 확인한 구성 화면 판정 |
+|---|---|
+| 390 | 사유·76경기 초안과 경고가 유지되고 두 버튼이 화면 안에 표시된다. 확인 재조회 뒤70경기·빈 사유로 복원되며 헤더/스크롤 겹침이 없다. |
+| 768 | 모달 폭·하단 버튼·경고문이 정상 배치되고, 재조회 전후 입력/저장 차단 상태가 일치한다. |
+| 1440 | 관리자 shell 안에서 모달과 본문 스크롤을 유지하며, 경고·최신값 복원 뒤 빈 공간/넘침이 없다. |
 
 ## 2026-11-17 — 리뷰3건 보완 완료
 
@@ -245,3 +257,7 @@ Cleanup: 이번 임시 SecureString 삭제(ParameterNotFound 확인), Alpha 컨�
 2026-11-17 로컬 보완 검증: 관리자 UI 회귀13/13, 증거 재개 검사9/9, Web TypeScript 및 v1 패턴 검사 PASS. 임시 의존성의 React/타입 연결 누락을 해결한 뒤 검사했다. Alpha 모바일 수정 전 초안 소실 재현을 확보했고 나머지 폭/배포 후 검증은 진행 중이다.
 
 수정 전 Alpha 실측 완료: 배포9f157aa571514fe4bc62c2104fd4f22a670d23a2, 390/768/1440 모두3/3에서 구성 회전2→1·사유 소실을 실제 이름 저장 후 재현. PNG3개와 stage-structure-before-20261117.json에 기록. 원래70경기·초안 서버 구성 복원 확인, console/network/가로 넘침0, 전용 브라우저15315 종료. 준비 중 잘못된 종목ID/선택자·저장 후 버튼 기대값을 교정했고, 중단된503·network-idle 대기는 성공 증거로 쓰지 않았다.
+
+PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN을 확인하고 dev2f5c166ffbab45f2dcfe8ffd7a5f50c39d3349bf로 머지했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지한다. Alpha matching-SHA 배포 후 구조3+기존39 화면을 검증하고 증거 PR로 마무리한다.
+
+구조 QA 보존 검사를 조작 종료 후 실제 GET으로 강화해 수정 전3/3을 재측정했다(브라우저15838 종료). 테스트 초안에 등록0·경기0도 확인했다. 초기 사전 조회 스냅샷 대신 실행 후 completed/70 fixture ID·공식 점수를 확인한 최신 before JSON으로 교체한다.

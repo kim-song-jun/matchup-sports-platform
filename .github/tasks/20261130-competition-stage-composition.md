@@ -1,6 +1,6 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: In Progress — 기존 동등성/화면39건 완료 후 리뷰 P2 2건(구성 초안·검증 재개 증거) 보완 및 Alpha 재검증
+Status: 추가 리뷰 완료 — P2 2건 dev PR #2427 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 통과
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
@@ -10,8 +10,10 @@ Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
 Owned: stage-plan-manager/structure-editor와 해당 테스트, stage-design QA 도구/검사, structure Alpha 증거, changeset 및 이 task/scenario/index. Forbidden: 다른 worktree/WIP, 기존20팀70경기 결과 변경, main 승격.
 - [x] 구성 editor의 revision key 제거, 초안 baseline/CAS 및 충돌 저장 차단·확인 재조회.
 - [x] 재개 format3 + full/filter/admin-bottom scope 분리, route/viewport별 필수 조작 검사.
-- [ ] UI 회귀·Web 타입/패턴·커밋 diff 검토 및 dev PR/CI/머지.
-- [ ] 별도 비공개20팀 초안 대회로 390/768/1440 실제 UI 재현/수정 검증·PNG, 원래70경기 보존 확인.
+- [x] UI 회귀13/13·재개9/9, Web 타입/패턴·커밋 diff 검토 및 dev PR #2427 전체CI/머지.
+- [x] 별도 비공개20팀 초안 대회로 390/768/1440 실제 UI 재현3/3→수정3/3·PNG9개, 원래70경기 보존 확인.
+- [x] Alpha dbea6a5f585ec2eff60d212e9fbf5036ab00ab61에서 기존39/39, 필수 조작 기록 제거 후 실제 --resume의 관리자3개 재검사 확인.
+최신 Progress Snapshot: #2427은2f5c166ff로 dev 머지됐다. 다른 PR #2424 후속 머지로2f5c CI가 취소돼 해당 Alpha job은 matching-CI gate에서 중단됐고, 수정을 포함한 최신 dbea6a5f5의 전체CI·Alpha 배포 성공 후 검증했다. 구조 before/after·필수 재개 조작·기존39 화면·원래70경기 모두 PASS. 증거는 시나리오 최신 절과 JSON을 따른다. 아래 최초 계획 체크리스트는 이번 P2 후속에서 새로 전 항목을 수행했다고 표시하지 않는다.
 Ambiguity: 완료 대회는 구성 탭이 없어 기존39개 화면만으로 해당 결함을 증명할 수 없다. 실 API로 별도 초안 fixture를 준비하고 실제 UI로 조작한다. 대회 DELETE API가 없어 비공개 재사용 초안으로 보존하며 선수/경기는 만들지 않는다.
 
 사용자는 정규리그 + N개 토너먼트와 기존 조별리그 + 토너먼트의 통합을 검토하며,
@@ -162,7 +164,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 공유 훅·타입·MSW·schema는 한 작업 단위에서 소유해 계약 드리프트를 막는다. PR마다 exact file scope를 명시한다.
 - Forbidden: 실제 사용자 대회 변환/시드·reset, 독립 리그 시즌 정책 변경, 무관한 WIP, 운영 main 승격.
 
-## Test Scenarios
+## Test Scenarios (최초 계획 체크리스트)
 - [ ] S1: 20팀, 예선5×6=30경기/본선4×10=40경기, 팀당7경기, 각 단계에 팀 정확히 한 번 등장.
 - [ ] S2: 3단계와 리그/토너먼트 혼합, 단일 단계 리그/토너먼트, 다른 조 수·홀수 팀·1/2회전.
 - [ ] 예선 승점이 본선에 섞이지 않음, 단계별 순위와 개인 대회 누적 기록의 중복 집계 없음.
@@ -177,9 +179,9 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - [ ] Alpha 실제 운영자·담당 디렉터·조회 스태프·참가팀·비로그인 각 권한 흐름.
 - [ ] 390/768/1440에서 초안 저장→예선 진행→진출 확정→본선 진행→공개 결과, console/network와 before/after 갤러리.
 - [ ] 생성량 상한과 초과 거절·성능, 불필요한 전체 suite 반복 없이 단계별 좁은 검증.
-실행 시나리오는 Phase 0에서 docs/scenarios에 작성하고 index에 Planning으로 등록한다. 이번에는 미실행.
+최초 계획 시점에는 미실행이었다. 현재 실행 범위·성공·한계는 `docs/scenarios/competition-stage-composition.md`의 최신 절과 원본 증거를 기준으로 판정한다.
 
-## Acceptance Criteria
+## Acceptance Criteria (최초 계획 체크리스트)
 - [ ] Original Conditions와 S1/S2 모두 충족. 특정 조 수/단계 이름 하드코딩 없음.
 - [ ] 사용자 UI 선택 후 구현, schema/API/hook/fixture 계약 동기화.
 - [ ] 참가·순위·진출·공개·시상 범위가 단계/편성 ID로 일치.
@@ -266,3 +268,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 2026-11-17 로컬 보완 검증: 관리자 UI 회귀13/13, 증거 재개 검사9/9, Web TypeScript 및 v1 패턴 검사 PASS. 임시 의존성의 React/타입 연결 누락을 해결한 뒤 검사했다. Alpha 모바일 수정 전 초안 소실 재현을 확보했고 나머지 폭/배포 후 검증은 진행 중이다.
 
 수정 전 Alpha 실측 완료: 배포9f157aa571514fe4bc62c2104fd4f22a670d23a2, 390/768/1440 모두3/3에서 구성 회전2→1·사유 소실을 실제 이름 저장 후 재현. PNG3개와 stage-structure-before-20261117.json에 기록. 원래70경기·초안 서버 구성 복원 확인, console/network/가로 넘침0, 전용 브라우저15315 종료. 준비 중 잘못된 종목ID/선택자·저장 후 버튼 기대값을 교정했고, 중단된503·network-idle 대기는 성공 증거로 쓰지 않았다.
+
+PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN을 확인하고 dev2f5c166ffbab45f2dcfe8ffd7a5f50c39d3349bf로 머지했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지한다. Alpha matching-SHA 배포 후 구조3+기존39 화면을 검증하고 증거 PR로 마무리한다.
+
+구조 QA 보존 검사를 조작 종료 후 실제 GET으로 강화해 수정 전3/3을 재측정했다(브라우저15838 종료). 테스트 초안에 등록0·경기0도 확인했다. 초기 사전 조회 스냅샷 대신 실행 후 completed/70 fixture ID·공식 점수를 확인한 최신 before JSON으로 교체한다.

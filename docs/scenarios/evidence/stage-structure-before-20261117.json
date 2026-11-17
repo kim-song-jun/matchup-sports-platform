@@ -2,9 +2,9 @@
   "expectedCommit": "9f157aa571514fe4bc62c2104fd4f22a670d23a2",
   "phase": "before",
   "lifecycle": {
-    "nodePid": 15294,
-    "browserPid": 15315,
-    "parentPid": 15294
+    "nodePid": 15820,
+    "browserPid": 15838,
+    "parentPid": 15820
   },
   "setup": "real admin API; all draft/conflict/reload actions use UI",
   "checks": [

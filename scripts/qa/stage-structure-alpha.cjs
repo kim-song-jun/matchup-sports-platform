@@ -42,7 +42,6 @@ async function main() {
         sessionState = await context.storageState();
         }
         await page.close(); page = await context.newPage();
-        const original = await json(await context.request.get(`${origin}/api/v1/tournaments/${originalId}`));
         let fixture;
         if (fs.existsSync(fixturePath)) fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
         else {
@@ -72,6 +71,8 @@ async function main() {
         await page.waitForTimeout(1500);
         const apiPath = `${origin}/api/v1/admin/tournaments/${fixture.id}/stages`;
         const initial = await json(await context.request.get(apiPath));
+        expect(initial.registrations).toHaveLength(0);
+        expect(initial.pools.every(pool => pool.fixtureIds.length === 0)).toBe(true);
         const initialConfig = JSON.stringify(initial.config);
         const pool = initial.config.stages[0].pools[0];
         await dialog.getByRole('tab', { name: '구성 수정' }).click();
@@ -128,11 +129,18 @@ async function main() {
           await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
           await page.waitForTimeout(1500);
           expect(JSON.stringify((await json(await context.request.get(apiPath))).config)).toBe(initialConfig);
+          if (!before && report.checks.at(-1)?.width === width) {
+            await dialog.getByRole('tab', { name: '구성 수정' }).click();
+            await expect(structure.getByLabel('편성 이름', { exact: true }).first()).toHaveValue(pool.name);
+            await expect(structure.getByText(/작성 중인 구성과 사유는 보존/)).toHaveCount(0);
+            report.checks.at(-1).cleanEditorSynced = true;
+          }
         }
         const evidence = JSON.parse(fs.readFileSync('docs/scenarios/evidence/sm-ranked-leagues-20261116.json', 'utf8'));
-        expect(original.fixtures).toHaveLength(70);
+        const preserved = await json(await context.request.get(`${origin}/api/v1/tournaments/${originalId}`));
+        expect(preserved.status).toBe('completed'); expect(preserved.fixtures).toHaveLength(70);
         for (const game of evidence.games) {
-          const current = original.fixtures.find(item => item.id === game.fixtureId);
+          const current = preserved.fixtures.find(item => item.id === game.fixtureId);
           expect(current?.result?.homeScore).toBe(game.homeScore); expect(current?.result?.awayScore).toBe(game.awayScore);
         }
         const check = report.checks.at(-1);

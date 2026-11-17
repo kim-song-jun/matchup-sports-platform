@@ -6,6 +6,7 @@ const usersQueryMock = vi.fn();
 
 // 딥링크 값을 테스트마다 바꿔야 해서 변수로 뺀다(기본값은 기존과 동일).
 const search = vi.hoisted(() => ({ query: 'status=active' }));
+const listItems = vi.hoisted(() => ({ rows: [] as Array<Record<string, unknown>> }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.query),
@@ -19,8 +20,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
     usersQueryMock(filters);
     return {
       data: {
-        items: [],
-        pageInfo: { page: 1, totalPages: 1, total: 0, limit: 20 },
+        items: listItems.rows,
+        pageInfo: { page: 1, totalPages: 1, total: listItems.rows.length, limit: 20 },
         summary: { total: 0, byStatus: {} },
       },
       isPending: false,
@@ -51,7 +52,7 @@ describe('AdminUsersPage — useAdminListQuery 배선', () => {
       expect.objectContaining({ status: 'active', page: 1, limit: 20 }),
     );
 
-    fireEvent.change(screen.getByLabelText('닉네임·이메일 검색'), {
+    fireEvent.change(screen.getByLabelText('닉네임·이메일·전화번호 검색'), {
       target: { value: '  kim ' },
     });
     // debounce(300ms) 전에는 q가 나가지 않는다
@@ -96,5 +97,47 @@ describe('AdminUsersPage — status 딥링크 검증', () => {
 
     const filters = usersQueryMock.mock.calls[0][0] as { status?: string };
     expect(filters.status).toBe('blocked');
+  });
+});
+
+describe('AdminUsersPage — 회원 칸 실명 표기', () => {
+  const baseRow = {
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+    authProviders: ['email'],
+    gender: 'male',
+    lastLoginAt: null,
+    createdAt: '2026-11-16T00:00:00.000Z',
+    hostedMatchCount: 0,
+    ownedTeamCount: 0,
+    membershipCount: 0,
+    adminRole: null,
+  };
+
+  beforeEach(() => {
+    search.query = 'status=active';
+    listItems.rows = [
+      { ...baseRow, userId: 'u-named', nickname: '닉네임A', displayName: '테스트회원', realName: '테스트회원', email: 'a@example.test' },
+      { ...baseRow, userId: 'u-anon', nickname: '닉네임B', displayName: null, realName: null, email: 'b@example.test' },
+    ];
+  });
+
+  afterEach(() => {
+    listItems.rows = [];
+  });
+
+  it('실명이 있으면 닉네임 옆 괄호에 보여주고, 없으면 닉네임만 보여준다(이메일 줄은 그대로)', () => {
+    render(<AdminUsersPage />);
+
+    expect(screen.getAllByText('닉네임A (테스트회원)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('닉네임B').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/닉네임B \(/)).toBeNull();
+    expect(screen.getAllByText('a@example.test').length).toBeGreaterThan(0);
+  });
+
+  it('검색창 placeholder 가 전화번호 검색을 안내한다', () => {
+    render(<AdminUsersPage />);
+
+    expect(screen.getAllByPlaceholderText('닉네임·이메일·전화번호 검색').length).toBeGreaterThan(0);
   });
 });

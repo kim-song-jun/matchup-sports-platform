@@ -489,6 +489,17 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
     expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'staff');
   });
 
+  it('운영 보드에서 연 콘솔(?from=board)은 이전 담당 경기 진입(staff) 기록을 덮어쓰고 유지된다 — 마지막 진입 경로가 이긴다', () => {
+    window.sessionStorage.setItem('teameet.v1.tournamentOpsOrigin.t-1', 'staff');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=board'));
+    const { rerender } = render(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'board');
+    expect(window.sessionStorage.getItem('teameet.v1.tournamentOpsOrigin.t-1')).toBe('board');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    rerender(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'board');
+  });
+
   it('?from=admin이면 origin="admin"으로 셸에 전달하고 sessionStorage에 기록한다', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=admin'));
     render(

@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AdminUserListQueryDto } from './dto/admin.dto';
-import { signupStage } from './admin-user-filters';
+import { phoneSearchDigits, signupStage } from './admin-user-filters';
 
 describe('admin member signup classification', () => {
   const profile = { nickname: 'member', deletedAt: null };
@@ -38,5 +38,21 @@ describe('admin member filter DTO', () => {
     { providers: ['email', 'kakao', 'apple', 'email'] },
   ])('rejects invalid filters %j', async (values) => {
     expect((await validate(plainToInstance(AdminUserListQueryDto, values))).length).toBeGreaterThan(0);
+  });
+});
+
+describe('admin member phone search digits', () => {
+  it.each([
+    ['010-0000-1234', '01000001234'],
+    ['01000001234', '01000001234'],
+    [' 010 0000 1234 ', '01000001234'],
+    ['0000-1234', '00001234'],
+    ['1234', '1234'],
+  ])('%s -> %s', (q, expected) => {
+    expect(phoneSearchDigits(q)).toBe(expected);
+  });
+
+  it.each(['123', '', '길동', 'user1234', 'a@b.c', '010-abcd-1234'])('%s is not a phone query', (q) => {
+    expect(phoneSearchDigits(q)).toBeNull();
   });
 });

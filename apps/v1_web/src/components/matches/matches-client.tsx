@@ -451,7 +451,7 @@ function MatchApplyDialog({ open, message, error, pending, onMessageChange, onCl
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" style={{ background: 'rgba(25,31,40,0.45)' }} onClick={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" style={{ background: 'rgba(25,31,40,0.45)', paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }} onClick={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="match-apply-title" className="w-full max-w-[420px] rounded-2xl" style={{ background: 'var(--surface, #fff)', padding: 24 }}>
         <h2 id="match-apply-title" className="tm-text-subhead" style={{ margin: 0 }}>참가 신청</h2>
         <p className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)' }}>호스트가 신청자와 메시지를 확인한 뒤 참가를 승인해요.</p>

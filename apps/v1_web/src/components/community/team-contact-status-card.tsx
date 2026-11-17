@@ -319,7 +319,7 @@ function ReportContactDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)' }}
+      style={{ background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)', paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }}
       onClick={onBackdropClick}
     >
       <div

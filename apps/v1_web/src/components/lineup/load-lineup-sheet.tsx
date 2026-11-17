@@ -126,6 +126,7 @@ export function LoadLineupSheet({
           background: 'var(--card-surface)',
           boxShadow: '0 8px 32px rgba(20,28,45,0.14)',
           maxHeight: '80vh',
+          paddingBottom: 'var(--v1-shell-safe-bottom, 0px)',
           display: 'flex',
           flexDirection: 'column',
         }}

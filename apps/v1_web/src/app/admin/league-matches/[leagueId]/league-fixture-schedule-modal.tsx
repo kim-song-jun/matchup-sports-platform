@@ -182,7 +182,7 @@ export function LeagueFixtureScheduleModal({
         role="dialog"
         aria-modal="true"
         aria-label="경기 수정"
-        className="flex max-h-[90vh] w-full max-w-[440px] flex-col gap-4 overflow-y-auto rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
+        className="flex max-h-[90vh] w-full max-w-[440px] flex-col gap-4 overflow-y-auto rounded-t-2xl bg-[var(--card-surface)] p-5 pb-[calc(1.25rem+var(--v1-shell-safe-bottom,0px))] sm:rounded-2xl"
       >
         <div>
           <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">경기 수정</h2>

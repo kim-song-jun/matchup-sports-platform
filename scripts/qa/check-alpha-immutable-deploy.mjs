@@ -31,6 +31,18 @@ const expectedRuntimeParameterNames = [
   'SOLAPI_SENDER_NUMBER',
 ];
 const operatorRuntimeParameterNames = ['ALPHA_SES_ACCESS_KEY_ID', 'ALPHA_SES_SECRET_ACCESS_KEY'];
+// Mirrors the lifecycle rules the live alpha ECR repositories carry.
+const expectedLifecycleRules = {
+  api: [
+    [1, 'Expire untagged images older than 7 days', { tagStatus: 'untagged', countType: 'sinceImagePushed', countUnit: 'days', countNumber: 7 }],
+    [2, 'Keep Task 168 tool images (retagged per deploy, so push time is not recency)', { tagStatus: 'tagged', tagPrefixList: ['task168-'], countType: 'imageCountMoreThan', countNumber: 10 }],
+    [3, 'Keep the 30 most recent release images', { tagStatus: 'tagged', tagPrefixList: ['sha-'], countType: 'imageCountMoreThan', countNumber: 30 }],
+  ],
+  web: [
+    [1, 'Expire untagged images older than 7 days', { tagStatus: 'untagged', countType: 'sinceImagePushed', countUnit: 'days', countNumber: 7 }],
+    [2, 'Keep the 30 most recent release images', { tagStatus: 'tagged', tagPrefixList: ['sha-'], countType: 'imageCountMoreThan', countNumber: 30 }],
+  ],
+};
 const syncScriptsOutsideIam = new Set(['sync-alpha-apple-sign-in-env.sh', 'sync-alpha-firebase-env.sh']);
 
 const workflowPath = '.github/workflows/deploy-alpha.yml';
@@ -43,6 +55,12 @@ const manifestLibraryPath = 'deploy/alpha-manifest-common.sh';
 const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
 const policyRendererPath = 'scripts/infra/render-alpha-immutable-deploy-policies.mjs';
+const lifecycleRendererPath = 'scripts/infra/render-alpha-ecr-lifecycle-policies.mjs';
+// Any lifecycle policy text other than the rendered variable is an inline literal, whatever quoting it uses.
+const provisioningForbiddenPatterns = [
+  [/--lifecycle-policy-text\s+(?!"\$\{lifecycle_policy\}")/, 'lifecycle rules must come from the renderer, not an inline literal'],
+  [/\blifecycle_policy=(?!"\$\(node "\$\{lifecycle_renderer\}")/, 'lifecycle_policy must only be assigned from the renderer output'],
+];
 const runtimeSyncPath = 'scripts/release/sync-alpha-inquiry-slack-env.sh';
 const firebaseRuntimeSyncPath = 'scripts/release/sync-alpha-firebase-env.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
@@ -60,6 +78,7 @@ const sources = new Map([
   [rollbackWorkflowPath, readRequiredFile(rollbackWorkflowPath)],
   [provisioningPath, readRequiredFile(provisioningPath)],
   [policyRendererPath, readRequiredFile(policyRendererPath)],
+  [lifecycleRendererPath, readRequiredFile(lifecycleRendererPath)],
   [runtimeSyncPath, readRequiredFile(runtimeSyncPath)],
   [firebaseRuntimeSyncPath, readRequiredFile(firebaseRuntimeSyncPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
@@ -75,6 +94,8 @@ if (kakaoBuildGate < 0 || kakaoBuildGate > alphaWorkflow.indexOf('- name: Resolv
 }
 const runtimePolicies = renderRuntimePolicies();
 if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
+const lifecyclePolicies = renderLifecyclePolicies();
+if (lifecyclePolicies !== undefined) validateLifecyclePolicies(lifecyclePolicies, errors);
 validateSyncScriptParameterParity(errors);
 validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
 validateKakaoSyncBehaviour(errors);
@@ -213,6 +234,10 @@ requirePatterns(provisioningPath, [
   [/sts:AssumeRoleWithWebIdentity/, 'provisioning must pin the GitHub OIDC trust policy'],
   [/render-alpha-immutable-deploy-policies\.mjs/, 'provisioning must use the canonical IAM policy renderer'],
   [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
+  [/render-alpha-ecr-lifecycle-policies\.mjs/, 'provisioning must use the canonical ECR lifecycle renderer'],
+  [/--lifecycle-policy-text "\$\{lifecycle_policy\}"/, 'provisioning must apply the rendered lifecycle policy'],
+  [/lifecycle_policy="\$\(node "\$\{lifecycle_renderer\}" --repository "\$\{repository_kind\}"\)"/, 'each repository must render the lifecycle policy for its own kind'],
+  [/if \[\[ "\$\{repository_kind\}" == api \]\]; then repository="\$\{API_REPOSITORY\}"; else repository="\$\{WEB_REPOSITORY\}"; fi/, 'the api kind must map to the api repository and web to the web repository'],
 ]);
 
 requirePatterns(policyRendererPath, [
@@ -222,9 +247,7 @@ requirePatterns(policyRendererPath, [
   [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
 ]);
 
-forbidPatterns(provisioningPath, [
-  [/imageCountMoreThan/, 'lifecycle must not blindly expire tagged rollback images'],
-]);
+forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
 
 if (errors.length > 0) {
   console.error('[alpha-immutable-deploy] failed');
@@ -233,7 +256,7 @@ if (errors.length > 0) {
 }
 
 console.log('[alpha-immutable-deploy] passed');
-if (runSelfTest) verifyNegativeControls(runtimePolicies);
+if (runSelfTest) verifyNegativeControls(runtimePolicies, lifecyclePolicies);
 
 function renderRuntimePolicies() {
   const accountId = '123456789012';
@@ -257,6 +280,43 @@ function renderRuntimePolicies() {
   } catch (error) {
     errors.push(`${provisioningPath}: rendered IAM policies are not valid JSON: ${error.message}`);
     return undefined;
+  }
+}
+
+function renderLifecyclePolicies() {
+  const policies = {};
+  for (const repository of Object.keys(expectedLifecycleRules)) {
+    const result = spawnSync(process.execPath, [lifecycleRendererPath, '--repository', repository], {
+      cwd: resolve(sourceRoot),
+      encoding: 'utf8',
+    });
+    if (result.status !== 0) {
+      errors.push(`${lifecycleRendererPath}: failed to render ${repository} ECR lifecycle policy: ${result.stderr.trim()}`);
+      return undefined;
+    }
+    try {
+      policies[repository] = JSON.parse(result.stdout);
+    } catch (error) {
+      errors.push(`${lifecycleRendererPath}: rendered ${repository} ECR lifecycle policy is not valid JSON: ${error.message}`);
+      return undefined;
+    }
+  }
+  return policies;
+}
+
+function validateLifecyclePolicies(policies, targetErrors) {
+  for (const [repository, rules] of Object.entries(expectedLifecycleRules)) {
+    const expected = {
+      rules: rules.map(([rulePriority, description, selection]) => ({
+        rulePriority,
+        description,
+        selection,
+        action: { type: 'expire' },
+      })),
+    };
+    if (JSON.stringify(policies?.[repository]) !== JSON.stringify(expected)) {
+      targetErrors.push(`${lifecycleRendererPath}: ${repository} ECR lifecycle policy must equal the rules the live repository carries`);
+    }
   }
 }
 
@@ -509,7 +569,7 @@ function forbidPatterns(filePath, forbidden) {
   }
 }
 
-function verifyNegativeControls(renderedPolicies) {
+function verifyNegativeControls(renderedPolicies, renderedLifecycle) {
   const originalDeploy = sources.get(deployPath);
   const originalCompose = sources.get(composePath);
   const originalProvisioning = sources.get(provisioningPath);
@@ -519,7 +579,8 @@ function verifyNegativeControls(renderedPolicies) {
     originalCompose === undefined ||
     originalProvisioning === undefined ||
     originalRuntimeSync === undefined ||
-    renderedPolicies === undefined
+    renderedPolicies === undefined ||
+    renderedLifecycle === undefined
   ) process.exit(1);
 
   sources.set(deployPath, `${originalDeploy}\ndocker build .\n`);
@@ -569,6 +630,31 @@ function verifyNegativeControls(renderedPolicies) {
     });
   }
 
+  for (const [label, replacement] of [
+    ['single-quoted inline lifecycle policy', `--lifecycle-policy-text '{"rules":[]}'`],
+    ['double-quoted inline lifecycle policy', `--lifecycle-policy-text "{\\"rules\\":[]}"`],
+  ]) {
+    sources.set(provisioningPath, originalProvisioning.replace('--lifecycle-policy-text "${lifecycle_policy}"', () => replacement));
+    errors.length = 0;
+    forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+    assertRejected(label);
+  }
+  sources.set(provisioningPath, originalProvisioning.replace('lifecycle_policy="$(node', () => 'lifecycle_policy=\'{"rules":[]}\'\n  lifecycle_policy="$(node'));
+  errors.length = 0;
+  forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+  assertRejected('hardcoded lifecycle_policy assignment');
+  sources.set(provisioningPath, originalProvisioning);
+
+  assertLifecycleRejected('dropped release retention rule', renderedLifecycle, (policies) => {
+    policies.web.rules.pop();
+  });
+  assertLifecycleRejected('dropped Task 168 retention rule', renderedLifecycle, (policies) => {
+    policies.api.rules.splice(1, 1);
+  });
+  assertLifecycleRejected('changed retention count', renderedLifecycle, (policies) => {
+    policies.api.rules[2].selection.countNumber = 31;
+  });
+
   errors.length = 0;
   validateRuntimeSecretTransport(
     originalRuntimeSync.replace(
@@ -611,6 +697,17 @@ function assertPolicyRejected(label, renderedPolicies, mutate) {
   const policyErrors = [];
   validateRuntimePolicies(policies, policyErrors);
   if (policyErrors.length === 0) {
+    console.error(`[alpha-immutable-deploy] negative control was not rejected: ${label}`);
+    process.exit(1);
+  }
+}
+
+function assertLifecycleRejected(label, renderedLifecycle, mutate) {
+  const policies = JSON.parse(JSON.stringify(renderedLifecycle));
+  mutate(policies);
+  const lifecycleErrors = [];
+  validateLifecyclePolicies(policies, lifecycleErrors);
+  if (lifecycleErrors.length === 0) {
     console.error(`[alpha-immutable-deploy] negative control was not rejected: ${label}`);
     process.exit(1);
   }

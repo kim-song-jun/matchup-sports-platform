@@ -5,7 +5,8 @@ const path = require('node:path');
 const origin = 'https://alpha.teameet.co.kr';
 const tournamentId = 'ee1675e5-264e-43ec-9a36-bd2f0a3099d9';
 const phase = process.argv.includes('--after') ? 'after' : 'before';
-const destination = path.resolve('tmp/stage-design-alpha', phase);
+const filterCaptures = process.argv.includes('--filter-captures');
+const destination = path.resolve('tmp/stage-design-alpha', filterCaptures ? 'filter-captures' : phase);
 const routes = [
   ['admin-create', '/admin/tournaments/new-staged'],
   ['admin-bracket', `/admin/tournaments/${tournamentId}/bracket`],
@@ -17,7 +18,7 @@ const routes = [
 ];
 async function interactionShot(page, report, name, width) {
   const file = `${name}-${width}.png`;
-  await page.screenshot({ path: path.join(destination, file) });
+  await page.screenshot({ animations: 'disabled', path: path.join(destination, file) });
   report.interactions.push({ name, width, screenshot: file, passed: true });
 }
 async function closeStagePanel(page) {
@@ -56,12 +57,14 @@ async function exercise(page, report, name, width) {
     await expect(page.getByText('모집 20팀 · 2단계 · 예상 70경기')).toBeVisible();
     await page.getByText('1위 리그 · 5팀 · 풀리그', { exact: true }).click();
     await expect(page.getByRole('combobox', { name: '1번 자리', exact: true })).toBeVisible();
+    await page.getByRole('combobox', { name: '1번 자리', exact: true }).scrollIntoViewIfNeeded();
     await interactionShot(page, report, 'create-20-team-editor', width);
   }
   if (name === 'admin-bracket') {
     await page.getByRole('button', { name: '단계·진출팀 관리', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '단계·진출팀 관리', exact: true });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('combobox', { name: '관리할 편성' })).toBeVisible();
     if (width === 390 && process.argv.includes('--normalize-fixture-names')) await normalizeFixtureNames(page, report);
     await page.keyboard.press('Shift+Tab');
     if (!await page.evaluate(() => document.activeElement?.closest('[role=dialog]') !== null)) throw Error('Stage panel focus escaped');
@@ -82,6 +85,7 @@ async function exercise(page, report, name, width) {
     await page.getByRole('navigation', { name: '편성 선택' }).getByRole('button').nth(1).click();
     await expect(page.getByRole('table')).toHaveCount(1);
     await page.getByRole('tab', { name: '경기 일정', exact: true }).click();
+    await expect(page.getByRole('tab', { name: '경기 일정', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('combobox', { name: '참가팀', exact: true }).selectOption({ index: 1 });
     const matches = page.locator(`a[href*="/tournaments/${tournamentId}/matches/"]`);
     await expect(matches).toHaveCount(4);
@@ -97,6 +101,7 @@ async function exercise(page, report, name, width) {
   if (name === 'results') {
     await expect(page.getByRole('navigation', { name: '진행 단계 선택' }).getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('table')).toHaveCount(4);
+    await page.getByRole('table').first().evaluate(element => element.scrollIntoView({ block: 'center' }));
     await interactionShot(page, report, 'final-league-results', width);
   }
 }
@@ -162,6 +167,7 @@ async function main() {
         await page.waitForFunction(() => document.querySelector('nav') && !document.body.innerText.includes('로그인 정보를 확인하고 있어요.'));
         consoleErrors.length = 0; networkErrors.length = 0;
         for (const [name, route] of routes) {
+          if (filterCaptures && name !== 'bracket') continue;
           if (report.checks.some(check => check.name === name && check.width === width)) continue;
           const consoleStart = consoleErrors.length, networkStart = networkErrors.length;
           const response = await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
@@ -194,11 +200,11 @@ async function main() {
             expect(fixture?.result?.homeScore).toBe(expected.homeScore); expect(fixture?.result?.awayScore).toBe(expected.awayScore);
           }
           report.preservation = { status: 'completed', originalFixtureIds: 70, officialScoresUnchanged: 70 };
-          await captureLegacyReference(page, context, report, width);
+          if (!filterCaptures) await captureLegacyReference(page, context, report, width);
         }
       } finally { await context.close(); }
     }
-    if (phase === 'after' && [...report.checks, ...report.references].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
+    if (phase === 'after' && [...report.checks, ...(report.references ?? [])].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
   } catch (error) { report.failure = error.message; throw error; }
   finally {
     await browser.close(); await server.close(); report.closed = true;

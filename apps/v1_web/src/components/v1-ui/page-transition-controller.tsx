@@ -45,10 +45,12 @@ export function PageTransitionController() {
     if (typeof document === 'undefined') return;
     // 연타 시 이전 snapshot과 callback을 먼저 해제한다.
     settlePending(true);
-    // 같은 pathname 안에서 검색 파라미터만 바뀌는 이동(필터 시트·칩·페이지네이션)은
-    // template.tsx 가 리마운트되지 않는다 — VT 를 걸면 resolve 신호가 영영 안 와 MAX_PENDING_MS
-    // 동안 old 스냅샷이 정지 화면으로 남는다(Copilot 2차). kind 만 심고 전환은 걸지 않는다.
-    if (kind === 'search') {
+    // 전환을 걸지 않는 이동 — kind 만 심는다(CSS 와 ScrollRestoration 이 읽는다).
+    // - search: 같은 pathname 안에서 검색 파라미터만 바뀌어 template.tsx 가 리마운트되지 않는다.
+    //   VT 를 걸면 resolve 신호가 안 와 MAX_PENDING_MS 동안 old 스냅샷이 정지 화면으로 남는다.
+    // - tab: CSS 가 tab 의 old/new/group 애니메이션을 전부 꺼 둬서 보여 줄 움직임이 없다.
+    //   VT 를 걸면 정지 화면만 생기고, 같은 경로 안 세부 탭은 resolve 신호도 안 온다.
+    if (kind === 'search' || kind === 'tab') {
       document.documentElement.dataset.navKind = kind;
       return;
     }
@@ -61,6 +63,8 @@ export function PageTransitionController() {
     // 래퍼의 view-transition-name 은 이 표시가 있는 동안에만 붙는다(globals.css) — 상시로 두면
     // 래퍼가 스태킹 컨텍스트가 되어 페이지 안 시트가 셸 아래에 깔린다. old 스냅샷 캡처 전에 달아야 한다.
     document.documentElement.dataset.pageTransition = 'active';
+    // 데스크톱은 문서가 스크롤돼서 옛 화면 스냅샷이 스크롤 값만큼 위에 있다 — globals.css 가 이 값으로 제자리에 둔다.
+    document.documentElement.style.setProperty('--tm-vt-scroll-y', String(window.scrollY));
     const pending: NonNullable<typeof pendingRef.current> = {};
     pendingRef.current = pending;
     const transition = document.startViewTransition(
@@ -83,6 +87,7 @@ export function PageTransitionController() {
       if (activeTransitionRef.current !== transition) return;
       activeTransitionRef.current = null;
       delete document.documentElement.dataset.pageTransition;
+      document.documentElement.style.removeProperty('--tm-vt-scroll-y');
     };
     void transition.finished.then(release, release);
     // skipTransition()은 ready를 reject할 수 있지만 navigation 실패는 아니다.

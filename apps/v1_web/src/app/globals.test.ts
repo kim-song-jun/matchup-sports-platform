@@ -404,9 +404,44 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
 
     expect(naming.length).toBeGreaterThan(0);
     for (const rule of naming) {
-      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-page-transition-enter$/);
-      expect(rule.body).toMatch(/view-transition-name:\s*page-content/);
+      // 모바일에서는 이름이 스크롤 상자로 옮겨 가므로 상자 안의 래퍼는 이름을 뗀다(none).
+      const insideScrollArea = /\.tm-scroll-area\s+\.tm-page-transition-enter$/.test(rule.selector);
+      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+(\.tm-scroll-area\s+)?\.tm-page-transition-enter$/);
+      expect(rule.body).toMatch(insideScrollArea ? /view-transition-name:\s*none/ : /view-transition-name:\s*page-content/);
     }
+  });
+
+  it('스크롤 상자(.tm-scroll-area)의 page-content 이름도 전환 중 표시 아래에서만 붙는다', () => {
+    const named = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, selector, body]) => ({ selector: selector.trim(), body }))
+      .filter((rule) => /\.tm-scroll-area$/.test(rule.selector) && /view-transition-name:\s*page-content/.test(rule.body));
+
+    expect(named.length).toBeGreaterThan(0);
+    for (const rule of named) expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-scroll-area$/);
+  });
+
+  // 데스크톱은 문서가 스크롤한다. group 이동을 끄고 옛 스냅샷을 누른 순간 스크롤만큼 올리지 않으면
+  // 옛 목록이 그 거리만큼 아래로 쓸린다. 내비가 셸 이름표를 받지 않으면 올라간 옛 스냅샷이 내비를 덮는다.
+  it('데스크톱 push 는 group 이동을 끄고 옛 스냅샷을 --tm-vt-scroll-y 만큼 올린다', () => {
+    const rules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({ selector: selector.trim(), body }));
+    const find = (selector: string) => rules.find((rule) => rule.selector === selector);
+
+    const group = find(':root[data-nav-kind="push"]::view-transition-group(page-content)');
+    expect(group?.body).toMatch(/animation:\s*none/);
+
+    const old = find(':root[data-nav-kind="push"]::view-transition-old(page-content)');
+    expect(old?.body).toMatch(/inset-block-start:\s*calc\(-1px\s*\*\s*var\(--tm-vt-scroll-y,\s*0\)\)/);
+
+    // 데스크톱 폭에서만 — 모바일은 스크롤 상자 이름표가 맡는다.
+    const desktopBlocks = [...rulesOnly.matchAll(/@media\s*\(min-width:\s*1024px\)\s*\{([\s\S]*?)\n\}/g)].map(([, body]) => body);
+    expect(desktopBlocks.some((body) => body.includes(':root[data-nav-kind="push"]::view-transition-group(page-content)'))).toBe(true);
+  });
+
+  it('데스크톱 상단 내비는 셸 이름표를 받고 old 를 숨긴다', () => {
+    expect(rulesOnly).toMatch(/\.tm-desktop-nav\s*\{\s*view-transition-name:\s*tm-shell-desktopnav;?\s*\}/);
+    expect(rulesOnly).toMatch(/::view-transition-group\(tm-shell-desktopnav\)/);
+    const oldRule = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, sel]) => sel.includes('::view-transition-old(tm-shell-desktopnav)'));
+    expect(oldRule?.[2]).toMatch(/display:\s*none/);
   });
 
   it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {

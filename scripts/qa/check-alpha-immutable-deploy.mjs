@@ -56,6 +56,11 @@ const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
 const policyRendererPath = 'scripts/infra/render-alpha-immutable-deploy-policies.mjs';
 const lifecycleRendererPath = 'scripts/infra/render-alpha-ecr-lifecycle-policies.mjs';
+// Any lifecycle policy text other than the rendered variable is an inline literal, whatever quoting it uses.
+const provisioningForbiddenPatterns = [
+  [/--lifecycle-policy-text\s+(?!"\$\{lifecycle_policy\}")/, 'lifecycle rules must come from the renderer, not an inline literal'],
+  [/\blifecycle_policy=(?!"\$\(node "\$\{lifecycle_renderer\}")/, 'lifecycle_policy must only be assigned from the renderer output'],
+];
 const runtimeSyncPath = 'scripts/release/sync-alpha-inquiry-slack-env.sh';
 const firebaseRuntimeSyncPath = 'scripts/release/sync-alpha-firebase-env.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
@@ -242,9 +247,7 @@ requirePatterns(policyRendererPath, [
   [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
 ]);
 
-forbidPatterns(provisioningPath, [
-  [/--lifecycle-policy-text '/, 'lifecycle rules must come from the renderer, not an inline literal'],
-]);
+forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
 
 if (errors.length > 0) {
   console.error('[alpha-immutable-deploy] failed');
@@ -288,13 +291,13 @@ function renderLifecyclePolicies() {
       encoding: 'utf8',
     });
     if (result.status !== 0) {
-      errors.push(`${provisioningPath}: failed to render ${repository} ECR lifecycle policy: ${result.stderr.trim()}`);
+      errors.push(`${lifecycleRendererPath}: failed to render ${repository} ECR lifecycle policy: ${result.stderr.trim()}`);
       return undefined;
     }
     try {
       policies[repository] = JSON.parse(result.stdout);
     } catch (error) {
-      errors.push(`${provisioningPath}: rendered ${repository} ECR lifecycle policy is not valid JSON: ${error.message}`);
+      errors.push(`${lifecycleRendererPath}: rendered ${repository} ECR lifecycle policy is not valid JSON: ${error.message}`);
       return undefined;
     }
   }
@@ -626,6 +629,21 @@ function verifyNegativeControls(renderedPolicies, renderedLifecycle) {
       resource.splice(index, 1);
     });
   }
+
+  for (const [label, replacement] of [
+    ['single-quoted inline lifecycle policy', `--lifecycle-policy-text '{"rules":[]}'`],
+    ['double-quoted inline lifecycle policy', `--lifecycle-policy-text "{\\"rules\\":[]}"`],
+  ]) {
+    sources.set(provisioningPath, originalProvisioning.replace('--lifecycle-policy-text "${lifecycle_policy}"', () => replacement));
+    errors.length = 0;
+    forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+    assertRejected(label);
+  }
+  sources.set(provisioningPath, originalProvisioning.replace('lifecycle_policy="$(node', () => 'lifecycle_policy=\'{"rules":[]}\'\n  lifecycle_policy="$(node'));
+  errors.length = 0;
+  forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+  assertRejected('hardcoded lifecycle_policy assignment');
+  sources.set(provisioningPath, originalProvisioning);
 
   assertLifecycleRejected('dropped release retention rule', renderedLifecycle, (policies) => {
     policies.web.rules.pop();

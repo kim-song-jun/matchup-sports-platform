@@ -101,26 +101,35 @@ async function exercise(page, report, name, width) {
   }
 }
 async function captureLegacyReference(page, context, report, width) {
-  if (!report.referenceId) {
+  if (!report.referenceIds) {
     const response = await context.request.get(`${origin}/api/v1/tournaments?status=completed`);
     if (!response.ok()) throw Error(`Cannot load existing comparison competitions: ${response.status()}`);
     const list = (await response.json()).data;
+    report.referenceIds = {};
     for (const item of list.items ?? []) {
-      if (item.id === tournamentId || item.kind === 'regular_league' || item.format === 'league_knockouts') continue;
+      if (item.id === tournamentId || item.kind === 'regular_league' || !['group_knockout', 'league_knockouts'].includes(item.format) || report.referenceIds[item.format]) continue;
       const detail = await context.request.get(`${origin}/api/v1/tournaments/${item.id}`);
       if (!detail.ok()) continue;
       const value = (await detail.json()).data;
-      if (!value.stagePlan && value.fixtures?.length) { report.referenceId = item.id; break; }
+      if (!value.stagePlan && value.fixtures?.length) report.referenceIds[item.format] = item.id;
     }
-    if (!report.referenceId) throw Error('No existing non-stage competition with fixtures was found for comparison');
+    if (Object.keys(report.referenceIds).length !== 2) throw Error('Both existing league + tournament formats are required for comparison');
   }
   report.references ??= [];
-  for (const [name, route] of [ ['bracket', `/tournaments/${report.referenceId}/bracket`], ['results', `/tournaments/${report.referenceId}/results`], ['admin-bracket', `/admin/tournaments/${report.referenceId}/bracket`] ]) {
+  for (const [format, referenceId] of Object.entries(report.referenceIds)) for (const [name, route] of [ ['bracket', `/tournaments/${referenceId}/bracket`], ['results', `/tournaments/${referenceId}/results`], ['admin-bracket', `/admin/tournaments/${referenceId}/bracket`] ]) {
+    const errors = [], network = [];
+    const onConsole = message => { if (message.type() === 'error') errors.push(message.text()); };
+    const onError = error => errors.push(error.message);
+    const onResponse = response => { if (response.status() >= 400 && new URL(response.url()).origin === origin) network.push({ path: new URL(response.url()).pathname, status: response.status() }); };
+    page.on('console', onConsole); page.on('pageerror', onError); page.on('response', onResponse);
+    try {
     const response = await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    const screenshot = `existing-${name}-${width}.png`;
+    const screenshot = `existing-${format}-${name}-${width}.png`;
     await page.screenshot({ path: path.join(destination, screenshot) });
-    report.references.push({ name, route, width, status: response.status(), screenshot });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    report.references.push({ name, format, route, width, status: response.status(), screenshot, horizontalOverflow: overflow, console: errors, network, passed: response.ok() && overflow === 0 && !errors.length && !network.length });
+    } finally { page.off('console', onConsole); page.off('pageerror', onError); page.off('response', onResponse); }
   }
 }
 async function main() {
@@ -189,7 +198,7 @@ async function main() {
         }
       } finally { await context.close(); }
     }
-    if (phase === 'after' && report.checks.some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
+    if (phase === 'after' && [...report.checks, ...report.references].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
   } catch (error) { report.failure = error.message; throw error; }
   finally {
     await browser.close(); await server.close(); report.closed = true;

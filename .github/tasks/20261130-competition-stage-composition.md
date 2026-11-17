@@ -229,6 +229,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 구조 저장은 기존 multiFinals와 독립인 versioned stagePlan으로 한다. 기존 그룹에는 stageKey/poolKey를 추가하고, 경기 정본은 그대로 재사용한다. 기존 행의 stagePlan=null/entryScope=legacy는 동작을 유지한다.
 
 ## 2026-11-16 동등성 수정 Progress Snapshot
+- Copilot 실제 차단 원인: 최신 공식 `POST /pulls/2419/copilot-code-review`가 HTTP422 `ACTOR_INELIGIBLE`(현재 actor의 코드리뷰 라이선스/조직 정책 자격 불충족)를 반환했다. 기존 requested_reviewers 요청의 성공 응답·리뷰0건을 clean으로 판정하지 않는다. 계정·요금제·정책 변경 없이 사용자에게 이번 작업 한정 수동 적대 검토+전체CI 대체를 설명한 뒤 2026-11-17 “스크린샷 찍어서 pr 까지 다 해줘” 후속 진행 지시를 해당 대체 승인으로 적용했다. Copilot clean으로 표시하지 않는다. 커밋5a77bd034의 Gates/API/Web 전체 CI 통과 및 MERGEABLE/CLEAN 확인 후 PR #2419를 dev에 merge(b4c9726cf)했다. Alpha after 검증을 진행한다.
 - 최신 사용자 지시: 기존 대회 디자인에 맞춘 수정과 모바일 포함 Alpha 화면 검증까지 완료한 뒤 반영. 기존 'PR까지만' 제한을 이 후속에 적용하지 않고 저장소의 dev PR→머지→Alpha 검증 순서를 따른다(main 승격 제외). 기존 컴포넌트 재사용 A안 유지. 검증 대상7 routes×390/768/1440=21 route/viewport. 관리자 생성·대진·시상, 공개 상세·대진·결과·시상. native CUA 브라우저 host unavailable/승인 timeout 재현 뒤 사용자가 Playwright 전용 headed 창을 명시 승인. 코드 회귀104건·Web 타입/패턴 PASS, before21/21 캡처 완료. 새 head CI/Alpha after21폭 검증은 남아 있어 완료로 선언하지 않는다.
 - 사용자 재리뷰 후 P1 수정: GamesService → stage-view → multi-finals-seeding → multi-finals-plan → LeagueFixtureGeneratorService → GamesService 순환으로 기존 API CI의 실제 앱 초기화가 실패했다. 읽기용 크기·오류 정의를 multi-finals-definition.ts로 분리해 planner의 기존 export 호환성을 유지했다. 냉시작 Nest 주입 RED1→GREEN1 및 대진 계산 포함34건, 실제 HTTP/DB76건(운영 보드58·health2·단계15·worker1) PASS. 운영 보드 첫 로컬 실행의 프리셋 누락58건은 CI와 같은 competition-config-backfill CLI를 소유 DB에 적용한 뒤 재검증해 PASS. 최종 API 타입·surface PASS. 새 head CI·Copilot은 후속 확인한다.
 - dev PR [#2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419), 구현 커밋2e3e6e793. CI Gates/API/Web 및 최신 head Copilot 확인 중. 사용자 요청 범위는 PR 생성까지이며 머지·main 승격 없음. 소유 PostgreSQL 컨테이너2개 실행분과 전용 볼륨, 공유 의존성 링크를 정리했다. 미병합 브랜치/worktree·재현용 ignored 의존성·Alpha 테스트 데이터는 보존한다.
@@ -239,3 +240,7 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 - 검증: 격리 PostgreSQL16/LF241 migration 재생, 원래 Alpha20팀70경기 증거 보존, 새 실제DB/단위/UI/타입/surface 검증. 최신 세부 결과는 시나리오의 동등성 전체 수정 cursor 및 최종 검증 기록 참조.
 - 남은 gate: dev PR/최신 head CI·Copilot, 머지 후 Alpha 배포·390/768/1440 갤러리·console/network/focus. 브라우저 host unavailable 재확인,0/3폭을 통과로 표시하지 않는다.
 - 소유 자원: 작업 전용 DB 컨테이너·clone·임시 의존성/스크립트만 정리한다. 미병합 worktree와 사용자가 요청한 Alpha 테스트 팀/계정/대회는 보존한다.
+
+## 2026-11-17 Alpha 화면 보완
+- PR #2419 dev 머지 및 Alpha b4c9726cf 실측. 모바일·태블릿 일정 상단에 전체 순위20행이 반복돼 경기가 밀리는 시각 결함 발견. 최종 순위를 결과 하단으로 옮기고 모바일 팀/라운드 필터를2열로 정리. 관련 공개 단계3 tests PASS. 기존 두 형식 비교까지39개 화면 및 실제 조작을 검증하며 최종 갤러리는 보완 배포 후 촬영한다.
+

@@ -226,7 +226,7 @@ export function ActionTargetPicker({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-target-picker-title"
-        className="flex max-h-[85vh] w-full max-w-[560px] flex-col rounded-t-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
+        className="flex max-h-[85vh] w-full max-w-[560px] flex-col rounded-t-2xl bg-[var(--card-surface)] pb-[var(--v1-shell-safe-bottom,0px)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>

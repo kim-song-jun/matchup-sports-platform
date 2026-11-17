@@ -644,7 +644,7 @@ export function ResultEditModal({
   return (
     <div
       className={inline ? 'w-full' : 'fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4'}
-      style={inline ? undefined : { background: 'rgba(25,31,40,0.45)' }}
+      style={inline ? undefined : { background: 'rgba(25,31,40,0.45)', paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }}
       onClick={inline ? undefined : (event) => {
         if (event.target === event.currentTarget) onCancel();
       }}

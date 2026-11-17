@@ -78,6 +78,7 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      style={{ paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }}
       role="presentation"
       onClick={onBackdropClick}
     >

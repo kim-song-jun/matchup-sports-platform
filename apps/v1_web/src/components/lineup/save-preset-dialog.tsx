@@ -49,7 +49,7 @@ export function SavePresetDialog({ open, onClose, existingNames, saving, error, 
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'rgba(25,31,40,0.45)' }}
+      style={{ background: 'rgba(25,31,40,0.45)', paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }}
       onClick={onBackdropClick}
     >
       <div

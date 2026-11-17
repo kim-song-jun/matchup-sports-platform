@@ -336,7 +336,7 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
     expectHttpCode(rejected, 409, 'NO_NEXT_PERIOD');
   });
 
-  describe('정규 시간 종료 뒤(경기는 아직 LIVE) 골 기록', () => {
+  describe('정규 시간 종료 뒤(경기는 아직 LIVE) 사건 기록', () => {
     const currentVersion = async () => (await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).version;
     const goalAt = async (id: string, clockMs: number, type: V1GameEventType = V1GameEventType.GOAL) =>
       service.appendEvent(authUser(ids.director), gameId, id, {
@@ -376,20 +376,45 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
       expectHttpCode(await captureFailure(() => goalAt('reg-goal-late', 10 * 60 * 60_000)), 409, 'PERIOD_ALREADY_ENDED');
     });
 
-    it('골이 아닌 기록은 계속 막는다', async () => {
-      const rejected = await captureFailure(async () =>
-        service.appendEvent(authUser(ids.director), gameId, 'reg-foul', {
-          expectedVersion: await currentVersion(),
-          clientEventId: 'reg-foul',
-          takeoverToken,
-          type: V1GameEventType.FOUL,
-          sideId: homeSideId,
-          participantId: homeParticipantId,
-          period: 2,
-          clockMs: 1_000,
-          occurredAt: new Date().toISOString(),
-          payload: {},
-        }),
+    // 2026-11-18 사용자 확정: 카드(옐로·레드)·파울도 쉬는 구간에 받는다. 교체는 계속 막는다.
+    const otherEventAt = async (id: string, type: V1GameEventType, payload: Record<string, unknown>, clockMs = 1_000) =>
+      service.appendEvent(authUser(ids.director), gameId, id, {
+        expectedVersion: await currentVersion(),
+        clientEventId: id,
+        takeoverToken,
+        type,
+        sideId: homeSideId,
+        participantId: homeParticipantId,
+        period: 2,
+        clockMs,
+        occurredAt: new Date().toISOString(),
+        payload,
+      });
+
+    it('파울과 카드(옐로·레드)도 마지막 피리어드에 받는다', async () => {
+      for (const [id, type, payload] of [
+        ['reg-foul', V1GameEventType.FOUL, {}],
+        ['reg-yellow', V1GameEventType.CARD, { card: 'YELLOW' }],
+        ['reg-red', V1GameEventType.CARD, { card: 'RED' }],
+      ] as const) {
+        const recorded = await otherEventAt(id, type, payload);
+        expect(recorded.replayed).toBe(false);
+        const stored = await prisma.v1GameEvent.findFirstOrThrow({ where: { gameId, clientEventId: id } });
+        expect(stored).toEqual(expect.objectContaining({ type, period: 2, clockMs: 1_000 }));
+      }
+    });
+
+    it('정규 시간을 넘는 시각의 카드·파울은 PERIOD_ALREADY_ENDED로 막는다', async () => {
+      expectHttpCode(
+        await captureFailure(() => otherEventAt('reg-foul-late', V1GameEventType.FOUL, {}, 10 * 60 * 60_000)),
+        409,
+        'PERIOD_ALREADY_ENDED',
+      );
+    });
+
+    it('교체는 계속 막는다', async () => {
+      const rejected = await captureFailure(() =>
+        otherEventAt('reg-sub', V1GameEventType.SUBSTITUTION, { outParticipantId: homeParticipantId }),
       );
       expectHttpCode(rejected, 409, 'PERIOD_ALREADY_ENDED');
     });

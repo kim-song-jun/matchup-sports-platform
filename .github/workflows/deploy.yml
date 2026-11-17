@@ -181,8 +181,14 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: pnpm
+
+      - name: Node.js security baseline
+        run: |
+          node scripts/qa/check-node-security.mjs
+          node --test --test-concurrency=1 scripts/qa/check-node-security.test.mjs
+          bash scripts/qa/test-nodesource-integrity.sh
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -530,7 +536,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: pnpm
 
       - name: Install dependencies
@@ -669,7 +675,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: pnpm
 
       - name: Install dependencies

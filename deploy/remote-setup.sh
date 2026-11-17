@@ -6,6 +6,7 @@ echo "=== MatchUp Server Setup ==="
 # System update
 sudo yum update -y
 sudo yum install -y docker git
+bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/qa/check-git-security.sh"
 
 # Start Docker
 sudo systemctl start docker

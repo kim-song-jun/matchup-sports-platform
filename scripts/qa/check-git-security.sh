@@ -24,6 +24,18 @@ case "$major.$minor" in
     fi ;;
 esac
 if (( patch < minimum )); then
+  # ALAS2023-2026-3445 backports both CVEs to 2.50.1-1.amzn2023.0.2.
+  # Only accept the package owning the executed binary, with vendor and
+  # installed-file integrity verified; never trust a version override flag.
+  if [[ "$major.$minor.$patch" == 2.50.1 ]] && command -v rpm >/dev/null 2>&1; then
+    binary="$(readlink -f "$(command -v git)")"
+    package="$(rpm -qf "$binary" --queryformat '%{NAME}|%{VERSION}|%{RELEASE}|%{VENDOR}' 2>/dev/null)" || package=''
+    if [[ "$package" =~ ^git-core\|2\.50\.1\|1\.amzn2023\.0\.([0-9]+)\|Amazon\ Linux$ ]] &&
+        (( 10#${BASH_REMATCH[1]} >= 2 )) && rpm -V git-core >/dev/null 2>&1; then
+      echo "Git security PASS: $version; $package; verified ALAS2023-2026-3445 backport"
+      exit 0
+    fi
+  fi
   echo "Git security FAIL: $version. Install 2.56.1+ or patched 2.50.2/2.51.3/2.52.1/2.53.1/2.54.1/2.55.1 (CVE-2026-111760, CVE-2026-105437)." >&2
   echo "For distro backports, retain the vendor advisory and package evidence for operator review; this gate does not silently accept an unverified backport." >&2
   exit 1

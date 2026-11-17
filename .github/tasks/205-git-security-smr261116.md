@@ -49,3 +49,6 @@ GHSA의 patched none과 공식 릴리스 노트가 상충하므로 공식 릴리
 origin/dev 9f157aa57에서 별도 worktree 생성. 개발 PC Git은 패치 기준 충족. 기존 서버 현황은 미확인.
 - 실제 CLI PASS: git version 2.56.1.windows.1. Git 경계·실행 실패 계약 20개 통과. DB guardrail 통과.
 - production security guard는 Windows CRLF checkout에서 기존 compose 키를 미탐하여 LF committed-tree로 재검증한다.
+- LF committed-tree에서 production security guard와 20개 shell 계약 통과.
+- Alpha 읽기 전용 SSM 실측: Git 2.50.1, RPM git-2.50.1-1.amzn2023.0.1.x86_64. 설치 패키지 changelog에서 두 CVE/2.50.2 수정 근거를 찾지 못했다. 캐시된 업데이트 목록에도 후보가 없었다(실시간 공급자 업데이트 확인은 별도). 기존 호스트의 패치 완료로 표시하지 않는다.
+- Amazon 공식 ALAS2023-2026-3445에서 수정 backport `2.50.1-1.amzn2023.0.2`, release snapshot `2023.12.20261112` 확인. 실제 실행 파일 RPM 소유자·공급자·release·파일 무결성을 모두 검증하는 좁은 backport 허용과 26개 계약 테스트를 추가했다. Alpha의 `.0.1`은 기준 미달이다.

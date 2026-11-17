@@ -1,6 +1,6 @@
 # Task 204: Node.js SMR261116 보안 업데이트
 
-Status: In Progress
+Status: Review
 Owner: Codex
 Created: 2026-11-17
 
@@ -54,3 +54,4 @@ https://nodejs.org/en/blog/release/v22.23.5 및 https://nodejs.org/en/blog/vulne
 - core.autocrlf=false archive의 Linux committed-tree에서 production security guard 통과.
 - Alpha 사전 실측: API·Web·worker 모두 v22.23.5. 고정 버전 회귀 방지 PR로 진행한다.
 - 보안 리뷰 지적에 따라 기존 remote curl-to-root 설치를 고정 커밋·SHA256 검증 후 실행으로 변경하고 변조 payload 차단 테스트 추가.
+- PR #2425(dev). 보안 스캔의 mutable installer 지적 수정·답변·resolve 완료. 최신 head Copilot 제출 리뷰 및 전체 CI 결과는 확인 중이며 clean/merge 완료로 표시하지 않는다.

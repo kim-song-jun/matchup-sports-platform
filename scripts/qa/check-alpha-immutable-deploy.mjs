@@ -231,6 +231,8 @@ requirePatterns(provisioningPath, [
   [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
   [/render-alpha-ecr-lifecycle-policies\.mjs/, 'provisioning must use the canonical ECR lifecycle renderer'],
   [/--lifecycle-policy-text "\$\{lifecycle_policy\}"/, 'provisioning must apply the rendered lifecycle policy'],
+  [/lifecycle_policy="\$\(node "\$\{lifecycle_renderer\}" --repository "\$\{repository_kind\}"\)"/, 'each repository must render the lifecycle policy for its own kind'],
+  [/if \[\[ "\$\{repository_kind\}" == api \]\]; then repository="\$\{API_REPOSITORY\}"; else repository="\$\{WEB_REPOSITORY\}"; fi/, 'the api kind must map to the api repository and web to the web repository'],
 ]);
 
 requirePatterns(policyRendererPath, [

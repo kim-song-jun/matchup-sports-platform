@@ -53,6 +53,60 @@ async function normalizeFixtureNames(page, report) {
     report.interactions.push({ name: 'owned-fixture-name-saved', poolKey: pool.key, stageName, poolName: name, passed: true });
   }
 }
+async function exerciseDraftPreservation(page, report, dialog, width) {
+  const select = dialog.getByRole('combobox', { name: '관리할 편성' });
+  const keys = await select.locator('option').evaluateAll(options => options.map(option => option.value));
+  if (keys.length < 2) throw Error('The owned multi-pool QA competition is required');
+  await select.selectOption(keys[0]);
+  const firstName = await dialog.getByLabel('편성 이름', { exact: true }).inputValue();
+  await dialog.getByLabel('편성 이름', { exact: true }).fill(`${firstName} · 미저장 확인`);
+  await select.selectOption(keys[1]);
+  const secondName = await dialog.getByLabel('편성 이름', { exact: true }).inputValue();
+  const draftName = `${secondName} · 미저장 확인`;
+  await dialog.getByLabel('편성 이름', { exact: true }).fill(draftName);
+  await select.selectOption(keys[0]);
+  await expect(dialog.getByLabel('편성 이름', { exact: true })).toHaveValue(`${firstName} · 미저장 확인`);
+  const saveNames = async () => {
+    const response = page.waitForResponse(result => new URL(result.url()).pathname.endsWith('/stages/names') && result.request().method() === 'PUT');
+    await dialog.getByRole('button', { name: '표시 설정 저장', exact: true }).click();
+    if (!(await response).ok()) throw Error('Owned QA display-name save failed');
+    await expect(dialog.getByRole('button', { name: '단계 관리 닫기', exact: true })).toBeEnabled();
+  };
+  try {
+    if (width === 390) {
+      await saveNames();
+      await expect(select.locator('option:checked')).toHaveText(`${firstName} · 미저장 확인 · 풀리그`);
+    }
+    await select.selectOption(keys[1]);
+    await expect(dialog.getByLabel('편성 이름', { exact: true })).toHaveValue(draftName);
+    await dialog.getByRole('button', { name: '최신 구성 불러오기', exact: true }).click();
+    const reloadDialog = page.getByRole('dialog', { name: '최신 구성으로 다시 불러올까요?', exact: true });
+    await expect(reloadDialog).toBeVisible();
+    await reloadDialog.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(reloadDialog).toHaveCount(0);
+    await expect(dialog.getByLabel('편성 이름', { exact: true })).toHaveValue(draftName);
+    await expect(dialog.getByRole('button', { name: '표시 설정 저장', exact: true })).toBeEnabled();
+    await interactionShot(page, report, 'admin-draft-preserved', width);
+    report.interactions.push({ name: 'drafts-survive-pool-switch', width, displaySaveExercised: width === 390, passed: true });
+  } finally {
+    await select.selectOption(keys[0]);
+    await dialog.getByLabel('편성 이름', { exact: true }).fill(firstName);
+    if (width === 390 && await dialog.getByRole('button', { name: '표시 설정 저장', exact: true }).isEnabled()) {
+      await saveNames();
+      await expect(select.locator('option:checked')).toHaveText(`${firstName} · 풀리그`);
+    }
+    await select.selectOption(keys[1]);
+    await dialog.getByLabel('편성 이름', { exact: true }).fill(secondName);
+    await select.selectOption(keys[0]);
+    await expect(dialog.getByLabel('편성 이름', { exact: true })).toHaveValue(firstName);
+  }
+  const response = await page.request.get(`${origin}/api/v1/admin/tournaments/${tournamentId}/stages`);
+  if (!response.ok()) throw Error('Cannot verify QA display-name restoration');
+  const pools = (await response.json()).data.config.stages.flatMap(stage => stage.pools);
+  expect(pools.find(pool => pool.key === keys[0]).name).toBe(firstName);
+  expect(pools.find(pool => pool.key === keys[1]).name).toBe(secondName);
+  report.interactions.push({ name: 'owned-fixture-labels-restored', width, passed: true });
+}
 async function exercise(page, report, name, width) {
   if (name === 'admin-create') {
     await page.getByRole('button', { name: '20팀 순위별 리그 템플릿' }).click();
@@ -69,6 +123,7 @@ async function exercise(page, report, name, width) {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('combobox', { name: '관리할 편성' })).toBeVisible();
     if (width === 390 && process.argv.includes('--normalize-fixture-names')) await normalizeFixtureNames(page, report);
+    await exerciseDraftPreservation(page, report, dialog, width);
     await page.keyboard.press('Shift+Tab');
     if (!await page.evaluate(() => document.activeElement?.closest('[role=dialog]') !== null)) throw Error('Stage panel focus escaped');
     await interactionShot(page, report, 'admin-stage-panel', width);
@@ -132,11 +187,12 @@ async function captureLegacyReference(page, context, report, width) {
     page.on('console', onConsole); page.on('pageerror', onError); page.on('response', onResponse);
     try {
     const response = await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded' });
+    if (response.headers()['x-teameet-commit'] !== report.expectedCommit) throw Error('Comparison page deployment changed during QA');
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     const screenshot = `existing-${format}-${name}-${width}.png`;
     await page.screenshot({ path: path.join(destination, screenshot) });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-    report.references.push({ name, format, route, width, status: response.status(), screenshot, horizontalOverflow: overflow, console: errors, network, passed: response.ok() && overflow === 0 && !errors.length && !network.length });
+    report.references.push({ name, format, route, width, release: response.headers()['x-teameet-commit'], status: response.status(), screenshot, horizontalOverflow: overflow, console: errors, network, passed: response.ok() && overflow === 0 && !errors.length && !network.length });
     } finally { page.off('console', onConsole); page.off('pageerror', onError); page.off('response', onResponse); }
   }
 }
@@ -167,7 +223,8 @@ async function main() {
       };
       observe(page);
       try {
-        await page.goto(`${origin}/login/email`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+        const loginPage = await page.goto(`${origin}/login/email`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+        if (phase === 'after' && loginPage.headers()['x-teameet-commit'] !== expectedCommit) throw Error('Alpha deployment does not match the requested QA SHA');
         await page.waitForFunction(() => { const form = document.querySelector('#v1-email-login-form'); return form && Object.keys(form).some(key => key.startsWith('__reactProps$')); }, { timeout: 45_000 });
         await page.locator('input[type=email]').fill(credentials.email);
         await page.locator('input[type=password]').fill(credentials.password);

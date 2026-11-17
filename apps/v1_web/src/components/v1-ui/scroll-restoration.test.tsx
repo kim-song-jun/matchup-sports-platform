@@ -12,7 +12,7 @@
  */
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { saveScrollPosition } from '@/lib/scroll-positions';
+import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
 
 const nav = vi.hoisted(() => ({ pathname: '/tournaments' }));
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
@@ -21,6 +21,8 @@ vi.mock('@/lib/session-storage', () => ({
 }));
 
 import { ScrollRestoration } from './scroll-restoration';
+
+const RESTORE_TIMEOUT_MS = 1500; // scroll-restoration.tsx 의 상수와 동일 — 타임아웃 클램프
 
 /** `.tm-scroll-area` 를 실제 스크롤러처럼 세운다 — 이 앱의 모바일 스크롤러는 window 가 아니다. */
 function mountScrollArea(scrollHeight: number, clientHeight = 800) {
@@ -352,5 +354,122 @@ describe('ScrollRestoration — 뒤로가기는 보던 자리로', () => {
 
     expect(area.scrollTop).toBe(410);
     expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+});
+
+// 위치를 "언제 저장하고 언제 복원하는가"의 계약 — 시간 순서가 핵심이라 가짜 타이머와
+// 콜백을 직접 부를 수 있는 ResizeObserver 스텁(불가피한 브라우저 API 목)을 쓴다.
+describe('ScrollRestoration — 저장과 복원의 시간 순서', () => {
+  class StubResizeObserver {
+    static instances: StubResizeObserver[] = [];
+    observed: Element[] = [];
+    constructor(private callback: ResizeObserverCallback) { StubResizeObserver.instances.push(this); }
+    observe(target: Element) { this.observed.push(target); }
+    disconnect() {}
+    fire() { this.callback([], this as unknown as ResizeObserver); }
+  }
+
+  /** 복원 대기 중인 상태를 만든다 — 저장값 1200, 돌아온 화면은 아직 짧다. */
+  function returnToTournamentsWhileShort() {
+    const area = mountScrollArea(500);
+    const content = document.createElement('div');
+    area.appendChild(content);
+    saveScrollPosition('/tournaments', 1200);
+    nav.pathname = '/teams';
+    const view = render(<ScrollRestoration />);
+    const tab = anchor('tm-bottom-tab', '/tournaments');
+    clickThen(tab, '/tournaments', () => view.rerender(<ScrollRestoration />));
+    return { area, content, view };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    nav.pathname = '/tournaments';
+    window.history.replaceState(null, '', '/tournaments');
+    window.sessionStorage.clear();
+    document.body.innerHTML = '';
+    StubResizeObserver.instances = [];
+    vi.stubGlobal('ResizeObserver', StubResizeObserver);
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('내용이 자라 높이가 차면 타임아웃을 기다리지 않고 바로 복원한다', () => {
+    const { area, content } = returnToTournamentsWhileShort();
+    expect(area.scrollTop).toBe(0);
+
+    // 스크롤 상자 자체는 크기가 고정이라 resize 를 못 받는다 — 자식을 지켜봐야 한다.
+    const observer = StubResizeObserver.instances[0];
+    expect(observer.observed).toContain(content);
+    expect(observer.observed).not.toContain(area);
+
+    Object.defineProperty(area, 'scrollHeight', { value: 5000, configurable: true });
+    act(() => observer.fire());
+
+    expect(area.scrollTop).toBe(1200);
+  });
+
+  it('복원이 끝나기 전에 일어난 스크롤(맨 위)로 저장된 위치를 덮어쓰지 않는다', () => {
+    const { area } = returnToTournamentsWhileShort();
+
+    // 새 화면이 맨 위(0)에 있는 동안의 스크롤 이벤트 — 디바운스가 복원 중에 만료된다.
+    area.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+
+    expect(readScrollPosition('/tournaments')).toBe(1200);
+  });
+
+  it('복원이 끝나면 다시 저장한다', () => {
+    const { area } = returnToTournamentsWhileShort();
+    Object.defineProperty(area, 'scrollHeight', { value: 5000, configurable: true });
+    act(() => StubResizeObserver.instances[0].fire());
+
+    area.scrollTop = 1300;
+    area.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+
+    expect(readScrollPosition('/tournaments')).toBe(1300);
+  });
+
+  it('복원을 기다리는 중에 다른 화면으로 이동하면 이전 복원이 새 화면의 위치를 건드리지 않는다', () => {
+    const { area, view } = returnToTournamentsWhileShort();
+
+    const card = anchor('tm-card-link', '/tournaments/abc');
+    clickThen(card, '/tournaments/abc', () => view.rerender(<ScrollRestoration />));
+    expect(area.scrollTop).toBe(0);
+
+    Object.defineProperty(area, 'scrollHeight', { value: 5000, configurable: true });
+    act(() => { vi.advanceTimersByTime(RESTORE_TIMEOUT_MS + 100); });
+
+    expect(area.scrollTop).toBe(0);
+  });
+
+  it('첫 화면에서 셸(.tm-scroll-area)이 늦게 마운트돼도 그 스크롤이 저장된다', () => {
+    render(<ScrollRestoration />);
+    const area = mountScrollArea(5000);
+
+    area.scrollTop = 700;
+    area.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+
+    expect(readScrollPosition('/tournaments')).toBe(700);
+  });
+
+  it('스크롤 주체가 아닌 안쪽 스크롤(가로 캐러셀 등)은 저장하지 않는다', () => {
+    const area = mountScrollArea(5000);
+    const carousel = document.createElement('div');
+    area.appendChild(carousel);
+    render(<ScrollRestoration />);
+    saveScrollPosition('/tournaments', 90);
+
+    area.scrollTop = 400;
+    carousel.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+
+    expect(readScrollPosition('/tournaments')).toBe(90);
   });
 });

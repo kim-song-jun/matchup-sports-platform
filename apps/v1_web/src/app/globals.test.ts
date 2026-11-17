@@ -404,9 +404,20 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
 
     expect(naming.length).toBeGreaterThan(0);
     for (const rule of naming) {
-      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-page-transition-enter$/);
-      expect(rule.body).toMatch(/view-transition-name:\s*page-content/);
+      // 모바일에서는 이름이 스크롤 상자로 옮겨 가므로 상자 안의 래퍼는 이름을 뗀다(none).
+      const insideScrollArea = /\.tm-scroll-area\s+\.tm-page-transition-enter$/.test(rule.selector);
+      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+(\.tm-scroll-area\s+)?\.tm-page-transition-enter$/);
+      expect(rule.body).toMatch(insideScrollArea ? /view-transition-name:\s*none/ : /view-transition-name:\s*page-content/);
     }
+  });
+
+  it('스크롤 상자(.tm-scroll-area)의 page-content 이름도 전환 중 표시 아래에서만 붙는다', () => {
+    const named = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, selector, body]) => ({ selector: selector.trim(), body }))
+      .filter((rule) => /\.tm-scroll-area$/.test(rule.selector) && /view-transition-name:\s*page-content/.test(rule.body));
+
+    expect(named.length).toBeGreaterThan(0);
+    for (const rule of named) expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-scroll-area$/);
   });
 
   it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {

@@ -69,18 +69,23 @@ function getClientHeight(el: ScrollHost): number {
  * 20개만 있는데 5,000px 지점을 복원하려는 경우) 지금 도달 가능한 최댓값으로 클램프하고
  * 포기한다 — 사용자를 무작정 맨 위로 되돌리는 것보다 보던 지점에 더 가깝다.
  */
-export function restoreWhenTallEnough(el: ScrollHost, target: number): void {
+export function restoreWhenTallEnough(el: ScrollHost, target: number, onSettled?: () => void): () => void {
   const clientHeight = getClientHeight(el);
   let settled = false;
   let observer: ResizeObserver | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  const finish = (finalTop: number) => {
-    if (settled) return;
+  const release = () => {
     settled = true;
     observer?.disconnect();
     if (timeoutId !== null) clearTimeout(timeoutId);
+  };
+
+  const finish = (finalTop: number) => {
+    if (settled) return;
+    release();
     setScrollTop(el, finalTop);
+    onSettled?.();
   };
 
   const tryRestore = () => {
@@ -88,17 +93,28 @@ export function restoreWhenTallEnough(el: ScrollHost, target: number): void {
     if (maxScrollable >= target) finish(target);
   };
 
-  tryRestore();
-  if (settled) return;
+  // 다음 이동이 시작되면 이전 복원이 새 화면의 scrollTop 을 건드리지 않게 끊는다. onSettled 는 부르지 않는다.
+  const cancel = () => {
+    if (!settled) release();
+  };
 
-  const node = el === window ? document.documentElement : (el as Element);
+  tryRestore();
+  if (settled) return cancel;
+
   observer = new ResizeObserver(tryRestore);
-  observer.observe(node);
+  if (el === window) {
+    observer.observe(document.documentElement);
+  } else {
+    // 모바일의 스크롤 상자는 크기가 고정이라 자기 자신은 내용이 자라도 resize 가 오지 않는다.
+    // 높이를 만드는 것은 안쪽 자식이므로 자식을 지켜본다.
+    for (const child of Array.from((el as Element).children)) observer.observe(child);
+  }
 
   timeoutId = setTimeout(() => {
     const maxScrollable = Math.max(0, getScrollHeight(el) - clientHeight);
     finish(Math.min(target, maxScrollable));
   }, RESTORE_TIMEOUT_MS);
+  return cancel;
 }
 
 /** 층위 §0 참고: layout.tsx 레벨에 마운트되는 부수효과 전용 컴포넌트. 항상 null 렌더. */
@@ -106,24 +122,31 @@ export function ScrollRestoration() {
   const pathname = usePathname();
   const navTypeRef = useRef<NavType>('push');
   const firstRenderRef = useRef(true);
+  // 복원이 끝나기 전의 위치는 "보던 자리"가 아니라 새 화면의 맨 위라서 저장하면 안 된다.
+  const restoringRef = useRef(false);
+  const cancelRestoreRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => cancelRestoreRef.current?.(), []);
 
   // ① 저장 — 스크롤할 때마다(디바운스) 현재 라우트에 현재 위치를 적는다.
+  // 스크롤은 버블링하지 않으므로 document 캡처 한 곳에서 받고, 스크롤 주체는 이벤트 때마다 다시 구한다 —
+  // 첫 화면은 셸(.tm-scroll-area)이 이 효과보다 늦게 마운트돼 효과 시점에 구하면 window 로 떨어진다.
   useEffect(() => {
-    const el = getScrollElement();
-    if (!el) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const onScroll = () => {
+    const onScroll = (event: Event) => {
+      const el = getScrollElement();
+      if (!el || event.target !== (el === window ? document : el)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
+        if (restoringRef.current) return;
         saveScrollPosition(getCurrentRedirectPath(), getScrollTop(el));
       }, SAVE_DEBOUNCE_MS);
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     return () => {
-      el.removeEventListener('scroll', onScroll);
+      document.removeEventListener('scroll', onScroll, { capture: true });
       if (timer) clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   // ② 방향 감지 — 앱 페이지 이동인 popstate(오버레이 pop 제외)와 헤더 뒤로가기 클릭이 "뒤로"다.
@@ -153,6 +176,9 @@ export function ScrollRestoration() {
 
   // ③ 적용 — pathname 이 실제로 바뀌면 방향에 따라 top=0, hash target, 또는 복원.
   useEffect(() => {
+    cancelRestoreRef.current?.();
+    cancelRestoreRef.current = null;
+    restoringRef.current = false;
     const el = getScrollElement();
     const scrollToHashTarget = () => {
       const hash = window.location.hash;
@@ -208,7 +234,10 @@ export function ScrollRestoration() {
 
     if (navTypeRef.current === 'pop' || navTypeRef.current === 'tab') {
       const saved = readScrollPosition(getCurrentRedirectPath());
-      if (saved != null) restoreWhenTallEnough(el, saved);
+      if (saved != null) {
+        restoringRef.current = true;
+        cancelRestoreRef.current = restoreWhenTallEnough(el, saved, () => { restoringRef.current = false; });
+      }
       // 저장된 값이 없으면(예: 딥링크로 직접 진입, 또는 그 탭에 처음 들어감) 아무 것도
       // 하지 않는다 — 이미 0이다.
     } else {

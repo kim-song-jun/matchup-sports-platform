@@ -10923,6 +10923,19 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   view-transition-name: page-content;
 }
 
+/* 이름표 위치 — 내용물(래퍼)이 스크롤하면 옛/새 스냅샷의 위치·높이가 스크롤만큼 달라서 UA 기본 group
+   이동 250ms 가 옛 목록을 아래로 쓸어 내린다(슬라이드와 같은 시각에 겹침). 모바일은 크기가 고정인
+   스크롤 상자에 이름을 달아 옛/새 사각형을 같게 둔다. 상자가 없는 화면(인증 등)은 위 래퍼 규칙이 그대로 남는다.
+   데스크톱(문서 스크롤)은 아래 push 규칙이 맡는다. */
+@media not all and (min-width: 1024px) {
+  :root[data-page-transition="active"] .tm-scroll-area {
+    view-transition-name: page-content;
+  }
+  :root[data-page-transition="active"] .tm-scroll-area .tm-page-transition-enter {
+    view-transition-name: none;
+  }
+}
+
 @keyframes tm-page-slide {
   from { translate: var(--tm-slide-offset); }
   to { translate: 0; }
@@ -10963,6 +10976,18 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   :root[data-nav-kind="pop"]::view-transition-new(page-content) {
     --tm-slide-offset: 0;
   }
+
+  /* push: 새 화면은 맨 위에서 시작하고 옛 화면은 --tm-vt-scroll-y(누른 순간 스크롤)만큼 올라가 있다.
+     group 이동을 그대로 두면 옛 목록이 그 거리만큼 아래로 쓸린다 — 끄고, 옛 스냅샷을 스크롤만큼
+     위로 올려 누르기 전 자리에 둔다. pop 은 새 화면 스크롤이 복원값이라 거리가 달라 이 방식을 쓰지 않는다. */
+  :root[data-nav-kind="push"]::view-transition-group(page-content) {
+    animation: none;
+  }
+  :root[data-nav-kind="push"]::view-transition-old(page-content) {
+    inset-block-start: calc(-1px * var(--tm-vt-scroll-y, 0));
+  }
+  /* 옛 스냅샷이 올라가 상단 내비 위를 덮지 않도록 내비를 셸 이름표로 분리한다(아래 tm-shell-* 규칙). */
+  .tm-desktop-nav { view-transition-name: tm-shell-desktopnav; }
 }
 
 /* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
@@ -11131,20 +11156,23 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 ::view-transition-group(tm-shell-topbar),
 ::view-transition-group(tm-shell-bottomnav),
 ::view-transition-group(tm-shell-fixed-cta),
-::view-transition-group(tm-shell-route-progress) {
+::view-transition-group(tm-shell-route-progress),
+::view-transition-group(tm-shell-desktopnav) {
   animation: none;
   z-index: 100; /* 슬라이드하는 page-content 그룹 위에 그려지도록 */
 }
 ::view-transition-old(tm-shell-topbar),
 ::view-transition-old(tm-shell-bottomnav),
 ::view-transition-old(tm-shell-fixed-cta),
-::view-transition-old(tm-shell-route-progress) {
+::view-transition-old(tm-shell-route-progress),
+::view-transition-old(tm-shell-desktopnav) {
   display: none; /* old+new 가 겹쳐 두 겹으로 보이는 것 방지 */
 }
 ::view-transition-new(tm-shell-topbar),
 ::view-transition-new(tm-shell-bottomnav),
 ::view-transition-new(tm-shell-fixed-cta),
-::view-transition-new(tm-shell-route-progress) {
+::view-transition-new(tm-shell-route-progress),
+::view-transition-new(tm-shell-desktopnav) {
   animation: none;
 }
 

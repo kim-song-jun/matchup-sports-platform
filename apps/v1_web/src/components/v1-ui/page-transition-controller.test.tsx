@@ -12,9 +12,11 @@ import { PageTransitionController } from './page-transition-controller';
 const route = vi.hoisted(() => ({ pathname: '/tournaments' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
 
-function clickAnchor(href: string) {
+function clickAnchor(href: string, containerClass?: string) {
   const host = document.createElement('div');
-  host.innerHTML = `<a href="${href}">이동</a>`;
+  host.innerHTML = containerClass
+    ? `<nav class="${containerClass}"><a href="${href}">이동</a></nav>`
+    : `<a href="${href}">이동</a>`;
   document.body.appendChild(host);
   host.querySelector('a')!.addEventListener('click', (event) => event.preventDefault());
   host.querySelector('a')!.click();
@@ -52,6 +54,25 @@ describe('PageTransitionController — search 이동에는 VT 를 걸지 않는�
     clickAnchor('/tournaments?filter=1');
 
     expect(document.documentElement.dataset.navKind).toBe('search');
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  // 탭은 CSS 가 old/new/group 애니메이션을 전부 꺼서 보여 줄 움직임이 없다 — VT 를 걸면 정지 화면만 생긴다.
+  it('하단 탭 이동은 data-nav-kind=tab 만 심고 startViewTransition 을 부르지 않는다', () => {
+    render(<PageTransitionController />);
+
+    clickAnchor('/teams', 'tm-bottom-nav');
+
+    expect(document.documentElement.dataset.navKind).toBe('tab');
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  it('같은 경로 안 세부 탭(?kind=)도 tab 으로 분류되고 VT 를 걸지 않는다', () => {
+    render(<PageTransitionController />);
+
+    clickAnchor('/tournaments?kind=league', 'tm-segmented-tabs');
+
+    expect(document.documentElement.dataset.navKind).toBe('tab');
     expect(startViewTransition).not.toHaveBeenCalled();
   });
 
@@ -190,5 +211,38 @@ describe('PageTransitionController — 래퍼 이름 표시(data-page-transition
 
     expect(document.startViewTransition).not.toHaveBeenCalled();
     expect(document.documentElement.dataset.pageTransition).toBeUndefined();
+  });
+
+  // 데스크톱은 문서가 스크롤돼서 옛 스냅샷이 스크롤 값만큼 위에 있다 — globals.css 가 이 값으로 제자리에 둔다.
+  it('push 는 누른 순간의 스크롤 값을 --tm-vt-scroll-y 로 심고, 전환이 끝나면 뗀다', async () => {
+    Object.defineProperty(window, 'scrollY', { value: 1200, configurable: true });
+    try {
+      render(<PageTransitionController />);
+      clickAnchor('/tournaments/abc');
+
+      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('1200');
+
+      fakes[0].finish();
+      await fakes[0].finished;
+      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('');
+    } finally {
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+    }
+  });
+
+  it('연타로 앞 전환이 skip 돼 끝나도 뒤 전환의 스크롤 값은 남는다', async () => {
+    Object.defineProperty(window, 'scrollY', { value: 300, configurable: true });
+    try {
+      render(<PageTransitionController />);
+      clickAnchor('/tournaments/abc');
+      Object.defineProperty(window, 'scrollY', { value: 700, configurable: true });
+      clickAnchor('/tournaments/def');
+      await fakes[0].finished;
+
+      expect(document.documentElement.style.getPropertyValue('--tm-vt-scroll-y')).toBe('700');
+    } finally {
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+      document.documentElement.style.removeProperty('--tm-vt-scroll-y');
+    }
   });
 });

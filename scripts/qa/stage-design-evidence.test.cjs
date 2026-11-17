@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { resumeEvidence } = require('./stage-design-evidence.cjs');
 const scope = { phase: 'after', origin: 'https://alpha.teameet.co.kr', tournamentId: 'owned', expectedCommit: 'new', routes: [['bracket', '/bracket']] };
-const check = { name: 'bracket', route: '/bracket', url: '/bracket', width: 390, release: 'new', passed: true };
+const check = { name: 'bracket', route: '/bracket', url: '/bracket', width: 390, release: 'new', passed: true, scroll: [{ after: 400, max: 400 }] };
 const report = checks => ({ evidenceVersion: 2, ...scope, checks, interactions: [{ name: 'filtered-final-team-matches', width: 390, passed: true }] });
 test('rejects screenshots from another deployment before launching a browser', () => {
   assert.throws(() => resumeEvidence(report([{ ...check, release: 'old' }]), scope), /different deployment/);
@@ -20,4 +20,7 @@ test('rejects evidence from another competition', () => {
 });
 test('rejects legacy captures that did not verify scrolling', () => {
   assert.throws(() => resumeEvidence({ ...report([check]), evidenceVersion: undefined }, scope), /older capture format/);
+});
+test('reruns a route whose claimed success did not reach the content bottom', () => {
+  assert.deepEqual(resumeEvidence(report([{ ...check, scroll: [{ after: 0, max: 400 }] }]), scope).checks, []);
 });

@@ -16,10 +16,11 @@ sudo usermod -aG docker ec2-user
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
-# Install Node.js 20 + pnpm
-curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+# Install patched Node.js 22 + pnpm
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
 sudo yum install -y nodejs
-sudo npm install -g pnpm@9
+node -e 'const [major,minor,patch]=process.versions.node.split(".").map(Number);if(major!==22||minor<23||(minor===23&&patch<5))throw new Error("Node.js >=22.23.5 <23 required (ICTIS SMR261116)")'
+sudo npm install -g pnpm@9.15.4
 
 echo "=== Setup Complete ==="
 docker --version

@@ -423,6 +423,23 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
     expect(oldRule?.[2]).toMatch(/display:\s*none/);
   });
 
+  // 배너가 전환 동안 제자리에 있으려면 이름표 + group 이동 끄기 + old 숨기기 + new 애니메이션 끄기가 모두 필요하다.
+  // 하나만 빠져도 옛 배너 사진이 겹치거나 배너가 슬라이드·페이드한다.
+  it('앱 설치 안내 배너 이름표는 group 이동을 끄고 old 를 숨기고 new 애니메이션을 끈다', () => {
+    const name = 'tm-shell-open-in-app';
+    const rules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
+      selectors: selector.split(',').map((s) => s.trim()),
+      body,
+    }));
+    const bodyFor = (pseudo: 'group' | 'old' | 'new') =>
+      rules.find((rule) => rule.selectors.includes(`::view-transition-${pseudo}(${name})`))?.body;
+
+    expect(rulesOnly).toMatch(new RegExp(`\\.tm-open-in-app-banner\\s*\\{\\s*view-transition-name:\\s*${name};?\\s*\\}`));
+    expect(bodyFor('group')).toMatch(/animation:\s*none/);
+    expect(bodyFor('old')).toMatch(/display:\s*none/);
+    expect(bodyFor('new')).toMatch(/animation:\s*none/);
+  });
+
   it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {
     const animated = wrapperRules.filter((rule) => /animation\s*:/.test(rule.body) && !/animation\s*:\s*none/.test(rule.body));
 

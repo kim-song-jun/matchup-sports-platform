@@ -61,7 +61,7 @@ export function PageTransitionController() {
     // 전환을 걸지 않는 이동 — kind 만 심는다(CSS 와 ScrollRestoration 이 읽는다).
     // - search: 같은 pathname 안에서 검색 파라미터만 바뀌어 template.tsx 가 리마운트되지 않는다.
     //   VT 를 걸면 resolve 신호가 안 와 MAX_PENDING_MS 동안 old 스냅샷이 정지 화면으로 남는다.
-    // - tab: CSS 가 tab 의 old/new/group 애니메이션을 전부 꺼 둬서 보여 줄 움직임이 없다.
+    // - tab: 탭 이동은 페이지가 아니라 보여 줄 움직임이 없다.
     //   VT 를 걸면 정지 화면만 생기고, 같은 경로 안 세부 탭은 resolve 신호도 안 온다.
     if (kind === 'search' || kind === 'tab') {
       document.documentElement.dataset.navKind = kind;

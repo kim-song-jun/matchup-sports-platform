@@ -57,7 +57,7 @@ describe('PageTransitionController — search 이동에는 VT 를 걸지 않는�
     expect(startViewTransition).not.toHaveBeenCalled();
   });
 
-  // 탭은 CSS 가 old/new/group 애니메이션을 전부 꺼서 보여 줄 움직임이 없다 — VT 를 걸면 정지 화면만 생긴다.
+  // 탭은 페이지가 아니라 보여 줄 움직임이 없다 — VT 를 걸면 정지 화면만 생긴다.
   it('하단 탭 이동은 data-nav-kind=tab 만 심고 startViewTransition 을 부르지 않는다', () => {
     render(<PageTransitionController />);
 

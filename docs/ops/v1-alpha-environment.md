@@ -242,7 +242,7 @@ curl -fsSI https://alpha.teameet.co.kr/landing | \
   grep -Ei '^(x-teameet-release|x-teameet-commit):'
 ```
 
-ECR의 `sha-*` tagged 이미지는 자동 만료하지 않는다. lifecycle은 7일이 지난 untagged build 잔여물만 제거하므로 active/previous rollback digest를 삭제하지 않는다. 향후 tagged retention을 도입하려면 EC2 active/previous state와 대조하는 state-aware GC가 먼저 필요하다. 단순 `dev.1`, `dev.2` 카운터는 사용하지 않는다.
+ECR lifecycle은 `scripts/infra/render-alpha-ecr-lifecycle-policies.mjs`가 정본이고 프로비저닝 스크립트가 그대로 적용한다. 규칙은 7일이 지난 untagged 이미지 만료, `sha-` 태그 30개 초과분 만료(api·web 공통), api 저장소만 `task168-` 태그 10개 초과분 만료다. 그래서 가장 최근 30개 밖의 옛 릴리스로는 rollback할 수 없다. 이 규칙은 EC2 active/previous state와 대조하지 않으므로 그 범위를 넓히려면 state-aware GC가 먼저 필요하다. 규칙을 바꾸면 `scripts/qa/check-alpha-immutable-deploy.mjs`의 기대값도 함께 고친다. 단순 `dev.1`, `dev.2` 카운터는 사용하지 않는다.
 
 ## alpha QA와 main 승격
 

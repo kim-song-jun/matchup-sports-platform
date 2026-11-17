@@ -459,6 +459,33 @@ describe('ScrollRestoration — 저장과 복원의 시간 순서', () => {
     expect(readScrollPosition('/tournaments')).toBe(700);
   });
 
+  it('데스크톱에서는 문서(window) 스크롤이 저장된다', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }));
+    render(<ScrollRestoration />);
+
+    Object.defineProperty(window, 'scrollY', { value: 640, configurable: true });
+    document.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+
+    expect(readScrollPosition('/tournaments')).toBe(640);
+  });
+
+  it('데스크톱에서는 안쪽 요소의 스크롤을 문서 스크롤로 착각해 저장하지 않는다', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }));
+    const inner = document.createElement('div');
+    document.body.appendChild(inner);
+    render(<ScrollRestoration />);
+    saveScrollPosition('/tournaments', 90);
+
+    Object.defineProperty(window, 'scrollY', { value: 640, configurable: true });
+    inner.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(200); });
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+
+    expect(readScrollPosition('/tournaments')).toBe(90);
+  });
+
   it('스크롤 주체가 아닌 안쪽 스크롤(가로 캐러셀 등)은 저장하지 않는다', () => {
     const area = mountScrollArea(5000);
     const carousel = document.createElement('div');

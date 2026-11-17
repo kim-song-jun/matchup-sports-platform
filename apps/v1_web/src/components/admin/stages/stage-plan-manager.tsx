@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStagePlan } from '@/hooks/use-stage-plan';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { Button } from '@/components/v1-ui/button';
@@ -15,16 +15,26 @@ import { StageStructureEditor } from './stage-structure-editor';
 import { StageFixtureRepair } from './stage-fixture-repair';
 import { StageSixTeamControl } from './stage-six-team-control';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+type PoolLabels = { name: string; stageName: string; rankStart: string };
+type PoolDraft = PoolLabels & { ids: string[]; reason: string; override: boolean; basis: string; labels: PoolLabels };
+const assignmentBasis = (pool: StagePoolView) => JSON.stringify([pool.sourceVersion, pool.registrationIds, pool.assigned, pool.stale]);
 export function StagePlanManager({ tournamentId, canWrite, canOverride = false, compactNavigation = false, tournamentStatus }: { tournamentId: string; canWrite: boolean; canOverride?: boolean; compactNavigation?: boolean; tournamentStatus?: string }) {
   const api = useStagePlan(tournamentId), bracket = useV1AdminBracket(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const [key, setKey] = useState(''), [error, setError] = useState('');
   const [panel, setPanel] = useState('teams');
+  const drafts = useRef<Record<string, PoolDraft>>({});
+  const [editorEpoch, setEditorEpoch] = useState(0);
   const editable = canWrite && tournamentStatus !== 'completed' && tournamentStatus !== 'cancelled';
   const view = api.view.data;
   if (!view) return api.view.isError ? <ErrorState message={extractErrorMessage(api.view.error, '단계 구성을 불러오지 못했어요.')} onRetry={() => void api.view.refetch()} /> : <p role="status">단계 구성을 불러오고 있어요.</p>;
   const pool = view.pools.find(p => p.key === key) ?? view.pools[0];
   const counts = stagePlanCounts(view.config);
+  async function reload() {
+    if (!await confirm({ title: '최신 구성으로 다시 불러올까요?', message: '저장하지 않은 입력은 최신 서버 내용으로 바뀌어요.', confirmLabel: '다시 불러오기' })) return;
+    const result = await api.view.refetch();
+    if (!result.isError) { drafts.current = {}; setEditorEpoch(epoch => epoch + 1); }
+  }
   async function generate() {
     if (!view || !await confirm({ title: '단계별 대진을 생성할까요?', message: `${counts.fixtures}경기를 참가팀 미정 상태로 만들어요. 참가팀과 경기 일정은 별도로 설정하고, 시작 전 편성은 구성 수정에서 변경할 수 있어요.`, confirmLabel: '대진 생성' })) return;
     try { setError(''); await api.generate.mutateAsync({ expectedRevision: view.revision }); } catch (e) { setError(extractErrorMessage(e, '대진을 생성하지 못했어요.')); }
@@ -48,11 +58,11 @@ export function StagePlanManager({ tournamentId, canWrite, canOverride = false, 
     <div className="flex flex-wrap gap-2">
       {editable && !view.pools.some(p => p.generated) && <Button variant="primary" disabled={api.generate.isPending || api.view.isError} onClick={() => void generate()}>{api.generate.isPending ? '생성 중…' : '단계별 대진 생성'}</Button>}
       {editable && view.pools.some(p => p.generated) && <Button variant="neutral" disabled={api.randomize?.isPending || view.pools.some(p => p.stageIndex === 0 && p.started)} onClick={() => void randomize()}>첫 단계 무작위 배정</Button>}
-      <Button variant="neutral" onClick={() => void api.view.refetch()}>최신 구성 불러오기</Button>
+      <Button variant="neutral" onClick={() => void reload()}>최신 구성 불러오기</Button>
       <Link className="tm-btn tm-btn-md tm-btn-neutral" href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`}>경기 운영 보드</Link>
     </div>
     <label className="block tm-text-label">관리할 편성<select className={stageControl} value={pool?.key ?? ''} onChange={e => setKey(e.target.value)}>{view.config.stages.map(s => <optgroup key={s.key} label={s.name}>{s.pools.map(p => <option key={p.key} value={p.key}>{p.name} · {p.format === 'league' ? '풀리그' : '토너먼트'}</option>)}</optgroup>)}</select></label>
-    {pool && <StagePoolAssignment key={`assignment:${pool.key}:${view.revision}`} pool={pool} view={view} canWrite={canWrite && !api.view.isError} canAssign={editable && !api.view.isError} canOverride={canOverride} onRename={names => api.rename.mutateAsync({ ...names, poolKey: pool.key, expectedRevision: view.revision })} onSave={registrationIds => api.assign.mutateAsync({ ...registrationIds, poolKey: pool.key, expectedRevision: view.revision, sourceVersion: pool.sourceVersion })} />}
+    {pool && <StagePoolAssignment key={`assignment:${tournamentId}:${pool.key}:${editorEpoch}`} pool={pool} view={view} initialDraft={drafts.current[`${tournamentId}:${pool.key}`]} onDraftChange={draft => { drafts.current[`${tournamentId}:${pool.key}`] = draft; }} canWrite={canWrite && !api.view.isError} canAssign={editable && !api.view.isError} canOverride={canOverride} onRename={names => api.rename.mutateAsync({ ...names, poolKey: pool.key, expectedRevision: view.revision })} onSave={registrationIds => api.assign.mutateAsync({ ...registrationIds, poolKey: pool.key, expectedRevision: view.revision, sourceVersion: pool.sourceVersion })} />}
     </div>
     {compactNavigation && panel === 'settings' && <label className="block tm-text-label">관리할 편성<select className={stageControl} value={pool?.key ?? ''} onChange={e => setKey(e.target.value)}>{view.config.stages.map(s => <optgroup key={s.key} label={s.name}>{s.pools.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</optgroup>)}</select></label>}
     <div hidden={compactNavigation && panel !== 'settings'} className="space-y-4">
@@ -64,32 +74,47 @@ export function StagePlanManager({ tournamentId, canWrite, canOverride = false, 
     {ConfirmModal}
   </div>;
 }
-function StagePoolAssignment({ pool, view, canWrite, canAssign, canOverride, onRename, onSave }: { pool: StagePoolView; view: StagePlanView; canWrite: boolean; canAssign: boolean; canOverride: boolean; onRename: (names: { name: string; stageName: string; overallRankStart?: number | null }) => Promise<unknown>; onSave: (input: { registrationIds: Array<string | null>; reason?: string; acknowledgeStartedCorrection?: boolean; draft?: boolean; overrideCandidates?: boolean }) => Promise<unknown> }) {
-  const [ids, setIds] = useState(() => Array.from({ length: pool.capacity }, (_, i) => pool.registrationIds[i] ?? ''));
-  const [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false);
-  const [name, setName] = useState(pool.name), [stageName, setStageName] = useState(pool.stageName), [override, setOverride] = useState(false);
-  const [rankStart, setRankStart] = useState(pool.overallRankStart === undefined ? '' : String(pool.overallRankStart));
+function StagePoolAssignment({ pool, view, initialDraft, onDraftChange, canWrite, canAssign, canOverride, onRename, onSave }: { pool: StagePoolView; view: StagePlanView; initialDraft?: PoolDraft; onDraftChange: (draft: PoolDraft) => void; canWrite: boolean; canAssign: boolean; canOverride: boolean; onRename: (names: { name: string; stageName: string; overallRankStart?: number | null }) => Promise<StagePlanView>; onSave: (input: { registrationIds: Array<string | null>; reason?: string; acknowledgeStartedCorrection?: boolean; draft?: boolean; overrideCandidates?: boolean }) => Promise<StagePlanView> }) {
+  const poolLabels = { name: pool.name, stageName: pool.stageName, rankStart: pool.overallRankStart === undefined ? '' : String(pool.overallRankStart) };
+  const initialLabel = (field: keyof PoolLabels) => initialDraft && initialDraft[field] !== initialDraft.labels[field] ? initialDraft[field] : poolLabels[field];
+  const [ids, setIds] = useState(() => initialDraft?.ids ?? Array.from({ length: pool.capacity }, (_, i) => pool.registrationIds[i] ?? ''));
+  const [reason, setReason] = useState(initialDraft?.reason ?? ''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false);
+  const [name, setName] = useState(() => initialLabel('name')), [stageName, setStageName] = useState(() => initialLabel('stageName')), [override, setOverride] = useState(initialDraft?.override ?? false);
+  const [rankStart, setRankStart] = useState(() => initialLabel('rankStart'));
+  const [basis, setBasis] = useState(initialDraft?.basis ?? assignmentBasis(pool));
+  useEffect(() => { setSaved(false); }, [ids, reason, override]);
+  const labels = useRef(poolLabels);
+  useEffect(() => {
+    const previous = labels.current, next = { name: pool.name, stageName: pool.stageName, rankStart: pool.overallRankStart === undefined ? '' : String(pool.overallRankStart) };
+    setName(current => current === previous.name ? next.name : current);
+    setStageName(current => current === previous.stageName ? next.stageName : current);
+    setRankStart(current => current === previous.rankStart ? next.rankStart : current);
+    labels.current = next;
+  }, [pool.name, pool.stageName, pool.overallRankStart]);
+  useEffect(() => { onDraftChange({ ids, reason, name, stageName, override, rankStart, basis, labels: labels.current }); }, [ids, reason, name, stageName, override, rankStart, basis, onDraftChange]);
+  const assignmentChanged = basis !== assignmentBasis(pool);
   const finalStage = pool.stageIndex === view.config.stages.length - 1;
   const rankChanged = rankStart !== (pool.overallRankStart === undefined ? '' : String(pool.overallRankStart));
   const rankInvalid = rankStart !== '' && (!Number.isInteger(Number(rankStart)) || Number(rankStart) < 1 || Number(rankStart) > stagePlanCounts(view.config).teams);
   const { confirm, ConfirmModal } = useConfirm();
-  const disabled = !canAssign || !pool.generated || pool.started || busy;
+  const disabled = !canAssign || !pool.generated || pool.started || busy || assignmentChanged;
+  const acceptSavedAssignment = (next: StagePlanView) => { const current = next.pools.find(item => item.key === pool.key); if (current) setBasis(assignmentBasis(current)); };
   const others = new Set(view.pools.filter(p => p.stageKey === pool.stageKey && p.key !== pool.key).flatMap(p => p.registrationIds));
   const teamName = (id: string) => view.registrations.find(r => r.id === id)?.team.name ?? '확정 명단에 없는 팀';
   const ready = ids.every(Boolean) && new Set(ids).size === pool.capacity;
   async function save() {
     if (!ready || !await confirm({ title: `${pool.name} 참가팀을 확정할까요?`, message: ids.map((id, i) => `${i + 1}번: ${teamName(id)}`).join('\n'), confirmLabel: '참가팀 확정' })) return;
-    try { setBusy(true); setError(''); await onSave({ registrationIds: ids, reason, ...(override ? { overrideCandidates: true } : {}) }); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '참가팀을 확정하지 못했어요.')); } finally { setBusy(false); }
+    try { setBusy(true); setError(''); acceptSavedAssignment(await onSave({ registrationIds: ids, reason, ...(override ? { overrideCandidates: true } : {}) })); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '참가팀을 확정하지 못했어요.')); } finally { setBusy(false); }
   }
   async function saveDraft() {
-    try { setBusy(true); setError(''); await onSave({ registrationIds: ids.map(id => id || null), reason, draft: true, ...(override ? { overrideCandidates: true } : {}) }); } catch (e) { setError(extractErrorMessage(e, '배정 초안을 저장하지 못했어요.')); } finally { setBusy(false); }
+    try { setBusy(true); setError(''); acceptSavedAssignment(await onSave({ registrationIds: ids.map(id => id || null), reason, draft: true, ...(override ? { overrideCandidates: true } : {}) })); setSaved(false); } catch (e) { setError(extractErrorMessage(e, '배정 초안을 저장하지 못했어요.')); } finally { setBusy(false); }
   }
   async function saveNames() {
     try { setBusy(true); setError(''); await onRename({ name, stageName, ...(finalStage ? { overallRankStart: rankStart === '' ? null : Number(rankStart) } : {}) }); } catch (e) { setError(extractErrorMessage(e, '표시 설정을 저장하지 못했어요.')); } finally { setBusy(false); }
   }
   async function acknowledgeCorrection() {
     if (!reason.trim() || !await confirm({ title: '현재 참가팀을 유지하고 정정 영향을 확인할까요?', message: '이미 시작한 편성의 참가팀과 경기 기록을 유지해요. 이전 단계의 변경된 공식 결과를 확인한 사유를 감사 기록에 남겨요.', confirmLabel: '참가팀 유지 확인' })) return;
-    try { setBusy(true); setError(''); await onSave({ registrationIds: pool.registrationIds as string[], reason, acknowledgeStartedCorrection: true }); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '정정 영향을 확인하지 못했어요.')); } finally { setBusy(false); }
+    try { setBusy(true); setError(''); acceptSavedAssignment(await onSave({ registrationIds: pool.registrationIds as string[], reason, acknowledgeStartedCorrection: true })); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '정정 영향을 확인하지 못했어요.')); } finally { setBusy(false); }
   }
   return <section className="space-y-4">
     <SectionTitle title={`${pool.stageName} · ${pool.name}`} />
@@ -101,6 +126,7 @@ function StagePoolAssignment({ pool, view, canWrite, canAssign, canOverride, onR
     {pool.started && <p className="tm-text-label">시작했거나 기록이 있는 편성이에요. 참가팀 배정은 고정돼요.</p>}
     {pool.stageIndex > 0 && <p className="tm-text-label">이전 단계의 공식 결과가 모두 반영돼야 추천할 수 있어요. 동률 자리는 후보 중에서 결정하고 사유를 남겨요.</p>}
     {error && <AlertBanner tone="error" message={error} />}{saved && <p role="status">참가팀을 확정했어요.</p>}
+    {assignmentChanged && <AlertBanner tone="warning" message="서버의 참가팀 배정이나 진출 출처가 바뀌었어요. 입력은 보존했으며 최신 구성을 다시 불러온 뒤 배정해 주세요." />}
     {canAssign && pool.started && pool.stale && pool.assigned && pool.stageIndex > 0 && <div className="space-y-3"><label className="block tm-text-label">참가팀 유지 사유<textarea className={stageControl} maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><Button variant="neutral" disabled={busy || !reason.trim() || pool.candidates.some(c => !c.length)} onClick={() => void acknowledgeCorrection()}>현재 참가팀 유지 · 정정 확인</Button></div>}
     <fieldset disabled={disabled} className="grid min-w-0 gap-3 sm:grid-cols-2 [&>button]:sm:col-span-2 [&>div]:sm:col-span-2">
       {canOverride && pool.stageIndex > 0 && <label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={override} onChange={e => setOverride(e.target.checked)} />공식 후보 밖 예외 배정 · 사유 필수</label>}

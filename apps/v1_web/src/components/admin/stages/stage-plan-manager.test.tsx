@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -19,7 +19,56 @@ function data(): StagePlanView {
     registrations: [{ id: 'r1', team: { name: '가팀' } }, { id: 'r2', team: { name: '나팀' } }], pools: [{ ...pool, stageKey: 'main', stageName: '본선', stageIndex: 0, generated: true, assigned: false, complete: false, stale: false, started: false, candidates: [], sourceVersion: 'source-v1', registrationIds: [null, null], fixtureIds: [], standings: [], slots: [{ id: 's1', position: 1, registrationId: null }, { id: 's2', position: 2, registrationId: null }] }] };
 }
 function show(canWrite = true) { const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }); render(<QueryClientProvider client={client}><StagePlanManager tournamentId="staged" canWrite={canWrite} /></QueryClientProvider>); }
+const assignmentForm = () => within(screen.getByRole('button', { name: '표시 설정 저장' }).closest('section')!);
 describe('단계별 참가팀 확정', () => {
+  it('편성을 왕복해도 각 편성의 미저장 이름과 참가팀 입력을 유지한다', async () => {
+    const view = data(), other = { ...view.pools[0], key: 'other', name: '다른 리그' };
+    view.pools.push(other); view.config.stages[0].pools.push(other);
+    server.use(http.get(base, () => success(view))); show();
+    fireEvent.change(await screen.findByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });
+    fireEvent.change(assignmentForm().getByLabelText('편성 이름'), { target: { value: '첫 편성 편집 중' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '관리할 편성' }), { target: { value: 'other' } });
+    expect(assignmentForm().getByLabelText('편성 이름')).toHaveValue('다른 리그');
+    fireEvent.change(assignmentForm().getByLabelText('편성 이름'), { target: { value: '둘째 편성 편집 중' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '관리할 편성' }), { target: { value: 'league' } });
+    expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue('r1');
+    expect(assignmentForm().getByLabelText('편성 이름')).toHaveValue('첫 편성 편집 중');
+    fireEvent.change(screen.getByRole('combobox', { name: '관리할 편성' }), { target: { value: 'other' } });
+    expect(assignmentForm().getByLabelText('편성 이름')).toHaveValue('둘째 편성 편집 중');
+  });
+  it('표시 이름을 저장한 뒤에도 미저장 참가팀을 새 revision으로 저장한다', async () => {
+    let view = data(), assigned: unknown;
+    server.use(http.get(base, () => success(view)), http.put(`${base}/names`, async ({ request }) => {
+      const names = await request.json() as { name: string };
+      view = { ...view, revision: 2, pools: view.pools.map(pool => ({ ...pool, name: names.name })) };
+      return success(view);
+    }), http.put(`${base}/assignment`, async ({ request }) => {
+      assigned = await request.json(); view = { ...view, revision: 3, pools: view.pools.map(pool => ({ ...pool, registrationIds: ['r1', null] })) };
+      return success(view);
+    })); show();
+    fireEvent.change(await screen.findByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });
+    fireEvent.change(assignmentForm().getByLabelText('편성 이름'), { target: { value: '저장한 편성 이름' } });
+    fireEvent.click(screen.getByRole('button', { name: '표시 설정 저장' }));
+    await screen.findByText('본선 · 저장한 편성 이름');
+    expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue('r1');
+    fireEvent.click(screen.getByRole('button', { name: '미정 자리 포함 초안 저장' }));
+    await waitFor(() => expect(assigned).toMatchObject({ expectedRevision: 2, registrationIds: ['r1', null] }));
+  });
+  it('서버 배정이 바뀌면 입력을 보존하고 재확인 전 덮어쓰기를 차단한다', async () => {
+    let view = data();
+    server.use(http.get(base, () => success(view)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><StagePlanManager tournamentId="staged" canWrite /></QueryClientProvider>);
+    fireEvent.change(await screen.findByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });
+    view = { ...view, revision: 2, pools: view.pools.map(pool => ({ ...pool, sourceVersion: 'changed-source' })) };
+    act(() => { client.setQueryData(['stages', 'staged'], view); });
+    expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue('r1');
+    await waitFor(() => expect(screen.getByRole('button', { name: '미정 자리 포함 초안 저장' })).toBeDisabled());
+    expect(screen.getByText(/입력은 보존했으며/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '최신 구성 불러오기' }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue(''));
+    expect(screen.getByRole('combobox', { name: '1번 자리' })).toBeEnabled();
+  });
   it('완료 대회는 구조·배정을 잠그고 이름·최종 순위 구간은 실제 표시 API로 저장한다', async () => {
     let view = data(), payload: unknown;
     server.use(http.get(base, () => success(view)), http.put(`${base}/names`, async ({ request }) => {

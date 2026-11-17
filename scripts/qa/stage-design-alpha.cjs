@@ -2,10 +2,14 @@
 const { chromium, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
+const { resumeEvidence, scrollContentToBottom } = require('./stage-design-evidence.cjs');
 const origin = 'https://alpha.teameet.co.kr';
 const tournamentId = 'ee1675e5-264e-43ec-9a36-bd2f0a3099d9';
 const phase = process.argv.includes('--after') ? 'after' : 'before';
-const destination = path.resolve('tmp/stage-design-alpha', phase);
+const filterCaptures = process.argv.includes('--filter-captures');
+const bottomCaptures = process.argv.includes('--admin-bottom-captures');
+if (filterCaptures && bottomCaptures) throw Error('Choose one focused capture scope');
+const destination = path.resolve('tmp/stage-design-alpha', filterCaptures ? 'filter-captures' : bottomCaptures ? 'admin-bottom-captures' : phase);
 const routes = [
   ['admin-create', '/admin/tournaments/new-staged'],
   ['admin-bracket', `/admin/tournaments/${tournamentId}/bracket`],
@@ -17,7 +21,7 @@ const routes = [
 ];
 async function interactionShot(page, report, name, width) {
   const file = `${name}-${width}.png`;
-  await page.screenshot({ path: path.join(destination, file) });
+  await page.screenshot({ animations: 'disabled', path: path.join(destination, file) });
   report.interactions.push({ name, width, screenshot: file, passed: true });
 }
 async function closeStagePanel(page) {
@@ -56,12 +60,14 @@ async function exercise(page, report, name, width) {
     await expect(page.getByText('모집 20팀 · 2단계 · 예상 70경기')).toBeVisible();
     await page.getByText('1위 리그 · 5팀 · 풀리그', { exact: true }).click();
     await expect(page.getByRole('combobox', { name: '1번 자리', exact: true })).toBeVisible();
+    await page.getByRole('combobox', { name: '1번 자리', exact: true }).scrollIntoViewIfNeeded();
     await interactionShot(page, report, 'create-20-team-editor', width);
   }
   if (name === 'admin-bracket') {
     await page.getByRole('button', { name: '단계·진출팀 관리', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '단계·진출팀 관리', exact: true });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('combobox', { name: '관리할 편성' })).toBeVisible();
     if (width === 390 && process.argv.includes('--normalize-fixture-names')) await normalizeFixtureNames(page, report);
     await page.keyboard.press('Shift+Tab');
     if (!await page.evaluate(() => document.activeElement?.closest('[role=dialog]') !== null)) throw Error('Stage panel focus escaped');
@@ -82,6 +88,7 @@ async function exercise(page, report, name, width) {
     await page.getByRole('navigation', { name: '편성 선택' }).getByRole('button').nth(1).click();
     await expect(page.getByRole('table')).toHaveCount(1);
     await page.getByRole('tab', { name: '경기 일정', exact: true }).click();
+    await expect(page.getByRole('tab', { name: '경기 일정', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('combobox', { name: '참가팀', exact: true }).selectOption({ index: 1 });
     const matches = page.locator(`a[href*="/tournaments/${tournamentId}/matches/"]`);
     await expect(matches).toHaveCount(4);
@@ -97,6 +104,7 @@ async function exercise(page, report, name, width) {
   if (name === 'results') {
     await expect(page.getByRole('navigation', { name: '진행 단계 선택' }).getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('table')).toHaveCount(4);
+    await page.getByRole('table').first().evaluate(element => element.scrollIntoView({ block: 'center' }));
     await interactionShot(page, report, 'final-league-results', width);
   }
 }
@@ -136,19 +144,28 @@ async function main() {
   const credentials = JSON.parse(fs.readFileSync(0, 'utf8').replace(/^\uFEFF/, ''));
   if (!credentials.email || !credentials.password) throw Error('Existing Alpha credentials required on stdin');
   fs.mkdirSync(destination, { recursive: true });
+  const expectedIndex = process.argv.indexOf('--expected-commit');
+  const expectedCommit = expectedIndex < 0 ? undefined : process.argv[expectedIndex + 1];
+  if (phase === 'after' && !/^[a-f0-9]{40}$/.test(expectedCommit ?? '')) throw Error('After evidence requires a full expected deployment SHA');
+  const resumed = process.argv.includes('--resume') && fs.existsSync(path.join(destination, 'report.json'))
+    ? resumeEvidence(JSON.parse(fs.readFileSync(path.join(destination, 'report.json'), 'utf8')), { phase, origin, tournamentId, expectedCommit, routes }) : { checks: [], interactions: [] };
+  if (resumed.checks.some(check => !fs.existsSync(path.join(destination, check.screenshot)) || !fs.existsSync(path.join(destination, check.screenshot.replace('-top.png', '-bottom.png')))) || resumed.interactions.some(item => item.screenshot && !fs.existsSync(path.join(destination, item.screenshot)))) throw Error('Resume screenshot files are missing; run without --resume');
   const server = await chromium.launchServer({ headless: false, args: ['--disable-dev-shm-usage', '--disable-gpu', '--disable-quic'] });
   const browser = await chromium.connect(server.wsEndpoint());
-  const report = { phase, origin, tournamentId, lifecycle: { nodePid: process.pid, browserPid: server.process().pid, parentPid: process.pid }, checks: [], interactions: [], closed: false };
-  if (process.argv.includes('--resume') && fs.existsSync(path.join(destination, 'report.json'))) report.checks = JSON.parse(fs.readFileSync(path.join(destination, 'report.json'), 'utf8')).checks;
+  const report = { evidenceVersion: 2, phase, origin, tournamentId, expectedCommit, lifecycle: { nodePid: process.pid, browserPid: server.process().pid, parentPid: process.pid }, checks: resumed.checks, interactions: resumed.interactions, loginDiagnostics: [], closed: false };
   console.log(JSON.stringify({ phase, browserPid: report.lifecycle.browserPid, headed: true }));
   try {
     for (const width of [390, 768, 1440]) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width < 1024, locale: 'ko-KR' });
-      const page = await context.newPage(), consoleErrors = [], networkErrors = [];
+      let page = await context.newPage();
+      const consoleErrors = [], networkErrors = [];
+      const observe = page => {
       page.on('pageerror', error => consoleErrors.push(error.message));
       page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
       page.on('response', response => { if (response.status() >= 400 && new URL(response.url()).origin === origin) networkErrors.push({ path: new URL(response.url()).pathname, status: response.status(), page: new URL(page.url()).pathname, resourceType: response.request().resourceType(), referrer: response.request().headers().referer ? new URL(response.request().headers().referer).pathname : null }); });
       page.on('requestfailed', request => { if (new URL(request.url()).origin === origin && request.failure()?.errorText !== 'net::ERR_ABORTED') networkErrors.push({ path: new URL(request.url()).pathname, error: request.failure()?.errorText }); });
+      };
+      observe(page);
       try {
         await page.goto(`${origin}/login/email`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
         await page.waitForFunction(() => { const form = document.querySelector('#v1-email-login-form'); return form && Object.keys(form).some(key => key.startsWith('__reactProps$')); }, { timeout: 45_000 });
@@ -160,13 +177,17 @@ async function main() {
         try { await page.waitForURL(url => !url.pathname.startsWith('/login'), { waitUntil: 'domcontentloaded', timeout: 30_000 }); }
         catch (error) { console.log(JSON.stringify({ loginText: await page.locator('body').innerText(), network: networkErrors })); throw error; }
         await page.waitForFunction(() => document.querySelector('nav') && !document.body.innerText.includes('로그인 정보를 확인하고 있어요.'));
+        await page.close();
+        report.loginDiagnostics.push({ width, console: [...consoleErrors], network: [...networkErrors] });
+        page = await context.newPage(); observe(page);
         consoleErrors.length = 0; networkErrors.length = 0;
         for (const [name, route] of routes) {
+          if (filterCaptures && name !== 'bracket') continue;
+          if (bottomCaptures && !name.startsWith('admin-')) continue;
           if (report.checks.some(check => check.name === name && check.width === width)) continue;
           const consoleStart = consoleErrors.length, networkStart = networkErrors.length;
           const response = await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-          const expected = process.argv.indexOf('--expected-commit');
-          if (phase === 'after' && (expected < 0 || response.headers()['x-teameet-commit'] !== process.argv[expected + 1])) throw Error(`Alpha release mismatch on ${name}`);
+          if (phase === 'after' && response.headers()['x-teameet-commit'] !== expectedCommit) throw Error(`Alpha release mismatch on ${name}`);
           await page.waitForFunction(() => document.body.innerText.length > 80 && !document.body.innerText.includes('로그인 정보를 확인하고 있어요.'), { timeout: 45_000 });
           await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
           await page.evaluate(() => document.fonts.ready);
@@ -174,12 +195,12 @@ async function main() {
           await page.screenshot({ path: path.join(destination, `${prefix}-top.png`) });
           const geometry = await page.evaluate(() => ({ width: innerWidth, documentWidth: document.documentElement.scrollWidth, horizontalOverflow: document.documentElement.scrollWidth - innerWidth, headings: [...document.querySelectorAll('h1,h2')].map(heading => heading.textContent.trim()) }));
           report.checks.push({ name, route, width, status: response.status(), release: response.headers()['x-teameet-commit'], url: new URL(page.url()).pathname, ...geometry, console: consoleErrors.slice(consoleStart), network: networkErrors.slice(networkStart), screenshot: `${prefix}-top.png` });
-          await page.evaluate(() => { const candidates = [...document.querySelectorAll('*')].filter(element => element.clientHeight > 200 && element.scrollHeight > element.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(element).overflowY)); candidates.sort((a, b) => b.clientHeight - a.clientHeight); if (candidates[0]) candidates[0].scrollTop = candidates[0].scrollHeight; else window.scrollTo(0, document.body.scrollHeight); });
-          await page.screenshot({ path: path.join(destination, `${prefix}-bottom.png`) });
-          if (phase === 'after') await exercise(page, report, name, width);
+          report.checks.at(-1).scroll = await scrollContentToBottom(page);
+          await page.screenshot({ animations: 'disabled', path: path.join(destination, `${prefix}-bottom.png`) });
+          if (phase === 'after' && !bottomCaptures) await exercise(page, report, name, width);
           const check = report.checks.at(-1);
           check.console = consoleErrors.slice(consoleStart); check.network = networkErrors.slice(networkStart);
-          check.passed = check.status === 200 && check.horizontalOverflow === 0 && check.console.length === 0 && check.network.length === 0;
+          check.passed = check.status === 200 && check.url === check.route && check.horizontalOverflow === 0 && check.console.length === 0 && check.network.length === 0;
           console.log(JSON.stringify({ name, width, status: response.status(), overflow: geometry.horizontalOverflow }));
           fs.writeFileSync(path.join(destination, 'report.json'), JSON.stringify(report, null, 2));
         }
@@ -194,11 +215,12 @@ async function main() {
             expect(fixture?.result?.homeScore).toBe(expected.homeScore); expect(fixture?.result?.awayScore).toBe(expected.awayScore);
           }
           report.preservation = { status: 'completed', originalFixtureIds: 70, officialScoresUnchanged: 70 };
-          await captureLegacyReference(page, context, report, width);
+          if (!filterCaptures && !bottomCaptures) await captureLegacyReference(page, context, report, width);
         }
       } finally { await context.close(); }
     }
-    if (phase === 'after' && [...report.checks, ...report.references].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
+    if (report.checks.length !== (filterCaptures ? 3 : bottomCaptures ? 9 : routes.length * 3)) throw Error('Route coverage is incomplete');
+    if (phase === 'after' && [...report.checks, ...(report.references ?? [])].some(check => !check.passed)) throw Error('Alpha route evidence contains an HTTP, console, network, or viewport failure');
   } catch (error) { report.failure = error.message; throw error; }
   finally {
     await browser.close(); await server.close(); report.closed = true;

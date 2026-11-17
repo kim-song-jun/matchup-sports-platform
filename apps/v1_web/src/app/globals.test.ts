@@ -237,19 +237,9 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
   // 실제로 그 상태로 배포돼 탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측).
   // 화면 없이는 잡을 수 없는 결함이라 텍스트 계약으로 고정한다.
 
-  it('탭 경로는 old/new 뿐 아니라 group 까지 끈다(이름 지정만으로는 부족)', () => {
+  it("'native'(iOS 셸의 popstate)는 old/new 뿐 아니라 group 까지 끈다(이름 지정만으로는 부족)", () => {
     // 이름을 지정(page-content)하면 root 스냅샷 교차 페이드와 group 리사이즈가 남는다.
     // 최소 재현: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 · group(*) 까지 0건.
-    // alpha 실측도 이름 지정 상태에서 정확히 6건이었다.
-    const tabRule = rulesOnly.match(/:root\[data-nav-kind=["']tab["']\][\s\S]*?\{[^}]*animation:\s*none[^}]*\}/);
-
-    expect(tabRule).not.toBeNull();
-    for (const part of ['old(*)', 'new(*)', 'group(*)']) {
-      expect(tabRule?.[0]).toContain(part);
-    }
-  });
-
-  it("'native'(iOS 셸의 popstate)도 tab 과 같은 범위로 끈다", () => {
     // iOS 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸다. 웹이 또 그리면 두 겹.
     // VT 경로(old/new/group 전부)와 CSS 폴백 경로 양쪽에 native 가 있어야 한다.
     for (const part of ['old(*)', 'new(*)', 'group(*)']) {
@@ -297,8 +287,8 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
   });
 
   it('push/pop 의 UA root leak 억제는 이름 없는 root 만 겨냥한다(와일드카드 금지 — F1)', () => {
-    // tab/native/search 는 (*) 와일드카드로 콘텐츠(page-content)까지 함께 죽이는 것이
-    // 의도(탭은 페이지가 아니다)지만, push/pop 은 콘텐츠 슬라이드+페이드를 우리가 직접
+    // native 는 (*) 와일드카드로 콘텐츠(page-content)까지 함께 죽이는 것이
+    // 의도지만, push/pop 은 콘텐츠 슬라이드+페이드를 우리가 직접
     // 그린다 — 여기 (*) 를 쓰면 attribute 셀렉터의 specificity 가 이름-특정 규칙을 이겨
     // push/pop 고유의 전환 자체가 사라진다(적대 검증에서 확인된 회귀). 'root' 이름만
     // 명시적으로 좁혀야 한다.
@@ -312,17 +302,6 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
       ) ?? [];
       expect(wildcard).toEqual([]);
     }
-  });
-
-  it("'search'(검색파라미터만 바뀌는 이동, FS-1)도 tab/native 와 같은 범위로 끈다", () => {
-    // VT 경로(old/new/group 전부)와 CSS 폴백 경로 양쪽에 search 가 있어야 한다 —
-    // 필터 시트 자체 애니메이션 위에 페이지 슬라이드+페이드가 겹치는 것을 막는다.
-    for (const part of ['old(*)', 'new(*)', 'group(*)']) {
-      expect(rulesOnly).toMatch(
-        new RegExp(`:root\\[data-nav-kind=["']search["']\\]::view-transition-${part.replace('(*)', '\\(\\*\\)')}`),
-      );
-    }
-    expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']search["']\]\s+\.tm-page-transition-enter/);
   });
 });
 
@@ -404,10 +383,10 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
 
     expect(naming.length).toBeGreaterThan(0);
     for (const rule of naming) {
-      // 모바일에서는 이름이 스크롤 상자로 옮겨 가므로 상자 안의 래퍼는 이름을 뗀다(none).
-      const insideScrollArea = /\.tm-scroll-area\s+\.tm-page-transition-enter$/.test(rule.selector);
-      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+(\.tm-scroll-area\s+)?\.tm-page-transition-enter$/);
-      expect(rule.body).toMatch(insideScrollArea ? /view-transition-name:\s*none/ : /view-transition-name:\s*page-content/);
+      // 모바일에서는 이름이 스크롤 상자로 옮겨 가므로 상자 안의 래퍼, 상자를 품은 래퍼는 이름을 뗀다(none).
+      const dropsName = /\.tm-scroll-area\s+\.tm-page-transition-enter$|\.tm-page-transition-enter:has\(\.tm-scroll-area\)$/.test(rule.selector);
+      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+(\.tm-scroll-area\s+)?\.tm-page-transition-enter(:has\(\.tm-scroll-area\))?$/);
+      expect(rule.body).toMatch(dropsName ? /view-transition-name:\s*none/ : /view-transition-name:\s*page-content/);
     }
   });
 
@@ -422,7 +401,7 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
 
   // 데스크톱은 문서가 스크롤한다. group 이동을 끄고 옛 스냅샷을 누른 순간 스크롤만큼 올리지 않으면
   // 옛 목록이 그 거리만큼 아래로 쓸린다. 내비가 셸 이름표를 받지 않으면 올라간 옛 스냅샷이 내비를 덮는다.
-  it('데스크톱 push 는 group 이동을 끄고 옛 스냅샷을 --tm-vt-scroll-y 만큼 올린다', () => {
+  it('데스크톱 push 는 group 이동을 끄고 옛 스냅샷을 --tm-vt-old-shift 만큼 옮긴다', () => {
     const rules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({ selector: selector.trim(), body }));
     const find = (selector: string) => rules.find((rule) => rule.selector === selector);
 
@@ -430,7 +409,7 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
     expect(group?.body).toMatch(/animation:\s*none/);
 
     const old = find(':root[data-nav-kind="push"]::view-transition-old(page-content)');
-    expect(old?.body).toMatch(/inset-block-start:\s*calc\(-1px\s*\*\s*var\(--tm-vt-scroll-y,\s*0\)\)/);
+    expect(old?.body).toMatch(/inset-block-start:\s*var\(--tm-vt-old-shift,\s*0px\)/);
 
     // 데스크톱 폭에서만 — 모바일은 스크롤 상자 이름표가 맡는다.
     const desktopBlocks = [...rulesOnly.matchAll(/@media\s*\(min-width:\s*1024px\)\s*\{([\s\S]*?)\n\}/g)].map(([, body]) => body);
@@ -444,11 +423,108 @@ describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹
     expect(oldRule?.[2]).toMatch(/display:\s*none/);
   });
 
+  // 배너가 전환 동안 제자리에 있으려면 이름표 + group 이동 끄기 + old 숨기기 + new 애니메이션 끄기가 모두 필요하다.
+  // 하나만 빠져도 옛 배너 사진이 겹치거나 배너가 슬라이드·페이드한다.
+  it('앱 설치 안내 배너 이름표는 group 이동을 끄고 old 를 숨기고 new 애니메이션을 끈다', () => {
+    const name = 'tm-shell-open-in-app';
+    const rules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
+      selectors: selector.split(',').map((s) => s.trim()),
+      body,
+    }));
+    const bodyFor = (pseudo: 'group' | 'old' | 'new') =>
+      rules.find((rule) => rule.selectors.includes(`::view-transition-${pseudo}(${name})`))?.body;
+
+    expect(rulesOnly).toMatch(new RegExp(`\\.tm-open-in-app-banner\\s*\\{\\s*view-transition-name:\\s*${name};?\\s*\\}`));
+    expect(bodyFor('group')).toMatch(/animation:\s*none/);
+    expect(bodyFor('old')).toMatch(/display:\s*none/);
+    expect(bodyFor('new')).toMatch(/animation:\s*none/);
+  });
+
   it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {
     const animated = wrapperRules.filter((rule) => /animation\s*:/.test(rule.body) && !/animation\s*:\s*none/.test(rule.body));
 
     expect(animated.length).toBeGreaterThan(0);
     for (const rule of animated) expect(rule.body).not.toMatch(/\b(both|forwards)\b/);
+  });
+});
+
+// 같은 view-transition-name 이 문서에 둘이면 전환이 InvalidStateError 로 취소돼 슬라이드가 사라진다.
+// jsdom 은 cascade 를 못 계산하므로 실제 globals.css 의 이름 규칙을 DOM 에 대조하고 선택자 우선순위로
+// 이긴 규칙을 고른다(이 파일의 이름 규칙이 쓰는 선택자 형태만 다룬다).
+describe('전환 중 view-transition-name 은 문서에서 하나씩만 붙는다', () => {
+  type NameRule = { selectors: string[]; name: string; media: 'all' | 'mobile' | 'desktop' };
+  const nameRules: NameRule[] = [];
+  postcss.parse(globalsCss).walkRules((rule) => {
+    if (rule.selector.includes('::')) return;
+    const decl = rule.nodes.find((node): node is postcss.Declaration => node.type === 'decl' && node.prop === 'view-transition-name');
+    if (!decl) return;
+    const parent = rule.parent;
+    const media = parent?.type === 'atrule' && (parent as postcss.AtRule).name === 'media'
+      ? ((parent as postcss.AtRule).params.startsWith('not all') ? 'mobile' : 'desktop')
+      : 'all';
+    nameRules.push({ selectors: rule.selectors, name: decl.value.trim(), media });
+  });
+
+  const specificity = (selector: string) => {
+    const flat = selector.replace(/:(?:has|not|is)\(/g, '(');
+    const ids = (flat.match(/#[\w-]+/g) ?? []).length;
+    const classes = (flat.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) ?? []).length;
+    return ids * 10000 + classes * 100;
+  };
+
+  const effectiveName = (element: Element, viewport: 'mobile' | 'desktop') => {
+    let best: { weight: number; name: string } | undefined;
+    for (const rule of nameRules) {
+      if (rule.media !== 'all' && rule.media !== viewport) continue;
+      const weight = Math.max(-1, ...rule.selectors.filter((selector) => element.matches(selector)).map(specificity));
+      if (weight >= 0 && (!best || weight >= best.weight)) best = { weight, name: rule.name };
+    }
+    return best?.name ?? 'none';
+  };
+
+  const shell = (inner: string) =>
+    `<div class="tm-app-frame"><nav class="tm-desktop-nav"></nav><header class="tm-topbar"></header>` +
+    `<main class="tm-scroll-area"><section class="tm-open-in-app-banner"></section>${inner}</main><nav class="tm-bottom-nav"></nav></div>`;
+  const WRAPPER = (inner: string) => `<div class="tm-page-transition-enter">${inner}</div>`;
+
+  // 모바일에서 page-content 를 받아야 하는 요소와, 데스크톱(문서 스크롤)에서 받는 요소.
+  const structures = [
+    { label: '셸이 래퍼 밖(대부분의 화면)', html: shell(WRAPPER('<p>본문</p>')), mobileOwner: '.tm-scroll-area', desktopOwner: '.tm-page-transition-enter' },
+    { label: '래퍼가 셸 밖(전역 404)', html: WRAPPER(shell('<p>본문</p>')), mobileOwner: '.tm-scroll-area', desktopOwner: '.tm-page-transition-enter' },
+    { label: '셸 없음(인증 화면)', html: WRAPPER('<div class="tm-auth-frame"></div>'), mobileOwner: '.tm-page-transition-enter', desktopOwner: '.tm-page-transition-enter' },
+  ];
+
+  for (const { label, html, mobileOwner, desktopOwner } of structures) {
+    for (const viewport of ['mobile', 'desktop'] as const) {
+      it(`${label} · ${viewport}: page-content 는 정확히 한 요소이고 다른 이름과 겹치지 않는다`, () => {
+        document.documentElement.setAttribute('data-page-transition', 'active');
+        document.body.innerHTML = html;
+
+        const named = [...document.body.querySelectorAll('*')]
+          .map((element) => ({ element, name: effectiveName(element, viewport) }))
+          .filter(({ name }) => name !== 'none');
+        const names = named.map(({ name }) => name);
+
+        expect(new Set(names).size).toBe(names.length);
+        const owner = named.filter(({ name }) => name === 'page-content');
+        expect(owner).toHaveLength(1);
+        expect(owner[0].element.matches(viewport === 'mobile' ? mobileOwner : desktopOwner)).toBe(true);
+      });
+    }
+  }
+
+  it('앱 설치 안내 배너는 page-content 가 아닌 자기 이름을 받아 슬라이드 밖에 남는다', () => {
+    document.documentElement.setAttribute('data-page-transition', 'active');
+    document.body.innerHTML = shell(WRAPPER('<p>본문</p>'));
+
+    for (const viewport of ['mobile', 'desktop'] as const) {
+      expect(effectiveName(document.querySelector('.tm-open-in-app-banner')!, viewport)).toBe('tm-shell-open-in-app');
+    }
+  });
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-page-transition');
+    document.body.innerHTML = '';
   });
 });
 

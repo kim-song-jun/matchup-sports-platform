@@ -331,8 +331,8 @@ interface FixtureSpec {
   readonly cancelled?: boolean;
   /**
    * 몰수패(부전승). 실 제품에서는 어드민 액션이 결과 리비전의 reason 에 마커를 붙여
-   * 만든다 — 시드는 그 결과 상태를 재현한다(참가자 0명·이벤트 0건·1:0 고정 스코어).
-   * 공개 화면에서 일반 1:0 승리와 구분되지 않는 것이 현재 설계의 알려진 한계이고,
+   * 만든다 — 시드는 그 결과 상태를 재현한다(참가자 0명·이벤트 0건·3:0 고정 스코어).
+   * 공개 화면에서 일반 3:0 승리와 구분되지 않는 것이 현재 설계의 알려진 한계이고,
    * 이 대진이 그 한계를 실제로 보여주는 예시가 된다.
    */
   readonly forfeit?: boolean;
@@ -417,7 +417,7 @@ const FIXTURES: readonly FixtureSpec[] = [
     },
   },
   {
-    // 몰수패(부전승). 승자 1 : 몰수팀 0 고정, 참가자 스탯 없음. 공개 화면에서 실제 1:0
+    // 몰수패(부전승). 승자 3 : 몰수팀 0 고정, 참가자 스탯 없음. 공개 화면에서 실제 3:0
     // 승리와 구분되지 않는 것이 현재 설계의 알려진 한계이고, 이 대진이 그 예시다.
     no: 8,
     round: 4,
@@ -425,7 +425,7 @@ const FIXTURES: readonly FixtureSpec[] = [
     awayTeamNo: 4,
     startAtOffsetDays: -3,
     forfeit: true,
-    result: { homeScore: 1, awayScore: 0, scorers: [] },
+    result: { homeScore: 3, awayScore: 0, scorers: [] },
   },
 ] as const;
 

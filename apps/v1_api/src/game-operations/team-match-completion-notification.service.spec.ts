@@ -179,7 +179,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   // 승패는 받는 사람 팀 기준이다 — 홈/원정, 승/무/패, 몰수 대조군을 한 번에 둔다.
   it.each([
     { name: '무승부', revision: { score: { home: 2, away: 2 } }, home: '무승부', away: '무승부' },
-    { name: '몰수', revision: { score: { home: 1, away: 0 }, outcomeReason: 'FORFEIT' }, home: '몰수승', away: '몰수패' },
+    { name: '몰수', revision: { score: { home: 3, away: 0 }, outcomeReason: 'FORFEIT' }, home: '몰수승', away: '몰수패' },
     { name: '승부차기', revision: { score: { home: 1, away: 1, penalties: { home: 3, away: 4 } } }, home: '패배', away: '승리' },
   ])('일반 팀매치 알림 본문에 $name 결과를 받는 사람 팀 기준으로 담는다', async ({ revision, home, away }) => {
     const { tx, createMany } = fakeTx({
@@ -282,12 +282,12 @@ describe('TeamMatchCompletionNotificationService', () => {
         const { tx, createMany } = fakeLeagueTx({ members, resultRows: [] });
         await new TeamMatchCompletionNotificationService().project(
           tx,
-          { ...leagueRevision(), score: { home: 0, away: 1 }, ...forfeit },
+          { ...leagueRevision(), score: { home: 0, away: 3 }, ...forfeit },
         );
         const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
         expect(data.map((row) => [row.recipientUserId, row.body])).toEqual([
-          ['home-owner', '가을 리그 2주차 · 성수 FC 0 : 1 망원 FC · 몰수패.'],
-          ['away-manager', '가을 리그 2주차 · 성수 FC 0 : 1 망원 FC · 몰수승.'],
+          ['home-owner', '가을 리그 2주차 · 성수 FC 0 : 3 망원 FC · 몰수패.'],
+          ['away-manager', '가을 리그 2주차 · 성수 FC 0 : 3 망원 FC · 몰수승.'],
         ]);
       }
     });

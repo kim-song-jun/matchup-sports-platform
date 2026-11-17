@@ -234,7 +234,7 @@ export class PublicTeamRecordsService {
         penalties: isStatusOnly
           ? null
           : resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
-        // 몰수는 1:0 관례 스코어라 표시 없이는 실제 1:0 승패와 구분되지 않는다.
+        // 몰수는 3:0 관례 스코어라 표시 없이는 실제 3:0 승패와 구분되지 않는다.
         isForfeit: isStatusOnly ? false : resolveIsForfeit(row.resultRevision),
         events: isStatusOnly ? [] : (eventsByGameId.get(row.gameId) ?? []),
         playedAt: row.playedAt.toISOString(),

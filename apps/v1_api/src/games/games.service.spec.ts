@@ -21,6 +21,11 @@ import {
   toGameHttpException,
   GamesService,
 } from './games.service';
+import {
+  FORFEIT_KEEP_RECORDED_MARGIN,
+  FORFEIT_LOSER_SCORE,
+  FORFEIT_WINNER_SCORE,
+} from '../league-matches/league-forfeit-result';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
@@ -247,14 +252,35 @@ describe('GamesService command boundary', () => {
       expect(extractEndForfeitSideId({ forfeitSideId: 'side-1' }, 'ABANDONED')).toBeUndefined();
     });
 
-    it('0:0 이나 기권 팀이 앞선 점수는 상대가 이기는 1:0 으로 정한다', () => {
-      expect(applyForfeitScore({ home: 0, away: 0 }, 'HOME')).toEqual({ home: 0, away: 1 });
-      expect(applyForfeitScore({ home: 2, away: 1 }, 'HOME')).toEqual({ home: 0, away: 1 });
-      expect(applyForfeitScore({ home: 1, away: 1 }, 'AWAY')).toEqual({ home: 1, away: 0 });
+    // 2026-11-17 사용자 확정: 몰수 공식 점수는 3:0(정본 §6). 1:0 이던 시절의 단정은 전부 3:0 으로 바뀌었다.
+    it('0:0 이나 기권 팀이 앞서거나 동점인 점수는 상대가 이기는 3:0 으로 정한다', () => {
+      expect(applyForfeitScore({ home: 0, away: 0 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 2, away: 1 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 1, away: 1 }, 'AWAY')).toEqual({ home: 3, away: 0 });
     });
 
-    it('운영자가 이미 상대 승리 점수(3:0)를 적었으면 그대로 둔다', () => {
+    it('상대가 1~2골 차로 앞서 있어도 3:0 으로 올려 확정한다 — 도중 기권이 노쇼보다 가벼워지지 않게', () => {
+      expect(applyForfeitScore({ home: 0, away: 1 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 2 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 3, away: 5 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 1 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 2, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 5, away: 3 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+    });
+
+    it('상대가 3골 차 이상 앞서 있으면 운영자가 적은 점수를 그대로 둔다 (FIFA 기준)', () => {
       expect(applyForfeitScore({ home: 0, away: 3 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 1, away: 4 }, 'HOME')).toEqual({ home: 1, away: 4 });
+      expect(applyForfeitScore({ home: 0, away: 5 }, 'HOME')).toEqual({ home: 0, away: 5 });
+      expect(applyForfeitScore({ home: 3, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 6, away: 3 }, 'AWAY')).toEqual({ home: 6, away: 3 });
+    });
+
+    it('몰수 공식 점수 상수는 몰수팀 0 · 상대 3 이고, 유지 기준 마진은 그 차이다', () => {
+      expect(FORFEIT_WINNER_SCORE).toBe(3);
+      expect(FORFEIT_LOSER_SCORE).toBe(0);
+      expect(FORFEIT_KEEP_RECORDED_MARGIN).toBe(3);
     });
   });
 

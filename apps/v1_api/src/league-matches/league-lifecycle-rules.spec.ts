@@ -245,48 +245,79 @@ describe('planNextSeasonTiers — 다음 시즌 편성', () => {
 });
 
 describe('resolveStoredForfeit — 몰수 멱등 응답', () => {
+  // 2026-11-17 사용자 확정으로 몰수 공식 점수가 1:0 에서 3:0 으로 바뀌었다. 판정은 두 점수의 대소만
+  // 보므로 새 몰수(3:0)와 그 전에 확정된 옛 몰수(1:0)가 저장된 행에서 둘 다 올바르게 읽혀야 한다.
   const base = {
     hostTeamId: HOME,
     awayTeamId: AWAY,
-    fallback: { homeScore: 1, awayScore: 0 },
+    fallback: { homeScore: 3, awayScore: 0 },
   };
 
-  it('저장된 1:0 은 원정팀이 몰수한 것으로 읽는다', () => {
+  it('저장된 3:0 은 원정팀이 몰수한 것으로 읽는다', () => {
     expect(
-      resolveStoredForfeit({ ...base, storedScore: { home: 1, away: 0 }, requestedNoShowTeamId: AWAY }),
+      resolveStoredForfeit({ ...base, storedScore: { home: 3, away: 0 }, requestedNoShowTeamId: AWAY }),
     ).toEqual({
       noShowTeamId: AWAY,
       winningTeamId: HOME,
-      homeScore: 1,
+      homeScore: 3,
       awayScore: 0,
       requestMatchesStored: true,
     });
   });
 
   it('반대 팀으로 재요청해도 저장된 값을 그대로 돌려주고 불일치를 알린다 — alpha 에서 거짓 성공을 내던 케이스', () => {
-    // 요청 dto 로 계산해 돌려주면 "0:1 · 홈팀 몰수, 처리 완료"라는 응답이 나가는데
-    // DB 는 여전히 1:0 · 원정팀 몰수다. 운영자가 정정됐다고 착각한다.
+    // 요청 dto 로 계산해 돌려주면 "0:3 · 홈팀 몰수, 처리 완료"라는 응답이 나가는데
+    // DB 는 여전히 3:0 · 원정팀 몰수다. 운영자가 정정됐다고 착각한다.
     const outcome = resolveStoredForfeit({
       ...base,
-      storedScore: { home: 1, away: 0 },
+      storedScore: { home: 3, away: 0 },
       requestedNoShowTeamId: HOME,
     });
     expect(outcome.noShowTeamId).toBe(AWAY);
     expect(outcome.winningTeamId).toBe(HOME);
-    expect(outcome.homeScore).toBe(1);
+    expect(outcome.homeScore).toBe(3);
     expect(outcome.awayScore).toBe(0);
     expect(outcome.requestMatchesStored).toBe(false);
   });
 
-  it('저장된 0:1 은 홈팀이 몰수한 것으로 읽는다', () => {
+  it('저장된 0:3 은 홈팀이 몰수한 것으로 읽는다', () => {
     const outcome = resolveStoredForfeit({
       ...base,
-      storedScore: { home: 0, away: 1 },
+      storedScore: { home: 0, away: 3 },
       requestedNoShowTeamId: HOME,
     });
     expect(outcome.noShowTeamId).toBe(HOME);
     expect(outcome.winningTeamId).toBe(AWAY);
     expect(outcome.requestMatchesStored).toBe(true);
+  });
+
+  it('3:0 으로 바뀌기 전에 확정된 옛 몰수(1:0·0:1)도 저장된 점수 그대로 읽는다 — 마진 크기를 가정하지 않는다', () => {
+    const awayNoShow = resolveStoredForfeit({
+      ...base,
+      storedScore: { home: 1, away: 0 },
+      requestedNoShowTeamId: AWAY,
+    });
+    expect(awayNoShow).toEqual({
+      noShowTeamId: AWAY,
+      winningTeamId: HOME,
+      homeScore: 1,
+      awayScore: 0,
+      requestMatchesStored: true,
+    });
+
+    // 옛 0:1 에 반대 팀으로 재요청해도 3:0 폴백이 아니라 저장된 0:1 을 돌려주고 불일치를 알린다.
+    const homeNoShowMismatch = resolveStoredForfeit({
+      ...base,
+      storedScore: { home: 0, away: 1 },
+      requestedNoShowTeamId: AWAY,
+    });
+    expect(homeNoShowMismatch).toEqual({
+      noShowTeamId: HOME,
+      winningTeamId: AWAY,
+      homeScore: 0,
+      awayScore: 1,
+      requestMatchesStored: false,
+    });
   });
 
   it('score 를 읽을 수 없으면 요청값으로 폴백한다 (500 으로 새지 않는다)', () => {
@@ -299,7 +330,7 @@ describe('resolveStoredForfeit — 몰수 멱등 응답', () => {
       expect(outcome).toEqual({
         noShowTeamId: AWAY,
         winningTeamId: HOME,
-        homeScore: 1,
+        homeScore: 3,
         awayScore: 0,
         requestMatchesStored: true,
       });

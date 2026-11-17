@@ -1546,7 +1546,7 @@ describe('LeagueMatchFixturesClient', () => {
         noShowTeamId: 't1',
         winningTeamId: 't2',
         homeScore: 0,
-        awayScore: 1,
+        awayScore: 3,
         resultRevisionId: 'rev-1',
         alreadyProcessed: true,
         requestMatchesStored: false,

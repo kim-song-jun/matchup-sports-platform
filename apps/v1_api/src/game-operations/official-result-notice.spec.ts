@@ -21,10 +21,10 @@ describe('officialResultNoticeBody', () => {
     );
   });
 
-  it('몰수 결과는 승패 라벨을 몰수승·몰수패로 바꾼다 — 1 : 0 이 실제 경기 결과처럼 읽히지 않게', () => {
-    const forfeit = { ...base, score: { home: 0, away: 1 }, record: null, isForfeit: true };
-    expect(officialResultNoticeBody({ ...forfeit, side: 'HOME' })).toBe('가을 리그 1주차 · 마포 FC 0 : 1 합정 유나이티드 · 몰수패.');
-    expect(officialResultNoticeBody({ ...forfeit, side: 'AWAY' })).toBe('가을 리그 1주차 · 마포 FC 0 : 1 합정 유나이티드 · 몰수승.');
+  it('몰수 결과는 승패 라벨을 몰수승·몰수패로 바꾼다 — 3 : 0 이 실제 경기 결과처럼 읽히지 않게', () => {
+    const forfeit = { ...base, score: { home: 0, away: 3 }, record: null, isForfeit: true };
+    expect(officialResultNoticeBody({ ...forfeit, side: 'HOME' })).toBe('가을 리그 1주차 · 마포 FC 0 : 3 합정 유나이티드 · 몰수패.');
+    expect(officialResultNoticeBody({ ...forfeit, side: 'AWAY' })).toBe('가을 리그 1주차 · 마포 FC 0 : 3 합정 유나이티드 · 몰수승.');
     expect(officialResultNoticeBody({ ...forfeit, side: 'AWAY', isForfeit: false })).toMatch(/· 승리\.$/);
   });
 

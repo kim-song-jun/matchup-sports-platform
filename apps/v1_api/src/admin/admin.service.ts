@@ -1,5 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
-import { authProviderWhere, signupFilterWhere, signupStage, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
+import { authProviderWhere, signupFilterWhere, signupStage, userSearchWhere, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
 import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
@@ -807,16 +807,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    const searchWhere = query.q
-      ? {
-          OR: [
-            { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } },
-            { profile: { realName: { contains: query.q, mode: 'insensitive' as const } } },
-            { profile: { displayName: { contains: query.q, mode: 'insensitive' as const } } },
-            { email: { contains: query.q, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const searchWhere = userSearchWhere(query.q);
 
     const accountWhere: Prisma.V1UserWhereInput = query.status ? { accountStatus: query.status } : {};
     const signupWhere = signupFilterWhere(query.signup);
@@ -885,6 +876,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         gender: normalizeProfileGender(row.profile?.gender),
         nickname: row.profile?.nickname ?? null,
         displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
+        realName: row.profile?.realName?.trim() || null,
         email: row.email ?? null,
         authProviders: [...new Set(row.authIdentities.map((identity) => identity.provider))],
         accountStatus: row.accountStatus,

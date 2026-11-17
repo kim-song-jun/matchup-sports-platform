@@ -3319,6 +3319,8 @@ export type V1AdminUserRow = {
   userId: string;
   nickname: string | null;
   displayName: string | null;
+  /** 프로필 실명. 없으면 null — 목록에서 `닉네임 (실명)` 괄호를 만들지 않는다. */
+  realName?: string | null;
   email: string | null;
   authProviders: Array<'kakao' | 'naver' | 'email' | 'apple'>;
   gender: 'male' | 'female' | null;

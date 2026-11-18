@@ -1,3 +1,5 @@
+2026-11-18 생성·접수 추가 5건은 [단계형 시나리오](./competition-stage-composition.md)와 PR #2442에서 추적한다. 서버360·Web181 tests PASS, API/Web 타입 검사 PASS, 신규 head Alpha 0/18·DB 실측 미실행.
+
 ## 2026-11-11 — 경기별 제목 수정
 
 [시나리오](./fixture-display-title.md). 경기 제목을 개별 저장하고 목록·그림에 함께 표시한다. 최신 dev 기준 PR 검증 및 alpha 배포 진행 중.

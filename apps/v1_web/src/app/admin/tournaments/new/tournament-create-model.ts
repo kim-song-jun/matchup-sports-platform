@@ -71,6 +71,8 @@ export type TournamentCreateState = {
   /** 초안이 이미 생성된 뒤의 대회 id. null이면 아직 서버에 아무것도 만들지 않은 상태 —
    * "참가 조건" 다음 단계에서 이 값의 유무로 생성(POST)인지 수정(PATCH)인지를 가른다. */
   draftId: string | null;
+  /** 복원한 초안은 별도 저장된 경기 시간을 확인하고 다시 저장해야 공개할 수 있다. */
+  requiresDraftReview: boolean;
   /** draftId가 가리키는 대회의 마지막으로 알려진 updatedAt — PATCH 시 expectedVersion으로
    * 그대로 되돌려 보낸다(동시 편집 CAS). draft-created/hydrate-from-draft가 채운다. */
   draftUpdatedAt: string | null;
@@ -157,6 +159,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   stagePlan: null,
   step: 0,
   draftId: null,
+  requiresDraftReview: false,
   draftUpdatedAt: null,
   savedPayload: null,
   sportId: '',
@@ -355,12 +358,14 @@ export function tournamentCreateReducer(
         draftId: action.tournament.id,
         draftUpdatedAt: action.tournament.updatedAt,
         savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
+        requiresDraftReview: false,
         step: CONFIRM_STEP_INDEX,
       };
     case 'hydrate-from-draft':
       return {
         ...mapTournamentToWizardFields(action.tournament),
-        step: CONFIRM_STEP_INDEX,
+        requiresDraftReview: true,
+        step: 2,
       };
   }
 }

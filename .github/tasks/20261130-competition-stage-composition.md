@@ -1,11 +1,25 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: Review — 2026-11-18 입력 동등성 네 결함 수정·로컬 검증 완료, dev PR #2442 생성. CI·리뷰/Alpha는 별도 gate. 이전 #2427 Alpha 42/42는 아래 과거 기록.
+Status: Review — dev PR #2442의 입력 동등성4건에 생성·접수5건 추가 수정. 서버360·Web181개 관련 회귀 PASS, API/Web 타입·규칙 통과, 기존 PR 갱신. CI·리뷰/Alpha는 별도 gate. 이전 #2427 Alpha 42/42는 아래 과거 기록.
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
 
 ## 2026-11-18 입력 동등성 리뷰 후속
+
+### 생성·신청 추가 리뷰 5건 — 후속 수정
+- 사용자 요청: 동시 제출 상태 덮어쓰기, 취소/종료 대회 참가 확정, 시간 일부 저장 실패 후 복원, 지난 마감 접수 시작, 초안 조회 실패의 새 생성 전환을 수정한다.
+- 기준: 기존 PR #2442 브랜치에 최신 origin/dev `886fd0b29` 병합. 기존 PR의 Gates/API/Web PASS. 별도 main 변경·머지·배포 없음.
+- Owned: 신청/관리자 접수/대회 상태 서비스와 회귀·통합 스펙, 생성 위저드·모델·신청 관리 UI와 회귀, API 문서·changeset·이 task/scenario/index.
+- Forbidden: 다른 WIP와 stash, 실제 사용자/결제/대회 데이터, Prisma schema·seed/reset, main 승격. 앞선 4건의 API 무변경 범위와 구분하며 이번에는 오류·상태 gate API 계약을 동기화한다.
+- [x] Wave A: 실패 회귀, 서버 신청 상태 재검증/CAS·종결 대회 확정 차단·지난 마감 open 차단.
+- [x] Wave B: 초안 로딩/오류 차단, 복원 뒤 저장된 경기 시간 재검토·명시 저장 전 접수 차단, 종결 대회 확정 UI 차단.
+- [x] Wave C: 관련 단위·API/Web 타입/규칙·문서 완료, 기존 dev PR #2442 갱신. DB 통합·새 head CI·Alpha는 아래 별도 gate.
+- Acceptance: 동시·취소 경쟁이 신청/결제/알림을 중복 변경하지 않음; cancelled/completed의 새 확정·대기 금지; 새로고침 복원이 곧바로 접수를 열지 않음; 실패한 초안 조회가 새 POST를 만들지 않음; 과거 마감으로 open 성공을 표시하지 않음.
+- 로컬 회귀: 수정 전 서버9건 RED → 서버3 suites360 tests PASS. Web 생성104·신청관리41·생성모델32·리그신청4 = 4 suites181 tests PASS(파일별 최종 실행 결과 합계). 복원 진입 계약 변경에 맞춰 기존 직접 확인 진입 테스트를 명시 저장 흐름으로 변경하고, 이전 테스트의 미소비 mockOnce가 다음 테스트로 새는 fixture도 reset했다.
+- 검증 상세: Web tsc·패턴, API 최신 schema 생성물 기준 tsc·표면 gate, patch changeset·공백 diff PASS. API 첫 타입 검사는 공유 의존성의 오래된 Prisma 생성물 때문에 실패했다. /tmp에만 최신 schema client를 생성하고 임시 tsconfig paths로 다시 검사해 PASS; 원본 의존성/DB/환경 파일은 건드리지 않았다. 마지막 시간 조회 실패 중 단계 이동 차단 회귀1/1 PASS. 새 TODO/FIXME/HACK/XXX 없음.
+- 미실행: Docker/DB 런타임 미제공으로 DB 동시 요청 실측 미실행. 사용자 요청대로 PR까지만 갱신하며 Alpha6 routes×3 viewport=0/18, 새 CI는 push 후 PR에서 확인한다. Copilot ACTOR_INELIGIBLE blocker는 유지한다.
+- 결정: DB 필드는 추가하지 않는다. 복원된 초안은 서버에 저장된 경기 설정을 다시 표시하고 명시적으로 저장한 뒤 공개 확인을 허용한다. 실패한 미저장 값을 저장 성공으로 복구했다고 표시하지 않는다.
 
 Status: Review — 사용자 요청: 확인된 입력/표시 결함 수정 후 dev 대상 PR 생성.
 - Base: `origin/dev` `4efec6c39`; branch `fix/stage-input-review-20261118`.

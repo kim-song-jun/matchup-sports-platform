@@ -156,6 +156,19 @@ describe('RegistrationsTab — 상태 필터의 빈 결과 (#1565)', () => {
   beforeEach(() => { vi.clearAllMocks(); arrange(); });
   afterEach(() => vi.clearAllMocks());
 
+  it('종료·취소된 대회에서는 참가 확정과 대기 버튼을 비활성화한다', () => {
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items: [baseRegistration({ status: 'payment_checking' })] }, isPending: false } as never);
+    const reason = '종료·취소된 대회에서는 참가 확정·대기 처리를 할 수 없어요.';
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite admissionsBlockedReason={reason} showToast={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent(reason);
+    const confirm = screen.getAllByRole('button', { name: '확정' }).find(button => button.hasAttribute('disabled'))!;
+    expect(confirm).toBeDisabled();
+    const waitlist = screen.getAllByRole('button', { name: '대기' }).find(button => button.hasAttribute('disabled'));
+    expect(waitlist).toBeDefined();
+    fireEvent.click(confirm);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it.each([
     { tournamentId: 'tournament-qa', canWrite: true, requireCancelReason: false },
     { tournamentId: 'league-qa', canWrite: true, requireCancelReason: true },

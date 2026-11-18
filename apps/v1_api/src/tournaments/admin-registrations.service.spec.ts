@@ -123,7 +123,7 @@ describe('AdminRegistrationsService', () => {
 
     // 기본: 정원(teamCount=8) 충분, 현재 confirmed=0 → AREG-03 통과
     prisma.v1Tournament.findFirst.mockImplementation(
-      kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament' }),
+      kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament', status: 'open' }),
     );
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
@@ -226,6 +226,17 @@ describe('AdminRegistrationsService', () => {
     await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
       response: { code: 'REGISTRATION_STATUS_INVALID' },
     });
+  });
+
+  it.each(['completed', 'cancelled'] as const)('confirm: %s 대회의 확정·대기 처리를 모두 차단한다', async (status) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament', status }));
+    for (const decision of ['confirm', 'waitlist'] as const) {
+      await expect(service.confirm(opsAuth, 'reg-1', { decision })).rejects.toMatchObject({ response: { code: 'TOURNAMENT_REGISTRATION_CLOSED' } });
+    }
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
   });
 
   it('confirm: payment_checking + decision=confirm → confirmed + alreadyProcessed false', async () => {

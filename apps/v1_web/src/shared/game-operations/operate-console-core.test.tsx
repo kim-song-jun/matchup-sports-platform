@@ -1117,9 +1117,28 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       // 경기를 시작해 주세요 배너가 하프타임 배너로 잘못 겹치지 않아야 한다.
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
 
-      // 하프타임 동안 골/카드 등 액션 버튼은 여전히 막혀 있어야 한다(LIVE인
-      // 피리어드가 없다 — currentPeriod === null 가드는 손대지 않았다).
-      expect(screen.getByRole('button', { name: /^골/ })).toBeDisabled();
+      // 하프타임에도 빠진 골·카드·파울은 앞 피리어드 끝 시각으로 기록할 수 있다
+      // (2026-11-18 사용자 확정). LIVE인 피리어드가 없어도 이 네 종류는 열린다.
+      expect(screen.getByRole('button', { name: /^골/ })).toBeEnabled();
+    });
+
+    it('골·자책골·옐로/레드카드·파울은 열려 있고, 하프타임 안내가 그 사실을 알려준다', () => {
+      gameAtHalftime();
+      render(<CoreHarness />);
+
+      for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
+        expect(screen.getByRole('button', { name })).toBeEnabled();
+      }
+      expect(screen.getByText(/빠진 골·카드·파울은 지금도 앞 피리어드 끝 시각으로 기록할 수 있어요/)).toBeInTheDocument();
+    });
+
+    it('하프타임에 누른 골은 전반이 실제로 뛴 시간(20:00)에 고정해 기록한다', async () => {
+      gameAtHalftime();
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: '골' }));
+
+      expect(await screen.findByText(/20:00 시점 기록/)).toBeInTheDocument();
     });
 
     it('"후반 시작"을 누르면 확인 모달을 거쳐 start-period를 보낸다', async () => {

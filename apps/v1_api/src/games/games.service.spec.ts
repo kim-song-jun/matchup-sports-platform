@@ -1100,3 +1100,77 @@ describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%
     expect(['team_manager', 'team_owner', 'team_member', 'opponent_manager', 'support_readonly', 'x'].some(canViewParticipantIdentity)).toBe(false);
   });
 });
+
+// 2026-11-18 사용자 확정: 하프타임·정규 시간 종료처럼 경기 종료 전 쉬는 구간에도 골·자책골·카드·파울을 받는다.
+// 판정 규칙 자체는 core/event-recording-window.spec.ts 가 고정하고, 여기서는 서비스가 기간·길이를 읽어
+// 그 규칙에 넘기는 연결(DB 없이 가짜 tx)을 확인한다.
+describe('GamesService.isEventAllowedDuringBreak — 쉬는 구간 사건 기록 연결', () => {
+  type BreakGate = (
+    tx: unknown,
+    game: { id: string; state: string },
+    dto: { type: string; clockMs: number },
+    periodNumber: number,
+  ) => Promise<boolean>;
+
+  function gate(): BreakGate {
+    const service = new GamesService({} as never, {} as never, {} as never, new TournamentStaffAccessService({} as never)) as unknown as {
+      isEventAllowedDuringBreak: BreakGate;
+    };
+    return service.isEventAllowedDuringBreak.bind(service);
+  }
+
+  function makeBreakTx(periods: Array<{ number: number; state: string }>, periodConfig: unknown = [{ durationMinutes: 15 }, { durationMinutes: 15 }]) {
+    return {
+      v1GamePeriod: { findMany: jest.fn().mockResolvedValue(periods) },
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ competitionConfig: { periods: periodConfig } }) },
+    };
+  }
+
+  const HALFTIME = [
+    { number: 1, state: 'ENDED' },
+    { number: 2, state: 'HALFTIME' },
+  ];
+  const REGULATION_ENDED = [
+    { number: 1, state: 'ENDED' },
+    { number: 2, state: 'ENDED' },
+  ];
+  const live = { id: 'game-1', state: 'LIVE' };
+
+  it('하프타임에는 전반에 골·자책골·카드·파울을 받는다', async () => {
+    for (const type of ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL']) {
+      expect(await gate()(makeBreakTx(HALFTIME), live, { type, clockMs: 15 * 60_000 }, 1)).toBe(true);
+    }
+  });
+
+  it('정규 시간 종료에는 마지막 기간에 카드·파울도 받는다', async () => {
+    for (const type of ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL']) {
+      expect(await gate()(makeBreakTx(REGULATION_ENDED), live, { type, clockMs: 1_000 }, 2)).toBe(true);
+    }
+  });
+
+  it('교체는 쉬는 구간에도 막고 기간·길이를 읽지도 않는다', async () => {
+    const tx = makeBreakTx(HALFTIME);
+    expect(await gate()(tx, live, { type: 'SUBSTITUTION', clockMs: 0 }, 1)).toBe(false);
+    expect(tx.v1GamePeriod.findMany).not.toHaveBeenCalled();
+    expect(tx.v1Game.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('경기가 LIVE 가 아니면 막고 기간을 읽지도 않는다', async () => {
+    const tx = makeBreakTx(REGULATION_ENDED);
+    expect(await gate()(tx, { id: 'game-1', state: 'ENDED' }, { type: 'GOAL', clockMs: 0 }, 2)).toBe(false);
+    expect(tx.v1GamePeriod.findMany).not.toHaveBeenCalled();
+  });
+
+  it('기간 설정 길이를 넘는 시각은 거절하고, 길이를 읽지 못하면 상한 없이 받는다', async () => {
+    expect(await gate()(makeBreakTx(HALFTIME), live, { type: 'FOUL', clockMs: 15 * 60_000 + 1 }, 1)).toBe(false);
+    expect(await gate()(makeBreakTx(HALFTIME, { count: 2 }), live, { type: 'FOUL', clockMs: 99 * 60_000 }, 1)).toBe(true);
+  });
+
+  it('후반이 시작된 뒤(LIVE)에는 전반에 더 붙이지 못한다', async () => {
+    const periods = [
+      { number: 1, state: 'ENDED' },
+      { number: 2, state: 'LIVE' },
+    ];
+    expect(await gate()(makeBreakTx(periods), live, { type: 'GOAL', clockMs: 1_000 }, 1)).toBe(false);
+  });
+});

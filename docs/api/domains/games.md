@@ -192,11 +192,16 @@ re-evaluates the same kick counts before persisting the result.
   계속 처리한다. 경기 수·DB 경합·worker 상태에 따라 지연될 수 있으므로 만료 시각 직후의
   확정 처리 시간을 보장하지 않는다. 콘솔은 만료 안내와 기존 수동 기간 종료를 함께 제공한다.
 
-- 모든 기간이 `ENDED`이고 Game이 아직 `LIVE`인 정규 시간 종료 상태에서는 마지막 기간에 한해
-  `GOAL`·`OWN_GOAL` 이벤트를 받는다(`POST /games/:gameId/events`). 시각(`clockMs`)은 그 기간의
-  설정 길이 이하여야 하고(길이를 읽지 못하면 상한 없음), 넘으면 `PERIOD_ALREADY_ENDED`다.
-  카드·파울·교체 등 다른 이벤트와 마지막이 아닌 기간은 그대로 `PERIOD_ALREADY_ENDED`다.
-  콘솔은 이때 골 시각을 정규 시간 끝(설정 길이와 실제로 뛴 시간 중 짧은 쪽)으로 고정해 보낸다.
+- Game이 아직 `LIVE`인 **쉬는 구간**에서는 방금 끝난 기간에 한해 `GOAL`·`OWN_GOAL`·`CARD`(옐로·레드)·`FOUL`
+  이벤트를 받는다(`POST /games/:gameId/events`, 2026-11-18). 쉬는 구간은 둘이다. 하프타임은 다음 기간이
+  `HALFTIME`이고 그 앞 기간이 모두 `ENDED`일 때 방금 끝난 기간(전반)에, 정규 시간 종료는 모든 기간이
+  `ENDED`일 때 마지막 기간에 붙인다. 시각(`clockMs`)은 그 기간의 설정 길이 이하여야 하고(길이를 읽지
+  못하면 상한 없음), 넘으면 `PERIOD_ALREADY_ENDED`다. 교체 등 다른 이벤트, 다음 기간이 이미 시작된 뒤의
+  앞 기간, 아직 시작하지 않은 `HALFTIME` 기간, `LIVE`가 아닌 Game(종료 뒤는 결과 정정)은 그대로
+  `PERIOD_ALREADY_ENDED`·`PERIOD_NOT_STARTED`·`TERMINAL_GAME_IMMUTABLE`이다. 판정은
+  `games/core/event-recording-window.ts`의 `isRecordableDuringBreak` 한 곳이다. 콘솔은 이때 사건 시각을 그
+  기간의 정규 시간 끝(설정 길이와 실제로 뛴 시간 중 짧은 쪽)으로 고정해 보낸다. 쉬는 구간에 넣은 사건의
+  취소(`reverseEvent`)는 기간 상태와 무관하게 기존 규칙을 따른다.
 
 `GET /api/v1/games/:gameId`의 `periods`, nullable `periodDurations`, `state`, `version`이
 운영 콘솔의 확인 기준이다. 기간 자동 종료는 `V1GameEvent`나 새 sequence를 만들지 않으며,

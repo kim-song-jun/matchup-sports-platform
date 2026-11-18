@@ -126,13 +126,15 @@ export class TeamsService {
     const where = this.teamListWhere(query);
     const withFacets = query.includeFacets === true && !query.cursor;
     const [teams, sportRows] = await Promise.all([
-      this.prisma.v1Team.findMany({
-        where,
-        include: this.teamInclude(user),
-        orderBy: getTeamOrderBy(query.sort),
-        take: limit + 1,
-        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      }),
+      query.sort === 'activity'
+        ? this.listByActivity(user, where, limit, query.cursor)
+        : this.prisma.v1Team.findMany({
+            where,
+            include: this.teamInclude(user),
+            orderBy: getTeamOrderBy(query.sort),
+            take: limit + 1,
+            ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+          }),
       // 건수는 includeFacets 를 요청한 첫 페이지에만 싣는다. 종목 건수는 종목 필터만 뺀 where 로 세고, 전체 건수는 거기서 얻는다.
       withFacets
         ? this.prisma.v1Team.groupBy({
@@ -164,6 +166,34 @@ export class TeamsService {
       },
       ...(sports ? { facets: { sports } } : {}),
     };
+  }
+
+  /**
+   * 활동 많은순 — 취소·삭제되지 않은 팀 매치를 호스트로 올린 횟수. Prisma 는 관계 개수 정렬에 조건을 걸 수 없어서
+   * 조건에 맞는 팀의 순서를 먼저 정하고(횟수 → 최근 등록 → id, 커서가 흔들리지 않게 항상 같은 순서), 그 순서로 한 페이지만 읽는다.
+   * ponytail: 조건에 맞는 팀 전체의 id 를 메모리에서 정렬한다. 팀이 수만 개를 넘으면 SQL 집계 정렬로 바꾼다.
+   */
+  private async listByActivity(user: V1AuthUser | null, where: Prisma.V1TeamWhereInput, limit: number, cursor: string | undefined) {
+    const [teams, hosted] = await Promise.all([
+      this.prisma.v1Team.findMany({ where, select: { id: true, createdAt: true } }),
+      this.prisma.v1TeamMatch.groupBy({
+        by: ['hostTeamId'],
+        where: { deletedAt: null, status: { not: 'cancelled' }, hostTeam: where },
+        _count: { _all: true },
+      }),
+    ]);
+    const counts = new Map(hosted.map((row) => [row.hostTeamId, row._count._all]));
+    const ordered = teams
+      .sort((a, b) =>
+        (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)
+        || b.createdAt.getTime() - a.createdAt.getTime()
+        || (a.id < b.id ? 1 : -1))
+      .map((team) => team.id);
+    const start = cursor ? ordered.indexOf(cursor) + 1 || ordered.length : 0;
+    const pageIds = ordered.slice(start, start + limit + 1);
+    const rows = await this.prisma.v1Team.findMany({ where: { id: { in: pageIds } }, include: this.teamInclude(user) });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return pageIds.flatMap((id) => byId.get(id) ?? []);
   }
 
   async detail(user: V1AuthUser | null, teamId: string) {
@@ -2646,8 +2676,6 @@ export function formatRegionDisplayName(region?: { name: string; parent?: { name
  */
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {
   if (sort === 'member_count') return [{ memberCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }];
-  // 활동 = 팀 매치를 호스트로 올린 횟수(host_team_id 인덱스). 취소된 매치도 센다. 상대 팀·리그·대회 경기는 세지 않는다.
-  if (sort === 'activity') return [{ hostedTeamMatches: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }];
   return [{ createdAt: 'desc' }, { id: 'desc' }];
 }
 

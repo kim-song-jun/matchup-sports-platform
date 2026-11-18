@@ -78,7 +78,7 @@ export function LeagueFixtureCard({
         result.hasScore ? (
           <div
             className="tm-text-body-lg tab-num"
-            // 몰수 스코어는 굵게 강조하지 않는다 — 관례로 붙은 3:0 이 실제 득점과 같은
+            // 몰수 스코어는 굵게 강조하지 않는다 — 몰수로 확정된 점수가 실제 득점과 같은
             // 무게로 읽히면 안 된다(리그 일정 목록과 같은 규칙).
             style={{
               color: 'var(--text-strong)',
@@ -103,7 +103,8 @@ export function LeagueFixtureCard({
  *
  * 몰수 사유 원문은 싣지 않는다. `V1LeagueFixture` 에 그 필드가 없고(어드민이 쓴 사유는
  * 공개하지 않는 것이 계약이다), 없는 값을 지어내는 대신 리그 일정 목록이 이미 쓰는
- * "(관례 스코어)" 문구를 그대로 쓴다.
+ * "(몰수 확정 점수)" 문구를 그대로 쓴다. 보통 3:0 이지만 상대가 3골 차 이상 앞서 있었다면 기록된
+ * 점수 그대로 확정되므로 "관례 스코어" 라고 부르지 않는다.
  */
 /**
  * ⚠️ **컴포넌트가 아니라 함수다.** `<LeagueFixtureCaption/>` 으로 넘기면 그 컴포넌트가
@@ -129,7 +130,7 @@ function leagueFixtureCaption(
         <>
           {/* 컬러만으로 알리지 않는다 — "몰수" 텍스트를 함께 싣는다. */}
           <span className="tm-badge tm-badge-sm tm-badge-grey">몰수</span>
-          <span>(관례 스코어)</span>
+          <span>(몰수 확정 점수)</span>
         </>
       ) : null}
       {note ? <span>{note}</span> : null}

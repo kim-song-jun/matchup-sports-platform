@@ -605,7 +605,7 @@ describe('MatchDetailContent — 경기 방식 줄(일시·장소 줄 아래)', 
 });
 
 describe('MatchDetailContent — 몰수 경기의 득점·카드 설명', () => {
-  const CAPTION = '몰수 전에 기록된 득점·카드예요. 공식 점수에는 반영되지 않아요';
+  const CAPTION = '몰수 전에 기록된 득점·카드예요. 점수와 다를 수 있어요';
   const goal: PublicMatchEvent = { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', profileHref: null, jerseyNumber: 9, period: 1, clockMs: 600_000 };
 
   it('몰수 경기에 이벤트가 있으면 득점·카드 목록 위에 설명이 붙는다', () => {

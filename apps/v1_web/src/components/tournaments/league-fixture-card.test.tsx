@@ -65,7 +65,7 @@ describe('LeagueFixtureCard', () => {
     expect(score).toBeInTheDocument();
     expect(score).toHaveStyle({ fontWeight: '400' });
     expect(screen.getByText('몰수')).toBeInTheDocument();
-    expect(screen.getByText('(관례 스코어)')).toBeInTheDocument();
+    expect(screen.getByText('(몰수 확정 점수)')).toBeInTheDocument();
   });
 
   it('실제로 치른 결과는 굵게 강조한다 — 몰수와 같은 무게로 읽히면 안 된다', () => {

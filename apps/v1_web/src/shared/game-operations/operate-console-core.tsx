@@ -1645,7 +1645,7 @@ export function OperateConsoleCore({
     moreActions.push({
       key: 'abnormal-end',
       label: '몰수·중단으로 종료',
-      description: '사유를 남기고 지금 기록된 점수로 마쳐요.',
+      description: '사유를 남기고 마쳐요.',
       destructive: true,
       disabled: commandUnavailable,
       onSelect: () => {

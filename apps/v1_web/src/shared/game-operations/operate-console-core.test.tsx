@@ -1230,6 +1230,10 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
       expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
       expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+      // 시트 설명은 점수 규칙을 말하지 않는다 — 몰수(3:0, 3골 차 이상이면 기록 그대로)와 중단(기록된 점수)이
+      // 한 줄에 섞이면 한쪽이 틀리므로 점수 안내는 종료 창이 고른 종류에 맞춰 한다.
+      expect(within(sheet).getByText('사유를 남기고 마쳐요.')).toBeInTheDocument();
+      expect(within(sheet).queryByText(/기록된 점수/)).toBeNull();
     });
 
     it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {

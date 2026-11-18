@@ -22,6 +22,13 @@ export const NOT_FORFEITED_GAME_WHERE = {
   },
 };
 
-/** Score assigned to a forfeit: the opponent wins by this margin. */
-export const FORFEIT_WINNER_SCORE = 1;
+/**
+ * Official forfeit score: the forfeiting team gets 0, the opponent gets 3 (3:0).
+ * Changed from 1:0 on 2026-11-17 (user decision, docs/design/competition-canonical-flow.md §6). Forfeits
+ * already confirmed as 1:0 are intentionally left as they are; readers must not assume a fixed margin
+ * (`resolveStoredForfeit` only compares the two scores).
+ */
+export const FORFEIT_WINNER_SCORE = 3;
 export const FORFEIT_LOSER_SCORE = 0;
+/** A recorded score is kept on forfeit only when the opponent already leads by at least this many goals. */
+export const FORFEIT_KEEP_RECORDED_MARGIN = FORFEIT_WINNER_SCORE - FORFEIT_LOSER_SCORE;

@@ -521,6 +521,7 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (forfeit/abandon end) first. Scheduled and ended games stay cancellable
   (ended ones for result corrections). The admin fixture table disables the
   cancel action on the same condition.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/forfeit` (`{ noShowTeamId, reason }`) confirms a forfeit as an official result in one admin action. The score is fixed at **3:0** (forfeiting team 0, opponent 3; changed from 1:0 on 2026-11-17, see `docs/design/competition-canonical-flow.md` §6). Forfeits confirmed before that change stay 1:0 and are not converted, so one standings table can mix 1:0 and 3:0 forfeits (same points, different goal difference and goals for). A repeat call returns `alreadyProcessed: true` with the **stored** score and team, and `requestMatchesStored: false` when the request named the other team; the forfeiting team is read back as the side with the lower stored score, which is correct for both 3:0 and the older 1:0.
 - `PATCH /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId` also accepts `title` (1–100) and
   `homeTeamId` / `awayTeamId` (confirmed league teams). Team changes go through the same side-assignment
   routine as slot boards (game side, team schedules, approved application, roster resync) and are allowed

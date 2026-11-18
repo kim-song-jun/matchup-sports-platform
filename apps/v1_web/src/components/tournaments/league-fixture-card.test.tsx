@@ -59,9 +59,9 @@ describe('LeagueFixtureCard', () => {
   });
 
   it('몰수는 점수를 지우지 않고 뱃지와 문구로 가른다 — 강조도 빼앗는다', () => {
-    // 몰수는 1:0 으로 기록돼 실제 1:0 승리와 화면에서 완전히 같아 보인다.
-    renderCard({ status: 'completed', homeScore: 1, awayScore: 0, isForfeit: true });
-    const score = screen.getByText('1 : 0');
+    // 몰수는 3:0 으로 기록돼 실제 3:0 승리와 화면에서 완전히 같아 보인다.
+    renderCard({ status: 'completed', homeScore: 3, awayScore: 0, isForfeit: true });
+    const score = screen.getByText('3 : 0');
     expect(score).toBeInTheDocument();
     expect(score).toHaveStyle({ fontWeight: '400' });
     expect(screen.getByText('몰수')).toBeInTheDocument();

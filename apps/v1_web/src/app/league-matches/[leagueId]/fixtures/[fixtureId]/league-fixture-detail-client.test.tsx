@@ -288,13 +288,13 @@ describe('LeagueFixtureDetailClient', () => {
   it('완료 경기: 스코어를 보여주고 몰수 결과에는 몰수 뱃지를 함께 싣는다', () => {
     mockLeague({
       fixtures: [
-        { ...FIXTURES[0], teamMatchId: 'fx-forfeit', homeScore: 1, awayScore: 0, isForfeit: true },
+        { ...FIXTURES[0], teamMatchId: 'fx-forfeit', homeScore: 3, awayScore: 0, isForfeit: true },
       ],
     });
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-forfeit" />);
 
-    expect(screen.getByText('1 : 0')).toBeInTheDocument();
+    expect(screen.getByText('3 : 0')).toBeInTheDocument();
     expect(screen.getByText('몰수')).toBeInTheDocument();
   });
 

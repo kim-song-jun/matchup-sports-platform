@@ -61,11 +61,11 @@ describe('toLeagueFixtureList', () => {
 
   it('몰수는 boolean 으로만 나가고 사유 원문은 응답에 없다', () => {
     // 사유는 운영자가 쓴 자유 텍스트다. 관전자에게 그대로 나가면 안 되지만, 몰수임을
-    // 알리지 않으면 관례 스코어 1:0 이 실제 1:0 승리와 구분되지 않는다.
+    // 알리지 않으면 관례 스코어 3:0 이 실제 3:0 승리와 구분되지 않는다.
     const secret = '상대팀이 무단 불참했고 담당자 김OO 확인';
     const [item] = toLeagueFixtureList(
       [row()],
-      new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: secret, outcomeReason: 'FORFEIT' } })]]),
+      new Map([['game-1', fact({ homeScore: 3, awayScore: 0, resultRevision: { reason: secret, outcomeReason: 'FORFEIT' } })]]),
       true,
     );
     expect(item.isForfeit).toBe(true);
@@ -108,10 +108,10 @@ describe('toLeagueFixtureList', () => {
   });
 
   it('가려진 대진의 몰수 뱃지도 함께 지운다', () => {
-    // 몰수 뱃지는 "1:0 으로 확정" 을 그대로 말한다 — 숫자만 가리면 가린 적이 없는 것과 같다.
+    // 몰수 뱃지는 "3:0 으로 확정" 을 그대로 말한다 — 숫자만 가리면 가린 적이 없는 것과 같다.
     const [item] = toLeagueFixtureList(
       [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', currentOfficialRevision: null, visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
-      new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: null, outcomeReason: 'FORFEIT' } })]]),
+      new Map([['game-1', fact({ homeScore: 3, awayScore: 0, resultRevision: { reason: null, outcomeReason: 'FORFEIT' } })]]),
       true,
     );
     expect(item).toMatchObject({ isForfeit: false, scoreHidden: true });

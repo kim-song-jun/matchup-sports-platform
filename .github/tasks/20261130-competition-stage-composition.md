@@ -16,6 +16,7 @@ Status: Review — 사용자 요청: 확인된 입력/표시 결함 수정 후 d
 - [x] Phase 3a: 관련 회귀·Web 타입/패턴·diff 범위 확인.
 - [x] Phase 3b: 커밋·dev PR·리뷰 요청.
 - PR: [#2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442), base `dev`, 구현 `62a3369b6`, 15 files. 로컬217 tests·Web 타입/패턴·changeset 정책·커밋 diff PASS. 최신 원격CI 진행 중, Copilot CLI/REST 요청 수행(대기 목록은 빈 배열·리뷰 아직0건이므로 clean으로 판정하지 않음). 사용자 요청대로 머지·배포는 실행하지 않았다.
+- 외부 리뷰 blocker: 공식 `POST /pulls/2442/copilot-code-review`가 HTTP422 `ACTOR_INELIGIBLE`(actor 코드리뷰 라이선스/조직 정책 자격 불충족)로 거절했다. 추가 반복 요청·계정/요금제/정책 변경은 하지 않는다. Copilot clean 또는 PR-ready로 표시하지 않으며 CI 진행 및 Alpha0/12와 함께 PR 본문에 명시했다.
 - Acceptance: 조회 갱신·충돌 뒤 옛 입력으로 최신 시간 덮어쓰기 금지; 명시 확인 재조회; 단계형 형식/정원은 구성 경로로 안내; 별도 시간 설정의 실제 이름·값 표시; 생성/수정/편성 시간 입력 계약 일치.
 - Ambiguity: 최소 보장 경기 수·회전 수·240경기 등 대회 운영 규칙 차이는 이번 버그 수정으로 확대하지 않는다. 시간 상한은 서버 DTO의 기존 양의 정수 계약을 따른다.
 - QA: 사용자 요청은 PR 생성까지다. 변경 후 Alpha `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/admin/tournaments/:id/info`, `/admin/tournaments/:id/bracket` 4 routes × 390/768/1440 = 0/12. console/network도 dev 머지·배포 이후에 가능하며 미실행 상태를 PR에 명시한다.

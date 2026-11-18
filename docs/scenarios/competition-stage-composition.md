@@ -5,6 +5,7 @@ Status: 입력 동등성 네 결함 후속 PR 준비 — 이전 #2427 Alpha 42/4
 ## 2026-11-18 — 입력 동등성 리뷰 후속 (PR 준비)
 
 수정 PR [#2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442), base dev, 구현62a3369b6·15 files. 원격CI·Copilot 결과와 머지 후 Alpha gate는 로컬 검증과 구분하며 사용자 요청에 따라 PR 생성까지 진행한다.
+Copilot 공식 리뷰 API는 HTTP422 `ACTOR_INELIGIBLE`로 실행을 거절했다(라이선스/조직 정책 자격). 리뷰0건을 clean으로 표시하지 않고, CI 및 Alpha gate를 대체 승인하지 않는다.
 
 기준 `4efec6c39`, 사용자 요청은 확인된 네 결함 수정과 dev PR 생성까지다. 기존 42/42는 이번 수정의 화면 증거가 아니다.
 

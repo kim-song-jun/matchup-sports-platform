@@ -138,12 +138,12 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     });
     await new TournamentFixtureCompletionNotificationService().project(
       tx,
-      revisionFixture({ score: { home: 0, away: 1 }, outcomeReason: 'FORFEIT' }),
+      revisionFixture({ score: { home: 0, away: 3 }, outcomeReason: 'FORFEIT' }),
     );
     const rows = createMany.mock.calls[0][0].data as Array<{ recipientUserId: string; body: string }>;
     const bodyOf = (userId: string) => rows.find((row) => row.recipientUserId === userId)?.body;
-    expect(bodyOf('captain-home')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 1 원정팀FC · 몰수패.');
-    expect(bodyOf('captain-away')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 1 원정팀FC · 몰수승.');
+    expect(bodyOf('captain-home')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 3 원정팀FC · 몰수패.');
+    expect(bodyOf('captain-away')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 3 원정팀FC · 몰수승.');
   });
 
   // W9-V2 — 알림도 화면과 같은 경기 이름("A조 · 조별리그 2라운드")을 쓴다. 예전엔 조 이름이 빠졌다.

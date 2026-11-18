@@ -98,7 +98,7 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {needsForfeitSide
-            ? '몰수는 기권한 팀의 상대가 이긴 점수로 확정돼요(적어 둔 점수가 이미 상대 승리면 그대로예요).'
+            ? '몰수는 기권한 팀 0점, 상대 3점(3:0)으로 확정돼요(상대가 이미 3골 차 이상 앞서 있으면 적어 둔 점수 그대로예요).'
             : '점수는 지금 기록된 값 그대로 확정돼요.'}{' '}
           사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜 이런지 설명하는 유일한 근거가 돼요.
         </p>

@@ -46,7 +46,7 @@ export function officialResultNoticeBody(input: {
   score: OfficialScore;
   side: ResultSide;
   record: PersonalRecord | null;
-  /** 몰수로 확정된 결과인지. 1 : 0 이 실제 경기 결과처럼 읽히지 않도록 승패 라벨을 몰수로 바꾼다. */
+  /** 몰수로 확정된 결과인지. 3 : 0 이 실제 경기 결과처럼 읽히지 않도록 승패 라벨을 몰수로 바꾼다. */
   isForfeit?: boolean;
 }): string {
   const { score } = input;

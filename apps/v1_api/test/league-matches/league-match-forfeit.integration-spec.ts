@@ -94,7 +94,7 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     return { leagueId, teamA, teamB, teamMatchIds: fixturesRes.body.data.teamMatchIds as string[] };
   }
 
-  it('원정팀이 불참하면 홈팀 승리(1:0)로 공식 확정되고, 유일한 대진이면 리그도 자동 completed로 전이한다', async () => {
+  it('원정팀이 불참하면 홈팀 승리(3:0)로 공식 확정되고, 유일한 대진이면 리그도 자동 completed로 전이한다', async () => {
     const { leagueId, teamA, teamB, teamMatchIds } = await createLeagueWithFixture('몰수-원정불참');
     const [teamMatchId] = teamMatchIds;
     const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
@@ -108,7 +108,7 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.alreadyProcessed).toBe(false);
-    expect(res.body.data.homeScore).toBe(1);
+    expect(res.body.data.homeScore).toBe(3);
     expect(res.body.data.awayScore).toBe(0);
     expect(res.body.data.winningTeamId).toBe(teamMatch.hostTeamId);
 
@@ -133,18 +133,23 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     const awayRow = standingsRes.body.data.standings.find((row: { teamId: string }) => row.teamId === awayTeamId);
     expect(hostRow.wins).toBe(1);
     expect(hostRow.points).toBe(3);
+    // 몰수 공식 점수 3:0(2026-11-17) 이 순위의 득점·실점에 그대로 들어간다 — 득실차 +3 / -3.
+    expect(hostRow.goalsFor).toBe(3);
+    expect(hostRow.goalsAgainst).toBe(0);
     expect(awayRow.losses).toBe(1);
     expect(awayRow.points).toBe(0);
+    expect(awayRow.goalsFor).toBe(0);
+    expect(awayRow.goalsAgainst).toBe(3);
     expect(standingsRes.body.data.pendingFixtures).toHaveLength(0);
 
     // 공개 상세는 몰수를 boolean 으로 구분해 준다. 이게 없으면 관전자에게 이 경기가
-    // 실제로 치러진 1:0 승리와 완전히 같아 보인다.
+    // 실제로 치러진 3:0 승리와 완전히 같아 보인다.
     const detailRes = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`);
     expect(detailRes.status).toBe(200);
     const detailFixture = detailRes.body.data.fixtures.find(
       (row: { teamMatchId: string }) => row.teamMatchId === teamMatchId,
     );
-    expect(detailFixture).toMatchObject({ homeScore: 1, awayScore: 0, isForfeit: true });
+    expect(detailFixture).toMatchObject({ homeScore: 3, awayScore: 0, isForfeit: true });
 
     // 몰수 사유는 운영자가 쓴 자유 텍스트라 공개 응답에 절대 실리면 안 된다 —
     // boolean 만 나가고 원문·내부 마커는 어디에도 없어야 한다(응답 전체를 훑어 고정).

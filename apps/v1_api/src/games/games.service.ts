@@ -44,7 +44,11 @@ import {
   parsePeriodDurations,
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
-import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/league-forfeit-result';
+import {
+  FORFEIT_KEEP_RECORDED_MARGIN,
+  FORFEIT_LOSER_SCORE,
+  FORFEIT_WINNER_SCORE,
+} from '../league-matches/league-forfeit-result';
 import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isTeamMatchRosterDependentEventType } from './core/team-match-lineup-window';
@@ -104,6 +108,7 @@ import {
   validateSubstitution,
   type PublicParticipantProjection,
 } from './core';
+import { BREAK_RECORDABLE_EVENT_TYPES, isRecordableDuringBreak } from './core/event-recording-window';
 import {
   hydrateFriendlyTeamMatchResultParticipants as mergeFriendlyTeamMatchResultParticipants,
 } from './core/friendly-team-match-result-participants';
@@ -613,7 +618,9 @@ function assertClockNotDrifted(occurredAt: string): void {
  * **사유를 필수로** 걸어 임의성이 사람 판단에 남더라도 그 판단이 기록에 남게 한다 —
  * 이 함수의 존재 이유가 그 "필수"다. 사유 없는 몰수는 여기서 422 로 막힌다.
  * 2026-10-09 사용자 결정(D1=A)이 Q3 를 일부 번복했다: 몰수는 기권 팀이 필수이고, 기록 점수가
- * 상대 승리가 아니면 1:0 으로 확정한다(`applyForfeitScore`, 리그 몰수 선언과 같은 값).
+ * 상대 승리가 아니면 몰수 점수로 확정한다(`applyForfeitScore`, 리그 몰수 선언과 같은 값).
+ * 2026-11-17 사용자 확정: 몰수 점수가 1:0 에서 3:0 으로 바뀌고, 기록 점수는 상대가 3골 차 이상
+ * 앞설 때만 그대로 둔다(정본 §6 결정 이력). 이미 확정된 옛 몰수(1:0)는 바꾸지 않는다.
  *
  * `extractEndPenalties` 와 같은 이유로 순수 함수다(payload 가 느슨한 레코드라 DTO
  * 검증을 못 거치고, DB 없이 단위 테스트할 수 있어야 한다).
@@ -662,11 +669,16 @@ export function extractEndForfeitSideId(
   return raw;
 }
 
-/** Keeps an operator-entered score that already favours the opponent; otherwise assigns the forfeit score. */
+/**
+ * Keeps an operator-entered score only when the opponent already leads by `FORFEIT_KEEP_RECORDED_MARGIN`
+ * goals or more (the FIFA rule: the on-pitch result stands when its goal difference is at least the forfeit
+ * margin). Otherwise assigns the forfeit score (3:0) -- 0:0 no-show, the forfeiting side ahead or level, and
+ * a 1-2 goal opponent lead all end up as 3:0, so walking off never costs less than not turning up.
+ */
 export function applyForfeitScore(score: GameScore, forfeitSide: 'HOME' | 'AWAY'): GameScore {
   const mine = forfeitSide === 'HOME' ? score.home : score.away;
   const theirs = forfeitSide === 'HOME' ? score.away : score.home;
-  if (theirs > mine) return { home: score.home, away: score.away };
+  if (theirs - mine >= FORFEIT_KEEP_RECORDED_MARGIN) return { home: score.home, away: score.away };
   return forfeitSide === 'HOME'
     ? { home: FORFEIT_LOSER_SCORE, away: FORFEIT_WINNER_SCORE }
     : { home: FORFEIT_WINNER_SCORE, away: FORFEIT_LOSER_SCORE };
@@ -6015,25 +6027,30 @@ export class GamesService {
    * exactly as cheap as every other event type.
    */
   /**
-   * 모든 피리어드가 ENDED인 "정규 시간 종료" 상태(경기는 아직 LIVE)에서 마지막 피리어드에 들어오는 골만 받는다.
-   * 정규 시간 자동 종료 뒤에 운영자가 빠진 골을 넣는 길이다 — 카드·교체 등은 그대로 막는다.
+   * 경기를 끝내기 전 "쉬는 구간"(하프타임·정규 시간 종료, 경기는 아직 LIVE)에서 방금 끝난 기간에 붙는
+   * 사건을 받을지 정한다. 골·자책골·카드·파울만 받고 교체 등은 그대로 막는다(2026-11-18 사용자 확정).
    * 시각은 그 피리어드의 정규 시간(분) 이하여야 한다. 길이를 읽지 못하면 상한 없이 받는다
-   * (`validateEventShape`가 상한을 두지 않는 이유와 같다).
+   * (`validateEventShape`가 상한을 두지 않는 이유와 같다). 판정 규칙은 `core/event-recording-window.ts`.
    */
-  private async isGoalAfterRegulationAllowed(
+  private async isEventAllowedDuringBreak(
     tx: Transaction,
     game: LockedGame,
     dto: AppendGameEventDto,
     periodNumber: number,
   ): Promise<boolean> {
-    if (dto.type !== V1GameEventType.GOAL && dto.type !== V1GameEventType.OWN_GOAL) return false;
-    if (game.state !== V1GameState.LIVE) return false;
+    // 종류·상태로 먼저 걸러 대부분의 거절 경로가 추가 조회 없이 끝나게 한다.
+    if (game.state !== V1GameState.LIVE || !BREAK_RECORDABLE_EVENT_TYPES.has(dto.type)) return false;
     const periods = await tx.v1GamePeriod.findMany({ where: { gameId: game.id }, select: { number: true, state: true } });
-    if (periods.length === 0 || periods.some((p) => p.state !== V1GamePeriodState.ENDED)) return false;
-    if (periods.some((p) => p.number > periodNumber)) return false;
     const config = await tx.v1Game.findUnique({ where: { id: game.id }, select: { competitionConfig: { select: { periods: true } } } });
     const durationMinutes = parsePeriodDurations(config?.competitionConfig.periods)?.[periodNumber - 1]?.durationMinutes;
-    return durationMinutes === undefined || dto.clockMs <= durationMinutes * 60_000;
+    return isRecordableDuringBreak({
+      gameState: game.state,
+      eventType: dto.type,
+      periodNumber,
+      periods,
+      clockMs: dto.clockMs,
+      durationMinutes,
+    });
   }
 
   private async assertEventReferences(
@@ -6075,8 +6092,9 @@ export class GamesService {
       });
     }
     if (period.state === V1GamePeriodState.ENDED) {
-      // 정규 시간이 끝났어도 경기 종료 전에는 빠진 골을 넣을 수 있다 — 시각은 정규 시간 안이어야 한다.
-      if (!(await this.isGoalAfterRegulationAllowed(tx, game, dto, period.number))) {
+      // 하프타임·정규 시간 종료처럼 경기 종료 전 쉬는 구간에는 빠진 골·카드·파울을 넣을 수 있다 —
+      // 시각은 그 기간 정규 시간 안이어야 한다.
+      if (!(await this.isEventAllowedDuringBreak(tx, game, dto, period.number))) {
         throw new ConflictException({
           code: 'PERIOD_ALREADY_ENDED',
           message: '이미 종료된 피리어드예요',

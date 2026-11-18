@@ -58,12 +58,14 @@ describe('팀 목록 정렬 HTTP/DB 계약', () => {
     await create('quiet-b', { memberCount: 2 });
     await create('quiet-c', { memberCount: 2 });
     await create('newest', { memberCount: 2, createdAt: new Date('2026-06-01T00:00:00Z') });
-    // 취소된 매치만 가진 팀 — 취소를 세는 정책이면 heavy(3)보다 앞서고, 빼면 맨 뒤 무리에 섞인다.
+    // 취소·삭제된 매치만 가진 팀 — 세는 정책이면 heavy(3)보다 앞서고, 빼면 맨 뒤 무리에 섞인다.
     await create('cancelled-only', { memberCount: 2 });
+    await create('deleted-only', { memberCount: 2 });
     for (let i = 0; i < 3; i += 1) await hostMatch(ids.heavy);
     await hostMatch(ids.light);
     await hostMatch(ids.light, { status: 'cancelled' });
     for (let i = 0; i < 4; i += 1) await hostMatch(ids['cancelled-only'], { status: 'cancelled' });
+    for (let i = 0; i < 4; i += 1) await hostMatch(ids['deleted-only'], { deletedAt: new Date() });
   });
 
   afterAll(async () => {
@@ -75,11 +77,11 @@ describe('팀 목록 정렬 HTTP/DB 계약', () => {
     await cleanup?.();
   });
 
-  it('activity: 취소된 매치를 포함해 팀 매치를 많이 올린 팀이 앞에 오고, 같은 횟수는 최근 등록순이다', async () => {
+  it('activity: 취소·삭제된 매치는 빼고 팀 매치를 많이 올린 팀이 앞에 오며, 같은 횟수는 최근 등록순이다', async () => {
     const page = await fetchPage({ sort: 'activity', limit: 50 });
 
-    expect(names(page.items).slice(0, 3)).toEqual(['cancelled-only', 'heavy', 'light']);
-    expect(names(page.items).slice(3, 4)).toEqual(['newest']);
+    // light 는 취소 1건을 빼면 1건이다. 취소·삭제만 가진 팀은 활동 0이라 아무 매치도 없는 팀과 같은 무리다.
+    expect(names(page.items).slice(0, 3)).toEqual(['heavy', 'light', 'newest']);
   });
 
   it('latest(기본): 활동·멤버 수와 무관하게 최근 등록순이다', async () => {

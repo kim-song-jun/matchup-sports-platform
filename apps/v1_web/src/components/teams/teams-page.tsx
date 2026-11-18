@@ -107,6 +107,22 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
       <TeamSearchBar model={model} />
       {/* 결과가 0건일 때만 tm-list-empty — matches-page.tsx 와 같은 이유. */}
       <div className={`tm-team-list${!model.listLoading && model.teams.length === 0 ? ' tm-list-empty' : ''}`}>
+        {model.myTeams?.length ? (
+          <section aria-label="내 팀" className="tm-my-team-section">
+            <div className="tm-text-body-lg">내 팀</div>
+            <div className="tm-my-team-row">
+              {model.myTeams.map((team) => (
+                <Link key={team.id} className="tm-my-team-chip tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
+                  <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="md" />
+                  <span style={{ minWidth: 0 }}>
+                    <span className="tm-text-body-lg line-clamp-1" style={{ display: 'block' }}>{team.name}</span>
+                    <span className="tm-text-caption line-clamp-1" style={{ display: 'block' }}>{team.sport} · {team.roleLabel}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
         <div className="tm-sport-chip-row" role="group" aria-label="종목 필터">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
         {/* 모바일 진입점 위계: summary-bar 텍스트를 tm-text-heading으로 승격해 페이지 진입점을 명확히 함.
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}

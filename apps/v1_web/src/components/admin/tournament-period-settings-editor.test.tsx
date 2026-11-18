@@ -32,6 +32,21 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
 }));
 
 describe('TournamentPeriodSettingsEditor', () => {
+  it('단계·편성별 시간이 있으면 실제 이름과 값을 보여주고 전체 기본값 안내를 하지 않는다', () => {
+    state.settings = { ...state.settings, compositionOverrides: [
+      { scope: 'stage', key: 'pre', competitionConfigVersionId: 'c-stage', periods: [{ code: 'SINGLE_PERIOD', label: '단판', durationMinutes: 15, extraTime: false }] },
+      { scope: 'pool', key: 'pool-a', competitionConfigVersionId: 'c-pool', periods: [{ code: 'SINGLE_PERIOD', label: '단판', durationMinutes: 10, extraTime: false }] },
+    ], stageOverrides: [] };
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} stagePlan={{
+      version: 1, stages: [{ key: 'pre', name: '예선', pools: [{ key: 'pool-a', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] }],
+    }} />);
+    expect(screen.getByText('예선 전체 · 15분')).toBeInTheDocument();
+    expect(screen.getByText('예선 · A조 · 10분')).toBeInTheDocument();
+    expect(screen.queryByText('모든 단계가 대회 기본값을 사용하고 있어요.')).toBeNull();
+    expect(screen.getByRole('link', { name: '단계·편성 경기 시간 수정' })).toHaveAttribute('href', '/admin/tournaments/tournament-1/bracket');
+    state.settings = { ...state.settings, compositionOverrides: [] };
+  });
+
   it('hydrates current durations and sends a durations-only update', () => {
     state.mutate.mockClear();
     state.settings = { ...state.settings, expectedVersion: 'version-1', periods: [

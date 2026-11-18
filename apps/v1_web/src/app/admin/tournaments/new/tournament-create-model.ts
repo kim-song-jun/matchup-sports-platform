@@ -1,5 +1,6 @@
 import type { StagePlan } from '@/types/stage-plan';
 import { stagePlanCounts, stagePlanError } from '@/lib/stage-plan';
+import { hasValidPeriodDurations } from '@/lib/tournament-periods';
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
@@ -715,11 +716,11 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
     }
-    if (state.periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240)) {
-      errors.periodMinutes = '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+    if (state.periodMinutes.length > 0 && !hasValidPeriodDurations(state.periodMinutes)) {
+      errors.periodMinutes = '경기 시간은 피리어드마다 1분 이상 정수로 입력해 주세요.';
     }
-    if (Object.values(state.stagePeriodMinutes).some((periods) => !periods?.length || periods.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240))) {
-      errors.stagePeriodMinutes = '단계별 경기 시간도 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+    if (Object.values(state.stagePeriodMinutes).some((periods) => !periods || !hasValidPeriodDurations(periods))) {
+      errors.stagePeriodMinutes = '단계별 경기 시간도 피리어드마다 1분 이상 정수로 입력해 주세요.';
     }
     if (state.substitutionMode === 'limited') {
       // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인

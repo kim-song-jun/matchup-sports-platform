@@ -687,15 +687,25 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: periodsVersion }), expect.any(Object));
   });
 
-  it('경기 시간: 1~240분 정수가 아니면 다음 단계로 못 넘어간다', () => {
+  it('경기 시간: 1분 이상 정수가 아니면 다음 단계로 못 넘어간다', () => {
     renderPage();
     goToParticipationStep();
 
     fireEvent.change(screen.getByLabelText('후반 시간(분)'), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
-    expect(screen.getByText(/경기 시간은 피리어드마다 1~240분/)).toBeInTheDocument();
+    expect(screen.getByText(/경기 시간은 피리어드마다 1분 이상 정수/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '대회 만들기' })).toBeNull();
+  });
+
+  it('경기 시간: 서버가 허용하는 240분 초과 입력으로 다음 단계를 진행한다', () => {
+    renderPage();
+    goToParticipationStep();
+    const duration = screen.getByLabelText('후반 시간(분)');
+    expect(duration).not.toHaveAttribute('max');
+    fireEvent.change(duration, { target: { value: '241' } });
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    expect(screen.getByRole('button', { name: '대회 만들기' })).toBeInTheDocument();
   });
 
   it('출전 인원: 카탈로그가 없는 종목이면 선택지를 지어내지 않고 안내만 보여준다', () => {

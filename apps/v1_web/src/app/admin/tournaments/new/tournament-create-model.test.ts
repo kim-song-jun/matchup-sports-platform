@@ -88,6 +88,15 @@ function draftWithMinimumMatches(
 }
 
 describe('league minimum matches draft roundtrip', () => {
+  it('생성의 기본·라운드별 경기 시간도 서버와 같은 1분 이상 정수를 허용한다', () => {
+    const state = { ...INITIAL_TOURNAMENT_CREATE_STATE, periodMinutes: ['241'], stagePeriodMinutes: { final: ['241'] } };
+    const errors = validateTournamentCreateStep(state, 2);
+    expect(errors.periodMinutes).toBeUndefined();
+    expect(errors.stagePeriodMinutes).toBeUndefined();
+    expect(validateTournamentCreateStep({ ...state, periodMinutes: ['0'], stagePeriodMinutes: { final: ['1.5'] } }, 2)).toMatchObject({
+      periodMinutes: expect.any(String), stagePeriodMinutes: expect.any(String),
+    });
+  });
   it('hydrates nullable values as blank and sends null when clearing a saved limit', () => {
     const savedLimit = mapTournamentToWizardFields(draftWithMinimumMatches(1));
     expect(savedLimit.minMatchesPerTeam).toBe('1');

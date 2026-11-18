@@ -1054,7 +1054,6 @@ function ParticipationStep({
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={240}
                     value={value}
                     disabled={pending}
                     aria-label={`${periodNames[index]} 시간(분)`}
@@ -1100,7 +1099,7 @@ function ParticipationStep({
                     {values.map((value, index) => (
                       <label key={`${phase}-${index}`} className="grid gap-1 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
                         {names[index]} (분)
-                        <input type="number" inputMode="numeric" min={1} max={240} value={value} disabled={pending} onChange={(event) => { const next = [...values]; next[index] = event.target.value; dispatch({ type: 'set-stage-period-minutes', phase, value: next }); }} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" />
+                        <input type="number" inputMode="numeric" min={1} value={value} disabled={pending} onChange={(event) => { const next = [...values]; next[index] = event.target.value; dispatch({ type: 'set-stage-period-minutes', phase, value: next }); }} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" />
                       </label>
                     ))}
                   </div>

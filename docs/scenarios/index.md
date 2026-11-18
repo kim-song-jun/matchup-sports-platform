@@ -8,6 +8,8 @@
 
 ## 2026-11-09 — 단계형 대회 구성 (추가 리뷰 검증 완료)
 
+2026-11-18 입력 동등성 후속: 시간 편집 CAS·형식/정원 제어와 라벨·상속 안내·시간 입력 범위 네 결함 수정 및 dev PR 준비. 이번 변경의 Alpha 4 routes×3폭은 0/12이며, 아래 이전42/42를 이번 after 증거로 사용하지 않는다. 최신 계약·검증은 [시나리오 후속 절](./competition-stage-composition.md#2026-11-18--입력-동등성-리뷰-후속-pr-준비)을 따른다.
+
 최신 추가 리뷰 보완 완료(2026-11-17): PR #2427 dev 반영, Alpha dbea6a5f5에서 구성3+기존39=42/42 PASS. 초안·사유 보존/충돌 차단·확인 재조회와 필수 조작 기록 누락 시 실제 관리자3개 재실행을 확인했다. 70경기·20팀140계정 보존, 구조 PNG9개와 기존 after78개 갱신. [최신 검증](./competition-stage-composition.md#2026-11-17--구성-초안재개-조작-증거-보완).
 
 최초 동등성 수정 당시 기록 [PR #2419](https://github.com/kim-song-jun/matchup-sports-platform/pull/2419): 감사40/40 추적, 실제DB15건+worker1건·6강 정정RED→GREEN, 최종Web65건·타입/규칙 PASS. 당시 Alpha 시각0/3 차단은 이후 사용자 승인 headed Playwright 검증으로 해소했고 최신 결과는 위 기록을 따른다. Copilot 자격 차단은 수동 검토+전체CI 대체로 명시했다.

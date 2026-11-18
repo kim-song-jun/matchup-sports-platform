@@ -1,6 +1,6 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
-Status: Review — 2026-11-18 입력 동등성 네 결함 수정·로컬 검증 완료, dev PR 제출 단계. 이전 #2427 Alpha 42/42는 아래 과거 기록.
+Status: Review — 2026-11-18 입력 동등성 네 결함 수정·로컬 검증 완료, dev PR #2442 생성. CI·리뷰/Alpha는 별도 gate. 이전 #2427 Alpha 42/42는 아래 과거 기록.
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
@@ -14,7 +14,8 @@ Status: Review — 사용자 요청: 확인된 입력/표시 결함 수정 후 d
 - [x] Phase 1: 네 결함(시간 CAS, 형식/정원 제어·라벨, 시간 상속 안내, 입력 범위)의 회귀 RED 확인.
 - [x] Phase 2: 기존 컴포넌트와 서버의 1분 이상 정수 계약에 맞춰 수정.
 - [x] Phase 3a: 관련 회귀·Web 타입/패턴·diff 범위 확인.
-- [ ] Phase 3b: 커밋·dev PR·리뷰 요청.
+- [x] Phase 3b: 커밋·dev PR·리뷰 요청.
+- PR: [#2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442), base `dev`, 구현 `62a3369b6`, 15 files. 로컬217 tests·Web 타입/패턴·changeset 정책·커밋 diff PASS. 최신 원격CI 진행 중, Copilot CLI/REST 요청 수행(대기 목록은 빈 배열·리뷰 아직0건이므로 clean으로 판정하지 않음). 사용자 요청대로 머지·배포는 실행하지 않았다.
 - Acceptance: 조회 갱신·충돌 뒤 옛 입력으로 최신 시간 덮어쓰기 금지; 명시 확인 재조회; 단계형 형식/정원은 구성 경로로 안내; 별도 시간 설정의 실제 이름·값 표시; 생성/수정/편성 시간 입력 계약 일치.
 - Ambiguity: 최소 보장 경기 수·회전 수·240경기 등 대회 운영 규칙 차이는 이번 버그 수정으로 확대하지 않는다. 시간 상한은 서버 DTO의 기존 양의 정수 계약을 따른다.
 - QA: 사용자 요청은 PR 생성까지다. 변경 후 Alpha `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/admin/tournaments/:id/info`, `/admin/tournaments/:id/bracket` 4 routes × 390/768/1440 = 0/12. console/network도 dev 머지·배포 이후에 가능하며 미실행 상태를 PR에 명시한다.

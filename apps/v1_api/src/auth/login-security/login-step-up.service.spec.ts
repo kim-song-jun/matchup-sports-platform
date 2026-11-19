@@ -70,7 +70,7 @@ describe('LoginStepUpService.start', () => {
     });
     const [row] = state.challenges;
     expect(row.tokenHash).not.toBe(view.challengeToken);
-    expect(row.codeHash).toMatch(/^scrypt:/);
+    expect(row.codeHash).toMatch(/^scrypt\$v1\$32768\$8\$3\$/);
     expect(row).toMatchObject({ userId: USER_ID, emailKey: 'key-a', sentCount: 1 });
   });
 

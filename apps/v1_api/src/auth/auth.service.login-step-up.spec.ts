@@ -158,7 +158,8 @@ describe('AuthService.login once step-up applies', () => {
       expect(Object.keys(result)).toEqual(['stepUp']);
       expect(Object.keys(stepUpOf(result))).toEqual(['challengeToken', 'maskedEmail', 'expiresAt', 'resendAvailableAt']);
     }
-    expect(outcomes.map((outcome) => outcome.scrypt)).toEqual([2, 2, 2]);
+    // Both password work factors plus the OTP hash must be identical for every account shape.
+    expect(outcomes.map((outcome) => outcome.scrypt)).toEqual([3, 3, 3]);
     expect(outcomes.map((outcome) => stepUpOf(outcome.result).maskedEmail)).toEqual([
       'ru***@example.com',
       'ru***@example.com',

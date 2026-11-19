@@ -28,8 +28,8 @@ Scope: backend/frontend/infra/docs · base origin/dev fb9e768aa · branch feat/p
 - 이후 구현 검증은 정본 §8에 정의. 현재 통과한 것으로 표시하지 않는다.
 
 ## Parallel Work Breakdown
-- 현재: 단일 세션, owned: 본 task / docs/security/personal-data-protection-plan.md / docs/README.md.
-- forbidden: apps/**, deploy/**, .env*, 기존 admin PR 브랜치·다른 worktree의 변경.
+- 단일 세션. 현재 owned: 본 task / docs/security/personal-data*.md·sql / docs/README.md / apps/v1_api/src/privacy / src/auth/password-hash*·auth.service* / API package·pnpm-lock / Changeset.
+- forbidden: deploy/**, .env*, 기존 admin PR 브랜치·다른 worktree의 변경. 중앙 PrismaService 연결은 자동 승인 검토 거부 후 미적용.
 - 후속 P0→P2→P3→P4→P5는 공유 계약 의존 관계에 따라 순차 진행, P1은 P0 후 진행 가능.
 - 병렬 에이전트 실행 요청 없음. 후속 구현 분해는 정본 §6을 따른다.
 
@@ -75,3 +75,12 @@ Scope: backend/frontend/infra/docs · base origin/dev fb9e768aa · branch feat/p
 - [ ] 보호: 현재 권한으로 가능한 설정 및 관리자가 적용할 설정 검증
 
 현재 owned scope는 v1 관련 개인정보 경로·Prisma migration·배포 설정·문서·시나리오·검증이며 구현 파일은 각 Phase 진행 때 추가 기록한다. 계획의 정확 일치 검색을 기본안으로 적용한다. 운영 데이터 변환/키 발급/운영 승격을 실행한 것으로 간주하지 않는다.
+
+## Implementation checkpoint — reviewable Draft
+- 구현 현황 정본: [personal-data-implementation-status.md](../../docs/security/personal-data-implementation-status.md). 전체 구현 미완료.
+- P2 일부: 버전 scrypt·일반 로그인 시 legacy CAS 업그레이드, 별도 행 바인딩 AES-GCM/KMS/정확 일치 변환 후보. 기존 PrismaService는 수정하지 않음.
+- 초기13모델/23필드 후보를 고정했으나 P0 전수 인벤토리·P1 관리자 열람·P3 데이터 전환·P4 복사본 적용은 미완료.
+- 자동 승인 검토가 전체 API 중앙 Prisma 경계 변경 명령을 서비스 전체 장애/데이터 접근 차단 위험으로 거부했다. 그 명령은 실행되지 않았고 중앙 연결을 우회하지 않음. 잠정 schema 변경은 본 작업의 추가분만 회수하고 docs/security/personal-data-expand-proposal.sql로 이동, 실행 migration 없음.
+- auth177/177 + privacy/password15/15 + 인증/복구214/214 = 406개 로컬 단위 PASS. 안정적 행 ID 없는 변환은 거부. 실제 DB/KMS·Alpha 검증 아님.
+- 개인 fork의 쓰기 사용자 seeungmin 단독을 확인. PR은 fork head·maintainer 수정 허용 false·Draft로 생성하고 실제 설정을 확인할 예정. upstream PR merge 본인 한정은 관리자 권한 부족으로 미적용.
+- 전체 구현과 보호 완료를 선언하거나 merge/배포하지 않음. 차단된 중앙 연결·데이터 전환은 명시적 승인 후에만 재개.

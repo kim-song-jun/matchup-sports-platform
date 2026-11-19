@@ -33,26 +33,34 @@ export function MemberAccessBanner() {
   const [hint, setHint] = useState(false);
   const bannerRef = useRef<HTMLElement>(null);
   const wasActive = useRef(false);
+  const returning = useRef(false);
   useEffect(() => {
     setHint(hasMemberAccessHint());
+  }, []);
+  useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== MEMBER_ACCESS_HINT) return;
+      if (event.key !== MEMBER_ACCESS_HINT || returning.current || transition.isPending || transition.isSuccess) return;
+      returning.current = true;
       disconnectV1Socket(); clearV1IdentityCache(client); window.location.reload();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [client]);
+  }, [client, transition.isPending, transition.isSuccess]);
   const access = status.data;
   useEffect(() => {
+    // A local stop owns its server returnPath; the watcher only recovers changes from elsewhere.
+    if (returning.current || transition.isPending || transition.isSuccess) return;
     if (access?.active) { wasActive.current = true; return; }
     if (access?.active !== false || (!wasActive.current && !hint)) return;
     // Storage events may be unavailable: polling still detects another tab ending the shared cookie session.
+    returning.current = true;
     wasActive.current = false;
+    setHint(false);
     disconnectV1Socket(); clearV1IdentityCache(client);
     try { window.localStorage.removeItem(MEMBER_ACCESS_HINT); }
     catch { console.warn('회원 조회 표시를 정리하지 못했어요. 페이지를 새로 불러와요.'); }
     window.location.assign('/admin/users');
-  }, [access?.active, client, hint]);
+  }, [access?.active, client, hint, transition.isPending, transition.isSuccess]);
   const visible = Boolean(access?.active || (hint && !status.isSuccess));
   useEffect(() => {
     if (!visible) return;

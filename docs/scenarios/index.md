@@ -1,6 +1,6 @@
 ## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
 
-[시나리오](./admin-member-team-operations.md) · [작업](../../.github/tasks/20261136-admin-member-team-operations.md) · [PR #2447](https://github.com/kim-song-jun/matchup-sports-platform/pull/2447). 목록/상세 4/4 구현, 조회 전용 10분 회원 접속과 시작·종료 감사 및 복귀 기능 추가. 로컬 UI/HTTP/인증·소켓 회귀를 검증했으며 실제 DB 통합 3건은 원격 CI 확인 대상이다. Alpha 브라우저 0/4·viewport 0/3은 ego-lite 미노출로 미실행이며 배포·시각 합격으로 표시하지 않는다.
+[시나리오](./admin-member-team-operations.md) · [작업](../../.github/tasks/20261136-admin-member-team-operations.md) · [PR #2447](https://github.com/kim-song-jun/matchup-sports-platform/pull/2447). 목록/상세 4/4 구현, 조회 전용 10분 회원 접속과 시작·종료 감사 및 복귀 기능 추가. 리뷰에서 발견한 쿠키 헤더 처리·모달 선택값·복귀 이동 충돌 3건을 RED→GREEN 회귀로 보완 중. 로컬 UI/HTTP/인증·소켓 회귀를 검증했으며 실제 DB 통합 3건은 원격 CI 확인 대상이다. Alpha 브라우저 0/4·viewport 0/3은 ego-lite 미노출로 미실행이며 배포·시각 합격으로 표시하지 않는다.
 
 ## 2026-11-11 — 경기별 제목 수정
 

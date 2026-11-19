@@ -35,7 +35,7 @@ type V1SessionRuntimeConfiguration = {
 };
 
 type V1SessionRequest = {
-  readonly headers: { readonly cookie?: string };
+  readonly headers?: { readonly cookie?: string };
   header(name: string): string | undefined;
 };
 
@@ -191,9 +191,9 @@ export function resolveV1RequestIdentity(
   const memberIdentity = getMemberAccessIdentity(request);
   if (memberIdentity) return memberIdentity;
   // HTTP authorization is performed by MemberAccessGuard. Socket.IO and unguarded callers fail closed.
-  if (memberAccessCookie(request.headers.cookie)) return null;
+  if (memberAccessCookie(request.headers?.cookie)) return null;
   const session = isStrongSessionSecret(configuration.sessionSecret)
-    ? readV1Session(request.headers.cookie, {
+    ? readV1Session(request.headers?.cookie, {
         secret: configuration.sessionSecret,
         nowMs: configuration.nowMs,
       })

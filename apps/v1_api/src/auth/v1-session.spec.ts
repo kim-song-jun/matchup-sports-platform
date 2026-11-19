@@ -300,3 +300,19 @@ function createRequest(headers: RequestHeaders, cookie?: string) {
     },
   };
 }
+
+
+describe('identity requests without a cookie header collection', () => {
+  it('treats an anonymous minimal request as unauthenticated', () => {
+    expect(resolveV1RequestIdentity({ header: () => undefined }, { nodeEnv: 'test', sessionSecret: undefined })).toBeNull();
+  });
+
+  it.each([undefined, SESSION_SECRET])('resolves a development header identity with secret=%s', (sessionSecret) => {
+    expect(resolveV1RequestIdentity({ header: (name) => name === 'x-v1-user-id' ? 'dev-user' : undefined },
+      { nodeEnv: 'test', sessionSecret })).toEqual({ kind: 'user_id', userId: 'dev-user' });
+  });
+
+  it('never accepts development headers in production', () => {
+    expect(resolveV1RequestIdentity({ header: () => 'forged-user' }, { nodeEnv: 'production', sessionSecret: SESSION_SECRET })).toBeNull();
+  });
+});

@@ -73,7 +73,7 @@ Forbidden: 운영 승격, 실제 회원 데이터 변경, 비밀값 출력, 다�
 - Phase 1(API)·Phase 2(UI/조회 전용 대리 접속) 구현 완료. 팀·회원 목록/상세 4/4 화면과 전역 안내/복귀를 구현했다. 추천안을 제시한 후 사용자 “진행해서 pr 올려줘” 지시에 따라 A안·조회 전용으로 진행했으며 권한을 일반 쓰기까지 넓히지 않았다.
 - Phase 3: 로컬 검증 완료 후 전체 변경을 PR에 push하고 CI·독립 리뷰 결과 확인. 이번 사용자 요청의 산출물은 PR이며 dev/main 머지를 실행하지 않는다.
 - 최종 API 관련 355/355 및 API 타입 검사 통과. 웹 관련 12개 파일77/77 및 웹 타입/규칙 검사 통과. 웹 타입에서 링크 값을 허용하지 않던 AdminDetailRow를 ReactNode로 확장했다. API surface·웹 pattern PASS. 홈 Provider 테스트의 act 경고는 기록하며 브라우저 console 합격 근거로 쓰지 않는다.
-- 실제 PostgreSQL 통합 3개를 test/admin-member-access.integration-spec.ts에 추가했다. 로컬 DB가 없어 미실행이며 승인된 폐기 가능 DB clone을 사용하는 원격 CI로 검증한다.
+- 실제 PostgreSQL 통합 3개를 test/admin-member-access.integration-spec.ts에 추가했다. 로컬 DB가 없어 미실행이다. 현재 CI의 일반 unit 성공만으로 이 PostgreSQL 통합 3개 실행을 주장하지 않으며, 별도 DB 실행 증거가 필요하다.
 - Node22.23.1은 요구 >=22.23.5보다 낮아 경고 발생. 의존성은 기존 pnpm store에서 offline/frozen 설치했고 Prisma는 작업 전용 /tmp 캐시로 생성했다. proof-token 테스트는 명시적 테스트용 secret으로 실행했다(실제 .env/비밀값 조회 없음).
 - Alpha 실제 브라우저 QA 0/4, viewport 0/3(390/768/1440): ego-lite 도구/스킬이 현재 세션에 없어 미실행. 로컬 next/다른 browser-use로 대체하지 않았다. PR에 미검증과 머지 후 갤러리 절차를 명시한다.
 - API 문서 README/global-contract/admin-and-ops, Changeset, 타입/조회 훅/MSW와 시나리오 허브를 동기화했다. 새로운 schema/migration, 운영 데이터 변경, dev/main 머지 없음.
@@ -85,3 +85,15 @@ Forbidden: 운영 승격, 실제 회원 데이터 변경, 비밀값 출력, 다�
 - 대리 접속은 원래 관리자 쿠키를 유지한다. 10분 signed grant, append-only 시작/종료 감사, 원래 세션 결합·양쪽 epoch·현재 권한·종료 상태를 매 요청 검사한다. 전역 쓰기/운영 경로/인증 발급/Socket.IO를 차단한다.
 - grant 만료 시 silent admin fallback을 막는 marker는 원래 세션 최대 수명7일 동안 유지한다. 상태 안내·원계정 복귀·개인화 캐시 정리·다른 탭 신원 동기화를 구현했다. 종료 감사 저장 실패를 성공으로 바꾸지 않는다.
 - 별도 schema/migration 없이 기존 감사 로그의 start grant와 end 이벤트를 사용한다. 만료 유효 시각은 expiresAt이며 다음 확인 때 end 이벤트를 남긴다.
+
+
+## 2026-11-19 리뷰 지적 3건 보완
+- 기준 head: 4c4e38f4b. 사용자 “수정하고 올려줘”에 따라 같은 PR #2447에서 수정한다.
+- [x] API CI 인증 회귀: headers가 없는 기존 요청 어댑터에서 새 쿠키 검사가 TypeError를 던졌다. cookie collection을 선택적으로 읽으며, 개발 헤더는 production에서 계속 거부한다.
+- [x] 상태 모달: deleted/withdrawal_pending처럼 선택지에 없는 현재 상태 대신 실제 표시되는 첫 유효 선택값으로 초기화한다. 선택지가 없거나 유효하지 않으면 제출을 막는다.
+- [x] 복귀 충돌: 직접 복귀가 진행 중이거나 성공한 경우 상태 감시/다른 탭 이벤트가 서버 returnPath를 덮지 않는다. 외부 종료 복귀도 한 번만 실행하고 오래된 hint를 정리한다.
+- [x] 회귀 테스트: 쿠키 헤더 컬렉션 없는 요청 4개, 상태 모달 4개, 회원 조회 시작/정상 복귀/다른 탭 종료 성공 경로 3개를 보강했다.
+- RED: 기존 API 인증 3개+신규 최소 요청 4개=7/42 실패, UI 상태/복귀 4/10 실패를 수정 전 확인했다. GREEN: 동일 API42/42와 UI10/10 통과.
+- [x] 기존 HTTP 권한/쓰기 차단 9/9, API 인증/기존 대회 관리자42/42, 회원·팀 화면/신원 전환/모달54/54 통과. API·웹 타입 및 surface/pattern 검사 PASS. touched source의 TODO/FIXME/HACK/XXX 신규 marker 없음, diff check PASS.
+- [ ] 수정 커밋 push 후 최신 head CI 결과 확인. 기존 head의 API CI3실패를 최신 head의 통과로 대체 확인해야 한다.
+- 범위: API 내부 요청 해석과 기존 UI 로직만 수정. 새 route/payload·schema/migration·레이아웃 변경 없음. Alpha 실화면/ego-lite 미노출 한계는 유지한다.

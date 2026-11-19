@@ -1628,6 +1628,18 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(text).toMatch(/text-overflow:\s*ellipsis/);
   });
 
+  it('카드 글자 칸이 좁으면 수준과 아이콘을 빼서 인원·경기 수를 지킨다', () => {
+    // 태블릿 2열의 글자 칸은 172px 라 세 칸이 다 들어가지 않는다 — 경기 수가 잘리지 않게 수준을 먼저 뺀다.
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const body = css.match(/\.tm-team-card-body\s*\{([^}]*)\}/)?.[1];
+    const narrow = css.match(/@container\s*\(max-width:\s*199px\)\s*\{([\s\S]*?)\n\}/)?.[1];
+
+    expect(body).toMatch(/container-type:\s*inline-size/);
+    expect(narrow).toMatch(/\.tm-team-card-meta-level/);
+    expect(narrow).toMatch(/\.tm-team-card-meta-icon/);
+    expect(narrow).toMatch(/display:\s*none/);
+  });
+
   it('활동 일정 자리는 비어 있어도 한 줄 높이를 지킨다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
     const slot = css.match(/\.tm-team-card-activity-slot\s*\{([^}]*)\}/)?.[1];

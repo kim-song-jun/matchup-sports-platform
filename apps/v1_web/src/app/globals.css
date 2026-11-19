@@ -5459,6 +5459,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   white-space: nowrap;
 }
 
+/* 카드 글자 칸이 좁으면(태블릿 2열 172px) 수준과 아이콘을 빼서 인원·경기 수가 잘리지 않게 한다.
+   390(250px)·1440(233px)은 그대로 다 보인다. 수준은 팀 상세에서 본다. */
+.tm-team-card-body {
+  container-type: inline-size;
+}
+
+@container (max-width: 199px) {
+  .tm-team-card-meta-level,
+  .tm-team-card-meta-icon {
+    display: none;
+  }
+}
+
 /* 활동 일정 줄 자리 — 내용이 없어도 한 줄 높이를 남겨 설명 유무와 상관없이 카드 높이를 같게 한다.
    1lh 를 못 읽는 오래된 브라우저를 위해 em 값을 먼저 둔다. */
 .tm-team-card-activity-slot {

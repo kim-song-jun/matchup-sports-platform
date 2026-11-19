@@ -527,14 +527,14 @@ export function findUnreadRuntimeEnvVariables(script) {
 }
 
 {
-  let compose = '';
+  const composePath = 'deploy/docker-compose.prod.yml';
+  let nginxProblem;
   try {
-    compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
-  } catch {
-    compose = '';
+    nginxProblem = findNginxImageProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    nginxProblem = `읽지 못해 nginx 이미지를 검사할 수 없습니다 (${error.code ?? error.message})`;
   }
-  const nginxProblem = compose ? findNginxImageProblem(compose) : null;
-  if (nginxProblem) errors.push(`deploy/docker-compose.prod.yml: ${nginxProblem}`);
+  if (nginxProblem) errors.push(`${composePath}: ${nginxProblem}`);
 }
 
 const requiredPatterns = [

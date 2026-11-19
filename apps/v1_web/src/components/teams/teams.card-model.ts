@@ -10,6 +10,9 @@ import type { ListFacets, V1Team } from '@/types/api';
 import { formatProvinceWide } from '@/lib/v1-regions';
 import { teamGenderRuleLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
+/** 서버가 수준을 정하지 않았을 때 목록·상세가 쓰는 자리표시자 — 카드는 이 값이면 수준 칸을 뺀다. */
+export const TEAM_LEVEL_UNSET_LABEL = '레벨 미설정';
+
 export function toTeam(team: V1Team): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
@@ -31,6 +34,8 @@ export function toTeam(team: V1Team): TeamModel {
     status: recruitment === '가입 가능' ? 'open' : 'closed',
     statusLabel: recruitment,
     tags: [levelTag, genderRule].filter(Boolean),
+    level: levelTag === TEAM_LEVEL_UNSET_LABEL ? '' : levelTag,
+    recentMatchCount: team.recentMatchCount,
     genderRule,
     // 소개가 없으면 **빈 값으로 둔다.** 예전엔 `{지역}에서 활동하는 {종목} 팀이에요.` 를
     // 만들어 넣었는데, 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)과 같은 말이라 정보가 되지
@@ -47,7 +52,20 @@ export function formatTeamLevelTag(team: V1Team) {
   const minName = team.minLevel?.name?.trim();
   const maxName = team.maxLevel?.name?.trim();
   if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
-  return minName ?? maxName ?? '레벨 미설정';
+  return minName ?? maxName ?? TEAM_LEVEL_UNSET_LABEL;
+}
+
+/** 카드 둘째 줄의 성별 — 목록 칩의 '남'·'여'를 문장 속에서 읽히게 풀어 쓴다. 그 밖의 값('성별 무관' 등)은 그대로, 비었으면 빈 문자열. */
+export function teamCardGenderLabel(genderRule: string | null | undefined): string {
+  const rule = genderRule?.trim() ?? '';
+  if (rule === '남') return '남성';
+  if (rule === '여') return '여성';
+  return rule;
+}
+
+/** 카드 정보 줄의 인원 — 목표 인원이 있으면 `현재/목표명`, 없으면 `현재명`. */
+export function formatTeamCardMembers(team: { members: number; capacity: number }): string {
+  return team.capacity > 0 ? `${team.members}/${team.capacity}명` : `${team.members}명`;
 }
 
 export function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {

@@ -109,3 +109,5 @@ DB 직접 입력·seed·관리자 직접 참가 등록·내부 서비스 호출�
 - 재검산: `node scripts/qa/ranked-flow/verify-results.cjs`.
 
 테스트 계정·팀·완료 대회는 사용자가 조회할 수 있도록 보존한다. 미병합 수정 worktree/브랜치는 후속 수정 및 리뷰를 위해 보존한다.
+
+최종 PR cursor: 최신 dev fb9e768aa 병합으로 문서 충돌2건을 양측 보존하여 해결, head58868e8bb. 합성 후 StagePlanEditor5tests PASS. 공식 Copilot 요청은 HTTP422 ACTOR_INELIGIBLE(리뷰 포함 라이선스 또는 조직 정책 자격 불충족)로 거절됨. 필수 최신 Copilot clean gate 미충족으로 dev 머지·Alpha 수정 배포는 실행하지 않았다. 사용자 예외 승인은 이번 수정에 대해 받지 않았다. 최종 정상 데스크톱 상단은 results-1440-animation-finished.png이며 CSS opacity 완료 후 촬영·직접 확인했다. 소유 임시 브라우저 공간과 미추적 실행 스크립트129개 정리, 미병합 worktree·테스트 데이터 보존.

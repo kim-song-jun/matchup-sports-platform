@@ -3415,6 +3415,8 @@ export type V1AdminTeamRow = {
   name: string;
   sportId: string;
   sportName: string;
+  regionId?: string;
+  regionName?: string;
   ownerUserId: string;
   ownerName: string | null;
   memberCount: number;
@@ -3613,6 +3615,7 @@ export type AdminListFilters = {
   status?: string;
   q?: string;
   sportId?: string;
+  regionId?: string;
   audience?: string;
   category?: string;
   /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */

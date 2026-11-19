@@ -356,3 +356,19 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - 조회 화면은 링크 탐색을 막고 회원 상세 복귀만 제공한다. 회원의 기기/쿠키/브라우저 상태나 가입·인증 게이트 전체를 재현하지 않는다. 원본 링크의 대진표 필터만 허용 목록으로 전달한다. 정규 리그·미공개 대진표는 범위 밖이다.
 
 - MSW/demo에서는 실제 관리자 감사 기록을 만들 수 없으므로 두 endpoint 모두 503 `MEMBER_PREVIEW_REQUIRES_LIVE_API`로 명시적으로 거절한다. 가짜 성공이나 회원 조회 ID를 만들지 않는다.
+
+
+## 회원·팀 운영 정보 (2026-11-19)
+
+- `GET /api/v1/admin/{users|teams}/:id/operations`: active admin 전용. 대상이 없으면 404, 응답은 `private, no-store`.
+- 회원 context: `kind=user`, `signupStage`, `missingItems`(`terms/basicProfile/phone/interestSport`), `pendingRequiredDocumentIds`, `deletionFinalized`, `withdrawalScheduledAt`(현재 탈퇴 대기일 때만 최신 **대상** 상태 로그 기준 30일 후, 로그 없으면 null). 가입 진행 단계와 현재 약관 재동의는 별개이며 missingItems는 현재 보완할 항목을 합친 값이다. 휴대폰 게이트 비활성화/관리자 면제는 기존 공용 판정을 따른다.
+- 팀 context: `kind=team`, `ownerAccountStatus`, `ownerLastLoginAt`, `pendingJoinCount`(requested 신청), `lastPlayedAt`(삭제되지 않은 주최/참가 완료 경기의 가장 최근 과거 시작 시각). 생성·수정 시각이나 미래/취소 일정을 최근 활동으로 대신 표시하지 않는다.
+- `GET /api/v1/admin/{users|teams}/:id/operations/:section?page=1`: 같은 권한, id UUID, section 허용 목록, page 정수 1~10000. 응답 `{items,pageInfo:{page,pageSize:10,total,hasNext}}`. 모든 목록은 정렬 동점에 id를 적용한다. 항목 `{id,title,href,status,at,description,actor?,fromStatus?,reason?}`. 링크는 관리자 shell 안의 실제 경로다.
+- `history`: targetType+targetId로 격리한 상태 변경 로그. 처리 주체의 닉네임/식별자, 이전/이후 상태, 사유와 시각. 회원의 actorUser 관계는 그 회원이 **다른 대상에 행한 기록**도 포함하므로 대상 이력으로 사용하지 않는다.
+- `inquiries`: 회원은 본인이 작성한 문의와 relatedType=user 대상 문의를 구분한다. 팀은 reportedTeamId 또는 relatedType=team 연결을 사용한다. 문의 제목·현재 처리 상태·상세 링크만 요약하며 답변/처리 결과는 기존 문의 상세에서 확인한다.
+- `matches`: 회원은 개인 매치 참가(취소·제외·불참 이력 포함), 팀은 주최/확정 상대 양쪽 경기. `upcoming`은 과거·취소·보관을 제외한 예정 항목이며 회원 참가 상태는 active로 제한한다.
+- `competitions`: 팀 참가 등록 또는 회원의 대회/리그 참가 명단. 명단에서 제외된 이력도 표시하며 **등록을 실제 출전으로 세지 않는다**.
+- `appearances`: 회원만 허용(팀은 400 INVALID_SECTION). 현재 신원 연결의 참가자에 대해 현재 공식 revision의 출전자 기록만 조회한다. 옛 정정본·초안은 제외하며 개인정보 공개 동의와 무관한 관리자 자료다. 회원·팀 참가 정보는 실제 DB 근거만 사용한다.
+- `GET /admin/teams`에 sportId/regionId UUID 필터 추가. regionId는 상위 지역과 바로 하위 지역을 포함한다(기존 공용 지역 해석). q는 팀명·팀장 닉네임/실명/표시명/이메일 부분 검색. 필터는 AND, q의 각 필드는 OR. 상태 facet에도 같은 검색/종목/지역 조건을 적용하며 상태만 제외한다. 목록 행에 regionId/regionName 추가, createdAt desc + id desc로 안정 정렬한다.
+- 이 API는 데이터 조회만 하며 스키마 변경/마이그레이션은 없다. 쓰기·multipart·멱등 키 계약 추가 없음. 공통 성공/에러 envelope와 기존 세션 권한 계약 유지.
+- MSW에서는 실제 권한·이력을 만들지 않고 `503 ADMIN_OPERATIONS_REQUIRES_LIVE_API`를 표시한다. 테스트용 응답은 명시적 시나리오 fixture로만 제공한다.

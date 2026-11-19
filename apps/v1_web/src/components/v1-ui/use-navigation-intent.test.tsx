@@ -5,11 +5,9 @@ import { useNavigationIntent, type NavigationIntentKind } from './use-navigation
 
 // 이 파일이 지키는 것은 하나다 — **어떤 클릭이 'tab' 으로 분류되는가**.
 //
-// 'tab' 이 아니면 page-transition-controller 가 data-nav-kind="push" 를 심고, 그러면
-// 페이지 이동용 슬라이드 전환이 그대로 재생된다. 실제로 판별이 `.tm-bottom-nav` 하나뿐이던
-// 동안 세부 탭 세 그룹과 데스크톱 상단 탭이 전부 push 로 잡혔고, "탭 전환에서 전환을 끈다"는
-// CSS(`:root[data-nav-kind="tab"]`)가 **한 번도 발화하지 않았다**. CSS 만 보고는 알 수 없는
-// 결함이라 여기서 분류 자체를 못박는다.
+// 'tab' 으로 분류되면 page-transition-controller 는 data-nav-kind="tab" 만 심고 View Transition 을
+// 걸지 않는다. 그래서 하단 탭·데스크톱 상단 탭·화면 안 세부 탭의 클릭이 모두 'tab' 으로
+// 분류되는지를 여기서 못박는다.
 
 function Harness({ onIntent }: { onIntent: (kind: NavigationIntentKind) => void }) {
   useNavigationIntent({ onIntent });

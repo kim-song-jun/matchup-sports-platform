@@ -9,6 +9,16 @@ vi.mock('@/components/v1-ui/confirm-modal', () => ({ useConfirm: () => ({ confir
 afterEach(cleanup);
 function Editor() { const [plan, setPlan] = useState(initialStagePlan); return <StagePlanEditor value={plan} onChange={setPlan} />; }
 describe('단계형 대회 생성 계약', () => {
+  it('생성 폼 안에서 템플릿을 적용해도 대회 저장이나 다음 단계 제출을 실행하지 않는다', async () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(<form onSubmit={submit}><Editor /></form>);
+    fireEvent.click(screen.getByRole('button', { name: '20팀 순위별 리그 템플릿' }));
+    expect(await screen.findByText('모집 20팀 · 2단계 · 예상 70경기')).toBeInTheDocument();
+    expect(submit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계 추가' }));
+    expect(screen.getByText('모집 20팀 · 3단계 · 예상 71경기')).toBeInTheDocument();
+    expect(submit).not.toHaveBeenCalled();
+  });
   it('단일 본선에서 토너먼트로 바꾸고 예선 없이 유지할 수 있다', () => {
     render(<Editor />);
     expect(screen.getByRole('status')).toHaveTextContent('모집 4팀 · 1단계 · 예상 6경기');

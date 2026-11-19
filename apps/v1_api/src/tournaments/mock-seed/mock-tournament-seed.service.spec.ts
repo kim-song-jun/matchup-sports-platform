@@ -189,7 +189,7 @@ function makeWorld(teamCount = 4) {
     preview: jest.fn().mockResolvedValue({ revision: 1, previewHash: 'hash' }),
     generate: jest.fn().mockResolvedValue({}),
   };
-  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never);
+  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never, {} as never);
   return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview, multiFinals };
 }
 
@@ -331,6 +331,8 @@ describe('MockTournamentSeedService', () => {
       maxTeamCount: 4,
       // 화면이 "몇 명 이상 팀만 쓸 수 있는지"를 설명하려면 이 값이 필요하다.
       minPlayersPerTeam: 3,
+      rankedLeagueUsableTeamCount: 0,
+      rankedLeagueMaxTeamCount: 0,
     });
   });
 

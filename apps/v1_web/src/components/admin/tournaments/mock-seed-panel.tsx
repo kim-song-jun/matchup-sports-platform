@@ -16,6 +16,7 @@ const FORMATS: Array<{ value: NonNullable<CreateMockTournamentInput['format']>; 
   { value: 'knockout', label: '토너먼트' },
   { value: 'group_knockout', label: '조별리그+토너먼트' },
   { value: 'league_knockouts', label: '정규리그+N개 토너먼트' },
+  { value: 'ranked_leagues', label: '예선+순위별 결선 리그' },
 ];
 
 const STATUSES: Array<{ value: NonNullable<CreateMockTournamentInput['status']>; label: string }> = [
@@ -29,10 +30,14 @@ const MAX_TEAMS_WITH_RESULTS = 16;
 
 /** 서버가 400 으로 막는 조합을 누르기 전에 알려준다. 막히지 않으면 null. */
 export function mockSeedBlockReason(input: Pick<CreateMockTournamentInput, 'format' | 'teamCount' | 'status' | 'withResults' | 'reviewReady'>): string | null {
+  if (input.format === 'ranked_leagues' && (!Number.isInteger(input.teamCount) || (input.teamCount ?? 0) < 8 || (input.teamCount ?? 0) > 32 || (input.teamCount ?? 0) % 4 !== 0)) {
+    return '순위별 결선 리그는 8~32팀 중 4의 배수로 선택해 주세요. 20팀은 예선 30경기와 결선 40경기예요.';
+  }
   if (input.format === 'league_knockouts' && input.status === 'completed') {
     return '정규리그+N개 토너먼트는 결선 결과를 채우지 않아 모집중·진행중으로만 만들 수 있어요.';
   }
   const withResults = input.withResults || input.reviewReady || input.status === 'completed';
+  if (input.format === 'ranked_leagues' && withResults && (input.teamCount ?? 0) > 20) return '순위별 결선 리그는 결과까지 채우면 20팀까지 만들 수 있어요.';
   if (input.status === 'open' && withResults) {
     return '모집중 목업은 경기 결과나 후기 작성 가능 상태로 만들 수 없어요. 상태를 진행중이나 종료로 바꿔 주세요.';
   }
@@ -68,16 +73,17 @@ export function MockSeedPanel() {
 
   if (!availability.data?.enabled) return null;
 
-  const maxTeamCount = availability.data.maxTeamCount ?? 32;
-  const usableTeamCount = availability.data.usableTeamCount ?? 0;
-  const minPlayersPerTeam = availability.data.minPlayersPerTeam ?? 0;
+  const ranked = format === 'ranked_leagues';
+  const maxTeamCount = ranked ? availability.data.rankedLeagueMaxTeamCount ?? 0 : availability.data.maxTeamCount ?? 32;
+  const usableTeamCount = ranked ? availability.data.rankedLeagueUsableTeamCount ?? 0 : availability.data.usableTeamCount ?? 0;
+  const minPlayersPerTeam = ranked ? 7 : availability.data.minPlayersPerTeam ?? 0;
   const teamCountTooHigh = teamCount > maxTeamCount;
   const blockReason = mockSeedBlockReason({ format, teamCount, status, withResults, reviewReady });
 
   const submit = () => {
     setError(null);
     createMock.mutate(
-      { format, teamCount, status, withResults, reviewReady, withLineups },
+      { format, teamCount, status, withResults, reviewReady, withLineups: ranked || withLineups },
       {
         onSuccess: (result) => setCreated(result),
         onError: (err) => setError(extractErrorMessage(err, '목업 대회를 만들지 못했어요.')),
@@ -106,7 +112,7 @@ export function MockSeedPanel() {
         실제 사용자가 섞인 팀은 쓰지 않아요.
         {minPlayersPerTeam > 0 ? (
           <>
-            {' '}이 대회 설정은 선발 <strong>{minPlayersPerTeam}명</strong> 이상이라, 멤버가 그보다 적은 팀은
+            {' '}이 대회 설정은 {ranked ? '등록 선수' : '선발'} <strong>{minPlayersPerTeam}명</strong> 이상이라, 멤버가 그보다 적은 팀은
             라인업을 제출할 수 없어 제외돼요.
           </>
         ) : null}
@@ -157,7 +163,7 @@ export function MockSeedPanel() {
         </label>
 
         <label className="flex items-center gap-2 h-[44px]">
-          <input type="checkbox" checked={withLineups} onChange={(e) => setWithLineups(e.target.checked)} className="w-4 h-4" />
+          <input type="checkbox" checked={ranked || withLineups} disabled={ranked} onChange={(e) => setWithLineups(e.target.checked)} className="w-4 h-4" />
           <span className="text-[length:var(--font-size-label)] text-gray-900 dark:text-white">라인업까지 제출</span>
         </label>
 
@@ -172,6 +178,7 @@ export function MockSeedPanel() {
         </button>
       </div>
 
+      {ranked ? <p className="mt-3 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">4팀씩 예선을 한 번씩 치른 뒤 같은 순위끼리 결선 리그를 만들어요. 팀당 등록 7명·출전 설정 6명이며, 20팀은 예선 30경기 + 결선 40경기예요. 대진에 팀을 배정하면 경기 명단도 자동 반영돼요. <strong>경기 결과까지</strong>를 켜면 결선까지 공식 결과를 채워요.</p> : null}
       {format === 'league_knockouts' ? (
         <p className="mt-3 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
           4팀 안팎으로 조를 나누고, 각 조 윗순위 절반은 상위 토너먼트·나머지는 하위 토너먼트로 보내요.

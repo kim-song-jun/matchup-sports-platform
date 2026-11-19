@@ -330,3 +330,10 @@ PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN�
 - 핵심 FAIL: 최대출전6명 설정이어도 양팀7명 전원 started=true로 LIVE 시작 허용. 선발6+벤치1/교체 계약은 미충족이며 전체 PASS 아님. 신규가입/OTP·팀생성은fixture 준비로 구분. 개인 이벤트·20팀교체는 통과 주장하지 않음.
 - 구성 버튼 폼 submit 버그 수정 PR #2453, 초기head CI Gates/API/Web PASS·회귀5PASS. 공식 Copilot review는 응답 없고 dev 이동 후 충돌 확인, 동기화 중. Alpha 배포 완료 아님.
 - 증거/상세/정확한 미검증 범위: docs/scenarios/ranked-leagues-full-flow-20261119.md. 기존 테스트/실회원 보존.
+
+
+## 2026-11-19 재실행 캡처 + 목업 카테고리 후속
+- 사용자 추가 요청: 실제 신청/수락 재실행 중요 장면을 PR에 게시하고 최종검증. 상단 기존 목업 패널의 팀 수·상태 선택을 유지하고 순위별 리그 카테고리만 확장.
+- 새 소유 대회21da8cb0-2138-431b-bc17-b5e3b6e8d326, 기존합성20팀 재사용. 실제신청20/20·명단140/140 완료, 관리자수락/스크린샷 진행 중. 상세 docs/scenarios/ranked-replay-screenshots-20261119.md.
+- 구현: ranked_leagues 목업전용format, 기존 DB format=league+stagePlan. 4팀예선→동순위결선,7명등록·6명config,8~32팀4배수·결과포함20팀상한. existingenv/admin guard유지, schema/migration없음. 공식70경기 생성통합회귀 추가.
+- 로컬 API53·Web6 tests 및 API/Web TypeScript PASS. 실제DB통합은CI대기. 기존동시6명강제실패는이변경이해결하지 않으며실제재검증으로분리.

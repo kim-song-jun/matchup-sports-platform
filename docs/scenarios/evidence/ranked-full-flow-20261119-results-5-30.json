@@ -1,0 +1,262 @@
+[
+  {
+    "fixtureNumber": 5,
+    "fixtureId": "a499f5db-1194-5bb0-a0a1-277729290d57",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 6,
+    "fixtureId": "00d8c306-43bf-5504-8615-e2724acaf9e3",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 7,
+    "fixtureId": "643e28b8-92de-5924-b882-ae6c231dd0f2",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 8,
+    "fixtureId": "7330795a-56b4-547b-869d-bf47265653c2",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 9,
+    "fixtureId": "ab8d4609-f66a-52c8-942f-9cfffcad4e2f",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 10,
+    "fixtureId": "51e588f3-8380-5c3e-a6b8-62c80fd3ea1f",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 11,
+    "fixtureId": "8cce85e8-6a9b-5259-8368-04d1ef938b5f",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 12,
+    "fixtureId": "56cc2508-3cf4-5b1f-b168-093d54160b60",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 13,
+    "fixtureId": "9bdf7e1b-94fd-5802-ab72-954202b62524",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 14,
+    "fixtureId": "3854ff04-bd02-58ed-ac39-5c3f552f808f",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 15,
+    "fixtureId": "5c103c3e-f981-5b6c-bb30-21889ff2bc3c",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 16,
+    "fixtureId": "ed852ae2-c558-5644-9c49-abcfb3c81f9c",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 17,
+    "fixtureId": "da1ac359-6fb9-58b3-9d00-6a5dbf40ae2b",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 18,
+    "fixtureId": "a713c1ce-e7d0-5f71-9bca-bd9c2a6f9f3d",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 19,
+    "fixtureId": "64560a27-afb2-5799-97b2-80325571e79c",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 20,
+    "fixtureId": "0b27c2aa-bd61-5130-9e2e-64cf5b085dfa",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 21,
+    "fixtureId": "1697a4c6-f545-5156-8c6a-09817dcfe474",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 22,
+    "fixtureId": "b1fbb3e7-26af-5066-8365-978386cd67f6",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 23,
+    "fixtureId": "ac06e024-69a0-55f9-9e10-feed45b583e3",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 24,
+    "fixtureId": "9c78232f-179a-55b6-8ce7-7ab6ebd448cf",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 25,
+    "fixtureId": "9555540c-76cb-5122-a8df-be68e488c7e2",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 26,
+    "fixtureId": "d77f870b-120b-5f48-988e-44c2e566aeda",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 27,
+    "fixtureId": "a365d12e-6c88-5af4-a495-34b37ecfdfc9",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 28,
+    "fixtureId": "d103544b-c6d0-5f44-9f19-e471fd7088fd",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 29,
+    "fixtureId": "38505dbc-0539-5221-b871-a5e2eef52305",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 30,
+    "fixtureId": "3b9e19b0-4121-53ea-be17-17fcd143f6ab",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  }
+]

@@ -1,0 +1,201 @@
+{
+  "tournamentId": "f5f3d600-a663-4e9d-a8d9-61ae3c1817c7",
+  "method": "ego-lite real UI, fixture identities only",
+  "teams": [
+    {
+      "team": 2,
+      "startedAt": "2026-11-19T08:26:00.290Z",
+      "status": "FAIL",
+      "error": "page.waitForSelector timed out after 10000ms: loc=role:button[name=\"로그아웃\"]",
+      "url": "https://alpha.teameet.co.kr/my/settings",
+      "pageText": "teameet\n홈\n매치\n대회\n팀\n마이\n오류가 발생했어요\n로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.\n다시 시도하기\nteameet\n같이 뛸 사람을 한 번에\n공지사항\n서비스 이용약관\n개인정보처리방침\n위치기반서비스 이용약관\n대회 운영정책\n고객센터\n\n© 2026 Teameet"
+    },
+    {
+      "team": 2,
+      "startedAt": "2026-11-19T08:27:48.118Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/ee887156-af81-4e6e-8241-5cf11cd7a70b/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:28:15.038Z"
+    },
+    {
+      "team": 3,
+      "startedAt": "2026-11-19T08:28:15.039Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/614254d4-3573-4ff3-b946-65a908eb2624/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:28:41.211Z"
+    },
+    {
+      "team": 4,
+      "startedAt": "2026-11-19T08:28:41.212Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/1daea413-92e0-4761-906f-5aa6f57bd059/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:29:06.245Z"
+    },
+    {
+      "team": 5,
+      "startedAt": "2026-11-19T08:29:06.247Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/9f204a34-0ae2-4936-8049-b59fcef0d0fc/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:29:31.334Z"
+    },
+    {
+      "team": 6,
+      "startedAt": "2026-11-19T08:29:31.335Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/7a08516d-8157-4e13-b140-89df87cf7eed/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:29:57.270Z"
+    },
+    {
+      "team": 7,
+      "startedAt": "2026-11-19T08:29:57.271Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/a6aec1f2-0e7f-4624-b56e-e94fad4ea002/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:30:25.040Z"
+    },
+    {
+      "team": 8,
+      "startedAt": "2026-11-19T08:30:25.041Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/462ddaca-9066-4218-863f-ee97a6ac360b/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:30:51.086Z"
+    },
+    {
+      "team": 9,
+      "startedAt": "2026-11-19T08:30:51.087Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/8e36b54d-8457-4b21-acc3-16bc4adaffd9/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:31:19.600Z"
+    },
+    {
+      "team": 10,
+      "startedAt": "2026-11-19T08:31:19.600Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/fc81d395-601a-4a00-aee1-d673e7734fc9/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:31:45.074Z"
+    },
+    {
+      "team": 11,
+      "startedAt": "2026-11-19T08:31:45.075Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/42b86aef-0e4c-4b8d-8b55-c793ddbf75b6/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:32:13.653Z"
+    },
+    {
+      "team": 12,
+      "startedAt": "2026-11-19T08:32:13.653Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/d640945e-7af0-4eb6-a696-6fc5c5ad7720/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:32:41.641Z"
+    },
+    {
+      "team": 13,
+      "startedAt": "2026-11-19T08:32:41.641Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/b182a2d9-97be-4052-8b2c-2a01bacb484e/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:33:13.601Z"
+    },
+    {
+      "team": 14,
+      "startedAt": "2026-11-19T08:33:13.601Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/5df8f25d-e3ce-4e32-adfa-73a9f9804759/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:33:40.978Z"
+    },
+    {
+      "team": 15,
+      "startedAt": "2026-11-19T08:33:40.980Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/b3c83a7e-8734-4274-81b8-d970bc7aaa92/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:34:08.293Z"
+    },
+    {
+      "team": 16,
+      "startedAt": "2026-11-19T08:34:08.293Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/e4970564-edcc-4f04-8692-a6aef39a2412/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:34:36.526Z"
+    },
+    {
+      "team": 17,
+      "startedAt": "2026-11-19T08:34:36.527Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/f44d662e-8e31-4a85-ba30-40d5ead3f898/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:35:00.255Z"
+    },
+    {
+      "team": 18,
+      "startedAt": "2026-11-19T08:35:00.256Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/95ca5fdb-dfbd-4253-a789-ae5afdf6a014/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:35:26.768Z"
+    },
+    {
+      "team": 19,
+      "startedAt": "2026-11-19T08:35:26.769Z",
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/e57970f3-ceb3-4e33-9875-b06e57ecfb54/roster",
+      "rosterPlayers": 7,
+      "finishedAt": "2026-11-19T08:35:55.002Z"
+    },
+    {
+      "team": 20,
+      "startedAt": "2026-11-19T08:35:55.003Z",
+      "status": "FAIL",
+      "applicationSuccess": true,
+      "error": "JavaScript evaluation failed at line 0, column 0: TypeError: Cannot read properties of null (reading 'href')\n    at <anonymous>:2:71\n    at __egoPageEvaluate (<anonymous>:2:77)\n    at <anonymous>:3:9; expression: ()=>document.querySelector('a[href$=\"/roster\"]').href",
+      "url": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/apply?team=bf191119-0000-4000-8000-000000000020",
+      "pageText": "teameet\n홈\n매치\n대회\n팀\n마이\n1\n참가 신청\n3단계 중 2단계: 참가 동의\n2/3 단계\n참가 동의\n\n다음: 신청 완료\n\n동의\n✓\n전체 동의\n대회 신청에 필요한 필수 동의와 선택 동의 항목을 모두 확인하고 동의해요.\n선택 동의는 동의하지 않아도 대회 신청이 가능해요.\n✓\n대회 규정 및 안내사항 동의\n필수\n참가 자격, 경기 운영, 노쇼, 실격, 허위 신분 제출 금지에 대한 동의입니다.\n보기\n✓\n대회 참가 개인정보 수집·이용 동의\n필수\n대회 참가자 확인 및 참가 자격 검토를 위한 동의입니다.\n보기\n✓\n참가비 입금·취소·환불 정책 동의\n필수\n입금 기한, 신청 취소, 환불 기준에 대한 동의입니다.\n보기\n✓\n사진·영상 촬영 및 홍보 활용 동의\n선택\n대회 기록, 홍보 콘텐츠, 협찬사 결과 보고에 활용될 수 있습니다.\n보기\n✓\n대회 경기 기록 공개 동의\n선택\n보기\n\n이 대회는 무료로 참가할 수 있어요.\n\n정원이 가득 찼어요 — 확인대기 20팀이 자리를 잡고 있어요. (확정 0팀 · 확인대기 20팀 / 총 20팀)\n신청 요약\n대회명\n(테스트) 정석 20팀 순위별리그 1119\n참가 팀\n(테스트) 정석1119-20팀\n참가비\n무료\n신청하기\nteameet\n같이 뛸 사람을 한 번에\n공지사항\n서비스 이용약관\n개인정보처리방침\n위치기반서비스 이용약관\n대회 운영정책\n고객센터\n\n© 2026 Teameet"
+    },
+    {
+      "team": 1,
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterPlayers": 7,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/5c31737f-b0c9-475d-b471-6408f788a828/roster",
+      "evidence": "rounds 30-45 real UI"
+    },
+    {
+      "team": 20,
+      "status": "PASS",
+      "applicationSuccess": true,
+      "rosterPlayers": 7,
+      "rosterUrl": "https://alpha.teameet.co.kr/tournaments/f5f3d600-a663-4e9d-a8d9-61ae3c1817c7/registrations/6721b431-fcb2-4839-83d5-aad5ce799e6f/roster",
+      "recovery": "waited for already-successful submission roster CTA; no repeat submit"
+    }
+  ]
+}

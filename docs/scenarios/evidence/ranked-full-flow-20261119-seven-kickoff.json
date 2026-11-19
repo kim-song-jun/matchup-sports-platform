@@ -1,0 +1,17 @@
+{
+  "verdict": "FAIL",
+  "state": "LIVE",
+  "maxPlayers": 6,
+  "lineups": [
+    {
+      "sideId": "164eeaa2-df38-4945-993e-385698ea8908",
+      "players": 7,
+      "started": 7
+    },
+    {
+      "sideId": "51b5300a-a80b-42fc-9257-d91a12f9f694",
+      "players": 7,
+      "started": 7
+    }
+  ]
+}

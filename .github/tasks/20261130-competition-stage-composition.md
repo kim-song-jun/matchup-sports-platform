@@ -290,3 +290,10 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN을 확인하고 dev2f5c166ffbab45f2dcfe8ffd7a5f50c39d3349bf로 머지했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지한다. Alpha matching-SHA 배포 후 구조3+기존39 화면을 검증하고 증거 PR로 마무리한다.
 
 구조 QA 보존 검사를 조작 종료 후 실제 GET으로 강화해 수정 전3/3을 재측정했다(브라우저15838 종료). 테스트 초안에 등록0·경기0도 확인했다. 초기 사전 조회 스냅샷 대신 실행 후 completed/70 fixture ID·공식 점수를 확인한 최신 before JSON으로 교체한다.
+
+
+## 2026-11-19 정식 신청·결과 전체 실행 cursor
+- Alpha 새 대회 f5f3d600-a663-4e9d-a8d9-61ae3c1817c7. 팀장20명 실제 로그인·신청20/20·명단140/140 UI 등록·접수20/20·공식결과70/70·대회 종료 완료. 결선 동률 사유 결정 포함4리그배정, 9개편성 승점·승무패·득실 독립대조 및 팀당7경기 PASS. 공개 결과3폭 시각 검토.
+- 핵심 FAIL: 최대출전6명 설정이어도 양팀7명 전원 started=true로 LIVE 시작 허용. 선발6+벤치1/교체 계약은 미충족이며 전체 PASS 아님. 신규가입/OTP·팀생성은fixture 준비로 구분. 개인 이벤트·20팀교체는 통과 주장하지 않음.
+- 구성 버튼 폼 submit 버그 수정 PR #2453, 초기head CI Gates/API/Web PASS·회귀5PASS. 공식 Copilot review는 응답 없고 dev 이동 후 충돌 확인, 동기화 중. Alpha 배포 완료 아님.
+- 증거/상세/정확한 미검증 범위: docs/scenarios/ranked-leagues-full-flow-20261119.md. 기존 테스트/실회원 보존.

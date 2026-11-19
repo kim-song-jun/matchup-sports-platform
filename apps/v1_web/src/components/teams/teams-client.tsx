@@ -104,6 +104,8 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     saved: signedIn ? profile.data?.regions : undefined,
     master: regions.data ?? [],
   });
+  // 목록 맨 위 "내 팀" 줄 — 검색·필터·이어 보기 중에는 결과를 좁힌 화면이라 내 팀 줄을 걷는다.
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: signedIn });
   const teamFilters = useMemo(() => {
     const filters = teamListQueryFilters({
       sportId: selectedSportId,
@@ -216,6 +218,15 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     ...base,
     query: submittedQuery,
     filterCount: activeFilterCount,
+    myTeams: activeFilterCount === 0 && !submittedQuery && !initialCursor
+      ? normalizeMyTeamsResponse(myTeamsQuery.data).map((team) => ({
+        id: team.teamId,
+        name: team.name,
+        logoUrl: team.logoUrl,
+        sport: team.sport.name,
+        roleLabel: teamRoleLabel(team.role) ?? '멤버',
+      }))
+      : undefined,
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], myRegion, filterOpen),

@@ -228,8 +228,10 @@ const COMMAND_LABEL: Record<
  * `periodLabel`(UX 감사 item 4)을 그대로 써서 "전반 종료"/"후반 시작"/
  * "N피리어드 종료"를 만든다(이슈 #375: 구 `nextPeriodCommandLabel` 하나가
  * 종료+시작 라벨을 겸했던 것을 명령이 둘로 나뉜 만큼 함수도 나눈다). */
-function isGoalAction(type: string): boolean {
-  return type === 'GOAL' || type === 'OWN_GOAL';
+/** 경기 종료 전 쉬는 구간(하프타임·정규 시간 종료)에도 늦게 기록할 수 있는 사건 — 서버의
+ * `BREAK_RECORDABLE_EVENT_TYPES`(골·자책골·카드·파울)와 같아야 한다. 교체는 뺀다. */
+function isBreakRecordableAction(type: string): boolean {
+  return type === 'GOAL' || type === 'OWN_GOAL' || type === 'CARD' || type === 'FOUL';
 }
 
 function endPeriodCommandLabel(currentPeriodNumber: number, periodCount: number | null): string {
@@ -595,23 +597,29 @@ export function OperateConsoleCore({
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
 
-  // 정규 시간이 끝났어도(모든 피리어드 ENDED, 경기는 아직 LIVE) 경기 종료 전에는
-  // 빠진 골을 넣을 수 있어야 한다. 그때 골의 시각은 마지막 피리어드의 정규 시간 끝으로 굳힌다
-  // (설정 길이와 실제로 뛴 시간 중 짧은 쪽). 서버도 같은 상한을 검사한다
+  // 하프타임이거나 정규 시간이 끝났어도(모든 피리어드 ENDED, 경기는 아직 LIVE) 경기 종료 전에는
+  // 빠진 골·카드·파울을 넣을 수 있어야 한다(2026-11-18 사용자 확정). 사건은 방금 끝난 피리어드
+  // (하프타임이면 직전 피리어드, 정규 시간 종료면 마지막 피리어드)에 붙고, 시각은 그 피리어드의
+  // 정규 시간 끝으로 굳힌다(설정 길이와 실제로 뛴 시간 중 짧은 쪽). 서버도 같은 상한을 검사한다
   // (`assertEventReferences`의 PERIOD_ALREADY_ENDED 예외).
-  const regulationEndCapture = useMemo(() => {
-    if (!regulationEnded) return null;
-    const last = [...(gameDetail.data?.periods ?? [])].sort((a, b) => b.number - a.number)[0];
-    if (last === undefined) return null;
-    const configuredMs = (gameDetail.data?.periodDurations?.[last.number - 1]?.durationMinutes ?? null);
-    const playedMs = last.startedAt !== null && last.endedAt !== null
-      ? Math.max(0, new Date(last.endedAt).getTime() - new Date(last.startedAt).getTime() - Math.max(0, last.pausedTotalMs))
+  const breakEndCapture = useMemo(() => {
+    const periods = gameDetail.data?.periods ?? [];
+    let target: (typeof periods)[number] | undefined;
+    if (regulationEnded) {
+      target = [...periods].sort((a, b) => b.number - a.number)[0];
+    } else if (halftimePeriod !== null) {
+      target = periods.find((period) => period.number === halftimePeriod.number - 1 && period.state === 'ENDED');
+    }
+    if (target === undefined) return null;
+    const configuredMinutes = gameDetail.data?.periodDurations?.[target.number - 1]?.durationMinutes ?? null;
+    const playedMs = target.startedAt !== null && target.endedAt !== null
+      ? Math.max(0, new Date(target.endedAt).getTime() - new Date(target.startedAt).getTime() - Math.max(0, target.pausedTotalMs))
       : null;
-    const clockMs = configuredMs !== null
-      ? Math.min(configuredMs * 60_000, playedMs ?? Number.POSITIVE_INFINITY)
+    const clockMs = configuredMinutes !== null
+      ? Math.min(configuredMinutes * 60_000, playedMs ?? Number.POSITIVE_INFINITY)
       : playedMs;
-    return clockMs === null ? null : { period: last.number, clockMs };
-  }, [regulationEnded, gameDetail.data?.periods, gameDetail.data?.periodDurations]);
+    return clockMs === null ? null : { period: target.number, clockMs };
+  }, [regulationEnded, halftimePeriod, gameDetail.data?.periods, gameDetail.data?.periodDurations]);
 
   const [expiredPeriodId, setExpiredPeriodId] = useState<string | null>(null);
   const [periodExpiryError, setPeriodExpiryError] = useState<string | null>(null);
@@ -979,15 +987,15 @@ export function OperateConsoleCore({
       // Date.now(), which is exactly why every captured event read
       // clockMs≈0. The persistent "경기를 시작해 주세요." banner already
       // explains why the tap did nothing, so this guard needs no message.
-      if (currentPeriod === null && regulationEndCapture !== null && isGoalAction(button.type)) {
+      if (currentPeriod === null && breakEndCapture !== null && isBreakRecordableAction(button.type)) {
         setPendingAction({
           actionType: button.type,
           actionLabel: button.label,
           cardColor: button.cardColor,
           allowTeamOnly: button.allowTeamOnly,
           frozen: {
-            period: regulationEndCapture.period,
-            clockMs: regulationEndCapture.clockMs,
+            period: breakEndCapture.period,
+            clockMs: breakEndCapture.clockMs,
             occurredAt: new Date(serverAlignedNowMs(Date.now(), ops.clockOffsetMs)).toISOString(),
           },
         });
@@ -1013,7 +1021,7 @@ export function OperateConsoleCore({
         frozen,
       });
     },
-    [commandBlocked, ops.clockOffsetMs, currentPeriod, regulationEndCapture],
+    [commandBlocked, ops.clockOffsetMs, currentPeriod, breakEndCapture],
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
@@ -1637,7 +1645,7 @@ export function OperateConsoleCore({
     moreActions.push({
       key: 'abnormal-end',
       label: '몰수·중단으로 종료',
-      description: '사유를 남기고 지금 기록된 점수로 마쳐요.',
+      description: '사유를 남기고 마쳐요.',
       destructive: true,
       disabled: commandUnavailable,
       onSelect: () => {
@@ -1962,6 +1970,7 @@ export function OperateConsoleCore({
         {halftimePeriod !== null && gameState === 'LIVE' && (
           <Banner tone="info">
             하프타임이에요. 준비되면 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
+            빠진 골·카드·파울은 지금도 앞 피리어드 끝 시각으로 기록할 수 있어요.
           </Banner>
         )}
         {/* 종료 흐름 개편 — 하프타임과 똑같은 함정이 정규 시간 종료
@@ -2095,7 +2104,7 @@ export function OperateConsoleCore({
               size="lg"
               variant="outline"
               className="h-16 flex-col gap-1 lg:h-20"
-              disabled={!canOperate || (currentPeriod === null && !(regulationEndCapture !== null && isGoalAction(button.type))) || commandBlocked}
+              disabled={!canOperate || (currentPeriod === null && !(breakEndCapture !== null && isBreakRecordableAction(button.type))) || commandBlocked}
               onClick={() => handleSelectAction(button)}
             >
               {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (

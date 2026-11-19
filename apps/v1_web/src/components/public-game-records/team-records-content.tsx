@@ -264,10 +264,10 @@ function TeamRecordRow({
           </span>
           {/* 정규시간 스코어 그대로 두고, 승부차기는 아래 보조 표기로만 덧붙인다 --
               대회 화면(PenaltyScoreline)과 동일한 "승부차기 N-M" 문구. */}
-          {/* 몰수 스코어는 관례로 붙은 값이라 굵게 강조하지 않고, 공개 리그 일정과 같은 말로 밝힌다. */}
+          {/* 몰수 점수는 실제 경기 득점과 같은 무게로 읽히면 안 돼 굵게 강조하지 않고, 공개 리그 일정과 같은 말로 밝힌다. */}
           {item.isForfeit ? (
             <span style={{ fontSize: 'var(--font-size-micro)', fontWeight: 600, color: 'var(--text-caption)' }}>
-              관례 스코어
+              몰수 확정 점수
             </span>
           ) : null}
           {penaltyLabel ? (

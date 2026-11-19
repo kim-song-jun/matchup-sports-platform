@@ -36,6 +36,8 @@ export function toDisplayableOutcomeReason(reason: string | null | undefined): M
 }
 
 /** 몰수 경기에서 이벤트·통계가 공식 점수와 별개로 남은 기록임을 알리는 문구. 기록이 나오는 모든 화면이 이 상수를 쓴다. */
-export const FORFEIT_RECORDS_NOTE_DETAIL = '몰수 전에 기록된 득점·카드예요. 공식 점수에는 반영되지 않아요';
+// 몰수 점수는 보통 3:0 이지만 상대가 3골 차 이상 앞서 있었다면 기록된 점수 그대로 확정된다 — 득점이 점수에
+// 반영됐는지는 경기마다 다르므로 "반영되지 않아요" 라고 단정하지 않는다.
+export const FORFEIT_RECORDS_NOTE_DETAIL = '몰수 전에 기록된 득점·카드예요. 점수와 다를 수 있어요';
 export const FORFEIT_RECORDS_NOTE_SHORT = '몰수 전 기록이에요';
 export const FORFEIT_RECORD_STAT_TAG = '몰수 경기 기록';

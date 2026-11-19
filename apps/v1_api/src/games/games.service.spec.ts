@@ -21,6 +21,11 @@ import {
   toGameHttpException,
   GamesService,
 } from './games.service';
+import {
+  FORFEIT_KEEP_RECORDED_MARGIN,
+  FORFEIT_LOSER_SCORE,
+  FORFEIT_WINNER_SCORE,
+} from '../league-matches/league-forfeit-result';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
@@ -247,14 +252,35 @@ describe('GamesService command boundary', () => {
       expect(extractEndForfeitSideId({ forfeitSideId: 'side-1' }, 'ABANDONED')).toBeUndefined();
     });
 
-    it('0:0 이나 기권 팀이 앞선 점수는 상대가 이기는 1:0 으로 정한다', () => {
-      expect(applyForfeitScore({ home: 0, away: 0 }, 'HOME')).toEqual({ home: 0, away: 1 });
-      expect(applyForfeitScore({ home: 2, away: 1 }, 'HOME')).toEqual({ home: 0, away: 1 });
-      expect(applyForfeitScore({ home: 1, away: 1 }, 'AWAY')).toEqual({ home: 1, away: 0 });
+    // 2026-11-17 사용자 확정: 몰수 공식 점수는 3:0(정본 §6). 1:0 이던 시절의 단정은 전부 3:0 으로 바뀌었다.
+    it('0:0 이나 기권 팀이 앞서거나 동점인 점수는 상대가 이기는 3:0 으로 정한다', () => {
+      expect(applyForfeitScore({ home: 0, away: 0 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 2, away: 1 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 1, away: 1 }, 'AWAY')).toEqual({ home: 3, away: 0 });
     });
 
-    it('운영자가 이미 상대 승리 점수(3:0)를 적었으면 그대로 둔다', () => {
+    it('상대가 1~2골 차로 앞서 있어도 3:0 으로 올려 확정한다 — 도중 기권이 노쇼보다 가벼워지지 않게', () => {
+      expect(applyForfeitScore({ home: 0, away: 1 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 2 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 3, away: 5 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 0, away: 1 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 2, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 5, away: 3 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+    });
+
+    it('상대가 3골 차 이상 앞서 있으면 운영자가 적은 점수를 그대로 둔다 (FIFA 기준)', () => {
       expect(applyForfeitScore({ home: 0, away: 3 }, 'HOME')).toEqual({ home: 0, away: 3 });
+      expect(applyForfeitScore({ home: 1, away: 4 }, 'HOME')).toEqual({ home: 1, away: 4 });
+      expect(applyForfeitScore({ home: 0, away: 5 }, 'HOME')).toEqual({ home: 0, away: 5 });
+      expect(applyForfeitScore({ home: 3, away: 0 }, 'AWAY')).toEqual({ home: 3, away: 0 });
+      expect(applyForfeitScore({ home: 6, away: 3 }, 'AWAY')).toEqual({ home: 6, away: 3 });
+    });
+
+    it('몰수 공식 점수 상수는 몰수팀 0 · 상대 3 이고, 유지 기준 마진은 그 차이다', () => {
+      expect(FORFEIT_WINNER_SCORE).toBe(3);
+      expect(FORFEIT_LOSER_SCORE).toBe(0);
+      expect(FORFEIT_KEEP_RECORDED_MARGIN).toBe(3);
     });
   });
 
@@ -1072,5 +1098,79 @@ describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%
   it('canViewParticipantIdentity 는 대회 운영 역할만 통과시킨다', () => {
     expect(['platform_ops', 'tournament_director', 'field_operator'].every(canViewParticipantIdentity)).toBe(true);
     expect(['team_manager', 'team_owner', 'team_member', 'opponent_manager', 'support_readonly', 'x'].some(canViewParticipantIdentity)).toBe(false);
+  });
+});
+
+// 2026-11-18 사용자 확정: 하프타임·정규 시간 종료처럼 경기 종료 전 쉬는 구간에도 골·자책골·카드·파울을 받는다.
+// 판정 규칙 자체는 core/event-recording-window.spec.ts 가 고정하고, 여기서는 서비스가 기간·길이를 읽어
+// 그 규칙에 넘기는 연결(DB 없이 가짜 tx)을 확인한다.
+describe('GamesService.isEventAllowedDuringBreak — 쉬는 구간 사건 기록 연결', () => {
+  type BreakGate = (
+    tx: unknown,
+    game: { id: string; state: string },
+    dto: { type: string; clockMs: number },
+    periodNumber: number,
+  ) => Promise<boolean>;
+
+  function gate(): BreakGate {
+    const service = new GamesService({} as never, {} as never, {} as never, new TournamentStaffAccessService({} as never)) as unknown as {
+      isEventAllowedDuringBreak: BreakGate;
+    };
+    return service.isEventAllowedDuringBreak.bind(service);
+  }
+
+  function makeBreakTx(periods: Array<{ number: number; state: string }>, periodConfig: unknown = [{ durationMinutes: 15 }, { durationMinutes: 15 }]) {
+    return {
+      v1GamePeriod: { findMany: jest.fn().mockResolvedValue(periods) },
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ competitionConfig: { periods: periodConfig } }) },
+    };
+  }
+
+  const HALFTIME = [
+    { number: 1, state: 'ENDED' },
+    { number: 2, state: 'HALFTIME' },
+  ];
+  const REGULATION_ENDED = [
+    { number: 1, state: 'ENDED' },
+    { number: 2, state: 'ENDED' },
+  ];
+  const live = { id: 'game-1', state: 'LIVE' };
+
+  it('하프타임에는 전반에 골·자책골·카드·파울을 받는다', async () => {
+    for (const type of ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL']) {
+      expect(await gate()(makeBreakTx(HALFTIME), live, { type, clockMs: 15 * 60_000 }, 1)).toBe(true);
+    }
+  });
+
+  it('정규 시간 종료에는 마지막 기간에 카드·파울도 받는다', async () => {
+    for (const type of ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL']) {
+      expect(await gate()(makeBreakTx(REGULATION_ENDED), live, { type, clockMs: 1_000 }, 2)).toBe(true);
+    }
+  });
+
+  it('교체는 쉬는 구간에도 막고 기간·길이를 읽지도 않는다', async () => {
+    const tx = makeBreakTx(HALFTIME);
+    expect(await gate()(tx, live, { type: 'SUBSTITUTION', clockMs: 0 }, 1)).toBe(false);
+    expect(tx.v1GamePeriod.findMany).not.toHaveBeenCalled();
+    expect(tx.v1Game.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('경기가 LIVE 가 아니면 막고 기간을 읽지도 않는다', async () => {
+    const tx = makeBreakTx(REGULATION_ENDED);
+    expect(await gate()(tx, { id: 'game-1', state: 'ENDED' }, { type: 'GOAL', clockMs: 0 }, 2)).toBe(false);
+    expect(tx.v1GamePeriod.findMany).not.toHaveBeenCalled();
+  });
+
+  it('기간 설정 길이를 넘는 시각은 거절하고, 길이를 읽지 못하면 상한 없이 받는다', async () => {
+    expect(await gate()(makeBreakTx(HALFTIME), live, { type: 'FOUL', clockMs: 15 * 60_000 + 1 }, 1)).toBe(false);
+    expect(await gate()(makeBreakTx(HALFTIME, { count: 2 }), live, { type: 'FOUL', clockMs: 99 * 60_000 }, 1)).toBe(true);
+  });
+
+  it('후반이 시작된 뒤(LIVE)에는 전반에 더 붙이지 못한다', async () => {
+    const periods = [
+      { number: 1, state: 'ENDED' },
+      { number: 2, state: 'LIVE' },
+    ];
+    expect(await gate()(makeBreakTx(periods), live, { type: 'GOAL', clockMs: 1_000 }, 1)).toBe(false);
   });
 });

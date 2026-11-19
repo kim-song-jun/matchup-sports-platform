@@ -132,12 +132,12 @@ describe('getSchedule — 정규 리그 갈래', () => {
   it('몰수 경기의 outcome 은 리그 상세와 같은 값이다 — 운영자 사유 원문은 note 로 나가지 않는다', async () => {
     const [base] = makeTeamMatches();
     const rows = [
-      { ...base, id: 'tm-column', game: makeGame('g-column', { home: 1, away: 0 }, { outcomeReason: 'FORFEIT', outcomeNote: '비공개 사유', reason: null }) },
+      { ...base, id: 'tm-column', game: makeGame('g-column', { home: 3, away: 0 }, { outcomeReason: 'FORFEIT', outcomeNote: '비공개 사유', reason: null }) },
       {
         ...base,
         id: 'tm-marker',
         startAt: new Date('2026-09-19T10:00:00.000Z'),
-        game: makeGame('g-marker', { home: 1, away: 0 }, { outcomeReason: 'NORMAL', outcomeNote: null, reason: '[LEAGUE_FORFEIT] 비공개 사유' }),
+        game: makeGame('g-marker', { home: 3, away: 0 }, { outcomeReason: 'NORMAL', outcomeNote: null, reason: '[LEAGUE_FORFEIT] 비공개 사유' }),
       },
       { ...base, id: 'tm-abandoned', startAt: new Date('2026-09-26T10:00:00.000Z'), game: makeGame('g-abandoned', { home: 0, away: 0 }, { outcomeReason: 'ABANDONED', outcomeNote: '비공개 사유', reason: null }) },
       { ...base, id: 'tm-normal', startAt: new Date('2026-10-03T10:00:00.000Z'), game: makeGame('g-normal', { home: 2, away: 1 }) },

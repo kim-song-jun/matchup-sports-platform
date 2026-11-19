@@ -107,7 +107,7 @@ export type LeagueFixtureListItem = {
  *   나가야 화면이 "아직 결과 없음" 과 구분해 적을 수 있다.
  * - **미확정 대진의 점수는 `null`** 이다. `0` 으로 채우면 화면이 0:0 무승부로 읽는다.
  * - **몰수는 boolean 하나로만** 나간다. 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에
- *   싣지 않는다 — 스코어만 보면 실제 1:0 승리와 구분되지 않으니 표식은 필요하고,
+ *   싣지 않는다 — 스코어만 보면 실제 3:0 승리와 구분되지 않으니 표식은 필요하고,
  *   그 표식이 사유를 노출해서는 안 된다.
  */
 export function toLeagueFixtureList(
@@ -135,7 +135,7 @@ export function toLeagueFixtureList(
       status: fixture.status,
       homeScore: scoreHidden ? null : fact?.homeScore ?? null,
       awayScore: scoreHidden ? null : fact?.awayScore ?? null,
-      // 몰수 뱃지는 "1:0 으로 확정됐다" 를 그대로 말한다 — 숫자만 가리고 뱃지를 남기면
+      // 몰수 뱃지는 "3:0 으로 확정됐다" 를 그대로 말한다 — 숫자만 가리고 뱃지를 남기면
       // 가린 적이 없는 것과 같다.
       isForfeit: scoreHidden || fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
       scoreHidden,

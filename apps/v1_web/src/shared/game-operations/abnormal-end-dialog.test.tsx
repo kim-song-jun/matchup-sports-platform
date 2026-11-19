@@ -62,6 +62,16 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     expect(onConfirm).toHaveBeenCalledWith({ reason: 'FORFEIT', note: '미출석', forfeitSideId: 'side-away' });
   });
 
+  // 2026-11-17 사용자 확정: 몰수 공식 점수는 3:0 이고, 적어 둔 점수는 상대가 3골 차 이상
+  // 앞설 때만 그대로 둔다. 운영자가 확정 점수를 화면에서 읽을 수 있어야 한다.
+  it('몰수 안내는 3:0 확정과 3골 차 이상일 때만 적은 점수를 유지한다는 규칙을 말한다', () => {
+    render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={vi.fn()} />);
+
+    expect(
+      screen.getByText(/기권한 팀 0점, 상대 3점\(3:0\)으로 확정돼요\(상대가 이미 3골 차 이상 앞서 있으면 적어 둔 점수 그대로예요\)/),
+    ).toBeInTheDocument();
+  });
+
   it('사유를 적으면 선택한 종류와 함께 확정한다', () => {
     const onConfirm = vi.fn();
     render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={onConfirm} />);

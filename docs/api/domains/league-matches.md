@@ -743,3 +743,5 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - Reuses V1TournamentScheduleTime and its competition/time uniqueness; no new migration. Tournament endpoints keep their tournament-only kind and league_knockouts format gate.
 - Registering a time does not move games. Selecting a game uses the existing PATCH /admin/league-matches/:leagueId/fixtures/:teamMatchId with only { startsAt }. Existing date/status validation, duration adjustment, and errors apply. Teams, title, field and place are omitted and preserved.
 - Start time remains required: no null/unset operation. Existing direct datetime entry remains available. Shared selector combines presets and actual game starts, uses KST input, and isolates league cache keys from tournament cache keys. Save failures remain visible; a failed post-save refresh is reported separately.
+
+공유 신청 제출·참가 확정에도 [대회 생성·접수 상태 보호](./tournaments.md#생성접수-상태-보호-2026-11-18)를 적용한다. 종료·취소 리그의 새 확정·대기 처리는409이며, 기존 목표 상태의 멱등 읽기는 유지한다.

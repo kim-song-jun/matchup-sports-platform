@@ -67,7 +67,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
           `LEAGUE_CANCEL_REASON_REQUIRED` 로 막는데 화면이 사유를 안 받아서, 그동안
           **어드민이 리그 신청을 거부할 방법이 아예 없었다.** 대회 화면은 이 값을 안 넘겨
           기존 계약(선택)이 그대로 유지된다. */}
-      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite requireCancelReason isFreeEntry={league?.entryFee === 0} />
+      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite requireCancelReason admissionsBlockedReason={!league ? '리그 상태를 불러온 뒤 참가 확정·대기 처리를 할 수 있어요.' : league.lifecycleStatus === 'completed' || league.lifecycleStatus === 'cancelled' ? '종료·취소된 리그에서는 참가 확정·대기 처리를 할 수 없어요.' : null} isFreeEntry={league?.entryFee === 0} />
       <AdminToasts toasts={toasts} />
     </div>
   );

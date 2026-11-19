@@ -1,5 +1,6 @@
 import type { StagePlan } from '@/types/stage-plan';
 import { stagePlanCounts, stagePlanError } from '@/lib/stage-plan';
+import { hasValidPeriodDurations } from '@/lib/tournament-periods';
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
@@ -70,6 +71,8 @@ export type TournamentCreateState = {
   /** 초안이 이미 생성된 뒤의 대회 id. null이면 아직 서버에 아무것도 만들지 않은 상태 —
    * "참가 조건" 다음 단계에서 이 값의 유무로 생성(POST)인지 수정(PATCH)인지를 가른다. */
   draftId: string | null;
+  /** 복원한 초안은 별도 저장된 경기 시간을 확인하고 다시 저장해야 공개할 수 있다. */
+  requiresDraftReview: boolean;
   /** draftId가 가리키는 대회의 마지막으로 알려진 updatedAt — PATCH 시 expectedVersion으로
    * 그대로 되돌려 보낸다(동시 편집 CAS). draft-created/hydrate-from-draft가 채운다. */
   draftUpdatedAt: string | null;
@@ -156,6 +159,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   stagePlan: null,
   step: 0,
   draftId: null,
+  requiresDraftReview: false,
   draftUpdatedAt: null,
   savedPayload: null,
   sportId: '',
@@ -354,12 +358,14 @@ export function tournamentCreateReducer(
         draftId: action.tournament.id,
         draftUpdatedAt: action.tournament.updatedAt,
         savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
+        requiresDraftReview: false,
         step: CONFIRM_STEP_INDEX,
       };
     case 'hydrate-from-draft':
       return {
         ...mapTournamentToWizardFields(action.tournament),
-        step: CONFIRM_STEP_INDEX,
+        requiresDraftReview: true,
+        step: 2,
       };
   }
 }
@@ -715,11 +721,11 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
     }
-    if (state.periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240)) {
-      errors.periodMinutes = '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+    if (state.periodMinutes.length > 0 && !hasValidPeriodDurations(state.periodMinutes)) {
+      errors.periodMinutes = '경기 시간은 피리어드마다 1분 이상 정수로 입력해 주세요.';
     }
-    if (Object.values(state.stagePeriodMinutes).some((periods) => !periods?.length || periods.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240))) {
-      errors.stagePeriodMinutes = '단계별 경기 시간도 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+    if (Object.values(state.stagePeriodMinutes).some((periods) => !periods || !hasValidPeriodDurations(periods))) {
+      errors.stagePeriodMinutes = '단계별 경기 시간도 피리어드마다 1분 이상 정수로 입력해 주세요.';
     }
     if (state.substitutionMode === 'limited') {
       // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인

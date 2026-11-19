@@ -1,5 +1,13 @@
 ## 6강 결승 직행 방식 (2026-10-28)
 
+## 생성·접수 상태 보호 (2026-11-18)
+
+- 신청 제출은 대회 행 잠금 후 신청을 다시 읽고 `draft`만 처리한다. 실제 쓰기는 `status=draft`와 현재 `updatedAt`을 함께 검증한다. 중복 제출·제출 전 취소 경합은 `409 REGISTRATION_NOT_DRAFT`이며 결제 upsert·약관 기록·알림을 다시 수행하지 않는다. 일반 대회·단계형 대회·정규 리그의 공유 신청 경로에 적용한다.
+- 관리자 `PATCH /api/v1/admin/registrations/:registrationId/confirm`의 새 확정/대기 처리는 잠금 이후 대회가 `completed`/`cancelled`이거나 삭제된 경우 `409 TOURNAMENT_REGISTRATION_CLOSED`다. 이미 목표 상태인 요청의 읽기 전용 `alreadyProcessed` 응답은 유지한다. 환불·취소·기존 명단 관리는 이 새 참가 차단과 별개다.
+- 관리자 대회 상태를 `open`으로 바꿀 때 마감이 현재 시각보다 과거면 `409 REGISTRATION_DEADLINE_PASSED`다. 최초 접수·재개·동일 상태 재요청에 적용하며, 마감 null은 허용한다. 마감 일시를 바꾸고 다시 요청해야 한다.
+- 생성 위저드의 `?draftId=`는 조회 로딩·실패 시 새 생성 폼을 표시하거나 새 POST를 보내지 않는다. 복원은 경기 시간 확인 단계에서 재개한다. 별도 경기 시간 GET이 실패하면 재시도를 제공하고 저장·공개를 차단한다. 서버에 저장된 기본·라운드 시간을 확인하고 기존 초안을 명시 저장한 뒤 공개 확인을 연다. 이전 저장 실패의 미저장 값은 복원하지 않으며 이 사실을 화면에 안내한다. DB 필드·DTO·응답 shape 변경은 없다.
+
+
 - 대회 create/update DTO의 `sixTeamMode?: boolean`: true는 정원6 + format=knockout만 허용. 기존 대회 기본 false.
   생성된 6강 대진이 있으면 정원/형식/방식 변경은 `409 SIX_TEAM_SETTINGS_LOCKED`.
 - 기존 template capabilities에 `sixTeamEligible` 추가. 정원6 토너먼트에서만 true.

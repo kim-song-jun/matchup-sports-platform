@@ -879,6 +879,9 @@ export class TournamentsAdminService {
       }
       const from = existing.status as TournamentStatus;
       const to = dto.status;
+      if (to === 'open' && existing.registrationDeadlineAt && existing.registrationDeadlineAt.getTime() < Date.now()) {
+        throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청 마감이 지났어요. 마감 일시를 변경한 뒤 접수를 시작해 주세요.' });
+      }
       if (from === to) {
         return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true, requestReviews: false };
       }

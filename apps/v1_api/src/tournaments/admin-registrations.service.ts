@@ -226,11 +226,14 @@ export class AdminRegistrationsService {
       if (!ADMIN_CONFIRMABLE_STATUSES.includes(current.status)) {
         throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 확정·대기 처리를 할 수 없어요.' });
       }
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+        where: { id: current.tournamentId, deletedAt: null },
+        select: { teamCount: true, maxTeams: true, kind: true, genderCategory: true, status: true },
+      });
+      if (!tournament || tournament.status === 'completed' || tournament.status === 'cancelled') {
+        throw new ConflictException({ code: 'TOURNAMENT_REGISTRATION_CLOSED', message: '종료·취소된 대회에서는 참가 확정·대기 처리를 할 수 없어요.' });
+      }
       if (dto.decision === 'confirm') {
-        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
-          where: { id: current.tournamentId },
-          select: { teamCount: true, maxTeams: true, kind: true, genderCategory: true },
-        });
         const reservedCount =
           tournament === null || capacityLimitOf(tournament) === null
             ? 0

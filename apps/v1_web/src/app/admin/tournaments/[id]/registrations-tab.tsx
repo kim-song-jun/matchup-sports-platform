@@ -493,6 +493,7 @@ export function RegistrationsTab({
   showToast,
   tournamentTeamCount,
   canWrite,
+  admissionsBlockedReason = null,
   requireCancelReason = false,
   isFreeEntry = false,
   rosterDeadlineAt = null,
@@ -502,6 +503,7 @@ export function RegistrationsTab({
   /** 정원(팀 수) — 참가 확정 시 정원 초과 경고에 사용. 로딩 중이면 undefined */
   tournamentTeamCount?: number;
   canWrite: boolean;
+  admissionsBlockedReason?: string | null;
   /**
    * 거부 사유를 **반드시** 받아야 하는가. 정규 리그가 그렇다(D9 — 서버가
    * `LEAGUE_CANCEL_REASON_REQUIRED` 로 400 을 준다). 대회는 선택 그대로다.
@@ -599,6 +601,10 @@ export function RegistrationsTab({
   };
 
   const handleConfirm = (reg: V1AdminTournamentRegistration, decision: 'confirm' | 'waitlist') => {
+    if (admissionsBlockedReason) {
+      showToast(admissionsBlockedReason, 'error');
+      return;
+    }
     confirmRegistration.mutate(
       { registrationId: reg.id, decision },
       {
@@ -617,6 +623,10 @@ export function RegistrationsTab({
 
   // P1-1: 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
   const handleConfirmClick = async (reg: V1AdminTournamentRegistration) => {
+    if (admissionsBlockedReason) {
+      showToast(admissionsBlockedReason, 'error');
+      return;
+    }
     const confirmedCount = registrations.filter((r) => r.status === 'confirmed').length;
     const nextCount = confirmedCount + 1;
     const capacityLine =
@@ -800,6 +810,7 @@ export function RegistrationsTab({
 
   return (
     <>
+      {admissionsBlockedReason && <p role="status" className="mb-3 text-[length:var(--font-size-body-sm)] text-[var(--text-caption)]">{admissionsBlockedReason}</p>}
       {/* 전량 로더의 안전 상한(1,000건)에 걸린 경우 — 조용한 잘림 금지, 정직하게 알린다 */}
       {data?.truncated && (
         <p className="mb-3 rounded-xl bg-[var(--tint-orange)] px-4 py-3 text-[length:var(--font-size-label)] font-medium text-[var(--orange700)]">
@@ -994,14 +1005,14 @@ export function RegistrationsTab({
                 <>
                   <ActionButton
                     onClick={() => void handleConfirmClick(reg)}
-                    disabled={confirmRegistration.isPending}
+                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                     icon={<Check size={13} />}
                     label="확정"
                     tone="blue"
                   />
                   <ActionButton
                     onClick={() => handleConfirm(reg, 'waitlist')}
-                    disabled={confirmRegistration.isPending}
+                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                     icon={<X size={13} />}
                     label="대기"
                     tone="gray"
@@ -1014,7 +1025,7 @@ export function RegistrationsTab({
               {canWrite && reg.status === 'waitlisted' && (
                 <ActionButton
                   onClick={() => void handleConfirmClick(reg)}
-                  disabled={confirmRegistration.isPending}
+                  disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                   icon={<Check size={13} />}
                   label="확정"
                   tone="blue"

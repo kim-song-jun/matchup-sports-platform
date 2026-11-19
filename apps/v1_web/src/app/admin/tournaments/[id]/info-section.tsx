@@ -1,7 +1,8 @@
 'use client';
 import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
@@ -24,6 +25,7 @@ import {
   tieBreakOrderOf,
 } from '@/lib/tournament-tie-break';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
+import { competitionFormatLabel } from '@/lib/competition-kind';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
@@ -79,7 +81,10 @@ export function TournamentInfoSection() {
   const [editTieBreakOrder, setEditTieBreakOrder] = useState<V1TournamentTieBreakOrder>([...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER]);
   const [editSixTeamOrder, setEditSixTeamOrder] = useState<V1SixTeamCriterion[]>([...DEFAULT_SIX_TEAM_DIRECT_FINAL_ORDER]);
   const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
-  const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
+  const stageTeamCountHelpId = useId();
+  const formatChangeBlockedReason = tournament?.stagePlan
+    ? '단계형 대회는 형식을 바꿀 수 없어요. 단계·편성 구성에서 진행 방식을 확인해 주세요.'
+    : tournament?.formatChangeBlockedReason
     ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
       ? '대회가 시작된 뒤에는 대회 형식을 변경할 수 없어요.'
       : null);
@@ -551,7 +556,7 @@ export function TournamentInfoSection() {
         <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[
             { label: '상태', value: TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status },
-            { label: '형식', value: TOURNAMENT_FORMAT_LABEL[tournament.format] ?? tournament.format },
+            { label: '형식', value: competitionFormatLabel({ ...tournament, kind: tournament.kind ?? null }) },
             { label: '대회 일정', value: scheduleLabel },
             { label: '장소', value: tournament.venue ?? '미정' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
@@ -624,7 +629,7 @@ export function TournamentInfoSection() {
         />
       ) : null}
 
-      <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
+      <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} stagePlan={tournament.stagePlan} />
 
       <CoverImageCard tournament={tournament} sportName={masterSports?.find((sport) => sport.id === tournament.sportId)?.name} canWrite={canWrite} showToast={showToast} />
 
@@ -760,7 +765,7 @@ export function TournamentInfoSection() {
               className={inputCls}
             >
               {Object.entries(TOURNAMENT_FORMAT_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>{tournament.stagePlan && value === tournament.format ? '단계형 대회' : label}</option>
               ))}
             </select>
             <p id="edit-format-help" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
@@ -864,9 +869,13 @@ export function TournamentInfoSection() {
                 min={2}
                 value={editTeamCount}
                 onChange={(e) => setEditTeamCount(e.target.value)}
-                disabled={updateTournament.isPending}
+                disabled={updateTournament.isPending || Boolean(tournament.stagePlan)}
+                aria-describedby={tournament.stagePlan ? stageTeamCountHelpId : undefined}
                 className={inputCls}
               />
+              {tournament.stagePlan && <p id={stageTeamCountHelpId} className="tm-text-caption text-[var(--text-muted)]">
+                팀 수는 첫 단계 편성의 정원 합계예요. <Link href={`/admin/tournaments/${id}/bracket`} className="inline-flex min-h-11 items-center underline underline-offset-2">단계·편성 구성에서 확인</Link>
+              </p>}
             </div>
             <SixTeamModeField eligible={editFormat === 'knockout' && Number(editTeamCount) === 6} value={editSixTeamMode} onChange={setEditSixTeamMode} disabled={updateTournament.isPending || Boolean(tournament?.sixTeamBracket)} />
             <div className="flex flex-col gap-2">

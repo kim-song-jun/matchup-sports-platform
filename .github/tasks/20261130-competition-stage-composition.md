@@ -19,9 +19,42 @@ Acceptance: 새 대회의 정식 UI 신청20/20 → 예선30/30 → 순위별 �
 Ambiguity: 결선 회전수는 단일 회전으로 가정하며 추가 확인 시 갱신한다. 미커밋 계획은 브라우저 연결 후 이어가기 위해 소유 worktree에 보존한다.
 
 Status: 추가 리뷰 완료 — P2 2건 dev PR #2427 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 통과
+Status: Review — dev PR #2442의 입력 동등성4건에 생성·접수5건 추가 수정. 서버360·Web181개 관련 회귀 PASS, API/Web 타입·규칙 통과, 기존 PR 갱신. CI·리뷰/Alpha는 별도 gate. 이전 #2427 Alpha 42/42는 아래 과거 기록.
 Created: 2026-11-09
 Owner: Codex
 Scope: v1 backend + frontend + schema/API/scenarios + Alpha runtime 호환성.
+
+## 2026-11-18 입력 동등성 리뷰 후속
+
+### 생성·신청 추가 리뷰 5건 — 후속 수정
+- 사용자 요청: 동시 제출 상태 덮어쓰기, 취소/종료 대회 참가 확정, 시간 일부 저장 실패 후 복원, 지난 마감 접수 시작, 초안 조회 실패의 새 생성 전환을 수정한다.
+- 기준: 기존 PR #2442 브랜치에 최신 origin/dev `886fd0b29` 병합. 기존 PR의 Gates/API/Web PASS. 별도 main 변경·머지·배포 없음.
+- Owned: 신청/관리자 접수/대회 상태 서비스와 회귀·통합 스펙, 생성 위저드·모델·신청 관리 UI와 회귀, API 문서·changeset·이 task/scenario/index.
+- Forbidden: 다른 WIP와 stash, 실제 사용자/결제/대회 데이터, Prisma schema·seed/reset, main 승격. 앞선 4건의 API 무변경 범위와 구분하며 이번에는 오류·상태 gate API 계약을 동기화한다.
+- [x] Wave A: 실패 회귀, 서버 신청 상태 재검증/CAS·종결 대회 확정 차단·지난 마감 open 차단.
+- [x] Wave B: 초안 로딩/오류 차단, 복원 뒤 저장된 경기 시간 재검토·명시 저장 전 접수 차단, 종결 대회 확정 UI 차단.
+- [x] Wave C: 관련 단위·API/Web 타입/규칙·문서 완료, 기존 dev PR #2442 갱신. DB 통합·새 head CI·Alpha는 아래 별도 gate.
+- Acceptance: 동시·취소 경쟁이 신청/결제/알림을 중복 변경하지 않음; cancelled/completed의 새 확정·대기 금지; 새로고침 복원이 곧바로 접수를 열지 않음; 실패한 초안 조회가 새 POST를 만들지 않음; 과거 마감으로 open 성공을 표시하지 않음.
+- 로컬 회귀: 수정 전 서버9건 RED → 서버3 suites360 tests PASS. Web 생성104·신청관리41·생성모델32·리그신청4 = 4 suites181 tests PASS(파일별 최종 실행 결과 합계). 복원 진입 계약 변경에 맞춰 기존 직접 확인 진입 테스트를 명시 저장 흐름으로 변경하고, 이전 테스트의 미소비 mockOnce가 다음 테스트로 새는 fixture도 reset했다.
+- 검증 상세: Web tsc·패턴, API 최신 schema 생성물 기준 tsc·표면 gate, patch changeset·공백 diff PASS. API 첫 타입 검사는 공유 의존성의 오래된 Prisma 생성물 때문에 실패했다. /tmp에만 최신 schema client를 생성하고 임시 tsconfig paths로 다시 검사해 PASS; 원본 의존성/DB/환경 파일은 건드리지 않았다. 마지막 시간 조회 실패 중 단계 이동 차단 회귀1/1 PASS. 새 TODO/FIXME/HACK/XXX 없음.
+- 미실행: Docker/DB 런타임 미제공으로 DB 동시 요청 실측 미실행. 사용자 요청대로 PR까지만 갱신하며 Alpha6 routes×3 viewport=0/18, 새 CI는 push 후 PR에서 확인한다. Copilot ACTOR_INELIGIBLE blocker는 유지한다.
+- 결정: DB 필드는 추가하지 않는다. 복원된 초안은 서버에 저장된 경기 설정을 다시 표시하고 명시적으로 저장한 뒤 공개 확인을 허용한다. 실패한 미저장 값을 저장 성공으로 복구했다고 표시하지 않는다.
+
+Status: Review — 사용자 요청: 확인된 입력/표시 결함 수정 후 dev 대상 PR 생성.
+- Base: `origin/dev` `4efec6c39`; branch `fix/stage-input-review-20261118`.
+- Owned: 단계·편성 시간 편집기, 공통 시간 검증·안내, 대회 생성/정보 화면과 관련 회귀, changeset, 이 task 및 단계형 시나리오.
+- Forbidden: 다른 WIP·stash, 실제 대회/경기 데이터, DB schema/API 규칙 변경, main 승격·PR 자동 머지.
+- [x] Phase 1: 네 결함(시간 CAS, 형식/정원 제어·라벨, 시간 상속 안내, 입력 범위)의 회귀 RED 확인.
+- [x] Phase 2: 기존 컴포넌트와 서버의 1분 이상 정수 계약에 맞춰 수정.
+- [x] Phase 3a: 관련 회귀·Web 타입/패턴·diff 범위 확인.
+- [x] Phase 3b: 커밋·dev PR·리뷰 요청.
+- PR: [#2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442), base `dev`, 구현 `62a3369b6`, 15 files. 로컬217 tests·Web 타입/패턴·changeset 정책·커밋 diff PASS. 최신 원격CI 진행 중, Copilot CLI/REST 요청 수행(대기 목록은 빈 배열·리뷰 아직0건이므로 clean으로 판정하지 않음). 사용자 요청대로 머지·배포는 실행하지 않았다.
+- 외부 리뷰 blocker: 공식 `POST /pulls/2442/copilot-code-review`가 HTTP422 `ACTOR_INELIGIBLE`(actor 코드리뷰 라이선스/조직 정책 자격 불충족)로 거절했다. 추가 반복 요청·계정/요금제/정책 변경은 하지 않는다. Copilot clean 또는 PR-ready로 표시하지 않으며 CI 진행 및 Alpha0/12와 함께 PR 본문에 명시했다.
+- Acceptance: 조회 갱신·충돌 뒤 옛 입력으로 최신 시간 덮어쓰기 금지; 명시 확인 재조회; 단계형 형식/정원은 구성 경로로 안내; 별도 시간 설정의 실제 이름·값 표시; 생성/수정/편성 시간 입력 계약 일치.
+- Ambiguity: 최소 보장 경기 수·회전 수·240경기 등 대회 운영 규칙 차이는 이번 버그 수정으로 확대하지 않는다. 시간 상한은 서버 DTO의 기존 양의 정수 계약을 따른다.
+- QA: 사용자 요청은 PR 생성까지다. 변경 후 Alpha `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/admin/tournaments/:id/info`, `/admin/tournaments/:id/bracket` 4 routes × 390/768/1440 = 0/12. console/network도 dev 머지·배포 이후에 가능하며 미실행 상태를 PR에 명시한다.
+- Progress Snapshot: 네 결함을 검증하는 회귀 RED를 확인한 뒤 수정. 최종 관련6 suites217 tests PASS(정보43·공통시간18·생성모델32·단계관리13·단계시간13·생성화면98), Web `tsc --noEmit` 및 패턴 검사 PASS. 생성화면의 기존 서로 다른 테스트에서 로컬 5초 timeout을 관찰해 단언 변경 없이 해당 파일을 `--testTimeout=15000`으로 재실행해98/98 PASS. 시간 규칙을 가리키던 테스트 문구·상한 단언만 새 계약으로 수정했다. 타입검사는1회, 패턴 검사의 하위 셸 EPERM은 권한 있는 동일 검사 재실행으로 해소했다. DB·API 변경 및 migration 없음.
+
 
 ## Context
 최신 resume cursor(2026-11-17): `fix/stage-structure-draft-resume-20261117`, base dev `9f157aa57`.

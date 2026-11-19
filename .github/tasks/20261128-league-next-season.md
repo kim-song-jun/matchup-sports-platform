@@ -134,3 +134,26 @@ Status: Review
 - 새 화면 설계나 API/DB 변경은 없다. alpha의 수정 후 시각 증거와 통합 트리의 API/DB 테스트는 미완료이므로 Draft PR로 제출한다.
 - 제출: [Draft PR #2150](https://github.com/kim-song-jun/matchup-sports-platform/pull/2150), base=`dev`, head=`fix/league-pr-integration-20261104`. P2 수정 커밋 `349f3203e`이며 CI Gates/API/Web은 생성 시 진행 중이었다. 원본 5개 PR·dev/main은 변경하지 않았다.
 - PR 전체 범위의 base-relative diff 검사에서 병합된 `league-fixture-videos.service.ts`의 EOF 빈 줄 1개를 추가 정리했다. API 로직·계약에는 변화가 없다. 후속 커밋은 이 공백 정리와 PR 기록뿐이며 이미 검증한 웹 소스는 그대로다.
+
+## 후속: 이미 만든 리그를 다음 시즌으로 잇기 — 2026-11-19
+
+Status: In Progress
+
+### Context / Goal
+사용자 요청: "따로 만든 두 리그를 잇는 기능". 처음 설계는 다음 시즌을 **만들 때만** 지난 리그와 이었다. 이미 따로 만든 두 독립 리그는 이을 길이 없었다.
+
+### Original Conditions
+- [x] 같은 `previousLeagueId` 컬럼·같은 지난 리그 판정(`assertNextSeasonSourceInTx`)을 쓴다. 마이그레이션 없음.
+- [x] UI 위치는 A·B·C 안 제시 뒤 사용자가 A안(지난 리그의 다음 시즌 메뉴 안)을 골랐고, 메뉴에서 '다음 시즌 만들기'와 '다음 시즌 잇기' 둘 다 하게 했다.
+- [x] 연결 해제도 같은 화면에서 한다.
+
+### Test Scenarios
+- Happy: 후보에서 골라 잇기 → 양쪽 상세가 서로를 가리킴·감사 로그, 풀고 다시 잇기.
+- Edge: 후보에서 자기 자신·지난 시즌 체인·종목 다른 리그·이미 이어진 리그 제외, 날짜가 거꾸로면 경고만.
+- Error: 자기 자신·순환·체계 소속·취소·다른 종목·시작 전 지난 리그 422, 둘째 연결 409, 전환한 리그 409, 이은 게 없는 해제 422.
+- Web: 메뉴 상호 배제 유지, 만들기/잇기 전환, 후보 선택·경고·확인 창, 연결 후 해제.
+
+### Ambiguity Log
+- 잇는 것만으로 이미 들어온 팀·명단은 바꾸지 않는다. 지난 시즌 팀은 참가팀 관리의 '지난 시즌 팀 넣기'로 넣는다(자동 이월은 팀 구성이 바뀔 수 있어 하지 않는다).
+- 접수를 이미 연 리그를 사후에 이으면 '접수를 처음 열 때 한 번' 보내는 지난 시즌 팀 안내는 나가지 않는다.
+- 정본 결정 이력: `docs/design/competition-canonical-flow.md` 2026-11-19.

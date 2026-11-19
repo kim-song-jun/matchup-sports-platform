@@ -1,12 +1,13 @@
 import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { IsIn, IsOptional, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
   AddPreviousSeasonTeamsDto,
+  LinkNextSeasonDto,
   ApplyLeagueTemplateDto,
   PreviewLeagueTemplateDto,
   CancelLeagueFixtureDto,
@@ -28,6 +29,7 @@ import {
 } from './dto/league-match.dto';
 import { ADMIN_LIST_VISIBILITIES, type AdminListVisibility } from '../tournaments/dto/admin-tournament.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
+import { LEAGUE_LIST_STATUS_FILTERS, type LeagueListStatusFilter } from './league-list-status';
 
 // ParseUUIDPipe 기본 예외는 code 없는 영어 메시지라 AllExceptionsFilter 가 INTERNAL_ERROR 로
 // 내보낸다 — 도메인 코드/해요체 계약(main.ts ValidationPipe 와 동일 컨벤션)으로 맞춘다.
@@ -55,6 +57,17 @@ class AdminLeagueListQueryDto {
   @IsOptional()
   @IsIn(ADMIN_LIST_VISIBILITIES)
   visibility?: AdminListVisibility;
+
+  /** 리그 이름 또는 소속 체계 이름(부분 일치, 대소문자 무시). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  /** 상태 칩 — 표의 상태 알약과 같은 단위(취소 행은 completed 로 묶인다). */
+  @IsOptional()
+  @IsIn(LEAGUE_LIST_STATUS_FILTERS)
+  status?: LeagueListStatusFilter;
 }
 
 @Controller('admin/league-matches')
@@ -64,7 +77,7 @@ export class LeagueMatchAdminController {
 
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
-    return this.service.list(user, query.seriesId, query.visibility);
+    return this.service.list(user, query.seriesId, query.visibility, { q: query.q, status: query.status });
   }
 
   @Get(':leagueId/settings')
@@ -122,6 +135,28 @@ export class LeagueMatchAdminController {
     @Body() dto: AddPreviousSeasonTeamsDto,
   ) {
     return this.service.addPreviousSeasonTeams(user, leagueId, dto);
+  }
+
+  /** 이 리그의 다음 시즌으로 이을 수 있는 리그 후보 — 같은 종목의 독립 리그 중 지난 시즌이 아직 없는 것(2026-11-19). */
+  @Get(':leagueId/next-season/candidates')
+  nextSeasonCandidates(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
+    return this.service.nextSeasonCandidates(user, leagueId);
+  }
+
+  /** 이미 만든 리그를 이 리그의 다음 시즌으로 잇는다. 이미 들어온 팀·명단은 바꾸지 않는다. */
+  @Post(':leagueId/next-season/link')
+  linkNextSeason(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: LinkNextSeasonDto,
+  ) {
+    return this.service.linkNextSeason(user, leagueId, dto);
+  }
+
+  /** 이어진 다음 시즌 연결을 푼다. 이미 옮겨 온 명단은 그대로 남는다. */
+  @Delete(':leagueId/next-season/link')
+  unlinkNextSeason(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
+    return this.service.unlinkNextSeason(user, leagueId);
   }
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. 이 팀이 낀 대진에 공식 결과가 확정돼 있으면

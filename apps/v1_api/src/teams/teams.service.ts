@@ -46,6 +46,7 @@ import {
 } from './dto/team-join-application.dto';
 import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 import { buildDissolutionInfo, loadTeamArchivedBy } from './team-dissolution';
+import { countRecentPlayedByTeam, recentThreeMonthsSince } from '../games/public-records/team-record-public-sql';
 
 /**
  * 정원 마감 안내 문구.
@@ -152,13 +153,15 @@ export class TeamsService {
     // 캐시(V1TeamTrustScore)는 리뷰 reveal 시점(상호제출 또는 72시간 경과)에 즉시 갱신되지 않을 수 있으므로,
     // 이 페이지에 담긴 팀들의 trustState/mannerScore만 배치 1회로 live 재계산해 덮어쓴다(N+1 방지).
     // matchCount는 이번 스코프 밖이라 기존 캐시값을 그대로 둔다.
-    const liveTrustByTeam = await computeRevealedTeamTrustBatch(
-      this.prisma,
-      pageItems.map((team) => team.id),
-    );
+    const pageTeamIds = pageItems.map((team) => team.id);
+    // 카드의 '최근 3개월 N경기' — 팀 전적과 같은 공개·공식 경기 기준으로 이 페이지 팀들만 쿼리 1번에 센다.
+    const [liveTrustByTeam, recentPlayedByTeam] = await Promise.all([
+      computeRevealedTeamTrustBatch(this.prisma, pageTeamIds),
+      countRecentPlayedByTeam(this.prisma, pageTeamIds, recentThreeMonthsSince(new Date())),
+    ]);
 
     return {
-      items: pageItems.map((team) => this.toListItem(team, user, liveTrustByTeam.get(team.id))),
+      items: pageItems.map((team) => this.toListItem(team, user, liveTrustByTeam.get(team.id), recentPlayedByTeam.get(team.id) ?? 0)),
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
@@ -2405,7 +2408,7 @@ export class TeamsService {
     };
   }
 
-  private toListItem(team: TeamWithRelations, user: V1AuthUser | null, liveTrust?: RevealedTeamTrust) {
+  private toListItem(team: TeamWithRelations, user: V1AuthUser | null, liveTrust: RevealedTeamTrust | undefined, recentMatchCount: number) {
     const viewer = this.getViewer(team, user);
     return {
       id: team.id,
@@ -2433,6 +2436,8 @@ export class TeamsService {
       memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
+      // 최근 3개월 공개·공식 경기 수(팀 전적과 같은 기준). 경기가 없으면 0 — 카드가 '0경기'를 그대로 보여 준다.
+      recentMatchCount,
       trustState: liveTrust?.trustState ?? team.trustScore?.trustState ?? 'none',
       viewerRole: viewer.role,
       viewerJoinState: viewer.joinState,

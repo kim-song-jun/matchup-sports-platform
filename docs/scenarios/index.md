@@ -1,6 +1,7 @@
 ## 2026-11-19 — 20팀 정식 신청부터 결과까지 재검증 (70/70 완료 / 출전 제한 FAIL)
 
-[실행 결과](./ranked-leagues-full-flow-20261119.md). Alpha 신청20/20·명단140/140·접수20/20·예선30/30·結선40/40 공식 결과·대회 종료·3폭 공개 화면 확인. 팀당7경기와9개조/리그 승점·득실 재검산 PASS. 최대6명 설정인데 양 팀7명 모두 started=true인 상태에서 경기 시작 허용: BLOCKING FAIL. 신규 가입/OTP·벤치/교체·개인 이벤트는 통과 범위에 포함하지 않는다. 구성 버튼 폼 제출 수정은 PR #2453, 미병합.
+[실행 결과](./ranked-leagues-full-flow-20261119.md). Alpha 신청20/20·명단140/140·접수20/20·예선30/30·결선40/40 공식 결과·대회 종료·3폭 공개 화면 확인. 팀당7경기와9개조/리그 승점·득실 재검산 PASS. 최대6명 설정인데 양 팀7명 모두 started=true인 상태에서 경기 시작 허용: BLOCKING FAIL. 신규 가입/OTP·벤치/교체·개인 이벤트는 통과 범위에 포함하지 않는다. 구성 버튼 폼 제출 수정은 PR #2453, 미병합.
+2026-11-18 생성·접수 추가 5건은 [단계형 시나리오](./competition-stage-composition.md)와 PR #2442에서 추적한다. 서버360·Web181 tests PASS, API/Web 타입 검사 PASS, 신규 head Alpha 0/18·DB 실측 미실행.
 
 ## 2026-11-11 — 경기별 제목 수정
 
@@ -11,6 +12,8 @@
 [시나리오](./fixture-time-court-assignment.md) · [작업](../../.github/tasks/20261132-fixture-time-court-assignment.md). 기존 배정의 핵심 Alpha QA와 3폭 근거는 [#2356 기록](https://github.com/kim-song-jun/matchup-sports-platform/pull/2356#issuecomment-6845422443)을 따른다(세부 권한 예외는 당시 후보 한정). 2026-11-13 후속은 사용자 A안인 항목 내부 시간·등록 구장 이름 수정이며, 새 inline 기능은 #2364 dev/Alpha 7c288bd0985b에서 실제 저장·취소·중복/stale/401/404와 2패널×3폭 before/after 6/6 PASS. 실제 팀 일정·핀·rollback 등은 PostgreSQL CI로 구분해 검증했다. [현행 근거](../ops/release-readiness-1.20.0-2026-11-13.md), 테스트 cancelled/private·브라우저 종료.
 
 ## 2026-11-09 — 단계형 대회 구성 (추가 리뷰 검증 완료)
+
+2026-11-18 입력 동등성 후속 [PR #2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442): 시간 편집 CAS·형식/정원 제어와 라벨·상속 안내·시간 입력 범위 네 결함 수정, 로컬217 tests·Web 타입/패턴 PASS. 원격CI/리뷰는 별도 gate다. 이번 변경의 Alpha 4 routes×3폭은 0/12이며, 아래 이전42/42를 이번 after 증거로 사용하지 않는다. 최신 계약·검증은 [시나리오 후속 절](./competition-stage-composition.md#2026-11-18--입력-동등성-리뷰-후속-pr-준비)을 따른다.
 
 최신 추가 리뷰 보완 완료(2026-11-17): PR #2427 dev 반영, Alpha dbea6a5f5에서 구성3+기존39=42/42 PASS. 초안·사유 보존/충돌 차단·확인 재조회와 필수 조작 기록 누락 시 실제 관리자3개 재실행을 확인했다. 70경기·20팀140계정 보존, 구조 PNG9개와 기존 after78개 갱신. [최신 검증](./competition-stage-composition.md#2026-11-17--구성-초안재개-조작-증거-보완).
 

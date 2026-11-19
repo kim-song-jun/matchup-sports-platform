@@ -938,6 +938,8 @@ export type V1Team = {
   regionName: string;
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   memberCount: number;
+  /** 최근 3개월 공개·공식 경기 수(팀 전적과 같은 기준). 목록 응답에만 실린다 — 값이 없는 옛 응답이면 카드가 칸을 뺀다. */
+  recentMatchCount?: number;
   trustState: TrustState | 'none';
   joinPolicy: 'approval_required' | 'closed';
   logoUrl?: string | null;

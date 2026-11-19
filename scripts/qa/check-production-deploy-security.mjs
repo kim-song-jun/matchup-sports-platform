@@ -268,6 +268,16 @@ export function findNginxImageProblem(compose) {
   return fixed ? null : `nginx ${version.join('.')} 는 보안 수정 버전(1.30.7 stable · 1.31.9 mainline) 보다 낮습니다`;
 }
 
+// nginx 설정 파일은 읽기 전용으로 마운트한다. 이미지 entrypoint 가 시작할 때 default.conf 를 touch 하므로
+// 쓰기 가능하면 서버에 저장된 릴리스 소스의 mtime 이 바뀌어 같은 SHA 재배포가 소스 변경 검사에서 멈춘다.
+export function findNginxConfMountProblem(compose) {
+  const block = compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
+  const mount = block.match(/^\s+-\s*(\S+):\/etc\/nginx\/conf\.d\/default\.conf(?::(\S+))?\s*$/m);
+  if (!mount) return 'nginx 서비스의 /etc/nginx/conf.d/default.conf 마운트를 찾지 못했습니다';
+  const options = (mount[2] ?? '').split(',');
+  return options.includes('ro') ? null : `nginx default.conf 마운트 ${mount[1]} 가 읽기 전용(:ro)이 아닙니다 — 컨테이너 시작이 소스 파일 시각을 바꿉니다`;
+}
+
 // 앱 전체의 회원 연결을 끊고 조회할 수 있는 키는 승인된 deploy job 의 Sync runtime env 로만 넘긴다.
 // 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다.
 const APPROVED_ONLY_SECRETS = ['KAKAO_ADMIN_KEY'];
@@ -535,6 +545,14 @@ export function findUnreadRuntimeEnvVariables(script) {
     nginxProblem = `읽지 못해 nginx 이미지를 검사할 수 없습니다 (${error.code ?? error.message})`;
   }
   if (nginxProblem) errors.push(`${composePath}: ${nginxProblem}`);
+
+  let mountProblem;
+  try {
+    mountProblem = findNginxConfMountProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    mountProblem = `읽지 못해 nginx 설정 마운트를 검사할 수 없습니다 (${error.code ?? error.message})`;
+  }
+  if (mountProblem) errors.push(`${composePath}: ${mountProblem}`);
 }
 
 const requiredPatterns = [

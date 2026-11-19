@@ -465,6 +465,13 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
+  it.each(['draft', 'closed', 'open'])('changeStatus: %s에서 지난 마감으로 접수 시작·재개할 수 없다', async (status) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ status, entryFee: 0, registrationDeadlineAt: new Date(Date.now() - 60000) })));
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open', reason: '접수 재개' })).rejects.toMatchObject({ response: { code: 'REGISTRATION_DEADLINE_PASSED' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
   it('changeStatus: 리그 id 는 상태를 바꿀 수 없다 — 쓰기·감사로그 모두 일어나지 않는다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockImplementation(

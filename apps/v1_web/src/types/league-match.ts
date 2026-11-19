@@ -193,6 +193,37 @@ export interface V1LeagueSeasonLink {
   title: string;
 }
 
+/** 이 리그의 다음 시즌으로 이을 수 있는 리그 한 건(GET .../next-season/candidates, 2026-11-19). */
+export interface V1NextSeasonCandidate {
+  leagueId: string;
+  title: string;
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
+  startsOn: string | null;
+  endsOn: string | null;
+  /** 이미 참가 확정된 팀 수 — 이어도 이 팀과 명단은 바뀌지 않는다. */
+  confirmedCount: number;
+}
+
+export interface V1NextSeasonCandidates {
+  leagueId: string;
+  /** 후보가 100개를 넘어 최근 100개만 담겼다. */
+  hasMore: boolean;
+  candidates: V1NextSeasonCandidate[];
+}
+
+/** POST .../next-season/link — 지난 리그 id 가 `leagueId` 다. */
+export interface V1LinkNextSeasonResult {
+  leagueId: string;
+  previousTitle: string;
+  nextSeason: V1LeagueSeasonLink;
+}
+
+/** DELETE .../next-season/link */
+export interface V1UnlinkNextSeasonResult {
+  leagueId: string;
+  unlinkedLeagueId: string;
+}
+
 export interface V1AdminLeagueDetail {
   /** 독립 리그는 null. 이전 API 응답에는 없을 수 있어 전환 메뉴는 명시적인 null만 허용한다. */
   seriesId?: string | null;

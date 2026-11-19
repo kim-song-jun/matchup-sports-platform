@@ -1,4 +1,5 @@
 import { getLeagueSettings, updateLeagueSettings } from './league-settings';
+import { linkNextSeason, listNextSeasonCandidates, unlinkNextSeason } from './league-season-link-admin';
 import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import { countPendingCapacityReservations } from '../tournaments/registration-capacity';
 import {
@@ -63,6 +64,7 @@ import { loadFirstGamePlayerNotices } from './league-fixture-scheduled-notice';
 import {
   AddLeagueTeamDto,
   AddPreviousSeasonTeamsDto,
+  LinkNextSeasonDto,
   ApplyLeagueTemplateDto,
   PreviewLeagueTemplateDto,
   LeagueFixtureScheduleDto,
@@ -446,6 +448,17 @@ export class LeagueMatchAdminService {
   }
   updateSettings(user: V1AuthUser, id: string, dto: UpdateLeagueSettingsDto) {
     return updateLeagueSettings(this.prisma, this.adminContext, user, id, dto);
+  }
+
+  /** 이 리그의 다음 시즌으로 이을 수 있는 리그 후보(2026-11-19). */
+  nextSeasonCandidates(user: V1AuthUser, leagueId: string) {
+    return listNextSeasonCandidates(this.prisma, this.adminContext, user, leagueId);
+  }
+  linkNextSeason(user: V1AuthUser, leagueId: string, dto: LinkNextSeasonDto) {
+    return linkNextSeason(this.prisma, this.adminContext, user, leagueId, dto);
+  }
+  unlinkNextSeason(user: V1AuthUser, leagueId: string) {
+    return unlinkNextSeason(this.prisma, this.adminContext, user, leagueId);
   }
 
   async detail(user: V1AuthUser, leagueId: string) {

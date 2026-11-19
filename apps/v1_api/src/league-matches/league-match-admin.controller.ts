@@ -7,6 +7,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
   AddPreviousSeasonTeamsDto,
+  LinkNextSeasonDto,
   ApplyLeagueTemplateDto,
   PreviewLeagueTemplateDto,
   CancelLeagueFixtureDto,
@@ -134,6 +135,28 @@ export class LeagueMatchAdminController {
     @Body() dto: AddPreviousSeasonTeamsDto,
   ) {
     return this.service.addPreviousSeasonTeams(user, leagueId, dto);
+  }
+
+  /** 이 리그의 다음 시즌으로 이을 수 있는 리그 후보 — 같은 종목의 독립 리그 중 지난 시즌이 아직 없는 것(2026-11-19). */
+  @Get(':leagueId/next-season/candidates')
+  nextSeasonCandidates(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
+    return this.service.nextSeasonCandidates(user, leagueId);
+  }
+
+  /** 이미 만든 리그를 이 리그의 다음 시즌으로 잇는다. 이미 들어온 팀·명단은 바꾸지 않는다. */
+  @Post(':leagueId/next-season/link')
+  linkNextSeason(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: LinkNextSeasonDto,
+  ) {
+    return this.service.linkNextSeason(user, leagueId, dto);
+  }
+
+  /** 이어진 다음 시즌 연결을 푼다. 이미 옮겨 온 명단은 그대로 남는다. */
+  @Delete(':leagueId/next-season/link')
+  unlinkNextSeason(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
+    return this.service.unlinkNextSeason(user, leagueId);
   }
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. 이 팀이 낀 대진에 공식 결과가 확정돼 있으면

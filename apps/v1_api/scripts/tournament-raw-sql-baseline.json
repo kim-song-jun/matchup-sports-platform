@@ -80,6 +80,10 @@
     "allowed": 1,
     "why": "리그 기본 정보 저장의 FOR UPDATE 잠금 하나. SQL에서 kind='regular_league'·deleted_at IS NULL을 제한하고, 즉시 findTournamentOnSurface(LEAGUE_KINDS)로 재조회한다. Prisma가 지원하지 않는 행 잠금만 사용하며 SQL 결과를 응답으로 노출하지 않는다. 기간 검사·updatedAt 충돌 검증·저장·audit를 같은 트랜잭션에 직렬화한다."
   },
+  "src/league-matches/league-season-link-admin.ts": {
+    "allowed": 1,
+    "why": "2026-11-19 이미 만든 리그를 사후에 다음 시즌으로 잇고 푸는 길의 행 잠금 하나(lockLeaguesInOrder): SELECT id ... AND kind = 'regular_league' FOR UPDATE. 지난 리그와 다음 시즌 후보 두 행을 id 순서로 잠그기만 하고 데이터를 돌려주지 않는다. 잇기·풀기·리그 체계 전환(league-series-conversion.service.ts 의 FOR UPDATE)이 같은 행을 다른 순서로 잡아 서로 기다리지 않게 하려는 것이다. 실제 판정은 잠금 뒤 findTournamentOnSurface(LEAGUE_KINDS)와 assertNextSeasonSourceInTx 가 한다 — 순서를 바꾸면 같은 리그에 둘이 동시에 이어지거나 전환과 겹치는 구멍이 된다."
+  },
   "src/league-matches/league-series-conversion.service.ts": {
     "allowed": 1,
     "why": "2026-11-03 다음 시즌 잇기와의 상호 배제: load()의 첫 문장 SELECT id ... AND kind = 'regular_league' FOR UPDATE. 원본 리그 행만 잠그고 데이터를 돌려주지 않는다. 다음 시즌 생성(assertNextSeasonSourceInTx)이 같은 행을 updateMany 로 갱신해 잠그므로 둘이 겹치면 한쪽이 기다린 뒤 상대의 기록(감사 로그·previous_league_id)을 본다. 실제 판정은 잠금 뒤 findTournamentOnSurface(['regular_league'])와 findNextSeasonLeague 다 — 순서를 바꾸면 둘 다 성공하는 구멍이 된다."

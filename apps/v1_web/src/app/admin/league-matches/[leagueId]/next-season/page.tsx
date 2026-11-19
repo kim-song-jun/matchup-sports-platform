@@ -1,6 +1,6 @@
-import { LeagueNextSeasonCreate } from './league-next-season-create';
+import { LeagueNextSeasonManage } from './league-next-season-manage';
 
 export default async function Page({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params;
-  return <LeagueNextSeasonCreate leagueId={leagueId} />;
+  return <LeagueNextSeasonManage leagueId={leagueId} />;
 }

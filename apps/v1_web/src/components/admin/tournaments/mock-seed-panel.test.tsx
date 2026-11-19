@@ -14,6 +14,7 @@ describe('mockSeedBlockReason — 서버가 막는 목업 조합을 미리 알�
     expect(mockSeedBlockReason({ format: 'ranked_leagues', teamCount: 10 })).toContain('4의 배수');
     expect(mockSeedBlockReason({ format: 'ranked_leagues', teamCount: 24, withResults: true })).toContain('20팀');
     expect(mockSeedBlockReason({ format: 'ranked_leagues', teamCount: 20, status: 'open', withResults: true })).toContain('모집중');
+    expect(mockSeedBlockReason({ format: 'ranked_leagues', teamCount: 20, status: 'in_progress', reviewReady: true })).toContain('종료');
   });
   it('정규리그+N개 토너먼트는 종료 상태로 만들 수 없다', () => {
     expect(mockSeedBlockReason({ format: 'league_knockouts', teamCount: 32, status: 'completed' })).toContain('모집중·진행중');

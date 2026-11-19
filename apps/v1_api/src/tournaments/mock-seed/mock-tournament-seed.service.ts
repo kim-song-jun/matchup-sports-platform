@@ -121,6 +121,9 @@ export class MockTournamentSeedService {
     if (status === 'open' && withResults) {
       throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '모집중 목업은 경기 결과나 후기 작성 가능 상태로 만들 수 없어요. 상태를 진행중이나 종료로 바꿔 주세요.' });
     }
+    if (ranked && reviewReady && status !== 'completed') {
+      throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '후기 작성 가능으로 만들려면 상태를 종료로 바꿔 주세요.' });
+    }
     if (withResults && (format === 'league' || format === 'group_knockout') && teamCount > MOCK_SEED_MAX_TEAMS_WITH_RESULTS) {
       throw new BadRequestException({
         code: 'MOCK_SEED_TOO_MANY_RESULTS',

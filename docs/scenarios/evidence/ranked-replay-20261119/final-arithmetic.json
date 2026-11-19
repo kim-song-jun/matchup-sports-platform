@@ -1,0 +1,65 @@
+{
+  "verdict": "PASS for application/admission/result arithmetic; six-player enforcement remains FAIL",
+  "applications": 20,
+  "registeredPlayers": 140,
+  "admissions": 20,
+  "officialResults": 70,
+  "gamesPerTeam": 7,
+  "recordedLiveGoals": 1,
+  "groups": [
+    {
+      "name": "1-1 · 예선 · A조",
+      "teams": 4,
+      "matches": 6,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "1-2 · 예선 · B조",
+      "teams": 4,
+      "matches": 6,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "1-3 · 예선 · C조",
+      "teams": 4,
+      "matches": 6,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "1-4 · 예선 · D조",
+      "teams": 4,
+      "matches": 6,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "1-5 · 예선 · E조",
+      "teams": 4,
+      "matches": 6,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "2-1 · 본선 · 1위 리그",
+      "teams": 5,
+      "matches": 10,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "2-2 · 본선 · 2위 리그",
+      "teams": 5,
+      "matches": 10,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "2-3 · 본선 · 3위 리그",
+      "teams": 5,
+      "matches": 10,
+      "arithmetic": "PASS"
+    },
+    {
+      "name": "2-4 · 본선 · 4위 리그",
+      "teams": 5,
+      "matches": 10,
+      "arithmetic": "PASS"
+    }
+  ]
+}

@@ -337,3 +337,5 @@ PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN�
 - 새 소유 대회21da8cb0-2138-431b-bc17-b5e3b6e8d326, 기존합성20팀 재사용. 실제신청20/20·명단140/140 완료, 관리자수락/스크린샷 진행 중. 상세 docs/scenarios/ranked-replay-screenshots-20261119.md.
 - 구현: ranked_leagues 목업전용format, 기존 DB format=league+stagePlan. 4팀예선→동순위결선,7명등록·6명config,8~32팀4배수·결과포함20팀상한. existingenv/admin guard유지, schema/migration없음. 공식70경기 생성통합회귀 추가.
 - 로컬 API53·Web6 tests 및 API/Web TypeScript PASS. 실제DB통합은CI대기. 기존동시6명강제실패는이변경이해결하지 않으며실제재검증으로분리.
+
+재실행완료: 새대회신청20·명단140·관리자수락20·공식70·completed·3폭결과/최종순위·개인1골PASS. 6명제한FAIL재현. PR댓글7011526051에팀별신청/수락캡처게시. 사용자이번PR전체CI+수동검토대체승인획득,Alpha목업실제생성대기. 로컬API54/Web6,타입PASS.

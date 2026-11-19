@@ -28,6 +28,7 @@
 | 접근성 의도적 예외 | `design/a11y-decisions.md` |
 | 디자인 시각 규칙 전체 | 레포 루트 `DESIGN.md` (`.impeccable.md`는 요약) |
 | 디자인 문서 읽는 순서 | `DESIGN_DOCUMENT_MAP.md`(이 폴더 최상위, navigation only — 규칙 정의 아님) |
+| 개인정보 저장 보호 수준·적용 계획 | [security/personal-data-protection-plan.md](security/personal-data-protection-plan.md) (제안, 구현 미착수) |
 | API 계약 색인 | `api/README.md` → `api/global-contract.md` → `api/domains/*.md` |
 | PR·배포·시각검증 런북 | `ops/pr-review-visual-workflow.md` |
 | E2E 시나리오 인덱스 | `scenarios/index.md` |

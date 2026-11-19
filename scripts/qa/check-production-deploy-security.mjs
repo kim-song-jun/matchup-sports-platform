@@ -252,6 +252,22 @@ export function composeServiceDeclares(compose, service, variable) {
   return new RegExp(String.raw`^\s+${variable}:\s*\$\{${variable}:-\}\s*$`, 'm').test(block);
 }
 
+// nginx 이미지는 `버전-alpine@sha256:<digest>` 로 고정하고, 버전은 보안 수정 버전 이상이어야 한다.
+// 태그만 있으면 같은 태그가 다른 내용으로 다시 올라와도 배포가 그대로 받는다.
+const compareVersion = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+export function findNginxImageProblem(compose) {
+  const block = compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
+  const image = block.match(/^ {4}image:\s*(\S+)\s*$/m)?.[1];
+  if (!image) return 'nginx 서비스의 image 를 찾지 못했습니다';
+  const pinned = image.match(/^nginx:(\d+)\.(\d+)\.(\d+)-alpine@sha256:[0-9a-f]{64}$/);
+  if (!pinned) return `nginx 이미지 ${image} 가 버전 태그와 digest 로 고정되어 있지 않습니다 (nginx:<버전>-alpine@sha256:<digest>)`;
+  const version = pinned.slice(1, 4).map(Number);
+  // 해결 버전은 줄마다 다르다: 1.30 stable 은 1.30.7, mainline 은 1.31.9 (이후 줄은 그보다 높으면 된다).
+  const fixed = version[0] === 1 && version[1] === 30 ? compareVersion(version, [1, 30, 7]) >= 0 : compareVersion(version, [1, 31, 9]) >= 0;
+  return fixed ? null : `nginx ${version.join('.')} 는 보안 수정 버전(1.30.7 stable · 1.31.9 mainline) 보다 낮습니다`;
+}
+
 // 앱 전체의 회원 연결을 끊고 조회할 수 있는 키는 승인된 deploy job 의 Sync runtime env 로만 넘긴다.
 // 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다.
 const APPROVED_ONLY_SECRETS = ['KAKAO_ADMIN_KEY'];
@@ -508,6 +524,17 @@ export function findUnreadRuntimeEnvVariables(script) {
         '동기화가 호스트 .env 에 값을 써도 컨테이너로 전달되지 않습니다',
     );
   }
+}
+
+{
+  const composePath = 'deploy/docker-compose.prod.yml';
+  let nginxProblem;
+  try {
+    nginxProblem = findNginxImageProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    nginxProblem = `읽지 못해 nginx 이미지를 검사할 수 없습니다 (${error.code ?? error.message})`;
+  }
+  if (nginxProblem) errors.push(`${composePath}: ${nginxProblem}`);
 }
 
 const requiredPatterns = [

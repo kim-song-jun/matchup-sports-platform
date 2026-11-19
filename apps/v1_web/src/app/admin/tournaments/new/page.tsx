@@ -100,7 +100,8 @@ export default function AdminTournamentsNewPage() {
   const uploadImages = useV1UploadImages();
   const savePeriods = useSaveTournamentPeriodSettings();
   const savedPeriodSettings = useTournamentPeriodSettings(state.draftId ?? draftIdParam ?? '');
-  const pending = createTournament.isPending || updateTournament.isPending || savePeriods.isPending;
+  const draftReviewLoading = state.requiresDraftReview && (!savedPeriodSettings.data || savedPeriodSettings.isError);
+  const pending = createTournament.isPending || updateTournament.isPending || savePeriods.isPending || draftReviewLoading;
   const selectedSport = sports?.find((sport) => sport.id === state.sportId);
   const previousWithBank = previousTournaments?.items.find(
     (tournament) => tournament.bankName || tournament.bankAccount || tournament.bankHolder,
@@ -122,7 +123,7 @@ export default function AdminTournamentsNewPage() {
   };
 
   // 새로고침·직접 URL 진입(?draftId=…)으로 돌아온 경우 — 메모리 상태는 비어 있지만 이미
-  // 서버에 초안이 있으므로, 그 값을 폼에 채우고 확인 단계로 보낸다. state.draftId가 이미
+  // 서버에 초안이 있으므로, 그 값을 폼에 채우고 경기 시간 확인 단계로 보낸다. state.draftId가 이미
   // 있으면(같은 세션에서 방금 생성) 다시 덮어쓰지 않는다 — 지금 입력 중인 값을 잃으면 안 된다.
   const hydratedRef = useRef(false);
   const draftQuery = useV1AdminTournament(draftIdParam ?? '');
@@ -212,6 +213,7 @@ export default function AdminTournamentsNewPage() {
   }, [errors]);
 
   const goToStep = (nextStep: number) => {
+    if (draftReviewLoading && nextStep > 2) return;
     // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
@@ -221,6 +223,7 @@ export default function AdminTournamentsNewPage() {
       showToast('저장하지 않은 대회 정보가 있어요. 저장하고 계속하기를 눌러 반영해 주세요.', 'error');
       return;
     }
+    if (nextStep === CONFIRM_STEP_INDEX && state.requiresDraftReview) return;
     if (nextStep < state.step) {
       dispatch({ type: 'set-step', step: nextStep });
       setErrors({});
@@ -239,6 +242,7 @@ export default function AdminTournamentsNewPage() {
   };
 
   const goNext = () => {
+    if (draftReviewLoading) return;
     const stepErrors = validateTournamentCreateStep(state);
     if (Object.keys(stepErrors).length > 0) {
       showErrors(stepErrors);
@@ -287,7 +291,7 @@ export default function AdminTournamentsNewPage() {
    */
   const handleCreateOrUpdateDraft = (event: React.FormEvent) => {
     event.preventDefault();
-    if (pending) return;
+    if (pending || (draftIdParam && !state.draftId)) return;
     const allErrors = Object.assign(
       {},
       ...[0, 1, 2, 3].map((step) => validateTournamentCreateStep(state, step)),
@@ -408,11 +412,18 @@ export default function AdminTournamentsNewPage() {
 
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
-    if (!state.draftId || state.periodMinutesDirty || state.stagePeriodMinutesDirty || pending) return;
+    if (!state.draftId || state.requiresDraftReview || state.periodMinutesDirty || state.stagePeriodMinutesDirty || pending) return;
     if (hasUnsavedTournamentChanges(state)) {
       goToStep(CONFIRM_STEP_INDEX);
       return;
     }
+    const deadlinePassed = () => {
+      if (!state.registrationDeadlineAt || new Date(state.registrationDeadlineAt).getTime() >= Date.now()) return false;
+      dispatch({ type: 'set-step', step: 1 });
+      showErrors({ registrationDeadlineAt: '신청 마감이 지났어요. 마감 일시를 변경하고 저장해 주세요.' });
+      return true;
+    };
+    if (deadlinePassed()) return;
     const ok = await confirm({
       title: '접수를 시작할까요?',
       message:
@@ -420,7 +431,7 @@ export default function AdminTournamentsNewPage() {
       confirmLabel: '접수 시작하기',
       cancelLabel: '취소',
     });
-    if (!ok) return;
+    if (!ok || deadlinePassed()) return;
 
     changeStatus.mutate(
       { status: 'open' },
@@ -436,8 +447,24 @@ export default function AdminTournamentsNewPage() {
     );
   };
 
+  if (draftIdParam && !state.draftId) {
+    return (
+      <div className="py-8" role={draftQuery.isError ? 'alert' : 'status'}>
+        <p>{draftQuery.isError ? extractErrorMessage(draftQuery.error, '초안을 불러오지 못했어요.') : '대회 초안을 불러오고 있어요.'}</p>
+        {draftQuery.isError && <button type="button" className="mt-3 min-h-[44px] text-[var(--blue700)]" onClick={() => void draftQuery.refetch()}>초안 다시 불러오기</button>}
+        <Link href="/admin/tournaments" className="mt-3 block min-h-[44px] text-[var(--blue700)]">대회 목록으로</Link>
+      </div>
+    );
+  }
+
   return (
     <>
+      {state.requiresDraftReview && (
+        <div className="mb-4 rounded-xl border border-[var(--border)] p-4" role={savedPeriodSettings.isError ? 'alert' : 'status'}>
+          <p>{savedPeriodSettings.isError ? extractErrorMessage(savedPeriodSettings.error, '저장된 경기 시간을 불러오지 못했어요.') : draftReviewLoading ? '저장된 경기 시간을 불러오고 있어요.' : '복원한 초안의 경기 시간을 확인한 뒤 저장하고 계속하기를 눌러 주세요. 이전에 저장에 실패한 입력은 복원되지 않아요.'}</p>
+          {savedPeriodSettings.isError && <button type="button" className="mt-2 min-h-[44px] text-[var(--blue700)]" onClick={() => void savedPeriodSettings.refetch()}>경기 시간 다시 불러오기</button>}
+        </div>
+      )}
       <div className="tm-content-enter mb-3">
         <Link
           href="/admin/tournaments"
@@ -461,7 +488,7 @@ export default function AdminTournamentsNewPage() {
           currentStep={state.step}
           onSelect={goToStep}
           ariaLabel="대회 생성 단계"
-          isLocked={(index) => index === CONFIRM_STEP_INDEX && !(state.draftId !== null && !state.periodMinutesDirty && !state.stagePeriodMinutesDirty)}
+          isLocked={(index) => (draftReviewLoading && index > 2) || (index === CONFIRM_STEP_INDEX && !(state.draftId !== null && !state.requiresDraftReview && !state.periodMinutesDirty && !state.stagePeriodMinutesDirty))}
         />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
@@ -1054,7 +1081,6 @@ function ParticipationStep({
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={240}
                     value={value}
                     disabled={pending}
                     aria-label={`${periodNames[index]} 시간(분)`}
@@ -1100,7 +1126,7 @@ function ParticipationStep({
                     {values.map((value, index) => (
                       <label key={`${phase}-${index}`} className="grid gap-1 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
                         {names[index]} (분)
-                        <input type="number" inputMode="numeric" min={1} max={240} value={value} disabled={pending} onChange={(event) => { const next = [...values]; next[index] = event.target.value; dispatch({ type: 'set-stage-period-minutes', phase, value: next }); }} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" />
+                        <input type="number" inputMode="numeric" min={1} value={value} disabled={pending} onChange={(event) => { const next = [...values]; next[index] = event.target.value; dispatch({ type: 'set-stage-period-minutes', phase, value: next }); }} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" />
                       </label>
                     ))}
                   </div>

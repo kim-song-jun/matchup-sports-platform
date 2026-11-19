@@ -14,13 +14,13 @@ const SERIES_TITLE = '서울 풋살 커뮤니티 리그';
 const LEAGUES: V1AdminLeagueListItem[] = [1, 2].map((tier) => ({
   leagueId: `ad210000-0000-4000-8000-00000000000${tier}`, isPublic: true,
   title: `${SERIES_TITLE} 1시즌 ${tier}부`,
-  state: 'draft', teamCount: 2, fixtureCount: 0,
+  state: 'active', lifecycleStatus: 'in_progress', teamCount: 2, fixtureCount: 0,
   startsOn: '2026-10-01', endsOn: '2026-12-31',
   seriesId: SERIES_ID, seriesTitle: SERIES_TITLE, tierLabel: `${tier}부`, seasonNo: 1,
 }));
 LEAGUES.push({
   leagueId: 'independent-league', isPublic: true, title: '독립 팀 리그',
-  state: 'draft', teamCount: 2, fixtureCount: 0,
+  state: 'completed', lifecycleStatus: 'completed', teamCount: 2, fixtureCount: 0,
   startsOn: '2026-10-01', endsOn: '2026-12-31',
   seriesId: null, seriesTitle: null, tierLabel: null, seasonNo: null,
 });
@@ -45,10 +45,19 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminLeagueMatchList: (seriesId?: string) => ({
-    data: { items: LEAGUES.filter((league) => !seriesId || (
-      seriesId === 'independent' ? league.seriesId === null : league.seriesId === seriesId
-    )) },
+  useV1AdminLeagueMatchList: ({ status }: { status?: string } = {}) => ({
+    data: {
+      items: LEAGUES.filter((league) => !status || league.lifecycleStatus === status),
+      summary: {
+        total: LEAGUES.length,
+        byStatus: {
+          draft: 0, open: 0, closed: 0,
+          in_progress: LEAGUES.filter((league) => league.lifecycleStatus === 'in_progress').length,
+          completed: LEAGUES.filter((league) => league.lifecycleStatus === 'completed').length,
+          on_hold: 0,
+        },
+      },
+    },
     isPending: false, isError: false, refetch: vi.fn(),
   }),
   useV1AdminLeagueSeriesList: () => ({
@@ -70,6 +79,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1ChangeLeagueState: () => ({ mutate: vi.fn(), isPending: false }),
   useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
+  // 리그 상세 셸이 접수·참가비 카드에 쓰는 훅.
+  useV1OpenLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1CloseLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1UpdateLeagueEntryFee: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // 리그 상세의 복귀 링크는 공통 셸이 그린다 — 섹션 화면은 비워 둔다.
@@ -85,10 +98,10 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     navigate(LIST_PATH);
   });
 
-  it('체계를 골라 상세를 열고 리그 목록으로 돌아오면 선택한 체계와 두 소속 리그를 유지한다', async () => {
+  it('초안 칩을 골라 상세를 열고 리그 목록으로 돌아오면 선택한 상태와 두 리그를 유지한다', async () => {
     const user = userEvent.setup();
     const list = render(<AdminLeagueHubPage />);
-    await user.click(screen.getByRole('button', { name: SERIES_TITLE }));
+    await user.click(screen.getByRole('button', { name: /^시즌 진행 중/ }));
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
     expect(screen.queryByText('독립 팀 리그')).not.toBeInTheDocument();
 
@@ -101,16 +114,16 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     detail.unmount();
     render(<AdminLeagueHubPage />);
 
-    expect(new URLSearchParams(window.location.search).get('seriesId')).toBe(SERIES_ID);
-    expect(screen.getByRole('button', { name: SERIES_TITLE })).toHaveAttribute('aria-pressed', 'true');
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('in_progress');
+    expect(screen.getByRole('button', { name: /^시즌 진행 중/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
     expect(screen.queryByText('독립 팀 리그')).not.toBeInTheDocument();
   });
 
-  it('독립 리그 조건도 상세 복귀 뒤에 유지한다', async () => {
+  it('진행 중 칩도 상세 복귀 뒤에 유지한다', async () => {
     const user = userEvent.setup();
     const list = render(<AdminLeagueHubPage />);
-    await user.click(screen.getByRole('button', { name: '독립 리그' }));
+    await user.click(screen.getByRole('button', { name: /^종료/ }));
     fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '독립 팀 리그 상세 보기' }));
     list.unmount();
     const detail = await renderDetail();
@@ -118,33 +131,33 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     detail.unmount();
     render(<AdminLeagueHubPage />);
 
-    expect(new URLSearchParams(window.location.search).get('seriesId')).toBe('independent');
-    expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('completed');
+    expect(screen.getByRole('button', { name: /^종료/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
     expect(screen.queryByText(`${SERIES_TITLE} 1시즌 1부`)).not.toBeInTheDocument();
   });
 
-  it('이전 체계 snapshot이 늦게 도착해도 최신 독립 리그 선택과 실제 목록 및 상세 출처를 유지한다', async () => {
+  it('이전 상태 snapshot이 늦게 도착해도 최신 진행 중 선택과 실제 목록 및 상세 출처를 유지한다', async () => {
     const user = userEvent.setup();
     navigate(`${LIST_PATH}?from=%2Fadmin`);
     const view = render(<AdminLeagueHubPage />);
     searchSnapshot = new URLSearchParams(window.location.search);
-    await user.click(screen.getByRole('button', { name: SERIES_TITLE }));
+    await user.click(screen.getByRole('button', { name: /^시즌 진행 중/ }));
     const previousSeriesSnapshot = new URLSearchParams(window.location.search);
-    await user.click(screen.getByRole('button', { name: '독립 리그' }));
-    expect(new URLSearchParams(window.location.search).get('seriesId')).toBe('independent');
+    await user.click(screen.getByRole('button', { name: /^종료/ }));
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('completed');
 
     searchSnapshot = previousSeriesSnapshot;
     view.rerender(<AdminLeagueHubPage />);
-    expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^종료/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
     expect(screen.queryByText(`${SERIES_TITLE} 1시즌 1부`)).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: '리그 체계' }));
-    expect(new URLSearchParams(window.location.search).get('seriesId')).toBe('independent');
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('completed');
     await user.click(screen.getByRole('tab', { name: '정규 리그' }));
     fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '독립 팀 리그 상세 보기' }));
     const from = new URLSearchParams(window.location.search).get('from');
-    expect(from).toBe(`${LIST_PATH}?seriesId=independent&from=%2Fadmin`);
+    expect(from).toBe(`${LIST_PATH}?status=completed&from=%2Fadmin`);
     view.unmount();
     await renderDetail();
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', from);
@@ -154,7 +167,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     const user = userEvent.setup();
     const view = render(<AdminLeagueHubPage />);
     searchSnapshot = new URLSearchParams();
-    await user.click(screen.getByRole('button', { name: '독립 리그' }));
+    await user.click(screen.getByRole('button', { name: /^종료/ }));
     await user.click(screen.getByRole('tab', { name: '리그 체계' }));
     const previousTabSnapshot = new URLSearchParams(window.location.search);
     await user.click(screen.getByRole('tab', { name: '정규 리그' }));
@@ -162,20 +175,20 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     view.rerender(<AdminLeagueHubPage />);
 
     expect(screen.getByRole('tab', { name: '정규 리그' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^종료/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
   });
 
-  it('native Back/Forward로 체계를 복원하고 설치된 Next history 경계가 출처와 hash 및 내부 상태를 보존한다', async () => {
+  it('native Back/Forward로 상태를 복원하고 설치된 Next history 경계가 출처와 hash 및 내부 상태를 보존한다', async () => {
     const user = userEvent.setup();
-    navigate(`${LIST_PATH}?seriesId=${SERIES_ID}&from=%2Fadmin#leagues`);
+    navigate(`${LIST_PATH}?status=in_progress&from=%2Fadmin#leagues`);
     const view = render(<AdminLeagueHubPage />);
-    window.history.pushState(null, '', `${LIST_PATH}?seriesId=independent&from=%2Fadmin#leagues`);
+    window.history.pushState(null, '', `${LIST_PATH}?status=completed&from=%2Fadmin#leagues`);
     view.rerender(<AdminLeagueHubPage />);
-    searchSnapshot = new URLSearchParams(`seriesId=${SERIES_ID}&from=%2Fadmin`);
+    searchSnapshot = new URLSearchParams(`status=in_progress&from=%2Fadmin`);
     view.rerender(<AdminLeagueHubPage />);
-    expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
-    for (const [direction, label, count] of [['back', SERIES_TITLE, 2], ['forward', '독립 리그', 1]] as const) {
+    expect(screen.getByRole('button', { name: /^종료/ })).toHaveAttribute('aria-pressed', 'true');
+    for (const [direction, label, count] of [['back', /^시즌 진행 중/, 2], ['forward', /^종료/, 1]] as const) {
       await act(() => new Promise<void>((resolve) => {
         window.addEventListener('popstate', () => resolve(), { once: true });
         window.history[direction]();
@@ -190,13 +203,13 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     const restoreBoundary = installActualNextReplaceBoundary((action) => restored.push(action));
     try {
       const historyLength = window.history.length;
-      await user.click(screen.getByRole('button', { name: SERIES_TITLE }));
+      await user.click(screen.getByRole('button', { name: /^시즌 진행 중/ }));
       expect(window.history.length).toBe(historyLength);
       expect(window.history.state).toMatchObject({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: tree });
-      expect(restored.at(-1)?.url.searchParams.get('seriesId')).toBe(SERIES_ID);
+      expect(restored.at(-1)?.url.searchParams.get('status')).toBe('in_progress');
       expect(restored.at(-1)?.url.hash).toBe('#leagues');
       fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: `${SERIES_TITLE} 1시즌 1부 상세 보기` }));
-      expect(new URLSearchParams(window.location.search).get('from')).toBe(`${LIST_PATH}?seriesId=${SERIES_ID}&from=%2Fadmin#leagues`);
+      expect(new URLSearchParams(window.location.search).get('from')).toBe(`${LIST_PATH}?status=in_progress&from=%2Fadmin#leagues`);
     } finally {
       restoreBoundary();
     }
@@ -211,23 +224,23 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     }
   });
 
-  it('체계 조건과 기존 출처를 탭 전환에 보존하고 외부 URL 변경에 맞춰 복원한다', async () => {
+  it('상태 조건과 기존 출처를 탭 전환에 보존하고 외부 URL 변경에 맞춰 복원한다', async () => {
     const user = userEvent.setup();
     navigate(`${LIST_PATH}?from=%2Fadmin`);
     const view = render(<AdminLeagueHubPage />);
-    await user.click(screen.getByRole('button', { name: SERIES_TITLE }));
+    await user.click(screen.getByRole('button', { name: /^시즌 진행 중/ }));
     await user.click(screen.getByRole('tab', { name: '리그 체계' }));
-    expect(new URLSearchParams(window.location.search).get('seriesId')).toBe(SERIES_ID);
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('in_progress');
     expect(new URLSearchParams(window.location.search).get('from')).toBe('/admin');
     await user.click(screen.getByRole('tab', { name: '정규 리그' }));
-    expect(screen.getByRole('button', { name: SERIES_TITLE })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^시즌 진행 중/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
 
-    navigate(`${LIST_PATH}?seriesId=independent`);
+    navigate(`${LIST_PATH}?status=completed`);
     view.rerender(<AdminLeagueHubPage />);
-    expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(screen.getByRole('button', { name: '전체' }));
-    expect(new URLSearchParams(window.location.search).has('seriesId')).toBe(false);
+    expect(screen.getByRole('button', { name: /^종료/ })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: /^전체/ }));
+    expect(new URLSearchParams(window.location.search).has('status')).toBe(false);
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(3);
   });
 
@@ -252,14 +265,14 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
 
   it('중복 from 값은 선택하지 않고 기본 목록으로 돌아간다', async () => {
     navigate(
-      `${LIST_PATH}/ad210000-0000-4000-8000-000000000001?from=${encodeURIComponent(`${LIST_PATH}?seriesId=${SERIES_ID}`)}&from=${encodeURIComponent('//evil.example')}`,
+      `${LIST_PATH}/ad210000-0000-4000-8000-000000000001?from=${encodeURIComponent(`${LIST_PATH}?status=in_progress`)}&from=${encodeURIComponent('//evil.example')}`,
     );
     await renderDetail();
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', LIST_PATH);
   });
 
   it('검증된 목록 조건과 중첩된 로컬 출처는 그대로 돌려준다', async () => {
-    const from = `${LIST_PATH}?seriesId=${SERIES_ID}&from=%2Fadmin%2Fleague-series%3Ftab%3Dseries`;
+    const from = `${LIST_PATH}?status=in_progress&from=%2Fadmin%2Fleague-series%3Ftab%3Dseries`;
     navigate(`${LIST_PATH}/ad210000-0000-4000-8000-000000000001?from=${encodeURIComponent(from)}`);
     await renderDetail();
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', from);

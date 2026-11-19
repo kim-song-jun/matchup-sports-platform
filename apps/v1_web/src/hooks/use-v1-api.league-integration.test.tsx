@@ -10,6 +10,9 @@ import {
   useV1AdminLeagueMatchList,
   useV1AdminLeagueTeams,
   useV1CreateManualLeagueFixtures,
+  useV1LinkNextSeason,
+  useV1NextSeasonCandidates,
+  useV1UnlinkNextSeason,
 } from './use-v1-api';
 
 const api = 'http://localhost/api/v1';
@@ -78,4 +81,56 @@ it('adds returning teams, then batch fixtures, and refreshes the same league vie
     expect(result.current.detail.data?.teamIds).toEqual(['team-a', 'team-b']);
     expect(result.current.list.data?.items[0]?.teamCount).toBe(2);
   });
+});
+
+it('links an existing league as the next season, then unlinks it, refreshing both leagues and the candidates', async () => {
+  vi.stubEnv('NEXT_PUBLIC_API_URL', api);
+  let linked = false;
+  const requests: string[] = [];
+  server.use(
+    http.get(`${api}/admin/league-matches/league-1`, () =>
+      HttpResponse.json({ status: 'success', data: { leagueId: 'league-1', nextSeason: linked ? { leagueId: 'league-2', title: '겨울 리그' } : null } })),
+    http.get(`${api}/admin/league-matches/league-2`, () =>
+      HttpResponse.json({ status: 'success', data: { leagueId: 'league-2', previousSeason: linked ? { leagueId: 'league-1', title: '가을 리그' } : null } })),
+    http.get(`${api}/admin/league-matches/league-1/next-season/candidates`, () =>
+      HttpResponse.json({
+        status: 'success',
+        data: { leagueId: 'league-1', hasMore: false, candidates: linked ? [] : [{ leagueId: 'league-2', title: '겨울 리그', state: 'draft', startsOn: null, endsOn: null, confirmedCount: 0 }] },
+      })),
+    http.post(`${api}/admin/league-matches/league-1/next-season/link`, async ({ request }) => {
+      requests.push(`POST ${JSON.stringify(await request.json())}`);
+      linked = true;
+      return HttpResponse.json({ status: 'success', data: { leagueId: 'league-1', previousTitle: '가을 리그', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } } });
+    }),
+    http.delete(`${api}/admin/league-matches/league-1/next-season/link`, () => {
+      requests.push('DELETE');
+      linked = false;
+      return HttpResponse.json({ status: 'success', data: { leagueId: 'league-1', unlinkedLeagueId: 'league-2' } });
+    }),
+  );
+  const { result } = renderHook(() => ({
+    previous: useV1AdminLeagueMatch('league-1'),
+    next: useV1AdminLeagueMatch('league-2'),
+    candidates: useV1NextSeasonCandidates('league-1'),
+    link: useV1LinkNextSeason('league-1'),
+    unlink: useV1UnlinkNextSeason('league-1'),
+  }), { wrapper });
+
+  await waitFor(() => {
+    expect(result.current.candidates.data?.candidates.map((candidate) => candidate.leagueId)).toEqual(['league-2']);
+    expect(result.current.previous.data?.nextSeason).toBeNull();
+  });
+  result.current.link.mutate('league-2');
+  await waitFor(() => {
+    expect(result.current.previous.data?.nextSeason).toEqual({ leagueId: 'league-2', title: '겨울 리그' });
+    expect(result.current.next.data?.previousSeason).toEqual({ leagueId: 'league-1', title: '가을 리그' });
+    expect(result.current.candidates.data?.candidates).toEqual([]);
+  });
+  result.current.unlink.mutate();
+  await waitFor(() => {
+    expect(result.current.previous.data?.nextSeason).toBeNull();
+    expect(result.current.next.data?.previousSeason).toBeNull();
+    expect(result.current.candidates.data?.candidates).toHaveLength(1);
+  });
+  expect(requests).toEqual(['POST {"nextLeagueId":"league-2"}', 'DELETE']);
 });

@@ -649,6 +649,27 @@ describe('TournamentRegistrationsService', () => {
     }
   });
 
+  it.each(['awaiting_payment', 'confirmed', 'cancelled'])('submit: 잠금을 기다리는 동안 %s가 된 신청은 결제를 다시 만들지 않는다', async (status) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValueOnce(registrationRow()).mockResolvedValue(registrationRow({ status }));
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({ kind: 'regular_tournament' })));
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({ response: { code: 'REGISTRATION_NOT_DRAFT' } });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it('submit: 초안 재확인 뒤 취소와 경합하면 CAS 실패를 409로 반환한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({ kind: 'regular_tournament' })));
+    prisma.v1TournamentRegistration.update.mockImplementation(async ({ where }) => {
+      if (where.status === 'draft' && where.updatedAt) throw new Prisma.PrismaClientKnownRequestError('concurrent cancel', { code: 'P2025', clientVersion: 'test' });
+      return registrationRow({ status: 'awaiting_payment' });
+    });
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({ response: { code: 'REGISTRATION_NOT_DRAFT' } });
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
   it('submit: not draft → 409 REGISTRATION_NOT_DRAFT', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
     await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({

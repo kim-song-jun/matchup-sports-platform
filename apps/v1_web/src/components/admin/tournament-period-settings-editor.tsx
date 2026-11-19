@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { hasValidPeriodDurations } from '@/lib/tournament-periods';
+import type { StagePlan } from '@/types/stage-plan';
 import {
   useTournamentPeriodSettings,
   useUpdateTournamentPeriodSettings,
@@ -20,6 +23,7 @@ interface TournamentPeriodSettingsEditorProps {
   tournamentId: string;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
+  stagePlan?: StagePlan | null;
 }
 
 function draftFromSettings(settings: TournamentPeriodSettingsResponse | undefined): string[] {
@@ -32,10 +36,6 @@ function periodFieldLabel(index: number, count: number): string {
   return count === 1 ? '단판' : count === 2 ? (index === 0 ? '전반' : '후반') : `피리어드 ${index + 1}`;
 }
 
-function hasValidDurations(durations: string[]) {
-  return durations.every((duration) => /^\d+$/.test(duration.trim()) && Number(duration) >= 1);
-}
-
 export function TournamentPeriodSettingsEditor(props: TournamentPeriodSettingsEditorProps) {
   return <PeriodSettingsEditor key={props.tournamentId} {...props} />;
 }
@@ -44,6 +44,7 @@ function PeriodSettingsEditor({
   tournamentId,
   canWrite,
   showToast,
+  stagePlan,
 }: TournamentPeriodSettingsEditorProps) {
   const settingsQuery = useTournamentPeriodSettings(tournamentId);
   const updateSettings = useUpdateTournamentPeriodSettings(tournamentId);
@@ -111,7 +112,7 @@ function PeriodSettingsEditor({
       showToast('현재 설정 버전을 확인하지 못했어요. 다시 불러온 뒤 시도해 주세요.', 'error');
       return;
     }
-    if (!draft.length || !hasValidDurations(draft)) {
+    if (!hasValidPeriodDurations(draft)) {
       showToast('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
       return;
     }
@@ -163,7 +164,7 @@ function PeriodSettingsEditor({
       return;
     }
     if (!stageEditingPhase || !stageExpectedVersion) return;
-    if (!inheritDefault && (!stageDraft.length || !hasValidDurations(stageDraft))) {
+    if (!inheritDefault && !hasValidPeriodDurations(stageDraft)) {
       showToast('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
       return;
     }
@@ -287,12 +288,28 @@ function PeriodSettingsEditor({
         </div>
       )}
 
+      {!editing && Boolean(settingsQuery.data.compositionOverrides?.length) && (
+        <div aria-label="단계·편성별 경기 시간 안내" className="mt-4 border-t border-[var(--border)] pt-4">
+          <h3 className="tm-text-label font-semibold">단계·편성별 경기 시간</h3>
+          <p className="mt-1 tm-text-caption text-[var(--text-muted)]">아래 범위는 대회 기본값·라운드별 설정 대신 별도로 정한 시간을 사용해요. 조·경기에 따로 정한 시간은 유지돼요.</p>
+          <ul className="mt-2 space-y-1 tm-text-caption">
+            {settingsQuery.data.compositionOverrides?.map(override => {
+              const stage = stagePlan?.stages.find(stage => override.scope === 'stage' ? stage.key === override.key : stage.pools.some(pool => pool.key === override.key));
+              const pool = stage?.pools.find(pool => pool.key === override.key);
+              const label = override.scope === 'stage' ? `${stage?.name ?? '단계'} 전체` : `${stage?.name ?? '단계'} · ${pool?.name ?? '편성'}`;
+              return <li key={`${override.scope}:${override.key}`}>{label} · {override.periods.map(period => `${period.durationMinutes}분`).join(' / ')}</li>;
+            })}
+          </ul>
+          {canWrite && <Link href={`/admin/tournaments/${tournamentId}/bracket`} className="mt-2 inline-flex min-h-11 items-center tm-text-caption underline underline-offset-2">단계·편성 경기 시간 수정</Link>}
+        </div>
+      )}
+
       {!editing && settingsQuery.data.kind === 'regular_tournament' && (
         <div className="mt-5 border-t border-[var(--border)] pt-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">단계별 경기 시간</h3>
-              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">설정하지 않은 단계는 위 기본값을 사용해요.</p>
+              <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{stagePlan ? '라운드별 경기 시간' : '단계별 경기 시간'}</h3>
+              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{stagePlan ? '조별리그·결승 같은 라운드의 설정이에요. 단계·편성에 따로 정한 시간이 우선 적용돼요.' : '설정하지 않은 단계는 위 기본값을 사용해요.'}</p>
             </div>
             {canWrite && stageEditingPhase === null && (
               <div className="flex flex-wrap items-center gap-2">
@@ -315,7 +332,9 @@ function PeriodSettingsEditor({
                 {canWrite && <button type="button" onClick={() => startStageEditing(override.phase)} disabled={stageEditingPhase !== null || updateSettings.isPending} className="h-[44px] rounded-lg px-3 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)] hover:bg-[var(--grey300)] disabled:opacity-50">수정</button>}
               </div>
             ))}
-            {settingsQuery.data.stageOverrides.length === 0 && stageEditingPhase === null && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">모든 단계가 대회 기본값을 사용하고 있어요.</p>}
+            {settingsQuery.data.stageOverrides.length === 0 && stageEditingPhase === null && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{settingsQuery.data.compositionOverrides?.length || settingsQuery.data.groupOverrides.length || settingsQuery.data.matchOverrideCount
+              ? '라운드별 재정의는 없어요. 별도로 정한 단계·편성·조·경기 설정을 우선 적용해요.'
+              : '모든 단계가 대회 기본값을 사용하고 있어요.'}</p>}
           </div>
 
           {stageEditingPhase !== null && (

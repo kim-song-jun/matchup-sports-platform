@@ -16,6 +16,10 @@ export type TeamModel = {
   status: TeamStatus;
   statusLabel: string;
   tags: string[];
+  /** 수준 라벨(예: 입문-고수). 서버가 정하지 않았으면 빈 문자열이고, 카드는 그 칸을 뺀다. */
+  level?: string;
+  /** 최근 3개월 공개·공식 경기 수. 값이 없으면(undefined) 카드가 그 칸을 뺀다 — 0 은 '0경기'로 보여 준다. */
+  recentMatchCount?: number;
   genderRule: string;
   intro: string;
   next: string;

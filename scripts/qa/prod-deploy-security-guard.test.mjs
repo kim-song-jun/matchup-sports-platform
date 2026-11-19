@@ -12,6 +12,7 @@ import {
   findUnreadRuntimeEnvVariables,
   findApprovedOnlySecretProblems,
   composeServiceDeclares,
+  findNginxImageProblem,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
@@ -552,4 +553,34 @@ test('다른 서비스에만 있거나 주석·미선언이면 넘기는 것으�
 test('실제 prod compose 는 API 서비스로 관리자 키를 넘긴다', () => {
   const compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
   assert.equal(composeServiceDeclares(compose, 'v1_api', 'KAKAO_ADMIN_KEY'), true);
+});
+
+const DIGEST = `sha256:${'a'.repeat(64)}`;
+const composeWithNginx = (image) => `services:
+  v1_web:
+    image: web
+
+  nginx:
+    image: ${image}
+    container_name: teameet_nginx
+`;
+
+test('nginx 이미지는 해결 버전 이상 + 버전 태그 + digest 일 때만 통과한다', () => {
+  for (const ok of ['1.31.9', '1.31.10', '1.32.0', '1.30.7', '1.30.8']) {
+    assert.equal(findNginxImageProblem(composeWithNginx(`nginx:${ok}-alpine@${DIGEST}`)), null, ok);
+  }
+  for (const bad of ['1.31.8', '1.30.6', '1.29.9', '1.30.0']) {
+    assert.match(findNginxImageProblem(composeWithNginx(`nginx:${bad}-alpine@${DIGEST}`)), /보안 수정 버전/, bad);
+  }
+});
+
+test('nginx 이미지가 움직이는 태그이거나 digest 가 없으면 실패한다', () => {
+  for (const image of ['nginx:alpine', 'nginx:latest', 'nginx:1.31.9-alpine', 'nginx:1.31.9-alpine@sha256:abc', `nginx:1.31.9@${DIGEST}`]) {
+    assert.match(findNginxImageProblem(composeWithNginx(image)), /고정되어 있지 않습니다/, image);
+  }
+  assert.match(findNginxImageProblem('services:\n  v1_web:\n    image: web\n'), /찾지 못했습니다/);
+});
+
+test('실제 prod compose 의 nginx 이미지는 고정돼 있다', () => {
+  assert.equal(findNginxImageProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
 });

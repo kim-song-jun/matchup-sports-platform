@@ -204,7 +204,7 @@ describe('TeamsService', () => {
     (prisma.$transaction as jest.Mock).mockImplementation(
       (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
-    prisma.$queryRaw.mockResolvedValue(undefined);
+    prisma.$queryRaw.mockResolvedValue([]);
     prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
     prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });

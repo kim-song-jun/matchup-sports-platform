@@ -60,6 +60,16 @@ numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`
 `GET /api/v1/admin/league-matches` accepts an optional `visibility=public|hidden` filter next to
 `seriesId` (any other value returns `400`); omitting it lists every league.
 
+The same endpoint also accepts `q` (trimmed, max 100 characters; case-insensitive substring match on the
+league title or its series title) and `status=draft|open|closed|in_progress|completed|on_hold` (any other
+value returns `400`). `status` follows the status pill the admin table draws: a leftover `cancelled` row
+counts as `completed` because leagues have no cancel state (they use `on_hold`). The response is
+`{ items, summary }`, where `summary = { total, byStatus }` applies `q`, `visibility` and `seriesId` but not
+`status`, so the status chips keep their counts while one is selected. The list is not paginated and
+rows with a broken integrated-axis mirror are left out of both `items` and `summary`. The admin league hub
+shows the search box and these status chips; it has no series chips (the series tab groups leagues by series),
+while the API still accepts `seriesId` for existing callers.
+
 Unpublishing removes the league from home discovery, league and tournament public
 lists, API-backed search and sitemap discovery. Direct public league, standings,
 fixture and associated public game reads return the normal not-found error.
@@ -719,6 +729,10 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - (2026-11-05) 리그 체계에 속한 리그의 참가 신청 생성(`POST /tournaments/:id/registrations`)과 제출(`.../submit`)은 같은 시즌 다른 티어에 이미 확정된 팀을 409 `LEAGUE_TEAM_INVALID`로 막는다(확정과 같은 `findLeagueAdmissionBlocker`). 전엔 입금 확인까지 지나 확정에서야 막혔다.
 - (2026-11-13) 팀 성별 설정 기준으로 남성부의 여성팀·여성부의 남성팀·모든 부문의 성별 미설정 팀만 차단한다. 성별 무관 팀은 모든 부문에 참가할 수 있고 팀원 성별은 판정에 쓰지 않는다. 팀 추가·한 번에 넣기는 422 `TEAM_GENDER_INELIGIBLE`, 신청 확정은 409 같은 코드다. 상세 계약은 `tournaments.md`의 팀 성별 신청 조건을 따른다. 시즌 시드·리그 체계 전환·리그 생성 `teamIds` 경로는 기존과 같이 이 판정 밖이다.
 - (2026-11-06) 공개 `GET /tournaments/:id` 의 `previousSeason` 은 리그 체계로 전환해 만든 첫 시즌 티어에서 원본 리그를 가리킨다(감사 기록 `afterJson.seriesId` 로 역조회, 공개된 리그만). 11-05 에 넣었던 `nextSeason` 은 뺐다 — 다음 시즌은 `GET /league-matches/:id` 의 `nextRound`·`nextSeasonTiers` 로 다음 리그 안내가 그린다(전환 리그는 티어마다 버튼). 화면은 이전 시즌을 제목 아래가 아니라 데스크톱 레일·모바일 본문 카드의 '이전 시즌 보기'로 보인다.
+- (2026-11-19) 이미 따로 만든 두 독립 리그를 사후에 잇고 푼다 — 마이그레이션 없이 같은 `previousLeagueId` 컬럼을 쓰고, 지난 리그 판정은 만들 때 잇는 길과 같은 `assertNextSeasonSourceInTx` 다. `:leagueId` 는 항상 **지난 리그**다.
+  - `GET /admin/league-matches/:leagueId/next-season/candidates` — 활성 admin. 이 리그의 다음 시즌으로 이을 수 있는 후보 `{leagueId, hasMore, candidates: [{leagueId,title,state,startsOn,endsOn,confirmedCount}]}`. 같은 종목의 독립 리그(체계 소속·취소·삭제 제외) 중 지난 시즌이 아직 없는 것이고, 자기 자신과 이 리그의 지난 시즌 체인은 뺀다. 최근 시작일순, 100개 초과면 `hasMore: true`. 최종 판정은 아래 link 가 다시 한다.
+  - `POST /admin/league-matches/:leagueId/next-season/link` — mutation admin, `{nextLeagueId: uuid}`. 두 리그 행을 id 순서로 잠근 뒤 판정하고 `nextLeagueId` 리그의 `previousLeagueId` 를 쓴다. 201 `{leagueId, previousTitle, nextSeason: {leagueId,title}}`. 422 `LEAGUE_NEXT_SEASON_INVALID`(자기 자신·없음·지움·취소·체계 소속·지난 시즌 체인 안의 리그=순환), 422 `LEAGUE_PREVIOUS_SEASON_INVALID`(지난 리그가 없음·체계 소속·시작 전·종목 다름), 409 `LEAGUE_ALREADY_CONVERTED`, 409 `LEAGUE_NEXT_SEASON_EXISTS`(지난 리그에 이미 다음 시즌), 409 `LEAGUE_PREVIOUS_SEASON_EXISTS`(다음 시즌 쪽에 이미 지난 시즌). 이미 들어온 팀·명단은 바꾸지 않는다. 감사 `league_match.link_next_season`(`afterJson: {previousLeagueId, nextLeagueId}`).
+  - `DELETE /admin/league-matches/:leagueId/next-season/link` — mutation admin. 이어진 다음 시즌의 `previousLeagueId` 를 비운다. 200 `{leagueId, unlinkedLeagueId}`. 이은 게 없으면 422 `LEAGUE_NEXT_SEASON_MISSING`, 잠근 사이 바뀌었으면 409 `LEAGUE_NEXT_SEASON_CHANGED`. 이미 옮겨 온 명단은 남는다. 감사 `league_match.unlink_next_season`(`beforeJson`).
 
 ## Registered fixture times (2026-11-13)
 
@@ -729,3 +743,5 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - Reuses V1TournamentScheduleTime and its competition/time uniqueness; no new migration. Tournament endpoints keep their tournament-only kind and league_knockouts format gate.
 - Registering a time does not move games. Selecting a game uses the existing PATCH /admin/league-matches/:leagueId/fixtures/:teamMatchId with only { startsAt }. Existing date/status validation, duration adjustment, and errors apply. Teams, title, field and place are omitted and preserved.
 - Start time remains required: no null/unset operation. Existing direct datetime entry remains available. Shared selector combines presets and actual game starts, uses KST input, and isolates league cache keys from tournament cache keys. Save failures remain visible; a failed post-save refresh is reported separately.
+
+공유 신청 제출·참가 확정에도 [대회 생성·접수 상태 보호](./tournaments.md#생성접수-상태-보호-2026-11-18)를 적용한다. 종료·취소 리그의 새 확정·대기 처리는409이며, 기존 목표 상태의 멱등 읽기는 유지한다.

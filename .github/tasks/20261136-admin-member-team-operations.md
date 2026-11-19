@@ -97,3 +97,5 @@ Forbidden: 운영 승격, 실제 회원 데이터 변경, 비밀값 출력, 다�
 - [x] 기존 HTTP 권한/쓰기 차단 9/9, API 인증/기존 대회 관리자42/42, 회원·팀 화면/신원 전환/모달54/54 통과. API·웹 타입 및 surface/pattern 검사 PASS. touched source의 TODO/FIXME/HACK/XXX 신규 marker 없음, diff check PASS.
 - [ ] 수정 커밋 push 후 최신 head CI 결과 확인. 기존 head의 API CI3실패를 최신 head의 통과로 대체 확인해야 한다.
 - 범위: API 내부 요청 해석과 기존 UI 로직만 수정. 새 route/payload·schema/migration·레이아웃 변경 없음. Alpha 실화면/ego-lite 미노출 한계는 유지한다.
+
+- 최신 dev e966e27b3f를 PR 브랜치에 통합: 충돌은 docs/api/global-contract.md와 docs/scenarios/index.md의 추가 문단 두 곳으로, 양쪽 내용을 보존해 해결했다. dev/main 자체에는 merge하지 않았다.

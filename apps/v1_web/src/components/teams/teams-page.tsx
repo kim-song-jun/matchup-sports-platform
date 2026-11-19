@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Check, ChevronDown, Info, Lock } from 'lucide-react';
+import { CalendarCheck, Check, ChartNoAxesColumn, ChevronDown, Info, Lock, Users } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -26,6 +26,7 @@ import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
+import { formatTeamCardMembers, teamCardGenderLabel } from './teams.card-model';
 import { TeamMembersSection } from './team-members-section';
 import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
 import type {
@@ -2192,43 +2193,58 @@ function RegionNotice({ notice }: { notice: NonNullable<NonNullable<TeamListView
   );
 }
 
-/** 고르는 화면의 카드라 한 줄씩만 쓴다(390 에서 5장). 팀장 이름은 비교 축이 아니라 팀 상세에서 본다. */
+/**
+ * 고르는 화면의 카드라 네 줄로 고정한다 — 이름 / 종목 · 지역 · 성별 / 인원 · 수준 · 최근 3개월 경기 / 활동 일정.
+ * 활동 일정(없으면 소개)은 비어 있어도 한 줄 자리를 비워 두어 모든 카드의 높이를 같게 맞춘다
+ * (설명이 있는 카드만 커서 줄마다 높이가 들쭉날쭉하던 문제 — alpha 390 에서 102px/124px 가 섞였다).
+ * 팀장 이름은 비교 축이 아니라 팀 상세에서 본다.
+ */
 function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromHref?: string }) {
-  // 활동 일정과 소개 중 한 줄만 — 둘 다 없으면 줄 자체를 그리지 않는다.
+  // 활동 일정과 소개 중 한 줄만. 둘 다 없으면 빈 줄로 둔다(자리는 유지).
   const extraLine = team.next.trim() || team.intro.trim();
-  const memberCapacity = formatMemberCapacity(team);
+  const subLine = [team.sport, team.region, teamCardGenderLabel(team.genderRule)].filter(Boolean).join(' · ');
 
   return (
     <Link className="tm-team-card tm-team-card-compact tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-body-lg line-clamp-1">{team.name}</div>
-          <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-            {/* 레벨 태그는 서버가 자유 텍스트로 준다 — 길면 형제 배지를 다음 줄로 밀어낼 수
-                있다(flexWrap:'wrap'). 형제와 나눈 고정 %(예전 62%)로 잘라 한 줄을 지키던
-                예전 방식은 카드 폭이 좁아지는 768(2열 그리드)에서 "입문-고수" 같은 짧은 값까지
-                잘랐다(2026-09-26 alpha 감사). 이제는 형제가 있어도 각 배지가 자기 줄 전체 폭
-                (max-width:100%, globals.css .tm-team-tag)까지 쓸 수 있다 — 자유 텍스트 하나가
-                혼자로도 그 폭을 넘길 만큼 길 때만 ellipsis 로 잘린다(카드 밖 가로 스크롤 방지). */}
-            {dedupeTags([...team.tags, team.genderRule]).map((tag) => (
-              <span key={tag} className="tm-badge tm-badge-grey tm-team-tag">
-                <span className="tm-team-tag-text">{tag}</span>
-              </span>
-            ))}
+        <div className="tm-team-card-body" style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="tm-text-body-lg line-clamp-1" style={{ minWidth: 0 }}>{team.name}</div>
             {/* '가입 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
                 50팀 중 50팀이 같은 값이었고, 머리말에도 "50팀 · 가입 가능 50" 이 이미 있다.
-                그 한 줄을 위해 구분선 + 49px 를 쓰고 있었다. 예외(가입 닫힘·정원 마감)만 알린다.
-                예전 자리는 aria-hidden 이라 스크린리더에는 아예 안 읽혔다 — 배지로 옮기며 읽히게 된다. */}
+                예외(가입 닫힘·정원 마감)만 이름 옆 배지로 알린다. 점은 5px — 7px 는 글자(12px)에 비해 커 보였다. */}
             {team.status !== 'open' ? (
-              <span className="tm-badge tm-badge-grey tm-team-card-status-badge">
-                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              <span className="tm-badge tm-badge-grey tm-team-card-status-badge" style={{ flexShrink: 0 }}>
+                <svg width="5" height="5" viewBox="0 0 5 5" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="2.5" cy="2.5" r="2.5" fill="currentColor" /></svg>
                 {team.statusLabel}
               </span>
             ) : null}
           </div>
-          {extraLine ? <div className="tm-text-caption tm-team-card-activity line-clamp-1" style={{ marginTop: 6 }}>{extraLine}</div> : null}
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>{subLine}</div>
+          <div className="tm-text-caption tm-team-card-meta" style={{ marginTop: 6 }}>
+            <span className="tm-team-card-meta-item">
+              <Users size={14} strokeWidth={2} className="tm-team-card-meta-icon" aria-hidden="true" style={{ flexShrink: 0 }} />
+              <span className="sr-only">인원 </span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatTeamCardMembers(team)}</span>
+            </span>
+            {/* 수준은 서버 자유 텍스트라 길 수 있다 — 인원·경기 수를 지키려고 이 칸만 줄이고 말줄임한다. 미설정이면 칸을 뺀다. */}
+            {team.level ? (
+              <span className="tm-team-card-meta-item tm-team-card-meta-level">
+                <ChartNoAxesColumn size={14} strokeWidth={2} className="tm-team-card-meta-icon" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span className="sr-only">수준 </span>
+                <span className="tm-team-card-meta-text">{team.level}</span>
+              </span>
+            ) : null}
+            {/* 0 도 '0경기'로 보여 준다. undefined(목록 API 가 아직 안 준 응답)일 때만 칸을 뺀다. */}
+            {team.recentMatchCount !== undefined ? (
+              <span className="tm-team-card-meta-item">
+                <CalendarCheck size={14} strokeWidth={2} className="tm-team-card-meta-icon" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>최근 3개월 {team.recentMatchCount}경기</span>
+              </span>
+            ) : null}
+          </div>
+          <div className="tm-text-caption tm-team-card-activity tm-team-card-activity-slot line-clamp-1" style={{ marginTop: 6 }}>{extraLine}</div>
         </div>
       </div>
     </Link>
@@ -2241,10 +2257,6 @@ function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {
 
 function formatCapacity(team: Pick<TeamModel, 'capacity'>) {
   return team.capacity > 0 ? `${team.capacity}명` : '정원 미정';
-}
-
-function dedupeTags(tags: string[]) {
-  return Array.from(new Set(tags.filter(Boolean)));
 }
 
 /* SectionTitle 로컬 복제본은 2026-09-07 에 제거하고 @/components/v1-ui/primitives 의 공유

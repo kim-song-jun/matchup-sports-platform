@@ -1,6 +1,36 @@
 # 단계형 대회 구성
 
-Status: 추가 리뷰 P2 2건 보완 완료 — dev 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 PASS
+Status: 입력 동등성 네 결함 + 생성·접수 다섯 결함 후속 PR 로컬 검증 완료 — 이전 #2427 Alpha 42/42와 이번 미배포 변경을 구분한다.
+
+## 2026-11-18 — 생성부터 신청까지 추가 5건
+
+PR #2442에 최신 dev `886fd0b29`를 반영하고 다섯 결함을 추가 수정한다. 이전 네 건과 이번 API gate 변경을 구분한다.
+
+1. 같은 초안의 제출 요청 두 개가 겹치거나 잠금 대기 중 취소되면 후속 요청은409이고 결제·약관·알림을 덮어쓰지 않는다. 초안 재조회 뒤 취소된 경우에도 CAS409다.
+2. 대회·리그가 종료/취소되면 확정/대기 새 처리는 서버409·UI 비활성이다. 이미 목표 상태인 읽기 멱등 응답은 유지한다.
+3. 경기 시간 일부 저장 실패 후 새로고침하면 서버에 남은 시간을 확인하는 단계로 복원한다. 명시 저장 전 공개 확인은 잠겨 있고 새 POST를 만들지 않는다. 미저장 입력은 복원되지 않는다고 안내한다.
+4. 마감 후 접수 시작·재개·동일 open 요청은409다. 확인 모달 대기 중 마감이 지나도 공개하지 않는다.
+5. draftId 조회 로딩/오류에는 새 생성 폼이 없고 재시도로 같은 초안을 조회한다. 별도 시간 조회 실패에도 저장·공개를 막고 재시도를 제공한다.
+
+로컬 회귀: 수정 전 서버9건 RED → 서버3 suites360 tests PASS. Web4 suites181 tests PASS(생성104·신청관리41·생성모델32·리그신청4). API/Web 타입 검사 PASS. API는 공유 의존성의 오래된 생성물로 발생한 타입 오류를 격리된 최신 schema 생성물과 임시 tsconfig paths로 재검증했으며 원본 의존성/DB를 바꾸지 않았다. DB 통합은 로컬 Docker/DB 런타임 미제공으로 미실행하며 동시 트랜잭션 실측은 CI/Alpha에서 확인한다.
+Alpha manual QA 대기: 기존4 routes + `/admin/tournaments/:id/registrations`, `/admin/league-matches/:leagueId/registrations` = 6 routes × 390/768/1440 **0/18**. 사용자 요청은 PR 갱신까지이며 미머지 head의 alpha 화면 증거는 없다. 관리자 owner/ops + 신청팀 manager, 실제 오류/network·console·viewport별 before/after와 cleanup을 배포 후 기록한다. 로컬 Next/DB/브라우저를 기동하지 않는다.
+
+## 2026-11-18 — 입력 동등성 리뷰 후속 (PR 준비)
+
+수정 PR [#2442](https://github.com/kim-song-jun/matchup-sports-platform/pull/2442), base dev, 구현62a3369b6·15 files. 원격CI·Copilot 결과와 머지 후 Alpha gate는 로컬 검증과 구분하며 사용자 요청에 따라 PR 생성까지 진행한다.
+Copilot 공식 리뷰 API는 HTTP422 `ACTOR_INELIGIBLE`로 실행을 거절했다(라이선스/조직 정책 자격). 리뷰0건을 clean으로 표시하지 않고, CI 및 Alpha gate를 대체 승인하지 않는다.
+
+기준 `4efec6c39`, 사용자 요청은 확인된 네 결함 수정과 dev PR 생성까지다. 기존 42/42는 이번 수정의 화면 증거가 아니다.
+
+검증할 계약:
+1. 단계·편성 시간 입력 중 조회가 갱신되거나 저장이 409이면 입력을 보존하고 저장을 차단한다. 최신값 재조회는 명시 확인 후 수행하며, 취소·조회 실패 시 입력을 유지한다.
+2. 단계형 정보에는 '단계형 대회'를 표시한다. 일반 정보 수정의 형식·팀 수를 잠그고 대진의 구성 편집 경로를 안내하며 제목 등 다른 정보는 정상 저장한다.
+3. 정보 화면에 별도 단계·편성 시간의 실제 이름·값을 표시한다. 재정의가 있으면 전체 기본값이라고 안내하지 않는다.
+4. 생성·기본/라운드 수정·단계/편성 수정은 서버의 기존 계약인 1분 이상 정수를 사용한다. 120/240분·10개 피리어드 등 화면 전용 상한은 두지 않는다.
+
+로컬 검증: 위 네 결함의 회귀 RED 확인 후 수정. 관련6 suites217 tests PASS(정보43·공통시간18·생성모델32·단계관리13·단계시간13·생성화면98), Web 타입/패턴 검사와 diff 공백 검사 PASS. 생성 화면은 로컬 기본5초 timeout이 실행마다 다른 기존 테스트에서 발생해 단언을 유지한 채15초 제한으로98/98을 재확인했다. fixture/DB/API 규칙은 바꾸지 않았다. 최신 원격CI·Copilot은 PR에서 별도 확인한다.
+
+Alpha manual QA: `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/admin/tournaments/:id/info`, `/admin/tournaments/:id/bracket` 4 routes × 390/768/1440 = 0/12. before/after·실제 저장/충돌·console/network·넘침·cleanup은 이번 head의 dev 머지·Alpha 배포 후 검증 대상이다. 로컬 Next 서버·운영 데이터 변경은 실행하지 않는다.
 
 ## 2026-11-17 — 구성 초안·재개 조작 증거 보완
 

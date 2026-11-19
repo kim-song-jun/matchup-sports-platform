@@ -1,3 +1,4 @@
+import { MemberAccessGuard } from './auth/member-access.guard';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -100,6 +101,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },
+    { provide: APP_GUARD, useClass: MemberAccessGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: UserMutationLoggingInterceptor },
   ],

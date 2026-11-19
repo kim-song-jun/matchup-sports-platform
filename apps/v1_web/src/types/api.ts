@@ -3327,6 +3327,8 @@ export type V1AdminUserRow = {
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
   signupStage?: 'required_complete' | 'onboarding_complete' | 'terms_required' | 'profile_required' | 'profile_deferred';
+  deletedAt?: string | null;
+  adminAccessStatus?: 'active' | 'suspended' | 'revoked' | null;
   lastLoginAt: string | null;
   createdAt: string;
   hostedMatchCount: number;

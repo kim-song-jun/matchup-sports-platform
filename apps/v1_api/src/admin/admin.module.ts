@@ -1,3 +1,5 @@
+import { MemberAccessController } from './member-access.controller';
+import { MemberAccessService } from './member-access.service';
 import { AdminEntityOperationsController } from './admin-entity-operations.controller';
 import { AdminEntityOperationsService } from './admin-entity-operations.service';
 import { GamesModule } from '../games/games.module';
@@ -23,7 +25,8 @@ import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 
 @Module({
   imports: [GamesModule, TeamsModule, AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule, KakaoUnlinkModule],
-  controllers: [AdminEntityOperationsController, MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
-  providers: [AdminEntityOperationsService, MemberBracketPreviewService, AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
+  controllers: [MemberAccessController, AdminEntityOperationsController, MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
+  exports: [MemberAccessService],
+  providers: [MemberAccessService, AdminEntityOperationsService, MemberBracketPreviewService, AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
 })
 export class AdminModule {}

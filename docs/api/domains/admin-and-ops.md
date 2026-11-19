@@ -372,3 +372,22 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - `GET /admin/teams`에 sportId/regionId UUID 필터 추가. regionId는 상위 지역과 바로 하위 지역을 포함한다(기존 공용 지역 해석). q는 팀명·팀장 닉네임/실명/표시명/이메일 부분 검색. 필터는 AND, q의 각 필드는 OR. 상태 facet에도 같은 검색/종목/지역 조건을 적용하며 상태만 제외한다. 목록 행에 regionId/regionName 추가, createdAt desc + id desc로 안정 정렬한다.
 - 이 API는 데이터 조회만 하며 스키마 변경/마이그레이션은 없다. 쓰기·multipart·멱등 키 계약 추가 없음. 공통 성공/에러 envelope와 기존 세션 권한 계약 유지.
 - MSW에서는 실제 권한·이력을 만들지 않고 `503 ADMIN_OPERATIONS_REQUIRES_LIVE_API`를 표시한다. 테스트용 응답은 명시적 시나리오 fixture로만 제공한다.
+
+
+## 회원 화면 대리 조회 (2026-11-19)
+
+| Method | 경로 | 권한·입력 | 동작 |
+|---|---|---|---|
+| POST | `/api/v1/admin/users/:userId/member-access` | 최근 30분 안에 발급된 실제 로그인 쿠키, active owner/ops. UUID, `{reason: 5~500자}` | 10분 조회 grant를 감사 로그에 기록하고 별도 HttpOnly 쿠키 발급. 응답 `{userId,label,expiresAt}`. 토큰은 응답 JSON에 포함하지 않음 |
+| GET | `/api/v1/admin/member-access` | 쿠키 없으면 개인 정보 없이 `{active:false}` | 유효 grant는 `{active:true,userId,label,expiresAt}`. 만료/권한 변경/잘못된 쿠키는 `{active:true,unavailable:true,message}`로 복귀 필요 상태를 표시. DB 실패를 inactive로 숨기지 않음 |
+| POST | `/api/v1/admin/member-access/stop` | 현재 marker와 원래 세션에 결합된 grant의 종료만 가능 | 종료 감사 기록 후 marker 쿠키만 제거. `{returnPath}`는 대상 회원의 관리자 상세 또는 회원 목록. 감사 기록 실패 시 쿠키를 먼저 지우지 않음 |
+
+- 모든 응답은 `Cache-Control: private, no-store`. 원래 `teameet_v1_session`을 덮거나 새 회원 로그인 쿠키를 만들지 않는다. marker `teameet_v1_member_access`는 서명한 grant UUID이며 host-only/HttpOnly/SameSite=Lax/production Secure다. marker는 원래 세션 최대 수명인 7일간 유지되어 10분 grant 만료 후 관리자 신원으로 조용히 돌아가지 않는다.
+- grant는 기존 `V1AdminActionLog`의 `user.member_access.start`로 남긴다. 관리자, 대상 회원, 접속 사유, 원래 세션의 SHA-256 결합값(토큰 원문 아님), 양쪽 sessionEpoch, 만료 시각을 기록한다. 관리자/회원 행과 관리자 grant는 트랜잭션에서 잠근 뒤 판정한다. 자기 자신·활성 관리자·비활성 회원은 거부하며 support·dev 헤더만으로 발급할 수 없다.
+- 종료는 원본 start 기록을 바꾸지 않고 `user.member_access.end`를 추가한다. `accessId/endReason/endedAt`를 기록한다. 명시 종료·권한/epoch 변경·만료 판정 후 기존 marker를 다시 보내도 사용할 수 없다. 만료의 유효 종료 시각은 start의 expiresAt이며, 다음 조회에서 end 이벤트를 남길 때도 그 시각을 보존한다. 브라우저가 닫혀 이후 요청이 없으면 start의 만료 시각이 유효기간 종료 근거다(별도 만료 cron 없음).
+- 전역 `MemberAccessGuard`가 매 요청에 현재 관리자·대상 계정·양쪽 epoch·원래 세션 결합·종료 기록을 재확인한다. 검증된 HTTP Request 객체만 임시 회원 신원으로 해석한다. 요청 헤더나 body로 신원을 주입할 수 없다.
+- 조회 중 모든 POST/PUT/PATCH/DELETE는 `403 MEMBER_ACCESS_READ_ONLY`이며, 운영 경로(`/admin`, `/tournament-ops`)와 인증 발급/변경 경로의 GET도 차단한다(`MEMBER_ACCESS_SCOPE_DENIED`). 예외는 상태 확인 GET와 복귀 POST 두 개뿐이다. Socket.IO 신원 해석도 marker가 있으면 거부하며, 웹은 알림/채팅 소켓 구독을 중단한다. 실제 회원의 원래 권한·가입·약관 게이트는 유지한다.
+- `/auth/me`는 대리 조회 때 기존 이메일 설정 플래그를 수정하지 않는다. 회원 세션 발급 인터셉터의 우회 경로도 열지 않는다. 대리 조회 시작·종료 시 웹의 개인화 쿼리/지속 캐시·소켓을 비우고 전체 이동한다. 다른 탭의 marker 표시 변경도 캐시를 비운 뒤 새로고침한다.
+- 대표 오류: `401 UNAUTHENTICATED`, `403 RECENT_LOGIN_REQUIRED`, `MEMBER_ACCESS_UNAVAILABLE`, `MEMBER_ACCESS_INVALID`, `MEMBER_ACCESS_EXPIRED`, `MEMBER_ACCESS_ENDED`, `MEMBER_ACCESS_REVOKED`, `MEMBER_ACCESS_READ_ONLY`, `MEMBER_ACCESS_SCOPE_DENIED`; 중첩 시작은 `409 MEMBER_ACCESS_ACTIVE`. 소켓/HTTP 실제 경계와 위조·재사용·만료·권한 회수·복귀를 테스트한다.
+- 회원 목록은 상태 변경 선택지에서 deleted를 제거한다. 기존 상태만 deleted인 계정은 상세에서 최종 삭제할 수 있고, deletedAt이 기록된 최종 삭제 계정은 복구/중복 삭제할 수 없다. 목록에도 deletedAt과 adminAccessStatus를 반환해 삭제 상태와 활성 관리자 여부를 구분한다. 과거 클라이언트의 상태 전이 API 계약은 보존한다.
+- DB 스키마·migration 변경 없음. MSW는 실제 연결 필요 오류를 반환하며 대리 접속 성공을 흉내 내지 않는다. UI는 기존 표·상세·확인 모달을 확장하며 상단에 조회 전용 안내/복귀 버튼을 유지한다.

@@ -1,0 +1,21 @@
+:root { --member-access-height: 0px; }
+
+.tm-member-access-banner {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: var(--z-top);
+}
+
+html[data-member-access] .tm-app-frame {
+  height: calc(var(--teameet-visual-viewport-height, 100dvh) - var(--member-access-height, 0px));
+}
+
+@media (min-width: 1024px) {
+  html[data-member-access] .tm-app-frame {
+    height: auto;
+    min-height: calc(100dvh - var(--member-access-height, 0px));
+  }
+  html[data-member-access] .tm-desktop-nav {
+    top: var(--member-access-height, 0px);
+  }
+}

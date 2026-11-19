@@ -8,6 +8,9 @@ function requiresLiveApi() {
 }
 
 export const adminEntityOperationsHandlers = [
+  http.get('*/api/v1/admin/member-access', requiresLiveApi),
+  http.post('*/api/v1/admin/member-access/stop', requiresLiveApi),
+  http.post('*/api/v1/admin/users/:userId/member-access', requiresLiveApi),
   http.get('*/api/v1/admin/:entity/:id/operations', requiresLiveApi),
   http.get('*/api/v1/admin/:entity/:id/operations/:section', requiresLiveApi),
 ];

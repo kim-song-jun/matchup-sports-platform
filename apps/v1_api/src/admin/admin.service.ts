@@ -835,7 +835,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           where: { status: 'active' },
           select: { provider: true },
         },
-        adminUser: { select: { adminRole: true } },
+        adminUser: { select: { adminRole: true, status: true } },
         teamMemberships: {
           where: { status: 'active' },
           select: { role: true },
@@ -883,6 +883,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         onboardingStatus: row.onboardingStatus,
         signupStage: signupStage(row),
         lastLoginAt: row.lastLoginAt,
+        deletedAt: row.deletedAt,
         createdAt: row.createdAt,
         hostedMatchCount: row._count.hostedMatches,
         ownedTeamCount: row._count.ownedTeams,
@@ -893,6 +894,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
         },
         adminRole: row.adminUser?.adminRole ?? null,
+        adminAccessStatus: row.adminUser?.status ?? null,
       })),
       pageInfo: buildPageInfo({
         page: query.page,
@@ -942,7 +944,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           where: { status: 'active' },
           select: { provider: true },
         },
-        adminUser: { select: { adminRole: true } },
+        adminUser: { select: { adminRole: true, status: true } },
         reputationSummary: {
           select: { trustState: true, mannerScore: true, reviewCount: true, calculatedAt: true },
         },
@@ -1023,6 +1025,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
       },
       adminRole: row.adminUser?.adminRole ?? null,
+        adminAccessStatus: row.adminUser?.status ?? null,
       reputationSummary: row.reputationSummary
         ? {
             trustState: row.reputationSummary.trustState,

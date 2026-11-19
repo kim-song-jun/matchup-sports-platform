@@ -13,7 +13,7 @@ export function AdminDetailRow({
   value,
 }: {
   label: string;
-  value: string | number | null | undefined;
+  value: ReactNode;
 }) {
   const isEmpty = value === null || value === undefined || value === '';
   return (

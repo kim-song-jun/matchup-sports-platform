@@ -29,7 +29,8 @@ import { ACTIVITY_RELATION_COUNTS } from './empty-signup-account';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import type { RegisterDto } from './dto/register.dto';
-import { hashPassword } from './password-hash';
+import { scryptSync } from 'node:crypto';
+import { hashPassword, verifyPassword, needsPasswordRehash } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
@@ -762,6 +763,35 @@ describe('AuthService', () => {
     expect(result).toMatchObject({ session: { userId: 'user-1', userEmail: 'user@teameet.v1' } });
     expect(loginSecurity.record).toHaveBeenCalledWith('success', expect.any(Object));
     expect(loginSecurity.scheduleSprayDetection).not.toHaveBeenCalled();
+  });
+
+  it('login upgrades a legacy credential atomically and refuses a concurrent password reset', async () => {
+    const salt = '12345678901234567890123456789012';
+    const legacy = `scrypt:${salt}:${scryptSync('ValidPass1!', salt, 64).toString('hex')}`;
+    let persisted = legacy;
+    const identity = {
+      id: 'identity-1', passwordHash: legacy, status: 'active',
+      user: { id: 'user-1', email: 'user@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW, sessionEpoch: 4 },
+    };
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(identity);
+    prisma.v1AuthIdentity.updateMany.mockImplementation(async ({ where, data }: { where: { passwordHash: string }; data: { passwordHash?: string } }) => {
+      if (where.passwordHash !== persisted) return { count: 0 };
+      if (data.passwordHash) persisted = data.passwordHash;
+      return { count: 1 };
+    });
+    jest.spyOn(service, 'me').mockResolvedValue({ user: { id: 'user-1', email: 'user@teameet.v1' },
+      onboarding: { status: 'completed', missing: [] } } as unknown as Awaited<ReturnType<AuthService['me']>>);
+    const result = await service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT);
+    expect(result).toMatchObject({ session: { userId: 'user-1', sessionEpoch: 4 } });
+    expect(persisted).not.toBe(legacy);
+    expect(needsPasswordRehash(persisted)).toBe(false);
+    await expect(verifyPassword('ValidPass1!', persisted)).resolves.toBe(true);
+    const resetHash = await hashPassword('ResetPass2!');
+    persisted = resetHash;
+    // The initial identity read is stale: a reset has replaced the stored hash before the CAS update.
+    await expect(service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT))
+      .rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+    expect(persisted).toBe(resetHash);
   });
 
   it('login: 비밀번호를 확인한 사이 재설정으로 해시가 바뀌면 세션 없이 401, 통과하면 확인 때 읽은 세션 번호를 넘긴다', async () => {

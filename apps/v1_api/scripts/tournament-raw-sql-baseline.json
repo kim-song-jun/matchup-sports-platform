@@ -53,8 +53,12 @@
     "why": "FOR UPDATE locks only the tournament id while deleting an unstarted fixture. Immediately after this lock findTournamentOnSurface(tx, TOURNAMENT_KINDS) revalidates tournament kind and deletedAt before any mutation; league rows are rejected."
   },
   "src/games/public-records/public-team-records.service.ts": {
-    "allowed": 3,
+    "allowed": 2,
     "why": "Public team-record page, summary, and available-season queries join the parent competition (regular league via league_id, otherwise the tournament via tournament_id) to filter is_public in SQL before pagination or aggregation. This prevents hidden league/tournament fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
+  },
+  "src/games/public-records/team-record-public-sql.ts": {
+    "allowed": 1,
+    "why": "Public team-record summary(public-team-records.service.ts) and the team-list card's recent-match count share the same public/official fact conditions (current official revision, visibility policy, is_public of the parent competition via league_id or tournament_id). The shared SQL fragment joins the parent competition in SQL so hidden league/tournament fixtures never leak through totals; keeping it in one file stops the list count and the team detail record from drifting apart."
   },
   "src/league-matches/league-cover-image.service.ts": {
     "allowed": 1,

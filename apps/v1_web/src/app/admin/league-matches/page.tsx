@@ -16,18 +16,29 @@ import {
 import { ADMIN_VISIBILITY_OPTIONS, AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
 import { AdminVisibilityBadge, LeagueRowVisibilityAction } from '@/components/admin/competition-visibility-row-action';
 import { pickAllowedParam } from '../pick-allowed-param';
-import { useV1AdminLeagueMatchList, useV1AdminLeagueSeriesList } from '@/hooks/use-v1-api';
-import type { V1AdminLeagueListItem } from '@/types/league-match';
+import { useV1AdminLeagueMatchList } from '@/hooks/use-v1-api';
+import type { V1AdminLeagueListItem, V1AdminLeagueStatusFilter } from '@/types/league-match';
+import { leagueLifecycleLabel } from '@/lib/v1-status-labels';
 import { withFromPath } from '@/lib/session-storage';
 import { LeagueSeriesView } from './league-series-view';
 
 type TabKey = 'leagues' | 'series';
-type HubFilters = { readonly activeTab: TabKey; readonly seriesFilter: string; readonly visibility: string };
+type HubFilters = { readonly activeTab: TabKey; readonly status: string; readonly q: string; readonly visibility: string };
+
+// 칩 이름은 표의 상태 알약(leagueLifecycleLabel)과 같은 말이다. 리그에는 취소가 없어(보류로 대신한다)
+// 취소로 남은 행은 '종료'에 묶여 보인다 — API 의 status=completed 가 그 집합이다.
+const STATUS_KEYS: readonly V1AdminLeagueStatusFilter[] = ['draft', 'open', 'closed', 'in_progress', 'completed', 'on_hold'];
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: '전체' },
+  ...STATUS_KEYS.map((key) => ({ value: key, label: leagueLifecycleLabel(key) })),
+];
+const SEARCH_MAX_LENGTH = 100;
 
 function readHubFilters(params: Pick<URLSearchParams, 'get'>): HubFilters {
   return {
     activeTab: params.get('tab') === 'series' ? 'series' : 'leagues',
-    seriesFilter: params.get('seriesId') ?? '',
+    status: pickAllowedParam(params.get('status'), STATUS_OPTIONS),
+    q: (params.get('q') ?? '').slice(0, SEARCH_MAX_LENGTH),
     visibility: pickAllowedParam(params.get('visibility'), ADMIN_VISIBILITY_OPTIONS),
   };
 }
@@ -37,8 +48,12 @@ function buildListHref(pathname: string, query: string, filters: HubFilters): st
   const params = new URLSearchParams(location?.search ?? query);
   if (filters.activeTab === 'series') params.set('tab', 'series');
   else params.delete('tab');
-  if (filters.seriesFilter) params.set('seriesId', filters.seriesFilter);
-  else params.delete('seriesId');
+  // 예전 체계 칩 링크(?seriesId=)는 더는 화면 필터가 아니므로 주소에서 걷어 낸다.
+  params.delete('seriesId');
+  if (filters.status) params.set('status', filters.status);
+  else params.delete('status');
+  if (filters.q) params.set('q', filters.q);
+  else params.delete('q');
   if (filters.visibility) params.set('visibility', filters.visibility);
   else params.delete('visibility');
   const nextQuery = params.toString();
@@ -61,8 +76,9 @@ export default function AdminLeagueHubPage() {
 
 /**
  * 리그 허브 — 정규 리그와 리그 체계를 한 입구로 합친다(B안 사용자 확정, 2026-08-25).
- * 정규 리그 탭은 목록 위 체계 칩으로 소속 리그를 그 자리에서 필터하고(백엔드 seriesId
- * 파라미터), 각 행에 소속 체계·티어를 표기한다. 리그 체계 탭 본문은 기존
+ * 정규 리그 탭은 대회 목록처럼 검색창과 상태 칩(초안·접수 중·마감·진행 중·종료·보류)으로
+ * 거르고, 각 행에 소속 체계·티어를 표기한다. 체계별로 모아 보는 일은 리그 체계 탭이 맡으므로
+ * 체계 칩은 두지 않는다(2026-11-19 사용자 요청). 리그 체계 탭 본문은 기존
  * /admin/league-series 목록을 그대로 이식했고 구 URL 은 ?tab=series 리다이렉트로 남는다.
  */
 function LeagueHub() {
@@ -72,7 +88,7 @@ function LeagueHub() {
   const query = searchParams.toString();
   const [filters, setFilters] = useState<HubFilters>(() => readHubFilters(searchParams));
   const latestFilters = useRef(filters);
-  const { activeTab, seriesFilter, visibility } = filters;
+  const { activeTab, status, q, visibility } = filters;
   // 상세 복귀·Back/Forward는 URL에서 복원하고, 연속 선택은 최신 local draft에 병합한다.
   useEffect(() => {
     // Next가 이전 선택을 늦게 전달해도 실제 주소의 최신 선택과 ref를 덮지 않는다.
@@ -92,8 +108,7 @@ function LeagueHub() {
     window.addEventListener('popstate', restore);
     return () => window.removeEventListener('popstate', restore);
   }, [pathname]);
-  // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id. 필터 선택은 탭을 오가도
-  // 남아야 하므로 허브가 들고, 목록 쿼리는 정규 리그 패널만 마운트될 때 실행되도록
+  // 검색어·상태·공개 여부 선택은 탭을 오가도 남아야 하므로 허브가 들고, 목록 쿼리는 정규 리그 패널만 마운트될 때 실행되도록
   // 패널 컴포넌트(LeaguesPanel) 안에 둔다 — 리그 체계 탭에서 리그 목록 API 가
   // 불필요하게 호출되지 않게 한다.
   const listHref = buildListHref(pathname, query, filters);
@@ -112,7 +127,7 @@ function LeagueHub() {
         description={
           activeTab === 'series'
             ? '1부·2부·3부로 나뉜 리그를 개설하고 시즌마다 승격·강등을 확정해요.'
-            : '공식 리그를 개설하고 대진·순위를 관리해요. 체계를 고르면 소속 리그만 모아 봐요.'
+            : '공식 리그를 개설하고 대진·순위를 관리해요.'
         }
         action={
           <Link
@@ -169,8 +184,10 @@ function LeagueHub() {
           <LeagueSeriesView />
         ) : (
           <LeaguesPanel
-            seriesFilter={seriesFilter}
-            onSeriesFilterChange={(value) => handleFiltersChange({ seriesFilter: value })}
+            search={q}
+            onSearchChange={(value) => handleFiltersChange({ q: value.slice(0, SEARCH_MAX_LENGTH) })}
+            status={status}
+            onStatusChange={(value) => handleFiltersChange({ status: value })}
             visibility={visibility}
             onVisibilityChange={(value) => handleFiltersChange({ visibility: value })}
             listHref={listHref}
@@ -183,44 +200,54 @@ function LeagueHub() {
 
 /** 정규 리그 탭 본문 — 목록 쿼리를 여기 두어 이 패널이 마운트된 동안에만 호출한다. */
 function LeaguesPanel({
-  seriesFilter,
-  onSeriesFilterChange,
+  search,
+  onSearchChange,
+  status,
+  onStatusChange,
   visibility,
   onVisibilityChange,
   listHref,
 }: {
-  seriesFilter: string;
-  onSeriesFilterChange: (value: string) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  status: string;
+  onStatusChange: (value: string) => void;
   visibility: string;
   onVisibilityChange: (value: string) => void;
   listHref: string;
 }) {
-  const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList(
-    seriesFilter || undefined,
-    visibility === 'public' || visibility === 'hidden' ? visibility : undefined,
-  );
+  // 입력은 바로 주소에 남기고(상세에 다녀와도 유지), API 검색만 0.3초 늦춘다.
+  const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList({
+    ...(visibility === 'public' || visibility === 'hidden' ? { visibility } : {}),
+    ...(debouncedSearch ? { q: debouncedSearch } : {}),
+    ...(status ? { status: status as V1AdminLeagueStatusFilter } : {}),
+  });
   const items = data?.items ?? [];
-  // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키·캐시를 공유한다(전역 staleTime 30초 안의
-  // 탭 전환은 재요청 없이 캐시를 읽고, 그 뒤 리마운트는 백그라운드 갱신이 될 수 있다).
-  const { data: seriesData } = useV1AdminLeagueSeriesList();
-  const seriesOptions = seriesData?.items ?? [];
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value
+      ? data?.summary?.byStatus?.[option.value as V1AdminLeagueStatusFilter]
+      : data?.summary?.total,
+  }));
 
   return (
     <>
-      {/* 체계 칩 필터 — 공용 AdminFilterBar 의 status 칩 재사용 (audit 선례). */}
+      {/* 대회 목록과 같은 검색창 + 상태 칩 (공용 AdminFilterBar). */}
       <div className="mb-4">
         <AdminFilterBar
-          hideSearch
-          searchValue=""
-          onSearchChange={() => undefined}
-          statusGroupLabel="체계 필터"
-          statusOptions={[
-            { value: '', label: '전체' },
-            ...seriesOptions.map((series) => ({ value: series.id, label: series.title })),
-            { value: 'independent', label: '독립 리그' },
-          ]}
-          activeStatus={seriesFilter}
-          onStatusChange={onSeriesFilterChange}
+          searchLabel="리그·체계 이름 검색"
+          searchPlaceholder="리그·체계 이름 검색"
+          searchValue={search}
+          onSearchChange={onSearchChange}
+          statusOptions={statusOptions}
+          activeStatus={status}
+          onStatusChange={onStatusChange}
           rightSlot={<AdminVisibilityFilter value={visibility} onChange={onVisibilityChange} />}
         />
       </div>
@@ -229,7 +256,7 @@ function LeaguesPanel({
         isPending={isPending}
         isError={isError}
         onRetry={() => void refetch()}
-        filtered={seriesFilter !== '' || visibility !== ''}
+        filtered={status !== '' || visibility !== '' || debouncedSearch !== ''}
         listHref={listHref}
       />
     </>
@@ -266,7 +293,7 @@ function LeagueListTable({
           title={filtered ? '이 조건의 리그가 없어요' : '아직 리그가 없어요'}
           description={
             filtered
-              ? '다른 체계나 공개 여부를 고르거나 전체로 돌아가 보세요.'
+              ? '검색어를 바꾸거나 다른 상태·공개 여부를 골라 보세요.'
               : '위 버튼으로 새 리그를 만들어 보세요.'
           }
         />

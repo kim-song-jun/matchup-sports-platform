@@ -2084,3 +2084,92 @@ describe('LeagueMatchAdminService.list — visibility filter', () => {
     expect(result.items.map((item) => item.leagueId)).toEqual(ids);
   });
 });
+
+describe('LeagueMatchAdminService.list — 검색어·상태 칩', () => {
+  const day = new Date('2026-10-01T00:00:00.000Z');
+  const mk = (id: string, status: string, over: Record<string, unknown> = {}) => ({
+    id,
+    title: id,
+    isPublic: true,
+    status,
+    registrationDeadlineAt: null,
+    scheduledAt: day,
+    scheduledEndAt: day,
+    regionId: 'region-1',
+    seriesId: null,
+    tier: null,
+    seasonNo: null,
+    _count: { registrations: 0 },
+    series: null,
+    ...over,
+  });
+  const stored = [
+    mk('l-draft', 'draft'),
+    mk('l-open', 'open'),
+    mk('l-closed', 'closed'),
+    mk('l-live-1', 'in_progress'),
+    mk('l-live-2', 'in_progress'),
+    mk('l-done', 'completed'),
+    mk('l-cancelled', 'cancelled'),
+    mk('l-hold', 'on_hold'),
+    mk('l-broken', 'draft', { scheduledAt: null }),
+  ];
+
+  function createService() {
+    const findMany = jest.fn().mockResolvedValue(stored);
+    const groupBy = jest.fn().mockResolvedValue([]);
+    const prisma = { v1Tournament: { findMany }, v1TeamMatch: { groupBy } };
+    const adminContext = { getActiveAdmin: jest.fn().mockResolvedValue({ id: 'a' }) };
+    const service = new LeagueMatchAdminService(prisma as never, adminContext as never, {} as never, {} as never);
+    return { service, findMany, groupBy };
+  }
+
+  it('상태를 고르지 않으면 전체를 주고, 칩 숫자는 깨진 거울을 뺀 전체 기준이며 취소 행은 완료로 센다', async () => {
+    const { service } = createService();
+    const result = await service.list(adminUser);
+
+    expect(result.items).toHaveLength(8);
+    expect(result.summary).toEqual({
+      total: 8,
+      byStatus: { draft: 1, open: 1, closed: 1, in_progress: 2, completed: 2, on_hold: 1 },
+    });
+  });
+
+  it('상태를 고르면 그 상태만 주되 칩 숫자는 그대로다', async () => {
+    const { service, groupBy } = createService();
+    const result = await service.list(adminUser, undefined, undefined, { status: 'in_progress' });
+
+    expect(result.items.map((item) => item.leagueId)).toEqual(['l-live-1', 'l-live-2']);
+    expect(result.summary.total).toBe(8);
+    expect(result.summary.byStatus.in_progress).toBe(2);
+    // 대진 수는 보이는 행만 센다.
+    expect(groupBy.mock.calls[0][0].where.leagueId).toEqual({ in: ['l-live-1', 'l-live-2'] });
+  });
+
+  it('완료 칩은 취소로 남은 행도 함께 준다(알약이 종료로 그리는 집합)', async () => {
+    const { service } = createService();
+    const result = await service.list(adminUser, undefined, undefined, { status: 'completed' });
+
+    expect(result.items.map((item) => item.leagueId)).toEqual(['l-done', 'l-cancelled']);
+  });
+
+  it('검색어는 앞뒤 공백을 빼고 리그 이름과 체계 이름에 부분 일치로 건다', async () => {
+    const { service, findMany } = createService();
+    await service.list(adminUser, undefined, undefined, { q: '  가을  ' });
+
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { title: { contains: '가을', mode: 'insensitive' } },
+      { series: { title: { contains: '가을', mode: 'insensitive' } } },
+    ]);
+  });
+
+  it('검색어가 비었거나 공백뿐이면 조건을 걸지 않고, 상태는 DB 조건에 넣지 않는다', async () => {
+    const { service, findMany } = createService();
+    await service.list(adminUser, undefined, undefined, { q: '   ', status: 'draft' });
+
+    const where = findMany.mock.calls[0][0].where;
+    expect(where).not.toHaveProperty('OR');
+    expect(where).not.toHaveProperty('status');
+  });
+});

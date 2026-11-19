@@ -3,6 +3,15 @@ import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayl
 /** 리그 저장 상태 — 대회와 같은 값에 보류(on_hold)를 더한다. 초안·접수 중·마감이 따로 보인다(2026-10-27). */
 export type V1LeagueLifecycleStatus = V1TournamentStatus | 'on_hold';
 
+/** 어드민 리그 목록의 상태 칩 키 — 표의 상태 알약과 같은 단위(취소로 남은 행은 completed 로 묶인다). */
+export type V1AdminLeagueStatusFilter = 'draft' | 'open' | 'closed' | 'in_progress' | 'completed' | 'on_hold';
+
+/** GET /admin/league-matches 응답. `summary` 는 검색어·공개 여부 조건만 적용하고 상태 선택은 뺀 칩 숫자다. */
+export interface V1AdminLeagueListResponse {
+  items: V1AdminLeagueListItem[];
+  summary: { total: number; byStatus: Record<V1AdminLeagueStatusFilter, number> };
+}
+
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;

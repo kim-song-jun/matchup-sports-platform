@@ -181,9 +181,14 @@ export const v1Keys = {
   // 'list' 세그먼트가 필수다 — 없으면 seriesId 변형 키가 adminLeagueMatch(leagueId)
   // 상세 키와 같은 shape([..., 'league-matches', <uuid>])가 돼 캐시가 섞일 수 있다.
   // 무인자 호출은 [..., 'list'] 프리픽스라 모든 필터 변형을 함께 invalidate 한다.
-  adminLeagueMatchList: (seriesId?: string, visibility?: string) =>
-    seriesId || visibility
-      ? ([...v1Keys.all, 'admin', 'league-matches', 'list', { seriesId: seriesId ?? null, visibility: visibility ?? null }] as const)
+  adminLeagueMatchList: (filters?: { seriesId?: string; visibility?: string; q?: string; status?: string }) =>
+    filters && (filters.seriesId || filters.visibility || filters.q || filters.status)
+      ? ([...v1Keys.all, 'admin', 'league-matches', 'list', {
+          seriesId: filters.seriesId ?? null,
+          visibility: filters.visibility ?? null,
+          q: filters.q ?? null,
+          status: filters.status ?? null,
+        }] as const)
       : ([...v1Keys.all, 'admin', 'league-matches', 'list'] as const),
   adminLeagueSeriesList: () => [...v1Keys.all, 'admin', 'league-series'] as const,
   adminLeagueSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'league-series', seriesId] as const,

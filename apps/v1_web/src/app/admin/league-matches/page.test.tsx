@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import AdminLeagueHubPage from './page';
@@ -55,6 +55,11 @@ const LEAGUES = [
   },
 ];
 
+const SUMMARY = {
+  total: 6,
+  byStatus: { draft: 1, open: 2, closed: 0, in_progress: 2, completed: 1, on_hold: 0 },
+};
+
 const SERIES = [
   { id: 'sr-1', title: '서울 풋살 리그', state: 'active', tierLabels: ['1부', '2부'], sport: null, region: null, leagueCount: 2 },
 ];
@@ -66,7 +71,7 @@ describe('AdminLeagueHubPage', () => {
     canWrite = true;
     visibilityMutateAsync.mockResolvedValue({});
     window.history.replaceState(null, '', '/admin/league-matches');
-    leagueListMock.mockReturnValue({ data: { items: LEAGUES }, isPending: false, isError: false, refetch: vi.fn() });
+    leagueListMock.mockReturnValue({ data: { items: LEAGUES, summary: SUMMARY }, isPending: false, isError: false, refetch: vi.fn() });
     seriesListMock.mockReturnValue({ data: { items: SERIES }, isPending: false, isError: false, refetch: vi.fn() });
   });
 
@@ -80,17 +85,61 @@ describe('AdminLeagueHubPage', () => {
     expect(screen.getByRole('tab', { name: '정규 리그' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('passes the chip filter to the list hook as seriesId (전체 = undefined)', async () => {
+  it('상태 칩(초안·접수 중·마감·진행 중·종료·보류)과 숫자를 보여 주고, 체계 칩은 두지 않는다', () => {
+    render(<AdminLeagueHubPage />);
+
+    const group = screen.getByRole('group', { name: '상태 필터' });
+    expect(within(group).getByRole('button', { name: '전체 6' })).toHaveAttribute('aria-pressed', 'true');
+    for (const [label, count] of [['초안', 1], ['접수 중', 2], ['마감', 0], ['시즌 진행 중', 2], ['종료', 1], ['보류', 0]] as const) {
+      expect(within(group).getByRole('button', { name: `${label} ${count}` })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('group', { name: '체계 필터' })).not.toBeInTheDocument();
+    expect(within(group).queryByRole('button', { name: /독립 리그/ })).not.toBeInTheDocument();
+  });
+
+  it('상태 칩 선택을 목록 훅의 status 로 넘기고 주소에 남긴다(전체 = 조건 없음)', async () => {
     const user = userEvent.setup();
     render(<AdminLeagueHubPage />);
 
-    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, undefined);
+    expect(leagueListMock).toHaveBeenLastCalledWith({});
 
-    await user.click(screen.getByRole('button', { name: /서울 풋살 리그/ }));
-    expect(leagueListMock).toHaveBeenLastCalledWith('sr-1', undefined);
+    await user.click(screen.getByRole('button', { name: /^접수 중/ }));
+    expect(leagueListMock).toHaveBeenLastCalledWith({ status: 'open' });
+    expect(window.location.search).toBe('?status=open');
+    expect(screen.getByRole('button', { name: /^접수 중/ })).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(screen.getByRole('button', { name: /독립 리그/ }));
-    expect(leagueListMock).toHaveBeenLastCalledWith('independent', undefined);
+    await user.click(screen.getByRole('button', { name: /^전체/ }));
+    expect(leagueListMock).toHaveBeenLastCalledWith({});
+    expect(window.location.search).toBe('');
+  });
+
+  it('목록에 없는 ?status= 값은 서버로 보내지 않고 전체로 떨어뜨린다', () => {
+    searchParams = new URLSearchParams('status=banned');
+    window.history.replaceState(null, '', '/admin/league-matches?status=banned');
+    render(<AdminLeagueHubPage />);
+
+    expect(leagueListMock).toHaveBeenLastCalledWith({});
+  });
+
+  it('검색창 입력은 바로 주소에 남기고 0.3초 뒤에 목록 훅의 q 로 넘긴다(앞뒤 공백 제외)', async () => {
+    const user = userEvent.setup();
+    render(<AdminLeagueHubPage />);
+
+    const input = screen.getByRole('searchbox', { name: '리그·체계 이름 검색' });
+    expect(input).toHaveAttribute('placeholder', '리그·체계 이름 검색');
+    await user.type(input, ' 서울 ');
+
+    expect(new URLSearchParams(window.location.search).get('q')).toBe(' 서울 ');
+    await waitFor(() => expect(leagueListMock).toHaveBeenLastCalledWith({ q: '서울' }));
+  });
+
+  it('검색 결과가 비면 조건을 안내한다', () => {
+    leagueListMock.mockReturnValue({ data: { items: [], summary: { ...SUMMARY, total: 0 } }, isPending: false, isError: false, refetch: vi.fn() });
+    searchParams = new URLSearchParams('q=없는리그');
+    window.history.replaceState(null, '', '/admin/league-matches?q=없는리그');
+    render(<AdminLeagueHubPage />);
+
+    expect(screen.getAllByText('이 조건의 리그가 없어요').length).toBeGreaterThan(0);
   });
 
   it('passes the 공개 여부 filter to the list hook and keeps it in the URL', async () => {
@@ -98,11 +147,11 @@ describe('AdminLeagueHubPage', () => {
     render(<AdminLeagueHubPage />);
 
     await user.selectOptions(screen.getByLabelText('공개 여부'), 'hidden');
-    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, 'hidden');
+    expect(leagueListMock).toHaveBeenLastCalledWith({ visibility: 'hidden' });
     expect(window.location.search).toBe('?visibility=hidden');
 
     await user.selectOptions(screen.getByLabelText('공개 여부'), '');
-    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, undefined);
+    expect(leagueListMock).toHaveBeenLastCalledWith({});
   });
 
   it('shows each league 공개/숨김 as text and hides a public league only after the confirm modal', async () => {

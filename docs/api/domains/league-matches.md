@@ -60,6 +60,16 @@ numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`
 `GET /api/v1/admin/league-matches` accepts an optional `visibility=public|hidden` filter next to
 `seriesId` (any other value returns `400`); omitting it lists every league.
 
+The same endpoint also accepts `q` (trimmed, max 100 characters; case-insensitive substring match on the
+league title or its series title) and `status=draft|open|closed|in_progress|completed|on_hold` (any other
+value returns `400`). `status` follows the status pill the admin table draws: a leftover `cancelled` row
+counts as `completed` because leagues have no cancel state (they use `on_hold`). The response is
+`{ items, summary }`, where `summary = { total, byStatus }` applies `q`, `visibility` and `seriesId` but not
+`status`, so the status chips keep their counts while one is selected. The list is not paginated and
+rows with a broken integrated-axis mirror are left out of both `items` and `summary`. The admin league hub
+shows the search box and these status chips; it has no series chips (the series tab groups leagues by series),
+while the API still accepts `seriesId` for existing callers.
+
 Unpublishing removes the league from home discovery, league and tournament public
 lists, API-backed search and sitemap discovery. Direct public league, standings,
 fixture and associated public game reads return the normal not-found error.

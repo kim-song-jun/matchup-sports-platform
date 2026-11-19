@@ -6237,7 +6237,8 @@ import type {
   V1AddLeagueTeamPayload,
   V1AddLeagueTeamResult,
   V1AdminLeagueDetail,
-  V1AdminLeagueListItem,
+  V1AdminLeagueListResponse,
+  V1AdminLeagueStatusFilter,
   V1UpdateLeagueVisibilityResult,
   V1ChangeLeagueStatePayload,
   V1ChangeLeagueStateResult,
@@ -6318,14 +6319,25 @@ export function useV1MyLeagues(options?: { enabled?: boolean }) {
   });
 }
 
-/** seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속만. 없으면 전체 (리그 허브 칩 필터). */
-export function useV1AdminLeagueMatchList(seriesId?: string, visibility?: 'public' | 'hidden') {
+/**
+ * 어드민 리그 목록. q: 리그·체계 이름 부분 일치, status: 상태 칩, visibility: 공개 여부.
+ * seriesId(체계 id 또는 'independent')는 API 가 계속 받지만 리그 허브 화면은 쓰지 않는다.
+ */
+export function useV1AdminLeagueMatchList(filters: {
+  seriesId?: string;
+  visibility?: 'public' | 'hidden';
+  q?: string;
+  status?: V1AdminLeagueStatusFilter;
+} = {}) {
+  const { seriesId, visibility, q, status } = filters;
   return useQuery({
-    queryKey: v1Keys.adminLeagueMatchList(seriesId, visibility),
+    queryKey: v1Keys.adminLeagueMatchList({ seriesId, visibility, q, status }),
     queryFn: () =>
-      v1Get<{ items: V1AdminLeagueListItem[] }>('/admin/league-matches', {
+      v1Get<V1AdminLeagueListResponse>('/admin/league-matches', {
         ...(seriesId ? { seriesId } : {}),
         ...(visibility ? { visibility } : {}),
+        ...(q ? { q } : {}),
+        ...(status ? { status } : {}),
       }),
   });
 }

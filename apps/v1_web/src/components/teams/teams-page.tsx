@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { CalendarCheck, Check, ChartNoAxesColumn, ChevronDown, Info, Lock, Users } from 'lucide-react';
+import { Check, ChartNoAxesColumn, ChevronDown, Info, Lock, Users } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -2208,7 +2208,7 @@ function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromH
     <Link className="tm-team-card tm-team-card-compact tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
-        <div className="tm-team-card-body" style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div className="tm-text-body-lg line-clamp-1" style={{ minWidth: 0 }}>{team.name}</div>
             {/* '가입 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
@@ -2228,19 +2228,12 @@ function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromH
               <span className="sr-only">인원 </span>
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatTeamCardMembers(team)}</span>
             </span>
-            {/* 수준은 서버 자유 텍스트라 길 수 있다 — 인원·경기 수를 지키려고 이 칸만 줄이고 말줄임한다. 미설정이면 칸을 뺀다. */}
+            {/* 수준은 서버 자유 텍스트라 길 수 있다 — 인원을 지키려고 이 칸만 줄이고 말줄임한다. 미설정이면 칸을 뺀다. */}
             {team.level ? (
               <span className="tm-team-card-meta-item tm-team-card-meta-level">
                 <ChartNoAxesColumn size={14} strokeWidth={2} className="tm-team-card-meta-icon" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span className="sr-only">수준 </span>
                 <span className="tm-team-card-meta-text">{team.level}</span>
-              </span>
-            ) : null}
-            {/* 0 도 '0경기'로 보여 준다. undefined(목록 API 가 아직 안 준 응답)일 때만 칸을 뺀다. */}
-            {team.recentMatchCount !== undefined ? (
-              <span className="tm-team-card-meta-item">
-                <CalendarCheck size={14} strokeWidth={2} className="tm-team-card-meta-icon" aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>최근 3개월 {team.recentMatchCount}경기</span>
               </span>
             ) : null}
           </div>

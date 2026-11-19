@@ -5428,7 +5428,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-muted);
 }
 
-/* 팀 카드 정보 줄 — 인원 · 수준 · 최근 3개월 경기. 한 줄을 지켜 모든 카드의 높이를 같게 한다. */
+/* 팀 카드 정보 줄 — 인원 · 수준. 한 줄을 지켜 모든 카드의 높이를 같게 한다. */
 .tm-team-card-meta {
   display: flex;
   align-items: center;
@@ -5446,7 +5446,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   flex: none;
 }
 
-/* 수준은 서버 자유 텍스트라 길이가 보장되지 않는다 — 인원·경기 수를 지키려고 이 칸만 줄어들고 말줄임한다. */
+/* 수준은 서버 자유 텍스트라 길이가 보장되지 않는다 — 인원을 지키려고 이 칸만 줄어들고 말줄임한다. */
 .tm-team-card-meta-level {
   flex: 0 1 auto;
   min-width: 0;
@@ -5457,19 +5457,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 카드 글자 칸이 좁으면(태블릿 2열 172px) 수준과 아이콘을 빼서 인원·경기 수가 잘리지 않게 한다.
-   390(250px)·1440(233px)은 그대로 다 보인다. 수준은 팀 상세에서 본다. */
-.tm-team-card-body {
-  container-type: inline-size;
-}
-
-@container (max-width: 199px) {
-  .tm-team-card-meta-level,
-  .tm-team-card-meta-icon {
-    display: none;
-  }
 }
 
 /* 활동 일정 줄 자리 — 내용이 없어도 한 줄 높이를 남겨 설명 유무와 상관없이 카드 높이를 같게 한다.

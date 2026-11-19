@@ -98,27 +98,35 @@ describe('LeagueAdminShell', () => {
       ['draft', null, undefined, false, false],
       ['completed', 'series-1', undefined, false, false],
       ['completed', null, undefined, true, false],
-    ])('상태 %s·체계 %s에서 다음 시즌 만들기 노출(이은 시즌 %s·전환 %s → %s)', (state, seriesId, nextSeason, convertedToSeries, visible) => {
+    ])('상태 %s·체계 %s에서 다음 시즌 관리 노출(이은 시즌 %s·전환 %s → %s)', (state, seriesId, nextSeason, convertedToSeries, visible) => {
       query.value = loaded({ state, seriesId, nextSeason, convertedToSeries });
       renderShell();
-      const link = screen.queryByRole('link', { name: '다음 시즌 만들기' });
+      const link = screen.queryByRole('link', { name: '다음 시즌 관리' });
       if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
       else expect(link).not.toBeInTheDocument();
     });
 
-    it('다음 시즌을 이은 리그는 다음 시즌 보기만 두고 리그 체계 전환을 숨긴다', () => {
+    it('다음 시즌을 이은 리그도 같은 다음 시즌 관리 메뉴를 두고(연결 해제를 위해) 리그 체계 전환을 숨긴다', () => {
       query.value = loaded({ state: 'completed', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } });
       renderShell();
-      expect(screen.getByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
+      expect(screen.getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
       expect(screen.queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '다음 시즌 보기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '리그 체계로 전환' })).not.toBeInTheDocument();
     });
 
-    it('조회 전용 관리자에게는 다음 시즌 만들기가 없다', () => {
+    it('조회 전용 관리자에게는 이은 시즌이 없으면 다음 시즌 관리가 없다', () => {
       adminCanWrite.value = false;
       query.value = loaded({ state: 'completed' });
       renderShell();
-      expect(screen.queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '다음 시즌 관리' })).not.toBeInTheDocument();
+    });
+
+    it('조회 전용 관리자도 이은 시즌이 있으면 다음 시즌 관리로 이어진 리그를 볼 수 있다', () => {
+      adminCanWrite.value = false;
+      query.value = loaded({ state: 'completed', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } });
+      renderShell();
+      expect(screen.getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
     });
 
     it('운영·설정·사후로 묶고, 각 섹션은 리그 아래 자기 주소를 가진다', () => {

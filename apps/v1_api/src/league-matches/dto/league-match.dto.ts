@@ -168,6 +168,12 @@ export class AddPreviousSeasonTeamsDto {
   teamIds!: string[];
 }
 
+/** 이미 만든 리그를 이 리그의 다음 시즌으로 잇기(2026-11-19). 이을 리그 하나만 받는다. */
+export class LinkNextSeasonDto {
+  @IsUUID()
+  nextLeagueId!: string;
+}
+
 /**
  * 대진을 놓을 **날짜 목록**. 서버는 요일을 모른다(Task 164 BE-2).
  *

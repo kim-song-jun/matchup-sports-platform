@@ -96,13 +96,14 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
         { slug: 'videos', label: '경기 영상' },
         { slug: 'reviews', label: '리뷰 관리' },
         // 끝난 독립 리그를 이어 가는 길은 둘이고 둘 중 하나만 한다(2026-11-03 사용자 선택): 다음 시즌을 이었으면 전환을,
-        // 전환했으면 다음 시즌 만들기를 숨긴다. 다음 시즌은 진행 중에도 미리 만들 수 있다.
+        // 전환했으면 다음 시즌 메뉴를 숨긴다. 다음 시즌은 진행 중에도 미리 만들거나 이을 수 있다.
+        // 메뉴 하나('다음 시즌 관리')에서 새로 만들기와 이미 만든 리그 잇기를 둘 다 한다(2026-11-19 사용자 요청) —
+        // 이미 이었으면 같은 화면이 이어진 리그와 연결 해제를 보인다.
         ...(series.nextSeason
-          ? [{ slug: 'next-season', label: '다음 시즌 보기' }]
-          : canWrite && series.seriesId === null && series.convertedToSeries !== true
-            && (series.state === 'active' || series.state === 'completed')
-            ? [{ slug: 'next-season', label: '다음 시즌 만들기' }]
-            : []),
+          || (canWrite && series.seriesId === null && series.convertedToSeries !== true
+            && (series.state === 'active' || series.state === 'completed'))
+          ? [{ slug: 'next-season', label: '다음 시즌 관리' }]
+          : []),
         ...(canWrite && series.state === 'completed' && series.seriesId === null && !series.nextSeason
           ? [{ slug: 'series-conversion', label: '리그 체계로 전환' }]
           : []),

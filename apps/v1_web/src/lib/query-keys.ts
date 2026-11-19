@@ -193,6 +193,9 @@ export const v1Keys = {
   adminLeagueTemplatePreview: (leagueId: string, request: unknown) =>
     [...v1Keys.all, 'admin', 'league-matches', leagueId, 'template-preview', request] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
+  // 이 리그의 다음 시즌으로 이을 수 있는 리그 후보. adminLeagueMatch(leagueId) 아래라 그 키를 무효화하면 함께 갱신된다.
+  adminLeagueNextSeasonCandidates: (leagueId: string) =>
+    [...v1Keys.all, 'admin', 'league-matches', leagueId, 'next-season-candidates'] as const,
   // D2 (E4): 어드민 이의 목록 — status 필터('' = 전체)가 다르면 다른 쿼리로 취급한다.
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를
   // 쓰지만 두 번째 세그먼트가 문자열(leagueId)이 아니라 filters 객체라 값이 절대 겹치지

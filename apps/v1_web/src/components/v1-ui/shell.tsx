@@ -20,6 +20,7 @@ import {
   TrophyIcon,
 } from './icons';
 import { DesktopScrollTop } from './desktop-scroll-top';
+import { scrollToTopOnTabRetap } from './scroll-restoration';
 import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
 import { FromLink } from './from-link';
@@ -303,7 +304,7 @@ function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
           // (모바일 폭에서도 DesktopNav는 CSS로만 숨겨질 뿐 DOM에는 남아 있다). Next
           // 라우터 캐시는 URL 기준 공유라 DesktopNav 쪽 프리페치만으로 이 탭 클릭도
           // 그대로 빨라진다.
-          <Link key={id} className="tm-bottom-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active} prefetch={false}>
+          <Link key={id} className="tm-bottom-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active} prefetch={false} onClick={scrollToTopOnTabRetap}>
             <Icon size={23} strokeWidth={active ? 2.2 : 1.7} />
             <span>{label}</span>
           </Link>
@@ -372,6 +373,7 @@ function DesktopNav({
               href={href}
               aria-current={active ? 'page' : undefined}
               data-active={active}
+              onClick={scrollToTopOnTabRetap}
             >
               {label}
             </Link>

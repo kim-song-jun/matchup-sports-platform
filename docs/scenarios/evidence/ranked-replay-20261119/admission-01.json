@@ -1,0 +1,11 @@
+{
+  "team": 1,
+  "reviewedPlayers": 7,
+  "actions": [
+    "roster review UI",
+    "accept UI",
+    "confirm UI"
+  ],
+  "confirmedAt": "2026-11-19T13:59:16.148Z",
+  "status": "PASS"
+}

@@ -1,5 +1,24 @@
 # Task 20261130: 단계·편성·진출 규칙으로 구성하는 대회
 
+## 2026-11-19 전체 정식 흐름 재검증 — 진행 중
+
+Alpha 관리자 실제 로그인과 정식 생성·접수 시작 완료. 소유 대회 `f5f3d600-a663-4e9d-a8d9-61ae3c1817c7`, `(테스트) 정석 20팀 순위별리그 1119`.
+20팀·등록7명·동시출전6명·롤링 교체·예선5조→순위별본선4리그 구성이다. 신규 가상 신원140명/팀20개만 Alpha 가드·충돌 검사 후 fixture로 준비했고 신청/선수/경기/결과는 주입하지 않았다. 회원가입·본인인증 PASS를 주장하지 않는다.
+첫3팀 신청·21명 선수 등록은 ego-lite UI로 완료, 나머지19팀 배치는 팀별 체크포인트를 기록하며 진행 중이다. 예선·결선 공식 결과는0/70이다.
+실제 생성 폼에서 템플릿 버튼의 기본 submit 때문에 확인 대화상자가 사라지고 다음 단계로 넘어가는 결함을 확인했다. StagePlanEditor의6개 편집 버튼을 type=button으로 고쳤다(공용 Button 기본값은 유지).
+생성 form 안에서 실제 템플릿 클릭→submit 발생 RED1, 수정 후 기존4+신규1=5/5 GREEN. Web tsc 통과, 패턴 검사는 cmd의 GNU 도구 부재로 실패 후 Git Bash에서 통과. 로컬 Node24 엔진 경고를 숨기지 않으며 Node22 CI 결과를 추가 확인한다.
+이 버그 수정 Owned를 stage-plan-editor.tsx/test.tsx와 해당 changeset으로 확장한다. QA 운영·증거는 같은 작업의 후속이며 이번 수정의 Alpha 재검증은 배포 후 진행한다.
+
+사용자가 20팀·팀당7명·풋살 동시출전6명으로 신청부터 결과 입력까지 다시 테스트하도록 요청했다.
+[실행 계획](../../docs/scenarios/ranked-leagues-full-flow-20261119.md)에 전체 수와 출전/교체 경계·권한·증거 기준을 고정했다.
+Phase1 컨텍스트·범위 확정 완료. Phase2 Alpha 신청/접수0/20, Phase3 예선0/30·결선0/40, Phase4 최종 검증0/1·viewport0/3은 대기다.
+ego-lite 0.6.3.17 설치·최초 설정 완료, 실제 TaskSpace1/p1 Alpha 이메일 로그인 화면을 확인했다. 관리자 자격증명 미제공으로 handOff 완료, 사용자 관리자 로그인 확인 뒤 같은 공간에서 재개한다.
+Owned: 이 task, 새 시나리오, docs/scenarios/index.md. Forbidden: 기존 완료70경기·20팀140계정 변경, 운영 데이터 쓰기, main 승격, 다른 worktree.
+Progress Snapshot: qa/ranked-leagues-20261119, base d80cf9d58. 새 대회/팀/계정 생성0, 신청0/20, 결과0/70. 이전 실행 PASS는 합산하지 않는다.
+Acceptance: 새 대회의 정식 UI 신청20/20 → 예선30/30 → 순위별 결선40/40 → 종료, 등록7/동시출전6/교체 보존·권한·공개 결과 증거.
+Ambiguity: 결선 회전수는 단일 회전으로 가정하며 추가 확인 시 갱신한다. 미커밋 계획은 브라우저 연결 후 이어가기 위해 소유 worktree에 보존한다.
+
+Status: 추가 리뷰 완료 — P2 2건 dev PR #2427 반영, Alpha 구성3+기존39=42/42 및 실제 재개 회귀 통과
 Status: Review — dev PR #2442의 입력 동등성4건에 생성·접수5건 추가 수정. 서버360·Web181개 관련 회귀 PASS, API/Web 타입·규칙 통과, 기존 PR 갱신. CI·리뷰/Alpha는 별도 gate. 이전 #2427 Alpha 42/42는 아래 과거 기록.
 Created: 2026-11-09
 Owner: Codex
@@ -304,3 +323,19 @@ Phase 1~3은 설계·검증 기반이며, 사용자가 이용 가능한 첫 출�
 PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN을 확인하고 dev2f5c166ffbab45f2dcfe8ffd7a5f50c39d3349bf로 머지했다. Copilot 공식 API는 다시422 ACTOR_INELIGIBLE로 거절해 기존 사용자 승인 수동 검토+CI 대체를 유지한다. Alpha matching-SHA 배포 후 구조3+기존39 화면을 검증하고 증거 PR로 마무리한다.
 
 구조 QA 보존 검사를 조작 종료 후 실제 GET으로 강화해 수정 전3/3을 재측정했다(브라우저15838 종료). 테스트 초안에 등록0·경기0도 확인했다. 초기 사전 조회 스냅샷 대신 실행 후 completed/70 fixture ID·공식 점수를 확인한 최신 before JSON으로 교체한다.
+
+
+## 2026-11-19 정식 신청·결과 전체 실행 cursor
+- Alpha 새 대회 f5f3d600-a663-4e9d-a8d9-61ae3c1817c7. 팀장20명 실제 로그인·신청20/20·명단140/140 UI 등록·접수20/20·공식결과70/70·대회 종료 완료. 결선 동률 사유 결정 포함4리그배정, 9개편성 승점·승무패·득실 독립대조 및 팀당7경기 PASS. 공개 결과3폭 시각 검토.
+- 핵심 FAIL: 최대출전6명 설정이어도 양팀7명 전원 started=true로 LIVE 시작 허용. 선발6+벤치1/교체 계약은 미충족이며 전체 PASS 아님. 신규가입/OTP·팀생성은fixture 준비로 구분. 개인 이벤트·20팀교체는 통과 주장하지 않음.
+- 구성 버튼 폼 submit 버그 수정 PR #2453, 초기head CI Gates/API/Web PASS·회귀5PASS. 공식 Copilot review는 응답 없고 dev 이동 후 충돌 확인, 동기화 중. Alpha 배포 완료 아님.
+- 증거/상세/정확한 미검증 범위: docs/scenarios/ranked-leagues-full-flow-20261119.md. 기존 테스트/실회원 보존.
+
+
+## 2026-11-19 재실행 캡처 + 목업 카테고리 후속
+- 사용자 추가 요청: 실제 신청/수락 재실행 중요 장면을 PR에 게시하고 최종검증. 상단 기존 목업 패널의 팀 수·상태 선택을 유지하고 순위별 리그 카테고리만 확장.
+- 새 소유 대회21da8cb0-2138-431b-bc17-b5e3b6e8d326, 기존합성20팀 재사용. 실제신청20/20·명단140/140 완료, 관리자수락/스크린샷 진행 중. 상세 docs/scenarios/ranked-replay-screenshots-20261119.md.
+- 구현: ranked_leagues 목업전용format, 기존 DB format=league+stagePlan. 4팀예선→동순위결선,7명등록·6명config,8~32팀4배수·결과포함20팀상한. existingenv/admin guard유지, schema/migration없음. 공식70경기 생성통합회귀 추가.
+- 로컬 API53·Web6 tests 및 API/Web TypeScript PASS. 실제DB통합은CI대기. 기존동시6명강제실패는이변경이해결하지 않으며실제재검증으로분리.
+
+재실행완료: 새대회신청20·명단140·관리자수락20·공식70·completed·3폭결과/최종순위·개인1골PASS. 6명제한FAIL재현. PR댓글7011526051에팀별신청/수락캡처게시. 사용자이번PR전체CI+수동검토대체승인획득,Alpha목업실제생성대기. 로컬API54/Web6,타입PASS.

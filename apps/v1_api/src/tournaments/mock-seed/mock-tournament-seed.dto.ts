@@ -1,6 +1,8 @@
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TOURNAMENT_FORMATS, type TournamentFormat } from '../dto/admin-tournament.dto';
+export const MOCK_SEED_FORMATS = [...TOURNAMENT_FORMATS, 'ranked_leagues'] as const;
+export type MockSeedFormat = TournamentFormat | 'ranked_leagues';
 
 export const MOCK_SEED_STATUSES = ['open', 'in_progress', 'completed'] as const;
 export type MockSeedStatus = (typeof MOCK_SEED_STATUSES)[number];
@@ -21,8 +23,8 @@ export const MOCK_SEED_MAX_TEAMS_WITH_RESULTS = 16;
  */
 export class CreateMockTournamentDto {
   @IsOptional()
-  @IsIn(TOURNAMENT_FORMATS)
-  format?: TournamentFormat;
+  @IsIn(MOCK_SEED_FORMATS)
+  format?: MockSeedFormat;
 
   /** 참가 팀 수. 조별리그+토너먼트·정규리그+N개 토너먼트는 4팀씩 조를 나눈다. */
   @IsOptional()

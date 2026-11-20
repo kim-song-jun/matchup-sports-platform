@@ -1,0 +1,25 @@
+{
+  "team": 2,
+  "startedAt": "2026-11-19T13:48:41.126Z",
+  "actions": [
+    {
+      "action": "captain login UI",
+      "at": "2026-11-19T13:48:43.182Z"
+    },
+    {
+      "action": "submit application UI",
+      "at": "2026-11-19T13:48:47.095Z"
+    },
+    {
+      "action": "confirm application UI",
+      "at": "2026-11-19T13:48:47.551Z"
+    }
+  ],
+  "confirmScreenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-02-application-confirm.png",
+  "successScreenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-02-application-submitted.png",
+  "rosterUrl": "https://alpha.teameet.co.kr/tournaments/21da8cb0-2138-431b-bc17-b5e3b6e8d326/registrations/1950aa32-0331-4ab7-9d1a-f6d340bf8d8e/roster",
+  "players": 7,
+  "screenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-02-seven-registered.png",
+  "status": "PASS",
+  "finishedAt": "2026-11-19T13:49:06.772Z"
+}

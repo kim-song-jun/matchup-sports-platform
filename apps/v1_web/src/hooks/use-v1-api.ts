@@ -4941,7 +4941,7 @@ export function useV1MockSeedAvailability() {
     // 쓸 수 있는 팀 수가 곧 만들 수 있는 대회 규모의 상한이다. 눌러 보고 400 으로 알게 되면
     // 사용자가 조건을 스스로 좁힐 수 없어서, 화면이 미리 알 수 있게 함께 받아 온다.
     queryFn: () =>
-      v1Get<{ enabled: boolean; usableTeamCount: number; maxTeamCount: number; minPlayersPerTeam: number }>(
+      v1Get<{ enabled: boolean; usableTeamCount: number; maxTeamCount: number; minPlayersPerTeam: number; rankedLeagueUsableTeamCount?: number; rankedLeagueMaxTeamCount?: number }>(
         '/admin/mock-seed/availability',
       ),
     staleTime: 60_000,
@@ -4949,7 +4949,7 @@ export function useV1MockSeedAvailability() {
 }
 
 export type CreateMockTournamentInput = {
-  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts' | 'ranked_leagues';
   teamCount?: number;
   status?: 'open' | 'in_progress' | 'completed';
   withResults?: boolean;

@@ -8,6 +8,7 @@ import { MockTournamentSeedService } from '../../src/tournaments/mock-seed/mock-
 import { MultiFinalsService } from '../../src/tournaments/multi-finals/multi-finals.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
+import { StagePlanService } from '../../src/tournaments/stages/stage-plan.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 
 const prisma = new PrismaService();
@@ -18,6 +19,7 @@ const games = new GamesService(prisma, new OperationAuditWriterService(), new Ga
 const multiFinals = new MultiFinalsService(prisma, admins, games, new BracketTemplateService(prisma, admins, games));
 const service = new MockTournamentSeedService(
   prisma, admins, games, new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService()), multiFinals,
+  new StagePlanService(prisma, admins, new BracketTemplateService(prisma, admins, games), games),
 );
 
 /** 목업이 고르는 '전원 테스트 계정' 팀 — 팀장 1명 + 팀원 7명. */
@@ -43,7 +45,7 @@ describe('목업 대회 — 정규리그+N개 토너먼트 (실제 DB)', () => {
     process.env.V1_ENABLE_MOCK_SEED = 'true';
     await prisma.$connect();
     await seedCompetitionConfigFixture(prisma, user);
-    await seedTestTeams(8);
+    await seedTestTeams(20);
   });
   afterAll(async () => { process.env.V1_ENABLE_MOCK_SEED = originalFlag; await prisma.$disconnect(); });
 
@@ -78,4 +80,17 @@ describe('목업 대회 — 정규리그+N개 토너먼트 (실제 DB)', () => {
       ['하위 토너먼트', ['목업 팀 3', '목업 팀 4', '목업 팀 7', '목업 팀 8']],
     ]);
   }, 120_000);
+
+  it('20팀 순위별 리그 목업은 등록7명·출전설정6명·공식70경기와4개결선을 만든다', async () => {
+    const result = await service.createTournament(user, { format: 'ranked_leagues', teamCount: 20, status: 'completed' });
+    expect(result).toMatchObject({ teamCount: 20, fixtureCount: 70, gamesCreated: 70, status: 'completed' });
+    const t = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: result.tournamentId }, include: { registrations: { include: { players: true } }, competitionConfig: true } });
+    expect(t.status).toBe('completed');expect(t.minPlayers).toBe(7);expect(t.maxPlayers).toBe(7);
+    expect((t.competitionConfig!.lineup as { maxPlayers: number }).maxPlayers).toBe(6);
+    expect(t.registrations).toHaveLength(20);expect(t.registrations.every(r => r.players.length === 7)).toBe(true);
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId: t.id }, include: { group: true, teamMatch: { include: { game: true } } } });
+    expect(fixtures).toHaveLength(70);expect(fixtures.every(f => f.teamMatch.game?.currentOfficialRevisionId)).toBe(true);
+    expect(fixtures.filter(f => f.group?.stageKey === 'preliminary')).toHaveLength(30);
+    expect(fixtures.filter(f => f.group?.stageKey === 'main')).toHaveLength(40);
+  }, 180_000);
 });

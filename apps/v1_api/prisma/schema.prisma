@@ -1505,6 +1505,7 @@ model V1Team {
   inviteLinks                  V1TeamInviteLink[]
   trustScore                   V1TeamTrustScore?
   hostedTeamMatches            V1TeamMatch[]              @relation("V1HostTeamMatches")
+  internalMatches              V1TeamInternalMatch[]
   approvedTeamMatches          V1TeamMatch[]              @relation("V1ApprovedApplicantTeam")
   teamMatchApplications        V1TeamMatchApplication[]   @relation("V1TeamMatchApplicantTeam")
   chatRoom                     V1ChatRoom?
@@ -4428,4 +4429,74 @@ model V1TournamentScheduleTime {
 
   @@unique([tournamentId, scheduledAt])
   @@map("v1_tournament_schedule_times")
+}
+
+/// 팀 내 경기(자체전) — 한 팀의 팀원끼리 N팀으로 나눠 뛴 경기와 그 기록. **그 팀의 정식 팀원에게만** 보인다.
+/// 대회·팀매치 경기 엔진(V1Game)과 완전히 분리돼 있다 — 공개 기록·팀 전적·신뢰도·알림에 닿지 않는다.
+/// 사용자 열(created_by_user_id 등)은 FK 없이 문자열로 둔다: 서비스가 활성 팀원인지 검증하고,
+/// 이 테이블은 사용자 쪽 삭제·익명화 경로에 얽히지 않는다.
+model V1TeamInternalMatch {
+  id               String    @id @default(uuid())
+  teamId           String    @map("team_id")
+  createdByUserId  String    @map("created_by_user_id")
+  playedAt         DateTime  @map("played_at")
+  /// 결과(점수) 를 처음 기록한 시각. null 이면 아직 결과 없음.
+  resultRecordedAt DateTime? @map("result_recorded_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  team    V1Team                      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sides   V1TeamInternalMatchSide[]
+  players V1TeamInternalMatchPlayer[]
+  goals   V1TeamInternalMatchGoal[]
+
+  @@index([teamId, playedAt(sort: Desc), id(sort: Desc)], map: "v1_team_internal_matches_team_played_idx")
+  @@map("v1_team_internal_matches")
+}
+
+model V1TeamInternalMatchSide {
+  id         String @id @default(uuid())
+  matchId    String @map("match_id")
+  /// 1부터. 이름은 "1팀"·"2팀"… 으로 고정한다.
+  sideNumber Int    @map("side_number")
+  name       String
+  /// 결과를 기록하기 전에는 null.
+  score      Int?
+
+  match   V1TeamInternalMatch         @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  players V1TeamInternalMatchPlayer[]
+  goals   V1TeamInternalMatchGoal[]
+
+  @@unique([matchId, sideNumber], map: "v1_team_internal_match_sides_match_number_key")
+  @@map("v1_team_internal_match_sides")
+}
+
+model V1TeamInternalMatchPlayer {
+  id      String @id @default(uuid())
+  matchId String @map("match_id")
+  sideId  String @map("side_id")
+  userId  String @map("user_id")
+
+  match V1TeamInternalMatch     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  side  V1TeamInternalMatchSide @relation(fields: [sideId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId], map: "v1_team_internal_match_players_match_user_key")
+  @@index([sideId], map: "v1_team_internal_match_players_side_idx")
+  @@map("v1_team_internal_match_players")
+}
+
+model V1TeamInternalMatchGoal {
+  id           String  @id @default(uuid())
+  matchId      String  @map("match_id")
+  sideId       String  @map("side_id")
+  scorerUserId String  @map("scorer_user_id")
+  assistUserId String? @map("assist_user_id")
+  sortOrder    Int     @map("sort_order")
+
+  match V1TeamInternalMatch     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  side  V1TeamInternalMatchSide @relation(fields: [sideId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, sortOrder], map: "v1_team_internal_match_goals_match_order_idx")
+  @@index([sideId], map: "v1_team_internal_match_goals_side_idx")
+  @@map("v1_team_internal_match_goals")
 }

@@ -24,6 +24,7 @@ import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { TeamInternalMatchesSection } from '@/components/team-internal-matches/team-internal-matches-section';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
 import { formatTeamCardMembers, teamCardGenderLabel } from './teams.card-model';
@@ -739,6 +740,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
               자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
+          {mode === 'mine' ? <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageGameRosters === true} /> : null}
           <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
           {model.competitionEntries ? (
             <TeamCompetitionEntriesSection model={model.competitionEntries} />
@@ -886,6 +888,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
             피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
+        {mode === 'mine' ? <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageGameRosters === true} /> : null}
         <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
         {model.competitionEntries ? (
             <TeamCompetitionEntriesSection model={model.competitionEntries} />

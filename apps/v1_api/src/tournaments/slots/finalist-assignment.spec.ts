@@ -5,6 +5,7 @@ import { loadCanonicalStandingsSource } from '../tournament-standings-source';
 import { findTournamentOnSurface } from '../tournament-surface-lookup';
 import { assignSlotsBatchInTx } from './tournament-slot.service';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
+import type { V1TournamentMatchAdvancementEdge } from '@prisma/client';
 
 jest.mock('./load-group-rank-preview', () => ({ loadGroupRankSources: jest.fn() }));
 jest.mock('../tournament-standings-source', () => ({ loadCanonicalStandingsSource: jest.fn() }));
@@ -66,6 +67,14 @@ describe('공통 결선 배정', () => {
     const preview = await read();
     expect(preview.targets).toHaveLength(7);
     expect(preview.targets.some((target) => target.fixtureId === 'f0' && target.side === 'HOME')).toBe(false);
+  });
+  it.each(['WINNER', 'LOSER'] as const)('%s 상대 연결을 미리보기에 명확하게 구분한다', async (sourceOutcome) => {
+    const { tx, read } = setup();
+    const edge = { targetTeamMatchId: 'f0', targetSide: 'AWAY', sourceTeamMatchId: 'p1', sourceOutcome } satisfies Pick<V1TournamentMatchAdvancementEdge, 'targetTeamMatchId' | 'targetSide' | 'sourceTeamMatchId' | 'sourceOutcome'>;
+    tx.v1TournamentMatchAdvancementEdge.findMany.mockResolvedValue([edge]);
+    const preview = await read();
+    expect(preview.targets.find(target => target.fixtureId === 'f0' && target.side === 'HOME')?.opponentWinnerFixtureId).toBe(sourceOutcome === 'WINNER' ? 'p1' : null);
+    expect(preview.targets.find(target => target.fixtureId === 'f1')?.opponentWinnerFixtureId).toBeNull();
   });
   it('조별 경기가 미완료면 순위를 보여주되 저장을 막는다', async () => {
     const { sources, read } = setup();

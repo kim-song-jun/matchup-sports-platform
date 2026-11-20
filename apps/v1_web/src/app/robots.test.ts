@@ -8,6 +8,7 @@ import path from 'node:path';
 import { shouldServeStreamingMetadata } from 'next/dist/server/lib/streaming-metadata';
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AI_CRAWLER_USER_AGENTS } from '@/lib/crawler-agents';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { publicSeoApi, REGULAR_LEAGUE_ID } from '@/test/public-seo-fixtures';
 import nextConfig from '../../next.config';
@@ -60,6 +61,10 @@ async function robotsTagsFor(pathname: string): Promise<string[]> {
     .map((header) => header.value);
 }
 
+const AI_AGENTS = new Set<string>(AI_CRAWLER_USER_AGENTS);
+/** Allow 접두마다 `<접두>*from=` 한 줄, 루트 한 줄. */
+const fromTailPairs = (allow: string[]) => ['/*from=', ...allow.map((prefix) => `${prefix}*from=`)];
+
 const PRIVATE_PATHS = ['/admin/', '/my/', '/chat/', '/api/', '/auth/', '/users/'];
 
 // 작성·수정·신청 화면 전수(app 아래 new·edit·apply·applications 폴더 중 사용자 화면).
@@ -96,10 +101,14 @@ describe('robots', () => {
     }
   });
 
-  it('선언한 차단 줄은 모두 자기 경로를 실제로 막고, 경로마다 효력이 갈리는 와일드카드 차단은 두지 않는다', () => {
+  it('선언한 차단 줄은 모두 자기 경로를 실제로 막고, 경로마다 효력이 갈리는 와일드카드 차단은 AI 크롤러의 from= 꼬리 짝 말고는 두지 않는다', () => {
     for (const rule of rules()) {
       const disallow = listOf(rule.disallow);
-      expect(disallow.filter((pattern) => pattern.includes('*')), '와일드카드 차단은 더 긴 Allow 줄에 져 경로마다 효력이 갈린다').toEqual([]);
+      const wildcards = disallow.filter((pattern) => pattern.includes('*'));
+      // 한 줄짜리 와일드카드 차단은 더 긴 Allow 줄에 져 경로마다 효력이 갈린다. from= 꼬리는 Allow 접두마다 짝을 둬서 푼다.
+      expect(wildcards, `${String(rule.userAgent)} 의 와일드카드 차단`).toEqual(
+        AI_AGENTS.has(String(rule.userAgent)) ? fromTailPairs(listOf(rule.allow)) : [],
+      );
       for (const pattern of disallow) {
         expect(crawlAllowed(rule, pattern), `${String(rule.userAgent)} 의 Disallow ${pattern} 가 더 긴 Allow 에 가려진다`).toBe(false);
       }
@@ -189,6 +198,60 @@ describe('robots', () => {
       const allow = Array.isArray(rule.allow) ? rule.allow : [rule.allow ?? ''];
       expect(allow).toEqual(expect.arrayContaining(['/help', '/faq', '/for/', '/contact']));
     }
+  });
+
+  describe('AI 크롤러의 from= 꼬리 주소', () => {
+    const aiRules = () => rules().filter((rule) => AI_AGENTS.has(String(rule.userAgent)));
+    const searchRules = () => rules().filter((rule) => !AI_AGENTS.has(String(rule.userAgent)));
+    const ID = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d';
+    const TAILED = [
+      '/terms?document=privacy&from=%2Fteams',
+      `/tournaments/${ID}?from=%2Ftournaments`,
+      `/teams/${ID}/records?tab=x&from=%2Fteams%2F${ID}`,
+      `/matches/${ID}?from=%2Fmatches`,
+      `/league-matches/${ID}/fixtures/${ID}?from=%2Fleague-matches`,
+      '/help?from=%2Fhome',
+      '/for/clubs?from=%2Flanding',
+    ];
+    const CANONICAL = ['/terms', '/terms?document=privacy', `/tournaments/${ID}`, `/tournaments?kind=league`, `/teams/${ID}/records?tab=x`, `/matches/${ID}`, '/help', '/for/clubs'];
+
+    it('AI 크롤러 11종 전부가 Allow 접두마다 짝이 되는 from= 차단을 가진다', () => {
+      expect(aiRules()).toHaveLength(AI_CRAWLER_USER_AGENTS.length);
+      for (const rule of aiRules()) {
+        const allow = listOf(rule.allow);
+        expect(allow.length).toBeGreaterThan(5);
+        expect(listOf(rule.disallow), String(rule.userAgent)).toEqual(expect.arrayContaining(fromTailPairs(allow)));
+      }
+    });
+
+    it('꼬리 주소는 가장 긴 일치로 막히고 정식 주소는 열린다', () => {
+      for (const rule of aiRules()) {
+        for (const address of TAILED) {
+          expect(crawlAllowed(rule, address), `${String(rule.userAgent)} 가 ${address} 를 읽는다`).toBe(false);
+        }
+        for (const address of CANONICAL) {
+          expect(crawlAllowed(rule, address), `${String(rule.userAgent)} 가 ${address} 를 막는다`).toBe(true);
+        }
+      }
+    });
+
+    it('from 이 아닌 다른 쿼리와 비공개 경로 차단은 그대로다', () => {
+      for (const rule of aiRules()) {
+        expect(crawlAllowed(rule, `/teams/${ID}/records?tab=x&sort=recent`)).toBe(true);
+        expect(crawlAllowed(rule, '/my/profile?from=%2Fhome')).toBe(false);
+        expect(crawlAllowed(rule, '/admin/users')).toBe(false);
+      }
+    });
+
+    it('검색 로봇(*·Yeti, Googlebot·Bingbot 은 * 규칙을 받는다)은 꼬리 주소를 막지 않아 정식 주소 신호를 읽는다', () => {
+      expect(searchRules().map((rule) => rule.userAgent)).toEqual(['*', 'Yeti']);
+      for (const rule of searchRules()) {
+        expect(listOf(rule.disallow).filter((pattern) => pattern.includes('from'))).toEqual([]);
+        for (const address of [...TAILED, ...CANONICAL]) {
+          expect(crawlAllowed(rule, address), `${String(rule.userAgent)} 가 ${address} 를 막는다`).toBe(true);
+        }
+      }
+    });
   });
 
   it('sitemap 을 절대 URL 로 알리고 Google 이 무시하는 Host 줄은 내지 않는다', () => {

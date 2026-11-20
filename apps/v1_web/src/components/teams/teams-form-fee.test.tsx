@@ -75,6 +75,16 @@ describe('팀 회비 편집', () => {
     await waitFor(() => expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ membershipFee: 30000 })));
   });
 
+  it('금액은 API 상한(10,000,000) 안의 7자리까지만 받고, 금액이 비면 정하지 않음으로 저장된다고 알려 준다', async () => {
+    team(null);
+    await edit();
+    fireEvent.click(screen.getByRole('button', { name: '있음' }));
+    expect(screen.getByText('금액을 적지 않으면 회비는 정하지 않음으로 저장돼요.')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: '월 회비(원)' }), { target: { value: '12345678' } });
+    expect(screen.getByRole('textbox', { name: '월 회비(원)' })).toHaveValue('1,234,567');
+    expect(screen.queryByText('금액을 적지 않으면 회비는 정하지 않음으로 저장돼요.')).toBeNull();
+  });
+
   it('저장된 회비는 있음과 금액으로 열린다', async () => {
     team(15000);
     await edit();

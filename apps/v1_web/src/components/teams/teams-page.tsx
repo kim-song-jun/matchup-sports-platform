@@ -2373,10 +2373,15 @@ function TeamMembershipFeeField({ value, onChange }: { value?: number | null; on
             aria-label="월 회비(원)"
             placeholder="10,000"
             value={value ? value.toLocaleString('ko-KR') : ''}
-            onChange={(event) => onChange?.(Number(event.target.value.replace(/\D/g, '').slice(0, 8)) || null)}
+            onChange={(event) => onChange?.(Number(event.target.value.replace(/\D/g, '').slice(0, 7)) || null)}
           />
           <span className="tm-text-body">원</span>
         </div>
+      ) : null}
+      {paid && value == null ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
+          금액을 적지 않으면 회비는 정하지 않음으로 저장돼요.
+        </p>
       ) : null}
     </div>
   );

@@ -303,6 +303,12 @@ function LeagueListTable({
       // 44px+ 행 높이를 그대로 가짐)으로 옮기고 제목은 일반 텍스트로 되돌린다.
       onRowClick={(row) => router.push(withFromPath(`/admin/league-matches/${encodeURIComponent(row.leagueId)}`, listHref))}
       rowClickLabel={(row) => `${row.title} 상세 보기`}
+      // alpha 1440 실측: 기본 캡(max-w-[900px])이 카드를 899px 로 묶는데 표는 1041px 라서 대진 수가
+      // 잘리고 숨기기·다시 보이기(작업 열)가 가로 스크롤 안으로 밀렸다. 대회 목록처럼 캡을 풀고
+      // 표를 카드 폭에 맞춘다.
+      tableMaxWidth="max-w-none"
+      fitContainer
+      dense
       columns={[
         {
           key: 'title',

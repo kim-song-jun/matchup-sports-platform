@@ -32,6 +32,39 @@ describe('짝수 대진 실제 저장과 조별 진출', () => {
   beforeAll(async () => { process.env.V1_FLEXIBLE_BRACKETS_ENABLED = 'true'; await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); if (oldFlag === undefined) delete process.env.V1_FLEXIBLE_BRACKETS_ENABLED; else process.env.V1_FLEXIBLE_BRACKETS_ENABLED = oldFlag; });
 
+  it('2개 조 각3팀 템플릿의 상단 A1-[B2/A3], 하단 B1-[A2/B3] 출처와 실제 승자 연결을 저장한다', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'fixed-cross-six', format: 'group_knockout', teamCount: 0 });
+    const input: ApplyBracketTemplateDto = { schemaVersion: 2, kind: 'group_knockout', participantCount: 10,
+      legs: 1, thirdPlace: true, drawSeed: 7,
+      groups: [{ name: 'A조', capacity: 5, advanceCount: 3 }, { name: 'B조', capacity: 5, advanceCount: 3 }] };
+    const preview = await templates.preview(user, tournamentId, input);
+    await templates.apply(user, tournamentId, { ...input, previewHash: preview.previewHash,
+      requestId: 'fixed-cross-six-request', acknowledgeRematches: true });
+    const saved = await new TournamentBracketService(prisma, admin, games).getBracket(user, tournamentId);
+    const groupIds = saved.groups.filter(g => g.phase === 'group').sort((a, b) => a.sortOrder - b.sortOrder).map(g => g.id);
+    const source = (slotId: string | null) => {
+      const slot = saved.slots.find(row => row.id === slotId)!;
+      return [slot.sourceGroupId, slot.position, slot.label];
+    };
+    const semis = saved.fixtures.filter(f => f.round === '4강').sort((a, b) => a.fixtureNumber - b.fixtureNumber);
+    expect(semis).toHaveLength(2);
+    expect(semis.map(f => f.fixtureNumber)).toEqual([23, 24]);
+    expect(semis.map(f => source(f.homeSlotId))).toEqual([[groupIds[0], 1, 'A조 1위'], [groupIds[1], 1, 'B조 1위']]);
+    for (const [index, semi] of semis.entries()) {
+      expect(semi.bracketSources).toEqual([expect.objectContaining({ outcome: 'WINNER', side: 'AWAY' })]);
+      const first = saved.fixtures.find(f => f.id === semi.bracketSources[0].fixtureId)!;
+      expect([source(first.homeSlotId), source(first.awaySlotId)]).toEqual(index === 0
+        ? [[groupIds[1], 2, 'B조 2위'], [groupIds[0], 3, 'A조 3위']]
+        : [[groupIds[0], 2, 'A조 2위'], [groupIds[1], 3, 'B조 3위']]);
+      expect(first.fixtureNumber).toBe(index + 21);
+    }
+    expect(saved.slots.filter(s => s.kind === 'GROUP_RANK').every(s => s.registrationId === null)).toBe(true);
+    const final = saved.fixtures.find(f => f.round === '결승')!;
+    expect(final.bracketSources).toEqual(expect.arrayContaining(semis.map((f, index) => ({
+      fixtureId: f.id, outcome: 'WINNER', side: index === 0 ? 'HOME' : 'AWAY',
+    }))));
+  });
+
   it('조별 1·2회전을 초안과 실제 경기의 회전 번호·홈원정에 반영한다', async () => {
     const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'mixed-group-legs', format: 'group_knockout', teamCount: 6 });
     const input: ApplyBracketTemplateDto = { schemaVersion: 2, kind: 'group_knockout', participantCount: 6, drawSeed: 7, registrationIds,

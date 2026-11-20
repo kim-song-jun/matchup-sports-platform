@@ -98,8 +98,13 @@ export function planFlexibleBracket(input: Input, offset: number): BracketTempla
   const width = 2 ** Math.ceil(Math.log2(size));
   const firstPhase = PHASE[width];
   const firstKey = `ko:${firstPhase}`;
-  // Rank priority is preserved; the same-rank draw is deterministic and reviewable.
-  const ordered = input.kind === 'knockout' && input.seedPolicy === 'seeded' ? sources : drawSources(sources, seed, width);
+  // Two groups advancing three each use fixed cross branches in group display order.
+  // Seeds A1,B1,A2,B2,A3,B3 yield A1-[B2/A3] above B1-[A2/B3].
+  const sourceGroups = plan.groups.filter(group => group.phase === 'group');
+  const fixedSixTeamCross = input.kind === 'group_knockout' && sourceGroups.length === 2 &&
+    sourceGroups.every(group => group.advanceCount === 3);
+  const ordered = fixedSixTeamCross ? [...sources].sort((a, b) => a.rank - b.rank)
+    : input.kind === 'knockout' && input.seedPolicy === 'seeded' ? sources : drawSources(sources, seed, width);
   const slots = ordered.map((source): PlanSlot => ({ key: source.key, kind: source.groupKey ? 'GROUP_RANK' : 'ENTRY',
     groupKey: firstKey, position: source.position, sourceGroupKey: source.groupKey }));
   const seedOrder = seedPositions(width);

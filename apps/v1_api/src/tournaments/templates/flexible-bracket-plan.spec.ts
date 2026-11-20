@@ -3,6 +3,37 @@ import { planBracketTemplate, type BracketTemplateInput } from './bracket-templa
 const plan = (input: BracketTemplateInput) => planBracketTemplate(input, { fixtureNumberOffset: 0 });
 
 describe('flexible bracket', () => {
+  it.each([0, 1, 7, 99, 0xffffffff])('2개 조 각3팀은 seed %i에도 상단 A1-[B2/A3], 하단 B1-[A2/B3]로 생성한다', (drawSeed) => {
+    for (const thirdPlace of [false, true]) {
+      const p = plan({ kind: 'group_knockout', schemaVersion: 2, groupCount: 2, teamsPerGroup: 5,
+        advancePerGroup: 3, legs: 1, thirdPlace, drawSeed,
+        groups: [{ name: 'A조', capacity: 5, advanceCount: 3 }, { name: 'B조', capacity: 4, advanceCount: 3 }] });
+      const slot = (key: string | null) => {
+        const row = p.slots.find(s => s.key === key)!;
+        return [row.sourceGroupKey, row.position];
+      };
+      const semis = p.fixtures.filter(f => f.groupKey === 'ko:semi');
+      expect(semis).toHaveLength(2);
+      expect(semis.map(f => slot(f.homeSlotKey))).toEqual([['group:0', 1], ['group:1', 1]]);
+      expect(semis.map(f => p.slots.find(s => s.key === f.homeSlotKey)?.byeSortOrder)).toEqual([0, 2]);
+      for (const [index, semi] of semis.entries()) {
+        const incoming = p.edges.filter(e => e.targetFixtureKey === semi.key);
+        expect(incoming).toEqual([expect.objectContaining({ outcome: 'WINNER', targetSide: 'AWAY' })]);
+        const first = p.fixtures.find(f => f.key === incoming[0].sourceFixtureKey)!;
+        expect([slot(first.homeSlotKey), slot(first.awaySlotKey)]).toEqual(index === 0
+          ? [['group:1', 2], ['group:0', 3]] : [['group:0', 2], ['group:1', 3]]);
+      }
+      const final = p.fixtures.find(f => f.groupKey === 'ko:final')!;
+      expect(p.edges.filter(e => e.targetFixtureKey === final.key)).toEqual(semis.map((f, index) => ({
+        sourceFixtureKey: f.key, outcome: 'WINNER', targetFixtureKey: final.key, targetSide: index === 0 ? 'HOME' : 'AWAY',
+      })));
+      expect(p.slots.filter(s => s.kind === 'GROUP_RANK')).toHaveLength(6);
+      expect(plan({ kind: 'group_knockout', schemaVersion: 2, groupCount: 2, teamsPerGroup: 5,
+        advancePerGroup: 3, legs: 1, thirdPlace, drawSeed }).slots.filter(s => s.byeSortOrder != null)
+        .map(s => [s.sourceGroupKey, s.position, s.byeSortOrder])).toEqual([['group:0', 1, 0], ['group:1', 1, 2]]);
+    }
+  });
+
   it('uses each group rotation independently and keeps old global rotations compatible', () => {
     const input = { kind: 'group_knockout' as const, schemaVersion: 2 as const, groupCount: 2,
       teamsPerGroup: 3, advancePerGroup: 1, legs: 2 as const, thirdPlace: false,

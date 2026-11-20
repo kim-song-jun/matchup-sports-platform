@@ -52,6 +52,7 @@ N개 토너먼트 대회의 독립 대진 초기화와 예선 수정도 활성 �
 # Teameet v1 API contracts
 
 2개 조 각3팀 진출 결선의 교차 자동 추천은 실제 승자 연결을 따라 조1위와 같은 조2위를 반대편에 배정한다. 미리보기의 `opponentWinnerFixtureId`를 사용하며 수동·시드순 배정은 유지한다. [결선 배정 계약](./domains/tournaments.md).
+신규 schemaVersion 2의 2개 조 각3팀 진출 템플릿은 추첨값과 무관하게 상단 A1→B2/A3 승자, 하단 B1→A2/B3 승자로 생성한다. 기존 대회는 자동 변경하지 않는다. [대회 계약](./domains/tournaments.md).
 
 대회 디렉터의 배정 대회 전체 관리는 [대회 관리 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다. 기존 관리자 API를 대회 범위로 재사용하며 플랫폼 관리자 계정은 만들지 않는다.
 

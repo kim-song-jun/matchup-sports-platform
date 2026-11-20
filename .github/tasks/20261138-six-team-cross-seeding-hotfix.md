@@ -30,3 +30,42 @@ base dev b6156d248, main ef22e365d. 격리 worktree six-team-cross-seeding. 관�
 
 - Alpha 원본 미리보기(space11) 확보. A1 알파 레드 FC의 #24 상대는 #22(A2 종점FS/B3 곰빵은 가면가), B1 FS풋술의 #23 상대는 #21(B2 잡초fs/A3 SOUL FC)로 문제 확인. 저장/실제 팀 배정 변경 없음.
 - 타입 검사에서 DB edge 이름을 sourceOutcome으로 정정했고 단위 fixture도 Prisma 타입으로 묶었다. 승자/패자 실제 PostgreSQL 회귀 추가. 로컬 Docker 없음, .env 조회/seed/reset 없음. Node24.15.0 차이는 CI Node22로 검증한다.
+
+
+## Follow-up — 템플릿 생성 순서 (2026-11-21)
+Status: In progress
+
+### Context / Goal
+사용자가 신규 템플릿부터 상단 A1→B2/A3 승자, 하단 B1→A2/B3 승자로 생성하도록 확정했다.
+Alpha의 기존 템플릿은 drawSources가 동순위 조를 섞어 B1을 위에 두고 같은 조 1·2위를 같은 가지에 배치했다.
+
+### Original Conditions / Owned / Forbidden
+- [x] 2개 조 각 3팀 진출일 때 조 표시 순서대로 1위를 상단/하단 직행에 고정한다.
+- [x] 첫 경기 B2/A3 및 A2/B3와 실제 승자 edge를 함께 검증한다.
+- [x] 다른 결선 규모와 일반 추첨, 기존 대회 데이터는 보존한다.
+- 단일 에이전트 순차. Owned: flexible-bracket-plan.ts/spec, 관련 통합 스펙, API 문서, changeset, 이 task.
+- Forbidden: 기존 대회 배정/결과 변경, main 승격, 재배정 저장 로직 변경, UI 변경.
+
+### User / Test Scenarios
+신규 템플릿 미리보기와 생성에서 drawSeed에 무관하게 위쪽 첫 조 1위가 반대 조 2위/같은 조 3위 승자와 만난다.
+seed 0/1/7/99/최댓값, 3위전 유무, 불균등 조, 실제 저장된 sourceGroupId/position/edge를 확인한다.
+
+### Acceptance Criteria
+- [x] 단위 RED5건→GREEN, flexible/template/group planner 3개 스위트 167건 통과.
+- [ ] DB 통합 회귀 작성, 로컬/CI 실행 결과 기록.
+- [ ] 범위 typecheck/surface, diff/debt 검토, dev PR·CI·머지.
+- [ ] Alpha 검증 결과 또는 정확한 blocker 기록.
+
+### Tech Debt / Security / Risks / Ambiguity
+기존 추천 우회에 앞서 템플릿의 순위 출처와 연결을 일치시킨다. 인증/권한/DTO/스키마 변경 없음.
+브라우저 도구 ego-browser가 현재 세션에 없고 로컬 Docker도 실행 불가. 기존 Alpha는 GET 조회만 수행했다.
+사용자의 최신 요청으로 우선 범위를 신규 템플릿 생성으로 제한한다. 재배정 저장은 이 변경에서 수정하지 않는다.
+
+### Progress Snapshot
+base ff7174832, branch fix/finalist-reassign-20261121, isolated worktree /tmp/teameet-finalist-reassign.
+Alpha 현재 #21=B2/A3→#23=B1, #22=A2/B3→#24=A1. 사용자 대회 데이터 변경 없음.
+
+- v1 surface PASS (842 files); diff --check PASS; touched code debt markers 없음. 코드 자체 검토: 고정 조건은 2개 조 advanceCount=3에만 적용하며 기존 rank-major seeds와 실제 edge 생성 경로를 재사용한다.
+- DB 저장 통합 회귀 작성 완료. 로컬 Docker가 WSL socket 오류로 실행되지 않아 DB 통합은 CI에서 확인한다.
+- 로컬 API typecheck는 공유 node_modules의 오래된 Prisma 생성물(예: V1AdCampaign/bracketTrack 누락)로 1021행 오류. 공유 client는 다른 세션 소유이므로 재생성하지 않음. CI의 새 Prisma 생성 이후 타입/DB 검증을 머지 게이트로 사용한다.
+- ego-browser가 없어 Alpha 클릭·스크린샷 검증은 현재 불가. 기존 Alpha/운영 대회는 변경하지 않았다.

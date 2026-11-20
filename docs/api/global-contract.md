@@ -33,6 +33,7 @@ N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대�
 # Global v1 API contract
 
 결선 배정 preview의 target은 `opponentWinnerFixtureId: string | null`을 제공한다. 직접 배정 자리의 상대가 단일 WINNER edge로 정해지면 그 원천 경기 ID, 그 외에는 null이다. 읽기 전용 메타데이터이며 기존 저장 payload/권한/경기 연결은 변경하지 않는다. [대회 계약](./domains/tournaments.md).
+신규 schemaVersion 2의 2개 조 각3팀 진출 템플릿은 추첨값과 무관하게 상단 A1→B2/A3 승자, 하단 B1→A2/B3 승자로 생성한다. 기존 대회는 자동 변경하지 않는다. [대회 계약](./domains/tournaments.md).
 
 대회 관리 API의 권한은 플랫폼 관리자 또는 해당 대회의 활성 `TOURNAMENT_DIRECTOR` 배정이다. 전역 관리자 게이트는 유지한다. 하위 리소스 ID의 실제 소속 대회를 서버에서 확인하고 범위 밖 요청은 `403 PERMISSION_DENIED`다. 자세한 범위와 예외는 [대회 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 

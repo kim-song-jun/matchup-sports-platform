@@ -244,7 +244,13 @@ export function useModalA11y<
   // 읽으면 곧 사라질 입력이 복원 대상이 되고 닫을 때 포커스가 body 로 떨어진다. 렌더 시점에는 아직 트리거에 있다.
   const returnFocusRef = useRef<Element | null>(null);
   const wasOpenRef = useRef(false);
-  if (open && !wasOpenRef.current && !dialogRef.current?.contains(document.activeElement)) {
+  // 서버 렌더에는 document 도 포커스도 없다 — URL 로 열린 시트는 첫 렌더부터 open 이다.
+  if (
+    open &&
+    !wasOpenRef.current &&
+    typeof document !== 'undefined' &&
+    !dialogRef.current?.contains(document.activeElement)
+  ) {
     returnFocusRef.current = document.activeElement;
   }
   wasOpenRef.current = open;

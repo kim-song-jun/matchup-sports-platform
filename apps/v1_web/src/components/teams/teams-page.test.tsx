@@ -240,6 +240,13 @@ describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
     expect(screen.queryByText('모집 여부')).toBeNull();
   });
 
+  it.each([[null, '미정'], [0, '없음'], [30000, '월 30,000원']])('회비 %s는 가입 조건 표에 "%s"로 적는다', (membershipFee, label) => {
+    const base = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, membershipFee } }} />);
+
+    expect(infoRowValue('회비')).toBe(label);
+  });
+
   it('가입 가능은 기본 상태라 배지 없이 표에만 적는다', () => {
     const base = getTeamDetailViewModel('default');
     render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'open', statusLabel: '가입 가능' } }} />);

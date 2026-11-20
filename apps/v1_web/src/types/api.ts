@@ -1049,6 +1049,7 @@ export type V1TeamDetail = {
     genderRule?: string | null;
     joinPolicy: string;
     memberGoalCount: number | null;
+    membershipFee?: number | null;
   };
   owner: {
     userId: string;
@@ -1194,6 +1195,7 @@ export type V1TeamMutationPayload = {
   genderRule?: string | null;
   joinPolicy: 'approval_required' | 'closed';
   memberGoalCount?: number | null;
+  membershipFee?: number | null;
 };
 
 export type V1TeamUpdatePayload = V1TeamMutationPayload & {

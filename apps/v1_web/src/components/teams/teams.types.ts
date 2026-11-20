@@ -91,6 +91,8 @@ export type TeamDetailViewModel = {
     county: string;
     level: string;
     genderRule: string;
+    /** 월 회비(원). 0 = 없음, null = 정하지 않음. */
+    membershipFee?: number | null;
     membersList: Array<{ membershipId: string; userId: string; name: string; role: string; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
@@ -187,6 +189,7 @@ export type TeamFormViewModel = {
     activityTypes: string[];
     activityMemo: string;
     capacity: number;
+    membershipFee?: number | null;
   };
   form?: {
     sportId: string;

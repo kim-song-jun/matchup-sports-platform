@@ -98,7 +98,7 @@ CAUTION:
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions, `{city} 전체` for city-level regions).
 - Team list, detail, `/me/teams` responses include `activityDays`, `activityFrequency`,
-  `activityTimeSlots`, `activityTypes`, `activityMemo`, `activitySummary`, `memberGoalCount`.
+  `activityTimeSlots`, `activityTypes`, `activityMemo`, `activitySummary`, `memberGoalCount`. 상세(`GET /teams/:teamId`)의 `profile`에는 `membershipFee`도 있다.
   `activityAreaText`는 기존 `activity_note` 컬럼을 쓰는 호환/폴백 필드로 남아 있다.
 - 목록 항목은 `recentMatchCount`(number, 0 이상)를 내려준다 — **최근 3개월**(UTC 기준 현재에서 3개월 전부터) 팀 전적에 잡힌 공개·공식 경기 수다. 팀 상세의 전적 요약과 같은 기준(그 게임의 현재 공식 리비전, 숨김·결과 비공개 경기와 비공개 대회 제외)을 `games/public-records/team-record-public-sql.ts` 한 곳에서 쓰고, 한 페이지 팀들을 쿼리 1번으로 센다. 경기가 없으면 `0`이다. 상세·`/me/teams` 응답에는 없다.
 - 목록 항목은 `owner`(팀장 이름·사진)를 내려주고 매니저 이름은 내려주지 않는다 — 목록 카드가 팀장·매니저 줄을 쓰지 않는다(Task 180 G12·H2, 예전 `manager` 필드 제거).
@@ -126,9 +126,11 @@ CAUTION:
 | `minLevelCode` / `maxLevelCode` | level code | No |
 | `genderRule` | string | No |
 | `memberGoalCount` | number | No |
+| `membershipFee` | number(0~10,000,000) \| null | No |
 
 - Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, `activity_types`, and `member_goal_count`.
 - `memberGoalCount`는 팀 정원이다. `memberCount >= memberGoalCount`면 가입 신청, 가입 승인, 팀 초대, 초대 수락이 모두 `TEAM_FULL`로 실패한다. 정원은 현재 `memberCount`보다 낮게 수정할 수 없다.
+- `membershipFee`는 월 회비(원)로 표시용 정보다 — 가입 신청·승인 규칙에는 영향이 없다. `0`은 회비 없음, `null`은 정하지 않음이다. 수정(`PATCH`)에서 필드를 생략하면 저장된 값을 그대로 둔다(`null`을 보내야 지워진다).
 - 새 팀은 기본 `membersVisibilityEnabled=true` / `members_visible=true`다.
 - `regionId`는 active city-level·district-level `v1_regions` 행을 받는다. city-level 행은 팀 UI에서 `{city} 전체`로 표시된다.
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다. `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다. `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.

@@ -32,7 +32,9 @@ export function HomePageClient() {
   const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
   const authMe = useV1AuthMe({ enabled: isAuthenticated });
   const memberAccess = useMemberAccessStatus();
-  const chatRestricted = hasMemberAccessHint() || memberAccess.data?.active === true;
+  const [memberAccessHint, setMemberAccessHint] = useState(false);
+  useEffect(() => { setMemberAccessHint(hasMemberAccessHint()); }, []);
+  const chatRestricted = memberAccessHint || memberAccess.data?.active === true;
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated && !chatRestricted });
   useV1ChatListSocket(isAuthenticated);
   const {

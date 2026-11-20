@@ -14,7 +14,17 @@ import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
 
-const nav = vi.hoisted(() => ({ pathname: '/tournaments' }));
+// 브라우저처럼 주소창도 함께 옮긴다 — 같은 화면 링크 판정은 window.location 을 본다.
+const nav = vi.hoisted(() => {
+  let pathname = '/tournaments';
+  return {
+    get pathname() { return pathname; },
+    set pathname(next: string) {
+      pathname = next;
+      if (window.location.pathname !== next) window.history.replaceState(null, '', next);
+    },
+  };
+});
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
 vi.mock('@/lib/session-storage', () => ({
   getCurrentRedirectPath: () => `${nav.pathname}${window.location.search}${window.location.hash}`,
@@ -101,6 +111,21 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
     clickThen(tab, '/tournaments', () => view.rerender(<ScrollRestoration />));
 
     expect(area.scrollTop).toBe(320);
+  });
+
+  it('같은 화면 탭을 다시 누른 뒤의 프로그램적 이동은 탭 복원이 아니라 맨 위에서 시작한다', () => {
+    const area = mountScrollArea(5000);
+    saveScrollPosition('/teams', 800);
+    const view = render(<ScrollRestoration />);
+
+    const sameTab = anchor('tm-bottom-tab', '/tournaments');
+    sameTab.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    sameTab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    area.scrollTop = 300;
+    nav.pathname = '/teams'; // 클릭 없이 router.push 로 이동
+    view.rerender(<ScrollRestoration />);
+
+    expect(area.scrollTop).toBe(0);
   });
 
   it('일반 링크(카드 클릭)는 여전히 맨 위에서 시작한다', () => {

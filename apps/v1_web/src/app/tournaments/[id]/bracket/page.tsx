@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BracketPageClient } from './bracket-page-client';
+import { bracketIntroLine, isLeagueCompetition } from '@/lib/competition-kind';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -10,9 +12,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!tournament) return buildNoIndexMetadata('대진표를 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${tournament.title} 대진표`,
-    description: `${tournament.title}의 조별 순위와 토너먼트 대진표를 확인하세요.`,
+    // 리그처럼 그리는 대회만 화면 소개 줄과 같은 문장을 쓴다. 그 밖의 형식은 기존 설명을 그대로 둔다.
+    description: isLeagueCompetition(tournament)
+      ? `${tournament.title}의 ${bracketIntroLine(tournament)}`
+      : `${tournament.title}의 조별 순위와 토너먼트 대진표를 확인하세요.`,
     path: `/tournaments/${id}/bracket`,
-    image: tournament.coverImageUrl,
+    image: resolveTournamentImage(tournament, 'cover'),
   });
 }
 

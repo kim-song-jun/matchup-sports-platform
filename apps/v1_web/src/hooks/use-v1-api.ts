@@ -2321,34 +2321,6 @@ export function useV1LeagueClaimableParticipants(
 }
 
 /**
- * 리그 상세(순위·득점·도움)의 "내 기록 연결" 배너용 목록 (F8, 2026-08-26).
- *
- * 리그 상세의 득점·도움 빈 상태는 "신원 연동과 기록 공개에 동의하면 순위가 공개돼요"라고
- * 이유를 말하면서 **연동을 시작할 수단은 주지 않았다**. 이 목록이 그 길이다 — 내 팀이
- * 참가했고 아직 연결되지 않은 참가자가 남은 대진만 돌려준다(서버 필터).
- */
-export type V1LeagueClaimableFixtures = {
-  leagueId: string;
-  fixtures: {
-    teamMatchId: string;
-    title: string;
-    startAt: string;
-    claimableCount: number;
-  }[];
-};
-
-export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: v1Keys.leagueClaimableFixtures(leagueId),
-    queryFn: () =>
-      v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
-    enabled: Boolean(leagueId) && (options?.enabled ?? true),
-    // 비로그인(401)·세션 만료는 정상 응답이다 -- 재시도해도 달라지지 않는다.
-    retry: false,
-  });
-}
-
-/**
  * 승인함 목록 (attest UI C안) — 이 경기에서 내가 승인할 수 있는 대기 중 신원 연결 요청.
  * game 경로라 대회·리그(팀매치) 어느 소스든 같은 훅을 쓴다.
  */
@@ -3522,12 +3494,19 @@ export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
 
 export function useV1CurrentTerms(
   context: 'signup' | 'tournament_application' | 'footer',
-  options?: { enabled?: boolean },
+  options?: {
+    enabled?: boolean;
+    /** 서버가 받아 둔 응답. initialDataUpdatedAt 을 서버가 받은 때로 줘야 staleTime 이 지난 값을 다시 받는다. */
+    initialData?: V1CurrentTerms;
+    initialDataUpdatedAt?: number;
+  },
 ) {
   return useQuery({
     queryKey: v1Keys.currentTerms(context),
     queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
     enabled: options?.enabled,
+    initialData: options?.initialData,
+    initialDataUpdatedAt: options?.initialDataUpdatedAt,
   });
 }
 
@@ -4689,12 +4668,12 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
  * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹(비게이팅).
  * 공개 랭킹과 달리 동의 게이팅이 없어 진짜 순위를 보장한다.
  */
-export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
+export function useV1AdminTournamentPlayerRecords(tournamentId: string, scope: { stageKey?: string; poolKey?: string } = {}) {
   const { v1Get } = useV1DataSource();
   return useQuery({
-    queryKey: v1Keys.adminTournamentPlayerRecords(tournamentId),
+    queryKey: [...v1Keys.adminTournamentPlayerRecords(tournamentId), scope.stageKey ?? '', scope.poolKey ?? ''],
     queryFn: () =>
-      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records`),
+      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records${scope.stageKey || scope.poolKey ? `?${new URLSearchParams({ ...(scope.stageKey ? { stageKey: scope.stageKey } : {}), ...(scope.poolKey ? { poolKey: scope.poolKey } : {}) })}` : ''}`),
     enabled: !!tournamentId,
   });
 }
@@ -6258,7 +6237,8 @@ import type {
   V1AddLeagueTeamPayload,
   V1AddLeagueTeamResult,
   V1AdminLeagueDetail,
-  V1AdminLeagueListItem,
+  V1AdminLeagueListResponse,
+  V1AdminLeagueStatusFilter,
   V1UpdateLeagueVisibilityResult,
   V1ChangeLeagueStatePayload,
   V1ChangeLeagueStateResult,
@@ -6299,6 +6279,9 @@ import type {
   V1CreateManualLeagueFixturePayload,
   V1CreateManualLeagueFixturesResult,
   V1AddPreviousSeasonTeamsResult,
+  V1LinkNextSeasonResult,
+  V1NextSeasonCandidates,
+  V1UnlinkNextSeasonResult,
 
   V1LeagueFixture,
 } from '@/types/league-match';
@@ -6339,14 +6322,25 @@ export function useV1MyLeagues(options?: { enabled?: boolean }) {
   });
 }
 
-/** seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속만. 없으면 전체 (리그 허브 칩 필터). */
-export function useV1AdminLeagueMatchList(seriesId?: string, visibility?: 'public' | 'hidden') {
+/**
+ * 어드민 리그 목록. q: 리그·체계 이름 부분 일치, status: 상태 칩, visibility: 공개 여부.
+ * seriesId(체계 id 또는 'independent')는 API 가 계속 받지만 리그 허브 화면은 쓰지 않는다.
+ */
+export function useV1AdminLeagueMatchList(filters: {
+  seriesId?: string;
+  visibility?: 'public' | 'hidden';
+  q?: string;
+  status?: V1AdminLeagueStatusFilter;
+} = {}) {
+  const { seriesId, visibility, q, status } = filters;
   return useQuery({
-    queryKey: v1Keys.adminLeagueMatchList(seriesId, visibility),
+    queryKey: v1Keys.adminLeagueMatchList({ seriesId, visibility, q, status }),
     queryFn: () =>
-      v1Get<{ items: V1AdminLeagueListItem[] }>('/admin/league-matches', {
+      v1Get<V1AdminLeagueListResponse>('/admin/league-matches', {
         ...(seriesId ? { seriesId } : {}),
         ...(visibility ? { visibility } : {}),
+        ...(q ? { q } : {}),
+        ...(status ? { status } : {}),
       }),
   });
 }
@@ -6391,7 +6385,6 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueClaimableFixtures(leagueId) });
       for (const fixtureId of fixtureIds) {
         queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
       }
@@ -6616,6 +6609,43 @@ export function useV1AddPreviousSeasonTeams(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/**
+ * 이 리그(지난 리그)의 다음 시즌으로 이을 수 있는 리그 후보 — 같은 종목의 독립 리그 중 지난 시즌이 아직 없는 것(2026-11-19).
+ * `enabled` 로 '기존 리그 잇기'를 열었을 때만 부른다.
+ */
+export function useV1NextSeasonCandidates(leagueId: string, enabled = true) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueNextSeasonCandidates(leagueId),
+    queryFn: () => v1Get<V1NextSeasonCandidates>(`/admin/league-matches/${encodeURIComponent(leagueId)}/next-season/candidates`),
+    enabled: Boolean(leagueId) && enabled,
+  });
+}
+
+/** 이미 만든 리그를 이 리그의 다음 시즌으로 잇는다. 양쪽 리그의 상세·목록과 공개 안내를 다시 읽는다. */
+export function useV1LinkNextSeason(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nextLeagueId: string) =>
+      v1Post<V1LinkNextSeasonResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/next-season/link`, { nextLeagueId }),
+    onSuccess: (result) => {
+      invalidateLeagueEverywhere(queryClient, leagueId);
+      invalidateLeagueEverywhere(queryClient, result.nextSeason.leagueId);
+    },
+  });
+}
+
+/** 이어진 다음 시즌 연결을 푼다. 이미 옮겨 온 명단은 그대로 남는다. */
+export function useV1UnlinkNextSeason(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Delete<V1UnlinkNextSeasonResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/next-season/link`),
+    onSuccess: (result) => {
+      invalidateLeagueEverywhere(queryClient, leagueId);
+      invalidateLeagueEverywhere(queryClient, result.unlinkedLeagueId);
     },
   });
 }

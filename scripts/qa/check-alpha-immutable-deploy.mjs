@@ -19,6 +19,7 @@ const expectedRuntimeParameterNames = [
   'GABIA_API_KEY',
   'GABIA_SENDER_NUMBER',
   'GABIA_SMS_ID',
+  'KAKAO_ADMIN_KEY',
   'KAKAO_APP_ID',
   'KAKAO_CLIENT_ID',
   'KAKAO_CLIENT_SECRET',
@@ -30,6 +31,18 @@ const expectedRuntimeParameterNames = [
   'SOLAPI_SENDER_NUMBER',
 ];
 const operatorRuntimeParameterNames = ['ALPHA_SES_ACCESS_KEY_ID', 'ALPHA_SES_SECRET_ACCESS_KEY'];
+// Mirrors the lifecycle rules the live alpha ECR repositories carry.
+const expectedLifecycleRules = {
+  api: [
+    [1, 'Expire untagged images older than 7 days', { tagStatus: 'untagged', countType: 'sinceImagePushed', countUnit: 'days', countNumber: 7 }],
+    [2, 'Keep Task 168 tool images (retagged per deploy, so push time is not recency)', { tagStatus: 'tagged', tagPrefixList: ['task168-'], countType: 'imageCountMoreThan', countNumber: 10 }],
+    [3, 'Keep the 30 most recent release images', { tagStatus: 'tagged', tagPrefixList: ['sha-'], countType: 'imageCountMoreThan', countNumber: 30 }],
+  ],
+  web: [
+    [1, 'Expire untagged images older than 7 days', { tagStatus: 'untagged', countType: 'sinceImagePushed', countUnit: 'days', countNumber: 7 }],
+    [2, 'Keep the 30 most recent release images', { tagStatus: 'tagged', tagPrefixList: ['sha-'], countType: 'imageCountMoreThan', countNumber: 30 }],
+  ],
+};
 const syncScriptsOutsideIam = new Set(['sync-alpha-apple-sign-in-env.sh', 'sync-alpha-firebase-env.sh']);
 
 const workflowPath = '.github/workflows/deploy-alpha.yml';
@@ -42,6 +55,12 @@ const manifestLibraryPath = 'deploy/alpha-manifest-common.sh';
 const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
 const policyRendererPath = 'scripts/infra/render-alpha-immutable-deploy-policies.mjs';
+const lifecycleRendererPath = 'scripts/infra/render-alpha-ecr-lifecycle-policies.mjs';
+// Any lifecycle policy text other than the rendered variable is an inline literal, whatever quoting it uses.
+const provisioningForbiddenPatterns = [
+  [/--lifecycle-policy-text\s+(?!"\$\{lifecycle_policy\}")/, 'lifecycle rules must come from the renderer, not an inline literal'],
+  [/\blifecycle_policy=(?!"\$\(node "\$\{lifecycle_renderer\}")/, 'lifecycle_policy must only be assigned from the renderer output'],
+];
 const runtimeSyncPath = 'scripts/release/sync-alpha-inquiry-slack-env.sh';
 const firebaseRuntimeSyncPath = 'scripts/release/sync-alpha-firebase-env.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
@@ -59,6 +78,7 @@ const sources = new Map([
   [rollbackWorkflowPath, readRequiredFile(rollbackWorkflowPath)],
   [provisioningPath, readRequiredFile(provisioningPath)],
   [policyRendererPath, readRequiredFile(policyRendererPath)],
+  [lifecycleRendererPath, readRequiredFile(lifecycleRendererPath)],
   [runtimeSyncPath, readRequiredFile(runtimeSyncPath)],
   [firebaseRuntimeSyncPath, readRequiredFile(firebaseRuntimeSyncPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
@@ -74,6 +94,8 @@ if (kakaoBuildGate < 0 || kakaoBuildGate > alphaWorkflow.indexOf('- name: Resolv
 }
 const runtimePolicies = renderRuntimePolicies();
 if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
+const lifecyclePolicies = renderLifecyclePolicies();
+if (lifecyclePolicies !== undefined) validateLifecyclePolicies(lifecyclePolicies, errors);
 validateSyncScriptParameterParity(errors);
 validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
 validateKakaoSyncBehaviour(errors);
@@ -91,6 +113,7 @@ requirePatterns(workflowPath, [
   [/SECRET_KAKAO_CLIENT_ID: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_ID \}\}/, 'API must use the same alpha Kakao app as the web'],
   [/SECRET_KAKAO_CLIENT_SECRET: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_SECRET \}\}/, 'API secret must be isolated from production'],
   [/SECRET_KAKAO_APP_ID: \$\{\{ secrets\.ALPHA_KAKAO_APP_ID \}\}/, 'native token audience must use the alpha app ID'],
+  [/SECRET_KAKAO_ADMIN_KEY: \$\{\{ secrets\.ALPHA_KAKAO_ADMIN_KEY \}\}/, 'Kakao admin key must reach the sync step from the alpha-only secret'],
   [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
   [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (push runs of the exact release SHA only)'],
 ]);
@@ -111,6 +134,7 @@ forbidPatterns(firebaseRuntimeSyncPath, [
 ]);
 
 forbidPatterns(workflowPath, [
+  [/for name in [^\n]*SECRET_KAKAO_ADMIN_KEY/, 'Kakao admin key must stay optional; a required check fails every alpha deploy until the secret exists'],
   [/imageTag=latest/, 'must not deploy a mutable latest tag'],
   [/uses:\s*[^\n]+@v[0-9]/, 'privileged actions must be pinned to full commits'],
 ]);
@@ -210,6 +234,10 @@ requirePatterns(provisioningPath, [
   [/sts:AssumeRoleWithWebIdentity/, 'provisioning must pin the GitHub OIDC trust policy'],
   [/render-alpha-immutable-deploy-policies\.mjs/, 'provisioning must use the canonical IAM policy renderer'],
   [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
+  [/render-alpha-ecr-lifecycle-policies\.mjs/, 'provisioning must use the canonical ECR lifecycle renderer'],
+  [/--lifecycle-policy-text "\$\{lifecycle_policy\}"/, 'provisioning must apply the rendered lifecycle policy'],
+  [/lifecycle_policy="\$\(node "\$\{lifecycle_renderer\}" --repository "\$\{repository_kind\}"\)"/, 'each repository must render the lifecycle policy for its own kind'],
+  [/if \[\[ "\$\{repository_kind\}" == api \]\]; then repository="\$\{API_REPOSITORY\}"; else repository="\$\{WEB_REPOSITORY\}"; fi/, 'the api kind must map to the api repository and web to the web repository'],
 ]);
 
 requirePatterns(policyRendererPath, [
@@ -219,9 +247,7 @@ requirePatterns(policyRendererPath, [
   [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
 ]);
 
-forbidPatterns(provisioningPath, [
-  [/imageCountMoreThan/, 'lifecycle must not blindly expire tagged rollback images'],
-]);
+forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
 
 if (errors.length > 0) {
   console.error('[alpha-immutable-deploy] failed');
@@ -230,7 +256,7 @@ if (errors.length > 0) {
 }
 
 console.log('[alpha-immutable-deploy] passed');
-if (runSelfTest) verifyNegativeControls(runtimePolicies);
+if (runSelfTest) verifyNegativeControls(runtimePolicies, lifecyclePolicies);
 
 function renderRuntimePolicies() {
   const accountId = '123456789012';
@@ -257,13 +283,51 @@ function renderRuntimePolicies() {
   }
 }
 
+function renderLifecyclePolicies() {
+  const policies = {};
+  for (const repository of Object.keys(expectedLifecycleRules)) {
+    const result = spawnSync(process.execPath, [lifecycleRendererPath, '--repository', repository], {
+      cwd: resolve(sourceRoot),
+      encoding: 'utf8',
+    });
+    if (result.status !== 0) {
+      errors.push(`${lifecycleRendererPath}: failed to render ${repository} ECR lifecycle policy: ${result.stderr.trim()}`);
+      return undefined;
+    }
+    try {
+      policies[repository] = JSON.parse(result.stdout);
+    } catch (error) {
+      errors.push(`${lifecycleRendererPath}: rendered ${repository} ECR lifecycle policy is not valid JSON: ${error.message}`);
+      return undefined;
+    }
+  }
+  return policies;
+}
+
+function validateLifecyclePolicies(policies, targetErrors) {
+  for (const [repository, rules] of Object.entries(expectedLifecycleRules)) {
+    const expected = {
+      rules: rules.map(([rulePriority, description, selection]) => ({
+        rulePriority,
+        description,
+        selection,
+        action: { type: 'expire' },
+      })),
+    };
+    if (JSON.stringify(policies?.[repository]) !== JSON.stringify(expected)) {
+      targetErrors.push(`${lifecycleRendererPath}: ${repository} ECR lifecycle policy must equal the rules the live repository carries`);
+    }
+  }
+}
+
 function validateSyncScriptParameterParity(targetErrors) {
   for (const file of readdirSync(resolve(sourceRoot, 'scripts/release'))) {
     if (!/^sync-alpha-.+-env\.sh$/.test(file) || syncScriptsOutsideIam.has(file)) continue;
     const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
     const written = new Set();
-    const namesArray = source.match(/^names=\(([^)]*)\)/m);
-    if (namesArray) namesArray[1].trim().split(/\s+/).forEach((name) => written.add(name));
+    for (const namesArray of source.matchAll(/^\s*names\+?=\(([^)]*)\)/gm)) {
+      namesArray[1].trim().split(/\s+/).filter(Boolean).forEach((name) => written.add(name));
+    }
     const literal = source.match(/parameter_name='\/teameet\/alpha\/env\/([A-Z0-9_]+)'/);
     if (literal) written.add(literal[1]);
     if (written.size === 0) {
@@ -279,10 +343,14 @@ function validateSyncScriptParameterParity(targetErrors) {
 
 // Runs the Kakao sync against a stubbed aws/jq: well-formed secrets must reach put-parameter, malformed
 // ones must leave AWS untouched. A guard that rejects everything still exits 0, so only this catches it.
+// The jq stub keeps the script that would run on the host, so the names the runner writes and the names
+// the host reads can be compared; a name present in only one of the two loops fails the real deploy.
 function validateKakaoSyncBehaviour(targetErrors) {
   const script = resolve(sourceRoot, 'scripts/release/sync-alpha-kakao-env.sh');
   const stubDir = mkdtempSync(join(tmpdir(), 'kakao-sync-stub-'));
   const callLog = join(stubDir, 'aws-calls.log');
+  const remoteFile = join(stubDir, 'remote-script.sh');
+  const label = 'scripts/release/sync-alpha-kakao-env.sh';
   try {
     writeFileSync(join(stubDir, 'aws'), [
       '#!/usr/bin/env bash',
@@ -290,9 +358,18 @@ function validateKakaoSyncBehaviour(targetErrors) {
       'case "$2" in send-command) echo cmd-0;; get-command-invocation) echo Success;; esac',
       '',
     ].join('\n'));
-    writeFileSync(join(stubDir, 'jq'), '#!/usr/bin/env bash\necho "{}"\n');
+    writeFileSync(join(stubDir, 'jq'), [
+      '#!/usr/bin/env bash',
+      'while [[ $# -gt 0 ]]; do',
+      `  if [[ "$1" == --arg && "$2" == script ]]; then printf '%s' "$3" > '${remoteFile}'; fi`,
+      '  shift',
+      'done',
+      'echo "{}"',
+      '',
+    ].join('\n'));
     chmodSync(join(stubDir, 'aws'), 0o755);
     chmodSync(join(stubDir, 'jq'), 0o755);
+    const adminKey = 'fedcba9876543210fedcba9876543210';
     const valid = {
       INSTANCE_ID: 'i-0123456789abcdef0',
       AWS_REGION: 'ap-northeast-2',
@@ -300,33 +377,65 @@ function validateKakaoSyncBehaviour(targetErrors) {
       SECRET_KAKAO_CLIENT_SECRET: 'AbCdEf0123456789AbCdEf0123456789',
       SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://alpha.teameet.co.kr/callback/kakao',
       SECRET_KAKAO_APP_ID: '1234567',
+      SECRET_KAKAO_ADMIN_KEY: '',
     };
     const run = (overrides) => {
       rmSync(callLog, { force: true });
+      rmSync(remoteFile, { force: true });
       const result = spawnSync('bash', [script], {
         encoding: 'utf8',
         env: { ...process.env, ...valid, ...overrides, PATH: `${stubDir}:${process.env.PATH}` },
       });
       let calls = '';
       try { calls = readFileSync(callLog, 'utf8'); } catch { calls = ''; }
+      let remote = '';
+      try { remote = readFileSync(remoteFile, 'utf8'); } catch { remote = ''; }
       const written = [...calls.matchAll(/put-parameter .*--name \/teameet\/alpha\/env\/([A-Z_]+)/g)].map((match) => match[1]);
-      return { result, calls, written };
+      const remoteNames = remote.match(/^for name in (.*); do$/m)?.[1].trim().split(/\s+/) ?? [];
+      const remoteSyntax = remote ? spawnSync('bash', ['-n'], { input: remote, encoding: 'utf8' }) : null;
+      return { result, calls, written, remote, remoteNames, remoteSyntax };
+    };
+    const sorted = (names) => [...names].sort().join(',');
+
+    const required = ['KAKAO_CLIENT_ID', 'KAKAO_CLIENT_SECRET', 'KAKAO_REDIRECT_URI', 'KAKAO_APP_ID'];
+    const checkRun = (description, outcome, expected, expectAdminInRemote) => {
+      if (outcome.result.status !== 0 || sorted(outcome.written) !== sorted(expected)) {
+        targetErrors.push(`${label}: ${description} must write exactly ${expected.join(', ')} (exit ${outcome.result.status}, wrote [${outcome.written.join(', ')}])`);
+        return;
+      }
+      if (sorted(outcome.remoteNames) !== sorted(expected)) {
+        targetErrors.push(`${label}: ${description}: the host must read exactly the names the runner wrote (host reads [${outcome.remoteNames.join(', ')}])`);
+      }
+      if (outcome.remoteSyntax?.status !== 0) {
+        targetErrors.push(`${label}: ${description}: the generated host script is not valid bash`);
+      }
+      if (/KAKAO_ADMIN_KEY/.test(outcome.remote) !== expectAdminInRemote) {
+        targetErrors.push(`${label}: ${description}: KAKAO_ADMIN_KEY must ${expectAdminInRemote ? '' : 'not '}appear in the host script`);
+      }
     };
 
-    const happy = run({});
-    const expected = ['KAKAO_CLIENT_ID', 'KAKAO_CLIENT_SECRET', 'KAKAO_REDIRECT_URI', 'KAKAO_APP_ID'];
-    if (happy.result.status !== 0 || expected.some((name) => !happy.written.includes(name))) {
-      targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: well-formed secrets did not write ${expected.join(', ')} (exit ${happy.result.status}, wrote [${happy.written.join(', ')}])`);
+    // Without the optional admin key the other four still sync and the admin key is absent everywhere.
+    checkRun('empty admin key', run({}), required, false);
+    checkRun('unset admin key', run({ SECRET_KAKAO_ADMIN_KEY: undefined }), required, false);
+    const withKey = run({ SECRET_KAKAO_ADMIN_KEY: adminKey });
+    checkRun('well-formed admin key', withKey, [...required, 'KAKAO_ADMIN_KEY'], true);
+    const sendCommandCalls = withKey.calls.split('\n').filter((line) => /ssm send-command/.test(line));
+    if (sendCommandCalls.some((line) => line.includes(adminKey)) || withKey.remote.includes(adminKey)) {
+      targetErrors.push(`${label}: the admin key value must reach the host through Parameter Store only, never the SSM command`);
     }
-    for (const [label, overrides] of [
+
+    for (const [rejectLabel, overrides] of [
       ['foreign redirect host', { SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://evil.example/callback/kakao' }],
       ['short client id', { SECRET_KAKAO_CLIENT_ID: 'abc' }],
       ['invalid native app id', { SECRET_KAKAO_APP_ID: 'not-an-app-id' }],
       ['missing native app id', { SECRET_KAKAO_APP_ID: '' }],
+      ['admin key with a space', { SECRET_KAKAO_ADMIN_KEY: 'fedcba9876543210 fedcba9876543210' }],
+      ['admin key with a quote', { SECRET_KAKAO_ADMIN_KEY: "fedcba9876543210fedcba98765'3210" }],
+      ['short admin key', { SECRET_KAKAO_ADMIN_KEY: 'abc' }],
     ]) {
       const rejected = run(overrides);
       if (rejected.result.status === 0 || rejected.calls !== '') {
-        targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: ${label} must fail and leave AWS untouched (exit ${rejected.result.status})`);
+        targetErrors.push(`${label}: ${rejectLabel} must fail and leave AWS untouched (exit ${rejected.result.status})`);
       }
     }
   } finally {
@@ -460,7 +569,7 @@ function forbidPatterns(filePath, forbidden) {
   }
 }
 
-function verifyNegativeControls(renderedPolicies) {
+function verifyNegativeControls(renderedPolicies, renderedLifecycle) {
   const originalDeploy = sources.get(deployPath);
   const originalCompose = sources.get(composePath);
   const originalProvisioning = sources.get(provisioningPath);
@@ -470,7 +579,8 @@ function verifyNegativeControls(renderedPolicies) {
     originalCompose === undefined ||
     originalProvisioning === undefined ||
     originalRuntimeSync === undefined ||
-    renderedPolicies === undefined
+    renderedPolicies === undefined ||
+    renderedLifecycle === undefined
   ) process.exit(1);
 
   sources.set(deployPath, `${originalDeploy}\ndocker build .\n`);
@@ -510,6 +620,39 @@ function verifyNegativeControls(renderedPolicies) {
   });
   assertPolicyRejected('missing runtime Parameter name', renderedPolicies, (policies) => {
     runtimeStatement(policies.instance).Resource.pop();
+  });
+  for (const [role, label] of [['github', 'GitHub deploy role'], ['instance', 'Alpha EC2 role']]) {
+    assertPolicyRejected(`${label} without KAKAO_ADMIN_KEY`, renderedPolicies, (policies) => {
+      const resource = runtimeStatement(policies[role]).Resource;
+      const index = resource.findIndex((arn) => arn.endsWith('/KAKAO_ADMIN_KEY'));
+      if (index < 0) throw new Error(`${label} policy has no KAKAO_ADMIN_KEY ARN to remove`);
+      resource.splice(index, 1);
+    });
+  }
+
+  for (const [label, replacement] of [
+    ['single-quoted inline lifecycle policy', `--lifecycle-policy-text '{"rules":[]}'`],
+    ['double-quoted inline lifecycle policy', `--lifecycle-policy-text "{\\"rules\\":[]}"`],
+  ]) {
+    sources.set(provisioningPath, originalProvisioning.replace('--lifecycle-policy-text "${lifecycle_policy}"', () => replacement));
+    errors.length = 0;
+    forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+    assertRejected(label);
+  }
+  sources.set(provisioningPath, originalProvisioning.replace('lifecycle_policy="$(node', () => 'lifecycle_policy=\'{"rules":[]}\'\n  lifecycle_policy="$(node'));
+  errors.length = 0;
+  forbidPatterns(provisioningPath, provisioningForbiddenPatterns);
+  assertRejected('hardcoded lifecycle_policy assignment');
+  sources.set(provisioningPath, originalProvisioning);
+
+  assertLifecycleRejected('dropped release retention rule', renderedLifecycle, (policies) => {
+    policies.web.rules.pop();
+  });
+  assertLifecycleRejected('dropped Task 168 retention rule', renderedLifecycle, (policies) => {
+    policies.api.rules.splice(1, 1);
+  });
+  assertLifecycleRejected('changed retention count', renderedLifecycle, (policies) => {
+    policies.api.rules[2].selection.countNumber = 31;
   });
 
   errors.length = 0;
@@ -554,6 +697,17 @@ function assertPolicyRejected(label, renderedPolicies, mutate) {
   const policyErrors = [];
   validateRuntimePolicies(policies, policyErrors);
   if (policyErrors.length === 0) {
+    console.error(`[alpha-immutable-deploy] negative control was not rejected: ${label}`);
+    process.exit(1);
+  }
+}
+
+function assertLifecycleRejected(label, renderedLifecycle, mutate) {
+  const policies = JSON.parse(JSON.stringify(renderedLifecycle));
+  mutate(policies);
+  const lifecycleErrors = [];
+  validateLifecyclePolicies(policies, lifecycleErrors);
+  if (lifecycleErrors.length === 0) {
     console.error(`[alpha-immutable-deploy] negative control was not rejected: ${label}`);
     process.exit(1);
   }

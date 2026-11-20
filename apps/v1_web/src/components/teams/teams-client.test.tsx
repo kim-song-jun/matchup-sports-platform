@@ -1120,10 +1120,17 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       regionName: '서울', memberCount: 4, genderRule: raw,
     } as unknown as V1Team;
     const list = render(<TeamListPageView model={{ ...getTeamListViewModel(), teams: [toTeam(api)] }} />);
-    const tags = Array.from(list.container.querySelectorAll('.tm-team-tag-text')).map((el) => el.textContent);
-    if (label) expect(tags).toContain(label);
-    else expect(tags.filter((tag) => tag === raw || tag === '성별 무관')).toHaveLength(0);
-    if (raw && raw !== label) expect(tags).not.toContain(raw);
+    // 카드 둘째 줄(종목 · 지역 · 성별)에 성별이 들어간다 — 칩 '남'·'여'는 문장 속에서 '남성'·'여성'으로 풀어 쓴다.
+    const subLine = list.container.querySelector('.tm-team-card .tm-text-caption')?.textContent ?? '';
+    const parts = subLine.split(' · ');
+    const shown = label === '남' ? '남성' : label === '여' ? '여성' : label;
+    if (shown) expect(parts).toContain(shown);
+    else {
+      expect(parts).not.toContain('성별 무관');
+      // 'unknown-rule' 같은 알 수 없는 값은 그대로 새기지 않는다(빈 값은 검사하지 않는다).
+      if (raw) expect(parts).not.toContain(String(raw).trim());
+    }
+    if (raw && raw !== label && raw !== shown) expect(parts).not.toContain(String(raw).trim());
     list.unmount();
 
     const detail = seededDetail();
@@ -1133,7 +1140,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     });
     render(<TeamDetailPageClient teamId="team-1" />);
     screen.getAllByText('성별 조건').forEach((el) =>
-      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미정'}`),
+      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미설정'}`),
     );
     expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' }).length).toBeGreaterThan(0);
   });

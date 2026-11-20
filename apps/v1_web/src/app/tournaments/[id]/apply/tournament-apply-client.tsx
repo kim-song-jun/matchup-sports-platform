@@ -8,6 +8,7 @@ import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
@@ -1377,6 +1378,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     depositorName: '',
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // 서버가 신청을 거절한 사유 — 화면 아래 배너만으로는 놓치기 쉬워 확인 창으로도 한 번 더 알린다.
+  const [rejectReason, setRejectReason] = useState<string | null>(null);
+  // `?team=` 진입 effect 가 이미 반영한 입력의 키 — 같은 입력이면 다시 반영하지 않는다(아래 effect 주석).
+  const requestedTeamAppliedKeyRef = useRef<string | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [submittedPaymentInstructions, setSubmittedPaymentInstructions] =
     useState<V1TournamentPaymentInstructions | null>(null);
@@ -1502,6 +1507,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     }
 
     const registration = myRegistrations.find((item) => item.teamId === requestedTeamId);
+    // 이 effect 의 deps(`managerTeams`·`myRegistrations`)는 렌더마다 새 배열이라 effect 가 렌더마다 다시 돈다.
+    // 같은 입력을 다시 반영하면 방금 저장한 제출 거절 사유(`submitError`)를 다음 렌더가 곧바로 지워서
+    // 서버가 이유를 줘도 화면에는 아무것도 남지 않았다. 입력이 실제로 바뀔 때만 반영한다.
+    const appliedKey = [requestedTeamId, registration?.id ?? '', registration?.status ?? '', newRegistrationBlockMessage ?? ''].join('|');
+    if (requestedTeamAppliedKeyRef.current === appliedKey) return;
+    requestedTeamAppliedKeyRef.current = appliedKey;
     setSelectedTeamId(requestedTeamId);
     setSubmitError(null);
 
@@ -1653,6 +1664,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       );
   }
 
+  /** 신청 실패 — 배너(`submitError`)에 남기고, 화면 가운데 확인 창으로도 사유를 알린다. */
+  function reportApplyFailure(err: unknown, fallback: string) {
+    const message = extractErrorMessage(err, fallback);
+    setSubmitError(message);
+    setRejectReason(message);
+  }
+
   async function handleTeamNext() {
     if (createBusyRef.current || isCreating) return;
     if (!selectedTeamId) return;
@@ -1694,7 +1712,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       }
       window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`));
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, '신청을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+      reportApplyFailure(err, '신청을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       createBusyRef.current = false;
     }
@@ -1729,7 +1747,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       trackEvent('tournament_apply_complete', { tournamentId });
       setStep('payment');
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+      reportApplyFailure(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       submitBusyRef.current = false;
     }
@@ -1875,6 +1893,15 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             onConfirm={confirmAgreementsSubmit}
           />
         ) : null}
+        <ConfirmModal
+          open={rejectReason !== null}
+          title="신청하지 못했어요"
+          message={rejectReason === null ? '' : withCompetitionNoun(rejectReason, competitionNoun)}
+          confirmLabel="확인"
+          hideCancel
+          onConfirm={() => setRejectReason(null)}
+          onCancel={() => setRejectReason(null)}
+        />
       </div>
     </>
   );

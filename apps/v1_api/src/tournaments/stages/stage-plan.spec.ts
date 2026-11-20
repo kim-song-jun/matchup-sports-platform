@@ -5,6 +5,27 @@ function twenty(): StagePlanDto {
   return { version: 1, stages: [{ key: 'pre', name: '예선', pools: first }, { key: 'main', name: '본선', pools: Array.from({ length: 4 }, (_, i) => ({ key: `main${i}`, name: `${i + 1}위 리그`, format: 'league' as const, capacity: 5, legs: 1 as const, sources: first.map(p => ({ poolKey: p.key, rank: i + 1 })) })) }] };
 }
 describe('stage composition planner', () => {
+  it('creates a third-place match with loser edges and allows ranks three and four downstream', () => {
+    const config: StagePlanDto = { version: 1, stages: [
+      { key: 'pre', name: '예선', pools: [{ key: 'ko', name: '토너먼트', format: 'knockout', capacity: 4, legs: 1, thirdPlace: true, sources: [] }] },
+      { key: 'main', name: '본선', pools: [{ key: 'league', name: '리그', format: 'league', capacity: 2, legs: 1, overallRankStart: 3, sources: [{ poolKey: 'ko', rank: 3 }, { poolKey: 'ko', rank: 4 }] }] },
+    ] };
+    expect(validateStagePlan(config, 4).fixtures).toBe(5);
+    const generated = planCompetitionStages(config);
+    expect(generated.groups.some(group => group.phase === 'third_place')).toBe(true);
+    expect(generated.edges.filter(edge => edge.outcome === 'LOSER')).toHaveLength(2);
+  });
+  it('supports distinct cross-pool wildcard places and rejects overlapping direct qualification', () => {
+    const config = twenty();
+    config.stages[1].pools = [{ key: 'wild', name: '와일드카드', format: 'league', capacity: 2, legs: 1, sources: [1, 2].map(comparisonPosition => ({ poolKey: 'pre0', rank: 2, comparisonPoolKeys: ['pre0', 'pre1', 'pre2'], comparisonPosition })) }];
+    expect(() => validateStagePlan(config, 20)).not.toThrow();
+    config.stages[1].pools[0].sources[1] = { poolKey: 'pre0', rank: 2 };
+    expect(() => validateStagePlan(config, 20)).toThrow();
+  });
+  it('rejects overlapping final rank ranges', () => {
+    const config = twenty(); config.stages[1].pools[0].overallRankStart = 1; config.stages[1].pools[1].overallRankStart = 5;
+    expect(() => validateStagePlan(config, 20)).toThrow();
+  });
   it('20팀의 예선30/본선40경기를 만들고 각 팀 자리를 단계 범위로 분리한다', () => {
     const config = twenty(); expect(validateStagePlan(config, 20)).toMatchObject({ fixtures: 70, stages: 2 });
     const plan = planCompetitionStages(config);

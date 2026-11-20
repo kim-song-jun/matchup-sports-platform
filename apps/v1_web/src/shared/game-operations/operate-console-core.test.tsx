@@ -659,6 +659,38 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(foulGroup).not.toHaveTextContent('0부터 다시 세요');
   });
 
+  // 2026-11-18 사용자 결정: 옐로·레드카드도 팀 파울 1개로 세고, 경고 누적 퇴장(옐로 2장 뒤 레드)은 세지 않는다.
+  it('팀 파울 막대는 카드도 파울로 세고 경고 누적 퇴장 레드는 세지 않는다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+    ]);
+    const cardEvent = (id: string, sequence: number, color: 'YELLOW' | 'RED', sideId: string, participantId: string) => ({
+      id, gameId: 'game-1', sequence, clientEventId: `${id}-client`,
+      payloadHash: `${id}-hash`, type: 'CARD', sideId, participantId,
+      assistParticipantId: null, period: 1, clockMs: sequence * 60_000,
+      occurredAt: '2026-08-07T00:10:00.000Z', receivedAt: '2026-08-07T00:10:00.000Z',
+      actorUserId: 'actor-1', reversesEventId: null, payload: { card: color },
+    }) as GameEventRecord;
+    testFixtures.operations.mockReturnValue(
+      consoleState({
+        liveEvents: [
+          cardEvent('yellow-1', 1, 'YELLOW', 'side-home', 'participant-1'),
+          cardEvent('yellow-2', 2, 'YELLOW', 'side-home', 'participant-1'),
+          cardEvent('red-accumulated', 3, 'RED', 'side-home', 'participant-1'),
+          cardEvent('red-direct', 4, 'RED', 'side-away', 'participant-2'),
+        ],
+      }),
+    );
+
+    render(<CoreHarness />);
+
+    const foulGroup = screen.getByRole('group', { name: '전반 팀 파울' });
+    // 홈: 옐로 2장 = 파울 2개(레드는 경고 누적 퇴장이라 제외). 원정: 직접 레드 = 파울 1개.
+    expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('파울 2');
+    expect(within(foulGroup).getByText('성수 풋살 클럽').closest('div')).toHaveTextContent('파울 1');
+  });
+
   // MD-QA #189: 하프타임에는 방금 끝난 전반의 팀 파울을 보여 주고, 후반에 다시 센다고 알려 준다.
   it('하프타임에는 전반 팀 파울과 후반에 0부터 다시 센다는 안내를 보여준다', () => {
     gameWithPeriods('LIVE', [
@@ -1117,9 +1149,28 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       // 경기를 시작해 주세요 배너가 하프타임 배너로 잘못 겹치지 않아야 한다.
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
 
-      // 하프타임 동안 골/카드 등 액션 버튼은 여전히 막혀 있어야 한다(LIVE인
-      // 피리어드가 없다 — currentPeriod === null 가드는 손대지 않았다).
-      expect(screen.getByRole('button', { name: /^골/ })).toBeDisabled();
+      // 하프타임에도 빠진 골·카드·파울은 앞 피리어드 끝 시각으로 기록할 수 있다
+      // (2026-11-18 사용자 확정). LIVE인 피리어드가 없어도 이 네 종류는 열린다.
+      expect(screen.getByRole('button', { name: /^골/ })).toBeEnabled();
+    });
+
+    it('골·자책골·옐로/레드카드·파울은 열려 있고, 하프타임 안내가 그 사실을 알려준다', () => {
+      gameAtHalftime();
+      render(<CoreHarness />);
+
+      for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
+        expect(screen.getByRole('button', { name })).toBeEnabled();
+      }
+      expect(screen.getByText(/빠진 골·카드·파울은 지금도 앞 피리어드 끝 시각으로 기록할 수 있어요/)).toBeInTheDocument();
+    });
+
+    it('하프타임에 누른 골은 전반이 실제로 뛴 시간(20:00)에 고정해 기록한다', async () => {
+      gameAtHalftime();
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: '골' }));
+
+      expect(await screen.findByText(/20:00 시점 기록/)).toBeInTheDocument();
     });
 
     it('"후반 시작"을 누르면 확인 모달을 거쳐 start-period를 보낸다', async () => {
@@ -1179,6 +1230,10 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
       expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
       expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+      // 시트 설명은 점수 규칙을 말하지 않는다 — 몰수(3:0, 3골 차 이상이면 기록 그대로)와 중단(기록된 점수)이
+      // 한 줄에 섞이면 한쪽이 틀리므로 점수 안내는 종료 창이 고른 종류에 맞춰 한다.
+      expect(within(sheet).getByText('사유를 남기고 마쳐요.')).toBeInTheDocument();
+      expect(within(sheet).queryByText(/기록된 점수/)).toBeNull();
     });
 
     it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {

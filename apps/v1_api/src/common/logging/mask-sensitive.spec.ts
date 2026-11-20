@@ -145,7 +145,38 @@ describe('maskSensitive', () => {
   it('masks the recovery proofs of the phone and the mailbox', () => {
     expect(
       maskSensitive({ phone: '01012345678', proofToken: 'signed.phone', email: 'a@example.com', emailProofToken: 'signed.email' }),
-    ).toEqual({ phone: '[REDACTED]', proofToken: '[REDACTED]', email: 'a@example.com', emailProofToken: '[REDACTED]' });
+    ).toEqual({ phone: '[REDACTED]', proofToken: '[REDACTED]', email: '[REDACTED]', emailProofToken: '[REDACTED]' });
+  });
+
+  // /auth/social-profile·/auth/register 가 4xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 이름·성별·이메일이 평문으로 남으면 안 된다.
+  it('masks the personal fields of the signup bodies wherever they appear, and not their neighbours', () => {
+    expect(
+      maskSensitive({
+        realName: '홍길동',
+        displayName: '길동',
+        gender: 'male',
+        email: 'a@example.com',
+        real_name: '홍길동',
+        'display-name': '길동',
+        Gender: 'female',
+        nested: { profile: { realName: '김철수', gender: 'male' }, list: [{ email: 'b@example.com', title: '킥오프' }] },
+        title: '주말 풋살',
+        genderRule: 'female_only',
+        nickname: '러너',
+      }),
+    ).toEqual({
+      realName: '[REDACTED]',
+      displayName: '[REDACTED]',
+      gender: '[REDACTED]',
+      email: '[REDACTED]',
+      real_name: '[REDACTED]',
+      'display-name': '[REDACTED]',
+      Gender: '[REDACTED]',
+      nested: { profile: { realName: '[REDACTED]', gender: '[REDACTED]' }, list: [{ email: '[REDACTED]', title: '킥오프' }] },
+      title: '주말 풋살',
+      genderRule: 'female_only',
+      nickname: '러너',
+    });
   });
 
   // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
@@ -263,6 +294,15 @@ describe('maskSensitiveText', () => {
 
   it('leaves non-sensitive query params and text untouched', () => {
     expect(maskSensitiveText('/matches?page=2&sort=asc')).toBe('/matches?page=2&sort=asc');
+  });
+
+  it('masks the signup personal fields in a query string and in embedded JSON text, keeping their neighbours', () => {
+    expect(maskSensitiveText('Cannot GET /api/v1/x?email=a@example.com&gender=male&realName=%ED%99%8D&title=cup&genderRule=any')).toBe(
+      'Cannot GET /api/v1/x?email=[REDACTED]&gender=[REDACTED]&realName=[REDACTED]&title=cup&genderRule=any',
+    );
+    expect(maskSensitiveText('upstream said {"realName":"홍길동","displayName":"길동","gender":"male","email":"a@example.com","title":"cup","genderRule":"any"}')).toBe(
+      'upstream said {"realName":"[REDACTED]","displayName":"[REDACTED]","gender":"[REDACTED]","email":"[REDACTED]","title":"cup","genderRule":"any"}',
+    );
   });
 
   it('leaves plain text with no key=value pattern untouched', () => {

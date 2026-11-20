@@ -1,5 +1,5 @@
 // apps/v1_web/src/lib/route-chrome/fragments/tournaments-core.ts
-// U32 — tournaments-core: 목록/상세/일정/브래킷/최종결과/시상 6패턴.
+// U32 — tournaments-core: 목록/상세/브래킷/최종결과/시상 5패턴(일정은 설정의 영구 이동으로 접혔다).
 // docs/design/app-shell-promotion.md 부록 A TOURNAMENTS_ROUTES(7패턴, list/detail/
 // schedule/bracket/results/awards/campaigns)를 시드로, 실제 파일을 직접 열어 확인한
 // 값으로 채웠다. campaigns는 U32 시점엔 backHref가 검색 파라미터 의존이라 제외했으나,
@@ -16,7 +16,7 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     // 같은 pathname 패턴을 tournaments/[id]/not-found.tsx도 그대로 재사용한다 — not-found는
     // notFound()가 던져진 그 URL 그대로 렌더되므로 pathname이 실제 페이지와 동일하다
     // (§2.25~2.38 공통 절차 6번, 자체 AppChrome 제거). 계획 문서가 "4개"라 적은 not-found
-    // 중 이 패턴을 공유하는 건 [id]/schedule/bracket/results 4개 — campaigns(맨 아래 별도
+    // 중 이 패턴을 공유하는 건 [id]/bracket/results 3개 — campaigns(맨 아래 별도
     // 패턴)는 검색 파라미터 backHref 계약 때문에 후속 유닛에서 등록했고, reviews는 U33
     // (tournaments-extra)가 자기 페이지와 함께 등록할 몫이라 이 유닛에서 건드리지 않는다.
     pattern: '/tournaments/:id',

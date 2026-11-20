@@ -24,6 +24,9 @@ import 'reflect-metadata';
 import { GamesModule } from '../games/games.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { V1GameOperationsWorkerModule } from './v1-game-operations-worker.module';
+import { Test } from '@nestjs/testing';
+import { PrismaService } from '../prisma/prisma.service';
+import { StagePlanService } from '../tournaments/stages/stage-plan.service';
 
 type ModuleClass = { new (...args: unknown[]): unknown; name: string };
 
@@ -43,6 +46,12 @@ function collectReachableModules(root: ModuleClass, seen: Set<ModuleClass> = new
 }
 
 describe('V1GameOperationsWorkerModule (Task 12 B1/B2 regression guard)', () => {
+  it('resolves the real stage auto-advancement dependency graph without attaching API controllers', async () => {
+    const module = await Test.createTestingModule({ imports: [V1GameOperationsWorkerModule] })
+      .overrideProvider(PrismaService).useValue({ $transaction: async (work: (tx: unknown) => Promise<unknown>) => work({ $executeRaw: async () => 0 }) }).compile();
+    expect(module.get(StagePlanService)).toBeInstanceOf(StagePlanService);
+    await module.close();
+  });
   it(
     'imports cleanly under NODE_ENV=production with no FRONTEND_URL set — the worker\'s real ' +
       'alpha environment (deploy/docker-compose.alpha.yml sets NODE_ENV=production but never ' +

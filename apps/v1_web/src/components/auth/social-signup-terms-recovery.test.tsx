@@ -22,11 +22,13 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
+// 건너뛰기가 남아 있는 가입은 Apple 뿐이다 — 인증을 마친 번호가 있고 이름·성별만 받은 상태로 생년월일 단계부터 시작한다.
 const requiredAuth: V1AuthMe = {
-  user: { id: 'pending-1', email: null, onboardingStatus: 'social_profile_required', authProvider: 'kakao' },
+  user: { id: 'pending-1', email: null, phone: '01012345678', onboardingStatus: 'social_profile_required', authProvider: 'apple' },
   profile: { displayName: '김러너', nickname: null },
-  verification: { emailVerified: false, phoneVerified: false },
-  socialSignupPrefill: { name: '김러너', phone: '01012345678', gender: 'female', birthDate: null },
+  verification: { emailVerified: false, phoneVerified: true },
+  socialSignupPrefill: { name: '김러너', phone: null, gender: 'female', birthDate: null },
+  socialSignupCanDefer: true,
   termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
 };
 let serverAuth = requiredAuth;

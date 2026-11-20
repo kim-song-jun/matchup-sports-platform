@@ -26,6 +26,7 @@ import {
   resolveParticipantProfileHref,
 } from './participant-name-gating';
 import { classifyTeamRecordCategory, type TeamRecordCategory } from './team-record-category';
+import { PUBLIC_OFFICIAL_TEAM_FACT_FILTER, PUBLIC_OFFICIAL_TEAM_FACT_JOINS } from './team-record-public-sql';
 
 type GameSideRow = { readonly id: string; readonly sideKey: 'HOME' | 'AWAY'; readonly teamId: string | null };
 type GameParticipantRow = {
@@ -234,7 +235,7 @@ export class PublicTeamRecordsService {
         penalties: isStatusOnly
           ? null
           : resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
-        // 몰수는 1:0 관례 스코어라 표시 없이는 실제 1:0 승패와 구분되지 않는다.
+        // 몰수는 3:0 관례 스코어라 표시 없이는 실제 3:0 승패와 구분되지 않는다.
         isForfeit: isStatusOnly ? false : resolveIsForfeit(row.resultRevision),
         events: isStatusOnly ? [] : (eventsByGameId.get(row.gameId) ?? []),
         playedAt: row.playedAt.toISOString(),
@@ -607,21 +608,12 @@ export class PublicTeamRecordsService {
         COALESCE(SUM(trf.goals_for), 0)::int AS "goalsFor",
         COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
       FROM v1_team_record_facts trf
-      INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
-      -- finding #40: 랭킹 필터(getPlayerRecords)와 동일한 규칙 -- hidden(정책 row 없음
-      -- 포함, fail-closed)·status_only 경기는 승-무-패·득실 합산에서도 빼야 한다.
-      -- 그 값 자체가 숨긴 경기의 결과를 간접 노출하기 때문.
-      --
-      -- effectivePublicVisibilityMode 를 SQL 로 옮겨 적은 자리다. LIVE 는 PUBLIC_LIVE 와
-      -- 무관하게 남는다 — 킬스위치가 꺼져도 official_only 로 강등될 뿐 확정 결과는
-      -- 공개이므로, 여기서 빼면 킬스위치가 팀 전적을 0 으로 만든다.
-      INNER JOIN v1_game_visibility_policies vp ON vp.game_id = g.id
-      LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
-      LEFT JOIN v1_tournaments league ON league.id = COALESCE(tm.league_id, tm.tournament_id)
+      ${PUBLIC_OFFICIAL_TEAM_FACT_JOINS}
+      -- 공개·공식 경기 기준(현재 공식 리비전, 숨김·결과 비공개 제외, 비공개 대회 제외)은
+      -- team-record-public-sql.ts 한 곳이 정한다 — 팀 목록 카드의 '최근 3개월 경기 수'가 같은 조건을 쓴다.
       WHERE trf.team_id = ${teamId}
-      AND (league.id IS NULL OR league.is_public IS TRUE)
+      AND ${PUBLIC_OFFICIAL_TEAM_FACT_FILTER}
       ${seasonSql}
-      AND vp.mode IN ('LIVE', 'OFFICIAL_ONLY')
       GROUP BY category
     `);
 

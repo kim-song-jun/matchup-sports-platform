@@ -198,7 +198,7 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
             state: 'OFFICIAL',
             supersedesId: null,
             officialAt: new Date('2026-09-05T11:00:00.000Z'),
-            score: { home: 1, away: 0 },
+            score: { home: 3, away: 0 },
             goalEvents: null,
             mvpParticipantId: null,
             outcomeReason: 'FORFEIT',
@@ -223,7 +223,7 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
             state: 'OFFICIAL',
             supersedesId: null,
             officialAt: new Date('2026-09-05T11:00:00.000Z'),
-            score: { home: 1, away: 0 },
+            score: { home: 3, away: 0 },
             goalEvents: null,
             mvpParticipantId: null,
             outcomeReason: 'NORMAL',
@@ -243,7 +243,7 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
       ],
     });
     const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
-    // 몰수 사실(boolean)은 스코어 옆에 뜬다 — 정상 1:0 승리로 오인되지 않는다.
+    // 몰수 사실(boolean)은 스코어 옆에 뜬다 — 정상 3:0 승리로 오인되지 않는다.
     expect(result.outcome).toEqual({ reason: 'FORFEIT', note: null });
     // 운영자가 쓴 내부 메모 원문은 어디에도 없다 — history 항목의 사유가 null.
     expect(result.history).toEqual([
@@ -262,7 +262,7 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
             state: 'OFFICIAL',
             supersedesId: 'prev-revision-id',
             officialAt: new Date('2026-09-05T11:00:00.000Z'),
-            score: { home: 1, away: 0 },
+            score: { home: 3, away: 0 },
             goalEvents: null,
             mvpParticipantId: null,
             outcomeReason: 'NORMAL',

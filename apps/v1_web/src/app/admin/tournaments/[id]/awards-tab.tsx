@@ -107,7 +107,9 @@ export function AwardsTab({
   // 소속팀)이 미리 채워진 항목이 추가된다 — 계정 미연결 후보는 recipientUserId가
   // 비어 저장 전 명단 picker로 채워야 하고, 그 필수 검증은 기존 handleSave가 한다.
   // 읽기 전용 접속(canWrite=false)은 chip을 렌더하지 않으므로 조회도 걸지 않는다.
-  const playerRecords = useV1AdminTournamentPlayerRecords(canWrite ? tournamentId : '');
+  const [recordScope, setRecordScope] = useState('');
+  const [scopeKind, scopeKey] = recordScope.split(':');
+  const playerRecords = useV1AdminTournamentPlayerRecords(canWrite ? tournamentId : '', scopeKind === 'stage' ? { stageKey: scopeKey } : scopeKind === 'pool' ? { poolKey: scopeKey } : {});
   const addRecommendedRow = ({ kind, row }: AwardRecommendation) => {
     setRows((prev) => [
       ...prev,
@@ -234,6 +236,8 @@ export function AwardsTab({
       </div>
 
       {canWrite && (
+        <div>
+        {stagePlan && <label className="block mb-3 tm-text-label">수상 추천 기록 범위<select className="tm-input min-h-11" value={recordScope} onChange={event => setRecordScope(event.target.value)}><option value="">대회 전체 · 누적 기록</option>{stagePlan.stages.map(stage => <optgroup key={stage.key} label={stage.name}><option value={`stage:${stage.key}`}>{stage.name} 전체</option>{stage.pools.map(pool => <option key={pool.key} value={`pool:${pool.key}`}>{stage.name} · {pool.name}</option>)}</optgroup>)}</select></label>}
         <AwardRecommendationChips
           goals={playerRecords.data?.goals}
           assists={playerRecords.data?.assists}
@@ -241,6 +245,7 @@ export function AwardsTab({
           onRetry={() => void playerRecords.refetch()}
           onPick={addRecommendedRow}
         />
+        </div>
       )}
 
       <div className="flex flex-col gap-3">

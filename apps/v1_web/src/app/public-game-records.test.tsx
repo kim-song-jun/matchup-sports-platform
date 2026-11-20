@@ -21,7 +21,6 @@ import type {
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
 } from '@/components/public-game-records/types';
-import TournamentSchedulePage from './tournaments/[id]/schedule/page';
 import TournamentMatchPage from './tournaments/[id]/matches/[fixtureId]/page';
 import TeamRecordsPage from './teams/[id]/records/page';
 import UserRecordsPage from './users/[id]/records/page';
@@ -1151,16 +1150,6 @@ describe('MatchDetailContent — 진행 중 경기의 라이브 스코어/경과
  */
 
 describe('공개 서브라우트의 404 게이트', () => {
-  // 대회 일정은 `/bracket` 으로 접혔다 — 404 게이트는 그 다음 홉이 진다.
-  it('대회 일정: bracket 으로 리다이렉트한다', async () => {
-    await expect(
-      TournamentSchedulePage({
-        params: Promise.resolve({ id: MISSING_ID }),
-        searchParams: Promise.resolve({}),
-      }),
-    ).rejects.toThrow(`NEXT_REDIRECT:/tournaments/${MISSING_ID}/bracket`);
-  });
-
   it('경기 상세: hidden 픽스처와 존재하지 않는 픽스처가 동일한 404로 처리된다', async () => {
     vi.mocked(fetchPublicV1).mockResolvedValue(null);
     await expect(

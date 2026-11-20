@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { getMobileAppStoreUrl } from '@/lib/app-store-links';
 import { detectNativeShell } from '@/lib/native-bridge';
@@ -16,6 +16,7 @@ import './open-in-app-banner.css';
  */
 export function OpenInAppBanner({ placement }: { placement: 'shell' | 'page' }) {
   const pathname = usePathname();
+  const bannerRef = useRef<HTMLElement>(null);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
 
   // 서버는 UA 를 모르므로 첫 렌더는 비워 두고 마운트 뒤에 판정한다(hydration 일치).
@@ -37,10 +38,33 @@ export function OpenInAppBanner({ placement }: { placement: 'shell' | 'page' }) 
     window.setTimeout(() => setStoreUrl(null), 0);
   }, []);
 
+  // 본문의 100% 높이 기준을 유지하면서 글자 크기·폭에 따른 배너 실제 높이를 확보한다.
+  // Keep this hook before the visibility return: navigation can hide a mounted banner.
+  useLayoutEffect(() => {
+    const banner = bannerRef.current;
+    const scrollArea = banner?.parentElement;
+    if (placement !== 'shell' || !banner || !scrollArea?.classList.contains('tm-scroll-area')) return;
+
+    const measure = () => {
+      const height = banner.getBoundingClientRect().height;
+      if (height > 0) scrollArea.style.setProperty('--tm-open-in-app-banner-height', `${height}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(banner);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      scrollArea.style.removeProperty('--tm-open-in-app-banner-height');
+    };
+  }, [pathname, placement, storeUrl]);
+
   if (!storeUrl || isExcludedOpenInAppPath(pathname)) return null;
 
   return (
     <section
+      ref={bannerRef}
       className="tm-open-in-app-banner"
       data-placement={placement}
       aria-label="팀밋 앱으로 열기"

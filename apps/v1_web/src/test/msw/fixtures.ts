@@ -411,6 +411,7 @@ export const v1TeamsFixture: V1Team[] = [
     sportName: '풋살',
     regionName: '서울 강동',
     memberCount: 18,
+    recentMatchCount: 7,
     trustState: 'verified',
     joinPolicy: 'approval_required',
     levelLabel: '초보-중수',

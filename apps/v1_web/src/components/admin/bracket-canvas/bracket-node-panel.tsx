@@ -361,7 +361,7 @@ export function BracketNodePanel({
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>팀 자리</h3>
         {renderSide('HOME')}
         {renderSide('AWAY')}
-        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite} showToast={showToast} onSaved={onClose} />
+        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:'))} showToast={showToast} onSaved={onClose} />
         {hidesOtherGroupTeams ? (
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
         ) : null}
@@ -407,7 +407,7 @@ export function BracketNodePanel({
         <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} />
       </section>
 
-      {canWrite ? (
+      {canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:')) ? (
         <Button type="button" variant="outline" size="md" className="self-start" style={{ color: 'var(--red700)' }} onClick={() => void handleDelete()}>
           경기 삭제
         </Button>

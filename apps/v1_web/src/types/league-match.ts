@@ -3,6 +3,15 @@ import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayl
 /** 리그 저장 상태 — 대회와 같은 값에 보류(on_hold)를 더한다. 초안·접수 중·마감이 따로 보인다(2026-10-27). */
 export type V1LeagueLifecycleStatus = V1TournamentStatus | 'on_hold';
 
+/** 어드민 리그 목록의 상태 칩 키 — 표의 상태 알약과 같은 단위(취소로 남은 행은 completed 로 묶인다). */
+export type V1AdminLeagueStatusFilter = 'draft' | 'open' | 'closed' | 'in_progress' | 'completed' | 'on_hold';
+
+/** GET /admin/league-matches 응답. `summary` 는 검색어·공개 여부 조건만 적용하고 상태 선택은 뺀 칩 숫자다. */
+export interface V1AdminLeagueListResponse {
+  items: V1AdminLeagueListItem[];
+  summary: { total: number; byStatus: Record<V1AdminLeagueStatusFilter, number> };
+}
+
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
@@ -150,7 +159,7 @@ export interface V1LeagueFixture {
   homeScore?: number | null;
   awayScore?: number | null;
   /**
-   * 몰수패로 확정된 결과인지. 몰수는 스코어만 보면 실제 1:0 승리와 구분되지 않아서
+   * 몰수패로 확정된 결과인지. 몰수는 스코어만 보면 실제 3:0 승리와 구분되지 않아서
    * 서버가 boolean 으로 알려준다(어드민이 쓴 몰수 사유 원문은 공개하지 않는다).
    * 공개 상세·어드민 상세 둘 다 채워진다(감사 L-E finding 4 수정 — 어드민 정정
    * 모달이 "현재 몰수로 확정돼 있어요"를 보여주려면 어드민 쪽에도 필요했다).
@@ -182,6 +191,37 @@ export interface V1LeagueFixture {
 export interface V1LeagueSeasonLink {
   leagueId: string;
   title: string;
+}
+
+/** 이 리그의 다음 시즌으로 이을 수 있는 리그 한 건(GET .../next-season/candidates, 2026-11-19). */
+export interface V1NextSeasonCandidate {
+  leagueId: string;
+  title: string;
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
+  startsOn: string | null;
+  endsOn: string | null;
+  /** 이미 참가 확정된 팀 수 — 이어도 이 팀과 명단은 바뀌지 않는다. */
+  confirmedCount: number;
+}
+
+export interface V1NextSeasonCandidates {
+  leagueId: string;
+  /** 후보가 100개를 넘어 최근 100개만 담겼다. */
+  hasMore: boolean;
+  candidates: V1NextSeasonCandidate[];
+}
+
+/** POST .../next-season/link — 지난 리그 id 가 `leagueId` 다. */
+export interface V1LinkNextSeasonResult {
+  leagueId: string;
+  previousTitle: string;
+  nextSeason: V1LeagueSeasonLink;
+}
+
+/** DELETE .../next-season/link */
+export interface V1UnlinkNextSeasonResult {
+  leagueId: string;
+  unlinkedLeagueId: string;
 }
 
 export interface V1AdminLeagueDetail {

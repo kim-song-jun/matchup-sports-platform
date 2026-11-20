@@ -36,9 +36,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { league: leagueRef, startsAt, place } = fixture.data;
   if (!leagueRef) return buildNoIndexMetadata('리그 경기 정보를 확인할 수 없어요');
   const leagueResult = await loadPublic<V1PublicLeagueDetail>(leaguePath(leagueRef.leagueId));
-  if (!leagueResult.ok || !leagueResult.data) {
-    return buildNoIndexMetadata('리그 경기 정보를 확인할 수 없어요');
-  }
+  if (!leagueResult.ok) return buildNoIndexMetadata('리그 경기 정보를 확인할 수 없어요');
+  if (!leagueResult.data) return buildNoIndexMetadata('경기를 찾을 수 없어요');
   const leagueDetail = leagueResult.data;
   const title = resolveFixtureTitle(fixture.data, leagueDetail, fixtureId);
   // 주소의 leagueId 가 틀려도(깨진 링크) canonical 은 경기가 실제로 속한 리그를 가리킨다.
@@ -60,7 +59,7 @@ export default async function LeagueFixturePage({ params }: Props) {
   if (!fixture.ok) {
     throw new Error('리그 경기 상세에 필요한 공개 경기 정보를 불러오지 못했어요');
   }
-  // 이 경로는 proxy.ts matcher 밖이라 없는 경기의 HTTP 404 를 여기서 낸다(조회 실패는 404 가 아니다).
+  // 없는 경기의 HTTP 404 는 proxy.ts 가 정하고 여기서는 안내 화면을 낸다(loading.tsx 때문에 상태 코드는 여기서 못 바꾼다). 조회 실패는 404 가 아니다.
   if (!fixture.data) notFound();
   const detail = fixture.data;
   // 존재하는 친선 팀매치가 잘못된 리그 fixture URL로 들어온 것은 upstream 장애가 아니라 route 404다.
@@ -69,9 +68,11 @@ export default async function LeagueFixturePage({ params }: Props) {
   const league = detail.league;
   const actualLeagueId = league.leagueId;
   const leagueResult = await loadPublic<V1PublicLeagueDetail>(leaguePath(actualLeagueId));
-  if (!leagueResult.ok || !leagueResult.data) {
+  if (!leagueResult.ok) {
     throw new Error('리그 경기 상세에 필요한 공개 리그 정보를 불러오지 못했어요');
   }
+  // 공개 페이지가 없는 리그(삭제·일정 미정)의 경기는 없는 경기와 같다.
+  if (!leagueResult.data) notFound();
   const leagueDetail = leagueResult.data;
   const standingsResult = await loadPublic<V1LeagueStandingsResponse>(`${leaguePath(actualLeagueId)}/standings`);
   const standings = standingsResult.ok ? standingsResult.data : null;

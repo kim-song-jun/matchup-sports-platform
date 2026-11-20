@@ -33,6 +33,9 @@ export type CursorListSeed<T> = {
 
 export const TEAM_LIST_PAGE_SIZE = 20;
 
+/** 팀 목록 기본 정렬 — URL 에 sort 가 없을 때 API 로 보내는 값. */
+export const DEFAULT_TEAM_SORT = 'activity';
+
 /*
  * 클라이언트 무필터 첫 요청과 같은 쿼리다. 매치·팀매치 목록은 파라미터 없이 부르고(서버 기본 20건),
  * 팀 목록은 limit 과 includeFacets 를 붙인다 — 목록 머리의 전체 건수를 첫 렌더부터 채우려면
@@ -54,11 +57,12 @@ const COMMON_LIST_FILTER_PARAMS = ['sportId', 'sort', 'genderRule', 'levelCodes'
 export const MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'regionId'] as const;
 export const TEAM_MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'kind'] as const;
 export const TEAM_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'regionId'] as const;
-/** 기본(최근 등록순)이 아닌 팀 정렬. URL 과 API 가 같은 값을 쓴다. 그 밖의 값은 기본 순서로 연다. */
-export type TeamSort = 'member_count' | 'activity';
+/** 기본(활동 많은순)이 아닌 팀 정렬. URL 과 API 가 같은 값을 쓴다. 그 밖의 값은 기본 순서로 연다. */
+export type TeamSort = 'latest' | 'member_count' | typeof DEFAULT_TEAM_SORT;
 
-export function toTeamSort(value: string | null | undefined): TeamSort | '' {
-  return value === 'member_count' || value === 'activity' ? value : '';
+/** URL 의 정렬. 기본(활동 많은순)은 파라미터가 없는 상태라 `''` 로 접는다. */
+export function toTeamSort(value: string | null | undefined): Exclude<TeamSort, typeof DEFAULT_TEAM_SORT> | '' {
+  return value === 'member_count' || value === 'latest' ? value : '';
 }
 
 /** The team filters that the list client actually sends after parsing its URL state. */
@@ -77,8 +81,8 @@ export function teamListQueryFilters(params: Record<string, string | string[] | 
   const query = firstSearchParam(params.q)?.trim();
   if (query) filters.query = query;
 
-  const sort = toTeamSort(firstSearchParam(params.sort));
-  if (sort) filters.sort = sort;
+  // 기본 정렬도 API 로는 명시해서 보낸다 — 서버 기본(최근 등록순)을 다른 목록 호출과 나눠 쓰기 위해서다.
+  filters.sort = toTeamSort(firstSearchParam(params.sort)) || DEFAULT_TEAM_SORT;
 
   const genderRule = firstSearchParam(params.genderRule);
   if (genderRule === '성별 무관' || genderRule === '남' || genderRule === '여') filters.genderRule = genderRule;
@@ -130,7 +134,8 @@ export function teamListContinuationPath(params: Record<string, string | string[
 
   const search = firstSearchParam(params.q)?.trim();
   if (search) query.set('q', search);
-  if (filters.sort) query.set('sort', filters.sort);
+  // 브라우저 주소에는 기본 정렬을 싣지 않는다 — 기본은 파라미터가 없는 상태다.
+  if (filters.sort && filters.sort !== DEFAULT_TEAM_SORT) query.set('sort', filters.sort);
 
   query.set('cursor', cursor);
   return `/teams?${query.toString()}`;

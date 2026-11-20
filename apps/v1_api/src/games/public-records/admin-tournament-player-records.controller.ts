@@ -1,9 +1,10 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { AdminContextService } from '../../common/admin-context.service';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
+import { TournamentRecordScopeQueryDto } from './dto/public-records-query.dto';
 
 /**
  * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹.
@@ -24,8 +25,9 @@ export class AdminTournamentPlayerRecordsController {
   async getPlayerRecords(
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
+    @Query() scope: TournamentRecordScopeQueryDto = {},
   ) {
     await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
-    return this.tournamentRecords.getPlayerRecordsForAdmin(tournamentId);
+    return this.tournamentRecords.getPlayerRecordsForAdmin(tournamentId, scope);
   }
 }

@@ -1,5 +1,8 @@
 import type { AuthExceptionKind, AuthExceptionViewModel, EmailLoginViewModel, LoginViewModel, SignupCompleteViewModel, SignupFormViewModel, TermsViewModel } from './auth.types';
 
+/** 카카오 로그인 버튼 가이드가 허용하는 문구는 「카카오 로그인」과 「로그인」뿐이다. */
+export const KAKAO_LOGIN_LABEL = '카카오 로그인';
+
 export function getLoginViewModel(redirectPath?: string | null): LoginViewModel {
   const kakaoHref = buildKakaoAuthUrl();
   // redirect 파라미터가 있으면 이메일 로그인 버튼도 해당 경로를 보존해야 세션 만료 후 복귀가 끊기지 않음.
@@ -11,12 +14,11 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
     emailHref,
     guestHref: '/home',
     signupHref: '/terms?mode=signup',
-    providers: [
-      { label: '카카오', background: 'var(--kakao-yellow)', foreground: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
-      { label: '네이버', background: 'var(--naver-green)', foreground: 'var(--static-white)', disabled: true },
-      // Apple 은 여기 없다. 네이티브 셸에서만 동작하므로 AppleLoginButton 이 브리지 존재
-      // 여부를 보고 스스로 나타난다 — 목록에 두면 브라우저에서 영영 "준비 중" 으로 남는다.
-    ],
+    // Apple 은 여기 없다. 네이티브 셸에서만 동작하므로 AppleLoginButton 이 브리지 존재
+    // 여부를 보고 스스로 나타난다 — 목록에 두면 브라우저에서 영영 "준비 중" 으로 남는다.
+    providers: [{ label: KAKAO_LOGIN_LABEL, ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref }],
+    // 버튼 없이 안내 줄로만 알리는 제공자. 네이버는 항상, 카카오는 로그인 설정이 없는 빌드에서만 든다.
+    preparingProviderNames: [...(kakaoHref ? [] : ['카카오']), '네이버'],
   };
 }
 
@@ -46,9 +48,8 @@ export function buildKakaoAuthUrl() {
     response_type: 'code',
   });
 
-  // 이름/전화번호/성별 자동 채움용 추가 동의항목. 카카오는 콘솔에서 승인되지 않은 scope 를
-  // 요청하면 authorize 단계에서 실패시키므로 기본값을 두지 않는다 — 검수 승인 후
-  // NEXT_PUBLIC_KAKAO_SCOPE='name,phone_number,gender' 로 켜면 코드 변경 없이 동작한다.
+  // 카카오는 콘솔에서 꺼져 있거나 승인되지 않은 동의항목을 요청하면 로그인을 실패시킨다.
+  // 그래서 기본값을 두지 않는다.
   const scope = process.env.NEXT_PUBLIC_KAKAO_SCOPE?.trim();
   if (scope) params.set('scope', scope);
 

@@ -360,7 +360,7 @@ export class TournamentsAdminService {
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
-          ...(dto.stagePlan ? { stagePlan: JSON.parse(JSON.stringify(dto.stagePlan)), stagePlanRevision: 1 } : {}),
+          ...(dto.stagePlan ? { stagePlan: JSON.parse(JSON.stringify({ ...dto.stagePlan, ...(dto.stagePlan.autoAdvance ? { automation: { configuredByUserId: user.id } } : {}) })), stagePlanRevision: 1 } : {}),
           sportId: dto.sportId,
           title: dto.title,
           competitionConfigVersionId,
@@ -608,7 +608,7 @@ export class TournamentsAdminService {
     const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
-    if (stagePlanChanged) { data.stagePlan = JSON.parse(JSON.stringify(dto.stagePlan)); data.stagePlanRevision = { increment: 1 }; }
+    if (stagePlanChanged) { data.stagePlan = JSON.parse(JSON.stringify({ ...dto.stagePlan, ...(dto.stagePlan?.autoAdvance ? { automation: { configuredByUserId: user.id } } : {}) })); data.stagePlanRevision = { increment: 1 }; }
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
     if (sportChanged) data.competitionConfigVersionId = sportChangeConfigVersionId;
     if (dto.title !== undefined) data.title = dto.title;
@@ -879,6 +879,9 @@ export class TournamentsAdminService {
       }
       const from = existing.status as TournamentStatus;
       const to = dto.status;
+      if (to === 'open' && existing.registrationDeadlineAt && existing.registrationDeadlineAt.getTime() < Date.now()) {
+        throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청 마감이 지났어요. 마감 일시를 변경한 뒤 접수를 시작해 주세요.' });
+      }
       if (from === to) {
         return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true, requestReviews: false };
       }

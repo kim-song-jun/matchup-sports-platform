@@ -409,6 +409,20 @@ describe('TournamentInfoSection — 장소 스냅샷', () => {
 describe('대회 형식 수정', () => {
   beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
 
+  it('단계형은 형식·팀 수를 잠그고 다른 정보는 변경된 값만 저장한다', () => {
+    renderSection(true, { format: 'league_knockouts', formatChangeBlockedReason: null, stagePlan: {
+      version: 1, stages: [{ key: 'main', name: '본선', pools: [{ key: 'main-league', name: '본선 리그', format: 'league', capacity: 8, legs: 1, sources: [] }] }],
+    } });
+    expect(screen.getByText('단계형 대회', { exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
+    expect(screen.getByLabelText('팀 수')).toBeDisabled();
+    expect(screen.getByRole('link', { name: '단계·편성 구성에서 확인' })).toHaveAttribute('href', '/admin/tournaments/tournament-1/bracket');
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '단계형 새 이름' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '단계형 새 이름', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
   it.each(['league', 'knockout'] as const)('현재 형식을 채우고 %s 변경을 저장 요청에 포함한다', (format) => {
     renderSection(true, { formatChangeBlockedReason: null });
     fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));

@@ -21,6 +21,25 @@ export function formatUserTitle(user: {
   return '프로필 없음';
 }
 
+/**
+ * 회원 목록 칸 표기: 닉네임이 있고 실명이 따로 있으면 `닉네임 (실명)`.
+ * 실명이 없거나 닉네임과 같으면 괄호를 만들지 않고 formatUserTitle 결과 그대로 쓴다.
+ */
+export function formatUserTitleWithRealName(user: {
+  nickname?: string | null;
+  displayName?: string | null;
+  realName?: string | null;
+  email?: string | null;
+  userId?: string;
+  onboardingStatus?: string | null;
+}): string {
+  const title = formatUserTitle(user);
+  const nickname = user.nickname?.trim();
+  const realName = user.realName?.trim();
+  if (!nickname || !realName || realName === nickname) return title;
+  return `${title} (${realName})`;
+}
+
 /** V1UserProfile.onboardingStatus 11종 (types/api.ts) — 모르는 값은 원문 그대로 보여준다 */
 const ONBOARDING_STATUS_LABEL: Record<string, string> = {
   not_started: '시작 전',

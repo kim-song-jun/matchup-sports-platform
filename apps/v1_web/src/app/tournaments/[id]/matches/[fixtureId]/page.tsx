@@ -4,15 +4,25 @@ import { MatchPageClient } from './match-page-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import { buildBreadcrumbLd } from '@/lib/structured-data';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { buildFixtureEventLd } from '@/lib/structured-data-competition';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
+import type { V1TournamentDetail } from '@/types/api';
 
 async function loadMatch(tournamentId: string, fixtureId: string) {
   return fetchPublicV1<PublicMatchDetail>(
     `/tournaments/${encodeURIComponent(tournamentId)}/matches/${encodeURIComponent(fixtureId)}`,
     { cache: 'no-store' },
   );
+}
+
+// 정규 리그 경기는 리그 경기 주소가 대표다(사이트맵·llms·팀 매치 이동이 그 주소를 쓴다). 종류가 비어 있는 옛 행은 대회다.
+async function loadIsRegularLeague(tournamentId: string): Promise<boolean> {
+  const tournament = await fetchPublicV1<Pick<V1TournamentDetail, 'kind'>>(
+    `/tournaments/${encodeURIComponent(tournamentId)}`,
+  );
+  return tournament?.kind === 'regular_league';
 }
 
 export async function generateMetadata({
@@ -31,7 +41,11 @@ export async function generateMetadata({
   return buildPublicMetadata({
     title: `${homeLabel} vs ${awayLabel} | ${match.tournamentTitle}`,
     description: `${match.tournamentTitle} ${competitionFixtureName(match)} 경기 기록을 확인하세요.`,
-    path: `/tournaments/${id}/matches/${fixtureId}`,
+    path: fixtureDetailHref({
+      isRegularLeague: await loadIsRegularLeague(id),
+      competitionId: id,
+      fixtureId,
+    }),
   });
 }
 
@@ -51,7 +65,8 @@ export default async function TournamentMatchPage({
   // 지키면 된다 — 팀장의 사전 준비 동선과 더 이상 얽히지 않는다.
   const match = await loadMatch(id, fixtureId);
   if (!match) notFound();
-  const eventLd = buildFixtureEventLd(match);
+  const isRegularLeague = await loadIsRegularLeague(id);
+  const eventLd = buildFixtureEventLd(match, { isRegularLeague });
   return (
     <>
       {eventLd ? <JsonLd data={eventLd} /> : null}
@@ -59,7 +74,10 @@ export default async function TournamentMatchPage({
         data={buildBreadcrumbLd([
           { name: '대회', path: '/tournaments' },
           { name: match.tournamentTitle, path: `/tournaments/${id}` },
-          { name: `${match.home?.teamName ?? '미정'} vs ${match.away?.teamName ?? '미정'}`, path: `/tournaments/${id}/matches/${fixtureId}` },
+          {
+            name: `${match.home?.teamName ?? '미정'} vs ${match.away?.teamName ?? '미정'}`,
+            path: fixtureDetailHref({ isRegularLeague, competitionId: id, fixtureId }),
+          },
         ])}
       />
       <MatchPageClient tournamentId={id} fixtureId={fixtureId} seed={match} />

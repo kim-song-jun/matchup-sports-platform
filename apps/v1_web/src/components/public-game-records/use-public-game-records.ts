@@ -240,13 +240,13 @@ export function usePublicUserRecords(userId: string, season?: string, type?: Tea
  */
 export function usePublicTournamentPlayerRecords(
   tournamentId: string,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; stageKey?: string; poolKey?: string } = {},
 ) {
   const { v1Get } = useV1DataSource();
   return useQuery({
-    queryKey: publicGameRecordsKeys.playerRecords(tournamentId),
+    queryKey: [...publicGameRecordsKeys.playerRecords(tournamentId), options.stageKey ?? '', options.poolKey ?? ''],
     queryFn: () =>
-      v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records`),
+      v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records${options.stageKey || options.poolKey ? `?${new URLSearchParams({ ...(options.stageKey ? { stageKey: options.stageKey } : {}), ...(options.poolKey ? { poolKey: options.poolKey } : {}) })}` : ''}`),
     enabled: Boolean(tournamentId) && (options.enabled ?? true),
     staleTime: 60_000,
     retry: false,

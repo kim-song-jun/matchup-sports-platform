@@ -76,7 +76,7 @@ describe('teams list metadata', () => {
 
     const html = await serverHtml('sportId=sport-futsal');
     const body = stripScriptTags(html);
-    expect(requestedPath('/teams?sportId=sport-futsal&limit=20&includeFacets=true')).toBe(true);
+    expect(requestedPath('/teams?sportId=sport-futsal&sort=activity&limit=20&includeFacets=true')).toBe(true);
     expect(body).toContain('필터 팀');
     expect(body).not.toContain('전체 팀');
     expect(parseJsonLd(html)).toBeNull();
@@ -87,7 +87,7 @@ describe('teams list metadata', () => {
 
     const html = await serverHtml('sort=unknown&genderRule=unknown&levelCodes=unknown&q=%20%20&status=unknown');
 
-    expect(requestedPath('/teams?limit=20&includeFacets=true')).toBe(true);
+    expect(requestedPath('/teams?sort=activity&limit=20&includeFacets=true')).toBe(true);
     expect(requests.some((url) => url.includes('status=') || url.includes('sort=unknown') || url.includes('genderRule=unknown') || url.includes('levelCodes=unknown'))).toBe(false);
     expect(stripScriptTags(html)).toContain('전체 팀');
     expect(parseJsonLd(html)).toBeNull();

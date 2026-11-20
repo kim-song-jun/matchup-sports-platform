@@ -1,6 +1,6 @@
 # main 선택 승격: 빈 명단 익명 운영 + 퀸즈컵 순위 보정
 
-Status: In Progress
+Status: Deploying
 Owner: Codex (single agent)
 Created: 2026-11-14
 
@@ -13,8 +13,9 @@ Created: 2026-11-14
 ## Original Conditions
 - [x] main 900539b7c 기준으로 90479696b, 6030b9afb, e652493bc, c53714726만 cherry-pick(충돌 없음).
 - [x] API/Web manifest 1.20.3, 양쪽 CHANGELOG에 두 항목만 반영하고 두 Changeset 소비.
-- [ ] 선택 후보의 테스트·타입/빌드·DB 통합·릴리스 정책·CI 확인.
-- [ ] main 대상 PR 준비. main 머지·운영 승인·운영 DB 쓰기는 금지.
+- [x] 선택 후보의 테스트·타입/빌드·DB 통합·릴리스 정책·CI 확인.
+- [x] main 대상 PR #2396 준비 및 CI/CodeQL 통과. 원래 main 머지 전 대기 경계는 아래 2026-11-15 사용자 한시 위임으로 변경됐다.
+- [ ] 한시 위임 범위의 운영 배포·실제 릴리스/DB/보정 결과 검증.
 
 ## User Scenarios
 1. 빈 홈/원정/양쪽 명단으로 경기 시작 → 익명 득점 → 종료 가능, 가상 선수와 개인 통계를 만들어내지 않는다.
@@ -31,9 +32,10 @@ Created: 2026-11-14
 에이전트 병렬화 없음. Owned: 위 두 PR의 원래 파일, 두 manifest/CHANGELOG, 소비한 Changeset 두 개, 이 문서와 선택 릴리스 검토 문서. 기존 #2394 원격 브랜치는 보존한다. 작업 중 만든 release-1203-queens worktree의 미푸시 merge는 승격 후보로 쓰지 않는다.
 
 ## Acceptance Criteria
-- [ ] 두 기능 밖 runtime diff 0.
-- [ ] 선택 후보 최신 head CI GREEN, 충돌 없음, 미해결 필수 검사 0.
-- [ ] 릴리스/검증 근거와 사용자 main 머지 전 남은 동작을 명시한다.
+- [x] 두 기능 밖 runtime diff 0.
+- [x] 선택 후보 최신 head CI GREEN, 충돌 없음, 미해결 필수 검사 0.
+- [x] 릴리스/검증 근거 및 수동 UI QA 도구 한계를 명시한다.
+- [ ] 운영 한시 위임 후 배포 결과와 main→dev 동기화 완료를 기록한다.
 
 ## Tech Debt Resolved
 dev 전체를 선택 승격으로 오인하는 릴리스 범위 혼동을 제거한다. #2394는 dev 전체 승격용 버전 PR이므로 이 선택 후보와 구분한다.
@@ -48,7 +50,7 @@ dev 전체를 선택 승격으로 오인하는 릴리스 범위 혼동을 제거
 2026-11-14: 앞선 #2394에 추가 요청은 "두개 내용만"이라는 후속 지시로 범위가 좁혀졌다. #2394의 dev ancestry를 main으로 가져오지 않고 새 main 기반 후보를 만든다. 버전 번호는 #2394의 1.20.3을 유지한다.
 
 ## Progress Snapshot
-Phase 1 source selection complete. Phase 2 local validation complete. Phase 3 exact-head CI / main PR pending.
+Phase 1 source selection complete. Phase 2 validation complete. Phase 3 PR #2396 CI/CodeQL passed and main merged by the user's one-time deployment delegation. Phase 4 production rollout / main-to-dev sync in progress.
 
 - API unit: 124/124 PASS (games.service + Queens repair), 2 suites, serial.
 - Web unit: 117/117 PASS (operate-console-core + action-target-picker), 2 files, one worker. Existing act/key fixture warnings remain; not reported as browser console evidence.
@@ -57,3 +59,13 @@ Phase 1 source selection complete. Phase 2 local validation complete. Phase 3 ex
 - Relevant runtime files are byte-identical to the alpha-tested e3d79cd07/dev files, but the candidate's full tree differs from alpha. No claim of candidate-wide alpha deployment verification.
 - Browser adapter unavailable; native Chrome observation request ended `Computer Use app approval timed out`. No clicks/auth/game writes or screenshots were completed. Manual authenticated empty-roster flow / 390,768,1440 evidence remains unverified; this is a documented tooling blocker, not a test PASS.
 - 2026-11-14 23:20 KST re-fetch: main remains 900539b7c, dev remains e3d79cd07. Local Docker is stopped; DB integration/build are assigned to exact-head CI.
+
+## 2026-11-15 One-time production delegation
+사용자가 "운영에 적용해줘 이번만 예외로 내 승인 없이 다 해도"라고 명시해 기존 main 머지 전 중지 경계를 이번 실행에만 해제했다. 상시 규칙은 바꾸지 않는다.
+
+- #2396 exact head 27406264c의 CI 43604496185 및 CodeQL 43604494127 모두 PASS. UI 도구 한계는 그대로 기록한다.
+- main merge 7a943d2ab7ec81c418e3f2b6654e3f4649099925, production run 43608475244 시작.
+- 이전 main 900539b7c의 승인 대기 run 43483693991은 새 릴리스가 해당 커밋을 포함하므로 취소했다. 운영의 시작 상태는 SHA 17ae2d713 / 표시 1.20.1 / HTTP 200 / DB true였다.
+- main→dev 동기화: manifest 1.20.3과 두 기능의 1.20.3 CHANGELOG를 받아오되 dev의 1.20.2 CHANGELOG는 보존한다. 이미 main에서 소비한 두 Changeset만 dev에서도 지워 다음 릴리스에서 중복 소비하지 않는다. 그 외 dev runtime은 바꾸지 않는다.
+- dev에만 남은 기존 미승격 변경은 deferred-dev-after-two-feature-release.md Changeset 하나로 릴리스 대기를 보존한다. 이번 운영 main에는 이 파일이나 추가 dev 기능을 넣지 않는다.
+- 운영 승인/배포/보정 결과와 동기화 PR 증거는 해당 PR 코멘트로 이어 기록한다. 아직 운영 적용 성공으로 판정하지 않는다.

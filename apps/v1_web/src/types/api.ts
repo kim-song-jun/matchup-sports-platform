@@ -121,6 +121,11 @@ export type V1AuthMe = {
   } | null;
   /** 약관 단계에서 서버가 정해 둔 자동 닉네임 — 가입 진행 중에만 오고, 확인 화면에 읽기 전용으로 보여 준다. */
   socialSignupNickname?: string | null;
+  /**
+   * 가입 화면에서 「나중에 입력할게요」를 보일 수 있는지 — 서버가 정하고 카카오 가입은 항상 false.
+   * 배포 직후 브라우저에 남은 이전 응답에는 키가 없어 optional 이며, `=== true` 로만 읽는다.
+   */
+  socialSignupCanDefer?: boolean;
   user: {
     id: string;
     email: string | null;
@@ -933,6 +938,8 @@ export type V1Team = {
   regionName: string;
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   memberCount: number;
+  /** 최근 3개월 공개·공식 경기 수(팀 전적과 같은 기준). 목록 응답에만 실린다 — 값이 없는 옛 응답이면 카드가 칸을 뺀다. */
+  recentMatchCount?: number;
   trustState: TrustState | 'none';
   joinPolicy: 'approval_required' | 'closed';
   logoUrl?: string | null;
@@ -3314,6 +3321,8 @@ export type V1AdminUserRow = {
   userId: string;
   nickname: string | null;
   displayName: string | null;
+  /** 프로필 실명. 없으면 null — 목록에서 `닉네임 (실명)` 괄호를 만들지 않는다. */
+  realName?: string | null;
   email: string | null;
   authProviders: Array<'kakao' | 'naver' | 'email' | 'apple'>;
   gender: 'male' | 'female' | null;
@@ -4398,6 +4407,7 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
+  stageProgress?: Array<{ poolKey: string; assigned: boolean; stale: boolean; complete: boolean; sixTeamBracket?: V1SixTeamBracket }>;
   /** 이어진 이전 시즌(독립 리그의 지난 시즌, 전환한 체계 첫 시즌 티어는 원본 리그 — 공개된 리그만). 대회·옛 응답은 없음. */
   previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;

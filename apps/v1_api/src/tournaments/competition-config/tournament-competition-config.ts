@@ -12,6 +12,7 @@ import { ChangeTournamentCompetitionConfigDto } from './competition-config.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { computePeriodCount } from '../../games/games.service';
 import { materializePeriodConfigVersion } from './materialize-period-config-version';
+import type { StoredStagePlan } from '../stages/stage-view';
 import { inPeriodScope, loadFixturePeriodRows, type PeriodScope } from './tournament-stage-period-config';
 
 type ConfigCountClient = {
@@ -308,7 +309,7 @@ export class TournamentCompetitionConfig {
       // 대회·리그 경기는 만들 때 명단 행이 함께 생겨 여기서 옮길 수 있는(명단 없는) 경기가 아니다.
       const stagePhases = new Set(lockedTournament.stagePeriodSettings.map((setting) => setting.phase));
       const fixtures = await loadFixturePeriodRows(tx, { tournamentId, kind: lockedTournament.kind, ownership: matchOwnership });
-      const hasOverrides = stagePhases.size > 0 || fixtures.some((fixture) => fixture.groupOverridden || fixture.matchOverridden);
+      const hasOverrides = stagePhases.size > 0 || fixtures.some((fixture) => fixture.groupOverridden || fixture.matchOverridden || fixture.stageOverridden || fixture.poolOverridden);
       const scopeOwnership = (scope: PeriodScope): Prisma.V1TeamMatchWhereInput => scope.kind === 'default' && !hasOverrides ? matchOwnership : {
         ...matchOwnership,
         id: { in: fixtures.filter((fixture) => inPeriodScope(fixture, scope, stagePhases)).map((fixture) => fixture.teamMatchId) },
@@ -333,6 +334,15 @@ export class TournamentCompetitionConfig {
         return materialized.version;
       };
       let teamMatchesRepointed = await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'default' }), selected);
+      const plan = lockedTournament.stagePlan as unknown as StoredStagePlan | null;
+      if (plan?.periodSettings) {
+        for (const kind of ['stages', 'pools'] as const) for (const [key, setting] of Object.entries(plan.periodSettings[kind] ?? {})) {
+          const version = await rebase(setting.periods as unknown as Prisma.JsonValue, { [kind === 'stages' ? 'stageKey' : 'poolKey']: key });
+          setting.competitionConfigVersionId = version.id;
+          teamMatchesRepointed += await repointUntouchedFixtures(tx, scopeOwnership(kind === 'stages' ? { kind: 'competition_stage', stageKey: key } : { kind: 'pool', poolKey: key }), version);
+        }
+        await tx.v1Tournament.update({ where: { id: tournamentId }, data: { stagePlan: JSON.parse(JSON.stringify(plan)), stagePlanRevision: { increment: 1 } } });
+      }
       for (const setting of lockedTournament.stagePeriodSettings) {
         const version = await rebase(setting.periods, { phase: setting.phase });
         await tx.v1TournamentStagePeriodSetting.update({

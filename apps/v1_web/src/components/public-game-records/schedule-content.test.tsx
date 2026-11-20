@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { nextPopState } from '@/test/history-router';
 import { ScheduleContent } from './schedule-content';
 import type { PublicTournamentScheduleResponse } from './types';
 
@@ -1429,6 +1430,54 @@ describe('ScheduleContent — 예정만·다음 경기', () => {
       expect(ids()).toEqual(['early', 'late', 'live-1']);
       fireEvent.click(screen.getByRole('button', { name: '예정만' }));
       expect(new URL(window.location.href).searchParams.has('schedule')).toBe(false);
+    } finally { window.history.replaceState(null, '', original); }
+  });
+
+  it.each(['all', 'unknown', ''])('주소의 schedule=%s 같은 허용되지 않은 값은 예정만을 켜지 않는다', (value) => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', `${path}?schedule=${value}`);
+    try {
+      render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={`${path}?schedule=${value}`} data={makeData({ items: progressItems })} />);
+      expect(screen.getByRole('button', { name: '예정만' })).toHaveAttribute('aria-pressed', 'false');
+      expect(ids()).toEqual(['cancelled-1', 'early', 'ended-1', 'late', 'live-1']);
+    } finally { window.history.replaceState(null, '', original); }
+  });
+
+  it('빠르게 연속으로 눌러도 다른 query·hash·history 길이는 그대로 두고 마지막 선택만 주소에 남긴다', () => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    const start = `${path}?q=keep&from=%2Fmy%2Fleagues#schedule`;
+    window.history.replaceState(null, '', start);
+    try {
+      render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={start} data={makeData({ items: progressItems })} />);
+      const historyLength = window.history.length;
+      const chip = screen.getByRole('button', { name: '예정만' });
+      act(() => { chip.click(); chip.click(); chip.click(); });
+      const url = new URL(window.location.href);
+      expect(chip).toHaveAttribute('aria-pressed', 'true');
+      expect(url.searchParams.get('schedule')).toBe('upcoming');
+      expect(url.searchParams.get('q')).toBe('keep');
+      expect(url.searchParams.get('from')).toBe('/my/leagues');
+      expect(url.hash).toBe('#schedule');
+      expect(window.history.length).toBe(historyLength);
+    } finally { window.history.replaceState(null, '', original); }
+  });
+
+  it('마운트된 채로 브라우저 뒤로·앞으로 가기를 하면 주소에 남은 예정만 선택을 따라간다', async () => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', `${path}?q=keep`);
+    window.history.pushState(null, '', `${path}?q=keep&schedule=upcoming`);
+    try {
+      render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames fromHref={`${path}?q=keep&schedule=upcoming`} data={makeData({ items: progressItems })} />);
+      expect(screen.getByRole('button', { name: '예정만' })).toHaveAttribute('aria-pressed', 'true');
+      await act(async () => { const popped = nextPopState(); window.history.back(); await popped; });
+      expect(screen.getByRole('button', { name: '예정만' })).toHaveAttribute('aria-pressed', 'false');
+      expect(ids()).toEqual(['cancelled-1', 'early', 'ended-1', 'late', 'live-1']);
+      await act(async () => { const popped = nextPopState(); window.history.forward(); await popped; });
+      expect(screen.getByRole('button', { name: '예정만' })).toHaveAttribute('aria-pressed', 'true');
+      expect(ids()).toEqual(['early', 'late', 'live-1']);
     } finally { window.history.replaceState(null, '', original); }
   });
 });

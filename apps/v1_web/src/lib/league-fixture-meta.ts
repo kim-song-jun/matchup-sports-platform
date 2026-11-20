@@ -24,8 +24,8 @@ export const SCORE_HIDDEN_LABEL = '점수 비공개';
  * 대신 "집계 제외"라고 명시해 그 경기가 기록에서 빠졌음을 그대로 읽히게 한다.
  * (취소 대진에 '예정'이 붙던 문제도 여기서 함께 사라진다.)
  *
- * **몰수 결과는 점수 옆에 뱃지로 구분한다.** 몰수는 1:0 으로 기록되는데, 그대로 두면
- * 실제로 치러진 1:0 승리와 화면에서 완전히 같아 보인다 — 관전자가 "이 팀이 이겼다"와
+ * **몰수 결과는 점수 옆에 뱃지로 구분한다.** 몰수는 3:0 으로 기록되는데, 그대로 두면
+ * 실제로 치러진 3:0 승리와 화면에서 완전히 같아 보인다 — 관전자가 "이 팀이 이겼다"와
  * "상대가 안 나왔다"를 구분할 수 없다.
  *
  * 점수가 없는 대진의 문구는 경기 단계(`leagueFixturePhase` — 킥오프가 지나면 '결과 대기')를 그대로 쓴다.
@@ -43,21 +43,11 @@ export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; ha
     return { text: SCORE_HIDDEN_LABEL, hasScore: false, isForfeit: false };
   }
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') {
-    // 몰수는 스코어만 보면 실제 1:0 승리와 똑같이 읽힌다 — 점수는 그대로 두고 별도
+    // 몰수는 스코어만 보면 실제 3:0 승리와 똑같이 읽힌다 — 점수는 그대로 두고 별도
     // 뱃지로 구분한다. 색만으로 알리지 않도록 "몰수" 텍스트를 함께 싣는다.
     return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true, isForfeit: fixture.isForfeit === true };
   }
   return { text: matchPhaseLabel(leagueFixturePhase(fixture)), hasScore: false, isForfeit: false };
-}
-
-/** "예정만 보기"·"다음 경기" 기준 — 행에 '예정'이라고 찍히는 대진과 같은 판정(결과 대기는 예정이 아니다). */
-export function isUpcomingFixture(fixture: V1LeagueFixture): boolean {
-  return leagueFixturePhase(fixture) === 'scheduled';
-}
-
-export interface TeamLookupEntry {
-  name: string;
-  logoUrl: string | null;
 }
 
 export interface LeagueSideLabels {

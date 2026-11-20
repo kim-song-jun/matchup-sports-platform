@@ -1,6 +1,14 @@
 # Task 20261133: 운영 승격 — #2364 포함 1.20.0 후보
 
-Status: Review
+Status: Done
+## Progress Snapshot (current) — 운영 적용 완료
+- Main PR #2367 MERGED, SHA `17ae2d713db40a2b50dfa1266941a4ddc3afd950` (2026-11-13T09:32:36Z). 고정 후보 `3a0ee067f15b42aec5a43c4156c881d3bdf2b684`와 tree diff0. 승인된 6개 기능과 두 main 핫픽스 보존.
+- Production workflow 43402189039 및 CodeQL43402187212 SUCCESS. 기존 reviewer 게이트에서 seeungmin current_user_can_approve=true를 확인해 사용자 위임으로 승인. 보호 설정 변경/우회 없이 배포했다.
+- 2026-11-13T09:56:17Z 실서비스 점검 5/5 PASS: 웹/API200·SHA일치·release1.20.1, DBtrue, 공개 대회 목록200, 비인증 시간/구장 PATCH401. 운영 smoke는 공개 조회와 존재하지 않는 UUID의 비인증 거절만 사용했다.
+- 배포 로그: 20261112000100_v1_tournament_schedule_times 적용 및 All migrations have been successfully applied 확인. 서버 교체 중502 한 번 관측 후200/DBtrue로 회복했고 최종 점검은 정상.
+- 실제 기능 저장·3폭·오류 QA는 Alpha의 고정 source7c288bd0985b에서 완료. 기능/준비/승격 worktree와 브랜치3개 정리 완료, QA대회cancelled/private·등록0 및 Chrome/helper 종료. 결과 문서 worktree/브랜치는 이 PR dev 반영 후 정리한다.
+- 이번 문서 PR은 main→dev 승격 merge 이력 흡수(tree diff0)와 실제 결과 기록만 포함한다. 이후 dev의 다른 기능을 이번 운영에 포함하지 않는다.
+- 이전 1.18.0/1.19.0 체크박스·미완료 문장은 당시 이력이며 현행 완료 판정은 이 절과 실제 workflow/PR 결과를 따른다. 최상위 task는 docs/scenario 경로 인용 보호 규칙으로 유지한다.
 
 **최신 범위 확장(2026-11-13)**: 사용자가 '해당 내용까지 main 승격에 포함해줘'라고 지시해 등록 시간·구장 이름 인라인 수정 PR #2364를 이번 운영 승격 범위에 추가했다. 아래 1.19.0/표시 1.19.1 잠금은 이전 후보 이력이며, 확장 후보의 완료 근거로 재사용하지 않는다. 새 후보 SHA·버전은 #2364 dev 반영·CI·Alpha QA와 Changeset 소비 후 고정한다.
 
@@ -52,7 +60,7 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 ## Ambiguity Log
 준비 요청은 main 승격 실행 권한이 아니다. 현재 준비 PR은 메타데이터/문서만 포함하고 기존 alpha 배포 기능을 새로 수정하지 않는다. 공식 resolver의 no-changeset patch 규칙으로 다음 운영 표시는 1.18.1 예상이다.
 
-## Progress Snapshot
+## Progress Snapshot — initial history
 비교 main `6d12d118ebf3fee7f7c970b7a7f18c72c9fe5edf`, alpha/dev `c339f1ee9901b6393c3aaa9d026d30ac4fe1043d`. dev CI 43246621638, alpha 배포 43246621387 모두 success. prepare-only PASS. version commit `d90c723a3`, main 흡수 merge `cf5d777be`는 runtime tree 변경 없음. 시스템 jq 부재는 `/tmp`의 공식 바이너리를 SHA256 검증해 사용하여 해결했으며 시스템/프로젝트 도구 설정은 변경하지 않았다. 보고서 및 PR 게시/검증 단계. 이후 CI/리뷰/배포 상태는 준비 PR에서 최신 head 기준으로 기록한다.
 
 ## 준비 PR / 외부 차단
@@ -92,7 +100,7 @@ main에만 있던 과거 승격 merge 3개 흡수. 릴리스 미소비 Changeset
 - no-changeset patch 계약상 manifest 1.19.0의 다음 배포 표시 예상은 1.19.1이다. 실제 승인 시 resolver와 serving SHA 재확인.
 - main 핫픽스 머지는 완료됐지만 준비 시작 시 운영 공개 헤더는 이전 SHA였다. main 저장소와 실배포를 동일시하지 않는다.
 
-### Progress Snapshot (current)
+### Progress Snapshot — 1.19.0 preparation history
 Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-20261113`. Main absorption merge `120490f26`. Metadata/docs 작성 및 계약 검증 완료; dev 준비 PR 게시 단계. 기존 root shared WIP 미변경.
 
 ## #2364 추가 승인 — 확장 승격 후보 준비
@@ -105,11 +113,11 @@ Branch `release/prepare-1.19.0-2353`, worktree `/tmp/teameet-release-2353-202611
 - 로컬 API 53/Web 14 테스트와 양쪽 타입·패턴 검사 PASS. 접기 후 편집 복원 회귀 1 PASS. 최신 기능 head `23c1ef2d5b87e3656e447faf2385300eb0f78e28`의 CI 43386715474 진행 중(아래 문서 커밋 반영 시 최신 PR head를 기준으로 재확인).
 - Copilot 전용 API 422 ACTOR_INELIGIBLE로 #2364 한정 리뷰 예외 답변 대기. 새 Alpha 테스트 대회 생성/수정/취소/숨김 승인 답변 대기. 기존 PR2356의 예외와 QA 증거를 새 기능의 완료로 확대하지 않는다.
 - [x] 사용자 범위 확장 기록 및 #2364 연결
-- [ ] #2364 최신 CI(실제 PostgreSQL 일정/rollback 통합 포함), 리뷰 조건 충족, dev 머지
-- [ ] 정확한 새 Alpha SHA에서 로그인·실제 저장과 390/768/1440 화면/console/network 검증 및 테스트 cleanup
-- [ ] source snapshot/main baseline과 최종 후보 SHA 고정, 변경 경로 전수 분류 및 기존 main 핫픽스 보존
-- [ ] 공식 prepare-only로 Changeset 소비, API/Web 버전·CHANGELOG 및 main 릴리스 게이트 검증, dev 대상 새 준비 PR
-- [ ] 준비 PR CI·새 Alpha 버전/SHA 확인 후 사용자에게 고정 후보 비교와 승격 근거 전달
+- [x] #2364 최신 CI(실제 PostgreSQL 일정/rollback 통합 포함), 리뷰 조건 충족, dev 머지
+- [x] 정확한 새 Alpha SHA에서 로그인·실제 저장과 390/768/1440 화면/console/network 검증 및 테스트 cleanup
+- [x] source snapshot/main baseline과 최종 후보 SHA 고정, 변경 경로 전수 분류 및 기존 main 핫픽스 보존
+- [x] 공식 prepare-only로 Changeset 소비, API/Web 버전·CHANGELOG 및 main 릴리스 게이트 검증, dev 대상 새 준비 PR
+- [x] 준비 PR CI·새 Alpha 버전/SHA 확인 후 사용자에게 고정 후보 비교와 승격 근거 전달
 - main PR 생성·머지 및 production 승인은 저장소 사용자 전용 규칙을 따른다. 범위 포함 지시는 운영 승격 완료를 뜻하지 않는다.
 ### 최신 실행 승인 / CI 수정 cursor
 - 사용자가 “리뷰가 아마 안될거야 그러니까 단계별로 문제 없으면 바로바로 진행해줘”라고 지시해 이번 승격의 Copilot 리뷰 예외를 승인했다. 이어 “전체 main 운영적용까지 바로 해줘 급해서 계속 승인 못해줘”라고 명시해 이번 고정 6개 기능의 main PR 생성·머지·production 배포 승인과 결과 검증까지 위임했다. 이는 앞의 사용자 전용 실행 제한에 대한 이번 세션의 명시적 예외다. 전역/저장소 정책을 영구 변경하거나 보호 규칙을 우회하지 않는다.

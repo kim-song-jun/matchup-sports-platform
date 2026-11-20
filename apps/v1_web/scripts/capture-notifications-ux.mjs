@@ -63,6 +63,7 @@ const SESSION = {
   termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
   verification: { emailVerified: true, phoneVerified: true },
   socialSignupPrefill: null,
+  socialSignupCanDefer: false,
 };
 
 const SETTINGS = {

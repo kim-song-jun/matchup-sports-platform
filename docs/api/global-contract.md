@@ -284,3 +284,7 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 # 등록 항목 수정의 일괄 반영
 
 시간 목록 PATCH는 편집 시작 시점의 expectedScheduleTimeId와 expectedScheduledAt을 검증한다. preset 없는 파생 항목은 명시적인 null ID와 expectedFixtureIds(1개 이상)를 요구하며 같은 시각의 대체 항목도 stale로 거절한다. 중복 목적지/삭제된 원본/진행된 경기/단계 순서 오류를 성공으로 숨기거나 일부 경기만 저장하지 않는다. 기존 정본 match updater와 트랜잭션으로 팀 일정을 동기화하며 구장·팀·결과는 보존한다. 구장 이름의 배정 경기 동기화는 기존 field PATCH의 `syncAssignedFixtures: true`에 한하고 expectedVersion·멱등 키와 기존 플랫폼 권한을 유지한다. 상세: [대회 계약](./domains/tournaments.md#등록-항목-수정-2026-11-13).
+
+단계형 대회의 신규 쓰기는 별도 stages API의 expectedRevision/sourceVersion·대회 권한·잠금·감사 계약을 사용한다. 구조 변경·재경기는 변경 대상의 미시작/취소/VOID 상태를 검사하고 기존 경기 기록을 보관하며 무관한 경기 ID·일정은 보존한다. 기존 일반 대회에는 자동 적용하지 않는다. 상세는 [단계형 운영 확장](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)과 [개인 기록 범위](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)를 따른다.
+
+신청 제출·참가 확정·접수 시작의 충돌도 기존 오류 envelope를 따른다. `REGISTRATION_NOT_DRAFT`, `TOURNAMENT_REGISTRATION_CLOSED`, `REGISTRATION_DEADLINE_PASSED`는409이며 성공으로 대체하지 않는다. [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18).

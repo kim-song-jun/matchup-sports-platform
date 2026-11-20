@@ -10,8 +10,19 @@ function foul(id: string, sideId: string, period: number, reversesEventId: strin
   };
 }
 
+function card(
+  id: string,
+  sideId: string,
+  participantId: string | null,
+  color: 'YELLOW' | 'RED',
+  period = 1,
+  reversesEventId: string | null = null,
+): GameEventRecord {
+  return { ...foul(id, sideId, period, reversesEventId), type: 'CARD', participantId, payload: { card: color } };
+}
+
 describe('deriveFoulCounts', () => {
-  it('counts only FOUL events for the given period, grouped by side', () => {
+  it('counts FOUL events for the given period, grouped by side', () => {
     const events = [foul('e1', 's-home', 1), foul('e2', 's-home', 1), foul('e3', 's-away', 1), foul('e4', 's-home', 2)];
     expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 2, 's-away': 1 });
   });
@@ -31,5 +42,95 @@ describe('deriveFoulCounts', () => {
     const reversedOriginal = foul('e2', 's-home', 1);
     const reversal: GameEventRecord = { ...foul('e3', 's-home', 1), type: 'CORRECTION', reversesEventId: 'e2' };
     expect(deriveFoulCounts([activeFoul, reversedOriginal, reversal], 1)).toEqual({ 's-away': 1 });
+  });
+
+  // 2026-11-18 사용자 결정: 카드(옐로·레드)도 팀 파울 1개로 센다.
+  describe('카드', () => {
+    it('옐로·레드카드 한 장은 파울과 같이 팀 파울 1개로 센다', () => {
+      const events = [
+        foul('e1', 's-home', 1),
+        card('e2', 's-home', 'p-1', 'YELLOW'),
+        card('e3', 's-home', 'p-2', 'RED'),
+        card('e4', 's-away', 'p-3', 'YELLOW'),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 3, 's-away': 1 });
+    });
+
+    it('피리어드별로 센다 — 후반 카드는 전반 숫자에 섞이지 않는다', () => {
+      const events = [card('e1', 's-home', 'p-1', 'YELLOW', 1), card('e2', 's-home', 'p-2', 'YELLOW', 2)];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 1 });
+      expect(deriveFoulCounts(events, 2)).toEqual({ 's-home': 1 });
+    });
+
+    it('취소된 카드는 세지 않는다', () => {
+      const original = card('e1', 's-home', 'p-1', 'YELLOW');
+      const reversal: GameEventRecord = { ...foul('e2', 's-home', 1), type: 'CORRECTION', reversesEventId: 'e1' };
+      expect(deriveFoulCounts([original, reversal], 1)).toEqual({});
+    });
+
+    it('선수가 없는 카드 이벤트도 팀 파울로 센다', () => {
+      expect(deriveFoulCounts([card('e1', 's-home', null, 'YELLOW')], 1)).toEqual({ 's-home': 1 });
+    });
+
+    it('카드 색 정보가 없는 카드는 옐로로 본다 — 서버 집계와 같다', () => {
+      const noColor: GameEventRecord = { ...card('e1', 's-home', 'p-1', 'YELLOW'), payload: {} };
+      expect(deriveFoulCounts([noColor], 1)).toEqual({ 's-home': 1 });
+    });
+  });
+
+  describe('경고 누적 퇴장', () => {
+    it('같은 선수의 옐로 2장 뒤에 붙는 레드는 파울로 세지 않는다 — 옐로 2장만 센다', () => {
+      const events = [
+        card('e1', 's-home', 'p-1', 'YELLOW'),
+        card('e2', 's-home', 'p-1', 'YELLOW'),
+        card('e3', 's-home', 'p-1', 'RED'),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 2 });
+    });
+
+    it('옐로가 1장뿐이거나 없는 레드(직접 퇴장)는 센다', () => {
+      expect(deriveFoulCounts([card('e1', 's-home', 'p-1', 'RED')], 1)).toEqual({ 's-home': 1 });
+      expect(
+        deriveFoulCounts([card('e1', 's-home', 'p-1', 'YELLOW'), card('e2', 's-home', 'p-1', 'RED')], 1),
+      ).toEqual({ 's-home': 2 });
+    });
+
+    it('옐로 한 장이 취소됐으면 남은 옐로가 1장이라 이어진 레드는 센다', () => {
+      const events = [
+        card('e1', 's-home', 'p-1', 'YELLOW'),
+        card('e2', 's-home', 'p-1', 'YELLOW'),
+        { ...foul('e3', 's-home', 1), type: 'CORRECTION', reversesEventId: 'e2' } as GameEventRecord,
+        card('e4', 's-home', 'p-1', 'RED'),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 2 });
+    });
+
+    it('다른 선수의 옐로는 합치지 않는다', () => {
+      const events = [
+        card('e1', 's-home', 'p-1', 'YELLOW'),
+        card('e2', 's-home', 'p-2', 'YELLOW'),
+        card('e3', 's-home', 'p-2', 'RED'),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 3 });
+    });
+
+    it('옐로가 전반, 레드가 후반이어도 후반 숫자에서 누적 퇴장 레드는 빠진다', () => {
+      const events = [
+        card('e1', 's-home', 'p-1', 'YELLOW', 1),
+        card('e2', 's-home', 'p-1', 'YELLOW', 2),
+        card('e3', 's-home', 'p-1', 'RED', 2),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 1 });
+      expect(deriveFoulCounts(events, 2)).toEqual({ 's-home': 1 });
+    });
+
+    it('이벤트 순서(sequence)로 판정한다 — 배열 순서가 뒤섞여도 같다', () => {
+      const events = [
+        card('e3', 's-home', 'p-1', 'RED'),
+        card('e1', 's-home', 'p-1', 'YELLOW'),
+        card('e2', 's-home', 'p-1', 'YELLOW'),
+      ];
+      expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 2 });
+    });
   });
 });

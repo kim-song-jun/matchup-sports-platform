@@ -278,7 +278,7 @@ export async function paginateByStatePriority<T extends StatePriorityPageRow>(in
  * 이미 확정된 몰수 결과를 **저장된 값 그대로** 되읽는다 (멱등 응답용).
  *
  * 요청 dto 로 계산한 값을 돌려주면, 운영자가 몰수팀을 반대로 지정해 재호출했을 때
- * "0:1 · B팀 몰수, 처리 완료" 라는 응답을 받는데 DB 에는 여전히 1:0 · A팀 몰수가 남는다 —
+ * "0:3 · B팀 몰수, 처리 완료" 라는 응답을 받는데 DB 에는 여전히 3:0 · A팀 몰수가 남는다 —
  * 잘못 넣은 몰수를 고쳤다고 착각하게 만드는 거짓 성공이다(alpha 실측으로 재현).
  *
  * `score` 는 Json 컬럼이라 타입이 unknown 이다. 형태가 기대와 다르면 null 을 돌려주고
@@ -399,7 +399,8 @@ export function resolveStoredForfeit(input: {
       requestMatchesStored: true,
     };
   }
-  // 몰수는 항상 승자 1 : 몰수팀 0 이므로 점수가 낮은 쪽이 몰수팀이다.
+  // 몰수는 항상 승자 > 몰수팀(지금은 3 : 0, 2026-11-17 전에 확정된 옛 몰수는 1 : 0)이므로 마진 크기와
+  // 무관하게 점수가 낮은 쪽이 몰수팀이다. 두 점수의 대소만 보므로 3:0·1:0 저장 행 모두 같은 답이 나온다.
   const noShowTeamId = stored.home < stored.away ? input.hostTeamId : input.awayTeamId;
   return {
     noShowTeamId,

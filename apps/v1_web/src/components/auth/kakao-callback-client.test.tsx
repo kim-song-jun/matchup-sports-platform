@@ -9,8 +9,11 @@ import { V1ApiError } from '@/lib/api-client';
 import { encodeKakaoStateVerifier } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
+import { saveStoredV1Session } from '@/lib/session-storage';
 
 afterEach(() => { vi.unstubAllGlobals(); });
+// A login hint left by an earlier test would make the late-answer guard skip the exchange.
+beforeEach(() => { window.localStorage.clear(); });
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -120,6 +123,7 @@ describe('KakaoCallbackClient GA events', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=social'));
     expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBe('/teams/new');
     unmount();
+    window.localStorage.clear();
 
     await primeValidOAuthState();
     api.v1Post.mockResolvedValue({
@@ -413,5 +417,203 @@ describe('KakaoCallbackClient 연결 모드', () => {
     render(<KakaoCallbackClient />);
     expect(await screen.findByText('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.')).toBeInTheDocument();
     expect(api.v1Post).not.toHaveBeenCalled();
+  });
+});
+
+describe('KakaoCallbackClient 이미 로그인된 화면에 늦게 도착한 답', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    searchParamsValue = new URLSearchParams();
+    vi.stubEnv('NEXT_PUBLIC_KAKAO_REDIRECT_URI', 'https://teameet.test/callback/kakao');
+    api.v1Post.mockResolvedValue({ session: { userId: 'kakao-user', userEmail: null }, next: { route: '/home' } });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  const signIn = () => saveStoredV1Session({ userId: 'someone-else', userEmail: 'else@example.com' });
+
+  it('로그인 답(code)은 교환하지 않고 홈으로 보내 세션을 바꾸지 않는다', async () => {
+    signIn();
+    await primeValidOAuthState();
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(api.v1Post).not.toHaveBeenCalled();
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'already_signed_in' });
+    expect(window.localStorage.getItem('teameet.v1.userId')).toBe('someone-else');
+  });
+
+  it('로그인 오류 답(timeout)도 오류 화면 없이 홈으로 보낸다', async () => {
+    signIn();
+    window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, 'state-123');
+    searchParamsValue = new URLSearchParams({ error: 'timeout', state: 'state-123' });
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(screen.queryByText('로그인을 완료하지 못했어요')).not.toBeInTheDocument();
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'already_signed_in' });
+  });
+
+  it('대조군: 로그인 표시가 없으면 같은 답으로 교환한다', async () => {
+    await primeValidOAuthState();
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(api.v1Post).toHaveBeenCalledWith('/auth/kakao', expect.objectContaining({ code: 'auth-code' })));
+    expect(analytics.trackEvent).not.toHaveBeenCalledWith('login_failed', expect.anything());
+  });
+
+  it('대조군: 로그인 표시가 있어도 연결 시도는 연결 요청을 그대로 보낸다', async () => {
+    signIn();
+    await primeLinkAttempt('/my/settings/login-methods');
+    api.v1Post.mockResolvedValue({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(api.v1Post).toHaveBeenCalledWith('/auth/link/kakao', { code: 'auth-code', redirectUri: 'https://teameet.test/callback/kakao' }));
+    expect(analytics.trackEvent).not.toHaveBeenCalledWith('login_failed', expect.anything());
+  });
+
+  it('대조군: 로그인 표시가 있어도 시도가 맞지 않으면 기존 「유효하지 않아요」 화면이다', async () => {
+    signIn();
+    window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, 'stored-state');
+    searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'mismatched-state' });
+    render(<KakaoCallbackClient />);
+
+    expect(await screen.findByText('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.')).toBeInTheDocument();
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'invalid_state' });
+    expect(api.v1Post).not.toHaveBeenCalled();
+  });
+});
+
+describe('KakaoCallbackClient 오류 뒤 돌아갈 경로', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, 'state-123');
+    searchParamsValue = new URLSearchParams({ error: 'server_error', state: 'state-123' });
+  });
+
+  const loginLinks = () => screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/login'));
+
+  it.each([
+    ['/teams/1', '/login?redirect=%2Fteams%2F1'],
+    ['/my?tab=a', '/login?redirect=%2Fmy%3Ftab%3Da'],
+    ['//evil.example', '/login'],
+    ['/login/email', '/login'],
+    [null, '/login'],
+  ])('저장해 둔 경로 %s 는 「다시 로그인하기」와 뒤로가기에 %s 로 실린다', async (saved, expected) => {
+    if (saved) window.sessionStorage.setItem('teameet.v1.savedRedirect', saved);
+    render(<KakaoCallbackClient />);
+
+    await screen.findByText('로그인을 완료하지 못했어요');
+    const links = loginLinks();
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(links.map(() => expected));
+    expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', expected);
+  });
+});
+
+describe('KakaoCallbackClient 취소·시간 초과는 오류 화면 없이 로그인 화면으로', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    searchParamsValue = new URLSearchParams();
+  });
+
+  const SAVED_REDIRECT_KEY = 'teameet.v1.savedRedirect';
+  const ERROR_HEADING = '로그인을 완료하지 못했어요';
+
+  // 이 탭이 시작한 시도(저장값)와 kauth 가 돌려준 error·state 를 세운다.
+  function primeReturn(error: string | null, options: { stored?: string | null; returnedState?: string } = {}) {
+    const { stored = 'state-123', returnedState = 'state-123' } = options;
+    if (stored) window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, stored);
+    searchParamsValue = new URLSearchParams(error ? { error, state: returnedState } : { state: returnedState });
+  }
+
+  it.each(['access_denied', 'timeout'])('이 탭의 로그인 시도에 온 %s 는 오류 화면 없이 로그인 화면으로 바꿔 보낸다', async (error) => {
+    primeReturn(error);
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/login'));
+    expect(screen.queryByText(ERROR_HEADING)).not.toBeInTheDocument();
+    expect(screen.queryByText('로그인 오류')).not.toBeInTheDocument();
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(api.v1Post).not.toHaveBeenCalled();
+  });
+
+  it('새 형식(JSON, mode=login) 저장값의 취소도 같게 돌아간다', async () => {
+    primeReturn('access_denied', { stored: await encodeKakaoStateVerifier({ state: 'state-123', mode: 'login', returnTo: null }) });
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/login'));
+    expect(screen.queryByText(ERROR_HEADING)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['/teams/1', '/login?redirect=%2Fteams%2F1'],
+    ['/my?tab=a', '/login?redirect=%2Fmy%3Ftab%3Da'],
+    ['//evil.example', '/login'],
+    ['/login/email', '/login'],
+    [null, '/login'],
+  ])('저장해 둔 경로 %s 가 있으면 로그인 주소는 %s 이다', async (saved, expected) => {
+    if (saved) window.sessionStorage.setItem(SAVED_REDIRECT_KEY, saved);
+    primeReturn('access_denied');
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(expected));
+    expect(screen.queryByText(ERROR_HEADING)).not.toBeInTheDocument();
+  });
+
+  it('돌아간 뒤 이 탭에 남는 저장값은 가려던 화면뿐이다(시도는 지워지고 새로 남기는 것이 없다)', async () => {
+    window.sessionStorage.setItem(SAVED_REDIRECT_KEY, '/teams/1');
+    primeReturn('timeout');
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/login?redirect=%2Fteams%2F1'));
+    const keys = Array.from({ length: window.sessionStorage.length }, (_, index) => window.sessionStorage.key(index));
+    expect(keys).toEqual([SAVED_REDIRECT_KEY]);
+    expect(window.sessionStorage.getItem(SAVED_REDIRECT_KEY)).toBe('/teams/1');
+  });
+
+  it.each(['access_denied', 'timeout'])('돌아갈 때도 login_failed 는 카카오가 준 %s 로 한 번 센다', async (error) => {
+    primeReturn(error);
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: error });
+  });
+
+  // 대조군: 아래는 모두 지금의 오류 화면 그대로여야 한다.
+  describe.each([
+    ['카카오가 다른 오류(server_error)를 줬을 때', 'server_error', {}, 'server_error'],
+    ['error 도 code 도 없을 때', null, {}, 'missing_code'],
+    ['state 가 저장된 시도와 다를 때(취소라고 적혀 있어도)', 'access_denied', { returnedState: 'attacker-state' }, 'access_denied'],
+    ['저장된 시도가 없을 때(다른 탭·만료)', 'timeout', { stored: null }, 'timeout'],
+  ] as const)('%s', (_label, error, options, reason) => {
+    it('오류 화면과 문구, 다시 로그인하기 링크가 그대로이고 어디로도 바꿔 보내지 않는다', async () => {
+      window.sessionStorage.setItem(SAVED_REDIRECT_KEY, '/teams/1');
+      primeReturn(error, options);
+      render(<KakaoCallbackClient />);
+
+      expect(await screen.findByText(ERROR_HEADING)).toBeInTheDocument();
+      expect(screen.getByText('로그인 오류')).toBeInTheDocument();
+      expect(screen.getByText('카카오 로그인을 완료하지 못했어요.')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login?redirect=%2Fteams%2F1');
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason });
+    });
+  });
+
+  it('대조군: 계정 연결 중의 시간 초과는 로그인 화면이 아니라 연결 실패 결과로 돌아간다', async () => {
+    window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier({ state: 'state-123', mode: 'link', returnTo: '/my/settings/login-methods' }));
+    searchParamsValue = new URLSearchParams({ error: 'timeout', state: 'state-123' });
+    render(<KakaoCallbackClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=failed&provider=kakao'));
+    expect(router.replace).not.toHaveBeenCalledWith(expect.stringMatching(/^\/login/));
+    expect(screen.queryByText(ERROR_HEADING)).not.toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ import { TeamsModule } from '../teams/teams.module';
 import { MemberBracketPreviewController } from './member-bracket-preview.controller';
 import { MemberBracketPreviewService } from './member-bracket-preview.service';
 import { Module } from '@nestjs/common';
+import { KakaoUnlinkModule } from '../auth/kakao-unlink.module';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { AdminContextModule } from '../common/admin-context.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -19,7 +20,7 @@ import { GuestInquiryPurgeController } from './guest-inquiry-purge.controller';
 import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 
 @Module({
-  imports: [GamesModule, TeamsModule, AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule],
+  imports: [GamesModule, TeamsModule, AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule, KakaoUnlinkModule],
   controllers: [MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
   providers: [MemberBracketPreviewService, AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
 })

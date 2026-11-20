@@ -37,7 +37,7 @@ import {
   standingsAriaLabel,
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
-import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketIntroLine, competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { isKnockoutRound, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
@@ -204,6 +204,7 @@ function GroupStandingsSection({
   const hasSplitQualificationTracks = trackQualifications !== undefined &&
     Object.keys(trackQualifications).length > 0;
   const hasResolvedTrackQualifications = Object.values(trackQualifications ?? {}).some(value => value != null);
+  const legacySplitTracks = Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower');
   const advancingLabels = new Map<string, string[]>();
   const advancingColors = new Map<string, number>();
   if (stageComplete && hasResolvedTrackQualifications) {
@@ -248,8 +249,9 @@ function GroupStandingsSection({
           </span>
         )}
       </div>
-      {hasSplitQualificationTracks ? <p className="tm-text-caption text-[var(--text-muted)]">
-        {Object.keys(trackQualifications ?? {}).every(track => track === 'upper' || track === 'lower')
+      {/* 이름 있는 토너먼트의 「운영자가 확정해요」는 확정 전 안내다 — 진출 표시가 붙은 뒤에도 남으면 모순이라 숨긴다. */}
+      {hasSplitQualificationTracks && (legacySplitTracks || !(stageComplete && hasResolvedTrackQualifications)) ? <p className="tm-text-caption text-[var(--text-muted)]">
+        {legacySplitTracks
           ? '각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.'
           : '진출 토너먼트와 참가팀은 운영자가 확정해요.'}
       </p> : null}
@@ -535,7 +537,16 @@ export function BracketScheduleTab({
 
 /* ── 메인 콘텐츠 ── */
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
-  return tournament.stagePlan ? <StagePublicView tournament={tournament} /> : <LegacyBracketPageContent tournament={tournament} />;
+  const source = useSearchParams().get('from');
+  return tournament.stagePlan ? <div className="tm-tourn-sub-page flex min-h-full min-w-0 flex-col pb-4">
+    <header className="tm-bracket-page-intro"><div>
+      <h1 className="sr-only">{tournament.title} 순위·대진표</h1><h2>{tournament.title}</h2>
+      <p>단계를 선택해 경기 일정과 편성별 순위를 확인해요.</p>
+    </div><span className="tm-bracket-page-format">{tournament.stagePlan.stages.length}단계 대회</span></header>
+    <div className="tm-tourn-sub-header"><TournamentProgressStepper stages={buildTournamentStages(tournament)} /></div>
+    <div className="min-w-0 flex-1 px-5 py-4"><StagePublicView tournament={tournament} mode="bracket" /></div>
+    <TournamentFlowNav prev={{ href: withFromPath(`/tournaments/${tournament.id}`, source), label: '대회 상세' }} next={{ href: withFromPath(`/tournaments/${tournament.id}/results`, source), label: '최종 결과', enabled: tournament.status === 'completed', disabledHint: '대회 종료 후 공개' }} />
+  </div> : <LegacyBracketPageContent tournament={tournament} />;
 }
 function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
@@ -736,12 +747,8 @@ function LegacyBracketPageContent({ tournament }: { tournament: V1TournamentDeta
               sr-only h1 이 맡고, 보이는 대회 제목은 기존 스타일(h2)을 그대로 쓴다. */}
           <h1 className="sr-only">{tournament.title} 순위·대진표</h1>
           <h2>{tournament.title}</h2>
-          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
-          <p>
-            {isLeague
-              ? '경기 일정과 순위를 확인하세요.'
-              : '경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.'}
-          </p>
+          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. 검색 설명과 같은 함수를 쓴다. */}
+          <p>{bracketIntroLine(tournament)}</p>
         </div>
         <span className="tm-bracket-page-format">
           {competitionFormatLabel(tournament)}

@@ -42,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   delete (window as W).webkit;
   delete window.TeameetNative;
 });
@@ -185,5 +186,56 @@ describe('OpenInAppBanner', () => {
 
     render(<OpenInAppBanner placement="shell" />);
     expect(banner()).toBeNull();
+  });
+});
+
+
+describe('OpenInAppBanner — 본문 공간 동기화', () => {
+  async function mountShell() {
+    vi.resetModules();
+    const { OpenInAppBanner } = await import('./open-in-app-banner');
+    const view = render(<main className="tm-scroll-area"><OpenInAppBanner placement="shell" /></main>);
+    return { ...view, OpenInAppBanner, area: view.container.querySelector('main')! };
+  }
+
+  it('대회 상세에서 배너 실제 높이가 바뀌면 본문 공간도 갱신한다', async () => {
+    nav.pathname = '/tournaments/5fa78e0e-4708-4518-a9f5-9ba2dcd737ec';
+    let height = 56;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ height }) as DOMRect);
+    let onResize: (() => void) | undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { onResize = callback; }
+      observe = vi.fn();
+      disconnect = disconnect;
+    });
+    const { area, unmount } = await mountShell();
+    expect(banner()).toBeInTheDocument();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('56px');
+    height = 80;
+    act(() => onResize?.());
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('80px');
+    unmount();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('');
+  });
+
+  it('닫으면 배너와 본문에 확보한 공간을 함께 제거한다', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 72 } as DOMRect);
+    const { area } = await mountShell();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('72px');
+    fireEvent.click(screen.getByRole('button', { name: '앱 안내 닫기' }));
+    expect(banner()).toBeNull();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('');
+  });
+
+  it('인증 화면으로 이동해 숨겨지면 확보한 공간을 남기지 않는다', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 56 } as DOMRect);
+    const { area, rerender, OpenInAppBanner } = await mountShell();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('56px');
+    nav.pathname = '/login';
+    rerender(<main className="tm-scroll-area"><OpenInAppBanner placement="shell" /></main>);
+    expect(banner()).toBeNull();
+    expect(area.style.getPropertyValue('--tm-open-in-app-banner-height')).toBe('');
   });
 });

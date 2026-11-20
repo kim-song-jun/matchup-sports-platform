@@ -245,6 +245,69 @@ export function findPrivilegedAwsWithoutApproval(workflow, readScript = readFile
   return problems;
 }
 
+// compose 서비스 블록(들여쓰기 2칸 키 아래)에 `NAME: ${NAME:-}` 전달 줄이 있는지. 동기화가 호스트 .env 에
+// 값을 써도 이 줄이 없으면 컨테이너의 변수는 조용히 비어 있다.
+export function composeServiceDeclares(compose, service, variable) {
+  const block = compose.match(new RegExp(String.raw`^  ${service}:\n((?:(?:[ ]{3,}.*)?\n)*)`, 'm'))?.[1] ?? '';
+  return new RegExp(String.raw`^\s+${variable}:\s*\$\{${variable}:-\}\s*$`, 'm').test(block);
+}
+
+// nginx 이미지는 `버전-alpine@sha256:<digest>` 로 고정하고, 버전은 보안 수정 버전 이상이어야 한다.
+// 태그만 있으면 같은 태그가 다른 내용으로 다시 올라와도 배포가 그대로 받는다.
+const compareVersion = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+export function findNginxImageProblem(compose) {
+  const block = compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
+  const image = block.match(/^ {4}image:\s*(\S+)\s*$/m)?.[1];
+  if (!image) return 'nginx 서비스의 image 를 찾지 못했습니다';
+  const pinned = image.match(/^nginx:(\d+)\.(\d+)\.(\d+)-alpine@sha256:[0-9a-f]{64}$/);
+  if (!pinned) return `nginx 이미지 ${image} 가 버전 태그와 digest 로 고정되어 있지 않습니다 (nginx:<버전>-alpine@sha256:<digest>)`;
+  const version = pinned.slice(1, 4).map(Number);
+  // 해결 버전은 줄마다 다르다: 1.30 stable 은 1.30.7, mainline 은 1.31.9 (이후 줄은 그보다 높으면 된다).
+  const fixed = version[0] === 1 && version[1] === 30 ? compareVersion(version, [1, 30, 7]) >= 0 : compareVersion(version, [1, 31, 9]) >= 0;
+  return fixed ? null : `nginx ${version.join('.')} 는 보안 수정 버전(1.30.7 stable · 1.31.9 mainline) 보다 낮습니다`;
+}
+
+// nginx 설정 파일은 읽기 전용으로 마운트한다. 이미지 entrypoint 가 시작할 때 default.conf 를 touch 하므로
+// 쓰기 가능하면 서버에 저장된 릴리스 소스의 mtime 이 바뀌어 같은 SHA 재배포가 소스 변경 검사에서 멈춘다.
+export function findNginxConfMountProblem(compose) {
+  const block = compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
+  const mount = block.match(/^\s+-\s*(\S+):\/etc\/nginx\/conf\.d\/default\.conf(?::(\S+))?\s*$/m);
+  if (!mount) return 'nginx 서비스의 /etc/nginx/conf.d/default.conf 마운트를 찾지 못했습니다';
+  const options = (mount[2] ?? '').split(',');
+  return options.includes('ro') ? null : `nginx default.conf 마운트 ${mount[1]} 가 읽기 전용(:ro)이 아닙니다 — 컨테이너 시작이 소스 파일 시각을 바꿉니다`;
+}
+
+// 앱 전체의 회원 연결을 끊고 조회할 수 있는 키는 승인된 deploy job 의 Sync runtime env 로만 넘긴다.
+// 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다.
+const APPROVED_ONLY_SECRETS = ['KAKAO_ADMIN_KEY'];
+
+export function findApprovedOnlySecretProblems(workflow, names = APPROVED_ONLY_SECRETS) {
+  const problems = [];
+  const jobs = splitJobs(workflow).map(({ name, body }) => ({
+    name,
+    approved: isApprovedJob(body),
+    code: stripShellComments(body),
+  }));
+  for (const secret of names) {
+    const read = new RegExp(String.raw`\bsecrets\.${secret}\b`);
+    const wired = new RegExp(String.raw`^\s*SECRET_${secret}:\s*\$\{\{\s*secrets\.${secret}\s*\}\}\s*$`, 'm');
+    for (const { name, approved, code } of jobs) {
+      if (!approved && read.test(code)) {
+        problems.push(
+          `job '${name}': 승인(environment) 없이 도는 job 이 secrets.${secret} 를 읽습니다 — 승인된 deploy job 의 Sync runtime env 에서만 읽으세요`,
+        );
+      }
+    }
+    if (!jobs.some(({ approved, code }) => approved && wired.test(code))) {
+      problems.push(
+        `승인된 deploy job 의 Sync runtime env 에 SECRET_${secret}: \${{ secrets.${secret} }} 가 없습니다`,
+      );
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
@@ -256,6 +319,7 @@ for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
 for (const problem of [
   ...findProdRoleWithoutApproval(workflow),
   ...findPrivilegedAwsWithoutApproval(workflow),
+  ...findApprovedOnlySecretProblems(workflow),
 ]) {
   errors.push(`${workflowPath}: ${problem}`);
 }
@@ -455,6 +519,40 @@ export function findUnreadRuntimeEnvVariables(script) {
       );
     }
   }
+}
+
+{
+  let compose = '';
+  try {
+    compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  } catch {
+    compose = '';
+  }
+  if (compose && !composeServiceDeclares(compose, 'v1_api', 'KAKAO_ADMIN_KEY')) {
+    errors.push(
+      'deploy/docker-compose.prod.yml: v1_api 에 KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-} 가 없습니다 — ' +
+        '동기화가 호스트 .env 에 값을 써도 컨테이너로 전달되지 않습니다',
+    );
+  }
+}
+
+{
+  const composePath = 'deploy/docker-compose.prod.yml';
+  let nginxProblem;
+  try {
+    nginxProblem = findNginxImageProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    nginxProblem = `읽지 못해 nginx 이미지를 검사할 수 없습니다 (${error.code ?? error.message})`;
+  }
+  if (nginxProblem) errors.push(`${composePath}: ${nginxProblem}`);
+
+  let mountProblem;
+  try {
+    mountProblem = findNginxConfMountProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    mountProblem = `읽지 못해 nginx 설정 마운트를 검사할 수 없습니다 (${error.code ?? error.message})`;
+  }
+  if (mountProblem) errors.push(`${composePath}: ${mountProblem}`);
 }
 
 const requiredPatterns = [

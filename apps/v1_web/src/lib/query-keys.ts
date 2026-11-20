@@ -181,9 +181,14 @@ export const v1Keys = {
   // 'list' 세그먼트가 필수다 — 없으면 seriesId 변형 키가 adminLeagueMatch(leagueId)
   // 상세 키와 같은 shape([..., 'league-matches', <uuid>])가 돼 캐시가 섞일 수 있다.
   // 무인자 호출은 [..., 'list'] 프리픽스라 모든 필터 변형을 함께 invalidate 한다.
-  adminLeagueMatchList: (seriesId?: string, visibility?: string) =>
-    seriesId || visibility
-      ? ([...v1Keys.all, 'admin', 'league-matches', 'list', { seriesId: seriesId ?? null, visibility: visibility ?? null }] as const)
+  adminLeagueMatchList: (filters?: { seriesId?: string; visibility?: string; q?: string; status?: string }) =>
+    filters && (filters.seriesId || filters.visibility || filters.q || filters.status)
+      ? ([...v1Keys.all, 'admin', 'league-matches', 'list', {
+          seriesId: filters.seriesId ?? null,
+          visibility: filters.visibility ?? null,
+          q: filters.q ?? null,
+          status: filters.status ?? null,
+        }] as const)
       : ([...v1Keys.all, 'admin', 'league-matches', 'list'] as const),
   adminLeagueSeriesList: () => [...v1Keys.all, 'admin', 'league-series'] as const,
   adminLeagueSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'league-series', seriesId] as const,
@@ -193,6 +198,9 @@ export const v1Keys = {
   adminLeagueTemplatePreview: (leagueId: string, request: unknown) =>
     [...v1Keys.all, 'admin', 'league-matches', leagueId, 'template-preview', request] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
+  // 이 리그의 다음 시즌으로 이을 수 있는 리그 후보. adminLeagueMatch(leagueId) 아래라 그 키를 무효화하면 함께 갱신된다.
+  adminLeagueNextSeasonCandidates: (leagueId: string) =>
+    [...v1Keys.all, 'admin', 'league-matches', leagueId, 'next-season-candidates'] as const,
   // D2 (E4): 어드민 이의 목록 — status 필터('' = 전체)가 다르면 다른 쿼리로 취급한다.
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를
   // 쓰지만 두 번째 세그먼트가 문자열(leagueId)이 아니라 filters 객체라 값이 절대 겹치지
@@ -201,7 +209,6 @@ export const v1Keys = {
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
   // R4: 내 리그. leagueMatch(leagueId) 와 같은 네임스페이스지만 'me' 는 UUID 가 아니라
   // 실제 리그 id 와 절대 충돌하지 않는다.
-  leagueClaimableFixtures: (leagueId: string) => [...v1Keys.all, 'league-claimable-fixtures', leagueId] as const,
   myLeagues: () => [...v1Keys.all, 'league-matches', 'me'] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
@@ -260,7 +267,6 @@ export function leagueViewKeys(leagueId: string) {
     v1Keys.adminLeagueMatchList(),
     v1Keys.leagueMatches(),
     v1Keys.leagueMatch(leagueId),
-    v1Keys.leagueClaimableFixtures(leagueId),
     v1Keys.tournament(leagueId),
     v1Keys.teamMatchesAll(),
     publicGameRecordsKeys.leagueFixtureRecords(leagueId),

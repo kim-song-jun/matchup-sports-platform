@@ -66,6 +66,7 @@ describe('restoreWhenTallEnough', () => {
       scrollHeight,
       clientHeight,
       scrollTop: 0,
+      children: [] as Element[],
     } as unknown as Element;
   }
 
@@ -121,5 +122,45 @@ describe('restoreWhenTallEnough', () => {
 
     // 무작정 맨 위(0)로 두지 않고, 도달 가능했던 최댓값(100)으로 클램프한다.
     expect(host.scrollTop).toBe(100);
+  });
+
+  it('높이를 만드는 건 스크롤 상자 안쪽 자식이므로 상자 자신이 아니라 자식을 관찰한다', () => {
+    const child = {} as Element;
+    const host = { scrollHeight: 500, clientHeight: 800, scrollTop: 0, children: [child] } as unknown as Element;
+
+    restoreWhenTallEnough(host, 1000);
+
+    const observer = MockResizeObserver.instances[0];
+    expect(observer.observe).toHaveBeenCalledWith(child);
+    expect(observer.observe).not.toHaveBeenCalledWith(host);
+  });
+
+  it('복원이 끝나면(목표 도달·타임아웃 클램프) onSettled 를 부른다', () => {
+    const reached = createFakeHost(2000, 800);
+    const onReached = vi.fn();
+    restoreWhenTallEnough(reached, 1000, onReached);
+    expect(onReached).toHaveBeenCalledOnce();
+
+    const clamped = createFakeHost(900, 800);
+    const onClamped = vi.fn();
+    restoreWhenTallEnough(clamped, 1000, onClamped);
+    expect(onClamped).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(RESTORE_TIMEOUT_MS);
+    expect(onClamped).toHaveBeenCalledOnce();
+  });
+
+  it('취소하면 이후 콜백·타임아웃이 스크롤을 쓰지 않고 onSettled 도 부르지 않는다', () => {
+    const host = createFakeHost(500, 800);
+    const onSettled = vi.fn();
+    const cancel = restoreWhenTallEnough(host, 1000, onSettled);
+
+    cancel();
+    Object.assign(host, { scrollHeight: 2000 });
+    MockResizeObserver.instances[0].callback([], MockResizeObserver.instances[0] as unknown as ResizeObserver);
+    vi.advanceTimersByTime(RESTORE_TIMEOUT_MS);
+
+    expect(host.scrollTop).toBe(0);
+    expect(onSettled).not.toHaveBeenCalled();
+    expect(MockResizeObserver.instances[0].disconnect).toHaveBeenCalled();
   });
 });

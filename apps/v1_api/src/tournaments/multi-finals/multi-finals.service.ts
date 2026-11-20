@@ -6,6 +6,7 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { findTournamentManagementAction } from '../../common/tournament-management-history';
 import { AdminContextService } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lockCompetitionForBracketMutationInTx } from '../slots/competition-bracket-lock';
 import { loadGroupRankSources } from '../slots/load-group-rank-preview';
@@ -31,7 +32,9 @@ const options = { timeout: 45_000, maxWait: 5_000 };
 @Injectable()
 export class MultiFinalsService {
   constructor(private readonly prisma: PrismaService, private readonly admins: AdminContextService,
-    private readonly games: GamesService, private readonly templates: BracketTemplateService) {}
+    private readonly games: GamesService, private readonly templates: BracketTemplateService,
+    // 선택값이다 — 진출 알림만 쓰고, 없으면(단위 시험) 알림 없이 배정만 한다.
+    private readonly notifications?: NotificationsService) {}
 
   private async tournament(tx: Tx, id: string) {
     const row = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: {
@@ -265,7 +268,9 @@ export class MultiFinalsService {
   }
   async assign(user: V1AuthUser, id: string, dto: MultiFinalAssignmentDto) {
     const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
-    return this.prisma.$transaction(async tx => {
+    // 이번 확정으로 이 토너먼트에 새로 들어간 팀(자리 번호 = 시드). 같은 명단을 다시 확정해도 알리지 않는다.
+    const advanced: { value: { title: string; entries: Array<{ registrationId: string; seed: number }> } | null } = { value: null };
+    const view = await this.prisma.$transaction(async tx => {
       const initial = await this.tournament(tx, id);
       await lockCompetitionForBracketMutationInTx(tx, initial);
       const tournament = await this.tournament(tx, id);
@@ -311,8 +316,30 @@ export class MultiFinalsService {
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.assign', targetType: 'tournament', targetId: id,
         beforeJson: JSON.parse(JSON.stringify(selected)), afterJson: { finalName: dto.finalName, registrationIds: dto.registrationIds, assignmentPolicy: dto.assignmentPolicy ?? 'rank_order',
           tiePicks: picks, standingsSnapshot: standingOrder(view.groupStandings, [...new Set(selected.rules.map(rule => rule.groupId))]) } }, tx);
+      const previous = new Set(selected.registrationIds ?? []);
+      advanced.value = { title: tournament.title, entries: dto.registrationIds.flatMap((registrationId, index) => previous.has(registrationId) ? [] : [{ registrationId, seed: index + 1 }]) };
       return this.view(tx, id);
     }, options);
+    if (advanced.value) this.notifyAdvanced(id, dto.finalName, advanced.value);
+    return view;
+  }
+  /** 진출한 팀의 팀장·매니저에게 알린다. 커밋 뒤 best-effort 라서 알림 실패가 확정을 되돌리지 않는다. */
+  private notifyAdvanced(tournamentId: string, finalName: string, advanced: { title: string; entries: Array<{ registrationId: string; seed: number }> }) {
+    for (const { registrationId, seed } of advanced.entries) {
+      this.notifications?.emitToManyDeferred(
+        async () => {
+          const rows = await this.prisma.v1TeamMembership.findMany({
+            where: { status: 'active', role: { in: ['owner', 'manager'] }, team: { tournamentRegistrations: { some: { id: registrationId } } } },
+            select: { userId: true },
+          });
+          return [...new Set(rows.map(row => row.userId))];
+        },
+        'tournament_finals_advanced',
+        tournamentId,
+        `"${advanced.title}" · ${finalName} · ${seed}번 시드로 진출했어요. 대진표에서 첫 경기를 확인해 보세요.`,
+        { businessKey: `tournament-finals-advanced:${tournamentId}:${finalName}:${registrationId}` },
+      );
+    }
   }
   private async previewInTx(tx: Tx, id: string) {
     const view = await this.view(tx, id);

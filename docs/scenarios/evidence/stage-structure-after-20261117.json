@@ -1,0 +1,61 @@
+{
+  "expectedCommit": "dbea6a5f585ec2eff60d212e9fbf5036ab00ab61",
+  "phase": "after",
+  "lifecycle": {
+    "nodePid": 16441,
+    "browserPid": 16466,
+    "parentPid": 16441
+  },
+  "setup": "real admin API; all draft/conflict/reload actions use UI",
+  "checks": [
+    {
+      "width": 390,
+      "draftPreserved": true,
+      "staleSaveBlocked": true,
+      "cancelPreserved": true,
+      "confirmedReload": true,
+      "cleanEditorSynced": true,
+      "originalConfigRestored": true,
+      "preservedOfficialGames": 70,
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "width": 768,
+      "draftPreserved": true,
+      "staleSaveBlocked": true,
+      "cancelPreserved": true,
+      "confirmedReload": true,
+      "cleanEditorSynced": true,
+      "originalConfigRestored": true,
+      "preservedOfficialGames": 70,
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "draftPreserved": true,
+      "staleSaveBlocked": true,
+      "cancelPreserved": true,
+      "confirmedReload": true,
+      "cleanEditorSynced": true,
+      "originalConfigRestored": true,
+      "preservedOfficialGames": 70,
+      "horizontalOverflow": 0,
+      "console": [],
+      "network": [],
+      "passed": true
+    }
+  ],
+  "closed": true,
+  "fixture": {
+    "id": "1fa13d46-ab8a-4760-9cdf-934fb48bc2aa",
+    "title": "(테스트) sm 구성 입력 보존 QA 20261117",
+    "isPublic": false,
+    "cleanup": "Private reusable draft retained: no tournament DELETE API exists; no registrations or fixtures created."
+  }
+}

@@ -1,5 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
-import { authProviderWhere, signupFilterWhere, signupStage, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
+import { authProviderWhere, signupFilterWhere, signupStage, userSearchWhere, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
 import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { KakaoUnlinkService } from '../auth/kakao-unlink.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PLACE_SELECT } from '../places/place-select';
 import { toPlaceView } from '../places/place-snapshot';
@@ -146,6 +147,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     // Optional for the same reason as realtimeGateway: AdminModule imports
     // NotificationsModule in production, so this always resolves there.
     @Optional() private readonly notifications?: NotificationsService,
+    // Optional for the same reason: AdminModule imports KakaoUnlinkModule in production.
+    @Optional() private readonly kakaoUnlink?: KakaoUnlinkService,
   ) {}
 
   onModuleInit() {
@@ -361,7 +364,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
     const deletedAt = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
+    const { result, kakaoUnlinkTargets } = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
       await lockUserRow(tx, userId);
@@ -391,7 +394,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
       // changeUserStatus 와 같은 이유로 소유권을 먼저 넘기게 한다(finalizeAccountDeletion 이 막는다) — 삭제는
       // 되돌릴 수 없으므로 여기서 막는 것이 더 중요하다.
-      const result = await finalizeAccountDeletion(tx, {
+      const { kakaoUnlinkTargets, ...deletion } = await finalizeAccountDeletion(tx, {
         target,
         actor: { type: 'admin', admin },
         reason: dto.reason,
@@ -399,8 +402,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         logger: this.logger,
       });
 
-      return { ...result, deletedAt };
+      return { result: { ...deletion, deletedAt }, kakaoUnlinkTargets };
     });
+
+    // The response goes to the operator, so the member numbers stay out of `result`. A Kakao failure is logged and
+    // recorded by the service and never changes the deletion.
+    void this.kakaoUnlink?.unlinkKeys(userId, kakaoUnlinkTargets, 'account_deleted');
 
     // Same isolation as changeUserStatus(): deletion also lands on the
     // disable-class accountStatus, so an already-connected socket must be
@@ -800,16 +807,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    const searchWhere = query.q
-      ? {
-          OR: [
-            { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } },
-            { profile: { realName: { contains: query.q, mode: 'insensitive' as const } } },
-            { profile: { displayName: { contains: query.q, mode: 'insensitive' as const } } },
-            { email: { contains: query.q, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const searchWhere = userSearchWhere(query.q);
 
     const accountWhere: Prisma.V1UserWhereInput = query.status ? { accountStatus: query.status } : {};
     const signupWhere = signupFilterWhere(query.signup);
@@ -878,6 +876,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         gender: normalizeProfileGender(row.profile?.gender),
         nickname: row.profile?.nickname ?? null,
         displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
+        realName: row.profile?.realName?.trim() || null,
         email: row.email ?? null,
         authProviders: [...new Set(row.authIdentities.map((identity) => identity.provider))],
         accountStatus: row.accountStatus,

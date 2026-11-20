@@ -9,7 +9,7 @@ import {
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
+import { formatAuthProviders, formatGender, formatUserTitleWithRealName } from '@/lib/format-user';
 import { formatAdminDate } from '@/lib/date-utils';
 import { ADMIN_USER_MULTI_FILTERS, ADMIN_USER_PROVIDER_OPTIONS, ADMIN_USER_SIGNUP_OPTIONS, adminUserSignupLabel } from '@/lib/admin-user-filters';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
@@ -149,8 +149,8 @@ function AdminUsersPageContent() {
       <div className="tm-content-enter flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
-          searchLabel="닉네임·이메일 검색"
-          searchPlaceholder="닉네임·이메일 검색"
+          searchLabel="닉네임·이메일·전화번호 검색"
+          searchPlaceholder="닉네임·이메일·전화번호 검색"
           searchValue={search}
           onSearchChange={setSearch}
           statusOptions={statusOptions}
@@ -200,7 +200,7 @@ function AdminUsersPageContent() {
           // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세" 버튼으로만
           // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
           onRowClick={(row) => router.push(`/admin/users/${encodeURIComponent(row.userId)}`)}
-          rowClickLabel={(row) => `${formatUserTitle(row)} 상세 보기`}
+          rowClickLabel={(row) => `${formatUserTitleWithRealName(row)} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
@@ -216,7 +216,7 @@ function AdminUsersPageContent() {
               render: (row) => (
                 <div className="min-w-0">
                   <span className="flex items-center gap-2">
-                    <span className="truncate font-medium text-[var(--text-strong)]">{formatUserTitle(row)}</span>
+                    <span className="truncate font-medium text-[var(--text-strong)]">{formatUserTitleWithRealName(row)}</span>
                     {row.adminRole ? (
                       <span className="shrink-0 rounded bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-semibold text-[var(--blue700)]">
                         운영자

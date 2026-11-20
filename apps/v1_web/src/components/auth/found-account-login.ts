@@ -1,5 +1,6 @@
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import type { V1FoundAccount } from '@/types/api';
+import { KAKAO_LOGIN_LABEL } from './auth.view-model';
 import type { LoginMethod } from './login-method-chips';
 
 export type FoundAccountLoginLink = { href: string; label: string; kakao: boolean };
@@ -36,7 +37,7 @@ export function describeFoundAccount(
   ];
   const links: FoundAccountLoginLink[] = [
     ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기', kakao: false }] : []),
-    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기', kakao: true }] : []),
+    ...(hasKakao ? [{ href: loginHref, label: KAKAO_LOGIN_LABEL, kakao: true }] : []),
     ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기', kakao: false }] : []),
   ];
   let label = '가입한 로그인 방법';

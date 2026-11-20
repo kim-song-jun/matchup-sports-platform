@@ -10,6 +10,9 @@ export class TournamentPeriodSettingDto {
 }
 
 export class UpdateTournamentPeriodSettingsDto {
+  /** Stable composition keys, distinct from the legacy round/phase setting. */
+  @IsOptional() @IsString() @IsNotEmpty() stageKey?: string;
+  @IsOptional() @IsString() @IsNotEmpty() poolKey?: string;
   @IsString()
   expectedVersion!: string;
 

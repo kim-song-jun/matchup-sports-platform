@@ -71,7 +71,7 @@ export function GameRosterPlayerRow({
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, padding: '8px 0' }}>
       {onJerseyPress === undefined ? (
         <span
-          className="tm-text-label"
+          className="tm-text-label tab-num"
           style={{ flex: '0 0 60px', textAlign: 'center', color: 'var(--text-muted)' }}
         >
           <span className="sr-only">등번호 </span>

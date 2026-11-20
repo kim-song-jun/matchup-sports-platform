@@ -111,6 +111,8 @@ raw roster identity fields.
 | `GET` | `/api/v1/teams/:teamId/games/:gameId/tactics-board` | 그 팀 활성 멤버(`assertTeamLineupMember`). 경기 사이드는 `gameId`+`teamId` 로 함께 찾는다 — 그 팀이 안 뛰는 경기는 `404 TACTICS_BOARD_SIDE_NOT_FOUND` | 팀 내부 전술보드 한 판 `{ gameSideId, sideKey, teamNameSnapshot, formation, version, updatedAt, updatedByUserId, starterCount, benchCount, lineupLimits, sportCode, playersPerSide, lineupConfig, entries[] }`. 저장 전이면 `version: 0` 빈 판. **Task 180 H7**: `sportCode`(`football`\|`futsal`, 설정을 못 찾으면 null)로 화면이 코트 모양을, `playersPerSide`(GK 포함 한 팀 인원 — 친선은 경기방식이 `"N:N"` 으로 읽힐 때 그 N, 아니면 설정의 `lineup.maxPlayers`)와 `lineupConfig`(`{ positions, formations, minPlayers, maxPlayers }`, 라인업 GET 과 같은 `parseLineupConfigForResponse`)로 고를 수 있는 대형을 정한다. 보드는 명단·kickoff·결과 어느 쪽과도 연결되지 않는다(정본 §3). |
 | `PUT` | `/api/v1/teams/:teamId/games/:gameId/tactics-board` | 그 팀 owner·manager(`assertTeamLineupManager`) | `SaveTeamTacticsBoardDto { formation, expectedVersion?, entries[] }` 전체 교체, compare-and-swap. 어긋나면 `409 TACTICS_BOARD_VERSION_CONFLICT`, 좌표 한쪽만 주면 `422 TACTICS_BOARD_INVALID_COORDINATE`. 응답은 GET 과 같은 모양. |
 
+**몰수 종료의 점수(2026-11-17):** `end` 커맨드가 `outcomeReason: 'FORFEIT'` + `forfeitSideId`(기권한 쪽)로 오면 공식 점수는 몰수 점수 **3:0**(기권팀 0, 상대 3, `FORFEIT_WINNER_SCORE`/`FORFEIT_LOSER_SCORE`)으로 확정된다. 기록된 점수는 **상대가 3골 차 이상 앞설 때만**(`FORFEIT_KEEP_RECORDED_MARGIN`) 그대로 두고, 0:0 노쇼·기권팀이 앞서거나 동점·상대가 1~2골 차로 앞선 경우는 3:0으로 덮어쓴다(`applyForfeitScore`). 리그 `POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/forfeit` 도 같은 3:0이다. 이 변경 전에 확정된 몰수(1:0)는 바꾸지 않았다 — 한 순위표에 1:0과 3:0이 섞일 수 있고 승점은 같지만 득실차·득점이 다르다. 순위·전적 계산에는 몰수 분기가 없어 저장된 점수를 그대로 읽는다.
+
 **참가 선수 재추가(MD-QA #156):** [참가 선수 추가 API](tournaments.md#참가-선수-재추가와-경기-명단-반영)는 재추가 시 포착한 활성 `EXCLUDE` ID를 `COMPETITION_ROSTER_RESYNC`의 `competitionPlayerReadded` 대상으로 남긴다. 참가 선수 응답은 경기 명단 반영 완료를 기다리지 않는다. 워커가 기존 경기 잠금을 얻고 위 시작 전 경기 선택 기준·`SCHEDULED`·공식 결과 없음·현재 팀/사이드를 다시 확인한 뒤, 포착한 ID와 같은 선수·팀·사이드의 활성 제외만 시스템 되돌리기로 닫고 명단을 다시 계산한다. 포착 목록에 없는 새 제외 ID와 다른 선수·팀·대회·리그의 조정, 시작·종료·취소 경기 및 공식 결과 이력은 보존하며 조정 행을 삭제하지 않는다. 이미 활성인 `EXCLUDE`의 일반 반복 POST는 위 멱등 계약대로 같은 기존 조정 ID를 반환한다.
 
 ### 미제출 친선 명단 조회·기록·도착 확인 (MD-QA #146)
@@ -189,6 +191,17 @@ re-evaluates the same kick counts before persisting the result.
   잠금을 잡는 종료 시도는 최대 1건이다. 만료 처리 여부나 스캔 오류와 별개로 기존 outbox 작업도
   계속 처리한다. 경기 수·DB 경합·worker 상태에 따라 지연될 수 있으므로 만료 시각 직후의
   확정 처리 시간을 보장하지 않는다. 콘솔은 만료 안내와 기존 수동 기간 종료를 함께 제공한다.
+
+- Game이 아직 `LIVE`인 **쉬는 구간**에서는 방금 끝난 기간에 한해 `GOAL`·`OWN_GOAL`·`CARD`(옐로·레드)·`FOUL`
+  이벤트를 받는다(`POST /games/:gameId/events`, 2026-11-18). 쉬는 구간은 둘이다. 하프타임은 다음 기간이
+  `HALFTIME`이고 그 앞 기간이 모두 `ENDED`일 때 방금 끝난 기간(전반)에, 정규 시간 종료는 모든 기간이
+  `ENDED`일 때 마지막 기간에 붙인다. 시각(`clockMs`)은 그 기간의 설정 길이 이하여야 하고(길이를 읽지
+  못하면 상한 없음), 넘으면 `PERIOD_ALREADY_ENDED`다. 교체 등 다른 이벤트, 다음 기간이 이미 시작된 뒤의
+  앞 기간, 아직 시작하지 않은 `HALFTIME` 기간, `LIVE`가 아닌 Game(종료 뒤는 결과 정정)은 그대로
+  `PERIOD_ALREADY_ENDED`·`PERIOD_NOT_STARTED`·`TERMINAL_GAME_IMMUTABLE`이다. 판정은
+  `games/core/event-recording-window.ts`의 `isRecordableDuringBreak` 한 곳이다. 콘솔은 이때 사건 시각을 그
+  기간의 정규 시간 끝(설정 길이와 실제로 뛴 시간 중 짧은 쪽)으로 고정해 보낸다. 쉬는 구간에 넣은 사건의
+  취소(`reverseEvent`)는 기간 상태와 무관하게 기존 규칙을 따른다.
 
 `GET /api/v1/games/:gameId`의 `periods`, nullable `periodDurations`, `state`, `version`이
 운영 콘솔의 확인 기준이다. 기간 자동 종료는 `V1GameEvent`나 새 sequence를 만들지 않으며,

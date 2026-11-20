@@ -10,6 +10,10 @@ import {
   findPrivilegedAwsInScript,
   findUnwiredComposeVariables,
   findUnreadRuntimeEnvVariables,
+  findApprovedOnlySecretProblems,
+  composeServiceDeclares,
+  findNginxImageProblem,
+  findNginxConfMountProblem,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
@@ -467,4 +471,148 @@ test('실제 deploy.yml 의 build-images 는 이 경계를 지킨다', () => {
   const real = normalizeWorkflowSource(readFileSync('.github/workflows/deploy.yml', 'utf8'));
   assert.deepEqual(findProdRoleWithoutApproval(real), []);
   assert.deepEqual(findPrivilegedAwsWithoutApproval(real), []);
+});
+
+// 승인 전 build-images 는 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다. 앱 전체의
+// 회원 연결을 끊고 조회할 수 있는 카카오 관리자 키는 승인된 deploy job 의 Sync runtime env 로만 간다.
+const twoJobs = ({ buildStep = 'echo build', deployEnv = '          SECRET_KAKAO_ADMIN_KEY: ${{ secrets.KAKAO_ADMIN_KEY }}' } = {}) => `
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: ${buildStep}
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Sync runtime env
+        env:
+${deployEnv}
+        run: bash scripts/release/sync-prod-runtime-env.sh
+`;
+
+test('관리자 키를 승인된 deploy job 에서만 읽으면 통과한다', () => {
+  assert.deepEqual(findApprovedOnlySecretProblems(twoJobs()), []);
+});
+
+test('승인 전 job 이 관리자 키를 읽으면 형태와 무관하게 탐지한다', () => {
+  for (const step of [
+    'echo ${{ secrets.KAKAO_ADMIN_KEY }}',
+    'env KEY=${{ secrets.KAKAO_ADMIN_KEY}} ./build.sh',
+  ]) {
+    const problems = findApprovedOnlySecretProblems(twoJobs({ buildStep: step }));
+    assert.equal(problems.length, 1, `${step} 를 놓쳤습니다`);
+    assert.match(problems[0], /build-images/);
+  }
+});
+
+test('승인된 job 에 관리자 키 배선이 없으면 탐지한다', () => {
+  const problems = findApprovedOnlySecretProblems(twoJobs({ deployEnv: '          SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}' }));
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /SECRET_KAKAO_ADMIN_KEY/);
+});
+
+test('주석 속 언급과 이름이 비슷한 secret 은 오탐하지 않는다', () => {
+  const wf = twoJobs({ buildStep: 'echo ok  # secrets.KAKAO_ADMIN_KEY 는 deploy job 에서만 읽는다' })
+    .replace('      - name: Build\n', '      # secrets.KAKAO_ADMIN_KEY 는 여기서 읽지 않는다\n      - name: Build\n')
+    .replace('        run: echo ok', '        env:\n          OTHER: ${{ secrets.ALPHA_KAKAO_ADMIN_KEY }}\n        run: echo ok');
+  assert.deepEqual(findApprovedOnlySecretProblems(wf), []);
+});
+
+test('실제 deploy.yml 은 관리자 키를 승인된 job 에만 넘긴다', () => {
+  const real = normalizeWorkflowSource(readFileSync('.github/workflows/deploy.yml', 'utf8'));
+  assert.deepEqual(findApprovedOnlySecretProblems(real), []);
+});
+
+// 동기화가 .env 에 값을 써도 compose 가 컨테이너로 넘기지 않으면 키는 조용히 비어 있다.
+const composeWith = (apiLines, workerLines = '') => `services:
+  v1_api:
+    environment:
+${apiLines}
+    healthcheck:
+      test: ["CMD", "true"]
+
+  v1_game_operations_worker:
+    environment:
+${workerLines || '      NODE_ENV: production'}
+`;
+
+test('compose 서비스가 변수를 컨테이너로 넘기는 줄을 찾는다', () => {
+  assert.equal(composeServiceDeclares(composeWith('      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}'), 'v1_api', 'KAKAO_ADMIN_KEY'), true);
+});
+
+test('다른 서비스에만 있거나 주석·미선언이면 넘기는 것으로 치지 않는다', () => {
+  const onlyWorker = composeWith('      KAKAO_APP_ID: ${KAKAO_APP_ID:-}', '      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}');
+  assert.equal(composeServiceDeclares(onlyWorker, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+  const commented = composeWith('      # KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}');
+  assert.equal(composeServiceDeclares(commented, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+  const missing = composeWith('      KAKAO_APP_ID: ${KAKAO_APP_ID:-}');
+  assert.equal(composeServiceDeclares(missing, 'v1_api', 'KAKAO_ADMIN_KEY'), false);
+});
+
+test('실제 prod compose 는 API 서비스로 관리자 키를 넘긴다', () => {
+  const compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  assert.equal(composeServiceDeclares(compose, 'v1_api', 'KAKAO_ADMIN_KEY'), true);
+});
+
+const DIGEST = `sha256:${'a'.repeat(64)}`;
+const composeWithNginx = (image) => `services:
+  v1_web:
+    image: web
+
+  nginx:
+    image: ${image}
+    container_name: teameet_nginx
+`;
+
+test('nginx 이미지는 해결 버전 이상 + 버전 태그 + digest 일 때만 통과한다', () => {
+  for (const ok of ['1.31.9', '1.31.10', '1.32.0', '1.30.7', '1.30.8']) {
+    assert.equal(findNginxImageProblem(composeWithNginx(`nginx:${ok}-alpine@${DIGEST}`)), null, ok);
+  }
+  for (const bad of ['1.31.8', '1.30.6', '1.29.9', '1.30.0']) {
+    assert.match(findNginxImageProblem(composeWithNginx(`nginx:${bad}-alpine@${DIGEST}`)), /보안 수정 버전/, bad);
+  }
+});
+
+test('nginx 이미지가 움직이는 태그이거나 digest 가 없으면 실패한다', () => {
+  for (const image of ['nginx:alpine', 'nginx:latest', 'nginx:1.31.9-alpine', 'nginx:1.31.9-alpine@sha256:abc', `nginx:1.31.9@${DIGEST}`]) {
+    assert.match(findNginxImageProblem(composeWithNginx(image)), /고정되어 있지 않습니다/, image);
+  }
+  assert.match(findNginxImageProblem('services:\n  v1_web:\n    image: web\n'), /찾지 못했습니다/);
+});
+
+test('실제 prod compose 의 nginx 이미지는 고정돼 있다', () => {
+  assert.equal(findNginxImageProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
+});
+
+const composeWithNginxMount = (mountLine) => `services:
+  v1_web:
+    volumes:
+      - ./other.conf:/etc/other.conf
+
+  nginx:
+    image: nginx:1.30.7-alpine
+    volumes:
+${mountLine}
+      - ./aasa:/etc/nginx/teameet-aasa:ro
+`;
+
+test('nginx default.conf 마운트는 :ro 일 때만 통과한다', () => {
+  for (const ok of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro,z']) {
+    assert.equal(findNginxConfMountProblem(composeWithNginxMount(ok)), null, ok);
+  }
+  for (const bad of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:rw', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:z']) {
+    assert.match(findNginxConfMountProblem(composeWithNginxMount(bad)), /읽기 전용/, bad);
+  }
+});
+
+test('nginx default.conf 마운트가 없거나 다른 서비스에만 있으면 실패한다', () => {
+  assert.match(findNginxConfMountProblem(composeWithNginxMount('      - ./x:/etc/nginx/other.conf:ro')), /찾지 못했습니다/);
+  const otherService = 'services:\n  v1_web:\n    volumes:\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro\n\n  nginx:\n    image: nginx\n';
+  assert.match(findNginxConfMountProblem(otherService), /찾지 못했습니다/);
+});
+
+test('실제 prod compose 의 nginx default.conf 마운트는 읽기 전용이다', () => {
+  assert.equal(findNginxConfMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
 });

@@ -8,6 +8,8 @@ export function bracketTrackLabel(track: V1TournamentBracketTrack | null | undef
       if (pool) return `${stage.name} · ${pool.name}`;
     }
   }
+  // Stage tracks are stable IDs, while callers without a plan already have the saved group name.
+  if (track?.startsWith('stage:')) return null;
   if (track === 'upper') return '상위 결선';
   if (track === 'lower') return '하위 결선';
   return track && track !== 'overall' ? track : null;

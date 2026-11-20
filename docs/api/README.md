@@ -1,3 +1,5 @@
+대회 생성·접수는 초안 복원 재검토, 제출 상태 CAS, 종료·취소 후 신규 확정 차단, 과거 마감의 접수 시작 차단을 적용한다. 오류·멱등 계약은 [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18)을 따른다.
+
 대회·리그 경기는 빈 출전 명단이어도 시작·익명 팀 득점·종료를 허용한다. 선수별 기록은 현재 유효 명단에 한하며 가상 참가자는 만들지 않는다. [경기 운영 계약](./domains/games.md#tournament-and-league-operation-without-a-roster-2026-11-14).
 
 리그+N개 토너먼트 대진의 시간·구장 독립 배정 및 대회별 재사용 시간 목록은 [대회 계약](./domains/tournaments.md#대진-시간구장-독립-배정-2026-11-12)을 따른다. 실제 경기 값과 기존 수동 편집 경로는 동일하다.
@@ -94,6 +96,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Public records](./domains/public-records.md)
 - [Chat](./domains/chat.md)
 - [Notifications](./domains/notifications.md)
+- [Webhooks](./domains/webhooks.md) — Kakao unlink notification: `POST /api/v1/webhooks/kakao/unlink` (Kakao's servers call it with the representative admin key; GET is not served)
 - [Home, search, notices, popups, master data](./domains/home-notices-master.md)
 - [Admin and operations](./domains/admin-and-ops.md)
 - [Ads](./domains/ads.md)
@@ -182,3 +185,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 회원 대진표 조회는 관리자 세션을 유지하는 별도 `/admin/users/:id/bracket-preview` 계약이며 회원 세션을 발급하지 않는다. 상세는 [관리자·운영 계약](domains/admin-and-ops.md)의 회원 대진표 조회 절을 따른다.
 
 - Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).
+
+단계형 대회의 자동 진출·초안/예외 배정·편성/경기 복구·단계별 경기 시간·교차 시드/6강/3위전·명시적 전체 순위는 [단계형 운영 확장 계약](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)을 따른다. 개인 기록의 stageKey/poolKey 필터는 [기록 계약](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)을 따른다.

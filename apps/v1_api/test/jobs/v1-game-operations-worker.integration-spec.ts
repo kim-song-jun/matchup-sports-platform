@@ -281,9 +281,10 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     // 아웃박스 이벤트가 더는 만들어지지 않는다(정본 §4). `GAME_RESULT_LEAGUE_AUTO_APPROVE`
     // 도 같은 이유로 빠졌다(11 → 10) — 어드민 확인을 건너뛰는 단계라 예약 자체를 지웠다.
     // Task 179 이 `COMPETITION_ROSTER_RESYNC`(경기 명단 재계산 후속 이벤트)를 더했다(10 → 11).
+    // 단계형 대회의 `STAGE_AUTO_ADVANCE`가 공식 순위 뒤 별도 대회 aggregate에서 실행된다(11 → 12).
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 11,
+      registeredHandlers: 12,
       queue: {
         pending: 0,
         retry: 0,
@@ -296,7 +297,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 12,
+      registeredHandlers: 13,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

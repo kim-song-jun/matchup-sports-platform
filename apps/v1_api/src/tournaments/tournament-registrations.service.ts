@@ -333,6 +333,14 @@ export class TournamentRegistrationsService {
       // submission can claim the last slot.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
 
+      // 같은 초안의 중복 제출과 취소 경합은 대회 잠금 이후 현재 신청으로 판정한다.
+      const currentRegistration = await tx.v1TournamentRegistration.findFirst({
+        where: { id: registrationId, tournamentId },
+      });
+      if (!currentRegistration || currentRegistration.status !== 'draft') {
+        throw new ConflictException({ code: 'REGISTRATION_NOT_DRAFT', message: '이미 제출되었거나 변경된 신청이에요.' });
+      }
+
       // Re-validate tournament state inside the transaction (prevents TOCTOU with status change).
       // **종류 조건은 트랜잭션 안에서도 걸어야 한다.** 밖의 `loadOpenTournament` 만 막으면
       // 이 재검증이 리그 행을 통과시키고, 그 사실이 밖에서는 드러나지 않는다 — 겉보기엔
@@ -405,7 +413,7 @@ export class TournamentRegistrationsService {
       // (재제출에서 옛 결제의 시각이 남아 있으면 안 된다 — 그래서 유료도 명시적으로 비운다).
       const settledAt = isFree ? new Date() : null;
       const updated = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
+        where: { id: registrationId, status: 'draft', updatedAt: currentRegistration.updatedAt },
         data: {
           status: isFree ? 'payment_checking' : 'awaiting_payment',
           // `!` 를 쓸 수 없다 — 입금자명 가드에 `entryFee > 0` 을 붙이면서 **"계좌이체면
@@ -483,6 +491,11 @@ export class TournamentRegistrationsService {
         ? await copyPreviousSeasonRoster(tx, tournamentId, { id: registrationId, teamId: registration.teamId })
         : null;
       return { updated, payment, tournament: lockedTournament, carriedPlayers: carried?.added ?? 0 };
+    }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException({ code: 'REGISTRATION_NOT_DRAFT', message: '이미 제출되었거나 변경된 신청이에요.' });
+      }
+      throw error;
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)

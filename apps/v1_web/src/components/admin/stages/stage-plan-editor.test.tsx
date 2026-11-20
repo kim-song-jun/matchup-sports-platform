@@ -19,8 +19,12 @@ describe('단계형 대회 생성 계약', () => {
   it('20팀 템플릿은 5개 예선 리그와 4개 본선 리그·70경기를 실제 폼에 채운다', async () => {
     render(<Editor />); fireEvent.click(screen.getByRole('button', { name: '20팀 순위별 리그 템플릿' }));
     expect(await screen.findByText('모집 20팀 · 2단계 · 예상 70경기')).toBeInTheDocument();
-    expect(screen.getAllByRole('combobox', { name: '경기 방식' })).toHaveLength(9);
-    expect((within(screen.getAllByRole('combobox', { name: '1번 자리' })[0]).getByRole('option', { name: '예선 · A조 1위' }) as HTMLOptionElement).selected).toBe(true);
+    expect(screen.getAllByText(/팀 · 풀리그/)).toHaveLength(9);
+    fireEvent.click(screen.getByText('1위 리그 · 5팀 · 풀리그'));
+    const expanded = screen.getByText('1위 리그 · 5팀 · 풀리그').closest('details')!;
+    expect(expanded.open).toBe(true);
+    expect(document.querySelectorAll('details[open]')).toHaveLength(1);
+    expect((within(within(expanded).getByRole('combobox', { name: '1번 자리' })).getByRole('option', { name: '예선 · A조 1위' }) as HTMLOptionElement).selected).toBe(true);
   });
   it('대회 저장 payload와 초안 복원에 단계 구성을 보존하고 변경을 감지한다', () => {
     const plan = rankedLeagueStagePlan();

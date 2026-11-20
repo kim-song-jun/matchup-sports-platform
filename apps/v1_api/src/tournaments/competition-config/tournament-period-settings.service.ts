@@ -12,6 +12,7 @@ import {
 } from './tournament-competition-config';
 import { materializePeriodConfigVersion } from './materialize-period-config-version';
 import { inPeriodScope, loadFixturePeriodRows, resolveTournamentFixturePeriodSource, type PeriodScope } from './tournament-stage-period-config';
+import type { StoredStagePlan } from '../stages/stage-view';
 
 type StoredPeriod = { code: string; label: string; durationMinutes: number; extraTime: boolean };
 type PeriodRead = { periods: StoredPeriod[] | null; legacyPeriodCount: number | null };
@@ -85,9 +86,10 @@ export class TournamentPeriodSettingsService {
 
       await lockCompetitionFixtureRows(tx, row.kind, row.id);
 
-      if ([dto.phase, dto.groupId, dto.teamMatchId].filter((scope) => scope !== undefined).length > 1) {
+      if ([dto.phase, dto.groupId, dto.teamMatchId, dto.stageKey, dto.poolKey].filter((scope) => scope !== undefined).length > 1) {
         throw new BadRequestException({ code: 'TOURNAMENT_PERIOD_SCOPE_CONFLICT', message: '단계·조·경기 중 하나만 골라 저장해 주세요.' });
       }
+      if (dto.stageKey !== undefined || dto.poolKey !== undefined) return this.updateCompositionScope(tx, user.id, admin, row, dto);
       if (dto.phase !== undefined) {
         return this.updateStage(tx, user.id, admin, row, { ...dto, phase: dto.phase });
       }
@@ -276,7 +278,45 @@ export class TournamentPeriodSettingsService {
     };
   }
 
-  /** 조별리그 조 하나의 피리어드. 강 단계는 블록이 보통 하나라 단계 설정 한 곳에서만 바꾼다. */
+  private async updateCompositionScope(tx: Prisma.TransactionClient, userId: string, admin: V1TournamentManager, row: PeriodSettingsTournament, dto: UpdateTournamentPeriodSettingsDto) {
+    const plan = row.stagePlan as unknown as StoredStagePlan | null;
+    if (!plan || !row.competitionConfig) throw new BadRequestException({ code: 'STAGE_PLAN_REQUIRED', message: '단계형 대회의 단계·편성을 선택해 주세요.' });
+    const kind = dto.poolKey !== undefined ? 'pools' : 'stages', key = dto.poolKey ?? dto.stageKey!;
+    const exists = kind === 'pools' ? plan.stages.some(s => s.pools.some(p => p.key === key)) : plan.stages.some(s => s.key === key);
+    if (!exists) throw new NotFoundException({ code: 'STAGE_SCOPE_NOT_FOUND', message: '단계 또는 편성을 찾을 수 없어요.' });
+    const scope: PeriodScope = kind === 'pools' ? { kind: 'pool', poolKey: key } : { kind: 'competition_stage', stageKey: key };
+    const ownership = await this.periodOwnership(tx, row, scope);
+    const previous = plan.periodSettings?.[kind]?.[key];
+    plan.periodSettings ??= {}; plan.periodSettings[kind] ??= {};
+    let fixturesRepointed = 0;
+    if (dto.inheritDefault) {
+      delete plan.periodSettings[kind]![key];
+      // Read the post-removal source; each group may have a different inherited round/stage rule.
+      await tx.v1Tournament.update({ where: { id: row.id }, data: { stagePlan: JSON.parse(JSON.stringify(plan)), updatedAt: row.updatedAt } });
+      const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: row.id, ...(dto.poolKey !== undefined ? { poolKey: key } : { stageKey: key }) }, select: { id: true, phase: true } });
+      for (const group of groups) {
+        const inherited = await resolveTournamentFixturePeriodSource(tx, { tournamentId: row.id, groupId: group.id, round: group.phase, defaultCompetitionConfigVersionId: row.competitionConfig.id });
+        const config = await tx.v1CompetitionConfigVersion.findUniqueOrThrow({ where: { id: inherited.competitionConfigVersionId } });
+        const periods = this.readPeriods(config.periods).periods;
+        if (!periods) throw new UnprocessableEntityException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '상속할 경기 시간을 확인해 주세요.' });
+        fixturesRepointed += await this.followPeriods(tx, row, config, periods, { ...ownership, tournamentDetails: { is: { groupId: group.id } } });
+      }
+    } else {
+      if (!dto.periods) throw new BadRequestException({ code: 'TOURNAMENT_PERIODS_REQUIRED', message: '경기 시간을 입력해 주세요.' });
+      const baseline = previous?.periods ?? this.readPeriods(row.competitionConfig.periods).periods ?? [];
+      const periods = normalizeTournamentPeriods(baseline, dto.periods);
+      const materialized = await materializePeriodConfigVersion(tx, { source: row.competitionConfig, periods: periods as unknown as Prisma.JsonValue, createdByUserId: userId });
+      plan.periodSettings[kind]![key] = { competitionConfigVersionId: materialized.version.id, periods };
+      fixturesRepointed = await this.followPeriods(tx, row, materialized.version, periods, ownership);
+      await this.logVersionCreated(tx, admin, row.id, row.competitionConfig, materialized, { [kind === 'pools' ? 'poolKey' : 'stageKey']: key });
+    }
+    const bumped = await this.bumpTournamentVersion(tx, row);
+    await tx.v1Tournament.update({ where: { id: row.id }, data: { stagePlan: JSON.parse(JSON.stringify(plan)), stagePlanRevision: { increment: 1 }, updatedAt: bumped } });
+    await this.adminContext.logAdminAction(admin, { action: 'tournament.composition_period_settings.change', targetType: 'tournament', targetId: row.id, beforeJson: previous ? JSON.parse(JSON.stringify(previous)) : undefined, afterJson: { scope: kind, key, inherit: dto.inheritDefault === true, fixturesRepointed } }, tx);
+    return { changed: true, fixturesRepointed, ...this.serialize({ ...row, stagePlan: JSON.parse(JSON.stringify(plan)), updatedAt: bumped }) };
+  }
+
+  /** Legacy group override, which takes precedence over composition stage/pool settings. */
   private async updateGroup(
     tx: Prisma.TransactionClient,
     userId: string,
@@ -295,7 +335,7 @@ export class TournamentPeriodSettingsService {
       include: { competitionConfig: true },
     });
     if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
-    if (group.phase !== V1TournamentGroupPhase.group) {
+    if (group.phase !== V1TournamentGroupPhase.group && !group.stageKey) {
       throw new BadRequestException({ code: 'TOURNAMENT_GROUP_PERIODS_UNSUPPORTED', message: '강 단계 경기 시간은 대회 정보의 단계별 경기 시간에서 바꿔 주세요.' });
     }
     const ownership = await this.periodOwnership(tx, row, { kind: 'group', groupId: group.id });
@@ -306,8 +346,9 @@ export class TournamentPeriodSettingsService {
       if (!overridden) return { changed: false, fixturesRepointed: 0, ...this.serialize(row) };
       await tx.v1TournamentGroup.update({ where: { id: group.id }, data: { periods: Prisma.DbNull, competitionConfigVersionId: null } });
       const bumped = await this.bumpTournamentVersion(tx, row);
-      const inherited = stage?.competitionConfig ?? row.competitionConfig;
-      const inheritedPeriods = this.readPeriods(stage?.periods ?? row.competitionConfig.periods).periods;
+      const source = await resolveTournamentFixturePeriodSource(tx, { tournamentId: row.id, groupId: group.id, round: group.phase, defaultCompetitionConfigVersionId: row.competitionConfig.id });
+      const inherited = await tx.v1CompetitionConfigVersion.findUniqueOrThrow({ where: { id: source.competitionConfigVersionId } });
+      const inheritedPeriods = this.readPeriods(inherited.periods).periods;
       if (!inheritedPeriods) throw new UnprocessableEntityException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '조별리그 경기 시간을 읽을 수 없어요.' });
       const fixturesRepointed = await this.followPeriods(tx, row, inherited, inheritedPeriods, ownership);
       await this.adminContext.logAdminAction(admin, {
@@ -642,12 +683,13 @@ export class TournamentPeriodSettingsService {
     return row;
   }
 
-  private serialize(row: Pick<PeriodSettingsTournament, 'id' | 'kind' | 'updatedAt' | 'competitionConfigVersionId' | 'competitionConfig' | 'stagePeriodSettings' | 'groups'>) {
+  private serialize(row: Pick<PeriodSettingsTournament, 'id' | 'kind' | 'updatedAt' | 'stagePlan' | 'competitionConfigVersionId' | 'competitionConfig' | 'stagePeriodSettings' | 'groups'>) {
     return {
       tournamentId: row.id,
       kind: row.kind ?? V1CompetitionKind.regular_tournament,
       competitionConfigVersionId: row.competitionConfigVersionId,
       expectedVersion: row.updatedAt.toISOString(),
+      compositionOverrides: (['stages', 'pools'] as const).flatMap(kind => Object.entries((row.stagePlan as unknown as StoredStagePlan | null)?.periodSettings?.[kind] ?? {}).map(([key, value]) => ({ scope: kind === 'stages' ? 'stage' as const : 'pool' as const, key, ...value }))),
       ...(row.competitionConfig ? this.readPeriods(row.competitionConfig.periods) : { periods: null, legacyPeriodCount: null }),
       requiresDurationInput: row.competitionConfig ? this.readPeriods(row.competitionConfig.periods).periods === null : true,
       stageOverrides: row.stagePeriodSettings.map((setting) => ({

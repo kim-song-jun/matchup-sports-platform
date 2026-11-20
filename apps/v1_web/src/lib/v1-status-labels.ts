@@ -403,20 +403,6 @@ export function competitionKindLabel(kind: CompetitionKindKey): string {
 export const LEAGUE_SUBJECT_LABEL = COMPETITION_KIND_LABEL.LEAGUE;
 export const MATCH_SUBJECT_LABEL = '경기';
 
-/** 리그 순위표 자리의 시즌 단계. */
-export type LeagueSeasonStage = 'preseason' | 'in_progress' | 'awaiting_result' | 'completed';
-
-const LEAGUE_SEASON_STAGE_LABEL: Record<LeagueSeasonStage, string> = {
-  preseason: '시즌 시작 전',
-  in_progress: '시즌 진행 중',
-  awaiting_result: MATCH_PHASE_LABEL.awaiting_result,
-  completed: '시즌 종료',
-};
-
-export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
-  return LEAGUE_SEASON_STAGE_LABEL[stage];
-}
-
 /** 운영 콘솔 도착 확인(검인)을 한 경기에서, 아직 도착 확인이 안 된 선수. */
 export const ARRIVAL_PENDING_LABEL = '도착 전';
 export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';

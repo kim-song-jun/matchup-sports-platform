@@ -1,4 +1,6 @@
+import { ANDROID_PLAY_STORE_URL, IOS_APP_STORE_URL } from '@/lib/app-store-links';
 import { formatTournamentDateLong } from '@/lib/date-utils';
+import { OFFICIAL_INSTAGRAM } from '@/lib/official-surfaces';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES, type PublicSiteRoute } from '@/lib/public-site/routes';
 import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
@@ -55,7 +57,9 @@ export async function GET(): Promise<Response> {
     '',
     ...(tournaments.length > 0
       ? [
-          '## 현재 모집 중이거나 진행 중인 대회',
+          '## 모집 단계이거나 진행 중인 대회',
+          '',
+          '정원이 찼거나 신청 기간이 지난 대회도 있어요. 신청할 수 있는지는 각 대회 페이지에서 확인해 주세요.',
           '',
           ...tournaments.map((item) => {
             const scheduled = item.scheduledAt ? formatTournamentDateLong(item.scheduledAt) : '';
@@ -81,11 +85,13 @@ export async function GET(): Promise<Response> {
     '- 로그인이 필요한 개인 정보(선수 개인 프로필·채팅·신청 내역)는 크롤링 대상이 아니며',
     '  인용 대상도 아닙니다.',
     '',
-    '## 문의',
+    '## 문의와 공식 채널',
     '',
     `- 이메일: ${siteInfo.contactEmail}`,
     `- 문의 창구 안내: ${absoluteSiteUrl('/contact')}`,
-    '- 인스타그램: https://www.instagram.com/teameet_official/',
+    `- 인스타그램: ${OFFICIAL_INSTAGRAM.url}`,
+    `- iOS 앱(App Store): ${IOS_APP_STORE_URL}`,
+    `- Android 앱(Google Play): ${ANDROID_PLAY_STORE_URL}`,
     '',
   ].join('\n');
 

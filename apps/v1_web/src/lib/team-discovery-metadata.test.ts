@@ -164,4 +164,25 @@ describe('buildTeamDiscoveryMetadata', () => {
     expect(metadata.description).toContain('성수 한강공원에서 주말마다 초보자와 함께 천천히 달리는');
     expect(metadata.description).not.toContain('undefined');
   });
+
+  it('masks phone numbers typed into the public introduction and activity summary', () => {
+    const metadata = buildTeamDiscoveryMetadata(teamFixture({
+      profile: {
+        ...teamFixture().profile,
+        introduction: '가입 문의는 010-1234-5678 로 주세요. 주말 아침 한강 러닝 모임입니다.',
+        activitySummary: '주말 · 오전 · 총무 010 9876 5432',
+      },
+    }));
+
+    expect(metadata.description).toContain('가입 문의는 ***-****-**** 로 주세요.');
+    expect(metadata.description).toContain('활동: 주말 · 오전 · 총무 ***-****-****.');
+    expect(metadata.description).not.toMatch(/010|1234|5678|9876|5432/);
+  });
+
+  it('treats an introduction that is only a phone number as too short and uses the fallback', () => {
+    const metadata = buildTeamDiscoveryMetadata(teamFixture({ profile: { ...teamFixture().profile, introduction: '010-1234-5678' } }));
+
+    expect(metadata.description).not.toContain('***');
+    expect(metadata.description).toContain('서울 성동구');
+  });
 });

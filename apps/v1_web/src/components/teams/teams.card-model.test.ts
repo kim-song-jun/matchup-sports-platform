@@ -3,7 +3,7 @@
  * 서버 프리렌더가 이 함수를 마스터 종목 없이도 호출하므로 두 경로를 모두 고정한다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildTeamSportChips, formatTeamRegion, toTeam } from './teams.card-model';
+import { buildTeamSportChips, formatTeamCardMembers, formatTeamRegion, teamCardGenderLabel, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
 import type { V1Sport, V1Team } from '@/types/api';
 
@@ -141,5 +141,43 @@ describe('formatTeamRegion — 시/도 전체 표기', () => {
   it('다른 시/도와 구/군 표기는 그대로다', () => {
     expect(formatTeamRegion({ name: '서울', parentName: null })).toBe('서울 전체');
     expect(formatTeamRegion({ name: '수원시', parentName: '경기' })).toBe('경기 수원시');
+  });
+});
+
+describe('toTeam — 카드 정보 줄(수준 · 최근 3개월 경기)', () => {
+  const api = (extra: Record<string, unknown>) => ({ ...team('풋살'), ...extra }) as unknown as V1Team;
+
+  it('서버가 준 수준과 최근 3개월 경기 수를 카드 모델에 싣는다', () => {
+    const model = toTeam(api({ levelLabel: '입문-고수', recentMatchCount: 17 }));
+
+    expect(model.level).toBe('입문-고수');
+    expect(model.recentMatchCount).toBe(17);
+  });
+
+  it('수준을 정하지 않은 팀은 자리표시자 대신 빈 문자열이다 — 카드가 수준 칸을 뺀다', () => {
+    expect(toTeam(api({})).level).toBe('');
+  });
+
+  it('경기가 0건이면 0 그대로 둔다 — 카드가 "0경기"를 보여 준다', () => {
+    expect(toTeam(api({ recentMatchCount: 0 })).recentMatchCount).toBe(0);
+  });
+
+  it('서버가 경기 수를 안 준 응답이면 undefined 로 둔다 — 0 으로 지어내지 않는다', () => {
+    expect(toTeam(api({})).recentMatchCount).toBeUndefined();
+  });
+});
+
+describe('teamCardGenderLabel', () => {
+  it.each([
+    ['남', '남성'], ['여', '여성'], ['성별 무관', '성별 무관'], ['혼성', '혼성'], ['', ''], [null, ''], [undefined, ''], [' 남 ', '남성'],
+  ])('%s → %s', (raw, expected) => {
+    expect(teamCardGenderLabel(raw)).toBe(expected);
+  });
+});
+
+describe('formatTeamCardMembers', () => {
+  it('목표 인원이 있으면 현재/목표, 없으면 현재 인원만 쓴다', () => {
+    expect(formatTeamCardMembers({ members: 9, capacity: 24 })).toBe('9/24명');
+    expect(formatTeamCardMembers({ members: 3, capacity: 0 })).toBe('3명');
   });
 });

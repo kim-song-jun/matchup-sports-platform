@@ -2,6 +2,8 @@ import type { Prisma } from '@prisma/client';
 import { leagueFixtureListOrder, leagueFixtureListWhere } from '../../league-matches/league-fixture-list-source';
 import { competitionStageRank } from '../tournament-stage-rank';
 import type { OrderedCompetitionGame } from './suspension-verdicts';
+import type { StoredStagePlan } from '../stages/stage-view';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 
 type Tx = Prisma.TransactionClient;
 
@@ -12,7 +14,7 @@ export interface CompetitionMatchOrderRow {
   readonly game: { readonly id: string } | null;
   readonly tournamentDetails?: {
     readonly round: string;
-    readonly group: { readonly phase: string } | null;
+    readonly group: { readonly phase: string; readonly stageKey?: string | null } | null;
   } | null;
 }
 
@@ -22,11 +24,14 @@ export interface CompetitionMatchOrderRow {
  * 단계를 먼저 보지 않으면 일찍 잡힌 결승이 조별 경기보다 "다음 경기"가 된다.
  * 단계를 알 수 없는 라운드는 조별 단계와 같은 칸에 둔다.
  */
-export function sortByCompetitionStage<T extends CompetitionMatchOrderRow>(rows: readonly T[]): T[] {
-  const rank = (row: T) => competitionStageRank({
+export function sortByCompetitionStage<T extends CompetitionMatchOrderRow>(rows: readonly T[], stageKeys: readonly string[] = []): T[] {
+  const rank = (row: T) => {
+    const stageIndex = stageKeys.indexOf(row.tournamentDetails?.group?.stageKey ?? '');
+    return Math.max(0, stageIndex) * 100 + (competitionStageRank({
     phase: row.tournamentDetails?.group?.phase,
     round: row.tournamentDetails?.round ?? '',
-  }) ?? 0;
+    }) ?? 0);
+  };
   return rows.map((row) => ({ row, rank: rank(row) })).sort((a, b) => a.rank - b.rank).map(({ row }) => row);
 }
 
@@ -53,7 +58,7 @@ const ORDER_SELECT = {
   approvedApplicantTeamId: true,
   startAt: true,
   game: { select: { id: true } },
-  tournamentDetails: { select: { round: true, group: { select: { phase: true } } } },
+  tournamentDetails: { select: { round: true, group: { select: { phase: true, stageKey: true } } } },
 } as const;
 
 /** 대회·리그 전체 경기를 정지 판정이 쓰는 순서로 읽는다 — 리그는 `leagueFixtureListOrder`, 대회는 단계 → 시각 → 라운드 → 대진 번호 → 레그 → id. */
@@ -78,7 +83,11 @@ export async function loadCompetitionMatchOrder(
         ],
         select: ORDER_SELECT,
       });
-  return input.isLeague ? rows : sortByCompetitionStage(rows);
+  if (input.isLeague) return rows;
+  const tournament = rows.some(row => row.tournamentDetails?.group?.stageKey)
+    ? await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: input.competitionId, deletedAt: null }, select: { stagePlan: true } }) : null;
+  const plan = tournament?.stagePlan as unknown as StoredStagePlan | null;
+  return sortByCompetitionStage(rows, plan?.stages.map(s => s.key));
 }
 
 /**

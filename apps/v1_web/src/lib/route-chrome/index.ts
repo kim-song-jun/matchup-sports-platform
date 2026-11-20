@@ -35,7 +35,7 @@ import { TEAM_MATCHES_ROUTES } from './fragments/team-matches'; // /team-matches
 import { TEAMS_ROUTES } from './fragments/teams'; // /teams
 import { TEAM_SCHEDULES_ROUTES } from './fragments/team-schedules'; // /teams/:id/schedule, /my/schedule
 import { LEAGUE_MATCHES_ROUTES } from './fragments/league-matches'; // /league-matches
-import { TOURNAMENTS_CORE_ROUTES } from './fragments/tournaments-core'; // /tournaments(list/detail/schedule/bracket/results/awards/campaigns)
+import { TOURNAMENTS_CORE_ROUTES } from './fragments/tournaments-core'; // /tournaments(list/detail/bracket/results/awards/campaigns)
 import { TOURNAMENTS_EXTRA_ROUTES } from './fragments/tournaments-extra'; // /tournaments/:id/apply, /my/tournaments, /matches, /registrations
 import { COMMUNITY_ROUTES } from './fragments/community'; // /chat, /notifications
 import { REVIEWS_ROUTES } from './fragments/reviews'; // /my/reviews, /tournaments/:id/reviews

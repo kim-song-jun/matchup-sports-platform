@@ -1,10 +1,10 @@
 import type { MetadataRoute } from 'next';
 import { ROBOTS_NAMED_USER_AGENTS } from '@/lib/crawler-agents';
-import { absoluteSiteUrl, getSiteOrigin, NOTICES_FEED_PATH } from '@/lib/seo';
+import { absoluteSiteUrl, NOTICES_FEED_PATH } from '@/lib/seo';
 import { PUBLIC_SITE_ALLOW_PATHS } from '@/lib/public-site/routes';
 
 /**
- * 공개 크롤 대상 경로. 로그인·개인 데이터·운영 화면은 아래 DISALLOWED_PATHS로 차단한다.
+ * 공개 크롤 대상 경로. 개인 데이터·운영·인증 영역은 아래 DISALLOWED_PATHS로 차단한다.
  */
 const ALLOWED_PATHS = [
   '/landing',
@@ -20,6 +20,8 @@ const ALLOWED_PATHS = [
   ...PUBLIC_SITE_ALLOW_PATHS,
 ];
 
+// 글자로 고정된 경로 앞부분만 쓴다. '/*/edit' 같은 와일드카드는 더 긴 Allow 줄('/teams' 등)에 져서
+// 경로마다 효력이 갈린다. 작성·수정·신청 화면은 수집을 허용하고 next.config.ts 의 noIndexRoutes 헤더로 검색에서 뺀다.
 const DISALLOWED_PATHS = [
   '/api/',
   '/admin/',
@@ -33,10 +35,6 @@ const DISALLOWED_PATHS = [
   '/search',
   '/signup',
   '/users/',
-  '/*/edit',
-  '/*/new',
-  '/*/apply',
-  '/*/applications',
 ];
 
 /**
@@ -54,6 +52,5 @@ export default function robots(): MetadataRoute.Robots {
     ],
     // Google·Bing 은 RSS 2.0 도 사이트맵 형식으로 받는다 — 공지 피드를 여기서 함께 알린다.
     sitemap: [absoluteSiteUrl('/sitemap.xml'), absoluteSiteUrl(NOTICES_FEED_PATH)],
-    host: getSiteOrigin(),
   };
 }

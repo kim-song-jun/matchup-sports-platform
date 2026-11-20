@@ -87,7 +87,7 @@ Query:
 | `genderRule` | string | No | `성별 무관`, `남`, `여`, `무관` |
 | `levelCodes` | comma string(≤100) | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `joinPolicy` | string | No | `approval_required`, `closed` |
-| `sort` | latest/member_count/activity | No | 기본 latest(최근 등록순). `member_count`는 멤버 많은순, `activity`는 팀 매치를 호스트로 올린 횟수(관계 `_count`, 취소된 매치 포함·상대 팀/리그/대회 경기 제외) 많은순이다. 같은 값이면 최근 등록순으로 이어지고 마지막 기준은 언제나 `id` 내림차순이라 생성 시각이 같은 팀이 커서 경계에서 겹치거나 빠지지 않는다(MD-QA #176). 이전에 허용하던 `recommended`·`trust`는 서버에 분기가 없어 등록순과 같은 결과였으므로 허용값에서 빠졌고, 보내면 400이다 |
+| `sort` | latest/member_count/activity | No | 기본 latest(최근 등록순). `member_count`는 멤버 많은순, `activity`는 팀 매치를 호스트로 올린 횟수(취소·삭제된 매치 제외, 상대 팀/리그/대회 경기 제외) 많은순이다. 같은 값이면 최근 등록순으로 이어지고 마지막 기준은 언제나 `id` 내림차순이라 생성 시각이 같은 팀이 커서 경계에서 겹치거나 빠지지 않는다(MD-QA #176). 이전에 허용하던 `recommended`·`trust`는 서버에 분기가 없어 등록순과 같은 결과였으므로 허용값에서 빠졌고, 보내면 400이다 |
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor |
 | `limit` | 1~50 | No | 기본 20 |
@@ -100,6 +100,7 @@ CAUTION:
 - Team list, detail, `/me/teams` responses include `activityDays`, `activityFrequency`,
   `activityTimeSlots`, `activityTypes`, `activityMemo`, `activitySummary`, `memberGoalCount`.
   `activityAreaText`는 기존 `activity_note` 컬럼을 쓰는 호환/폴백 필드로 남아 있다.
+- 목록 항목은 `recentMatchCount`(number, 0 이상)를 내려준다 — **최근 3개월**(UTC 기준 현재에서 3개월 전부터) 팀 전적에 잡힌 공개·공식 경기 수다. 팀 상세의 전적 요약과 같은 기준(그 게임의 현재 공식 리비전, 숨김·결과 비공개 경기와 비공개 대회 제외)을 `games/public-records/team-record-public-sql.ts` 한 곳에서 쓰고, 한 페이지 팀들을 쿼리 1번으로 센다. 경기가 없으면 `0`이다. 상세·`/me/teams` 응답에는 없다.
 - 목록 항목은 `owner`(팀장 이름·사진)를 내려주고 매니저 이름은 내려주지 않는다 — 목록 카드가 팀장·매니저 줄을 쓰지 않는다(Task 180 G12·H2, 예전 `manager` 필드 제거).
 
 ## POST /teams (MutateTeamDto / CreateTeamDto)

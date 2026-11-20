@@ -1,4 +1,5 @@
 import { getLeagueSettings, updateLeagueSettings } from './league-settings';
+import { linkNextSeason, listNextSeasonCandidates, unlinkNextSeason } from './league-season-link-admin';
 import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import { countPendingCapacityReservations } from '../tournaments/registration-capacity';
 import {
@@ -63,6 +64,7 @@ import { loadFirstGamePlayerNotices } from './league-fixture-scheduled-notice';
 import {
   AddLeagueTeamDto,
   AddPreviousSeasonTeamsDto,
+  LinkNextSeasonDto,
   ApplyLeagueTemplateDto,
   PreviewLeagueTemplateDto,
   LeagueFixtureScheduleDto,
@@ -101,6 +103,7 @@ import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/comp
 import { buildLeagueTemplatePreview, type LeagueTemplatePreview } from './league-template-preview';
 import { type LeagueTemplatePlan, type LeagueTemplateTiming, planLeagueTemplate, resolveTemplateSlots, templateMatchdayCount } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
+import { LEAGUE_LIST_STATUS_FILTERS, leagueListStatusKey, type LeagueListStatusFilter } from './league-list-status';
 import { isRegistrationWindowOpen } from '../tournaments/registration-window';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { adminBracketSlotInclude, serializeAdminBracketGame, serializeAdminBracketSlot } from '../tournaments/slots/admin-bracket-view';
@@ -340,8 +343,14 @@ export class LeagueMatchAdminService {
    * seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속(단발) 리그만 필터한다.
    * 리그 허브(B안, 2026-08-25)의 체계 칩 필터가 쓰는 파라미터 — 없으면 전체.
    */
-  async list(user: V1AuthUser, seriesId?: string, visibility?: 'public' | 'hidden') {
+  async list(
+    user: V1AuthUser,
+    seriesId?: string,
+    visibility?: 'public' | 'hidden',
+    filters: { q?: string; status?: LeagueListStatusFilter } = {},
+  ) {
     await this.adminContext.getActiveAdmin(user.id);
+    const q = filters.q?.trim();
     // DTO 검증이 /i 라 'INDEPENDENT'·대문자 uuid 도 통과한다 — 소문자로 정규화해야
     // 리터럴 비교와 (소문자로 저장되는) uuid 매칭이 어긋나지 않는다.
     const normalized = seriesId?.toLowerCase();
@@ -353,6 +362,15 @@ export class LeagueMatchAdminService {
         deletedAt: null,
         ...seriesFilter,
         ...(visibility ? { isPublic: visibility === 'public' } : {}),
+        // 리그 이름 또는 소속 체계 이름. 상태는 칩 숫자를 위해 DB 가 아니라 아래에서 메모리로 거른다.
+        ...(q
+          ? {
+              OR: [
+                { title: { contains: q, mode: 'insensitive' as const } },
+                { series: { title: { contains: q, mode: 'insensitive' as const } } },
+              ],
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -374,17 +392,6 @@ export class LeagueMatchAdminService {
         series: { select: { title: true } },
       },
     });
-    // 대진 수는 따로 센다. `V1TeamMatch.leagueId` 는 아직 레거시 테이블을 가리켜
-    // (`V1Tournament` 쪽 relation 이 없다) `_count` 로 함께 셀 수 없다 — 그 FK 재타깃은
-    // BE-5 ④ drop 의 몫이다. id 는 두 축이 같으므로 leagueId 로 그대로 묶인다.
-    const fixtureCounts = await this.prisma.v1TeamMatch.groupBy({
-      by: ['leagueId'],
-      where: { leagueId: { in: rows.map((row) => row.id) }, deletedAt: null },
-      _count: { _all: true },
-    });
-    const fixtureCountByLeagueId = new Map(
-      fixtureCounts.map((row) => [row.leagueId, row._count._all]),
-    );
     // 깨진 거울(일정·지역이 빈 행)은 **끊지 않고 제외한다** — 목록 하나 때문에 전체가 500 이
     // 되면 운영자가 다른 리그도 못 본다. 대신 몇 건을 뺐는지 로그로 남긴다(조용히 사라지면
     // 아무도 모른다). 단건 조회는 그대로 `LEAGUE_MIRROR_MISSING` 으로 끊는다.
@@ -395,8 +402,28 @@ export class LeagueMatchAdminService {
           `(ids: ${rows.filter((row) => !isCompleteLeagueMirror(row)).map((row) => row.id).join(', ')})`,
       );
     }
+    // 상태 칩 숫자: 검색어·공개 여부·체계 조건은 적용하고 상태 선택만 뺀 집계(회원·대회 목록과 같다).
+    // 목록은 페이지로 나누지 않으므로 같은 행 집합에서 메모리로 센다 — 깨진 거울을 뺀 `listable` 기준이라
+    // 칩 숫자와 표 행 수가 어긋나지 않는다.
+    const byStatus = Object.fromEntries(LEAGUE_LIST_STATUS_FILTERS.map((key) => [key, 0])) as Record<LeagueListStatusFilter, number>;
+    for (const row of listable) byStatus[leagueListStatusKey(row.status)] += 1;
+    const visible = filters.status
+      ? listable.filter((row) => leagueListStatusKey(row.status) === filters.status)
+      : listable;
+    // 대진 수는 따로 센다. `V1TeamMatch.leagueId` 는 아직 레거시 테이블을 가리켜
+    // (`V1Tournament` 쪽 relation 이 없다) `_count` 로 함께 셀 수 없다 — 그 FK 재타깃은
+    // BE-5 ④ drop 의 몫이다. id 는 두 축이 같으므로 leagueId 로 그대로 묶인다.
+    const fixtureCounts = await this.prisma.v1TeamMatch.groupBy({
+      by: ['leagueId'],
+      where: { leagueId: { in: visible.map((row) => row.id) }, deletedAt: null },
+      _count: { _all: true },
+    });
+    const fixtureCountByLeagueId = new Map(
+      fixtureCounts.map((row) => [row.leagueId, row._count._all]),
+    );
     return {
-      items: listable.map((row) => ({
+      summary: { total: listable.length, byStatus },
+      items: visible.map((row) => ({
         leagueId: row.id,
         title: row.title,
         isPublic: row.isPublic,
@@ -421,6 +448,17 @@ export class LeagueMatchAdminService {
   }
   updateSettings(user: V1AuthUser, id: string, dto: UpdateLeagueSettingsDto) {
     return updateLeagueSettings(this.prisma, this.adminContext, user, id, dto);
+  }
+
+  /** 이 리그의 다음 시즌으로 이을 수 있는 리그 후보(2026-11-19). */
+  nextSeasonCandidates(user: V1AuthUser, leagueId: string) {
+    return listNextSeasonCandidates(this.prisma, this.adminContext, user, leagueId);
+  }
+  linkNextSeason(user: V1AuthUser, leagueId: string, dto: LinkNextSeasonDto) {
+    return linkNextSeason(this.prisma, this.adminContext, user, leagueId, dto);
+  }
+  unlinkNextSeason(user: V1AuthUser, leagueId: string) {
+    return unlinkNextSeason(this.prisma, this.adminContext, user, leagueId);
   }
 
   async detail(user: V1AuthUser, leagueId: string) {

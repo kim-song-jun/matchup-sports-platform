@@ -671,4 +671,24 @@ describe('OperationsBoardClient', () => {
       expect(link.getAttribute('href')).toMatch(/^\/admin\/live\/t-1\/fixtures\//);
     }
   });
+
+  // 같은 사람이 담당 경기 목록(`?from=staff`)으로도, 이 보드로도 콘솔에 들어갈 수 있다(디렉터 + 필드 담당자).
+  // 출처를 실어 보내지 않으면 예전에 저장된 `staff` 가 남아, 콘솔의 뒤로가기가 바로 앞 화면(이 보드)이 아니라
+  // 가 본 적 없는 담당 경기 목록으로 갔다.
+  it('스태프 표면의 경기 콘솔 링크는 출처(from=board)를 싣는다', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/\/operate\?from=board$/);
+    }
+  });
+
+  it('어드민 표면의 경기 콘솔 링크에는 쿼리를 붙이지 않는다 — 경로만 봐도 출처를 안다', () => {
+    mocks.pathname.value = '/admin/live/t-1/operations';
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    for (const link of screen.getAllByRole('link', { name: /운영 콘솔/ })) {
+      expect(link.getAttribute('href')).toMatch(/\/operate$/);
+    }
+  });
 });

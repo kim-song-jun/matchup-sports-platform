@@ -24,7 +24,7 @@ import {
   matchesEligibilityFilter,
   type EligibilityFilter,
 } from '@/components/admin/admin-player-eligibility-review';
-import { JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
+import { JOINKFA_CERTIFICATE_GUIDE, JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
 import { formatDate } from './tournament-admin-shared';
 import {
   ADMIN_CANCELLABLE,
@@ -228,7 +228,7 @@ export function RosterModal({
                       `0` 은 유효한 번호라 falsy 검사로 거르면 0번이 "—" 로 사라진다. */}
                   <span
                     className="shrink-0 tab-num text-sm font-semibold text-[var(--text-muted)]"
-                    style={{ minWidth: 24 }}
+                    style={{ minWidth: 24, textAlign: 'right' }}
                     aria-label={p.jerseyNumber === null ? '등번호 없음' : `등번호 ${p.jerseyNumber}번`}
                   >
                     {p.jerseyNumber === null ? '—' : p.jerseyNumber}
@@ -385,6 +385,7 @@ export function RosterModal({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE} 대한축구협회 공식 사이트에서 직접 확인해 주세요.</p>
         <JoinKfaLink label="JoinKFA 열기" />
+        <p className="m-0 w-full text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{JOINKFA_CERTIFICATE_GUIDE}</p>
       </div>
       <button
         type="button"
@@ -492,6 +493,7 @@ export function RegistrationsTab({
   showToast,
   tournamentTeamCount,
   canWrite,
+  admissionsBlockedReason = null,
   requireCancelReason = false,
   isFreeEntry = false,
   rosterDeadlineAt = null,
@@ -501,6 +503,7 @@ export function RegistrationsTab({
   /** 정원(팀 수) — 참가 확정 시 정원 초과 경고에 사용. 로딩 중이면 undefined */
   tournamentTeamCount?: number;
   canWrite: boolean;
+  admissionsBlockedReason?: string | null;
   /**
    * 거부 사유를 **반드시** 받아야 하는가. 정규 리그가 그렇다(D9 — 서버가
    * `LEAGUE_CANCEL_REASON_REQUIRED` 로 400 을 준다). 대회는 선택 그대로다.
@@ -598,6 +601,10 @@ export function RegistrationsTab({
   };
 
   const handleConfirm = (reg: V1AdminTournamentRegistration, decision: 'confirm' | 'waitlist') => {
+    if (admissionsBlockedReason) {
+      showToast(admissionsBlockedReason, 'error');
+      return;
+    }
     confirmRegistration.mutate(
       { registrationId: reg.id, decision },
       {
@@ -616,6 +623,10 @@ export function RegistrationsTab({
 
   // P1-1: 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
   const handleConfirmClick = async (reg: V1AdminTournamentRegistration) => {
+    if (admissionsBlockedReason) {
+      showToast(admissionsBlockedReason, 'error');
+      return;
+    }
     const confirmedCount = registrations.filter((r) => r.status === 'confirmed').length;
     const nextCount = confirmedCount + 1;
     const capacityLine =
@@ -799,6 +810,7 @@ export function RegistrationsTab({
 
   return (
     <>
+      {admissionsBlockedReason && <p role="status" className="mb-3 text-[length:var(--font-size-body-sm)] text-[var(--text-caption)]">{admissionsBlockedReason}</p>}
       {/* 전량 로더의 안전 상한(1,000건)에 걸린 경우 — 조용한 잘림 금지, 정직하게 알린다 */}
       {data?.truncated && (
         <p className="mb-3 rounded-xl bg-[var(--tint-orange)] px-4 py-3 text-[length:var(--font-size-label)] font-medium text-[var(--orange700)]">
@@ -993,14 +1005,14 @@ export function RegistrationsTab({
                 <>
                   <ActionButton
                     onClick={() => void handleConfirmClick(reg)}
-                    disabled={confirmRegistration.isPending}
+                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                     icon={<Check size={13} />}
                     label="확정"
                     tone="blue"
                   />
                   <ActionButton
                     onClick={() => handleConfirm(reg, 'waitlist')}
-                    disabled={confirmRegistration.isPending}
+                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                     icon={<X size={13} />}
                     label="대기"
                     tone="gray"
@@ -1013,7 +1025,7 @@ export function RegistrationsTab({
               {canWrite && reg.status === 'waitlisted' && (
                 <ActionButton
                   onClick={() => void handleConfirmClick(reg)}
-                  disabled={confirmRegistration.isPending}
+                  disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
                   icon={<Check size={13} />}
                   label="확정"
                   tone="blue"

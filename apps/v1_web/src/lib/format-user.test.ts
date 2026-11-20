@@ -8,6 +8,7 @@ import {
   formatGender,
   formatOnboardingStatus,
   formatUserTitle,
+  formatUserTitleWithRealName,
   maskPhoneNumber,
 } from './format-user';
 
@@ -30,6 +31,26 @@ describe('formatUserTitle', () => {
     expect(formatUserTitle({ email: 'a@b.c' })).toBe('a@b.c');
     expect(formatUserTitle({ userId: '0123456789abcdef' })).toBe('01234567');
     expect(formatUserTitle({})).toBe('프로필 없음');
+  });
+});
+
+describe('formatUserTitleWithRealName', () => {
+  it('닉네임과 실명이 있으면 닉네임 옆 괄호에 실명을 붙인다', () => {
+    expect(formatUserTitleWithRealName({ nickname: '싱아', displayName: '테스트회원', realName: '테스트회원' })).toBe(
+      '싱아 (테스트회원)',
+    );
+  });
+
+  it('실명이 없거나 공백이면 괄호 없이 닉네임만 보여준다', () => {
+    expect(formatUserTitleWithRealName({ nickname: '싱아', realName: null })).toBe('싱아');
+    expect(formatUserTitleWithRealName({ nickname: '싱아', realName: '  ' })).toBe('싱아');
+    expect(formatUserTitleWithRealName({ nickname: '싱아' })).toBe('싱아');
+  });
+
+  it('실명이 닉네임과 같거나 닉네임이 없으면 괄호를 만들지 않는다', () => {
+    expect(formatUserTitleWithRealName({ nickname: '싱아', realName: '싱아' })).toBe('싱아');
+    expect(formatUserTitleWithRealName({ nickname: null, displayName: '테스트회원', realName: '테스트회원' })).toBe('테스트회원');
+    expect(formatUserTitleWithRealName({ email: 'a@b.c', realName: '테스트회원' })).toBe('a@b.c');
   });
 });
 

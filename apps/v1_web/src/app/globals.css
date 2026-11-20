@@ -115,7 +115,6 @@
   /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
   /* OAuth 브랜드 */
   --kakao-yellow: #FEE500;
-  --naver-green: #03C75A;
   /* 톤 카드 틴트 배경 */
   --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
   --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
@@ -175,7 +174,7 @@
      ≈2.42:1, 다크 --orange700 배경 + 흰 글씨 ≈2.16:1 — 둘 다 WCAG AA 4.5:1 미달,
      원래 --orange500 텍스트 대비 결함과 동일한 유형이 배경 용도로 재발). 라이트 700
      hex(#1b64da/#a36100) 자체는 흰 텍스트를 얹는 배경으로도 4.5:1을 넘어(재계산:
-     blue 5.41:1, orange 4.92:1) kakao-yellow/naver-green과 같은 패턴(브랜드/고정
+     blue 5.41:1, orange 4.92:1) kakao-yellow 와 같은 패턴(브랜드/고정
      chip 색은 다크모드에도 동일 값 유지)으로 고정한다 — :root.dark 오버라이드 없음. */
   --player-marker-blue: #1b64da;
   --player-marker-orange: #a36100;
@@ -562,7 +561,8 @@ button:disabled {
 
 .tm-topbar {
   min-height: var(--v1-shell-topbar-height);
-  padding: 8px var(--v1-shell-topbar-x);
+  /* 44px controls + 8px padding + border fit the shared 56px scroll offset. */
+  padding: 4px var(--v1-shell-topbar-x);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1455,16 +1455,6 @@ button:disabled {
   font-style: normal;
 }
 
-.tm-auth-provider-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.tm-auth-provider-row > * {
-  flex: 1;
-}
-
 .tm-auth-provider-group {
   display: flex;
   flex-direction: column;
@@ -1538,9 +1528,9 @@ button:disabled {
   color: var(--static-black);
 }
 
-/* 카카오 브랜드 버튼(계정 연결). 배경은 브랜드 고정색이라 라이트·다크가 같다. 공용 .tm-btn-outline 의
- * 흰 배경·회색 테두리와 hover·disabled 규칙이 브랜드색을 덮지 않도록 특이도로 이긴다(인라인 스타일은
- * hover 색 변화까지 막는다). */
+/* 카카오 브랜드 버튼. 색은 카카오 로그인 버튼 가이드 값이고 라이트·다크가 같다: 컨테이너 노랑, 심볼 검정, 문구 검정 85%.
+ * 공용 variant(.tm-btn-outline 등)의 배경·테두리·hover·disabled 규칙이 브랜드색을 덮지 않도록 특이도로 이긴다 —
+ * 인라인 스타일은 쓰지 않는다. hover 는 색을 바꾸지 않고(눌림은 .tm-pressable), variant 의 hover 배경만 막는다. */
 .tm-btn.tm-auth-kakao {
   background: var(--kakao-yellow);
   color: var(--static-black);
@@ -1549,8 +1539,19 @@ button:disabled {
 
 @media (hover: hover) {
   .tm-btn.tm-auth-kakao:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--kakao-yellow) 90%, var(--static-black));
+    background: var(--kakao-yellow);
   }
+}
+
+.tm-auth-kakao-symbol {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--static-black);
+}
+
+.tm-auth-kakao-label {
+  color: color-mix(in srgb, var(--static-black) 85%, transparent);
 }
 
 .tm-btn.tm-auth-kakao:disabled {
@@ -1565,31 +1566,21 @@ button:disabled {
   opacity: 1;
 }
 
+/* 공용 비활성 규칙(.tm-btn:disabled > *)이 자식을 따로 0.5 로 또 흐려 버튼 전체의 0.58 과 겹치지 않게 한다. */
+.tm-btn.tm-auth-kakao:disabled:not([aria-busy='true']) > * {
+  opacity: 1;
+}
+
 .tm-auth-provider-note {
   text-align: center;
   color: var(--text-caption);
-}
-
-/* 버튼 행 안에 렌더되는 오류 문구: 버튼 폭을 나누지 않고 행 아래 한 줄을 쓴다. */
-.tm-auth-provider-error {
-  flex: 1 1 100%;
-  order: 1;
+  word-break: keep-all;
 }
 
 /* 같은 자리에 오류가 아닌 진행 안내(role="status")를 보일 때. --blue700 은 다크에서 밝은 값으로 덮여 두 테마 모두 AA 를 넘는다.
    아래에 선언된 .tm-text-caption 의 색에 지지 않게 두 클래스로 올린다. */
 .tm-auth-provider-note.tm-auth-provider-status {
   color: var(--blue700);
-}
-
-.tm-auth-provider-disabled,
-.tm-auth-provider-disabled:disabled {
-  border: 1px solid var(--grey100);
-  background: var(--grey100);
-  color: var(--text-caption);
-  opacity: 1;
-  cursor: not-allowed;
-  box-shadow: none;
 }
 
 .tm-auth-policy {
@@ -5133,6 +5124,36 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 16px var(--v1-shell-page-x) 104px;
 }
 
+.tm-my-team-section {
+  margin-bottom: 16px;
+}
+
+.tm-my-team-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0 2px;
+  scrollbar-width: none;
+}
+
+.tm-my-team-row::-webkit-scrollbar {
+  display: none;
+}
+
+.tm-my-team-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 220px;
+  padding: 12px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
 .tm-team-searchbar {
   gap: 1px;
 }
@@ -5407,22 +5428,42 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-muted);
 }
 
-/* 팀 카드 조건 태그 — 레벨은 서버 자유 텍스트라 길이가 보장되지 않는다.
-   고정 %폭 상한(예전 62%)은 390 카드(232px 태그 행) 기준으로 잡혀 있어, 형제 배지가 있으면
-   짧고 의미 있는 값("입문-고수")까지 좁게 나눈 몫에 맞춰 잘렸다(768 2열, 카드 272px에서
-   실측, 2026-09-26 alpha 감사). .tm-league-badge 와 같은 관례로 100%(자기 줄 전체 폭)까지만
-   막는다 — 형제와 나눠 쓸 필요가 없는 한 잘리지 않고, 자유 텍스트 하나가 혼자로도 카드 폭을
-   넘길 만큼 길 때만(Copilot 리뷰 지적) ellipsis 로 막아 카드 밖 가로 스크롤을 막는다. */
-.tm-team-tag {
-  max-width: 100%;
+/* 팀 카드 정보 줄 — 인원 · 수준. 한 줄을 지켜 모든 카드의 높이를 같게 한다. */
+.tm-team-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-caption);
+}
+
+.tm-team-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* 수준은 서버 자유 텍스트라 길이가 보장되지 않는다 — 인원을 지키려고 이 칸만 줄어들고 말줄임한다. */
+.tm-team-card-meta-level {
+  flex: 0 1 auto;
   min-width: 0;
 }
 
-.tm-team-tag-text {
+.tm-team-card-meta-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 활동 일정 줄 자리 — 내용이 없어도 한 줄 높이를 남겨 설명 유무와 상관없이 카드 높이를 같게 한다.
+   1lh 를 못 읽는 오래된 브라우저를 위해 em 값을 먼저 둔다. */
+.tm-team-card-activity-slot {
+  min-height: 1.5em;
+  min-height: 1lh;
 }
 
 .tm-team-card-status-badge {
@@ -10932,6 +10973,23 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   view-transition-name: page-content;
 }
 
+/* 이름표 위치 — 내용물(래퍼)이 스크롤하면 옛/새 스냅샷의 위치·높이가 스크롤만큼 달라서 UA 기본 group
+   이동 250ms 가 옛 목록을 아래로 쓸어 내린다(슬라이드와 같은 시각에 겹침). 모바일은 크기가 고정인
+   스크롤 상자에 이름을 달아 옛/새 사각형을 같게 둔다. 상자가 없는 화면(인증 등)은 위 래퍼 규칙이 그대로 남는다.
+   데스크톱(문서 스크롤)은 아래 push 규칙이 맡는다. */
+@media not all and (min-width: 1024px) {
+  :root[data-page-transition="active"] .tm-scroll-area {
+    view-transition-name: page-content;
+  }
+  :root[data-page-transition="active"] .tm-scroll-area .tm-page-transition-enter {
+    view-transition-name: none;
+  }
+  /* 셸 없이 래퍼 안에 상자를 그리는 화면(전역 404)은 이름이 둘이 되어 전환이 InvalidStateError 로 취소된다. */
+  :root[data-page-transition="active"] .tm-page-transition-enter:has(.tm-scroll-area) {
+    view-transition-name: none;
+  }
+}
+
 @keyframes tm-page-slide {
   from { translate: var(--tm-slide-offset); }
   to { translate: 0; }
@@ -10972,58 +11030,38 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   :root[data-nav-kind="pop"]::view-transition-new(page-content) {
     --tm-slide-offset: 0;
   }
+
+  /* push: 옛 스냅샷은 group(새 화면 사각형) 안에서 맨 위에 놓이므로, group 이동을 끄고
+     컨트롤러가 재 둔 옛·새 래퍼 위쪽 위치 차이(--tm-vt-old-shift)만큼 옮겨 누르기 전 자리에 둔다.
+     스크롤·셸 머리 유무·해시 이동으로 생기는 차이를 한 값이 모두 담는다. pop 은 이 방식을 쓰지 않는다. */
+  :root[data-nav-kind="push"]::view-transition-group(page-content) {
+    animation: none;
+  }
+  :root[data-nav-kind="push"]::view-transition-old(page-content) {
+    inset-block-start: var(--tm-vt-old-shift, 0px);
+  }
+  /* 옛 스냅샷이 올라가 상단 내비 위를 덮지 않도록 내비를 셸 이름표로 분리한다(아래 tm-shell-* 규칙). */
+  .tm-desktop-nav { view-transition-name: tm-shell-desktopnav; }
 }
 
-/* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
-   페이드조차 "다른 것으로 대체됐다"는 신호라 탭에는 맞지 않는다 -- 대신 탭 컨트롤
-   자신(BottomNav 아이콘/thumb)이 반응해 "내가 바꿨다"를 알린다.
-   VT 자체를 건너뛰는 방법(PageTransitionController 에서 kind==='tab' 이면
-   startViewTransition 호출 자체를 생략)도 검토했으나, 그 컨트롤러는 매 pathname
-   변경마다 template.tsx 마운트를 기다려 pending VT 를 resolve 하는 왕복 로직과
-   묶여 있어 이 좁은 CSS 전용 작업 범위 밖이다 -- animation:none 으로 이 이름-특정
-   선택자(::view-transition-old/new(page-content))가 UA 기본 크로스페이드
-   (::view-transition-old/new(*) 에 걸리는 -ua-view-transition-fade-*)를 그대로
-   덮어써 없애는 쪽이 이 파일만으로 완결되고, 스펙상 "기본 크로스페이드 끄기"의
-   표준 방법이기도 하다(오버레이 없이 old→new 가 그 자리에서 즉시 스왑).
-   ::view-transition-group(page-content) 의 기본 리사이즈 애니메이션도 실질적으로
-   no-op 이다 -- .tm-scroll-area 는 문서 흐름이 아니라 셸이 고정하는 뷰포트 박스라
-   old/new 캡처 rect 가 탭 전환 전후로 항상 같다(v1_web 은 window 로 스크롤하지
-   않는다: .tm-scroll-area 가 내부 스크롤러). */
+/* native 이동은 콘텐츠에 아무 전환도 걸지 않는다 — iOS 셸의 엣지 스와이프는 네이티브가 이미 슬라이드를
+   그렸으므로 웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류).
+   search·tab 은 컨트롤러가 View Transition 자체를 걸지 않아(page-transition-controller.tsx) 여기에 닿지 않는다. */
 /* [선택자 형태 주의] :root[data-nav-kind="..."] 와 ::view-transition-old/new(page-content)
-   사이에 **공백을 두면 안 된다.**
-   공백은 자손 결합자인데 view-transition 의사요소는 그 방식으로 매칭되지 않는다 —
-   최소 재현으로 확인했다(Chromium): 공백형은 UA 애니메이션이 그대로 2건 재생되고,
-   붙여 쓴 형태만 0건으로 꺼진다. 공백형이던 동안 이 규칙은 **한 번도 발화하지 않았고**,
-   탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측). */
-/* [범위 주의] 이름을 지정(page-content)하면 **부족하다.** 그것만 끄면 UA 기본 애니메이션
-   6건이 그대로 남는다 — root 스냅샷의 교차 페이드와 group 리사이즈다(alpha 실측 6건,
-   최소 재현 6건으로 일치 확인). 탭은 "같은 화면에서 보는 각도만 바꾸는" 조작이므로
-   전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
-   여기에 group(*) 까지 더해야 0건. */
-/* 'native' 도 같다 — iOS 셸의 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸으므로
-   웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류).
-   'search' 도 여기 합류한다 — pathname 은 그대로고 검색파라미터만 바뀌는 이동(필터 시트
-   열기/닫기·칩 선택 등)이다. use-navigation-intent.ts 가 push 의 하위분류로만 내리므로
-   콘텐츠(page-content) 쪽 VT 는 tab/native 와 똑같이 전부 꺼야 한다 — 안 그러면 필터
-   시트 자체 애니메이션(tm-filter-sheet-up 등) 위에 페이지 슬라이드+페이드가 겹쳐 재생된다
-   (FS-1, alpha 실측: vtCalls 2, 열기·닫기 각각 page-content VT 가 시트 애니메이션과
-   같은 프레임에서 동시 발화). */
-:root[data-nav-kind="tab"]::view-transition-old(*),
-:root[data-nav-kind="tab"]::view-transition-new(*),
-:root[data-nav-kind="tab"]::view-transition-group(*),
+   사이에 **공백을 두면 안 된다.** 공백은 자손 결합자인데 view-transition 의사요소는 그 방식으로
+   매칭되지 않는다 — 공백형은 UA 애니메이션이 그대로 재생되고 붙여 쓴 형태만 꺼진다(Chromium). */
+/* [범위 주의] 이름을 지정(page-content)하면 **부족하다.** 그것만 끄면 root 스냅샷의 교차 페이드와
+   group 리사이즈가 남는다 — old/new/group 의 (*) 를 모두 꺼야 0건이다. */
 :root[data-nav-kind="native"]::view-transition-old(*),
 :root[data-nav-kind="native"]::view-transition-new(*),
-:root[data-nav-kind="native"]::view-transition-group(*),
-:root[data-nav-kind="search"]::view-transition-old(*),
-:root[data-nav-kind="search"]::view-transition-new(*),
-:root[data-nav-kind="search"]::view-transition-group(*) {
+:root[data-nav-kind="native"]::view-transition-group(*) {
   animation: none;
 }
 
 /* push/pop 은 콘텐츠(page-content)는 우리가 그린다 -- 하지만 이름 없는 UA 기본 root
    스냅샷 교차 페이드(mix-blend-mode:plus-lighter 포함 6종)는 여전히 우리 슬라이드+페이드
    위에 겹쳐 재생된다(F1, alpha 실측 6건 — push/pop 6/6 인스턴스에서 -ua-view-transition-*
-   가 tm-page-slide/tm-page-fade 와 같은 t 에 나열됨). 위 tab/native/search 블록처럼
+   가 tm-page-slide/tm-page-fade 와 같은 t 에 나열됨). 위 native 블록처럼
    와일드카드(*)는 절대 쓰지 않는다 -- attribute 셀렉터가 포함돼 이름-특정 규칙
    (::view-transition-old/new(page-content))보다 specificity 가 높아서 이겨버리므로,
    push/pop 에 (*) 를 그대로 복사하면 root leak 은 잡히지만 push/pop 고유의 콘텐츠
@@ -11136,24 +11174,32 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-bottom-nav  { view-transition-name: tm-shell-bottomnav; }
 .tm-fixed-cta   { view-transition-name: tm-shell-fixed-cta; }
 .tm-route-progress { view-transition-name: tm-shell-route-progress; }
+/* 앱 설치 안내 배너는 스크롤 상자 안에 있어 이름이 없으면 page-content 스냅샷과 함께 슬라이드·페이드한다. */
+.tm-open-in-app-banner { view-transition-name: tm-shell-open-in-app; }
 
 ::view-transition-group(tm-shell-topbar),
 ::view-transition-group(tm-shell-bottomnav),
 ::view-transition-group(tm-shell-fixed-cta),
-::view-transition-group(tm-shell-route-progress) {
+::view-transition-group(tm-shell-route-progress),
+::view-transition-group(tm-shell-open-in-app),
+::view-transition-group(tm-shell-desktopnav) {
   animation: none;
   z-index: 100; /* 슬라이드하는 page-content 그룹 위에 그려지도록 */
 }
 ::view-transition-old(tm-shell-topbar),
 ::view-transition-old(tm-shell-bottomnav),
 ::view-transition-old(tm-shell-fixed-cta),
-::view-transition-old(tm-shell-route-progress) {
+::view-transition-old(tm-shell-route-progress),
+::view-transition-old(tm-shell-open-in-app),
+::view-transition-old(tm-shell-desktopnav) {
   display: none; /* old+new 가 겹쳐 두 겹으로 보이는 것 방지 */
 }
 ::view-transition-new(tm-shell-topbar),
 ::view-transition-new(tm-shell-bottomnav),
 ::view-transition-new(tm-shell-fixed-cta),
-::view-transition-new(tm-shell-route-progress) {
+::view-transition-new(tm-shell-route-progress),
+::view-transition-new(tm-shell-open-in-app),
+::view-transition-new(tm-shell-desktopnav) {
   animation: none;
 }
 

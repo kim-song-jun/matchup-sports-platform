@@ -64,6 +64,7 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
       KAKAO_APP_ID: ${KAKAO_APP_ID:-}
+      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       SOLAPI_API_KEY: ${SOLAPI_API_KEY:-}
       SOLAPI_API_SECRET: ${SOLAPI_API_SECRET:-}
@@ -235,14 +236,16 @@ services:
           memory: 512M
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.30.7-alpine@sha256:bef154735288bc38d99fac41ae63730684bcc661503673a04a0f9bc526ba8598
     container_name: teameet_nginx
     restart: always
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      # :ro 가 없으면 이미지 entrypoint(10-listen-on-ipv6-by-default.sh)가 시작할 때 이 파일을 touch 해
+      # 서버에 저장된 릴리스 소스의 mtime 이 바뀌고, 같은 SHA 재배포가 소스 변경 검사에서 멈춘다.
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./aasa:/etc/nginx/teameet-aasa:ro
       - ./maintenance:/etc/nginx/teameet-maintenance:ro
       # 점검 플래그 디렉터리는 릴리스 디렉터리(배포마다 교체) 밖에 둬야 배포가 플래그를 지우지 않는다.

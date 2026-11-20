@@ -12,9 +12,11 @@ import { PageTransitionController } from './page-transition-controller';
 const route = vi.hoisted(() => ({ pathname: '/tournaments' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
 
-function clickAnchor(href: string) {
+function clickAnchor(href: string, containerClass?: string) {
   const host = document.createElement('div');
-  host.innerHTML = `<a href="${href}">이동</a>`;
+  host.innerHTML = containerClass
+    ? `<nav class="${containerClass}"><a href="${href}">이동</a></nav>`
+    : `<a href="${href}">이동</a>`;
   document.body.appendChild(host);
   host.querySelector('a')!.addEventListener('click', (event) => event.preventDefault());
   host.querySelector('a')!.click();
@@ -52,6 +54,25 @@ describe('PageTransitionController — search 이동에는 VT 를 걸지 않는�
     clickAnchor('/tournaments?filter=1');
 
     expect(document.documentElement.dataset.navKind).toBe('search');
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  // 탭은 페이지가 아니라 보여 줄 움직임이 없다 — VT 를 걸면 정지 화면만 생긴다.
+  it('하단 탭 이동은 data-nav-kind=tab 만 심고 startViewTransition 을 부르지 않는다', () => {
+    render(<PageTransitionController />);
+
+    clickAnchor('/teams', 'tm-bottom-nav');
+
+    expect(document.documentElement.dataset.navKind).toBe('tab');
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  it('같은 경로 안 세부 탭(?kind=)도 tab 으로 분류되고 VT 를 걸지 않는다', () => {
+    render(<PageTransitionController />);
+
+    clickAnchor('/tournaments?kind=league', 'tm-segmented-tabs');
+
+    expect(document.documentElement.dataset.navKind).toBe('tab');
     expect(startViewTransition).not.toHaveBeenCalled();
   });
 
@@ -190,5 +211,65 @@ describe('PageTransitionController — 래퍼 이름 표시(data-page-transition
 
     expect(document.startViewTransition).not.toHaveBeenCalled();
     expect(document.documentElement.dataset.pageTransition).toBeUndefined();
+  });
+
+  // 데스크톱 push 는 옛 스냅샷을 누르기 전 자리에 둔다 — globals.css 가 --tm-vt-old-shift(옛 래퍼 위치 − 새 래퍼
+  // 위치)만큼 옮긴다. 스크롤·셸 머리 유무·해시 이동으로 새 래퍼가 다른 자리에 놓여도 그 값이 맞아야 한다.
+  function mountWrapper(top: number) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tm-page-transition-enter';
+    wrapper.getBoundingClientRect = () => ({ top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) });
+    document.body.appendChild(wrapper);
+    return wrapper;
+  }
+
+  it('push 는 옛·새 래퍼의 위쪽 위치 차이를 --tm-vt-old-shift 로 심고, 전환이 끝나면 뗀다', async () => {
+    const oldWrapper = mountWrapper(-890);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+
+    // 커밋: 옛 래퍼가 사라지고 셸 머리(88px)가 있는 새 화면의 래퍼가 152px 에 놓인다.
+    oldWrapper.remove();
+    mountWrapper(152);
+    route.pathname = '/tournaments/abc';
+    result.rerender(<PageTransitionController />);
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-1042px');
+
+    fakes[0].finish();
+    await fakes[0].finished;
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('');
+  });
+
+  it('새 스냅샷이 잡힌 뒤 새 래퍼가 더 움직이면(해시 스크롤) ready 시점에 다시 맞춘다', async () => {
+    const oldWrapper = mountWrapper(-211);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+    oldWrapper.remove();
+    mountWrapper(64);
+    route.pathname = '/tournaments/abc';
+    result.rerender(<PageTransitionController />);
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-275px');
+
+    document.querySelector('.tm-page-transition-enter')!.getBoundingClientRect = () => ({ top: -945, bottom: -945, left: 0, right: 0, width: 0, height: 0, x: 0, y: -945, toJSON: () => ({}) });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('734px');
+  });
+
+  it('연타로 앞 전환이 skip 돼 끝나도 뒤 전환의 값은 남는다', async () => {
+    const oldWrapper = mountWrapper(-300);
+    const result = render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+    clickAnchor('/tournaments/def');
+    oldWrapper.remove();
+    mountWrapper(64);
+    route.pathname = '/tournaments/def';
+    result.rerender(<PageTransitionController />);
+    await fakes[0].finished;
+
+    expect(document.documentElement.style.getPropertyValue('--tm-vt-old-shift')).toBe('-364px');
+    document.documentElement.style.removeProperty('--tm-vt-old-shift');
   });
 });

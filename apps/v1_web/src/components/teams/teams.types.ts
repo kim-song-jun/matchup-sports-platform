@@ -16,6 +16,10 @@ export type TeamModel = {
   status: TeamStatus;
   statusLabel: string;
   tags: string[];
+  /** 수준 라벨(예: 입문-고수). 서버가 정하지 않았으면 빈 문자열이고, 카드는 그 칸을 뺀다. */
+  level?: string;
+  /** 최근 3개월 공개·공식 경기 수. 값이 없으면(undefined) 카드가 그 칸을 뺀다 — 0 은 '0경기'로 보여 준다. */
+  recentMatchCount?: number;
   genderRule: string;
   intro: string;
   next: string;
@@ -44,18 +48,20 @@ export type TeamListViewModel = {
     closeHref: string;
     resetHref: string;
     applyHref: string;
-    sort: '' | 'member_count' | 'activity';
+    sort: '' | 'latest' | 'member_count';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     regionId: string;
-    /** 기본(최근 등록순)은 sort 가 비어 있는 상태라 value 가 빈 문자열이다. */
-    sortOptions: Array<{ label: string; value: '' | 'member_count' | 'activity'; href: string; active?: boolean }>;
+    /** 기본(활동 많은순)은 sort 가 비어 있는 상태라 value 가 빈 문자열이다. */
+    sortOptions: Array<{ label: string; value: '' | 'latest' | 'member_count'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
     /** 저장한 활동 지역 안내(내 지역 칩이 있을 때) 또는 설정 유도. 프로필을 아직 못 받았으면 없다. */
     regionNotice?: { text: string; link: { label: string; href: string } };
   };
+  /** 로그인한 내가 속한 팀. 검색·필터 중이거나 없으면 비워 둔다(목록 맨 위 "내 팀" 줄). */
+  myTeams?: Array<{ id: string; name: string; logoUrl: string | null; sport: string; roleLabel: string }>;
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
   summary: { scope: string; total?: number; totalState?: 'loading' | 'error'; totalRefreshError?: boolean; loaded?: number; recruiting: number; nearby?: number };
   listLoading?: boolean;

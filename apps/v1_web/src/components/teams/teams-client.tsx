@@ -104,6 +104,8 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     saved: signedIn ? profile.data?.regions : undefined,
     master: regions.data ?? [],
   });
+  // 목록 맨 위 "내 팀" 줄 — 검색·필터·이어 보기 중에는 결과를 좁힌 화면이라 내 팀 줄을 걷는다.
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: signedIn });
   const teamFilters = useMemo(() => {
     const filters = teamListQueryFilters({
       sportId: selectedSportId,
@@ -216,6 +218,15 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     ...base,
     query: submittedQuery,
     filterCount: activeFilterCount,
+    myTeams: activeFilterCount === 0 && !submittedQuery && !initialCursor
+      ? normalizeMyTeamsResponse(myTeamsQuery.data).map((team) => ({
+        id: team.teamId,
+        name: team.name,
+        logoUrl: team.logoUrl,
+        sport: team.sport.name,
+        roleLabel: teamRoleLabel(team.role) ?? '멤버',
+      }))
+      : undefined,
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], myRegion, filterOpen),
@@ -1114,11 +1125,11 @@ function buildTeamFilterSheet(
   myRegion: MyTeamRegion,
   open: boolean,
 ): NonNullable<TeamListViewModel['filterSheet']> {
-  // 기본(최근 등록순)은 sort 파라미터가 없는 상태다 — 서버에서 순서가 실제로 다른 정렬만 메뉴에 둔다.
+  // 기본(활동 많은순)은 sort 파라미터가 없는 상태다 — 서버에서 순서가 실제로 다른 정렬만 메뉴에 둔다.
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
-    { label: '최근 등록순', value: '', href: buildTeamHref(params, { sort: null, filter: '1' }), active: sort === '' },
+    { label: '활동 많은순', value: '', href: buildTeamHref(params, { sort: null, filter: '1' }), active: sort === '' },
+    { label: '최근 등록순', value: 'latest', href: buildTeamHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
     { label: '멤버 많은순', value: 'member_count', href: buildTeamHref(params, { sort: sort === 'member_count' ? null : 'member_count', filter: '1' }), active: sort === 'member_count' },
-    { label: '활동 많은순', value: 'activity', href: buildTeamHref(params, { sort: sort === 'activity' ? null : 'activity', filter: '1' }), active: sort === 'activity' },
   ];
   const genderOptions: NonNullable<TeamListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildTeamHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },

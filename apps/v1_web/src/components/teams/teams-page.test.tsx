@@ -186,6 +186,8 @@ describe('TeamListPageView', () => {
           status: 'open',
           statusLabel: '가입 가능',
           tags: ['레벨 미설정'],
+          level: '',
+          recentMatchCount: 0,
           genderRule: '성별 무관',
           intro: '짧은 소개',
           next: '수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ',
@@ -201,14 +203,15 @@ describe('TeamListPageView', () => {
 
     expect(screen.getByText('라이브 팀')).toBeInTheDocument();
     expect(screen.queryByText('가입 가능')).not.toBeInTheDocument();
-    expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
+    // 수준이 정해지지 않은 팀은 '레벨 미설정' 같은 자리표시자를 쓰지 않고 수준 칸을 뺀다.
+    expect(screen.queryByText('레벨 미설정')).not.toBeInTheDocument();
     expect(screen.getByText('수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ')).toBeInTheDocument();
     expect(screen.queryByText('짧은 소개')).not.toBeInTheDocument();
     expect(screen.queryByText(/팀장|감독/)).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
   });
 
-  it('활동 일정이 없으면 소개를 한 줄로 쓰고, 둘 다 없으면 줄을 그리지 않는다', () => {
+  it('활동 일정이 없으면 소개를 한 줄로 쓰고, 둘 다 없으면 빈 줄 자리만 남긴다', () => {
     const { container, rerender } = render(<TeamListPageView model={listOf({ next: '' })} />);
     expect(screen.getByText('짧은 소개')).toBeInTheDocument();
 
@@ -217,7 +220,8 @@ describe('TeamListPageView', () => {
         <TeamListPageView model={listOf({ next: '', intro: '' })} />
       </QueryClientProvider>,
     );
-    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+    // 빈 줄은 카드 높이를 맞추려고 자리만 남긴다.
+    expect(container.querySelector('.tm-team-card-activity-slot')?.textContent).toBe('');
   });
 });
 
@@ -1540,13 +1544,20 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(badge!.textContent).toContain('가입 닫힘');
     // 예전 액션 행은 aria-hidden 이라 안 읽혔다. 배지에는 그 속성이 없어야 한다.
     expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
+    // 배지 안의 점은 글자(12px)에 비해 커 보여서 7px → 5px 로 줄였다.
+    const dot = badge!.querySelector('svg');
+    expect(dot).toHaveAttribute('width', '5');
+    expect(dot).toHaveAttribute('height', '5');
   });
 
-  it("활동 일정·소개가 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
+  it("활동 일정·소개가 없으면 '활동 일정 미정' 으로 채우지 않고, 한 줄 자리만 비워 둔다", () => {
     const { container } = render(<TeamListPageView model={listWith({ next: '', intro: '' })} />);
 
     expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
-    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+    // 줄 자체를 빼면 설명이 있는 카드만 커진다 — 빈 자리를 남겨 모든 카드의 높이를 같게 맞춘다.
+    const slot = container.querySelector('.tm-team-card-activity-slot');
+    expect(slot).not.toBeNull();
+    expect(slot!.textContent).toBe('');
   });
 
   // G12(F96): 카드 마지막 자식에 FAB 몫 64px 를 비워 두면 소개·활동 줄이 없는 카드는 팀 이름이
@@ -1557,41 +1568,63 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(css).not.toMatch(/\.tm-team-card[^{]*>\s*:last-child\s*\{[^}]*padding-right/);
   });
 
-  /**
-   * 레벨 태그는 서버 자유 텍스트라 길이가 보장되지 않는다. 폭 상한(예전 62%)으로 잘라
-   * 형제 배지 자리를 지키던 방식은 768(2열 그리드, 카드 폭이 좁아짐)에서 "입문-고수" 같은
-   * 짧고 의미 있는 값까지 잘랐다(2026-09-26 alpha 감사) — 이제는 잘리지 않고 DOM/화면 둘 다
-   * 전문이 남으며, 자리가 부족하면 배지 자체가 다음 줄로 내려간다(flexWrap:'wrap').
-   */
-  it('긴 태그도 잘리지 않고 DOM 에 전문이 남는다', () => {
-    const long = '중급 · 빌드업과 패스 플레이 중심';
-    const { container } = render(<TeamListPageView model={listWith({ tags: [long], genderRule: '성별 무관' })} />);
+  it('둘째 줄은 종목 · 지역 · 성별 순이고, 남·여는 남성·여성으로 풀어 쓴다', () => {
+    const { container, rerender } = render(<TeamListPageView model={listWith({ sport: '풋살', region: '서울 전체', genderRule: '남' })} />);
+    const subLine = () => container.querySelector('.tm-team-card .tm-text-caption')?.textContent;
 
-    const tag = [...container.querySelectorAll('.tm-team-tag-text')].find((el) => el.textContent === long);
-    expect(tag).toBeDefined();
-    expect(tag!.textContent).toBe(long);
-    expect(tag!.closest('.tm-team-tag')).not.toBeNull();
+    expect(subLine()).toBe('풋살 · 서울 전체 · 남성');
+    rerender(<TeamListPageView model={listWith({ sport: '풋살', region: '서울 전체', genderRule: '여' })} />);
+    expect(subLine()).toBe('풋살 · 서울 전체 · 여성');
+    rerender(<TeamListPageView model={listWith({ sport: '풋살', region: '서울 전체', genderRule: '성별 무관' })} />);
+    expect(subLine()).toBe('풋살 · 서울 전체 · 성별 무관');
+    rerender(<TeamListPageView model={listWith({ sport: '풋살', region: '서울 전체', genderRule: '' })} />);
+    expect(subLine()).toBe('풋살 · 서울 전체');
   });
 
-  it('태그마다 배지 래퍼가 붙는다 — 레벨만이 아니라 전부 서버 문자열이다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ tags: ['입문-고수'], genderRule: '성별 무관' })} />);
+  it('정보 줄에 인원 · 수준을 보여 준다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ members: 9, capacity: 24, level: '초보-중수', recentMatchCount: 66 })} />);
 
-    const tags = [...container.querySelectorAll('.tm-team-tag')];
-    expect(tags).toHaveLength(2);
-    tags.forEach((t) => expect(t.querySelector('.tm-team-tag-text')).not.toBeNull());
+    const meta = container.querySelector('.tm-team-card-meta')!;
+    expect(meta.textContent).toContain('9/24명');
+    expect(meta.textContent).toContain('초보-중수');
+    expect(meta.textContent).not.toContain('최근 3개월');
+    // 아이콘은 장식 — 스크린리더는 글자만 읽는다.
+    meta.querySelectorAll('svg').forEach((icon) => expect(icon).toHaveAttribute('aria-hidden', 'true'));
   });
 
-  it('태그 폭 상한은 형제와 나눈 고정 %가 아니라 자기 줄 전체(100%)다 — 좁은 카드에서도 짧은 값이 잘리지 않는다', () => {
-    // 2026-09-26 alpha 감사: 예전 62%(형제와 나눈 몫)는 768(카드 272px)에서 "입문-고수" 같은
-    // 짧은 값까지 잘랐다. 100%(.tm-league-badge 와 같은 관례)로 바꾸면 형제가 있어도 각
-    // 배지가 자기 줄 폭까지 온전히 쓸 수 있다 — ellipsis 자체는 남겨 자유 텍스트 하나가
-    // 혼자로도 카드 폭을 넘길 만큼 길 때 카드 밖 가로 스크롤을 막는다(Copilot 리뷰 지적).
+  it('목표 인원이 없으면 현재 인원만 보여 준다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ members: 3, capacity: 0 })} />);
+
+    expect(container.querySelector('.tm-team-card-meta')!.textContent).toContain('3명');
+    expect(container.querySelector('.tm-team-card-meta')!.textContent).not.toContain('/');
+  });
+
+  it('수준이 정해지지 않은 팀은 수준 칸을 뺀다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ level: '' })} />);
+
+    expect(container.querySelector('.tm-team-card-meta-level')).toBeNull();
+  });
+
+  it('수준이 길어도 인원을 지킨다 — 줄어드는 칸은 수준 하나이고 말줄임한다', () => {
+    // 수준은 서버 자유 텍스트라 길이가 보장되지 않는다. 한 줄(nowrap)을 지켜야 카드 높이가 같다.
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const tagRule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
+    const item = css.match(/\.tm-team-card-meta-item\s*\{([^}]*)\}/)?.[1];
+    const level = css.match(/\.tm-team-card-meta-level\s*\{([^}]*)\}/)?.[1];
+    const text = css.match(/\.tm-team-card-meta-text\s*\{([^}]*)\}/)?.[1];
+    const meta = css.match(/\.tm-team-card-meta\s*\{([^}]*)\}/)?.[1];
 
-    expect(tagRule).toBeDefined();
-    expect(tagRule).toMatch(/max-width:\s*100%/);
-    expect(tagRule).not.toMatch(/max-width:\s*62%/);
+    expect(meta).toMatch(/white-space:\s*nowrap/);
+    expect(item).toMatch(/flex:\s*none/);
+    expect(level).toMatch(/flex:\s*0\s+1\s+auto/);
+    expect(level).toMatch(/min-width:\s*0/);
+    expect(text).toMatch(/text-overflow:\s*ellipsis/);
+  });
+
+  it('활동 일정 자리는 비어 있어도 한 줄 높이를 지킨다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const slot = css.match(/\.tm-team-card-activity-slot\s*\{([^}]*)\}/)?.[1];
+
+    expect(slot).toMatch(/min-height:\s*1lh/);
   });
 
   it('소개가 없으면 지역·종목을 문장으로 되풀이하지 않는다', () => {

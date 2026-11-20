@@ -4,7 +4,7 @@ import type { V1AdminLeagueDetail, V1AdminLeagueListItem, V1PublicLeagueDetail, 
 const api = '*/api/v1';
 const leagueId = 'league-visibility-fixture';
 
-export const v1LeagueVisibilityFixture: {
+const v1LeagueVisibilityFixture: {
   isPublic: boolean;
   adminDetail: V1AdminLeagueDetail;
   adminListItem: V1AdminLeagueListItem;
@@ -40,6 +40,7 @@ export const v1LeagueVisibilityFixture: {
     title: '공개 설정 검증 리그',
     isPublic: true,
     state: 'active',
+    lifecycleStatus: 'in_progress',
     teamCount: 2,
     fixtureCount: 0,
     startsOn: '2026-10-01T00:00:00.000Z',
@@ -98,7 +99,13 @@ export const v1LeagueVisibilityMswHandlers = [
     if (params.leagueId !== leagueId) return notFound();
     return envelope(v1LeagueVisibilityFixture.adminDetail);
   }),
-  http.get(`${api}/admin/league-matches`, () => envelope({ items: [v1LeagueVisibilityFixture.adminListItem] })),
+  http.get(`${api}/admin/league-matches`, () => {
+    const item = v1LeagueVisibilityFixture.adminListItem;
+    const byStatus = { draft: 0, open: 0, closed: 0, in_progress: 0, completed: 0, on_hold: 0 };
+    const key = item.lifecycleStatus === 'cancelled' ? 'completed' : item.lifecycleStatus;
+    if (key && key in byStatus) byStatus[key as keyof typeof byStatus] += 1;
+    return envelope({ items: [item], summary: { total: 1, byStatus } });
+  }),
   http.patch(`${api}/admin/league-matches/:leagueId/visibility`, async ({ params, request }) => {
     if (params.leagueId !== leagueId) return notFound();
     const body = await request.json() as Record<string, unknown>;

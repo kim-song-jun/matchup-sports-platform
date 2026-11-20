@@ -356,6 +356,39 @@ describe('AdminService — list/detail endpoints', () => {
       expect(where.AND[0].OR).toHaveLength(4);
     });
 
+    it.each(['010-0000-1234', '01000001234', '010 0000 1234'])('adds a phone contains clause with hyphen-free digits for "%s"', async (q) => {
+      prisma.v1User.findMany.mockResolvedValue([]);
+      await service.listUsers(adminAuthUser, { q });
+
+      const call = prisma.v1User.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+      const where = call.where as { AND: Array<{ OR?: unknown[] }> };
+      expect(where.AND[0].OR).toHaveLength(5);
+      expect(where.AND[0].OR).toContainEqual({ phone: { contains: '01000001234' } });
+    });
+
+    it('does not search phone for a name or a short digit query', async () => {
+      prisma.v1User.findMany.mockResolvedValue([]);
+      await service.listUsers(adminAuthUser, { q: '123' });
+
+      const call = prisma.v1User.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+      const where = call.where as { AND: Array<{ OR?: unknown[] }> };
+      expect(where.AND[0].OR).toHaveLength(4);
+    });
+
+    it('returns realName separately and null when blank or missing', async () => {
+      prisma.v1User.findMany.mockResolvedValue([
+        makeUserRow({ id: 'u-a', profile: { nickname: '닉', displayName: null, realName: '테스트회원', gender: null } }),
+        makeUserRow({ id: 'u-b', profile: { nickname: '닉', displayName: null, realName: '  ', gender: null } }),
+        makeUserRow({ id: 'u-c', profile: { nickname: '닉', displayName: null, realName: null, gender: null } }),
+        makeUserRow({ id: 'u-d', profile: null }),
+      ]);
+
+      const result = await service.listUsers(adminAuthUser, {});
+
+      expect(result.items.map((item) => item.realName)).toEqual(['테스트회원', null, null, null]);
+      expect(result.items[0]).not.toHaveProperty('phone');
+    });
+
     it('returns hasNext=true and nextCursor when rows exceed limit', async () => {
       // limit default=20; return 21 rows to trigger next page
       const rows = Array.from({ length: 21 }, (_, i) => makeUserRow({ id: `u-${i + 1}` }));

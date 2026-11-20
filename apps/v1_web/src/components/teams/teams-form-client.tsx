@@ -254,7 +254,8 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       city: query.data.region?.name ?? '',
       county: '',
       level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? '',
-      genderRule: query.data.profile.genderRule ?? '성별 무관',
+      // 저장값이 없는 팀은 선택하지 않은 상태로 연다 — '성별 무관'으로 보여 주면 설정된 줄 알고 넘어간다.
+      genderRule: query.data.profile.genderRule ?? '',
       activityDays: query.data.profile.activityDays ?? [],
       activityFrequency: query.data.profile.activityFrequency ?? '',
       activityTimeSlots: query.data.profile.activityTimeSlots ?? [],
@@ -700,5 +701,7 @@ function parseDraftLevelRange(value: string) {
 
 function normalizeGenderRule(value?: string | null) {
   if (value === '남' || value === '여') return value;
+  // 고르지 않았으면 비워 둔다 — 말없이 '성별 무관'을 써 넣지 않는다.
+  if (!value) return null;
   return '성별 무관';
 }

@@ -112,7 +112,7 @@ alpha 에서 매치·팀매치·대회·리그를 만들 때 장소를 검색해
 - REST 키는 서버에만 둔다(검색은 서버 프록시). JS 키는 도메인 제한 키라 공개 API 로 내려도 된다(기존).
 - 장소 검색은 로그인 필수 + 분당 30회 제한 — 카카오 쿼터 소진 방어.
 - 클라이언트가 보낸 좌표는 범위 검증만 한다. 엉뚱한 좌표는 엉뚱한 장소 글자와 같은 수준의 위험(호스트가 쓰는 정보).
-- CSP `script-src` 에 카카오 세 도메인을 둔다 — **셋 다 빼지 말 것**: `dapi.kakao.com`(SDK 로더), `t1.kakaocdn.net`(로더가 받는 지도 본체
+- CSP `script-src` 에 카카오 세 도메인을 둔다 — **셋 다 빼지 말 것**: `dapi.kakao.com`(SDK 로더), `*.kakaocdn.net`(로더가 받는 지도 본체
   `mapjsapi/js/main/<버전>/kakao.js` — 이게 빠지면 지도가 회색 상자만 남는다, #1767 alpha QA), `t1.daumcdn.net`(본체가 가리키는 로드뷰 자원 경로,
   지금은 쓰지 않지만 SDK 가 같은 CDN 계열로 옮겨 다닌다). 지도 타일·요청은 기존 `img-src https:`·`connect-src https:` 로 충분.
 

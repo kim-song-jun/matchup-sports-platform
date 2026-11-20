@@ -1,4 +1,4 @@
-import { MutationObserver, QueryObserver, type QueryClient } from '@tanstack/react-query';
+import { MutationObserver, QueryObserver, environmentManager, type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1_OFFLINE_WRITE_MESSAGE, v1Get, v1Post } from './api-client';
 import * as clientErrorReporter from './client-error-reporter';
@@ -132,5 +132,36 @@ describe('createV1QueryClient — 조회', () => {
     await flush();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     unsubscribe();
+  });
+});
+
+describe('createV1QueryClient — 서버 렌더 메모리', () => {
+  const KEY = ['terms', 'footer'];
+  // 서버 렌더는 요청마다 클라이언트를 새로 만든다. 쿼리 하나에 gc 타이머가 걸리면 그 요청의 클라이언트 전체가 타이머 동안 살아 있다.
+  const pendingTimersAfterSeed = (server: boolean) => {
+    environmentManager.setIsServer(() => server);
+    const seeded = createV1QueryClient();
+    seeded.setQueryData(KEY, { body: '약관 본문' });
+    vi.advanceTimersByTime(1); // 알림 묶음(0ms)만 비운다.
+    return { seeded, timers: vi.getTimerCount() };
+  };
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    environmentManager.setIsServer(() => typeof window === 'undefined');
+    vi.useRealTimers();
+  });
+
+  it('서버에서는 시드한 쿼리에 gc 타이머를 걸지 않는다', () => {
+    const { seeded, timers } = pendingTimersAfterSeed(true);
+    expect(timers).toBe(0);
+    expect(seeded.getQueryCache().find({ queryKey: KEY })?.gcTime).toBe(Infinity);
+  });
+
+  it('대조군 — 브라우저에서는 쓰지 않는 쿼리를 10분 뒤 지운다', () => {
+    const { seeded, timers } = pendingTimersAfterSeed(false);
+    expect(timers).toBe(1);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(seeded.getQueryCache().find({ queryKey: KEY })).toBeUndefined();
   });
 });

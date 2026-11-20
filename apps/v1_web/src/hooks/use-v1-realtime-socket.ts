@@ -1,3 +1,4 @@
+import { hasMemberAccessHint } from '@/hooks/use-member-access';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, Query } from '@tanstack/react-query';
@@ -149,6 +150,7 @@ export function useV1NotificationSocket(): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (hasMemberAccessHint()) return;
     const socket = getV1Socket();
     const handler = () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
@@ -167,6 +169,7 @@ export function useV1ChatRoomSocket(roomId: string): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (hasMemberAccessHint()) return;
     const socket = getV1Socket();
     const handler = (payload: unknown) => {
       const message = chatMessageIdentity(payload);
@@ -186,7 +189,7 @@ export function useV1ChatListSocket(enabled = true): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || hasMemberAccessHint()) return;
     const socket = getV1Socket();
     const handler = (payload: unknown) => {
       const message = chatMessageIdentity(payload);

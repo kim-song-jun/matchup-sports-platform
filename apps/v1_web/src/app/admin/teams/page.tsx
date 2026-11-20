@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   useV1AdminTeams,
+  useV1MasterSports,
+  useV1MasterRegions,
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow, V1TeamDissolutionBlocker } from '@/types/api';
@@ -45,6 +47,8 @@ const REASON_MODAL_STATUS_OPTIONS = [
 ];
 
 const PAGE_SIZE = 20;
+const TEAM_SCALAR_FILTERS = ['sportId', 'regionId'] as const;
+const SELECT_CLASS = 'min-h-[44px] max-w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--text-strong)]';
 
 type ArchiveBlocked = { message: string; blockers: V1TeamDissolutionBlocker[] };
 type RestoreNameTaken = { message: string; teamId: string };
@@ -99,6 +103,8 @@ export default function AdminTeamsPage() {
 }
 
 function AdminTeamsPageContent() {
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
   const canWrite = useAdminCanWrite();
@@ -113,7 +119,9 @@ function AdminTeamsPageContent() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
+    selectedFilters,
+    setSingleFilter,
+  } = useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE, undefined, TEAM_SCALAR_FILTERS);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];
@@ -182,14 +190,30 @@ function AdminTeamsPageContent() {
       <div className="tm-content-enter flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
-          searchLabel="팀명 검색"
-          searchPlaceholder="팀명 검색"
+          searchLabel="팀명·팀장 이름·이메일 검색"
+          searchPlaceholder="팀명·팀장 이름·이메일 검색"
           searchValue={search}
           onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
+          rightSlot={<div className="flex min-w-0 flex-wrap gap-2">
+            <select aria-label="팀 종목 필터" className={SELECT_CLASS} value={selectedFilters.sportId ?? ''} disabled={sports.isPending}
+              onChange={(event) => setSingleFilter('sportId', event.target.value)}>
+              <option value="">전체 종목</option>
+              {selectedFilters.sportId && !sports.data?.some((sport) => sport.id === selectedFilters.sportId) ? <option value={selectedFilters.sportId}>선택한 종목</option> : null}
+              {sports.data?.map((sport) => <option key={sport.id} value={sport.id}>{sport.name}</option>)}
+            </select>
+            <select aria-label="팀 지역 필터" className={SELECT_CLASS} value={selectedFilters.regionId ?? ''} disabled={regions.isPending}
+              onChange={(event) => setSingleFilter('regionId', event.target.value)}>
+              <option value="">전체 지역</option>
+              {selectedFilters.regionId && !regions.data?.some((region) => region.id === selectedFilters.regionId) ? <option value={selectedFilters.regionId}>선택한 지역</option> : null}
+              {regions.data?.map((region) => <option key={region.id} value={region.id}>{region.parentId ? `${regions.data?.find((parent) => parent.id === region.parentId)?.name ?? ''} ${region.name}` : region.name}</option>)}
+            </select>
+            <button type="button" className="min-h-[44px] px-3 text-[var(--text-muted)]" onClick={() => { setSearch(''); setActiveStatus(''); setSingleFilter('sportId', ''); setSingleFilter('regionId', ''); }}>필터 초기화</button>
+          </div>}
         />
+        {sports.isError || regions.isError ? <div role="alert" className="text-[var(--red700)]">분류 정보를 불러오지 못했어요. <button type="button" className="min-h-[44px] px-3" onClick={() => { void sports.refetch(); void regions.refetch(); }}>다시 시도</button></div> : null}
 
         {/* Card list */}
         <AdminDataTable<V1AdminTeamRow>
@@ -230,9 +254,10 @@ function AdminTeamsPageContent() {
               header: '팀장',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="block truncate text-[var(--text-muted)]">{row.ownerName ?? '—'}</span>
+                <Link href={`/admin/users/${encodeURIComponent(row.ownerUserId)}`} className="block truncate text-[var(--blue700)]">{row.ownerName ?? '회원 상세'}</Link>
               ),
             },
+            { key: 'region', header: '지역', render: (row) => <span className="text-[var(--text-muted)]">{row.regionName ?? '미등록'}</span> },
             {
               key: 'members',
               header: '멤버 / 매니저',

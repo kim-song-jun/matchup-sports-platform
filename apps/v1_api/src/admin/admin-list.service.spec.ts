@@ -93,6 +93,7 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     ownerUserId: 'u-1',
     sport: { id: 'sport-running', name: '러닝' },
+    region: { id: 'region-gangnam', name: '강남구' },
     ownerUser: { profile: { nickname: '팀장원' } },
     memberships: [],
     ...overrides,
@@ -171,6 +172,7 @@ describe('AdminService — list/detail endpoints', () => {
     v1User: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1Region: { findMany: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
     v1TeamContact: { findUnique: jest.Mock };
@@ -188,6 +190,7 @@ describe('AdminService — list/detail endpoints', () => {
       v1User: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Region: { findMany: jest.fn().mockResolvedValue([{ id: 'parent' }, { id: 'child' }]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Inquiry: {
         findMany: jest.fn(),
@@ -729,12 +732,23 @@ describe('AdminService — list/detail endpoints', () => {
       expect(call.where).toMatchObject({ status: 'suspended' });
     });
 
-    it('passes q search as name contains', async () => {
+    it('combines sport and descendant region filters, including the status facet', async () => {
+      prisma.v1Team.findMany.mockResolvedValue([makeTeamRow()]);
+      const result = await service.listTeams(adminAuthUser, { sportId: 'sport-running', regionId: 'parent', status: 'active' });
+      expect(result.items[0]).toMatchObject({ regionId: 'region-gangnam', regionName: '강남구' });
+      expect(prisma.v1Team.findMany.mock.calls[0][0].where).toMatchObject({ sportId: 'sport-running', regionId: { in: ['parent', 'child'] }, status: 'active' });
+      expect(prisma.v1Team.groupBy.mock.calls[0][0].where).toEqual({ sportId: 'sport-running', regionId: { in: ['parent', 'child'] } });
+    });
+
+    it('searches team name and owner identities', async () => {
       prisma.v1Team.findMany.mockResolvedValue([]);
       await service.listTeams(adminAuthUser, { q: '러닝' });
 
       const call = prisma.v1Team.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-      expect(call.where).toMatchObject({ name: { contains: '러닝' } });
+      expect(call.where).toMatchObject({ OR: expect.arrayContaining([
+        { name: { contains: '러닝', mode: 'insensitive' } },
+        { ownerUser: { profile: { realName: { contains: '러닝', mode: 'insensitive' } } } },
+      ]) });
     });
 
     it('pagination: second page differs from first when nextCursor used', async () => {

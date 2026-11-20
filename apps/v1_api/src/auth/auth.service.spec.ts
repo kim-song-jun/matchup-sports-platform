@@ -2872,6 +2872,13 @@ describe('AuthService', () => {
     expect(result.onboarding.canResume).toBe(false);
   });
 
+  it('me: 회원 대리 조회는 이전 이메일 설정 플래그를 수정하지 않는다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue(completedUserRow({ signupEmailLoginRequired: true }));
+    const result = await service.me('user-1', true);
+    expect(result.user.id).toBe('user-1');
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+  });
+
   it('sessionResponse: 이전 필수 이메일 설정을 해제하고 온보딩으로 이어진다', async () => {
     prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
       onboardingStatus: 'signup_done', signupEmailLoginRequired: true, onboardingProgress: { currentStep: 'sport' },

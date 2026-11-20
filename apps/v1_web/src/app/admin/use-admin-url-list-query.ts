@@ -9,8 +9,10 @@ type Draft = { search: string; activeStatus: string; page: number; selectedFilte
 type StatusOptions = ReadonlyArray<{ value: string }>;
 type MultiFilters = Readonly<Record<string, readonly string[]>>;
 const NO_MULTI_FILTERS: MultiFilters = {};
+const NO_SCALAR_FILTERS: readonly string[] = [];
+const UUID_FILTER_VALUE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function readDraft(query: string, statuses: StatusOptions, multiFilters: MultiFilters): Draft {
+function readDraft(query: string, statuses: StatusOptions, multiFilters: MultiFilters, scalarFilters: readonly string[]): Draft {
   const params = new URLSearchParams(query);
   const rawPage = params.get('page') ?? '1';
   const page = Number(rawPage);
@@ -18,10 +20,13 @@ function readDraft(query: string, statuses: StatusOptions, multiFilters: MultiFi
     search: params.get('q') ?? '',
     activeStatus: pickAllowedParam(params.get('status'), statuses),
     page: /^\d+$/.test(rawPage) && Number.isSafeInteger(page) && page >= 1 ? page : 1,
-    selectedFilters: Object.fromEntries(Object.entries(multiFilters).map(([key, allowed]) => {
+    selectedFilters: { ...Object.fromEntries(scalarFilters.map((key) => {
+      const value = params.get(key) ?? '';
+      return [key, UUID_FILTER_VALUE.test(value) ? value : ''];
+    })), ...Object.fromEntries(Object.entries(multiFilters).map(([key, allowed]) => {
       const values = new Set(params.get(key)?.split(',') ?? []);
       return [key, allowed.filter((value) => values.has(value)).join(',')];
-    })),
+    })) },
   };
 }
 
@@ -41,9 +46,10 @@ function rememberListUrl(pathname: string, search: string): void {
  * 조건이 기본값으로 돌아간다(MD-QA #21). `useAdminListQuery`와 같은 반환 계약이라 바꿔 끼우면 된다.
  * 지금 목록 주소는 탭 세션에 기억해 두고, 상세의 '목록' 버튼이 `useAdminListReturnHref`로 그 주소로 돌아온다.
  */
-export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, multiFilters: MultiFilters = NO_MULTI_FILTERS): AdminListQueryState & {
+export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, multiFilters: MultiFilters = NO_MULTI_FILTERS, scalarFilters: readonly string[] = NO_SCALAR_FILTERS): AdminListQueryState & {
   selectedFilters: Record<string, string>;
   setMultiFilter: (key: string, values: readonly string[]) => void;
+  setSingleFilter: (key: string, value: string) => void;
 } {
   const query = useSearchParams().toString();
 
@@ -51,7 +57,7 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, 
     // Next가 replaceState·Back을 반영할 때마다 지금 주소를 기억한다(오래된 snapshot이 아니라 실제 주소).
     rememberListUrl(window.location.pathname, window.location.search);
   }, [query]);
-  const fromUrl = useMemo(() => readDraft(query, statuses, multiFilters), [query, statuses, multiFilters]);
+  const fromUrl = useMemo(() => readDraft(query, statuses, multiFilters, scalarFilters), [query, statuses, multiFilters, scalarFilters]);
   const [draft, setDraft] = useState(fromUrl);
   const latestDraft = useRef(draft);
   const [debouncedSearch, setDebouncedSearch] = useState(fromUrl.search.trim());
@@ -109,6 +115,10 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, 
       page: 1,
     });
   }, [multiFilters, updateDraft]);
+  const setSingleFilter = useCallback((key: string, value: string) => {
+    if (!scalarFilters.includes(key) || (value && !UUID_FILTER_VALUE.test(value))) return;
+    updateDraft({ selectedFilters: { ...latestDraft.current.selectedFilters, [key]: value }, page: 1 });
+  }, [scalarFilters, updateDraft]);
   const filters = useMemo(() => ({
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(draft.activeStatus ? { status: draft.activeStatus } : {}),
@@ -130,7 +140,7 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, 
   }, [draft.page, pageSize, setPage]);
 
   return {
-    ...draft, setSearch, debouncedSearch, setActiveStatus, setPage, resetToFirstPage, filters, buildPagination, setMultiFilter,
+    ...draft, setSearch, debouncedSearch, setActiveStatus, setPage, resetToFirstPage, filters, buildPagination, setMultiFilter, setSingleFilter,
   };
 }
 

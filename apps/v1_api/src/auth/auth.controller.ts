@@ -1,3 +1,4 @@
+import { getMemberAccessIdentity } from './request-identity-override';
 import {
   Body,
   Controller,
@@ -45,8 +46,8 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(V1AuthGuard)
-  me(@CurrentUser() user: V1AuthUser) {
-    return this.authService.me(user.id);
+  me(@CurrentUser() user: V1AuthUser, @Req() request?: Request) {
+    return request && getMemberAccessIdentity(request) ? this.authService.me(user.id, true) : this.authService.me(user.id);
   }
 
   /** A step-up challenge is a 200 (no session, nothing created); a completed login keeps its existing status. */

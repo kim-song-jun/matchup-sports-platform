@@ -1,5 +1,7 @@
 'use client';
 
+import { AdminEntityOperations } from '@/components/admin/admin-entity-operations';
+import { adminTrustStateLabel } from '@/lib/admin-labels';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -34,35 +36,6 @@ function BackLink() {
       <ArrowLeft size={16} aria-hidden="true" />
       목록
     </Link>
-  );
-}
-
-function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
-  const matches = team.recentHostedTeamMatches ?? [];
-
-  return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="최근 주최 팀매치">
-      <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
-      {matches.length > 0 ? (
-        <ol className="mt-4 flex flex-col gap-2">
-          {matches.map((match) => (
-            <li key={match.teamMatchId} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{match.title}</p>
-                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatAdminDateTime(match.startAt)}</p>
-                </div>
-                <AdminStatusPill status={match.status} />
-              </div>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
-          최근 주최한 팀매치가 없어요.
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -204,14 +177,14 @@ export default function AdminTeamDetailPage() {
               <AdminDetailRow label="팀 ID" value={team.teamId} />
               <AdminDetailRow label="종목" value={team.sportName} />
               <AdminDetailRow label="지역" value={team.regionName} />
-              <AdminDetailRow label="팀장" value={team.ownerName} />
+              <AdminDetailRow label="팀장" value={<Link className="text-[var(--blue700)]" href={`/admin/users/${encodeURIComponent(team.ownerUserId)}`}>{team.ownerName ?? '회원 상세 보기'}</Link>} />
               <AdminDetailRow label="팀장 ID" value={team.ownerUserId} />
               <AdminDetailRow label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </article>
 
           <TeamMembers team={team} />
-          <RecentTeamMatches team={team} />
+          <AdminEntityOperations entity="teams" id={teamId} />
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="팀 운영 요약">
@@ -228,10 +201,11 @@ export default function AdminTeamDetailPage() {
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
+            <p className="mt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">확인된 자료·추정값·표본 부족을 구분해요. 표본이 부족하면 점수만으로 판단하지 마세요.</p>
             {trust ? (
               <dl className="mt-4 grid gap-3">
-                <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
-                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={trust.mannerScore} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={adminTrustStateLabel(trust.trustState)} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={trust.mannerScore ?? '산정 전'} />
                 <AdminSummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
                 <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatAdminDateTime(trust.calculatedAt)} />
               </dl>

@@ -23,6 +23,7 @@ function createWrapper(queryClient: QueryClient) {
 }
 
 afterEach(() => {
+  window.localStorage.removeItem('teameet.member-access');
   vi.clearAllMocks();
   for (const key of Object.keys(listeners)) delete listeners[key];
 });
@@ -354,4 +355,14 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     unmount();
     stop();
   });
+});
+
+
+it('회원 조회 중에는 알림·채팅 소켓 구독을 만들지 않는다', async () => {
+  window.localStorage.setItem('teameet.member-access', 'active');
+  const { useV1NotificationSocket, useV1ChatRoomSocket, useV1ChatListSocket } = await import('./use-v1-realtime-socket');
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { unmount } = renderHook(() => { useV1NotificationSocket(); useV1ChatRoomSocket('room-1'); useV1ChatListSocket(); }, { wrapper: createWrapper(client) });
+  expect(mockSocket.on).not.toHaveBeenCalled();
+  unmount(); client.clear();
 });

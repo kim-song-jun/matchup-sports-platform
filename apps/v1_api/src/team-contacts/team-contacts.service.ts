@@ -462,7 +462,7 @@ export class TeamContactsService {
    * 활성 팀 전체의 **대기 중 받은 컨택** 수를 팀별로 센다. 컨택함 목록·상세 API 가 사라지면서
    * 만료 lazy-flip 의 읽기 경로 담당도 이 메서드가 이어받는다(create/respond 와 함께 세 곳).
    */
-  async summary(user: V1AuthUser) {
+  async summary(user: V1AuthUser, readOnly = false) {
     const teams = await this.prisma.v1TeamMembership.findMany({
       where: {
         userId: user.id,
@@ -475,14 +475,17 @@ export class TeamContactsService {
     const teamIds = teams.map((row) => row.teamId);
     if (teamIds.length === 0) return { pendingInbound: 0, byTeam: [] };
 
-    await this.prisma.v1TeamContact.updateMany({
-      where: { toTeamId: { in: teamIds }, status: 'requested', expiresAt: { lt: new Date() } },
-      data: { status: 'expired' },
-    });
-    await archiveEndedContactRooms(this.prisma, { toTeamId: { in: teamIds } });
+    const now = new Date();
+    if (!readOnly) {
+      await this.prisma.v1TeamContact.updateMany({
+        where: { toTeamId: { in: teamIds }, status: 'requested', expiresAt: { lt: now } },
+        data: { status: 'expired' },
+      });
+      await archiveEndedContactRooms(this.prisma, { toTeamId: { in: teamIds } });
+    }
     const groups = await this.prisma.v1TeamContact.groupBy({
       by: ['toTeamId'],
-      where: { toTeamId: { in: teamIds }, status: 'requested' },
+      where: { toTeamId: { in: teamIds }, status: 'requested', ...(readOnly ? { expiresAt: { gte: now } } : {}) },
       _count: { _all: true },
     });
     const byTeam = teamIds.map((teamId) => ({

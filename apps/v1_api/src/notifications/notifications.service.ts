@@ -1314,12 +1314,13 @@ export class NotificationsService {
   }
 
   async preferences(user: V1AuthUser) {
-    const preferences = await this.prisma.v1NotificationPreference.upsert({
+    const preferences = await this.prisma.v1NotificationPreference.findUnique({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id },
     });
-    return toPreferencesResponse(preferences);
+    // Match Prisma defaults without creating a row or touching its updatedAt during a GET.
+    return toPreferencesResponse(preferences ?? {
+      importantEnabled: true, activityEnabled: true, marketingEnabled: false, updatedAt: new Date(),
+    });
   }
 
   async updatePreferences(user: V1AuthUser, dto: UpdateNotificationPreferencesDto) {

@@ -1,5 +1,7 @@
 'use client';
 
+import { MemberAccessBanner } from '@/components/admin/member-access';
+
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { type ReactNode, useState } from 'react';
 import { ActivityProfileRequiredModal } from '@/components/auth/activity-profile-required-modal';
@@ -23,6 +25,7 @@ import { createV1QueryClient } from '@/lib/query-client';
 import { NativeAppSurface } from '@/components/providers/native-app-surface';
 import { NativeAppUpdateGate } from '@/components/providers/native-app-update-gate';
 import '@/components/providers/native-app-update-gate.css';
+import '@/components/admin/member-access.css';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createV1QueryClient);
@@ -50,6 +53,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && <GoogleAnalytics />}
+        <MemberAccessBanner />
         <PendingSocialSignupGate>
           <AppShellFrame>{children}</AppShellFrame>
           <GlobalPopup />

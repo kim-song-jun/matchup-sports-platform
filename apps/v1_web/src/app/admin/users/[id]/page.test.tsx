@@ -17,6 +17,7 @@ const manyOwnedMemberships = vi.hoisted(() =>
 );
 const state = vi.hoisted(() => ({
   noMatches: false,
+  accountStatus: 'active',
   withOwnedOnlyTeam: true,
   manyOwned: false,
   canWrite: true,
@@ -28,6 +29,8 @@ const state = vi.hoisted(() => ({
   releaseOutcome: { kind: 'success' } as { kind: 'success' } | { kind: 'error'; error: unknown },
 }));
 
+vi.mock('@/components/admin/member-access', () => ({ MemberAccessStartButton: () => null }));
+vi.mock('@/components/admin/admin-entity-operations', () => ({ AdminEntityOperations: () => null }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'user-1' }),
   useRouter: () => ({ push: vi.fn() }),
@@ -59,7 +62,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
       email: 'qa@example.test',
       displayName: 'QA 계정',
       nickname: null,
-      accountStatus: 'active',
+      accountStatus: state.accountStatus,
       phone: state.phone,
       emailVerifiedAt: null,
       phoneVerifiedAt: null,
@@ -296,5 +299,22 @@ describe('AdminUserDetailPage — 회원 삭제 모달', () => {
     expect(state.deleteCalls).toEqual([{ reason: '이용약관 위반' }]);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByText('회원을 삭제 처리했어요.')).toBeInTheDocument();
+  });
+});
+
+
+describe('회원 삭제 상태와 최종 삭제 구분', () => {
+  afterEach(() => { state.accountStatus = 'active'; state.deletedAt = null; });
+  it('상태만 삭제된 계정은 최종 삭제할 수 있다', () => {
+    state.accountStatus = 'deleted';
+    render(<AdminUserDetailPage />);
+    expect(screen.getByRole('button', { name: '회원 삭제' })).toBeEnabled();
+    expect(screen.getByText('이용 중지(삭제 상태)')).toBeInTheDocument();
+  });
+  it('최종 삭제된 계정은 다시 삭제할 수 없다', () => {
+    state.accountStatus = 'deleted'; state.deletedAt = '2026-11-19T00:00:00Z';
+    render(<AdminUserDetailPage />);
+    expect(screen.getByRole('button', { name: '회원 삭제' })).toBeDisabled();
+    expect(screen.getByText('최종 삭제 완료')).toBeInTheDocument();
   });
 });

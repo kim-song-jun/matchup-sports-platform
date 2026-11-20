@@ -258,6 +258,7 @@ export class TeamsService {
         genderRule: team.profile?.genderRule ?? null,
         joinPolicy: team.joinPolicy,
         memberGoalCount: team.profile?.memberGoalCount ?? null,
+        membershipFee: team.profile?.membershipFee ?? null,
       },
       owner: {
         userId: team.ownerUser.id,
@@ -351,6 +352,7 @@ export class TeamsService {
               maxSportLevelId: levelRange.maxSportLevelId,
               genderRule: dto.genderRule ?? null,
               memberGoalCount: dto.memberGoalCount ?? null,
+              membershipFee: dto.membershipFee ?? null,
             },
           },
         },
@@ -446,6 +448,8 @@ export class TeamsService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           memberGoalCount: dto.memberGoalCount ?? null,
+          // 예전 클라이언트가 이 칸을 모르고 저장해도 설정해 둔 회비를 지우지 않는다.
+          membershipFee: dto.membershipFee,
         },
         create: {
           teamId: team.id,
@@ -462,6 +466,7 @@ export class TeamsService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           memberGoalCount: dto.memberGoalCount ?? null,
+          membershipFee: dto.membershipFee ?? null,
         },
       });
 
@@ -2353,6 +2358,7 @@ export class TeamsService {
           maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           genderRule: true,
           memberGoalCount: true,
+          membershipFee: true,
         },
       },
       memberships: {

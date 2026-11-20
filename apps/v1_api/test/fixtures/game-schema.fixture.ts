@@ -618,7 +618,8 @@ export const gameSchemaSourceManifest = {
   // 2026-11-12: stage tie-break settings + six-team direct-final order (MD-QA #186, 20261111180000); historical game migration unchanged.
   // 2026-11-12: additive V1TournamentScheduleTime; historical game migration unchanged.
   // 2026-11-20: additive V1TeamInternalMatch* tables (team-internal matches, 20261120000100); historical game migration unchanged.
-  schema: '0f2588a68754399023e94bd171a0ceac4f1b3921c736ceea0ce7cc6efd2e174d',
+  // 2026-11-20: additive V1TeamProfile.membershipFee (20261120100000_v1_team_membership_fee); historical game migration unchanged.
+  schema: '616ec82475046627e4e58c6982c6312e95ddfd38831e44c5629a8b7eaa3d443b',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

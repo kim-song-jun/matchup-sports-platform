@@ -507,6 +507,7 @@ function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule || '성별 미설정'} />
             <InfoRow label="정원" value={capacity} />
+            <InfoRow label="회비" value={formatMembershipFee(team.membershipFee)} muted={team.membershipFee == null} />
             <InfoRow label="가입 신청" value={team.statusLabel} />
           </div>
         </div>
@@ -1204,6 +1205,7 @@ export function TeamFormPageView({
     <>
       <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} editing={edit} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
       <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
+      <TeamMembershipFeeField value={team.membershipFee} onChange={(value) => form?.onFieldChange('membershipFee', value)} />
       <TeamActivityFields team={team} form={form} />
     </>
   );
@@ -2251,6 +2253,11 @@ function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {
   return team.capacity > 0 ? `${team.members}/${team.capacity}명` : `현재 ${team.members}명`;
 }
 
+function formatMembershipFee(fee?: number | null) {
+  if (fee == null) return '미정';
+  return fee === 0 ? '없음' : `월 ${fee.toLocaleString('ko-KR')}원`;
+}
+
 function formatCapacity(team: Pick<TeamModel, 'capacity'>) {
   return team.capacity > 0 ? `${team.capacity}명` : '정원 미정';
 }
@@ -2342,6 +2349,40 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
           성별 조건을 선택해 주세요. 선택하지 않으면 대회·리그에 신청할 수 없어요.
         </p>
       )}
+    </div>
+  );
+}
+
+function TeamMembershipFeeField({ value, onChange }: { value?: number | null; onChange?: (value: number | null) => void }) {
+  // '있음'인데 금액을 아직 안 적은 상태(null)를 칩이 기억해야 해서 따로 든다. 수정 화면은 값이 늦게 오므로 값도 함께 본다.
+  const [pickedPaid, setPaid] = useState(false);
+  const paid = pickedPaid || (value ?? 0) > 0;
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">회비</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label="회비 선택">
+        <button className={`tm-chip ${!paid && value === 0 ? 'tm-chip-active' : ''}`} type="button" aria-pressed={!paid && value === 0} onClick={() => { setPaid(false); onChange?.(0); }}>없음</button>
+        <button className={`tm-chip ${paid ? 'tm-chip-active' : ''}`} type="button" aria-pressed={paid} onClick={() => { setPaid(true); onChange?.(null); }}>있음</button>
+      </div>
+      {paid ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <span className="tm-text-body">월</span>
+          <input
+            className="tm-create-input"
+            inputMode="numeric"
+            aria-label="월 회비(원)"
+            placeholder="10,000"
+            value={value ? value.toLocaleString('ko-KR') : ''}
+            onChange={(event) => onChange?.(Number(event.target.value.replace(/\D/g, '').slice(0, 7)) || null)}
+          />
+          <span className="tm-text-body">원</span>
+        </div>
+      ) : null}
+      {paid && value == null ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
+          금액을 적지 않으면 회비는 정하지 않음으로 저장돼요.
+        </p>
+      ) : null}
     </div>
   );
 }

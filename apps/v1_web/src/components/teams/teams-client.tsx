@@ -488,6 +488,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
       condition: formatTeamDetailLevel(query.data),
       schedule: '',
+      membershipFee: query.data.profile.membershipFee ?? null,
       city: regionParts.city,
       county: regionParts.county,
       level: formatTeamDetailLevel(query.data) || '레벨 미설정',

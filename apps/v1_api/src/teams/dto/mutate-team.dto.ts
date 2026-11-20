@@ -98,6 +98,14 @@ export class MutateTeamDto {
   @Min(2)
   @Max(50)
   memberGoalCount?: number | null;
+
+  /** 월 회비(원). 0 = 회비 없음, null/생략 = 정하지 않음. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  membershipFee?: number | null;
 }
 
 export class UpdateTeamDto extends MutateTeamDto {

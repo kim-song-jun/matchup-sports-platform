@@ -514,6 +514,7 @@ function teamDetail(teamId: string) {
       genderRule: team.genderRule ?? null,
       joinPolicy: team.joinPolicy,
       memberGoalCount: null,
+      membershipFee: null,
     },
     owner: {
       userId: 'user-1',

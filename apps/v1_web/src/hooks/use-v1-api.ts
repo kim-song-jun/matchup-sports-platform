@@ -1293,6 +1293,7 @@ export function useV1UpdateTeam(teamId: string) {
                   genderRule: variables.genderRule ?? null,
                   joinPolicy: variables.joinPolicy,
                   memberGoalCount: variables.memberGoalCount ?? null,
+                  membershipFee: variables.membershipFee ?? null,
                 },
               }
             : current,

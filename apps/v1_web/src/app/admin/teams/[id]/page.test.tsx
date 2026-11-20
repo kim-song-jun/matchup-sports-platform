@@ -9,6 +9,7 @@ const hooks = vi.hoisted(() => ({
   renameMutate: vi.fn(),
 }));
 
+vi.mock('@/components/admin/admin-entity-operations', () => ({ AdminEntityOperations: () => null }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'team-1' }),
 }));
@@ -43,6 +44,7 @@ describe('AdminTeamDetailPage — 상태와 인원은 한 번씩만', () => {
   it('상태는 원문("active") 없이 한글 배지로 한 번만 보인다', () => {
     render(<AdminTeamDetailPage />);
 
+    expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/admin/users/user-owner');
     expect(screen.queryByText('active')).not.toBeInTheDocument();
     expect(screen.getAllByText('활성')).toHaveLength(1);
   });

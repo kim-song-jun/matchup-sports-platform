@@ -116,6 +116,14 @@ export class AdminMatchListQueryDto {
 
 export class AdminTeamListQueryDto {
   @IsOptional()
+  @IsUUID()
+  sportId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  regionId?: string;
+
+  @IsOptional()
   @IsIn(['active', 'suspended', 'archived'])
   status?: 'active' | 'suspended' | 'archived';
 

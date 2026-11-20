@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePathname } from 'next/navigation';
 import { getCurrentRedirectPath } from '@/lib/session-storage';
 import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
@@ -11,6 +11,7 @@ import { TAB_LINK_SELECTOR } from './navigation-tab-selectors';
 const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoint 와 동일해야
   // 한다 — 이 값이 어긋나면 두 스크롤 모델(문서 vs .tm-scroll-area)이 서로 다른 지점에서
   // 전환돼 스크롤 대상이 어긋난다.
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const SAVE_DEBOUNCE_MS = 150;
 const HASH_TARGET_WAIT_MS = 10_000;
 
@@ -55,6 +56,35 @@ function getScrollHeight(el: ScrollHost): number {
 }
 function getClientHeight(el: ScrollHost): number {
   return el === window ? window.innerHeight : (el as Element).clientHeight;
+}
+
+function isSameLocation(href: string): boolean {
+  try {
+    const url = new URL(href, window.location.href);
+    return url.origin === window.location.origin
+      && url.pathname === window.location.pathname
+      && url.search === window.location.search;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 하단 탭·데스크톱 상단 탭의 onClick. 지금 화면의 탭을 다시 누르면 라우터 이동 없이 스크롤 상자를
+ * 맨 위로 올린다(동작 줄이기면 즉시). 다른 화면으로 가는 클릭은 건드리지 않는다.
+ */
+export function scrollToTopOnTabRetap(event: ReactMouseEvent<HTMLAnchorElement>) {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const href = event.currentTarget.getAttribute('href');
+  if (!href || !isSameLocation(href)) return;
+  event.preventDefault();
+  const el = getScrollElement();
+  if (!el || getScrollTop(el) <= 0) return;
+  // 디바운스 저장은 화면이 바뀌면 버려진다 — 올라가는 도중 다른 탭으로 가도 돌아오면 맨 위이도록 목표값을 먼저 적는다.
+  saveScrollPosition(getCurrentRedirectPath(), 0);
+  const reduce = window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  el.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 }
 
 /**
@@ -161,6 +191,8 @@ export function ScrollRestoration() {
       const href = anchor.getAttribute('href');
       if (!href || anchor.getAttribute('target') === '_blank' || anchor.hasAttribute('download')) return;
       if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+      // 같은 화면 링크는 pathname 이 안 바뀌어 ③이 소비하지 않는다 — 여기서 적으면 다음 프로그램적 이동까지 남는다.
+      if (isSameLocation(href)) return;
       navTypeRef.current = anchor.closest(TAB_LINK_SELECTOR)
         ? 'tab'
         : anchor.dataset.navBack === 'true'

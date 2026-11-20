@@ -752,6 +752,24 @@ describe('NotificationsService', () => {
 
   // ─── updatePreferences ─────────────────────────────────────────────────────
 
+  it('preferences returns defaults without creating a row, then reads saved choices without changing them', async () => {
+    let stored: Record<string, unknown> | null = null;
+    prisma.v1NotificationPreference.findUnique.mockImplementation(async () => stored);
+    prisma.v1NotificationPreference.upsert.mockImplementation(async ({ create }) => {
+      stored = { ...create, updatedAt: new Date() };
+      return stored;
+    });
+    expect(await service.preferences(user)).toEqual({ importantEnabled: true, activityEnabled: true,
+      marketingEnabled: false, updatedAt: new Date() });
+    expect(stored).toBeNull();
+    const saved = { importantEnabled: false, activityEnabled: false, marketingEnabled: true,
+      updatedAt: new Date('2026-01-01T00:00:00Z') };
+    stored = { ...saved };
+    expect(await service.preferences(user)).toEqual(saved);
+    expect(stored).toEqual(saved);
+    expect(prisma.v1NotificationPreference.upsert).not.toHaveBeenCalled();
+  });
+
   it('updatePreferences: 부분 업데이트 — 전달하지 않은 필드는 update payload에 포함되지 않는다', async () => {
     const existingPref = {
       userId: 'user-1',

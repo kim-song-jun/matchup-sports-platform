@@ -79,7 +79,7 @@ export type HomeViewModel = {
   hasNewNotification: boolean;
   chatUnreadCount: number;
   chatHref: string;
-  chatStatus: 'loading' | 'error' | 'ready';
+  chatStatus: 'loading' | 'error' | 'ready' | 'restricted';
   chatRooms: HomeChatRoom[];
   retry?: () => void;
   /** 채팅방 목록 조회 전용 재시도 — 전체 홈 데이터(retry)와 별도 쿼리이므로 분리한다. */

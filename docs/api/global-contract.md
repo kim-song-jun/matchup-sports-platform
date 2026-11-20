@@ -289,6 +289,10 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 
 단계형 대회의 신규 쓰기는 별도 stages API의 expectedRevision/sourceVersion·대회 권한·잠금·감사 계약을 사용한다. 구조 변경·재경기는 변경 대상의 미시작/취소/VOID 상태를 검사하고 기존 경기 기록을 보관하며 무관한 경기 ID·일정은 보존한다. 기존 일반 대회에는 자동 적용하지 않는다. 상세는 [단계형 운영 확장](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)과 [개인 기록 범위](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)를 따른다.
 
+회원·팀별 운영 조회 context와 상태 이력·문의·참가/공식 출전 기록은 active admin 전용이며 private/no-store다. 팀 목록은 종목·지역·팀장 검색을 지원한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원팀-운영-정보-2026-11-19)을 따른다.
+
+회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·채팅 API(목록·본문·첨부파일 포함)·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. 알림 설정 GET은 저장 없이 기존 값 또는 기본값만 읽는다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.
+
 신청 제출·참가 확정·접수 시작의 충돌도 기존 오류 envelope를 따른다. `REGISTRATION_NOT_DRAFT`, `TOURNAMENT_REGISTRATION_CLOSED`, `REGISTRATION_DEADLINE_PASSED`는409이며 성공으로 대체하지 않는다. [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18).
 
 Admin manual-push history is active-admin-only (`GET /admin/ops/push-history[/:id]`);

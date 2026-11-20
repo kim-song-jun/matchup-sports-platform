@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { AdminEntityOperations } from '@/components/admin/admin-entity-operations';
+import { MemberAccessStartButton } from '@/components/admin/member-access';
 import { MemberBracketPreviewButton } from '@/components/admin/member-bracket-preview-button';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
@@ -60,7 +62,7 @@ export default function AdminUserDetailPage() {
   const [releaseOpen, setReleaseOpen] = useState(false);
 
   const canWrite = useAdminCanWrite();
-  const canDelete = canWrite && user?.accountStatus !== 'deleted';
+  const canDelete = canWrite && Boolean(user) && !user?.deletedAt;
   // 서버는 완전히 삭제된 계정(deletedAt 이 있는 삭제 상태)의 번호 해제를 막는다 — 그 계정의 번호는 삭제 때 이미 풀렸다.
   const hasReleasablePhone = Boolean(user?.phone) && !user?.deletedAt;
 
@@ -144,7 +146,7 @@ export default function AdminUserDetailPage() {
                 <h2 className="break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
                 <p className="mt-1 break-all text-sm text-[var(--text-muted)]">{user.email ?? '이메일 없음'}</p>
               </div>
-              <AdminStatusPill status={user.accountStatus} />
+              <AdminStatusPill status={user.accountStatus} label={user.accountStatus === 'deleted' ? (user.deletedAt ? '최종 삭제 완료' : '이용 중지(삭제 상태)') : undefined} />
             </div>
 
             <dl className="mt-4">
@@ -223,9 +225,11 @@ export default function AdminUserDetailPage() {
               />
             ))}
           </ListSection>
+          <AdminEntityOperations entity="users" id={userId} />
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="회원 운영 정보">
+          <MemberAccessStartButton userId={userId} enabled={canWrite && user.accountStatus === 'active' && user.adminAccessStatus !== 'active'} />
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-2">
@@ -260,7 +264,7 @@ export default function AdminUserDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">삭제 처리</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-              삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
+              이 버튼은 최종 삭제를 처리해요. 상태만 삭제로 바뀐 계정도 최종 삭제할 수 있어요. 삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
             </p>
             <button
               type="button"

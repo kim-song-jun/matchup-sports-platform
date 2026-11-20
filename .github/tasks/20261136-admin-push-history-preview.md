@@ -8,7 +8,7 @@ Status: Review
 관리자는 수동 발송 후 제목·본문·대상·앱/웹 전송 결과를 전용 화면에서 다시 확인할 수 없다. 기존 감사 로그에는 제목과 인앱 생성/제외/실패 수만 남는다.
 
 ## Goal
-기존 및 신규 수동 푸시를 관리자에서 조회하고, 실제 저장된 내용과 전송 집계를 구분해 미리본다. 사용자 요청 범위는 dev 대상 PR 생성까지이며 운영 승격·광고 재발송은 포함하지 않는다.
+기존 및 신규 수동 푸시를 관리자에서 조회하고, 실제 저장된 내용과 전송 집계를 구분해 미리본다. 최초 요청은 dev 대상 PR 생성이었고, 2026-11-20 사용자가 "리뷰없이 진행해줘"로 이번 PR의 Copilot 리뷰 생략과 dev 병합·Alpha 배포 진행을 승인했다. 운영 승격·광고 재발송은 포함하지 않는다.
 
 ## Original Conditions (must all be satisfied)
 - [x] 지금까지 보낸 수동 푸시 이력 조회
@@ -98,3 +98,12 @@ Forbidden: 운영 데이터 변경/재발송, main 승격, 다른 작업의 work
 - 후속: CI DB 통합 결과·Copilot 최신 head 리뷰 확인 → dev 병합이 승인/요청되면 배포 후 ego-lite로 발송 이력·상세·작성 미리보기/권한/390·768·1440·console/network 검증. 실제 전체 푸시 발송은 QA로 실행하지 않는다.
 - Copilot: `gh pr edit --add-reviewer @copilot`와 공식 requested_reviewers REST 모두 성공 응답이나 reviewer 목록/요청 이벤트/리뷰는 비어 있음. clean 리뷰로 취급하지 않으며 Draft 해제·후속 승인 시 재확인이 필요하다. 반복 요청은 하지 않는다.
 - Cleanup 계획: 원격에 커밋이 보존됨을 대조한 뒤 이번 작업의 의존성 symlink·격리 생성 client·로컬 worktree만 정리한다. 미병합 작업 브랜치는 보존하고 baseline 스크린샷은 after 비교를 위한 로컬 QA 증거로 유지한다.
+
+## Deployment continuation — 2026-11-20
+- 사용자 승인: "리뷰없이 진행해줘". 이번 PR #2461의 Copilot gate만 생략하며 CI/배포/Alpha 화면 검증은 유지한다.
+- 최초 최종 head b1a240d56e: CI 44659988562의 API/Web/Gates PASS. 발송 이력 persisted-data 통합 스위트도 실제 CI PASS.
+- 최신 dev 동기화 중 admin.module.ts 및 API 문서 2곳이 충돌했다. MemberAccess/AdminEntityOperations 등록과 PushHistory 등록, 양쪽 API 계약을 모두 보존해 해결했다.
+- [ ] 동기화 head CI 통과 및 dev 대상/미해결 스레드 0 재확인 후 병합
+- [ ] Alpha 배포 성공·서빙 SHA가 머지를 포함하는지 검증
+- [ ] ego-lite 로그인 상태에서 이력·상세·필터·작성 미리보기·탭 입력 보존·390/768/1440·console/network 검증
+- [ ] 소유 worktree/브랜치/프로세스 정리. 공유 루트의 다른 세션 대량 WIP는 보존.

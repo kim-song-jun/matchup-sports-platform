@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
 import { AppChrome } from './shell';
 
@@ -395,5 +397,126 @@ describe('AppChrome 스크롤 영역 — floatingSlot(FAB) 유무에 따른 하�
 
     expect(container.querySelector('.tm-app-frame')).toHaveClass('tm-app-frame-no-bottom');
     expect(container.querySelector<HTMLElement>('.tm-scroll-area')?.style.paddingBottom).toBe('');
+  });
+});
+
+// 지금 화면의 주 탭을 다시 누르면 라우터 이동 없이 스크롤 상자가 맨 위로 올라간다(네이티브 탭바 관례).
+describe('AppChrome 주 탭 다시 누르기 — 맨 위로', () => {
+  const realMatchMedia = window.matchMedia;
+
+  function stubMedia({ desktop = false, reduce = false } = {}) {
+    window.matchMedia = ((query: string) => ({
+      matches: (query.includes('min-width: 1024px') && desktop) || (query.includes('prefers-reduced-motion: reduce') && reduce),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+  }
+
+  /** 클릭 뒤 기본 동작이 막혔는지 기록한다. jsdom 의 앵커 이동은 기록 뒤에 막아 둔다. */
+  function clickAndReport(link: HTMLElement) {
+    let prevented: boolean | null = null;
+    const record = (event: Event) => { prevented = event.defaultPrevented; event.preventDefault(); };
+    window.addEventListener('click', record, { once: true });
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    window.removeEventListener('click', record);
+    return prevented;
+  }
+
+  function renderShell(children: ReactNode = <div>본문</div>) {
+    const view = render(<AppChrome title="테스트" showNotifications={false}>{children}</AppChrome>);
+    const area = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+    const scrollTo = vi.fn();
+    area.scrollTo = scrollTo as unknown as HTMLElement['scrollTo'];
+    return { area, scrollTo };
+  }
+
+  const bottomTab = (label: string) => within(screen.getByRole('navigation', { name: '주요 메뉴' })).getByRole('link', { name: label });
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/tournaments');
+    window.sessionStorage.clear();
+    stubMedia();
+  });
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+    window.sessionStorage.clear();
+  });
+
+  it('하단 탭: 같은 탭을 다시 누르면 이동을 막고 부드럽게 맨 위로 올리며 목표값 0 을 먼저 저장한다', () => {
+    saveScrollPosition('/tournaments', 1200);
+    const { area, scrollTo } = renderShell();
+    area.scrollTop = 1200;
+
+    expect(clickAndReport(bottomTab('대회'))).toBe(true);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(readScrollPosition('/tournaments')).toBe(0);
+  });
+
+  it('동작 줄이기를 켜면 즉시 맨 위로 간다', () => {
+    stubMedia({ reduce: true });
+    const { area, scrollTo } = renderShell();
+    area.scrollTop = 1200;
+
+    clickAndReport(bottomTab('대회'));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
+  });
+
+  it('이미 맨 위면 스크롤을 부르지 않고 이동도 일으키지 않는다', () => {
+    const { scrollTo } = renderShell();
+
+    expect(clickAndReport(bottomTab('대회'))).toBe(true);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('다른 탭을 누르면 기존 이동에 맡긴다(막지 않고 스크롤하지 않는다)', () => {
+    saveScrollPosition('/tournaments', 1200);
+    const { area, scrollTo } = renderShell();
+    area.scrollTop = 1200;
+
+    expect(clickAndReport(bottomTab('팀'))).toBe(false);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(readScrollPosition('/tournaments')).toBe(1200);
+  });
+
+  it('검색 조건이 붙은 화면에서 탭을 누르면 같은 화면이 아니라 기존 이동이다', () => {
+    window.history.replaceState(null, '', '/tournaments?kind=league');
+    const { area, scrollTo } = renderShell();
+    area.scrollTop = 1200;
+
+    expect(clickAndReport(bottomTab('대회'))).toBe(false);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('화면 안 세부 탭은 같은 주소여도 건드리지 않는다', () => {
+    const { area, scrollTo } = renderShell(
+      <div className="tm-segmented-tabs"><a className="tm-segmented-tab" href="/tournaments">전체</a></div>,
+    );
+    area.scrollTop = 1200;
+
+    expect(clickAndReport(screen.getByRole('link', { name: '전체' }))).toBe(false);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('데스크톱 상단 탭: 문서 스크롤을 부드럽게 맨 위로 올린다', () => {
+    stubMedia({ desktop: true });
+    const windowScrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    Object.defineProperty(window, 'scrollY', { value: 1200, configurable: true });
+    try {
+      const { scrollTo } = renderShell();
+      const tab = within(screen.getByRole('navigation', { name: '데스크톱 주요 메뉴' })).getByRole('link', { name: '대회' });
+
+      expect(clickAndReport(tab)).toBe(true);
+      expect(windowScrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+      windowScrollTo.mockRestore();
+    }
   });
 });

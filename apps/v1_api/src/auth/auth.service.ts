@@ -1426,7 +1426,7 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
-  async me(userId: string) {
+  async me(userId: string, readOnly = false) {
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
       include: {
@@ -1476,7 +1476,7 @@ export class AuthService {
 
     // Retire the old Alpha-only gate for members already waiting in email setup.
     // Keep the column for rolling-deploy compatibility with the previous release.
-    if (user.signupEmailLoginRequired) {
+    if (user.signupEmailLoginRequired && !readOnly) {
       await this.prisma.v1User.updateMany({
         where: { id: user.id, signupEmailLoginRequired: true },
         data: { signupEmailLoginRequired: false },

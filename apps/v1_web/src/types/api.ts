@@ -3329,6 +3329,8 @@ export type V1AdminUserRow = {
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
   signupStage?: 'required_complete' | 'onboarding_complete' | 'terms_required' | 'profile_required' | 'profile_deferred';
+  deletedAt?: string | null;
+  adminAccessStatus?: 'active' | 'suspended' | 'revoked' | null;
   lastLoginAt: string | null;
   createdAt: string;
   hostedMatchCount: number;
@@ -3417,6 +3419,8 @@ export type V1AdminTeamRow = {
   name: string;
   sportId: string;
   sportName: string;
+  regionId?: string;
+  regionName?: string;
   ownerUserId: string;
   ownerName: string | null;
   memberCount: number;
@@ -3615,6 +3619,7 @@ export type AdminListFilters = {
   status?: string;
   q?: string;
   sportId?: string;
+  regionId?: string;
   audience?: string;
   category?: string;
   /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */

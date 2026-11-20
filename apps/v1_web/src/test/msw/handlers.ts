@@ -1,3 +1,4 @@
+import { adminEntityOperationsHandlers } from './admin-entity-operations-handlers';
 import { scheduleTimeHandlers } from './schedule-time-handlers';
 import { adminPushHistoryMswHandlers } from './admin-push-history-handlers';
 import { memberBracketPreviewMswHandlers } from './member-bracket-preview-handlers';
@@ -813,6 +814,7 @@ export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
   ...v1AdminUserPhoneReleaseMswHandlers,
   ...memberBracketPreviewMswHandlers,
+  ...adminEntityOperationsHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueCapacityMswHandlers,

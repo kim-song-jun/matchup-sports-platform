@@ -3821,6 +3821,8 @@ export type V1AdminPushSendPayload = {
 };
 
 export type V1AdminPushSendResult = {
+  /** 발송은 끝났지만 감사 이력 저장이 실패한 경우. 재발송하지 않는다. */
+  historyRecorded?: false;
   /** 인앱 알림을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
   skipped: number;

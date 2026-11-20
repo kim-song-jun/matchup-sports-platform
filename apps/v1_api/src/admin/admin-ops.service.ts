@@ -76,6 +76,8 @@ const BROADCAST_DEDUPE_WINDOW_MS = 10 * 60_000;
 const BROADCAST_IDEMPOTENCY_ACTION = 'admin.push.broadcast';
 
 export interface ManualPushSendResult {
+  /** False only when sending completed but its audit history could not be saved. Never retry the send automatically. */
+  historyRecorded?: false;
   /** 인앱 알림(V1Notification)을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
   skipped: number;
@@ -400,14 +402,19 @@ export class AdminOpsService {
         targetType: 'push',
         targetId,
         afterJson: {
+          historyVersion: 1,
           title: dto.title,
+          body: dto.body ?? null,
+          url: dto.url ?? null,
           target: dto.target,
           sent: result.sent,
           skipped: result.skipped,
           failed: result.failed,
+          push: result.push as unknown as Prisma.InputJsonValue,
         },
       });
     } catch (err: unknown) {
+      result.historyRecorded = false;
       this.logger.warn(
         `수동 푸시 발송 감사 로그 기록 실패 [targetId=${targetId}]: ${err instanceof Error ? err.message : String(err)}`,
       );

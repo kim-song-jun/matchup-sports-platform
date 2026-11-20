@@ -12,6 +12,7 @@ import { AdminController } from './admin.controller';
 import { AdminMonitoringController } from './admin-monitoring.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOpsService } from './admin-ops.service';
+import { AdminPushHistoryService } from './admin-push-history.service';
 import { AdminService } from './admin.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { AdminTermsController } from './admin-terms.controller';
@@ -22,6 +23,6 @@ import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 @Module({
   imports: [GamesModule, TeamsModule, AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule, KakaoUnlinkModule],
   controllers: [MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
-  providers: [MemberBracketPreviewService, AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
+  providers: [MemberBracketPreviewService, AdminService, AdminOpsService, AdminPushHistoryService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
 })
 export class AdminModule {}

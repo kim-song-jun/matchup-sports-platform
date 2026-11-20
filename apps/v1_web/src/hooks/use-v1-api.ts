@@ -4092,6 +4092,7 @@ export function useV1AdminSendPush() {
       v1Post<V1AdminPushSendResult>('/admin/ops/push-send', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushHistoryAll() });
     },
   });
 }

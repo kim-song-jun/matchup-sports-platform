@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOpsService } from './admin-ops.service';
+import { AdminPushHistoryService } from './admin-push-history.service';
 
 const user = {
   id: 'user-1',
@@ -20,6 +21,7 @@ describe('AdminOpsController', () => {
     getActiveAdmin: jest.fn().mockResolvedValue(admin),
     getMutationAdmin: jest.fn().mockResolvedValue(admin),
   };
+  const history = { list: jest.fn(), detail: jest.fn() };
 
   let controller: AdminOpsController;
 
@@ -31,12 +33,30 @@ describe('AdminOpsController', () => {
       controllers: [AdminOpsController],
       providers: [
         { provide: AdminOpsService, useValue: adminOpsService },
+        { provide: AdminPushHistoryService, useValue: history },
         { provide: AdminContextService, useValue: adminContext },
         { provide: PrismaService, useValue: {} },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
       ],
     }).compile();
     controller = moduleRef.get(AdminOpsController);
+  });
+
+  it('allows an active read-only admin to list and inspect history', async () => {
+    adminContext.getActiveAdmin.mockResolvedValueOnce({ ...admin, adminRole: 'support' });
+    await controller.history(user, { limit: 10 });
+    await controller.historyDetail(user, 'history-id');
+    expect(history.list).toHaveBeenCalledWith({ limit: 10 });
+    expect(history.detail).toHaveBeenCalledWith('history-id');
+    expect(adminContext.getMutationAdmin).not.toHaveBeenCalled();
+  });
+
+  it('does not read history when the administrator is inactive', async () => {
+    adminContext.getActiveAdmin.mockRejectedValue(new Error('inactive'));
+    await expect(controller.history(user, {})).rejects.toThrow('inactive');
+    await expect(controller.historyDetail(user, 'history-id')).rejects.toThrow('inactive');
+    expect(history.list).not.toHaveBeenCalled();
+    expect(history.detail).not.toHaveBeenCalled();
   });
 
   it('recentPushFailures gates on getActiveAdmin (read-only) and delegates to the service', async () => {

@@ -189,3 +189,6 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).
 
 단계형 대회의 자동 진출·초안/예외 배정·편성/경기 복구·단계별 경기 시간·교차 시드/6강/3위전·명시적 전체 순위는 [단계형 운영 확장 계약](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)을 따른다. 개인 기록의 stageKey/poolKey 필터는 [기록 계약](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)을 따른다.
+
+관리자 수동 푸시의 발송·이력 조회·과거 본문 출처·앱/웹 접수 집계 계약은
+[Admin & Ops — 수동 푸시 발송과 이력](domains/admin-and-ops.md#수동-푸시-발송과-이력)을 따른다.

@@ -111,6 +111,8 @@ export class TeamInternalMatchesService {
     this.assertActiveAccount(user);
     await this.prisma.$transaction(async (tx) => {
       await this.requireManager(tx, user, teamId);
+      // 같은 경기의 결과를 두 운영진이 동시에 저장하면 득점(삭제 후 재생성)이 겹쳐 쌓인다 — 경기 행을 잠가 한 명씩 처리한다.
+      await tx.$queryRaw`SELECT id FROM "v1_team_internal_matches" WHERE id = ${matchId} FOR UPDATE`;
       const match = await this.findMatch(tx, teamId, matchId);
       const sides = await tx.v1TeamInternalMatchSide.findMany({ where: { matchId }, orderBy: { sideNumber: 'asc' } });
       const players = await tx.v1TeamInternalMatchPlayer.findMany({ where: { matchId } });
@@ -123,7 +125,7 @@ export class TeamInternalMatchesService {
         const side = sides[goal.sideNumber - 1];
         if (!side) throw new UnprocessableEntityException({ code: 'INTERNAL_MATCH_GOAL_SIDE', message: '없는 팀의 득점이에요' });
         const inSide = (userId: string) => players.some((player) => player.userId === userId && player.sideId === side.id);
-        if (!inSide(goal.scorerUserId) || (goal.assistUserId !== undefined && !inSide(goal.assistUserId))) {
+        if (!inSide(goal.scorerUserId) || (goal.assistUserId != null && !inSide(goal.assistUserId))) {
           throw new UnprocessableEntityException({ code: 'INTERNAL_MATCH_GOAL_PLAYER', message: '득점·어시스트는 그 팀 선수만 고를 수 있어요' });
         }
         if (goal.assistUserId === goal.scorerUserId) {

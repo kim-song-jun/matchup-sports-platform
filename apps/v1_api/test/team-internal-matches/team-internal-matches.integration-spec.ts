@@ -121,6 +121,8 @@ describe('팀 내 경기 HTTP/DB 계약', () => {
     await put({ scores: [1, 0], goals: [{ sideNumber: 1, scorerUserId: a, assistUserId: a }] }).expect(422);
     await put({ scores: [1, 0], goals: [{ sideNumber: 1, scorerUserId: a, assistUserId: other }] }).expect(422);
     await put({ scores: [1], goals: [] }).expect(400);
+    // 어시스트를 비우는 건 null 로 보내도 같다 — '그 팀 선수만' 오류가 아니라 정상 저장이다.
+    await put({ scores: [1, 0], goals: [{ sideNumber: 1, scorerUserId: a, assistUserId: null }] }).expect(200);
     await put({ scores: [1, 0], goals: [{ sideNumber: 1, scorerUserId: a, assistUserId: b }] }).expect(200);
   });
 

@@ -48,8 +48,10 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-08: additive V1VerificationPurpose email_change (20261106180000_v1_verification_purpose_email_change); M11 remains unchanged.
 # 2026-11-08: additive V1Tournament.tieBreakOrder (20261107120000_tournament_tie_break_order); M11 remains unchanged.
 # 2026-11-08: additive v1_ad_campaigns, v1_ad_campaign_daily_stats and V1ContentAsset.adCampaignId (20261108130000_v1_ad_campaigns); M11 remains unchanged.
+# 2026-11-20: additive V1TeamInternalMatch* tables (20261120000100_team_internal_matches); M11 remains unchanged.
 # 2026-11-12: additive V1TournamentStageTieBreakSetting and V1Tournament.sixTeamDirectFinalOrder (20261111180000_tournament_stage_tie_break_settings, MD-QA #186); M11 remains unchanged.
-[[ ( "$schema_sha" == 5c1f131cad5acefe13408405bdd222141cfaffdcf53de6a1599ed6a7008baf7d \
+[[ ( "$schema_sha" == 0f2588a68754399023e94bd171a0ceac4f1b3921c736ceea0ce7cc6efd2e174d \
+  || "$schema_sha" == 5c1f131cad5acefe13408405bdd222141cfaffdcf53de6a1599ed6a7008baf7d \
   || "$schema_sha" == 65f3640c6129b81e1a503c6c5a2c11cbc79154e4e35acc598bed34f6110d50c1 \
   || "$schema_sha" == e6fa0c33ed33f7d3cbda7e83a4373338a801edfd8acc2e02cc6db6b38f20fe01 \
   || "$schema_sha" == 063ef4cfd11e619251ee47426b88822e7757503702a0fdc407067e3f6ae74fd8 \

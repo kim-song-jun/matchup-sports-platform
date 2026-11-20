@@ -92,6 +92,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
+- [Team internal matches](./domains/team-internal-matches.md)
 - [Tournament operations](./domains/tournament-operations.md)
 - [Tournament operations authorization](./domains/tournament-operations-auth.md)
 - [Tournament operations escalations](./domains/tournament-operations-escalations.md)

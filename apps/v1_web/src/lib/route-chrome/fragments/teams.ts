@@ -130,4 +130,26 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     pattern: '/invite/:token',
     chrome: { title: '팀 초대', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },
+  {
+    // 팀 내 경기(자체전) 만들기 — 팀장·매니저. 하단 고정 버튼이 없어도 폼이라 탭바를 숨긴다.
+    pattern: '/teams/:id/internal-matches/new',
+    chrome: {
+      title: '팀 내 경기 만들기',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    // 팀 내 경기 상세 — 팀원만. literal 세그먼트가 같은 `new` 패턴이 더 구체적이라 먼저 매치된다.
+    pattern: '/teams/:id/internal-matches/:matchId',
+    chrome: {
+      title: '팀 내 경기',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
 ];

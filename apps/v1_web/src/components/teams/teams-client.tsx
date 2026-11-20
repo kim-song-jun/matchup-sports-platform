@@ -590,6 +590,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
     canManageGameRosters: authVerified && isTeamOperatorRole(query.data.viewer.role),
+    canManageInternalMatches: authVerified && isTeamOperatorRole(query.data.viewer.role),
     operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, selfHref) : undefined,
     justCreated: authVerified && justCreatedParam && query.data.viewer.role === 'owner',
     manageShortcuts:

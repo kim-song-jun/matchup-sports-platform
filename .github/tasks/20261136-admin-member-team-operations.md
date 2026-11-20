@@ -1,5 +1,15 @@
 # Task 20261136: 회원·팀 운영 정보와 회원 대리 접속
 
+## 2026-11-20 배포 준비 재검토
+
+- 사용자 요청: PR #2447 배포 준비와 즉시 진행 가능 여부 판단.
+- 검토 head `8e6bf99ca`, 최신 fetch dev `a45642e4a`. GitHub Gates/API/Web/security check 성공을 직접 확인. Build images/Deploy는 skipped.
+- **NO-GO**: GET 허용만으로 조회 전용을 보장하지 않는다. 실제 채팅 GET은 lazy 컨택 만료/방 보관, 참가·열람 경계 저장, 입장 system message 생성·전달을 실행할 수 있다. 알림 설정 GET도 upsert한다. 기존 probe HTTP 테스트가 이 실제 서비스 부작용을 검증하지 않는다.
+- GitHub `mergeable=false/dirty`; merge-tree로 `docs/scenarios/index.md` 충돌 확인. 리뷰/리뷰 댓글은 API 기준 0건.
+- 기존 Ego Lite 로그인으로 Alpha 회원 검색→테스트 회원 상세 클릭 확인, 390/768/1440 baseline 캡처. 변경 후 4화면 QA와 신원 전환은 여전히 0/4이며 새 기능 PASS를 주장하지 않는다.
+- 상세 근거·수정 수용 조건·배포/QA 순서: `docs/ops/pr2447-deployment-readiness.md`.
+- 현재 배포 보류. 기존 PR/branch 수정이나 dev/main 머지 없이 검토 branch에 문서만 기록한다. 원 작업 및 다른 세션 자원은 보존한다.
+
 Status: Review
 Owner: Codex (단일 세션)
 Created: 2026-11-19

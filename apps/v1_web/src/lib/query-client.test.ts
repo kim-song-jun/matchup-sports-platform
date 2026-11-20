@@ -146,9 +146,14 @@ describe('createV1QueryClient — 서버 렌더 메모리', () => {
     return { seeded, timers: vi.getTimerCount() };
   };
 
-  beforeEach(() => vi.useFakeTimers());
+  // environmentManager 는 모듈 전역이라 시험 전 판정을 그대로 되돌린다.
+  let wasServer = false;
+  beforeEach(() => {
+    wasServer = environmentManager.isServer();
+    vi.useFakeTimers();
+  });
   afterEach(() => {
-    environmentManager.setIsServer(() => typeof window === 'undefined');
+    environmentManager.setIsServer(() => wasServer);
     vi.useRealTimers();
   });
 

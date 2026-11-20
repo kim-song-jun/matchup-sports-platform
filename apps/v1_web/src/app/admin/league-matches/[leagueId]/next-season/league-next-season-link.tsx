@@ -9,6 +9,7 @@ import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1LinkNextSeason, useV1NextSeasonCandidates, useV1UnlinkNextSeason } from '@/hooks/use-v1-api';
 import { formatTournamentDateMedium, formatTournamentDateRangeMedium } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
 import { leagueStateLabel } from '@/lib/v1-status-labels';
 import type { V1AdminLeagueDetail, V1NextSeasonCandidate } from '@/types/league-match';
 import { leagueInputClass, leagueLabelClass } from '../../league-basic-fields';
@@ -43,6 +44,24 @@ export function nextSeasonLinkNotices(
   return notices;
 }
 
+/**
+ * 리그 이름은 운영자가 정한 자유 문자열이라 뒤에 붙는 조사가 끝소리에 따라 달라진다. 따옴표로 감싼 이름에 `josa` 를 쓴다 —
+ * 끝의 따옴표·괄호는 읽히지 않아 건너뛴다(2026-11-19 alpha QA: "…다음 리그"을·"…다음 리그"이 로 고정돼 어색했다).
+ */
+const quoted = (title: string) => `"${title}"`;
+
+export const nextSeasonLinkedToast = (nextTitle: string) =>
+  `${josa(quoted(nextTitle), ['을', '를'])} 다음 시즌으로 이었어요.`;
+
+export const nextSeasonLinkedNotice = (nextTitle: string) =>
+  `이미 ${josa(quoted(nextTitle), ['이', '가'])} 다음 시즌으로 이어져 있어요.`;
+
+export const nextSeasonLinkConfirmMessage = (previousTitle: string, nextTitle: string) =>
+  `${quoted(previousTitle)}의 다음 시즌으로 ${josa(quoted(nextTitle), ['을', '를'])} 이어요. 공개 화면에 다음 시즌 안내가 생기고, 지난 시즌 팀이 재참가 신청을 할 수 있어요. 잘못 이었다면 이 화면에서 풀 수 있어요.`;
+
+export const nextSeasonUnlinkConfirmMessage = (previousTitle: string, nextTitle: string) =>
+  `${josa(quoted(previousTitle), ['과', '와'])} ${quoted(nextTitle)}의 연결을 풀어요. 이미 옮겨 온 지난 시즌 명단과 참가 팀은 그대로 남고, 공개 화면의 다음 시즌 안내와 재참가 신청 입구만 사라져요.`;
+
 /** 이름이 비슷한 리그를 가릴 수 있게 상태와 시작일을 목록에 같이 적는다. */
 export function candidateOptionLabel(candidate: Pick<V1NextSeasonCandidate, 'title' | 'state' | 'startsOn'>): string {
   const start = formatTournamentDateMedium(candidate.startsOn);
@@ -71,7 +90,7 @@ export function LeagueNextSeasonLink({ league, showToast }: { league: V1AdminLea
       onSuccess: (result) => {
         setConfirming(false);
         setPickedId('');
-        showToast(`"${result.nextSeason.title}"을 다음 시즌으로 이었어요.`, 'success');
+        showToast(nextSeasonLinkedToast(result.nextSeason.title), 'success');
       },
       onError: (err) => setError(extractErrorMessage(err, '다음 시즌으로 잇지 못했어요.')),
     });
@@ -152,7 +171,7 @@ export function LeagueNextSeasonLink({ league, showToast }: { league: V1AdminLea
       <ConfirmModal
         open={confirming && picked !== null}
         title="다음 시즌으로 이을까요?"
-        message={`"${league.title}"의 다음 시즌으로 "${picked?.title ?? ''}"을 이어요. 공개 화면에 다음 시즌 안내가 생기고, 지난 시즌 팀이 재참가 신청을 할 수 있어요. 잘못 이었다면 이 화면에서 풀 수 있어요.`}
+        message={nextSeasonLinkConfirmMessage(league.title, picked?.title ?? '')}
         confirmLabel="다음 시즌으로 잇기"
         busy={link.isPending}
         error={error}
@@ -196,7 +215,7 @@ export function LeagueNextSeasonLinked({
 
   return (
     <div className="tm-content-enter mx-auto flex max-w-2xl flex-col gap-3 pb-28">
-      <AlertBanner tone="info" message={`이미 "${nextSeason.title}"이 다음 시즌으로 이어져 있어요.`} />
+      <AlertBanner tone="info" message={nextSeasonLinkedNotice(nextSeason.title)} />
       <div className="flex flex-wrap gap-2">
         <Link href={`/admin/league-matches/${encodeURIComponent(nextSeason.leagueId)}`} className="tm-btn tm-btn-md tm-btn-outline">
           다음 시즌 관리로 가기
@@ -210,7 +229,7 @@ export function LeagueNextSeasonLinked({
       <ConfirmModal
         open={confirming}
         title="다음 시즌 연결을 풀까요?"
-        message={`"${league.title}"과 "${nextSeason.title}"의 연결을 풀어요. 이미 옮겨 온 지난 시즌 명단과 참가 팀은 그대로 남고, 공개 화면의 다음 시즌 안내와 재참가 신청 입구만 사라져요.`}
+        message={nextSeasonUnlinkConfirmMessage(league.title, nextSeason.title)}
         confirmLabel="연결 해제"
         busy={unlink.isPending}
         error={error}

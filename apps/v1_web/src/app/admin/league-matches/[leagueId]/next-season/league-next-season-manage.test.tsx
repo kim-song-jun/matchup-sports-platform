@@ -2,7 +2,14 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminLeagueDetail, V1NextSeasonCandidate } from '@/types/league-match';
 import { LeagueNextSeasonManage, nextSeasonBlockedReason } from './league-next-season-manage';
-import { candidateOptionLabel, nextSeasonLinkNotices } from './league-next-season-link';
+import {
+  candidateOptionLabel,
+  nextSeasonLinkConfirmMessage,
+  nextSeasonLinkedNotice,
+  nextSeasonLinkedToast,
+  nextSeasonLinkNotices,
+  nextSeasonUnlinkConfirmMessage,
+} from './league-next-season-link';
 
 const canWrite = vi.hoisted(() => ({ value: true }));
 const leagueQuery = vi.hoisted(() => ({ value: {} as Record<string, unknown>, refetch: vi.fn() }));
@@ -128,11 +135,11 @@ describe('기존 리그 잇기', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '다음 시즌으로 잇기' }));
     const dialog = screen.getByRole('dialog', { name: '다음 시즌으로 이을까요?' });
-    expect(dialog).toHaveTextContent('"가을 리그"의 다음 시즌으로 "겨울 리그"을 이어요.');
+    expect(dialog).toHaveTextContent('"가을 리그"의 다음 시즌으로 "겨울 리그"를 이어요.');
     expect(linkMutation.mutate).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '다음 시즌으로 잇기' }));
     expect(linkMutation.mutate).toHaveBeenCalledWith('league-2', expect.objectContaining({ onSuccess: expect.any(Function) }));
-    expect(screen.getByText('"겨울 리그"을 다음 시즌으로 이었어요.')).toBeInTheDocument();
+    expect(screen.getByText('"겨울 리그"를 다음 시즌으로 이었어요.')).toBeInTheDocument();
   });
 
   it('서버가 거절하면 확인 창을 닫지 않고 이유를 보여 준다', () => {
@@ -186,7 +193,7 @@ describe('이미 이어진 리그', () => {
 
   it('이어진 리그로 가는 길과 연결 해제를 보이고, 만들기·잇기는 열지 않는다', () => {
     render(<LeagueNextSeasonManage leagueId="league-1" />);
-    expect(screen.getByText('이미 "겨울 리그"이 다음 시즌으로 이어져 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('이미 "겨울 리그"가 다음 시즌으로 이어져 있어요.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '다음 시즌 관리로 가기' })).toHaveAttribute('href', '/admin/league-matches/league-2');
     expect(screen.getByRole('button', { name: '연결 해제' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '기존 리그 잇기' })).not.toBeInTheDocument();
@@ -198,6 +205,7 @@ describe('이미 이어진 리그', () => {
     render(<LeagueNextSeasonManage leagueId="league-1" />);
     fireEvent.click(screen.getByRole('button', { name: '연결 해제' }));
     const dialog = screen.getByRole('dialog', { name: '다음 시즌 연결을 풀까요?' });
+    expect(dialog).toHaveTextContent('"가을 리그"와 "겨울 리그"의 연결을 풀어요.');
     expect(dialog).toHaveTextContent('이미 옮겨 온 지난 시즌 명단과 참가 팀은 그대로 남고');
     expect(unlinkMutation.mutate).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '연결 해제' }));
@@ -210,6 +218,25 @@ describe('이미 이어진 리그', () => {
     render(<LeagueNextSeasonManage leagueId="league-1" />);
     expect(screen.getByRole('link', { name: '다음 시즌 관리로 가기' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '연결 해제' })).not.toBeInTheDocument();
+  });
+});
+
+// 리그 이름은 운영자가 정한 자유 문자열이라 끝소리에 따라 조사가 달라진다(2026-11-19 alpha QA: "…다음 리그"을·"…다음 리그"이).
+describe('다음 시즌 안내 문구의 조사', () => {
+  // [이름, 을/를, 이/가, 과/와] — 받침이 있으면 앞쪽, 없으면 뒤쪽. 끝의 따옴표·괄호는 읽히지 않으니 건너뛴다.
+  it.each([
+    ['겨울 리그', '를', '가', '와'],
+    ['겨울 시즌', '을', '이', '과'],
+    ['2026 겨울 리그 2', '를', '가', '와'],
+    ['2026 겨울 리그 3', '을', '이', '과'],
+    ['겨울 리그(B조)', '를', '가', '와'],
+    ['겨울 리그(U18)', '을', '이', '과'],
+    ['겨울 리그 B', '를', '가', '와'],
+  ])('%s', (title, eulReul, iGa, gwaWa) => {
+    expect(nextSeasonLinkedToast(title)).toBe(`"${title}"${eulReul} 다음 시즌으로 이었어요.`);
+    expect(nextSeasonLinkedNotice(title)).toBe(`이미 "${title}"${iGa} 다음 시즌으로 이어져 있어요.`);
+    expect(nextSeasonLinkConfirmMessage('가을 리그', title)).toContain(`"가을 리그"의 다음 시즌으로 "${title}"${eulReul} 이어요.`);
+    expect(nextSeasonUnlinkConfirmMessage(title, '가을 시즌')).toContain(`"${title}"${gwaWa} "가을 시즌"의 연결을 풀어요.`);
   });
 });
 

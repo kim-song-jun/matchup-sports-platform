@@ -1,5 +1,18 @@
 # Task 20261136: 회원·팀 운영 정보와 회원 대리 접속
 
+## 2026-11-20 Alpha 실측 재개 — “너가 전부 확인해줘”
+
+- 범위: 회원 목록/상세, 팀 목록/상세, 회원 조회 중 홈/채팅의 6개 화면 ×390/768/1440 =18개 화면·폭 조합. 배포 전 관리자4화면×3폭은 캡처했으며 변경 후 검증은 아직 0/18이다.
+- PR #2447 최종 head `775cb4fd3`: API/Web/Gates/security PASS. API 로그에서 PostgreSQL212파일/1624 PASS(기존3 SKIP), 단위562파일/9391 PASS와 신규 알림 설정 무변경 통합 파일 PASS를 직접 확인했다.
+- dev 머지 `f5f1a21fe`. 해당 Alpha workflow run44688579922는 success지만 후속 dev 머지 때문에 SSM 활성화와 공개 release 검증은 **skipped**다. workflow success를 실제 배포 완료로 해석하지 않는다.
+- 후속 dev `caa0f5d82`(#2465), 현재 최신 dev `e8385cf331a2094ba0b93db15cf11ff824a791bd`(#2461)에 회원 조회 controller/service/export/global guard가 보존돼 있음을 확인했다. 최신 CI44692078486 및 Alpha44692078647 실행 중.
+- 공개 `/landing`의 실제 `x-teameet-commit`은 아직 `f9bb65921ef72d90dbf6c3d27ac4efacd82b2631`, release `1.21.2-alpha.20261120.gf9bb65921ef7`이다. 현재 `/admin/member-access` 404는 신규 코드 미반영의 근거이며 기능 합격으로 처리하지 않는다.
+- 현재 Alpha health200/db=true, 익명 개발 헤더의 관리자 접근401을 확인했다. Ego space3/page p1에서 실제 관리자 로그인은 유지 중이며 이메일 방식만 연결돼 있다. lastLoginAt `2026-11-19T13:59:55.694Z`; 새로운 조회 시작은 배포 후 실제 클릭 결과로 확인한다. 비밀번호 추측·시크릿/.env 조회·세션 위조·최근 로그인 우회는 하지 않는다.
+- 기존 구현 검토 worktree/로컬 branch는 dev 병합 확인 후 정리했다. 새 QA 소유 worktree `_worktrees/pr2447-alpha-qa`, branch `qa/pr2447-alpha-evidence-20261120`에 증거와 결과를 기록한다. 다른 세션의 worktree 및 원 feature branch는 보존한다.
+- [ ] 최신 release header/실제 신규 API/버튼을 확인하고 관리자4화면의 데이터·이동·필터·운영 섹션·3폭·console/network를 실측한다.
+- [ ] 회원 조회 시작, 채팅 차단, 무변경, 만료·복귀와 다른 탭을 실제 가능한 인증 범위에서 검증한다. 인증이 실제로 막히면 해당 항목/개수와 에러를 기록한다.
+- [ ] 결과/갤러리를 같은 PR에 연결하고 cleanup과 잔여 blocker를 기록한다.
+
 ## 2026-11-20 후속 구현 — 사용자 승인 범위
 
 - 사용자 “그렇게 해보자”: 일반 채팅 유지, 회원 조회 중 채팅 접근 차단, 알림 설정 조회의 저장 제거로 확정.

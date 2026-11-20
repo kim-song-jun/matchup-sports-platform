@@ -52,7 +52,7 @@ export function TeamInternalMatchDetailPageClient({ teamId, matchId }: { teamId:
           {match.sides.map((side) => (
             <div key={side.sideNumber}>
               <div className="tm-text-body-lg">{side.name}</div>
-              <div className="tab-num" style={{ fontSize: 28, fontWeight: 700 }}>{match.resultRecorded ? side.score ?? 0 : '-'}</div>
+              <div className="tab-num" style={{ fontSize: 'var(--font-size-heading)', fontWeight: 700 }}>{match.resultRecorded ? side.score ?? 0 : '-'}</div>
               <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'grid', gap: 4 }}>
                 {side.players.map((player) => (
                   <li key={player.userId} className="tm-text-body" style={{ fontWeight: player.isMe ? 700 : 400 }}>

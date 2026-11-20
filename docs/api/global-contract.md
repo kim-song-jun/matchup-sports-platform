@@ -1,3 +1,5 @@
+대회 상태를 cancelled로 바꿀 때 사유가 누락·빈값·공백이면 400 TOURNAMENT_STATUS_REASON_REQUIRED로 거부한다. 상태와 감사 로그는 변경하지 않는다. 기존 취소 상태 재요청의 no-op은 유지한다. [대회 계약](./domains/tournaments.md).
+
 Alpha 목업 생성에 예선+순위별 결선 리그 카테고리를 추가한다. 기존 팀 수·상태 선택을 유지하며20팀·등록7명·출전설정6명·70경기를 만든다. 실제 신청 검증과 구분하며 환경·권한·오류 계약은 [대회 API](./domains/tournaments.md#alpha-목업-순위별-리그-카테고리-2026-11-19)를 따른다.
 
 대회·리그 경기는 빈 출전 명단이어도 시작·익명 팀 득점·종료를 허용한다. 선수별 기록은 현재 유효 명단에 한하며 가상 참가자는 만들지 않는다. [경기 운영 계약](./domains/games.md#tournament-and-league-operation-without-a-roster-2026-11-14).

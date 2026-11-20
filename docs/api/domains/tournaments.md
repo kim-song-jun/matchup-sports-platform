@@ -376,6 +376,7 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 | cancelled | **draft** (restore) |
 
 - All three reverse transitions (`in_progress -> closed`, `completed -> in_progress`, `cancelled -> draft`) require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
+- Cancellation from `draft`, `open`, `closed`, or `in_progress` also requires a non-blank `reason` (maximum 500 characters). Missing, empty, or whitespace-only reasons return `400 TOURNAMENT_STATUS_REASON_REQUIRED` before any status/audit writes. The trimmed reason is stored in both audit logs. Repeating an already-cancelled status remains an idempotent no-op.
 - Everything else, including `in_progress -> open`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.

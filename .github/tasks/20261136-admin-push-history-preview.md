@@ -13,7 +13,7 @@ Status: Review
 ## Original Conditions (must all be satisfied)
 - [x] 지금까지 보낸 수동 푸시 이력 조회
 - [x] 알림 표시 미리보기와 상세 내용/대상/발송 시각/결과 확인
-- [ ] 수정 후 dev 대상 PR 생성
+- [x] 수정 후 dev 대상 PR 생성
 
 ## User Scenarios
 - 관리자가 최신순 이력을 더 불러오고 한 건을 선택해 본문·이동 경로·발송자·결과를 확인한다.
@@ -39,7 +39,7 @@ Status: Review
 - [x] Phase 1: 현행 계약 조사, 최신 dev 격리 worktree
 - [x] Phase 2: API/기록 저장/회귀 검증
 - [x] Phase 3: UI A·B·C 제시 → 사용자 A안 선택 → UI/preview 구현
-- [ ] Phase 4: 좁은 테스트·범위 lint, self-review, 문서/changeset, PR
+- [x] Phase 4: 좁은 테스트·범위 lint, self-review, 문서/changeset, PR
 - [ ] Phase 5: PR CI·리뷰 확인 (Alpha 검증은 dev 병합 후 가능)
 Owned: admin push service/controller/DTO/tests, push history UI/hooks/types/query keys/MSW, API docs/changeset/task.
 Forbidden: 운영 데이터 변경/재발송, main 승격, 다른 작업의 worktree/변경.
@@ -73,7 +73,7 @@ Forbidden: 운영 데이터 변경/재발송, main 승격, 다른 작업의 work
 ## Progress Snapshot
 - Base: origin/dev 8950d7b29c. Branch feat/admin-push-history-20261120.
 - 실제 운영 계정·토큰·광고 발송 식별자는 이 공개 문서에 기록하지 않는다.
-- 현재: 구현·타입/패턴 검사 완료, PR 생성 준비.
+- 현재: [Draft PR #2461](https://github.com/kim-song-jun/matchup-sports-platform/pull/2461), base=dev, source commit 0e4f4f23e5. CI 진행 중; Copilot 요청은 CLI/REST 모두 2xx지만 requested_reviewers·timeline·reviews가 비어 있어 실제 실행 미확인. 변경 화면 Alpha 검증 전이므로 Draft 유지.
 
 ## Validation & Review Evidence
 - Backend: 4 suites / 54 unit+HTTP tests PASS (single worker). Auth guard override is only the HTTP test boundary; controller active-admin gate and support read-only vs mutation permission are exercised.
@@ -91,3 +91,10 @@ Forbidden: 운영 데이터 변경/재발송, main 승격, 다른 작업의 work
 | A: same-menu tabs (chosen) | Sending and review share one entry; form draft remains across tabs | One extra tab click | SegmentedTabs, AdminDataTable, AdminEmpty, AdminInlineError, useModalA11y, SectionTitle |
 | B: history below form | Everything in one scroll | Long form pushes history below fold | Same primitives |
 | C: separate menu | Independent bookmark/navigation | Additional admin navigation entry and context switch | Same primitives |
+
+## PR handoff
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2461 (Draft, dev 대상)
+- CI: https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/44659728783 (API/Web/Gates 진행 중, 완료로 표시하지 않음).
+- 후속: CI DB 통합 결과·Copilot 최신 head 리뷰 확인 → dev 병합이 승인/요청되면 배포 후 ego-lite로 발송 이력·상세·작성 미리보기/권한/390·768·1440·console/network 검증. 실제 전체 푸시 발송은 QA로 실행하지 않는다.
+- Copilot: `gh pr edit --add-reviewer @copilot`와 공식 requested_reviewers REST 모두 성공 응답이나 reviewer 목록/요청 이벤트/리뷰는 비어 있음. clean 리뷰로 취급하지 않으며 Draft 해제·후속 승인 시 재확인이 필요하다. 반복 요청은 하지 않는다.
+- Cleanup 계획: 원격에 커밋이 보존됨을 대조한 뒤 이번 작업의 의존성 symlink·격리 생성 client·로컬 worktree만 정리한다. 미병합 작업 브랜치는 보존하고 baseline 스크린샷은 after 비교를 위한 로컬 QA 증거로 유지한다.

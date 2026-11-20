@@ -628,6 +628,23 @@ describe('TournamentsAdminService', () => {
     expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
   });
 
+  it.each(['draft', 'open', 'closed', 'in_progress'] as const)('changeStatus: %s 대회 취소는 사유 필수이며 감사 기록에 저장한다', async (from) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: from }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'cancelled' }));
+    for (const reason of [undefined, '', ' \n\t ']) {
+      await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'cancelled', reason })).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_STATUS_REASON_REQUIRED' },
+      });
+    }
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'cancelled', reason: ' 폭우로 안전 확보 불가 ' })).resolves.toMatchObject({ status: 'cancelled' });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.status', reason: '폭우로 안전 확보 불가' }) }));
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fromStatus: from, toStatus: 'cancelled', reason: '폭우로 안전 확보 불가' }) }));
+  });
+
   it('changeStatus: 복구한 초안은 다시 열 수 있다 (cancelled → draft → open)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));

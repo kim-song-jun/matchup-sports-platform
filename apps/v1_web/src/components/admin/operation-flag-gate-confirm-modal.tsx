@@ -12,6 +12,7 @@ export interface GateConfirmModalProps {
   /** 본문 경고 문단. 되돌릴 수 있는 조작이면 그 사실도 이 문자열에 포함해서 넘긴다. */
   description: string;
   confirmLabel: string;
+  cancelLabel?: string;
   /**
    * 강조색: 되돌릴 수 없는 조작(2단계)만 amber, 나머지는 blue.
    * R-C1(단일 블루 액센트) 준수 — amber는 이 한 곳(되돌릴 수 없음 경고)에만 쓴다.
@@ -56,6 +57,7 @@ export function GateConfirmModal({
   title,
   description,
   confirmLabel,
+  cancelLabel = '취소',
   tone,
   typedChallenge,
   onConfirm,
@@ -196,7 +198,7 @@ export function GateConfirmModal({
               disabled={pending}
               className="tm-on-tint flex-1 h-[48px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
-              취소
+              {cancelLabel}
             </button>
             <button
               type="submit"

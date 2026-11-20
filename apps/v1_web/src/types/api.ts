@@ -5259,6 +5259,7 @@ export type V1UpdateTournamentPayload = Omit<
 
 export type V1ChangeTournamentStatusPayload = {
   status: V1TournamentStatus;
+  /** 취소·되돌리기에는 공백이 아닌 사유 필수, 최대 500자. */
   reason?: string;
 };
 

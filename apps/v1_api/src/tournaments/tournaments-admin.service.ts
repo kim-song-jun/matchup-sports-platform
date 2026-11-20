@@ -892,8 +892,8 @@ export class TournamentsAdminService {
         });
       }
       const reason = dto.reason?.trim() || undefined;
-      if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
-        throw new BadRequestException({ code: 'TOURNAMENT_STATUS_REASON_REQUIRED', message: '되돌리는 사유를 입력해 주세요.' });
+      if (!reason && (to === 'cancelled' || REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to))) {
+        throw new BadRequestException({ code: 'TOURNAMENT_STATUS_REASON_REQUIRED', message: to === 'cancelled' ? '대회 취소 사유를 입력해 주세요.' : '되돌리는 사유를 입력해 주세요.' });
       }
       if (from === 'in_progress' && to === 'closed') {
         // 경기 시작 커맨드도 Game 행을 잠근다. 먼저 시작된 요청을 기다린 뒤 이력을 다시 확인한다.

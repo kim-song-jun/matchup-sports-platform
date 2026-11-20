@@ -28,6 +28,8 @@ N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대�
 
 # Global v1 API contract
 
+결선 배정 preview의 target은 `opponentWinnerFixtureId: string | null`을 제공한다. 직접 배정 자리의 상대가 단일 WINNER edge로 정해지면 그 원천 경기 ID, 그 외에는 null이다. 읽기 전용 메타데이터이며 기존 저장 payload/권한/경기 연결은 변경하지 않는다. [대회 계약](./domains/tournaments.md).
+
 대회 관리 API의 권한은 플랫폼 관리자 또는 해당 대회의 활성 `TOURNAMENT_DIRECTOR` 배정이다. 전역 관리자 게이트는 유지한다. 하위 리소스 ID의 실제 소속 대회를 서버에서 확인하고 범위 밖 요청은 `403 PERMISSION_DENIED`다. 자세한 범위와 예외는 [대회 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
 대진 v2 생성은 게임 명령 헤더 대신 body의 `requestId`와 서버 `previewHash`를 사용한다. 각 조의 `groups[].legs`(1·2회전)가 기존 최상위 `legs`보다 우선하며 둘 다 없으면 1회전이다. 초안·미리보기·실제 생성·경기 상한은 같은 조별 회전 설정을 사용한다. 같은 키의 입력 변경·오래된 미리보기·초안 revision 충돌은 409이며 부분 생성은 없다. 권한과 출시 플래그는 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.

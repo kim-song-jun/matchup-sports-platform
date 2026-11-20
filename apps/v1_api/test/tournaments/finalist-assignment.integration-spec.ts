@@ -45,6 +45,21 @@ async function settledManual(label: string, sizes: number[]) {
 describe('수동 결선 진출팀 실제 저장 계약', () => {
   beforeAll(async () => { await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); });
+  it('실제 승자 edge의 상대 경기 ID를 전달하고 패자 연결과 구분한다', async () => {
+    const { tournamentId, fixtureIds } = await settledManual('finalist-winner-link-metadata', [3, 3]);
+    const semi = await bracket.createGroup(user, tournamentId, { name: '4강', phase: 'semi', sortOrder: 5 });
+    const fixture = await bracket.createFixture(user, tournamentId, { groupId: semi.id, round: '4강' });
+    const edge = await prisma.v1TournamentMatchAdvancementEdge.create({ data: {
+      tournamentId, sourceTeamMatchId: fixtureIds[0], sourceOutcome: 'WINNER', targetTeamMatchId: fixture.id, targetSide: 'AWAY',
+    } });
+    const preview = await slots.finalistPreview(user, tournamentId);
+    expect(preview.targets.find(target => target.fixtureId === fixture.id && target.side === 'HOME')?.opponentWinnerFixtureId).toBe(fixtureIds[0]);
+    expect(preview.targets.some(target => target.fixtureId === fixture.id && target.side === 'AWAY')).toBe(false);
+    await prisma.v1TournamentMatchAdvancementEdge.update({ where: { id: edge.id }, data: { sourceOutcome: 'LOSER' } });
+    const changed = await slots.finalistPreview(user, tournamentId);
+    expect(changed.targets.find(target => target.fixtureId === fixture.id)?.opponentWinnerFixtureId).toBeNull();
+    expect(changed.version).not.toBe(preview.version);
+  });
   it.each([[4, 4, 3, 3], [4, 4, 4, 3]])('불균등 %j조에서 기존 수동 8강을 채우고 교환하며 원본 순위는 보존한다', async (...sizes) => {
     const { tournamentId, fixtureIds } = await settledManual(`manual-finalist-${sizes.join('-')}`, sizes);
     const before = await prisma.v1TournamentStanding.findMany({ where: { group: { tournamentId, phase: 'group' } }, orderBy: { id: 'asc' } });

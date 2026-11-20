@@ -45,6 +45,8 @@ N개 토너먼트 대회의 독립 대진 초기화와 예선 수정도 활성 �
 
 # Teameet v1 API contracts
 
+2개 조 각3팀 진출 결선의 교차 자동 추천은 실제 승자 연결을 따라 조1위와 같은 조2위를 반대편에 배정한다. 미리보기의 `opponentWinnerFixtureId`를 사용하며 수동·시드순 배정은 유지한다. [결선 배정 계약](./domains/tournaments.md).
+
 대회 디렉터의 배정 대회 전체 관리는 [대회 관리 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다. 기존 관리자 API를 대회 범위로 재사용하며 플랫폼 관리자 계정은 만들지 않는다.
 
 대진 v2는 4~64팀 짝수, 조별 인원·진출 수와 홀수 결선, 서버 미리보기·초안·멱등 생성 계약을 제공한다. 활성화와 수동 결선 진출 표시 규칙은 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.

@@ -5121,6 +5121,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-team-list {
+  /* 목록 카드(이름 + 3줄)의 높이. '내 팀' 칩이 같은 높이를 쓰도록 한 곳에 둔다 —
+     카드 구성이 바뀌어 높이가 달라지면 이 값과 아래 두 min-height 가 함께 따라간다. */
+  --tm-team-card-height: 116px;
   padding: 16px var(--v1-shell-page-x) 104px;
 }
 
@@ -5141,17 +5144,25 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-my-team-chip {
-  flex: 0 0 auto;
+  /* 목록 카드와 같은 크기 — 높이·로고·안쪽 여백·간격을 맞춘다. 폭은 모바일에서 다음 카드가 살짝 보이도록
+     한 장보다 48px 좁게 하고(옆으로 넘길 수 있다는 단서), 팀이 하나뿐이면 목록 카드와 같은 전체 폭이다.
+     태블릿·데스크톱 폭은 목록 그리드 열과 같게 desktop/teams.css 에서 맞춘다. */
+  flex: 0 0 calc(100% - 48px);
+  box-sizing: border-box;
+  min-height: var(--tm-team-card-height);
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 220px;
   padding: 12px 16px;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-container);
   background: var(--card-surface);
   color: inherit;
   text-decoration: none;
+}
+
+.tm-my-team-chip:only-child {
+  flex-basis: 100%;
 }
 
 .tm-team-searchbar {
@@ -5407,6 +5418,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* 목록 카드는 로고 54 + 세 줄로 98px 를 맞춘다(390 에서 화면당 5장, F19). */
 .tm-team-card-compact {
   padding: 12px 16px;
+  min-height: var(--tm-team-card-height);
 }
 
 .tm-team-card:active {

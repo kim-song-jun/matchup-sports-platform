@@ -230,10 +230,12 @@ services:
       start_period: 20s
     ports:
       - "127.0.0.1:3013:3013"
+    # NODE_OPTIONS 를 두지 않아 Node 가 이 한도의 약 절반을 JS heap 상한으로 잡는다(512M → 259MB, 768M → 396MB).
+    # 한도를 낮추면 heap 상한도 같이 내려간다. alpha 오버레이도 이 값을 그대로 쓴다.
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M
 
   nginx:
     image: nginx:1.30.7-alpine@sha256:bef154735288bc38d99fac41ae63730684bcc661503673a04a0f9bc526ba8598

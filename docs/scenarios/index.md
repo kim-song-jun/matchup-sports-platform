@@ -1,3 +1,7 @@
+## 2026-11-21 — 대회 취소 사유 필수 (dev·Alpha 반영 / 시각 캡처 미완료)
+
+[시나리오](./tournament-cancel-reason.md) · [작업](../../.github/tasks/20261137-tournament-cancel-reason.md) · [PR #2470](https://github.com/kim-song-jun/matchup-sports-platform/pull/2470). 취소4상태 사유 누락/빈값/공백 거부·감사 저장, 공용 모달 필수 입력 적용. PR/머지 CI 전부 PASS, Alpha b6156d248 실제 배포·DB health 확인. ego-lite 입력/실패/닫기·390/768/1440 구조3/3 확인, 실제 취소 실행 없음. 전후 스크린샷은 capture timeout으로 미완료.
+
 ## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
 
 [시나리오](./admin-member-team-operations.md) · [작업](../../.github/tasks/20261136-admin-member-team-operations.md) · [PR #2447](https://github.com/kim-song-jun/matchup-sports-platform/pull/2447). 목록/상세 4/4 구현, 조회 전용 10분 회원 접속과 시작·종료 감사 및 복귀 기능 추가. 리뷰에서 발견한 쿠키 헤더 처리·모달 선택값·복귀 이동 충돌 3건을 RED→GREEN 회귀로 수정했다. 로컬 UI/HTTP/인증·소켓 회귀를 검증했으며 실제 DB 통합 3건은 별도 실행 증거가 필요하다. Alpha 브라우저 0/4·viewport 0/3은 ego-lite 미노출로 미실행이며 배포·시각 합격으로 표시하지 않는다.

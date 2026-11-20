@@ -14,6 +14,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { MemberAccessController } from './member-access.controller';
 import { MemberAccessService } from './member-access.service';
+import { ChatController } from '../chat/chat.controller';
+import { ChatService } from '../chat/chat.service';
+import { TeamContactsController } from '../team-contacts/team-contacts.controller';
+import { TeamContactsService } from '../team-contacts/team-contacts.service';
 
 const ACTOR = '10000000-0000-4000-8000-000000000001';
 const TARGET = '20000000-0000-4000-8000-000000000002';
@@ -38,6 +42,7 @@ describe('member access actual HTTP authentication boundary', () => {
   let actorEpoch: number;
   let targetEpoch: number;
   let targetAdmin: boolean;
+  let chatWrites: number;
   const previousSecret = process.env.V1_SESSION_SECRET;
   const previousNodeEnv = process.env.NODE_ENV;
   function cookie(userId = ACTOR, issuedAtMs = Date.now()) {
@@ -80,10 +85,23 @@ describe('member access actual HTTP authentication boundary', () => {
         findFirst: jest.fn(({ where }) => Promise.resolve(logs.find((row) => row.action === where.action
           && row.targetId === where.targetId && row.afterJson.accessId === where.afterJson.equals) ?? null)),
       },
+      v1TeamContact: {
+        updateMany: jest.fn(async () => { chatWrites++; return { count: 1 }; }),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+      v1ChatRoom: {
+        updateMany: jest.fn(async () => { chatWrites++; return { count: 1 }; }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'target-team' }]) },
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const client = { ...prisma, $transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(prisma) };
-    const module = await Test.createTestingModule({ controllers: [MemberAccessController, ProtectedMemberProbe], providers: [
+    const chat = new ChatService(client as unknown as PrismaService, {} as never, {} as never, {} as never);
+    const contacts = new TeamContactsService(client as unknown as PrismaService, {} as never, chat);
+    const module = await Test.createTestingModule({ controllers: [MemberAccessController, ProtectedMemberProbe, ChatController, TeamContactsController], providers: [
+      { provide: ChatService, useValue: chat },
+      { provide: TeamContactsService, useValue: contacts },
       MemberAccessService, AdminContextService, V1AuthGuard,
       { provide: PrismaService, useValue: client },
       { provide: ManagedTermsRuntimeService, useValue: { signupCompliance: async () => ({ compliant: true }) } },
@@ -94,7 +112,7 @@ describe('member access actual HTTP authentication boundary', () => {
     app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     await app.init();
   });
-  beforeEach(() => { logs = []; actorRole = 'owner'; actorEpoch = 0; targetEpoch = 0; targetAdmin = false; });
+  beforeEach(() => { logs = []; actorRole = 'owner'; actorEpoch = 0; targetEpoch = 0; targetAdmin = false; chatWrites = 0; });
   afterEach(() => jest.restoreAllMocks());
   afterAll(async () => {
     await app.close();
@@ -122,6 +140,33 @@ describe('member access actual HTTP authentication boundary', () => {
   it('rejects Socket.IO identity resolution when the member access cookie is present', async () => {
     const { combined } = await begin();
     expect(resolveV1RequestIdentity({ headers: { cookie: combined }, header: () => undefined }, { nodeEnv: 'production', sessionSecret: SECRET })).toBeNull();
+  });
+
+  it('blocks the real chat GET before lazy contact writes, while ordinary chat still works', async () => {
+    const { original, combined } = await begin();
+    const blocked = await request(app.getHttpServer()).get('/api/v1/chat/rooms').set('Cookie', combined).expect(403);
+    expect(blocked.body.code).toBe('MEMBER_ACCESS_CHAT_DENIED');
+    expect(chatWrites).toBe(0);
+    await request(app.getHttpServer()).get('/api/v1/chat/rooms').set('Cookie', original).expect(200);
+    expect(chatWrites).toBe(2);
+  });
+
+  it('reads the real contact summary without expiry or archive writes during member access', async () => {
+    const { original, combined } = await begin();
+    await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('Cookie', combined)
+      .expect(200, { pendingInbound: 0, byTeam: [{ teamId: 'target-team', pendingInbound: 0 }] });
+    expect(chatWrites).toBe(0);
+    await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('Cookie', original).expect(200);
+    expect(chatWrites).toBe(2);
+  });
+
+  it.each(['/api/v1/chat/rooms/room', '/api/v1/chat/rooms/room/messages',
+    '/api/v1/chat/rooms/room/messages/message/file', '/api/v1/CHAT/rooms'])
+  ('blocks member chat access including alternate route spelling: %s', async (path) => {
+    const { combined } = await begin();
+    const blocked = await request(app.getHttpServer()).get(path).set('Cookie', combined).expect(403);
+    expect(blocked.body.code).toBe('MEMBER_ACCESS_CHAT_DENIED');
+    expect(chatWrites).toBe(0);
   });
 
   it('denies dev headers, ordinary users, support admins, and old administrator logins', async () => {

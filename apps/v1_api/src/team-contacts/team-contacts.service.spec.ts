@@ -656,6 +656,23 @@ describe('TeamContactsService 종료된 컨택 방 보관', () => {
 });
 
 describe('TeamContactsService.summary', () => {
+  it('회원 조회는 만료 컨택을 저장 없이 제외하고 방 보관을 실행하지 않는다', async () => {
+    const prisma = makePrisma();
+    const rows = [
+      { toTeamId: 'A', status: 'requested', expiresAt: new Date(Date.now() - 60_000) },
+      { toTeamId: 'A', status: 'requested', expiresAt: new Date(Date.now() + 60_000) },
+    ];
+    const before = structuredClone(rows);
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'A' }]);
+    prisma.v1TeamContact.groupBy.mockImplementation(async ({ where }: any) => [{ toTeamId: 'A', _count: {
+      _all: rows.filter((row) => where.toTeamId.in.includes(row.toTeamId) && row.status === where.status
+        && (!where.expiresAt || row.expiresAt >= where.expiresAt.gte)).length,
+    } }]);
+    expect(await makeService(prisma).summary(actor, true)).toEqual({ pendingInbound: 1, byTeam: [{ teamId: 'A', pendingInbound: 1 }] });
+    expect(rows).toEqual(before);
+    expect(prisma.v1TeamContact.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
+  });
   it('운영 팀 전체의 대기 중 받은 컨택을 팀별로 세고, 세기 전에 만료 건을 정리한다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'A' }, { teamId: 'B' }]);

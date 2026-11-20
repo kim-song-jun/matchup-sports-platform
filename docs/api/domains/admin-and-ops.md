@@ -382,6 +382,11 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 | GET | `/api/v1/admin/member-access` | 쿠키 없으면 개인 정보 없이 `{active:false}` | 유효 grant는 `{active:true,userId,label,expiresAt}`. 만료/권한 변경/잘못된 쿠키는 `{active:true,unavailable:true,message}`로 복귀 필요 상태를 표시. DB 실패를 inactive로 숨기지 않음 |
 | POST | `/api/v1/admin/member-access/stop` | 현재 marker와 원래 세션에 결합된 grant의 종료만 가능 | 종료 감사 기록 후 marker 쿠키만 제거. `{returnPath}`는 대상 회원의 관리자 상세 또는 회원 목록. 감사 기록 실패 시 쿠키를 먼저 지우지 않음 |
 
+- 회원 조회 중 `/api/v1/chat` 및 하위 모든 API는 HTTP method와 관계없이 `403 MEMBER_ACCESS_CHAT_DENIED`다. GET 목록·본문·첨부파일도 차단해 lazy 참가/입장 메시지/컨택 보관을 실행하지 않는다. 원래 관리자/일반 회원의 정상 채팅에는 적용하지 않는다. 대소문자 경계는 Express 라우팅과 동일하게 처리한다.
+- `/chat` layout은 조회 상태 확인 전 채팅 자식을 렌더하지 않는다. 활성/만료 조회는 접근 제한, 상태 조회 실패는 재시도로 표시한다. 홈의 채팅 미리보기도 회원 조회 중 제한 안내로 표시한다.
+- `GET /notification-preferences`는 기존 행을 읽거나 저장 없는 기본값을 반환한다. 조회가 설정 행이나 `updatedAt`을 변경하지 않는다. [알림 계약](./notifications.md#getpatch-notification-preferences).
+- `GET /me/team-contacts/summary`는 회원 조회 중 만료/방 보관을 저장하지 않고 `expiresAt`으로 대기 수를 계산한다. 일반 로그인에서는 기존 lazy 정리 동작을 유지한다.
+
 - 모든 응답은 `Cache-Control: private, no-store`. 원래 `teameet_v1_session`을 덮거나 새 회원 로그인 쿠키를 만들지 않는다. marker `teameet_v1_member_access`는 서명한 grant UUID이며 host-only/HttpOnly/SameSite=Lax/production Secure다. marker는 원래 세션 최대 수명인 7일간 유지되어 10분 grant 만료 후 관리자 신원으로 조용히 돌아가지 않는다.
 - grant는 기존 `V1AdminActionLog`의 `user.member_access.start`로 남긴다. 관리자, 대상 회원, 접속 사유, 원래 세션의 SHA-256 결합값(토큰 원문 아님), 양쪽 sessionEpoch, 만료 시각을 기록한다. 관리자/회원 행과 관리자 grant는 트랜잭션에서 잠근 뒤 판정한다. 자기 자신·활성 관리자·비활성 회원은 거부하며 support·dev 헤더만으로 발급할 수 없다.
 - 종료는 원본 start 기록을 바꾸지 않고 `user.member_access.end`를 추가한다. `accessId/endReason/endedAt`를 기록한다. 명시 종료·권한/epoch 변경·만료 판정 후 기존 marker를 다시 보내도 사용할 수 없다. 만료의 유효 종료 시각은 start의 expiresAt이며, 다음 조회에서 end 이벤트를 남길 때도 그 시각을 보존한다. 브라우저가 닫혀 이후 요청이 없으면 start의 만료 시각이 유효기간 종료 근거다(별도 만료 cron 없음).

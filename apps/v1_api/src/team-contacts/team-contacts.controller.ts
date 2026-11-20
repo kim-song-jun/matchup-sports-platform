@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { getMemberAccessIdentity } from '../auth/request-identity-override';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -26,8 +28,9 @@ export class TeamContactsController {
 
   @Get('me/team-contacts/summary')
   @UseGuards(V1AuthGuard)
-  summary(@CurrentUser() user: V1AuthUser) {
-    return this.teamContactsService.summary(user);
+  summary(@CurrentUser() user: V1AuthUser, @Req() request?: Request) {
+    return request && getMemberAccessIdentity(request)
+      ? this.teamContactsService.summary(user, true) : this.teamContactsService.summary(user);
   }
 
   @Patch('team-contacts/:contactId/accept')

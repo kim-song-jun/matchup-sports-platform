@@ -5,6 +5,7 @@ import { MemberAccessService } from '../src/admin/member-access.service';
 import { AdminEntityOperationsService } from '../src/admin/admin-entity-operations.service';
 import { createV1SessionToken, V1_SESSION_COOKIE_NAME } from '../src/auth/v1-session';
 import { MEMBER_ACCESS_COOKIE } from '../src/auth/member-access-token';
+import { NotificationsService } from '../src/notifications/notifications.service';
 
 // The integration environment only accepts disposable databases and clones one per file.
 describe('member access durable grants and entity history against PostgreSQL', () => {
@@ -62,6 +63,17 @@ describe('member access durable grants and entity history against PostgreSQL', (
     await prisma.v1User.update({ where: { id: targetId }, data: { sessionEpoch: { increment: 1 } } });
     await expect(access.authorize(request)).rejects.toMatchObject({ response: { code: 'MEMBER_ACCESS_REVOKED' } });
     expect(await access.status(request)).toMatchObject({ active: true, unavailable: true });
+  });
+
+  it('reads notification defaults and saved choices without creating or updating a database row', async () => {
+    const notifications = new NotificationsService(prisma, {} as never, {} as never, {} as never);
+    const user = { id: targetId, email: null, accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+    expect(await prisma.v1NotificationPreference.findUnique({ where: { userId: targetId } })).toBeNull();
+    expect(await notifications.preferences(user)).toMatchObject({ importantEnabled: true, activityEnabled: true, marketingEnabled: false });
+    expect(await prisma.v1NotificationPreference.findUnique({ where: { userId: targetId } })).toBeNull();
+    const saved = await prisma.v1NotificationPreference.create({ data: { userId: targetId, marketingEnabled: true } });
+    expect(await notifications.preferences(user)).toMatchObject({ marketingEnabled: true, updatedAt: saved.updatedAt });
+    expect(await prisma.v1NotificationPreference.findUnique({ where: { userId: targetId } })).toEqual(saved);
   });
 
   it('isolates target history from actions that the same member performed on someone else', async () => {

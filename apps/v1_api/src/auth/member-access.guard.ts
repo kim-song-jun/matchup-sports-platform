@@ -11,10 +11,15 @@ export class MemberAccessGuard implements CanActivate {
     if (context.getType() !== 'http') return true;
     const request = context.switchToHttp().getRequest<Request>();
     if (!memberAccessCookie(request.headers.cookie)) return true;
-    const path = (request.originalUrl ?? request.url).split('?')[0].replace(/\/+$/, '');
+    // Express routes are case-insensitive by default; apply the same boundary to the guard.
+    const path = (request.originalUrl ?? request.url).split('?')[0].replace(/\/+$/, '').toLowerCase();
     if ((path === MEMBER_ACCESS_CONTROL_PATH && request.method === 'GET')
       || (path === `${MEMBER_ACCESS_CONTROL_PATH}/stop` && request.method === 'POST')) return true;
     const target = await this.access.authorize(request);
+    // Chat GET handlers can enroll participants, record first entry and publish system messages.
+    if (/^\/api\/v1\/chat(\/|$)/.test(path)) {
+      throw new ForbiddenException({ code: 'MEMBER_ACCESS_CHAT_DENIED', message: '회원 조회 중에는 채팅을 볼 수 없어요. 상단의 관리자 복귀를 눌러 주세요.' });
+    }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       throw new ForbiddenException({ code: 'MEMBER_ACCESS_READ_ONLY', message: '회원 조회 중에는 신청·수정·전송할 수 없어요. 관리자 복귀 후 처리해 주세요.' });
     }

@@ -1,5 +1,18 @@
 # Task 20261136: 회원·팀 운영 정보와 회원 대리 접속
 
+## 2026-11-20 후속 구현 — 사용자 승인 범위
+
+- 사용자 “그렇게 해보자”: 일반 채팅 유지, 회원 조회 중 채팅 접근 차단, 알림 설정 조회의 저장 제거로 확정.
+- [x] Phase 1: 전역 guard의 채팅 API 차단(대소문자 포함), 실제 ChatController/ChatService HTTP 회귀와 일반 세션 보존.
+- [x] Phase 2: 채팅 layout 상태 gate, 홈 채팅 제한 안내, 알림 GET의 저장 없는 기본값, 조회 중 컨택 요약의 lazy 쓰기 제거.
+- [x] Phase 3: 최신 dev `f9bb65921` 통합, 시나리오 충돌 양쪽 보존. API RED→GREEN/웹 회귀 및 API/Web 타입·규칙 검증.
+- [ ] Phase 4: PR #2447 새 head CI/PostgreSQL/리뷰 확인, dev 머지 및 Alpha 실측.
+- [ ] Phase 5: Alpha 결과 문서와 소유 자원 정리. main 승격은 실행하지 않는다.
+- 실제 채팅 GET→lazy contact 쓰기 경로를 연결한 RED 후 GREEN 확인. API 첫 2개 파일100/100, 컨택 추가 후 관련3개 파일84/84. 웹5개 파일16/16 및 홈 추가3/3. 중복 테스트 수는 합산하지 않는다.
+- 현재 Windows Node24.15.0, 프로젝트 CI Node22.23.5. 로컬 타입 검사는 통과했으며 POSIX find/grep 부재로 실패한 규칙 검사만 Git usr/bin 경로로 재실행하여 API surface·웹 pattern PASS. PostgreSQL 추가 회귀는 CI에 등록했다.
+- 관련 GET 추가 점검에서 `GET /me/team-contacts/summary`의 만료/채팅방 보관 쓰기도 발견: 회원 조회 컨텍스트에서만 저장을 생략하고 만료 시각으로 같은 요약을 계산한다. 일반 호출의 정리 동작은 유지한다.
+- Owned: PR #2447 admin/auth/notifications/team-contacts 서비스·회귀, 채팅 layout/홈 조회 안내, 관련 계약/시나리오/작업 문서. 다른 세션 파일은 변경하지 않는다.
+
 ## 2026-11-20 배포 준비 재검토
 
 - 사용자 요청: PR #2447 배포 준비와 즉시 진행 가능 여부 판단.

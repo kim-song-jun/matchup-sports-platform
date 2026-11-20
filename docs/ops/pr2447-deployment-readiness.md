@@ -1,6 +1,16 @@
 # PR #2447 배포 준비 판정 — 2026-11-20
 
-판정: **NO-GO — 현재 head로 dev 머지/Alpha 배포 보류**.
+최초 판정: **NO-GO — 기존 head `8e6bf99ca` 배포 보류**. 아래 후속 구현으로 재검증 중이며 기존 판정과 근거는 이력으로 보존한다.
+
+## 사용자 승인 후 보완 — 2026-11-20
+
+- 일반 채팅은 유지하고 회원 조회 중 채팅 API 전체(목록/본문/첨부/쓰기)를 전역 guard에서 차단했다. 대소문자 우회도 차단한다.
+- 채팅 layout은 상태 확인 전 자식을 렌더하지 않으며 조회 중에는 제한 안내를 표시한다. 홈 미리보기/조회 시작·상단 안내도 동일한 범위를 알린다.
+- 알림 설정 GET의 upsert를 findUnique+저장 없는 기본값으로 변경했다. 실제 PostgreSQL 행 생성/updatedAt 불변 회귀를 추가했다.
+- 추가 점검에서 발견한 `GET /me/team-contacts/summary`의 lazy 만료/방 보관은 조회 중 생략하고 expiresAt으로 요약을 계산한다. 기존 일반 세션의 정리 동작은 유지한다.
+- 최신 dev `f9bb65921`을 통합했고 시나리오 충돌은 양쪽 내용을 보존했다.
+- 로컬 API/웹 회귀와 양쪽 타입 검사, API surface/웹 pattern PASS. 단위 검증은 실제 HTTP guard→컨트롤러→ChatService 및 TeamContactsService를 연결한다. DB는 격리 대역이며 실제 PostgreSQL 신규 테스트 실행은 CI에서 별도로 확인한다.
+- 새 head CI/리뷰와 Alpha 변경 후 검증은 아직 대기다. 이 보완만으로 배포 완료 또는 모든 GET 경로의 무변경을 주장하지 않는다.
 
 - PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2447
 - 검토 head: `8e6bf99ca27a6819854ac0b5301415e0e56a63b7`

@@ -55,7 +55,7 @@
 }
 ```
 
-GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위 boolean 필드 중 전달한 값만 upsert한다.
+GET은 row가 없으면 기본값을 반환하며 실제 row를 생성하거나 기존 `updatedAt`을 갱신하지 않는다. 저장되지 않은 기본값의 `updatedAt`은 응답 생성 시각이다. PATCH는 위 boolean 필드 중 전달한 값만 upsert한다.
 `chatEnabled=false`는 채팅 알림센터 row, `notification:new` 뱃지 이벤트, 채팅 푸시 발송을 억제한다.
 사용자가 방 안에 있는 동안의 실시간 `chat:message` 이벤트 자체는 억제하지 않는다.
 

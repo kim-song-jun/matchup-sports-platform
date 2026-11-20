@@ -22,6 +22,36 @@ function setup(data = preview(), supportsRound12 = false) {
 const save = () => screen.getByRole('button', { name: /배정 저장 ·/ });
 beforeEach(() => { get.mockReset(); post.mockReset(); });
 describe('결선 진출팀 배정', () => {
+  it.each([false, true])('6팀 교차 초안을 만들고 수동 교환 여부(%s)를 그대로 저장한다', async (manual) => {
+    const data = preview();
+    data.groups = data.groups.slice(0, 2).map(group => ({ ...group, advanceCount: 3 }));
+    data.targets = [
+      { fixtureId: 'p1', side: 'HOME', sourceGroupId: 'g0', sourceRank: 2 },
+      { fixtureId: 'p1', side: 'AWAY', sourceGroupId: 'g1', sourceRank: 3 },
+      { fixtureId: 'p2', side: 'HOME', sourceGroupId: 'g1', sourceRank: 2 },
+      { fixtureId: 'p2', side: 'AWAY', sourceGroupId: 'g0', sourceRank: 3 },
+      { fixtureId: 's1', side: 'HOME', sourceGroupId: 'g0', sourceRank: 1, opponentWinnerFixtureId: 'p1' },
+      { fixtureId: 's2', side: 'AWAY', sourceGroupId: 'g1', sourceRank: 1, opponentWinnerFixtureId: 'p2' },
+    ].map(target => ({ label: target.fixtureId + target.side, groupId: null, slotId: null, currentRegistrationId: null, ...target })) as FinalistPreview['targets'];
+    setup(data);
+    fireEvent.click(await screen.findByRole('button', { name: '조별 교차 자동 배정' }));
+    expect(screen.getByLabelText('s1HOME')).toHaveValue('g0-0');
+    expect(screen.getByLabelText('s2AWAY')).toHaveValue('g1-0');
+    expect(screen.getByLabelText('p1HOME')).toHaveValue('g1-1');
+    expect(screen.getByLabelText('p1AWAY')).toHaveValue('g0-2');
+    expect(post).not.toHaveBeenCalled();
+    if (manual) {
+      fireEvent.change(screen.getByLabelText('p1HOME'), { target: { value: 'g0-1' } });
+      expect(screen.getByLabelText('p2HOME')).toHaveValue('g1-1');
+      fireEvent.click(screen.getByLabelText('동률·운영자 조정 및 최종 진출팀 배치를 확인했어요.'));
+    }
+    fireEvent.click(save());
+    const confirm = await screen.findByRole('dialog', { name: '결선 배정 저장' });
+    fireEvent.click(within(confirm).getByRole('button', { name: '배정 저장' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0][1].assignments.map((row: { registrationId: string }) => row.registrationId)).toEqual(manual
+      ? ['g0-1', 'g0-2', 'g1-1', 'g1-2', 'g0-0', 'g1-0'] : ['g1-1', 'g0-2', 'g0-1', 'g1-2', 'g0-0', 'g1-0']);
+  });
   it('템플릿 없는 14팀 대진을 공식 순위에서 자동 배정하고 실제 API payload로 저장한다', async () => {
     const { onClose, showToast } = setup();
     await screen.findByRole('button', { name: '조별 교차 자동 배정' });

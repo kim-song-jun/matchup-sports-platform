@@ -1,0 +1,23 @@
+{
+  "report": [
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "finalRank20": true,
+      "completePools": 4
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "finalRank20": true,
+      "completePools": 4
+    },
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "finalRank20": true,
+      "completePools": 4
+    }
+  ],
+  "errors": []
+}

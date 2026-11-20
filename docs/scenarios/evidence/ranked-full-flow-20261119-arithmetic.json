@@ -1,0 +1,63 @@
+{
+  "verdict": "PASS",
+  "officialResults": 70,
+  "teams": 20,
+  "gamesPerTeam": 7,
+  "rankSourceMapping": "PASS (A group tied positions resolved with recorded operator reason)",
+  "groups": [
+    {
+      "name": "1-1 · 예선 · A조",
+      "teams": 4,
+      "matches": 6,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "1-2 · 예선 · B조",
+      "teams": 4,
+      "matches": 6,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "1-3 · 예선 · C조",
+      "teams": 4,
+      "matches": 6,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "1-4 · 예선 · D조",
+      "teams": 4,
+      "matches": 6,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "1-5 · 예선 · E조",
+      "teams": 4,
+      "matches": 6,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "2-1 · 본선 · 1위 리그",
+      "teams": 5,
+      "matches": 10,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "2-2 · 본선 · 2위 리그",
+      "teams": 5,
+      "matches": 10,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "2-3 · 본선 · 3위 리그",
+      "teams": 5,
+      "matches": 10,
+      "standingsArithmetic": "PASS"
+    },
+    {
+      "name": "2-4 · 본선 · 4위 리그",
+      "teams": 5,
+      "matches": 10,
+      "standingsArithmetic": "PASS"
+    }
+  ]
+}

@@ -230,10 +230,12 @@ services:
       start_period: 20s
     ports:
       - "127.0.0.1:3013:3013"
+    # NODE_OPTIONS 를 두지 않아 Node 가 이 한도의 약 절반을 JS heap 상한으로 잡는다(512M → 259MB, 768M → 396MB).
+    # 한도를 낮추면 heap 상한도 같이 내려간다. alpha 오버레이도 이 값을 그대로 쓴다.
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M
 
   nginx:
     image: nginx:1.30.7-alpine@sha256:bef154735288bc38d99fac41ae63730684bcc661503673a04a0f9bc526ba8598
@@ -243,7 +245,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      # :ro 가 없으면 이미지 entrypoint(10-listen-on-ipv6-by-default.sh)가 시작할 때 이 파일을 touch 해
+      # 서버에 저장된 릴리스 소스의 mtime 이 바뀌고, 같은 SHA 재배포가 소스 변경 검사에서 멈춘다.
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./aasa:/etc/nginx/teameet-aasa:ro
       - ./maintenance:/etc/nginx/teameet-maintenance:ro
       # 점검 플래그 디렉터리는 릴리스 디렉터리(배포마다 교체) 밖에 둬야 배포가 플래그를 지우지 않는다.

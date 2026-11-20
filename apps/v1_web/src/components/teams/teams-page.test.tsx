@@ -1581,13 +1581,13 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(subLine()).toBe('풋살 · 서울 전체');
   });
 
-  it('정보 줄에 인원 · 수준 · 최근 3개월 경기 수를 보여 준다', () => {
+  it('정보 줄에 인원 · 수준을 보여 준다', () => {
     const { container } = render(<TeamListPageView model={listWith({ members: 9, capacity: 24, level: '초보-중수', recentMatchCount: 66 })} />);
 
     const meta = container.querySelector('.tm-team-card-meta')!;
     expect(meta.textContent).toContain('9/24명');
     expect(meta.textContent).toContain('초보-중수');
-    expect(meta.textContent).toContain('최근 3개월 66경기');
+    expect(meta.textContent).not.toContain('최근 3개월');
     // 아이콘은 장식 — 스크린리더는 글자만 읽는다.
     meta.querySelectorAll('svg').forEach((icon) => expect(icon).toHaveAttribute('aria-hidden', 'true'));
   });
@@ -1599,21 +1599,13 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(container.querySelector('.tm-team-card-meta')!.textContent).not.toContain('/');
   });
 
-  it('경기가 한 번도 없으면 0경기로 보여 주고, 값이 아직 없는 응답이면 그 칸만 뺀다', () => {
-    const { container, rerender } = render(<TeamListPageView model={listWith({ recentMatchCount: 0 })} />);
-
-    expect(container.querySelector('.tm-team-card-meta')!.textContent).toContain('최근 3개월 0경기');
-    rerender(<TeamListPageView model={listWith({ recentMatchCount: undefined })} />);
-    expect(container.querySelector('.tm-team-card-meta')!.textContent).not.toContain('최근 3개월');
-  });
-
   it('수준이 정해지지 않은 팀은 수준 칸을 뺀다', () => {
     const { container } = render(<TeamListPageView model={listWith({ level: '' })} />);
 
     expect(container.querySelector('.tm-team-card-meta-level')).toBeNull();
   });
 
-  it('수준이 길어도 인원·경기 수를 지킨다 — 줄어드는 칸은 수준 하나이고 말줄임한다', () => {
+  it('수준이 길어도 인원을 지킨다 — 줄어드는 칸은 수준 하나이고 말줄임한다', () => {
     // 수준은 서버 자유 텍스트라 길이가 보장되지 않는다. 한 줄(nowrap)을 지켜야 카드 높이가 같다.
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
     const item = css.match(/\.tm-team-card-meta-item\s*\{([^}]*)\}/)?.[1];
@@ -1626,18 +1618,6 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(level).toMatch(/flex:\s*0\s+1\s+auto/);
     expect(level).toMatch(/min-width:\s*0/);
     expect(text).toMatch(/text-overflow:\s*ellipsis/);
-  });
-
-  it('카드 글자 칸이 좁으면 수준과 아이콘을 빼서 인원·경기 수를 지킨다', () => {
-    // 태블릿 2열의 글자 칸은 172px 라 세 칸이 다 들어가지 않는다 — 경기 수가 잘리지 않게 수준을 먼저 뺀다.
-    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const body = css.match(/\.tm-team-card-body\s*\{([^}]*)\}/)?.[1];
-    const narrow = css.match(/@container\s*\(max-width:\s*199px\)\s*\{([\s\S]*?)\n\}/)?.[1];
-
-    expect(body).toMatch(/container-type:\s*inline-size/);
-    expect(narrow).toMatch(/\.tm-team-card-meta-level/);
-    expect(narrow).toMatch(/\.tm-team-card-meta-icon/);
-    expect(narrow).toMatch(/display:\s*none/);
   });
 
   it('활동 일정 자리는 비어 있어도 한 줄 높이를 지킨다', () => {

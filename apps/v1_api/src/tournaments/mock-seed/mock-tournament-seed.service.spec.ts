@@ -189,7 +189,7 @@ function makeWorld(teamCount = 4) {
     preview: jest.fn().mockResolvedValue({ revision: 1, previewHash: 'hash' }),
     generate: jest.fn().mockResolvedValue({}),
   };
-  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never);
+  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never, {} as never);
   return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview, multiFinals };
 }
 
@@ -197,6 +197,11 @@ describe('MockTournamentSeedService', () => {
   const originalFlag = process.env.V1_ENABLE_MOCK_SEED;
   beforeEach(() => { process.env.V1_ENABLE_MOCK_SEED = 'true'; });
   afterAll(() => { process.env.V1_ENABLE_MOCK_SEED = originalFlag; });
+  it('순위별 리그의 후기가능 옵션은 종료 상태를 요구하고 생성 전에 거절한다', async () => {
+    const {service,prisma}=makeWorld(20);
+    await expect(service.createTournament(user,{format:'ranked_leagues',teamCount:20,status:'in_progress',reviewReady:true})).rejects.toMatchObject({response:{code:'MOCK_SEED_STATUS_UNSUPPORTED'}});
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
 
   // 데이터를 대량 생성하는 기능이라 프로덕션에서 눌릴 여지 자체를 없앤다.
   // NODE_ENV 로는 alpha 와 프로덕션을 구분할 수 없어서 전용 플래그를 쓴다.
@@ -331,6 +336,8 @@ describe('MockTournamentSeedService', () => {
       maxTeamCount: 4,
       // 화면이 "몇 명 이상 팀만 쓸 수 있는지"를 설명하려면 이 값이 필요하다.
       minPlayersPerTeam: 3,
+      rankedLeagueUsableTeamCount: 0,
+      rankedLeagueMaxTeamCount: 0,
     });
   });
 

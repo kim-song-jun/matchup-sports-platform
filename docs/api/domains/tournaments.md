@@ -1135,3 +1135,15 @@ assignment 확장: registrationIds는 자리 수만큼의 (UUID|null) 목록이�
 공개 상세는 대진 공개 후에만 stageProgress[{poolKey,assigned,stale,complete,sixTeamBracket?}]를 반환한다. 내부 선택 사유·권한 주체·시간 버전 ID·스냅샷은 공개하지 않는다. 결과 화면은 완료 대회에서 마지막 단계를 기본으로 열고 stage/pool/team/round URL 선택, 편성별 우승 요약, 진출 순위 강조를 제공한다. 개인 기록 API의 stageKey/poolKey 필터는 public-records 계약을 따른다.
 
 실제 DB 검증은 test/tournaments/stage-plan.integration-spec.ts, 원래20팀 Alpha 증거와40개 비교 상태는 docs/scenarios/competition-stage-composition.md에 둔다. 새 JSON 옵션·수동 결정이 저장된 뒤에는 이를 지원하지 않는 API로 단순 롤백하지 말고 해당 지원 버전을 유지하거나 전진 수정한다. 이 변경은 기존 데이터를 자동 변환하거나 기존70경기 테스트 결과를 수정하지 않는다.
+
+## Alpha 목업 순위별 리그 카테고리 (2026-11-19)
+
+`POST /api/v1/admin/mock-seed/tournaments`의 `format`에 `ranked_leagues`를 추가한다. 일반 대회 생성 format enum이나 DB enum은 확장하지 않는다. 실제 저장은 `format=league` + 기존 `stagePlan`이며 기존 권한(플랫폼 mutation admin)·환경 플래그·감사 로그를 유지한다. 운영 플래그가 꺼지면404 `MOCK_SEED_DISABLED`다.
+
+- 팀 수 선택 유지: 8~32팀의4배수. 그 외400 `MOCK_SEED_RANKED_TEAM_COUNT`.20팀은 예선5조×4팀30경기, 같은 순위별 결선4리그×5팀40경기다. 각 결선의 전체순위 구간도 저장한다.
+- 전원 `@teameet.test`인 활성 팀 중 멤버7명 이상만 선택한다. 팀마다 등록7명, min/maxPlayers=7, 불변 풋살 경기 설정은 maxPlayers=6·rolling으로 pin한다. 선발/후보를 seed 전용 방식으로 조작하지 않는다. 현재 런타임의 동시6명 강제 실패는 별도 QA 결함이며 이 카테고리 추가가 이를 해결하지 않는다.
+- 기존 status/withResults/reviewReady/withLineups 선택 유지. 순위별 리그의 팀 배정은 정본 명단 동기화로 제출본을 만들기 때문에 UI에서 라인업 옵션은 켜진 상태로 설명·잠근다. 직접 API에서false를 보내도 단계 배정이 명단을 자동 반영한다.
+- withResults 또는 completed/reviewReady는 예선과 결선까지 실제 Game 명령·공식 확정 경로로 채운다.20팀 초과 결과 요청은400 `MOCK_SEED_TOO_MANY_RESULTS`. open+결과는기존400 `MOCK_SEED_STATUS_UNSUPPORTED`. 순위별 리그의reviewReady=true는status=completed를요구하며그외동일코드400과종료상태선택안내로거절한다. 결과 없는 요청은 예선 팀만 배정하고 결선은 공식 순위 확정 대기다.
+- 결과 생성 도중은in_progress이며 모든 결과/배정 후에만completed를 저장한다. seed 중에는CAS 기반 순차 배정, 완료 후autoAdvance를 켠다. 실패를 완료로 숨기지 않는다. 네트워크 타임아웃 때는 자동 중복 재시도하지 말고 관리자 목록의 생성 상태부터 확인한다.
+- availability 응답에 `rankedLeagueUsableTeamCount`, `rankedLeagueMaxTeamCount`를 추가해7명 팀 기준의 실제 상한을 표시한다. enabled=false/종목·config 부재는 두 필드를 생략할 수 있고UI는0으로 닫는다.
+- 응답 format은요청카테고리 ranked_leagues, teamCount/fixtureCount/gamesCreated/lineupsSubmitted/route와 테스트계정 목록을 제공한다. 비밀번호는 응답에 포함하지 않는다. 이 목업은 정식 UI 신청 통과 증거가 아니다.

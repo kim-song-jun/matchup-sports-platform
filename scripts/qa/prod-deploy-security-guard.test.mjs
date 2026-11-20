@@ -13,6 +13,7 @@ import {
   findApprovedOnlySecretProblems,
   composeServiceDeclares,
   findNginxImageProblem,
+  findNginxConfMountProblem,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
@@ -583,4 +584,35 @@ test('nginx 이미지가 움직이는 태그이거나 digest 가 없으면 실�
 
 test('실제 prod compose 의 nginx 이미지는 고정돼 있다', () => {
   assert.equal(findNginxImageProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
+});
+
+const composeWithNginxMount = (mountLine) => `services:
+  v1_web:
+    volumes:
+      - ./other.conf:/etc/other.conf
+
+  nginx:
+    image: nginx:1.30.7-alpine
+    volumes:
+${mountLine}
+      - ./aasa:/etc/nginx/teameet-aasa:ro
+`;
+
+test('nginx default.conf 마운트는 :ro 일 때만 통과한다', () => {
+  for (const ok of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro,z']) {
+    assert.equal(findNginxConfMountProblem(composeWithNginxMount(ok)), null, ok);
+  }
+  for (const bad of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:rw', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:z']) {
+    assert.match(findNginxConfMountProblem(composeWithNginxMount(bad)), /읽기 전용/, bad);
+  }
+});
+
+test('nginx default.conf 마운트가 없거나 다른 서비스에만 있으면 실패한다', () => {
+  assert.match(findNginxConfMountProblem(composeWithNginxMount('      - ./x:/etc/nginx/other.conf:ro')), /찾지 못했습니다/);
+  const otherService = 'services:\n  v1_web:\n    volumes:\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro\n\n  nginx:\n    image: nginx\n';
+  assert.match(findNginxConfMountProblem(otherService), /찾지 못했습니다/);
+});
+
+test('실제 prod compose 의 nginx default.conf 마운트는 읽기 전용이다', () => {
+  assert.equal(findNginxConfMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
 });

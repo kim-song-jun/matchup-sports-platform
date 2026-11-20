@@ -1,0 +1,125 @@
+{
+  "method": "ego-lite roster review and confirm buttons",
+  "teams": [
+    {
+      "team": 1,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:33.802Z"
+    },
+    {
+      "team": 2,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:38.191Z"
+    },
+    {
+      "team": 3,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:40.496Z"
+    },
+    {
+      "team": 4,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:42.951Z"
+    },
+    {
+      "team": 5,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:47.420Z"
+    },
+    {
+      "team": 6,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:50.747Z"
+    },
+    {
+      "team": 7,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:53.164Z"
+    },
+    {
+      "team": 8,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:41:57.469Z"
+    },
+    {
+      "team": 9,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:01.064Z"
+    },
+    {
+      "team": 10,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:04.288Z"
+    },
+    {
+      "team": 11,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:06.635Z"
+    },
+    {
+      "team": 12,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:09.232Z"
+    },
+    {
+      "team": 13,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:15.153Z"
+    },
+    {
+      "team": 14,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:18.350Z"
+    },
+    {
+      "team": 15,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:20.636Z"
+    },
+    {
+      "team": 16,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:25.038Z"
+    },
+    {
+      "team": 17,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:28.584Z"
+    },
+    {
+      "team": 18,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:33.018Z"
+    },
+    {
+      "team": 19,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:36.981Z"
+    },
+    {
+      "team": 20,
+      "status": "PASS",
+      "rosterReviewed": 7,
+      "confirmedAt": "2026-11-19T08:42:40.327Z"
+    }
+  ]
+}

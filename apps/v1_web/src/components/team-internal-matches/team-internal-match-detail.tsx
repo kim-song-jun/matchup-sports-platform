@@ -140,7 +140,7 @@ function ResultEditor({ teamId, match, onDone }: { teamId: string; match: Intern
         ))}
       </div>
 
-      <div className="tm-text-label" style={{ margin: '20px 0 8px', color: 'var(--text-muted)' }}>득점 기록 <em className="tm-auth-optional">선택</em></div>
+      <div className="tm-text-label" style={{ margin: '20px 0 8px', color: 'var(--text-muted)' }}>득점 기록 (선택)</div>
       <div style={{ display: 'grid', gap: 12 }}>
         {goals.map((goal, index) => (
           <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 6, alignItems: 'center' }}>

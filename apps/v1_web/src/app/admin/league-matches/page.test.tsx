@@ -85,6 +85,21 @@ describe('AdminLeagueHubPage', () => {
     expect(screen.getByRole('tab', { name: '정규 리그' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  // alpha 1440 실측: AdminDataTable 의 기본 캡(max-w-[900px])이 카드를 899px 로 묶어(표는 1041px)
+  // 대진 수가 잘리고 작업 열(숨기기·다시 보이기)이 가로 스크롤 안으로 밀렸다. 대회 목록처럼 캡을 푼다.
+  it('리그 표 카드는 기본 폭 캡에 묶이지 않고 표가 카드 폭에 맞는다(대회 목록과 같은 설정)', () => {
+    render(<AdminLeagueHubPage />);
+
+    const table = screen.getByRole('table');
+    // 표 → 가로 스크롤 상자 → 카드. 카드에 캡이 살아 있으면 1440 에서도 작업 열이 밀린다.
+    const card = table.parentElement?.parentElement;
+    expect(card).toHaveClass('max-w-none');
+    expect(card).not.toHaveClass('max-w-[900px]');
+    // fitContainer: 표가 내용 폭(w-max)이 아니라 카드 폭(w-full)을 따른다.
+    expect(table).toHaveClass('w-full');
+    expect(table).not.toHaveClass('w-max');
+  });
+
   it('상태 칩(초안·접수 중·마감·진행 중·종료·보류)과 숫자를 보여 주고, 체계 칩은 두지 않는다', () => {
     render(<AdminLeagueHubPage />);
 

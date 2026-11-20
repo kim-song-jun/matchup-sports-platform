@@ -9,6 +9,39 @@ export function previewOf(sizes = [4, 4, 3, 3]): FinalistPreview {
   };
 }
 describe('결선 자동 배정 초안', () => {
+  it('순위 출처 없는 수동 6팀 골격도 교차 추천하되 중복 승자 연결은 거부한다', () => {
+    const preview = previewOf([5, 5]);
+    preview.targets = preview.targets.slice(0, 6);
+    preview.targets[4] = { ...preview.targets[4], fixtureId: 's1', opponentWinnerFixtureId: 'f0' };
+    preview.targets[5] = { ...preview.targets[5], fixtureId: 's2', opponentWinnerFixtureId: 'f1' };
+    const orders = { g0: initialFinalistOrder(preview.groups[0]), g1: initialFinalistOrder(preview.groups[1]) };
+    [orders.g0[1], orders.g0[2]] = [orders.g0[2], orders.g0[1]];
+    expect(recommendFinalists(preview, orders, { g0: 3, g1: 3 }, 'cross')).toEqual(['g1-1', 'g0-1', 'g0-2', 'g1-2', 'g0-0', 'g1-0']);
+    preview.targets[5].opponentWinnerFixtureId = 'f0';
+    expect(() => recommendFinalists(preview, orders, { g0: 3, g1: 3 }, 'cross')).toThrow('승자 연결');
+  });
+  it.each([false, true])('6팀은 실제 부전승 상대 연결로 같은 조 1·2위를 분리한다 (역순=%s)', (reverse) => {
+    const preview = previewOf([5, 5]);
+    preview.targets = [
+      { fixtureId: 'p1', side: 'HOME', sourceGroupId: 'g0', sourceRank: 2 },
+      { fixtureId: 'p1', side: 'AWAY', sourceGroupId: 'g1', sourceRank: 3 },
+      { fixtureId: 'p2', side: 'HOME', sourceGroupId: 'g1', sourceRank: 2 },
+      { fixtureId: 'p2', side: 'AWAY', sourceGroupId: 'g0', sourceRank: 3 },
+      { fixtureId: 's1', side: 'HOME', sourceGroupId: 'g0', sourceRank: 1, opponentWinnerFixtureId: 'p1' },
+      { fixtureId: 's2', side: 'AWAY', sourceGroupId: 'g1', sourceRank: 1, opponentWinnerFixtureId: 'p2' },
+    ].map(target => ({ label: target.fixtureId + target.side, groupId: null, slotId: null, currentRegistrationId: null, ...target })) as FinalistPreview['targets'];
+    if (reverse) preview.targets.reverse();
+    const before = JSON.stringify(preview);
+    const orders = Object.fromEntries(preview.groups.map(group => [group.id, initialFinalistOrder(group)]));
+    const result = recommendFinalists(preview, orders, { g0: 3, g1: 3 }, 'cross');
+    const byTarget = Object.fromEntries(preview.targets.map((target, i) => [target.fixtureId + target.side, result[i]]));
+    expect(byTarget).toEqual({ p1HOME: 'g1-1', p1AWAY: 'g0-2', p2HOME: 'g0-1', p2AWAY: 'g1-2', s1HOME: 'g0-0', s2AWAY: 'g1-0' });
+    expect(new Set(result).size).toBe(6);
+    expect(JSON.stringify(preview)).toBe(before);
+    expect(recommendFinalists(preview, orders, { g0: 3, g1: 3 }, 'seed')).toEqual(preview.targets.map(target => orders[target.sourceGroupId!][target.sourceRank! - 1]));
+    preview.targets = preview.targets.map(target => ({ ...target, opponentWinnerFixtureId: undefined }));
+    expect(() => recommendFinalists(preview, orders, { g0: 3, g1: 3 }, 'cross')).toThrow('승자 연결');
+  });
   it.each([[4, 4, 3, 3], [4, 4, 4, 3]])('불균등 조 %j 에서 상위 2팀씩 중복 없이 교차 배정한다', (...sizes) => {
     const preview = previewOf(sizes);
     const orders = Object.fromEntries(preview.groups.map((group) => [group.id, initialFinalistOrder(group)]));

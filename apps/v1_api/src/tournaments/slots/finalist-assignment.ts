@@ -14,7 +14,7 @@ import { assignSlotsBatchInTx } from './tournament-slot.service';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
 
 type Dependencies = { prisma: PrismaService; adminContext: AdminContextService; games: GamesService };
-type Target = { fixtureId: string; side: 'HOME' | 'AWAY'; label: string; groupId: string | null; slotId: string | null; currentRegistrationId: string | null; byeSortOrder: number | null; byePosition: number | null; sourceGroupId?: string | null; sourceRank?: number };
+type Target = { fixtureId: string; side: 'HOME' | 'AWAY'; label: string; groupId: string | null; slotId: string | null; currentRegistrationId: string | null; byeSortOrder: number | null; byePosition: number | null; sourceGroupId?: string | null; sourceRank?: number; opponentWinnerFixtureId: string | null };
 const options = { timeout: 45_000, maxWait: 5_000 } as const;
 const notReady = (message: string) => new ConflictException({ code: 'FINALIST_NOT_READY', message });
 
@@ -93,6 +93,7 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
       const isBye = slot?.kind === 'BYE' || slot?.byeSortOrder != null || (slotId === null && manualBye !== undefined);
       const byeSortOrder = slot?.byeSortOrder != null ? slot.byeSortOrder : manualBye?.sortOrder ?? null;
       targets.push({ sourceGroupId: slot?.sourceGroupId, sourceRank: slot?.sourceGroupId ? slot.position : undefined, fixtureId: fixture.teamMatchId, side, slotId, groupId: slot?.groupId ?? (isBye ? sourceRound12!.groupId : fixture.groupId),
+        opponentWinnerFixtureId: incoming.length === 1 && incoming[0].sourceOutcome === 'WINNER' ? incoming[0].sourceTeamMatchId : null,
         byeSortOrder: isBye ? byeSortOrder : null, byePosition: isBye ? slot?.position ?? quarterIndex + 1 : null,
         label: `${groups.find((group) => group.id === fixture.groupId)?.name ?? fixture.round} #${fixture.fixtureNumber} ${side === 'HOME' ? '홈' : '원정'}${isBye ? ' · 직행' : ''}`,
         currentRegistrationId: side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId });

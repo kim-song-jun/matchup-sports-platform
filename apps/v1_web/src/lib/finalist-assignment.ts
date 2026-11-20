@@ -7,11 +7,45 @@ export function initialFinalistOrder(group: FinalistGroup): string[] {
   return group.teams.map((team) => team.registrationId);
 }
 
+/** Keep the saved fixture links; only recommend different teams for the six direct entries. */
+function sixTeamCross(preview: FinalistPreview, orders: Record<string, string[]>, counts: Record<string, number>): string[] | null {
+  if (preview.groups.length !== 2 || preview.targets.length !== 6 || preview.groups.some(group => counts[group.id] !== 3)) return null;
+  const fixtures = new Map<string, number[]>();
+  preview.targets.forEach((target, index) => fixtures.set(target.fixtureId, [...(fixtures.get(target.fixtureId) ?? []), index]));
+  const byes = [...fixtures.values()].filter(indexes => indexes.length === 1).map(indexes => indexes[0]);
+  const pairs = [...fixtures.values()].filter(indexes => indexes.length === 2);
+  if (byes.length !== 2 || pairs.length !== 2) return null;
+  // Source bindings identify the two bye branches even when the API target order is reversed.
+  byes.sort((left, right) => preview.targets[left].fixtureId.localeCompare(preview.targets[right].fixtureId));
+  const boundGroups = byes.map(index => preview.targets[index].sourceGroupId);
+  const groups = boundGroups.every(id => preview.groups.some(group => group.id === id)) && new Set(boundGroups).size === 2
+    ? boundGroups as string[] : preview.groups.map(group => group.id);
+  const result = new Map<number, string>();
+  const usedPairs = new Set<string>();
+  byes.forEach((bye, branch) => {
+    const source = preview.targets[bye].opponentWinnerFixtureId;
+    const pair = source ? pairs.find(indexes => preview.targets[indexes[0]].fixtureId === source) : undefined;
+    if (!source || !pair || usedPairs.has(source)) throw new Error('결선 승자 연결 정보를 다시 불러온 뒤 교차 배정해 주세요.');
+    usedPairs.add(source);
+    const home = pair.find(index => preview.targets[index].side === 'HOME');
+    const away = pair.find(index => preview.targets[index].side === 'AWAY');
+    if (home === undefined || away === undefined) throw new Error('결선 승자 연결과 홈·원정 자리를 확인해 주세요.');
+    const own = orders[groups[branch]];
+    const other = orders[groups[1 - branch]];
+    result.set(bye, own[0]);
+    result.set(home, other[1]);
+    result.set(away, own[2]);
+  });
+  return preview.targets.map((_, index) => result.get(index)!);
+}
+
 export function recommendFinalists(preview: FinalistPreview, orders: Record<string, string[]>, counts: Record<string, number>, mode: 'cross' | 'seed'): string[] {
   const selected = preview.groups.flatMap((group) => (orders[group.id] ?? []).slice(0, counts[group.id] ?? 0)
     .map((id, rank) => ({ id, rank, groupId: group.id })));
   if (new Set(selected.map((team) => team.id)).size !== selected.length) throw new Error('같은 팀이 여러 조에 있어요. 조 편성을 확인해 주세요.');
   if (selected.length !== preview.targets.length) throw new Error(`진출팀 ${selected.length}팀과 결선 자리 ${preview.targets.length}개가 같아야 해요.`);
+  const sixTeam = mode === 'cross' ? sixTeamCross(preview, orders, counts) : null;
+  if (sixTeam) return sixTeam;
   if (preview.targets.every((target) => target.sourceGroupId && target.sourceRank)) {
     return preview.targets.map((target) => {
       const id = orders[target.sourceGroupId!]?.[target.sourceRank! - 1];

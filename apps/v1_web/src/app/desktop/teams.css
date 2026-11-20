@@ -121,6 +121,16 @@
     margin-top: 20px;
   }
 
+  /* '내 팀' 칩은 목록 그리드 한 열과 같은 폭(2열, 간격 16px)이다. */
+  .tm-my-team-row {
+    gap: 16px;
+  }
+
+  .tm-my-team-chip,
+  .tm-my-team-chip:only-child {
+    flex: 0 0 calc((100% - 16px) / 2);
+  }
+
   /* hover lift(translateY) 금지(rubric R-K2 / .impeccable anti-pattern).
      배경 tint + border-color 변화만으로 hover 상태를 표현한다. */
   .tm-team-card {
@@ -146,6 +156,16 @@
     gap: 16px;
     margin-top: 16px;
   }
+
+  /* '내 팀' 칩은 목록 그리드 한 열과 같은 폭(2열, 간격 16px)이다. */
+  .tm-my-team-row {
+    gap: 16px;
+  }
+
+  .tm-my-team-chip,
+  .tm-my-team-chip:only-child {
+    flex: 0 0 calc((100% - 16px) / 2);
+  }
 }
 
 @media (min-width: 1440px) {
@@ -153,6 +173,16 @@
   .tm-team-card-stack {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
+  }
+
+  /* '내 팀' 칩은 목록 그리드 한 열과 같은 폭(3열, 간격 20px)이다. */
+  .tm-my-team-row {
+    gap: 20px;
+  }
+
+  .tm-my-team-chip,
+  .tm-my-team-chip:only-child {
+    flex: 0 0 calc((100% - 40px) / 3);
   }
 }
 

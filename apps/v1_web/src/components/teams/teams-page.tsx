@@ -114,10 +114,12 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             <div className="tm-my-team-row">
               {model.myTeams.map((team) => (
                 <Link key={team.id} className="tm-my-team-chip tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
-                  <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="md" />
+                  {/* 목록 카드(TeamCard)와 같은 로고 크기(lg). 이름·종목 줄에 인라인 display:block 을 두면 line-clamp-1(display:-webkit-box)을
+                      덮어써서 긴 이름이 3줄로 늘어나 카드가 목록 카드보다 커진다 — 클래스만 쓴다. */}
+                  <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
                   <span style={{ minWidth: 0 }}>
-                    <span className="tm-text-body-lg line-clamp-1" style={{ display: 'block' }}>{team.name}</span>
-                    <span className="tm-text-caption line-clamp-1" style={{ display: 'block' }}>{team.sport} · {team.roleLabel}</span>
+                    <span className="tm-text-body-lg line-clamp-1">{team.name}</span>
+                    <span className="tm-text-caption line-clamp-1">{team.sport} · {team.roleLabel}</span>
                   </span>
                 </Link>
               ))}

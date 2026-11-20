@@ -294,3 +294,9 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·채팅 API(목록·본문·첨부파일 포함)·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. 알림 설정 GET은 저장 없이 기존 값 또는 기본값만 읽는다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.
 
 신청 제출·참가 확정·접수 시작의 충돌도 기존 오류 envelope를 따른다. `REGISTRATION_NOT_DRAFT`, `TOURNAMENT_REGISTRATION_CLOSED`, `REGISTRATION_DEADLINE_PASSED`는409이며 성공으로 대체하지 않는다. [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18).
+
+Admin manual-push history is active-admin-only (`GET /admin/ops/push-history[/:id]`);
+owner/ops authorization for sending is unchanged. Inbox creation, web acceptance and native
+acceptance are distinct measurements; missing historical payload/channel results remain unknown.
+A successful send with `historyRecorded:false` means the send completed but its audit write failed,
+and must not trigger an automatic resend. See [admin/ops](domains/admin-and-ops.md#수동-푸시-발송과-이력).

@@ -163,7 +163,7 @@ describe('AdminShell nav', () => {
     const boundary = texts.indexOf('제어 · 발송');
     expect(boundary).toBeGreaterThan(-1);
     expect(texts.indexOf('감사 로그')).toBeLessThan(boundary);
-    expect(texts.indexOf('웹 푸시 발송')).toBeGreaterThan(boundary);
+    expect(texts.indexOf('푸시 발송')).toBeGreaterThan(boundary);
     expect(texts.indexOf('경기 운영 플래그')).toBeGreaterThan(boundary);
   });
 

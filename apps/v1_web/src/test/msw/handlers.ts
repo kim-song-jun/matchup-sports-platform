@@ -1,5 +1,6 @@
 import { adminEntityOperationsHandlers } from './admin-entity-operations-handlers';
 import { scheduleTimeHandlers } from './schedule-time-handlers';
+import { adminPushHistoryMswHandlers } from './admin-push-history-handlers';
 import { memberBracketPreviewMswHandlers } from './member-bracket-preview-handlers';
 import { namedFinalsMsw } from './named-finals-handlers';
 import { http, HttpResponse } from 'msw';
@@ -806,6 +807,7 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
   place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
+  ...adminPushHistoryMswHandlers,
   ...namedFinalsMsw.handlers,
   ...scheduleTimeHandlers,
   http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),

@@ -2,12 +2,13 @@
 
 ## 범위와 Source of Truth
 
-이 문서는 v1 `AdminController`가 실제로 노출하는 `/api/v1/admin/*` 운영 API만 다룬다.
+이 문서는 v1 관리자·운영 컨트롤러가 실제로 노출하는 `/api/v1/admin/*` 운영 API만 다룬다.
 
 1. `apps/v1_api/src/admin/admin.controller.ts`
 2. `apps/v1_api/src/admin/dto/admin.dto.ts`
 3. `apps/v1_api/src/admin/admin.service.ts`
 4. `apps/v1_web/src/hooks/use-v1-api.ts`
+5. `apps/v1_api/src/admin/admin-ops.controller.ts`, `admin-ops.service.ts`, `admin-push-history.service.ts`
 
 ## 공통 인증/권한
 
@@ -356,6 +357,49 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - 조회 화면은 링크 탐색을 막고 회원 상세 복귀만 제공한다. 회원의 기기/쿠키/브라우저 상태나 가입·인증 게이트 전체를 재현하지 않는다. 원본 링크의 대진표 필터만 허용 목록으로 전달한다. 정규 리그·미공개 대진표는 범위 밖이다.
 
 - MSW/demo에서는 실제 관리자 감사 기록을 만들 수 없으므로 두 endpoint 모두 503 `MEMBER_PREVIEW_REQUIRES_LIVE_API`로 명시적으로 거절한다. 가짜 성공이나 회원 조회 ID를 만들지 않는다.
+
+## 수동 푸시 발송과 이력
+
+정본: `admin/admin-ops.controller.ts`, `admin/admin-ops.service.ts`,
+`admin/admin-push-history.service.ts`, `admin/dto/admin-push-*.dto.ts`,
+`web/src/hooks/use-admin-push-history.ts` 및 `types/admin-push-history.ts`.
+
+| Method | Path (`/api/v1` prefix) | 권한 | 계약 |
+|---|---|---|---|
+| POST | `/admin/ops/push-send` | active owner/ops | `{ target: 'user' \| 'broadcast', userId?, title, body?, url? }`. 단일 수신자는 UUID 필수. `title≤120`, `body≤2000`, `url≤500`, 이동 경로는 단일 `/`로 시작하고 `//`·역슬래시는 금지. 분당 5회. UI 입력 한도는 제목 60자·본문 200자. |
+| GET | `/admin/ops/push-history` | active owner/ops/support | `limit=1..50`(기본 20), `cursor?`, `target=user\|broadcast?`. `{ items, pageInfo: { hasNextPage, nextCursor } }`. 시각·ID 내림차순 keyset cursor. 잘못된 cursor는 400 `INVALID_CURSOR`. |
+| GET | `/admin/ops/push-history/:id` | active owner/ops/support | UUID 필수. 수동 발송 감사 로그만 상세 허용. 없거나 다른 액션은 404 `PUSH_HISTORY_NOT_FOUND`. |
+
+발송 결과 `{ sent, skipped, failed, push }`의 `sent`는 **회원 알림함 생성 수**다.
+`push.{subscriptions,delivered,failed,disabled}`는 웹 구독, `push.native?`
+`{devices,delivered,failed,disabled}`는 APNs/FCM 기기 집계다. `delivered`는 푸시 서비스 접수이며 실제 기기 도착·읽음 증명이 아니다.
+전체 대상은 활성 회원이고 `noticeEnabled=false`는 제외한다. 마케팅 동의 기반 광고 캠페인 기능은 아니며,
+이 변경은 수신 설정·발송 대상 계약을 바꾸지 않는다.
+동일 운영자·동일 제목/본문/링크의 전체 발송은 10분간 첫 결과를 재생하고 새 발송·이력을 생성하지 않는다.
+진행 중 동일 요청은 409 `BROADCAST_IN_PROGRESS`. 개인 발송에는 이 멱등 보호가 없다.
+
+새 감사 로그(`action=push.manual_send`, `targetType=push`)의 `afterJson`은 기존 집계에
+`historyVersion:1`, `body`, `url`, `push`를 추가한다. 스키마·마이그레이션은 없다.
+이미 발송한 뒤 감사 저장이 실패하면 성공 결과에 `historyRecorded:false`를 덧붙여 **발송 완료와 이력 저장 실패**를 구분한다.
+화면은 재발송을 권하지 않으며, 이력 API는 남지 않은 감사 로그를 가짜로 생성하지 않는다.
+
+목록 항목: `{ id, createdAt, title, target, recipientUserId, sender:{name,role}, sent, skipped, failed }`.
+상세는 `content:{source,body,url}`, `delivery:{web,native}`를 추가한다.
+각 channel은 `{total,delivered,failed,disabled}` 또는 `null`(미보관)이다.
+기기 토큰·브라우저 구독·관리자 이메일은 응답에 포함하지 않는다.
+
+- `content.source=snapshot`: 신규 발송 원본. `body=null`은 본문 없이 보냈다는 뜻이다.
+- `notification`: 과거 원본 미보관. 같은 제목·직전 같은 제목 발송 이후·감사 시각 전 10분 이내의
+  `notice/targetId=null` 회원 알림 보관본에서 단일 본문·경로 조합을 확인한 것이다. 개인 발송은 실제 수신자도 제한한다.
+  이는 시간대 기반 보관본 대조이며 발송 요청 원본으로 보증하지 않는다. UI는 출처를 명시한다.
+- `ambiguous`: 보관본의 본문·경로 조합이 여러 개라 특정할 수 없음. `body/url=null`, 미리보기 없음.
+- `unavailable`: 보관본 없음·생성 0건·잘못된 과거 데이터. `body/url=null`, 미리보기 없음.
+- 과거 push 집계는 미보관이면 `null`; 현재 기기 상태나 만료/삭제 가능한 멱등 레코드로 과거 통계를 추정하지 않는다.
+- 자동 경기·채팅 알림과 APNs 직접 발송은 수동 감사 이력 범위가 아니다.
+
+UI는 `/admin/ops/push-send`의 발송하기/발송 이력 탭이다. support는 이력만 열고 발송 탭은 비활성화한다.
+미리보기는 inert 텍스트이며 발송·경로 이동을 실행하지 않는다. 이동 경로는 상세에 텍스트로만 표시한다.
+MSW의 `[샘플]` 이력은 전용 fixture이며 실제 발송 완료처럼 생성하지 않는다.
 
 
 ## 회원·팀 운영 정보 (2026-11-19)

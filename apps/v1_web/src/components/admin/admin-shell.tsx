@@ -105,7 +105,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       // (/admin/monitoring 탭)로 통합됐고 구 URL 은 리다이렉트로 보존된다.
       { label: '대회·리그 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
       { label: '모니터링', href: '/admin/monitoring', icon: <Gauge size={18} /> },
-      { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} />, subgroup: '제어 · 발송', tone: 'control' },
+      { label: '푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} />, subgroup: '제어 · 발송', tone: 'control' },
       { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} />, subgroup: '제어 · 발송', tone: 'control' },
     ],
   },

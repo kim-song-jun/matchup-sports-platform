@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
@@ -8,6 +8,8 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminContextService } from '../common/admin-context.service';
 import { AdminPushSendDto } from './dto/admin-push-send.dto';
 import { AdminOpsService } from './admin-ops.service';
+import { AdminPushHistoryService } from './admin-push-history.service';
+import { AdminPushHistoryQueryDto } from './dto/admin-push-history.dto';
 
 class RecentPushFailuresQueryDto {
   @IsOptional()
@@ -49,7 +51,22 @@ export class AdminOpsController {
   constructor(
     private readonly adminOpsService: AdminOpsService,
     private readonly adminContext: AdminContextService,
+    private readonly pushHistory: AdminPushHistoryService,
   ) {}
+
+  @Get('push-history')
+  @Header('Cache-Control', 'private, no-store')
+  async history(@CurrentUser() user: V1AuthUser, @Query() query: AdminPushHistoryQueryDto) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.pushHistory.list(query);
+  }
+
+  @Get('push-history/:id')
+  @Header('Cache-Control', 'private, no-store')
+  async historyDetail(@CurrentUser() user: V1AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.pushHistory.detail(id);
+  }
 
   @Get('recent-push-failures')
   async recentPushFailures(@CurrentUser() user: V1AuthUser, @Query() query: RecentPushFailuresQueryDto) {

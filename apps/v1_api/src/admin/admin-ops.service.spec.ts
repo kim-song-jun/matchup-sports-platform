@@ -302,6 +302,25 @@ describe('AdminOpsService', () => {
   });
 
   describe('sendManualPush', () => {
+    it('persists the exact payload and app/web transport summary for later previews', async () => {
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: 'user-1' });
+      const dto = { target: 'user' as const, userId: 'user-1', title: '대회 안내', body: '상금 안내', url: '/tournaments' };
+      const result = await service.sendManualPush(dto, admin);
+      expect(adminContext.logAdminAction).toHaveBeenCalledWith(admin, expect.objectContaining({
+        action: 'push.manual_send', targetId: 'user-1', afterJson: {
+          historyVersion: 1, title: dto.title, body: dto.body, url: dto.url, target: 'user',
+          sent: result.sent, skipped: result.skipped, failed: result.failed, push: result.push,
+        },
+      }));
+    });
+
+    it('reports a history write failure separately without falsely failing an already-sent push', async () => {
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: 'user-1' });
+      adminContext.logAdminAction.mockRejectedValueOnce(new Error('audit unavailable'));
+      const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: '안내' }, admin);
+      expect(result).toMatchObject({ sent: 1, historyRecorded: false });
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+    });
     it('sends to a single user: creates the notification, emits realtime, sends the push, and audit-logs the userId as targetId', async () => {
       prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
       prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
@@ -569,7 +588,7 @@ describe('AdminOpsService', () => {
 
       // The push was already sent — a failed audit log must not turn this into
       // an error response, or an operator could retry and duplicate-send.
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
+      expect(result).toEqual({ historyRecorded: false, sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
     });
   });
 });

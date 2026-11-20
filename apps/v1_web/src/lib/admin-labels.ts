@@ -5,6 +5,12 @@ import type {
   V1AdPublishMissingField,
 } from '@/types/ads';
 
+export function adminPushTargetLabel(target: 'user' | 'broadcast' | null): string {
+  if (target === 'broadcast') return '전체 회원';
+  if (target === 'user') return '특정 회원';
+  return '대상 미보관';
+}
+
 /**
  * 관리자 액션 코드를 사람이 읽을 수 있는 한국어 레이블로 변환해요.
  *

@@ -1,6 +1,42 @@
 # 구(legacy) 루트 스택(postgres/redis/api/web)은 2026-07 아카이빙됨.
 # 구 스택 데이터 볼륨(postgres_data, uploads_data)은 도커 호스트에 그대로 남아 있다
 # (compose 정의에서 제외했으므로 `down -v`로도 삭제되지 않음 — 복구 시 수동 재연결).
+# v1_web 과 v1_web_b 가 같은 설정을 쓴다. 컨테이너 이름·볼륨·포트만 서비스마다 다르다.
+x-v1-web: &v1-web
+  image: ${V1_WEB_IMAGE}
+  restart: always
+  environment:
+    NEXT_PUBLIC_API_URL: /api/v1
+    NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+    NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY: ${KAKAO_LOGIN_JS_KEY:-}
+    NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
+    NEXT_PUBLIC_KAKAO_SCOPE: ${KAKAO_SCOPE:-}
+    ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS: ${ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS:-}
+    INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
+    HOSTNAME: 0.0.0.0
+    PORT: 3013
+    NODE_ENV: production
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  depends_on:
+    v1_api:
+      condition: service_healthy
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3013/landing').then((res) => { if (!res.ok) throw new Error('v1 web health ' + res.status); }).catch(() => process.exit(1));",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+
 services:
   v1_postgres:
     image: postgres:16-alpine
@@ -188,50 +224,34 @@ services:
           memory: 512M
 
   v1_web:
-    image: ${V1_WEB_IMAGE}
+    <<: *v1-web
     container_name: teameet_v1_web
-    restart: always
     # /_next/image 변환 결과를 배포 사이에 유지한다 — 없으면 배포마다 모든 사진을 다시 변환한다.
     # 이미지 안에 app 소유로 만들어 둔 폴더라 첫 연결 때 그 소유권을 물려받는다(Dockerfile.v1-web).
     # 상한은 next.config.ts 의 images.maximumDiskCacheSize. .next/cache 전체가 아니라 images 만 —
     # 다른 캐시는 빌드마다 달라 남기면 안 된다.
     volumes:
       - v1_web_image_cache:/app/apps/v1_web/.next/cache/images
-    environment:
-      NEXT_PUBLIC_API_URL: /api/v1
-      NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
-      NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY: ${KAKAO_LOGIN_JS_KEY:-}
-      NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
-      NEXT_PUBLIC_KAKAO_SCOPE: ${KAKAO_SCOPE:-}
-      ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS: ${ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS:-}
-      INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
-      HOSTNAME: 0.0.0.0
-      PORT: 3013
-      NODE_ENV: production
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    depends_on:
-      v1_api:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3013/landing').then((res) => { if (!res.ok) throw new Error('v1 web health ' + res.status); }).catch(() => process.exit(1));",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
     ports:
       - "127.0.0.1:3013:3013"
     # NODE_OPTIONS 를 두지 않아 Node 가 이 한도의 약 절반을 JS heap 상한으로 잡는다(512M → 259MB, 768M → 396MB).
     # 한도를 낮추면 heap 상한도 같이 내려간다. alpha 오버레이도 이 값을 그대로 쓴다.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  # 두 번째 웹 컨테이너 — V1_WEB_REPLICAS=2 일 때만 뜬다(배포 스크립트가 `--profile web-pair` 를 건다).
+  # 4GB 이상 호스트에서 쓴다: 한쪽이 죽거나 배포로 다시 만들어지는 동안 다른 쪽이 받는다.
+  # 이미지 캐시 볼륨은 컨테이너마다 따로 둔다 — Next 이미지 최적화기는 캐시 파일을 잠금 없이 쓰므로
+  # 두 프로세스가 한 폴더를 같이 쓰면 덜 쓴 파일을 읽을 수 있다. 호스트 포트는 열지 않는다.
+  v1_web_b:
+    <<: *v1-web
+    container_name: teameet_v1_web_b
+    profiles: ["web-pair"]
+    volumes:
+      - v1_web_b_image_cache:/app/apps/v1_web/.next/cache/images
+    # v1_web 과 같은 한도(위 주석 참조). 한도 하한 검사가 서비스 블록 안의 값을 읽으므로 공통 설정에 넣지 않는다.
     deploy:
       resources:
         limits:
@@ -253,6 +273,8 @@ services:
       # 점검 플래그 디렉터리는 릴리스 디렉터리(배포마다 교체) 밖에 둬야 배포가 플래그를 지우지 않는다.
       - /home/ec2-user/.teameet-maintenance:/etc/nginx/maintenance:ro
       - ./release-metadata.prod.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
+      # 웹 컨테이너 개수(V1_WEB_REPLICAS, 기본 1)에 맞는 upstream·재시도 설정. nginx.conf 가 include 한다.
+      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web:ro
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     depends_on:
@@ -269,3 +291,4 @@ volumes:
   v1_postgres_data:
   v1_uploads_data:
   v1_web_image_cache:
+  v1_web_b_image_cache:

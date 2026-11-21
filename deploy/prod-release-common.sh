@@ -84,6 +84,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-manifest-common.sh"
 # Shares PROD_TASK168_STATE_ROOT (and its default) with the Task168 runner so
 # the restore/rollback guard reads the receipts Stage A/B actually wrote.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-task168-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/web-replicas-common.sh"
+WEB_DOCKER=(sudo docker)
 
 write_candidate_manifest() {
   local manifest_file="$1"
@@ -196,6 +198,7 @@ assert_running_release_digests() {
   [[ "${running_api_image}" == "${V1_API_IMAGE}" ]] || return 1
   [[ "${running_worker_image}" == "${V1_API_IMAGE}" ]] || return 1
   [[ "${running_web_image}" == "${V1_WEB_IMAGE}" ]] || return 1
+  assert_extra_web_images "${V1_WEB_IMAGE}" || return 1
 }
 
 check_prod_health_contract() {
@@ -323,7 +326,7 @@ restore_active_release() {
   load_prod_release_manifest "${active_tmp}" || return 1
   pull_release_images || return 1
   write_release_metadata "${active_tmp}" || return 1
-  "${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker || return 1
+  up_app_containers || return 1
   "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   wait_for_prod_health_contract || return 1
   assert_running_release_digests || return 1

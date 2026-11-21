@@ -43,6 +43,7 @@ set -a
 # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
 source "${ENV_FILE}"
 set +a
+configure_web_replicas "${V1_WEB_REPLICAS:-}" 1 3500000
 
 # --preserve-env 가 필수인 이유는 deploy-prod.sh 의 같은 지점 주석 참조 — 요약하면
 # ${V1_API_IMAGE}/${V1_WEB_IMAGE} 는 .env 가 아니라 load_prod_release_manifest() 가
@@ -62,6 +63,7 @@ compose=(
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"
+  ${WEB_COMPOSE_ARGS[@]+"${WEB_COMPOSE_ARGS[@]}"}
 )
 
 aws ecr get-login-password --region "${PROD_AWS_REGION}" |
@@ -118,7 +120,7 @@ pull_release_images
 activate_prod_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
 
-"${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker
+up_app_containers
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_prod_health_contract
 assert_running_release_digests

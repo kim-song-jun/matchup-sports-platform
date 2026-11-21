@@ -14,6 +14,8 @@ import {
   composeServiceDeclares,
   findNginxImageProblem,
   findNginxConfMountProblem,
+  findNginxWebMountProblem,
+  findDirectWebUp,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
@@ -615,4 +617,34 @@ test('nginx default.conf 마운트가 없거나 다른 서비스에만 있으면
 
 test('실제 prod compose 의 nginx default.conf 마운트는 읽기 전용이다', () => {
   assert.equal(findNginxConfMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
+});
+
+test('nginx 웹 설정 마운트는 읽기 전용이고 기본 개수가 1 일 때만 통과한다', () => {
+  const ok = '      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web:ro';
+  assert.equal(findNginxWebMountProblem(composeWithNginxMount(ok)), null);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web')), /읽기 전용/);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/${V1_WEB_REPLICAS:-2}:/etc/nginx/teameet-web:ro')), /기본 웹 개수가 1/);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/2:/etc/nginx/teameet-web:ro')), /기본 웹 개수가 1/);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./x:/etc/nginx/other:ro')), /찾지 못했습니다/);
+});
+
+test('실제 prod compose 의 nginx 웹 설정 마운트가 통과한다', () => {
+  assert.equal(findNginxWebMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
+});
+
+test('웹 컨테이너를 compose up 으로 직접 올리는 줄만 잡는다', () => {
+  const script = [
+    '# "${compose[@]}" up -d v1_web  (주석은 무시)',
+    '"${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker',
+    '"${compose[@]}" up -d --no-deps v1_api v1_game_operations_worker',
+    '"${compose[@]}" ps -q v1_web',
+    'up_app_containers --force-recreate',
+  ].join('\n');
+  assert.deepEqual(findDirectWebUp(script), [2]);
+});
+
+test('배포 스크립트 어디에서도 웹을 직접 올리지 않는다', () => {
+  for (const rel of ['deploy/rollback-prod.sh', 'deploy/prod-release-common.sh', 'deploy/deploy-alpha.sh', 'deploy/rollback-alpha.sh', 'deploy/alpha-release-common.sh', 'deploy/deploy-alpha-stage-b.sh']) {
+    assert.deepEqual(findDirectWebUp(readFileSync(rel, 'utf8')), [], rel);
+  }
 });

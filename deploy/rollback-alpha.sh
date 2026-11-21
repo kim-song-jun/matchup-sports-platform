@@ -29,6 +29,7 @@ set -a
 # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
 source "${ENV_FILE}"
 set +a
+configure_web_replicas "${V1_WEB_REPLICAS:-}" 2 1800000
 
 compose=(
   docker compose
@@ -36,6 +37,7 @@ compose=(
   -f "${COMPOSE_PROD}"
   -f "${COMPOSE_ALPHA}"
   --env-file "${ENV_FILE}"
+  ${WEB_COMPOSE_ARGS[@]+"${WEB_COMPOSE_ARGS[@]}"}
 )
 
 aws ecr get-login-password --region "${ALPHA_AWS_REGION}" |
@@ -103,8 +105,7 @@ previous_source_key="$(alpha_release_source_key "${PREVIOUS_MANIFEST}")"
 activate_alpha_release_source "${previous_source_key}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
 
-"${compose[@]}" up -d --force-recreate --no-deps \
-  v1_api v1_web v1_game_operations_worker
+up_app_containers --force-recreate
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_alpha_health_contract
 assert_running_release_digests

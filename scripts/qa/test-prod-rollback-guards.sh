@@ -62,6 +62,7 @@ make_live_dir() {
   # prod-task168-common.sh is a sibling prod-release-common.sh now sources
   # too (fix round 3, state-root unification).
   cp "${REPO_ROOT}/deploy/prod-task168-common.sh" "${home}/teameet/deploy/" 2>/dev/null || true
+  cp "${REPO_ROOT}/deploy/web-replicas-common.sh" "${home}/teameet/deploy/"
   cp "${REPO_ROOT}/deploy/docker-compose.prod.yml" "${home}/teameet/deploy/" 2>/dev/null || true
 }
 

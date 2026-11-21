@@ -43,6 +43,7 @@ for required_path in \
   "${ALPHA_SOURCE_DIR}/deploy/deploy-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-tournament-runtime.sh" \
+  "${ALPHA_SOURCE_DIR}/deploy/web-replicas-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-manifest-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-source-common.sh" \
@@ -110,6 +111,7 @@ set -a
 # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
 source "${ENV_FILE}"
 set +a
+configure_web_replicas "${V1_WEB_REPLICAS:-}" 2 1800000
 
 export COMPOSE_PARALLEL_LIMIT=1
 compose=(
@@ -118,6 +120,7 @@ compose=(
   -f "${COMPOSE_PROD}"
   -f "${COMPOSE_ALPHA}"
   --env-file "${ENV_FILE}"
+  ${WEB_COMPOSE_ARGS[@]+"${WEB_COMPOSE_ARGS[@]}"}
 )
 
 restore_on_failure() {
@@ -165,8 +168,7 @@ restore_legacy_runtime() {
   ALPHA_RELEASE_VERSION="${legacy_release_version}"
   ALPHA_RELEASE_SHA="${legacy_release_sha}"
   export ALPHA_API_IMAGE ALPHA_WEB_IMAGE ALPHA_RELEASE_VERSION ALPHA_RELEASE_SHA
-  alpha_restore_step legacy_compose_up_app "${compose[@]}" up -d --force-recreate --no-deps \
-    v1_api v1_web v1_game_operations_worker || return 1
+  alpha_restore_step legacy_compose_up_app up_app_containers --force-recreate || return 1
   alpha_restore_step legacy_compose_up_nginx "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   local restored_api_container
   local restored_web_container
@@ -358,9 +360,8 @@ fi
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/queens-cup-ranking-repair.cli.js'
 
-"${compose[@]}" up -d
-"${compose[@]}" up -d --force-recreate --no-deps \
-  v1_api v1_web v1_game_operations_worker
+up_base_services
+up_app_containers --force-recreate
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_alpha_health_contract
 wait_for_alpha_worker_healthy

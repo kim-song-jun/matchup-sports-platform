@@ -238,6 +238,7 @@ export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-stor
     ...(options.cache === 'no-store' ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
   });
 
+  if (response.status === 404 || !response.ok) await response.body?.cancel();
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`SEO metadata request failed: ${path} (${response.status})`);
 

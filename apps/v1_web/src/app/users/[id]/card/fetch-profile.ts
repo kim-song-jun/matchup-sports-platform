@@ -40,6 +40,7 @@ export async function fetchPublicProfileForOg(
   try {
     const response = await fetch(url, { ...init, signal: serverFetchSignal() });
     if (!response.ok) {
+      await response.body?.cancel();
       console.error(`[og-card] 프로필 조회 실패: ${response.status} ${url}`);
       return null;
     }

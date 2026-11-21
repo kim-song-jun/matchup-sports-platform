@@ -92,6 +92,16 @@ describe('fetchPublicV1 cache policy', () => {
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('next');
   });
 
+  it.each([404, 503])('closes the unread body of a %s answer', async (status) => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status, ok: false, body: { cancel } }));
+
+    await fetchPublicV1('/matches/m-1').catch(() => null);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it('gives up on an API that never answers instead of waiting for the server default', async () => {
     vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
     const real = AbortSignal.timeout.bind(AbortSignal);

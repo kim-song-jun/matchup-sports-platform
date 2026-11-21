@@ -24,6 +24,7 @@ export async function loadPublicTournamentCampaign(
     { cache: 'no-store', headers: { accept: 'application/json' }, signal: serverFetchSignal() },
   );
 
+  if (response.status === 404 || !response.ok) await response.body?.cancel();
   if (response.status === 404) return { kind: 'not_found' };
   if (!response.ok) throw new TournamentCampaignLoadError(response.status);
 

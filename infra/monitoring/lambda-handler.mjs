@@ -88,7 +88,11 @@ async function decideForGroup(alarm, known, deps) {
   }
 }
 
-export async function handler(event, deps = defaultDeps()) {
+// Lambda calls handler(event, context): the second argument is never the dependencies.
+export const makeHandler = (makeDeps) => (event) => handleEvent(event, makeDeps());
+export const handler = makeHandler(defaultDeps);
+
+export async function handleEvent(event, deps) {
   const webhook = await deps.getWebhook();
   const messages = [];
   if (Array.isArray(event?.Records)) {

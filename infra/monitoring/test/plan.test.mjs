@@ -6,7 +6,7 @@ import { parseArgs } from '../install.mjs';
 import {
   alarmMetrics, buildInstallPlan, buildTeardownPlan, DEFAULTS, lambdaPolicy, serverPolicy,
 } from '../lib/plan.mjs';
-import { assertApplicable, normalizeCapture, renderCommand, runPlan } from '../lib/run-plan.mjs';
+import { assertApplicable, firstLine, normalizeCapture, renderCommand, runPlan } from '../lib/run-plan.mjs';
 import { RULES, rulesFor, HEALTH_CHECKS } from '../lib/thresholds.mjs';
 
 const ids = { prodInstanceId: 'i-prod', alphaInstanceId: 'i-alpha', rdsId: 'rds-main' };
@@ -151,6 +151,16 @@ test('apply stops at the first real failure and reports which step', async () =>
     /mail-topic-exists 실패/,
   );
   assert.ok(!calls.includes('create-topic'), 'nothing is created without the mail topic');
+});
+
+test('a failure message shows the first non-empty line of the aws CLI error', async () => {
+  assert.equal(firstLine('\nAn error occurred (InvalidParameterValueException)\nmore'), 'An error occurred (InvalidParameterValueException)');
+  const exec = async (args) => {
+    if (args[1] === 'create-role') throw Object.assign(new Error('Command failed'), { stderr: '\nAn error occurred (AccessDenied) when calling CreateRole\n' });
+    return args[0] === 'sts' ? '111122223333' : '';
+  };
+  await assert.rejects(runPlan(buildInstallPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' }),
+    /role 실패: An error occurred \(AccessDenied\)/);
 });
 
 test('a second apply tolerates "already exists" but not other errors', async () => {

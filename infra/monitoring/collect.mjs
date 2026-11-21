@@ -5,7 +5,7 @@
 import { execFile } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { buildMetricData, CONTAINER_LABELS } from './lib/metrics.mjs';
@@ -18,7 +18,11 @@ import {
 const execFileAsync = promisify(execFile);
 const STEP_TIMEOUT_MS = 15_000;
 const TOTAL_TIMEOUT_MS = 40_000;
-const DEFAULT_CERT_PATH = '/etc/letsencrypt/live/teameet.co.kr/fullchain.pem';
+const CERT_DOMAIN = 'teameet.co.kr';
+const CERT_MOUNT = '/etc/letsencrypt';
+// docker logs reads a json-file log from its start; --tail makes it read from the end, so an nginx log
+// without rotation does not slow the minute down. A minute that hits the cap is reported, not hidden.
+const NGINX_TAIL_LINES = 20_000;
 
 const NAME_BY_LABEL = Object.fromEntries(Object.entries(CONTAINER_LABELS).map(([n, l]) => [l, n]));
 
@@ -33,7 +37,7 @@ const splitLines = ({ stdout, stderr }) => `${stdout}\n${stderr}`.split('\n').fi
  * One collection pass. Every step is isolated: a failing step is recorded in `failed` (and the
  * Heartbeat is withheld) instead of aborting the others or being swallowed.
  */
-export async function collectSample({ exec, readText, nowMs, state, env, certPath = DEFAULT_CERT_PATH }) {
+export async function collectSample({ exec, readText, nowMs, state, env, certPath }) {
   const failed = [];
   const step = async (name, fn) => {
     try { return await fn(); } catch (err) {
@@ -45,9 +49,14 @@ export async function collectSample({ exec, readText, nowMs, state, env, certPat
   const started = Date.now();
   const next = { ...state };
 
+  // The certificate directory is whatever nginx actually has mounted, so no host path is assumed.
+  let certDir = null;
   const containers = await step('docker-inspect', async () => {
     const { stdout } = await exec('docker', ['inspect', ...Object.keys(CONTAINER_LABELS)]);
-    return JSON.parse(stdout).map((c) => ({
+    const inspected = JSON.parse(stdout);
+    certDir = inspected.find((c) => c.Name === '/teameet_nginx')?.Mounts
+      ?.find((m) => m.Destination === CERT_MOUNT)?.Source ?? null;
+    return inspected.map((c) => ({
       name: CONTAINER_LABELS[c.Name.replace(/^\//, '')],
       id: c.Id,
       startedAt: c.State.StartedAt,
@@ -74,8 +83,13 @@ export async function collectSample({ exec, readText, nowMs, state, env, certPat
   if (diff?.oomKilledRestarts) heapOom.web = Math.max(heapOom.web, diff.restarts.web ?? 0);
 
   const nginx = await step('nginx-logs', async () => {
-    const logs = await exec('docker', ['logs', '--since', '60s', '--timestamps', NAME_BY_LABEL.nginx]);
-    const fresh = linesAfter(splitLines(logs), state.nginxLast ?? null);
+    const logs = await exec('docker', ['logs', '--since', '60s', '--tail', String(NGINX_TAIL_LINES), '--timestamps', NAME_BY_LABEL.nginx]);
+    const lines = splitLines(logs);
+    if (lines.length >= NGINX_TAIL_LINES) {
+      failed.push('nginx-logs-truncated');
+      console.error(`[collector] nginx-logs-truncated: ${lines.length} lines in a minute, counts are a lower bound`);
+    }
+    const fresh = linesAfter(lines, state.nginxLast ?? null);
     if (fresh.newest) next.nginxLast = fresh.newest;
     return summarizeNginx(fresh.lines);
   });
@@ -89,7 +103,9 @@ export async function collectSample({ exec, readText, nowMs, state, env, certPat
   const today = new Date(nowMs).toISOString().slice(0, 10);
   if (env === 'prod' && state.certDay !== today) {
     originCertDays = await step('origin-cert', async () => {
-      const { stdout } = await exec('openssl', ['x509', '-enddate', '-noout', '-in', certPath]);
+      const file = certPath ?? (certDir ? join(certDir, 'live', CERT_DOMAIN, 'fullchain.pem') : null);
+      if (!file) throw new Error(`nginx has no ${CERT_MOUNT} mount; pass --cert-path`);
+      const { stdout } = await exec('openssl', ['x509', '-enddate', '-noout', '-in', file]);
       return parseCertDaysLeft(stdout, nowMs);
     });
     if (originCertDays !== null) next.certDay = today;

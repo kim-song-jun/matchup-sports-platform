@@ -16,7 +16,7 @@ import { runPlan } from './lib/run-plan.mjs';
 
 const execFileAsync = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const ZIP_FILES = ['lambda-handler.mjs', 'lib/format.mjs', 'lib/thresholds.mjs', 'lib/summary.mjs'];
+export const ZIP_FILES = ['lambda-handler.mjs', 'lib/dedupe.mjs', 'lib/format.mjs', 'lib/thresholds.mjs', 'lib/summary.mjs'];
 
 const VALUE_FLAGS = {
   '--region': 'region', '--host': 'host', '--webhook-param': 'webhookParam', '--prod-instance-id': 'prodInstanceId',

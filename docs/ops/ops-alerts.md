@@ -20,10 +20,16 @@ Route 53 헬스 체크 2개(us-east-1) ─▶ 경보 ─▶ 같은 Lambda
 
 | 머리 | 뜻 |
 |---|---|
-| `[긴급]` | 지금 봐요. 회복 알림도 와요 |
+| `[긴급]` | 지금 봐요. 회복 알림도 와요(재시작 · heap 부족처럼 한 번 일어나고 끝나는 일은 회복 알림이 없어요) |
 | `[주의]` | 오늘 안에 봐요. alpha 는 항상 주의예요 |
 | `[회복]` | 경보가 풀렸어요(걸린 시간이 붙어요) |
 | `[하루 요약]` | 매일 09:00 KST, 어제 0~24시 |
+
+### 알림을 묶는 방식
+
+- 한 번의 heap 부족은 「web 재시작」과 「heap 부족」이 몇 초 간격으로 같이 울려요. **먼저 울린 경보 하나만** 보내고, 「같이 울린 경보」 줄에 나머지를 적어요(3분 안에 이어진 경보는 한 사건이에요).
+- 같은 사건이 30분 안에 되풀이되면 **1 · 3 · 6 · 12 · 24번째만** 보내요. 사이 알림은 CloudWatch 경보 기록과 하루 요약에 남아요. 같은 종류가 이어지는데 알림이 없다면 마지막 알림의 「N번째」 줄을 봐요.
+- 경보 기록을 읽지 못하면 묶지 않고 그대로 보내요(알림을 놓치는 것보다 겹치는 편이 나아요).
 
 ## 경보별 먼저 볼 것
 
@@ -84,7 +90,15 @@ swap 사용이 1,200MB 를 넘어 10분 이어졌어요(평소 약 450MB). `free
 
 1. 외부에서: `curl -sS -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/landing`. 응답이 없으면 서버 문제예요(「서버 자체」 · 「외부 헬스」 알림이 같이 올 수 있어요).
 2. 서버에서: `systemctl status teameet-ops-metrics.timer teameet-ops-metrics.service`, `journalctl -u teameet-ops-metrics.service -n 30 --no-pager`.
-3. 로그에 `[collector] <단계> failed` 가 보이면 그 단계(docker 권한 · nginx 컨테이너 이름 · aws 자격 증명)가 원인이에요. 한 단계라도 실패하면 하트비트를 일부러 올리지 않아요.
+3. 로그에 `[collector] <단계> failed` 가 보이면 그 단계가 원인이에요. 컨테이너를 못 보는 단계(`docker-inspect` · `docker-logs-*`: docker 권한 · 컨테이너 이름)가 실패하거나 숫자를 보내는 `aws` 가 실패하면 하트비트를 일부러 올리지 않아요. 그 밖의 단계 실패는 「수집기 단계 실패」(주의)로 따로 알려요.
+
+## 수집기 단계 실패
+
+수집기는 돌지만 일부 단계(인증서 읽기 · nginx 로그 · `df` · `docker stats` · 메모리 읽기)가 5분 내내 실패했어요. 서버는 살아 있어요 — 컨테이너를 못 보는 경우(`docker-inspect` · `docker-logs-*` 실패)만 「수집기 끊김」으로 알려요.
+
+1. 서버에서: `journalctl -u teameet-ops-metrics.service -n 30 --no-pager` 에서 `[collector] <단계> failed` 줄을 봐요.
+2. `origin-cert` 면 nginx 컨테이너의 `/etc/letsencrypt` 마운트 아래 `live/teameet.co.kr/fullchain.pem` 을 읽을 수 있는지(`docker inspect` 의 Mounts · 읽기 권한).
+3. `nginx-logs` 가 시간 초과면 nginx 로그가 매우 큰 거예요(`docker inspect -f '{{.LogPath}}' teameet_nginx` 파일 크기를 `stat` 으로만 봐요). `nginx-logs-truncated` 는 1분에 2만 줄을 넘어 5xx · 요청 수가 실제보다 적게 잡힌다는 뜻이에요.
 
 ## 인증서
 

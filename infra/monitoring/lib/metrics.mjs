@@ -9,12 +9,20 @@ export const CONTAINER_LABELS = {
 };
 
 // Alpha only pages on four things (heartbeat, restarts, heap, disk) so it publishes just those.
-const ALPHA_METRICS = new Set(['Heartbeat', 'Restarts', 'HeapOom', 'DiskUsedPct', 'CollectorSeconds']);
+const ALPHA_METRICS = new Set(['Heartbeat', 'Restarts', 'HeapOom', 'DiskUsedPct', 'CollectorSeconds', 'StepFailures']);
+
+/**
+ * Steps whose failure makes a published zero meaningless (restart and heap counters come from them).
+ * Every other step only owns its own metric, which is skipped when the step fails.
+ */
+export const isCriticalStep = (name) => name === 'docker-inspect' || name.startsWith('docker-logs-');
 
 /**
  * sample -> CloudWatch PutMetricData entries. Zero counts are published on purpose: an alarm that
  * never sees a datapoint cannot tell "nothing happened" from "collector is down".
- * Heartbeat is published only when every hard step succeeded, so a half-working collector goes silent.
+ * Heartbeat is published only when the critical steps succeeded: a collector that cannot see containers
+ * goes silent. An optional step that fails (certificate, nginx log, df) surfaces as StepFailures instead,
+ * so it never looks like a stopped server.
  */
 export function buildMetricData(env, sample, { botNames = false } = {}) {
   const ts = new Date(sample.nowMs).toISOString();
@@ -39,6 +47,7 @@ export function buildMetricData(env, sample, { botNames = false } = {}) {
     entry('SwapUsedMB', sample.swapUsedMB, 'Megabytes'),
     entry('DiskUsedPct', sample.diskUsedPct, 'Percent'),
     entry('CollectorSeconds', sample.collectorSeconds, 'Seconds'),
+    entry('StepFailures', sample.failed.length),
   ];
   if (botNames && sample.nginx) {
     for (const [bot, n] of Object.entries(sample.nginx.botsByName)) {
@@ -46,7 +55,7 @@ export function buildMetricData(env, sample, { botNames = false } = {}) {
     }
   }
   if (sample.originCertDays !== undefined) data.push(entry('OriginCertDays', sample.originCertDays, 'Count'));
-  if (sample.failed.length === 0) data.push(entry('Heartbeat', 1));
+  if (!sample.failed.some(isCriticalStep)) data.push(entry('Heartbeat', 1));
 
   const present = data.filter(Boolean);
   return env === 'alpha' ? present.filter((d) => ALPHA_METRICS.has(d.MetricName)) : present;

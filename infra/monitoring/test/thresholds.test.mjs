@@ -21,9 +21,9 @@ test('every rule is well formed and ids are unique', () => {
   }
 });
 
-test('alpha pages on exactly four things and never as critical', () => {
+test('alpha pages on exactly five things and never as critical', () => {
   const alpha = rulesFor('alpha');
-  assert.deepEqual(alpha.map((r) => r.id).sort(), ['collector-silent', 'disk-high', 'heap-oom', 'web-restart']);
+  assert.deepEqual(alpha.map((r) => r.id).sort(), ['collector-silent', 'collector-step-failed', 'disk-high', 'heap-oom', 'web-restart']);
   assert.ok(alpha.every((r) => r.severity === 'warning'));
   assert.ok(rulesFor('prod').some((r) => r.severity === 'critical'));
 });

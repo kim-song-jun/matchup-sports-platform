@@ -1,5 +1,6 @@
 // Slack message text for alarms, recoveries and the daily summary. Pure functions: no I/O, no clock
 // (callers pass dates in), so the exact output is testable.
+import { POST_AT_INCIDENT, REPEAT_WINDOW_MS } from './dedupe.mjs';
 import { describeAlarm } from './thresholds.mjs';
 
 export const RUNBOOK_BASE =
@@ -53,6 +54,8 @@ function minutesBetween(fromIso, toIso) {
  * Returns null for INSUFFICIENT_DATA: alarms that care about missing data are configured to
  * breach, so this state carries no extra information.
  * `context.alarmedAt` (ISO) lets a recovery report how long the alarm lasted.
+ * `context.alongside` (alarm names that fired in the same incident) and `context.incident` (n-th within
+ * the repeat window) come from lib/dedupe.mjs.
  */
 export function formatAlarmNotification(message, context = {}) {
   const state = message.NewStateValue;
@@ -75,6 +78,12 @@ export function formatAlarmNotification(message, context = {}) {
     lines.push(`• 언제: ${when}`);
     const reason = scrub(message.NewStateReason ?? '');
     if (reason) lines.push(`• 무엇: ${escapeSlack(reason.slice(0, 220))}`);
+    const others = (context.alongside ?? []).map((n) => describeAlarm(n)?.title ?? n);
+    if (others.length) lines.push(`• 같이 울린 경보: ${escapeSlack(scrub(others.join(' / ')))}`);
+    if (context.incident > 1) {
+      lines.push(`• ${REPEAT_WINDOW_MS / 60_000}분 안에 ${context.incident}번째예요 — 되풀이되고 있어요(알림은 ${POST_AT_INCIDENT.join(' · ')}번째에만 보내요)`);
+    }
+    if (known?.event) lines.push('• 한 번 일어난 일이라 회복 알림은 보내지 않아요(또 일어나면 다시 알려요)');
   } else {
     const minutes = context.alarmedAt ? minutesBetween(context.alarmedAt, message.StateChangeTime) : null;
     lines.push(minutes === null

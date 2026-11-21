@@ -74,6 +74,46 @@ test('apply runs steps in order and threads captured values (account, health che
   assert.ok(order('route53 create-health-check') < order('teameet-prod-health-api'));
 });
 
+const aws = (calls, over = {}) => async (args) => {
+  calls.push(args.join(' '));
+  if (args[0] === 'sts') return '111122223333';
+  if (args[1] === 'get-metric-statistics') return over[args.at(args.indexOf('--namespace') + 1)] ?? 'None\n';
+  return '';
+};
+
+test('collector-silent is only created for an environment whose Heartbeat already arrived', async () => {
+  const calls = [];
+  const logs = [];
+  await runPlan(buildInstallPlan(ids), {
+    apply: true, exec: aws(calls, { 'Teameet/Ops/Alpha': '15.0\n' }), log: (l) => logs.push(l), buildZip: async () => '/x',
+  });
+  assert.ok(calls.some((c) => c.includes('teameet-alpha-collector-silent')), 'alpha reported, alarm created');
+  assert.ok(!calls.some((c) => c.includes('teameet-prod-collector-silent')), 'prod never reported, alarm withheld');
+  assert.ok(logs.some((l) => /prod 서버의 Heartbeat 숫자가 아직 없어요/.test(l)));
+  assert.ok(calls.some((c) => c.includes('teameet-prod-web-restart')), 'every other alarm is still created');
+});
+
+test('the Heartbeat check is read-only, looks at the last 15 minutes of the right namespace, and precedes its alarm', () => {
+  const now = Date.parse('2026-11-21T03:00:00Z');
+  const plan = buildInstallPlan({ ...ids, now });
+  const gate = plan.find((s) => s.id === 'heartbeat-prod');
+  assert.equal(gate.readonly, true);
+  const arg = (name) => gate.args[gate.args.indexOf(name) + 1];
+  assert.equal(arg('--namespace'), 'Teameet/Ops/Prod');
+  assert.equal(arg('--metric-name'), 'Heartbeat');
+  assert.equal(arg('--start-time'), '2026-11-21T02:45:00.000Z');
+  assert.equal(arg('--end-time'), '2026-11-21T03:00:00.000Z');
+  assert.ok(plan.findIndex((s) => s.id === 'heartbeat-prod') < plan.findIndex((s) => s.id === 'alarm-prod-collector-silent'));
+  assert.equal(plan.find((s) => s.id === 'alarm-prod-collector-silent').requires, 'heartbeat-prod');
+  assert.equal(plan.filter((s) => s.requires).length, 2, 'no other alarm is gated');
+});
+
+test('the dry run shows which alarm is gated on the Heartbeat check', async () => {
+  const logs = [];
+  await runPlan(buildInstallPlan(ids), { apply: false, exec: async () => { throw new Error('no aws in a dry run'); }, log: (l) => logs.push(l), buildZip: async () => '/x' });
+  assert.ok(logs.some((l) => l.includes('teameet-prod-collector-silent') && l.includes('heartbeat-prod 확인이 통과할 때만 만들어요')));
+});
+
 test('apply stops at the first real failure and reports which step', async () => {
   const exec = async (args) => {
     if (args[0] === 'ssm') throw Object.assign(new Error('x'), { stderr: 'ParameterNotFound' });

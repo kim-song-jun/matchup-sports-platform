@@ -1,6 +1,8 @@
 // Lambda entry: SNS alarm notification or the daily scheduler tick -> one Slack message.
 // The webhook URL is read from SSM Parameter Store (SecureString) at cold start and never logged.
+import { decideGroupAlarm, REPEAT_WINDOW_MS } from './lib/dedupe.mjs';
 import { formatAlarmNotification, formatDailySummary, scrub } from './lib/format.mjs';
+import { describeAlarm, groupAlarmNames } from './lib/thresholds.mjs';
 import {
   buildSummary, kstDateOf, summarizeCost, summaryQueries, yesterdayKst, SUMMARY_METRICS,
 } from './lib/summary.mjs';
@@ -9,6 +11,8 @@ import {
 const SLACK_WEBHOOK = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/;
 const SLACK_TIMEOUT_MS = 5_000;
 const DAY_MS = 86_400_000;
+// Sibling alarms of one incident flip within seconds; waiting lets every one of them see the others.
+const SIBLING_WAIT_MS = 8_000;
 
 export async function postToSlack(webhookUrl, text, fetchFn = fetch) {
   if (!SLACK_WEBHOOK.test(webhookUrl)) throw new Error('webhook parameter is not a Slack Incoming Webhook URL');
@@ -22,8 +26,11 @@ export async function postToSlack(webhookUrl, text, fetchFn = fetch) {
   if (!res.ok || body !== 'ok') throw new Error(`Slack webhook failed (${res.status}): ${body.slice(0, 100)}`);
 }
 
-/** SNS record body -> text, or null when the notification carries nothing worth posting. */
-export async function messageForSnsRecord(record, lookupAlarmedAt) {
+/**
+ * SNS record body -> text, or null when the notification carries nothing worth posting.
+ * `deps.sleep` and `deps.loadGroupTransitions` serve the cause groups (see lib/dedupe.mjs).
+ */
+export async function messageForSnsRecord(record, deps) {
   const raw = record.Sns?.Message ?? '';
   let alarm;
   try { alarm = JSON.parse(raw); } catch {
@@ -31,11 +38,33 @@ export async function messageForSnsRecord(record, lookupAlarmedAt) {
     const subject = scrub(record.Sns?.Subject ?? '');
     return `[공지][운영] ${subject ? `${subject}\n` : ''}${scrub(raw).slice(0, 500)}`;
   }
+  const known = describeAlarm(String(alarm?.AlarmName ?? ''));
   if (alarm?.NewStateValue === 'OK') {
-    const alarmedAt = await lookupAlarmedAt(alarm.AlarmName);
+    // An event clears itself a minute later; posting that would only double the messages.
+    if (known?.event) return null;
+    const alarmedAt = await deps.lookupAlarmedAt(alarm.AlarmName);
     return formatAlarmNotification(alarm, { alarmedAt });
   }
+  if (alarm?.NewStateValue === 'ALARM' && known?.group) {
+    const decision = await decideForGroup(alarm, known, deps);
+    if (decision && !decision.post) return null;
+    return formatAlarmNotification(alarm, decision ?? {});
+  }
   return formatAlarmNotification(alarm);
+}
+
+// A failed history lookup posts the alarm as it is: an extra message is better than a missed one.
+async function decideForGroup(alarm, known, deps) {
+  try {
+    await deps.sleep(SIBLING_WAIT_MS);
+    const transitions = await deps.loadGroupTransitions(groupAlarmNames(known.env, known.group));
+    return decideGroupAlarm({
+      name: alarm.AlarmName, changeMs: Date.parse(alarm.StateChangeTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')), transitions,
+    });
+  } catch (err) {
+    console.error(`group lookup failed: ${err.name ?? err.message}`);
+    return null;
+  }
 }
 
 export async function handler(event, deps = defaultDeps()) {
@@ -43,7 +72,7 @@ export async function handler(event, deps = defaultDeps()) {
   const messages = [];
   if (Array.isArray(event?.Records)) {
     for (const record of event.Records) {
-      const text = await messageForSnsRecord(record, deps.lookupAlarmedAt);
+      const text = await messageForSnsRecord(record, deps);
       if (text) messages.push(text);
     }
   } else if (event?.mode === 'daily-summary') {
@@ -75,6 +104,8 @@ function defaultDeps() {
     },
     post: (url, text) => postToSlack(url, text),
     lookupAlarmedAt: (name) => lookupAlarmedAt(region, name),
+    sleep: (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
+    loadGroupTransitions: (names) => loadGroupTransitions(region, names),
     loadSummary: (env, dateKst) => loadSummary({ region, env, dateKst, rdsId: process.env.RDS_ID }),
   };
 }
@@ -92,6 +123,22 @@ async function lookupAlarmedAt(region, alarmName) {
     console.error(`alarm history lookup failed: ${err.name}`);
     return undefined;
   }
+}
+
+// ALARM transitions of every alarm in a cause group inside the repeat window.
+async function loadGroupTransitions(region, alarmNames) {
+  const { CloudWatchClient, DescribeAlarmHistoryCommand } = await import('@aws-sdk/client-cloudwatch');
+  const cw = new CloudWatchClient({ region });
+  const startDate = new Date(Date.now() - REPEAT_WINDOW_MS - 5 * 60_000);
+  const perAlarm = await Promise.all(alarmNames.map(async (name) => {
+    const out = await cw.send(new DescribeAlarmHistoryCommand({
+      AlarmName: name, HistoryItemType: 'StateUpdate', StartDate: startDate, MaxRecords: 50, ScanBy: 'TimestampDescending',
+    }));
+    return (out.AlarmHistoryItems ?? [])
+      .filter((i) => /to ALARM/.test(i.HistorySummary ?? ''))
+      .map((i) => ({ name, atMs: i.Timestamp.getTime() }));
+  }));
+  return perAlarm.flat();
 }
 
 async function loadSummary({ region, env, dateKst, rdsId }) {

@@ -47,12 +47,14 @@ export async function runPlan(steps, { apply, exec, log, buildZip }) {
     if (!apply) {
       // The policy document is printed once, pretty, instead of as a long one-line argument.
       const shown = step.policy ? step.args.map((a) => (a === JSON.stringify(step.policy) ? '<아래 정책>' : a)) : step.args;
-      log(`${head}\n  ${step.local ? '(로컬) lambda-handler.mjs + lib/ 를 zip 으로 묶어요' : renderCommand(shown)}`);
+      const gate = step.requires ? `\n  (${step.requires} 확인이 통과할 때만 만들어요)` : '';
+      log(`${head}${gate}\n  ${step.local ? '(로컬) lambda-handler.mjs + lib/ 를 zip 으로 묶어요' : renderCommand(shown)}`);
       if (step.policy) log(indent(JSON.stringify(step.policy, null, 2)));
       continue;
     }
     log(head);
     if (step.local === 'package') { tokens.zip = await buildZip(); continue; }
+    if (step.requires && !tokens[step.requires]) { log(`  건너뛰어요: ${step.skipHint}`); continue; }
     const { args, missing } = substitute(step.args, tokens);
     if (missing) { log(`  건너뛰어요: ${missing} 대상이 없어요`); continue; }
     try {

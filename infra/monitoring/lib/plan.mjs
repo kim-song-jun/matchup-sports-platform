@@ -98,10 +98,22 @@ function putAlarmArgs({ region, name, description, op, threshold, evaluationPeri
 
 const resolve = (p) => ({
   ...DEFAULTS,
+  now: Date.now(),
   ...p,
   instanceIds: { prod: p.prodInstanceId ?? q('PROD_INSTANCE_ID'), alpha: p.alphaInstanceId ?? q('ALPHA_INSTANCE_ID') },
   rdsId: p.rdsId ?? q('RDS_INSTANCE_ID'),
 });
+
+/** Read-only: the Heartbeat Sum of the last 15 minutes ('' when the collector never reported). */
+function heartbeatGate(env, region, now) {
+  const end = new Date(now);
+  return {
+    id: `heartbeat-${env}`, title: `${env} 수집기 Heartbeat 가 들어오는지 확인(읽기)`, readonly: true, capture: `heartbeat-${env}`,
+    args: ['cloudwatch', 'get-metric-statistics', '--region', region, '--namespace', NAMESPACES[env], '--metric-name', 'Heartbeat',
+      '--start-time', new Date(end.getTime() - 15 * 60_000).toISOString(), '--end-time', end.toISOString(),
+      '--period', '900', '--statistics', 'Sum', '--query', 'Datapoints[0].Sum', '--output', 'text'],
+  };
+}
 
 export const alarmNames = (p) => {
   const r = resolve(p);
@@ -147,7 +159,7 @@ export function buildInstallPlan(input) {
     args: ['lambda', 'wait', state, '--region', p.region, '--function-name', p.lambdaName] });
   add({ id: 'lambda', title: `Lambda ${p.lambdaName}`, tolerate: 'ResourceConflict',
     args: ['lambda', 'create-function', '--region', p.region, '--function-name', p.lambdaName, '--runtime', 'nodejs22.x',
-      '--handler', 'lambda-handler.handler', '--timeout', '20', '--memory-size', '128',
+      '--handler', 'lambda-handler.handler', '--timeout', '30', '--memory-size', '128',
       '--role', `arn:aws:iam::{{account}}:role/${p.lambdaRole}`, '--zip-file', 'fileb://{{zip}}'] });
   add(wait('lambda-wait-1', 'function-active-v2'));
   add({ id: 'lambda-code', title: 'Lambda 코드 갱신(다시 실행해도 같은 결과)',
@@ -164,7 +176,11 @@ export function buildInstallPlan(input) {
 
   for (const e of p.includeAlpha ? ['prod', 'alpha'] : ['prod']) {
     for (const rule of rulesFor(e)) {
+      // missing=breaching: without a collector sending numbers this alarm would page at once, so it is only
+      // created after a Heartbeat arrived. A rerun of the installer adds it later.
+      if (rule.id === 'collector-silent') add(heartbeatGate(e, p.region, p.now));
       add({ id: `alarm-${e}-${rule.id}`, title: `경보 ${alarmName(e, rule.id)}`,
+        ...(rule.id === 'collector-silent' ? { requires: `heartbeat-${e}`, skipHint: `${e} 서버의 Heartbeat 숫자가 아직 없어요. 수집기를 깐 뒤 이 스크립트를 다시 실행하면 이 경보가 만들어져요` } : {}),
         args: putAlarmArgs({ region: p.region, name: alarmName(e, rule.id), description: rule.title, op: rule.op,
           threshold: rule.threshold, evaluationPeriods: rule.evaluationPeriods, datapointsToAlarm: rule.datapointsToAlarm,
           missing: rule.missing, topic, metrics: alarmMetrics(e, rule, p) }) });

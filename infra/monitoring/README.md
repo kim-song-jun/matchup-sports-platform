@@ -33,19 +33,25 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
    node infra/monitoring/install.mjs
    ```
 3. **서버 역할에 정책 붙이기(사람).** 미리보기 끝에 나오는 `PutMetricData` 정책 2개를 운영 · alpha 서버의 인스턴스 역할에 각각 붙여요. 각 서버는 **자기 이름공간에만** 쓸 수 있어요. 이 스크립트는 서버 역할을 건드리지 않아요.
-4. **AWS 쪽 만들기.** 인스턴스 ID · RDS 이름은 매개변수예요(저장소에 적지 않아요).
-   ```bash
-   node infra/monitoring/install.mjs --apply \
-     --prod-instance-id <운영 인스턴스 ID> --alpha-instance-id <alpha 인스턴스 ID> --rds-id <RDS 인스턴스 이름>
-   ```
-   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 24개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1. 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로예요.
-5. **수집기 설치(서버, alpha 먼저 하루 → 운영).** SSM Run Command 나 SSH 로 이 폴더를 서버에 올린 뒤:
+4. **수집기 설치(서버, alpha 먼저 하루 → 운영).** SSM Run Command 나 SSH 로 이 폴더를 서버에 올린 뒤:
    ```bash
    sudo infra/monitoring/install-collector.sh --env alpha            # 미리보기
    sudo infra/monitoring/install-collector.sh --env alpha --apply
    ```
-   파일 3묶음(`/usr/local/lib/teameet-ops/`, `/etc/systemd/system/teameet-ops-metrics.{service,timer}`, `/etc/teameet-ops/collector.env`)만 만들고 컨테이너 · compose · nginx 는 건드리지 않아요.
+   파일 3묶음(`/usr/local/lib/teameet-ops/`, `/etc/systemd/system/teameet-ops-metrics.{service,timer}`, `/etc/teameet-ops/collector.env`)만 만들고 컨테이너 · compose · nginx 는 건드리지 않아요. 몇 분 뒤 CloudWatch 에 `Heartbeat` 가 들어오는지 봐요(5번이 이것을 확인해요).
+5. **AWS 쪽 만들기.** 인스턴스 ID · RDS 이름은 매개변수예요(저장소에 적지 않아요).
+   ```bash
+   node infra/monitoring/install.mjs --apply \
+     --prod-instance-id <운영 인스턴스 ID> --alpha-instance-id <alpha 인스턴스 ID> --rds-id <RDS 인스턴스 이름>
+   ```
+   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 26개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1. 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로예요.
+
+   **「수집기 끊김」 경보는 그 환경의 Heartbeat 가 최근 15분에 들어온 것을 확인한 뒤에만 만들어요**(숫자가 없으면 만들자마자 긴급이 울려요). 수집기를 아직 못 깔았으면(예: 운영 서버에 Node 가 없을 때) 그 경보만 건너뛰고 나머지는 만들어요. 수집기를 깐 뒤 같은 명령을 다시 실행하면 그때 만들어져요 — 그 전까지 운영은 수집기 끊김 경보가 없다는 뜻이니 설치 완료 전까지 사람이 서버 상태를 봐요.
 6. **시험.** `aws cloudwatch set-alarm-state --alarm-name teameet-alpha-web-restart --state-value ALARM --state-reason test` 로 Slack 모양을 확인하고, alpha 에서 `systemctl stop teameet-ops-metrics.timer` 5분 뒤 「수집기 끊김」 경보와 회복을 확인해요. 시험 채널로 1주 돌린 뒤 임계값을 보고 운영 채널로 옮겨요.
+
+### 오리진 인증서 경로
+
+수집기는 인증서 경로를 가정하지 않고, 실행 중인 `teameet_nginx` 컨테이너에서 `/etc/letsencrypt` 가 어느 호스트 폴더에 연결돼 있는지 읽어 그 아래 `live/teameet.co.kr/fullchain.pem` 을 열어요(필요하면 `collect.mjs --cert-path <파일>` 로 직접 지정). 인증서를 못 읽어도 하트비트는 그대로 올라가고 「수집기 단계 실패」(주의)만 와요.
 
 ### 서버의 Node
 
@@ -58,6 +64,10 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
 ```bash
 node /usr/local/lib/teameet-ops/collect.mjs --env prod            # 출력만
 ```
+
+## 알림 묶기
+
+한 번의 heap 부족이 만드는 경보 2개(`web-restart` · `heap-oom`)를 Lambda 가 한 메시지로 묶고, 재시작 · heap 부족은 회복 메시지를 보내지 않으며, 같은 사건이 30분 안에 되풀이되면 1 · 3 · 6 · 12 · 24번째만 보내요(`lib/dedupe.mjs`). 새 경보를 묶고 싶으면 `RULES` 에 같은 `group` 을(한 번 일어나고 끝나는 일이면 `event: true` 도) 달아요. Lambda 는 알림 한 건마다 8초 기다려 같은 사건의 다른 경보를 함께 봐요.
 
 ## 되돌리기
 
@@ -96,6 +106,10 @@ node --test infra/monitoring/test/*.test.mjs
 ```
 
 실제 11-20 heap 부족 줄 · nginx combined 줄 모양으로 파서를 시험하고, 임계값은 11-20 실측 5분 창으로 판정해요. 이 시험은 아직 CI 워크플로(`deploy.yml`)에 걸려 있지 않아요(그 파일은 이 작업의 범위 밖).
+
+## 다른 작업에 넘기는 것
+
+- 운영 `nginx` 서비스(`deploy/docker-compose.prod.yml`)에는 `logging` 제한이 없어 로그 파일이 계속 커져요. 수집기는 `--tail` 로 끝에서부터 읽어 영향을 줄였지만, 디스크를 위해서도 다른 서비스처럼 `max-size` · `max-file` 을 두는 것이 좋아요(이 폴더의 범위 밖이라 고치지 않았어요).
 
 ## 이 PR 에 없는 것
 

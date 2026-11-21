@@ -31,12 +31,14 @@ const aws = (namespace, metricName, dimensionName, { stat = 'Average', period = 
 /**
  * op: CloudWatch comparison operator. missing: treat-missing-data.
  * scope: 'prod' | 'both' (alpha keeps only the `both` rules, as warnings — see alphaRules).
+ * event: a one-off occurrence that clears itself a minute later, so recoveries are not posted.
+ * group: alarms of one cause; the Lambda posts one message per incident (lib/dedupe.mjs).
  */
 export const RULES = [
-  { id: 'web-restart', scope: 'both', severity: 'critical', title: '컨테이너가 다시 시작됐어요',
+  { id: 'web-restart', scope: 'both', severity: 'critical', event: true, group: 'process-exit', title: '컨테이너가 다시 시작됐어요',
     anchor: 'web-재시작', source: { kind: 'sum-containers', metricName: 'Restarts', containers: CONTAINERS, period: 60 },
     op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching' },
-  { id: 'heap-oom', scope: 'both', severity: 'critical', title: 'heap 부족으로 프로세스가 죽었어요',
+  { id: 'heap-oom', scope: 'both', severity: 'critical', event: true, group: 'process-exit', title: 'heap 부족으로 프로세스가 죽었어요',
     anchor: 'heap-부족', source: { kind: 'sum-containers', metricName: 'HeapOom', containers: HEAP_CONTAINERS, period: 60 },
     op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching' },
   { id: 'web-memory-high', scope: 'prod', severity: 'warning', title: 'web 메모리가 한도에 가까워요',
@@ -63,6 +65,9 @@ export const RULES = [
   { id: 'collector-silent', scope: 'both', severity: 'critical', title: '수집기가 끊겼어요(서버가 멈췄을 수 있어요)',
     anchor: '수집기-끊김', source: custom('Heartbeat'),
     op: 'LessThanThreshold', threshold: 1, evaluationPeriods: 5, datapointsToAlarm: 5, missing: 'breaching' },
+  { id: 'collector-step-failed', scope: 'both', severity: 'warning', title: '수집기의 일부 단계가 계속 실패해요',
+    anchor: '수집기-단계-실패', source: custom('StepFailures', { stat: 'Maximum' }),
+    op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 5, datapointsToAlarm: 5, missing: 'notBreaching' },
   { id: 'origin-cert-expiring', scope: 'prod', severity: 'warning', title: '오리진 인증서 만료가 가까워요',
     anchor: '인증서', source: custom('OriginCertDays', { stat: 'Minimum', period: 86400 }),
     op: 'LessThanThreshold', threshold: 20, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'ignore' },
@@ -105,6 +110,10 @@ export function rulesFor(env) {
 }
 
 export const alarmName = (env, ruleId) => `teameet-${env}-${ruleId}`;
+
+/** Alarm names of one cause group in one environment. */
+export const groupAlarmNames = (env, group) =>
+  rulesFor(env).filter((r) => r.group === group).map((r) => alarmName(env, r.id));
 
 const BY_ALARM_NAME = new Map(
   ['prod', 'alpha'].flatMap((env) => rulesFor(env).map((r) => [alarmName(env, r.id), { ...r, env }])),

@@ -14,7 +14,11 @@ const inspectJson = (over = {}) => JSON.stringify([
   { Name: '/teameet_v1_web', Id: over.webId ?? 'WEB1', State: { StartedAt: over.webStarted ?? '2026-11-20T01:40:50Z', OOMKilled: over.oom ?? false } },
   { Name: '/teameet_v1_api', Id: 'API1', State: { StartedAt: '2026-11-20T01:40:49Z', OOMKilled: false } },
   { Name: '/teameet_v1_game_operations_worker', Id: 'WRK1', State: { StartedAt: '2026-11-20T01:40:49Z', OOMKilled: false } },
-  { Name: '/teameet_nginx', Id: 'NGX1', State: { StartedAt: '2026-11-20T01:40:48Z', OOMKilled: false } },
+  { Name: '/teameet_nginx', Id: 'NGX1', State: { StartedAt: '2026-11-20T01:40:48Z', OOMKilled: false },
+    Mounts: over.mounts ?? [
+      { Destination: '/etc/nginx/conf.d/default.conf', Source: '/srv/release/nginx.conf' },
+      { Destination: '/etc/letsencrypt', Source: '/srv/release/certbot/conf' },
+    ] },
 ]);
 
 function fakeExec(over = {}) {
@@ -23,7 +27,7 @@ function fakeExec(over = {}) {
     calls.push([file, ...args].join(' '));
     const key = args[0] === 'logs' ? `logs:${args.at(-1)}` : `${file} ${args[0]}`;
     const table = {
-      'docker inspect': () => ({ stdout: over.inspect ?? inspectJson(), stderr: '' }),
+      'docker inspect': () => ({ stdout: over.inspect ?? inspectJson(over), stderr: '' }),
       'logs:teameet_v1_web': () => ({ stdout: '', stderr: over.webLogs ?? '' }),
       'logs:teameet_v1_api': () => ({ stdout: '', stderr: '' }),
       'logs:teameet_v1_game_operations_worker': () => ({ stdout: '', stderr: '' }),
@@ -96,15 +100,61 @@ test('the origin certificate is read once per day, in prod only', async () => {
   assert.equal(alpha.sample.originCertDays, undefined);
 });
 
-test('a failing step is reported, withholds the heartbeat, and does not stop the other steps', async () => {
+test('an optional step that fails is counted, keeps the heartbeat, and does not stop the other steps', async () => {
   const { sample } = await run({}, { fail: ['docker stats'] });
   assert.deepEqual(sample.failed, ['docker-stats']);
   assert.equal(sample.webMemPct, null);
   assert.equal(sample.diskUsedPct, 57);
   const data = buildMetricData('prod', sample);
-  assert.ok(!data.some((d) => d.MetricName === 'Heartbeat'), 'half-working collector must go silent');
+  assert.ok(data.some((d) => d.MetricName === 'Heartbeat'), 'a failed optional read is not a stopped server');
+  assert.equal(data.find((d) => d.MetricName === 'StepFailures').Value, 1);
   assert.ok(!data.some((d) => d.MetricName === 'WebMemPct'), 'no made-up zero for a failed read');
   assert.ok(data.some((d) => d.MetricName === 'DiskUsedPct'));
+});
+
+test('a step that feeds the restart / heap counters withholds the heartbeat when it fails', async () => {
+  for (const fail of [['docker inspect'], ['logs:teameet_v1_web']]) {
+    const { sample } = await run({}, { fail });
+    const data = buildMetricData('prod', sample);
+    assert.ok(!data.some((d) => d.MetricName === 'Heartbeat'), `${fail[0]}: collector cannot see containers, so it goes silent`);
+    assert.ok(data.some((d) => d.MetricName === 'StepFailures' && d.Value >= 1));
+  }
+});
+
+test('the origin certificate is read from the directory nginx has mounted, not from an assumed host path', async () => {
+  const fake = fakeExec();
+  const { sample } = await collectSample({ exec: fake.exec, readText: async () => fx.MEMINFO, nowMs: NOW, state: {}, env: 'prod' });
+  assert.equal(sample.originCertDays, 42);
+  assert.ok(fake.calls.includes('openssl x509 -enddate -noout -in /srv/release/certbot/conf/live/teameet.co.kr/fullchain.pem'));
+});
+
+test('--cert-path overrides the mount lookup', async () => {
+  const fake = fakeExec();
+  await collectSample({ exec: fake.exec, readText: async () => fx.MEMINFO, nowMs: NOW, state: {}, env: 'prod', certPath: '/x/fullchain.pem' });
+  assert.ok(fake.calls.includes('openssl x509 -enddate -noout -in /x/fullchain.pem'));
+});
+
+test('no letsencrypt mount: the certificate step fails visibly, the heartbeat survives, the cert is retried next minute', async () => {
+  const { sample, nextState } = await run({}, { mounts: [] });
+  assert.deepEqual(sample.failed, ['origin-cert']);
+  assert.equal(sample.originCertDays, undefined);
+  assert.equal(nextState.certDay, undefined);
+  const data = buildMetricData('prod', sample);
+  assert.ok(data.some((d) => d.MetricName === 'Heartbeat'));
+  assert.ok(!data.some((d) => d.MetricName === 'OriginCertDays'));
+});
+
+test('nginx logs are read from the end of the file with a line cap', async () => {
+  const fake = fakeExec();
+  await collectSample({ exec: fake.exec, readText: async () => fx.MEMINFO, nowMs: NOW, state: {}, env: 'prod' });
+  assert.ok(fake.calls.includes('docker logs --since 60s --tail 20000 --timestamps teameet_nginx'));
+});
+
+test('a minute that fills the line cap is reported as truncated, not published as exact', async () => {
+  const lines = Array.from({ length: 20_000 }, () => fx.NGINX_OK).join('\n');
+  const { sample } = await run({}, { nginx: lines });
+  assert.deepEqual(sample.failed, ['nginx-logs-truncated']);
+  assert.ok(sample.nginx.requests > 0);
 });
 
 test('a failed nginx read neither publishes zeros nor advances the log position', async () => {
@@ -124,10 +174,10 @@ test('a clean pass publishes zero-valued counters and a heartbeat', async () => 
   assert.ok(data.every((d) => d.Timestamp === '2026-11-20T01:51:00.000Z'));
 });
 
-test('alpha publishes only what its four alarms read', async () => {
+test('alpha publishes only what its five alarms read', async () => {
   const { sample } = await run({}, {}, 'alpha');
   const names = new Set(buildMetricData('alpha', sample).map((d) => d.MetricName));
-  assert.deepEqual([...names].sort(), ['CollectorSeconds', 'DiskUsedPct', 'HeapOom', 'Heartbeat', 'Restarts']);
+  assert.deepEqual([...names].sort(), ['CollectorSeconds', 'DiskUsedPct', 'HeapOom', 'Heartbeat', 'Restarts', 'StepFailures']);
 });
 
 test('bot names become a Bot dimension only when asked', async () => {

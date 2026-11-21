@@ -26,6 +26,8 @@ const deps = (over = {}) => {
     getWebhook: async () => WEBHOOK,
     post: async (url, text) => { posted.push({ url, text }); },
     lookupAlarmedAt: async () => '2026-11-20T01:50:47.000Z',
+    sleep: async () => {},
+    loadGroupTransitions: async () => [],
     loadSummary: async (env, date) => ({ env, date, requests: 10 }),
     ...over,
   };
@@ -53,8 +55,75 @@ test('an SNS alarm becomes one Slack post to the webhook from SSM', async () => 
 
 test('a recovery asks for the alarm start so it can show how long it lasted', async () => {
   const d = deps();
-  await handler({ Records: [sns(alarm({ NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
   assert.match(d.posted[0].text, /\(12분\)/);
+});
+
+test('an event alarm (restart, heap death) never posts a recovery', async () => {
+  for (const name of ['teameet-prod-web-restart', 'teameet-prod-heap-oom']) {
+    const d = deps({ lookupAlarmedAt: async () => { throw new Error('must not look up history for a skipped recovery'); } });
+    assert.deepEqual(await handler({ Records: [sns(alarm({ AlarmName: name, NewStateValue: 'OK' }))] }, d), { posted: 0 });
+  }
+  const d = deps();
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
+  assert.equal(d.posted.length, 1, 'a state alarm still reports its recovery');
+});
+
+const HEAP_ALARM_TIME = Date.parse('2026-11-20T01:50:47.803Z');
+test('one OOM death: the two alarms and their two recoveries become one Slack message', async () => {
+  const transitions = [
+    { name: 'teameet-prod-web-restart', atMs: HEAP_ALARM_TIME }, { name: 'teameet-prod-heap-oom', atMs: HEAP_ALARM_TIME + 1_500 },
+  ];
+  const d = deps({ loadGroupTransitions: async () => transitions });
+  const events = [
+    alarm({ AlarmName: 'teameet-prod-web-restart' }),
+    alarm({ AlarmName: 'teameet-prod-heap-oom', StateChangeTime: '2026-11-20T01:50:49.303+0000' }),
+    alarm({ AlarmName: 'teameet-prod-web-restart', NewStateValue: 'OK', StateChangeTime: '2026-11-20T01:51:47.000+0000' }),
+    alarm({ AlarmName: 'teameet-prod-heap-oom', NewStateValue: 'OK', StateChangeTime: '2026-11-20T01:51:48.000+0000' }),
+  ];
+  for (const e of events) await handler({ Records: [sns(e)] }, d);
+  assert.equal(d.posted.length, 1);
+  assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
+  assert.match(d.posted[0].text, /• 같이 울린 경보: heap 부족으로 프로세스가 죽었어요/);
+});
+
+test('a sibling alarm waits before reading history, so both alarms of one incident are visible', async () => {
+  const order = [];
+  const d = deps({
+    sleep: async (ms) => { order.push(`sleep:${ms}`); },
+    loadGroupTransitions: async () => { order.push('history'); return []; },
+  });
+  await handler({ Records: [sns(alarm())] }, d);
+  assert.deepEqual(order, ['sleep:8000', 'history']);
+});
+
+test('the 2nd restart within 30 minutes stays quiet, the 3rd says it is repeating', async () => {
+  const min = 60_000;
+  const base = HEAP_ALARM_TIME;
+  const history = [0, 4, 8].map((m) => ({ name: 'teameet-prod-web-restart', atMs: base + m * min }));
+  const stamp = (m) => new Date(base + m * min).toISOString().replace('Z', '+0000');
+  const d = deps({ loadGroupTransitions: async () => history });
+  await handler({ Records: [sns(alarm({ StateChangeTime: stamp(4) }))] }, d);
+  assert.equal(d.posted.length, 0);
+  await handler({ Records: [sns(alarm({ StateChangeTime: stamp(8) }))] }, d);
+  assert.equal(d.posted.length, 1);
+  assert.match(d.posted[0].text, /30분 안에 3번째예요/);
+});
+
+test('when the alarm history cannot be read, the alarm is posted as it is', async () => {
+  const d = deps({ loadGroupTransitions: async () => { throw new Error('throttled'); } });
+  const result = await handler({ Records: [sns(alarm())] }, d);
+  assert.equal(result.posted, 1);
+  assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
+});
+
+test('an alarm outside any group never reads history or waits', async () => {
+  const d = deps({
+    sleep: async () => { throw new Error('no wait expected'); },
+    loadGroupTransitions: async () => { throw new Error('no history expected'); },
+  });
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high' }))] }, d);
+  assert.equal(d.posted.length, 1);
 });
 
 test('INSUFFICIENT_DATA posts nothing', async () => {
@@ -65,7 +134,7 @@ test('INSUFFICIENT_DATA posts nothing', async () => {
 
 test('a plain-text SNS message (maintenance script) is forwarded scrubbed', async () => {
   const text = await messageForSnsRecord(
-    sns('maintenance from 203.0.113.9 by account 123456789012', 'Window'), async () => undefined);
+    sns('maintenance from 203.0.113.9 by account 123456789012', 'Window'), deps());
   assert.equal(text, '[공지][운영] Window\nmaintenance from [IP] by account');
 });
 

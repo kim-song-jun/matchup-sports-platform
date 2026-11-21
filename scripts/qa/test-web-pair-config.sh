@@ -67,14 +67,15 @@ nginx_run() { # <conf> <개수> <nginx 인자...>
 }
 for conf in nginx.conf nginx.alpha.conf; do
   for replicas in 1 2; do
-    if nginx_run "${conf}" "${replicas}" -t | grep -q 'test is successful'; then
+    result="$(nginx_run "${conf}" "${replicas}" -t || true)"
+    if grep -q 'test is successful' <<<"${result}"; then
       pass "${conf} 개수 ${replicas}: nginx -t 통과"
     else
       fail "${conf} 개수 ${replicas}: nginx -t 실패"
     fi
   done
-  one="$(nginx_run "${conf}" 1 -T | awk '/^upstream v1_web \{/ { in_u = 1 } in_u { print } in_u && /^\}/ { exit }')"
-  two="$(nginx_run "${conf}" 2 -T | awk '/^upstream v1_web \{/ { in_u = 1 } in_u { print } in_u && /^\}/ { exit }')"
+  one="$(nginx_run "${conf}" 1 -T | awk '/^upstream v1_web \{/ { in_u = 1 } in_u { print } in_u && /^\}/ { in_u = 0 }')"
+  two="$(nginx_run "${conf}" 2 -T | awk '/^upstream v1_web \{/ { in_u = 1 } in_u { print } in_u && /^\}/ { in_u = 0 }')"
   if [[ "$(grep -c 'server ' <<<"${one}")" == 1 && "$(grep -c 'server ' <<<"${two}")" == 2 ]]; then
     pass "${conf}: upstream 서버가 개수 1 은 하나, 개수 2 는 둘"
   else

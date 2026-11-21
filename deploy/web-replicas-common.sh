@@ -49,12 +49,16 @@ configure_web_replicas() {
   WEB_ACTIVE=("${WEB_SERVICES[@]}")
 }
 
-# 롤백이 개수 2 를 모르는 옛 릴리스 소스(v1_web_b 가 없는 compose)로 돌아가면 v1_web_b 를 올릴 수 없다.
+# 개수 1 이면 compose 에 묻지 않는다. 개수 2 일 때 롤백이 v1_web_b 를 모르는 옛 릴리스 소스(compose)로 돌아가면 v1_web_b 를 올릴 수 없다.
 # 그때는 그 소스가 아는 서비스만 다루고, 남은 v1_web_b 컨테이너는 옛 nginx 설정이 쓰지 않으므로 치운다.
 resolve_web_services() {
   local defined
   local service
 
+  if (( WEB_REPLICAS == 1 )); then
+    WEB_ACTIVE=(v1_web)
+    return 0
+  fi
   defined="$("${compose[@]}" config --services)" || return 1
   WEB_ACTIVE=()
   for service in "${WEB_SERVICES[@]}"; do

@@ -180,6 +180,75 @@ describe('ScheduleReminderService', () => {
       });
     });
 
+    it('rsvpDeadlineReminderHandler 는 이미 응답한 팀원을 빼고 아직 응답하지 않은 팀원만 조회한다', async () => {
+      const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);
+      const tx = txWith({
+        lockRows: [{ id: 's1', teamId: 't1', state: 'SCHEDULED' }],
+        memberRows: [{ userId: 'u1' }],
+      });
+
+      await service.rsvpDeadlineReminderHandler(claim('s1') as never, tx as never);
+
+      // 응답 여부 조건은 중첩 Prisma.Sql 조각으로 들어간다(팀 id 뒤의 값 자리).
+      const fragments = (tx.$queryRaw as jest.Mock).mock.calls[1].slice(1) as Array<{ sql?: string; values?: unknown[] }>;
+      const unanswered = fragments.find((value) => typeof value?.sql === 'string' && value.sql.includes('NOT EXISTS'));
+      expect(unanswered?.sql).toContain('v1_schedule_attendance');
+      expect(unanswered?.values).toContain('s1');
+    });
+
+    it('guestRecruitmentCloseReminderHandler 는 응답 여부로 거르지 않는다(팀원 전체)', async () => {
+      const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);
+      const tx = txWith({
+        lockRows: [{ id: 'r1', scheduleId: 's1', teamId: 't1', state: 'OPEN', version: 0, scheduleState: 'SCHEDULED' }],
+        memberRows: [{ userId: 'u3' }],
+      });
+
+      await service.guestRecruitmentCloseReminderHandler(guestClaim('s1') as never, tx as never);
+
+      const fragments = (tx.$queryRaw as jest.Mock).mock.calls[1].slice(1) as Array<{ sql?: string }>;
+      expect(fragments.some((value) => typeof value?.sql === 'string' && value.sql.includes('NOT EXISTS'))).toBe(false);
+    });
+
+    describe('자동 리마인더의 야간 푸시', () => {
+      afterEach(() => jest.useRealTimers());
+      const autoClaim = () => ({ ...claim('s1'), payload: { scheduleId: 's1', kind: 'rsvp_deadline', auto: true } });
+      const row = (startAt: string) => ({ id: 's1', teamId: 't1', state: 'SCHEDULED', rsvpDeadlineAt: null, startAt: new Date(startAt) });
+
+      it('밤(한국 23시)에는 알림함에만 남기고 푸시는 보내지 않는다', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-11-20T14:00:00.000Z')); // KST 23:00
+        const webPush = fakeWebPush();
+        const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);
+        const tx = txWith({ lockRows: [row('2026-11-25T01:00:00.000Z')], memberRows: [{ userId: 'u1' }] });
+
+        await service.rsvpDeadlineReminderHandler(autoClaim() as never, tx as never);
+
+        expect(tx.v1Notification.createMany).toHaveBeenCalled();
+        expect(webPush.sendToUser).not.toHaveBeenCalled();
+      });
+
+      it('낮(한국 12시)에는 푸시도 보낸다', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-11-20T03:00:00.000Z')); // KST 12:00
+        const webPush = fakeWebPush();
+        const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);
+        const tx = txWith({ lockRows: [row('2026-11-25T01:00:00.000Z')], memberRows: [{ userId: 'u1' }] });
+
+        await service.rsvpDeadlineReminderHandler(autoClaim() as never, tx as never);
+
+        expect(webPush.sendToUser).toHaveBeenCalledWith('u1', expect.anything());
+      });
+
+      it('팀장이 직접 누른 수동 트리거(auto 아님)는 밤에도 지금까지처럼 푸시한다', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-11-20T14:00:00.000Z'));
+        const webPush = fakeWebPush();
+        const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);
+        const tx = txWith({ lockRows: [row('2026-11-25T01:00:00.000Z')], memberRows: [{ userId: 'u1' }] });
+
+        await service.rsvpDeadlineReminderHandler(claim('s1') as never, tx as never);
+
+        expect(webPush.sendToUser).toHaveBeenCalledWith('u1', expect.anything());
+      });
+    });
+
     it('guestRecruitmentCloseReminderHandler persists through tx keyed by outboxId:recipient', async () => {
       const webPush = fakeWebPush();
       const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);

@@ -22,6 +22,12 @@ The service distinguishes omitted capacity from explicit `null` inside its versi
 
 `POST` creation keeps `CreateScheduleDto.capacity?: number` unchanged: omitting capacity creates an uncapped schedule, and supplied non-null values must be positive integers.
 
+## RSVP deadline reminder (automatic, unanswered members only)
+
+When a schedule is created or its `rsvpDeadlineAt` is changed, the same transaction schedules a reminder (`SCHEDULE_RSVP_DEADLINE_REMINDER`, payload `auto: true`) for **3 hours before the deadline**. It is skipped when there is no deadline or the deadline is less than 3 hours away (the "new schedule" notice already asked for a response). A changed deadline gets its own row; the older row is skipped by the worker because its `expectedRsvpDeadlineAt` no longer matches. The row uses the same business key as the manual `POST .../reminders { kind: "rsvp_deadline" }`, so a manual trigger for the same deadline does not send a second reminder.
+
+The worker sends it only to active team members who have **no attendance row** for the schedule (GOING, MAYBE, NOT_GOING and WAITLISTED all count as answered). This also applies to the manual trigger. Automatic reminders keep the in-app notification at night but suppress the Web Push between 21:00 and 09:00 KST (`nightPushAllowed`); a manual trigger still pushes immediately.
+
 ## Task 12 implementation status: BUILT (post-review hardening applied)
 
 Every route below is implemented, CI-integration-tested (`apps/v1_api/test/team-schedules/*.integration-spec.ts`), and wired into `AppModule` via `TeamSchedulesModule`. No new migration was required — the four models and seven enums already existed (migration `20260729000100_v1_game_operations`).

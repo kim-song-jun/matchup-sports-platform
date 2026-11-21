@@ -191,14 +191,23 @@ load_pid=$!
 write_meta c2
 configure_web_replicas 2 1 1800000
 sync_prod_nginx_config full >/dev/null
-docker exec "${NAME}" nginx -t >/dev/null 2>&1 && docker exec "${NAME}" nginx -s reload >/dev/null 2>&1
-for _ in $(seq 1 25); do [[ "$(commit_of)" == c2 ]] && break; sleep 0.2; done
+test_out="$(docker exec "${NAME}" nginx -t 2>&1)" && pass '새 릴리스 설정으로 nginx -t 통과' || fail "새 릴리스 설정으로 nginx -t 실패: ${test_out}"
+reload_out="$(docker exec "${NAME}" nginx -s reload 2>&1)" || fail "nginx -s reload 실패: ${reload_out}"
+for _ in $(seq 1 50); do [[ "$(commit_of)" == c2 ]] && break; sleep 0.2; done
 wait "${load_pid}"
-[[ "$(commit_of)" == c2 ]] && pass 'reload 뒤 c2 헤더' || fail 'reload 뒤에도 c2 헤더가 아니다'
+if [[ "$(commit_of)" == c2 ]]; then
+  pass 'reload 뒤 c2 헤더'
+else
+  fail "reload 뒤에도 c2 헤더가 아니다 (지금 '$(commit_of)')"
+  docker exec "${NAME}" cat /etc/nginx/snippets/teameet-release-metadata.conf 2>&1 | sed 's/^/        snippet: /'
+  docker logs "${NAME}" 2>&1 | tail -8 | sed 's/^/        log: /'
+fi
 [[ "$(docker exec "${NAME}" cat "/etc/nginx/conf.d/${NGINX_SYNC_MARKER}")" == "$(cat "${WORK}/runtime/nginx/conf.d/${NGINX_SYNC_MARKER}")" ]] &&
   pass '컨테이너가 이번 채우기 표식을 본다(apply_nginx_config 가 reload 를 고르는 근거)' || fail '컨테이너가 이번 표식을 보지 못한다'
+# nginx -T 는 지금 디스크의 파일을 읽으므로, 컨테이너가 이번 web 폴더를 본다는 뜻이다(돌고 있는 설정은 위 헤더로 본다).
 servers="$(docker exec "${NAME}" nginx -T 2>/dev/null | awk '/^upstream v1_web \{/ { u = 1 } u && /server / { n++ } u && /^\}/ { u = 0 } END { print n + 0 }')"
-[[ "${servers}" == 2 ]] && pass 'reload 뒤 upstream 은 웹 2개' || fail "reload 뒤 upstream 서버 ${servers}개"
+[[ "${servers}" == 2 ]] && pass '컨테이너가 보는 upstream 은 웹 2개' || fail "컨테이너가 보는 upstream 서버 ${servers}개"
+grep -q 'signal process started\|reconfiguring' <<<"$(docker logs "${NAME}" 2>&1)" && pass 'nginx 로그에 reload 가 남았다' || fail 'nginx 로그에 reload 흔적이 없다'
 [[ "$(docker inspect --format '{{.State.StartedAt}}' "${NAME}")" == "${started_before}" ]] &&
   pass '컨테이너는 다시 시작하지 않았다' || fail '컨테이너가 다시 시작됐다'
 bad="$(grep -vc '^200$' "${codes}" || true)"

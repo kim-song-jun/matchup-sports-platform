@@ -17,6 +17,10 @@ import type { GameEventRecord, GameLineup } from '@/types/game-operations';
 import { formatPlayerLabel } from './player-label';
 import { participantIdentityName } from './participant-identity';
 
+/** "수정" 버튼 모양 — 합친 줄(경고 누적 퇴장)의 수정 버튼과 한 이벤트의 수정 버튼이 같은 모양이다. */
+const EDIT_BUTTON_CLASS =
+  'flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40';
+
 /**
  * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
  *
@@ -104,8 +108,11 @@ export function RecordedEventList({
   /**
    * MD-QA #187: "수정" — 시각 정정(과 기록 취소)을 한 시트에서 고르는 진입점. 시각을 고칠 수 있는 기록에만
    * 뜨고, 그렇지 않은 기록(레거시 백필 골 등)은 `onReverseEvent` 의 "수정·취소"로 물러난다.
+   *
+   * 경고 누적 퇴장으로 합친 줄은 수정 버튼이 하나이고, 레드를 `event` 로, 함께 옮겨질 두 번째 옐로를
+   * `linkedEvents` 로 넘긴다 — 둘은 같은 순간의 기록이라 시각을 같이 옮겨야 줄이 갈라지지 않는다.
    */
-  readonly onEditEvent?: (event: GameEventRecord) => void;
+  readonly onEditEvent?: (event: GameEventRecord, linkedEvents?: readonly GameEventRecord[]) => void;
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
    * `GamesService.reverseEvent`(CORRECTION) 를 그대로 호출한다. */
@@ -248,7 +255,7 @@ export function RecordedEventList({
             disabled={disabled}
             onClick={() => onEditEvent?.(listedEvent)}
             aria-label={`기록 수정 (${eventTypeLabel(event)})`}
-            className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className={EDIT_BUTTON_CLASS}
           >
             <Pencil size={12} aria-hidden="true" />
             {actionPrefix === null ? '수정' : `${actionPrefix} 수정`}
@@ -335,13 +342,27 @@ export function RecordedEventList({
                 </p>
               </div>
               <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 @md:justify-end">
-                {mergedYellow !== null ? (
+                {mergedYellow === null ? (
+                  renderActions(listedEvent, null)
+                ) : onEditEvent !== undefined && resultOfficialized !== true ? (
+                  /* 합친 줄은 수정 버튼이 하나다 — 옐로와 레드는 같은 순간의 기록이라 시각을 같이 옮긴다.
+                     기록 취소는 시트의 "기록 취소" 탭에서 레드만/모두로 갈린다. */
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onEditEvent(listedEvent, [mergedYellow])}
+                    aria-label={`기록 수정 (${SECOND_YELLOW_RED_LABEL})`}
+                    className={EDIT_BUTTON_CLASS}
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    수정
+                  </button>
+                ) : (
+                  /* 시각 수정이 없는 화면(취소만 되는 곳)은 옐로·레드를 각각 취소할 수 있게 둘을 낸다. */
                   <>
                     {renderActions(mergedYellow, '옐로')}
                     {renderActions(listedEvent, '레드')}
                   </>
-                ) : (
-                  renderActions(listedEvent, null)
                 )}
                 {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
                     가장 약하게 표현돼 있었다(11px·regular·muted, 우측 끝 — 알파 390px

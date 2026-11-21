@@ -606,7 +606,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     expect(rows[1]).not.toHaveTextContent('레드카드');
   });
 
-  it('합친 줄은 옐로·레드 수정 버튼을 따로 두고, 각 버튼이 그 이벤트의 콜백을 부른다', async () => {
+  it('합친 줄은 수정 버튼이 하나이고, 누르면 레드를 주 대상으로 두 번째 옐로를 함께 넘긴다', async () => {
     const onEditEvent = vi.fn();
     const first = card(1, 'YELLOW', 1, 11 * 60000);
     const second = card(2, 'YELLOW', 2, 31 * 60000);
@@ -614,11 +614,53 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     render(<RecordedEventList events={[first, second, red]} sides={SIDES} lineups={LINEUPS} onEditEvent={onEditEvent} />);
 
     const merged = rowsOf()[1];
-    expect(within(merged).getAllByRole('button')).toHaveLength(2);
-    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (옐로카드)' }));
-    expect(onEditEvent).toHaveBeenLastCalledWith(second);
-    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (레드카드)' }));
-    expect(onEditEvent).toHaveBeenLastCalledWith(red);
+    expect(within(merged).getAllByRole('button')).toHaveLength(1);
+    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    expect(onEditEvent).toHaveBeenCalledTimes(1);
+    expect(onEditEvent).toHaveBeenCalledWith(red, [second]);
+  });
+
+  it('합치지 않은 카드 줄의 수정은 그 이벤트 하나만 넘긴다', async () => {
+    const onEditEvent = vi.fn();
+    const only = card(1, 'YELLOW', 1, 11 * 60000);
+    render(<RecordedEventList events={[only]} sides={SIDES} lineups={LINEUPS} onEditEvent={onEditEvent} />);
+
+    await userEvent.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    expect(onEditEvent).toHaveBeenCalledWith(only);
+  });
+
+  it('결과가 확정됐으면 합친 줄에도 수정 버튼이 없다', () => {
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), card(2, 'YELLOW', 2, 31 * 60000), card(3, 'RED', 2, 31 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onEditEvent={vi.fn()}
+        resultOfficialized
+      />,
+    );
+
+    expect(within(rowsOf()[1]).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('시각 수정 없이 취소만 가능한 화면에서는 합친 줄에 옐로·레드 각각의 수정·취소 버튼을 둔다', async () => {
+    const onReverseEvent = vi.fn();
+    const second = card(2, 'YELLOW', 2, 31 * 60000);
+    const red = card(3, 'RED', 2, 31 * 60000);
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), second, red]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseEvent={onReverseEvent}
+      />,
+    );
+
+    const merged = rowsOf()[1];
+    await userEvent.click(within(merged).getByRole('button', { name: '옐로 수정·취소' }));
+    expect(onReverseEvent).toHaveBeenLastCalledWith(second);
+    await userEvent.click(within(merged).getByRole('button', { name: '레드 수정·취소' }));
+    expect(onReverseEvent).toHaveBeenLastCalledWith(red);
   });
 
   it('newest-first 에서도 합친 줄은 마지막 기록 자리에 한 줄로 남는다', () => {

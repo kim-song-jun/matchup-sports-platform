@@ -45,7 +45,8 @@ import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList, eventTypeLabel } from './recorded-event-list';
 import { EventTimeCorrectionSheet } from './event-time-correction-sheet';
-import { collectEventTimeCorrections, eventClockUpperBoundMs } from '@/lib/event-time-correction';
+import { collectEventTimeCorrections, eventClockUpperBoundMs, eventTimeCorrectionErrorMessage } from '@/lib/event-time-correction';
+import { SECOND_YELLOW_RED_LABEL } from '@/lib/second-yellow-red';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
 import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
@@ -1028,6 +1029,8 @@ export function OperateConsoleCore({
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
   // MD-QA #187: "수정" 시트의 대상. 시각 정정과 기록 취소를 한 시트에서 고른다.
   const [editTarget, setEditTarget] = useState<GameEventRecord | null>(null);
+  // 경고 누적 퇴장 합친 줄의 수정이면 `editTarget` 은 레드이고 여기에 함께 옮길 두 번째 옐로가 들어 있다(아니면 빈 배열).
+  const [editLinked, setEditLinked] = useState<readonly GameEventRecord[]>([]);
 
   // Copilot review (PR #276): the toast's action.onClick used to close over
   // `ops.liveEvents` from the render that submitted the GOAL -- before the
@@ -1174,6 +1177,35 @@ export function OperateConsoleCore({
       });
       if (!ok) return;
       await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
+    },
+    [commandBlocked, confirm, ops],
+  );
+
+  /**
+   * 경고 누적 퇴장 합친 줄의 기록 취소 — 레드만(`yellow` 가 null) 또는 두 번째 옐로까지 모두. 레드를 먼저 되돌린다 — 도중에
+   * 멈춰도 "옐로 2장"(옐로만 둘 때와 같은 상태)이 남아 근거 없는 레드가 남지 않는다.
+   */
+  const handleReverseSecondYellowRed = useCallback(
+    async (red: GameEventRecord, yellow: GameEventRecord | null) => {
+      if (commandBlocked) return;
+      const ok = await confirm(
+        yellow === null
+          ? {
+              title: '레드카드 기록을 취소할까요?',
+              message: '옐로 2장은 그대로 남고 퇴장만 취소돼요. 취소 기록이 감사 로그에 남아요.',
+              confirmLabel: '레드 취소',
+              tone: 'danger',
+            }
+          : {
+              title: '두 번째 옐로와 레드를 모두 취소할까요?',
+              message: '첫 번째 옐로는 그대로 남아요. 취소 기록이 감사 로그에 남아요. 취소 후 올바른 기록을 다시 입력해 주세요.',
+              confirmLabel: '모두 취소',
+              tone: 'danger',
+            },
+      );
+      if (!ok) return;
+      await ops.reverseEvent({ eventId: red.id, reason: '레드카드 기록 수정·취소' });
+      if (yellow !== null) await ops.reverseEvent({ eventId: yellow.id, reason: '옐로카드 기록 수정·취소' });
     },
     [commandBlocked, confirm, ops],
   );
@@ -2192,7 +2224,14 @@ export function OperateConsoleCore({
           lineups={lineups}
           periodCount={periodCount}
           onAttachAssist={canOperate ? (event) => setAssistTarget({ event }) : undefined}
-          onEditEvent={canOperate && ops.correctEventTime !== undefined ? (event) => setEditTarget(event) : undefined}
+          onEditEvent={
+            canOperate && ops.correctEventTime !== undefined
+              ? (event, linkedEvents) => {
+                  setEditTarget(event);
+                  setEditLinked(linkedEvents ?? []);
+                }
+              : undefined
+          }
           onReverseEvent={canOperate ? (event) => void handleReverseEvent(event) : undefined}
           disabled={commandBlocked}
           resultOfficialized={resultOfficialized}
@@ -2234,8 +2273,9 @@ export function OperateConsoleCore({
         <EventTimeCorrectionSheet
           open
           mode="operator"
-          title={`${eventTypeLabel(editTarget)} 기록 수정`}
-          summary={eventTimeSummary(editTarget, sides, lineups, eventTypeLabel(editTarget))}
+          title={`${editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget)} 기록 수정`}
+          summary={eventTimeSummary(editTarget, sides, lineups, editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget))}
+          linkedNotice={editLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodLabel(editTarget.period, periodCount)}
           currentClockMs={collectEventTimeCorrections(ops.liveEvents).get(editTarget.id)?.currentClockMs ?? editTarget.clockMs}
           maxClockMs={eventClockUpperBoundMs({
@@ -2244,14 +2284,62 @@ export function OperateConsoleCore({
             nowMs: Date.now(),
           })}
           onSubmit={async ({ clockMs, reason }) => {
-            await ops.correctEventTime?.({ eventId: editTarget.id, clockMs, reason });
+            if (editLinked.length === 0) {
+              await ops.correctEventTime?.({ eventId: editTarget.id, clockMs, reason });
+              return;
+            }
+            // 합친 줄은 옐로, 이어서 레드를 같은 시각으로 옮긴다(저장은 이벤트마다 따로라 두 번 부른다). 이미 그 시각인 기록은
+            // 건너뛴다 — 앞 호출만 성공하고 멈춘 뒤 다시 정정해도 레드만 옮겨지도록.
+            const corrections = collectEventTimeCorrections(ops.liveEvents);
+            const targets = [...editLinked, editTarget].filter(
+              (event) => (corrections.get(event.id)?.currentClockMs ?? event.clockMs) !== clockMs,
+            );
+            for (const [index, event] of targets.entries()) {
+              try {
+                await ops.correctEventTime?.({ eventId: event.id, clockMs, reason });
+              } catch (err) {
+                if (index === 0) throw err;
+                throw new Error(
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                );
+              }
+            }
           }}
           onRequestCancelRecord={() => {
             const target = editTarget;
             setEditTarget(null);
+            setEditLinked([]);
             void handleReverseEvent(target);
           }}
-          onClose={() => setEditTarget(null)}
+          cancelOptions={
+            editLinked.length > 0
+              ? [
+                  {
+                    label: '레드카드만 취소 (퇴장 취소)',
+                    onSelect: () => {
+                      const red = editTarget;
+                      setEditTarget(null);
+                      setEditLinked([]);
+                      void handleReverseSecondYellowRed(red, null);
+                    },
+                  },
+                  {
+                    label: '옐로·레드 모두 취소',
+                    onSelect: () => {
+                      const red = editTarget;
+                      const yellow = editLinked[0] ?? null;
+                      setEditTarget(null);
+                      setEditLinked([]);
+                      void handleReverseSecondYellowRed(red, yellow);
+                    },
+                  },
+                ]
+              : undefined
+          }
+          onClose={() => {
+            setEditTarget(null);
+            setEditLinked([]);
+          }}
         />
       ) : null}
       {assistTarget ? (

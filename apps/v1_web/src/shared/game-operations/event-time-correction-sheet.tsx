@@ -41,8 +41,18 @@ export interface EventTimeCorrectionSheetProps {
   readonly maxClockMs: number | null;
   /** 정정 저장. 실패하면 throw — 시트가 해요체 안내를 보여 주고 열어 둔다. */
   readonly onSubmit: (input: { clockMs: number; reason: string }) => Promise<void>;
-  /** 운영 콘솔 전용: "기록 취소" 탭의 실행. 없으면 탭 없이 시간 정정만 보인다. */
+  /** 운영 콘솔 전용: "기록 취소" 탭의 실행. 없으면(`cancelOptions` 도 없으면) 탭 없이 시간 정정만 보인다. */
   readonly onRequestCancelRecord?: () => void;
+  /**
+   * 이 기록과 **함께 옮겨지는** 기록이 있다는 안내 한 줄(요약 줄 아래) — 경고 누적 퇴장 합친 줄은 옐로와 레드를 같은
+   * 시각으로 옮기므로 "옐로카드와 레드카드가 함께 옮겨져요."를 알린다. 없으면 그 줄이 없다.
+   */
+  readonly linkedNotice?: string;
+  /**
+   * "기록 취소" 탭의 선택지. 있으면 단일 "이 기록 취소하기" 대신 선택지마다 버튼을 낸다 — 합친 줄은 "레드카드만
+   * 취소"와 "옐로·레드 모두 취소"로 갈린다. 앞쪽일수록 되돌림이 가벼운 선택지다.
+   */
+  readonly cancelOptions?: ReadonlyArray<{ readonly label: string; readonly onSelect: () => void }>;
   readonly onClose: () => void;
 }
 
@@ -68,6 +78,8 @@ export function EventTimeCorrectionSheet({
   maxClockMs,
   onSubmit,
   onRequestCancelRecord,
+  linkedNotice,
+  cancelOptions,
   onClose,
 }: EventTimeCorrectionSheetProps) {
   const idPrefix = useId();
@@ -89,7 +101,7 @@ export function EventTimeCorrectionSheet({
 
   if (!open) return null;
 
-  const showTabs = mode === 'operator' && onRequestCancelRecord !== undefined;
+  const showTabs = mode === 'operator' && (onRequestCancelRecord !== undefined || cancelOptions !== undefined);
   const inRange = isClockInRange(clockMs, maxClockMs);
   const unchanged = clockMs === currentClockMs;
   const trimmedReason = reason.trim();
@@ -167,6 +179,10 @@ export function EventTimeCorrectionSheet({
           )}
         </div>
 
+        {linkedNotice !== undefined ? (
+          <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">{linkedNotice}</p>
+        ) : null}
+
         {showTabs ? (
           <div
             role="tablist"
@@ -221,9 +237,23 @@ export function EventTimeCorrectionSheet({
               <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)]">
                 시각이 아니라 기록 자체가 잘못됐다면 취소하고 올바른 기록을 다시 입력해 주세요. 취소 기록이 감사 로그에 남아요.
               </p>
-              <Button variant="danger" size="lg" block onClick={() => onRequestCancelRecord?.()}>
-                이 기록 취소하기
-              </Button>
+              {cancelOptions !== undefined ? (
+                cancelOptions.map((option, index) => (
+                  <Button
+                    key={option.label}
+                    variant={index === cancelOptions.length - 1 ? 'danger' : 'outline'}
+                    size="lg"
+                    block
+                    onClick={option.onSelect}
+                  >
+                    {option.label}
+                  </Button>
+                ))
+              ) : (
+                <Button variant="danger" size="lg" block onClick={() => onRequestCancelRecord?.()}>
+                  이 기록 취소하기
+                </Button>
+              )}
             </div>
           ) : (
             <>

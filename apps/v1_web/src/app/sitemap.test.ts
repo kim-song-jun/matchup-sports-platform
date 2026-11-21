@@ -36,8 +36,8 @@ describe('sitemap', () => {
       return emptyApi(path);
     });
     const urls = (await sitemap()).map((entry) => entry.url);
-    expect(urls).toContain('https://teameet.co.kr/tournaments?kind=tournament');
-    expect(urls).toContain('https://teameet.co.kr/tournaments?kind=league');
+    expect(urls).toContain('https://teameet.co.kr/tournaments');
+    expect(urls.filter((url) => url.includes('?'))).toEqual([]);
     expect(urls).toContain('https://teameet.co.kr/tournaments/cup/reviews');
     expect(urls).not.toContain('https://teameet.co.kr/tournaments/empty/reviews');
     expect(urls).toContain('https://teameet.co.kr/tournaments/league/reviews');

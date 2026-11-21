@@ -4,7 +4,7 @@ import LeagueFixtureDetailClient from './league-fixture-detail-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { leagueFixtureWeekNumber, withDerivedWeek } from '@/lib/league-fixture-week';
-import { buildNoIndexMetadata, buildPublicMetadata } from '@/lib/seo';
+import { buildLeagueFixtureTitle, buildNoIndexMetadata, buildPublicMetadata } from '@/lib/seo';
 import { buildBreadcrumbLd, buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
 import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
@@ -44,7 +44,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const canonical = fixturePath(leagueRef.leagueId, fixtureId);
   const parts = [leagueRef.title, formatTournamentDateTimeLong(startsAt), place?.name].filter(Boolean);
   return buildPublicMetadata({
-    title,
+    title: buildLeagueFixtureTitle(title, {
+      host: fixture.data.hostTeam?.name ?? fixture.data.hostTeamName,
+      opponent: fixture.data.approvedOpponentTeam?.name,
+    }),
     description: `${parts.join(' · ')}. 리그 경기의 일정과 결과를 확인해 보세요.`,
     path: canonical,
   });

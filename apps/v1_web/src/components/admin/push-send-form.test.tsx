@@ -29,6 +29,25 @@ describe('PushSendForm', () => {
     sendMutate.mockReset();
   });
 
+  it('previews the actual title and body before sending without invoking the send API', async () => {
+    const user = userEvent.setup(); render(<PushSendForm />);
+    await user.type(screen.getByLabelText(/제목/), '우승 혜택 안내');
+    await user.type(screen.getByLabelText('내용'), '상금과 상품권 안내');
+    expect(screen.getByTestId('phone-push-preview')).toHaveTextContent('우승 혜택 안내');
+    expect(screen.getByTestId('inbox-push-preview')).toHaveTextContent('상금과 상품권 안내');
+    expect(sendMutate).not.toHaveBeenCalled();
+  });
+
+  it('warns about history storage failure without asking the operator to send again', async () => {
+    sendMutate.mockImplementation((_payload, options) => options.onSuccess({ sent: 1, skipped: 0, failed: 0, historyRecorded: false }));
+    const user = userEvent.setup(); render(<PushSendForm />);
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 안내');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+    expect(await screen.findByText(/발송 처리는 끝났지만 이력 저장에 실패/)).toBeInTheDocument();
+    expect(sendMutate).toHaveBeenCalledTimes(1);
+  });
+
   it('sends the correct payload for a user-target push', async () => {
     const user = userEvent.setup();
     render(<PushSendForm />);
@@ -53,7 +72,7 @@ describe('PushSendForm', () => {
     const user = userEvent.setup();
     render(<PushSendForm />);
 
-    await user.click(screen.getByRole('radio', { name: /전체 구독자/ }));
+    await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
     await user.type(screen.getByLabelText(/제목/), '전체 공지');
 
     // Submitting only opens the confirmation dialog — no send yet.
@@ -78,7 +97,7 @@ describe('PushSendForm', () => {
     const user = userEvent.setup();
     render(<PushSendForm />);
 
-    await user.click(screen.getByRole('radio', { name: /전체 구독자/ }));
+    await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
     await user.type(screen.getByLabelText(/제목/), '전체 공지');
 
     const triggerButton = screen.getByRole('button', { name: '전체 발송 확인' });

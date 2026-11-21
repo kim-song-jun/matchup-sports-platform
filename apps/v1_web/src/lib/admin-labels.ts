@@ -5,6 +5,12 @@ import type {
   V1AdPublishMissingField,
 } from '@/types/ads';
 
+export function adminPushTargetLabel(target: 'user' | 'broadcast' | null): string {
+  if (target === 'broadcast') return '전체 회원';
+  if (target === 'user') return '특정 회원';
+  return '대상 미보관';
+}
+
 /**
  * 관리자 액션 코드를 사람이 읽을 수 있는 한국어 레이블로 변환해요.
  *
@@ -17,6 +23,8 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'user.delete': '회원 삭제',
   'user.phone.release': '휴대폰 번호 해제',
   'user.bracket_preview': '회원 대진표 조회',
+  'user.member_access.start': '회원 화면 조회 시작',
+  'user.member_access.end': '회원 화면 조회 종료',
   'match.status.update': '매치 상태 변경',
   'match.online.update': '매치 온라인 장소 분류 변경',
   'team.status.update': '팀 상태 변경',
@@ -149,4 +157,21 @@ export function isAdPublishMissingField(value: unknown): value is V1AdPublishMis
 
 export function adPublishFieldLabel(field: V1AdPublishMissingField): string {
   return AD_PUBLISH_FIELD_LABEL[field] ?? '필수 항목';
+}
+
+
+export function adminMissingItemLabel(value: string): string {
+  return ({ terms: '필수 약관 동의', basicProfile: '기본 프로필', phone: '휴대폰 인증', interestSport: '관심 종목' } as Record<string, string>)[value] ?? '추가 정보 확인';
+}
+export function adminTrustStateLabel(value: string): string {
+  return ({ verified: '확인된 자료', estimated: '참고 추정값', sample: '표본 부족', none: '산정 자료 없음' } as Record<string, string>)[value] ?? '산정 상태 확인 필요';
+}
+export function adminOperationStatusLabel(value: string): string {
+  return ({ active: '활성', suspended: '정지', blocked: '차단', deleted: '삭제', withdrawal_pending: '탈퇴 대기',
+    archived: '보관', received: '접수', reviewing: '검토 중', answered: '답변 완료', closed: '마감', recruiting: '모집 중',
+    matched: '매칭됨', completed: '완료', cancelled: '취소', removed: '제외', no_show: '불참', draft: '작성 중',
+    submitted: '제출', requested: '신청', approved: '승인', rejected: '거절', confirmed: '확정',
+    awaiting_payment: '입금 대기', payment_checking: '입금 확인 중', paid: '입금 완료', pending_payment: '입금 대기', payment_submitted: '입금 확인 중', waitlisted: '대기', cancel_requested: '취소 요청',
+    roster_submitted: '명단 제출', roster_locked: '명단 확정', withdrawn: '철회', pending: '대기',
+  } as Record<string, string>)[value] ?? '상태 확인 필요';
 }

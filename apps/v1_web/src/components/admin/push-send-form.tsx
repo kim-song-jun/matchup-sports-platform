@@ -8,6 +8,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { EntityPicker, type EntityPickerItem } from './entity-picker';
 import { useAdminToast, AdminToasts } from './admin-toast';
 import type { V1AdminPushSendPayload, V1AdminPushSendResult, V1AdminPushSendTarget } from '@/types/api';
+import { PushNotificationPreview } from './push-notification-preview';
 
 // ── Constants ────────────────────────────────────────────────────────────
 const TITLE_MAX = 60;
@@ -78,7 +79,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
 
         <div className="px-5 py-5 flex flex-col gap-3">
           <p id="push-broadcast-confirm-desc" className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)] leading-relaxed">
-            현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
+            공지 알림을 켠 <strong>모든 활성 회원</strong>의 알림함에 저장하고, 등록된 앱·웹 기기로 푸시를 보내요. 이 작업은 되돌릴 수 없어요.
           </p>
           <div className="tm-on-tint bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3">
             <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
@@ -249,10 +250,11 @@ export function PushSendForm() {
         const pushHadTrouble = data.push ? pushReportedTrouble(data.push) : false;
         showToast(
           `발송 완료 — 앱 알림 ${data.sent}건 · 스킵 ${data.skipped}건 · 실패 ${data.failed}건` +
-            (pushWentNowhere ? ' (푸시는 나가지 않았어요)' : pushHadTrouble ? ' (푸시 일부가 실패했어요)' : ''),
+            (pushWentNowhere ? ' (푸시는 나가지 않았어요)' : pushHadTrouble ? ' (푸시 일부가 실패했어요)' : '') +
+            (data.historyRecorded === false ? ' (발송 이력 저장 실패 — 다시 발송하지 마세요)' : ''),
           // 토스트는 success/error 두 가지뿐이라, 푸시가 아무 데도 안 갔거나 실패한 경우도
           // '성공'으로 흘려보내지 않도록 error 로 띄워 눈에 걸리게 한다.
-          data.failed > 0 || pushWentNowhere || pushHadTrouble ? 'error' : 'success',
+          data.failed > 0 || pushWentNowhere || pushHadTrouble || data.historyRecorded === false ? 'error' : 'success',
         );
         setConfirmOpen(false);
         setTitle('');
@@ -323,7 +325,7 @@ export function PushSendForm() {
               className={segmentButtonClass(target === 'broadcast')}
             >
               <Users size={15} aria-hidden="true" />
-              전체 구독자
+              전체 회원
             </button>
           </div>
         </div>
@@ -355,7 +357,7 @@ export function PushSendForm() {
             className="text-[length:var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-4 py-3 flex items-start gap-2"
           >
             <AlertTriangle size={15} className="text-[var(--orange700)] shrink-0 mt-0.5" aria-hidden="true" />
-            현재 웹 푸시를 구독 중인 모든 회원에게 발송돼요. 공지 알림을 꺼둔 회원은 자동으로 제외돼요.
+            모든 활성 회원의 알림함에 저장해요. 공지 알림을 꺼둔 회원은 제외하고, 앱·웹 푸시는 수신 기기를 등록한 회원에게 보내요.
           </p>
         )}
 
@@ -432,6 +434,8 @@ export function PushSendForm() {
           />
         </div>
 
+        <PushNotificationPreview title={trimmedTitle || '알림 제목을 입력해 주세요.'} body={body.trim() || null} />
+
         <button
           type="submit"
           disabled={!canSubmit}
@@ -456,6 +460,7 @@ export function PushSendForm() {
       {/* Result summary */}
       {result && (
         <div role="status" aria-live="polite" className="flex flex-col gap-3" data-testid="push-send-result">
+          {result.historyRecorded === false && <p className="text-[length:var(--font-size-label)] text-[var(--red700)]">발송 처리는 끝났지만 이력 저장에 실패했어요. 중복 발송을 피하려면 다시 발송하지 말고 운영 로그를 확인해 주세요.</p>}
           <div className="grid grid-cols-3 gap-3">
             <ResultStat label="앱 알림 생성" value={result.sent} tone="success" />
             <ResultStat label="스킵" value={result.skipped} tone="neutral" />

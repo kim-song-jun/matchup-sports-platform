@@ -425,8 +425,14 @@ function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weather
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {
   const router = useRouter();
-  const unreadLabel = model.chatUnreadCount > 0 ? `읽지 않은 메시지 ${model.chatUnreadCount}개` : '새 메시지 없음';
+  const unreadLabel = model.chatStatus === 'restricted' ? '회원 조회 중 접근 제한' : model.chatUnreadCount > 0 ? `읽지 않은 메시지 ${model.chatUnreadCount}개` : '새 메시지 없음';
   const body = (() => {
+    if (model.chatStatus === 'restricted') return (
+      <Card pad={16} className="tm-home-chat-empty">
+        <div className="tm-text-body-lg">회원 조회 중에는 채팅을 볼 수 없어요</div>
+        <p className="tm-text-caption">조회를 마치려면 상단의 관리자 복귀를 눌러 주세요.</p>
+      </Card>
+    );
     if (model.signedOut) {
       return (
         <Card pad={16} className="tm-home-chat-empty">

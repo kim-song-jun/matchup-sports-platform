@@ -24,6 +24,7 @@ import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { TeamInternalMatchesSection } from '@/components/team-internal-matches/team-internal-matches-section';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
 import { formatTeamCardMembers, teamCardGenderLabel } from './teams.card-model';
@@ -114,10 +115,12 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             <div className="tm-my-team-row">
               {model.myTeams.map((team) => (
                 <Link key={team.id} className="tm-my-team-chip tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
-                  <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="md" />
+                  {/* 목록 카드(TeamCard)와 같은 로고 크기(lg). 이름·종목 줄에 인라인 display:block 을 두면 line-clamp-1(display:-webkit-box)을
+                      덮어써서 긴 이름이 3줄로 늘어나 카드가 목록 카드보다 커진다 — 클래스만 쓴다. */}
+                  <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
                   <span style={{ minWidth: 0 }}>
-                    <span className="tm-text-body-lg line-clamp-1" style={{ display: 'block' }}>{team.name}</span>
-                    <span className="tm-text-caption line-clamp-1" style={{ display: 'block' }}>{team.sport} · {team.roleLabel}</span>
+                    <span className="tm-text-body-lg line-clamp-1">{team.name}</span>
+                    <span className="tm-text-caption line-clamp-1">{team.sport} · {team.roleLabel}</span>
                   </span>
                 </Link>
               ))}
@@ -506,6 +509,7 @@ function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule || '성별 미설정'} />
             <InfoRow label="정원" value={capacity} />
+            <InfoRow label="회비" value={formatMembershipFee(team.membershipFee)} muted={team.membershipFee == null} />
             <InfoRow label="가입 신청" value={team.statusLabel} />
           </div>
         </div>
@@ -739,6 +743,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
               자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
+          {mode === 'mine' ? <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageInternalMatches === true} /> : null}
           <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
           {model.competitionEntries ? (
             <TeamCompetitionEntriesSection model={model.competitionEntries} />
@@ -886,6 +891,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
             피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
+        {mode === 'mine' ? <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageInternalMatches === true} /> : null}
         <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
         {model.competitionEntries ? (
             <TeamCompetitionEntriesSection model={model.competitionEntries} />
@@ -1201,6 +1207,7 @@ export function TeamFormPageView({
     <>
       <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} editing={edit} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
       <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
+      <TeamMembershipFeeField value={team.membershipFee} onChange={(value) => form?.onFieldChange('membershipFee', value)} />
       <TeamActivityFields team={team} form={form} />
     </>
   );
@@ -2248,6 +2255,11 @@ function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {
   return team.capacity > 0 ? `${team.members}/${team.capacity}명` : `현재 ${team.members}명`;
 }
 
+function formatMembershipFee(fee?: number | null) {
+  if (fee == null) return '미정';
+  return fee === 0 ? '없음' : `월 ${fee.toLocaleString('ko-KR')}원`;
+}
+
 function formatCapacity(team: Pick<TeamModel, 'capacity'>) {
   return team.capacity > 0 ? `${team.capacity}명` : '정원 미정';
 }
@@ -2339,6 +2351,40 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
           성별 조건을 선택해 주세요. 선택하지 않으면 대회·리그에 신청할 수 없어요.
         </p>
       )}
+    </div>
+  );
+}
+
+function TeamMembershipFeeField({ value, onChange }: { value?: number | null; onChange?: (value: number | null) => void }) {
+  // '있음'인데 금액을 아직 안 적은 상태(null)를 칩이 기억해야 해서 따로 든다. 수정 화면은 값이 늦게 오므로 값도 함께 본다.
+  const [pickedPaid, setPaid] = useState(false);
+  const paid = pickedPaid || (value ?? 0) > 0;
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">회비</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label="회비 선택">
+        <button className={`tm-chip ${!paid && value === 0 ? 'tm-chip-active' : ''}`} type="button" aria-pressed={!paid && value === 0} onClick={() => { setPaid(false); onChange?.(0); }}>없음</button>
+        <button className={`tm-chip ${paid ? 'tm-chip-active' : ''}`} type="button" aria-pressed={paid} onClick={() => { setPaid(true); onChange?.(null); }}>있음</button>
+      </div>
+      {paid ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <span className="tm-text-body">월</span>
+          <input
+            className="tm-create-input"
+            inputMode="numeric"
+            aria-label="월 회비(원)"
+            placeholder="10,000"
+            value={value ? value.toLocaleString('ko-KR') : ''}
+            onChange={(event) => onChange?.(Number(event.target.value.replace(/\D/g, '').slice(0, 7)) || null)}
+          />
+          <span className="tm-text-body">원</span>
+        </div>
+      ) : null}
+      {paid && value == null ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
+          금액을 적지 않으면 회비는 정하지 않음으로 저장돼요.
+        </p>
+      ) : null}
     </div>
   );
 }

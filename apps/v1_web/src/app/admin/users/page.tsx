@@ -41,7 +41,7 @@ function getTeamRoleCounts(row: V1AdminUserRow) {
 
 // ── Status options for moderation modal ──────────────────────────────────────
 const USER_STATUS_OPTIONS = (
-  ['active', 'suspended', 'blocked', 'deleted'] as const
+  ['active', 'suspended', 'blocked'] as const
 ).map((v) => ({
   value: v,
   label: STATUS_META[v]?.label ?? v,
@@ -235,7 +235,7 @@ function AdminUsersPageContent() {
               key: 'accountStatus',
               header: '상태',
               width: 'w-[104px]',
-              render: (row) => <AdminStatusPill status={row.accountStatus} />,
+              render: (row) => <AdminStatusPill status={row.accountStatus} label={row.accountStatus === 'deleted' ? (row.deletedAt ? '최종 삭제 완료' : '이용 중지(삭제 상태)') : undefined} />,
             },
             {
               key: 'signupStage',

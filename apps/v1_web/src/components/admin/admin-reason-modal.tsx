@@ -27,6 +27,10 @@ interface AdminReasonModalProps {
 
 const REASON_MAX = 500;
 
+function selectableStatus(currentStatus: string | undefined, options: ReasonStatusOption[]) {
+  return options.find((option) => option.value === currentStatus)?.value ?? options[0]?.value ?? '';
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export function AdminReasonModal({
   open,
@@ -40,7 +44,7 @@ export function AdminReasonModal({
   error,
 }: AdminReasonModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>(
-    currentStatus ?? statusOptions[0]?.value ?? '',
+    () => selectableStatus(currentStatus, statusOptions),
   );
   const [reason, setReason] = useState('');
 
@@ -55,7 +59,7 @@ export function AdminReasonModal({
   // Reset form whenever the modal opens
   useEffect(() => {
     if (open) {
-      setSelectedStatus(currentStatus ?? statusOptions[0]?.value ?? '');
+      setSelectedStatus(selectableStatus(currentStatus, statusOptions));
       setReason('');
     }
   }, [open, currentStatus, statusOptions]);
@@ -63,7 +67,8 @@ export function AdminReasonModal({
   if (!mounted) return null;
 
   const trimmedReason = reason.trim();
-  const canSubmit = trimmedReason.length > 0 && !pending;
+  const canSubmit = trimmedReason.length > 0 && !pending && Boolean(selectedStatus)
+    && statusOptions.some((option) => option.value === selectedStatus);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

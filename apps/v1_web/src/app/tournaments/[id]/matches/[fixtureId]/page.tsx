@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchPageClient } from './match-page-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildFixtureDescription, buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import { buildBreadcrumbLd } from '@/lib/structured-data';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { buildFixtureEventLd } from '@/lib/structured-data-competition';
-import { competitionFixtureName } from '@/lib/tournament-round-label';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import type { V1TournamentDetail } from '@/types/api';
 
@@ -40,7 +39,7 @@ export async function generateMetadata({
   const awayLabel = match.away?.teamName ?? '미정';
   return buildPublicMetadata({
     title: `${homeLabel} vs ${awayLabel} | ${match.tournamentTitle}`,
-    description: `${match.tournamentTitle} ${competitionFixtureName(match)} 경기 기록을 확인하세요.`,
+    description: buildFixtureDescription(match),
     path: fixtureDetailHref({
       isRegularLeague: await loadIsRegularLeague(id),
       competitionId: id,

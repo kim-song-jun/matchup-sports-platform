@@ -517,7 +517,8 @@ compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
     # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
     source "${env_file}"
     set +a
-    compose=(docker compose --project-name deploy -f "${compose_prod}" -f "${compose_alpha}" --env-file "${env_file}")
+    configure_web_replicas "${V1_WEB_REPLICAS:-}" 2 1800000
+    compose=(docker compose --project-name deploy -f "${compose_prod}" -f "${compose_alpha}" --env-file "${env_file}" ${WEB_COMPOSE_ARGS[@]+"${WEB_COMPOSE_ARGS[@]}"})
 
     activation_step="activate-source"
     activate_alpha_release_source "${source_key}"
@@ -529,7 +530,7 @@ compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
     write_release_metadata "${ALPHA_MANIFEST_FILE}"
 
     activation_step="compose-up"
-    "${compose[@]}" up -d --force-recreate --no-deps v1_api v1_web v1_game_operations_worker
+    up_app_containers --force-recreate
     "${compose[@]}" up -d --force-recreate --no-deps nginx
 
     # Restore each writer's restart policy from quiesce.json's recorded

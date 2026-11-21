@@ -143,7 +143,8 @@ setup_env() {
   # too (fix round 3, state-root unification) -- must be copied alongside or
   # that source line fails before rollback-prod.sh's own logic ever runs.
   cp "${ROOT_DIR}/deploy/prod-release-common.sh" "${ROOT_DIR}/deploy/prod-source-common.sh" \
-    "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${ROOT_DIR}/deploy/prod-task168-common.sh" "${live}/deploy/"
+    "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${ROOT_DIR}/deploy/prod-task168-common.sh" \
+    "${ROOT_DIR}/deploy/web-replicas-common.sh" "${live}/deploy/"
   printf 'FOO=bar\n' > "${live}/deploy/.env"
   printf 'services: {}\n' > "${live}/deploy/docker-compose.prod.yml"
 

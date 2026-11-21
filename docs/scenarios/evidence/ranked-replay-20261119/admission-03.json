@@ -1,0 +1,15 @@
+{
+  "team": 3,
+  "actions": [
+    "review seven players UI",
+    "accept application UI",
+    "confirm admission UI"
+  ],
+  "startedAt": "2026-11-19T13:59:46.514Z",
+  "review": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-03-admin-roster-review.png",
+  "confirm": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-03-admin-accept-confirm.png",
+  "accepted": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-replay-20261119/team-03-admin-accepted.png",
+  "reviewedPlayers": 7,
+  "status": "PASS",
+  "confirmedAt": "2026-11-19T13:59:52.680Z"
+}

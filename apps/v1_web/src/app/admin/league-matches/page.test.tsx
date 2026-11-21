@@ -64,6 +64,13 @@ const SERIES = [
   { id: 'sr-1', title: '서울 풋살 리그', state: 'active', tierLabels: ['1부', '2부'], sport: null, region: null, leagueCount: 2 },
 ];
 
+// 검색 테스트용: 종목·지역·티어가 서로 다른 체계 셋.
+const SEARCHABLE_SERIES = [
+  { id: 'sr-1', title: '서울 풋살 리그', state: 'active', tierLabels: ['1부', '2부'], sport: { id: 's1', name: '풋살' }, region: { id: 'r1', name: '송파구' }, leagueCount: 2 },
+  { id: 'sr-2', title: 'Tennis Open', state: 'active', tierLabels: ['1부'], sport: { id: 's2', name: '테니스' }, region: { id: 'r2', name: '강남구' }, leagueCount: 1 },
+  { id: 'sr-3', title: '성남 야간 리그', state: 'draft', tierLabels: ['1부', '2부', '3부'], sport: { id: 's1', name: '풋살' }, region: { id: 'r3', name: '분당구' }, leagueCount: 0 },
+];
+
 describe('AdminLeagueHubPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,6 +90,21 @@ describe('AdminLeagueHubPage', () => {
     expect(within(table).getByText('서울 풋살 리그 · 1부')).toBeInTheDocument();
     expect(within(table).getByText('독립 리그')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '정규 리그' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  // alpha 1440 실측: AdminDataTable 의 기본 캡(max-w-[900px])이 카드를 899px 로 묶어(표는 1041px)
+  // 대진 수가 잘리고 작업 열(숨기기·다시 보이기)이 가로 스크롤 안으로 밀렸다. 대회 목록처럼 캡을 푼다.
+  it('리그 표 카드는 기본 폭 캡에 묶이지 않고 표가 카드 폭에 맞는다(대회 목록과 같은 설정)', () => {
+    render(<AdminLeagueHubPage />);
+
+    const table = screen.getByRole('table');
+    // 표 → 가로 스크롤 상자 → 카드. 카드에 캡이 살아 있으면 1440 에서도 작업 열이 밀린다.
+    const card = table.parentElement?.parentElement;
+    expect(card).toHaveClass('max-w-none');
+    expect(card).not.toHaveClass('max-w-[900px]');
+    // fitContainer: 표가 내용 폭(w-max)이 아니라 카드 폭(w-full)을 따른다.
+    expect(table).toHaveClass('w-full');
+    expect(table).not.toHaveClass('w-max');
   });
 
   it('상태 칩(초안·접수 중·마감·진행 중·종료·보류)과 숫자를 보여 주고, 체계 칩은 두지 않는다', () => {
@@ -222,5 +244,98 @@ describe('AdminLeagueHubPage', () => {
     render(<AdminLeagueHubPage />);
 
     expect(screen.getByRole('tab', { name: '리그 체계' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  describe('리그 체계 탭 검색', () => {
+    beforeEach(() => {
+      seriesListMock.mockReturnValue({ data: { items: SEARCHABLE_SERIES }, isPending: false, isError: false, refetch: vi.fn() });
+      searchParams = new URLSearchParams('tab=series');
+      window.history.replaceState(null, '', '/admin/league-matches?tab=series');
+    });
+
+    const titlesInTable = () =>
+      SEARCHABLE_SERIES.map((s) => s.title).filter((title) => within(screen.getByRole('table')).queryByText(title));
+
+    it('검색창이 보이고, 입력하면 체계 이름·종목·지역·티어로 걸러지며 주소(?q=)에 남는다', async () => {
+      const user = userEvent.setup();
+      render(<AdminLeagueHubPage />);
+
+      const input = screen.getByRole('searchbox', { name: '리그 체계 검색' });
+      expect(input).toHaveAttribute('placeholder', '체계 이름·종목·지역·티어 검색');
+      expect(titlesInTable()).toEqual(['서울 풋살 리그', 'Tennis Open', '성남 야간 리그']);
+
+      await user.type(input, '풋살'); // 종목
+      expect(titlesInTable()).toEqual(['서울 풋살 리그', '성남 야간 리그']);
+      expect(window.location.search).toBe('?tab=series&q=%ED%92%8B%EC%82%B4');
+
+      await user.clear(input);
+      await user.type(input, '송파'); // 지역
+      expect(titlesInTable()).toEqual(['서울 풋살 리그']);
+
+      await user.clear(input);
+      await user.type(input, '3부'); // 티어
+      expect(titlesInTable()).toEqual(['성남 야간 리그']);
+
+      await user.clear(input);
+      await user.type(input, 'TENNIS open'); // 이름, 대소문자 무시
+      expect(titlesInTable()).toEqual(['Tennis Open']);
+
+      await user.clear(input);
+      await user.type(input, '풋살 송파'); // 띄어쓴 낱말은 모두 맞아야 한다
+      expect(titlesInTable()).toEqual(['서울 풋살 리그']);
+
+      await user.clear(input);
+      expect(titlesInTable()).toHaveLength(3);
+      expect(window.location.search).toBe('?tab=series');
+    });
+
+    it('맞는 체계가 없으면 조건을 안내하고, 목록이 원래 비어 있을 때와 문구가 다르다', async () => {
+      const user = userEvent.setup();
+      render(<AdminLeagueHubPage />);
+
+      await user.type(screen.getByRole('searchbox', { name: '리그 체계 검색' }), '없는이름');
+      expect(screen.getAllByText('이 조건의 리그 체계가 없어요').length).toBeGreaterThan(0);
+      expect(screen.queryByText('아직 리그 체계가 없어요')).not.toBeInTheDocument();
+    });
+
+    it('목록이 원래 비어 있으면 검색어 없이도 만들기 안내를 보여 준다', () => {
+      seriesListMock.mockReturnValue({ data: { items: [] }, isPending: false, isError: false, refetch: vi.fn() });
+      render(<AdminLeagueHubPage />);
+
+      expect(screen.getAllByText('아직 리그 체계가 없어요').length).toBeGreaterThan(0);
+    });
+
+    it('주소의 ?q= 로 열면 검색창이 채워지고 걸러진 채로 보인다', () => {
+      searchParams = new URLSearchParams('tab=series&q=tennis');
+      window.history.replaceState(null, '', '/admin/league-matches?tab=series&q=tennis');
+      render(<AdminLeagueHubPage />);
+
+      expect(screen.getByRole('searchbox', { name: '리그 체계 검색' })).toHaveValue('tennis');
+      expect(titlesInTable()).toEqual(['Tennis Open']);
+    });
+
+    it('정규 리그 탭에서 쓴 검색어가 탭을 옮겨도 남는다', async () => {
+      const user = userEvent.setup();
+      searchParams = new URLSearchParams();
+      window.history.replaceState(null, '', '/admin/league-matches');
+      render(<AdminLeagueHubPage />);
+
+      await user.type(screen.getByRole('searchbox', { name: '리그·체계 이름 검색' }), '풋살');
+      await user.click(screen.getByRole('tab', { name: '리그 체계' }));
+
+      expect(screen.getByRole('searchbox', { name: '리그 체계 검색' })).toHaveValue('풋살');
+      expect(titlesInTable()).toEqual(['서울 풋살 리그', '성남 야간 리그']);
+    });
+
+    // 기본 캡(max-w-[900px])이 남으면 탭을 오갈 때 카드 폭이 정규 리그 탭과 달라진다(alpha 1440 실측).
+    it('체계 표 카드는 기본 폭 캡에 묶이지 않고 표가 카드 폭에 맞는다', () => {
+      render(<AdminLeagueHubPage />);
+
+      const table = screen.getByRole('table');
+      const card = table.parentElement?.parentElement;
+      expect(card).toHaveClass('max-w-none');
+      expect(card).not.toHaveClass('max-w-[900px]');
+      expect(table).toHaveClass('w-full');
+    });
   });
 });

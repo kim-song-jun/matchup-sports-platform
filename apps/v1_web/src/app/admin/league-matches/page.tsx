@@ -79,7 +79,9 @@ export default function AdminLeagueHubPage() {
  * 정규 리그 탭은 대회 목록처럼 검색창과 상태 칩(초안·접수 중·마감·진행 중·종료·보류)으로
  * 거르고, 각 행에 소속 체계·티어를 표기한다. 체계별로 모아 보는 일은 리그 체계 탭이 맡으므로
  * 체계 칩은 두지 않는다(2026-11-19 사용자 요청). 리그 체계 탭 본문은 기존
- * /admin/league-series 목록을 그대로 이식했고 구 URL 은 ?tab=series 리다이렉트로 남는다.
+ * /admin/league-series 목록을 이식한 것이고 구 URL 은 ?tab=series 리다이렉트로 남는다.
+ * 체계 탭에도 검색창이 있다(체계 이름·종목·지역·티어, 2026-11-21 사용자 요청) — 검색어(?q=)는
+ * 두 탭이 같이 쓰므로 탭을 오가도 남는다.
  */
 function LeagueHub() {
   const searchParams = useSearchParams();
@@ -181,7 +183,10 @@ function LeagueHub() {
         aria-labelledby={`league-tab-${activeTab}`}
       >
         {activeTab === 'series' ? (
-          <LeagueSeriesView />
+          <LeagueSeriesView
+            search={q}
+            onSearchChange={(value) => handleFiltersChange({ q: value.slice(0, SEARCH_MAX_LENGTH) })}
+          />
         ) : (
           <LeaguesPanel
             search={q}
@@ -303,6 +308,12 @@ function LeagueListTable({
       // 44px+ 행 높이를 그대로 가짐)으로 옮기고 제목은 일반 텍스트로 되돌린다.
       onRowClick={(row) => router.push(withFromPath(`/admin/league-matches/${encodeURIComponent(row.leagueId)}`, listHref))}
       rowClickLabel={(row) => `${row.title} 상세 보기`}
+      // alpha 1440 실측: 기본 캡(max-w-[900px])이 카드를 899px 로 묶는데 표는 1041px 라서 대진 수가
+      // 잘리고 숨기기·다시 보이기(작업 열)가 가로 스크롤 안으로 밀렸다. 대회 목록처럼 캡을 풀고
+      // 표를 카드 폭에 맞춘다.
+      tableMaxWidth="max-w-none"
+      fitContainer
+      dense
       columns={[
         {
           key: 'title',

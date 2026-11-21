@@ -1049,6 +1049,7 @@ export type V1TeamDetail = {
     genderRule?: string | null;
     joinPolicy: string;
     memberGoalCount: number | null;
+    membershipFee?: number | null;
   };
   owner: {
     userId: string;
@@ -1194,6 +1195,7 @@ export type V1TeamMutationPayload = {
   genderRule?: string | null;
   joinPolicy: 'approval_required' | 'closed';
   memberGoalCount?: number | null;
+  membershipFee?: number | null;
 };
 
 export type V1TeamUpdatePayload = V1TeamMutationPayload & {
@@ -3329,6 +3331,8 @@ export type V1AdminUserRow = {
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
   signupStage?: 'required_complete' | 'onboarding_complete' | 'terms_required' | 'profile_required' | 'profile_deferred';
+  deletedAt?: string | null;
+  adminAccessStatus?: 'active' | 'suspended' | 'revoked' | null;
   lastLoginAt: string | null;
   createdAt: string;
   hostedMatchCount: number;
@@ -3417,6 +3421,8 @@ export type V1AdminTeamRow = {
   name: string;
   sportId: string;
   sportName: string;
+  regionId?: string;
+  regionName?: string;
   ownerUserId: string;
   ownerName: string | null;
   memberCount: number;
@@ -3615,6 +3621,7 @@ export type AdminListFilters = {
   status?: string;
   q?: string;
   sportId?: string;
+  regionId?: string;
   audience?: string;
   category?: string;
   /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */
@@ -3821,6 +3828,8 @@ export type V1AdminPushSendPayload = {
 };
 
 export type V1AdminPushSendResult = {
+  /** 발송은 끝났지만 감사 이력 저장이 실패한 경우. 재발송하지 않는다. */
+  historyRecorded?: false;
   /** 인앱 알림을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
   skipped: number;
@@ -5250,6 +5259,7 @@ export type V1UpdateTournamentPayload = Omit<
 
 export type V1ChangeTournamentStatusPayload = {
   status: V1TournamentStatus;
+  /** 취소·되돌리기에는 공백이 아닌 사유 필수, 최대 500자. */
   reason?: string;
 };
 

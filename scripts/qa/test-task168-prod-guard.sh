@@ -334,6 +334,7 @@ ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${mut_dir}/prod-manifest-com
 # symlink too, or the source line itself fails before the mutated code is
 # ever reached.
 ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${mut_dir}/prod-task168-common.sh"
+ln -s "${ROOT_DIR}/deploy/web-replicas-common.sh" "${mut_dir}/web-replicas-common.sh"
 scratch_invert="${mut_dir}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_invert}" <<'PYEOF'
 import sys
@@ -422,6 +423,7 @@ mkdir -p "${scratch_and_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_and_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_and_removed}/prod-manifest-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_and_removed}/prod-task168-common.sh"
+ln -s "${ROOT_DIR}/deploy/web-replicas-common.sh" "${scratch_and_removed}/web-replicas-common.sh"
 scratch_and_removed_common="${scratch_and_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_and_removed_common}" <<'PYEOF'
 import sys
@@ -463,6 +465,7 @@ mkdir -p "${scratch_failopen}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_failopen}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_failopen}/prod-manifest-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_failopen}/prod-task168-common.sh"
+ln -s "${ROOT_DIR}/deploy/web-replicas-common.sh" "${scratch_failopen}/web-replicas-common.sh"
 scratch_failopen_common="${scratch_failopen}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_failopen_common}" <<'PYEOF'
 import sys
@@ -510,6 +513,7 @@ mkdir -p "${scratch_pin_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_pin_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_pin_removed}/prod-manifest-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_pin_removed}/prod-task168-common.sh"
+ln -s "${ROOT_DIR}/deploy/web-replicas-common.sh" "${scratch_pin_removed}/web-replicas-common.sh"
 scratch_pin_removed_common="${scratch_pin_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_pin_removed_common}" <<'PYEOF'
 import sys

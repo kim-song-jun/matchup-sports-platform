@@ -1,0 +1,22 @@
+[
+  {
+    "fixtureNumber": 3,
+    "fixtureId": "6ff42aea-77b2-5875-ac3a-522247f74d7f",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  },
+  {
+    "fixtureNumber": 4,
+    "fixtureId": "0af6afc5-5622-51c0-9706-29fa3cb468a2",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "admin UI score confirmation",
+    "verdict": "PASS"
+  }
+]

@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ANDROID_PLAY_STORE_URL, IOS_APP_STORE_URL } from '@/lib/app-store-links';
+import { faqById } from '@/lib/public-content/faq';
 import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 
 const fetchPublicV1 = vi.fn();
@@ -138,5 +139,89 @@ describe('GET /llms.txt', () => {
     expect(body).not.toContain('## 모집 단계이거나 진행 중인 대회');
     // 조용히 삼키면 upstream 장애를 관측할 방법이 없다.
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('llms.txt'), expect.any(Error));
+  });
+
+  describe('핵심 사실·자주 묻는 질문 블록', () => {
+    function sectionOf(body: string, heading: string): string {
+      const start = body.indexOf(`\n${heading}\n`);
+      expect(start, `${heading} 절이 없어요`).toBeGreaterThan(-1);
+      const next = body.indexOf('\n## ', start + 1);
+      return body.slice(start, next === -1 ? undefined : next);
+    }
+
+    /** answer 가 원문 문단 일부를 순서대로 ' ' 로 이은 것과 정확히 같은지 — 지어낸 글이 끼면 false. */
+    function isOrderedParagraphJoin(answer: string, paragraphs: readonly string[], from = 0): boolean {
+      for (let i = from; i < paragraphs.length; i += 1) {
+        if (answer === paragraphs[i]) return true;
+        const head = `${paragraphs[i]} `;
+        if (answer.startsWith(head) && isOrderedParagraphJoin(answer.slice(head.length), paragraphs, i + 1)) return true;
+      }
+      return false;
+    }
+
+    it('대회 목록 조회가 실패해도 두 절이 모두 나오고, 「무엇의 원출처인가」 바로 뒤에 놓인다', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      fetchPublicV1.mockRejectedValue(new Error('upstream down'));
+
+      const body = await (await GET()).text();
+
+      expect(body).not.toContain('## 모집 단계이거나 진행 중인 대회');
+      const order = ['## 무엇의 원출처인가', '## 핵심 사실', '## 자주 묻는 질문', '## 핵심 페이지'].map((h) =>
+        body.indexOf(`\n${h}\n`),
+      );
+      expect(order.every((index) => index > -1)).toBe(true);
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+    });
+
+    it('핵심 사실에 종목·팀 만들기 무료·대회 참가비는 대회별·앱 스토어·결과 확정을 싣는다', async () => {
+      fetchPublicV1.mockResolvedValue(null);
+
+      const facts = sectionOf(await (await GET()).text(), '## 핵심 사실');
+
+      expect(facts).toContain('축구·풋살·러닝·수영 네 종목');
+      expect(facts).toContain('팀 만들기는 현재 무료예요');
+      expect(facts).toContain('대회 참가비는 대회마다 주최 측이 정해요');
+      expect(facts).toContain(`[App Store](${IOS_APP_STORE_URL})`);
+      expect(facts).toContain(`[Google Play](${ANDROID_PLAY_STORE_URL})`);
+      expect(facts).toContain('어드민이 확인하면 확정돼요');
+    });
+
+    it('자주 묻는 질문 8개는 FAQ_ITEMS 의 질문·답 그대로이고, 근거 링크는 /faq 앵커를 가리킨다', async () => {
+      fetchPublicV1.mockResolvedValue(null);
+
+      const faq = sectionOf(await (await GET()).text(), '## 자주 묻는 질문');
+      const blocks = faq.split('\n### ').slice(1);
+
+      expect(blocks).toHaveLength(8);
+      for (const block of blocks) {
+        const [question, answer, source] = block.split('\n');
+        const url = new URL(source.replace('근거: ', ''));
+        expect(url.pathname).toBe('/faq');
+        const anchor = url.hash.slice(1);
+        const item = faqById(anchor);
+        // 없는 앵커를 가리키면 근거 링크가 /faq 맨 위로만 열린다.
+        expect(item, `${anchor} 는 FAQ_ITEMS 에 없는 id`).toBeDefined();
+        expect(question).toBe(item!.question);
+        // 답은 FAQ 원문 문단을 이어 붙인 것이어야 한다 — 새로 지어낸 문장이 섞이면 /faq 와 어긋난다.
+        expect(isOrderedParagraphJoin(answer, item!.answer), `${anchor} 답이 원문 문단의 연결이 아님`).toBe(true);
+      }
+    });
+
+    it('두 절의 링크에는 유입 표식(from=)이 붙지 않는다', async () => {
+      fetchPublicV1.mockResolvedValue(null);
+
+      const body = await (await GET()).text();
+      const block = body.slice(body.indexOf('\n## 핵심 사실\n'), body.indexOf('\n## 핵심 페이지\n'));
+
+      expect(block).toContain('/faq#');
+      expect(block).not.toMatch(/[?&]from=/);
+    });
+
+    it('두 절 모두 대회에 러닝·수영을 약속하는 문장을 담지 않는다', async () => {
+      fetchPublicV1.mockResolvedValue(null);
+
+      const body = await (await GET()).text();
+      expectNoNonFootballCompetitionClaim(body.slice(body.indexOf('\n## 핵심 사실\n'), body.indexOf('\n## 핵심 페이지\n')));
+    });
   });
 });

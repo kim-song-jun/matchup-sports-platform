@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
 import { parseNextImageSrc } from '@/test/next-image';
-import { absoluteSiteUrl, buildPublicMetadata, buildTournamentDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildFixtureDescription, buildPublicMetadata, buildTeamRecordsDescription, buildTournamentDescription, buildTournamentSubpageDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -90,6 +90,29 @@ describe('fetchPublicV1 cache policy', () => {
       expect.objectContaining({ cache: 'no-store' }),
     );
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('next');
+  });
+
+  it.each([404, 503])('closes the unread body of a %s answer', async (status) => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status, ok: false, body: { cancel } }));
+
+    await fetchPublicV1('/matches/m-1').catch(() => null);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on an API that never answers instead of waiting for the server default', async () => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const real = AbortSignal.timeout.bind(AbortSignal);
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(20));
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    })));
+
+    await expect(fetchPublicV1('/matches/m-1')).rejects.toMatchObject({ name: 'TimeoutError' });
+    expect(timeoutSpy).toHaveBeenCalledWith(4000);
+    timeoutSpy.mockRestore();
   });
 });
 
@@ -232,6 +255,116 @@ describe('buildTournamentDescription', () => {
   it('검색 설명도 실제 마감·결제 대기 정원을 기준으로 모집 상태를 안내한다', () => {
     expect(buildTournamentDescription({ ...open, registrationDeadlineAt: '2026-10-12T14:59:00.000Z' })).toContain('신청 마감됨');
     expect(buildTournamentDescription({ ...open, pendingPaymentCount: 6 })).toContain('정원 마감');
+  });
+});
+
+describe('buildFixtureDescription', () => {
+  const played = {
+    tournamentTitle: '가을 풋살컵',
+    displayTitle: null,
+    round: 'quarter',
+    groupName: null,
+    legNumber: 1,
+    scheduledAt: '2026-10-25T05:00:00.000Z',
+    venue: '경기대 케이풋살파크',
+    fieldName: 'A구장',
+    home: { registrationId: 'r1', teamId: 't1', teamName: '송파 FC' },
+    away: { registrationId: 'r2', teamId: 't2', teamName: '잠실 유나이티드' },
+    status: 'ended',
+    scoreStatus: 'official',
+    score: { home: 3, away: 1, penalties: null },
+  } as unknown as Parameters<typeof buildFixtureDescription>[0];
+
+  it('확정 경기는 점수·일정·장소를 앞에 두고 70자를 넘긴다', () => {
+    const text = buildFixtureDescription(played);
+    expect(text).toBe(
+      '최종 스코어 송파 FC 3 : 1 잠실 유나이티드 · 2026년 10월 25일 (일) 오후 2:00 · 경기대 케이풋살파크 A구장 — 가을 풋살컵 8강 경기 일정과 득점·카드 기록을 확인하세요.',
+    );
+    expect(text.length).toBeGreaterThanOrEqual(70);
+  });
+
+  it('승부차기까지 간 확정 경기는 승부차기 점수도 적는다', () => {
+    const text = buildFixtureDescription({ ...played, score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } });
+    expect(text).toContain('송파 FC 1 : 1 잠실 유나이티드 (승부차기 4 : 3)');
+  });
+
+  it.each(['pending', 'live', 'unavailable'] as const)('점수 상태가 %s 이면 점수를 싣지 않고 팀과 일정만 적는다', (scoreStatus) => {
+    const text = buildFixtureDescription({ ...played, scoreStatus, status: scoreStatus === 'live' ? 'live' : 'scheduled' });
+    expect(text).not.toMatch(/\d : \d|스코어/);
+    expect(text.startsWith('송파 FC vs 잠실 유나이티드 · 2026년 10월 25일 (일) 오후 2:00')).toBe(true);
+  });
+
+  it('같은 대회·라운드의 경기도 팀과 일정이 다르면 설명이 다르다', () => {
+    const other = { ...played, home: { registrationId: 'r3', teamId: 't3', teamName: '강동 FC' }, scheduledAt: '2026-10-25T07:00:00.000Z' };
+    expect(buildFixtureDescription(other)).not.toBe(buildFixtureDescription(played));
+  });
+
+  it('팀이 정해지지 않은 경기는 미정으로 적고, 취소된 경기는 취소를 적는다', () => {
+    const text = buildFixtureDescription({ ...played, home: null, away: null, scoreStatus: 'unavailable', score: null, status: 'cancelled' });
+    expect(text).toContain('미정 vs 미정 · 취소된 경기 ·');
+  });
+
+  it('일정이 미정이어도 가짜 날짜는 적지 않고 확정 점수와 장소는 싣는다', () => {
+    const text = buildFixtureDescription({ ...played, scheduledAt: null });
+    expect(text).toBe('최종 스코어 송파 FC 3 : 1 잠실 유나이티드 · 경기대 케이풋살파크 A구장 — 가을 풋살컵 8강 경기 일정과 득점·카드 기록을 확인하세요.');
+    expect(text).not.toContain('일정 미정');
+  });
+
+  it('구장 이름이 장소 이름과 같으면 한 번만 적는다', () => {
+    expect(buildFixtureDescription({ ...played, fieldName: '경기대 케이풋살파크' })).toContain('오후 2:00 · 경기대 케이풋살파크 — ');
+  });
+
+  it('날짜·확정 점수·장소가 모두 없으면 기존 문구를 그대로 쓴다', () => {
+    expect(buildFixtureDescription({ ...played, scheduledAt: null, venue: null, fieldName: null, scoreStatus: 'pending', score: null })).toBe(
+      '가을 풋살컵 8강 경기 기록을 확인하세요.',
+    );
+  });
+});
+
+describe('buildTournamentSubpageDescription', () => {
+  const base = {
+    title: '가을 풋살컵',
+    sport: { code: 'futsal', name: '풋살' },
+    format: 'group_knockout',
+    kind: 'regular_tournament',
+    status: 'completed',
+    scheduledAt: '2026-10-25T02:00:00.000Z',
+    scheduledEndAt: '2026-10-25T10:00:00.000Z',
+    venue: '경기대 케이풋살파크',
+  } as unknown as Parameters<typeof buildTournamentSubpageDescription>[0];
+
+  it('화면 목적 문장 뒤에 일정·장소·방식·상태를 붙인다', () => {
+    expect(buildTournamentSubpageDescription(base, 'results')).toBe(
+      '가을 풋살컵의 경기별 결과와 기록을 확인하세요. 2026년 10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 대회 종료',
+    );
+    expect(buildTournamentSubpageDescription(base, 'awards')).toContain('MVP와 개인 시상 결과를 확인하세요. 2026년 10월 25일');
+    expect(buildTournamentSubpageDescription(base, 'bracket')).toContain('조별 순위와 토너먼트 대진표를 확인하세요. 2026년 10월 25일');
+  });
+
+  it('리그처럼 그리는 대회의 대진표는 리그 소개 문장을 쓴다', () => {
+    expect(buildTournamentSubpageDescription({ ...base, kind: 'regular_league' } as typeof base, 'bracket')).toContain(
+      '가을 풋살컵의 경기 일정과 순위를 확인하세요. 2026년 10월 25일',
+    );
+  });
+
+  it('일정·장소가 없으면 방식만 덧붙인다', () => {
+    expect(buildTournamentSubpageDescription({ ...base, scheduledAt: null, venue: null, status: 'open' } as typeof base, 'results')).toBe(
+      '가을 풋살컵의 경기별 결과와 기록을 확인하세요. 풋살 조별리그 + 토너먼트',
+    );
+  });
+});
+
+describe('buildTeamRecordsDescription', () => {
+  const summary = { played: 12, won: 7, drawn: 2, lost: 3, goalsFor: 30, goalsAgainst: 18, byType: {} };
+
+  it('공식 경기가 있으면 시즌 범위와 승무패를 적는다', () => {
+    const records = { teamName: '송파 FC', summary, availableSeasons: ['2026', '2025'] } as unknown as Parameters<typeof buildTeamRecordsDescription>[0];
+    expect(buildTeamRecordsDescription(records)).toBe('송파 FC의 공식 경기 전적과 최근 결과를 확인하세요. 2025~2026년 공식 12경기 7승 2무 3패');
+  });
+
+  it('공식 경기가 없으면 전적 숫자를 적지 않는다', () => {
+    const records = { teamName: '송파 FC', summary: { ...summary, played: 0, won: 0, drawn: 0, lost: 0 }, availableSeasons: [] } as unknown as Parameters<typeof buildTeamRecordsDescription>[0];
+    expect(buildTeamRecordsDescription(records)).toBe('송파 FC의 공식 경기 전적과 최근 결과를 확인하세요.');
   });
 });
 

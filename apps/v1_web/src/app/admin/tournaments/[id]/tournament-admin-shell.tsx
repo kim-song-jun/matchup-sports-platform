@@ -131,6 +131,7 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
   const [revertOpen, setRevertOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const { toasts, showToast } = useAdminToast();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
@@ -141,18 +142,10 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
 
   // ── Status change ────────────────────────────────────────────────────
   const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
-    // 취소는 비가역 → 반드시 확인 게이트
+    // 취소는 사유를 남기는 공용 확인 게이트를 거친다.
     if (nextStatus === 'cancelled') {
-      // "취소"(모달 닫기)와 "대회 취소"(대회를 없앰)가 나란히 놓이면 급할 때 오독한다 —
-      // 두 버튼이 서로 다른 말이 되도록 닫기 쪽을 '돌아가기'로 바꾼다.
-      const ok = await confirmStatusChange({
-        title: '대회를 취소할까요?',
-        message: '취소하면 참가 신청과 일정도 함께 무효가 돼요. 취소 후에도 초안으로 복구할 수 있어요.',
-        confirmLabel: '대회 취소하기',
-        cancelLabel: '돌아가기',
-        tone: 'danger',
-      });
-      if (!ok) return;
+      setCancelOpen(true);
+      return;
     }
     // 마감·시작·완료는 모바일에서 오탭하면 참가팀 전체에 바로 반영된다(2026-10 알파 실측: 확인 없이 즉시 실행).
     const forwardConfirm = STATUS_CHANGE_CONFIRM[nextStatus];
@@ -315,8 +308,28 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
         <div className="min-w-0 flex-1">{children}</div>
       </div>
 
-      {/* 대회 상태 변경 confirm modal (취소 등 비가역 액션) */}
+      {/* 상태 변경 확인과 사유 필수 게이트 */}
       {StatusConfirmModal}
+      <GateConfirmModal
+        open={cancelOpen}
+        pending={changeStatus.isPending}
+        title="대회를 취소할까요?"
+        description="취소 사유를 남겨 주세요. 취소 후에도 초안으로 복구할 수 있어요."
+        confirmLabel="대회 취소하기"
+        cancelLabel="돌아가기"
+        tone="blue"
+        onConfirm={(reason) => {
+          if (!reason.trim() || !canWrite || changeStatus.isPending) return;
+          changeStatus.mutate({ status: 'cancelled', reason: reason.trim() }, {
+            onSuccess: () => {
+              setCancelOpen(false);
+              showToast('대회를 취소했어요.', 'success');
+            },
+            onError: (err) => showToast(extractErrorMessage(err, '대회 취소에 실패했어요.'), 'error'),
+          });
+        }}
+        onClose={() => setCancelOpen(false)}
+      />
       {revertCopy && (
         <GateConfirmModal
           open={revertOpen}

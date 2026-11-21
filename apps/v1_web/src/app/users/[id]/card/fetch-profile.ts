@@ -1,3 +1,5 @@
+import { cache } from 'react';
+import { serverFetchSignal } from '@/lib/server-fetch-timeout';
 import type { V1PublicProfile } from '@/types/api';
 
 /**
@@ -23,10 +25,10 @@ import type { V1PublicProfile } from '@/types/api';
  */
 export type OgFetchStrategy = 'revalidate' | 'no-store';
 
-export async function fetchPublicProfileForOg(
+const readPublicProfileForOg = cache(async (
   userId: string,
-  strategy: OgFetchStrategy = 'revalidate',
-): Promise<V1PublicProfile | null> {
+  strategy: OgFetchStrategy,
+): Promise<V1PublicProfile | null> => {
   const origin =
     process.env.INTERNAL_API_ORIGIN ??
     process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') ??
@@ -37,8 +39,9 @@ export async function fetchPublicProfileForOg(
     strategy === 'no-store' ? { cache: 'no-store' } : { next: { revalidate: 300 } };
 
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: serverFetchSignal() });
     if (!response.ok) {
+      await response.body?.cancel();
       console.error(`[og-card] 프로필 조회 실패: ${response.status} ${url}`);
       return null;
     }
@@ -50,4 +53,12 @@ export async function fetchPublicProfileForOg(
     console.error(`[og-card] 프로필 조회 예외 (${strategy}) ${url}`, error);
     return null;
   }
+});
+
+// Memoized per render: the signal disables Next's own fetch de-duplication between generateMetadata and the page.
+export function fetchPublicProfileForOg(
+  userId: string,
+  strategy: OgFetchStrategy = 'revalidate',
+): Promise<V1PublicProfile | null> {
+  return readPublicProfileForOg(userId, strategy);
 }

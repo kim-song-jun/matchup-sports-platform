@@ -1,3 +1,7 @@
+import { MemberAccessController } from './member-access.controller';
+import { MemberAccessService } from './member-access.service';
+import { AdminEntityOperationsController } from './admin-entity-operations.controller';
+import { AdminEntityOperationsService } from './admin-entity-operations.service';
 import { GamesModule } from '../games/games.module';
 import { TeamsModule } from '../teams/teams.module';
 import { MemberBracketPreviewController } from './member-bracket-preview.controller';
@@ -12,6 +16,7 @@ import { AdminController } from './admin.controller';
 import { AdminMonitoringController } from './admin-monitoring.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOpsService } from './admin-ops.service';
+import { AdminPushHistoryService } from './admin-push-history.service';
 import { AdminService } from './admin.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { AdminTermsController } from './admin-terms.controller';
@@ -21,7 +26,8 @@ import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 
 @Module({
   imports: [GamesModule, TeamsModule, AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule, KakaoUnlinkModule],
-  controllers: [MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
-  providers: [MemberBracketPreviewService, AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
+  controllers: [MemberAccessController, AdminEntityOperationsController, MemberBracketPreviewController, AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
+  exports: [MemberAccessService],
+  providers: [MemberAccessService, AdminEntityOperationsService, MemberBracketPreviewService, AdminService, AdminOpsService, AdminPushHistoryService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
 })
 export class AdminModule {}

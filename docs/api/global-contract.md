@@ -1,3 +1,7 @@
+대회 상태를 cancelled로 바꿀 때 사유가 누락·빈값·공백이면 400 TOURNAMENT_STATUS_REASON_REQUIRED로 거부한다. 상태와 감사 로그는 변경하지 않는다. 기존 취소 상태 재요청의 no-op은 유지한다. [대회 계약](./domains/tournaments.md).
+
+Alpha 목업 생성에 예선+순위별 결선 리그 카테고리를 추가한다. 기존 팀 수·상태 선택을 유지하며20팀·등록7명·출전설정6명·70경기를 만든다. 실제 신청 검증과 구분하며 환경·권한·오류 계약은 [대회 API](./domains/tournaments.md#alpha-목업-순위별-리그-카테고리-2026-11-19)를 따른다.
+
 대회·리그 경기는 빈 출전 명단이어도 시작·익명 팀 득점·종료를 허용한다. 선수별 기록은 현재 유효 명단에 한하며 가상 참가자는 만들지 않는다. [경기 운영 계약](./domains/games.md#tournament-and-league-operation-without-a-roster-2026-11-14).
 
 리그+토너먼트의 조 이름 수정은 구조 편집과 분리한다. 저장 이름은 공개 일정·대진·경기 결과에 반영하며 예선 설정과 revision을 원자적으로 갱신한다. 기존 N개 토너먼트의 자동 생성 명칭은 선행 PR #2181의 짝수 6팀 이상 강수 규칙에 맞춰 보정한다. [대회 계약](./domains/tournaments.md#조-이름과-결선-규모-표시-2026-11-06).
@@ -289,4 +293,14 @@ Tournament qualification destinations may carry a server-owned colorIndex. Edito
 
 단계형 대회의 신규 쓰기는 별도 stages API의 expectedRevision/sourceVersion·대회 권한·잠금·감사 계약을 사용한다. 구조 변경·재경기는 변경 대상의 미시작/취소/VOID 상태를 검사하고 기존 경기 기록을 보관하며 무관한 경기 ID·일정은 보존한다. 기존 일반 대회에는 자동 적용하지 않는다. 상세는 [단계형 운영 확장](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)과 [개인 기록 범위](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)를 따른다.
 
+회원·팀별 운영 조회 context와 상태 이력·문의·참가/공식 출전 기록은 active admin 전용이며 private/no-store다. 팀 목록은 종목·지역·팀장 검색을 지원한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원팀-운영-정보-2026-11-19)을 따른다.
+
+회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·채팅 API(목록·본문·첨부파일 포함)·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. 알림 설정 GET은 저장 없이 기존 값 또는 기본값만 읽는다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.
+
 신청 제출·참가 확정·접수 시작의 충돌도 기존 오류 envelope를 따른다. `REGISTRATION_NOT_DRAFT`, `TOURNAMENT_REGISTRATION_CLOSED`, `REGISTRATION_DEADLINE_PASSED`는409이며 성공으로 대체하지 않는다. [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18).
+
+Admin manual-push history is active-admin-only (`GET /admin/ops/push-history[/:id]`);
+owner/ops authorization for sending is unchanged. Inbox creation, web acceptance and native
+acceptance are distinct measurements; missing historical payload/channel results remain unknown.
+A successful send with `historyRecorded:false` means the send completed but its audit write failed,
+and must not trigger an automatic resend. See [admin/ops](domains/admin-and-ops.md#수동-푸시-발송과-이력).

@@ -53,6 +53,9 @@ function success(data: unknown) {
   return HttpResponse.json({ status: 'success', data, timestamp });
 }
 const server = setupServer(
+  http.get('*/api/v1/admin/member-access', () => success({ active: false })),
+  http.get('*/api/v1/ads/active', () => success([])),
+  http.get('*/api/v1/team-matches', () => success({ items: [], pageInfo })),
   http.get('*/api/v1/home', () => success(home)),
   http.get('*/api/v1/auth/me', () => success({
     user: { id: 'user-a', email: 'user-a@example.com', onboardingStatus: 'completed' },
@@ -80,6 +83,7 @@ beforeEach(() => {
   };
 });
 afterEach(() => {
+  window.localStorage.removeItem('teameet.member-access');
   cleanup();
   for (const client of clients) client.clear();
   clients.length = 0;
@@ -94,6 +98,17 @@ function renderHome() {
   const view = render(<QueryClientProvider client={client}><HomePageClient /></QueryClientProvider>);
   return { client, ...view };
 }
+
+it('shows a restriction instead of fetching or displaying chat during member lookup', async () => {
+  window.localStorage.setItem('teameet.member-access', 'active');
+  server.use(http.get('*/api/v1/admin/member-access', () => success({ active: true, userId: 'user-a' })));
+  renderHome();
+  expect(await screen.findByText('회원 조회 중에는 채팅을 볼 수 없어요')).toBeInTheDocument();
+  expect(screen.queryByText('새 메시지 없음')).not.toBeInTheDocument();
+  expect(screen.queryByText('이전 홈 미리보기')).not.toBeInTheDocument();
+  expect(listReads).toBe(0);
+  expect(socket.connections).not.toHaveBeenCalled();
+});
 function emitMessage() {
   act(() => {
     for (const listener of socket.listeners.get('chat:message') ?? []) {

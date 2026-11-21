@@ -1,3 +1,5 @@
+import { getMemberAccessIdentity } from './request-identity-override';
+import { memberAccessCookie } from './member-access-token';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const V1_SESSION_COOKIE_NAME = 'teameet_v1_session';
@@ -33,7 +35,7 @@ type V1SessionRuntimeConfiguration = {
 };
 
 type V1SessionRequest = {
-  readonly headers: { readonly cookie?: string };
+  readonly headers?: { readonly cookie?: string };
   header(name: string): string | undefined;
 };
 
@@ -186,8 +188,12 @@ export function resolveV1RequestIdentity(
   request: V1SessionRequest,
   configuration: V1SessionRuntimeConfiguration,
 ): V1RequestIdentity | null {
+  const memberIdentity = getMemberAccessIdentity(request);
+  if (memberIdentity) return memberIdentity;
+  // HTTP authorization is performed by MemberAccessGuard. Socket.IO and unguarded callers fail closed.
+  if (memberAccessCookie(request.headers?.cookie)) return null;
   const session = isStrongSessionSecret(configuration.sessionSecret)
-    ? readV1Session(request.headers.cookie, {
+    ? readV1Session(request.headers?.cookie, {
         secret: configuration.sessionSecret,
         nowMs: configuration.nowMs,
       })

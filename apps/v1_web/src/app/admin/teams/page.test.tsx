@@ -13,6 +13,7 @@ const hooks = vi.hoisted(() => ({
   querySnapshot: null as string | null,
 }));
 
+vi.mock('@/components/admin/admin-entity-operations', () => ({ AdminEntityOperations: () => null }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: hooks.push }),
   useParams: () => ({ id: 'team-1' }),
@@ -20,6 +21,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1MasterSports: () => ({ data: [], isPending: false }),
+  useV1MasterRegions: () => ({ data: [], isPending: false }),
   useV1AdminTeams: (filters: unknown) => hooks.teams(filters),
   useV1ChangeTeamStatus: () => ({ mutate: hooks.mutate, isPending: false }),
   useV1AdminMe: () => ({ data: { capabilities: hooks.capabilities } }),
@@ -56,7 +59,7 @@ describe('AdminTeamsPage — 주소로 들어온 검색어', () => {
     window.history.replaceState(null, '', '/admin/teams?q=%EB%A7%88%ED%8F%AC');
 
     render(<AdminTeamsPage />);
-    expect(screen.getByRole('searchbox', { name: '팀명 검색' })).toHaveValue('마포');
+    expect(screen.getByRole('searchbox', { name: '팀명·팀장 이름·이메일 검색' })).toHaveValue('마포');
 
     act(() => {
       vi.advanceTimersByTime(400);
@@ -72,7 +75,7 @@ describe('AdminTeamsPage — 주소로 들어온 검색어', () => {
       vi.advanceTimersByTime(400);
     });
 
-    expect(screen.getByRole('searchbox', { name: '팀명 검색' })).toHaveValue('');
+    expect(screen.getByRole('searchbox', { name: '팀명·팀장 이름·이메일 검색' })).toHaveValue('');
     expect(hooks.teams).toHaveBeenLastCalledWith(expect.not.objectContaining({ q: expect.anything() }));
   });
 });
@@ -97,7 +100,7 @@ describe('AdminTeamsPage — query snapshot 갱신 전 상세 왕복', () => {
     window.history.replaceState(null, '', '/admin/teams?q=old');
     hooks.querySnapshot = window.location.search;
     const list = render(<AdminTeamsPage />);
-    fireEvent.change(screen.getByRole('searchbox', { name: '팀명 검색' }), { target: { value: '마포' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '팀명·팀장 이름·이메일 검색' }), { target: { value: '마포' } });
     expect(hooks.querySnapshot).toBe('?q=old');
     fireEvent.click(screen.getAllByRole('button', { name: '마포 FC 상세 보기' })[0]);
     expect(hooks.push).toHaveBeenCalledWith('/admin/teams/team-1');
@@ -115,7 +118,7 @@ describe('AdminTeamsPage — query snapshot 갱신 전 상세 왕복', () => {
     window.history.replaceState(null, '', href);
     hooks.querySnapshot = null;
     render(<AdminTeamsPage />);
-    expect(screen.getByRole('searchbox', { name: '팀명 검색' })).toHaveValue('마포');
+    expect(screen.getByRole('searchbox', { name: '팀명·팀장 이름·이메일 검색' })).toHaveValue('마포');
   });
 });
 

@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
-import { competitionFormatLabel } from '@/lib/competition-kind';
-import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
+import { cache } from 'react';
+import type { PublicMatchDetail, PublicTeamRecordsResponse } from '@/components/public-game-records/types';
+import { bracketIntroLine, competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import {
+  formatEntryFee,
+  formatTournamentDateLong,
+  formatTournamentDateRangeLong,
+  formatTournamentDateTimeLong,
+} from '@/lib/date-utils';
 import { socialImageSrc } from '@/lib/og-image';
 import { maskContactNumbers } from '@/lib/public-text';
+import { serverFetchSignal } from '@/lib/server-fetch-timeout';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
@@ -179,6 +188,17 @@ const TOURNAMENT_STATUS_PHRASE: Partial<Record<V1TournamentStatus, string>> = {
   cancelled: '대회 취소',
 };
 
+/** 대회 상세·하위 화면 설명이 함께 쓰는 앞쪽 사실: 일정 · 장소 · 종목과 방식. */
+function tournamentFactParts(
+  tournament: Pick<V1TournamentDetail, 'sport' | 'format' | 'kind' | 'scheduledAt' | 'scheduledEndAt' | 'venue'>,
+): Array<string | null> {
+  return [
+    tournament.scheduledAt ? formatTournamentDateRangeLong(tournament.scheduledAt, tournament.scheduledEndAt) : null,
+    tournament.venue?.trim() || null,
+    `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
+  ];
+}
+
 /**
  * 대회 검색 설명문. 주최자 소개는 이모지 한 줄("⚽️ 5대5 풋살 ⚽️")인 경우가 많아 검색 결과·AI 요약이
  * 일정도 장소도 모른다 — 사람이 대회를 고를 때 묻는 사실(언제·어디·방식·참가비·자리)을 앞에 둔다.
@@ -204,9 +224,7 @@ export function buildTournamentDescription(
   >,
 ): string {
   const facts = [
-    tournament.scheduledAt ? formatTournamentDateRangeLong(tournament.scheduledAt, tournament.scheduledEndAt) : null,
-    tournament.venue?.trim() || null,
-    `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
+    ...tournamentFactParts(tournament),
     // 미설정 리그의 entryFee 0 은 '무료' 가 아니라 미확정이다.
     tournament.kind === 'regular_league' && !tournament.entryFeeConfigured
       ? null
@@ -230,17 +248,125 @@ export function buildTournamentDescription(
   );
 }
 
-export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
+type TournamentSubpageSection = 'bracket' | 'results' | 'awards';
+
+const SUBPAGE_PURPOSE: Record<Exclude<TournamentSubpageSection, 'bracket'>, string> = {
+  results: '경기별 결과와 기록을 확인하세요.',
+  awards: 'MVP와 개인 시상 결과를 확인하세요.',
+};
+
+/**
+ * 대회 하위 화면(대진표·결과·시상) 검색 설명. 화면 목적 한 문장 뒤에 일정·장소·방식·진행 상태를 붙여
+ * 같은 대회의 상세·하위 화면끼리, 대회끼리 설명이 갈리게 한다. 일정·장소는 알 때만, 종목·방식은 항상, 상태 문구는 신청 마감·진행 중·종료·취소일 때만(모집 중 등은 없음) 붙는다.
+ */
+export function buildTournamentSubpageDescription(
+  tournament: Pick<
+    V1TournamentDetail,
+    'title' | 'sport' | 'format' | 'kind' | 'status' | 'scheduledAt' | 'scheduledEndAt' | 'venue'
+  >,
+  section: TournamentSubpageSection,
+): string {
+  const purpose = section === 'bracket'
+    ? isLeagueCompetition(tournament)
+      ? bracketIntroLine(tournament)
+      : '조별 순위와 토너먼트 대진표를 확인하세요.'
+    : SUBPAGE_PURPOSE[section];
+  const facts = [...tournamentFactParts(tournament), TOURNAMENT_STATUS_PHRASE[tournament.status] ?? null]
+    .filter(Boolean)
+    .join(' · ');
+  return metadataDescription(`${tournament.title}의 ${purpose} ${facts}`, `${tournament.title}의 ${purpose}`);
+}
+
+/** 확정 결과만 점수 문장이 된다 — 진행 중·확정 전 점수는 검색 결과·AI 답변에 인용되면 안 된다. */
+export function officialScoreText(
+  match: Pick<PublicMatchDetail, 'scoreStatus' | 'score'>,
+  home: string,
+  away: string,
+): string | null {
+  if (match.scoreStatus !== 'official' || !match.score) return null;
+  const penalties = match.score.penalties
+    ? ` (승부차기 ${match.score.penalties.home} : ${match.score.penalties.away})`
+    : '';
+  return `최종 스코어 ${home} ${match.score.home} : ${match.score.away} ${away}${penalties}`;
+}
+
+/** 구장 이름이 장소 이름과 같은 경기(운영자가 같은 값을 두 칸에 넣은 행)는 한 번만 적는다. */
+export function fixtureVenueText(match: Pick<PublicMatchDetail, 'venue' | 'fieldName'>): string {
+  const venue = match.venue?.trim() ?? '';
+  const field = match.fieldName?.trim() ?? '';
+  return field && field !== venue ? [venue, field].filter(Boolean).join(' ') : venue;
+}
+
+/**
+ * 경기 상세 검색 설명. 같은 대회 경기는 대회명·라운드가 같아 제목만으로는 서로 갈리지 않으므로
+ * 팀 · 일정 · 장소 · 확정 점수를 앞에 둔다. 일정이 미정이면 날짜는 적지 않고(가짜 날짜 금지),
+ * 날짜·확정 점수·장소가 모두 없을 때만 기본 문구로 둔다.
+ */
+export function buildFixtureDescription(
+  match: Pick<
+    PublicMatchDetail,
+    | 'tournamentTitle'
+    | 'displayTitle'
+    | 'round'
+    | 'groupName'
+    | 'legNumber'
+    | 'scheduledAt'
+    | 'venue'
+    | 'fieldName'
+    | 'home'
+    | 'away'
+    | 'status'
+    | 'scoreStatus'
+    | 'score'
+  >,
+): string {
+  const fixtureName = `${match.tournamentTitle} ${competitionFixtureName(match)}`;
+  const fallback = `${fixtureName} 경기 기록을 확인하세요.`;
+
+  const home = match.home?.teamName ?? '미정';
+  const away = match.away?.teamName ?? '미정';
+  const score = officialScoreText(match, home, away);
+  const venue = fixtureVenueText(match);
+  if (!match.scheduledAt && !score && !venue) return metadataDescription(null, fallback);
+  const facts = [
+    score ?? `${home} vs ${away}`,
+    match.status === 'cancelled' ? '취소된 경기' : null,
+    match.scheduledAt ? formatTournamentDateTimeLong(match.scheduledAt) : null,
+    venue || null,
+  ];
+  return metadataDescription(`${facts.filter(Boolean).join(' · ')} — ${fixtureName} 경기 일정과 득점·카드 기록을 확인하세요.`, fallback);
+}
+
+/** 팀 전적 검색 설명. 공식 경기가 하나도 없으면 전적 숫자를 적지 않는다. */
+export function buildTeamRecordsDescription(
+  records: Pick<PublicTeamRecordsResponse, 'teamName' | 'summary' | 'availableSeasons'>,
+): string {
+  const { played, won, drawn, lost } = records.summary;
+  const lead = `${records.teamName}의 공식 경기 전적과 최근 결과를 확인하세요.`;
+  if (played <= 0) return metadataDescription(lead, lead);
+  const seasons = records.availableSeasons;
+  const seasonRange = seasons.length > 1 ? `${seasons[seasons.length - 1]}~${seasons[0]}년 ` : seasons.length === 1 ? `${seasons[0]}년 ` : '';
+  return metadataDescription(`${lead} ${seasonRange}공식 ${played}경기 ${won}승 ${drawn}무 ${lost}패`, lead);
+}
+
+// A fetch carrying an AbortSignal opts out of Next's per-render request memoization, so the
+// de-duplication generateMetadata and the page body relied on is done here, keyed by primitives.
+const readPublicV1 = cache(async (path: string, noStore: boolean): Promise<unknown> => {
   const response = await fetch(`${getInternalApiOrigin()}/api/v1${path}`, {
     headers: { accept: 'application/json' },
-    ...(options.cache === 'no-store' ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
+    signal: serverFetchSignal(),
+    ...(noStore ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
   });
 
+  if (response.status === 404 || !response.ok) await response.body?.cancel();
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`SEO metadata request failed: ${path} (${response.status})`);
 
-  const envelope = (await response.json()) as ApiEnvelope<T>;
-  return envelope.data;
+  return ((await response.json()) as ApiEnvelope<unknown>).data;
+});
+
+export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
+  return (await readPublicV1(path, options.cache === 'no-store')) as T | null;
 }
 
 function getInternalApiOrigin(): string {

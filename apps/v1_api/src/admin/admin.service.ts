@@ -835,7 +835,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           where: { status: 'active' },
           select: { provider: true },
         },
-        adminUser: { select: { adminRole: true } },
+        adminUser: { select: { adminRole: true, status: true } },
         teamMemberships: {
           where: { status: 'active' },
           select: { role: true },
@@ -883,6 +883,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         onboardingStatus: row.onboardingStatus,
         signupStage: signupStage(row),
         lastLoginAt: row.lastLoginAt,
+        deletedAt: row.deletedAt,
         createdAt: row.createdAt,
         hostedMatchCount: row._count.hostedMatches,
         ownedTeamCount: row._count.ownedTeams,
@@ -893,6 +894,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
         },
         adminRole: row.adminUser?.adminRole ?? null,
+        adminAccessStatus: row.adminUser?.status ?? null,
       })),
       pageInfo: buildPageInfo({
         page: query.page,
@@ -942,7 +944,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           where: { status: 'active' },
           select: { provider: true },
         },
-        adminUser: { select: { adminRole: true } },
+        adminUser: { select: { adminRole: true, status: true } },
         reputationSummary: {
           select: { trustState: true, mannerScore: true, reviewCount: true, calculatedAt: true },
         },
@@ -983,6 +985,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         statusLogs: {
           where: {
             targetType: 'user',
+            targetId: targetUserId,
             toStatus: 'withdrawal_pending',
             actorType: 'user',
           },
@@ -1022,6 +1025,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
       },
       adminRole: row.adminUser?.adminRole ?? null,
+        adminAccessStatus: row.adminUser?.status ?? null,
       reputationSummary: row.reputationSummary
         ? {
             trustState: row.reputationSummary.trustState,
@@ -1500,15 +1504,25 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
+    const regionIds = query.regionId ? await this.resolveRegionFilterIds(query.regionId) : null;
+    const contains = query.q?.trim() ? { contains: query.q.trim(), mode: 'insensitive' as const } : null;
     const statusFacetWhere: Prisma.V1TeamWhereInput = {
-      ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(regionIds ? { regionId: { in: regionIds } } : {}),
+      ...(contains ? { OR: [
+        { name: contains },
+        { ownerUser: { profile: { nickname: contains } } },
+        { ownerUser: { profile: { realName: contains } } },
+        { ownerUser: { profile: { displayName: contains } } },
+        { ownerUser: { email: contains } },
+      ] } : {}),
     };
     const [rows, statusGroups] = await Promise.all([this.prisma.v1Team.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...statusFacetWhere,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...paginationArgs(query, limit),
       select: {
@@ -1520,6 +1534,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: true,
         ownerUserId: true,
         sport: { select: { id: true, name: true } },
+        region: { select: { id: true, name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
       },
     }), this.prisma.v1Team.groupBy({
@@ -1542,6 +1557,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         name: row.name,
         sportId: row.sport.id,
         sportName: row.sport.name,
+        regionId: row.region.id,
+        regionName: row.region.name,
         ownerUserId: row.ownerUserId,
         ownerName: row.ownerUser.profile?.nickname ?? null,
         memberCount: row.memberCount,

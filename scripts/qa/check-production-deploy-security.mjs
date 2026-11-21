@@ -278,6 +278,26 @@ export function findNginxConfMountProblem(compose) {
   return options.includes('ro') ? null : `nginx default.conf 마운트 ${mount[1]} 가 읽기 전용(:ro)이 아닙니다 — 컨테이너 시작이 소스 파일 시각을 바꿉니다`;
 }
 
+// 웹 컨테이너 개수는 V1_WEB_REPLICAS 하나로 정하고 기본은 1 이다. 기본이 2 가 되면 2GB 운영 서버에서
+// 웹 둘이 메모리를 넘기므로, nginx 의 upstream·재시도 설정 마운트가 읽기 전용이면서 기본 1 인지 본다.
+export function findNginxWebMountProblem(compose) {
+  const block = compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
+  const mount = block.match(/^\s+-\s*(\S+):\/etc\/nginx\/teameet-web(?::(\S+))?\s*$/m);
+  if (!mount) return 'nginx 서비스의 /etc/nginx/teameet-web 마운트를 찾지 못했습니다';
+  if (!(mount[2] ?? '').split(',').includes('ro')) return `nginx teameet-web 마운트 ${mount[1]} 가 읽기 전용(:ro)이 아닙니다`;
+  return mount[1].includes('${V1_WEB_REPLICAS:-1}') ? null : `nginx teameet-web 마운트 ${mount[1]} 의 기본 웹 개수가 1 이 아닙니다 — \${V1_WEB_REPLICAS:-1} 이어야 합니다`;
+}
+
+// 웹 컨테이너를 compose up 으로 직접 올리면 두 컨테이너가 한꺼번에 내려간다.
+// up_app_containers / up_all_services (deploy/web-replicas-common.sh) 만 웹을 올린다.
+export function findDirectWebUp(script) {
+  return script
+    .split('\n')
+    .map((line, index) => ({ line: line.replace(/^\s*#.*$/, ''), number: index + 1 }))
+    .filter(({ line }) => /\bup\b/.test(line) && /\bv1_web\b/.test(line))
+    .map(({ number }) => number);
+}
+
 // 앱 전체의 회원 연결을 끊고 조회할 수 있는 키는 승인된 deploy job 의 Sync runtime env 로만 넘긴다.
 // 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝을 바꿔 실행시킬 수 있다.
 const APPROVED_ONLY_SECRETS = ['KAKAO_ADMIN_KEY'];
@@ -553,6 +573,41 @@ export function findUnreadRuntimeEnvVariables(script) {
     mountProblem = `읽지 못해 nginx 설정 마운트를 검사할 수 없습니다 (${error.code ?? error.message})`;
   }
   if (mountProblem) errors.push(`${composePath}: ${mountProblem}`);
+}
+
+{
+  const composePath = 'deploy/docker-compose.prod.yml';
+  let webMountProblem;
+  try {
+    webMountProblem = findNginxWebMountProblem(readFileSync(composePath, 'utf8'));
+  } catch (error) {
+    webMountProblem = `읽지 못해 nginx 웹 설정 마운트를 검사할 수 없습니다 (${error.code ?? error.message})`;
+  }
+  if (webMountProblem) errors.push(`${composePath}: ${webMountProblem}`);
+
+  for (const rel of [
+    'deploy/deploy-prod.sh',
+    'deploy/rollback-prod.sh',
+    'deploy/prod-release-common.sh',
+    'deploy/deploy-alpha.sh',
+    'deploy/rollback-alpha.sh',
+    'deploy/alpha-release-common.sh',
+    'deploy/deploy-alpha-stage-b.sh',
+  ]) {
+    let body;
+    try {
+      body = readFileSync(rel, 'utf8');
+    } catch (error) {
+      errors.push(`${rel}: 읽지 못해 웹 컨테이너 직접 기동을 검사할 수 없습니다 (${error.code ?? error.message})`);
+      continue;
+    }
+    // 첫 전환 때 legacy 컨테이너로 되돌리는 함수는 legacy 이미지 태그를 직접 올리는 경로라 제외한다.
+    const code = body.replace(/restore_legacy_runtime\(\) \{[\s\S]*?\n\}\n/, '');
+    const lines = findDirectWebUp(code);
+    if (lines.length > 0) {
+      errors.push(`${rel}: 웹 컨테이너를 compose up 으로 직접 올립니다(코드 기준 ${lines.join(', ')}번째 줄) — up_app_containers 를 쓰세요`);
+    }
+  }
 }
 
 const requiredPatterns = [

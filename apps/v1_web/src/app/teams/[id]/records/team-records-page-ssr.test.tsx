@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicTeamRecordsResponse } from '@/components/public-game-records/types';
 import { fetchPublicV1 } from '@/lib/seo';
+import { parseJsonLd } from '@/test/html-sanitize';
 import TeamRecordsPage, { generateMetadata } from './page';
 import { TeamRecordsPageClient } from './team-records-page-client';
 
@@ -103,6 +104,42 @@ describe('TeamRecordsPage first HTML', () => {
     expect(html).not.toContain('tm-skeleton');
   });
 
+  it('puts a team > team name > records BreadcrumbList in the first HTML', async () => {
+    vi.mocked(fetchPublicV1).mockResolvedValue(allRecords as never);
+    api.get.mockResolvedValue(allRecords);
+
+    const ld = parseJsonLd<{ '@type': string; itemListElement: unknown[] }>(await renderPage());
+
+    expect(ld?.['@type']).toBe('BreadcrumbList');
+    expect(ld?.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: '팀', item: 'https://teameet.co.kr/teams' },
+      { '@type': 'ListItem', position: 2, name: 'LAW OB', item: 'https://teameet.co.kr/teams/team-real-2041' },
+      { '@type': 'ListItem', position: 3, name: '전적', item: 'https://teameet.co.kr/teams/team-real-2041/records' },
+    ]);
+  });
+
+  it('omits the breadcrumb and noindexes records of a dissolved team', async () => {
+    const dissolved = { id: 'team-real-2041', name: 'LAW OB', dissolution: { dissolvedAt: '2026-10-01T00:00:00Z' } };
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => (
+      path.includes('/records') ? allRecords : dissolved
+    ) as never);
+    api.get.mockResolvedValue(allRecords);
+
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: 'team-real-2041' }) });
+    const html = await renderPage();
+
+    expect(metadata.robots).toMatchObject({ index: false });
+    expect(parseJsonLd(html)).toBeNull();
+    expect(html).toContain('실제 풋살컵');
+  });
+
+  it('omits the breadcrumb when the team detail is not public', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => (path.includes('/records') ? allRecords : null) as never);
+    api.get.mockResolvedValue(allRecords);
+
+    expect(parseJsonLd(await renderPage())).toBeNull();
+  });
+
   it('seeds first HTML from the exact filtered public response requested by URL', async () => {
     navigation.search = '?type=tournament&season=2026';
     vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
@@ -168,7 +205,8 @@ describe('TeamRecordsPage first HTML', () => {
         status: 200,
         ok: true,
         json: async () => ({ data: redactedRecords }),
-      });
+      })
+      .mockResolvedValueOnce({ status: 404, ok: false });
     globalThis.fetch = upstreamFetch as unknown as typeof fetch;
     api.get.mockResolvedValue(redactedRecords);
 
@@ -182,8 +220,10 @@ describe('TeamRecordsPage first HTML', () => {
       expect(html).not.toContain('실제 풋살컵');
       expect(html).not.toContain('부산 FC');
       expect(html).not.toContain('2 : 1');
-      expect(upstreamFetch).toHaveBeenCalledTimes(2);
-      for (const [input, init] of upstreamFetch.mock.calls) {
+      expect(upstreamFetch).toHaveBeenCalledTimes(3);
+      const recordsCalls = upstreamFetch.mock.calls.filter(([input]) => String(input).endsWith('/records'));
+      expect(recordsCalls).toHaveLength(2);
+      for (const [input, init] of recordsCalls) {
         expect(String(input)).toContain('/api/v1/teams/team-real-2041/records');
         expect(init).toMatchObject({ cache: 'no-store' });
         expect(init).not.toHaveProperty('next.revalidate');

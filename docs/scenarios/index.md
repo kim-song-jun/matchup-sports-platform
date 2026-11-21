@@ -1,3 +1,10 @@
+## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
+
+[시나리오](./admin-member-team-operations.md) · [작업](../../.github/tasks/20261136-admin-member-team-operations.md) · [PR #2447](https://github.com/kim-song-jun/matchup-sports-platform/pull/2447). 목록/상세 4/4 구현, 조회 전용 10분 회원 접속과 시작·종료 감사 및 복귀 기능 추가. 리뷰에서 발견한 쿠키 헤더 처리·모달 선택값·복귀 이동 충돌 3건을 RED→GREEN 회귀로 수정했다. 로컬 UI/HTTP/인증·소켓 회귀를 검증했으며 실제 DB 통합 3건은 별도 실행 증거가 필요하다. Alpha 브라우저 0/4·viewport 0/3은 ego-lite 미노출로 미실행이며 배포·시각 합격으로 표시하지 않는다.
+
+## 2026-11-19 — 20팀 정식 신청부터 결과까지 재검증 (70/70 완료 / 출전 제한 FAIL)
+
+[실행 결과](./ranked-leagues-full-flow-20261119.md). Alpha 신청20/20·명단140/140·접수20/20·예선30/30·결선40/40 공식 결과·대회 종료·3폭 공개 화면 확인. 팀당7경기와9개조/리그 승점·득실 재검산 PASS. 최대6명 설정인데 양 팀7명 모두 started=true인 상태에서 경기 시작 허용: BLOCKING FAIL. 신규 가입/OTP·벤치/교체·개인 이벤트는 통과 범위에 포함하지 않는다. 구성 버튼 폼 제출 수정은 PR #2453, 미병합.
 2026-11-18 생성·접수 추가 5건은 [단계형 시나리오](./competition-stage-composition.md)와 PR #2442에서 추적한다. 서버360·Web181 tests PASS, API/Web 타입 검사 PASS, 신규 head Alpha 0/18·DB 실측 미실행.
 
 ## 2026-11-11 — 경기별 제목 수정

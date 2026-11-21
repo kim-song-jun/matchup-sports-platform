@@ -1,3 +1,4 @@
+import { MemberAccessGuard } from './auth/member-access.guard';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -21,6 +22,7 @@ import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
 import { TeamContactsModule } from './team-contacts/team-contacts.module';
 import { TeamLineupsModule } from './team-lineups/team-lineups.module';
+import { TeamInternalMatchesModule } from './team-internal-matches/team-internal-matches.module';
 import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -73,6 +75,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
     TeamContactsModule,
     TeamLineupsModule,
     TeamSchedulesModule,
+    TeamInternalMatchesModule,
     GamesModule,
     GameOperationFlagsModule,
     ChatModule,
@@ -100,6 +103,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },
+    { provide: APP_GUARD, useClass: MemberAccessGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: UserMutationLoggingInterceptor },
   ],

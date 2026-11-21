@@ -1,0 +1,442 @@
+[
+  {
+    "fixtureNumber": 31,
+    "fixtureId": "5feb91bd-cf25-5016-b75d-bd9306dbd56d",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:10:52.406Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 32,
+    "fixtureId": "47433db0-49bc-5985-83f5-b430b6f12819",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:10:55.196Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 33,
+    "fixtureId": "f308fa0c-de2d-5cd7-bb6b-a177023109c2",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:10:57.545Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 34,
+    "fixtureId": "63740767-f844-5cd8-9345-e02af2fca423",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:10:59.965Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 35,
+    "fixtureId": "d8bca6c6-ea2b-551d-9e78-4f5ff1ac4c02",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:05.772Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 36,
+    "fixtureId": "44306852-1d65-5fbf-85aa-8c032380ec4e",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:08.595Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 37,
+    "fixtureId": "7ae1ea56-22c9-5146-a7bd-0959973479be",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:11.453Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 38,
+    "fixtureId": "f8b79569-d111-595e-a8a0-36eb3df2c41a",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:16.389Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 39,
+    "fixtureId": "0eab08b6-7c83-54dd-bb02-ac16a4fd7f5d",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:21.942Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 40,
+    "fixtureId": "eb8f79b6-751c-5692-a558-e7e589c43b2e",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:25.053Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 41,
+    "fixtureId": "c706c0b8-b17b-5545-8b4a-685f3523a55e",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:29.493Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 42,
+    "fixtureId": "e4f151dc-e888-5a5f-953b-8126f02472c4",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:32.357Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 43,
+    "fixtureId": "68b5a18c-e384-5067-a089-477e1da1a5af",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:34.711Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 44,
+    "fixtureId": "a897e850-8198-5368-82d4-e864670bca18",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:38.102Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 45,
+    "fixtureId": "ef82bc3c-48ea-55b4-9010-294760fd1556",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:43.771Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 46,
+    "fixtureId": "8fecc9fc-35ff-5aa7-99fc-bcd899733389",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:46.722Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 47,
+    "fixtureId": "f9d13773-26ce-508b-ab97-b5e6b37d6491",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:50.293Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 48,
+    "fixtureId": "fec1f6b4-7bd0-54eb-93f8-955461062b95",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:53.221Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 49,
+    "fixtureId": "6b4a7ce9-e46d-5e08-8173-d2832cbb9a5e",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:56.500Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 50,
+    "fixtureId": "6dc757c4-d318-52e7-ab82-72a628faaad1",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:11:59.511Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 51,
+    "fixtureId": "070b0087-bc36-5ba0-86ac-8c7c32d5cad9",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:02.390Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 52,
+    "fixtureId": "3d51d079-9733-5188-bcc5-a8d31ef99529",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:05.254Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 53,
+    "fixtureId": "73cf1f3d-18f3-51e1-9d47-5001fcc8a0d4",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:08.520Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 54,
+    "fixtureId": "d1c5eee0-17db-5bb1-ba0f-97b15af06dbc",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:10.570Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 55,
+    "fixtureId": "50a67986-4a2b-590a-bb4d-8bc16e5d49c7",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:17.710Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 56,
+    "fixtureId": "b1b5673b-2401-52ce-be9e-46cde96d5ba1",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:20.566Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 57,
+    "fixtureId": "155c4cec-c088-5f12-ab0a-75783cda476d",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:24.652Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 58,
+    "fixtureId": "b57ab5ee-3af7-591e-b58a-cd65bbddb3dc",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:29.136Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 59,
+    "fixtureId": "9a54f80e-8d84-523e-b389-bb9e8f966a22",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:32.097Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 60,
+    "fixtureId": "dcaca544-992f-521f-82bf-5865a8423a96",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:35.048Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 61,
+    "fixtureId": "ecd8487b-bcad-5fe9-b458-a0822f780d72",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:38.151Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 62,
+    "fixtureId": "4045cae3-a1bc-54c7-816a-4cfe7b197652",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:41.050Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 63,
+    "fixtureId": "39495747-95c9-5133-a132-c21922c08007",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:43.917Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 64,
+    "fixtureId": "98d3406e-425b-5ebf-8e47-34f7f0da0c74",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:47.243Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 65,
+    "fixtureId": "857830de-5baf-5bdd-8156-a41ddc424a67",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:52.137Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 66,
+    "fixtureId": "4dd33a29-5852-522b-b970-66aa8d5febcb",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:55.375Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 67,
+    "fixtureId": "7e26a67a-5c42-5a29-a773-7ddc24dc7acb",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:12:58.500Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 68,
+    "fixtureId": "474f2230-ec20-52b8-adfe-515b6013c9d6",
+    "score": {
+      "home": 3,
+      "away": 1
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:13:01.722Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 69,
+    "fixtureId": "752c0ef5-5fee-5524-92a3-221c30017d6c",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:13:04.826Z",
+    "status": "PASS"
+  },
+  {
+    "fixtureNumber": 70,
+    "fixtureId": "4c1c04f3-ac96-5c2f-a3b2-7b1d594b0dce",
+    "score": {
+      "home": 1,
+      "away": 3
+    },
+    "method": "UI score form + confirm",
+    "at": "2026-11-19T14:13:08.068Z",
+    "status": "PASS"
+  }
+]

@@ -85,3 +85,18 @@ describe('관리자 목록 조건의 상세 왕복 (MD-QA #21)', () => {
     expect(renderHook(() => useAdminUrlListQuery(STATUSES, 20)).result.current.filters).toEqual({ page: 1, limit: 20 });
   });
 });
+
+
+it('팀 종목·지역 조건을 연속 변경해도 검색과 상태를 보존하고 페이지를 초기화한다', () => {
+  const sportId = '10000000-0000-4000-8000-000000000001';
+  const regionId = '20000000-0000-4000-8000-000000000002';
+  const scalarFilters = ['sportId', 'regionId'];
+  window.history.replaceState(null, '', `/admin/teams?status=active&sportId=${sportId}&page=3&q=팀장`);
+  const { result, unmount } = renderHook(() => useAdminUrlListQuery(STATUSES, 20, undefined, scalarFilters));
+  expect(result.current.filters).toMatchObject({ sportId, status: 'active', page: 3, q: '팀장' });
+  act(() => { result.current.setSingleFilter('regionId', regionId); result.current.setSearch('새 팀장'); });
+  expect(new URL(window.location.href).searchParams.get('regionId')).toBe(regionId);
+  expect(new URL(window.location.href).searchParams.get('sportId')).toBe(sportId);
+  expect(result.current.filters).toMatchObject({ sportId, regionId, status: 'active', page: 1 });
+  unmount();
+});

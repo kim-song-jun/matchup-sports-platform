@@ -10,7 +10,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = buildPublicMetadata({
   title: '팀매치 찾기',
-  description: '우리 팀과 조건이 맞는 상대 팀을 찾고 스포츠 팀매치를 성사시켜 보세요.',
+  description: '우리 팀과 조건이 맞는 상대 팀을 찾고 스포츠 팀매치를 성사시켜 보세요. 일정, 장소, 실력 수준과 모집 상태를 비교하고 바로 신청할 수 있어요.',
   path: '/team-matches',
 });
 

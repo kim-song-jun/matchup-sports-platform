@@ -29,6 +29,10 @@ services:
       EMAIL_FROM: alpha-no-reply@teameet.co.kr
       SES_ACCESS_KEY_ID: ${ALPHA_SES_ACCESS_KEY_ID:-}
       SES_SECRET_ACCESS_KEY: ${ALPHA_SES_SECRET_ACCESS_KEY:-}
+    # alpha 는 DB 가 같은 호스트의 v1_postgres 컨테이너다(운영 베이스는 이 의존을 갖지 않는다).
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
 
   # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
   # (alpha-release-common.sh 의 assert_running_release_digests 가
@@ -68,6 +72,10 @@ services:
   v1_web:
     image: ${ALPHA_WEB_IMAGE:?ALPHA_WEB_IMAGE must be an ECR digest URI}
 
+  # V1_WEB_REPLICAS=2(alpha 기본값)일 때만 뜬다 — docker-compose.prod.yml 의 같은 서비스 참조.
+  v1_web_b:
+    image: ${ALPHA_WEB_IMAGE:?ALPHA_WEB_IMAGE must be an ECR digest URI}
+
   nginx:
     volumes:
       - ./nginx.alpha.conf:/etc/nginx/conf.d/default.conf:ro
@@ -76,3 +84,5 @@ services:
       - ./nginx.security-headers.conf:/etc/nginx/snippets/teameet-security-headers.conf:ro
       - ./nginx.proxy-hide-security-headers.conf:/etc/nginx/snippets/teameet-proxy-hide-security-headers.conf:ro
       - ./release-metadata.alpha.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
+      # alpha 는 웹 컨테이너 2개가 기본이다(V1_WEB_REPLICAS=1 로 줄일 수 있다). 배포 스크립트의 기본값과 같아야 한다.
+      - ./nginx-web/${V1_WEB_REPLICAS:-2}:/etc/nginx/teameet-web:ro

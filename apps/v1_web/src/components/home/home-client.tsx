@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { useV1ChatListSocket } from '@/hooks/use-v1-realtime-socket';
+import { hasMemberAccessHint, useMemberAccessStatus } from '@/hooks/use-member-access';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { observeHomeNavigation } from '@/lib/home-analytics';
@@ -30,7 +31,11 @@ export function HomePageClient() {
   const isAuthenticated = query.data?.viewer?.authenticated === true;
   const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
   const authMe = useV1AuthMe({ enabled: isAuthenticated });
-  const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
+  const memberAccess = useMemberAccessStatus();
+  const [memberAccessHint, setMemberAccessHint] = useState(false);
+  useEffect(() => { setMemberAccessHint(hasMemberAccessHint()); }, []);
+  const chatRestricted = memberAccessHint || memberAccess.data?.active === true;
+  const chatRooms = useV1ChatRooms({ enabled: isAuthenticated && !chatRestricted });
   useV1ChatListSocket(isAuthenticated);
   const {
     weather,
@@ -76,8 +81,8 @@ export function HomePageClient() {
     pendingReviews: pendingReviews.total > 0,
   });
 
-  const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
-  const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
+  const chatStatus: HomeViewModel['chatStatus'] = chatRestricted ? 'restricted' : !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
+  const chatRoomSummaries = !chatRestricted && chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
   const nonDataFallback = withoutHomeContent(fallback);
 
   if (query.isError) {

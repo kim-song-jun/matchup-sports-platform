@@ -1,3 +1,9 @@
+대회 취소는 공백이 아닌 사유(최대 500자)를 필수로 받고 양쪽 감사 이력에 저장한다. [상태 변경 계약](./domains/tournaments.md).
+
+회원 조회 중 채팅 API 전체는 `403 MEMBER_ACCESS_CHAT_DENIED`이며 알림 설정 GET은 저장 없이 읽는다. [관리자 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19), [알림 설정](./domains/notifications.md#getpatch-notification-preferences).
+
+Alpha 목업 생성에 예선+순위별 결선 리그 카테고리를 추가한다. 기존 팀 수·상태 선택을 유지하며20팀·등록7명·출전설정6명·70경기를 만든다. 실제 신청 검증과 구분하며 환경·권한·오류 계약은 [대회 API](./domains/tournaments.md#alpha-목업-순위별-리그-카테고리-2026-11-19)를 따른다.
+
 대회 생성·접수는 초안 복원 재검토, 제출 상태 CAS, 종료·취소 후 신규 확정 차단, 과거 마감의 접수 시작 차단을 적용한다. 오류·멱등 계약은 [대회 계약](./domains/tournaments.md#생성접수-상태-보호-2026-11-18)을 따른다.
 
 대회·리그 경기는 빈 출전 명단이어도 시작·익명 팀 득점·종료를 허용한다. 선수별 기록은 현재 유효 명단에 한하며 가상 참가자는 만들지 않는다. [경기 운영 계약](./domains/games.md#tournament-and-league-operation-without-a-roster-2026-11-14).
@@ -90,6 +96,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
+- [Team internal matches](./domains/team-internal-matches.md)
 - [Tournament operations](./domains/tournament-operations.md)
 - [Tournament operations authorization](./domains/tournament-operations-auth.md)
 - [Tournament operations escalations](./domains/tournament-operations-escalations.md)
@@ -189,3 +196,10 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - Regular league registered times: GET/POST /admin/league-matches/:leagueId/schedule-times; see [league matches](domains/league-matches.md#registered-fixture-times-2026-11-13).
 
 단계형 대회의 자동 진출·초안/예외 배정·편성/경기 복구·단계별 경기 시간·교차 시드/6강/3위전·명시적 전체 순위는 [단계형 운영 확장 계약](./domains/tournaments.md#단계형-대회-운영-동등성-보완--2026-11-16)을 따른다. 개인 기록의 stageKey/poolKey 필터는 [기록 계약](./domains/public-records.md#단계편성별-대회-개인-기록--2026-11-16)을 따른다.
+
+관리자 수동 푸시의 발송·이력 조회·과거 본문 출처·앱/웹 접수 집계 계약은
+[Admin & Ops — 수동 푸시 발송과 이력](domains/admin-and-ops.md#수동-푸시-발송과-이력)을 따른다.
+
+회원·팀별 운영 조회 context와 상태 이력·문의·참가/공식 출전 기록은 active admin 전용이며 private/no-store다. 팀 목록은 종목·지역·팀장 검색을 지원한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원팀-운영-정보-2026-11-19)을 따른다.
+
+회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.

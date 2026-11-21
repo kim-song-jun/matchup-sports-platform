@@ -50,6 +50,7 @@ const EMPTY_TEAM_DRAFT: TeamDraft = {
   activityTypes: [],
   activityMemo: '',
   capacity: 0,
+  membershipFee: null,
 };
 
 export function TeamCreatePageClient() {
@@ -263,6 +264,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       activityMemo: normalizeHydratedActivityMemo(query.data.profile),
       // 미정 정원을 숫자 하한으로 바꾸면 소개만 저장해도 모집 조건이 달라진다.
       capacity: query.data.profile.memberGoalCount == null ? 0 : Math.max(2, query.data.profile.memberGoalCount, query.data.memberCount),
+      membershipFee: query.data.profile.membershipFee ?? null,
     });
     setDraft((current) => ({
       ...current,
@@ -563,6 +565,7 @@ function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinP
     genderRule: normalizeGenderRule(draft.genderRule),
     joinPolicy,
     memberGoalCount: Number(draft.capacity) || null,
+    membershipFee: draft.membershipFee,
   };
 }
 

@@ -62,8 +62,9 @@
 
 ### 인프라 구조 — 무엇이 어디서 도는가
 
-살아 있는 환경은 **두 개**입니다. 둘은 서로 다른 EC2 인스턴스에서 돌지만, **로드밸런서는
-하나를 나눠 씁니다.**
+살아 있는 환경은 **두 개**이고 서로 다른 EC2 인스턴스에서 돕니다. 인터넷 입구(앞단)는 환경마다 다릅니다 —
+alpha 는 **CloudFront + WAF**, 운영은 **아직 로드밸런서(ALB) + WAF**이고 CloudFront 로 옮기는 중입니다
+(운영 DNS 전환 전, `docs/ops/edge-cloudfront.md`).
 
 - **alpha** (`alpha.teameet.co.kr`) — `dev` 브랜치가 머지되면 자동으로 올라가는 검증용 환경
 - **production** (`teameet.co.kr`) — 실제 사용자가 쓰는 환경. `main` 브랜치 + 사람의 승인이 필요
@@ -71,11 +72,13 @@
 ```mermaid
 graph TB
     U["사용자 브라우저 · 모바일 앱"]
-    ALB["Application Load Balancer<br/>(인터넷에 노출된 유일한 입구)"]
+    CFA["CloudFront + 엣지 WAF<br/>(alpha 의 입구)"]
+    ALB["Application Load Balancer + 지역 WAF<br/>(운영의 현재 입구 — 전환 뒤 제거 예정)"]
+    CFP["CloudFront + 엣지 WAF + 캐시<br/>(운영의 다음 입구 — DNS 전환 전, 아직 트래픽 없음)"]
 
-    U -->|HTTPS 443| ALB
-    ALB -->|"Host = alpha.teameet.co.kr<br/>(규칙 우선순위 10)"| A
-    ALB -->|"그 외 전부<br/>(기본 규칙)"| P
+    U -->|"alpha.teameet.co.kr"| CFA --> A
+    U -->|"teameet.co.kr (지금)"| ALB --> P
+    U -.->|"teameet.co.kr (전환 뒤)"| CFP -.-> P
 
     subgraph A["alpha · EC2"]
         AN["nginx"] --> AW["v1_web (Next.js)"]
@@ -106,9 +109,11 @@ graph TB
 > 📌 **헷갈리기 쉬운 점 — 현재 배포 스택에는 Redis가 없습니다.** 옛 v0 시절 문서(`docs/archive/`)에는
 > Redis가 나오지만 v1 스택은 쓰지 않습니다.
 
-**로드밸런서(ALB)** 는 들어온 요청을 어느 서버로 보낼지 정하는 교통정리 담당입니다. 여기서는
-요청에 붙은 **호스트 이름**을 보고 나눕니다 — `alpha.teameet.co.kr`이면 alpha 인스턴스로,
-나머지는 프로덕션으로 보냅니다. 80(HTTP) 리스너는 443(HTTPS)으로 리다이렉트만 합니다.
+**앞단(인터넷 입구)** 은 요청을 서버로 넘기기 전에 막고 거르는 역할입니다. CloudFront 는 TLS 를 끝내고 WAF 로
+나쁜 요청을 거르며 정적 파일 같은 응답을 캐시합니다. 운영이 아직 쓰는 ALB 는 요청에 붙은 **호스트 이름**을 보고
+서버를 나누던 교통정리 담당인데, 서버가 한 대씩이라 나눠 줄 일이 없습니다. 그래서 운영도 CloudFront 로 옮기고
+ALB 와 지역 WAF 를 지울 계획입니다. 현재 상태·캐시 설계·전환 절차는 `docs/ops/edge-cloudfront.md` 에
+있습니다(**전환 전**이라는 점도 거기에 적어 두었습니다).
 
 두 환경 모두 **애플리케이션은 Docker 컨테이너로** 돌고, 각 인스턴스 안의 **nginx 컨테이너가
 앞단**에서 웹(Next.js)과 API(NestJS)로 나눠 보냅니다.

@@ -91,6 +91,8 @@ export type TeamDetailViewModel = {
     county: string;
     level: string;
     genderRule: string;
+    /** 월 회비(원). 0 = 없음, null = 정하지 않음. */
+    membershipFee?: number | null;
     membersList: Array<{ membershipId: string; userId: string; name: string; role: string; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
@@ -137,6 +139,8 @@ export type TeamDetailViewModel = {
   manageShortcuts?: { membersHref: string; editHref: string; inviteHref: string };
   /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 179 팀 A). */
   canManageGameRosters?: boolean;
+  /** 팀 내 경기 만들기 버튼 노출 — 팀장·매니저. 경기 명단 권한과 따로 둔다(서버가 최종 판정). */
+  canManageInternalMatches?: boolean;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;
@@ -185,6 +189,7 @@ export type TeamFormViewModel = {
     activityTypes: string[];
     activityMemo: string;
     capacity: number;
+    membershipFee?: number | null;
   };
   form?: {
     sportId: string;

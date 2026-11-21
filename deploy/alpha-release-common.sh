@@ -12,6 +12,7 @@ ALPHA_FAILED_RELEASE_DIR="${ALPHA_FAILED_RELEASE_DIR:-${ALPHA_RELEASE_STATE_DIR}
 ALPHA_LEGACY_STATE_FILE="${ALPHA_LEGACY_STATE_FILE:-${ALPHA_HOME_DIR}/.teameet-alpha-release}"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alpha-source-common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alpha-manifest-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/web-replicas-common.sh"
 
 # 복구 경로의 한 단계를 감싼다. 실패하면 **어느 단계인지** 를 남기고 종료코드를 그대로 돌려준다.
 # 복구는 배포가 이미 실패한 뒤에 도는 안전망이라, 여기서 조용히 죽으면 운영자가 받는 신호는
@@ -192,6 +193,7 @@ assert_running_release_digests() {
   [[ "${running_api_image}" == "${ALPHA_API_IMAGE}" ]] || return 1
   [[ "${running_web_image}" == "${ALPHA_WEB_IMAGE}" ]] || return 1
   [[ "${running_worker_image}" == "${ALPHA_API_IMAGE}" ]] || return 1
+  assert_extra_web_images "${ALPHA_WEB_IMAGE}" || return 1
 }
 
 check_alpha_health_contract() {
@@ -283,8 +285,7 @@ restore_active_release() {
   alpha_restore_step load_manifest load_alpha_release_manifest "${active_tmp}" || return 1
   alpha_restore_step pull_images pull_release_images || return 1
   alpha_restore_step write_metadata write_release_metadata "${active_tmp}" || return 1
-  alpha_restore_step compose_up_app "${compose[@]}" up -d --force-recreate --no-deps \
-    v1_api v1_web v1_game_operations_worker || return 1
+  alpha_restore_step compose_up_app up_app_containers --force-recreate || return 1
   alpha_restore_step compose_up_nginx "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   alpha_restore_step health_contract wait_for_alpha_health_contract || return 1
   alpha_restore_step assert_digests assert_running_release_digests || return 1

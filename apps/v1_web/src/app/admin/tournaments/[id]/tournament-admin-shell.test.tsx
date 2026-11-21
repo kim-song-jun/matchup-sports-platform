@@ -5,7 +5,7 @@
  * 항목은 대회 하위 탭이 아니라 **경로를 프리필한 전역 화면 링크**여야 한다 — 이 링크가
  * 사라지거나 옛 하위 경로로 되돌아가면 운영자는 그 대회의 팝업을 만들 길이 없어진다.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentAdminShell, TournamentManagementContent } from './tournament-admin-shell';
 
@@ -121,6 +121,36 @@ describe('TournamentAdminShell 섹션 내비', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: '대회 완료하기' }));
     await vi.waitFor(() => expect(statusMutate).toHaveBeenCalledWith({ status: 'completed' }, expect.anything()));
+  });
+
+  it.each(['draft', 'open', 'closed', 'in_progress'])('%s 대회 취소는 공백 사유를 막고 trim한 사유를 보낸다', async (status) => {
+    adminRoleMock.value = 'ops';
+    tournamentStatusMock.value = status;
+    statusMutate.mockReset();
+    try {
+      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+      fireEvent.click(screen.getByRole('button', { name: '취소하기' }));
+      const dialog = await screen.findByRole('alertdialog');
+      const submit = within(dialog).getByRole('button', { name: '대회 취소하기' });
+      const reason = within(dialog).getByRole('textbox', { name: /사유/ });
+      expect(submit).toBeDisabled();
+      fireEvent.change(reason, { target: { value: ' \n\t ' } });
+      fireEvent.click(submit);
+      expect(statusMutate).not.toHaveBeenCalled();
+      expect(reason).toHaveAttribute('maxLength', '500');
+      fireEvent.change(reason, { target: { value: ' 폭우로 안전 확보 불가 ' } });
+      fireEvent.click(submit);
+      expect(statusMutate).toHaveBeenCalledWith({ status: 'cancelled', reason: '폭우로 안전 확보 불가' }, expect.anything());
+      const callbacks = statusMutate.mock.calls[0][1];
+      act(() => callbacks.onError(new Error('일시적인 오류')));
+      expect(reason).toHaveValue(' 폭우로 안전 확보 불가 ');
+      expect(dialog).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: '돌아가기' }));
+      expect(statusMutate).toHaveBeenCalledTimes(1);
+    } finally {
+      tournamentStatusMock.value = 'in_progress';
+      statusMutate.mockReset();
+    }
   });
 
   it.each([

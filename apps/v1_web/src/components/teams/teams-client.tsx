@@ -488,6 +488,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
       condition: formatTeamDetailLevel(query.data),
       schedule: '',
+      membershipFee: query.data.profile.membershipFee ?? null,
       city: regionParts.city,
       county: regionParts.county,
       level: formatTeamDetailLevel(query.data) || '레벨 미설정',
@@ -590,6 +591,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
     canManageGameRosters: authVerified && isTeamOperatorRole(query.data.viewer.role),
+    canManageInternalMatches: authVerified && isTeamOperatorRole(query.data.viewer.role),
     operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, selfHref) : undefined,
     justCreated: authVerified && justCreatedParam && query.data.viewer.role === 'owner',
     manageShortcuts:

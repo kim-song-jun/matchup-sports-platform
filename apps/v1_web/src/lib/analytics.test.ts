@@ -204,6 +204,13 @@ describe('outgoing GA hits', () => {
     expect(init.method).toBe('POST');
   });
 
+  it('rewrites a hit whose URL is given as a URL object', async () => {
+    const { fetchSpy } = await installWithFakes();
+    await window.fetch(new URL(`${COLLECT}&dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F9f3a-secret`));
+    const [url] = fetchSpy.mock.calls[0] as unknown as [string];
+    expect(url).not.toContain('9f3a-secret');
+  });
+
   it('rewrites a sendBeacon hit', async () => {
     const { beaconSpy } = await installWithFakes();
     window.navigator.sendBeacon(`${COLLECT}&dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F9f3a-secret`, 'en=user_engagement');

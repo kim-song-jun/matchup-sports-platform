@@ -1,7 +1,7 @@
 // Builds the list of AWS CLI steps that create (or remove) the alerting stack, as data.
 // install.mjs prints them (default) or runs them (--apply). Nothing here touches AWS.
 import {
-  alarmName, HEALTH_CHECKS, NAMESPACES, rulesFor, SPIKE_5XX_EXPRESSION,
+  alarmName, HEALTH_CHECKS, LAMBDA_TIMEOUT_S, NAMESPACES, rulesFor, SPIKE_5XX_EXPRESSION,
 } from './thresholds.mjs';
 
 export const DEFAULTS = {
@@ -166,14 +166,15 @@ export function buildInstallPlan(input) {
     args: ['lambda', 'wait', state, '--region', p.region, '--function-name', p.lambdaName] });
   add({ id: 'lambda', title: `Lambda ${p.lambdaName}`, tolerate: 'ResourceConflict',
     args: ['lambda', 'create-function', '--region', p.region, '--function-name', p.lambdaName, '--runtime', 'nodejs22.x',
-      '--handler', 'lambda-handler.handler', '--timeout', '30', '--memory-size', '128',
+      '--handler', 'lambda-handler.handler', '--timeout', String(LAMBDA_TIMEOUT_S), '--memory-size', '128',
       '--role', `arn:aws:iam::{{account}}:role/${p.lambdaRole}`, '--zip-file', 'fileb://{{zip}}'] });
   add(wait('lambda-wait-1', 'function-active-v2'));
   add({ id: 'lambda-code', title: 'Lambda 코드 갱신(다시 실행해도 같은 결과)',
     args: ['lambda', 'update-function-code', '--region', p.region, '--function-name', p.lambdaName, '--zip-file', 'fileb://{{zip}}'] });
   add(wait('lambda-wait-2', 'function-updated-v2'));
-  add({ id: 'lambda-config', title: 'Lambda 환경 변수(웹훅 매개변수 이름 · RDS 이름만, 비밀값 없음)',
-    args: ['lambda', 'update-function-configuration', '--region', p.region, '--function-name', p.lambdaName, '--environment', lambdaEnv] });
+  add({ id: 'lambda-config', title: 'Lambda 제한 시간 · 환경 변수(웹훅 매개변수 이름 · RDS 이름만, 비밀값 없음)',
+    args: ['lambda', 'update-function-configuration', '--region', p.region, '--function-name', p.lambdaName,
+      '--timeout', String(LAMBDA_TIMEOUT_S), '--environment', lambdaEnv] });
   add(wait('lambda-wait-3', 'function-updated-v2'));
   add({ id: 'perm-sns', title: '서울 SNS 주제가 Lambda 를 부를 수 있게', tolerate: 'ResourceConflict',
     args: ['lambda', 'add-permission', '--region', p.region, '--function-name', p.lambdaName, '--statement-id', 'sns-seoul',

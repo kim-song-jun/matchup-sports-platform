@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decideGroupAlarm, POST_AT_OCCURRENCE, REPEAT_GAP_MS, SIBLING_GAP_MS } from '../lib/dedupe.mjs';
+import { decideGroupAlarm, decideRecovery, POST_AT_OCCURRENCE, REPEAT_GAP_MS, SIBLING_GAP_MS } from '../lib/dedupe.mjs';
 
 const T0 = Date.parse('2026-11-20T01:50:47Z');
 const MIN = 60_000;
@@ -85,4 +85,26 @@ test('a sibling of a different alarm more than the sibling gap later is its own 
   const apart = decideGroupAlarm({ name: HEAP, changeMs: T0 + SIBLING_GAP_MS + 1_000, transitions: [at(RESTART, 0)] });
   assert.equal(apart.post, false);
   assert.equal(apart.occurrence, 2);
+});
+
+const LOOP = 'teameet-prod-restart-loop';
+
+test('recovery: an ALARM after the OK means the loop only paused, so no recovery', () => {
+  const transitions = [at(LOOP, 0), at(LOOP, 10 * MIN)];
+  assert.deepEqual(decideRecovery({ name: LOOP, changeMs: T0 + 5 * MIN, transitions }), { post: false, reason: 'loop-continues' });
+});
+
+test('recovery: the last OK of a run is posted and reports where the whole run started', () => {
+  const transitions = [0, 4, 8, 12].map((m) => at(LOOP, m * MIN));
+  assert.deepEqual(decideRecovery({ name: LOOP, changeMs: T0 + 14 * MIN, transitions }), { post: true, runStartMs: T0 });
+});
+
+test('recovery: only the ALARMs of this alarm count, and a run ends at a gap longer than the repeat gap', () => {
+  const transitions = [at(LOOP, 0), at(LOOP, REPEAT_GAP_MS + 5 * MIN), at(RESTART, REPEAT_GAP_MS + 20 * MIN)];
+  const d = decideRecovery({ name: LOOP, changeMs: T0 + REPEAT_GAP_MS + 7 * MIN, transitions });
+  assert.deepEqual(d, { post: true, runStartMs: T0 + REPEAT_GAP_MS + 5 * MIN });
+});
+
+test('recovery: no ALARM in the history (older than the lookback) still posts, without a run start', () => {
+  assert.deepEqual(decideRecovery({ name: LOOP, changeMs: T0, transitions: [] }), { post: true });
 });

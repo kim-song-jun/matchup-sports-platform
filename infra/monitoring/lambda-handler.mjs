@@ -1,6 +1,6 @@
 // Lambda entry: SNS alarm notification or the daily scheduler tick -> one Slack message.
 // The webhook URL is read from SSM Parameter Store (SecureString) on every invocation and never logged.
-import { decideGroupAlarm, HISTORY_LOOKBACK_MS } from './lib/dedupe.mjs';
+import { decideGroupAlarm, decideRecovery, HISTORY_LOOKBACK_MS, RECOVERY_QUIET_MS } from './lib/dedupe.mjs';
 import { formatAlarmNotification, formatDailySummary, scrub } from './lib/format.mjs';
 import { describeAlarm, groupAlarmNames } from './lib/thresholds.mjs';
 import {
@@ -42,6 +42,7 @@ export async function messageForSnsRecord(record, deps) {
   if (alarm?.NewStateValue === 'OK') {
     // An event clears itself a minute later; posting that would only double the messages.
     if (known?.event) return null;
+    if (known?.group) return recoveryForGroup(alarm, known, deps);
     const alarmedAt = await deps.lookupAlarmedAt(alarm.AlarmName);
     return formatAlarmNotification(alarm, { alarmedAt });
   }
@@ -53,13 +54,32 @@ export async function messageForSnsRecord(record, deps) {
   return formatAlarmNotification(alarm);
 }
 
+// A grouped state alarm can flip back to ALARM minutes after this OK, so the recovery waits and reads the history
+// again; it is posted only when the alarm stayed OK. A failed lookup posts it as it is, like decideForGroup.
+async function recoveryForGroup(alarm, known, deps) {
+  let verdict = {};
+  try {
+    await deps.sleep(RECOVERY_QUIET_MS);
+    const transitions = await deps.loadGroupTransitions(groupAlarmNames(known.env, known.group));
+    verdict = decideRecovery({ name: alarm.AlarmName, changeMs: parseStateChange(alarm.StateChangeTime), transitions });
+    if (!verdict.post) return null;
+  } catch (err) {
+    console.error(`recovery lookup failed: ${err.name ?? err.message}`);
+  }
+  const alarmedAt = verdict.runStartMs === undefined
+    ? await deps.lookupAlarmedAt(alarm.AlarmName) : new Date(verdict.runStartMs).toISOString();
+  return formatAlarmNotification(alarm, { alarmedAt });
+}
+
+const parseStateChange = (stamp) => Date.parse(stamp.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+
 // A failed history lookup posts the alarm as it is: an extra message is better than a missed one.
 async function decideForGroup(alarm, known, deps) {
   try {
     await deps.sleep(SIBLING_WAIT_MS);
     const transitions = await deps.loadGroupTransitions(groupAlarmNames(known.env, known.group));
     return decideGroupAlarm({
-      name: alarm.AlarmName, changeMs: Date.parse(alarm.StateChangeTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')), transitions,
+      name: alarm.AlarmName, changeMs: parseStateChange(alarm.StateChangeTime), transitions,
     });
   } catch (err) {
     console.error(`group lookup failed: ${err.name ?? err.message}`);

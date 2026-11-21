@@ -5,6 +5,9 @@ export const NAMESPACES = { prod: 'Teameet/Ops/Prod', alpha: 'Teameet/Ops/Alpha'
 export const CONTAINERS = ['web', 'api', 'worker', 'nginx'];
 export const HEAP_CONTAINERS = ['web', 'api', 'worker'];
 
+/** Lambda time limit: it must outlast RECOVERY_QUIET_MS (lib/dedupe.mjs) plus the history reads. */
+export const LAMBDA_TIMEOUT_S = 720;
+
 export const SPIKE_5XX_MIN_COUNT = 15;
 export const SPIKE_5XX_MIN_RATIO = 0.02;
 
@@ -32,7 +35,8 @@ const aws = (namespace, metricName, dimensionName, { stat = 'Average', period = 
  * op: CloudWatch comparison operator. missing: treat-missing-data.
  * scope: 'prod' | 'both' (alpha keeps only the `both` rules, as warnings — see alphaRules).
  * event: a one-off occurrence that clears itself a minute later, so recoveries are not posted.
- * group: alarms of one cause; the Lambda posts one message per incident (lib/dedupe.mjs).
+ * group: alarms of one cause; the Lambda posts one message per incident (lib/dedupe.mjs). A state alarm with a
+ * group also waits for a quiet period before its recovery, since it can flip again within minutes.
  */
 export const RULES = [
   { id: 'web-restart', scope: 'both', severity: 'critical', event: true, group: 'process-exit', title: '컨테이너가 다시 시작됐어요',
@@ -43,7 +47,9 @@ export const RULES = [
     op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching' },
   // State alarm (recovers, so it posts [회복]): a loop faster than one minute keeps the `event` alarms above in
   // ALARM, where CloudWatch sends nothing more. 3 of the last 10 minutes with a restart ends that silence.
-  { id: 'restart-loop', scope: 'both', severity: 'critical', title: '컨테이너가 계속 다시 시작되고 있어요(재시작 루프)',
+  // Its own `group`: a 3.5-5 minute loop flips it ALARM/OK every 2 minutes, so the Lambda counts its ALARMs
+  // (1 · 3 · 6 …) and posts the recovery only after RECOVERY_QUIET_MS of OK.
+  { id: 'restart-loop', scope: 'both', severity: 'critical', group: 'restart-loop', title: '컨테이너가 계속 다시 시작되고 있어요(재시작 루프)',
     anchor: '재시작-루프', source: { kind: 'sum-containers', metricName: 'Restarts', containers: CONTAINERS, period: 60 },
     op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 10, datapointsToAlarm: 3, missing: 'notBreaching' },
   { id: 'web-memory-high', scope: 'prod', severity: 'warning', title: 'web 메모리가 한도에 가까워요',

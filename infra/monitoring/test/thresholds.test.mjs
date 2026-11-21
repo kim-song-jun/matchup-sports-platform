@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  alarmName, describeAlarm, evaluateRule, HEALTH_CHECKS, RULES, rulesFor, SPIKE_5XX_EXPRESSION,
+  alarmName, describeAlarm, evaluateRule, groupAlarmNames, HEALTH_CHECKS, RULES, rulesFor, SPIKE_5XX_EXPRESSION,
   SPIKE_5XX_MIN_COUNT, SPIKE_5XX_MIN_RATIO, spike5xxValue,
 } from '../lib/thresholds.mjs';
 
@@ -141,9 +141,10 @@ test('restart-loop: the 2-minute and the 65-second loops of the review reproduct
   }
 });
 
-test('restart-loop is a state alarm: it has no event flag and no dedupe group, so its recovery is posted', () => {
+test('restart-loop is a state alarm in a group of its own: no event flag, so its recovery is posted, and its ALARMs are counted', () => {
   const loop = rule('restart-loop');
   assert.equal(loop.event, undefined);
-  assert.equal(loop.group, undefined);
+  assert.equal(loop.group, 'restart-loop');
+  assert.deepEqual(groupAlarmNames('prod', 'restart-loop'), ['teameet-prod-restart-loop'], 'it must not share a group with the event alarms');
   assert.equal(loop.source.kind, 'sum-containers');
 });

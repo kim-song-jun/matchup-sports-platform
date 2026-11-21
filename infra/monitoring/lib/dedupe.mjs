@@ -13,6 +13,11 @@ export const REPEAT_GAP_MS = 30 * 60_000;
 export const POST_AT_OCCURRENCE = [1, 3, 6, 12, 24, 48, 96];
 /** How far back the Lambda reads history: a run older than this is counted from here. */
 export const HISTORY_LOOKBACK_MS = 6 * 3_600_000;
+/**
+ * A state alarm of a cause group (`restart-loop`) flips ALARM/OK every few minutes in a slow loop. Its recovery
+ * is posted only when the alarm stayed OK this long: the Lambda waits, then reads the history again.
+ */
+export const RECOVERY_QUIET_MS = 10 * 60_000;
 /** The same transition can appear with a few ms of difference between the SNS message and the history. */
 const SAME_TRANSITION_MS = 5_000;
 
@@ -53,4 +58,22 @@ export function decideGroupAlarm({ name, changeMs, transitions }) {
   if (!POST_AT_OCCURRENCE.includes(occurrence)) return { post: false, reason: 'repeat-throttled', occurrence };
   const spanMinutes = Math.round((leader.atMs - clusters[first][0].atMs) / 60_000);
   return { post: true, occurrence, spanMinutes, alongside: [...new Set(cluster.map((t) => t.name).filter((n) => n !== name))] };
+}
+
+/**
+ * Whether the OK transition of a grouped state alarm ends the loop (post the recovery) or only a pause in it.
+ * Every repeat run posts its 1st ALARM, so a run that ends quiet always has a message to recover.
+ * @param {{name: string, changeMs: number, transitions: {name: string, atMs: number}[]}} input
+ *   transitions: ALARM transitions read at least RECOVERY_QUIET_MS after `changeMs`.
+ * @returns {{post: false, reason: 'loop-continues'} | {post: true, runStartMs?: number}}
+ *   runStartMs: first ALARM of the repeat run that just ended (the recovery reports the whole run's length).
+ */
+export function decideRecovery({ name, changeMs, transitions }) {
+  const mine = transitions.filter((t) => t.name === name).map((t) => t.atMs).sort((a, b) => a - b);
+  if (mine.some((atMs) => atMs > changeMs + SAME_TRANSITION_MS)) return { post: false, reason: 'loop-continues' };
+  const before = mine.filter((atMs) => atMs <= changeMs + SAME_TRANSITION_MS);
+  if (!before.length) return { post: true };
+  let start = before.length - 1;
+  while (start > 0 && before[start] - before[start - 1] <= REPEAT_GAP_MS) start -= 1;
+  return { post: true, runStartMs: before[start] };
 }

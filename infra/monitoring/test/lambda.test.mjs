@@ -4,6 +4,9 @@ import { dirname, join, relative } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { ZIP_FILES } from '../install.mjs';
+import { RECOVERY_QUIET_MS } from '../lib/dedupe.mjs';
+import { buildInstallPlan, DEFAULTS } from '../lib/plan.mjs';
+import { evaluateRule, LAMBDA_TIMEOUT_S, RULES } from '../lib/thresholds.mjs';
 import { handler, loadAlarmTransitions, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
 import {
   buildSummary, kstDayWindow, reduceSeries, summarizeCost, summaryQueries, SUMMARY_METRICS, yesterdayKst,
@@ -80,6 +83,71 @@ test('the restart-loop alarm posts its start and its recovery with the duration,
   await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:05:47.000+0000' }))] }, r);
   assert.equal(r.posted.length, 1);
   assert.match(r.posted[0].text, /^\[회복\]\[운영\].*\(15분\)/s);
+});
+
+// Replays a restart loop (one restart every `periodS` seconds for `loopMin` minutes, then `quietMin` of nothing)
+// through the real restart-loop rule, then feeds every ALARM/OK transition CloudWatch would have sent to the handler.
+// Each invocation sees the history as of its own (virtual) clock, which `sleep` moves forward.
+async function replayRestartLoop({ periodS, loopMin, quietMin }) {
+  const rule = RULES.find((r) => r.id === 'restart-loop');
+  const minutes = loopMin + quietMin;
+  const perMinute = Array(minutes).fill(0);
+  for (let t = 0; t < loopMin * 60; t += periodS) perMinute[Math.floor(t / 60)] += 1;
+  const start = Date.parse('2026-11-20T00:00:00Z');
+  const flips = [];
+  let state = 'OK';
+  for (let i = 0; i < minutes; i += 1) {
+    const next = evaluateRule(rule, perMinute.slice(0, i + 1));
+    if (next !== state && (next === 'ALARM' || next === 'OK')) { flips.push({ to: next, atMs: start + i * 60_000 }); state = next; }
+  }
+  const alarmHistory = flips.filter((f) => f.to === 'ALARM').map((f) => ({ name: 'teameet-prod-restart-loop', atMs: f.atMs }));
+  const posts = [];
+  for (const flip of flips) {
+    let nowMs = flip.atMs;
+    const d = deps({
+      sleep: async (ms) => { nowMs += ms; },
+      loadGroupTransitions: async () => alarmHistory.filter((t) => t.atMs <= nowMs),
+      lookupAlarmedAt: async () => undefined,
+    });
+    const stamp = new Date(flip.atMs).toISOString().replace('Z', '+0000');
+    await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: flip.to, StateChangeTime: stamp }))] }, d);
+    posts.push(...d.posted.map((p) => ({ to: flip.to, text: p.text })));
+  }
+  return { flips, posts };
+}
+
+test('a 240-second restart loop for 2 hours: ALARM only at the 1st, 3rd, 6th, 12th and 24th, one recovery when it ends', async () => {
+  const { flips, posts } = await replayRestartLoop({ periodS: 240, loopMin: 120, quietMin: 30 });
+  assert.ok(flips.filter((f) => f.to === 'ALARM').length >= 25, 'the rule really flaps here: that is what this test pins');
+  const alarms = posts.filter((p) => p.to === 'ALARM');
+  assert.deepEqual(alarms.map((p) => p.text.match(/(\d+)번째/)?.[1] ?? 'first'), ['first', '3', '6', '12', '24']);
+  const recoveries = posts.filter((p) => p.to === 'OK');
+  assert.equal(recoveries.length, 1);
+  assert.match(recoveries[0].text, /^\[회복\]\[운영\] 컨테이너가 계속 다시 시작되고 있어요/);
+  assert.match(recoveries[0].text, /\((1\d\d)분\)/, 'the recovery reports the length of the whole loop, not of its last flap');
+});
+
+test('a loop that simply stops: one ALARM, then one recovery', async () => {
+  const { posts } = await replayRestartLoop({ periodS: 120, loopMin: 30, quietMin: 30 });
+  assert.deepEqual(posts.map((p) => p.to), ['ALARM', 'OK']);
+});
+
+test('the recovery waits RECOVERY_QUIET_MS before it reads the history, and the Lambda outlives that wait', async () => {
+  const waits = [];
+  const d = deps({ sleep: async (ms) => { waits.push(ms); } });
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
+  assert.deepEqual(waits, [RECOVERY_QUIET_MS]);
+  const lambdaStep = buildInstallPlan({ ...DEFAULTS, rdsId: 'rds-main', prodInstanceId: 'i-prod' }).find((s) => s.id === 'lambda');
+  const timeout = Number(lambdaStep.args[lambdaStep.args.indexOf('--timeout') + 1]);
+  assert.equal(timeout, LAMBDA_TIMEOUT_S);
+  assert.ok(timeout * 1000 > RECOVERY_QUIET_MS + 60_000, 'the timeout must leave room for the history reads after the wait');
+});
+
+test('when the history cannot be read for a recovery, it is posted anyway', async () => {
+  const d = deps({ loadGroupTransitions: async () => { throw new Error('throttled'); } });
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
+  assert.equal(d.posted.length, 1);
+  assert.match(d.posted[0].text, /^\[회복\]/);
 });
 
 const HEAP_ALARM_TIME = Date.parse('2026-11-20T01:50:47.803Z');

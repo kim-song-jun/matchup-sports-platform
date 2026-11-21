@@ -168,8 +168,9 @@ sync_nginx_live_config() {
     if [[ "${mode}" == seed && -d "${live}/${sub}" && -n "$(\ls -A "${live}/${sub}")" ]]; then
       continue
     fi
+    # --checksum: 릴리스 헤더처럼 길이가 같은 파일을 같은 초에 다시 채우면 크기·시각 비교로는 바뀐 줄 모른다.
     install -d -m 755 "${live}/${sub}" &&
-      rsync -rpt --delete "${stage}/${sub}/" "${live}/${sub}/" || { rm -rf "${stage}"; return 1; }
+      rsync -rpt --checksum --delete "${stage}/${sub}/" "${live}/${sub}/" || { rm -rf "${stage}"; return 1; }
   done
   rm -rf "${stage}"
 }

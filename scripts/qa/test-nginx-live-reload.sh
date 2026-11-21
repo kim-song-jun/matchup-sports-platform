@@ -134,6 +134,13 @@ inode_after="$(\ls -di "${WORK}/runtime/nginx/conf.d" | awk '{ print $1 }')"
 mode="$(stat -c '%a' "${WORK}/runtime/nginx/aasa/apple-app-site-association" 2>/dev/null ||
   stat -f '%Lp' "${WORK}/runtime/nginx/aasa/apple-app-site-association")"
 [[ "${mode}" == 644 ]] && pass '정적 파일은 nginx 작업자가 읽을 수 있다(644)' || fail "정적 파일 권한이 ${mode} 다"
+stale=0
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  write_meta "q${i}"
+  sync_prod_nginx_config full >/dev/null
+  grep -q "\"q${i}\"" "${WORK}/runtime/nginx/snippets/teameet-release-metadata.conf" || stale=$((stale + 1))
+done
+[[ "${stale}" == 0 ]] && pass '같은 초에 길이가 같은 헤더로 다시 채워도 바뀐다' || fail "연달아 채운 10번 중 ${stale}번 헤더가 그대로였다"
 if sync_nginx_live_config full "${WORK}/teameet/deploy" 'conf.d/../../x=nginx.conf' 2>/dev/null; then
   fail '폴더 밖을 가리키는 대상을 받아들였다'
 else
@@ -156,13 +163,14 @@ nginx_hash() { docker compose -f "${WORK}/teameet/deploy/docker-compose.prod.yml
 release_b="${WORK}/sources/release-b"
 cp -R "${release}" "${release_b}"
 rm -f "${release_b}/deploy/nginx-live" && ln -s "${WORK}/runtime/nginx" "${release_b}/deploy/nginx-live"
+point_live() { rm -f "${WORK}/teameet" && ln -s "$1" "${WORK}/teameet" && [[ "$(readlink "${WORK}/teameet")" == "$1" ]]; }
 hash_a="$(nginx_hash)"
-ln -sfn "${release_b}" "${WORK}/teameet"
+point_live "${release_b}"
 hash_b="$(nginx_hash)"
 [[ -n "${hash_a}" && "${hash_a}" == "${hash_b}" ]] && pass '릴리스만 바뀌면 compose 는 nginx 를 다시 만들지 않는다' || fail "릴리스를 바꾸자 해시가 바뀌었다 (${hash_a} → ${hash_b})"
 sed -i.bak 's|^    image: nginx:.*|    image: nginx:9.9.9-alpine|' "${release_b}/deploy/docker-compose.prod.yml"
 [[ "$(nginx_hash)" != "${hash_a}" ]] && pass 'nginx 이미지가 바뀌면 해시가 바뀐다(compose 가 다시 만든다)' || fail '이미지가 바뀌어도 해시가 같다'
-ln -sfn "${release}" "${WORK}/teameet"
+point_live "${release}"
 
 echo '[nginx-live] 같은 컨테이너에서 reload 로 새 릴리스를 읽는다'
 write_meta c1

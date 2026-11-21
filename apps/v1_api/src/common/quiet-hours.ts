@@ -49,6 +49,16 @@ export function nightPushAllowed(now: Date, startsAt: Date | null): boolean {
   return startsAt !== null && startsAt < quietHoursEndAfter(now);
 }
 
+/**
+ * 밤(21~09시 KST)에 걸린 시각을 직전 저녁 20:30 으로 앞당긴다. 낮이면 그대로다.
+ * 밤에는 푸시가 미뤄지지 않고 걸러지므로(`nightPushAllowed`), 한 번만 예약하는 알림은 예약 시각 자체를 낮에 두어야 푸시가 간다.
+ */
+export function pullBackToDaytime(at: Date): Date {
+  if (!isQuietHour(at)) return at;
+  const { hour } = kstParts(at);
+  return new Date(kstMidnight(at, hour >= QUIET_START_HOUR ? 0 : -1).getTime() + (QUIET_START_HOUR - 0.5) * 60 * 60 * 1000);
+}
+
 /** 밤이 시작되기 전 마지막 스캔 창(KST 20:45~21:00). 스캔이 15분 슬롯이라 이 창에는 한 번만 든다. */
 export function isEveningCutoffScan(at: Date): boolean {
   const shifted = new Date(at.getTime() + KST_OFFSET_MS);

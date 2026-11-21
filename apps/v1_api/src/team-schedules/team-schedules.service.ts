@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
+import { pullBackToDaytime } from '../common/quiet-hours';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MyScheduleQueryDto } from './dto/my-schedule-query.dto';
@@ -55,6 +56,37 @@ async function enqueueScheduleNotice(tx: Tx, kind: 'created' | 'cancelled', sche
     skipDuplicates: true,
   });
 }
+/** 응답 마감 3시간 전에 아직 응답하지 않은 팀원에게 가는 자동 리마인더. 수동 트리거(triggerReminder)와 같은 키를 써서 한 마감에 한 번만 간다. */
+const RSVP_AUTO_REMINDER_LEAD_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * 마감이 있는 일정을 만들거나 마감을 바꿀 때, 같은 트랜잭션에서 "마감 3시간 전" 리마인더를 예약한다.
+ * 마감이 3시간 안으로 가까우면(방금 올린 일정이면 새 일정 알림이 이미 응답을 요청했다) 예약하지 않는다.
+ * 마감을 다시 바꾸면 새 마감 값으로 새 행이 생기고, 옛 행은 워커가 마감 값 불일치로 건너뛴다.
+ * 예약 시각이 밤(21~09시 KST)이면 푸시가 걸러져 한 번도 안 가므로 직전 저녁 20:30 으로 앞당긴다(이미 지난 시각이면 그대로 두고 알림함에만 남는다).
+ */
+async function enqueueAutoRsvpReminder(tx: Tx, scheduleId: string, rsvpDeadlineAt: Date | null): Promise<void> {
+  if (rsvpDeadlineAt === null) return;
+  const lead = new Date(rsvpDeadlineAt.getTime() - RSVP_AUTO_REMINDER_LEAD_MS);
+  if (lead.getTime() <= Date.now()) return;
+  const daytime = pullBackToDaytime(lead);
+  const availableAt = daytime.getTime() > Date.now() ? daytime : lead;
+  const deadlineIso = rsvpDeadlineAt.toISOString();
+  await tx.v1OutboxEvent.createMany({
+    data: [
+      {
+        businessKey: `schedule:${scheduleId}:reminder:rsvp_deadline:${deadlineIso}`,
+        aggregateType: RESOURCE_TYPE,
+        aggregateId: scheduleId,
+        type: 'SCHEDULE_RSVP_DEADLINE_REMINDER',
+        payload: { scheduleId, kind: 'rsvp_deadline', expectedRsvpDeadlineAt: deadlineIso, auto: true },
+        availableAt,
+      },
+    ],
+    skipDuplicates: true,
+  });
+}
+
 type LinkedMatch = { teamMatchId: string; tournamentId: string | null; leagueId: string | null };
 type MatchProjection = { linkedMatch: LinkedMatch; confirmed: boolean };
 
@@ -477,6 +509,7 @@ export class TeamSchedulesService {
       });
 
       await enqueueScheduleNotice(tx, 'created', created.id, user.id);
+      await enqueueAutoRsvpReminder(tx, created.id, created.rsvpDeadlineAt);
 
       const response = { ...this.toDetailJson(created), replayed: false };
       // P1-6 fix: resourceId is `teamId` (matching the lock/lookup above), not `created.id` — see
@@ -582,6 +615,7 @@ export class TeamSchedulesService {
       if (updated !== 1) {
         throw new ConflictException({ code: 'VERSION_CONFLICT', message: 'Schedule version changed during the write' });
       }
+      await enqueueAutoRsvpReminder(tx, scheduleId, nextRsvpDeadlineAt);
 
       // P1-10 fix (continued): capacity genuinely changed and already passed the reject-check
       // above. Two sub-cases actually free slots and require promoting from the front of the

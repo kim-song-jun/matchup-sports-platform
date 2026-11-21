@@ -8,7 +8,7 @@ import type { V1NoticesResponse } from '@/types/api';
 
 export const metadata = buildPublicMetadata({
   title: '공지사항',
-  description: 'Teameet 서비스 업데이트와 중요한 운영 소식을 확인하세요.',
+  description: 'Teameet 서비스 업데이트와 중요한 운영 소식을 확인하세요. 새 기능, 점검 일정, 대회·매치 운영 정책 변경과 이용 안내를 공지사항에서 가장 먼저 알려 드려요.',
   path: '/notices',
 });
 

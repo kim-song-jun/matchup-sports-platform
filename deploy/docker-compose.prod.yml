@@ -119,9 +119,9 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+    # v1_postgres 에 의존하지 않는다 — 운영 DB 는 RDS 라 이 컨테이너는 앱이 접속하는 대상이 아니다.
+    # 로컬 DB 를 쓰는 환경(alpha)은 오버레이가 의존을 다시 건다.
     depends_on:
-      v1_postgres:
-        condition: service_healthy
       v1_uploads_init:
         condition: service_completed_successfully
     ports:
@@ -179,9 +179,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
-    depends_on:
-      v1_postgres:
-        condition: service_healthy
     deploy:
       resources:
         limits:

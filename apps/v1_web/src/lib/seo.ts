@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import { competitionFormatLabel } from '@/lib/competition-kind';
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
 import { socialImageSrc } from '@/lib/og-image';
@@ -231,19 +232,24 @@ export function buildTournamentDescription(
   );
 }
 
-export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
+// A fetch carrying an AbortSignal opts out of Next's per-render request memoization, so the
+// de-duplication generateMetadata and the page body relied on is done here, keyed by primitives.
+const readPublicV1 = cache(async (path: string, noStore: boolean): Promise<unknown> => {
   const response = await fetch(`${getInternalApiOrigin()}/api/v1${path}`, {
     headers: { accept: 'application/json' },
     signal: serverFetchSignal(),
-    ...(options.cache === 'no-store' ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
+    ...(noStore ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
   });
 
   if (response.status === 404 || !response.ok) await response.body?.cancel();
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`SEO metadata request failed: ${path} (${response.status})`);
 
-  const envelope = (await response.json()) as ApiEnvelope<T>;
-  return envelope.data;
+  return ((await response.json()) as ApiEnvelope<unknown>).data;
+});
+
+export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
+  return (await readPublicV1(path, options.cache === 'no-store')) as T | null;
 }
 
 function getInternalApiOrigin(): string {

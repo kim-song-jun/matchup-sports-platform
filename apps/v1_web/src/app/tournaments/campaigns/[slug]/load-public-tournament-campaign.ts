@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { serverFetchSignal } from '@/lib/server-fetch-timeout';
 import type { ApiEnvelope } from '@/types/api';
 import type { V1PublicTournamentCampaign } from '@/types/tournament-campaign';
@@ -16,9 +17,10 @@ export class TournamentCampaignLoadError extends Error {
   }
 }
 
-export async function loadPublicTournamentCampaign(
+// Memoized per render: the signal below disables Next's own fetch de-duplication.
+export const loadPublicTournamentCampaign = cache(async (
   slug: string,
-): Promise<PublicTournamentCampaignLoadResult> {
+): Promise<PublicTournamentCampaignLoadResult> => {
   const response = await fetch(
     `${getInternalApiOrigin()}/api/v1/tournaments/campaigns/${encodeURIComponent(slug)}`,
     { cache: 'no-store', headers: { accept: 'application/json' }, signal: serverFetchSignal() },
@@ -30,7 +32,7 @@ export async function loadPublicTournamentCampaign(
 
   const envelope: ApiEnvelope<V1PublicTournamentCampaign> = await response.json();
   return { kind: 'found', campaign: envelope.data };
-}
+});
 
 function getInternalApiOrigin(): string {
   const configured = process.env.INTERNAL_API_ORIGIN

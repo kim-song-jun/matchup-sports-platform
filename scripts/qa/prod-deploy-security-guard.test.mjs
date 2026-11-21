@@ -663,6 +663,21 @@ test('해석하지 못한 볼륨 줄과 .. 로 빠져나가는 경로는 통과�
   assert.ok(problems.includes('./certbot/../nginx.conf:/etc/nginx/y.conf'));
 });
 
+test('flow·태그 문법의 volumes 와 점검 플래그 밖의 절대경로는 통과시키지 않는다', () => {
+  const flow = 'services:\n  nginx:\n    image: nginx\n    volumes: [ "./nginx.conf:/etc/nginx/conf.d/default.conf:ro" ]\n';
+  assert.match(findNginxReleasePinnedMounts(flow).join('\n'), /해석하지 못한 볼륨/);
+  const tagged = 'services:\n  nginx:\n    volumes: !override\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro\n';
+  assert.match(findNginxReleasePinnedMounts(tagged).join('\n'), /해석하지 못한 볼륨/);
+  const absolute = composeWithNginxMount([
+    '      - /home/ec2-user/teameet/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro',
+    '      - /home/ec2-user/.teameet-maintenance:/etc/nginx/maintenance:ro',
+  ].join('\n'));
+  assert.deepEqual(findNginxReleasePinnedMounts(absolute), [
+    '/home/ec2-user/teameet/deploy/nginx.conf:/etc/nginx/conf.d/default.conf',
+    './aasa:/etc/nginx/teameet-aasa',
+  ]);
+});
+
 test('실제 prod·alpha compose 의 nginx 는 릴리스 소스 파일을 직접 마운트하지 않는다', () => {
   for (const rel of ['deploy/docker-compose.prod.yml', 'deploy/docker-compose.alpha.yml']) {
     assert.deepEqual(findNginxReleasePinnedMounts(readFileSync(rel, 'utf8')), [], rel);

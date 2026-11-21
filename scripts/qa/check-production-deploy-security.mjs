@@ -271,7 +271,10 @@ export function findNginxImageProblem(compose) {
 const nginxBlock = (compose) => compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
 // nginx 의 volumes 목록 항목. 따옴표 없는 짧은 문법 `./원본|/원본:대상[:옵션]` 만 해석하고, 나머지 줄은 parsed:false 로 남긴다.
 const nginxVolumes = (compose) => {
-  const list = nginxBlock(compose).match(/^ {4}volumes:\n((?: {6}(?:-.*|#.*)?\n|\s*\n)*)/m)?.[1] ?? '';
+  const block = nginxBlock(compose);
+  const header = block.match(/^ {4}volumes:(.*)$/m);
+  if (header && header[1].trim() !== '') return [{ parsed: false, line: header[0].trim() }];
+  const list = block.match(/^ {4}volumes:\n((?: {6}(?:-.*|#.*)?\n|\s*\n)*)/m)?.[1] ?? '';
   return list
     .split('\n')
     .filter((line) => /^\s+-/.test(line))
@@ -299,11 +302,13 @@ export function findNginxWebMountProblem(compose) {
 
 // 릴리스 소스 안의 파일·폴더를 직접 마운트하면 컨테이너가 만들 때의 릴리스에 묶여 reload 로 새 릴리스를 못 읽는다.
 // 릴리스 소스 기준 경로(./)는 고정 런타임 폴더로 가는 ./nginx-live/·./certbot/ 아래만 허용한다.
+const NGINX_FIXED_HOST_SOURCES = new Set(['/home/ec2-user/.teameet-maintenance']);
 export function findNginxReleasePinnedMounts(compose) {
   return nginxVolumes(compose).flatMap((volume) => {
     if (!volume.parsed) return [`해석하지 못한 볼륨 ${volume.line}`];
     const { source, target, readOnly } = volume;
-    if (!source.startsWith('./')) return [];
+    // 절대경로는 릴리스와 무관한 점검 플래그 폴더만 허용한다(~/teameet/... 은 릴리스 링크를 거친다).
+    if (!source.startsWith('./')) return NGINX_FIXED_HOST_SOURCES.has(source) ? [] : [`${source}:${target}`];
     const fixed = !source.split('/').includes('..') &&
       ((source.startsWith('./nginx-live/') && readOnly) || source.startsWith('./certbot/'));
     return fixed ? [] : [`${source}:${target}`];

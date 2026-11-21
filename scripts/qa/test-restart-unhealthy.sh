@@ -23,6 +23,10 @@ case "$1" in
     ;;
   restart)
     echo "$2" >> "${STUB_DIR}/restarts.log"
+    # 재시작하는 동안 다른 프로세스(배포·롤백)가 `flock -n` 으로 잠금을 잡을 수 있는지 기록한다.
+    if [[ -n "${STUB_PROBE_LOCK:-}" ]]; then
+      if flock -n "${STUB_PROBE_LOCK}" true; then echo free >> "${STUB_DIR}/probe.log"; else echo held >> "${STUB_DIR}/probe.log"; fi
+    fi
     [[ ! -f "${STUB_DIR}/fail/$2" ]]
     ;;
   *) echo "unexpected: $*" >&2; exit 2 ;;
@@ -34,7 +38,7 @@ failures=0
 fail() { echo "  FAIL  $1" >&2; failures=$((failures + 1)); }
 
 reset() {
-  rm -rf "${WORK}/state" "${WORK}/restarts.log" "${WORK}/status/"* "${WORK}/fail/"*
+  rm -rf "${WORK}/state" "${WORK}/restarts.log" "${WORK}/probe.log" "${WORK}/status/"* "${WORK}/fail/"*
   : > "${WORK}/restarts.log"
 }
 set_status() { printf '%s' "$2" > "${WORK}/status/$1"; }
@@ -117,6 +121,21 @@ expect_restarts "teameet_v1_web,teameet_v1_api" "한 컨테이너 재시작이 �
 
 reset
 set_status teameet_v1_web unhealthy
+run 1000 DEPLOY_LOCK_FILE=
+run 1200 DEPLOY_LOCK_FILE=
+expect_restarts "" "DEPLOY_LOCK_FILE 이 없으면 아무것도 다시 띄우지 않는다(서버별 잠금 경로를 추측하지 않는다)"
+[[ "${RC}" == 1 ]] || fail "DEPLOY_LOCK_FILE 없음: 종료 코드 기대 1 실제 ${RC}"
+grep -q "DEPLOY_LOCK_FILE" "${WORK}/out.log" || fail "DEPLOY_LOCK_FILE 없음: 원인을 로그에 남기지 않았다"
+
+reset
+set_status teameet_v1_web unhealthy
+run 1000
+run 1200
+expect_restarts "teameet_v1_web" "잠금 파일이 없으면 평소처럼 동작한다"
+grep -q "배포 잠금 파일" "${WORK}/out.log" || fail "잠금 파일 없음: 확인하지 못했다는 로그를 남기지 않았다"
+
+reset
+set_status teameet_v1_web unhealthy
 run 1000
 [[ ! -e "${WORK}/no-such-lock" ]] || fail "배포 잠금 파일을 만들면 안 된다(root 소유 파일은 배포 스크립트를 막는다)"
 
@@ -146,6 +165,15 @@ if command -v flock >/dev/null 2>&1; then
   )
   expect_restarts "" "실제 flock: 배포 잠금을 쥐고 있는 동안 다시 띄우지 않는다"
   [[ ! -e "${WORK}/state" ]] || fail "실제 flock: 배포 중에 상태 파일을 만들었다"
+
+  # 재시작이 오래 걸리는 동안 배포·롤백이 `flock -n` 으로 잠금을 잡을 수 있어야 한다.
+  reset
+  set_status teameet_v1_web unhealthy
+  : > "${WORK}/probe.lock"
+  run 1000 DEPLOY_LOCK_FILE="${WORK}/probe.lock" STUB_PROBE_LOCK="${WORK}/probe.lock"
+  run 1200 DEPLOY_LOCK_FILE="${WORK}/probe.lock" STUB_PROBE_LOCK="${WORK}/probe.lock"
+  expect_restarts "teameet_v1_web" "재시작 시험 전제: 잠금이 비어 있으면 다시 띄운다"
+  [[ "$(paste -sd, "${WORK}/probe.log")" == "free" ]] || fail "재시작하는 동안 배포 잠금을 쥐고 있다: $(paste -sd, "${WORK}/probe.log")"
 else
   echo "  SKIP  flock 이 없는 환경 — 실제 flock 시나리오는 CI 에서 확인한다"
 fi

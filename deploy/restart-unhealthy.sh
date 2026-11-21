@@ -14,13 +14,15 @@ set -Eeuo pipefail
 #     처음 본 시각을 STATE_DIR 에 적어 두고, 다시 healthy/starting 이 되면 지운다.
 #   - 같은 컨테이너는 RESTART_COOLDOWN_SECONDS 안에 두 번 다시 띄우지 않는다. DB 가 죽어서 API 가
 #     unhealthy 인 때처럼 재시작이 해결책이 아닌 경우에 재시작 폭풍이 되지 않게 한다.
-#   - 배포가 진행 중이면(배포 잠금을 다른 프로세스가 쥐고 있으면) 아무것도 하지 않는다. 잠금 파일을
-#     새로 만들지 않는다 — root 가 만든 파일은 ec2-user 의 배포 스크립트가 열 수 없게 된다.
+#   - 배포가 진행 중이면(배포 잠금을 다른 프로세스가 쥐고 있으면) 아무것도 하지 않는다. 잠금은 비었는지
+#     확인한 직후 놓는다 — 쥔 채로 재시작하면 그 사이 시작한 배포·롤백(`flock -n`)이 바로 실패한다.
+#     잠금 파일을 새로 만들지 않는다 — root 가 만든 파일은 ec2-user 의 배포 스크립트가 열 수 없게 된다.
+#   - 잠금 파일 경로는 서버마다 다르므로(운영·alpha) DEPLOY_LOCK_FILE 을 반드시 지정해야 한다.
 
 DOCKER_BIN="${DOCKER_BIN:-docker}"
 FLOCK_BIN="${FLOCK_BIN:-flock}"
 CONTAINERS="${CONTAINERS:-teameet_v1_web teameet_v1_web_b teameet_v1_api teameet_v1_game_operations_worker}"
-DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/home/ec2-user/.teameet-prod-deploy.lock}"
+DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-}"
 STATE_DIR="${STATE_DIR:-/run/teameet-restart-unhealthy}"
 UNHEALTHY_GRACE_SECONDS="${UNHEALTHY_GRACE_SECONDS:-120}"
 RESTART_COOLDOWN_SECONDS="${RESTART_COOLDOWN_SECONDS:-600}"
@@ -42,12 +44,20 @@ read_epoch() {
   printf '%s' "${value}"
 }
 
+if [[ -z "${DEPLOY_LOCK_FILE}" ]]; then
+  log "DEPLOY_LOCK_FILE 이 지정되지 않았어요 — 서버의 배포 잠금 파일 경로를 지정해 주세요"
+  exit 1
+fi
+
 if [[ -e "${DEPLOY_LOCK_FILE}" ]]; then
   exec 8<"${DEPLOY_LOCK_FILE}"
   if ! "${FLOCK_BIN}" -n 8; then
     log "배포가 진행 중이에요 — 이번 확인은 건너뛰어요"
     exit 0
   fi
+  exec 8<&-
+else
+  log "배포 잠금 파일(${DEPLOY_LOCK_FILE})이 없어요 — 배포 중인지 확인하지 못한 채 진행해요"
 fi
 
 mkdir -p "${STATE_DIR}"

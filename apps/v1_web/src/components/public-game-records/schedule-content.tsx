@@ -12,12 +12,16 @@ import {
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
+import { pairSecondYellowRed } from '@/lib/second-yellow-red';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
+import { PresentationIcon } from './card-pair-icon';
 import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { LiveBadge } from './live-badge';
 import {
   eventPresentation,
+  publicCardFacts,
+  secondYellowRedPresentation,
   fixtureStatusLabel,
   formatGoalMinute,
   formatPeriodFormat,
@@ -185,6 +189,8 @@ type ScheduleEventItem = {
   label: string;
   /** 눈에 보이는 표식(자책골 등). `eventPresentation` 이 필요한 이벤트에만 채운다. */
   badge?: string;
+  /** 경고 누적 퇴장 — 옐로 위에 레드를 겹친 아이콘으로 그린다. */
+  overlap?: true;
   participantName: string | null;
   period: number | null;
   clockMs: number | null;
@@ -203,15 +209,27 @@ function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   // `?? []` -- 서버는 항상 이 키를 채우지만, 배포 과도기나 React Query 캐시에 남은
   // 구 응답에는 `cards` 키가 아예 없을 수 있다(`formatPenaltyScoreline`이 `penalties`를
   // 같은 이유로 방어한다). 시스템 경계에서 들어오는 값이라 키 부재를 정상 입력으로 다룬다.
-  const cards = (entry.cards ?? []).map((card, index) => ({
-    key: `card-${index}`,
-    eventType: 'CARD',
-    side: card.side,
-    ...eventPresentation({ type: 'CARD', cardColor: card.cardColor }),
-    participantName: card.participantName,
-    period: card.period,
-    clockMs: card.clockMs,
-  }));
+  // 같은 선수의 두 번째 옐로와 같은 시각의 레드(경고 누적 퇴장)는 레드 한 행으로 합친다(`@/lib/second-yellow-red`) —
+  // 경기 상세 타임라인과 같은 규칙이다. 짝은 "몇 번째 옐로인가"를 목록 순서로 가리므로 시간순으로 놓고 찾는다.
+  const orderedCards = [...(entry.cards ?? [])].sort(
+    (a, b) =>
+      (a.period ?? Number.MAX_SAFE_INTEGER) - (b.period ?? Number.MAX_SAFE_INTEGER) ||
+      (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER),
+  );
+  const cardPairs = pairSecondYellowRed(orderedCards, publicCardFacts);
+  const cards = orderedCards
+    .filter((card) => !cardPairs.absorbedYellows.has(card))
+    .map((card, index) => ({
+      key: `card-${index}`,
+      eventType: 'CARD',
+      side: card.side,
+      ...(cardPairs.yellowOfRed.has(card)
+        ? secondYellowRedPresentation()
+        : eventPresentation({ type: 'CARD', cardColor: card.cardColor })),
+      participantName: card.participantName,
+      period: card.period,
+      clockMs: card.clockMs,
+    }));
   return [...goals, ...cards];
 }
 
@@ -306,7 +324,7 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
     >
       <div style={{ textAlign: 'right' }}>{item.side === 'home' ? content : null}</div>
       <div style={{ textAlign: 'center', lineHeight: 1 }}>
-        <span aria-hidden="true">{item.icon}</span>
+        <span aria-hidden="true"><PresentationIcon presentation={item} size={12} /></span>
         <span className="sr-only">{item.label}</span>
         {item.badge ? (
           /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.

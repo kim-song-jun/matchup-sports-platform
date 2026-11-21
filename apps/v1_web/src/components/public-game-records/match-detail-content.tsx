@@ -7,11 +7,15 @@ import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
+import { pairSecondYellowRed } from '@/lib/second-yellow-red';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
+import { PresentationIcon } from './card-pair-icon';
 import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
   eventPresentation,
+  publicCardFacts,
+  secondYellowRedPresentation,
   formatClock,
   formatPeriodFormat,
   formatScoreline,
@@ -153,8 +157,17 @@ function LineupColumn({ title, slots, from }: { title: string; slots: readonly P
  * 홈/원정은 스코어 헤더의 좌(홈)/우(원정) 배치를 그대로 이어받아, 시간·아이콘을
  * 가운데 열에 두고 좌우 열에 각 팀의 이벤트만 채우는 2열 타임라인으로 보여준다.
  */
-function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
-  const presentation = eventPresentation(event);
+function EventRow({
+  event,
+  from,
+  secondYellowRed = false,
+}: {
+  event: PublicMatchEvent;
+  from?: string;
+  /** 이 레드가 같은 선수의 두 번째 옐로를 흡수한 경고 누적 퇴장이면 true — 겹친 카드 한 줄로 그린다. */
+  secondYellowRed?: boolean;
+}) {
+  const presentation = secondYellowRed ? secondYellowRedPresentation() : eventPresentation(event);
   // 두 열의 바깥쪽 가장자리에 붙는다 -- 홈은 오른쪽(가운데 시각 쪽), 원정은 왼쪽 정렬.
   const alignItems = event.side === 'home' ? 'flex-end' : 'flex-start';
   const assist = event.assist ?? null;
@@ -186,7 +199,7 @@ function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
     >
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{event.side === 'home' ? content : null}</div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
-        <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{presentation.icon}</span>
+        <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}><PresentationIcon presentation={presentation} /></span>
         <span className="sr-only">{presentation.label}</span>
         {presentation.badge ? (
           /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
@@ -270,9 +283,14 @@ function EventsSection({
   // period===null(타입상 허용되지만 V1GameEvent.period가 NOT NULL이라 현재
   // 서버 경로로는 발생하지 않음)인 이벤트는 유실시키지 않고 별도 "기타" 구간에
   // 담는다.
+  //
+  // 같은 선수의 두 번째 옐로와 같은 시각의 레드(경고 누적 퇴장)는 레드 한 줄로 합쳐 보인다(`@/lib/second-yellow-red`).
+  // 짝은 **구간을 나누기 전에** 전체 목록에서 찾는다 — 첫 옐로가 전반, 두 번째 옐로·레드가 후반일 수 있다.
+  const secondYellowRed = pairSecondYellowRed(events, publicCardFacts);
   const byPeriod = new Map<number, PublicMatchEvent[]>();
   const unknownPeriodEvents: PublicMatchEvent[] = [];
   for (const event of events) {
+    if (secondYellowRed.absorbedYellows.has(event)) continue;
     if (event.period === null) {
       unknownPeriodEvents.push(event);
       continue;
@@ -310,7 +328,12 @@ function EventsSection({
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {group.events.map((event, index) => (
-                <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
+                <EventRow
+                  key={`${event.type}-${event.sideId}-${group.id}-${index}`}
+                  event={event}
+                  from={from}
+                  secondYellowRed={secondYellowRed.yellowOfRed.has(event)}
+                />
               ))}
             </div>
           </div>

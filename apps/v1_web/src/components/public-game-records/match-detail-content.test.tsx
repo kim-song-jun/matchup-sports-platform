@@ -632,3 +632,49 @@ describe('MatchDetailContent — 몰수 경기의 득점·카드 설명', () => 
     expect(screen.queryByText(CAPTION)).not.toBeInTheDocument();
   });
 });
+
+// 경고 누적 퇴장 — 같은 선수의 두 번째 옐로와 같은 시각의 레드는 한 줄(겹친 카드 아이콘)로 합쳐 보인다.
+// 저장은 이벤트 둘 그대로이고 표시만 합친다(`@/lib/second-yellow-red`).
+describe('MatchDetailContent — 경고 누적 퇴장', () => {
+  const card = (color: 'YELLOW' | 'RED', period: number, clockMs: number, overrides: Partial<PublicMatchEvent> = {}): PublicMatchEvent => ({
+    assist: null, type: 'CARD', cardColor: color, sideId: 'side-home', side: 'home', participantId: 'p-7',
+    participantName: '홍길동', profileHref: null, jerseyNumber: 7, period, clockMs, ...overrides,
+  });
+  const MERGED_LABEL = '경고 누적 퇴장 (옐로카드 2장, 레드카드)';
+
+  it('두 번째 옐로와 레드를 한 줄로 합치고, 전반의 첫 옐로는 그대로 둔다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      events: [card('YELLOW', 1, 600_000), card('YELLOW', 2, 1_860_000), card('RED', 2, 1_860_000)],
+    })} />);
+
+    const firstHalf = screen.getByRole('group', { name: '전반' });
+    const secondHalf = screen.getByRole('group', { name: '후반' });
+    expect(within(firstHalf).getByText('옐로카드')).toBeInTheDocument();
+    expect(within(secondHalf).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(secondHalf).getByText(MERGED_LABEL)).toBeInTheDocument();
+    expect(within(secondHalf).getByText('홍길동')).toBeInTheDocument();
+    expect(within(secondHalf).queryByText('옐로카드')).not.toBeInTheDocument();
+    expect(within(secondHalf).queryByText('레드카드')).not.toBeInTheDocument();
+  });
+
+  it('옐로 없이 받은 직접 퇴장과 시각이 다른 레드는 합치지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      events: [card('YELLOW', 1, 600_000), card('YELLOW', 2, 1_860_000), card('RED', 2, 2_000_000), card('RED', 2, 900_000, { participantId: 'p-9', participantName: '이선수' })],
+    })} />);
+
+    const secondHalf = screen.getByRole('group', { name: '후반' });
+    expect(within(secondHalf).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(secondHalf).queryByText(MERGED_LABEL)).not.toBeInTheDocument();
+    expect(within(secondHalf).getAllByText('레드카드')).toHaveLength(2);
+  });
+
+  it('선수를 알아볼 수 없는 기록은 합치지 않는다', () => {
+    const withheld = { participantId: null, participantName: null, jerseyNumber: null };
+    render(<MatchDetailContent data={makeDetail({
+      events: [card('YELLOW', 1, 600_000, withheld), card('YELLOW', 2, 1_860_000, withheld), card('RED', 2, 1_860_000, withheld)],
+    })} />);
+
+    expect(screen.getByRole('group', { name: '후반' })).not.toHaveTextContent(MERGED_LABEL);
+    expect(within(screen.getByRole('group', { name: '후반' })).getAllByRole('listitem')).toHaveLength(2);
+  });
+});

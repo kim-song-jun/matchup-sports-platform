@@ -28,7 +28,8 @@ import {
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { EventTimeCorrectionSheet, RecordedEventList, eventTimeSummary, eventTypeLabel, periodLabel as periodNameOf, regularPeriodCountOf } from '@/shared/game-operations';
-import { collectEventTimeCorrections } from '@/lib/event-time-correction';
+import { collectEventTimeCorrections, eventTimeCorrectionErrorMessage } from '@/lib/event-time-correction';
+import { SECOND_YELLOW_RED_LABEL } from '@/lib/second-yellow-red';
 import type { GameEventRecord } from '@/types/game-operations';
 import { josa } from '@/lib/korean';
 
@@ -111,6 +112,8 @@ export function GameResultCorrectionPanel({
   const correctEventTime = useCorrectOfficialEventTime(gameId, tournamentId);
   // MD-QA #187: 확정된 결과의 사건 시각 정정 시트 대상.
   const [timeTarget, setTimeTarget] = useState<GameEventRecord | null>(null);
+  // 경고 누적 퇴장 합친 줄의 정정이면 `timeTarget` 은 레드이고 여기에 함께 옮길 두 번째 옐로가 들어 있다(아니면 빈 배열).
+  const [timeLinked, setTimeLinked] = useState<readonly GameEventRecord[]>([]);
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
   const [correctionFormOpen, setCorrectionFormOpen] = useState(autoOpen);
@@ -480,9 +483,10 @@ export function GameResultCorrectionPanel({
               sides={game.sides}
               lineups={lineupsQuery.data ?? []}
               periodCount={regularPeriodCountOf(game.periods.length, game.periodDurations)}
-              onEditEvent={(event) => {
+              onEditEvent={(event, linkedEvents) => {
                 correctEventTime.reset();
                 setTimeTarget(event);
+                setTimeLinked(linkedEvents ?? []);
               }}
             />
           )}
@@ -501,7 +505,8 @@ export function GameResultCorrectionPanel({
           open
           mode="admin"
           title="기록 시각 정정"
-          summary={[eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
+          summary={[timeLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
+          linkedNotice={timeLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
           currentClockMs={
             collectEventTimeCorrections(eventsQuery.data?.events ?? []).get(timeTarget.id)?.currentClockMs ??
@@ -511,15 +516,43 @@ export function GameResultCorrectionPanel({
           // 추가 시간에 기록된 사건이 설정 길이 밖일 수 있어서다 — 범위 판정은 서버가 한다(EVENT_CLOCK_OUT_OF_RANGE).
           maxClockMs={null}
           onSubmit={async ({ clockMs, reason }) => {
-            await correctEventTime.mutateAsync({
-              eventId: timeTarget.id,
-              expectedVersion: game.version,
-              clockMs,
-              reason,
-            });
+            if (timeLinked.length === 0) {
+              await correctEventTime.mutateAsync({
+                eventId: timeTarget.id,
+                expectedVersion: game.version,
+                clockMs,
+                reason,
+              });
+              onSaved?.();
+              return;
+            }
+            // 합친 줄은 옐로, 이어서 레드를 같은 시각·같은 사유로 옮긴다(저장은 이벤트마다 따로라 두 번 부른다). 정정마다
+            // 경기 버전이 올라가므로 두 번째는 첫 호출이 돌려준 버전을 쓴다. 이미 그 시각인 기록은 건너뛴다 — 앞 호출만
+            // 성공하고 멈춘 뒤 다시 정정해도 레드만 옮겨지도록.
+            const corrections = collectEventTimeCorrections(eventsQuery.data?.events ?? []);
+            const targets = [...timeLinked, timeTarget].filter(
+              (event) => (corrections.get(event.id)?.currentClockMs ?? event.clockMs) !== clockMs,
+            );
+            let version = game.version;
+            for (const [index, event] of targets.entries()) {
+              try {
+                const result = await correctEventTime.mutateAsync({ eventId: event.id, expectedVersion: version, clockMs, reason });
+                version = result.version;
+              } catch (err) {
+                // 부모의 저장 완료 알림(`onSaved`)은 둘 다 성공했을 때만 보낸다 — 여기서 부르면 오류를 읽기 전에 닫힐 수 있다.
+                // 옐로 정정은 이미 저장됐고, 화면 데이터는 mutation 의 onSuccess 가 다시 읽는다.
+                if (index === 0) throw err;
+                throw new Error(
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                );
+              }
+            }
             onSaved?.();
           }}
-          onClose={() => setTimeTarget(null)}
+          onClose={() => {
+            setTimeTarget(null);
+            setTimeLinked([]);
+          }}
         />
       ) : null}
 

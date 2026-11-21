@@ -2511,3 +2511,153 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
 // 게이팅과, 최종 결과 반영
 // (요구사항 4·5: end 커맨드의 payload.penalties로 실제 반영, 확인 모달을 거침)
 // 을 검증한다.
+
+// 경고 누적 퇴장 합친 줄 — 두 번째 옐로와 레드는 같은 순간의 기록이라 시각을 같이 옮기고, 취소는 레드만/모두로 갈린다.
+describe('OperateConsole — 경고 누적 퇴장 합친 줄의 수정·취소', () => {
+  beforeEach(() => {
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [{ sideId: SIDE_ID, invalidatedAt: null, participants: [
+        { id: 'p-1', gameId: 'game-1', sideId: SIDE_ID, lineupId: 'l-1',
+          displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
+          createdAt: '', updatedAt: '' },
+      ] }] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    testFixtures.game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [],
+        sides: [{ id: SIDE_ID, gameId: 'game-1', sideKey: 'HOME', teamId: null,
+          displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' }],
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    testFixtures.operations.mockReturnValue(consoleState());
+  });
+
+  const card = (sequence: number, color: 'YELLOW' | 'RED', period: number, clockMs: number): GameEventRecord =>
+    ({ ...goal(sequence), type: 'CARD', period, clockMs, payload: { card: color } }) as GameEventRecord;
+  const first = card(1, 'YELLOW', 1, 11 * 60000);
+  const second = card(2, 'YELLOW', 2, 31 * 60000);
+  const red = card(3, 'RED', 2, 31 * 60000);
+  const SHEET = '경고 누적 퇴장 기록 수정';
+  const openMergedSheet = async () => {
+    fireEvent.click(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    return screen.findByRole('dialog', { name: SHEET });
+  };
+
+  it('시각을 고치면 옐로, 이어서 레드를 같은 시각·같은 사유로 정정한다', async () => {
+    const correctEventTime = vi.fn<NonNullable<OperationsContract['correctEventTime']>>().mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [first, second, red], correctEventTime }));
+    render(<CoreHarness />);
+
+    const dialog = await openMergedSheet();
+    expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+
+    await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(2));
+    const reason = '경기 중 기록 시각 정정 (31:00 → 30:00)';
+    expect(correctEventTime).toHaveBeenNthCalledWith(1, { eventId: 'event-2', clockMs: 30 * 60000, reason });
+    expect(correctEventTime).toHaveBeenNthCalledWith(2, { eventId: 'event-3', clockMs: 30 * 60000, reason });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: SHEET })).toBeNull());
+  });
+
+  it('옐로만 옮겨지고 레드가 실패하면 안내를 남기고, 다시 정정하면 이미 옮긴 옐로는 건너뛰고 레드만 옮긴다', async () => {
+    const correctEventTime = vi
+      .fn<NonNullable<OperationsContract['correctEventTime']>>()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('서버가 바빠요.'))
+      .mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [first, second, red], correctEventTime }));
+    const view = render(<CoreHarness />);
+
+    const dialog = await openMergedSheet();
+    fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
+    expect(screen.getByRole('dialog', { name: SHEET })).toBeInTheDocument();
+    expect(correctEventTime).toHaveBeenCalledTimes(2);
+
+    // 옐로의 정정이 반영된 목록(옐로 30:00, 레드 31:00)으로 다시 그려진 상태에서 다시 정정한다.
+    const yellowCorrection: GameEventRecord = {
+      ...goal(4),
+      id: 'tc-1',
+      type: 'TIME_CORRECTION',
+      sideId: null,
+      participantId: null,
+      period: 2,
+      clockMs: 30 * 60000,
+      correctsEventId: 'event-2',
+      payload: { previousClockMs: 31 * 60000, clockMs: 30 * 60000, reason: '자동', lane: 'OPERATOR' },
+    } as GameEventRecord;
+    testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [first, second, red, yellowCorrection], correctEventTime }));
+    view.rerender(<CoreHarness />);
+    fireEvent.click(within(screen.getByRole('dialog', { name: SHEET })).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+
+    await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(3));
+    expect(correctEventTime).toHaveBeenLastCalledWith({
+      eventId: 'event-3',
+      clockMs: 30 * 60000,
+      reason: '경기 중 기록 시각 정정 (31:00 → 30:00)',
+    });
+  });
+
+  it('"레드카드만 취소"는 확인을 거쳐 레드만 되돌리고 옐로 2장은 남긴다', async () => {
+    const ops = consoleState({ liveEvents: [first, second, red] });
+    ops.reverseEvent.mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    const dialog = await openMergedSheet();
+    fireEvent.click(within(dialog).getByRole('tab', { name: '기록 취소' }));
+    expect(within(dialog).queryByRole('button', { name: '이 기록 취소하기' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: '레드카드만 취소 (퇴장 취소)' }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '레드카드 기록을 취소할까요?' });
+    expect(confirmDialog).toHaveTextContent('옐로 2장은 그대로 남고 퇴장만 취소돼요');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '레드 취소' }));
+
+    await waitFor(() => expect(ops.reverseEvent).toHaveBeenCalledTimes(1));
+    expect(ops.reverseEvent).toHaveBeenCalledWith({ eventId: 'event-3', reason: '레드카드 기록 수정·취소' });
+  });
+
+  it('"옐로·레드 모두 취소"는 레드를 먼저, 이어서 두 번째 옐로를 되돌린다', async () => {
+    const ops = consoleState({ liveEvents: [first, second, red] });
+    ops.reverseEvent.mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    const dialog = await openMergedSheet();
+    fireEvent.click(within(dialog).getByRole('tab', { name: '기록 취소' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '옐로·레드 모두 취소' }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '두 번째 옐로와 레드를 모두 취소할까요?' });
+    expect(confirmDialog).toHaveTextContent('첫 번째 옐로는 그대로 남아요');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '모두 취소' }));
+
+    await waitFor(() => expect(ops.reverseEvent).toHaveBeenCalledTimes(2));
+    expect(ops.reverseEvent).toHaveBeenNthCalledWith(1, { eventId: 'event-3', reason: '레드카드 기록 수정·취소' });
+    expect(ops.reverseEvent).toHaveBeenNthCalledWith(2, { eventId: 'event-2', reason: '옐로카드 기록 수정·취소' });
+  });
+
+  it('합치지 않은 카드 한 장의 수정 시트에는 함께 옮김 안내와 취소 선택지가 없다', async () => {
+    const ops = consoleState({ liveEvents: [first] });
+    ops.reverseEvent.mockResolvedValue(undefined);
+    testFixtures.operations.mockReturnValue(ops);
+    render(<CoreHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    const dialog = await screen.findByRole('dialog', { name: '옐로카드 기록 수정' });
+    expect(within(dialog).queryByText(/함께 옮겨져요/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('tab', { name: '기록 취소' }));
+    expect(within(dialog).getByRole('button', { name: '이 기록 취소하기' })).toBeInTheDocument();
+  });
+});

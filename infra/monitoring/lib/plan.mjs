@@ -39,6 +39,8 @@ export function lambdaPolicy(p) {
       { Sid: 'ReadMetricsForSummary', Effect: 'Allow',
         Action: ['cloudwatch:GetMetricData', 'cloudwatch:DescribeAlarms', 'cloudwatch:DescribeAlarmHistory'], Resource: '*' },
       { Sid: 'ReadCost', Effect: 'Allow', Action: ['ce:GetCostAndUsage', 'ce:GetCostForecast'], Resource: '*' },
+      { Sid: 'MailWithoutWebhook', Effect: 'Allow', Action: 'sns:Publish',
+        Resource: `arn:aws:sns:${p.region}:{{account}}:${p.mailTopicName}` },
     ],
   };
 }
@@ -148,7 +150,8 @@ export function buildInstallPlan(input) {
   add({ id: 'account', title: '계정 확인(읽기)', readonly: true, capture: 'account',
     args: ['sts', 'get-caller-identity', '--query', 'Account', '--output', 'text'] });
   add({ id: 'webhook-exists', title: '웹훅 매개변수가 있는지 확인(값은 읽지 않아요)', readonly: true,
-    failHint: `${p.webhookParam} 가 없어요. 사용자가 SecureString 으로 먼저 넣어야 해요(런북 1단계).`,
+    optional: 'ParameterNotFound',
+    optionalHint: `${p.webhookParam} 가 아직 없어요. 그동안 Lambda 는 같은 알림을 메일 주제 ${p.mailTopicName} 로 보내요. 웹훅을 SecureString 으로 넣으면 다음 알림부터 Slack 으로 가요(다시 설치할 필요 없어요).`,
     args: ['ssm', 'get-parameter', '--region', p.region, '--name', p.webhookParam, '--query', 'Parameter.Name', '--output', 'text'] });
   add({ id: 'mail-topic-exists', title: `메일 구독이 있는 기존 주제 ${p.mailTopicName} 가 있는지 확인(읽기)`, readonly: true,
     failHint: `${p.mailTopicName} 가 없어요. Slack 전달 실패 경보를 받을 메일 주제가 먼저 있어야 해요(docs/ops/prod-backup.md).`,
@@ -161,7 +164,7 @@ export function buildInstallPlan(input) {
   add({ id: 'role-policy', title: '역할 정책(웹훅 매개변수 하나만 읽어요)', policy: lambdaDoc,
     args: ['iam', 'put-role-policy', '--role-name', p.lambdaRole, '--policy-name', 'ops-slack', '--policy-document', JSON.stringify(lambdaDoc)] });
   add({ id: 'package', title: 'Lambda 압축 파일 만들기(lambda-handler.mjs + lib/)', local: 'package' });
-  const lambdaEnv = JSON.stringify({ Variables: { WEBHOOK_PARAM: p.webhookParam, RDS_ID: p.rdsId } });
+  const lambdaEnv = JSON.stringify({ Variables: { WEBHOOK_PARAM: p.webhookParam, MAIL_TOPIC_ARN: mailTopic, RDS_ID: p.rdsId } });
   const wait = (id, state) => ({ id, title: `Lambda 상태 기다리기(${state})`, readonly: true,
     args: ['lambda', 'wait', state, '--region', p.region, '--function-name', p.lambdaName] });
   add({ id: 'lambda', title: `Lambda ${p.lambdaName}`, tolerate: 'ResourceConflict',

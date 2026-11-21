@@ -23,7 +23,7 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
 
 ## 설치 순서
 
-1. **웹훅 만들기(사람).** Slack 에 비공개 채널(예: `#teameet-ops-alerts`)과 Incoming Webhook 을 만들고, 값을 터미널에서 직접 SSM 에 넣어요. 값을 채팅 · 저장소 · 셸 기록에 남기지 않아요.
+1. **웹훅 만들기(사람, 나중에 해도 돼요).** Slack 에 비공개 채널(예: `#teameet-ops-alerts`)과 Incoming Webhook 을 만들고, 값을 터미널에서 직접 SSM 에 넣어요. 값을 채팅 · 저장소 · 셸 기록에 남기지 않아요. 이 매개변수가 없는 동안 Lambda 는 같은 알림을 기존 메일 주제 `teameet-prod-ops-alerts` 로 보내요(메일 제목은 `Teameet ops alert`).
    ```bash
    read -rs WEBHOOK && aws ssm put-parameter --region ap-northeast-2 --type SecureString \
      --name /teameet/ops/slack-webhook --value "$WEBHOOK" --overwrite; unset WEBHOOK
@@ -44,7 +44,7 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
    node infra/monitoring/install.mjs --apply \
      --prod-instance-id <운영 인스턴스 ID> --alpha-instance-id <alpha 인스턴스 ID> --rds-id <RDS 인스턴스 이름>
    ```
-   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 28개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1, 서울 SNS 주제 `teameet-prod-ops-slack` 1(경보와 Lambda 만 써요, 메일 구독 없음). 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로고, 이 주제에는 백업 경보와 「Slack 전달 실패」 경보만 있어요(메일 한 통이 곧 실제 문제예요). 이 주제가 없으면 아무것도 만들기 전에 멈춰요.
+   웹훅 매개변수가 없어도 멈추지 않고, 그동안 Lambda 가 메일 주제로 보낸다고 알려 줘요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 28개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1, 서울 SNS 주제 `teameet-prod-ops-slack` 1(경보와 Lambda 만 써요, 메일 구독 없음). 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로고, 이 주제에는 백업 경보와 「Slack 전달 실패」 경보만 있고, 웹훅이 없는 동안에는 Lambda 가 알림 문구도 여기로 보내요(Lambda 역할은 이 주제 하나에만 `sns:Publish` 할 수 있어요). 이 주제가 없으면 아무것도 만들기 전에 멈춰요.
 
    **「수집기 끊김」 경보는 그 환경의 Heartbeat 가 최근 15분에 들어온 것을 확인한 뒤에만 만들어요**(숫자가 없으면 만들자마자 긴급이 울려요). 수집기를 아직 못 깔았으면(예: 운영 서버에 Node 가 없을 때) 그 경보만 건너뛰고 나머지는 만들어요. 수집기를 깐 뒤 같은 명령을 다시 실행하면 그때 만들어져요 — 그 전까지 운영은 수집기 끊김 경보가 없다는 뜻이니 설치 완료 전까지 사람이 서버 상태를 봐요.
 6. **시험.** `aws cloudwatch set-alarm-state --alarm-name teameet-alpha-web-restart --state-value ALARM --state-reason test` 로 Slack 모양을 확인하고, alpha 에서 `systemctl stop teameet-ops-metrics.timer` 5분 뒤 「수집기 끊김」 경보와 회복을 확인해요. 시험 채널로 1주 돌린 뒤 임계값을 보고 운영 채널로 옮겨요.
@@ -97,7 +97,7 @@ node infra/monitoring/install.mjs --teardown --apply                        # �
 
 ## 웹훅을 바꿀 때
 
-SSM 매개변수 값만 바꾸면 돼요. Lambda 는 호출마다 웹훅을 읽어서 다시 배포하지 않아도 다음 알림부터 새 값을 써요.
+SSM 매개변수 값만 바꾸면 돼요. Lambda 는 호출마다 웹훅을 읽어서 다시 배포하지 않아도 다음 알림부터 새 값을 써요. 매개변수를 처음 넣을 때도 같아요 — 다음 알림부터 메일 대신 Slack 으로 가요. 매개변수를 지우면 다시 메일로 가요.
 
 ## 시험
 

@@ -1,5 +1,6 @@
 // Lambda entry: SNS alarm notification or the daily scheduler tick -> one Slack message.
 // The webhook URL is read from SSM Parameter Store (SecureString) on every invocation and never logged.
+// While that parameter does not exist, the same messages go to the mail topic (MAIL_TOPIC_ARN).
 import { decideGroupAlarm, decideRecovery, HISTORY_LOOKBACK_MS, RECOVERY_QUIET_MS } from './lib/dedupe.mjs';
 import { formatAlarmNotification, formatDailySummary, scrub } from './lib/format.mjs';
 import { describeAlarm, groupAlarmNames } from './lib/thresholds.mjs';
@@ -100,13 +101,35 @@ export async function handler(event, deps = defaultDeps()) {
   } else {
     throw new Error('unsupported event shape');
   }
+  // No webhook parameter yet: the same text goes to the existing mail topic instead of Slack.
+  const via = webhook ? 'slack' : 'mail';
+  const deliver = webhook ? (text) => deps.post(webhook, text) : (text) => deps.publishMail(text);
   // Every message is attempted; a failure is thrown at the end so Lambda reports it (and retries).
   const failures = [];
   for (const text of messages) {
-    try { await deps.post(webhook, text); } catch (err) { failures.push(err.message); }
+    try { await deliver(text); } catch (err) { failures.push(err.message); }
   }
   if (failures.length) throw new Error(failures.join('; '));
-  return { posted: messages.length };
+  return { posted: messages.length, via };
+}
+
+// SNS subjects must be ASCII without line breaks, so the Korean title stays in the body.
+export const MAIL_SUBJECT = 'Teameet ops alert';
+
+export async function publishToMailTopic(topicArn, text, send) {
+  if (!topicArn) throw new Error('no webhook parameter and no MAIL_TOPIC_ARN: nowhere to deliver');
+  await send({ TopicArn: topicArn, Subject: MAIL_SUBJECT, Message: text });
+}
+
+/** The webhook URL, or null when the parameter does not exist yet (any other failure still throws). */
+export async function readWebhook(send, name) {
+  try {
+    const out = await send({ Name: name, WithDecryption: true });
+    return out.Parameter.Value;
+  } catch (err) {
+    if (err?.name === 'ParameterNotFound') return null;
+    throw err;
+  }
 }
 
 function defaultDeps() {
@@ -116,13 +139,17 @@ function defaultDeps() {
     getWebhook: () => {
       webhookPromise ??= (async () => {
         const { SSMClient, GetParameterCommand } = await import('@aws-sdk/client-ssm');
-        const out = await new SSMClient({ region }).send(
-          new GetParameterCommand({ Name: process.env.WEBHOOK_PARAM, WithDecryption: true }));
-        return out.Parameter.Value;
+        const client = new SSMClient({ region });
+        return readWebhook((input) => client.send(new GetParameterCommand(input)), process.env.WEBHOOK_PARAM);
       })();
       return webhookPromise;
     },
     post: (url, text) => postToSlack(url, text),
+    publishMail: async (text) => {
+      const { SNSClient, PublishCommand } = await import('@aws-sdk/client-sns');
+      const client = new SNSClient({ region });
+      await publishToMailTopic(process.env.MAIL_TOPIC_ARN, text, (input) => client.send(new PublishCommand(input)));
+    },
     lookupAlarmedAt: (name) => lookupAlarmedAt(region, name),
     sleep: (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
     loadGroupTransitions: (names) => loadGroupTransitions(region, names),

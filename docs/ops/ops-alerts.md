@@ -11,7 +11,7 @@ Route 53 헬스 체크 2개(us-east-1) ─▶ 경보 ─▶ 같은 Lambda
 매일 09:00 KST ─▶ Lambda(하루 요약)
 ```
 
-- 서버에는 Slack 주소가 없어요. 주소는 SSM Parameter Store SecureString `/teameet/ops/slack-webhook` 에만 있고 Lambda 만 읽어요.
+- 서버에는 Slack 주소가 없어요. 주소는 SSM Parameter Store SecureString `/teameet/ops/slack-webhook` 에만 있고 Lambda 만 읽어요. 이 매개변수가 없는 동안에는 같은 알림이 메일(주제 `teameet-prod-ops-alerts`, 제목 `Teameet ops alert`)로 와요.
 - 서버가 멈추면 수집기 하트비트가 끊겨 「수집기 끊김」 경보가 와요(서버가 스스로 알리지 못하는 경우를 메워요).
 - 이 경보들은 새 SNS 주제(`teameet-prod-ops-slack`)로 가서 Lambda 만 받아요. 기존 주제(`teameet-prod-ops-alerts`)와 메일 구독은 그대로고, 거기에는 백업 경보와 「Slack 전달 실패」 경보만 있어요 — 메일이 오면 곧 실제 문제예요.
 - 배포 중(컨테이너가 새로 만들어진 뒤 3분)에는 5xx 경보가 울리지 않게 빼요.
@@ -134,4 +134,4 @@ Route 53 이 밖에서 `/api/v1/health`(DB 가 안 되면 오류) 또는 `/landi
 
 ## Slack 전달 실패
 
-`teameet-ops-slack-errors` — Slack 으로 보내는 Lambda 가 실패했어요(웹훅 만료 · Slack 장애). 이 경보는 기존 주제(`teameet-prod-ops-alerts`)의 **메일**로만 와요(두 번째 길). 이 주제에는 다른 경보가 없어서 메일이 오면 실제로 Slack 이 막힌 거예요. 확인: Lambda `teameet-ops-slack` 의 CloudWatch 로그. 웹훅을 새로 만들었다면 SSM 매개변수만 바꾸면 돼요(Lambda 는 호출마다 읽어요).
+`teameet-ops-slack-errors` — Slack 으로 보내는 Lambda 가 실패했어요(웹훅 만료 · Slack 장애). 이 경보는 기존 주제(`teameet-prod-ops-alerts`)의 **메일**로만 와요(두 번째 길). 웹훅을 넣은 뒤에는 이 주제에 다른 경보가 없어서 메일이 오면 실제로 Slack 이 막힌 거예요(웹훅이 없는 동안에는 제목 `Teameet ops alert` 메일이 평소 알림이에요). 확인: Lambda `teameet-ops-slack` 의 CloudWatch 로그. 웹훅을 새로 만들었다면 SSM 매개변수만 바꾸면 돼요(Lambda 는 호출마다 읽어요).

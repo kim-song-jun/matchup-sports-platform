@@ -7,7 +7,9 @@ import { ZIP_FILES } from '../install.mjs';
 import { RECOVERY_QUIET_MS } from '../lib/dedupe.mjs';
 import { buildInstallPlan, DEFAULTS } from '../lib/plan.mjs';
 import { evaluateRule, LAMBDA_TIMEOUT_S, RULES } from '../lib/thresholds.mjs';
-import { handler, loadAlarmTransitions, loadGroupHistory, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
+import {
+  handler, loadAlarmTransitions, loadGroupHistory, MAIL_SUBJECT, messageForSnsRecord, postToSlack, publishToMailTopic, readWebhook,
+} from '../lambda-handler.mjs';
 import {
   buildSummary, kstDayWindow, reduceSeries, summarizeCost, summaryQueries, SUMMARY_METRICS, yesterdayKst,
 } from '../lib/summary.mjs';
@@ -65,7 +67,7 @@ test('a recovery asks for the alarm start so it can show how long it lasted', as
 test('an event alarm (restart, heap death) never posts a recovery', async () => {
   for (const name of ['teameet-prod-web-restart', 'teameet-prod-heap-oom']) {
     const d = deps({ lookupAlarmedAt: async () => { throw new Error('must not look up history for a skipped recovery'); } });
-    assert.deepEqual(await handler({ Records: [sns(alarm({ AlarmName: name, NewStateValue: 'OK' }))] }, d), { posted: 0 });
+    assert.deepEqual(await handler({ Records: [sns(alarm({ AlarmName: name, NewStateValue: 'OK' }))] }, d), { posted: 0, via: 'slack' });
   }
   const d = deps();
   await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
@@ -292,7 +294,7 @@ test('an alarm outside any group never reads history or waits', async () => {
 
 test('INSUFFICIENT_DATA posts nothing', async () => {
   const d = deps();
-  assert.deepEqual(await handler({ Records: [sns(alarm({ NewStateValue: 'INSUFFICIENT_DATA' }))] }, d), { posted: 0 });
+  assert.deepEqual(await handler({ Records: [sns(alarm({ NewStateValue: 'INSUFFICIENT_DATA' }))] }, d), { posted: 0, via: 'slack' });
   assert.equal(d.posted.length, 0);
 });
 
@@ -320,6 +322,40 @@ test('one failed post does not drop the others, and the failure still surfaces',
   await assert.rejects(
     handler({ Records: [sns(alarm()), sns(alarm({ AlarmName: 'teameet-prod-heap-oom' }))] }, d), /Slack down/);
   assert.equal(attempted.length, 2);
+});
+
+test('without a webhook parameter the same text goes to the mail topic and Slack is never called', async () => {
+  const mailed = [];
+  const d = deps({ getWebhook: async () => null, publishMail: async (text) => { mailed.push(text); } });
+  const result = await handler({ Records: [sns(alarm())] }, d);
+  assert.deepEqual(result, { posted: 1, via: 'mail' });
+  assert.equal(d.posted.length, 0);
+  assert.match(mailed[0], /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
+  const slack = deps({ publishMail: async () => { throw new Error('mail must not be used with a webhook'); } });
+  assert.deepEqual(await handler({ Records: [sns(alarm())] }, slack), { posted: 1, via: 'slack' });
+});
+
+test('a failed mail delivery still surfaces as a Lambda error', async () => {
+  const d = deps({ getWebhook: async () => null, publishMail: async () => { throw new Error('SNS down'); } });
+  await assert.rejects(handler({ Records: [sns(alarm())] }, d), /SNS down/);
+});
+
+test('readWebhook: only a missing parameter means "no webhook"; other SSM failures throw', async () => {
+  const fail = (name) => async () => { throw Object.assign(new Error(name), { name }); };
+  assert.equal(await readWebhook(fail('ParameterNotFound'), '/p'), null);
+  await assert.rejects(readWebhook(fail('AccessDeniedException'), '/p'), /AccessDeniedException/);
+  const seen = [];
+  const value = await readWebhook(async (input) => { seen.push(input); return { Parameter: { Value: WEBHOOK } }; }, '/p');
+  assert.equal(value, WEBHOOK);
+  assert.deepEqual(seen, [{ Name: '/p', WithDecryption: true }]);
+});
+
+test('publishToMailTopic sends an ASCII one-line subject and refuses when no topic is configured', async () => {
+  const sent = [];
+  await publishToMailTopic('arn:aws:sns:ap-northeast-2:1:t', '[긴급][운영] 본문\n둘째 줄', async (input) => { sent.push(input); });
+  assert.deepEqual(sent, [{ TopicArn: 'arn:aws:sns:ap-northeast-2:1:t', Subject: MAIL_SUBJECT, Message: '[긴급][운영] 본문\n둘째 줄' }]);
+  assert.match(MAIL_SUBJECT, /^[\x20-\x7e]{1,99}$/);
+  await assert.rejects(publishToMailTopic(undefined, 'x', async () => {}), /MAIL_TOPIC_ARN/);
 });
 
 test('postToSlack refuses anything that is not an Incoming Webhook URL, and never calls out', async () => {

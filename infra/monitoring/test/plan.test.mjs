@@ -114,15 +114,43 @@ test('the dry run shows which alarm is gated on the Heartbeat check', async () =
   assert.ok(logs.some((l) => l.includes('teameet-prod-collector-silent') && l.includes('heartbeat-prod 확인이 통과할 때만 만들어요')));
 });
 
-test('apply stops at the first real failure and reports which step', async () => {
+test('a missing webhook parameter does not stop the install; the Lambda is pointed at the mail topic', async () => {
+  const calls = [];
+  const logs = [];
   const exec = async (args) => {
-    if (args[0] === 'ssm') throw Object.assign(new Error('x'), { stderr: 'ParameterNotFound' });
+    calls.push(args);
+    if (args[0] === 'sts') return '111122223333';
+    if (args[0] === 'ssm') throw Object.assign(new Error('x'), { stderr: 'An error occurred (ParameterNotFound)' });
+    return '';
+  };
+  await runPlan(buildInstallPlan(ids), { apply: true, exec, log: (l) => logs.push(l), buildZip: async () => '/x' });
+  assert.ok(logs.some((l) => /아직 없어요.*메일 주제 teameet-prod-ops-alerts/.test(l)));
+  assert.ok(calls.some((c) => c[1] === 'create-function'), 'the Lambda is still created');
+  const config = calls.find((c) => c[1] === 'update-function-configuration');
+  const vars = JSON.parse(config[config.indexOf('--environment') + 1]).Variables;
+  assert.equal(vars.MAIL_TOPIC_ARN, 'arn:aws:sns:ap-northeast-2:111122223333:teameet-prod-ops-alerts');
+});
+
+test('apply stops at the first real failure and reports which step', async () => {
+  const denied = async (args) => {
+    if (args[0] === 'ssm') throw Object.assign(new Error('x'), { stderr: 'AccessDeniedException' });
     return '';
   };
   await assert.rejects(
-    runPlan(buildInstallPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' }),
-    /webhook-exists 실패.*SecureString/s,
+    runPlan(buildInstallPlan(ids), { apply: true, exec: denied, log() {}, buildZip: async () => '/x' }),
+    /webhook-exists 실패: AccessDeniedException/,
   );
+  const calls = [];
+  const noMailTopic = async (args) => {
+    calls.push(args[1]);
+    if (args[0] === 'sns' && args[1] === 'get-topic-attributes') throw Object.assign(new Error('x'), { stderr: 'NotFound' });
+    return args[0] === 'sts' ? '111122223333' : '';
+  };
+  await assert.rejects(
+    runPlan(buildInstallPlan(ids), { apply: true, exec: noMailTopic, log() {}, buildZip: async () => '/x' }),
+    /mail-topic-exists 실패/,
+  );
+  assert.ok(!calls.includes('create-topic'), 'nothing is created without the mail topic');
 });
 
 test('a second apply tolerates "already exists" but not other errors', async () => {
@@ -155,13 +183,16 @@ test('the webhook is only ever referenced by parameter name', () => {
   assert.ok(!read.args.includes('--with-decryption'), 'existence check must not read the secret');
 });
 
-test('Lambda role: reads exactly one SSM parameter, decrypt only via SSM, nothing writes', () => {
+test('Lambda role: reads exactly one SSM parameter, decrypt only via SSM, publishes only to the mail topic', () => {
   const policy = lambdaPolicy({ ...DEFAULTS });
   const statements = Object.fromEntries(policy.Statement.map((s) => [s.Sid, s]));
   assert.equal(statements.ReadWebhook.Resource, 'arn:aws:ssm:ap-northeast-2:{{account}}:parameter/teameet/ops/slack-webhook');
   assert.deepEqual(statements.DecryptWebhook.Condition.StringEquals, { 'kms:ViaService': 'ssm.ap-northeast-2.amazonaws.com' });
-  const actions = policy.Statement.flatMap((s) => [s.Action].flat());
-  assert.ok(actions.every((a) => !/^(\*|.*:\*)$/.test(a)), 'no wildcard actions');
+  assert.equal(statements.MailWithoutWebhook.Action, 'sns:Publish');
+  assert.equal(statements.MailWithoutWebhook.Resource, 'arn:aws:sns:ap-northeast-2:{{account}}:teameet-prod-ops-alerts');
+  const others = policy.Statement.filter((s) => s.Sid !== 'MailWithoutWebhook');
+  const actions = others.flatMap((s) => [s.Action].flat());
+  assert.ok([...actions, 'sns:Publish'].every((a) => !/^(\*|.*:\*)$/.test(a)), 'no wildcard actions');
   assert.ok(!actions.some((a) => /Put|Delete|Create(?!Log)|Update|Publish|Invoke/.test(a.split(':')[1]) && !a.startsWith('logs:')));
 });
 

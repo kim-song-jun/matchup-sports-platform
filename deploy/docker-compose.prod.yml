@@ -81,6 +81,8 @@ services:
     image: ${V1_API_IMAGE}
     container_name: teameet_v1_api
     restart: always
+    # 관리자 대진 트랜잭션이 45초까지 가므로 Docker 기본 10초면 재생성마다 끊긴다. 하한은 qa:compose-stop-grace 가 지킨다.
+    stop_grace_period: 60s
     volumes:
       - v1_uploads_data:/app/apps/v1_api/uploads
     environment:
@@ -172,6 +174,8 @@ services:
     container_name: teameet_v1_game_operations_worker
     command: ["node", "dist/src/jobs/v1-game-operations-worker.main.js"]
     restart: always
+    # 워커는 진행 중 일감을 20초까지 기다린 뒤 임대를 풀어서, 기본 10초면 풀기 전에 SIGKILL 을 받는다.
+    stop_grace_period: 30s
     environment:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
       NODE_ENV: production

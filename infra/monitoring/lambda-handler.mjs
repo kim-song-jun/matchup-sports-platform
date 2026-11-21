@@ -150,10 +150,11 @@ const HISTORY_PAGE_SIZE = 100;
 const HISTORY_MAX_PAGES = 5;
 
 /**
- * ALARM transitions of one alarm since `startDate`. `send` runs one DescribeAlarmHistory request, so
- * paging (an event alarm also records its OK flips, which fill the first page of a long loop) is testable.
+ * ALARM transitions of one alarm since `startDate`, plus its OK transitions (`to: 'OK'`) when `withOk` is set: only a
+ * state alarm's OK ends a pause (lib/dedupe.mjs). `send` runs one DescribeAlarmHistory request, so paging (an event
+ * alarm also records its OK flips, which fill the first page of a long loop) is testable.
  */
-export async function loadAlarmTransitions(send, name, startDate) {
+export async function loadAlarmTransitions(send, name, startDate, { withOk = false } = {}) {
   const found = [];
   let nextToken;
   for (let page = 0; page < HISTORY_MAX_PAGES; page += 1) {
@@ -162,7 +163,9 @@ export async function loadAlarmTransitions(send, name, startDate) {
       ScanBy: 'TimestampDescending', ...(nextToken ? { NextToken: nextToken } : {}),
     });
     for (const i of out.AlarmHistoryItems ?? []) {
-      if (/to ALARM/.test(i.HistorySummary ?? '')) found.push({ name, atMs: i.Timestamp.getTime() });
+      const summary = i.HistorySummary ?? '';
+      if (/to ALARM/.test(summary)) found.push({ name, atMs: i.Timestamp.getTime() });
+      else if (withOk && /to OK/.test(summary)) found.push({ name, atMs: i.Timestamp.getTime(), to: 'OK' });
     }
     nextToken = out.NextToken;
     if (!nextToken) break;
@@ -170,13 +173,19 @@ export async function loadAlarmTransitions(send, name, startDate) {
   return found;
 }
 
-// ALARM transitions of every alarm in a cause group inside the history lookback.
+/**
+ * ALARM transitions of every alarm in a cause group since `startDate`, and the OK ones of its state alarms (an event
+ * alarm's OK follows each occurrence within a minute and says nothing about a pause).
+ */
+export async function loadGroupHistory(send, alarmNames, startDate) {
+  return (await Promise.all(alarmNames.map((name) =>
+    loadAlarmTransitions(send, name, startDate, { withOk: !describeAlarm(name)?.event })))).flat();
+}
+
 async function loadGroupTransitions(region, alarmNames) {
   const { CloudWatchClient, DescribeAlarmHistoryCommand } = await import('@aws-sdk/client-cloudwatch');
   const cw = new CloudWatchClient({ region });
-  const startDate = new Date(Date.now() - HISTORY_LOOKBACK_MS);
-  const send = (input) => cw.send(new DescribeAlarmHistoryCommand(input));
-  return (await Promise.all(alarmNames.map((name) => loadAlarmTransitions(send, name, startDate)))).flat();
+  return loadGroupHistory((input) => cw.send(new DescribeAlarmHistoryCommand(input)), alarmNames, new Date(Date.now() - HISTORY_LOOKBACK_MS));
 }
 
 async function loadSummary({ region, env, dateKst, rdsId }) {

@@ -7,7 +7,7 @@ import { ZIP_FILES } from '../install.mjs';
 import { RECOVERY_QUIET_MS } from '../lib/dedupe.mjs';
 import { buildInstallPlan, DEFAULTS } from '../lib/plan.mjs';
 import { evaluateRule, LAMBDA_TIMEOUT_S, RULES } from '../lib/thresholds.mjs';
-import { handler, loadAlarmTransitions, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
+import { handler, loadAlarmTransitions, loadGroupHistory, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
 import {
   buildSummary, kstDayWindow, reduceSeries, summarizeCost, summaryQueries, SUMMARY_METRICS, yesterdayKst,
 } from '../lib/summary.mjs';
@@ -85,14 +85,15 @@ test('the restart-loop alarm posts its start and its recovery with the duration,
   assert.match(r.posted[0].text, /^\[회복\]\[운영\].*\(15분\)/s);
 });
 
-// Replays a restart loop (one restart every `periodS` seconds for `loopMin` minutes, then `quietMin` of nothing)
-// through the real restart-loop rule, then feeds every ALARM/OK transition CloudWatch would have sent to the handler.
-// Each invocation sees the history as of its own (virtual) clock, which `sleep` moves forward.
-async function replayRestartLoop({ periodS, loopMin, quietMin }) {
+// Replays restarts through the real restart-loop rule, then feeds every ALARM/OK transition CloudWatch would have
+// sent to the handler. Each invocation sees the history as of its own (virtual) clock, which `sleep` moves forward.
+// `bursts`: [startMin, lengthMin, periodS][]: a restart every periodS seconds for lengthMin minutes from startMin.
+async function replayRestarts({ bursts, minutes }) {
   const rule = RULES.find((r) => r.id === 'restart-loop');
-  const minutes = loopMin + quietMin;
   const perMinute = Array(minutes).fill(0);
-  for (let t = 0; t < loopMin * 60; t += periodS) perMinute[Math.floor(t / 60)] += 1;
+  for (const [startMin, lengthMin, periodS] of bursts) {
+    for (let t = 0; t < lengthMin * 60; t += periodS) perMinute[startMin + Math.floor(t / 60)] += 1;
+  }
   const start = Date.parse('2026-11-20T00:00:00Z');
   const flips = [];
   let state = 'OK';
@@ -100,13 +101,13 @@ async function replayRestartLoop({ periodS, loopMin, quietMin }) {
     const next = evaluateRule(rule, perMinute.slice(0, i + 1));
     if (next !== state && (next === 'ALARM' || next === 'OK')) { flips.push({ to: next, atMs: start + i * 60_000 }); state = next; }
   }
-  const alarmHistory = flips.filter((f) => f.to === 'ALARM').map((f) => ({ name: 'teameet-prod-restart-loop', atMs: f.atMs }));
+  const history = flips.map((f) => ({ name: 'teameet-prod-restart-loop', atMs: f.atMs, ...(f.to === 'OK' ? { to: 'OK' } : {}) }));
   const posts = [];
   for (const flip of flips) {
     let nowMs = flip.atMs;
     const d = deps({
       sleep: async (ms) => { nowMs += ms; },
-      loadGroupTransitions: async () => alarmHistory.filter((t) => t.atMs <= nowMs),
+      loadGroupTransitions: async () => history.filter((t) => t.atMs <= nowMs),
       lookupAlarmedAt: async () => undefined,
     });
     const stamp = new Date(flip.atMs).toISOString().replace('Z', '+0000');
@@ -115,6 +116,9 @@ async function replayRestartLoop({ periodS, loopMin, quietMin }) {
   }
   return { flips, posts };
 }
+
+const replayRestartLoop = ({ periodS, loopMin, quietMin }) =>
+  replayRestarts({ bursts: [[0, loopMin, periodS]], minutes: loopMin + quietMin });
 
 test('a 240-second restart loop for 2 hours: ALARM only at the 1st, 3rd, 6th, 12th and 24th, one recovery when it ends', async () => {
   const { flips, posts } = await replayRestartLoop({ periodS: 240, loopMin: 120, quietMin: 30 });
@@ -125,6 +129,33 @@ test('a 240-second restart loop for 2 hours: ALARM only at the 1st, 3rd, 6th, 12
   assert.equal(recoveries.length, 1);
   assert.match(recoveries[0].text, /^\[회복\]\[운영\] 컨테이너가 계속 다시 시작되고 있어요/);
   assert.match(recoveries[0].text, /\((1\d\d)분\)/, 'the recovery reports the length of the whole loop, not of its last flap');
+});
+
+// Every [회복] must follow a [긴급] that reached Slack since the previous [회복].
+const assertPaired = (posts) => {
+  let open = false;
+  for (const p of posts) {
+    if (p.to === 'ALARM') open = true;
+    else {
+      assert.ok(open, `a [회복] was posted with no [긴급] before it: ${posts.map((q) => (q.to === 'OK' ? 'R' : 'A')).join('')}`);
+      open = false;
+    }
+  }
+  assert.ok(!open, 'the last [긴급] was never recovered');
+};
+
+test('a 285-second loop that flaps for 3 hours posts recoveries only as the pair of a [긴급]', async () => {
+  const { posts, flips } = await replayRestartLoop({ periodS: 285, loopMin: 180, quietMin: 40 });
+  assert.ok(flips.some((f, i) => f.to === 'OK' && flips[i + 1]?.to === 'ALARM' && flips[i + 1].atMs - f.atMs > RECOVERY_QUIET_MS),
+    'the rule pauses longer than the quiet period here: that is the case this test pins');
+  assertPaired(posts);
+});
+
+test('six 6-minute bursts 20 minutes apart: each recovery follows its own [긴급]', async () => {
+  const bursts = [0, 1, 2, 3, 4, 5].map((i) => [i * 26, 6, 120]);
+  const { posts } = await replayRestarts({ bursts, minutes: 6 * 26 + 30 });
+  assert.equal(posts.filter((p) => p.to === 'OK').length, posts.filter((p) => p.to === 'ALARM').length);
+  assertPaired(posts);
 });
 
 test('a loop that simply stops: one ALARM, then one recovery', async () => {
@@ -216,6 +247,24 @@ test('alarm history is read page by page and only the ALARM transitions are kept
   const found = await loadAlarmTransitions(send, 'teameet-prod-web-restart', new Date('2026-11-20T00:00:00Z'));
   assert.deepEqual(seen, [undefined, 't1']);
   assert.deepEqual(found.map((f) => f.atMs), [Date.parse('2026-11-20T01:50:47Z'), Date.parse('2026-11-20T01:48:47Z')]);
+});
+
+test('OK transitions are kept (marked) only when asked for, for state alarms', async () => {
+  const item = (summary, iso) => ({ HistorySummary: summary, Timestamp: new Date(iso) });
+  const send = async () => ({ AlarmHistoryItems: [item('Alarm updated from ALARM to OK', '2026-11-20T01:51:47Z'), item('Alarm updated from OK to ALARM', '2026-11-20T01:50:47Z')] });
+  const start = new Date('2026-11-20T00:00:00Z');
+  assert.equal((await loadAlarmTransitions(send, 'a', start)).length, 1);
+  const withOk = await loadAlarmTransitions(send, 'a', start, { withOk: true });
+  assert.deepEqual(withOk.map((t) => t.to ?? 'ALARM'), ['OK', 'ALARM']);
+});
+
+test('a group history keeps the OK transitions of state alarms only, never those of event alarms', async () => {
+  const item = (summary, iso) => ({ HistorySummary: summary, Timestamp: new Date(iso) });
+  const send = async () => ({ AlarmHistoryItems: [item('Alarm updated from ALARM to OK', '2026-11-20T01:51:47Z'), item('Alarm updated from OK to ALARM', '2026-11-20T01:50:47Z')] });
+  const names = ['teameet-prod-web-restart', 'teameet-prod-restart-loop'];
+  const found = await loadGroupHistory(send, names, new Date('2026-11-20T00:00:00Z'));
+  assert.deepEqual(found.map((t) => `${t.name.split('-').slice(2).join('-')}:${t.to ?? 'ALARM'}`),
+    ['web-restart:ALARM', 'restart-loop:OK', 'restart-loop:ALARM']);
 });
 
 test('paging stops at the cap even when CloudWatch keeps returning a token', async () => {

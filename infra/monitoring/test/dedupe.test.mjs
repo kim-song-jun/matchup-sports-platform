@@ -108,3 +108,28 @@ test('recovery: only the ALARMs of this alarm count, and a run ends at a gap lon
 test('recovery: no ALARM in the history (older than the lookback) still posts, without a run start', () => {
   assert.deepEqual(decideRecovery({ name: LOOP, changeMs: T0, transitions: [] }), { post: true });
 });
+
+const ok = (name, offsetMs) => ({ name, atMs: T0 + offsetMs, to: 'OK' });
+
+test('an ALARM after the alarm stayed OK for the quiet period starts a new run and posts as the 1st', () => {
+  const history = [at(LOOP, 0), ok(LOOP, 2 * MIN), at(LOOP, 4 * MIN), ok(LOOP, 6 * MIN), at(LOOP, 20 * MIN)];
+  const d = decideGroupAlarm({ name: LOOP, changeMs: T0 + 20 * MIN, transitions: history });
+  assert.deepEqual(d, { post: true, occurrence: 1, spanMinutes: 0, alongside: [] });
+});
+
+test('an ALARM that comes back before the quiet period ends stays in the same run', () => {
+  const history = [at(LOOP, 0), ok(LOOP, 2 * MIN), at(LOOP, 4 * MIN), ok(LOOP, 6 * MIN), at(LOOP, 15 * MIN)];
+  const d = decideGroupAlarm({ name: LOOP, changeMs: T0 + 15 * MIN, transitions: history });
+  assert.deepEqual(d, { post: true, occurrence: 3, spanMinutes: 15, alongside: [] });
+});
+
+test('the recovery after a new run reports that run only, not the one a quiet pause closed', () => {
+  const history = [at(LOOP, 0), ok(LOOP, 2 * MIN), at(LOOP, 20 * MIN), ok(LOOP, 22 * MIN)];
+  assert.deepEqual(decideRecovery({ name: LOOP, changeMs: T0 + 22 * MIN, transitions: history }), { post: true, runStartMs: T0 + 20 * MIN });
+});
+
+test('OK transitions of other alarms do not end a run', () => {
+  const history = [at(LOOP, 0), ok(HEAP, 2 * MIN), at(LOOP, 20 * MIN)];
+  const d = decideRecovery({ name: LOOP, changeMs: T0 + 22 * MIN, transitions: history });
+  assert.deepEqual(d, { post: true, runStartMs: T0 });
+});

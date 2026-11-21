@@ -1,0 +1,12 @@
+[Unit]
+Description=Teameet ops metrics collector (publishes numbers to CloudWatch)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/teameet-ops/collector.env
+ExecStart=/usr/bin/flock -n /run/teameet-ops-metrics.lock /usr/bin/env node /usr/local/lib/teameet-ops/collect.mjs --env ${TEAMEET_ENV} --output cloudwatch
+TimeoutStartSec=45
+Nice=10
+NoNewPrivileges=true

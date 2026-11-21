@@ -1,4 +1,10 @@
-# ALB idle_timeout — 사용자가 실제로 만나는 60초 벽
+# 앞단 응답 대기 — 사용자가 실제로 만나는 60초 벽 (ALB idle_timeout · CloudFront 오리진 응답 대기)
+
+> **상태(2026-11-21): 운영은 아직 ALB, alpha 는 이미 CloudFront 다.** 운영 DNS 는 ALB 를 가리키고, alpha 는
+> CloudFront 를 거친다. 둘 다 사용자가 보는 상한이 **60초**라 이 문서의 문제(아래 2절)는 두 환경에 모두 해당한다.
+> 운영 DNS 를 CloudFront 로 옮기면 상한을 정하는 값이 ALB `idle_timeout` 에서 CloudFront 오리진 응답 대기로
+> 바뀐다(6절). 앞단 구조 전체는 `docs/ops/edge-cloudfront.md`. 파일 이름이 `alb-idle-timeout` 인 것은 코드 주석이
+> 이 경로를 가리키기 때문이다 — 이름 변경은 그 주석 정리와 함께 한다.
 
 대진 자동 생성처럼 오래 걸리는 어드민 요청이 **60초에 504 로 끊기는데 서버 트랜잭션은 그대로
 커밋되는** 문제의 마지막 남은 원인. `deploy/nginx.conf`·`deploy/nginx.alpha.conf` 의
@@ -15,7 +21,8 @@
 |---|---|---|
 | 로드밸런서 | `teameet-alb` (ap-northeast-2) | `README.md` "인프라 구조", `deploy/nginx.conf:14` |
 | `idle_timeout.timeout_seconds` | **60** (ALB 기본값) | 2026-08-27 `describe-load-balancer-attributes` 보고값 |
-| 적용 범위 | **alpha + prod 양쪽 전부** | alpha 와 prod 는 ALB 하나를 호스트 규칙으로 나눠 쓴다 (`README.md`) |
+| 적용 범위 | **prod 만**(alpha 는 DNS 가 CloudFront 로 옮겨져 이 ALB 를 지나지 않는다) | 2026-11-21 Route 53 확인: apex·`www` → ALB, `alpha` → CloudFront. alpha 의 호스트 규칙·대상 그룹은 남아 있지만 쓰이지 않는다 |
+| alpha 의 같은 벽 | CloudFront 오리진 응답 대기 **60초** | 6절 |
 | nginx `proxy_read_timeout` (대진 생성 3라우트) | 180초 | `deploy/nginx.conf`, `deploy/nginx.alpha.conf` |
 | nginx `proxy_read_timeout` (그 외 전부) | 60초 (nginx 기본값, 미지정) | 같은 파일 |
 | 앱 최악 상한 | 130초 = Prisma `maxWait 10초` + `timeout 120초` | 아래 4번 표 |
@@ -124,8 +131,9 @@ aws elbv2 modify-load-balancer-attributes --region ap-northeast-2 \
 
 ### 4-2. 영향 범위 — 반드시 먼저 읽을 것
 
-**이 값은 로드밸런서 전체에 걸린다. alpha 와 prod 는 같은 ALB 를 쓰므로 두 환경이 동시에 바뀐다.**
-환경별로 다르게 줄 방법은 없다(리스너·규칙 단위 속성이 아니다).
+**이 값은 로드밸런서 전체에 걸린다.** 환경별로 다르게 줄 방법은 없다(리스너·규칙 단위 속성이 아니다).
+2026-11-21 현재 이 ALB 를 지나는 환경은 prod 뿐이지만, alpha 호스트 규칙이 남아 있어 alpha 를 ALB 로 되돌리면
+같은 값이 적용된다.
 
 바뀌는 것: 유휴 커넥션을 최대 180초까지 잡아 둔다 → ALB 의 동시 연결 수가 늘어날 수 있고,
 느린 백엔드가 있을 때 사용자가 실패를 아는 데 최대 3배 오래 걸린다. 반대로 얻는 것은
@@ -191,10 +199,32 @@ ALB 작업은 사람 손이 필요하므로 그때까지 아래로 버틴다. **
 
 ---
 
+## 6. 운영 DNS 를 CloudFront 로 옮긴 뒤 — 같은 벽이 다른 값으로 바뀐다
+
+운영이 CloudFront 를 거치면 ALB `idle_timeout` 은 의미가 없어지고(ALB 는 삭제 예정), 사용자가 보는 상한은
+**CloudFront 의 오리진 응답 대기(`OriginReadTimeout`)** 가 정한다. alpha 는 지금 이 구조다.
+
+| 항목 | 값 |
+|---|---|
+| 현재 설정 | 두 배포 모두 **60초**(CloudFront 기본 최대치) — ALB 와 같아서 전환으로 나빠지지 않는다 |
+| 올리는 법 | 이 값은 **계정 한도(Service Quotas → CloudFront → "Response timeout per origin")** 가 상한이라, 한도 상향 요청이 승인돼야 배포 설정을 올릴 수 있다. 순서는 **쿼터 승인 → 각 배포 오리진 설정**(nginx 는 이미 180초) |
+| 영향 범위 | 배포(오리진) 단위다. 운영·alpha 를 따로 올릴 수 있다 — ALB 와 달리 환경별로 다르게 줄 수 있다 |
+| 트레이드오프 | 2절·4-2 와 같다. 60초는 "빨리 실패", 180초는 "정확한 결과" |
+| 지금 해둘 일 | 쿼터 상향 신청은 전환 **전에** 해 둔다(승인은 나중에 와도 된다). 승인 전까지는 5절 완화책이 그대로 필요하다 |
+
+확인 명령(읽기 전용):
+
+```bash
+aws cloudfront get-distribution-config --id "$DISTRIBUTION_ID" \
+  --query 'DistributionConfig.Origins.Items[].{host:DomainName,readTimeout:CustomOriginConfig.OriginReadTimeout}'
+```
+
+---
+
 ## 관련 파일
 
 - `deploy/nginx.conf` · `deploy/nginx.alpha.conf` — 대진 생성 3라우트의 `proxy_read_timeout 180s`
   중첩 location 과 그 근거 주석
-- `README.md` "인프라 구조" — alpha·prod 가 ALB 하나를 나눠 쓰는 구조
-- `docs/ops/maintenance-mode.md` — 같은 ALB 를 만지는 다른 절차(리스너 기본 규칙). 확인 명령·
-  `--no-keepalive` 주의사항의 출처
+- `README.md` "인프라 구조" — 환경별 앞단(alpha CloudFront, 운영 ALB → CloudFront 전환 예정)
+- `docs/ops/edge-cloudfront.md` — 앞단 현재 상태·캐시 설계·전환 절차
+- `docs/ops/maintenance-mode.md` — 계획 점검 절차. 확인 명령·`--no-keepalive` 주의사항의 출처

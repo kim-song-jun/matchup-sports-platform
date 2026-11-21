@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { AwardsPageClient } from './awards-page-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, buildTournamentSubpageDescription, fetchPublicV1 } from '@/lib/seo';
 import { buildTournamentSubpageBreadcrumbLd } from '@/lib/structured-data';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!tournament) return buildNoIndexMetadata('대회 시상 정보를 찾을 수 없어요');
   const metadata = buildPublicMetadata({
     title: `${tournament.title} 개인 시상`,
-    description: `${tournament.title}의 MVP와 개인 시상 결과를 확인하세요.`,
+    description: buildTournamentSubpageDescription(tournament, 'awards'),
     path: `/tournaments/${id}/awards`,
     image: resolveTournamentImage(tournament, 'cover'),
   });

@@ -1527,3 +1527,39 @@ describe('ScheduleContent — 몰수 경기의 기록 설명', () => {
     expect(screen.queryByText('몰수 전 기록이에요')).not.toBeInTheDocument();
   });
 });
+
+// 경고 누적 퇴장 — 같은 선수의 두 번째 옐로와 같은 시각의 레드는 상세 타임라인과 같은 규칙으로 한 행에 합쳐 보인다.
+describe('ScheduleContent — 경고 누적 퇴장은 한 행으로 합쳐 보인다', () => {
+  const MERGED_LABEL = '경고 누적 퇴장 (옐로카드 2장, 레드카드)';
+  const card = (cardColor: 'YELLOW' | 'RED', period: number, clockMs: number, participantName: string | null = '홍길동') =>
+    ({ side: 'home', cardColor, participantName, jerseyNumber: participantName === null ? null : 7, period, clockMs }) as const;
+
+  it('두 번째 옐로와 레드를 한 행으로 합치고, 전반의 첫 옐로는 그대로 둔다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      cards: [card('YELLOW', 1, 600_000), card('YELLOW', 2, 1_860_000), card('RED', 2, 1_860_000)],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const firstHalf = screen.getByRole('group', { name: '전반 기록' });
+    const secondHalf = screen.getByRole('group', { name: '후반 기록' });
+    expect(within(firstHalf).getByText('옐로카드')).toBeInTheDocument();
+    expect(within(secondHalf).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(secondHalf).getByText(MERGED_LABEL)).toBeInTheDocument();
+    expect(secondHalf).toHaveTextContent('홍길동');
+    expect(within(secondHalf).queryByText('옐로카드')).not.toBeInTheDocument();
+    expect(within(secondHalf).queryByText('레드카드')).not.toBeInTheDocument();
+  });
+
+  it('옐로 한 장과 같은 시각의 레드, 이름이 가려진 기록은 합치지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      cards: [card('YELLOW', 2, 1_860_000), card('RED', 2, 1_860_000), card('YELLOW', 2, 100_000, null), card('YELLOW', 2, 200_000, null), card('RED', 2, 200_000, null)],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const secondHalf = screen.getByRole('group', { name: '후반 기록' });
+    expect(within(secondHalf).queryByText(MERGED_LABEL)).not.toBeInTheDocument();
+    expect(within(secondHalf).getAllByRole('listitem')).toHaveLength(5);
+  });
+});

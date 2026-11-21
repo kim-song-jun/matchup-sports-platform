@@ -576,3 +576,124 @@ describe('RecordedEventList — 운영진 실명', () => {
     expect(screen.getByText(text, { exact: true }).closest('p')).not.toHaveClass('line-clamp-2');
   });
 });
+
+// 경고 누적 퇴장 — 같은 선수의 두 번째 옐로와 같은 시각의 레드는 한 줄(겹친 점)로 합쳐 보인다.
+// 저장은 이벤트 둘 그대로이고, 합친 줄에는 옐로·레드 각각의 수정 버튼이 따로 있다.
+describe('RecordedEventList — 경고 누적 퇴장', () => {
+  const card = (sequence: number, color: 'YELLOW' | 'RED', period: number, clockMs: number, participantId: string | null = 'p-jung'): GameEventRecord => ({
+    ...goal(sequence, HOME_SIDE_ID, participantId, clockMs),
+    type: 'CARD' as const,
+    period,
+    payload: { card: color },
+  });
+  const rowsOf = () => within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+
+  it('두 번째 옐로와 레드를 한 줄로 합치고 첫 옐로는 그대로 둔다', () => {
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), card(2, 'YELLOW', 2, 31 * 60000), card(3, 'RED', 2, 31 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    const rows = rowsOf();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('옐로카드 · 10 정우진');
+    expect(rows[1]).toHaveTextContent('후반 31');
+    expect(rows[1]).toHaveTextContent('경고 누적 퇴장 · 10 정우진');
+    expect(rows[1]).toHaveTextContent('강남 풋살 클럽');
+    expect(rows[1]).not.toHaveTextContent('레드카드');
+  });
+
+  it('합친 줄은 옐로·레드 수정 버튼을 따로 두고, 각 버튼이 그 이벤트의 콜백을 부른다', async () => {
+    const onEditEvent = vi.fn();
+    const first = card(1, 'YELLOW', 1, 11 * 60000);
+    const second = card(2, 'YELLOW', 2, 31 * 60000);
+    const red = card(3, 'RED', 2, 31 * 60000);
+    render(<RecordedEventList events={[first, second, red]} sides={SIDES} lineups={LINEUPS} onEditEvent={onEditEvent} />);
+
+    const merged = rowsOf()[1];
+    expect(within(merged).getAllByRole('button')).toHaveLength(2);
+    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    expect(onEditEvent).toHaveBeenLastCalledWith(second);
+    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (레드카드)' }));
+    expect(onEditEvent).toHaveBeenLastCalledWith(red);
+  });
+
+  it('newest-first 에서도 합친 줄은 마지막 기록 자리에 한 줄로 남는다', () => {
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), card(2, 'YELLOW', 2, 31 * 60000), card(3, 'RED', 2, 31 * 60000), goal(4, AWAY_SIDE_ID, 'p-cho', 40 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        order="newest-first"
+      />,
+    );
+
+    const rows = rowsOf();
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('골 · 9 조현우');
+    expect(rows[1]).toHaveTextContent('경고 누적 퇴장');
+    expect(rows[2]).toHaveTextContent('옐로카드');
+  });
+
+  it('옐로 한 장과 같은 시각의 레드나 시각이 다른 레드는 합치지 않는다', () => {
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 2, 31 * 60000), card(2, 'RED', 2, 31 * 60000), card(3, 'YELLOW', 1, 5 * 60000, 'p-cho'), card(4, 'YELLOW', 2, 20 * 60000, 'p-cho'), card(5, 'RED', 2, 25 * 60000, 'p-cho')]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(rowsOf()).toHaveLength(5);
+  });
+
+  it('레드를 되돌리면(취소) 합치지 않고 원본 기록과 정정 줄을 그대로 보여 준다', () => {
+    const red = card(3, 'RED', 2, 31 * 60000);
+    const correction = {
+      ...goal(4, HOME_SIDE_ID, null, 31 * 60000),
+      type: 'CORRECTION' as const,
+      period: 2,
+      reversesEventId: red.id,
+      payload: { reason: '오조작' },
+    };
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), card(2, 'YELLOW', 2, 31 * 60000), red, correction]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    const rows = rowsOf();
+    expect(rows).toHaveLength(4);
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(rows[2]).toHaveTextContent('레드카드');
+    expect(rows[2]).toHaveTextContent('취소된 기록');
+  });
+
+  it('시각 정정으로 레드가 옐로와 다른 시각이 되면 두 줄로 돌아간다', () => {
+    const second = card(2, 'YELLOW', 2, 31 * 60000);
+    const red = card(3, 'RED', 2, 31 * 60000);
+    const timeCorrection = {
+      ...goal(4, HOME_SIDE_ID, null, 33 * 60000),
+      type: 'TIME_CORRECTION' as const,
+      period: 2,
+      correctsEventId: red.id,
+      payload: { previousClockMs: 31 * 60000, clockMs: 33 * 60000 },
+    };
+    render(
+      <RecordedEventList
+        events={[card(1, 'YELLOW', 1, 11 * 60000), second, red, timeCorrection]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(rowsOf()).toHaveLength(3);
+  });
+});

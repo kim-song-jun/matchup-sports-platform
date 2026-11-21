@@ -99,14 +99,14 @@ test('a fixture at 00:30 KST tomorrow is not today', async () => {
   assert.equal(await run(api), 0);
 });
 
-test('the list request covers leagues and carries no date window', async () => {
+test('the list request covers leagues and carries no status or date window', async () => {
   const api = fakeApi({ tournaments: [], schedules: {} });
   assert.equal(await run(api), 0);
   const listCalls = api.calls.filter((call) => call.startsWith('/tournaments?'));
   assert.equal(listCalls.length, 1);
   const query = new URL(listCalls[0], 'https://api.test').searchParams;
   assert.equal(query.get('kind'), 'all');
-  assert.equal(query.get('status'), 'in_progress');
+  assert.equal(query.has('status'), false);
   assert.equal(query.has('dateFrom') || query.has('dateTo'), false);
 });
 
@@ -120,6 +120,45 @@ test('a regular league with a fixture today blocks, and finished competitions ar
   });
   assert.equal(await run(api), 1);
   assert.ok(!api.calls.some((call) => call.includes('/done/')));
+});
+
+test('a closed tournament with a fixture today blocks even though it is not in progress', async () => {
+  const api = fakeApi({
+    tournaments: [{ id: 'closed', title: '접수 마감 대회', kind: 'regular_tournament', status: 'closed' }],
+    schedules: { closed: [{ scheduledAt: '2026-11-21T05:00:00.000Z', status: 'scheduled' }] },
+  });
+  assert.equal(await run(api), 1);
+});
+
+test('a league that has not started yet (draft, open) blocks on a fixture today', async () => {
+  for (const status of ['draft', 'open']) {
+    const api = fakeApi({
+      tournaments: [{ id: 'pre', title: '시작 전 리그', kind: 'regular_league', status }],
+      schedules: { pre: [{ scheduledAt: '2026-11-21T05:00:00.000Z', status: 'scheduled' }] },
+    });
+    assert.equal(await run(api), 1, status);
+  }
+});
+
+test('completed and cancelled competitions are never read, and the list stops at the first one', async () => {
+  const pages = {
+    first: { items: [{ id: 'live', title: '진행', status: 'in_progress' }, { id: 'done', title: '종료', status: 'completed' }], nextCursor: 'second' },
+    second: { items: [{ id: 'old', title: '더 옛날', status: 'completed' }], nextCursor: null },
+  };
+  const requested = [];
+  const fetchJson = async (path) => {
+    if (path.startsWith('/tournaments?')) {
+      const cursor = new URL(path, 'https://api.test').searchParams.get('cursor') ?? 'first';
+      requested.push(cursor);
+      return { items: pages[cursor].items, pageInfo: { nextCursor: pages[cursor].nextCursor } };
+    }
+    const id = path.split('/')[2];
+    assert.equal(id, 'live', `${id} 의 일정을 읽으면 안 돼요`);
+    return { items: [{ scheduledAt: '2026-11-21T05:00:00.000Z', status: 'scheduled' }], nextCursor: null };
+  };
+  const result = await collectMatchDay({ fetchJson, now: NOW });
+  assert.equal(result.open.length, 1);
+  assert.deepEqual(requested, ['first']);
 });
 
 test('an in-progress competition without dates still blocks on its fixture today', async () => {

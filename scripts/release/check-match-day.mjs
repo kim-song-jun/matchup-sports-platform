@@ -17,6 +17,9 @@ const PAGE_LIMIT = 50;
 const SCHEDULE_PAGE_LIMIT = 100;
 const MAX_PAGES = 20;
 const OPEN_FIXTURE_STATUSES = new Set(['scheduled', 'live']);
+// The list sorts finished competitions last (in progress, recruiting, preparing, recruitment closed,
+// completed, then anything else), so the first page showing one of these has nothing left to read.
+const FINISHED_COMPETITION_STATUSES = new Set(['completed', 'cancelled']);
 
 /** Calendar date (YYYY-MM-DD) of an instant in Asia/Seoul, by epoch arithmetic. */
 export function kstDate(instant) {
@@ -47,22 +50,25 @@ async function pagedItems(fetchJson, pathFor, pageLimit, isDone = () => false) {
 }
 
 /**
- * Fixtures kicking off today (KST) in every in-progress competition, tournaments and regular
- * leagues alike. The list is not narrowed by date: a rescheduled fixture can fall outside the
- * competition's own date window, and a competition without dates would never match a date filter.
- * Returns the ones not yet finished (`open`) and a count of the finished ones.
+ * Fixtures kicking off today (KST) in every unfinished competition, tournaments and regular
+ * leagues alike. Neither the status nor the date narrows the list: fixtures open before an
+ * operator moves a tournament to in-progress, a league only turns in-progress once its first game
+ * starts, a rescheduled fixture can fall outside the competition's own date window, and a
+ * competition without dates would never match a date filter. Returns the ones not yet finished (`open`) and a count of the finished ones.
  */
 export async function collectMatchDay({ fetchJson, now }) {
   const today = kstDate(now);
   const tournaments = await pagedItems(
     fetchJson,
-    (cursor) => `/tournaments?kind=all&status=in_progress&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+    (cursor) => `/tournaments?kind=all&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
     PAGE_LIMIT,
+    (pageItems) => pageItems.some((item) => FINISHED_COMPETITION_STATUSES.has(item.status)),
   );
 
   const open = [];
   let finished = 0;
   for (const tournament of tournaments) {
+    if (FINISHED_COMPETITION_STATUSES.has(tournament.status)) continue;
     const fixtures = await pagedItems(
       fetchJson,
       (cursor) => `/tournaments/${encodeURIComponent(tournament.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,

@@ -33,6 +33,43 @@ export function detectInAppBrowser(userAgent: string): string {
   return 'none';
 }
 
+// A team invite link is the credential itself (`/invite/<token>`), and the login/signup
+// screens carry it onward in `?redirect=`. gtag.js reports the address bar (`dl`) and the
+// previous one (`dr`) with every hit, and its history-change page_views ignore any override
+// set through `set`/`config` — so the hits are rewritten on their way out instead. The three
+// separators cover the plain, percent-encoded and double-encoded forms of the path.
+const INVITE_TOKEN = /(\/|%2F|%252F)invite(\/|%2F|%252F)[^/?#&%\s]+/gi;
+const GA_COLLECT_URL = /^https:\/\/(?:[\w-]+\.)*(?:google-analytics\.com|analytics\.google\.com)\/(?:[a-z]\/)?collect(?:[/?]|$)/;
+
+export function redactInviteTokens(text: string): string {
+  return text.replace(INVITE_TOKEN, '$1invite$2:token');
+}
+
+function redactCollectBody<T extends BodyInit | null | undefined>(body: T): T | string {
+  return typeof body === 'string' ? redactInviteTokens(body) : body;
+}
+
+// gtag.js sends hits with fetch (keepalive) and falls back to sendBeacon, always with string
+// bodies. Anything that is not a GA collect request passes through untouched.
+function redactOutgoingHits(): void {
+  const nativeFetch = window.fetch;
+  window.fetch = function patchedFetch(input, init) {
+    const url = input instanceof URL ? input.href : input;
+    if (typeof url === 'string' && GA_COLLECT_URL.test(url)) {
+      return nativeFetch.call(this, redactInviteTokens(url), init && { ...init, body: redactCollectBody(init.body) });
+    }
+    return nativeFetch.call(this, input, init);
+  };
+  const nativeBeacon = window.navigator.sendBeacon;
+  if (typeof nativeBeacon === 'function') {
+    window.navigator.sendBeacon = function patchedBeacon(url, data) {
+      return GA_COLLECT_URL.test(String(url))
+        ? nativeBeacon.call(this, redactInviteTokens(String(url)), redactCollectBody(data))
+        : nativeBeacon.call(this, url, data);
+    };
+  }
+}
+
 function markInternalIfConsole(path: string): void {
   if (internalMarked || !INTERNAL_PATH.test(path)) return;
   internalMarked = true;
@@ -68,6 +105,7 @@ function ensureGtag(measurementId: string): void {
   window.gtag('js', new Date());
   // A user property, not a plain `set` key: gtag.js drops custom keys given to `set`.
   window.gtag('set', 'user_properties', { in_app_browser: detectInAppBrowser(window.navigator.userAgent) });
+  redactOutgoingHits();
   markInternalIfConsole(window.location.pathname);
   window.gtag('config', measurementId);
   document.addEventListener('click', markInternalOnConsoleLinkClick, { capture: true });

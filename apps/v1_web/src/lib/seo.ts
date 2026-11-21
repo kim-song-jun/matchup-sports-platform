@@ -312,7 +312,7 @@ export function buildFixtureTitle(
 
 /**
  * 리그 경기 상세 제목. 대진 제목은 주차까지만 말해서 같은 주차의 경기가 모두 같은 제목이 되므로
- * 맞붙는 두 팀을 덧붙인다. 팀을 모르면 저장된 제목 그대로다.
+ * 맞붙는 두 팀을 덧붙인다(한쪽만 알면 모르는 쪽은 「미정」). 둘 다 모르면 저장된 제목 그대로다.
  */
 export function buildLeagueFixtureTitle(
   title: string,

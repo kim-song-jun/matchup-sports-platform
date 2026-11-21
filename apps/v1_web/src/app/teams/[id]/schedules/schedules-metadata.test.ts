@@ -21,6 +21,12 @@ describe('팀 일정 화면 메타데이터', () => {
     expect(meta.robots).toMatchObject({ index: true, follow: true });
   });
 
+  it('주소에 쓸 수 없는 글자가 든 팀 id 는 인코딩해 canonical 을 만든다', async () => {
+    serve({ id: 'team 1', name: '한강 FC', dissolution: null });
+    const meta = await generateMetadata({ params: Promise.resolve({ id: 'team 1' }) });
+    expect(meta.alternates?.canonical).toBe('/teams/team%201/schedules');
+  });
+
   it('해체된 팀의 일정은 검색에서 뺀다', async () => {
     serve({ id: 'team-1', name: '한강 FC', dissolution: { dissolvedAt: '2026-10-01T00:00:00Z' } });
     expect((await generateMetadata({ params })).robots).toMatchObject({ index: false });

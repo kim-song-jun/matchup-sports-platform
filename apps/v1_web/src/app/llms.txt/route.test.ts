@@ -149,6 +149,16 @@ describe('GET /llms.txt', () => {
       return body.slice(start, next === -1 ? undefined : next);
     }
 
+    /** answer 가 원문 문단 일부를 순서대로 ' ' 로 이은 것과 정확히 같은지 — 지어낸 글이 끼면 false. */
+    function isOrderedParagraphJoin(answer: string, paragraphs: readonly string[], from = 0): boolean {
+      for (let i = from; i < paragraphs.length; i += 1) {
+        if (answer === paragraphs[i]) return true;
+        const head = `${paragraphs[i]} `;
+        if (answer.startsWith(head) && isOrderedParagraphJoin(answer.slice(head.length), paragraphs, i + 1)) return true;
+      }
+      return false;
+    }
+
     it('대회 목록 조회가 실패해도 두 절이 모두 나오고, 「무엇의 원출처인가」 바로 뒤에 놓인다', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
       fetchPublicV1.mockRejectedValue(new Error('upstream down'));
@@ -193,9 +203,7 @@ describe('GET /llms.txt', () => {
         expect(item, `${anchor} 는 FAQ_ITEMS 에 없는 id`).toBeDefined();
         expect(question).toBe(item!.question);
         // 답은 FAQ 원문 문단을 이어 붙인 것이어야 한다 — 새로 지어낸 문장이 섞이면 /faq 와 어긋난다.
-        expect(answer.length).toBeGreaterThan(0);
-        expect(item!.answer.join(' ').startsWith(answer.split(' ').slice(0, 3).join(' '))).toBe(true);
-        expect(item!.answer.some((paragraph) => answer.includes(paragraph))).toBe(true);
+        expect(isOrderedParagraphJoin(answer, item!.answer), `${anchor} 답이 원문 문단의 연결이 아님`).toBe(true);
       }
     });
 

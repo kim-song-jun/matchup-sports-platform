@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ResultsPageClient } from './results-page-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildTournamentSubpageBreadcrumbLd } from '@/lib/structured-data';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
@@ -27,5 +29,10 @@ export default async function TournamentResultsPage({
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!tournament) notFound();
   // 404 판정에 받은 응답을 첫 화면으로 넘긴다 — 크롤러가 받는 서버 HTML 에 실제 내용이 들어간다.
-  return <ResultsPageClient tournamentId={id} seed={tournament} />;
+  return (
+    <>
+      <JsonLd data={buildTournamentSubpageBreadcrumbLd({ id, title: tournament.title }, { name: '경기 결과', segment: 'results' })} />
+      <ResultsPageClient tournamentId={id} seed={tournament} />
+    </>
+  );
 }

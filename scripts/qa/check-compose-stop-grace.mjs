@@ -15,7 +15,7 @@ const PROD_COMPOSE = 'deploy/docker-compose.prod.yml';
 const ALPHA_COMPOSE = 'deploy/docker-compose.alpha.yml';
 const WORKER_SOURCE = 'apps/v1_api/src/jobs/v1-game-operations-worker.service.ts';
 const MARGIN_SECONDS = 5;
-/** 관리자 대진 트랜잭션 상한(45초) + 여유. 트랜잭션 timeout 을 늘리면 이 값도 같이 올린다. */
+/** 관리자 대진 트랜잭션 상한(45초) + 여유. 트랜잭션 timeout 을 늘리면 이 값도 같이 올린다. 이 여유가 의미를 가지려면 PrismaService 가 onApplicationShutdown 에서 연결을 끊어야 한다(prisma.service.shutdown.spec.ts). */
 export const API_MIN_GRACE_SECONDS = 50;
 
 export function readWorkerShutdownSeconds(path = WORKER_SOURCE) {

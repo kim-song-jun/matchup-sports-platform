@@ -324,6 +324,18 @@ test('one failed post does not drop the others, and the failure still surfaces',
   assert.equal(attempted.length, 2);
 });
 
+test('the first OK of a newly created alarm is not posted as a recovery', async () => {
+  const lookups = [];
+  const d = deps({ lookupAlarmedAt: async (name) => { lookups.push(name); return '2026-11-20T01:50:47.000Z'; } });
+  const fresh = (name) => sns(alarm({ AlarmName: name, NewStateValue: 'OK', OldStateValue: 'INSUFFICIENT_DATA' }));
+  const result = await handleEvent({ Records: [fresh('teameet-prod-disk-high'), fresh('teameet-prod-restart-loop')] }, d);
+  assert.deepEqual(result, { posted: 0, via: 'slack' });
+  assert.deepEqual(lookups, []);
+  const real = await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', OldStateValue: 'ALARM' }))] }, d);
+  assert.equal(real.posted, 1, 'a real recovery is still posted');
+  assert.match(d.posted[0].text, /^\[회복\]/);
+});
+
 test('the Lambda entry ignores the runtime context and builds its own dependencies', async () => {
   const d = deps();
   const context = { awsRequestId: 'req-1', functionName: 'teameet-ops-slack', getRemainingTimeInMillis: () => 1000 };

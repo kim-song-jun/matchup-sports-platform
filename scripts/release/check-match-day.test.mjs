@@ -100,3 +100,21 @@ test('an unreadable API fails closed, and only the confirmation lets it through'
   assert.equal(await run(api), 1);
   assert.equal(await run(api, { MATCHDAY_CONFIRMATION: 'MATCHDAY' }), 0);
 });
+
+test('a long schedule is read only until a page ends after today', async () => {
+  const pages = {
+    first: { items: [{ scheduledAt: '2026-11-21T05:00:00.000Z', status: 'scheduled' }], nextCursor: 'second' },
+    second: { items: [{ scheduledAt: '2026-11-22T05:00:00.000Z', status: 'scheduled' }], nextCursor: 'third' },
+    third: { items: [{ scheduledAt: '2026-11-23T05:00:00.000Z', status: 'scheduled' }], nextCursor: null },
+  };
+  const requested = [];
+  const fetchJson = async (path) => {
+    if (path.startsWith('/tournaments?')) return { items: [{ id: 't1', title: '시즌', status: 'in_progress' }], pageInfo: { nextCursor: null } };
+    const cursor = new URL(path, 'https://api.test').searchParams.get('cursor') ?? 'first';
+    requested.push(cursor);
+    return pages[cursor];
+  };
+  const result = await collectMatchDay({ fetchJson, now: NOW });
+  assert.equal(result.open.length, 1);
+  assert.deepEqual(requested, ['first', 'second']);
+});

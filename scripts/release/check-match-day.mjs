@@ -31,14 +31,16 @@ export function isOverridden({ confirmation, overrideDate, today }) {
   return (confirmation ?? '').trim() === CONFIRMATION_WORD || (overrideDate ?? '').trim() === today;
 }
 
-async function pagedItems(fetchJson, pathFor, pageLimit) {
+// `isDone(pageItems)` ends the walk early for lists that are sorted by the field it checks.
+async function pagedItems(fetchJson, pathFor, pageLimit, isDone = () => false) {
   const items = [];
   let cursor = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const data = await fetchJson(pathFor(cursor));
-    items.push(...(data.items ?? []));
+    const pageItems = data.items ?? [];
+    items.push(...pageItems);
     cursor = data.pageInfo?.nextCursor ?? data.nextCursor ?? null;
-    if (!cursor) return items;
+    if (!cursor || isDone(pageItems)) return items;
   }
   throw new Error(`${pathFor(null)} 가 ${MAX_PAGES * pageLimit} 건을 넘어 끝까지 읽지 못했어요.`);
 }
@@ -63,6 +65,11 @@ export async function collectMatchDay({ fetchJson, now }) {
       fetchJson,
       (cursor) => `/tournaments/${encodeURIComponent(tournament.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       SCHEDULE_PAGE_LIMIT,
+      // The schedule is ordered by kickoff, so a page ending after today has nothing left for today.
+      (pageItems) => {
+        const last = pageItems.at(-1)?.scheduledAt;
+        return Boolean(last) && kstDate(new Date(last)) > today;
+      },
     );
     for (const fixture of fixtures) {
       if (!fixture.scheduledAt || kstDate(new Date(fixture.scheduledAt)) !== today) continue;

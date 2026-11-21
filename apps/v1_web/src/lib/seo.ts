@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import type { PublicMatchDetail, PublicTeamRecordsResponse } from '@/components/public-game-records/types';
-import { bracketIntroLine, competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { bracketIntroLine, competitionFormatSearchLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatEntryFee,
   formatTournamentDateLong,
@@ -195,7 +195,7 @@ function tournamentFactParts(
   return [
     tournament.scheduledAt ? formatTournamentDateRangeLong(tournament.scheduledAt, tournament.scheduledEndAt) : null,
     tournament.venue?.trim() || null,
-    `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
+    `${tournament.sport.name} ${competitionFormatSearchLabel(tournament)}`,
   ];
 }
 
@@ -295,6 +295,33 @@ export function fixtureVenueText(match: Pick<PublicMatchDetail, 'venue' | 'field
   const venue = match.venue?.trim() ?? '';
   const field = match.fieldName?.trim() ?? '';
   return field && field !== venue ? [venue, field].filter(Boolean).join(' ') : venue;
+}
+
+/**
+ * 대회 경기 상세 제목. 같은 두 팀이 한 대회에서 다시 만나면(조별리그 뒤 결선 등) 팀 이름만으로는
+ * 제목이 같아지므로 라운드·조 이름을 붙여 가른다.
+ */
+export function buildFixtureTitle(
+  match: Pick<PublicMatchDetail, 'tournamentTitle' | 'displayTitle' | 'round' | 'groupName' | 'legNumber' | 'home' | 'away'>,
+): string {
+  const home = match.home?.teamName ?? '미정';
+  const away = match.away?.teamName ?? '미정';
+  const fixtureName = competitionFixtureName(match).trim();
+  return `${home} vs ${away}${fixtureName ? ` · ${fixtureName}` : ''} | ${match.tournamentTitle}`;
+}
+
+/**
+ * 리그 경기 상세 제목. 대진 제목은 주차까지만 말해서 같은 주차의 경기가 모두 같은 제목이 되므로
+ * 맞붙는 두 팀을 덧붙인다(한쪽만 알면 모르는 쪽은 「미정」). 둘 다 모르면 저장된 제목 그대로다.
+ */
+export function buildLeagueFixtureTitle(
+  title: string,
+  teams: { readonly host?: string | null; readonly opponent?: string | null },
+): string {
+  const host = teams.host?.trim();
+  const opponent = teams.opponent?.trim();
+  if (!host && !opponent) return title;
+  return `${title} · ${host || '미정'} vs ${opponent || '미정'}`;
 }
 
 /**

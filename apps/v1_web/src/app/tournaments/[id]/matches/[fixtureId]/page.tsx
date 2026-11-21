@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchPageClient } from './match-page-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildFixtureDescription, buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildFixtureDescription, buildFixtureTitle, buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import { buildBreadcrumbLd } from '@/lib/structured-data';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { buildFixtureEventLd } from '@/lib/structured-data-competition';
@@ -35,10 +35,8 @@ export async function generateMetadata({
   // 이 메타데이터도 그 둘을 구분하지 않고 항상 같은 noindex로 떨어진다.
   if (!match) return buildNoIndexMetadata('경기 정보를 찾을 수 없어요');
 
-  const homeLabel = match.home?.teamName ?? '미정';
-  const awayLabel = match.away?.teamName ?? '미정';
   return buildPublicMetadata({
-    title: `${homeLabel} vs ${awayLabel} | ${match.tournamentTitle}`,
+    title: buildFixtureTitle(match),
     description: buildFixtureDescription(match),
     path: fixtureDetailHref({
       isRegularLeague: await loadIsRegularLeague(id),

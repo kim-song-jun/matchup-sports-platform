@@ -824,9 +824,9 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
       {photoUrls.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          {photoUrls.map((url) => (
+          {photoUrls.map((url, index) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
-              <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt={`${review.teamName ?? review.authorNickname}의 후기 사진 ${index + 1}/${photoUrls.length}`} loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>

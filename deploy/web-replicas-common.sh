@@ -213,15 +213,14 @@ apply_nginx_config() {
   fi
   action="$(nginx_apply_action "${before}" "${after}" "${status}" "${seen}")"
   echo "[${0##*/}] nginx 설정 적용: ${action} (컨테이너 ${status}, 지금 폴더를 봄: ${seen})"
-  case "${action}" in
-    reload)
-      "${compose[@]}" exec -T nginx nginx -t || return 1
-      "${compose[@]}" exec -T nginx nginx -s reload || return 1
-      ;;
-    recreate)
-      "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
-      ;;
-  esac
+  if [[ "${action}" == recreate ]]; then
+    "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  fi
+  # 새로 만든 컨테이너도 여기서 확인한다 — 설정이 잘못돼 멈추거나 재시작 중이면 exec 가 실패한다.
+  "${compose[@]}" exec -T nginx nginx -t || return 1
+  if [[ "${action}" == reload ]]; then
+    "${compose[@]}" exec -T nginx nginx -s reload || return 1
+  fi
   return 0
 }
 

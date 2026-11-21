@@ -154,24 +154,30 @@ compose exec -T nginx nginx -s reload'
 
 : > "${LOG}"; FAKE_NGINX_AFTER='cid-new'
 apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
-expect_log 'compose 가 서비스 정의 변경으로 새로 만들었으면 reload 하지 않는다' 'compose up -d --no-deps nginx'
+expect_log 'compose 가 서비스 정의 변경으로 새로 만들었으면 nginx -t 만 하고 reload 하지 않는다' 'compose up -d --no-deps nginx
+compose exec -T nginx nginx -t'
 FAKE_NGINX_AFTER='cid-nginx'
 
 : > "${LOG}"; FAKE_NGINX_SEEN='marker-old'
 apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
 expect_log '컨테이너가 다른 폴더(옛 클론 등)에 묶여 있으면 다시 만든다' 'compose up -d --no-deps nginx
-compose up -d --force-recreate --no-deps nginx'
+compose up -d --force-recreate --no-deps nginx
+compose exec -T nginx nginx -t'
 FAKE_NGINX_SEEN='marker-1'
 
 : > "${LOG}"; FAKE_NGINX_STATUS=restarting
 apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
 expect_log '같은 컨테이너가 재시작 중이면 다시 만든다' 'compose up -d --no-deps nginx
-compose up -d --force-recreate --no-deps nginx'
+compose up -d --force-recreate --no-deps nginx
+compose exec -T nginx nginx -t'
 FAKE_NGINX_STATUS=running
 
 : > "${LOG}"; FAKE_NGINX_TEST_FAILS=true
 if apply_nginx_config "${LIVE_DEPLOY}" >/dev/null 2>&1; then fail 'nginx -t 가 실패했는데 성공했다'; else pass 'nginx -t 가 실패하면 실패'; fi
 if grep -q 'nginx -s reload' "${LOG}"; then fail 'nginx -t 실패 뒤에도 reload 했다'; else pass 'nginx -t 실패면 reload 하지 않는다'; fi
+FAKE_NGINX_AFTER='cid-new'
+if apply_nginx_config "${LIVE_DEPLOY}" >/dev/null 2>&1; then fail '새로 만든 nginx 가 설정 검사에 실패했는데 성공했다'; else pass '새로 만든 nginx 도 nginx -t 가 실패하면 실패'; fi
+FAKE_NGINX_AFTER='cid-nginx'
 FAKE_NGINX_TEST_FAILS=false
 
 : > "${LOG}"

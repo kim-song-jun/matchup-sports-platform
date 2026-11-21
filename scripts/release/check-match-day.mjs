@@ -99,6 +99,11 @@ export function summarize({ today, open, finished }) {
   return lines;
 }
 
+/** Workflow-command payloads end at a newline and read `%XX` escapes, so error text from the network must be escaped. */
+export function escapeCommandData(text) {
+  return String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
 export async function main({ env = process.env, fetchImpl = fetch, now = new Date(), log = console } = {}) {
   const base = (env.PUBLIC_API_BASE || 'https://teameet.co.kr/api/v1').replace(/\/$/, '');
   const summaryFile = env.GITHUB_STEP_SUMMARY;
@@ -125,12 +130,12 @@ export async function main({ env = process.env, fetchImpl = fetch, now = new Dat
     const reason = error instanceof Error ? error.message : String(error);
     const lines = [`오늘 경기를 확인하지 못했어요: ${reason}`];
     if (overridden) {
-      log.log(`::warning::${lines[0]} 확인 입력이 있어 그대로 진행해요.`);
+      log.log(`::warning::${escapeCommandData(`${lines[0]} 확인 입력이 있어 그대로 진행해요.`)}`);
       note([...lines, '확인 입력이 있어 진행했어요.']);
       return 0;
     }
     lines.push(`경기가 없는 날이거나 핫픽스라면 확인 입력(${CONFIRMATION_WORD})으로 다시 실행해 주세요.`);
-    log.error(`::error::${lines.join(' ')}`);
+    log.error(`::error::${escapeCommandData(lines.join(' '))}`);
     note(lines);
     return 1;
   }
@@ -142,7 +147,7 @@ export async function main({ env = process.env, fetchImpl = fetch, now = new Dat
     return 0;
   }
   if (overridden) {
-    log.log(`::warning::${lines[0]} 확인 입력이 있어 그대로 진행해요.`);
+    log.log(`::warning::${escapeCommandData(`${lines[0]} 확인 입력이 있어 그대로 진행해요.`)}`);
     note([...lines, '확인 입력이 있어 진행했어요.']);
     return 0;
   }
@@ -150,7 +155,7 @@ export async function main({ env = process.env, fetchImpl = fetch, now = new Dat
     `경기가 끝난 뒤에 다시 실행하거나, 핫픽스라면 확인 입력(${CONFIRMATION_WORD})으로 다시 실행해 주세요. ` +
       `푸시로 시작된 운영 배포는 저장소 변수 PROD_MATCHDAY_OVERRIDE_DATE 를 오늘 날짜(${result.today})로 두고 실패한 작업을 다시 실행해요.`,
   );
-  log.error(`::error::${lines.join(' ')}`);
+  log.error(`::error::${escapeCommandData(lines.join(' '))}`);
   note(lines);
   return 1;
 }

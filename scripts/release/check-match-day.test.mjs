@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectMatchDay, isOverridden, kstDate, main } from './check-match-day.mjs';
+import { collectMatchDay, escapeCommandData, isOverridden, kstDate, main } from './check-match-day.mjs';
 
 // 2026-11-21 10:00 KST
 const NOW = new Date('2026-11-21T01:00:00.000Z');
@@ -117,4 +117,8 @@ test('a long schedule is read only until a page ends after today', async () => {
   const result = await collectMatchDay({ fetchJson, now: NOW });
   assert.equal(result.open.length, 1);
   assert.deepEqual(requested, ['first', 'second']);
+});
+
+test('error text from the network cannot start a new workflow command', () => {
+  assert.equal(escapeCommandData('boom 100%\n::set-output name=x::1\r'), 'boom 100%25%0A::set-output name=x::1%0D');
 });

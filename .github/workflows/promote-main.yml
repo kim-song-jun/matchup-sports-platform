@@ -56,7 +56,6 @@ jobs:
       - name: Match-day gate
         env:
           MATCHDAY_CONFIRMATION: ${{ inputs.matchday_confirmation }}
-          MATCHDAY_OVERRIDE_DATE: ${{ vars.PROD_MATCHDAY_OVERRIDE_DATE }}
         run: node scripts/release/check-match-day.mjs
 
       - name: Promote dev to main

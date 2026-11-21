@@ -1,6 +1,7 @@
 import { ANDROID_PLAY_STORE_URL, IOS_APP_STORE_URL } from '@/lib/app-store-links';
 import { formatTournamentDateLong } from '@/lib/date-utils';
 import { OFFICIAL_INSTAGRAM } from '@/lib/official-surfaces';
+import { faqsByIds } from '@/lib/public-content/faq';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES, type PublicSiteRoute } from '@/lib/public-site/routes';
 import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
@@ -19,6 +20,30 @@ import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 export const revalidate = 0;
 
 const MAX_LISTED_TOURNAMENTS = 15;
+
+/**
+ * 「핵심 사실」과 「자주 묻는 질문」은 `/faq` 의 FAQ_ITEMS 문장을 그대로 옮긴다 — 여기서 새 문장을
+ * 지어내면 `/faq` 와 어긋나고, AI 가 둘 중 하나를 인용한다. `paragraphs` 는 옮길 문단 번호다.
+ */
+type FaqPick = { readonly id: string; readonly paragraphs: readonly number[] };
+
+const KEY_FACT_PICKS: readonly (FaqPick & { readonly label: string })[] = [
+  { label: '지원 종목', id: 'supported-sports', paragraphs: [0, 1] },
+  { label: '팀 만들기', id: 'create-a-team', paragraphs: [0] },
+  { label: '대회 참가비', id: 'entry-fee-payment', paragraphs: [0, 2] },
+  { label: '경기 결과', id: 'result-confirmation', paragraphs: [0] },
+];
+
+const FAQ_PICKS: readonly FaqPick[] = [
+  { id: 'how-to-sign-up', paragraphs: [0] },
+  { id: 'browse-without-account', paragraphs: [0] },
+  { id: 'create-a-team', paragraphs: [0] },
+  { id: 'join-a-competition', paragraphs: [0] },
+  { id: 'entry-fee-payment', paragraphs: [0, 1] },
+  { id: 'entry-fee-refund', paragraphs: [0, 1] },
+  { id: 'result-confirmation', paragraphs: [0] },
+  { id: 'host-a-competition', paragraphs: [0] },
+];
 
 export async function GET(): Promise<Response> {
   const [tournaments, siteInfo] = await Promise.all([fetchOpenTournaments(), fetchPublicSiteInfo()]);
@@ -39,6 +64,8 @@ export async function GET(): Promise<Response> {
     '이 데이터는 대회 운영자가 팀밋 운영 도구로 직접 입력하고, 경기 진행 중에는 실시간으로 갱신돼요.',
     '외부 매체를 인용한 2차 가공이 아니라, 경기가 실제로 치러진 현장에서 기록된 원본이에요.',
     '',
+    ...keyFactsLines(),
+    ...faqLines(),
     '## 핵심 페이지',
     '',
     `- [대회 목록](${absoluteSiteUrl('/tournaments')}): 모집 중·진행 중·종료된 아마추어 대회 전체`,
@@ -101,6 +128,37 @@ export async function GET(): Promise<Response> {
       'cache-control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
     },
   });
+}
+
+function pickedAnswer(pick: FaqPick): { readonly question: string; readonly answer: string } {
+  const [item] = faqsByIds([pick.id]);
+  const answer = pick.paragraphs.map((index) => {
+    const paragraph = item.answer[index];
+    if (paragraph === undefined) throw new Error(`FAQ ${pick.id} 에 ${index}번 문단이 없어요`);
+    return paragraph;
+  });
+  return { question: item.question, answer: answer.join(' ') };
+}
+
+function keyFactsLines(): string[] {
+  return [
+    '## 핵심 사실',
+    '',
+    ...KEY_FACT_PICKS.map((pick) => `- **${pick.label}**: ${pickedAnswer(pick).answer}`),
+    `- **앱**: [App Store](${IOS_APP_STORE_URL}) · [Google Play](${ANDROID_PLAY_STORE_URL})`,
+    '',
+  ];
+}
+
+function faqLines(): string[] {
+  return [
+    '## 자주 묻는 질문',
+    '',
+    ...FAQ_PICKS.flatMap((pick) => {
+      const { question, answer } = pickedAnswer(pick);
+      return [`### ${question}`, answer, `근거: ${absoluteSiteUrl(`/faq#${pick.id}`)}`, ''];
+    }),
+  ];
 }
 
 /** 도움말 허브 아래 세부 페이지(가이드·용어집)는 핵심 페이지 목록과 따로 싣는다. */

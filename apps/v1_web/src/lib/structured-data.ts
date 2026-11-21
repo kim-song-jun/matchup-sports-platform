@@ -397,6 +397,32 @@ export function buildBreadcrumbLd(items: readonly BreadcrumbItem[]): JsonLdNode 
   };
 }
 
+/** 대회 하위 화면(대진표·결과·시상·후기)의 경로: 대회 > 대회명 > 화면명. */
+export function buildTournamentSubpageBreadcrumbLd(
+  tournament: { readonly id: string; readonly title: string },
+  subpage: { readonly name: string; readonly segment: string },
+): JsonLdNode {
+  const root = `/tournaments/${encodeURIComponent(tournament.id)}`;
+  return buildBreadcrumbLd([
+    { name: '대회', path: '/tournaments' },
+    { name: tournament.title, path: root },
+    { name: subpage.name, path: `${root}/${subpage.segment}` },
+  ]);
+}
+
+/** 팀 하위 화면(전적 등)의 경로: 팀 > 팀명 > 화면명. */
+export function buildTeamSubpageBreadcrumbLd(
+  team: { readonly id: string; readonly name: string },
+  subpage: { readonly name: string; readonly segment: string },
+): JsonLdNode {
+  const root = `/teams/${encodeURIComponent(team.id)}`;
+  return buildBreadcrumbLd([
+    { name: '팀', path: '/teams' },
+    { name: team.name, path: root },
+    { name: subpage.name, path: `${root}/${subpage.segment}` },
+  ]);
+}
+
 export type ItemListEntry = { readonly name: string; readonly path: string };
 
 /**

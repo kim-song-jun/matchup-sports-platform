@@ -7,6 +7,8 @@ import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 import { TEAM_LOGO_PRESETS } from './team-logo-presets';
 import {
   buildBreadcrumbLd,
+  buildTeamSubpageBreadcrumbLd,
+  buildTournamentSubpageBreadcrumbLd,
   buildSiteIdentityLd,
   buildSportsEventLd,
   buildSportsTeamLd,
@@ -310,6 +312,26 @@ describe('buildBreadcrumbLd', () => {
         name: '풋살컵',
         item: 'https://teameet.co.kr/tournaments/tour-1',
       },
+    ]);
+  });
+});
+
+describe('buildTournamentSubpageBreadcrumbLd · buildTeamSubpageBreadcrumbLd', () => {
+  it('대회 하위 화면은 대회 > 대회명 > 화면명 3단 경로를 만든다', () => {
+    const ld = buildTournamentSubpageBreadcrumbLd({ id: 't 1', title: '풋살컵' }, { name: '대진표', segment: 'bracket' });
+    expect(ld.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: '대회', item: 'https://teameet.co.kr/tournaments' },
+      { '@type': 'ListItem', position: 2, name: '풋살컵', item: 'https://teameet.co.kr/tournaments/t%201' },
+      { '@type': 'ListItem', position: 3, name: '대진표', item: 'https://teameet.co.kr/tournaments/t%201/bracket' },
+    ]);
+  });
+
+  it('팀 하위 화면은 팀 > 팀명 > 화면명 3단 경로를 만든다', () => {
+    const ld = buildTeamSubpageBreadcrumbLd({ id: 'team-1', name: '한강 FC' }, { name: '전적', segment: 'records' });
+    expect(ld.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: '팀', item: 'https://teameet.co.kr/teams' },
+      { '@type': 'ListItem', position: 2, name: '한강 FC', item: 'https://teameet.co.kr/teams/team-1' },
+      { '@type': 'ListItem', position: 3, name: '전적', item: 'https://teameet.co.kr/teams/team-1/records' },
     ]);
   });
 });

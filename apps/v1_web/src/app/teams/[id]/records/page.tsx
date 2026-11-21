@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TeamRecordsPageClient } from './team-records-page-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildTeamSubpageBreadcrumbLd } from '@/lib/structured-data';
 import type { PublicTeamRecordsResponse, TeamRecordCategory } from '@/components/public-game-records/types';
 
 type RecordsSearchParams = Record<string, string | string[] | undefined>;
@@ -49,5 +51,10 @@ export default async function TeamRecordsPage({
   const filters = normalizeRecordsFilters(searchParams ? await searchParams : undefined);
   const records = await fetchPublicV1<PublicTeamRecordsResponse>(recordsPath(id, filters), { cache: 'no-store' });
   if (!records) notFound();
-  return <TeamRecordsPageClient teamId={id} seed={records} seedSeason={filters.season} seedType={filters.type} />;
+  return (
+    <>
+      <JsonLd data={buildTeamSubpageBreadcrumbLd({ id, name: records.teamName }, { name: '전적', segment: 'records' })} />
+      <TeamRecordsPageClient teamId={id} seed={records} seedSeason={filters.season} seedType={filters.type} />
+    </>
+  );
 }

@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BracketPageClient } from './bracket-page-client';
 import { bracketIntroLine, isLeagueCompetition } from '@/lib/competition-kind';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildTournamentSubpageBreadcrumbLd } from '@/lib/structured-data';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
@@ -30,5 +32,10 @@ export default async function TournamentBracketPage({
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!tournament) notFound();
   // 404 판정에 받은 응답을 첫 화면으로 넘긴다 — 크롤러가 받는 서버 HTML 에 실제 내용이 들어간다.
-  return <BracketPageClient tournamentId={id} seed={tournament} />;
+  return (
+    <>
+      <JsonLd data={buildTournamentSubpageBreadcrumbLd({ id, title: tournament.title }, { name: '대진표', segment: 'bracket' })} />
+      <BracketPageClient tournamentId={id} seed={tournament} />
+    </>
+  );
 }

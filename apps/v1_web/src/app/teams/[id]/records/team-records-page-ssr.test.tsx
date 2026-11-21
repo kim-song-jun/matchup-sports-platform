@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicTeamRecordsResponse } from '@/components/public-game-records/types';
 import { fetchPublicV1 } from '@/lib/seo';
+import { parseJsonLd } from '@/test/html-sanitize';
 import TeamRecordsPage, { generateMetadata } from './page';
 import { TeamRecordsPageClient } from './team-records-page-client';
 
@@ -101,6 +102,20 @@ describe('TeamRecordsPage first HTML', () => {
     expect(html).toContain('실제 풋살컵');
     expect(html).toContain('2 : 1');
     expect(html).not.toContain('tm-skeleton');
+  });
+
+  it('puts a team > team name > records BreadcrumbList in the first HTML', async () => {
+    vi.mocked(fetchPublicV1).mockResolvedValue(allRecords as never);
+    api.get.mockResolvedValue(allRecords);
+
+    const ld = parseJsonLd<{ '@type': string; itemListElement: unknown[] }>(await renderPage());
+
+    expect(ld?.['@type']).toBe('BreadcrumbList');
+    expect(ld?.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: '팀', item: 'https://teameet.co.kr/teams' },
+      { '@type': 'ListItem', position: 2, name: 'LAW OB', item: 'https://teameet.co.kr/teams/team-real-2041' },
+      { '@type': 'ListItem', position: 3, name: '전적', item: 'https://teameet.co.kr/teams/team-real-2041/records' },
+    ]);
   });
 
   it('seeds first HTML from the exact filtered public response requested by URL', async () => {

@@ -137,6 +137,17 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 
 `build-images`와 `deploy`는 같은 concurrency group(`deploy-production`)을 공유한다. 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도 뒤에 큐잉되므로, 두 릴리스가 같은 호스트를 동시에 건드리지 않는다.
 
+### 4-0. 경기일 배포 게이트
+
+`build-images` 의 첫 스텝(`Match-day deploy gate`)과 `Promote to main` 워크플로가 `scripts/release/check-match-day.mjs` 를 실행한다. 공개 API(`GET /tournaments`, `GET /tournaments/:id/schedule`)만 읽어, 오늘(KST) 시작하는 경기 가운데 `scheduled`·`live` 가 하나라도 있으면 실패한다 — 승인·빌드·승격 준비가 시작되기 전이다. 경기를 읽지 못해도 실패한다(장애가 조용한 날로 보이지 않게).
+
+| 상황 | 통과시키는 법 |
+|---|---|
+| `workflow_dispatch`(운영 배포 · Promote to main) | `matchday_confirmation` 입력에 `MATCHDAY` |
+| main 푸시로 시작된 운영 배포 | 저장소 변수 `PROD_MATCHDAY_OVERRIDE_DATE` 를 오늘 날짜(`YYYY-MM-DD`, KST)로 두고 실패한 작업을 다시 실행. 날짜가 지나면 저절로 무효가 된다 |
+
+경기가 끝난 뒤에는 입력 없이 다시 실행하면 통과한다. 롤백(`rollback-prod.yml`)은 이 게이트 대상이 아니다.
+
 ### 4-1. 이전 릴리스로 롤백
 
 `.github/workflows/rollback-prod.yml`을 `workflow_dispatch`로 실행한다(재빌드 없이 즉시 되돌린다). 입력값 `expected_active_sha`는 되돌리기 직전 "현재 active"라고 보는 40자리 커밋 SHA다 — 실제 active 와 다르면 compare-and-swap 안전장치가 배포를 거부한다.

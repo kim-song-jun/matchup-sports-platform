@@ -222,6 +222,14 @@ jobs:
       - name: Compose service parity guard tests
         run: node --test scripts/qa/check-compose-service-parity.test.mjs
 
+      # 운영 DB 는 RDS 라 로컬 v1_postgres 컨테이너는 유휴다. API/워커가 그 컨테이너의 건강 상태를
+      # 기다리면 유휴 컨테이너 하나로 전체 `up -d` 에서 API 가 뜨지 않는다. alpha 는 반대로 그 의존이 필수다.
+      - name: Compose DB dependency (prod no, alpha yes)
+        run: pnpm qa:compose-db-dependency
+
+      - name: Compose DB dependency guard tests
+        run: node --test scripts/qa/check-compose-db-dependency.test.mjs
+
       # alpha 배포 시드가 이미지에 없는 파일을 참조하면 배포가 죽는다(2026-09-08 실사고).
       - name: Alpha seed runtime contracts
         run: pnpm qa:alpha-seed-runtime

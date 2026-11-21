@@ -29,6 +29,10 @@ services:
       EMAIL_FROM: alpha-no-reply@teameet.co.kr
       SES_ACCESS_KEY_ID: ${ALPHA_SES_ACCESS_KEY_ID:-}
       SES_SECRET_ACCESS_KEY: ${ALPHA_SES_SECRET_ACCESS_KEY:-}
+    # alpha 는 DB 가 같은 호스트의 v1_postgres 컨테이너다(운영 베이스는 이 의존을 갖지 않는다).
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
 
   # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
   # (alpha-release-common.sh 의 assert_running_release_digests 가

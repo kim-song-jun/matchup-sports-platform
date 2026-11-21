@@ -64,9 +64,12 @@ export async function runPlan(steps, { apply, exec, log, buildZip }) {
       const text = `${err.stderr ?? ''}${err.message ?? ''}`;
       if (step.tolerate && text.includes(step.tolerate)) { log('  이미 있어요, 그대로 둬요'); continue; }
       if (step.optional && text.includes(step.optional)) { log(`  없어요, 계속해요: ${step.optionalHint}`); continue; }
-      throw new Error(`${step.id} 실패: ${text.split('\n')[0].slice(0, 300)}${step.failHint ? `\n  ${step.failHint}` : ''}`);
+      throw new Error(`${step.id} 실패: ${firstLine(text).slice(0, 300)}${step.failHint ? `\n  ${step.failHint}` : ''}`);
     }
   }
 }
+
+// The aws CLI starts its error output with an empty line.
+export const firstLine = (text) => text.split('\n').find((line) => line.trim()) ?? '';
 
 const indent = (text) => text.split('\n').map((l) => `    ${l}`).join('\n');

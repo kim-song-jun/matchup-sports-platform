@@ -41,6 +41,8 @@ export async function messageForSnsRecord(record, deps) {
   }
   const known = describeAlarm(String(alarm?.AlarmName ?? ''));
   if (alarm?.NewStateValue === 'OK') {
+    // A new (or re-put) alarm starts in INSUFFICIENT_DATA; its first OK is not a recovery from anything.
+    if (alarm.OldStateValue === 'INSUFFICIENT_DATA') return null;
     // An event clears itself a minute later; posting that would only double the messages.
     if (known?.event) return null;
     if (known?.group) return recoveryForGroup(alarm, known, deps);
@@ -88,7 +90,11 @@ async function decideForGroup(alarm, known, deps) {
   }
 }
 
-export async function handler(event, deps = defaultDeps()) {
+// Lambda calls handler(event, context): the second argument is never the dependencies.
+export const makeHandler = (makeDeps) => (event) => handleEvent(event, makeDeps());
+export const handler = makeHandler(defaultDeps);
+
+export async function handleEvent(event, deps) {
   const webhook = await deps.getWebhook();
   const messages = [];
   if (Array.isArray(event?.Records)) {

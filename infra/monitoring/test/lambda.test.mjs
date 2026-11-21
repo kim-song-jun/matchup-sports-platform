@@ -8,7 +8,7 @@ import { RECOVERY_QUIET_MS } from '../lib/dedupe.mjs';
 import { buildInstallPlan, DEFAULTS } from '../lib/plan.mjs';
 import { evaluateRule, LAMBDA_TIMEOUT_S, RULES } from '../lib/thresholds.mjs';
 import {
-  handler, loadAlarmTransitions, loadGroupHistory, MAIL_SUBJECT, messageForSnsRecord, postToSlack, publishToMailTopic, readWebhook,
+  handleEvent, loadAlarmTransitions, makeHandler, loadGroupHistory, MAIL_SUBJECT, messageForSnsRecord, postToSlack, publishToMailTopic, readWebhook,
 } from '../lambda-handler.mjs';
 import {
   buildSummary, kstDayWindow, reduceSeries, summarizeCost, summaryQueries, SUMMARY_METRICS, yesterdayKst,
@@ -52,7 +52,7 @@ test('the Lambda zip contains every local file the handler (transitively) import
 
 test('an SNS alarm becomes one Slack post to the webhook from SSM', async () => {
   const d = deps();
-  const result = await handler({ Records: [sns(alarm())] }, d);
+  const result = await handleEvent({ Records: [sns(alarm())] }, d);
   assert.equal(result.posted, 1);
   assert.equal(d.posted[0].url, WEBHOOK);
   assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
@@ -60,29 +60,29 @@ test('an SNS alarm becomes one Slack post to the webhook from SSM', async () => 
 
 test('a recovery asks for the alarm start so it can show how long it lasted', async () => {
   const d = deps();
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
   assert.match(d.posted[0].text, /\(12분\)/);
 });
 
 test('an event alarm (restart, heap death) never posts a recovery', async () => {
   for (const name of ['teameet-prod-web-restart', 'teameet-prod-heap-oom']) {
     const d = deps({ lookupAlarmedAt: async () => { throw new Error('must not look up history for a skipped recovery'); } });
-    assert.deepEqual(await handler({ Records: [sns(alarm({ AlarmName: name, NewStateValue: 'OK' }))] }, d), { posted: 0, via: 'slack' });
+    assert.deepEqual(await handleEvent({ Records: [sns(alarm({ AlarmName: name, NewStateValue: 'OK' }))] }, d), { posted: 0, via: 'slack' });
   }
   const d = deps();
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:02:47.000+0000' }))] }, d);
   assert.equal(d.posted.length, 1, 'a state alarm still reports its recovery');
 });
 
 test('the restart-loop alarm posts its start and its recovery with the duration, unlike the event alarms', async () => {
   const d = deps();
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop' }))] }, d);
   assert.equal(d.posted.length, 1);
   assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 계속 다시 시작되고 있어요/);
   assert.ok(!d.posted[0].text.includes('회복 알림은 보내지 않아요'));
   assert.ok(d.posted[0].text.includes(`#${encodeURIComponent('재시작-루프')}`));
   const r = deps({ lookupAlarmedAt: async () => '2026-11-20T01:50:47.000+0000' });
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:05:47.000+0000' }))] }, r);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:05:47.000+0000' }))] }, r);
   assert.equal(r.posted.length, 1);
   assert.match(r.posted[0].text, /^\[회복\]\[운영\].*\(15분\)/s);
 });
@@ -113,7 +113,7 @@ async function replayRestarts({ bursts, minutes }) {
       lookupAlarmedAt: async () => undefined,
     });
     const stamp = new Date(flip.atMs).toISOString().replace('Z', '+0000');
-    await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: flip.to, StateChangeTime: stamp }))] }, d);
+    await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: flip.to, StateChangeTime: stamp }))] }, d);
     posts.push(...d.posted.map((p) => ({ to: flip.to, text: p.text })));
   }
   return { flips, posts };
@@ -168,7 +168,7 @@ test('a loop that simply stops: one ALARM, then one recovery', async () => {
 test('the recovery waits RECOVERY_QUIET_MS before it reads the history, and the Lambda outlives that wait', async () => {
   const waits = [];
   const d = deps({ sleep: async (ms) => { waits.push(ms); } });
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
   assert.deepEqual(waits, [RECOVERY_QUIET_MS]);
   const lambdaStep = buildInstallPlan({ ...DEFAULTS, rdsId: 'rds-main', prodInstanceId: 'i-prod' }).find((s) => s.id === 'lambda');
   const timeout = Number(lambdaStep.args[lambdaStep.args.indexOf('--timeout') + 1]);
@@ -178,7 +178,7 @@ test('the recovery waits RECOVERY_QUIET_MS before it reads the history, and the 
 
 test('when the history cannot be read for a recovery, it is posted anyway', async () => {
   const d = deps({ loadGroupTransitions: async () => { throw new Error('throttled'); } });
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK' }))] }, d);
   assert.equal(d.posted.length, 1);
   assert.match(d.posted[0].text, /^\[회복\]/);
 });
@@ -195,7 +195,7 @@ test('one OOM death: the two alarms and their two recoveries become one Slack me
     alarm({ AlarmName: 'teameet-prod-web-restart', NewStateValue: 'OK', StateChangeTime: '2026-11-20T01:51:47.000+0000' }),
     alarm({ AlarmName: 'teameet-prod-heap-oom', NewStateValue: 'OK', StateChangeTime: '2026-11-20T01:51:48.000+0000' }),
   ];
-  for (const e of events) await handler({ Records: [sns(e)] }, d);
+  for (const e of events) await handleEvent({ Records: [sns(e)] }, d);
   assert.equal(d.posted.length, 1);
   assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
   assert.match(d.posted[0].text, /• 같이 울린 경보: heap 부족으로 프로세스가 죽었어요/);
@@ -207,7 +207,7 @@ test('a sibling alarm waits before reading history, so both alarms of one incide
     sleep: async (ms) => { order.push(`sleep:${ms}`); },
     loadGroupTransitions: async () => { order.push('history'); return []; },
   });
-  await handler({ Records: [sns(alarm())] }, d);
+  await handleEvent({ Records: [sns(alarm())] }, d);
   assert.deepEqual(order, ['sleep:8000', 'history']);
 });
 
@@ -217,9 +217,9 @@ test('the 2nd restart within 30 minutes stays quiet, the 3rd says it is repeatin
   const history = [0, 4, 8].map((m) => ({ name: 'teameet-prod-web-restart', atMs: base + m * min }));
   const stamp = (m) => new Date(base + m * min).toISOString().replace('Z', '+0000');
   const d = deps({ loadGroupTransitions: async () => history });
-  await handler({ Records: [sns(alarm({ StateChangeTime: stamp(4) }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ StateChangeTime: stamp(4) }))] }, d);
   assert.equal(d.posted.length, 0);
-  await handler({ Records: [sns(alarm({ StateChangeTime: stamp(8) }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ StateChangeTime: stamp(8) }))] }, d);
   assert.equal(d.posted.length, 1);
   assert.match(d.posted[0].text, /• 되풀이되고 있어요 — 8분 동안 3번째예요/);
 });
@@ -232,7 +232,7 @@ test('a crash loop restarting every 2 minutes still reaches Slack at the 3rd, 6t
     history.push({ name: 'teameet-prod-web-restart', atMs: HEAP_ALARM_TIME + m * min });
     const d = deps({ loadGroupTransitions: async () => history });
     const stamp = new Date(HEAP_ALARM_TIME + m * min).toISOString().replace('Z', '+0000');
-    await handler({ Records: [sns(alarm({ StateChangeTime: stamp }))] }, d);
+    await handleEvent({ Records: [sns(alarm({ StateChangeTime: stamp }))] }, d);
     if (d.posted.length) posts.push([m, d.posted[0].text.match(/(\d+)분 동안 (\d+)번째/)?.slice(1).join('/') ?? 'first']);
   }
   assert.deepEqual(posts, [[0, 'first'], [4, '4/3'], [10, '10/6'], [22, '22/12']]);
@@ -278,7 +278,7 @@ test('paging stops at the cap even when CloudWatch keeps returning a token', asy
 
 test('when the alarm history cannot be read, the alarm is posted as it is', async () => {
   const d = deps({ loadGroupTransitions: async () => { throw new Error('throttled'); } });
-  const result = await handler({ Records: [sns(alarm())] }, d);
+  const result = await handleEvent({ Records: [sns(alarm())] }, d);
   assert.equal(result.posted, 1);
   assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
 });
@@ -288,13 +288,13 @@ test('an alarm outside any group never reads history or waits', async () => {
     sleep: async () => { throw new Error('no wait expected'); },
     loadGroupTransitions: async () => { throw new Error('no history expected'); },
   });
-  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high' }))] }, d);
+  await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high' }))] }, d);
   assert.equal(d.posted.length, 1);
 });
 
 test('INSUFFICIENT_DATA posts nothing', async () => {
   const d = deps();
-  assert.deepEqual(await handler({ Records: [sns(alarm({ NewStateValue: 'INSUFFICIENT_DATA' }))] }, d), { posted: 0, via: 'slack' });
+  assert.deepEqual(await handleEvent({ Records: [sns(alarm({ NewStateValue: 'INSUFFICIENT_DATA' }))] }, d), { posted: 0, via: 'slack' });
   assert.equal(d.posted.length, 0);
 });
 
@@ -306,12 +306,12 @@ test('a plain-text SNS message (maintenance script) is forwarded scrubbed', asyn
 
 test('the scheduler tick posts the daily summary', async () => {
   const d = deps();
-  await handler({ mode: 'daily-summary' }, d);
+  await handleEvent({ mode: 'daily-summary' }, d);
   assert.match(d.posted[0].text, /^\[하루 요약\]\[운영\] \d\d-\d\d\(.\)\n• 요청 10건/);
 });
 
 test('an unknown event shape fails loudly instead of posting nothing', async () => {
-  await assert.rejects(handler({ hello: 1 }, deps()), /unsupported event shape/);
+  await assert.rejects(handleEvent({ hello: 1 }, deps()), /unsupported event shape/);
 });
 
 test('one failed post does not drop the others, and the failure still surfaces', async () => {
@@ -320,24 +320,44 @@ test('one failed post does not drop the others, and the failure still surfaces',
     post: async (url, text) => { attempted.push(text); if (text.includes('컨테이너')) throw new Error('Slack down'); },
   });
   await assert.rejects(
-    handler({ Records: [sns(alarm()), sns(alarm({ AlarmName: 'teameet-prod-heap-oom' }))] }, d), /Slack down/);
+    handleEvent({ Records: [sns(alarm()), sns(alarm({ AlarmName: 'teameet-prod-heap-oom' }))] }, d), /Slack down/);
   assert.equal(attempted.length, 2);
+});
+
+test('the first OK of a newly created alarm is not posted as a recovery', async () => {
+  const lookups = [];
+  const d = deps({ lookupAlarmedAt: async (name) => { lookups.push(name); return '2026-11-20T01:50:47.000Z'; } });
+  const fresh = (name) => sns(alarm({ AlarmName: name, NewStateValue: 'OK', OldStateValue: 'INSUFFICIENT_DATA' }));
+  const result = await handleEvent({ Records: [fresh('teameet-prod-disk-high'), fresh('teameet-prod-restart-loop')] }, d);
+  assert.deepEqual(result, { posted: 0, via: 'slack' });
+  assert.deepEqual(lookups, []);
+  const real = await handleEvent({ Records: [sns(alarm({ AlarmName: 'teameet-prod-disk-high', NewStateValue: 'OK', OldStateValue: 'ALARM' }))] }, d);
+  assert.equal(real.posted, 1, 'a real recovery is still posted');
+  assert.match(d.posted[0].text, /^\[회복\]/);
+});
+
+test('the Lambda entry ignores the runtime context and builds its own dependencies', async () => {
+  const d = deps();
+  const context = { awsRequestId: 'req-1', functionName: 'teameet-ops-slack', getRemainingTimeInMillis: () => 1000 };
+  const result = await makeHandler(() => d)({ Records: [sns(alarm())] }, context);
+  assert.deepEqual(result, { posted: 1, via: 'slack' });
+  assert.equal(d.posted.length, 1);
 });
 
 test('without a webhook parameter the same text goes to the mail topic and Slack is never called', async () => {
   const mailed = [];
   const d = deps({ getWebhook: async () => null, publishMail: async (text) => { mailed.push(text); } });
-  const result = await handler({ Records: [sns(alarm())] }, d);
+  const result = await handleEvent({ Records: [sns(alarm())] }, d);
   assert.deepEqual(result, { posted: 1, via: 'mail' });
   assert.equal(d.posted.length, 0);
   assert.match(mailed[0], /^\[긴급\]\[운영\] 컨테이너가 다시 시작됐어요/);
   const slack = deps({ publishMail: async () => { throw new Error('mail must not be used with a webhook'); } });
-  assert.deepEqual(await handler({ Records: [sns(alarm())] }, slack), { posted: 1, via: 'slack' });
+  assert.deepEqual(await handleEvent({ Records: [sns(alarm())] }, slack), { posted: 1, via: 'slack' });
 });
 
 test('a failed mail delivery still surfaces as a Lambda error', async () => {
   const d = deps({ getWebhook: async () => null, publishMail: async () => { throw new Error('SNS down'); } });
-  await assert.rejects(handler({ Records: [sns(alarm())] }, d), /SNS down/);
+  await assert.rejects(handleEvent({ Records: [sns(alarm())] }, d), /SNS down/);
 });
 
 test('readWebhook: only a missing parameter means "no webhook"; other SSM failures throw', async () => {

@@ -101,6 +101,7 @@ active_api_image="\$(jq -r '.images.api.uri' "${manifest}")"
 active_web_image="\$(jq -r '.images.web.uri' "${manifest}")"
 fake_compose() {
   case "\$*" in
+    *"config --services"*) echo v1_web ;;
     *"ps -q v1_api"*) echo api-container ;;
     *"ps -q v1_web"*) echo web-container ;;
     *"ps -q v1_game_operations_worker"*) echo worker-container ;;

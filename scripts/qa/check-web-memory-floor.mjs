@@ -9,13 +9,14 @@
  * 값은 compose 파일이 들고 있어야 한다.
  *
  * 규칙: prod compose 의 v1_web 은 명시적 memory 한도를 가져야 하고 WEB_MEMORY_FLOOR_MIB 이상이어야
- * 한다. alpha override 가 v1_web 한도를 다시 정하면 그 값도 같은 하한을 지켜야 한다.
+ * 한다. 롤링 배포용 둘째 웹(v1_web_b)도 같은 하한을 지킨다 — 한쪽만 낮으면 그 컨테이너가 같은 사고를 낸다.
+ * alpha override 가 두 웹 한도를 다시 정하면 그 값도 같은 하한을 지켜야 한다.
  */
 import { readFileSync } from 'node:fs';
 
 const PROD_COMPOSE = 'deploy/docker-compose.prod.yml';
 const ALPHA_COMPOSE = 'deploy/docker-compose.alpha.yml';
-export const WEB_SERVICE = 'v1_web';
+export const WEB_SERVICES = ['v1_web', 'v1_web_b'];
 export const WEB_MEMORY_FLOOR_MIB = 768;
 
 const UNIT_MIB = new Map([
@@ -62,16 +63,16 @@ function limitMemory(block) {
   return match ? match[1] : null;
 }
 
-export function readWebMemoryMib(path, { required }) {
+export function readWebMemoryMib(path, service, { required }) {
   const lines = readFileSync(path, 'utf8').split('\n');
-  const block = serviceBlock(lines, WEB_SERVICE);
+  const block = serviceBlock(lines, service);
   if (!block) {
-    if (required) throw new Error(`${path}: \`${WEB_SERVICE}\` 서비스를 찾지 못했습니다`);
+    if (required) throw new Error(`${path}: \`${service}\` 서비스를 찾지 못했습니다`);
     return null;
   }
   const raw = limitMemory(block);
   if (raw === null) {
-    if (required) throw new Error(`${path}: \`${WEB_SERVICE}\` 에 deploy.resources.limits.memory 가 없습니다`);
+    if (required) throw new Error(`${path}: \`${service}\` 에 deploy.resources.limits.memory 가 없습니다`);
     return null;
   }
   return parseMemoryMib(raw);
@@ -84,9 +85,11 @@ export function findWebMemoryViolations(prodPath = PROD_COMPOSE, alphaPath = ALP
     [alphaPath, false],
   ];
   for (const [path, required] of sources) {
-    const mib = readWebMemoryMib(path, { required });
-    if (mib !== null && mib < WEB_MEMORY_FLOOR_MIB) {
-      violations.push(`${path}: ${WEB_SERVICE} 메모리 한도 ${mib}MiB 가 하한 ${WEB_MEMORY_FLOOR_MIB}MiB 보다 낮습니다`);
+    for (const service of WEB_SERVICES) {
+      const mib = readWebMemoryMib(path, service, { required });
+      if (mib !== null && mib < WEB_MEMORY_FLOOR_MIB) {
+        violations.push(`${path}: ${service} 메모리 한도 ${mib}MiB 가 하한 ${WEB_MEMORY_FLOOR_MIB}MiB 보다 낮습니다`);
+      }
     }
   }
   return violations;

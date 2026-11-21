@@ -74,7 +74,7 @@ setup_recover_fixture() {
   log="${root}/calls.log"
   mkdir -p "${live}/deploy" "${state_dir}" "${bin}"
   : > "${log}"
-  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\nV1_WEB_REPLICAS=1\n' > "${live}/deploy/.env"
   # prepare_alpha_release_source copies this into the runtime config on first use.
   printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
@@ -652,7 +652,7 @@ run_stage_b_final_no_receipt() {
   local bin="${root}/bin"
   mkdir -p "${live}/deploy" "${bin}"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"; chmod +x "${bin}/flock"
-  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\nV1_WEB_REPLICAS=1\n' > "${live}/deploy/.env"
   # prepare_alpha_release_source copies this into the runtime config on first use.
   printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
@@ -744,7 +744,7 @@ build_activation_fixture() {
   bin="${root}/bin"
   mkdir -p "${live}/deploy" "${bin}"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"; chmod +x "${bin}/flock"
-  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\nV1_WEB_REPLICAS=1\n' > "${live}/deploy/.env"
   # prepare_alpha_release_source copies this into the runtime config on first use.
   printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"

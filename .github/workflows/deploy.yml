@@ -315,6 +315,14 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # 웹 컨테이너 개수(V1_WEB_REPLICAS) — 개수 1 은 예전 compose 명령 그대로, 개수 2 는 웹을
+      # 하나씩 healthy 를 기다리며 올리는지, 옛 릴리스 소스로 롤백하면 개수 1 로 처리하는지를
+      # 호출 순서로 고정하고, compose·nginx 설정이 개수별로 실제 도구에서 해석되는지 본다.
+      - name: Web replica rollout tests
+        run: |
+          bash scripts/qa/test-web-replicas.sh
+          bash scripts/qa/test-web-pair-config.sh
+
       # Task 168 M11 StageB 이관 도구 (PR-A1) — 어떤 배포 경로도 아직 호출하지
       # 않는 도구 계층 계약 테스트. 합성 fixture 로만 실행되고 Docker 는 쓰지
       # 않는다: package 쪽은 실제 git 저장소를 만들어 패키징 결정성(umask/TZ)과

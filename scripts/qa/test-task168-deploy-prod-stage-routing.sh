@@ -58,6 +58,7 @@ run_case() {
 #!/bin/sh
 case "$*" in
   'ps -a --format {{.Names}}') exit 0 ;; # empty output: no existing container
+  'ps -aq --filter name=^teameet_v1_web_b$') exit 0 ;;
   'image prune -f') exit 0 ;;
   *) echo "unexpected docker invocation in this routing test: $*" >&2; exit 92 ;;
 esac
@@ -75,10 +76,13 @@ PATH="${mock_bin}:\${PATH}"
 # other call's stdout is bare/ignored, so a constant placeholder is safe for
 # all of them.
 compose_mock() {
+  if [[ "\$1" == config ]]; then printf 'v1_web\n'; return 0; fi
   printf '%s\n' "COMPOSE:\$*" >> "${events}"
   printf fake-db-url
 }
 compose=(compose_mock)
+source "${ROOT_DIR}/deploy/web-replicas-common.sh"
+WEB_DOCKER=(docker)
 prod_task168_main() { printf '%s\n' "TASK168:\$1" >> "${events}"; }
 wait_for_prod_health_contract() { printf '%s\n' HEALTH >> "${events}"; }
 assert_running_release_digests() { printf '%s\n' DIGEST >> "${events}"; }

@@ -17,6 +17,10 @@ const indexOfCommand = (name: string) => queuedCommands().findIndex((c) => c[0] 
 const isInternalSet = (c: unknown[]) =>
   c[0] === 'set' && typeof c[1] === 'object' && c[1] !== null && 'traffic_type' in c[1];
 
+// ensureGtag wraps fetch/sendBeacon once per page session; every test loads a fresh module.
+const nativeFetch = window.fetch;
+const nativeBeacon = window.navigator.sendBeacon;
+
 beforeEach(() => {
   delete window.gtag;
   delete window.dataLayer;
@@ -24,6 +28,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  window.fetch = nativeFetch;
+  window.navigator.sendBeacon = nativeBeacon;
   window.history.replaceState(null, '', '/');
 });
 
@@ -149,6 +155,70 @@ describe('trackRoute', () => {
     trackRoute('/administration-guide');
     trackRoute('/tournaments/t1');
     expect(queuedCommands().some(isInternalSet)).toBe(false);
+  });
+});
+
+describe('redactInviteTokens', () => {
+  it('replaces the token in plain, percent-encoded and double-encoded paths', async () => {
+    const { redactInviteTokens } = await loadAnalytics('G-TEST123');
+    expect(redactInviteTokens('https://teameet.co.kr/invite/9f3a-secret?x=1')).toBe('https://teameet.co.kr/invite/:token?x=1');
+    expect(redactInviteTokens('dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F9f3a-secret&dt=x')).toBe(
+      'dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F:token&dt=x',
+    );
+    expect(redactInviteTokens('dl=https%3A%2F%2Fteameet.co.kr%2Flogin%3Fredirect%3D%252Finvite%252F9f3a-secret')).toBe(
+      'dl=https%3A%2F%2Fteameet.co.kr%2Flogin%3Fredirect%3D%252Finvite%252F:token',
+    );
+  });
+
+  it('leaves addresses without an invite token byte for byte', async () => {
+    const { redactInviteTokens } = await loadAnalytics('G-TEST123');
+    for (const text of ['https://teameet.co.kr/teams/t1/invite', 'https://teameet.co.kr/invite', 'dl=https%3A%2F%2Fteameet.co.kr%2Fteams%3Fq%3D%ED%8C%80']) {
+      expect(redactInviteTokens(text)).toBe(text);
+    }
+  });
+});
+
+describe('outgoing GA hits', () => {
+  const COLLECT = 'https://www.google-analytics.com/g/collect?v=2&tid=G-TEST123';
+
+  async function installWithFakes() {
+    const fetchSpy = vi.fn(async () => new Response(null, { status: 204 }));
+    const beaconSpy = vi.fn(() => true);
+    window.fetch = fetchSpy as typeof window.fetch;
+    window.navigator.sendBeacon = beaconSpy;
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/home');
+    return { fetchSpy, beaconSpy };
+  }
+
+  it('rewrites the address and referrer of a fetch hit, in the URL and in the batched body', async () => {
+    const { fetchSpy } = await installWithFakes();
+    await window.fetch(`${COLLECT}&dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F9f3a-secret`, {
+      method: 'POST',
+      body: 'en=page_view&dr=https%3A%2F%2Fteameet.co.kr%2Flogin%3Fredirect%3D%252Finvite%252F9f3a-secret',
+    });
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain('%2Finvite%2F:token');
+    expect(String(init.body)).toContain('%252Finvite%252F:token');
+    expect(url + String(init.body)).not.toContain('9f3a-secret');
+    expect(init.method).toBe('POST');
+  });
+
+  it('rewrites a sendBeacon hit', async () => {
+    const { beaconSpy } = await installWithFakes();
+    window.navigator.sendBeacon(`${COLLECT}&dl=https%3A%2F%2Fteameet.co.kr%2Finvite%2F9f3a-secret`, 'en=user_engagement');
+    const [url, data] = beaconSpy.mock.calls[0] as unknown as [string, string];
+    expect(url).not.toContain('9f3a-secret');
+    expect(data).toBe('en=user_engagement');
+  });
+
+  it('does not touch requests that are not GA collect hits', async () => {
+    const { fetchSpy, beaconSpy } = await installWithFakes();
+    const apiUrl = '/api/v1/teams/invite/9f3a-secret/accept';
+    await window.fetch(apiUrl, { method: 'POST', body: '{"x":"/invite/9f3a-secret"}' });
+    window.navigator.sendBeacon('/api/v1/logs/client-error', '/invite/9f3a-secret');
+    expect(fetchSpy).toHaveBeenCalledWith(apiUrl, { method: 'POST', body: '{"x":"/invite/9f3a-secret"}' });
+    expect(beaconSpy).toHaveBeenCalledWith('/api/v1/logs/client-error', '/invite/9f3a-secret');
   });
 });
 

@@ -1,3 +1,4 @@
+import { serverFetchSignal } from '@/lib/server-fetch-timeout';
 import type { V1PublicProfile } from '@/types/api';
 
 /**
@@ -37,7 +38,7 @@ export async function fetchPublicProfileForOg(
     strategy === 'no-store' ? { cache: 'no-store' } : { next: { revalidate: 300 } };
 
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: serverFetchSignal() });
     if (!response.ok) {
       console.error(`[og-card] 프로필 조회 실패: ${response.status} ${url}`);
       return null;

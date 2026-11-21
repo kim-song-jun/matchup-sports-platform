@@ -26,7 +26,7 @@ describe('loadPublicTournamentCampaign', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'http://v1-api.internal:8121/api/v1/tournaments/campaigns/summer-futsal-cup',
-      { cache: 'no-store', headers: { accept: 'application/json' } },
+      { cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 

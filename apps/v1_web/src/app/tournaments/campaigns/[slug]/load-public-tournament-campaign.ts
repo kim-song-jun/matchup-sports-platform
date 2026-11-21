@@ -1,3 +1,4 @@
+import { serverFetchSignal } from '@/lib/server-fetch-timeout';
 import type { ApiEnvelope } from '@/types/api';
 import type { V1PublicTournamentCampaign } from '@/types/tournament-campaign';
 
@@ -20,7 +21,7 @@ export async function loadPublicTournamentCampaign(
 ): Promise<PublicTournamentCampaignLoadResult> {
   const response = await fetch(
     `${getInternalApiOrigin()}/api/v1/tournaments/campaigns/${encodeURIComponent(slug)}`,
-    { cache: 'no-store', headers: { accept: 'application/json' } },
+    { cache: 'no-store', headers: { accept: 'application/json' }, signal: serverFetchSignal() },
   );
 
   if (response.status === 404) return { kind: 'not_found' };

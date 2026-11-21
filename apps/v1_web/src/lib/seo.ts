@@ -3,6 +3,7 @@ import { competitionFormatLabel } from '@/lib/competition-kind';
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
 import { socialImageSrc } from '@/lib/og-image';
 import { maskContactNumbers } from '@/lib/public-text';
+import { serverFetchSignal } from '@/lib/server-fetch-timeout';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
@@ -233,6 +234,7 @@ export function buildTournamentDescription(
 export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
   const response = await fetch(`${getInternalApiOrigin()}/api/v1${path}`, {
     headers: { accept: 'application/json' },
+    signal: serverFetchSignal(),
     ...(options.cache === 'no-store' ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
   });
 

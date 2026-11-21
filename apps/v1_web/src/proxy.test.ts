@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SERVER_FETCH_TIMEOUT_MS } from '@/lib/server-fetch-timeout';
 import { config, proxy } from './proxy';
 
 function campaignRequest(slug: string, method = 'GET'): NextRequest {
@@ -59,7 +60,7 @@ describe('tournament campaign proxy', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://v1-api.internal:8121/api/v1/tournaments/campaigns/summer%20futsal%20cup/availability',
-      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 
@@ -73,7 +74,7 @@ describe('tournament campaign proxy', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://public-api.internal:8121/api/v1/tournaments/campaigns/summer-cup/availability',
-      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 
@@ -123,7 +124,7 @@ describe('tournament campaign proxy', () => {
       expect(response.status).toBe(404);
       expect(fetchMock).toHaveBeenCalledWith(
         `http://localhost:8121/api/v1/tournaments/${id}`,
-        { cache: 'no-store', headers: { accept: 'application/json' } },
+        { cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
       );
     },
   );
@@ -186,7 +187,7 @@ describe('tournament match detail proxy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       `http://localhost:8121/api/v1/tournaments/${TOURNAMENT_ID}/matches/${FIXTURE_ID}`,
-      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 
@@ -226,12 +227,12 @@ describe('tournament match detail proxy', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       `http://localhost:8121/api/v1/tournaments/${TOURNAMENT_ID}`,
-      { cache: 'no-store', headers: { accept: 'application/json' } },
+      { cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://localhost:8121/api/v1/tournaments/campaigns/archived-campaign/availability',
-      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 });
@@ -266,7 +267,7 @@ describe('league fixture detail proxy', () => {
 
     expect(response.status).toBe(404);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(TEAM_MATCH_URL, { cache: 'no-store', headers: { accept: 'application/json' } });
+    expect(fetchMock).toHaveBeenCalledWith(TEAM_MATCH_URL, { cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) });
   });
 
   it('sets a fixture whose league has no public page to a real 404 and asks the fixture\'s own league', async () => {
@@ -283,7 +284,7 @@ describe('league fixture detail proxy', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       leagueUrl(LEAGUE_ID),
-      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' } },
+      { method: 'HEAD', cache: 'no-store', headers: { accept: 'application/json' }, signal: expect.any(AbortSignal) },
     );
   });
 
@@ -375,5 +376,90 @@ describe('league fixture detail proxy', () => {
 
     expect(response.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('proxy API timeout', () => {
+  const API = 'http://localhost:8121/api/v1';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  // fetch 가 signal 이 끊길 때까지 영원히 기다리는 API 를 흉내 낸다.
+  function stubHangingApi() {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  // 4초를 실제로 기다리지 않도록 제한 시간만 줄인다. 시간 제한을 쓰는지는 이 신호가 끊겨야 드러난다.
+  function shortenTimeout(ms = 20) {
+    const real = AbortSignal.timeout.bind(AbortSignal);
+    return vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(ms));
+  }
+
+  it('asks every API with the shared timeout', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+
+    await proxy(detailRequest(`/matches/${FIXTURE_ID}`));
+
+    expect(timeoutSpy).toHaveBeenCalledWith(SERVER_FETCH_TIMEOUT_MS);
+    expect(SERVER_FETCH_TIMEOUT_MS).toBe(4000);
+  });
+
+  it.each([
+    ['public detail', `/matches/${FIXTURE_ID}`],
+    ['campaign', '/tournaments/campaigns/summer-cup'],
+    ['tournament match', `/tournaments/${TOURNAMENT_ID}/matches/${FIXTURE_ID}`],
+    ['league fixture', `/league-matches/${LEAGUE_ID}/fixtures/${FIXTURE_ID}`],
+  ])('lets a %s request through when the API never answers', async (_label, requestPath) => {
+    shortenTimeout();
+    stubHangingApi();
+
+    const response = await proxy(detailRequest(requestPath));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('lets a league fixture through when the league lookup stalls after the fixture answered', async () => {
+    shortenTimeout();
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === `${API}/team-matches/${FIXTURE_ID}`) {
+        return Promise.resolve(teamMatchBody({ teamMatchId: FIXTURE_ID, league: { leagueId: LEAGUE_ID, title: '리그' } }));
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await proxy(detailRequest(`/league-matches/${LEAGUE_ID}/fixtures/${FIXTURE_ID}`));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(200);
+  });
+
+  it('does not hide a non-timeout transport failure behind the timeout pass-through', async () => {
+    const transportError = new TypeError('fetch failed');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(transportError));
+
+    await expect(proxy(detailRequest(`/matches/${FIXTURE_ID}`))).rejects.toBe(transportError);
+  });
+
+  it('closes the detail response body instead of leaving the JSON unread', async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, ok: true, body: { cancel } }));
+
+    const response = await proxy(detailRequest(`/matches/${FIXTURE_ID}`));
+
+    expect(response.status).toBe(200);
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,8 @@ ALPHA_SOURCE_RELEASES_DIR="${ALPHA_SOURCE_RELEASES_DIR:-${ALPHA_HOME_DIR}/.teame
 ALPHA_RUNTIME_CONFIG_DIR="${ALPHA_RUNTIME_CONFIG_DIR:-${ALPHA_HOME_DIR}/.teameet-alpha-runtime}"
 ALPHA_LEGACY_SOURCE_DIR="${ALPHA_LEGACY_SOURCE_DIR:-${ALPHA_SOURCE_RELEASES_DIR}/legacy-pre-immutable}"
 ALPHA_RUNTIME_METADATA_FILE="${ALPHA_RUNTIME_METADATA_FILE:-${ALPHA_RUNTIME_CONFIG_DIR}/release-metadata.alpha.conf}"
+# nginx 가 마운트하는 설정 폴더. 릴리스 소스의 deploy/nginx-live 가 여기를 가리킨다(web-replicas-common.sh).
+ALPHA_RUNTIME_NGINX_DIR="${ALPHA_RUNTIME_NGINX_DIR:-${ALPHA_RUNTIME_CONFIG_DIR}/nginx}"
 
 # A release's source tree lives under a key taken from its manifest's own
 # source key, not the bare SHA: StageB packages a different tree (final schema
@@ -45,6 +47,7 @@ prepare_alpha_release_source() {
   # (deploy-alpha-stage-b.sh) turn errexit off inside the function, so each
   # step stops it itself rather than relying on the caller's `set -e`.
   install -d -m 700 "${ALPHA_SOURCE_RELEASES_DIR}" "${ALPHA_RUNTIME_CONFIG_DIR}" || return 1
+  install -d -m 755 "${ALPHA_RUNTIME_NGINX_DIR}" || return 1
   if [[ ! -f "${ALPHA_RUNTIME_CONFIG_DIR}/.env" ]]; then
     install -m 600 "${ALPHA_LIVE_DIR}/deploy/.env" "${ALPHA_RUNTIME_CONFIG_DIR}/.env" || return 1
   fi
@@ -69,7 +72,7 @@ prepare_alpha_release_source() {
       return 1
     fi
     # --omit-dir-times 가 없으면 이 검사는 자기가 만든 mtime 을 드리프트로 오판한다.
-    # 아래 생성 경로는 rsync -a 로 복사한 뒤 deploy/ 안의 심볼릭 링크 3개와 루트의
+    # 아래 생성 경로는 rsync -a 로 복사한 뒤 deploy/ 안의 심볼릭 링크 4개와 루트의
     # .source-sha256 을 만든다 — 그 쓰기가 target 의 ./ 와 deploy/ mtime 을 "그때"로
     # 바꿔 버려서, 원본의 디렉토리 mtime 과 영구히 달라진다. 그 상태로 rsync -ani(-a 는
     # -t 포함)를 돌리면 내용이 완전히 같아도 `.d..t......  ./` 두 줄이 나와 드리프트로
@@ -81,6 +84,7 @@ prepare_alpha_release_source() {
       --exclude '/deploy/.env' \
       --exclude '/deploy/certbot' \
       --exclude '/deploy/release-metadata.alpha.conf' \
+      --exclude '/deploy/nginx-live' \
       "${source_dir}/" "${target_dir}/")" || return 1
     if [[ -n "${drift}" ]]; then
       echo "[alpha-release] Stored source ${source_key} drifted from the packaged source:" >&2
@@ -96,9 +100,10 @@ prepare_alpha_release_source() {
     return 1
   fi
   if ! {
-    rm -rf "${target_tmp}/deploy/certbot" &&
+    rm -rf "${target_tmp}/deploy/certbot" "${target_tmp}/deploy/nginx-live" &&
       rm -f "${target_tmp}/deploy/.env" "${target_tmp}/deploy/release-metadata.alpha.conf" &&
       ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" "${target_tmp}/deploy/certbot" &&
+      ln -s "${ALPHA_RUNTIME_NGINX_DIR}" "${target_tmp}/deploy/nginx-live" &&
       ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/.env" "${target_tmp}/deploy/.env" &&
       ln -s "${ALPHA_RUNTIME_METADATA_FILE}" "${target_tmp}/deploy/release-metadata.alpha.conf" &&
       printf '%s\n' "${source_sha256}" > "${target_tmp}/.source-sha256" &&

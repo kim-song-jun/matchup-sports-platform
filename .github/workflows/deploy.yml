@@ -331,6 +331,7 @@ jobs:
         run: |
           bash scripts/qa/test-web-replicas.sh
           bash scripts/qa/test-web-pair-config.sh
+          bash scripts/qa/test-nginx-live-reload.sh
 
       # AI 수집기 속도 제한 — 실제 nginx 에 운영·alpha 설정을 올려 수집기 UA 는 한도 초과 시 429, 사람·검색 엔진 UA 는 전부 통과하는지 본다.
       - name: nginx AI crawler rate limit tests

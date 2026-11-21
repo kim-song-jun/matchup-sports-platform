@@ -406,6 +406,7 @@ if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   fi
 fi
 
+sync_prod_nginx_config
 up_all_services
 
 if [[ -d "${v1_uploads_backup_dir}/uploads" ]]; then
@@ -420,7 +421,7 @@ if ! sudo rm -rf "${v1_uploads_backup_dir}"; then
   echo "[prod-deploy] WARNING: 업로드 백업 폴더를 지우지 못했습니다 — 수동 정리 필요: ${v1_uploads_backup_dir}" >&2
 fi
 
-"${compose[@]}" up -d --force-recreate --no-deps nginx
+apply_nginx_config "${PROD_LIVE_DIR}/deploy"
 wait_for_prod_health_contract
 assert_running_release_digests
 

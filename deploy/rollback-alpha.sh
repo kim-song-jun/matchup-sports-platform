@@ -104,9 +104,10 @@ pull_release_images
 previous_source_key="$(alpha_release_source_key "${PREVIOUS_MANIFEST}")"
 activate_alpha_release_source "${previous_source_key}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
+sync_alpha_nginx_config
 
 up_app_containers --force-recreate
-"${compose[@]}" up -d --force-recreate --no-deps nginx
+apply_nginx_config "${ALPHA_LIVE_DIR}/deploy"
 wait_for_alpha_health_contract
 assert_running_release_digests
 swap_active_previous_manifests

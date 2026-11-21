@@ -215,6 +215,9 @@ activate_prod_release_source "${SHA_A}"
 [[ "$(cat "${PROD_LIVE_DIR}/deploy/.env")" == 'protected=true' ]]
 [[ "$(cat "${PROD_LIVE_DIR}/deploy/certbot/cert.pem")" == 'legacy certificate' ]]
 [[ "$(cat "${PROD_LIVE_DIR}/deploy/release-metadata.prod.conf")" == 'legacy metadata' ]]
+# nginx 는 릴리스와 무관한 런타임 폴더를 마운트한다(web-replicas-common.sh 의 nginx-live).
+[[ "$(readlink "${PROD_LIVE_DIR}/deploy/nginx-live")" == "${PROD_RUNTIME_NGINX_DIR}" && -d "${PROD_RUNTIME_NGINX_DIR}" ]] ||
+  { echo "release source does not link deploy/nginx-live to the runtime nginx directory" >&2; exit 1; }
 
 prepare_prod_release_source "${source_b}" "${SHA_B}" "${DIGEST_B#sha256:}"
 activate_prod_release_source "${SHA_B}"

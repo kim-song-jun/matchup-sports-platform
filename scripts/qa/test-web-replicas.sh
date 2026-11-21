@@ -22,12 +22,21 @@ FAKE_DEFINED='v1_web'          # `compose config --services` 가 돌려줄 서�
 FAKE_UNHEALTHY=''              # healthy 가 되지 않는 서비스
 FAKE_ORPHAN=''                 # 남아 있는 v1_web_b 컨테이너 id
 FAKE_WEB_B_IMAGE='img:new'
+FAKE_NGINX_BEFORE='cid-nginx'  # `compose up -d --no-deps nginx` 앞·뒤의 nginx 컨테이너 id
+FAKE_NGINX_AFTER='cid-nginx'
+FAKE_NGINX_RUNNING=true
+FAKE_NGINX_TEST_FAILS=false    # nginx -t 실패
 fake_compose() {
   case "$1" in
     config) printf '%s\n' ${FAKE_DEFINED} ;;
-    ps) printf 'cid-%s\n' "$3" ;;
+    ps)
+      if [[ "$3" != nginx ]]; then printf 'cid-%s\n' "$3"
+      elif grep -qx 'compose up -d --no-deps nginx' "${LOG}"; then echo "${FAKE_NGINX_AFTER}"
+      else echo "${FAKE_NGINX_BEFORE}"; fi ;;
     logs) ;;
-    *) echo "compose $*" >> "${LOG}" ;;
+    *)
+      echo "compose $*" >> "${LOG}"
+      [[ "$*" != 'exec -T nginx nginx -t' || "${FAKE_NGINX_TEST_FAILS}" != true ]] ;;
   esac
 }
 fake_docker() {
@@ -36,6 +45,7 @@ fake_docker() {
       case "$*" in
         *Health.Status*) [[ " ${FAKE_UNHEALTHY} " == *" ${4#cid-} "* ]] && echo starting || echo healthy ;;
         *Config.Image*) echo "${FAKE_WEB_B_IMAGE}" ;;
+        *State.Running*) echo "${FAKE_NGINX_RUNNING}" ;;
       esac ;;
     ps) echo "${FAKE_ORPHAN}" ;;
     rm) echo "docker $*" >> "${LOG}" ;;
@@ -116,6 +126,43 @@ echo '[web-replicas] 둘째 웹 이미지 검사'
 FAKE_DEFINED='v1_web v1_web_b'; resolve_web_services
 assert_extra_web_images 'img:new' && pass '같은 이미지는 통과' || fail '같은 이미지는 통과해야 한다'
 if assert_extra_web_images 'img:old'; then fail '옛 이미지가 남았는데 통과했다'; else pass '옛 이미지 거절'; fi
+
+echo '[web-replicas] nginx 설정 적용: 다시 만들지 reload 할지'
+for case_ in 'cid-a cid-a true reload' 'cid-a cid-b true none' "'' cid-b true none" "cid-a '' false recreate" 'cid-a cid-a false recreate'; do
+  eval "set -- ${case_}"
+  [[ "$(nginx_apply_action "$1" "$2" "$3")" == "$4" ]] && pass "앞 '$1' 뒤 '$2' running=$3 → $4" || fail "앞 '$1' 뒤 '$2' running=$3 → $4 가 아니다"
+done
+LIVE_DEPLOY="$(mktemp -d)"
+LEGACY_DEPLOY="$(mktemp -d)"
+trap 'rm -rf "${LOG}" "${LIVE_DEPLOY}" "${LEGACY_DEPLOY}"' EXIT
+mkdir "${LIVE_DEPLOY}/runtime-nginx"
+ln -s "${LIVE_DEPLOY}/runtime-nginx" "${LIVE_DEPLOY}/nginx-live"
+
+: > "${LOG}"
+apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
+expect_log '같은 컨테이너가 그대로면 nginx -t 뒤 reload 만 한다' 'compose up -d --no-deps nginx
+compose exec -T nginx nginx -t
+compose exec -T nginx nginx -s reload'
+
+: > "${LOG}"; FAKE_NGINX_AFTER='cid-new'
+apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
+expect_log 'compose 가 서비스 정의 변경으로 새로 만들었으면 reload 하지 않는다' 'compose up -d --no-deps nginx'
+FAKE_NGINX_AFTER='cid-nginx'
+
+: > "${LOG}"; FAKE_NGINX_RUNNING=false
+apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
+expect_log '같은 컨테이너가 멈춰 있으면 다시 만든다' 'compose up -d --no-deps nginx
+compose up -d --force-recreate --no-deps nginx'
+FAKE_NGINX_RUNNING=true
+
+: > "${LOG}"; FAKE_NGINX_TEST_FAILS=true
+if apply_nginx_config "${LIVE_DEPLOY}" >/dev/null 2>&1; then fail 'nginx -t 가 실패했는데 성공했다'; else pass 'nginx -t 가 실패하면 실패'; fi
+if grep -q 'nginx -s reload' "${LOG}"; then fail 'nginx -t 실패 뒤에도 reload 했다'; else pass 'nginx -t 실패면 reload 하지 않는다'; fi
+FAKE_NGINX_TEST_FAILS=false
+
+: > "${LOG}"
+apply_nginx_config "${LEGACY_DEPLOY}" >/dev/null
+expect_log 'nginx-live 가 없는 옛 릴리스 소스는 예전처럼 다시 만든다' 'compose up -d --force-recreate --no-deps nginx'
 
 if (( failures > 0 )); then echo "[web-replicas] ${failures}건 실패" >&2; exit 1; fi
 echo '[web-replicas] passed'

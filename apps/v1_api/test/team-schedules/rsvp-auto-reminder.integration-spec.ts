@@ -78,6 +78,17 @@ describe('응답 마감 자동 리마인더', () => {
     expect(row.payload).toEqual({ scheduleId: id, kind: 'rsvp_deadline', expectedRsvpDeadlineAt: deadline.toISOString(), auto: true });
   });
 
+  it('마감 3시간 전이 밤(21~09시 KST)이면 직전 저녁 20:30 KST 로 앞당겨 예약한다', async () => {
+    // 마감 = 현재 기준 1~2일 뒤의 06:00 KST(= 전날 21:00Z). 3시간 전은 03:00 KST 라 밤이다.
+    const base = new Date(Date.now() + 48 * HOUR);
+    const deadline = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), 21, 0));
+    const { id } = await create({ rsvpDeadlineAt: deadline.toISOString() });
+    const [row] = await reminderRows(id);
+
+    const expected = new Date(Date.UTC(deadline.getUTCFullYear(), deadline.getUTCMonth(), deadline.getUTCDate(), 11, 30)); // 20:30 KST
+    expect(row.availableAt.toISOString()).toBe(expected.toISOString());
+  });
+
   it('마감이 없거나 3시간 안으로 가까우면 예약하지 않는다', async () => {
     const none = await create();
     const soon = await create({ rsvpDeadlineAt: at(2).toISOString() });
@@ -115,6 +126,14 @@ describe('응답 마감 자동 리마인더', () => {
     await prisma.$transaction((tx) => worker.rsvpDeadlineReminderHandler(claimOf(row) as never, tx));
 
     expect(await recipientsOf(row.id)).toEqual([ids.owner, ids.manager, ids.memberSilent].sort());
+  });
+
+  it('같은 마감에 수동 트리거를 불러도 새 행이 생기지 않고 자동 행의 상태만 돌아온다', async () => {
+    const created = await create({ rsvpDeadlineAt: at(24).toISOString() });
+    const result = (await service.triggerReminder(authUser(ids.owner), ids.team, created.id, { kind: 'rsvp_deadline' }, `auto-reminder-manual-${Date.now()}`)) as { status: string };
+
+    expect(await reminderRows(created.id)).toHaveLength(1);
+    expect(result.status).toBe('PENDING');
   });
 
   it('전원이 응답했으면 아무에게도 보내지 않는다', async () => {

@@ -222,6 +222,13 @@ jobs:
       - name: Compose service parity guard tests
         run: node --test scripts/qa/check-compose-service-parity.test.mjs
 
+      # 웹 한도가 512M 로 돌아가면 heap 상한이 259MB 가 돼 서버 렌더가 몰릴 때 웹이 반복해서 죽는다.
+      - name: Web memory floor (prod · alpha compose)
+        run: pnpm qa:web-memory-floor
+
+      - name: Web memory floor guard tests
+        run: node --test scripts/qa/check-web-memory-floor.test.mjs
+
       # alpha 배포 시드가 이미지에 없는 파일을 참조하면 배포가 죽는다(2026-09-08 실사고).
       - name: Alpha seed runtime contracts
         run: pnpm qa:alpha-seed-runtime

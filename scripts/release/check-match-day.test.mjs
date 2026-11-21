@@ -5,8 +5,8 @@ import { collectMatchDay, escapeCommandData, isOverridden, kstDate, main } from 
 // 2026-11-21 10:00 KST
 const NOW = new Date('2026-11-21T01:00:00.000Z');
 
-// Answers the way the real list does: `kind` defaults to tournaments only, `all` adds regular
-// leagues, `status` narrows by status, and a date window drops competitions that have no dates.
+// Answers the way the real list does: `kind` defaults to `tournament` (regular tournaments and rows
+// without a kind), `league` is regular leagues only, `all` is both, `status` narrows by status, and a date window drops competitions that have no dates.
 function fakeApi({ tournaments, schedules, failOn }) {
   const calls = [];
   const fetchImpl = async (url) => {
@@ -18,7 +18,7 @@ function fakeApi({ tournaments, schedules, failOn }) {
       const kind = query.get('kind') ?? 'tournament';
       const items = tournaments.filter(
         (item) =>
-          (kind === 'all' || (item.kind ?? 'tournament') === kind) &&
+          (kind === 'all' || (kind === 'league' ? item.kind === 'regular_league' : item.kind !== 'regular_league')) &&
           (!query.get('status') || item.status === query.get('status')) &&
           (!(query.get('dateFrom') || query.get('dateTo')) || item.hasDates !== false),
       );

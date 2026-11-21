@@ -185,7 +185,9 @@ describe('GET /llms.txt', () => {
       expect(blocks).toHaveLength(8);
       for (const block of blocks) {
         const [question, answer, source] = block.split('\n');
-        const anchor = source.replace('근거: https://teameet.co.kr/faq#', '');
+        const url = new URL(source.replace('근거: ', ''));
+        expect(url.pathname).toBe('/faq');
+        const anchor = url.hash.slice(1);
         const item = faqById(anchor);
         // 없는 앵커를 가리키면 근거 링크가 /faq 맨 위로만 열린다.
         expect(item, `${anchor} 는 FAQ_ITEMS 에 없는 id`).toBeDefined();
@@ -203,7 +205,7 @@ describe('GET /llms.txt', () => {
       const body = await (await GET()).text();
       const block = body.slice(body.indexOf('\n## 핵심 사실\n'), body.indexOf('\n## 핵심 페이지\n'));
 
-      expect(block).toContain('https://teameet.co.kr/faq#');
+      expect(block).toContain('/faq#');
       expect(block).not.toMatch(/[?&]from=/);
     });
 

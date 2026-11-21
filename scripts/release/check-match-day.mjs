@@ -5,6 +5,8 @@
 // Reads only public endpoints (GET /tournaments, GET /tournaments/:id/schedule). When the
 // fixtures cannot be read the gate fails closed, so an outage never looks like a quiet day —
 // a hotfix passes with the explicit confirmation like any other match-day release.
+// Fixtures the public schedule hides (hidden visibility, unpublished bracket, non-public
+// tournaments) are invisible to this gate too.
 
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +17,6 @@ const PAGE_LIMIT = 50;
 const SCHEDULE_PAGE_LIMIT = 100;
 const MAX_PAGES = 20;
 const OPEN_FIXTURE_STATUSES = new Set(['scheduled', 'live']);
-const SKIPPED_TOURNAMENT_STATUSES = new Set(['completed', 'cancelled', 'draft']);
 
 /** Calendar date (YYYY-MM-DD) of an instant in Asia/Seoul, by epoch arithmetic. */
 export function kstDate(instant) {
@@ -46,21 +47,22 @@ async function pagedItems(fetchJson, pathFor, pageLimit, isDone = () => false) {
 }
 
 /**
- * Fixtures kicking off today (KST) in every tournament whose date window overlaps today.
+ * Fixtures kicking off today (KST) in every in-progress competition, tournaments and regular
+ * leagues alike. The list is not narrowed by date: a rescheduled fixture can fall outside the
+ * competition's own date window, and a competition without dates would never match a date filter.
  * Returns the ones not yet finished (`open`) and a count of the finished ones.
  */
 export async function collectMatchDay({ fetchJson, now }) {
   const today = kstDate(now);
   const tournaments = await pagedItems(
     fetchJson,
-    (cursor) => `/tournaments?dateFrom=${today}&dateTo=${today}&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+    (cursor) => `/tournaments?kind=all&status=in_progress&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
     PAGE_LIMIT,
   );
 
   const open = [];
   let finished = 0;
   for (const tournament of tournaments) {
-    if (SKIPPED_TOURNAMENT_STATUSES.has(tournament.status)) continue;
     const fixtures = await pagedItems(
       fetchJson,
       (cursor) => `/tournaments/${encodeURIComponent(tournament.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,

@@ -5,6 +5,8 @@ import { collectMatchDay, escapeCommandData, isOverridden, kstDate, main } from 
 // 2026-11-21 10:00 KST
 const NOW = new Date('2026-11-21T01:00:00.000Z');
 
+// Answers the way the real list does: `kind` defaults to tournaments only, `all` adds regular
+// leagues, `status` narrows by status, and a date window drops competitions that have no dates.
 function fakeApi({ tournaments, schedules, failOn }) {
   const calls = [];
   const fetchImpl = async (url) => {
@@ -12,7 +14,15 @@ function fakeApi({ tournaments, schedules, failOn }) {
     calls.push(path);
     if (failOn && path.startsWith(failOn)) return { ok: false, status: 503, json: async () => ({}) };
     if (path.startsWith('/tournaments?')) {
-      return { ok: true, status: 200, json: async () => ({ data: { items: tournaments, pageInfo: { nextCursor: null } } }) };
+      const query = new URL(path, 'https://api.test').searchParams;
+      const kind = query.get('kind') ?? 'tournament';
+      const items = tournaments.filter(
+        (item) =>
+          (kind === 'all' || (item.kind ?? 'tournament') === kind) &&
+          (!query.get('status') || item.status === query.get('status')) &&
+          (!(query.get('dateFrom') || query.get('dateTo')) || item.hasDates !== false),
+      );
+      return { ok: true, status: 200, json: async () => ({ data: { items, pageInfo: { nextCursor: null } } }) };
     }
     const id = path.split('/')[2];
     return { ok: true, status: 200, json: async () => ({ data: { items: schedules[id] ?? [], nextCursor: null } }) };
@@ -89,10 +99,35 @@ test('a fixture at 00:30 KST tomorrow is not today', async () => {
   assert.equal(await run(api), 0);
 });
 
-test('completed tournaments are not read at all', async () => {
-  const api = fakeApi({ tournaments: [{ id: 'done', title: '끝난 대회', status: 'completed' }], schedules: {} });
+test('the list request covers leagues and carries no date window', async () => {
+  const api = fakeApi({ tournaments: [], schedules: {} });
   assert.equal(await run(api), 0);
-  assert.ok(!api.calls.some((call) => call.includes('/schedule')));
+  const listCalls = api.calls.filter((call) => call.startsWith('/tournaments?'));
+  assert.equal(listCalls.length, 1);
+  const query = new URL(listCalls[0], 'https://api.test').searchParams;
+  assert.equal(query.get('kind'), 'all');
+  assert.equal(query.get('status'), 'in_progress');
+  assert.equal(query.has('dateFrom') || query.has('dateTo'), false);
+});
+
+test('a regular league with a fixture today blocks, and finished competitions are not read', async () => {
+  const api = fakeApi({
+    tournaments: [
+      { id: 'league', title: '정규 리그', kind: 'regular_league', status: 'in_progress' },
+      { id: 'done', title: '끝난 대회', status: 'completed' },
+    ],
+    schedules: { league: [{ scheduledAt: '2026-11-21T05:00:00.000Z', status: 'scheduled' }] },
+  });
+  assert.equal(await run(api), 1);
+  assert.ok(!api.calls.some((call) => call.includes('/done/')));
+});
+
+test('an in-progress competition without dates still blocks on its fixture today', async () => {
+  const api = fakeApi({
+    tournaments: [{ id: 'undated', title: '일정 미정 리그', kind: 'regular_league', status: 'in_progress', hasDates: false }],
+    schedules: { undated: [{ scheduledAt: '2026-11-21T08:00:00.000Z', status: 'live' }] },
+  });
+  assert.equal(await run(api), 1);
 });
 
 test('an unreadable API fails closed, and only the confirmation lets it through', async () => {

@@ -139,7 +139,9 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 
 ### 4-0. 경기일 배포 게이트
 
-`build-images` 의 첫 스텝(`Match-day deploy gate`)과 `Promote to main` 워크플로가 `scripts/release/check-match-day.mjs` 를 실행한다. 공개 API(`GET /tournaments`, `GET /tournaments/:id/schedule`)만 읽어, 오늘(KST) 시작하는 경기 가운데 `scheduled`·`live` 가 하나라도 있으면 실패한다 — 승인·빌드·승격 준비가 시작되기 전이다. 경기를 읽지 못해도 실패한다(장애가 조용한 날로 보이지 않게).
+`build-images` 의 첫 스텝(`Match-day deploy gate`)과 `Promote to main` 워크플로가 `scripts/release/check-match-day.mjs` 를 실행한다. 공개 API(`GET /tournaments?kind=all&status=in_progress`, `GET /tournaments/:id/schedule`)만 읽어, 진행 중인 대회·정규 리그의 경기 가운데 오늘(KST) 시작하는 것 중 `scheduled`·`live` 가 하나라도 있으면 실패한다 — 승인·빌드·승격 준비가 시작되기 전이다. 경기를 읽지 못해도 실패한다(장애가 조용한 날로 보이지 않게).
+
+**한계:** 공개 일정이 숨기는 경기(공개 범위 hidden, 대진표 미공개, 비공개 대회)는 이 게이트도 볼 수 없다. 상태가 `in_progress` 가 아닌 대회·리그의 경기도 읽지 않는다 — 경기는 대회가 시작된 뒤에만 열리기 때문이다. 이런 경기가 있는 날은 운영자가 직접 확인한다.
 
 | 상황 | 통과시키는 법 |
 |---|---|

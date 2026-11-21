@@ -5,6 +5,8 @@
 // Reads only public endpoints (GET /tournaments, GET /tournaments/:id/schedule). When the
 // fixtures cannot be read the gate fails closed, so an outage never looks like a quiet day —
 // a hotfix passes with the explicit confirmation like any other match-day release.
+// Fixtures the public schedule hides (hidden visibility, unpublished bracket, non-public
+// tournaments) are invisible to this gate too.
 
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +17,9 @@ const PAGE_LIMIT = 50;
 const SCHEDULE_PAGE_LIMIT = 100;
 const MAX_PAGES = 20;
 const OPEN_FIXTURE_STATUSES = new Set(['scheduled', 'live']);
-const SKIPPED_TOURNAMENT_STATUSES = new Set(['completed', 'cancelled', 'draft']);
+// The list sorts finished competitions last (in progress, recruiting, preparing, recruitment closed,
+// completed, then anything else), so the first page showing one of these has nothing left to read.
+const FINISHED_COMPETITION_STATUSES = new Set(['completed', 'cancelled']);
 
 /** Calendar date (YYYY-MM-DD) of an instant in Asia/Seoul, by epoch arithmetic. */
 export function kstDate(instant) {
@@ -46,24 +50,28 @@ async function pagedItems(fetchJson, pathFor, pageLimit, isDone = () => false) {
 }
 
 /**
- * Fixtures kicking off today (KST) in every tournament whose date window overlaps today.
- * Returns the ones not yet finished (`open`) and a count of the finished ones.
+ * Fixtures kicking off today (KST) in every unfinished competition, tournaments and regular
+ * leagues alike. Neither the status nor the date narrows the list: fixtures open before an
+ * operator moves a tournament to in-progress, a league only turns in-progress once its first game
+ * starts, a rescheduled fixture can fall outside the competition's own date window, and a
+ * competition without dates would never match a date filter. Returns the ones not yet finished (`open`) and a count of the finished ones.
  */
 export async function collectMatchDay({ fetchJson, now }) {
   const today = kstDate(now);
-  const tournaments = await pagedItems(
+  const competitions = await pagedItems(
     fetchJson,
-    (cursor) => `/tournaments?dateFrom=${today}&dateTo=${today}&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+    (cursor) => `/tournaments?kind=all&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
     PAGE_LIMIT,
+    (pageItems) => pageItems.some((item) => FINISHED_COMPETITION_STATUSES.has(item.status)),
   );
 
   const open = [];
   let finished = 0;
-  for (const tournament of tournaments) {
-    if (SKIPPED_TOURNAMENT_STATUSES.has(tournament.status)) continue;
+  for (const competition of competitions) {
+    if (FINISHED_COMPETITION_STATUSES.has(competition.status)) continue;
     const fixtures = await pagedItems(
       fetchJson,
-      (cursor) => `/tournaments/${encodeURIComponent(tournament.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      (cursor) => `/tournaments/${encodeURIComponent(competition.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       SCHEDULE_PAGE_LIMIT,
       // The schedule is ordered by kickoff, so a page ending after today has nothing left for today.
       (pageItems) => {
@@ -74,7 +82,7 @@ export async function collectMatchDay({ fetchJson, now }) {
     for (const fixture of fixtures) {
       if (!fixture.scheduledAt || kstDate(new Date(fixture.scheduledAt)) !== today) continue;
       if (OPEN_FIXTURE_STATUSES.has(fixture.status)) {
-        open.push({ title: tournament.title, scheduledAt: fixture.scheduledAt, status: fixture.status });
+        open.push({ title: competition.title, scheduledAt: fixture.scheduledAt, status: fixture.status });
       } else if (fixture.status === 'ended') {
         finished += 1;
       }

@@ -332,6 +332,10 @@ jobs:
           bash scripts/qa/test-web-replicas.sh
           bash scripts/qa/test-web-pair-config.sh
 
+      # AI 수집기 속도 제한 — 실제 nginx 에 운영·alpha 설정을 올려 수집기 UA 는 한도 초과 시 429, 사람·검색 엔진 UA 는 전부 통과하는지 본다.
+      - name: nginx AI crawler rate limit tests
+        run: bash scripts/qa/test-nginx-crawler-limit.sh
+
       # Task 168 M11 StageB 이관 도구 (PR-A1) — 어떤 배포 경로도 아직 호출하지
       # 않는 도구 계층 계약 테스트. 합성 fixture 로만 실행되고 Docker 는 쓰지
       # 않는다: package 쪽은 실제 git 저장소를 만들어 패키징 결정성(umask/TZ)과

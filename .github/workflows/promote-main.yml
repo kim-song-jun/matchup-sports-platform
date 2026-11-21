@@ -13,6 +13,11 @@ on:
         description: Type PROMOTE to confirm
         required: true
         type: string
+      matchday_confirmation:
+        description: "Type MATCHDAY to promote while a tournament fixture is still scheduled or live today (KST), e.g. a hotfix"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -46,6 +51,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '22.23.5'
+
+      # 오늘(KST) 남은 대회 경기가 있으면 승격 준비도 멈춘다 — 승격 PR 머지는 곧 운영 배포다.
+      - name: Match-day gate
+        env:
+          MATCHDAY_CONFIRMATION: ${{ inputs.matchday_confirmation }}
+        run: node scripts/release/check-match-day.mjs
 
       - name: Promote dev to main
         env:

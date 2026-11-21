@@ -27,6 +27,12 @@ on:
         required: false
         type: string
         default: ""
+      # 경기일(오늘 KST 에 남은 대회 경기가 있는 날)에는 이 값이 MATCHDAY 일 때만 운영 배포가 진행된다.
+      matchday_confirmation:
+        description: "Match-day deploy gate: type MATCHDAY to deploy while a tournament fixture is still scheduled or live today (KST), e.g. a hotfix"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -255,6 +261,9 @@ jobs:
       # 넘어가므로 파일을 명시한다.
       - name: Release contract tests
         run: node --test scripts/release/versioning.contract.test.mjs
+
+      - name: Match-day deploy gate tests
+        run: node --test scripts/release/check-match-day.test.mjs
 
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
@@ -777,6 +786,14 @@ jobs:
 
       - name: Git security baseline
         run: bash scripts/qa/check-git-security.sh
+
+      # 오늘(KST) 남은 대회 경기가 있으면 승인·빌드 전에 멈춘다. 공개 API 만 읽는다. 푸시로 시작된
+      # 배포는 입력을 받을 수 없어 저장소 변수 PROD_MATCHDAY_OVERRIDE_DATE(오늘 날짜)로 통과시킨다.
+      - name: Match-day deploy gate
+        env:
+          MATCHDAY_CONFIRMATION: ${{ github.event_name == 'workflow_dispatch' && inputs.matchday_confirmation || '' }}
+          MATCHDAY_OVERRIDE_DATE: ${{ vars.PROD_MATCHDAY_OVERRIDE_DATE }}
+        run: node scripts/release/check-match-day.mjs
 
       # Resolves the Task168 stage for every step below. Values are read
       # through env (never interpolated into the run body) so a

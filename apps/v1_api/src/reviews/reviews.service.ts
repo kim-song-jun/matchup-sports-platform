@@ -66,7 +66,7 @@ type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId:
 type LineupPlayer = { userId: string; name: string; imageUrl: string | null };
 type PrismaTx = Omit<
   PrismaService,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onModuleDestroy'
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onApplicationShutdown'
 >;
 
 @Injectable()

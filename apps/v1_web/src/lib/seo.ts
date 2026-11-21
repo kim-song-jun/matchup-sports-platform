@@ -255,7 +255,7 @@ const SUBPAGE_PURPOSE: Record<Exclude<TournamentSubpageSection, 'bracket'>, stri
 
 /**
  * 대회 하위 화면(대진표·결과·시상) 검색 설명. 화면 목적 한 문장 뒤에 일정·장소·방식·진행 상태를 붙여
- * 같은 대회의 상세·하위 화면끼리, 대회끼리 설명이 갈리게 한다. 일정·장소를 모르면 방식·상태만 붙는다.
+ * 같은 대회의 상세·하위 화면끼리, 대회끼리 설명이 갈리게 한다. 일정·장소는 알 때만, 종목·방식은 항상, 상태 문구는 신청 마감·진행 중·종료·취소일 때만(모집 중 등은 없음) 붙는다.
  */
 export function buildTournamentSubpageDescription(
   tournament: Pick<

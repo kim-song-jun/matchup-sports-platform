@@ -315,6 +315,10 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # unhealthy 로 굳은 앱 컨테이너를 다시 띄우는 서버 타이머의 계약(유예 · 쿨다운 · 배포 중 건너뛰기 · 대상 범위).
+      - name: Restart-unhealthy timer tests
+        run: bash scripts/qa/test-restart-unhealthy.sh
+
       # 웹 컨테이너 개수(V1_WEB_REPLICAS) — 개수 1 은 예전 compose 명령 그대로, 개수 2 는 웹을
       # 하나씩 healthy 를 기다리며 올리는지, 옛 릴리스 소스로 롤백하면 개수 1 로 처리하는지를
       # 호출 순서로 고정하고, compose·nginx 설정이 개수별로 실제 도구에서 해석되는지 본다.

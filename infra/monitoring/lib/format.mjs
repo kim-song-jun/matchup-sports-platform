@@ -24,7 +24,7 @@ const escapeSlack = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').
 const link = (url, label) => `<${url}|${label}>`;
 const parseTime = (isoLike) => Date.parse(isoLike.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
 
-/** 2026-11-20T01:50:47.803+0000 -> `11-20(목) 10:50 KST` */
+/** 2026-11-20T01:50:47.803+0000 -> `11-20(금) 10:50 KST` */
 export function formatKst(isoLike) {
   const t = parseTime(isoLike);
   if (Number.isNaN(t)) throw new Error(`unparseable time: ${isoLike}`);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
 import { parseNextImageSrc } from '@/test/next-image';
-import { absoluteSiteUrl, buildFixtureDescription, buildPublicMetadata, buildTeamRecordsDescription, buildTournamentDescription, buildTournamentSubpageDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildFixtureDescription, buildFixtureTitle, buildLeagueFixtureTitle, buildPublicMetadata, buildTeamRecordsDescription, buildTournamentDescription, buildTournamentSubpageDescription, buildTournamentTitle, DEFAULT_SOCIAL_IMAGE, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -413,5 +413,68 @@ describe('buildPublicMetadata 공유 이미지', () => {
       { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: '공지' },
     ]);
     expect(metadata.twitter).toMatchObject({ card: 'summary_large_image', images: [DEFAULT_SOCIAL_IMAGE.path] });
+  });
+});
+
+describe('buildFixtureTitle', () => {
+  const pair = {
+    tournamentTitle: '가을 풋살컵',
+    displayTitle: null,
+    legNumber: 1,
+    home: { registrationId: 'r1', teamId: 't1', teamName: '송파 FC' },
+    away: { registrationId: 'r2', teamId: 't2', teamName: '잠실 유나이티드' },
+  };
+
+  it('같은 두 팀이 조별리그와 결선에서 만나면 라운드·조 이름으로 제목이 갈린다', () => {
+    const group = buildFixtureTitle({ ...pair, round: 'group', groupName: 'A조' } as unknown as Parameters<typeof buildFixtureTitle>[0]);
+    const final = buildFixtureTitle({ ...pair, round: 'final', groupName: null } as unknown as Parameters<typeof buildFixtureTitle>[0]);
+    expect(group).not.toBe(final);
+    expect(group).toBe('송파 FC vs 잠실 유나이티드 · A조 · 조별리그 | 가을 풋살컵');
+    expect(final).toContain('송파 FC vs 잠실 유나이티드 · ');
+  });
+
+  it('운영자가 정한 경기 제목이 있으면 그것을 쓴다', () => {
+    const title = buildFixtureTitle({ ...pair, round: 'final', groupName: null, displayTitle: '챔피언 결정전' } as unknown as Parameters<typeof buildFixtureTitle>[0]);
+    expect(title).toBe('송파 FC vs 잠실 유나이티드 · 챔피언 결정전 | 가을 풋살컵');
+  });
+
+  it('팀이 정해지지 않았으면 미정으로 적는다', () => {
+    const title = buildFixtureTitle({ ...pair, home: null, away: null, round: 'final', groupName: null } as unknown as Parameters<typeof buildFixtureTitle>[0]);
+    expect(title.startsWith('미정 vs 미정 · ')).toBe(true);
+  });
+});
+
+describe('buildLeagueFixtureTitle', () => {
+  it('두 팀이 정해지면 제목 뒤에 붙인다', () => {
+    expect(buildLeagueFixtureTitle('봄 리그 3주차', { host: '송파 FC', opponent: '잠실 FC' })).toBe('봄 리그 3주차 · 송파 FC vs 잠실 FC');
+  });
+
+  it('한쪽만 알면 모르는 쪽은 미정이고, 둘 다 모르면 제목 그대로다', () => {
+    expect(buildLeagueFixtureTitle('봄 리그 3주차', { host: '송파 FC' })).toBe('봄 리그 3주차 · 송파 FC vs 미정');
+    expect(buildLeagueFixtureTitle('봄 리그 3주차', { host: ' ', opponent: null })).toBe('봄 리그 3주차');
+  });
+});
+
+describe('정규리그 + 토너먼트 방식 검색 설명', () => {
+  const base = {
+    title: '가을컵',
+    sport: { code: 'futsal', name: '풋살' },
+    format: 'league_knockouts',
+    kind: 'regular_tournament',
+    status: 'in_progress',
+    scheduledAt: '2026-10-25T02:00:00.000Z',
+    scheduledEndAt: null,
+    venue: '경기대 케이풋살파크',
+  } as unknown as Parameters<typeof buildTournamentSubpageDescription>[0];
+
+  it('화면 라벨의 자리표시자 「N개」가 검색 설명에 나오지 않는다', () => {
+    const text = buildTournamentSubpageDescription(base, 'bracket');
+    expect(text).toContain('정규리그 + 복수 토너먼트');
+    expect(text).not.toContain('N개');
+  });
+
+  it('다른 방식의 문구는 그대로다', () => {
+    const text = buildTournamentSubpageDescription({ ...base, format: 'group_knockout' } as typeof base, 'bracket');
+    expect(text).toContain('풋살 조별리그 + 토너먼트');
   });
 });

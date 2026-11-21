@@ -37,9 +37,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: '/matches', priority: 0.9, changeFrequency: 'hourly' },
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
+  // 목록 필터 주소(?kind=)는 싣지 않는다 — 크롤러는 /tournaments 하나에서 목록으로 들어온다.
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
-  { path: '/tournaments?kind=tournament', priority: 0.8, changeFrequency: 'daily' },
-  { path: '/tournaments?kind=league', priority: 0.8, changeFrequency: 'daily' },
   // League list/detail aliases redirect; only canonical destinations are indexed.
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },

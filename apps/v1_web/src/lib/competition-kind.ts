@@ -76,16 +76,26 @@ export function isLeagueCompetition(competition: {
  * `format` 은 사실이 아니기 때문이다. 분기와 달리 라벨은 `|| kind` 를 덧붙여 고칠 수 없고
  * (틀린 값을 그대로 읽으니까) **리그 판정을 먼저** 해야 한다.
  */
-export function competitionFormatLabel(competition: {
+type FormatLabelInput = {
   format: V1TournamentFormat;
   kind: V1CompetitionKind | null;
   stagePlan?: unknown;
   isStaged?: boolean;
-}): string {
+};
+
+const LEAGUE_KNOCKOUTS_LABEL = '정규리그 + N개 토너먼트';
+
+export function competitionFormatLabel(competition: FormatLabelInput): string {
   if (competition.stagePlan || competition.isStaged) return '단계형 대회';
   if (isLeagueCompetition(competition)) return '리그 방식';
-  if (competition.format === 'league_knockouts') return '정규리그 + N개 토너먼트';
+  if (competition.format === 'league_knockouts') return LEAGUE_KNOCKOUTS_LABEL;
   return competition.format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트';
+}
+
+/** 검색 설명·공유 미리보기용 방식 문구. 화면 라벨의 「N개」는 자리표시자라 그대로 노출하지 않는다. */
+export function competitionFormatSearchLabel(competition: FormatLabelInput): string {
+  const label = competitionFormatLabel(competition);
+  return label === LEAGUE_KNOCKOUTS_LABEL ? '정규리그 + 복수 토너먼트' : label;
 }
 
 /** 대진 화면의 소개 줄. 리그처럼 그리는 대회(리그 방식 대회·정규 리그)에는 조별리그도 결선도 없다. 검색 설명도 같은 문장을 쓴다. */

@@ -113,7 +113,7 @@ describe('대진 화면 설명', () => {
 
   it.each([
     ['조별+토너먼트 대회', { format: 'group_knockout', kind: 'regular_tournament' }, '조별리그 + 토너먼트'],
-    ['정규리그 + N개 토너먼트 대회', { format: 'league_knockouts', kind: 'regular_tournament' }, '정규리그 + N개 토너먼트'],
+    ['정규리그 + 여러 토너먼트 대회', { format: 'league_knockouts', kind: 'regular_tournament' }, '정규리그 + 복수 토너먼트'],
     ['토너먼트 대회', { format: 'knockout', kind: 'regular_tournament' }, '토너먼트'],
     ['kind 없는 옛 행', { format: 'group_knockout', kind: null }, '조별리그 + 토너먼트'],
   ])('%s: 대진표 문장 뒤에 일정·장소·방식이 붙는다', async (_name, shape, formatLabel) => {
@@ -348,6 +348,13 @@ describe('경기 상세 설명', () => {
     const meta = await describeMatch({ scoreStatus: 'pending', score: { home: 2, away: 0, penalties: null } });
     expect(meta.description).not.toMatch(/스코어|\d : \d/);
     expect(meta.description).toContain('송파 FC vs 잠실 유나이티드 · 2026년 10월 25일');
+  });
+
+  it('같은 두 팀의 다른 라운드 경기는 제목이 갈린다', async () => {
+    const group = await describeMatch({ round: 'group', groupName: 'A조' });
+    const final = await describeMatch({ round: 'final', groupName: null });
+    expect(group.title).not.toBe(final.title);
+    expect(String(group.title)).toContain('A조');
   });
 });
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ResultsPageClient } from './results-page-client';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, buildTournamentSubpageDescription, fetchPublicV1 } from '@/lib/seo';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!tournament) return buildNoIndexMetadata('대회 결과를 찾을 수 없어요');
   const metadata = buildPublicMetadata({
     title: `${tournament.title} 경기 결과`,
-    description: `${tournament.title}의 경기별 결과와 기록을 확인하세요.`,
+    description: buildTournamentSubpageDescription(tournament, 'results'),
     path: `/tournaments/${id}/results`,
     image: resolveTournamentImage(tournament, 'cover'),
   });

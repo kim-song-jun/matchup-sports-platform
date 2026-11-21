@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TeamRecordsPageClient } from './team-records-page-client';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, buildTeamRecordsDescription, fetchPublicV1 } from '@/lib/seo';
 import type { PublicTeamRecordsResponse, TeamRecordCategory } from '@/components/public-game-records/types';
 
 type RecordsSearchParams = Record<string, string | string[] | undefined>;
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!records) return buildNoIndexMetadata('팀 전적을 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${records.teamName} 전적`,
-    description: `${records.teamName}의 공식 경기 전적과 최근 결과를 확인하세요.`,
+    description: buildTeamRecordsDescription(records),
     path: `/teams/${id}/records`,
   });
 }

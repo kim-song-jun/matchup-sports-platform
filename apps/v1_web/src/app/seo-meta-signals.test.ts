@@ -17,6 +17,8 @@ vi.mock('next/navigation', () => ({
     throw new Error('NEXT_NOT_FOUND');
   }),
 }));
+vi.mock('./tournaments/[id]/matches/[fixtureId]/match-page-client', () => ({ MatchPageClient: () => null }));
+vi.mock('./teams/[id]/records/team-records-page-client', () => ({ TeamRecordsPageClient: () => null }));
 vi.mock('./tournaments/[id]/bracket/bracket-page-client', () => ({ BracketPageClient: () => null }));
 vi.mock('./tournaments/[id]/results/results-page-client', () => ({ ResultsPageClient: () => null }));
 vi.mock('./tournaments/[id]/awards/awards-page-client', () => ({ AwardsPageClient: () => null }));
@@ -27,6 +29,8 @@ vi.mock('./users/[id]/card/fetch-profile', () => ({ fetchPublicProfileForOg: moc
 vi.mock('@/components/users/player-card-share-client', () => ({ PlayerCardShareClient: () => null }));
 
 const { default: sitemap } = await import('./sitemap');
+const { generateMetadata: matchMetadata } = await import('./tournaments/[id]/matches/[fixtureId]/page');
+const { generateMetadata: teamRecordsMetadata } = await import('./teams/[id]/records/page');
 const { generateMetadata: bracketMetadata } = await import('./tournaments/[id]/bracket/page');
 const { generateMetadata: resultsMetadata } = await import('./tournaments/[id]/results/page');
 const { generateMetadata: awardsMetadata } = await import('./tournaments/[id]/awards/page');
@@ -50,6 +54,12 @@ function tournament(overrides: Record<string, unknown> = {}) {
     tournamentId: 't-1',
     title: '가을 풋살컵',
     status: 'completed',
+    sport: { code: 'futsal', name: '풋살' },
+    format: 'group_knockout',
+    kind: 'regular_tournament',
+    scheduledAt: '2026-10-25T02:00:00.000Z',
+    scheduledEndAt: '2026-10-25T10:00:00.000Z',
+    venue: '경기대 케이풋살파크',
     coverImageUrl: null,
     listImageUrl: null,
     promoHomeImageUrl: null,
@@ -83,8 +93,10 @@ describe('대회 결과·시상 화면의 색인 조건', () => {
 });
 
 describe('대진 화면 설명', () => {
-  const LEAGUE_STYLE = `가을 풋살컵의 경기 일정과 순위를 확인하세요.`;
-  const TOURNAMENT_STYLE = `가을 풋살컵의 조별 순위와 토너먼트 대진표를 확인하세요.`;
+  const FACTS = '2026년 10월 25일 (일) · 경기대 케이풋살파크';
+  const LEAGUE_STYLE = `가을 풋살컵의 경기 일정과 순위를 확인하세요. ${FACTS} · 풋살 리그 방식 · 대회 종료`;
+  const TOURNAMENT_STYLE = (format: string) =>
+    `가을 풋살컵의 조별 순위와 토너먼트 대진표를 확인하세요. ${FACTS} · 풋살 ${format} · 대회 종료`;
 
   // 리그처럼 그리는 두 모양 — 정규 리그 거울 행은 format 이 group_knockout 이라 format 만 보면 못 잡는다.
   it.each([
@@ -100,17 +112,17 @@ describe('대진 화면 설명', () => {
   });
 
   it.each([
-    ['조별+토너먼트 대회', { format: 'group_knockout', kind: 'regular_tournament' }],
-    ['정규리그 + N개 토너먼트 대회', { format: 'league_knockouts', kind: 'regular_tournament' }],
-    ['토너먼트 대회', { format: 'knockout', kind: 'regular_tournament' }],
-    ['kind 없는 옛 행', { format: 'group_knockout', kind: null }],
-  ])('%s: 설명 문장은 그대로다', async (_name, shape) => {
+    ['조별+토너먼트 대회', { format: 'group_knockout', kind: 'regular_tournament' }, '조별리그 + 토너먼트'],
+    ['정규리그 + N개 토너먼트 대회', { format: 'league_knockouts', kind: 'regular_tournament' }, '정규리그 + N개 토너먼트'],
+    ['토너먼트 대회', { format: 'knockout', kind: 'regular_tournament' }, '토너먼트'],
+    ['kind 없는 옛 행', { format: 'group_knockout', kind: null }, '조별리그 + 토너먼트'],
+  ])('%s: 대진표 문장 뒤에 일정·장소·방식이 붙는다', async (_name, shape, formatLabel) => {
     mocks.fetchPublicV1.mockResolvedValueOnce(tournament(shape));
 
     const meta = await bracketMetadata(params);
 
-    expect(meta.description).toBe(TOURNAMENT_STYLE);
-    expect(meta.openGraph?.description).toBe(TOURNAMENT_STYLE);
+    expect(meta.description).toBe(TOURNAMENT_STYLE(formatLabel));
+    expect(meta.openGraph?.description).toBe(TOURNAMENT_STYLE(formatLabel));
   });
 
   it.each([
@@ -272,5 +284,86 @@ describe('선수 카드·활동 기록 메타', () => {
     expect(meta.robots).toMatchObject({ index: false });
     expect(meta.openGraph?.title).toBe('민수 님의 활동 기록 | Teameet');
     expect(ogImageUrl(meta)).toBe('/opengraph-image');
+  });
+});
+
+describe('결과·시상 화면 설명', () => {
+  it.each([
+    ['결과', resultsMetadata, '경기별 결과와 기록을 확인하세요.'],
+    ['시상', awardsMetadata, 'MVP와 개인 시상 결과를 확인하세요.'],
+  ])('%s: 목적 문장 뒤에 일정·장소·방식·상태가 붙고 og 설명도 같다', async (_screen, generate, purpose) => {
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament());
+
+    const meta = await generate(params);
+
+    const expected = `가을 풋살컵의 ${purpose} 2026년 10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 대회 종료`;
+    expect(meta.description).toBe(expected);
+    expect(meta.openGraph?.description).toBe(expected);
+  });
+
+  it('일정이 다른 대회는 같은 화면이어도 설명이 다르다', async () => {
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament());
+    mocks.fetchPublicV1.mockResolvedValueOnce(tournament({ scheduledAt: '2026-11-08T02:00:00.000Z', scheduledEndAt: null, venue: '송파 풋살파크' }));
+
+    const first = await resultsMetadata(params);
+    const second = await resultsMetadata(params);
+
+    expect(second.description).not.toBe(first.description);
+  });
+});
+
+describe('경기 상세 설명', () => {
+  const match = {
+    tournamentId: 't-1',
+    tournamentTitle: '가을 풋살컵',
+    fixtureId: 'f-1',
+    displayTitle: null,
+    round: 'quarter',
+    groupName: null,
+    legNumber: 1,
+    scheduledAt: '2026-10-25T05:00:00.000Z',
+    venue: '경기대 케이풋살파크',
+    fieldName: null,
+    home: { registrationId: 'r1', teamId: 'a', teamName: '송파 FC' },
+    away: { registrationId: 'r2', teamId: 'b', teamName: '잠실 유나이티드' },
+    status: 'ended',
+    scoreStatus: 'official',
+    score: { home: 2, away: 0, penalties: null },
+  };
+  const matchParams = { params: Promise.resolve({ id: 't-1', fixtureId: 'f-1' }) };
+
+  async function describeMatch(overrides: Record<string, unknown>) {
+    mocks.fetchPublicV1.mockResolvedValueOnce({ ...match, ...overrides }).mockResolvedValueOnce({ kind: 'regular_tournament' });
+    return matchMetadata(matchParams);
+  }
+
+  it('확정 경기는 점수·일정·장소를 설명에 싣고 og 설명도 같다', async () => {
+    const meta = await describeMatch({});
+    expect(meta.description).toContain('최종 스코어 송파 FC 2 : 0 잠실 유나이티드 · 2026년 10월 25일 (일) 오후 2:00 · 경기대 케이풋살파크');
+    expect(meta.openGraph?.description).toBe(meta.description);
+    expect((meta.description ?? '').length).toBeGreaterThanOrEqual(70);
+  });
+
+  it('확정 전 경기의 설명에는 점수가 없다', async () => {
+    const meta = await describeMatch({ scoreStatus: 'pending', score: { home: 2, away: 0, penalties: null } });
+    expect(meta.description).not.toMatch(/스코어|\d : \d/);
+    expect(meta.description).toContain('송파 FC vs 잠실 유나이티드 · 2026년 10월 25일');
+  });
+});
+
+describe('팀 전적 설명', () => {
+  it('공식 경기 승무패가 설명에 들어간다', async () => {
+    mocks.fetchPublicV1.mockResolvedValueOnce({
+      teamId: 'a',
+      teamName: '송파 FC',
+      summary: { played: 5, won: 3, drawn: 1, lost: 1, goalsFor: 9, goalsAgainst: 4, byType: {} },
+      availableSeasons: ['2026'],
+      items: [],
+      nextCursor: null,
+    });
+
+    const meta = await teamRecordsMetadata(params);
+
+    expect(meta.description).toBe('송파 FC의 공식 경기 전적과 최근 결과를 확인하세요. 2026년 공식 5경기 3승 1무 1패');
   });
 });

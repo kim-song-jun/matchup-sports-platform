@@ -50,6 +50,7 @@ for required_path in \
   "${PROD_SOURCE_DIR}/deploy/prod-source-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-task168.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-task168-common.sh" \
+  "${PROD_SOURCE_DIR}/deploy/web-replicas-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/rollback-prod.sh" \
   "${PROD_MANIFEST_FILE}"; do
   if [[ ! -f "${required_path}" ]]; then
@@ -149,6 +150,9 @@ env_value() {
 V1_DB_USER="$(env_value V1_DB_USER)"
 V1_DB_NAME="$(env_value V1_DB_NAME)"
 V1_DB_HOST="$(env_value V1_DB_HOST)"
+# 웹 컨테이너 개수. 비어 있으면 1 이고, 2 는 4GB 이상 호스트에서만 켜진다(web-replicas-common.sh).
+V1_WEB_REPLICAS="$(env_value V1_WEB_REPLICAS)"
+configure_web_replicas "${V1_WEB_REPLICAS}" 1 3500000
 
 export COMPOSE_PARALLEL_LIMIT=1
 # --preserve-env 가 반드시 필요하다. docker-compose.prod.yml 은 이미지를
@@ -175,6 +179,7 @@ compose=(
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"
+  ${WEB_COMPOSE_ARGS[@]+"${WEB_COMPOSE_ARGS[@]}"}
 )
 
 assert_compose_variables_resolve "${compose[@]}"
@@ -401,7 +406,7 @@ if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   fi
 fi
 
-"${compose[@]}" up -d
+up_all_services
 
 if [[ -d "${v1_uploads_backup_dir}/uploads" ]]; then
   echo "[prod-deploy] Restoring v1 uploads into the persistent volume..."

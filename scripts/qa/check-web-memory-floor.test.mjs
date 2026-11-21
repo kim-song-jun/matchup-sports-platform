@@ -18,12 +18,17 @@ function fixture(name, body) {
   return path;
 }
 
-function prodCompose({ apiMemory = '512M', webMemory = '768M' } = {}) {
-  const webLimit = webMemory === null ? '' : `    deploy:
+function limitBlock(memory) {
+  return memory === null ? '' : `    deploy:
       resources:
         limits:
-          memory: ${webMemory}
+          memory: ${memory}
 `;
+}
+
+function prodCompose({ apiMemory = '512M', webMemory = '768M', webBMemory = '768M' } = {}) {
+  const webLimit = limitBlock(webMemory);
+  const webBLimit = limitBlock(webBMemory);
   return `services:
   v1_api:
     image: api
@@ -37,6 +42,10 @@ function prodCompose({ apiMemory = '512M', webMemory = '768M' } = {}) {
     ports:
       - "127.0.0.1:3013:3013"
 ${webLimit}
+  v1_web_b:
+    image: web
+    profiles: ["web-pair"]
+${webBLimit}
   nginx:
     image: nginx
     deploy:
@@ -69,6 +78,32 @@ test('웹 한도가 하한 미만(512M, 사고 당시 값)이면 위반으로 �
   assert.match(violations[0], /512MiB.*768MiB/);
 });
 
+test('둘째 웹(v1_web_b)만 하한 아래여도 잡는다 — 첫째 웹 값으로 덮이지 않는다', () => {
+  const prod = fixture('prod.yml', prodCompose({ webMemory: '768M', webBMemory: '256M' }));
+  const violations = findWebMemoryViolations(prod, fixture('alpha.yml', ALPHA_WITHOUT_LIMIT));
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /v1_web_b.*256MiB/);
+});
+
+test('prod 의 둘째 웹에 한도가 없으면 던진다', () => {
+  const prod = fixture('prod.yml', prodCompose({ webBMemory: null }));
+  assert.throws(() => findWebMemoryViolations(prod, fixture('alpha.yml', ALPHA_WITHOUT_LIMIT)), /v1_web_b.*limits\.memory 가 없습니다/);
+});
+
+test('alpha override 가 둘째 웹 한도를 하한 아래로 정하면 잡는다', () => {
+  const alpha = `services:
+  v1_web_b:
+    image: alpha-web
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+`;
+  const violations = findWebMemoryViolations(fixture('prod.yml', prodCompose()), fixture('alpha.yml', alpha));
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /v1_web_b.*384MiB/);
+});
+
 test('웹 한도가 하한 이상이면 통과한다 — 하한 값 자체와 더 큰 값 모두', () => {
   for (const webMemory of ['768M', '1G']) {
     const prod = fixture('prod.yml', prodCompose({ webMemory }));
@@ -78,9 +113,9 @@ test('웹 한도가 하한 이상이면 통과한다 — 하한 값 자체와 �
 
 test('다른 서비스의 한도를 웹 한도로 읽지 않는다 — 웹만 낮을 때와 웹만 높을 때 모두', () => {
   const lowWeb = fixture('low.yml', prodCompose({ apiMemory: '1G', webMemory: '512M' }));
-  assert.equal(readWebMemoryMib(lowWeb, { required: true }), 512);
+  assert.equal(readWebMemoryMib(lowWeb, 'v1_web', { required: true }), 512);
   const highWeb = fixture('high.yml', prodCompose({ apiMemory: '512M', webMemory: '768M' }));
-  assert.equal(readWebMemoryMib(highWeb, { required: true }), 768);
+  assert.equal(readWebMemoryMib(highWeb, 'v1_web', { required: true }), 768);
 });
 
 test('prod 의 웹에 한도가 없으면 조용히 통과하지 않고 던진다', () => {
@@ -104,5 +139,6 @@ test('alpha override 가 웹 한도를 하한 아래로 다시 정하면 잡는�
 
 test('실제 compose 파일이 하한을 지킨다', () => {
   assert.deepEqual(findWebMemoryViolations(), []);
-  assert.ok(readWebMemoryMib('deploy/docker-compose.prod.yml', { required: true }) >= WEB_MEMORY_FLOOR_MIB);
+  assert.ok(readWebMemoryMib('deploy/docker-compose.prod.yml', 'v1_web', { required: true }) >= WEB_MEMORY_FLOOR_MIB);
+  assert.ok(readWebMemoryMib('deploy/docker-compose.prod.yml', 'v1_web_b', { required: true }) >= WEB_MEMORY_FLOOR_MIB);
 });

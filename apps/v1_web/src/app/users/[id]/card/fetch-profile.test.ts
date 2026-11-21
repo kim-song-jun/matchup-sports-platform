@@ -59,7 +59,7 @@ describe('fetchPublicProfileForOg', () => {
 
     await fetchPublicProfileForOg('u-1', 'no-store');
 
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), { cache: 'no-store' });
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }));
   });
 
   it('실패를 조용히 삼키지 않는다 -- 원인이 로그에 남아야 다음에 볼 수 있다', async () => {

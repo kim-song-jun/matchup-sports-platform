@@ -91,6 +91,29 @@ describe('fetchPublicV1 cache policy', () => {
     );
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('next');
   });
+
+  it.each([404, 503])('closes the unread body of a %s answer', async (status) => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status, ok: false, body: { cancel } }));
+
+    await fetchPublicV1('/matches/m-1').catch(() => null);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on an API that never answers instead of waiting for the server default', async () => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const real = AbortSignal.timeout.bind(AbortSignal);
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(20));
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    })));
+
+    await expect(fetchPublicV1('/matches/m-1')).rejects.toMatchObject({ name: 'TimeoutError' });
+    expect(timeoutSpy).toHaveBeenCalledWith(4000);
+    timeoutSpy.mockRestore();
+  });
 });
 
 describe('teamDescriptionFallback', () => {

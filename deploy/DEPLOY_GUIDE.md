@@ -168,6 +168,20 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 | `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET` | 결제 연동 |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (`WebPushService`); 셋 중 하나라도 비어 있으면 graceful disable. 생성·회전 절차는 `docs/ops/vapid-setup.md` 참조 |
 
+### 웹 컨테이너 개수(`V1_WEB_REPLICAS`)
+
+| 값 | 동작 |
+|---|---|
+| 비어 있음 / `1` (운영 기본) | 웹 컨테이너 `v1_web` 하나. 배포 명령·nginx 설정은 개수 도입 전과 같다 |
+| `2` (alpha 기본) | `v1_web`, `v1_web_b` 둘. 배포·롤백이 하나씩 다시 만들고 healthy 를 기다린 뒤 nginx 를 reload 해 다음으로 넘어간다 |
+
+- 다른 값과, 메모리가 모자란 호스트(운영 3.5GB 미만 · alpha 1.8GB 미만)의 `2` 는 배포 스크립트가 컨테이너를 건드리기 전에 거절한다.
+- 켜는 방법: 운영은 서버를 4GB 로 올린 뒤 `deploy/.env` 에 `V1_WEB_REPLICAS=2` 를 넣고 다음 배포를 한다. 끄는 방법은 값을 지우거나 `1` 로 바꾸는 것이고, 남은 `teameet_v1_web_b` 는 그 배포가 지운다.
+- nginx 설정은 `deploy/nginx-web/<개수>/` 의 `upstream.conf`·`failover.conf`·`static-failover.conf` 를 compose 가 마운트하고 `nginx.conf`·`nginx.alpha.conf` 가 include 한다. 개수 2 의 재시도(`proxy_next_upstream`)는 연결 실패·타임아웃·502/503/504 를 다른 웹으로 넘긴다. POST 같은 멱등하지 않은 요청은 upstream 에 보낸 뒤에는 nginx 가 넘기지 않는다.
+- 이미지 캐시 볼륨(`v1_web_image_cache`, `v1_web_b_image_cache`)은 컨테이너마다 따로다. Next 이미지 최적화기가 캐시 파일을 잠금 없이 쓰기 때문이다. 업로드 볼륨은 API 만 쓰므로 웹 둘이 공유할 것이 없다.
+- 남는 끊김: 배포마다 nginx 컨테이너를 다시 만들기 때문에(릴리스 헤더 파일을 새로 읽어야 한다) 그 순간 1~2초는 웹과 API 모두 끊긴다. API 는 컨테이너가 하나라 교체 중 몇 초 끊긴다.
+- 롤백 대상 릴리스가 `v1_web_b` 를 모르는 옛 소스면 스크립트가 그 소스의 서비스만 올리고 남은 `v1_web_b` 컨테이너를 지운다.
+
 `v1_web`의 브라우저 API URL은 이미지 빌드 시 `/api/v1`로 고정한다. 배포 환경에 별도 Web base path를 설정하지 않는다.
 
 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`는 **production(`deploy.yml`)에서만** GitHub Actions secret → `deploy/.env` 동기화 대상이다(4절 표, `sync_env_from_github_secret` 패턴). **Alpha(`deploy-alpha.yml` / `deploy/deploy-alpha.sh`)에는 의도적으로 배선하지 않는다** — alpha의 `deploy/.env`는 operator-managed 파일이고, CI는 `scripts/release/sync-alpha-*-env.sh`가 맡은 키(문의 Slack·APNs·카카오 로그인 `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`/`KAKAO_REDIRECT_URI`/`KAKAO_APP_ID`, 선택으로 `KAKAO_ADMIN_KEY`)만 SSM을 거쳐 고쳐 쓴다. `GA_ALPHA`가 따로인 이유는 Web 빌드 시점에 `NEXT_PUBLIC_GA_MEASUREMENT_ID` build-arg로 번들에 굽기 위해 SSM 파라미터로 직접 전달되는 것일 뿐 `deploy/.env`에 쓰이지 않기 때문이다. VAPID는 build-arg가 아니라 `v1_api` 컨테이너 런타임 secret이므로 이 경로를 재사용할 수 없다. Alpha에서 Web Push를 켜려면 운영자가 alpha EC2의 `~/teameet/deploy/.env`에 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`를 직접 추가한다(미설정 시 `WebPushService`가 graceful disable되므로 배포 자체는 안전).
@@ -180,7 +194,7 @@ Internet :80/:443
       nginx
        |  \
        |   +-- /api/v1/*, /uploads/* --> v1_api:8121 --> v1_postgres:5432
-       +------ /, /_next/static/* ------> v1_web:3013
+       +------ /, /_next/static/* ------> v1_web:3013 (V1_WEB_REPLICAS=2 이면 v1_web_b:3013 과 나눠 받는다)
 ```
 
 호스트에는 API `8121`과 Web `3013`이 loopback으로만 노출된다. 외부 요청은 Nginx를 통해서만 받는다.

@@ -118,6 +118,10 @@ touch "${WORK}/fail/teameet_v1_web"
 run 1200
 expect_restarts "teameet_v1_web,teameet_v1_api" "한 컨테이너 재시작이 실패해도 나머지는 이어서 처리한다"
 [[ "${RC}" == 1 ]] || fail "재시작 실패: 종료 코드 기대 1 실제 ${RC}"
+rm -f "${WORK}/fail/teameet_v1_web"
+run 1210
+expect_restarts "teameet_v1_web,teameet_v1_api,teameet_v1_web" "재시작이 실패하면 유예를 다시 세지 않고 쿨다운도 없이 다음 실행이 바로 재시도한다"
+[[ "${RC}" == 0 ]] || fail "재시도 성공: 종료 코드 기대 0 실제 ${RC}"
 
 reset
 set_status teameet_v1_web unhealthy

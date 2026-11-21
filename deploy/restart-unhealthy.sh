@@ -12,7 +12,7 @@ set -Eeuo pipefail
 #   - 대상은 앱 컨테이너(웹·API·워커)만이다. nginx 와 postgres 는 건드리지 않는다.
 #   - unhealthy 가 UNHEALTHY_GRACE_SECONDS 이상 이어진 컨테이너만 `docker restart` 한다.
 #     처음 본 시각을 STATE_DIR 에 적어 두고, 다시 healthy/starting 이 되면 지운다.
-#   - 같은 컨테이너는 RESTART_COOLDOWN_SECONDS 안에 두 번 다시 띄우지 않는다. DB 가 죽어서 API 가
+#   - 같은 컨테이너는 (성공한 재시작 뒤) RESTART_COOLDOWN_SECONDS 안에 두 번 다시 띄우지 않는다. DB 가 죽어서 API 가
 #     unhealthy 인 때처럼 재시작이 해결책이 아닌 경우에 재시작 폭풍이 되지 않게 한다.
 #   - 배포가 진행 중이면(배포 잠금을 다른 프로세스가 쥐고 있으면) 아무것도 하지 않는다. 잠금은 비었는지
 #     확인한 직후 놓는다 — 쥔 채로 재시작하면 그 사이 시작한 배포·롤백(`flock -n`)이 바로 실패한다.
@@ -92,9 +92,11 @@ for name in ${CONTAINERS}; do
   fi
 
   log "${name}: ${elapsed}초째 unhealthy — 다시 띄워요"
-  echo "${NOW_EPOCH}" > "${restarted_file}"
-  rm -f "${seen_file}"
-  if ! "${DOCKER_BIN}" restart "${name}" >/dev/null; then
+  if "${DOCKER_BIN}" restart "${name}" >/dev/null; then
+    echo "${NOW_EPOCH}" > "${restarted_file}"
+    rm -f "${seen_file}"
+  else
+    # 실패한 재시작은 유예도 쿨다운도 새로 세지 않는다 — 다음 실행이 바로 다시 시도한다.
     log "${name}: docker restart 가 실패했어요"
     failed=1
   fi

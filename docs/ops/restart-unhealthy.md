@@ -11,7 +11,7 @@
 - `unhealthy` 가 120초 이상 이어진 컨테이너만 `docker restart` 해요. Docker 가 `unhealthy` 로 표시하는 데도 연속 실패가
   필요해서(웹 약 2분), 실제로는 약 4분 안팎에 다시 떠요. 중간에 `healthy` · `starting` 이 되면 세던 시간을 지워요.
 - 같은 컨테이너는 600초 안에 두 번 다시 띄우지 않아요. DB 가 죽어 API 가 unhealthy 인 때처럼 재시작이 해결책이 아닌 경우에
-  재시작이 반복되지 않게 해요.
+  재시작이 반복되지 않게 해요. `docker restart` 가 실패하면 세던 시간도 쿨다운도 그대로 두고 다음 실행(30초 뒤)이 바로 다시 시도해요.
 - 배포 잠금을 배포·롤백이 쥐고 있으면 아무것도 하지 않아요. 잠금 파일은 읽기로만 열고 새로 만들지 않아요. 잠금이 비었는지
   본 직후 놓아서, 재시작하는 동안 시작한 배포·롤백이 막히지 않아요. 잠금 경로는 서버마다 달라서(운영
   `/home/ec2-user/.teameet-prod-deploy.lock`, alpha `/home/ec2-user/.teameet-alpha-deploy.lock`) `DEPLOY_LOCK_FILE` 을

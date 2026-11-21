@@ -2,6 +2,7 @@
 # 배포가 nginx 를 다시 만들지 않고 설정만 다시 읽히는 계약(deploy/web-replicas-common.sh 의 nginx-live)을 실제 nginx 로 본다.
 # - sync_prod_nginx_config · sync_alpha_nginx_config 가 채우는 폴더가 compose 의 nginx-live 마운트와 정확히 맞고 nginx -t 를 통과한다.
 # - 같은 컨테이너에 새 릴리스 파일을 채우고 reload 하면 새 헤더·새 upstream 을 읽고, 그동안 요청이 끊기지 않으며 컨테이너는 그대로다.
+# - seed 는 빈 폴더만 채우고, 릴리스 링크를 바꿔도 compose 의 nginx 정의 해시는 그대로다(이미지가 바뀌면 바뀐다).
 # - nginx-live 링크가 없는 옛 릴리스 소스는 건드리지 않는다.
 # docker(compose v2)·jq 가 필요하다. nginx 는 compose 에 고정된 이미지를 쓴다(NGINX_TEST_IMAGE 로 바꿀 수 있다).
 set -Eeuo pipefail
@@ -96,7 +97,7 @@ for env in prod alpha; do
   for replicas in 1 2; do
     rm -rf "${WORK}/runtime/nginx" && mkdir -p "${WORK}/runtime/nginx"
     configure_web_replicas "${replicas}" 1 1800000
-    "sync_${env}_nginx_config" >/dev/null
+    "sync_${env}_nginx_config" full >/dev/null
     synced="$(cd "${WORK}/runtime/nginx" && \ls -1 | sort | tr '\n' ' ')"
     mounted="$(mounted_live_dirs "${env}")"
     if [[ -n "${synced}" && "${synced}" == "${mounted}" ]]; then
@@ -123,25 +124,49 @@ done
 echo '[nginx-live] 파일 권한·옛 파일 정리·마운트 폴더 유지'
 configure_web_replicas 1 1 1800000
 rm -rf "${WORK}/runtime/nginx" && mkdir -p "${WORK}/runtime/nginx"
-sync_prod_nginx_config >/dev/null
+sync_prod_nginx_config full >/dev/null
 inode_before="$(\ls -di "${WORK}/runtime/nginx/conf.d" | awk '{ print $1 }')"
 touch "${WORK}/runtime/nginx/conf.d/stale.conf"
-sync_prod_nginx_config >/dev/null
+sync_prod_nginx_config full >/dev/null
 inode_after="$(\ls -di "${WORK}/runtime/nginx/conf.d" | awk '{ print $1 }')"
 [[ "${inode_before}" == "${inode_after}" ]] && pass '다시 채워도 마운트되는 폴더는 같은 폴더다' || fail '다시 채우자 conf.d 폴더가 바뀌었다'
 [[ ! -e "${WORK}/runtime/nginx/conf.d/stale.conf" ]] && pass '원본에 없는 파일은 지운다' || fail '옛 파일이 남았다'
 mode="$(stat -c '%a' "${WORK}/runtime/nginx/aasa/apple-app-site-association" 2>/dev/null ||
   stat -f '%Lp' "${WORK}/runtime/nginx/aasa/apple-app-site-association")"
 [[ "${mode}" == 644 ]] && pass '정적 파일은 nginx 작업자가 읽을 수 있다(644)' || fail "정적 파일 권한이 ${mode} 다"
-if sync_nginx_live_config "${WORK}/teameet/deploy" 'conf.d/../../x=nginx.conf' 2>/dev/null; then
+if sync_nginx_live_config full "${WORK}/teameet/deploy" 'conf.d/../../x=nginx.conf' 2>/dev/null; then
   fail '폴더 밖을 가리키는 대상을 받아들였다'
 else
   pass '폴더 밖을 가리키는 대상은 거절한다'
 fi
 
+echo '[nginx-live] seed 는 비어 있는 폴더만 채운다'
+configure_web_replicas 1 1 1800000
+sync_prod_nginx_config full >/dev/null
+rm -rf "${WORK}/runtime/nginx/aasa"
+configure_web_replicas 2 1 1800000
+sync_prod_nginx_config seed >/dev/null
+cmp -s "${WORK}/runtime/nginx/web/upstream.conf" "${ROOT_DIR}/deploy/nginx-web/1/upstream.conf" &&
+  pass '채워진 web 폴더는 그대로(웹 교체 중 reload 가 옛 upstream 을 읽는다)' || fail 'seed 가 채워진 web 폴더를 바꿨다'
+[[ -f "${WORK}/runtime/nginx/aasa/apple-app-site-association" ]] && pass '빈 폴더는 채운다' || fail 'seed 가 빈 aasa 폴더를 채우지 않았다'
+configure_web_replicas 1 1 1800000
+
+echo '[nginx-live] 릴리스 링크를 바꿔도 compose 의 nginx 정의 해시는 그대로다'
+nginx_hash() { docker compose -f "${WORK}/teameet/deploy/docker-compose.prod.yml" --env-file "${WORK}/env" config --hash nginx | awk '{ print $2 }'; }
+release_b="${WORK}/sources/release-b"
+cp -R "${release}" "${release_b}"
+rm -f "${release_b}/deploy/nginx-live" && ln -s "${WORK}/runtime/nginx" "${release_b}/deploy/nginx-live"
+hash_a="$(nginx_hash)"
+ln -sfn "${release_b}" "${WORK}/teameet"
+hash_b="$(nginx_hash)"
+[[ -n "${hash_a}" && "${hash_a}" == "${hash_b}" ]] && pass '릴리스만 바뀌면 compose 는 nginx 를 다시 만들지 않는다' || fail "릴리스를 바꾸자 해시가 바뀌었다 (${hash_a} → ${hash_b})"
+sed -i.bak 's|^    image: nginx:.*|    image: nginx:9.9.9-alpine|' "${release_b}/deploy/docker-compose.prod.yml"
+[[ "$(nginx_hash)" != "${hash_a}" ]] && pass 'nginx 이미지가 바뀌면 해시가 바뀐다(compose 가 다시 만든다)' || fail '이미지가 바뀌어도 해시가 같다'
+ln -sfn "${release}" "${WORK}/teameet"
+
 echo '[nginx-live] 같은 컨테이너에서 reload 로 새 릴리스를 읽는다'
 write_meta c1
-sync_prod_nginx_config >/dev/null
+sync_prod_nginx_config full >/dev/null
 nginx_mounts prod
 docker run -d --name "${NAME}" --add-host v1_web:127.0.0.1 --add-host v1_web_b:127.0.0.1 --add-host v1_api:127.0.0.1 \
   -p 127.0.0.1::443 "${MOUNTS[@]}" -v "${WORK}/stub.conf:/stub.conf:ro" \
@@ -165,11 +190,13 @@ codes="${WORK}/codes"
 load_pid=$!
 write_meta c2
 configure_web_replicas 2 1 1800000
-sync_prod_nginx_config >/dev/null
+sync_prod_nginx_config full >/dev/null
 docker exec "${NAME}" nginx -t >/dev/null 2>&1 && docker exec "${NAME}" nginx -s reload >/dev/null 2>&1
 for _ in $(seq 1 25); do [[ "$(commit_of)" == c2 ]] && break; sleep 0.2; done
 wait "${load_pid}"
 [[ "$(commit_of)" == c2 ]] && pass 'reload 뒤 c2 헤더' || fail 'reload 뒤에도 c2 헤더가 아니다'
+[[ "$(docker exec "${NAME}" cat "/etc/nginx/conf.d/${NGINX_SYNC_MARKER}")" == "$(cat "${WORK}/runtime/nginx/conf.d/${NGINX_SYNC_MARKER}")" ]] &&
+  pass '컨테이너가 이번 채우기 표식을 본다(apply_nginx_config 가 reload 를 고르는 근거)' || fail '컨테이너가 이번 표식을 보지 못한다'
 servers="$(docker exec "${NAME}" nginx -T 2>/dev/null | awk '/^upstream v1_web \{/ { u = 1 } u && /server / { n++ } u && /^\}/ { u = 0 } END { print n + 0 }')"
 [[ "${servers}" == 2 ]] && pass 'reload 뒤 upstream 은 웹 2개' || fail "reload 뒤 upstream 서버 ${servers}개"
 [[ "$(docker inspect --format '{{.State.StartedAt}}' "${NAME}")" == "${started_before}" ]] &&
@@ -183,7 +210,7 @@ legacy="${WORK}/legacy"
 mkdir -p "${legacy}/runtime-untouched"
 cp -R "${ROOT_DIR}/deploy" "${legacy}/deploy"
 if nginx_live_layout "${legacy}/deploy"; then fail '링크 없는 소스를 새 방식으로 봤다'; else pass '링크 없는 소스는 옛 방식'; fi
-sync_nginx_live_config "${legacy}/deploy" conf.d/default.conf=nginx.conf >/dev/null &&
+sync_nginx_live_config full "${legacy}/deploy" conf.d/default.conf=nginx.conf >/dev/null &&
   [[ ! -e "${legacy}/deploy/nginx-live" ]] && pass '옛 소스에는 아무것도 만들지 않는다' || fail '옛 소스에 nginx-live 를 만들었다'
 
 if (( failures > 0 )); then echo "[nginx-live] ${failures}건 실패" >&2; exit 1; fi

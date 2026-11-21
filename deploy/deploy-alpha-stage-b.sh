@@ -529,12 +529,12 @@ compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
     activation_step="write-metadata"
     write_release_metadata "${ALPHA_MANIFEST_FILE}"
 
-    activation_step="sync-nginx-config"
-    sync_alpha_nginx_config
+    activation_step="seed-nginx-config"
+    sync_alpha_nginx_config seed
 
     activation_step="compose-up"
     up_app_containers --force-recreate
-    apply_nginx_config "${ALPHA_LIVE_DIR}/deploy"
+    apply_alpha_nginx_config
 
     # Restore each writer's restart policy from quiesce.json's recorded
     # pre-quiesce value -- compose's own static `restart: always` would

@@ -171,8 +171,9 @@ write_release_metadata() {
 }
 
 # docker-compose.prod.yml·alpha.yml 의 nginx-live 마운트와 짝이다. 웹 개수는 configure_web_replicas 가 정한 값을 쓴다.
+# sync_alpha_nginx_config <seed|full> — 모드는 web-replicas-common.sh 의 sync_nginx_live_config 참고.
 sync_alpha_nginx_config() {
-  sync_nginx_live_config "${ALPHA_LIVE_DIR}/deploy" \
+  sync_nginx_live_config "$1" "${ALPHA_LIVE_DIR}/deploy" \
     conf.d/default.conf=nginx.alpha.conf \
     snippets/teameet-release-metadata.conf=release-metadata.alpha.conf \
     snippets/teameet-security-headers.conf=nginx.security-headers.conf \
@@ -181,6 +182,12 @@ sync_alpha_nginx_config() {
     aasa=aasa \
     maintenance=maintenance \
     "web=nginx-web/${WEB_REPLICAS}"
+}
+
+# 웹 교체가 끝난 뒤 부른다: 이번 릴리스로 채우고 nginx 에 적용한다.
+apply_alpha_nginx_config() {
+  sync_alpha_nginx_config full || return 1
+  apply_nginx_config "${ALPHA_LIVE_DIR}/deploy" || return 1
 }
 
 pull_release_images() {
@@ -298,9 +305,9 @@ restore_active_release() {
   alpha_restore_step load_manifest load_alpha_release_manifest "${active_tmp}" || return 1
   alpha_restore_step pull_images pull_release_images || return 1
   alpha_restore_step write_metadata write_release_metadata "${active_tmp}" || return 1
-  alpha_restore_step sync_nginx_config sync_alpha_nginx_config || return 1
+  alpha_restore_step seed_nginx_config sync_alpha_nginx_config seed || return 1
   alpha_restore_step compose_up_app up_app_containers --force-recreate || return 1
-  alpha_restore_step apply_nginx_config apply_nginx_config "${ALPHA_LIVE_DIR}/deploy" || return 1
+  alpha_restore_step apply_nginx_config apply_alpha_nginx_config || return 1
   alpha_restore_step health_contract wait_for_alpha_health_contract || return 1
   alpha_restore_step assert_digests assert_running_release_digests || return 1
   alpha_restore_step cleanup_tmp rm -f "${active_tmp}" || return 1

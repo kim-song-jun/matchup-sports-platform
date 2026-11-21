@@ -24,7 +24,8 @@ FAKE_ORPHAN=''                 # 남아 있는 v1_web_b 컨테이너 id
 FAKE_WEB_B_IMAGE='img:new'
 FAKE_NGINX_BEFORE='cid-nginx'  # `compose up -d --no-deps nginx` 앞·뒤의 nginx 컨테이너 id
 FAKE_NGINX_AFTER='cid-nginx'
-FAKE_NGINX_RUNNING=true
+FAKE_NGINX_STATUS=running
+FAKE_NGINX_SEEN='marker-1'     # 컨테이너 안에서 읽히는 채우기 표식
 FAKE_NGINX_TEST_FAILS=false    # nginx -t 실패
 fake_compose() {
   case "$1" in
@@ -34,6 +35,10 @@ fake_compose() {
       elif grep -qx 'compose up -d --no-deps nginx' "${LOG}"; then echo "${FAKE_NGINX_AFTER}"
       else echo "${FAKE_NGINX_BEFORE}"; fi ;;
     logs) ;;
+    exec)
+      if [[ "$*" == 'exec -T nginx cat /etc/nginx/conf.d/.teameet-sync-id' ]]; then echo "${FAKE_NGINX_SEEN}"; return 0; fi
+      echo "compose $*" >> "${LOG}"
+      [[ "$*" != 'exec -T nginx nginx -t' || "${FAKE_NGINX_TEST_FAILS}" != true ]] ;;
     *)
       echo "compose $*" >> "${LOG}"
       [[ "$*" != 'exec -T nginx nginx -t' || "${FAKE_NGINX_TEST_FAILS}" != true ]] ;;
@@ -45,7 +50,7 @@ fake_docker() {
       case "$*" in
         *Health.Status*) [[ " ${FAKE_UNHEALTHY} " == *" ${4#cid-} "* ]] && echo starting || echo healthy ;;
         *Config.Image*) echo "${FAKE_WEB_B_IMAGE}" ;;
-        *State.Running*) echo "${FAKE_NGINX_RUNNING}" ;;
+        *State.Status*) echo "${FAKE_NGINX_STATUS}" ;;
       esac ;;
     ps) echo "${FAKE_ORPHAN}" ;;
     rm) echo "docker $*" >> "${LOG}" ;;
@@ -128,19 +133,22 @@ assert_extra_web_images 'img:new' && pass '같은 이미지는 통과' || fail '
 if assert_extra_web_images 'img:old'; then fail '옛 이미지가 남았는데 통과했다'; else pass '옛 이미지 거절'; fi
 
 echo '[web-replicas] nginx 설정 적용: 다시 만들지 reload 할지'
-for case_ in 'cid-a cid-a true reload' 'cid-a cid-b true none' "'' cid-b true none" "cid-a '' false recreate" 'cid-a cid-a false recreate'; do
+for case_ in 'cid-a cid-a running true reload' 'cid-a cid-b running true none' "'' cid-b running true none" \
+  "cid-a '' missing false recreate" 'cid-a cid-a exited true recreate' 'cid-a cid-a restarting true recreate' \
+  'cid-a cid-a running false recreate'; do
   eval "set -- ${case_}"
-  [[ "$(nginx_apply_action "$1" "$2" "$3")" == "$4" ]] && pass "앞 '$1' 뒤 '$2' running=$3 → $4" || fail "앞 '$1' 뒤 '$2' running=$3 → $4 가 아니다"
+  [[ "$(nginx_apply_action "$1" "$2" "$3" "$4")" == "$5" ]] && pass "앞 '$1' 뒤 '$2' $3 표식 $4 → $5" || fail "앞 '$1' 뒤 '$2' $3 표식 $4 → $5 가 아니다"
 done
 LIVE_DEPLOY="$(mktemp -d)"
 LEGACY_DEPLOY="$(mktemp -d)"
 trap 'rm -rf "${LOG}" "${LIVE_DEPLOY}" "${LEGACY_DEPLOY}"' EXIT
-mkdir "${LIVE_DEPLOY}/runtime-nginx"
+mkdir -p "${LIVE_DEPLOY}/runtime-nginx/conf.d"
 ln -s "${LIVE_DEPLOY}/runtime-nginx" "${LIVE_DEPLOY}/nginx-live"
+echo marker-1 > "${LIVE_DEPLOY}/runtime-nginx/conf.d/.teameet-sync-id"
 
 : > "${LOG}"
 apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
-expect_log '같은 컨테이너가 그대로면 nginx -t 뒤 reload 만 한다' 'compose up -d --no-deps nginx
+expect_log '같은 컨테이너가 지금 폴더를 보면 nginx -t 뒤 reload 만 한다' 'compose up -d --no-deps nginx
 compose exec -T nginx nginx -t
 compose exec -T nginx nginx -s reload'
 
@@ -149,11 +157,17 @@ apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
 expect_log 'compose 가 서비스 정의 변경으로 새로 만들었으면 reload 하지 않는다' 'compose up -d --no-deps nginx'
 FAKE_NGINX_AFTER='cid-nginx'
 
-: > "${LOG}"; FAKE_NGINX_RUNNING=false
+: > "${LOG}"; FAKE_NGINX_SEEN='marker-old'
 apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
-expect_log '같은 컨테이너가 멈춰 있으면 다시 만든다' 'compose up -d --no-deps nginx
+expect_log '컨테이너가 다른 폴더(옛 클론 등)에 묶여 있으면 다시 만든다' 'compose up -d --no-deps nginx
 compose up -d --force-recreate --no-deps nginx'
-FAKE_NGINX_RUNNING=true
+FAKE_NGINX_SEEN='marker-1'
+
+: > "${LOG}"; FAKE_NGINX_STATUS=restarting
+apply_nginx_config "${LIVE_DEPLOY}" >/dev/null
+expect_log '같은 컨테이너가 재시작 중이면 다시 만든다' 'compose up -d --no-deps nginx
+compose up -d --force-recreate --no-deps nginx'
+FAKE_NGINX_STATUS=running
 
 : > "${LOG}"; FAKE_NGINX_TEST_FAILS=true
 if apply_nginx_config "${LIVE_DEPLOY}" >/dev/null 2>&1; then fail 'nginx -t 가 실패했는데 성공했다'; else pass 'nginx -t 가 실패하면 실패'; fi

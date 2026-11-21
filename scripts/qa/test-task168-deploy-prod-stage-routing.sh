@@ -88,8 +88,8 @@ wait_for_prod_health_contract() { printf '%s\n' HEALTH >> "${events}"; }
 assert_running_release_digests() { printf '%s\n' DIGEST >> "${events}"; }
 promote_candidate_manifest() { printf '%s\n' PROMOTE >> "${events}"; }
 write_legacy_release_state() { printf '%s\n' LEGACY_STATE >> "${events}"; }
-sync_prod_nginx_config() { printf '%s\n' SYNC_NGINX >> "${events}"; }
-PROD_LIVE_DIR="${scenario_dir}"
+sync_prod_nginx_config() { printf '%s\n' "SYNC_NGINX:\$1" >> "${events}"; }
+apply_prod_nginx_config() { printf '%s\n' APPLY_NGINX >> "${events}"; }
 assert_task168_m11_guard() { printf '%s\n' M11_GUARD >> "${events}"; }
 task168_stage="${stage}"
 PROD_MANIFEST_FILE="${manifest_file}"

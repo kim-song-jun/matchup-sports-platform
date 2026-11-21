@@ -649,6 +649,20 @@ test('릴리스 소스 파일을 직접 마운트하는 nginx 볼륨만 잡는�
   ]);
 });
 
+test('해석하지 못한 볼륨 줄과 .. 로 빠져나가는 경로는 통과시키지 않는다', () => {
+  const compose = composeWithNginxMount([
+    '      - "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"',
+    '      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro # 줄 끝 주석',
+    '      - type: bind',
+    '      - ./nginx-live/../nginx.conf:/etc/nginx/x.conf:ro',
+    '      - ./certbot/../nginx.conf:/etc/nginx/y.conf:ro',
+  ].join('\n'));
+  const problems = findNginxReleasePinnedMounts(compose);
+  assert.equal(problems.filter((p) => p.startsWith('해석하지 못한 볼륨')).length, 3, problems.join('\n'));
+  assert.ok(problems.includes('./nginx-live/../nginx.conf:/etc/nginx/x.conf'));
+  assert.ok(problems.includes('./certbot/../nginx.conf:/etc/nginx/y.conf'));
+});
+
 test('실제 prod·alpha compose 의 nginx 는 릴리스 소스 파일을 직접 마운트하지 않는다', () => {
   for (const rel of ['deploy/docker-compose.prod.yml', 'deploy/docker-compose.alpha.yml']) {
     assert.deepEqual(findNginxReleasePinnedMounts(readFileSync(rel, 'utf8')), [], rel);
@@ -677,7 +691,18 @@ test('nginx 강제 재생성은 restore_legacy_runtime 안에서만 허용한다
     '"${compose[@]}" up -d --force-recreate --no-deps v1_api',
   ].join('\n');
   assert.deepEqual(findNginxForceRecreate(script), [6, 8]);
-  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh', 'deploy/prod-release-common.sh', 'deploy/deploy-alpha.sh', 'deploy/rollback-alpha.sh', 'deploy/alpha-release-common.sh', 'deploy/deploy-alpha-stage-b.sh']) {
+  const wrapped = [
+    '"${compose[@]}" up -d --force-recreate \\',
+    '  --no-deps nginx',
+    '"${compose[@]}" restart nginx',
+    'sudo docker restart teameet_nginx',
+    'apply_nginx_config() {',
+    '  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1',
+    '}',
+    'ln -s x deploy/nginx-live --force-recreate',
+  ].join('\n');
+  assert.deepEqual(findNginxForceRecreate(wrapped), [1, 3, 4]);
+  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh', 'deploy/prod-release-common.sh', 'deploy/deploy-alpha.sh', 'deploy/rollback-alpha.sh', 'deploy/alpha-release-common.sh', 'deploy/deploy-alpha-stage-b.sh', 'deploy/web-replicas-common.sh']) {
     assert.deepEqual(findNginxForceRecreate(readFileSync(rel, 'utf8')), [], rel);
   }
 });

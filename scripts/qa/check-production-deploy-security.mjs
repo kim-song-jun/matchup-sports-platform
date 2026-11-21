@@ -269,23 +269,29 @@ export function findNginxImageProblem(compose) {
 }
 
 const nginxBlock = (compose) => compose.match(/^  nginx:\n((?:(?:[ ]{3,}.*)?\n)*)/m)?.[1] ?? '';
-const nginxVolumes = (compose) =>
-  [...nginxBlock(compose).matchAll(/^\s+-\s*(\S+?):(\/[^\s:]+)(?::(\S+))?\s*$/gm)].map(([, source, target, options]) => ({
-    source,
-    target,
-    readOnly: (options ?? '').split(',').includes('ro'),
-  }));
+// nginx 의 volumes 목록 항목. 따옴표 없는 짧은 문법 `./원본|/원본:대상[:옵션]` 만 해석하고, 나머지 줄은 parsed:false 로 남긴다.
+const nginxVolumes = (compose) => {
+  const list = nginxBlock(compose).match(/^ {4}volumes:\n((?: {6}(?:-.*|#.*)?\n|\s*\n)*)/m)?.[1] ?? '';
+  return list
+    .split('\n')
+    .filter((line) => /^\s+-/.test(line))
+    .map((line) => {
+      const m = line.match(/^\s+-\s*((?:\.\/|\/)\S*?):(\/[^\s:]+)(?::(\S+))?\s*$/);
+      if (!m) return { parsed: false, line: line.trim() };
+      return { parsed: true, source: m[1], target: m[2], readOnly: (m[3] ?? '').split(',').includes('ro') };
+    });
+};
 
 // nginx 설정 폴더는 읽기 전용으로 마운트한다. 쓰기 가능하면 이미지 entrypoint 가 시작할 때 default.conf 를 고친다.
 export function findNginxConfMountProblem(compose) {
-  const mount = nginxVolumes(compose).find(({ target }) => target === '/etc/nginx/conf.d');
+  const mount = nginxVolumes(compose).find(({ parsed, target }) => parsed && target === '/etc/nginx/conf.d');
   if (!mount) return 'nginx 서비스의 /etc/nginx/conf.d 마운트를 찾지 못했습니다';
   return mount.readOnly ? null : `nginx conf.d 마운트 ${mount.source} 가 읽기 전용(:ro)이 아닙니다`;
 }
 
 // upstream·재시도 설정은 배포가 웹 개수에 맞춰 nginx-live/web 에 채운다(sync_*_nginx_config).
 export function findNginxWebMountProblem(compose) {
-  const mount = nginxVolumes(compose).find(({ target }) => target === '/etc/nginx/teameet-web');
+  const mount = nginxVolumes(compose).find(({ parsed, target }) => parsed && target === '/etc/nginx/teameet-web');
   if (!mount) return 'nginx 서비스의 /etc/nginx/teameet-web 마운트를 찾지 못했습니다';
   if (!mount.readOnly) return `nginx teameet-web 마운트 ${mount.source} 가 읽기 전용(:ro)이 아닙니다`;
   return mount.source === './nginx-live/web' ? null : `nginx teameet-web 마운트 ${mount.source} 가 ./nginx-live/web 이 아닙니다`;
@@ -294,10 +300,14 @@ export function findNginxWebMountProblem(compose) {
 // 릴리스 소스 안의 파일·폴더를 직접 마운트하면 컨테이너가 만들 때의 릴리스에 묶여 reload 로 새 릴리스를 못 읽는다.
 // 릴리스 소스 기준 경로(./)는 고정 런타임 폴더로 가는 ./nginx-live/·./certbot/ 아래만 허용한다.
 export function findNginxReleasePinnedMounts(compose) {
-  return nginxVolumes(compose)
-    .filter(({ source }) => source.startsWith('./'))
-    .filter(({ source, readOnly }) => !(source.startsWith('./nginx-live/') && readOnly) && !source.startsWith('./certbot/'))
-    .map(({ source, target }) => `${source}:${target}`);
+  return nginxVolumes(compose).flatMap((volume) => {
+    if (!volume.parsed) return [`해석하지 못한 볼륨 ${volume.line}`];
+    const { source, target, readOnly } = volume;
+    if (!source.startsWith('./')) return [];
+    const fixed = !source.split('/').includes('..') &&
+      ((source.startsWith('./nginx-live/') && readOnly) || source.startsWith('./certbot/'));
+    return fixed ? [] : [`${source}:${target}`];
+  });
 }
 
 // 운영 서버(2GB)는 웹 둘이 메모리를 넘기므로 V1_WEB_REPLICAS 가 비면 웹 하나여야 한다.
@@ -308,17 +318,27 @@ export function findProdWebReplicasDefaultProblem(script) {
 }
 
 // 배포마다 nginx 를 다시 만들면 그동안 앞단이 끊긴다. apply_nginx_config(web-replicas-common.sh)만 다시 만들지 정하고,
-// 예외는 파일을 직접 마운트하던 옛 레이아웃으로 되돌리는 restore_legacy_runtime 하나다.
+// 예외는 파일을 직접 마운트하던 옛 레이아웃으로 되돌리는 restore_legacy_runtime 이다. `\` 로 이은 줄은 한 줄로 본다.
+const NGINX_RECREATE_ALLOWED = new Set(['apply_nginx_config', 'restore_legacy_runtime']);
 export function findNginxForceRecreate(script) {
   let fn = '';
-  return script.split('\n').flatMap((raw, index) => {
-    const line = raw.replace(/^\s*#.*$/, '');
+  const hits = [];
+  const lines = script.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const start = index;
+    let line = lines[index].replace(/^\s*#.*$/, '');
+    while (/\\\s*$/.test(line) && index + 1 < lines.length) {
+      index += 1;
+      line = `${line.replace(/\\\s*$/, ' ')}${lines[index].replace(/^\s*#.*$/, '')}`;
+    }
     const opened = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\(\)\s*\{/);
     if (opened) fn = opened[1];
     else if (/^\}/.test(line)) fn = '';
-    const hit = /--force-recreate/.test(line) && /--no-deps nginx\b/.test(line) && fn !== 'restore_legacy_runtime';
-    return hit ? [index + 1] : [];
-  });
+    const recreate = /--force-recreate\b/.test(line) && /\bnginx\b/.test(line.replace(/nginx-live/g, ''));
+    const restart = /\brestart\b[^|;&]*\bnginx\b/.test(line) || /\bdocker\s+restart\s+teameet_nginx\b/.test(line);
+    if ((recreate || restart) && !NGINX_RECREATE_ALLOWED.has(fn)) hits.push(start + 1);
+  }
+  return hits;
 }
 
 // 웹 컨테이너를 compose up 으로 직접 올리면 두 컨테이너가 한꺼번에 내려간다.
@@ -618,6 +638,17 @@ for (const composePath of ['deploy/docker-compose.prod.yml', 'deploy/docker-comp
   }
   if (pinned.length > 0) {
     errors.push(`${composePath}: nginx 가 릴리스 소스 파일을 직접 마운트합니다(${pinned.join(', ')}) — ./nginx-live/ 아래 읽기 전용으로 옮기세요`);
+  }
+}
+
+{
+  // 웹을 올리는 함수가 있는 공용 파일이라 위의 웹 직접 기동 검사 대상은 아니고, nginx 재생성만 본다.
+  const rel = 'deploy/web-replicas-common.sh';
+  try {
+    const recreates = findNginxForceRecreate(readFileSync(rel, 'utf8'));
+    if (recreates.length > 0) errors.push(`${rel}: nginx 를 apply_nginx_config 밖에서 다시 만듭니다(${recreates.join(', ')}번째 줄)`);
+  } catch (error) {
+    errors.push(`${rel}: 읽지 못해 nginx 재생성을 검사할 수 없습니다 (${error.code ?? error.message})`);
   }
 }
 

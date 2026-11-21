@@ -119,20 +119,26 @@ reload_nginx_upstreams() {
 #
 # 이 링크가 없는 릴리스 소스(이 방식 전에 만든 것 — 복구·롤백 대상일 수 있다)는 파일을 직접 마운트하므로,
 # 그때는 예전처럼 nginx 를 다시 만들어야 새 파일을 읽는다.
+NGINX_SYNC_MARKER=.teameet-sync-id
+
 nginx_live_layout() {
   [[ -L "$1/nginx-live" ]]
 }
 
-# sync_nginx_live_config <deploy 폴더> <대상=원본>...
+# sync_nginx_live_config <seed|full> <deploy 폴더> <대상=원본>...
 # 대상의 첫 경로 조각이 마운트되는 하위 폴더다. 원본이 폴더면 그 안의 파일을, 파일이면 그 파일을 대상 이름으로
-# 둔다(링크는 따라가 내용을 복사한다). 하위 폴더마다 원본에 없는 파일은 지운다. 앱 컨테이너를 바꾸기 전에 부른다 —
-# 서비스 정의가 바뀐 첫 배포에서는 `compose up -d` 가 nginx 를 이 폴더로 새로 만들 수 있다.
+# 둔다(링크는 따라가 내용을 복사한다).
+# - full: 하위 폴더마다 원본과 같게 맞추고(없는 파일은 지운다) conf.d 에 이번 채우기 표식을 남긴다. 적용 직전에 부른다.
+# - seed: 아직 비어 있는 하위 폴더만 채운다. 앱 컨테이너를 바꾸기 전에 부른다 — 서비스 정의가 바뀐 배포에서는
+#   `compose up -d` 가 nginx 를 이 폴더로 먼저 만들 수 있다. 채워진 폴더는 지금 설정 그대로 둔다: 웹 교체 중의
+#   reload 가 새 upstream(예: 아직 없는 v1_web_b)을 읽으면 설정이 거부돼 옛 IP 로 남는다.
 sync_nginx_live_config() {
-  local deploy_dir="$1"
-  shift
+  local mode="$1" deploy_dir="$2"
+  shift 2
   local live="${deploy_dir}/nginx-live"
   local stage pair dest src sub
 
+  [[ "${mode}" == seed || "${mode}" == full ]] || { echo "[${0##*/}] sync_nginx_live_config: 모드는 seed 또는 full" >&2; return 1; }
   if ! nginx_live_layout "${deploy_dir}"; then
     echo "[${0##*/}] 이 릴리스 소스는 nginx-live 를 쓰지 않아 nginx 설정 폴더를 채우지 않습니다"
     return 0
@@ -152,49 +158,61 @@ sync_nginx_live_config() {
       mkdir -p "$(dirname "${stage}/${dest}")" && cp -L "${src}" "${stage}/${dest}"
     fi || { rm -rf "${stage}"; return 1; }
   done
+  if [[ "${mode}" == full ]]; then
+    mkdir -p "${stage}/conf.d" && printf '%s-%s-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" "$$" "${RANDOM}" > "${stage}/conf.d/${NGINX_SYNC_MARKER}" ||
+      { rm -rf "${stage}"; return 1; }
+  fi
   chmod -R u=rwX,go=rX "${stage}" || { rm -rf "${stage}"; return 1; }
   for sub in "${stage}"/*; do
     sub="${sub##*/}"
+    if [[ "${mode}" == seed && -d "${live}/${sub}" && -n "$(\ls -A "${live}/${sub}")" ]]; then
+      continue
+    fi
     install -d -m 755 "${live}/${sub}" &&
       rsync -rpt --delete "${stage}/${sub}/" "${live}/${sub}/" || { rm -rf "${stage}"; return 1; }
   done
   rm -rf "${stage}"
 }
 
-# nginx_apply_action <앞 컨테이너 id> <뒤 컨테이너 id> <뒤 컨테이너 running(true|false)>
-# `compose up -d` 가 같은 컨테이너를 그대로 두었으면 reload, 새로 만들었으면 시작할 때 이미 읽었으므로 none,
-# 같은 컨테이너인데 멈춰 있으면 recreate 다.
+# nginx_apply_action <앞 컨테이너 id> <뒤 컨테이너 id> <뒤 컨테이너 상태> <컨테이너가 이번 표식을 보는가(true|false)>
+# `compose up -d` 가 새로 만들었으면 시작할 때 지금 폴더를 읽었으므로 none, 같은 컨테이너가 돌고 있고 지금 폴더를
+# 보면 reload 다. 멈췄거나 재시작 중이거나, 다른 폴더(이 방식 전에 만든 폴더 등)에 묶여 있으면 recreate 다.
 nginx_apply_action() {
   if [[ -z "$2" ]]; then
     echo recreate
   elif [[ "$1" != "$2" ]]; then
     echo none
-  elif [[ "$3" == true ]]; then
+  elif [[ "$3" == running && "$4" == true ]]; then
     echo reload
   else
     echo recreate
   fi
 }
 
-# nginx 에 지금 릴리스 설정을 적용한다. 컨테이너는 compose 가 서비스 정의(이미지·마운트·포트)가 바뀌었다고
-# 볼 때만 다시 만들고, 그대로면 nginx -t 로 확인한 뒤 reload 한다 — 진행 중인 요청을 끊지 않는다.
+# nginx 에 지금 nginx-live 설정을 적용한다(호출 전에 full 로 채운다). 컨테이너는 compose 가 서비스 정의(이미지·
+# 마운트·포트)가 바뀌었다고 볼 때와 위 recreate 경우에만 다시 만들고, 그 밖에는 nginx -t 로 확인한 뒤 reload 한다.
 apply_nginx_config() {
   local deploy_dir="$1"
-  local before after running action
+  local before after status=missing marker seen_marker seen=false action
 
   if ! nginx_live_layout "${deploy_dir}"; then
     "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
     return 0
   fi
+  marker="$(cat "${deploy_dir}/nginx-live/conf.d/${NGINX_SYNC_MARKER}")" || return 1
   before="$("${compose[@]}" ps -q nginx)" || return 1
   "${compose[@]}" up -d --no-deps nginx || return 1
   after="$("${compose[@]}" ps -q nginx)" || return 1
-  running=false
   if [[ -n "${after}" ]]; then
-    running="$("${WEB_DOCKER[@]}" inspect --format '{{.State.Running}}' "${after}")" || return 1
+    status="$("${WEB_DOCKER[@]}" inspect --format '{{.State.Status}}' "${after}")" || return 1
   fi
-  action="$(nginx_apply_action "${before}" "${after}" "${running}")"
-  echo "[${0##*/}] nginx 설정 적용: ${action}"
+  # 표식을 못 읽는 것(옛 폴더에 묶인 컨테이너, 멈춘 컨테이너)도 "지금 폴더를 보지 않는다"는 답이라 실패로 다루지 않는다.
+  if [[ "${status}" == running ]]; then
+    seen_marker="$("${compose[@]}" exec -T nginx cat "/etc/nginx/conf.d/${NGINX_SYNC_MARKER}" 2>/dev/null || true)"
+    [[ "${seen_marker}" != "${marker}" ]] || seen=true
+  fi
+  action="$(nginx_apply_action "${before}" "${after}" "${status}" "${seen}")"
+  echo "[${0##*/}] nginx 설정 적용: ${action} (컨테이너 ${status}, 지금 폴더를 봄: ${seen})"
   case "${action}" in
     reload)
       "${compose[@]}" exec -T nginx nginx -t || return 1

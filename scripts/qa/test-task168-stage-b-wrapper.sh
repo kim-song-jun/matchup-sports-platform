@@ -878,7 +878,7 @@ case "\${argv[0]}" in
         esac ;;
       '{{.State.Health.Status}}')
         if [[ "${break_case}" == worker-unhealthy ]]; then echo unhealthy; else echo healthy; fi ;;
-      '{{.State.Running}}') echo true ;;
+      '{{.State.Status}}') echo running ;;
       *) echo "fake docker: unexpected inspect template: \${tmpl}" >&2; exit 1 ;;
     esac
     exit 0 ;;

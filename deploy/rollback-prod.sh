@@ -119,10 +119,10 @@ trap 'restore_current_on_failure' ERR
 pull_release_images
 activate_prod_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
-sync_prod_nginx_config
+sync_prod_nginx_config seed
 
 up_app_containers
-apply_nginx_config "${PROD_LIVE_DIR}/deploy"
+apply_prod_nginx_config
 wait_for_prod_health_contract
 assert_running_release_digests
 

@@ -556,8 +556,8 @@ test('alpha deploy consumes a supplied SemVer prerelease instead of incrementing
 test('alpha deploy copies the new release metadata into nginx-live before applying nginx config', () => {
   const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
   const metadataReplacement = deployScript.indexOf('write_release_metadata "${ALPHA_MANIFEST_FILE}"');
-  const nginxSync = deployScript.indexOf('sync_alpha_nginx_config', metadataReplacement);
-  const nginxApply = deployScript.indexOf('apply_nginx_config "${ALPHA_LIVE_DIR}/deploy"', nginxSync);
+  const nginxSync = deployScript.indexOf('sync_alpha_nginx_config seed', metadataReplacement);
+  const nginxApply = deployScript.indexOf('apply_alpha_nginx_config', nginxSync);
 
   assert.notEqual(metadataReplacement, -1);
   assert.ok(nginxSync > metadataReplacement);

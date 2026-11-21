@@ -190,7 +190,7 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 - 켜는 방법: 운영은 서버를 4GB 로 올린 뒤 `deploy/.env` 에 `V1_WEB_REPLICAS=2` 를 넣고 다음 배포를 한다. 끄는 방법은 값을 지우거나 `1` 로 바꾸는 것이고, 남은 `teameet_v1_web_b` 는 그 배포가 지운다.
 - nginx 설정은 배포가 `deploy/nginx-web/<개수>/` 의 `upstream.conf`·`failover.conf`·`static-failover.conf` 를 `nginx-live/web` 에 채우고 `nginx.conf`·`nginx.alpha.conf` 가 include 한다. 개수 2 의 재시도(`proxy_next_upstream`)는 연결 실패·타임아웃·502/503/504 를 다른 웹으로 넘긴다. POST 같은 멱등하지 않은 요청은 upstream 에 보낸 뒤에는 nginx 가 넘기지 않는다.
 - 이미지 캐시 볼륨(`v1_web_image_cache`, `v1_web_b_image_cache`)은 컨테이너마다 따로다. Next 이미지 최적화기가 캐시 파일을 잠금 없이 쓰기 때문이다. 업로드 볼륨은 API 만 쓰므로 웹 둘이 공유할 것이 없다.
-- nginx 는 배포마다 다시 만들지 않고 reload 한다. compose 가 마운트하는 `deploy/nginx-live` 는 릴리스마다 바뀌지 않는 런타임 폴더(`~/.teameet-{prod,alpha}-runtime/nginx`)를 가리키는 링크이고, 배포가 그 안에 설정·릴리스 헤더·정적 파일을 채운 뒤 `nginx -t` 와 `nginx -s reload` 를 한다(`deploy/web-replicas-common.sh` 의 `sync_nginx_live_config`·`apply_nginx_config`). nginx 이미지·마운트·포트처럼 서비스 정의가 바뀐 배포에서만 compose 가 컨테이너를 다시 만든다. `nginx-live` 링크가 없는 옛 릴리스 소스로 되돌릴 때도 다시 만든다.
+- nginx 는 배포마다 다시 만들지 않고 reload 한다. compose 가 마운트하는 `deploy/nginx-live` 는 릴리스마다 바뀌지 않는 런타임 폴더(`~/.teameet-{prod,alpha}-runtime/nginx`)를 가리키는 링크이고, 배포는 앱 컨테이너를 바꾸기 전에는 비어 있는 폴더만 채우고(웹 교체 중 reload 는 지금 설정을 읽는다), 웹 교체가 끝나면 이번 릴리스의 설정·릴리스 헤더·정적 파일로 맞춘 뒤 `nginx -t` 와 `nginx -s reload` 를 한다(`deploy/web-replicas-common.sh` 의 `sync_nginx_live_config`·`apply_nginx_config`). nginx 이미지·마운트·포트처럼 서비스 정의가 바뀐 배포, 컨테이너가 멈췄거나 이 폴더를 보지 않는 경우에만 다시 만든다. `nginx-live` 링크가 없는 옛 릴리스 소스로 되돌릴 때도 다시 만든다.
 - 남는 끊김: API 는 컨테이너가 하나라 교체 중 몇 초 끊긴다.
 - 롤백 대상 릴리스가 `v1_web_b` 를 모르는 옛 소스면 스크립트가 그 소스의 서비스만 올리고 남은 `v1_web_b` 컨테이너를 지운다.
 

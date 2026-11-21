@@ -54,8 +54,9 @@ function redactCollectBody<T extends BodyInit | null | undefined>(body: T): T | 
 function redactOutgoingHits(): void {
   const nativeFetch = window.fetch;
   window.fetch = function patchedFetch(input, init) {
-    if (typeof input === 'string' && GA_COLLECT_URL.test(input)) {
-      return nativeFetch.call(this, redactInviteTokens(input), init && { ...init, body: redactCollectBody(init.body) });
+    const url = input instanceof URL ? input.href : input;
+    if (typeof url === 'string' && GA_COLLECT_URL.test(url)) {
+      return nativeFetch.call(this, redactInviteTokens(url), init && { ...init, body: redactCollectBody(init.body) });
     }
     return nativeFetch.call(this, input, init);
   };

@@ -10,9 +10,8 @@ export class PrismaService
     await this.$connect();
   }
 
-  // Nest destroys the @Global module first (onModuleDestroy runs by descending module distance), and only
-  // then closes the HTTP server. Disconnecting there would cut in-flight requests and the worker's drain.
-  // onApplicationShutdown runs after both.
+  // close() runs onModuleDestroy hooks, then dispose() (closes the HTTP server and waits for in-flight
+  // requests), then onApplicationShutdown. Disconnecting in onModuleDestroy would cut those requests.
   async onApplicationShutdown() {
     await this.$disconnect();
   }

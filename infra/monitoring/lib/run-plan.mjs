@@ -14,6 +14,17 @@ const substitute = (args, tokens) => {
   return { args: out, missing };
 };
 
+/**
+ * `--output text` prints the string `None` for a null result and joins several matches with tabs.
+ * Neither may reach a delete call as if it were an id.
+ */
+export function normalizeCapture(stdout, stepId) {
+  const value = String(stdout).trim();
+  if (value === 'None') return '';
+  if (/\s/.test(value)) throw new Error(`${stepId}: 하나여야 하는데 여러 개가 나왔어요(${value.split(/\s+/).length}개)`);
+  return value;
+}
+
 /** Refuses before the first call when a parameter the plan needs was never supplied. */
 export function assertApplicable(steps) {
   const open = steps.filter((s) => s.args?.some(hasPlaceholder)).map((s) => s.id);
@@ -46,7 +57,7 @@ export async function runPlan(steps, { apply, exec, log, buildZip }) {
     if (missing) { log(`  건너뛰어요: ${missing} 대상이 없어요`); continue; }
     try {
       const stdout = await exec(args);
-      if (step.capture) tokens[step.capture] = String(stdout).trim();
+      if (step.capture) tokens[step.capture] = normalizeCapture(stdout, step.id);
     } catch (err) {
       const text = `${err.stderr ?? ''}${err.message ?? ''}`;
       if (step.tolerate && text.includes(step.tolerate)) { log('  이미 있어요, 그대로 둬요'); continue; }

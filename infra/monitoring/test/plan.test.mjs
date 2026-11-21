@@ -6,7 +6,7 @@ import { parseArgs } from '../install.mjs';
 import {
   alarmMetrics, buildInstallPlan, buildTeardownPlan, DEFAULTS, lambdaPolicy, serverPolicy,
 } from '../lib/plan.mjs';
-import { assertApplicable, renderCommand, runPlan } from '../lib/run-plan.mjs';
+import { assertApplicable, normalizeCapture, renderCommand, runPlan } from '../lib/run-plan.mjs';
 import { RULES, rulesFor, HEALTH_CHECKS } from '../lib/thresholds.mjs';
 
 const ids = { prodInstanceId: 'i-prod', alphaInstanceId: 'i-alpha', rdsId: 'rds-main' };
@@ -194,4 +194,22 @@ test('every put-metric-alarm uses --metrics JSON that parses and has exactly one
     const metrics = JSON.parse(s.args[s.args.indexOf('--metrics') + 1]);
     assert.equal(metrics.filter((m) => m.ReturnData).length, 1, s.id);
   }
+});
+
+test('teardown: the CLI text output "None" means nothing was found, so no delete runs', async () => {
+  const calls = [];
+  const exec = async (args) => {
+    calls.push(args);
+    if (args[0] === 'sts') return '111122223333\n';
+    return args[1] === 'list-health-checks' || args[1] === 'list-subscriptions-by-topic' ? 'None\n' : '';
+  };
+  await runPlan(buildTeardownPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' });
+  assert.ok(!calls.some((c) => c[1] === 'delete-health-check' || c[1] === 'unsubscribe'));
+  assert.ok(calls.some((c) => c[1] === 'delete-alarms'), 'unrelated steps still run');
+});
+
+test('teardown: several matches stop the run instead of deleting an arbitrary one', async () => {
+  const exec = async (args) => (args[0] === 'sts' ? '111122223333' : args[1] === 'list-health-checks' ? 'hc-1\thc-2\n' : '');
+  await assert.rejects(runPlan(buildTeardownPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' }), /여러 개/);
+  assert.equal(normalizeCapture('  hc-1\n', 'x'), 'hc-1');
 });

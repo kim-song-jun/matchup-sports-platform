@@ -1,6 +1,6 @@
 // Lambda entry: SNS alarm notification or the daily scheduler tick -> one Slack message.
-// The webhook URL is read from SSM Parameter Store (SecureString) at cold start and never logged.
-import { decideGroupAlarm, REPEAT_WINDOW_MS } from './lib/dedupe.mjs';
+// The webhook URL is read from SSM Parameter Store (SecureString) on every invocation and never logged.
+import { decideGroupAlarm, HISTORY_LOOKBACK_MS } from './lib/dedupe.mjs';
 import { formatAlarmNotification, formatDailySummary, scrub } from './lib/format.mjs';
 import { describeAlarm, groupAlarmNames } from './lib/thresholds.mjs';
 import {
@@ -125,20 +125,38 @@ async function lookupAlarmedAt(region, alarmName) {
   }
 }
 
-// ALARM transitions of every alarm in a cause group inside the repeat window.
+const HISTORY_PAGE_SIZE = 100;
+// A 2-minute crash loop writes about 360 records per alarm in 6 hours; the cap bounds the calls of one run.
+const HISTORY_MAX_PAGES = 5;
+
+/**
+ * ALARM transitions of one alarm since `startDate`. `send` runs one DescribeAlarmHistory request, so
+ * paging (an event alarm also records its OK flips, which fill the first page of a long loop) is testable.
+ */
+export async function loadAlarmTransitions(send, name, startDate) {
+  const found = [];
+  let nextToken;
+  for (let page = 0; page < HISTORY_MAX_PAGES; page += 1) {
+    const out = await send({
+      AlarmName: name, HistoryItemType: 'StateUpdate', StartDate: startDate, MaxRecords: HISTORY_PAGE_SIZE,
+      ScanBy: 'TimestampDescending', ...(nextToken ? { NextToken: nextToken } : {}),
+    });
+    for (const i of out.AlarmHistoryItems ?? []) {
+      if (/to ALARM/.test(i.HistorySummary ?? '')) found.push({ name, atMs: i.Timestamp.getTime() });
+    }
+    nextToken = out.NextToken;
+    if (!nextToken) break;
+  }
+  return found;
+}
+
+// ALARM transitions of every alarm in a cause group inside the history lookback.
 async function loadGroupTransitions(region, alarmNames) {
   const { CloudWatchClient, DescribeAlarmHistoryCommand } = await import('@aws-sdk/client-cloudwatch');
   const cw = new CloudWatchClient({ region });
-  const startDate = new Date(Date.now() - REPEAT_WINDOW_MS - 5 * 60_000);
-  const perAlarm = await Promise.all(alarmNames.map(async (name) => {
-    const out = await cw.send(new DescribeAlarmHistoryCommand({
-      AlarmName: name, HistoryItemType: 'StateUpdate', StartDate: startDate, MaxRecords: 50, ScanBy: 'TimestampDescending',
-    }));
-    return (out.AlarmHistoryItems ?? [])
-      .filter((i) => /to ALARM/.test(i.HistorySummary ?? ''))
-      .map((i) => ({ name, atMs: i.Timestamp.getTime() }));
-  }));
-  return perAlarm.flat();
+  const startDate = new Date(Date.now() - HISTORY_LOOKBACK_MS);
+  const send = (input) => cw.send(new DescribeAlarmHistoryCommand(input));
+  return (await Promise.all(alarmNames.map((name) => loadAlarmTransitions(send, name, startDate)))).flat();
 }
 
 async function loadSummary({ region, env, dateKst, rdsId }) {

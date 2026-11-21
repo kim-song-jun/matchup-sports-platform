@@ -9,7 +9,10 @@ export const DEFAULTS = {
   healthRegion: 'us-east-1',
   host: 'teameet.co.kr',
   webhookParam: '/teameet/ops/slack-webhook',
-  topicName: 'teameet-prod-ops-alerts',
+  // Alarms of this stack and the Slack Lambda only: no mail subscription, so mail never sees every transition.
+  topicName: 'teameet-prod-ops-slack',
+  // Existing topic with the mail subscription: backup alarm and the Slack-delivery-failure alarm only.
+  mailTopicName: 'teameet-prod-ops-alerts',
   healthTopicName: 'teameet-ops-alerts-use1',
   lambdaName: 'teameet-ops-slack',
   lambdaRole: 'teameet-ops-slack-lambda',
@@ -136,6 +139,7 @@ export const alarmNames = (p) => {
 export function buildInstallPlan(input) {
   const p = resolve(input);
   const topic = `arn:aws:sns:${p.region}:{{account}}:${p.topicName}`;
+  const mailTopic = `arn:aws:sns:${p.region}:{{account}}:${p.mailTopicName}`;
   const healthTopic = `arn:aws:sns:${p.healthRegion}:{{account}}:${p.healthTopicName}`;
   const fn = `arn:aws:lambda:${p.region}:{{account}}:function:${p.lambdaName}`;
   const steps = [];
@@ -146,7 +150,10 @@ export function buildInstallPlan(input) {
   add({ id: 'webhook-exists', title: '웹훅 매개변수가 있는지 확인(값은 읽지 않아요)', readonly: true,
     failHint: `${p.webhookParam} 가 없어요. 사용자가 SecureString 으로 먼저 넣어야 해요(런북 1단계).`,
     args: ['ssm', 'get-parameter', '--region', p.region, '--name', p.webhookParam, '--query', 'Parameter.Name', '--output', 'text'] });
-  add({ id: 'topic', title: `SNS 주제 ${p.topicName} (이미 있으면 그대로)`,
+  add({ id: 'mail-topic-exists', title: `메일 구독이 있는 기존 주제 ${p.mailTopicName} 가 있는지 확인(읽기)`, readonly: true,
+    failHint: `${p.mailTopicName} 가 없어요. Slack 전달 실패 경보를 받을 메일 주제가 먼저 있어야 해요(docs/ops/prod-backup.md).`,
+    args: ['sns', 'get-topic-attributes', '--region', p.region, '--topic-arn', mailTopic, '--query', 'Attributes.TopicArn', '--output', 'text'] });
+  add({ id: 'topic', title: `SNS 주제 ${p.topicName} (이 스택의 경보 · Lambda 만 써요, 이미 있으면 그대로)`,
     args: ['sns', 'create-topic', '--region', p.region, '--name', p.topicName] });
   add({ id: 'role', title: `Lambda 실행 역할 ${p.lambdaRole}`, tolerate: 'EntityAlreadyExists',
     args: ['iam', 'create-role', '--role-name', p.lambdaRole, '--assume-role-policy-document', JSON.stringify(trust('lambda.amazonaws.com'))] });
@@ -171,7 +178,7 @@ export function buildInstallPlan(input) {
   add({ id: 'perm-sns', title: '서울 SNS 주제가 Lambda 를 부를 수 있게', tolerate: 'ResourceConflict',
     args: ['lambda', 'add-permission', '--region', p.region, '--function-name', p.lambdaName, '--statement-id', 'sns-seoul',
       '--action', 'lambda:InvokeFunction', '--principal', 'sns.amazonaws.com', '--source-arn', topic] });
-  add({ id: 'subscribe', title: '주제 → Lambda 구독(기존 메일 구독은 그대로)',
+  add({ id: 'subscribe', title: '주제 → Lambda 구독(메일 구독은 붙이지 않아요)',
     args: ['sns', 'subscribe', '--region', p.region, '--topic-arn', topic, '--protocol', 'lambda', '--notification-endpoint', fn] });
 
   for (const e of p.includeAlpha ? ['prod', 'alpha'] : ['prod']) {
@@ -186,9 +193,9 @@ export function buildInstallPlan(input) {
           missing: rule.missing, topic, metrics: alarmMetrics(e, rule, p) }) });
     }
   }
-  add({ id: 'alarm-lambda-errors', title: 'Lambda 가 실패하면 메일로(두 번째 길)',
+  add({ id: 'alarm-lambda-errors', title: 'Lambda 가 실패하면 기존 메일 주제로(두 번째 길)',
     args: putAlarmArgs({ region: p.region, name: 'teameet-ops-slack-errors', description: 'Slack 전달 Lambda 오류', op: 'GreaterThanOrEqualToThreshold',
-      threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching', topic,
+      threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching', topic: mailTopic,
       metrics: [metric('m1', 'AWS/Lambda', 'Errors', 300, 'Sum', [{ Name: 'FunctionName', Value: p.lambdaName }])] }) });
 
   add({ id: 'health-topic', title: `us-east-1 SNS 주제 ${p.healthTopicName}`,
@@ -226,7 +233,7 @@ export function buildInstallPlan(input) {
   return steps;
 }
 
-/** Reverse order; the existing topic and its mail subscription are never touched. */
+/** Reverse order; the existing mail topic and its subscription are never touched. */
 export function buildTeardownPlan(input) {
   const p = resolve(input);
   const steps = [];
@@ -246,14 +253,11 @@ export function buildTeardownPlan(input) {
     steps.push({ id: `delete-${h.id}`, title: `헬스 체크 ${h.path} 삭제`, args: ['route53', 'delete-health-check', '--health-check-id', `{{${h.id}}}`] });
   }
   steps.push({ id: 'delete-schedule', title: '하루 요약 스케줄 삭제', tolerate: 'ResourceNotFound', args: ['scheduler', 'delete-schedule', '--region', p.region, '--name', p.scheduleName] });
-  for (const [region, topicName] of [[p.region, p.topicName], [p.healthRegion, p.healthTopicName]]) {
-    steps.push({ id: `find-sub-${region}`, title: `${region} Lambda 구독 찾기(읽기)`, readonly: true, capture: `sub-${region}`,
-      args: ['sns', 'list-subscriptions-by-topic', '--region', region, '--topic-arn', `arn:aws:sns:${region}:{{account}}:${topicName}`,
-        '--query', `Subscriptions[?contains(Endpoint,':function:${p.lambdaName}')].SubscriptionArn`, '--output', 'text'] });
-    steps.push({ id: `unsubscribe-${region}`, title: `${region} Lambda 구독 해제`, args: ['sns', 'unsubscribe', '--region', region, '--subscription-arn', `{{sub-${region}}}`] });
-  }
   steps.push({ id: 'delete-lambda', title: 'Lambda 삭제', tolerate: 'ResourceNotFound', args: ['lambda', 'delete-function', '--region', p.region, '--function-name', p.lambdaName] });
-  steps.push({ id: 'delete-health-topic', title: `${p.healthTopicName} 삭제(이 스택이 만든 주제)`, args: ['sns', 'delete-topic', '--region', p.healthRegion, '--topic-arn', `arn:aws:sns:${p.healthRegion}:{{account}}:${p.healthTopicName}`] });
+  // Deleting a topic drops its subscriptions. The mail topic is not in this list: it predates the stack.
+  for (const [region, topicName] of [[p.region, p.topicName], [p.healthRegion, p.healthTopicName]]) {
+    steps.push({ id: `delete-topic-${region}`, title: `${region} 주제 ${topicName} 삭제(이 스택이 만든 주제)`, args: ['sns', 'delete-topic', '--region', region, '--topic-arn', `arn:aws:sns:${region}:{{account}}:${topicName}`] });
+  }
   for (const [role, policy] of [[p.schedulerRole, 'invoke-ops-slack'], [p.lambdaRole, 'ops-slack']]) {
     steps.push({ id: `delete-policy-${role}`, title: `${role} 정책 삭제`, tolerate: 'NoSuchEntity', args: ['iam', 'delete-role-policy', '--role-name', role, '--policy-name', policy] });
     steps.push({ id: `delete-role-${role}`, title: `${role} 삭제`, tolerate: 'NoSuchEntity', args: ['iam', 'delete-role', '--role-name', role] });

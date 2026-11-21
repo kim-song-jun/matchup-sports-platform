@@ -13,7 +13,7 @@ Route 53 헬스 체크 2개(us-east-1) ─▶ 경보 ─▶ 같은 Lambda
 
 - 서버에는 Slack 주소가 없어요. 주소는 SSM Parameter Store SecureString `/teameet/ops/slack-webhook` 에만 있고 Lambda 만 읽어요.
 - 서버가 멈추면 수집기 하트비트가 끊겨 「수집기 끊김」 경보가 와요(서버가 스스로 알리지 못하는 경우를 메워요).
-- 기존 백업 경보(`teameet-prod-backup-missing`)와 메일 구독은 그대로고, 같은 SNS 주제라 Slack 에도 와요.
+- 이 경보들은 새 SNS 주제(`teameet-prod-ops-slack`)로 가서 Lambda 만 받아요. 기존 주제(`teameet-prod-ops-alerts`)와 메일 구독은 그대로고, 거기에는 백업 경보와 「Slack 전달 실패」 경보만 있어요 — 메일이 오면 곧 실제 문제예요.
 - 배포 중(컨테이너가 새로 만들어진 뒤 3분)에는 5xx 경보가 울리지 않게 빼요.
 
 ## 메시지 읽는 법
@@ -27,8 +27,8 @@ Route 53 헬스 체크 2개(us-east-1) ─▶ 경보 ─▶ 같은 Lambda
 
 ### 알림을 묶는 방식
 
-- 한 번의 heap 부족은 「web 재시작」과 「heap 부족」이 몇 초 간격으로 같이 울려요. **먼저 울린 경보 하나만** 보내고, 「같이 울린 경보」 줄에 나머지를 적어요(3분 안에 이어진 경보는 한 사건이에요).
-- 같은 사건이 30분 안에 되풀이되면 **1 · 3 · 6 · 12 · 24번째만** 보내요. 사이 알림은 CloudWatch 경보 기록과 하루 요약에 남아요. 같은 종류가 이어지는데 알림이 없다면 마지막 알림의 「N번째」 줄을 봐요.
+- 한 번의 heap 부족은 「web 재시작」과 「heap 부족」이 몇 초 간격으로 같이 울려요. **먼저 울린 경보 하나만** 보내고, 「같이 울린 경보」 줄에 나머지를 적어요(서로 다른 경보가 3분 안에 이어지면 한 번이에요).
+- 같은 경보가 되풀이되면(이어진 두 번 사이가 30분 이내) **1 · 3 · 6 · 12 · 24 · 48 · 96번째만** 보내고 「N분 동안 M번째」를 적어요. 2분마다 다시 뜨는 크래시 루프도 같아요(4분 · 10분 · 22분째 …에 알림이 와요). 사이 알림은 CloudWatch 경보 기록과 하루 요약에 남아요. 같은 종류가 이어지는데 알림이 없다면 마지막 알림의 「N분 동안 M번째」 줄을 봐요. 6시간을 넘게 이어지는 반복은 6시간 전부터 세어요.
 - 경보 기록을 읽지 못하면 묶지 않고 그대로 보내요(알림을 놓치는 것보다 겹치는 편이 나아요).
 
 ## 경보별 먼저 볼 것
@@ -62,7 +62,7 @@ web 컨테이너 사용률이 85% 이상으로 10분 이어졌어요. 안정일 
 
 5분에 5xx 가 15건 이상이고 요청의 2% 이상인 상태가 두 번 이어졌어요(배포 직후 3분은 제외).
 
-1. `docker logs --since 10m teameet_nginx | awk '$9 ~ /^5/ {print $9}' | sort | uniq -c` — 502/504 면 web 이나 api 가 응답하지 못한 거예요.
+1. `docker logs --since 10m teameet_nginx | awk '$9 ~ /^5/ {print $9}' | sort | uniq -c` — 502/504 면 web 이나 api 가 응답하지 못한 거예요. 503 은 nginx 요청 제한(`limit_req`)이 거절한 것일 수 있어요: `docker logs --since 10m teameet_nginx 2>&1 | grep -c 'limiting requests'` 가 503 개수와 비슷하면 서버 문제가 아니에요(이 거절은 이 경보에서 이미 빼고 하루 요약의 「요청 제한 거절」로 따로 세요).
 2. `docker ps` 로 web · api 상태, 「web 재시작」 · 「heap 부족」 알림이 같이 왔는지 봐요.
 
 ## 서버 메모리
@@ -126,4 +126,4 @@ Route 53 이 밖에서 `/api/v1/health`(DB 가 안 되면 오류) 또는 `/landi
 
 ## Slack 전달 실패
 
-`teameet-ops-slack-errors` — Slack 으로 보내는 Lambda 가 실패했어요(웹훅 만료 · Slack 장애). 이 경보는 **메일**로 와요(두 번째 길). 확인: Lambda `teameet-ops-slack` 의 CloudWatch 로그. 웹훅을 새로 만들었다면 SSM 매개변수를 바꾼 뒤 Lambda 를 한 번 갱신해야 새 값을 읽어요(README).
+`teameet-ops-slack-errors` — Slack 으로 보내는 Lambda 가 실패했어요(웹훅 만료 · Slack 장애). 이 경보는 기존 주제(`teameet-prod-ops-alerts`)의 **메일**로만 와요(두 번째 길). 이 주제에는 다른 경보가 없어서 메일이 오면 실제로 Slack 이 막힌 거예요. 확인: Lambda `teameet-ops-slack` 의 CloudWatch 로그. 웹훅을 새로 만들었다면 SSM 매개변수만 바꾸면 돼요(Lambda 는 호출마다 읽어요).

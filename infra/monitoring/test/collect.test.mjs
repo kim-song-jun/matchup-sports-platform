@@ -49,7 +49,7 @@ test('first pass is a baseline: no restart is invented, every number is read', a
   const { sample, nextState } = await run({});
   assert.deepEqual(sample.restarts, {});
   assert.equal(sample.deploys, 0);
-  assert.deepEqual(sample.nginx, { requests: 2, errors5xx: 1, bots: 0, botsByName: {} });
+  assert.deepEqual(sample.nginx, { requests: 2, errors5xx: 1, rateLimited: 0, bots: 0, botsByName: {} });
   assert.equal(sample.webMemPct, 70.5);
   assert.equal(sample.memAvailableMB, 488);
   assert.equal(sample.diskUsedPct, 57);
@@ -155,6 +155,15 @@ test('a minute that fills the line cap is reported as truncated, not published a
   const { sample } = await run({}, { nginx: lines });
   assert.deepEqual(sample.failed, ['nginx-logs-truncated']);
   assert.ok(sample.nginx.requests > 0);
+});
+
+test('a bot burst rejected by limit_req publishes the rejections apart and no 5xx', async () => {
+  const burst = Array.from({ length: 30 }, () => [fx.NGINX_503, fx.NGINX_LIMIT_REQ_LINE]).flat();
+  const { sample } = await run({}, { nginx: [fx.NGINX_OK, ...burst].join('\n') });
+  const value = (name) => buildMetricData('prod', sample).find((d) => d.MetricName === name)?.Value;
+  assert.equal(value('Nginx5xx'), 0);
+  assert.equal(value('NginxRateLimited'), 30);
+  assert.equal(value('NginxRequests'), 31);
 });
 
 test('a failed nginx read neither publishes zeros nor advances the log position', async () => {

@@ -32,10 +32,10 @@ test('alarm message: critical prod heap death, exact text', () => {
 
 test('an incident with siblings and repeats says so; a plain alarm does not', () => {
   const text = formatAlarmNotification(alarm({ AlarmName: 'teameet-prod-web-restart' }), {
-    alongside: ['teameet-prod-heap-oom'], incident: 3,
+    alongside: ['teameet-prod-heap-oom'], occurrence: 3, spanMinutes: 4,
   });
   assert.match(text, /• 같이 울린 경보: heap 부족으로 프로세스가 죽었어요\n/);
-  assert.match(text, /• 30분 안에 3번째예요 — 되풀이되고 있어요\(알림은 1 · 3 · 6 · 12 · 24번째에만 보내요\)/);
+  assert.match(text, /• 되풀이되고 있어요 — 4분 동안 3번째예요\(알림은 1 · 3 · 6 · 12 · 24 · 48 · 96번째에만 보내요\)/);
   const plain = formatAlarmNotification(alarm({ AlarmName: 'teameet-prod-disk-high' }));
   assert.doesNotMatch(plain, /같이 울린|번째예요|회복 알림은 보내지 않아요/);
 });
@@ -117,6 +117,11 @@ test('daily summary: exact text for the 11-20 numbers', () => {
     '• 비용: 11-19 확정 $4.71 · 이번 달 $96.04(한 달 예상 $144.00) · 지난달 $147.42',
     '• 어제 울린 경보 7개 · 지금 열린 경보 0개 <https://ap-northeast-2.console.aws.amazon.com/cloudwatch/home?region=ap-northeast-2#alarmsV2:|경보 목록>',
   ].join('\n'));
+});
+
+test('daily summary shows rate-limit rejections apart from 5xx, only when there were some', () => {
+  assert.ok(formatDailySummary({ ...summary, rateLimited: 1200 }).includes('5xx 486건(배포 창 밖 452) · 요청 제한 거절 1,200건 · 재시작'));
+  assert.ok(!formatDailySummary({ ...summary, rateLimited: 0 }).includes('요청 제한'));
 });
 
 test('daily summary leaves out what it could not read instead of printing zero', () => {

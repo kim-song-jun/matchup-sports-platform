@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  botKind, countNewHeapOom, diffContainers, linesAfter, parseCertDaysLeft, parseDfUsedPct, parseMemPerc,
+  botKind, countNewHeapOom, diffContainers, isRateLimitRejection, linesAfter, parseCertDaysLeft, parseDfUsedPct, parseMemPerc,
   parseMeminfo, parseNginxLine, summarizeNginx,
 } from '../lib/parse.mjs';
 import * as fx from './fixtures.mjs';
@@ -24,9 +24,37 @@ test('nginx error-log lines and junk are ignored, not counted as requests', () =
 
 test('summarizeNginx counts requests, 5xx (500-599 only) and bots', () => {
   const s = summarizeNginx([fx.NGINX_OK, fx.NGINX_502, fx.NGINX_504, fx.NGINX_GPT_200, fx.NGINX_ERROR_LOG_LINE]);
-  assert.deepEqual(s, { requests: 4, errors5xx: 2, bots: 2, botsByName: { GPTBot: 2 } });
+  assert.deepEqual(s, { requests: 4, errors5xx: 2, rateLimited: 0, bots: 2, botsByName: { GPTBot: 2 } });
   assert.equal(summarizeNginx([`${fx.NGINX_OK.replace(' 200 ', ' 499 ')}`]).errors5xx, 0);
   assert.equal(summarizeNginx([`${fx.NGINX_OK.replace(' 200 ', ' 599 ')}`]).errors5xx, 1);
+});
+
+test('limit_req rejections (503) are counted apart and are not server errors', () => {
+  const lines = [fx.NGINX_OK, fx.NGINX_502, fx.NGINX_503, fx.NGINX_LIMIT_REQ_LINE, fx.NGINX_503, fx.NGINX_LIMIT_REQ_LINE];
+  assert.deepEqual(summarizeNginx(lines), { requests: 4, errors5xx: 1, rateLimited: 2, bots: 0, botsByName: {} });
+});
+
+test('a 503 without a rejection line is a real server error and still counts', () => {
+  const s = summarizeNginx([fx.NGINX_503, fx.NGINX_503, fx.NGINX_LIMIT_REQ_LINE]);
+  assert.equal(s.errors5xx, 1);
+  assert.equal(s.rateLimited, 1);
+});
+
+test('rejection lines never remove errors that are not 503', () => {
+  const s = summarizeNginx([fx.NGINX_502, fx.NGINX_504, fx.NGINX_LIMIT_REQ_LINE, fx.NGINX_LIMIT_REQ_LINE]);
+  assert.equal(s.errors5xx, 2);
+  assert.equal(s.rateLimited, 2);
+});
+
+test('only the real rejection line is recognised: dry-run lines, other error lines and request text are not', () => {
+  assert.equal(isRateLimitRejection(fx.NGINX_LIMIT_REQ_LINE), true);
+  assert.equal(isRateLimitRejection(fx.NGINX_LIMIT_REQ_LINE.replace(/^\S+ /, '')), true, 'also without the docker timestamp');
+  assert.equal(isRateLimitRejection(fx.NGINX_LIMIT_REQ_DRY_RUN), false);
+  assert.equal(isRateLimitRejection(fx.NGINX_ERROR_LOG_LINE), false);
+  // A client controls the referer and user agent, so the whole error-line shape can appear inside an access line.
+  const spoof = fx.NGINX_503.replace('"-" "python', '"2026/11/20 01:50:36 [error] 29#29: *7 limiting requests, excess: 1" "python');
+  assert.equal(isRateLimitRejection(spoof), false);
+  assert.equal(summarizeNginx([spoof]).errors5xx, 1, 'a client cannot hide a 503 by faking the line in a header');
 });
 
 test('botKind: named bots, other bots, and people', () => {

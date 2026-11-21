@@ -19,6 +19,13 @@ export const NGINX_GPT_200 =
   `${ts} 203.0.113.10 - - [20/Nov/2026:01:50:33 +0000] "GET /terms?q=1 HTTP/1.1" 200 900 "-" "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.3; +https://openai.com/gptbot)"`;
 export const NGINX_QUOTED_UA =
   `${ts} 203.0.113.11 - - [20/Nov/2026:01:50:34 +0000] "GET /x HTTP/1.1" 200 10 "-" "weird \\"quoted\\" agent Bytespider"`;
+export const NGINX_503 =
+  `${ts} 203.0.113.12 - - [20/Nov/2026:01:50:36 +0000] "GET /api/v1/teams HTTP/1.1" 503 197 "-" "python-requests/2.31"`;
+// Written once per rejected request (limit_req_log_level defaults to error); the matching access line is NGINX_503.
+export const NGINX_LIMIT_REQ_LINE =
+  `${ts} 2026/11/20 01:50:36 [error] 29#29: *7 limiting requests, excess: 60.500 by zone "v1api", client: 203.0.113.12, server: teameet.co.kr, request: "GET /api/v1/teams HTTP/1.1", host: "teameet.co.kr"`;
+export const NGINX_LIMIT_REQ_DRY_RUN =
+  `${ts} 2026/11/20 01:50:36 [error] 29#29: *8 limiting requests, dry run, excess: 60.500 by zone "v1api", client: 203.0.113.12, server: teameet.co.kr, request: "GET /x HTTP/1.1", host: "teameet.co.kr"`;
 export const NGINX_ERROR_LOG_LINE =
   `${ts} 2026/11/20 01:50:35 [error] 29#29: *1 connect() failed (111: Connection refused) while connecting to upstream`;
 

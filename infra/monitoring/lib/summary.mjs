@@ -30,6 +30,7 @@ const ops = (key, metricName, stat, reduce, extra = {}) => ({ key, metricName, s
 export const SUMMARY_METRICS = [
   ops('requests', 'NginxRequests', 'Sum', 'sum'),
   ops('errors5xx', 'Nginx5xx', 'Sum', 'sum'),
+  ops('rateLimited', 'NginxRateLimited', 'Sum', 'sum'),
   ops('bots', 'BotRequests', 'Sum', 'sum'),
   ops('webMemPctMax', 'WebMemPct', 'Maximum', 'max'),
   ops('memAvailableMinMB', 'MemAvailableMB', 'Minimum', 'min'),
@@ -82,6 +83,7 @@ export function buildSummary({ env, dateKst, series, rds = {}, alarms = {}, cost
     requestsAvg7d: prior === null ? null : prior / 7,
     bots: day('bots'),
     errors5xx: day('errors5xx'),
+    rateLimited: day('rateLimited'),
     restarts: restarts.any ? restarts.byName : null,
     heapOom: heap.any ? Object.values(heap.byName).reduce((a, b) => a + b, 0) : null,
     webMemPctMax: day('webMemPctMax'),

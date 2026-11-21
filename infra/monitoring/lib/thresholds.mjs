@@ -121,13 +121,6 @@ const BY_ALARM_NAME = new Map(
 for (const h of HEALTH_CHECKS) {
   BY_ALARM_NAME.set(alarmName('prod', h.id), { ...h, env: 'prod', severity: 'critical' });
 }
-BY_ALARM_NAME.set('teameet-ops-slack-errors', {
-  env: 'prod', severity: 'warning', title: 'Slack 알림 전달이 실패했어요(메일로 알려요)', anchor: 'slack-전달-실패',
-});
-// Alarm that already exists outside this stack (docs/ops/prod-backup.md).
-BY_ALARM_NAME.set('teameet-prod-backup-missing', {
-  env: 'prod', severity: 'warning', title: '운영 DB 백업이 26시간 안에 성공하지 않았어요', anchor: '백업',
-});
 
 export const describeAlarm = (name) => BY_ALARM_NAME.get(name) ?? null;
 

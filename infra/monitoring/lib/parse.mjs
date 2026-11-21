@@ -30,18 +30,37 @@ export function botKind(userAgent) {
   return OTHER_BOT.test(userAgent) ? 'other' : null;
 }
 
+// nginx error log, written to stderr and so part of `docker logs`:
+//   2026/11/20 01:50:35 [error] 29#29: *1 limiting requests, excess: 60.500 by zone "v1api", client: ...
+// The access log has no field for it: a rejected request is an ordinary 503 line.
+const LIMIT_REQ_REJECTION = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} \[\w+\] \d+#\d+: \*\d+ limiting requests, excess: /;
+
+/** True for the error-log line nginx writes each time `limit_req` rejects a request (not the dry-run one). */
+export function isRateLimitRejection(rawLine) {
+  return LIMIT_REQ_REJECTION.test(rawLine.replace(TS_PREFIX, ''));
+}
+
+/**
+ * `errors5xx` is what the server answered wrongly. `limit_req` rejections come back as 503 too but say the
+ * server is fine, so they are counted apart in `rateLimited` and taken out of `errors5xx`.
+ */
 export function summarizeNginx(lines) {
-  const out = { requests: 0, errors5xx: 0, bots: 0, botsByName: {} };
+  const out = { requests: 0, errors5xx: 0, rateLimited: 0, bots: 0, botsByName: {} };
+  let status503 = 0;
   for (const line of lines) {
+    if (isRateLimitRejection(line)) { out.rateLimited += 1; continue; }
     const parsed = parseNginxLine(line);
     if (!parsed) continue;
     out.requests += 1;
     if (parsed.status >= 500 && parsed.status <= 599) out.errors5xx += 1;
+    if (parsed.status === 503) status503 += 1;
     if (parsed.bot) {
       out.bots += 1;
       out.botsByName[parsed.bot] = (out.botsByName[parsed.bot] ?? 0) + 1;
     }
   }
+  // Only a 503 can be a rejection, and every rejection left exactly one 503 access line.
+  out.errors5xx -= Math.min(out.rateLimited, status503);
   return out;
 }
 

@@ -4,7 +4,7 @@ import { dirname, join, relative } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { ZIP_FILES } from '../install.mjs';
-import { handler, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
+import { handler, loadAlarmTransitions, messageForSnsRecord, postToSlack } from '../lambda-handler.mjs';
 import {
   buildSummary, kstDayWindow, reduceSeries, summarizeCost, summaryQueries, SUMMARY_METRICS, yesterdayKst,
 } from '../lib/summary.mjs';
@@ -107,7 +107,41 @@ test('the 2nd restart within 30 minutes stays quiet, the 3rd says it is repeatin
   assert.equal(d.posted.length, 0);
   await handler({ Records: [sns(alarm({ StateChangeTime: stamp(8) }))] }, d);
   assert.equal(d.posted.length, 1);
-  assert.match(d.posted[0].text, /30분 안에 3번째예요/);
+  assert.match(d.posted[0].text, /• 되풀이되고 있어요 — 8분 동안 3번째예요/);
+});
+
+test('a crash loop restarting every 2 minutes still reaches Slack at the 3rd, 6th and 12th restart', async () => {
+  const min = 60_000;
+  const history = [];
+  const posts = [];
+  for (let m = 0; m <= 24; m += 2) {
+    history.push({ name: 'teameet-prod-web-restart', atMs: HEAP_ALARM_TIME + m * min });
+    const d = deps({ loadGroupTransitions: async () => history });
+    const stamp = new Date(HEAP_ALARM_TIME + m * min).toISOString().replace('Z', '+0000');
+    await handler({ Records: [sns(alarm({ StateChangeTime: stamp }))] }, d);
+    if (d.posted.length) posts.push([m, d.posted[0].text.match(/(\d+)분 동안 (\d+)번째/)?.slice(1).join('/') ?? 'first']);
+  }
+  assert.deepEqual(posts, [[0, 'first'], [4, '4/3'], [10, '10/6'], [22, '22/12']]);
+});
+
+test('alarm history is read page by page and only the ALARM transitions are kept', async () => {
+  const item = (summary, iso) => ({ HistorySummary: summary, Timestamp: new Date(iso) });
+  const pages = [
+    { AlarmHistoryItems: [item('Alarm updated from OK to ALARM', '2026-11-20T01:50:47Z'), item('Alarm updated from ALARM to OK', '2026-11-20T01:51:47Z')], NextToken: 't1' },
+    { AlarmHistoryItems: [item('Alarm updated from OK to ALARM', '2026-11-20T01:48:47Z')] },
+  ];
+  const seen = [];
+  const send = async (input) => { seen.push(input.NextToken); return pages[seen.length - 1]; };
+  const found = await loadAlarmTransitions(send, 'teameet-prod-web-restart', new Date('2026-11-20T00:00:00Z'));
+  assert.deepEqual(seen, [undefined, 't1']);
+  assert.deepEqual(found.map((f) => f.atMs), [Date.parse('2026-11-20T01:50:47Z'), Date.parse('2026-11-20T01:48:47Z')]);
+});
+
+test('paging stops at the cap even when CloudWatch keeps returning a token', async () => {
+  let calls = 0;
+  const send = async () => { calls += 1; return { AlarmHistoryItems: [], NextToken: 'more' }; };
+  await loadAlarmTransitions(send, 'x', new Date());
+  assert.equal(calls, 5);
 });
 
 test('when the alarm history cannot be read, the alarm is posted as it is', async () => {

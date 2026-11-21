@@ -44,7 +44,7 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
    node infra/monitoring/install.mjs --apply \
      --prod-instance-id <운영 인스턴스 ID> --alpha-instance-id <alpha 인스턴스 ID> --rds-id <RDS 인스턴스 이름>
    ```
-   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 26개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1. 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로예요.
+   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 26개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1, 서울 SNS 주제 `teameet-prod-ops-slack` 1(경보와 Lambda 만 써요, 메일 구독 없음). 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로고, 이 주제에는 백업 경보와 「Slack 전달 실패」 경보만 있어요(메일 한 통이 곧 실제 문제예요). 이 주제가 없으면 아무것도 만들기 전에 멈춰요.
 
    **「수집기 끊김」 경보는 그 환경의 Heartbeat 가 최근 15분에 들어온 것을 확인한 뒤에만 만들어요**(숫자가 없으면 만들자마자 긴급이 울려요). 수집기를 아직 못 깔았으면(예: 운영 서버에 Node 가 없을 때) 그 경보만 건너뛰고 나머지는 만들어요. 수집기를 깐 뒤 같은 명령을 다시 실행하면 그때 만들어져요 — 그 전까지 운영은 수집기 끊김 경보가 없다는 뜻이니 설치 완료 전까지 사람이 서버 상태를 봐요.
 6. **시험.** `aws cloudwatch set-alarm-state --alarm-name teameet-alpha-web-restart --state-value ALARM --state-reason test` 로 Slack 모양을 확인하고, alpha 에서 `systemctl stop teameet-ops-metrics.timer` 5분 뒤 「수집기 끊김」 경보와 회복을 확인해요. 시험 채널로 1주 돌린 뒤 임계값을 보고 운영 채널로 옮겨요.
@@ -67,17 +67,17 @@ node /usr/local/lib/teameet-ops/collect.mjs --env prod            # 출력만
 
 ## 알림 묶기
 
-한 번의 heap 부족이 만드는 경보 2개(`web-restart` · `heap-oom`)를 Lambda 가 한 메시지로 묶고, 재시작 · heap 부족은 회복 메시지를 보내지 않으며, 같은 사건이 30분 안에 되풀이되면 1 · 3 · 6 · 12 · 24번째만 보내요(`lib/dedupe.mjs`). 새 경보를 묶고 싶으면 `RULES` 에 같은 `group` 을(한 번 일어나고 끝나는 일이면 `event: true` 도) 달아요. Lambda 는 알림 한 건마다 8초 기다려 같은 사건의 다른 경보를 함께 봐요.
+한 번의 heap 부족이 만드는 경보 2개(`web-restart` · `heap-oom`)를 Lambda 가 한 메시지로 묶고, 재시작 · heap 부족은 회복 메시지를 보내지 않으며, 같은 경보가 되풀이되면(이어진 두 번 사이가 30분 이내) 1 · 3 · 6 · 12 · 24 · 48 · 96번째만 보내고 「N분 동안 M번째」를 적어요. 같은 경보는 아무리 가까워도 따로 세요(2분마다 다시 뜨는 크래시 루프도 세요). 서로 다른 경보는 3분 안에 이어지면 한 번으로 묶어요. 경보 기록은 6시간 전까지, 5쪽까지 읽어요(`lib/dedupe.mjs`). 새 경보를 묶고 싶으면 `RULES` 에 같은 `group` 을(한 번 일어나고 끝나는 일이면 `event: true` 도) 달아요. Lambda 는 알림 한 건마다 8초 기다려 같은 사건의 다른 경보를 함께 봐요.
 
 ## 되돌리기
 
 ```bash
 sudo infra/monitoring/install-collector.sh --env prod --apply --uninstall   # 서버(타이머 · 파일 · 상태 폴더)
 node infra/monitoring/install.mjs --teardown                                # 미리보기
-node infra/monitoring/install.mjs --teardown --apply                        # 경보 · Lambda · 스케줄 · 헬스 체크 · 역할 · us-east-1 주제 삭제
+node infra/monitoring/install.mjs --teardown --apply                        # 경보 · Lambda · 스케줄 · 헬스 체크 · 역할 · 이 도구가 만든 SNS 주제 2개 삭제
 ```
 
-`--teardown` 은 이 도구가 만든 것만 지워요. 기존 SNS 주제 · 메일 구독 · 백업 경보 · SSM 웹훅 매개변수와 서버 역할의 정책은 남아요(직접 뗀 정책은 직접 지워요).
+`--teardown` 은 이 도구가 만든 것만 지워요. 기존 메일 SNS 주제 · 메일 구독 · 백업 경보 · SSM 웹훅 매개변수와 서버 역할의 정책은 남아요(직접 뗀 정책은 직접 지워요).
 
 ## 임계값 조정
 
@@ -93,11 +93,11 @@ node infra/monitoring/install.mjs --teardown --apply                        # �
    ```
 3. `node --test infra/monitoring/test/*.test.mjs` 가 통과하는지 확인하고, `node infra/monitoring/install.mjs --apply ...` 로 다시 적용해요(`put-metric-alarm` 은 같은 이름이면 덮어써요).
 
-5xx 경보는 「5분에 15건 이상이고 요청의 2% 이상, 2번 연속」이에요(`SPIKE_5XX_MIN_COUNT` · `SPIKE_5XX_MIN_RATIO`). 배포 직후 3분은 수집기가 `DeployWindow` 를 올려 빼요.
+5xx 경보는 「5분에 15건 이상이고 요청의 2% 이상, 2번 연속」이에요(`SPIKE_5XX_MIN_COUNT` · `SPIKE_5XX_MIN_RATIO`). 배포 직후 3분은 수집기가 `DeployWindow` 를 올려 빼요. nginx `limit_req` 가 거절한 요청도 503 으로 기록되는데, 수집기가 nginx 오류 로그의 거절 줄(`limiting requests, excess:`)을 세어 5xx 에서 빼고 `NginxRateLimited` 로 따로 올려요(하루 요약의 「요청 제한 거절」). 로그에 그 줄이 없으면(`docker logs teameet_nginx 2>&1 | grep -c 'limiting requests'` 로 확인) 거절이 5xx 로 센다는 뜻이에요.
 
 ## 웹훅을 바꿀 때
 
-SSM 매개변수 값을 바꾼 뒤 Lambda 를 한 번 갱신해요(`install.mjs --apply` 를 다시 돌리면 돼요). Lambda 는 웹훅을 첫 실행 때 한 번 읽고 기억해요.
+SSM 매개변수 값만 바꾸면 돼요. Lambda 는 호출마다 웹훅을 읽어서 다시 배포하지 않아도 다음 알림부터 새 값을 써요.
 
 ## 시험
 

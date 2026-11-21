@@ -207,12 +207,42 @@ test('the collector-silent alarm treats missing data as breaching, a counter ala
   assert.equal(arg('alarm-prod-web-restart'), 'notBreaching');
 });
 
-test('teardown removes only what the stack made: the existing topic and backup alarm are never touched', () => {
-  const text = JSON.stringify(buildTeardownPlan(ids));
-  assert.ok(!text.includes('backup-missing'));
-  assert.ok(!buildTeardownPlan(ids).some((s) => s.args?.[1] === 'delete-topic' && s.args.includes('teameet-prod-ops-alerts')));
-  const alarmDeletes = buildTeardownPlan(ids).filter((s) => s.args?.[1] === 'delete-alarms');
-  assert.equal(alarmDeletes.length, 2);
+test('teardown removes only what the stack made: the mail topic and backup alarm are never touched', () => {
+  const plan = buildTeardownPlan(ids);
+  assert.ok(!JSON.stringify(plan).includes('backup-missing'));
+  assert.ok(!JSON.stringify(plan).includes('teameet-prod-ops-alerts'), 'the mail topic is not deleted or unsubscribed');
+  const topics = plan.filter((s) => s.args?.[1] === 'delete-topic').map((s) => s.args.at(-1));
+  assert.deepEqual(topics, [
+    'arn:aws:sns:ap-northeast-2:{{account}}:teameet-prod-ops-slack',
+    'arn:aws:sns:us-east-1:{{account}}:teameet-ops-alerts-use1',
+  ]);
+  assert.equal(plan.filter((s) => s.args?.[1] === 'delete-alarms').length, 2);
+});
+
+test('the stack alarms go to the Slack topic, which the Lambda alone subscribes to; only the delivery-failure alarm uses the mail topic', () => {
+  const plan = buildInstallPlan(ids);
+  const SLACK = 'arn:aws:sns:ap-northeast-2:{{account}}:teameet-prod-ops-slack';
+  const MAIL = 'arn:aws:sns:ap-northeast-2:{{account}}:teameet-prod-ops-alerts';
+  const regional = plan.filter((s) => s.args?.[1] === 'put-metric-alarm' && s.args.includes('ap-northeast-2'));
+  assert.ok(regional.length > 20);
+  for (const s of regional) {
+    const actions = [s.args[s.args.indexOf('--alarm-actions') + 1], s.args[s.args.indexOf('--ok-actions') + 1]];
+    const expected = s.id === 'alarm-lambda-errors' ? MAIL : SLACK;
+    assert.deepEqual(actions, [expected, expected], s.id);
+  }
+  const subscribes = plan.filter((s) => s.args?.[1] === 'subscribe');
+  assert.deepEqual(subscribes.map((s) => s.args[s.args.indexOf('--topic-arn') + 1]).filter((a) => a.includes('ap-northeast-2')), [SLACK]);
+  assert.ok(!JSON.stringify(plan).includes('"--protocol","email"'));
+  const perm = plan.find((s) => s.id === 'perm-sns');
+  assert.equal(perm.args[perm.args.indexOf('--source-arn') + 1], SLACK);
+});
+
+test('the mail topic is checked read-only before anything is created', () => {
+  const plan = buildInstallPlan(ids);
+  const check = plan.find((s) => s.id === 'mail-topic-exists');
+  assert.equal(check.readonly, true);
+  assert.equal(check.args[1], 'get-topic-attributes');
+  assert.ok(plan.indexOf(check) < plan.findIndex((s) => s.id === 'role'));
 });
 
 test('teardown skips a step whose target does not exist instead of calling with an empty id', async () => {
@@ -220,7 +250,6 @@ test('teardown skips a step whose target does not exist instead of calling with 
   const exec = async (args) => { calls.push(args); return args[0] === 'sts' ? '111122223333' : ''; };
   await runPlan(buildTeardownPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' });
   assert.ok(!calls.some((c) => c[1] === 'delete-health-check'));
-  assert.ok(!calls.some((c) => c[1] === 'unsubscribe'));
 });
 
 test('renderCommand quotes JSON so a printed command can be pasted into a shell', () => {
@@ -241,10 +270,10 @@ test('teardown: the CLI text output "None" means nothing was found, so no delete
   const exec = async (args) => {
     calls.push(args);
     if (args[0] === 'sts') return '111122223333\n';
-    return args[1] === 'list-health-checks' || args[1] === 'list-subscriptions-by-topic' ? 'None\n' : '';
+    return args[1] === 'list-health-checks' ? 'None\n' : '';
   };
   await runPlan(buildTeardownPlan(ids), { apply: true, exec, log() {}, buildZip: async () => '/x' });
-  assert.ok(!calls.some((c) => c[1] === 'delete-health-check' || c[1] === 'unsubscribe'));
+  assert.ok(!calls.some((c) => c[1] === 'delete-health-check'));
   assert.ok(calls.some((c) => c[1] === 'delete-alarms'), 'unrelated steps still run');
 });
 

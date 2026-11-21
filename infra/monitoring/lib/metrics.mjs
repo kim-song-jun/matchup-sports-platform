@@ -41,6 +41,7 @@ export function buildMetricData(env, sample, { botNames = false } = {}) {
     entry('DeployWindow', sample.deployWindow),
     entry('Nginx5xx', sample.nginx?.errors5xx),
     entry('NginxRequests', sample.nginx?.requests),
+    entry('NginxRateLimited', sample.nginx?.rateLimited),
     entry('BotRequests', sample.nginx?.bots),
     entry('WebMemPct', sample.webMemPct, 'Percent'),
     entry('MemAvailableMB', sample.memAvailableMB, 'Megabytes'),

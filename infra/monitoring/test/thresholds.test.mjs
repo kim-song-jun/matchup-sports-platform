@@ -91,10 +91,10 @@ test('prod steady state from the 7-day measurement stays quiet', () => {
   assert.equal(evaluateRule(rule('ec2-cpu-high'), [77.6, 45, 18]), 'OK');
 });
 
-test('describeAlarm resolves names, including the existing backup alarm', () => {
+test('describeAlarm resolves the stack alarms and nothing else', () => {
   assert.equal(describeAlarm('teameet-prod-heap-oom').severity, 'critical');
   assert.equal(describeAlarm('teameet-alpha-heap-oom').severity, 'warning');
-  assert.equal(describeAlarm('teameet-prod-backup-missing').env, 'prod');
+  assert.equal(describeAlarm('teameet-prod-backup-missing'), null, 'mail-only alarms never reach the Lambda');
   assert.equal(describeAlarm('teameet-prod-health-web').severity, 'critical');
   assert.equal(describeAlarm('something-else'), null);
 });
@@ -103,6 +103,6 @@ test('every runbook anchor used in Slack links exists as a heading in docs/ops/o
   const md = readFileSync(fileURLToPath(new URL('../../../docs/ops/ops-alerts.md', import.meta.url)), 'utf8');
   const slugs = new Set(md.split('\n').filter((l) => /^#{2,3} /.test(l)).map((l) =>
     l.replace(/^#+ /, '').trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-')));
-  const anchors = new Set([...RULES.map((r) => r.anchor), ...HEALTH_CHECKS.map((h) => h.anchor), '백업', 'slack-전달-실패']);
+  const anchors = new Set([...RULES.map((r) => r.anchor), ...HEALTH_CHECKS.map((h) => h.anchor)]);
   for (const a of anchors) assert.ok(slugs.has(a), `runbook has no heading for #${a}`);
 });

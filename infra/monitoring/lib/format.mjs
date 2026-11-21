@@ -83,7 +83,7 @@ export function formatAlarmNotification(message, context = {}) {
     if (context.occurrence > 1) {
       lines.push(`• 되풀이되고 있어요 — ${context.spanMinutes}분 동안 ${context.occurrence}번째예요(알림은 ${POST_AT_OCCURRENCE.join(' · ')}번째에만 보내요)`);
     }
-    if (known?.event) lines.push('• 한 번 일어난 일이라 회복 알림은 보내지 않아요(또 일어나면 다시 알려요)');
+    if (known?.event) lines.push('• 한 번 일어난 일이라 회복 알림은 보내지 않아요(10분 안에 3번 넘게 이어지면 「재시작 루프」 경보가 따로 와요)');
   } else {
     const minutes = context.alarmedAt ? minutesBetween(context.alarmedAt, message.StateChangeTime) : null;
     lines.push(minutes === null

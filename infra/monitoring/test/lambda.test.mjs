@@ -69,6 +69,19 @@ test('an event alarm (restart, heap death) never posts a recovery', async () => 
   assert.equal(d.posted.length, 1, 'a state alarm still reports its recovery');
 });
 
+test('the restart-loop alarm posts its start and its recovery with the duration, unlike the event alarms', async () => {
+  const d = deps();
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop' }))] }, d);
+  assert.equal(d.posted.length, 1);
+  assert.match(d.posted[0].text, /^\[긴급\]\[운영\] 컨테이너가 계속 다시 시작되고 있어요/);
+  assert.ok(!d.posted[0].text.includes('회복 알림은 보내지 않아요'));
+  assert.ok(d.posted[0].text.includes(`#${encodeURIComponent('재시작-루프')}`));
+  const r = deps({ lookupAlarmedAt: async () => '2026-11-20T01:50:47.000+0000' });
+  await handler({ Records: [sns(alarm({ AlarmName: 'teameet-prod-restart-loop', NewStateValue: 'OK', StateChangeTime: '2026-11-20T02:05:47.000+0000' }))] }, r);
+  assert.equal(r.posted.length, 1);
+  assert.match(r.posted[0].text, /^\[회복\]\[운영\].*\(15분\)/s);
+});
+
 const HEAP_ALARM_TIME = Date.parse('2026-11-20T01:50:47.803Z');
 test('one OOM death: the two alarms and their two recoveries become one Slack message', async () => {
   const transitions = [

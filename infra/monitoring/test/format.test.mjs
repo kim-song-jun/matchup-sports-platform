@@ -24,7 +24,7 @@ test('alarm message: critical prod heap death, exact text', () => {
     '[긴급][운영] heap 부족으로 프로세스가 죽었어요',
     '• 언제: 11-20(금) 10:50 KST',
     '• 무엇: Threshold Crossed: 1 datapoint [1.0 (20/11/26 01:50:00)] was greater than or equal to the threshold (1.0).',
-    '• 한 번 일어난 일이라 회복 알림은 보내지 않아요(또 일어나면 다시 알려요)',
+    '• 한 번 일어난 일이라 회복 알림은 보내지 않아요(10분 안에 3번 넘게 이어지면 「재시작 루프」 경보가 따로 와요)',
     '• 먼저 볼 것: <https://github.com/kim-song-jun/matchup-sports-platform/blob/dev/docs/ops/ops-alerts.md#heap-%EB%B6%80%EC%A1%B1|런북>',
     '• 경보 <https://ap-northeast-2.console.aws.amazon.com/cloudwatch/home?region=ap-northeast-2#alarmsV2:alarm/teameet-prod-heap-oom|CloudWatch>',
   ].join('\n'));

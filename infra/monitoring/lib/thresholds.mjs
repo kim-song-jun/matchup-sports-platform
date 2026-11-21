@@ -41,6 +41,11 @@ export const RULES = [
   { id: 'heap-oom', scope: 'both', severity: 'critical', event: true, group: 'process-exit', title: 'heap 부족으로 프로세스가 죽었어요',
     anchor: 'heap-부족', source: { kind: 'sum-containers', metricName: 'HeapOom', containers: HEAP_CONTAINERS, period: 60 },
     op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 1, datapointsToAlarm: 1, missing: 'notBreaching' },
+  // State alarm (recovers, so it posts [회복]): a loop faster than one minute keeps the `event` alarms above in
+  // ALARM, where CloudWatch sends nothing more. 3 of the last 10 minutes with a restart ends that silence.
+  { id: 'restart-loop', scope: 'both', severity: 'critical', title: '컨테이너가 계속 다시 시작되고 있어요(재시작 루프)',
+    anchor: '재시작-루프', source: { kind: 'sum-containers', metricName: 'Restarts', containers: CONTAINERS, period: 60 },
+    op: 'GreaterThanOrEqualToThreshold', threshold: 1, evaluationPeriods: 10, datapointsToAlarm: 3, missing: 'notBreaching' },
   { id: 'web-memory-high', scope: 'prod', severity: 'warning', title: 'web 메모리가 한도에 가까워요',
     anchor: 'web-메모리', source: custom('WebMemPct', { stat: 'Maximum' }),
     op: 'GreaterThanOrEqualToThreshold', threshold: 85, evaluationPeriods: 10, datapointsToAlarm: 10, missing: 'notBreaching' },

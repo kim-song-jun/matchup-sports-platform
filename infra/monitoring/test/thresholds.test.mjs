@@ -21,9 +21,9 @@ test('every rule is well formed and ids are unique', () => {
   }
 });
 
-test('alpha pages on exactly five things and never as critical', () => {
+test('alpha pages on exactly six things and never as critical', () => {
   const alpha = rulesFor('alpha');
-  assert.deepEqual(alpha.map((r) => r.id).sort(), ['collector-silent', 'collector-step-failed', 'disk-high', 'heap-oom', 'web-restart']);
+  assert.deepEqual(alpha.map((r) => r.id).sort(), ['collector-silent', 'collector-step-failed', 'disk-high', 'heap-oom', 'restart-loop', 'web-restart']);
   assert.ok(alpha.every((r) => r.severity === 'warning'));
   assert.ok(rulesFor('prod').some((r) => r.severity === 'critical'));
 });
@@ -105,4 +105,45 @@ test('every runbook anchor used in Slack links exists as a heading in docs/ops/o
     l.replace(/^#+ /, '').trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-')));
   const anchors = new Set([...RULES.map((r) => r.anchor), ...HEALTH_CHECKS.map((h) => h.anchor)]);
   for (const a of anchors) assert.ok(slugs.has(a), `runbook has no heading for #${a}`);
+});
+
+// Per-minute restart counts the collector would publish for a container that restarts every `periodS` seconds.
+function restartMinutes(periodS, minutes) {
+  return Array.from({ length: minutes }, (_, m) => {
+    let n = 0;
+    for (let t = 0; t < minutes * 60; t += periodS) if (t >= m * 60 && t < (m + 1) * 60) n += 1;
+    return n;
+  });
+}
+
+test('restart-loop: a loop faster than a minute is ALARM and stays ALARM until it stops, then recovers', () => {
+  const loop = rule('restart-loop');
+  const state = (values) => values.map((_, i) => evaluateRule(loop, values.slice(0, i + 1)));
+  const fast = restartMinutes(50, 30);
+  // The event alarm never leaves ALARM here (a restart every minute): that is the gap this rule closes.
+  assert.ok(state(fast).slice(3).every((v) => v === 'ALARM'));
+  assert.equal(evaluateRule(rule('web-restart'), fast.slice(-1)), 'ALARM');
+  const stopped = [...fast, ...Array(12).fill(0)];
+  assert.equal(state(stopped).at(-1), 'OK', 'recovers once fewer than 3 of the last 10 minutes have a restart');
+  assert.equal(state(stopped)[fast.length + 2], 'ALARM', 'does not flap off the minute the loop pauses');
+});
+
+test('restart-loop: a single restart or one OOM death (restart + heap in the same minute) stays quiet', () => {
+  const loop = rule('restart-loop');
+  assert.equal(evaluateRule(loop, [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]), 'OK');
+  assert.equal(evaluateRule(loop, [0, 0, 0, 0, 0, 1, 0, 0, 1, 0]), 'OK');
+  assert.equal(evaluateRule(loop, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]), 'OK');
+});
+
+test('restart-loop: the 2-minute and the 65-second loops of the review reproduction both alarm', () => {
+  for (const periodS of [65, 120]) {
+    assert.equal(evaluateRule(rule('restart-loop'), restartMinutes(periodS, 12)), 'ALARM', `${periodS}s`);
+  }
+});
+
+test('restart-loop is a state alarm: it has no event flag and no dedupe group, so its recovery is posted', () => {
+  const loop = rule('restart-loop');
+  assert.equal(loop.event, undefined);
+  assert.equal(loop.group, undefined);
+  assert.equal(loop.source.kind, 'sum-containers');
 });

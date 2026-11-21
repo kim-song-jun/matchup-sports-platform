@@ -44,7 +44,7 @@ PR 이 머지돼도 AWS 와 서버는 그대로예요. 아래 순서로 **사람
    node infra/monitoring/install.mjs --apply \
      --prod-instance-id <운영 인스턴스 ID> --alpha-instance-id <alpha 인스턴스 ID> --rds-id <RDS 인스턴스 이름>
    ```
-   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 26개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1, 서울 SNS 주제 `teameet-prod-ops-slack` 1(경보와 Lambda 만 써요, 메일 구독 없음). 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로고, 이 주제에는 백업 경보와 「Slack 전달 실패」 경보만 있어요(메일 한 통이 곧 실제 문제예요). 이 주제가 없으면 아무것도 만들기 전에 멈춰요.
+   웹훅 매개변수가 없으면 아무것도 만들기 전에 멈춰요. 두 번 실행해도 안전해요(이미 있는 것은 그대로 두고 코드 · 경보는 덮어써요). 만들어지는 것: Lambda 1 + 역할 2, 서울 경보 28개 · us-east-1 경보 2개, us-east-1 SNS 주제 1, Route 53 헬스 체크 2, 하루 요약 스케줄 1, 서울 SNS 주제 `teameet-prod-ops-slack` 1(경보와 Lambda 만 써요, 메일 구독 없음). 기존 SNS 주제 `teameet-prod-ops-alerts` 와 메일 구독은 그대로고, 이 주제에는 백업 경보와 「Slack 전달 실패」 경보만 있어요(메일 한 통이 곧 실제 문제예요). 이 주제가 없으면 아무것도 만들기 전에 멈춰요.
 
    **「수집기 끊김」 경보는 그 환경의 Heartbeat 가 최근 15분에 들어온 것을 확인한 뒤에만 만들어요**(숫자가 없으면 만들자마자 긴급이 울려요). 수집기를 아직 못 깔았으면(예: 운영 서버에 Node 가 없을 때) 그 경보만 건너뛰고 나머지는 만들어요. 수집기를 깐 뒤 같은 명령을 다시 실행하면 그때 만들어져요 — 그 전까지 운영은 수집기 끊김 경보가 없다는 뜻이니 설치 완료 전까지 사람이 서버 상태를 봐요.
 6. **시험.** `aws cloudwatch set-alarm-state --alarm-name teameet-alpha-web-restart --state-value ALARM --state-reason test` 로 Slack 모양을 확인하고, alpha 에서 `systemctl stop teameet-ops-metrics.timer` 5분 뒤 「수집기 끊김」 경보와 회복을 확인해요. 시험 채널로 1주 돌린 뒤 임계값을 보고 운영 채널로 옮겨요.
@@ -67,7 +67,7 @@ node /usr/local/lib/teameet-ops/collect.mjs --env prod            # 출력만
 
 ## 알림 묶기
 
-한 번의 heap 부족이 만드는 경보 2개(`web-restart` · `heap-oom`)를 Lambda 가 한 메시지로 묶고, 재시작 · heap 부족은 회복 메시지를 보내지 않으며, 같은 경보가 되풀이되면(이어진 두 번 사이가 30분 이내) 1 · 3 · 6 · 12 · 24 · 48 · 96번째만 보내고 「N분 동안 M번째」를 적어요. 같은 경보는 아무리 가까워도 따로 세요(2분마다 다시 뜨는 크래시 루프도 세요). 서로 다른 경보는 3분 안에 이어지면 한 번으로 묶어요. 경보 기록은 6시간 전까지, 5쪽까지 읽어요(`lib/dedupe.mjs`). 새 경보를 묶고 싶으면 `RULES` 에 같은 `group` 을(한 번 일어나고 끝나는 일이면 `event: true` 도) 달아요. Lambda 는 알림 한 건마다 8초 기다려 같은 사건의 다른 경보를 함께 봐요.
+한 번의 heap 부족이 만드는 경보 2개(`web-restart` · `heap-oom`)를 Lambda 가 한 메시지로 묶고, 재시작 · heap 부족은 회복 메시지를 보내지 않으며, 같은 경보가 되풀이되면(이어진 두 번 사이가 30분 이내) 1 · 3 · 6 · 12 · 24 · 48 · 96번째만 보내고 「N분 동안 M번째」를 적어요. 같은 경보는 아무리 가까워도 따로 세요(2분마다 다시 뜨는 크래시 루프도 세요). 다만 재시작이 1분보다 빠르거나 여러 컨테이너가 엇갈려 일어나면 `web-restart` · `heap-oom` 은 ALARM 에서 풀리지 않아 CloudWatch 가 새 전이를 보내지 않고, 첫 알림만 와요. 그 구간은 회복 알림이 있는 `restart-loop` 경보(10분 중 3분 이상 재시작)가 맡아요. 서로 다른 경보는 3분 안에 이어지면 한 번으로 묶어요. 경보 기록은 6시간 전까지, 5쪽까지 읽어요(`lib/dedupe.mjs`). 새 경보를 묶고 싶으면 `RULES` 에 같은 `group` 을(한 번 일어나고 끝나는 일이면 `event: true` 도) 달아요. Lambda 는 알림 한 건마다 8초 기다려 같은 사건의 다른 경보를 함께 봐요.
 
 ## 되돌리기
 

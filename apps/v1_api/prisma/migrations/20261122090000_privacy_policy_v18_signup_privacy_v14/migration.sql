@@ -1,6 +1,6 @@
 -- Immutable privacy_policy v1.8 and signup_privacy v1.4 revisions, effective when this migration runs. Retain all previously accepted documents.
 INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "subtitle", "content", "content_hash", "change_summary", "requires_reconsent", "status", "effective_at", "published_at", "supersedes_document_id", "created_at", "updated_at")
-SELECT 'a1190000-0000-4000-8000-000000000004', 'a1100000-0000-4000-8000-000000000004', 'v1.8', '개인정보처리방침', '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.', doc.body, encode(sha256(convert_to(doc.body, 'UTF8')), 'hex'), '수탁자와 위탁 업무, 쿠키와 국외 이전, 카카오 닉네임·프로필 이미지 미수집, 카카오 연결 해제 요청과 해제 통지 처리, 로그인 수단 연결·해제, 카카오 지도·장소 검색, 팀 내 경기 기록, 관리자 회원 조회 보호조치, 처리방침 변경 안내 추가', false, 'published'::"V1TermsDocumentStatus", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'a1180000-0000-4000-8000-000000000004', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+SELECT 'a1190000-0000-4000-8000-000000000004', 'a1100000-0000-4000-8000-000000000004', 'v1.8', '개인정보처리방침', '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.', doc.body, encode(sha256(convert_to(doc.body, 'UTF8')), 'hex'), '수탁자와 위탁 업무, 쿠키와 국외 이전, 카카오 닉네임·프로필 이미지 미수집, 카카오 연결 해제 요청과 해제 통지 처리, 로그인 수단 연결·해제, 카카오 지도·장소 검색, 팀 내 경기 기록, 관리자 회원 조회 보호조치, 처리방침 변경 안내 추가', false, 'published'::"V1TermsDocumentStatus", doc.published_utc, doc.published_utc, 'a1180000-0000-4000-8000-000000000004', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (SELECT '개인정보처리방침
 
 아이위(IWI)(대표 김봉목, 이하 “회사”)는 팀밋(Teameet) 이용자의 개인정보를 중요하게 생각하며, 개인정보 보호 관련 법령을 준수하기 위해 다음과 같이 개인정보처리방침을 수립·공개합니다.
@@ -207,9 +207,9 @@ Amazon Web Services Korea LLC(개인정보 문의: https://aws.amazon.com/privac
 
 17. 개인정보처리방침의 변경
 
-이 개인정보처리방침은 ' || day.published_day || '부터 적용됩니다. 처리하는 개인정보의 항목이나 처리 목적처럼 이용자의 권리에 중요한 영향을 주는 내용이 바뀌면 시행 전 또는 시행과 동시에 바뀌기 전과 후를 비교해 서비스 공지로 안내합니다. 이전 개인정보처리방침은 고객센터에 요청하면 확인할 수 있습니다.
+이 개인정보처리방침은 ' || to_char(clock.published AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '부터 적용됩니다. 처리하는 개인정보의 항목이나 처리 목적처럼 이용자의 권리에 중요한 영향을 주는 내용이 바뀌면 시행 전 또는 시행과 동시에 바뀌기 전과 후를 비교해 서비스 공지로 안내합니다. 이전 개인정보처리방침은 고객센터에 요청하면 확인할 수 있습니다.
 
-최종 변경일: ' || day.published_day || '' AS body FROM (SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') AS published_day) AS day) AS doc
+최종 변경일: ' || to_char(clock.published AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AS body, clock.published AT TIME ZONE 'UTC' AS published_utc FROM (SELECT date_trunc('second', CURRENT_TIMESTAMP) AS published) AS clock) AS doc
 ON CONFLICT ("policy_id", "version") DO NOTHING;
 DO $privacy_v18_guard$ BEGIN
  IF NOT EXISTS (SELECT 1 FROM "v1_managed_terms_documents" AS t WHERE t."id" = 'a1190000-0000-4000-8000-000000000004' AND t."policy_id" = 'a1100000-0000-4000-8000-000000000004' AND t."version" = 'v1.8' AND t."title" = '개인정보처리방침' AND t."subtitle" = '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.' AND t."change_summary" = '수탁자와 위탁 업무, 쿠키와 국외 이전, 카카오 닉네임·프로필 이미지 미수집, 카카오 연결 해제 요청과 해제 통지 처리, 로그인 수단 연결·해제, 카카오 지도·장소 검색, 팀 내 경기 기록, 관리자 회원 조회 보호조치, 처리방침 변경 안내 추가' AND t."content" = '개인정보처리방침
@@ -418,12 +418,12 @@ Amazon Web Services Korea LLC(개인정보 문의: https://aws.amazon.com/privac
 
 17. 개인정보처리방침의 변경
 
-이 개인정보처리방침은 ' || to_char(t."effective_at" AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '부터 적용됩니다. 처리하는 개인정보의 항목이나 처리 목적처럼 이용자의 권리에 중요한 영향을 주는 내용이 바뀌면 시행 전 또는 시행과 동시에 바뀌기 전과 후를 비교해 서비스 공지로 안내합니다. 이전 개인정보처리방침은 고객센터에 요청하면 확인할 수 있습니다.
+이 개인정보처리방침은 ' || to_char((t."effective_at" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '부터 적용됩니다. 처리하는 개인정보의 항목이나 처리 목적처럼 이용자의 권리에 중요한 영향을 주는 내용이 바뀌면 시행 전 또는 시행과 동시에 바뀌기 전과 후를 비교해 서비스 공지로 안내합니다. 이전 개인정보처리방침은 고객센터에 요청하면 확인할 수 있습니다.
 
-최종 변경일: ' || to_char(t."effective_at" AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AND t."content_hash" = encode(sha256(convert_to(t."content", 'UTF8')), 'hex') AND t."requires_reconsent" = false AND t."status" = 'published' AND t."effective_at" IS NOT NULL AND t."effective_at" = t."published_at" AND t."supersedes_document_id" = 'a1180000-0000-4000-8000-000000000004') THEN RAISE EXCEPTION 'Privacy v1.8 canonical document conflict' USING ERRCODE = '23514'; END IF;
+최종 변경일: ' || to_char((t."effective_at" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AND t."content_hash" = encode(sha256(convert_to(t."content", 'UTF8')), 'hex') AND t."requires_reconsent" = false AND t."status" = 'published' AND t."effective_at" IS NOT NULL AND t."effective_at" = t."published_at" AND t."supersedes_document_id" = 'a1180000-0000-4000-8000-000000000004') THEN RAISE EXCEPTION 'Privacy v1.8 canonical document conflict' USING ERRCODE = '23514'; END IF;
 END $privacy_v18_guard$;
 INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "subtitle", "content", "content_hash", "change_summary", "requires_reconsent", "status", "effective_at", "published_at", "supersedes_document_id", "created_at", "updated_at")
-SELECT 'a1190000-0000-4000-8000-000000000002', 'a1100000-0000-4000-8000-000000000002', 'v1.4', '개인정보 수집 및 이용 동의', '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.', doc.body, encode(sha256(convert_to(doc.body, 'UTF8')), 'hex'), 'Apple 로그인 수집 정보 명시, 카카오 닉네임·프로필 이미지 미수집, 팀 내 경기 기록 추가', false, 'published'::"V1TermsDocumentStatus", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'a1170000-0000-4000-8000-000000000002', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+SELECT 'a1190000-0000-4000-8000-000000000002', 'a1100000-0000-4000-8000-000000000002', 'v1.4', '개인정보 수집 및 이용 동의', '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.', doc.body, encode(sha256(convert_to(doc.body, 'UTF8')), 'hex'), 'Apple 로그인 수집 정보 명시, 카카오 닉네임·프로필 이미지 미수집, 팀 내 경기 기록 추가', false, 'published'::"V1TermsDocumentStatus", doc.published_utc, doc.published_utc, 'a1170000-0000-4000-8000-000000000002', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (SELECT '개인정보 수집 및 이용 동의
 
 아이위(IWI)(대표 김봉목, 이하 “회사”)는 팀밋(Teameet) 서비스 제공을 위해 아래와 같이 개인정보를 수집 및 이용합니다.
@@ -487,7 +487,7 @@ Apple 서비스 회원번호, Apple 동의 화면에서 이용자가 허용한 �
 대표자: 김봉목
 사업자등록번호: 759-31-01615
 주소: 경기도 평택시 탄현1로 108, 105호(서정동)
-시행일: ' || day.published_day || '' AS body FROM (SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') AS published_day) AS day) AS doc
+시행일: ' || to_char(clock.published AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AS body, clock.published AT TIME ZONE 'UTC' AS published_utc FROM (SELECT date_trunc('second', CURRENT_TIMESTAMP) AS published) AS clock) AS doc
 ON CONFLICT ("policy_id", "version") DO NOTHING;
 DO $signup_privacy_v14_guard$ BEGIN
  IF NOT EXISTS (SELECT 1 FROM "v1_managed_terms_documents" AS t WHERE t."id" = 'a1190000-0000-4000-8000-000000000002' AND t."policy_id" = 'a1100000-0000-4000-8000-000000000002' AND t."version" = 'v1.4' AND t."title" = '개인정보 수집 및 이용 동의' AND t."subtitle" = '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.' AND t."change_summary" = 'Apple 로그인 수집 정보 명시, 카카오 닉네임·프로필 이미지 미수집, 팀 내 경기 기록 추가' AND t."content" = '개인정보 수집 및 이용 동의
@@ -553,5 +553,5 @@ Apple 서비스 회원번호, Apple 동의 화면에서 이용자가 허용한 �
 대표자: 김봉목
 사업자등록번호: 759-31-01615
 주소: 경기도 평택시 탄현1로 108, 105호(서정동)
-시행일: ' || to_char(t."effective_at" AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AND t."content_hash" = encode(sha256(convert_to(t."content", 'UTF8')), 'hex') AND t."requires_reconsent" = false AND t."status" = 'published' AND t."effective_at" IS NOT NULL AND t."effective_at" = t."published_at" AND t."supersedes_document_id" = 'a1170000-0000-4000-8000-000000000002') THEN RAISE EXCEPTION 'Signup privacy v1.4 canonical document conflict' USING ERRCODE = '23514'; END IF;
+시행일: ' || to_char((t."effective_at" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY"년 "FMMM"월 "FMDD"일"') || '' AND t."content_hash" = encode(sha256(convert_to(t."content", 'UTF8')), 'hex') AND t."requires_reconsent" = false AND t."status" = 'published' AND t."effective_at" IS NOT NULL AND t."effective_at" = t."published_at" AND t."supersedes_document_id" = 'a1170000-0000-4000-8000-000000000002') THEN RAISE EXCEPTION 'Signup privacy v1.4 canonical document conflict' USING ERRCODE = '23514'; END IF;
 END $signup_privacy_v14_guard$;

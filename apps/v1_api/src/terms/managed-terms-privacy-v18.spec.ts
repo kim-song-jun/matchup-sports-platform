@@ -38,10 +38,11 @@ describe('immutable privacy_policy v1.8 and signup_privacy v1.4 (effective when 
     expect(entry.policyId).toBe(before.policyId);
     expect(entry.document).toMatchObject({ version, supersedesDocumentId: before.document.id, requiresReconsent: false });
     expect(insert).toContain(`SELECT ${sqlLiteral(String(entry.document.id))}, ${sqlLiteral(entry.policyId)}, '${version}'`);
-    expect(insert).toContain(`${bodyExpression(entry.document, 'day.published_day')} AS body`);
-    expect(insert).toContain(`FROM (SELECT ${kstDay('CURRENT_TIMESTAMP')} AS published_day) AS day`);
+    // One whole-second instant feeds both the stored UTC wall-clock time and the KST date in the body.
+    expect(insert).toContain(`${bodyExpression(entry.document, kstDay('clock.published'))} AS body, clock.published AT TIME ZONE 'UTC' AS published_utc`);
+    expect(insert).toContain("FROM (SELECT date_trunc('second', CURRENT_TIMESTAMP) AS published) AS clock");
     expect(insert).toContain("doc.body, encode(sha256(convert_to(doc.body, 'UTF8')), 'hex')");
-    expect(insert).toContain(`false, 'published'::"V1TermsDocumentStatus", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ${sqlLiteral(String(entry.document.supersedesDocumentId))}`);
+    expect(insert).toContain(`false, 'published'::"V1TermsDocumentStatus", doc.published_utc, doc.published_utc, ${sqlLiteral(String(entry.document.supersedesDocumentId))}`);
   });
 
   it.each([
@@ -49,7 +50,7 @@ describe('immutable privacy_policy v1.8 and signup_privacy v1.4 (effective when 
     ['signup_privacy', () => signup, 3, 'Signup privacy v1.4'],
   ])('guards %s against a conflicting row using its own stored date and hash', (_code, current, guardIndex, label) => {
     const guard = statements[guardIndex];
-    expect(guard).toContain(`AND t."content" = ${bodyExpression(current().document, kstDay('t."effective_at"'))} `);
+    expect(guard).toContain(`AND t."content" = ${bodyExpression(current().document, kstDay(`(t."effective_at" AT TIME ZONE 'UTC')`))} `);
     expect(guard).toContain(`t."content_hash" = encode(sha256(convert_to(t."content", 'UTF8')), 'hex')`);
     expect(guard).toContain('t."effective_at" = t."published_at"');
     expect(guard).toContain(`RAISE EXCEPTION '${label} canonical document conflict'`);

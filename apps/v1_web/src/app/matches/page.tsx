@@ -10,7 +10,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = buildPublicMetadata({
   title: '개인 매치 찾기',
-  description: '내 지역과 종목에 맞는 스포츠 매치를 찾고 함께 운동할 사람을 만나보세요.',
+  description: '내 지역과 종목에 맞는 개인 스포츠 매치를 찾고 함께 운동할 사람을 만나보세요. 일정, 장소, 모집 인원, 참가비를 한눈에 비교할 수 있어요.',
   path: '/matches',
 });
 

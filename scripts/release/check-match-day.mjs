@@ -58,7 +58,7 @@ async function pagedItems(fetchJson, pathFor, pageLimit, isDone = () => false) {
  */
 export async function collectMatchDay({ fetchJson, now }) {
   const today = kstDate(now);
-  const tournaments = await pagedItems(
+  const competitions = await pagedItems(
     fetchJson,
     (cursor) => `/tournaments?kind=all&limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
     PAGE_LIMIT,
@@ -67,11 +67,11 @@ export async function collectMatchDay({ fetchJson, now }) {
 
   const open = [];
   let finished = 0;
-  for (const tournament of tournaments) {
-    if (FINISHED_COMPETITION_STATUSES.has(tournament.status)) continue;
+  for (const competition of competitions) {
+    if (FINISHED_COMPETITION_STATUSES.has(competition.status)) continue;
     const fixtures = await pagedItems(
       fetchJson,
-      (cursor) => `/tournaments/${encodeURIComponent(tournament.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      (cursor) => `/tournaments/${encodeURIComponent(competition.id)}/schedule?limit=${SCHEDULE_PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       SCHEDULE_PAGE_LIMIT,
       // The schedule is ordered by kickoff, so a page ending after today has nothing left for today.
       (pageItems) => {
@@ -82,7 +82,7 @@ export async function collectMatchDay({ fetchJson, now }) {
     for (const fixture of fixtures) {
       if (!fixture.scheduledAt || kstDate(new Date(fixture.scheduledAt)) !== today) continue;
       if (OPEN_FIXTURE_STATUSES.has(fixture.status)) {
-        open.push({ title: tournament.title, scheduledAt: fixture.scheduledAt, status: fixture.status });
+        open.push({ title: competition.title, scheduledAt: fixture.scheduledAt, status: fixture.status });
       } else if (fixture.status === 'ended') {
         finished += 1;
       }

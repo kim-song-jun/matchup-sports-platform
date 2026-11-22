@@ -144,6 +144,17 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             팀 만들기
           </Link>
         </div>
+        {model.regionPriorityNotice ? (
+          <p className="tm-text-caption tm-team-region-priority">
+            {model.regionPriorityNotice.text}
+            {model.regionPriorityNotice.link ? (
+              <>
+                {' · '}
+                <Link className="tm-filter-region-notice-link" href={model.regionPriorityNotice.link.href}>{model.regionPriorityNotice.link.label}</Link>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (

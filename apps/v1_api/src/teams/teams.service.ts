@@ -128,7 +128,7 @@ export class TeamsService {
     const withFacets = query.includeFacets === true && !query.cursor;
     const [teams, sportRows] = await Promise.all([
       query.sort === 'activity'
-        ? this.listByActivity(user, where, limit, query.cursor)
+        ? this.listByActivity(user, where, limit, query.cursor, query.preferRegionId)
         : this.prisma.v1Team.findMany({
             where,
             include: this.teamInclude(user),
@@ -173,12 +173,19 @@ export class TeamsService {
 
   /**
    * 활동 많은순 — 취소·삭제되지 않은 팀 매치를 호스트로 올린 횟수. Prisma 는 관계 개수 정렬에 조건을 걸 수 없어서
-   * 조건에 맞는 팀의 순서를 먼저 정하고(횟수 → 최근 등록 → id, 커서가 흔들리지 않게 항상 같은 순서), 그 순서로 한 페이지만 읽는다.
+   * 조건에 맞는 팀의 순서를 먼저 정하고(내 지역 팀 먼저 → 횟수 → 최근 등록 → id, 커서가 흔들리지 않게 항상 같은 순서), 그 순서로 한 페이지만 읽는다.
+   * `preferRegionId` 가 있으면 그 지역(시/도면 하위 구/군 포함)의 팀이 전체 활동 순위와 무관하게 앞 무리가 되고, 두 무리 안에서는 각각 활동순이다.
    * ponytail: 조건에 맞는 팀 전체의 id 를 메모리에서 정렬한다. 팀이 수만 개를 넘으면 SQL 집계 정렬로 바꾼다.
    */
-  private async listByActivity(user: V1AuthUser | null, where: Prisma.V1TeamWhereInput, limit: number, cursor: string | undefined) {
+  private async listByActivity(
+    user: V1AuthUser | null,
+    where: Prisma.V1TeamWhereInput,
+    limit: number,
+    cursor: string | undefined,
+    preferRegionId?: string,
+  ) {
     const [teams, hosted] = await Promise.all([
-      this.prisma.v1Team.findMany({ where, select: { id: true, createdAt: true } }),
+      this.prisma.v1Team.findMany({ where, select: { id: true, createdAt: true, regionId: true, region: { select: { parentId: true } } } }),
       this.prisma.v1TeamMatch.groupBy({
         by: ['hostTeamId'],
         where: { deletedAt: null, status: { not: 'cancelled' }, hostTeam: where },
@@ -186,9 +193,13 @@ export class TeamsService {
       }),
     ]);
     const counts = new Map(hosted.map((row) => [row.hostTeamId, row._count._all]));
+    // 팀의 지역은 실제로는 구/군 단위라, 시/도를 고르면 그 하위 구/군도 같은 지역이다(teamListWhere 의 regionId 필터와 같은 규칙).
+    const inPreferredRegion = (team: (typeof teams)[number]) =>
+      Boolean(preferRegionId) && (team.regionId === preferRegionId || team.region?.parentId === preferRegionId);
     const ordered = teams
       .sort((a, b) =>
-        (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)
+        Number(inPreferredRegion(b)) - Number(inPreferredRegion(a))
+        || (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)
         || b.createdAt.getTime() - a.createdAt.getTime()
         || (a.id < b.id ? 1 : -1))
       .map((team) => team.id);

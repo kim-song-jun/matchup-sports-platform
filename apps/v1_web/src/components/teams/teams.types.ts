@@ -60,6 +60,8 @@ export type TeamListViewModel = {
     /** 저장한 활동 지역 안내(내 지역 칩이 있을 때) 또는 설정 유도. 프로필을 아직 못 받았으면 없다. */
     regionNotice?: { text: string; link: { label: string; href: string } };
   };
+  /** 기본 정렬(활동 많은순)에서 내 지역 팀을 먼저 보여 준다는 한 줄 안내. 링크는 활동 지역 설정을 권할 때만 있다. 적용하지 않는 목록·아직 모르는 상태에는 없다. */
+  regionPriorityNotice?: { text: string; link?: { label: string; href: string } };
   /** 로그인한 내가 속한 팀. 검색·필터 중이거나 없으면 비워 둔다(목록 맨 위 "내 팀" 줄). */
   myTeams?: Array<{ id: string; name: string; logoUrl: string | null; sport: string; roleLabel: string }>;
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;

@@ -5332,6 +5332,13 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0 12px;
 }
 
+/* 기본 정렬에서 내 지역 팀을 먼저 보여 준다는 한 줄 — 요약 바 바로 아래, 바와 같은 좌우 여백. */
+.tm-team-region-priority {
+  margin: var(--spacing-2) 0 0;
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
 .tm-team-summary-meta {
   display: flex;
   align-items: center;

@@ -56,7 +56,8 @@ export const TEAM_LIST_SEED_PATH = teamListSeedPath();
 const COMMON_LIST_FILTER_PARAMS = ['sportId', 'sort', 'genderRule', 'levelCodes', 'levels', 'q', 'recruitingOnly'] as const;
 export const MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'regionId'] as const;
 export const TEAM_MATCH_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'view', 'kind'] as const;
-export const TEAM_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'regionId'] as const;
+// `near` 는 "내 지역 팀 먼저"의 기준 지역이다. 사람이 고르는 필터가 아니라 이어 보기 주소가 순서를 이어 가려고 싣는 값이라 UI 에는 칩이 없다.
+export const TEAM_LIST_FILTER_PARAMS = [...COMMON_LIST_FILTER_PARAMS, 'regionId', 'near'] as const;
 /** 기본(활동 많은순)이 아닌 팀 정렬. URL 과 API 가 같은 값을 쓴다. 그 밖의 값은 기본 순서로 연다. */
 export type TeamSort = 'latest' | 'member_count' | typeof DEFAULT_TEAM_SORT;
 
@@ -73,6 +74,8 @@ export function teamListQueryFilters(params: Record<string, string | string[] | 
   genderRule?: string;
   levelCodes?: string;
   regionId?: string;
+  /** 활동 많은순에서 이 지역(시/도) 팀을 먼저 보여 준다. URL 의 `near` 에 대응한다. */
+  preferRegionId?: string;
 } {
   const filters: ReturnType<typeof teamListQueryFilters> = {};
   const sportId = firstSearchParam(params.sportId);
@@ -94,6 +97,10 @@ export function teamListQueryFilters(params: Record<string, string | string[] | 
 
   const regionId = firstSearchParam(params.regionId);
   if (regionId) filters.regionId = regionId;
+
+  // 지역 우선은 기본 정렬(활동 많은순)에서만 의미가 있고, 지역을 직접 고른 목록은 이미 그 지역뿐이라 싣지 않는다.
+  const near = firstSearchParam(params.near);
+  if (near && !regionId && filters.sort === DEFAULT_TEAM_SORT) filters.preferRegionId = near;
   return filters;
 }
 
@@ -136,6 +143,8 @@ export function teamListContinuationPath(params: Record<string, string | string[
   if (search) query.set('q', search);
   // 브라우저 주소에는 기본 정렬을 싣지 않는다 — 기본은 파라미터가 없는 상태다.
   if (filters.sort && filters.sort !== DEFAULT_TEAM_SORT) query.set('sort', filters.sort);
+  // 지역 우선으로 읽던 목록의 이어 보기는 같은 기준을 실어야 커서가 같은 순서에서 이어진다(없으면 기본 순서로 읽혀 겹치거나 빠진다).
+  if (filters.preferRegionId) query.set('near', filters.preferRegionId);
 
   query.set('cursor', cursor);
   return `/teams?${query.toString()}`;

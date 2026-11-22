@@ -687,6 +687,79 @@ describe('TeamsService', () => {
       expect(prisma.v1Team.findMany.mock.calls.at(-1)[0].orderBy).toEqual(expected);
     });
 
+    // 활동 많은순에 지역 우선을 얹는다 — 내 지역 팀이 앞 무리, 나머지는 그 뒤. 걸러 내지는 않는다.
+    describe('활동 많은순 — preferRegionId', () => {
+      const SEOUL = 'region-seoul';
+      // 순서를 정하는 첫 조회(select)와 페이지 본문을 읽는 둘째 조회(where.id.in)를 구분해 답한다.
+      const ordering = [
+        { id: 'seoul-gangnam', createdAt: new Date('2026-03-01T00:00:00Z'), regionId: 'region-gangnam', region: { parentId: SEOUL } },
+        { id: 'seoul-province', createdAt: new Date('2026-02-01T00:00:00Z'), regionId: SEOUL, region: { parentId: null } },
+        { id: 'busan-hot', createdAt: new Date('2026-01-01T00:00:00Z'), regionId: 'region-busan-haeundae', region: { parentId: 'region-busan' } },
+        { id: 'gyeonggi', createdAt: new Date('2026-04-01T00:00:00Z'), regionId: 'region-suwon', region: { parentId: 'region-gyeonggi' } },
+      ];
+      const hosted = [
+        { hostTeamId: 'busan-hot', _count: { _all: 9 } },
+        { hostTeamId: 'gyeonggi', _count: { _all: 5 } },
+        { hostTeamId: 'seoul-gangnam', _count: { _all: 2 } },
+      ];
+
+      beforeEach(() => {
+        (prisma.v1TeamMatch as unknown as { groupBy: jest.Mock }).groupBy = jest.fn().mockResolvedValue(hosted);
+        prisma.v1Team.findMany.mockImplementation(async (args: { select?: unknown; where: { id?: { in: string[] } } }) =>
+          args.select
+            ? [...ordering]
+            : (args.where.id?.in ?? []).map((id) => ({
+                ...teamRow({ id }),
+                name: id,
+                sport: { id: 'sport-1', name: 'Futsal' },
+                region: null,
+                profile: null,
+                memberships: [],
+                joinApplications: [],
+                trustScore: null,
+                ownerUser: { id: owner.id, profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: null } },
+              })));
+      });
+
+      const ids = async (query: Parameters<TeamsService['list']>[1]) => (await service.list(null, { sort: 'activity', ...query })).items.map((item) => item.id);
+
+      it('지역을 주지 않으면 지역과 무관하게 활동순이다', async () => {
+        expect(await ids({})).toEqual(['busan-hot', 'gyeonggi', 'seoul-gangnam', 'seoul-province']);
+      });
+
+      it('시/도를 주면 그 지역(하위 구/군 포함) 팀이 앞 무리가 되고, 각 무리 안에서는 활동순이다', async () => {
+        // 앞 무리: 강남(2건) → 서울 전체(0건). 뒤 무리: 부산(9건) → 경기(5건) — 활동이 더 많아도 내 지역 팀 뒤다.
+        expect(await ids({ preferRegionId: SEOUL })).toEqual(['seoul-gangnam', 'seoul-province', 'busan-hot', 'gyeonggi']);
+      });
+
+      it('어느 팀과도 맞지 않는 지역이면 순서를 바꾸지 않고, 팀을 걸러 내지도 않는다', async () => {
+        expect(await ids({ preferRegionId: 'region-none' })).toEqual(['busan-hot', 'gyeonggi', 'seoul-gangnam', 'seoul-province']);
+      });
+
+      it('빈 문자열은 지역을 주지 않은 것과 같다', async () => {
+        expect(await ids({ preferRegionId: '' })).toEqual(['busan-hot', 'gyeonggi', 'seoul-gangnam', 'seoul-province']);
+      });
+
+      it('더 보기로 이어 읽어도 같은 순서에서 겹치거나 빠지지 않는다', async () => {
+        const first = await service.list(null, { sort: 'activity', preferRegionId: SEOUL, limit: 3 });
+        expect(first.items.map((item) => item.id)).toEqual(['seoul-gangnam', 'seoul-province', 'busan-hot']);
+        expect(first.pageInfo).toMatchObject({ hasNext: true, nextCursor: 'busan-hot' });
+
+        const next = await service.list(null, { sort: 'activity', preferRegionId: SEOUL, limit: 3, cursor: first.pageInfo.nextCursor ?? undefined });
+        expect(next.items.map((item) => item.id)).toEqual(['gyeonggi']);
+        expect(next.pageInfo.hasNext).toBe(false);
+      });
+
+      it('활동순이 아닌 정렬에서는 무시한다', async () => {
+        prisma.v1Team.findMany.mockResolvedValue([]);
+        await service.list(null, { sort: 'latest', preferRegionId: SEOUL });
+
+        const args = prisma.v1Team.findMany.mock.calls.at(-1)[0];
+        expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+        expect(JSON.stringify(args.where)).not.toContain(SEOUL);
+      });
+    });
+
     it('includes the owner in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([
         {

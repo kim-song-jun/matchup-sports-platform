@@ -261,6 +261,9 @@ export class LineupTodoService {
       hostTeamId: { not: null },
       approvedApplicantTeamId: { not: null },
       game: { isNot: null },
+      // 삭제된 대회의 경기는 목록·알림에서 뺀다 — 남기면 "경기 상세" 링크가 404 로 끊긴다.
+      // 최상위 NOT 은 아래 일정 조건(AND/OR)과 겹치지 않아 시각 있는/없는 경기 모두에 걸린다.
+      NOT: { tournament: { is: { deletedAt: { not: null } } } },
       ...(teamIds !== null
         ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
         : {}),

@@ -353,6 +353,11 @@ export interface PublicMatchDetail {
    * 쓴다(`formatPeriodFormat`). null·누락이면 길이를 모르는 것이라 줄을 그리지 않는다.
    */
   readonly periodMinutes?: readonly number[] | null;
+  /**
+   * 경기의 교체 방식. `'rolling'`(풋살처럼 교체를 기록하지 않는 종목)이면 진행 중 경기에 퇴장 패널티 줄을 보여 준다.
+   * null·누락이면 종목을 모르는 것이라 줄을 그리지 않는다(옛 응답·설정 없음).
+   */
+  readonly substitutionMode?: 'limited' | 'rolling' | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;

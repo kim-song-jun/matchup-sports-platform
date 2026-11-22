@@ -1848,6 +1848,69 @@ describe('OperateConsole — 선수 교체', () => {
     expect(screen.queryByRole('button', { name: /빠른 교체 모드/ })).toBeNull();
   });
 
+  describe('퇴장 패널티 카운트다운(롤링 교체 종목)', () => {
+    // LIVE_PERIOD 는 2026-08-07 00:00:00Z 에 시작했다 — 시스템 시각만 고정해 경기 시계를 8:00 으로 둔다.
+    const MATCH_TIME = (minutes: number, seconds = 0) => new Date(Date.UTC(2026, 7, 7, 0, minutes, seconds));
+    const card = (id: string, sequence: number, color: 'RED' | 'YELLOW', clockMs: number): GameEventRecord => ({
+      ...substitutionEvent(id, sequence, 'p-1', 'p-2'),
+      type: 'CARD',
+      participantId: 'p-1',
+      clockMs,
+      payload: { card: color },
+    });
+    const opponentGoal = (clockMs: number): GameEventRecord => ({
+      ...substitutionEvent('goal-away', 9, 'p-9', 'p-8'),
+      type: 'GOAL',
+      sideId: 'side-away',
+      participantId: 'p-9',
+      clockMs,
+      payload: {},
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('레드카드를 받은 팀에 "패널티 1:30"이 남은 시간과 함께 뜬다', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(MATCH_TIME(8, 0));
+      gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null }, [card('red-1', 1, 'RED', 7.5 * 60_000)]);
+      render(<CoreHarness />);
+
+      const list = screen.getByRole('list', { name: '퇴장 패널티' });
+      expect(within(list).getByRole('timer')).toHaveTextContent('패널티 1:30');
+      expect(list).toHaveTextContent('강남 풋살 클럽 · 정우진 퇴장');
+    });
+
+    it('2분이 지났거나 상대가 득점했거나 레드카드가 아니면 아무것도 뜨지 않는다', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(MATCH_TIME(9, 40));
+      gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null }, [card('red-1', 1, 'RED', 7.5 * 60_000)]);
+      const { unmount } = render(<CoreHarness />);
+      expect(screen.queryByRole('list', { name: '퇴장 패널티' })).toBeNull();
+      unmount();
+
+      vi.setSystemTime(MATCH_TIME(8, 0));
+      gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null }, [card('red-1', 1, 'RED', 7.5 * 60_000), opponentGoal(7.75 * 60_000)]);
+      const second = render(<CoreHarness />);
+      expect(screen.queryByRole('list', { name: '퇴장 패널티' })).toBeNull();
+      second.unmount();
+
+      gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null }, [card('yellow-1', 1, 'YELLOW', 7.5 * 60_000)]);
+      render(<CoreHarness />);
+      expect(screen.queryByRole('list', { name: '퇴장 패널티' })).toBeNull();
+    });
+
+    it('제한 교체 종목(축구)에서는 레드카드가 있어도 패널티를 띄우지 않는다', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(MATCH_TIME(8, 0));
+      gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 }, [card('red-1', 1, 'RED', 7.5 * 60_000)]);
+      render(<CoreHarness />);
+
+      expect(screen.queryByRole('list', { name: '퇴장 패널티' })).toBeNull();
+    });
+  });
+
   it('제한 교체 종목에서는 "교체" 액션 버튼이 그대로 있다 (회귀)', () => {
     // 음성 케이스가 없으면 "모든 경기에서 숨김" 으로 바뀌어도 위 테스트가 통과한다.
     gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });

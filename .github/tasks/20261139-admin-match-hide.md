@@ -1,5 +1,5 @@
 # Task 20261139 — 어드민 개인 매치 숨김·복원
-Status: In Progress (백엔드 완료, 웹 대기)
+Status: In Progress (백엔드·웹 구현 완료, PR·alpha 실측 대기)
 **Owner**: Planning team → backend-data-dev → frontend
 **Created**: 2026-11-22
 
@@ -40,13 +40,13 @@ owner·ops 가 개인 매치를 사유와 함께 숨기고(soft delete) 다시 �
 - [x] support·일반 사용자 403, 비로그인 401, 사유 없음·공백·501자 400
 - [x] 참가자·신청자 있는 예정 매치 409, 이미 숨김 409, 숨기지 않음 409, 주최자 삭제 매치 복원 409, 없는 매치 404
 ### Mock data updates needed
-- [ ] `apps/v1_web/src/test/msw/`·`apps/v1_web/src/types/` 어드민 매치 목록·상세 응답(`hiddenAt` 등) — 웹 단계 (`API.md` 참고)
+- [x] `apps/v1_web/src/test/msw/admin-match-visibility-handlers.ts`·`apps/v1_web/src/types/api.ts` 어드민 매치 목록·상세 응답(`hiddenAt`·`hiddenBy`·`hideBlocked` 등)과 숨김·복원 핸들러
 
 ## Parallel Work Breakdown
 ### Backend
-- [x] `POST /admin/matches/:id/hide|unhide`, `visibility` 필터, 목록·상세 숨김 필드, `changeMatchStatus` 거부, 후기 대상·쓰기 거부, 홈 대기 신청·어드민 대시보드 집계
+- [x] `POST /admin/matches/:id/hide|unhide`, `visibility` 필터, 목록·상세 숨김 필드(상세 `hideBlocked` 는 숨기기 API 와 같은 규칙으로 웹이 버튼을 미리 잠그는 근거), `changeMatchStatus` 거부, 후기 대상·쓰기 거부, 홈 대기 신청·어드민 대시보드 집계
 ### Frontend (Backend 계약 확정 뒤)
-- [ ] 상세 위험 영역 카드·배너·사유 확인 모달(`AdminReasonConfirmDialog`), 목록 배지·`AdminVisibilityFilter`
+- [x] 상세 위험 영역 카드·배너·사유 확인 모달(`AdminReasonConfirmDialog`, 사유 비면 버튼 잠금·글자 수 표시·서버 409 문구 표시), 목록 배지·`AdminVisibilityFilter`·숨긴 행 상태 변경 잠금
 ### Sequential
 - [ ] 머지 후 alpha 에서 시험 경기로 숨김·복원 확인, 운영 2건 숨김은 승격 뒤 사용자가 직접
 
@@ -55,7 +55,8 @@ owner·ops 가 개인 매치를 사유와 함께 숨기고(soft delete) 다시 �
 - [x] Original conditions(백엔드 몫) 충족
 - [x] 서비스 단위·통합 시험 green, 변이 4개로 시험이 깨짐을 확인
 - [x] DB 마이그레이션 없음, 새 부채 0
-- [ ] 웹 단계, dev PR·CI, alpha 실측
+- [x] 웹 단계 구현·시험(변이 확인)
+- [ ] dev PR·CI, alpha 실측(머지 뒤 UI 갤러리 3폭)
 
 ## Tech Debt Resolved
 - 후기 쓰기 API 가 `deletedAt` 을 보지 않던 빈틈, 홈 「대기 중인 신청」 건수와 어드민 대시보드 매치 집계가 숨긴 매치를 세던 빈틈.

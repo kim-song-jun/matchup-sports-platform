@@ -169,6 +169,8 @@ describe('AdminService.listMatches / getMatch — 숨김 표시', () => {
       v1AdminUser: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', userId: user.id, adminRole: 'support', status: 'active', user: { accountStatus: 'active' } }) },
       v1Match: { findMany: jest.fn().mockResolvedValue(rows), groupBy: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
       v1AdminActionLog: { findFirst: jest.fn() },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1MatchApplication: { count: jest.fn().mockResolvedValue(0) },
     };
   }
   const baseRow = {
@@ -219,5 +221,22 @@ describe('AdminService.listMatches / getMatch — 숨김 표시', () => {
     visible.v1Match.findUnique.mockResolvedValue({ ...detailRow, deletedAt: null });
     await expect((await serviceFor(visible)).getMatch(user, 'm-1')).resolves.toMatchObject({ hiddenAt: null, hiddenBy: null, canUnhide: false });
     expect(visible.v1AdminActionLog.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('상세의 hideBlocked 는 숨기기 API 와 같은 규칙이다 — 시작 전이고 주최자 말고 참가자·신청이 있을 때만 true', async () => {
+    const detailRow = { ...baseRow, description: null, deadlineAt: null, region: null, _count: { participants: 2, applications: 1 } };
+    const hideBlocked = async (row: Record<string, unknown>, participants: number, applications: number) => {
+      const prisma = listPrisma([]);
+      prisma.v1Match.findUnique.mockResolvedValue({ ...detailRow, ...row });
+      prisma.v1MatchParticipant.count.mockResolvedValue(participants);
+      prisma.v1MatchApplication.count.mockResolvedValue(applications);
+      return (await (await serviceFor(prisma)).getMatch(user, 'm-1')).hideBlocked;
+    };
+    await expect(hideBlocked({ startAt: FUTURE }, 1, 0)).resolves.toBe(true);
+    await expect(hideBlocked({ startAt: FUTURE, status: 'closed' }, 0, 1)).resolves.toBe(true);
+    await expect(hideBlocked({ startAt: FUTURE }, 0, 0)).resolves.toBe(false);
+    await expect(hideBlocked({ startAt: PAST }, 1, 1)).resolves.toBe(false);
+    await expect(hideBlocked({ startAt: FUTURE, status: 'cancelled' }, 1, 1)).resolves.toBe(false);
+    await expect(hideBlocked({ startAt: FUTURE, deletedAt: new Date() }, 1, 1)).resolves.toBe(false);
   });
 });

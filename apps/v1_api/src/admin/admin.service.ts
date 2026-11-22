@@ -113,6 +113,19 @@ function latestMatchVisibilityLog(client: Prisma.TransactionClient | PrismaServi
     },
   });
 }
+
+/** 시작 전(모집 중·마감, 시작 시각 미래)인데 주최자 말고 확정 참가자나 대기·승인 신청이 있으면 숨길 수 없다. */
+async function matchHideBlockedByParticipants(
+  client: Prisma.TransactionClient | PrismaService,
+  match: { id: string; status: string; startAt: Date },
+) {
+  const upcoming = ['recruiting', 'closed'].includes(match.status) && match.startAt > new Date();
+  const [participantCount, applicationCount] = await Promise.all([
+    client.v1MatchParticipant.count({ where: { matchId: match.id, role: 'participant', status: 'active' } }),
+    client.v1MatchApplication.count({ where: { matchId: match.id, status: { in: ['requested', 'approved'] } } }),
+  ]);
+  return { blocked: upcoming && (participantCount > 0 || applicationCount > 0), participantCount, applicationCount };
+}
 const TEAM_LIST_STATUSES = ['active', 'suspended', 'archived'] as const;
 /** Every sort ends on `id` so the cursor and page modes see one total order. */
 function teamMatchOrderBy(sort: AdminTeamMatchSort): Prisma.V1TeamMatchOrderByWithRelationInput[] {
@@ -565,12 +578,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         throw new ConflictException({ code: 'MATCH_ALREADY_HIDDEN', message: '이미 숨겨진 매치예요.' });
       }
 
-      const [participantCount, applicationCount] = await Promise.all([
-        tx.v1MatchParticipant.count({ where: { matchId, role: 'participant', status: 'active' } }),
-        tx.v1MatchApplication.count({ where: { matchId, status: { in: ['requested', 'approved'] } } }),
-      ]);
-      const upcoming = ['recruiting', 'closed'].includes(target.status) && target.startAt > new Date();
-      if (upcoming && (participantCount > 0 || applicationCount > 0)) {
+      const { blocked, participantCount, applicationCount } = await matchHideBlockedByParticipants(tx, target);
+      if (blocked) {
         throw new ConflictException({
           code: 'MATCH_HIDE_HAS_PARTICIPANTS',
           message: '신청자나 확정 참가자가 있는 진행 예정 매치는 숨길 수 없어요. 먼저 매치를 취소해 주세요.',
@@ -1281,6 +1290,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
     const hideLog = row.deletedAt ? await latestMatchVisibilityLog(this.prisma, matchId) : null;
     const hiddenByAdmin = hideLog?.action === MATCH_HIDE_ACTION;
+    const hideBlocked = row.deletedAt ? false : (await matchHideBlockedByParticipants(this.prisma, { id: row.id, status: row.status, startAt: row.startAt })).blocked;
 
     return {
       matchId: row.id,
@@ -1300,6 +1310,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       hiddenReason: hiddenByAdmin ? hideLog?.reason ?? null : null,
       hiddenByName: hiddenByAdmin ? hideLog?.adminUser.user.profile?.nickname ?? null : null,
       canUnhide: hiddenByAdmin,
+      hideBlocked,
       participantCount: row._count.participants,
       applicationCount: row._count.applications,
       maxParticipants: row.maxParticipants,

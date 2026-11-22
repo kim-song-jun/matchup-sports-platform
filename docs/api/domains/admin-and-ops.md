@@ -228,7 +228,7 @@ type AdminListSummary = {
 - 시작 전(`recruiting|closed` 이고 `startAt` 이 미래)인데 주최자 말고 확정 참가자 또는 대기·승인 신청이 있으면 409 `MATCH_HIDE_HAS_PARTICIPANTS`. 먼저 매치를 취소(상태 변경)해야 한다. 이미 숨겼으면 409 `MATCH_ALREADY_HIDDEN`, 없는 매치는 404.
 - 다시 공개는 `deletedAt` 을 비운다. 숨기지 않은 매치는 409 `MATCH_NOT_HIDDEN`, 가장 최근 숨김 기록이 어드민 `match.hide` 가 아닌 매치(주최자가 직접 삭제)는 409 `MATCH_DELETED_BY_HOST`.
 - 응답: 숨김 `{ matchId, hidden: true, hiddenAt, actionLogId }`, 복원 `{ matchId, hidden: false, hiddenAt: null, actionLogId }`. 감사 기록은 `match.hide` / `match.unhide`(`reason`, `beforeJson`·`afterJson` 의 `status`·`deletedAt`, 숨김은 `participantCount`·`applicationCount` 추가).
-- `GET /admin/matches` 는 `visibility=public|hidden` 필터를 받는다(생략=숨긴 매치 포함 전체). 목록 행은 `hiddenAt`, 상태 칩 집계도 같은 필터를 따른다. `GET /admin/matches/:matchId` 는 `hiddenAt`·`hiddenBy`(`admin|host|null`)·`hiddenReason`·`hiddenByName`·`canUnhide` 를 더한다.
+- `GET /admin/matches` 는 `visibility=public|hidden` 필터를 받는다(생략=숨긴 매치 포함 전체). 목록 행은 `hiddenAt`, 상태 칩 집계도 같은 필터를 따른다. `GET /admin/matches/:matchId` 는 `hiddenAt`·`hiddenBy`(`admin|host|null`)·`hiddenReason`·`hiddenByName`·`canUnhide`·`hideBlocked`(시작 전인데 주최자 말고 확정 참가자나 대기·승인 신청이 있어 숨기기가 409 로 막히는지) 를 더한다.
 - 숨긴 매치에는 `POST /admin/matches/:matchId/status` 가 409 `MATCH_HIDDEN` 이다. 후기 쓰기·후기 대상 조회(`/reviews/sources/match/:id`)는 404 `SOURCE_NOT_FOUND` 다.
 
 ### 개인 매치 온라인 장소 분류

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1MyTeams, useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import type { V1ReviewSourceType } from '@/types/api';
 import { ReviewSourcePageView, ReviewsPageView, ReviewSubmitCompleteView } from './reviews-page';
 import type { ReviewMetricDraft, ReviewTargetDraft, ReviewsTab } from './reviews.types';
@@ -66,6 +67,8 @@ export function ReviewSourcePageClient({
   sourceType: V1ReviewSourceType;
 }) {
   const router = useRouter();
+  // 목록이 실어 준 출처(`?from=`) — 제출 완료·확인으로 화면을 바꿔도 이어 가야 그 뒤의 뒤로가기가 들어온 화면으로 간다.
+  const from = sanitizeRedirectPath(useSearchParams()?.get('from'));
   const query = useV1ReviewSource(sourceType, sourceId);
   const submit = useV1SubmitReview();
   const [drafts, setDrafts] = useState<Record<string, ReviewTargetDraft>>({});
@@ -74,7 +77,7 @@ export function ReviewSourcePageClient({
   const model = useMemo(() => (query.data ? toReviewSourcePageModel(query.data) : null), [query.data]);
 
   if (complete && model) {
-    return <ReviewSubmitCompleteView model={model} onConfirm={() => router.replace('/my/reviews?tab=written')} />;
+    return <ReviewSubmitCompleteView model={model} onConfirm={() => router.replace(withFromPath('/my/reviews?tab=written', from))} />;
   }
 
   // 별은 비어 있는 채로 시작한다 -- 기본 점수가 없어야 누르지 않은 5점이 서버에 저장되지 않는다.
@@ -132,7 +135,7 @@ export function ReviewSourcePageClient({
       if (admin) {
         await query.refetch();
         setMessage(null);
-      } else router.replace(`/my/reviews/${sourceType}/${sourceId}?complete=1`);
+      } else router.replace(withFromPath(`/my/reviews/${sourceType}/${sourceId}?complete=1`, from));
     } catch (error) {
       setMessage(extractErrorMessage(error, '리뷰 전송에 실패했어요. 다시 시도해 주세요.'));
     }

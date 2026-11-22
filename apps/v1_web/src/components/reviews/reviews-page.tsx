@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { useId, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
@@ -27,6 +29,7 @@ import {
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
 import type { V1ReceivedReviewDetail, V1ReviewReceivedSummaryResponse, V1ReviewTargetType } from '@/types/api';
 import { nextStarValue, STAR_VALUES } from '@/lib/star-rating-keys';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 
 type QueryStateProps = {
   errorMessage: string | null;
@@ -65,6 +68,9 @@ export function ReviewsPageView({
   teamSummaryLoading: boolean;
 }) {
   const isReceivedTab = model.tab === 'received';
+  // 작성 화면으로 갈 때 지금 목록 주소(받은 출처 `?from=` 포함)를 출처로 싣는다 — 안 그러면 작성 화면의
+  // 뒤로가기가 `?from=` 없는 목록으로 되돌려 그 출처(홈 등)를 잃고, 이어지는 뒤로가기가 마이로 간다.
+  const here = useCurrentHref();
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
   const hasReceivedContent = receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
@@ -129,7 +135,7 @@ export function ReviewsPageView({
                 />
               ) : null}
               {!loading && !errorMessage ? model.cards.map((card) => (
-                <Link key={`${card.sourceType}:${card.sourceId}:${card.reviewerTeam?.teamId ?? card.targetType}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
+                <Link key={`${card.sourceType}:${card.sourceId}:${card.reviewerTeam?.teamId ?? card.targetType}`} className="tm-review-schedule-card tm-pressable" href={withFromPath(card.href, here)}>
                   <div className="tm-review-card-head">
                     <div style={{ minWidth: 0 }}>
                       <div className="tm-text-body-lg line-clamp-2">{card.title}</div>
@@ -419,9 +425,16 @@ const REVIEW_TAB_ITEMS: SegmentedTabsItem[] = [
 // 뒤 이동이 일어난다는 예고가 사라진다. role 을 비우면 SegmentedTabs 가 <nav> +
 // 링크 + aria-current="page" 로 렌더한다(라우팅 하위 내비게이션의 표준 형태).
 function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: ReviewsTab) => void }) {
+  // 들어온 곳(`?from=`)은 탭을 옮겨도 이어 간다 — 안 그러면 탭을 한 번 바꾼 뒤의 뒤로가기가 들어온 화면(홈 등)
+  // 대신 고정 목적지(마이)로 간다.
+  const from = sanitizeRedirectPath(useSearchParams()?.get('from'));
+  const items = useMemo(
+    () => REVIEW_TAB_ITEMS.map((item) => ({ ...item, href: item.href ? withFromPath(item.href, from) : item.href })),
+    [from],
+  );
   return (
     <SegmentedTabs
-      items={REVIEW_TAB_ITEMS}
+      items={items}
       activeId={active}
       onSelect={(id) => onChange(id as ReviewsTab)}
       ariaLabel="리뷰 탭"

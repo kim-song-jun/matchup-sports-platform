@@ -32,6 +32,7 @@ import {
   AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
+  ChangeMatchVisibilityDto,
   ChangeInquiryStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
@@ -113,6 +114,24 @@ export class AdminController {
     @Body() dto: ChangeMatchStatusDto,
   ) {
     return this.adminService.changeMatchStatus(user, matchId, dto);
+  }
+
+  @Post('matches/:matchId/hide')
+  hideMatch(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: ChangeMatchVisibilityDto,
+  ) {
+    return this.adminService.hideMatch(user, matchId, dto);
+  }
+
+  @Post('matches/:matchId/unhide')
+  unhideMatch(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: ChangeMatchVisibilityDto,
+  ) {
+    return this.adminService.unhideMatch(user, matchId, dto);
   }
 
   @Patch('matches/:matchId/online')

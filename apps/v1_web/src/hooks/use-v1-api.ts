@@ -73,6 +73,8 @@ import type {
   V1AdminMatchDetail,
   V1AdminTeamMatchDetail,
   V1AdminMatchRow,
+  V1AdminMatchVisibilityPayload,
+  V1AdminMatchVisibilityResult,
   V1AdminMe,
   V1AdminOverview,
   V1AdminStatusChangeLog,
@@ -3826,6 +3828,31 @@ export function useV1ChangeMatchStatus() {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
     },
   });
+}
+
+/** 숨김·복원은 응답 모양이 같고 같은 화면을 갱신한다 — 부르는 경로만 다르다. */
+function useAdminMatchVisibilityMutation(matchId: string, action: 'hide' | 'unhide') {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminMatchVisibilityPayload) =>
+      v1Post<V1AdminMatchVisibilityResult>(`/admin/matches/${encodeURIComponent(matchId)}/${action}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMatch(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+      // 같은 브라우저의 공개 화면 캐시도 숨김 여부를 다시 확인한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+    },
+  });
+}
+
+export function useV1HideAdminMatch(matchId: string) {
+  return useAdminMatchVisibilityMutation(matchId, 'hide');
+}
+
+export function useV1UnhideAdminMatch(matchId: string) {
+  return useAdminMatchVisibilityMutation(matchId, 'unhide');
 }
 
 export function useV1ChangeTeamStatus() {

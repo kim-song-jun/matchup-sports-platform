@@ -404,3 +404,19 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- 경기 방식
     expect(result.periodMinutes).toBeNull();
   });
 });
+
+describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- substitutionMode (퇴장 패널티 줄을 켜는 종목 구분)', () => {
+  const modeFor = async (competitionConfig: unknown) =>
+    (await buildService({ fixture: makeFixtureRow({ game: makeGame({ competitionConfig }) }) }).getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID))
+      .substitutionMode;
+
+  it('롤링 교체(풋살) 설정이면 rolling, 제한 교체(축구) 설정이면 limited다', async () => {
+    expect(await modeFor({ periods: [], lineup: { substitutions: 'rolling', maxSubstitutions: null } })).toBe('rolling');
+    expect(await modeFor({ periods: [], lineup: { substitutions: 'limited', maxSubstitutions: 5 } })).toBe('limited');
+  });
+
+  it('경기 설정이 없으면 null이라 화면은 패널티 줄을 그리지 않는다', async () => {
+    const result = await buildService({}).getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.substitutionMode).toBeNull();
+  });
+});

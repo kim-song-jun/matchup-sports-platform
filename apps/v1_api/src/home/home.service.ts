@@ -122,7 +122,7 @@ export class HomeService {
         select: { mannerScore: true, trustState: true },
       }),
       this.prisma.v1MatchApplication.count({
-        where: { applicantUserId: user.id, status: 'requested' },
+        where: { applicantUserId: user.id, status: 'requested', match: { deletedAt: null } },
       }),
     ]);
 

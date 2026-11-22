@@ -10,7 +10,12 @@ import {
   AdminStatusPill,
   AdminSummaryItem,
   AdminTableSkeleton,
+  AdminToasts,
+  useAdminToast,
 } from '@/components/admin';
+import { AdminMatchHiddenBanner, AdminMatchVisibilityCard } from '@/components/admin/admin-match-visibility';
+import { AdminVisibilityBadge } from '@/components/admin/competition-visibility-row-action';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminMatch } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -21,7 +26,8 @@ import { useAdminListReturnHref } from '../../use-admin-url-list-query';
  * 아무도 부르지 않는 상태였다 — 목록에서 행을 눌러도 갈 곳이 없었다.
  *
  * 상태 변경은 목록 화면이 계속 담당한다: 사유 입력 모달과 뮤테이션이 거기 있고, 같은 액션을
- * 두 곳에 두면 M4 에서 정리한 '이중 편집 진입점'을 다시 만드는 셈이다.
+ * 두 곳에 두면 M4 에서 정리한 '이중 편집 진입점'을 다시 만드는 셈이다. 공개 화면에서 숨기기·다시
+ * 공개하기는 상태가 아니라 노출 여부라 상세의 '위험 영역' 카드가 맡는다.
  */
 
 // '목록'은 그 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
@@ -42,6 +48,8 @@ export default function AdminMatchDetailPage() {
   const params = useParams<{ id: string }>();
   const matchId = params.id;
   const { data: match, isPending, isError, error, refetch } = useV1AdminMatch(matchId);
+  const canWrite = useAdminCanWrite();
+  const { toasts, showToast } = useAdminToast();
 
   if (isPending) {
     return <AdminTableSkeleton rows={6} />;
@@ -79,6 +87,7 @@ export default function AdminMatchDetailPage() {
 
       <div className="tm-content-enter grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="매치 상세 정보">
+          <AdminMatchHiddenBanner match={match} />
           <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -89,7 +98,10 @@ export default function AdminMatchDetailPage() {
                 <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{match.title}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{match.sportName} · {match.placeName}</p>
               </div>
-              <AdminStatusPill status={match.status} />
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminStatusPill status={match.status} />
+                {match.hiddenAt ? <AdminVisibilityBadge isPublic={false} /> : null}
+              </div>
             </div>
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -142,8 +154,12 @@ export default function AdminMatchDetailPage() {
               호스트 회원 상세 보기
             </Link>
           </section>
+
+          <AdminMatchVisibilityCard match={match} canWrite={canWrite} onToast={showToast} />
         </aside>
       </div>
+
+      <AdminToasts toasts={toasts} />
     </>
   );
 }

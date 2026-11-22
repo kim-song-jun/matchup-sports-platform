@@ -28,6 +28,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { PublicRedCardPenalty } from './public-red-card-penalty';
 import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { InlineChevronLink } from './inline-chevron-link';
 import { PlaceCard } from '@/components/v1-ui/place-card';
@@ -504,6 +505,19 @@ export function MatchDetailContent({
             </span>
             {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} periodCount={data.periodCount} /> : null}
           </div>
+          {/* 퇴장 패널티 — 풋살처럼 교체를 기록하지 않는 종목(`substitutionMode === 'rolling'`)의 진행 중 경기에서만.
+              퇴장 뒤 2분 또는 상대 득점까지 남은 시간을 LIVE 배지 바로 아래에 둔다. */}
+          {data.status === 'live' && data.substitutionMode === 'rolling' ? (
+            <PublicRedCardPenalty
+              events={data.events}
+              clock={data.clock}
+              periodBreak={data.periodBreak}
+              periodCount={data.periodCount}
+              periodMinutes={data.periodMinutes}
+              homeName={sideLabel(data.home)}
+              awayName={sideLabel(data.away)}
+            />
+          ) : null}
           {/* 경기 방식("단판 20분"·"전·후반 15분") — 일시·장소 줄 바로 아래. 길이를 모르는 경기는 null 이라 줄이 없다. */}
           {periodFormat ? (
             <div style={{ marginTop: 4, textAlign: 'center', fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)' }}>{periodFormat}</div>

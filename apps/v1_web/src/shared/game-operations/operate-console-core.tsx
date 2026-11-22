@@ -51,6 +51,7 @@ import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
 import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
 import { RestTimer } from './rest-timer';
+import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-banner';
 import { useEventToast, EventToasts } from './event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
@@ -597,6 +598,41 @@ export function OperateConsoleCore({
     const entry = durations?.[currentPeriod.number - 1] ?? null;
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
+
+  // 퇴장 패널티 카운트다운(풋살 등 롤링 교체 종목) — 퇴장 뒤 2분 또는 상대 득점까지 한 명 모자란 채 뛰므로,
+  // 시계 아래에서 보충 가능 시점을 바로 읽게 한다. 종목명이 아니라 `substitutionPolicy.mode`로 켠다(교체 버튼과 같은 기준).
+  // 서버 상태가 없고 이벤트 로그와 경기 시계에서 매초 다시 계산한다(`lib/red-card-penalty.ts`).
+  const penaltyPeriodLengthMs = useCallback(
+    (period: number): number | null => {
+      const minutes = gameDetail.data?.periodDurations?.[period - 1]?.durationMinutes;
+      return typeof minutes === 'number' ? minutes * 60_000 : null;
+    },
+    [gameDetail.data?.periodDurations],
+  );
+  const eventClockCorrections = useMemo(() => collectEventTimeCorrections(ops.liveEvents), [ops.liveEvents]);
+  const penaltyClockMsOf = useCallback(
+    (event: GameEventRecord) => eventClockCorrections.get(event.id)?.currentClockMs ?? event.clockMs,
+    [eventClockCorrections],
+  );
+  const penaltyAnchor = useMemo<PenaltyNowAnchor | null>(() => {
+    if (gameDetail.data?.substitutionPolicy?.mode !== 'rolling' || gameState !== 'LIVE' || regulationEnded) return null;
+    if (currentPeriod !== null && currentPeriod.startedAt !== null) {
+      return {
+        kind: 'live',
+        period: currentPeriod.number,
+        periodStartedAtMs: new Date(currentPeriod.startedAt).getTime(),
+        offsetMs: ops.clockOffsetMs,
+        pausedTotalMs: currentPeriod.pausedTotalMs,
+        pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
+      };
+    }
+    // 하프타임에는 흐르는 경기 시간이 없다 — 직전 피리어드가 끝난 시점에 멈춘 값을 보여 준다.
+    if (halftimePeriod !== null) {
+      const previousLengthMs = penaltyPeriodLengthMs(halftimePeriod.number - 1);
+      return previousLengthMs === null ? null : { kind: 'frozen', period: halftimePeriod.number - 1, clockMs: previousLengthMs };
+    }
+    return null;
+  }, [gameDetail.data?.substitutionPolicy?.mode, gameState, regulationEnded, currentPeriod, halftimePeriod, ops.clockOffsetMs, penaltyPeriodLengthMs]);
 
   // 하프타임이거나 정규 시간이 끝났어도(모든 피리어드 ENDED, 경기는 아직 LIVE) 경기 종료 전에는
   // 빠진 골·카드·파울을 넣을 수 있어야 한다(2026-11-18 사용자 확정). 사건은 방금 끝난 피리어드
@@ -1951,6 +1987,18 @@ export function OperateConsoleCore({
           </div>
         ) : null}
       </header>
+
+      {penaltyAnchor !== null ? (
+        <RedCardPenaltyBanner
+          events={ops.liveEvents}
+          queuedItems={ops.queue.items}
+          anchor={penaltyAnchor}
+          periodLengthMs={penaltyPeriodLengthMs}
+          clockMsOf={penaltyClockMsOf}
+          sides={sides}
+          lineups={lineups}
+        />
+      ) : null}
 
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}

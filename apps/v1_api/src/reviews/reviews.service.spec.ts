@@ -123,6 +123,32 @@ describe('ReviewsService', () => {
     });
   });
 
+  it.each([
+    ['숨긴(deletedAt) 매치', new Date('2026-09-30T00:00:00Z'), 'SOURCE_NOT_FOUND'],
+    ['숨기지 않은 매치', null, null],
+  ])('match source/submit: %s', async (_label, deletedAt, rejectCode) => {
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId, hostUserId: user.id, title: '개인 매치', status: 'completed', deletedAt,
+          completedAt: submittedAt, startAt: submittedAt, sportId: 'sport-futsal',
+          participants: [{ userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } }],
+        }),
+      },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, {} as never, adminContextStub(), reviewPolicyStub());
+    const submitDto = { sourceType: 'match', sourceId, targetType: 'user', targetUserId, rating: 5, tagCodes: ['manner'] } as never;
+    if (rejectCode) {
+      await expect(service.source(user, { sourceType: 'match', sourceId })).rejects.toMatchObject({ response: { code: rejectCode } });
+      await expect(service.submit(user, submitDto)).rejects.toMatchObject({ response: { code: rejectCode } });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    } else {
+      await expect(service.source(user, { sourceType: 'match', sourceId })).resolves.toMatchObject({ targets: [expect.objectContaining({ targetUserId })] });
+    }
+  });
+
   it('match source: 방장도 참가자도 아닌 사용자는 계속 차단한다', async () => {
     const prisma = {
       v1Match: {

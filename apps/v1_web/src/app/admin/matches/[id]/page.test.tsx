@@ -8,10 +8,16 @@ import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminMatchDetail } from '@/types/api';
 import AdminMatchDetailPage from './page';
 
-const { hooks } = vi.hoisted(() => ({ hooks: { query: {} as Record<string, unknown> } }));
+const { hooks } = vi.hoisted(() => ({ hooks: { query: {} as Record<string, unknown>, canWrite: true } }));
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'match-1' }) }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminMatch: () => hooks.query }));
+vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => hooks.canWrite }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AdminMatch: () => hooks.query,
+  // 숨기기·다시 공개하기 동작은 admin-match-visibility.test.tsx 가 실제 훅과 MSW 로 확인한다.
+  useV1HideAdminMatch: () => ({ isPending: false, mutate: vi.fn() }),
+  useV1UnhideAdminMatch: () => ({ isPending: false, mutate: vi.fn() }),
+}));
 
 const MATCH: V1AdminMatchDetail = {
   matchId: 'match-1',
@@ -30,10 +36,17 @@ const MATCH: V1AdminMatchDetail = {
   regionName: '서울 성동구',
   deadlineAt: '2026-08-30T11:00:00.000Z',
   applicationCount: 3,
+  hiddenAt: null,
+  hiddenBy: null,
+  hiddenReason: null,
+  hiddenByName: null,
+  canUnhide: false,
+  hideBlocked: false,
 };
 
 function renderWith(query: Record<string, unknown>) {
   hooks.query = query;
+  hooks.canWrite = true;
   return render(<AdminMatchDetailPage />);
 }
 
@@ -72,5 +85,38 @@ describe('AdminMatchDetailPage', () => {
     renderWith({ data: undefined, isPending: false, isError: true, error: new Error('boom'), refetch });
     expect(screen.getByText('매치 정보를 불러오지 못했어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  });
+
+  it('공개 중인 매치는 위험 영역에 숨기기 버튼을 두고 숨김 표시는 없다', () => {
+    renderWith(OK);
+    const summary = screen.getByRole('complementary', { name: '매치 운영 요약' });
+    expect(within(summary).getByRole('button', { name: '이 매치 숨기기' })).toBeEnabled();
+    expect(screen.queryByRole('status', { name: '숨김 안내' })).not.toBeInTheDocument();
+    expect(screen.queryByText('숨김')).not.toBeInTheDocument();
+  });
+
+  it('어드민이 숨긴 매치는 맨 위 안내·숨김 배지·다시 공개하기를 보인다', () => {
+    renderWith({
+      ...OK,
+      data: {
+        ...MATCH,
+        hiddenAt: '2026-11-22T08:05:00.000Z',
+        hiddenBy: 'admin',
+        hiddenReason: '운영 시험용 경기',
+        hiddenByName: '운영자',
+        canUnhide: true,
+      },
+    });
+    expect(screen.getByRole('status', { name: '숨김 안내' })).toHaveTextContent('사유: 운영 시험용 경기');
+    expect(screen.getByText('숨김')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 공개하기' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '이 매치 숨기기' })).not.toBeInTheDocument();
+  });
+
+  it('쓰기 권한이 없으면 숨기기 버튼이 잠긴다', () => {
+    hooks.query = OK;
+    hooks.canWrite = false;
+    render(<AdminMatchDetailPage />);
+    expect(screen.getByRole('button', { name: '이 매치 숨기기' })).toBeDisabled();
   });
 });

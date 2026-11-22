@@ -3407,6 +3407,8 @@ export type V1AdminMatchRow = {
   participantCount: number;
   maxParticipants: number;
   createdAt: string;
+  /** 공개 화면에서 숨긴 시각. 주최자가 직접 삭제한 매치도 채워진다. */
+  hiddenAt: string | null;
 };
 
 export type V1AdminMatchDetail = V1AdminMatchRow & {
@@ -3414,6 +3416,25 @@ export type V1AdminMatchDetail = V1AdminMatchRow & {
   regionName: string | null;
   deadlineAt: string | null;
   applicationCount: number;
+  hiddenBy: 'admin' | 'host' | null;
+  /** 어드민이 숨겼을 때만 값이 있다. */
+  hiddenReason: string | null;
+  hiddenByName: string | null;
+  /** 어드민이 숨긴 매치만 다시 공개할 수 있다(주최자 삭제는 불가). */
+  canUnhide: boolean;
+  /** 시작 전인데 주최자 말고 참가자·신청이 있어 숨기기가 막힌 상태. */
+  hideBlocked: boolean;
+};
+
+export type V1AdminMatchVisibilityPayload = {
+  reason: string;
+};
+
+export type V1AdminMatchVisibilityResult = {
+  matchId: string;
+  hidden: boolean;
+  hiddenAt: string | null;
+  actionLogId: string;
 };
 
 export type V1AdminTeamRow = {
@@ -3619,6 +3640,8 @@ export type AdminListFilters = {
   signup?: string;
   providers?: string;
   status?: string;
+  /** 매치 목록 전용. 서버 DTO 가 public|hidden 만 받는다(생략 = 숨긴 매치 포함 전체). */
+  visibility?: string;
   q?: string;
   sportId?: string;
   regionId?: string;

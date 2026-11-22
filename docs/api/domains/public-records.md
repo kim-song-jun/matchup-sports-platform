@@ -270,6 +270,16 @@ projection, computed only when there is no official revision yet:
   `{ count }` shape, or any regular period without a positive length) means "do not
   guess" -- the web draws no line. Present on `getMatch`, `getLeagueFixtureRecord` and
   every `presentScheduleEntry` entry.
+- `substitutionMode` -- `'limited' | 'rolling' | null`, the game's substitution style read
+  from the same competition-config snapshot (`lineup.substitutions` via `parseLineupLimits`,
+  `competition-config.parse.ts`) -- the same key and parser the operations console uses for
+  `substitutionPolicy.mode`. `'rolling'` (futsal-style, substitutions are not recorded) tells the
+  web to show the red-card penalty line under the LIVE badge of an in-progress match
+  ("패널티 1:30" -- two minutes after a sending-off or until the opponent scores, computed in the
+  browser from `events[]`, `clock` and `periodMinutes`; nothing about it is stored).
+  A missing or malformed `lineup` degrades to `'limited'` like the console; `null` (no game or no
+  config snapshot) means "do not guess" -- the web draws no line. Present on `getMatch` and
+  `getLeagueFixtureRecord` only.
 
 None of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`

@@ -6,7 +6,7 @@ import type { V1AdminMatchRow } from '@/types/api';
 import AdminMatchesPage from './page';
 
 const state = vi.hoisted(() => ({
-  query: vi.fn(), refetch: vi.fn(), mutate: vi.fn(), error: false, canWrite: false,
+  query: vi.fn(), refetch: vi.fn(), mutate: vi.fn(), error: false, canWrite: false, mixed: false,
 }));
 const router = createHistoryRouter();
 vi.mock('next/navigation', () => ({
@@ -27,18 +27,25 @@ const row: V1AdminMatchRow = {
   matchId: 'abc11044-1e5e-4657-a390-589d2daa4eb3', title: '(테스트) 1.0.3 QA 수명주기',
   sportName: '풋살', sportCode: 'futsal', hostUserId: 'synthetic-host', hostName: 'QA 호스트',
   placeName: 'QA 구장', startAt: '2026-10-01T09:00:00Z', status: 'completed',
-  participantCount: 10, maxParticipants: 10, createdAt: '2026-10-01T08:00:00Z',
+  participantCount: 10, maxParticipants: 10, createdAt: '2026-10-01T08:00:00Z', hiddenAt: null,
+};
+const hiddenRow: V1AdminMatchRow = {
+  ...row, matchId: 'hidden-match', title: '(테스트) 숨긴 경기', status: 'cancelled', hiddenAt: '2026-11-22T08:05:00Z',
 };
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: state.canWrite ? ['status:write'] : [] } }),
   useV1ChangeMatchStatus: () => ({ mutate: state.mutate, isPending: false }),
-  useV1AdminMatches: (filters: { q?: string; status?: string; page: number }) => {
+  useV1AdminMatches: (filters: { q?: string; status?: string; visibility?: string; page: number }) => {
     state.query(filters);
     const matches = (!filters.q || row.title.includes(filters.q))
       && (!filters.status || filters.status === row.status);
+    // 서버처럼 공개 여부 필터로 숨긴 행과 공개 행을 가른다(필터 없음 = 둘 다).
+    const items = filters.visibility === 'hidden' ? [hiddenRow]
+      : filters.visibility === 'public' ? [row]
+        : state.mixed ? [row, hiddenRow] : [row];
     return {
       data: {
-        items: matches ? [row] : [],
+        items: matches || filters.visibility === 'hidden' ? items : [],
         pageInfo: { page: filters.page, totalPages: 3, total: 41, limit: 20 },
         summary: { total: 29, byStatus: { completed: 1 } },
       },
@@ -56,6 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.error = false;
   state.canWrite = false;
+  state.mixed = false;
   window.history.replaceState(null, '', '/admin/matches');
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -207,5 +215,42 @@ describe('관리자 매치 목록의 URL 조회 조건', () => {
     expect(params().get('q')).toBe('1.0.3');
     expect(params().get('status')).toBe('completed');
     expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it('숨긴 행에는 숨김 배지를 달고 상태 변경 버튼을 잠그며, 공개 행은 그대로 둔다', () => {
+    state.canWrite = true;
+    state.mixed = true;
+    render(<AdminMatchesPage />);
+    const hiddenButton = screen.getAllByRole('button', { name: `${hiddenRow.title} 상태 변경 — 숨긴 매치는 바꿀 수 없어요` })[0];
+    expect(hiddenButton).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: `${row.title} 상태 변경` })[0]).toBeEnabled();
+    // 숨김 배지는 숨긴 행에만 달린다. 목록이 표·카드 두 벌로 그려져도 행 수만큼이고, 필터의 '숨김' 옵션은 뺀다.
+    const badges = screen.getAllByText('숨김').filter((node) => node.tagName !== 'OPTION');
+    expect(badges.length).toBeGreaterThan(0);
+    expect(badges.length).toBe(screen.getAllByText(hiddenRow.title).length);
+  });
+
+  it('공개 여부 필터를 고르면 visibility 로 조회하고 URL 에 남기며 전체로 돌리면 지운다', () => {
+    render(<AdminMatchesPage />);
+    expect(state.query).toHaveBeenLastCalledWith({ page: 1, limit: 20 });
+    fireEvent.change(screen.getByLabelText('공개 여부'), { target: { value: 'hidden' } });
+    expect(state.query).toHaveBeenLastCalledWith({ visibility: 'hidden', page: 1, limit: 20 });
+    expect(params().get('visibility')).toBe('hidden');
+    expect(screen.getAllByText(hiddenRow.title).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('공개 여부'), { target: { value: '' } });
+    expect(params().has('visibility')).toBe(false);
+    expect(state.query).toHaveBeenLastCalledWith({ page: 1, limit: 20 });
+  });
+
+  it('URL 의 visibility 를 복원하고 허용 밖 값은 전체로 본다', () => {
+    window.history.replaceState(null, '', '/admin/matches?visibility=hidden');
+    const view = render(<AdminMatchesPage />);
+    expect(screen.getByLabelText('공개 여부')).toHaveValue('hidden');
+    expect(state.query.mock.calls[0][0]).toEqual({ visibility: 'hidden', page: 1, limit: 20 });
+    view.unmount();
+    window.history.replaceState(null, '', '/admin/matches?visibility=bogus');
+    render(<AdminMatchesPage />);
+    expect(screen.getByLabelText('공개 여부')).toHaveValue('');
+    expect(state.query.mock.calls.at(-1)?.[0]).toEqual({ page: 1, limit: 20 });
   });
 });

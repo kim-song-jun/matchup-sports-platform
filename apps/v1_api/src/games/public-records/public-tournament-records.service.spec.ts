@@ -129,6 +129,8 @@ function buildFakePrisma(options: {
   gameState?: string;
   /** 경기 설정 스냅샷의 `periods`(JSON) — `periodCount` 산출 검증용. 기본값 undefined = 설정 없음. */
   configPeriods?: unknown;
+  /** 경기 설정 스냅샷의 `lineup`(JSON) — `substitutionMode` 산출 검증용. `configPeriods`가 있을 때만 설정 스냅샷이 생긴다. */
+  configLineup?: unknown;
   lineups?: readonly { id: string; sideId: string; revision: number; state?: string; invalidatedAt?: Date | null }[];
   participants?: readonly FakeParticipant[];
   /**
@@ -189,7 +191,8 @@ function buildFakePrisma(options: {
               participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
               currentOfficialRevision: options.officialRevision ?? null,
               periods: options.periods ?? [],
-              competitionConfig: options.configPeriods === undefined ? undefined : { periods: options.configPeriods },
+              competitionConfig:
+                options.configPeriods === undefined ? undefined : { periods: options.configPeriods, lineup: options.configLineup },
             },
           },
         };
@@ -1184,6 +1187,46 @@ describe('PublicTournamentRecordsService.getMatch -- periodMinutes (정규 피�
     expect(await periodMinutesFor('broken')).toBeNull();
     expect(await periodMinutesFor({ count: 2 })).toBeNull();
     expect(await periodMinutesFor([half('H1', 20), { ...half('H2', 20), durationMinutes: 0 }])).toBeNull();
+  });
+});
+
+describe('PublicTournamentRecordsService.getMatch -- substitutionMode (퇴장 패널티 줄을 켜는 종목 구분)', () => {
+  const substitutionModeFor = async (configLineup: unknown, configPeriods: unknown = []) => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      configPeriods,
+      configLineup,
+      periods: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).substitutionMode;
+  };
+
+  it('롤링 교체(풋살) 설정이면 rolling, 제한 교체(축구) 설정이면 limited다', async () => {
+    expect(await substitutionModeFor({ substitutions: 'rolling', maxSubstitutions: null })).toBe('rolling');
+    expect(await substitutionModeFor({ substitutions: 'limited', maxSubstitutions: 5 })).toBe('limited');
+  });
+
+  it('lineup 설정을 읽을 수 없으면 콘솔과 같이 limited로 떨어진다 — 패널티 줄을 켜지 않는 쪽이다', async () => {
+    expect(await substitutionModeFor(undefined)).toBe('limited');
+    expect(await substitutionModeFor('broken')).toBe('limited');
+    expect(await substitutionModeFor({ substitutions: 'Rolling' })).toBe('limited');
+  });
+
+  it('경기 설정 스냅샷이 아예 없으면 null이라 화면은 패널티 줄을 그리지 않는다', async () => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      periods: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    expect((await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).substitutionMode).toBeNull();
   });
 });
 

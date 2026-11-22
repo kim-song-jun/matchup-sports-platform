@@ -977,3 +977,84 @@ describe('re-entry offered once the official result was just voided', () => {
     expect(screen.getAllByText('무효 처리됨')).toHaveLength(2);
   });
 });
+
+// 경고 누적 퇴장 합친 줄 — 확정 뒤 어드민 시각 정정도 옐로와 레드를 같은 시각으로 함께 옮긴다.
+describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)', () => {
+  const card = (id: string, sequence: number, color: 'YELLOW' | 'RED', period: number, clockMs: number) => ({
+    id,
+    gameId: 'game-1',
+    sequence,
+    clientEventId: `c-${sequence}`,
+    payloadHash: 'h',
+    type: 'CARD' as const,
+    sideId: 'side-away',
+    participantId: 'p-9',
+    assistParticipantId: null,
+    period,
+    clockMs,
+    occurredAt: '2026-08-01T10:11:00.000Z',
+    receivedAt: '2026-08-01T10:11:00.000Z',
+    actorUserId: 'u-1',
+    reversesEventId: null,
+    correctsEventId: null,
+    payload: { card: color },
+  });
+
+  it('옐로, 이어서 레드를 같은 시각·같은 사유로 정정하고 두 번째 호출은 첫 호출이 돌려준 버전을 쓴다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 4, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', officialAt: '2026-08-01T12:00:00.000Z' })];
+    hookMocks.events.data = {
+      events: [card('y1', 1, 'YELLOW', 1, 11 * 60_000), card('y2', 2, 'YELLOW', 2, 31 * 60_000), card('r1', 3, 'RED', 2, 31 * 60_000)],
+      lastSequence: 3,
+      gap: null,
+    };
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    await user.type(within(dialog).getByLabelText(/정정 사유/), '심판 기록지 대조 결과 30분');
+    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+
+    await waitFor(() => expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenCalledTimes(2));
+    expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenNthCalledWith(1, {
+      eventId: 'y2',
+      expectedVersion: 4,
+      clockMs: 30 * 60_000,
+      reason: '심판 기록지 대조 결과 30분',
+    });
+    expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenNthCalledWith(2, {
+      eventId: 'r1',
+      expectedVersion: 5,
+      clockMs: 30 * 60_000,
+      reason: '심판 기록지 대조 결과 30분',
+    });
+  });
+
+  it('레드 정정이 실패하면 옐로는 옮겼다고 알리고 시트를 열어 둔다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 4, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', officialAt: '2026-08-01T12:00:00.000Z' })];
+    hookMocks.events.data = {
+      events: [card('y1', 1, 'YELLOW', 1, 11 * 60_000), card('y2', 2, 'YELLOW', 2, 31 * 60_000), card('r1', 3, 'RED', 2, 31 * 60_000)],
+      lastSequence: 3,
+      gap: null,
+    };
+    hookMocks.correctEventTime.mutateAsync
+      .mockResolvedValueOnce({ version: 5, replayed: false })
+      .mockRejectedValueOnce(new Error('서버가 바빠요.'));
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
+    await user.type(within(dialog).getByLabelText(/정정 사유/), '대조 결과');
+    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
+    expect(screen.getByRole('dialog', { name: '기록 시각 정정' })).toBeInTheDocument();
+  });
+});

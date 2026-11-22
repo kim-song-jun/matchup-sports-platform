@@ -1,0 +1,16 @@
+[Unit]
+Description=Restart Teameet app containers that stay unhealthy
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# 서버마다 다른 값(DEPLOY_LOCK_FILE, 필요하면 CONTAINERS)은 이 파일에 둔다. 없으면 시작하지 않는다.
+EnvironmentFile=/etc/teameet-restart-unhealthy.env
+ExecStart=/usr/local/bin/teameet-restart-unhealthy.sh
+RuntimeDirectory=teameet-restart-unhealthy
+# 재시작 기록이 타이머 실행 사이에 남아야 쿨다운이 동작한다.
+RuntimeDirectoryPreserve=yes
+# docker restart 가 컨테이너 종료 여유(stop_grace_period 최대 60초)를 기다릴 수 있다.
+TimeoutStartSec=300
+Nice=10

@@ -5,9 +5,13 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { formatMatchClock } from '@/lib/game-operations-clock';
+import { wasSentOffAt, type SentOffRedCard } from '@/lib/on-pitch-state';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 import { participantIdentityName } from './participant-identity';
+import { periodPrefix } from './period-label';
+import { SentOffConfirmPanel } from './sent-off-confirm-panel';
 
 export interface AssistPickerSheetProps {
   readonly open: boolean;
@@ -18,6 +22,11 @@ export interface AssistPickerSheetProps {
   /** 언제 넣은 골인지(예: "전반 12:03"). 같은 선수가 여러 번 넣었을 때 구분한다. */
   readonly whenLabel?: string;
   readonly teammates: readonly GameLineupParticipant[];
+  /** 레드카드를 받은 선수와 그 시각. 골 **이전(같은 시각 포함)에** 퇴장한 선수를 고르면 어시스트로 올리기 전에
+   * 한 번 더 확인한다 — 어시스트는 골 뒤에 붙이는 기록이라, 골 이후에 퇴장한 선수는 정상이므로 시각으로 가른다. */
+  readonly sentOffRedCards?: ReadonlyMap<string, SentOffRedCard>;
+  /** 정규 피리어드 수 — 확인 문구의 퇴장 시각 말머리("후반")에 쓴다. */
+  readonly periodCount?: number | null;
   readonly onAttach: (assistParticipantId: string) => Promise<void>;
   readonly onClose: () => void;
 }
@@ -27,8 +36,21 @@ export interface AssistPickerSheetProps {
  * "이미 확정된 GOAL을 되돌리고 어시스트를 넣어 재기록한다"는 두 단계 조작을
  * 사용자에게는 한 번의 선택으로 보여준다.
  */
-export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel, teammates, onAttach, onClose }: AssistPickerSheetProps) {
+export function AssistPickerSheet({
+  open,
+  event,
+  scorerName,
+  teamName,
+  whenLabel,
+  teammates,
+  sentOffRedCards,
+  periodCount,
+  onAttach,
+  onClose,
+}: AssistPickerSheetProps) {
   const [pending, setPending] = useState<string | null>(null);
+  // 골 시점에 이미 퇴장해 있던 선수를 골랐을 때 "그래도 추가할까요?"를 기다리는 선택. 이 동안 목록 자리에 확인 패널이 뜬다.
+  const [sentOffPending, setSentOffPending] = useState<GameLineupParticipant | null>(null);
   /* 목록이 실제로 넘칠 때만 아래쪽 페이드와 "아래로 더 있어요"를 켠다. 예전에는
      둘 다 무조건 켜져 있어(페이드는 상시, 문구는 `teammates.length > 4` 어림짐작),
      4명이 딱 들어맞는 화면에서도 마지막 선수가 반쯤 지워져 "잘렸다"처럼 보였다
@@ -48,7 +70,8 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
     const observer = new ResizeObserver(measureOverflow);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [measureOverflow, teammates.length]);
+    // 퇴장 확인 패널이 목록을 걷어 냈다가 돌려놓으면 새 요소이므로 다시 잰다.
+  }, [measureOverflow, teammates.length, sentOffPending]);
   const [error, setError] = useState<string | null>(null);
 
   // ESC·focus trap·스크롤 잠금·포커스 복원을 공용 훅에 맡긴다. 이 시트에는
@@ -96,6 +119,16 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
     }
   };
 
+  // 골을 넣은 시각에 이미 퇴장해 있던 선수는 어시스트로 올리기 전에 한 번 더 확인한다.
+  const choose = (teammate: GameLineupParticipant) => {
+    if (wasSentOffAt(sentOffRedCards?.get(teammate.id), { period: event.period, clockMs: event.clockMs })) {
+      setSentOffPending(teammate);
+      return;
+    }
+    void pick(teammate);
+  };
+  const sentOffRed = sentOffPending === null ? undefined : sentOffRedCards?.get(sentOffPending.id);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
@@ -141,42 +174,61 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
             했는데, 그게 "어시스트 없음"인지 "골 기록 취소"인지 화면에 적혀 있지 않았다.
             골은 이미 기록돼 있으므로 이 버튼은 그대로 닫기와 같은 동작이되, 무엇을
             선택하는 것인지 이름을 준다. */}
-        <button
-          type="button"
-          onClick={closeIfIdle}
-          disabled={pending !== null}
-          className="mb-2 min-h-[44px] w-full shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-bold text-[var(--text-strong)] transition-colors hover:bg-[var(--card-surface)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          어시스트 없이 두기
-        </button>
-        <div
-          ref={listRef}
-          className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto${
-            listOverflows ? ' [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent)]' : ''
-          }`}
-          role="list"
-        >
-          {teammates.map((teammate) => (
-            <Button
-              key={teammate.id}
-              size="md"
-              variant="outline"
-              loading={pending === teammate.id}
+        {sentOffPending !== null ? (
+          <SentOffConfirmPanel
+            playerName={participantIdentityName(sentOffPending)}
+            sentOffWhen={
+              sentOffRed === undefined ? null : `${periodPrefix(sentOffRed.period, periodCount)}${formatMatchClock(sentOffRed.clockMs)}`
+            }
+            noun="어시스트"
+            verb="추가"
+            onBack={() => setSentOffPending(null)}
+            onContinue={() => {
+              const chosen = sentOffPending;
+              setSentOffPending(null);
+              void pick(chosen);
+            }}
+          />
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={closeIfIdle}
               disabled={pending !== null}
-              onClick={() => pick(teammate)}
+              className="mb-2 min-h-[44px] w-full shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-bold text-[var(--text-strong)] transition-colors hover:bg-[var(--card-surface)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
-              <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-[var(--text-muted)]">
-                {jerseyText(teammate.jerseyNumber)}
-              </span>
-              {participantIdentityName(teammate)}
-            </Button>
-          ))}
-        </div>
-        {listOverflows ? (
-          <p className="mt-1 shrink-0 text-center text-xs text-[var(--text-muted)]" aria-hidden="true">
-            아래로 더 있어요
-          </p>
-        ) : null}
+              어시스트 없이 두기
+            </button>
+            <div
+              ref={listRef}
+              className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto${
+                listOverflows ? ' [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent)]' : ''
+              }`}
+              role="list"
+            >
+              {teammates.map((teammate) => (
+                <Button
+                  key={teammate.id}
+                  size="md"
+                  variant="outline"
+                  loading={pending === teammate.id}
+                  disabled={pending !== null}
+                  onClick={() => choose(teammate)}
+                >
+                  <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-[var(--text-muted)]">
+                    {jerseyText(teammate.jerseyNumber)}
+                  </span>
+                  {participantIdentityName(teammate)}
+                </Button>
+              ))}
+            </div>
+            {listOverflows ? (
+              <p className="mt-1 shrink-0 text-center text-xs text-[var(--text-muted)]" aria-hidden="true">
+                아래로 더 있어요
+              </p>
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );

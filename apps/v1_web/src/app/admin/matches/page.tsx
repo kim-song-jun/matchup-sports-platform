@@ -10,6 +10,7 @@ import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
+import { useAdminVisibilityParam } from '../use-admin-visibility-param';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -21,6 +22,8 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
+import { AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
+import { AdminVisibilityBadge } from '@/components/admin/competition-visibility-row-action';
 import type { V1AdminMatchRow } from '@/types/api';
 
 // ── Status options for moderation modal ──────────────────────────────────────
@@ -64,6 +67,9 @@ function AdminMatchesPageContent() {
     buildPagination,
   } = useAdminUrlListQuery(MATCH_STATUS_FILTER_OPTIONS, PAGE_SIZE);
 
+  // 공개 여부 필터도 ?visibility= 로 URL 에 남긴다.
+  const [visibility, setVisibility] = useAdminVisibilityParam(resetToFirstPage);
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<V1AdminMatchRow | null>(null);
@@ -81,7 +87,7 @@ function AdminMatchesPageContent() {
     isError,
     error,
     refetch,
-  } = useV1AdminMatches(filters);
+  } = useV1AdminMatches(visibility ? { ...filters, visibility } : filters);
 
   // Mutation
   const changeStatusMutation = useV1ChangeMatchStatus();
@@ -135,6 +141,7 @@ function AdminMatchesPageContent() {
           statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={(v) => setActiveStatus(v)}
+          rightSlot={<AdminVisibilityFilter value={visibility} onChange={setVisibility} />}
         />
 
         {/* Card list */}
@@ -160,8 +167,13 @@ function AdminMatchesPageContent() {
             {
               key: 'status',
               header: '상태',
-              width: 'w-[104px]',
-              render: (row) => <AdminStatusPill status={row.status} />,
+              width: 'w-[112px]',
+              render: (row) => (
+                <div className="flex flex-col items-start gap-1">
+                  <AdminStatusPill status={row.status} />
+                  {row.hiddenAt ? <AdminVisibilityBadge isPublic={false} /> : null}
+                </div>
+              ),
             },
             {
               key: 'title',
@@ -208,6 +220,9 @@ function AdminMatchesPageContent() {
               ? (row) => (
                   <button
                     type="button"
+                    // 숨긴 매치는 서버가 상태 변경을 거절한다 — 상세의 '다시 공개하기'가 먼저다.
+                    disabled={Boolean(row.hiddenAt)}
+                    title={row.hiddenAt ? '숨긴 매치는 상태를 바꿀 수 없어요.' : undefined}
                     onClick={() => {
                       setSelectedRow(row);
                       setModalOpen(true);
@@ -216,8 +231,9 @@ function AdminMatchesPageContent() {
                       'tm-on-tint inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                      'disabled:cursor-not-allowed disabled:opacity-50',
                     ].join(' ')}
-                    aria-label={`${row.title} 상태 변경`}
+                    aria-label={row.hiddenAt ? `${row.title} 상태 변경 — 숨긴 매치는 바꿀 수 없어요` : `${row.title} 상태 변경`}
                   >
                     상태 변경
                   </button>

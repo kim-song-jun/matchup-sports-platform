@@ -8,6 +8,8 @@ import {
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
   playerLabel,
+  recordNounOf,
+  sentOffPlayerNoticeCopy,
 } from './confirm-copy';
 
 const sides: GameSide[] = [
@@ -180,5 +182,39 @@ describe('playerLabel — 확인 문구·도움 창 제목의 운영진 실명',
     expect(playerLabel('p-1', lineups)).toBe(name);
     expect(commitActionConfirmCopy(input({ type: 'GOAL', participantId: 'p-1' }), sides, lineups, null).message)
       .toBe(`홈팀 · ${name} · 전반 1:00에 기록해요.`);
+  });
+});
+
+describe('sentOffPlayerNoticeCopy — 퇴장한 선수 재확인 문구', () => {
+  it('제목은 퇴장 사실을 먼저 말하고, 본문은 레드카드를 받은 시각과 기록 이름을 보여 준다', () => {
+    const copy = sentOffPlayerNoticeCopy({ playerName: '수용5팀장', sentOffWhen: '후반 8:12', noun: '골' });
+
+    expect(copy.title).toBe('수용5팀장은 퇴장한 선수예요');
+    expect(copy.message).toBe('후반 8:12에 레드카드를 받고 퇴장했어요. 그래도 골을 기록할까요?');
+    expect(copy.backLabel).toBe('다른 선수 고르기');
+    expect(copy.continueLabel).toBe('그래도 계속');
+  });
+
+  it('받침 없는 이름은 "는", 받침 없는 기록 이름은 "를"을 붙인다', () => {
+    const copy = sentOffPlayerNoticeCopy({ playerName: '정우', sentOffWhen: '전반 3:00', noun: '옐로카드' });
+
+    expect(copy.title).toBe('정우는 퇴장한 선수예요');
+    expect(copy.message).toContain('그래도 옐로카드를 기록할까요?');
+  });
+
+  it('퇴장 시각을 모르면 시각 없이 묻고, 어시스트는 "추가"로 묻는다', () => {
+    const copy = sentOffPlayerNoticeCopy({ playerName: '조현우', sentOffWhen: null, noun: '어시스트', verb: '추가' });
+
+    expect(copy.message).toBe('레드카드를 받고 퇴장했어요. 그래도 어시스트를 추가할까요?');
+  });
+});
+
+describe('recordNounOf — 기록 이름', () => {
+  it('골·자책골·파울·카드 색에 맞는 이름을 돌려준다', () => {
+    expect(recordNounOf(input({ type: 'GOAL' }))).toBe('골');
+    expect(recordNounOf(input({ type: 'OWN_GOAL' }))).toBe('자책골');
+    expect(recordNounOf(input({ type: 'FOUL' }))).toBe('파울');
+    expect(recordNounOf(input({ type: 'CARD', payload: { card: 'YELLOW' } }))).toBe('옐로카드');
+    expect(recordNounOf(input({ type: 'CARD', payload: { card: 'RED' } }))).toBe('레드카드');
   });
 });

@@ -198,6 +198,7 @@ apply_nginx_config() {
 
   if ! nginx_live_layout "${deploy_dir}"; then
     "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+    "${compose[@]}" exec -T nginx nginx -t || return 1
     return 0
   fi
   marker="$(cat "${deploy_dir}/nginx-live/conf.d/${NGINX_SYNC_MARKER}")" || return 1

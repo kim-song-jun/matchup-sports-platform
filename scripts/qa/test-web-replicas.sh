@@ -13,7 +13,7 @@ fail() { printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); }
 expect_log() {
   local label="$1" expected="$2"
   if [[ "$(cat "${LOG}")" == "${expected}" ]]; then pass "${label}"; else
-    fail "${label}"; printf '--- 기대\n%s\n--- 실제\n%s\n' "${expected}" "$(cat "${LOG}")"
+    fail "${label}"; printf -- '--- 기대\n%s\n--- 실제\n%s\n' "${expected}" "$(cat "${LOG}")"
   fi
 }
 
@@ -182,7 +182,11 @@ FAKE_NGINX_TEST_FAILS=false
 
 : > "${LOG}"
 apply_nginx_config "${LEGACY_DEPLOY}" >/dev/null
-expect_log 'nginx-live 가 없는 옛 릴리스 소스는 예전처럼 다시 만든다' 'compose up -d --force-recreate --no-deps nginx'
+expect_log 'nginx-live 가 없는 옛 릴리스 소스는 예전처럼 다시 만들고 설정을 검사한다' 'compose up -d --force-recreate --no-deps nginx
+compose exec -T nginx nginx -t'
+FAKE_NGINX_TEST_FAILS=true
+if apply_nginx_config "${LEGACY_DEPLOY}" >/dev/null 2>&1; then fail '옛 릴리스 소스로 만든 nginx 가 설정 검사에 실패했는데 성공했다'; else pass '옛 릴리스 소스도 nginx -t 가 실패하면 실패'; fi
+FAKE_NGINX_TEST_FAILS=false
 
 if (( failures > 0 )); then echo "[web-replicas] ${failures}건 실패" >&2; exit 1; fi
 echo '[web-replicas] passed'

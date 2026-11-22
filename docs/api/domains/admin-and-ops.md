@@ -50,7 +50,9 @@
 | `POST` | `/api/v1/admin/users/:userId/phone/release` | `ReleaseAdminUserPhoneDto` | owner/ops | 계정에서 휴대폰 번호만 해제 |
 | `GET` | `/api/v1/admin/matches` | `AdminMatchListQueryDto` | active admin | 매치 목록 |
 | `GET` | `/api/v1/admin/matches/:matchId` | - | active admin | 매치 상세 |
-| `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경 |
+| `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경(숨긴 매치는 409 `MATCH_HIDDEN`) |
+| `POST` | `/api/v1/admin/matches/:matchId/hide` | `ChangeMatchVisibilityDto` | owner/ops | 개인 매치 숨김(soft delete) |
+| `POST` | `/api/v1/admin/matches/:matchId/unhide` | `ChangeMatchVisibilityDto` | owner/ops | 어드민이 숨긴 개인 매치 다시 공개 |
 | `PATCH` | `/api/v1/admin/matches/:matchId/online` | `SetMatchOnlineDto` | owner/ops | 개인 매치 장소의 온라인 여부 분류 |
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
@@ -218,6 +220,16 @@ type AdminListSummary = {
 이 remediation 이후 런타임도 운영자 행과 연결 사용자 계정이 모두 active인 경우에만 접근을 허용한다.
 
 ## 상태 변경 DTO
+
+### 개인 매치 숨김·다시 공개
+
+- `POST /admin/matches/:matchId/hide`, `POST /admin/matches/:matchId/unhide` body는 `{ reason }`(필수, trim 후 1~500자)다. owner·ops만 호출하고 support는 403 `PERMISSION_DENIED`다.
+- 숨김은 `V1Match.deletedAt`만 기록한다(상태 `status`는 그대로). 공개 목록·검색·홈·사이트맵·공개 상세(404)·신청·「내 매치」·채팅·남은 후기·경기 수가 이미 이 값으로 거른다. 알림은 보내지 않는다.
+- 시작 전(`recruiting|closed` 이고 `startAt` 이 미래)인데 주최자 말고 확정 참가자 또는 대기·승인 신청이 있으면 409 `MATCH_HIDE_HAS_PARTICIPANTS`. 먼저 매치를 취소(상태 변경)해야 한다. 이미 숨겼으면 409 `MATCH_ALREADY_HIDDEN`, 없는 매치는 404.
+- 다시 공개는 `deletedAt` 을 비운다. 숨기지 않은 매치는 409 `MATCH_NOT_HIDDEN`, 가장 최근 숨김 기록이 어드민 `match.hide` 가 아닌 매치(주최자가 직접 삭제)는 409 `MATCH_DELETED_BY_HOST`.
+- 응답: 숨김 `{ matchId, hidden: true, hiddenAt, actionLogId }`, 복원 `{ matchId, hidden: false, hiddenAt: null, actionLogId }`. 감사 기록은 `match.hide` / `match.unhide`(`reason`, `beforeJson`·`afterJson` 의 `status`·`deletedAt`, 숨김은 `participantCount`·`applicationCount` 추가).
+- `GET /admin/matches` 는 `visibility=public|hidden` 필터를 받는다(생략=숨긴 매치 포함 전체). 목록 행은 `hiddenAt`, 상태 칩 집계도 같은 필터를 따른다. `GET /admin/matches/:matchId` 는 `hiddenAt`·`hiddenBy`(`admin|host|null`)·`hiddenReason`·`hiddenByName`·`canUnhide` 를 더한다.
+- 숨긴 매치에는 `POST /admin/matches/:matchId/status` 가 409 `MATCH_HIDDEN` 이다. 후기 쓰기·후기 대상 조회(`/reviews/sources/match/:id`)는 404 `SOURCE_NOT_FOUND` 다.
 
 ### 개인 매치 온라인 장소 분류
 

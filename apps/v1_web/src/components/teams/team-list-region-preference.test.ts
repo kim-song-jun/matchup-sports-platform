@@ -90,7 +90,7 @@ describe('teamListRegionNotice — 목록 머리의 한 줄', () => {
   });
 
   it('저장한 활동 지역이 없으면 설정을 권한다 — 링크는 이 경우에만 있다', () => {
-    expect(notice({ status: 'none' })).toEqual({ text: '활동 지역을 정하면 가까운 팀을 먼저 보여 줘요', link: { label: '설정하기', href } });
+    expect(notice({ status: 'none' })).toEqual({ text: '활동 지역을 정하면 가까운 팀을 먼저 보여 줘요', link: { label: '지역 설정', href } });
   });
 
   it('이어 보기 주소의 기준은 지역 이름을 모르면 이름 없이 말한다', () => {

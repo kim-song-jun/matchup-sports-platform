@@ -4,6 +4,8 @@
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Team } from '@/types/api';
@@ -78,7 +80,8 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     expect(lastFilters()).toMatchObject({ sort: 'activity', preferRegionId: 'r-seoul' });
     expect(screen.getByText('내 활동 지역(서울)의 팀을 먼저 보여 줘요')).toBeTruthy();
     // 설정 링크는 활동 지역이 아직 없는 사람에게만 보인다 — 이미 정한 사람에게는 어떤 이름으로도 없다.
-    expect(screen.queryByRole('link', { name: /설정하기/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /지역 설정/ })).toBeNull();
+    expect(document.querySelector('.tm-team-region-priority-action')).toBeNull();
   });
 
   it('활동 지역을 정한 사람은 내 팀이 다른 지역에 있어도 저장한 지역을 쓰고 설정 링크가 없다', () => {
@@ -87,7 +90,7 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
 
     expect(lastFilters()).toMatchObject({ preferRegionId: 'r-seoul' });
     expect(screen.getByText('내 활동 지역(서울)의 팀을 먼저 보여 줘요')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: /설정하기/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /지역 설정/ })).toBeNull();
   });
 
   // 활동 지역을 정하지 않은 사람은 소속 팀이 있든 없든 똑같다 — 소속 팀의 지역으로 대신하지 않는다.
@@ -102,7 +105,12 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
 
     expect(lastFilters()).not.toHaveProperty('preferRegionId');
     expect(screen.getByText(/활동 지역을 정하면 가까운 팀을 먼저 보여 줘요/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: '설정하기' }).getAttribute('href')).toBe('/my/settings/location');
+    // 안내 글은 왼쪽, "지역 설정" 알약 버튼은 오른쪽 — 같은 줄(.tm-team-region-priority-action)에 있고 설정 화면으로 이어진다.
+    const link = screen.getByRole('link', { name: '지역 설정' });
+    expect(link.getAttribute('href')).toBe('/my/settings/location');
+    expect(link.classList.contains('tm-team-region-priority-link')).toBe(true);
+    expect(link.closest('.tm-team-region-priority-action')?.textContent).toContain('활동 지역을 정하면 가까운 팀을 먼저 보여 줘요');
+    expect(link.querySelector('.tm-team-region-priority-pill svg')).not.toBeNull();
     expect(screen.queryByText(/내 팀이 있는 지역/)).toBeNull();
   });
 
@@ -171,5 +179,16 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     render(<TeamListPageClient seed={{ page: seedPage as never, sports: [], query: TEAM_LIST_SEED_PATH }} />);
     expect(hrefOf().searchParams.has('near')).toBe(false);
     expect(hrefOf().searchParams.get('cursor')).toBe('c-1');
+  });
+
+  it('설정 알약은 눈에 보이는 높이 32px, 누르는 영역 44px 이고 토큰만 쓴다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const rule = (selector: string) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+
+    expect(rule('.tm-team-region-priority-link')).toMatch(/min-height:\s*var\(--spacing-11\)/);
+    expect(rule('.tm-team-region-priority-pill')).toMatch(/height:\s*var\(--spacing-8\)/);
+    expect(rule('.tm-team-region-priority-pill')).toMatch(/border-radius:\s*var\(--radius-pill\)/);
+    expect(rule('.tm-team-region-priority-pill')).toMatch(/background:\s*var\(--blue50\)/);
+    expect(rule('.tm-team-region-priority-pill')).toMatch(/color:\s*var\(--blue700\)/);
   });
 });

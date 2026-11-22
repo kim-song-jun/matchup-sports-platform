@@ -80,7 +80,7 @@ export function teamListRegionNotice(
   settingsHref: string,
 ): { text: string; link?: { label: string; href: string } } | undefined {
   if (preference.status === 'none') {
-    return { text: '활동 지역을 정하면 가까운 팀을 먼저 보여 줘요', link: { label: '설정하기', href: settingsHref } };
+    return { text: '활동 지역을 정하면 가까운 팀을 먼저 보여 줘요', link: { label: '지역 설정', href: settingsHref } };
   }
   if (preference.status !== 'ready') return undefined;
   const where = preference.name ? `(${preference.name})` : '';

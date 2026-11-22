@@ -1090,9 +1090,9 @@ async function clearScenarioLeaves(
 }
 
 // 시드는 단계마다 별도 트랜잭션으로 나눠 돌린다(명단 → 시나리오 하나씩 → QA 스쿼드 팀 하나씩 →
-// 수동 연습 대회). 한 트랜잭션에 모으면 쿼리가 1,400개를 넘어 alpha 호스트가 느린 날 Prisma
-// 기본 한도 5초에 걸려 배포가 되돌려졌다. 가장 큰 단계도 쿼리 약 250개라서, 한도는 그 단계가
-// 호스트 지연을 견디는 여유분이다.
+// 수동 연습 대회). 한 트랜잭션에 모으면 alpha 호스트가 느린 날 Prisma 기본 한도 5초에 걸려
+// 배포가 되돌려졌다. 단계 크기를 고정해 한도가 호스트 속도에 좌우되지 않게 하고, 15초는 그
+// 위의 여유분이다.
 const ALPHA_SEED_TRANSACTION_OPTIONS = { timeout: 15_000 } as const;
 
 async function main() {

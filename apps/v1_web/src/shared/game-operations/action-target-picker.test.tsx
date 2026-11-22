@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -536,5 +537,136 @@ describe('ActionTargetPicker — 교체 문구의 운영진 실명', () => {
     await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
 
     expect(screen.getByText(text)).toBeInTheDocument();
+  });
+});
+
+describe('ActionTargetPicker — 퇴장한 선수는 기록 전에 한 번 더 확인한다', () => {
+  const SENT_OFF = new Set(['p-jung']);
+  const RED_AT = new Map([['p-jung', { period: 2, clockMs: 492_000 }]]);
+
+  function renderPicker(props: Partial<ComponentProps<typeof ActionTargetPicker>> = {}) {
+    const onCommit = vi.fn();
+    render(
+      <ActionTargetPicker
+        open
+        actionLabel="골"
+        actionType="GOAL"
+        frozen={FROZEN}
+        periodCount={2}
+        sides={SIDES}
+        lineups={LINEUPS}
+        allowTeamOnly={false}
+        sentOffParticipantIds={SENT_OFF}
+        sentOffRedCards={RED_AT}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        {...props}
+      />,
+    );
+    return onCommit;
+  }
+
+  it('퇴장한 선수를 고르면 바로 기록하지 않고 퇴장 사실·시각을 보여 주는 확인을 먼저 띄운다', async () => {
+    const onCommit = renderPicker();
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    const panel = screen.getByRole('group', { name: '정우진은 퇴장한 선수예요' });
+    expect(panel).toHaveTextContent('후반 8:12에 레드카드를 받고 퇴장했어요. 그래도 골을 기록할까요?');
+    expect(onCommit).not.toHaveBeenCalled();
+    // 선수 목록은 확인이 끝날 때까지 가려진다 — 결정이 하나만 보이게.
+    expect(screen.queryByRole('button', { name: /조현우/ })).not.toBeInTheDocument();
+  });
+
+  it('처음 포커스는 "다른 선수 고르기"에 있다 — 습관적으로 Enter 를 눌러도 기록되지 않는다', async () => {
+    renderPicker();
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.getByRole('button', { name: '다른 선수 고르기' })).toHaveFocus();
+  });
+
+  it('"그래도 계속"을 누르면 그 선수로 한 번만 커밋한다(얼린 시각 그대로)', async () => {
+    const onCommit = renderPicker();
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+    await userEvent.click(screen.getByRole('button', { name: '그래도 계속' }));
+
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'GOAL', participantId: 'p-jung', sideId: 's-home', period: 1, clockMs: 120_000 }),
+    );
+  });
+
+  it('"다른 선수 고르기"를 누르면 아무것도 기록하지 않고 선수 목록으로 돌아가 다른 선수를 고를 수 있다', async () => {
+    const onCommit = renderPicker();
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+    await userEvent.click(screen.getByRole('button', { name: '다른 선수 고르기' }));
+
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ participantId: 'p-cho' }));
+  });
+
+  it('퇴장하지 않은 선수는 확인 없이 바로 기록한다', async () => {
+    const onCommit = renderPicker();
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ participantId: 'p-cho' }));
+    expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['옐로카드', 'CARD', 'YELLOW', '그래도 옐로카드를 기록할까요?'],
+    ['레드카드', 'CARD', 'RED', '그래도 레드카드를 기록할까요?'],
+    ['파울', 'FOUL', undefined, '그래도 파울을 기록할까요?'],
+    ['자책골', 'OWN_GOAL', undefined, '그래도 자책골을 기록할까요?'],
+  ] as const)('%s도 같은 확인을 거친다', async (actionLabel, actionType, cardColor, question) => {
+    const onCommit = renderPicker({ actionLabel, actionType, cardColor });
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.getByRole('group', { name: '정우진은 퇴장한 선수예요' })).toHaveTextContent(question);
+    expect(onCommit).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: '그래도 계속' }));
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ type: actionType, participantId: 'p-jung' }));
+  });
+
+  it('퇴장 시각을 모르면 시각 없이 묻는다', async () => {
+    renderPicker({ sentOffRedCards: undefined });
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.getByRole('group', { name: '정우진은 퇴장한 선수예요' })).toHaveTextContent(
+      '레드카드를 받고 퇴장했어요. 그래도 골을 기록할까요?',
+    );
+  });
+
+  it('확인이 떠 있는 동안에는 팀 단위(선수 지정 없이) 기록 버튼을 감춘다', async () => {
+    renderPicker({ allowTeamOnly: true });
+    expect(screen.getAllByRole('button', { name: /익명 골로 기록/ })).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.queryByRole('button', { name: /익명 골로 기록/ })).not.toBeInTheDocument();
+  });
+
+  it('교체는 이 확인을 거치지 않는다 — 퇴장한 선수도 나가는 선수로 고르면 다음 단계로 간다', async () => {
+    renderPicker({
+      actionLabel: '교체',
+      actionType: 'SUBSTITUTION',
+      lineups: SUB_LINEUPS,
+      onPitchParticipantIds: SUB_ON_PITCH,
+      sentOffParticipantIds: new Set(['p-out']),
+      sentOffRedCards: new Map([['p-out', { period: 1, clockMs: 60_000 }]]),
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
+    expect(screen.getByText('정우진 선수와 교체')).toBeInTheDocument();
   });
 });

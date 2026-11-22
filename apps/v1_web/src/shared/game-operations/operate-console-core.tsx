@@ -55,7 +55,7 @@ import { useEventToast, EventToasts } from './event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
-import { deriveOnPitchParticipantIds, deriveSentOffParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
+import { deriveOnPitchParticipantIds, deriveSentOffRedCards, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from './team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
@@ -763,10 +763,13 @@ export function OperateConsoleCore({
     () => deriveOnPitchParticipantIds(allParticipants, ops.liveEvents),
     [allParticipants, ops.liveEvents],
   );
-  const sentOffParticipantIds = useMemo(
-    () => deriveSentOffParticipantIds(ops.liveEvents, ops.queue.items),
+  // 퇴장한 선수 → 레드카드 시각. 선수 목록의 "퇴장" 칩, 기록 전 재확인 문구("후반 8:12에 퇴장"),
+  // 어시스트가 퇴장 전 골인지 가르는 데 같이 쓴다.
+  const sentOffRedCards = useMemo(
+    () => deriveSentOffRedCards(ops.liveEvents, ops.queue.items),
     [ops.liveEvents, ops.queue.items],
   );
+  const sentOffParticipantIds = useMemo(() => new Set(sentOffRedCards.keys()), [sentOffRedCards]);
   const substitutionUsedBySideId = useMemo(() => {
     const bySide: Record<string, number> = {};
     for (const side of gameDetail.data?.sides ?? []) {
@@ -2264,6 +2267,7 @@ export function OperateConsoleCore({
           substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
           substitutionUsedBySideId={substitutionUsedBySideId}
           sentOffParticipantIds={sentOffParticipantIds}
+          sentOffRedCards={sentOffRedCards}
           lineupPositions={gameDetail.data?.lineupConfig?.positions}
           onCommit={handleCommit}
           onCancel={() => setPendingAction(null)}
@@ -2350,6 +2354,8 @@ export function OperateConsoleCore({
           teamName={sides.find((side) => side.id === assistTarget.event.sideId)?.displayNameSnapshot}
           whenLabel={`${periodPrefix(assistTarget.event.period, periodCount)}${formatMatchClock(assistTarget.event.clockMs)}`}
           teammates={teammatesForSide(assistTarget.event.sideId, lineups, assistTarget.event.participantId)}
+          sentOffRedCards={sentOffRedCards}
+          periodCount={periodCount}
           onAttach={(assistParticipantId) => attachAssist(assistTarget.event, assistParticipantId)}
           onClose={() => setAssistTarget(null)}
         />

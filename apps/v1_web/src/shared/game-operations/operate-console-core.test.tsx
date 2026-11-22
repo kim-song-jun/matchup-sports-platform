@@ -807,6 +807,66 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
   });
 
+  describe('퇴장한 선수 재확인', () => {
+    const periods = [
+      { number: 1, state: 'LIVE' as const, startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED' as const, startedAt: null, endedAt: null },
+    ];
+    // 선수 목록 스텁은 언제나 p-1(정우진)을 고른다 — 그 선수가 전반 8:00 에 레드카드를 받은 상태.
+    const redCardOfP1 = { ...goal(1), type: 'CARD', participantId: 'p-1', period: 1, clockMs: 8 * 60000, payload: { card: 'RED' } } as GameEventRecord;
+
+    it('퇴장한 선수를 고르면 기록 확인 전에 "퇴장한 선수예요"를 먼저 묻고, 계속하면 평소 기록 확인으로 이어진다', async () => {
+      gameWithPeriods('LIVE', periods);
+      testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [redCardOfP1] }));
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+      const panel = within(screen.getByRole('dialog')).getByRole('group', { name: '정우진은 퇴장한 선수예요' });
+      expect(panel).toHaveTextContent('전반 8:00에 레드카드를 받고 퇴장했어요. 그래도 골을 기록할까요?');
+      expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
+
+      fireEvent.click(within(panel).getByRole('button', { name: '그래도 계속' }));
+
+      const confirmDialog = await screen.findByRole('dialog', { name: '골을 기록할까요?' });
+      expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
+      fireEvent.click(within(confirmDialog).getByRole('button', { name: '골 기록' }));
+      await waitFor(() =>
+        expect(testFixtures.operations().submitEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
+        ),
+      );
+      expect(testFixtures.operations().submitEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('"다른 선수 고르기"를 누르면 아무것도 기록하지 않고 선택 화면에 머문다', () => {
+      gameWithPeriods('LIVE', periods);
+      testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [redCardOfP1] }));
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(screen.getByRole('button', { name: '다른 선수 고르기' }));
+
+      expect(within(screen.getByRole('dialog')).getByTestId('lineup-grid')).toBeInTheDocument();
+      expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
+    });
+
+    it('레드카드를 되돌린 선수는 확인 없이 평소처럼 기록 확인으로 간다', async () => {
+      gameWithPeriods('LIVE', periods);
+      const undo = { ...goal(2), type: 'CORRECTION', participantId: 'p-1', reversesEventId: redCardOfP1.id, payload: {} } as GameEventRecord;
+      testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [redCardOfP1, undo] }));
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+      expect(await screen.findByRole('dialog', { name: '골을 기록할까요?' })).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
+    });
+  });
+
   it('골 확인 모달에서 취소하면 아무것도 기록되지 않는다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
@@ -842,6 +902,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       render(<CoreHarness />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      // 이미 레드카드를 받은 선수면 기록 확인 전에 "퇴장한 선수예요"가 먼저 뜬다 — 계속을 눌러 평소 기록 확인으로 넘어간다.
+      const sentOffPanel = screen.queryByRole('group', { name: /퇴장한 선수예요/ });
+      if (sentOffPanel) fireEvent.click(within(sentOffPanel).getByRole('button', { name: '그래도 계속' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
       return state.submitEvent;
     }

@@ -5,9 +5,12 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
+import type { SentOffRedCard } from '@/lib/on-pitch-state';
+import { recordNounOf } from './confirm-copy';
 import { LineupGrid } from './lineup-grid';
 import { participantIdentityName } from './participant-identity';
 import { periodPrefix } from './period-label';
+import { SentOffConfirmPanel } from './sent-off-confirm-panel';
 import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
   GameCardColor,
@@ -66,8 +69,11 @@ export interface ActionTargetPickerProps {
   readonly substitutionPolicy?: GameSubstitutionPolicy | null;
   /** sideId → 지금까지 확정된(되돌리지 않은) 교체 횟수. */
   readonly substitutionUsedBySideId?: Readonly<Record<string, number>>;
-  /** 레드카드가 기록된 선수 id — 선수 목록에서 "퇴장" 칩으로 가른다. */
+  /** 레드카드가 기록된 선수 id — 선수 목록에서 "퇴장" 칩으로 가르고, 이 선수를 골랐을 때(교체 제외)
+   * 기록하기 전에 한 번 더 확인한다. */
   readonly sentOffParticipantIds?: ReadonlySet<string>;
+  /** 퇴장한 선수가 레드카드를 받은 시각 — 확인 문구에 "후반 8:12에 퇴장"을 보여 준다. 없으면 시각 없이 묻는다. */
+  readonly sentOffRedCards?: ReadonlyMap<string, SentOffRedCard>;
   readonly lineupPositions?: readonly V1LineupConfigPosition[];
   readonly onCommit: (input: EventCaptureCommitInput) => void;
   readonly onCancel: () => void;
@@ -103,6 +109,7 @@ export function ActionTargetPicker({
   substitutionPolicy,
   substitutionUsedBySideId,
   sentOffParticipantIds,
+  sentOffRedCards,
   lineupPositions,
   onCommit,
   onCancel,
@@ -111,13 +118,20 @@ export function ActionTargetPicker({
     readonly sideId: string;
     readonly participant: GameLineupParticipant;
   } | null>(null);
+  // 퇴장한 선수를 골랐을 때 "그래도 기록할까요?"를 기다리는 선택. 이 동안 목록 자리에 확인 패널이 뜬다.
+  const [sentOffPending, setSentOffPending] = useState<{
+    readonly sideId: string;
+    readonly participant: GameLineupParticipant;
+  } | null>(null);
 
   // 부모(operate-console)는 pendingAction이 null이 아닌 동안 이 컴포넌트를
   // 계속 마운트해 둔 채 새 액션으로 교체할 수 있다(모달이 열린 채로 다른
   // 액션 버튼을 다시 누르는 경우) — 그때 이전 SUBSTITUTION 1단계 선택이
   // 새 액션에 새어 들어가면 안 되므로 actionType/시각이 바뀔 때마다 초기화한다.
+  // 퇴장 확인 대기 중인 선택도 같은 이유로 새 액션에 넘어가면 안 된다.
   useEffect(() => {
     setSubstitutionOut(null);
+    setSentOffPending(null);
   }, [actionType, frozen.occurredAt]);
 
   // focus 저장/복원 · ESC 닫기 · Tab focus trap · 스크롤 잠금 · backdrop 클릭 닫기를
@@ -141,14 +155,18 @@ export function ActionTargetPicker({
   // 영향을 받으므로, 이 화면만 갖는 2단계 문제는 이 파일에서 국소로 해결한다.
   // 이전 값을 ref 로 추적해 **바뀔 때만** 옮기므로 초기 마운트(open 시)에는
   // 훅의 초기 포커스와 경합하지 않는다.
-  const lastSubstitutionOutIdRef = useRef<string | null>(null);
+  //
+  // 퇴장 확인 패널도 같은 문제를 갖는다 — 선수 버튼이 사라지고, '다른 선수 고르기'로 목록에 돌아올 때
+  // 포커스가 body 로 떨어진다. 패널이 떠 있는 동안은 패널이 스스로 첫 버튼에 포커스를 잡으므로
+  // 여기서는 건너뛰고, 패널이 닫혀 목록으로 돌아올 때만 첫 focusable 로 옮긴다.
+  const lastFocusKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const currentId = substitutionOut?.participant.id ?? null;
-    if (lastSubstitutionOutIdRef.current === currentId) return;
-    lastSubstitutionOutIdRef.current = currentId;
-    if (!open) return;
+    const currentKey = sentOffPending?.participant.id ?? substitutionOut?.participant.id ?? null;
+    if (lastFocusKeyRef.current === currentKey) return;
+    lastFocusKeyRef.current = currentKey;
+    if (!open || sentOffPending !== null) return;
     dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-  }, [open, substitutionOut, dialogRef]);
+  }, [open, substitutionOut, sentOffPending, dialogRef]);
 
   if (!open) return null;
 
@@ -171,6 +189,16 @@ export function ActionTargetPicker({
       occurredAt: frozen.occurredAt,
       payload,
     });
+  };
+
+  // 퇴장한 선수(레드카드가 기록된 선수)를 골랐으면 바로 기록하지 않고 확인 패널을 먼저 띄운다.
+  // 교체는 이 경로를 타지 않는다 — 1·2단계 선택은 `setSubstitutionOut`·`commitSubstitution`이 따로 받는다.
+  const selectPlayer = (input: { sideId: string; participant: GameLineupParticipant }) => {
+    if (sentOffParticipantIds?.has(input.participant.id)) {
+      setSentOffPending(input);
+      return;
+    }
+    commitPlayer(input);
   };
 
   const commitTeamOnly = (targetSideId: string) => {
@@ -210,6 +238,10 @@ export function ActionTargetPicker({
   };
 
   const isSubstitution = actionType === 'SUBSTITUTION';
+
+  const sentOffRed = sentOffPending === null ? undefined : sentOffRedCards?.get(sentOffPending.participant.id);
+  const sentOffWhen =
+    sentOffRed === undefined ? null : `${periodPrefix(sentOffRed.period, periodCount)}${formatMatchClock(sentOffRed.clockMs)}`;
 
   let titleText = `${actionLabel} · 누구인가요?`;
   if (isSubstitution) {
@@ -254,7 +286,19 @@ export function ActionTargetPicker({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {isSubstitution ? (
+          {sentOffPending !== null ? (
+            <SentOffConfirmPanel
+              playerName={participantIdentityName(sentOffPending.participant)}
+              sentOffWhen={sentOffWhen}
+              noun={recordNounOf({ type: actionType, payload })}
+              onBack={() => setSentOffPending(null)}
+              onContinue={() => {
+                const chosen = sentOffPending;
+                setSentOffPending(null);
+                commitPlayer(chosen);
+              }}
+            />
+          ) : isSubstitution ? (
             substitutionOut === null ? (
               <LineupGrid
                 sides={sides}
@@ -297,13 +341,13 @@ export function ActionTargetPicker({
             <LineupGrid
               sides={sides}
               lineups={lineups}
-              onSelectPlayer={commitPlayer}
+              onSelectPlayer={selectPlayer}
               sentOffParticipantIds={sentOffParticipantIds}
               lineupPositions={lineupPositions}
             />
           )}
 
-          {allowTeamOnly ? (
+          {allowTeamOnly && sentOffPending === null ? (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {sides.map((side) => {
                 const creditedSide = sides.find((candidate) => candidate.id !== side.id);

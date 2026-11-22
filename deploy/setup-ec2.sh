@@ -165,6 +165,15 @@ $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/
 $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js"
 
 # 10. 전체 스택 시작
+# nginx 는 deploy/nginx-live(릴리스와 무관한 런타임 폴더)를 마운트한다. 비어 있으면 docker 가 root 소유의 빈 폴더를
+# 만들어 nginx 가 설정 없이 뜨므로 먼저 채운다. 첫 배포(deploy-prod.sh)는 같은 런타임 폴더를 이어 쓴다.
+PROD_HOME_DIR="$HOME"
+PROD_LIVE_DIR="$APP_DIR"
+. ./prod-release-common.sh
+install -d -m 755 "$PROD_RUNTIME_NGINX_DIR"
+ln -sfn "$PROD_RUNTIME_NGINX_DIR" nginx-live
+configure_web_replicas "${V1_WEB_REPLICAS:-}" 1 3500000
+sync_prod_nginx_config full
 echo "🚀 애플리케이션 스택 시작..."
 $COMPOSE -f docker-compose.prod.yml up -d
 

@@ -175,6 +175,23 @@ write_release_metadata() {
   mv "${metadata_tmp}" "${metadata_snippet}"
 }
 
+# docker-compose.prod.yml 의 nginx-live 마운트와 짝이다. 웹 개수는 configure_web_replicas 가 정한 값을 쓴다.
+# sync_prod_nginx_config <seed|full> — 모드는 web-replicas-common.sh 의 sync_nginx_live_config 참고.
+sync_prod_nginx_config() {
+  sync_nginx_live_config "$1" "${PROD_LIVE_DIR}/deploy" \
+    conf.d/default.conf=nginx.conf \
+    snippets/teameet-release-metadata.conf=release-metadata.prod.conf \
+    aasa=aasa \
+    maintenance=maintenance \
+    "web=nginx-web/${WEB_REPLICAS}"
+}
+
+# 웹 교체가 끝난 뒤 부른다: 이번 릴리스로 채우고 nginx 에 적용한다.
+apply_prod_nginx_config() {
+  sync_prod_nginx_config full || return 1
+  apply_nginx_config "${PROD_LIVE_DIR}/deploy" || return 1
+}
+
 pull_release_images() {
   sudo docker pull "${V1_API_IMAGE}" || return 1
   sudo docker pull "${V1_WEB_IMAGE}" || return 1
@@ -326,8 +343,9 @@ restore_active_release() {
   load_prod_release_manifest "${active_tmp}" || return 1
   pull_release_images || return 1
   write_release_metadata "${active_tmp}" || return 1
+  sync_prod_nginx_config seed || return 1
   up_app_containers || return 1
-  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  apply_prod_nginx_config || return 1
   wait_for_prod_health_contract || return 1
   assert_running_release_digests || return 1
   rm -f "${active_tmp}" || return 1

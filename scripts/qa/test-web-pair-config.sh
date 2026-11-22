@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 웹 컨테이너 개수(V1_WEB_REPLICAS) 설정이 실제 도구에서 해석되는지 본다.
-#  - compose: 기본(개수 1)은 v1_web_b 를 내지 않고 `--profile web-pair` 일 때만 낸다. nginx 마운트는 개수를 따른다.
+#  - compose: 기본(개수 1)은 v1_web_b 를 내지 않고 `--profile web-pair` 일 때만 낸다. nginx 웹 설정 마운트는 개수와 무관한 nginx-live/web 이다.
 #  - nginx: prod·alpha 설정 × 개수 1·2 모두 `nginx -t` 를 통과하고, 개수 1 의 upstream 은 v1_web 하나다.
 # docker(compose v2)가 필요하다. nginx 는 compose 에 고정된 이미지를 쓴다(NGINX_TEST_IMAGE 로 바꿀 수 있다).
 set -Eeuo pipefail
@@ -26,10 +26,11 @@ if [[ "$(services_of "${prod[@]}" --profile web-pair)" == *v1_web_b* ]]; then pa
 if [[ "$(services_of "${alpha[@]}")" != *v1_web_b* ]]; then pass 'alpha 도 프로필 없이는 v1_web_b 를 내지 않는다'; else fail 'alpha 기본에 v1_web_b 가 있다'; fi
 
 mount_source() { "$@" config | awk '/target: \/etc\/nginx\/teameet-web/ { print prev } { if ($1 == "source:") prev = $2 }'; }
-[[ "$(mount_source "${prod[@]}")" == */nginx-web/1 ]] && pass 'prod 기본 마운트는 nginx-web/1' || fail 'prod 기본 마운트가 nginx-web/1 이 아니다'
-[[ "$(V1_WEB_REPLICAS=2 mount_source "${prod[@]}")" == */nginx-web/2 ]] && pass 'V1_WEB_REPLICAS=2 면 nginx-web/2' || fail 'V1_WEB_REPLICAS=2 인데 nginx-web/2 가 아니다'
-[[ "$(mount_source "${alpha[@]}")" == */nginx-web/2 ]] && pass 'alpha 기본 마운트는 nginx-web/2' || fail 'alpha 기본 마운트가 nginx-web/2 가 아니다'
-[[ "$(V1_WEB_REPLICAS=1 mount_source "${alpha[@]}")" == */nginx-web/1 ]] && pass 'alpha 도 1 로 줄일 수 있다' || fail 'alpha 를 1 로 줄일 수 없다'
+# 개수에 맞는 nginx-web/<개수> 는 배포가 nginx-live/web 에 채운다(test-nginx-live-reload.sh). 마운트는 개수와 무관하다.
+for v in '' 1 2; do
+  [[ "$(V1_WEB_REPLICAS="${v}" mount_source "${prod[@]}")" == */nginx-live/web ]] && pass "prod 개수 '${v}': 마운트는 nginx-live/web" || fail "prod 개수 '${v}': 마운트가 nginx-live/web 이 아니다"
+  [[ "$(V1_WEB_REPLICAS="${v}" mount_source "${alpha[@]}")" == */nginx-live/web ]] && pass "alpha 개수 '${v}': 마운트는 nginx-live/web" || fail "alpha 개수 '${v}': 마운트가 nginx-live/web 이 아니다"
+done
 
 web_b_mounts="$("${prod[@]}" --profile web-pair config | awk '/^  v1_web_b:/ { in_b = 1; next } /^  [a-z_0-9]+:/ { in_b = 0 } in_b && /source: v1_web_b_image_cache|ports:|published:/ { print $0 }')"
 if grep -q 'v1_web_b_image_cache' <<<"${web_b_mounts}" && ! grep -qE 'ports:|published:' <<<"${web_b_mounts}"; then

@@ -15,6 +15,9 @@ import {
   findNginxImageProblem,
   findNginxConfMountProblem,
   findNginxWebMountProblem,
+  findNginxReleasePinnedMounts,
+  findProdWebReplicasDefaultProblem,
+  findNginxForceRecreate,
   findDirectWebUp,
   normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
@@ -600,36 +603,123 @@ ${mountLine}
       - ./aasa:/etc/nginx/teameet-aasa:ro
 `;
 
-test('nginx default.conf 마운트는 :ro 일 때만 통과한다', () => {
-  for (const ok of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro,z']) {
+test('nginx conf.d 마운트는 :ro 일 때만 통과한다', () => {
+  for (const ok of ['      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro', '      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro,z']) {
     assert.equal(findNginxConfMountProblem(composeWithNginxMount(ok)), null, ok);
   }
-  for (const bad of ['      - ./nginx.conf:/etc/nginx/conf.d/default.conf', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:rw', '      - ./nginx.conf:/etc/nginx/conf.d/default.conf:z']) {
+  for (const bad of ['      - ./nginx-live/conf.d:/etc/nginx/conf.d', '      - ./nginx-live/conf.d:/etc/nginx/conf.d:rw', '      - ./nginx-live/conf.d:/etc/nginx/conf.d:z']) {
     assert.match(findNginxConfMountProblem(composeWithNginxMount(bad)), /읽기 전용/, bad);
   }
 });
 
-test('nginx default.conf 마운트가 없거나 다른 서비스에만 있으면 실패한다', () => {
+test('nginx conf.d 마운트가 없거나 다른 서비스에만 있으면 실패한다', () => {
   assert.match(findNginxConfMountProblem(composeWithNginxMount('      - ./x:/etc/nginx/other.conf:ro')), /찾지 못했습니다/);
-  const otherService = 'services:\n  v1_web:\n    volumes:\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro\n\n  nginx:\n    image: nginx\n';
+  const otherService = 'services:\n  v1_web:\n    volumes:\n      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro\n\n  nginx:\n    image: nginx\n';
   assert.match(findNginxConfMountProblem(otherService), /찾지 못했습니다/);
 });
 
-test('실제 prod compose 의 nginx default.conf 마운트는 읽기 전용이다', () => {
+test('실제 prod compose 의 nginx conf.d 마운트는 읽기 전용이다', () => {
   assert.equal(findNginxConfMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
 });
 
-test('nginx 웹 설정 마운트는 읽기 전용이고 기본 개수가 1 일 때만 통과한다', () => {
-  const ok = '      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web:ro';
-  assert.equal(findNginxWebMountProblem(composeWithNginxMount(ok)), null);
-  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web')), /읽기 전용/);
-  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/${V1_WEB_REPLICAS:-2}:/etc/nginx/teameet-web:ro')), /기본 웹 개수가 1/);
-  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/2:/etc/nginx/teameet-web:ro')), /기본 웹 개수가 1/);
+test('nginx 웹 설정 마운트는 읽기 전용 nginx-live/web 일 때만 통과한다', () => {
+  assert.equal(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-live/web:/etc/nginx/teameet-web:ro')), null);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-live/web:/etc/nginx/teameet-web')), /읽기 전용/);
+  assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./nginx-web/${V1_WEB_REPLICAS:-1}:/etc/nginx/teameet-web:ro')), /nginx-live\/web 이 아닙니다/);
   assert.match(findNginxWebMountProblem(composeWithNginxMount('      - ./x:/etc/nginx/other:ro')), /찾지 못했습니다/);
 });
 
 test('실제 prod compose 의 nginx 웹 설정 마운트가 통과한다', () => {
   assert.equal(findNginxWebMountProblem(readFileSync('deploy/docker-compose.prod.yml', 'utf8')), null);
+});
+
+test('릴리스 소스 파일을 직접 마운트하는 nginx 볼륨만 잡는다', () => {
+  const compose = composeWithNginxMount([
+    '      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro',
+    '      - ./nginx-live/web:/etc/nginx/teameet-web',
+    '      - ./robots.alpha.txt:/etc/nginx/teameet-robots/robots.txt:ro',
+    '      - /home/ec2-user/.teameet-maintenance:/etc/nginx/maintenance:ro',
+    '      - ./certbot/conf:/etc/letsencrypt',
+  ].join('\n'));
+  // composeWithNginxMount 가 붙이는 ./aasa 마운트도 릴리스 파일이다. 다른 서비스의 ./other.conf 는 보지 않는다.
+  assert.deepEqual(findNginxReleasePinnedMounts(compose), [
+    './nginx-live/web:/etc/nginx/teameet-web',
+    './robots.alpha.txt:/etc/nginx/teameet-robots/robots.txt',
+    './aasa:/etc/nginx/teameet-aasa',
+  ]);
+});
+
+test('해석하지 못한 볼륨 줄과 .. 로 빠져나가는 경로는 통과시키지 않는다', () => {
+  const compose = composeWithNginxMount([
+    '      - "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"',
+    '      - ./nginx-live/conf.d:/etc/nginx/conf.d:ro # 줄 끝 주석',
+    '      - type: bind',
+    '      - ./nginx-live/../nginx.conf:/etc/nginx/x.conf:ro',
+    '      - ./certbot/../nginx.conf:/etc/nginx/y.conf:ro',
+  ].join('\n'));
+  const problems = findNginxReleasePinnedMounts(compose);
+  assert.equal(problems.filter((p) => p.startsWith('해석하지 못한 볼륨')).length, 3, problems.join('\n'));
+  assert.ok(problems.includes('./nginx-live/../nginx.conf:/etc/nginx/x.conf'));
+  assert.ok(problems.includes('./certbot/../nginx.conf:/etc/nginx/y.conf'));
+});
+
+test('flow·태그 문법의 volumes 와 점검 플래그 밖의 절대경로는 통과시키지 않는다', () => {
+  const flow = 'services:\n  nginx:\n    image: nginx\n    volumes: [ "./nginx.conf:/etc/nginx/conf.d/default.conf:ro" ]\n';
+  assert.match(findNginxReleasePinnedMounts(flow).join('\n'), /해석하지 못한 볼륨/);
+  const tagged = 'services:\n  nginx:\n    volumes: !override\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro\n';
+  assert.match(findNginxReleasePinnedMounts(tagged).join('\n'), /해석하지 못한 볼륨/);
+  const absolute = composeWithNginxMount([
+    '      - /home/ec2-user/teameet/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro',
+    '      - /home/ec2-user/.teameet-maintenance:/etc/nginx/maintenance:ro',
+  ].join('\n'));
+  assert.deepEqual(findNginxReleasePinnedMounts(absolute), [
+    '/home/ec2-user/teameet/deploy/nginx.conf:/etc/nginx/conf.d/default.conf',
+    './aasa:/etc/nginx/teameet-aasa',
+  ]);
+});
+
+test('실제 prod·alpha compose 의 nginx 는 릴리스 소스 파일을 직접 마운트하지 않는다', () => {
+  for (const rel of ['deploy/docker-compose.prod.yml', 'deploy/docker-compose.alpha.yml']) {
+    assert.deepEqual(findNginxReleasePinnedMounts(readFileSync(rel, 'utf8')), [], rel);
+  }
+});
+
+test('운영 웹 개수 기본값은 1 일 때만 통과한다', () => {
+  assert.equal(findProdWebReplicasDefaultProblem('configure_web_replicas "${V1_WEB_REPLICAS}" 1 3500000\n'), null);
+  assert.match(findProdWebReplicasDefaultProblem('configure_web_replicas "${V1_WEB_REPLICAS:-}" 2 3500000\n'), /1 이 아닙니다/);
+  assert.match(findProdWebReplicasDefaultProblem('echo none\n'), /찾지 못했습니다/);
+  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh']) {
+    assert.equal(findProdWebReplicasDefaultProblem(readFileSync(rel, 'utf8')), null, rel);
+  }
+});
+
+test('nginx 강제 재생성은 restore_legacy_runtime 안에서만 허용한다', () => {
+  const script = [
+    'restore_legacy_runtime() {',
+    '  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1',
+    '}',
+    '# "${compose[@]}" up -d --force-recreate --no-deps nginx',
+    'restore_active_release() {',
+    '  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1',
+    '}',
+    '"${compose[@]}" up -d --force-recreate --no-deps nginx',
+    '"${compose[@]}" up -d --force-recreate --no-deps v1_api',
+  ].join('\n');
+  assert.deepEqual(findNginxForceRecreate(script), [6, 8]);
+  const wrapped = [
+    '"${compose[@]}" up -d --force-recreate \\',
+    '  --no-deps nginx',
+    '"${compose[@]}" restart nginx',
+    'sudo docker restart teameet_nginx',
+    'apply_nginx_config() {',
+    '  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1',
+    '}',
+    'ln -s x deploy/nginx-live --force-recreate',
+  ].join('\n');
+  assert.deepEqual(findNginxForceRecreate(wrapped), [1, 3, 4]);
+  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh', 'deploy/prod-release-common.sh', 'deploy/deploy-alpha.sh', 'deploy/rollback-alpha.sh', 'deploy/alpha-release-common.sh', 'deploy/deploy-alpha-stage-b.sh', 'deploy/web-replicas-common.sh']) {
+    assert.deepEqual(findNginxForceRecreate(readFileSync(rel, 'utf8')), [], rel);
+  }
 });
 
 test('웹 컨테이너를 compose up 으로 직접 올리는 줄만 잡는다', () => {

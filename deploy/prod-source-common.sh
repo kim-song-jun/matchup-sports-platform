@@ -20,6 +20,8 @@ PROD_SOURCE_STAGING_DIR="${PROD_SOURCE_STAGING_DIR:-${PROD_HOME_DIR}/.teameet-pr
 PROD_RUNTIME_CONFIG_DIR="${PROD_RUNTIME_CONFIG_DIR:-${PROD_HOME_DIR}/.teameet-prod-runtime}"
 PROD_LEGACY_SOURCE_DIR="${PROD_LEGACY_SOURCE_DIR:-${PROD_SOURCE_RELEASES_DIR}/legacy-pre-immutable}"
 PROD_RUNTIME_METADATA_FILE="${PROD_RUNTIME_METADATA_FILE:-${PROD_RUNTIME_CONFIG_DIR}/release-metadata.prod.conf}"
+# nginx 가 마운트하는 설정 폴더. 릴리스 소스의 deploy/nginx-live 가 여기를 가리킨다(web-replicas-common.sh).
+PROD_RUNTIME_NGINX_DIR="${PROD_RUNTIME_NGINX_DIR:-${PROD_RUNTIME_CONFIG_DIR}/nginx}"
 PROD_RUNTIME_BACKUPS_DIR="${PROD_RUNTIME_BACKUPS_DIR:-${PROD_HOME_DIR}/teameet-backups}"
 
 prepare_prod_release_source() {
@@ -31,6 +33,7 @@ prepare_prod_release_source() {
   local drift
 
   install -d -m 700 "${PROD_SOURCE_RELEASES_DIR}" "${PROD_RUNTIME_CONFIG_DIR}"
+  install -d -m 755 "${PROD_RUNTIME_NGINX_DIR}"
   if [[ ! -f "${PROD_RUNTIME_CONFIG_DIR}/.env" ]]; then
     install -m 600 "${PROD_LIVE_DIR}/deploy/.env" "${PROD_RUNTIME_CONFIG_DIR}/.env"
   fi
@@ -71,6 +74,7 @@ prepare_prod_release_source() {
       --exclude '/deploy/.env' \
       --exclude '/deploy/certbot' \
       --exclude '/deploy/release-metadata.prod.conf' \
+      --exclude '/deploy/nginx-live' \
       "${source_dir}/" "${target_dir}/")"
     if [[ -n "${drift}" ]]; then
       echo "[prod-release] Stored source ${release_sha} drifted from the packaged source:" >&2
@@ -85,10 +89,11 @@ prepare_prod_release_source() {
     rm -rf "${target_tmp}"
     return 1
   fi
-  rm -rf "${target_tmp}/deploy/certbot"
+  rm -rf "${target_tmp}/deploy/certbot" "${target_tmp}/deploy/nginx-live"
   rm -f "${target_tmp}/deploy/.env"
   rm -f "${target_tmp}/deploy/release-metadata.prod.conf"
   ln -s "${PROD_RUNTIME_CONFIG_DIR}/certbot" "${target_tmp}/deploy/certbot"
+  ln -s "${PROD_RUNTIME_NGINX_DIR}" "${target_tmp}/deploy/nginx-live"
   ln -s "${PROD_RUNTIME_CONFIG_DIR}/.env" "${target_tmp}/deploy/.env"
   ln -s "${PROD_RUNTIME_METADATA_FILE}" \
     "${target_tmp}/deploy/release-metadata.prod.conf"

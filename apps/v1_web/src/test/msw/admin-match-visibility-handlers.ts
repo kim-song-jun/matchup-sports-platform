@@ -4,7 +4,7 @@ import type { V1AdminMatchVisibilityResult } from '@/types/api';
 /**
  * `POST /admin/matches/:matchId/hide|unhide` — `docs/api/domains/admin-and-ops.md` 계약.
  * 시나리오는 매치 id 로 고른다. 상태를 들고 있지 않아 테스트 간 오염이 없다.
- * 본문은 서버 DTO(`ChangeMatchVisibilityDto`)와 같다: `reason` 하나, 앞뒤 공백을 뺀 1~500자.
+ * 본문은 서버 DTO(`ChangeMatchVisibilityDto`)와 같다: `reason` 하나, 앞뒤 공백을 뺀 뒤 1~500자(공백은 서버가 trim 한다).
  */
 const api = '*/api/v1';
 const NOW = '2026-11-22T00:00:00.000Z';
@@ -29,7 +29,7 @@ async function validReason(request: Request): Promise<boolean> {
   const body: unknown = await request.json().catch(() => null);
   const fields = typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
   const { reason, ...rest } = fields;
-  return typeof reason === 'string' && reason.trim() === reason && reason.length >= 1 && reason.length <= 500 && Object.keys(rest).length === 0;
+  return typeof reason === 'string' && reason.trim().length >= 1 && reason.trim().length <= 500 && Object.keys(rest).length === 0;
 }
 
 export const v1AdminMatchVisibilityMswHandlers = [

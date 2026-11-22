@@ -17,7 +17,15 @@ const LEAGUE = {
     // 제목은 2주차로 박제됐지만 일정이 옮겨져 세 번째 경기 날짜가 됐다.
     fixture('fx-3', '서울 나이트 풋살 리그 2주차', '2026-09-27T14:57:00.000Z'),
     fixture('fx-4', '개막전', '2026-10-04T11:00:00.000Z'),
+    // 1주차에 같은 시각 두 경기가 열린다 — 팀이 다르다.
+    fixture('fx-5', '서울 나이트 풋살 리그 1주차', '2026-09-13T11:00:00.000Z'),
+    fixture('fx-6', '서울 나이트 풋살 리그 1주차', '2026-09-13T11:00:00.000Z'),
   ],
+};
+
+const TEAMS: Record<string, { host: string; opponent: string }> = {
+  'fx-5': { host: '송파 FC', opponent: '잠실 유나이티드' },
+  'fx-6': { host: '강동 FC', opponent: '광진 FC' },
 };
 
 const teamMatch = (id: string) => {
@@ -25,6 +33,10 @@ const teamMatch = (id: string) => {
   return {
     id, title: stored.title, startsAt: stored.startAt, place: { name: stored.placeName },
     league: { leagueId: 'lg-1', title: LEAGUE.title },
+    ...(TEAMS[id] ? {
+      hostTeam: { teamId: `${id}-h`, name: TEAMS[id].host },
+      approvedOpponentTeam: { teamId: `${id}-o`, name: TEAMS[id].opponent },
+    } : {}),
   };
 };
 
@@ -74,5 +86,18 @@ describe('리그 경기 탭 제목의 주차', () => {
     const meta = await generateMetadata({ params: Promise.resolve({ leagueId: 'lg-1', fixtureId: 'fx-3' }) });
     expect(String(meta.title)).toContain('리그 경기 정보를 확인할 수 없어요');
     expect(meta.robots).toMatchObject({ index: false, follow: false, nocache: true });
+  });
+});
+
+describe('리그 경기 탭 제목의 팀 이름', () => {
+  it('같은 주차의 경기도 맞붙는 팀으로 제목이 갈린다', async () => {
+    const first = await titleOf('fx-5');
+    const second = await titleOf('fx-6');
+    expect(first).toBe('서울 나이트 풋살 리그 1주차 · 송파 FC vs 잠실 유나이티드');
+    expect(second).toBe('서울 나이트 풋살 리그 1주차 · 강동 FC vs 광진 FC');
+  });
+
+  it('팀을 모르는 경기는 저장된 제목 그대로다', async () => {
+    expect(await titleOf('fx-1')).toBe('서울 나이트 풋살 리그 1주차');
   });
 });

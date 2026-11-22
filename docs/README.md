@@ -30,6 +30,7 @@
 | 디자인 문서 읽는 순서 | `DESIGN_DOCUMENT_MAP.md`(이 폴더 최상위, navigation only — 규칙 정의 아님) |
 | API 계약 색인 | `api/README.md` → `api/global-contract.md` → `api/domains/*.md` |
 | PR·배포·시각검증 런북 | `ops/pr-review-visual-workflow.md` |
+| unhealthy 컨테이너 자동 재시작 | `ops/restart-unhealthy.md` |
 | E2E 시나리오 인덱스 | `scenarios/index.md` |
 | 완료 태스크 아카이브 규칙 | 레포 루트 `.github/tasks/README.md` |
 

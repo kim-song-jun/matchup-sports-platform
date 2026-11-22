@@ -171,6 +171,8 @@ describe('AdminService — list/detail endpoints', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1User: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1MatchParticipant: { count: jest.Mock };
+    v1MatchApplication: { count: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Region: { findMany: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
@@ -189,6 +191,8 @@ describe('AdminService — list/detail endpoints', () => {
       v1AdminUser: { findUnique: jest.fn() },
       v1User: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1MatchApplication: { count: jest.fn().mockResolvedValue(0) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Region: { findMany: jest.fn().mockResolvedValue([{ id: 'parent' }, { id: 'child' }]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },

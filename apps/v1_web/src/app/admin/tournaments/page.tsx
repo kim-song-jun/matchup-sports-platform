@@ -1,7 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
 import { useV1AdminTournaments } from '@/hooks/use-v1-api';
@@ -10,7 +9,7 @@ import { formatAdminKstDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
-import { pickAllowedParam } from '../pick-allowed-param';
+import { useAdminVisibilityParam } from '../use-admin-visibility-param';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -21,7 +20,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { ADMIN_VISIBILITY_OPTIONS, AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
+import { AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
 import { AdminVisibilityBadge, TournamentRowVisibilityAction } from '@/components/admin/competition-visibility-row-action';
 import { tournamentVisibilityHiddenReason } from '@/components/admin/tournaments/tournament-visibility-control';
 import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
@@ -69,23 +68,8 @@ function AdminTournamentsPageContent() {
   const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination, resetToFirstPage } =
     useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
 
-  // 공개 여부 필터도 ?visibility= 로 URL 에 남긴다. 공용 훅은 다른 URL 파라미터를 건드리지 않는다.
-  const query = useSearchParams().toString();
-  const [visibility, setVisibilityState] = useState(() =>
-    pickAllowedParam(new URLSearchParams(query).get('visibility'), ADMIN_VISIBILITY_OPTIONS));
-  useEffect(() => {
-    // Next 가 늦게 전달한 오래된 snapshot 은 실제 주소와 다르므로 무시한다(공용 훅과 같은 가드).
-    if (query !== new URLSearchParams(window.location.search).toString()) return;
-    setVisibilityState(pickAllowedParam(new URLSearchParams(query).get('visibility'), ADMIN_VISIBILITY_OPTIONS));
-  }, [query]);
-  const setVisibility = useCallback((next: string) => {
-    setVisibilityState(next);
-    const url = new URL(window.location.href);
-    if (next) url.searchParams.set('visibility', next);
-    else url.searchParams.delete('visibility');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-    resetToFirstPage();
-  }, [resetToFirstPage]);
+  // 공개 여부 필터도 ?visibility= 로 URL 에 남긴다.
+  const [visibility, setVisibility] = useAdminVisibilityParam(resetToFirstPage);
 
   const { toasts, showToast } = useAdminToast();
 

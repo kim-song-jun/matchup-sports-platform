@@ -78,11 +78,5 @@ services:
 
   nginx:
     volumes:
-      - ./nginx.alpha.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./robots.alpha.txt:/etc/nginx/teameet-robots/robots.txt:ro
-      - ./aasa:/etc/nginx/teameet-aasa:ro
-      - ./nginx.security-headers.conf:/etc/nginx/snippets/teameet-security-headers.conf:ro
-      - ./nginx.proxy-hide-security-headers.conf:/etc/nginx/snippets/teameet-proxy-hide-security-headers.conf:ro
-      - ./release-metadata.alpha.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
-      # alpha 는 웹 컨테이너 2개가 기본이다(V1_WEB_REPLICAS=1 로 줄일 수 있다). 배포 스크립트의 기본값과 같아야 한다.
-      - ./nginx-web/${V1_WEB_REPLICAS:-2}:/etc/nginx/teameet-web:ro
+      # 나머지 nginx-live 마운트는 prod 와 같다. 안에 무엇을 두는지는 alpha-release-common.sh 의 sync_alpha_nginx_config 가 정한다.
+      - ./nginx-live/robots:/etc/nginx/teameet-robots:ro

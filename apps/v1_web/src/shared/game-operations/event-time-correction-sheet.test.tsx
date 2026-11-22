@@ -246,3 +246,48 @@ describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기
     expect(summary.style.overflowWrap).toBe('anywhere');
   });
 });
+
+// 경고 누적 퇴장 합친 줄 — 옐로·레드를 함께 옮긴다는 안내와, 레드만/모두 취소 두 갈래.
+describe('EventTimeCorrectionSheet — 함께 옮기는 기록이 있을 때', () => {
+  it('함께 옮겨진다는 안내를 요약 줄 아래에 보여준다', () => {
+    renderSheet({ linkedNotice: '옐로카드와 레드카드가 함께 옮겨져요.' });
+
+    expect(screen.getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
+  });
+
+  it('안내가 없으면 그 줄이 없다', () => {
+    renderSheet();
+
+    expect(screen.queryByText(/함께 옮겨져요/)).not.toBeInTheDocument();
+  });
+
+  it('"기록 취소" 탭에 선택지가 있으면 단일 취소 버튼 대신 선택지마다 버튼을 보여주고, 누른 선택지만 부른다', async () => {
+    const user = userEvent.setup();
+    const onRedOnly = vi.fn();
+    const onBoth = vi.fn();
+    const { onRequestCancelRecord } = renderSheet({
+      cancelOptions: [
+        { label: '레드카드만 취소 (퇴장 취소)', onSelect: onRedOnly },
+        { label: '옐로·레드 모두 취소', onSelect: onBoth },
+      ],
+    });
+
+    await user.click(screen.getByRole('tab', { name: '기록 취소' }));
+    expect(screen.queryByRole('button', { name: '이 기록 취소하기' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '레드카드만 취소 (퇴장 취소)' }));
+    expect(onRedOnly).toHaveBeenCalledTimes(1);
+    expect(onBoth).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '옐로·레드 모두 취소' }));
+    expect(onBoth).toHaveBeenCalledTimes(1);
+    expect(onRequestCancelRecord).not.toHaveBeenCalled();
+  });
+
+  it('취소 선택지만 넘겨도(onRequestCancelRecord 없이) 기록 취소 탭이 열린다', async () => {
+    const user = userEvent.setup();
+    renderSheet({ onRequestCancelRecord: undefined, cancelOptions: [{ label: '옐로·레드 모두 취소', onSelect: vi.fn() }] });
+
+    expect(screen.getByRole('tab', { name: '기록 취소' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: '기록 취소' }));
+    expect(screen.getByRole('button', { name: '옐로·레드 모두 취소' })).toBeInTheDocument();
+  });
+});

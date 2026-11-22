@@ -162,3 +162,57 @@ describe('AssistPickerSheet — 운영진 실명', () => {
     expect(screen.getByRole('button', { name })).toBeInTheDocument();
   });
 });
+
+describe('AssistPickerSheet — 골 시점에 이미 퇴장한 선수는 어시스트로 올리기 전에 한 번 더 확인한다', () => {
+  // EVENT 는 전반 1:00(60000ms) 골이다.
+  const sentOffBefore = new Map([['p-cho', { period: 1, clockMs: 30_000 }]]);
+  const sentOffAfter = new Map([['p-cho', { period: 1, clockMs: 90_000 }]]);
+  const base = { open: true as const, event: EVENT, scorerName: '정우진', teammates: [TEAMMATE], periodCount: 2 };
+
+  it('골보다 먼저 퇴장한 선수를 고르면 바로 붙이지 않고 퇴장 사실·시각을 보여 주는 확인을 먼저 띄운다', async () => {
+    const onAttach = vi.fn().mockResolvedValue(undefined);
+    render(<AssistPickerSheet {...base} sentOffRedCards={sentOffBefore} onAttach={onAttach} onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+
+    expect(screen.getByRole('group', { name: '조현우는 퇴장한 선수예요' })).toHaveTextContent(
+      '전반 0:30에 레드카드를 받고 퇴장했어요. 그래도 어시스트를 추가할까요?',
+    );
+    expect(onAttach).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '다른 선수 고르기' })).toHaveFocus();
+  });
+
+  it('"그래도 계속"을 누르면 그 선수로 어시스트를 붙이고 닫는다', async () => {
+    const onAttach = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    render(<AssistPickerSheet {...base} sentOffRedCards={sentOffBefore} onAttach={onAttach} onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+    await userEvent.click(screen.getByRole('button', { name: '그래도 계속' }));
+
+    expect(onAttach).toHaveBeenCalledWith('p-cho');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('"다른 선수 고르기"를 누르면 아무것도 붙이지 않고 목록으로 돌아온다', async () => {
+    const onAttach = vi.fn();
+    render(<AssistPickerSheet {...base} sentOffRedCards={sentOffBefore} onAttach={onAttach} onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+    await userEvent.click(screen.getByRole('button', { name: '다른 선수 고르기' }));
+
+    expect(onAttach).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '어시스트 없이 두기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /조현우/ })).toBeInTheDocument();
+  });
+
+  it('골을 넣은 뒤에 퇴장한 선수는 정상이므로 확인 없이 바로 붙인다', async () => {
+    const onAttach = vi.fn().mockResolvedValue(undefined);
+    render(<AssistPickerSheet {...base} sentOffRedCards={sentOffAfter} onAttach={onAttach} onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+
+    expect(onAttach).toHaveBeenCalledWith('p-cho');
+    expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
+  });
+});

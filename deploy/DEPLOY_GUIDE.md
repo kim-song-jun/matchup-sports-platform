@@ -137,6 +137,19 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 
 `build-images`와 `deploy`는 같은 concurrency group(`deploy-production`)을 공유한다. 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도 뒤에 큐잉되므로, 두 릴리스가 같은 호스트를 동시에 건드리지 않는다.
 
+### 4-0. 경기일 배포 게이트
+
+`build-images` 의 첫 스텝(`Match-day deploy gate`)과 `Promote to main` 워크플로가 `scripts/release/check-match-day.mjs` 를 실행한다. 공개 API(`GET /tournaments?kind=all`, `GET /tournaments/:id/schedule`)만 읽어, 끝나지 않은(종료·취소가 아닌) 대회·정규 리그의 경기 가운데 오늘(KST) 시작하는 것 중 `scheduled`·`live` 가 하나라도 있으면 실패한다 — 승인·빌드·승격 준비가 시작되기 전이다. 경기를 읽지 못해도 실패한다(장애가 조용한 날로 보이지 않게).
+
+**한계:** 공개 일정이 숨기는 경기(공개 범위 hidden, 대진표 미공개, 비공개 대회)는 이 게이트도 볼 수 없다. 종료·취소된 대회·리그는 일정을 읽지 않는다. 이런 경기가 있는 날은 운영자가 직접 확인한다.
+
+| 상황 | 통과시키는 법 |
+|---|---|
+| `workflow_dispatch`(운영 배포 · Promote to main) | `matchday_confirmation` 입력에 `MATCHDAY` |
+| main 푸시로 시작된 운영 배포 | 저장소 변수 `PROD_MATCHDAY_OVERRIDE_DATE` 를 오늘 날짜(`YYYY-MM-DD`, KST)로 두고 실패한 작업을 다시 실행. 날짜가 지나면 저절로 무효가 된다 |
+
+경기가 끝난 뒤에는 입력 없이 다시 실행하면 통과한다. 롤백(`rollback-prod.yml`)은 이 게이트 대상이 아니다.
+
 ### 4-1. 이전 릴리스로 롤백
 
 `.github/workflows/rollback-prod.yml`을 `workflow_dispatch`로 실행한다(재빌드 없이 즉시 되돌린다). 입력값 `expected_active_sha`는 되돌리기 직전 "현재 active"라고 보는 40자리 커밋 SHA다 — 실제 active 와 다르면 compare-and-swap 안전장치가 배포를 거부한다.
@@ -177,9 +190,10 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 
 - 다른 값과, 메모리가 모자란 호스트(운영 3.5GB 미만 · alpha 1.8GB 미만)의 `2` 는 배포 스크립트가 컨테이너를 건드리기 전에 거절한다.
 - 켜는 방법: 운영은 서버를 4GB 로 올린 뒤 `deploy/.env` 에 `V1_WEB_REPLICAS=2` 를 넣고 다음 배포를 한다. 끄는 방법은 값을 지우거나 `1` 로 바꾸는 것이고, 남은 `teameet_v1_web_b` 는 그 배포가 지운다.
-- nginx 설정은 `deploy/nginx-web/<개수>/` 의 `upstream.conf`·`failover.conf`·`static-failover.conf` 를 compose 가 마운트하고 `nginx.conf`·`nginx.alpha.conf` 가 include 한다. 개수 2 의 재시도(`proxy_next_upstream`)는 연결 실패·타임아웃·502/503/504 를 다른 웹으로 넘긴다. POST 같은 멱등하지 않은 요청은 upstream 에 보낸 뒤에는 nginx 가 넘기지 않는다.
+- nginx 설정은 배포가 `deploy/nginx-web/<개수>/` 의 `upstream.conf`·`failover.conf`·`static-failover.conf` 를 `nginx-live/web` 에 채우고 `nginx.conf`·`nginx.alpha.conf` 가 include 한다. 개수 2 의 재시도(`proxy_next_upstream`)는 연결 실패·타임아웃·502/503/504 를 다른 웹으로 넘긴다. POST 같은 멱등하지 않은 요청은 upstream 에 보낸 뒤에는 nginx 가 넘기지 않는다.
 - 이미지 캐시 볼륨(`v1_web_image_cache`, `v1_web_b_image_cache`)은 컨테이너마다 따로다. Next 이미지 최적화기가 캐시 파일을 잠금 없이 쓰기 때문이다. 업로드 볼륨은 API 만 쓰므로 웹 둘이 공유할 것이 없다.
-- 남는 끊김: 배포마다 nginx 컨테이너를 다시 만들기 때문에(릴리스 헤더 파일을 새로 읽어야 한다) 그 순간 1~2초는 웹과 API 모두 끊긴다. API 는 컨테이너가 하나라 교체 중 몇 초 끊긴다.
+- nginx 는 배포마다 다시 만들지 않고 reload 한다. compose 가 마운트하는 `deploy/nginx-live` 는 릴리스마다 바뀌지 않는 런타임 폴더(`~/.teameet-{prod,alpha}-runtime/nginx`)를 가리키는 링크이고, 배포는 앱 컨테이너를 바꾸기 전에는 비어 있는 폴더만 채우고(웹 교체 중 reload 는 지금 설정을 읽는다), 웹 교체가 끝나면 이번 릴리스의 설정·릴리스 헤더·정적 파일로 맞춘 뒤 `nginx -t` 와 `nginx -s reload` 를 한다(`deploy/web-replicas-common.sh` 의 `sync_nginx_live_config`·`apply_nginx_config`). nginx 이미지·마운트·포트처럼 서비스 정의가 바뀐 배포, 컨테이너가 멈췄거나 이 폴더를 보지 않는 경우에만 다시 만든다. `nginx-live` 링크가 없는 옛 릴리스 소스로 되돌릴 때도 다시 만든다.
+- 남는 끊김: API 는 컨테이너가 하나라 교체 중 몇 초 끊긴다.
 - 롤백 대상 릴리스가 `v1_web_b` 를 모르는 옛 소스면 스크립트가 그 소스의 서비스만 올리고 남은 `v1_web_b` 컨테이너를 지운다.
 
 `v1_web`의 브라우저 API URL은 이미지 빌드 시 `/api/v1`로 고정한다. 배포 환경에 별도 Web base path를 설정하지 않는다.

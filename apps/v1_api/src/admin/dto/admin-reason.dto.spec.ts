@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
   ChangeMatchStatusDto,
+  ChangeMatchVisibilityDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
@@ -19,6 +20,7 @@ const cases: Array<[string, Ctor, Record<string, unknown>]> = [
   ['ChangeUserStatusDto', ChangeUserStatusDto, { status: 'suspended' }],
   ['DeleteAdminUserDto', DeleteAdminUserDto, {}],
   ['ChangeMatchStatusDto', ChangeMatchStatusDto, { status: 'closed' }],
+  ['ChangeMatchVisibilityDto', ChangeMatchVisibilityDto, {}],
   ['ChangeTeamStatusDto', ChangeTeamStatusDto, { status: 'suspended' }],
   ['RenameArchivedTeamDto', RenameArchivedTeamDto, { name: '새 이름' }],
   ['ChangeTeamMatchStatusDto', ChangeTeamMatchStatusDto, { status: 'closed' }],

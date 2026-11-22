@@ -66,7 +66,7 @@ type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId:
 type LineupPlayer = { userId: string; name: string; imageUrl: string | null };
 type PrismaTx = Omit<
   PrismaService,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onModuleDestroy'
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onApplicationShutdown'
 >;
 
 @Injectable()
@@ -688,6 +688,7 @@ export class ReviewsService {
           select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } },
         },
         status: true,
+        deletedAt: true,
         completedAt: true,
         startAt: true,
         sportId: true,
@@ -702,7 +703,7 @@ export class ReviewsService {
         },
       },
     });
-    if (!match) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (!match || match.deletedAt) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(match)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     const isHost = match.hostUserId === user.id;
     const isParticipant = match.participants.some((participant) => participant.userId === user.id);

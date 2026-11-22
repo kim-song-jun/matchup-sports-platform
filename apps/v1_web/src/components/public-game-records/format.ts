@@ -1,3 +1,4 @@
+import { cardPlayerKey, SECOND_YELLOW_RED_LABEL, type CardFacts } from '@/lib/second-yellow-red';
 import { matchPhaseLabel, type MatchPhase } from '@/lib/v1-status-labels';
 import type { PublicResultState, PublicScore, PublicScoreStatus } from './types';
 
@@ -161,13 +162,47 @@ export function formatGoalMinute(clockMs: number | null): string {
 export function eventPresentation(event: {
   type: string;
   cardColor: 'YELLOW' | 'RED' | null;
-}): { icon: string; label: string; badge?: string } {
+}): { icon: string; label: string; badge?: string; overlap?: true } {
   if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
   if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골', badge: 'OG' };
   if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
   if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
   if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };
   return { icon: '•', label: event.type };
+}
+
+/**
+ * 같은 선수의 두 번째 옐로와 그 레드를 한 줄로 합쳐 보일 때의 표현(`@/lib/second-yellow-red`). 아이콘은 호출부가
+ * `overlap` 을 보고 겹친 카드(`CardPairIcon`)로 그린다 — 이 `icon` 문자열은 겹침을 그리지 못하는 곳의 대체 표기다.
+ * 라벨은 `sr-only` 로 함께 나가 색·모양만으로 전하지 않는다.
+ */
+export function secondYellowRedPresentation(): { icon: string; label: string; badge?: string; overlap: true } {
+  return { icon: '🟨🟥', label: `${SECOND_YELLOW_RED_LABEL} (옐로카드 2장, 레드카드)`, overlap: true };
+}
+
+/**
+ * 공개 화면의 카드 항목을 `pairSecondYellowRed` 가 읽는 모양으로 바꾼다. 경기 상세·팀 기록 이벤트는 `type` 이 있고
+ * 일정 카드 요약의 카드 항목은 카드만 담겨 `type` 이 없다 — `type` 이 있는데 CARD 가 아니면 카드가 아니다.
+ * 팀은 `side`(home/away 또는 own/opponent), 선수는 id 가 있으면 id·없으면 이름과 등번호로 알아본다.
+ */
+export function publicCardFacts(event: {
+  readonly type?: string;
+  readonly cardColor: 'YELLOW' | 'RED' | null;
+  readonly side: string;
+  readonly participantId?: string | null;
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly period: number | null;
+  readonly clockMs: number | null;
+}): CardFacts | null {
+  if (event.type !== undefined && event.type !== 'CARD') return null;
+  return {
+    color: event.cardColor,
+    playerKey: cardPlayerKey(event),
+    sideKey: event.side,
+    period: event.period,
+    clockMs: event.clockMs,
+  };
 }
 
 /** 축구 기록 관례의 올림 분 표기. 예: 2:04에 발생한 이벤트는 `3′`로 표시한다. */

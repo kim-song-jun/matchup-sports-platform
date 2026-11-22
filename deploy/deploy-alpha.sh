@@ -360,9 +360,10 @@ fi
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/queens-cup-ranking-repair.cli.js'
 
+sync_alpha_nginx_config seed
 up_base_services
 up_app_containers --force-recreate
-"${compose[@]}" up -d --force-recreate --no-deps nginx
+apply_alpha_nginx_config
 wait_for_alpha_health_contract
 wait_for_alpha_worker_healthy
 assert_running_release_digests

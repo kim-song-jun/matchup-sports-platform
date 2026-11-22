@@ -16,6 +16,10 @@ interface AdminReasonConfirmDialogProps {
   tone?: 'danger' | 'primary';
   /** 요청이 진행 중인 동안 닫기·재제출을 잠근다. */
   pending: boolean;
+  /** true 면 사유가 비어 있는 동안 확인 버튼을 잠그고 안내를 보인다. 기본은 제출 시 안내만 보인다. */
+  disableSubmitWhenEmpty?: boolean;
+  /** 서버가 거절한 이유. 모달을 닫지 않고 사유 아래에 보인다. */
+  error?: string;
   /** 앞뒤 공백을 뺀, 비어 있지 않은 사유로만 불린다. */
   onSubmit: (reason: string) => void;
   onClose: () => void;
@@ -39,6 +43,8 @@ export function AdminReasonConfirmDialog({
   pendingLabel,
   tone = 'danger',
   pending,
+  disableSubmitWhenEmpty = false,
+  error,
   onSubmit,
   onClose,
 }: AdminReasonConfirmDialogProps) {
@@ -47,6 +53,8 @@ export function AdminReasonConfirmDialog({
   const titleId = useId();
   const reasonId = useId();
   const errorId = useId();
+  const hintId = useId();
+  const serverErrorId = useId();
   const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
     open,
     onClose,
@@ -61,6 +69,11 @@ export function AdminReasonConfirmDialog({
   }, [open]);
 
   if (!mounted) return null;
+
+  const emptyBlocked = disableSubmitWhenEmpty && !reason.trim();
+  const describedBy = [missingReason ? errorId : null, emptyBlocked ? hintId : null, error ? serverErrorId : null]
+    .filter(Boolean)
+    .join(' ');
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,11 +120,20 @@ export function AdminReasonConfirmDialog({
           disabled={pending}
           aria-required="true"
           aria-invalid={missingReason}
-          aria-describedby={missingReason ? errorId : undefined}
+          aria-describedby={describedBy || undefined}
         />
+        <div className="mt-1 flex items-start justify-between gap-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          {emptyBlocked ? <p id={hintId}>사유를 입력하면 진행할 수 있어요.</p> : <span />}
+          <span className="shrink-0 tabular-nums">{reason.length}/{REASON_MAX}</span>
+        </div>
         {missingReason ? (
           <p id={errorId} role="alert" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--red700)]">
             사유를 입력해 주세요.
+          </p>
+        ) : null}
+        {error ? (
+          <p id={serverErrorId} role="alert" className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--red700)]">
+            {error}
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap gap-2">
@@ -125,7 +147,7 @@ export function AdminReasonConfirmDialog({
           </button>
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || emptyBlocked}
             className={`inline-flex h-[44px] flex-1 items-center justify-center rounded-xl px-4 text-[length:var(--font-size-body-sm)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${SUBMIT_TONE[tone]}`}
           >
             {pending ? pendingLabel : submitLabel}

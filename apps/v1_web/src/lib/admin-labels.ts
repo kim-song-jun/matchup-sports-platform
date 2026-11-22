@@ -5,6 +5,12 @@ import type {
   V1AdPublishMissingField,
 } from '@/types/ads';
 
+/** 매치를 누가 숨겼는지 — 어드민 숨김만 어드민 화면에서 다시 공개할 수 있다. */
+export const ADMIN_MATCH_HIDDEN_BY_LABEL = {
+  admin: '운영자가 숨김',
+  host: '주최자가 삭제',
+} as const;
+
 export function adminPushTargetLabel(target: 'user' | 'broadcast' | null): string {
   if (target === 'broadcast') return '전체 회원';
   if (target === 'user') return '특정 회원';
@@ -26,6 +32,8 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'user.member_access.start': '회원 화면 조회 시작',
   'user.member_access.end': '회원 화면 조회 종료',
   'match.status.update': '매치 상태 변경',
+  'match.hide': '매치 숨김',
+  'match.unhide': '매치 다시 공개',
   'match.online.update': '매치 온라인 장소 분류 변경',
   'team.status.update': '팀 상태 변경',
   'team.rename': '보관 팀 이름 변경',

@@ -753,6 +753,10 @@ build_activation_fixture() {
   cp "${ROOT}/deploy/alpha-manifest-common.sh" "${source_dir}/deploy/alpha-manifest-common.sh"
   cp "${ROOT}/deploy/alpha-source-common.sh" "${source_dir}/deploy/alpha-source-common.sh"
   cp "${ROOT}/scripts/release/task168-stage-b-post-live-verify.sh" "${source_dir}/scripts/release/task168-stage-b-post-live-verify.sh"
+  # sync_alpha_nginx_config copies these into the runtime nginx directory.
+  cp -R "${ROOT}/deploy/nginx.alpha.conf" "${ROOT}/deploy/nginx.security-headers.conf" \
+    "${ROOT}/deploy/nginx.proxy-hide-security-headers.conf" "${ROOT}/deploy/robots.alpha.txt" \
+    "${ROOT}/deploy/aasa" "${ROOT}/deploy/maintenance" "${ROOT}/deploy/nginx-web" "${source_dir}/deploy/"
   cat > "${source_dir}/deploy/alpha-release-common.sh" <<EOF
 source "${ROOT}/deploy/alpha-release-common.sh"
 EOF
@@ -874,6 +878,7 @@ case "\${argv[0]}" in
         esac ;;
       '{{.State.Health.Status}}')
         if [[ "${break_case}" == worker-unhealthy ]]; then echo unhealthy; else echo healthy; fi ;;
+      '{{.State.Status}}') echo running ;;
       *) echo "fake docker: unexpected inspect template: \${tmpl}" >&2; exit 1 ;;
     esac
     exit 0 ;;
@@ -883,6 +888,7 @@ case "\${argv[0]}" in
         v1_api) echo api-container ;;
         v1_web) echo web-container ;;
         v1_game_operations_worker) echo worker-container ;;
+        nginx) echo nginx-container ;;
         *) echo "fake docker: unexpected ps service: \${argv[\$((idx+2))]}" >&2; exit 1 ;;
       esac
       exit 0
@@ -908,6 +914,8 @@ case "\${argv[0]}" in
         esac
       elif [[ "\${svc}" == v1_api ]]; then
         if [[ "${break_case}" == drift ]]; then echo "drift detected" >&2; exit 2; fi
+        exit 0
+      elif [[ "\${svc}" == nginx ]]; then
         exit 0
       else
         echo "fake docker: unexpected exec service: \${svc}" >&2; exit 1

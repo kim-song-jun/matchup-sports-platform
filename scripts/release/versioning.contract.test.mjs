@@ -553,16 +553,15 @@ test('alpha deploy consumes a supplied SemVer prerelease instead of incrementing
   assert.match(releaseHelper, /printf 'release=%s\\nsha=%s\\ndeployed_at=%s\\n'/);
 });
 
-test('alpha deploy recreates nginx after replacing the release metadata bind mount', () => {
+test('alpha deploy copies the new release metadata into nginx-live before applying nginx config', () => {
   const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
   const metadataReplacement = deployScript.indexOf('write_release_metadata "${ALPHA_MANIFEST_FILE}"');
-  const nginxRecreate = deployScript.indexOf(
-    'up -d --force-recreate --no-deps nginx',
-    metadataReplacement,
-  );
+  const nginxSync = deployScript.indexOf('sync_alpha_nginx_config seed', metadataReplacement);
+  const nginxApply = deployScript.indexOf('apply_alpha_nginx_config', nginxSync);
 
   assert.notEqual(metadataReplacement, -1);
-  assert.ok(nginxRecreate > metadataReplacement);
+  assert.ok(nginxSync > metadataReplacement);
+  assert.ok(nginxApply > nginxSync);
 });
 
 test('Stage A recovers reviewed signatures only after its sealed prerequisites', () => {

@@ -90,6 +90,7 @@ import { COMMON_PASSWORD_ERROR_CODE, COMMON_PASSWORD_MESSAGE, accountPasswordIss
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1AdminUserPhoneReleaseMswHandlers } from './admin-user-phone-release-handlers';
+import { v1AdminMatchVisibilityMswHandlers } from './admin-match-visibility-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
@@ -814,6 +815,7 @@ export const v1MswHandlers = [
   http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
   ...v1AdminUserPhoneReleaseMswHandlers,
+  ...v1AdminMatchVisibilityMswHandlers,
   ...memberBracketPreviewMswHandlers,
   ...adminEntityOperationsHandlers,
   ...v1TeamDissolutionMswHandlers,

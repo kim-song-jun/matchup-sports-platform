@@ -280,6 +280,16 @@ projection, computed only when there is no official revision yet:
   A missing or malformed `lineup` degrades to `'limited'` like the console; `null` (no game or no
   config snapshot) means "do not guess" -- the web draws no line. Present on `getMatch` and
   `getLeagueFixtureRecord` only.
+- `endedPeriods` -- `{ periodNumber, elapsedMs }[] | null`, how long each already-`ENDED`
+  period was **actually played** (pause-aware, `resolveEndedPeriods`, `public-clock.ts` -- the
+  same fold as the console's `elapsedMatchMs`, evaluated at the period's `endedAt`), in period
+  order. The red-card penalty line needs it to carry the remaining time across the period
+  boundary: a first half the operator ended at 5:00 is 5:00 long, not the configured 20:00, so
+  the halftime value (and the second half's count) would be inflated if the web assumed
+  `periodMinutes`. The web falls back to `periodMinutes` when a period is missing from the list
+  (older responses). Gated like `periodBreak` (live mode, not an official result, `status ===
+  'live'`), otherwise `null`. Rows without `startedAt`/`endedAt` are left out. Present on
+  `getMatch` and `getLeagueFixtureRecord` only.
 
 None of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`

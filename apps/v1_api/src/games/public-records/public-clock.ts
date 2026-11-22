@@ -39,6 +39,35 @@ export interface GamePeriodClockRow {
   readonly startedAt: Date | null;
   readonly pausedTotalMs: number;
   readonly pausedAt: Date | null;
+  /** `resolveEndedPeriods` 전용 — 이 필드를 읽지 않는 호출부(`resolveLiveClock` 등)는 안 채워도 된다. */
+  readonly endedAt?: Date | null;
+}
+
+/** 이미 끝난 피리어드가 실제로 진행된 경기 시간. */
+export interface PublicEndedPeriod {
+  readonly periodNumber: number;
+  readonly elapsedMs: number;
+}
+
+/**
+ * 끝난(`ENDED`) 피리어드마다 **실제로 진행된 경기 시간**(일시 중지 제외, 피리어드 번호 순). 화면이 퇴장 패널티처럼 피리어드
+ * 경계를 넘는 시간을 이어 셀 때, 전반이 설정 길이(20분)가 아니라 실제로 몇 분에 끝났는지 알아야 한다 — 설정 길이로 가정하면
+ * 일찍 끝낸 전반 뒤의 하프타임에서 흐른 시간이 부풀려진다. 계산은 `computeElapsedMs`(운영 콘솔의 `elapsedMatchMs`와 같다)에
+ * "끝난 시각"을 기준 시각으로 넣은 값이라 끝나기 직전 시계가 보여 준 값과 같다. 시작·종료 시각을 모르는 행은 뺀다(지어내지 않는다).
+ */
+export function resolveEndedPeriods(periods: readonly GamePeriodClockRow[]): PublicEndedPeriod[] {
+  return periods
+    .filter((period) => period.state === 'ENDED' && period.startedAt !== null && period.endedAt != null)
+    .sort((left, right) => left.number - right.number)
+    .map((period) => ({
+      periodNumber: period.number,
+      elapsedMs: computeElapsedMs({
+        nowMs: period.endedAt!.getTime(),
+        periodStartedAtMs: period.startedAt!.getTime(),
+        pausedTotalMs: period.pausedTotalMs,
+        pausedAtMs: period.pausedAt?.getTime() ?? null,
+      }),
+    }));
 }
 
 /**

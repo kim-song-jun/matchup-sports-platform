@@ -72,6 +72,12 @@ export interface PublicGameClock {
  *  두 상태를 그대로 재사용한다(operate-console.tsx, 이슈 #375 / 종료 흐름 개편). */
 export type PublicPeriodBreak = 'halftime' | 'regulation_ended';
 
+/** 이미 끝난 피리어드가 실제로 진행된 경기 시간(일시 중지 제외). 설정 길이와 다를 수 있다(일찍 끝냈거나 늘어난 경우). */
+export interface PublicEndedPeriod {
+  readonly periodNumber: number;
+  readonly elapsedMs: number;
+}
+
 /**
  * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName은 대회가 모집
  * 중(status==='open')이고 조회자가 운영자·스태프가 아니면 둘 다 null이다.
@@ -358,6 +364,11 @@ export interface PublicMatchDetail {
    * null·누락이면 종목을 모르는 것이라 줄을 그리지 않는다(옛 응답·설정 없음).
    */
   readonly substitutionMode?: 'limited' | 'rolling' | null;
+  /**
+   * 끝난 피리어드의 실제 진행 시간(진행 중 경기에서만, 아니면 null·옛 응답엔 없음). 퇴장 패널티가 전·후반 경계를 이어 셀 때
+   * 설정 길이(`periodMinutes`) 대신 쓴다 — 전반을 일찍 끝내면 둘이 다르다.
+   */
+  readonly endedPeriods?: readonly PublicEndedPeriod[] | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;

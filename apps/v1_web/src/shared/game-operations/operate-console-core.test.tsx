@@ -1972,6 +1972,52 @@ describe('OperateConsole — 선수 교체', () => {
 
       expect(screen.queryByRole('list', { name: '퇴장 패널티' })).toBeNull();
     });
+
+    // alpha 확인(#2506): 일시 중지하면 경기 상태가 PAUSED 가 되는데 줄이 통째로 사라졌다.
+    it('일시 중지(PAUSED) 중에도 줄이 남고, 시계와 함께 멈춘 값에 "일시 중지 중"을 적는다', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // 8:00 에 멈췄고 지금은 그 뒤 30초 — 숫자는 8:00 기준 그대로여야 한다.
+      vi.setSystemTime(MATCH_TIME(8, 30));
+      testFixtures.game.mockReturnValue({
+        data: {
+          id: 'game-1', state: 'PAUSED', version: 2, lastSequence: 1,
+          periods: [{ ...LIVE_PERIOD, pausedAt: MATCH_TIME(8, 0).toISOString() }],
+          sides: SUB_SIDES, lineups: [], substitutionPolicy: { mode: 'rolling', maxSubstitutions: null },
+        },
+        isLoading: false, isError: false, refetch: vi.fn(),
+      });
+      testFixtures.operations.mockReturnValue(
+        consoleState({ gameSnapshot: { version: 2, state: 'PAUSED' }, liveEvents: [card('red-1', 1, 'RED', 7.5 * 60_000)] }),
+      );
+      render(<CoreHarness />);
+
+      const list = screen.getByRole('list', { name: '퇴장 패널티' });
+      expect(within(list).getByRole('timer')).toHaveTextContent('패널티 1:30');
+      expect(list).toHaveTextContent('일시 중지 중');
+    });
+
+    // alpha 확인(#2506): 전반을 설정 길이(20분)보다 일찍 끝내면 하프타임에 줄이 사라졌다.
+    it('전반을 설정 길이보다 일찍 끝내도 하프타임에 실제로 흐른 시간으로 줄을 유지한다', () => {
+      gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null }, [card('red-1', 1, 'RED', 4.5 * 60_000)]);
+      testFixtures.game.mockReturnValue({
+        data: {
+          id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
+          // 전반은 설정이 20분인데 5:00 에 끝났다. 퇴장은 4:30 — 하프타임 값은 실제 종료(5:00) 기준 30초가 흐른 1:30 이다.
+          periods: [
+            { id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED', startedAt: MATCH_TIME(0).toISOString(), endedAt: MATCH_TIME(5).toISOString(), pausedTotalMs: 0, pausedAt: null },
+            { id: 'period-2', gameId: 'game-1', number: 2, state: 'HALFTIME', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+          ],
+          sides: SUB_SIDES, lineups: [], substitutionPolicy: { mode: 'rolling', maxSubstitutions: null },
+          periodDurations: [{ durationMinutes: 20, extraTime: false }, { durationMinutes: 20, extraTime: false }],
+        },
+        isLoading: false, isError: false, refetch: vi.fn(),
+      });
+      render(<CoreHarness />);
+
+      const list = screen.getByRole('list', { name: '퇴장 패널티' });
+      expect(within(list).getByRole('timer')).toHaveTextContent('패널티 1:30');
+      expect(list).toHaveTextContent('하프타임');
+    });
   });
 
   it('제한 교체 종목에서는 "교체" 액션 버튼이 그대로 있다 (회귀)', () => {

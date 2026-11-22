@@ -71,7 +71,6 @@ export function AdminMatchVisibilityCard({
   const [dialogError, setDialogError] = useState<string>();
   const baseId = useId();
   const hidden = Boolean(match.hiddenAt);
-  const mutation = hidden ? unhideMutation : hideMutation;
   const statusLabel = STATUS_META[match.status]?.label ?? match.status;
 
   function openDialog(next: 'hide' | 'unhide') {
@@ -79,8 +78,8 @@ export function AdminMatchVisibilityCard({
     setDialog(next);
   }
 
-  function submit(reason: string) {
-    const next = hidden ? 'unhide' : 'hide';
+  function submit(next: 'hide' | 'unhide', reason: string) {
+    const mutation = next === 'hide' ? hideMutation : unhideMutation;
     mutation.mutate(
       { reason },
       {
@@ -174,7 +173,7 @@ export function AdminMatchVisibilityCard({
         disableSubmitWhenEmpty
         pending={hideMutation.isPending}
         error={dialogError}
-        onSubmit={submit}
+        onSubmit={(reason) => submit('hide', reason)}
         onClose={() => setDialog(null)}
       />
       <AdminReasonConfirmDialog
@@ -198,7 +197,7 @@ export function AdminMatchVisibilityCard({
         disableSubmitWhenEmpty
         pending={unhideMutation.isPending}
         error={dialogError}
-        onSubmit={submit}
+        onSubmit={(reason) => submit('unhide', reason)}
         onClose={() => setDialog(null)}
       />
     </section>

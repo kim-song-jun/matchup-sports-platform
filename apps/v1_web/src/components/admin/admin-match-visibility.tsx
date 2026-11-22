@@ -69,6 +69,7 @@ export function AdminMatchVisibilityCard({
   const unhideMutation = useV1UnhideAdminMatch(match.matchId);
   const [dialog, setDialog] = useState<'hide' | 'unhide' | null>(null);
   const [dialogError, setDialogError] = useState<string>();
+  const baseId = useId();
   const hidden = Boolean(match.hiddenAt);
   const mutation = hidden ? unhideMutation : hideMutation;
   const statusLabel = STATUS_META[match.status]?.label ?? match.status;
@@ -105,7 +106,6 @@ export function AdminMatchVisibilityCard({
 
   const blocked = !hidden && match.hideBlocked;
   const disabled = !canWrite || blocked;
-  const baseId = useId();
   const blockedId = `${baseId}-blocked`;
   const permissionId = `${baseId}-permission`;
   const describedBy = !canWrite ? permissionId : blocked ? blockedId : undefined;

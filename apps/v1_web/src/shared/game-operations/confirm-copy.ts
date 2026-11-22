@@ -153,6 +153,42 @@ export function commitActionConfirmCopy(
   };
 }
 
+/** 선수를 골랐을 때 "그래도 ○○을 기록할까요?"에 들어가는 기록 이름(골·자책골·파울·옐로카드·레드카드). */
+export function recordNounOf(input: Pick<EventCaptureCommitInput, 'type' | 'payload'>): string {
+  return eventActionNoun(input).noun;
+}
+
+export interface SentOffPlayerNoticeCopy {
+  readonly title: string;
+  readonly message: string;
+  readonly backLabel: string;
+  readonly continueLabel: string;
+}
+
+/**
+ * 이미 퇴장(레드카드)한 선수를 골랐을 때 선택 화면 안에서 한 번 더 묻는 문구.
+ *
+ * 평소 "○○을 기록할까요?" 확인과 모양이 비슷하면 습관적으로 넘기게 되므로, 제목이 "퇴장한 선수"라는
+ * 사실을 먼저 말하고 왜 그런지(몇 분에 레드카드)를 보여 준다. 되돌아갈 길("다른 선수 고르기")이 첫째 버튼이다.
+ * `verb`는 새 이벤트 기록은 `기록`, 이미 기록된 골에 붙이는 어시스트는 `추가`.
+ */
+export function sentOffPlayerNoticeCopy(input: {
+  readonly playerName: string;
+  /** 레드카드를 받은 시각("후반 8:12"). 모르면 null. */
+  readonly sentOffWhen: string | null;
+  /** 기록 이름("골"·"레드카드"·"어시스트" …). */
+  readonly noun: string;
+  readonly verb?: '기록' | '추가';
+}): SentOffPlayerNoticeCopy {
+  const when = input.sentOffWhen === null ? '' : `${input.sentOffWhen}에 `;
+  return {
+    title: `${josa(input.playerName, ['은', '는'])} 퇴장한 선수예요`,
+    message: `${when}레드카드를 받고 퇴장했어요. 그래도 ${josa(input.noun, ['을', '를'])} ${input.verb ?? '기록'}할까요?`,
+    backLabel: '다른 선수 고르기',
+    continueLabel: '그래도 계속',
+  };
+}
+
 /** 같은 경기에서 같은 선수에게 두 번째 옐로를 기록한 직후, 레드(경고 누적 퇴장)도 남길지 묻는 시트. */
 export function secondYellowConfirmCopy(
   input: EventCaptureCommitInput,

@@ -27,6 +27,7 @@ import { readGameResultScore } from '@/lib/game-result-score';
 
 import { hasPendingWork, isTakeoverHeld, type GameOperationsQueueState, type GameSyncState, type TakeoverState } from '@/lib/game-operations-queue';
 import {
+  elapsedMatchMs,
   freezeCapture,
   isClockSuspicious,
   serverAlignedNowMs,
@@ -602,12 +603,24 @@ export function OperateConsoleCore({
   // 퇴장 패널티 카운트다운(풋살 등 롤링 교체 종목) — 퇴장 뒤 2분 또는 상대 득점까지 한 명 모자란 채 뛰므로,
   // 시계 아래에서 보충 가능 시점을 바로 읽게 한다. 종목명이 아니라 `substitutionPolicy.mode`로 켠다(교체 버튼과 같은 기준).
   // 서버 상태가 없고 이벤트 로그와 경기 시계에서 매초 다시 계산한다(`lib/red-card-penalty.ts`).
+  // 이미 끝난 피리어드는 **실제로 진행된 시간**을 쓴다 — 전반을 설정 길이(20분)보다 일찍 끝냈는데 20:00으로 보면 퇴장 뒤 흐른 시간이
+  // 부풀려져 하프타임에 패널티가 사라진다. 계산은 경기 시계(`elapsedMatchMs`)와 같고 끝난 시각을 기준으로 한다.
+  // 아직 안 끝났거나 시각을 모르면 설정 길이로 돌아간다.
   const penaltyPeriodLengthMs = useCallback(
     (period: number): number | null => {
+      const row = gameDetail.data?.periods.find((candidate) => candidate.number === period);
+      if (row !== undefined && row.state === 'ENDED' && row.startedAt !== null && row.endedAt !== null) {
+        return elapsedMatchMs({
+          referenceNowMs: new Date(row.endedAt).getTime(),
+          periodStartedAtMs: new Date(row.startedAt).getTime(),
+          pausedTotalMs: row.pausedTotalMs,
+          pausedAtMs: row.pausedAt === null ? null : new Date(row.pausedAt).getTime(),
+        });
+      }
       const minutes = gameDetail.data?.periodDurations?.[period - 1]?.durationMinutes;
       return typeof minutes === 'number' ? minutes * 60_000 : null;
     },
-    [gameDetail.data?.periodDurations],
+    [gameDetail.data?.periods, gameDetail.data?.periodDurations],
   );
   const eventClockCorrections = useMemo(() => collectEventTimeCorrections(ops.liveEvents), [ops.liveEvents]);
   const penaltyClockMsOf = useCallback(
@@ -615,7 +628,14 @@ export function OperateConsoleCore({
     [eventClockCorrections],
   );
   const penaltyAnchor = useMemo<PenaltyNowAnchor | null>(() => {
-    if (gameDetail.data?.substitutionPolicy?.mode !== 'rolling' || gameState !== 'LIVE' || regulationEnded) return null;
+    // 일시 중지(`PAUSED`) 중에도 패널티는 그대로 보여야 한다 — 시계와 함께 멈춘 값에 "일시 중지 중"을 적는다.
+    if (
+      gameDetail.data?.substitutionPolicy?.mode !== 'rolling' ||
+      (gameState !== 'LIVE' && gameState !== 'PAUSED') ||
+      regulationEnded
+    ) {
+      return null;
+    }
     if (currentPeriod !== null && currentPeriod.startedAt !== null) {
       return {
         kind: 'live',

@@ -1,4 +1,4 @@
-import { computeElapsedMs, resolveLiveClock, resolvePeriodBreak } from './public-clock';
+import { computeElapsedMs, resolveEndedPeriods, resolveLiveClock, resolvePeriodBreak } from './public-clock';
 
 describe('computeElapsedMs', () => {
   it('일시정지 없이 5분이 지났으면 300000ms를 반환한다', () => {
@@ -127,5 +127,44 @@ describe('resolvePeriodBreak', () => {
       { number: 2, state: 'SCHEDULED', startedAt: null, pausedTotalMs: 0, pausedAt: null },
     ]);
     expect(result).toBeNull();
+  });
+});
+
+describe('resolveEndedPeriods — 끝난 피리어드가 실제로 진행된 시간', () => {
+  const at = (minutes: number, seconds = 0) => new Date(Date.UTC(2026, 7, 10, 12, minutes, seconds));
+
+  it('설정 길이가 아니라 시작~종료 시각으로 잰다 — 20분 경기를 5분에 끝냈으면 5분이다', () => {
+    const result = resolveEndedPeriods([
+      { number: 1, state: 'ENDED', startedAt: at(0), endedAt: at(5), pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+    ]);
+    expect(result).toEqual([{ periodNumber: 1, elapsedMs: 5 * 60_000 }]);
+  });
+
+  it('일시 중지 구간은 뺀다 — 끝나기 직전 시계가 보여 준 값과 같다', () => {
+    const result = resolveEndedPeriods([
+      { number: 1, state: 'ENDED', startedAt: at(0), endedAt: at(22), pausedTotalMs: 2 * 60_000, pausedAt: null },
+    ]);
+    expect(result).toEqual([{ periodNumber: 1, elapsedMs: 20 * 60_000 }]);
+  });
+
+  it('피리어드 번호 순으로 돌려주고, 아직 안 끝난 행·시각을 모르는 행은 뺀다', () => {
+    const result = resolveEndedPeriods([
+      { number: 3, state: 'LIVE', startedAt: at(40), endedAt: null, pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'ENDED', startedAt: at(25), endedAt: at(45), pausedTotalMs: 0, pausedAt: null },
+      { number: 1, state: 'ENDED', startedAt: at(0), endedAt: at(20), pausedTotalMs: 0, pausedAt: null },
+      { number: 4, state: 'ENDED', startedAt: at(50), endedAt: null, pausedTotalMs: 0, pausedAt: null },
+      { number: 5, state: 'ENDED', startedAt: null, endedAt: at(60), pausedTotalMs: 0, pausedAt: null },
+    ]);
+    expect(result).toEqual([
+      { periodNumber: 1, elapsedMs: 20 * 60_000 },
+      { periodNumber: 2, elapsedMs: 20 * 60_000 },
+    ]);
+  });
+
+  it('endedAt 을 채우지 않는 호출부(옛 select)에서는 빈 목록이다', () => {
+    expect(
+      resolveEndedPeriods([{ number: 1, state: 'ENDED', startedAt: at(0), pausedTotalMs: 0, pausedAt: null }]),
+    ).toEqual([]);
   });
 });

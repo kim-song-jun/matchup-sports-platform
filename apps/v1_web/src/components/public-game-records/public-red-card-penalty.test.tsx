@@ -136,6 +136,57 @@ describe('PublicRedCardPenalty — 공개 경기 화면의 퇴장 패널티', ()
     expect(screen.getByRole('list', { name: '퇴장 패널티' })).toHaveTextContent('하프타임');
   });
 
+  // alpha 확인(#2506): 전반을 설정 길이(20분)보다 일찍 끝내면 하프타임에 줄이 사라졌다.
+  it('전반을 설정 길이보다 일찍 끝내도 서버가 알려 준 실제 진행 시간으로 하프타임 값을 잰다', () => {
+    const early = event({ type: 'CARD', cardColor: 'RED', clockMs: 4 * MIN + 30_000 });
+    // 전반은 5:00 에 끝났다 → 퇴장 뒤 30초만 흘렀다.
+    renderPenalty({
+      events: [early],
+      clock: null,
+      periodBreak: 'halftime',
+      endedPeriods: [{ periodNumber: 1, elapsedMs: 5 * MIN }],
+    });
+
+    expect(screen.getByRole('timer')).toHaveTextContent('패널티 1:30');
+    expect(screen.getByRole('list', { name: '퇴장 패널티' })).toHaveTextContent('하프타임');
+  });
+
+  it('실제 진행 시간이 없는 옛 응답은 설정 길이로 센다 — 일찍 끝낸 전반이면 만료로 보인다(이전 동작 그대로)', () => {
+    const { container } = renderPenalty({
+      events: [event({ type: 'CARD', cardColor: 'RED', clockMs: 4 * MIN + 30_000 })],
+      clock: null,
+      periodBreak: 'halftime',
+    });
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('후반이 시작된 뒤에도 전반의 실제 종료 시점부터 이어 센다', () => {
+    renderPenalty({
+      events: [event({ type: 'CARD', cardColor: 'RED', clockMs: 4 * MIN + 30_000 })],
+      clock: { periodNumber: 2, elapsedMs: 45_000, isPaused: false },
+      endedPeriods: [{ periodNumber: 1, elapsedMs: 5 * MIN }],
+    });
+
+    // 전반 남은 30초 + 후반 0:45 = 1분 15초가 흘렀다.
+    expect(screen.getByRole('timer')).toHaveTextContent('패널티 0:45');
+  });
+
+  it('끝난 피리어드가 여럿이면 하프타임 값은 가장 마지막 피리어드가 끝난 시점이다', () => {
+    renderPenalty({
+      events: [event({ type: 'CARD', cardColor: 'RED', period: 2, clockMs: 19 * MIN + 30_000 })],
+      clock: null,
+      periodBreak: 'halftime',
+      periodCount: 2,
+      endedPeriods: [
+        { periodNumber: 1, elapsedMs: 20 * MIN },
+        { periodNumber: 2, elapsedMs: 20 * MIN },
+      ],
+    });
+
+    expect(screen.getByRole('timer')).toHaveTextContent('패널티 1:30');
+  });
+
   it('시계가 없고 하프타임도 아니거나, 피리어드 길이를 모르는 하프타임이면 아무것도 그리지 않는다', () => {
     const { container, unmount } = renderPenalty({ clock: null, periodBreak: null });
     expect(container).toBeEmptyDOMElement();

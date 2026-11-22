@@ -8,10 +8,14 @@ import { RECORD_TYPE_TABS, recordEmptyCopy } from './record-category-tabs';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { pairSecondYellowRed } from '@/lib/second-yellow-red';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
+import { PresentationIcon } from './card-pair-icon';
 import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import {
   eventPresentation,
+  publicCardFacts,
+  secondYellowRedPresentation,
   formatGoalMinute,
   formatTeamRecordPenaltyScoreline,
   isClockAbnormal,
@@ -76,8 +80,15 @@ function recordHref(item: PublicTeamRecordItem, fromHref: string): string | null
  * `side`는 'own'/'opponent'로 이미 정규화돼 오므로, 우리 팀 이벤트는 좌측, 상대팀
  * 이벤트는 우측에 배치해 색이 아니라 정렬로도 구분한다.
  */
-function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
-  const presentation = eventPresentation(event);
+function TeamRecordEventRow({
+  event,
+  secondYellowRed = false,
+}: {
+  event: PublicTeamRecordEvent;
+  /** 이 레드가 같은 선수의 두 번째 옐로를 흡수한 경고 누적 퇴장이면 true — 겹친 카드 한 줄로 그린다. */
+  secondYellowRed?: boolean;
+}) {
+  const presentation = secondYellowRed ? secondYellowRedPresentation() : eventPresentation(event);
   const content = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       {event.jerseyNumber !== null ? (
@@ -95,7 +106,7 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
     <div role="listitem" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{event.side === 'own' ? content : null}</div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
-        <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{presentation.icon}</span>
+        <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}><PresentationIcon presentation={presentation} /></span>
         <span className="sr-only">{presentation.label}</span>
         {presentation.badge ? (
           /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
@@ -141,6 +152,8 @@ function TeamRecordEventsPanel({
   item: PublicTeamRecordItem;
   teamName: string;
 }) {
+  // 같은 선수의 두 번째 옐로와 같은 시각의 레드(경고 누적 퇴장)는 레드 한 줄로 합친다(`@/lib/second-yellow-red`).
+  const secondYellowRed = pairSecondYellowRed(item.events, publicCardFacts);
   return (
     <div
       id={id}
@@ -171,9 +184,11 @@ function TeamRecordEventsPanel({
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {item.events.map((event) => (
-          <TeamRecordEventRow key={event.id} event={event} />
-        ))}
+        {item.events
+          .filter((event) => !secondYellowRed.absorbedYellows.has(event))
+          .map((event) => (
+            <TeamRecordEventRow key={event.id} event={event} secondYellowRed={secondYellowRed.yellowOfRed.has(event)} />
+          ))}
       </div>
     </div>
   );

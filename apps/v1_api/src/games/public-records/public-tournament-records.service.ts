@@ -65,7 +65,7 @@ import { leagueWeekCounter } from '../../league-matches/league-week-number';
 import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
 import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
-import { regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
+import { parseLineupLimits, regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
 import { FORFEIT_REASON_MARKER, resolveIsForfeit } from '../../league-matches/league-forfeit-result';
 import { PLACE_SELECT } from '../../places/place-select';
 import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
@@ -174,7 +174,8 @@ const GAME_MATCH_SELECT = {
   // Lane 1 addition -- see GAME_MATCH_SELECT above.
   periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
   // 정규 피리어드 수(`periodCount`) 산출용 — 연장은 `V1GamePeriod` 행이라 행 수로는 셀 수 없다.
-  competitionConfig: { select: { periods: true } },
+  // `lineup`은 교체 방식(`substitutionMode`) 산출용이다.
+  competitionConfig: { select: { periods: true, lineup: true } },
 } satisfies Prisma.V1GameSelect;
 
 type GameMatchRow = Prisma.V1GameGetPayload<{ select: typeof GAME_MATCH_SELECT }>;
@@ -1343,6 +1344,7 @@ export class PublicTournamentRecordsService {
       periodBreak,
       periodCount: gamePeriodCount(fixture.game),
       periodMinutes: gamePeriodMinutes(fixture.game),
+      substitutionMode: gameSubstitutionMode(fixture.game),
       lineup,
       events,
       mvp,
@@ -2070,6 +2072,7 @@ export class PublicTournamentRecordsService {
       periodBreak,
       periodCount: gamePeriodCount(teamMatch.game),
       periodMinutes: gamePeriodMinutes(teamMatch.game),
+      substitutionMode: gameSubstitutionMode(teamMatch.game),
       lineup,
       events,
       mvp,
@@ -2387,6 +2390,20 @@ function gamePeriodCount(game: { competitionConfig?: { periods: Prisma.JsonValue
  */
 function gamePeriodMinutes(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number[] | null {
   return regularPeriodMinutes(game?.competitionConfig?.periods);
+}
+
+/**
+ * 경기의 교체 방식. 풋살처럼 교체를 기록하지 않는 롤링 교체면 `'rolling'`, 그 밖에는 `'limited'`.
+ * 화면이 "퇴장 뒤 2분 또는 상대 득점까지" 패널티 줄을 켤지 가르는 값이고, 운영 콘솔이 `substitutionPolicy.mode`로
+ * 같은 줄을 켜는 것과 같은 설정 키(`lineup.substitutions`)를 같은 파서로 읽는다.
+ * 경기 레코드나 설정 스냅샷이 없으면 null — 화면은 그때 패널티 줄을 그리지 않는다(종목을 지어내지 않는다).
+ */
+function gameSubstitutionMode(
+  game: { competitionConfig?: { lineup: Prisma.JsonValue } | null } | null | undefined,
+): 'limited' | 'rolling' | null {
+  const config = game?.competitionConfig;
+  if (config === null || config === undefined) return null;
+  return parseLineupLimits(config.lineup).substitutions;
 }
 
 function presentScheduleEntry(

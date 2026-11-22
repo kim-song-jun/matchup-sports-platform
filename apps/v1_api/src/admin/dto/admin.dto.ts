@@ -84,6 +84,11 @@ export class AdminMatchListQueryDto {
   @IsIn(['recruiting', 'closed', 'cancelled', 'completed', 'archived'])
   status?: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';
 
+  /** 생략하면 숨긴 매치까지 모두 돌려준다. `public` 은 숨기지 않은 매치만, `hidden` 은 숨긴 매치만. */
+  @IsOptional()
+  @IsIn(['public', 'hidden'])
+  visibility?: 'public' | 'hidden';
+
   @IsOptional()
   @IsUUID()
   sportId?: string;
@@ -471,6 +476,15 @@ export class ChangeMatchStatusDto {
   @IsIn(['recruiting', 'closed', 'cancelled', 'completed', 'archived'])
   status!: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}
+
+/** 개인 매치 숨김·다시 공개 요청 본문. 사유는 감사 기록에 그대로 남는다. */
+export class ChangeMatchVisibilityDto {
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()

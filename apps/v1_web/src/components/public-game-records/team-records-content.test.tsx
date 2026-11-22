@@ -266,3 +266,29 @@ describe('TeamRecordsContent — 몰수 경기의 펼침 패널 설명', () => {
     expect(screen.queryByText('몰수 전 기록이에요')).not.toBeInTheDocument();
   });
 });
+
+// 경고 누적 퇴장 — 경기 상세·일정 카드와 같은 규칙으로, 같은 선수의 두 번째 옐로와 같은 시각의 레드를 한 줄로 합친다.
+describe('TeamRecordsContent — 경고 누적 퇴장은 한 줄로 합쳐 보인다', () => {
+  const card = (id: string, cardColor: 'YELLOW' | 'RED', period: number, clockMs: number) =>
+    ({ id, type: 'CARD', side: 'own', jerseyNumber: 7, period, clockMs, cardColor, participantName: '홍길동', profileHref: null }) as const;
+  const open = (item: PublicTeamRecordItem) => {
+    render(<TeamRecordsContent data={makeTeamRecords([item])} activeType="all" onChangeType={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: /경기 기록 펼치기/ }));
+  };
+
+  it('두 번째 옐로와 레드를 한 줄로 합치고 첫 옐로는 그대로 둔다', () => {
+    open(makeItem({ events: [card('e-1', 'YELLOW', 1, 600_000), card('e-2', 'YELLOW', 2, 1_860_000), card('e-3', 'RED', 2, 1_860_000)] }));
+
+    expect(screen.getByText('경고 누적 퇴장 (옐로카드 2장, 레드카드)')).toBeInTheDocument();
+    expect(screen.getAllByText('옐로카드')).toHaveLength(1);
+    expect(screen.queryByText('레드카드')).not.toBeInTheDocument();
+  });
+
+  it('옐로 한 장과 같은 시각의 레드는 합치지 않는다', () => {
+    open(makeItem({ events: [card('e-1', 'YELLOW', 2, 1_860_000), card('e-2', 'RED', 2, 1_860_000)] }));
+
+    expect(screen.queryByText('경고 누적 퇴장 (옐로카드 2장, 레드카드)')).not.toBeInTheDocument();
+    expect(screen.getByText('옐로카드')).toBeInTheDocument();
+    expect(screen.getByText('레드카드')).toBeInTheDocument();
+  });
+});

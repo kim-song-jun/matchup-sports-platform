@@ -161,7 +161,7 @@ async function review(admin) {
   if(counts.size!==20||[...counts.values()].some(n=>n!==7))throw Error('Expected seven games per team');
   report.publicFinalRankings=ranks;report.publicFixtureCount=t.fixtures.length;
   report.pageResponses=[];
-  for(const route of ['results','awards']){const r=await fetch(`${origin}/tournaments/${tid}/${route}`,{signal:AbortSignal.timeout(30000)});const html=await r.text();const text=html.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');report.pageResponses.push({route,status:r.status,bytes:Buffer.byteLength(html),containsTournamentId:html.includes(tid),serverText:text.slice(0,12000)});if(!r.ok)throw Error('Public page HTTP '+r.status);}
+  for(const route of ['results','awards']){const r=await fetch(`${origin}/tournaments/${tid}/${route}`,{signal:AbortSignal.timeout(30000)});const html=await r.text();const text=html.replace(/<script\b[^>]*>[\s\S]*?<\/script(?:\s[^>]*)?>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style(?:\s[^>]*)?>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');report.pageResponses.push({route,status:r.status,bytes:Buffer.byteLength(html),containsTournamentId:html.includes(tid),serverText:text.slice(0,12000)});if(!r.ok)throw Error('Public page HTTP '+r.status);}
   report.awardScopeTracks=finals.map(g=>g.bracketTrack);report.awardSets=t.awardSets??[];
   const records=await request(null,'GET',`/tournaments/${tid}/player-records`);
   if(records.hiddenByEligibility||records.goals.reduce((sum,p)=>sum+p.goals,0)!==70)throw Error('Public cumulative goals mismatch');

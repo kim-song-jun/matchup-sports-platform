@@ -1,4 +1,4 @@
-import { Prisma, V1AuthProvider } from '@prisma/client';
+import { Prisma, PrismaClient, V1AuthProvider } from '@prisma/client';
 import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 
 /**
@@ -58,13 +58,151 @@ export interface AlphaQaSquadSummary {
 }
 
 /**
- * @param sportId  팀 종목(풋살) — 호출부가 이미 조회해 둔 것을 그대로 쓴다.
- * @param regionId 팀 지역 — 위와 동일.
+ * 팀 하나(선수 10명 + 팀 + 프로필 + 멤버십)를 한 트랜잭션 안에서 시드한다. 쿼리 수가 팀 크기로
+ * 고정이라 alpha 호스트 속도와 무관하게 시간 한도 안에 끝난다.
  */
-export async function seedAlphaQaSquads(
+async function seedSquadTeam(
   tx: Prisma.TransactionClient,
+  teamNo: number,
   sportId: string,
   regionId: string,
+  passwordHash: string,
+  now: Date,
+): Promise<void> {
+  const memberIds: string[] = [];
+
+  for (let playerNo = 1; playerNo <= ALPHA_QA_SQUAD_MEMBERS_PER_TEAM; playerNo += 1) {
+    const id = userId(teamNo, playerNo);
+    const userEmail = email(teamNo, playerNo);
+    const user = await tx.v1User.upsert({
+      where: { id },
+      update: {
+        email: userEmail,
+        phone: phone(teamNo, playerNo),
+        // 휴대폰 인증은 쓰기 전역 게이트(V1AuthGuard)의 조건이다 — 미인증이면 로그인만 되고
+        // 대회 신청·라인업 제출 같은 검증 동작을 아무것도 못 한다.
+        phoneVerifiedAt: now,
+        emailVerifiedAt: now,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        deletedAt: null,
+      },
+      create: {
+        id,
+        email: userEmail,
+        phone: phone(teamNo, playerNo),
+        phoneVerifiedAt: now,
+        emailVerifiedAt: now,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    await tx.v1UserProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        nickname: nickname(teamNo, playerNo),
+        displayName: nickname(teamNo, playerNo),
+        realName: `큐에이${String(playerNo).padStart(2, '0')}`,
+        gender: playerNo % 2 === 0 ? 'female' : 'male',
+        birthDate: '1995-05-15',
+        bio: 'ALPHA QA 스쿼드 — 라인업·실시간 운영 검증용 가상 선수입니다.',
+        deletedAt: null,
+      },
+      create: {
+        userId: user.id,
+        nickname: nickname(teamNo, playerNo),
+        displayName: nickname(teamNo, playerNo),
+        realName: `큐에이${String(playerNo).padStart(2, '0')}`,
+        gender: playerNo % 2 === 0 ? 'female' : 'male',
+        birthDate: '1995-05-15',
+        bio: 'ALPHA QA 스쿼드 — 라인업·실시간 운영 검증용 가상 선수입니다.',
+      },
+    });
+    await tx.v1AuthIdentity.upsert({
+      where: {
+        provider_providerUserKey: { provider: V1AuthProvider.email, providerUserKey: userEmail },
+      },
+      update: { userId: user.id, email: userEmail, passwordHash, status: 'active' },
+      create: {
+        userId: user.id,
+        provider: V1AuthProvider.email,
+        providerUserKey: userEmail,
+        email: userEmail,
+        passwordHash,
+        status: 'active',
+      },
+    });
+    memberIds.push(user.id);
+  }
+
+  const [ownerId] = memberIds;
+  const id = teamId(teamNo);
+  const team = await tx.v1Team.upsert({
+    where: { id },
+    update: {
+      ownerUserId: ownerId,
+      sportId,
+      regionId,
+      name: `(테스트) QA 스쿼드 ${String(teamNo).padStart(2, '0')}팀`,
+      status: 'active',
+      // 스키마상 가입 정책은 approval_required | closed 둘뿐이다(공개 가입 값은 없다).
+      // 어차피 이 시드가 멤버 10명을 직접 넣으므로 신청 왕복은 필요 없다.
+      joinPolicy: 'approval_required',
+      membersVisible: true,
+      memberCount: memberIds.length,
+      deletedAt: null,
+    },
+    create: {
+      id,
+      ownerUserId: ownerId,
+      sportId,
+      regionId,
+      name: `(테스트) QA 스쿼드 ${String(teamNo).padStart(2, '0')}팀`,
+      status: 'active',
+      joinPolicy: 'approval_required',
+      membersVisible: true,
+      memberCount: memberIds.length,
+    },
+  });
+  await tx.v1TeamProfile.upsert({
+    where: { teamId: team.id },
+    update: {
+      description: 'ALPHA QA 스쿼드 — 대회 라인업·실시간 운영 검증용 가상 팀입니다.',
+      deletedAt: null,
+    },
+    create: {
+      teamId: team.id,
+      description: 'ALPHA QA 스쿼드 — 대회 라인업·실시간 운영 검증용 가상 팀입니다.',
+    },
+  });
+
+  for (const [index, memberId] of memberIds.entries()) {
+    // 1번은 팀장(owner), 2번은 매니저(manager 권한 경로 검증용), 나머지는 일반 팀원.
+    const role = index === 0 ? 'owner' : index === 1 ? 'manager' : 'member';
+    await tx.v1TeamMembership.upsert({
+      where: { teamId_userId: { teamId: team.id, userId: memberId } },
+      update: { role, status: 'active', joinedAt: now, leftAt: null },
+      create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now },
+    });
+  }
+  await refreshAlphaTeamMembershipCounts(tx, team.id);
+}
+
+/**
+ * 계정을 한 트랜잭션에 몰아넣으면 쿼리가 계정 수만큼 늘어 5초 기본 한도에 걸린다. 팀마다
+ * 트랜잭션을 나눠 한 트랜잭션의 크기를 고정한다. 모든 행이 결정적 id 의 upsert 라서 중간에
+ * 실패해도 다시 돌리면 같은 상태로 수렴한다.
+ *
+ * @param prisma             트랜잭션을 직접 열기 위해 클라이언트를 받는다(`tx` 가 아니다).
+ * @param sportId            팀 종목(풋살) — 호출부가 이미 조회해 둔 것을 그대로 쓴다.
+ * @param regionId           팀 지역 — 위와 동일.
+ * @param transactionOptions 팀 단위 트랜잭션에 적용할 옵션(시간 한도).
+ */
+export async function seedAlphaQaSquads(
+  prisma: PrismaClient,
+  sportId: string,
+  regionId: string,
+  transactionOptions: { readonly timeout: number },
 ): Promise<AlphaQaSquadSummary> {
   // alpha 전용 안전장치. 호출부(`seed-alpha-tournament-qa.ts`)가 이미 NODE_ENV·확인 플래그·
   // alpha DB 호스트/이름까지 4중으로 검사하고, 프로덕션 배포 스크립트에는 이 시드를 실행하는
@@ -74,7 +212,7 @@ export async function seedAlphaQaSquads(
   if (process.env.V1_ALPHA_QA_SEED !== 'true') {
     return { teams: 0, users: 0, skippedReason: 'V1_ALPHA_QA_SEED!=true — alpha 전용 시드라 건너뜀' };
   }
-  const source = await tx.v1AuthIdentity.findFirst({
+  const source = await prisma.v1AuthIdentity.findFirst({
     where: { provider: V1AuthProvider.email, providerUserKey: PASSWORD_SOURCE_EMAIL, status: 'active' },
     select: { passwordHash: true },
   });
@@ -89,139 +227,15 @@ export async function seedAlphaQaSquads(
   const passwordHash = source.passwordHash;
   const now = new Date();
 
-  let teams = 0;
-  let users = 0;
-
   for (let teamNo = 1; teamNo <= ALPHA_QA_SQUAD_TEAM_COUNT; teamNo += 1) {
-    const memberIds: string[] = [];
-
-    for (let playerNo = 1; playerNo <= ALPHA_QA_SQUAD_MEMBERS_PER_TEAM; playerNo += 1) {
-      const id = userId(teamNo, playerNo);
-      const userEmail = email(teamNo, playerNo);
-      const user = await tx.v1User.upsert({
-        where: { id },
-        update: {
-          email: userEmail,
-          phone: phone(teamNo, playerNo),
-          // 휴대폰 인증은 쓰기 전역 게이트(V1AuthGuard)의 조건이다 — 미인증이면 로그인만 되고
-          // 대회 신청·라인업 제출 같은 검증 동작을 아무것도 못 한다.
-          phoneVerifiedAt: now,
-          emailVerifiedAt: now,
-          accountStatus: 'active',
-          onboardingStatus: 'completed',
-          deletedAt: null,
-        },
-        create: {
-          id,
-          email: userEmail,
-          phone: phone(teamNo, playerNo),
-          phoneVerifiedAt: now,
-          emailVerifiedAt: now,
-          accountStatus: 'active',
-          onboardingStatus: 'completed',
-        },
-      });
-      await tx.v1UserProfile.upsert({
-        where: { userId: user.id },
-        update: {
-          nickname: nickname(teamNo, playerNo),
-          displayName: nickname(teamNo, playerNo),
-          realName: `큐에이${String(playerNo).padStart(2, '0')}`,
-          gender: playerNo % 2 === 0 ? 'female' : 'male',
-          birthDate: '1995-05-15',
-          bio: 'ALPHA QA 스쿼드 — 라인업·실시간 운영 검증용 가상 선수입니다.',
-          deletedAt: null,
-        },
-        create: {
-          userId: user.id,
-          nickname: nickname(teamNo, playerNo),
-          displayName: nickname(teamNo, playerNo),
-          realName: `큐에이${String(playerNo).padStart(2, '0')}`,
-          gender: playerNo % 2 === 0 ? 'female' : 'male',
-          birthDate: '1995-05-15',
-          bio: 'ALPHA QA 스쿼드 — 라인업·실시간 운영 검증용 가상 선수입니다.',
-        },
-      });
-      await tx.v1AuthIdentity.upsert({
-        where: {
-          provider_providerUserKey: { provider: V1AuthProvider.email, providerUserKey: userEmail },
-        },
-        update: { userId: user.id, email: userEmail, passwordHash, status: 'active' },
-        create: {
-          userId: user.id,
-          provider: V1AuthProvider.email,
-          providerUserKey: userEmail,
-          email: userEmail,
-          passwordHash,
-          status: 'active',
-        },
-      });
-      memberIds.push(user.id);
-      users += 1;
-    }
-
-    const [ownerId] = memberIds;
-    const id = teamId(teamNo);
-    const team = await tx.v1Team.upsert({
-      where: { id },
-      update: {
-        ownerUserId: ownerId,
-        sportId,
-        regionId,
-        name: `(테스트) QA 스쿼드 ${String(teamNo).padStart(2, '0')}팀`,
-        status: 'active',
-        // 스키마상 가입 정책은 approval_required | closed 둘뿐이다(공개 가입 값은 없다).
-        // 어차피 이 시드가 멤버 10명을 직접 넣으므로 신청 왕복은 필요 없다.
-        joinPolicy: 'approval_required',
-        membersVisible: true,
-        memberCount: memberIds.length,
-        deletedAt: null,
-      },
-      create: {
-        id,
-        ownerUserId: ownerId,
-        sportId,
-        regionId,
-        name: `(테스트) QA 스쿼드 ${String(teamNo).padStart(2, '0')}팀`,
-        status: 'active',
-        joinPolicy: 'approval_required',
-        membersVisible: true,
-        memberCount: memberIds.length,
-      },
-    });
-    await tx.v1TeamProfile.upsert({
-      where: { teamId: team.id },
-      update: {
-        description: 'ALPHA QA 스쿼드 — 대회 라인업·실시간 운영 검증용 가상 팀입니다.',
-        deletedAt: null,
-      },
-      create: {
-        teamId: team.id,
-        description: 'ALPHA QA 스쿼드 — 대회 라인업·실시간 운영 검증용 가상 팀입니다.',
-      },
-    });
-
-    for (const [index, memberId] of memberIds.entries()) {
-      // 1번은 팀장(owner), 2번은 매니저(manager 권한 경로 검증용), 나머지는 일반 팀원.
-      const role = index === 0 ? 'owner' : index === 1 ? 'manager' : 'member';
-      const existing = await tx.v1TeamMembership.findFirst({
-        where: { teamId: team.id, userId: memberId },
-        select: { id: true },
-      });
-      if (existing) {
-        await tx.v1TeamMembership.update({
-          where: { id: existing.id },
-          data: { role, status: 'active', joinedAt: now, leftAt: null },
-        });
-      } else {
-        await tx.v1TeamMembership.create({
-          data: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now },
-        });
-      }
-    }
-    await refreshAlphaTeamMembershipCounts(tx, team.id);
-    teams += 1;
+    await prisma.$transaction(
+      (tx) => seedSquadTeam(tx, teamNo, sportId, regionId, passwordHash, now),
+      transactionOptions,
+    );
   }
 
-  return { teams, users };
+  return {
+    teams: ALPHA_QA_SQUAD_TEAM_COUNT,
+    users: ALPHA_QA_SQUAD_TEAM_COUNT * ALPHA_QA_SQUAD_MEMBERS_PER_TEAM,
+  };
 }

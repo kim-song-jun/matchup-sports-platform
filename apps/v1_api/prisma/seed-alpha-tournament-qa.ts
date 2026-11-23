@@ -1089,6 +1089,12 @@ async function clearScenarioLeaves(
   await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId } });
 }
 
+// 시드는 단계마다 별도 트랜잭션으로 나눠 돌린다(명단 → 시나리오 하나씩 → QA 스쿼드 팀 하나씩 →
+// 수동 연습 대회). 한 트랜잭션에 모으면 alpha 호스트가 느린 날 Prisma 기본 한도 5초에 걸려
+// 배포가 되돌려졌다. 단계 크기를 고정해 한도가 호스트 속도에 좌우되지 않게 하고, 15초는 그
+// 위의 여유분이다.
+const ALPHA_SEED_TRANSACTION_OPTIONS = { timeout: 15_000 } as const;
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -1125,11 +1131,9 @@ async function main() {
     }
     const competitionConfigVersionId = competitionConfig.id;
 
-    const summary = await prisma.$transaction(async (tx) => {
-      // Part 2: reset(삭제)/skip 단계가 사라졌다. createScenario 가 대회·그룹·픽스처를 upsert 하고
-      // leaf 만 삭제-재생성하므로 append-only 데드락이 구조적으로 없다 → 매 배포 전 시나리오를 예외
-      // 없이 시드한다(예전엔 append-only 가 못박은 대회가 skip 되어 stale 로 남았다).
-      const qaTeams = await ensureTeamRoster(
+    // 시나리오가 쓰는 팀·선수 명단. 한 번에 커밋해 아래 단계가 같은 행을 읽는다.
+    const { qaTeams, featuredTeams } = await prisma.$transaction(async (tx) => ({
+      qaTeams: await ensureTeamRoster(
         tx,
         sport.id,
         region.id,
@@ -1137,8 +1141,8 @@ async function main() {
         TEAMS,
         'ALPHA 대회 전체 플로우 검증용 가상 사용자입니다.',
         'ALPHA 대회 상태·대진·결과 검증용 가상 팀입니다.',
-      );
-      const featuredTeams = await ensureTeamRoster(
+      ),
+      featuredTeams: await ensureTeamRoster(
         tx,
         sport.id,
         region.id,
@@ -1146,37 +1150,38 @@ async function main() {
         FEATURED_TEAMS,
         '서울 지역 풋살 리그와 대회에 정기적으로 참가하는 선수입니다. Alpha 쇼케이스 계정입니다.',
         '서울 지역 정식 매치와 대회에 참가하는 풋살 팀입니다. Alpha 쇼케이스 데이터입니다.',
-      );
-      const now = new Date();
-      for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
-        const teams = scenario.marketing ? featuredTeams : qaTeams;
-        await createScenario(
-          tx,
-          scenario,
-          sport.id,
-          teams,
-          admin?.id ?? null,
-          now,
-          competitionConfigVersionId,
-        );
-      }
-      // QA 스쿼드(팀 10 × 선수 10) — 대회 시나리오와 독립적인 "테스트용 팀·계정 풀"이다.
-      // alpha 는 SMS 미설정 + 휴대폰 인증 강제라 API 로는 계정을 늘릴 수 없어(register →
-      // PHONE_NOT_VERIFIED, phone/issue → SMS_NOT_CONFIGURED) 이 시드가 유일한 경로다.
-      const squads = await seedAlphaQaSquads(tx, sport.id, region.id);
-
-      return {
-        tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
-        campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
-        statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),
-        completedIncludes: ['results', 'videos', 'reviews', 'awards'],
-        qaSquads: squads,
-      };
-    });
+      ),
+    }), ALPHA_SEED_TRANSACTION_OPTIONS);
+    const now = new Date();
+    // createScenario 가 대회·그룹·픽스처를 upsert 하고 leaf 만 삭제-재생성하므로 시나리오를
+    // 따로 커밋해도 재실행이 같은 상태로 수렴한다(append-only 데드락도 없다).
+    for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
+      const teams = scenario.marketing ? featuredTeams : qaTeams;
+      await prisma.$transaction((tx) => createScenario(
+        tx,
+        scenario,
+        sport.id,
+        teams,
+        admin?.id ?? null,
+        now,
+        competitionConfigVersionId,
+      ), ALPHA_SEED_TRANSACTION_OPTIONS);
+    }
+    // QA 스쿼드(팀 10 × 선수 10) — 대회 시나리오와 독립적인 "테스트용 팀·계정 풀"이다.
+    // alpha 는 SMS 미설정 + 휴대폰 인증 강제라 API 로는 계정을 늘릴 수 없어(register →
+    // PHONE_NOT_VERIFIED, phone/issue → SMS_NOT_CONFIGURED) 이 시드가 유일한 경로다.
+    const squads = await seedAlphaQaSquads(prisma, sport.id, region.id, ALPHA_SEED_TRANSACTION_OPTIONS);
+    const summary = {
+      tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
+      campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
+      statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),
+      completedIncludes: ['results', 'videos', 'reviews', 'awards'],
+      qaSquads: squads,
+    };
     if (!admin) throw new Error('An active admin is required for the manual round12 QA tournament.');
     const manualRound12 = await prisma.$transaction((tx) => seedAlphaRound12Manual(tx, {
       sportId: sport.id, regionId: region.id, adminId: admin.id, competitionConfigVersionId, now: new Date(),
-    }), { timeout: 15000 });
+    }), ALPHA_SEED_TRANSACTION_OPTIONS);
     process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary, manualRound12 })}\n`);
   } finally {
     await prisma.$disconnect();

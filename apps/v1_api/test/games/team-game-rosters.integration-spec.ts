@@ -661,6 +661,26 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
   });
 
   describe('다가오는 경기 — 명단 요약', () => {
+    it('삭제된 대회의 경기는 다가오는 경기에서 빠지고, 대회 없는 친선 경기는 그대로 남는다', async () => {
+      const f = await seedTournament();
+      const friendly = await createGame({
+        teamMatch: {
+          sportId, regionId, title: `친선 ${suiteId}`, hostTeamId: f.teamA.id, approvedApplicantTeamId: f.teamB.id,
+          startAt: new Date(Date.now() + 5 * DAY), status: 'matched', competitionConfigVersionId: configId,
+          createdByUserId: f.teamA.ownerId, placeName: '친선 구장',
+        },
+        homeTeamId: f.teamA.id, awayTeamId: f.teamB.id, actorUserId: f.adminId,
+      });
+      const ids = async () => ((await getAs(`/api/v1/teams/${f.teamA.id}/upcoming-games`, f.teamA.members[0])).body.data.items as Array<{ gameId: string }>).map((item) => item.gameId);
+      expect(await ids()).toEqual(expect.arrayContaining([f.games.g1.gameId, f.games.g2.gameId, friendly.gameId]));
+
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { deletedAt: new Date() } });
+      const after = await ids();
+      expect(after).toContain(friendly.gameId);
+      expect(after).not.toContain(f.games.g1.gameId);
+      expect(after).not.toContain(f.games.g2.gameId);
+    });
+
     it('킥오프가 지나도 SCHEDULED 대회 경기는 팀원 선택 목록과 팀장 표에 남고, 취소·종료 뒤에는 빠진다', async () => {
       const f = await seedTournament();
       const pastKickoff = new Date(Date.now() - 60_000);

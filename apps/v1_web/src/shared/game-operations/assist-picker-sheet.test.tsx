@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AssistPickerSheet } from './assist-picker-sheet';
@@ -204,6 +204,21 @@ describe('AssistPickerSheet — 골 시점에 이미 퇴장한 선수는 어시�
     expect(onAttach).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '어시스트 없이 두기' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /조현우/ })).toBeInTheDocument();
+  });
+
+  it('"다른 선수 고르기"로 돌아오면 포커스가 body 로 떨어지지 않고 시트를 처음 열었을 때와 같은 첫 컨트롤에 있다', async () => {
+    render(<AssistPickerSheet {...base} sentOffRedCards={sentOffBefore} onAttach={vi.fn()} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    // 열릴 때 공용 훅이 60ms 뒤에 잡는 처음 포커스가 끝난 뒤에 시작한다. 그 전에 돌려놓으면 훅이 대신 채워 줘서
+    // 이 확인이 고침 없이도 통과한다.
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    expect(screen.getByRole('button', { name: '닫기' })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+    await userEvent.click(screen.getByRole('button', { name: '다른 선수 고르기' }));
+
+    expect(document.body).not.toHaveFocus();
+    expect(screen.getByRole('button', { name: '닫기' })).toHaveFocus();
   });
 
   it('골을 넣은 뒤에 퇴장한 선수는 정상이므로 확인 없이 바로 붙인다', async () => {

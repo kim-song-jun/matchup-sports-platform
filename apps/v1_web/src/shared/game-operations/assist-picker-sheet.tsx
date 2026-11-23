@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { extractErrorMessage } from '@/lib/error-message';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { wasSentOffAt, type SentOffRedCard } from '@/lib/on-pitch-state';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
@@ -84,6 +84,16 @@ export function AssistPickerSheet({
     onClose,
     pending: pending !== null,
   });
+
+  // 확인 패널이 목록을 걷어 내면 방금 누른 선수 버튼이 사라져 포커스가 body 로 떨어진다. 목록으로 돌아올 때
+  // 처음 열었을 때와 같은 첫 컨트롤로 옮긴다(ActionTargetPicker 와 같은 방식). "그래도 계속"으로 빠져나가는
+  // 경우는 모든 컨트롤이 pending 으로 잠겨 있어 옮길 대상이 없다.
+  const wasConfirmingRef = useRef(false);
+  useEffect(() => {
+    const returnedToList = wasConfirmingRef.current && sentOffPending === null;
+    wasConfirmingRef.current = sentOffPending !== null;
+    if (returnedToList && open) dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+  }, [open, sentOffPending, dialogRef]);
 
   if (!open) return null;
 

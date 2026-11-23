@@ -619,7 +619,8 @@ export const gameSchemaSourceManifest = {
   // 2026-11-12: additive V1TournamentScheduleTime; historical game migration unchanged.
   // 2026-11-20: additive V1TeamInternalMatch* tables (team-internal matches, 20261120000100); historical game migration unchanged.
   // 2026-11-20: additive V1TeamProfile.membershipFee (20261120100000_v1_team_membership_fee); historical game migration unchanged.
-  schema: '616ec82475046627e4e58c6982c6312e95ddfd38831e44c5629a8b7eaa3d443b',
+  // 2026-11-23: additive V1AccessToken (20261123090000_v1_access_tokens); historical game migration unchanged.
+  schema: '40d98233092f3d6b8dbbe9c601d2d7081ae6ec141b30cd703c00a03584474d3a',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

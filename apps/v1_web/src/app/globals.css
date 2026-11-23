@@ -7505,6 +7505,51 @@ textarea.tm-chat-input-placeholder::placeholder {
   gap: 12px;
 }
 
+/* 내 일정 맨 위 「캘린더 연결」 — 버튼 한 줄과 연결 시트(docs/api/domains/calendar-feed.md). */
+.tm-calendar-connect-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tm-calendar-connect {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-3);
+  padding: 0 var(--spacing-1) var(--spacing-2);
+}
+
+.tm-calendar-connect-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-2);
+}
+
+.tm-calendar-connect-url {
+  width: 100%;
+  min-height: var(--size-control-md);
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+}
+
+.tm-calendar-connect-help {
+  display: grid;
+  gap: var(--spacing-1);
+  margin: 0;
+  padding-left: var(--spacing-4);
+  color: var(--text-muted);
+  list-style: disc;
+}
+
+.tm-calendar-connect-warning {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .tm-my-card-head {
   display: flex;
   align-items: flex-start;

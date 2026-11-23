@@ -19,6 +19,7 @@ import type {
   ScheduleListViewModel,
 } from './team-schedules.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { CalendarConnectButton } from './calendar-connect-sheet';
 import detailStyles from './team-schedules-detail.module.css';
 
 // ── 목록 (calendar/list 토글 + type/state 필터) ───────────────────────────────
@@ -285,6 +286,16 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           </div>
           <div className="tm-text-body-lg" style={{ marginBottom: 4 }}>{model.title}</div>
           <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{model.dateTimeLabel}</div>
+          {model.calendarFileHref ? (
+            <a
+              className="tm-text-caption"
+              href={model.calendarFileHref}
+              download
+              style={{ color: 'var(--blue700)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+            >
+              캘린더에 추가
+            </a>
+          ) : null}
           {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{model.capacityLabel}</div> : null}
           {/* M-M 감사: 배지가 "상대팀 확정"이라 말하면서 상대팀·장소가 화면 어디에도
               없었다 — 이어진 경기 상세(친선·리그는 팀 매치, 대회는 공개 경기)의 값을 요약해 보여준다. */}
@@ -1027,6 +1038,8 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
           </AppBackLink>
           <h1 className="tm-text-heading">내 일정</h1>
         </div>
+
+        <CalendarConnectButton />
 
         <FilterChipGroup label="상태" options={model.statusOptions} value={model.statusFilter} onChange={model.onStatusFilterChange} />
 

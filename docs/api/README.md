@@ -97,6 +97,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
 - [Team internal matches](./domains/team-internal-matches.md)
+- [Calendar feed](./domains/calendar-feed.md)
 - [Tournament operations](./domains/tournament-operations.md)
 - [Tournament operations authorization](./domains/tournament-operations-auth.md)
 - [Tournament operations escalations](./domains/tournament-operations-escalations.md)

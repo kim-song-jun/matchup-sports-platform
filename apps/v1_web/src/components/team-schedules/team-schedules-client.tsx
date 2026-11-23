@@ -26,7 +26,7 @@ import {
 // 배치의 ownedFiles가 그 파일을 포함하지 않아 새 훅을 그쪽에 추가할 수 없음) — 같은 파일이
 // 이미 쓰는 저수준 클라이언트(v1Get/v1Patch)를 이 컴포넌트 안에서 직접 useQuery/useMutation과
 // 조합해 동일한 패턴(성공 시 teamSchedule invalidate)을 재현한다.
-import { v1Get, v1Patch } from '@/lib/api-client';
+import { getV1ApiBaseUrl, v1Get, v1Patch } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -532,6 +532,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     stateTone: matchDisplay?.stateTone ?? 'default',
     state: schedule?.state ?? 'SCHEDULED',
     dateTimeLabel: schedule ? formatTournamentDateRangeWithTime(schedule.startAt, schedule.endAt) ?? '일정 미정' : '',
+    calendarFileHref: canRsvp && schedule ? `${getV1ApiBaseUrl()}/teams/${teamId}/schedules/${scheduleId}/calendar.ics` : null,
     visibilityLabel: schedule ? scheduleVisibilityLabel(schedule.visibility) : '',
     capacityLabel: schedule?.capacity != null ? `정원 ${schedule.goingCount}/${schedule.capacity}명` : null,
     opponent,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import {
   ALPHA_QA_SQUAD_MEMBERS_PER_TEAM,
@@ -30,8 +31,9 @@ async function squadCounts() {
 describe('alpha QA 스쿼드 시드(팀 10 × 선수 10)', () => {
   beforeAll(async () => {
     await prisma.$connect();
-    const sport = await prisma.v1Sport.create({ data: { code: 'squad-seed-futsal', name: '풋살' } });
-    const region = await prisma.v1Region.create({ data: { code: 'squad-seed-region', name: '시드 지역', level: 1 } });
+    const run = randomUUID().slice(0, 8);
+    const sport = await prisma.v1Sport.create({ data: { code: `squad-seed-futsal-${run}`, name: '풋살' } });
+    const region = await prisma.v1Region.create({ data: { code: `squad-seed-region-${run}`, name: '시드 지역', level: 1 } });
     sportId = sport.id;
     regionId = region.id;
     const source = await prisma.v1User.create({

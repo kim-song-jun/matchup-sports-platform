@@ -104,12 +104,12 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     render(<TeamListPageClient />);
 
     expect(lastFilters()).not.toHaveProperty('preferRegionId');
-    expect(screen.getByText(/활동 지역을 정하면 가까운 팀을 먼저 보여 줘요/)).toBeTruthy();
+    expect(screen.getByText(/가까운 팀을 먼저 보려면/)).toBeTruthy();
     // 안내 글은 왼쪽, "지역 설정" 알약 버튼은 오른쪽 — 같은 줄(.tm-list-region-notice-action)에 있고 설정 화면으로 이어진다.
     const link = screen.getByRole('link', { name: '지역 설정' });
     expect(link.getAttribute('href')).toBe('/my/settings/location');
     expect(link.classList.contains('tm-list-region-notice-link')).toBe(true);
-    expect(link.closest('.tm-list-region-notice-action')?.textContent).toContain('활동 지역을 정하면 가까운 팀을 먼저 보여 줘요');
+    expect(link.closest('.tm-list-region-notice-action')?.textContent).toContain('가까운 팀을 먼저 보려면');
     expect(link.querySelector('.tm-list-region-notice-pill svg')).not.toBeNull();
     expect(screen.queryByText(/내 팀이 있는 지역/)).toBeNull();
   });

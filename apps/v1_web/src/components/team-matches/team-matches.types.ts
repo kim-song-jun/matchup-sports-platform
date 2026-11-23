@@ -1,5 +1,6 @@
 import type { TeamMatchRuleDraft } from './team-match-rules-draft';
 import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
+import type { ListRegionNotice } from '@/lib/list-region-preference';
 import type { PlaceValue } from '@/lib/place';
 import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus, V1TeamMatchPeriod, V1TeamMatchPeriodInput } from '@/types/api';
 
@@ -96,6 +97,8 @@ export type TeamMatchListViewModel = {
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     kindOptions: Array<{ label: string; value: '' | 'friendly' | 'competition'; href: string; active?: boolean }>;
   };
+  /** 활동 지역 우선(각 상태 묶음 안에서 내 지역 팀 매치가 먼저)이라는 한 줄 안내. 링크는 활동 지역이 없는 사용자에게만 있다. */
+  regionPriorityNotice?: ListRegionNotice;
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: {
     count: number;

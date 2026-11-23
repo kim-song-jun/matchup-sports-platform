@@ -1,3 +1,4 @@
+import type { ListRegionNotice } from '@/lib/list-region-preference';
 import type { PlaceValue } from '@/lib/place';
 import type { V1MatchApiStatus, V1PlaceView, V1RecentVenue } from '@/types/api';
 
@@ -60,6 +61,8 @@ export type MatchListViewModel = {
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
   };
+  /** 활동 지역 우선(각 상태 묶음 안에서 내 지역 매치가 먼저)이라는 한 줄 안내. 링크는 활동 지역이 없는 사용자에게만 있다. */
+  regionPriorityNotice?: ListRegionNotice;
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: {
     label: string;

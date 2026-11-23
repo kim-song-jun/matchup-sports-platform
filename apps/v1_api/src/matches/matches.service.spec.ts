@@ -899,6 +899,79 @@ describe('MatchesService', () => {
     });
   });
 
+  // 활동 지역 우선: 상태 묶음 순서는 그대로 두고, 각 묶음 앞에 "내 지역" 하위 묶음이 선다. 하위 묶음 이름은 커서에 그대로 실린다.
+  describe('list: 활동 지역 우선(preferRegionId)', () => {
+    const now = Date.now();
+    const HOUR = 60 * 60 * 1000;
+    const player = { role: 'participant', status: 'active' };
+    const SEOUL = 'region-seoul';
+    // 지역은 구/군 단위에 저장된다 — 시/도(SEOUL)를 주면 그 하위 구/군(마포)도 내 지역이다.
+    const mine = { regionId: 'region-mapo', region: { id: 'region-mapo', name: '마포구', parentId: SEOUL } };
+    const other = { regionId: 'region-busan-haeundae', region: { id: 'region-busan-haeundae', name: '해운대구', parentId: 'region-busan' } };
+    const noRegion = { regionId: null, region: null };
+    const liveRow = (id: string, area: Record<string, unknown>) =>
+      listRow(id, { startAt: new Date(now - HOUR), endAt: new Date(now + HOUR), participants: [player], proceedConfirmedAt: new Date(now - 2 * HOUR), ...area });
+    const endedRow = (id: string, area: Record<string, unknown>) => listRow(id, { status: 'completed', startAt: new Date(now - 48 * HOUR), ...area });
+    const rows = [
+      liveRow('live-other', other),
+      liveRow('live-mine', mine),
+      listRow('open-other-a', other),
+      listRow('open-mine', mine),
+      listRow('open-no-region', noRegion),
+      endedRow('ended-other', other),
+      endedRow('ended-mine', mine),
+    ];
+    const ids = (result: { items: Array<{ matchId: string }> }) => result.items.map((item) => item.matchId);
+
+    it('지역을 주지 않으면 묶음 안 순서 그대로다', async () => {
+      serveList(rows);
+
+      expect(ids(await service.list(null, {}))).toEqual(['live-other', 'live-mine', 'open-other-a', 'open-mine', 'open-no-region', 'ended-other', 'ended-mine']);
+    });
+
+    it('상태 묶음 순서는 그대로 두고, 각 묶음 안에서 내 지역(시/도의 구/군 포함)이 먼저다 — 지역 없는 글은 그 밖 무리다', async () => {
+      serveList(rows);
+
+      const result = await service.list(null, { preferRegionId: SEOUL });
+
+      expect(ids(result)).toEqual(['live-mine', 'live-other', 'open-mine', 'open-other-a', 'open-no-region', 'ended-mine', 'ended-other']);
+    });
+
+    it('다른 지역의 진행 중 경기가 내 지역의 끝난 경기보다 위에 있다 — 묶음 순서가 지역보다 먼저다', async () => {
+      serveList([endedRow('ended-mine', mine), liveRow('live-other', other)]);
+
+      expect(ids(await service.list(null, { preferRegionId: SEOUL }))).toEqual(['live-other', 'ended-mine']);
+    });
+
+    it('내 지역 하위 묶음을 가로지르며 이어 읽어도 겹치거나 빠지지 않고, 커서에는 하위 묶음 이름이 실린다', async () => {
+      serveList(rows);
+
+      const first = await service.list(null, { preferRegionId: SEOUL, limit: 3 });
+      expect(ids(first)).toEqual(['live-mine', 'live-other', 'open-mine']);
+      expect(first.pageInfo.nextCursor).toMatch(/^open~region:open-mine@\d+$/);
+
+      const second = await service.list(null, { preferRegionId: SEOUL, limit: 3, cursor: first.pageInfo.nextCursor! });
+      expect(ids(second)).toEqual(['open-other-a', 'open-no-region', 'ended-mine']);
+    });
+
+    it('내 지역 하위 묶음도 원래 묶음의 정렬을 쓴다', async () => {
+      serveList(rows);
+
+      await service.list(null, { preferRegionId: SEOUL, sort: 'latest' });
+
+      const byGroup = (id: string) => groupCalls().find((args: any) => args.where.id.in.includes(id));
+      expect(byGroup('open-mine').orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+      expect(byGroup('open-other-a').orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+      expect(byGroup('ended-mine').orderBy).toEqual([{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]);
+    });
+
+    it('빈 문자열은 지역을 주지 않은 것과 같다', async () => {
+      serveList(rows);
+
+      expect(ids(await service.list(null, { preferRegionId: '' }))).toEqual(['live-other', 'live-mine', 'open-other-a', 'open-mine', 'open-no-region', 'ended-other', 'ended-mine']);
+    });
+  });
+
   describe('list: 묶음 기준 시각은 첫 페이지에서 고정돼 커서로 이어진다', () => {
     const T0 = new Date('2026-10-03T12:00:00.000Z');
     const DAY = 24 * 60 * 60 * 1000;

@@ -15,6 +15,7 @@ import {
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
+import { useListRegionPreference } from '@/hooks/use-list-region-preference';
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import { chatRoomHref } from '@/lib/chat-route';
@@ -61,6 +62,10 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedRegionId = searchParams.get('regionId') ?? undefined;
+  // 활동 지역 우선 — 각 상태 묶음 안에서 내 지역 매치가 먼저다(걸러 내지 않고 묶음 순서·정렬은 그대로). 지역을 직접 고른 목록에는 걸지 않는다.
+  const regionPreference = useListRegionPreference({ applicable: !selectedRegionId, noun: '매치' });
+  const preferRegionId = regionPreference.preferRegionId;
+  const prefer = useMemo(() => (preferRegionId ? { preferRegionId } : undefined), [preferRegionId]);
   // 요약 줄의 '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다(서버 recruitingOnly).
   const recruitingOnly = searchParams.get('recruitingOnly') === '1';
   const filterOpen = searchParams.get('filter') === '1';
@@ -91,19 +96,19 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   // 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
   // 필터가 바뀌면 새 조건의 1페이지부터 다시 쌓고(렌더 중 되감기), 상세에 다녀와도 누적분을
   // 되살린다 — 팀매치·대회 목록과 같은 훅이다(useCursorPagination).
-  const matchFiltersKey = matchFilters ? JSON.stringify(matchFilters) : '';
+  // 내 지역 기준이 바뀌면(로그인·프로필이 도착하면) 새 기준의 1페이지부터 다시 쌓는다 — 커서는 그 순서의 토큰이다.
+  const matchFiltersKey = matchFilters || prefer ? JSON.stringify({ ...matchFilters, ...prefer }) : '';
   const { cursor, accumulated, setPagination, snapshotKey } = useCursorPagination<V1Match>(
     v1Keys.matchesAll(),
     matchFiltersKey,
-    (savedCursor) => v1Keys.matches(savedCursor ? { ...matchFilters, cursor: savedCursor } : matchFilters),
+    (savedCursor) => v1Keys.matches(matchPageFilters(matchFilters, prefer, savedCursor)),
   );
-  const allMatchesFilters = useMemo(() => (!matchFilters && cursor ? { cursor } : undefined), [matchFilters, cursor]);
-  const filteredMatchesFilters = useMemo(
-    () => (matchFilters ? (cursor ? { ...matchFilters, cursor } : matchFilters) : undefined),
-    [matchFilters, cursor],
-  );
+  // 지역 기준은 "보이는 목록"을 읽는 조회에만 싣는다. 건수(facets)와 인접 매치 레일의 무필터 조회는 순서와 무관하다.
+  const allMatchesFilters = useMemo(() => (matchFilters ? undefined : matchPageFilters(undefined, prefer, cursor)), [matchFilters, prefer, cursor]);
+  const filteredMatchesFilters = useMemo(() => (matchFilters ? matchPageFilters(matchFilters, prefer, cursor) : undefined), [matchFilters, prefer, cursor]);
   // seed 는 무필터 첫 페이지라 allMatches 의 cursor 없는 키에만 맞는다(필터가 걸려도 이 키는 무필터다).
-  const allMatches = useV1Matches(allMatchesFilters, { seed: allMatchesFilters ? undefined : seed?.page });
+  // 내 지역 순서를 읽는 동안에도 seed 를 placeholder 로 보여 주다가 새 순서가 도착하면 바꿔 끼운다(빈 화면 없음).
+  const allMatches = useV1Matches(allMatchesFilters, { seed: !matchFilters && cursor ? undefined : seed?.page });
   // 상단 숫자(전체·오늘·모집 중)와 종목 칩은 서버가 센 전체 건수다 — 불러온 20개만 세면 "전체 20"처럼 작게 보였다.
   // 정렬·보기 방식은 건수와 무관해 빼고, 한 건만 받는다(목록은 위 조회가 맡는다).
   const facetFilters = useMemo(() => {
@@ -207,6 +212,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
           urgent: facets?.recruiting ?? visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
           recruitingFilter: { active: recruitingOnly, href: buildMatchHref(searchParams, { recruitingOnly: recruitingOnly ? null : '1', filter: null }) },
         },
+        regionPriorityNotice: regionPreference.notice,
         hasNext,
         onLoadMore: handleLoadMore,
         loadMorePending,
@@ -229,6 +235,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
           urgent: facets?.recruiting ?? 0,
           recruitingFilter: { active: recruitingOnly, href: buildMatchHref(searchParams, { recruitingOnly: recruitingOnly ? null : '1', filter: null }) },
         },
+        regionPriorityNotice: regionPreference.notice,
         // team-matches-client.tsx #5와 동일 — 로딩 중임을 명시해 EmptyState 대신 스켈레톤을
         // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다). isLoading 이 아니라 isPending —
         // 서버·하이드레이션 첫 렌더는 persist 복원 중이라 fetchStatus 'idle' 이고 isLoading 이 false 다.
@@ -550,6 +557,12 @@ function buildMatchFilterSheet(
   };
 }
 
+
+/** 보이는 목록을 읽는 조회의 필터 — 필터·내 지역 기준·커서를 한 객체로 모은다. 아무것도 없으면 undefined(무필터 첫 페이지). */
+function matchPageFilters<T extends object>(base: T | undefined, prefer: { preferRegionId: string } | undefined, cursor: string | undefined) {
+  if (!base && !prefer && !cursor) return undefined;
+  return { ...base, ...prefer, ...(cursor ? { cursor } : {}) };
+}
 
 function toMatchSort(value: string | null): '' | 'recommended' | 'deadline' | 'latest' {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;

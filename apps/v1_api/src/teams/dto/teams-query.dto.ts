@@ -45,6 +45,15 @@ export class TeamsQueryDto {
   @IsIn(['latest', 'member_count', 'activity'])
   sort?: 'latest' | 'member_count' | 'activity';
 
+  /**
+   * 활동 많은순(`sort=activity`)에서 이 지역(시/도면 하위 구/군 포함)의 팀을 먼저 보여 준다. 걸러 내지 않는다 — 나머지 팀은 그 뒤에 활동순으로 이어진다.
+   * 다른 정렬에서는 무시한다. 사용자의 활동 지역은 서버가 읽지 않고 호출한 쪽이 명시해서, 같은 주소가 같은 결과를 내게 한다(캐시가 섞이지 않는다).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  preferRegionId?: string;
+
   @IsOptional()
   @IsIn(['card', 'compact'])
   view?: 'card' | 'compact';

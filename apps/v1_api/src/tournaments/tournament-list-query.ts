@@ -83,16 +83,30 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   return Prisma.join(conditions, ' AND ');
 }
 
+/**
+ * Activity-region preference ("내 지역 먼저"): 0 for a row in the preferred region, 1 for everything else (including rows
+ * with no region). A province id also covers its districts, the same rule as the other lists' `regionId` filter. It
+ * orders rows **inside** a group, right after the group rank, so the group order is untouched. Without a preference the
+ * column does not exist and the order, the cursor and the SQL are exactly what they were.
+ */
+function preferenceSelectSql(query: TournamentListQueryDto): Prisma.Sql {
+  if (!query.preferRegionId) return Prisma.empty;
+  const id = query.preferRegionId;
+  return Prisma.sql`CASE WHEN t.region_id IS NOT NULL AND (t.region_id = ${id} OR t.region_id IN (SELECT r.id FROM v1_regions r WHERE r.parent_id = ${id})) THEN 0 ELSE 1 END AS pref,
+    `;
+}
+
 // sort_at: registration time (newest first), except a finished row, which sorts by when it ended.
 const FILTERED_SQL = (query: TournamentListQueryDto) => Prisma.sql`filtered AS (
   SELECT t.id,
     ${GROUP_RANK_SQL} AS grp,
-    CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.created_at END AS sort_at
+    ${preferenceSelectSql(query)}CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.created_at END AS sort_at
   FROM v1_tournaments t
   WHERE ${buildFilterSql(query)}
 )`;
 
 const ORDER_SQL = Prisma.sql`f.grp ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC`;
+const ORDER_SQL_PREFERRED = Prisma.sql`f.grp ASC, f.pref ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC`;
 
 /** Rows strictly after the cursor row `c` in `ORDER_SQL` order (keyset comparison). */
 const AFTER_CURSOR_SQL = Prisma.sql`(
@@ -102,6 +116,20 @@ const AFTER_CURSOR_SQL = Prisma.sql`(
       f.sort_at IS NULL
       OR (f.sort_at = c.sort_at AND f.id COLLATE "C" > c.id COLLATE "C")
       OR f.sort_at < c.sort_at
+    ))
+  ))
+)`;
+
+/** `AFTER_CURSOR_SQL` with the preference column in the key: group, then preference, then the usual sort key. */
+const AFTER_CURSOR_SQL_PREFERRED = Prisma.sql`(
+  f.grp > c.grp OR (f.grp = c.grp AND (
+    f.pref > c.pref OR (f.pref = c.pref AND (
+      (c.sort_at IS NULL AND f.sort_at IS NULL AND f.id COLLATE "C" > c.id COLLATE "C")
+      OR (c.sort_at IS NOT NULL AND (
+        f.sort_at IS NULL
+        OR (f.sort_at = c.sort_at AND f.id COLLATE "C" > c.id COLLATE "C")
+        OR f.sort_at < c.sort_at
+      ))
     ))
   ))
 )`;
@@ -122,6 +150,8 @@ export interface TournamentListRow {
 
 interface CursorKey {
   grp: number;
+  /** 0 = preferred region, 1 = everything else. Present only on a list read with `preferRegionId`. */
+  pref?: number;
   /** `timestamp` rendered as text, so microseconds survive the round trip. */
   sortAt: string | null;
   id: string;
@@ -157,24 +187,39 @@ function isRealTimestampText(text: string): boolean {
  * whenever the meaning of `grp` or `sortAt` changes again.
  */
 const CURSOR_VERSION = 'v2';
+/**
+ * A list read with `preferRegionId` orders by one more key, so its cursor is a different shape with its own tag:
+ * `[v3, group, preference, sortAt, id]`. The two shapes never decode as each other — a cursor from a list read the
+ * other way (the client sends the same preference on every page, so this is only a stale tab) yields an empty window.
+ */
+const PREFERRED_CURSOR_VERSION = 'v3';
 
 function encodeCursor(key: CursorKey): string {
-  return Buffer.from(JSON.stringify([CURSOR_VERSION, key.grp, key.sortAt, key.id])).toString('base64url');
+  const parts = key.pref === undefined
+    ? [CURSOR_VERSION, key.grp, key.sortAt, key.id]
+    : [PREFERRED_CURSOR_VERSION, key.grp, key.pref, key.sortAt, key.id];
+  return Buffer.from(JSON.stringify(parts)).toString('base64url');
 }
 
-function decodeCursor(token: string): CursorKey | null {
+function decodeCursor(token: string, preferred: boolean): CursorKey | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed) || parsed.length !== 4 || parsed[0] !== CURSOR_VERSION) return null;
-  const [, grp, sortAt, id] = parsed;
+  if (!Array.isArray(parsed)) return null;
+  if (preferred) {
+    if (parsed.length !== 5 || parsed[0] !== PREFERRED_CURSOR_VERSION) return null;
+  } else if (parsed.length !== 4 || parsed[0] !== CURSOR_VERSION) {
+    return null;
+  }
+  const [grp, pref, sortAt, id] = preferred ? parsed.slice(1) : [parsed[1], undefined, parsed[2], parsed[3]];
   if (!Number.isInteger(grp) || grp < 0 || grp > 5) return null;
+  if (preferred && pref !== 0 && pref !== 1) return null;
   if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
-  return { grp, sortAt, id };
+  return preferred ? { grp, pref, sortAt, id } : { grp, sortAt, id };
 }
 
 /** One page window plus one lookahead row, in default list order. */
@@ -184,25 +229,38 @@ export async function listTournamentIds(
   window: TournamentListWindow,
 ): Promise<TournamentListRow[]> {
   const take = window.limit + 1;
-  type Row = { id: string; grp: number; sort_at: string | null };
+  type Row = { id: string; grp: number; pref?: number; sort_at: string | null };
+  const preferred = Boolean(query.preferRegionId);
   let rows: Row[];
   if (window.cursor !== undefined && window.cursor !== '') {
-    const key = decodeCursor(window.cursor);
+    const key = decodeCursor(window.cursor, preferred);
     if (!key) return [];
-    rows = await prisma.$queryRaw<Row[]>`
+    // The default-order statements are written out unchanged (not built from fragments) so their call shape stays what it was.
+    rows = preferred
+      ? await prisma.$queryRaw<Row[]>`
+        WITH ${FILTERED_SQL(query)},
+          c AS (SELECT ${key.grp}::int AS grp, ${key.pref}::int AS pref, ${key.sortAt}::timestamp AS sort_at, ${key.id}::text AS id)
+        SELECT f.id, f.grp, f.pref, f.sort_at::text AS sort_at FROM filtered f, c WHERE ${AFTER_CURSOR_SQL_PREFERRED}
+        ORDER BY ${ORDER_SQL_PREFERRED} LIMIT ${take}`
+      : await prisma.$queryRaw<Row[]>`
         WITH ${FILTERED_SQL(query)},
           c AS (SELECT ${key.grp}::int AS grp, ${key.sortAt}::timestamp AS sort_at, ${key.id}::text AS id)
         SELECT f.id, f.grp, f.sort_at::text AS sort_at FROM filtered f, c WHERE ${AFTER_CURSOR_SQL}
         ORDER BY ${ORDER_SQL} LIMIT ${take}`;
   } else {
-    rows = await prisma.$queryRaw<Row[]>`
+    rows = preferred
+      ? await prisma.$queryRaw<Row[]>`
+        WITH ${FILTERED_SQL(query)}
+        SELECT f.id, f.grp, f.pref, f.sort_at::text AS sort_at FROM filtered f
+        ORDER BY ${ORDER_SQL_PREFERRED} LIMIT ${take} OFFSET ${window.offset ?? 0}`
+      : await prisma.$queryRaw<Row[]>`
         WITH ${FILTERED_SQL(query)}
         SELECT f.id, f.grp, f.sort_at::text AS sort_at FROM filtered f
         ORDER BY ${ORDER_SQL} LIMIT ${take} OFFSET ${window.offset ?? 0}`;
   }
   return rows.map((row) => ({
     id: row.id,
-    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id }),
+    cursor: encodeCursor({ grp: row.grp, ...(preferred ? { pref: row.pref } : {}), sortAt: row.sort_at, id: row.id }),
   }));
 }
 

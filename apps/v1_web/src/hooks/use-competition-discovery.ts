@@ -8,7 +8,7 @@ import type { TournamentListSeed } from '@/lib/public-list-seed';
 
 /** 상위 필터 key가 바뀌면 재마운트하므로 이전 조건은 버리고 같은 조건의 페이지 이동만 유지한다. */
 export function useCompetitionDiscovery(
-  params: CompetitionDiscoveryFilters & { page?: number; cursor?: string; limit: number },
+  params: CompetitionDiscoveryFilters & { page?: number; cursor?: string; limit: number; preferRegionId?: string },
   seed?: TournamentListSeed['page'],
 ) {
   return useQuery({

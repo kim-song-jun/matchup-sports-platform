@@ -84,6 +84,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
   useV1TeamMatches: useV1TeamMatchesMock,
   useV1MasterSports: () => ({ data: [] }),
+  useV1MasterRegions: () => ({ data: [], isPending: false }),
+  useV1AuthMe: () => ({ data: undefined, isPending: false }),
+  useV1Profile: () => ({ data: undefined, isPending: false, isError: false }),
   useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
   useV1RecordSearch: () => ({ mutate: vi.fn() }),
 }));

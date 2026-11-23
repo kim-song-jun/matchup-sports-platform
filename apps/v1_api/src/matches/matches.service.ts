@@ -12,7 +12,8 @@ import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/
 import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { isResumableStatePriorityCursor, paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
-import { groupIdsByListStatus, LIST_STATUS_GROUPS, listGroupOrderBy, type ListStatusGroup } from '../common/pagination/list-status-groups';
+import { baseListStatusGroup, groupIdsByListStatus, listGroupOrderBy, listStatusGroupsFor } from '../common/pagination/list-status-groups';
+import { isInPreferredRegion, PREFERRED_REGION_SELECT } from '../common/region/preferred-region';
 import { matchApiStatus, matchHostParticipates, matchListGroup, matchParticipantCount } from './match-list-group';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
@@ -67,6 +68,9 @@ export class MatchesService {
     // 묶음 순서(list-status-groups.ts): 진행 중 → 신청 가능 → 경기 예정 → 신청 마감 → 끝난 경기.
     // 개인 매치 상태는 인원으로 정해져 DB 조건으로 가를 수 없다 — 행마다 카드와 같은 기준(matchListGroup)으로 묶고,
     // 묶음 안 순서만 DB 정렬로 읽는다. 커서는 "<묶음>:<id>@<기준 시각>"이다.
+    // 활동 지역 우선(preferRegionId)이면 각 묶음 앞에 "내 지역" 하위 묶음이 서서, 묶음 순서는 그대로 두고 묶음 안에서만 내 지역이 먼저다.
+    const preferRegionId = query.preferRegionId || undefined;
+    const statusGroups = listStatusGroupsFor(preferRegionId !== undefined);
     // ponytail: 공개 범위 전체의 상태·참가자를 매 요청 읽는다 — 공개 목록이 수천 건을 넘으면 묶음을 컬럼으로 저장하는 쪽으로.
     const [candidates, counts] = await Promise.all([
       this.prisma.v1Match.findMany({
@@ -80,25 +84,30 @@ export class MatchesService {
           maxParticipants: true,
           proceedConfirmedAt: true,
           participants: { select: { status: true, role: true } },
+          ...PREFERRED_REGION_SELECT,
         },
       }),
-      query.includeFacets && !isResumableStatePriorityCursor(cursor, LIST_STATUS_GROUPS)
+      query.includeFacets && !isResumableStatePriorityCursor(cursor, statusGroups)
         ? this.countListFacets(query, now, fullMatchIds)
         : Promise.resolve(null),
     ]);
-    const idsByGroup = groupIdsByListStatus(candidates, (row) => matchListGroup(row, splitAt));
+    const idsByGroup = groupIdsByListStatus(
+      candidates,
+      (row) => matchListGroup(row, splitAt),
+      preferRegionId === undefined ? undefined : (row) => isInPreferredRegion(row, preferRegionId),
+    );
     const include = this.matchInclude(user);
     const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
-      stateGroups: LIST_STATUS_GROUPS,
+      stateGroups: statusGroups,
       limit,
       cursor,
       fetchGroup: (group, page) => {
-        const ids = idsByGroup.get(group as ListStatusGroup) ?? [];
+        const ids = idsByGroup.get(group) ?? [];
         if (ids.length === 0) return Promise.resolve([]);
         return this.prisma.v1Match
           .findMany({
             where: { id: { in: ids } },
-            orderBy: listGroupOrderBy(group as ListStatusGroup, query.sort),
+            orderBy: listGroupOrderBy(baseListStatusGroup(group), query.sort),
             ...resumeAfterCursorArgs(page.cursorId, page.take),
             include,
           })

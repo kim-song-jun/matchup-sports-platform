@@ -56,6 +56,7 @@ import { DissolvedTeamView } from './dissolved-team-view';
 import { toCompetitionEntryRows } from './team-competition-entries-section';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
+import { resolveMyTeamRegion, resolveListRegionPreference, listRegionNotice, type MyTeamRegion } from '@/lib/list-region-preference';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMemberAction, TeamMemberRowModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
@@ -80,6 +81,8 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedRegionId = searchParams.get('regionId') ?? undefined;
+  // 이어 보기 주소가 싣고 온 "내 지역 먼저"의 기준 지역 — 첫 페이지를 읽을 때 쓴 기준을 그대로 이어야 커서가 같은 순서에서 이어진다.
+  const urlNear = firstSearchParam(searchParams.get('near') ?? undefined) ?? undefined;
   const initialCursor = firstSearchParam(searchParams.get('cursor') ?? undefined) ?? undefined;
   const filterSearchParams = new URLSearchParams(searchParams.toString());
   filterSearchParams.delete('cursor');
@@ -106,6 +109,16 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
   });
   // 목록 맨 위 "내 팀" 줄 — 검색·필터·이어 보기 중에는 결과를 좁힌 화면이라 내 팀 줄을 걷는다.
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: signedIn });
+  // 활동 많은순에서는 내 지역 팀을 앞 무리로 올린다(걸러 내지 않는다). 기준은 저장한 활동 지역뿐이고, 없으면 소속 팀이 있어도 기본 순서다.
+  const regionPreference = resolveListRegionPreference({
+    applicable: selectedSort === '' && !selectedRegionId,
+    signedIn,
+    linkRegionId: urlNear,
+    isContinuation: Boolean(initialCursor),
+    myRegion,
+    master: regions.data ?? [],
+  });
+  const preferRegionId = regionPreference.status === 'ready' ? regionPreference.regionId : undefined;
   const teamFilters = useMemo(() => {
     const filters = teamListQueryFilters({
       sportId: selectedSportId,
@@ -113,18 +126,22 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
       genderRule: selectedGenderRule,
       levelCodes: selectedLevels.join(','),
       regionId: selectedRegionId,
+      near: preferRegionId,
       q: submittedQuery,
     });
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
+  }, [preferRegionId, selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
   const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: TEAM_LIST_PAGE_SIZE }), [teamFilters]);
   // Seed query identity prevents a prior route's first-page response from appearing after filters change.
+  // 내 지역 기준은 URL 의 near 만 싣는다 — 서버가 받아 둔 시드는 로그인 정보 없이 읽은 순서라, 개인 지역을 알아낸 뒤에도
+  // 같은 시드로 인식해 새 순서가 올 때까지 시드를 보여 주고(빈 화면·깜빡임 없이) 도착하면 바꿔 끼운다.
   const seedQuery = teamListSeedPath({
     sportId: selectedSportId,
     sort: selectedSort,
     genderRule: selectedGenderRule,
     levelCodes: selectedLevels.join(','),
     regionId: selectedRegionId,
+    near: urlNear,
     q: submittedQuery,
     cursor: initialCursor,
   });
@@ -134,6 +151,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     genderRule: selectedGenderRule,
     levelCodes: selectedLevels.join(','),
     regionId: selectedRegionId,
+    near: urlNear,
     q: initialQuery,
     cursor: initialCursor,
   });
@@ -187,6 +205,8 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
       genderRule: selectedGenderRule,
       levelCodes: selectedLevels.join(','),
       regionId: selectedRegionId,
+      // 시드를 보여 주는 동안의 커서는 기본 순서의 것이라 기준을 싣지 않는다. 새 순서가 도착한 뒤의 커서에는 그 기준을 싣는다.
+      near: query.isPlaceholderData ? urlNear : preferRegionId,
       q: submittedQuery,
       cursor: continuationCursor,
     })
@@ -230,6 +250,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], myRegion, filterOpen),
+    regionPriorityNotice: listRegionNotice(regionPreference, LOCATION_SETTINGS_HREF),
     chips: buildTeamSportChips(
       visibleItems,
       base,
@@ -1191,35 +1212,6 @@ function buildTeamFilterSheet(
 }
 
 const LOCATION_SETTINGS_HREF = '/my/settings/location';
-
-type MyTeamRegion =
-  | { status: 'unknown' }
-  | { status: 'none' }
-  | { status: 'ready'; provinceId: string; provinceName: string; savedName: string };
-
-/**
- * 저장한 활동 지역(시/군/구일 수 있다)을 목록 필터가 쓰는 시/도로 올린다. 서버가 regionId 하나만 받아 기본(primary) 한 곳만 쓴다.
- * 아직 모르는 상태(로딩·프로필 조회 실패·마스터에서 못 찾음)는 'none' 과 달리 안내를 내지 않는다 — 지역이 있는 사람에게 설정을 권하지 않기 위해서다.
- */
-function resolveMyTeamRegion({ unresolved, saved, master }: {
-  unresolved: boolean;
-  saved: ReadonlyArray<{ regionId: string; primary: boolean }> | undefined;
-  master: ReadonlyArray<{ id: string; name: string; parentId: string | null }>;
-}): MyTeamRegion {
-  if (unresolved) return { status: 'unknown' };
-  const mine = saved?.find((region) => region.primary) ?? saved?.[0];
-  if (!mine) return { status: 'none' };
-  const district = master.find((region) => region.id === mine.regionId);
-  const province = district?.parentId ? master.find((region) => region.id === district.parentId) : district;
-  if (!district || !province) return { status: 'unknown' };
-  return {
-    status: 'ready',
-    provinceId: province.id,
-    provinceName: province.name,
-    savedName: district.id === province.id ? province.name : `${province.name} ${district.name}`,
-  };
-}
-
 
 function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' | '여' {
   if (value === '성별 무관' || value === '남' || value === '여') return value;

@@ -44,6 +44,16 @@ export class MatchesQueryDto {
   @IsIn(['recommended', 'latest', 'starts_at', 'deadline'])
   sort?: 'recommended' | 'latest' | 'starts_at' | 'deadline';
 
+  /**
+   * 이 지역(시/도면 하위 구/군 포함)의 경기를 **각 상태 묶음 안에서** 먼저 보여 준다. 걸러 내지 않고, 묶음 순서와 `sort` 는 그대로다.
+   * 사용자의 활동 지역은 서버가 읽지 않고 호출한 쪽이 명시한다(같은 주소가 같은 결과를 내고 캐시가 섞이지 않는다).
+   * 더 보기 커서는 같은 값으로 이어 읽어야 순서가 맞는다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  preferRegionId?: string;
+
   @IsOptional()
   @IsIn(['card', 'compact'])
   view?: 'card' | 'compact';

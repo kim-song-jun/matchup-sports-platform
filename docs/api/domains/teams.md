@@ -88,6 +88,7 @@ Query:
 | `levelCodes` | comma string(≤100) | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `joinPolicy` | string | No | `approval_required`, `closed` |
 | `sort` | latest/member_count/activity | No | 기본 latest(최근 등록순). `member_count`는 멤버 많은순, `activity`는 팀 매치를 호스트로 올린 횟수(취소·삭제된 매치 제외, 상대 팀/리그/대회 경기 제외) 많은순이다. 같은 값이면 최근 등록순으로 이어지고 마지막 기준은 언제나 `id` 내림차순이라 생성 시각이 같은 팀이 커서 경계에서 겹치거나 빠지지 않는다(MD-QA #176). 이전에 허용하던 `recommended`·`trust`는 서버에 분기가 없어 등록순과 같은 결과였으므로 허용값에서 빠졌고, 보내면 400이다 |
+| `preferRegionId` | string(≤100) | No | `sort=activity`에서만 쓴다(다른 정렬은 무시). 이 지역(시/도를 주면 하위 구/군 팀 포함)의 팀을 **걸러 내지 않고** 앞 무리로 올리고, 두 무리(내 지역 / 그 밖) 안에서 각각 활동순으로 잇는다. 어느 팀과도 맞지 않거나 빈 값이면 지역 없이 보낸 것과 같다. 서버는 로그인 사용자의 활동 지역을 읽지 않는다 — 호출한 쪽이 값을 명시해야 같은 주소가 같은 결과를 내고 응답 캐시가 사용자 사이에 섞이지 않는다. 더 보기 커서는 같은 `preferRegionId`로 이어 읽어야 순서가 맞는다 |
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor |
 | `limit` | 1~50 | No | 기본 20 |

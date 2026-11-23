@@ -36,12 +36,36 @@ export function listGroupOrderBy(group: ListStatusGroup, sort: ListSort): ListOr
   return [{ startAt: 'asc' }, ...tail];
 }
 
-/** 행마다 묶음을 정해 묶음별 id 목록으로 모은다. 묶음 순서는 LIST_STATUS_GROUPS 다. */
+/**
+ * 활동 지역 우선("내 지역 먼저")을 켜면 묶음마다 "내 지역" 하위 묶음이 그 묶음 바로 앞에 선다(`open~region` → `open`).
+ * 상태 묶음 순서(진행 중 → 신청 가능 → …)는 그대로이고 **묶음 안에서만** 내 지역이 먼저다 — 2026-10-21 에 확정한 묶음 순서를 깨지 않는다.
+ * 하위 묶음 이름은 커서(`<묶음>:<id>`)에 그대로 실리므로 ':' 를 쓰지 않는다.
+ * 지역을 주지 않은 요청은 하위 묶음이 없는 원래 묶음 목록을 쓴다.
+ */
+export const PREFERRED_GROUP_SUFFIX = '~region';
+
+export function listStatusGroupsFor(preferRegion: boolean): readonly string[] {
+  return preferRegion ? LIST_STATUS_GROUPS.flatMap((group) => [`${group}${PREFERRED_GROUP_SUFFIX}`, group]) : LIST_STATUS_GROUPS;
+}
+
+/** 하위 묶음 이름에서 원래 상태 묶음을 되돌린다(묶음 안 정렬은 원래 묶음 기준이다). */
+export function baseListStatusGroup(group: string): ListStatusGroup {
+  return (group.endsWith(PREFERRED_GROUP_SUFFIX) ? group.slice(0, -PREFERRED_GROUP_SUFFIX.length) : group) as ListStatusGroup;
+}
+
+/**
+ * 행마다 묶음을 정해 묶음별 id 목록으로 모은다. 묶음 순서는 `listStatusGroupsFor` 다.
+ * `preferredOf` 를 주면(활동 지역 우선) 그 행은 같은 묶음의 "내 지역" 하위 묶음으로 간다.
+ */
 export function groupIdsByListStatus<T extends { id: string }>(
   rows: readonly T[],
   groupOf: (row: T) => ListStatusGroup,
-): Map<ListStatusGroup, string[]> {
-  const ids = new Map<ListStatusGroup, string[]>(LIST_STATUS_GROUPS.map((group) => [group, []]));
-  for (const row of rows) ids.get(groupOf(row))!.push(row.id);
+  preferredOf?: (row: T) => boolean,
+): Map<string, string[]> {
+  const ids = new Map<string, string[]>(listStatusGroupsFor(preferredOf !== undefined).map((group) => [group, []]));
+  for (const row of rows) {
+    const group = groupOf(row);
+    ids.get(preferredOf?.(row) ? `${group}${PREFERRED_GROUP_SUFFIX}` : group)!.push(row.id);
+  }
   return ids;
 }

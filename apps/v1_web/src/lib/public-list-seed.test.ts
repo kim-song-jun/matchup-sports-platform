@@ -105,6 +105,32 @@ describe('filtered public-list seed requests', () => {
     expect(publicListSeed.teamListContinuationPath({ sort, cursor: 'c1' })).toBe(`/teams?sort=${sort}&cursor=c1`);
   });
 
+  describe('내 지역 먼저(near)', () => {
+    it('기본 정렬이면 API 에는 preferRegionId 로, 이어 보기 주소에는 near 로 실어 순서를 이어 간다', () => {
+      expect(publicListSeed.teamListQueryFilters({ near: 'region-seoul' })).toEqual({ sort: 'activity', preferRegionId: 'region-seoul' });
+      expect(new URL(teamListSeedPath({ near: 'region-seoul' }), 'https://teameet.test').searchParams.get('preferRegionId')).toBe('region-seoul');
+      expect(publicListSeed.teamListContinuationPath({ near: 'region-seoul', cursor: 'c1' })).toBe('/teams?near=region-seoul&cursor=c1');
+    });
+
+    it('near 가 없으면 아무것도 싣지 않는다 — 공개 첫 화면의 시드 주소가 그대로다', () => {
+      expect(new URL(teamListSeedPath(), 'https://teameet.test').searchParams.has('preferRegionId')).toBe(false);
+      expect(publicListSeed.teamListContinuationPath({ cursor: 'c1' })).toBe('/teams?cursor=c1');
+    });
+
+    it.each(['member_count', 'latest'])('활동순이 아닌 정렬(%s)에서는 near 를 무시한다', (sort) => {
+      expect(publicListSeed.teamListQueryFilters({ sort, near: 'region-seoul' })).toEqual({ sort });
+      expect(publicListSeed.teamListContinuationPath({ sort, near: 'region-seoul', cursor: 'c1' })).toBe(`/teams?sort=${sort}&cursor=c1`);
+    });
+
+    it('지역을 직접 고른 목록에서는 near 를 무시한다 — 그 지역 팀뿐이라 순서를 바꿀 이유가 없다', () => {
+      expect(publicListSeed.teamListQueryFilters({ regionId: 'region-busan', near: 'region-seoul' })).toEqual({ sort: 'activity', regionId: 'region-busan' });
+    });
+
+    it('near 가 있는 주소는 필터가 걸린 목록으로 본다 — 무필터 첫 페이지 전용 구조화 데이터를 내지 않는다', () => {
+      expect(publicListSeed.TEAM_LIST_FILTER_PARAMS).toContain('near');
+    });
+  });
+
   it('uses the effective tournament filters and ignores invalid filter values', () => {
     const sports = [{ id: 'sport-futsal' }] as V1Sport[];
 

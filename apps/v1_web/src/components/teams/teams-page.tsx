@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChartNoAxesColumn, ChevronDown, Info, Lock, Users } from 'lucide-react';
+import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -144,6 +145,7 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             팀 만들기
           </Link>
         </div>
+        <ListRegionNotice notice={model.regionPriorityNotice} />
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (

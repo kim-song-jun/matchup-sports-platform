@@ -40,6 +40,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MasterSports: (options?: { seed?: Array<{ id: string; name: string }> }) => ({
     data: options?.seed ?? [{ id: SWIMMING_ID, name: '수영' }, { id: BASKETBALL_ID, name: '농구' }],
   }),
+  useV1MasterRegions: () => ({ data: [], isPending: false }),
+  useV1AuthMe: () => ({ data: undefined, isPending: false }),
+  useV1Profile: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 
 beforeEach(() => {

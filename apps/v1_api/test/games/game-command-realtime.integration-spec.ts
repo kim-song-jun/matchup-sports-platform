@@ -373,9 +373,18 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     });
   }
 
-  function holdActualEventRead(userId: string, requestedGameId: string) {
+  /**
+   * Holds the first full event read made for `userId`. A user with several sockets (the operator's two
+   * consoles) has refresh reads on each of them, and which one reaches `listEvents` first depends on
+   * room join order and scheduler slots — pass `holder` to hold only that socket's session read.
+   */
+  function holdActualEventRead(userId: string, requestedGameId: string, holder?: Socket) {
     const gamesService = app.get(GamesService);
     const original = gamesService.listEvents.bind(gamesService);
+    const holderUser = holder === undefined
+      ? undefined
+      : app.get(RealtimeGateway).server.sockets.get(holder.id ?? '')?.data.authUser;
+    if (holder !== undefined && holderUser === undefined) throw new Error('Held socket has no server-side session');
     let release!: () => void;
     let markReached!: () => void;
     let armed = true;
@@ -383,7 +392,8 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const reached = new Promise<void>((resolve) => { markReached = resolve; });
     const spy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
       const actual = await original(user, targetGameId, afterSequence);
-      if (armed && user.id === userId && targetGameId === requestedGameId && afterSequence === 0) {
+      if (armed && user.id === userId && (holderUser === undefined || user === holderUser) &&
+        targetGameId === requestedGameId && afterSequence === 0) {
         armed = false;
         markReached();
         await gate;
@@ -779,6 +789,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
 
     const pauseVersion = goalVersion!;
     const observerPauseSnapshot = eventOnce(observer, 'game.snapshot');
+    const operatorPauseSnapshot = eventOnce(operator, 'game.snapshot');
     const secondConsolePauseSnapshot = eventOnce(operatorSecondConsole, 'game.snapshot');
     const pause = await request(app.getHttpServer())
       .post(`/api/v1/games/${gameId}/commands/pause`)
@@ -792,11 +803,19 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         payload: {},
       })
       .expect(201);
-    const [observerPaused, secondConsolePaused] = await Promise.all([
+    // Both consoles belong to one user and the room refreshes at most two sockets at a time, so the operator
+    // socket's pause snapshot can land after the second console's. Wait for it before the resume step
+    // listens for the operator's next snapshot.
+    const [observerPaused, operatorPaused, secondConsolePaused] = await Promise.all([
       observerPauseSnapshot.promise,
+      operatorPauseSnapshot.promise,
       secondConsolePauseSnapshot.promise,
     ]);
     expect(observerPaused).toMatchObject({ event: {
+      gameId, version: pause.body.data.version, state: 'PAUSED', lastSequence: 1,
+      events: [expect.objectContaining({ type: 'GOAL', sequence: 1, participantId: homeParticipantId })],
+    } });
+    expect(operatorPaused).toMatchObject({ event: {
       gameId, version: pause.body.data.version, state: 'PAUSED', lastSequence: 1,
       events: [expect.objectContaining({ type: 'GOAL', sequence: 1, participantId: homeParticipantId })],
     } });
@@ -811,7 +830,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     expect(pausedDetail.body.data).toMatchObject({ state: 'PAUSED', version: pause.body.data.version });
     expect(pausedDetail.body.data.periods[0].pausedAt).toEqual(expect.any(String));
 
-    const resumeReadGate = holdActualEventRead(operatorId, gameId);
+    const resumeReadGate = holdActualEventRead(operatorId, gameId, operator);
     const resumeRefreshes = trackRefreshPromises();
     const resumeSnapshot = eventOnce<{ gameId: string; version: number; state: string; lastSequence: number }>(operator, 'game.snapshot');
     const resumedGoalEvent = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');

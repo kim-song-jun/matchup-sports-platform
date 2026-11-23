@@ -36,6 +36,41 @@ export async function visibleTeamMatchScheduleWhere(prisma: PrismaService, teamI
   return hidden.length ? { OR: [{ teamMatchId: null }, { teamMatchId: { notIn: hidden.map((match) => match.id) } }] } : {};
 }
 
+/**
+ * 내 일정 정렬 묶음. 「예정」은 둘로 나눈다 — 아직 안 끝난 일정은 가까운 순으로 먼저, 끝났는데 예정으로 남은 일정
+ * (팀 매치·리그·대회 일정은 경기 결과가 상태를 정해 자동 완료되지 않는다)은 뒤로 보내 앞으로 올 일정을 밀어내지 않게 한다.
+ * 완료·취소됨은 최근 순. `ended` 는 `endAt` 이 지났는지(없으면 가르지 않는다).
+ */
+const MY_SCHEDULE_GROUPS: ReadonlyArray<{ key: string; state: V1ScheduleState; order: 'asc' | 'desc'; ended?: boolean }> = [
+  { key: 'SCHEDULED', state: V1ScheduleState.SCHEDULED, order: 'asc', ended: false },
+  { key: 'SCHEDULED_PAST', state: V1ScheduleState.SCHEDULED, order: 'desc', ended: true },
+  { key: 'COMPLETED', state: V1ScheduleState.COMPLETED, order: 'desc' },
+  { key: 'CANCELLED', state: V1ScheduleState.CANCELLED, order: 'desc' },
+];
+
+/** 이 행이 속한 묶음. 쪽 사이에 시각이 흘러 경계의 행이 묶음을 옮기면 한 건이 다시 보일 수 있다(드물고 해가 없다). */
+function myScheduleGroupKey(row: { state: V1ScheduleState; endAt: Date }, now: Date): string {
+  if (row.state !== V1ScheduleState.SCHEDULED) return row.state;
+  return row.endAt.getTime() > now.getTime() ? 'SCHEDULED' : 'SCHEDULED_PAST';
+}
+
+function myScheduleCursor(row: { id: string; state: V1ScheduleState; endAt: Date } | undefined, now: Date): string | null {
+  return row === undefined ? null : `${myScheduleGroupKey(row, now)}:${row.id}`;
+}
+
+/** `<묶음>:<id>` → [묶음 키, id]. 묶음이 없는 옛 커서(`<id>`)는 첫 묶음의 id 로 본다. 모르는 묶음은 처음부터. */
+function parseMyScheduleCursor(
+  cursor: string | undefined,
+  groups: ReadonlyArray<{ key: string }>,
+): [string, string | null] {
+  const first = groups[0]?.key ?? 'SCHEDULED';
+  if (cursor === undefined || cursor === '') return [first, null];
+  const colon = cursor.indexOf(':');
+  if (colon < 0) return [first, cursor];
+  const key = cursor.slice(0, colon);
+  return groups.some((group) => group.key === key) ? [key, cursor.slice(colon + 1)] : [first, null];
+}
+
 /** 일정 생성·취소 알림(H1-schedule-*) outbox 종류 — 워커의 ScheduleReminderService 가 받아 팀원에게 쓴다. */
 export const SCHEDULE_CREATED_NOTIFICATION_TYPE = 'SCHEDULE_CREATED_NOTIFICATION';
 export const SCHEDULE_CANCELLED_NOTIFICATION_TYPE = 'SCHEDULE_CANCELLED_NOTIFICATION';
@@ -350,7 +385,6 @@ export class TeamSchedulesService {
     const where: Prisma.V1TeamScheduleWhereInput = {
       AND: [await visibleTeamMatchScheduleWhere(this.prisma, [...infoByTeam.keys()])],
       teamId: { in: [...infoByTeam.keys()] },
-      ...(state ? { state } : {}),
       ...(query.from || query.to
         ? {
             startAt: {
@@ -361,15 +395,29 @@ export class TeamSchedulesService {
         : {}),
     };
 
-    const rows = await this.prisma.v1TeamSchedule.findMany({
-      where,
-      // Full attendance list (not filtered to the caller) — toSummary()'s goingCount/
-      // waitlistedCount must reflect the schedule's real totals, not just the caller's own row.
-      include: { attendance: { select: { userId: true, status: true } } },
-      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    // 예정(안 끝난 것, 가까운 순) → 예정인데 끝난 것(최근 순) → 완료(최근 순) → 취소됨(최근 순)(2026-11-23).
+    // 한 줄 orderBy 로는 묶음을 못 만들어, 묶음마다 따로 읽어 limit 까지 채운다.
+    // 커서는 `<묶음>:<id>` — 어느 묶음의 어디까지 읽었는지를 담는다(옛 커서 `<id>` 도 받는다).
+    const now = new Date();
+    const groups = MY_SCHEDULE_GROUPS.filter((group) => state === undefined || group.state === state);
+    const [cursorKey, cursorId] = parseMyScheduleCursor(query.cursor, groups);
+    const firstGroup = Math.max(0, groups.findIndex((group) => group.key === cursorKey));
+    const rows: Array<Prisma.V1TeamScheduleGetPayload<{ include: { attendance: { select: { userId: true; status: true } } } }>> = [];
+    for (const group of groups.slice(firstGroup)) {
+      const remaining = limit + 1 - rows.length;
+      if (remaining <= 0) break;
+      rows.push(
+        ...(await this.prisma.v1TeamSchedule.findMany({
+          where: { ...where, state: group.state, ...(group.ended === undefined ? {} : { endAt: group.ended ? { lte: now } : { gt: now } }) },
+          // Full attendance list (not filtered to the caller) — toSummary()'s goingCount/
+          // waitlistedCount must reflect the schedule's real totals, not just the caller's own row.
+          include: { attendance: { select: { userId: true, status: true } } },
+          orderBy: [{ startAt: group.order }, { id: group.order }],
+          take: remaining,
+          ...(cursorId !== null && group.key === cursorKey ? { cursor: { id: cursorId }, skip: 1 } : {}),
+        })),
+      );
+    }
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
     const matchProjectionByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
@@ -400,7 +448,7 @@ export class TeamSchedulesService {
           myAttendanceStatus: mine?.status ?? null,
         };
       }),
-      nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      nextCursor: hasNext ? myScheduleCursor(pageItems.at(-1), now) : null,
     };
   }
 

@@ -34,6 +34,11 @@ import {
 } from './login-security-retention/login-security-retention.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
 import {
+  scheduleNextScheduleAutoCompleteScan,
+  TEAM_SCHEDULE_AUTO_COMPLETE_SCAN_TYPE,
+  TeamScheduleAutoCompleteService,
+} from './team-schedule-auto-complete/team-schedule-auto-complete.service';
+import {
   scheduleNextNoOpponentScan,
   TEAM_MATCH_NO_OPPONENT_SCAN_TYPE,
   TeamMatchNoOpponentCancelService,
@@ -127,6 +132,11 @@ async function bootstrap(): Promise<void> {
   const noOpponentCancel = new TeamMatchNoOpponentCancelService(prisma, webPush);
   worker.registerHandler(TEAM_MATCH_NO_OPPONENT_SCAN_TYPE, noOpponentCancel.scanHandler);
   await prisma.$transaction((tx) => scheduleNextNoOpponentScan(tx, new Date()));
+
+  // 끝난 지 24시간이 지난 「예정」 훈련·모임을 알림 없이 「완료」로 바꾼다(2026-11-23). 같은 자기 예약 스캔이다.
+  const scheduleAutoComplete = new TeamScheduleAutoCompleteService(prisma);
+  worker.registerHandler(TEAM_SCHEDULE_AUTO_COMPLETE_SCAN_TYPE, scheduleAutoComplete.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextScheduleAutoCompleteScan(tx, new Date()));
 
   // 로그인 시도 기록·만료 챌린지 보관 정리(30일/7일). 같은 자기 예약 스캔이다.
   const loginSecurityRetention = new LoginSecurityRetentionService(prisma);

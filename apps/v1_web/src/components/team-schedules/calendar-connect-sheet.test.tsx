@@ -64,7 +64,7 @@ describe('내 일정 — 캘린더 연결', () => {
     renderButton();
     openSheet();
     expect(await screen.findByRole('link', { name: '폰 캘린더에서 열기' })).toHaveAttribute('href', connectedFeed.webcalUrl);
-    expect(screen.queryByRole('link', { name: '구글 캘린더에 추가' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^구글 캘린더에 추가/ })).toBeNull();
     expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
     expect(screen.getByText(/아래로 당기면 바로 새로고침/)).toBeInTheDocument();
   });
@@ -74,9 +74,11 @@ describe('내 일정 — 캘린더 연결', () => {
     api.v1Get.mockResolvedValue(connectedFeed);
     renderButton();
     openSheet();
-    const google = await screen.findByRole('link', { name: '구글 캘린더에 추가' });
+    const google = await screen.findByRole('link', { name: /^구글 캘린더에 추가/ });
     expect(google).toHaveAttribute('href', `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(connectedFeed.webcalUrl!)}`);
     expect(google).toHaveAttribute('target', '_blank');
+    // 새 창으로 열리는 링크라는 걸 스크린리더에도 알린다.
+    expect(google).toHaveAccessibleName('구글 캘린더에 추가 (새 창으로 열려요)');
     expect(screen.queryByRole('link', { name: '폰 캘린더에서 열기' })).toBeNull();
     expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
     expect(screen.getByText(/갤럭시 캘린더에도 보여요/)).toBeInTheDocument();

@@ -54,7 +54,7 @@ const PLATFORM_HELP: Record<CalendarPlatform, string[]> = {
     '반영은 바로 되지 않아요. 몇 시간 걸릴 수 있어요. 캘린더 목록에서 아래로 당기면 바로 새로고침돼요.',
   ],
   android: [
-    '「구글 캘린더에 추가」를 눌러 구독을 확인해 주세요. 구글 계정이 연결된 갤럭시 캘린더에도 보여요(안 보이면 갤럭시 캘린더 설정에서 그 캘린더를 켜 주세요).',
+    '「구글 캘린더에 추가」를 눌러 구독을 확인해 주세요. 구글 계정이 연결된 갤럭시 캘린더에도 보여요(안 보이면 구글 계정의 캘린더 동기화 설정에서 이 캘린더가 켜져 있는지 확인해 주세요).',
     '열리지 않으면 「주소 복사」 후 브라우저에서 구글 캘린더(PC 보기)를 열고 「다른 캘린더 → URL로 추가」에 붙여 넣어 주세요.',
     '반영은 바로 되지 않아요. 최대 하루 걸릴 수 있어요.',
   ],
@@ -70,9 +70,8 @@ export function CalendarConnectSheet({ onClose }: { onClose: () => void }) {
   const regenerate = useRegenerateCalendarFeed();
   const { confirm, ConfirmModal } = useConfirm();
   const [copied, setCopied] = useState<'done' | 'failed' | null>(null);
-  // 서버 렌더와 첫 화면이 어긋나지 않게 기기는 열린 뒤에 정한다(시트는 사용자가 눌러야 열려 곧바로 정해진다).
-  const [platform, setPlatform] = useState<CalendarPlatform>('other');
-  useEffect(() => setPlatform(currentCalendarPlatform()), []);
+  // 시트는 사용자가 버튼을 눌러야 마운트돼 서버에서 그려지지 않는다 — 처음부터 기기를 정해 둘 수 있다(깜빡임 없음).
+  const [platform] = useState<CalendarPlatform>(currentCalendarPlatform);
 
   // 열자마자 주소가 없으면 바로 만든다 — 「주소 만들기」를 따로 누르지 않아도 버튼이 나온다.
   const needsConnect = feed.data !== undefined && !feed.data.connected;
@@ -114,7 +113,7 @@ export function CalendarConnectSheet({ onClose }: { onClose: () => void }) {
         target="_blank"
         rel="noopener noreferrer"
       >
-        구글 캘린더에 추가
+        구글 캘린더에 추가<span className="sr-only"> (새 창으로 열려요)</span>
       </a>
     );
 

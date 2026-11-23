@@ -6,6 +6,7 @@ import { parseArgs } from '../install.mjs';
 import {
   alarmMetrics, buildInstallPlan, buildTeardownPlan, DEFAULTS, lambdaPolicy, serverPolicy,
 } from '../lib/plan.mjs';
+import { buildMetricData } from '../lib/metrics.mjs';
 import { assertApplicable, firstLine, normalizeCapture, renderCommand, runPlan } from '../lib/run-plan.mjs';
 import { RULES, rulesFor, HEALTH_CHECKS } from '../lib/thresholds.mjs';
 
@@ -227,6 +228,21 @@ test('alarm metrics: restarts sum the four containers, FILLing gaps with 0', () 
   assert.deepEqual(containers, ['web', 'api', 'worker', 'nginx']);
   assert.equal(m.at(-1).Expression, 'FILL(m1,0)+FILL(m2,0)+FILL(m3,0)+FILL(m4,0)');
   assert.deepEqual(m.filter((x) => x.ReturnData).map((x) => x.Id), ['e1']);
+});
+
+test('every container-summing alarm adds up exactly the containers the collector publishes that metric for', () => {
+  const published = (metricName) => buildMetricData('prod', { nowMs: 0, restarts: {}, heapOom: {}, failed: [] })
+    .filter((d) => d.MetricName === metricName).map((d) => d.Dimensions[0].Value);
+  const summing = RULES.filter((r) => r.source.kind === 'sum-containers');
+  for (const id of ['web-restart', 'heap-oom', 'restart-loop']) assert.ok(summing.some((r) => r.id === id), `${id} sums containers`);
+  for (const rule of summing) {
+    const m = alarmMetrics('prod', rule, { instanceIds: {}, rdsId: '' });
+    const summed = m.filter((x) => x.MetricStat).map((x) => x.MetricStat.Metric.Dimensions[0].Value);
+    const expected = published(rule.source.metricName);
+    assert.ok(expected.length >= 3, `${rule.id}: the collector publishes ${rule.source.metricName} per container`);
+    assert.deepEqual(summed, expected, rule.id);
+    assert.equal(m.at(-1).Expression, expected.map((_, i) => `FILL(m${i + 1},0)`).join('+'), rule.id);
+  }
 });
 
 test('alarm metrics: EC2 and RDS rules carry their own dimension values, alpha never reads prod namespaces', () => {

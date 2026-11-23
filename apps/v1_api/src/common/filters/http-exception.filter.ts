@@ -2,6 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
 import { ErrorLogService } from '../../error-logs/error-log.service';
+import { maskCalendarFeedToken } from '../logging/mask-calendar-feed-token';
 import { shouldOmitErrorLogBody } from '../logging/omit-error-log-body';
 import {
   PRISMA_AVAILABILITY_CODE,
@@ -17,7 +18,7 @@ type V1Request = Request & { id?: string; v1User?: { id: string } };
 // 남기므로 같은 보호를 받지 못한다 — route 에도 동일하게 쿼리스트링을 제거해야
 // GET /auth/check-email?email=... 같은 케이스에서 이메일이 로그에 그대로 남지 않는다.
 function stripQueryString(url: string): string {
-  return url.split('?')[0];
+  return maskCalendarFeedToken(url.split('?')[0]);
 }
 
 // 5xx 는 대부분 예상치 못한 드라이버/런타임 에러(Prisma, pg 등)이며 그 message 가 사용자

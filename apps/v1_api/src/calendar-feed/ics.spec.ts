@@ -14,7 +14,7 @@ describe('ics', () => {
   });
 
   it('쉼표·세미콜론·역슬래시·줄바꿈을 이스케이프한다', () => {
-    expect(escapeIcsText('a,b;c\\d\ne')).toBe('a\\,b\;c\\\\d\\ne');
+    expect(escapeIcsText('a,b;c\\d\ne')).toBe('a\\,b\\;c\\\\d\\ne');
   });
 
   it('긴 줄은 75옥텟 안에서 접고, 한글을 가운데서 자르지 않는다', () => {

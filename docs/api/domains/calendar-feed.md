@@ -23,3 +23,7 @@
 - 주소를 아는 사람은 그 사용자의 캘린더를 읽을 수 있다. 그래서 `regenerate` 로 즉시 폐기할 수 있다. 종류(`calendar_feed`/`widget`)가 서명에 들어가 서로 바꿔 쓸 수 없다.
 - 위젯 토큰(`widget`)도 같은 테이블·방식을 쓴다(아직 발급하는 곳은 없다).
 - `V1_SESSION_SECRET` 이 32자 미만이면 503 `CALENDAR_FEED_NOT_CONFIGURED`.
+- **`V1_SESSION_SECRET` 을 바꾸면 이미 나눠 준 구독 주소가 전부 404 가 된다**(토큰이 이 비밀에서 파생된다). 캘린더 앱에는 "구독 실패"로만 보이므로, 시크릿 교체 절차를 밟을 때 사용자에게 「주소 다시 만들기」 안내가 필요하다.
+- **로그:** 토큰이 경로에 있어 요청 로그에서 가린다 — pino 요청 로그와 오류 필터의 경로는 `/calendar/feed/[redacted].ics` 로 찍고(`common/logging/mask-calendar-feed-token.ts`), nginx 는 이 경로(`/api/v1/calendar/feed/<토큰>`)의 `access_log` 를 끈다.
+- 연결(`POST /me/calendar-feed`)과 다시 만들기는 사용자별 advisory lock 으로 직렬화한다 — 두 탭에서 동시에 눌러도 활성 주소는 하나다.
+- 개인 매치의 `SEQUENCE` 는 수정 시각(초), 팀 일정은 일정 버전이다. 둘 다 바뀔 때마다 커진다.

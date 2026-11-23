@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { V1AttendanceStatus, V1ScheduleType } from '@prisma/client';
+import { Prisma, V1AttendanceStatus, V1ScheduleType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
@@ -49,14 +49,22 @@ export class CalendarFeedService {
 
   /** 아직 없으면 만든다. 있으면 그대로 돌려준다(같은 주소를 몇 번이든 다시 복사할 수 있다). */
   async ensure(user: V1AuthUser, origin: string): Promise<CalendarFeedStatus> {
-    const existing = await this.activeToken(user.id);
-    const row = existing ?? (await this.prisma.v1AccessToken.create({ data: { userId: user.id, kind: 'calendar_feed' } }));
+    // 두 탭에서 동시에 눌러도 활성 주소가 하나만 생기게 사용자별로 줄을 세운다.
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockUserFeed(tx, user.id);
+      const existing = await tx.v1AccessToken.findFirst({
+        where: { userId: user.id, kind: 'calendar_feed', revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+      return existing ?? (await tx.v1AccessToken.create({ data: { userId: user.id, kind: 'calendar_feed' } }));
+    });
     return this.toStatus(row, origin);
   }
 
   /** 옛 주소는 즉시 쓸 수 없게 하고 새 주소를 만든다. */
   async regenerate(user: V1AuthUser, origin: string): Promise<CalendarFeedStatus> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockUserFeed(tx, user.id);
       await tx.v1AccessToken.updateMany({
         where: { userId: user.id, kind: 'calendar_feed', revokedAt: null },
         data: { revokedAt: new Date() },
@@ -148,6 +156,8 @@ export class CalendarFeedService {
       startAt: match.startAt,
       endAt: match.endAt ?? new Date(match.startAt.getTime() + MATCH_SCHEDULE_DEFAULT_DURATION_MS),
       updatedAt: match.updatedAt,
+      // 개인 매치에는 버전이 없어 수정 시각(초)을 쓴다 — 바뀔 때마다 커지니 캘린더가 변경·취소를 알아본다.
+      sequence: Math.floor(match.updatedAt.getTime() / 1_000),
       location: [match.placeName, match.placeAddress].filter(Boolean).join(' ') || null,
       description: `개인 매치\n자세히 보기: ${origin}/matches/${match.id}`,
       url: `${origin}/matches/${match.id}`,
@@ -207,6 +217,10 @@ export class CalendarFeedService {
   }
 
   // ── 내부 ──────────────────────────────────────────────────────────────────
+
+  private async lockUserFeed(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`calendar-feed:${userId}`}, 0))`;
+  }
 
   private activeToken(userId: string) {
     return this.prisma.v1AccessToken.findFirst({

@@ -1,4 +1,5 @@
 import type { Options as PinoHttpOptions } from 'pino-http';
+import { maskCalendarFeedToken } from './mask-calendar-feed-token';
 
 /**
  * pino-http 로깅 설정 — app.module.ts 와 이 파일을 검증하는 테스트가 동일 설정을 공유해
@@ -22,7 +23,7 @@ export function buildPinoHttpOptions(): PinoHttpOptions {
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split('?')[0],
+          url: req.url === undefined ? undefined : maskCalendarFeedToken(req.url.split('?')[0]),
           headers: req.headers,
         };
       },

@@ -13,7 +13,7 @@ export const AUTO_COMPLETE_GRACE_MS = 24 * 60 * 60 * 1000;
 /**
  * 끝난 지 오래된 「예정」 훈련·모임을 알림 없이 「완료」로 바꾼다(2026-11-23 사용자 결정, A안).
  *
- * - 대상은 팀이 직접 만든 훈련·모임(`teamMatchId` 없음)뿐이다. 팀 매치·리그·대회 일정은 경기 결과가 상태를 정한다.
+ * - 대상은 팀이 직접 만든 일정(훈련·모임, 그리고 경기 연결이 없는 「경기」 일정 — `teamMatchId` 없음)뿐이다. 팀 매치·리그·대회 일정은 경기 결과가 상태를 정한다.
  * - 취소가 아니라 완료다 — 취소하면 팀원 전체에게 취소 알림이 나가고, 이미 진행된 일정을 취소로 남기게 된다.
  * - 직접 「완료 처리」할 때(`TeamSchedulesService.complete`)와 같이 열려 있는 용병 모집은 닫는다. 알림은 보내지 않는다.
  *
@@ -35,7 +35,6 @@ export async function completeEndedSchedules(tx: Prisma.TransactionClient, now: 
   const candidates = await tx.v1TeamSchedule.findMany({
     where: {
       state: 'SCHEDULED',
-      type: { in: ['TRAINING', 'EVENT'] },
       teamMatchId: null,
       endAt: { lte: new Date(now.getTime() - AUTO_COMPLETE_GRACE_MS) },
     },

@@ -10,7 +10,7 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 const DAY = 24 * 60 * 60 * 1_000;
 const HOUR = 60 * 60 * 1_000;
 
-/** 내 일정: 예정(가까운 순) → 완료(최근 순) → 취소됨(최근 순). 끝난 지 24시간 지난 「예정」 훈련·모임은 알림 없이 완료로 바뀐다. */
+/** 내 일정: 예정(안 끝난 것, 가까운 순) → 예정인데 끝난 것(최근 순) → 완료(최근 순) → 취소됨(최근 순). 끝난 지 24시간 지난 「예정」 중 팀 매치와 연결되지 않은 일정은 알림 없이 완료로 바뀐다. */
 describe('내 일정 정렬과 지난 예정 자동 완료', () => {
   let app: INestApplication;
   let cleanup: (() => Promise<void>) | undefined;
@@ -24,6 +24,7 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
   let sportId: string;
   let regionId: string;
   const ids: Record<string, string> = {};
+  let linkedTeamMatchId: string;
 
   const as = (userId: string) => ({ get: (url: string) => request(app.getHttpServer()).get(`/api/v1${url}`).set('x-v1-user-id', userId) });
   const make = async (key: string, teamId: string, offsetMs: number, state: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED', extra: Partial<Prisma.V1TeamScheduleUncheckedCreateInput> = {}) => {
@@ -62,6 +63,11 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
     await make('cancel-new', teamOrder, -1 * DAY, 'CANCELLED');
     await make('done-new', teamOrder, -2 * DAY, 'COMPLETED');
     await make('up-2d', teamOrder, 2 * DAY, 'SCHEDULED');
+    // 팀 매치와 연결된 일정은 경기 결과가 상태를 정해서 자동 완료되지 않는다 — 오래 「예정」으로 남아도 안 끝난 일정 뒤로 간다.
+    linkedTeamMatchId = (await db.v1TeamMatch.create({
+      data: { hostTeamId: teamOrder, createdByUserId: userOrder, sportId, regionId, title: `연결 매치-${tag}`, placeName: '구장', startAt: new Date(Date.now() - 3 * DAY) },
+    })).id;
+    await make('stale-match', teamOrder, -3 * DAY, 'SCHEDULED', { type: 'MATCH', teamMatchId: linkedTeamMatchId });
     // 자동 완료: 오래전에 끝난 훈련·모임 / 끝난 지 24시간이 안 된 훈련 / 오래전 팀 매치형 일정 / 이미 취소된 것.
     await make('old-training', teamAuto, -5 * DAY, 'SCHEDULED');
     await make('old-event', teamAuto, -4 * DAY, 'SCHEDULED', { type: 'EVENT' });
@@ -73,6 +79,7 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
 
   afterAll(async () => {
     await db.v1TeamSchedule.deleteMany({ where: { teamId: { in: [teamOrder, teamAuto] } } });
+    await db.v1TeamMatch.deleteMany({ where: { id: linkedTeamMatchId } });
     await db.v1Team.deleteMany({ where: { id: { in: [teamOrder, teamAuto] } } });
     await db.v1UserProfile.deleteMany({ where: { userId: { in: users } } });
     await db.v1User.deleteMany({ where: { id: { in: users } } });
@@ -80,9 +87,9 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
     await cleanup?.();
   });
 
-  it('전체: 예정은 가까운 순 → 완료는 최근 순 → 취소됨은 최근 순', async () => {
+  it('전체: 안 끝난 예정은 가까운 순 → 끝났는데 예정인 것 → 완료는 최근 순 → 취소됨은 최근 순', async () => {
     const res = await as(userOrder).get('/me/schedule?limit=50').expect(200);
-    expect(titles(res.body.data.items)).toEqual(['up-1d', 'up-2d', 'up-3d', 'done-new', 'done-old', 'cancel-new', 'cancel-old']);
+    expect(titles(res.body.data.items)).toEqual(['up-1d', 'up-2d', 'up-3d', 'stale-match', 'done-new', 'done-old', 'cancel-new', 'cancel-old']);
     expect(res.body.data.nextCursor).toBeNull();
   });
 
@@ -95,32 +102,33 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
       cursor = res.body.data.nextCursor;
       if (cursor === null) break;
     }
-    expect(seen).toEqual(['up-1d', 'up-2d', 'up-3d', 'done-new', 'done-old', 'cancel-new', 'cancel-old']);
+    expect(seen).toEqual(['up-1d', 'up-2d', 'up-3d', 'stale-match', 'done-new', 'done-old', 'cancel-new', 'cancel-old']);
   });
 
   it('상태 탭: 예정은 가까운 순, 완료·취소됨은 최근 순, 옛 커서(id 만)도 받는다', async () => {
-    expect(titles((await as(userOrder).get('/me/schedule?status=scheduled').expect(200)).body.data.items)).toEqual(['up-1d', 'up-2d', 'up-3d']);
+    expect(titles((await as(userOrder).get('/me/schedule?status=scheduled').expect(200)).body.data.items)).toEqual(['up-1d', 'up-2d', 'up-3d', 'stale-match']);
     expect(titles((await as(userOrder).get('/me/schedule?status=completed').expect(200)).body.data.items)).toEqual(['done-new', 'done-old']);
     expect(titles((await as(userOrder).get('/me/schedule?status=cancelled').expect(200)).body.data.items)).toEqual(['cancel-new', 'cancel-old']);
     const first = await as(userOrder).get('/me/schedule?status=scheduled&limit=1').expect(200);
     const legacy = await as(userOrder).get(`/me/schedule?status=scheduled&limit=5&cursor=${ids['up-1d']}`).expect(200);
     expect(titles(first.body.data.items)).toEqual(['up-1d']);
-    expect(titles(legacy.body.data.items)).toEqual(['up-2d', 'up-3d']);
+    expect(titles(legacy.body.data.items)).toEqual(['up-2d', 'up-3d', 'stale-match']);
   });
 
-  it('끝난 지 24시간이 지난 훈련·모임만 알림 없이 완료로 바꾸고, 팀 매치형·최근 일정·취소는 그대로 둔다', async () => {
+  it('끝난 지 24시간이 지난 팀 직접 일정(훈련·모임·연결 없는 경기)만 알림 없이 완료로 바꾸고, 팀 매치와 연결된 일정·최근 일정·취소는 그대로 둔다', async () => {
     const outboxBefore = await db.v1OutboxEvent.count();
     const guestBefore = await db.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId: ids['old-training'] } });
     expect(guestBefore.state).toBe('OPEN');
 
     const done = await db.$transaction((tx) => completeEndedSchedules(tx, new Date()));
-    expect(done).toBe(2);
+    expect(done).toBe(3);
     const state = async (key: string) => (await db.v1TeamSchedule.findUniqueOrThrow({ where: { id: ids[key] } }));
     expect((await state('old-training')).state).toBe('COMPLETED');
     expect((await state('old-event')).state).toBe('COMPLETED');
     expect((await state('old-training')).version).toBe(1);
     expect((await state('recent-training')).state).toBe('SCHEDULED');
-    expect((await state('old-match')).state).toBe('SCHEDULED');
+    expect((await state('old-match')).state).toBe('COMPLETED'); // 연결된 팀 매치가 없는 「경기」 일정도 대상이다
+    expect((await state('stale-match')).state).toBe('SCHEDULED'); // 팀 매치와 연결된 일정은 결과가 정한다
     expect((await state('old-cancelled')).state).toBe('CANCELLED');
     // 직접 완료 처리할 때처럼 열린 용병 모집은 닫는다. 알림 행은 만들지 않는다.
     expect((await db.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId: ids['old-training'] } })).state).toBe('CLOSED');
@@ -130,7 +138,7 @@ describe('내 일정 정렬과 지난 예정 자동 완료', () => {
     expect(await db.$transaction((tx) => completeEndedSchedules(tx, new Date()))).toBe(0);
     // 내 일정에서도 완료 묶음으로 내려간다.
     const items = (await as(userAuto).get('/me/schedule').expect(200)).body.data.items as Array<{ title: string; state: string }>;
-    expect(titles(items)).toEqual(['old-match', 'recent-training', 'old-event', 'old-training', 'old-cancelled']);
-    expect(items.map((item) => item.state)).toEqual(['SCHEDULED', 'SCHEDULED', 'COMPLETED', 'COMPLETED', 'CANCELLED']);
+    expect(titles(items)).toEqual(['recent-training', 'old-event', 'old-training', 'old-match', 'old-cancelled']);
+    expect(items.map((item) => item.state)).toEqual(['SCHEDULED', 'COMPLETED', 'COMPLETED', 'COMPLETED', 'CANCELLED']);
   });
 });

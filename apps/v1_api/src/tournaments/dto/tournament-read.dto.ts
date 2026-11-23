@@ -114,6 +114,16 @@ export class TournamentListQueryDto {
   @IsIn(COMPETITION_LIST_KINDS)
   kind?: CompetitionListKind;
 
+  /**
+   * 이 지역(시/도면 하위 구/군 포함)의 대회·리그를 **각 상태 묶음 안에서** 먼저 보여 준다. 걸러 내지 않고, 묶음 순서와 묶음 안 순서는 그대로다.
+   * 지역이 없는 대회·리그는 어느 지역에도 속하지 않는다. 사용자의 활동 지역은 서버가 읽지 않고 호출한 쪽이 명시한다.
+   * 더 보기 커서는 같은 값으로 이어 읽어야 순서가 맞는다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  preferRegionId?: string;
+
   @IsOptional()
   // 성별 미지정(`null`)은 필터로 고르지 않는다(2026-11-06). 값이 비어 있는 옛 대회·리그는 성별 필터를 걸지 않을 때만 나온다.
   // 대회·리그 모두에 걸린다(2026-11-06) — 리그도 만들 때 성별을 고른다.

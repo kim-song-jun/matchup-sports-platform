@@ -263,6 +263,7 @@ the web explicitly requests `all` for its default tab.
 | Query | Values / behavior |
 |---|---|
 | `stage` | The state the card shows (one badge): `preparing` = draft (regular leagues only; a tournament draft stays hidden), `recruiting` = `open`, deadline not passed, capacity left, `recruit_closed` = stored `closed`, or `open` whose deadline passed or capacity is full, `ongoing` = in_progress, `completed` = completed. It filters on the same group rank the list order uses, so badge, filter and order cannot disagree |
+| `preferRegionId` | Floats rows in this region (a province also covers its districts) to the top of **each state group** — the group order and the order inside a group are unchanged, nothing is filtered out, and a row with no region is never preferred. The cursor of a list read this way is a different shape (`[v3, group, preference, sortAt, id]`), so a cursor must be continued with the same `preferRegionId`; a cursor of the other shape returns an empty page. The server never reads the signed-in user's activity region — the caller sends it, so one URL is one result and response caches are not shared across users. An empty value means none |
 | `sportId` | UUID, existing sport filter |
 | `genderCategory` | mixed/male/female. A tournament or league whose gender is empty (`null`, from before the choice was required) is not selectable here and appears only while no gender filter is set; `unspecified` was removed on 2026-11-06 and is now a 400 |
 | `format` | league/knockout/group_knockout; format is not competition kind |

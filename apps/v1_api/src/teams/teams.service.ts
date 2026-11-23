@@ -18,6 +18,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService, type ChatSystemLine } from '../chat/chat.service';
 import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
 import { toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
+import { isInPreferredRegion, PREFERRED_REGION_SELECT } from '../common/region/preferred-region';
 import { PrismaService } from '../prisma/prisma.service';
 import { contactRecruitingWhere } from '../team-matches/contact-recruiting';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -185,7 +186,7 @@ export class TeamsService {
     preferRegionId?: string,
   ) {
     const [teams, hosted] = await Promise.all([
-      this.prisma.v1Team.findMany({ where, select: { id: true, createdAt: true, regionId: true, region: { select: { parentId: true } } } }),
+      this.prisma.v1Team.findMany({ where, select: { id: true, createdAt: true, ...PREFERRED_REGION_SELECT } }),
       this.prisma.v1TeamMatch.groupBy({
         by: ['hostTeamId'],
         where: { deletedAt: null, status: { not: 'cancelled' }, hostTeam: where },
@@ -193,12 +194,10 @@ export class TeamsService {
       }),
     ]);
     const counts = new Map(hosted.map((row) => [row.hostTeamId, row._count._all]));
-    // 팀의 지역은 실제로는 구/군 단위라, 시/도를 고르면 그 하위 구/군도 같은 지역이다(teamListWhere 의 regionId 필터와 같은 규칙).
-    const inPreferredRegion = (team: (typeof teams)[number]) =>
-      Boolean(preferRegionId) && (team.regionId === preferRegionId || team.region?.parentId === preferRegionId);
+    // 팀의 지역은 실제로는 구/군 단위라, 시/도를 고르면 그 하위 구/군도 같은 지역이다(common/region/preferred-region.ts — 매치·대회 목록도 같은 판정).
     const ordered = teams
       .sort((a, b) =>
-        Number(inPreferredRegion(b)) - Number(inPreferredRegion(a))
+        Number(isInPreferredRegion(b, preferRegionId)) - Number(isInPreferredRegion(a, preferRegionId))
         || (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)
         || b.createdAt.getTime() - a.createdAt.getTime()
         || (a.id < b.id ? 1 : -1))

@@ -29,6 +29,9 @@ vi.mock('@/hooks/use-competition-discovery', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: () => ({ data: [] }),
+  useV1MasterRegions: () => ({ data: [], isPending: false }),
+  useV1AuthMe: () => ({ data: undefined, isPending: false }),
+  useV1Profile: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 
 function card(id: string) {

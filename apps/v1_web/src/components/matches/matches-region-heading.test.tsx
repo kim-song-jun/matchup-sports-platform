@@ -29,6 +29,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
     { id: BUSAN, name: '부산', parentId: null },
     { id: SEOUL, name: '서울', parentId: null },
   ] }),
+  useV1AuthMe: () => ({ data: undefined, isPending: false }),
+  useV1Profile: () => ({ data: undefined, isPending: false, isError: false }),
   useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
   useV1RecordSearch: () => ({ mutate: vi.fn() }),
 }));

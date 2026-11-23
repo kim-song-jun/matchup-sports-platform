@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
+import { useListRegionPreference } from '@/hooks/use-list-region-preference';
 import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
@@ -84,6 +85,10 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedKind = toTeamMatchKind(searchParams.get('kind'));
+  // 활동 지역 우선 — 각 상태 묶음 안에서 내 지역 팀 매치가 먼저다(걸러 내지 않고 묶음 순서·정렬은 그대로). 이 목록에는 지역 필터가 없다.
+  const regionPreference = useListRegionPreference({ applicable: true, noun: '팀 매치' });
+  const preferRegionId = regionPreference.preferRegionId;
+  const prefer = useMemo(() => (preferRegionId ? { preferRegionId } : undefined), [preferRegionId]);
   // 요약 줄의 '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다(서버 recruitingOnly).
   const recruitingOnly = searchParams.get('recruitingOnly') === '1';
   const filterOpen = searchParams.get('filter') === '1';
@@ -133,12 +138,15 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
   // 같은 수정과 동일 패턴, tournaments/tournaments-list-client.tsx 의 "더 보기" 누적 방식을 따른다).
-  const teamMatchFiltersKey = teamMatchFilters ? JSON.stringify(teamMatchFilters) : '';
+  // 보이는 목록을 읽는 조회의 필터 = 사용자가 고른 필터 + 내 지역 기준. 기준이 바뀌면(로그인·프로필이 도착하면) 새 기준의 1페이지부터 다시 쌓는다 —
+  // 커서는 그 순서의 토큰이다. 건수(facets)는 순서와 무관해 teamMatchFilters 그대로 쓴다.
+  const listFilters = useMemo(() => (teamMatchFilters || prefer ? { ...teamMatchFilters, ...prefer } : undefined), [teamMatchFilters, prefer]);
+  const teamMatchFiltersKey = listFilters ? JSON.stringify(listFilters) : '';
   // 필터 되감기·상세 복귀 복원은 매치·대회 목록과 같은 훅이다(useCursorPagination).
   const { cursor, accumulated, setPagination, snapshotKey } = useCursorPagination<V1TeamMatch>(
     v1Keys.teamMatchesAll(),
     teamMatchFiltersKey,
-    (savedCursor) => v1Keys.teamMatches(savedCursor ? { ...teamMatchFilters, cursor: savedCursor } : teamMatchFilters),
+    (savedCursor) => v1Keys.teamMatches(savedCursor ? { ...listFilters, cursor: savedCursor } : listFilters),
   );
   const loadedPageCursorsKey = useMemo(() => [...snapshotKey, 'loaded-page-cursors'] as const, [snapshotKey]);
   useEffect(() => {
@@ -146,14 +154,18 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       queryClient.setQueryData(loadedPageCursorsKey, []);
     }
   }, [accumulated.length, cursor, loadedPageCursorsKey, queryClient]);
-  const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
-  const filteredQueryFilters = useMemo(
-    () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
-    [teamMatchFilters, cursor],
+  const allQueryFilters = useMemo(
+    () => (teamMatchFilters || !(cursor || prefer) ? undefined : { ...prefer, ...(cursor ? { cursor } : {}) }),
+    [teamMatchFilters, cursor, prefer],
   );
-  // matches-client.tsx 와 같다 — seed 는 cursor 없는 무필터 키에만 맞는다.
+  const filteredQueryFilters = useMemo(
+    () => (teamMatchFilters ? { ...teamMatchFilters, ...prefer, ...(cursor ? { cursor } : {}) } : undefined),
+    [teamMatchFilters, cursor, prefer],
+  );
+  // matches-client.tsx 와 같다 — seed 는 cursor 없는 무필터 키에만 맞는다. 내 지역 순서를 읽는 동안에도 seed 를 placeholder 로 보여 주다가
+  // 새 순서가 도착하면 바꿔 끼운다(빈 화면 없음).
   const allQuery = useV1TeamMatches(allQueryFilters, {
-    seed: allQueryFilters ? undefined : seed?.page,
+    seed: !teamMatchFilters && cursor ? undefined : seed?.page,
     refetchOnWindowFocus: 'always',
   });
   // 상단 숫자(전체·오늘·모집 중)와 종목 칩은 서버가 센 전체 건수다 — 불러온 20개만 세면 "전체 20"처럼 작게 보였다.
@@ -191,7 +203,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       if (queryKey[1] !== 'team-matches' || !isTeamMatchFilterRecord(queryKey[2])) return false;
       const pageFilters = { ...queryKey[2] };
       delete pageFilters.cursor;
-      return sameTeamMatchFilters(pageFilters, teamMatchFilters ?? {});
+      return sameTeamMatchFilters(pageFilters, listFilters ?? {});
     };
     const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).filter((cachedQuery) => matchesFilters(cachedQuery.queryKey));
     const pageByCursor = new Map<string | undefined, (typeof matchingQueries)[number]>();
@@ -359,6 +371,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         }),
         matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
         summary,
+        regionPriorityNotice: regionPreference.notice,
         hasNext,
         onLoadMore: handleLoadMore,
         loadMorePending,
@@ -382,6 +395,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         }),
         matches: [],
         summary,
+        regionPriorityNotice: regionPreference.notice,
         // #5: 로딩 중임을 명시 — 빈/로딩 구분. isPending 인 이유는 matches-client.tsx 같은 자리.
         isLoading: query.isPending,
       };

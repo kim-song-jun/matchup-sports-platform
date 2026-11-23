@@ -5333,7 +5333,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 /* 기본 정렬에서 내 지역 팀을 먼저 보여 준다는 한 줄 — 요약 바 바로 아래, 바와 같은 좌우 여백. */
-.tm-team-region-priority {
+.tm-list-region-notice {
   margin: var(--spacing-2) 0 0;
   padding: 0 12px;
   color: var(--text-muted);
@@ -5341,14 +5341,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 /* 활동 지역 설정을 권하는 줄 — 안내 글은 왼쪽, 알약 버튼은 오른쪽. 눈에 보이는 알약은 32px 이고,
    누르는 영역은 링크 전체(44px)라 터치 기준을 지킨다. */
-.tm-team-region-priority-action {
+.tm-list-region-notice-action {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-3);
 }
 
-.tm-team-region-priority-link {
+.tm-list-region-notice-link {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -5356,7 +5356,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
-.tm-team-region-priority-pill {
+.tm-list-region-notice-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-1);
@@ -5370,7 +5370,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   white-space: nowrap;
 }
 
-.tm-team-region-priority-link:focus-visible {
+.tm-list-region-notice-link:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
   border-radius: var(--radius-pill);

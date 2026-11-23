@@ -12,6 +12,7 @@ import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1PlaceView } from '@/types/api';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector } from '@/components/v1-ui/create-form-fields';
@@ -91,6 +92,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
           <h2 className="tm-list-scope-heading">{buildTeamMatchSummaryLabel()}</h2>
           <ListSummaryCounts summary={model.summary} />
         </div>
+        <ListRegionNotice notice={model.regionPriorityNotice} />
         {/* #5: 로딩 중엔 PageSkeleton, 완료 후 비어 있으면 EmptyState — 빈/로딩 구분 */}
         {model.isLoading
           ? <PageSkeleton />

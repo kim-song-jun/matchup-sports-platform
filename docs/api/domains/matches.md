@@ -39,6 +39,7 @@
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `status` | recruiting/closed/completed/cancelled/expired | No | 기본 recruiting |
 | `sort` | recommended/latest/starts_at/deadline | No | 신청 가능 묶음 안의 순서(아래). 생략 시 경기 가까운 순 |
+| `preferRegionId` | string(≤100) | No | 이 지역(시/도를 주면 하위 구/군 포함)의 경기를 **각 상태 묶음 안에서** 먼저 보여 준다. 걸러 내지 않고 묶음 순서와 `sort`는 그대로다 — 내 지역의 끝난 경기는 다른 지역의 진행 중 경기 뒤에 온다. 묶음마다 앞에 "내 지역" 하위 묶음이 서며 커서의 묶음 이름(`open~region:<id>@…`)에 그대로 실린다. 지역이 없는 경기는 그 밖 무리다. 서버는 로그인 사용자의 활동 지역을 읽지 않는다 — 호출한 쪽이 명시해야 같은 주소가 같은 결과를 내고 응답 캐시가 섞이지 않는다. 더 보기 커서는 같은 `preferRegionId`로 이어 읽어야 하고, 없이 읽으면 원래 묶음 목록으로 이어진다. 빈 값은 지정하지 않은 것과 같다 |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
 | `today` | boolean(`true`/`false`) | No | `true` 이면 오늘(KST) 시작하는 경기만 |

@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Check, ChartNoAxesColumn, ChevronDown, Info, Lock, MapPin, Users } from 'lucide-react';
+import { Check, ChartNoAxesColumn, ChevronDown, Info, Lock, Users } from 'lucide-react';
+import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -144,21 +145,7 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             팀 만들기
           </Link>
         </div>
-        {model.regionPriorityNotice ? (
-          model.regionPriorityNotice.link ? (
-            <div className="tm-team-region-priority tm-team-region-priority-action">
-              <span className="tm-text-caption">{model.regionPriorityNotice.text}</span>
-              <Link className="tm-team-region-priority-link" href={model.regionPriorityNotice.link.href}>
-                <span className="tm-team-region-priority-pill">
-                  <MapPin size={14} strokeWidth={2.2} aria-hidden="true" />
-                  {model.regionPriorityNotice.link.label}
-                </span>
-              </Link>
-            </div>
-          ) : (
-            <p className="tm-text-caption tm-team-region-priority">{model.regionPriorityNotice.text}</p>
-          )
-        ) : null}
+        <ListRegionNotice notice={model.regionPriorityNotice} />
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (

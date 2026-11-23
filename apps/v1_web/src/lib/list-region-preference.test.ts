@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   resolveMyTeamRegion,
-  resolveTeamListRegionPreference,
-  teamListRegionNotice,
+  resolveListRegionPreference,
+  listRegionNotice,
   type MasterRegionLike,
   type MyTeamRegion,
-  type TeamListRegionPreference,
-} from './team-list-region-preference';
+  type ListRegionPreference,
+} from './list-region-preference';
 
 const master: MasterRegionLike[] = [
   { id: 'r-seoul', name: '서울', parentId: null },
@@ -19,8 +19,8 @@ const master: MasterRegionLike[] = [
 const saved: MyTeamRegion = { status: 'ready', provinceId: 'r-seoul', provinceName: '서울', savedName: '서울 마포구' };
 const noSaved: MyTeamRegion = { status: 'none' };
 
-const resolve = (over: Partial<Parameters<typeof resolveTeamListRegionPreference>[0]> = {}) =>
-  resolveTeamListRegionPreference({
+const resolve = (over: Partial<Parameters<typeof resolveListRegionPreference>[0]> = {}) =>
+  resolveListRegionPreference({
     applicable: true,
     signedIn: true,
     linkRegionId: undefined,
@@ -46,7 +46,7 @@ describe('resolveMyTeamRegion', () => {
   });
 });
 
-describe('resolveTeamListRegionPreference — 어느 지역을 앞에 둘지', () => {
+describe('resolveListRegionPreference — 어느 지역을 앞에 둘지', () => {
   it('저장한 활동 지역(시/도)이 있으면 그것을 쓴다', () => {
     expect(resolve()).toEqual({ status: 'ready', regionId: 'r-seoul', name: '서울', source: 'saved' });
   });
@@ -81,9 +81,9 @@ describe('resolveTeamListRegionPreference — 어느 지역을 앞에 둘지', (
   });
 });
 
-describe('teamListRegionNotice — 목록 머리의 한 줄', () => {
+describe('listRegionNotice — 목록 머리의 한 줄', () => {
   const href = '/my/settings/location';
-  const notice = (preference: TeamListRegionPreference) => teamListRegionNotice(preference, href);
+  const notice = (preference: ListRegionPreference) => listRegionNotice(preference, href);
 
   it('저장한 활동 지역을 쓰면 안내만 한다(링크 없음)', () => {
     expect(notice({ status: 'ready', regionId: 'r-seoul', name: '서울', source: 'saved' })).toEqual({ text: '내 활동 지역(서울)의 팀을 먼저 보여 줘요' });
@@ -100,5 +100,29 @@ describe('teamListRegionNotice — 목록 머리의 한 줄', () => {
   it('모르는 상태와 적용하지 않는 목록에는 내지 않는다', () => {
     expect(notice({ status: 'pending' })).toBeUndefined();
     expect(notice({ status: 'off' })).toBeUndefined();
+  });
+});
+
+describe('listRegionNotice — 목록 이름과 조사', () => {
+  const href = '/my/settings/location';
+
+  it.each([
+    ['팀', '팀을'],
+    ['매치', '매치를'],
+    ['팀 매치', '팀 매치를'],
+    ['대회', '대회를'],
+    ['리그', '리그를'],
+    ['대회·리그', '대회·리그를'],
+  ])('%s 목록은 "%s" 로 말한다(받침이 있으면 을, 없으면 를)', (noun, withParticle) => {
+    expect(listRegionNotice({ status: 'ready', regionId: 'r', name: '부산', source: 'saved' }, href, noun)?.text).toBe(`내 활동 지역(부산)의 ${withParticle} 먼저 보여 줘요`);
+    expect(listRegionNotice({ status: 'none' }, href, noun)?.text).toBe(`활동 지역을 정하면 가까운 ${withParticle} 먼저 보여 줘요`);
+  });
+
+  it('이름을 주지 않으면 팀 목록의 문구와 같다', () => {
+    expect(listRegionNotice({ status: 'none' }, href)?.text).toBe('활동 지역을 정하면 가까운 팀을 먼저 보여 줘요');
+  });
+
+  it('한글이 아닌 글자로 끝나도 깨지지 않는다 — 조사는 를', () => {
+    expect(listRegionNotice({ status: 'none' }, href, 'FC')?.text).toBe('활동 지역을 정하면 가까운 FC를 먼저 보여 줘요');
   });
 });

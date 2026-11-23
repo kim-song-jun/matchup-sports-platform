@@ -110,6 +110,8 @@ beforeEach(() => {
     if (path.startsWith('/team-matches/')) return match(Number(path.split('-').at(-1)));
     if (path === '/master/sports') return [{ sportId: 'futsal', name: '풋살' }];
     if (path === '/search/recent') return { items: [] };
+    if (path === '/master/regions') return [];
+    if (path === '/auth/me') return { user: null };
     throw new Error(`Unexpected API path: ${path}`);
   });
   apiPost.mockResolvedValue({});

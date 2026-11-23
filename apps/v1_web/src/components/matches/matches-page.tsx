@@ -13,6 +13,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { optimizedCssUrl, responsiveBackgroundImageVars } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
@@ -132,6 +133,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
           <ListSummaryCounts summary={model.summary} />
         </div>
+        <ListRegionNotice notice={model.regionPriorityNotice} />
         {/* team-matches-page.tsx #5와 동일 — 로딩 중(isLoading)엔 PageSkeleton, 완료 후
             비어 있으면 EmptyState. 이 분기 없이는 필터를 바꿔 새 쿼리가 도는 동안에도
             "조건에 맞는 매치가 없어요"가 잠깐 뜬다(실제로는 아직 응답을 못 받은 상태). */}

@@ -139,3 +139,78 @@ describe('gender filter spans every kind', () => {
     expect(statement.text).toContain("t.kind::text = 'regular_tournament' OR t.kind IS NULL");
   });
 });
+
+// 활동 지역 우선("내 지역 먼저"): 상태 묶음(grp) 순서는 그대로 두고 묶음 안에서만 내 지역 행이 먼저다.
+describe('activity-region preference (preferRegionId)', () => {
+  const capture = async (query: Parameters<typeof listTournamentIds>[1], cursor?: string) => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values)); return [];
+    });
+    const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, query, { limit: 5, ...(cursor ? { cursor } : {}) });
+    return { statement: statements[0], rows, queried: queryRaw.mock.calls.length };
+  };
+
+  it('without a preference the SQL has no preference column and the order is exactly the default one', async () => {
+    const { statement } = await capture({ kind: 'all' });
+    expect(statement.text).not.toContain('pref');
+    expect(statement.text).toContain('ORDER BY f.grp ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC');
+  });
+
+  it('an empty preference counts as none', async () => {
+    const { statement } = await capture({ kind: 'all', preferRegionId: '' });
+    expect(statement.text).not.toContain('pref');
+  });
+
+  it('orders by the preference right after the group, so the group order is untouched', async () => {
+    const { statement } = await capture({ kind: 'all', preferRegionId: 'region-seoul' });
+    expect(statement.text).toContain('ORDER BY f.grp ASC, f.pref ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC');
+    expect(statement.text).toContain('SELECT f.id, f.grp, f.pref, f.sort_at::text AS sort_at FROM filtered f');
+  });
+
+  it('a province also covers its districts, and a row with no region is never preferred', async () => {
+    const { statement } = await capture({ kind: 'all', preferRegionId: 'region-seoul' });
+    expect(statement.text).toContain('CASE WHEN t.region_id IS NOT NULL AND (t.region_id = $');
+    expect(statement.text).toContain('t.region_id IN (SELECT r.id FROM v1_regions r WHERE r.parent_id = $');
+    expect(statement.text).toContain('THEN 0 ELSE 1 END AS pref');
+    expect(statement.values.filter((value) => value === 'region-seoul')).toHaveLength(2);
+    // The id is bound, never spliced into the SQL text.
+    expect(statement.text).not.toContain('region-seoul');
+  });
+
+  it('keeps the preference a column of the filter, not a WHERE condition — nothing is filtered out', async () => {
+    const { statement } = await capture({ kind: 'all', preferRegionId: 'region-seoul' });
+    const where = statement.text.slice(statement.text.indexOf('FROM v1_tournaments t'));
+    expect(where).not.toContain('t.region_id');
+  });
+
+  it('carries [v3, group, preference, sortAt, id] in the cursor', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([{ id: 'a', grp: 1, pref: 0, sort_at: '2026-11-01 09:00:00.123456' }]);
+    const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, { preferRegionId: 'region-seoul' }, { limit: 1 });
+    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual(['v3', 1, 0, '2026-11-01 09:00:00.123456', 'a']);
+  });
+
+  it('resumes with a keyset that compares group, then preference, then the usual key', async () => {
+    const { statement, queried } = await capture({ preferRegionId: 'region-seoul' }, token(['v3', 1, 1, '2026-11-01 09:00:00', 'a']));
+    expect(queried).toBe(1);
+    expect(statement.text).toContain('f.pref > c.pref OR (f.pref = c.pref AND (');
+    expect(statement.text).toContain('AS grp, $');
+    expect(statement.text).toContain('::int AS pref, $');
+    expect(statement.values).toEqual(expect.arrayContaining([1, 1, '2026-11-01 09:00:00', 'a']));
+  });
+
+  it('refuses a cursor of the other shape without reaching the database', async () => {
+    // A default-order cursor on a preference read, and a preference cursor on a default read: both are a stale tab.
+    expect(await capture({ preferRegionId: 'region-seoul' }, token(['v2', 1, '2026-11-01 09:00:00', 'a']))).toMatchObject({ rows: [], queried: 0 });
+    expect(await capture({}, token(['v3', 1, 0, '2026-11-01 09:00:00', 'a']))).toMatchObject({ rows: [], queried: 0 });
+  });
+
+  it.each([
+    ['preference 2', ['v3', 1, 2, '2026-11-01 09:00:00', 'a']],
+    ['preference as text', ['v3', 1, '0', '2026-11-01 09:00:00', 'a']],
+    ['four parts', ['v3', 1, '2026-11-01 09:00:00', 'a']],
+    ['non-existent timestamp', ['v3', 1, 0, '2026-02-30 10:00:00', 'a']],
+  ])('rejects a malformed preference cursor (%s)', async (_label, parts) => {
+    expect(await capture({ preferRegionId: 'region-seoul' }, token(parts))).toMatchObject({ rows: [], queried: 0 });
+  });
+});

@@ -35,7 +35,7 @@ export function resolveMyTeamRegion({ unresolved, saved, master }: {
   };
 }
 
-export type TeamListRegionPreference =
+export type ListRegionPreference =
   /** 적용하지 않는다 — 비로그인, 다른 정렬, 지역을 직접 고른 목록, 기준 없이 열린 이어 보기. 안내도 없다. */
   | { status: 'off' }
   /** 아직 모른다(로딩 중이거나 조회 실패). 요청도 안내도 보류한다 — 지역이 있는 사람에게 설정을 권하지 않기 위해서다. */
@@ -45,9 +45,9 @@ export type TeamListRegionPreference =
   /** `source`: 저장한 활동 지역(saved) · 이어 보기 주소가 싣고 온 기준(link). `name` 은 모를 수 있다. */
   | { status: 'ready'; regionId: string; name: string; source: 'saved' | 'link' };
 
-const OFF: TeamListRegionPreference = { status: 'off' };
+const OFF: ListRegionPreference = { status: 'off' };
 
-export function resolveTeamListRegionPreference({ applicable, signedIn, linkRegionId, isContinuation, myRegion, master }: {
+export function resolveListRegionPreference({ applicable, signedIn, linkRegionId, isContinuation, myRegion, master }: {
   /** 기본 정렬(활동 많은순)이고 지역을 직접 고르지 않은 목록인가. */
   applicable: boolean;
   signedIn: boolean;
@@ -57,7 +57,7 @@ export function resolveTeamListRegionPreference({ applicable, signedIn, linkRegi
   isContinuation: boolean;
   myRegion: MyTeamRegion;
   master: ReadonlyArray<MasterRegionLike>;
-}): TeamListRegionPreference {
+}): ListRegionPreference {
   if (!applicable) return OFF;
   if (linkRegionId) {
     return { status: 'ready', regionId: linkRegionId, name: master.find((region) => region.id === linkRegionId)?.name ?? '', source: 'link' };
@@ -75,15 +75,28 @@ export function resolveTeamListRegionPreference({ applicable, signedIn, linkRegi
  * 링크는 저장한 활동 지역이 없는 사람에게만 단다 — 이미 저장한 지역을 쓰는 줄은 안내만 하고,
  * 바꾸는 길은 필터 시트의 지역 안내가 맡는다(44px 터치 줄이 목록 머리에 늘 붙지 않게).
  */
-export function teamListRegionNotice(
-  preference: TeamListRegionPreference,
+export function listRegionNotice(
+  preference: ListRegionPreference,
   settingsHref: string,
-): { text: string; link?: { label: string; href: string } } | undefined {
+  /** 목록이 담는 것의 이름 — 팀·매치·팀 매치·대회·리그. 문구가 이 말을 그대로 쓴다. */
+  noun = '팀',
+): ListRegionNotice | undefined {
+  const what = `${noun}${objectParticle(noun)}`;
   if (preference.status === 'none') {
-    return { text: '활동 지역을 정하면 가까운 팀을 먼저 보여 줘요', link: { label: '지역 설정', href: settingsHref } };
+    return { text: `활동 지역을 정하면 가까운 ${what} 먼저 보여 줘요`, link: { label: '지역 설정', href: settingsHref } };
   }
   if (preference.status !== 'ready') return undefined;
   const where = preference.name ? `(${preference.name})` : '';
-  if (preference.source === 'saved') return { text: `내 활동 지역${where}의 팀을 먼저 보여 줘요` };
-  return { text: `내 지역${where}의 팀을 먼저 보여 줘요` };
+  if (preference.source === 'saved') return { text: `내 활동 지역${where}의 ${what} 먼저 보여 줘요` };
+  return { text: `내 지역${where}의 ${what} 먼저 보여 줘요` };
+}
+
+/** 목록 머리 안내 한 줄. 링크는 활동 지역이 없는 사람에게만 있다. */
+export type ListRegionNotice = { text: string; link?: { label: string; href: string } };
+
+/** 받침이 있으면 "을", 없으면 "를" — 마지막 글자가 한글 음절일 때만 받침을 본다(그 밖은 "를"). */
+function objectParticle(word: string): '을' | '를' {
+  const code = word.charCodeAt(word.length - 1);
+  const isSyllable = code >= 0xac00 && code <= 0xd7a3;
+  return isSyllable && (code - 0xac00) % 28 !== 0 ? '을' : '를';
 }

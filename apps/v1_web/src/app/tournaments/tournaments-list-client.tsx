@@ -15,6 +15,8 @@ import { CompetitionDiscoveryControls } from '@/components/v1-ui/competition-dis
 import { resolveSportIdParam } from '@/components/v1-ui/competition-filter-model';
 import { readCompetitionDiscovery, competitionDiscoveryHref, competitionDiscoverySeedPath, type CompetitionDiscoveryFilters } from '@/lib/competition-discovery';
 import { useCompetitionDiscovery } from '@/hooks/use-competition-discovery';
+import { useListRegionPreference } from '@/hooks/use-list-region-preference';
+import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
 import { useV1AllTournaments, useV1MasterSports } from '@/hooks/use-v1-api';
@@ -90,7 +92,7 @@ function tournamentPagePath(params: URLSearchParams, page: number): string {
   return `/tournaments${query ? `?${query}` : ''}`;
 }
 
-type TournamentListFilters = CompetitionDiscoveryFilters & { limit: number; withTotal: 'true' };
+type TournamentListFilters = CompetitionDiscoveryFilters & { limit: number; withTotal: 'true'; preferRegionId?: string };
 
 /**
  * 대회 목록의 페이지 이동은 화면 폭에 따라 **다른 방식**을 쓴다.
@@ -159,9 +161,16 @@ function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }
     sportsLoaded: sportsData !== undefined,
   });
 
+  // 활동 지역 우선 — 각 상태 묶음 안에서 내 지역 대회·리그가 먼저다(걸러 내지 않고 묶음 순서·묶음 안 순서는 그대로).
+  // 이 목록에는 지역 필터가 없다. 기준이 바뀌면(로그인·프로필이 도착하면) 새 기준의 1페이지부터 다시 쌓는다 — 커서는 그 순서의 토큰이다.
+  const regionPreference = useListRegionPreference({
+    applicable: true,
+    noun: activeKind === 'league' ? '리그' : activeKind === 'tournament' ? '대회' : '대회·리그',
+  });
   // 모바일은 커서 페이지를 누적한다 — 필터 되감기·상세 복귀 복원은 useCursorPagination(매치·팀매치와 같은 훅).
   const mobileFilters: TournamentListFilters = {
     ...filters, limit: TOURNAMENT_LIST_PAGE_SIZE, sportId: querySportId, withTotal: 'true',
+    ...(regionPreference.preferRegionId ? { preferRegionId: regionPreference.preferRegionId } : {}),
   };
   const { cursor, accumulated: allItems, setPagination, snapshotKey } = useCursorPagination<V1TournamentListItem>(
     v1Keys.tournaments(),
@@ -282,6 +291,7 @@ function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }
         <CompetitionDiscoveryControls filters={{ ...filters, sportId: querySportId }} sports={filterSports}
           sheetOpen={filterSheetOpen} desktop={isDesktop} page={page}
           total={isError ? undefined : data?.pageInfo?.total} pending={isPending} />
+        <ListRegionNotice notice={regionPreference.notice} />
 
         {isPending || needsPageNormalization || emptyPreviousPage ? (
           <TournamentSkeletonList />

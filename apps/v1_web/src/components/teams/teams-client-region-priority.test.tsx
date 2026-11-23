@@ -81,7 +81,7 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     expect(screen.getByText('내 활동 지역(서울)의 팀을 먼저 보여 줘요')).toBeTruthy();
     // 설정 링크는 활동 지역이 아직 없는 사람에게만 보인다 — 이미 정한 사람에게는 어떤 이름으로도 없다.
     expect(screen.queryByRole('link', { name: /지역 설정/ })).toBeNull();
-    expect(document.querySelector('.tm-team-region-priority-action')).toBeNull();
+    expect(document.querySelector('.tm-list-region-notice-action')).toBeNull();
   });
 
   it('활동 지역을 정한 사람은 내 팀이 다른 지역에 있어도 저장한 지역을 쓰고 설정 링크가 없다', () => {
@@ -105,12 +105,12 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
 
     expect(lastFilters()).not.toHaveProperty('preferRegionId');
     expect(screen.getByText(/활동 지역을 정하면 가까운 팀을 먼저 보여 줘요/)).toBeTruthy();
-    // 안내 글은 왼쪽, "지역 설정" 알약 버튼은 오른쪽 — 같은 줄(.tm-team-region-priority-action)에 있고 설정 화면으로 이어진다.
+    // 안내 글은 왼쪽, "지역 설정" 알약 버튼은 오른쪽 — 같은 줄(.tm-list-region-notice-action)에 있고 설정 화면으로 이어진다.
     const link = screen.getByRole('link', { name: '지역 설정' });
     expect(link.getAttribute('href')).toBe('/my/settings/location');
-    expect(link.classList.contains('tm-team-region-priority-link')).toBe(true);
-    expect(link.closest('.tm-team-region-priority-action')?.textContent).toContain('활동 지역을 정하면 가까운 팀을 먼저 보여 줘요');
-    expect(link.querySelector('.tm-team-region-priority-pill svg')).not.toBeNull();
+    expect(link.classList.contains('tm-list-region-notice-link')).toBe(true);
+    expect(link.closest('.tm-list-region-notice-action')?.textContent).toContain('활동 지역을 정하면 가까운 팀을 먼저 보여 줘요');
+    expect(link.querySelector('.tm-list-region-notice-pill svg')).not.toBeNull();
     expect(screen.queryByText(/내 팀이 있는 지역/)).toBeNull();
   });
 
@@ -185,10 +185,10 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
     const rule = (selector: string) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
 
-    expect(rule('.tm-team-region-priority-link')).toMatch(/min-height:\s*var\(--spacing-11\)/);
-    expect(rule('.tm-team-region-priority-pill')).toMatch(/height:\s*var\(--spacing-8\)/);
-    expect(rule('.tm-team-region-priority-pill')).toMatch(/border-radius:\s*var\(--radius-pill\)/);
-    expect(rule('.tm-team-region-priority-pill')).toMatch(/background:\s*var\(--blue50\)/);
-    expect(rule('.tm-team-region-priority-pill')).toMatch(/color:\s*var\(--blue700\)/);
+    expect(rule('.tm-list-region-notice-link')).toMatch(/min-height:\s*var\(--spacing-11\)/);
+    expect(rule('.tm-list-region-notice-pill')).toMatch(/height:\s*var\(--spacing-8\)/);
+    expect(rule('.tm-list-region-notice-pill')).toMatch(/border-radius:\s*var\(--radius-pill\)/);
+    expect(rule('.tm-list-region-notice-pill')).toMatch(/background:\s*var\(--blue50\)/);
+    expect(rule('.tm-list-region-notice-pill')).toMatch(/color:\s*var\(--blue700\)/);
   });
 });

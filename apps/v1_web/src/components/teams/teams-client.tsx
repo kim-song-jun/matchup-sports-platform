@@ -56,7 +56,7 @@ import { DissolvedTeamView } from './dissolved-team-view';
 import { toCompetitionEntryRows } from './team-competition-entries-section';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
-import { resolveMyTeamRegion, resolveTeamListRegionPreference, teamListRegionNotice, type MyTeamRegion } from './team-list-region-preference';
+import { resolveMyTeamRegion, resolveListRegionPreference, listRegionNotice, type MyTeamRegion } from '@/lib/list-region-preference';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMemberAction, TeamMemberRowModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
@@ -110,7 +110,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
   // 목록 맨 위 "내 팀" 줄 — 검색·필터·이어 보기 중에는 결과를 좁힌 화면이라 내 팀 줄을 걷는다.
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: signedIn });
   // 활동 많은순에서는 내 지역 팀을 앞 무리로 올린다(걸러 내지 않는다). 기준은 저장한 활동 지역뿐이고, 없으면 소속 팀이 있어도 기본 순서다.
-  const regionPreference = resolveTeamListRegionPreference({
+  const regionPreference = resolveListRegionPreference({
     applicable: selectedSort === '' && !selectedRegionId,
     signedIn,
     linkRegionId: urlNear,
@@ -250,7 +250,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], myRegion, filterOpen),
-    regionPriorityNotice: teamListRegionNotice(regionPreference, LOCATION_SETTINGS_HREF),
+    regionPriorityNotice: listRegionNotice(regionPreference, LOCATION_SETTINGS_HREF),
     chips: buildTeamSportChips(
       visibleItems,
       base,

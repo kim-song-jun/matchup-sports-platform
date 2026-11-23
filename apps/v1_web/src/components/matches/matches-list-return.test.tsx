@@ -60,6 +60,7 @@ beforeEach(() => {
     if (path === '/matches') return page(filters);
     if (path === '/master/sports') return [{ sportId: 'futsal', name: '풋살' }];
     if (path === '/master/regions') return [];
+    if (path === '/auth/me') return { user: null };
     if (path === '/search/recent') return { items: [] };
     throw new Error(`Unexpected API path: ${path}`);
   });

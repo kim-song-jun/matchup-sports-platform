@@ -84,7 +84,8 @@ describe('TeamListPageClient — 내 팀 줄', () => {
    */
   it('내 팀 칩과 목록 카드는 같은 높이 변수를 쓴다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const rule = (selector: string) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rule = (selector: string) => css.match(new RegExp(`\\n${escapeRegExp(selector)}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
 
     expect(rule('.tm-team-list')).toMatch(/--tm-team-card-height:\s*116px/);
     expect(rule('.tm-team-card-compact')).toMatch(/min-height:\s*var\(--tm-team-card-height\)/);

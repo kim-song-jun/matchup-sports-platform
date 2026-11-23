@@ -8,7 +8,8 @@ export const CONTAINER_LABELS = {
   teameet_nginx: 'nginx',
 };
 
-// Alpha only pages on four things (heartbeat, restarts, heap, disk) so it publishes just those.
+// Alpha pages on heartbeat, restarts, heap and disk; the collector's own CollectorSeconds / StepFailures
+// ride along, so it publishes just these six.
 const ALPHA_METRICS = new Set(['Heartbeat', 'Restarts', 'HeapOom', 'DiskUsedPct', 'CollectorSeconds', 'StepFailures']);
 
 /**

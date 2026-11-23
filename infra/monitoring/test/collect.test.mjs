@@ -31,7 +31,8 @@ function fakeExec(over = {}) {
       'logs:teameet_v1_web': () => ({ stdout: '', stderr: over.webLogs ?? '' }),
       'logs:teameet_v1_api': () => ({ stdout: '', stderr: '' }),
       'logs:teameet_v1_game_operations_worker': () => ({ stdout: '', stderr: '' }),
-      'logs:teameet_nginx': () => ({ stdout: over.nginx ?? [fx.NGINX_OK, fx.NGINX_502].join('\n'), stderr: '' }),
+      // nginx writes access lines to stdout and its error log (the `limiting requests` rejections) to stderr.
+      'logs:teameet_nginx': () => ({ stdout: over.nginx ?? [fx.NGINX_OK, fx.NGINX_502].join('\n'), stderr: over.nginxErr ?? '' }),
       'docker stats': () => ({ stdout: '70.5%\n', stderr: '' }),
       'df -P': () => ({ stdout: fx.DF, stderr: '' }),
       'openssl x509': () => ({ stdout: fx.OPENSSL, stderr: '' }),
@@ -158,8 +159,9 @@ test('a minute that fills the line cap is reported as truncated, not published a
 });
 
 test('a bot burst rejected by limit_req publishes the rejections apart and no 5xx', async () => {
-  const burst = Array.from({ length: 30 }, () => [fx.NGINX_503, fx.NGINX_LIMIT_REQ_LINE]).flat();
-  const { sample } = await run({}, { nginx: [fx.NGINX_OK, ...burst].join('\n') });
+  const access = Array.from({ length: 30 }, () => fx.NGINX_503);
+  const rejections = Array.from({ length: 30 }, () => fx.NGINX_LIMIT_REQ_LINE);
+  const { sample } = await run({}, { nginx: [fx.NGINX_OK, ...access].join('\n'), nginxErr: rejections.join('\n') });
   const value = (name) => buildMetricData('prod', sample).find((d) => d.MetricName === name)?.Value;
   assert.equal(value('Nginx5xx'), 0);
   assert.equal(value('NginxRateLimited'), 30);

@@ -90,9 +90,13 @@ Not specified verbatim anywhere in the frozen contract, but required for the wai
 
 An older v1 precedent (`team-matches.service.ts`) returns `{items, pageInfo:{nextCursor,hasNext}}`. Since `global-contract.md`'s opening paragraph freezes `{items,nextCursor}` as the cross-domain default, every Task 12 list endpoint follows that literal shape instead of copying the pre-existing (pre-contract) team-matches convention.
 
+**`me/schedule` order (2026-11-23).** The "all" list is grouped by state — `SCHEDULED` first (soonest `startAt` first), then `COMPLETED` (most recent first), then `CANCELLED` (most recent first) — and the `status` filter uses the same per-state order. A single `orderBy` cannot express that, so each group is read in turn until `limit` is filled; `nextCursor` is `<STATE>:<id>` (a bare `<id>` from an older client is still accepted and read as a position inside the first group). Before this, every state was ordered by `startAt` ascending, so old completed/cancelled rows filled the top and the 50-row page could cut off upcoming schedules.
+
 ### 7. `COMPLETED` is reachable only through an explicit `POST .../complete` mutation, never automatically
 
 The frozen contract's transition table (`scheduled -> cancelled|completed`) does not specify a mechanism. `TeamSchedulesService.complete()` is a versioned, idempotent, owner/manager-only CAS mutation (same shape as `cancel()`) that requires `schedule.endAt` to already be in the past (`409 SCHEDULE_NOT_YET_ENDED` otherwise) and is itself terminal (a completed schedule cannot be updated, cancelled, or completed again). There is no cron/worker that completes schedules automatically based on `endAt` alone — an owner/manager must call this route.
+
+**Update (2026-11-23): training/event schedules now auto-complete.** The worker (`TeamScheduleAutoCompleteService`, a self-rescheduling outbox scan every 10 minutes, 100 rows per scan) sets `SCHEDULED` → `COMPLETED` for `TRAINING`/`EVENT` schedules with no `teamMatchId` whose `endAt` is more than 24 hours in the past, and closes an `OPEN` guest recruitment just like `complete()`. It sends **no notification** and never cancels (a cancel would notify the whole team about something that already happened). `MATCH` schedules and anything tied to a team match/league/tournament are left alone — the game result decides their state. The 24 hours leave the owner/manager room to complete or cancel by hand.
 
 ### 8. Durable reminder delivery does not reuse `NotificationsService.emitNotificationToMany`'s persistence path
 

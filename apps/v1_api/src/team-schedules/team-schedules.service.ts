@@ -36,6 +36,30 @@ export async function visibleTeamMatchScheduleWhere(prisma: PrismaService, teamI
   return hidden.length ? { OR: [{ teamMatchId: null }, { teamMatchId: { notIn: hidden.map((match) => match.id) } }] } : {};
 }
 
+/** 내 일정 정렬 묶음 — 예정은 가까운 순, 완료·취소됨은 최근 순. */
+const MY_SCHEDULE_GROUPS: ReadonlyArray<{ state: V1ScheduleState; order: 'asc' | 'desc' }> = [
+  { state: V1ScheduleState.SCHEDULED, order: 'asc' },
+  { state: V1ScheduleState.COMPLETED, order: 'desc' },
+  { state: V1ScheduleState.CANCELLED, order: 'desc' },
+];
+
+function myScheduleCursor(row: { id: string; state: V1ScheduleState } | undefined): string | null {
+  return row === undefined ? null : `${row.state}:${row.id}`;
+}
+
+/** `<상태>:<id>` → [상태, id]. 상태가 없는 옛 커서(`<id>`)는 첫 묶음의 id 로 본다. 묶음에 없는 상태는 처음부터. */
+function parseMyScheduleCursor(
+  cursor: string | undefined,
+  groups: ReadonlyArray<{ state: V1ScheduleState }>,
+): [V1ScheduleState, string | null] {
+  const first = groups[0]?.state ?? V1ScheduleState.SCHEDULED;
+  if (cursor === undefined || cursor === '') return [first, null];
+  const colon = cursor.indexOf(':');
+  if (colon < 0) return [first, cursor];
+  const state = cursor.slice(0, colon) as V1ScheduleState;
+  return groups.some((group) => group.state === state) ? [state, cursor.slice(colon + 1)] : [first, null];
+}
+
 /** 일정 생성·취소 알림(H1-schedule-*) outbox 종류 — 워커의 ScheduleReminderService 가 받아 팀원에게 쓴다. */
 export const SCHEDULE_CREATED_NOTIFICATION_TYPE = 'SCHEDULE_CREATED_NOTIFICATION';
 export const SCHEDULE_CANCELLED_NOTIFICATION_TYPE = 'SCHEDULE_CANCELLED_NOTIFICATION';
@@ -350,7 +374,6 @@ export class TeamSchedulesService {
     const where: Prisma.V1TeamScheduleWhereInput = {
       AND: [await visibleTeamMatchScheduleWhere(this.prisma, [...infoByTeam.keys()])],
       teamId: { in: [...infoByTeam.keys()] },
-      ...(state ? { state } : {}),
       ...(query.from || query.to
         ? {
             startAt: {
@@ -361,15 +384,28 @@ export class TeamSchedulesService {
         : {}),
     };
 
-    const rows = await this.prisma.v1TeamSchedule.findMany({
-      where,
-      // Full attendance list (not filtered to the caller) — toSummary()'s goingCount/
-      // waitlistedCount must reflect the schedule's real totals, not just the caller's own row.
-      include: { attendance: { select: { userId: true, status: true } } },
-      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    // 예정 → 완료 → 취소됨 순서. 예정은 가까운 일정이 위, 완료·취소됨은 최근 것이 위다(2026-11-23).
+    // 한 줄 orderBy 로는 상태 묶음을 못 만들어, 묶음마다 따로 읽어 limit 까지 채운다.
+    // 커서는 `<상태>:<id>` — 어느 묶음의 어디까지 읽었는지를 담는다(상태 필터 때 옛 커서 `<id>` 도 받는다).
+    const groups = MY_SCHEDULE_GROUPS.filter((group) => state === undefined || group.state === state);
+    const [cursorState, cursorId] = parseMyScheduleCursor(query.cursor, groups);
+    const firstGroup = Math.max(0, groups.findIndex((group) => group.state === cursorState));
+    const rows: Array<Prisma.V1TeamScheduleGetPayload<{ include: { attendance: { select: { userId: true; status: true } } } }>> = [];
+    for (const group of groups.slice(firstGroup)) {
+      const remaining = limit + 1 - rows.length;
+      if (remaining <= 0) break;
+      rows.push(
+        ...(await this.prisma.v1TeamSchedule.findMany({
+          where: { ...where, state: group.state },
+          // Full attendance list (not filtered to the caller) — toSummary()'s goingCount/
+          // waitlistedCount must reflect the schedule's real totals, not just the caller's own row.
+          include: { attendance: { select: { userId: true, status: true } } },
+          orderBy: [{ startAt: group.order }, { id: group.order }],
+          take: remaining,
+          ...(cursorId !== null && group.state === cursorState ? { cursor: { id: cursorId }, skip: 1 } : {}),
+        })),
+      );
+    }
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
     const matchProjectionByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
@@ -400,7 +436,7 @@ export class TeamSchedulesService {
           myAttendanceStatus: mine?.status ?? null,
         };
       }),
-      nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      nextCursor: hasNext ? myScheduleCursor(pageItems.at(-1)) : null,
     };
   }
 

@@ -191,4 +191,13 @@ describe('TeamListPageClient — 내 지역 팀 먼저', () => {
     expect(rule('.tm-list-region-notice-pill')).toMatch(/background:\s*var\(--blue50\)/);
     expect(rule('.tm-list-region-notice-pill')).toMatch(/color:\s*var\(--blue700\)/);
   });
+
+  it('안내 문구는 알약 옆에서 두 줄로 접혀도 어절 단위로만 줄바꿈하고 짧은 마지막 줄을 피한다', () => {
+    // 390 폭에서 문구 영역은 224px 라 한 줄에 다 들어가지 않는다 — 기본 줄바꿈은 "보|여", 마지막 "요" 한 글자에서 끊겼다.
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const notice = css.match(/\n\.tm-list-region-notice\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    expect(notice).toMatch(/word-break:\s*keep-all/);
+    expect(notice).toMatch(/text-wrap:\s*pretty/);
+  });
 });

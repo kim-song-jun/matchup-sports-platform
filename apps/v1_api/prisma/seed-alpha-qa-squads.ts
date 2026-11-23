@@ -179,20 +179,11 @@ async function seedSquadTeam(
   for (const [index, memberId] of memberIds.entries()) {
     // 1번은 팀장(owner), 2번은 매니저(manager 권한 경로 검증용), 나머지는 일반 팀원.
     const role = index === 0 ? 'owner' : index === 1 ? 'manager' : 'member';
-    const existing = await tx.v1TeamMembership.findFirst({
-      where: { teamId: team.id, userId: memberId },
-      select: { id: true },
+    await tx.v1TeamMembership.upsert({
+      where: { teamId_userId: { teamId: team.id, userId: memberId } },
+      update: { role, status: 'active', joinedAt: now, leftAt: null },
+      create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now },
     });
-    if (existing) {
-      await tx.v1TeamMembership.update({
-        where: { id: existing.id },
-        data: { role, status: 'active', joinedAt: now, leftAt: null },
-      });
-    } else {
-      await tx.v1TeamMembership.create({
-        data: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now },
-      });
-    }
   }
   await refreshAlphaTeamMembershipCounts(tx, team.id);
 }

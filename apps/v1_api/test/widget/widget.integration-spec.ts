@@ -34,6 +34,7 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
 
   const as = (userId: string) => ({
     post: (url: string) => request(app.getHttpServer()).post(`/api/v1${url}`).set('x-v1-user-id', userId),
+    del: (url: string) => request(app.getHttpServer()).delete(`/api/v1${url}`).set('x-v1-user-id', userId),
   });
   const bearer = (token: string) => ({
     get: (url: string) => request(app.getHttpServer()).get(`/api/v1${url}`).set('Authorization', `Bearer ${token}`),
@@ -181,6 +182,24 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
     await bearer(token).get('/widget/games?limit=0').expect(400);
     await bearer(token).get('/widget/games?limit=11').expect(400);
     expect((await bearer(await tokenOf(userC)).get('/widget/games').expect(200)).body.data.items).toEqual([]);
+  });
+
+  it('오래 진행 중인 경기도 삭제된 경기는 숨기고, 내 위젯 토큰은 한 번에 전부 폐기할 수 있다', async () => {
+    // 시작한 지 5시간(3시간 유예 밖)이라 "다가오는" 수집이 아니라 진행 중 경로로만 잡힌다.
+    const long = await makeGame('long', { host: team1, away: team2, startOffsetMs: -5 * 60 * 60_000, state: 'LIVE', policy: 'LIVE' });
+    const token = await tokenOf(userA);
+    const ids = async () => ((await bearer(token).get('/widget/games?limit=10').expect(200)).body.data.items as Array<{ gameId: string }>).map((item) => item.gameId);
+    expect(await ids()).toContain(long.gameId);
+
+    await db.v1TeamMatch.update({ where: { id: createdTeamMatchIds[createdTeamMatchIds.length - 1] }, data: { deletedAt: new Date() } });
+    expect(await ids()).not.toContain(long.gameId);
+    await db.v1Game.update({ where: { id: long.gameId }, data: { state: 'ENDED' } }); // 뒤 케이스에 영향이 없게
+
+    const second = await tokenOf(userA);
+    const revoked = (await as(userA).del('/me/widget-token').expect(200)).body.data as { revoked: number };
+    expect(revoked.revoked).toBeGreaterThanOrEqual(2);
+    await bearer(token).get('/widget/games').expect(401);
+    await bearer(second).get('/widget/games').expect(401);
   });
 
   it('토큰을 폐기하면 바로 401, 캘린더 토큰으로는 위젯을 못 연다, 기기당 활성 토큰은 10개까지', async () => {

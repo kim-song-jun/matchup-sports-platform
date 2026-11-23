@@ -69,6 +69,15 @@ export class WidgetService {
     return { userId: row.userId, tokenId: row.id };
   }
 
+  /** 분실·교체한 기기까지 포함해 내 위젯 토큰을 전부 폐기한다(로그인 쿠키). */
+  async revokeAll(user: V1AuthUser): Promise<{ revoked: number }> {
+    const { count } = await this.prisma.v1AccessToken.updateMany({
+      where: { userId: user.id, kind: 'widget', revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return { revoked: count };
+  }
+
   /** 앱에서 로그아웃할 때 그 기기의 위젯 토큰을 폐기한다. */
   async revoke(tokenId: string): Promise<{ revoked: true }> {
     await this.prisma.v1AccessToken.updateMany({ where: { id: tokenId, revokedAt: null }, data: { revokedAt: new Date() } });
@@ -91,9 +100,19 @@ export class WidgetService {
       includeUntimedTournamentGames: true,
     });
     // 3시간을 넘겨 길어지는 진행 중 경기도 놓치지 않게 따로 찾는다.
+    // 위 수집 경로와 같은 숨김 규칙을 건다 — 삭제된 경기·삭제된 대회·보류된 리그의 경기는 오래 진행 중이어도 안 나온다.
     const liveRows = await this.prisma.v1Game.findMany({
-      where: { state: { in: ['LIVE', 'PAUSED'] }, sides: { some: { teamId: { in: teamIds } } } },
+      where: {
+        state: { in: ['LIVE', 'PAUSED'] },
+        sides: { some: { teamId: { in: teamIds } } },
+        NOT: [
+          { teamMatch: { is: { deletedAt: { not: null } } } },
+          { teamMatch: { is: { tournament: { is: { deletedAt: { not: null } } } } } },
+          { teamMatch: { is: { league: { is: { status: 'on_hold' } } } } },
+        ],
+      },
       select: { id: true },
+      orderBy: { id: 'asc' },
       take: WIDGET_MAX_LIMIT,
     });
     const gameIds = [...new Set([...upcoming.map((g) => g.gameId), ...liveRows.map((g) => g.id)])];

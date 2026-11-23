@@ -13,6 +13,8 @@ type LockedSchedule = {
   // P1-2 fix: needed so rsvpDeadlineReminderHandler can compare it against the outbox payload's
   // `expectedRsvpDeadlineAt` and no-op a row whose generation the schedule has since moved past.
   rsvpDeadlineAt: Date | null;
+  /** 자동 리마인더가 밤에 푸시를 보낼지 가리는 데 쓴다. */
+  startAt?: Date | null;
 };
 
 type LockedRecruitment = {
@@ -131,10 +133,15 @@ export class ScheduleReminderService {
       if (currentRsvpDeadlineAt !== expectedRsvpDeadlineAt) return;
     }
 
-    const recipients = await this.activeTeamMemberIds(tx, schedule.teamId);
+    // 이미 참석·미정·불참(대기 포함)으로 응답한 팀원은 뺀다 — 아직 응답하지 않은 사람에게만 간다.
+    const recipients = await this.activeTeamMemberIds(tx, schedule.teamId, schedule.id);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim, recipients, scheduleNotice('schedule_rsvp_deadline_reminder', schedule.teamId, schedule.id), true);
+    // 자동 예약(payload.auto)은 팀장이 누른 게 아니라 밤에도 울리면 안 된다 — 알림함에는 남기고 푸시만 낮 시간에 보낸다.
+    // 수동 트리거는 팀장이 직접 요청했으므로 지금까지처럼 항상 푸시한다.
+    const auto = (claim.payload as { auto?: unknown } | null)?.auto === true;
+    const push = auto ? nightPushAllowed(new Date(), schedule.startAt ?? null) : true;
+    await this.deliverDurableReminder(tx, claim, recipients, scheduleNotice('schedule_rsvp_deadline_reminder', schedule.teamId, schedule.id), push);
   };
 
   readonly guestRecruitmentCloseReminderHandler: GameOperationHandler = async (claim, tx) => {
@@ -443,7 +450,7 @@ export class ScheduleReminderService {
 
   private async lockSchedule(tx: Prisma.TransactionClient, scheduleId: string): Promise<LockedSchedule | null> {
     const rows = await tx.$queryRaw<LockedSchedule[]>`
-      SELECT id, team_id AS "teamId", state::text AS state, rsvp_deadline_at AS "rsvpDeadlineAt"
+      SELECT id, team_id AS "teamId", state::text AS state, rsvp_deadline_at AS "rsvpDeadlineAt", start_at AS "startAt"
       FROM v1_team_schedules
       WHERE id = ${scheduleId}
       FOR UPDATE
@@ -469,7 +476,14 @@ export class ScheduleReminderService {
 
   // No role filter: "every active team member (owner/manager/member)" per the reminder design —
   // all three roles are included, so the role column is not restricted here.
-  private async activeTeamMemberIds(tx: Prisma.TransactionClient, teamId: string): Promise<string[]> {
+  /** `unansweredScheduleId` 를 주면 그 일정에 응답 행이 없는 팀원만 돌려준다(단일 쿼리라 호출 순서가 그대로다). */
+  private async activeTeamMemberIds(tx: Prisma.TransactionClient, teamId: string, unansweredScheduleId?: string): Promise<string[]> {
+    const unanswered = unansweredScheduleId === undefined
+      ? Prisma.empty
+      : Prisma.sql`AND NOT EXISTS (
+          SELECT 1 FROM v1_schedule_attendance a
+          WHERE a.schedule_id = ${unansweredScheduleId} AND a.user_id = membership.user_id
+        )`;
     const rows = await tx.$queryRaw<Array<{ userId: string }>>`
       SELECT membership.user_id AS "userId"
       FROM v1_team_memberships membership
@@ -477,6 +491,7 @@ export class ScheduleReminderService {
       WHERE membership.team_id = ${teamId}
         AND membership.status = 'active'
         AND u.account_status = 'active'
+        ${unanswered}
     `;
     return rows.map((r) => r.userId);
   }

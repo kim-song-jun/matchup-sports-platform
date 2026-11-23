@@ -31,6 +31,7 @@ function buildModel(
     stateTone: 'default',
     state: 'SCHEDULED',
     dateTimeLabel: '5월 11일 09:00-11:00',
+    calendarFileHref: null,
     visibilityLabel: '팀 전체',
     capacityLabel: null,
     opponent: null,
@@ -444,5 +445,16 @@ describe('일정 상세 — 친선 경기 응답 이름 (H5 A-3)', () => {
     for (const other of ['미정', '불참']) {
       expect(screen.getByRole('button', { name: other }).querySelector('svg')).toBeNull();
     }
+  });
+});
+
+describe('일정 상세 — 캘린더에 추가', () => {
+  it('팀원에게는 .ics 내려받기 링크가 보이고, 파일 주소가 없으면(팀원이 아니면) 안 보인다', () => {
+    const model = { ...buildModel({}), calendarFileHref: '/api/v1/teams/team-1/schedules/schedule-1/calendar.ics' };
+    renderPage(<ScheduleDetailPageView model={model} />);
+    expect(screen.getAllByRole('link', { name: '캘린더에 추가' })[0]).toHaveAttribute('href', '/api/v1/teams/team-1/schedules/schedule-1/calendar.ics');
+    cleanup();
+    renderPage(<ScheduleDetailPageView model={buildModel({})} />);
+    expect(screen.queryByRole('link', { name: '캘린더에 추가' })).toBeNull();
   });
 });

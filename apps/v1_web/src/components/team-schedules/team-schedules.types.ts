@@ -231,6 +231,8 @@ export type ScheduleDetailViewModel = {
   stateTone: 'default' | 'muted';
   state: V1ScheduleState;
   dateTimeLabel: string;
+  /** 이 일정 한 건을 폰 캘린더에 넣는 `.ics` 파일 주소 — 팀원에게만. */
+  calendarFileHref: string | null;
   visibilityLabel: string;
   capacityLabel: string | null;
   /** MATCH 타입이 확정됐고(matchConfirmed) 상대팀 이름을 불러왔을 때만 채워진다. */

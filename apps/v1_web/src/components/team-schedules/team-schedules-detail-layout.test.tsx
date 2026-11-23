@@ -16,7 +16,7 @@ function detailModel(): ScheduleDetailViewModel {
   return {
     teamId: 'team-1', scheduleId: 'schedule-1', backHref: '/teams/team-1/schedules',
     title: '토요일 정기훈련', typeLabel: '정기훈련', stateLabel: '예정', stateTone: 'default',
-    state: 'SCHEDULED', dateTimeLabel: '10월 10일 09:00-11:00', visibilityLabel: '팀 전체',
+    state: 'SCHEDULED', dateTimeLabel: '10월 10일 09:00-11:00', calendarFileHref: null, visibilityLabel: '팀 전체',
     capacityLabel: null, opponent: null, roster: null, version: 1,
     conflictBanner: null, onDismissConflict: () => undefined,
     history: [{ label: '시간 변경', detail: '오전 9시로 바꿨어요.' }],

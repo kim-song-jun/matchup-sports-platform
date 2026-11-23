@@ -51,7 +51,9 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-20: additive V1TeamInternalMatch* tables (20261120000100_team_internal_matches); M11 remains unchanged.
 # 2026-11-12: additive V1TournamentStageTieBreakSetting and V1Tournament.sixTeamDirectFinalOrder (20261111180000_tournament_stage_tie_break_settings, MD-QA #186); M11 remains unchanged.
 # 2026-11-20: additive V1TeamProfile.membershipFee (20261120100000_v1_team_membership_fee); M11 remains unchanged.
-[[ ( "$schema_sha" == 616ec82475046627e4e58c6982c6312e95ddfd38831e44c5629a8b7eaa3d443b \
+# 2026-11-23: additive V1AccessToken (20261123090000_v1_access_tokens); M11 remains unchanged.
+[[ ( "$schema_sha" == 40d98233092f3d6b8dbbe9c601d2d7081ae6ec141b30cd703c00a03584474d3a \
+  || "$schema_sha" == 616ec82475046627e4e58c6982c6312e95ddfd38831e44c5629a8b7eaa3d443b \
   || "$schema_sha" == 0f2588a68754399023e94bd171a0ceac4f1b3921c736ceea0ce7cc6efd2e174d \
   || "$schema_sha" == 5c1f131cad5acefe13408405bdd222141cfaffdcf53de6a1599ed6a7008baf7d \
   || "$schema_sha" == 65f3640c6129b81e1a503c6c5a2c11cbc79154e4e35acc598bed34f6110d50c1 \

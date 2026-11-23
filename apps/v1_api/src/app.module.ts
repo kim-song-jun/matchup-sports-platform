@@ -22,6 +22,7 @@ import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
 import { TeamContactsModule } from './team-contacts/team-contacts.module';
 import { TeamLineupsModule } from './team-lineups/team-lineups.module';
+import { CalendarFeedModule } from './calendar-feed/calendar-feed.module';
 import { TeamInternalMatchesModule } from './team-internal-matches/team-internal-matches.module';
 import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
@@ -76,6 +77,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
     TeamLineupsModule,
     TeamSchedulesModule,
     TeamInternalMatchesModule,
+    CalendarFeedModule,
     GamesModule,
     GameOperationFlagsModule,
     ChatModule,

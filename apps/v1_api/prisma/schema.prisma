@@ -4501,3 +4501,24 @@ model V1TeamInternalMatchGoal {
   @@index([sideId], map: "v1_team_internal_match_goals_side_idx")
   @@map("v1_team_internal_match_goals")
 }
+
+/// 읽기 전용 개인 토큰 종류. 캘린더 구독 주소와 위젯이 같은 테이블을 쓴다.
+enum V1AccessTokenKind {
+  calendar_feed
+  widget
+}
+
+/// 로그인 쿠키를 쓸 수 없는 곳(폰 캘린더 구독, 위젯)에 주는 읽기 전용 토큰.
+/// 토큰 문자열은 DB에 두지 않는다 — `<id>.<HMAC(id)>` 로 서버가 다시 만들 수 있어 "주소 복사"가 가능하고,
+/// 폐기(`revokedAt`)하면 그 id 의 토큰은 바로 쓸 수 없다. 사용자 id 는 FK 없이 문자열로만 둔다(내 팀 내 경기와 같은 방식).
+model V1AccessToken {
+  id         String            @id @default(uuid())
+  userId     String            @map("user_id")
+  kind       V1AccessTokenKind
+  createdAt  DateTime          @default(now()) @map("created_at")
+  revokedAt  DateTime?         @map("revoked_at")
+  lastUsedAt DateTime?         @map("last_used_at")
+
+  @@index([userId, kind, revokedAt], map: "v1_access_tokens_user_kind_idx")
+  @@map("v1_access_tokens")
+}

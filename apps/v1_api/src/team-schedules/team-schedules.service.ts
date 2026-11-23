@@ -24,7 +24,7 @@ const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 type Tx = Prisma.TransactionClient;
 
 // 취소된 팀매치의 일정은 운영 이력으로만 남긴다. 일반 팀 일정의 취소 표시는 유지한다.
-async function visibleTeamMatchScheduleWhere(prisma: PrismaService, teamIds: string[]): Promise<Prisma.V1TeamScheduleWhereInput> {
+export async function visibleTeamMatchScheduleWhere(prisma: PrismaService, teamIds: string[]): Promise<Prisma.V1TeamScheduleWhereInput> {
   // teamMatchId에는 Prisma relation이 없어 현재 팀의 비공개 매치 ID를 배치 조회해서 제외한다.
   const hidden = await prisma.v1TeamMatch.findMany({
     where: { AND: [

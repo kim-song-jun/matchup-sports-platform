@@ -65,6 +65,16 @@ describe('buildPinoHttpOptions', () => {
     expect((loggedReq.headers as Record<string, unknown>)['user-agent']).toBe('jest-test-agent');
   });
 
+  it('masks the calendar feed token in the request path', () => {
+    const { stream, lines } = captureLogLines();
+    const { logger } = pinoHttp(optionsForTest(), stream);
+
+    logger.info({ req: { id: 'req-2', method: 'GET', url: '/api/v1/calendar/feed/0f1e2d3c-aaaa-4bbb-8ccc-123456789abc.SIGNATURE_abc-123.ics', headers: {} } }, 'test log');
+
+    const [entry] = lines();
+    expect((entry.req as Record<string, unknown>).url).toBe('/api/v1/calendar/feed/[redacted].ics');
+  });
+
   it('redacts req.headers.referer to prevent leaking OAuth code/state carried by same-origin Referer headers', () => {
     const { stream, lines } = captureLogLines();
     const { logger } = pinoHttp(optionsForTest(), stream);

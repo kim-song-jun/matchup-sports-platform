@@ -1106,6 +1106,49 @@ describe('PublicTournamentRecordsService.getMatch -- periodBreak 배선', () => 
   });
 });
 
+describe('PublicTournamentRecordsService.getMatch -- endedPeriods (끝난 피리어드의 실제 진행 시간)', () => {
+  const kickoff = new Date('2026-08-10T04:00:00.000Z');
+  const ended = (number: number, startMin: number, endMin: number, pausedTotalMs = 0) => ({
+    number,
+    state: 'ENDED',
+    startedAt: new Date(kickoff.getTime() + startMin * 60_000),
+    endedAt: new Date(kickoff.getTime() + endMin * 60_000),
+    pausedTotalMs,
+    pausedAt: null,
+  });
+  const endedPeriodsFor = async (options: { gameState?: string; periods: unknown[] }) => {
+    const prisma = buildFakePrisma({
+      scheduledAt: kickoff,
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      ...options,
+    } as Parameters<typeof buildFakePrisma>[0]);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).endedPeriods;
+  };
+
+  it('진행 중 경기의 하프타임에는 끝난 전반이 설정 길이가 아니라 실제로 진행된 시간으로 실린다', async () => {
+    const result = await endedPeriodsFor({
+      periods: [
+        ended(1, 0, 5), // 설정은 20분이지만 5분에 끝냈다
+        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    expect(result).toEqual([{ periodNumber: 1, elapsedMs: 5 * 60_000 }]);
+  });
+
+  it('일시 중지 구간은 뺀다', async () => {
+    expect(await endedPeriodsFor({ periods: [ended(1, 0, 22, 2 * 60_000)] })).toEqual([
+      { periodNumber: 1, elapsedMs: 20 * 60_000 },
+    ]);
+  });
+
+  it('경기가 이미 종료됐으면(status !== live) null이다 — 라이브 전용 값이 끝난 경기 응답에 실리지 않는다', async () => {
+    expect(await endedPeriodsFor({ gameState: 'ENDED', periods: [ended(1, 0, 20), ended(2, 25, 45)] })).toBeNull();
+  });
+});
+
 describe('PublicTournamentRecordsService.getMatch -- periodCount (정규 피리어드 수)', () => {
   const periodCountFor = async (configPeriods: unknown, periods: readonly { number: number }[] = []) => {
     const prisma = buildFakePrisma({

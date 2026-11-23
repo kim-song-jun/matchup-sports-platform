@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { derivePenaltiesFromMarkers, type PenaltyMarker } from '@/lib/red-card-penalty';
 import { RedCardPenaltyRows } from '@/shared/game-operations/red-card-penalty-rows';
-import type { PublicGameClock, PublicMatchEvent, PublicPeriodBreak } from './types';
+import type { PublicEndedPeriod, PublicGameClock, PublicMatchEvent, PublicPeriodBreak } from './types';
 
 export interface PublicRedCardPenaltyProps {
   readonly events: readonly PublicMatchEvent[];
@@ -12,6 +12,8 @@ export interface PublicRedCardPenaltyProps {
   readonly periodCount?: number | null;
   /** 정규 피리어드별 길이(분). 전·후반 경계를 넘는 패널티를 이어 세는 데 쓴다. */
   readonly periodMinutes?: readonly number[] | null;
+  /** 끝난 피리어드가 실제로 진행된 시간 — 설정 길이보다 일찍 끝낸 전반 뒤의 하프타임·후반에서 흐른 시간을 정확히 센다. */
+  readonly endedPeriods?: readonly PublicEndedPeriod[] | null;
   readonly homeName: string;
   readonly awayName: string;
 }
@@ -31,6 +33,7 @@ export function PublicRedCardPenalty({
   periodBreak,
   periodCount,
   periodMinutes,
+  endedPeriods,
   homeName,
   awayName,
 }: PublicRedCardPenaltyProps) {
@@ -52,7 +55,11 @@ export function PublicRedCardPenalty({
     return () => clearInterval(interval);
   }, [running]);
 
+  // 끝난 피리어드는 서버가 알려 준 **실제 진행 시간**을 쓰고(전반을 설정 길이보다 일찍 끝냈어도 맞는다), 그 값이 없으면
+  // (옛 응답·시각을 모르는 행) 설정 길이로 돌아간다.
   const periodLengthMs = (period: number): number | null => {
+    const played = endedPeriods?.find((ended) => ended.periodNumber === period)?.elapsedMs;
+    if (typeof played === 'number') return played;
     const minutes = periodMinutes?.[period - 1];
     return typeof minutes === 'number' && minutes > 0 ? minutes * 60_000 : null;
   };
@@ -63,10 +70,16 @@ export function PublicRedCardPenalty({
       period: clock.periodNumber,
       clockMs: clock.elapsedMs + (clock.isPaused ? 0 : Math.max(0, time.nowMs - time.receivedAtMs)),
     };
-  } else if (periodBreak === 'halftime' && periodCount === 2) {
-    // 하프타임에는 흐르는 경기 시간이 없다 — 전반이 끝난 시점에 멈춘 값을 보여 준다(정규 두 피리어드일 때만 직전 피리어드를 안다).
-    const firstLength = periodLengthMs(1);
-    if (firstLength !== null) now = { period: 1, clockMs: firstLength };
+  } else if (periodBreak === 'halftime') {
+    // 하프타임에는 흐르는 경기 시간이 없다 — 방금 끝난 피리어드의 끝 시점에 멈춘 값을 보여 준다. 서버가 끝난 피리어드를 알려 주면
+    // 그중 마지막 것이 직전 피리어드이고, 모르는 옛 응답은 정규 두 피리어드일 때만 직전이 전반이라고 본다.
+    const lastEnded = endedPeriods?.at(-1);
+    if (lastEnded !== undefined) {
+      now = { period: lastEnded.periodNumber, clockMs: lastEnded.elapsedMs };
+    } else if (periodCount === 2) {
+      const firstLength = periodLengthMs(1);
+      if (firstLength !== null) now = { period: 1, clockMs: firstLength };
+    }
   }
   if (now === null) return null;
 

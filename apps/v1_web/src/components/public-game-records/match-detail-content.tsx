@@ -514,6 +514,7 @@ export function MatchDetailContent({
               periodBreak={data.periodBreak}
               periodCount={data.periodCount}
               periodMinutes={data.periodMinutes}
+              endedPeriods={data.endedPeriods}
               homeName={sideLabel(data.home)}
               awayName={sideLabel(data.away)}
             />

@@ -33,7 +33,14 @@ import {
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
 import { displayRevisionReason } from './revision-reason-display';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
-import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
+import {
+  resolveEndedPeriods,
+  resolveLiveClock,
+  resolvePeriodBreak,
+  type PublicEndedPeriod,
+  type PublicGameClock,
+  type PublicPeriodBreak,
+} from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import {
@@ -172,7 +179,8 @@ const GAME_MATCH_SELECT = {
     },
   },
   // Lane 1 addition -- see GAME_MATCH_SELECT above.
-  periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
+  // `endedAt`은 끝난 피리어드의 실제 진행 시간(`endedPeriods`) 산출용이다.
+  periods: { select: { number: true, state: true, startedAt: true, endedAt: true, pausedTotalMs: true, pausedAt: true } },
   // 정규 피리어드 수(`periodCount`) 산출용 — 연장은 `V1GamePeriod` 행이라 행 수로는 셀 수 없다.
   // `lineup`은 교체 방식(`substitutionMode`) 산출용이다.
   competitionConfig: { select: { periods: true, lineup: true } },
@@ -1259,6 +1267,12 @@ export class PublicTournamentRecordsService {
       mode === 'live' && !showOfficialResult && status === 'live'
         ? resolvePeriodBreak(fixture.game?.periods ?? [])
         : null;
+    // 끝난 피리어드의 실제 진행 시간 — `periodBreak`와 같은 게이트(진행 중 경기에서만). 화면의 퇴장 패널티가 전·후반
+    // 경계를 이어 셀 때 설정 길이 대신 쓴다.
+    const endedPeriods: PublicEndedPeriod[] | null =
+      mode === 'live' && !showOfficialResult && status === 'live'
+        ? resolveEndedPeriods(fixture.game?.periods ?? [])
+        : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만, 프로필 링크
@@ -1345,6 +1359,7 @@ export class PublicTournamentRecordsService {
       periodCount: gamePeriodCount(fixture.game),
       periodMinutes: gamePeriodMinutes(fixture.game),
       substitutionMode: gameSubstitutionMode(fixture.game),
+      endedPeriods,
       lineup,
       events,
       mvp,
@@ -1990,6 +2005,11 @@ export class PublicTournamentRecordsService {
       mode === 'live' && !showOfficialResult && status === 'live'
         ? resolvePeriodBreak(teamMatch.game?.periods ?? [])
         : null;
+    // getMatch 의 같은 이름 주석 참고.
+    const endedPeriods: PublicEndedPeriod[] | null =
+      mode === 'live' && !showOfficialResult && status === 'live'
+        ? resolveEndedPeriods(teamMatch.game?.periods ?? [])
+        : null;
 
     const participantIds = (teamMatch.game?.participants ?? []).map((participant) => participant.id);
     // getMatch 와 동일: 프로필 링크의 동의 확인 때문에 항상 조회한다(그쪽 주석 참고).
@@ -2073,6 +2093,7 @@ export class PublicTournamentRecordsService {
       periodCount: gamePeriodCount(teamMatch.game),
       periodMinutes: gamePeriodMinutes(teamMatch.game),
       substitutionMode: gameSubstitutionMode(teamMatch.game),
+      endedPeriods,
       lineup,
       events,
       mvp,

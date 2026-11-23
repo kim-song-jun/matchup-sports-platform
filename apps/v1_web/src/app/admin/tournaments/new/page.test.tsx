@@ -1259,7 +1259,11 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     const dialog = await screen.findByRole('dialog');
     vi.setSystemTime(new Date('2026-09-01T00:00:00.000Z'));
     fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작하기' }));
-    await waitFor(() => expect(screen.getByText('STEP 2 / 5')).toBeInTheDocument());
+    // 오류 입력으로의 포커스 이동은 단계가 커밋된 뒤 effect 에서 일어난다. 커밋(STEP 2 표시)만 기다리면 그 effect 가
+    // 시험 종료 뒤로 밀려 afterEach 의 scrollIntoView 스텁 복구와 겹치므로, effect 의 결과(포커스)까지 기다린다.
+    await waitFor(() => expect(screen.getByLabelText(/신청 마감/)).toHaveFocus());
+    expect(screen.getByText('STEP 2 / 5')).toBeInTheDocument();
+    expect(screen.getByText('신청 마감이 지났어요. 마감 일시를 변경하고 저장해 주세요.')).toBeInTheDocument();
     expect(changeStatusMutate).not.toHaveBeenCalled();
   });
 

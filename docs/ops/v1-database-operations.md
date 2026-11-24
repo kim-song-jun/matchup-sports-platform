@@ -114,7 +114,7 @@ Demo and coverage modes are blocked when `NODE_ENV=production` unless `V1_ALLOW_
 Production-to-local refresh is an operator workflow, not an application deploy step.
 
 1. Run a host load, memory, swap, Node/browser process, Docker, and target-service preflight.
-2. Keep production read-only. Stream `pg_dump --format=custom --no-owner --no-acl` from `teameet_v1_postgres`; do not create a persistent dump file on the production host.
+2. Keep production read-only. Production is RDS: stream `pg_dump --format=custom --no-owner --no-acl` through the backup script's one-off client (`prod_db_client`, `docs/ops/prod-backup.md`), or restore the latest `pg/daily/` dump instead of dumping again; do not create a persistent dump file on the production host.
 3. Store temporary local dumps outside the repository with directory mode `0700` and file mode `0600`.
 4. Back up the current local dev DB before replacement.
 5. Stop only the local v1 API process that owns connections to the target DB. The Web server may stay up.
@@ -244,7 +244,7 @@ Do not convert these templates into delete statements without dependency counts 
 
 ### 현재 배포 동작
 
-로컬에서 `git push`를 실행하는 것만으로 운영 DB에 직접 접속하지는 않는다. 하지만 `main` 브랜치에 push되면 GitHub Actions 배포 workflow가 실행된다. 이 workflow는 저장소를 EC2 호스트로 동기화하고, 새 컨테이너를 빌드하고, `v1_postgres`를 시작한 뒤 `deploy/.env`의 `V1_DB_*` 설정으로 운영 v1 DB에 Prisma 명령을 실행한다.
+로컬에서 `git push`를 실행하는 것만으로 운영 DB에 직접 접속하지는 않는다. 하지만 `main` 브랜치에 push되면 GitHub Actions 배포 workflow가 실행된다. 이 workflow는 릴리스 소스와 이미지를 EC2 호스트로 내려받고 `deploy/.env`의 `V1_DB_*` 설정(호스트는 `V1_DB_HOST` = RDS)으로 운영 v1 DB에 Prisma 명령을 실행한다. 운영 compose 에는 DB 컨테이너가 없고, `V1_DB_HOST` 가 비면 배포가 시작 전에 멈춘다.
 
 현재 v1 운영 배포에서 DB 구조에 영향을 주는 명령:
 
@@ -295,7 +295,7 @@ prisma migrate deploy
 | Staging / preview | `prisma migrate deploy` 우선. demo seed는 명시 검토 후에만 허용 | demo seed는 운영 데이터와 명확히 분리되어야 한다. |
 | Production | `prisma migrate deploy` only | `db push`, demo/coverage seed, reset 금지. |
 
-운영 v1 DB는 `v1_postgres`와 `V1_DB_*`로 legacy 운영 DB와 분리된다. legacy `DB_*`와 v1 `V1_DB_*`가 같은 DB를 가리킨다고 가정하지 않는다.
+운영 v1 DB는 RDS(`V1_DB_*`)이고 alpha 는 같은 호스트의 `v1_postgres` 컨테이너(`docker-compose.alpha.yml`)다. 둘 다 legacy 운영 DB와 분리된다. legacy `DB_*`와 v1 `V1_DB_*`가 같은 DB를 가리킨다고 가정하지 않는다.
 
 ### Schema 변경 위험도 가이드
 

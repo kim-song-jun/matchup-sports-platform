@@ -103,7 +103,7 @@ graph TB
 | `v1_web` | Next.js 프론트엔드 (`apps/v1_web`, 3013) |
 | `v1_api` | NestJS 백엔드 (`apps/v1_api`, 8121) |
 | `v1_game_operations_worker` | 경기 운영 작업을 처리하는 워커(같은 API 이미지, `WORKER_PORT` 기본 8122) |
-| `v1_postgres` | PostgreSQL 16 컨테이너 (prod compose에 정의) |
+| `v1_postgres` | alpha 전용 PostgreSQL 16 컨테이너 (`docker-compose.alpha.yml`). 운영 DB 는 RDS 라 운영 compose 에는 없어요 |
 | `v1_uploads_init` | 업로드 디렉터리 권한을 맞추고 종료하는 **1회성 초기화 컨테이너** |
 
 > 📌 **헷갈리기 쉬운 점 — 현재 배포 스택에는 Redis가 없습니다.** 옛 v0 시절 문서(`docs/archive/`)에는

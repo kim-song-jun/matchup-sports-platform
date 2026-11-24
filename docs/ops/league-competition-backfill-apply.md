@@ -61,7 +61,7 @@ SELECT count(*) FROM v1_tournaments t JOIN v1_leagues l ON l.id = t.id;
 (재실행이면 정상, 아니면 **멈춘다** — CLI 가드가 같은 판단을 하지만 미리 알면 놀라지 않는다).
 
 공개 API 로는 이 값을 완전히 못 본다 — 대회 공개 목록이 `draft` 를 제외하기 때문이다.
-**SSM → EC2 → psql 경로**(문서화된 유일한 경로)로 조회한다.
+**SSM → EC2 → psql 경로**로 조회한다(prod 는 `docs/ops/prod-backup.md` 「운영 DB 에 읽기 전용으로 붙기」).
 
 ### 2. 미지원 종목
 ```sql

@@ -93,20 +93,23 @@ FAKE_ORPHAN=''
 
 echo '[web-replicas] 개수 2: 웹을 하나씩, healthy 뒤에 다음으로'
 configure_web_replicas 2 1 3500000
-FAKE_DEFINED='v1_web v1_web_b'
+# alpha: 오버레이가 DB 컨테이너를 정의하므로 앱보다 먼저 올린다.
+FAKE_DEFINED='v1_postgres v1_uploads_init v1_api v1_game_operations_worker v1_web v1_web_b nginx'
 : > "${LOG}"
 up_base_services
 up_app_containers --force-recreate
-expect_log '개수 2 순서' 'compose up -d v1_postgres v1_uploads_init
+expect_log '개수 2 순서(alpha)' 'compose up -d v1_postgres v1_uploads_init
 compose up -d --force-recreate --no-deps v1_api v1_game_operations_worker
 compose up -d --force-recreate --no-deps v1_web
 compose exec -T nginx nginx -s reload
 compose up -d --force-recreate --no-deps v1_web_b
 compose exec -T nginx nginx -s reload'
 
+# 운영: compose 에 DB 컨테이너가 없다(RDS). 없는 서비스를 부르면 compose 가 "no such service" 로 배포를 죽인다.
+FAKE_DEFINED='v1_uploads_init v1_api v1_game_operations_worker v1_web v1_web_b nginx'
 : > "${LOG}"
 up_all_services
-expect_log 'prod 의 up -d 대체는 웹 둘 다 순서대로' 'compose up -d v1_postgres v1_uploads_init
+expect_log 'prod 의 up -d 대체는 DB 컨테이너 없이 웹 둘 다 순서대로' 'compose up -d v1_uploads_init
 compose up -d --no-deps v1_api v1_game_operations_worker
 compose up -d --no-deps v1_web
 compose exec -T nginx nginx -s reload

@@ -30,8 +30,7 @@ const ALPHA_COMPOSE = 'deploy/docker-compose.alpha.yml';
  * 이유 없는 등록은 이 체커를 무력화하는 것과 같다.
  */
 const ALPHA_ONLY_ALLOWLIST = new Map([
-  // 예시 형태 유지용 주석 — 현재 등록된 예외는 없다.
-  // ['some_alpha_only_service', 'alpha 전용인 이유를 여기에 적는다'],
+  ['v1_postgres', 'alpha DB 는 같은 호스트의 컨테이너이고 운영 DB 는 RDS 다 — 운영에 두면 앱이 쓰지 않는 옛 DB 가 계속 뜬다'],
 ]);
 
 /**

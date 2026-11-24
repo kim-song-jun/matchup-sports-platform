@@ -260,9 +260,9 @@ SELECT c.conrelid::regclass, c.confdeltype FROM pg_constraint c
 > **아직 참인지 확인**: `SELECT count(*) FROM v1_game_official_result_cache c
 > JOIN v1_tournaments t ON t.id = c.tournament_id WHERE t.kind = 'regular_league';`
 > **0 이면 창이 아직 열려 있다.** 0 이 아니면 이미 닫혔으니 되돌리기는 선택지가 아니다 —
-> 그 사실부터 사용자에게 알린다. **alpha·prod DB 조회 경로는 저장소에 문서가 없다** —
-> SSM → EC2 → `docker exec … psql` 이고, 자격증명과 인스턴스 선택법은 저장소 밖 비공개
-> 메모리에 있다(이 저장소는 PUBLIC 이라 여기 적지 않는다).
+> 그 사실부터 사용자에게 알린다. 조회 경로는 SSM → EC2 다. prod 는 `docs/ops/prod-backup.md`
+> 「운영 DB 에 읽기 전용으로 붙기」(`prod_db_client`), alpha 는 `docker exec … teameet_v1_postgres psql` 이다.
+> 인스턴스 선택법은 저장소 밖 비공개 메모리에 있다(이 저장소는 PUBLIC 이라 여기 적지 않는다).
 
 ---
 

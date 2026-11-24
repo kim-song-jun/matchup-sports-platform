@@ -2,83 +2,123 @@
 
 set -Eeuo pipefail
 
-# 프로덕션 Postgres 논리 백업 → S3.
+# 운영 DB(RDS) 논리 백업 → S3. systemd 타이머(deploy/systemd/teameet-backup-db.timer)가 매일 돌린다.
 #
-# EBS 스냅샷(DLM, 매일 03:00 KST)이 볼륨 전체를 커버하지만, 그건 크래시 일관성 스냅샷이라
-# "테이블 하나만 되돌리기" 같은 복구는 못 한다. 그리고 스냅샷은 이 인스턴스의 볼륨에 묶여
-# 있어서, RDS 로 옮길 때 그대로 쓸 수 없다. pg_dump 는 두 경우 모두를 커버한다.
+# 접속 정보는 실행 중인 API 컨테이너의 DATABASE_URL 이다 — 앱이 실제로 쓰는 DB 를 뜬다. 비밀번호는
+# 명령줄 인자·로그에 싣지 않는다: libpq 환경변수(PG*)로 나눠 0600 임시 파일로만 일회용 클라이언트
+# 컨테이너에 넘긴다. pg_dump 는 서버보다 주 버전이 낮으면 거부하므로, RDS 주 버전을 올리면
+# BACKUP_PG_CLIENT_IMAGE 도 같은 주 버전 이상으로 올린다.
 #
-# 2026-08-02 실측: 자동 백업이 **하나도** 없었다(EBS 스냅샷 0건, cron 미설치, 백업 디렉터리
-# 부재). DB 는 v1 24MB + 레거시 43MB 로 작아서 매일 전체 덤프를 떠도 부담이 없다.
-#
-# 값은 인스턴스 IAM role 로 S3 에 올린다 — 자격증명을 파일에 두지 않는다.
+# source 하면 함수만 정의하고 백업은 돌지 않는다. prod_db_client 로 운영 DB 를 읽기 전용으로 조회할 때
+# 쓴다(docs/ops/prod-backup.md).
 
-BACKUP_BUCKET="${BACKUP_BUCKET:-teameet-prod-backups-851725525576-ap-northeast-2}"
+# Docker Hub 공식 이미지의 ECR Public 사본(같은 digest). Docker Hub 익명 받기는 IP 당 한도에 자주 걸린다.
+BACKUP_PG_CLIENT_IMAGE="${BACKUP_PG_CLIENT_IMAGE:-public.ecr.aws/docker/library/postgres:16.15-alpine3.24@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139}"
+BACKUP_API_CONTAINER="${BACKUP_API_CONTAINER:-teameet_v1_api}"
+# 앱 컨테이너와 같은 네트워크로 붙는다 — 앱이 DB 에 닿는 경로 그대로다.
+BACKUP_DOCKER_NETWORK="${BACKUP_DOCKER_NETWORK:-deploy_default}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
-# 덤프가 이보다 작으면 뭔가 잘못된 것이다(빈 DB·권한 오류·조기 종료). 성공으로 착각하고
-# 올려 두면 정작 복구할 때 알게 된다 — 그때는 늦다.
+# 덤프가 이보다 작으면 빈 DB·권한 오류·조기 종료다. 올려 두면 복구할 때에야 안다.
 MIN_DUMP_BYTES="${MIN_DUMP_BYTES:-1024}"
+read -r -a BACKUP_DOCKER <<< "${BACKUP_DOCKER_CMD:-sudo docker}"
 
-log() { echo "[prod-backup] $*"; }
+# 표준오류로 쓴다 — prod_db_env 의 표준출력은 env 파일이고 prod_db_client 의 표준출력은 덤프·조회 결과다.
+backup_log() { echo "[prod-backup] $*" >&2; }
 
-dump_database() {
-  local container="$1" db_user="$2" db_name="$3" label="$4"
-  local stamp key tmp size
-
-  if ! sudo docker inspect "${container}" >/dev/null 2>&1; then
-    log "${label}: 컨테이너 ${container} 가 없습니다 — 백업을 실패로 처리합니다"
-    return 1
-  fi
-
-  # 정지된 컨테이너는 건너뛴다. `docker inspect` 는 정지된 컨테이너에도 성공하므로 위
-  # 검사만으로는 걸러지지 않고, 그 다음 `docker exec` 가 죽어서 백업 전체가 exit 1 이 된다.
-  #
-  # 2026-08-02 실제로 이렇게 됐다: 레거시 스택(teameet_postgres)이 정지된 뒤로 매일 밤
-  # "legacy: pg_dump 실패 → 일부 백업이 실패했습니다 → exit 1" 이 반복됐고, v1 덤프는
-  # 정상적으로 S3 에 올라갔는데도 **성공 하트비트가 발행되지 않았다**. 즉 백업은 되고 있는데
-  # 감시 지표만 죽어 있는, 가장 헷갈리는 상태였다.
-  #
-  # 정지된 DB 는 더 이상 변하지 않으므로 마지막 덤프가 곧 최종본이다 — 백업할 것이 없는 게
-  # 맞고, 이것을 실패로 볼 이유가 없다. 반대로 **실행 중인데** 덤프가 실패하면 그건 진짜
-  # 실패이므로 아래 경로에서 그대로 exit 1 이 된다.
-  if [[ "$(sudo docker inspect -f '{{.State.Running}}' "${container}")" != "true" ]]; then
-    log "${label}: 컨테이너 ${container} 가 정지 상태입니다 — 변경될 수 없으므로 건너뜁니다"
-    return 0
-  fi
-
-  stamp="$(date -u +%Y/%m/%d/%Y%m%dT%H%M%SZ)"
-  key="pg/${label}/${stamp}.sql.gz"
-  tmp="$(mktemp)"
-  chmod 600 "${tmp}"
-
-  # pipefail 이 켜져 있으므로 pg_dump 가 죽으면 파이프라인 전체가 실패한다.
-  if ! sudo docker exec "${container}" pg_dump -U "${db_user}" -d "${db_name}" --clean --if-exists \
-    | gzip -9 > "${tmp}"; then
-    log "${label}: pg_dump 실패"
-    rm -f "${tmp}"
-    return 1
-  fi
-
-  size="$(stat -c %s "${tmp}")"
-  if (( size < MIN_DUMP_BYTES )); then
-    log "${label}: 덤프가 너무 작습니다 (${size} bytes) — 업로드하지 않습니다"
-    rm -f "${tmp}"
-    return 1
-  fi
-
-  if ! aws s3 cp "${tmp}" "s3://${BACKUP_BUCKET}/${key}" --region "${AWS_REGION}" --only-show-errors; then
-    log "${label}: S3 업로드 실패"
-    rm -f "${tmp}"
-    return 1
-  fi
-  rm -f "${tmp}"
-
-  log "${label}: s3://${BACKUP_BUCKET}/${key} (${size} bytes)"
+# URL 의 %XX 를 푼다. 값 하나가 env 파일 한 줄이므로 제어 문자(줄바꿈 등)로 풀리는 값은 거부한다 — 줄이 늘면
+# 다른 PG* 값을 덮어쓸 수 있다. `%` 뒤가 16진 두 자리가 아니면 거부한다: printf 의 \x 는 한 자리도 받아서
+# `%a` 가 줄바꿈이 된다. 원문의 백슬래시는 printf 가 해석하지 않게 먼저 감싼다.
+_backup_url_decode() {
+  local s="$1" out
+  [[ ! "${s}" =~ %([^0-9A-Fa-f]|.[^0-9A-Fa-f]|.?$) && ! "${s}" =~ %(0[0-9A-Fa-f]|1[0-9A-Fa-f]|7[fF]) ]] || return 1
+  s="${s//\\/\\\\}"
+  out="$(printf '%b' "${s//%/\\x}")"
+  [[ "${out}" != *[[:cntrl:]]* ]] || return 1
+  printf '%s' "${out}"
 }
 
-# CloudWatch 하트비트. 성공했을 때만 1 을 올린다 — 알람은 "지표가 없음"을 위반으로 취급하므로
-# 스크립트가 실패한 경우뿐 아니라 **타이머가 아예 안 돌았거나 인스턴스가 꺼져 있던 경우**도
-# 잡힌다. 실패 시에 0 을 올리는 방식은 스크립트가 실행조차 안 되면 침묵하므로 쓰지 않는다.
+# 실행 중인 API 컨테이너의 DATABASE_URL 을 libpq 환경변수 줄로 바꿔 stdout 에 낸다(docker --env-file 형식).
+# 운영 API 가 옛 DB 컨테이너나 자기 자신을 가리키면 거부한다 — 운영 DB 는 RDS 다.
+prod_db_env() {
+  local url rest db userinfo hostport user password host port d_db d_user d_password
+
+  url="$("${BACKUP_DOCKER[@]}" inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "${BACKUP_API_CONTAINER}" \
+    | sed -n 's/^DATABASE_URL=//p')" || {
+    backup_log "${BACKUP_API_CONTAINER} 컨테이너의 환경을 읽지 못했습니다"
+    return 1
+  }
+  # 값에 줄바꿈이 있으면 inspect 출력에서 여러 줄이 된다 — 한 줄짜리 URL 만 받는다.
+  if [[ ! "${url}" =~ ^postgres(ql)?:// || "${url}" == *[[:cntrl:]]* ]]; then
+    backup_log "${BACKUP_API_CONTAINER} 컨테이너에 한 줄짜리 postgres DATABASE_URL 이 없습니다"
+    return 1
+  fi
+
+  rest="${url#*://}"
+  rest="${rest%%\?*}"
+  db="${rest#*/}"
+  [[ "${db}" != "${rest}" ]] || db=''
+  rest="${rest%%/*}"
+  hostport="${rest##*@}"
+  userinfo=''
+  [[ "${hostport}" == "${rest}" ]] || userinfo="${rest%@*}"
+  user="${userinfo%%:*}"
+  password=''
+  [[ "${userinfo}" != *:* ]] || password="${userinfo#*:}"
+  host="${hostport%%:*}"
+  port=5432
+  [[ "${hostport}" != *:* ]] || port="${hostport##*:}"
+
+  case "${host}" in
+    '' | v1_postgres | teameet_v1_postgres | localhost | 127.0.0.1)
+      backup_log "운영 API 의 DATABASE_URL 이 운영 DB(RDS)가 아닌 '${host}' 를 가리킵니다 — 백업하지 않습니다"
+      return 1
+      ;;
+  esac
+  if [[ -z "${user}" || -z "${db}" || ! "${port}" =~ ^[0-9]+$ ]]; then
+    backup_log "DATABASE_URL 에서 사용자·DB 이름·포트를 읽지 못했습니다"
+    return 1
+  fi
+  if [[ "${host}" == *%* ]] || ! d_db="$(_backup_url_decode "${db}")" || ! d_user="$(_backup_url_decode "${user}")" \
+    || ! d_password="$(_backup_url_decode "${password}")"; then
+    backup_log "DATABASE_URL 에 잘못된 %-인코딩이나 제어 문자가 있습니다 — 백업하지 않습니다"
+    return 1
+  fi
+
+  printf 'PGHOST=%s\nPGPORT=%s\nPGDATABASE=%s\nPGUSER=%s\nPGPASSWORD=%s\n' \
+    "${host}" "${port}" "${d_db}" "${d_user}" "${d_password}"
+  printf 'PGOPTIONS=-c default_transaction_read_only=on\nPGCONNECT_TIMEOUT=10\nPGAPPNAME=teameet-prod-db-client\n'
+}
+
+# 운영 DB 에 일회용 클라이언트 컨테이너로 붙는다: prod_db_client <명령…>  (예: psql -X -At -c 'select 1')
+# 세션은 읽기 전용이다. 표준입력은 컨테이너로 넘긴다 — 넘길 것이 없으면 호출자가 </dev/null 을 붙인다.
+# 로그 드라이버를 끈다: 켜 두면 표준출력(덤프 등)이 서버 디스크의 컨테이너 로그에도 그대로 쌓인다.
+prod_db_client() {
+  local dir rc tty=()
+
+  dir="$(mktemp -d)" || return 1
+  if ! (umask 077 && prod_db_env > "${dir}/pg.env"); then
+    rm -rf "${dir}"
+    return 1
+  fi
+  [[ ! -t 0 || ! -t 1 ]] || tty=(-t)
+  "${BACKUP_DOCKER[@]}" run --rm -i ${tty[@]+"${tty[@]}"} --log-driver none \
+    --network "${BACKUP_DOCKER_NETWORK}" --env-file "${dir}/pg.env" \
+    "${BACKUP_PG_CLIENT_IMAGE}" "$@" && rc=0 || rc=$?
+  rm -rf "${dir}"
+  return "${rc}"
+}
+
+# 덤프 목차에서 "테이블 수 데이터항목 수 _prisma_migrations 유무" 를 센다.
+backup_toc_counts() {
+  awk '
+    $1 ~ /^[0-9]+;$/ && $4 == "TABLE" && $5 == "DATA" { data++; next }
+    $1 ~ /^[0-9]+;$/ && $4 == "TABLE" { tables++; if ($6 == "_prisma_migrations") ledger = 1 }
+    END { printf "%d %d %d\n", tables, data, ledger }
+  '
+}
+
+# CloudWatch 하트비트. 성공했을 때만 1 을 올린다 — 알람은 "지표 없음"을 위반으로 보므로 스크립트 실패뿐
+# 아니라 타이머가 안 돌았거나 인스턴스가 꺼져 있던 경우도 잡힌다.
 publish_heartbeat() {
   aws cloudwatch put-metric-data \
     --region "${AWS_REGION}" \
@@ -86,18 +126,56 @@ publish_heartbeat() {
     --metric-name BackupSuccess \
     --value 1 \
     --unit Count >/dev/null 2>&1 \
-    || log "하트비트 지표 발행 실패 — 백업 자체는 성공했습니다"
+    || backup_log "하트비트 지표 발행 실패 — 백업 자체는 성공했습니다"
 }
 
-failed=0
-# v1 이 현재 서비스, teameet 은 아직 도는 레거시 스택. 레거시도 데이터가 남아 있어
-# 정리 판단이 끝나기 전까지는 같이 뜬다.
-dump_database teameet_v1_postgres teameet_v1 teameet_v1 v1 || failed=1
-dump_database teameet_postgres teameet teameet legacy || failed=1
+backup_main() {
+  local workdir dump stamp key size toc tables data ledger
 
-if (( failed != 0 )); then
-  log "일부 백업이 실패했습니다"
-  exit 1
+  : "${BACKUP_BUCKET:?BACKUP_BUCKET 이 없습니다 — /etc/teameet/backup-db.env 에 넣으세요}"
+  umask 077
+  workdir="$(mktemp -d)"
+  # shellcheck disable=SC2064 # 지금 정해진 경로를 지운다.
+  trap "rm -rf '${workdir}'" EXIT
+  dump="${workdir}/db.dump"
+
+  # custom 형식(-Fc)은 압축돼 있고 pg_restore 로 목차를 읽거나 테이블 하나만 되돌릴 수 있다.
+  # 다른 세션의 DDL 을 무한정 기다리지 않게 잠금 대기를 끊는다.
+  if ! prod_db_client pg_dump --format=custom --no-password --lock-wait-timeout=60s < /dev/null > "${dump}"; then
+    backup_log "pg_dump 실패"
+    return 1
+  fi
+
+  size="$(wc -c < "${dump}" | tr -d ' ')"
+  if (( size < MIN_DUMP_BYTES )); then
+    backup_log "덤프가 너무 작습니다 (${size} bytes) — 업로드하지 않습니다"
+    return 1
+  fi
+
+  if ! toc="$("${BACKUP_DOCKER[@]}" run --rm -i --log-driver none --network none \
+    "${BACKUP_PG_CLIENT_IMAGE}" pg_restore --list < "${dump}")"; then
+    backup_log "pg_restore 가 덤프 목차를 읽지 못했습니다"
+    return 1
+  fi
+  read -r tables data ledger < <(backup_toc_counts <<< "${toc}")
+  if (( tables == 0 || data == 0 || ledger != 1 )); then
+    backup_log "덤프 목차가 앱 DB 가 아닙니다 (테이블 ${tables}개, 데이터 ${data}개, _prisma_migrations ${ledger}) — 업로드하지 않습니다"
+    return 1
+  fi
+
+  # 일일 덤프는 pg/daily/ 아래에만 둔다 — 보존 규칙(lifecycle)이 이 접두어를 지운다.
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  key="pg/daily/${stamp:0:4}/${stamp:4:2}/${stamp:6:2}/teameet-v1-${stamp}.dump"
+  if ! aws s3 cp "${dump}" "s3://${BACKUP_BUCKET}/${key}" --region "${AWS_REGION}" --only-show-errors; then
+    backup_log "S3 업로드 실패"
+    return 1
+  fi
+
+  backup_log "s3://${BACKUP_BUCKET}/${key} (${size} bytes, 테이블 ${tables}개, 데이터 항목 ${data}개)"
+  publish_heartbeat
+  backup_log "백업 완료"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  backup_main "$@"
 fi
-publish_heartbeat
-log "모든 백업 완료"

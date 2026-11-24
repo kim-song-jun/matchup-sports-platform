@@ -138,6 +138,14 @@ set -a
 . ./deploy/.env
 set +a
 
+# 운영 DB 는 RDS 다 — docker-compose.prod.yml 에는 DB 컨테이너가 없고 DATABASE_URL 호스트에 기본값도 없다.
+case "${V1_DB_HOST:-}" in
+  '' | v1_postgres | teameet_v1_postgres | localhost | 127.0.0.1)
+    echo "deploy/.env 의 V1_DB_HOST 에 운영 DB(RDS) 호스트를 넣은 뒤 다시 실행하세요 (V1_DB_APP_PASSWORD 도 함께)"
+    exit 1
+    ;;
+esac
+
 sudo docker build -f deploy/Dockerfile.v1-api -t teameet-v1-api .
 sudo docker build \
   -f deploy/Dockerfile.v1-web \
@@ -146,21 +154,7 @@ sudo docker build \
   -t teameet-v1-web .
 
 cd deploy
-$COMPOSE -f docker-compose.prod.yml up -d v1_postgres
-
 echo "🗄️ DB bootstrap 적용..."
-for i in $(seq 1 30); do
-  if $COMPOSE -f docker-compose.prod.yml exec -T v1_postgres pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    echo "v1_postgres ready"
-    break
-  fi
-  if [ "$i" -eq 30 ]; then
-    echo "v1_postgres did not become ready in time"
-    exit 1
-  fi
-  sleep 2
-done
-
 $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js"
 

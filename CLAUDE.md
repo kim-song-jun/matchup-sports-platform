@@ -233,7 +233,7 @@ infra/load/               → k6 부하 테스트 하네스
 | v1_web | 3013 (`apps/v1_web/package.json` dev 스크립트) | 3013 (`127.0.0.1` 바인딩, nginx 뒷단) |
 | v1_api | 8121 (`API_PORT \|\| 8121`, `apps/v1_api/src/main.ts`) | 8121 (`127.0.0.1` 바인딩, nginx 뒷단) |
 | game-operations worker | — | `WORKER_PORT` 기본 8122 |
-| v1_postgres | 컨테이너 내부 5432만(호스트 노출 없음) | 컨테이너 내부 |
+| v1_postgres | 컨테이너 내부 5432만(호스트 노출 없음) | alpha 만 컨테이너 내부(`docker-compose.alpha.yml`). 운영 DB 는 RDS |
 
 - 웹은 `/api/:path*`·`/uploads/:path*`를 API로 rewrite한다(`apps/v1_web/next.config.ts`,
   dev `http://localhost:8121` / prod `http://v1_api:8121`).

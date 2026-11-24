@@ -74,6 +74,7 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  myScheduleStateDisplay,
   scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
   scheduleLinkedMatchKind,
@@ -898,7 +899,7 @@ export function MySchedulePageClient() {
       { value: 'completed', label: '완료' },
     ],
     items: (query.data?.items ?? []).map((item) => {
-      const display = matchScheduleDisplay(item.type, item.state, item.matchConfirmed);
+      const display = myScheduleStateDisplay(item, new Date());
       return {
         id: item.id,
         teamId: item.teamId,

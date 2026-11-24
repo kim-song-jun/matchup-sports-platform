@@ -74,6 +74,20 @@ export function matchScheduleDisplay(
   return { stateLabel: scheduleStateLabel(state), stateTone: scheduleStateTone(state), isTentative: false };
 }
 
+/**
+ * 내 일정 목록의 상태 배지. 끝났는데도 「예정」으로 남은 일정(팀 매치·리그·대회 경기는 결과가 확정돼야 완료가 된다)은
+ * 「예정」이라 하면 앞으로 올 일정과 헷갈려서 「지난」으로 보여 주고 흐리게 둔다 — 서버가 이런 일정을 예정 맨 아래로 내려 준다.
+ * 색만으로 구분하지 않게 글자도 바꾼다.
+ */
+export function myScheduleStateDisplay(
+  schedule: { type: V1ScheduleType; state: V1ScheduleState; matchConfirmed: boolean | null; endAt: string },
+  now: Date,
+): { stateLabel: string; stateTone: 'default' | 'muted'; isTentative: boolean } {
+  const ended = Date.parse(schedule.endAt) <= now.getTime();
+  if (schedule.state === 'SCHEDULED' && ended) return { stateLabel: '지난', stateTone: 'muted', isTentative: true };
+  return matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed);
+}
+
 const SCHEDULE_VISIBILITY_LABELS: Record<V1ScheduleVisibility, string> = {
   PUBLIC: '전체 공개',
   TEAM: '팀 전용',

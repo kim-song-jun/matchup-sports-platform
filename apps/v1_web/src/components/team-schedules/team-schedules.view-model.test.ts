@@ -13,6 +13,7 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  myScheduleStateDisplay,
   scheduleCancelNoticeLine,
   scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
@@ -368,5 +369,27 @@ describe('scheduleCancelNoticeLine — 서버 취소 알림 수신자와 같은 
     expect(scheduleCancelNoticeLine('PUBLIC', 0)).toBe('팀원에게 알림이 가요.');
     expect(scheduleCancelNoticeLine('TEAM', 3)).toBe('팀원에게 알림이 가요.');
     expect(scheduleCancelNoticeLine('MEMBERS', 3)).toBe('팀원에게 알림이 가요.');
+  });
+});
+
+describe('myScheduleStateDisplay — 끝났는데 예정으로 남은 일정은 「지난」', () => {
+  const NOW = new Date('2026-11-24T00:00:00.000Z');
+  const base = { type: 'TRAINING' as const, state: 'SCHEDULED' as const, matchConfirmed: null, endAt: '2026-11-25T02:00:00.000Z' };
+
+  it('아직 안 끝난 예정은 그대로 「예정」', () => {
+    expect(myScheduleStateDisplay(base, NOW)).toEqual({ stateLabel: '예정', stateTone: 'default', isTentative: false });
+  });
+
+  it('끝났는데 예정이면 종류·상대 확정 여부와 상관없이 「지난」으로 흐리게', () => {
+    const past = { ...base, endAt: '2026-11-20T02:00:00.000Z' };
+    expect(myScheduleStateDisplay(past, NOW)).toEqual({ stateLabel: '지난', stateTone: 'muted', isTentative: true });
+    expect(myScheduleStateDisplay({ ...past, type: 'MATCH', matchConfirmed: true }, NOW).stateLabel).toBe('지난');
+    expect(myScheduleStateDisplay({ ...past, type: 'MATCH', matchConfirmed: false }, NOW).stateLabel).toBe('지난');
+  });
+
+  it('완료·취소는 지난 일정이어도 원래 라벨', () => {
+    const past = { ...base, endAt: '2026-11-20T02:00:00.000Z' };
+    expect(myScheduleStateDisplay({ ...past, state: 'COMPLETED' }, NOW).stateLabel).toBe('완료');
+    expect(myScheduleStateDisplay({ ...past, state: 'CANCELLED' }, NOW).stateLabel).toBe('취소됨');
   });
 });

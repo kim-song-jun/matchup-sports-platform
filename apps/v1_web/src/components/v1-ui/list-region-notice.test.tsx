@@ -7,7 +7,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
 
-const withLink = { text: '가까운 팀 매치를 먼저 보려면', link: { label: '지역 설정', href: '/my/settings/location' } };
+const withLink = { text: '내 지역 팀 매치를 먼저 보려면', link: { label: '지역 설정', href: '/my/settings/location' } };
 
 beforeEach(() => {
   router.push.mockClear();

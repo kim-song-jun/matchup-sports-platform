@@ -240,8 +240,8 @@ roll_web_services() {
   for service in "${WEB_ACTIVE[@]}"; do
     started="${SECONDS}"
     "${compose[@]}" up -d "$@" --no-deps "${service}" || return 1
-    # up -d 는 옛 컨테이너가 종료 신호를 받고 나갈 때까지 기다린 뒤 새 컨테이너를 만든다. 이 시간이 웹 한 개의 교체 구간이다.
-    echo "[${0##*/}] ${service} 교체(옛 컨테이너 정지·새 컨테이너 시작): $(( SECONDS - started ))초"
+    # 컨테이너를 바꿔야 하면 up -d 는 옛 컨테이너가 종료 신호를 받고 나갈 때까지 기다린 뒤 새 컨테이너를 만든다. 바꿀 것이 없으면 바로 끝난다.
+    echo "[${0##*/}] ${service} compose up -d: $(( SECONDS - started ))초"
     wait_for_service_healthy "${service}" || return 1
     reload_nginx_upstreams
   done

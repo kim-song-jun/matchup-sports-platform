@@ -275,6 +275,8 @@ up_app_containers() {
     return 0
   fi
   "${compose[@]}" up -d "$@" --no-deps v1_api v1_game_operations_worker || return 1
+  # 새 API 가 다른 IP 를 받으면 nginx 는 다음 reload 까지 옛 IP 로 보낸다. 웹 교체 뒤의 reload 까지 기다리지 않는다.
+  reload_nginx_upstreams
   wait_for_service_healthy v1_api || return 1
   roll_web_services "$@"
 }

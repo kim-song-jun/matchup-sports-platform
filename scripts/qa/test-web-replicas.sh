@@ -91,7 +91,7 @@ expect_log '남은 v1_web_b 제거' 'compose up -d --no-deps v1_api v1_web v1_ga
 docker rm -f teameet_v1_web_b'
 FAKE_ORPHAN=''
 
-echo '[web-replicas] 개수 2: 웹을 하나씩, healthy 뒤에 다음으로'
+echo '[web-replicas] 개수 2: API 를 바꾼 직후 nginx 가 새 주소를 읽고, 웹은 하나씩 healthy 뒤에 다음으로'
 configure_web_replicas 2 1 3500000
 # alpha: 오버레이가 DB 컨테이너를 정의하므로 앱보다 먼저 올린다.
 FAKE_DEFINED='v1_postgres v1_uploads_init v1_api v1_game_operations_worker v1_web v1_web_b nginx'
@@ -100,6 +100,7 @@ up_base_services
 up_app_containers --force-recreate
 expect_log '개수 2 순서(alpha)' 'compose up -d v1_postgres v1_uploads_init
 compose up -d --force-recreate --no-deps v1_api v1_game_operations_worker
+compose exec -T nginx nginx -s reload
 compose up -d --force-recreate --no-deps v1_web
 compose exec -T nginx nginx -s reload
 compose up -d --force-recreate --no-deps v1_web_b
@@ -111,6 +112,7 @@ FAKE_DEFINED='v1_uploads_init v1_api v1_game_operations_worker v1_web v1_web_b n
 up_all_services
 expect_log 'prod 의 up -d 대체는 DB 컨테이너 없이 웹 둘 다 순서대로' 'compose up -d v1_uploads_init
 compose up -d --no-deps v1_api v1_game_operations_worker
+compose exec -T nginx nginx -s reload
 compose up -d --no-deps v1_web
 compose exec -T nginx nginx -s reload
 compose up -d --no-deps v1_web_b

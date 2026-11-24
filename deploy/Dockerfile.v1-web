@@ -62,6 +62,8 @@ RUN apk upgrade --no-cache libcrypto3 libssl3 zlib \
 COPY --from=builder /app/apps/v1_web/.next/standalone ./
 COPY --from=builder /app/apps/v1_web/.next/static ./apps/v1_web/.next/static
 COPY --from=builder /app/apps/v1_web/public ./apps/v1_web/public
+# 종료 신호 뒤 keep-alive 연결을 정리해 Next 의 server.close() 가 유예 끝까지 매달리지 않게 한다(파일 머리 주석).
+COPY deploy/runtime/http-drain-on-shutdown.cjs /app/runtime/http-drain-on-shutdown.cjs
 
 ARG NAVER_SITE_VERIFICATION=
 ARG GOOGLE_SITE_VERIFICATION=
@@ -82,4 +84,4 @@ RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
   && chown -R app:app /app
 
 USER app
-CMD ["node", "apps/v1_web/server.js"]
+CMD ["node", "--require", "/app/runtime/http-drain-on-shutdown.cjs", "apps/v1_web/server.js"]

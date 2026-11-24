@@ -96,6 +96,7 @@ COPY --from=builder-task168-final /app/apps/v1_api/tsconfig.json ./apps/v1_api/t
 COPY --from=builder-task168-final /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
 COPY --from=builder-task168-final /app/package.json ./package.json
 COPY --from=builder-task168-final /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY deploy/runtime/http-drain-on-shutdown.cjs /app/runtime/http-drain-on-shutdown.cjs
 
 ENV NODE_ENV=production
 EXPOSE 8121
@@ -106,7 +107,7 @@ RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
 
 WORKDIR /app/apps/v1_api
 USER app
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "--require", "/app/runtime/http-drain-on-shutdown.cjs", "dist/src/main.js"]
 
 FROM base AS runtime
 WORKDIR /app
@@ -130,6 +131,8 @@ COPY --from=builder /app/apps/v1_api/tsconfig.json ./apps/v1_api/tsconfig.json
 COPY --from=builder /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# 종료 신호 뒤 keep-alive 연결을 정리해 Nest 의 HTTP 서버 종료가 유예 끝까지 매달리지 않게 한다(파일 머리 주석).
+COPY deploy/runtime/http-drain-on-shutdown.cjs /app/runtime/http-drain-on-shutdown.cjs
 
 ENV NODE_ENV=production
 EXPOSE 8121
@@ -142,4 +145,4 @@ RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
 
 WORKDIR /app/apps/v1_api
 USER app
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "--require", "/app/runtime/http-drain-on-shutdown.cjs", "dist/src/main.js"]

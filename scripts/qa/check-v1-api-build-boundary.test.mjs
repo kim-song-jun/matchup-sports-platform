@@ -71,7 +71,7 @@ function emitSource(program, source) {
 function runtimeEntrypoints() {
   const result = new Set();
   const dockerfile = readFileSync(join(repoRoot, 'deploy/Dockerfile.v1-api'), 'utf8');
-  for (const match of dockerfile.matchAll(/CMD\s*\[\s*"node"\s*,\s*"dist\/([A-Za-z0-9._/-]+)\.js"\s*\]/g)) {
+  for (const match of dockerfile.matchAll(/CMD\s*\[\s*"node"\s*,\s*(?:"--require"\s*,\s*"[^"]+"\s*,\s*)?"dist\/([A-Za-z0-9._/-]+)\.js"\s*\]/g)) {
     result.add(match[1]);
   }
   for (const script of ['deploy/deploy-alpha.sh', 'deploy/deploy-prod.sh']) {

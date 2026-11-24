@@ -5,10 +5,7 @@ import { COMPETITION_ROSTER_RESYNC_TYPE } from '../../games/roster/roster-resync
 import { INQUIRY_SLACK_NOTIFICATION_TYPE } from '../../inquiries/inquiry-slack-notifier';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE } from '../../team-matches/team-match-lineup.service';
-import {
-  SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
-  SCHEDULE_CREATED_NOTIFICATION_TYPE,
-} from '../../team-schedules/team-schedules.service';
+import { SCHEDULE_CREATED_NOTIFICATION_TYPE } from '../../team-schedules/team-schedules.service';
 import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from '../../users/withdrawal-finalization-report';
 import { EMAIL_DELIVERY_FAILED_TYPE } from '../../verification/email/email-delivery-failure';
 import { IDENTITY_LINK_EXPIRY_TYPE } from '../identity-link/identity-link-expiry.service';
@@ -31,10 +28,11 @@ const DEFAULT_BATCH_SIZE = 1_000;
 const DEFAULT_MAX_BATCHES = 5;
 
 /**
- * COMPLETED 행을 지워도 되는 종류. business_key 가 다시 만들어질 수 없거나(앞으로의 슬롯 시각,
- * 같은 트랜잭션에서 새로 만든 행의 id, 지금 시각의 창), 다시 만들어져도 알림·감사 쪽 고유 키가
- * 중복 발송을 막는다. 여기 없는 종류는 지우지 않는다. 특히 일정 리마인더 두 종류는 수동 요청이
- * 같은 키를 다시 넣을 수 있고 알림 중복 방지가 행 id 에 묶여 있어, 행을 지우면 같은 알림이 또 간다.
+ * COMPLETED 행을 지워도 되는 종류. business_key 를 다시 만드는 경로가 없거나(앞으로의 슬롯 시각, 같은
+ * 트랜잭션의 새 행 id, 지금 시각의 창), 다시 만들어져도 알림·감사 쪽 고정 키가 중복을 막아야 한다. 일정 생성
+ * 알림·용병 신청 알림은 알림 중복 방지가 행 id 에 묶여 있어, 같은 키를 다시 넣는 경로가 생기면 빼야 한다.
+ * 목록 밖은 지우지 않는다 — 일정 리마인더(수동 요청이 같은 키를 다시 넣음)·일정 취소 알림(대진 수정으로
+ * 되살아난 일정이 다시 취소됨)은 지우면 같은 알림이 또 간다.
  */
 export const PRUNABLE_COMPLETED_OUTBOX_TYPES: readonly string[] = [
   OUTBOX_RETENTION_SCAN_TYPE,
@@ -56,7 +54,6 @@ export const PRUNABLE_COMPLETED_OUTBOX_TYPES: readonly string[] = [
   LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
   LINEUP_INCLUDED_NOTIFICATION_TYPE,
   SCHEDULE_CREATED_NOTIFICATION_TYPE,
-  SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
   'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
   'GAME_RESULT_REVIEW_REMINDER',
   'GAME_RESULT_REVIEW_ESCALATION',

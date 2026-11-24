@@ -48,6 +48,10 @@ describe('completed outbox retention', () => {
       await insertEvent({
         name: 'old-recruitment-reminder', type: 'SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER', status: 'COMPLETED', availableDaysAgo: 400,
       }),
+      // A schedule restored by a fixture edit can be cancelled again under the same key.
+      await insertEvent({
+        name: 'old-schedule-cancelled', type: 'SCHEDULE_CANCELLED_NOTIFICATION', status: 'COMPLETED', availableDaysAgo: 400,
+      }),
       await insertEvent({ name: 'old-video-cleanup', type: 'VIDEO_UPLOAD_CLEANUP', status: 'COMPLETED', availableDaysAgo: 400 }),
       await insertEvent({ name: 'old-official', type: 'GAME_RESULT_OFFICIAL', status: 'COMPLETED', availableDaysAgo: 400 }),
     ];

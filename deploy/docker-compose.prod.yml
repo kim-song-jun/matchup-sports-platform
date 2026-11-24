@@ -6,7 +6,7 @@ x-v1-web: &v1-web
   image: ${V1_WEB_IMAGE}
   restart: always
   # Next 는 종료 신호를 받으면 새 연결을 막고 진행 중 요청을 끝낸 뒤 나간다. 이 값은 그 기다림의 상한이다.
-  # 다시 쓰이는 keep-alive 연결은 이미지의 deploy/runtime/http-drain-on-shutdown.cjs 가 닫으므로 처리 중 요청만 기다린다. 기본 10초는 느린 서버 렌더를 자른다.
+  # 다시 쓰이는 keep-alive 연결은 이미지의 deploy/runtime/http-drain-on-shutdown.cjs 가 닫으므로 처리 중 요청만 기다린다. Docker 기본값(10초)은 느린 서버 렌더를 자를 수 있어 30초로 둔다.
   stop_grace_period: 30s
   environment:
     NEXT_PUBLIC_API_URL: /api/v1

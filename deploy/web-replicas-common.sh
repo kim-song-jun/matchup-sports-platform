@@ -98,7 +98,7 @@ wait_for_service_healthy() {
     if [[ -n "${container}" ]]; then
       health="$("${WEB_DOCKER[@]}" inspect --format '{{.State.Health.Status}}' "${container}" 2>/dev/null || true)"
       if [[ "${health}" == healthy ]]; then
-        echo "[${0##*/}] ${service} healthy: 시작 후 $(( SECONDS - started ))초 기다림"
+        echo "[${0##*/}] ${service} healthy: 대기 $(( SECONDS - started ))초"
         return 0
       fi
     fi

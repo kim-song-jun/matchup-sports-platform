@@ -13,6 +13,10 @@ WEB_SERVICES=(v1_web)
 WEB_COMPOSE_ARGS=()
 # 이번 compose 프로젝트(활성 릴리스 소스)에 실제로 정의된 웹 서비스. resolve_web_services 가 채운다.
 WEB_ACTIVE=(v1_web)
+# 대기 예산(5s × 36 = 180s)은 compose healthcheck 가 스스로 실패를 확정하는 창(start_period 20s +
+# interval 10s × retries 12 = 140s)보다 길어야 한다. 짧으면 늦게 뜨는 정상 컨테이너를 Docker 가 아직
+# starting 으로 보는 사이에 배포가 먼저 실패한다. 성공하면 첫 healthy 에서 바로 끝나므로 예산은 실패를
+# 알아차리는 시간에만 든다. healthcheck 값을 바꾸면 이 숫자도 함께 올린다.
 WEB_HEALTH_POLL_SECONDS="${WEB_HEALTH_POLL_SECONDS:-5}"
 WEB_HEALTH_ATTEMPTS="${WEB_HEALTH_ATTEMPTS:-36}"
 
@@ -87,12 +91,14 @@ wait_for_service_healthy() {
   local attempt
   local container
   local health=''
+  local started="${SECONDS}"
 
   for attempt in $(seq 1 "${WEB_HEALTH_ATTEMPTS}"); do
     container="$("${compose[@]}" ps -q "${service}")" || return 1
     if [[ -n "${container}" ]]; then
       health="$("${WEB_DOCKER[@]}" inspect --format '{{.State.Health.Status}}' "${container}" 2>/dev/null || true)"
       if [[ "${health}" == healthy ]]; then
+        echo "[${0##*/}] ${service} healthy: 시작 후 $(( SECONDS - started ))초 기다림"
         return 0
       fi
     fi
@@ -229,9 +235,13 @@ apply_nginx_config() {
 # 웹 컨테이너를 하나씩 올린다. 추가 인자(--force-recreate 등)는 compose up 에 그대로 넘긴다.
 roll_web_services() {
   local service
+  local started
 
   for service in "${WEB_ACTIVE[@]}"; do
+    started="${SECONDS}"
     "${compose[@]}" up -d "$@" --no-deps "${service}" || return 1
+    # up -d 는 옛 컨테이너가 종료 신호를 받고 나갈 때까지 기다린 뒤 새 컨테이너를 만든다. 이 시간이 웹 한 개의 교체 구간이다.
+    echo "[${0##*/}] ${service} 교체(옛 컨테이너 정지·새 컨테이너 시작): $(( SECONDS - started ))초"
     wait_for_service_healthy "${service}" || return 1
     reload_nginx_upstreams
   done

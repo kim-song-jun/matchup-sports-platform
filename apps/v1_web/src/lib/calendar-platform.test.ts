@@ -4,6 +4,7 @@ import { detectCalendarPlatform, googleCalendarAddUrl } from './calendar-platfor
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
 const GALAXY = 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36';
 const SAMSUNG_BROWSER = 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 SamsungBrowser/25.0 Chrome/121.0 Mobile Safari/537.36';
+const WINDOWS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36';
 const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15';
 
 describe('detectCalendarPlatform', () => {
@@ -12,11 +13,12 @@ describe('detectCalendarPlatform', () => {
     expect(detectCalendarPlatform(IPHONE, 'android')).toBe('android');
   });
 
-  it('브라우저에서는 아이폰·갤럭시(삼성 브라우저 포함)를 나누고 그 밖은 공통 안내', () => {
+  it('브라우저에서는 아이폰·맥·갤럭시(삼성 브라우저 포함)를 나누고 그 밖은 공통 안내', () => {
     expect(detectCalendarPlatform(IPHONE, null)).toBe('ios');
     expect(detectCalendarPlatform(GALAXY, null)).toBe('android');
     expect(detectCalendarPlatform(SAMSUNG_BROWSER, null)).toBe('android');
-    expect(detectCalendarPlatform(MAC, null)).toBe('other');
+    expect(detectCalendarPlatform(MAC, null)).toBe('mac');
+    expect(detectCalendarPlatform(WINDOWS, null)).toBe('other');
     expect(detectCalendarPlatform('', null)).toBe('other');
   });
 });

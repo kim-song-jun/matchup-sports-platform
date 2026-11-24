@@ -12,20 +12,25 @@ const SIGNALS = ['SIGTERM', 'SIGINT'];
 const servers = new Set();
 let draining = false;
 
-dc.subscribe('http.server.request.start', ({ response, server }) => {
-  servers.add(server);
-  if (draining && !response.headersSent) response.setHeader('Connection', 'close');
-});
+// 그 순간 쉬는 연결은 앱이 부르는 server.close() 가 닫는다. 신호 전에 keep-alive 로 답한 응답은 끝난 뒤
+// Node 의 keep-alive 타이머(1ms)로 닫힌다. 그 사이 새 요청이 오면 타이머가 풀리고 그 응답은 Connection: close 다.
+function drain(server) {
+  server.keepAliveTimeout = 1;
+  server.keepAliveTimeoutBuffer = 0;
+}
 
-// 종료 신호 전에 헤더를 보낸 응답은 keep-alive 로 끝나므로, 끝난 직후 쉬는 연결로 바뀔 때 닫는다.
-dc.subscribe('http.server.response.finish', ({ server }) => {
-  if (draining) setImmediate(() => server.closeIdleConnections());
+dc.subscribe('http.server.request.start', ({ response, server }) => {
+  if (!servers.has(server)) {
+    servers.add(server);
+    if (draining) drain(server);
+  }
+  if (draining && !response.headersSent) response.setHeader('Connection', 'close');
 });
 
 function startDraining() {
   if (draining) return;
   draining = true;
-  for (const server of servers) server.closeIdleConnections();
+  for (const server of servers) drain(server);
 }
 
 for (const signal of SIGNALS) {

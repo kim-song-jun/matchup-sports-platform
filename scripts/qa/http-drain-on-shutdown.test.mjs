@@ -15,11 +15,19 @@ const SLOW_MS = 1500;
 
 // 운영 모드 Next(start-server.js)와 같은 종료: SIGTERM → server.close(cb) → exit(143).
 // closeDelayMs 는 Nest 처럼 HTTP 서버를 닫기 전에 다른 종료 단계를 먼저 도는 경우다.
+// 신호 뒤에 처리한 요청 수를 부모에게 알린다(대조군이 '연결이 다시 쓰여서' 안 끝나는지 가르는 데 쓴다).
 const serverSource = (closeDelayMs) => `
 const http = require('node:http');
-const server = http.createServer((req, res) => setTimeout(() => res.end('ok'), req.url === '/slow' ? ${SLOW_MS} : 5));
+let stopping = false;
+const server = http.createServer((req, res) => {
+  if (stopping) process.send('served-after-signal');
+  setTimeout(() => res.end('ok'), req.url === '/slow' ? ${SLOW_MS} : 5);
+});
 server.listen(0, '127.0.0.1', () => process.send(server.address().port));
-process.on('SIGTERM', () => setTimeout(() => server.close(() => process.exit(143)), ${closeDelayMs}));
+process.on('SIGTERM', () => {
+  stopping = true;
+  setTimeout(() => server.close(() => process.exit(143)), ${closeDelayMs});
+});
 `;
 
 async function startServer({ drain, closeDelayMs = 0, source = serverSource(closeDelayMs) }) {
@@ -27,16 +35,19 @@ async function startServer({ drain, closeDelayMs = 0, source = serverSource(clos
   const child = spawn(process.execPath, args, { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
   const [port] = await once(child, 'message');
   const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal, at: Date.now() })));
-  return { child, port, exited };
+  const served = { afterSignal: 0 };
+  child.on('message', (m) => { if (m === 'served-after-signal') served.afterSignal += 1; });
+  return { child, port, exited, served };
 }
 
 function get(agent, port, path) {
+  const startedAt = Date.now();
   return new Promise((resolve) => {
     http.get({ host: '127.0.0.1', port, path, agent }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
-      res.on('end', () => resolve({ status: res.statusCode, connection: res.headers.connection, body }));
-    }).on('error', (error) => resolve({ error: error.code }));
+      res.on('end', () => resolve({ startedAt, status: res.statusCode, connection: res.headers.connection, body }));
+    }).on('error', (error) => resolve({ startedAt, error: error.code }));
   });
 }
 
@@ -61,7 +72,6 @@ async function shutdownUnderTraffic({ drain, closeDelayMs = 0 }) {
   const slow = get(agent, server.port, '/slow');
   await new Promise((r) => setTimeout(r, 100));
   const sentAt = Date.now();
-  const before = traffic.results.length;
   server.child.kill('SIGTERM');
   const outcome = await Promise.race([server.exited, new Promise((r) => setTimeout(() => r(null), 4000))]);
   traffic.stop();
@@ -70,13 +80,19 @@ async function shutdownUnderTraffic({ drain, closeDelayMs = 0 }) {
     await server.exited;
   }
   agent.destroy();
-  return { outcome, sentAt, slow: await slow, afterSignal: traffic.results.slice(before) };
+  // 신호 전에 시작한 요청은 keep-alive 로 답할 수 있으므로 신호 뒤에 시작한 요청만 본다.
+  return {
+    outcome, sentAt, slow: await slow, servedAfterSignal: server.served.afterSignal,
+    afterSignal: traffic.results.filter((r) => r.startedAt > sentAt),
+  };
 }
 
 test('대조군: 드레인 없이는 다시 쓰이는 keep-alive 연결 때문에 server.close() 가 끝나지 않는다', async () => {
-  const { outcome, slow } = await shutdownUnderTraffic({ drain: false });
+  const { outcome, slow, servedAfterSignal } = await shutdownUnderTraffic({ drain: false });
   assert.equal(outcome, null, '드레인 없이 4초 안에 끝났다 — 이 시험이 매달림을 재현하지 못한다');
   assert.equal(slow.status, 200);
+  // close() 뒤에는 새 연결을 받지 않으므로, 신호 뒤에 처리한 요청은 모두 이미 열린 연결로 들어온 것이다.
+  assert.ok(servedAfterSignal >= 10, `신호 뒤 처리한 요청 ${servedAfterSignal}건 — 연결이 계속 다시 쓰이지 않았다`);
 });
 
 test('드레인: 처리 중 요청을 끝까지 응답하고, 그 뒤 바로 나간다', async () => {
@@ -87,7 +103,7 @@ test('드레인: 처리 중 요청을 끝까지 응답하고, 그 뒤 바로 나
   assert.ok(outcome.at - sentAt < SLOW_MS + 1000, `종료까지 ${outcome.at - sentAt}ms`);
 });
 
-test('드레인: 처리 중이던 응답이 끝나 연결이 쉬게 되면 keep-alive 시간을 기다리지 않고 닫는다', async () => {
+test('드레인: 처리 중이던 응답이 끝나 연결이 쉬게 되면 keep-alive 시간(5초)을 기다리지 않고 닫는다', async () => {
   const server = await startServer({ drain: true });
   const agent = new http.Agent({ keepAlive: true });
   const slow = get(agent, server.port, '/slow');

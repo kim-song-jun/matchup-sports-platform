@@ -41,7 +41,8 @@ fi
 
 echo '[web-pair-config] 종료 유예 · 배포 건강 대기'
 duration_seconds() { # compose 가 쓰는 30s · 1m0s 같은 길이를 초로 바꾼다
-  awk -v d="$1" 'BEGIN { s = 0; while (match(d, /^[0-9]+[hms]/)) { n = substr(d, 1, RLENGTH - 1) + 0; u = substr(d, RLENGTH, 1); s += n * (u == "h" ? 3600 : u == "m" ? 60 : 1); d = substr(d, RLENGTH + 1) } if (d != "") exit 1; print s }'
+  awk -v d="$1" 'BEGIN { s = 0; while (match(d, /^[0-9]+[hms]/)) { n = substr(d, 1, RLENGTH - 1) + 0; u = substr(d, RLENGTH, 1); s += n * (u == "h" ? 3600 : u == "m" ? 60 : 1); d = substr(d, RLENGTH + 1) } if (d != "") exit 1; print s }' ||
+    { echo "[web-pair-config] compose 에서 길이 값을 읽지 못했습니다: '$1'" >&2; return 1; }
 }
 web_config="$("${prod[@]}" --profile web-pair config --format json)"
 for service in v1_web v1_web_b; do
@@ -52,8 +53,11 @@ for service in v1_web v1_web_b; do
     fail "${service}: 종료 유예가 Docker 기본 10초 이하다(${grace}초) — 느린 서버 렌더가 잘린다"
   fi
 done
-health_window=$(( $(duration_seconds "$(jq -r '.services.v1_web.healthcheck.start_period' <<<"${web_config}")") \
-  + $(duration_seconds "$(jq -r '.services.v1_web.healthcheck.interval' <<<"${web_config}")") * $(jq -r '.services.v1_web.healthcheck.retries' <<<"${web_config}") ))
+# 산술식 안의 명령 치환은 실패해도 set -e 가 잡지 못해 값이 빈 채로 계산된다 — 변수로 먼저 받는다.
+start_period="$(duration_seconds "$(jq -r '.services.v1_web.healthcheck.start_period' <<<"${web_config}")")"
+check_interval="$(duration_seconds "$(jq -r '.services.v1_web.healthcheck.interval' <<<"${web_config}")")"
+check_retries="$(jq -er '.services.v1_web.healthcheck.retries' <<<"${web_config}")"
+health_window=$(( start_period + check_interval * check_retries ))
 wait_budget="$(env -u WEB_HEALTH_ATTEMPTS -u WEB_HEALTH_POLL_SECONDS bash -c 'source ./web-replicas-common.sh && echo $(( WEB_HEALTH_ATTEMPTS * WEB_HEALTH_POLL_SECONDS ))')"
 if (( wait_budget > health_window )); then
   pass "배포의 웹 healthy 대기 ${wait_budget}초가 healthcheck 가 실패를 확정하는 창 ${health_window}초보다 길다"

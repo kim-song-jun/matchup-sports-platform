@@ -32,6 +32,11 @@ import {
   LoginSecurityRetentionService,
   scheduleNextLoginSecurityRetentionScan,
 } from './login-security-retention/login-security-retention.service';
+import {
+  OUTBOX_RETENTION_SCAN_TYPE,
+  OutboxRetentionService,
+  scheduleNextOutboxRetentionScan,
+} from './outbox-retention/outbox-retention.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
 import {
   scheduleNextScheduleAutoCompleteScan,
@@ -142,6 +147,11 @@ async function bootstrap(): Promise<void> {
   const loginSecurityRetention = new LoginSecurityRetentionService(prisma);
   worker.registerHandler(LOGIN_SECURITY_RETENTION_SCAN_TYPE, loginSecurityRetention.scanHandler);
   await prisma.$transaction((tx) => scheduleNextLoginSecurityRetentionScan(tx, new Date()));
+
+  // 30일이 지난 완료 일감 정리(지워도 되는 종류만). 같은 자기 예약 스캔이다.
+  const outboxRetention = new OutboxRetentionService(prisma);
+  worker.registerHandler(OUTBOX_RETENTION_SCAN_TYPE, outboxRetention.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextOutboxRetentionScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

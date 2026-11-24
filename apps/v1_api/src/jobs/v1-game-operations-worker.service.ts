@@ -83,12 +83,14 @@ export function withCompetitionRosterResync(handler: GameOperationHandler): Game
   };
 }
 
+/** 상태마다 세는 최대 행 수. 이 값이 보이면 그 이상이라는 뜻이다. */
+export const QUEUE_COUNT_CAP = 10_000;
+
 type QueueCounts = {
   pending: number;
   retry: number;
   processing: number;
   poisoned: number;
-  completed: number;
 };
 
 @Injectable()
@@ -605,6 +607,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
       activeHandlers: this.active.size,
       registeredHandlers: this.handlers.size,
       queue,
+      queueCountCap: QUEUE_COUNT_CAP,
     };
   }
 
@@ -618,6 +621,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
       casFailures: this.casFailureCount,
       active: this.active.size,
       queue,
+      queueCountCap: QUEUE_COUNT_CAP,
     };
   }
 
@@ -681,17 +685,17 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     }
   }
 
+  // 배포 건강검사가 10초마다 부른다. COMPLETED 는 세지 않고, 상태를 글자로 적어 (status, available_at)
+  // 색인의 해당 구간만 읽게 하며, 상태마다 상한에서 멈춘다.
   private async getQueueCounts(): Promise<QueueCounts> {
     const [counts] = await this.prisma.$queryRaw<QueueCounts[]>`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending,
-        COUNT(*) FILTER (WHERE status = 'RETRY')::int AS retry,
-        COUNT(*) FILTER (WHERE status = 'PROCESSING')::int AS processing,
-        COUNT(*) FILTER (WHERE status = 'POISONED')::int AS poisoned,
-        COUNT(*) FILTER (WHERE status = 'COMPLETED')::int AS completed
-      FROM v1_outbox_events
+        (SELECT COUNT(*) FROM (SELECT 1 FROM v1_outbox_events WHERE status = 'PENDING' LIMIT ${QUEUE_COUNT_CAP}::int) capped)::int AS pending,
+        (SELECT COUNT(*) FROM (SELECT 1 FROM v1_outbox_events WHERE status = 'RETRY' LIMIT ${QUEUE_COUNT_CAP}::int) capped)::int AS retry,
+        (SELECT COUNT(*) FROM (SELECT 1 FROM v1_outbox_events WHERE status = 'PROCESSING' LIMIT ${QUEUE_COUNT_CAP}::int) capped)::int AS processing,
+        (SELECT COUNT(*) FROM (SELECT 1 FROM v1_outbox_events WHERE status = 'POISONED' LIMIT ${QUEUE_COUNT_CAP}::int) capped)::int AS poisoned
     `;
-    return counts ?? { pending: 0, retry: 0, processing: 0, poisoned: 0, completed: 0 };
+    return counts ?? { pending: 0, retry: 0, processing: 0, poisoned: 0 };
   }
 
   private boundedError(error: unknown): string {

@@ -290,7 +290,6 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
         retry: 0,
         processing: 0,
         poisoned: 0,
-        completed: 0,
       },
     });
 
@@ -308,6 +307,20 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
       queue: { poisoned: 1 },
     });
     expect(JSON.stringify(health)).not.toContain(service.owner);
+  });
+
+  it('counts each waiting or active status but never COMPLETED rows in health and metrics', async () => {
+    const service = new V1GameOperationsWorkerService(prisma);
+    for (const status of ['PENDING', 'RETRY', 'RETRY', 'PROCESSING', 'POISONED', 'COMPLETED', 'COMPLETED'] as const) {
+      await insertJob({ status, attempts: status === 'POISONED' ? 6 : 0 });
+    }
+    const expectedQueue = { pending: 1, retry: 2, processing: 1, poisoned: 1 };
+
+    const health = await service.getHealth();
+    expect(health.queue).toEqual(expectedQueue);
+    expect(health.queueCountCap).toBe(10_000);
+    const metrics = await service.getMetrics();
+    expect(metrics.queue).toEqual(expectedQueue);
   });
 
   function worker(): V1GameOperationsWorkerService {

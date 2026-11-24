@@ -73,7 +73,7 @@ import {
   isScheduleMemberRole,
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
-  matchScheduleDisplay,
+  myScheduleStateDisplay,
   scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
   scheduleLinkedMatchKind,
@@ -482,7 +482,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     history.push({ label: '완료 처리됨', detail: null });
   }
 
-  const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
+  const matchDisplay = schedule ? myScheduleStateDisplay(schedule, new Date()) : null;
 
   const opponentTeamName = linkedTournamentId
     ? scheduleTournamentOpponentTeamName(opponentTournamentMatch.data, teamId)
@@ -898,7 +898,7 @@ export function MySchedulePageClient() {
       { value: 'completed', label: '완료' },
     ],
     items: (query.data?.items ?? []).map((item) => {
-      const display = matchScheduleDisplay(item.type, item.state, item.matchConfirmed);
+      const display = myScheduleStateDisplay(item, new Date());
       return {
         id: item.id,
         teamId: item.teamId,

@@ -17,7 +17,7 @@ WEB_DEFINED_SERVICES=''
 # 대기 예산(5s × 36 = 180s)은 compose healthcheck 가 스스로 실패를 확정하는 창(start_period 20s +
 # interval 10s × retries 12 = 140s)보다 길어야 한다. 짧으면 늦게 뜨는 정상 컨테이너를 Docker 가 아직
 # starting 으로 보는 사이에 배포가 먼저 실패한다. 성공하면 첫 healthy 에서 바로 끝나므로 예산은 실패를
-# 알아차리는 시간에만 든다. healthcheck 값을 바꾸면 이 숫자도 함께 올린다.
+# 알아차리는 시간에만 든다. healthcheck 값을 바꾸면 이 숫자도 함께 올린다(scripts/qa/test-web-pair-config.sh 가 확인한다).
 WEB_HEALTH_POLL_SECONDS="${WEB_HEALTH_POLL_SECONDS:-5}"
 WEB_HEALTH_ATTEMPTS="${WEB_HEALTH_ATTEMPTS:-36}"
 

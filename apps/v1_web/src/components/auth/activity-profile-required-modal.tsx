@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { browserAppRoute } from '@/lib/app-route';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import {
   ACTIVITY_PROFILE_PATH,
   buildActivityGateHref,
@@ -33,8 +34,12 @@ export function ActivityProfileRequiredModal() {
   );
 
   const handleConfirm = () => {
-    setOpen(false);
-    window.location.assign(browserAppRoute(buildActivityGateHref(currentReturnPath(), missing)));
+    // 이동할 주소는 모달이 닫히기 전의 위치로 정한다.
+    const href = browserAppRoute(buildActivityGateHref(currentReturnPath(), missing));
+    // 모달을 닫으면 모달이 쌓아 둔 뒤로가기 표식을 걷으려고 history.back() 이 예약된다. 그 사이에 location.assign 을
+    // 먼저 부르면 뒤로가기가 막 시작한 이동을 취소해, 서버엔 화면 요청이 도착하는데 화면은 그대로 남는다
+    // (운영에서 "관심 종목 고르기" 버튼이 안 먹히던 원인). 닫기를 먼저 끝내고 이동한다.
+    void closeOverlayThenNavigate(() => setOpen(false), () => window.location.assign(href));
   };
 
   const detailed = missing.length > 0;

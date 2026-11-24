@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Post } from '@/lib/api-client';
+import { overlayMarkerOf } from '@/lib/overlay-history';
 import { PhoneVerificationRequiredModal } from './phone-verification-required-modal';
 
 const reportClientError = vi.fn();
@@ -71,7 +72,31 @@ describe('PhoneVerificationRequiredModal', () => {
     expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '인증하러 가기' }));
-    expect(assign).toHaveBeenCalledWith('/my/phone-verify?redirect=%2Ftournaments%2Ft-1%2Fapply');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/my/phone-verify?redirect=%2Ftournaments%2Ft-1%2Fapply'));
+  });
+
+  // 모달을 닫으면 뒤로가기 표식을 걷는 history.back() 이 예약된다. 같은 틱에 location.assign 을 부르면 그 뒤로가기가
+  // 이동을 취소해 화면이 그대로 남는다(운영에서 관심 종목 안내 모달이 같은 이유로 안 넘어갔다) — 표식을 걷은 뒤에 이동한다.
+  it('navigates only after the modal history marker is consumed', async () => {
+    setLocation('/tournaments/t-1/apply');
+    stubApiError('PHONE_VERIFICATION_REQUIRED');
+    render(<PhoneVerificationRequiredModal />);
+    await act(async () => {
+      await expect(v1Post('/tournaments/t-1/registrations', {})).rejects.toThrow();
+    });
+    await screen.findByText('휴대폰 본인인증이 필요해요');
+    expect(overlayMarkerOf(window.history.state)).not.toBeNull();
+
+    let markerAtNavigation: string | null | undefined;
+    assign.mockImplementation(() => {
+      markerAtNavigation = overlayMarkerOf(window.history.state);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '인증하러 가기' }));
+    expect(assign).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(markerAtNavigation).toBeNull();
   });
 
   it('stays closed for unrelated failures', async () => {

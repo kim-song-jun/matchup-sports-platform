@@ -5,8 +5,8 @@
 # refuse the Stage B build ("public SHA mismatch"). Stage B and ordinary
 # deploys still write it.
 #
-# Extracts from `pull_release_images` through the line before the local
-# v1_postgres branch by content anchor and runs it with the two helpers faked.
+# Extracts from `pull_release_images` through the line before the Task168
+# DATABASE_URL block by content anchor and runs it with the two helpers faked.
 
 set -Eeuo pipefail
 
@@ -16,7 +16,7 @@ readonly TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
 
 start_line="$(grep -n '^pull_release_images$' "${DEPLOY_PROD}" | head -1 | cut -d: -f1)"
-end_line="$(grep -n '^if \[\[ "\${V1_DB_HOST:-v1_postgres}" == "v1_postgres" \]\]; then$' "${DEPLOY_PROD}" | head -1 | cut -d: -f1)"
+end_line="$(grep -n '^if \[\[ "\${task168_stage}" == stageA || "\${task168_stage}" == stageB \]\]; then$' "${DEPLOY_PROD}" | head -1 | cut -d: -f1)"
 [[ -n "${start_line}" && -n "${end_line}" && "${start_line}" -lt "${end_line}" ]] || {
   echo "extract: could not find both anchor lines in deploy-prod.sh" >&2
   exit 1

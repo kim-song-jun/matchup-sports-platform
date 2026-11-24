@@ -86,7 +86,7 @@ describe('TeamMatchListPageClient — 내 지역 먼저', () => {
     render(<TeamMatchListPageClient />);
 
     expect(listCalls().some((filters) => filters?.preferRegionId !== undefined)).toBe(false);
-    expect(screen.getByText('활동 지역을 정하면 가까운 팀 매치를 먼저 보여 줘요')).toBeTruthy();
+    expect(screen.getByText('가까운 팀 매치를 먼저 보려면')).toBeTruthy();
     expect(screen.getByRole('link', { name: '지역 설정' }).getAttribute('href')).toBe('/my/settings/location');
   });
 

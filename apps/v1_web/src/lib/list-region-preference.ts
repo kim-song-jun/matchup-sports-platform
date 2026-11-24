@@ -83,7 +83,8 @@ export function listRegionNotice(
 ): ListRegionNotice | undefined {
   const what = `${noun}${objectParticle(noun)}`;
   if (preference.status === 'none') {
-    return { text: `활동 지역을 정하면 가까운 ${what} 먼저 보여 줘요`, link: { label: '지역 설정', href: settingsHref } };
+    // 문장이 "지역 설정" 알약으로 이어진다("…먼저 보려면 [지역 설정]"). 알약 옆 390 폭 문구 영역이 224px 라 한 줄에 들어가야 한다.
+    return { text: `가까운 ${what} 먼저 보려면`, link: { label: '지역 설정', href: settingsHref } };
   }
   if (preference.status !== 'ready') return undefined;
   const where = preference.name ? `(${preference.name})` : '';

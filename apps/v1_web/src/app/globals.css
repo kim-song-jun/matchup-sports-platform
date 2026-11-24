@@ -5337,6 +5337,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin: var(--spacing-2) 0 0;
   padding: 0 12px;
   color: var(--text-muted);
+  /* 알약 옆 390 폭에서 문구가 두 줄로 접힐 때 어절 중간("보|여")이나 마지막 한 글자("요")로 끊기지 않게 한다. */
+  word-break: keep-all;
+  text-wrap: pretty;
 }
 
 /* 활동 지역 설정을 권하는 줄 — 안내 글은 왼쪽, 알약 버튼은 오른쪽. 눈에 보이는 알약은 32px 이고,

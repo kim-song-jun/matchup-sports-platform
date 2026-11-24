@@ -133,8 +133,8 @@ for conf in nginx.conf nginx.alpha.conf; do
     # location 마다의 헤더는 웹 개수와 무관하므로 첫 번째 개수에서만 본다. 개수는 upstream 블록(연결 재사용·keepalive_timeout)만 바꾼다.
     if [[ "${replicas}" == 1 ]]; then
       check_plain 3013 /landing /_next/static/x.js '/_next/image?url=x' /images/a.png /fonts/a.woff2
-      check_plain 8121 /api/v1/health /api/v1/auth/me /api/v1/auth/login /uploads/a.png /api/v1/calendar/feed/tok
-      check_upgrade 3013 '/socket.io/?EIO=4&transport=websocket'
+      check_plain 8121 /api/v1/health /api/v1/auth/me /api/v1/auth/login /uploads/a.png /api/v1/calendar/feed/tok '/socket.io/?EIO=4&transport=polling'
+      check_upgrade 8121 '/socket.io/?EIO=4&transport=websocket'
       check_upgrade 3013 /admin-content-preview/x
       check_upgrade 8121 /api/v1/health
     fi

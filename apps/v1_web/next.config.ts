@@ -142,6 +142,8 @@ const nextConfig: NextConfig = {
         destination: `${internalApiOrigin}/uploads/:path*`,
       },
       {
+        // Deployed nginx sends /socket.io/ straight to the API (deploy/nginx*.conf) so the web
+        // container never holds realtime connections; these two rules only serve the dev server.
         // The bare handshake request (no extra path segments) still needs an
         // explicit rule: `/socket.io/:path*` alone collapses to a destination
         // without the trailing slash when :path* is empty, and the Engine.IO

@@ -39,6 +39,37 @@ else
   fail 'v1_web_b 의 볼륨·포트가 기대와 다르다'
 fi
 
+echo '[web-pair-config] 종료 유예 · 배포 건강 대기'
+duration_seconds() { # compose 가 쓰는 30s · 1m0s 같은 길이를 초로 바꾼다
+  awk -v d="$1" 'BEGIN { s = 0; while (match(d, /^[0-9]+[hms]/)) { n = substr(d, 1, RLENGTH - 1) + 0; u = substr(d, RLENGTH, 1); s += n * (u == "h" ? 3600 : u == "m" ? 60 : 1); d = substr(d, RLENGTH + 1) } if (d != "") exit 1; print s }' ||
+    { echo "[web-pair-config] compose 에서 길이 값을 읽지 못했습니다: '$1'" >&2; return 1; }
+}
+web_config="$("${prod[@]}" --profile web-pair config --format json)"
+for service in v1_web v1_web_b; do
+  grace="$(duration_seconds "$(jq -r ".services.${service}.stop_grace_period // \"10s\"" <<<"${web_config}")")"
+  if (( grace > 10 )); then
+    pass "${service}: 종료 유예 ${grace}초 — Docker 기본 10초보다 길다"
+  else
+    fail "${service}: 종료 유예가 Docker 기본 10초 이하다(${grace}초) — 느린 서버 렌더가 잘린다"
+  fi
+done
+# 산술식 안의 명령 치환은 실패해도 set -e 가 잡지 못해 값이 빈 채로 계산된다 — 변수로 먼저 받는다.
+start_period="$(duration_seconds "$(jq -r '.services.v1_web.healthcheck.start_period' <<<"${web_config}")")"
+check_interval="$(duration_seconds "$(jq -r '.services.v1_web.healthcheck.interval' <<<"${web_config}")")"
+check_retries="$(jq -er '.services.v1_web.healthcheck.retries' <<<"${web_config}")"
+health_window=$(( start_period + check_interval * check_retries ))
+wait_budget="$(env -u WEB_HEALTH_ATTEMPTS -u WEB_HEALTH_POLL_SECONDS bash -c 'source ./web-replicas-common.sh && echo $(( WEB_HEALTH_ATTEMPTS * WEB_HEALTH_POLL_SECONDS ))')"
+if (( wait_budget > health_window )); then
+  pass "배포의 웹 healthy 대기 ${wait_budget}초가 healthcheck 가 실패를 확정하는 창 ${health_window}초보다 길다"
+else
+  fail "배포의 웹 healthy 대기 ${wait_budget}초가 healthcheck 실패 확정 창 ${health_window}초 이하다 — 늦게 뜨는 정상 컨테이너에서 배포가 먼저 실패한다"
+fi
+if grep -rq 'non_idempotent' nginx-web/; then
+  fail 'nginx-web 재시도 설정에 non_idempotent 가 있다 — 보낸 POST 가 다른 웹으로 다시 가 두 번 처리된다'
+else
+  pass 'nginx-web 재시도 설정은 non_idempotent 를 켜지 않는다'
+fi
+
 echo '[web-pair-config] nginx -t'
 image="${NGINX_TEST_IMAGE:-$(awk '/^  nginx:/ { in_n = 1; next } in_n && $1 == "image:" { print $2; exit }' docker-compose.prod.yml)}"
 [[ -n "${image}" ]] || { echo '[web-pair-config] nginx 이미지를 읽지 못했습니다' >&2; exit 1; }
@@ -96,6 +127,13 @@ for conf in nginx.conf nginx.alpha.conf; do
     pass "${conf}: 재시도 설정은 개수 2 에만 있다"
   else
     fail "${conf}: 재시도 설정이 기대와 다르다 (개수 1: ${retry_one}, 개수 2: ${retry_two})"
+  fi
+  # 웹이 폴링 POST·WebSocket 을 쥐면 종료 신호 뒤에도 닫히지 못하고, 보낸 POST 는 다른 웹으로 재시도되지 않는다.
+  socket_block="$(nginx_run "${conf}" 2 -T | awk '/^[[:space:]]*location \^~ \/socket\.io\/ \{/ { in_b = 1 } in_b { print } in_b && /^    \}/ { in_b = 0 }')"
+  if grep -q 'proxy_pass http://v1_api;' <<<"${socket_block}" && grep -q 'proxy_set_header Upgrade \$http_upgrade;' <<<"${socket_block}"; then
+    pass "${conf}: /socket.io/ 는 웹이 아니라 v1_api 로 간다(Upgrade 전달)"
+  else
+    fail "${conf}: /socket.io/ 위치가 없거나 v1_api 로 가지 않는다 — Socket.IO 가 웹 컨테이너를 거친다"
   fi
 done
 

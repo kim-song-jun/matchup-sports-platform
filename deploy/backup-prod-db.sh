@@ -70,6 +70,11 @@ prod_db_env() {
     backup_log "DATABASE_URL 에서 사용자·DB 이름·포트를 읽지 못했습니다"
     return 1
   fi
+  # 값 하나가 env 파일 한 줄이다. 풀어서 줄바꿈이 되는 %0A·%0D 가 있으면 줄이 늘어 다른 PG* 값을 덮어쓸 수 있다.
+  if [[ "${host}${db}${user}${password}" =~ %0[aAdD] ]]; then
+    backup_log "DATABASE_URL 에 줄바꿈 문자가 들어 있습니다 — 백업하지 않습니다"
+    return 1
+  fi
 
   printf 'PGHOST=%s\nPGPORT=%s\nPGDATABASE=%s\nPGUSER=%s\nPGPASSWORD=%s\n' \
     "${host}" "${port}" "$(_backup_url_decode "${db}")" "$(_backup_url_decode "${user}")" "$(_backup_url_decode "${password}")"

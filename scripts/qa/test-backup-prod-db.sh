@@ -98,6 +98,9 @@ echo '[backup-prod-db] 거부'
 run_case old-container FAKE_DATABASE_URL='postgresql://teameet_v1:x@v1_postgres:5432/teameet_v1'
 expect_refused '운영 API 가 옛 DB 컨테이너(v1_postgres)를 가리키면 뜨지 않는다'
 if grep -q ' pg_dump ' "${CASE_DIR}/docker.argv"; then fail '거부했는데 pg_dump 를 불렀다'; else pass '거부하면 pg_dump 도 부르지 않는다'; fi
+run_case newline FAKE_DATABASE_URL='postgresql://teameet_v1:x%0APGHOST%3Devil.example@db.example.internal:5432/teameet_v1'
+expect_refused '값을 풀면 줄바꿈이 되는 %0A 가 있으면 env 파일에 쓰지 않는다(다른 PG* 값을 덮어쓰는 길)'
+if [[ -e "${CASE_DIR}/pg.env" ]]; then fail '줄바꿈 값인데 env 파일이 만들어져 넘어갔다'; else pass '줄바꿈 값이면 pg_dump 에 아무것도 넘기지 않는다'; fi
 run_case empty-host FAKE_DATABASE_URL='postgresql://teameet_v1:x@:5432/teameet_v1'
 expect_refused 'DATABASE_URL 호스트가 비면 실패'
 run_case no-url FAKE_DATABASE_URL=''

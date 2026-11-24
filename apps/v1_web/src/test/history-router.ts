@@ -28,3 +28,36 @@ export async function settleHistory(ticks = 5): Promise<void> {
 }
 
 export const currentPath = () => `${window.location.pathname}${window.location.search}`;
+
+/**
+ * Starts at `path` on the real jsdom history and records, in order, `location.assign` calls, `history.back()`
+ * calls and popstate events. Browsers cancel a hard navigation when a history.back() follows it, so an overlay
+ * that closes (back) and then leaves (assign) must show `back, pop` before `assign`.
+ */
+export function recordCloseThenNavigateOrder(path: string) {
+  window.history.replaceState(null, '', path);
+  const real = window.location;
+  const order: string[] = [];
+  vi.stubGlobal('location', {
+    get pathname() { return real.pathname; },
+    get search() { return real.search; },
+    get hash() { return real.hash; },
+    get href() { return real.href; },
+    get origin() { return real.origin; },
+    assign: (url: string) => { order.push(`assign ${url}`); },
+  });
+  const realBack = window.history.back.bind(window.history);
+  const back = vi.spyOn(window.history, 'back').mockImplementation(() => {
+    order.push('back');
+    realBack();
+  });
+  const onPop = () => order.push('pop');
+  window.addEventListener('popstate', onPop, { capture: true });
+  return {
+    order,
+    restore: () => {
+      back.mockRestore();
+      window.removeEventListener('popstate', onPop, { capture: true });
+    },
+  };
+}

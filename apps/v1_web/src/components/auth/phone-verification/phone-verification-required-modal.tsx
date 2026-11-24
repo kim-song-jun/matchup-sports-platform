@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { browserAppRoute } from '@/lib/app-route';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { subscribePhoneVerificationRequired } from '@/lib/phone-verification-required';
 import { PHONE_VERIFY_PATH, buildPhoneVerifyHref } from './phone-verify-route';
 
@@ -32,9 +33,10 @@ export function PhoneVerificationRequiredModal() {
   );
 
   const handleConfirm = () => {
-    setOpen(false);
     const returnTo = `${window.location.pathname}${window.location.search}`;
-    window.location.assign(browserAppRoute(buildPhoneVerifyHref(returnTo)));
+    const href = browserAppRoute(buildPhoneVerifyHref(returnTo));
+    // 닫기가 모달 히스토리 항목을 back 으로 걷는다 — 그 전에 assign 하면 그 back 이 이동을 취소한다.
+    void closeOverlayThenNavigate(() => setOpen(false), () => window.location.assign(href));
   };
 
   return (

@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Post } from '@/lib/api-client';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { recordCloseThenNavigateOrder } from '@/test/history-router';
 import { PhoneVerificationRequiredModal } from './phone-verification-required-modal';
 
 const reportClientError = vi.fn();
@@ -37,6 +40,9 @@ describe('PhoneVerificationRequiredModal', () => {
     vi.unstubAllGlobals();
     assign.mockReset();
     reportClientError.mockReset();
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
   });
 
   // 미인증 차단은 설계된 제품 상태다. 이걸 클라이언트 에러로 올리면 미인증 사용자 수만큼
@@ -71,7 +77,27 @@ describe('PhoneVerificationRequiredModal', () => {
     expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '인증하러 가기' }));
-    expect(assign).toHaveBeenCalledWith('/my/phone-verify?redirect=%2Ftournaments%2Ft-1%2Fapply');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/my/phone-verify?redirect=%2Ftournaments%2Ft-1%2Fapply'));
+  });
+
+  it('leaves only after the dialog history entry is gone — leaving first lets that back cancel the navigation', async () => {
+    const { order, restore } = recordCloseThenNavigateOrder('/tournaments/t-1/apply');
+    try {
+      stubApiError('PHONE_VERIFICATION_REQUIRED');
+      render(<PhoneVerificationRequiredModal />);
+      await act(async () => {
+        await expect(v1Post('/tournaments/t-1/registrations', {})).rejects.toThrow();
+      });
+
+      fireEvent.click(await screen.findByRole('button', { name: '인증하러 가기' }));
+
+      const navigation = 'assign /my/phone-verify?redirect=%2Ftournaments%2Ft-1%2Fapply';
+      await waitFor(() => expect(order).toContain(navigation));
+      expect(order).toEqual(['back', 'pop', navigation]);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    } finally {
+      restore();
+    }
   });
 
   it('stays closed for unrelated failures', async () => {

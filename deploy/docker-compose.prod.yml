@@ -38,32 +38,7 @@ x-v1-web: &v1-web
     start_period: 20s
 
 services:
-  v1_postgres:
-    image: postgres:16-alpine
-    container_name: teameet_v1_postgres
-    restart: always
-    command: >
-      postgres
-      -c shared_buffers=128MB
-      -c effective_cache_size=384MB
-      -c max_connections=100
-      -c work_mem=4MB
-    environment:
-      POSTGRES_USER: ${V1_DB_USER:-teameet_v1}
-      POSTGRES_PASSWORD: ${V1_DB_PASSWORD:-${DB_PASSWORD}}
-      POSTGRES_DB: ${V1_DB_NAME:-teameet_v1}
-    volumes:
-      - v1_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${V1_DB_USER:-teameet_v1} -d ${V1_DB_NAME:-teameet_v1}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-
+  # 운영 DB 는 RDS 라 이 파일에는 DB 컨테이너가 없다. alpha 의 DB 컨테이너(v1_postgres)는 docker-compose.alpha.yml 에 있다.
   v1_uploads_init:
     image: ${V1_API_IMAGE}
     user: 0:0
@@ -86,15 +61,13 @@ services:
     volumes:
       - v1_uploads_data:/app/apps/v1_api/uploads
     environment:
-      # DB 접속 대상을 변수로 뺀다 — 기본값이 v1_postgres 라 미설정 시 지금과 완전히 동일하게
-      # 동작한다(alpha 도 이 파일을 베이스로 로드하므로 기본값 유지가 필수다).
+      # 호스트는 런타임 .env 의 V1_DB_HOST(RDS)이고 대신 쓸 기본값은 없다. 비어 있으면 deploy-prod.sh 가
+      # 컨테이너를 건드리기 전에 멈춘다. alpha 는 오버레이가 이 값을 같은 호스트의 v1_postgres 로 다시 정한다.
+      # (`:?` 를 쓰지 않는 이유: compose 는 파일마다 따로 보간해서 오버레이가 덮어써도 alpha 가 실패한다.)
       #
-      # 비밀번호를 V1_DB_APP_PASSWORD 로 따로 둔 이유: V1_DB_PASSWORD 는 바로 위
-      # v1_postgres 컨테이너의 POSTGRES_PASSWORD 로도 쓰인다. RDS 로 옮기면서 그 값을
-      # RDS 비밀번호로 바꾸면, 데이터 디렉터리가 이미 초기화된 로컬 컨테이너는 옛 비밀번호를
-      # 유지한 채 접속 문자열만 바뀌어 인증에 실패한다(2026-08-03 실제로 이 상태를 만들 뻔했다).
-      # 앱이 무엇으로 접속하는지와 로컬 컨테이너가 무엇으로 초기화됐는지는 별개 값이어야 한다.
-      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
+      # 앱 접속 비밀번호는 V1_DB_APP_PASSWORD 로 따로 받는다 — V1_DB_PASSWORD 는 alpha DB 컨테이너가
+      # 처음 초기화될 때의 비밀번호라, 둘을 한 값으로 묶으면 바꾸는 순간 이미 초기화된 쪽 인증이 깨진다.
+      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-}:5432/${V1_DB_NAME:-teameet_v1}
       JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}}
       V1_SESSION_SECRET: ${V1_SESSION_SECRET:-${V1_JWT_SECRET:-${JWT_SECRET}}}
       FRONTEND_URL: ${FRONTEND_URL:-https://teameet.co.kr}
@@ -157,8 +130,7 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
-    # v1_postgres 에 의존하지 않는다 — 운영 DB 는 RDS 라 이 컨테이너는 앱이 접속하는 대상이 아니다.
-    # 로컬 DB 를 쓰는 환경(alpha)은 오버레이가 의존을 다시 건다.
+    # DB 컨테이너를 쓰는 alpha 는 오버레이가 v1_postgres 의존을 더한다.
     depends_on:
       v1_uploads_init:
         condition: service_completed_successfully
@@ -177,7 +149,8 @@ services:
     # 워커는 진행 중 일감을 20초까지 기다린 뒤 임대를 풀어서, 기본 10초면 풀기 전에 SIGKILL 을 받는다.
     stop_grace_period: 30s
     environment:
-      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
+      # v1_api 와 같은 규칙(위 주석).
+      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-}:5432/${V1_DB_NAME:-teameet_v1}
       NODE_ENV: production
       WORKER_PORT: ${WORKER_PORT:-8122}
       FRONTEND_URL: ${FRONTEND_URL:-https://teameet.co.kr}
@@ -290,7 +263,6 @@ services:
           memory: 256M
 
 volumes:
-  v1_postgres_data:
   v1_uploads_data:
   v1_web_image_cache:
   v1_web_b_image_cache:

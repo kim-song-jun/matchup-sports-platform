@@ -138,18 +138,18 @@ fi
 #
 # 시크릿은 compose 가 --env-file 로 직접 읽으므로 셸 환경에 올릴 이유가 없다.
 # 이 스크립트가 셸에서 직접 봐야 하는 값만 아래에서 읽는다(셸 해석 없이).
-#
-# V1_DB_HOST 를 여기서 함께 읽는 것이 중요하다. source 를 없앤 뒤에도 아래 로컬 Postgres
-# 분기가 이 변수를 참조하는데, 정작 셸에는 값이 들어오지 않아 **항상 미설정**이었다. 즉
-# `${V1_DB_HOST:-v1_postgres}` 가 언제나 기본값으로 떨어져 외부 DB 분기가 죽은 코드였다
-# — .env 가 RDS 엔드포인트를 가리켜도 로컬 컨테이너를 띄우고 기다렸다.
-# (Copilot 리뷰 지적, 2026-08-03 재현으로 확인.)
 env_value() {
   sed -n "s/^$1=//p" "${ENV_FILE}" | head -1
 }
-V1_DB_USER="$(env_value V1_DB_USER)"
-V1_DB_NAME="$(env_value V1_DB_NAME)"
+# 운영 DB 는 RDS 다. compose 의 DATABASE_URL 은 이 값 말고 대신 쓸 호스트가 없으므로, 비었거나 옛 DB
+# 컨테이너 이름이면 컨테이너를 하나도 건드리기 전에 멈춘다. 값은 로그에 남기지 않는다.
 V1_DB_HOST="$(env_value V1_DB_HOST)"
+case "${V1_DB_HOST}" in
+  '' | v1_postgres | teameet_v1_postgres | localhost | 127.0.0.1)
+    echo "[prod-deploy] 런타임 .env 의 V1_DB_HOST 가 운영 DB(RDS) 호스트가 아닙니다 — 배포를 멈춥니다" >&2
+    exit 1
+    ;;
+esac
 # 웹 컨테이너 개수. 비어 있으면 1 이고, 2 는 4GB 이상 호스트에서만 켜진다(web-replicas-common.sh).
 V1_WEB_REPLICAS="$(env_value V1_WEB_REPLICAS)"
 configure_web_replicas "${V1_WEB_REPLICAS}" 1 3500000
@@ -293,28 +293,6 @@ fi
 if [[ "${task168_stage}" != stageA ]]; then
   write_release_metadata "${PROD_MANIFEST_FILE}"
 fi
-# DB 가 인스턴스 밖(RDS)에 있으면 로컬 컨테이너를 띄우고 그것의 준비 상태를 기다리는 것은
-# 의미가 없다 — 앱이 접속하는 대상이 아니기 때문이다. V1_DB_HOST 가 기본값(v1_postgres)일
-# 때만 로컬 경로를 탄다. 전환 후에도 컨테이너와 볼륨은 남겨 두지만(롤백 창), 기동과 대기는
-# 건너뛴다.
-if [[ "${V1_DB_HOST:-v1_postgres}" == "v1_postgres" ]]; then
-  "${compose[@]}" up -d v1_postgres
-
-  for attempt in $(seq 1 30); do
-    if "${compose[@]}" exec -T v1_postgres \
-      pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-      break
-    fi
-    if [[ "${attempt}" -eq 30 ]]; then
-      echo "[prod-deploy] PostgreSQL did not become ready" >&2
-      false
-    fi
-    sleep 2
-  done
-else
-  echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
-fi
-
 if [[ "${task168_stage}" == stageA || "${task168_stage}" == stageB ]]; then
   # Ruling R1: 러너는 DB URL 을 이 변수로만 받는다(argv 금지). 획득 경로는
   # assert_task168_m11_guard 와 같다.

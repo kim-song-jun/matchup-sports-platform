@@ -207,11 +207,14 @@ Internet :80/:443
         |
       nginx
        |  \
-       |   +-- /api/v1/*, /uploads/* --> v1_api:8121 --> v1_postgres:5432
+       |   +-- /api/v1/*, /uploads/* --> v1_api:8121 --> RDS(V1_DB_HOST):5432
        +------ /, /_next/static/* ------> v1_web:3013 (V1_WEB_REPLICAS=2 이면 v1_web_b:3013 과 나눠 받는다)
 ```
 
 호스트에는 API `8121`과 Web `3013`이 loopback으로만 노출된다. 외부 요청은 Nginx를 통해서만 받는다.
+운영 DB 는 RDS 이고 `docker-compose.prod.yml` 에는 DB 컨테이너가 없다. `deploy/.env` 의 `V1_DB_HOST` 가 비었거나
+옛 DB 컨테이너 이름이면 `deploy-prod.sh` 가 컨테이너를 건드리기 전에 멈춘다. alpha 의 DB 컨테이너(`v1_postgres`)는
+`docker-compose.alpha.yml` 에 있다.
 
 ## 7. 수동 배포
 
@@ -240,7 +243,7 @@ else
   COMPOSE="sudo docker-compose"
 fi
 
-${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
+# DB 는 RDS 다 — .env 의 V1_DB_HOST·V1_DB_APP_PASSWORD 가 채워져 있어야 한다.
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c \
   "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
@@ -269,15 +272,12 @@ sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_web
 sudo docker compose -f docker-compose.prod.yml --env-file .env restart nginx
 ```
 
-DB backup과 복원은 v1 PostgreSQL container와 v1 DB 이름을 명시한다.
+DB 백업·복원·읽기 전용 조회는 `docs/ops/prod-backup.md` 를 따른다. 일일 백업은 RDS 를 일회용 클라이언트
+컨테이너로 뜬다(`deploy/backup-prod-db.sh`). 운영 DB 를 조회할 때도 같은 스크립트의 `prod_db_client` 를 쓴다 —
+접속 정보를 명령줄에 싣지 않고 세션이 읽기 전용이다.
 
 ```bash
-docker exec teameet_v1_postgres \
-  pg_dump -U "${V1_DB_USER:-teameet_v1}" "${V1_DB_NAME:-teameet_v1}" \
-  > "v1_backup_$(date +%Y%m%d).sql"
-
-cat v1_backup.sql | docker exec -i teameet_v1_postgres \
-  psql -U "${V1_DB_USER:-teameet_v1}" "${V1_DB_NAME:-teameet_v1}"
+sudo bash -c '. /usr/local/bin/teameet-backup-db.sh && prod_db_client psql -X -At -c "select count(*) from v1_users"'
 ```
 
 ## 9. TLS
@@ -309,7 +309,7 @@ test "$(curl -sS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w '%{http_c
 ## 10. 트러블슈팅
 
 - Web health가 실패하면 `teameet_v1_web` 로그와 `http://localhost:3013/landing`을 확인한다.
-- API health가 실패하면 `teameet_v1_api` 로그, `v1_postgres` health, Prisma migration 상태를 확인한다.
+- API health가 실패하면 `teameet_v1_api` 로그, RDS 연결(보안 그룹·`V1_DB_HOST`), Prisma migration 상태를 확인한다.
 - Nginx에서만 실패하면 `nginx -t`, upstream container health, root path proxy 순으로 확인한다.
 - 업로드 쓰기 실패 시 persistent volume의 owner가 v1 API container UID/GID와 일치하는지 확인한다.
 - Web 로그에 `Failed to write image to cache` 가 반복되면 `v1_web_image_cache` 볼륨(`/app/apps/v1_web/.next/cache/images`) 소유자가 UID/GID 1001 인지 확인한다. 쓰기에 실패해도 이미지는 나가고, 요청마다 다시 변환할 뿐이다.

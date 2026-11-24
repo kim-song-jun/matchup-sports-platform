@@ -228,8 +228,8 @@ jobs:
       - name: Compose service parity guard tests
         run: node --test scripts/qa/check-compose-service-parity.test.mjs
 
-      # 운영 DB 는 RDS 라 로컬 v1_postgres 컨테이너는 유휴다. API/워커가 그 컨테이너의 건강 상태를
-      # 기다리면 유휴 컨테이너 하나로 전체 `up -d` 에서 API 가 뜨지 않는다. alpha 는 반대로 그 의존이 필수다.
+      # 운영 DB 는 RDS 라 운영 compose 에는 DB 컨테이너도, DATABASE_URL 의 기본 호스트도 없어야 한다(있으면 서버에
+      # 남은 옛 컨테이너로 조용히 붙는다). alpha 는 반대로 오버레이의 v1_postgres 에 의존하고 그 컨테이너를 가리킨다.
       - name: Compose DB dependency (prod no, alpha yes)
         run: pnpm qa:compose-db-dependency
 
@@ -334,6 +334,11 @@ jobs:
       # unhealthy 로 굳은 앱 컨테이너를 다시 띄우는 서버 타이머의 계약(유예 · 쿨다운 · 배포 중 건너뛰기 · 대상 범위).
       - name: Restart-unhealthy timer tests
         run: bash scripts/qa/test-restart-unhealthy.sh
+
+      # 운영 DB 일일 백업(서버 타이머, 손 설치)의 계약 — 앱이 쓰는 DB 를 뜨는지, 비밀번호를 docker 명령줄에 싣지 않는지,
+      # 진짜 덤프일 때만 S3 에 올리고 하트비트를 내는지.
+      - name: Prod DB backup script contract tests
+        run: bash scripts/qa/test-backup-prod-db.sh
 
       # 운영 알림 코드(수집기 · 알림 판정 · Slack 문구 · 설치 계획)의 시험. node:test 만 쓰고 의존성이 없다.
       - name: Ops alert code tests

@@ -11,8 +11,9 @@ WEB_DOCKER=(docker)
 WEB_REPLICAS=1
 WEB_SERVICES=(v1_web)
 WEB_COMPOSE_ARGS=()
-# 이번 compose 프로젝트(활성 릴리스 소스)에 실제로 정의된 웹 서비스. resolve_web_services 가 채운다.
+# 이번 compose 프로젝트(활성 릴리스 소스)에 실제로 정의된 웹 서비스와 전체 서비스 목록. resolve_web_services 가 채운다.
 WEB_ACTIVE=(v1_web)
+WEB_DEFINED_SERVICES=''
 WEB_HEALTH_POLL_SECONDS="${WEB_HEALTH_POLL_SECONDS:-5}"
 WEB_HEALTH_ATTEMPTS="${WEB_HEALTH_ATTEMPTS:-36}"
 
@@ -60,6 +61,7 @@ resolve_web_services() {
     return 0
   fi
   defined="$("${compose[@]}" config --services)" || return 1
+  WEB_DEFINED_SERVICES="${defined}"
   WEB_ACTIVE=()
   for service in "${WEB_SERVICES[@]}"; do
     if grep -qx -- "${service}" <<<"${defined}"; then
@@ -238,14 +240,20 @@ roll_web_services() {
 }
 
 # 배포 첫 단계: 앱 컨테이너를 뺀 나머지 스택. 개수 1 이면 예전 그대로 `up -d` 한 번이다.
+# DB 컨테이너(v1_postgres)는 그것을 정의한 프로젝트(alpha 오버레이)에서만 올린다 — 운영 compose 에는 없다.
 up_base_services() {
+  local base=(v1_uploads_init)
+
   resolve_web_services || return 1
   if (( ${#WEB_ACTIVE[@]} == 1 )); then
     "${compose[@]}" up -d || return 1
     remove_web_pair_orphan || return 1
-  else
-    "${compose[@]}" up -d v1_postgres v1_uploads_init
+    return 0
   fi
+  if grep -qx -- v1_postgres <<<"${WEB_DEFINED_SERVICES}"; then
+    base=(v1_postgres "${base[@]}")
+  fi
+  "${compose[@]}" up -d "${base[@]}" || return 1
 }
 
 # api·web·worker 를 다시 만든다. 개수 1 이면 예전 그대로 한 명령이다.

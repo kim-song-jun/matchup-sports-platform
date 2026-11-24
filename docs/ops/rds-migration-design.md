@@ -113,10 +113,10 @@ DB 가 24MB 라 논리 복제 같은 무중단 기법은 과하다. 짧은 점�
 
 ### 3단계 — 정리 (전환 후 최소 7일 뒤)
 
-- `deploy/docker-compose.prod.yml` 에서 `v1_postgres` 서비스 제거
-- `deploy/backup-prod-db.sh` 의 접속 대상을 RDS 엔드포인트로 변경
-  (스크립트를 `pg_dump` 기반으로 남겨 둔 이유가 이것이다 — 접속 대상만 바뀐다)
-- 컨테이너 Postgres 볼륨은 **바로 지우지 않는다.** 롤백 창이 끝난 뒤에 지운다
+- `deploy/docker-compose.prod.yml` 에서 `v1_postgres` 서비스 제거 — 2026-11-24 반영(alpha 정의는 `docker-compose.alpha.yml` 로 옮김)
+- `deploy/backup-prod-db.sh` 의 접속 대상을 RDS 로 변경 — 2026-11-24 반영. `docker exec` 구조라 접속 대상만 바꿀 수는 없었고,
+  API 컨테이너의 `DATABASE_URL` 로 일회용 클라이언트를 띄우게 고쳤다(`docs/ops/prod-backup.md`)
+- 컨테이너 Postgres 볼륨은 **바로 지우지 않는다.** 마지막 보관 덤프를 복원해 대조한 뒤에 지운다
 
 ## 롤백
 

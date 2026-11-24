@@ -22,7 +22,8 @@ AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 MIN_DUMP_BYTES="${MIN_DUMP_BYTES:-1024}"
 read -r -a BACKUP_DOCKER <<< "${BACKUP_DOCKER_CMD:-sudo docker}"
 
-backup_log() { echo "[prod-backup] $*"; }
+# 표준오류로 쓴다 — prod_db_env 의 표준출력은 env 파일이고 prod_db_client 의 표준출력은 덤프·조회 결과다.
+backup_log() { echo "[prod-backup] $*" >&2; }
 
 # URL 의 %XX 를 푼다. 값 하나가 env 파일 한 줄이므로 제어 문자(줄바꿈 등)로 풀리는 값은 거부한다 — 줄이 늘면
 # 다른 PG* 값을 덮어쓸 수 있다. `%` 뒤가 16진 두 자리가 아니면 거부한다: printf 의 \x 는 한 자리도 받아서

@@ -7,7 +7,7 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 
 const DAY = 24 * 60 * 60 * 1_000;
 
-/** 폰 캘린더 구독: 내 일정만, 불참은 빼고, 취소는 취소로, 주소를 다시 만들면 옛 주소는 못 쓴다. */
+/** 캘린더 구독: 내 일정 중 아직 끝나지 않은 「예정」만, 불참은 빼고, 주소를 다시 만들면 옛 주소는 못 쓴다. */
 describe('캘린더 구독 주소 HTTP/DB 계약', () => {
   let app: INestApplication;
   let cleanup: (() => Promise<void>) | undefined;
@@ -60,11 +60,11 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
     });
 
     const now = Date.now();
-    const make = async (key: string, teamId: string, data: { title: string; startOffsetDays: number; state?: 'SCHEDULED' | 'CANCELLED'; type?: 'TRAINING' | 'EVENT' | 'MATCH'; teamMatchId?: string; cancelReason?: string }) => {
+    const make = async (key: string, teamId: string, data: { title: string; startOffsetDays: number; state?: 'SCHEDULED' | 'CANCELLED' | 'COMPLETED'; durationHours?: number; type?: 'TRAINING' | 'EVENT' | 'MATCH'; teamMatchId?: string; cancelReason?: string }) => {
       const startAt = new Date(now + data.startOffsetDays * DAY);
       sched[key] = (await db.v1TeamSchedule.create({
         data: {
-          teamId, title: data.title, type: data.type ?? 'TRAINING', startAt, endAt: new Date(startAt.getTime() + 2 * 60 * 60 * 1_000),
+          teamId, title: data.title, type: data.type ?? 'TRAINING', startAt, endAt: new Date(startAt.getTime() + (data.durationHours ?? 2) * 60 * 60 * 1_000),
           timezone: 'Asia/Seoul', state: data.state ?? 'SCHEDULED', teamMatchId: data.teamMatchId ?? null, cancelReason: data.cancelReason ?? null,
         },
       })).id;
@@ -77,6 +77,9 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
     });
     await make('training', team1, { title: `팀하나 훈련-${tag}`, startOffsetDays: 2 });
     await make('cancelled', team1, { title: `팀하나 취소-${tag}`, startOffsetDays: 4, state: 'CANCELLED', type: 'EVENT', cancelReason: '우천' });
+    await make('completed', team1, { title: `팀하나 완료-${tag}`, startOffsetDays: -1, state: 'COMPLETED' });
+    await make('endedScheduled', team1, { title: `팀하나 지난예정-${tag}`, startOffsetDays: -3 });
+    await make('inProgress', team1, { title: `팀하나 진행중-${tag}`, startOffsetDays: -30 / (24 * 60), durationHours: 3 });
     await make('notGoing', team1, { title: `팀하나 불참-${tag}`, startOffsetDays: 5 });
     await make('far', team1, { title: `팀하나 먼미래-${tag}`, startOffsetDays: 400 });
     await make('match', team1, { title: `팀하나 경기-${tag}`, startOffsetDays: 3, type: 'MATCH', teamMatchId: teamMatch.id });
@@ -127,7 +130,7 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
     await request(app.getHttpServer()).get('/api/v1/me/calendar-feed').expect(401);
   });
 
-  it('로그인 없이 구독 주소로 읽으면 내 일정만 들어 있다: 불참·범위 밖·다른 사람 일정은 빠지고 취소는 취소로 남는다', async () => {
+  it('로그인 없이 구독 주소로 읽으면 내 예정 일정만 들어 있다: 불참·취소·완료·끝난 예정·범위 밖·다른 사람 일정은 빠진다', async () => {
     const { feedUrl } = (await as(userA).post('/me/calendar-feed').expect(201)).body.data;
     const res = await readFeed(feedUrl).expect(200);
     expect(res.headers['content-type']).toContain('text/calendar');
@@ -139,9 +142,12 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
     expect(ics).toContain(`UID:schedule-${sched.training}@teameet.co.kr`);
     expect(ics).not.toContain(`팀하나 불참-${tag}`);
     expect(ics).not.toContain(`팀하나 먼미래-${tag}`);
-    const cancelled = ics.split('BEGIN:VEVENT').find((block) => block.includes(`schedule-${sched.cancelled}@`));
-    expect(cancelled).toContain('STATUS:CANCELLED');
-    expect(cancelled).toContain('우천');
+    // 예정만 들어간다 — 취소·완료·끝난 예정은 빠지고, 진행 중인 일정은 들어간다.
+    expect(ics).not.toContain(`팀하나 취소-${tag}`);
+    expect(ics).not.toContain('STATUS:CANCELLED');
+    expect(ics).not.toContain(`팀하나 완료-${tag}`);
+    expect(ics).not.toContain(`팀하나 지난예정-${tag}`);
+    expect(ics).toContain(`팀하나 진행중-${tag}`);
     // 팀 매치 일정은 경기장을 장소로 싣는다.
     expect(ics.split('BEGIN:VEVENT').find((block) => block.includes(`schedule-${sched.match}@`))).toContain('LOCATION:마포 풋살장');
     // 참가 확정한 개인 매치만 들어간다(취소한 참가는 제외).

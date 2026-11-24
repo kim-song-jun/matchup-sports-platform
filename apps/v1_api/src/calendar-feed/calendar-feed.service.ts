@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { Prisma, V1AttendanceStatus, V1ScheduleType } from '@prisma/client';
+import { Prisma, V1AttendanceStatus, V1ScheduleState, V1ScheduleType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
@@ -8,9 +8,10 @@ import { isUsableAccessTokenSecret, issueAccessToken, parseAccessToken } from '.
 import { buildIcs, type IcsEvent } from './ics';
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
-/** 구독 캘린더에 싣는 범위: 지난 2주 ~ 앞으로 6개월. */
-const FEED_PAST_MS = 14 * DAY_MS;
+/** 구독 캘린더에는 아직 끝나지 않은 「예정」만, 앞으로 6개월 안까지 싣는다(2026-11-24). */
 const FEED_FUTURE_MS = 180 * DAY_MS;
+/** 끝 시각이 없는 개인 매치는 시작 후 이 시간까지 진행 중으로 본다. */
+const OPEN_ENDED_MATCH_GRACE_MS = 2 * 60 * 60 * 1_000;
 const FEED_MAX_EVENTS = 1_000;
 const LAST_USED_TOUCH_MS = 10 * 60 * 1_000;
 const CALENDAR_NAME = 'Teameet';
@@ -112,7 +113,6 @@ export class CalendarFeedService {
   // ── 일정 모으기 ────────────────────────────────────────────────────────────
 
   private async feedEvents(userId: string, now: Date): Promise<IcsEvent[]> {
-    const from = new Date(now.getTime() - FEED_PAST_MS);
     const to = new Date(now.getTime() + FEED_FUTURE_MS);
 
     const memberships = await this.prisma.v1TeamMembership.findMany({
@@ -128,7 +128,10 @@ export class CalendarFeedService {
         : await this.prisma.v1TeamSchedule.findMany({
             where: {
               teamId: { in: teamIds },
-              startAt: { gte: from, lte: to },
+              // 「예정」이고 아직 끝나지 않은 것만 — 진행 중인 일정은 넣고, 끝났거나 완료·취소된 일정은 뺀다.
+              state: V1ScheduleState.SCHEDULED,
+              endAt: { gte: now },
+              startAt: { lte: to },
               AND: [await visibleTeamMatchScheduleWhere(this.prisma, teamIds)],
               // 불참을 누른 일정은 내 캘린더에 넣지 않는다. 응답이 없거나 대기 중이면 넣는다.
               NOT: { attendance: { some: { userId, status: V1AttendanceStatus.NOT_GOING } } },
@@ -140,8 +143,10 @@ export class CalendarFeedService {
     const matches = await this.prisma.v1Match.findMany({
       where: {
         deletedAt: null,
-        startAt: { gte: from, lte: to },
-        status: { not: 'archived' },
+        startAt: { lte: to },
+        // 모집 중·마감된 개인 매치 가운데 아직 끝나지 않은 것만(취소·완료·보관은 뺀다).
+        status: { in: ['recruiting', 'closed'] },
+        OR: [{ endAt: { gte: now } }, { endAt: null, startAt: { gte: new Date(now.getTime() - OPEN_ENDED_MATCH_GRACE_MS) } }],
         participants: { some: { userId, role: 'participant', status: { in: ['active', 'completed'] } } },
       },
       select: { id: true, title: true, placeName: true, placeAddress: true, startAt: true, endAt: true, status: true, updatedAt: true },
@@ -161,7 +166,6 @@ export class CalendarFeedService {
       location: [match.placeName, match.placeAddress].filter(Boolean).join(' ') || null,
       description: `개인 매치\n자세히 보기: ${origin}/matches/${match.id}`,
       url: `${origin}/matches/${match.id}`,
-      cancelled: match.status === 'cancelled',
     }));
 
     // 팀이 둘 이상이면 어느 팀 일정인지 한눈에 보이게 제목 앞에 팀 이름을 붙인다.

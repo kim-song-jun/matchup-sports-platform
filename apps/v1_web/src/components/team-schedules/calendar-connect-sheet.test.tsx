@@ -53,17 +53,17 @@ describe('내 일정 — 캘린더 연결', () => {
     expect(api.v1Post).toHaveBeenCalledWith('/me/calendar-feed');
     expect(screen.queryByRole('button', { name: '캘린더 주소 만들기' })).toBeNull();
     // 버튼 → 안내 → 주소 → 설명 순서(설명이 맨 위에서 버튼을 밀어내지 않는다).
-    const description = screen.getByText(/팀 일정과 내 경기가 캘린더에 자동으로 들어와요/);
+    const description = screen.getByText(/앞으로 있을 팀 일정과 내 경기가 캘린더에 자동으로 들어와요/);
     expect(copy.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByLabelText('캘린더 구독 주소')).toHaveValue(connectedFeed.feedUrl);
   });
 
-  it('아이폰(앱·브라우저): 「폰 캘린더에서 열기」(webcal)와 「주소 복사」', async () => {
+  it('아이폰(앱·브라우저): 「캘린더에서 열기」(webcal)와 「주소 복사」', async () => {
     shell.value = 'ios';
     api.v1Get.mockResolvedValue(connectedFeed);
     renderButton();
     openSheet();
-    expect(await screen.findByRole('link', { name: '폰 캘린더에서 열기' })).toHaveAttribute('href', connectedFeed.webcalUrl);
+    expect(await screen.findByRole('link', { name: '캘린더에서 열기' })).toHaveAttribute('href', connectedFeed.webcalUrl);
     expect(screen.queryByRole('link', { name: /^구글 캘린더에 추가/ })).toBeNull();
     expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
     expect(screen.getByText(/아래로 당기면 바로 새로고침/)).toBeInTheDocument();
@@ -78,7 +78,6 @@ describe('내 일정 — 캘린더 연결', () => {
       openSheet();
       expect(await screen.findByRole('link', { name: '캘린더에서 열기' })).toHaveAttribute('href', connectedFeed.webcalUrl);
       expect(screen.queryByRole('link', { name: '구글 캘린더에 추가' })).toBeNull();
-      expect(screen.queryByRole('link', { name: '폰 캘린더에서 열기' })).toBeNull();
       expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
       expect(screen.getByText(/맥 캘린더에 들어와요/)).toBeInTheDocument();
     } finally {
@@ -86,7 +85,7 @@ describe('내 일정 — 캘린더 연결', () => {
     }
   });
 
-  it('갤럭시(안드로이드 앱): 「구글 캘린더에 추가」와 「주소 복사」, 폰 캘린더 버튼은 없다', async () => {
+  it('갤럭시(안드로이드 앱): 「구글 캘린더에 추가」와 「주소 복사」, 「캘린더에서 열기」(webcal)는 없다', async () => {
     shell.value = 'android';
     api.v1Get.mockResolvedValue(connectedFeed);
     renderButton();
@@ -96,7 +95,7 @@ describe('내 일정 — 캘린더 연결', () => {
     expect(google).toHaveAttribute('target', '_blank');
     // 새 창으로 열리는 링크라는 걸 스크린리더에도 알린다.
     expect(google).toHaveAccessibleName('구글 캘린더에 추가 (새 창으로 열려요)');
-    expect(screen.queryByRole('link', { name: '폰 캘린더에서 열기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '캘린더에서 열기' })).toBeNull();
     expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
     expect(screen.getByText(/갤럭시 캘린더에도 보여요/)).toBeInTheDocument();
   });

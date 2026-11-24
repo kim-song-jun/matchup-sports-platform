@@ -211,12 +211,30 @@ describe('TeamSchedulesPage — 목록 라우트 권한 게이팅', () => {
     container.querySelector('.tm-team-open-match-list .tm-badge');
 
   it('목록의 상태값은 텍스트 라벨을 유지한 배지로 렌더된다', async () => {
+    // 아직 안 끝난 예정 — 기본 fixture 는 지난 날짜라 현재 시각에 기대지 않게 먼 미래로 둔다.
+    scheduleApiMocks.useV1TeamSchedules.mockReturnValue({
+      data: { items: [scheduleSummary({ startAt: '2099-01-01T12:00:00.000Z', endAt: '2099-01-01T14:00:00.000Z' })], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
     const page = await TeamSchedulesPage({ params: Promise.resolve({ id: 'team-1' }) });
     const { container } = render(page);
 
     const badge = listStateBadge(container);
     expect(badge).not.toBeNull();
     expect(badge).toHaveTextContent('예정');
+  });
+
+  it('끝났는데 예정으로 남은 일정은 목록에서 「지난」 텍스트 배지이고 카드는 흐려지지 않는다', async () => {
+    // 기본 fixture 는 이미 지난 일정(2026-08-10 종료)이다.
+    const page = await TeamSchedulesPage({ params: Promise.resolve({ id: 'team-1' }) });
+    const { container } = render(page);
+
+    const badge = listStateBadge(container);
+    expect(badge).toHaveTextContent('지난');
+    expect(badge).not.toHaveTextContent('예정');
+    expect(container.querySelector('.tm-team-open-match-list [style*="opacity"]')).toBeNull();
   });
 
   it('취소된 일정도 컬러가 아닌 텍스트로 상태를 알린다', async () => {

@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Post } from '@/lib/api-client';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { recordCloseThenNavigateOrder } from '@/test/history-router';
 import { ActivityProfileRequiredModal } from './activity-profile-required-modal';
 
 const reportClientError = vi.fn();
@@ -40,6 +43,9 @@ describe('ActivityProfileRequiredModal', () => {
     vi.unstubAllGlobals();
     assign.mockReset();
     reportClientError.mockReset();
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
   });
 
   it('403 ACTIVITY_PROFILE_REQUIRED 를 받으면 시트를 띄우고 정보 입력으로 안내하며 클라이언트 오류로 올리지 않는다', async () => {
@@ -55,7 +61,7 @@ describe('ActivityProfileRequiredModal', () => {
     expect(reportClientError).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
-    expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fmatches%2Fm-1%3Ftab%3Dinfo%23roster');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fmatches%2Fm-1%3Ftab%3Dinfo%23roster'));
   });
 
   it('서버가 알려 준 남은 항목을 체크리스트로 보여 주고 첫 항목 화면으로 보낸 뒤 원래 화면으로 돌아오게 한다', async () => {
@@ -74,7 +80,27 @@ describe('ActivityProfileRequiredModal', () => {
       '관심 종목필요',
     ]);
     fireEvent.click(screen.getByRole('button', { name: '관심 종목 고르기' }));
-    expect(assign).toHaveBeenCalledWith('/onboarding/sport?redirect=%2Fteams%2Fnew%3Ffrom%3Dhome');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/onboarding/sport?redirect=%2Fteams%2Fnew%3Ffrom%3Dhome'));
+  });
+
+  it('관심 종목 고르기는 모달의 히스토리 항목을 걷어 낸 뒤에 이동한다 — 먼저 이동하면 그 back 이 이동을 취소한다', async () => {
+    const { order, restore } = recordCloseThenNavigateOrder('/teams/t-1');
+    try {
+      stubApiError('ACTIVITY_PROFILE_REQUIRED', { missing: ['interestSport'] });
+      render(<ActivityProfileRequiredModal />);
+      await act(async () => {
+        await expect(v1Post('/chat/rooms/resolve', {})).rejects.toThrow();
+      });
+
+      fireEvent.click(await screen.findByRole('button', { name: '관심 종목 고르기' }));
+
+      const navigation = 'assign /onboarding/sport?redirect=%2Fteams%2Ft-1';
+      await waitFor(() => expect(order).toContain(navigation));
+      expect(order).toEqual(['back', 'pop', navigation]);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    } finally {
+      restore();
+    }
   });
 
   it('휴대폰이 먼저 남았으면 정보 입력 화면으로 보낸다', async () => {
@@ -88,7 +114,7 @@ describe('ActivityProfileRequiredModal', () => {
 
     expect(await screen.findByText('3가지가 더 필요해요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
-    expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fteams%2Fnew');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fteams%2Fnew'));
   });
 
   it('다음에 할게요로 닫으면 이동하지 않는다', async () => {

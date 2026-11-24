@@ -24,24 +24,31 @@ read -r -a BACKUP_DOCKER <<< "${BACKUP_DOCKER_CMD:-sudo docker}"
 
 backup_log() { echo "[prod-backup] $*"; }
 
-# URL 의 %XX 를 푼다. 원문의 백슬래시는 printf 가 해석하지 않게 먼저 감싼다.
+# URL 의 %XX 를 푼다. 값 하나가 env 파일 한 줄이므로 제어 문자(줄바꿈 등)로 풀리는 값은 거부한다 — 줄이 늘면
+# 다른 PG* 값을 덮어쓸 수 있다. `%` 뒤가 16진 두 자리가 아니면 거부한다: printf 의 \x 는 한 자리도 받아서
+# `%a` 가 줄바꿈이 된다. 원문의 백슬래시는 printf 가 해석하지 않게 먼저 감싼다.
 _backup_url_decode() {
-  local s="${1//\\/\\\\}"
-  printf '%b' "${s//%/\\x}"
+  local s="$1" out
+  [[ ! "${s}" =~ %([^0-9A-Fa-f]|.[^0-9A-Fa-f]|.?$) && ! "${s}" =~ %(0[0-9A-Fa-f]|1[0-9A-Fa-f]|7[fF]) ]] || return 1
+  s="${s//\\/\\\\}"
+  out="$(printf '%b' "${s//%/\\x}")"
+  [[ "${out}" != *[[:cntrl:]]* ]] || return 1
+  printf '%s' "${out}"
 }
 
 # 실행 중인 API 컨테이너의 DATABASE_URL 을 libpq 환경변수 줄로 바꿔 stdout 에 낸다(docker --env-file 형식).
 # 운영 API 가 옛 DB 컨테이너나 자기 자신을 가리키면 거부한다 — 운영 DB 는 RDS 다.
 prod_db_env() {
-  local url rest db userinfo hostport user password host port
+  local url rest db userinfo hostport user password host port d_db d_user d_password
 
   url="$("${BACKUP_DOCKER[@]}" inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "${BACKUP_API_CONTAINER}" \
     | sed -n 's/^DATABASE_URL=//p')" || {
     backup_log "${BACKUP_API_CONTAINER} 컨테이너의 환경을 읽지 못했습니다"
     return 1
   }
-  if [[ ! "${url}" =~ ^postgres(ql)?:// ]]; then
-    backup_log "${BACKUP_API_CONTAINER} 컨테이너에 postgres DATABASE_URL 이 없습니다"
+  # 값에 줄바꿈이 있으면 inspect 출력에서 여러 줄이 된다 — 한 줄짜리 URL 만 받는다.
+  if [[ ! "${url}" =~ ^postgres(ql)?:// || "${url}" == *[[:cntrl:]]* ]]; then
+    backup_log "${BACKUP_API_CONTAINER} 컨테이너에 한 줄짜리 postgres DATABASE_URL 이 없습니다"
     return 1
   fi
 
@@ -70,14 +77,14 @@ prod_db_env() {
     backup_log "DATABASE_URL 에서 사용자·DB 이름·포트를 읽지 못했습니다"
     return 1
   fi
-  # 값 하나가 env 파일 한 줄이다. 풀어서 줄바꿈이 되는 %0A·%0D 가 있으면 줄이 늘어 다른 PG* 값을 덮어쓸 수 있다.
-  if [[ "${host}${db}${user}${password}" =~ %0[aAdD] ]]; then
-    backup_log "DATABASE_URL 에 줄바꿈 문자가 들어 있습니다 — 백업하지 않습니다"
+  if [[ "${host}" == *%* ]] || ! d_db="$(_backup_url_decode "${db}")" || ! d_user="$(_backup_url_decode "${user}")" \
+    || ! d_password="$(_backup_url_decode "${password}")"; then
+    backup_log "DATABASE_URL 에 잘못된 %-인코딩이나 제어 문자가 있습니다 — 백업하지 않습니다"
     return 1
   fi
 
   printf 'PGHOST=%s\nPGPORT=%s\nPGDATABASE=%s\nPGUSER=%s\nPGPASSWORD=%s\n' \
-    "${host}" "${port}" "$(_backup_url_decode "${db}")" "$(_backup_url_decode "${user}")" "$(_backup_url_decode "${password}")"
+    "${host}" "${port}" "${d_db}" "${d_user}" "${d_password}"
   printf 'PGOPTIONS=-c default_transaction_read_only=on\nPGCONNECT_TIMEOUT=10\nPGAPPNAME=teameet-prod-db-client\n'
 }
 

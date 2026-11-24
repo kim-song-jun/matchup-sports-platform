@@ -98,9 +98,14 @@ echo '[backup-prod-db] 거부'
 run_case old-container FAKE_DATABASE_URL='postgresql://teameet_v1:x@v1_postgres:5432/teameet_v1'
 expect_refused '운영 API 가 옛 DB 컨테이너(v1_postgres)를 가리키면 뜨지 않는다'
 if grep -q ' pg_dump ' "${CASE_DIR}/docker.argv"; then fail '거부했는데 pg_dump 를 불렀다'; else pass '거부하면 pg_dump 도 부르지 않는다'; fi
-run_case newline FAKE_DATABASE_URL='postgresql://teameet_v1:x%0APGHOST%3Devil.example@db.example.internal:5432/teameet_v1'
-expect_refused '값을 풀면 줄바꿈이 되는 %0A 가 있으면 env 파일에 쓰지 않는다(다른 PG* 값을 덮어쓰는 길)'
-if [[ -e "${CASE_DIR}/pg.env" ]]; then fail '줄바꿈 값인데 env 파일이 만들어져 넘어갔다'; else pass '줄바꿈 값이면 pg_dump 에 아무것도 넘기지 않는다'; fi
+# 값 하나가 env 파일 한 줄이다 — 줄이 늘면 다른 PG* 값(예: PGHOST)을 덮어쓸 수 있다.
+for case_ in 'newline-0a|x%0APGHOST%3Devil.example' 'newline-1digit|x%aPGHOST%3Devil.example' 'bad-percent|x%zz' 'percent-at-end|x%'; do
+  run_case "${case_%%|*}" FAKE_DATABASE_URL="postgresql://teameet_v1:${case_#*|}@db.example.internal:5432/teameet_v1"
+  expect_refused "비밀번호 '${case_#*|}' 처럼 줄바꿈으로 풀리거나 잘못된 %-인코딩이면 거부"
+  if [[ -e "${CASE_DIR}/pg.env" ]]; then fail "'${case_#*|}' 인데 env 파일이 pg_dump 로 넘어갔다"; fi
+done
+run_case multi-line FAKE_DATABASE_URL=$'postgresql://teameet_v1:x@db.example.internal:5432/teameet_v1\nDATABASE_URL=postgresql://u:p@other.example/db'
+expect_refused 'inspect 에서 DATABASE_URL 이 여러 줄로 나오면 거부'
 run_case empty-host FAKE_DATABASE_URL='postgresql://teameet_v1:x@:5432/teameet_v1'
 expect_refused 'DATABASE_URL 호스트가 비면 실패'
 run_case no-url FAKE_DATABASE_URL=''

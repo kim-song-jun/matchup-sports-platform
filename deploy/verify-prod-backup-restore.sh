@@ -41,7 +41,7 @@ COUNT_SQL="SELECT table_schema || '.' || table_name || '|' || (xpath('/row/c/tex
 SCRATCH="teameet-restore-rehearsal-$$"
 WORK="$(mktemp -d)"
 cleanup() {
-  "${BACKUP_DOCKER[@]}" rm -f "${SCRATCH}" >/dev/null 2>&1 || true
+  "${BACKUP_DOCKER[@]}" rm -f -v "${SCRATCH}" >/dev/null 2>&1 || true
   "${BACKUP_DOCKER[@]}" volume rm "${SCRATCH}" >/dev/null 2>&1 || true
   rm -rf "${WORK}"
 }

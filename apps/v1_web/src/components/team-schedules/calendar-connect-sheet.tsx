@@ -47,11 +47,16 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** 기기별 안내 — 버튼 바로 아래에 둔다. 아이폰은 캘린더 앱이 구독을 바로 받고, 갤럭시는 구글 캘린더(웹)를 거친다. */
+/** 기기별 안내 — 버튼 바로 아래에 둔다. 아이폰·맥은 캘린더 앱이 구독을 바로 받고, 갤럭시는 구글 캘린더(웹)를 거친다. */
 const PLATFORM_HELP: Record<CalendarPlatform, string[]> = {
   ios: [
     '「폰 캘린더에서 열기」를 누르고 구독을 확인해 주세요.',
     '반영은 바로 되지 않아요. 몇 시간 걸릴 수 있어요. 캘린더 목록에서 아래로 당기면 바로 새로고침돼요.',
+  ],
+  mac: [
+    '「캘린더에서 열기」를 누르고 구독을 확인해 주세요. 맥 캘린더에 들어와요.',
+    '구글 캘린더를 쓴다면 「주소 복사」 후 구글 캘린더(웹)의 「다른 캘린더 → URL로 추가」에 붙여 넣어 주세요.',
+    '반영은 바로 되지 않아요. 몇 시간 걸릴 수 있어요.',
   ],
   android: [
     '「구글 캘린더에 추가」를 눌러 구독을 확인해 주세요. 구글 계정이 연결된 갤럭시 캘린더에도 보여요(안 보이면 구글 계정의 캘린더 동기화 설정에서 이 캘린더가 켜져 있는지 확인해 주세요).',
@@ -102,9 +107,9 @@ export function CalendarConnectSheet({ onClose }: { onClose: () => void }) {
   }
 
   const primary =
-    platform === 'ios' ? (
+    platform === 'ios' || platform === 'mac' ? (
       <a className="tm-btn tm-btn-md tm-btn-primary tm-btn-block" href={feed.data?.webcalUrl ?? undefined}>
-        폰 캘린더에서 열기
+        {platform === 'ios' ? '폰 캘린더에서 열기' : '캘린더에서 열기'}
       </a>
     ) : (
       <a

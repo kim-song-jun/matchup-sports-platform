@@ -69,6 +69,23 @@ describe('내 일정 — 캘린더 연결', () => {
     expect(screen.getByText(/아래로 당기면 바로 새로고침/)).toBeInTheDocument();
   });
 
+  it('맥 사파리·크롬: 구글 캘린더가 아니라 「캘린더에서 열기」(webcal)와 「주소 복사」', async () => {
+    const original = window.navigator.userAgent;
+    Object.defineProperty(window.navigator, 'userAgent', { value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15', configurable: true });
+    try {
+      api.v1Get.mockResolvedValue(connectedFeed);
+      renderButton();
+      openSheet();
+      expect(await screen.findByRole('link', { name: '캘린더에서 열기' })).toHaveAttribute('href', connectedFeed.webcalUrl);
+      expect(screen.queryByRole('link', { name: '구글 캘린더에 추가' })).toBeNull();
+      expect(screen.queryByRole('link', { name: '폰 캘린더에서 열기' })).toBeNull();
+      expect(screen.getByRole('button', { name: '주소 복사' })).toBeInTheDocument();
+      expect(screen.getByText(/맥 캘린더에 들어와요/)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { value: original, configurable: true });
+    }
+  });
+
   it('갤럭시(안드로이드 앱): 「구글 캘린더에 추가」와 「주소 복사」, 폰 캘린더 버튼은 없다', async () => {
     shell.value = 'android';
     api.v1Get.mockResolvedValue(connectedFeed);

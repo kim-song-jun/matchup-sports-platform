@@ -22,6 +22,9 @@ import {
   toScheduleListItemModel,
 } from './team-schedules.view-model';
 
+/** fixture 일정(2026-08-10 종료)이 아직 안 끝난 시각 — 현재 시각에 기대지 않게 고정한다. */
+const BEFORE_FIXTURE_END = new Date('2026-08-10T00:00:00.000Z');
+
 function schedule(overrides: Partial<V1TeamScheduleSummary> = {}): V1TeamScheduleSummary {
   return {
     id: 'sched-1',
@@ -153,7 +156,7 @@ describe('team-schedules view-model — API failure / 409 conflict mapping', () 
 
 describe('team-schedules view-model — list item / labels', () => {
   it('converts a schedule summary into a list item with derived labels and href', () => {
-    const item = toScheduleListItemModel(schedule(), 'team-1');
+    const item = toScheduleListItemModel(schedule(), 'team-1', BEFORE_FIXTURE_END);
     expect(item.href).toBe('/teams/team-1/schedules/sched-1');
     expect(item.typeLabel).toBe(scheduleTypeLabel('TRAINING'));
     expect(item.stateLabel).toBe(scheduleStateLabel('SCHEDULED'));
@@ -224,8 +227,15 @@ describe('team-schedules view-model — match schedule confirmation display', ()
     expect(display.isTentative).toBe(false);
   });
 
+  it('끝났는데 예정으로 남은 일정은 팀 일정 목록에서도 「지난」(흐리게 하지 않는다)', () => {
+    const item = toScheduleListItemModel(schedule(), 'team-1', new Date('2026-08-20T00:00:00.000Z'));
+    expect(item.stateLabel).toBe('지난');
+    expect(item.stateTone).toBe('muted');
+    expect(item.isTentative).toBe(false);
+  });
+
   it('threads the tentative flag through toScheduleListItemModel for an unconfirmed MATCH schedule', () => {
-    const item = toScheduleListItemModel(schedule({ type: 'MATCH', matchConfirmed: false }), 'team-1');
+    const item = toScheduleListItemModel(schedule({ type: 'MATCH', matchConfirmed: false }), 'team-1', BEFORE_FIXTURE_END);
     expect(item.stateLabel).toBe('상대팀 모집 중');
     expect(item.stateTone).toBe('muted');
     expect(item.isTentative).toBe(true);
@@ -382,7 +392,7 @@ describe('myScheduleStateDisplay — 끝났는데 예정으로 남은 일정은 
 
   it('끝났는데 예정이면 종류·상대 확정 여부와 상관없이 「지난」으로 흐리게', () => {
     const past = { ...base, endAt: '2026-11-20T02:00:00.000Z' };
-    expect(myScheduleStateDisplay(past, NOW)).toEqual({ stateLabel: '지난', stateTone: 'muted', isTentative: true });
+    expect(myScheduleStateDisplay(past, NOW)).toEqual({ stateLabel: '지난', stateTone: 'muted', isTentative: false });
     expect(myScheduleStateDisplay({ ...past, type: 'MATCH', matchConfirmed: true }, NOW).stateLabel).toBe('지난');
     expect(myScheduleStateDisplay({ ...past, type: 'MATCH', matchConfirmed: false }, NOW).stateLabel).toBe('지난');
   });

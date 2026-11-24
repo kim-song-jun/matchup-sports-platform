@@ -76,15 +76,16 @@ export function matchScheduleDisplay(
 
 /**
  * 내 일정 목록의 상태 배지. 끝났는데도 「예정」으로 남은 일정(팀 매치·리그·대회 경기는 결과가 확정돼야 완료가 된다)은
- * 「예정」이라 하면 앞으로 올 일정과 헷갈려서 「지난」으로 보여 주고 흐리게 둔다 — 서버가 이런 일정을 예정 맨 아래로 내려 준다.
- * 색만으로 구분하지 않게 글자도 바꾼다.
+ * 「예정」이라 하면 앞으로 올 일정과 헷갈려서 「지난」으로 보여 준다 — 서버가 이런 일정을 예정 맨 아래로 내려 준다.
+ * 색만으로 구분하지 않게 글자도 바꾸고(회색 배지), 카드 전체를 흐리게(`isTentative` → opacity)는 하지 않는다 — 지난 일정도
+ * 읽어야 하는 기록이라 글자 대비를 유지한다.
  */
 export function myScheduleStateDisplay(
   schedule: { type: V1ScheduleType; state: V1ScheduleState; matchConfirmed: boolean | null; endAt: string },
   now: Date,
 ): { stateLabel: string; stateTone: 'default' | 'muted'; isTentative: boolean } {
   const ended = Date.parse(schedule.endAt) <= now.getTime();
-  if (schedule.state === 'SCHEDULED' && ended) return { stateLabel: '지난', stateTone: 'muted', isTentative: true };
+  if (schedule.state === 'SCHEDULED' && ended) return { stateLabel: '지난', stateTone: 'muted', isTentative: false };
   return matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed);
 }
 
@@ -200,8 +201,8 @@ export function kstMonthStart(instant: Date): Date {
   return new Date(year, month - 1, 1);
 }
 
-export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId: string): ScheduleListItemModel {
-  const display = matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed);
+export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId: string, now: Date = new Date()): ScheduleListItemModel {
+  const display = myScheduleStateDisplay(schedule, now);
   return {
     id: schedule.id,
     title: schedule.title,

@@ -73,7 +73,6 @@ import {
   isScheduleMemberRole,
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
-  matchScheduleDisplay,
   myScheduleStateDisplay,
   scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
@@ -483,7 +482,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     history.push({ label: '완료 처리됨', detail: null });
   }
 
-  const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
+  const matchDisplay = schedule ? myScheduleStateDisplay(schedule, new Date()) : null;
 
   const opponentTeamName = linkedTournamentId
     ? scheduleTournamentOpponentTeamName(opponentTournamentMatch.data, teamId)

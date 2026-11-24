@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { browserAppRoute } from '@/lib/app-route';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import {
   ACTIVITY_PROFILE_PATH,
   buildActivityGateHref,
@@ -33,8 +34,9 @@ export function ActivityProfileRequiredModal() {
   );
 
   const handleConfirm = () => {
-    setOpen(false);
-    window.location.assign(browserAppRoute(buildActivityGateHref(currentReturnPath(), missing)));
+    const href = browserAppRoute(buildActivityGateHref(currentReturnPath(), missing));
+    // 닫기가 모달 히스토리 항목을 back 으로 걷는다 — 그 전에 assign 하면 그 back 이 이동을 취소한다.
+    void closeOverlayThenNavigate(() => setOpen(false), () => window.location.assign(href));
   };
 
   const detailed = missing.length > 0;

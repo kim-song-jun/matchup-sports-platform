@@ -6,6 +6,7 @@ import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtim
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 const DAY = 24 * 60 * 60 * 1_000;
+const HOUR = 60 * 60 * 1_000;
 
 /** 캘린더 구독: 내 일정 중 아직 끝나지 않은 「예정」만, 불참은 빼고, 주소를 다시 만들면 옛 주소는 못 쓴다. */
 describe('캘린더 구독 주소 HTTP/DB 계약', () => {
@@ -99,6 +100,27 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
         { matchId: cancelledPersonal.id, userId: userA, role: 'participant', status: 'cancelled' },
       ],
     });
+
+    // 개인 매치 경계: 모집 중·마감만, 끝나지 않은 것만(끝 시각이 없으면 시작 후 2시간까지).
+    const boundary: Array<{ key: string; status: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived'; startOffsetMs: number; endOffsetMs: number | null }> = [
+      { key: 'closed', status: 'closed', startOffsetMs: 9 * DAY, endOffsetMs: null },
+      { key: 'completed', status: 'completed', startOffsetMs: 10 * DAY, endOffsetMs: null },
+      { key: 'cancelled', status: 'cancelled', startOffsetMs: 11 * DAY, endOffsetMs: null },
+      { key: 'archived', status: 'archived', startOffsetMs: 12 * DAY, endOffsetMs: null },
+      { key: 'openRecent', status: 'recruiting', startOffsetMs: -1 * HOUR, endOffsetMs: null }, // 끝 시각 없음, 1시간 전 시작 → 진행 중으로 본다
+      { key: 'openOld', status: 'recruiting', startOffsetMs: -3 * HOUR, endOffsetMs: null }, // 끝 시각 없음, 3시간 전 시작 → 끝난 것
+      { key: 'endedWithEnd', status: 'recruiting', startOffsetMs: -5 * HOUR, endOffsetMs: -3 * HOUR },
+      { key: 'ongoingWithEnd', status: 'recruiting', startOffsetMs: -1 * HOUR, endOffsetMs: 1 * HOUR },
+    ];
+    for (const item of boundary) {
+      const created = await db.v1Match.create({
+        data: {
+          hostUserId: userB, sportId, regionId, title: `경계-${item.key}-${tag}`, placeName: '상암 구장', maxParticipants: 10, status: item.status,
+          startAt: new Date(now + item.startOffsetMs), endAt: item.endOffsetMs === null ? null : new Date(now + item.endOffsetMs),
+        },
+      });
+      await db.v1MatchParticipant.create({ data: { matchId: created.id, userId: userA, role: 'participant', status: 'active' } });
+    }
   });
 
   afterAll(async () => {
@@ -153,6 +175,13 @@ describe('캘린더 구독 주소 HTTP/DB 계약', () => {
     // 참가 확정한 개인 매치만 들어간다(취소한 참가는 제외).
     expect(ics).toContain(`개인매치-${tag}`);
     expect(ics).not.toContain(`취소참가-${tag}`);
+  });
+
+  it('개인 매치는 모집 중·마감이고 끝나지 않은 것만 들어간다(끝 시각이 없으면 시작 후 2시간까지)', async () => {
+    const { feedUrl } = (await as(userA).post('/me/calendar-feed').expect(201)).body.data;
+    const ics = (await readFeed(feedUrl).expect(200)).text;
+    for (const included of ['closed', 'openRecent', 'ongoingWithEnd']) expect(ics).toContain(`경계-${included}-${tag}`);
+    for (const excluded of ['completed', 'cancelled', 'archived', 'openOld', 'endedWithEnd']) expect(ics).not.toContain(`경계-${excluded}-${tag}`);
   });
 
   it('팀 하나뿐인 사람의 구독에는 자기 팀 일정만 있고 팀 이름 머리말은 없다. 불참 표시가 없는 일정은 들어간다', async () => {

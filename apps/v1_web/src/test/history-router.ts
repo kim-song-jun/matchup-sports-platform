@@ -58,6 +58,7 @@ export function recordCloseThenNavigateOrder(path: string) {
     restore: () => {
       back.mockRestore();
       window.removeEventListener('popstate', onPop, { capture: true });
+      vi.stubGlobal('location', real);
     },
   };
 }

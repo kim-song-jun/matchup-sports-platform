@@ -41,5 +41,7 @@ import { TeamSchedulesService } from './team-schedules.service';
     V1AuthGuard,
     OptionalV1AuthGuard,
   ],
+  // 위젯(`WidgetHomeService`)이 앱에서 누를 때와 같은 참석 응답 규칙을 그대로 쓴다.
+  exports: [ScheduleAttendanceService],
 })
 export class TeamSchedulesModule {}

@@ -26,3 +26,25 @@ export function readEndedResult(
     mineSideKey === 'HOME' ? { mine: value.home, opponent: value.away } : { mine: value.away, opponent: value.home };
   return { score: pick(parsed), penalties: parsed.penalties === undefined ? null : pick(parsed.penalties) };
 }
+
+/**
+ * 친선 팀 매치의 진행 중 점수. 친선 팀 매치는 득점을 `V1GameEvent` 가 아니라 공유 기록(`V1TeamMatchRecord.goals`, JSON)에 두므로
+ * 이벤트만 세면 항상 0 : 0 이 나온다. 공개 경기 화면(`TeamMatchRecordService.view`)과 같게 골의 `sideId` 로 센다.
+ */
+export function tallySharedRecordGoals(
+  goals: Prisma.JsonValue | null | undefined,
+  sideKeyById: ReadonlyMap<string, 'HOME' | 'AWAY'>,
+): { home: number; away: number } {
+  let home = 0;
+  let away = 0;
+  if (!Array.isArray(goals)) return { home, away };
+  for (const goal of goals) {
+    if (typeof goal !== 'object' || goal === null || Array.isArray(goal)) continue;
+    const sideId = (goal as { sideId?: unknown }).sideId;
+    if (typeof sideId !== 'string') continue;
+    const key = sideKeyById.get(sideId);
+    if (key === 'HOME') home += 1;
+    else if (key === 'AWAY') away += 1;
+  }
+  return { home, away };
+}

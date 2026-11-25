@@ -1,4 +1,4 @@
-import { readEndedResult } from './widget-home';
+import { readEndedResult, tallySharedRecordGoals } from './widget-home';
 
 describe('readEndedResult', () => {
   it('홈이면 그대로, 원정이면 뒤집어서 우리 팀 기준으로 읽는다', () => {
@@ -21,5 +21,20 @@ describe('readEndedResult', () => {
     expect(readEndedResult(null, 'HOME')).toBeNull();
     expect(readEndedResult(undefined, 'HOME')).toBeNull();
     expect(readEndedResult({ home: 'x', away: 1 }, 'HOME')).toBeNull();
+  });
+});
+
+describe('tallySharedRecordGoals', () => {
+  const sides = new Map<string, 'HOME' | 'AWAY'>([['s-home', 'HOME'], ['s-away', 'AWAY']]);
+
+  it('골의 sideId 로 홈·원정 득점을 센다', () => {
+    const goals = [{ id: 'g1', sideId: 's-home' }, { id: 'g2', sideId: 's-home' }, { id: 'g3', sideId: 's-away' }];
+    expect(tallySharedRecordGoals(goals, sides)).toEqual({ home: 2, away: 1 });
+  });
+
+  it('모르는 사이드·깨진 항목·배열이 아닌 값은 세지 않는다', () => {
+    expect(tallySharedRecordGoals([{ sideId: 'x' }, null, 3, { id: 'a' }, { sideId: 7 }], sides)).toEqual({ home: 0, away: 0 });
+    expect(tallySharedRecordGoals(null, sides)).toEqual({ home: 0, away: 0 });
+    expect(tallySharedRecordGoals({ sideId: 's-home' }, sides)).toEqual({ home: 0, away: 0 });
   });
 });

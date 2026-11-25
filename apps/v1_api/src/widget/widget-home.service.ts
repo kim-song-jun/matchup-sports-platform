@@ -10,6 +10,7 @@ import { ScheduleAttendanceService, type SetAttendanceResponse } from '../team-s
 import { visibleTeamMatchScheduleWhere } from '../team-schedules/team-schedules.service';
 import {
   readEndedResult,
+  tallySharedRecordGoals,
   WIDGET_JUST_ENDED_MS,
   WIDGET_LIVE_MAX_AGE_MS,
   WIDGET_PENDING_LIMIT,
@@ -191,10 +192,11 @@ export class WidgetHomeService {
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
         currentOfficialRevision: { select: { score: true } },
+        sharedRecord: { select: { goals: true } },
         teamMatch: { select: { title: true, startAt: true, tournamentId: true, leagueId: true } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 5,
+      take: 10,
     });
     if (games.length === 0) return [];
 
@@ -221,9 +223,18 @@ export class WidgetHomeService {
           const result = readEndedResult(game.currentOfficialRevision?.score, mine.sideKey);
           score = result?.score ?? null;
           penalties = result?.penalties ?? null;
+          // 공식 점수를 못 읽는 친선 경기는 공유 기록의 골로 대신 센다.
+          if (score === null && game.sharedRecord !== null) {
+            const tally = tallySharedRecordGoals(game.sharedRecord.goals, new Map(game.sides.map((side) => [side.id, side.sideKey] as const)));
+            score = mine.sideKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
+          }
         }
       } else if (mode === 'live') {
-        const tally = tallyLiveScore(events.filter((event) => event.gameId === game.id), new Map(game.sides.map((side) => [side.id, side.sideKey] as const)));
+        const sideKeyById = new Map(game.sides.map((side) => [side.id, side.sideKey] as const));
+        // 친선 팀 매치는 공유 기록의 골로, 대회·리그 경기는 경기 이벤트로 센다.
+        const tally = game.sharedRecord !== null
+          ? tallySharedRecordGoals(game.sharedRecord.goals, sideKeyById)
+          : tallyLiveScore(events.filter((event) => event.gameId === game.id), sideKeyById);
         score = mine.sideKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
       }
       items.push({

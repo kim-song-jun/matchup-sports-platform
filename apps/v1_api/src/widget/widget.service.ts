@@ -5,6 +5,7 @@ import { tallyLiveScore } from '../games/public-records/public-live-score';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { PrismaService } from '../prisma/prisma.service';
+import { tallySharedRecordGoals } from './widget-home';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { NEXT_GAME_STARTED_GRACE_MS } from '../team-lineups/team-upcoming-games.service';
 
@@ -125,6 +126,7 @@ export class WidgetService {
         state: true,
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
+        sharedRecord: { select: { goals: true } },
         teamMatch: { select: { title: true, startAt: true, placeName: true, tournamentId: true, leagueId: true } },
       },
     });
@@ -182,7 +184,11 @@ export class WidgetService {
       });
       for (const item of scorable) {
         const game = gameById.get(item.gameId)!;
-        const tally = tallyLiveScore(events.filter((e) => e.gameId === item.gameId), new Map(game.sides.map((s) => [s.id, s.sideKey] as const)));
+        const sideKeyById = new Map(game.sides.map((s) => [s.id, s.sideKey] as const));
+        // 친선 팀 매치는 득점을 공유 기록에 두므로 그쪽에서 센다(이벤트만 세면 0 : 0).
+        const tally = game.sharedRecord !== null
+          ? tallySharedRecordGoals(game.sharedRecord.goals, sideKeyById)
+          : tallyLiveScore(events.filter((e) => e.gameId === item.gameId), sideKeyById);
         const mineKey = game.sides.find((s) => s.teamId === item.teamId)?.sideKey ?? 'HOME';
         item.score = mineKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
       }

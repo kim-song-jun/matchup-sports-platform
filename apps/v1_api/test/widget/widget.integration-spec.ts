@@ -115,6 +115,11 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
     // 다가오는 경기(2일 뒤), 진행 중(우리가 원정), 진행 중이지만 점수 비공개, 끝난 경기, 남의 경기.
     await makeGame('upcoming', { host: team1, away: team2, startOffsetMs: 2 * DAY, state: 'SCHEDULED', policy: 'LIVE' });
     const live = await makeGame('live', { host: team2, away: team1, startOffsetMs: -30 * 60_000, state: 'LIVE', policy: 'LIVE' });
+    // 친선 팀 매치: 득점이 공유 기록에 있다(우리가 홈, 3 : 0).
+    const friendlyLive = await makeGame('friendly', { host: team1, away: team2, startOffsetMs: -10 * 60_000, state: 'LIVE', policy: 'LIVE' });
+    await db.v1TeamMatchRecord.create({
+      data: { gameId: friendlyLive.gameId, goals: [1, 2, 3].map((n) => ({ id: randomUUID(), sideId: friendlyLive.side('HOME'), ownGoal: false, participantId: null, minute: n, subMatchId: null })) },
+    });
     const hiddenLive = await makeGame('hidden', { host: team1, away: team2, startOffsetMs: -20 * 60_000, state: 'LIVE', policy: 'HIDDEN' });
     await makeGame('ended', { host: team1, away: team2, startOffsetMs: -60 * 60_000, state: 'ENDED', policy: 'LIVE' });
     await makeGame('others', { host: team3, away: team2, startOffsetMs: 1 * DAY, state: 'SCHEDULED', policy: 'LIVE' });
@@ -131,6 +136,7 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
 
   afterAll(async () => {
     const gameIds = Object.values(games);
+    await db.v1TeamMatchRecord.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1AccessToken.deleteMany({ where: { userId: { in: users } } });
@@ -155,9 +161,9 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
 
   it('진행 중 경기가 앞에, 그다음 다가오는 경기. 끝난 경기·남의 경기는 안 나온다', async () => {
     const token = await tokenOf(userB);
-    const items = (await bearer(token).get('/widget/games').expect(200)).body.data.items as Array<Record<string, unknown>>;
-    expect(items.map((item) => item.state)).toEqual(['LIVE', 'LIVE', 'SCHEDULED']);
-    expect(new Set(items.map((item) => item.gameId))).toEqual(new Set([games.live, games.hidden, games.upcoming]));
+    const items = (await bearer(token).get('/widget/games?limit=10').expect(200)).body.data.items as Array<Record<string, unknown>>;
+    expect(items.map((item) => item.state)).toEqual(['LIVE', 'LIVE', 'LIVE', 'SCHEDULED']);
+    expect(new Set(items.map((item) => item.gameId))).toEqual(new Set([games.live, games.friendly, games.hidden, games.upcoming]));
     expect(items.map((item) => item.gameId)).not.toContain(games.ended);
     expect(items.map((item) => item.gameId)).not.toContain(games.others);
     const upcoming = items.find((item) => item.gameId === games.upcoming)!;
@@ -165,13 +171,14 @@ describe('위젯 내 팀 경기 HTTP/DB 계약', () => {
   });
 
   it('점수는 우리 팀 기준이고 취소된 골은 빼며, 공개 정책이 가린 경기는 점수를 안 준다', async () => {
-    const items = (await bearer(await tokenOf(userA)).get('/widget/games').expect(200)).body.data.items as Array<{ gameId: string; score: { mine: number; opponent: number } | null }>;
+    const items = (await bearer(await tokenOf(userA)).get('/widget/games?limit=10').expect(200)).body.data.items as Array<{ gameId: string; score: { mine: number; opponent: number } | null }>;
     expect(items.find((item) => item.gameId === games.live)!.score).toEqual({ mine: 2, opponent: 1 }); // 우리가 원정
+    expect(items.find((item) => item.gameId === games.friendly)!.score).toEqual({ mine: 3, opponent: 0 }); // 친선: 공유 기록의 골
     expect(items.find((item) => item.gameId === games.hidden)!.score).toBeNull(); // HIDDEN 정책
     expect(items.find((item) => item.gameId === games.upcoming)!.score).toBeNull();
 
     await db.v1GameOperationFlag.update({ where: { key: 'PUBLIC_LIVE' }, data: { value: 'off' } }); // 운영 킬스위치
-    const off = (await bearer(await tokenOf(userA)).get('/widget/games').expect(200)).body.data.items as Array<{ gameId: string; score: unknown }>;
+    const off = (await bearer(await tokenOf(userA)).get('/widget/games?limit=10').expect(200)).body.data.items as Array<{ gameId: string; score: unknown }>;
     expect(off.find((item) => item.gameId === games.live)!.score).toBeNull();
     await db.v1GameOperationFlag.update({ where: { key: 'PUBLIC_LIVE' }, data: { value: 'on' } });
   });

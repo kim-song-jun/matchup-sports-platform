@@ -148,6 +148,18 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await goal(live.gameId, live.side('HOME'));
     await goal(live.gameId, live.side('AWAY'));
     await goal(live.gameId, live.side('AWAY'));
+    // 친선 팀 매치: 득점이 경기 이벤트가 아니라 공유 기록에 있다(우리가 홈, 2 : 1).
+    const friendly = await makeGame('friendly', { startOffsetMs: -10 * MIN, state: 'LIVE', policy: 'LIVE' });
+    await db.v1TeamMatchRecord.create({
+      data: {
+        gameId: friendly.gameId,
+        goals: [
+          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 3, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 9, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('AWAY'), ownGoal: false, participantId: null, minute: 14, subMatchId: null },
+        ],
+      },
+    });
     const hidden = await makeGame('hidden', { startOffsetMs: -20 * MIN, state: 'LIVE', policy: 'HIDDEN' });
     await goal(hidden.gameId, hidden.side('HOME'));
     await makeGame('tooOld', { startOffsetMs: -13 * HOUR, state: 'LIVE', policy: 'LIVE' });
@@ -160,6 +172,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
 
   afterAll(async () => {
     const gameIds = Object.values(games);
+    await db.v1TeamMatchRecord.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1AccessToken.deleteMany({ where: { userId: { in: users } } });
@@ -188,8 +201,9 @@ describe('위젯 홈 HTTP/DB 계약', () => {
 
   it('진행 중 경기: 우리 팀 기준 점수, 가린 경기는 점수 null, 13시간 넘은 진행 중·20분 전에 확정된 경기는 빠지고 방금 끝난 경기는 남는다(끝난 뒤 갱신돼도 옛 경기는 안 돌아온다)', async () => {
     const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; state: string; score: { mine: number; opponent: number } | null; penalties: unknown }>;
-    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.hidden, games.justEnded, games.endedAway, games.endedHidden]));
+    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.friendly, games.hidden, games.justEnded, games.endedAway, games.endedHidden]));
     expect(live.find((g) => g.gameId === games.live)!.score).toEqual({ mine: 2, opponent: 1 }); // 우리가 원정
+    expect(live.find((g) => g.gameId === games.friendly)!.score).toEqual({ mine: 2, opponent: 1 }); // 친선: 공유 기록의 골
     expect(live.find((g) => g.gameId === games.hidden)!.score).toBeNull();
     const ended = live.find((g) => g.gameId === games.justEnded)!;
     expect(ended.state).toBe('ENDED');
@@ -197,7 +211,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect((ended as { score: unknown }).score).toEqual({ mine: 2, opponent: 1 }); // 우리가 홈
     expect(live.find((g) => g.gameId === games.endedAway)!.score).toEqual({ mine: 1, opponent: 2 }); // 우리가 원정
     expect(live.find((g) => g.gameId === games.endedHidden)!.score).toBeNull(); // 가린 경기는 끝나도 점수를 안 준다
-    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
+    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
   });
 
   it('응답 대기: 훈련·모임 중 내가 응답 안 했고 마감 전인 것만, 마감이 가까운 순(마감 없는 것은 뒤)', async () => {

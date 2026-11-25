@@ -30,7 +30,7 @@
 | GET | `/widget/home` | Bearer 위젯 토큰 | `{ generatedAt, live, pendingCount, pending, schedules }` — 실시간 경기·응답 대기·일정을 한 번에. |
 | PUT | `/widget/schedules/:scheduleId/attendance` | Bearer 위젯 토큰 | `{ status: GOING \| MAYBE \| NOT_GOING }` → 앱의 `PUT .../attendance/me` 와 같은 응답. |
 
-- **`live`**: 내 팀 경기 중 진행 중(`LIVE`·`PAUSED`, **시작한 지 12시간 안**)과 **끝난 지 15분 안**(`ENDED`, 「방금 끝남」). 진행 중이 앞이다. 점수(`score`)는 우리 팀 기준이고 공개 경기 화면과 같은 규칙으로만 준다 — 진행 중은 정책이 `live` 일 때, 끝난 경기는 공식 결과가 있고 운영자가 가리지 않았을 때(`hidden`·`status_only` 제외). **승부차기(`penalties`)는 경기가 끝난 뒤에만 있다** — 서버가 승부차기를 `end` 커맨드로 한꺼번에 받아 진행 중에는 알 수 없다(`apps/v1_web/src/lib/penalty-shootout.ts` 설계 주석).
+- **`live`**: 내 팀 경기 중 진행 중(`LIVE`·`PAUSED`, **시작한 지 12시간 안**)과 **공식 결과가 확정된 지 15분 안**(`ENDED`, 「방금 끝남」 — 종료 시각 컬럼이 없어 결과 리비전의 `createdAt` 으로 잰다. 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다). 진행 중이 앞이다. 점수(`score`)는 우리 팀 기준이고 공개 경기 화면과 같은 규칙으로만 준다 — 진행 중은 정책이 `live` 일 때, 끝난 경기는 공식 결과가 있고 운영자가 가리지 않았을 때(`hidden`·`status_only` 제외). **승부차기(`penalties`)는 경기가 끝난 뒤에만 있다** — 서버가 승부차기를 `end` 커맨드로 한꺼번에 받아 진행 중에는 알 수 없다(`apps/v1_web/src/lib/penalty-shootout.ts` 설계 주석).
 - **`pending`/`pendingCount`**: 훈련·모임(`TRAINING`·`EVENT`) 중 아직 끝나지 않았고 응답 마감이 안 지났으며 **내가 응답하지 않은** 일정. 마감이 가까운 순(마감 없는 것은 뒤), 최대 3건. 경기 일정은 응답 대상이 아니다.
 - **`schedules`**: 앞으로 올 팀 일정 최대 4건(가까운 순). 항목마다 `myResponse`(내 응답 또는 null)와 `canRespond`(훈련·모임이고 마감 전).
-- **응답 저장**은 내가 활성 팀원인 팀의 일정만(아니면 404). 마감·정원·대기자 같은 규칙은 앱에서 누를 때와 같은 서비스(`ScheduleAttendanceService.setMyAttendance`)를 탄다. 멱등키는 서버가 요청마다 새로 만든다.
+- **응답 저장**은 내가 활성 팀원인 팀의 일정만(아니면 404), 그리고 훈련·모임만(`canRespond` 로 내려 주는 종류 — 경기 일정은 400 `WIDGET_SCHEDULE_NOT_RESPONDABLE`, 앱에서 응답). 마감·정원·대기자 같은 규칙은 앱에서 누를 때와 같은 서비스(`ScheduleAttendanceService.setMyAttendance`)를 탄다. 멱등키는 서버가 시도마다 새로 만들고, 앱·연타로 버전이 바뀌어 `VERSION_CONFLICT` 가 나면 한 번 다시 읽어 재시도한다.

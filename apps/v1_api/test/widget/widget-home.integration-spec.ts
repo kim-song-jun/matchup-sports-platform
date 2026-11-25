@@ -6,6 +6,8 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
+import { WidgetHomeService } from '../../src/widget/widget-home.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 const DAY = 24 * 60 * 60 * 1_000;
@@ -43,7 +45,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
   const tokenOf = async (userId: string) => (await as(userId).post('/me/widget-token').expect(201)).body.data.token as string;
   const homeOf = async (token: string) => (await bearer(token).get('/widget/home').expect(200)).body.data;
 
-  async function makeGame(key: string, input: { startOffsetMs: number; state: 'LIVE' | 'ENDED'; policy: 'LIVE' | 'HIDDEN'; mineIsAway?: boolean; updatedAgoMs?: number }) {
+  async function makeGame(key: string, input: { startOffsetMs: number; state: 'LIVE' | 'ENDED'; policy: 'LIVE' | 'HIDDEN'; mineIsAway?: boolean; endedAgoMs?: number; bumpedNow?: boolean }) {
     const [host, away] = input.mineIsAway ? [team2, team1] : [team1, team2];
     const teamMatch = await db.v1TeamMatch.create({
       data: {
@@ -70,7 +72,21 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     };
     await db.$transaction((client: Prisma.TransactionClient) => app.get(GamesService).createFromSourceInTransaction(client, creation, context));
     const game = await db.v1Game.findUniqueOrThrow({ where: { teamMatchId: teamMatch.id }, include: { sides: true } });
-    await db.v1Game.update({ where: { id: game.id }, data: { state: input.state, ...(input.updatedAgoMs === undefined ? {} : { updatedAt: new Date(Date.now() - input.updatedAgoMs) }) } });
+    await db.v1Game.update({ where: { id: game.id }, data: { state: input.state } });
+    if (input.state === 'ENDED') {
+      // 끝난 경기: 공식 결과(홈 2 : 1 원정)가 `endedAgoMs` 전에 확정됐다. 확정 시각은 리비전의 createdAt 이다.
+      const officialAt = new Date(Date.now() - (input.endedAgoMs ?? 0));
+      const score = { home: 2, away: 1 };
+      const revision = await db.v1GameResultRevision.create({
+        data: { gameId: game.id, revision: 1, state: 'OFFICIAL', score, eventsHash: `wh-${tag}-${key}`, createdByActorType: 'SYSTEM', createdBySystemActor: 'WIDGET_HOME_TEST', submittedAt: officialAt, officialAt, createdAt: officialAt },
+      });
+      await db.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+      await db.v1GameOfficialFact.create({
+        data: { revisionId: revision.id, gameId: game.id, revision: 1, sourceType: 'TEAM_MATCH', homeTeamId: host, awayTeamId: away, homeScore: 2, awayScore: 1, score, eventsHash: `wh-${tag}-${key}`, officialAt },
+      });
+      // 끝난 뒤의 갱신(정정·대진 갱신)은 `updatedAt` 만 바꾼다 — 「방금 끝남」 판단이 여기에 흔들리지 않아야 한다.
+      if (input.bumpedNow) await db.v1Game.update({ where: { id: game.id }, data: { version: { increment: 1 } } });
+    }
     await db.v1GameVisibilityPolicy.upsert({ where: { gameId: game.id }, create: { gameId: game.id, mode: input.policy }, update: { mode: input.policy } });
     games[key] = game.id;
     return { gameId: game.id, side: (k: V1GameSideKey) => game.sides.find((s) => s.sideKey === k)!.id };
@@ -136,7 +152,10 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await goal(hidden.gameId, hidden.side('HOME'));
     await makeGame('tooOld', { startOffsetMs: -13 * HOUR, state: 'LIVE', policy: 'LIVE' });
     await makeGame('justEnded', { startOffsetMs: -90 * MIN, state: 'ENDED', policy: 'LIVE' });
-    await makeGame('endedLong', { startOffsetMs: -3 * HOUR, state: 'ENDED', policy: 'LIVE', updatedAgoMs: 20 * MIN });
+    await makeGame('endedLong', { startOffsetMs: -3 * HOUR, state: 'ENDED', policy: 'LIVE', endedAgoMs: 20 * MIN });
+    await makeGame('endedBumped', { startOffsetMs: -2 * DAY, state: 'ENDED', policy: 'LIVE', endedAgoMs: 2 * DAY, bumpedNow: true });
+    await makeGame('endedAway', { startOffsetMs: -100 * MIN, state: 'ENDED', policy: 'LIVE', mineIsAway: true, endedAgoMs: 5 * MIN });
+    await makeGame('endedHidden', { startOffsetMs: -80 * MIN, state: 'ENDED', policy: 'HIDDEN', endedAgoMs: 4 * MIN });
   });
 
   afterAll(async () => {
@@ -147,6 +166,8 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await db.v1ScheduleAttendance.deleteMany({ where: { scheduleId: { in: Object.values(sched) } } });
     await db.v1TeamSchedule.deleteMany({ where: { id: { in: Object.values(sched) } } });
     await db.$executeRawUnsafe('SET session_replication_role = replica');
+    await db.v1GameOfficialFact.deleteMany({ where: { gameId: { in: gameIds } } });
+    await db.v1GameResultRevision.deleteMany({ where: { gameId: { in: gameIds } } });
     await db.v1Game.deleteMany({ where: { id: { in: gameIds } } });
     await db.v1TeamMatch.deleteMany({ where: { id: { in: createdTeamMatchIds } } });
     await db.$executeRawUnsafe('SET session_replication_role = DEFAULT');
@@ -165,15 +186,18 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect(await homeOf(await tokenOf(userC))).toMatchObject({ live: [], pendingCount: 0, pending: [], schedules: [] });
   });
 
-  it('진행 중 경기: 우리 팀 기준 점수, 가린 경기는 점수 null, 13시간 넘은 진행 중·20분 지난 끝난 경기는 빠지고 방금 끝난 경기는 남는다', async () => {
+  it('진행 중 경기: 우리 팀 기준 점수, 가린 경기는 점수 null, 13시간 넘은 진행 중·20분 전에 확정된 경기는 빠지고 방금 끝난 경기는 남는다(끝난 뒤 갱신돼도 옛 경기는 안 돌아온다)', async () => {
     const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; state: string; score: { mine: number; opponent: number } | null; penalties: unknown }>;
-    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.hidden, games.justEnded]));
+    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.hidden, games.justEnded, games.endedAway, games.endedHidden]));
     expect(live.find((g) => g.gameId === games.live)!.score).toEqual({ mine: 2, opponent: 1 }); // 우리가 원정
     expect(live.find((g) => g.gameId === games.hidden)!.score).toBeNull();
     const ended = live.find((g) => g.gameId === games.justEnded)!;
     expect(ended.state).toBe('ENDED');
     expect(ended.penalties).toBeNull();
-    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'ENDED']); // 진행 중이 앞
+    expect((ended as { score: unknown }).score).toEqual({ mine: 2, opponent: 1 }); // 우리가 홈
+    expect(live.find((g) => g.gameId === games.endedAway)!.score).toEqual({ mine: 1, opponent: 2 }); // 우리가 원정
+    expect(live.find((g) => g.gameId === games.endedHidden)!.score).toBeNull(); // 가린 경기는 끝나도 점수를 안 준다
+    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
   });
 
   it('응답 대기: 훈련·모임 중 내가 응답 안 했고 마감 전인 것만, 마감이 가까운 순(마감 없는 것은 뒤)', async () => {
@@ -218,6 +242,27 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await bearer(token).put(`/widget/schedules/${sched.other}/attendance`).send({ status: 'GOING' }).expect(404);
     await bearer(token).put(`/widget/schedules/${randomUUID()}/attendance`).send({ status: 'GOING' }).expect(404);
     await bearer(token).put(`/widget/schedules/${sched.open}/attendance`).send({ status: 'WAITLISTED' }).expect(400);
+    await bearer(token).put(`/widget/schedules/${sched.matchType}/attendance`).send({ status: 'GOING' }).expect(400); // 경기 일정은 앱에서
     await bearer(await tokenOf(userD)).put(`/widget/schedules/${sched.open}/attendance`).send({ status: 'GOING' }).expect(404); // 다른 팀 팀장
+  });
+
+  it('위젯과 앱이 거의 동시에 눌러 버전이 바뀌어도 한 번 다시 읽어 저장한다', async () => {
+    await db.v1ScheduleAttendance.create({ data: { scheduleId: sched.deadline, userId: userB, status: 'MAYBE' } });
+    const attendance = app.get(ScheduleAttendanceService);
+    const real = attendance.setMyAttendance.bind(attendance);
+    let calls = 0;
+    const spy = jest.spyOn(attendance, 'setMyAttendance').mockImplementation(async (...args) => {
+      calls += 1;
+      // 첫 시도 직전에 앱이 먼저 저장해 버전이 올라간 상황(위젯이 읽은 버전이 낡았다).
+      if (calls === 1) await db.v1ScheduleAttendance.update({ where: { scheduleId_userId: { scheduleId: sched.deadline, userId: userB } }, data: { version: { increment: 1 } } });
+      return real(...args);
+    });
+    try {
+      const done = await app.get(WidgetHomeService).setResponse(userB, sched.deadline, 'GOING');
+      expect(done.status).toBe('GOING');
+      expect(calls).toBe(2); // 첫 시도는 VERSION_CONFLICT, 재시도가 저장
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

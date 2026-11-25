@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1ScheduleState, V1ScheduleType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { tallyLiveScore } from '../games/public-records/public-live-score';
@@ -114,7 +114,7 @@ export class WidgetHomeService {
   /** 위젯에서 참석·불참·미정을 저장한다. 마감·정원 같은 규칙은 앱에서 누를 때와 같은 서비스를 그대로 탄다. */
   async setResponse(userId: string, scheduleId: string, status: 'GOING' | 'MAYBE' | 'NOT_GOING'): Promise<SetAttendanceResponse> {
     const [schedule, user] = await Promise.all([
-      this.prisma.v1TeamSchedule.findUnique({ where: { id: scheduleId }, select: { id: true, teamId: true } }),
+      this.prisma.v1TeamSchedule.findUnique({ where: { id: scheduleId }, select: { id: true, teamId: true, type: true } }),
       this.prisma.v1User.findFirst({ where: { id: userId, accountStatus: 'active' }, select: { id: true, email: true, accountStatus: true, onboardingStatus: true } }),
     ]);
     // 내가 활성 팀원인 팀의 일정만 — 남의 팀 일정은 있는지도 알려 주지 않는다.
@@ -128,13 +128,25 @@ export class WidgetHomeService {
     if (schedule === null || user === null || member === null) {
       throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: '일정을 찾을 수 없어요.' });
     }
-    const existing = await this.prisma.v1ScheduleAttendance.findUnique({
-      where: { scheduleId_userId: { scheduleId, userId } },
-      select: { version: true },
-    });
+    // 위젯이 응답을 받는 건 홈에 `canRespond` 로 내려 주는 훈련·모임뿐이다(경기 일정 출석은 앱에서).
+    if (!(RESPONDABLE_TYPES as readonly V1ScheduleType[]).includes(schedule.type)) {
+      throw new BadRequestException({ code: 'WIDGET_SCHEDULE_NOT_RESPONDABLE', message: '이 일정은 앱에서 응답해 주세요.' });
+    }
     const actor: V1AuthUser = { id: user.id, email: user.email, accountStatus: user.accountStatus, onboardingStatus: user.onboardingStatus };
-    // 멱등키는 누를 때마다 새로 만든다 — 같은 응답을 다시 눌러도 앱에서처럼 그대로 저장된다.
-    return this.attendance.setMyAttendance(actor, schedule.teamId, scheduleId, { status, expectedVersion: existing?.version ?? 0 }, randomUUID());
+    // 위젯은 버전을 모르니 서버가 읽어 넘긴다. 그 사이 앱·연타로 버전이 바뀌면 한 번 다시 읽어 재시도한다.
+    // 멱등키는 시도마다 새로 만든다 — 같은 응답을 다시 눌러도 앱에서처럼 그대로 저장된다.
+    for (let attempt = 0; ; attempt += 1) {
+      const existing = await this.prisma.v1ScheduleAttendance.findUnique({
+        where: { scheduleId_userId: { scheduleId, userId } },
+        select: { version: true },
+      });
+      try {
+        return await this.attendance.setMyAttendance(actor, schedule.teamId, scheduleId, { status, expectedVersion: existing?.version ?? 0 }, randomUUID());
+      } catch (error) {
+        const code = error instanceof ConflictException ? (error.getResponse() as { code?: string }).code : undefined;
+        if (code !== 'VERSION_CONFLICT' || attempt >= 1) throw error;
+      }
+    }
   }
 
   private pendingWhere(teamIds: string[], userId: string, now: Date, visible: object) {
@@ -164,7 +176,8 @@ export class WidgetHomeService {
         sides: { some: { teamId: { in: teamIds } } },
         OR: [
           { state: { in: ['LIVE', 'PAUSED'] }, teamMatch: { is: { startAt: { gte: new Date(now.getTime() - WIDGET_LIVE_MAX_AGE_MS) } } } },
-          { state: 'ENDED', updatedAt: { gte: new Date(now.getTime() - WIDGET_JUST_ENDED_MS) } },
+          // 종료 시각 컬럼이 없어 공식 결과가 확정된 시각으로 잰다(`updatedAt` 은 끝난 뒤 정정·갱신에도 바뀐다). 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다.
+          { state: 'ENDED', currentOfficialRevision: { is: { createdAt: { gte: new Date(now.getTime() - WIDGET_JUST_ENDED_MS) } } } },
         ],
         NOT: [
           { teamMatch: { is: { deletedAt: { not: null } } } },

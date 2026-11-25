@@ -90,7 +90,7 @@ describe('listRegionNotice — 목록 머리의 한 줄', () => {
   });
 
   it('저장한 활동 지역이 없으면 설정을 권한다 — 링크는 이 경우에만 있다', () => {
-    expect(notice({ status: 'none' })).toEqual({ text: '가까운 팀을 먼저 보려면', link: { label: '지역 설정', href } });
+    expect(notice({ status: 'none' })).toEqual({ text: '내 지역 팀을 먼저 보려면', link: { label: '지역 설정', href } });
   });
 
   it('이어 보기 주소의 기준은 지역 이름을 모르면 이름 없이 말한다', () => {
@@ -115,14 +115,14 @@ describe('listRegionNotice — 목록 이름과 조사', () => {
     ['대회·리그', '대회·리그를'],
   ])('%s 목록은 "%s" 로 말한다(받침이 있으면 을, 없으면 를)', (noun, withParticle) => {
     expect(listRegionNotice({ status: 'ready', regionId: 'r', name: '부산', source: 'saved' }, href, noun)?.text).toBe(`내 활동 지역(부산)의 ${withParticle} 먼저 보여 줘요`);
-    expect(listRegionNotice({ status: 'none' }, href, noun)?.text).toBe(`가까운 ${withParticle} 먼저 보려면`);
+    expect(listRegionNotice({ status: 'none' }, href, noun)?.text).toBe(`내 지역 ${withParticle} 먼저 보려면`);
   });
 
   it('이름을 주지 않으면 팀 목록의 문구와 같다', () => {
-    expect(listRegionNotice({ status: 'none' }, href)?.text).toBe('가까운 팀을 먼저 보려면');
+    expect(listRegionNotice({ status: 'none' }, href)?.text).toBe('내 지역 팀을 먼저 보려면');
   });
 
   it('한글이 아닌 글자로 끝나도 깨지지 않는다 — 조사는 를', () => {
-    expect(listRegionNotice({ status: 'none' }, href, 'FC')?.text).toBe('가까운 FC를 먼저 보려면');
+    expect(listRegionNotice({ status: 'none' }, href, 'FC')?.text).toBe('내 지역 FC를 먼저 보려면');
   });
 });

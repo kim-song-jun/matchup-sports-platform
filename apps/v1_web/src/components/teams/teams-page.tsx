@@ -8,6 +8,7 @@ import { ListRegionNotice } from '@/components/v1-ui/list-region-notice';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { FromLink } from '@/components/v1-ui/from-link';
 import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -2197,7 +2198,7 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
 function RegionNotice({ notice }: { notice: NonNullable<NonNullable<TeamListViewModel['filterSheet']>['regionNotice']> }) {
   return (
     <p className="tm-text-caption tm-filter-region-notice">
-      {notice.text} · <Link className="tm-filter-region-notice-link" href={notice.link.href}>{notice.link.label}</Link>
+      {notice.text} · <FromLink className="tm-filter-region-notice-link" href={notice.link.href}>{notice.link.label}</FromLink>
     </p>
   );
 }

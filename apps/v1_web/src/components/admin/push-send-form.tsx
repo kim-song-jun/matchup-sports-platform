@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Send, User as UserIcon, Users, AlertTriangle, X } from 'lucide-react';
+import { Send, User as UserIcon, Users, Trophy, AlertTriangle, X } from 'lucide-react';
 import { useModalA11y } from '../v1-ui/use-modal-a11y';
-import { useV1AdminSendPush, useV1AdminUsers } from '@/hooks/use-v1-api';
+import { useV1AdminLeagueMatchList, useV1AdminPushAudience, useV1AdminSendPush, useV1AdminTournaments, useV1AdminUsers } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { EntityPicker, type EntityPickerItem } from './entity-picker';
 import { useAdminToast, AdminToasts } from './admin-toast';
-import type { V1AdminPushSendPayload, V1AdminPushSendResult, V1AdminPushSendTarget } from '@/types/api';
+import { adminPushGenderLabel } from '@/lib/admin-labels';
+import type { V1AdminPushAudience, V1AdminPushGender, V1AdminPushSendPayload, V1AdminPushSendResult, V1AdminPushSendTarget } from '@/types/api';
 import { PushNotificationPreview } from './push-notification-preview';
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -28,16 +29,23 @@ function segmentButtonClass(active: boolean) {
   ].join(' ');
 }
 
-// ── Broadcast confirm dialog (mirrors AdminReasonModal/GrantModal inline dialog pattern) ──
-interface BroadcastConfirmModalProps {
+// ── Bulk send confirm dialog (mirrors AdminReasonModal/GrantModal inline dialog pattern) ──
+interface BulkConfirmModalProps {
   open: boolean;
   pending: boolean;
   title: string;
+  /** 확인창 제목·확정 버튼에 쓰는 이름 — 전체 회원은 '전체 발송', 대회·리그는 '참가팀 발송' */
+  actionLabel: string;
+  /** 누구에게 가는지 — 대상(전체 회원 / 대회·리그 이름)과 성별 조건을 사람이 읽는 문장으로 */
+  audienceLabel: string;
+  genderLabel: string;
+  /** 예상 인원. 조회 중이면 undefined, 실패면 null */
+  audience: V1AdminPushAudience | null | undefined;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: BroadcastConfirmModalProps) {
+function BulkConfirmModal({ open, pending, title, actionLabel, audienceLabel, genderLabel, audience, onConfirm, onClose }: BulkConfirmModalProps) {
   const {
     dialogRef: panelRef,
     initialFocusRef: confirmButtonRef,
@@ -47,6 +55,14 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
   } = useModalA11y<HTMLButtonElement>({ open, onClose, pending });
 
   if (!mounted) return null;
+
+  // 인원을 모르는 상태(조회 중·실패)로 되돌릴 수 없는 발송을 누르게 두지 않는다 — 실패하면 닫고 폼의 '다시 세기'로 센 뒤 다시 연다.
+  const countKnown = audience !== undefined && audience !== null;
+  const countText = audience === undefined
+    ? '예상 인원을 세는 중이에요…'
+    : audience === null
+      ? '예상 인원을 불러오지 못했어요. 창을 닫고 ‘다시 세기’를 눌러 주세요.'
+      : `알림함에 저장할 예상 인원 ${audience.recipients.toLocaleString()}명` + (audience.noticeOff > 0 ? ` (공지 알림을 끈 ${audience.noticeOff.toLocaleString()}명 제외)` : '');
 
   return (
     <div
@@ -64,7 +80,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id="push-broadcast-confirm-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2">
             <AlertTriangle size={17} className="text-[var(--orange500)]" aria-hidden="true" />
-            전체 발송 확인
+            {actionLabel} 확인
           </h2>
           <button
             type="button"
@@ -79,12 +95,22 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
 
         <div className="px-5 py-5 flex flex-col gap-3">
           <p id="push-broadcast-confirm-desc" className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)] leading-relaxed">
-            공지 알림을 켠 <strong>모든 활성 회원</strong>의 알림함에 저장하고, 등록된 앱·웹 기기로 푸시를 보내요. 이 작업은 되돌릴 수 없어요.
+            아래 대상의 알림함에 저장하고, 등록된 앱·웹 기기로 푸시를 보내요. 이 작업은 되돌릴 수 없어요.
           </p>
-          <div className="tm-on-tint bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3">
-            <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
-            <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{title}</p>
-          </div>
+          <dl className="tm-on-tint bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3 flex flex-col gap-2">
+            <div>
+              <dt className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</dt>
+              <dd className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{title}</dd>
+            </div>
+            <div>
+              <dt className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">받는 사람</dt>
+              <dd className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{audienceLabel} · {genderLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">예상 인원</dt>
+              <dd data-testid="push-confirm-audience" className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{countText}</dd>
+            </div>
+          </dl>
         </div>
 
         <div className="flex items-center gap-2 px-5 pb-5">
@@ -100,10 +126,10 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || !countKnown}
             className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
           >
-            {pending ? '발송 중…' : '전체 발송'}
+            {pending ? '발송 중…' : actionLabel}
           </button>
         </div>
       </div>
@@ -205,11 +231,53 @@ function pushReportedTrouble(push: NonNullable<V1AdminPushSendResult['push']>): 
   return !!push.native && (push.native.disabled || push.native.failed > 0);
 }
 
+// ── 대회·리그 선택 ────────────────────────────────────────────────────────
+/**
+ * 대회와 리그를 한 목록에 섞어 고른다. 서버는 둘을 같은 id 공간으로 다루므로(같은 신청 테이블)
+ * 어느 쪽 id 든 그대로 보낼 수 있다. 대상 종류가 대회·리그일 때만 그려서, 다른 대상을 고른 화면이
+ * 쓸데없이 목록을 불러오지 않게 한다.
+ */
+function CompetitionPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: EntityPickerItem | null;
+  onChange: (item: EntityPickerItem | null) => void;
+  disabled: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const q = query.trim() || undefined;
+  const { data: tournaments, isPending: tournamentsPending } = useV1AdminTournaments({ q, limit: 10 });
+  const { data: leagues, isPending: leaguesPending } = useV1AdminLeagueMatchList({ q });
+  const items: EntityPickerItem[] = [
+    ...(tournaments?.items ?? []).map((row) => ({ id: row.id, label: row.title, description: '대회' })),
+    ...(leagues?.items ?? []).slice(0, 10).map((row) => ({ id: row.leagueId, label: row.title, description: '리그' })),
+  ];
+  return (
+    <EntityPicker
+      id="push-send-competition"
+      value={value}
+      onChange={onChange}
+      items={items}
+      onSearch={setQuery}
+      loading={tournamentsPending || leaguesPending}
+      placeholder="대회·리그 이름 검색"
+      disabled={disabled}
+      emptyText="결과가 없어요."
+      showResultsWithoutQuery
+    />
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export function PushSendForm() {
   const [target, setTarget] = useState<V1AdminPushSendTarget>('user');
   const [query, setQuery] = useState('');
   const [pickedUser, setPickedUser] = useState<EntityPickerItem | null>(null);
+  const [pickedCompetition, setPickedCompetition] = useState<EntityPickerItem | null>(null);
+  // 성별을 안 고르면(undefined) 구분 없이 모두에게 간다. 고르면 그 성별 + 성별 미입력 회원.
+  const [gender, setGender] = useState<V1AdminPushGender | undefined>(undefined);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [url, setUrl] = useState('');
@@ -223,15 +291,29 @@ export function PushSendForm() {
   );
 
   const trimmedTitle = title.trim();
-  const canSubmit =
-    trimmedTitle.length > 0 &&
-    !sendMutation.isPending &&
-    (target === 'broadcast' || !!pickedUser);
+  const bulk = target !== 'user';
+  const hasRecipient = target === 'user' ? !!pickedUser : target === 'competition' ? !!pickedCompetition : true;
+  const canSubmit = trimmedTitle.length > 0 && !sendMutation.isPending && hasRecipient;
+
+  // 예상 인원 — 대상이 정해진 단체 발송일 때만 센다. 실제 발송과 같은 서버 조건이다.
+  const audienceQuery = useV1AdminPushAudience(
+    target === 'broadcast'
+      ? { target: 'broadcast', gender }
+      : target === 'competition' && pickedCompetition
+        ? { target: 'competition', competitionId: pickedCompetition.id, gender }
+        : null,
+  );
+  const audienceLabel = target === 'competition'
+    ? `${pickedCompetition?.label ?? ''} 참가 확정 팀의 팀원`
+    : '전체 회원';
+  const bulkActionLabel = target === 'competition' ? '참가팀 발송' : '전체 발송';
 
   function buildPayload(): V1AdminPushSendPayload {
     return {
       target,
       userId: target === 'user' ? (pickedUser?.id ?? undefined) : undefined,
+      competitionId: target === 'competition' ? (pickedCompetition?.id ?? undefined) : undefined,
+      gender: bulk ? gender : undefined,
       title: trimmedTitle,
       body: body.trim() || undefined,
       url: url.trim() || undefined,
@@ -272,8 +354,8 @@ export function PushSendForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    // 브로드캐스트는 파급력이 크므로 확인 모달을 거쳐야만 실제 발송된다.
-    if (target === 'broadcast') {
+    // 단체 발송(전체 회원·대회/리그 참가팀)은 파급력이 크므로 확인 모달을 거쳐야만 실제 발송된다.
+    if (bulk) {
       setConfirmOpen(true);
       return;
     }
@@ -298,35 +380,28 @@ export function PushSendForm() {
           <span id="push-send-target-label" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             발송 대상
           </span>
-          <div role="radiogroup" aria-labelledby="push-send-target-label" className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={target === 'user'}
-              onClick={() => {
-                setTarget('user');
-                setResult(null);
-              }}
-              disabled={sendMutation.isPending}
-              className={segmentButtonClass(target === 'user')}
-            >
-              <UserIcon size={15} aria-hidden="true" />
-              특정 유저
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={target === 'broadcast'}
-              onClick={() => {
-                setTarget('broadcast');
-                setResult(null);
-              }}
-              disabled={sendMutation.isPending}
-              className={segmentButtonClass(target === 'broadcast')}
-            >
-              <Users size={15} aria-hidden="true" />
-              전체 회원
-            </button>
+          <div role="radiogroup" aria-labelledby="push-send-target-label" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {([
+              { value: 'user', label: '특정 유저', Icon: UserIcon },
+              { value: 'broadcast', label: '전체 회원', Icon: Users },
+              { value: 'competition', label: '대회·리그 참가팀', Icon: Trophy },
+            ] as const).map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={target === value}
+                onClick={() => {
+                  setTarget(value);
+                  setResult(null);
+                }}
+                disabled={sendMutation.isPending}
+                className={segmentButtonClass(target === value)}
+              >
+                <Icon size={15} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -350,15 +425,81 @@ export function PushSendForm() {
           </div>
         )}
 
-        {/* Broadcast notice */}
-        {target === 'broadcast' && (
-          <p
+        {/* Competition picker */}
+        {target === 'competition' && (
+          <div className="flex flex-col gap-2">
+            <label htmlFor="push-send-competition" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
+              대회·리그
+            </label>
+            <CompetitionPicker value={pickedCompetition} onChange={setPickedCompetition} disabled={sendMutation.isPending} />
+          </div>
+        )}
+
+        {/* Gender filter — 단체 발송에만 */}
+        {bulk && (
+          <div className="flex flex-col gap-2">
+            <span id="push-send-gender-label" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
+              받는 성별
+            </span>
+            <div role="radiogroup" aria-labelledby="push-send-gender-label" className="grid grid-cols-3 gap-2">
+              {([
+                { value: undefined, label: '구분 없음' },
+                { value: 'male', label: '남성' },
+                { value: 'female', label: '여성' },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="radio"
+                  aria-checked={gender === value}
+                  onClick={() => setGender(value)}
+                  disabled={sendMutation.isPending}
+                  className={segmentButtonClass(gender === value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed">
+              {gender
+                ? '고른 성별과 성별을 입력하지 않은 회원이 함께 받아요. 같은 팀의 반대 성별 회원은 제외돼요.'
+                : '성별 구분 없이 대상 전원이 받아요.'}
+            </p>
+          </div>
+        )}
+
+        {/* Bulk notice + 예상 인원 */}
+        {bulk && (
+          <div
             role="note"
-            className="text-[length:var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-4 py-3 flex items-start gap-2"
+            className="text-[length:var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-4 py-3 flex flex-col gap-2"
           >
-            <AlertTriangle size={15} className="text-[var(--orange700)] shrink-0 mt-0.5" aria-hidden="true" />
-            모든 활성 회원의 알림함에 저장해요. 공지 알림을 꺼둔 회원은 제외하고, 앱·웹 푸시는 수신 기기를 등록한 회원에게 보내요.
-          </p>
+            <p className="flex items-start gap-2">
+              <AlertTriangle size={15} className="text-[var(--orange700)] shrink-0 mt-0.5" aria-hidden="true" />
+              {target === 'competition'
+                ? '참가가 확정된 팀의 활성 팀원의 알림함에 저장해요. 신청만 하고 확정 전인 팀은 제외하고, 공지 알림을 꺼둔 회원도 제외해요. 앱·웹 푸시는 수신 기기를 등록한 회원에게 보내요.'
+                : '모든 활성 회원의 알림함에 저장해요. 공지 알림을 꺼둔 회원은 제외하고, 앱·웹 푸시는 수신 기기를 등록한 회원에게 보내요.'}
+            </p>
+            <p data-testid="push-audience-estimate" className="font-semibold pl-6">
+              {target === 'competition' && !pickedCompetition
+                ? '대회·리그를 고르면 예상 인원을 보여 드려요.'
+                : audienceQuery.isError
+                  ? '예상 인원을 불러오지 못했어요.'
+                  : audienceQuery.data
+                    ? `예상 인원 ${audienceQuery.data.recipients.toLocaleString()}명` +
+                      (audienceQuery.data.noticeOff > 0 ? ` (공지 알림을 끈 ${audienceQuery.data.noticeOff.toLocaleString()}명 제외)` : '')
+                    : '예상 인원을 세는 중이에요…'}
+              {audienceQuery.isError && (
+                <button
+                  type="button"
+                  onClick={() => void audienceQuery.refetch()}
+                  className="ml-2 min-h-[44px] px-2 underline focus-visible:outline-2 focus-visible:outline-blue-500"
+                >
+                  다시 세기
+                </button>
+              )}
+            </p>
+          </div>
         )}
 
         {/* Title */}
@@ -451,8 +592,8 @@ export function PushSendForm() {
           <Send size={16} aria-hidden="true" />
           {sendMutation.isPending
             ? '발송 중…'
-            : target === 'broadcast'
-              ? '전체 발송 확인'
+            : bulk
+              ? `${bulkActionLabel} 확인`
               : '발송하기'}
         </button>
       </form>
@@ -474,10 +615,14 @@ export function PushSendForm() {
         </div>
       )}
 
-      <BroadcastConfirmModal
+      <BulkConfirmModal
         open={confirmOpen}
         pending={sendMutation.isPending}
         title={trimmedTitle}
+        actionLabel={bulkActionLabel}
+        audienceLabel={audienceLabel}
+        genderLabel={adminPushGenderLabel(gender)}
+        audience={audienceQuery.isError ? null : audienceQuery.data}
         onConfirm={executeSend}
         onClose={() => {
           if (!sendMutation.isPending) setConfirmOpen(false);

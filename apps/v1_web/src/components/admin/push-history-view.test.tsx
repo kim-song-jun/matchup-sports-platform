@@ -65,6 +65,25 @@ describe('PushHistoryView with real query hooks and HTTP handlers', () => {
     expect(screen.queryByRole('button', { name: /발송 상세 보기/ })).not.toBeInTheDocument();
   });
 
+  it('대회·리그 발송 행에는 대회 이름과 성별 조건이 함께 보이고, 대상 필터에 대회·리그 참가팀이 있다', async () => {
+    server.use(http.get('*/api/v1/admin/ops/push-history', () => envelope({
+      items: [{ ...adminPushHistoryFixture, target: 'competition', gender: 'female', competition: { id: 'league-1', title: '11월 여자부 리그' } }],
+      pageInfo: { hasNextPage: false, nextCursor: null },
+    })));
+    mount();
+    // 같은 문구가 필터 옵션에도 있으므로, 표에만 있는 대회 이름을 기다린 뒤 확인한다.
+    // 표가 데스크톱·모바일 표현을 함께 그려서 같은 글이 여러 번 나온다.
+    expect((await screen.findAllByText('11월 여자부 리그')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('여성 (성별 미입력 포함)').length).toBeGreaterThan(0);
+    expect(screen.getByRole('option', { name: '대회·리그 참가팀' })).toBeInTheDocument();
+  });
+
+  it('예전 이력(성별·대회 정보 없음)은 성별을 지어내지 않는다', async () => {
+    mount();
+    await firstDetailButton();
+    expect(screen.queryByText(/성별 미입력 포함/)).not.toBeInTheDocument();
+  });
+
   it('appends the next API page instead of replacing earlier history', async () => {
     server.use(http.get('*/api/v1/admin/ops/push-history', ({ request }) => {
       const next = new URL(request.url).searchParams.get('cursor');

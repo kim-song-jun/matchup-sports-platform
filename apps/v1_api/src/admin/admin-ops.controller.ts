@@ -7,6 +7,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminContextService } from '../common/admin-context.service';
 import { AdminPushSendDto } from './dto/admin-push-send.dto';
+import { AdminPushAudienceQueryDto } from './dto/admin-push-audience.dto';
 import { AdminOpsService } from './admin-ops.service';
 import { AdminPushHistoryService } from './admin-push-history.service';
 import { AdminPushHistoryQueryDto } from './dto/admin-push-history.dto';
@@ -105,5 +106,13 @@ export class AdminOpsController {
   async sendPush(@CurrentUser() user: V1AuthUser, @Body() dto: AdminPushSendDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.adminOpsService.sendManualPush(dto, admin);
+  }
+
+  // 확인창의 예상 수신 인원 — 읽기 전용이라 발송보다 한도를 넉넉히 둔다(성별·대회를 바꿀 때마다 부른다).
+  @Get('push-send/audience')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async pushAudience(@CurrentUser() user: V1AuthUser, @Query() query: AdminPushAudienceQueryDto) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.adminOpsService.previewPushAudience(query);
   }
 }

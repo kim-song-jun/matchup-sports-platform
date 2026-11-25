@@ -8,7 +8,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { adminPushTargetLabel } from '@/lib/admin-labels';
+import { adminPushGenderLabel, adminPushTargetLabel } from '@/lib/admin-labels';
 import type { AdminPushDeliveryChannel } from '@/types/admin-push-history';
 import { AdminDetailRow } from './admin-detail-row';
 import { AdminInlineError } from './admin-inline-error';
@@ -51,6 +51,8 @@ export function PushHistoryDetail({ id, open, onClose }: { id: string | null; op
             <AdminDetailRow label="발송 시각" value={formatAdminDateTime(item.createdAt)} />
             <AdminDetailRow label="발송자" value={item.sender.name ?? '이름 미보관'} />
             <AdminDetailRow label="발송 대상" value={adminPushTargetLabel(item.target)} />
+            {item.target === 'competition' && <AdminDetailRow label="대회·리그" value={item.competition?.title ?? '이름 미보관'} />}
+            {item.target !== 'user' && <AdminDetailRow label="성별" value={adminPushGenderLabel(item.gender)} />}
             <AdminDetailRow label="알림함 생성" value={displayCount(item.sent)} />
             <AdminDetailRow label="수신 설정으로 제외" value={displayCount(item.skipped)} />
             <AdminDetailRow label="알림 처리 실패" value={displayCount(item.failed)} />

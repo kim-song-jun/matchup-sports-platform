@@ -15,6 +15,6 @@ export class AdminPushHistoryQueryDto {
   limit?: number;
 
   @IsOptional()
-  @IsIn(['user', 'broadcast'])
-  target?: 'user' | 'broadcast';
+  @IsIn(['user', 'broadcast', 'competition'])
+  target?: 'user' | 'broadcast' | 'competition';
 }

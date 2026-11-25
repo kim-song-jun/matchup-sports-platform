@@ -378,16 +378,21 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 
 | Method | Path (`/api/v1` prefix) | 권한 | 계약 |
 |---|---|---|---|
-| POST | `/admin/ops/push-send` | active owner/ops | `{ target: 'user' \| 'broadcast', userId?, title, body?, url? }`. 단일 수신자는 UUID 필수. `title≤120`, `body≤2000`, `url≤500`, 이동 경로는 단일 `/`로 시작하고 `//`·역슬래시는 금지. 분당 5회. UI 입력 한도는 제목 60자·본문 200자. |
-| GET | `/admin/ops/push-history` | active owner/ops/support | `limit=1..50`(기본 20), `cursor?`, `target=user\|broadcast?`. `{ items, pageInfo: { hasNextPage, nextCursor } }`. 시각·ID 내림차순 keyset cursor. 잘못된 cursor는 400 `INVALID_CURSOR`. |
+| POST | `/admin/ops/push-send` | active owner/ops | `{ target: 'user' \| 'broadcast' \| 'competition', userId?, competitionId?, gender?, title, body?, url? }`. 단일 수신자는 UUID 필수. `competition` 은 `competitionId`(UUID, 대회·리그 공통) 필수. `gender`(`male`\|`female`)는 `broadcast`·`competition` 에서만 — `user` 에 보내면 400 `PUSH_GENDER_BULK_ONLY`. 없는 대회·리그는 404 `COMPETITION_NOT_FOUND`. `title≤120`, `body≤2000`, `url≤500`, 이동 경로는 단일 `/`로 시작하고 `//`·역슬래시는 금지. 분당 5회. UI 입력 한도는 제목 60자·본문 200자. |
+| GET | `/admin/ops/push-send/audience` | active owner/ops/support | `target=broadcast\|competition`, `competitionId?`(competition 이면 필수), `gender?`. 발송과 같은 대상 계산으로 센 `{ audience, noticeOff, recipients }`(후보·공지 알림 끈 회원·실제 알림함 생성 예상). 읽기 전용, 분당 30회. 확인창이 쓴다. |
+| GET | `/admin/ops/push-history` | active owner/ops/support | `limit=1..50`(기본 20), `cursor?`, `target=user\|broadcast\|competition?`. `{ items, pageInfo: { hasNextPage, nextCursor } }`. 시각·ID 내림차순 keyset cursor. 잘못된 cursor는 400 `INVALID_CURSOR`. |
 | GET | `/admin/ops/push-history/:id` | active owner/ops/support | UUID 필수. 수동 발송 감사 로그만 상세 허용. 없거나 다른 액션은 404 `PUSH_HISTORY_NOT_FOUND`. |
 
 발송 결과 `{ sent, skipped, failed, push }`의 `sent`는 **회원 알림함 생성 수**다.
 `push.{subscriptions,delivered,failed,disabled}`는 웹 구독, `push.native?`
 `{devices,delivered,failed,disabled}`는 APNs/FCM 기기 집계다. `delivered`는 푸시 서비스 접수이며 실제 기기 도착·읽음 증명이 아니다.
-전체 대상은 활성 회원이고 `noticeEnabled=false`는 제외한다. 마케팅 동의 기반 광고 캠페인 기능은 아니며,
+전체 대상은 활성 회원이고 `noticeEnabled=false`는 제외한다.
+`competition` 대상은 **참가 확정(`confirmed`) 신청이 있는 팀의 활성 팀원**이다(삭제된 팀 제외). 대회와 리그는 같은 신청 테이블·같은 id 공간이다.
+`gender` 를 고르면 그 성별 **또는 성별 미입력**(프로필 없음·빈 값·`male`/`female` 이 아닌 값) 회원이 받는다 — 남성 발송과 여성 발송 모두에 미입력 회원이 들어가므로 어느 쪽에서도 공지를 못 받는 사람이 없다(2026-11-25 결정).
+같은 팀에 남녀가 섞여 있어도 여자부 안내는 여성 선택으로 보내 남성 팀원을 빼고, 남자부 안내는 남성으로 보내 여성 팀원을 뺀다.
+대상 계산은 `admin/admin-push-audience.ts` 한 곳이다(발송과 예상 인원이 같은 where 를 쓴다). 마케팅 동의 기반 광고 캠페인 기능은 아니며,
 이 변경은 수신 설정·발송 대상 계약을 바꾸지 않는다.
-동일 운영자·동일 제목/본문/링크의 전체 발송은 10분간 첫 결과를 재생하고 새 발송·이력을 생성하지 않는다.
+동일 운영자·동일 제목/본문/링크(·대상 종류·대회·리그·성별)의 단체 발송은 10분간 첫 결과를 재생하고 새 발송·이력을 생성하지 않는다. 성별·대회가 다르면 다른 발송이다.
 진행 중 동일 요청은 409 `BROADCAST_IN_PROGRESS`. 개인 발송에는 이 멱등 보호가 없다.
 
 새 감사 로그(`action=push.manual_send`, `targetType=push`)의 `afterJson`은 기존 집계에
@@ -395,7 +400,7 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 이미 발송한 뒤 감사 저장이 실패하면 성공 결과에 `historyRecorded:false`를 덧붙여 **발송 완료와 이력 저장 실패**를 구분한다.
 화면은 재발송을 권하지 않으며, 이력 API는 남지 않은 감사 로그를 가짜로 생성하지 않는다.
 
-목록 항목: `{ id, createdAt, title, target, recipientUserId, sender:{name,role}, sent, skipped, failed }`.
+목록 항목: `{ id, createdAt, title, target, recipientUserId, gender, competition:{id,title}\|null, sender:{name,role}, sent, skipped, failed }`. `gender`·`competition` 은 새 감사 로그의 `afterJson`(`gender`, `competitionId`, `competitionTitle`)에서 읽고 예전 이력은 `null`이다. 대회·리그 발송의 감사 `targetId` 는 `competition:<id>` 다.
 상세는 `content:{source,body,url}`, `delivery:{web,native}`를 추가한다.
 각 channel은 `{total,delivered,failed,disabled}` 또는 `null`(미보관)이다.
 기기 토큰·브라우저 구독·관리자 이메일은 응답에 포함하지 않는다.
@@ -409,7 +414,7 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 - 과거 push 집계는 미보관이면 `null`; 현재 기기 상태나 만료/삭제 가능한 멱등 레코드로 과거 통계를 추정하지 않는다.
 - 자동 경기·채팅 알림과 APNs 직접 발송은 수동 감사 이력 범위가 아니다.
 
-UI는 `/admin/ops/push-send`의 발송하기/발송 이력 탭이다. support는 이력만 열고 발송 탭은 비활성화한다.
+UI는 `/admin/ops/push-send`의 발송하기/발송 이력 탭이다. 발송 대상은 특정 유저·전체 회원·대회·리그 참가팀이고, 단체 발송은 확인창에 대상·성별·예상 인원을 보여 준다(인원을 못 불러오면 발송 버튼을 막는다). support는 이력만 열고 발송 탭은 비활성화한다.
 미리보기는 inert 텍스트이며 발송·경로 이동을 실행하지 않는다. 이동 경로는 상세에 텍스트로만 표시한다.
 MSW의 `[샘플]` 이력은 전용 fixture이며 실제 발송 완료처럼 생성하지 않는다.
 

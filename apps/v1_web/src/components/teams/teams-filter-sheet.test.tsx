@@ -133,7 +133,10 @@ describe('TeamListPageClient — 필터 시트', () => {
       render(<TeamListPageClient />);
 
       expect(chipLabels('지역')).toEqual(['전체', '서울', '경기', '인천']);
-      expect(screen.getByRole('link', { name: /활동 지역 설정하기/ }).getAttribute('href')).toBe('/my/settings/location');
+      const settingsLink = screen.getByRole('link', { name: /활동 지역 설정하기/ });
+      expect(settingsLink.getAttribute('href')).toBe('/my/settings/location');
+      // 시트가 가로채 replace 하면 출처(?from=)를 잃어 설정 화면의 뒤로가기가 목록으로 못 돌아온다 — 시트 밖으로 나가는 링크로 표시한다.
+      expect(settingsLink.hasAttribute('data-sheet-exit')).toBe(true);
     });
 
     it('비로그인도 설정 링크를 본다', () => {

@@ -177,6 +177,27 @@ describe('BottomSheet 닫기와 히스토리', () => {
     expect(router.push).not.toHaveBeenCalled();
     expect(decideBackAction('/matches')).toBe('back');
   });
+
+  it('시트 밖으로 나가는 링크(data-sheet-exit)는 가로채지 않는다 — 링크 자체의 이동이 돌고 시트 항목이 남는다', () => {
+    openFromList();
+    renderSheet(<a href="/my/settings/location" data-sheet-exit="true">지역 설정</a>);
+    // 링크 쪽이 기본 동작을 막지 않았는지(= 시트가 가로채지 않았는지)를 React 루트 핸들러가 끝난 뒤에 본다.
+    const observed = { prevented: undefined as boolean | undefined };
+    document.addEventListener(
+      'click',
+      (event) => {
+        observed.prevented = event.defaultPrevented;
+        event.preventDefault(); // jsdom 이 실제 이동을 시도하지 않게.
+      },
+      { once: true },
+    );
+    fireEvent.click(screen.getByRole('link', { name: '지역 설정' }));
+
+    expect(observed.prevented).toBe(false);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(currentPath()).toBe('/matches?filter=open');
+  });
 });
 
 // 부모 상태로 여는 시트(상세 ⋯ 메뉴 등) — URL 을 건드리지 않고 onClose 로만 닫는다.

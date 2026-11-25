@@ -1,11 +1,10 @@
 import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { isUsableAccessTokenSecret, issueAccessToken, parseAccessToken } from '../calendar-feed/access-token';
-import { tallyLiveScore } from '../games/public-records/public-live-score';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { PrismaService } from '../prisma/prisma.service';
-import { tallySharedRecordGoals } from './widget-home';
+import { perspectiveScore, tallyGameScore } from './widget-home';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { NEXT_GAME_STARTED_GRACE_MS } from '../team-lineups/team-upcoming-games.service';
 
@@ -184,13 +183,8 @@ export class WidgetService {
       });
       for (const item of scorable) {
         const game = gameById.get(item.gameId)!;
-        const sideKeyById = new Map(game.sides.map((s) => [s.id, s.sideKey] as const));
-        // 친선 팀 매치는 득점을 공유 기록에 두므로 그쪽에서 센다(이벤트만 세면 0 : 0).
-        const tally = game.sharedRecord !== null
-          ? tallySharedRecordGoals(game.sharedRecord.goals, sideKeyById)
-          : tallyLiveScore(events.filter((e) => e.gameId === item.gameId), sideKeyById);
         const mineKey = game.sides.find((s) => s.teamId === item.teamId)?.sideKey ?? 'HOME';
-        item.score = mineKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
+        item.score = perspectiveScore(tallyGameScore(game, events.filter((e) => e.gameId === item.gameId)), mineKey);
       }
     }
 

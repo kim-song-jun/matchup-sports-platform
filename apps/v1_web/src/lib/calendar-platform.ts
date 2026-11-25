@@ -1,16 +1,18 @@
 import { detectNativeShell } from './native-bridge';
 
 /** 캘린더 연결 화면이 어느 기기 기준으로 안내할지. */
-export type CalendarPlatform = 'ios' | 'android' | 'other';
+export type CalendarPlatform = 'ios' | 'mac' | 'android' | 'other';
 
 /**
  * 앱 안에서는 셸이 알려 주는 값(`detectNativeShell`)을 그대로 쓴다 — 아이폰 앱이면 항상 ios, 안드로이드 앱이면 항상 android.
- * 브라우저에서는 접속 기기 정보(userAgent)로 나누고, 데스크톱·iPad 데스크톱 모드는 `other`(공통 안내)다.
+ * 브라우저에서는 접속 기기 정보(userAgent)로 나눈다 — 맥(사파리·크롬, iPad 데스크톱 모드 포함)은 `webcal` 을 캘린더 앱이 바로 받으므로
+ * `mac`, 윈도우·리눅스 같은 그 밖의 데스크톱은 `other`(공통 안내)다.
  */
 export function detectCalendarPlatform(userAgent: string, shell: 'ios' | 'android' | null): CalendarPlatform {
   if (shell !== null) return shell;
   if (/iPhone|iPod|iPad/i.test(userAgent)) return 'ios';
   if (/Android/i.test(userAgent)) return 'android';
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return 'mac';
   return 'other';
 }
 

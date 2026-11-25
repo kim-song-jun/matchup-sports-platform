@@ -92,6 +92,29 @@ describe('MySchedulePage — 빈 상태 / 데이터 렌더링', () => {
     expect(link).toHaveTextContent('참석');
   });
 
+  it('끝났는데 예정으로 남은 일정은 「지난」, 앞으로 올 일정은 「예정」 배지로 보여준다', () => {
+    const DAY = 24 * 60 * 60 * 1_000;
+    const at = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString();
+    myScheduleApiMocks.useV1MySchedule.mockReturnValue({
+      data: {
+        items: [
+          myScheduleItem({ id: 'upcoming', title: '다음 훈련', startAt: at(2), endAt: at(2.1) }),
+          myScheduleItem({ id: 'overdue', title: '지난 경기', type: 'MATCH', startAt: at(-9), endAt: at(-8.9) }),
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(MySchedulePage());
+
+    expect(screen.getByRole('link', { name: /다음 훈련/ })).toHaveTextContent('예정');
+    expect(screen.getByRole('link', { name: /지난 경기/ })).toHaveTextContent('지난');
+    expect(screen.getByRole('link', { name: /지난 경기/ })).not.toHaveTextContent('예정');
+  });
+
   it('내 참석 상태가 미정/불참이면 (본인 응답이므로) 그 라벨을 그대로 보여준다', () => {
     // 주의: 이건 팀 전체 미정/불참 "합계"를 지어내는 것과는 다르다 — 여기서는 서버가
     // 실제로 반환하는 이 사용자 본인의 myAttendanceStatus 필드를 그대로 라벨링할 뿐이다.

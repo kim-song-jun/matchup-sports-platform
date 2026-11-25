@@ -105,12 +105,15 @@ export function BottomSheet(props: BottomSheetProps) {
   }, [closeHref, navigate, onClose]);
 
   // 시트 안의 링크(칩·초기화·적용·닫기)는 push 대신 navigate 로 — 시트 항목을 쌓지 않는다.
+  // 시트 밖 다른 화면으로 나가는 링크는 `data-sheet-exit` 로 표시한다 — 가로채지 않으므로 그 링크 자체의 이동(예: 출처를
+  // 싣는 FromLink 의 push)이 돌고, 돌아오면 시트가 열린 그 목록이 남아 있다. replace 로 가로채면 시트 항목이 사라져 출처를 잃는다.
   const onLinkClick = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
       if (event.defaultPrevented || event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element | null)?.closest?.('a');
       if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      if (anchor.hasAttribute('data-sheet-exit')) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin) return;
       event.preventDefault();

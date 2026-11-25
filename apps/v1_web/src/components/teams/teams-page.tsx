@@ -2198,7 +2198,7 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
 function RegionNotice({ notice }: { notice: NonNullable<NonNullable<TeamListViewModel['filterSheet']>['regionNotice']> }) {
   return (
     <p className="tm-text-caption tm-filter-region-notice">
-      {notice.text} · <FromLink className="tm-filter-region-notice-link" href={notice.link.href}>{notice.link.label}</FromLink>
+      {notice.text} · <FromLink className="tm-filter-region-notice-link" href={notice.link.href} data-sheet-exit="true">{notice.link.label}</FromLink>
     </p>
   );
 }

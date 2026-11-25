@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +6,9 @@ import { AdminContextService, V1ActiveAdmin } from '../common/admin-context.serv
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService, type PushDeliverySummary } from '../notifications/web-push.service';
 import { AdminPushSendDto } from './dto/admin-push-send.dto';
+import type { AdminPushAudienceQueryDto } from './dto/admin-push-audience.dto';
+import { buildPushAudienceWhere } from './admin-push-audience';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { LOGIN_SECURITY_POLICY, LOGIN_SPRAY_ANOMALY_KIND } from '../auth/login-security/login-security.policy';
 
 export interface PushFailureSummary {
@@ -313,15 +316,34 @@ export class AdminOpsService {
    * enum 값을 추가해 마이그레이션을 늘리기보다 기존 값을 재사용했다.
    */
   async sendManualPush(dto: AdminPushSendDto, admin: V1ActiveAdmin): Promise<ManualPushSendResult> {
-    // 전체 발송은 되돌릴 수 없고 대상이 전 사용자다 — 두 번 눌리면 모두가 같은 공지를
+    // 전체 회원·대회/리그 참가팀 발송은 되돌릴 수 없고 대상이 여러 명이다 — 두 번 눌리면 모두가 같은 공지를
     // 두 번 받는다. 확인 절차도 멱등 키도 없어서 더블 클릭·재시도 한 번이 그대로 사고가
     // 됐다. 클라이언트가 키를 보내 주기를 기다리는 대신 **내용 자체를 키로 삼는다**:
     // 같은 운영자가 같은 내용을 짧은 시간 안에 다시 보내면 새로 보내지 않고 첫 결과를
-    // 그대로 돌려준다(저장소의 v1IdempotencyRecord 규약을 그대로 쓴다).
+    // 그대로 돌려준다(저장소의 v1IdempotencyRecord 규약을 그대로 쓴다). 대상·성별이 다르면
+    // 다른 발송이라 키에 함께 넣는다(broadcastScope).
     //
     // 개인 발송은 대상이 한 명이라 이 보호를 걸지 않는다 — 운영자가 같은 사람에게
     // 같은 안내를 다시 보내는 것은 정상적인 조작이다.
-    if (dto.target === 'broadcast') {
+    const bulk = dto.target !== 'user';
+    if (!bulk && dto.gender) {
+      // 한 명에게 보내는데 성별 조건을 받아 두고 조용히 무시하면 "남성에게만 갔겠지" 하는 오해가 생긴다.
+      throw new BadRequestException({
+        code: 'PUSH_GENDER_BULK_ONLY',
+        message: '성별은 전체 회원이나 대회·리그 참가팀에게 보낼 때만 고를 수 있어요.',
+      });
+    }
+    if (dto.target !== 'competition' && dto.competitionId) {
+      // 성별과 같은 이유 — "참가팀에게만 갔겠지" 했는데 전체 회원에게 나가는 오해를 만들지 않는다.
+      throw new BadRequestException({
+        code: 'PUSH_COMPETITION_TARGET_ONLY',
+        message: '대회·리그는 발송 대상을 「대회·리그 참가팀」으로 골랐을 때만 지정할 수 있어요.',
+      });
+    }
+    // 대회·리그 대상은 실제로 있는 대회·리그여야 한다. 제목은 발송 이력에 남긴다.
+    const competition = dto.target === 'competition' ? await this.loadPushCompetition(dto.competitionId as string) : null;
+
+    if (bulk) {
       const claim = await this.claimBroadcast(dto, admin);
       if (claim.status === 'replay') return claim.body;
       if (claim.status === 'in_progress') {
@@ -357,15 +379,21 @@ export class AdminOpsService {
         };
         addPushTally(result.push, push);
       } else {
-        targetId = 'broadcast';
+        targetId = competition ? `competition:${competition.id}` : 'broadcast';
         result = { sent: 0, skipped: 0, failed: 0, push: emptyPushTally() };
+        // 수신 후보는 확인창의 예상 인원(previewPushAudience)과 같은 where 로 정한다.
+        const audienceWhere = buildPushAudienceWhere({
+          target: dto.target as 'broadcast' | 'competition',
+          competitionId: competition?.id,
+          gender: dto.gender,
+        });
         // 대상 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
         // 청크 단위로 페이지네이션해 가져온다 — 사용자 수가 커져도 한 번에 들고
         // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
         let cursor: string | undefined;
         for (;;) {
           const page = await this.prisma.v1User.findMany({
-            where: { accountStatus: 'active' },
+            where: audienceWhere,
             take: BROADCAST_CHUNK_SIZE,
             ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
             orderBy: { id: 'asc' },
@@ -387,7 +415,7 @@ export class AdminOpsService {
       // 발송 도중 실패했다면 클레임을 되돌려 다음 진짜 재시도가 막히지 않게 한다 —
       // claimBroadcast가 이미 202로 선점해 둔 상태라, 여기서 풀지 않으면 10분 창
       // 동안 "발송 중"으로 오인돼 정상적인 재시도까지 ConflictException으로 막힌다.
-      if (dto.target === 'broadcast') {
+      if (bulk) {
         await this.releaseBroadcastClaim(dto, admin);
       }
       throw err;
@@ -407,6 +435,8 @@ export class AdminOpsService {
           body: dto.body ?? null,
           url: dto.url ?? null,
           target: dto.target,
+          ...(dto.gender ? { gender: dto.gender } : {}),
+          ...(competition ? { competitionId: competition.id, competitionTitle: competition.title } : {}),
           sent: result.sent,
           skipped: result.skipped,
           failed: result.failed,
@@ -420,7 +450,7 @@ export class AdminOpsService {
       );
     }
 
-    if (dto.target === 'broadcast') {
+    if (bulk) {
       await this.finalizeBroadcastClaim(dto, admin, result);
     }
 
@@ -527,8 +557,16 @@ export class AdminOpsService {
 
   /** 내용 자체가 키다 — 클라이언트가 멱등 키를 보내 주지 않아도 중복을 잡는다. */
   private broadcastScope(dto: AdminPushSendDto, admin: V1ActiveAdmin) {
+    // 대상·성별이 다르면 다른 발송이다 — 같은 내용을 남성에게 보낸 직후 여성에게 보내도 "이미 나간 공지"로 막히지 않게
+    // 키에 넣는다. 전체 회원·성별 없음은 예전 키 그대로다(배포 직전에 선점된 10분 창과 어긋나지 않는다).
     const contentHash = createHash('sha256')
-      .update(JSON.stringify({ title: dto.title, body: dto.body ?? null, url: dto.url ?? null }))
+      .update(JSON.stringify({
+        title: dto.title,
+        body: dto.body ?? null,
+        url: dto.url ?? null,
+        ...(dto.target === 'competition' ? { target: 'competition', competitionId: dto.competitionId } : {}),
+        ...(dto.gender ? { gender: dto.gender } : {}),
+      }))
       .digest('hex');
     return {
       actorUserId: admin.userId,
@@ -537,6 +575,32 @@ export class AdminOpsService {
       resourceId: 'broadcast',
       idempotencyKey: contentHash,
     };
+  }
+
+  /** 대회·리그(같은 id 공간)를 찾는다. 없거나 삭제됐으면 404 — 존재하지 않는 대상에 "0명 발송 완료"로 끝나지 않게 한다. */
+  private async loadPushCompetition(id: string): Promise<{ id: string; title: string }> {
+    const row = await findTournamentOnSurface(this.prisma, [...ALL_COMPETITION_KINDS], {
+      where: { id, deletedAt: null },
+      select: { id: true, title: true },
+    });
+    if (!row) {
+      throw new NotFoundException({ code: 'COMPETITION_NOT_FOUND', message: '대회·리그를 찾을 수 없어요.' });
+    }
+    return row;
+  }
+
+  /**
+   * 확인창의 예상 수신 인원. 실제 발송과 같은 대상 계산(buildPushAudienceWhere)을 쓰고,
+   * 공지 알림을 꺼 둔 회원은 발송 단계에서 건너뛰므로 따로 세어 뺀다.
+   */
+  async previewPushAudience(query: AdminPushAudienceQueryDto): Promise<{ audience: number; noticeOff: number; recipients: number }> {
+    if (query.target === 'competition') await this.loadPushCompetition(query.competitionId as string);
+    const where = buildPushAudienceWhere({ target: query.target, competitionId: query.competitionId, gender: query.gender });
+    const [audience, noticeOff] = await Promise.all([
+      this.prisma.v1User.count({ where }),
+      this.prisma.v1User.count({ where: { AND: [where, { notificationPreference: { is: { noticeEnabled: false } } }] } }),
+    ]);
+    return { audience, noticeOff, recipients: audience - noticeOff };
   }
 
   /**

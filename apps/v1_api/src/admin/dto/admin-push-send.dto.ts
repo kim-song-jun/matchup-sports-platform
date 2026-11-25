@@ -1,4 +1,5 @@
 import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { PUSH_AUDIENCE_GENDERS, type PushAudienceGender, type PushSendTarget } from '../admin-push-audience';
 
 /**
  * 어드민 수동 웹 푸시 발송 요청.
@@ -11,12 +12,26 @@ import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } fr
  * 이미 쓰이는 컨벤션이다.
  */
 export class AdminPushSendDto {
-  @IsIn(['user', 'broadcast'])
-  target!: 'user' | 'broadcast';
+  /**
+   * `user` 한 명 / `broadcast` 활성 회원 전체 / `competition` 대회·리그 참가 확정 팀의 팀원.
+   * `broadcast`·`competition` 은 `gender` 로 성별을 좁힐 수 있다(성별 미입력 회원은 어느 쪽이든 포함).
+   */
+  @IsIn(['user', 'broadcast', 'competition'])
+  target!: PushSendTarget;
 
   @ValidateIf((dto: AdminPushSendDto) => dto.target === 'user')
   @IsUUID()
   userId?: string;
+
+  /** `competition` 대상일 때만 필수 — 대회와 리그는 같은 id 공간(v1_tournaments)을 쓴다. */
+  @ValidateIf((dto: AdminPushSendDto) => dto.target === 'competition')
+  @IsUUID()
+  competitionId?: string;
+
+  /** 대량 발송(`broadcast`·`competition`)에서만 쓴다. 비우면 성별 제한이 없다. `user` 와 함께 보내면 거절한다(서비스). */
+  @IsOptional()
+  @IsIn([...PUSH_AUDIENCE_GENDERS])
+  gender?: PushAudienceGender;
 
   @IsString()
   @MaxLength(120)

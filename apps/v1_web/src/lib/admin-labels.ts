@@ -11,10 +11,18 @@ export const ADMIN_MATCH_HIDDEN_BY_LABEL = {
   host: '주최자가 삭제',
 } as const;
 
-export function adminPushTargetLabel(target: 'user' | 'broadcast' | null): string {
+export function adminPushTargetLabel(target: 'user' | 'broadcast' | 'competition' | null): string {
   if (target === 'broadcast') return '전체 회원';
+  if (target === 'competition') return '대회·리그 참가팀';
   if (target === 'user') return '특정 회원';
   return '대상 미보관';
+}
+
+/** 성별 조건 표기 — 고르면 그 성별과 성별 미입력 회원이 함께 받는다는 사실을 라벨에 담는다. */
+export function adminPushGenderLabel(gender: 'male' | 'female' | null | undefined): string {
+  if (gender === 'male') return '남성 (성별 미입력 포함)';
+  if (gender === 'female') return '여성 (성별 미입력 포함)';
+  return '성별 구분 없음';
 }
 
 /**

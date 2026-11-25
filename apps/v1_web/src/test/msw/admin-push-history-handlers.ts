@@ -16,9 +16,11 @@ export const adminPushHistoryMswHandlers = [
   http.get('*/api/v1/admin/ops/push-history', ({ request }) => {
     const url = new URL(request.url);
     const { content: _content, delivery: _delivery, ...item } = adminPushHistoryFixture;
-    const items = url.searchParams.has('cursor') || url.searchParams.get('target') === 'user' ? [] : [item];
+    const items = url.searchParams.has('cursor') || ['user', 'competition'].includes(url.searchParams.get('target') ?? '') ? [] : [item];
     return ok({ items, pageInfo: { hasNextPage: false, nextCursor: null } });
   }),
+  // 예상 인원 샘플 — 실제 집계가 아니라 화면 확인용 고정값이다.
+  http.get('*/api/v1/admin/ops/push-send/audience', () => ok({ audience: 24, noticeOff: 2, recipients: 22 })),
   http.get('*/api/v1/admin/ops/push-history/:id', ({ params }) => {
     if (params.id === adminPushHistoryFixture.id) return ok(adminPushHistoryFixture);
     return HttpResponse.json({ status: 'error', statusCode: 404, code: 'PUSH_HISTORY_NOT_FOUND', message: '발송 이력을 찾을 수 없어요.', timestamp: new Date().toISOString() }, { status: 404 });

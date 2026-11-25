@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAdminPushHistory } from '@/hooks/use-admin-push-history';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { adminPushTargetLabel } from '@/lib/admin-labels';
+import { adminPushGenderLabel, adminPushTargetLabel } from '@/lib/admin-labels';
 import type { AdminPushHistoryItem } from '@/types/admin-push-history';
 import type { V1AdminPushSendTarget } from '@/types/api';
 import { AdminDataTable, type AdminTableColumn } from './admin-data-table';
@@ -15,7 +15,15 @@ import { PushHistoryDetail } from './push-history-detail';
 const columns: AdminTableColumn<AdminPushHistoryItem>[] = [
   { key: 'title', header: '제목', render: (row) => <span className="block max-w-sm whitespace-pre-wrap break-words font-semibold">{row.title ?? '제목 미보관'}</span> },
   { key: 'createdAt', header: '발송 시각', render: (row) => formatAdminDateTime(row.createdAt) },
-  { key: 'target', header: '대상', render: (row) => adminPushTargetLabel(row.target) },
+  {
+    key: 'target', header: '대상', render: (row) => (
+      <span className="block max-w-xs break-words">
+        {adminPushTargetLabel(row.target)}
+        {row.target === 'competition' && <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{row.competition?.title ?? '대회·리그 이름 미보관'}</span>}
+        {row.gender && <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{adminPushGenderLabel(row.gender)}</span>}
+      </span>
+    ),
+  },
   { key: 'sender', header: '발송자', render: (row) => row.sender.name ?? '미보관' },
   { key: 'sent', header: '알림함 생성', render: (row) => row.sent === null ? '미보관' : `${row.sent.toLocaleString()}건` },
 ];
@@ -32,7 +40,7 @@ export function PushHistoryView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">관리자가 직접 보낸 푸시 이력이에요. 자동 경기·채팅 알림은 포함하지 않아요.</p>
         <select aria-label="발송 대상 필터" value={target ?? ''} onChange={(event) => setTarget(event.target.value === '' ? undefined : event.target.value as V1AdminPushSendTarget)} className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500">
-          <option value="">모든 발송</option><option value="broadcast">전체 발송</option><option value="user">특정 회원</option>
+          <option value="">모든 발송</option><option value="broadcast">전체 발송</option><option value="competition">대회·리그 참가팀</option><option value="user">특정 회원</option>
         </select>
       </div>
       <AdminDataTable columns={columns} rows={rows} keyExtractor={(row) => row.id} loading={query.isPending}

@@ -33,6 +33,48 @@ describe('AdminPushHistoryService', () => {
     }));
   });
 
+  it('대회·리그 대상 발송은 이력에 대회와 성별을 싣고, 필터는 competition: 접두 targetId 로 건다', async () => {
+    const competitionId = '11111111-1111-4111-8111-111111111111';
+    prisma.v1AdminActionLog.findMany.mockResolvedValue([{
+      ...log({ title: '일정 안내', target: 'competition', gender: 'female', competitionId, competitionTitle: '11월 여자부 리그', sent: 4, skipped: 0, failed: 0 }),
+      targetId: `competition:${competitionId}`,
+    }]);
+    const page = await service.list({ target: 'competition' });
+    expect(page.items[0]).toMatchObject({
+      target: 'competition', gender: 'female', recipientUserId: null,
+      competition: { id: competitionId, title: '11월 여자부 리그' },
+    });
+    expect(prisma.v1AdminActionLog.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { action: 'push.manual_send', targetType: 'push', targetId: { startsWith: 'competition:' } },
+    }));
+  });
+
+  it('개인 필터는 전체 발송과 대회·리그 발송을 모두 뺀다', async () => {
+    prisma.v1AdminActionLog.findMany.mockResolvedValue([]);
+    await service.list({ target: 'user' });
+    expect(prisma.v1AdminActionLog.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { action: 'push.manual_send', targetType: 'push', AND: [
+        { targetId: { not: 'broadcast' } }, { NOT: { targetId: { startsWith: 'competition:' } } },
+      ] },
+    }));
+  });
+
+  it('예전 이력(성별·대회 칸이 없는 행)은 성별 null · 대회 null 로 읽는다', async () => {
+    prisma.v1AdminActionLog.findMany.mockResolvedValue([log(old)]);
+    const page = await service.list({});
+    expect(page.items[0]).toMatchObject({ target: 'broadcast', gender: null, competition: null });
+  });
+
+  it('대회·리그 발송 상세는 저장된 내용(snapshot)만 보여 주고 알림함에서 내용을 빌려 오지 않는다', async () => {
+    prisma.v1AdminActionLog.findFirst.mockResolvedValue({
+      ...log({ title: '일정', target: 'competition', competitionId: id, competitionTitle: '리그', sent: 3, skipped: 0, failed: 0 }),
+      targetId: `competition:${id}`,
+    });
+    const detail = await service.detail(id);
+    expect(detail.content).toEqual({ source: 'unavailable', body: null, url: null });
+    expect(prisma.v1Notification.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed cursors without querying a different page', async () => {
     await expect(service.list({ cursor: 'invalid' })).rejects.toMatchObject({ status: 400 });
     expect(prisma.v1AdminActionLog.findMany).not.toHaveBeenCalled();

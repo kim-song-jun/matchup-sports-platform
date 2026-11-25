@@ -4,6 +4,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { PushSendForm } from './push-send-form';
 
 const sendMutate = vi.fn();
+const audienceParams = vi.fn();
+let audienceResult: { data?: { audience: number; noticeOff: number; recipients: number }; isError: boolean; refetch: () => void } = {
+  data: { audience: 24, noticeOff: 2, recipients: 22 }, isError: false, refetch: vi.fn(),
+};
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminUsers: () => ({
@@ -15,6 +19,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isPending: false,
   }),
   useV1AdminSendPush: () => ({ mutate: sendMutate, isPending: false }),
+  useV1AdminTournaments: () => ({ data: { items: [{ id: 'tournament-1', title: '11월 오픈 대회' }] }, isPending: false }),
+  useV1AdminLeagueMatchList: () => ({ data: { items: [{ leagueId: 'league-1', title: '11월 여자부 리그' }] }, isPending: false }),
+  useV1AdminPushAudience: (params: unknown) => { audienceParams(params); return params ? audienceResult : { data: undefined, isError: false, refetch: vi.fn() }; },
 }));
 
 async function pickUser(user: ReturnType<typeof userEvent.setup>) {
@@ -27,6 +34,8 @@ async function pickUser(user: ReturnType<typeof userEvent.setup>) {
 describe('PushSendForm', () => {
   beforeEach(() => {
     sendMutate.mockReset();
+    audienceParams.mockReset();
+    audienceResult = { data: { audience: 24, noticeOff: 2, recipients: 22 }, isError: false, refetch: vi.fn() };
   });
 
   it('previews the actual title and body before sending without invoking the send API', async () => {
@@ -90,6 +99,104 @@ describe('PushSendForm', () => {
       title: '전체 공지',
       body: undefined,
       url: undefined,
+    });
+  });
+
+  describe('성별·대회/리그 참가팀 발송', () => {
+    async function pickCompetition(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+      await user.click(screen.getByRole('radio', { name: /대회·리그 참가팀/ }));
+      await user.type(screen.getByLabelText('대회·리그'), '11월');
+      await user.click(await screen.findByRole('option', { name }));
+    }
+
+    it('전체 회원 + 여성: 성별이 담긴 payload 를 확인창을 거쳐서만 보내고, 확인창에 대상·성별·예상 인원을 보여 준다', async () => {
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
+      await user.click(screen.getByRole('radio', { name: '여성' }));
+      await user.type(screen.getByLabelText(/제목/), '여자부 안내');
+      expect(audienceParams).toHaveBeenLastCalledWith({ target: 'broadcast', gender: 'female' });
+      expect(screen.getByTestId('push-audience-estimate')).toHaveTextContent('예상 인원 22명 (공지 알림을 끈 2명 제외)');
+
+      await user.click(screen.getByRole('button', { name: '전체 발송 확인' }));
+      expect(sendMutate).not.toHaveBeenCalled();
+      const dialog = await screen.findByRole('alertdialog', { name: '전체 발송 확인' });
+      expect(within(dialog).getByText('전체 회원 · 여성 (성별 미입력 포함)')).toBeInTheDocument();
+      expect(within(dialog).getByTestId('push-confirm-audience')).toHaveTextContent('알림함에 저장할 예상 인원 22명');
+      await user.click(within(dialog).getByRole('button', { name: '전체 발송' }));
+
+      expect(sendMutate.mock.calls[0][0]).toEqual({ target: 'broadcast', gender: 'female', title: '여자부 안내' });
+    });
+
+    it('성별을 고르지 않으면 payload 에 성별이 없고 "구분 없음" 으로 안내한다', async () => {
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
+      expect(screen.getByRole('radio', { name: '구분 없음' })).toHaveAttribute('aria-checked', 'true');
+      await user.type(screen.getByLabelText(/제목/), '전체 공지');
+      await user.click(screen.getByRole('button', { name: '전체 발송 확인' }));
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '전체 발송' }));
+      expect(sendMutate.mock.calls[0][0].gender).toBeUndefined();
+    });
+
+    it('대회·리그 참가팀: 고른 대회를 id 로 보내고, 대회를 고르기 전에는 발송할 수 없다', async () => {
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await user.click(screen.getByRole('radio', { name: /대회·리그 참가팀/ }));
+      await user.type(screen.getByLabelText(/제목/), '일정 안내');
+      expect(screen.getByRole('button', { name: '참가팀 발송 확인' })).toBeDisabled();
+      expect(screen.getByTestId('push-audience-estimate')).toHaveTextContent('대회·리그를 고르면 예상 인원을 보여 드려요.');
+
+      await user.type(screen.getByLabelText('대회·리그'), '11월');
+      await user.click(await screen.findByRole('option', { name: /11월 여자부 리그/ }));
+      await user.click(screen.getByRole('radio', { name: '여성' }));
+      expect(audienceParams).toHaveBeenLastCalledWith({ target: 'competition', competitionId: 'league-1', gender: 'female' });
+
+      await user.click(screen.getByRole('button', { name: '참가팀 발송 확인' }));
+      const dialog = await screen.findByRole('alertdialog', { name: '참가팀 발송 확인' });
+      expect(within(dialog).getByText('11월 여자부 리그 참가 확정 팀의 팀원 · 여성 (성별 미입력 포함)')).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: '참가팀 발송' }));
+
+      expect(sendMutate.mock.calls[0][0]).toEqual({ target: 'competition', competitionId: 'league-1', gender: 'female', title: '일정 안내' });
+    });
+
+    it('대회와 리그를 한 목록에서 고를 수 있다', async () => {
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await pickCompetition(user, /11월 오픈 대회/);
+      await user.type(screen.getByLabelText(/제목/), '안내');
+      await user.click(screen.getByRole('button', { name: '참가팀 발송 확인' }));
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '참가팀 발송' }));
+      expect(sendMutate.mock.calls[0][0].competitionId).toBe('tournament-1');
+    });
+
+    it('특정 유저 발송에는 성별 선택이 없고 payload 에도 성별이 실리지 않는다', async () => {
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
+      await user.click(screen.getByRole('radio', { name: '남성' }));
+      await user.click(screen.getByRole('radio', { name: /특정 유저/ }));
+      expect(screen.queryByRole('radio', { name: '남성' })).not.toBeInTheDocument();
+      await pickUser(user);
+      await user.type(screen.getByLabelText(/제목/), '개인 안내');
+      await user.click(screen.getByRole('button', { name: '발송하기' }));
+      expect(sendMutate.mock.calls[0][0].gender).toBeUndefined();
+    });
+
+    it('예상 인원을 불러오지 못하면 확인창에서 발송 버튼을 막고 다시 세기를 안내한다', async () => {
+      audienceResult = { data: undefined, isError: true, refetch: vi.fn() };
+      const user = userEvent.setup();
+      render(<PushSendForm />);
+      await user.click(screen.getByRole('radio', { name: /전체 회원/ }));
+      await user.type(screen.getByLabelText(/제목/), '전체 공지');
+      await user.click(screen.getByRole('button', { name: '전체 발송 확인' }));
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByRole('button', { name: '전체 발송' })).toBeDisabled();
+      expect(within(dialog).getByTestId('push-confirm-audience')).toHaveTextContent('불러오지 못했어요');
+      await user.click(within(dialog).getByRole('button', { name: '취소' }));
+      await user.click(screen.getByRole('button', { name: '다시 세기' }));
+      expect(audienceResult.refetch).toHaveBeenCalledTimes(1);
+      expect(sendMutate).not.toHaveBeenCalled();
     });
   });
 

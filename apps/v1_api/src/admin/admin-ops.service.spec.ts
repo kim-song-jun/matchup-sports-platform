@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -24,7 +24,9 @@ describe('AdminOpsService', () => {
     v1ErrorLog: { count: jest.fn() },
     v1AdminActionLog: { count: jest.fn() },
     v1SecurityAnomaly: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
-    v1User: { findUnique: jest.fn(), findMany: jest.fn() },
+    v1User: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+    // 대회·리그 대상 발송은 대상이 실제로 있는지 단건 조회(findTournamentOnSurface → findFirst)로 확인한다.
+    v1Tournament: { findFirst: jest.fn() },
     v1PushSubscription: { findMany: jest.fn() },
     v1NotificationPreference: { findUnique: jest.fn() },
     v1Notification: { create: jest.fn() },
@@ -577,6 +579,156 @@ describe('AdminOpsService', () => {
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
       expect(result).toEqual({ sent: 1, skipped: 0, failed: 1, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
+    });
+
+    describe('성별·대회/리그 참가팀 대상', () => {
+      const COMPETITION_ID = '11111111-1111-4111-8111-111111111111';
+      const competitionWhere = {
+        teamMemberships: { some: { status: 'active', team: { status: 'active', deletedAt: null, tournamentRegistrations: { some: { tournamentId: COMPETITION_ID, status: 'confirmed' } } } } },
+      };
+      const genderWhere = (gender: 'male' | 'female') => ({
+        OR: [
+          { profile: { is: { gender } } },
+          { profile: { is: null } },
+          { profile: { is: { gender: null } } },
+          { profile: { is: { gender: { notIn: ['male', 'female'] } } } },
+        ],
+      });
+
+      it('전체 회원 + 성별: 그 성별과 성별 미입력 회원만 후보로 잡고, 이력에 성별을 남긴다', async () => {
+        prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }]);
+        prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+
+        await service.sendManualPush({ target: 'broadcast', gender: 'female', title: '여자부 안내' }, admin);
+
+        expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+          where: { AND: [{ accountStatus: 'active' }, genderWhere('female')] },
+        }));
+        expect(adminContext.logAdminAction).toHaveBeenCalledWith(admin, expect.objectContaining({
+          targetId: 'broadcast', afterJson: expect.objectContaining({ target: 'broadcast', gender: 'female' }),
+        }));
+      });
+
+      it('성별을 고르지 않은 전체 발송은 예전과 같은 where 와 이력(성별 칸 없음)을 쓴다', async () => {
+        prisma.v1User.findMany.mockResolvedValueOnce([]);
+
+        await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+        expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { accountStatus: 'active' } }));
+        const after = adminContext.logAdminAction.mock.calls[0][1].afterJson;
+        expect(after).not.toHaveProperty('gender');
+        expect(after).not.toHaveProperty('competitionId');
+      });
+
+      it('대회·리그 대상: 참가 확정 팀의 활성 팀원 중 성별 조건에 맞는 회원에게만 보내고, targetId·이력에 대회를 남긴다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValueOnce({ id: COMPETITION_ID, title: '11월 여자부 리그' });
+        prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }, { id: 'user-2' }]);
+        prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+
+        const result = await service.sendManualPush(
+          { target: 'competition', competitionId: COMPETITION_ID, gender: 'female', title: '일정 안내' },
+          admin,
+        );
+
+        expect(result.sent).toBe(2);
+        expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+          where: { AND: [{ accountStatus: 'active' }, competitionWhere, genderWhere('female')] },
+        }));
+        expect(adminContext.logAdminAction).toHaveBeenCalledWith(admin, expect.objectContaining({
+          targetId: `competition:${COMPETITION_ID}`,
+          afterJson: expect.objectContaining({
+            target: 'competition', gender: 'female', competitionId: COMPETITION_ID, competitionTitle: '11월 여자부 리그',
+          }),
+        }));
+      });
+
+      it('대회·리그 대상은 정규 대회와 정규 리그를 모두 조회 대상으로 허용한다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValueOnce({ id: COMPETITION_ID, title: '리그' });
+        prisma.v1User.findMany.mockResolvedValueOnce([]);
+
+        await service.sendManualPush({ target: 'competition', competitionId: COMPETITION_ID, title: '안내' }, admin);
+
+        const where = JSON.stringify(prisma.v1Tournament.findFirst.mock.calls[0][0].where);
+        expect(where).toContain('regular_league');
+        expect(where).toContain('regular_tournament');
+      });
+
+      it('없는(또는 삭제된) 대회·리그면 404 로 막고, 선점 기록도 발송도 하지 않는다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValueOnce(null);
+
+        await expect(
+          service.sendManualPush({ target: 'competition', competitionId: COMPETITION_ID, title: '안내' }, admin),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(prisma.v1IdempotencyRecord.upsert).not.toHaveBeenCalled();
+        expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+        expect(adminContext.logAdminAction).not.toHaveBeenCalled();
+      });
+
+      it('개인 발송에 성별을 같이 보내면 조용히 무시하지 않고 400 으로 막는다', async () => {
+        await expect(
+          service.sendManualPush({ target: 'user', userId: 'user-1', gender: 'male', title: '안내' }, admin),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+      });
+
+      it('전체·개인 발송에 대회·리그를 같이 보내면 조용히 무시하지 않고 400 으로 막는다(전체 회원에게 나가는 오해 방지)', async () => {
+        await expect(
+          service.sendManualPush({ target: 'broadcast', competitionId: COMPETITION_ID, title: '안내' }, admin),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+          service.sendManualPush({ target: 'user', userId: 'user-1', competitionId: COMPETITION_ID, title: '안내' }, admin),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(prisma.v1IdempotencyRecord.upsert).not.toHaveBeenCalled();
+        expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+      });
+
+      it('같은 내용을 남성에게 보낸 직후 여성에게 보내도 중복으로 막히지 않는다(중복 방지 키가 성별마다 다르다)', async () => {
+        prisma.v1User.findMany.mockResolvedValue([]);
+
+        await service.sendManualPush({ target: 'broadcast', gender: 'male', title: '같은 문구' }, admin);
+        await service.sendManualPush({ target: 'broadcast', gender: 'female', title: '같은 문구' }, admin);
+        await service.sendManualPush({ target: 'broadcast', title: '같은 문구' }, admin);
+
+        const keys = prisma.v1IdempotencyRecord.findUnique.mock.calls.map((c) => JSON.stringify(c[0]));
+        expect(new Set(keys).size).toBe(3);
+      });
+
+      it('같은 내용이라도 대회·리그가 다르면 다른 발송이다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'x', title: 't' });
+        prisma.v1User.findMany.mockResolvedValue([]);
+
+        await service.sendManualPush({ target: 'competition', competitionId: COMPETITION_ID, title: '같은 문구' }, admin);
+        await service.sendManualPush({ target: 'competition', competitionId: '22222222-2222-4222-8222-222222222222', title: '같은 문구' }, admin);
+
+        const keys = prisma.v1IdempotencyRecord.findUnique.mock.calls.map((c) => JSON.stringify(c[0]));
+        expect(new Set(keys).size).toBe(2);
+      });
+
+      it('예상 인원: 실제 발송과 같은 where 로 세고, 공지 알림을 끈 회원은 따로 빼서 보여 준다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValueOnce({ id: COMPETITION_ID, title: '리그' });
+        prisma.v1User.count.mockResolvedValueOnce(40).mockResolvedValueOnce(3);
+
+        const result = await service.previewPushAudience({ target: 'competition', competitionId: COMPETITION_ID, gender: 'male' });
+
+        expect(result).toEqual({ audience: 40, noticeOff: 3, recipients: 37 });
+        const where = { AND: [{ accountStatus: 'active' }, competitionWhere, genderWhere('male')] };
+        expect(prisma.v1User.count).toHaveBeenNthCalledWith(1, { where });
+        expect(prisma.v1User.count).toHaveBeenNthCalledWith(2, {
+          where: { AND: [where, { notificationPreference: { is: { noticeEnabled: false } } }] },
+        });
+      });
+
+      it('예상 인원도 없는 대회·리그면 404 다', async () => {
+        prisma.v1Tournament.findFirst.mockResolvedValueOnce(null);
+
+        await expect(
+          service.previewPushAudience({ target: 'competition', competitionId: COMPETITION_ID }),
+        ).rejects.toThrow(NotFoundException);
+        expect(prisma.v1User.count).not.toHaveBeenCalled();
+      });
     });
 
     it('does not fail the whole request when the audit log write fails after a successful send', async () => {

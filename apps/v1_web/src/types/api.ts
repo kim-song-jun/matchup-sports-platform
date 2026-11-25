@@ -3839,15 +3839,33 @@ export type V1SetSimplifiedOperationFlagGatePayload = {
 // Admin — manual web push send
 // ---------------------------------------------------------------------------
 
-export type V1AdminPushSendTarget = 'user' | 'broadcast';
+/** user = 한 명, broadcast = 전체 회원, competition = 대회·리그 참가 확정 팀의 팀원 */
+export type V1AdminPushSendTarget = 'user' | 'broadcast' | 'competition';
+
+/** 성별 조건 — 고르면 그 성별과 성별 미입력 회원이 받는다. 안 고르면 구분 없이 모두. */
+export type V1AdminPushGender = 'male' | 'female';
 
 export type V1AdminPushSendPayload = {
   target: V1AdminPushSendTarget;
   /** target === 'user'일 때만 필수 */
   userId?: string;
+  /** target === 'competition'일 때만 필수 — 대회와 리그가 같은 id 공간을 쓴다 */
+  competitionId?: string;
+  /** target === 'user'에는 보낼 수 없다(서버가 400) */
+  gender?: V1AdminPushGender;
   title: string;
   body?: string;
   url?: string;
+};
+
+/** GET /admin/ops/push-send/audience — 확인창에 보여 줄 예상 수신 인원. */
+export type V1AdminPushAudience = {
+  /** 발송 후보(활성 계정 중 대상·성별 조건에 맞는 회원) */
+  audience: number;
+  /** 후보 중 공지 알림을 꺼 둬서 건너뛸 회원 */
+  noticeOff: number;
+  /** 실제로 알림함에 저장될 예상 인원 = audience - noticeOff */
+  recipients: number;
 };
 
 export type V1AdminPushSendResult = {

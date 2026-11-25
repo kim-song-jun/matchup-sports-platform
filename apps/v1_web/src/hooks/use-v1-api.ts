@@ -63,6 +63,8 @@ import type {
   V1AdminErrorLogsPage,
   V1AdminErrorLogDetail,
   V1AdminErrorLogFilters,
+  V1AdminPushAudience,
+  V1AdminPushGender,
   V1AdminPushSendPayload,
   V1AdminPushSendResult,
   V1GameOperationFlag,
@@ -4122,6 +4124,22 @@ export function useV1AdminSendPush() {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushHistoryAll() });
     },
+  });
+}
+
+/**
+ * 수동 푸시 확인창의 예상 수신 인원. 서버가 실제 발송과 같은 조건으로 센다.
+ * params 가 null 이면(대상을 아직 못 정함) 부르지 않는다. 숫자가 오래 묵으면 "670명" 같은 거짓 안내가 되므로 캐시를 두지 않는다.
+ */
+export function useV1AdminPushAudience(
+  params: { target: 'broadcast' | 'competition'; competitionId?: string; gender?: V1AdminPushGender } | null,
+) {
+  return useQuery({
+    queryKey: v1Keys.adminPushAudience(params ?? {}),
+    queryFn: () => v1Get<V1AdminPushAudience>('/admin/ops/push-send/audience', params ?? undefined),
+    enabled: params !== null,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 

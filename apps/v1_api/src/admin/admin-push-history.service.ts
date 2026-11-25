@@ -32,8 +32,11 @@ function summary(row: HistoryLog) {
     id: row.id,
     createdAt: row.createdAt,
     title: text(data.title),
-    target: data.target === 'broadcast' || data.target === 'user' ? data.target : null,
+    target: data.target === 'broadcast' || data.target === 'user' || data.target === 'competition' ? data.target : null,
     recipientUserId: data.target === 'user' ? row.targetId : null,
+    gender: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
+    competition: data.target === 'competition' && typeof data.competitionId === 'string'
+      ? { id: data.competitionId, title: text(data.competitionTitle) } : null,
     sender: {
       name: row.adminUser.user.profile?.nickname ?? row.adminUser.user.profile?.displayName ?? null,
       role: row.adminUser.adminRole,
@@ -50,7 +53,10 @@ export class AdminPushHistoryService {
   async list(query: AdminPushHistoryQueryDto) {
     const limit = query.limit ?? 20;
     const where: Prisma.V1AdminActionLogWhereInput = { action: ACTION, targetType: 'push' };
-    if (query.target) where.targetId = query.target === 'broadcast' ? 'broadcast' : { not: 'broadcast' };
+    // 개인 발송의 targetId 는 사용자 id, 전체는 'broadcast', 대회·리그는 'competition:<id>' 다.
+    if (query.target === 'broadcast') where.targetId = 'broadcast';
+    else if (query.target === 'competition') where.targetId = { startsWith: 'competition:' };
+    else if (query.target === 'user') where.AND = [{ targetId: { not: 'broadcast' } }, { NOT: { targetId: { startsWith: 'competition:' } } }];
     if (query.cursor) {
       const cursor = decodeCursor(query.cursor);
       where.OR = [

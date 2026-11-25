@@ -16,7 +16,7 @@ const user = {
 const admin = { id: 'admin-row-1', userId: 'user-1', adminRole: 'ops' as const, status: 'active' as const };
 
 describe('AdminOpsController', () => {
-  const adminOpsService = { recentPushFailures: jest.fn(), acknowledgeFailures: jest.fn(), sendManualPush: jest.fn() };
+  const adminOpsService = { recentPushFailures: jest.fn(), acknowledgeFailures: jest.fn(), sendManualPush: jest.fn(), previewPushAudience: jest.fn() };
   const adminContext = {
     getActiveAdmin: jest.fn().mockResolvedValue(admin),
     getMutationAdmin: jest.fn().mockResolvedValue(admin),
@@ -105,5 +105,25 @@ describe('AdminOpsController', () => {
     ).rejects.toThrow('Support admins cannot mutate');
 
     expect(adminOpsService.sendManualPush).not.toHaveBeenCalled();
+  });
+
+  it('pushAudience 는 읽기 전용 관리자도 볼 수 있다(getActiveAdmin) — 발송과 달리 변경 권한을 요구하지 않는다', async () => {
+    adminOpsService.previewPushAudience.mockResolvedValue({ audience: 10, noticeOff: 1, recipients: 9 });
+    const query = { target: 'broadcast' as const, gender: 'female' as const };
+
+    const result = await controller.pushAudience(user, query);
+
+    expect(adminContext.getActiveAdmin).toHaveBeenCalledWith('user-1');
+    expect(adminContext.getMutationAdmin).not.toHaveBeenCalled();
+    expect(adminOpsService.previewPushAudience).toHaveBeenCalledWith(query);
+    expect(result).toEqual({ audience: 10, noticeOff: 1, recipients: 9 });
+  });
+
+  it('pushAudience 는 활성 관리자가 아니면 집계 전에 막힌다', async () => {
+    adminContext.getActiveAdmin.mockRejectedValue(new Error('not an admin'));
+
+    await expect(controller.pushAudience(user, { target: 'broadcast' })).rejects.toThrow('not an admin');
+
+    expect(adminOpsService.previewPushAudience).not.toHaveBeenCalled();
   });
 });

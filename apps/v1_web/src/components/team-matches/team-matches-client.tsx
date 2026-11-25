@@ -514,7 +514,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     if (!query.data || !chatAvailable || autoResolvedChatRef.current === teamMatchId) return;
     autoResolvedChatRef.current = teamMatchId;
     resolveChatRoom.mutate(
-      { targetType: 'team_match', targetId: teamMatchId },
+      { targetType: 'team_match', targetId: teamMatchId, automatic: true },
       // 이 자동 resolve는 조용히 실패해도 된다(다시 열면 재시도되고, 배너까지 띄우면
       // 페이지 진입만으로 매번 에러가 뜬다) — 그래도 삼키지 않고 로그는 남긴다.
       { onError: (e) => console.warn('team match chat auto-resolve failed', e) },

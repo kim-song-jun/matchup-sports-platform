@@ -103,6 +103,7 @@ export function extractErrorDetails(err: unknown): unknown {
 /**
  * api-client 가 이미 전역 안내(휴대폰 인증 모달·활동 정보 시트)를 띄운 에러인지.
  * 호출부는 이 에러에 "다시 시도해 주세요" 류 일반 실패 문구를 겹쳐 보여 주지 않는다.
+ * `automatic` 요청이 막힌 에러는 안내가 뜨지 않으므로 사용자가 누른 요청에만 이 판정을 쓴다.
  */
 export function isGloballyHandledError(err: unknown): boolean {
   const code = extractErrorCode(err);

@@ -124,4 +124,21 @@ describe('PhoneVerificationRequiredModal', () => {
 
     await waitFor(() => expect(screen.queryByText('휴대폰 본인인증이 필요해요')).not.toBeInTheDocument());
   });
+
+  it('stays closed when an automatic request is blocked, and opens for the same request made by the user', async () => {
+    setLocation('/teams/t-1');
+    stubApiError('PHONE_VERIFICATION_REQUIRED');
+    render(<PhoneVerificationRequiredModal />);
+
+    await act(async () => {
+      await expect(v1Post('/chat/rooms/resolve', {}, { automatic: true })).rejects.toMatchObject({ code: 'PHONE_VERIFICATION_REQUIRED' });
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(reportClientError).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(v1Post('/chat/rooms/resolve', {})).rejects.toThrow();
+    });
+    expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
+  });
 });

@@ -862,7 +862,7 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
     expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
     expect(resolveChatRoomMutateMock).toHaveBeenCalledWith(
-      { targetType: 'team_match', targetId: 'team-match-1' },
+      { targetType: 'team_match', targetId: 'team-match-1', automatic: true },
       expect.objectContaining({ onError: expect.any(Function) }),
     );
   });
@@ -920,15 +920,30 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
     expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('승인 후 채팅');
   });
 
-  it('상대팀이 확정되면 상세 진입에서 채팅방을 자동으로 연결한다', () => {
+  // 자동 연결은 휴대폰·활동 정보 게이트에 막혀도 안내 창을 띄우면 안 되는 요청이라 표시를 단다.
+  // 직접 누른 채팅 열기는 그 표시가 없어야 막혔을 때 창이 뜬다.
+  it('상대팀이 확정되면 상세 진입에서 채팅방을 자동으로 연결한다 — 안내 창을 띄우지 않는 자동 요청으로', () => {
     mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'matched');
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
     expect(resolveChatRoomMutateMock).toHaveBeenCalledWith(
-      { targetType: 'team_match', targetId: 'team-match-1' },
+      { targetType: 'team_match', targetId: 'team-match-1', automatic: true },
       expect.anything(),
     );
+  });
+
+  it('채팅 열기를 직접 누르면 자동 표시 없이 요청한다', () => {
+    mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'matched');
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    resolveChatRoomMutateMock.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '채팅 열기' }));
+
+    expect(resolveChatRoomMutateMock).toHaveBeenCalledTimes(1);
+    const [variables] = resolveChatRoomMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(variables).toEqual({ targetType: 'team_match', targetId: 'team-match-1' });
+    expect(variables).not.toHaveProperty('automatic');
   });
 });
 

@@ -196,6 +196,49 @@ describe('ChatRoomPageClient', () => {
     expect(socket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
   });
 
+  // 읽음 처리는 방을 열면 화면이 알아서 보낸다. 휴대폰·활동 정보 게이트에 막혀도 안내 창을 띄우지 않으려면
+  // 사용자가 누른 요청과 구분되는 표시가 필요하다.
+  it('마지막 메시지를 읽음으로 보낼 때 자동 요청 표시를 단다', () => {
+    const mutate = vi.fn();
+    hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate });
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-read',
+        roomType: 'team',
+        status: 'active',
+        title: 'Read test',
+        linkedTarget: { type: 'team', id: 'team-1', title: 'Test team', route: '/teams/team-1' },
+        composer: { canSend: true, blockedReason: null },
+        me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({
+      data: {
+        items: [{
+          messageId: 'message-last',
+          sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+          messageType: 'text',
+          content: 'Hello',
+          status: 'sent',
+          sentAt: '2026-08-31T09:01:00.000Z',
+          mine: false,
+        }],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-read" />);
+
+    expect(mutate).toHaveBeenCalledWith({ lastReadMessageId: 'message-last', automatic: true });
+  });
+
   it('shows a real error state — never the hardcoded mock room/messages — when the room fetch fails', () => {
     hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch: vi.fn() });
     hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch: vi.fn() });

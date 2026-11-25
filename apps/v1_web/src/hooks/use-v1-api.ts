@@ -2924,8 +2924,8 @@ export function useV1ChatRoom(roomId: string) {
 export function useV1ResolveChatRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match' | 'team_contact'; targetId: string }) =>
-      v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
+    mutationFn: ({ automatic, ...body }: { targetType: 'match' | 'team' | 'team_match' | 'team_contact'; targetId: string; automatic?: boolean }) =>
+      v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body, { automatic }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
       // 신규 채팅방이 실제로 시작될 때만 기록 (기존 방을 다시 여는 경우는 "시작"이 아님)
@@ -2958,8 +2958,8 @@ export function useV1SendChatMessage(roomId: string) {
 export function useV1UpdateMyChatRoom(roomId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null }) =>
-      v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body),
+    mutationFn: ({ automatic, ...body }: { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null; automatic?: boolean }) =>
+      v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body, { automatic }),
     onSuccess: (updated) => {
       // 열린 방의 상세·메시지는 이 변경과 무관해 다시 받지 않는다. 상세의 me 는 응답으로 맞추고, 안읽음 수가 걸린 목록만 갱신한다.
       queryClient.setQueryData<V1ChatRoomDetail>(v1Keys.chatRoom(roomId), (detail) => detail && {
@@ -5834,8 +5834,8 @@ export function useV1TeamInviteLink(teamId: string, options?: QueryOptions) {
 export function useV1WriteTeamInviteLink(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ reissue }: { reissue: boolean }) =>
-      v1Post<V1TeamInviteLinkIssueResult>(`/teams/${teamId}/invite-link${reissue ? '/reissue' : ''}`),
+    mutationFn: ({ reissue, automatic }: { reissue: boolean; automatic?: boolean }) =>
+      v1Post<V1TeamInviteLinkIssueResult>(`/teams/${teamId}/invite-link${reissue ? '/reissue' : ''}`, undefined, { automatic }),
     onSuccess: (link) => {
       queryClient.setQueryData<V1TeamInviteLink>(v1Keys.teamInviteLink(teamId), link);
     },

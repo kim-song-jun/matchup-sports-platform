@@ -114,7 +114,7 @@ function TeamInviteLinkCard({
   useEffect(() => {
     if (status !== 'none' || autoIssued.current) return;
     autoIssued.current = true;
-    issue({ reissue: false }, { onError: (err) => setError(extractErrorMessage(err, '초대 링크를 만들지 못했어요.')) });
+    issue({ reissue: false, automatic: true }, { onError: (err) => setError(extractErrorMessage(err, '초대 링크를 만들지 못했어요.')) });
   }, [status, issue]);
 
   const writeLink = (reissue: boolean, done: string | null) => {

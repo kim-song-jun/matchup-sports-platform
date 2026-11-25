@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ActivityProfileRequiredModal } from '@/components/auth/activity-profile-required-modal';
 import type { V1TeamInviteLink } from '@/types/api';
 import { createV1TeamInviteLinkMswHandlers, inviteLinkToken, TEAM_INVITE_LINK_MSW } from '@/test/msw/team-invite-link-handlers';
 import { TeamInviteGatherPageClient } from './team-invite-gather-client';
@@ -123,6 +124,37 @@ describe('초대 링크', () => {
 
     await user.click(screen.getByRole('button', { name: '새 링크 만들기' }));
     expect(await screen.findByRole('textbox', { name: '초대 링크' })).toHaveValue(expectedUrl(1));
+  });
+
+  it('처음 열 때 자동으로 만드는 요청이 활동 정보 게이트에 막혀도 안내 창은 띄우지 않고, 직접 누른 「새 링크 만들기」가 막히면 띄운다', async () => {
+    const user = userEvent.setup();
+    start('owner');
+    let attempts = 0;
+    server.use(
+      http.post(`*/api/v1/teams/${teamId}/invite-link`, () => {
+        attempts += 1;
+        return HttpResponse.json(
+          { status: 'error', statusCode: 403, code: 'ACTIVITY_PROFILE_REQUIRED', message: '활동하려면 정보를 먼저 입력해 주세요.', details: { missing: ['interestSport'] }, timestamp: '2026-10-01T00:00:00.000Z' },
+          { status: 403 },
+        );
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TeamInviteGatherPageClient teamId={teamId} />
+        <ActivityProfileRequiredModal />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('활동하려면 정보를 먼저 입력해 주세요.')).toBeInTheDocument();
+    expect(attempts).toBe(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '새 링크 만들기' }));
+
+    expect(await screen.findByText('1가지가 더 필요해요')).toBeInTheDocument();
+    expect(attempts).toBe(2);
   });
 
   it('멤버에게는 화면을 열지 않고 링크도 요청하지 않는다', async () => {

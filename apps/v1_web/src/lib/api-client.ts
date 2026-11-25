@@ -17,6 +17,16 @@ import {
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
 
+/** `fetch` 설정에 요청의 의도 하나를 더한 모양. `automatic` 은 서버로 보내지 않는다. */
+export type V1RequestInit = RequestInit & {
+  /**
+   * 사용자가 누르지 않고 화면이 알아서 보내는 요청(진입 시 채팅방 준비·읽음 처리 등)이다.
+   * 휴대폰 인증·활동 정보 때문에 막혀도 전역 안내 창을 띄우지 않고 오류만 호출한 쪽에 던진다.
+   * 안내 창은 사용자가 직접 한 동작이 막혔을 때만 뜬다.
+   */
+  automatic?: boolean;
+};
+
 export class V1ApiError extends Error {
   readonly statusCode: number;
   readonly code: string;
@@ -142,7 +152,8 @@ export function getV1DevAuthHeaders(): HeadersInit {
   };
 }
 
-export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function v1Api<T>(path: string, requestInit: V1RequestInit = {}): Promise<T> {
+  const { automatic = false, ...init } = requestInit;
   const response = await fetchOrNetworkError(`${getV1ApiBaseUrl()}${path}`, {
     ...init,
     credentials: 'include',
@@ -191,9 +202,10 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
       });
     }
     // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
-    // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
-    if (phoneVerificationRequired) notifyPhoneVerificationRequired();
-    if (activityProfileRequired) notifyActivityProfileRequired({ missing: parseActivityMissing(error.details) });
+    // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다. 화면이 알아서 보낸
+    // 요청(automatic)이면 보기만 한 사용자에게 창이 뜨므로 신호를 쏘지 않는다.
+    if (phoneVerificationRequired && !automatic) notifyPhoneVerificationRequired();
+    if (activityProfileRequired && !automatic) notifyActivityProfileRequired({ missing: parseActivityMissing(error.details) });
     throw error;
   }
 
@@ -206,19 +218,19 @@ export function v1Get<T>(path: string, query?: QueryParams) {
   return v1Api<T>(withQuery(path, query), { method: 'GET' });
 }
 
-export function v1Post<T>(path: string, body?: unknown, init?: RequestInit) {
+export function v1Post<T>(path: string, body?: unknown, init?: V1RequestInit) {
   return v1Api<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export function v1Put<T>(path: string, body?: unknown, init?: RequestInit) {
+export function v1Put<T>(path: string, body?: unknown, init?: V1RequestInit) {
   return v1Api<T>(path, { ...init, method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export function v1Patch<T>(path: string, body?: unknown, init?: RequestInit) {
+export function v1Patch<T>(path: string, body?: unknown, init?: V1RequestInit) {
   return v1Api<T>(path, { ...init, method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export function v1Delete<T>(path: string, body?: unknown, init?: RequestInit) {
+export function v1Delete<T>(path: string, body?: unknown, init?: V1RequestInit) {
   return v1Api<T>(path, { ...init, method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 

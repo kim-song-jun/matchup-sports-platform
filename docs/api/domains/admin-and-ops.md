@@ -378,7 +378,7 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 
 | Method | Path (`/api/v1` prefix) | 권한 | 계약 |
 |---|---|---|---|
-| POST | `/admin/ops/push-send` | active owner/ops | `{ target: 'user' \| 'broadcast' \| 'competition', userId?, competitionId?, gender?, title, body?, url? }`. 단일 수신자는 UUID 필수. `competition` 은 `competitionId`(UUID, 대회·리그 공통) 필수. `gender`(`male`\|`female`)는 `broadcast`·`competition` 에서만 — `user` 에 보내면 400 `PUSH_GENDER_BULK_ONLY`. 없는 대회·리그는 404 `COMPETITION_NOT_FOUND`. `title≤120`, `body≤2000`, `url≤500`, 이동 경로는 단일 `/`로 시작하고 `//`·역슬래시는 금지. 분당 5회. UI 입력 한도는 제목 60자·본문 200자. |
+| POST | `/admin/ops/push-send` | active owner/ops | `{ target: 'user' \| 'broadcast' \| 'competition', userId?, competitionId?, gender?, title, body?, url? }`. 단일 수신자는 UUID 필수. `competition` 은 `competitionId`(UUID, 대회·리그 공통) 필수. `gender`(`male`\|`female`)는 `broadcast`·`competition` 에서만 — `user` 에 보내면 400 `PUSH_GENDER_BULK_ONLY`. `user`·`broadcast` 에 `competitionId` 를 보내면 400 `PUSH_COMPETITION_TARGET_ONLY`. 없는 대회·리그는 404 `COMPETITION_NOT_FOUND`. `title≤120`, `body≤2000`, `url≤500`, 이동 경로는 단일 `/`로 시작하고 `//`·역슬래시는 금지. 분당 5회. UI 입력 한도는 제목 60자·본문 200자. |
 | GET | `/admin/ops/push-send/audience` | active owner/ops/support | `target=broadcast\|competition`, `competitionId?`(competition 이면 필수), `gender?`. 발송과 같은 대상 계산으로 센 `{ audience, noticeOff, recipients }`(후보·공지 알림 끈 회원·실제 알림함 생성 예상). 읽기 전용, 분당 30회. 확인창이 쓴다. |
 | GET | `/admin/ops/push-history` | active owner/ops/support | `limit=1..50`(기본 20), `cursor?`, `target=user\|broadcast\|competition?`. `{ items, pageInfo: { hasNextPage, nextCursor } }`. 시각·ID 내림차순 keyset cursor. 잘못된 cursor는 400 `INVALID_CURSOR`. |
 | GET | `/admin/ops/push-history/:id` | active owner/ops/support | UUID 필수. 수동 발송 감사 로그만 상세 허용. 없거나 다른 액션은 404 `PUSH_HISTORY_NOT_FOUND`. |
@@ -387,7 +387,7 @@ Admin team-match list also accepts optional `kind=friendly|league|tournament`; D
 `push.{subscriptions,delivered,failed,disabled}`는 웹 구독, `push.native?`
 `{devices,delivered,failed,disabled}`는 APNs/FCM 기기 집계다. `delivered`는 푸시 서비스 접수이며 실제 기기 도착·읽음 증명이 아니다.
 전체 대상은 활성 회원이고 `noticeEnabled=false`는 제외한다.
-`competition` 대상은 **참가 확정(`confirmed`) 신청이 있는 팀의 활성 팀원**이다(삭제된 팀 제외). 대회와 리그는 같은 신청 테이블·같은 id 공간이다.
+`competition` 대상은 **참가 확정(`confirmed`) 신청이 있는 활성 팀의 활성 팀원**이다(삭제·정지·보관된 팀 제외). 대회와 리그는 같은 신청 테이블·같은 id 공간이다.
 `gender` 를 고르면 그 성별 **또는 성별 미입력**(프로필 없음·빈 값·`male`/`female` 이 아닌 값) 회원이 받는다 — 남성 발송과 여성 발송 모두에 미입력 회원이 들어가므로 어느 쪽에서도 공지를 못 받는 사람이 없다(2026-11-25 결정).
 같은 팀에 남녀가 섞여 있어도 여자부 안내는 여성 선택으로 보내 남성 팀원을 빼고, 남자부 안내는 남성으로 보내 여성 팀원을 뺀다.
 대상 계산은 `admin/admin-push-audience.ts` 한 곳이다(발송과 예상 인원이 같은 where 를 쓴다). 마케팅 동의 기반 광고 캠페인 기능은 아니며,

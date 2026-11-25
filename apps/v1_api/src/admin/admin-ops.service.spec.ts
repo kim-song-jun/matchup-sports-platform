@@ -584,7 +584,7 @@ describe('AdminOpsService', () => {
     describe('성별·대회/리그 참가팀 대상', () => {
       const COMPETITION_ID = '11111111-1111-4111-8111-111111111111';
       const competitionWhere = {
-        teamMemberships: { some: { status: 'active', team: { deletedAt: null, tournamentRegistrations: { some: { tournamentId: COMPETITION_ID, status: 'confirmed' } } } } },
+        teamMemberships: { some: { status: 'active', team: { status: 'active', deletedAt: null, tournamentRegistrations: { some: { tournamentId: COMPETITION_ID, status: 'confirmed' } } } } },
       };
       const genderWhere = (gender: 'male' | 'female') => ({
         OR: [
@@ -671,6 +671,18 @@ describe('AdminOpsService', () => {
         ).rejects.toThrow(BadRequestException);
 
         expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+      });
+
+      it('전체·개인 발송에 대회·리그를 같이 보내면 조용히 무시하지 않고 400 으로 막는다(전체 회원에게 나가는 오해 방지)', async () => {
+        await expect(
+          service.sendManualPush({ target: 'broadcast', competitionId: COMPETITION_ID, title: '안내' }, admin),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+          service.sendManualPush({ target: 'user', userId: 'user-1', competitionId: COMPETITION_ID, title: '안내' }, admin),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(prisma.v1IdempotencyRecord.upsert).not.toHaveBeenCalled();
+        expect(prisma.v1User.findMany).not.toHaveBeenCalled();
       });
 
       it('같은 내용을 남성에게 보낸 직후 여성에게 보내도 중복으로 막히지 않는다(중복 방지 키가 성별마다 다르다)', async () => {

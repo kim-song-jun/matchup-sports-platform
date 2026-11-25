@@ -19,12 +19,12 @@ describe('admin-push-audience', () => {
     });
   });
 
-  it('대회·리그 대상은 참가 확정 팀의 활성 팀원으로 좁히고, 삭제된 팀은 뺀다', () => {
+  it('대회·리그 대상은 참가 확정 팀의 활성 팀원으로 좁히고, 삭제·정지·보관된 팀은 뺀다', () => {
     const where = buildPushAudienceWhere({ target: 'competition', competitionId: COMPETITION_ID });
     expect(where).toEqual({
       AND: [
         { accountStatus: 'active' },
-        { teamMemberships: { some: { status: 'active', team: { deletedAt: null, tournamentRegistrations: { some: { tournamentId: COMPETITION_ID, status: 'confirmed' } } } } } },
+        { teamMemberships: { some: { status: 'active', team: { status: 'active', deletedAt: null, tournamentRegistrations: { some: { tournamentId: COMPETITION_ID, status: 'confirmed' } } } } } },
       ],
     });
   });

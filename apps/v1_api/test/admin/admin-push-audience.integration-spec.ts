@@ -6,7 +6,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 /**
  * 관리자 수동 푸시의 수신 대상 계산을 **실제 Prisma 쿼리**로 본다.
  * 성별 조건은 "프로필 없음 / 빈 값 / male·female 아님" 을 모두 "미입력" 으로 읽어야 하고,
- * 참가팀 조건은 확정(confirmed) 신청 + 활성 팀원 + 삭제 안 된 팀이어야 한다.
+ * 참가팀 조건은 확정(confirmed) 신청 + 활성 팀원 + 삭제·정지·보관되지 않은 팀이어야 한다.
  * 이 조건들은 중첩 relation 필터(`NOT … is …`, `some … some`)라 mock 으로는 증명되지 않는다.
  */
 describe('admin push audience (real DB)', () => {
@@ -16,10 +16,10 @@ describe('admin push audience (real DB)', () => {
   const users = {
     male: id(), female: id(), noProfile: id(), blankGender: id(), otherGender: id(), nullGender: id(),
     femaleNoticeOff: id(), femaleLeft: id(), femaleSuspended: id(),
-    maleOnPendingTeam: id(), femaleOnDeletedTeam: id(), maleNoTeam: id(),
+    maleOnPendingTeam: id(), femaleOnDeletedTeam: id(), femaleOnInactiveTeams: id(), maleNoTeam: id(),
   };
   const sportId = id(); const regionId = id();
-  const teams = { confirmed: id(), pending: id(), deleted: id() };
+  const teams = { confirmed: id(), pending: id(), deleted: id(), suspended: id(), archived: id() };
   const tournamentId = id(); const otherTournamentId = id();
   const sent: string[] = [];
   let service: AdminOpsService;
@@ -62,6 +62,7 @@ describe('admin push audience (real DB)', () => {
     await user('femaleSuspended', { profile: profile(`fs-${run}`, 'female'), accountStatus: 'suspended' });
     await user('maleOnPendingTeam', { profile: profile(`mp-${run}`, 'male') });
     await user('femaleOnDeletedTeam', { profile: profile(`fd-${run}`, 'female') });
+    await user('femaleOnInactiveTeams', { profile: profile(`fi-${run}`, 'female') });
     await user('maleNoTeam', { profile: profile(`mn-${run}`, 'male') });
 
     await prisma.v1Sport.create({ data: { id: sportId, code: 'futsal', name: `push-audience ${run}` } });
@@ -71,6 +72,8 @@ describe('admin push audience (real DB)', () => {
         { id: teams.confirmed, ownerUserId: users.male, sportId, regionId, name: `확정 ${run}` },
         { id: teams.pending, ownerUserId: users.maleOnPendingTeam, sportId, regionId, name: `대기 ${run}` },
         { id: teams.deleted, ownerUserId: users.femaleOnDeletedTeam, sportId, regionId, name: `삭제 ${run}`, deletedAt: new Date() },
+        { id: teams.suspended, ownerUserId: users.femaleOnInactiveTeams, sportId, regionId, name: `정지 ${run}`, status: 'suspended' },
+        { id: teams.archived, ownerUserId: users.femaleOnInactiveTeams, sportId, regionId, name: `보관 ${run}`, status: 'archived' },
       ],
     });
     const member = (teamId: string, key: keyof typeof users, status: 'active' | 'left' = 'active') =>
@@ -82,6 +85,8 @@ describe('admin push audience (real DB)', () => {
         member(teams.confirmed, 'femaleNoticeOff'), member(teams.confirmed, 'femaleLeft', 'left'), member(teams.confirmed, 'femaleSuspended'),
         member(teams.pending, 'maleOnPendingTeam'),
         member(teams.deleted, 'femaleOnDeletedTeam'),
+        member(teams.suspended, 'femaleOnInactiveTeams'),
+        member(teams.archived, 'femaleOnInactiveTeams'),
       ],
     });
     await prisma.v1Tournament.createMany({
@@ -95,6 +100,8 @@ describe('admin push audience (real DB)', () => {
         { tournamentId, teamId: teams.confirmed, appliedByUserId: users.male, status: 'confirmed' },
         { tournamentId, teamId: teams.pending, appliedByUserId: users.maleOnPendingTeam, status: 'submitted' },
         { tournamentId, teamId: teams.deleted, appliedByUserId: users.femaleOnDeletedTeam, status: 'confirmed' },
+        { tournamentId, teamId: teams.suspended, appliedByUserId: users.femaleOnInactiveTeams, status: 'confirmed' },
+        { tournamentId, teamId: teams.archived, appliedByUserId: users.femaleOnInactiveTeams, status: 'confirmed' },
         // 다른 대회에는 확정 팀이 따로 없다 — 이 대회로 보낸 발송이 새어 나가지 않는지 본다.
         { tournamentId: otherTournamentId, teamId: teams.pending, appliedByUserId: users.maleOnPendingTeam, status: 'confirmed' },
       ],
@@ -120,7 +127,7 @@ describe('admin push audience (real DB)', () => {
     }
   });
 
-  it('참가팀 + 성별 없음: 확정 팀의 활성 팀원 전원(탈퇴·정지 제외, 대기·삭제 팀 제외)', async () => {
+  it('참가팀 + 성별 없음: 확정 팀의 활성 팀원 전원(탈퇴·정지 제외, 대기·삭제·정지·보관 팀 제외)', async () => {
     expect(await recipients({ target: 'competition', competitionId: tournamentId })).toEqual(
       ids('male', 'female', 'noProfile', 'blankGender', 'otherGender', 'nullGender', 'femaleNoticeOff'),
     );
@@ -145,7 +152,7 @@ describe('admin push audience (real DB)', () => {
 
   it('전체 회원 + 여성: 팀 소속과 무관하게 여성과 미입력 활성 회원이다(정지 계정 제외)', async () => {
     expect(await recipients({ target: 'broadcast', gender: 'female' })).toEqual(
-      ids('female', 'noProfile', 'blankGender', 'otherGender', 'nullGender', 'femaleNoticeOff', 'femaleLeft', 'femaleOnDeletedTeam'),
+      ids('female', 'noProfile', 'blankGender', 'otherGender', 'nullGender', 'femaleNoticeOff', 'femaleLeft', 'femaleOnDeletedTeam', 'femaleOnInactiveTeams'),
     );
   });
 

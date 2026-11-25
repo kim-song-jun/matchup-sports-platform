@@ -333,6 +333,13 @@ export class AdminOpsService {
         message: '성별은 전체 회원이나 대회·리그 참가팀에게 보낼 때만 고를 수 있어요.',
       });
     }
+    if (dto.target !== 'competition' && dto.competitionId) {
+      // 성별과 같은 이유 — "참가팀에게만 갔겠지" 했는데 전체 회원에게 나가는 오해를 만들지 않는다.
+      throw new BadRequestException({
+        code: 'PUSH_COMPETITION_TARGET_ONLY',
+        message: '대회·리그는 발송 대상을 「대회·리그 참가팀」으로 골랐을 때만 지정할 수 있어요.',
+      });
+    }
     // 대회·리그 대상은 실제로 있는 대회·리그여야 한다. 제목은 발송 이력에 남긴다.
     const competition = dto.target === 'competition' ? await this.loadPushCompetition(dto.competitionId as string) : null;
 

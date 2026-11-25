@@ -39,7 +39,9 @@ export function competitionMembersWhere(competitionId: string): Prisma.V1UserWhe
     teamMemberships: {
       some: {
         status: 'active',
+        // 정지·보관된 팀도 뺀다 — 다른 표면(위젯·일정)과 같은 `status: 'active'`.
         team: {
+          status: 'active',
           deletedAt: null,
           tournamentRegistrations: { some: { tournamentId: competitionId, status: 'confirmed' } },
         },

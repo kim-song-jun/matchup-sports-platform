@@ -155,4 +155,22 @@ describe('ActivityProfileRequiredModal', () => {
 
     expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
   });
+
+  it('자동 요청(automatic)이 막히면 시트 없이 오류만 돌려주고, 같은 요청을 직접 하면 시트가 뜬다', async () => {
+    setLocation('/teams/t-1');
+    stubApiError('ACTIVITY_PROFILE_REQUIRED', { missing: ['interestSport'] });
+    render(<ActivityProfileRequiredModal />);
+
+    await act(async () => {
+      await expect(v1Post('/chat/rooms/resolve', {}, { automatic: true })).rejects.toMatchObject({ code: 'ACTIVITY_PROFILE_REQUIRED' });
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // 안내 창이 없어도 제품 상태이지 클라이언트 오류가 아니다.
+    expect(reportClientError).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(v1Post('/chat/rooms/resolve', {})).rejects.toThrow();
+    });
+    expect(await screen.findByText('1가지가 더 필요해요')).toBeInTheDocument();
+  });
 });

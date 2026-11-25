@@ -465,7 +465,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   useEffect(() => {
     if (!authVerified || !query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
     autoResolvedChatRef.current = teamId;
-    resolveChat.mutate({ targetType: 'team', targetId: teamId });
+    resolveChat.mutate({ targetType: 'team', targetId: teamId, automatic: true });
   }, [authVerified, query.data, resolveChat, teamId]);
 
   if (loadFailed) {

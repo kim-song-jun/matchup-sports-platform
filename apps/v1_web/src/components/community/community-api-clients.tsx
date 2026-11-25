@@ -191,7 +191,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     if (!lastMessageId || updateMe.isPending) return;
-    updateMe.mutate({ lastReadMessageId: lastMessageId });
+    updateMe.mutate({ lastReadMessageId: lastMessageId, automatic: true });
   }, [lastMessageId]);
 
   const contact = room.data?.teamContact ?? null;

@@ -7,6 +7,7 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1AuthMe } from '@/types/api';
 import { v1TeamCompetitionEntriesFixture } from '@/test/msw/fixtures';
+import { ActivityProfileRequiredModal } from '@/components/auth/activity-profile-required-modal';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
 import { TeamListPageView } from './teams-page';
@@ -1388,6 +1389,63 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     fireEvent.click(screen.getAllByRole('button', { name: '팀 채팅' })[0]);
     await waitFor(() => expect(chatMutateAsync).toHaveBeenCalledWith({ targetType: 'team', targetId: 'team-1' }));
     expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
+  });
+
+  // 진입 시 자동 resolve 가 막히는 계정(관심 종목을 건너뛴 소셜 계정)이 팀 상세를 열 때마다 안내 창이
+  // 뜨던 결함 — 실제 훅·api-client·전역 창을 그대로 이어서 본다.
+  describe('채팅방 자동 준비가 활동 정보 게이트에 막힐 때', () => {
+    // 서버 게이트는 쓰기만 막는다. 팀 상세가 같이 부르는 조회(GET)는 끝나지 않게 둬 화면 구성에 끼어들지 않게 한다.
+    function stubGateFetch() {
+      const fetchMock = vi.fn((_url: string, request: RequestInit) => request.method === 'POST'
+        ? Promise.resolve({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          json: async () => ({
+            status: 'error',
+            statusCode: 403,
+            code: 'ACTIVITY_PROFILE_REQUIRED',
+            message: '활동하려면 정보를 먼저 입력해 주세요.',
+            details: { missing: ['interestSport'] },
+            timestamp: new Date().toISOString(),
+          }),
+        })
+        : new Promise<never>(() => {}));
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    async function renderGatedMember() {
+      const actual = await vi.importActual<typeof import('@/hooks/use-v1-api')>('@/hooks/use-v1-api');
+      teamApiMocks.useV1ResolveChatRoom.mockImplementation(actual.useV1ResolveChatRoom);
+      const detail = seededDetail();
+      teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'gated-user', email: null, onboardingStatus: 'deferred' }, profile: { displayName: '게이트 사용자' } }, isPending: false, isFetching: false, isError: false });
+      teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, role: 'member', disabledReason: null } }, isError: false, isPlaceholderData: false });
+      render(<><TeamDetailPageClient teamId="team-1" /><ActivityProfileRequiredModal /></>);
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('진입 때 자동으로 나간 요청이 403 으로 막혀도 안내 창을 띄우지 않고, 직접 누른 「팀 채팅」이 다시 요청해 막히면 그때 띄운다', async () => {
+      const fetchMock = stubGateFetch();
+      await renderGatedMember();
+
+      const writes = () => fetchMock.mock.calls.filter(([, request]) => request.method === 'POST');
+      await waitFor(() => expect(writes()).toHaveLength(1));
+      const [url, init] = writes()[0];
+      expect(url).toBe('/api/v1/chat/rooms/resolve');
+      // 화면 쪽 표시(automatic)가 서버로 새면 forbidNonWhitelisted 가 400 으로 막는다.
+      expect(JSON.parse(String(init.body))).toEqual({ targetType: 'team', targetId: 'team-1' });
+      await act(async () => {});
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      fireEvent.click(screen.getAllByRole('button', { name: '팀 채팅' })[0]);
+
+      expect(await screen.findByText('1가지가 더 필요해요')).toBeInTheDocument();
+      expect(writes()).toHaveLength(2);
+    });
   });
 
   function renderPendingMember(eligibility: Record<string, unknown>) {

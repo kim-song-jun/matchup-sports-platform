@@ -186,7 +186,7 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 | 값 | 동작 |
 |---|---|
 | 비어 있음 / `1` (운영 기본) | 웹 컨테이너 `v1_web` 하나. 배포 명령·nginx 설정은 개수 도입 전과 같다 |
-| `2` (alpha 기본) | `v1_web`, `v1_web_b` 둘. 배포·롤백이 API 를 다시 만든 직후 nginx 를 reload 하고(새 API 가 다른 IP 를 받을 수 있다), 웹은 하나씩 다시 만들고 healthy 를 기다린 뒤 reload 해 다음으로 넘어간다 |
+| `2` (alpha 기본) | `v1_web`, `v1_web_b` 둘. 배포·롤백이 API 를 워커와 따로 먼저 다시 만들고(한 명령이면 compose 가 워커 정지 — 진행 중 일감 정리에 20초까지 — 를 기다린 뒤에야 새 API 를 시작한다) 그 직후 nginx 를 reload 하며(새 API 가 다른 IP 를 받을 수 있다), 웹은 하나씩 다시 만들고 healthy 를 기다린 뒤 reload 해 다음으로 넘어간다 |
 
 - 다른 값과, 메모리가 모자란 호스트(운영 3.5GB 미만 · alpha 1.8GB 미만)의 `2` 는 배포 스크립트가 컨테이너를 건드리기 전에 거절한다.
 - 켜는 방법: 운영은 서버를 4GB 로 올린 뒤 `deploy/.env` 에 `V1_WEB_REPLICAS=2` 를 넣고 다음 배포를 한다. 끄는 방법은 값을 지우거나 `1` 로 바꾸는 것이고, 남은 `teameet_v1_web_b` 는 그 배포가 지운다.

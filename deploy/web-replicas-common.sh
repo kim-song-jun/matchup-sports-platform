@@ -274,9 +274,12 @@ up_app_containers() {
     remove_web_pair_orphan || return 1
     return 0
   fi
-  "${compose[@]}" up -d "$@" --no-deps v1_api v1_game_operations_worker || return 1
+  # API 와 워커를 한 명령으로 바꾸면 compose 는 둘 다 멈춘 뒤에야 새 컨테이너를 시작해서, 진행 중 일감을 끝내느라
+  # 20초까지 걸리는 워커 정지만큼 API 가 더 끊긴다. 그래서 API 를 먼저 따로 바꾼다.
+  "${compose[@]}" up -d "$@" --no-deps v1_api || return 1
   # 새 API 가 다른 IP 를 받으면 nginx 는 다음 reload 까지 옛 IP 로 보낸다. 웹 교체 뒤의 reload 까지 기다리지 않는다.
   reload_nginx_upstreams
+  "${compose[@]}" up -d "$@" --no-deps v1_game_operations_worker || return 1
   wait_for_service_healthy v1_api || return 1
   roll_web_services "$@"
 }

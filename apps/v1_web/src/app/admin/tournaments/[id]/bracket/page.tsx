@@ -124,6 +124,6 @@ function BracketPageBody() {
       )}
     </div>
   );
-  return tournament?.format === 'league_knockouts' ? <FixtureAssignmentWorkspace tournamentId={tournamentId} canWrite={canWrite}
+  return tournament?.stagePlan || tournament?.format === 'league_knockouts' ? <FixtureAssignmentWorkspace tournamentId={tournamentId} canWrite={canWrite}
     canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} toolbar={assignmentToolbar}>{content}</FixtureAssignmentWorkspace> : content;
 }

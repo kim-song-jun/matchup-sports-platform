@@ -205,3 +205,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 회원·팀별 운영 조회 context와 상태 이력·문의·참가/공식 출전 기록은 active admin 전용이며 private/no-store다. 팀 목록은 종목·지역·팀장 검색을 지원한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원팀-운영-정보-2026-11-19)을 따른다.
 
 회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.
+
+목업 생성의 `format=staged`는 예선·본선 기본 구성을 만든 뒤 기존 단계 편집기로 세부 설정해요. 상태·결과 제한과 응답 계약은 [단계별 목업](./domains/tournaments.md#단계별-기본-목업-staged-2026-11-26)을 따라요.

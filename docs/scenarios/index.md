@@ -670,3 +670,8 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - [League registered time choices](league-schedule-time-picker.md): local API/Web checks; alpha 0/10 flows and 0/3 viewports pending deployment.
 
 2026-11-16 후속: 사용자 승인으로 동등성 감사40항목 전체를 수정·확장했다. 새20팀 자동 본선/70경기/전체1~20위·종료 실제DB 및 운영 UI125건 검증. 기존 Alpha70경기는 그대로다. 당시 브라우저 host 차단은 사용자 승인 headed Playwright로 해소했고 최종39/39 증거는 위 최신 UI 후속과 현행 시나리오를 참조한다. [수정 cursor](./competition-stage-composition.md#2026-11-16-동등성-전체-수정--최신-cursor).
+
+## 2026-11-26 단계별 목업 기본 형식
+- 사용자 선택: 목업 형식에 ‘단계별 대회’를 추가하고 기본 구성으로 만든 뒤 세부 설정은 나중에 진행해요.
+- 대상: `/admin/tournaments` 목업 패널 → `staged` 생성 → `/admin/tournaments/:id/bracket` → 단계·진출팀 관리/구성 수정, 시간·구장 배정.
+- 구현/검증 기록: [.github/tasks/20261130-competition-stage-composition.md](../../.github/tasks/20261130-competition-stage-composition.md)의 2026-11-26 후속 절. Alpha after/실제 DB 미검증이며 기존 증거를 재사용하지 않아요.

@@ -1150,3 +1150,10 @@ assignment 확장: registrationIds는 자리 수만큼의 (UUID|null) 목록이�
 - 결과 생성 도중은in_progress이며 모든 결과/배정 후에만completed를 저장한다. seed 중에는CAS 기반 순차 배정, 완료 후autoAdvance를 켠다. 실패를 완료로 숨기지 않는다. 네트워크 타임아웃 때는 자동 중복 재시도하지 말고 관리자 목록의 생성 상태부터 확인한다.
 - availability 응답에 `rankedLeagueUsableTeamCount`, `rankedLeagueMaxTeamCount`를 추가해7명 팀 기준의 실제 상한을 표시한다. enabled=false/종목·config 부재는 두 필드를 생략할 수 있고UI는0으로 닫는다.
 - 응답 format은요청카테고리 ranked_leagues, teamCount/fixtureCount/gamesCreated/lineupsSubmitted/route와 테스트계정 목록을 제공한다. 비밀번호는 응답에 포함하지 않는다. 이 목업은 정식 UI 신청 통과 증거가 아니다.
+
+### 단계별 기본 목업 (`staged`, 2026-11-26)
+- `POST /api/v1/admin/mock-seed/tournaments`의 목업 전용 `format=staged`를 지원해요. 일반 대회/DB enum은 그대로 두고 정식 단계형 생성과 같은 `format=league_knockouts` + `stagePlan`으로 저장해요.
+- 팀 수 2~32를 유지하며 최대 4팀씩 균등 예선 풀리그 → 각 조 상위 2팀 본선 토너먼트의 기본 두 단계를 만들어요. 정원이 찬 확정 팀을 실제 `StagePlanService.generate`/`randomize` 경로로 배정하고 정본 경기 명단을 동기화해요. 다음 단계는 공식 결과 대기이며 자동 진출은 꺼져 있어요.
+- 세부 설정은 생성 후 관리자 대진의 ‘단계·진출팀 관리 → 구성 수정’에서 바꿔요. 시작/결과가 없는 상태를 보존하려고 `withResults=true`, `reviewReady=true`, `status=completed`는 400 `MOCK_SEED_STATUS_UNSUPPORTED`로 저장 전에 거절해요. 기본값과 `open`/`in_progress`는 기존 계약을 따라요.
+- 단계 배정으로 경기 명단을 만들기 때문에 `withLineups` 여부와 무관하게 정본 제출본을 반영해요. API 환경 플래그, mutation admin, 감사 로그, 응답 계정 비밀번호 제외 계약은 그대로 적용해요. 응답 `format=staged`이며 일반 목업 응답 필드와 같아요.
+- Web은 `stagePlan`이 있으면 DB format이 `league`여도 단계 관리·시간 배정·구장 배정을 그림/목록 보기에서 유지해요. 기존 목업 카테고리의 동작은 바꾸지 않아요.

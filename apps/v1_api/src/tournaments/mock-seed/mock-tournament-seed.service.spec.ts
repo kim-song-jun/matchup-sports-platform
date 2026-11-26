@@ -189,14 +189,40 @@ function makeWorld(teamCount = 4) {
     preview: jest.fn().mockResolvedValue({ revision: 1, previewHash: 'hash' }),
     generate: jest.fn().mockResolvedValue({}),
   };
-  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never, {} as never);
-  return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview, multiFinals };
+  const stages = {
+    get: jest.fn().mockResolvedValue({ revision: 0 }),
+    generate: jest.fn().mockResolvedValue({ revision: 1 }),
+    randomize: jest.fn().mockResolvedValue({ revision: 2 }),
+  };
+  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never, stages as never);
+  return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview, multiFinals, stages };
 }
 
 describe('MockTournamentSeedService', () => {
   const originalFlag = process.env.V1_ENABLE_MOCK_SEED;
   beforeEach(() => { process.env.V1_ENABLE_MOCK_SEED = 'true'; });
   afterAll(() => { process.env.V1_ENABLE_MOCK_SEED = originalFlag; });
+  it('단계별 목업은 기본 두 단계를 저장하고 실제 단계 생성·배정 경로로 연결한다', async () => {
+    const { service, tx, stages, gamesService, resultReview } = makeWorld();
+    const created = await service.createTournament(user, { format: 'staged', teamCount: 4, status: 'in_progress' });
+    expect(tx.v1Tournament.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      format: 'league_knockouts', stagePlan: expect.objectContaining({ stages: [
+        expect.objectContaining({ name: '예선', pools: [expect.objectContaining({ capacity: 4, format: 'league' })] }),
+        expect.objectContaining({ name: '본선', pools: [expect.objectContaining({ capacity: 2, format: 'knockout' })] }),
+      ] }),
+    }) }));
+    expect(stages.generate).toHaveBeenCalledWith(user, 'tour-1', { expectedRevision: 0 });
+    expect(stages.randomize).toHaveBeenCalledWith(user, 'tour-1', { expectedRevision: 1 });
+    expect(created).toMatchObject({ format: 'staged', teamCount: 4, status: 'in_progress' });
+    expect(created.title).toContain('단계별 대회');
+    expect(gamesService.executeCommand).not.toHaveBeenCalled();
+    expect(resultReview.officializeResultRevision).not.toHaveBeenCalled();
+  });
+  it.each([{ withResults: true }, { reviewReady: true }, { status: 'completed' as const }])('단계별 목업의 결과 옵션 %j를 저장 전에 거절한다', async input => {
+    const { service, prisma } = makeWorld();
+    await expect(service.createTournament(user, { format: 'staged', ...input })).rejects.toMatchObject({ response: { code: 'MOCK_SEED_STATUS_UNSUPPORTED' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
   it('순위별 리그의 후기가능 옵션은 종료 상태를 요구하고 생성 전에 거절한다', async () => {
     const {service,prisma}=makeWorld(20);
     await expect(service.createTournament(user,{format:'ranked_leagues',teamCount:20,status:'in_progress',reviewReady:true})).rejects.toMatchObject({response:{code:'MOCK_SEED_STATUS_UNSUPPORTED'}});

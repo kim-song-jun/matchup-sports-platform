@@ -853,8 +853,9 @@ function TeamContactRow({ href, unavailableReason, children }: { href?: string; 
   const reasonId = useId();
   return (
     <>
-      {/* 컨택이 앞(좁게), 주 행동(가입 신청)이 뒤(넓게) — 2026-11-26 사용자 확정. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+      {/* 컨택이 앞(좁게), 주 행동(가입 신청)이 뒤(넓게) — 2026-11-26 사용자 확정. 360px 이하에서도 한 줄을
+          지킨다(인라인 grid 를 세로로 쌓는 전역 규칙을 피하려고 클래스로 둔다 — globals.css .tm-team-contact-row). */}
+      <div className="tm-team-contact-row">
         {unavailableReason || !href ? (
           <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled aria-describedby={reasonId}>
             컨택 보내기

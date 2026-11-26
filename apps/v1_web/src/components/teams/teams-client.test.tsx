@@ -990,7 +990,7 @@ describe('TeamDetailPageClient — 내 리그', () => {
     leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1'));
   });
 
-  it('참가 중인 리그가 없으면 리그 탭이 없다 — 매치·대회도 없으면 안내 한 줄', () => {
+  it('참가 중인 리그가 없어도 리그 탭은 남고(0), 셋 다 비면 첫 탭(매치)의 안내를 보인다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
     teamApiMocks.useV1LeagueMatches.mockReturnValue({
@@ -1000,8 +1000,8 @@ describe('TeamDetailPageClient — 내 리그', () => {
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.queryByRole('tab', { name: /리그/ })).not.toBeInTheDocument();
-    expect(screen.getAllByText('아직 참가 중인 경기가 없어요')).toHaveLength(2);
+    expect(screen.getAllByRole('tab', { name: /^리그\s*0$/ })).toHaveLength(2);
+    expect(screen.getAllByText('모집 중인 매치가 없어요')).toHaveLength(2);
   });
 
   it('리그 목록을 teamId 필터로 조회한다 (팀매치 역산이 아니라)', () => {
@@ -1250,6 +1250,18 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       const [link] = screen.getAllByRole('link', { name: '컨택 보내기' });
       expect(link).toHaveAttribute('href', '/teams/team-1/contact/new');
       expect(screen.queryByText('이 팀은 지금 컨택을 받지 않고 있어요.')).toBeNull();
+    });
+
+    it('버튼 줄은 [컨택 | 가입 신청] 한 줄이고 인라인 grid 를 쓰지 않는다 — 360px 이하 세로 쌓기 전역 규칙을 피한다', () => {
+      renderAsOperator(true);
+
+      // globals.css `.tm-fixed-cta > div[style*="grid"]` 가 360px 이하에서 인라인 grid 를 한 열로 바꾼다(alpha 실측 회귀).
+      for (const link of screen.getAllByRole('link', { name: '컨택 보내기' })) {
+        const row = link.parentElement!;
+        expect(row).toHaveClass('tm-team-contact-row');
+        expect(row).not.toHaveAttribute('style');
+        expect(row.lastElementChild).toHaveTextContent('가입 신청');
+      }
     });
 
     it('값이 없으면(구버전 응답) 링크를 그대로 둔다 — 서버가 컨택 생성 때 다시 막는다', () => {

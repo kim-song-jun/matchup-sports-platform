@@ -904,8 +904,9 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     // StateCard 는 tone 에 따라 --tint-grey/green/orange 셋을 깐다 — 배경이 변수라
     // 태그에서 잡히는 것은 `background: tint` 다. 한 곳이 셋을 다 만든다.
     ['src/components/matches/matches-page.tsx', 'Card', /background: tint/, 1],
-    // 이 파일엔 grey50 카드가 둘이다(에러 상태 · 매치 없음). 둘 다 그 위가 캡션이다.
-    ['src/components/teams/teams-page.tsx', 'Card', /background: 'var\(--grey50\)' \}\}/, 2],
+    // 이 파일엔 grey50 카드가 하나다(에러 상태). "매치 없음" 카드는 팀 상세 개편(2026-11-26)으로 빠졌고,
+    // 그 자리의 "참가 중인 경기 없음" 카드는 team-detail-profile.tsx 가 CSS 로 grey50 을 깔고 tm-on-tint 를 단다.
+    ['src/components/teams/teams-page.tsx', 'Card', /background: 'var\(--grey50\)' \}\}/, 1],
     ['src/components/tournaments/tournament-event-hub-sections.tsx', 'Card', /var\(--grey50\)/, 1],
     // 이 파일의 grey50 Card 넷 — 참가 전 유의사항(모바일·데스크톱 두 벌) · 환불 정책 원문 ·
     // 대진표 준비 중. 표시 클래스를 고르는 조건에 넣으면 순환이 되므로 지면만으로 고른다.

@@ -363,7 +363,8 @@ export function TeamParticipationSection({ tabs }: { tabs: TeamParticipationTab[
           </div>
         </>
       ) : (
-        <div className="tm-card tm-team-participation-empty">
+        // grey50 지면 위 캡션 — 다른 틴트 카드처럼 tm-on-tint 로 보조 글자 대비를 올린다.
+        <div className="tm-card tm-on-tint tm-team-participation-empty">
           <div className="tm-text-label">아직 참가 중인 경기가 없어요</div>
           <div className="tm-text-caption">이 팀이 매치를 열거나 리그·대회에 참가하면 여기서 볼 수 있어요.</div>
         </div>

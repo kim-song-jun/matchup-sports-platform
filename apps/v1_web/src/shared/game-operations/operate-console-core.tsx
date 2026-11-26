@@ -2074,26 +2074,6 @@ export function OperateConsoleCore({
                 : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
           </Banner>
         )}
-        {leaseRequired && canOperate && matchInPlay && !sampleMode &&
-          (startRevert === null ? renderCommandButton('revert-start', false) : (
-            <form className="flex flex-col gap-3" aria-label="경기 시작 취소" onSubmit={async event => {
-              event.preventDefault();
-              if (startRevert.phrase !== '취소한다' || commandUnavailable) return;
-              if (gameVersionRef.current !== startRevert.version) {
-                setStartRevert(null); setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.'); return;
-              }
-              const confirmation = startRevert.phrase;
-              setStartRevert(null);
-              await handleRunCommand('revert-start', { confirmation });
-            }}>
-              <p>무효 처리할 경기 기록: {startRevert.summary}</p>
-              <label className="tm-text-label">경기 시계를 초기화하고 시작 전으로 돌아가려면 ‘취소한다’를 입력해 주세요.
-                <input className="tm-input" autoFocus autoComplete="off" value={startRevert.phrase}
-                  onChange={event => setStartRevert({ ...startRevert, phrase: event.target.value })} />
-              </label>
-              <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setStartRevert(null)}>돌아가기</Button>
-                <Button type="submit" disabled={commandUnavailable || startRevert.phrase !== '취소한다'}>경기 시작 취소 확정</Button></div>
-            </form>))}
         {gameState === 'SCHEDULED' && startBlockedByTeams && (
           <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
         )}
@@ -2344,6 +2324,28 @@ export function OperateConsoleCore({
           disabled={commandBlocked}
           resultOfficialized={resultOfficialized}
         />
+        <div className="mt-3 empty:hidden">
+        {leaseRequired && canOperate && matchInPlay && !sampleMode &&
+          (startRevert === null ? renderCommandButton('revert-start', false) : (
+            <form className="flex flex-col gap-3" aria-label="경기 시작 취소" onSubmit={async event => {
+              event.preventDefault();
+              if (startRevert.phrase !== '취소한다' || commandUnavailable) return;
+              if (gameVersionRef.current !== startRevert.version) {
+                setStartRevert(null); setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.'); return;
+              }
+              const confirmation = startRevert.phrase;
+              setStartRevert(null);
+              await handleRunCommand('revert-start', { confirmation });
+            }}>
+              <p>무효 처리할 경기 기록: {startRevert.summary}</p>
+              <label className="tm-text-label">경기 시계를 초기화하고 시작 전으로 돌아가려면 ‘취소한다’를 입력해 주세요.
+                <input className="tm-input placeholder:text-[var(--text-muted)]" placeholder="취소한다" autoFocus autoComplete="off" value={startRevert.phrase}
+                  onChange={event => setStartRevert({ ...startRevert, phrase: event.target.value })} />
+              </label>
+              <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setStartRevert(null)}>돌아가기</Button>
+                <Button type="submit" disabled={commandUnavailable || startRevert.phrase !== '취소한다'}>경기 시작 취소 확정</Button></div>
+            </form>))}
+        </div>
       </section>
 
       {/* 전부 ack 된 평상시에는 이 섹션 자체를 그리지 않는다 — 성공은 위 "기록된

@@ -2327,7 +2327,9 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     const form = screen.getByRole('form', { name: '경기 시작 취소' });
     const submit = within(form).getByRole('button', { name: '경기 시작 취소 확정' });
     expect(submit).toBeDisabled();
-    const input = within(form).getByRole('textbox');
+    const input = within(form).getByPlaceholderText('취소한다');
+    expect(input).toHaveValue('');
+    expect(screen.getByRole('heading', { name: /기록된 이벤트/ }).closest('section')).toContainElement(form);
     fireEvent.change(input, { target: { value: '취소한다 ' } });
     expect(submit).toBeDisabled();
     fireEvent.change(input, { target: { value: '취소한다' } });

@@ -34,3 +34,5 @@
 - **`pending`/`pendingCount`**: 훈련·모임(`TRAINING`·`EVENT`) 중 아직 끝나지 않았고 응답 마감이 안 지났으며 **내가 응답하지 않은** 일정. 마감이 가까운 순(마감 없는 것은 뒤), 최대 3건. 경기 일정은 응답 대상이 아니다.
 - **`schedules`**: 앞으로 올 팀 일정 최대 4건(가까운 순). 항목마다 `myResponse`(내 응답 또는 null)와 `canRespond`(훈련·모임이고 마감 전).
 - **응답 저장**은 내가 활성 팀원인 팀의 일정만(아니면 404), 그리고 훈련·모임만(`canRespond` 로 내려 주는 종류 — 경기 일정은 400 `WIDGET_SCHEDULE_NOT_RESPONDABLE`, 앱에서 응답). 마감·정원·대기자 같은 규칙은 앱에서 누를 때와 같은 서비스(`ScheduleAttendanceService.setMyAttendance`)를 탄다. 멱등키는 서버가 시도마다 새로 만들고, 앱·연타로 버전이 바뀌어 `VERSION_CONFLICT` 가 나면 한 번 다시 읽어 재시도한다.
+
+**진행 중 점수의 출처 (2026-11-25).** 대회·리그 경기는 경기 이벤트(`V1GameEvent`)의 골을 세고, **친선 팀 매치는 득점을 공유 기록(`V1TeamMatchRecord.goals`)에 두므로 그 골을 센다** — 이벤트만 세면 친선 경기가 항상 0 : 0 으로 나온다(알파에서 한강 로버스·마포 친선으로 확인). `GET /widget/games` 와 `GET /widget/home` 모두 같다.

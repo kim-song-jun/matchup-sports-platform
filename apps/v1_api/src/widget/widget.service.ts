@@ -1,10 +1,10 @@
 import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { isUsableAccessTokenSecret, issueAccessToken, parseAccessToken } from '../calendar-feed/access-token';
-import { tallyLiveScore } from '../games/public-records/public-live-score';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { PrismaService } from '../prisma/prisma.service';
+import { perspectiveScore, tallyGameScore } from './widget-home';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { NEXT_GAME_STARTED_GRACE_MS } from '../team-lineups/team-upcoming-games.service';
 
@@ -125,6 +125,7 @@ export class WidgetService {
         state: true,
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
+        sharedRecord: { select: { goals: true } },
         teamMatch: { select: { title: true, startAt: true, placeName: true, tournamentId: true, leagueId: true } },
       },
     });
@@ -182,9 +183,8 @@ export class WidgetService {
       });
       for (const item of scorable) {
         const game = gameById.get(item.gameId)!;
-        const tally = tallyLiveScore(events.filter((e) => e.gameId === item.gameId), new Map(game.sides.map((s) => [s.id, s.sideKey] as const)));
         const mineKey = game.sides.find((s) => s.teamId === item.teamId)?.sideKey ?? 'HOME';
-        item.score = mineKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
+        item.score = perspectiveScore(tallyGameScore(game, events.filter((e) => e.gameId === item.gameId)), mineKey);
       }
     }
 

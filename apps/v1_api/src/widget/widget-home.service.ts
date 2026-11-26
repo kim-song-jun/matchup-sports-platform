@@ -2,14 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1ScheduleState, V1ScheduleType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
-import { tallyLiveScore } from '../games/public-records/public-live-score';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleAttendanceService, type SetAttendanceResponse } from '../team-schedules/attendance.service';
 import { visibleTeamMatchScheduleWhere } from '../team-schedules/team-schedules.service';
 import {
-  readEndedResult,
+  endedGameScore,
+  perspectiveScore,
+  tallyGameScore,
   WIDGET_JUST_ENDED_MS,
   WIDGET_LIVE_MAX_AGE_MS,
   WIDGET_PENDING_LIMIT,
@@ -191,10 +192,11 @@ export class WidgetHomeService {
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
         currentOfficialRevision: { select: { score: true } },
+        sharedRecord: { select: { goals: true } },
         teamMatch: { select: { title: true, startAt: true, tournamentId: true, leagueId: true } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 5,
+      take: 10,
     });
     if (games.length === 0) return [];
 
@@ -218,13 +220,10 @@ export class WidgetHomeService {
       if (game.state === 'ENDED') {
         // 끝난 경기는 공식 결과를 보여 주되, 운영자가 가린 경기(hidden·status_only)는 숨긴다.
         if (mode === 'live' || mode === 'official_only') {
-          const result = readEndedResult(game.currentOfficialRevision?.score, mine.sideKey);
-          score = result?.score ?? null;
-          penalties = result?.penalties ?? null;
+          ({ score, penalties } = endedGameScore(game, mine.sideKey));
         }
       } else if (mode === 'live') {
-        const tally = tallyLiveScore(events.filter((event) => event.gameId === game.id), new Map(game.sides.map((side) => [side.id, side.sideKey] as const)));
-        score = mine.sideKey === 'HOME' ? { mine: tally.home, opponent: tally.away } : { mine: tally.away, opponent: tally.home };
+        score = perspectiveScore(tallyGameScore(game, events.filter((event) => event.gameId === game.id)), mine.sideKey);
       }
       items.push({
         gameId: game.id,

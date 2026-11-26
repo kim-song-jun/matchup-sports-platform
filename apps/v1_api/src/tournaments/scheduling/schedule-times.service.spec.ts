@@ -184,13 +184,13 @@ describe('ScheduleTimesService', () => {
     await expect(support.service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' }, 'league-matches')).rejects.toThrow(ForbiddenException);
     expect(support.rows).toHaveLength(0);
   });
-  it('rejects missing or unsupported tournaments without creating times', async () => {
+  it('rejects missing tournaments and accepts knockout tournaments', async () => {
     const { service, db, rows } = setup();
     db.v1Tournament.findFirst.mockResolvedValueOnce(null as never);
     await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).rejects.toMatchObject({ response: { code: 'NOT_FOUND' } });
     db.v1Tournament.findFirst.mockResolvedValueOnce({ id: 't1', format: 'knockout' });
-    await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).rejects.toMatchObject({ response: { code: 'SCHEDULE_TIMES_FORMAT_UNSUPPORTED' } });
-    expect(rows).toHaveLength(0);
+    await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).resolves.toHaveProperty('item');
+    expect(rows).toHaveLength(1);
   });
 });
 describe('CreateScheduleTimeDto', () => {

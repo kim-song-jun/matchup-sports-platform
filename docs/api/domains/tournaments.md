@@ -1077,7 +1077,7 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 
 ## 대진 시간·구장 독립 배정 (2026-11-12)
 
-`league_knockouts`의 어드민 대진에서 시간/구장을 독립 배정한다. 실제 일정·장소·필드는 기존 `V1TeamMatch.startAt`, `fieldId`, 장소 스냅샷이 정본이다. 목록·그림·수동 편집·배정 패널은 기존 `GET /admin/tournaments/:id/bracket`을 읽으며 배정도 기존 `PATCH /admin/fixtures/:fixtureId`를 사용한다.
+모든 대회 형식의 어드민 대진에서 시간/구장을 독립 배정한다. 실제 일정·장소·필드는 기존 `V1TeamMatch.startAt`, `fieldId`, 장소 스냅샷이 정본이다. 목록·그림·수동 편집·배정 패널은 기존 `GET /admin/tournaments/:id/bracket`을 읽으며 배정도 기존 `PATCH /admin/fixtures/:fixtureId`를 사용한다.
 
 | Method | Path | 계약 |
 |---|---|---|
@@ -1098,7 +1098,7 @@ DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은
 - 공유 MSW는 정본 경기·팀 일정 저장소가 없는 시간 일괄 수정을 가짜 성공으로 만들지 않고 `503 SCHEDULE_TIME_EDIT_REQUIRES_REAL_API`로 명시한다. 컴포넌트 계약 테스트는 별도 stateful HTTP 핸들러로 실제 훅의 요청과 화면 반영·실패 보존을 검증한다. 구장 mock은 목록·연결된 fixture 장소·운영 보드 이름을 함께 갱신한다.
 
 - `V1AuthGuard` 인증 + 서비스 `getTournamentAdmin`(조회)/`getTournamentMutationAdmin`(등록). 활성 owner/ops는 쓰기, support는 조회, 배정된 활성 대회 총괄은 담당 대회만 허용한다. 철회/만료/타 대회는 `403 PERMISSION_DENIED`.
-- 대회 종류·미삭제·`format === league_knockouts` 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`, 다른 format은 409 `SCHEDULE_TIMES_FORMAT_UNSUPPORTED`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.
+- 대회 종류·미삭제 확인. 대회 없음/다른 종류는 404 `NOT_FOUND`. UUID 경로와 DTO whitelist/forbidNonWhitelisted 적용. offset 없는 날짜/시각·실재하지 않는 날짜·미지정/추가 필드는 400.
 - 신규 `V1TournamentScheduleTime`은 재사용 선택지만 저장한다. `(tournamentId, scheduledAt)` unique 및 createMany skipDuplicates로 동시 등록/응답 유실 재시도에도 중복을 만들지 않는다. 실제 새 행만 `tournament.schedule_time.create` 관리자/대회 감사에 기록한다. 시간 목록 등록은 기존 경기 시간을 바꾸지 않는다.
 - 시간 배정/해제는 `{ scheduledAt: ISO | null }`만 보내 fieldId/장소를 보존한다. 구장 배정은 `{ fieldId }`, 기존 직접 입력 장소는 `{ fieldId: null, venue, ...snapshot }`, 구장 해제는 `{ fieldId: null, venue: '' }`로 시간을 보존한다. 기존 경기 수정의 권한·필드 범위·단계/경기 상태 검사와 오류를 그대로 적용한다.
 - 구장 목록/등록은 기존 `/tournament-ops/tournaments/:id/fields`를 재사용한다. 필드 생성은 기존대로 플랫폼 운영자만, 배정은 owner/ops 및 담당 총괄이다. support/담당자에게 새로운 필드 등록 권한을 주지 않는다.

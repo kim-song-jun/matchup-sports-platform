@@ -9,6 +9,9 @@ import AdminTournamentBracketPage from './page';
 
 const { adminState } = vi.hoisted(() => ({ adminState: { canWrite: true } }));
 
+vi.mock('@/components/admin/bracket-canvas/fixture-assignment-workspace', () => ({
+  FixtureAssignmentWorkspace: ({ children }: { children: React.ReactNode }) => <div data-testid="assignment-workspace">{children}</div>,
+}));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   usePathname: () => '/admin/tournaments/t-1/bracket',

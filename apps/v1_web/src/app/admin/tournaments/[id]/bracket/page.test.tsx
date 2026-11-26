@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   admin: { tournamentId: 't-1', canWrite: true, showToast: vi.fn() },
 }));
 
+vi.mock('@/components/admin/bracket-canvas/fixture-assignment-workspace', () => ({
+  FixtureAssignmentWorkspace: ({ children }: { children: React.ReactNode }) => <div data-testid="assignment-workspace">{children}</div>,
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/t-1/bracket',
   useRouter: () => ({ replace: mocks.replace }),
@@ -56,6 +59,11 @@ afterEach(() => {
 });
 
 describe('AdminTournamentBracketPage — [그림 | 목록]', () => {
+  it.each(['league', 'knockout', 'group_knockout', 'league_knockouts'])('%s 대진을 배정 패널에 연결한다', format => {
+    mocks.tournament.data = { format };
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByTestId('assignment-workspace')).toContainElement(screen.getByTestId('workspace'));
+  });
   it('기본은 그림이다: 작업 영역에 대회 방식·쓰기 권한·참가팀을 넘기고 목록은 그리지 않는다', () => {
     render(<AdminTournamentBracketPage />);
     expect(screen.getByRole('tab', { name: '그림' })).toHaveAttribute('aria-selected', 'true');

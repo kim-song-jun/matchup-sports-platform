@@ -2,5 +2,5 @@
 
 import { createContext } from 'react';
 
-/** Only the approved league + N finals journey loads the reusable time catalogue. */
+/** Enable the tournament time catalogue inside the assignment workspace. */
 export const FixtureAssignmentContext = createContext(false);

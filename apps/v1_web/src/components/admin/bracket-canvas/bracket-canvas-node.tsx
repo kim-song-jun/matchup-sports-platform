@@ -157,7 +157,8 @@ export function BracketCanvasNode({
         className="tm-text-caption flex items-center justify-between gap-2 whitespace-nowrap border-t border-[var(--border)] bg-[var(--grey50)] px-2"
         style={{ height: CANVAS_FOOTER_HEIGHT, color: 'var(--text-muted)' }}
       >
-        <span className="shrink-0">{when}</span>
+        <button type="button" className="min-w-0 truncate text-left" onClick={() => onSelect(fixture.id)}
+          title={`${when} · ${fixture.venue || '구장 미정'}`}>{when} · {fixture.venue || '구장 미정'}</button>
         {footer.length ? <span className="flex min-w-0 items-center gap-1" title={footer.join(' · ')}>{quick ? <Zap size={12} aria-label="어드민 빠른 입력" className="shrink-0" /> : null}<span className="shrink-0">{voided ? '무효 처리됨' : penalty}</span></span> : null}
       </div>
     </div>

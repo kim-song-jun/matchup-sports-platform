@@ -19,15 +19,16 @@ let fail: boolean;
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data });
 const server = setupServer(
   http.post('*/api/v1/logs/client-error', () => ok({})),
+  http.get('*/api/v1/tournament-ops/tournaments/l1/fields', () => ok({ items: [{ id: 'court2', name: 'B구장', active: true }] })),
   http.get('*/api/v1/admin/league-matches/l1/schedule-times', () => ok({ items })),
   http.post('*/api/v1/admin/league-matches/l1/schedule-times', async ({ request }) => {
     const input = await request.json() as { scheduledAt: string };
     const item = { id: 'new', ...input }; items.push(item); return ok({ item });
   }),
   http.patch('*/api/v1/admin/league-matches/l1/fixtures/f1', async ({ request }) => {
-    const body = await request.json() as { startsAt: string }; patches.push(body);
+    const body = await request.json() as { startsAt?: string; fieldId?: string }; patches.push(body);
     if (fail) return HttpResponse.json({ status: 'error', statusCode: 409, code: 'CONFLICT', message: '일정을 다시 확인해 주세요.' }, { status: 409 });
-    fixture = { ...fixture, startAt: body.startsAt }; return ok({ teamMatchId: 'f1' });
+    fixture = { ...fixture, startAt: body.startsAt ?? fixture.startAt, fieldId: body.fieldId ?? fixture.fieldId }; return ok({ teamMatchId: 'f1' });
   }),
 );
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -42,13 +43,22 @@ function show(canWrite = true, refreshFail = false, additional: V1LeagueFixture[
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   function Page() {
     const [fixtures, setFixtures] = useState([fixture, ...additional]);
-    return <LeagueTimeAssignment leagueId="l1" fixtures={fixtures} canWrite={canWrite} fixtureName={f => f.title}
+    return <LeagueTimeAssignment leagueId="l1" fixtures={fixtures} canWrite={canWrite} onEditCourt={vi.fn()} fixtureName={f => f.title}
       refresh={async () => { setFixtures([fixture]); return { isError: refreshFail }; }} showToast={vi.fn()} />;
   }
   render(<QueryClientProvider client={client}><Page /></QueryClientProvider>);
   fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
 }
 describe('league time assignment through the league API', () => {
+  it('assigns a registered court without changing the time or teams', async () => {
+    show();
+    fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
+    await screen.findByRole('option', { name: 'B구장' });
+    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
+    await waitFor(() => expect(patches).toEqual([{ fieldId: 'court2' }]));
+    expect(fixture.startAt).toBe('2026-11-20T01:00:00.000Z');
+  });
   it('registers a KST time and moves a game using only startsAt, preserving court and teams', async () => {
     show();
     const input = await screen.findByLabelText('시간 추가 (한국 시간)');

@@ -1004,6 +1004,15 @@ describe('TeamsService', () => {
     });
 
     // 팀 상세 '신생팀' 배지의 원재료 — 화면이 만든 날짜로 3개월 미만인지 판단한다.
+    // 팀 상세 상단 배너의 종목 색 — 웹이 종목 코드로 색을 고른다.
+    it('detail reports the sport code with the sport', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({ ...contactPolicyRow('open'), sport: { id: 'sport-1', name: '풋살', code: 'futsal' } });
+
+      const result = await service.detail(null, 'team-1');
+
+      expect(result.sport).toEqual({ sportId: 'sport-1', name: '풋살', code: 'futsal' });
+    });
+
     it('detail reports when the team was created', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({ ...contactPolicyRow('open'), createdAt: new Date('2026-10-01T03:00:00.000Z') });
 

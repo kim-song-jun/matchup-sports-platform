@@ -5550,9 +5550,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
  * 상단 팀 정보(로고·팀명·칩·숫자 3칸) → 팀 소개 → 가입 조건 → 활동 정보 → 참가 중인 경기(밑줄 탭) → 멤버.
  * 데스크톱은 가입 조건이 오른쪽 고정 카드로 간다(desktop/teams.css). */
 .tm-team-profile {
-  border: 1px solid var(--grey150);
-  border-radius: var(--radius-hero);
-  background: var(--bg);
+  /* 공용 카드(.tm-card)와 같은 지면·테두리·모서리 — 상세 요약도 다른 카드와 같은 틀(DESIGN.md §10). */
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
   overflow: hidden;
 }
 
@@ -5563,25 +5564,42 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background-color: var(--grey100);
 }
 
+/* 커버 사진이 없을 때의 종목 색 배너(배경은 인라인 그라디언트 — team-detail-profile.tsx sportBannerGradient). */
+.tm-team-profile-banner {
+  height: 64px;
+}
+
 .tm-team-profile-main {
-  padding: var(--spacing-5) var(--spacing-5) 0;
+  /* 카드 안쪽 여백은 16px 로 통일한다(DESIGN.md §2.1). */
+  padding: var(--spacing-4) var(--spacing-4) 0;
 }
 
 .tm-team-profile-identity {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-4);
+}
+
+/* 로고는 배너(사진·종목 색)에 반쯤 걸친다. 카드 지면색 링으로 배너와 떼어 낸다 — 다크에서도 지면색을 따른다. */
+.tm-team-profile-logo {
+  flex: none;
+  display: inline-flex;
+  margin-top: -40px;
+  border-radius: var(--radius-hero);
+  background: var(--card-surface);
+  box-shadow: 0 0 0 3px var(--card-surface);
 }
 
 .tm-team-profile-text {
   flex: 1;
   min-width: 0;
+  padding-top: var(--spacing-1);
 }
 
 .tm-team-profile-name {
   margin: 0;
   font-size: var(--font-size-heading);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
   color: var(--text-strong);
   overflow-wrap: anywhere;
@@ -5605,26 +5623,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   list-style: none;
 }
 
-.tm-team-profile-chip {
-  padding: var(--spacing-1) var(--spacing-3);
-  border-radius: var(--radius-pill);
-  background: var(--grey100);
-  color: var(--grey700);
-  font-size: var(--font-size-label);
-  font-weight: 600;
-}
-
-.tm-team-profile-chip-badge {
-  background: var(--blue50);
-  color: var(--blue700);
-}
-
 .tm-team-profile-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--spacing-2);
   margin: 0;
-  padding: var(--spacing-4) var(--spacing-5) var(--spacing-5);
+  padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
   list-style: none;
 }
 
@@ -5636,9 +5640,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: var(--spacing-1);
   min-height: 72px;
   padding: var(--spacing-3) var(--spacing-1);
-  border: 1px solid var(--grey150);
+  /* 카드 안의 칸은 배경 톤만으로 나눈다 — 테두리 상자를 겹치지 않는다(DESIGN.md §4.2).
+     grey50 은 흰 카드 위에서 거의 안 보여 한 단계 진한 grey100 을 쓴다. */
   border-radius: var(--radius-field);
-  background: var(--grey50);
+  background: var(--grey100);
   color: inherit;
   text-align: center;
   text-decoration: none;
@@ -5664,8 +5669,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-team-profile-footnote {
-  margin: calc(-1 * var(--spacing-2)) 0 0;
-  padding: 0 var(--spacing-5) var(--spacing-5);
+  margin: calc(-1 * var(--spacing-1)) 0 0;
+  padding: 0 var(--spacing-4) var(--spacing-4);
 }
 
 .tm-team-profile-stat-label {
@@ -5864,15 +5869,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-team-participation-row {
-  display: flex;
-  align-items: center;
+  /* 모양은 공용 목록 줄(.tm-list-row)이 맡고 — 바로 아래 멤버 줄과 같은 모양 — 여기서는 배지를 오른쪽 끝으로만 민다. */
   justify-content: space-between;
-  gap: var(--spacing-3);
-  min-height: 64px;
-  padding: var(--spacing-3) var(--spacing-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-field);
-  background: var(--bg);
   color: inherit;
   text-decoration: none;
 }

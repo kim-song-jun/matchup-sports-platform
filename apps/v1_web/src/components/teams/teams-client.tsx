@@ -540,6 +540,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       schedule: '',
       membershipFee: query.data.profile.membershipFee ?? null,
       isNew: isNewTeam(query.data.createdAt),
+      sportCode: query.data.sport.code ?? '',
       activityProfile: {
         days: query.data.profile.activityDays ?? [],
         timeSlots: query.data.profile.activityTimeSlots ?? [],

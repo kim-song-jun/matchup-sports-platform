@@ -21,6 +21,7 @@ import { ShareIcon } from '@/components/v1-ui/icons';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { optimizedCssUrl } from '@/lib/assets';
+import { getSportAccent } from '@/lib/v1-sport-accent';
 
 export type TeamDetailStat = {
   key: string;
@@ -38,11 +39,19 @@ type HeaderTeam = {
   coverImageUrl?: string | null;
   sport: string;
   region: string;
+  /** 커버 사진이 없을 때 배너 색을 고르는 종목 코드. 모르는 값이면 회색. */
+  sportCode?: string;
 };
 
 // 커버 배너 요청 폭. 데스크톱 본문 열(최대 약 760px)도 600 기준(2배 → 1200 단계)이면 장식용 배너로 충분하고,
 // 760 으로 잡으면 2배가 1920 단계로 넘어가 모바일까지 큰 사진을 받는다 — 예전 상세 히어로와 같은 값이다.
 const TEAM_COVER_BANNER_WIDTH = 600;
+
+/** 종목 색 배너 — 종목 아이콘 배지와 같은 135° 그라디언트. 종목을 모르면 회색 계열(FALLBACK)이다. */
+export function sportBannerGradient(sportCode: string | undefined): string {
+  const accent = getSportAccent(sportCode ?? '');
+  return `linear-gradient(135deg, ${accent.dot} 0%, ${accent.gradientTo} 100%)`;
+}
 
 export function TeamDetailHeader({
   team,
@@ -75,10 +84,16 @@ export function TeamDetailHeader({
           aria-hidden="true"
           style={{ backgroundImage: optimizedCssUrl(team.coverImageUrl, TEAM_COVER_BANNER_WIDTH) }}
         />
-      ) : null}
+      ) : (
+        // 커버 사진이 없으면 종목 색 배너 — 목록·대회 카드의 종목 아이콘과 같은 그라디언트(dot → gradientTo).
+        <div className="tm-team-profile-banner" aria-hidden="true" style={{ backgroundImage: sportBannerGradient(team.sportCode) }} />
+      )}
       <div className="tm-team-profile-main">
         <div className="tm-team-profile-identity">
-          <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+          {/* 로고는 배너에 반쯤 걸친다(흰 테두리로 배너와 떼어 낸다). */}
+          <span className="tm-team-profile-logo">
+            <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+          </span>
           <div className="tm-team-profile-text">
             <Name className="tm-team-profile-name" aria-hidden={nameAs === 'div' ? true : undefined}>{team.name}</Name>
             <div className="tm-text-caption tm-team-profile-meta">{[team.sport, team.region].filter(Boolean).join(' · ')}</div>
@@ -89,9 +104,10 @@ export function TeamDetailHeader({
         </div>
         {chips.length || badge ? (
           <ul className="tm-team-profile-chips" aria-label="팀 조건">
-            {badge ? <li className="tm-team-profile-chip tm-team-profile-chip-badge">{badge}</li> : null}
+            {/* 모양은 앱 공용 배지(.tm-badge) — 목록 카드·다른 상세와 같은 배지. tm-team-profile-chip* 는 표시용 이름표다. */}
+            {badge ? <li className="tm-badge tm-badge-blue tm-team-profile-chip tm-team-profile-chip-badge">{badge}</li> : null}
             {chips.map((chip) => (
-              <li key={chip} className="tm-team-profile-chip">{chip}</li>
+              <li key={chip} className="tm-badge tm-badge-grey tm-team-profile-chip">{chip}</li>
             ))}
           </ul>
         ) : null}
@@ -290,7 +306,7 @@ export function TeamParticipationList({ items }: { items: TeamParticipationItem[
     <ul className="tm-team-participation-list">
       {items.map((item) => (
         <li key={item.key}>
-          <Link className="tm-team-participation-row tm-pressable" href={item.href}>
+          <Link className="tm-list-row tm-pressable tm-team-participation-row" href={item.href}>
             <span className="tm-team-participation-text">
               <span className="tm-text-label tm-team-participation-title">{item.title}</span>
               {item.sub ? <span className="tm-text-caption">{item.sub}</span> : null}

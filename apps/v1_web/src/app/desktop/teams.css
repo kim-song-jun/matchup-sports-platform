@@ -282,16 +282,19 @@
     align-items: center;
   }
 
-  .tm-team-detail-desktop-main .tm-team-profile-cover {
+  .tm-team-detail-desktop-main .tm-team-profile-cover,
+  .tm-team-detail-desktop-main .tm-team-profile-banner {
     grid-column: 1 / -1;
   }
 
   .tm-team-detail-desktop-main .tm-team-profile-main {
-    padding: var(--spacing-5) 0 var(--spacing-5) var(--spacing-5);
+    /* 로고가 배너에 걸치도록 위에 붙인다(가운데 정렬이면 배너와 떨어질 수 있다). */
+    align-self: start;
+    padding: var(--spacing-4) 0 var(--spacing-4) var(--spacing-4);
   }
 
   .tm-team-detail-desktop-main .tm-team-profile-stats {
-    padding: var(--spacing-5);
+    padding: var(--spacing-4);
   }
 
   .tm-team-detail-desktop-main .tm-team-profile-footnote {

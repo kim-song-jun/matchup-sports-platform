@@ -71,7 +71,7 @@ const PAST_INVITATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const PAST_INVITATION_LIMIT = 50;
 
 type TeamWithRelations = V1Team & {
-  sport: { id: string; name: string };
+  sport: { id: string; name: string; code: string };
   region: { id: string; name: string; parent: { name: string } | null } | null;
   profile: {
     logoUrl: string | null;
@@ -233,7 +233,7 @@ export class TeamsService {
       status: team.status,
       visibility: 'public',
       sportName: team.sport.name,
-      sport: { sportId: team.sport.id, name: team.sport.name },
+      sport: { sportId: team.sport.id, name: team.sport.name, code: team.sport.code },
       regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
@@ -2358,7 +2358,8 @@ export class TeamsService {
 
   private teamInclude(user: V1AuthUser | null) {
     return {
-      sport: { select: { id: true, name: true } },
+      // code 는 팀 상세 상단 배너의 종목 색(웹 v1-sport-accent)에 쓴다.
+      sport: { select: { id: true, name: true, code: true } },
       region: { select: { id: true, name: true, parent: { select: { name: true } } } },
       profile: {
         select: {

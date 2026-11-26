@@ -1012,7 +1012,8 @@ export type V1TeamDetail = {
   status: string;
   visibility: string;
   sportName?: string;
-  sport: { sportId: string; name: string };
+  /** `code` 는 상세 상단 배너의 종목 색에 쓴다(옛 응답에는 없을 수 있다 — 그때는 회색). */
+  sport: { sportId: string; name: string; code?: string };
   regionName?: string | null;
   region: { regionId: string; name: string; parentName?: string | null } | null;
   joinPolicy?: 'approval_required' | 'closed';

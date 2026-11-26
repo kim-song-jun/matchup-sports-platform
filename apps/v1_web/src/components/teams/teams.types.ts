@@ -95,6 +95,8 @@ export type TeamDetailViewModel = {
     genderRule: string;
     /** 월 회비(원). 0 = 없음, null = 정하지 않음. */
     membershipFee?: number | null;
+    /** 종목 코드(`futsal`·`soccer` …) — 커버 사진이 없을 때 상단 배너를 이 종목 색으로 칠한다. */
+    sportCode?: string;
     /** 만든 지 3개월 미만 — 상단 칩 맨 앞에 '신생팀'을 단다. */
     isNew?: boolean;
     /** 활동 정보 두 줄(언제 / 어디서)의 원재료 — 화면이 선택지 라벨로 바꾼다. */

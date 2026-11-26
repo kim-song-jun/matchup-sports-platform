@@ -13,7 +13,7 @@
  */
 
 import Link from 'next/link';
-import type { KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarDays, MapPin } from 'lucide-react';
 import { readTopbarHeight } from '@/components/v1-ui/focus-below-topbar';
@@ -51,6 +51,15 @@ const TEAM_COVER_BANNER_WIDTH = 600;
 export function sportBannerGradient(sportCode: string | undefined): string {
   const accent = getSportAccent(sportCode ?? '');
   return `linear-gradient(135deg, ${accent.dot} 0%, ${accent.gradientTo} 100%)`;
+}
+
+/**
+ * 작은 상단 바의 종목 색 — 배너 색을 옅게 이어받는다(2026-11-27 사용자 확정 A안). 바탕은 종목 배지 바탕,
+ * 요약 줄은 종목 배지 글자색이다(배지와 같은 조합이라 대비가 검증돼 있다).
+ */
+export function sportCompactBarStyle(sportCode: string | undefined): CSSProperties {
+  const accent = getSportAccent(sportCode ?? '');
+  return { '--team-accent-soft': accent.badgeBg, '--team-accent-text': accent.badgeText } as CSSProperties;
 }
 
 export function TeamDetailHeader({
@@ -147,7 +156,7 @@ export function TeamDetailCompactBar({
   summary,
 }: {
   targetRef: RefObject<HTMLElement | null>;
-  team: Pick<HeaderTeam, 'id' | 'name' | 'logoUrl'>;
+  team: Pick<HeaderTeam, 'id' | 'name' | 'logoUrl' | 'sportCode'>;
   summary: string;
 }) {
   const [visible, setVisible] = useState(false);
@@ -164,7 +173,7 @@ export function TeamDetailCompactBar({
     return () => observer.disconnect();
   }, [targetRef]);
   return (
-    <div className="tm-team-compact-bar tm-hide-desktop" data-visible={visible ? 'true' : 'false'} aria-hidden="true">
+    <div className="tm-team-compact-bar tm-hide-desktop" style={sportCompactBarStyle(team.sportCode)} data-visible={visible ? 'true' : 'false'} aria-hidden="true">
       <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="md" />
       <div className="tm-team-compact-bar-text">
         <div className="tm-team-compact-bar-name">{team.name}</div>

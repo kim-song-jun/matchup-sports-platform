@@ -5690,7 +5690,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: var(--spacing-3);
   padding: var(--spacing-2) var(--v1-shell-page-x);
   border-bottom: 1px solid var(--grey150);
-  background: var(--bg);
+  /* 종목 색 바탕(배너 색을 옅게) — 값은 sportCompactBarStyle() 이 인라인 변수로 준다. 없으면 기본 바탕. */
+  background: var(--team-accent-soft, var(--bg));
   transform: translate(-50%, -8px);
   opacity: 0;
   visibility: hidden;
@@ -5725,6 +5726,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-team-compact-bar-summary {
+  /* 요약 줄은 진한 종목 색(배지 글자색) — tm-text-caption 색보다 뒤에 와야 이긴다. */
+  color: var(--team-accent-text, var(--text-caption));
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

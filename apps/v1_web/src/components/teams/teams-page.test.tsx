@@ -1854,3 +1854,26 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매일 · 저녁 · 실력 중심');
   });
 });
+
+describe('TeamDetailPageView — 작은 상단 바 종목 색(A안)', () => {
+  it.each([
+    ['futsal', 'var(--blue50)', 'var(--blue700)'],
+    ['soccer', 'var(--green50)', 'var(--green700)'],
+  ])('%s 팀은 바탕을 연한 종목 색, 요약 줄을 진한 종목 색으로 준다', (sportCode, soft, text) => {
+    const base = getTeamDetailViewModel('default');
+    const { container } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, sportCode } }} />);
+    const bar = container.querySelector<HTMLElement>('.tm-team-compact-bar')!;
+
+    expect(bar.style.getPropertyValue('--team-accent-soft')).toBe(soft);
+    expect(bar.style.getPropertyValue('--team-accent-text')).toBe(text);
+  });
+
+  it('CSS 는 그 변수로 바탕·요약 줄을 칠하고, 값이 없으면 기본 색으로 돌아간다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const bar = css.match(/\n\.tm-team-compact-bar\s*\{([^}]*)\}/)?.[1];
+    const summary = css.match(/\.tm-team-compact-bar-summary\s*\{([^}]*)\}/)?.[1];
+
+    expect(bar).toMatch(/background:\s*var\(--team-accent-soft,\s*var\(--bg\)\)/);
+    expect(summary).toMatch(/color:\s*var\(--team-accent-text,\s*var\(--text-caption\)\)/);
+  });
+});

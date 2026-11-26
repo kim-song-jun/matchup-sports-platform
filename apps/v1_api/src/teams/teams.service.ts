@@ -220,7 +220,11 @@ export class TeamsService {
     const viewer = dissolved ? dissolvedTeamViewer() : actualViewer;
     const archivedBy = dissolved && viewerIsOwner ? (await loadTeamArchivedBy(this.prisma, [team.id]))(team.id) : null;
     const canViewMembers = !dissolved && this.canViewMembers(team, viewer);
-    const canSendContact = dissolved ? undefined : await this.canSendContactTo(user, team, viewer);
+    // 팀 상세 상단의 '최근 3개월 N경기' — 목록 카드와 같은 함수·같은 기준(공개·공식 경기)으로 센다.
+    const [canSendContact, recentPlayedByTeam] = await Promise.all([
+      dissolved ? Promise.resolve(undefined) : this.canSendContactTo(user, team, viewer),
+      countRecentPlayedByTeam(this.prisma, [team.id], recentThreeMonthsSince(new Date())),
+    ]);
 
     return {
       id: team.id,
@@ -295,6 +299,9 @@ export class TeamsService {
         : [],
       memberCount: team.memberCount,
       managerCount: team.managerCount,
+      recentMatchCount: recentPlayedByTeam.get(team.id) ?? 0,
+      // 팀 상세 상단 '신생팀' 배지 — 만든 지 3개월이 안 됐는지는 화면이 이 값으로 판단한다.
+      createdAt: team.createdAt.toISOString(),
       trust: {
         trustState: team.trustScore?.trustState ?? 'none',
         score: team.trustScore?.mannerScore ? Number(team.trustScore.mannerScore) : null,

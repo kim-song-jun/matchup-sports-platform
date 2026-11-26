@@ -4285,6 +4285,8 @@ type TournamentListFilters = {
    */
   status?: 'open' | 'closed' | 'in_progress' | 'completed' | 'draft';
   sportId?: string;
+  /** 이 팀이 참가 확정된 대회·리그만(팀 상세 "참가 중인 경기 > 대회" 탭). */
+  teamId?: string;
   cursor?: string;
   /** 데스크톱 페이지 번호. cursor 와 함께 오면 서버가 page 를 택한다. */
   page?: number;
@@ -4294,11 +4296,13 @@ type TournamentListFilters = {
   genderCategory?: 'mixed' | 'male' | 'female';
 };
 
-export function useV1Tournaments(params?: TournamentListFilters, options?: { seed?: V1TournamentListPage }) {
+export function useV1Tournaments(params?: TournamentListFilters, options?: { seed?: V1TournamentListPage; enabled?: boolean }) {
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+    // 팀 상세처럼 보는 사람에 따라 이 목록이 필요 없는 화면이 끈다(기본은 켜짐).
+    enabled: options?.enabled,
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 목록이 빈 화면으로 깜빡이면
     // 스크롤 위치와 읽던 자리를 잃는다(어드민 목록과 같은 처리). 직전 페이지가 없는 첫
     // 진입에만 서버 seed 를 쓴다 — initialData 가 아니라 placeholder 라 실제 요청은 그대로 돈다.

@@ -155,3 +155,16 @@ export function buildTeamHref(params: URLSearchParams, overrides: Record<string,
   const queryString = next.toString();
   return queryString ? `/teams?${queryString}` : '/teams';
 }
+
+/**
+ * 만든 지 3개월(달력 기준)이 안 된 팀인가 — 팀 상세 '신생팀' 배지. 기준은 서버의 '최근 3개월'(`recentThreeMonthsSince`)과
+ * 같은 달력 3개월이다. 날짜가 없거나 읽을 수 없으면 배지를 달지 않는다.
+ */
+export function isNewTeam(createdAt: string | null | undefined, now: Date = new Date()): boolean {
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  const since = new Date(now.getTime());
+  since.setUTCMonth(since.getUTCMonth() - 3);
+  return created.getTime() >= since.getTime();
+}

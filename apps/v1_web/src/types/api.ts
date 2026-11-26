@@ -1064,6 +1064,10 @@ export type V1TeamDetail = {
   }>;
   memberCount: number;
   managerCount: number;
+  /** 최근 3개월 공개·공식 경기 수 — 목록 카드와 같은 기준. 옛 응답에는 없을 수 있다(그때 화면은 그 칸을 '—'로 둔다). */
+  recentMatchCount?: number;
+  /** 팀을 만든 시각(ISO). 3개월 미만이면 화면이 '신생팀' 배지를 단다. 옛 응답에는 없을 수 있다. */
+  createdAt?: string;
   trust: {
     trustState: TrustState;
     score: number | null;

@@ -53,6 +53,7 @@ function teamRow(overrides: Record<string, unknown> = {}) {
     managerCount: 1,
     membersVisible: true,
     ownerUserId: owner.id,
+    createdAt: new Date('2026-05-01T00:00:00.000Z'),
     updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     deletedAt: null,
     ...overrides,
@@ -989,6 +990,34 @@ describe('TeamsService', () => {
       const result = await service.detail(member, 'team-1');
 
       expect(result.contactPolicy).toBeUndefined();
+    });
+
+    // 팀 상세 상단의 '최근 3개월 N경기' — 목록 카드와 같은 집계(countRecentPlayedByTeam)를 이 팀 하나로 돌린다.
+    it('detail reports the recent three-month public official match count for this team', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(contactPolicyRow('open'));
+      prisma.$queryRaw.mockResolvedValueOnce([{ teamId: 'team-1', played: 14 }]);
+
+      const result = await service.detail(null, 'team-1');
+
+      expect(result.recentMatchCount).toBe(14);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    // 팀 상세 '신생팀' 배지의 원재료 — 화면이 만든 날짜로 3개월 미만인지 판단한다.
+    it('detail reports when the team was created', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({ ...contactPolicyRow('open'), createdAt: new Date('2026-10-01T03:00:00.000Z') });
+
+      const result = await service.detail(null, 'team-1');
+
+      expect(result.createdAt).toBe('2026-10-01T03:00:00.000Z');
+    });
+
+    it('detail reports 0 recent matches when the team has no counted games', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(contactPolicyRow('open'));
+
+      const result = await service.detail(null, 'team-1');
+
+      expect(result.recentMatchCount).toBe(0);
     });
   });
 

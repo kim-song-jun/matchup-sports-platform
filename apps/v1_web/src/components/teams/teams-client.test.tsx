@@ -33,6 +33,8 @@ const teamApiMocks = vi.hoisted(() => ({
   // 값을 돌려줄 때 tsc가 undefined 할당으로 잡는다(다른 훅 목들과 같은 형태로 맞춘다).
   useV1LeagueMatches: vi.fn(),
   useV1TeamCompetitionEntries: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })),
+  // 비회원 "참가 중인 경기 > 대회" 탭(GET /tournaments?kind=tournament&teamId=).
+  useV1Tournaments: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })),
   useV1TeamMembers: vi.fn(),
   useV1MyTeams: vi.fn(() => ({ data: undefined })),
   useV1TeamContactSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
@@ -171,6 +173,8 @@ describe('TeamDetailPageClient GA events', () => {
 
     const [applyButton] = await screen.findAllByRole('button', { name: '가입 신청' });
     fireEvent.click(applyButton);
+    // 가입 신청은 확인 한 번을 거친다(2026-11-26).
+    fireEvent.click(screen.getByRole('button', { name: '신청하기' }));
 
     await waitFor(() => {
       expect(joinMutateAsync).toHaveBeenCalledWith({ message: null });
@@ -575,10 +579,11 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
       expect(link.tabIndex).toBe(0);
       expect(link).not.toHaveAttribute('aria-hidden');
       expect(link).not.toHaveAttribute('aria-disabled');
+      // 순서(2026-11-26 개편): 상단 숫자 칸(받은 후기) → … → 팀 일정 → 주요 멤버.
       const reviews = within(block).getByRole('link', { name: /받은 후기/ });
       expect(reviews.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      const basicInfo = within(block).getByText('팀 개요');
-      expect(link.compareDocumentPosition(basicInfo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const members = within(block).getByText('주요 멤버');
+      expect(link.compareDocumentPosition(members) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(Boolean(within(block).queryByRole('link', { name: /정보 수정/ }))).toBe(role !== 'member');
     }
     expect(screen.getAllByRole('link', { name: /팀 일정/ })).toHaveLength(2);
@@ -594,14 +599,16 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(screen.queryByRole('link', { name: /팀 일정/ })).not.toBeInTheDocument();
   });
 
-  it('#1546 mobile 기록 묶음의 후기 다음 Tab은 일정 링크이며 Enter로 현재 href를 활성화한다', async () => {
+  it('#1546 mobile 일정 링크는 바로 앞 컨트롤에서 Tab 한 번으로 닿고 Enter로 현재 href를 활성화한다', async () => {
     const user = userEvent.setup();
     const { mobile } = renderScheduleEntry('owner');
-    const reviews = within(mobile).getByRole('link', { name: /받은 후기/ });
     const schedule = within(mobile).getByRole('link', { name: /팀 일정/ });
     const activation = vi.fn((event: Event) => event.preventDefault());
     schedule.addEventListener('click', activation);
-    reviews.focus();
+    // 일정 링크 앞의 마지막 포커스 대상(문서 순서)에서 Tab 한 번 — 사이에 포커스를 가로채는 것이 없어야 한다.
+    const focusables = Array.from(mobile.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]'));
+    const previous = focusables[focusables.indexOf(schedule) - 1];
+    previous.focus();
     await user.tab();
     expect(schedule).toHaveFocus();
     await user.keyboard('{Enter}');
@@ -983,7 +990,7 @@ describe('TeamDetailPageClient — 내 리그', () => {
     leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1'));
   });
 
-  it('참가 중인 리그가 없으면 "내 리그" 섹션 자체가 없다', () => {
+  it('참가 중인 리그가 없으면 리그 탭이 없다 — 매치·대회도 없으면 안내 한 줄', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
     teamApiMocks.useV1LeagueMatches.mockReturnValue({
@@ -993,7 +1000,8 @@ describe('TeamDetailPageClient — 내 리그', () => {
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /리그/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('아직 참가 중인 경기가 없어요')).toHaveLength(2);
   });
 
   it('리그 목록을 teamId 필터로 조회한다 (팀매치 역산이 아니라)', () => {
@@ -1027,12 +1035,13 @@ describe('TeamDetailPageClient — 내 리그', () => {
 
     expect(teamApiMocks.useV1TeamCompetitionEntries).toHaveBeenLastCalledWith('team-1', { enabled: true });
     expect(teamApiMocks.useV1LeagueMatches).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: 'team-1' }), { enabled: false });
-    // 데스크톱·모바일 레이아웃당 1개씩.
-    expect(screen.getAllByText('참가 중인 대회·리그')).toHaveLength(2);
+    // 팀원은 공개 대회 목록도 부르지 않는다 — 신청 줄이 같은 대회를 이미 담는다.
+    expect(teamApiMocks.useV1Tournaments).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: 'team-1' }), { enabled: false });
+    // 리그·대회 탭이 신청 줄을 그린다(데스크톱·모바일 레이아웃당 한 벌).
+    expect(screen.getAllByRole('tab', { name: /리그/ })).toHaveLength(2);
     screen.getAllByRole('link', { name: '가을 정규 리그 참가 선수 관리' }).forEach((link) =>
       expect(link).toHaveAttribute('href', '/tournaments/league-1/registrations/registration-league-1/roster?from=%2Fteams%2Fteam-1'),
     );
-    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
   });
 
   it('비회원에게는 참가 내역을 조회하지 않고 공개 리그 목록("내 리그")을 그대로 보인다', () => {
@@ -1048,8 +1057,42 @@ describe('TeamDetailPageClient — 내 리그', () => {
     render(<TeamDetailPageClient teamId="team-1" />);
 
     expect(teamApiMocks.useV1TeamCompetitionEntries).not.toHaveBeenCalledWith('team-1', { enabled: true });
-    expect(screen.queryByText('참가 중인 대회·리그')).not.toBeInTheDocument();
-    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /참가 선수/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /가을 리그/ })[0]).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1');
+  });
+
+  it('상세 응답의 createdAt 이 3개월 안이면 신생팀 배지를, 오래된 팀이면 달지 않는다', () => {
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null, hasNext: false } }, isLoading: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail({ createdAt: new Date(Date.now() - 7 * 86_400_000).toISOString() }), isError: false });
+    const { unmount } = render(<TeamDetailPageClient teamId="team-1" />);
+    expect(screen.getAllByText('신생팀')).toHaveLength(2);
+    unmount();
+
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail({ createdAt: '2024-01-01T00:00:00.000Z' }), isError: false });
+    render(<TeamDetailPageClient teamId="team-1" />);
+    expect(screen.queryByText('신생팀')).not.toBeInTheDocument();
+  });
+
+  it('비회원에게는 이 팀이 참가 확정된 공개 대회를 대회 탭에 보인다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'outsider', email: null, onboardingStatus: 'complete' }, profile: { displayName: '방문자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null, hasNext: false } }, isLoading: false });
+    teamApiMocks.useV1Tournaments.mockReturnValue({
+      data: { items: [{ id: 'cup-1', title: '티밋컵', status: 'open', scheduledAt: '2026-12-14T01:00:00.000Z' }], pageInfo: { nextCursor: null, hasNext: false } },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1Tournaments).toHaveBeenLastCalledWith({ kind: 'tournament', teamId: 'team-1', limit: 10 }, { enabled: true });
+    const cupLinks = screen.getAllByRole('link', { name: /티밋컵/ });
+    expect(cupLinks).toHaveLength(2);
+    expect(cupLinks[0]).toHaveAttribute('href', '/tournaments/cup-1?from=%2Fteams%2Fteam-1');
+    expect(cupLinks[0]).toHaveTextContent('모집 중');
   });
 });
 
@@ -1140,9 +1183,10 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       isError: false, isPlaceholderData: false,
     });
     render(<TeamDetailPageClient teamId="team-1" />);
-    screen.getAllByText('성별 조건').forEach((el) =>
-      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미설정'}`),
-    );
+    // 가입 조건 표(모바일 본문·데스크톱 고정 카드 두 벌)의 '성별' 줄.
+    const genderRows = screen.getAllByText('성별', { selector: '.tm-team-kv-row dt' });
+    expect(genderRows).toHaveLength(2);
+    genderRows.forEach((el) => expect(el.parentElement).toHaveTextContent(`성별${label || '성별 미설정'}`));
     expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' }).length).toBeGreaterThan(0);
   });
 

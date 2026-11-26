@@ -65,6 +65,8 @@ const server = setupServer(
   http.get(`*/api/v1/teams/${teamId}`, () => ok(detail)),
   http.get(`*/api/v1/teams/${teamId}/reviews`, () => ok({ bySport: [], highlight: null })),
   http.get('*/api/v1/league-matches', () => ok({ items: [], pageInfo: { nextCursor: null, hasNext: false } })),
+  // 비회원 "참가 중인 경기 > 대회" 탭(GET /tournaments?kind=tournament&teamId=).
+  http.get('*/api/v1/tournaments', () => ok({ items: [], pageInfo: { nextCursor: null, hasNext: false } })),
   http.get('*/api/v1/auth/me', () => HttpResponse.json({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: '로그인이 필요해요.' }, { status: 401 })),
   ...v1MswHandlers,
 );

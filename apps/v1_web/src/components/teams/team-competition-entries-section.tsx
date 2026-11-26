@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { formatTournamentDateMedium } from '@/lib/date-utils';
 import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { registrationRosterPath } from '@/lib/game-roster-routes';
@@ -70,72 +69,50 @@ export function toCompetitionEntryRows(
 }
 
 /**
- * 팀 상세 "참가 중인 대회·리그"(Task 180 R-1 B) — 활성 팀원만 본다. 줄을 누르면 대회·리그 상세,
- * 오른쪽 버튼은 참가 명단 화면으로 바로 간다. 진짜 0개면 섹션을 그리지 않고, 조회 실패는 재시도로 따로 보인다.
+ * 팀 상세 "참가 중인 경기"의 리그·대회 탭(팀원 전용, Task 180 R-1 B) — 신청 줄 목록. 줄을 누르면
+ * 대회·리그 상세, 오른쪽 버튼은 참가 명단 화면으로 바로 간다. 빈 목록·조회 실패는 탭이 따로 보인다.
  */
-export function TeamCompetitionEntriesSection({ model }: { model: TeamCompetitionEntriesModel }) {
-  const { rows, loading, error } = model;
-  if (!loading && !error && rows.length === 0) return null;
+export function TeamCompetitionEntryList({ rows }: { rows: TeamCompetitionEntryRow[] }) {
   return (
-    <>
-      <SectionTitle
-        title="참가 중인 대회·리그"
-        sub={
-          model.viewerCanManageRoster
-            ? '선수 추가·빼기와 등번호는 [참가 선수 관리]에서 고쳐요.'
-            : '참가 명단은 팀장·매니저가 고쳐요.'
-        }
-      />
-      {loading ? (
-        <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="참가 중인 대회·리그 불러오는 중">
-          {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
-          ))}
-        </div>
-      ) : error ? (
-        <EmptyState title="대회·리그 정보를 불러오지 못했어요" sub="잠시 후 다시 시도해 주세요." cta="다시 시도" onCta={model.onRetry} />
-      ) : (
-        <div className="tm-card" style={{ padding: '4px 16px' }}>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {rows.map((row, index) => (
-              <li
-                key={row.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '10px 0',
-                  borderBottom: index === rows.length - 1 ? undefined : '1px solid var(--border)',
-                }}
-              >
-                <Link
-                  href={row.href}
-                  style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44, justifyContent: 'center', color: 'inherit', textDecoration: 'none' }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <TeamGameKindBadge kind={row.kind} />
-                    <span className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.title}
-                    </span>
-                  </span>
-                  <span className="tm-text-caption">
-                    <span style={{ color: row.statusColor, fontWeight: 700 }}>{row.statusLabel}</span>
-                    {` · 선수 ${row.playerCount}명 · ${row.rosterNote}`}
-                  </span>
-                </Link>
-                <Link
-                  href={row.rosterHref}
-                  className={`tm-btn tm-btn-sm ${row.canEdit ? 'tm-btn-outline' : 'tm-btn-neutral'}`}
-                  style={{ minHeight: 44, flex: '0 0 auto' }}
-                  aria-label={`${row.title} 참가 선수 ${row.canEdit ? '관리' : '보기'}`}
-                >
-                  {row.canEdit ? '참가 선수 관리' : '참가 선수 보기'}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </>
+    <div className="tm-card" style={{ padding: '4px 16px' }}>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {rows.map((row, index) => (
+          <li
+            key={row.key}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 0',
+              borderBottom: index === rows.length - 1 ? undefined : '1px solid var(--border)',
+            }}
+          >
+            <Link
+              href={row.href}
+              style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44, justifyContent: 'center', color: 'inherit', textDecoration: 'none' }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <TeamGameKindBadge kind={row.kind} />
+                <span className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {row.title}
+                </span>
+              </span>
+              <span className="tm-text-caption">
+                <span style={{ color: row.statusColor, fontWeight: 700 }}>{row.statusLabel}</span>
+                {` · 선수 ${row.playerCount}명 · ${row.rosterNote}`}
+              </span>
+            </Link>
+            <Link
+              href={row.rosterHref}
+              className={`tm-btn tm-btn-sm ${row.canEdit ? 'tm-btn-outline' : 'tm-btn-neutral'}`}
+              style={{ minHeight: 44, flex: '0 0 auto' }}
+              aria-label={`${row.title} 참가 선수 ${row.canEdit ? '관리' : '보기'}`}
+            >
+              {row.canEdit ? '참가 선수 관리' : '참가 선수 보기'}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -104,6 +104,13 @@ function mockOwnerMembersPage(activeOwnerCount: number, { memberCount = activeOw
   return leaveMutate;
 }
 
+
+/** 가입 신청은 확인 한 번을 거친다(2026-11-26) — 버튼을 누르고 확인창의 [신청하기]까지 누른다. */
+function clickJoinAndConfirm(button: HTMLElement) {
+  fireEvent.click(button);
+  fireEvent.click(screen.getByRole('button', { name: '신청하기' }));
+}
+
 describe('TeamListPageView', () => {
   it('does not render sample team cards while the live team list is loading', () => {
     const base = getTeamListViewModel();
@@ -226,16 +233,20 @@ describe('TeamListPageView', () => {
 });
 
 describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
+  // 가입 조건 표(모바일 본문·데스크톱 고정 카드 두 벌)의 값 — 두 벌이 같은 말이어야 한다.
   function infoRowValue(label: string) {
-    const row = screen.getAllByText(label).map((node) => node.closest('.tm-team-info-row')).find(Boolean);
-    return row?.lastElementChild?.textContent;
+    const values = screen
+      .getAllByText(label, { selector: '.tm-team-kv-row dt' })
+      .map((dt) => dt.parentElement?.querySelector('dd')?.textContent);
+    expect(new Set(values).size).toBe(1);
+    return values[0];
   }
 
-  it('가입을 닫은 팀은 배지와 표가 같은 말(가입 닫힘)을 쓴다', () => {
+  it('가입을 닫은 팀은 상단 칩과 표가 같은 말(가입 닫힘)을 쓴다', () => {
     const base = getTeamDetailViewModel('default');
     render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'closed', statusLabel: '가입 닫힘' } }} />);
 
-    expect(screen.getAllByText('가입 닫힘', { selector: '.tm-badge' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('가입 닫힘', { selector: '.tm-team-profile-chip' }).length).toBeGreaterThan(0);
     expect(infoRowValue('가입 신청')).toBe('가입 닫힘');
     expect(screen.queryByText('모집 여부')).toBeNull();
   });
@@ -247,11 +258,26 @@ describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
     expect(infoRowValue('회비')).toBe(label);
   });
 
+  it('만든 지 3개월 미만 팀은 조건 칩 맨 앞에 신생팀을 단다 — 아니면 달지 않는다', () => {
+    const base = getTeamDetailViewModel('default');
+    const { container, unmount } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, isNew: true } }} />);
+    const firstChips = [...container.querySelectorAll('.tm-team-profile-chips')].map((list) => list.firstElementChild);
+    expect(firstChips).toHaveLength(2);
+    firstChips.forEach((chip) => {
+      expect(chip).toHaveTextContent('신생팀');
+      expect(chip).toHaveClass('tm-team-profile-chip-badge');
+    });
+    unmount();
+
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, isNew: false } }} />);
+    expect(screen.queryByText('신생팀')).not.toBeInTheDocument();
+  });
+
   it('가입 가능은 기본 상태라 배지 없이 표에만 적는다', () => {
     const base = getTeamDetailViewModel('default');
     render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'open', statusLabel: '가입 가능' } }} />);
 
-    expect(screen.queryByText('가입 가능', { selector: '.tm-badge' })).toBeNull();
+    expect(screen.queryByText('가입 가능', { selector: '.tm-team-profile-chip' })).toBeNull();
     expect(infoRowValue('가입 신청')).toBe('가입 가능');
   });
 });
@@ -296,10 +322,11 @@ describe('TeamDetailPageView', () => {
 
     render(<TeamDetailPageView model={model} />);
 
-    const introNodes = screen.getAllByText((_, node) => node?.textContent === introduction);
+    // 줄바꿈은 글자 그대로 두고 .tm-team-intro-text(white-space: pre-line)가 그린다 — 모바일·데스크톱 두 벌.
+    const introNodes = screen.getAllByText((_, node) => node?.tagName === 'P' && node.textContent === introduction);
     expect(introNodes).toHaveLength(2);
     introNodes.forEach((node) => {
-      expect(node).toHaveStyle({ whiteSpace: 'pre-line' });
+      expect(node).toHaveClass('tm-team-intro-text');
     });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: '라이브 팀' })).toBeInTheDocument();
@@ -351,11 +378,11 @@ describe('TeamDetailPageView', () => {
 
     // Promise.resolve(action())은 action()을 동기 평가하므로 sync throw가 .catch/.finally를
     // 건너뛰고 heroActionBusyRef를 영구 잠금 상태로 남긴다 — 이 테스트는 그 회귀를 잡는다.
-    fireEvent.click(ctaButton);
+    clickJoinAndConfirm(ctaButton);
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    fireEvent.click(ctaButton);
+    clickJoinAndConfirm(ctaButton);
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -376,21 +403,26 @@ describe('TeamDetailPageView', () => {
           <TeamDetailPageView model={model} />
         </QueryClientProvider>,
       );
-      const timersBeforeAction = vi.getTimerCount();
-
-      fireEvent.click(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      clickJoinAndConfirm(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      // 확인창의 닫힘 타이머를 먼저 끝까지 돌린다 — 닫히는 중에 떼면 화면 잠금이 다음 테스트로 샌다.
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+      // 다른 컴포넌트·렌더 환경의 타이머가 섞일 수 있어(CI 실측) 정확한 개수 대신 "안내 뒤에 늘고, 떼면 줄어든다"를 본다.
+      // window.setTimeout 을 spy 로 덮으면 가짜 타이머가 원래대로 안 돌아와 뒤 테스트가 멈춘다 — 개수로만 본다.
+      const timersBeforeMessage = vi.getTimerCount();
       await act(async () => {
         for (let i = 0; i < 5; i += 1) await Promise.resolve();
       });
 
       expect(screen.getAllByText('신청을 처리하지 못했어요.')).toHaveLength(2);
-      expect(vi.getTimerCount()).toBe(timersBeforeAction + 1);
+      const timersWithMessage = vi.getTimerCount();
+      expect(timersWithMessage).toBeGreaterThan(timersBeforeMessage);
 
       unmount();
-      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.getTimerCount()).toBeLessThan(timersWithMessage);
 
       await vi.advanceTimersByTimeAsync(4000);
-      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }
@@ -415,7 +447,11 @@ describe('TeamDetailPageView', () => {
         </QueryClientProvider>,
       );
 
-      fireEvent.click(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      clickJoinAndConfirm(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      // 확인창의 닫힘 타이머를 끝까지 돌려 화면 잠금을 푼 뒤 본다 — 닫히는 중에 떼면 다음 테스트로 잠금이 샌다.
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
       await act(async () => {
         for (let i = 0; i < 3; i += 1) await Promise.resolve();
       });
@@ -1311,12 +1347,17 @@ describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
  * 받은 후기 링크는 **내 팀에서만** 보여야 한다 — 이 요약 API 는 "로그인 사용자가 받은 팀
  * 후기"라, 남의 팀 상세에 두면 그 팀 것이 아니라 내 후기를 그 팀 평가인 양 보여주게 된다.
  */
-describe('TeamDetailPageView — 팀 기록 섹션', () => {
+/**
+ * 팀 기록(2026-11-26 개편) — 예전 "팀 기록" 링크 카드 묶음이 상단 숫자 칸으로 올라왔다.
+ * 최근 3개월 칸은 팀 전적으로, 후기 칸은 **내 팀에서만** 내 받은 후기 화면으로 간다 — 이 요약은
+ * 공개 엔드포인트라 남의 팀도 보이지만, /my/reviews 는 "내" 후기 화면이다.
+ */
+describe('TeamDetailPageView — 팀 기록 숫자 칸', () => {
   function modelWithMode(mode: TeamDetailViewModel['mode']): TeamDetailViewModel {
     return { ...getTeamDetailViewModel('default'), mode };
   }
 
-  it('내 팀이면 전적과 받은 후기 링크를 함께 보여주고, 요약을 배지로 적는다', () => {
+  it('내 팀이면 전적과 받은 후기 칸이 링크이고, 후기는 평균과 평가한 팀 수를 적는다', () => {
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: {
         bySport: [
@@ -1336,13 +1377,11 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(reviewLinks).toHaveLength(2);
     const reviewLink = reviewLinks[0];
     // 뒤로가기 출처(from=팀 상세 selfHref)를 담아야 후기 화면에서 이 팀으로 돌아온다.
-    // modelWithMode('mine')는 mode만 바꾸고 team 데이터는 'default'(team-1) 그대로다.
     expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received&from=%2Fteams%2Fteam-1');
-    // 종목별 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8.
-    // 단위는 후기 건수가 아니라 **평가한 팀 수**다 — 팀 평점이 팀당 1표로 계산되므로
-    // 가중치도 팀 수여야 하고, 배지도 같은 단위로 적어야 숫자가 거짓말을 하지 않는다.
+    // 종목별 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8. 단위는 후기 건수가 아니라 **평가한 팀 수**다.
+    expect(reviewLink).toHaveAccessibleName('받은 후기 평균 4.8점, 4팀');
     expect(reviewLink).toHaveTextContent('4.8');
-    expect(reviewLink).toHaveTextContent('4팀');
+    expect(reviewLink).toHaveTextContent('후기 4팀');
   });
 
   it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {
@@ -1353,45 +1392,58 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     render(<TeamDetailPageView model={modelWithMode('default')} />);
 
     // 요약은 보인다 — 공개 엔드포인트라 그 팀이 받은 평가가 맞다.
-    expect(screen.getAllByText('받은 후기').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('받은 후기 평균 4.5점, 2팀')).toHaveLength(2);
     // 하지만 링크는 아니다: /my/reviews 는 "내" 후기 화면이라 남의 팀에서 그리로 보내면 거짓말이 된다.
     expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
+    // 전적은 남의 팀도 공개다.
+    expect(screen.getAllByRole('link', { name: /팀 전적/ })[0]).toHaveAttribute('href', '/teams/team-1/records');
   });
 
-  // 설명 문장 대신 가장 많이 받은 태그를 문장으로 보여준다 — 누구의 평가인지(내 팀/남의 팀)에 맞춘 주어로.
-  it('공개된 후기가 충분하면 가장 많이 받은 태그를 한 문장으로, 모자라면 기존 안내를 보여준다', () => {
+  // 가장 많이 받은 태그는 숫자 칸 아래 한 줄로 — 누구의 평가인지(내 팀/남의 팀)에 맞춘 주어로.
+  it('공개된 후기가 충분하면 가장 많이 받은 태그를 한 줄로, 모자라면 그 줄을 두지 않는다', () => {
     const highlight = { tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, reviewCount: 12 };
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.6, ratingCount: 12, tagRates: [] }], availableMonths: [], highlight },
     });
-    const { unmount } = render(<TeamDetailPageView model={modelWithMode('default')} />);
-    const card = screen.getAllByText('받은 후기')[0].closest('.tm-team-detail-record-card');
-    expect(card).toHaveTextContent('이 팀과 뛴 팀들이 ‘매너가 좋아요’를 가장 많이 꼽았어요 (68%)');
+    const { container, unmount } = render(<TeamDetailPageView model={modelWithMode('default')} />);
+    const footnotes = container.querySelectorAll('.tm-team-profile-footnote');
+    expect(footnotes).toHaveLength(2);
+    expect(footnotes[0]).toHaveTextContent('이 팀과 뛴 팀들이 ‘매너가 좋아요’를 가장 많이 꼽았어요 (68%)');
     unmount();
 
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.6, ratingCount: 2, tagRates: [] }], availableMonths: [], highlight: null },
     });
-    render(<TeamDetailPageView model={modelWithMode('default')} />);
-    const plain = screen.getAllByText('받은 후기')[0].closest('.tm-team-detail-record-card');
-    expect(plain).toHaveTextContent('이 팀과 뛴 팀들이 남긴 평가예요.');
-    expect(plain).not.toHaveTextContent('가장 많이 꼽았어요');
+    const plain = render(<TeamDetailPageView model={modelWithMode('default')} />);
+    expect(plain.container.querySelectorAll('.tm-team-profile-footnote')).toHaveLength(0);
   });
 
-  it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
+  it('받은 후기가 아직 없으면 칸에 "후기 없음"을 적고, 남의 팀이면 링크가 아니다', () => {
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 
     render(<TeamDetailPageView model={modelWithMode('default')} />);
 
-    expect(screen.queryAllByText('받은 후기')).toHaveLength(0);
+    expect(screen.getAllByText('받은 후기 없음')).toHaveLength(2);
+    expect(screen.getAllByText('후기 없음')).toHaveLength(2);
+    expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
   });
 
-  it('받은 후기가 아직 없으면 배지 없이 안내만 보여준다', () => {
+  it('내 팀은 후기가 없어도 받은 후기 화면으로 가는 칸을 둔다', () => {
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 
     render(<TeamDetailPageView model={modelWithMode('mine')} />);
 
-    expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
+    expect(screen.getAllByRole('link', { name: '받은 후기 없음' })[0]).toHaveTextContent('후기 없음');
+  });
+
+  it('최근 3개월 경기 수를 적고, 값이 없는 옛 응답이면 "—"로 둔다', () => {
+    const base = modelWithMode('default');
+    const { unmount } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, recentMatchCount: 14 } }} />);
+    expect(screen.getAllByRole('link', { name: '최근 3개월 14경기, 팀 전적 보기' })[0]).toHaveTextContent('14경기');
+    unmount();
+
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, recentMatchCount: undefined } }} />);
+    expect(screen.getAllByRole('link', { name: '팀 전적 보기' })[0]).toHaveTextContent('—');
   });
 
   it('model.selfHref 가 있으면 그 값을 뒤로가기 출처로 우선 사용한다', () => {
@@ -1438,74 +1490,155 @@ describe('TeamStatePageView — 데스크톱 뒤로가기', () => {
 });
 
 /**
- * "내 리그" (R4, 2026-08-20) — 리그 상세로 가는 인앱 진입점이 team-matches 상세 화면의
- * 배지 하나뿐이었어서(team-matches-page.tsx 참고) 팀장·선수가 자기 팀의 리그를 발견할
- * 방법이 사실상 없었다. 팀 상세에 이 팀이 속한 리그 목록을 보여준다.
+ * 참가 중인 경기(2026-11-26 개편) — 매치·리그·대회를 밑줄 탭 하나로 묶는다. 비어 있는 탭은 숨기고,
+ * 불러오는 중·실패한 탭은 보인다(통신 오류를 "0개"로 위장하지 않는다 — 그룹 F 재감사). 셋 다 비면 안내 한 줄.
  */
-describe('TeamDetailPageView — 내 리그 섹션', () => {
-  function modelWithLeagues(
-    myLeagues: TeamDetailViewModel['myLeagues'],
-    myLeaguesLoading = false,
-    myLeaguesError = false,
-    onRetryMyLeagues?: () => void,
-  ): TeamDetailViewModel {
-    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading, myLeaguesError, onRetryMyLeagues };
+describe('TeamDetailPageView — 참가 중인 경기', () => {
+  const league = (id: string, title: string) => ({
+    leagueId: id,
+    title,
+    href: `/tournaments/${id}?from=%2Fteams%2Fteam-1`,
+    sub: '9월 1일 (월) ~ 11월 30일 (일)',
+    status: { label: '진행 중', badgeClass: 'tm-badge-green' },
+  });
+  type PublicTournaments = NonNullable<TeamDetailViewModel['publicTournaments']>;
+  const publicTournaments = (items: PublicTournaments['items'], extra: Partial<PublicTournaments> = {}): PublicTournaments => ({
+    items,
+    loading: false,
+    error: false,
+    onRetry: vi.fn(),
+    ...extra,
+  });
+  function model(overrides: Partial<TeamDetailViewModel>): TeamDetailViewModel {
+    return { ...getTeamDetailViewModel('default'), openMatches: [], myLeagues: [], publicTournaments: publicTournaments([]), ...overrides };
   }
+  // 모바일·데스크톱 두 벌이 함께 마운트된다 — 첫 벌(데스크톱)만 본다.
+  const firstTablist = () => screen.getAllByRole('tablist', { name: '참가 중인 경기 종류' })[0];
 
-  it('소속 리그가 있으면 리그별로 리그 상세 링크를 보여준다', () => {
+  it('매치·리그·대회가 있으면 탭 셋에 개수를 붙이고, 첫 탭(매치)을 먼저 연다', () => {
     render(
       <TeamDetailPageView
-        model={modelWithLeagues([
-          { leagueId: 'lg-1', title: '가을 리그', href: '/league-matches/lg-1' },
-          { leagueId: 'lg-2', title: '겨울 리그', href: '/league-matches/lg-2' },
-        ])}
+        model={model({
+          openMatches: [{ id: 'tm-1', title: '일요일 저녁 6파전', dateLabel: '11월 30일 (일) 19:00', venue: '잠실 풋살파크' }],
+          myLeagues: [league('lg-1', '가을 리그'), league('lg-2', '겨울 리그')],
+          publicTournaments: publicTournaments([
+            { id: 'cup-1', title: '티밋컵', href: '/tournaments/cup-1?from=%2Fteams%2Fteam-1', sub: '12월 14일 (일)', status: { label: '모집 중', badgeClass: 'tm-badge-blue' } },
+          ]),
+        })}
       />,
     );
 
-    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
-    // 모바일·데스크톱 두 레이아웃이 동시에 마운트되므로 리그당 2개씩 나온다.
-    const autumnLinks = screen.getAllByRole('link', { name: /가을 리그/ });
-    expect(autumnLinks).toHaveLength(2);
-    autumnLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
-    const winterLinks = screen.getAllByRole('link', { name: /겨울 리그/ });
-    expect(winterLinks).toHaveLength(2);
-    winterLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-2'));
+    const tabs = within(firstTablist()).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['매치1', '리그2', '대회1']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    const matchLink = screen.getAllByRole('link', { name: /일요일 저녁 6파전/ })[0];
+    // 뒤로가기가 이 팀 상세로 돌아오도록 출처를 함께 넘긴다.
+    expect(matchLink).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteams%2Fteam-1');
+    expect(matchLink).toHaveTextContent('모집 중');
+    expect(screen.queryByRole('link', { name: /가을 리그/ })).not.toBeInTheDocument();
   });
 
-  it('소속 리그가 없으면 "내 리그" 섹션 자체를 렌더하지 않는다 — 빈 섹션 노출 금지', () => {
-    render(<TeamDetailPageView model={modelWithLeagues([])} />);
+  it('리그 탭을 누르면 리그 상세 링크와 상태를 보이고, 화살표 키로 다음 탭으로 옮긴다', () => {
+    render(
+      <TeamDetailPageView
+        model={model({
+          openMatches: [{ id: 'tm-1', title: '일요일 저녁 6파전', dateLabel: '', venue: '' }],
+          myLeagues: [league('lg-1', '가을 리그')],
+          publicTournaments: publicTournaments([
+            { id: 'cup-1', title: '티밋컵', href: '/tournaments/cup-1', sub: '', status: { label: '예정', badgeClass: 'tm-badge-grey' } },
+          ]),
+        })}
+      />,
+    );
 
-    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+    const tablist = firstTablist();
+    fireEvent.click(within(tablist).getByRole('tab', { name: /리그/ }));
+    const leagueLink = screen.getAllByRole('link', { name: /가을 리그/ })[0];
+    expect(leagueLink).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1');
+    expect(leagueLink).toHaveTextContent('진행 중');
+
+    fireEvent.keyDown(within(tablist).getByRole('tab', { name: /리그/ }), { key: 'ArrowRight' });
+    expect(within(tablist).getByRole('tab', { name: /대회/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('link', { name: /티밋컵/ })[0]).toHaveAttribute('href', '/tournaments/cup-1');
   });
 
-  it('아직 로딩 중이면(빈 배열이어도) 섹션 제목과 스켈레톤을 보여준다', () => {
-    render(<TeamDetailPageView model={modelWithLeagues([], true)} />);
+  it('비어 있는 탭은 숨긴다 — 리그만 있으면 리그 탭 하나', () => {
+    render(<TeamDetailPageView model={model({ myLeagues: [league('lg-1', '가을 리그')] })} />);
 
-    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('내 리그 불러오는 중').length).toBeGreaterThan(0);
+    expect(within(firstTablist()).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['리그1']);
+    expect(screen.getAllByRole('link', { name: /가을 리그/ })).toHaveLength(2);
   });
 
-  /**
-   * 그룹 F 재감사 — myLeaguesQuery 가 실패하면 items도 빈 배열이 되어 위 "소속 리그가
-   * 없으면 섹션을 감춘다" 케이스와 화면이 100% 같아지던 결함. 에러 플래그가 있으면
-   * items가 비어 있어도 섹션이 감춰지지 않고 재시도 UI가 떠야 한다.
-   */
-  it('통신 오류면(items가 비어 있어도) 섹션을 감추지 않고 재시도 안내를 보여준다', () => {
-    render(<TeamDetailPageView model={modelWithLeagues([], false, true)} />);
+  it('셋 다 비면 탭 없이 안내 한 줄만 둔다', () => {
+    render(<TeamDetailPageView model={model({})} />);
 
-    expect(screen.queryByLabelText('내 리그 불러오는 중')).not.toBeInTheDocument();
-    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('tablist', { name: '참가 중인 경기 종류' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('아직 참가 중인 경기가 없어요')).toHaveLength(2);
   });
 
-  it('재시도 버튼을 누르면 onRetryMyLeagues가 호출된다', () => {
+  it('불러오는 중인 탭은 비어 있어도 감추지 않고 스켈레톤을 보인다', () => {
+    render(<TeamDetailPageView model={model({ myLeaguesLoading: true })} />);
+
+    expect(within(firstTablist()).getByRole('tab', { name: '리그' })).toBeInTheDocument();
+    expect(screen.getAllByLabelText('리그 불러오는 중').length).toBeGreaterThan(0);
+  });
+
+  it('통신 오류면(items가 비어 있어도) 탭을 감추지 않고 재시도를 보인다', () => {
     const onRetryMyLeagues = vi.fn();
-    render(<TeamDetailPageView model={modelWithLeagues([], false, true, onRetryMyLeagues)} />);
+    const onRetryTournaments = vi.fn();
+    render(
+      <TeamDetailPageView
+        model={model({ myLeaguesError: true, onRetryMyLeagues, publicTournaments: publicTournaments([], { error: true, onRetry: onRetryTournaments }) })}
+      />,
+    );
 
-    const retryButtons = screen.getAllByRole('button', { name: '다시 시도' });
-    fireEvent.click(retryButtons[0]);
-
+    expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '다시 시도' })[0]);
     expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(firstTablist()).getByRole('tab', { name: '대회' }));
+    expect(screen.getAllByText('대회 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '다시 시도' })[0]);
+    expect(onRetryTournaments).toHaveBeenCalledTimes(1);
+  });
+
+  it('팀원은 리그·대회 탭에서 신청 줄과 참가 명단 버튼을 본다(공개 목록 대신)', () => {
+    const entryRow = (key: string, kind: 'LEAGUE' | 'TOURNAMENT', title: string) => ({
+      key,
+      kind,
+      title,
+      href: `/tournaments/${key}`,
+      statusLabel: '참가 확정',
+      statusColor: 'var(--blue500)',
+      playerCount: 10,
+      rosterNote: '수정 가능',
+      rosterHref: `/tournaments/${key}/registrations/r/roster`,
+      canEdit: true,
+    });
+    render(
+      <TeamDetailPageView
+        model={model({
+          myLeagues: [league('lg-public', '공개 리그')],
+          competitionEntries: {
+            rows: [entryRow('lg-1', 'LEAGUE', '가을 정규 리그'), entryRow('cup-1', 'TOURNAMENT', '성수 풋살컵')],
+            viewerCanManageRoster: true,
+            loading: false,
+            error: false,
+            onRetry: vi.fn(),
+          },
+        })}
+      />,
+    );
+
+    const tablist = firstTablist();
+    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['리그1', '대회1']);
+    expect(screen.getAllByRole('link', { name: '가을 정규 리그 참가 선수 관리' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('선수 추가·빼기와 등번호는 [참가 선수 관리]에서 고쳐요.').length).toBeGreaterThan(0);
+    // 팀원에게는 공개 리그 목록을 그리지 않는다 — 신청 줄이 같은 리그를 이미 담는다.
+    expect(screen.queryByRole('link', { name: /공개 리그/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(tablist).getByRole('tab', { name: /대회/ }));
+    expect(screen.getAllByRole('link', { name: '성수 풋살컵 참가 선수 관리' }).length).toBeGreaterThan(0);
   });
 });
 

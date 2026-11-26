@@ -17,7 +17,7 @@ function teamRow(status: 'active' | 'archived', deletedAt: Date | null) {
   });
   return {
     id: 'team-1', name: '마포 FC', status, deletedAt, joinPolicy: 'approval_required', contactPolicy: 'open',
-    membersVisible: true, memberCount: 2, managerCount: 0, ownerUserId: OWNER.id, updatedAt: new Date('2026-09-01'),
+    membersVisible: true, memberCount: 2, managerCount: 0, ownerUserId: OWNER.id, createdAt: new Date('2026-05-01'), updatedAt: new Date('2026-09-01'),
     sport: { id: 'sport-1', name: '풋살' }, region: null, profile: null, joinApplications: [], trustScore: null,
     memberships: [membership(OWNER.id, 'owner'), membership(MEMBER.id, 'member')],
     ownerUser: { id: OWNER.id, profile: null },
@@ -32,6 +32,8 @@ function setup(row: ReturnType<typeof teamRow>, archivedByActor: 'user' | 'admin
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(null) },
+    // 상세의 '최근 3개월 N경기' 집계(countRecentPlayedByTeam).
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
   const service = new TeamsService(prisma as unknown as PrismaService, {} as NotificationsService, {} as ChatService);
   return { prisma, service };

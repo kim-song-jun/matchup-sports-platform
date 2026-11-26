@@ -42,25 +42,44 @@ function renderedStyle(ui: ReactElement, selector: string) {
   return doc.querySelector(selector)?.getAttribute('style') ?? null;
 }
 
+/** 배너의 인라인 style 속성 문자열 — CSS 변수가 든 그라디언트를 그대로 비교한다. */
+function renderedBannerStyles(container: HTMLElement) {
+  return [...container.querySelectorAll<HTMLElement>('.tm-team-profile-banner')].map((el) => el.getAttribute('style'));
+}
+
 describe('팀 상단 이미지', () => {
-  it('상세 히어로(모바일·데스크톱 두 카드)가 어두운 그라디언트 아래에서 1200 폭으로 받는다', () => {
+  it('상세 팀 정보 카드(모바일·데스크톱 두 벌)는 위쪽 배너로 사진을 1200 폭으로 받는다', () => {
     const base = getTeamDetailViewModel('default');
     const { container } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, coverImageUrl: COVER } }} />);
 
-    const heroes = container.querySelectorAll<HTMLElement>('.tm-team-detail-hero-card');
-    expect(heroes).toHaveLength(2);
-    for (const hero of heroes) {
-      expect(hero.style.backgroundImage).toContain('linear-gradient');
-      expect(firstImageRequest(hero.style.backgroundImage)).toEqual({ pathname: '/_next/image', url: COVER, w: '1200' });
+    // 2026-11-26 개편: 어두운 히어로 위 글자 대신 밝은 카드 위 배너 — 글자가 사진 위에 얹히지 않아 그라디언트가 필요 없다.
+    const banners = container.querySelectorAll<HTMLElement>('.tm-team-profile-cover');
+    expect(banners).toHaveLength(2);
+    for (const banner of banners) {
+      expect(banner).toHaveAttribute('aria-hidden', 'true');
+      expect(firstImageRequest(banner.style.backgroundImage)).toEqual({ pathname: '/_next/image', url: COVER, w: '1200' });
     }
   });
 
-  it('사진이 없으면 배경 이미지를 깔지 않는다', () => {
-    const { container } = render(<TeamDetailPageView model={getTeamDetailViewModel('default')} />);
+  it('사진이 있으면 종목 색 배너 대신 사진을 깐다', () => {
+    const base = getTeamDetailViewModel('default');
+    const { container } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, coverImageUrl: COVER, sportCode: 'soccer' } }} />);
 
-    for (const hero of container.querySelectorAll<HTMLElement>('.tm-team-detail-hero-card')) {
-      expect(hero.style.backgroundImage).toBe('');
-    }
+    expect(container.querySelectorAll('.tm-team-profile-banner')).toHaveLength(0);
+  });
+
+  it.each([
+    ['soccer', 'var(--green500)', 'var(--green600)'],
+    ['futsal', 'var(--blue500)', 'var(--brand-hero-gradient-end)'],
+    ['unknown-sport', 'var(--grey400)', 'var(--grey600)'],
+  ])('사진이 없으면 종목(%s) 색 그라디언트 배너를 깐다 — 모르는 종목은 회색', (sportCode, from, to) => {
+    const base = getTeamDetailViewModel('default');
+    const { container } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, coverImageUrl: null, sportCode } }} />);
+
+    expect(container.querySelectorAll('.tm-team-profile-cover')).toHaveLength(0);
+    const banners = renderedBannerStyles(container);
+    expect(banners).toHaveLength(2);
+    banners.forEach((style) => expect(style).toBe(`background-image: linear-gradient(135deg, ${from} 0%, ${to} 100%);`));
   });
 
   it('수정 폼의 미리보기도 같은 폭으로 받는다', () => {

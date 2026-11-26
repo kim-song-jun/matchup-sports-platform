@@ -5542,21 +5542,375 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 12px;
 }
 
-.tm-team-detail-hero-card {
-  background: var(--grey900);
-  color: var(--static-white);
-}
-
-/* [다크모드 회귀 fix] :root.dark는 --grey900을 #f2f4f6(거의 흰색)로 반전시킨다(304행) —
-   이 카드는 coverImageUrl 유무와 무관하게 항상 어두운 히어로 배경 위에 --static-white
-   텍스트를 얹는 디자인이므로, 다크모드에서 반전되지 않는 고정 다크 배경으로 오버라이드한다.
-   라이트모드 --grey900 리터럴(#191f28, 59행)을 그대로 재사용 — 새 토큰 발명 금지. */
-:root.dark .tm-team-detail-hero-card {
-  background: #191f28;
-}
-
 .tm-team-detail-body {
   padding: 20px 20px 128px;
+}
+
+/* ─── 팀 상세 개편(2026-11-26) ───────────────────────────────────────────────
+ * 상단 팀 정보(로고·팀명·칩·숫자 3칸) → 팀 소개 → 가입 조건 → 활동 정보 → 참가 중인 경기(밑줄 탭) → 멤버.
+ * 데스크톱은 가입 조건이 오른쪽 고정 카드로 간다(desktop/teams.css). */
+.tm-team-profile {
+  /* 공용 카드(.tm-card)와 같은 지면·테두리·모서리 — 상세 요약도 다른 카드와 같은 틀(DESIGN.md §10). */
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  overflow: hidden;
+}
+
+.tm-team-profile-cover {
+  height: 96px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--grey100);
+}
+
+/* 커버 사진이 없을 때의 종목 색 배너(배경은 인라인 그라디언트 — team-detail-profile.tsx sportBannerGradient). */
+.tm-team-profile-banner {
+  height: 64px;
+}
+
+.tm-team-profile-main {
+  /* 카드 안쪽 여백은 16px 로 통일한다(DESIGN.md §2.1). */
+  padding: var(--spacing-4) var(--spacing-4) 0;
+}
+
+.tm-team-profile-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+}
+
+/* 로고는 배너(사진·종목 색)에 반쯤 걸친다. 카드 지면색 링으로 배너와 떼어 낸다 — 다크에서도 지면색을 따른다. */
+.tm-team-profile-logo {
+  flex: none;
+  display: inline-flex;
+  margin-top: -40px;
+  border-radius: var(--radius-hero);
+  background: var(--card-surface);
+  box-shadow: 0 0 0 3px var(--card-surface);
+}
+
+.tm-team-profile-text {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--spacing-1);
+}
+
+.tm-team-profile-name {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.tm-team-profile-meta {
+  margin-top: var(--spacing-1);
+}
+
+.tm-team-profile-share {
+  align-self: flex-start;
+  flex: none;
+}
+
+.tm-team-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin: var(--spacing-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-team-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  list-style: none;
+}
+
+.tm-team-profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-1);
+  min-height: 72px;
+  padding: var(--spacing-3) var(--spacing-1);
+  /* 카드 안의 칸은 배경 톤만으로 나눈다 — 테두리 상자를 겹치지 않는다(DESIGN.md §4.2).
+     grey50 은 흰 카드 위에서 거의 안 보여 한 단계 진한 grey100 을 쓴다. */
+  border-radius: var(--radius-field);
+  background: var(--grey100);
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+
+.tm-team-profile-stat-value {
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.tm-team-profile-stat-value small {
+  margin-left: 1px;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tm-team-profile-star {
+  margin-right: 2px;
+  color: var(--yellow500);
+}
+
+.tm-team-profile-footnote {
+  margin: calc(-1 * var(--spacing-1)) 0 0;
+  padding: 0 var(--spacing-4) var(--spacing-4);
+}
+
+.tm-team-profile-stat-label {
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+}
+
+/* 모바일 축소 헤더 — 팀 정보가 상단바 뒤로 지나가면 상단바 바로 아래에 붙는다. */
+.tm-team-compact-bar {
+  position: fixed;
+  top: var(--v1-shell-topbar-height);
+  left: 50%;
+  width: min(100%, var(--v1-app-chrome-frame-width));
+  z-index: var(--z-raised);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--v1-shell-page-x);
+  border-bottom: 1px solid var(--grey150);
+  background: var(--bg);
+  transform: translate(-50%, -8px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out), visibility 0s linear 0.18s;
+}
+
+.tm-team-compact-bar[data-visible="true"] {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-team-compact-bar {
+    transition: none;
+  }
+}
+
+.tm-team-compact-bar-text {
+  min-width: 0;
+}
+
+.tm-team-compact-bar-name {
+  font-size: var(--font-size-body);
+  font-weight: 800;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-team-compact-bar-summary {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-team-section {
+  margin-top: var(--spacing-2);
+}
+
+.tm-team-intro-text {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--grey800);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.tm-team-intro-text-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tm-team-intro-more {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tm-team-kv {
+  margin: 0;
+}
+
+.tm-team-kv-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) 0;
+  font-size: var(--font-size-body);
+}
+
+.tm-team-kv-row + .tm-team-kv-row {
+  border-top: 1px solid var(--grey100);
+}
+
+.tm-team-kv-row dt {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.tm-team-kv-row dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.tm-team-kv .tm-team-kv-muted,
+.tm-team-activity .tm-team-kv-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tm-team-side-title {
+  margin-bottom: var(--spacing-1);
+}
+
+.tm-team-side-hint {
+  margin: 0;
+  text-align: center;
+}
+
+.tm-team-activity {
+  display: grid;
+  gap: var(--spacing-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-team-activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+}
+
+.tm-team-activity-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+
+.tm-team-activity-sub {
+  margin-top: 2px;
+}
+
+/* 참가 중인 경기 — 밑줄 탭(섹션 폭 3등분). */
+.tm-team-tabs {
+  display: flex;
+  margin-bottom: var(--spacing-3);
+  border-bottom: 1px solid var(--grey200);
+}
+
+.tm-team-tab {
+  flex: 1;
+  min-height: 44px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tm-team-tab[aria-selected="true"] {
+  color: var(--text-strong);
+  border-bottom-color: var(--grey900);
+}
+
+.tm-team-tab-count {
+  margin-left: var(--spacing-1);
+}
+
+.tm-team-participation-list {
+  display: grid;
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-team-participation-row {
+  /* 모양은 공용 목록 줄(.tm-list-row)이 맡고 — 바로 아래 멤버 줄과 같은 모양 — 여기서는 배지를 오른쪽 끝으로만 민다. */
+  justify-content: space-between;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tm-team-participation-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tm-team-participation-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-team-participation-badge {
+  flex: none;
+}
+
+.tm-team-participation-skeleton {
+  height: 64px;
+  border-radius: var(--radius-field);
+}
+
+.tm-team-participation-hint {
+  margin: 0 0 var(--spacing-2);
+}
+
+.tm-team-participation-empty {
+  display: grid;
+  gap: var(--spacing-1);
+  padding: var(--spacing-4);
+  background: var(--grey50);
+}
+
+.tm-team-hero-message {
+  margin-bottom: var(--spacing-2);
+  color: var(--text-caption);
 }
 
 /* Keep the basic-info card and member section as separate reading groups in both layouts.
@@ -5643,23 +5997,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding-inline: 0;
 }
 
-.tm-team-info-row {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-
-.tm-team-info-row:last-child,
 .tm-team-info-block:last-child {
   border-bottom: 0;
-}
-
-.tm-team-info-row .tm-text-body {
-  min-width: 0;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
 }
 
 .tm-team-info-block {
@@ -7027,11 +7366,6 @@ textarea.tm-chat-input-placeholder::placeholder {
      좌측 정렬되도록 — text-align:left와 일치(값이 우측에 잔류하지 않게). */
   .tm-info-row > div:last-child > div {
     justify-content: flex-start;
-  }
-
-  .tm-team-info-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
   }
 
   .tm-team-stat-grid {
@@ -11372,31 +11706,6 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
 
 .tm-team-detail-desktop-main > .tm-team-detail-record-card {
   margin-top: 24px;
-}
-
-.tm-team-detail-hero-identity {
-  margin-top: 16px;
-  padding: 12px;
-  border-radius: var(--radius-field);
-  background: var(--scrim-dark-72);
-}
-
-.tm-team-detail-info-group + .tm-team-detail-info-group {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.tm-team-detail-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 24px;
-}
-
-@media (max-width: 767px) {
-  .tm-team-detail-info-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Stable tournament destination colors. Index order is a public display contract. */

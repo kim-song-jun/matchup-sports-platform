@@ -68,8 +68,12 @@ describe('응답 마감 자동 리마인더', () => {
     await prisma.$disconnect();
   });
 
-  it('마감이 24시간 뒤면 마감 3시간 전으로 예약된다', async () => {
-    const deadline = at(24);
+  it('마감 3시간 전이 낮이면 그 시각에 그대로 예약된다', async () => {
+    // 마감 = 현재 기준 1~2일 뒤의 15:00 KST(= 06:00Z). 3시간 전은 12:00 KST 라 낮이다.
+    // 예전엔 `at(24)`(지금 + 24시간)를 써서, 00~12시 KST 에 돌면 3시간 전이 밤(21~09시)에 걸려
+    // 20:30 KST 로 앞당겨지고 이 단언이 깨졌다(CI 실측: 00:57 KST 실행에서 87분 차이).
+    const base = new Date(Date.now() + 48 * HOUR);
+    const deadline = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), 6, 0));
     const { id } = await create({ rsvpDeadlineAt: deadline.toISOString() });
     const [row] = await reminderRows(id);
 

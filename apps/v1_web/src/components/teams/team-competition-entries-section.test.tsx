@@ -1,11 +1,12 @@
 /**
- * 팀 상세 "참가 중인 대회·리그"(Task 180 R-1 B) — 서버 응답을 줄로 바꾸는 규칙과, 누가 [참가 선수 관리]를 보는지.
+ * 팀 상세 "참가 중인 경기"의 리그·대회 줄(Task 180 R-1 B) — 서버 응답을 줄로 바꾸는 규칙과, 누가 [참가 선수 관리]를 보는지.
+ * 탭·빈 목록·조회 실패는 teams-page.test.tsx 의 "참가 중인 경기" 묶음이 본다.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { v1TeamCompetitionEntriesFixture as fixture } from '@/test/msw/fixtures';
 import type { V1TeamCompetitionEntries, V1TeamCompetitionEntry } from '@/types/api';
-import { TeamCompetitionEntriesSection, toCompetitionEntryRows } from './team-competition-entries-section';
+import { TeamCompetitionEntryList, toCompetitionEntryRows } from './team-competition-entries-section';
 
 const SELF = '/teams/team-1';
 const FROM = `?from=${encodeURIComponent(SELF)}`;
@@ -19,18 +20,8 @@ function entries(items: Partial<V1TeamCompetitionEntry>[], viewerCanManageRoster
   };
 }
 
-function renderSection(data: V1TeamCompetitionEntries, extra: { loading?: boolean; error?: boolean; onRetry?: () => void } = {}) {
-  return render(
-    <TeamCompetitionEntriesSection
-      model={{
-        rows: toCompetitionEntryRows(data, SELF, NOW),
-        viewerCanManageRoster: data.viewerCanManageRoster,
-        loading: extra.loading ?? false,
-        error: extra.error ?? false,
-        onRetry: extra.onRetry ?? vi.fn(),
-      }}
-    />,
-  );
+function renderList(data: V1TeamCompetitionEntries) {
+  return render(<TeamCompetitionEntryList rows={toCompetitionEntryRows(data, SELF, NOW)} />);
 }
 
 describe('toCompetitionEntryRows', () => {
@@ -77,10 +68,9 @@ describe('toCompetitionEntryRows', () => {
   });
 });
 
-describe('TeamCompetitionEntriesSection', () => {
+describe('TeamCompetitionEntryList', () => {
   it('팀장에게 줄마다 신청 상태·선수 수와 [참가 선수 관리]·[참가 선수 보기]를 보인다', () => {
-    renderSection(fixture);
-    expect(screen.getByText('참가 중인 대회·리그')).toBeInTheDocument();
+    renderList(fixture);
     const league = screen.getByRole('link', { name: '가을 정규 리그 참가 선수 관리' });
     expect(league).toHaveTextContent('참가 선수 관리');
     expect(screen.getByRole('link', { name: '성수 풋살컵 참가 선수 보기' })).toHaveTextContent('참가 선수 보기');
@@ -90,20 +80,8 @@ describe('TeamCompetitionEntriesSection', () => {
   });
 
   it('팀원에게는 [참가 선수 보기]만 보인다', () => {
-    renderSection({ ...fixture, viewerCanManageRoster: false });
+    renderList({ ...fixture, viewerCanManageRoster: false });
     expect(screen.queryByRole('link', { name: /참가 선수 관리/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /참가 선수 보기$/ })).toHaveLength(2);
-    expect(screen.getByText('참가 명단은 팀장·매니저가 고쳐요.')).toBeInTheDocument();
-  });
-
-  it('신청이 하나도 없으면 섹션을 그리지 않고, 조회 실패는 재시도를 보인다', () => {
-    const { container, unmount } = renderSection(entries([]));
-    expect(container).toBeEmptyDOMElement();
-    unmount();
-
-    const onRetry = vi.fn();
-    renderSection(entries([]), { error: true, onRetry });
-    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

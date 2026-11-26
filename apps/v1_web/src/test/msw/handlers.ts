@@ -524,6 +524,10 @@ function teamDetail(teamId: string) {
     },
     membersPreview: [],
     managerCount: 0,
+    // 상세도 목록과 같은 기준의 최근 3개월 경기 수를 늘 싣는다(없으면 0).
+    recentMatchCount: team.recentMatchCount ?? 0,
+    // 만든 지 오래된 팀 — 신생팀 배지가 붙지 않는 기본값.
+    createdAt: '2025-01-01T00:00:00.000Z',
     trust: {
       trustState: team.trustState === 'none' ? 'sample' : team.trustState,
       score: null,

@@ -71,7 +71,7 @@ const PAST_INVITATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const PAST_INVITATION_LIMIT = 50;
 
 type TeamWithRelations = V1Team & {
-  sport: { id: string; name: string };
+  sport: { id: string; name: string; code: string };
   region: { id: string; name: string; parent: { name: string } | null } | null;
   profile: {
     logoUrl: string | null;
@@ -220,7 +220,11 @@ export class TeamsService {
     const viewer = dissolved ? dissolvedTeamViewer() : actualViewer;
     const archivedBy = dissolved && viewerIsOwner ? (await loadTeamArchivedBy(this.prisma, [team.id]))(team.id) : null;
     const canViewMembers = !dissolved && this.canViewMembers(team, viewer);
-    const canSendContact = dissolved ? undefined : await this.canSendContactTo(user, team, viewer);
+    // 팀 상세 상단의 '최근 3개월 N경기' — 목록 카드와 같은 함수·같은 기준(공개·공식 경기)으로 센다.
+    const [canSendContact, recentPlayedByTeam] = await Promise.all([
+      dissolved ? Promise.resolve(undefined) : this.canSendContactTo(user, team, viewer),
+      countRecentPlayedByTeam(this.prisma, [team.id], recentThreeMonthsSince(new Date())),
+    ]);
 
     return {
       id: team.id,
@@ -229,7 +233,7 @@ export class TeamsService {
       status: team.status,
       visibility: 'public',
       sportName: team.sport.name,
-      sport: { sportId: team.sport.id, name: team.sport.name },
+      sport: { sportId: team.sport.id, name: team.sport.name, code: team.sport.code },
       regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
@@ -295,6 +299,9 @@ export class TeamsService {
         : [],
       memberCount: team.memberCount,
       managerCount: team.managerCount,
+      recentMatchCount: recentPlayedByTeam.get(team.id) ?? 0,
+      // 팀 상세 상단 '신생팀' 배지 — 만든 지 3개월이 안 됐는지는 화면이 이 값으로 판단한다.
+      createdAt: team.createdAt.toISOString(),
       trust: {
         trustState: team.trustScore?.trustState ?? 'none',
         score: team.trustScore?.mannerScore ? Number(team.trustScore.mannerScore) : null,
@@ -2351,7 +2358,8 @@ export class TeamsService {
 
   private teamInclude(user: V1AuthUser | null) {
     return {
-      sport: { select: { id: true, name: true } },
+      // code 는 팀 상세 상단 배너의 종목 색(웹 v1-sport-accent)에 쓴다.
+      sport: { select: { id: true, name: true, code: true } },
       region: { select: { id: true, name: true, parent: { select: { name: true } } } },
       profile: {
         select: {

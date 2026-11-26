@@ -30,6 +30,37 @@ describe('listTournamentIds cursor validation', () => {
   });
 });
 
+describe('teamId filter (team detail "참가 중인 경기")', () => {
+  const build = async (query: Record<string, unknown>) => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values));
+      return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, query as never, { limit: 5 });
+    const statement = statements[0];
+    if (statement === undefined) throw new Error('The actual public list query was not built');
+    return statement;
+  };
+
+  it('keeps only competitions this team is confirmed in, bound as a value', async () => {
+    const teamId = '11111111-1111-4111-8111-111111111111';
+    const statement = await build({ teamId });
+    expect(statement.text).toMatch(
+      /EXISTS \(SELECT 1 FROM v1_tournament_registrations tr WHERE tr\.tournament_id = t\.id AND tr\.team_id = \$\d+ AND tr\.status::text = 'confirmed'\)/,
+    );
+    expect(statement.values).toContain(teamId);
+    // The public surface gates still apply on top of it.
+    expect(statement.text).toContain('t.is_public = true');
+    expect(statement.text).toContain('t.deleted_at IS NULL');
+  });
+
+  it('adds no registration condition without teamId', async () => {
+    const statement = await build({});
+    expect(statement.text).not.toContain('tr.team_id');
+  });
+});
+
 describe('MD-QA #145 public list capacity SQL binding', () => {
   it('compatible draft filter covers all pre-start league statuses without exposing tournament drafts', async () => {
     const statements: Prisma.Sql[] = [];

@@ -103,6 +103,15 @@ export class TournamentListQueryDto {
   sportId?: string;
 
   /**
+   * 이 팀이 **참가 확정(`confirmed`)** 된 대회·리그만. 팀 상세의 "참가 중인 경기 > 대회" 탭이 쓴다.
+   * 공개 리그 목록의 `teamId`(`ListLeagueMatchesQueryDto`)와 같은 기준이라 공개 범위가 넓어지지 않는다 —
+   * 확정 참가팀은 공개 대회 상세의 참가팀 목록에 이미 보인다. 신청 중·대기·취소는 담지 않는다.
+   */
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
+
+  /**
    * 담을 종류. **기본값은 `tournament`** — 지금까지의 동작을 그대로 유지한다.
    *
    * 기본값을 `all` 로 두지 않은 이유: 이 파라미터만 들어가고 화면이 아직 두 종류를 그리지

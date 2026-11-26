@@ -30,6 +30,7 @@ import {
   useV1TeamMatches,
   useV1TeamMembers,
   useV1TeamPages,
+  useV1Tournaments,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
@@ -37,7 +38,9 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
 import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
-import { formatTournamentDateShort } from '@/lib/date-utils';
+import { formatTournamentDateMedium, formatTournamentDateShort } from '@/lib/date-utils';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { teamErrorMessage } from '@/lib/team-error-messages';
 import { isTeamOperatorRole, normalizeMyTeamsResponse, TEAM_MANAGER_LIMIT } from '@/lib/team-role';
 import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
@@ -46,7 +49,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
-import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
+import { leagueStateLabel, sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { CursorPage, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { firstSearchParam, TEAM_LIST_PAGE_SIZE, teamListContinuationPath, teamListQueryFilters, teamListSeedPath, toTeamSort, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -65,12 +68,21 @@ import {
   buildTeamSportChips,
   deriveTeamScope,
   formatTeamRegion,
+  isNewTeam,
   splitTeamRegion,
   toTeam,
 } from './teams.card-model';
 
 type TeamListSeed = CursorListSeed<V1Team> & {
   readonly metadata?: CursorPage<V1Team>;
+};
+
+/** 공개 리그 상태 → 배지 색. 글자는 `leagueStateLabel` 이 정하고, 색은 대회 배지(`getTournamentStatusConfig`)와 같은 뜻으로 맞춘다. */
+const LEAGUE_STATE_BADGE: Record<'draft' | 'active' | 'completed' | 'on_hold', string> = {
+  draft: 'tm-badge-grey',
+  active: 'tm-badge-green',
+  completed: 'tm-badge-grey',
+  on_hold: 'tm-badge-orange',
 };
 
 export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = {}) {
@@ -459,7 +471,24 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     title: item.title,
     // profileHref와 같은 이유로 출처를 넘긴다 — 뒤로가기가 리그 목록이 아니라 이 팀으로.
     href: withFromPath(`/tournaments/${item.leagueId}`, selfHref),
+    sub: [formatTournamentDateMedium(item.startsOn), formatTournamentDateMedium(item.endsOn)].filter(Boolean).join(' ~ '),
+    status: { label: leagueStateLabel(item.state), badgeClass: LEAGUE_STATE_BADGE[item.state] },
   }));
+  // 비회원의 "참가 중인 경기 > 대회" — 팀원은 신청 줄(competitionEntries)로 같은 대회를 이미 본다.
+  const publicTournamentsQuery = useV1Tournaments(
+    { kind: 'tournament', teamId, limit: 10 },
+    { enabled: Boolean(query.data) && !memberView },
+  );
+  const publicTournaments = (publicTournamentsQuery.data?.items ?? []).map((item) => {
+    const status = getTournamentStatusConfig(item.status);
+    return {
+      id: item.id,
+      title: item.title,
+      href: competitionDetailHref({ isRegularLeague: false, competitionId: item.id, fromHref: selfHref }),
+      sub: formatTournamentDateMedium(item.scheduledAt) ?? '',
+      status: { label: status.label, badgeClass: status.badgeClass },
+    };
+  });
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -510,6 +539,15 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       condition: formatTeamDetailLevel(query.data),
       schedule: '',
       membershipFee: query.data.profile.membershipFee ?? null,
+      isNew: isNewTeam(query.data.createdAt),
+      sportCode: query.data.sport.code ?? '',
+      activityProfile: {
+        days: query.data.profile.activityDays ?? [],
+        timeSlots: query.data.profile.activityTimeSlots ?? [],
+        frequency: query.data.profile.activityFrequency ?? null,
+        types: query.data.profile.activityTypes ?? [],
+        area: query.data.profile.activityAreaText?.trim() || null,
+      },
       city: regionParts.city,
       county: regionParts.county,
       level: formatTeamDetailLevel(query.data) || '레벨 미설정',
@@ -636,6 +674,14 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     // 같은 쿼리를 다시 부르게 한다.
     myLeaguesError: myLeaguesQuery.isError,
     onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
+    publicTournaments: memberView
+      ? undefined
+      : {
+          items: publicTournaments,
+          loading: publicTournamentsQuery.isLoading,
+          error: publicTournamentsQuery.isError,
+          onRetry: () => void publicTournamentsQuery.refetch(),
+        },
     competitionEntries: memberView
       ? {
           rows: entriesQuery.data ? toCompetitionEntryRows(entriesQuery.data, selfHref) : [],
@@ -1261,6 +1307,8 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
     intro: team.profile.introduction ?? `${regionName}에서 활동하는 ${team.sport.name} 팀이에요.`,
     tags: [levelLabel, genderRule].filter(Boolean),
     next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '',
+    // 팀 상세 상단 '최근 3개월 N경기'. 값이 없는 옛 응답이면 undefined 그대로 — 화면이 '—'로 둔다.
+    recentMatchCount: team.recentMatchCount,
   };
 }
 

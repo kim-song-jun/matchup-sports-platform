@@ -3,7 +3,7 @@
  * 서버 프리렌더가 이 함수를 마스터 종목 없이도 호출하므로 두 경로를 모두 고정한다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildTeamSportChips, formatTeamCardMembers, formatTeamRegion, teamCardGenderLabel, toTeam } from './teams.card-model';
+import { buildTeamSportChips, formatTeamCardMembers, formatTeamRegion, isNewTeam, teamCardGenderLabel, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
 import type { V1Sport, V1Team } from '@/types/api';
 
@@ -179,5 +179,26 @@ describe('formatTeamCardMembers', () => {
   it('목표 인원이 있으면 현재/목표, 없으면 현재 인원만 쓴다', () => {
     expect(formatTeamCardMembers({ members: 9, capacity: 24 })).toBe('9/24명');
     expect(formatTeamCardMembers({ members: 3, capacity: 0 })).toBe('3명');
+  });
+});
+
+// 팀 상세 '신생팀' 배지 — 서버 '최근 3개월'과 같은 달력 3개월(UTC) 기준.
+describe('isNewTeam', () => {
+  const now = new Date('2026-11-26T06:00:00.000Z');
+
+  it('만든 지 3개월이 안 됐으면 신생팀, 딱 3개월 전 같은 시각까지 포함한다', () => {
+    expect(isNewTeam('2026-11-01T00:00:00.000Z', now)).toBe(true);
+    expect(isNewTeam('2026-08-26T06:00:00.000Z', now)).toBe(true);
+  });
+
+  it('3개월이 지났으면 신생팀이 아니다', () => {
+    expect(isNewTeam('2026-08-26T05:59:59.999Z', now)).toBe(false);
+    expect(isNewTeam('2025-01-01T00:00:00.000Z', now)).toBe(false);
+  });
+
+  it('날짜가 없거나 읽을 수 없으면 배지를 달지 않는다', () => {
+    expect(isNewTeam(undefined, now)).toBe(false);
+    expect(isNewTeam(null, now)).toBe(false);
+    expect(isNewTeam('not-a-date', now)).toBe(false);
   });
 });

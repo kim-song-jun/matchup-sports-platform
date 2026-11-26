@@ -206,8 +206,8 @@
 
 /* ─── Detail /teams/[id] ──────────────────────────────────────────────────────
  * 2-column body:
- *   LEFT  (flex 1): hero identity card + intro/info rows + member card
- *   RIGHT (~360px sticky): recruiting status + member count + join/apply CTA
+ *   LEFT  (flex 1): 팀 정보 카드 → 소개 → 활동 정보 → 참가 중인 경기 → 멤버
+ *   RIGHT (~360px sticky): 가입 조건 + 가입 신청·컨택 CTA
  * The .tm-fixed-cta (mobile join CTA) is hidden on desktop via .tm-hide-desktop
  * on the wrapper; a sticky right panel replaces it.
  */
@@ -232,15 +232,18 @@
     min-width: 0;
   }
 
-  /* Hero card: keep dark background, constrain to column */
-  .tm-team-detail-hero-card {
-    border-radius: var(--radius-hero);
+  /* 팀 정보 카드는 왼쪽 본문 폭에 맞춘다(오른쪽 고정 카드와 윗선이 같다). */
+  .tm-team-detail-desktop-main > .tm-team-profile {
+    margin-bottom: var(--spacing-2);
   }
 
-  /* Info rows: wider label column on desktop */
-  .tm-team-detail-desktop-main .tm-team-info-row {
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 16px;
+  .tm-team-detail-desktop-main .tm-team-profile-cover {
+    height: 120px;
+  }
+
+  /* 참가 중인 경기 카드는 넓은 본문에서 2열로 놓는다. */
+  .tm-team-detail-desktop-main .tm-team-participation-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* RIGHT: sticky sidebar card */
@@ -257,21 +260,6 @@
     gap: 16px;
   }
 
-  /* Status + member count row in sidebar */
-  .tm-team-detail-sidebar-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-
-  /* Divider inside sidebar */
-  .tm-team-detail-sidebar-divider {
-    height: 1px;
-    background: var(--grey100);
-    margin: 0;
-  }
-
   /* CTA button in sidebar */
   .tm-team-detail-sidebar-cta {
     display: grid;
@@ -283,6 +271,35 @@
   .tm-team-detail-desktop-layout {
     grid-template-columns: 1fr 400px;
     gap: 40px;
+  }
+}
+
+/* 넓은 화면에서는 팀 정보 카드를 한 줄로 — 왼쪽 정체성(로고·팀명·칩), 오른쪽 숫자 3칸. */
+@media (min-width: 1280px) {
+  .tm-team-detail-desktop-main .tm-team-profile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: center;
+  }
+
+  .tm-team-detail-desktop-main .tm-team-profile-cover,
+  .tm-team-detail-desktop-main .tm-team-profile-banner {
+    grid-column: 1 / -1;
+  }
+
+  .tm-team-detail-desktop-main .tm-team-profile-main {
+    /* 로고가 배너에 걸치도록 위에 붙인다(가운데 정렬이면 배너와 떨어질 수 있다). */
+    align-self: start;
+    padding: var(--spacing-4) 0 var(--spacing-4) var(--spacing-4);
+  }
+
+  .tm-team-detail-desktop-main .tm-team-profile-stats {
+    padding: var(--spacing-4);
+  }
+
+  .tm-team-detail-desktop-main .tm-team-profile-footnote {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 }
 

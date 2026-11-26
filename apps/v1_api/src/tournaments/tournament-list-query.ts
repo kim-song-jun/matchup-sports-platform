@@ -66,6 +66,12 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
     conditions.push(Prisma.sql`t.status::text = ${query.status}`);
   }
   if (query.sportId) conditions.push(Prisma.sql`t.sport_id = ${query.sportId}`);
+  // Team detail's "참가 중인 경기": only competitions this team is confirmed in — the same rule as the public league list's teamId.
+  if (query.teamId) {
+    conditions.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM v1_tournament_registrations tr WHERE tr.tournament_id = t.id AND tr.team_id = ${query.teamId} AND tr.status::text = 'confirmed')`,
+    );
+  }
   // The card's single state badge is the list's group, so the filter selects exactly the rows showing that badge.
   if (query.stage) conditions.push(Prisma.sql`(${GROUP_RANK_SQL}) = ${STAGE_RANK[query.stage]}`);
   if (query.genderCategory) conditions.push(Prisma.sql`t.gender_category::text = ${query.genderCategory}`);

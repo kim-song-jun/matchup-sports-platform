@@ -95,6 +95,19 @@ export type TeamDetailViewModel = {
     genderRule: string;
     /** 월 회비(원). 0 = 없음, null = 정하지 않음. */
     membershipFee?: number | null;
+    /** 종목 코드(`futsal`·`soccer` …) — 커버 사진이 없을 때 상단 배너를 이 종목 색으로 칠한다. */
+    sportCode?: string;
+    /** 만든 지 3개월 미만 — 상단 칩 맨 앞에 '신생팀'을 단다. */
+    isNew?: boolean;
+    /** 활동 정보 두 줄(언제 / 어디서)의 원재료 — 화면이 선택지 라벨로 바꾼다. */
+    activityProfile?: {
+      days: string[];
+      timeSlots: string[];
+      frequency: string | null;
+      types: string[];
+      /** 팀이 적은 활동 지역·메모(`activityAreaText`). */
+      area: string | null;
+    };
     membersList: Array<{ membershipId: string; userId: string; name: string; role: string; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
@@ -151,7 +164,14 @@ export type TeamDetailViewModel = {
    * R4: 전용 리그 API 없이 GET /team-matches?teamId= 응답의 league 필드만으로 구성한다.
    * 값이 비어 있으면(리그 소속 매치 없음) 섹션 자체를 렌더하지 않는다.
    */
-  myLeagues?: Array<{ leagueId: string; title: string; href: string }>;
+  myLeagues?: Array<{
+    leagueId: string;
+    title: string;
+    href: string;
+    /** 기간 같은 보조 한 줄. */
+    sub?: string;
+    status?: { label: string; badgeClass: string };
+  }>;
   myLeaguesLoading?: boolean;
   /**
    * 그룹 F 재감사: myLeaguesQuery 가 실패해도 items가 빈 배열이 되어 "참가 리그 0개"와
@@ -165,6 +185,16 @@ export type TeamDetailViewModel = {
    * 신청 상태·신청 id 는 팀 내부 정보라 비회원은 공개 리그 목록("내 리그")을 그대로 본다.
    */
   competitionEntries?: TeamCompetitionEntriesModel;
+  /**
+   * 비회원에게 — 이 팀이 참가 확정된 공개 대회(`GET /tournaments?kind=tournament&teamId=`).
+   * 팀원은 `competitionEntries` 의 대회 줄을 대신 본다.
+   */
+  publicTournaments?: {
+    items: Array<{ id: string; title: string; href: string; sub: string; status: { label: string; badgeClass: string } }>;
+    loading: boolean;
+    error: boolean;
+    onRetry: () => void;
+  };
 };
 
 export type TeamFormMode = 'create' | 'edit';

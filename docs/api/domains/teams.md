@@ -101,7 +101,9 @@ CAUTION:
 - Team list, detail, `/me/teams` responses include `activityDays`, `activityFrequency`,
   `activityTimeSlots`, `activityTypes`, `activityMemo`, `activitySummary`, `memberGoalCount`. 상세(`GET /teams/:teamId`)의 `profile`에는 `membershipFee`도 있다.
   `activityAreaText`는 기존 `activity_note` 컬럼을 쓰는 호환/폴백 필드로 남아 있다.
-- 목록 항목은 `recentMatchCount`(number, 0 이상)를 내려준다 — **최근 3개월**(UTC 기준 현재에서 3개월 전부터) 팀 전적에 잡힌 공개·공식 경기 수다. 팀 상세의 전적 요약과 같은 기준(그 게임의 현재 공식 리비전, 숨김·결과 비공개 경기와 비공개 대회 제외)을 `games/public-records/team-record-public-sql.ts` 한 곳에서 쓰고, 한 페이지 팀들을 쿼리 1번으로 센다. 경기가 없으면 `0`이다. 상세·`/me/teams` 응답에는 없다.
+- 목록 항목은 `recentMatchCount`(number, 0 이상)를 내려준다 — **최근 3개월**(UTC 기준 현재에서 3개월 전부터) 팀 전적에 잡힌 공개·공식 경기 수다. 팀 상세의 전적 요약과 같은 기준(그 게임의 현재 공식 리비전, 숨김·결과 비공개 경기와 비공개 대회 제외)을 `games/public-records/team-record-public-sql.ts` 한 곳에서 쓰고, 한 페이지 팀들을 쿼리 1번으로 센다. 경기가 없으면 `0`이다. 상세(`GET /teams/:teamId`)도 같은 함수·같은 기준으로 그 팀 하나를 세어 최상위 `recentMatchCount`로 내려준다(팀 상세 상단 숫자 칸). `/me/teams` 응답에는 없다.
+- 상세(`GET /teams/:teamId`)는 팀을 만든 시각 `createdAt`(ISO 8601 UTC)을 내려준다. 화면은 만든 지 3개월(달력 기준)이 안 된 팀에 '신생팀' 배지를 단다.
+- 상세의 `sport`는 `{ sportId, name, code }`다. `code`(`soccer`·`futsal` 등 `v1_sports.code`)로 화면이 상단 배너의 종목 색을 고른다(커버 사진이 있으면 사진이 대신한다).
 - 목록 항목은 `owner`(팀장 이름·사진)를 내려주고 매니저 이름은 내려주지 않는다 — 목록 카드가 팀장·매니저 줄을 쓰지 않는다(Task 180 G12·H2, 예전 `manager` 필드 제거).
 
 ## POST /teams (MutateTeamDto / CreateTeamDto)

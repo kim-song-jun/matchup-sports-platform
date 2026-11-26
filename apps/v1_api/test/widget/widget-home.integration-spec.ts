@@ -45,7 +45,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
   const tokenOf = async (userId: string) => (await as(userId).post('/me/widget-token').expect(201)).body.data.token as string;
   const homeOf = async (token: string) => (await bearer(token).get('/widget/home').expect(200)).body.data;
 
-  async function makeGame(key: string, input: { startOffsetMs: number; state: 'LIVE' | 'ENDED'; policy: 'LIVE' | 'HIDDEN'; mineIsAway?: boolean; endedAgoMs?: number; bumpedNow?: boolean }) {
+  async function makeGame(key: string, input: { startOffsetMs: number; state: 'SCHEDULED' | 'LIVE' | 'ENDED'; policy: 'LIVE' | 'HIDDEN'; mineIsAway?: boolean; endedAgoMs?: number; bumpedNow?: boolean }) {
     const [host, away] = input.mineIsAway ? [team2, team1] : [team1, team2];
     const teamMatch = await db.v1TeamMatch.create({
       data: {
@@ -160,6 +160,10 @@ describe('위젯 홈 HTTP/DB 계약', () => {
         ],
       },
     });
+    // 친선 팀 매치는 첫 득점을 기록하기 전까지 경기 상태가 SCHEDULED 다 — 킥오프가 지났으면(3시간 안) 진행 중 0 : 0 으로, 오래됐거나 아직 시작 전이면 안 나온다.
+    await makeGame('friendlyKickedOff', { startOffsetMs: -10 * MIN, state: 'SCHEDULED', policy: 'LIVE' });
+    await makeGame('friendlyStale', { startOffsetMs: -4 * HOUR, state: 'SCHEDULED', policy: 'LIVE' });
+    await makeGame('friendlyFuture', { startOffsetMs: 1 * HOUR, state: 'SCHEDULED', policy: 'LIVE' });
     const hidden = await makeGame('hidden', { startOffsetMs: -20 * MIN, state: 'LIVE', policy: 'HIDDEN' });
     await goal(hidden.gameId, hidden.side('HOME'));
     await makeGame('tooOld', { startOffsetMs: -13 * HOUR, state: 'LIVE', policy: 'LIVE' });
@@ -201,9 +205,12 @@ describe('위젯 홈 HTTP/DB 계약', () => {
 
   it('진행 중 경기: 우리 팀 기준 점수, 가린 경기는 점수 null, 13시간 넘은 진행 중·20분 전에 확정된 경기는 빠지고 방금 끝난 경기는 남는다(끝난 뒤 갱신돼도 옛 경기는 안 돌아온다)', async () => {
     const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; state: string; score: { mine: number; opponent: number } | null; penalties: unknown }>;
-    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.friendly, games.hidden, games.justEnded, games.endedAway, games.endedHidden]));
+    expect(new Set(live.map((g) => g.gameId))).toEqual(new Set([games.live, games.friendly, games.friendlyKickedOff, games.hidden, games.justEnded, games.endedAway, games.endedHidden]));
     expect(live.find((g) => g.gameId === games.live)!.score).toEqual({ mine: 2, opponent: 1 }); // 우리가 원정
     expect(live.find((g) => g.gameId === games.friendly)!.score).toEqual({ mine: 2, opponent: 1 }); // 친선: 공유 기록의 골
+    expect(live.find((g) => g.gameId === games.friendlyKickedOff)).toMatchObject({ state: 'LIVE', score: { mine: 0, opponent: 0 } }); // 득점 전 친선
+    expect(live.map((g) => g.gameId)).not.toContain(games.friendlyStale);
+    expect(live.map((g) => g.gameId)).not.toContain(games.friendlyFuture);
     expect(live.find((g) => g.gameId === games.hidden)!.score).toBeNull();
     const ended = live.find((g) => g.gameId === games.justEnded)!;
     expect(ended.state).toBe('ENDED');
@@ -211,7 +218,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect((ended as { score: unknown }).score).toEqual({ mine: 2, opponent: 1 }); // 우리가 홈
     expect(live.find((g) => g.gameId === games.endedAway)!.score).toEqual({ mine: 1, opponent: 2 }); // 우리가 원정
     expect(live.find((g) => g.gameId === games.endedHidden)!.score).toBeNull(); // 가린 경기는 끝나도 점수를 안 준다
-    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
+    expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
   });
 
   it('응답 대기: 훈련·모임 중 내가 응답 안 했고 마감 전인 것만, 마감이 가까운 순(마감 없는 것은 뒤)', async () => {

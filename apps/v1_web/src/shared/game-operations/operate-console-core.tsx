@@ -222,6 +222,7 @@ const COMMAND_LABEL: Record<
   string
 > = {
   start: '경기 시작',
+  'revert-start': '경기 시작 취소',
   pause: '일시 중지',
   resume: '재개',
   end: '경기 종료',
@@ -272,6 +273,7 @@ function commandLabel(
  * 여기서 "정지/재생/다음/멈춤/되돌리기"의 의미만 보탠다. */
 const COMMAND_ICON: Record<GameCommandName, typeof Pause> = {
   start: Play,
+  'revert-start': RotateCcw,
   pause: Pause,
   resume: Play,
   'end-period': SkipForward,
@@ -385,6 +387,7 @@ export function OperateConsoleCore({
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [startRevert, setStartRevert] = useState<{ summary: string; version: number; phrase: string } | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
@@ -487,6 +490,7 @@ export function OperateConsoleCore({
       setPendingCommandRetry(null);
       setCommandError(null);
       setCommandPending(false);
+      setStartRevert(null);
     }
     commandCanOperateRef.current = canOperate;
   }, [commandIdentityKey, commandScopeKey, canOperate]);
@@ -1422,7 +1426,7 @@ export function OperateConsoleCore({
         // retry now so a refetch failure cannot resend a committed command
         // with a new version and create a false VERSION_CONFLICT.
         setPendingCommandRetry(null);
-        if (command === 'end' && Object.prototype.hasOwnProperty.call(commandBody.payload, 'penalties')) {
+        if (command === 'revert-start' || (command === 'end' && Object.prototype.hasOwnProperty.call(commandBody.payload, 'penalties'))) {
           setPenaltyKicks(null);
           setFirstKickSideId(null);
         }
@@ -1491,6 +1495,19 @@ export function OperateConsoleCore({
       if (commandBlocked) return;
       const confirmedScope = captureCommandScope();
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
+      if (command === 'revert-start') {
+        const reversed = new Set(ops.liveEvents.map(event => event.reversesEventId));
+        const counts = new Map<string, number>();
+        for (const event of ops.liveEvents) {
+          if (event.type === 'CORRECTION' || event.type === 'TIME_CORRECTION' || reversed.has(event.id)) continue;
+          const name = ({ GOAL: '골', OWN_GOAL: '자책골', CARD: '카드', SUBSTITUTION: '교체', FOUL: '파울',
+            PERIOD_START: '피리어드 시작', PERIOD_END: '피리어드 종료', PAUSE: '일시 중지', RESUME: '재개' })[event.type];
+          counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+        const summary = [...counts].map(([name, count]) => `${name} ${count}건`).join(', ') || '없음';
+        setStartRevert({ summary, version: gameVersionRef.current, phrase: '' });
+        return;
+      }
       const copy = commandConfirmCopy(command, label, {
         sides: gameDetail.data?.sides ?? [],
         scoreBySideId,
@@ -1504,7 +1521,7 @@ export function OperateConsoleCore({
       if (!(await confirm(copy))) return;
       await handleRunCommand(command, {}, undefined, confirmedScope);
     },
-    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, penaltyShootoutTied, substitutionTracked, handleRunCommand, captureCommandScope, isCommandScopeCurrent],
+    [ops.liveEvents, commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, penaltyShootoutTied, substitutionTracked, handleRunCommand, captureCommandScope, isCommandScopeCurrent],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
@@ -2057,6 +2074,26 @@ export function OperateConsoleCore({
                 : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
           </Banner>
         )}
+        {leaseRequired && canOperate && matchInPlay && !sampleMode &&
+          (startRevert === null ? renderCommandButton('revert-start', false) : (
+            <form className="flex flex-col gap-3" aria-label="경기 시작 취소" onSubmit={async event => {
+              event.preventDefault();
+              if (startRevert.phrase !== '취소한다' || commandUnavailable) return;
+              if (gameVersionRef.current !== startRevert.version) {
+                setStartRevert(null); setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.'); return;
+              }
+              const confirmation = startRevert.phrase;
+              setStartRevert(null);
+              await handleRunCommand('revert-start', { confirmation });
+            }}>
+              <p>무효 처리할 경기 기록: {startRevert.summary}</p>
+              <label className="tm-text-label">경기 시계를 초기화하고 시작 전으로 돌아가려면 ‘취소한다’를 입력해 주세요.
+                <input className="tm-input" autoFocus autoComplete="off" value={startRevert.phrase}
+                  onChange={event => setStartRevert({ ...startRevert, phrase: event.target.value })} />
+              </label>
+              <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setStartRevert(null)}>돌아가기</Button>
+                <Button type="submit" disabled={commandUnavailable || startRevert.phrase !== '취소한다'}>경기 시작 취소 확정</Button></div>
+            </form>))}
         {gameState === 'SCHEDULED' && startBlockedByTeams && (
           <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
         )}

@@ -283,7 +283,7 @@ export interface GameEventsBackfill {
  * next_period`의 @deprecated 문서, apps/v1_api) 이 프런트 타입에서는
  * 아예 제거한다 — 새로 빌드되는 콘솔은 이 값을 절대 보내지 않는다.
  */
-export type GameCommandName = 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period';
+export type GameCommandName = 'revert-start' | 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period';
 
 export interface GameCommandRequest {
   expectedVersion: number;

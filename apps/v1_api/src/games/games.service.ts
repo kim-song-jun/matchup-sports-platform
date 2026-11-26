@@ -321,6 +321,7 @@ function parseStoredGameEventAppendResult(value: unknown): GameEventAppendResult
 
 export function gameAuthorizationAction(action: string): GameAuthorizationAction {
   switch (action) {
+    case 'game_revert_start':
     case 'game_start':
     case 'game_pause':
     case 'game_resume':
@@ -800,9 +801,11 @@ function parseKickCount(raw: unknown, key: 'takenHome' | 'takenAway'): number | 
  * 있다(`canonicalGameCommandPayloadHash`/`extractEndPenalties`와 같은 이유).
  */
 export function gameCommandAuditAction(
-  command: 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period' | 'next-period',
+  command: 'revert-start' | 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period' | 'next-period',
 ): string {
   switch (command) {
+    case 'revert-start':
+      return 'game_revert_start';
     case 'end-period':
       return 'game_end_period';
     case 'start-period':
@@ -1433,6 +1436,7 @@ export class GamesService {
       | 'end-period'
       | 'start-period'
       | 'revert-period'
+      | 'revert-start'
       | 'next-period',
     headerIdempotencyKey: string | undefined,
     dto: GameCommandDto,
@@ -1502,6 +1506,10 @@ export class GamesService {
         // 아래 C-1 주석의 사슬(취소 → completed → 자동 확정)이 다시 열린다.
         if (endingCancelledFixture) {
           return this.closeGameAsCancelled(tx, game, context);
+        }
+
+        if (command === 'revert-start') {
+          return this.revertGameStart(tx, game, context, dto.payload.confirmation);
         }
 
         // 이슈 #375 — 구 `next-period`(fused 종료+시작, 배포 호환용으로만
@@ -1911,8 +1919,9 @@ export class GamesService {
         message: '되돌릴 피리어드 전환이 없어요',
       });
     }
+    const kickoff = await tx.v1GamePeriod.findFirst({ where: { gameId: game.id, number: 1 }, select: { startedAt: true } });
     const nextPeriodEventCount = await tx.v1GameEvent.count({
-      where: { gameId: game.id, period: next.number },
+      where: { gameId: game.id, period: next.number, ...(kickoff?.startedAt ? { receivedAt: { gte: kickoff.startedAt } } : {}) },
     });
     if (nextPeriodEventCount > 0) {
       throw new ConflictException({
@@ -1963,6 +1972,35 @@ export class GamesService {
       durableCommandId: context.durableCommandId,
       replayed: false,
     };
+  }
+
+  private async revertGameStart(tx: Transaction, game: LockedGame, context: GameCommandContext, confirmation: unknown): Promise<GameMutationResult> {
+    const gameId = game.id;
+    if (confirmation !== '취소한다') {
+      throw new UnprocessableEntityException({ code: 'START_REVERT_CONFIRMATION_REQUIRED', message: '취소한다를 정확히 입력해 주세요.' });
+    }
+    if (game.state !== V1GameState.LIVE && game.state !== V1GameState.PAUSED) {
+      throw new ConflictException({ code: 'START_REVERT_NOT_AVAILABLE', message: '진행 중인 경기만 시작을 취소할 수 있어요.' });
+    }
+    if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE &&
+        !(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId))) throw this.forbidden();
+    const events = await tx.v1GameEvent.findMany({ where: { gameId }, orderBy: { sequence: 'asc' },
+      select: { id: true, type: true, reversesEventId: true, period: true, clockMs: true, sideId: true, participantId: true } });
+    const reversed = new Set(events.map(event => event.reversesEventId));
+    const active = events.filter(event => event.type !== 'CORRECTION' && event.type !== 'TIME_CORRECTION' && !reversed.has(event.id));
+    if (active.length) await tx.v1GameEvent.createMany({ data: active.map((event, index) => ({
+      gameId, sequence: game.lastSequence + index + 1, clientEventId: randomUUID(), payloadHash: context.payloadHash,
+      type: V1GameEventType.CORRECTION, sideId: event.sideId, participantId: event.participantId, period: event.period,
+      clockMs: event.clockMs, occurredAt: new Date(), actorUserId: actorStorageId(context.actor), reversesEventId: event.id,
+      payload: { reason: '경기 시작 취소', commandId: context.durableCommandId },
+    })) });
+    await tx.v1GamePeriod.updateMany({ where: { gameId }, data: {
+      state: V1GamePeriodState.SCHEDULED, startedAt: null, endedAt: null, pausedAt: null, pausedTotalMs: 0,
+    } });
+    const updated = await tx.v1Game.update({ where: { id: gameId }, data: {
+      state: V1GameState.SCHEDULED, version: { increment: 1 }, lastSequence: game.lastSequence + active.length,
+    } });
+    return { gameId, state: updated.state, version: updated.version, durableCommandId: context.durableCommandId, replayed: false };
   }
 
   async cancel(
@@ -5203,7 +5241,7 @@ export class GamesService {
               );
         // Serialize legacy writers with the shared score sheet on the Game lock.
         if ((input.action.startsWith('result_') || input.action.startsWith('event_') ||
-            ['game_start', 'game_end', 'game_pause', 'game_resume', 'game_next_period', 'game_end_period', 'game_start_period', 'game_revert_period'].includes(input.action)) &&
+            ['game_start', 'game_revert_start', 'game_end', 'game_pause', 'game_resume', 'game_next_period', 'game_end_period', 'game_start_period', 'game_revert_period'].includes(input.action)) &&
             game.sharedRecord) {
           throw new ConflictException({ code: 'SHARED_RECORD_REQUIRED', message: '공동 경기 기록 화면에서 수정해 주세요.' });
         }

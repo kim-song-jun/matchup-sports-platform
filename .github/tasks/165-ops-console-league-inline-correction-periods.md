@@ -236,3 +236,7 @@
 - [x] 관련 서비스 단위85건·API TypeScript PASS. 단위 mock 통과를 실제 DB HTTP GREEN으로 간주하지 않는다.
 - [ ] committed-tree 좁은 검증·일반 push·최신 PostgreSQL CI GREEN과 정식 재리뷰. 이 체크는 alpha QA 완료를 뜻하지 않는다.
 - Validation limitation: 로컬 Docker 접근 부재. 외부 임시 SQLite 진단도 schema engine 오류로 실행되지 않아 성공 근거로 사용하지 않았다. 실제 DB GREEN은 새 head CI로 확인한다.
+
+### 경기 시작 취소 (2026-11-26)
+
+대회·리그 진행 중 경기에서 정확한 확인 문구 ‘취소한다’를 UI와 API가 요구한다. 기록은 정정 이력으로 무효화하고 시계는 시작 전으로 되돌린다. 시간·구장·출전 명단은 유지하며 종료·확정 경기는 기존 결과 정정 경로를 사용한다.

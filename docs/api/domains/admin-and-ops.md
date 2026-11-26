@@ -457,3 +457,5 @@ MSW의 `[샘플]` 이력은 전용 fixture이며 실제 발송 완료처럼 생�
 - 대표 오류: `401 UNAUTHENTICATED`, `403 RECENT_LOGIN_REQUIRED`, `MEMBER_ACCESS_UNAVAILABLE`, `MEMBER_ACCESS_INVALID`, `MEMBER_ACCESS_EXPIRED`, `MEMBER_ACCESS_ENDED`, `MEMBER_ACCESS_REVOKED`, `MEMBER_ACCESS_READ_ONLY`, `MEMBER_ACCESS_SCOPE_DENIED`; 중첩 시작은 `409 MEMBER_ACCESS_ACTIVE`. 소켓/HTTP 실제 경계와 위조·재사용·만료·권한 회수·복귀를 테스트한다.
 - 회원 목록은 상태 변경 선택지에서 deleted를 제거한다. 기존 상태만 deleted인 계정은 상세에서 최종 삭제할 수 있고, deletedAt이 기록된 최종 삭제 계정은 복구/중복 삭제할 수 없다. 목록에도 deletedAt과 adminAccessStatus를 반환해 삭제 상태와 활성 관리자 여부를 구분한다. 과거 클라이언트의 상태 전이 API 계약은 보존한다.
 - DB 스키마·migration 변경 없음. MSW는 실제 연결 필요 오류를 반환하며 대리 접속 성공을 흉내 내지 않는다. UI는 기존 표·상세·확인 모달을 확장하며 상단에 조회 전용 안내/복귀 버튼을 유지한다.
+
+활성 관리자는 `GET /api/v1/admin/game-start-reverts`로 대회·리그의 경기 시작 취소 이력을 조회한다. page/limit 또는 cursor로 페이지를 넘기며 최신순이다. 경기 운영 감사 원본에서 실행자 회원 ID, 경기 ID·경기명, 처리 시각, 전후 상태를 조회한다. 신규 취소의 afterState.cancelledEventCount는 해당 명령으로 무효화된 원본 이벤트 수다.

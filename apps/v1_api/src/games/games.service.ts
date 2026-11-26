@@ -1974,7 +1974,7 @@ export class GamesService {
     };
   }
 
-  private async revertGameStart(tx: Transaction, game: LockedGame, context: GameCommandContext, confirmation: unknown): Promise<GameMutationResult> {
+  private async revertGameStart(tx: Transaction, game: LockedGame, context: GameCommandContext, confirmation: unknown): Promise<GameMutationResult & { cancelledEventCount: number }> {
     const gameId = game.id;
     if (confirmation !== '취소한다') {
       throw new UnprocessableEntityException({ code: 'START_REVERT_CONFIRMATION_REQUIRED', message: '취소한다를 정확히 입력해 주세요.' });
@@ -1985,7 +1985,7 @@ export class GamesService {
     if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE &&
         !(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId))) throw this.forbidden();
     const events = await tx.v1GameEvent.findMany({ where: { gameId }, orderBy: { sequence: 'asc' },
-      select: { id: true, type: true, reversesEventId: true, period: true, clockMs: true, sideId: true, participantId: true } });
+      select: { id: true, type: true, payload: true, reversesEventId: true, period: true, clockMs: true, sideId: true, participantId: true } });
     const reversed = new Set(events.map(event => event.reversesEventId));
     const active = events.filter(event => event.type !== 'CORRECTION' && event.type !== 'TIME_CORRECTION' && !reversed.has(event.id));
     if (active.length) await tx.v1GameEvent.createMany({ data: active.map((event, index) => ({
@@ -1994,13 +1994,24 @@ export class GamesService {
       clockMs: event.clockMs, occurredAt: new Date(), actorUserId: actorStorageId(context.actor), reversesEventId: event.id,
       payload: { reason: '경기 시작 취소', commandId: context.durableCommandId },
     })) });
+    let lastSequence = game.lastSequence + active.length;
+    const latest = events.at(-1);
+    if (!active.length && latest && !(latest.type === 'CORRECTION' && jsonObject(latest.payload).reason === '경기 시작 취소' &&
+        typeof jsonObject(latest.payload).commandId === 'string')) {
+      // Even when each event was undone individually, the next kickoff starts with an empty history.
+      await tx.v1GameEvent.create({ data: {
+        gameId, sequence: ++lastSequence, clientEventId: randomUUID(), payloadHash: context.payloadHash,
+        type: V1GameEventType.CORRECTION, period: latest.period, clockMs: latest.clockMs, occurredAt: new Date(),
+        actorUserId: actorStorageId(context.actor), payload: { reason: '경기 시작 취소', commandId: context.durableCommandId },
+      } });
+    }
     await tx.v1GamePeriod.updateMany({ where: { gameId }, data: {
       state: V1GamePeriodState.SCHEDULED, startedAt: null, endedAt: null, pausedAt: null, pausedTotalMs: 0,
     } });
     const updated = await tx.v1Game.update({ where: { id: gameId }, data: {
-      state: V1GameState.SCHEDULED, version: { increment: 1 }, lastSequence: game.lastSequence + active.length,
+      state: V1GameState.SCHEDULED, version: { increment: 1 }, lastSequence,
     } });
-    return { gameId, state: updated.state, version: updated.version, durableCommandId: context.durableCommandId, replayed: false };
+    return { gameId, cancelledEventCount: active.length, state: updated.state, version: updated.version, durableCommandId: context.durableCommandId, replayed: false };
   }
 
   async cancel(

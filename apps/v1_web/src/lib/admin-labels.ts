@@ -45,6 +45,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'match.online.update': '매치 온라인 장소 분류 변경',
   'team.status.update': '팀 상태 변경',
   'team.rename': '보관 팀 이름 변경',
+  GAME_REVERT_START: '경기 시작 취소',
   'team_match.status.update': '팀매치 상태 변경',
   // 관리자
   'admin.grant': '관리자 권한 부여',
@@ -96,6 +97,7 @@ const TARGET_TYPE_LABEL_MAP: Record<string, string> = {
   team: '팀',
   team_join_application: '팀 가입 신청',
   team_membership: '팀 멤버십',
+  game: '경기',
   team_match: '팀매치',
   team_match_application: '팀매치 신청',
   tournament: '대회',

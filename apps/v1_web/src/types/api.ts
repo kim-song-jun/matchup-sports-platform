@@ -2977,7 +2977,8 @@ export type V1AdminOverview = {
 
 export type V1AdminLog = {
   actionLogId: string;
-  adminUserId: string;
+  adminUserId: string | null;
+  actorUserId?: string | null;
   actionType: string;
   targetType: string;
   targetId: string;

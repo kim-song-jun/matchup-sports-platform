@@ -5,6 +5,8 @@ import { tallyLiveScore } from '../games/public-records/public-live-score';
 /** 진행 중인 경기는 시작한 지 이만큼까지만 보여준다 — 운영자가 종료를 깜빡한 경기가 위젯에 계속 남지 않게(대부분 30분 안에 끝난다). */
 export const WIDGET_LIVE_MAX_AGE_MS = 12 * 60 * 60 * 1_000;
 /** 끝난 경기는 이 시간 동안만 「방금 끝남」으로 최종 점수(승부차기 포함)를 보여준다. 승부차기는 종료할 때 한꺼번에 기록돼 진행 중에는 서버가 모른다. */
+/** 친선 팀 매치는 첫 득점을 기록해야 경기 상태가 진행 중이 된다. 득점 전이라도 킥오프가 지났으면 이 시간 동안은 진행 중으로 본다(공개 목록의 「진행 중」과 같은 기준). */
+export const WIDGET_FRIENDLY_STARTED_MS = 3 * 60 * 60 * 1_000;
 export const WIDGET_JUST_ENDED_MS = 15 * 60 * 1_000;
 export const WIDGET_PENDING_LIMIT = 3;
 export const WIDGET_SCHEDULE_LIMIT = 4;

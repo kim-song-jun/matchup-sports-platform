@@ -11,6 +11,7 @@ import {
   endedGameScore,
   perspectiveScore,
   tallyGameScore,
+  WIDGET_FRIENDLY_STARTED_MS,
   WIDGET_JUST_ENDED_MS,
   WIDGET_LIVE_MAX_AGE_MS,
   WIDGET_PENDING_LIMIT,
@@ -177,6 +178,11 @@ export class WidgetHomeService {
         sides: { some: { teamId: { in: teamIds } } },
         OR: [
           { state: { in: ['LIVE', 'PAUSED'] }, teamMatch: { is: { startAt: { gte: new Date(now.getTime() - WIDGET_LIVE_MAX_AGE_MS) } } } },
+          // 친선 팀 매치: 첫 득점을 기록하기 전까지 경기 상태는 SCHEDULED 라 킥오프가 지난 것으로 따로 잡는다(점수는 0 : 0).
+          {
+            state: 'SCHEDULED',
+            teamMatch: { is: { status: 'matched', leagueId: null, tournamentId: null, startAt: { lte: now, gte: new Date(now.getTime() - WIDGET_FRIENDLY_STARTED_MS) } } },
+          },
           // 종료 시각 컬럼이 없어 공식 결과가 확정된 시각으로 잰다(`updatedAt` 은 끝난 뒤 정정·갱신에도 바뀐다). 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다.
           { state: 'ENDED', currentOfficialRevision: { is: { createdAt: { gte: new Date(now.getTime() - WIDGET_JUST_ENDED_MS) } } } },
         ],
@@ -213,11 +219,13 @@ export class WidgetHomeService {
     const items: WidgetLiveGame[] = [];
     for (const game of games) {
       const mine = game.sides.find((side) => side.teamId !== null && teamIdSet.has(side.teamId));
-      if (mine === undefined || (game.state !== 'LIVE' && game.state !== 'PAUSED' && game.state !== 'ENDED')) continue;
+      if (mine === undefined || (game.state !== 'SCHEDULED' && game.state !== 'LIVE' && game.state !== 'PAUSED' && game.state !== 'ENDED')) continue;
+      // 킥오프가 지난 친선 경기는 아직 SCHEDULED 여도 진행 중으로 보인다.
+      const state = game.state === 'SCHEDULED' ? 'LIVE' : game.state;
       const mode = effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'HIDDEN', liveEnabled);
       let score: WidgetPerspectiveScore | null = null;
       let penalties: WidgetPerspectiveScore | null = null;
-      if (game.state === 'ENDED') {
+      if (state === 'ENDED') {
         // 끝난 경기는 공식 결과를 보여 주되, 운영자가 가린 경기(hidden·status_only)는 숨긴다.
         if (mode === 'live' || mode === 'official_only') {
           ({ score, penalties } = endedGameScore(game, mine.sideKey));
@@ -232,7 +240,7 @@ export class WidgetHomeService {
         title: game.teamMatch?.title ?? '경기',
         opponentName: game.sides.find((side) => side.id !== mine.id)?.displayNameSnapshot ?? null,
         competitionKind: game.teamMatch?.tournamentId ? 'TOURNAMENT' : game.teamMatch?.leagueId ? 'LEAGUE' : 'FRIENDLY',
-        state: game.state,
+        state,
         startedAt: game.teamMatch?.startAt ?? null,
         score,
         penalties,

@@ -196,8 +196,11 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     await prisma.v1TeamMatch.create({ data: {
       id: fixtureId, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam,
       approvedApplicantTeamId: ids.awayTeam, title: '시작 취소', status: 'matched', startAt: new Date(),
-      competitionConfigVersionId, tournamentDetails: { create: { tournamentId: ids.tournament, round: 'group',
-        fixtureNumber: 5, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration } },
+      competitionConfigVersionId,
+    } });
+    await prisma.v1TournamentMatchDetails.create({ data: {
+      teamMatchId: fixtureId, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, legNumber: 1,
+      homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration,
     } });
     const input: GameSourceCreationInput = { sourceType: V1GameSourceType.TEAM_MATCH, sourceId: fixtureId, competitionConfigVersionId,
       sides: [{ sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: '홈' },

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
+import type { ReactNode } from 'react';
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -31,6 +32,12 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
 }));
 vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile-screen', () => ({
   BracketCanvasMobileScreen: () => null,
+}));
+vi.mock('@/components/admin/stages/stage-plan-toolbar', () => ({
+  StagePlanToolbar: () => <button>단계·진출팀 관리</button>,
+}));
+vi.mock('@/components/admin/bracket-canvas/fixture-assignment-workspace', () => ({
+  FixtureAssignmentWorkspace: ({ toolbar, children }: { toolbar: ReactNode; children: ReactNode }) => <div>{toolbar}<button>시간 배정</button><button>구장 배정</button>{children}</div>,
 }));
 vi.mock('../bracket-tab', () => ({
   BracketTab: (props: { tournamentId: string; canWrite: boolean; bracketPublishedAt: string | null | undefined; confirmedTeamCount: number; confirmedTeamCountStatus: string }) => (
@@ -123,6 +130,14 @@ describe('AdminTournamentBracketPage — [그림 | 목록]', () => {
 });
 
 describe('AdminTournamentBracketPage — 신청 목록 조회 상태를 그림 화면에 넘긴다', () => {
+  it.each(['', 'view=list'])('stagePlan이 있는 league 형식도 단계·시간·구장 도구를 유지한다 (%s)', query => {
+    mocks.searchParams = new URLSearchParams(query);
+    mocks.tournament.data = { format: 'league', stagePlan: { version: 1, stages: [] }, status: 'in_progress' };
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByRole('button', { name: '단계·진출팀 관리' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '시간 배정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '구장 배정' })).toBeInTheDocument();
+  });
   it('데이터가 없고 에러도 없으면 pending, 에러면 error(빈 목록으로 숨기지 않는다)', () => {
     mocks.registrations.data = undefined;
     const { unmount } = render(<AdminTournamentBracketPage />);

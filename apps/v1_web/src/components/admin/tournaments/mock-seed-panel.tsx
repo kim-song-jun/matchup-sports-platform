@@ -12,6 +12,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 
 const FORMATS: Array<{ value: NonNullable<CreateMockTournamentInput['format']>; label: string }> = [
+  { value: 'staged', label: '단계별 대회' },
   { value: 'league', label: '리그' },
   { value: 'knockout', label: '토너먼트' },
   { value: 'group_knockout', label: '조별리그+토너먼트' },
@@ -30,6 +31,9 @@ const MAX_TEAMS_WITH_RESULTS = 16;
 
 /** 서버가 400 으로 막는 조합을 누르기 전에 알려준다. 막히지 않으면 null. */
 export function mockSeedBlockReason(input: Pick<CreateMockTournamentInput, 'format' | 'teamCount' | 'status' | 'withResults' | 'reviewReady'>): string | null {
+  if (input.format === 'staged' && (input.withResults || input.reviewReady || input.status === 'completed')) {
+    return '단계별 대회는 세부 설정을 나중에 바꿀 수 있도록 결과 없이 모집중·진행중으로 만들어 주세요.';
+  }
   if (input.format === 'ranked_leagues' && (!Number.isInteger(input.teamCount) || (input.teamCount ?? 0) < 8 || (input.teamCount ?? 0) > 32 || (input.teamCount ?? 0) % 4 !== 0)) {
     return '순위별 결선 리그는 8~32팀 중 4의 배수로 선택해 주세요. 20팀은 예선 30경기와 결선 40경기예요.';
   }
@@ -75,6 +79,7 @@ export function MockSeedPanel() {
   if (!availability.data?.enabled) return null;
 
   const ranked = format === 'ranked_leagues';
+  const staged = format === 'staged';
   const maxTeamCount = ranked ? availability.data.rankedLeagueMaxTeamCount ?? 0 : availability.data.maxTeamCount ?? 32;
   const usableTeamCount = ranked ? availability.data.rankedLeagueUsableTeamCount ?? 0 : availability.data.usableTeamCount ?? 0;
   const minPlayersPerTeam = ranked ? 7 : availability.data.minPlayersPerTeam ?? 0;
@@ -84,7 +89,7 @@ export function MockSeedPanel() {
   const submit = () => {
     setError(null);
     createMock.mutate(
-      { format, teamCount, status, withResults, reviewReady, withLineups: ranked || withLineups },
+      { format, teamCount, status, withResults, reviewReady, withLineups: ranked || staged || withLineups },
       {
         onSuccess: (result) => setCreated(result),
         onError: (err) => setError(extractErrorMessage(err, '목업 대회를 만들지 못했어요.')),
@@ -105,8 +110,9 @@ export function MockSeedPanel() {
       </div>
       <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
         조건에 맞는 테스트 대회를 하나 만들어요. 팀 등록·명단·경기(운영 콘솔)까지 준비해요.
-        {ranked ? '순위별 리그는 참가팀을 배정하면서 경기 명단도 함께 반영해요.' : <>라인업은 기본적으로 비워 두니 직접 제출해 보시고, 그 다음 단계를 테스트하려면{' '}<strong>라인업까지 제출</strong>을 켜세요.</>}
+        {ranked || staged ? '단계형 대회는 참가팀을 배정하면서 경기 명단도 함께 반영해요.' : <>라인업은 기본적으로 비워 두니 직접 제출해 보시고, 그 다음 단계를 테스트하려면{' '}<strong>라인업까지 제출</strong>을 켜세요.</>}
       </p>
+      {staged && <p className="mt-2 tm-text-caption text-[var(--text-muted)]">예선 조별리그 → 각 조 상위 2팀 본선 토너먼트로 만들어요. 세부 설정은 생성 후 대진의 ‘단계·진출팀 관리 → 구성 수정’에서 바꿀 수 있어요. 경기 결과는 비워 둬요.</p>}
       <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
         지금 쓸 수 있는 테스트 팀 <strong>{usableTeamCount}팀</strong> (최대 {maxTeamCount}팀까지 만들 수 있어요).
         실제 사용자가 섞인 팀은 쓰지 않아요.
@@ -163,7 +169,7 @@ export function MockSeedPanel() {
         </label>
 
         <label className="flex items-center gap-2 h-[44px]">
-          <input type="checkbox" checked={ranked || withLineups} disabled={ranked} onChange={(e) => setWithLineups(e.target.checked)} className="w-4 h-4" />
+          <input type="checkbox" checked={ranked || staged || withLineups} disabled={ranked || staged} onChange={(e) => setWithLineups(e.target.checked)} className="w-4 h-4" />
           <span className="text-[length:var(--font-size-label)] text-gray-900 dark:text-white">라인업까지 제출</span>
         </label>
 
@@ -201,6 +207,7 @@ export function MockSeedPanel() {
             {created.gamesCreated > 0 ? ` · 운영 콘솔 ${created.gamesCreated}경기 준비됨` : ''}
             {created.lineupsSubmitted > 0 ? ` · 라인업 ${created.lineupsSubmitted}건 제출됨` : ''}{' '}
             <Link href={created.route} className="text-blue-600 dark:text-blue-400 underline">대회 보기</Link>
+            {created.format === 'staged' && <> · <Link href={`/admin/tournaments/${encodeURIComponent(created.tournamentId)}/bracket`} className="text-blue-600 dark:text-blue-400 underline">단계 설정하러 가기</Link></>}
           </p>
 
           {created.teams?.length ? (

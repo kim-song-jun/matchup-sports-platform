@@ -93,4 +93,24 @@ describe('목업 대회 — 정규리그+N개 토너먼트 (실제 DB)', () => {
     expect(fixtures.filter(f => f.group?.stageKey === 'preliminary')).toHaveLength(30);
     expect(fixtures.filter(f => f.group?.stageKey === 'main')).toHaveLength(40);
   }, 180_000);
+  it('단계별 목업은 기본 예선·본선을 만들고 결과 없이 이후 구성을 편집할 수 있다', async () => {
+    const result = await service.createTournament(user, { format: 'staged', teamCount: 8, status: 'in_progress' });
+    expect(result).toMatchObject({ format: 'staged', teamCount: 8, fixtureCount: 15, gamesCreated: 15 });
+    const tournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: result.tournamentId } });
+    expect(tournament.format).toBe('league_knockouts');
+    const stages = new StagePlanService(prisma, admins, new BracketTemplateService(prisma, admins, games), games);
+    const view = await stages.get(user, result.tournamentId);
+    if (!view.config) throw new Error('단계별 목업의 기본 구성이 저장되지 않았어요.');
+    expect(view.config.autoAdvance).toBe(false);
+    expect(view.pools.filter(pool => pool.stageIndex === 0).every(pool => pool.assigned && !pool.started)).toBe(true);
+    expect(view.pools.filter(pool => pool.stageIndex === 1).every(pool => !pool.assigned && !pool.started)).toBe(true);
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId: result.tournamentId }, include: { teamMatch: { include: { game: true } } } });
+    expect(fixtures).toHaveLength(15);
+    expect(fixtures.every(fixture => fixture.teamMatch.game?.state === 'SCHEDULED' && !fixture.teamMatch.game.currentOfficialRevisionId)).toBe(true);
+    const updated = await stages.updateStructure(user, result.tournamentId, {
+      expectedRevision: view.revision, reason: '목업 생성 후 세부 설정 검증',
+      plan: { ...view.config, stages: view.config.stages.map((stage, index) => index === 0 ? { ...stage, name: '예선 리그' } : stage) },
+    });
+    expect(updated.config?.stages[0].name).toBe('예선 리그');
+  }, 120_000);
 });

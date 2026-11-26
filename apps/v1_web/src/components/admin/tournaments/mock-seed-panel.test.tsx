@@ -40,6 +40,27 @@ describe('mockSeedBlockReason — 서버가 막는 목업 조합을 미리 알�
 
 describe('목업 카테고리 선택',()=>{
   beforeEach(()=>mocks.mutate.mockReset());
+  it('단계별 형식은 기본 구성 안내와 이후 편집 경로를 표시하고 선택한 팀 수로 생성한다', () => {
+    render(<MockSeedPanel />);
+    fireEvent.change(screen.getByLabelText('형식'), { target: { value: 'staged' } });
+    expect(screen.getByRole('option', { name: '단계별 대회' })).toBeInTheDocument();
+    expect(screen.getByText(/각 조 상위 2팀/)).toHaveTextContent('구성 수정');
+    expect(screen.getByLabelText('라인업까지 제출')).toBeChecked();
+    expect(screen.getByLabelText('라인업까지 제출')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('팀 수'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: '목업 대회 만들기' }));
+    expect(mocks.mutate).toHaveBeenCalledWith(expect.objectContaining({ format: 'staged', teamCount: 5, withResults: false, withLineups: true }), expect.any(Object));
+  });
+  it('단계별은 결과를 켜거나 종료를 선택하면 이유를 표시하고 생성을 막는다', () => {
+    render(<MockSeedPanel />);
+    fireEvent.change(screen.getByLabelText('형식'), { target: { value: 'staged' } });
+    fireEvent.click(screen.getByLabelText('경기 결과까지'));
+    expect(screen.getByRole('button', { name: '목업 대회 만들기' })).toBeDisabled();
+    expect(screen.getByText(/결과 없이 모집중·진행중/)).toBeInTheDocument();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mockSeedBlockReason({ format: 'staged', status: 'completed' })).toContain('결과 없이');
+    expect(mockSeedBlockReason({ format: 'staged', reviewReady: true })).toContain('결과 없이');
+  });
   it('팀 수·상태를 유지하며 새 카테고리와 실제 생성 payload를 연결한다',()=>{
     render(<MockSeedPanel/>);
     fireEvent.change(screen.getByLabelText('팀 수'),{target:{value:'20'}});

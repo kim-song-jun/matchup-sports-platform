@@ -17,6 +17,7 @@ import { CreateMockTournamentDto, MOCK_SEED_MAX_TEAMS, MOCK_SEED_MAX_TEAMS_WITH_
 import { participantDisplayName } from '../participant-display-name';
 import { StagePlanService } from '../stages/stage-plan.service';
 import { mockRankedLeaguePlan } from './mock-ranked-leagues';
+import { mockStagePlan } from './mock-stage-plan';
 import { LineupSizeConfigResolver } from '../competition-config/lineup-size-config-resolver';
 
 /**
@@ -108,7 +109,11 @@ export class MockTournamentSeedService {
     const withLineups = dto.withLineups ?? false;
     const withResults = dto.withResults || reviewReady || status === 'completed';
     const ranked = format === 'ranked_leagues';
-    const rankedPlan = ranked ? mockRankedLeaguePlan(teamCount) : null;
+    const staged = format === 'staged';
+    const rankedPlan = ranked ? mockRankedLeaguePlan(teamCount) : staged ? mockStagePlan(teamCount) : null;
+    if (staged && withResults) {
+      throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '단계별 대회는 세부 설정을 나중에 바꿀 수 있도록 결과 없이 모집중·진행중으로 만들어 주세요.' });
+    }
     if (ranked && withResults && teamCount > 20) {
       throw new BadRequestException({ code: 'MOCK_SEED_TOO_MANY_RESULTS', message: '순위별 결선 리그는 결과까지 채우면 20팀까지 만들 수 있어요.' });
     }
@@ -170,7 +175,7 @@ export class MockTournamentSeedService {
         data: {
           sportId: sport.id,
           title,
-          format: ranked ? 'league' : format,
+          format: staged ? 'league_knockouts' : ranked ? 'league' : format,
           ...(rankedPlan ? { stagePlan: JSON.parse(JSON.stringify(rankedPlan)) } : {}),
           teamCount,
           // 대회 참가 명단 하한도 라인업 하한과 맞춘다 — 어긋나면 명단은 통과했는데
@@ -248,7 +253,7 @@ export class MockTournamentSeedService {
       }
 
       // 정규리그+N개 토너먼트는 아래에서 실제 예선 편성 경로(MultiFinalsService.setup)로 만든다.
-      const fixtures = format === 'league_knockouts' || ranked ? [] : await this.buildFixtures(
+      const fixtures = format === 'league_knockouts' || ranked || staged ? [] : await this.buildFixtures(
         tx,
         tournament.id,
         format,
@@ -264,7 +269,15 @@ export class MockTournamentSeedService {
     let fixtureCount = created.fixtures.length;
     let lineupsSubmitted = 0;
     let gamesCreated = 0;
-    if (ranked) {
+    if (staged) {
+      let view = await this.stages.get(user, created.tournament.id);
+      view = await this.stages.generate(user, created.tournament.id, { expectedRevision: view.revision });
+      await this.stages.randomize(user, created.tournament.id, { expectedRevision: view.revision });
+      await this.syncSeatedRosters(created.tournament.id);
+      fixtureCount = await this.prisma.v1TournamentMatchDetails.count({ where: { tournamentId: created.tournament.id, teamMatch: { deletedAt: null } } });
+      gamesCreated = fixtureCount;
+      lineupsSubmitted = (await this.prisma.v1GameLineup.findMany({ where: { state: 'SUBMITTED', invalidatedAt: null, game: { teamMatch: { tournamentId: created.tournament.id, deletedAt: null } } }, distinct: ['sideId'], select: { sideId: true } })).length;
+    } else if (ranked) {
       ({ fixtureCount, lineupsSubmitted, gamesCreated } = await this.seedRankedLeagues(user, created.tournament.id, created.registrationIds, withResults));
       if (status === 'completed') await this.prisma.v1Tournament.update({ where: { id: created.tournament.id }, data: { status: 'completed' } });
     } else if (format === 'league_knockouts') {
@@ -631,6 +644,7 @@ export class MockTournamentSeedService {
       : format === 'knockout' ? '토너먼트'
       : format === 'league_knockouts' ? '정규리그+N개 토너먼트'
       : format === 'ranked_leagues' ? '예선+순위별 결선 리그'
+      : format === 'staged' ? '단계별 대회'
       : '조별리그+토너먼트';
     const statusLabel = status === 'open' ? '모집중' : status === 'in_progress' ? '진행중' : '종료';
     return `${formatLabel} ${teamCount}팀 ${statusLabel}${reviewReady ? ' 후기가능' : ''}`;

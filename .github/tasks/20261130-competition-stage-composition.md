@@ -339,3 +339,14 @@ PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN�
 - 로컬 API53·Web6 tests 및 API/Web TypeScript PASS. 실제DB통합은CI대기. 기존동시6명강제실패는이변경이해결하지 않으며실제재검증으로분리.
 
 재실행완료: 새대회신청20·명단140·관리자수락20·공식70·completed·3폭결과/최종순위·개인1골PASS. 6명제한FAIL재현. PR댓글7011526051에팀별신청/수락캡처게시. 사용자이번PR전체CI+수동검토대체승인획득,Alpha목업실제생성대기. 로컬API54/Web6,타입PASS.
+
+## 2026-11-26 단계별 목업 기본 형식 추가
+- Status: In Progress. 기존 단계형 작업의 목업 후속 범위(API/Web/docs).
+- 사용자 선택: 3안 중 B의 간소화. 형식에 ‘단계별 대회’를 추가하고 기본 구성으로 생성, 세부 설정은 나중에 기존 편집기에서 처리.
+- 기본 구성: 최대 4팀씩 균등 예선 리그 → 조별 상위 2팀 본선 토너먼트. 결과 없이 첫 단계 팀 배정까지 준비.
+- Owned files: mock-seed DTO/service/default plan/tests, Web mock panel/hook type/bracket page/tests, docs/api/domains/tournaments.md, scenario hub.
+- Forbidden: Prisma schema/migrations, 기존 목업 카테고리 의미 변경, 전체 초기화 기능, 다른 세션 파일.
+- Acceptance: [ ] 사용자 UI 선택 확인 [ ] staged API 저장·기본 plan 검증 [ ] 기존 단계 편집·시간/구장 진입 [ ] 결과 옵션 거부 안내 [ ] 좁은 회귀 [ ] committed diff/CI/Alpha.
+- Ambiguity: 세부 구성 폼은 목업 패널에 추가하지 않음. 완료/결과 자동생성은 초기 편집 가능성을 보존하기 위해 staged에서는 거부.
+- Progress Snapshot: 최신 origin/dev f3eed1204 기반 fix/stage-mock-controls-20261126 격리 작업트리. 호스트 메모리 약22GB 여유/24논리코어/Node1/Chrome11. Docker 엔진 없음(실제DB 검증 불가), 테스트 직렬 실행.
+- 검증 중간: API90/Web21 PASS. Windows 링크·POSIX 실행 환경을 작업트리 내부 의존성과 Git Bash로 해결. API surface/Web pattern PASS, Web 타입 PASS. 실제DB 통합 시나리오(기본15경기·시작전·구성수정)를 추가했고 Docker 미가동으로 CI 실행 대상. 정식 단계형과 같은 league_knockouts 저장 형식 사용.

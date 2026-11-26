@@ -304,3 +304,5 @@ owner/ops authorization for sending is unchanged. Inbox creation, web acceptance
 acceptance are distinct measurements; missing historical payload/channel results remain unknown.
 A successful send with `historyRecorded:false` means the send completed but its audit write failed,
 and must not trigger an automatic resend. See [admin/ops](domains/admin-and-ops.md#수동-푸시-발송과-이력).
+
+Alpha 목업 생성의 `staged` 카테고리는 기존 성공/오류 envelope와 mutation-admin 권한을 따르며, 결과·종료 자동생성 요청은 저장 전에 400 `MOCK_SEED_STATUS_UNSUPPORTED`로 거절해요. [세부 계약](./domains/tournaments.md#단계별-기본-목업-staged-2026-11-26).

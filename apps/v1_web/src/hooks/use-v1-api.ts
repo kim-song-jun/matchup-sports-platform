@@ -4996,7 +4996,7 @@ export function useV1MockSeedAvailability() {
 }
 
 export type CreateMockTournamentInput = {
-  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts' | 'ranked_leagues';
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts' | 'ranked_leagues' | 'staged';
   teamCount?: number;
   status?: 'open' | 'in_progress' | 'completed';
   withResults?: boolean;

@@ -1,8 +1,8 @@
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TOURNAMENT_FORMATS, type TournamentFormat } from '../dto/admin-tournament.dto';
-export const MOCK_SEED_FORMATS = [...TOURNAMENT_FORMATS, 'ranked_leagues'] as const;
-export type MockSeedFormat = TournamentFormat | 'ranked_leagues';
+export const MOCK_SEED_FORMATS = [...TOURNAMENT_FORMATS, 'ranked_leagues', 'staged'] as const;
+export type MockSeedFormat = TournamentFormat | 'ranked_leagues' | 'staged';
 
 export const MOCK_SEED_STATUSES = ['open', 'in_progress', 'completed'] as const;
 export type MockSeedStatus = (typeof MOCK_SEED_STATUSES)[number];

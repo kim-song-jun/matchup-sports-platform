@@ -5833,6 +5833,16 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 2px;
 }
 
+/* 정원이 다 찬 팀 — [정원 마감] 버튼 바로 위 한 줄 안내. 데스크톱 오른쪽 카드는 카드 gap 이 간격을 맡는다. */
+.tm-team-full-notice {
+  margin: 0;
+  text-align: center;
+}
+
+.tm-fixed-cta .tm-team-full-notice {
+  margin-bottom: var(--spacing-2);
+}
+
 /* 팀 상세 하단 버튼 줄 — [컨택 보내기 | 가입 신청] 1:2. */
 .tm-team-contact-row {
   display: grid;

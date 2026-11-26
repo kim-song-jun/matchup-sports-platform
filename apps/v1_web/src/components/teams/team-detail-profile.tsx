@@ -71,6 +71,7 @@ export function TeamDetailHeader({
   headerRef,
   footnote,
   badge,
+  alertChip,
 }: {
   team: HeaderTeam;
   chips: string[];
@@ -80,6 +81,11 @@ export function TeamDetailHeader({
   footnote?: ReactNode;
   /** 조건 칩 맨 앞의 강조 칩 — 만든 지 3개월 미만이면 '신생팀'. */
   badge?: string;
+  /**
+   * 조건 칩 끝의 주의 칩 — 가입을 받지 않는 예외(가입 닫힘·정원 마감). 회색 조건 칩과 섞이지 않게 주황으로
+   * 둔다(2026-11-27 사용자 확정 A안). 색만으로 말하지 않는다 — 칩은 항상 글자를 담는다.
+   */
+  alertChip?: string;
   /** 데스크톱은 h2, 모바일은 sr-only h1 과 겹치지 않게 aria-hidden div. */
   nameAs?: 'h2' | 'div';
   headerRef?: RefObject<HTMLElement | null>;
@@ -111,13 +117,14 @@ export function TeamDetailHeader({
             <ShareIcon size={20} />
           </button>
         </div>
-        {chips.length || badge ? (
+        {chips.length || badge || alertChip ? (
           <ul className="tm-team-profile-chips" aria-label="팀 조건">
             {/* 모양은 앱 공용 배지(.tm-badge) — 목록 카드·다른 상세와 같은 배지. tm-team-profile-chip* 는 표시용 이름표다. */}
             {badge ? <li className="tm-badge tm-badge-blue tm-team-profile-chip tm-team-profile-chip-badge">{badge}</li> : null}
             {chips.map((chip) => (
               <li key={chip} className="tm-badge tm-badge-grey tm-team-profile-chip">{chip}</li>
             ))}
+            {alertChip ? <li className="tm-badge tm-badge-orange tm-team-profile-chip tm-team-profile-chip-alert">{alertChip}</li> : null}
           </ul>
         ) : null}
       </div>

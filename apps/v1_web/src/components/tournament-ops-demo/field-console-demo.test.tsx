@@ -78,19 +78,17 @@ describe('필드 운영콘솔 안내와 체험', () => {
     await user.click(screen.getByRole('button', { name: '골' }));
     const picker = await screen.findByRole('dialog');
     await user.click(within(picker).getByRole('button', { name: /김하늘/ }));
-    const confirmation = await screen.findByRole('dialog');
-    await user.click(within(confirmation).getByRole('button', { name: '골 기록' }));
+    // 기록은 확인 창 없이 바로 저장된다.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText(/스코어 블루 FC 1점, 오렌지 FS 0점/)).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: '옐로카드' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /김하늘/ }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '교체' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /김하늘/ }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /윤겨울/ }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '교체 기록' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    const history = screen.getByRole('heading', { name: /기록된 이벤트/ }).parentElement!;
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const history = screen.getByRole('heading', { name: /^최근 기록/ }).parentElement!;
     expect(within(history).getByText(/옐로카드/)).toBeInTheDocument();
     expect(within(history).getByText(/윤겨울/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '안내 다시 보기' }));

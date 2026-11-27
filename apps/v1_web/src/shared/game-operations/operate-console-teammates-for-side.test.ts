@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { teammatesForSide } from './operate-console-core';
+import { rosterForSide } from './lineup-grid';
 import type { GameLineup, GameLineupParticipant } from '@/types/game-operations';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,5 +105,22 @@ describe('teammatesForSide — 어시스트 후보 선택', () => {
 
   it('sideId가 null이면 빈 배열을 반환한다', () => {
     expect(teammatesForSide(null, [], null)).toEqual([]);
+  });
+
+  it('선수 시트와 같은 명단(rosterForSide)에서 득점자만 뺀다 — 무효가 된 명단은 후보가 아니다', () => {
+    const lineups: readonly GameLineup[] = [
+      lineup([participant({ id: 'p-old', displayNameSnapshot: '무효선수' })], {
+        id: 'lineup-old',
+        revision: 3,
+        invalidatedAt: '2026-09-08T00:00:00.000Z',
+      }),
+      lineup([
+        participant({ id: 'p-1', displayNameSnapshot: '득점자' }),
+        participant({ id: 'p-2', displayNameSnapshot: '어시스트후보' }),
+      ]),
+    ];
+
+    expect(teammatesForSide('side-home', lineups, null)).toEqual(rosterForSide(lineups, 'side-home'));
+    expect(teammatesForSide('side-home', lineups, 'p-1').map((p) => p.id)).toEqual(['p-2']);
   });
 });

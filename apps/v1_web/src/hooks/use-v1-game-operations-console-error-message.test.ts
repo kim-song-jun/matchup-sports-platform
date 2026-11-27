@@ -140,3 +140,28 @@ describe('ACTIVITY_PROFILE_REQUIRED — 활동 정보 입력을 미룬 계정의
     expect(isRetryableGameOperationsErrorCode('ACTIVITY_PROFILE_REQUIRED')).toBe(false);
   });
 });
+
+describe('콘솔에 보이는 안내는 용어표의 말을 쓴다 — 「기록 권한」·「경기 시간」', () => {
+  it.each([
+    ['TAKEOVER_TOKEN_EXPIRED', '기록 권한이 만료됐어요. 다시 가져오는 중이에요.'],
+    ['TAKEOVER_SUPERSEDED', '다른 화면에서 이 경기 기록 권한을 가져갔어요. 지금은 보기만 할 수 있어요.'],
+    ['TAKEOVER_UNAVAILABLE', '경기 기록 권한을 가져오지 못했어요. 새로고침 후 다시 시도해 주세요.'],
+    ['PERIOD_ALREADY_ENDED', '이미 종료된 경기 시간이에요. 새로고침 후 다시 확인해주세요.'],
+    ['NO_NEXT_PERIOD', '마지막 경기 시간이에요. 경기를 종료해 주세요.'],
+    ['EVENT_LATE', '기록하려는 시점이 이미 지난 경기 시간이에요. 새로고침 후 다시 확인해주세요.'],
+  ])('%s', (code, message) => {
+    expect(gameOperationsErrorMessage(code)).toBe(message);
+  });
+
+  it.each([
+    'TAKEOVER_TOKEN_EXPIRED', 'TAKEOVER_SUPERSEDED', 'TAKEOVER_HELD', 'TAKEOVER_UNAVAILABLE', 'STAFF_SCOPE_DENIED',
+    'ACTIVITY_PROFILE_REQUIRED', 'VERSION_CONFLICT', 'CLOCK_DRIFT', 'VALIDATION_ERROR', 'SEND_TIMEOUT',
+    'OFFLINE_EVENT_REBASE_CONFLICT', 'PERIOD_NOT_STARTED', 'PERIOD_ALREADY_ENDED', 'NO_NEXT_PERIOD', 'EVENT_LATE',
+    'TERMINAL_GAME_IMMUTABLE', 'EVENT_INVALID', 'PARTICIPANT_SIDE_MISMATCH', 'SCORER_REQUIRED', 'SUBSTITUTION_INVALID',
+    'SUBSTITUTION_OUT_NOT_ON_PITCH', 'SUBSTITUTION_IN_ALREADY_ON_PITCH', 'SUBSTITUTION_LIMIT_REACHED',
+    'SUBSTITUTION_NOT_TRACKED', 'COMMAND_IDEMPOTENCY_KEY_MISMATCH', 'IDEMPOTENCY_PAYLOAD_CONFLICT', 'INVALID_ACTOR_SCOPE',
+    'COMMAND_CONCURRENCY_CONFLICT', 'INTERNAL_ERROR', 'SOME_UNKNOWN_CODE',
+  ])('%s 안내에 「피리어드」·「운영 권한」·「정정」이 없다', (code) => {
+    expect(gameOperationsErrorMessage(code)).not.toMatch(/피리어드|운영 권한|정정/);
+  });
+});

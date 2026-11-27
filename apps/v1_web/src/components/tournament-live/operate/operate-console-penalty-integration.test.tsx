@@ -188,10 +188,10 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(within(events).getAllByRole('listitem')).toHaveLength(1);
     if (canEdit) {
       expect(within(events).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
-      expect(within(events).getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
+      expect(within(events).getByRole('button', { name: '고치기' })).toBeInTheDocument();
     } else {
       expect(within(events).queryByRole('button', { name: /어시스트/ })).not.toBeInTheDocument();
-      expect(within(events).queryByRole('button', { name: '수정·취소' })).not.toBeInTheDocument();
+      expect(within(events).queryByRole('button', { name: '고치기' })).not.toBeInTheDocument();
     }
   });
 
@@ -221,8 +221,8 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-    const moreDialog = screen.getByRole('dialog', { name: '경기 더보기' });
-    const endButton = within(moreDialog).getByRole('button', { name: /^경기 종료/ });
+    const moreDialog = screen.getByRole('dialog', { name: '더보기' });
+    const endButton = within(moreDialog).getByRole('button', { name: /^경기 일찍 끝내기/ });
     expect(endButton).toBeDisabled();
     expect(within(moreDialog).getByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeInTheDocument();
     fireEvent.click(endButton);
@@ -241,7 +241,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '더보기' }));
     expect(
-      within(screen.getByRole('dialog', { name: '경기 더보기' })).getByRole('button', { name: /^경기 종료/ }),
+      within(screen.getByRole('dialog', { name: '더보기' })).getByRole('button', { name: /^경기 일찍 끝내기/ }),
     ).toBeEnabled();
   });
 
@@ -252,20 +252,30 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     );
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('다른 기기에서 기록하고 있어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이 기기에서 기록하기' })).toBeInTheDocument();
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+    // 더보기는 열리지만(기록 전체 보기) 종료 계열은 잠긴다.
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    const moreDialog = screen.getByRole('dialog', { name: '더보기' });
+    expect(within(moreDialog).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeDisabled();
+    expect(within(moreDialog).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeDisabled();
+    expect(within(moreDialog).queryByRole('button', { name: /^경기 시작 취소/ })).toBeNull();
     expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
   });
 
-  it('[MD-QA #180] SUPPORT_READONLY 권한의 결선 동점 경기는 경고 없이 더보기와 종료 명령이 잠긴다', () => {
+  it('[MD-QA #180] SUPPORT_READONLY 권한의 결선 동점 경기는 경고 없이 더보기의 종료 명령이 잠긴다', () => {
     setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
     mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    const moreDialog = screen.getByRole('dialog', { name: '더보기' });
+    expect(within(moreDialog).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeDisabled();
+    expect(within(moreDialog).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeDisabled();
+    expect(within(moreDialog).queryByRole('button', { name: /^경기 시작 취소/ })).toBeNull();
     expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
   });
 

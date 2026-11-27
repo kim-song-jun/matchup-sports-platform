@@ -50,7 +50,7 @@ function eventLabel(item: QueuedGameEvent): string {
   }
   if (item.event.type === 'FOUL') return '파울';
   if (item.event.type === 'SUBSTITUTION') return '교체';
-  if (item.event.type === 'CORRECTION') return '정정';
+  if (item.event.type === 'CORRECTION') return '기록 취소';
   return item.event.type;
 }
 
@@ -65,7 +65,7 @@ export function QueueStatusPanel({ items, onRetry, disabled = false, isRetryable
   }
 
   return (
-    <ul className="flex flex-col gap-2" aria-label="전송 대기·실패한 이벤트 목록">
+    <ul className="flex flex-col gap-2" aria-label="전송 대기·실패한 기록 목록">
       {unsettled.map((item) => (
         <li
           key={item.clientEventId}

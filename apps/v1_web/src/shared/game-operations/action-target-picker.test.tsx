@@ -167,7 +167,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         onCancel={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: /강남 풋살 클럽 · 익명 골로 기록/ }));
+    await userEvent.click(screen.getByRole('button', { name: '강남 풋살 클럽 · 선수 모름' }));
     expect(onCommitGoal).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'GOAL', sideId: 's-home', payload: { anonymous: true } }),
     );
@@ -219,7 +219,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     expect(onCommit.mock.calls[0]![0].participantId).toBeUndefined();
   });
 
-  it('FOUL에서 "선수 지정 없이"를 고르면 participantId 없이 sideId만으로 커밋한다', async () => {
+  it('FOUL에서 "선수 모름"을 고르면 participantId 없이 sideId만으로 커밋한다', async () => {
     const onCommit = vi.fn();
     render(
       <ActionTargetPicker
@@ -234,7 +234,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         onCancel={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: /강남 풋살 클럽 · 선수 지정 없이/ }));
+    await userEvent.click(screen.getByRole('button', { name: '강남 풋살 클럽 · 선수 모름' }));
     expect(onCommit).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'FOUL', sideId: 's-home' }),
     );
@@ -645,13 +645,13 @@ describe('ActionTargetPicker — 퇴장한 선수는 기록 전에 한 번 더 �
     );
   });
 
-  it('확인이 떠 있는 동안에는 팀 단위(선수 지정 없이) 기록 버튼을 감춘다', async () => {
+  it('확인이 떠 있는 동안에는 팀 단위(선수 모름) 기록 버튼을 감춘다', async () => {
     renderPicker({ allowTeamOnly: true });
-    expect(screen.getAllByRole('button', { name: /익명 골로 기록/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /선수 모름/ })).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
 
-    expect(screen.queryByRole('button', { name: /익명 골로 기록/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /선수 모름/ })).not.toBeInTheDocument();
   });
 
   it('교체는 이 확인을 거치지 않는다 — 퇴장한 선수도 나가는 선수로 고르면 다음 단계로 간다', async () => {
@@ -668,5 +668,120 @@ describe('ActionTargetPicker — 퇴장한 선수는 기록 전에 한 번 더 �
 
     expect(screen.queryByRole('group', { name: /퇴장한 선수예요/ })).not.toBeInTheDocument();
     expect(screen.getByText('정우진 선수와 교체')).toBeInTheDocument();
+  });
+});
+
+describe('ActionTargetPicker — 두 팀 한 시트 · 선수 모름 · 문구', () => {
+  function renderAction(overrides: Partial<ComponentProps<typeof ActionTargetPicker>> = {}) {
+    const onCommit = vi.fn();
+    render(
+      <ActionTargetPicker
+        open
+        actionLabel="골"
+        actionType="GOAL"
+        frozen={FROZEN}
+        periodCount={2}
+        sides={SIDES}
+        lineups={LINEUPS}
+        allowTeamOnly
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        {...overrides}
+      />,
+    );
+    return { onCommit };
+  }
+
+  it('GOAL 은 선수를 누르면 확인 없이 onCommit 한 번', async () => {
+    const { onCommit } = renderAction();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getByRole('region', { name: '홈 · 강남 풋살 클럽' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '원정 · 성수 풋살 클럽' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ type: 'GOAL', participantId: 'p-cho', sideId: 's-away', payload: {} }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
+
+  it('선수 모름은 payload.anonymous=true', async () => {
+    const { onCommit } = renderAction();
+    const away = screen.getByRole('region', { name: '원정 · 성수 풋살 클럽' });
+    const unknown = within(away).getByRole('button', { name: '성수 풋살 클럽 · 선수 모름' });
+    expect(unknown).toHaveClass('min-h-12');
+    expect(unknown).toHaveTextContent('선수 모름');
+
+    await userEvent.click(unknown);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toMatchObject({ type: 'GOAL', sideId: 's-away', payload: { anonymous: true } });
+    expect(onCommit.mock.calls[0]![0].participantId).toBeUndefined();
+  });
+
+  it('파울의 선수 모름은 anonymous 를 붙이지 않는다', async () => {
+    const { onCommit } = renderAction({ actionLabel: '파울', actionType: 'FOUL' });
+    await userEvent.click(screen.getByRole('button', { name: '강남 풋살 클럽 · 선수 모름' }));
+    expect(onCommit.mock.calls[0]![0]).toMatchObject({ type: 'FOUL', sideId: 's-home', payload: {} });
+  });
+
+  it('자책골의 선수 모름은 어느 팀 득점이 되는지 함께 적는다', () => {
+    renderAction({ actionLabel: '자책골', actionType: 'OWN_GOAL' });
+    const button = screen.getByRole('button', { name: /성수 풋살 클럽 자책골 · 강남 풋살 클럽 득점으로 기록/ });
+    expect(button).toHaveTextContent('선수 모름');
+    expect(button).toHaveTextContent('강남 풋살 클럽 득점으로 기록');
+  });
+
+  it('CARD 에는 선수 모름이 없다', () => {
+    renderAction({ actionLabel: '옐로카드', actionType: 'CARD', cardColor: 'YELLOW', allowTeamOnly: false });
+    expect(screen.queryByRole('button', { name: /선수 모름/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument();
+  });
+
+  it('퇴장한 선수는 여전히 확인 패널이 먼저', async () => {
+    const { onCommit } = renderAction({ sentOffParticipantIds: new Set(['p-jung']) });
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: '정우진은 퇴장한 선수예요' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['골', 'GOAL', undefined, '골 · 누가 넣었나요?'],
+    ['자책골', 'OWN_GOAL', undefined, '자책골 · 누구의 자책골인가요?'],
+    ['옐로카드', 'CARD', 'YELLOW', '옐로카드 · 누가 받았나요?'],
+    ['레드카드', 'CARD', 'RED', '레드카드 · 누가 받았나요?'],
+    ['파울', 'FOUL', undefined, '파울 · 누가 했나요?'],
+  ] as const)('%s 시트 제목', (actionLabel, actionType, cardColor, title) => {
+    renderAction({ actionLabel, actionType, cardColor });
+    expect(screen.getByRole('dialog', { name: title })).toBeInTheDocument();
+  });
+
+  it('캡션은 기록될 시각과 바로 저장된다는 사실을 말한다', () => {
+    renderAction();
+    expect(screen.getByText('전반 2:00로 기록돼요 · 누르면 바로 저장돼요')).toBeInTheDocument();
+  });
+
+  it('단판이면 캡션에 전반을 붙이지 않는다', () => {
+    renderAction({ periodCount: 1 });
+    expect(screen.getByText('2:00로 기록돼요 · 누르면 바로 저장돼요')).toBeInTheDocument();
+  });
+
+  it('교체 1단계 캡션은 시각만 말한다(아직 저장되지 않는다)', async () => {
+    renderAction({
+      actionLabel: '교체',
+      actionType: 'SUBSTITUTION',
+      allowTeamOnly: false,
+      onPitchParticipantIds: new Set(['p-jung', 'p-cho']),
+    });
+    expect(screen.getByText('전반 2:00로 기록돼요')).toBeInTheDocument();
+    expect(screen.queryByText(/누르면 바로 저장돼요/)).toBeNull();
+    // 교체는 기존 탭 배치 그대로다.
+    expect(screen.getByRole('tablist', { name: '팀 선택' })).toBeInTheDocument();
+  });
+
+  it('시트는 화면 높이 − 48px 를 넘지 않고 본문만 스크롤한다', () => {
+    renderAction();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('max-h-[calc(100dvh-48px)]');
+    expect(screen.getByRole('region', { name: '홈 · 강남 풋살 클럽' }).closest('[class*="overflow-y-auto"]')).not.toBeNull();
+    expect(screen.getByRole('heading', { name: '골 · 누가 넣었나요?' }).closest('[class*="overflow-y-auto"]')).toBeNull();
   });
 });

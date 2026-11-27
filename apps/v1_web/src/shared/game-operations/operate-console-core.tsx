@@ -4,12 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import Link from 'next/link';
 import type { QueryClient, RefetchOptions } from '@tanstack/react-query';
 import {
-  WifiOff,
-  Wifi,
-  FlaskConical,
-  Goal,
-  AlertTriangle,
-  ArrowLeftRight,
   Pause,
   Play,
   RotateCcw,
@@ -20,8 +14,8 @@ import {
   Ellipsis,
 } from 'lucide-react';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
-import { ErrorState } from '@/components/v1-ui/primitives';
 import type { ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import { readGameResultScore } from '@/lib/game-result-score';
 
@@ -40,30 +34,39 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { v1Keys } from '@/lib/query-keys';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { isSecondYellowWithoutRed } from './second-yellow';
-import { latestLineupForDisplay } from './lineup-grid';
-import { MatchupTitle } from './matchup-title';
+import { rosterForSide } from './lineup-grid';
 import { ElapsedMatchClock } from './elapsed-match-clock';
-import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
+import { deriveConsoleStatus } from './console-status';
+import { ConsoleStatusPanel, type RosterRow } from './console-status-panel';
+import { ConsoleScoreCard } from './console-score-card';
+import { RecordGrid, type RecordCellKey } from './record-grid';
 import { RecordedEventList, eventTypeLabel } from './recorded-event-list';
 import { EventTimeCorrectionSheet } from './event-time-correction-sheet';
 import { collectEventTimeCorrections, eventClockUpperBoundMs, eventTimeCorrectionErrorMessage } from '@/lib/event-time-correction';
 import { SECOND_YELLOW_RED_LABEL } from '@/lib/second-yellow-red';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
-import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
-import { RestTimer } from './rest-timer';
+import { resultProgressSteps } from '@/lib/match-progress-steps';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import {
+  HALFTIME_REST_SCOPE_PREFIX,
+  MANUAL_REST_SCOPE,
+  RestTimerCard,
+  RestTimerPresets,
+  formatRestCountdown,
+  useRestTimer,
+} from './rest-timer';
 import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-banner';
 import { useEventToast, EventToasts } from './event-toast';
-import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
-import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts, resolveTeamFoulThreshold } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, deriveSentOffRedCards, countActiveSubstitutions } from '@/lib/on-pitch-state';
-import { TeamFoulCounterBar } from './team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 import {
+  clockCheckConfirmCopy,
   commandConfirmCopy,
-  commitActionConfirmCopy,
+  recordNounOf,
+  recordedToastCopy,
   secondYellowConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
@@ -172,12 +175,11 @@ export interface OperateConsoleCoreProps {
   readonly operatorScopeKey: string | null;
   readonly operationContextKey: string | null;
   readonly headerTopClass: string;
-  readonly showEmptyRosterNotice: boolean;
   readonly allowPenaltyShootout: boolean;
   readonly hostContext?: TeamMatchGameOperationsContext;
   readonly resultHref?: string;
   readonly resultReviewEnabled: boolean;
-  /** Sample hosts drive the console from memory, so the header must not claim a live server connection. */
+  /** Sample hosts drive the console from memory, so the status line must not claim a live server connection. */
   readonly sampleMode?: boolean;
   readonly renderResultReview?: (gameId: string) => ReactNode;
   /** The common Core previously mounted this for both leased operations and ordinary hosts; the ordinary `end` command remains gated. */
@@ -298,6 +300,89 @@ interface PendingAction {
   readonly frozen: FrozenEventCapture;
 }
 
+/** 되돌릴 기록을 찾은 결과. `absent` 는 서버가 없다고 확인한 것, `unknown` 은 확인하지 못한 것이다. */
+type RecordedEventLookup =
+  | { readonly kind: 'found'; readonly event: GameEventRecord; readonly reversed: boolean }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'expired' };
+
+/**
+ * 되돌리기가 전송이 끝나기를 기다려 주는 한도. 지나면 그만두고, 그 뒤로는 서버에 되돌리기를 보내지 않는다.
+ * 전송 응답 제한(10초)보다 길어야 그 제한에 걸린 기록을 서버 목록에서 확인할 틈이 남는다.
+ */
+export const UNDO_WAIT_LIMIT_MS = 15_000;
+
+interface UndoWaitLimit {
+  readonly expired: boolean;
+  /** 한도 안에 끝났으면 true, 한도가 먼저 지났으면 false. */
+  readonly wait: (work: Promise<unknown>) => Promise<boolean>;
+  readonly clear: () => void;
+}
+
+function startUndoWaitLimit(): UndoWaitLimit {
+  const state = { expired: false };
+  const wakeOnExpiry: Array<() => void> = [];
+  const timer = setTimeout(() => {
+    state.expired = true;
+    wakeOnExpiry.splice(0).forEach((wake) => wake());
+  }, UNDO_WAIT_LIMIT_MS);
+  return {
+    get expired() {
+      return state.expired;
+    },
+    wait: (work) =>
+      new Promise<boolean>((resolve) => {
+        if (state.expired) {
+          resolve(false);
+          return;
+        }
+        wakeOnExpiry.push(() => resolve(false));
+        void work.then(() => resolve(!state.expired));
+      }),
+    clear: () => clearTimeout(timer),
+  };
+}
+
+/** 뛰는 동안 폰 첫 화면에 두는 최근 기록 줄 수. 나머지는 전체 보기 시트에 있다. */
+const RECENT_RECORD_ROWS = 4;
+
+const STAGE_CAPTION_CLASS = 'break-keep text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-body)]';
+const STAGE_CHIP_CLASS =
+  'flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-[length:var(--font-size-body-sm)] font-bold text-[var(--blue700)] dark:bg-blue-500/10';
+
+const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
+const UNDO_FAILED = '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_BLOCKED_BY_COMMAND = '진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+// 되돌리기 버튼은 누르면 토스트와 함께 사라진다 — 다시 누르라고 하지 않고 기록 목록을 가리킨다.
+const UNDO_WAIT_EXPIRED = '기록 전송이 끝나지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_WAIT_EXPIRED_OFFLINE = '연결이 돌아오지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_NO_RESPONSE = '되돌리기 응답을 받지 못했어요. 기록 목록에서 취소됐는지 확인해 주세요.';
+const UNDO_CONFLICT = '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_FAILURE_BY_CODE: Readonly<Record<string, string>> = {
+  VERSION_CONFLICT: UNDO_CONFLICT,
+  COMMAND_CONCURRENCY_CONFLICT: UNDO_CONFLICT,
+  RESULT_ALREADY_OFFICIAL: '결과가 이미 확정돼 되돌릴 수 없어요. 결과 고치기에서 고쳐 주세요.',
+  TERMINAL_GAME_IMMUTABLE: '취소된 경기라 기록을 되돌릴 수 없어요.',
+};
+/** 기록 권한을 잃어 거절된 코드 — 호스트의 코드별 안내가 이유를 그대로 말한다. */
+const UNDO_PERMISSION_CODES: ReadonlySet<string> = new Set([
+  'TAKEOVER_TOKEN_EXPIRED',
+  'TAKEOVER_SUPERSEDED',
+  'TAKEOVER_HELD',
+  'STAFF_SCOPE_DENIED',
+  'INVALID_ACTOR_SCOPE',
+]);
+
+/** 되돌리기 실패 안내. 서버 메시지는 영어 원문일 수 있어 한글 안내만 그대로 쓰고, 아니면 코드별 문구나 기본 문구로 바꾼다. */
+function undoFailureMessage(err: unknown, permissionMessage: (code: string) => string): string {
+  const code = extractErrorCode(err);
+  if (code !== null && UNDO_FAILURE_BY_CODE[code] !== undefined) return UNDO_FAILURE_BY_CODE[code];
+  if (code !== null && UNDO_PERMISSION_CODES.has(code)) return permissionMessage(code);
+  const message = extractErrorMessage(err, UNDO_FAILED);
+  return /[가-힣]/.test(message) ? message : UNDO_FAILED;
+}
+
 /** 진행 명령 REST 응답을 기다리는 한도. 이벤트 전송의 ack 한도(`SEND_ACK_TIMEOUT_MS`)와 같다. */
 export const COMMAND_RESPONSE_TIMEOUT_MS = 10_000;
 
@@ -351,7 +436,6 @@ export function OperateConsoleCore({
   operatorScopeKey,
   operationContextKey,
   headerTopClass,
-  showEmptyRosterNotice,
   allowPenaltyShootout,
   hostContext,
   resultHref,
@@ -387,7 +471,8 @@ export function OperateConsoleCore({
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
-  const [startRevert, setStartRevert] = useState<{ summary: string; version: number; phrase: string } | null>(null);
+  // 기록·되돌리기 실패 안내. 진행 명령의 오류와 따로 둬서 다음 기록을 할 때 지운다 — 지난 실패가 상태 줄에 남지 않게.
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
@@ -410,20 +495,16 @@ export function OperateConsoleCore({
   }, [leaseRequired, realtimeConnected, commandPathOpen, takeoverEnabled, ops.takeover]);
   // 몰수·중단 종료 다이얼로그. 사유 자유 텍스트를 받아야 해서 useConfirm(boolean)으로는 안 된다.
   const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
-  // ⋯ 더보기 시트 — 조기 정상 종료·몰수/중단 종료가 여기 들어 있다.
   const [moreOpen, setMoreOpen] = useState(false);
+  const [allRecordsOpen, setAllRecordsOpen] = useState(false);
+  const [restSheetOpen, setRestSheetOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
   const gameDetailBehind = (gameDetail.data?.version ?? 0) < gameVersion;
-  // 확인 모달이 떠 있는 동안 버전이 낡는 문제(409 VERSION_CONFLICT) —
-  // 커맨드는 이제 예외 없이 확인을 거치고(사용자 결정), 승부차기 입력은 킥을
-  // 다 찍을 때까지 수 분이 걸릴 수도 있다. 그사이 다른 이벤트가 커밋되면
-  // (`use-v1-game-operations-console`의 WS ack가 gameSnapshot.version을
-  // 올린다) 모달을 연 렌더의 클로저가 들고 있던 `gameVersion`은 이미 낡은
-  // 값이고, 그대로 보내면 서버가 CAS에서 409를 던진다(command transport는
-  // 재시도하지 않는다). ref로 "보내는 순간의" 최신 버전을 읽는다 —
-  // 아래 handleRunCommandRef가 토스트 콜백에 쓰는 것과 같은 패턴이다.
+  // 확인 창이 떠 있거나 승부차기를 입력하는 동안 다른 기록이 커밋되면 버전이 올라간다. 창을 연 렌더의
+  // 값으로 보내면 서버가 409 VERSION_CONFLICT 를 주므로, 보내는 순간의 버전을 ref 로 읽는다.
   const gameVersionRef = useRef(gameVersion);
   const commandScopeGenerationRef = useRef(0);
   const commandAttemptRef = useRef(0);
@@ -489,8 +570,8 @@ export function OperateConsoleCore({
       commandAttemptRef.current += 1;
       setPendingCommandRetry(null);
       setCommandError(null);
+      setRecordError(null);
       setCommandPending(false);
-      setStartRevert(null);
     }
     commandCanOperateRef.current = canOperate;
   }, [commandIdentityKey, commandScopeKey, canOperate]);
@@ -521,16 +602,16 @@ export function OperateConsoleCore({
     }
     if (!gate.pathOpen) {
       if (leaseRequired && !gate.connected && gate.token === null) {
-        return `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
+        return `연결이 끊긴 사이 기록 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
       }
       return `실시간 연결이 끊겨 있어 ‘${label}’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.`;
     }
     if (leaseRequired && gate.token === null) {
       return gate.connected
-        ? `운영 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
-        : `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
+        ? `기록 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
+        : `연결이 끊긴 사이 기록 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
     }
-    return `운영 권한이 바뀌었어요. ‘${label}’ 요청을 다시 확인해 주세요.`;
+    return `기록 권한이 바뀌었어요. ‘${label}’ 요청을 다시 확인해 주세요.`;
   }, [leaseRequired]);
 
   // T1-0: a period only counts as "current" once the server has marked it
@@ -922,9 +1003,8 @@ export function OperateConsoleCore({
   }, [gameEnded, resultRevisions, gameDetail.data?.currentOfficialRevisionId]);
   const confirmedPenalties = confirmedResultScore?.penalties ?? null;
 
-  /* 헤더 스코어. 경기 중에는 이벤트 파생값이지만, 종료 후 결과 검수에서 "고치고 확인"으로
-   * 점수를 정정하면 이벤트 로그는 그대로라 헤더만 옛 점수(알파 실측 2:0 → 정정 3:0)로
-   * 남았다 — 결과 리비전이 있으면 그 점수를 따른다. */
+  // 점수 카드의 스코어. 경기 중에는 기록에서 센 값이고, 끝난 뒤 결과를 고치면 기록은 그대로라
+  // 결과 리비전이 있으면 그 점수를 따른다.
   const headerScoreBySideId = useMemo(() => {
     if (confirmedResultScore === null) return scoreBySideId;
     return new Map(
@@ -990,7 +1070,7 @@ export function OperateConsoleCore({
   // 중지처럼 아직 정규 시간이 안 끝난 예외 종료 경로다.
   const endBlockedReason: string | null =
     penaltyShootoutTied && !penaltyShootoutEligible
-      ? '결선 경기는 무승부로 끝낼 수 없어요. 남은 피리어드를 마친 뒤 승부차기 결과를 입력해주세요.'
+      ? '결선 경기는 무승부로 끝낼 수 없어요. 남은 경기 시간을 마친 뒤 승부차기 결과를 입력해 주세요.'
       : null;
 
   // 킥별 기록은 서버에 남지 않는다(옵션 B — `@/lib/penalty-shootout.ts` doc
@@ -1011,28 +1091,20 @@ export function OperateConsoleCore({
   const penaltyPolicy = useMemo(() => ({ earlyStop: penaltyEarlyStop }), [penaltyEarlyStop]);
 
 
-  // MD-QA #165: 다른 사람이 운영 중이면 콘솔은 보기 모드로 열린다. 가져오기는 확인을 거친 이 경로뿐이다.
+  // 다른 기기가 기록 중이면 콘솔은 보기 모드로 열린다. 가져오기는 확인을 거친 이 경로뿐이다.
   const takeoverHandoff = leaseRequired && ops.takeover.status === 'denied' && TAKEOVER_HANDOFF_CODES.has(ops.takeover.code) ? ops.takeover : null;
   const takeOverFromHolder = useCallback(async () => {
     const holder = takeoverHandoff?.holderName;
     const ok = await confirm({
-      title: '운영 권한을 가져올까요?',
-      message: `${holder ? `${holder}님의` : '다른'} 화면은 보기 전용으로 바뀌어요. 같은 경기를 두 곳에서 기록하지 않도록 먼저 확인해 주세요.`,
-      confirmLabel: '가져오기',
+      title: '이 기기에서 기록할까요?',
+      message: `${holder ? `${holder}님의` : '다른'} 기기는 보기만 할 수 있게 돼요. 같은 경기를 두 곳에서 기록하지 않도록 먼저 확인해 주세요.`,
+      confirmLabel: '이 기기에서 기록하기',
     });
     if (ok) ops.requestTakeover({ force: true });
   }, [confirm, ops, takeoverHandoff?.holderName]);
 
-  // alpha "452′" 사고 대응 — 예전엔 이 계산이 곧장 `confirm()`을 띄우는
-  // `confirmIfClockSuspicious`였다(시계가 수상할 때만 확인). 과제 1(사용자
-  // 결정: "예외 없이 전부"에 확인 모달)로 이제 모든 커밋이 항상 확인을
-  // 거치므로, 시계가 수상하다고 여기서 또 `confirm()`을 부르면 확인 모달이
-  // 두 번(먼저 이 경고, 그다음 액션 확인) 뜬다 — 나쁜 UX다. 그래서 이 함수는
-  // 더 이상 confirm을 부르지 않고 "경고가 필요한가/피리어드가 몇 분짜리인가"
-  // 만 계산해서 돌려주고, 호출부(`handleCommit`)가
-  // `commitActionConfirmCopy`에 이 값을 건네 **같은 모달 안에** 병합한다.
-  // `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음) 판단 근거가
-  // 없으므로 경고 없이 통과시킨다 — 지어낸 기준으로 막지 않는다.
+  // 기록 시각이 수상한지(경기 시간의 보통 길이를 크게 넘는지)만 계산한다 — 확인은 `handleCommit` 이 띄운다.
+  // 경기 시간 길이를 못 읽었으면 판단 근거가 없으므로 경고 없이 통과시킨다.
   const clockWarningMinutes = useCallback(
     (clockMs: number): number | null => {
       if (currentPeriodDurationMinutes === null || !isClockSuspicious(clockMs, currentPeriodDurationMinutes)) {
@@ -1043,14 +1115,13 @@ export function OperateConsoleCore({
     [currentPeriodDurationMinutes],
   );
 
+  // 되돌리기와 기록 전송은 둘 다 지금 버전을 싣는다. 같은 버전으로 겹치면 서버가 한쪽을 거절하므로
+  // 되돌리기는 큐가 빈 뒤에 보내고, 새 기록은 서버에 가 있는 되돌리기가 끝난 뒤에 큐에 넣는다.
+  const reverseInFlightRef = useRef<Promise<void> | null>(null);
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
-      if (commandBlocked) return;
-      // T1-0: no LIVE period means there is no server-anchored start time to
-      // freeze a capture against. This used to silently fall back to
-      // Date.now(), which is exactly why every captured event read
-      // clockMs≈0. The persistent "경기를 시작해 주세요." banner already
-      // explains why the tap did nothing, so this guard needs no message.
+      if (commandBlocked || reverseInFlightRef.current !== null) return;
+      // 뛰는 경기 시간이 없으면 기록 시각을 고정할 서버 기준이 없다 — 쉬는 구간에 허용된 기록만 직전 구간 끝 시각으로 받는다.
       if (currentPeriod === null && breakEndCapture !== null && isBreakRecordableAction(button.type)) {
         setPendingAction({
           actionType: button.type,
@@ -1089,19 +1160,44 @@ export function OperateConsoleCore({
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
+
+  // 쉬는 시간은 하프타임이 되면 스스로 시작한다. 범위는 `gameDetailBehind` 로 가리지 않은 원본 상세에서 읽는다 —
+  // 하프타임에 늦은 기록을 넣으면 상세가 잠깐 뒤처지는데, 그때 범위가 사라지면 타이머가 처음부터 다시 돈다.
+  const restHalftimePeriodId =
+    gameState === 'LIVE'
+      ? ((gameDetail.data?.periods ?? []).find((period) => period.state === 'HALFTIME')?.id ?? null)
+      : null;
+  const restHalftimeScope = restHalftimePeriodId === null ? null : `${HALFTIME_REST_SCOPE_PREFIX}${restHalftimePeriodId}`;
+  const rest = useRestTimer({
+    // 경기 정보를 읽는 동안에는 열쇠를 주지 않는다 — 범위를 아직 몰라 저장된 하프타임 타이머를 지워 버린다.
+    storageKey: gameId !== null && gameDetail.data !== undefined ? `teameet.v1.restTimer:${gameId}` : null,
+    autoStart: restHalftimeScope === null ? null : { scope: restHalftimeScope },
+  });
+  const restKind = rest.state.kind;
+  const endRest = rest.end;
+  const previousRestKindRef = useRef(restKind);
+  useEffect(() => {
+    const previous = previousRestKindRef.current;
+    previousRestKindRef.current = restKind;
+    // 하프타임 카드와 열린 시트는 스스로 알린다. 경기 중에 닫아 둔 타이머가 끝났을 때만 토스트로 알린다.
+    if (previous !== 'running' || restKind !== 'finished' || restHalftimeScope !== null || restSheetOpen) return;
+    showToast('쉬는 시간이 끝났어요');
+    endRest();
+  }, [restKind, restHalftimeScope, restSheetOpen, showToast, endRest]);
+  // 더보기 시트가 남은 시간을 보여 주는 동안에만 초마다 다시 그린다.
+  const [, setRestTick] = useState(0);
+  useEffect(() => {
+    if (!moreOpen || restKind !== 'running') return;
+    const interval = setInterval(() => setRestTick((tick) => tick + 1), 1_000);
+    return () => clearInterval(interval);
+  }, [moreOpen, restKind]);
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
   // MD-QA #187: "수정" 시트의 대상. 시각 정정과 기록 취소를 한 시트에서 고른다.
   const [editTarget, setEditTarget] = useState<GameEventRecord | null>(null);
   // 경고 누적 퇴장 합친 줄의 수정이면 `editTarget` 은 레드이고 여기에 함께 옮길 두 번째 옐로가 들어 있다(아니면 빈 배열).
   const [editLinked, setEditLinked] = useState<readonly GameEventRecord[]>([]);
 
-  // Copilot review (PR #276): the toast's action.onClick used to close over
-  // `ops.liveEvents` from the render that submitted the GOAL -- before the
-  // websocket/query round-trip lands that event in liveEvents. The toast
-  // itself is never re-created once shown, so that closure stayed stale for
-  // its whole 5s lifetime and findRecentGoalEvent almost always returned
-  // undefined ("어시스트 추가" silently did nothing). A ref kept in sync via
-  // effect lets the onClick read the live value at click time instead.
+  // 토스트의 되돌리기는 토스트를 띄운 렌더의 클로저로 남는다 — 누르는 순간의 기록 목록을 ref 로 읽는다.
   const liveEventsRef = useRef(ops.liveEvents);
   useEffect(() => {
     liveEventsRef.current = ops.liveEvents;
@@ -1111,8 +1207,11 @@ export function OperateConsoleCore({
   // 앞 이벤트가 확정되기 전에 뒤 이벤트를 적재하면 서버가 VERSION_CONFLICT 로 거절한다.
   const opsRef = useRef(ops);
   const queueIdleWaitersRef = useRef<Array<() => void>>([]);
-  useEffect(() => {
+  // 커밋과 함께 맞춘다 — 토스트가 뜬 직후의 누름이 방금 넣은 기록을 큐에서 못 보면 서버에 없는 기록으로 넘겨짚는다.
+  useLayoutEffect(() => {
     opsRef.current = ops;
+  }, [ops]);
+  useEffect(() => {
     if (hasPendingWork(ops.queue)) return;
     const waiters = queueIdleWaitersRef.current;
     queueIdleWaitersRef.current = [];
@@ -1146,60 +1245,269 @@ export function OperateConsoleCore({
     [],
   );
 
+  // 방금 적재한 기록이 서버 기록 목록에 나타날 때까지 기다린다(확정 직후 목록 반영까지의 틈).
+  const waitForRecordedEvent = useCallback(
+    (clientEventId: string, timeoutMs: number) =>
+      new Promise<GameEventRecord | null>((resolve) => {
+        let done = false;
+        const timer = setTimeout(() => {
+          done = true;
+          resolve(null);
+        }, timeoutMs);
+        const check = () => {
+          if (done) return;
+          const event = opsRef.current.liveEvents.find((candidate) => candidate.clientEventId === clientEventId);
+          if (event === undefined) {
+            eventSettledWaitersRef.current.push(check);
+            return;
+          }
+          done = true;
+          clearTimeout(timer);
+          resolve(event);
+        };
+        check();
+      }),
+    [],
+  );
+
+  const commandBlockedRef = useRef(commandBlocked);
+  useLayoutEffect(() => {
+    commandBlockedRef.current = commandBlocked;
+  }, [commandBlocked]);
+  // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.
+  const undoStartedRef = useRef(new Set<string>());
+  // `sending` 은 되돌리기 요청이 서버에 가 있는 동안이다 — 그동안만 기록 격자를 막고, 다른 전송을 기다리는 동안에는 막지 않는다.
+  const [undoActivity, setUndoActivity] = useState({ running: 0, sending: 0 });
+  const undoPhase = undoActivity.sending > 0 ? 'sending' : undoActivity.running > 0 ? 'waiting' : null;
+  // 선수 시트를 열어 둔 채 되돌리기가 시작되면 격자를 막아도 이 길로 기록이 들어온다 — 기다린다고 알린다.
+  const waitForReverseInFlight = useCallback(async () => {
+    if (reverseInFlightRef.current !== null) showToast('되돌리기를 마치면 바로 기록할게요.');
+    while (reverseInFlightRef.current !== null) await reverseInFlightRef.current;
+  }, [showToast]);
+
+  // 서버 기록 목록을 직접 읽어 이 기록이 저장됐는지 확인한다. 읽지 못하면 없다고 단정하지 않는다(`unknown`).
+  const lookUpRecordedEvent = useCallback(
+    async (clientEventId: string): Promise<RecordedEventLookup> => {
+      if (!gameId) return { kind: 'unknown' };
+      const abort = new AbortController();
+      const abortTimer = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
+      try {
+        const page = await v1Api<{ events?: readonly GameEventRecord[]; version?: number; state?: GameState }>(
+          `/games/${gameId}/events`,
+          { method: 'GET', signal: abort.signal },
+        );
+        if (!Array.isArray(page.events)) return { kind: 'unknown' };
+        // 이 기기가 놓친 커밋만큼 버전을 맞춘다 — 옛 버전으로 되돌리기를 보내면 서버가 거절한다.
+        if (typeof page.version === 'number' && page.state !== undefined) {
+          opsRef.current.applyCommandResult({ state: page.state, version: page.version });
+        }
+        const event = page.events.find((candidate) => candidate.clientEventId === clientEventId);
+        if (event === undefined) return { kind: 'absent' };
+        return { kind: 'found', event, reversed: page.events.some((candidate) => candidate.reversesEventId === event.id) };
+      } catch {
+        return { kind: 'unknown' };
+      } finally {
+        clearTimeout(abortTimer);
+      }
+    },
+    [gameId, v1Api],
+  );
+
+  // 되돌릴 기록의 실제 상태를 정한다: 화면 목록 → (전송 중이면 끝날 때까지) → 서버 목록 순서로 본다.
+  // 큐가 「전송 실패」로 표시한 기록도 응답만 잃었을 뿐 서버에는 저장됐을 수 있어, 실패 표시만으로 없다고 하지 않는다.
+  const resolveRecordedEvent = useCallback(
+    async (clientEventId: string, limit: UndoWaitLimit): Promise<RecordedEventLookup> => {
+      const inList = (): RecordedEventLookup | null => {
+        const events = opsRef.current.liveEvents;
+        const event = events.find((candidate) => candidate.clientEventId === clientEventId);
+        return event === undefined
+          ? null
+          : { kind: 'found', event, reversed: events.some((candidate) => candidate.reversesEventId === event.id) };
+      };
+      const statusInQueue = () =>
+        opsRef.current.queue.items.find((item) => item.clientEventId === clientEventId)?.status ?? null;
+      const listed = inList();
+      if (listed !== null) return listed;
+      const status = statusInQueue();
+      if (status === 'queued' || status === 'sending') {
+        showToast('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
+        if (!(await limit.wait(waitForEventSettled(clientEventId)))) return { kind: 'expired' };
+      }
+      // 확정 응답과 목록 반영 사이의 틈은 잠깐 기다린다.
+      if (statusInQueue() === 'acked') await waitForRecordedEvent(clientEventId, 3_000);
+      return inList() ?? lookUpRecordedEvent(clientEventId);
+    },
+    [showToast, waitForEventSettled, waitForRecordedEvent, lookUpRecordedEvent],
+  );
+
+  /**
+   * 방금 한 기록을 되돌린다. 여러 건이면 뒤에서부터 — 레드를 먼저 되돌려야 도중에 멈춰도 근거 없는 레드가 남지 않는다.
+   * 서버가 없다고 확인한 기록·이미 취소한 기록은 되돌렸다고 말하지 않는다.
+   */
+  const undoRecord = useCallback(
+    async (clientEventIds: readonly string[], noun: string) => {
+      if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
+      clientEventIds.forEach((id) => undoStartedRef.current.add(id));
+      const stop = (message: string) => {
+        // 끝내지 못했으면 잠금을 푼다 — 다시 누르면 이미 취소된 기록은 건너뛰고 남은 것만 보낸다.
+        clientEventIds.forEach((id) => undoStartedRef.current.delete(id));
+        setRecordError(message);
+      };
+      if (commandBlockedRef.current) {
+        stop(UNDO_BLOCKED_BY_COMMAND);
+        return;
+      }
+      setRecordError(null);
+      setUndoActivity((activity) => ({ ...activity, running: activity.running + 1 }));
+      // 첫 요청을 보낼 때부터 이 되돌리기가 끝날 때까지 새 기록을 세워 둔다 — 여러 건을 잇달아 되돌리는 사이에도 끼어들지 않게.
+      const records: { release: (() => void) | null } = { release: null };
+      const holdRecords = () => {
+        if (records.release !== null) return;
+        let resolveHeld: () => void = () => undefined;
+        const held = new Promise<void>((resolve) => {
+          resolveHeld = resolve;
+        });
+        reverseInFlightRef.current = held;
+        setUndoActivity((activity) => ({ ...activity, sending: activity.sending + 1 }));
+        records.release = () => {
+          if (reverseInFlightRef.current === held) reverseInFlightRef.current = null;
+          setUndoActivity((activity) => ({ ...activity, sending: activity.sending - 1 }));
+          resolveHeld();
+        };
+      };
+      const stopExpired = () =>
+        stop(opsRef.current.connectionStatus === 'connected' ? UNDO_WAIT_EXPIRED : UNDO_WAIT_EXPIRED_OFFLINE);
+      try {
+        let reversed = 0;
+        for (const clientEventId of [...clientEventIds].reverse()) {
+          const limit = startUndoWaitLimit();
+          let giveUp: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const found = await resolveRecordedEvent(clientEventId, limit);
+            if (found.kind === 'expired') {
+              stopExpired();
+              return;
+            }
+            if (found.kind === 'absent') {
+              stop('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
+              return;
+            }
+            if (found.kind === 'unknown') {
+              stop('전송 결과를 아직 확인하지 못했어요. 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
+              return;
+            }
+            if (found.reversed) continue;
+            const eventId = found.event.id;
+            if (hasPendingWork(opsRef.current.queue)) {
+              showToast('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
+              if (!(await limit.wait(waitForQueueIdle()))) {
+                stopExpired();
+                return;
+              }
+              // 기다리는 사이 다른 길로 취소됐을 수 있다.
+              if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+            }
+            // 서버 목록을 읽는 데 오래 걸려 한도를 넘겼을 수도 있다.
+            if (limit.expired) {
+              stopExpired();
+              return;
+            }
+            // 기다리는 사이 진행 요청이 시작됐을 수 있다.
+            if (commandBlockedRef.current) {
+              stop(UNDO_BLOCKED_BY_COMMAND);
+              return;
+            }
+            holdRecords();
+            const request = opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
+            // API 요청에는 제한 시간이 없다 — 응답이 끝내 안 오면 기록 버튼을 풀고 결과를 모른다고 알린다.
+            const outcome = await Promise.race([
+              request.then(() => 'reversed' as const),
+              new Promise<'no-response'>((resolve) => {
+                giveUp = setTimeout(() => resolve('no-response'), COMMAND_RESPONSE_TIMEOUT_MS);
+              }),
+            ]);
+            if (outcome === 'no-response') {
+              stop(UNDO_NO_RESPONSE);
+              return;
+            }
+            reversed += 1;
+          } catch (err) {
+            // 다른 길로 이미 취소된 기록이다 — 실패가 아니다.
+            if (extractErrorCode(err) === 'EVENT_ALREADY_REVERSED') continue;
+            stop(undoFailureMessage(err, gameOperationsErrorMessage));
+            return;
+          } finally {
+            limit.clear();
+            clearTimeout(giveUp);
+          }
+        }
+        showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
+      } finally {
+        records.release?.();
+        setUndoActivity((activity) => ({ ...activity, running: activity.running - 1 }));
+      }
+    },
+    [showToast, resolveRecordedEvent, waitForQueueIdle, gameOperationsErrorMessage],
+  );
+
+  // 기록은 확인 없이 저장하고 5초 되돌리기로 복구한다. 확인을 남기는 예외는 수상한 시계와 두 번째 옐로 뒤의 레드뿐이다
+  // (퇴장한 선수 확인은 선택 시트 안에서 끝난다).
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
       if (commandBlocked) return;
-      // 확인 모달을 띄우기 전에 선택 화면부터 닫는다 — 모달 두 개가 겹쳐
-      // 보이지 않게(ActionTargetPicker의 role="dialog" 위에 ConfirmModal의
-      // role="dialog"가 또 뜨는 상태를 만들지 않는다). 확인 문구 자체에
-      // 팀·선수·시각이 다 들어 있으니(요구사항 2) 선택 화면을 먼저 닫아도
-      // 정보가 사라지지 않는다.
       setPendingAction(null);
-      const copy = commitActionConfirmCopy(
-        input,
-        gameDetail.data?.sides ?? [],
-        lineupsQuery.data ?? [],
-        clockWarningMinutes(input.clockMs),
-        periodCount,
-      );
-      if (!(await confirm(copy))) return;
+      setRecordError(null);
+      const sidesNow = gameDetail.data?.sides ?? [];
+      const lineupsNow = lineupsQuery.data ?? [];
+      const warningMinutes = clockWarningMinutes(input.clockMs);
+      if (
+        warningMinutes !== null &&
+        !(await confirm(clockCheckConfirmCopy(input, sidesNow, lineupsNow, warningMinutes, periodCount)))
+      ) {
+        return;
+      }
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
-      const submitted = opsRef.current.submitEvent(input);
+      // 끊긴 채 적은 기록은 이 기기 큐에만 있다 — 서버 되돌리기를 약속하지 않는다.
+      const connected = opsRef.current.connectionStatus === 'connected';
+      await waitForReverseInFlight();
+      const recordedId = await opsRef.current.submitEvent(input);
+      if (recordedId === null) {
+        setRecordError(RECORD_SAVE_FAILED);
+        return;
+      }
+      const recordedIds = [recordedId];
+      let noun = recordNounOf(input);
       if (askRed) {
-        const yellowEventId = await submitted;
-        if (yellowEventId === null) return;
         const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
-        const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], lineupsQuery.data ?? [], periodCount);
-        if (await confirm(redCopy)) {
+        if (await confirm(secondYellowConfirmCopy(input, sidesNow, lineupsNow, periodCount))) {
           // 서버는 레드 앞에 옐로가 있는지 보지 않는다 — 옐로가 확정되기 전에 레드를 적재하면 옐로가 실패해도
           // 레드만 남고, 옐로를 다시 보내면 기록 순서가 뒤집힌다.
-          if ((await waitForEventSettled(yellowEventId)) !== 'acked') {
+          if ((await waitForEventSettled(recordedId)) !== 'acked') {
             showToast('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.');
             return;
           }
           await waitForQueueIdle();
-          void opsRef.current.submitEvent(redInput);
+          await waitForReverseInFlight();
+          const redId = await opsRef.current.submitEvent(redInput);
+          if (redId === null) {
+            setRecordError(RECORD_SAVE_FAILED);
+          } else {
+            recordedIds.push(redId);
+            noun = SECOND_YELLOW_RED_LABEL;
+          }
         }
-      } else {
-        void submitted;
       }
-      // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
-      // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
-      if (input.type === 'GOAL' && input.participantId !== undefined) {
-        const participantId = input.participantId;
-        const clockMs = input.clockMs;
-        showToast('골을 기록했어요', {
-          action: {
-            label: '어시스트 추가',
-            onClick: () => {
-              const match = findRecentGoalEvent(liveEventsRef.current, { participantId, clockMs });
-              if (match) setAssistTarget({ event: match });
-            },
-          },
-        });
+      const copy = recordedToastCopy(input, sidesNow, lineupsNow, noun);
+      if (!connected) {
+        showToast(copy.offlineMessage, { description: '연결되면 보내요' });
+        return;
       }
+      showToast(copy.message, {
+        description: '잘못 눌렀으면 5초 안에 되돌려요',
+        action: { label: '되돌리기', onClick: () => void undoRecord(recordedIds, noun) },
+      });
     },
-    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, waitForReverseInFlight, undoRecord, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
@@ -1239,7 +1547,7 @@ export function OperateConsoleCore({
         tone: 'danger',
       });
       if (!ok) return;
-      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
+      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 취소` });
     },
     [commandBlocked, confirm, ops],
   );
@@ -1267,8 +1575,8 @@ export function OperateConsoleCore({
             },
       );
       if (!ok) return;
-      await ops.reverseEvent({ eventId: red.id, reason: '레드카드 기록 수정·취소' });
-      if (yellow !== null) await ops.reverseEvent({ eventId: yellow.id, reason: '옐로카드 기록 수정·취소' });
+      await ops.reverseEvent({ eventId: red.id, reason: '레드카드 기록 취소' });
+      if (yellow !== null) await ops.reverseEvent({ eventId: yellow.id, reason: '옐로카드 기록 취소' });
     },
     [commandBlocked, confirm, ops],
   );
@@ -1284,22 +1592,9 @@ export function OperateConsoleCore({
   );
 
 
-  // 확인 모달은 더 이상 이 함수 안에서 뜨지 않는다 — 과제 1(사용자 결정:
-  // "예외 없이 전부"에 확인)로 start/pause/resume/end-period/start-period/end
-  // 전부가 확인을 거쳐야 하는데, 그 문구는 명령마다 달라야 한다(요구사항 2:
-  // "정말?" 금지, 팀/스코어가 보여야 함). 그래서 확인은 호출부(아래
-  // `confirmAndRunCommand`, 그리고 승부차기 종료의 `handleFinishPenaltyShootout`)
-  // 가 각자의 문구로 미리 처리하고, 이 함수는 "이미 확인된 명령을 그대로
-  // 실행"만 한다 — `revert-period`(사용자 결정에서 제외된 유일한 명령, 그
-  // 자체가 교정 행동이라 확인이 없다)도 같은 이유로 이 함수를 직접 부른다.
-  // `payload`는 승부차기 종료가 `{ penalties: { home, away } }`를 실어 보내는
-  // 통로다 — 새 커맨드나 새 엔드포인트가 아니라 `end`가 이미 갖고 있던 범용
-  // payload 슬롯을 그대로 쓴다(`GamesService.extractEndPenalties` doc 참고).
-  // F65 fix: 반환값(성공 true / 실패 false)을 추가했다 — 예전엔 항상 undefined라
-  // 호출부가 성공 여부를 알 방법이 없었다. 승부차기 종료(`handleFinishPenaltyShootout`)가
-  // 이 값으로 "서버가 실제로 받아들였을 때만" 로컬 킥 입력을 지운다. 기존 호출부
-  // (revert-period 토스트, confirmAndRunCommand, 몰수 종료)는 반환값을 그냥 무시하므로
-  // 동작이 그대로다.
+  // 이미 확인을 거친 명령을 그대로 실행한다 — 확인 문구는 명령마다 달라 호출부(`confirmAndRunCommand`,
+  // 승부차기 종료)가 띄운다. 확인 없이 부르는 명령은 그 자체가 되돌리기인 `revert-period` 뿐이다.
+  // `payload` 는 `end` 가 승부차기 결과·몰수 사유를 싣는 통로이고, 반환값은 서버가 받아들였는지다.
   const handleRunCommand = useCallback(
     async (
       command: GameCommandName,
@@ -1449,24 +1744,8 @@ export function OperateConsoleCore({
           }
         }
         if (!ownsAttempt()) return false;
-        // 이슈 #375 — 기존 골/교체 되돌리기(findRecentGoalEvent /
-        // ops.reverseEvent)와 같은 토스트 패턴을 따른다: end-period 직후
-        // "방금 실수로 눌렀다"를 바로 되돌릴 수 있는 액션을 붙인다. 골/교체
-        // 되돌리기와 달리 "어떤 이벤트인지" 찾을 필요가 없다 — 되돌릴
-        // 대상은 서버가 "지금 되돌릴 수 있는 전환" 하나로 유일하게 정한다
-        // (GamesService.revertPeriodTransition). 하프타임 창을 넘겨 다음
-        // 피리어드에 이벤트가 이미 생겼다면 서버가 PERIOD_REVERT_HAS_EVENTS로
-        // 거부하고, 그 실패는 이 화면의 공용 오류 배너로 그대로 뜬다(토스트
-        // 자체는 별도 실패 처리를 하지 않는다). 요구사항 6 — 이 되돌리기
-        // 토스트는 확인 모달이 생겼다고 없애지 않는다(사후 복구 수단 유지).
-        //
-        // 종료 흐름 개편 — `hasNextPeriod` 조건이 새로 붙었다. 마지막
-        // 피리어드를 닫는 `end-period`(=후반 종료)는 되돌릴 수 없다:
-        // `revertPeriodTransition`은 "다음 피리어드를 SCHEDULED로 되감고
-        // 이전 피리어드를 다시 LIVE로"가 전부라 되감을 다음 피리어드가
-        // 없으면 PERIOD_REVERT_NOT_AVAILABLE 409다. 그런데도 토스트를
-        // 붙이면 누를 때마다 실패 배너만 뜨는 거짓 복구 수단이 된다 —
-        // 대신 확인 문구가 "되돌릴 수 없다"를 미리 알린다(confirm-copy.ts).
+        // 마지막 경기 시간을 닫는 종료는 서버에 되감을 다음 구간이 없어 되돌릴 수 없다 — 누르면 실패만 하는
+        // 되돌리기를 붙이지 않는다. 되돌리기가 거절되면(다음 구간에 이미 기록이 있음) 공용 오류 안내로 뜬다.
         if (command === 'end-period' && hasNextPeriod) {
           showToast(`${label}했어요`, {
             action: {
@@ -1485,11 +1764,8 @@ export function OperateConsoleCore({
     [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, pendingCommandRetry, showToast, leaseRequired, captureCommandScope, isCommandScopeCurrent, isCommandIdentityCurrent, commandGateFailureMessage, refreshLineupsAfterStart],
   );
 
-  // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
-  // 명령별 확인 문구(`commandConfirmCopy`)를 먼저 보여주고, 확인해야만
-  // `handleRunCommand`를 부른다. `revert-period`는 이 함수의 타입에서부터
-  // 제외돼 있다(사용자 결정에서 빠진 유일한 명령 — 버튼 onClick이 그 경우엔
-  // 이 함수 대신 `handleRunCommand`를 직접 부른다).
+  // 진행 명령 버튼의 진입점 — 명령별 확인 문구를 보여 주고 확인해야만 실행한다.
+  // `revert-period` 는 타입에서부터 빠져 있다(확인 없이 `handleRunCommand` 를 직접 부른다).
   const confirmAndRunCommand = useCallback(
     async (command: Exclude<GameCommandName, 'revert-period'>) => {
       if (commandBlocked) return;
@@ -1501,11 +1777,26 @@ export function OperateConsoleCore({
         for (const event of ops.liveEvents) {
           if (event.type === 'CORRECTION' || event.type === 'TIME_CORRECTION' || reversed.has(event.id)) continue;
           const name = ({ GOAL: '골', OWN_GOAL: '자책골', CARD: '카드', SUBSTITUTION: '교체', FOUL: '파울',
-            PERIOD_START: '피리어드 시작', PERIOD_END: '피리어드 종료', PAUSE: '일시 중지', RESUME: '재개' })[event.type];
+            PERIOD_START: '경기 시간 시작', PERIOD_END: '경기 시간 종료', PAUSE: '일시 중지', RESUME: '재개' })[event.type];
           counts.set(name, (counts.get(name) ?? 0) + 1);
         }
         const summary = [...counts].map(([name, count]) => `${name} ${count}건`).join(', ') || '없음';
-        setStartRevert({ summary, version: gameVersionRef.current, phrase: '' });
+        const versionAtOpen = gameVersionRef.current;
+        const confirmation = '취소한다';
+        const ok = await confirm({
+          title: '경기 시작을 취소할까요?',
+          message: `무효 처리할 경기 기록: ${summary}. 경기 시계를 초기화하고 시작 전으로 돌아가요.`,
+          confirmLabel: '경기 시작 취소',
+          tone: 'danger',
+          confirmationText: confirmation,
+        });
+        if (!ok) return;
+        // 확인 창이 보여 준 기록 요약이 낡았으면 보내지 않는다.
+        if (gameVersionRef.current !== versionAtOpen) {
+          setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.');
+          return;
+        }
+        await handleRunCommand('revert-start', { confirmation }, undefined, confirmedScope);
         return;
       }
       const copy = commandConfirmCopy(command, label, {
@@ -1524,9 +1815,7 @@ export function OperateConsoleCore({
     [ops.liveEvents, commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, penaltyShootoutTied, substitutionTracked, handleRunCommand, captureCommandScope, isCommandScopeCurrent],
   );
 
-  // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
-  // 로컬 상태 전환뿐) — 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
-  // 거친다.
+  // 승부차기 시작 — 서버에는 아무것도 보내지 않지만(패널을 여는 로컬 상태 전환) 진행 단계를 바꾸므로 확인을 거친다.
   const handleStartPenaltyShootout = useCallback(async () => {
     if (commandBlocked) return;
     const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);
@@ -1662,17 +1951,10 @@ export function OperateConsoleCore({
   const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
   const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
   const lineups = lineupsQuery.data ?? [];
-  const sidesWithoutCurrentPlayers = showEmptyRosterNotice
-    ? sides.filter((side) => {
-        const lineup = latestLineupForDisplay(lineups, side.id);
-        return lineup === null || lineup.participants.length === 0;
-      })
-    : [];
-  const hasEmptyRoster = sidesWithoutCurrentPlayers.length > 0;
 
   if (lineupsQuery.isLoading || (gameId && gameDetail.isLoading)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
+      <div className="flex min-h-[50vh] items-center justify-center text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
         불러오는 중이에요…
       </div>
     );
@@ -1683,7 +1965,7 @@ export function OperateConsoleCore({
     const scopeDenied = extractErrorCode(lineupsQuery.error) === 'STAFF_SCOPE_DENIED';
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center">
-        <p className="text-sm font-medium text-[var(--text-body)]">
+        <p className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-body)]">
           {scopeDenied
             ? gameOperationsErrorMessage('STAFF_SCOPE_DENIED')
             : extractErrorMessage(lineupsQuery.error, '경기 정보를 불러오지 못했어요.')}
@@ -1699,48 +1981,77 @@ export function OperateConsoleCore({
 
   if (!gameId) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
+      <div className="flex min-h-[50vh] items-center justify-center text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
         아직 생성된 경기 정보가 없어요.
       </div>
     );
   }
 
-  // 진행 조작 줄. "다음 걸음"은 진행 방향 명령 하나(시작·후반 시작·재개·전반/후반 종료)이고
-  // 일시 중지·되돌리기는 그 곁의 보조다. 정규 시간 종료 뒤에는 "경기 종료"(동점 결선이면
-  // "승부차기 시작")가 다음 걸음이 된다.
-  // 헤더의 진행 단계 스트립. 뛰는 동안은 전반 · 하프타임 · 후반 · 종료, 끝난 뒤에는 예정 · 진행 · 결과 확인 ·
-  // 확정. 시작 전에는 스트립 대신 "킥오프 준비"가 그 자리의 안내다.
-  const progressSteps =
-    gameState === 'LIVE' || gameState === 'PAUSED'
-      ? periodProgressSteps({
-          periods: (gameDetail.data?.periods ?? []).map((period) => ({
-            number: period.number,
-            label: periodLabel(period.number, periodCount),
-          })),
-          livePeriodNumber: currentPeriod?.number ?? null,
-          halftimePeriodNumber: halftimePeriod?.number ?? null,
-          regulationEnded,
-        })
-      : gameState === 'ENDED'
-        ? resultProgressSteps({ official: resultOfficialized })
-        : [];
-
   const matchInPlay = gameState === 'LIVE' || gameState === 'PAUSED';
+  const halftime = halftimePeriod !== null && gameState === 'LIVE';
+  const labelOf = (command: GameCommandName) =>
+    commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
+
+  // 진행 바에는 지금 단계의 명령만 둔다 — 일시 중지와 "다음 걸음" 하나(시작·종료·재개·후반 시작).
+  // 정규 시간이 끝나면 다음 걸음은 "경기 종료"(동점 결선이면 "승부차기 시작")다.
   const stepCommands = availableCommands.filter((command) => command !== 'end');
-  const secondaryCommands = stepCommands.filter((command) => command === 'pause' || command === 'revert-period');
   const nextStepCommand = stepCommands.find((command) => command !== 'pause' && command !== 'revert-period') ?? null;
   const commandBarVisible = availableCommands.length > 0;
 
-  // 정규 시간이 끝나기 전에도 눌리는 "경기 종료"(조기 정상 종료)와 몰수·중단 종료는
-  // 주 조작 줄이 아니라 ⋯ 시트 안에 둔다. 정규 시간 종료 뒤의 "경기 종료"만 주 버튼이다.
+  // 자주 누르지 않거나 되돌리기 어려운 동작은 더보기 시트에 모은다. 위험한 것은 묶음 제목과 빨간 글자로 가른다.
   const endAvailable = availableCommands.includes('end');
+  const DANGER_GROUP = '되돌리기 어려운 동작';
   const moreActions: ActionSheetAction[] = [];
+  // 하프타임에는 카드가 화면에 있다. 카드를 끝낸 뒤에는 여기서 다시 잴 수 있다.
+  const restCardVisible = restHalftimeScope !== null && restKind !== 'idle';
+  if (matchInPlay && !restCardVisible) {
+    moreActions.push({
+      key: 'rest-timer',
+      label: '쉬는 시간 재기',
+      description:
+        restKind === 'running'
+          ? `${formatRestCountdown(rest.remainingMs)} 남았어요`
+          : restKind === 'finished'
+            ? '쉬는 시간이 끝났어요'
+            : '부상·작전 시간처럼 잠깐 멈출 때',
+      onSelect: () => {
+        setMoreOpen(false);
+        setRestSheetOpen(true);
+      },
+    });
+  }
+  if (matchInPlay) {
+    moreActions.push({
+      key: 'all-records',
+      label: '기록 전체 보기·고치기',
+      description: '시각 고치기, 기록 취소',
+      onSelect: () => {
+        setMoreOpen(false);
+        setAllRecordsOpen(true);
+      },
+    });
+  }
+  if (availableCommands.includes('revert-period') && halftimePeriod !== null) {
+    const endedLabel = endPeriodCommandLabel(halftimePeriod.number - 1, periodCount);
+    moreActions.push({
+      key: 'revert-period',
+      label: `${endedLabel} 되돌리기`,
+      description: '쉬는 시간을 끝내고 방금 마친 경기 시간으로 돌아가요',
+      disabled: commandUnavailable,
+      onSelect: () => {
+        setMoreOpen(false);
+        // 확인 없이 실행하는 명령은 `revert-period` 하나뿐이다 — 그 자체가 되돌리기다.
+        void handleRunCommand('revert-period');
+      },
+    });
+  }
   if (endAvailable && !regulationEnded) {
     moreActions.push({
       key: 'early-end',
-      label: '경기 종료',
-      description: '정규 시간이 끝나기 전에 경기를 마쳐요. 되돌릴 수 없어요.',
+      label: '경기 일찍 끝내기',
+      description: '정규 시간 전에 마쳐요 · 되돌릴 수 없어요',
       destructive: true,
+      groupLabel: DANGER_GROUP,
       disabled: commandUnavailable || endBlockedReason !== null,
       disabledReason: endBlockedReason,
       onSelect: () => {
@@ -1752,9 +2063,10 @@ export function OperateConsoleCore({
   if (endAvailable && !penaltyShootoutEligible) {
     moreActions.push({
       key: 'abnormal-end',
-      label: '몰수·중단으로 종료',
-      description: '사유를 남기고 마쳐요.',
+      label: '몰수·중단으로 끝내기',
+      description: '사유를 남기고 마쳐요',
       destructive: true,
+      groupLabel: DANGER_GROUP,
       disabled: commandUnavailable,
       onSelect: () => {
         setMoreOpen(false);
@@ -1762,6 +2074,159 @@ export function OperateConsoleCore({
       },
     });
   }
+  if (leaseRequired && canOperate && matchInPlay && !sampleMode) {
+    moreActions.push({
+      key: 'revert-start',
+      label: '경기 시작 취소',
+      description: '적은 기록을 지우고 시작 전으로',
+      destructive: true,
+      groupLabel: DANGER_GROUP,
+      disabled: commandUnavailable,
+      onSelect: () => {
+        setMoreOpen(false);
+        void confirmAndRunCommand('revert-start');
+      },
+    });
+  }
+
+  // 교체를 기록하는 종목은 격자 여섯째 칸이 「교체」라 더보기가 진행 바의 ⋯ 로 간다.
+  const gridCells = [
+    ...visibleActionButtons.map((button) => ({
+      key: (button.type === 'CARD' ? (button.cardColor ?? 'YELLOW') : button.type) as RecordCellKey,
+      label: button.label,
+      disabled:
+        !canOperate ||
+        commandBlocked ||
+        undoPhase === 'sending' ||
+        (currentPeriod === null && !(breakEndCapture !== null && isBreakRecordableAction(button.type))),
+    })),
+    ...(substitutionTracked ? [] : [{ key: 'MORE' as const, label: '더보기' }]),
+  ];
+  const handleGridSelect = (key: RecordCellKey) => {
+    if (key === 'MORE') {
+      setMoreOpen(true);
+      return;
+    }
+    const button = visibleActionButtons.find(
+      (candidate) => (candidate.type === 'CARD' ? candidate.cardColor : candidate.type) === key,
+    );
+    if (button !== undefined) handleSelectAction(button);
+  };
+
+  // 서버 기록 목록에 이미 있는 기록은 「보내지 못한 기록」이 아니다 — 응답만 잃은 것이다.
+  const recordedClientEventIds = new Set(ops.liveEvents.map((event) => event.clientEventId));
+  const unconfirmedQueueItems = ops.queue.items.filter((item) => !recordedClientEventIds.has(item.clientEventId));
+  const consoleStatus = deriveConsoleStatus({
+    gameState,
+    leaseRequired,
+    takeoverEnabled,
+    sampleMode,
+    takeover: ops.takeover,
+    handoff: takeoverHandoff === null ? null : { code: takeoverHandoff.code, holderName: takeoverHandoff.holderName },
+    connection: ops.connectionStatus,
+    offlineCommandAllowed,
+    canOperate,
+    syncGap: ops.sync.status === 'gap',
+    behind: gameDetailBehind,
+    periodExpired,
+    expiryError: periodRefreshNeeded ? periodExpiryError : null,
+    startBlockedByTeams,
+    commandError: commandError ?? recordError,
+    bannerMessage: ops.bannerMessage,
+    retryLabel: pendingCommandRetry?.label ?? null,
+    queue: {
+      waiting: unconfirmedQueueItems.filter((item) => item.status === 'queued' || item.status === 'sending').length,
+      failed: unconfirmedQueueItems.filter((item) => item.status === 'failed').length,
+    },
+    undo: undoPhase,
+    endPeriodLabel: endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount),
+    gameOperationsErrorMessage,
+  });
+  // 명단의 단일 출처: 선수 시트가 쓰는 목록(`rosterForSide`)을 그대로 센다. 뛰는 동안에만 보여 준다 —
+  // 시작 전에는 킥오프 준비 패널이 명단이다.
+  const rosterRows: readonly RosterRow[] | null = matchInPlay
+    ? sides.map((side) => ({
+        sideId: side.id,
+        label: `${side.sideKey === 'HOME' ? '홈' : '원정'} · ${side.displayNameSnapshot}`,
+        count: rosterForSide(lineups, side.id).length,
+      }))
+    : null;
+
+  // 단계 문구 — 지금 단계에서 다음에 할 일을 점수 카드 안에 한 번만 적는다(상태 줄과 겹치지 않게).
+  const foulPeriodNumber = periodForDisplay?.number ?? 1;
+  let stageCaption: ReactNode = null;
+  if (gameState === 'ENDED') {
+    stageCaption = <MatchProgressStrip steps={resultProgressSteps({ official: resultOfficialized })} label="경기 진행 단계" />;
+  } else if (halftime && halftimePeriod !== null) {
+    stageCaption = (
+      <p className={STAGE_CAPTION_CLASS}>
+        하프타임이에요. 준비되면 ‘{startPeriodCommandLabel(halftimePeriod.number)}’을 눌러 주세요. 빠진 골·카드·파울은 지금도{' '}
+        {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각으로 기록할 수 있어요.
+      </p>
+    );
+  } else if (regulationEnded) {
+    stageCaption = penaltyShootoutEligible ? (
+      <p className={STAGE_CAPTION_CLASS}>정규 시간이 무승부로 끝났어요. ‘승부차기 시작’으로 결과를 입력해 주세요.</p>
+    ) : leaseRequired ? (
+      <p className={STAGE_CAPTION_CLASS}>정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.</p>
+    ) : (
+      <p className={STAGE_CAPTION_CLASS}>
+        정규 시간이 끝났어요. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요.
+        {resultHref ? (
+          <Link
+            href={resultHref}
+            className="ml-1 inline-flex items-center font-semibold underline underline-offset-2"
+            style={{ minHeight: 'var(--size-touch-min)' }}
+          >
+            결과 제출 화면 열기
+          </Link>
+        ) : null}
+      </p>
+    );
+  } else if (
+    currentPeriod === null &&
+    !gameDetailBehind &&
+    !startBlockedByTeams &&
+    gameState !== 'CANCELLED'
+  ) {
+    stageCaption = <p className={STAGE_CAPTION_CLASS}>경기를 시작해 주세요.</p>;
+  }
+
+  const clockSlot =
+    currentPeriod && currentPeriod.startedAt ? (
+      <ElapsedMatchClock
+        periodNumber={currentPeriod.number}
+        periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
+        offsetMs={ops.clockOffsetMs}
+        pausedTotalMs={currentPeriod.pausedTotalMs}
+        pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
+        periodCount={periodCount}
+        periodDurationMinutes={gameState === 'LIVE' ? currentPeriodDurationMinutes : null}
+        onExpiryChange={handlePeriodExpiryChange}
+      />
+    ) : halftime || regulationEnded ? (
+      // 뛰는 경기 시간이 없어 잴 시계가 없다 — 상태 칩은 여전히 "진행 중"이라 이 칩이 단계를 말한다.
+      <span className={STAGE_CHIP_CLASS}>
+        <Timer size={16} aria-hidden="true" />
+        {halftime ? '하프타임' : '정규 시간 종료'}
+      </span>
+    ) : null;
+
+  // 승부차기는 정규 시간 점수와 다른 값이라 스코어에 섞지 않고 따로 적는다. 선축을 모르는 옛 기록은 그 조각을 생략한다.
+  const penaltyChip = confirmedPenalties ? (
+    <span
+      className={`${STAGE_CHIP_CLASS} tabular-nums`}
+      aria-label={`승부차기 ${sides
+        .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
+        .join(', ')}${confirmedFirstKicker === null ? '' : `, 선축 ${confirmedFirstKicker.displayNameSnapshot}`}`}
+    >
+      <Target size={16} aria-hidden="true" />
+      승부차기 {sides.map((side) => penaltyScoreForSide(side, confirmedPenalties)).join(':')}
+      {confirmedFirstKicker === null ? null : (
+        <span className="font-semibold">· 선축 {confirmedFirstKicker.displayNameSnapshot}</span>
+      )}
+    </span>
+  ) : null;
 
   const renderCommandButton = (command: GameCommandName, primary: boolean) => {
     const Icon = COMMAND_ICON[command];
@@ -1774,497 +2239,241 @@ export function OperateConsoleCore({
           'whitespace-nowrap max-sm:!min-h-12',
           primary ? 'flex-1 enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 sm:flex-none' : '',
         ].join(' ')}
-        // 빈 명단은 익명 기록으로 운영한다. 시작에는 양 팀 배정만 필요하다.
+        // 빈 명단은 선수 모름으로 기록한다. 시작에는 양 팀 배정만 필요하다.
         disabled={commandUnavailable || (command === 'start' && startBlockedByTeams)}
         loading={commandPending}
-        // 확인 없이 실행하는 명령은 `revert-period` 하나뿐이다 — 그 자체가 되돌리기다.
         onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
       >
         {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
-        {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount)}
+        {labelOf(command)}
       </Button>
     );
   };
 
+  // 폰(sm 미만)에서는 화면 아래에 고정한다. sm 부터는 운영 셸의 사이드바를 덮지 않게 상태 줄 아래에 그대로 둔다.
+  const commandBar = commandBarVisible ? (
+    <div
+      role="group"
+      aria-label="경기 진행 조작"
+      data-console-guide="commands"
+      className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))] sm:static sm:z-auto sm:justify-end sm:border-0 sm:bg-transparent sm:py-0"
+    >
+      {stepCommands.includes('pause') ? renderCommandButton('pause', false) : null}
+      {nextStepCommand !== null ? renderCommandButton(nextStepCommand, true) : null}
+      {nextStepCommand === null && regulationEnded ? (
+        penaltyShootoutEligible ? (
+          <Button
+            key="penalty-start"
+            size="md"
+            variant="primary"
+            className="flex-1 whitespace-nowrap enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
+            disabled={commandUnavailable}
+            onClick={() => void handleStartPenaltyShootout()}
+          >
+            <Target size={14} aria-hidden="true" />
+            승부차기 시작
+          </Button>
+        ) : endAvailable ? (
+          <Button
+            key="end"
+            size="md"
+            variant="danger"
+            className="flex-1 whitespace-nowrap enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
+            disabled={commandUnavailable || endBlockedReason !== null}
+            loading={commandPending}
+            onClick={() => void confirmAndRunCommand('end')}
+          >
+            {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
+            {labelOf('end')}
+          </Button>
+        ) : null
+      ) : null}
+      {substitutionTracked && moreActions.length > 0 ? (
+        <button
+          type="button"
+          aria-label="더보기"
+          aria-haspopup="dialog"
+          onClick={() => setMoreOpen(true)}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 max-sm:h-12 max-sm:w-12"
+        >
+          <Ellipsis size={18} aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  ) : null;
+
+  // 기록 목록 하나를 첫 화면(최근 몇 줄)과 전체 보기 시트가 같이 쓴다. 시트에서 고치기를 누르면 시트를 먼저 닫는다.
+  const renderEventList = (options: { maxRows?: number; fromSheet?: boolean } = {}) => {
+    const leaveSheet = () => {
+      if (options.fromSheet === true) setAllRecordsOpen(false);
+    };
+    return (
+      <RecordedEventList
+        order="newest-first"
+        events={ops.liveEvents}
+        sides={sides}
+        lineups={lineups}
+        periodCount={periodCount}
+        maxRows={options.maxRows}
+        renderMore={(totalRows) => (
+          <Button size="md" variant="outline" block className="mt-2 min-h-[44px]" onClick={() => setAllRecordsOpen(true)}>
+            기록 {totalRows}개 전체 보기
+          </Button>
+        )}
+        onAttachAssist={
+          canOperate
+            ? (event) => {
+                leaveSheet();
+                setAssistTarget({ event });
+              }
+            : undefined
+        }
+        onEditEvent={
+          canOperate && ops.correctEventTime !== undefined
+            ? (event, linkedEvents) => {
+                leaveSheet();
+                setEditTarget(event);
+                setEditLinked(linkedEvents ?? []);
+              }
+            : undefined
+        }
+        onReverseEvent={
+          canOperate
+            ? (event) => {
+                leaveSheet();
+                void handleReverseEvent(event);
+              }
+            : undefined
+        }
+        disabled={commandBlocked}
+        resultOfficialized={resultOfficialized}
+      />
+    );
+  };
+  // 뛰는 동안 폰·태블릿 첫 화면에는 최근 4줄만 둔다 — 넓은 화면(오른쪽 열)과 끝난 경기는 전부 보여 준다.
+  const recentOnly = matchInPlay && !isDesktop;
+  const recordsSection = (
+    <section data-console-guide="history" className="px-4">
+      <h3 className="mb-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+        {recentOnly ? '최근 기록' : '기록'}{' '}
+        <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
+      </h3>
+      {renderEventList(recentOnly ? { maxRows: RECENT_RECORD_ROWS } : {})}
+    </section>
+  );
+
   return (
-    <div className="tm-content-enter mx-auto flex max-w-3xl flex-col gap-4 pb-24 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
-      {/* tm-content-enter: 로딩(944)→콘텐츠(이 반환문) 전환 시 1회만 페이드인한다
-          (CSS animation, fill-mode both) — 소켓 이벤트로 오는 재렌더는 이 div를
-          리마운트하지 않으므로(고정 key 없음) 라이브 갱신 중 재생되지 않는다. */}
-      {/* [알파 감사 F] 1280px+ 데스크톱에서 콘텐츠가 상단 1/3에만 몰리고 그 아래가
-          광활하게 비어 있다는 실측 지적 — 모바일/태블릿은 기존과 동일한 세로
-          스택(flex-col, max-w-3xl)을 그대로 유지하고, lg(1024px)부터만 2열
-          grid로 전환한다. 왼쪽(점수·명령·액션 버튼 — 경기 중 빠르게 눌러야
-          하는 primary)이 더 넓은 1.6fr, 오른쪽(기록된 이벤트·전송 상태 —
-          참고용 secondary, R-D1)이 1fr다. 위→아래로만 쌓지 않고 나란히
-          배치해 데스크톱의 남는 세로 공간을 채운다. 두 컬럼 모두 내부에서
-          기존과 같은 gap-4 세로 리듬을 유지해 모바일 스택 순서·간격은
-          픽셀 단위로 그대로다. */}
-      {/* On mobile the first column must not become the sticky header's containing
-          block: it ends before the event column, which otherwise forces the header
-          back toward the viewport top at the end of the first column. The outer
-          console stack owns the full scroll flow; desktop keeps the two-column
-          wrapper for its existing grid layout. */}
+    <div
+      className={[
+        'tm-content-enter mx-auto flex max-w-3xl flex-col gap-4 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6',
+        // 폰에서는 고정 진행 바가 본문 끝을 가리지 않게 바 높이만큼 비운다.
+        commandBarVisible ? 'pb-[calc(6rem+var(--v1-shell-safe-bottom))] sm:pb-8' : 'pb-8',
+        // 기록이 몇 줄 없을 때도 기록 격자가 진행 바 가까이에 머물게 한다(격자의 `mt-auto` 와 짝).
+        matchInPlay ? 'max-sm:min-h-[calc(100dvh-12rem)]' : '',
+      ].join(' ')}
+    >
+      {/* lg 미만에서는 이 래퍼가 `contents` 라 바깥 세로 스택이 스크롤 흐름을 갖는다 — 래퍼가 점수 카드의
+          sticky 기준 상자가 되면 첫 열이 끝나는 곳에서 카드가 밀려 올라간다. lg 부터는 왼쪽 열이 된다. */}
       <div className="contents lg:flex lg:flex-col lg:gap-4">
-      {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
-          visible while scrolling the lineup/queue below. */}
-      {/* The ops shell keeps a 52px mobile/tablet header sticky at the viewport top.
-          Keep this game context header below it while scrolling; the shell header is
-          hidden on desktop, so the console can return to the viewport top at lg. */}
-      <header
-        data-console-guide="overview"
-        className={[
-          'sticky z-10 border-b border-[var(--border)] bg-[var(--card-surface)] px-4 py-3',
-          headerTopClass,
-        ].join(' ')}
-      >
-        {/* T1-0: next-period(현재는 end-period) 버튼이 추가되며 LIVE 상태의
-            버튼이 최대 3개(일시 중지/전반 종료/경기 종료)가 됐다. 기존 "한
-            줄에 타이틀+뱃지+버튼" 레이아웃은 390px 모바일에서 버튼 3개가
-            shrink-0로 자기 너비를 그대로 차지해 왼쪽 뱃지·연결상태 영역이
-            극단적으로 좁아져 "진행 중" 뱃지가 글자 단위로 세로 줄바꿈되는
-            회귀를 만들었다(2버튼 상태에서는 재현 안 됨 — 실측 스크린샷으로
-            확인). 모바일에서는 타이틀 행과 버튼 행을 세로로 분리하고, 버튼
-            행은 필요시 자체적으로 줄바꿈하도록 바꿔 타이틀/뱃지 쪽 공간을
-            압박하지 않는다. sm(640px) 이상은 기존 한 줄 레이아웃을 유지한다
-            (768/1440에서는 문제없이 확인됨).
-            이슈 #375 — 하프타임 버튼 셋(후반 시작/되돌리기/경기 종료)도 같은
-            "비-end 2개 + 구분선 + end 1개" 모양이라 이 컨테이너를 그대로
-            재사용한다(새 레이아웃을 만들지 않는다) — 위에서 이미 3버튼
-            모바일 줄바꿈까지 검증된 자리다. */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <MatchupTitle sides={sides} />
-            <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
-                {gameState ? STATE_LABEL[gameState] : '-'}
-              </span>
-              {sampleMode ? (
-                <span className="flex items-center gap-1">
-                  <FlaskConical size={13} aria-hidden="true" />
-                  체험 중 · 서버 연결 없음
-                </span>
-              ) : (
-                <span className="flex items-center gap-1" aria-live="polite">
-                  {ops.connectionStatus === 'connected' ? (
-                    <Wifi size={13} aria-hidden="true" />
-                  ) : (
-                    <WifiOff size={13} aria-hidden="true" />
-                  )}
-                  {ops.connectionStatus === 'connected'
-                    ? '실시간 연결됨'
-                    : ops.connectionStatus === 'connecting'
-                      ? '연결 중…'
-                      : '연결 끊김'}
-                </span>
-              )}
-            </div>
-            {!leaseRequired && resultHref ? (
-              <Link className="tm-btn tm-btn-md tm-btn-outline mt-3" href={resultHref}>
+        <ConsoleScoreCard
+          sides={sides}
+          scoreBySideId={headerScoreBySideId}
+          foulCounts={foulCounts}
+          foulThreshold={resolveTeamFoulThreshold(gameDetail.data?.teamFoulThreshold)}
+          foulPeriodLabel={matchInPlay ? `${periodLabel(foulPeriodNumber, periodCount)} 팀 파울` : null}
+          foulResetNote={
+            matchInPlay && foulPeriodHasNext ? `${periodLabel(foulPeriodNumber + 1, periodCount)}에는 0부터 다시 세요` : null
+          }
+          stateLabel={gameState ? STATE_LABEL[gameState] : '-'}
+          clock={clockSlot}
+          penaltyChip={penaltyChip}
+          caption={stageCaption}
+          footer={
+            !leaseRequired && resultHref ? (
+              <Link className="tm-btn tm-btn-md tm-btn-outline" href={resultHref}>
                 결과 보내기
               </Link>
-            ) : null}
-          </div>
-          {/* 진행 조작 줄 — 폰(sm 미만)에서는 화면 아래에 고정하고, sm 부터는 헤더 오른쪽에
-              그대로 둔다(같은 노드가 breakpoint 로 자리만 바꾼다). 헤더의 backdrop-blur 는
-              자손 fixed 의 기준 상자를 헤더로 바꾸므로 sm 미만에서는 꺼 둔다.
-              가운데(넓은 칸)는 지금 누를 "다음 걸음" 하나, 일시 중지·되돌리기는 옆의 보조,
-              되돌릴 수 없는 종료 계열은 ⋯ 시트 안으로 뺐다 — 자주 누르는 "전반 종료" 곁에
-              가장 위험한 버튼이 있던 배치(오탭) 자체를 없앤 것이다. */}
-          {commandBarVisible ? (
-            <div
-              role="group"
-              aria-label="경기 진행 조작"
-              data-console-guide="commands"
-              className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))] sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:justify-end sm:border-0 sm:bg-transparent sm:p-0"
-            >
-              {secondaryCommands.map((command) => renderCommandButton(command, false))}
-              {nextStepCommand !== null ? renderCommandButton(nextStepCommand, true) : null}
-              {/* 정규 시간 종료 뒤: 다음 걸음이 "경기 종료"(동점 결선이면 "승부차기 시작")다. */}
-              {nextStepCommand === null && regulationEnded ? (
-                penaltyShootoutEligible ? (
-                  <Button
-                    key="penalty-start"
-                    size="md"
-                    variant="primary"
-                    className="flex-1 whitespace-nowrap enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
-                    disabled={commandUnavailable}
-                    onClick={() => void handleStartPenaltyShootout()}
-                  >
-                    <Target size={14} aria-hidden="true" />
-                    승부차기 시작
-                  </Button>
-                ) : (
-                  <Button
-                    key="end"
-                    size="md"
-                    variant="danger"
-                    className="flex-1 whitespace-nowrap enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
-                    disabled={commandUnavailable || endBlockedReason !== null}
-                    loading={commandPending}
-                    onClick={() => void confirmAndRunCommand('end')}
-                  >
-                    {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount)}
-                  </Button>
-                )
-              ) : null}
-              {moreActions.length > 0 ? (
-                <button
-                  type="button"
-                  aria-label="더보기"
-                  aria-haspopup="dialog"
-                  disabled={commandUnavailable}
-                  onClick={() => setMoreOpen(true)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 max-sm:h-12 max-sm:w-12"
-                >
-                  <Ellipsis size={18} aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-        <MatchProgressStrip steps={progressSteps} label="경기 진행 단계" />
-        {/* UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데 헤더에
-            점수가 아예 없었다. 경과시간과 같은 위계(text-2xl font-bold)로,
-            같은 행에 나란히 둔다. sides 배열 순서를 그대로 써서 위 제목
-            줄("A vs B")과 좌우 순서가 반드시 일치한다 — 홈/원정을 임의로
-            가정하지 않는다. */}
-        {sides.length > 0 ? (
-          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {/* 점수는 이 화면에서 가장 멀리서 확인되는 값이다 — 현장에서는 화면을
-                손에 들고 보는 게 아니라 테이블에 두고 곁눈질한다. text-2xl(24px)로는
-                옆의 라벨·칩과 무게가 비슷해 한눈에 잡히지 않아 text-4xl 로 올린다.
-                양옆에 팀 색 점을 붙여 어느 숫자가 어느 팀인지 읽지 않고 알 수 있게
-                하되, 팀 이름은 바로 위 제목 줄("A vs B")에 그대로 있으므로 색만으로
-                정보를 전달하지 않는다(R-C3). sides 배열 순서를 그대로 써서 제목 줄과
-                좌우 순서가 반드시 일치한다. */}
-            <p className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">스코어</span>
-              <span
-                className="flex items-center gap-2 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
-                aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${headerScoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
-              >
-                {/* 점수 문자열("2 : 1")은 한 텍스트 노드로 유지한다 — 숫자 사이에
-                    엘리먼트를 끼우면 화면은 같아 보여도 점수를 읽는 쪽(스크린리더,
-                    그리고 이 값을 계약으로 검증하는 테스트)에서 하나의 값으로
-                    잡히지 않는다. 팀 색 점은 양옆 바깥에 둔다(좌=홈, 우=원정). */}
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--blue500)]"
-                />
-                <span>{sides.map((side) => headerScoreBySideId.get(side.id) ?? 0).join(' : ')}</span>
-                {sides.length > 1 ? (
-                  <span
-                    aria-hidden="true"
-                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--orange500)]"
-                  />
-                ) : null}
-              </span>
-            </p>
-            {/* 승부차기 — 정규시간 점수와 다른 값이라 위 스코어에 섞지 않고 별도 칩으로
-                병기한다. 경기가 끝난 뒤에는 경과 시간 칩이 들어올 자리가 비므로 그
-                슬롯을 그대로 쓴다(하프타임·정규 시간 종료 칩과 같은 자리·같은 무게).
-                aria-label 은 "2:0"이 시각으로 읽히지 않게 점수임을 명시한다. */}
-            {confirmedPenalties ? (
-              <span
-                className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
-                aria-label={`승부차기 ${sides
-                  .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
-                  .join(', ')}${
-                  confirmedFirstKicker === null ? '' : `, 선축 ${confirmedFirstKicker.displayNameSnapshot}`
-                }`}
-              >
-                <Target size={16} aria-hidden="true" />
-                승부차기{' '}
-                {sides.map((side) => penaltyScoreForSide(side, confirmedPenalties)).join(':')}
-                {/* 선축은 점수와 함께 결과의 일부다(두 숫자로는 복원되지 않는다). 여기서는
-                    사이드 목록이 있으므로 `홈`/`원정` 대신 실제 팀 이름을 쓴다 — 목록형
-                    화면(결과 검수·픽스처 목록)은 이름을 갖고 있지 않아
-                    `formatGameResultScoreWithPenalties`가 `홈`/`원정`을 쓴다. 선축이 없던
-                    시절에 저장된 경기는 이 조각을 아예 그리지 않는다. */}
-                {confirmedFirstKicker === null ? null : (
-                  <span className="font-semibold">· 선축 {confirmedFirstKicker.displayNameSnapshot}</span>
-                )}
-              </span>
-            ) : null}
-            {currentPeriod && currentPeriod.startedAt ? (
-              <ElapsedMatchClock
-                periodNumber={currentPeriod.number}
-                periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
-                offsetMs={ops.clockOffsetMs}
-                pausedTotalMs={currentPeriod.pausedTotalMs}
-                pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
-                periodCount={periodCount}
-                periodDurationMinutes={gameState === 'LIVE' ? currentPeriodDurationMinutes : null}
-                onExpiryChange={handlePeriodExpiryChange}
-              />
-            ) : halftimePeriod !== null ? (
-              // 이슈 #375 — 어떤 피리어드도 LIVE가 아니므로 경과 시간 자체가
-              // 없다(잴 대상이 없다). 자리를 비워두면(예전 동작) "고장
-              // 났나?" 처럼 읽히므로, ElapsedMatchClock과 같은 슬롯에
-              // 같은 시각적 무게로 하프타임임을 명시한다 — STATE_LABEL
-              // 뱃지는 여전히 "진행 중"이라(게임 자체는 LIVE) 이 칩이 없으면
-              // 하프타임이라는 사실이 화면 어디에도 안 보인다. 아이콘은
-              // `Pause`(=PAUSED 상태 배지가 이미 쓰는 아이콘) 대신
-              // `Timer`를 써서 "일시 중지"와 헷갈리지 않게 한다 — 아래
-              // RestTimer("휴식 타이머")와 같은 아이콘 언어를 공유한다.
-              <span className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
-                <Timer size={16} aria-hidden="true" />
-                하프타임
-              </span>
-            ) : regulationEnded ? (
-              // 종료 흐름 개편 — 하프타임 칩과 같은 이유로 같은 슬롯을 쓴다:
-              // 이 단계에서도 LIVE인 피리어드가 없어 잴 경과 시간이 없는데,
-              // 상태 뱃지는 여전히 "진행 중"(게임 자체는 LIVE)이라 이 칩이
-              // 없으면 "정규 시간은 끝났고 결과는 아직 확정 전"이라는 사실이
-              // 화면 어디에도 드러나지 않는다.
-              <span className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
-                <Timer size={16} aria-hidden="true" />
-                정규 시간 종료
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-
-      {penaltyAnchor !== null ? (
-        <RedCardPenaltyBanner
-          events={ops.liveEvents}
-          queuedItems={ops.queue.items}
-          anchor={penaltyAnchor}
-          periodLengthMs={penaltyPeriodLengthMs}
-          clockMsOf={penaltyClockMsOf}
-          sides={sides}
-          lineups={lineups}
+            ) : null
+          }
+          stickyClass={headerTopClass}
         />
-      ) : null}
 
-      {/* Banners — never silently swallowed; each condition is its own
-          visible, dismissable-by-recovery state. */}
-      <div className="flex flex-col gap-2 px-4 empty:hidden" aria-live="polite">
-        {periodExpired ? (
-          <Banner tone="warning">
-            설정된 시간이 끝났어요. 서버의 기간 종료 처리를 확인하고 있어요. 처리가 늦어지면 ‘{endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount)}’를 눌러 주세요.
-          </Banner>
+        {penaltyAnchor !== null ? (
+          <RedCardPenaltyBanner
+            events={ops.liveEvents}
+            queuedItems={ops.queue.items}
+            anchor={penaltyAnchor}
+            periodLengthMs={penaltyPeriodLengthMs}
+            clockMsOf={penaltyClockMsOf}
+            sides={sides}
+            lineups={lineups}
+          />
         ) : null}
-        {gameDetailBehind && <Banner tone="info">최신 경기 진행 상태를 확인하고 있어요.</Banner>}
-        {periodRefreshNeeded && periodExpiryError ? (
-          <ErrorState compact title="경기 진행 상태를 확인하지 못했어요" message={periodExpiryError} retryLabel="종료 상태 다시 확인" retryPending={periodExpiryPending} onRetry={() => setPeriodExpiryRetry((retry) => retry + 1)} />
-        ) : null}
-        {leaseRequired && !takeoverEnabled && (
-          <Banner tone="info">지원 담당자는 이 경기의 기록을 조회할 수 있지만 수정할 수 없어요.</Banner>
-        )}
-        {/* UX 감사 item 4 — takeover.status가 'none'/'requesting'인 동안(마운트 시
-            자동 요청, 매번 콘솔을 열 때마다 거치는 구간) 명령 버튼과
-            LineupGrid가 전부 비활성인데 이유를 알려주는 배너가 없었다(감사의
-            반복 패턴 ①). */}
-        {leaseRequired && takeoverEnabled && (ops.takeover.status === 'none' || ops.takeover.status === 'requesting') && (
-          <Banner tone="info">경기 운영 권한을 가져오는 중이에요…</Banner>
-        )}
-        {!leaseRequired && ops.connectionStatus === 'disconnected' ? (
-          <Banner tone="warning">실시간 연결이 끊겼어요. 진행 요청은 서버에 직접 보내고, 이벤트 기록은 다시 연결되면 전송돼요.</Banner>
-        ) : null}
-        {leaseRequired && takeoverEnabled && ops.connectionStatus === 'disconnected' && (
-          <Banner tone="warning">
-            {!offlineCommandAllowed
-              ? '실시간 연결이 끊겨 다시 연결하는 중이에요. 연결될 때까지 재개·종료 같은 진행 버튼은 잠겨요.'
-              : canOperate
-                ? '실시간 연결이 끊겨 다시 연결하는 중이에요. 진행 버튼은 그대로 쓸 수 있고, 보낸 명령은 서버 기준으로 반영돼요.'
-                : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
-          </Banner>
-        )}
-        {gameState === 'SCHEDULED' && startBlockedByTeams && (
-          <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
-        )}
-        {gameState !== 'ENDED' && gameState !== 'CANCELLED' && !startBlockedByTeams && hasEmptyRoster && (
-          <Banner tone="info">
-            {sidesWithoutCurrentPlayers.map((side) => side.displayNameSnapshot).join(', ')} 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.
-          </Banner>
-        )}
-        {/* 이슈 #375 — halftimePeriod가 있을 때도 currentPeriod는 null이라
-            (LIVE인 피리어드가 없다), 이 조건을 손대지 않았다면 하프타임
-            도중에도 "경기를 시작해 주세요."가 그대로 떠서 운영자가 경기가
-            아직 시작조차 안 됐다고 오해할 뻔했다. 하프타임은 별도의 정확한
-            안내로 갈라낸다. */}
-        {halftimePeriod !== null && gameState === 'LIVE' && (
-          <Banner tone="info">
-            하프타임이에요. 준비되면 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
-            빠진 골·카드·파울은 지금도 앞 피리어드 끝 시각으로 기록할 수 있어요.
-          </Banner>
-        )}
-        {/* 종료 흐름 개편 — 하프타임과 똑같은 함정이 정규 시간 종료
-            단계에도 있다: 여기서도 currentPeriod는 null이라, 아래
-            "경기를 시작해 주세요."가 그대로 떠서 방금 후반을 끝낸
-            운영자에게 경기가 시작조차 안 됐다고 말하게 된다. 갈라내고,
-            다음에 무엇을 해야 하는지(승부차기 입력이 필요한지 여부까지)
-            정확히 알린다. */}
-        {regulationEnded && (
-          <Banner tone="info">
-            {penaltyShootoutEligible
-              ? '정규 시간이 무승부로 끝났어요. ‘승부차기 시작’으로 결과를 입력해주세요.'
-              : !leaseRequired
-                ? (
-                  <>
-                    정규 시간이 끝났어요. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요.
-                    {resultHref ? (
-                      <Link
-                        href={resultHref}
-                        className="mt-2 inline-flex items-center font-semibold underline underline-offset-2"
-                        style={{ minHeight: 'var(--size-touch-min)' }}
-                      >
-                        결과 제출 화면 열기
-                      </Link>
-                    ) : null}
-                  </>
-                )
-                : '정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.'}
-          </Banner>
-        )}
-        {currentPeriod === null &&
-          halftimePeriod === null &&
-          !regulationEnded &&
-          !gameDetailBehind &&
-          !startBlockedByTeams &&
-          gameState !== 'ENDED' &&
-          gameState !== 'CANCELLED' && (
-            <Banner tone="info">경기를 시작해 주세요.</Banner>
-          )}
-        {/*
-          takeover 가 'revoked' 로 가는 경로는 use-v1-game-operations-console.ts 의
-          onPermissionRevoked 하나뿐이고, 그 경로는 서버 리스를 건드리지 않는다 —
-          아무도 실제로 인수하지 않았으므로 "다른 운영자가 담당하고 있어요" 는 언제나
-          근거 없는 단정이었다. 같은 경로가 확인된 사실만 말하는 배너
-          ("운영 권한을 다시 확인하지 못했어요")를 bannerMessage 로 이미 세우므로,
-          여기서 별도 배너를 렌더하면 모순되는 안내 두 개가 동시에 뜬다.
-        */}
-        {leaseRequired && ops.takeover.status === 'expired' && (
-          <Banner tone="warning">운영 권한을 다시 가져오는 중이에요…</Banner>
-        )}
-        {takeoverHandoff ? (
-          /* 다른 운영자에게 넘어간 건 오류가 아니다 — 코드 없이 누가 쥐고 있는지와 되찾는 방법을 보여 준다(MD-QA #165). */
-          <div role="status" className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--blue50)] px-3 py-2 text-[length:var(--font-size-body-sm)] font-medium text-[var(--blue700)] sm:flex-row sm:items-center sm:gap-3">
-            <span className="min-w-0 flex-1 break-keep">{takeoverHandoffMessage(takeoverHandoff, gameOperationsErrorMessage)}</span>
-            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" onClick={() => void takeOverFromHolder()}>
-              운영 권한 가져오기
-            </Button>
+
+        <ConsoleStatusPanel
+          status={consoleStatus}
+          roster={rosterRows}
+          queue={{
+            items: unconfirmedQueueItems,
+            onRetry: ops.retryFailedEvent,
+            disabled: commandBlocked,
+            isRetryableError: isRetryableGameOperationsErrorCode,
+          }}
+          actions={{
+            takeover: () => void takeOverFromHolder(),
+            retryCommand: retryPendingCommand,
+            retryExpiry: () => setPeriodExpiryRetry((retry) => retry + 1),
+          }}
+          actionsDisabled={{
+            'retry-command': commandPending || !canOperate || !commandPathOpen,
+            'retry-expiry': periodExpiryPending,
+          }}
+        />
+
+        {commandBar}
+
+        {restCardVisible ? (
+          <div className="px-4">
+            <RestTimerCard api={rest} />
           </div>
-        ) : leaseRequired && ops.takeover.status === 'denied' ? (
-          /* 거부 사유와 무관하게 "권한이 없어요" 로 고정돼 있었다 — 서버가 실제로는
-             granted 를 준 경우까지 권한 문제로 보여, 운영자를 엉뚱한 대응으로 보냈다.
-             코드별 문구를 쓰고 코드 자체는 운영 문의용으로 괄호에 남긴다. */
-          <Banner tone="danger">
-            {gameOperationsErrorMessage(ops.takeover.code)} ({ops.takeover.code})
-          </Banner>
         ) : null}
-        {ops.sync.status === 'gap' && (
-          <Banner tone="info">누락된 기록을 다시 불러오는 중이에요…</Banner>
-        )}
-        {ops.bannerMessage && <Banner tone="danger">{ops.bannerMessage}</Banner>}
-        {commandError && <Banner tone="danger">{commandError}</Banner>}
-        {pendingCommandRetry && (
-          <div className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-body-sm)] leading-relaxed text-[var(--red700)] sm:flex-row sm:items-center sm:gap-3">
-            <span className="min-w-0 flex-1 break-keep">{pendingCommandRetry.label} 요청의 서버 응답을 받지 못했어요. 같은 요청을 다시 보낼 수 있어요.</span>
-            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" disabled={commandPending || !canOperate || !commandPathOpen} onClick={retryPendingCommand}>
-              같은 요청 재시도
-            </Button>
+
+        {/* 폰·태블릿에서는 최근 기록이 기록 격자 바로 위에 온다. 넓은 화면에서는 오른쪽 열로 간다(아래). */}
+        {isDesktop ? null : recordsSection}
+
+        {matchInPlay ? (
+          <div className="mt-auto">
+            <RecordGrid cells={gridCells} onSelect={handleGridSelect} />
           </div>
-        )}
+        ) : null}
+
+        {/* 출전 명단 편집은 킥오프 전에만 띄운다 — 경기가 시작되면 이 자리는 기록이 차지한다. */}
+        {leaseRequired && gameState === 'SCHEDULED' && renderKickoffChecklist?.({
+          gameId: gameId ?? '',
+          sides,
+          onRosterError: (message) => showToast(message),
+          disabled: !canOperate || commandBlocked,
+        })}
+
+        {/* 경기가 끝나면 콘솔이 그 자리에서 결과 확정 카드로 이어진다. 권한 안내와 서버 권한 검사는 패널이 맡는다. */}
+        {gameEnded && resultReviewEnabled && renderResultReview && gameId !== null
+          ? <div className="px-4">{renderResultReview(gameId)}</div>
+          : null}
       </div>
 
-      {/* 경기가 끝나면 콘솔이 그 자리에서 결과 확정 카드로 이어진다 — 종료 뒤 "다음에 뭘 해야 하는지"가
-          화면에 없던 막다른 길을 없앤다. 확정 권한이 없는 역할의 안내와 서버 권한 검사는 패널이 맡는다. */}
-      {gameEnded && resultReviewEnabled && renderResultReview && gameId !== null
-        ? <div className="px-4">{renderResultReview(gameId)}</div>
-        : null}
+      {isDesktop ? recordsSection : null}
 
-      {/* 휴식 타이머(하프타임·부상 중단) — 경기가 SCHEDULED 이전(아직 시작 전)이나
-          이미 ENDED/CANCELLED된 뒤에는 의미가 없으므로 LIVE/PAUSED에서만 보여준다.
-          "다음 피리어드가 없을 때"로 좁히지 않는 이유: 부상 중단은 어느 피리어드
-          중에도 필요하다. */}
-      {matchInPlay && <RestTimer />}
-
-      {/* 팀 파울과 이벤트 패드도 경기가 뛰는 동안에만 둔다. 시작 전·종료 뒤엔 전부 비활성이라
-          자리만 차지해, 폰에서 그 단계의 할 일(킥오프 준비·결과 확정 카드)을 첫 화면 밖으로 밀었다. */}
-      {matchInPlay && (
-        <TeamFoulCounterBar
-          sides={sides}
-          counts={foulCounts}
-          period={periodForDisplay?.number ?? 1}
-          periodCount={periodCount}
-          hasNextPeriod={foulPeriodHasNext}
-          threshold={resolveTeamFoulThreshold(gameDetail.data?.teamFoulThreshold)}
-        />
-      )}
-
-      {/* 액션 우선 리오더: 이 자리는 예전엔 탭 가능한 선수 그리드였다(선수 먼저 →
-          액션). 지금은 액션이 먼저이므로, 그 다음 조작이 실제로 일어나는 자리가
-          정확히 이 위치를 차지해야 한다 — 그래서 선수 그리드가 아니라 액션 버튼이
-          이 자리를 채운다(요소를 없앤 게 아니라 같은 자리의 진입점을 바꾼 것).
-          "누구"를 고르는 단계는 `ActionTargetPicker` 모달에서 처리한다. */}
-      {/* 액션 버튼 그리드 — R-C1/R-C2 재설계: 예전엔 골=초록/옐로=주황/
-          레드=빨강 배경으로 버튼 전체를 의미색으로 채웠다("의미색은 상태
-          배지 전용, 장식 금지"를 어긴 자리 — 배지가 아니라 액션 버튼인데
-          배지처럼 배경 전체를 칠했다). 다섯 버튼 전부 같은 중립(outline)
-          배경으로 통일하고, 의미는 아이콘·스와치 색 하나로만 좁혀
-          전달한다(R-C3: 색+라벨 텍스트 병행은 그대로 유지). 그 결과 한
-          화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
-          지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
-          강조가 뭉개지지 않게 한다(R-D2).
-          자책골이 추가된 현재는 6개 액션을 모바일 2열·데스크톱 6열로
-          균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
-          다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
-      {matchInPlay ? (
-        <div data-console-guide="events" className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
-          {visibleActionButtons.map((button) => (
-            <Button
-              // key 에 index 를 쓰지 않는다 — 롤링/제한에 따라 목록이 갈리면 같은 버튼의
-              // index 가 달라져 React 가 remount 한다(Copilot 리뷰). CARD 두 개는
-              // cardColor 로 갈리므로 type+cardColor 조합이 이미 고유하다.
-              key={`${button.type}-${button.cardColor ?? 'none'}`}
-              size="lg"
-              variant="outline"
-              className="h-16 flex-col gap-1 lg:h-20"
-              disabled={!canOperate || (currentPeriod === null && !(breakEndCapture !== null && isBreakRecordableAction(button.type))) || commandBlocked}
-              onClick={() => handleSelectAction(button)}
-            >
-              {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (
-                <Goal size={18} aria-hidden="true" className="text-green-600 dark:text-green-400" />
-              ) : button.type === 'FOUL' ? (
-                <AlertTriangle size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
-              ) : button.type === 'SUBSTITUTION' ? (
-                <ArrowLeftRight size={18} aria-hidden="true" className="text-[var(--blue700)]" />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className={`block h-4 w-3 rounded-[2px] ${button.cardColor === 'RED' ? 'bg-red-500' : 'bg-yellow-300'}`}
-                />
-              )}
-              {button.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-
-      {/* 풋살 등 롤링 교체 종목 전용 — 하드코딩된 종목명이 아니라
-          `substitutionPolicy.mode`(config 값)로만 노출 여부를 판단한다(요건 B).
-          기본 `교체` 액션(액션 우선 2단계)은 이 종목에서도 항상 그대로 쓸 수
-          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다.
-          정렬 재설계(alpha 390px 실측 지적) — 예전엔 `self-start`로 왼쪽에
-          작게 붙어 있어, 바로 위 액션 그리드와 좌우 경계가 어긋나고 크기도
-          확 줄어 "따로 노는 버튼"처럼 보였다. `block`(전폭)으로 바꿔 위
-          그리드와 정확히 같은 `px-4` 좌우 경계를 공유하게 한다 — 그리드가
-          끝나는 자리에서 자연스럽게 다음 단(선택적 빠른 경로)으로 이어지는
-          느낌을 준다. 높이는 그대로 sm(44px 터치 타깃)을 유지한다 — 이건
-          다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
-          높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
-          부풀어 보인다. */}
       <ActionSheet
         open={moreOpen && moreActions.length > 0}
-        title="경기 더보기"
+        title="더보기"
         actions={moreActions}
         onClose={() => setMoreOpen(false)}
       />
+      {allRecordsOpen ? (
+        <BottomSheet open title="기록 전체" onClose={() => setAllRecordsOpen(false)}>
+          <div className="pb-2">{renderEventList({ fromSheet: true })}</div>
+        </BottomSheet>
+      ) : null}
       {renderAbnormalEndDialog({
         open: abnormalEndOpen,
         sides: gameDetail.data?.sides ?? [],
@@ -2279,85 +2488,22 @@ export function OperateConsoleCore({
           });
         },
       })}
-      {/* 경기 출전 명단 편집은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
-          차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
-          takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}
-      {leaseRequired && gameState === 'SCHEDULED' && renderKickoffChecklist?.({
-        gameId: gameId ?? '',
-        sides,
-        onRosterError: (message) => showToast(message),
-        disabled: !canOperate || commandBlocked,
-      })}
-
-      {/* Task 166 BE-3: 여기 있던 "빠른 교체 모드"(롤링 종목 전용 패널)를 없앴다 —
-          롤링에서만 뜨던 UI 인데 그 종목의 교체 기록 자체가 사라졌으므로 도달 불가다. */}
-
-      </div>
-
-      {/* [알파 감사 F] 오른쪽 컬럼(secondary) — lg 미만에서는 그냥 다음 섹션으로
-          이어져 기존 세로 스택과 동일하다. */}
-      <div className="flex flex-col gap-4">
-      {/* "기록한 이벤트" 라는 제목 아래에 로컬 전송 큐만 그리고 있었다. 큐는 이번 세션에
-          내가 올린 것만 담으므로, 새로고침하거나 다른 운영자가 넘겨받으면 골이 4개
-          기록된 경기도 "기록된 이벤트가 아직 없어요" 로 보였다 — 화면이 실제 기록을
-          부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
-          않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
-      <section data-console-guide="history" className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">
-          기록된 이벤트 <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
-        </h3>
-        <RecordedEventList
-          order="newest-first"
-          events={ops.liveEvents}
-          sides={sides}
-          lineups={lineups}
-          periodCount={periodCount}
-          onAttachAssist={canOperate ? (event) => setAssistTarget({ event }) : undefined}
-          onEditEvent={
-            canOperate && ops.correctEventTime !== undefined
-              ? (event, linkedEvents) => {
-                  setEditTarget(event);
-                  setEditLinked(linkedEvents ?? []);
-                }
-              : undefined
-          }
-          onReverseEvent={canOperate ? (event) => void handleReverseEvent(event) : undefined}
-          disabled={commandBlocked}
-          resultOfficialized={resultOfficialized}
-        />
-        <div className="mt-3 empty:hidden">
-        {leaseRequired && canOperate && matchInPlay && !sampleMode &&
-          (startRevert === null ? renderCommandButton('revert-start', false) : (
-            <form className="flex flex-col gap-3" aria-label="경기 시작 취소" onSubmit={async event => {
-              event.preventDefault();
-              if (startRevert.phrase !== '취소한다' || commandUnavailable) return;
-              if (gameVersionRef.current !== startRevert.version) {
-                setStartRevert(null); setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.'); return;
-              }
-              const confirmation = startRevert.phrase;
-              setStartRevert(null);
-              await handleRunCommand('revert-start', { confirmation });
-            }}>
-              <p>무효 처리할 경기 기록: {startRevert.summary}</p>
-              <label className="tm-text-label">경기 시계를 초기화하고 시작 전으로 돌아가려면 ‘취소한다’를 입력해 주세요.
-                <input className="tm-input placeholder:text-[var(--text-muted)]" placeholder="취소한다" autoFocus autoComplete="off" value={startRevert.phrase}
-                  onChange={event => setStartRevert({ ...startRevert, phrase: event.target.value })} />
-              </label>
-              <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setStartRevert(null)}>돌아가기</Button>
-                <Button type="submit" disabled={commandUnavailable || startRevert.phrase !== '취소한다'}>경기 시작 취소 확정</Button></div>
-            </form>))}
-        </div>
-      </section>
-
-      {/* 전부 ack 된 평상시에는 이 섹션 자체를 그리지 않는다 — 성공은 위 "기록된
-          이벤트"가 이미 보여주므로, 여기는 손이 필요한 것만 남는 자리다. */}
-      {hasUnsettledQueueItems(ops.queue.items) && (
-        <section className="px-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 대기·실패</h3>
-          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} disabled={commandBlocked} isRetryableError={isRetryableGameOperationsErrorCode} />
-        </section>
-      )}
-      </div>
+      {restSheetOpen ? (
+        <BottomSheet open title="쉬는 시간" onClose={() => setRestSheetOpen(false)}>
+          <div className="pb-2">
+            {restKind === 'idle' ? (
+              <RestTimerPresets
+                api={rest}
+                scope={restHalftimeScope ?? MANUAL_REST_SCOPE}
+                // 하프타임에는 고르는 즉시 화면의 카드가 이어받는다.
+                onStarted={restHalftimeScope === null ? undefined : () => setRestSheetOpen(false)}
+              />
+            ) : (
+              <RestTimerCard api={rest} />
+            )}
+          </div>
+        </BottomSheet>
+      ) : null}
 
       {pendingAction && (
         <ActionTargetPicker
@@ -2385,7 +2531,7 @@ export function OperateConsoleCore({
         <EventTimeCorrectionSheet
           open
           mode="operator"
-          title={`${editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget)} 기록 수정`}
+          title={`${editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget)} 기록 고치기`}
           summary={eventTimeSummary(editTarget, sides, lineups, editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget))}
           linkedNotice={editLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodLabel(editTarget.period, periodCount)}
@@ -2412,7 +2558,7 @@ export function OperateConsoleCore({
               } catch (err) {
                 if (index === 0) throw err;
                 throw new Error(
-                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 고치면 레드카드만 옮겨요.`,
                 );
               }
             }
@@ -2511,39 +2657,9 @@ export function teammatesForSide(
   excludeParticipantId: string | null,
 ): readonly GameLineupParticipant[] {
   if (sideId === null) return [];
-  // LineupGrid·ArrivalCheckinPanel과 **같은 규칙**을 재사용한다. 핵심은 "제출본만"이
-  // 아니라 **셋이 같은 명단을 본다**는 것이다 -- 여기서 규칙이 갈리면 그리드에는 안 보이는
-  // 선수가 어시스트 후보에는 뜨는 모순이 생긴다(이 주석이 원래 막으려던 것).
-  //
-  // [P1-c 후속] 그 셋이 이제 `latestLineupForDisplay`(폴백)로 옮겨 갔다. 제출 없이 시작한
-  // 경기에서 제출본만 보면 세 화면이 통째로 비기 때문이다. 규칙이 바뀌어도 **셋이 함께
-  // 움직인다**는 원래 계약은 그대로다.
-  const lineup = latestLineupForDisplay(lineups, sideId);
-  return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
+  // 선수 시트(`LineupGrid`)와 같은 명단을 봐야 한다 — 규칙이 갈리면 시트에 없는 선수가 어시스트 후보로 뜬다.
+  return rosterForSide(lineups, sideId).filter((participant) => participant.id !== excludeParticipantId);
 }
 
 /** 다른 운영자(또는 내 다른 화면)가 쥐고 있어 보기 모드인 거부 코드. 자동 재요청하지 않는다. */
 const TAKEOVER_HANDOFF_CODES: ReadonlySet<string> = new Set(['TAKEOVER_HELD', 'TAKEOVER_SUPERSEDED']);
-
-function takeoverHandoffMessage(
-  { code, holderName }: { code: string; holderName?: string | null },
-  formatError: (code: string) => string,
-): string {
-  if (!holderName) return formatError(code);
-  return code === 'TAKEOVER_HELD'
-    ? `${holderName}님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.`
-    : `${holderName}님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.`;
-}
-
-function Banner({ tone, children }: { tone: 'info' | 'warning' | 'danger'; children: ReactNode }) {
-  const toneClass = {
-    info: 'bg-[var(--blue50)] text-[var(--blue700)]',
-    warning: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
-    danger: 'bg-[var(--red50)] text-[var(--red700)]',
-  }[tone];
-  return (
-    <p role={tone === 'danger' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-sm font-medium ${toneClass}`}>
-      {children}
-    </p>
-  );
-}

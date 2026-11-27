@@ -165,8 +165,9 @@ final class WidgetRenderer {
         rv.setTextViewText(R.id.p_head, "응답 대기 · " + (s.rsvpDeadlineAtMs > 0 ? WidgetFormat.remaining(s.rsvpDeadlineAtMs, now) : "마감 없음"));
         place(context, rv, R.id.p_place_box, R.id.p_place, s.placeName);
         rv.setTextViewText(R.id.p_title, whenAndTitle(s, now));
-        int total = Math.max(s.capacity, 1);
-        rv.setProgressBar(R.id.p_ring, 100, Math.min(100, s.goingCount * 100 / total), false);
+        // 정원(팀원 수)을 모르면 원을 숨긴다 — 0/0 을 보이지 않게.
+        rv.setViewVisibility(R.id.p_ring_box, s.capacity > 0 ? View.VISIBLE : View.GONE);
+        rv.setProgressBar(R.id.p_ring, 100, s.capacity > 0 ? Math.min(100, s.goingCount * 100 / s.capacity) : 0, false);
         rv.setTextViewText(R.id.p_count, s.goingCount + "/" + s.capacity);
         rv.setOnClickPendingIntent(R.id.p_yes, respond(context, s.scheduleId, "GOING"));
         rv.setOnClickPendingIntent(R.id.p_no, respond(context, s.scheduleId, "NOT_GOING"));

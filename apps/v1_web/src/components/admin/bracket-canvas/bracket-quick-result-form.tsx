@@ -127,7 +127,7 @@ export function BracketQuickResultForm({
       <ConfirmModal
         open={awaitingConfirm !== null}
         title="이 점수로 확정할까요?"
-        message={`${homeLabel} ${awaitingConfirm === null ? '' : formatGameResultScoreWithPenalties(awaitingConfirm)} ${awayLabel}. 확정하면 공식 결과로 공개돼요. 나중에 고치려면 사유를 남기는 정정이 필요해요.`}
+        message={`${homeLabel} ${awaitingConfirm === null ? '' : formatGameResultScoreWithPenalties(awaitingConfirm)} ${awayLabel}. 확정하면 공식 결과로 공개돼요. 나중에 바꾸려면 고치는 이유를 남기고 결과를 고쳐야 해요.`}
         confirmLabel={submitLabel}
         onConfirm={confirmScore}
         onCancel={() => setAwaitingConfirm(null)}

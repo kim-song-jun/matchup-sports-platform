@@ -240,7 +240,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
                   return (
                     <div key={side} className="flex flex-col gap-1">
                       <label htmlFor={`${idPrefix}-${side}`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
-                        {side === 'HOME' ? '홈 자리' : '어웨이 자리'}
+                        {side === 'HOME' ? '홈 자리' : '원정 자리'}
                       </label>
                       <select
                         id={`${idPrefix}-${side}`}

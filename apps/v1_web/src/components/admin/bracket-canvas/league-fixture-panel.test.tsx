@@ -180,9 +180,9 @@ describe('LeagueFixturePanel — 결과', () => {
     expect(mocks.formProps).toHaveLength(0);
   });
 
-  it('라이브 득점 기록이 있으면 정정 화면으로 보내고, 진행 중이면 콘솔로 보낸다', () => {
+  it('라이브 득점 기록이 있으면 고치기 화면으로 보내고, 진행 중이면 콘솔로 보낸다', () => {
     const { unmount } = renderPanel(nodeOf({ ...TEAMS_FILLED, game: makeGame({ id: 'g1', hasLiveRecords: true }) }));
-    expect(screen.getByRole('link', { name: '결과 정정 화면 열기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute(
       'href',
       '/admin/live/league-1/records/corrections?fixtureId=fx-1',
     );

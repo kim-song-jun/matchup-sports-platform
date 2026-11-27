@@ -419,14 +419,29 @@ describe('BracketNodePanel — 구성·시간·삭제', () => {
     expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
   });
 
-  it('머리의 휴지통이 확인 창을 거쳐 deleteFixture 를 부르고, 후속 경기 수·결과 보호 문구가 메시지에 남는다', async () => {
+  it('진행 중이거나 결과가 있는 경기의 휴지통은 눌리지 않고 이유를 알린다', () => {
+    const live = fixtureOf({ game: makeGame({ id: 'game-1', state: 'LIVE' }) });
+    renderPanel(live);
+    const trash = screen.getByRole('button', { name: '경기 삭제' });
+    expect(trash).toBeDisabled();
+    expect(trash).toHaveAccessibleDescription('진행 중인 경기는 삭제할 수 없어요.');
+    cleanup();
+
+    renderPanel(fixtureOf({ game: makeGame({ id: 'game-1', hasOfficialResult: true }) }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toHaveAccessibleDescription('결과가 있는 경기는 삭제할 수 없어요.');
+    cleanup();
+
+    renderPanel();
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeEnabled();
+  });
+
+  it('머리의 휴지통이 확인 창을 거쳐 deleteFixture 를 부르고, 후속 경기 수가 메시지에 남는다', async () => {
     const downstream = makeFixture({ id: 'f2', groupId: 'g-qf', fixtureNumber: 2, bracketSources: [{ fixtureId: 'f1', side: 'HOME', outcome: 'WINNER' }] });
-    const fixture = fixtureOf({ game: makeGame({ id: 'game-1', state: 'LIVE' }) });
+    const fixture = fixtureOf();
     const props = renderPanel(fixture, { fixtures: [fixture, downstream] });
     fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('후속 경기 1개도 영향을 받아요');
-    expect(dialog).toHaveTextContent('진행 중인 경기는 삭제할 수 없어요');
     expect(mocks.deleteFixture).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
     await vi.waitFor(() => expect(mocks.deleteFixture).toHaveBeenCalledWith('f1', expect.any(Object)));

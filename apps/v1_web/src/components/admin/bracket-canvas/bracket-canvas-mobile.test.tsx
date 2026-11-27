@@ -830,6 +830,15 @@ describe('BracketCanvasMobile — 대회 시트(기본 5칸 + 더 보기 + 휴�
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('진행 중인 경기의 휴지통은 눌리지 않고 이유를 알린다', () => {
+    tournamentSheet();
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 9번 경기/));
+    const trash = within(sheet()).getByRole('button', { name: '경기 삭제' });
+    expect(trash).toBeDisabled();
+    expect(trash).toHaveAccessibleDescription('진행 중인 경기는 삭제할 수 없어요.');
+  });
+
   it('삭제가 거절되면 시트를 닫지 않고 이유를 알린다', async () => {
     const { showToast } = tournamentSheet();
     fireEvent.click(card(/8강 · 1번 경기/));

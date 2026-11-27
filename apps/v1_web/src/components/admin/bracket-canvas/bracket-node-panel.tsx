@@ -2,7 +2,7 @@
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
@@ -19,7 +19,7 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
-import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureDeleteBlockedReason, fixtureDeleteConfirm } from './fixture-delete-confirm';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
 import { useStartedTeamChangeReason } from './use-started-team-change-reason';
@@ -69,12 +69,14 @@ export function BracketNodePanel({
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [quickError, setQuickError] = useState<string | null>(null);
+  const deleteReasonId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (autoFocusTitle) titleRef.current?.focus();
   }, [autoFocusTitle]);
 
   const title = fixtureTitle(fixture, groups);
+  const deleteBlockedReason = fixtureDeleteBlockedReason(fixture);
   const locked = isFixtureLocked(fixture);
   const teamChangeAccess = fixtureTeamChangeAccess(fixture);
   const group = groups.find((candidate) => candidate.id === fixture.groupId);
@@ -327,10 +329,14 @@ export function BracketNodePanel({
         <h2 ref={titleRef} tabIndex={-1} className="tm-text-body-lg min-w-0 truncate font-bold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" style={{ color: 'var(--text-strong)' }}>{title}</h2>
         <div className="flex shrink-0 items-center">
           {canWrite && !stageManaged ? (
-            <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={iconButton}
-              style={{ borderRadius: 'var(--radius-control)', color: 'var(--red700)' }}>
-              <Trash2 size={18} aria-hidden="true" />
-            </button>
+            <>
+              <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={`${iconButton} disabled:opacity-50`}
+                disabled={deleteBlockedReason !== null} title={deleteBlockedReason ?? undefined} aria-describedby={deleteBlockedReason !== null ? deleteReasonId : undefined}
+                style={{ borderRadius: 'var(--radius-control)', color: 'var(--red700)' }}>
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
+              {deleteBlockedReason !== null ? <span id={deleteReasonId} className="sr-only">{deleteBlockedReason}</span> : null}
+            </>
           ) : null}
           <button type="button" aria-label="패널 닫기" onClick={onClose} className={iconButton}
             style={{ borderRadius: 'var(--radius-control)', color: 'var(--text-muted)' }}>

@@ -2405,6 +2405,7 @@ export function OperateConsoleCore({
             ) : null
           }
           stickyClass={headerTopClass}
+          overlay={<EventToasts toasts={toasts} onDismiss={dismiss} />}
         />
 
         {penaltyAnchor !== null ? (
@@ -2639,7 +2640,6 @@ export function OperateConsoleCore({
         policy: penaltyPolicy,
         finishing: commandBlocked,
       })}
-      <EventToasts toasts={toasts} onDismiss={dismiss} aboveBottomBar={commandBarVisible} />
       {confirmModal}
     </div>
   );

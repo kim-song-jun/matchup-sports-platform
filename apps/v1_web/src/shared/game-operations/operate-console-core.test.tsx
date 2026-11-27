@@ -3051,6 +3051,36 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  // 토스트를 화면 아래에 고정하면 기록 격자 셋째 줄(파울·더보기)이나 선수 시트 위에 얹혀, 다른 버튼을 누르려다 되돌리기가 눌린다.
+  it('토스트는 점수 카드 바로 아래에 겹쳐 떠서 기록 격자와 진행 바를 덮지 않는다', async () => {
+    setup();
+    render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+
+    const card = document.querySelector('[data-console-guide="overview"]') as HTMLElement;
+    expect(card).toContainElement(undo);
+    expect(screen.getByRole('group', { name: '기록하기' })).not.toContainElement(undo);
+    expect(screen.getByRole('group', { name: '경기 진행 조작' })).not.toContainElement(undo);
+    const stack = undo.closest('[aria-live="polite"]') as HTMLElement;
+    expect(stack).toHaveClass('absolute', 'top-full');
+    // 화면에 고정하거나 시트(z-50)보다 높은 층에 두지 않는다 — 점수 카드의 층(z-10) 안에서만 뜬다.
+    expect(stack.className).not.toMatch(/(^|\s)(fixed|bottom-\S+|z-\S+)(\s|$)/);
+    expect(card).toHaveClass('z-10');
+  });
+
+  it('토스트가 떠 있는 동안 더보기를 눌러도 되돌리기는 나가지 않는다', async () => {
+    const state = setup();
+    render(<CoreHarness />);
+    recordGoal();
+    await screen.findByRole('button', { name: '되돌리기' });
+
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+
+    expect(screen.getByRole('dialog', { name: '더보기' })).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+  });
+
   it('되돌리기는 서버 이벤트 id 로 reverseEvent 를 확인 없이 부른다', async () => {
     const state = setup();
     const { rerender } = render(<CoreHarness />);

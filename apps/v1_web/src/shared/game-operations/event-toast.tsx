@@ -74,32 +74,24 @@ export function useEventToast() {
   return { toasts, showToast, dismiss };
 }
 
+/**
+ * 가장 가까운 기준 상자(콘솔에서는 화면 위에 붙는 점수 카드) 바로 아래에 겹쳐 뜬다. 화면 아래에 고정하면
+ * 기록 격자·진행 바·바닥에서 올라오는 시트와 겹쳐 되돌리기가 다른 버튼 위에 얹힌다.
+ * 폭은 부모 폭(`inset-x-0`)이고 가운데 정렬은 flex 가 맡는다. 컨테이너는 `pointer-events-none`, 토스트만 `pointer-events-auto`다.
+ */
 export function EventToasts({
   toasts,
   onDismiss,
-  aboveBottomBar = false,
 }: {
   toasts: readonly EventToastItem[];
   onDismiss?: (id: number) => void;
-  /** 화면 아래에 고정 조작 바가 있는 폰에서 토스트가 그 바를 덮지 않게 위로 띄운다. */
-  aboveBottomBar?: boolean;
 }) {
   if (toasts.length === 0) return null;
-  // `left-1/2 + -translate-x-1/2`로 가운데를 맞추면 390px에서 토스트가 세로로
-  // 찌그러진다(실측: "골을 기록했어요"가 한 줄에 한 글자씩 쌓였다). fixed 요소는
-  // `right`가 없으면 가용 폭이 `100% - left`, 즉 50vw(390px에서 195px)로 잘리고
-  // `max-w-[90vw]`(=351px)는 그보다 넓어 아무 것도 늘려주지 못한다 — 데스크톱
-  // (50vw=720px)에서만 멀쩡해 보였던 이유다. `inset-x-0`로 폭을 뷰포트 전체로 주고
-  // 가운데 정렬은 flex(`items-center`)에 맡긴다. 전폭 컨테이너가 아래 화면 조작을
-  // 가로막지 않도록 컨테이너는 `pointer-events-none`, 토스트 자신만
-  // `pointer-events-auto`로 되살린다.
   return (
     <div
       aria-live="polite"
       aria-atomic="false"
-      className={`tm-native-toast-stack pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
-        aboveBottomBar ? 'bottom-28 sm:bottom-6' : 'bottom-6'
-      }`}
+      className="pointer-events-none absolute inset-x-0 top-full flex flex-col items-center gap-2 px-4 pt-2"
     >
       {toasts.map((toast) => (
         <div

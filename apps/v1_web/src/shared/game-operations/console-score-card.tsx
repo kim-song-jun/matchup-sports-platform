@@ -16,6 +16,8 @@ export interface ConsoleScoreCardProps {
   readonly caption: ReactNode | null;
   readonly footer: ReactNode | null;
   readonly stickyClass: string;
+  /** 카드 바로 아래에 겹쳐 뜨는 것(토스트). 카드가 기준 상자라 카드와 같이 붙어 다닌다. */
+  readonly overlay?: ReactNode;
 }
 
 /** 콘솔 머리: 점수 · 팀 파울 · 상태 · 시계를 한 장에 모은다. 스크롤해도 화면 위에 붙어 있다. */
@@ -32,6 +34,7 @@ export function ConsoleScoreCard({
   caption,
   footer,
   stickyClass,
+  overlay,
 }: ConsoleScoreCardProps) {
   const [left, right] = sides;
 
@@ -108,6 +111,7 @@ export function ConsoleScoreCard({
         <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{foulResetNote}</p>
       ) : null}
       {footer !== null ? <div className="mt-3">{footer}</div> : null}
+      {overlay}
     </header>
   );
 }

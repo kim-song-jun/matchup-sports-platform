@@ -442,7 +442,9 @@ export function BracketCanvasWorkspace({
           )}
           {rightColumn ? (
             panel !== null ? (
-              panel
+              <div className="sticky top-4 max-h-[calc(100dvh-2rem)] self-start overflow-y-auto">
+                {panel}
+              </div>
             ) : (
               <aside aria-label="조별 순위" className="sticky top-4 self-start">
                 <BracketLeagueStandings groups={standingsGroups} />
@@ -470,7 +472,7 @@ export function BracketCanvasWorkspace({
 
       {format !== undefined ? (
         <BracketFixtureToolsDialog
-          key={toolsMode ?? 'closed'}
+          key={`fixture-tools-${toolsMode ?? 'closed'}`}
           open={toolsMode !== null}
           mode={toolsMode ?? 'add'}
           format={format}

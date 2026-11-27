@@ -5777,8 +5777,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   font-size: var(--font-size-body);
 }
 
+/* 줄 구분선 — grey100(#f2f4f6)은 흰 바탕에서 거의 안 보였고 --border(grey200)도 옅었다(2026-11-27
+   사용자 지적·비교 후 선택). 배지 테두리와 같은 --border-strong(라이트 grey300 · 다크 #4e5968)으로 둔다. */
 .tm-team-kv-row + .tm-team-kv-row {
-  border-top: 1px solid var(--grey100);
+  border-top: 1px solid var(--border-strong);
 }
 
 .tm-team-kv-row dt {

@@ -1868,6 +1868,13 @@ describe('TeamDetailPageView — 작은 상단 바 종목 색(A안)', () => {
     expect(bar.style.getPropertyValue('--team-accent-text')).toBe(text);
   });
 
+  it('가입 조건 줄 구분선은 --border-strong 이다 — grey100·grey200 은 흰 바탕에서 옅었다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const divider = css.match(/\.tm-team-kv-row \+ \.tm-team-kv-row\s*\{([^}]*)\}/)?.[1];
+
+    expect(divider).toMatch(/border-top:\s*1px solid var\(--border-strong\)/);
+  });
+
   it('CSS 는 그 변수로 바탕·요약 줄을 칠하고, 값이 없으면 기본 색으로 돌아간다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
     const bar = css.match(/\n\.tm-team-compact-bar\s*\{([^}]*)\}/)?.[1];

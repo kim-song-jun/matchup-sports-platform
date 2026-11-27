@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { ReactNode } from 'react';
@@ -95,6 +95,23 @@ describe('usePendingResultCount', () => {
     const { result } = renderHook(() => usePendingResultCount('t-1', true), { wrapper });
     await waitFor(() => expect(result.current).toBe(2));
     expect(requests[0]).toContain('status=ENDED');
+  });
+
+  it('운영 보드와 같은 15초 주기로 다시 읽어 메뉴 숫자가 보드와 따로 놀지 않는다', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    try {
+      const { result } = renderHook(() => usePendingResultCount('t-1', true), { wrapper });
+      await waitFor(() => expect(result.current).toBe(2));
+      expect(requests).toHaveLength(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+
+      await waitFor(() => expect(requests.length).toBeGreaterThanOrEqual(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('enabled 가 false 면 읽지 않고 0 이다', async () => {

@@ -89,3 +89,69 @@ describe('EventToasts — 자동 닫힘', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 });
+
+describe('EventToasts — 한 번에 하나', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function Harness({ onUndo }: { onUndo: (record: string) => void }) {
+    const { toasts, showToast, dismiss } = useEventToast();
+    return (
+      <>
+        {['골1', '파울2'].map((record) => (
+          <button
+            key={record}
+            type="button"
+            onClick={() => showToast(`${record} 기록했어요`, { action: { label: '되돌리기', onClick: () => onUndo(record) } })}
+          >
+            {record} 기록
+          </button>
+        ))}
+        <EventToasts toasts={toasts} onDismiss={dismiss} />
+      </>
+    );
+  }
+
+  it('연달아 두 건을 기록해도 토스트는 하나뿐이고, 되돌리기는 마지막 기록만 겨냥한다', () => {
+    const onUndo = vi.fn();
+    render(<Harness onUndo={onUndo} />);
+
+    act(() => screen.getByRole('button', { name: '골1 기록' }).click());
+    act(() => screen.getByRole('button', { name: '파울2 기록' }).click());
+
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByText('파울2 기록했어요')).toBeInTheDocument();
+    expect(screen.queryByText('골1 기록했어요')).toBeNull();
+    const undoButtons = screen.getAllByRole('button', { name: '되돌리기' });
+    expect(undoButtons).toHaveLength(1);
+    act(() => undoButtons[0].click());
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onUndo).toHaveBeenCalledWith('파울2');
+  });
+
+  it('앞 토스트의 5초 타이머가 새 토스트를 일찍 닫지 않고, 새 토스트는 제 5초를 채운다', () => {
+    vi.useFakeTimers();
+    render(<Harness onUndo={vi.fn()} />);
+
+    act(() => screen.getByRole('button', { name: '골1 기록' }).click());
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    act(() => screen.getByRole('button', { name: '파울2 기록' }).click());
+    // 첫 토스트가 5초가 되는 시점(전체 5000ms)을 넘겨도 새 토스트는 남아 있다.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
+    // 새 토스트는 뜬 지 4999ms 까지 남아 있고, 5초가 지나면 사라진다.
+    act(() => {
+      vi.advanceTimersByTime(2499);
+    });
+    expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(1 + 150);
+    });
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});

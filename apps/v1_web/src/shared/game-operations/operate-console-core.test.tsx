@@ -3069,6 +3069,28 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(card).toHaveClass('z-10');
   });
 
+  // 토스트가 쌓이면 아래로 늘어나 「최근 기록」 머리와 진행 바를 덮고, 그 자리에서 확인 없는 되돌리기가 눌린다.
+  it('5초 안에 골을 두 번 기록해도 토스트는 하나뿐이고, 되돌리기는 마지막 골만 되돌린다', async () => {
+    const state = setup();
+    state.submitEvent.mockResolvedValueOnce('c1').mockResolvedValueOnce('c2');
+    const { rerender } = render(<CoreHarness />);
+    recordGoal();
+    await screen.findByRole('button', { name: '되돌리기' });
+    recordGoal();
+    await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
+
+    const card = document.querySelector('[data-console-guide="overview"]') as HTMLElement;
+    expect(within(card).getAllByRole('status')).toHaveLength(1);
+    expect(within(card).getAllByRole('button', { name: '되돌리기' })).toHaveLength(1);
+    advance(state, { liveEvents: [recorded('e9', 'c1'), recorded('e10', 'c2')] });
+    rerender(<CoreHarness />);
+
+    fireEvent.click(within(card).getByRole('button', { name: '되돌리기' }));
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledWith({ eventId: 'e10', reason: '골 기록 되돌리기' }));
+    expect(state.reverseEvent).toHaveBeenCalledTimes(1);
+  });
+
   it('토스트가 떠 있는 동안 더보기를 눌러도 되돌리기는 나가지 않는다', async () => {
     const state = setup();
     render(<CoreHarness />);

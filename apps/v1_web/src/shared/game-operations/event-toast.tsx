@@ -61,7 +61,11 @@ export function useEventToast() {
   const showToast = useCallback(
     (message: string, opts?: { action?: EventToastAction; description?: string }) => {
       const id = ++counterRef.current;
-      setToasts((prev) => [...prev, { id, message, description: opts?.description ?? null, action: opts?.action ?? null }]);
+      // 한 번에 하나만 띄운다 — 쌓으면 아래로 늘어나 그 아래 버튼을 덮고, 그 자리에서 되돌리기가 눌린다.
+      // 앞 토스트의 타이머도 함께 거둬 새 토스트를 일찍 닫지 못하게 한다.
+      timerRefs.current.forEach(clearTimeout);
+      timerRefs.current = [];
+      setToasts([{ id, message, description: opts?.description ?? null, action: opts?.action ?? null }]);
       const timer = setTimeout(() => {
         dismiss(id);
         timerRefs.current = timerRefs.current.filter((t) => t !== timer);

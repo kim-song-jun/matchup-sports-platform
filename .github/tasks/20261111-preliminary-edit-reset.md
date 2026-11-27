@@ -46,6 +46,7 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 - 진입점 교차 검증 후 보완: #2557은 `096769476`로 dev 머지, CI45948453869 모두 PASS(실DB reset 감사·최종 master 감사 실패 rollback 포함). 사용자는 #2557 리뷰 예외를 별도로 승인했다. 이후 기존 복수 결선 설정창의 별도 reset이 직접 입력을 요구하지 않는 우회를 발견해 같은 작업에서 보완한다. `fix/bracket-reset-entry-consistency`에서 기존 UI/DTO/service에도 정확 입력을 적용하고 공통 `captureBracketResetState`를 재사용해 전체 감사 상세를 남긴다. 새 보완 PR과 Alpha 검증은 진행 중이다. 기존 #2557 예외를 다른 PR에 임의 확대하지 않는다.
 - PR #2558에서도 사용자가 리뷰 예외와 CI 통과 후 머지/Alpha 완료를 명시 승인했다. 감사 교차 검증에서 TeamMatch 자리 연결·Game 공개 정책·연쇄 취소 팀 일정/게스트 모집도 원본 캡처에 포함했다. 실제 DB 회귀에 이들의 이전 값 보존과 CANCELLED/CLOSED/STATUS_ONLY 전이를 추가했다. 이 보완은 새 head CI로 검증하며 이전 head 성공을 대체하지 않는다.
+- CI45951971729 API/Gates PASS, Web 전체13517건 중 재진입 시 이전 입력이 보이는1건이 RED였다. 상태 초기화 useEffect 실행 전 첫 프레임 경합을 확인하고 useConfirm 모달에 open/closed key를 줘 열 때 새 컴포넌트 상태로 시작하도록 수정했다(검증 대기를 늘려 숨기지 않음). 두 초기화 HTTP 흐름+공유 모달40건 GREEN. 수정 head에서 CI를 다시 확인한다.
 
 - 사용자 요청: 확인창에서 `초기화한다` 직접 입력, 실행 로그 전체 보존. 기존 A안 모달/버튼을 유지하고 정확 입력 필드만 추가한다. Scope backend/frontend/docs, 단일 에이전트. Owned: shared ConfirmModal의 optional confirmationText, reset hook/button/DTO/service/tests/integration, API 문서/Changeset/시나리오. Forbidden: 다른 worktree·schema/migration·기존 사용자 대회 초기화.
 - 단계: [x] 기존 로그/입력 계약 확인 [x] UI+서버 정확 문구 검사 [x] 초기화 전 전체 대진 상태·결과 감사 [ ] 좁은 단위/타입/실DB CI [ ] PR/리뷰/dev 머지 [ ] Alpha3폭/취소·오입력·실제 저장·감사 검증/정리.

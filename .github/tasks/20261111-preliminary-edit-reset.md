@@ -42,6 +42,15 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ## Progress Snapshot
 
+### 2026-11-27 후속 — 초기화 확인 문구와 감사 상세
+
+- 사용자 요청: 확인창에서 `초기화한다` 직접 입력, 실행 로그 전체 보존. 기존 A안 모달/버튼을 유지하고 정확 입력 필드만 추가한다. Scope backend/frontend/docs, 단일 에이전트. Owned: shared ConfirmModal의 optional confirmationText, reset hook/button/DTO/service/tests/integration, API 문서/Changeset/시나리오. Forbidden: 다른 worktree·schema/migration·기존 사용자 대회 초기화.
+- 단계: [x] 기존 로그/입력 계약 확인 [x] UI+서버 정확 문구 검사 [x] 초기화 전 전체 대진 상태·결과 감사 [ ] 좁은 단위/타입/실DB CI [ ] PR/리뷰/dev 머지 [ ] Alpha3폭/취소·오입력·실제 저장·감사 검증/정리.
+- Acceptance: 비어 있거나 오타/앞뒤 공백이면 실행 불가, 정확 입력만 실행, 닫고 재진입 시 비움, 서버도 누락/오타 거절. 감사에 처리자/시각/대회/확인 문구와 변경 전 구성·경기·편성·자리·진출 연결·순위·부전승 및 변경 후 보관/삭제 ID·결과 보존. 감사 저장 실패 시 전체 rollback. 참가 신청·시간/구장·설정 보존 기존 계약 유지.
+- Ambiguity: “로그 다”는 실제 초기화 성공의 변경 전 상태·처리 결과와 기존 개별 경기 감사 보존으로 적용한다. 미입력/취소는 서버 쓰기 자체가 없으며 성공 로그를 만들지 않는다. 조회 권한·개인정보 노출 범위는 기존 관리자/담당 총괄 감사 정본을 따른다.
+- Resume: 최신 origin/dev `b7accfe5d`, `feat/bracket-reset-confirmation`, `_worktrees/bracket-reset-confirmation`. 기존 #2553 한정 리뷰 예외는 이 PR에 자동 적용하지 않는다.
+- 검증: API22/Web23 PASS, 웹/API 타입 및 surface/pattern PASS. 공유 Prisma Client가 이전 스키마여서 최신 dev의 teamFoulThreshold 타입 오류가 났고, 공유 의존성을 수정하지 않고 worktree 전용 출력 Client를 생성해 재검증 PASS. 최종 감사 실패 테스트는 단순 첫 감사 실패가 아니라 실제 `tournament.bracket.reset` 마스터 감사에서만 실패하도록 강화했다. DB schema/migration/의존성 변경 없음.
+
 ### 2026-11-27 후속 — 대진 상단 초기화 버튼
 
 - 사용자 요청: “대진 초기화 관련해서 버튼 만들고 pr 추가해줘”. UI A/B/C 중 A(대진 상단 독립 버튼)를 명시 선택했다. 기존 Button/ConfirmModal과 API 오류 패턴을 재사용한다.

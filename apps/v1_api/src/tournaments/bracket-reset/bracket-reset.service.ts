@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -33,6 +33,9 @@ export class BracketResetService {
     const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
     const slots = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
     const groupTeams = await tx.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
+    const standings = await tx.v1TournamentStanding.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
+    const byes = await tx.v1TournamentByeSlot.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
+    const overallStandings = await tx.v1TournamentOverallStanding.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
     const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' },
       select: { id: true, sourceTeamMatchId: true, targetTeamMatchId: true, sourceOutcome: true, targetSide: true } });
     const unsafe = await tx.v1TeamMatch.findFirst({ where: { tournamentId: id, deletedAt: null, tournamentDetails: { isNot: null },
@@ -44,8 +47,9 @@ export class BracketResetService {
       : unsafe ? '시작했거나 경기 기록·결과가 있는 경기가 있어 대진을 초기화할 수 없어요.'
         : fixtures.length + slots.length + groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').length === 0
           ? '초기화할 대진이 없어요.' : null;
-    const hash = createHash('sha256').update(JSON.stringify({ tournament, fixtures, groups, slots, groupTeams, edges })).digest('hex');
-    return { tournament, fixtures, groups, slots, edges, hash, blockedReason, preservesPreliminaryGroups };
+    const before = { tournament, fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings };
+    const hash = createHash('sha256').update(JSON.stringify(before)).digest('hex');
+    return { ...before, hash, blockedReason, preservesPreliminaryGroups };
   }
 
   async preview(user: V1AuthUser, id: string) {
@@ -59,6 +63,9 @@ export class BracketResetService {
   }
 
   async reset(user: V1AuthUser, id: string, dto: ResetTournamentBracketDto) {
+    if (dto.confirmationText !== '초기화한다' || dto.confirmed !== true) {
+      throw new BadRequestException({ code: 'BRACKET_RESET_CONFIRMATION_REQUIRED', message: '초기화한다를 정확히 입력해 주세요.' });
+    }
     return this.prisma.$transaction(async tx => {
       const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id }, tx);
       const initial = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id, deletedAt: null }, select: { id: true, kind: true } });
@@ -93,9 +100,15 @@ export class BracketResetService {
         ...(plan ? { stagePlan: JSON.parse(JSON.stringify({ ...plan, assignments: {}, removedFixtures: {}, sixTeamSelections: {} })),
           stagePlanRevision: { increment: 1 } } : {}),
       } });
+      const { hash, blockedReason: _blockedReason, preservesPreliminaryGroups, ...before } = snapshot;
       await this.admins.logAdminAction(admin, { action: 'tournament.bracket.reset', targetType: 'tournament', targetId: id,
-        beforeJson: { snapshot: snapshot.hash, format: tournament.format, fixtureCount: snapshot.fixtures.length },
-        afterJson: { archivedFixtureIds: snapshot.fixtures.map(fixture => fixture.teamMatchId), unpublished: true, settingsPreserved: true } }, tx);
+        reason: '초기화한다',
+        beforeJson: JSON.parse(JSON.stringify({ snapshot: hash, format: tournament.format, fixtureCount: snapshot.fixtures.length, ...before })),
+        afterJson: { result: 'succeeded', actorUserId: user.id, confirmationText: dto.confirmationText,
+          archivedFixtureIds: snapshot.fixtures.map(fixture => fixture.teamMatchId),
+          removedGroupIds: snapshot.groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').map(group => group.id),
+          clearedSlotIds: snapshot.slots.map(slot => slot.id), clearedAdvancementEdgeIds: snapshot.edges.map(edge => edge.id),
+          unpublished: true, settingsPreserved: true } }, tx);
       return { deletedFixtureCount: snapshot.fixtures.length };
     }, options);
   }

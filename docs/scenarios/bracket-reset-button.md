@@ -24,3 +24,10 @@ Task: [20261111](../../.github/tasks/20261111-preliminary-edit-reset.md)
 - 실제 PostgreSQL spec 11건은 일반 세 형식·단계형 재생성·복수 결선 보존·LIVE/결과 초안/피리어드 보호·stale/support·감사 rollback·진출 outcome만 변경된 CAS를 검증한다. 최초 CI45935098816은 group_knockout 준비에서 조당2팀 입력이 지원 최소3팀 계약에 막혀 실패했다. 2개 조×3팀/총6팀으로 수정했으며 planner RED→GREEN 및 API 타입 PASS. 실제 초기화까지의 수정 후 판정은 새 CI에서 확인하며 이전 실패를 성공으로 표시하지 않는다.
 - Alpha 5유형 × 3폭 = 0/15. 현재 관리자 인증 자료가 확인되지 않았고 이 PR은 미배포다. before/after·console/network·실제 사용자 흐름을 통과로 표시하지 않는다. 로컬 next 서버는 실행하지 않았다.
 - 사용자 대회 초기화·DB seed/reset 실행 없음. 테스트 외 사용자 데이터 변경 없음.
+
+## 2026-11-27 후속: 직접 입력 확인 및 감사 상세
+
+- 모달 빈 입력/오타/앞뒤 공백은 실행 비활성, 정확히 초기화한다 입력 후에만 실행. 취소는 POST0, 재진입 시 입력 비움.
+- 서버 DTO와 service는 확인 문구 누락/오타를 거절한다. 실제 PostgreSQL에서 감사 처리자/시각/확인 문구/전체 before 상태 및 결과 ID를 확인한다.
+- 최종 reset 감사만 강제로 실패시켜 앞선 경기별 삭제와 감사까지 모두 rollback되는지 확인한다.
+- 구현 검증 및 새 PR/Alpha3폭 QA는 진행 중이며 기존 #2553 검증과 구분한다.

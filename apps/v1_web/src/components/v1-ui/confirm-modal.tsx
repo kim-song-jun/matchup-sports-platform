@@ -20,6 +20,8 @@ export interface ConfirmOptions {
   tone?: ConfirmTone;
   /** 체크해야 확인 버튼이 켜지는 한 줄(예: '이해했어요') — 되돌리기 어려운 작업을 단순 확인보다 한 단계 무겁게(H2). */
   acknowledgement?: string;
+  /** 정확히 입력해야 실행할 수 있는 파괴적 작업 확인 문구. */
+  confirmationText?: string;
 }
 
 /** `confirmWithReason` 의 사유 입력칸 — 값은 훅이 들고 있으므로 라벨·제한만 넘긴다. */
@@ -102,6 +104,7 @@ export function useConfirm() {
       cancelLabel={state?.cancelLabel}
       tone={state?.tone}
       acknowledgement={state?.acknowledgement}
+      confirmationText={state?.confirmationText}
       reasonField={state?.reason ? { ...state.reason, value: reasonValue, onChange: setReasonValue } : undefined}
       onConfirm={() => handleResolve(true)}
       onCancel={() => handleResolve(false)}
@@ -130,6 +133,7 @@ interface ConfirmModalProps {
   hideCancel?: boolean;
   tone?: ConfirmTone;
   acknowledgement?: string;
+  confirmationText?: string;
   /** 확인 창 안에서 사유를 받는다 — 값은 호출자가 들고(제출 실패 뒤에도 남게) 창은 보여 주기만 한다. */
   reasonField?: ConfirmReasonField;
   /** 호출자가 요청을 보내는 동안 true — 버튼·입력과 ESC·바깥 클릭 닫기를 잠근다. */
@@ -166,6 +170,7 @@ export function ConfirmModal({
   hideCancel = false,
   tone = 'default',
   acknowledgement,
+  confirmationText,
   reasonField,
   busy = false,
   error = null,
@@ -179,15 +184,16 @@ export function ConfirmModal({
   const reasonId = `${idPrefix}-confirm-reason`;
   const reasonHintId = `${idPrefix}-confirm-reason-hint`;
   const [acknowledged, setAcknowledged] = useState(false);
+  const [confirmationValue, setConfirmationValue] = useState('');
   const acknowledgementReady = acknowledgement === undefined || acknowledged;
   const reasonReady = !reasonField?.required || reasonField.value.trim().length > 0;
-  const canConfirm = acknowledgementReady && reasonReady && !busy;
+  const canConfirm = acknowledgementReady && reasonReady && (confirmationText === undefined || confirmationValue === confirmationText) && !busy;
   // 초기 포커스는 패널의 첫 컨트롤 — 입력칸이 있으면 입력칸, 없으면 취소 버튼(실수로 확인하지 않게).
   const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel, pending: busy, exitMs: 0 }); // 닫히면 즉시 렌더를 떼므로 잠금·포커스 복원도 즉시.
 
   useEffect(() => {
-    if (open) setAcknowledged(false);
-  }, [open]);
+    if (open) { setAcknowledged(false); setConfirmationValue(''); }
+  }, [open, confirmationText]);
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -267,6 +273,16 @@ export function ConfirmModal({
                   ) : null}
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {confirmationText !== undefined ? (
+            <div className="tm-create-field" style={{ marginTop: 16 }}>
+              <label className="tm-text-label" htmlFor={`${idPrefix}-confirmation`}>
+                계속하려면 ‘{confirmationText}’를 입력해 주세요.
+              </label>
+              <input id={`${idPrefix}-confirmation`} className="tm-input" type="text"
+                value={confirmationValue} onChange={event => setConfirmationValue(event.target.value)}
+                autoComplete="off" spellCheck={false} disabled={busy} />
             </div>
           ) : null}
           {acknowledgement ? (

@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
   admin: { tournamentId: 't-1', canWrite: true, showToast: vi.fn() },
 }));
 
+vi.mock('@/components/admin/bracket-canvas/bracket-reset-button', () => ({
+  BracketResetButton: ({ tournamentId, canWrite }: { tournamentId: string; canWrite: boolean }) => canWrite ? <button data-tournament-id={tournamentId}>대진 초기화</button> : null,
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/t-1/bracket',
   useRouter: () => ({ replace: mocks.replace }),
@@ -35,6 +39,9 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile-screen', () => 
 }));
 vi.mock('@/components/admin/stages/stage-plan-toolbar', () => ({
   StagePlanToolbar: () => <button>단계·진출팀 관리</button>,
+}));
+vi.mock('@/components/admin/bracket-canvas/multi-finals-wizard', () => ({
+  MultiFinalsWizard: () => null,
 }));
 vi.mock('@/components/admin/bracket-canvas/fixture-assignment-workspace', () => ({
   FixtureAssignmentWorkspace: ({ toolbar, children }: { toolbar: ReactNode; children: ReactNode }) => <div>{toolbar}<button>시간 배정</button><button>구장 배정</button>{children}</div>,
@@ -135,6 +142,7 @@ describe('AdminTournamentBracketPage — 신청 목록 조회 상태를 그림 �
     mocks.tournament.data = { format: 'league', stagePlan: { version: 1, stages: [] }, status: 'in_progress' };
     render(<AdminTournamentBracketPage />);
     expect(screen.getByRole('button', { name: '단계·진출팀 관리' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '대진 초기화' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '시간 배정' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '구장 배정' })).toBeInTheDocument();
   });
@@ -176,5 +184,17 @@ describe('AdminTournamentBracketPage — 신청 목록 조회 상태를 그림 �
     render(<AdminTournamentBracketPage />);
     expect(screen.getByTestId('list')).toHaveAttribute('data-confirmed-count', '0');
     expect(screen.getByTestId('list')).toHaveAttribute('data-registrations-status', 'pending');
+  });
+});
+
+describe('AdminTournamentBracketPage — 상단 초기화', () => {
+  it.each(['league', 'knockout', 'group_knockout', 'league_knockouts'])('%s 대진의 그림과 목록에서 상단 초기화 버튼을 유지한다', format => {
+    mocks.tournament.data = { format };
+    const rendered = render(<AdminTournamentBracketPage />);
+    expect(screen.getByRole('button', { name: '대진 초기화' })).toHaveAttribute('data-tournament-id', 't-1');
+    mocks.searchParams = new URLSearchParams('view=list');
+    rendered.rerender(<AdminTournamentBracketPage />);
+    expect(screen.getByRole('button', { name: '대진 초기화' })).toBeInTheDocument();
+    expect(screen.getByTestId('list')).toBeInTheDocument();
   });
 });

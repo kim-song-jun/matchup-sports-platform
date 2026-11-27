@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { findTournamentManagementAction } from '../../common/tournament-management-history';
-import { AdminContextService } from '../../common/admin-context.service';
+import { AdminContextService, type V1TournamentManager } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -186,29 +186,31 @@ export class MultiFinalsService {
   }
   async reset(user: V1AuthUser, id: string, dto: MultiFinalResetDto) {
     const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
-    return this.prisma.$transaction(async tx => {
-      const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
-      const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
-      const config = this.config(tournament.multiFinals);
-      if (!config || tournament.multiFinalsRevision !== dto.expectedRevision) throw stale();
-      // Serialize with score/event writers before checking whether any game has started.
-      await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id WHERE d.tournament_id = ${id} AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
-      const fixtures = await this.assertUnstarted(tx, id, true);
-      const before = await this.view(tx, id);
-      const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
-      for (const fixtureId of orderFixturesForTeardown(fixtures.map(f => f.teamMatchId), edges)) await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
-      await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
-      await tx.v1TournamentStanding.deleteMany({ where: { group: { tournamentId: id } } });
-      await tx.v1TournamentByeSlot.deleteMany({ where: { group: { tournamentId: id } } });
-      const finalGroups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id, phase: { not: 'group' } }, select: { id: true } });
-      await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: finalGroups.map(g => g.id) } } });
-      for (const group of finalGroups) await deleteTournamentGroupInTx(tx, admin, group.id);
-      const next: Config = { ...config, groups: before.groups, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
-      await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
-      await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.reset', targetType: 'tournament', targetId: id,
-        beforeJson: JSON.parse(JSON.stringify(config)), afterJson: { deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
-      return this.view(tx, id);
-    }, options);
+    return this.prisma.$transaction(tx => this.resetInTx(tx, admin, id, dto), options);
+  }
+  /** Reused by the stage-aware top-level reset inside its locked snapshot transaction. */
+  async resetInTx(tx: Tx, admin: V1TournamentManager, id: string, dto: MultiFinalResetDto) {
+    const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
+    const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
+    const config = this.config(tournament.multiFinals);
+    if (!config || tournament.multiFinalsRevision !== dto.expectedRevision) throw stale();
+    // Serialize with score/event writers before checking whether any game has started.
+    await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id WHERE d.tournament_id = ${id} AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
+    const fixtures = await this.assertUnstarted(tx, id, true);
+    const before = await this.view(tx, id);
+    const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
+    for (const fixtureId of orderFixturesForTeardown(fixtures.map(f => f.teamMatchId), edges)) await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
+    await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
+    await tx.v1TournamentStanding.deleteMany({ where: { group: { tournamentId: id } } });
+    await tx.v1TournamentByeSlot.deleteMany({ where: { group: { tournamentId: id } } });
+    const finalGroups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id, phase: { not: 'group' } }, select: { id: true } });
+    await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: finalGroups.map(g => g.id) } } });
+    for (const group of finalGroups) await deleteTournamentGroupInTx(tx, admin, group.id);
+    const next: Config = { ...config, groups: before.groups, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
+    await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
+    await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.reset', targetType: 'tournament', targetId: id,
+      beforeJson: JSON.parse(JSON.stringify(config)), afterJson: { deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
+    return this.view(tx, id);
   }
   async select(user: V1AuthUser, id: string, dto: MultiFinalSelectionDto) {
     const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });

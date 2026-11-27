@@ -1,3 +1,5 @@
+대회 대진 상단 초기화는 preview snapshot 확인 후 같은 상태만 초기화한다. 참가 신청·설정·등록 시간/구장은 보존하며 진행·기록·결과가 있는 경기는 차단한다. [초기화 계약](./domains/tournaments.md#대진-상단-초기화-2026-11-27).
+
 대회 취소는 공백이 아닌 사유(최대 500자)를 필수로 받고 양쪽 감사 이력에 저장한다. [상태 변경 계약](./domains/tournaments.md).
 
 회원 조회 중 채팅 API 전체는 `403 MEMBER_ACCESS_CHAT_DENIED`이며 알림 설정 GET은 저장 없이 읽는다. [관리자 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19), [알림 설정](./domains/notifications.md#getpatch-notification-preferences).

@@ -1,5 +1,23 @@
 ## 6강 결승 직행 방식 (2026-10-28)
 
+## 대진 상단 초기화 (2026-11-27)
+
+대회 어드민 `/admin/tournaments/:id/bracket`의 그림·목록 상단 독립 버튼으로 초기화한다. `league`, `knockout`, `group_knockout`, `league_knockouts`와 단계형 대회를 지원한다. 별도 정규 리그 surface는 대상이 아니다.
+
+| Method | Path | 계약 |
+|---|---|---|
+| GET | `/api/v1/admin/tournaments/:id/bracket/reset-preview` | `{ snapshot, fixtureCount, groupCount, canReset, blockedReason, stageBased, preservesPreliminaryGroups }` |
+| POST | `/api/v1/admin/tournaments/:id/bracket/reset` | 입력 `{ expectedSnapshot: SHA256 hex 64자, confirmed: true }`, 응답 `{ deletedFixtureCount }` |
+
+- 기존 success/error envelope 적용. UUID path 및 DTO whitelist/forbidNonWhitelisted 적용. offset/시각 입력은 없으며 잘못된 hash·확인 누락/false·추가 필드는 400. 비인증 401, support 쓰기·철회/만료/타 대회 총괄은 403. 조회는 기존 대회 관리 읽기 권한. 없는/삭제된 대회·다른 surface는 404 `TOURNAMENT_NOT_FOUND`.
+- preview는 RepeatableRead로 조회하며 쓰기하지 않는다. 대회/설정 revision·활성 경기/일정/버전·조·자리/팀 선택·진출 연결을 hash로 묶는다. POST는 대회 advisory/행 → Game → TeamMatch 순서로 잠그고 snapshot과 권한·상태를 다시 검증한다. 확인 이후 변경은 409 `BRACKET_RESET_STALE`. 이전 hash 재시도는 멱등 성공으로 가장하지 않고 현재 보호/stale 오류를 반환한다.
+- 진행/이벤트/어떤 상태의 결과 revision/시작된 피리어드가 있거나 정본 Game이 없으면 409 `BRACKET_RESET_BLOCKED`. 종료·취소·보관 대회와 초기화할 내용이 없는 대진도 같은 코드로 사유를 제공한다. 출전 명단만 있는 예정 경기는 기존 삭제 계약대로 처리한다.
+- 경기는 canonical soft-delete 경로로 보관한다. Game/감사는 삭제하지 않고 Game은 CANCELLED, TeamMatch는 archived/deletedAt, 노출은 STATUS_ONLY로 바꾸며 관련 팀 일정을 취소한다. 하위/후속 경기를 먼저 처리하고 자리·진출 연결·순위·공개/예약 공개·6강 런타임 상태를 함께 정리한다. 실패 시 전체 tx rollback.
+- 참가 신청·대회/경기 규칙·저장된 생성 초안·등록 시간/구장은 보존한다. 리그/조별리그+토너먼트는 예선 조와 팀 선택을 보존하고 결선 그룹/선택을 정리한다. 단독 토너먼트와 아직 설정되지 않은 복수 결선은 생성 그룹도 비운다. 설정된 복수 결선은 기존 reset InTx를 재사용해 예선 설정·팀 선택·결선 규칙을 보존한다. 단계형은 단계 정의·period/autoAdvance 설정을 보존하고 생성 그룹/자리 및 assignments/removedFixtures/sixTeamSelections를 비워 재생성 가능하게 한다. 관련 revision을 증가시킨다.
+- `tournament.bracket.reset` 감사에 수행자·이전 snapshot·형식·보관 경기 ID·공개 해제·설정 보존을 남긴다. 기존 개별 삭제·복수 결선 감사도 유지한다.
+- UI는 매 클릭 최신 preview를 읽고 실제 경기 수와 보존/삭제 범위·되돌릴 수 없음을 기존 danger 확인 모달로 안내한다. 취소는 POST 없음, 다른 mutation/진행 중 중복 실행 차단. 저장 후 조회 실패는 ‘초기화됐지만 최신 화면 조회 실패’로 분리하며 성공 toast로 숨기지 않는다.
+- 공유 MSW에는 정본 게임·일정·tx가 없으므로 두 endpoint를 503 `BRACKET_RESET_REQUIRES_REAL_API`로 명시한다. 버튼 HTTP 회귀는 별도의 stateful handler로 저장·재조회/실패 보존을 확인한다.
+
 ## 생성·접수 상태 보호 (2026-11-18)
 
 - 신청 제출은 대회 행 잠금 후 신청을 다시 읽고 `draft`만 처리한다. 실제 쓰기는 `status=draft`와 현재 `updatedAt`을 함께 검증한다. 중복 제출·제출 전 취소 경합은 `409 REGISTRATION_NOT_DRAFT`이며 결제 upsert·약관 기록·알림을 다시 수행하지 않는다. 일반 대회·단계형 대회·정규 리그의 공유 신청 경로에 적용한다.

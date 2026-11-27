@@ -1,5 +1,7 @@
 import { ScheduleTimesController, LeagueScheduleTimesController } from './scheduling/schedule-times.controller';
 import { ScheduleTimesService } from './scheduling/schedule-times.service';
+import { BracketResetController } from './bracket-reset/bracket-reset.controller';
+import { BracketResetService } from './bracket-reset/bracket-reset.service';
 import { StageLegacyMutationGuard } from './stages/stage-legacy-mutation.guard';
 import { StagePlanService } from './stages/stage-plan.service';
 import { StagePlanController } from './stages/stage-plan.controller';
@@ -94,6 +96,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     PublicRecordsModule,
   ],
   controllers: [
+    BracketResetController,
     ScheduleTimesController,
     LeagueScheduleTimesController,
     StagePlanController,
@@ -124,6 +127,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TeamCompetitionEntriesController,
   ],
   providers: [
+    BracketResetService,
     ScheduleTimesService,
     StageLegacyMutationGuard,
     StagePlanService,

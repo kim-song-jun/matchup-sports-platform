@@ -1,3 +1,7 @@
+## 2026-11-27 — 대진 상단 초기화 버튼 (PR 준비)
+
+[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md). 사용자 A안 상단 독립 버튼. 네 대회 형식·단계형 preview snapshot 검증, 실제 soft-delete·일정 취소·공개 해제·설정 보존을 하나의 tx로 처리한다. API36/Web31·양쪽 타입/정책 PASS, 실제 PostgreSQL11건은 CI 대상. Alpha 0/15(인증 자료 미확인·미배포), 사용자 대회 초기화는 실행하지 않았다.
+
 ## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
 
 [시나리오](./admin-member-team-operations.md) · [작업](../../.github/tasks/20261136-admin-member-team-operations.md) · [PR #2447](https://github.com/kim-song-jun/matchup-sports-platform/pull/2447). 목록/상세 4/4 구현, 조회 전용 10분 회원 접속과 시작·종료 감사 및 복귀 기능 추가. 리뷰에서 발견한 쿠키 헤더 처리·모달 선택값·복귀 이동 충돌 3건을 RED→GREEN 회귀로 수정했다. 로컬 UI/HTTP/인증·소켓 회귀를 검증했으며 실제 DB 통합 3건은 별도 실행 증거가 필요하다. Alpha 브라우저 0/4·viewport 0/3은 ego-lite 미노출로 미실행이며 배포·시각 합격으로 표시하지 않는다.

@@ -1,0 +1,14 @@
+{
+  "afterFixtures": 0,
+  "masterCount": 2,
+  "actorRecorded": true,
+  "timeRecorded": true,
+  "confirmationRecorded": true,
+  "fullRows": true,
+  "scheduleSnapshot": true,
+  "postCount": 1,
+  "consoleErrors": 0,
+  "uncaught": 0,
+  "httpErrors": 0,
+  "fixtureAudits": 3
+}

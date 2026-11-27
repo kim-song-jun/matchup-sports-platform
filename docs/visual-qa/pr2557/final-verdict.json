@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-27T12:53:55.859Z",
+  "releaseSha": "8208a35887f1e6e418e3e134f9054842c837f171",
+  "persona": "Alpha platform administrator",
+  "healthDb": true,
+  "viewports": [
+    390,
+    768,
+    1440
+  ],
+  "entryPoints": 2,
+  "viewportChecks": 6,
+  "actualResets": 3,
+  "masterLogs": 3,
+  "fixtureDeleteLogs": 12,
+  "cleanup": [
+    {
+      "status": "cancelled",
+      "isPublic": false
+    },
+    {
+      "status": "cancelled",
+      "isPublic": false
+    }
+  ],
+  "existingUserTournamentsChanged": 0,
+  "limitations": "Alpha fixtures have no participants or linked team schedules. Nonempty team schedule/guest recruitment cancellation, visibility policy snapshots and final audit rollback were verified in actual PostgreSQL CI."
+}

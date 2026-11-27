@@ -1,0 +1,50 @@
+[
+  {
+    "width": 390,
+    "layout": {
+      "focusInside": true,
+      "left": 16,
+      "right": 374,
+      "bottom": 828,
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390
+    },
+    "cancelPostCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  },
+  {
+    "width": 768,
+    "layout": {
+      "focusInside": true,
+      "left": 204,
+      "right": 564,
+      "bottom": 664.59375,
+      "width": 768,
+      "height": 1000,
+      "scrollWidth": 768
+    },
+    "cancelPostCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  },
+  {
+    "width": 1440,
+    "layout": {
+      "focusInside": true,
+      "left": 540,
+      "right": 900,
+      "bottom": 664.59375,
+      "width": 1440,
+      "height": 1000,
+      "scrollWidth": 1440
+    },
+    "cancelPostCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  }
+]

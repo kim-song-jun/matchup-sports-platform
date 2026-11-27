@@ -44,6 +44,8 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ### 2026-11-27 후속 — 초기화 확인 문구와 감사 상세
 
+- 최종 판정 COMPLETE(본 후속 범위): 배포8208a3588에 #2557/#2558 포함, CI45989079714/Alpha45989080002 성공·health200/db=true. 플랫폼 관리자 정상 로그인/ego-browser로 상단·설정창×3폭6/6 PASS(빈 값/오타/공백 차단·정확 입력만 실행·취소 POST0·재진입 비움·모달 focus/overflow/44px). 실제 초기화3회 후 마스터 감사3건·경기별12건의 처리자/시각/확인 문구/원본/결과와 최종 TeamMatch 자리·Game 정책·일정 스냅샷 필드를 관리자 API에서 확인했다. 기능 흐름 console/uncaught/의도하지 않은 HTTP 오류0. 잘못된 요청3건400은 별도 예상 실패 검증이다. 전용2개 대회 cancelled+private 보관, 사용자 대회 변경0. Alpha 신청/일정0인 한계는 실DB의 실제 일정·모집 취소/정책 보존·감사 rollback PASS와 구분한다. 증거는 qa/pr2557-alpha-evidence 및 두 PR 갤러리로 보존한다. 기존 #2151 작업 전체 완료 의미는 아니다.
+
 - 최종 dev cursor: #2557 `096769476` 및 #2558 `6c6e9df87` 모두 dev merge. #2558 최종 head42f2610bc의 CI45953663094 Gates/API/Web PASS(실DB226 suites/1722 tests, API580 suites/9695 tests). 사용자가 두 PR 각각 Copilot 리뷰 예외를 명시 승인했다. 실제 리뷰가 없으므로 clean으로 표시하지 않았다. 머지 커밋의 CI45955159248/Alpha45955159255를 추적한다.
 - Alpha 중간 증거: 배포096769476에서 상단3폭 입력/오타·공백 차단·취소 POST0·재진입 비움 PASS. 잘못된 API2건400/대진 유지, 실제 UI초기화3→0과 마스터 감사1건·경기별 감사3건의 처리자/시각/확인 문구/원본/결과를 관리자 API에서 확인했다. 최종6c6 배포의 상단/기존 설정창 재검증 및 전용2개 대회 정리는 아래 최종 판정에서 갱신한다. 원본 감사/자격증명/쿠키/개인정보는 공개 증거에 내보내지 않는다.
 
@@ -52,7 +54,7 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 - CI45951971729 API/Gates PASS, Web 전체13517건 중 재진입 시 이전 입력이 보이는1건이 RED였다. 상태 초기화 useEffect 실행 전 첫 프레임 경합을 확인하고 useConfirm 모달에 open/closed key를 줘 열 때 새 컴포넌트 상태로 시작하도록 수정했다(검증 대기를 늘려 숨기지 않음). 두 초기화 HTTP 흐름+공유 모달40건 GREEN. 수정 head에서 CI를 다시 확인한다.
 
 - 사용자 요청: 확인창에서 `초기화한다` 직접 입력, 실행 로그 전체 보존. 기존 A안 모달/버튼을 유지하고 정확 입력 필드만 추가한다. Scope backend/frontend/docs, 단일 에이전트. Owned: shared ConfirmModal의 optional confirmationText, reset hook/button/DTO/service/tests/integration, API 문서/Changeset/시나리오. Forbidden: 다른 worktree·schema/migration·기존 사용자 대회 초기화.
-- 단계: [x] 기존 로그/입력 계약 확인 [x] UI+서버 정확 문구 검사 [x] 초기화 전 전체 대진 상태·결과 감사 [ ] 좁은 단위/타입/실DB CI [ ] PR/리뷰/dev 머지 [ ] Alpha3폭/취소·오입력·실제 저장·감사 검증/정리.
+- 단계: [x] 기존 로그/입력 계약 확인 [x] UI+서버 정확 문구 검사 [x] 초기화 전 전체 대진 상태·결과 감사 [x] 좁은 단위/타입/실DB CI [x] PR/리뷰/dev 머지 [x] Alpha3폭/취소·오입력·실제 저장·감사 검증/정리.
 - Acceptance: 비어 있거나 오타/앞뒤 공백이면 실행 불가, 정확 입력만 실행, 닫고 재진입 시 비움, 서버도 누락/오타 거절. 감사에 처리자/시각/대회/확인 문구와 변경 전 구성·경기·편성·자리·진출 연결·순위·부전승 및 변경 후 보관/삭제 ID·결과 보존. 감사 저장 실패 시 전체 rollback. 참가 신청·시간/구장·설정 보존 기존 계약 유지.
 - Ambiguity: “로그 다”는 실제 초기화 성공의 변경 전 상태·처리 결과와 기존 개별 경기 감사 보존으로 적용한다. 미입력/취소는 서버 쓰기 자체가 없으며 성공 로그를 만들지 않는다. 조회 권한·개인정보 노출 범위는 기존 관리자/담당 총괄 감사 정본을 따른다.
 - Resume: 최신 origin/dev `b7accfe5d`, `feat/bracket-reset-confirmation`, `_worktrees/bracket-reset-confirmation`. 기존 #2553 한정 리뷰 예외는 이 PR에 자동 적용하지 않는다.

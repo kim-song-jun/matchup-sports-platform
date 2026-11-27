@@ -1,10 +1,10 @@
-## 2026-11-27 — 초기화 직접 입력 확인·감사 상세 (후속 검증 중)
+## 2026-11-27 — 초기화 직접 입력 확인·감사 상세 (dev 머지·Alpha PASS)
 
-[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md). `초기화한다` 정확 입력 후 실행, 서버 동일 검증, 변경 전 전체 대진/편성/순위와 처리 결과 감사의 원자적 저장. API22/Web23 및 타입/정책 PASS. 최종 감사 실패 rollback 실DB·새 PR/Alpha3폭은 진행 중이다.
+[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [#2557](https://github.com/kim-song-jun/matchup-sports-platform/pull/2557) · [#2558](https://github.com/kim-song-jun/matchup-sports-platform/pull/2558). `초기화한다` 정확 입력·서버 검증·원본 전체 상태/연쇄 취소 감사 저장. 최신 CI/실DB PASS, Alpha2경로×3폭6/6·취소 POST0·잘못된 API400·실제 초기화3회와 마스터3/경기별12개 감사 확인 PASS. 전용2개 대회 cancelled+private 정리. 기존 사용자 대회 변경0. 두 PR에 승인된 리뷰 예외와 SHA 고정 갤러리를 기록한다.
 
-## 2026-11-27 — 대진 상단 초기화 버튼 (PR #2553 검증 중)
+## 2026-11-27 — 대진 상단 초기화 버튼 (PR #2553 dev 머지·Alpha PASS)
 
-[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [PR #2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553). 사용자 A안 상단 독립 버튼. 네 대회 형식·단계형 preview snapshot 검증, 실제 soft-delete·일정 취소·공개 해제·설정 보존을 하나의 tx로 처리한다. API36/Web31·양쪽 타입/정책 PASS, 실제 PostgreSQL11건은 CI 대상. Alpha 0/15(인증 자료 미확인·미배포), 사용자 대회 초기화는 실행하지 않았다.
+[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [PR #2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553). 사용자 A안 상단 독립 버튼. 네 대회 형식·단계형의 실제 대진 초기화와 보호/보존 계약을 검증했다. CI/실제 PostgreSQL PASS, Alpha5유형×3폭15/15 및 초기화5/5·구장/시간 보존·단계형 재생성 PASS. [당시 갤러리](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553#issuecomment-7210821954). 전용5개 대회 cancelled+private 정리, 기존 사용자 대회 변경0. 직접 입력/감사 상세 후속은 위 #2557/#2558 판정과 구분한다.
 
 ## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
 

@@ -1,0 +1,68 @@
+[
+  {
+    "width": 390,
+    "emptyDisabled": true,
+    "wrongTextBlocked": 3,
+    "reopenCleared": true,
+    "layout": {
+      "enabled": true,
+      "focusInside": true,
+      "x": 16,
+      "right": 374,
+      "bottom": 828,
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "scrollWidth": 390,
+      "inputHeight": 50,
+      "buttonHeight": 44
+    },
+    "postCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  },
+  {
+    "width": 768,
+    "emptyDisabled": true,
+    "wrongTextBlocked": 3,
+    "reopenCleared": true,
+    "layout": {
+      "enabled": true,
+      "focusInside": true,
+      "x": 204,
+      "right": 564,
+      "bottom": 664.59375,
+      "viewportWidth": 768,
+      "viewportHeight": 1000,
+      "scrollWidth": 768,
+      "inputHeight": 50,
+      "buttonHeight": 44
+    },
+    "postCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  },
+  {
+    "width": 1440,
+    "emptyDisabled": true,
+    "wrongTextBlocked": 3,
+    "reopenCleared": true,
+    "layout": {
+      "enabled": true,
+      "focusInside": true,
+      "x": 540,
+      "right": 900,
+      "bottom": 664.59375,
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "scrollWidth": 1440,
+      "inputHeight": 50,
+      "buttonHeight": 44
+    },
+    "postCount": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": 0
+  }
+]

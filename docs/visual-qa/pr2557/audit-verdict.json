@@ -1,0 +1,20 @@
+{
+  "invalidApiStatuses": [
+    400,
+    400
+  ],
+  "invalidWrites": 0,
+  "beforeFixtures": 3,
+  "afterFixtures": 0,
+  "masterAuditCount": 1,
+  "actorRecorded": true,
+  "timeRecorded": true,
+  "confirmationRecorded": true,
+  "fullBeforeState": true,
+  "resultRecorded": true,
+  "fixtureAudits": 3,
+  "postCount": 1,
+  "consoleErrors": 0,
+  "uncaught": 0,
+  "httpErrors": 0
+}

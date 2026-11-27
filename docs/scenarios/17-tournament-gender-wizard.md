@@ -1,4 +1,4 @@
-# Tournament Gender Quota and Creation Wizard Scenarios
+# Tournament Gender Quota and Creation Form Scenarios
 
 대회 성별 카테고리·혼성 쿼터와 관리자 생성/수정 화면의 공통 계약을 추적한다.
 
@@ -23,7 +23,7 @@
 
 - [ ] 기존 Web `3013`, API `8121`, 기존 dev DB만 사용해 생성 → 상세 수정 → 공개 목록/상세 → 혼성 명단 잠금 성공/실패를 확인한다.
 - [ ] `/admin/tournaments/new`, 관리자 상세 편집, `/tournaments`, 공개 상세를 390×844, 768×1024, 1440×900에서 확인한다.
-- [ ] 단계별 focus order, sticky action, 가로 넘침, 이미지 비율, console error, 실패 network를 확인한다.
+- [ ] 오류 시 포커스 이동, 하단 고정 바, 가로 넘침, 이미지 비율, console error, 실패 network를 확인한다.
 - [ ] `html`, `body`, form control, Tailwind `font-sans`/`font-mono` computed font가 Pretendard를 첫 번째 유효 서체로 사용한다.
 - [ ] QA가 만든 대회·등록·선수·감사 로그만 exact cleanup하고 기존 row는 보존한다.
 
@@ -31,6 +31,6 @@
 
 ## Related (Todo 26 reconciliation, 2026-08-04)
 
-이 파일은 이미 v1 스택(`3013`/`8121`) 기준이며 Tasks 12-24와 stack이 어긋나지 않는다. 다만 범위가 대회 생성 마법사와 성별 쿼터로 좁아, 관리자/스태프 **actor 권한 행렬**(director/field_operator/support_readonly/platform_ops)은 이 파일이 다루지 않는다. 그 행렬은 `docs/api/domains/tournament-operations-auth.md`가 계약을 정의하고, `E2E-AUTH-01`(Todo 26이 새로 명명한 시나리오 ID, `docs/scenarios/index.md`의 "v1 Team & Tournament Operations Scenario Ledger" 참조)가 그 계약의 E2E 검증을 담당한다. `E2E-AUTH-01`은 `e2e/v1-tests/tournament.spec.ts`에 아직 구현되지 않았다 — 이 파일의 체크리스트(전부 `[ ]`)와 마찬가지로 미검증 상태이며, 이번 재조정 라운드에서 fabricate하지 않는다.
+이 파일은 이미 v1 스택(`3013`/`8121`) 기준이며 Tasks 12-24와 stack이 어긋나지 않는다. 다만 범위가 대회 생성 폼과 성별 쿼터로 좁아, 관리자/스태프 **actor 권한 행렬**(director/field_operator/support_readonly/platform_ops)은 이 파일이 다루지 않는다. 그 행렬은 `docs/api/domains/tournament-operations-auth.md`가 계약을 정의하고, `E2E-AUTH-01`(Todo 26이 새로 명명한 시나리오 ID, `docs/scenarios/index.md`의 "v1 Team & Tournament Operations Scenario Ledger" 참조)가 그 계약의 E2E 검증을 담당한다. `E2E-AUTH-01`은 `e2e/v1-tests/tournament.spec.ts`에 아직 구현되지 않았다 — 이 파일의 체크리스트(전부 `[ ]`)와 마찬가지로 미검증 상태이며, 이번 재조정 라운드에서 fabricate하지 않는다.
 
-이 파일의 다른 어떤 문장도 Tasks 12-24 소스(`apps/v1_api/src/tournaments/**`, `apps/v1_api/src/tournament-operations/**`)와 상충하는 것으로 확인되지 않았다 — 대회 마법사/쿼터 범위는 이번 재조정에서 정정할 false claim이 없었다.
+이 파일의 다른 어떤 문장도 Tasks 12-24 소스(`apps/v1_api/src/tournaments/**`, `apps/v1_api/src/tournament-operations/**`)와 상충하는 것으로 확인되지 않았다 — 대회 생성 폼/쿼터 범위는 이번 재조정에서 정정할 false claim이 없었다.

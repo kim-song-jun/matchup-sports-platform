@@ -81,7 +81,7 @@ function openRegistrationTab() {
 async function reviewTeam(user: ReturnType<typeof userEvent.setup>, teamName = registration.teamName) {
   const card = (await screen.findByText(teamName ?? '')).closest('li');
   if (!card) throw new Error('실제 신청 카드가 없어요.');
-  await user.click(within(card).getByRole('button', { name: '명단 검토' }));
+  await user.click(within(card).getByRole('button', { name: '명단 보기' }));
   return screen.findByRole('dialog', { name: `명단 검토 — ${teamName}` });
 }
 

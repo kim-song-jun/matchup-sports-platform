@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { settleHistory } from '@/test/history-router';
-import { SimpleModal } from './tournament-detail-shared';
+import { SimpleModal, substitutionPolicyLabel } from './tournament-detail-shared';
 
 beforeEach(() => {
   __resetOverlayHistoryForTests();
@@ -143,5 +143,17 @@ describe('SimpleModal 높이 제한', () => {
     const body = screen.getByText('본문').parentElement!;
     expect(body.className).toContain('overflow-y-auto');
     expect(body.className).toContain('min-h-0');
+  });
+});
+
+describe('substitutionPolicyLabel', () => {
+  it.each([
+    ['rolling' as const, null, '자유 교체'],
+    ['limited' as const, 3, '횟수 제한 3회'],
+    ['limited' as const, 0, '횟수 제한 0회'],
+    ['limited' as const, null, '횟수 제한 (횟수 미설정)'],
+    [null, null, '정하지 않음'],
+  ])('%s · %s → %s', (mode, max, label) => {
+    expect(substitutionPolicyLabel(mode, max)).toBe(label);
   });
 });

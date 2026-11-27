@@ -134,6 +134,10 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
       { id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] },
       { id: 'sport-football', code: 'football', name: '축구', levels: [] },
     ] as unknown as V1Sport[],
+    /** 200 이 아니면 출전 인원·교체 선택지 조회가 그 상태로 실패한다. */
+    lineupOptionsStatus: 200,
+    /** 단계별 순위 순서 PUT — `{ stageKey, ...본문 }`. */
+    stageTieBreakPuts: [] as Record<string, unknown>[],
     /** 서버에 닿은 대회 PATCH 본문(실패한 것 포함) — 순서대로. */
     patches: [] as Record<string, unknown>[],
     periodPatches: [] as Record<string, unknown>[],
@@ -151,7 +155,13 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
   const handlers = [
     http.post('*/api/v1/logs/client-error', () => ok(null)),
     http.get('*/api/v1/master/sports', () => ok(state.sports)),
-    http.get('*/api/v1/admin/competition-configs/lineup-size-options', () => ok(state.lineupOptions)),
+    http.get('*/api/v1/admin/competition-configs/lineup-size-options', () =>
+      state.lineupOptionsStatus === 200 ? ok(state.lineupOptions) : failed({ status: state.lineupOptionsStatus, body: {} }),
+    ),
+    http.put('*/api/v1/admin/tournaments/:id/stages/:stageKey/tie-break-order', async ({ request, params }) => {
+      state.stageTieBreakPuts.push({ stageKey: params.stageKey, ...((await request.json()) as Record<string, unknown>) });
+      return ok({ revision: (state.tournament.stagePlanRevision ?? 0) + 1, stageTieBreak: state.tournament.stageTieBreak });
+    }),
     http.get('*/api/v1/admin/tournaments/:id/bracket', () => ok(state.bracket)),
     http.get('*/api/v1/admin/tournaments/:id/periods', () => ok({ ...state.periods, expectedVersion: state.tournament.updatedAt })),
     http.patch('*/api/v1/admin/tournaments/:id/periods', async ({ request }) => {

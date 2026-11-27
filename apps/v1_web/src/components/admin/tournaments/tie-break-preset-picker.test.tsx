@@ -20,7 +20,7 @@ function Controlled({ initial = DEFAULT_TOURNAMENT_TIE_BREAK_ORDER, onChange, ..
 describe('TieBreakPresetPicker', () => {
   it('프리셋 셋과 직접 정하기를 라디오로 보여주고 지금 순서와 같은 프리셋을 고른 채로 둔다', () => {
     render(<Controlled />);
-    expect(screen.getByRole('radiogroup', { name: '동점일 때 순서' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: '순위 정하는 순서' })).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(4);
     expect(screen.getByRole('radio', { name: /맞대결 우선/ })).toBeChecked();
     expect(screen.getByText('기본')).toBeInTheDocument();

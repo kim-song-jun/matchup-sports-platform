@@ -33,6 +33,8 @@ export function useSectionDraft<Draft>(
   base: V1Tournament,
   toDraft: (tournament: V1Tournament) => Draft,
   onDirtyChange: (dirty: boolean) => void,
+  /** 이 초안 밖에서 든 변경(예: 경기 시간) — 섹션의 「바뀜」 에 함께 센다. */
+  extraDirty = false,
 ) {
   const [initial] = useState(() => toDraft(base));
   const [draft, setDraft] = useState(initial);
@@ -40,8 +42,8 @@ export function useSectionDraft<Draft>(
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
 
   useEffect(() => {
-    onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
+    onDirtyChange(dirty || extraDirty);
+  }, [dirty, extraDirty, onDirtyChange]);
 
   const set = useCallback(<Key extends keyof Draft>(key: Key, value: Draft[Key]) => {
     setDraft((current) => ({ ...current, [key]: value }));

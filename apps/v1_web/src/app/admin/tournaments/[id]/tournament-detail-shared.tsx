@@ -32,9 +32,9 @@ export function substitutionPolicyLabel(
   mode: 'limited' | 'rolling' | null,
   maxSubstitutions: number | null,
 ): string {
-  if (mode === null) return '미지정';
-  if (mode === 'rolling') return '무제한(롤링)';
-  return typeof maxSubstitutions === 'number' ? `제한 ${maxSubstitutions}회` : '제한 (횟수 미설정)';
+  if (mode === null) return '정하지 않음';
+  if (mode === 'rolling') return '자유 교체';
+  return typeof maxSubstitutions === 'number' ? `횟수 제한 ${maxSubstitutions}회` : '횟수 제한 (횟수 미설정)';
 }
 
 export function formatPhoneNumber(phone: string | null): string {

@@ -1279,7 +1279,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       expect(screen.queryByText('정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.')).toBeNull();
     });
 
-    it('가입 닫힘이 정원보다 앞선다 — 칩은 [가입 닫힘](주황), 정원 안내 한 줄은 없다', () => {
+    it('모집 마감이 정원보다 앞선다 — 칩은 [모집 마감](주황), 정원 안내 한 줄은 없다', () => {
       signedIn();
       const detail = fullDetail({ joinPolicy: 'closed' });
       teamApiMocks.useV1TeamDetail.mockReturnValue({
@@ -1291,7 +1291,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
 
       const { container } = render(<TeamDetailPageClient teamId="team-1" />);
 
-      expect(container.querySelector('.tm-team-profile-chip-alert')).toHaveTextContent('가입 닫힘');
+      expect(container.querySelector('.tm-team-profile-chip-alert')).toHaveTextContent('모집 마감');
       expect(screen.queryByRole('button', { name: '정원 마감' })).toBeNull();
       expect(screen.queryByText('정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.')).toBeNull();
     });

@@ -1366,7 +1366,7 @@ function canWithdrawJoin(team: V1TeamDetail, eligibility?: { joinState: string; 
 /**
  * 정원이 다 찬 팀(가입은 열려 있음)에 아직 회원도 신청자도 아닌 사람 — 버튼은 짧게 '정원 마감'으로 막는다
  * (2026-11-27 사용자 확정 A안). 로그아웃 상태도 같다 — 예전엔 '로그인 후 가입 신청'이 눌려 로그인하고
- * 돌아와서야 정원이 찼다는 걸 알았다. 가입 닫힘이 정원보다 앞선다(teamRecruitmentLabel 순서).
+ * 돌아와서야 정원이 찼다는 걸 알았다. 모집 마감이 정원보다 앞선다(teamRecruitmentLabel 순서).
  */
 const TEAM_FULL_CTA = '정원 마감';
 function isTeamFullForViewer(team: V1TeamDetail, eligibility?: { joinState: string }) {

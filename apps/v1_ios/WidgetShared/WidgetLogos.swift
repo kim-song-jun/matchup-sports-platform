@@ -1,11 +1,10 @@
 import Foundation
 import UIKit
 import ImageIO
-import CryptoKit
 
 /// Shell and timeline provider download bounded logos; views read only local PNGs.
 enum WidgetLogos {
-    static func key(_ path: String) -> String { SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined() + ".png" }
+    static func key(_ path: String) -> String { WidgetLogoKey.make(path) }
     static func url(_ path: String?, environment: WidgetEnvironment) -> URL? {
         guard let path, let url = URL(string: path, relativeTo: environment.origin)?.absoluteURL,
               url.scheme == "https", url.user == nil, url.password == nil else { return nil }

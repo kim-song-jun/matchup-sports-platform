@@ -317,6 +317,7 @@ schemes:
       # command line by scripts/ios/verify-push-slice.sh, which reads them from its own
       # environment.
       environmentVariables:
+        TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST: $(TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST)
         TEAMEET_UITEST_EMAIL: $(TEAMEET_UITEST_EMAIL)
         TEAMEET_UITEST_PASSWORD: $(TEAMEET_UITEST_PASSWORD)
         TEAMEET_UITEST_INQUIRY_ID: $(TEAMEET_UITEST_INQUIRY_ID)

@@ -202,7 +202,7 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
         aria-live="assertive"
         className="flex flex-col items-center gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-4 text-center"
       >
-        <p className="flex items-center gap-2 text-base font-extrabold text-[var(--orange700)]">
+        <p className="flex items-center gap-2 text-[length:var(--font-size-body-lg)] font-extrabold text-[var(--orange700)]">
           <Timer size={18} aria-hidden="true" />
           쉬는 시간이 끝났어요
         </p>

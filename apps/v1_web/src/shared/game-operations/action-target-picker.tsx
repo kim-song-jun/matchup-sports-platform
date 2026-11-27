@@ -293,12 +293,12 @@ export function ActionTargetPicker({
               {titleText}
             </h2>
             {isSubstitution && substitutionOut !== null ? (
-              <p className="mt-0.5 text-xs font-medium text-[var(--text-muted)]">
+              <p className="mt-0.5 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
                 {participantIdentityName(substitutionOut.participant)} 선수와 교체
               </p>
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
-            <p className="mt-0.5 text-xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
+            <p className="mt-0.5 text-[length:var(--font-size-caption)] font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
               {periodPrefix(frozen.period, periodCount)}{formatMatchClock(frozen.clockMs)}로 기록돼요{tapSaves ? ' · 누르면 바로 저장돼요' : ''}
             </p>
           </div>
@@ -338,7 +338,7 @@ export function ActionTargetPicker({
             ) : (
               <div className="flex flex-col gap-3">
                 {remainingSubstitutionsLabel(substitutionOut.sideId) ? (
-                  <p className="text-xs font-semibold text-[var(--text-muted)]">
+                  <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
                     {remainingSubstitutionsLabel(substitutionOut.sideId)}
                   </p>
                 ) : null}

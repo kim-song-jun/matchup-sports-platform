@@ -105,7 +105,7 @@ export function EventToasts({
         <div
           key={toast.id}
           role="status"
-          className={`tm-native-toast-card pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg sm:max-w-[400px] ${
+          className={`tm-native-toast-card pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-[length:var(--font-size-body-sm)] font-semibold text-white shadow-lg sm:max-w-[400px] ${
             toast.exiting
               ? 'motion-safe:animate-[fade-in_0.15s_ease-in_reverse_both]'
               : 'motion-safe:animate-[fade-in_0.15s_ease-out]'

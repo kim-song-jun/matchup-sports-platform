@@ -5,7 +5,10 @@ import type { V1AdminTournamentRegistration } from '@/types/api';
 import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
-vi.mock('@/components/admin/bracket-canvas/bracket-reset-button', () => ({ BracketResetButton: () => null }));
+vi.mock('@/components/admin/bracket-canvas/use-bracket-tools', () => ({
+  useBracketTools: () => ({ loading: false, isEmpty: false, hasGroups: true, summary: '', unscheduledCount: 0, menus: { teamFill: [], match: [], timeVenue: [] }, create: null, openCreate: vi.fn(), resetError: null, dialogs: null }),
+}));
+vi.mock('@/components/admin/bracket-canvas/bracket-tools-bar', () => ({ BracketToolsBar: ({ children }: { children: React.ReactNode }) => <div data-testid="tools-bar">{children}</div> }));
 
 const mocks = vi.hoisted(() => ({
   registrations: { data: undefined as unknown, isError: false, error: null as unknown, refetch: vi.fn() },

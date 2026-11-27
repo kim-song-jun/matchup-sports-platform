@@ -57,7 +57,7 @@ function templateStagePreview(input: BracketTemplateInput): string {
   }
   if (input.kind === 'league') {
     const rounds = (input.teamCount % 2 === 0 ? input.teamCount - 1 : input.teamCount) * input.legs;
-    const mode = input.legs === 2 ? '홈·어웨이 리그' : '단일 리그';
+    const mode = input.legs === 2 ? '홈·원정 리그' : '단일 리그';
     return `${mode} · ${rounds}라운드 · 라운드마다 ${Math.floor(input.teamCount / 2)}경기`;
   }
   if (input.qualificationMode === 'cross_group_round12') {
@@ -410,8 +410,8 @@ export function LegacyBracketTemplateDialog({ open, tournamentId, format, confir
                       return (
                         <CompetitionTemplateCard key={value} mode="radio" name={`${idPrefix}-legs`} value={String(value)} checked={legs === value}
                           onChange={() => { draftTouchedRef.current = true; setLegs(value); }}
-                          graphic={value === 1 ? 'league-single' : 'league-double'} title={value === 1 ? '단일 리그' : '홈·어웨이 리그'}
-                          description={value === 1 ? '모든 팀과 한 번씩 경기해요.' : '모든 팀과 홈·어웨이로 두 번 경기해요.'}
+                          graphic={value === 1 ? 'league-single' : 'league-double'} title={value === 1 ? '단일 리그' : '홈·원정 리그'}
+                          description={value === 1 ? '모든 팀과 한 번씩 경기해요.' : '모든 팀과 홈·원정으로 두 번 경기해요.'}
                           meta={plan && rounds !== null ? `${rounds}라운드 · 경기 ${plan.fixtures}개` : '팀 수를 입력하면 일정을 계산해요'} />
                       );
                     })}

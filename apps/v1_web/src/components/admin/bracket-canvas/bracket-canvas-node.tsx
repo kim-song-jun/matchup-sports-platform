@@ -21,7 +21,7 @@ import type { V1AdminBracketFixture, V1AdminBracketSlot } from '@/types/api';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 import { fixtureOpenerProps } from './fixture-opener-focus';
 
-const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
+const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '원정' };
 
 export type BracketCanvasNodeProps = {
   fixture: V1AdminBracketFixture;
@@ -33,6 +33,8 @@ export type BracketCanvasNodeProps = {
   sideLabels: Record<SideKey, string>;
   slots: { HOME: V1AdminBracketSlot | null; AWAY: V1AdminBracketSlot | null };
   selected: boolean;
+  /** 「시간 미정만 보기」 같은 필터가 켜졌을 때 이 칸이 해당하는지. 생략하면 필터가 없다. 글자 대비는 그대로 두고 지면·테두리·푸터 글자로만 구분한다. */
+  filterMatch?: boolean;
   canWrite: boolean;
   pendingRegistrationId: string | null;
   onSelect: (fixtureId: string) => void;
@@ -48,6 +50,7 @@ export function BracketCanvasNode({
   sideLabels,
   slots,
   selected,
+  filterMatch,
   canWrite,
   pendingRegistrationId,
   onSelect,
@@ -129,12 +132,14 @@ export function BracketCanvasNode({
       aria-label={`${accessibleTitle}, ${chip.label}`}
       data-fixture-id={fixture.id}
       data-state={state}
-      className={`${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]`}
+      data-filter-match={filterMatch === undefined ? undefined : String(filterMatch)}
+      className={`tm-on-tint ${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]`}
       style={{
         ...placement,
         borderRadius: 'var(--radius-container)',
-        // 선택은 색만이 아니라 두께로도 구분한다(색만으로 정보 전달 금지).
-        border: selected ? '2px solid var(--blue500)' : '1px solid var(--border-strong)',
+        // 선택은 옅은 배경 + 1px 테두리 색이다. 두꺼운 색 테두리는 쓰지 않는다.
+        border: selected ? '1px solid var(--blue500)' : filterMatch === false ? '1px solid var(--border)' : '1px solid var(--border-strong)',
+        background: selected ? 'var(--blue50)' : filterMatch === false ? 'var(--surface-soft)' : undefined,
       }}
     >
       <button
@@ -157,7 +162,8 @@ export function BracketCanvasNode({
         className="tm-text-caption flex items-center justify-between gap-2 whitespace-nowrap border-t border-[var(--border)] bg-[var(--grey50)] px-2"
         style={{ height: CANVAS_FOOTER_HEIGHT, color: 'var(--text-muted)' }}
       >
-        <button type="button" className="min-w-0 truncate text-left" onClick={() => onSelect(fixture.id)}
+        <button type="button" className={`min-w-0 truncate text-left${filterMatch === true ? ' font-semibold' : ''}`}
+          style={filterMatch === true ? { color: 'var(--text-strong)' } : undefined} onClick={() => onSelect(fixture.id)}
           title={`${when} · ${fixture.venue || '구장 미정'}`}>{when} · {fixture.venue || '구장 미정'}</button>
         {footer.length ? <span className="flex min-w-0 items-center gap-1" title={footer.join(' · ')}>{quick ? <Zap size={12} aria-label="어드민 빠른 입력" className="shrink-0" /> : null}<span className="shrink-0">{voided ? '무효 처리됨' : penalty}</span></span> : null}
       </div>

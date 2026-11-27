@@ -74,22 +74,6 @@ export const ADMIN_CANCELLABLE = new Set<string>([
   'waitlisted',
 ]);
 
-// P1-2: 신청 관리 탭 상태 필터 칩 (기존 STATUS_META 라벨 매핑 재사용)
-export const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
-  { value: 'all', label: '전체' },
-  { value: 'awaiting_payment', label: '입금 대기' },
-  { value: 'payment_checking', label: '입금 확인 중' },
-  // 'paid'는 실사용 상태(입금 확인 완료, 확정 전)인데 칩이 없어 '전체'로만 볼 수 있었다.
-  { value: 'paid', label: '결제 완료' },
-  { value: 'confirmed', label: '확정' },
-  { value: 'waitlisted', label: '대기' },
-  { value: 'cancel_requested', label: '취소 요청' },
-  { value: 'cancelled', label: '취소' },
-];
-
-// ── Status transition guards ────────────────────────────────────────────────
-
-/** Returns next allowed statuses from the current one */
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 const formatCurrency = formatEntryFee;
@@ -256,51 +240,5 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">{children}</div>
       </div>
     </div>
-  );
-}
-
-// ── Tab type ──────────────────────────────────────────────────────────────
-
-// ── Small action button ───────────────────────────────────────────────────
-
-export function ActionButton({
-  onClick,
-  disabled,
-  icon,
-  label,
-  tone,
-  expanded,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  icon: React.ReactNode;
-  label: string;
-  tone: 'blue' | 'gray' | 'red';
-  /** 펼침 토글 버튼이면 현재 펼침 여부(aria-expanded). */
-  expanded?: boolean;
-}) {
-  const toneClass =
-    tone === 'blue'
-      ? 'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)]'
-      : tone === 'red'
-      ? 'text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)]'
-      : 'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)]';
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-expanded={expanded}
-      className={[
-        'inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
-        'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-        'disabled:opacity-50',
-        toneClass,
-      ].join(' ')}
-    >
-      <span aria-hidden="true">{icon}</span>
-      {label}
-    </button>
   );
 }

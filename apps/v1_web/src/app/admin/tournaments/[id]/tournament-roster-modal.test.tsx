@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOINKFA_CERTIFICATE_GUIDE } from '@/components/tournaments/player-eligibility';
 import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
-import { RosterModal } from './registrations-tab';
+import { RosterModal } from './registration-roster-modal';
 
 const clients: QueryClient[] = [];
 

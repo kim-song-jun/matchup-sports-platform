@@ -243,3 +243,38 @@ describe('BracketTeamTray — collapsible(좁은 태블릿)', () => {
     expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
   });
 });
+
+describe('BracketTeamTray — 부모가 쥐는 펼침·닫기', () => {
+  it('expanded 를 주면 부모 값을 따르고, 토글은 onExpandedChange 로 알린다(자기 상태는 바꾸지 않는다)', () => {
+    const onExpandedChange = vi.fn();
+    renderTray({ collapsible: true, expanded: false, onExpandedChange });
+    expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
+  });
+
+  it('expanded=true 면 처음부터 펼쳐져 있고 접기가 false 를 알린다', () => {
+    const onExpandedChange = vi.fn();
+    renderTray({ collapsible: true, expanded: true, onExpandedChange });
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '접기' }));
+    expect(onExpandedChange).toHaveBeenCalledWith(false);
+  });
+
+  it('expanded 를 안 주면 지금처럼 자기 상태로 접고 편다(대조군)', () => {
+    renderTray({ collapsible: true });
+    fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+  });
+
+  it('onClose 가 있으면 접지 않는 목록에 「참가팀 목록 닫기」가 생기고, 없으면 없다', () => {
+    const onClose = vi.fn();
+    renderTray({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: '참가팀 목록 닫기' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    cleanup();
+    renderTray();
+    expect(screen.queryByRole('button', { name: '참가팀 목록 닫기' })).not.toBeInTheDocument();
+  });
+});

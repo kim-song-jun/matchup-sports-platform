@@ -42,6 +42,8 @@ import {
   type PublicPeriodBreak,
 } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
+import { resolveTeamFoulPeriod, tallyTeamFouls, type PublicTeamFouls } from './public-team-fouls';
+import { resolveTeamFoulThreshold } from '../../tournaments/team-foul-threshold';
 import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import {
   resolvePublicScorePresentation,
@@ -1176,7 +1178,7 @@ export class PublicTournamentRecordsService {
         deletedAt: null,
         AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
-      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true, teamFoulThreshold: true },
     });
     if (tournament === null) {
       throw new NotFoundException(NOT_FOUND);
@@ -1273,6 +1275,11 @@ export class PublicTournamentRecordsService {
       mode === 'live' && !showOfficialResult && status === 'live'
         ? resolveEndedPeriods(fixture.game?.periods ?? [])
         : null;
+    // 라이브 전용 팀 파울 — `periodBreak` 와 같은 게이트라 경기가 끝나면 응답에서 사라진다(기록으로 남기지 않는다).
+    const teamFouls =
+      mode === 'live' && !showOfficialResult && status === 'live' && fixture.game !== null
+        ? await this.computeLiveTeamFouls(fixture.game.id, fixture.game.sides, fixture.game.periods, tournament.teamFoulThreshold)
+        : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만, 프로필 링크
@@ -1360,6 +1367,7 @@ export class PublicTournamentRecordsService {
       periodMinutes: gamePeriodMinutes(fixture.game),
       substitutionMode: gameSubstitutionMode(fixture.game),
       endedPeriods,
+      teamFouls,
       lineup,
       events,
       mvp,
@@ -1547,6 +1555,29 @@ export class PublicTournamentRecordsService {
     });
     const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
     return tallyLiveScore(events, sideKeyById);
+  }
+
+  /**
+   * 라이브 경기의 팀 파울(진행 중인 피리어드 기준). 아직 시작한 피리어드가 없으면 null.
+   * 기준(`threshold`)은 경기에 고정해 둔 값이 아니라 **지금 대회·리그에 저장된 값**을 읽는다 — 운영 콘솔(`games.service`)과
+   * 같아서, 진행 중에 정보 수정으로 바꾼 기준이 다음 폴링부터 바로 바에 반영된다.
+   * 관전자 폴링으로 반복 호출되는 경로라 FOUL·CARD 와 "되돌린 이벤트"만 읽는다(`computeLiveScore` 와 같은 이유).
+   */
+  private async computeLiveTeamFouls(
+    gameId: string,
+    sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
+    periods: Parameters<typeof resolveTeamFoulPeriod>[0],
+    storedThreshold: number | null,
+  ): Promise<PublicTeamFouls | null> {
+    const periodNumber = resolveTeamFoulPeriod(periods);
+    if (periodNumber === null) return null;
+    const events = await this.prisma.v1GameEvent.findMany({
+      where: { gameId, OR: [{ type: { in: ['FOUL', 'CARD'] } }, { reversesEventId: { not: null } }] },
+      select: { id: true, type: true, sideId: true, participantId: true, period: true, sequence: true, reversesEventId: true, payload: true },
+    });
+    const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
+    const { home, away } = tallyTeamFouls(events, sideKeyById, periodNumber);
+    return { periodNumber, threshold: resolveTeamFoulThreshold(storedThreshold), home, away };
   }
 
   private async buildEvents(
@@ -1933,7 +1964,7 @@ export class PublicTournamentRecordsService {
   async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
     const league = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { id: true, title: true },
+      select: { id: true, title: true, teamFoulThreshold: true },
     });
     if (league === null) {
       throw new NotFoundException(LEAGUE_FIXTURE_NOT_FOUND);
@@ -2009,6 +2040,11 @@ export class PublicTournamentRecordsService {
     const endedPeriods: PublicEndedPeriod[] | null =
       mode === 'live' && !showOfficialResult && status === 'live'
         ? resolveEndedPeriods(teamMatch.game?.periods ?? [])
+        : null;
+    // getMatch 의 같은 이름 주석 참고 — 라이브 전용이다.
+    const teamFouls =
+      mode === 'live' && !showOfficialResult && status === 'live' && teamMatch.game !== null
+        ? await this.computeLiveTeamFouls(teamMatch.game.id, teamMatch.game.sides, teamMatch.game.periods, league.teamFoulThreshold)
         : null;
 
     const participantIds = (teamMatch.game?.participants ?? []).map((participant) => participant.id);
@@ -2094,6 +2130,7 @@ export class PublicTournamentRecordsService {
       periodMinutes: gamePeriodMinutes(teamMatch.game),
       substitutionMode: gameSubstitutionMode(teamMatch.game),
       endedPeriods,
+      teamFouls,
       lineup,
       events,
       mvp,

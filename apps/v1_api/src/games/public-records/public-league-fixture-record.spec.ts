@@ -76,7 +76,9 @@ function makeFixtureRow(overrides: Partial<FakeTeamMatchRow> = {}): FakeTeamMatc
 }
 
 function buildService(options: {
-  league?: { id: string; title: string } | null;
+  league?: { id: string; title: string; teamFoulThreshold?: number | null } | null;
+  /** 팀 파울 집계 검증용 이벤트(FOUL·CARD). 기본값 빈 배열. */
+  events?: unknown[];
   fixture?: FakeTeamMatchRow | null;
   // 주차 파생용 리그 전체 대진의 킥오프 시각들.
   fixtureStartAts?: Date[];
@@ -99,7 +101,7 @@ function buildService(options: {
       findUnique: async () => ((options.publicLive ?? true) ? { value: 'on' } : null),
     },
     v1ParticipantIdentityLinkCurrent: { findMany: async () => [] },
-    v1GameEvent: { findMany: async () => [] },
+    v1GameEvent: { findMany: async () => options.events ?? [] },
     v1GameResultRevision: { findMany: async () => options.revisions ?? [] },
   } as unknown as PrismaService;
   return new PublicTournamentRecordsService(fakePrisma, {} as TournamentStaffAccessService);
@@ -381,6 +383,36 @@ describe('리그 자동 명단의 사이드별 공개', () => {
     expect(result.status).toBe('live');
     expect(result.scoreStatus).toBe('live');
     expect(result.score).toEqual({ home: 0, away: 0, penalties: null });
+  });
+});
+
+describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- teamFouls (라이브 전용 팀 파울)', () => {
+  const startedAt = new Date('2026-09-12T10:00:00.000Z');
+  const livePeriod = { number: 1, state: 'LIVE', startedAt, pausedTotalMs: 0, pausedAt: null };
+  const foul = (id: string, sideId: string, sequence: number) => ({
+    id, type: 'FOUL', sideId, participantId: null, period: 1, sequence, reversesEventId: null, payload: {},
+  });
+  const teamFoulsFor = async (options: { state: string; teamFoulThreshold?: number | null }) =>
+    (
+      await buildService({
+        league: { id: LEAGUE_ID, title: '가을 정규 리그', teamFoulThreshold: options.teamFoulThreshold ?? null },
+        events: [foul('f1', 'side-home', 1), foul('f2', 'side-away', 2), foul('f3', 'side-away', 3)],
+        fixture: makeFixtureRow({
+          game: makeGame({ state: options.state, currentOfficialRevision: null, periods: options.state === 'LIVE' ? [livePeriod] : [{ ...livePeriod, state: 'ENDED' }] }),
+        }),
+      }).getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID)
+    ).teamFouls;
+
+  it('진행 중인 리그 경기는 홈·원정 파울과 리그에 저장된 기준을 싣는다', async () => {
+    expect(await teamFoulsFor({ state: 'LIVE', teamFoulThreshold: 7 })).toEqual({ periodNumber: 1, threshold: 7, home: 1, away: 2 });
+  });
+
+  it('리그 기준이 비어 있으면 기본 5개다', async () => {
+    expect((await teamFoulsFor({ state: 'LIVE' }))?.threshold).toBe(5);
+  });
+
+  it('끝난 경기에는 싣지 않는다 — 기록으로 남기지 않는다', async () => {
+    expect(await teamFoulsFor({ state: 'ENDED' })).toBeNull();
   });
 });
 

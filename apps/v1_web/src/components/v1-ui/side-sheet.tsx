@@ -70,7 +70,7 @@ export function SideSheet({ open, title, onClose, children, footer, dirty = fals
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex h-[90vh] w-full flex-col rounded-t-2xl bg-[var(--card-surface)] lg:h-full lg:w-[480px] lg:rounded-none lg:rounded-l-2xl"
+        className="flex h-[90dvh] w-full flex-col rounded-t-2xl bg-[var(--card-surface)] lg:h-full lg:w-[480px] lg:rounded-none lg:rounded-l-2xl"
       >
         <div
           aria-hidden="true"

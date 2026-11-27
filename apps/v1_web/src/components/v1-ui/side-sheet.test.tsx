@@ -75,6 +75,14 @@ describe('SideSheet', () => {
     expect(within(sheet()).getByRole('button', { name: '저장' })).toBeInTheDocument();
   });
 
+  it('폰에서 올라오는 시트 높이는 주소창이 보이는 모바일 브라우저에서도 화면 안에 들어오게 dvh 로 잡는다', () => {
+    render(<Harness onClose={vi.fn()} />);
+    openSheet();
+
+    expect(sheet().className).toContain('h-[90dvh]');
+    expect(sheet().className).not.toContain('90vh');
+  });
+
   it('footer 는 스크롤되는 본문 밖에 있다', () => {
     render(<Harness onClose={vi.fn()} />);
     openSheet();

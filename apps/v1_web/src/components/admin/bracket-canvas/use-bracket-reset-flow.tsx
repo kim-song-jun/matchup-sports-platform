@@ -1,21 +1,20 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useIsMutating, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useBracketReset } from '@/hooks/use-bracket-reset';
 import { extractErrorMessage } from '@/lib/error-message';
 
-export function BracketResetButton({ tournamentId, canWrite, showToast }: {
-  tournamentId: string; canWrite: boolean; showToast: (message: string, variant?: 'success' | 'error') => void;
-}) {
+/** 대진 초기화 한 번의 흐름 — 미리보기 → 확인 문구 입력 → 초기화 → 화면 갱신. 호출은 `start()`, 결과는 토스트와 `error` 로 알린다. */
+export function useBracketResetFlow(tournamentId: string, canWrite: boolean, showToast: (message: string, variant?: 'success' | 'error') => void): {
+  start: () => void; busy: boolean; error: string | null; ConfirmModal: ReactNode;
+} {
   const api = useBracketReset(tournamentId), client = useQueryClient();
   const mutations = useIsMutating();
   const { confirm, ConfirmModal } = useConfirm();
   const [preparing, setPreparing] = useState(false), [error, setError] = useState<string | null>(null);
   const running = useRef(false);
-  if (!canWrite) return null;
 
   async function reset() {
     if (!canWrite || running.current || mutations > 0) return;
@@ -37,9 +36,5 @@ export function BracketResetButton({ tournamentId, canWrite, showToast }: {
     } finally { running.current = false; setPreparing(false); }
   }
 
-  return <div className="flex flex-col items-start gap-2">
-    <Button type="button" variant="outline" disabled={preparing || mutations > 0} loading={preparing} onClick={() => void reset()}>대진 초기화</Button>
-    {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
-    {ConfirmModal}
-  </div>;
+  return { start: () => void reset(), busy: preparing || mutations > 0, error, ConfirmModal };
 }

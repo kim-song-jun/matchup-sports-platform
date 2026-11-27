@@ -6,7 +6,7 @@ const registrations = [
   makeRegistration({ id: 'r1', teamName: '서울FC' }),
   makeRegistration({ id: 'r2', teamName: '부산FC' }),
   makeRegistration({ id: 'r3', teamName: '대구FC' }),
-  makeRegistration({ id: 'r4', teamName: '신청중FC', status: 'pending' }),
+  makeRegistration({ id: 'r4', teamName: '신청중FC', status: 'awaiting_payment' }),
 ];
 
 describe('unplacedTeamCount', () => {

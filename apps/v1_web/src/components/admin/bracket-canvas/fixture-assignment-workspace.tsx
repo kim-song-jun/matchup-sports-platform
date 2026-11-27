@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ChevronDown, Clock3, MapPin, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -20,13 +20,14 @@ import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-la
 import { fixtureTitle } from './bracket-canvas';
 import { FixtureAssignmentContext } from './fixture-assignment-context';
 
-export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFields, showToast, children, toolbar }: {
+/** 시간·구장 일괄 배정 패널. 어느 패널을 열지는 도구 메뉴가 쥐고(`mode`), 이 컴포넌트는 그 값을 그린다. */
+export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFields, showToast, mode, onModeChange, children }: {
   tournamentId: string; canWrite: boolean; canManageFields: boolean;
-  showToast: (message: string, variant?: 'success' | 'error') => void; children: ReactNode; toolbar?: ReactNode;
+  showToast: (message: string, variant?: 'success' | 'error') => void;
+  mode: AssignmentMode | null; onModeChange: (next: AssignmentMode | null) => void; children: ReactNode;
 }) {
   const id = useId();
   const { confirm, ConfirmModal } = useConfirm();
-  const [mode, setMode] = useState<AssignmentMode | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [timeDraft, setTimeDraft] = useState('');
   const [courtDraft, setCourtDraft] = useState('');
@@ -60,8 +61,9 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
     setEditing(null); setEditError(null);
     if (editTrigger.current?.isConnected) editTrigger.current.focus(); else panelRef.current?.focus();
   } };
-  const close = () => { if (!busy) { setMode(null); setError(null); setEditing(null); setEditError(null); } };
-  const open = (next: AssignmentMode) => { if (!busy) { setMode(mode === next ? null : next); setError(null); setEditing(null); setEditError(null); } };
+  const close = () => { if (!busy) onModeChange(null); };
+  // 다른 패널로 바뀌거나 닫히면 쓰던 입력·오류는 버린다.
+  useEffect(() => { setError(null); setEditing(null); setEditError(null); }, [mode]);
 
   async function saveEntry(event: FormEvent) {
     event.preventDefault();
@@ -228,8 +230,6 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
     </div>
   </section>;
   return <FixtureAssignmentContext.Provider value><div className="flex min-w-0 flex-col gap-4">
-    <div className="flex flex-wrap gap-2">{toolbar}<Button variant={mode === 'time' ? 'primary' : 'outline'} onClick={() => open('time')} disabled={busy} aria-expanded={mode === 'time'} aria-controls={`${id}-panel`}><Clock3 size={16} aria-hidden="true" />시간 배정</Button>
-      <Button variant={mode === 'court' ? 'primary' : 'outline'} onClick={() => open('court')} disabled={busy} aria-expanded={mode === 'court'} aria-controls={`${id}-panel`}><MapPin size={16} aria-hidden="true" />구장 배정</Button></div>
     <div className={mode && wide ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_360px] items-start gap-4' : 'min-w-0'}>
       <div className="min-w-0">{children}</div>
       {mode && wide ? <aside id={`${id}-panel`} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}

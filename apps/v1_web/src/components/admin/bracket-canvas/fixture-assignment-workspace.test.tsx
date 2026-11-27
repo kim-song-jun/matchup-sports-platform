@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useIsFetching, useIsMutating } from '@tanstack/react-query';
+import { useState } from 'react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -83,11 +84,23 @@ function CurrentFixture() {
   const query = useV1AdminBracket('t-1');
   return query.data ? <FixtureMetadataEditor tournamentId="t-1" fixture={query.data.fixtures[0]} groups={query.data.groups} fixtures={query.data.fixtures} slots={[]} canWrite showToast={vi.fn()} /> : null;
 }
+// 패널을 여닫는 건 도구 메뉴의 몫이다 — 여기서는 같은 이름의 두 버튼이 그 메뉴 항목 역할을 한다.
+// 저장·재조회(첫 조회 제외)가 끝나기 전에는 눌리지 않게 해, 요청 중에는 패널을 못 바꾸던 동기점을 둔다.
+function Host({ canWrite, canManageFields, editor }: { canWrite: boolean; canManageFields: boolean; editor: boolean }) {
+  const [mode, setMode] = useState<'time' | 'court' | null>(null);
+  const inFlight = useIsMutating() > 0 || useIsFetching({ predicate: query => query.state.dataUpdateCount > 0 }) > 0;
+  const toggle = (next: 'time' | 'court') => setMode(current => (current === next ? null : next));
+  return <>
+    <button type="button" disabled={inFlight} aria-expanded={mode === 'time'} onClick={() => toggle('time')}>시간 배정</button>
+    <button type="button" disabled={inFlight} aria-expanded={mode === 'court'} onClick={() => toggle('court')}>구장 배정</button>
+    <FixtureAssignmentWorkspace tournamentId="t-1" canWrite={canWrite} canManageFields={canManageFields} showToast={vi.fn()} mode={mode} onModeChange={setMode}>
+      {editor ? <CurrentFixture /> : <p>대진표</p>}
+    </FixtureAssignmentWorkspace>
+  </>;
+}
 function show(canWrite = true, canManageFields = true, editor = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  render(<QueryClientProvider client={client}><FixtureAssignmentWorkspace tournamentId="t-1" canWrite={canWrite} canManageFields={canManageFields} showToast={vi.fn()}>
-    {editor ? <CurrentFixture /> : <p>대진표</p>}
-  </FixtureAssignmentWorkspace></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><Host canWrite={canWrite} canManageFields={canManageFields} editor={editor} /></QueryClientProvider>);
   return client;
 }
 const timeLabel = (stamp: string) => `${formatKstDateShort(stamp)} ${formatKstTime(stamp)}`;
@@ -314,5 +327,46 @@ describe('real fixture assignment API and shared editor', () => {
     await screen.findByText(timeLabel(stamp));
     expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(`${timeLabel(stamp)}에 경기 배정`)).not.toBeInTheDocument();
+  });
+});
+
+describe('mode 를 부모가 쥔다', () => {
+  function Controlled({ mode, onModeChange }: { mode: 'time' | 'court' | null; onModeChange: (next: 'time' | 'court' | null) => void }) {
+    return <FixtureAssignmentWorkspace tournamentId="t-1" canWrite canManageFields showToast={vi.fn()} mode={mode} onModeChange={onModeChange}><p>대진표</p></FixtureAssignmentWorkspace>;
+  }
+  const mount = (mode: 'time' | 'court' | null, onModeChange = vi.fn()) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><Controlled mode={mode} onModeChange={onModeChange} /></QueryClientProvider>);
+    return { view, client, onModeChange, again: (next: 'time' | 'court' | null) => view.rerender(<QueryClientProvider client={client}><Controlled mode={next} onModeChange={onModeChange} /></QueryClientProvider>) };
+  };
+
+  it('mode="time" 이 시간 배정 패널을, mode="court" 가 구장 배정 패널을 열고, null 이면 닫힌다', async () => {
+    const { again } = mount('time');
+    expect(await screen.findByRole('region', { name: '시간 배정' })).toBeInTheDocument();
+    again('court');
+    expect(await screen.findByRole('region', { name: '구장 배정' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '시간 배정' })).not.toBeInTheDocument();
+    again(null);
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+  });
+
+  it('패널의 「닫기」가 onModeChange(null) 을 부르고, 내부에 「시간 배정」「구장 배정」 버튼이 없다', async () => {
+    const { onModeChange } = mount('time');
+    await screen.findByRole('region', { name: '시간 배정' });
+    expect(screen.queryByRole('button', { name: '시간 배정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '구장 배정' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '시간 배정 닫기' }));
+    expect(onModeChange).toHaveBeenCalledWith(null);
+  });
+
+  it('다른 패널로 바뀌면 쓰던 수정 입력은 버린다', async () => {
+    const { again } = mount('time');
+    fireEvent.click(await screen.findByRole('button', { name: `${timeLabel(stamp)} 시간 수정` }));
+    expect(screen.getByLabelText('시간 수정 (한국 시간)')).toBeInTheDocument();
+    again('court');
+    await screen.findByRole('region', { name: '구장 배정' });
+    again('time');
+    await screen.findByRole('region', { name: '시간 배정' });
+    expect(screen.queryByLabelText('시간 수정 (한국 시간)')).not.toBeInTheDocument();
   });
 });

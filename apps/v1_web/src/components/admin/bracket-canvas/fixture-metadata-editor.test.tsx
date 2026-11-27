@@ -4,6 +4,7 @@ import { makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 
 const save = vi.hoisted(() => vi.fn());
+const fields = vi.hoisted(() => ({ items: [{ id: 'field-a', name: 'A구장', active: true }, { id: 'field-b', name: 'B구장', active: true }] as Array<{ id: string; name: string; active: boolean }> }));
 const periods = vi.hoisted(() => ({ match: null as null | Record<string, unknown>, save: vi.fn() }));
 vi.mock('@/hooks/use-tournament-period-settings', () => ({
   useTournamentMatchPeriods: () => ({ data: periods.match ?? undefined, isPending: !periods.match, isError: false }),
@@ -13,10 +14,11 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1UpdateFixture: () => ({ mutateAsync: save, isPending: false }),
-  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: 'A구장', active: true }, { id: 'field-b', name: 'B구장', active: true }] }, isPending: false, isError: false }),
+  useV1TournamentFields: () => ({ data: { items: fields.items }, isPending: false, isError: false }),
 }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({ useV1SetBracketSources: () => ({ mutateAsync: vi.fn(), isPending: false }) }));
-afterEach(() => { cleanup(); periods.match = null; });
+const registeredFields = [{ id: 'field-a', name: 'A구장', active: true }, { id: 'field-b', name: 'B구장', active: true }];
+afterEach(() => { cleanup(); periods.match = null; fields.items = registeredFields; });
 beforeEach(() => { save.mockReset(); save.mockResolvedValue({}); });
 const showToast = vi.fn();
 const group = makeGroup({ id: 'semi', name: '준결승', phase: 'semi' });
@@ -150,6 +152,25 @@ describe('shared fixture metadata editor', () => {
     await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', fieldId: 'field-b' }));
     fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: '' } });
     expect(await screen.findByLabelText('구장 직접 입력')).toBeInTheDocument();
+  });
+
+  it('등록된 구장이 없는 대회: 「더 보기」를 열지 않아도 구장을 바로 고치고 저장하며, 죽은 select 는 없다', async () => {
+    fields.items = [];
+    render(editor(makeFixture({ id: 'final', groupId: null, fixtureNumber: 13, venue: '탄천 보조구장' })));
+    expect(screen.queryByLabelText('등록된 구장')).toBeNull();
+    fireEvent.change(screen.getByLabelText('구장 직접 입력'), { target: { value: '상암 보조구장' } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', venue: '상암 보조구장' }));
+    expect(screen.getAllByLabelText('구장 직접 입력')).toHaveLength(1);
+    openMore();
+    expect(screen.getAllByLabelText('구장 직접 입력')).toHaveLength(1);
+  });
+
+  it('등록된 구장이 전부 사용 안 함이어도 고를 수 있는 구장이 없으니 직접 입력을 기본 영역에 둔다', () => {
+    fields.items = [{ id: 'field-x', name: '옛 구장', active: false }];
+    render(editor(makeFixture({ id: 'final', groupId: null, fixtureNumber: 13 })));
+    expect(screen.queryByLabelText('등록된 구장')).toBeNull();
+    expect(screen.getByLabelText('구장 직접 입력')).toBeInTheDocument();
   });
 
   it('unassigns the registered field and stored place together', async () => {

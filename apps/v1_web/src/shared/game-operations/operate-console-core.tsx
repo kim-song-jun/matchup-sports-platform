@@ -307,6 +307,8 @@ const STAGE_CAPTION_CLASS = 'break-keep text-[length:var(--font-size-body-sm)] f
 const STAGE_CHIP_CLASS =
   'flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-[length:var(--font-size-body-sm)] font-bold text-[var(--blue700)] dark:bg-blue-500/10';
 
+const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
+
 /** 진행 명령 REST 응답을 기다리는 한도. 이벤트 전송의 ack 한도(`SEND_ACK_TIMEOUT_MS`)와 같다. */
 export const COMMAND_RESPONSE_TIMEOUT_MS = 10_000;
 
@@ -395,6 +397,8 @@ export function OperateConsoleCore({
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
+  // 기록·되돌리기 실패 안내. 진행 명령의 오류와 따로 둬서 다음 기록을 할 때 지운다 — 지난 실패가 상태 줄에 남지 않게.
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
@@ -492,6 +496,7 @@ export function OperateConsoleCore({
       commandAttemptRef.current += 1;
       setPendingCommandRetry(null);
       setCommandError(null);
+      setRecordError(null);
       setCommandPending(false);
     }
     commandCanOperateRef.current = canOperate;
@@ -924,9 +929,8 @@ export function OperateConsoleCore({
   }, [gameEnded, resultRevisions, gameDetail.data?.currentOfficialRevisionId]);
   const confirmedPenalties = confirmedResultScore?.penalties ?? null;
 
-  /* 헤더 스코어. 경기 중에는 이벤트 파생값이지만, 종료 후 결과 검수에서 "고치고 확인"으로
-   * 점수를 정정하면 이벤트 로그는 그대로라 헤더만 옛 점수(알파 실측 2:0 → 정정 3:0)로
-   * 남았다 — 결과 리비전이 있으면 그 점수를 따른다. */
+  // 점수 카드의 스코어. 경기 중에는 기록에서 센 값이고, 끝난 뒤 결과를 고치면 기록은 그대로라
+  // 결과 리비전이 있으면 그 점수를 따른다.
   const headerScoreBySideId = useMemo(() => {
     if (confirmedResultScore === null) return scoreBySideId;
     return new Map(
@@ -1202,7 +1206,7 @@ export function OperateConsoleCore({
       if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
       clientEventIds.forEach((id) => undoStartedRef.current.add(id));
       if (commandBlockedRef.current) {
-        setCommandError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+        setRecordError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
         return;
       }
       let reversed = 0;
@@ -1210,18 +1214,18 @@ export function OperateConsoleCore({
         let event = opsRef.current.liveEvents.find((candidate) => candidate.clientEventId === clientEventId) ?? null;
         if (event === null) {
           const queued = opsRef.current.queue.items.find((item) => item.clientEventId === clientEventId);
-          const settled =
-            queued !== undefined && (queued.status === 'queued' || queued.status === 'sending')
-              ? await waitForEventSettled(clientEventId)
-              : queued?.status;
+          const waiting = queued !== undefined && (queued.status === 'queued' || queued.status === 'sending');
+          // 서버에 닿기 전에는 되돌릴 대상이 없다 — 기다린다는 사실을 알리고 확정된 뒤에 되돌린다.
+          if (waiting) showToast('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
+          const settled = waiting ? await waitForEventSettled(clientEventId) : queued?.status;
           if (settled === 'failed') {
-            setCommandError('전송에 실패한 기록이라 되돌릴 것이 없어요. 다시 보내지 않으면 기록되지 않아요.');
+            setRecordError('전송에 실패한 기록이라 되돌릴 것이 없어요. 다시 보내지 않으면 기록되지 않아요.');
             return;
           }
           event = await waitForRecordedEvent(clientEventId, 3_000);
         }
         if (event === null) {
-          setCommandError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+          setRecordError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
           return;
         }
         const eventId = event.id;
@@ -1229,7 +1233,7 @@ export function OperateConsoleCore({
         try {
           await opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
         } catch (err) {
-          setCommandError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
+          setRecordError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
           return;
         }
         reversed += 1;
@@ -1245,6 +1249,7 @@ export function OperateConsoleCore({
     async (input: EventCaptureCommitInput) => {
       if (commandBlocked) return;
       setPendingAction(null);
+      setRecordError(null);
       const sidesNow = gameDetail.data?.sides ?? [];
       const lineupsNow = lineupsQuery.data ?? [];
       const warningMinutes = clockWarningMinutes(input.clockMs);
@@ -1257,10 +1262,9 @@ export function OperateConsoleCore({
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
       // 끊긴 채 적은 기록은 이 기기 큐에만 있다 — 서버 되돌리기를 약속하지 않는다.
       const connected = opsRef.current.connectionStatus === 'connected';
-      const SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
       const recordedId = await opsRef.current.submitEvent(input);
       if (recordedId === null) {
-        setCommandError(SAVE_FAILED);
+        setRecordError(RECORD_SAVE_FAILED);
         return;
       }
       const recordedIds = [recordedId];
@@ -1277,7 +1281,7 @@ export function OperateConsoleCore({
           await waitForQueueIdle();
           const redId = await opsRef.current.submitEvent(redInput);
           if (redId === null) {
-            setCommandError(SAVE_FAILED);
+            setRecordError(RECORD_SAVE_FAILED);
           } else {
             recordedIds.push(redId);
             noun = SECOND_YELLOW_RED_LABEL;
@@ -1914,7 +1918,7 @@ export function OperateConsoleCore({
     periodExpired,
     expiryError: periodRefreshNeeded ? periodExpiryError : null,
     startBlockedByTeams,
-    commandError,
+    commandError: commandError ?? recordError,
     bannerMessage: ops.bannerMessage,
     retryLabel: pendingCommandRetry?.label ?? null,
     queue: {
@@ -2253,7 +2257,7 @@ export function OperateConsoleCore({
       />
       {allRecordsOpen ? (
         <BottomSheet open title="기록 전체" onClose={() => setAllRecordsOpen(false)}>
-          <div className="min-h-0 overflow-y-auto pb-2">{renderEventList({ fromSheet: true })}</div>
+          <div className="pb-2">{renderEventList({ fromSheet: true })}</div>
         </BottomSheet>
       ) : null}
       {renderAbnormalEndDialog({

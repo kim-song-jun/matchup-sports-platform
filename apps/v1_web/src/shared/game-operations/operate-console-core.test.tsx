@@ -3073,6 +3073,8 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     });
     expect(state.reverseEvent).not.toHaveBeenCalled();
     expect(screen.queryByText('되돌렸어요')).toBeNull();
+    // 눌렀는데 아무 일도 없는 것처럼 보이지 않게, 기다리는 중이라고 알린다.
+    expect(screen.getByText('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.')).toBeInTheDocument();
 
     advance(state, { queue: { items: [queuedEvent('c1', 'acked')] }, liveEvents: [recorded('e9', 'c1')] });
     rerender(<CoreHarness />);
@@ -3170,6 +3172,21 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(await findConsoleNotice('기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.')).toBeInTheDocument();
     expect(screen.queryByText(RECORDED)).toBeNull();
     expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull();
+  });
+
+  it('기록 실패 안내는 다음 기록을 하면 사라진다 — 지난 실패가 상태 줄에 계속 남지 않는다', async () => {
+    const state = setup();
+    state.submitEvent.mockResolvedValueOnce(null);
+    render(<CoreHarness />);
+    recordGoal();
+    await waitFor(() => expect(statusRow()).toHaveAttribute('role', 'alert'));
+    expect(statusRow()).toHaveTextContent('요청을 처리하지 못했어요');
+
+    recordGoal();
+
+    expect(await screen.findByText(RECORDED)).toBeInTheDocument();
+    expect(statusRow()).toHaveAttribute('role', 'status');
+    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
   });
 
   it('선수 모름 골은 anonymous 로 저장되고 토스트에 선수 모름', async () => {

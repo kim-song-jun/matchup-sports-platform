@@ -98,7 +98,7 @@ export function ConsoleStatusPanel({ status, roster, queue, actions, actionsDisa
       {/* 닫혀 있을 때는 시트를 마운트하지 않는다 — 시트의 라우터 훅이 콘솔 첫 렌더에 끼지 않게. */}
       {open ? (
       <BottomSheet open title="경기 상태" onClose={() => setOpen(false)}>
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pb-2">
+        <div className="flex flex-col gap-4 pb-2">
           <section className="flex flex-col gap-2">
             <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
               {status.items.length > 0 ? `지금 확인할 것 ${status.items.length}개` : '지금 확인할 것이 없어요'}

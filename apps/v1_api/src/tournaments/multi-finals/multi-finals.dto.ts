@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, Equals, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class PreliminaryGroupDto {
   @IsString() @MaxLength(80) name!: string;
@@ -39,6 +39,8 @@ export class MultiFinalGenerateDto {
 }
 
 export class MultiFinalResetDto {
+  @Transform(({ obj, key }) => obj[key])
+  @IsString() @Equals('초기화한다') confirmationText!: string;
   @IsInt() @Min(0) expectedRevision!: number;
 }
 

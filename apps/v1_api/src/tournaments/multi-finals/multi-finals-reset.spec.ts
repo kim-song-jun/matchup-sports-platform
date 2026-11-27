@@ -30,7 +30,8 @@ function harness(options: { director?: boolean; revoked?: boolean; expiresAt?: D
     v1TournamentMatchAdvancementEdge: { findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentSlot: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStanding: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-    v1TournamentByeSlot: { deleteMany: jest.fn() },
+    v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), deleteMany: jest.fn() },
+    v1TournamentOverallStanding: { findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
     v1TournamentGroupTeam: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
@@ -41,6 +42,11 @@ function harness(options: { director?: boolean; revoked?: boolean; expiresAt?: D
   return { row, tx, admins, actor, service: new MultiFinalsService(prisma as unknown as PrismaService, context, {} as GamesService, {} as BracketTemplateService) };
 }
 describe('대진 초기화와 별도 예선 수정 보호', () => {
+  it.each(['', '초기화', '초기화한다 '])('기존 초기화 경로도 잘못된 확인 문구 %p를 쓰기 전에 거절한다', async confirmationText => {
+    const { service, tx } = harness();
+    await expect(service.reset(user, 't', { expectedRevision: 2, confirmationText })).rejects.toMatchObject({ response: { code: 'BRACKET_RESET_CONFIRMATION_REQUIRED' } });
+    expect(tx.v1Tournament.update).not.toHaveBeenCalled();
+  });
   it.each([
     { status: 'matched', game: { state: 'LIVE', currentOfficialRevisionId: null, _count: { events: 0 } } },
     { status: 'matched', game: { state: 'SCHEDULED', currentOfficialRevisionId: 'result', _count: { events: 0 } } },
@@ -50,32 +56,34 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
   ])('시작·결과·이벤트·누락 게임은 삭제 전에 차단한다: %j', async teamMatch => {
     const { tx, service } = harness();
     tx.v1TournamentMatchDetails.findMany.mockResolvedValue([{ teamMatchId: 'fixture', teamMatch }] as never);
-    await expect(service.reset(user, 't', { expectedRevision: 2 })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
+    await expect(service.reset(user, 't', { expectedRevision: 2, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
     expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
     expect(tx.v1Tournament.update).not.toHaveBeenCalled();
   });
   it.each(['completed', 'cancelled', 'archived'])('%s 대회는 초기화하지 않는다', async status => {
     const { row, tx, service } = harness(); row.status = status;
-    await expect(service.reset(user, 't', { expectedRevision: 2 })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
+    await expect(service.reset(user, 't', { expectedRevision: 2, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
     expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
   });
   it('오래된 revision과 권한 없는 관리자는 쓰기 전에 거절한다', async () => {
     const { tx, admins, service } = harness();
-    await expect(service.reset(user, 't', { expectedRevision: 1 })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_STALE' } });
+    await expect(service.reset(user, 't', { expectedRevision: 1, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_STALE' } });
     admins.getTournamentMutationAdmin.mockRejectedValueOnce(new Error('forbidden'));
-    await expect(service.reset(user, 't', { expectedRevision: 2 })).rejects.toThrow('forbidden');
+    await expect(service.reset(user, 't', { expectedRevision: 2, confirmationText: '초기화한다' })).rejects.toThrow('forbidden');
     expect(tx.v1Tournament.update).not.toHaveBeenCalled();
   });
   it('초기화는 조 설정과 진출 규칙을 유지하고 진출 명단·revision을 갱신한다', async () => {
     const { service, row, admins } = harness();
-    const result = await service.reset(user, 't', { expectedRevision: 2 });
+    const result = await service.reset(user, 't', { expectedRevision: 2, confirmationText: '초기화한다' });
     expect(result.revision).toBe(3);
     expect(result.groups).toEqual([{ id: 'g', name: 'A조', capacity: 4, legs: 1, registrationIds: [] }]);
     expect(result.preliminaryFixtureCount).toBe(0);
     expect(result.generated).toBe(false);
     expect(row.multiFinals.finals[0].registrationIds).toBeNull();
     expect(result.finals[0].rules).toEqual([{ groupId: 'g', rank: 1 }, { groupId: 'g', rank: 2 }]);
-    expect(admins.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: 'tournament.multi_finals.reset' }), expect.anything());
+    expect(admins.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: 'tournament.multi_finals.reset',
+      reason: '초기화한다', beforeJson: expect.objectContaining({ bracketState: expect.objectContaining({ tournament: expect.any(Object), fixtures: [], slots: [], standings: [], byes: [], overallStandings: [] }) }),
+      afterJson: expect.objectContaining({ result: 'succeeded', confirmationText: '초기화한다', actorUserId: user.id }) }), expect.anything());
   });
   it.each([false, true])('대진이 있으면 예선 수정으로 우회 삭제할 수 없다 (director=%s)', async director => {
     const { tx, service, actor } = harness({ director }); tx.v1TournamentMatchDetails.count.mockResolvedValue(1);
@@ -87,7 +95,7 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
     tx.v1TournamentGroupTeam.findMany.mockResolvedValue([{ groupId: 'g', registrationId: 'r2', registration: { team: { name: '둘' } } }, { groupId: 'g', registrationId: 'r1', registration: { team: { name: '하나' } } }] as never);
     tx.v1TournamentSlot.findMany.mockResolvedValue([{ groupId: 'g', registrationId: 'r1' }, { groupId: 'g', registrationId: 'r2' }, { groupId: 'g', registrationId: null }] as never);
     tx.v1TournamentSlot.deleteMany.mockImplementation(async () => { tx.v1TournamentSlot.findMany.mockResolvedValue([]); });
-    const result = await service.reset(user, 't', { expectedRevision: 2 });
+    const result = await service.reset(user, 't', { expectedRevision: 2, confirmationText: '초기화한다' });
     expect(result.groups[0].registrationIds).toEqual(['r1', 'r2']);
   });
 });
@@ -95,7 +103,7 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
 describe('배정 디렉터 초기화 권한과 실제 감사 경로', () => {
   it('플랫폼 관리자 계정 없이 담당 대회를 초기화하고 실제 배정 신원으로 기록한다', async () => {
     const { service, actor, tx } = harness({ director: true });
-    const result = await service.reset(actor, 't', { expectedRevision: 2 });
+    const result = await service.reset(actor, 't', { expectedRevision: 2, confirmationText: '초기화한다' });
     expect(result.revision).toBe(3);
     expect(tx.v1Tournament.update).toHaveBeenCalled();
     expect(tx.v1OperationAudit.create).toHaveBeenCalledWith({ data: expect.objectContaining({
@@ -112,7 +120,7 @@ describe('배정 디렉터 초기화 권한과 실제 감사 경로', () => {
     { name: '조회 역할', tournamentId: 't', options: { readonlyRole: true } },
   ])('$name은 읽기·삭제·감사 전에 거절한다', async ({ tournamentId, options }) => {
     const { service, actor, tx } = harness({ director: true, ...options });
-    await expect(service.reset(actor, tournamentId, { expectedRevision: 2 })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    await expect(service.reset(actor, tournamentId, { expectedRevision: 2, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
     expect(tx.v1Tournament.findFirst).not.toHaveBeenCalled();
     expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
     expect(tx.v1Tournament.update).not.toHaveBeenCalled();

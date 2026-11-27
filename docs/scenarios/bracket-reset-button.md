@@ -27,6 +27,8 @@ Task: [20261111](../../.github/tasks/20261111-preliminary-edit-reset.md)
 
 ## 2026-11-27 후속: 직접 입력 확인 및 감사 상세
 
+- 상단 버튼 외 복수 결선 설정창에서도 빈 값/오타가 실행 불가하고 정확 입력만 기존 reset endpoint에 저장되는지 검증한다. 서버 문구 누락 거절 및 `tournament.multi_finals.reset`의 공통 전체 bracketState 감사 보존도 확인한다.
+
 - 모달 빈 입력/오타/앞뒤 공백은 실행 비활성, 정확히 초기화한다 입력 후에만 실행. 취소는 POST0, 재진입 시 입력 비움.
 - 서버 DTO와 service는 확인 문구 누락/오타를 거절한다. 실제 PostgreSQL에서 감사 처리자/시각/확인 문구/전체 before 상태 및 결과 ID를 확인한다.
 - 최종 reset 감사만 강제로 실패시켜 앞선 경기별 삭제와 감사까지 모두 rollback되는지 확인한다.

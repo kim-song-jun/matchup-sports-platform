@@ -44,6 +44,8 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ### 2026-11-27 후속 — 초기화 확인 문구와 감사 상세
 
+- 진입점 교차 검증 후 보완: #2557은 `096769476`로 dev 머지, CI45948453869 모두 PASS(실DB reset 감사·최종 master 감사 실패 rollback 포함). 사용자는 #2557 리뷰 예외를 별도로 승인했다. 이후 기존 복수 결선 설정창의 별도 reset이 직접 입력을 요구하지 않는 우회를 발견해 같은 작업에서 보완한다. `fix/bracket-reset-entry-consistency`에서 기존 UI/DTO/service에도 정확 입력을 적용하고 공통 `captureBracketResetState`를 재사용해 전체 감사 상세를 남긴다. 새 보완 PR과 Alpha 검증은 진행 중이다. 기존 #2557 예외를 다른 PR에 임의 확대하지 않는다.
+
 - 사용자 요청: 확인창에서 `초기화한다` 직접 입력, 실행 로그 전체 보존. 기존 A안 모달/버튼을 유지하고 정확 입력 필드만 추가한다. Scope backend/frontend/docs, 단일 에이전트. Owned: shared ConfirmModal의 optional confirmationText, reset hook/button/DTO/service/tests/integration, API 문서/Changeset/시나리오. Forbidden: 다른 worktree·schema/migration·기존 사용자 대회 초기화.
 - 단계: [x] 기존 로그/입력 계약 확인 [x] UI+서버 정확 문구 검사 [x] 초기화 전 전체 대진 상태·결과 감사 [ ] 좁은 단위/타입/실DB CI [ ] PR/리뷰/dev 머지 [ ] Alpha3폭/취소·오입력·실제 저장·감사 검증/정리.
 - Acceptance: 비어 있거나 오타/앞뒤 공백이면 실행 불가, 정확 입력만 실행, 닫고 재진입 시 비움, 서버도 누락/오타 거절. 감사에 처리자/시각/대회/확인 문구와 변경 전 구성·경기·편성·자리·진출 연결·순위·부전승 및 변경 후 보관/삭제 ID·결과 보존. 감사 저장 실패 시 전체 rollback. 참가 신청·시간/구장·설정 보존 기존 계약 유지.

@@ -60,7 +60,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
   // Rules stored before rank-first ordering keep their old seed order until they are saved again.
   const needsReorder = finals.some((f, i) => f.rules.some((rule, j) => rule.groupId !== seedOrders[i][j].groupId || rule.rank !== seedOrders[i][j].rank));
   async function resetBracket() {
-    if (!server || busy || !await confirm({ title: '대진 초기화', message: '예선과 결선의 모든 대진·일정·대진 자리와 진출팀 선택을 삭제해요. 참가 신청, 예선 조 설정과 팀 선택, 토너먼트 규칙은 유지해요. 시작했거나 기록·결과가 있는 경기가 있으면 초기화할 수 없어요. 초기화할까요?', confirmLabel: '대진 초기화', tone: 'danger' })) return;
+    if (!server || busy || !await confirm({ title: '대진 초기화', confirmationText: '초기화한다', message: '예선과 결선의 모든 대진·일정·대진 자리와 진출팀 선택을 삭제해요. 참가 신청, 예선 조 설정과 팀 선택, 토너먼트 규칙은 유지해요. 시작했거나 기록·결과가 있는 경기가 있으면 초기화할 수 없어요. 초기화할까요?', confirmLabel: '대진 초기화', tone: 'danger' })) return;
     try {
       const result = await api.reset.mutateAsync({ expectedRevision: server.revision });
       hydrate(result); setDirty(false); setError(''); setNotice('대진을 초기화했어요. 예선 편성과 팀 선택을 수정한 뒤 별도로 저장해 주세요.'); api.preview.reset(); requestId.current = null; setStep(0);

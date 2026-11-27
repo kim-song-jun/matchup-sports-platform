@@ -97,7 +97,7 @@ describe('대진 상단 초기화 계약', () => {
     const h = setup(); h.row.format = 'league_knockouts'; h.row.multiFinals = { groups: [], finals: [] };
     const p = await h.service.preview(user, 't1');
     await h.service.reset(user, 't1', { expectedSnapshot: p.snapshot, confirmed: true, confirmationText: '초기화한다' });
-    expect(h.finals.resetInTx).toHaveBeenCalledWith(h.tx, expect.anything(), 't1', { expectedRevision: 4 });
+    expect(h.finals.resetInTx).toHaveBeenCalledWith(h.tx, expect.anything(), 't1', { expectedRevision: 4, confirmationText: '초기화한다' });
     expect(softDeleteTournamentFixtureInTx).not.toHaveBeenCalled();
   });
   it('후속 경기와 하위 경기를 먼저 보관한다', async () => {

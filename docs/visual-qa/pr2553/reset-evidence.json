@@ -1,0 +1,72 @@
+[
+  {
+    "kind": "knockout",
+    "beforeFixtures": 3,
+    "afterFixtures": 0,
+    "private": true,
+    "unpublished": true,
+    "fieldsPreserved": true,
+    "timesPreserved": true,
+    "stageDefinitionPreserved": true,
+    "multiFinalsPreserved": true,
+    "postCount": 1,
+    "exceptions": 0,
+    "httpErrors": []
+  },
+  {
+    "kind": "league",
+    "beforeFixtures": 6,
+    "afterFixtures": 0,
+    "private": true,
+    "unpublished": true,
+    "fieldsPreserved": true,
+    "timesPreserved": true,
+    "stageDefinitionPreserved": true,
+    "multiFinalsPreserved": true,
+    "postCount": 1,
+    "exceptions": 0,
+    "httpErrors": []
+  },
+  {
+    "kind": "group_knockout",
+    "beforeFixtures": 7,
+    "afterFixtures": 0,
+    "private": true,
+    "unpublished": true,
+    "fieldsPreserved": true,
+    "timesPreserved": true,
+    "stageDefinitionPreserved": true,
+    "multiFinalsPreserved": true,
+    "postCount": 1,
+    "exceptions": 0,
+    "httpErrors": []
+  },
+  {
+    "kind": "league_knockouts",
+    "beforeFixtures": 6,
+    "afterFixtures": 0,
+    "private": true,
+    "unpublished": true,
+    "fieldsPreserved": true,
+    "timesPreserved": true,
+    "stageDefinitionPreserved": true,
+    "multiFinalsPreserved": true,
+    "postCount": 1,
+    "exceptions": 0,
+    "httpErrors": []
+  },
+  {
+    "kind": "stage",
+    "beforeFixtures": 3,
+    "afterFixtures": 0,
+    "private": true,
+    "unpublished": true,
+    "fieldsPreserved": true,
+    "timesPreserved": true,
+    "stageDefinitionPreserved": true,
+    "multiFinalsPreserved": true,
+    "postCount": 1,
+    "exceptions": 0,
+    "httpErrors": []
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-27T05:36:50.576Z",
+  "persona": "Alpha platform administrator",
+  "releaseSha": "ba97444e89b0c43517861cf3b51b484cde285534",
+  "widths": [
+    390,
+    768,
+    1440
+  ],
+  "cancelChecks": 15,
+  "resetChecks": 5,
+  "emptyResetChecks": 5,
+  "stageRegenerationFixtures": 3,
+  "cleanup": {
+    "cancelledPrivate": 5,
+    "existingTournamentsChanged": 0
+  },
+  "limitations": "Alpha fixtures have no registrations. Registration preservation and started/result/stale/permission/rollback protections were covered by real PostgreSQL integration tests."
+}

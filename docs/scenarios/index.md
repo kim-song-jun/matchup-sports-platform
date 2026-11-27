@@ -1,6 +1,6 @@
-## 2026-11-27 — 대진 상단 초기화 버튼 (PR #2553 검증 중)
+## 2026-11-27 — 대진 상단 초기화 버튼 (PR #2553 dev 머지·Alpha PASS)
 
-[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [PR #2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553). 사용자 A안 상단 독립 버튼. 네 대회 형식·단계형 preview snapshot 검증, 실제 soft-delete·일정 취소·공개 해제·설정 보존을 하나의 tx로 처리한다. API36/Web31·양쪽 타입/정책 PASS, 실제 PostgreSQL11건은 CI 대상. Alpha 0/15(인증 자료 미확인·미배포), 사용자 대회 초기화는 실행하지 않았다.
+[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [PR #2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553). 사용자 A안 상단 독립 버튼. CI Gates/API/Web 및 실제 PostgreSQL reset 통합 PASS. 사용자 승인으로 이번 PR만 Copilot 리뷰 예외 후 dev 머지. Alpha 네 형식+단계형3폭15/15, 취소 POST0·실제 초기화5/5·구장/시간/설정 보존·빈 대진 차단·단계형 재생성 PASS. 전용5개 대회 cancelled+private 정리, 기존 사용자 대회 변경0. 증거는 같은 PR 갤러리 및 QA evidence 브랜치에 보관한다.
 
 ## 2026-11-19 — 회원·팀 운영 정보와 회원 화면 조회 (PR 검증 중)
 

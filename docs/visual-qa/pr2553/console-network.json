@@ -1,0 +1,37 @@
+[
+  {
+    "kind": "knockout",
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": [],
+    "navigationAborts": 2
+  },
+  {
+    "kind": "league",
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": [],
+    "navigationAborts": 2
+  },
+  {
+    "kind": "group_knockout",
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": [],
+    "navigationAborts": 2
+  },
+  {
+    "kind": "league_knockouts",
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": [],
+    "navigationAborts": 7
+  },
+  {
+    "kind": "stage",
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "httpErrors": [],
+    "navigationAborts": 2
+  }
+]

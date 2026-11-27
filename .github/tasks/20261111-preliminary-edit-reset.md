@@ -59,6 +59,12 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 - PR cursor: [#2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553), base `dev`, head `feat/bracket-reset-button`. 구현 커밋 f10c204db, 변경22파일·700추가/24삭제, 커밋 트리 clean/diff check PASS. 요청된 PR 생성까지 완료했으며 dev 머지·CI/PostgreSQL·최신 Copilot clean·Alpha 검증은 미완료다. 진행 중 #2546과 다른 세션 worktree를 보존한다. 미병합 작업의 후속 검증을 위해 이번 worktree/브랜치와 세션 소유 의존성 junction도 유지하며 정리 완료로 표시하지 않는다.
 - 2026-11-27 PR 완료 요청 후속: 사용자 “수정해서 pr 완료해줘”에 따라 기존 소유 worktree에서 최신 origin/dev 7ee1be637을 정상 merge했다. CI 45935098816은 Gates/Web PASS, API 통합의 group_knockout 준비만 실패했다(조당2팀은 기존 최소3팀 계약 위반). 실제 planner에서 동일 오류 RED 재현 → 총6팀/2개 조×3팀으로 수정 후 경기7개/자리8개 GREEN 확인. 보존 인원 기대값은 실제 registrationIds 길이를 따르고 형식별4/6팀과 비어 있지 않은 경기 목록을 별도로 단언한다. API 타입 PASS, 실DB는 새 CI로 확인한다. 사용자 데이터 초기화·생산 규칙 변경 없음. Alpha space3에서 여전히 로그인 화면으로 확인돼 실제 QA 인증 gate는 남아 있다.
 
+### PR #2553 배포 검증
+- PR #2553 완료 후속: 수정 커밋 `bac4701c8`의 CI45939872223 Gates/API/Web PASS. 실제 PostgreSQL 226 suites/1714 tests PASS(3 skip), API unit 576 suites/9635 tests PASS. 새 reset integration도 PASS다. Copilot 요청은 실제 리뷰를 생성하지 않았으며 사용자가 이번 PR에 한해 리뷰 요건 예외를 명시 승인했다. clean 리뷰로 표시하지 않았다. `75df1a3c5`로 dev merge 완료. 후속 #2555가 포함된 최신 dev `50f3d767d`의 CI/Alpha 배포를 추적한다. 이 문서의 기존 인증 미확인 상태는 해소됐으며 정상 Alpha UI 로그인으로 검증한다. 자격증명·쿠키는 저장하지 않는다.
+- QA 준비: 단일 관리자 persona, 전용 초안/비공개 대회 5종(4형식+단계형)만 새로 생성했다. 기존 사용자 대회 변경0. 변경 전 실제 대진 생성 3/6/7/6/3경기와 390/768/1440 캡처15개 확보. 전용 구장5개와 지원 형식의 등록 시간2개를 만들어 보존 기준을 저장했다. 변경 후 초기화/취소/빈 대진 오류/보존/3폭 검증은 배포 후 수행한다. QA 완료 후 해당 대회만 cancelled+private로 보관한다.
+
+- 최종 Alpha PASS: 배포 `ba97444e8`에 #2553 포함 확인, health200/db=true. 플랫폼 관리자 persona로5종×3폭15/15 버튼·확인·취소 PASS(POST0·기존 경기3/6/7/6/3 보존). 실제 초기화5/5 POST각1·대진0·구장5개/시간2개·복수 결선/단계 정의 보존, 빈 대진 차단5/5·단계형 UI재생성3경기 PASS. 해당 흐름 Runtime exception0/HTTP error0, 모달 focus 내부·가로 overflow0·버튼44px. 전용5개 대회 cancelled+private로 보관, 사용자 대회 변경0. Alpha 신청0인 한계는 실DB4/6팀 신청 보존 검증과 구분한다. 증거/갤러리와 최종 cursor는 `qa/pr2553-alpha-evidence` 및 같은 PR에 보관한다. #2553 Phase4와 배포 QA 완료(기존 #2151 작업 전체 완료 의미 아님).
+
 ### 기존 구현 이력
 - 최신 origin/dev 4a22824a5 기준 feat/preliminary-edit-reset 격리 worktree.
 - Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 22 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.

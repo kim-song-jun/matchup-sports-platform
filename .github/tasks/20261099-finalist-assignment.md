@@ -64,3 +64,5 @@ origin/dev 88119dbd9, branch feat/group-finalist-assignment, worktree /tmp/teame
 - [ ] 좁은 회귀·API 타입 검증 및 실제 DB CI 후 dev 반영; release metadata 재준비와 matching Alpha 확인 후 main PR을 재검증한다.
 - API/Prisma 모델·DB schema 변경 없음, migration 불필요. 권한·잠금·원자 저장·감사·기존12강을 유지한다. 테스트 기대값을 완화하거나 실패 CI를 성공으로 취급하지 않는다.
 검증 기록: 로컬 stale Prisma client 때문에 일반 Jest 타입 단계에서 시작하지 못한 1회는 RED 증거로 세지 않았다. 공유 client를 덮어쓰지 않고 임시 transpile-only 설정으로 기존 코드의 새 회귀 1실패/18통과를 확인한 뒤 수정 후 19/19 PASS. 실제 PG 통합·Prisma 생성·타입 검사는 최종 head CI에서 확인하며 로컬 Docker 부재를 숨기지 않는다. 새 debt marker 없음.
+
+공통 결선 수동 배정에서 템플릿의 조·순위는 기본 추천값이며 다른 조의 확정 참가팀도 경기 자리에 지정할 수 있다.

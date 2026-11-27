@@ -174,7 +174,7 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
           </p>
         </div>
       ) : null}
-      {header}
+      {header ? <div className="px-2.5 pb-2">{header}</div> : null}
       {toSegments(actions).map((segment, index) => (
         <div
           key={segment.actions[0].key}

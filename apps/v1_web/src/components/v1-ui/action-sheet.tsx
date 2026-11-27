@@ -117,7 +117,7 @@ export function ActionSheet({ open, title, subtitle, header, actions, onClose }:
         {subtitle ? (
           <p className="mb-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{subtitle}</p>
         ) : null}
-        {header}
+        {header ? <div className="mb-3">{header}</div> : null}
         <ul className="flex flex-col gap-2 overflow-y-auto">
           {actions.map((action, index) => (
             <li key={action.key}>

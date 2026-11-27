@@ -130,7 +130,7 @@ describe('describeResultReviewError — RESULT_ALREADY_OFFICIAL (contract 신설
     expect(message).not.toContain('official result');
     expect(message).toContain('공식 결과');
     // 무엇을 하라는 안내가 있어야 한다 — 막혔다는 사실만으로는 운영자가 다음 수를 모른다.
-    expect(message).toContain('정정');
+    expect(message).toContain('결과 고치기');
   });
 });
 

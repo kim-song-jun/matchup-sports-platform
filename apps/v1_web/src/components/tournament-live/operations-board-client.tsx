@@ -1,806 +1,329 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
-import { Ellipsis, RefreshCw } from 'lucide-react';
-import {
-  fetchV1TournamentOperationsBoardPage,
-  useV1AssignFixtureField,
-  useV1ClearFixtureField,
-  useV1TournamentFields,
-  useV1TournamentOperationsBoard,
-  useV1Tournament,
-} from '@/hooks/use-v1-api';
-import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/fixture-label';
-import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
-import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
-import { useGameResultRevisions } from '@/hooks/use-tournament-result-review';
-import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
-import { ErrorState } from '@/components/v1-ui/primitives';
-import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
-import { extractErrorMessage } from '@/lib/error-message';
-import { formatAdminDateTime } from '@/lib/date-utils';
-import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
 import { AdminEmpty } from '@/components/admin/admin-empty';
-import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
-import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
+import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
+import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/fixture-label';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
-import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
-import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
-import type {
-  V1GameState,
-  V1TournamentField,
-  V1TournamentOperationsBoardItem,
-  V1TournamentOperationsLiveWarning,
-  V1TournamentOperationsWarningCode,
-  V1TournamentStableWarningCode,
-  V1TournamentStaffRole,
-} from '@/types/api';
-import { V1_GAME_STATES, V1_STABLE_WARNING_CODES } from '@/types/api';
-import { competitionFixtureName } from '@/lib/tournament-round-label';
+import { canAssignOperations, useTournamentOpsRole } from '@/components/tournament-ops/role-context';
+import { ErrorState } from '@/components/v1-ui/primitives';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { useV1Tournament, useV1TournamentFields, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
-import { useV1DataSource } from '@/components/providers/v1-data-source';
+import { extractErrorMessage } from '@/lib/error-message';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { competitionFixtureName } from '@/lib/tournament-round-label';
+import type { V1TournamentOperationsBoardItem } from '@/types/api';
+import { BoardCardView } from './board-card';
+import { FieldChips } from './field-chips';
+import { MatchInfoSheet } from './match-info-sheet';
+import { OperationsListView } from './operations-list-view';
+import { OperationsPhoneList } from './operations-phone-list';
+import { OperationsTimeline } from './operations-timeline';
+import {
+  NO_FIELD_KEY,
+  buildBoardCards,
+  buildFieldColumns,
+  formatDayLabel,
+  kstDayKey,
+  kstTimeLabel,
+  listMatchDays,
+  pickBoardDay,
+  usesFieldStaff,
+  type BoardCard,
+} from './ops-board-model';
+import { useOperationsBoardAll } from './use-operations-board-all';
 
-function ExpandedResultPanel({
-  gameId,
-  tournamentId,
-  isRegularLeague,
-  onSaved,
-}: {
-  gameId: string;
-  tournamentId: string;
-  isRegularLeague: boolean;
-  onSaved: () => void;
-}) {
-  const revisions = useGameResultRevisions(gameId);
-  const [mode, setMode] = useState<'review' | 'correction' | null>(null);
-  const latest = revisions.data?.[0];
-  const handleSaved = useCallback(() => {
-    void revisions.refetch().then((result) => {
-      if (result.isSuccess && result.data) {
-        setMode(result.data[0]?.state === 'SUBMITTED' ? 'review' : 'correction');
-      }
-      onSaved();
-    });
-  }, [onSaved, revisions.refetch]);
-  useEffect(() => {
-    if (mode !== null || revisions.isPending || revisions.isError) return;
-    setMode(latest?.state === 'SUBMITTED' ? 'review' : 'correction');
-  }, [latest?.state, mode, revisions.isError, revisions.isPending]);
-  if (revisions.isPending) return <AdminListSkeleton rows={4} />;
-  if (revisions.isError) {
-    return <ErrorState message={extractErrorMessage(revisions.error, '결과 정보를 불러오지 못했어요.')} onRetry={() => void revisions.refetch()} />;
-  }
-  if (mode === null) return <AdminListSkeleton rows={4} />;
-  return mode === 'review' ? (
-    <GameResultReviewPanel gameId={gameId} tournamentId={tournamentId} inline onSaved={handleSaved} />
-  ) : (
-    <GameResultCorrectionPanel gameId={gameId} tournamentId={tournamentId} isRegularLeague={isRegularLeague} inline autoOpen onSaved={handleSaved} />
-  );
+const TEAM_TBD = '팀 미정';
+const MAX_FIELD_COLUMNS = 3;
+const CLOCK_INTERVAL_MS = 30_000;
+
+/** 팀이 정해진 쪽은 팀 이름, 아니면 자리 이름(「A조 1위」)이다. */
+function sideName(registrationId: string | null | undefined, teamName: string | null | undefined, slotLabel: string | null | undefined): string {
+  if (!registrationId) return slotLabel || TEAM_TBD;
+  return teamName && teamName !== 'TBD' ? teamName : TEAM_TBD;
 }
 
-const GAME_STATE_FILTER_LABELS: Record<V1GameState, string> = {
-  SCHEDULED: '예정',
-  LIVE: '진행 중',
-  PAUSED: '일시중지',
-  ENDED: '종료',
-  CANCELLED: '취소됨',
-};
-
-// 필터 라벨과 배지 라벨이 다르면 "필터를 걸었는데 다른 이름의 행만 나온다"로 읽힌다 —
-// 배지와 같은 출처(WARNING_LABELS)를 쓴다.
-// `RESULT_REVIEW_OVERDUE` 는 여기 없다 — 시계 의존으로 옮겨져 서버가 `?warning=` 필터로는
-// 받지 않는다(400). 배지로는 계속 보인다.
-const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
-  NO_FIELD_ASSIGNED: WARNING_LABELS.NO_FIELD_ASSIGNED,
-  MISSING_SCORER: WARNING_LABELS.MISSING_SCORER,
-};
-
-function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
-  if (value === null) return undefined;
-  return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
-}
-
-/**
- * 확정 결과 칸 — 데스크톱 표와 모바일 카드가 공유한다(한쪽만 그리면 뷰포트에 따라 결과가
- * 사라진다).
- *
- * 결선 무승부는 승부차기로만 승자가 갈리는데 이 보드에는 결과 칸 자체가 없어서, 운영자가
- * 방금 입력한 승부차기 결과를 보드에서 확인할 방법이 없었다(알파 실측: 서버에는 정규 0:0 ·
- * 승부차기 2:0 이 저장돼 있었다). 승부차기는 정규시간 점수와 다른 값이므로 같은 줄에 섞지
- * 않고 아래 캡션으로 병기한다 — 공개 결과 화면의 `PK 4:3` 배치와 같은 규칙이다.
- *
- * 확정 결과가 없는 경기(진행 중·예정)는 `—` 로 비워 둔다. `0:0` 을 그리면 "득점 없이 끝난
- * 경기"로 오독된다.
- */
-function FixtureResultCell({
-  item,
-  align = 'left',
-}: {
-  item: V1TournamentOperationsBoardItem;
-  align?: 'left' | 'right';
-}) {
-  if (item.currentRevisionState === 'VOID') {
-    return <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--red700)]">결과 무효</span>;
-  }
-  if (item.currentRevisionState !== null && item.currentRevisionState !== 'OFFICIAL') {
-    return <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">결과 대기</span>;
-  }
-  const score = readGameResultScore(item.currentScore);
-  if (score === null) {
-    return <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>;
-  }
-  return (
-    <div className={align === 'right' ? 'text-right' : undefined}>
-      <p className="font-medium tabular-nums text-[var(--text-strong)]">
-        {score.home}:{score.away}
-      </p>
-      {score.penalties ? (
-        <p className="text-[length:var(--font-size-caption)] tabular-nums text-[var(--text-muted)]">
-          {formatPenaltyShootout(score.penalties)}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function canOpenResultCorrection(item: V1TournamentOperationsBoardItem): boolean {
-  if (item.gameId === null) return false;
-  if (item.revisionId !== null) return true;
-  // Standard result submission transitions the game to ENDED before review; the official
-  // pointer remains null until approval, so ENDED is the real pending-submission signal.
-  return item.gameState === 'ENDED' || item.currentRevisionState === 'SUBMITTED';
-}
-
-/**
- * 경기장 배정은 서버가 `event_reverse` 권한으로 판정한다 — 플랫폼 운영자와 대회 디렉터만
- * 통과하고 필드 담당자·조회 전용은 거부된다. 누르면 403 나는 컨트롤을 만들지 않기 위해
- * 화면에서도 같은 기준으로 가린다(권한 판정 자체는 서버가 최종).
- */
-const FIELD_ASSIGN_ROLES: readonly V1TournamentStaffRole[] = ['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR'];
-
-/** 경기 한 건의 경기장 선택. 권한이 없으면 읽기 전용 텍스트로 떨어진다. */
-function FixtureFieldCell({
-  tournamentId,
-  item,
-  fields,
-  canAssign,
-}: {
-  tournamentId: string;
-  item: V1TournamentOperationsBoardItem;
-  fields: readonly V1TournamentField[];
-  canAssign: boolean;
-}) {
-  const assign = useV1AssignFixtureField(tournamentId);
-  const clear = useV1ClearFixtureField(tournamentId);
-  const [error, setError] = useState<string | null>(null);
-  const pending = assign.isPending || clear.isPending;
-
-  if (!canAssign) {
-    return <span className="text-[var(--text-body)]">{item.fieldName ?? '미배정'}</span>;
-  }
-
-  const selectId = `field-${item.fixtureId}`;
-  return (
-    <div className="flex flex-col gap-1">
-      {/* 표 헤더가 "필드"라 라벨이 시각적으로 중복된다 — 스크린리더에만 경기까지 밝혀 준다. */}
-      <label className="sr-only" htmlFor={selectId}>
-        {rowLabelFor(item)} 경기장
-      </label>
-      <select
-        id={selectId}
-        value={item.fieldId ?? ''}
-        disabled={pending}
-        onChange={(e) => {
-          setError(null);
-          const next = e.target.value;
-          const onError = (err: unknown) =>
-            setError(extractErrorMessage(err, '경기장을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.'));
-          if (next === '') {
-            clear.mutate({ fixtureId: item.fixtureId }, { onError });
-          } else {
-            assign.mutate({ fixtureId: item.fixtureId, fieldId: next }, { onError });
-          }
-        }}
-        className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-2 text-[length:var(--font-size-label)] text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-      >
-        <option value="">미배정</option>
-        {fields.map((field) => (
-          <option key={field.id} value={field.id}>
-            {field.name}
-          </option>
-        ))}
-      </select>
-      {error !== null && (
-        <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * 표·카드·라벨이 같은 문구를 쓰도록 컴포넌트 밖으로 뺀 경기 이름(팀명은 호출부가 채운다).
- *
- * **리그 행은 `round`·`fixtureNumber` 가 둘 다 `null` 이다** — 그대로 템플릿 리터럴에 넣으면
- * `"null null번"` 이 된다(타입이 non-null 이라 tsc 도 못 잡던 자리다). 값이 없으면 대진
- * 제목으로 대체하고, 그것도 없으면 아무것도 만들어 내지 않는다.
- */
-function rowLabelFor(item: V1TournamentOperationsBoardItem, leagueTitle?: string): string {
-  if (item.round === null || item.fixtureNumber === null) return leagueTitle ?? '경기';
-  return `${competitionFixtureName({ displayTitle: item.displayTitle, groupName: item.groupName, round: item.round, legNumber: item.legNumber })} ${item.fixtureNumber}번`;
-}
+const CONTROL_BUTTON =
+  'inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] font-medium text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 interface Props {
   tournamentId: string;
 }
 
 export function OperationsBoardClient({ tournamentId }: Props) {
-  const { v1Get } = useV1DataSource();
-  const router = useRouter();
   const pathname = usePathname();
-  // 이 화면은 스태프 표면과 어드민 표면 양쪽에서 렌더된다 — 본문 링크도 nav 와 같이
-  // 지금 표면을 따라가야 한다(하드코딩하면 어드민에서 누를 때 스태프 경로로 튕긴다).
+  // 두 표면(어드민·스태프)에서 같이 쓰므로 링크는 지금 표면을 따라간다. 스태프 표면의 콘솔은 돌아올 곳을 쿼리로 안다.
   const liveBase = resolveTournamentLiveBase(pathname, tournamentId);
-  // 스태프 표면(`/tournament-ops`)에서 연 콘솔은 돌아갈 곳이 이 보드라는 걸 콘솔에 알린다. 어드민 표면은 경로만
-  // 보면 출처를 알 수 있어 쿼리를 붙이지 않는다.
-  const consoleOriginQuery = liveBase.startsWith('/admin/') ? '' : '?from=board';
-  const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
-
-  // ── 필터 상태: URL 쿼리를 딥링크 소스로 삼되, 화면 자체는 로컬 상태로 즉시 반응한다.
-  const [status, setStatus] = useState<V1GameState | undefined>(() =>
-    readFilter(searchParams.get('status'), V1_GAME_STATES),
-  );
-  const [fieldId, setFieldId] = useState<string | undefined>(() => searchParams.get('fieldId') ?? undefined);
-  const [warning, setWarning] = useState<V1TournamentStableWarningCode | undefined>(() =>
-    readFilter(searchParams.get('warning'), V1_STABLE_WARNING_CODES),
-  );
-  const [olderItems, setOlderItems] = useState<V1TournamentOperationsBoardItem[]>([]);
-  const [olderLiveWarnings, setOlderLiveWarnings] = useState<V1TournamentOperationsLiveWarning[]>([]);
-  // undefined = "더 보기를 아직 누르지 않음(1페이지 커서를 그대로 따른다)". null/문자열은 마지막으로
-  // 받아온 페이지의 실제 nextCursor다 — null도 "더 이상 다음 페이지 없음"이라는 유효한 값이라
-  // `??`로 1페이지 커서에 되돌아가면(null이 nullish이므로) 마지막 페이지에서도 "더 보기"가 사라지지
-  // 않는 채 같은 커서를 무한 재요청하는 버그가 생긴다 — 그래서 undefined만 오버라이드 부재로 취급한다.
-  const [olderCursor, setOlderCursor] = useState<string | null | undefined>(undefined);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-  const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
-  // ⋯ 시트가 열려 있는 경기(fixtureId). 시트 하나를 모든 행이 공유한다.
-  const [menuFixtureId, setMenuFixtureId] = useState<string | null>(null);
+  const consoleQuery = liveBase.startsWith('/admin/') ? '' : '?from=board';
+  const role = useTournamentOpsRole();
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
-  const [editorHost] = useState<HTMLDivElement | null>(() =>
-    typeof document === 'undefined' ? null : document.createElement('div'),
-  );
-  const desktopEditorSlots = useRef<Record<string, HTMLDivElement | null>>({});
-  const mobileEditorSlots = useRef<Record<string, HTMLDivElement | null>>({});
+  const bundleHeadingId = useId();
 
-  const filters = useMemo(
-    () => ({ status, fieldId, warning, limit: 50 }),
-    [status, fieldId, warning],
-  );
-
-  const board = useV1TournamentOperationsBoard(tournamentId, filters);
+  const board = useOperationsBoardAll(tournamentId);
+  const tournament = useV1Tournament(tournamentId);
   const fields = useV1TournamentFields(tournamentId);
-  const refreshBoard = () => {
+  const staff = useV1TournamentStaffAssignments(tournamentId);
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), CLOCK_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [view, setView] = useState<'timeline' | 'list'>('timeline');
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const [fieldPick, setFieldPick] = useState<string[] | null>(null);
+  const [onlyChecks, setOnlyChecks] = useState(false);
+  const [infoFixtureId, setInfoFixtureId] = useState<string | null>(null);
+
+  const fixturesById = useMemo(() => new Map((tournament.data?.fixtures ?? []).map((f) => [f.id, f] as const)), [tournament.data?.fixtures]);
+  const leagueTitles = useMemo(() => buildLeagueFixtureTitles(tournament.data?.leagueFixtures), [tournament.data?.leagueFixtures]);
+
+  const labelFor = useCallback(
+    (item: V1TournamentOperationsBoardItem) => {
+      const fixture = fixturesById.get(item.fixtureId);
+      let title: string;
+      if (fixture || (item.homeTeamName && item.awayTeamName)) {
+        const home = sideName(item.homeRegistrationId, fixture?.homeTeamName ?? item.homeTeamName, fixture?.homeSlotLabel);
+        const away = sideName(item.awayRegistrationId, fixture?.awayTeamName ?? item.awayTeamName, fixture?.awaySlotLabel);
+        title = `${home} vs ${away}`;
+      } else {
+        title = leagueTitles.get(item.fixtureId) ?? (typeof item.fixtureNumber === 'number' ? `${item.fixtureNumber}번 경기` : '경기');
+      }
+      const subtitle = item.round
+        ? competitionFixtureName({ displayTitle: item.displayTitle, groupName: item.groupName, round: item.round, legNumber: item.legNumber })
+        : '';
+      return { title, subtitle };
+    },
+    [fixturesById, leagueTitles],
+  );
+
+  const staffItems = useMemo(() => staff.data?.items ?? [], [staff.data?.items]);
+  const registeredFields = useMemo(() => fields.data?.items ?? [], [fields.data?.items]);
+
+  const cards = useMemo(() => {
+    const liveWarnings = new Map((board.data?.liveWarnings ?? []).map((entry) => [entry.fixtureId, entry.warnings] as const));
+    return buildBoardCards({ items: board.data?.items ?? [], liveWarnings, labelFor, staff: staffItems, role, now });
+  }, [board.data, labelFor, staffItems, role, now]);
+
+  const todayKey = kstDayKey(now.toISOString());
+  const nowLabel = kstTimeLabel(now.toISOString());
+  const days = useMemo(() => listMatchDays(cards), [cards]);
+  const activeDay = pickedDay !== null && days.includes(pickedDay) ? pickedDay : pickBoardDay(days, todayKey);
+  const dayIndex = activeDay === null ? -1 : days.indexOf(activeDay);
+
+  const columnsAll = useMemo(() => buildFieldColumns(cards, activeDay, registeredFields, staffItems), [cards, activeDay, registeredFields, staffItems]);
+  // 구장 수는 실제 구장만 센다. 구장 미정 열은 골라서 거르는 대상이 아니라 늘 보이고 늘 센다.
+  const fieldColumns = columnsAll.filter((column) => column.key !== NO_FIELD_KEY);
+  const noFieldColumn = columnsAll.find((column) => column.key === NO_FIELD_KEY);
+  const multiPick = isDesktop && fieldColumns.length > MAX_FIELD_COLUMNS;
+  const chipColumns = multiPick ? fieldColumns : columnsAll;
+  const validPick = (fieldPick ?? []).filter((key) => chipColumns.some((column) => column.key === key));
+  const selectedKeys = multiPick
+    ? validPick.length > 0
+      ? validPick
+      : fieldColumns.slice(0, MAX_FIELD_COLUMNS).map((column) => column.key)
+    : validPick.slice(0, 1);
+  const visibleColumns = multiPick
+    ? [...fieldColumns.filter((column) => selectedKeys.includes(column.key)), ...(noFieldColumn ? [noFieldColumn] : [])]
+    : selectedKeys.length === 0
+      ? columnsAll
+      : columnsAll.filter((column) => selectedKeys.includes(column.key));
+  const passesFieldFilter = (card: BoardCard) =>
+    selectedKeys.length === 0 || selectedKeys.includes(card.fieldKey) || (multiPick && card.fieldKey === NO_FIELD_KEY);
+
+  const scopeCards = cards.filter((card) => (card.dayKey === activeDay || card.dayKey === null) && passesFieldFilter(card));
+  const checkCount = scopeCards.filter((card) => card.checks.length > 0).length;
+  const shown = onlyChecks ? scopeCards.filter((card) => card.checks.length > 0) : scopeCards;
+  const dayShown = shown.filter((card) => card.dayKey !== null);
+  const unscheduledShown = shown.filter((card) => card.dayKey === null);
+
+  const dayCards = cards.filter((card) => card.dayKey === activeDay);
+  const endedCount = dayCards.filter((card) => card.state === 'result-pending' || card.state === 'result-done' || card.state === 'result-void').length;
+  const liveCount = dayCards.filter((card) => card.state === 'live').length;
+  const remainingCount = dayCards.filter((card) => card.state === 'scheduled').length;
+
+  const infoCard = infoFixtureId === null ? null : (cards.find((card) => card.fixtureId === infoFixtureId) ?? null);
+  const openInfo = useCallback((card: BoardCard) => setInfoFixtureId(card.fixtureId), []);
+  const renderCard = (card: BoardCard, showField = false) => (
+    <BoardCardView key={card.fixtureId} card={card} liveBase={liveBase} consoleQuery={consoleQuery} showField={showField} onOpenInfo={openInfo} />
+  );
+
+  const isRefreshing = board.isFetching || fields.isFetching || staff.isFetching;
+  const refresh = () => {
     void board.refetch();
     void fields.refetch();
+    void staff.refetch();
+    void tournament.refetch();
   };
-  const tournament = useV1Tournament(tournamentId);
 
-  const role = useTournamentOpsRole();
-  const resultActionLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 정정';
-  const resultPanelLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 편집';
-  const resultCloseLabel = role === 'SUPPORT_READONLY' ? '결과 보기 닫기' : '정정 닫기';
-  const canAssignField = FIELD_ASSIGN_ROLES.includes(role);
-  const allFields = useMemo(() => fields.data?.items ?? [], [fields.data]);
-
-  const teamNamesByFixtureId = useMemo(() => {
-    // 참가팀 공개 정책 통일(fix/v1-publish) — 이 페이지는 GET /tournaments/:id(공개
-    // 상세)를 그대로 쓰므로(useV1Tournament) 타입상 homeTeamName/awayTeamName이
-    // null일 수 있다. 실제로는 이 화면에 접근하는 스태프(TOURNAMENT_DIRECTOR 등,
-    // TournamentOperationsBoardController와 동일하게 대회 전체 단위로 인가됨)는
-    // 항상 실명을 받으므로 null은 이 화면에서 실질적으로 나타나지 않지만, 방어적으로
-    // '미정'으로 표시한다(빈 문자열을 만들어 rowLabel의 "vs" 표기가 깨지지 않도록).
-    const map = new Map<string, { home: string; away: string }>();
-    for (const fixture of tournament.data?.fixtures ?? []) {
-      map.set(fixture.id, { home: fixture.homeTeamName ?? '미정', away: fixture.awayTeamName ?? '미정' });
-    }
-    return map;
-  }, [tournament.data?.fixtures]);
-
-  /* 리그 대진은 `fixtures` 가 아니라 `leagueFixtures` 로 온다 — 리그 거울엔
-     `V1TournamentFixture` 가 0건이라 위 맵은 리그에서 항상 빈다. 제목은 생성 시 이미
-     "N주차 M경기" 로 붙어 있으니 그걸 읽는다. */
-  const leagueTitlesByFixtureId = useMemo(
-    () => buildLeagueFixtureTitles(tournament.data?.leagueFixtures),
-    [tournament.data?.leagueFixtures],
-  );
-
-  /* 소비자용 순위·브래킷 화면(/tournaments/:id/bracket)은 이미 이 스테퍼로 대회
-   * 진행 단계를 보여준다. 운영 보드에는 같은 정보가 표에 흩어져 있어서 스태프가
-   * "지금 대회가 어느 단계인지"를 표를 다 훑어야 알 수 있었다 — 소비자 화면과
-   * 데이터 소스가 같으므로(둘 다 useV1Tournament) 새 API 호출 없이 재사용한다. */
-  const stages = useMemo(() => (tournament.data ? buildTournamentStages(tournament.data) : []), [tournament.data]);
-
-  const liveWarningsByFixtureId = useMemo(() => {
-    const map = new Map<string, readonly V1TournamentOperationsWarningCode[]>();
-    for (const entry of [...(board.data?.liveWarnings ?? []), ...olderLiveWarnings]) {
-      map.set(entry.fixtureId, entry.warnings);
-    }
-    return map;
-  }, [board.data?.liveWarnings, olderLiveWarnings]);
-
-  // 딥링크: 필터가 바뀔 때만 URL을 갱신한다(뒤로가기/공유 가능한 상태).
-  const updateFilters = useCallback(
-    (next: { status?: V1GameState; fieldId?: string; warning?: V1TournamentStableWarningCode }) => {
-      const nextStatus = 'status' in next ? next.status : status;
-      const nextFieldId = 'fieldId' in next ? next.fieldId : fieldId;
-      const nextWarning = 'warning' in next ? next.warning : warning;
-      setStatus(nextStatus);
-      setFieldId(nextFieldId);
-      setWarning(nextWarning);
-      setOlderItems([]);
-      setOlderLiveWarnings([]);
-      setOlderCursor(undefined);
-      setLoadMoreError(null);
-
-      const query = new URLSearchParams();
-      if (nextStatus) query.set('status', nextStatus);
-      if (nextFieldId) query.set('fieldId', nextFieldId);
-      if (nextWarning) query.set('warning', nextWarning);
-      const queryString = query.toString();
-      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
-    },
-    [status, fieldId, warning, pathname, router],
-  );
-
-  const handleLoadMore = useCallback(async () => {
-    const cursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);
-    if (!cursor) return;
-    setLoadingMore(true);
-    setLoadMoreError(null);
-    try {
-      const page = await fetchV1TournamentOperationsBoardPage(queryClient, tournamentId, {
-        ...filters,
-        cursor,
-      }, v1Get);
-      setOlderItems((prev) => [...prev, ...page.items]);
-      setOlderLiveWarnings((prev) => [...prev, ...page.liveWarnings]);
-      setOlderCursor(page.nextCursor);
-    } catch (error) {
-      setLoadMoreError(extractErrorMessage(error, '다음 페이지를 불러오지 못했어요.'));
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [olderCursor, board.data?.nextCursor, queryClient, tournamentId, filters, v1Get]);
-
-  const items = useMemo(() => [...(board.data?.items ?? []), ...olderItems], [board.data?.items, olderItems]);
-  const nextCursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);
-
-  function rowLabel(item: V1TournamentOperationsBoardItem): string {
-    const names = teamNamesByFixtureId.get(item.fixtureId);
-    if (names) return `${names.home} vs ${names.away}`;
-    if (item.homeTeamName && item.awayTeamName) return `${item.homeTeamName} vs ${item.awayTeamName}`;
-    // 리그 행은 팀명 맵이 비고(`fixtures` 가 아니라 `leagueFixtures` 로 온다) 번호도 없다.
-    return rowLabelFor(item, leagueTitlesByFixtureId.get(item.fixtureId));
-  }
-
-  /** 행 버튼의 접근 가능한 이름. 리그 행 제목은 "N주차"라 같은 주의 경기끼리 겹친다 — 일정까지 붙인다. */
-  function rowControlName(item: V1TournamentOperationsBoardItem): string {
-    return item.scheduledAt ? `${rowLabel(item)} ${formatAdminDateTime(item.scheduledAt)}` : rowLabel(item);
-  }
-
-  /* 예전에는 NO_FIELD_ASSIGNED·NO_STAFF_ASSIGNED 를 여기서 통째로 걸러냈다 — 경기장 배정
-   * API 는 백엔드에 있는데 그걸 호출하는 화면이 없어서, 두 경고가 모든 경기에 영구히 켜진
-   * 채 끌 방법이 없었기 때문이다(해소 불가능한 경고가 상시 주황이면 정말 조치가 필요한
-   * 경고까지 묻힌다). 이 화면에 경기장 배정 셀렉트가 생겨 이제 둘 다 **해소 가능한 경고**가
-   * 됐으므로 필터를 제거한다 — 원래 주석이 "배정 UI 가 생기면 되돌린다"고 적어 둔 대로다. */
-  function rowWarnings(item: V1TournamentOperationsBoardItem): readonly V1TournamentOperationsWarningCode[] {
-    const live = liveWarningsByFixtureId.get(item.fixtureId) ?? [];
-    return [...item.warnings, ...live];
-  }
-
-  function toggleCorrection(item: V1TournamentOperationsBoardItem) {
-    if (item.gameId === null) return;
-    setExpandedGameId((current) => (current === item.gameId ? null : item.gameId));
-  }
-
-  /**
-   * ⋯ 시트의 항목. 결과 정정·보기는 제출되거나 확정된 결과가 있는 경기에만 둔다 — 아직 안 치른
-   * 경기에 비활성 버튼을 두면 "왜 못 누르지"만 남는다(F55). 팀별 명단 요약과 명단 화면 링크는 콘솔의
-   * "킥오프 준비"로 옮겼다 — 킥오프를 준비하는 자리가 그곳이다.
-   */
-  function rowActions(item: V1TournamentOperationsBoardItem): ActionSheetAction[] {
-    const actions: ActionSheetAction[] = [];
-    if (canOpenResultCorrection(item)) {
-      actions.push({
-        key: 'result',
-        label: resultActionLabel,
-        description: role === 'SUPPORT_READONLY' ? '제출·확정된 결과를 확인해요' : '제출·확정된 결과를 확인하고 고쳐요',
-        onSelect: () => {
-          setMenuFixtureId(null);
-          toggleCorrection(item);
-        },
-      });
-    }
-    return actions;
-  }
-
-  /** 운영 열/카드의 조작 — 주 버튼은 운영 콘솔 하나, 나머지는 ⋯ 안이다. */
-  function rowMenuButton(item: V1TournamentOperationsBoardItem) {
-    if (rowActions(item).length === 0) return null;
-    return (
-      <button
-        type="button"
-        aria-label={`${rowControlName(item)} 더보기`}
-        aria-haspopup="dialog"
-        onClick={() => setMenuFixtureId(item.fixtureId)}
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-      >
-        <Ellipsis size={18} aria-hidden="true" />
-      </button>
-    );
-  }
-
-  function expandedCorrection(item: V1TournamentOperationsBoardItem) {
-    if (item.gameId === null || expandedGameId !== item.gameId) return null;
-    return (
-      <ExpandedResultPanel
-        key={item.gameId}
-        gameId={item.gameId}
-        tournamentId={tournamentId}
-        isRegularLeague={tournament.data?.kind === 'regular_league'}
-        onSaved={() => void board.refetch()}
-      />
-    );
-  }
-
-  useLayoutEffect(() => {
-    if (!editorHost) return;
-    if (expandedGameId === null) {
-      editorHost.remove();
-      return;
-    }
-    const slot = (isDesktop ? desktopEditorSlots : mobileEditorSlots).current[expandedGameId];
-    if (!slot) {
-      editorHost.remove();
-      return;
-    }
-    if (editorHost.parentElement !== slot) slot.appendChild(editorHost);
-  }, [editorHost, expandedGameId, isDesktop, items]);
-
-  const menuItem = menuFixtureId === null ? null : items.find((item) => item.fixtureId === menuFixtureId) ?? null;
-  const expandedItem = expandedGameId === null ? null : items.find((item) => item.gameId === expandedGameId) ?? null;
-  const expandedEditor =
-    editorHost && expandedItem
-      ? createPortal(
-          <section aria-label={`${rowLabel(expandedItem)} ${resultPanelLabel}`} className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4 md:p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">선택한 경기</p>
-                <h2 className="font-semibold text-[var(--text-strong)]">{rowLabel(expandedItem)}</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExpandedGameId(null)}
-                className="min-h-11 px-3 rounded-lg border border-[var(--border)] text-[length:var(--font-size-body-sm)] text-[var(--text-body)] hover:bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                {resultCloseLabel}
-              </button>
-            </div>
-            {expandedCorrection(expandedItem)}
-          </section>,
-          editorHost,
-        )
-      : null;
+  const loading = board.isPending || tournament.isPending || fields.isPending || staff.isPending;
+  const publicHref = tournament.data?.kind === 'regular_league' ? `/league-matches/${tournamentId}` : `/tournaments/${tournamentId}`;
+  const showStaffHint = staff.isSuccess && !usesFieldStaff(staffItems) && canAssignOperations(role) && cards.length > 0;
+  const phoneColumn = !isDesktop && selectedKeys.length === 1 ? columnsAll.find((column) => column.key === selectedKeys[0]) : undefined;
+  const nowTimeLabel = activeDay !== null && activeDay === todayKey ? nowLabel : null;
+  const eyebrowDay = activeDay === null ? '' : ` · ${formatDayLabel(activeDay)}`;
 
   return (
     <div className="tm-content-enter flex flex-col gap-5">
       <OpsPageHeader
-        tournamentTitle={tournament.data?.title}
+        tournamentTitle={`${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`}
         title="운영 보드"
-        description="경기 진행 상태와 경고를 한눈에 확인해요. 15초마다 자동으로 갱신돼요."
+        description={`끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount} · ${nowLabel} 기준 · 15초마다 새로 고쳐요`}
         action={
-          <button
-            type="button"
-            onClick={refreshBoard}
-            disabled={board.isFetching || fields.isFetching}
-            aria-label="지금 새로고침"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
-          >
-            <RefreshCw size={18} aria-hidden="true" className={board.isFetching || fields.isFetching ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <button type="button" onClick={refresh} disabled={isRefreshing} className={CONTROL_BUTTON}>
+              <RefreshCw size={16} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
+              새로고침
+            </button>
+            <Link href={publicHref} target="_blank" rel="noopener noreferrer" className={CONTROL_BUTTON}>
+              참가자 화면 보기
+              <ExternalLink size={14} aria-hidden="true" />
+              <span className="sr-only">(새 탭에서 열려요)</span>
+            </Link>
+          </div>
         }
       />
 
-      {stages.length > 0 ? (
-        <div className="border-y border-[var(--border)] py-3 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8">
-          <TournamentProgressStepper stages={stages} />
+      {loading ? (
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+          <AdminListSkeleton rows={6} />
         </div>
-      ) : null}
-
-      {/* ── 필터 ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="운영 보드 필터">
-        <label className="sr-only" htmlFor="board-status-filter">
-          경기 상태
-        </label>
-        <select
-          id="board-status-filter"
-          value={status ?? ''}
-          onChange={(e) => updateFilters({ status: (e.target.value || undefined) as V1GameState | undefined })}
-          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
-        >
-          <option value="">전체 상태</option>
-          {V1_GAME_STATES.map((value) => (
-            <option key={value} value={value}>
-              {GAME_STATE_FILTER_LABELS[value]}
-            </option>
-          ))}
-        </select>
-
-        <label className="sr-only" htmlFor="board-field-filter">
-          필드
-        </label>
-        <select
-          id="board-field-filter"
-          value={fieldId ?? ''}
-          onChange={(e) => updateFilters({ fieldId: e.target.value || undefined })}
-          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
-        >
-          <option value="">전체 필드</option>
-          {(fields.data?.items ?? []).map((field) => (
-            <option key={field.id} value={field.id}>
-              {field.name}
-            </option>
-          ))}
-        </select>
-
-        <label className="sr-only" htmlFor="board-warning-filter">
-          경고
-        </label>
-        <select
-          id="board-warning-filter"
-          value={warning ?? ''}
-          onChange={(e) =>
-            updateFilters({ warning: (e.target.value || undefined) as V1TournamentStableWarningCode | undefined })
-          }
-          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
-        >
-          <option value="">전체 경고</option>
-          {/* 예전에는 배지에서 숨긴 경고를 필터에서도 뺐다 — 이제 숨기는 경고가 없으므로
-              전체 코드를 그대로 낸다(rowWarnings 위 주석 참고). */}
-          {V1_STABLE_WARNING_CODES.map((value) => (
-            <option key={value} value={value}>
-              {WARNING_FILTER_LABELS[value]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* ── 목록 ─────────────────────────────────────────────────────── */}
-      {board.isPending ? (
-        <>
-          <div className="hidden lg:block">
-            <AdminTableSkeleton rows={6} cols={5} />
-          </div>
-          <div className="lg:hidden bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
-            <AdminListSkeleton rows={6} />
-          </div>
-        </>
-      ) : board.isError ? (
-        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-[var(--red700)] font-medium">
-            {extractErrorMessage(board.error, '운영 보드를 불러오지 못했어요.')}
-          </p>
-          <button
-            type="button"
-            onClick={refreshBoard}
-            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            다시 시도하기
-          </button>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
-          <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 필터로 다시 확인해 보세요." />
+      ) : board.isError && !board.data ? (
+        <ErrorState message={extractErrorMessage(board.error, '운영 보드를 불러오지 못했어요.')} onRetry={refresh} />
+      ) : cards.length === 0 ? (
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+          <AdminEmpty title="아직 대진이 없어요" description="대진을 만들면 여기에서 경기를 운영해요." />
         </div>
       ) : (
         <>
-          {/* ── 데스크톱 표 (lg+) ────────────────────────────────────── */}
-          <div className="hidden lg:block bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
-            <div className="overflow-x-hidden">
-              <table className="w-full table-fixed text-sm text-[var(--text-body)]">
-                <colgroup>
-                  <col className="w-[17%]" />
-                  <col className="w-[15%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[19%]" />
-                </colgroup>
-                <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      대진
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      일정
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      필드
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      상태
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      결과
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      경고
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
-                      운영
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {items.map((item) => (
-                    <Fragment key={item.fixtureId}>
-                    <tr>
-                      <td className="px-4 py-3 align-middle">
-                        <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
-                        {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
-                        {item.round !== null && item.fixtureNumber !== null ? (
-                          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{competitionFixtureName({ displayTitle: item.displayTitle, groupName: item.groupName, round: item.round, legNumber: item.legNumber })} · {item.fixtureNumber}번 경기</p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 align-middle tabular-nums">
-                        {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <FixtureFieldCell
-                          tournamentId={tournamentId}
-                          item={item}
-                          fields={allFields}
-                          canAssign={canAssignField}
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <GameStateBadge state={item.gameState} />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <FixtureResultCell item={item} />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex flex-wrap gap-1">
-                          {rowWarnings(item).length === 0 ? (
-                            <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>
-                          ) : (
-                            rowWarnings(item).map((code) => <WarningBadge key={code} code={code} />)
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate${consoleOriginQuery}`}
-                            aria-label={`${rowControlName(item)} 운영 콘솔`}
-                            className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                          >
-                            운영 콘솔
-                          </Link>
-                          {rowMenuButton(item)}
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedGameId === item.gameId && item.gameId !== null ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 pb-4">
-                          <div ref={(node) => { desktopEditorSlots.current[item.gameId!] = node; }} />
-                        </td>
-                      </tr>
-                    ) : null}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+          {showStaffHint ? (
+            <p className="flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] px-3 py-2 text-[length:var(--font-size-label)] text-[var(--orange700)]">
+              <TriangleAlert size={16} aria-hidden="true" className="shrink-0" />
+              <span>
+                구장 담당자가 아직 없어요.{' '}
+                <Link href={`${liveBase}/staff`} className="font-semibold underline underline-offset-2">
+                  스태프·구장
+                </Link>
+                에서 배정해요.
+              </span>
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {chipColumns.length > 1 ? (
+              <FieldChips
+                columns={chipColumns}
+                mode={multiPick ? 'multi' : 'single'}
+                selected={selectedKeys}
+                maxSelected={multiPick ? MAX_FIELD_COLUMNS : undefined}
+                onChange={setFieldPick}
+                ariaLabel="구장 고르기"
+              />
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={onlyChecks}
+              onClick={() => setOnlyChecks((on) => !on)}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-[length:var(--font-size-label)] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
+                onlyChecks
+                  ? 'border-[var(--orange500)] bg-[var(--tint-orange)] text-[var(--orange700)]'
+                  : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:bg-[var(--surface-soft)]'
+              }`}
+            >
+              <TriangleAlert size={14} aria-hidden="true" />
+              확인할 것 {checkCount}
+            </button>
+            <div className="ml-auto w-full sm:w-auto sm:min-w-44">
+              <SegmentedTabs
+                role="tablist"
+                ariaLabel="보기 방식"
+                activeId={view}
+                onSelect={(id) => setView(id === 'list' ? 'list' : 'timeline')}
+                items={[
+                  { id: 'timeline', label: '시간표' },
+                  { id: 'list', label: '목록' },
+                ]}
+              />
             </div>
           </div>
 
-          {/* ── 모바일/태블릿 카드 목록 (<lg) ───────────────────────────── */}
-          <ul className="lg:hidden flex flex-col gap-2" role="list">
-            {items.map((item) => (
-              <li
-                key={item.fixtureId}
-                className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-[var(--text-strong)] min-w-0 whitespace-normal break-words">{rowLabel(item)}</p>
-                    <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                      {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
-                          대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
-                      {item.round !== null && item.fixtureNumber !== null
-                        ? `${competitionFixtureName({ displayTitle: item.displayTitle, groupName: item.groupName, round: item.round, legNumber: item.legNumber })} · ${item.fixtureNumber}번 경기 · `
-                        : ''}
-                      {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
-                    </p>
-                    {/* 배정 권한이 있으면 여기서 바로 바꾼다 — 권한이 없으면 배정된 필드만 읽기로
-                        보여주고, 미배정은 아래 경고 배지가 이미 알려주므로 반복하지 않는다. */}
-                    {canAssignField ? (
-                      <div className="mt-2">
-                        <FixtureFieldCell
-                          tournamentId={tournamentId}
-                          item={item}
-                          fields={allFields}
-                          canAssign
-                        />
-                      </div>
-                    ) : item.fieldName ? (
-                      <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">필드 {item.fieldName}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <GameStateBadge state={item.gameState} />
-                    <FixtureResultCell item={item} align="right" />
-                  </div>
-                </div>
-                {rowWarnings(item).length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {rowWarnings(item).map((code) => (
-                      <WarningBadge key={code} code={code} />
-                    ))}
-                  </div>
-                )}
-                <div className="mt-2 flex items-center gap-2">
-                  <Link
-                    href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate${consoleOriginQuery}`}
-                    aria-label={`${rowControlName(item)} 운영 콘솔로 이동`}
-                    className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                  >
-                    운영 콘솔로 이동
-                  </Link>
-                  {rowMenuButton(item)}
-                </div>
-                {expandedGameId === item.gameId && item.gameId !== null ? (
-                  <div ref={(node) => { mobileEditorSlots.current[item.gameId!] = node; }} />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-
-          {nextCursor && (
-            <div className="flex flex-col items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleLoadMore()}
-                disabled={loadingMore}
-                className="h-[44px] px-6 rounded-xl border border-[var(--border)] text-[var(--text-body)] text-sm font-semibold hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-              >
-                {loadingMore ? '불러오는 중…' : '더 보기'}
+          {days.length > 1 && activeDay !== null ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" disabled={dayIndex <= 0} onClick={() => setPickedDay(days[dayIndex - 1])} className={CONTROL_BUTTON}>
+                <ChevronLeft size={16} aria-hidden="true" />
+                이전 경기일
               </button>
-              {loadMoreError && (
-                <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
-                  {loadMoreError}
-                </p>
-              )}
+              <span className="min-w-24 text-center font-semibold tabular-nums text-[var(--text-strong)]">{formatDayLabel(activeDay)}</span>
+              <button type="button" disabled={dayIndex >= days.length - 1} onClick={() => setPickedDay(days[dayIndex + 1])} className={CONTROL_BUTTON}>
+                다음 경기일
+                <ChevronRight size={16} aria-hidden="true" />
+              </button>
+              {days.includes(todayKey) && activeDay !== todayKey ? (
+                <button type="button" onClick={() => setPickedDay(todayKey)} className={CONTROL_BUTTON}>
+                  오늘
+                </button>
+              ) : null}
             </div>
+          ) : null}
+
+          {shown.length === 0 ? (
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+              <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 구장이나 날짜를 골라 보세요." />
+            </div>
+          ) : view === 'list' ? (
+            <OperationsListView
+              cards={[...dayShown, ...unscheduledShown]}
+              isDesktop={isDesktop}
+              liveBase={liveBase}
+              consoleQuery={consoleQuery}
+              onOpenInfo={openInfo}
+            />
+          ) : (
+            <>
+              {isDesktop ? (
+                <OperationsTimeline columns={visibleColumns} cards={dayShown} nowTimeLabel={nowTimeLabel} renderCard={(card) => renderCard(card)} />
+              ) : (
+                <>
+                  {phoneColumn ? (
+                    <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+                      {`${phoneColumn.name} · ${phoneColumn.staffLine}${phoneColumn.expiresLabel === null ? '' : ` · ${phoneColumn.expiresLabel}`} · 경기 ${phoneColumn.count}`}
+                    </p>
+                  ) : null}
+                  <OperationsPhoneList
+                    cards={dayShown}
+                    showField={selectedKeys.length === 0 && columnsAll.length > 1}
+                    nowTimeLabel={nowTimeLabel}
+                    renderCard={renderCard}
+                  />
+                </>
+              )}
+              {unscheduledShown.length > 0 ? (
+                <section aria-labelledby={bundleHeadingId} className="flex flex-col gap-2">
+                  <h2 id={bundleHeadingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+                    시간 미정 {unscheduledShown.length}
+                  </h2>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{unscheduledShown.map((card) => renderCard(card, true))}</div>
+                </section>
+              ) : null}
+            </>
           )}
         </>
       )}
-      <ActionSheet
-        open={menuItem !== null}
-        title={menuItem === null ? '경기 더보기' : `${rowLabel(menuItem)} 더보기`}
-        actions={menuItem === null ? [] : rowActions(menuItem)}
-        onClose={() => setMenuFixtureId(null)}
+
+      <MatchInfoSheet
+        card={infoCard}
+        allCards={cards}
+        fields={registeredFields}
+        canAssignField={canAssignOperations(role)}
+        liveBase={liveBase}
+        consoleQuery={consoleQuery}
+        onClose={() => setInfoFixtureId(null)}
       />
-      {expandedEditor}
     </div>
   );
 }

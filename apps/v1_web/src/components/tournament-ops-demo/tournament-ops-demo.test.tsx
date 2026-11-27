@@ -130,17 +130,20 @@ describe('실제 어드민을 사용하는 공개 대회 체험', () => {
   });
   it('체험 진입은 로그인 없는 공개 경로를 유지한다', () => {
     render(<TournamentOpsDemoEntry />);
-    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
+    expect(screen.getByRole('link', { name: /경기 콘솔 연습하기/ })).toHaveAttribute('href', '/field-console-demo');
   });
   it('실제 관리 셸과 11개 섹션을 샘플 경로 안에서 제공한다', async () => {
     const network = vi.spyOn(globalThis, 'fetch');
     render(<TournamentOpsDemo><TournamentOverviewSection /></TournamentOpsDemo>);
     expect(await screen.findByRole('heading', { name: 'Teameet 파트너컵 · 샘플' })).toBeInTheDocument();
     const menu = screen.getByRole('navigation', { name: '대회 관리 섹션' });
-    const links = within(menu).getAllByRole('link');
-    expect(links).toHaveLength(11);
-    for (const link of links) expect(link.getAttribute('href')).toMatch(/^\/tournament-ops-demo\//);
-    expect(within(menu).getByRole('link', { name: '신청 관리 4' })).toHaveAttribute('href', '/tournament-ops-demo/registrations');
+    const tabs = within(menu).getAllByRole('link');
+    expect(tabs).toHaveLength(5);
+    await userEvent.click(within(menu).getByRole('button', { name: /더보기/ }));
+    const more = within(await screen.findByRole('dialog', { name: '더보기' })).getAllByRole('link');
+    expect(more).toHaveLength(6);
+    for (const link of [...tabs, ...more]) expect(link.getAttribute('href')).toMatch(/^\/tournament-ops-demo\//);
+    expect(within(menu).getByRole('link', { name: '신청 4' })).toHaveAttribute('href', '/tournament-ops-demo/registrations');
     expect(network).not.toHaveBeenCalled();
   });
   it('실제 신청 관리에서 참가 확정하고 다시 열어 복원한다', async () => {

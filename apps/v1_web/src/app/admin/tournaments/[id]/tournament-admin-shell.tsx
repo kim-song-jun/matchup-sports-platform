@@ -1,115 +1,33 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import {
-  AdminPageHeader,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { AdminSectionNav, type AdminSectionNavGroup } from '@/components/admin/admin-section-nav';
+import { AdminTabNav } from '@/components/admin/admin-tab-nav';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
-import { useConfirm, type ConfirmOptions } from '@/components/v1-ui/confirm-modal';
+import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import {
   useV1AdminMe,
   useV1AdminTournament,
   useV1ChangeTournamentStatus,
+  useV1UpdateTournamentVisibility,
 } from '@/hooks/use-v1-api';
-import type { V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { canWriteTournamentAdmin, deriveTournamentAdminRole, type TournamentAdminRole } from '@/lib/admin-tournament-role';
-import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
+import { useTournamentOpsAccess } from './tournament-ops-quick-links';
 import { TournamentAdminProvider } from './tournament-admin-context';
-import {
-  TOURNAMENT_STATUS_LABEL,
-  allowedNextStatuses,
-  revertTargetStatus,
-  REVERT_COPY,
-  formatDateRange,
-} from './tournament-admin-shared';
+import { REVERT_COPY, formatDateRange, revertTargetStatus } from './tournament-admin-shared';
+import { TournamentDetailHeader } from './tournament-detail-header';
+import { buildTournamentNav } from './tournament-nav-model';
+import { buildTournamentSetupItems, requiredSetupLabels } from './tournament-overview-model';
+import { TournamentStatusMenu } from './tournament-status-menu';
+import { primaryStatusAction, statusConfirmOptions, type StatusAction } from './tournament-status-model';
 import { useAdminListReturnHref } from '../../use-admin-url-list-query';
-import { TournamentVisibilityControl } from '@/components/admin/tournaments/tournament-visibility-control';
-
-/**
- * 대회 상세 섹션 구획.
- *
- * 예전에는 탭 10개가 한 줄에 나란히 있어, 매일 여러 번 쓰는 운영 작업(신청·대진)과
- * 대회 시작 전 한 번 세팅하는 노출 작업(협찬·팝업·캠페인)이 같은 무게로 섞여 있었다.
- * 성격별로 묶고, 각 섹션을 하위 라우트로 분리해 딥링크·뒤로가기가 동작하게 한다.
- */
-type CountKey = 'registrations' | 'fixtures' | 'announcements';
-
-interface SectionItem {
-  slug: string;
-  label: string;
-  /** 플랫폼 어드민 화면에만 둔다 — 대회 스태프(담당 대회 관리) 셸에서는 그리지 않는다. */
-  platformOnly?: boolean;
-  /** 탭 옆 숫자에 쓰이는 operationCounts 키. 없으면 숫자를 그리지 않는다. */
-  countKey?: CountKey;
-  /**
-   * 대회 셸 밖으로 나가는 항목의 링크를 만든다. 없으면 `${basePath}/${slug}` 를 쓴다.
-   * 팝업처럼 전역 화면 하나로 통합된 기능은 여기서 목적지를 지정한다 — 목록에서 빼버리면
-   * 운영자가 그 대회의 팝업을 어디서 만드는지 알 길이 없다.
-   */
-  externalHref?: (tournamentId: string) => string;
-}
-
-const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
-  {
-    label: '운영',
-    items: [
-      { slug: 'overview', label: '개요' },
-      { slug: 'info', label: '대회 정보' },
-      { slug: 'registrations', label: '신청 관리', countKey: 'registrations' },
-      { slug: 'bracket', label: '대진 관리', countKey: 'fixtures' },
-      { slug: 'announcements', label: '공지', countKey: 'announcements' },
-      { slug: 'discipline', label: '징계 현황', platformOnly: true },
-    ],
-  },
-  {
-    label: '노출',
-    items: [
-      { slug: 'sponsors', label: '협찬' },
-      {
-        slug: 'popups',
-        label: '팝업',
-        externalHref: (tournamentId) =>
-          `/admin/content?tab=popups&targetPath=${encodeURIComponent(`/tournaments/${tournamentId}`)}`,
-      },
-      { slug: 'campaign', label: '캠페인' },
-    ],
-  },
-  {
-    label: '사후',
-    items: [
-      { slug: 'reviews', label: '리뷰 관리' },
-      { slug: 'awards', label: '시상' },
-      { slug: 'statistics', label: '통계' },
-    ],
-  },
-];
-
-const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>> = {
-  closed: {
-    title: '접수를 마감할까요?',
-    message: '새 참가 신청을 더 받지 않아요. 필요하면 다시 접수를 열 수 있어요.',
-    confirmLabel: '접수 마감하기',
-  },
-  in_progress: {
-    title: '대회를 시작할까요?',
-    message: '대진표와 경기 일정을 먼저 확인해 주세요. 실제 시작한 경기가 없으면 접수 마감으로 되돌릴 수 있어요.',
-    confirmLabel: '대회 시작하기',
-  },
-  completed: {
-    title: '대회를 완료할까요?',
-    message: '완료하면 시상과 후기가 열리고 참가팀에 후기 요청 알림이 가요. 모든 경기 결과가 확정됐는지 먼저 확인해 주세요. 잘못 눌러도 진행 중으로 되돌릴 수 있어요.',
-    confirmLabel: '대회 완료하기',
-    tone: 'danger',
-  },
-};
 
 export function TournamentAdminShell({ id, children }: { id: string; children: ReactNode }) {
   const { data: adminMe } = useV1AdminMe();
@@ -130,6 +48,8 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
+  const updateVisibility = useV1UpdateTournamentVisibility(id);
+  const opsAccess = useTournamentOpsAccess({ tournamentId: id, staffSurface, basePath: navigation?.operationsBasePath });
   const [revertOpen, setRevertOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const { toasts, showToast } = useAdminToast();
@@ -139,32 +59,6 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   const adminListHref = useAdminListReturnHref('/admin/tournaments');
   const listHref = navigation?.listHref ?? (staffSurface ? '/tournament-management' : adminListHref);
   const basePath = navigation?.basePath ?? `${staffSurface ? '/tournament-management/tournaments' : '/admin/tournaments'}/${id}`;
-
-  // ── Status change ────────────────────────────────────────────────────
-  const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
-    // 취소는 사유를 남기는 공용 확인 게이트를 거친다.
-    if (nextStatus === 'cancelled') {
-      setCancelOpen(true);
-      return;
-    }
-    // 마감·시작·완료는 모바일에서 오탭하면 참가팀 전체에 바로 반영된다(2026-10 알파 실측: 확인 없이 즉시 실행).
-    const forwardConfirm = STATUS_CHANGE_CONFIRM[nextStatus];
-    if (forwardConfirm && !(await confirmStatusChange(forwardConfirm))) return;
-    changeStatus.mutate(
-      { status: nextStatus },
-      {
-        onSuccess: (res) => {
-          if (res.alreadyInStatus) {
-            showToast('이미 이 상태예요.', 'success');
-          } else {
-            showToast('상태를 변경했어요.', 'success');
-          }
-        },
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error'),
-      },
-    );
-  };
 
   const onConfirmRevert = (reason: string) => {
     const target = tournament ? revertTargetStatus(tournament.status, tournament.canRevertStart === true) : null;
@@ -209,104 +103,116 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
     );
   }
 
-  const nextStatuses = allowedNextStatuses(tournament.status);
-  const revertCopy = revertTargetStatus(tournament.status, tournament.canRevertStart === true) ? REVERT_COPY[tournament.status] : undefined;
-  const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
+  const isPublic = tournament.isPublic ?? true;
+  const canRevertStart = tournament.canRevertStart === true;
+  const requiredLabels = requiredSetupLabels(buildTournamentSetupItems(tournament, new Date(), basePath));
   const counts = tournament.operationCounts;
-  const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
-    label: group.label,
-    items: group.items.filter((item) => !(staffSurface && item.externalHref) && !((staffSurface || navigation !== undefined) && item.platformOnly === true)).map((item) => ({
-      slug: item.slug,
-      label: item.label,
-      count: item.countKey ? counts?.[item.countKey] : undefined,
-      externalHref: navigation?.localPopups ? undefined : item.externalHref?.(id),
-      externalNote: item.externalHref && !navigation?.localPopups ? '전역 팝업 화면으로 이동' : undefined,
-    })),
-  }));
+  const revertCopy = revertTargetStatus(tournament.status, canRevertStart) ? REVERT_COPY[tournament.status] : undefined;
+
+  const handleStatusAction = async (action: StatusAction) => {
+    // 취소·되돌리기는 사유를 남기는 공용 확인 게이트를 거친다.
+    if (action.kind === 'cancel') {
+      setCancelOpen(true);
+      return;
+    }
+    if (action.kind === 'revert') {
+      setRevertOpen(true);
+      return;
+    }
+    // 마감·시작·완료는 모바일에서 오탭하면 참가팀 전체에 바로 반영된다(2026-10 알파 실측: 확인 없이 즉시 실행).
+    const confirmOptions = statusConfirmOptions(action, { isPublic, requiredLabels });
+    if (confirmOptions && !(await confirmStatusChange(confirmOptions))) return;
+    changeStatus.mutate(
+      { status: action.target },
+      {
+        onSuccess: (res) => {
+          showToast(res.alreadyInStatus ? '이미 이 상태예요.' : '상태를 변경했어요.', 'success');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleToggleVisibility = (next: boolean) => {
+    updateVisibility.mutate(
+      { isPublic: next },
+      {
+        onSuccess: () => showToast('공개 상태를 저장했어요.', 'success'),
+        onError: (err) => showToast(extractErrorMessage(err, '공개 상태를 저장하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  const primary = canWrite ? primaryStatusAction(tournament.status, { canRevertStart }) : null;
+
+  // 경기가 생기기 전에는 현장 운영이 머리에 없고 ⋯ 메뉴 안에 있다. 접근 판정은 스태프 배정 조회 하나라 둘이 같이 잠긴다.
+  const showLiveOpsInHeader = (counts?.fixtures ?? 0) > 0;
+  const opsAction = (key: string, label: string, path: string): ActionSheetAction =>
+    opsAccess.reasonLabel
+      ? { key, label, disabled: true, disabledReason: opsAccess.reasonLabel, onSelect: () => {} }
+      : { key, label, href: `${opsAccess.base}/${path}` };
+  const moreActions: ActionSheetAction[] = [
+    ...(showLiveOpsInHeader ? [] : [opsAction('live-ops', '현장 운영', 'operations')]),
+    opsAction('staff', '스태프 배정', 'staff'),
+  ];
+
+  const nav = buildTournamentNav({
+    id,
+    status: tournament.status,
+    staffSurface,
+    restricted: navigation !== undefined,
+    localPopups: navigation?.localPopups === true,
+    counts,
+  });
+
+  const meta = [
+    tournament.venue?.trim() || '장소 미정',
+    tournament.scheduledAt ? formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt) : '일정 미정',
+    `${tournament.teamCount}팀`,
+  ].join(' · ');
 
   return (
     <TournamentAdminProvider value={{ tournamentId: id, basePath, role, canWrite, showToast }}>
-      {/* ── Back link ─────────────────────────────────────────────────── */}
-      <div className="mb-4">
-        <Link
-          href={listHref}
-          className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-          대회 목록으로
-        </Link>
-      </div>
-
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
-      <AdminPageHeader
-        eyebrow={staffSurface ? '담당 대회 관리' : '플랫폼 · 대회'}
+      <TournamentDetailHeader
         title={tournament.title}
-        description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
+        meta={meta}
+        listHref={listHref}
+        statusMenu={
+          <TournamentStatusMenu
+            status={tournament.status}
+            isPublic={isPublic}
+            canWrite={canWrite}
+            canRevertStart={canRevertStart}
+            visibilityPending={updateVisibility.isPending}
+            statusPending={changeStatus.isPending}
+            onStatusAction={(action) => void handleStatusAction(action)}
+            onToggleVisibility={handleToggleVisibility}
+          />
+        }
+        primaryAction={
+          primary
+            ? {
+                label: primary.label,
+                // 초안에서 채워야 할 필요 설정이 남았으면 흰 버튼 — 막지는 않고 확인 창이 항목을 경고한다.
+                emphasis: tournament.status === 'draft' && requiredLabels.length > 0 ? 'secondary' : 'primary',
+                busy: changeStatus.isPending,
+                onClick: () => void handleStatusAction(primary),
+              }
+            : undefined
+        }
+        liveOps={showLiveOpsInHeader ? { href: `${opsAccess.base}/operations`, reasonLabel: opsAccess.reasonLabel } : undefined}
+        moreActions={moreActions}
       />
 
-      {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
-      {/* #5: forward transitions = solid blue (primary); 취소하기 = outline red-text (not solid) */}
-      {canWrite && nextStatuses.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-5">
-          {nextStatuses.map((s) => {
-            const isDestructive = s === 'cancelled';
-            const label =
-              s === 'open' ? '접수 시작하기' :
-              s === 'closed' ? '접수 마감하기' :
-              s === 'in_progress' ? '대회 시작하기' :
-              s === 'completed' ? '대회 완료하기' :
-              s === 'cancelled' ? '취소하기' :
-              `${TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경`;
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => handleStatusChange(s)}
-                disabled={changeStatus.isPending}
-                className={[
-                  'inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold',
-                  'transition-colors disabled:opacity-50',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap',
-                  isDestructive
-                    ? 'text-[var(--red700)] border border-[var(--tint-red-border)] bg-transparent hover:bg-[var(--red50)]'
-                    : 'text-white bg-blue-500 hover:bg-blue-600',
-                ].join(' ')}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <AdminTabNav
+        ariaLabel="대회 관리 섹션"
+        tabs={nav.tabs}
+        more={{ label: '더보기', groups: nav.more }}
+        basePath={basePath}
+        pathname={pathname}
+      />
 
-      {canWrite && revertCopy && (
-        <div className="flex flex-wrap gap-2 mb-5">
-          <button
-            type="button"
-            onClick={() => setRevertOpen(true)}
-            disabled={changeStatus.isPending}
-            className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold whitespace-nowrap text-[var(--text-strong)] border border-[var(--border)] bg-transparent hover:bg-[var(--surface-soft)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            {revertCopy.button}
-          </button>
-        </div>
-      )}
-
-      {/* 공개 설정 — 비공개면 일반 사용자 화면에서 숨고 관리자 운영은 그대로다(리그와 같은 카드). */}
-      <TournamentVisibilityControl canWrite={canWrite} tournamentId={id} isPublic={tournament.isPublic ?? true} status={tournament.status} />
-
-      {/* ── Tournament-ops quick links: 이 관리자 콘솔 섹션들과 별개인 대회 현장 운영
-          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
-          권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
-      <TournamentOpsQuickLinks tournamentId={id} staffSurface={staffSurface} basePath={navigation?.operationsBasePath} />
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-        {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}
-        <AdminSectionNav ariaLabel="대회 관리 섹션" groups={navGroups} basePath={basePath} pathname={pathname} />
-
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+      <div className="mt-6 min-w-0">{children}</div>
 
       {/* 상태 변경 확인과 사유 필수 게이트 */}
       {StatusConfirmModal}

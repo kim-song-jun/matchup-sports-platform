@@ -110,7 +110,7 @@ describe('StaffClient', () => {
     mocks.importFieldPlacesMutate.mockImplementation((_body, options) => options.onSuccess({ addedCount: 2, existingCount: 1 }));
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
-    const heading = screen.getByRole('heading', { name: '경기장(필드)' });
+    const heading = screen.getByRole('heading', { name: '구장' });
     expect(heading.querySelector('.tm-section-title')).toHaveClass('tm-section-title-compact');
     expect(heading.parentElement).toHaveClass('min-w-0', 'flex-1');
     expect(screen.getAllByText('디렉터윤')[0].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -151,7 +151,7 @@ describe('StaffClient', () => {
       expect(container).not.toBeNull();
       const texts = Array.from(container!.querySelectorAll('p')).map((p) => p.textContent?.trim());
       expect(texts[0]).toBe('디렉터윤');
-      expect(texts[1]).toBe('대회 디렉터');
+      expect(texts[1]).toBe('대회 운영자');
     }
   });
 
@@ -178,8 +178,8 @@ describe('StaffClient', () => {
 
     await user.click(screen.getByRole('button', { name: '스태프 배정' }));
     const optionLabels = optionLabelsOf(screen.getByLabelText('역할'));
-    expect(optionLabels).toEqual(['필드 담당자', '지원(조회 전용)']);
-    expect(optionLabels).not.toContain('대회 디렉터');
+    expect(optionLabels).toEqual(['구장 담당자', '지원(보기만)']);
+    expect(optionLabels).not.toContain('대회 운영자');
 
     // director row(assignment-director)에는 해제 버튼이 없어야 하고, field operator row에는 있어야 한다.
     expect(screen.queryAllByRole('button', { name: '해제' })).toHaveLength(1);
@@ -192,7 +192,7 @@ describe('StaffClient', () => {
 
     await user.click(screen.getByRole('button', { name: '스태프 배정' }));
     const optionLabels = optionLabelsOf(screen.getByLabelText('역할'));
-    expect(optionLabels).toEqual(['대회 디렉터', '필드 담당자', '지원(조회 전용)']);
+    expect(optionLabels).toEqual(['대회 운영자', '구장 담당자', '지원(보기만)']);
 
     expect(screen.queryAllByRole('button', { name: '해제' })).toHaveLength(2);
   });
@@ -220,7 +220,7 @@ describe('StaffClient', () => {
 
   /* 종전에는 담당 필드를 안 고르면 제출 버튼이 조용히 잠겨 있었다 — 왜 안 눌리는지
      알 방법이 없었다. 이제 버튼은 눌리고, 막힌 이유를 해요체로 말해 준다. */
-  it('필드 담당자 배정에서 담당 필드를 안 고르면 이유를 알려주고 배정 요청은 나가지 않는다', async () => {
+  it('구장 담당자 배정에서 담당 구장을 안 고르면 이유를 알려주고 배정 요청은 나가지 않는다', async () => {
     setRole('PLATFORM_OPS');
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
@@ -230,10 +230,10 @@ describe('StaffClient', () => {
     await pickCandidate(user, '이승민');
     await user.click(screen.getByRole('button', { name: '배정하기' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('필드 담당자는 담당 경기장을 골라야 해요.');
+    expect(screen.getByRole('alert')).toHaveTextContent('구장 담당자는 담당 구장을 골라야 해요.');
     expect(mocks.grantMutate).not.toHaveBeenCalled();
 
-    await user.selectOptions(screen.getByLabelText(/담당 필드/), 'field-1');
+    await user.selectOptions(screen.getByLabelText(/담당 구장/), 'field-1');
     await user.click(screen.getByRole('button', { name: '배정하기' }));
 
     expect(mocks.grantMutate).toHaveBeenCalledTimes(1);
@@ -254,7 +254,7 @@ describe('StaffClient', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('마이페이지 → “담당 대회 운영”에서');
 
     await user.selectOptions(screen.getByLabelText('역할'), 'FIELD_OPERATOR');
-    await user.selectOptions(screen.getByLabelText(/담당 필드/), 'field-1');
+    await user.selectOptions(screen.getByLabelText(/담당 구장/), 'field-1');
     await pickCandidate(user, '이승민');
     mocks.grantMutate.mockImplementation((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess());
     await user.click(screen.getByRole('button', { name: '배정하기' }));
@@ -277,7 +277,7 @@ describe('StaffClient', () => {
   });
 
   describe('정규 리그의 대회 디렉터 배정 안내', () => {
-    const LEAGUE_DIRECTOR_NOTICE = '리그에서 디렉터는 운영 보드만 볼 수 있어요. 결과 입력·확정은 운영자가 해요.';
+    const LEAGUE_DIRECTOR_NOTICE = '리그에서 대회 운영자는 운영 보드만 볼 수 있어요. 결과 입력·확정은 플랫폼 운영자가 해요.';
 
     it('정규 리그에서 대회 디렉터를 고르면 할 수 있는 일의 한계를 배정 전에 알려 준다', async () => {
       setRole('PLATFORM_OPS');
@@ -395,14 +395,14 @@ describe('StaffClient', () => {
 
   /* #373 — 프론트에 필드 생성 호출부가 없어 필드가 영영 0건이었고, 그래서
      필드 담당자 배정을 끝낼 수 없었다. 등록 경로와 "왜 막혔는지" 안내가 이 화면의 계약이다. */
-  it('플랫폼 운영자가 경기장을 등록하면 입력한 이름으로 생성 요청이 나간다', async () => {
+  it('플랫폼 운영자가 구장을 등록하면 입력한 이름으로 생성 요청이 나간다', async () => {
     setRole('PLATFORM_OPS');
     mocks.fieldsResult.mockReturnValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
 
-    await user.type(screen.getByLabelText('경기장 이름'), 'A구장');
-    await user.click(screen.getByRole('button', { name: '경기장 추가' }));
+    await user.type(screen.getByLabelText('구장 이름'), 'A구장');
+    await user.click(screen.getByRole('button', { name: '구장 추가' }));
 
     // 등록 전에 경기장 이름을 확인한다.
     expect(mocks.createFieldMutate).not.toHaveBeenCalled();
@@ -416,22 +416,22 @@ describe('StaffClient', () => {
    * 같은 이름으로 두 번 등록하지 않도록 클라이언트와 서버의 기준을 맞춘다. 클라이언트
    * 단계에서 이름 중복(대소문자·앞뒤 공백 무시)을 먼저 막아 그 사고 지점을 없앤다.
    */
-  it('이미 있는 이름(대소문자·공백만 다름)으로는 경기장을 등록할 수 없다', async () => {
+  it('이미 있는 이름(대소문자·공백만 다름)으로는 구장을 등록할 수 없다', async () => {
     setRole('PLATFORM_OPS');
     mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: 'A구장' }] } });
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
 
-    await user.type(screen.getByLabelText('경기장 이름'), '  a구장  ');
+    await user.type(screen.getByLabelText('구장 이름'), '  a구장  ');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('이미 같은 이름의 경기장이 있어요');
-    expect(screen.getByRole('button', { name: '경기장 추가' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('이미 같은 이름의 구장이 있어요');
+    expect(screen.getByRole('button', { name: '구장 추가' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: '경기장 추가' }));
+    await user.click(screen.getByRole('button', { name: '구장 추가' }));
     expect(mocks.createFieldMutate).not.toHaveBeenCalled();
   });
 
-  it('등록된 경기장이 없으면 필드 담당자 배정이 왜 막혔는지 알려주고 제출을 잠근다', async () => {
+  it('등록된 구장이 없으면 구장 담당자 배정이 왜 막혔는지 알려주고 제출을 잠근다', async () => {
     setRole('PLATFORM_OPS');
     mocks.fieldsResult.mockReturnValue({ data: { items: [] } });
     const user = userEvent.setup();
@@ -444,7 +444,7 @@ describe('StaffClient', () => {
     const modal = screen.getByRole('dialog');
     // 이유를 문구로 알려준다(색만으로 상태를 전달하지 않는다)
     // select 의 빈 option 에도 같은 문구가 있으므로, 도움말 문단(aria-describedby)만 겨냥한다
-    const fieldSelect = within(modal).getByLabelText(/담당 필드/);
+    const fieldSelect = within(modal).getByLabelText(/담당 구장/);
     const helpId = fieldSelect.getAttribute('aria-describedby');
     expect(helpId).toBeTruthy();
     expect(document.getElementById(helpId!)?.textContent).toMatch(/먼저 등록해 주세요/);
@@ -454,7 +454,7 @@ describe('StaffClient', () => {
     // (배정 대상은 골라 둔다 — 검증 순서상 대상이 먼저라 비워 두면 그 사유가 먼저 나온다)
     await pickCandidate(user, '이승민');
     await user.click(within(modal).getByRole('button', { name: '배정하기' }));
-    expect(within(modal).getByRole('alert')).toHaveTextContent('등록된 경기장이 없어');
+    expect(within(modal).getByRole('alert')).toHaveTextContent('등록된 구장이 없어');
     expect(mocks.grantMutate).not.toHaveBeenCalled();
   });
 });

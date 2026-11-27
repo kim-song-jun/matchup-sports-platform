@@ -1869,9 +1869,7 @@ export type V1TeamMatchApplicationsPage = {
 // ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
 
 export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
-// `V1GameState`는 아래 Task 18 블록에 `V1_GAME_STATES` 상수와 함께 선언돼 있다.
-// 머지 과정에서 양쪽 브랜치가 각각 같은 유니온을 추가해 중복 선언(TS2300)이
-// 발생했으므로, 문서 주석과 상수를 함께 갖춘 쪽만 단일 정의로 남긴다.
+// `V1GameState`는 아래 Task 18 블록에 한 번만 선언돼 있다 — 같은 유니온을 다시 선언하면 TS2300 이다.
 export type V1GameResultRevisionState =
   | 'DRAFT'
   | 'SUBMITTED'
@@ -5711,8 +5709,6 @@ export type V1PublicKakaoMapsKeyResponse = {
 /** V1Game.state — Task 18 board가 읽는 실제 상태 컬럼(V1TournamentFixture.status 아님). */
 export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
 
-export const V1_GAME_STATES: readonly V1GameState[] = ['SCHEDULED', 'LIVE', 'PAUSED', 'ENDED', 'CANCELLED'];
-
 /** 대회 운영 스태프 역할. `PLATFORM_OPS`는 배정 행이 아니라 어드민 테이블에서 유래한다. */
 export type V1TournamentStaffRole = 'PLATFORM_OPS' | 'TOURNAMENT_DIRECTOR' | 'FIELD_OPERATOR' | 'SUPPORT_READONLY';
 
@@ -5732,12 +5728,6 @@ export type V1TournamentTimeRelativeWarningCode =
   | 'LINEUP_NOT_SUBMITTED'
   | 'RESULT_REVIEW_OVERDUE';
 export type V1TournamentOperationsWarningCode = V1TournamentStableWarningCode | V1TournamentTimeRelativeWarningCode;
-
-/** `?warning=` 필터는 안정(시간 무관) 코드만 받는다 — 서버가 시간 의존 코드는 400으로 거부한다. */
-export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] = [
-  'NO_FIELD_ASSIGNED',
-  'MISSING_SCORER',
-];
 
 /** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
 export type V1TournamentOperationsBoardItem = {
@@ -5793,14 +5783,6 @@ export type V1TournamentOperationsBoardPage = {
   nextCursor: string | null;
   watermark: string;
   liveWarnings: V1TournamentOperationsLiveWarning[];
-};
-
-export type V1TournamentOperationsBoardFilters = {
-  cursor?: string;
-  status?: V1GameState;
-  fieldId?: string;
-  warning?: V1TournamentStableWarningCode;
-  limit?: number;
 };
 
 /** GET /tournament-ops/tournaments/:tournamentId/staff 응답의 items[] 항목. */

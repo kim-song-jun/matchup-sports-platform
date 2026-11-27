@@ -8,6 +8,8 @@ import {
   Clock,
   UserX,
   ShieldAlert,
+  Hourglass,
+  Ban,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type {
@@ -45,9 +47,9 @@ function Pill({ tone, icon, label }: { tone: Tone; icon: ReactNode; label: strin
 
 const GAME_STATE_META: Record<V1GameState, { label: string; tone: Tone; icon: ReactNode }> = {
   SCHEDULED: { label: '예정', tone: 'gray', icon: <CalendarClock size={12} aria-hidden="true" /> },
-  LIVE: { label: '진행 중', tone: 'green', icon: <CircleDot size={12} aria-hidden="true" /> },
+  LIVE: { label: '진행 중', tone: 'blue', icon: <CircleDot size={12} aria-hidden="true" /> },
   PAUSED: { label: '일시중지', tone: 'amber', icon: <PauseCircle size={12} aria-hidden="true" /> },
-  ENDED: { label: '종료', tone: 'blue', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
+  ENDED: { label: '끝남', tone: 'gray', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
   CANCELLED: { label: '취소됨', tone: 'red', icon: <XCircle size={12} aria-hidden="true" /> },
 };
 
@@ -57,6 +59,30 @@ export function GameStateBadge({ state }: { state: V1GameState | null }) {
   }
   const meta = GAME_STATE_META[state];
   return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
+}
+
+/** 운영 보드 카드의 상태 — 경기 상태에 결과 확정 단계를 더한 말. */
+export type BoardCardState = 'scheduled' | 'live' | 'result-pending' | 'result-done' | 'result-void' | 'cancelled';
+
+const BOARD_CARD_STATE_META: Record<BoardCardState, { label: string; tone: Tone; icon: ReactNode }> = {
+  scheduled: { label: '예정', tone: 'gray', icon: <CalendarClock size={12} aria-hidden="true" /> },
+  live: { label: '진행 중', tone: 'blue', icon: <CircleDot size={12} aria-hidden="true" /> },
+  'result-pending': { label: '결과 확정 대기', tone: 'amber', icon: <Hourglass size={12} aria-hidden="true" /> },
+  'result-done': { label: '결과 확정됨', tone: 'green', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
+  'result-void': { label: '결과 무효', tone: 'red', icon: <Ban size={12} aria-hidden="true" /> },
+  cancelled: { label: '취소됨', tone: 'red', icon: <XCircle size={12} aria-hidden="true" /> },
+};
+
+export function BoardCardStateBadge({ state }: { state: BoardCardState }) {
+  const meta = BOARD_CARD_STATE_META[state];
+  return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
+}
+
+/** 결과 화면 목록 줄의 배지. 보드 카드의 「결과 확정 대기·결과 확정됨」과 같은 색·아이콘이다. */
+export function ResultListBadge({ kind }: { kind: 'pending' | 'confirmed' | 'void' }) {
+  if (kind === 'confirmed') return <Pill tone="green" icon={<CheckCircle2 size={12} aria-hidden="true" />} label="확정됨" />;
+  if (kind === 'void') return <Pill tone="red" icon={<Ban size={12} aria-hidden="true" />} label="결과 무효" />;
+  return <Pill tone="amber" icon={<Hourglass size={12} aria-hidden="true" />} label="확정 대기" />;
 }
 
 const PUBLIC_FIXTURE_STATE: Readonly<Record<string, V1GameState>> = {
@@ -76,15 +102,15 @@ export function PublicFixtureStateBadge({ status }: { status: string }) {
 }
 
 // ── 운영 보드 경고 배지 ────────────────────────────────────────────────────
-/* 경고 코드 → 한글 라벨의 단일 출처. 결과 검토·정정 화면(fixture-picker-list)도 이걸 쓴다.
+/* 경고 코드 → 한글 라벨의 단일 출처.
  * MISSING_SCORER 는 서버에서 "골에 득점자가 지정되지 않음"(V1GameResultRevision.missingScorer)을
  * 뜻한다 — 예전 라벨 '기록자 없음'은 기록 담당 스태프가 없다는 뜻으로 읽혀서, 운영자가
  * 존재하지도 않는 '기록자' 역할을 배정하려 헤매고 정작 득점자 누락은 방치됐다. */
 export const WARNING_LABELS: Record<V1TournamentOperationsWarningCode, string> = {
-  NO_FIELD_ASSIGNED: '경기장 미배정',
+  NO_FIELD_ASSIGNED: '구장 미배정',
   MISSING_SCORER: '득점자 미기재',
   RESULT_REVIEW_OVERDUE: '검토 기한 초과',
-  NO_STAFF_ASSIGNED: '담당자 미배정',
+  NO_STAFF_ASSIGNED: '구장 담당자 없음',
   LINEUP_NOT_SUBMITTED: '라인업 미제출',
 };
 
@@ -104,9 +130,9 @@ export function WarningBadge({ code }: { code: V1TournamentOperationsWarningCode
 // ── 스태프 역할 라벨 ───────────────────────────────────────────────────────
 export const STAFF_ROLE_LABELS: Record<V1TournamentStaffRole, string> = {
   PLATFORM_OPS: '플랫폼 운영자',
-  TOURNAMENT_DIRECTOR: '대회 디렉터',
-  FIELD_OPERATOR: '필드 담당자',
-  SUPPORT_READONLY: '지원(조회 전용)',
+  TOURNAMENT_DIRECTOR: '대회 운영자',
+  FIELD_OPERATOR: '구장 담당자',
+  SUPPORT_READONLY: '지원(보기만)',
 };
 
 export function staffRoleLabel(role: V1TournamentStaffRole): string {

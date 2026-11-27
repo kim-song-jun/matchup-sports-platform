@@ -296,7 +296,19 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
           {shown.length === 0 ? (
             <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
-              <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 구장이나 날짜를 골라 보세요." />
+              {onlyChecks ? (
+                <AdminEmpty
+                  title="확인할 것이 없어요"
+                  description="이 날짜·구장에서는 따로 챙길 경기가 없어요."
+                  action={
+                    <button type="button" onClick={() => setOnlyChecks(false)} className={CONTROL_BUTTON}>
+                      모든 경기 보기
+                    </button>
+                  }
+                />
+              ) : (
+                <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 구장이나 날짜를 골라 보세요." />
+              )}
             </div>
           ) : view === 'list' ? (
             <OperationsListView

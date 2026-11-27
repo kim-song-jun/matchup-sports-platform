@@ -357,7 +357,13 @@ describe('OperationsBoardClient — 확인할 것과 목록', () => {
     await screen.findByRole('columnheader', { name: /구장 1/ });
 
     await user.click(screen.getByRole('button', { name: '확인할 것 0' }));
-    expect(screen.getByText('조건에 맞는 경기가 없어요')).toBeInTheDocument();
+
+    // 원인은 구장·날짜가 아니라 방금 켠 「확인할 것」이라, 그 토글을 풀 길을 준다.
+    expect(screen.getByText('확인할 것이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 경기가 없어요')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '모든 경기 보기' }));
+    expect(screen.getByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인할 것 0' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('목록 보기는 구장 열 머리와 행마다 할 일 하나를 준다', async () => {

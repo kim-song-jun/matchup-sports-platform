@@ -7,12 +7,14 @@ export interface ConsoleScoreCardProps {
   readonly scoreBySideId: ReadonlyMap<string, number>;
   readonly foulCounts: Record<string, number>;
   readonly foulThreshold: number;
-  /** 「전반 팀 파울」처럼 어느 경기 시간의 숫자인지까지 담은 이름. null 이면 팀 파울을 그리지 않는다. */
-  readonly foulPeriodLabel: string | null;
-  readonly foulResetNote: string | null;
-  readonly stateLabel: string;
+  /** 팀 파울 줄의 이름. 어느 경기 시간의 숫자인지는 단계 줄이 말한다. null 이면 팀 파울을 그리지 않는다. */
+  readonly foulLabel: string | null;
+  /** 상태 배지. 경기가 정상으로 흐르는 동안은 시계·단계 줄이 말하므로 null 로 숨긴다. */
+  readonly stateLabel: string | null;
   readonly clock: ReactNode;
   readonly penaltyChip: ReactNode | null;
+  /** 점수 아래 진행 단계 줄. */
+  readonly progress: ReactNode | null;
   readonly caption: ReactNode | null;
   readonly footer: ReactNode | null;
   readonly stickyClass: string;
@@ -26,22 +28,23 @@ export function ConsoleScoreCard({
   scoreBySideId,
   foulCounts,
   foulThreshold,
-  foulPeriodLabel,
-  foulResetNote,
+  foulLabel,
   stateLabel,
   clock,
   penaltyChip,
+  progress,
   caption,
   footer,
   stickyClass,
   overlay,
 }: ConsoleScoreCardProps) {
   const [left, right] = sides;
+  const chipRowVisible = stateLabel !== null || clock !== null || penaltyChip !== null;
 
   const teamColumn = (side: GameSide, align: 'start' | 'end') => {
     const sideWord = side.sideKey === 'HOME' ? '홈' : '원정';
     const fouls = foulCounts[side.id] ?? 0;
-    const warning = foulPeriodLabel !== null && fouls >= foulThreshold;
+    const warning = foulLabel !== null && fouls >= foulThreshold;
     return (
       <div
         role="group"
@@ -56,7 +59,7 @@ export function ConsoleScoreCard({
         >
           {side.displayNameSnapshot}
         </span>
-        {foulPeriodLabel !== null ? (
+        {foulLabel !== null ? (
           <span
             className={`flex items-center gap-1 whitespace-nowrap text-[length:var(--font-size-caption)] tabular-nums ${
               warning ? 'font-bold text-[var(--orange700)]' : 'text-[var(--text-body)]'
@@ -64,7 +67,7 @@ export function ConsoleScoreCard({
           >
             {warning ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
             <span>
-              {foulPeriodLabel} {fouls}
+              {foulLabel} {fouls}
             </span>
           </span>
         ) : null}
@@ -99,17 +102,21 @@ export function ConsoleScoreCard({
           {right !== undefined ? teamColumn(right, 'end') : <span />}
         </div>
       )}
-      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border)] pt-2">
-        <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">
-          {stateLabel}
-        </span>
-        {clock}
-        {penaltyChip}
+      <div className="mt-2 flex flex-col gap-2 border-t border-[var(--border)] pt-2">
+        {progress}
+        {chipRowVisible ? (
+          <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+            {stateLabel !== null ? (
+              <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">
+                {stateLabel}
+              </span>
+            ) : null}
+            {clock}
+            {penaltyChip}
+          </div>
+        ) : null}
       </div>
       {caption !== null ? <div className="mt-2">{caption}</div> : null}
-      {foulResetNote !== null ? (
-        <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{foulResetNote}</p>
-      ) : null}
       {footer !== null ? <div className="mt-3">{footer}</div> : null}
       {overlay}
     </header>

@@ -20,11 +20,11 @@ function renderCard(overrides: Partial<ComponentProps<typeof ConsoleScoreCard>> 
       scoreBySideId={new Map([['side-home', 2], ['side-away', 1]])}
       foulCounts={{ 'side-home': 2, 'side-away': 3 }}
       foulThreshold={5}
-      foulPeriodLabel="전반 팀 파울"
-      foulResetNote="후반에는 0부터 다시 세요"
+      foulLabel="팀 파울"
       stateLabel="진행 중"
-      clock={<span>전반 12:31</span>}
+      clock={<span>12:31</span>}
       penaltyChip={null}
+      progress={null}
       caption={null}
       footer={null}
       stickyClass="top-[52px] lg:top-0"
@@ -55,9 +55,9 @@ describe('ConsoleScoreCard', () => {
     const [home, away] = screen.getAllByRole('group');
     expect(within(home).getByText('홈')).toBeInTheDocument();
     expect(within(home).getByText('QA0929 마포 FC')).toBeInTheDocument();
-    expect(within(home).getByText('전반 팀 파울 2')).toBeInTheDocument();
+    expect(within(home).getByText('팀 파울 2')).toBeInTheDocument();
     expect(within(away).getByText('원정')).toBeInTheDocument();
-    expect(within(away).getByText('전반 팀 파울 3')).toBeInTheDocument();
+    expect(within(away).getByText('팀 파울 3')).toBeInTheDocument();
   });
 
   it('긴 팀 이름은 자르지 않고 줄바꿈한다', () => {
@@ -79,21 +79,32 @@ describe('ConsoleScoreCard', () => {
     expect(away.querySelector('svg')).toBeNull();
   });
 
-  it('단판이면 「경기 팀 파울」', () => {
-    renderCard({ foulPeriodLabel: '경기 팀 파울', foulResetNote: null });
-    expect(screen.getByText('경기 팀 파울 2')).toBeInTheDocument();
-    expect(screen.queryByText(/0부터 다시 세요/)).toBeNull();
-  });
-
-  it('다음 경기 시간이 있으면 재시작 안내', () => {
+  it('팀 파울 줄에는 구간 이름이 없다 — 구간은 단계 줄이 말한다', () => {
     renderCard();
-    expect(screen.getByText('후반에는 0부터 다시 세요')).toBeInTheDocument();
+    expect(screen.getAllByText(/^팀 파울 \d+$/)).toHaveLength(2);
+    expect(screen.queryByText(/전반|후반|0부터/)).toBeNull();
   });
 
-  it('foulPeriodLabel 이 null 이면(경기 중이 아님) 팀 파울을 그리지 않는다', () => {
-    renderCard({ foulPeriodLabel: null, foulResetNote: null });
+  it('foulLabel 이 null 이면(경기 중이 아님) 팀 파울을 그리지 않는다', () => {
+    renderCard({ foulLabel: null });
     expect(screen.queryByText(/팀 파울/)).toBeNull();
     expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+  });
+
+  it('stateLabel 이 null 이면 상태 배지는 없고 시계는 그대로 있다', () => {
+    renderCard({ stateLabel: null });
+    const card = screen.getByRole('banner');
+    expect(within(card).queryByText('진행 중')).toBeNull();
+    expect(within(card).getByText('12:31')).toBeInTheDocument();
+  });
+
+  it('단계 줄은 점수 아래·시계 위에 놓인다', () => {
+    renderCard({ progress: <ol aria-label="경기 진행 단계"><li>전반</li></ol> });
+    const steps = screen.getByRole('list', { name: '경기 진행 단계' });
+    const score = screen.getByText('2 : 1');
+    const clock = screen.getByText('12:31');
+    expect(score.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(steps.compareDocumentPosition(clock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('상태 칩·시계·승부차기 칩·단계 문구·바닥 링크를 한 카드 안에 둔다', () => {
@@ -106,7 +117,7 @@ describe('ConsoleScoreCard', () => {
     expect(card).toHaveAttribute('data-console-guide', 'overview');
     expect(card).toHaveClass('sticky', 'z-10', 'top-[52px]', 'lg:top-0');
     expect(within(card).getByText('진행 중')).toBeInTheDocument();
-    expect(within(card).getByText('전반 12:31')).toBeInTheDocument();
+    expect(within(card).getByText('12:31')).toBeInTheDocument();
     expect(within(card).getByText('승부차기 4:3')).toBeInTheDocument();
     expect(within(card).getByText('하프타임이에요.')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: '결과 보내기' })).toBeInTheDocument();
@@ -118,7 +129,7 @@ describe('ConsoleScoreCard', () => {
   });
 
   it('사이드를 아직 못 받았으면 「경기 콘솔」과 상태만 보인다', () => {
-    renderCard({ sides: [], scoreBySideId: new Map(), foulPeriodLabel: null, foulResetNote: null, stateLabel: '시작 전', clock: null });
+    renderCard({ sides: [], scoreBySideId: new Map(), foulLabel: null, stateLabel: '시작 전', clock: null });
     expect(screen.getByText('경기 콘솔')).toBeInTheDocument();
     expect(screen.getByText('시작 전')).toBeInTheDocument();
     expect(screen.queryByLabelText(/스코어/)).toBeNull();

@@ -98,6 +98,16 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:45:00.000Z', pausedTotalMs: 0, pausedAt: null,
   };
 
+  /** 점수 카드의 진행 단계 줄 — 단계 이름(스크린리더용 포함)과 지금 단계. */
+  function stages() {
+    const list = screen.getByRole('list', { name: '경기 진행 단계' });
+    return {
+      names: within(list).getAllByRole('listitem').map((item) => item.textContent),
+      current: list.querySelector('[aria-current="step"]')?.textContent ?? null,
+      penalty: list.querySelector('[data-step-state="conditional"]')?.textContent ?? null,
+    };
+  }
+
   function tiedGoal(sequence: number, sideId: string, id: string): GameEventRecord {
     return {
       id, gameId: 'game-1', sequence, clientEventId: `client-${sequence}`, payloadHash: 'hash',
@@ -216,8 +226,11 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    expect(screen.getByText(/정규 시간이 무승부로 끝났어요/)).toBeInTheDocument();
+    expect(screen.getByText('무승부예요. 승부차기 결과를 입력해 주세요.')).toBeInTheDocument();
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    // 단계 줄도 같은 말을 한다 — 승부차기가 지금 단계다.
+    expect(stages()).toMatchObject({ current: '승부차기', penalty: null });
+    expect(stages().names).toEqual(['전반', '하프타임', '후반', '승부차기', '종료']);
   });
 
   // 요구사항 4 — 아직 정규 시간이 끝나지 않은 예외 종료 경로(하프타임 중
@@ -244,6 +257,8 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
     // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+    // 단계 줄은 승부차기를 「동점이면」 조건부 단계로 남겨 두고 지금은 하프타임이다.
+    expect(stages()).toMatchObject({ current: '하프타임', penalty: '승부차기(동점이면)' });
   });
 
   it('[MD-QA #180] 비동점 결선 경기의 더보기 종료 액션은 경고 없이 사용할 수 있다', () => {
@@ -337,6 +352,8 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+    // 조별 경기에는 승부차기 단계가 처음부터 없다.
+    expect(stages().names).toEqual(['전반', '하프타임', '후반', '종료']);
   });
 
   it('동점이 아니면 knockout 경기여도 "승부차기 시작"이 보이지 않는다', () => {
@@ -345,6 +362,9 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+    // 정규가 동점이 아니게 끝났으니 일어나지 않은 승부차기 단계는 단계 줄에서 빠지고 종료가 지금이다.
+    expect(stages()).toMatchObject({ current: '종료' });
+    expect(stages().names).toEqual(['전반', '하프타임', '후반', '종료']);
   });
 
   it('현행 대회 경기(TEAM_MATCH)도 결선 무승부면 "승부차기 시작"이 보이고 일반 종료는 막힌다', () => {

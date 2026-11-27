@@ -302,7 +302,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
     });
     mountOrdinaryConsole(finishedPeriods);
 
-    expect(screen.getByText(/정규 시간이 끝났어요/)).toBeInTheDocument();
+    expect(screen.getByText(/기록을 확인한 뒤 결과를 보내 주세요\./)).toBeInTheDocument();
     expect(screen.queryByText(/‘경기 종료’를 눌러주세요/)).not.toBeInTheDocument();
     const resultLink = screen.getByRole('link', { name: '결과 제출 화면 열기' });
     expect(resultLink).toHaveAttribute(

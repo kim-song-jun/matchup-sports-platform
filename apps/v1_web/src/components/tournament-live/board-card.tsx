@@ -45,6 +45,27 @@ function footerText(card: BoardCard): string {
   return card.subtitle;
 }
 
+interface CardActionLinkProps {
+  card: BoardCard;
+  action: CardAction;
+  liveBase: string;
+  consoleQuery: string;
+}
+
+/** 카드·목록 행이 쓰는 할 일 버튼 하나. 이름에 경기 제목을 붙여 같은 문구끼리 구분한다. */
+export function CardActionLink({ card, action, liveBase, consoleQuery }: CardActionLinkProps) {
+  return (
+    <Link
+      href={actionHref(action, card, liveBase, consoleQuery)}
+      aria-label={`${card.title} ${action.label}`}
+      className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[length:var(--font-size-label)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${ACTION_TONE[action.emphasis]}`}
+    >
+      {ACTION_ICON[action.kind]}
+      {action.label}
+    </Link>
+  );
+}
+
 interface BoardCardViewProps {
   card: BoardCard;
   liveBase: string;
@@ -60,7 +81,7 @@ export function BoardCardView({ card, liveBase, consoleQuery, showField = false,
   const score = item.currentRevisionState === 'OFFICIAL' ? readGameResultScore(item.currentScore) : null;
   const topLine = [
     card.timeLabel ?? '시간 미정',
-    item.fixtureNumber === null ? null : `${item.fixtureNumber}번 경기`,
+    typeof item.fixtureNumber === 'number' ? `${item.fixtureNumber}번 경기` : null,
     showField ? (card.fieldName ?? '구장 미정') : null,
   ]
     .filter((part): part is string => part !== null)
@@ -104,16 +125,7 @@ export function BoardCardView({ card, liveBase, consoleQuery, showField = false,
         >
           {text}
         </span>
-        {action ? (
-          <Link
-            href={actionHref(action, card, liveBase, consoleQuery)}
-            aria-label={`${card.title} ${action.label}`}
-            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[length:var(--font-size-label)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${ACTION_TONE[action.emphasis]}`}
-          >
-            {ACTION_ICON[action.kind]}
-            {action.label}
-          </Link>
-        ) : null}
+        {action ? <CardActionLink card={card} action={action} liveBase={liveBase} consoleQuery={consoleQuery} /> : null}
       </div>
     </article>
   );

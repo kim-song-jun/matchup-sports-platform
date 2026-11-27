@@ -1,3 +1,4 @@
+import { bracketBranchOrder } from './bracket-branch-order';
 import { byeRound } from './tournament-bracket-rounds';
 import type { V1TournamentFixture, V1TournamentGroup, V1TournamentGroupTeam } from '@/types/api';
 
@@ -64,6 +65,10 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     }
     ordered.forEach((node, index) => rank.set(node.id, roundIndex * 1000 + index));
   });
+  const entryOrder = rounds.map(round => nodes.filter(node => node.round === round.key)
+    .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!).map(node => node.id));
+  bracketBranchOrder(entryOrder, edges).forEach((column, i) =>
+    column.forEach((id, j) => rank.set(id, i * 1000 + j)));
   // Partial connections keep the existing shared canvas. A single assigned
   // bye must not move unlinked rounds below the connected branches or make
   // two next-round cards share the height of consecutive bye slots.
@@ -84,8 +89,7 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     });
     return { nodes, edges, height };
   }
-  // Stored entry order is canonical. Connections determine the centres of
-  // later rounds, never silently reorder the first-round matches/byes.
+  // Estimate the centre of each match from the ordered feeder cards.
   let cursor = 0;
   for (const node of [...nodes].filter((candidate) => !edges.some((edge) => edge.target === candidate.id))
     .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!)) {

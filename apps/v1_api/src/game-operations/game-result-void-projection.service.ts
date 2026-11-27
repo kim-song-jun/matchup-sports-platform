@@ -57,7 +57,12 @@ export class GameResultVoidProjectionService {
   private readonly leagueCompletion = new LeagueCompletionProjectionService();
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
-    const revision = await this.lockVoidRevision(tx, this.revisionId(claim.payload));
+    await this.projectInTransaction(tx, this.revisionId(claim.payload));
+  };
+
+  async projectInTransaction(tx: Prisma.TransactionClient, revisionId: string): Promise<void> {
+    const revision = await this.lockVoidRevision(tx, revisionId);
+    if (revision === null) return;
     // A delayed void job must not hide or undo a newer official correction.
     if (revision.currentOfficialRevisionId !== revision.revisionId) return;
     if (revision.supersedesId === null) {
@@ -80,7 +85,7 @@ export class GameResultVoidProjectionService {
     );
     await this.writeWatermarks(tx, revision, teamIds);
     await this.settleLeagueIfNeeded(tx, revision);
-  };
+  }
 
   /**
    * 무효 처리된 대진이 리그 소속이면 그 리그의 완료 판정을 다시 돌린다.
@@ -111,7 +116,7 @@ export class GameResultVoidProjectionService {
   private async lockVoidRevision(
     tx: Prisma.TransactionClient,
     revisionId: string,
-  ): Promise<LockedVoidRevisionRow> {
+  ): Promise<LockedVoidRevisionRow | null> {
     const rows = await tx.$queryRaw<Array<Omit<OfficialRevisionRowRaw, 'officialAt'> & {
       state: string;
       officialAt: Date | null;
@@ -136,6 +141,13 @@ export class GameResultVoidProjectionService {
       where: { id: normalized.teamMatchId },
       select: { deletedAt: true },
     });
+    if (match?.deletedAt && normalized.currentOfficialRevisionId === revisionId) {
+      const applied = await tx.v1ProjectionWatermark.findFirst({ where: {
+        projection: 'PUBLIC_OFFICIAL_RESULT', entityType: 'GAME', entityId: normalized.gameId,
+        revisionId, sourceHash: normalized.sourceHash, status: 'APPLIED',
+      } });
+      if (applied) return null;
+    }
     if (match === null || match.deletedAt !== null) {
       throw new Error('CANONICAL_MATCH_REQUIRED');
     }

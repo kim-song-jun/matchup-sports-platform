@@ -2101,6 +2101,7 @@ export type V1DecideGameResultRevisionPayload = {
 };
 
 export type V1GameRevisionMutationResult = {
+  replacement?: { fixtureId: string; gameId: string };
   gameId: string;
   state: V1GameState;
   version: number;
@@ -5952,6 +5953,8 @@ export type V1AdminRosterEligibleMembersResponse = {
 };
 
 export interface V1CreateBracketByePayload {
+  targetFixtureId?: string;
+  targetSide?: 'HOME' | 'AWAY';
   groupId: string;
   byeId?: string;
   registrationId?: string | null;

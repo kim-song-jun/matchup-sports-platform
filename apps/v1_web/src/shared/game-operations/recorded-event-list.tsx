@@ -148,7 +148,7 @@ export function RecordedEventList({
   if (events.length === 0) {
     return (
       <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
-        아직 기록된 이벤트가 없어요.
+        아직 기록이 없어요.
       </p>
     );
   }
@@ -290,7 +290,7 @@ export function RecordedEventList({
     <>
     <ul
       className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
-      aria-label="기록된 이벤트 목록"
+      aria-label="기록 목록"
     >
       {orderedEvents.map((listedEvent) => {
         // 경고 누적 퇴장이면 이 줄은 레드이고, `mergedYellow` 가 그 레드가 흡수한 두 번째 옐로다.

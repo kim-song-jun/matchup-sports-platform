@@ -96,7 +96,7 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
 
   function renderedClocks(order?: 'chronological' | 'newest-first') {
     render(<RecordedEventList events={EVENTS} sides={SIDES} lineups={LINEUPS} order={order} />);
-    return within(screen.getByRole('list', { name: '기록된 이벤트 목록' }))
+    return within(screen.getByRole('list', { name: '기록 목록' }))
       .getAllByRole('listitem')
       .map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1]);
   }
@@ -112,7 +112,7 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
   it('maxRows=4 이면 최신 4줄만, 생략하면 전부', () => {
     const six = [1, 2, 3, 4, 5, 6].map((sequence) => goal(sequence, HOME_SIDE_ID, 'p-jung', sequence * 60000));
     const clocks = () =>
-      within(screen.getByRole('list', { name: '기록된 이벤트 목록' }))
+      within(screen.getByRole('list', { name: '기록 목록' }))
         .getAllByRole('listitem')
         .map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1]);
 
@@ -154,7 +154,7 @@ describe('RecordedEventList', () => {
     const reset: GameEventRecord = { ...first, id: 'reset', sequence: 2, type: 'CORRECTION',
       reversesEventId: first.id, payload: { reason: '경기 시작 취소', commandId: 'cmd' } };
     const view = render(<RecordedEventList events={[first, reset]} sides={SIDES} lineups={LINEUPS} />);
-    expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
+    expect(screen.getByText('아직 기록이 없어요.')).toBeInTheDocument();
     view.rerender(<RecordedEventList events={[first, reset, goal(3, HOME_SIDE_ID, 'p-jung', 300)]} sides={SIDES} lineups={LINEUPS} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
@@ -167,7 +167,7 @@ describe('RecordedEventList', () => {
       />,
     );
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
     // UX 감사 item 4 — "N피리어드/전반/후반/P" 세 가지 표기가 섞여 있던 걸
     // "전반/후반"으로 통일했다(`period-label.ts`). 이 헬퍼는 period: 2로
@@ -236,7 +236,7 @@ describe('RecordedEventList', () => {
       />,
     );
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('파울');
     expect(rows[0]).toHaveTextContent('취소된 기록');
@@ -267,7 +267,7 @@ describe('RecordedEventList', () => {
       // 증분 수신 직후처럼 원본의 clockMs 가 아직 옛 값(11분)이어도 정정 행의 시각이 이긴다.
       render(<RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
 
-      const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+      const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
       expect(rows).toHaveLength(1);
       expect(rows[0]).toHaveTextContent('후반 9:00');
       expect(rows[0]).not.toHaveTextContent('후반 11:00');
@@ -363,7 +363,7 @@ describe('RecordedEventList', () => {
       />,
     );
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('강남 풋살 클럽');
     expect(rows[0]).not.toHaveTextContent('정우진');
     expect(rows[0]).not.toHaveTextContent('·');
@@ -375,14 +375,14 @@ describe('RecordedEventList', () => {
   it('선수 없는 자책골은 OG로 표시한다', () => {
     const ownGoal = { ...goal(1, HOME_SIDE_ID, null, 60000), type: 'OWN_GOAL' as const, payload: { anonymous: true } };
     render(<RecordedEventList events={[ownGoal]} sides={SIDES} lineups={LINEUPS} />);
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('자책골 · OG');
+    expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('자책골 · OG');
   });
 
   it('shows an empty state instead of an empty list when nothing is recorded yet', () => {
     render(<RecordedEventList events={[]} sides={SIDES} lineups={LINEUPS} />);
 
-    expect(screen.queryByRole('list', { name: '기록된 이벤트 목록' })).toBeNull();
-    expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '기록 목록' })).toBeNull();
+    expect(screen.getByText('아직 기록이 없어요.')).toBeInTheDocument();
   });
 
   /**
@@ -398,7 +398,7 @@ describe('RecordedEventList', () => {
     };
     render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
 
-    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    const row = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem')[0];
     expect(row).toHaveTextContent('시각 미상');
     expect(row).not.toHaveTextContent('후반');
     expect(row).not.toHaveTextContent('0:00');
@@ -411,7 +411,7 @@ describe('RecordedEventList', () => {
     };
     render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
 
-    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    const row = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem')[0];
     expect(row).toHaveTextContent('71:00');
     expect(row).not.toHaveTextContent('후반');
   });
@@ -425,7 +425,7 @@ describe('RecordedEventList', () => {
     };
     render(<RecordedEventList events={[live]} sides={SIDES} lineups={LINEUPS} />);
 
-    expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0])
+    expect(within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem')[0])
       .toHaveTextContent('후반 71:00');
   });
 
@@ -436,7 +436,7 @@ describe('RecordedEventList', () => {
       payload: { card: 'YELLOW' },
     };
     render(<RecordedEventList events={[yellowCard]} sides={SIDES} lineups={LINEUPS} />);
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('옐로카드');
+    expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('옐로카드');
   });
 
   it('assistParticipantId가 없는 GOAL 이벤트에는 "+ 어시스트" 버튼이 뜬다', () => {
@@ -484,7 +484,7 @@ describe('RecordedEventList', () => {
         ]}
       />,
     );
-    const row = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    const row = screen.getByRole('list', { name: '기록 목록' });
     expect(row).toHaveTextContent('교체');
     expect(row).toHaveTextContent('9 조현우 → 10 정우진');
   });
@@ -610,7 +610,7 @@ describe('RecordedEventList — 운영진 실명', () => {
     ];
     render(<RecordedEventList events={[goal(1, HOME_SIDE_ID, 'p-jung', 60000)]} sides={SIDES} lineups={lineups} />);
 
-    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('listitem');
+    const row = within(screen.getByRole('list', { name: '기록 목록' })).getByRole('listitem');
     expect(row).toHaveTextContent(text);
     // 이름이 길어져도 두 줄에서 자르지 않는다.
     expect(screen.getByText(text, { exact: true }).closest('p')).not.toHaveClass('line-clamp-2');
@@ -626,7 +626,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     period,
     payload: { card: color },
   });
-  const rowsOf = () => within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+  const rowsOf = () => within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
 
   it('두 번째 옐로와 레드를 한 줄로 합치고 첫 옐로는 그대로 둔다', () => {
     render(
@@ -729,7 +729,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
       />,
     );
 
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(screen.getByRole('list', { name: '기록 목록' })).not.toHaveTextContent('경고 누적 퇴장');
     expect(rowsOf()).toHaveLength(5);
   });
 
@@ -752,7 +752,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
 
     const rows = rowsOf();
     expect(rows).toHaveLength(4);
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(screen.getByRole('list', { name: '기록 목록' })).not.toHaveTextContent('경고 누적 퇴장');
     expect(rows[2]).toHaveTextContent('레드카드');
     expect(rows[2]).toHaveTextContent('취소된 기록');
   });
@@ -775,7 +775,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
       />,
     );
 
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
+    expect(screen.getByRole('list', { name: '기록 목록' })).not.toHaveTextContent('경고 누적 퇴장');
     expect(rowsOf()).toHaveLength(3);
   });
 

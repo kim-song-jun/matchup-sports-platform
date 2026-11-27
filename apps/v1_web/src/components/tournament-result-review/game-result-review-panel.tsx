@@ -317,7 +317,7 @@ export function GameResultReviewPanel({
       ) : null}
 
       {/* 경기 세부 기록 — 종류·시점·팀·선수·도움. 승인 버튼보다 위에 둔다(근거를
-          먼저 보고 결정하게). "아직 기록된 이벤트가 없어요"(RecordedEventList의
+          먼저 보고 결정하게). "아직 기록이 없어요"(RecordedEventList의
           빈 상태)와 "불러오지 못했어요"(아래 ErrorState + 다시 시도)를 절대 같은
           화면으로 뭉개지 않는다 — 조회 실패를 미기록으로 오인하면 검토자가 근거
           없이 승인해 버린다. */}

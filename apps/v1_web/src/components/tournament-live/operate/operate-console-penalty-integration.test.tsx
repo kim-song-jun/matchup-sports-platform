@@ -184,7 +184,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
       operationMode: 'tournament-leased',
       takeoverEnabled: canEdit,
     }));
-    const events = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    const events = screen.getByRole('list', { name: '기록 목록' });
     expect(within(events).getAllByRole('listitem')).toHaveLength(1);
     if (canEdit) {
       expect(within(events).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();

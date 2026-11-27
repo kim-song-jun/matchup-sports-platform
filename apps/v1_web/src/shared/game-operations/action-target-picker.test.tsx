@@ -126,8 +126,8 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         />,
       );
 
-      expect(screen.getByRole('button', { name: '정우진 선수 이벤트 기록, 퇴장' })).toHaveTextContent('퇴장');
-      expect(screen.getByRole('button', { name: '조현우 선수 이벤트 기록' })).not.toHaveTextContent('퇴장');
+      expect(screen.getByRole('button', { name: '정우진 선수로 기록, 퇴장' })).toHaveTextContent('퇴장');
+      expect(screen.getByRole('button', { name: '조현우 선수로 기록' })).not.toHaveTextContent('퇴장');
       unmount();
     }
   });
@@ -258,7 +258,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         onCancel={onCancel}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: '이벤트 기록 취소' }));
+    await userEvent.click(screen.getByRole('button', { name: '기록 그만두기' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onCommit).not.toHaveBeenCalled();
   });

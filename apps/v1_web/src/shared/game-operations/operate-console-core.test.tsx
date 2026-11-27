@@ -399,7 +399,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
   it('서버에 확정된 이벤트를 보여준다 — 로컬 큐가 비어 있어도', () => {
     render(<CoreHarness />);
 
-    const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    const list = screen.getByRole('list', { name: '기록 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(list).toHaveTextContent('정우진');
   });
@@ -470,7 +470,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     );
     render(<CoreHarness />);
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
     expect(screen.getByRole('heading', { name: /^최근 기록/ })).toHaveTextContent('최신순');
   });
@@ -484,7 +484,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     );
     render(<CoreHarness />);
 
-    expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: '기록 목록' })).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
   });
 
   // MD-QA #187 -- 기록 "수정" 시트: 시각 정정은 콘솔 커맨드 경로(ops.correctEventTime)로 간다.
@@ -494,7 +494,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     testFixtures.operations.mockReturnValue(ops);
     render(<CoreHarness />);
 
-    fireEvent.click(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: '기록 고치기 (골)' }));
+    fireEvent.click(within(screen.getByRole('list', { name: '기록 목록' })).getByRole('button', { name: '기록 고치기 (골)' }));
     const dialog = await screen.findByRole('dialog', { name: '골 기록 고치기' });
     expect(within(dialog).getByText(/정우진/)).toBeInTheDocument();
 
@@ -524,7 +524,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [goal(1), correction] }));
     render(<CoreHarness />);
 
-    const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    const list = screen.getByRole('list', { name: '기록 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(list).toHaveTextContent('후반 5:00');
     expect(within(list).getByRole('button', { name: /고친 기록/ })).toBeInTheDocument();
@@ -580,7 +580,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
   it('takeover가 비활성화되면 기록 조회만 허용한다', () => {
     render(<CoreHarness takeoverEnabled={false} operatorScopeKey="readonly-operator" />);
 
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('정우진');
+    expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('정우진');
     expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
     expect(screen.queryByRole('button', { name: '고치기' })).toBeNull();
   });
@@ -610,7 +610,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     expect(statusRow()).toHaveAttribute('role', 'alert');
     expect(statusRow()).toHaveTextContent('기록 1개를 보내지 못했어요');
     // 서버 로그는 그대로 남아 있어야 한다 — 큐가 그것을 대체하지 않는다.
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '기록 목록' })).toBeInTheDocument();
 
     const sheet = openStatusSheet();
     expect(within(sheet).getByText('이벤트를 기록하지 못했어요.')).toBeInTheDocument();
@@ -634,7 +634,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
     expect(within(openStatusSheet()).queryByText('보낼 기록')).toBeNull();
     // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
-    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '기록 목록' })).toBeInTheDocument();
   });
 });
 
@@ -1572,7 +1572,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('group', { name: '기록하기' })).toBeNull();
       expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
       expect(screen.queryByText(/팀 파울/)).toBeNull();
-      expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: '기록 목록' })).toBeInTheDocument();
     });
 
     it('아직 끝나지 않은 경기(정규 시간 종료 직후 포함)에는 확정 카드가 없다', () => {
@@ -2854,7 +2854,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
   const red = card(3, 'RED', 2, 31 * 60000);
   const SHEET = '경고 누적 퇴장 기록 고치기';
   const openMergedSheet = async () => {
-    fireEvent.click(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
+    fireEvent.click(within(screen.getByRole('list', { name: '기록 목록' })).getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
     return screen.findByRole('dialog', { name: SHEET });
   };
 
@@ -3918,7 +3918,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       const follows = (earlier: Element, later: Element) =>
         Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
       const card = screen.getByRole('banner');
-      const records = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+      const records = screen.getByRole('list', { name: '기록 목록' });
       expect(card).toHaveAttribute('data-console-guide', 'overview');
       expect(commandBar()).toHaveAttribute('data-console-guide', 'commands');
       expect(recordGrid()).toHaveAttribute('data-console-guide', 'events');
@@ -3979,7 +3979,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
 
       fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^기록 전체 보기·고치기/ }));
       const sheet = screen.getByRole('dialog', { name: '기록 전체' });
-      expect(within(within(sheet).getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')).toHaveLength(6);
+      expect(within(within(sheet).getByRole('list', { name: '기록 목록' })).getAllByRole('listitem')).toHaveLength(6);
       expect(screen.queryByRole('dialog', { name: '더보기' })).toBeNull();
     });
   });
@@ -3987,7 +3987,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
   describe('최근 기록', () => {
     const six = [1, 2, 3, 4, 5, 6].map((sequence) => ({ ...goal(sequence), clockMs: sequence * 60000 }));
     const visibleRows = () =>
-      within(screen.getAllByRole('list', { name: '기록된 이벤트 목록' })[0]).getAllByRole('listitem');
+      within(screen.getAllByRole('list', { name: '기록 목록' })[0]).getAllByRole('listitem');
     let restoreViewport: (() => void) | undefined;
     afterEach(() => {
       restoreViewport?.();
@@ -4107,7 +4107,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       const home = within(picker).getByRole('region', { name: '홈 · 강남 풋살 클럽' });
       const away = within(picker).getByRole('region', { name: '원정 · 성수 풋살 클럽' });
       expect(within(home).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
-        '홈선수1 선수 이벤트 기록', '홈선수2 선수 이벤트 기록', '홈선수3 선수 이벤트 기록', '강남 풋살 클럽 · 선수 모름',
+        '홈선수1 선수로 기록', '홈선수2 선수로 기록', '홈선수3 선수로 기록', '강남 풋살 클럽 · 선수 모름',
       ]);
       expect(within(away).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
         '성수 풋살 클럽 · 선수 모름',

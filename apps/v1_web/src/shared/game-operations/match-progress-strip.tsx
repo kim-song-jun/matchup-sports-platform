@@ -7,8 +7,8 @@ import type { ProgressStep } from '@/lib/match-progress-steps';
  * 남은 단계는 빈 점, 조건부 단계(승부차기)는 점선 고리다.
  *
  * 글자는 지금 단계와 바로 다음 단계만 보인다(`labels="now-next"`, 기본). 나머지 단계의 이름은 스크린리더용
- * `sr-only` 로 남긴다. 단계가 아홉 개여도 폰 폭에서 한 줄에 들어가게 하는 규칙이다. 단계가 네 개뿐인
- * 결과 줄은 `labels="all"` 로 이름을 모두 보인다.
+ * `sr-only` 로 남긴다. 단계가 아홉 개여도 폰(390) 폭에서 한 줄에 들어가게 하는 규칙이다 — 연결선은 남는
+ * 폭만큼만 늘어나고 최소 4px 이다. 단계가 네 개뿐인 결과 줄은 `labels="all"` 로 이름을 모두 보인다.
  */
 export function MatchProgressStrip({
   steps,
@@ -22,7 +22,7 @@ export function MatchProgressStrip({
   if (steps.length === 0) return null;
   const currentIndex = steps.findIndex((step) => step.state === 'current');
   return (
-    <ol aria-label={label} className="m-0 flex w-full list-none flex-nowrap items-center p-0">
+    <ol aria-label={label} className="m-0 flex w-full list-none flex-nowrap items-center overflow-x-auto p-0">
       {steps.map((step, index) => {
         const isLast = index === steps.length - 1;
         const isCurrent = step.state === 'current';
@@ -33,19 +33,19 @@ export function MatchProgressStrip({
             key={step.key}
             data-step-state={step.state}
             aria-current={isCurrent ? 'step' : undefined}
-            className={['flex items-center', isLast ? 'shrink-0' : 'min-w-0 flex-auto'].join(' ')}
+            className={['flex shrink-0 items-center', isLast ? '' : 'grow'].join(' ')}
           >
-            <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+            <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center">
               {step.state === 'done' ? (
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--blue500)] text-white">
-                  <Check size={10} strokeWidth={3.5} />
+                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--blue500)] text-white">
+                  <Check size={9} strokeWidth={3.5} />
                 </span>
               ) : isCurrent ? (
                 <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--blue500)]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue500)]" />
                 </span>
               ) : step.state === 'conditional' ? (
-                <span className="h-4 w-4 rounded-full border-2 border-dashed border-[var(--border-strong)]" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-dashed border-[var(--border-strong)]" />
               ) : (
                 <span className="h-2.5 w-2.5 rounded-full border-2 border-[var(--border-strong)]" />
               )}
@@ -67,7 +67,7 @@ export function MatchProgressStrip({
               <span
                 aria-hidden="true"
                 className={[
-                  'mx-1 h-0.5 min-w-1.5 flex-1 basis-0 rounded-sm',
+                  'mx-0.5 h-0.5 min-w-1 flex-1 basis-0 rounded-sm',
                   step.state === 'done' ? 'bg-[var(--blue500)]' : 'bg-[var(--border-strong)]',
                 ].join(' ')}
               />

@@ -106,7 +106,7 @@ export function AdminTabNav({ ariaLabel, tabs, more, basePath, pathname, query =
                 aria-current={active ? 'page' : undefined}
                 aria-label={hasCount ? `${tab.label} ${tab.count}` : undefined}
                 className={[
-                  'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 border-b-2 px-3.5 text-[length:var(--font-size-body-sm)] transition-colors whitespace-nowrap',
+                  'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 text-[length:var(--font-size-body-sm)] transition-colors whitespace-nowrap md:px-3.5',
                   FOCUS_RING,
                   active
                     ? 'border-[var(--text-strong)] font-bold text-[var(--text-strong)]'
@@ -136,14 +136,19 @@ export function AdminTabNav({ ariaLabel, tabs, more, basePath, pathname, query =
                 aria-current={moreIsCurrent ? true : undefined}
                 onClick={onToggle}
                 className={[
-                  'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 border-b-2 px-3.5 text-[length:var(--font-size-body-sm)] transition-colors whitespace-nowrap',
+                  'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 border-b-2 px-2 transition-colors whitespace-nowrap md:px-3.5',
                   FOCUS_RING,
                   moreIsCurrent
-                    ? 'border-[var(--text-strong)] font-bold text-[var(--text-strong)]'
+                    ? 'border-[var(--text-strong)] text-[var(--text-strong)]'
                     : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                {more.label}
+                {/* 전역 `button { font: inherit }` 가 버튼 자신의 글자 크기·굵기 유틸리티를 이겨서, 글자는 안쪽 span 이 정한다. */}
+                <span
+                  className={`text-[length:var(--font-size-body-sm)] ${moreIsCurrent ? 'font-bold' : ''}`}
+                >
+                  {more.label}
+                </span>
                 <ChevronDown size={14} aria-hidden="true" />
               </button>
             )}

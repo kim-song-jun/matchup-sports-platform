@@ -63,3 +63,9 @@ export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1440px)';
 
 /** Tailwind `md` 와 같은 값. 폰(미만)과 태블릿 이상에서 머리말 구성이 갈리는 화면이 쓴다. */
 export const MD_UP_MEDIA_QUERY = '(min-width: 768px)';
+
+/**
+ * Tailwind `lg` 와 같은 값. 어드민 셸이 사이드바를 보이는(= 데스크톱 셸) 폭 — `admin-shell.tsx` 의 `lg:`.
+ * 이보다 좁은 폰·태블릿에서 배치가 갈리는 어드민 화면이 쓴다.
+ */
+export const LG_UP_MEDIA_QUERY = '(min-width: 1024px)';

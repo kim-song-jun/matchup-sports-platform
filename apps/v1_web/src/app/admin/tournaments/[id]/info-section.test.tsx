@@ -71,7 +71,7 @@ async function renderPage({ canWrite = true, initial = {}, search = '' }: { canW
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast }}>
+      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast, overviewAdvance: null }}>
         <TournamentInfoSection />
       </TournamentAdminProvider>
     </QueryClientProvider>,

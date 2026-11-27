@@ -19,17 +19,37 @@ export interface StatusAction {
   target: V1TournamentStatus;
   label: string;
   description: string;
+  /** 다음 단계(forward) 동작만 가진다 — 개요 카드가 버튼 옆에 한 줄로 보인다. */
+  hint?: string;
 }
+
+export type ForwardStatusAction = StatusAction & { kind: 'forward'; hint: string };
 
 interface StatusActionContext {
   canRevertStart: boolean;
 }
 
-const FORWARD_COPY: Partial<Record<V1TournamentStatus, { label: string; description: string }>> = {
-  open: { label: '접수 시작하기', description: '신청을 받기 시작해요.' },
-  closed: { label: '접수 마감하기', description: '새 신청을 더 받지 않아요. 필요하면 다시 열 수 있어요.' },
-  in_progress: { label: '대회 시작하기', description: '대진표와 경기 일정을 먼저 확인해 주세요.' },
-  completed: { label: '대회 완료하기', description: '시상과 후기가 열리고 참가팀에 후기 요청 알림이 가요.' },
+const FORWARD_COPY: Partial<Record<V1TournamentStatus, { label: string; description: string; hint: string }>> = {
+  open: {
+    label: '접수 시작하기',
+    description: '신청을 받기 시작해요.',
+    hint: '시작하면 참가팀이 신청할 수 있어요. 비어 있는 설정은 시작한 뒤에도 채울 수 있어요.',
+  },
+  closed: {
+    label: '접수 마감하기',
+    description: '새 신청을 더 받지 않아요. 필요하면 다시 열 수 있어요.',
+    hint: '마감하면 새 신청을 더 받지 않아요. 필요하면 다시 열 수 있어요.',
+  },
+  in_progress: {
+    label: '대회 시작하기',
+    description: '대진표와 경기 일정을 먼저 확인해 주세요.',
+    hint: '시작하기 전에 대진표와 경기 일정을 확인해 주세요.',
+  },
+  completed: {
+    label: '대회 완료하기',
+    description: '시상과 후기가 열리고 참가팀에 후기 요청 알림이 가요.',
+    hint: '완료하면 시상과 후기가 열리고 참가팀에 후기 요청 알림이 가요.',
+  },
 };
 
 const REOPEN_COPY = { label: '접수 다시 열기', description: '새 신청을 다시 받아요.' };
@@ -71,8 +91,12 @@ export function statusActions(status: V1TournamentStatus, ctx: StatusActionConte
   return actions.sort((left, right) => KIND_ORDER.indexOf(left.kind) - KIND_ORDER.indexOf(right.kind));
 }
 
-export function primaryStatusAction(status: V1TournamentStatus, ctx: StatusActionContext): StatusAction | null {
-  return statusActions(status, ctx).find((action) => action.kind === 'forward') ?? null;
+function isForward(action: StatusAction): action is ForwardStatusAction {
+  return action.kind === 'forward' && action.hint !== undefined;
+}
+
+export function primaryStatusAction(status: V1TournamentStatus, ctx: StatusActionContext): ForwardStatusAction | null {
+  return statusActions(status, ctx).find(isForward) ?? null;
 }
 
 const FORWARD_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>> = {

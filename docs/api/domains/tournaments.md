@@ -1042,7 +1042,7 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 ## 단계형 대회 구성 (2026-11-09)
 
-기존 생성 형식·데이터는 유지한다. 새 `/admin/tournaments/new-staged` 진입에서만 `stagePlan`을 추가해 생성한다.
+기존 생성 형식·데이터는 유지한다. `/admin/tournaments/new` 에서 진행 방식 「여러 단계」를 고른 경우에만 `stagePlan`(팀 수에 맞춘 기본 예선 구성)을 함께 보낸다. 옛 `/new-staged` 는 `/new?format=staged` 로 이동한다. 단계 구성은 초안 뒤 대진 탭에서 바꾼다.
 DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은 `stagePlan != null`이다. 이를 기존 N개 토너먼트로 재해석하지 않는다.
 
 ### 생성·초안 변경

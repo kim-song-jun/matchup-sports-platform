@@ -93,7 +93,7 @@ Alpha manual QA: `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/ad
 Task: [20261130](../../.github/tasks/20261130-competition-stage-composition.md)
 
 ## 범위와 진입
-플랫폼 운영자: 기존 `/admin/tournaments/new` 유지. 새 버튼 `/admin/tournaments/new-staged`에서 기본 정보·단계/편성·일정·참가조건·공개 확인을 거쳐 실제 초안을 저장한다.
+플랫폼 운영자: `/admin/tournaments/new`에서 진행 방식 「여러 단계」를 고르면 팀 수에 맞춘 기본 예선 구성으로 초안을 만든다(옛 `/new-staged`는 `/new?format=staged`로 이동). 단계·편성은 초안 뒤 대진 탭에서 고친다.
 관리자는 대진 관리에서 미정 대진을 생성하고 편성별 참가팀을 확정하며, 경기 운영은 기존 보드/콘솔을 쓴다.
 공개 사용자는 같은 대회의 대진/결과에서 단계를 골라 독립 순위를 확인한다.
 

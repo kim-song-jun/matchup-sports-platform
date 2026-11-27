@@ -22,7 +22,7 @@ describe('buildTournamentNav', () => {
       const nav = buildTournamentNav(input({ status }));
       expect(nav.tabs.map((tab) => tab.label)).toEqual(['개요', '신청', '대진', '공지', '대회 정보']);
       expect(moreOf(input({ status }))).toEqual([
-        ['홍보', ['sponsors', 'popups', 'campaign']],
+        ['홍보', ['sponsors', 'campaign', 'popups']],
         ['운영', ['discipline']],
         ['대회 후', ['reviews', 'awards', 'statistics']],
       ]);
@@ -36,7 +36,7 @@ describe('buildTournamentNav', () => {
       expect(nav.tabs.map((tab) => tab.label)).toEqual(['개요', '신청', '대진', '공지', '시상', '리뷰 관리', '통계']);
       expect(nav.tabs.map((tab) => tab.slug)).not.toContain('info');
       expect(moreOf(input({ status }))).toEqual([
-        ['홍보', ['sponsors', 'popups', 'campaign']],
+        ['홍보', ['sponsors', 'campaign', 'popups']],
         ['운영', ['info', 'discipline']],
       ]);
       // 진행 전 상태에서는 반대로 대회 정보가 탭에 있고 더보기「운영」에는 없다.

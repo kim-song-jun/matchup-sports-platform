@@ -53,7 +53,7 @@ export function buildTournamentNav(input: TournamentNavInput): TournamentNavMode
   const hasDiscipline = !input.staffSurface && !input.restricted;
 
   const groups: { label: string; items: (AdminTabNavItem | null)[] }[] = [
-    { label: '홍보', items: [item('sponsors', '협찬'), popups, item('campaign', '캠페인')] },
+    { label: '홍보', items: [item('sponsors', '협찬'), item('campaign', '캠페인'), popups] },
     {
       label: '운영',
       items: [afterStart ? item('info', '대회 정보') : null, hasDiscipline ? item('discipline', '징계 현황') : null],

@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { TEAM_FOUL_WARNING_THRESHOLD } from '@/lib/team-foul-counter';
+import { DEFAULT_TEAM_FOUL_THRESHOLD } from '@/lib/team-foul-counter';
 import type { GameSide } from '@/types/game-operations';
 import { TeamFoulCounterBar } from './team-foul-counter-bar';
 
@@ -41,10 +41,30 @@ describe('TeamFoulCounterBar', () => {
     render(
       <TeamFoulCounterBar
         sides={SIDES}
-        counts={{ 'side-home': TEAM_FOUL_WARNING_THRESHOLD, 'side-away': TEAM_FOUL_WARNING_THRESHOLD - 1 }}
+        counts={{ 'side-home': DEFAULT_TEAM_FOUL_THRESHOLD, 'side-away': DEFAULT_TEAM_FOUL_THRESHOLD - 1 }}
         period={1}
       />,
     );
+
+    expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+  });
+
+  // 대회·리그마다 기준이 다르다 — 기준을 넘겨 주면 기본값(5개)이 아니라 그 값에서 경고한다.
+  it('대회·리그가 정한 기준(threshold)에서 경고한다 — 기본값(5)보다 낮으면 더 일찍, 높으면 더 늦게', () => {
+    const { unmount } = render(
+      <TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 3, 'side-away': 2 }} period={1} threshold={3} />,
+    );
+    // 홈 3개 = 기준 3개 도달, 원정 2개 = 미만. 기본값이었다면 둘 다 경고가 없다.
+    expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+    unmount();
+
+    render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 5, 'side-away': 6 }} period={1} threshold={7} />);
+    // 기본값이었다면 둘 다 경고가 떴을 개수라도 기준이 7이면 경고가 없다.
+    expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+  });
+
+  it('기준을 넘기지 않으면 기본값(5개)으로 경고한다', () => {
+    render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 5, 'side-away': 4 }} period={1} />);
 
     expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
   });

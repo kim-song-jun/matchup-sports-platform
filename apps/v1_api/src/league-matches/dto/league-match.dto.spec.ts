@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CreateLeagueMatchDto, UpdateLeagueVisibilityDto } from './league-match.dto';
+import { CreateLeagueMatchDto, UpdateLeagueDisciplineDto, UpdateLeagueVisibilityDto } from './league-match.dto';
 import { createGlobalValidationPipe } from '../../common/global-validation-pipe';
 
 const valid = {
@@ -95,5 +95,35 @@ describe('UpdateLeagueVisibilityDto', () => {
       status: 400,
       response: { code: 'VALIDATION_ERROR' },
     });
+  });
+});
+
+describe('team foul threshold on league DTOs', () => {
+  const create = (teamFoulThreshold: unknown) => plainToInstance(CreateLeagueMatchDto, { ...valid, regionId: 'region-busan-jung', teamFoulThreshold });
+  const discipline = (body: object) => plainToInstance(UpdateLeagueDisciplineDto, body);
+  const on = async (dto: object) => (await validate(dto as never)).filter((error) => error.property === 'teamFoulThreshold');
+
+  it.each([1, 5, 7, 20])('accepts %p when creating and when editing', async (value) => {
+    expect(await on(create(value))).toHaveLength(0);
+    expect(await on(discipline({ teamFoulThreshold: value }))).toHaveLength(0);
+  });
+
+  it('accepts omission and null (default 5) on both DTOs', async () => {
+    expect(await on(create(undefined))).toHaveLength(0);
+    expect(await on(create(null))).toHaveLength(0);
+    expect(await on(discipline({}))).toHaveLength(0);
+    expect(await on(discipline({ teamFoulThreshold: null }))).toHaveLength(0);
+  });
+
+  it.each([0, -1, 21, 2.5, '5', true])('rejects %p on both DTOs', async (value) => {
+    expect((await on(create(value))).length).toBeGreaterThan(0);
+    expect((await on(discipline({ teamFoulThreshold: value }))).length).toBeGreaterThan(0);
+  });
+
+  it('lets the edit DTO carry only the team foul threshold (suspension fields stay untouched)', async () => {
+    const dto = discipline({ teamFoulThreshold: 6 });
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.yellowAccumulationLimit).toBeUndefined();
+    expect(dto.redCardSuspensionMatches).toBeUndefined();
   });
 });

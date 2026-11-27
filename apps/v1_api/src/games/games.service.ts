@@ -50,6 +50,8 @@ import {
   FORFEIT_WINNER_SCORE,
 } from '../league-matches/league-forfeit-result';
 import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { resolveTeamFoulThreshold } from '../tournaments/team-foul-threshold';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isTeamMatchRosterDependentEventType } from './core/team-match-lineup-window';
 import { commandConcurrencyConflict, isCommandConcurrencyConflict } from './command-concurrency-error';
@@ -1252,6 +1254,17 @@ export class GamesService {
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
       const { teamMatchId, teamMatch, ...gameFields } = game;
+      // 팀 파울 경고 기준 — 이 경기가 속한 대회·리그의 값이다. 친선 경기(대회·리그 없음)와 값을 비워 둔
+      // 대회·리그는 기본값(5개)을 쓴다. 경기마다 config 를 pin 하는 것과 달리 대회·리그 값은 **지금 값**을
+      // 읽는다 — 진행 중에 바꾼 기준이 다음 화면 갱신부터 바로 콘솔에 반영돼야 한다.
+      const competitionId = teamMatch?.tournamentId ?? teamMatch?.leagueId ?? null;
+      const competition =
+        competitionId === null
+          ? null
+          : await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+              where: { id: competitionId },
+              select: { teamFoulThreshold: true },
+            });
       return {
         ...gameFields,
         actorRole: actor.role,
@@ -1290,6 +1303,9 @@ export class GamesService {
         // config JSON 을 직접 읽지 않는다. `parseResultPolicy`가 키 부재를 기본값
         // (`earlyStop: true`)으로 메우므로 `config === null`이어도 같은 기본값이다.
         penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
+        // 운영 콘솔의 팀 파울 경고("다음부터 10m 프리킥") 기준. `substitutionPolicy` 와 같은 원칙 —
+        // 서버가 해석해 내려주고 프런트는 기본값을 따로 추측하지 않는다(응답에 없을 때만 폴백).
+        teamFoulThreshold: resolveTeamFoulThreshold(competition?.teamFoulThreshold),
       };
     });
   }

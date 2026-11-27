@@ -533,3 +533,40 @@ describe('동점 순서 초안 왕복', () => {
   });
 });
 
+
+describe('대회 생성 — 팀 파울 기준', () => {
+  it('빈칸은 기본값(5개)이라 null 로 보내고, 입력한 개수는 숫자로 보낸다', () => {
+    expect(INITIAL_TOURNAMENT_CREATE_STATE.teamFoulThreshold).toBe('');
+    expect(buildTournamentCreatePayload(INITIAL_TOURNAMENT_CREATE_STATE).teamFoulThreshold).toBeNull();
+    expect(
+      buildTournamentCreatePayload({ ...INITIAL_TOURNAMENT_CREATE_STATE, teamFoulThreshold: '7' }).teamFoulThreshold,
+    ).toBe(7);
+  });
+
+  it('저장된 대회의 개수를 불러오고, 값이 없거나 구버전 응답이면 빈칸으로 읽는다', () => {
+    expect(mapTournamentToWizardFields(draftWithMinimumMatches(1, { teamFoulThreshold: 6 })).teamFoulThreshold).toBe('6');
+    expect(mapTournamentToWizardFields(draftWithMinimumMatches(1, { teamFoulThreshold: null })).teamFoulThreshold).toBe('');
+    expect(mapTournamentToWizardFields(draftWithMinimumMatches(1)).teamFoulThreshold).toBe('');
+  });
+
+  it('저장한 값을 비우면 null 을 보내 기본값으로 되돌리고, 서버 기준선과 같으면 변경 없음으로 본다', () => {
+    const saved = mapTournamentToWizardFields(draftWithMinimumMatches(1, { teamFoulThreshold: 6 }));
+    const cleared = { ...saved, teamFoulThreshold: '' };
+
+    expect(buildTournamentCreatePayload(cleared).teamFoulThreshold).toBeNull();
+    expect(hasUnsavedTournamentChanges(cleared, saved.savedPayload)).toBe(true);
+    expect(hasUnsavedTournamentChanges(saved, saved.savedPayload)).toBe(false);
+  });
+
+  it('1~20 밖이거나 정수가 아니면 경기 설정 단계에서 막고, 빈칸·범위 안 값은 통과한다', () => {
+    const errorsFor = (teamFoulThreshold: string) =>
+      validateTournamentCreateStep({ ...INITIAL_TOURNAMENT_CREATE_STATE, teamFoulThreshold }, 2).teamFoulThreshold;
+
+    for (const bad of ['0', '21', '3.5', '-1', 'abc']) {
+      expect(errorsFor(bad)).toContain('1부터 20 사이의 정수');
+    }
+    for (const ok of ['', '1', '5', '20']) {
+      expect(errorsFor(ok)).toBeUndefined();
+    }
+  });
+});

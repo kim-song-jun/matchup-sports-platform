@@ -33,8 +33,16 @@ describe('nextSeasonPrefill', () => {
       sportId: 'sport-futsal', regionId: 'region-1', genderCategory: 'male',
       entryFee: 30000, bankName: '팀밋은행', bankAccount: '123', bankHolder: '운영자',
       rosterLimit: { unlimited: false, minPlayers: '6', maxPlayers: '12' },
-      maxTeams: '8', plannedFixtureCount: '14', periodMinutes: ['25', '20'],
+      maxTeams: '8', plannedFixtureCount: '14', teamFoulThreshold: '', periodMinutes: ['25', '20'],
     });
+  });
+
+  it('지난 리그가 팀 파울 기준을 정했다면 다음 시즌에도 이어 가고, 기본값이었다면 비워 둔다', () => {
+    const periods = [{ durationMinutes: 20 }, { durationMinutes: 20 }];
+    expect(nextSeasonPrefill({ ...base, teamFoulThreshold: 7 } as V1AdminLeagueDetail, settings, periods).teamFoulThreshold).toBe('7');
+    expect(nextSeasonPrefill({ ...base, teamFoulThreshold: null } as V1AdminLeagueDetail, settings, periods).teamFoulThreshold).toBe('');
+    // 필드가 없던 구버전 응답도 기본값으로 읽는다.
+    expect(nextSeasonPrefill(base, settings, periods).teamFoulThreshold).toBe('');
   });
 
   it('참가비를 정한 적 없으면 비워 두고, 명단 제한이 없으면 제한 없음으로, 피리어드가 셋 이상이면 종목 기본값으로 둔다', () => {

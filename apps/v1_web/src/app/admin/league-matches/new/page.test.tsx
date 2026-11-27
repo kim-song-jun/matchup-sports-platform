@@ -266,6 +266,49 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ minPlayers: 5, maxPlayers: 15, plannedFixtureCount: 6 })));
   });
 
+  // 팀 파울 기준 — 대회·리그마다 다른 개수를 쓰므로 생성 때 정할 수 있어야 하고, 비우면 서버 기본값(5개)을 쓴다.
+  it('팀 파울 기준을 입력하면 리그 생성 요청에 함께 보내고, 확인 단계 요약에도 보여 준다', async () => {
+    mockData();
+    const mutateAsync = mockCreate();
+    await toGameSettings();
+
+    fireEvent.change(screen.getByLabelText('팀 파울 기준 (선택)'), { target: { value: '7' } });
+    next();
+    expect(screen.getByText('팀 파울 기준')).toBeInTheDocument();
+    expect(screen.getByText('7개')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ teamFoulThreshold: 7 })));
+  });
+
+  it('팀 파울 기준을 비워 두면 요청에 싣지 않고(기본 5개), 확인 단계는 기본 5개라고 알려 준다', async () => {
+    mockData();
+    const mutateAsync = mockCreate();
+    await toGameSettings();
+
+    expect(screen.getByLabelText('팀 파울 기준 (선택)')).toHaveValue(null);
+    next();
+    expect(screen.getByText('기본 5개')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty('teamFoulThreshold');
+  });
+
+  it('팀 파울 기준이 1~20 밖이거나 정수가 아니면 다음으로 가지 못하고 이유를 알려 준다', async () => {
+    mockData();
+    mockCreate();
+    await toGameSettings();
+
+    for (const bad of ['0', '21', '3.5']) {
+      fireEvent.change(screen.getByLabelText('팀 파울 기준 (선택)'), { target: { value: bad } });
+      expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+      expect(screen.getAllByText(/팀 파울 기준은 1부터 20 사이의 정수/).length).toBeGreaterThan(0);
+    }
+    fireEvent.change(screen.getByLabelText('팀 파울 기준 (선택)'), { target: { value: '20' } });
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
+  });
+
   it('최소 인원이 최대보다 많으면 다음으로 가지 못하고 이유를 알려준다', async () => {
     mockData();
     mockCreate();

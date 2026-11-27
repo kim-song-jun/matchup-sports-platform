@@ -554,4 +554,36 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     const stillThree = await admin.detail(authUser(ids.adminUser), ids.openLeague);
     expect(stillThree.yellowAccumulationLimit).toBe(3);
   });
+
+  /**
+   * 팀 파울 경고 기준은 **출전정지 규정과 달리 잠기지 않는다.** 화면 안내 기준일 뿐 이미 치른 경기의
+   * 기록·판정을 소급해서 바꾸지 않으므로, 리그가 굴러가는 도중에도 바꿀 수 있어야 한다(중간 수정 요구).
+   * 같은 엔드포인트(`updateDiscipline`)를 쓰지만 잠금은 출전정지 두 칸을 바꾸는 요청에만 걸린다.
+   */
+  it('팀 파울 기준은 경기가 끝난 뒤에도 바꿀 수 있고, 출전정지 규정 잠금은 그대로다', async () => {
+    const admin = makeAdminService();
+    // 앞 케이스와 같은 상태를 스스로 만든다 — 순서에 기대지 않는다(경기 하나가 이미 끝난 리그).
+    await prisma.v1Game.update({ where: { teamMatchId: ids.openPast }, data: { state: 'ENDED' } });
+
+    // 처음에는 비어 있다(= 기본값 5개).
+    expect((await admin.detail(authUser(ids.adminUser), ids.openLeague)).teamFoulThreshold).toBeNull();
+
+    const updated = await admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, { teamFoulThreshold: 7 });
+    expect(updated.teamFoulThreshold).toBe(7);
+    // 이 칸만 보냈으므로 출전정지 칸은 건드리지 않는다.
+    expect(updated.yellowAccumulationLimit).toBe(3);
+    expect((await admin.detail(authUser(ids.adminUser), ids.openLeague)).teamFoulThreshold).toBe(7);
+
+    // null = 기본값으로 되돌리기 — 응답과 저장본 둘 다 비어야 한다(`??` 폴백으로 옛 값이 돌아오면 안 된다).
+    const cleared = await admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, { teamFoulThreshold: null });
+    expect(cleared.teamFoulThreshold).toBeNull();
+    expect((await admin.detail(authUser(ids.adminUser), ids.openLeague)).teamFoulThreshold).toBeNull();
+
+    // 출전정지 칸을 같이 보내면 여전히 잠겨 있고, 잠금이 팀 파울 값까지 쓰지 않는다.
+    const locked = await captureFailure(() =>
+      admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, { yellowAccumulationLimit: 5, teamFoulThreshold: 9 }),
+    );
+    expectHttpCode(locked, 409, 'LEAGUE_DISCIPLINE_LOCKED');
+    expect((await admin.detail(authUser(ids.adminUser), ids.openLeague)).teamFoulThreshold).toBeNull();
+  });
 });

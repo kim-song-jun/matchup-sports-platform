@@ -630,3 +630,66 @@ describe('단계별 동점 순서 카드', () => {
     expect(screen.getByLabelText('1단계 · 예선 조별리그')).toBeDisabled();
   });
 });
+
+// 팀 파울 기준 — 대회마다 다른 개수를 쓰므로 생성 뒤에도 바꿀 수 있어야 하고, 출전정지 규정과 달리 진행 중에도 열려 있다.
+describe('TournamentInfoSection — 팀 파울 기준', () => {
+  beforeEach(() => {
+    hooks.mutate.mockReset();
+    hooks.showToast.mockReset();
+  });
+
+  function save(edit: () => void) {
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  }
+
+  it('값을 비워 둔 대회는 빈칸 + "비우면 5개" 안내로 열린다', () => {
+    renderSection(true, { teamFoulThreshold: null });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+
+    const input = screen.getByLabelText('팀 파울 기준 (개)');
+    expect(input).toHaveValue(null);
+    expect(input).toHaveAttribute('placeholder', '비우면 5개');
+  });
+
+  it('정한 대회는 그 개수로 채워 열리고, 바꾸면 그 값만 보낸다', () => {
+    renderSection(true, { teamFoulThreshold: 6 });
+    save(() => {
+      expect(screen.getByLabelText('팀 파울 기준 (개)')).toHaveValue(6);
+      fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '8' } });
+    });
+
+    expect(hooks.mutate).toHaveBeenCalledTimes(1);
+    expect(hooks.mutate.mock.calls[0][0]).toEqual({ teamFoulThreshold: 8, expectedVersion: tournament.updatedAt });
+  });
+
+  it('칸을 비우고 저장하면 null 을 명시적으로 보내 기본값(5개)으로 되돌린다', () => {
+    renderSection(true, { teamFoulThreshold: 6 });
+    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '' } }));
+
+    expect(hooks.mutate.mock.calls[0][0]).toEqual({ teamFoulThreshold: null, expectedVersion: tournament.updatedAt });
+  });
+
+  it('건드리지 않으면 팀 파울 기준을 보내지 않는다(다른 항목만 바꾼 수정이 값을 덮어쓰지 않게)', () => {
+    renderSection(true, { teamFoulThreshold: 6 });
+    save(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
+
+    expect(hooks.mutate.mock.calls[0][0]).not.toHaveProperty('teamFoulThreshold');
+  });
+
+  it('진행 중인 대회도 수정할 수 있다(출전정지 규정과 달리 잠그지 않는다)', () => {
+    renderSection(true, { status: 'in_progress', teamFoulThreshold: null });
+    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '4' } }));
+
+    expect(hooks.mutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: 4 });
+  });
+
+  it.each(['0', '21', '2.5'])('%s 은(는) 저장하지 않고 이유를 알린다', (bad) => {
+    renderSection(true, { teamFoulThreshold: null });
+    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: bad } }));
+
+    expect(hooks.showToast).toHaveBeenCalledWith(expect.stringContaining('1부터 20 사이의 정수'), 'error');
+    expect(hooks.mutate).not.toHaveBeenCalled();
+  });
+});

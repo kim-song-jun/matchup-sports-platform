@@ -1,6 +1,13 @@
 'use client';
 
 import { useId } from 'react';
+import {
+  DEFAULT_TEAM_FOUL_THRESHOLD,
+  MAX_TEAM_FOUL_THRESHOLD,
+  MIN_TEAM_FOUL_THRESHOLD,
+  parseTeamFoulThresholdInput,
+  TEAM_FOUL_THRESHOLD_ERROR,
+} from '@/lib/team-foul-counter';
 
 const fieldClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -126,6 +133,46 @@ export function LeaguePlannedFixtureField({
         {teamCount >= 2
           ? `${teamCount}팀이 한 번씩 만나면 ${counts.single}경기, 두 번씩이면 ${counts.double}경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.`
           : '대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.'}
+      </p>
+    </div>
+  );
+}
+
+/** 팀 파울 기준 입력 검증 — 빈칸은 기본값(5개)이라 통과한다. 오류가 있으면 문구를 돌려준다. */
+export function leagueTeamFoulThresholdError(value: string): string | null {
+  return parseTeamFoulThresholdInput(value) === 'invalid' ? TEAM_FOUL_THRESHOLD_ERROR : null;
+}
+
+/** 팀 파울 기준(개). 비워 두면 기본 5개 — 한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 "다음부터 10m 프리킥"을 알린다. */
+export function LeagueTeamFoulThresholdField({ value, onChange, disabled }: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const error = leagueTeamFoulThresholdError(value);
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">팀 파울 기준 (선택)</label>
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={MIN_TEAM_FOUL_THRESHOLD}
+          max={MAX_TEAM_FOUL_THRESHOLD}
+          value={value}
+          placeholder={`비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개`}
+          disabled={disabled}
+          aria-invalid={error !== null}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${fieldClass} w-32`}
+        />
+        <span className="shrink-0 whitespace-nowrap text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">개</span>
+      </div>
+      {error !== null && <p role="alert" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--red700)]">{error}</p>}
+      <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+        한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 비우면 {DEFAULT_TEAM_FOUL_THRESHOLD}개예요. 리그를 연 뒤에도 규정 탭에서 바꿀 수 있어요.
       </p>
     </div>
   );

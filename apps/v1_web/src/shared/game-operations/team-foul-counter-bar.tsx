@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
-import { TEAM_FOUL_WARNING_THRESHOLD } from '@/lib/team-foul-counter';
+import { DEFAULT_TEAM_FOUL_THRESHOLD } from '@/lib/team-foul-counter';
 import type { GameSide } from '@/types/game-operations';
 import { periodLabel } from './period-label';
 
@@ -16,6 +16,7 @@ export function TeamFoulCounterBar({
   period,
   periodCount = null,
   hasNextPeriod = false,
+  threshold = DEFAULT_TEAM_FOUL_THRESHOLD,
 }: {
   readonly sides: readonly GameSide[];
   readonly counts: Record<string, number>;
@@ -24,6 +25,8 @@ export function TeamFoulCounterBar({
   readonly periodCount?: number | null;
   /** 이 피리어드 다음 피리어드가 있는가(하프타임 포함) — 있으면 다시 센다고 알려 준다. */
   readonly hasNextPeriod?: boolean;
+  /** 이 개수에 이르면 경고한다 — 대회·리그별 기준(`GameDetail.teamFoulThreshold`). 생략하면 기본값. */
+  readonly threshold?: number;
 }) {
   if (sides.length === 0) return null;
   const periodName = periodLabel(period, periodCount);
@@ -55,7 +58,7 @@ export function TeamFoulCounterBar({
       <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
         {sides.map((side) => {
           const count = counts[side.id] ?? 0;
-          const warning = count >= TEAM_FOUL_WARNING_THRESHOLD;
+          const warning = count >= threshold;
           return (
             <div
               key={side.id}

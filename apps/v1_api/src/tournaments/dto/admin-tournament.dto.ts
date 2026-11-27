@@ -18,6 +18,7 @@ import {
   Min,
 } from 'class-validator';
 import { MAX_PAGE_NUMBER } from '../../common/pagination/page-args';
+import { MAX_TEAM_FOUL_THRESHOLD, MIN_TEAM_FOUL_THRESHOLD } from '../team-foul-threshold';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 export const TOURNAMENT_STATUSES = [
@@ -302,6 +303,16 @@ export class CreateTournamentDto {
   @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
   @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
   redCardSuspensionMatches?: number | null;
+
+  /**
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"을 알린다.
+   * **생략·null = 기본값(5개).** 수정 요청에서 undefined 는 유지, null 은 기본값으로 되돌리기다.
+   */
+  @IsOptional()
+  @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
+  @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
+  @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
+  teamFoulThreshold?: number | null;
 
   @IsOptional()
   @IsString()
@@ -673,6 +684,16 @@ export class UpdateTournamentDto {
   @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
   @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
   redCardSuspensionMatches?: number | null;
+
+  /**
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"을 알린다.
+   * **생략·null = 기본값(5개).** 수정 요청에서 undefined 는 유지, null 은 기본값으로 되돌리기다.
+   */
+  @IsOptional()
+  @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
+  @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
+  @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
+  teamFoulThreshold?: number | null;
 
   @IsOptional()
   @IsString()

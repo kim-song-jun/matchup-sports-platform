@@ -4,6 +4,7 @@ import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefine
 import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { TOURNAMENT_GENDER_CATEGORIES, type TournamentGenderCategory } from '../../tournaments/dto/admin-tournament.dto';
+import { MAX_TEAM_FOUL_THRESHOLD, MIN_TEAM_FOUL_THRESHOLD } from '../../tournaments/team-foul-threshold';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
 export abstract class LeaguePlaceSnapshotDto {
@@ -93,6 +94,13 @@ export class CreateLeagueMatchDto {
   @IsOptional()
   @IsDateString()
   registrationDeadlineAt?: string | null;
+
+  /** 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"을 알린다. 생략·null = 기본값(5개). */
+  @IsOptional()
+  @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
+  @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
+  @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
+  teamFoulThreshold?: number | null;
 
   /** 팀당 참가비. 보내면 참가비를 확정한 것으로 본다(0원 = 무료 확정). 0원 초과면 계좌 세 칸이 필수다. */
   @IsOptional()
@@ -495,6 +503,17 @@ export class UpdateLeagueDisciplineDto {
   @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
   @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
   redCardSuspensionMatches?: number | null;
+
+  /**
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"을 알린다.
+   * 생략 = 유지, null = 기본값(5개)으로 되돌리기. **출전정지 규정과 달리 경기가 시작된 뒤에도 바꿀 수 있다** —
+   * 화면 안내 기준일 뿐이라 이미 치른 경기의 기록·판정을 소급해서 바꾸지 않는다.
+   */
+  @IsOptional()
+  @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
+  @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
+  @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
+  teamFoulThreshold?: number | null;
 }
 
 // 정규 리그 대진 템플릿(자리 기반 빈 경기). 팀은 나중에 자리에 넣으므로 teamIds 가 없다.

@@ -691,6 +691,51 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(within(foulGroup).getByText('성수 풋살 클럽').closest('div')).toHaveTextContent('파울 1');
   });
 
+  // 대회·리그마다 팀 파울 기준이 다르다 — 서버가 경기 상세에 실어 준 `teamFoulThreshold` 로 경고를 켠다.
+  describe('팀 파울 경고 기준(teamFoulThreshold)', () => {
+    const LIVE_FIRST_HALF = [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }];
+    const foulEvent = (index: number, sideId: string) => ({
+      id: `foul-${sideId}-${index}`, gameId: 'game-1', sequence: index, clientEventId: `foul-client-${index}`,
+      payloadHash: `foul-hash-${index}`, type: 'FOUL', sideId, participantId: null,
+      assistParticipantId: null, period: 1, clockMs: index * 60_000,
+      occurredAt: '2026-08-07T00:10:00.000Z', receivedAt: '2026-08-07T00:10:00.000Z',
+      actorUserId: 'actor-1', reversesEventId: null, payload: {},
+    }) as GameEventRecord;
+    const homeFouls = (count: number) => Array.from({ length: count }, (_, index) => foulEvent(index + 1, 'side-home'));
+    function mountWith(fouls: GameEventRecord[], teamFoulThreshold?: number) {
+      gameWithPeriods('LIVE', LIVE_FIRST_HALF);
+      const current = testFixtures.game() as { data: object };
+      testFixtures.game.mockReturnValue({ ...current, data: { ...current.data, teamFoulThreshold } });
+      testFixtures.operations.mockReturnValue(consoleState({ liveEvents: fouls }));
+      render(<CoreHarness />);
+    }
+
+    it('대회·리그가 정한 기준(3개)에 이르면 기본값(5개)보다 일찍 경고한다', () => {
+      mountWith(homeFouls(3), 3);
+
+      // 피리어드가 하나뿐인 경기라 막대 이름은 "경기 팀 파울"이다 — 이름이 아니라 팀 파울 막대로 찾는다.
+      const foulGroup = screen.getByRole('group', { name: /팀 파울/ });
+      expect(within(foulGroup).getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+      expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('다음부터 10m 프리킥');
+    });
+
+    it('같은 파울 수라도 기준이 7개면 아직 경고하지 않는다', () => {
+      mountWith(homeFouls(5), 7);
+
+      expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+    });
+
+    it('서버 응답에 기준이 없으면(구버전·캐시) 기본값(5개)으로 경고한다', () => {
+      mountWith(homeFouls(4));
+      expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+    });
+
+    it('기준이 없는 응답이어도 5개째에는 경고한다(기존 동작 유지)', () => {
+      mountWith(homeFouls(5));
+      expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+    });
+  });
+
   // MD-QA #189: 하프타임에는 방금 끝난 전반의 팀 파울을 보여 주고, 후반에 다시 센다고 알려 준다.
   it('하프타임에는 전반 팀 파울과 후반에 0부터 다시 센다는 안내를 보여준다', () => {
     gameWithPeriods('LIVE', [

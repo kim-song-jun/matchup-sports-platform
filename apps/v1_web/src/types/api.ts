@@ -4234,6 +4234,8 @@ export type V1Tournament = {
   yellowAccumulationLimit: number | null;
   /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
   redCardSuspensionMatches: number | null;
+  /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
+  teamFoulThreshold?: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   registrationCount: number;
@@ -4554,6 +4556,8 @@ export type V1TournamentDetail = {
   yellowAccumulationLimit: number | null;
   /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
   redCardSuspensionMatches: number | null;
+  /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
+  teamFoulThreshold?: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -5265,6 +5269,8 @@ export type V1CreateTournamentPayload = {
   yellowAccumulationLimit?: number | null;
   /** 퇴장 1장당 출전정지 경기 수. 생략·null = 미적용. */
   redCardSuspensionMatches?: number | null;
+  /** 팀 파울 경고 기준(개). 생략·null = 기본값(5개). 수정 요청에서 생략은 유지, null은 기본값으로 되돌리기. */
+  teamFoulThreshold?: number | null;
   rulesText?: string | null;
   refundPolicyText?: string | null;
 };

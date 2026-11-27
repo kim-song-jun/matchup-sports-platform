@@ -1,6 +1,7 @@
 import type { StagePlan } from '@/types/stage-plan';
 import { stagePlanCounts, stagePlanError } from '@/lib/stage-plan';
 import { hasValidPeriodDurations } from '@/lib/tournament-periods';
+import { parseTeamFoulThresholdInput, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
@@ -128,6 +129,8 @@ export type TournamentCreateState = {
   yellowAccumulationLimit: string;
   /** 퇴장 1장당 정지 경기 수. 빈 문자열 = 미적용. */
   redCardSuspensionMatches: string;
+  /** 팀 파울 경고 기준(개). 빈 문자열 = 기본값(5개). */
+  teamFoulThreshold: string;
   rulesText: string;
   refundPolicyText: string;
   coverImageUrl: string | null;
@@ -204,6 +207,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   tieBreakOrder: [...DEFAULT_TOURNAMENT_TIE_BREAK_ORDER],
   yellowAccumulationLimit: '',
   redCardSuspensionMatches: '',
+  // 비워 두면 기본값(5개)이다 — 정지 규정과 달리 비워 두는 것이 정상 상태라 소급 위험이 없다.
+  teamFoulThreshold: '',
   rulesText: '',
   refundPolicyText: '',
   coverImageUrl: null,
@@ -521,6 +526,10 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
         ? ''
         : String(tournament.redCardSuspensionMatches),
+    teamFoulThreshold:
+      tournament.teamFoulThreshold === null || tournament.teamFoulThreshold === undefined
+        ? ''
+        : String(tournament.teamFoulThreshold),
     rulesText: tournament.rulesText ?? '',
     refundPolicyText: tournament.refundPolicyText ?? '',
     coverImageUrl: tournament.coverImageUrl,
@@ -764,6 +773,9 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
         errors.minMatchesPerTeam = '최소 경기 수는 1~50경기 사이의 정수여야 해요.';
       }
     }
+    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
+      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
+    }
     if (state.genderCategory === 'mixed') {
       const minMale = optionalNumeric(state.genderMinMale);
       const maxMale = optionalNumeric(state.genderMaxMale);
@@ -876,6 +888,11 @@ export function buildTournamentCreatePayload(
       state.redCardSuspensionMatches.trim() === ''
         ? null
         : numeric(state.redCardSuspensionMatches) ?? undefined,
+    // 빈칸 = null(기본값 5개). 잘못된 값은 단계 검증이 먼저 막으므로 여기까지 오지 않는다.
+    teamFoulThreshold: (() => {
+      const parsed = parseTeamFoulThresholdInput(state.teamFoulThreshold);
+      return parsed === 'invalid' ? undefined : parsed;
+    })(),
     rulesText: state.rulesText.trim() || null,
     refundPolicyText: state.refundPolicyText.trim() || null,
     ...promoPayload('promoHome', state.promoHome),

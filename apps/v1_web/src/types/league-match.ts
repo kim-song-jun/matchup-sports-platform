@@ -303,6 +303,8 @@ export interface V1AdminLeagueDetail {
   confirmedRegistrationCount: number;
   yellowAccumulationLimit?: number | null;
   redCardSuspensionMatches?: number | null;
+  /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
+  teamFoulThreshold?: number | null;
   /**
    * 대진 자리(slot) 목록 — 어드민 상세 전용. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
    * 자리를 쓰지 않는 기존 리그는 빈 배열로 온다.
@@ -471,6 +473,8 @@ export interface V1CreateLeaguePayload {
   bankHolder?: string;
   /** 대회와 같은 성별 카테고리. 화면은 필수로 고르게 하고, 서버는 생략을 허용한다. */
   genderCategory?: V1TournamentGenderCategory;
+  /** 팀 파울 경고 기준(개). 생략·null = 기본값(5개). */
+  teamFoulThreshold?: number | null;
   /** 이어 갈 지난 시즌(다음 시즌 만들기). */
   previousLeagueId?: string;
 }

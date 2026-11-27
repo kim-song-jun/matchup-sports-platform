@@ -287,6 +287,8 @@ export class LeagueMatchAdminService {
           ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
           ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
           ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
+          // 팀 파울 경고 기준 — 생략·null 이면 컬럼을 비워 둔다(= 기본값 5개).
+          ...(dto.teamFoulThreshold != null ? { teamFoulThreshold: dto.teamFoulThreshold } : {}),
           ...(dto.previousLeagueId !== undefined ? { previousLeagueId: dto.previousLeagueId } : {}),
           registrationDeadlineAt,
           // 참가비를 보냈으면 확정한 것이다(0원 = 무료 확정). 안 보냈으면 미설정으로 남겨 신청 관리가 확인을 받는다.
@@ -581,6 +583,8 @@ export class LeagueMatchAdminService {
       // 하므로 0 으로 뭉개지 않고 그대로 내린다.
       yellowAccumulationLimit: league.yellowAccumulationLimit,
       redCardSuspensionMatches: league.redCardSuspensionMatches,
+      // null = 기본값(5개). 화면이 "기본 5개"와 직접 입력한 값을 구분해 보여 줄 수 있게 그대로 내린다.
+      teamFoulThreshold: league.teamFoulThreshold,
       sportCode: league.sportCode,
       coverImageUrl: league.coverImageUrl,
       listImageUrl: league.listImageUrl,
@@ -2131,18 +2135,23 @@ export class LeagueMatchAdminService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { id: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+      select: { id: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true, teamFoulThreshold: true },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
 
-    const startedGames = await this.prisma.v1Game.count({
-      where: {
-        teamMatch: { leagueId, deletedAt: null },
-        state: { in: ['LIVE', 'PAUSED', 'ENDED'] },
-      },
-    });
+    // 잠금은 **출전정지 규정을 바꾸는 요청에만** 건다. 팀 파울 경고 기준은 화면 안내일 뿐 이미 치른 경기를
+    // 소급해서 바꾸지 않으므로, 리그가 굴러가는 도중에도 바꿀 수 있어야 한다(중간 수정 요구).
+    const touchesSuspensionRules = dto.yellowAccumulationLimit !== undefined || dto.redCardSuspensionMatches !== undefined;
+    const startedGames = touchesSuspensionRules
+      ? await this.prisma.v1Game.count({
+          where: {
+            teamMatch: { leagueId, deletedAt: null },
+            state: { in: ['LIVE', 'PAUSED', 'ENDED'] },
+          },
+        })
+      : 0;
     if (startedGames > 0) {
       throw new ConflictException({
         code: 'LEAGUE_DISCIPLINE_LOCKED',
@@ -2152,9 +2161,14 @@ export class LeagueMatchAdminService {
 
     // `undefined`(필드 미전송)와 `null`(규정 끄기)을 **구분한다** — 한쪽 값만 바꾸려는
     // 요청이 다른 쪽을 조용히 지우면 안 된다.
-    const data: { yellowAccumulationLimit?: number | null; redCardSuspensionMatches?: number | null } = {};
+    const data: {
+      yellowAccumulationLimit?: number | null;
+      redCardSuspensionMatches?: number | null;
+      teamFoulThreshold?: number | null;
+    } = {};
     if (dto.yellowAccumulationLimit !== undefined) data.yellowAccumulationLimit = dto.yellowAccumulationLimit;
     if (dto.redCardSuspensionMatches !== undefined) data.redCardSuspensionMatches = dto.redCardSuspensionMatches;
+    if (dto.teamFoulThreshold !== undefined) data.teamFoulThreshold = dto.teamFoulThreshold;
 
     if (Object.keys(data).length > 0) {
       // `updateMany` + `kind` 가드인 이유는 이 파일의 다른 dual-write 와 같다 — `update` 는
@@ -2188,6 +2202,8 @@ export class LeagueMatchAdminService {
         dto.redCardSuspensionMatches !== undefined
           ? (dto.redCardSuspensionMatches ?? null)
           : league.redCardSuspensionMatches,
+      teamFoulThreshold:
+        dto.teamFoulThreshold !== undefined ? (dto.teamFoulThreshold ?? null) : league.teamFoulThreshold,
     };
   }
 
@@ -2538,6 +2554,7 @@ export class LeagueMatchAdminService {
         // 있다. 둘 다 null 이면 이 리그에는 규정이 적용되지 않는다.
         yellowAccumulationLimit: true,
         redCardSuspensionMatches: true,
+        teamFoulThreshold: true,
         // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
         coverImageUrl: true,
         listImageUrl: true,

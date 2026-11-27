@@ -396,6 +396,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
       expectedVersion: GAME_VERSION,
       clientCommandId: commandId,
       reason: '오심으로 무효 처리',
+      confirmationText: '결과 무효',
     } as never);
   };
 
@@ -1455,6 +1456,7 @@ describe('동시 처리 충돌 응답', () => {
         expectedVersion: GAME_VERSION,
         clientCommandId: 'concurrent-void-1',
         reason: '오심으로 무효 처리',
+        confirmationText: '결과 무효',
       } as never),
     );
 

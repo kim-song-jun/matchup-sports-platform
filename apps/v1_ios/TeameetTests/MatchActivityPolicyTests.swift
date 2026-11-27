@@ -12,6 +12,15 @@ final class MatchActivityPolicyTests: XCTestCase {
         XCTAssertTrue(reloaded.mayStart(.init(gameId: "game-2")))
         XCTAssertNil(reloaded.tracked["activity-1"])
     }
+    func testFinalCardDismissalStillPreventsRestart() throws {
+        var ledger = MatchActivityLedger()
+        ledger.tracked["final-card"] = .init(gameID: "game-1", revision: "session")
+        ledger.recordEnd(activityID: "final-card")
+        var reloaded = try JSONDecoder().decode(MatchActivityLedger.self, from: JSONEncoder().encode(ledger))
+        XCTAssertEqual(reloaded.tracked["final-card"]?.finalized, true)
+        reloaded.recordDismissal(activityID: "final-card")
+        XCTAssertFalse(reloaded.mayStart(.init(gameId: "game-1")))
+    }
     func testFirstEndedTimeSurvivesRelaunchAndDoesNotSlide() throws {
         var ledger = MatchActivityLedger()
         let first: Int64 = 1_000_000

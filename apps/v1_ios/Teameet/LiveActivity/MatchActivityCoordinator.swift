@@ -89,6 +89,16 @@ final class MatchActivityCoordinator {
             await remove(activity)
         }
     }
+    /// The app's cookie/widget synchronization can observe ENDED before this coordinator's poll.
+    /// Record that fresh response immediately, before its logo IO or the next API request.
+    func observed(_ snapshot: WidgetSnapshot) {
+        guard !snapshot.stale, let model = snapshot.model,
+              let game = MatchActivityLedger.selected(in: model), game.state == "ENDED",
+              let current = try? WidgetStore().read(), current.revision == snapshot.revision,
+              current.token != nil, current.owner != nil else { return }
+        _ = ledger.endDeadline(gameID: game.gameId, now: snapshot.updatedAt)
+        save()
+    }
     private var allActivities: [Activity<MatchActivityAttributes>] {
         var activities = Dictionary(uniqueKeysWithValues: Activity<MatchActivityAttributes>.activities.map { ($0.id, $0) })
         for (id, activity) in finals { activities[id] = activity }
@@ -102,6 +112,7 @@ final class MatchActivityCoordinator {
                 if state == .dismissed {
                     self.ledger.recordDismissal(activityID: activity.id)
                     self.save()
+                    self.finals.removeValue(forKey: activity.id)
                     self.observers[activity.id] = nil
                     return
                 }
@@ -145,7 +156,7 @@ final class MatchActivityCoordinator {
             }
             save()
             for activity in activities where ledger.tracked[activity.id] != nil {
-                if activity.activityState == .dismissed || activity.activityState == .ended { ledger.recordDismissal(activityID: activity.id); save() }
+                if activity.activityState == .dismissed || (activity.activityState == .ended && ledger.tracked[activity.id]?.finalized != true) { ledger.recordDismissal(activityID: activity.id); save() }
                 else { observe(activity) }
             }
             guard storageHealthy else { report("실시간 카드 설정을 읽지 못했어요. 자동 시작을 보류했어요"); return }
@@ -191,8 +202,7 @@ final class MatchActivityCoordinator {
             if game.state == "ENDED" {
                 guard let deadline = finalDeadline else { return }
                 if let activity {
-                    observers.removeValue(forKey: activity.id)?.cancel()
-                    ledger.tracked.removeValue(forKey: activity.id)
+                    ledger.recordEnd(activityID: activity.id)
                     save()
                     finals[activity.id] = activity
                     // End once. Reopening the app cannot extend this fixed date.

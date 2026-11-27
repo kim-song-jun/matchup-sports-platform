@@ -10,7 +10,7 @@ Task: [20261142](../../.github/tasks/20261142-ios-live-activity.md). Stacked bas
 - bounded public payload (<4KB): 팀/점수/구간/로고 파일 key만, 토큰/쿠키/득점자·계정 식별자 없음. 앱과 확장 공유 ActivityAttributes, iOS16.2+ 가드. 최소 iOS16.0~16.1 기존 위젯 유지.
 
 ## 실행 증거
-- Alpha unsigned 앱+확장 컴파일 및 관련 단위 테스트 17/17 PASS, 최종 정책 변경 후 정책4/4 재확인 PASS. dismissal ledger JSON 재실행, ID별 최초 종료시각 고정, 첫 경기만 선택, 숨겨진 점수/멈춘 시계/4KB 제한 검증.
+- Alpha unsigned 앱+확장 컴파일 및 관련 단위 테스트 17/17 PASS, 최종 정책 변경 후 정책5/5 재확인 PASS. dismissal ledger JSON 재실행, ID별 최초 종료시각 고정, 첫 경기만 선택, 숨겨진 점수/멈춘 시계/4KB 제한 검증.
 - Production unsigned 앱+확장 빌드 PASS.
 - XCTest LiveActivityUITests: 실제 Simulator ActivityKit.request/update/end 사용. 합성 샘플로 생성·갱신·15분 종료화면 유지요청·즉시종료1/1 PASS. 고정 텍스트 존재만 검사하는 테스트가 아니며 OS 명령의 실제 대상을 ID로 찾아야 결과가 성공이 된다.
 - 전용 iPhone17 Pro iOS26.2, UDID 6F68E52F-23C1-4040-8C1E-B372EE92B28B. 시스템 compact/expanded XCTest 첨부 및 CUA 실제 잠금화면 stale 표시·권한 허용 후 갱신·샘플 종료 확인. 시스템 권한은 사용자 명시 승인 후 이 기기에서만 허용.
@@ -30,3 +30,10 @@ Task: [20261142](../../.github/tasks/20261142-ios-live-activity.md). Stacked bas
 - iPhone17 Pro 402×874pt(1206×2622px): 카드/확장 팀명·중앙 점수·구간 타이머 겹침 없음. compact 점수·시계, minimal 샘플 점수 확인. 실제 minimal은 미검증.
 - 타이머는 시스템 Text(timer)의 늘어나는 폭을 제한했고 구간 레이블은 압축하지 않음. 팀명 두 줄, 일시정지/하프타임/지연은 의미색, 숨김 점수는 대시.
 - 신규 네이티브 화면이라 before 구현 없음. #2554 시안과 대조. 작은 화면/큰 화면 및 light/dark 전체 기기 매트릭스는 미완료이며 샘플 한 기기 검증으로 대체 완료 판정하지 않음.
+
+## PR 및 증거 커서
+- PR [#2565](https://github.com/kim-song-jun/matchup-sports-platform/pull/2565), base codex/ios-widget-pr-b, draft=false.
+- [화면 갤러리](https://github.com/kim-song-jun/matchup-sports-platform/pull/2565#issuecomment-7212995159): SHA 2b7fb1acd 고정 raw10/10 HTTP200. 실제 시스템 compact/expanded/잠금화면 stale3장 + 고정 상태7장. PNG는 후속 커밋에서 트리에서 제거, URL 유지. 화면 코드 변경 없음.
+- 종료 카드도 tracked.finalized로 닫기를 계속 관찰한다. JSON 재실행 후 최종 카드 닫기 차단 회귀 테스트 추가. WidgetSessionCoordinator의 선행 API 관찰도 로고 다운로드 전 기록.
+
+Cleanup: 실제 ActivityKit UI 테스트의 end/immediate 정리 확인, 고정 갤러리 앱 종료 및 위 전용 UDID shutdown 완료. 다른 시뮬레이터/Android/서버·DB 상태 변경 없음.

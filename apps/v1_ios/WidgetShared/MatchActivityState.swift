@@ -40,7 +40,7 @@ struct MatchActivityState: Codable, Hashable, Sendable {
 
 /// Persisted independently of login. Swiping a card never becomes consent to recreate it.
 struct MatchActivityLedger: Codable, Sendable {
-    struct Tracked: Codable, Sendable, Equatable { var gameID: String; var revision: String }
+    struct Tracked: Codable, Sendable, Equatable { var gameID: String; var revision: String; var finalized: Bool? = nil }
     var tracked: [String: Tracked] = [:]
     var dismissed: Set<String> = []
     var firstEndedAt: [String: Int64] = [:]
@@ -49,6 +49,9 @@ struct MatchActivityLedger: Codable, Sendable {
     mutating func endDeadline(gameID: String, now: Int64) -> Int64 {
         if firstEndedAt[gameID] == nil { firstEndedAt[gameID] = now }
         return firstEndedAt[gameID]! + Self.finalDisplayMs
+    }
+    mutating func recordEnd(activityID: String) {
+        tracked[activityID]?.finalized = true
     }
     mutating func recordDismissal(activityID: String) {
         if let tracked = tracked.removeValue(forKey: activityID) { dismissed.insert(tracked.gameID) }

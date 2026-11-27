@@ -43,6 +43,14 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     expect(registrationIds).toHaveLength(format === 'group_knockout' ? 6 : 4);
     const field = await prisma.v1TournamentField.create({ data: { tournamentId, name: '보존 구장', scopeKey: 'reset-kept-field' } });
     const time = await prisma.v1TournamentScheduleTime.create({ data: { tournamentId, scheduledAt: new Date('2026-12-01T01:00:00Z') } });
+    const team = await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] }, select: { teamId: true } });
+    const matchBefore = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fixtures[0].teamMatchId }, include: { game: true } });
+    const schedule = await prisma.v1TeamSchedule.upsert({ where: { teamId_teamMatchId: { teamId: team.teamId, teamMatchId: matchBefore.id } },
+      create: { teamId: team.teamId, teamMatchId: matchBefore.id, title: '초기화 감사 일정', type: 'MATCH', startAt: new Date('2026-12-01T01:00:00Z'), endAt: new Date('2026-12-01T02:00:00Z'), timezone: 'Asia/Seoul' },
+      update: { state: 'SCHEDULED' } });
+    await prisma.v1ScheduleGuestRecruitment.upsert({ where: { scheduleId: schedule.id },
+      create: { scheduleId: schedule.id, slots: 1, closesAt: new Date('2026-12-01T00:00:00Z'), state: 'OPEN' }, update: { state: 'OPEN' } });
+    await prisma.v1GameVisibilityPolicy.update({ where: { gameId: matchBefore.game!.id }, data: { mode: 'LIVE', lineupAt: new Date('2026-12-01T00:00:00Z') } });
     await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
     expect(await reset(tournamentId)).toEqual({ deletedFixtureCount: fixtures.length });
     expect(await live(tournamentId)).toEqual([]);
@@ -62,7 +70,14 @@ describe('대진 초기화 PostgreSQL 계약', () => {
       groups: expect.any(Array), slots: expect.any(Array), groupTeams: expect.any(Array), edges: expect.any(Array),
       standings: expect.any(Array), byes: expect.any(Array), overallStandings: expect.any(Array) });
     expect(audit.afterJson).toMatchObject({ result: 'succeeded', actorUserId: user.id, confirmationText: '초기화한다',
-      archivedFixtureIds: fixtures.map(f => f.teamMatchId), unpublished: true });
+      archivedFixtureIds: fixtures.map(f => f.teamMatchId), cancelledScheduleIds: expect.arrayContaining([schedule.id]), unpublished: true });
+    expect(audit.beforeJson).toMatchObject({ fixtures: expect.arrayContaining([expect.objectContaining({ teamMatchId: matchBefore.id,
+      teamMatch: expect.objectContaining({ homeSlotId: matchBefore.homeSlotId, awaySlotId: matchBefore.awaySlotId,
+        game: expect.objectContaining({ visibilityPolicy: expect.objectContaining({ mode: 'LIVE', lineupAt: '2026-12-01T00:00:00.000Z' }) }) }) })]),
+      schedules: expect.arrayContaining([expect.objectContaining({ id: schedule.id, state: 'SCHEDULED', guestRecruitment: expect.objectContaining({ state: 'OPEN' }) })]) });
+    expect((await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: schedule.id } })).state).toBe('CANCELLED');
+    expect((await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId: schedule.id } })).state).toBe('CLOSED');
+    expect(await prisma.v1GameVisibilityPolicy.findUniqueOrThrow({ where: { gameId: matchBefore.game!.id } })).toMatchObject({ mode: 'STATUS_ONLY', lineupAt: null });
   });
 
   it('단계형 초기화 후 같은 구성으로 새 대진을 생성할 수 있다', async () => {

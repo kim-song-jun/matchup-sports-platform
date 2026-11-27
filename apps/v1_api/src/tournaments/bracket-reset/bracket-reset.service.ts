@@ -10,6 +10,7 @@ import type { StoredStagePlan } from '../stages/stage-view';
 import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
 import { deleteTournamentGroupInTx, softDeleteTournamentFixtureInTx } from '../tournament-bracket-tx';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
+import { captureBracketResetState } from './bracket-reset-state';
 import { ResetTournamentBracketDto } from './bracket-reset.dto';
 
 type Tx = Prisma.TransactionClient;
@@ -27,17 +28,7 @@ export class BracketResetService {
       sixTeamMode: true, sixTeamBracket: true, bracketPublishedAt: true, bracketPublishScheduledAt: true,
     } });
     if (!tournament) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, teamMatch: { deletedAt: null } },
-      orderBy: { teamMatchId: 'asc' }, include: { teamMatch: { select: { updatedAt: true, status: true, startAt: true,
-        game: { select: { version: true, state: true, currentOfficialRevisionId: true } } } } } });
-    const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
-    const slots = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
-    const groupTeams = await tx.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
-    const standings = await tx.v1TournamentStanding.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
-    const byes = await tx.v1TournamentByeSlot.findMany({ where: { group: { tournamentId: id } }, orderBy: { id: 'asc' } });
-    const overallStandings = await tx.v1TournamentOverallStanding.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' } });
-    const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, orderBy: { id: 'asc' },
-      select: { id: true, sourceTeamMatchId: true, targetTeamMatchId: true, sourceOutcome: true, targetSide: true } });
+    const { fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings, schedules } = await captureBracketResetState(tx, id);
     const unsafe = await tx.v1TeamMatch.findFirst({ where: { tournamentId: id, deletedAt: null, tournamentDetails: { isNot: null },
       OR: [{ status: { not: 'matched' } }, { game: { is: null } }, { game: { isNot: untouchedGameWhere(true) } }] }, select: { id: true } });
     const preservesPreliminaryGroups = !tournament.stagePlan && (tournament.format === 'league' || tournament.format === 'group_knockout'
@@ -47,7 +38,7 @@ export class BracketResetService {
       : unsafe ? '시작했거나 경기 기록·결과가 있는 경기가 있어 대진을 초기화할 수 없어요.'
         : fixtures.length + slots.length + groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').length === 0
           ? '초기화할 대진이 없어요.' : null;
-    const before = { tournament, fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings };
+    const before = { tournament, fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings, schedules };
     const hash = createHash('sha256').update(JSON.stringify(before)).digest('hex');
     return { ...before, hash, blockedReason, preservesPreliminaryGroups };
   }
@@ -77,7 +68,7 @@ export class BracketResetService {
       if (snapshot.hash !== dto.expectedSnapshot) throw new ConflictException({ code: 'BRACKET_RESET_STALE', message: '확인하는 동안 대진이나 설정이 바뀌었어요. 최신 내용을 확인한 뒤 다시 초기화해 주세요.' });
 
       if (!tournament.stagePlan && tournament.multiFinals && tournament.format === 'league_knockouts') {
-        await this.finals.resetInTx(tx, admin, id, { expectedRevision: tournament.multiFinalsRevision });
+        await this.finals.resetInTx(tx, admin, id, { expectedRevision: tournament.multiFinalsRevision, confirmationText: dto.confirmationText });
       } else {
         const dependencies = [...snapshot.edges, ...snapshot.fixtures.flatMap(fixture => fixture.parentTeamMatchId
           ? [{ sourceTeamMatchId: fixture.parentTeamMatchId, targetTeamMatchId: fixture.teamMatchId }] : [])];
@@ -108,6 +99,7 @@ export class BracketResetService {
           archivedFixtureIds: snapshot.fixtures.map(fixture => fixture.teamMatchId),
           removedGroupIds: snapshot.groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').map(group => group.id),
           clearedSlotIds: snapshot.slots.map(slot => slot.id), clearedAdvancementEdgeIds: snapshot.edges.map(edge => edge.id),
+          cancelledScheduleIds: snapshot.schedules.map(schedule => schedule.id),
           unpublished: true, settingsPreserved: true } }, tx);
       return { deletedFixtureCount: snapshot.fixtures.length };
     }, options);

@@ -97,6 +97,8 @@ export function useConfirm() {
 
   const modal = (
     <ConfirmModal
+      // A new opening must be blank on its first committed frame, before reset effects run.
+      key={state === null ? 'closed' : 'open'}
       open={state !== null}
       title={state?.title ?? ''}
       message={state?.message ?? ''}

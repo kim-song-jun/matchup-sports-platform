@@ -36,7 +36,7 @@ export function useMultiFinals(id: string, enabled: boolean) {
   const setup = useMutation({ mutationFn: (input: { expectedRevision: number; groups: Array<Omit<MultiFinalGroup, 'id'> & { registrationIds?: string[] }>; finals: MultiFinalDefinition[] }) => v1Post<MultiFinalView>(`${path}/setup`, input), onSuccess: refresh });
   const select = useMutation({ mutationFn: (input: { expectedRevision: number; finals: MultiFinalDefinition[] }) => v1Put<MultiFinalView>(`${path}/selection`, input), onSuccess: refresh });
   const updatePreliminary = useMutation({ mutationFn: (input: Parameters<typeof setup.mutateAsync>[0]) => v1Put<MultiFinalView>(`${path}/preliminary`, input), onSuccess: refresh });
-  const reset = useMutation({ mutationFn: (input: { expectedRevision: number }) => v1Post<MultiFinalView>(`${path}/reset`, input), onSuccess: refresh });
+  const reset = useMutation({ mutationFn: (input: { expectedRevision: number }) => v1Post<MultiFinalView>(`${path}/reset`, { ...input, confirmationText: '초기화한다' }), onSuccess: refresh });
   const preview = useMutation({ mutationFn: () => v1Post<MultiFinalPreview>(`${path}/preview`, {}) });
   const generate = useMutation({ mutationFn: (input: { expectedRevision: number; previewHash: string; requestId: string }) => v1Post<{ revision: number }>(`${path}/generate`, input), onSuccess: refresh });
   const assignmentPreview = useMutation({ mutationFn: (input: { expectedRevision: number; finalName: string; assignmentPolicy: MultiFinalPolicy; tiePicks?: MultiFinalTiePick[] }) =>

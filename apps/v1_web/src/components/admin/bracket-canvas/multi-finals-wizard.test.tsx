@@ -75,9 +75,14 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
     const props = show('create');
     fireEvent.click(await screen.findByRole('button', { name: '대진 초기화' }));
     const confirmation = await screen.findByRole('dialog', { name: '대진 초기화' });
+    expect(within(confirmation).getByRole('button', { name: '대진 초기화' })).toBeDisabled();
+    fireEvent.change(within(confirmation).getByRole('textbox'), { target: { value: '초기화' } });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '대진 초기화' }));
+    expect(resetInput).toBeUndefined();
+    fireEvent.change(within(confirmation).getByRole('textbox'), { target: { value: '초기화한다' } });
     fireEvent.click(within(confirmation).getByRole('button', { name: '대진 초기화' }));
     const capacity = await screen.findByRole('spinbutton', { name: '1번째 조 팀 수' });
-    expect(resetInput).toEqual({ expectedRevision: 1 }); expect(updateInput).toBeUndefined(); expect(props.onApplied).not.toHaveBeenCalled();
+    expect(resetInput).toEqual({ expectedRevision: 1, confirmationText: '초기화한다' }); expect(updateInput).toBeUndefined(); expect(props.onApplied).not.toHaveBeenCalled();
     expect(screen.getByRole('combobox', { name: 'A조 1번 팀' })).toHaveValue('reg-0');
     fireEvent.change(capacity, { target: { value: '3' } });
     fireEvent.change(screen.getByRole('combobox', { name: 'A조 1번 팀' }), { target: { value: 'reg-2' } });
@@ -89,7 +94,9 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
   it('초기화 API가 거절하면 오류를 표시하고 저장된 편성을 잠근 채 유지한다', async () => {
     server.use(http.get(base, () => success({ ...savedView(), preliminaryFixtureCount: 6 })), http.post(`${base}/reset`, () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'BRACKET_LOCKED', message: '결과가 있는 경기는 초기화할 수 없어요.' }, { status: 409 })));
     show('create'); fireEvent.click(await screen.findByRole('button', { name: '대진 초기화' }));
-    fireEvent.click(within(await screen.findByRole('dialog', { name: '대진 초기화' })).getByRole('button', { name: '대진 초기화' }));
+    const confirmation = await screen.findByRole('dialog', { name: '대진 초기화' });
+    fireEvent.change(within(confirmation).getByRole('textbox'), { target: { value: '초기화한다' } });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '대진 초기화' }));
     await screen.findByText('결과가 있는 경기는 초기화할 수 없어요.');
     expect(screen.queryByRole('spinbutton', { name: '1번째 조 팀 수' })).not.toBeInTheDocument();
     expect(screen.getByText('A조 · 4팀 · 1회전')).toBeInTheDocument();

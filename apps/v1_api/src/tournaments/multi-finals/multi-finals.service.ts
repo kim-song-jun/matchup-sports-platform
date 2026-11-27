@@ -1,5 +1,5 @@
 import { normalizeFinalColors, reconcileFinalColors } from './multi-finals-colors';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -15,6 +15,7 @@ import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { BracketTemplateService } from '../templates/bracket-template.service';
 import { deleteTournamentGroupInTx, softDeleteTournamentFixtureInTx } from '../tournament-bracket-tx';
 import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
+import { captureBracketResetState } from '../bracket-reset/bracket-reset-state';
 import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
@@ -190,6 +191,7 @@ export class MultiFinalsService {
   }
   /** Reused by the stage-aware top-level reset inside its locked snapshot transaction. */
   async resetInTx(tx: Tx, admin: V1TournamentManager, id: string, dto: MultiFinalResetDto) {
+    if (dto.confirmationText !== '초기화한다') throw new BadRequestException({ code: 'BRACKET_RESET_CONFIRMATION_REQUIRED', message: '초기화한다를 정확히 입력해 주세요.' });
     const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
     const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
     const config = this.config(tournament.multiFinals);
@@ -198,6 +200,7 @@ export class MultiFinalsService {
     await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id WHERE d.tournament_id = ${id} AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
     const fixtures = await this.assertUnstarted(tx, id, true);
     const before = await this.view(tx, id);
+    const bracketState = await captureBracketResetState(tx, id);
     const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
     for (const fixtureId of orderFixturesForTeardown(fixtures.map(f => f.teamMatchId), edges)) await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
     await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
@@ -209,7 +212,11 @@ export class MultiFinalsService {
     const next: Config = { ...config, groups: before.groups, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
     await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
     await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.reset', targetType: 'tournament', targetId: id,
-      beforeJson: JSON.parse(JSON.stringify(config)), afterJson: { deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
+      reason: '초기화한다',
+      beforeJson: JSON.parse(JSON.stringify({ ...config, bracketState: { tournament, ...bracketState } })),
+      afterJson: { result: 'succeeded', actorUserId: admin.userId, confirmationText: dto.confirmationText,
+        cancelledScheduleIds: bracketState.schedules.map(schedule => schedule.id),
+        archivedFixtureIds: fixtures.map(f => f.teamMatchId), deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
     return this.view(tx, id);
   }
   async select(user: V1AuthUser, id: string, dto: MultiFinalSelectionDto) {

@@ -7,6 +7,13 @@ export interface SaveStep {
   readonly run: () => Promise<void>;
 }
 
+/**
+ * key 에 보낼 내용까지 담은 단계. 일부만 저장된 뒤 값을 다시 고치면 key 가 달라져, 이미 끝난 호출로 건너뛰지 않는다.
+ */
+export function saveStep(name: string, label: string, payload: unknown, run: () => Promise<void>): SaveStep {
+  return { key: `${name}:${JSON.stringify(payload)}`, label, run };
+}
+
 export type SaveOutcome =
   | { status: 'saved'; done: readonly string[] }
   | { status: 'failed'; done: readonly string[]; failedKey: string; message: string };

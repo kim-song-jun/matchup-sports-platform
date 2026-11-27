@@ -3,6 +3,7 @@
 import { useImperativeHandle } from 'react';
 import { formatEntryFee } from '@/lib/date-utils';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
+import { saveStep } from '@/lib/sequential-save';
 import type { V1Tournament, V1UpdateTournamentPayload } from '@/types/api';
 import {
   DEFAULT_BADGE,
@@ -11,7 +12,6 @@ import {
   TextField,
   infoFieldId,
   requiredNeedKeys,
-  saveStep,
   textOrNull,
   useSectionDraft,
 } from './form-kit';

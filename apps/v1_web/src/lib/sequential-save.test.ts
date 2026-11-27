@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { partialSaveMessage, runSaveSteps, type SaveStep } from './sequential-save';
+import { partialSaveMessage, runSaveSteps, saveStep, type SaveStep } from './sequential-save';
 
 const step = (key: string, label: string, run: () => Promise<void> = async () => {}): SaveStep => ({ key, label, run });
 const reason = () => '사유';
@@ -79,5 +79,20 @@ describe('partialSaveMessage', () => {
 
   it('returns the reason unchanged when nothing was saved', () => {
     expect(partialSaveMessage([], '경기 규칙', '사유')).toBe('사유');
+  });
+});
+
+describe('saveStep', () => {
+  it('같은 이름이라도 보낼 내용이 다르면 key 가 달라, 끝난 단계로 건너뛰지 않는다', async () => {
+    const first = saveStep('periods', '경기 시간', { minutes: [20, 20] }, async () => {});
+    const sameAgain = saveStep('periods', '경기 시간', { minutes: [20, 20] }, vi.fn(async () => {}));
+    const edited = saveStep('periods', '경기 시간', { minutes: [25, 25] }, vi.fn(async () => {}));
+    const completed = new Set([first.key]);
+
+    await runSaveSteps([sameAgain], completed, reason);
+    await runSaveSteps([edited], completed, reason);
+
+    expect(sameAgain.run).not.toHaveBeenCalled();
+    expect(edited.run).toHaveBeenCalledTimes(1);
   });
 });

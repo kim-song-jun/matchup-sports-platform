@@ -8,8 +8,9 @@ import {
 } from '@/components/admin/tournaments/tournament-gender-choice-field';
 import { useV1MasterSports } from '@/hooks/use-v1-api';
 import { TOURNAMENT_FORMAT_NAMES } from '@/lib/tournament-format-labels';
+import { saveStep } from '@/lib/sequential-save';
 import type { V1Tournament, V1TournamentFormat, V1UpdateTournamentPayload } from '@/types/api';
-import { Field, FormGroup, TextField, fieldBorderCls, fieldInputCls, infoFieldId, saveStep, useSectionDraft } from './form-kit';
+import { Field, FormGroup, TextField, fieldBorderCls, fieldInputCls, infoFieldId, useSectionDraft } from './form-kit';
 import type { InfoSectionDefinition, InfoSectionFormProps } from './types';
 
 const TITLE_MAX_LENGTH = 100;

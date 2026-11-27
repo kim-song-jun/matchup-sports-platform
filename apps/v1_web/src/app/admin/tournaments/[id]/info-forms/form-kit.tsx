@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { SaveStep } from '@/lib/sequential-save';
 import type { V1Tournament } from '@/types/api';
 import { tournamentInfoNeeds, type InfoNeedKey } from '../info-sections';
 import type { BuildResult, InfoSummaryBadgeTone, InfoSummaryRow } from './types';
@@ -22,13 +21,6 @@ export function requiredNeedKeys(tournament: V1Tournament): ReadonlySet<InfoNeed
       .filter((need) => need.tier === 'required')
       .map((need) => need.key),
   );
-}
-
-/**
- * 저장 단계의 key — 보낼 내용까지 담는다. 일부만 저장된 뒤 값을 다시 고치면 key 가 달라져, 이미 끝난 호출로 건너뛰지 않는다.
- */
-export function saveStep(name: string, label: string, payload: unknown, run: () => Promise<void>): SaveStep {
-  return { key: `${name}:${JSON.stringify(payload)}`, label, run };
 }
 
 interface FieldError {

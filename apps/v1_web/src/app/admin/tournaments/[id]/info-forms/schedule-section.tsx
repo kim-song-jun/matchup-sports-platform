@@ -5,6 +5,7 @@ import { TournamentDatetimeField } from '@/components/admin/tournaments/tourname
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { PLACE_NAME_MAX_LENGTH, placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
+import { saveStep } from '@/lib/sequential-save';
 import type { V1Tournament, V1UpdateTournamentPayload } from '@/types/api';
 import { formatDate, formatDateRange } from '../tournament-admin-shared';
 import {
@@ -16,7 +17,6 @@ import {
   fieldTextareaCls,
   infoFieldId,
   requiredNeedKeys,
-  saveStep,
   textOrNull,
   useSectionDraft,
 } from './form-kit';

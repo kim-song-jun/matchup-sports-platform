@@ -29,10 +29,10 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     const onConfirm = vi.fn();
     render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={onConfirm} />);
 
-    const submit = screen.getByRole('button', { name: '이대로 종료' });
+    const submit = screen.getByRole('button', { name: '이대로 끝내기' });
     expect(submit).toBeDisabled();
     // 비활성 버튼만 두면 현장에서 왜 못 누르는지 못 찾는다 — 이유를 말로 준다.
-    expect(screen.getByText('사유를 적어야 종료할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('사유를 적어야 끝낼 수 있어요.')).toBeInTheDocument();
 
     fireEvent.click(submit);
     expect(onConfirm).not.toHaveBeenCalled();
@@ -44,7 +44,7 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
 
     fireEvent.change(screen.getByLabelText(/사유/), { target: { value: '   ' } });
 
-    expect(screen.getByRole('button', { name: '이대로 종료' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '이대로 끝내기' })).toBeDisabled();
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
@@ -53,12 +53,12 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={onConfirm} />);
 
     fireEvent.change(screen.getByLabelText(/사유/), { target: { value: '미출석' } });
-    expect(screen.getByRole('button', { name: '이대로 종료' })).toBeDisabled();
-    expect(screen.getByText('기권한 팀을 골라야 종료할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이대로 끝내기' })).toBeDisabled();
+    expect(screen.getByText('기권한 팀을 골라야 끝낼 수 있어요.')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: '원정팀' })).not.toBeChecked();
 
     fireEvent.click(screen.getByRole('radio', { name: '원정팀' }));
-    fireEvent.click(screen.getByRole('button', { name: '이대로 종료' }));
+    fireEvent.click(screen.getByRole('button', { name: '이대로 끝내기' }));
     expect(onConfirm).toHaveBeenCalledWith({ reason: 'FORFEIT', note: '미출석', forfeitSideId: 'side-away' });
   });
 
@@ -80,7 +80,7 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     fireEvent.change(screen.getByLabelText(/사유/), {
       target: { value: '  원정팀 미출석  ' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '이대로 종료' }));
+    fireEvent.click(screen.getByRole('button', { name: '이대로 끝내기' }));
 
     // 앞뒤 공백은 다듬어 보낸다 — 서버도 trim 하지만 화면이 보낸 값과 저장되는 값이
     // 다르면 나중에 "내가 적은 그대로인가"를 확인할 수 없다.
@@ -93,7 +93,7 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /경기 중단/ }));
     fireEvent.change(screen.getByLabelText(/사유/), { target: { value: '낙뢰로 중단' } });
-    fireEvent.click(screen.getByRole('button', { name: '이대로 종료' }));
+    fireEvent.click(screen.getByRole('button', { name: '이대로 끝내기' }));
 
     expect(onConfirm).toHaveBeenCalledWith({ reason: 'ABANDONED', note: '낙뢰로 중단' });
   });
@@ -129,7 +129,29 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     render(<AbnormalEndDialog sides={SIDES} open submitting onCancel={vi.fn()} onConfirm={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/사유/), { target: { value: '원정팀 미출석' } });
-    expect(screen.getByRole('button', { name: '이대로 종료' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '이대로 끝내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+  });
+
+  it('제목은 「몰수·중단으로 끝내기」다', () => {
+    render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByRole('dialog', { name: '몰수·중단으로 끝내기' })).toBeInTheDocument();
+  });
+
+  it('패널 최대 높이는 100dvh − 48px 이다', () => {
+    render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByRole('dialog').style.maxHeight).toBe('calc(100dvh - 48px)');
+  });
+
+  it('사유 입력칸은 스크롤 영역 안, 취소·이대로 끝내기 버튼은 스크롤 영역 밖이다', () => {
+    render(<AbnormalEndDialog sides={SIDES} open onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    const scrollArea = screen.getByLabelText(/사유/).closest('[class*="overflow-y-auto"]');
+    expect(scrollArea).not.toBeNull();
+    expect(dialog).toContainElement(scrollArea as HTMLElement);
+    expect(scrollArea).toContainElement(screen.getByRole('radio', { name: '원정팀' }));
+    expect(scrollArea).not.toContainElement(screen.getByRole('button', { name: '취소' }));
+    expect(scrollArea).not.toContainElement(screen.getByRole('button', { name: '이대로 끝내기' }));
+    expect(scrollArea).not.toContainElement(screen.getByRole('heading', { name: '몰수·중단으로 끝내기' }));
   });
 });

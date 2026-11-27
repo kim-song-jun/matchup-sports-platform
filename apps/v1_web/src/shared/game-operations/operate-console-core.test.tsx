@@ -1371,7 +1371,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^몰수·중단으로 종료/ }));
 
       expect(screen.getAllByRole('dialog')).toHaveLength(1);
-      expect(screen.getByRole('dialog', { name: '몰수·중단으로 종료' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: '몰수·중단으로 끝내기' })).toBeInTheDocument();
     });
 
     it('일시 중지 중에도 "경기 종료"는 헤더가 아니라 시트 안에 있다', () => {

@@ -6,7 +6,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { type MatchOutcomeReason, matchOutcomeReasonLabel } from '@/lib/match-outcome';
 
 /**
- * 몰수·중단으로 경기를 종료할 때 **사유를 받는** 다이얼로그.
+ * 몰수·중단으로 경기를 끝낼 때 **사유를 받는** 다이얼로그.
  *
  * 1차 대회(2026-08-15~16) 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는
  * 몰수를 임의 점수(3-0 등)로 수기 입력하는 수밖에 없었고, 정상 종료와 구분되지 않아
@@ -87,16 +87,19 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-5 shadow-xl"
+        // 낮은 화면(키보드가 올라온 폰)에서도 버튼 줄이 화면 안에 남게 본문만 스크롤한다.
+        style={{ maxHeight: 'calc(100dvh - 48px)' }}
+        className="flex w-full max-w-md flex-col rounded-2xl bg-[var(--surface)] p-5 shadow-xl"
       >
         {/* text-strong 을 명시한다 — 지금은 body 상속색(--foreground)과 값이 같아 화면은
             달라지지 않지만(라이트 둘 다 --grey900, 다크 둘 다 #f2f4f6), 형제 다이얼로그 셋
             (assist/penalty/action-target)이 전부 명시하고 있어 이 하나만 상속에 기대면
             두 토큰이 갈라지는 날 여기만 조용히 드리프트한다. */}
-        <h2 id={titleId} className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
-          몰수·중단으로 종료
+        <h2 id={titleId} className="shrink-0 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
+          몰수·중단으로 끝내기
         </h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
+        <div className="-mx-1 mt-2 min-h-0 flex-1 overflow-y-auto px-1">
+        <p className="text-sm text-[var(--text-muted)]">
           {needsForfeitSide
             ? '몰수는 기권한 팀 0점, 상대 3점(3:0)으로 확정돼요(상대가 이미 3골 차 이상 앞서 있으면 적어 둔 점수 그대로예요).'
             : '점수는 지금 기록된 값 그대로 확정돼요.'}{' '}
@@ -161,7 +164,7 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
               ))}
             </div>
             {forfeitSideId === '' ? (
-              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">기권한 팀을 골라야 종료할 수 있어요.</p>
+              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">기권한 팀을 골라야 끝낼 수 있어요.</p>
             ) : null}
           </fieldset>
         ) : null}
@@ -182,12 +185,13 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
           {/* 왜 못 누르는지 말해 준다 — 비활성 버튼만 두면 운영자가 현장에서 이유를 못 찾는다. */}
           {trimmed.length === 0 ? (
             <p className="mt-1 text-xs text-[var(--text-muted)]">
-              사유를 적어야 종료할 수 있어요.
+              사유를 적어야 끝낼 수 있어요.
             </p>
           ) : null}
         </div>
+        </div>
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5 flex shrink-0 gap-2">
           <Button variant="outline" block onClick={onCancel} disabled={submitting}>
             취소
           </Button>
@@ -198,7 +202,7 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
             loading={submitting}
             onClick={() => onConfirm(needsForfeitSide ? { reason, note: trimmed, forfeitSideId } : { reason, note: trimmed })}
           >
-            이대로 종료
+            이대로 끝내기
           </Button>
         </div>
       </div>

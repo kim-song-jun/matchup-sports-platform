@@ -308,3 +308,5 @@ A successful send with `historyRecorded:false` means the send completed but its 
 and must not trigger an automatic resend. See [admin/ops](domains/admin-and-ops.md#수동-푸시-발송과-이력).
 
 Alpha 목업 생성의 `staged` 카테고리는 기존 성공/오류 envelope와 mutation-admin 권한을 따르며, 결과·종료 자동생성 요청은 저장 전에 400 `MOCK_SEED_STATUS_UNSUPPORTED`로 거절해요. [세부 계약](./domains/tournaments.md#단계별-기본-목업-staged-2026-11-26).
+
+공통 결선 수동 배정에서 템플릿의 조·순위는 기본 추천값이며 다른 조의 확정 참가팀도 경기 자리에 지정할 수 있다.

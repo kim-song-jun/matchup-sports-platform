@@ -30,6 +30,11 @@ public final class TeameetMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage message) {
+        // 위젯만 새로 그리는 조용한 메시지(득점·하프타임 등) — 알림을 띄우지 않으니 알림 동의와 무관하게 처리한다.
+        if ("widget_refresh".equals(message.getData().get("type"))) {
+            WidgetUpdater.refresh(this, null);
+            return;
+        }
         boolean permissionGranted = PushPermission.isGranted(this);
         boolean optedIn = InstallationIdentity.isOptedIn(this);
         logDiagnostic("message_received permission=" + permissionGranted + " optedIn=" + optedIn);

@@ -276,6 +276,7 @@ public final class MainActivity extends AppCompatActivity {
                     publishNativeCapabilities();
                     publishKakaoCapability();
                     publishSystemInsets();
+                    WidgetUpdater.onWebPageFinished(MainActivity.this, CookieManager.getInstance().getCookie(BuildConfig.WEB_ORIGIN));
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
                     } else if (InstallationIdentity.isRegistered(MainActivity.this)) {

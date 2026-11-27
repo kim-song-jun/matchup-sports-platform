@@ -53,6 +53,19 @@
                 <data android:scheme="kakao${kakaoNativeAppKey}" android:host="oauth" />
             </intent-filter>
         </activity>
+        <receiver android:name=".TeameetWidgetProvider" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_medium_info" />
+        </receiver>
+        <receiver android:name=".TeameetSquareWidgetProvider" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_square_info" />
+        </receiver>
+        <receiver android:name=".WidgetActionReceiver" android:exported="false" />
         <service android:name=".TeameetMessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

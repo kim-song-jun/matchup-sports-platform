@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 import os
 
-/// Local-only PR-C lifecycle. Background time is opportunistic; remote start/push is PR-D.
+/// Foreground-only start, per-card push update/end. Remote start is deliberately excluded.
 @available(iOS 16.2, *)
 @MainActor
 final class MatchActivityCoordinator {
@@ -12,7 +12,9 @@ final class MatchActivityCoordinator {
     private let key = "teameet.match-activities.v1"
     private var ledger: MatchActivityLedger
     private var loop: Task<Void, Never>?
+    private var contentObservers: [String: Task<Void, Never>] = [:]
     private var observers: [String: Task<Void, Never>] = [:]
+    private let push = MatchActivityPushCoordinator()
     private var finals: [String: Activity<MatchActivityAttributes>] = [:]
     private var refreshing = false
     private var foreground = false
@@ -50,6 +52,7 @@ final class MatchActivityCoordinator {
         onFailure?(message)
     }
     func setForeground(_ active: Bool) {
+        push.onFailure = { [weak self] in self?.report($0) }
         foreground = active
         let previous = loop
         previous?.cancel(); loop = nil
@@ -96,7 +99,7 @@ final class MatchActivityCoordinator {
               let game = MatchActivityLedger.selected(in: model), game.state == "ENDED",
               let current = try? WidgetStore().read(), current.revision == snapshot.revision,
               current.token != nil, current.owner != nil else { return }
-        _ = ledger.endDeadline(gameID: game.gameId, now: snapshot.updatedAt)
+        _ = ledger.endDeadline(gameID: game.gameId, now: snapshot.updatedAt, endedAt: game.endedAt)
         save()
     }
     private var allActivities: [Activity<MatchActivityAttributes>] {
@@ -105,27 +108,60 @@ final class MatchActivityCoordinator {
         return Array(activities.values)
     }
     private func observe(_ activity: Activity<MatchActivityAttributes>) {
+        push.observe(activity)
+        if contentObservers[activity.id] == nil {
+            contentObservers[activity.id] = Task { [weak self] in
+                for await content in activity.contentUpdates {
+                    guard !Task.isCancelled, let self else { return }
+                    if content.state.state == "ENDED" {
+                        self.adoptFinal(activity, state: content.state)
+                        if let ended = self.ledger.firstEndedAt[activity.attributes.gameID],
+                           ended + MatchActivityLedger.finalDisplayMs <= WidgetFormat.now { await self.remove(activity) }
+                    }
+                }
+            }
+        }
         guard observers[activity.id] == nil else { return }
         observers[activity.id] = Task { [weak self] in
             for await state in activity.activityStateUpdates {
                 guard !Task.isCancelled, let self else { return }
+                if state == .ended {
+                    self.adoptFinal(activity)
+                    await self.push.revoke(activity)
+                }
                 if state == .dismissed {
                     self.ledger.recordDismissal(activityID: activity.id)
                     self.save()
                     self.finals.removeValue(forKey: activity.id)
+                    self.contentObservers.removeValue(forKey: activity.id)?.cancel()
                     self.observers[activity.id] = nil
+                    await self.push.revoke(activity)
                     return
                 }
             }
         }
     }
     private func remove(_ activity: Activity<MatchActivityAttributes>) async {
+        contentObservers.removeValue(forKey: activity.id)?.cancel()
         observers.removeValue(forKey: activity.id)?.cancel()
         if activity.activityState == .dismissed { ledger.recordDismissal(activityID: activity.id) }
         else { ledger.tracked.removeValue(forKey: activity.id) }
         finals.removeValue(forKey: activity.id)
         save()
         await MatchActivityCommands.end(id: activity.id)
+        await push.revoke(activity)
+    }
+    private func adoptFinal(_ activity: Activity<MatchActivityAttributes>, state supplied: MatchActivityState? = nil) {
+        let state = supplied ?? activity.content.state
+        guard state.state == "ENDED", let current = try? WidgetStore().read(), current.token != nil,
+              current.owner != nil, current.revision == activity.attributes.revision else { return }
+        _ = ledger.endDeadline(gameID: activity.attributes.gameID, now: WidgetFormat.now, endedAt: state.endedAt)
+        if ledger.tracked[activity.id] == nil {
+            ledger.tracked[activity.id] = .init(gameID: activity.attributes.gameID, revision: activity.attributes.revision)
+        }
+        ledger.recordEnd(activityID: activity.id)
+        finals[activity.id] = activity
+        save()
     }
     func refresh(allowStart: Bool) async {
         guard !refreshing else { return }
@@ -133,6 +169,7 @@ final class MatchActivityCoordinator {
         defer { refreshing = false }
         let generation = sessionGeneration
         do {
+            await push.retryRevocations()
             let store = try WidgetStore()
             let initial = try store.read()
             guard initial.token != nil, initial.owner != nil else {
@@ -148,14 +185,19 @@ final class MatchActivityCoordinator {
             // State updates may have been missed while suspended or after process termination.
             for id in Array(ledger.tracked.keys) where !present.contains(id) { ledger.recordDismissal(activityID: id) }
             save()
-            for activity in activities where activity.attributes.revision == initial.revision
-                && (activity.activityState == .active || activity.activityState == .stale) {
+            for activity in activities where activity.attributes.revision == initial.revision {
+                if activity.activityState == .ended { adoptFinal(activity) }
+                guard activity.activityState == .active || activity.activityState == .stale else { continue }
                 if ledger.tracked[activity.id] == nil {
                     ledger.tracked[activity.id] = .init(gameID: activity.attributes.gameID, revision: initial.revision)
                 }
             }
             save()
-            for activity in activities where ledger.tracked[activity.id] != nil {
+            for activity in activities where activity.activityState == .ended {
+                if let ended = ledger.firstEndedAt[activity.attributes.gameID],
+                   ended + MatchActivityLedger.finalDisplayMs <= WidgetFormat.now { await remove(activity) }
+            }
+            for activity in allActivities where ledger.tracked[activity.id] != nil {
                 if activity.activityState == .dismissed || (activity.activityState == .ended && ledger.tracked[activity.id]?.finalized != true) { ledger.recordDismissal(activityID: activity.id); save() }
                 else { observe(activity) }
             }
@@ -178,7 +220,7 @@ final class MatchActivityCoordinator {
             // Terminating the app during a download must not restart the fifteen-minute window.
             let finalDeadline: Int64?
             if game.state == "ENDED" {
-                finalDeadline = ledger.endDeadline(gameID: game.gameId, now: snapshot.updatedAt)
+                finalDeadline = ledger.endDeadline(gameID: game.gameId, now: snapshot.updatedAt, endedAt: game.endedAt)
                 save()
             } else { finalDeadline = nil }
             for activity in allActivities where activity.attributes.revision != current.revision || activity.attributes.gameID != game.gameId {
@@ -202,6 +244,7 @@ final class MatchActivityCoordinator {
             if game.state == "ENDED" {
                 guard let deadline = finalDeadline else { return }
                 if let activity {
+                    state.endedAt = ledger.firstEndedAt[game.gameId]
                     ledger.recordEnd(activityID: activity.id)
                     save()
                     finals[activity.id] = activity
@@ -221,7 +264,7 @@ final class MatchActivityCoordinator {
                     guard !Task.isCancelled, generation == sessionGeneration,
                           try store.read().revision == current.revision else { return }
                     let created = try Activity.request(attributes: MatchActivityAttributes(gameID: game.gameId, revision: current.revision),
-                                                       content: content, pushType: nil)
+                                                       content: content, pushType: .token)
                     ledger.tracked[created.id] = .init(gameID: game.gameId, revision: current.revision)
                     save()
                     if storageHealthy { observe(created) }

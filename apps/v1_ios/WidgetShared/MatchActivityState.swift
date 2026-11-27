@@ -13,6 +13,7 @@ struct MatchActivityState: Codable, Hashable, Sendable {
     var teamLogoKey: String?
     var opponentLogoKey: String?
     var updatedAt: Int64
+    var endedAt: Int64? = nil
 
     init(game: WidgetModel.Live, now: Int64) {
         teamName = String(game.teamName.prefix(80))
@@ -24,6 +25,7 @@ struct MatchActivityState: Codable, Hashable, Sendable {
         penalties = game.penalties
         period = game.period
         updatedAt = now
+        endedAt = game.endedAt
     }
     var status: String {
         if state == "ENDED" { return "종료" }
@@ -46,8 +48,9 @@ struct MatchActivityLedger: Codable, Sendable {
     var firstEndedAt: [String: Int64] = [:]
     static let finalDisplayMs: Int64 = 15 * 60 * 1000
 
-    mutating func endDeadline(gameID: String, now: Int64) -> Int64 {
-        if firstEndedAt[gameID] == nil { firstEndedAt[gameID] = now }
+    mutating func endDeadline(gameID: String, now: Int64, endedAt: Int64? = nil) -> Int64 {
+        let observation = endedAt.flatMap(WidgetMilliseconds.valid) ?? now
+        firstEndedAt[gameID] = min(firstEndedAt[gameID] ?? observation, observation)
         return firstEndedAt[gameID]! + Self.finalDisplayMs
     }
     mutating func recordEnd(activityID: String) {
@@ -60,5 +63,31 @@ struct MatchActivityLedger: Codable, Sendable {
     func mayStart(_ game: WidgetModel.Live) -> Bool {
         !game.gameId.isEmpty && ["LIVE", "PAUSED"].contains(game.state)
             && !dismissed.contains(game.gameId)
+    }
+}
+
+extension MatchActivityState {
+    private enum CodingKeys: String, CodingKey {
+        case teamName, opponentName, competitionName, venueName, state, score, penalties, period
+        case teamLogoKey, opponentLogoKey, updatedAt, endedAt
+    }
+    private enum LogoKeys: String, CodingKey { case teamLogoUrl, opponentLogoUrl }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let logos = try decoder.container(keyedBy: LogoKeys.self)
+        teamName = String((try c.decodeIfPresent(String.self, forKey: .teamName) ?? "").prefix(80))
+        opponentName = String((try c.decodeIfPresent(String.self, forKey: .opponentName) ?? "상대팀").prefix(80))
+        competitionName = String((try c.decodeIfPresent(String.self, forKey: .competitionName) ?? "").prefix(80))
+        venueName = String((try c.decodeIfPresent(String.self, forKey: .venueName) ?? "").prefix(80))
+        state = try c.decode(String.self, forKey: .state)
+        score = try c.decodeIfPresent(WidgetModel.Score.self, forKey: .score)
+        penalties = try c.decodeIfPresent(WidgetModel.Score.self, forKey: .penalties)
+        period = try c.decodeIfPresent(WidgetModel.Period.self, forKey: .period)
+        teamLogoKey = try c.decodeIfPresent(String.self, forKey: .teamLogoKey)
+            ?? logos.decodeIfPresent(String.self, forKey: .teamLogoUrl).map(WidgetLogoKey.make)
+        opponentLogoKey = try c.decodeIfPresent(String.self, forKey: .opponentLogoKey)
+            ?? logos.decodeIfPresent(String.self, forKey: .opponentLogoUrl).map(WidgetLogoKey.make)
+        updatedAt = try WidgetMilliseconds.decode(c, .updatedAt) ?? WidgetFormat.now
+        endedAt = try WidgetMilliseconds.decode(c, .endedAt)
     }
 }

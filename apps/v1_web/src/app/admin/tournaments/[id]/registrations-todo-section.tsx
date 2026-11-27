@@ -25,7 +25,7 @@ type Layout = 'wide' | 'narrow' | 'select';
 const CARD_CLASS =
   'rounded-[var(--radius-container)] border shadow-[var(--shadow-card)]';
 const CHECKBOX_CLASS =
-  'h-5 w-5 cursor-pointer rounded accent-[var(--blue500)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+  'mt-0.5 h-5 w-5 cursor-pointer rounded accent-[var(--blue500)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
 const TODO_META = ['roster', 'autoConfirmed', 'depositor', 'applied', 'cancelRequested', 'payment'] as const;
 const NOT_SELECTABLE_NOTE = '한꺼번에 처리할 수 없어요. 고르기를 끝내고 따로 처리해요.';
 
@@ -244,7 +244,7 @@ function TodoRow({
         className={`${CARD_CLASS} flex ${tinted ? 'tm-on-tint border-[var(--blue500)] bg-[var(--blue50)]' : bulkSelectable ? 'border-[var(--border)] bg-[var(--card-surface)]' : 'tm-on-tint border-[var(--border)] bg-[var(--surface-soft)] shadow-none'}`}
       >
         {bulkSelectable ? (
-          <label className="flex w-[52px] shrink-0 cursor-pointer items-start justify-center pt-[17px]">{checkbox}</label>
+          <label className="flex w-[52px] shrink-0 cursor-pointer items-start justify-center pt-4">{checkbox}</label>
         ) : (
           <span aria-hidden="true" className="w-[52px] shrink-0" />
         )}
@@ -280,7 +280,7 @@ function TodoRow({
       className={`${CARD_CLASS} grid items-start ${hasSelectColumn ? 'grid-cols-[52px_minmax(0,1fr)_auto]' : 'grid-cols-[16px_minmax(0,1fr)_auto]'} ${tinted ? 'tm-on-tint border-[var(--blue500)] bg-[var(--blue50)]' : 'border-[var(--border)] bg-[var(--card-surface)]'}`}
     >
       {hasSelectColumn && bulkSelectable ? (
-        <label className="flex cursor-pointer items-start justify-center self-stretch rounded-l-[var(--radius-container)] pt-[18px] hover:bg-[var(--surface-soft)]">
+        <label className="flex cursor-pointer items-start justify-center self-stretch rounded-l-[var(--radius-container)] pt-4 hover:bg-[var(--surface-soft)]">
           {checkbox}
         </label>
       ) : (

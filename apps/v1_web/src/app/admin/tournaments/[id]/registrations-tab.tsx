@@ -310,11 +310,11 @@ export function RegistrationsTab({
 
       {isError ? (
         <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-[var(--red700)] font-medium">{extractErrorMessage(error, '신청 목록을 불러오지 못했어요.')}</p>
+          <p className="text-[length:var(--font-size-body-sm)] text-[var(--red700)] font-medium">{extractErrorMessage(error, '신청 목록을 불러오지 못했어요.')}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="text-[length:var(--font-size-body-sm)] text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>

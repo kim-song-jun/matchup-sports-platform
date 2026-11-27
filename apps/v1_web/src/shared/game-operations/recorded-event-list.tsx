@@ -94,6 +94,7 @@ export function RecordedEventList({
   disabled = false,
   order = 'chronological',
   periodCount,
+  maxRows,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -134,6 +135,8 @@ export function RecordedEventList({
    * 시간순(`chronological`, 기본값)을 유지한다. 순서는 서버가 준 `sequence` 순서를 뒤집기만 한다.
    */
   readonly order?: 'chronological' | 'newest-first';
+  /** 보이는 순서에서 위 N줄만 그린다. 경고 누적 퇴장처럼 합친 줄은 한 줄로 센다. */
+  readonly maxRows?: number;
 }) {
   const lastReset = history.reduce((sequence, event) =>
     event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
@@ -201,7 +204,8 @@ export function RecordedEventList({
     };
   });
   const listedEvents = visibleEvents.filter((event) => !secondYellowRed.absorbedYellows.has(event));
-  const orderedEvents = order === 'newest-first' ? [...listedEvents].reverse() : listedEvents;
+  const sortedEvents = order === 'newest-first' ? [...listedEvents].reverse() : listedEvents;
+  const orderedEvents = maxRows === undefined ? sortedEvents : sortedEvents.slice(0, maxRows);
   const reverseHandler = onReverseEvent ?? onReverseSubstitution;
 
   /**

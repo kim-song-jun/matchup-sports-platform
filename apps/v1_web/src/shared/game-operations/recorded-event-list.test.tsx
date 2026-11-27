@@ -109,6 +109,21 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
     expect(renderedClocks('newest-first')).toEqual(['15', '11', '6']);
   });
 
+  it('maxRows=4 이면 최신 4줄만, 생략하면 전부', () => {
+    const six = [1, 2, 3, 4, 5, 6].map((sequence) => goal(sequence, HOME_SIDE_ID, 'p-jung', sequence * 60000));
+    const clocks = () =>
+      within(screen.getByRole('list', { name: '기록된 이벤트 목록' }))
+        .getAllByRole('listitem')
+        .map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1]);
+
+    const { unmount } = render(<RecordedEventList events={six} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={4} />);
+    expect(clocks()).toEqual(['6', '5', '4', '3']);
+    unmount();
+
+    render(<RecordedEventList events={six} sides={SIDES} lineups={LINEUPS} order="newest-first" />);
+    expect(clocks()).toEqual(['6', '5', '4', '3', '2', '1']);
+  });
+
   it('뒤집는 것이 입력 배열을 바꾸지 않는다 (콘솔의 스코어 파생 등 다른 소비처가 같은 배열을 쓴다)', () => {
     const events = [...EVENTS];
     render(<RecordedEventList events={events} sides={SIDES} lineups={LINEUPS} order="newest-first" />);
@@ -746,5 +761,28 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
 
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).not.toHaveTextContent('경고 누적 퇴장');
     expect(rowsOf()).toHaveLength(3);
+  });
+
+  it('합친 경고 누적 퇴장 줄은 한 줄로 센다', () => {
+    render(
+      <RecordedEventList
+        events={[
+          goal(1, HOME_SIDE_ID, 'p-jung', 5 * 60000),
+          card(2, 'YELLOW', 1, 11 * 60000),
+          card(3, 'YELLOW', 2, 31 * 60000),
+          card(4, 'RED', 2, 31 * 60000),
+        ]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        order="newest-first"
+        maxRows={2}
+      />,
+    );
+
+    const rows = rowsOf();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('경고 누적 퇴장');
+    expect(rows[1]).toHaveTextContent('옐로카드');
+    expect(screen.queryByText(/^골/)).toBeNull();
   });
 });

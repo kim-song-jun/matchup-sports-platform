@@ -178,7 +178,7 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
 
   return (
     <div>
-      <FormGroup title="출전 인원" badge={lineupIsDefault ? SPORT_DEFAULT_BADGE : undefined} hint="한 경기에 경기장에 서는 인원이에요(골키퍼 포함).">
+      <FormGroup title="출전 인원" badge={lineupIsDefault ? SPORT_DEFAULT_BADGE : undefined} hint="한 경기에 동시에 뛰는 인원이에요(골키퍼 포함).">
         {lineupNote ? (
           <p className={`text-[length:var(--font-size-caption)] ${noteToneCls[lineupNote.tone]}`}>{lineupNote.text}</p>
         ) : (

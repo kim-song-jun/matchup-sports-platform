@@ -178,6 +178,13 @@ describe('경기 규칙 섹션 시트 — 저장 순서(경기 시간 → 경기
 });
 
 describe('경기 규칙 섹션 시트 — 출전 인원·교체', () => {
+  it('출전 인원 설명은 「경기장」 대신 동시에 뛰는 인원이라고 말한다', async () => {
+    const view = await open(start());
+
+    expect(view.inSheet().getByText('한 경기에 동시에 뛰는 인원이에요(골키퍼 포함).')).toBeInTheDocument();
+    expect(view.inSheet().queryByText(/경기장/)).toBeNull();
+  });
+
   it('출전 인원을 고르면 lineupMaxPlayers 만 보낸다', async () => {
     const backend = start();
     const view = await open(backend);

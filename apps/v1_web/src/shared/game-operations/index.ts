@@ -16,4 +16,6 @@ export { AbnormalEndDialog, type AbnormalEndReason, type AbnormalEndDialogProps 
 export { EventToasts, useEventToast, type EventToastAction, type EventToastItem } from './event-toast';
 export { TeamFoulCounterBar } from './team-foul-counter-bar';
 export { QueueStatusPanel, hasUnsettledQueueItems, type QueueStatusPanelProps } from './queue-status-panel';
+export { deriveConsoleStatus, type ConsoleStatus, type ConsoleStatusActionKind, type ConsoleStatusInput, type ConsoleStatusItem, type ConsoleStatusKey } from './console-status';
+export { ConsoleStatusPanel, type ConsoleStatusPanelProps, type RosterRow } from './console-status-panel';
 export { OperateConsoleCore, type OperateConsoleCoreProps, type GameDetailQueryState, type OperateConsoleRuntime, COMMAND_RESPONSE_TIMEOUT_MS, teammatesForSide } from './operate-console-core';

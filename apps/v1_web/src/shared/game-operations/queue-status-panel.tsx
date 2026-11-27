@@ -65,7 +65,7 @@ export function QueueStatusPanel({ items, onRetry, disabled = false, isRetryable
   }
 
   return (
-    <ul className="flex flex-col gap-2" aria-label="전송 대기·실패한 이벤트 목록">
+    <ul className="flex flex-col gap-2" aria-label="전송 대기·실패한 기록 목록">
       {unsettled.map((item) => (
         <li
           key={item.clientEventId}

@@ -83,7 +83,7 @@ function participantSuffix(
  * 해당 참가자가 빠진 경우 이름을 지어내지 않고 팀명만 남긴다.
  */
 export function RecordedEventList({
-  events,
+  events: history,
   sides,
   lineups,
   onAttachAssist,
@@ -135,6 +135,10 @@ export function RecordedEventList({
    */
   readonly order?: 'chronological' | 'newest-first';
 }) {
+  const lastReset = history.reduce((sequence, event) =>
+    event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
+      ? Math.max(sequence, event.sequence) : sequence, 0);
+  const events = lastReset ? history.filter(event => event.sequence > lastReset) : history;
   if (events.length === 0) {
     return (
       <p className="px-1 py-3 text-xs text-[var(--text-muted)]">

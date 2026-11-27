@@ -874,6 +874,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async gameStartReverts(user: V1AuthUser, query: AdminLogsQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const where = { action: 'GAME_REVERT_START', resourceType: 'GAME' };
+    const [rows, total] = await Promise.all([
+      this.prisma.v1OperationAudit.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1, ...paginationArgs(query, limit),
+        include: { teamMatch: { select: { title: true } } },
+      }),
+      this.prisma.v1OperationAudit.count({ where }),
+    ]);
+    const items = rows.slice(0, limit).map(row => ({
+      actionLogId: row.id, adminUserId: null, actorUserId: row.actorUserId, actionType: row.action,
+      targetType: 'game', targetId: row.resourceId, reason: row.teamMatch?.title ?? null,
+      beforeState: row.before, afterState: row.after, createdAt: row.createdAt,
+    }));
+    const hasNext = rows.length > limit;
+    return { items, pageInfo: buildPageInfo({ page: query.page, limit, total, hasNext,
+      nextCursor: hasNext ? items.at(-1)?.actionLogId ?? null : null }) };
+  }
+
   async statusChangeLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);

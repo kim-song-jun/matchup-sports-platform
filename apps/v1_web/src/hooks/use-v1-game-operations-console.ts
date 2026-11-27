@@ -1381,6 +1381,7 @@ export function useV1GameOperationsConsole(
   const applyCommandResult = useCallback((result: { state: GameState; version: number }): boolean => {
     if (!isMountedRef.current || activeGameIdRef.current !== gameId || result.version < acceptedVersionRef.current) return false;
     acceptedVersionRef.current = result.version;
+    if (result.state === 'SCHEDULED') resyncEventsRef.current?.();
     setGameSnapshot((current) =>
       current ? { ...current, state: result.state, version: result.version } : current,
     );

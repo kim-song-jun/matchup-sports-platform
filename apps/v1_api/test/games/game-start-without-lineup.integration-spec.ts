@@ -190,6 +190,49 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     expect(lineups.every((lineup) => lineup.state === 'DRAFT')).toBe(true);
   });
 
+  it('시작 취소는 빈 경기에도 정확한 확인 문구가 필요하고, 골을 무효 처리한 뒤 다시 시작할 수 있다', async () => {
+    const fixtureId = randomUUID();
+    const { competitionConfigVersionId } = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    await prisma.v1TeamMatch.create({ data: {
+      id: fixtureId, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam,
+      approvedApplicantTeamId: ids.awayTeam, title: '시작 취소', status: 'matched', startAt: new Date(),
+      competitionConfigVersionId,
+    } });
+    await prisma.v1TournamentMatchDetails.create({ data: {
+      teamMatchId: fixtureId, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, legNumber: 1,
+      homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration,
+    } });
+    const input: GameSourceCreationInput = { sourceType: V1GameSourceType.TEAM_MATCH, sourceId: fixtureId, competitionConfigVersionId,
+      sides: [{ sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: '홈' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '원정' }], participants: [] };
+    const { gameId: resetGameId } = await prisma.$transaction(tx => service.createFromSourceInTransaction(tx, input, creationContext(fixtureId, input)));
+    const user = authUser(ids.operatorUser);
+    const lease = await service.requestTakeover(user, resetGameId, { clientInstanceId: randomUUID(), lastSequence: 0 });
+    const version = async () => (await prisma.v1Game.findUniqueOrThrow({ where: { id: resetGameId } })).version;
+    const command = async (name: 'start' | 'revert-start', confirmation?: string) => {
+      const clientCommandId = randomUUID();
+      return service.executeCommand(user, resetGameId, name, clientCommandId, { expectedVersion: await version(),
+        clientCommandId, takeoverToken: lease.takeoverToken, occurredAt: new Date().toISOString(),
+        payload: confirmation === undefined ? {} : { confirmation } });
+    };
+    await command('start');
+    await expect(command('revert-start')).rejects.toMatchObject({ response: { code: 'START_REVERT_CONFIRMATION_REQUIRED' } });
+    const side = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId: resetGameId } });
+    const clientEventId = randomUUID();
+    const goal = await service.appendEvent(user, resetGameId, clientEventId, { expectedVersion: await version(),
+      clientEventId, takeoverToken: lease.takeoverToken, type: 'GOAL' as never, sideId: side.id,
+      period: 1, clockMs: 100, occurredAt: new Date().toISOString(), payload: { anonymous: true } });
+    await expect(command('revert-start', '취소한다 ')).rejects.toMatchObject({ response: { code: 'START_REVERT_CONFIRMATION_REQUIRED' } });
+    expect((await command('revert-start', '취소한다')).state).toBe('SCHEDULED');
+    expect(await prisma.v1GameEvent.findFirst({ where: { gameId: resetGameId, reversesEventId: goal.event!.id } })).toBeTruthy();
+    expect(await prisma.v1GamePeriod.findFirst({ where: { gameId: resetGameId, number: 1 } })).toMatchObject({
+      state: 'SCHEDULED', startedAt: null, endedAt: null, pausedAt: null, pausedTotalMs: 0,
+    });
+    expect((await command('start')).state).toBe('LIVE');
+    expect((await command('revert-start', '취소한다')).state).toBe('SCHEDULED');
+    expect(await prisma.v1GameEvent.count({ where: { gameId: resetGameId, type: 'CORRECTION' } })).toBe(1);
+  });
+
   it.each([
     { label: '홈 명단 없음', home: false, away: true },
     { label: '원정 명단 없음', home: true, away: false },

@@ -3371,10 +3371,10 @@ export function useV1AdminHubInbox() {
   });
 }
 
-export function useV1AdminActionLogs(filters?: ListFilters) {
+export function useV1AdminActionLogs(filters?: ListFilters, gameStartReverts = false) {
   return useQuery({
-    queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
-    queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
+    queryKey: [...v1Keys.adminActionLogs(), ...(gameStartReverts ? ['game-start-reverts'] : []), filters ?? {}] as const,
+    queryFn: () => v1Get<CursorPage<V1AdminLog>>(gameStartReverts ? '/admin/game-start-reverts' : '/admin/action-logs', filters),
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
     // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
     placeholderData: keepPreviousData,

@@ -188,6 +188,11 @@ export class AdminController {
     return this.adminService.actionLogs(user, query);
   }
 
+  @Get('game-start-reverts')
+  gameStartReverts(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto) {
+    return this.adminService.gameStartReverts(user, query);
+  }
+
   @Get('status-change-logs')
   statusChangeLogs(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto) {
     return this.adminService.statusChangeLogs(user, query);

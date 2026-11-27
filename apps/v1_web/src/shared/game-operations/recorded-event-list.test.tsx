@@ -118,6 +118,15 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
 });
 
 describe('RecordedEventList', () => {
+  it('경기 시작 취소 뒤에는 이전 기록을 비우고 재시작 후의 이벤트만 표시한다', () => {
+    const first = goal(1, HOME_SIDE_ID, 'p-jung', 100);
+    const reset: GameEventRecord = { ...first, id: 'reset', sequence: 2, type: 'CORRECTION',
+      reversesEventId: first.id, payload: { reason: '경기 시작 취소', commandId: 'cmd' } };
+    const view = render(<RecordedEventList events={[first, reset]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
+    view.rerender(<RecordedEventList events={[first, reset, goal(3, HOME_SIDE_ID, 'p-jung', 300)]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
   it('renders each server-confirmed event with its clock, scorer and side', () => {
     render(
       <RecordedEventList

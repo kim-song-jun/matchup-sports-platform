@@ -216,7 +216,7 @@ export function secondYellowConfirmCopy(
  * 건네받는 형태로 경계를 나눴다.
  */
 export function commandConfirmCopy(
-  command: Exclude<GameCommandName, 'revert-period'>,
+  command: Exclude<GameCommandName, 'revert-period' | 'revert-start'>,
   label: string,
   ctx: {
     readonly sides: readonly GameSide[];

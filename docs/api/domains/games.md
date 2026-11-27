@@ -400,3 +400,7 @@ The effective roster still prefers the latest non-invalidated `SUBMITTED`/`LOCKE
 - 공식 결과는 기존 리비전을 수정하지 않고 점수·상대팀·기존 개인 기록을 보존한 새 공식 리비전으로 출전자만 변경한다. `GAME_RESULT_OFFICIAL` 후속 이벤트로 공식 조회 캐시·개인 전적을 갱신한다. 확정 전은 제출 결과와 기록 명단의 후속 리비전을 만들고 `GAME_RESULT_SUBMITTED`를 발행한다. 결과 없는 종료 경기는 기록 명단의 후속 제출본을 만든다.
 - 뺄 선수에게 득점·도움·반칙·카드·MVP·득점 타임라인이 있거나 되돌릴 과거 참가자 행이 없으면 `409 ROSTER_RESULT_CORRECTION_REQUIRED`: 결과 정정에서 함께 수정하도록 실제 이유를 안내한다. 전체 batch는 rollback한다. 이미 적용한 변경 재요청은 기존 멱등 처리를 유지한다.
 - 경기별 조정 기록에 ADMIN 주체가 남고, 기존 라인업·결과 이력을 삭제하지 않는다. API 응답 필드 추가나 DB migration은 없다.
+
+### 경기 시작 취소
+
+대회·정규 리그 경기 운영자는 LIVE(하프타임 포함) 또는 PAUSED 상태에서 `POST /games/:gameId/commands/revert-start`를 호출한다. 일반 경기 명령과 같은 권한·버전·멱등성 검사를 적용한다. 이벤트가 없어도 `payload.confirmation`은 정확히 `취소한다`여야 한다. 다른 값은 422, 시작 전·종료·취소 상태는 409다. 유효 이벤트별로 CORRECTION을 추가하고 모든 피리어드 시계를 초기화해 SCHEDULED로 돌린다. 대진, 시간, 구장, 명단은 유지한다.

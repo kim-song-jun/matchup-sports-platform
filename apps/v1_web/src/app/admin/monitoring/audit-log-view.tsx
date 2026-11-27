@@ -37,7 +37,7 @@ interface FilterOption {
   label: string;
 }
 
-type TabKey = 'action' | 'status';
+type TabKey = 'action' | 'status' | 'game';
 
 interface Tab {
   key: TabKey;
@@ -65,6 +65,7 @@ const TARGET_TYPE_OPTIONS: FilterOption[] = [
 
 const TABS: Tab[] = [
   { key: 'action', label: '운영 활동' },
+  { key: 'game', label: '경기 시작 취소' },
   { key: 'status', label: '상태 변경' },
 ];
 
@@ -188,9 +189,9 @@ function ActionLogDetailModal({ log, onClose }: { log: V1AdminLog | null; onClos
         <DetailRow label="시각" value={formatAdminDateTimeShort(log.createdAt)} />
         <DetailRow label="대상" value={adminTargetTypeLabel(log.targetType)} />
         <DetailRow label="대상 ID" value={<span className="font-mono">{log.targetId ?? '—'}</span>} />
-        <DetailRow label="실행자" value={<span className="font-mono">{log.adminUserId ?? '—'}</span>} />
+        <DetailRow label="실행자" value={<span className="font-mono">{log.adminUserId ?? log.actorUserId ?? '—'}</span>} />
         <DetailRow label="액션" value={<span className="font-mono">{log.actionType}</span>} />
-        <DetailRow label="사유" value={log.reason ?? '—'} />
+        <DetailRow label={log.actionType === 'GAME_REVERT_START' ? '경기명' : '사유'} value={log.reason ?? '—'} />
       </dl>
       <StateBlock label="변경 전" value={log.beforeState} />
       <StateBlock label="변경 후" value={log.afterState} />
@@ -236,7 +237,7 @@ function StatusLogDetailModal({
 }
 
 // ── Action log panel ──────────────────────────────────────────────────────
-function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
+function ActionLogPanel({ targetType, gameStartReverts = false }: { targetType: TargetTypeFilter; gameStartReverts?: boolean }) {
   // 커서 누적("더 보기") 대신 페이지 단위 교체다. 로그는 "어디쯤 보고 있는지"와 총량을
   // 알아야 조사가 되는데, 누적 목록은 그 감각을 주지 못한다.
   // 페이지 상태·리셋·pagination 조립은 공용 훅 소관 — 두 패널이 각자 재구현하던 로직.
@@ -253,7 +254,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
     limit: PAGE_SIZE,
   };
 
-  const { data, isPending, isFetching, isError, refetch } = useV1AdminActionLogs(filters);
+  const { data, isPending, isFetching, isError, refetch } = useV1AdminActionLogs(filters, gameStartReverts);
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
 
@@ -303,11 +304,11 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             key: 'adminUserId',
             header: '실행자',
             width: 'w-[120px]',
-            render: (row) => <IdCell id={row.adminUserId} />,
+            render: (row) => <IdCell id={row.adminUserId ?? row.actorUserId} href={adminAuditActorHref(row.actorUserId)} />,
           },
           {
             key: 'reason',
-            header: '사유',
+            header: gameStartReverts ? '경기명' : '사유',
             render: (row) => <ReasonCell reason={row.reason} />,
           },
         ]}
@@ -487,7 +488,7 @@ export function AuditLogView() {
 
       {/* ── Target type filter chips — 수제 칩을 공용 AdminFilterBar 로 교체.
           마크업이 AdminFilterBar 의 statusOptions 렌더와 구조적으로 동일했다. ── */}
-      <div className="mb-5">
+      {activeTab !== 'game' && <div className="mb-5">
         <AdminFilterBar
           hideSearch
           searchValue=""
@@ -497,7 +498,7 @@ export function AuditLogView() {
           activeStatus={targetType}
           onStatusChange={(value) => setTargetType(value as TargetTypeFilter)}
         />
-      </div>
+      </div>}
 
       {/* ── Tab panels ───────────────────────────────────────────── */}
       {TABS.map((tab) => (
@@ -508,7 +509,7 @@ export function AuditLogView() {
           aria-labelledby={`audit-tab-${tab.key}`}
           hidden={activeTab !== tab.key}
         >
-          {tab.key === 'action' ? (
+          {tab.key === 'game' ? (activeTab === 'game' && <ActionLogPanel targetType="" gameStartReverts />) : tab.key === 'action' ? (
             <ActionLogPanel targetType={targetType} />
           ) : (
             <StatusLogPanel targetType={targetType} />

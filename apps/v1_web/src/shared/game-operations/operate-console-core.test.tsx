@@ -2366,6 +2366,23 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
       testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
   });
 
+  it('경기 시작 취소는 기록이 없어도 정확한 문구를 입력해야 전송한다', async () => {
+    render(<CoreHarness />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작 취소' }));
+    const form = screen.getByRole('form', { name: '경기 시작 취소' });
+    const submit = within(form).getByRole('button', { name: '경기 시작 취소 확정' });
+    expect(submit).toBeDisabled();
+    const input = within(form).getByPlaceholderText('취소한다');
+    expect(input).toHaveValue('');
+    expect(screen.getByRole('heading', { name: /기록된 이벤트/ }).closest('section')).toContainElement(form);
+    fireEvent.change(input, { target: { value: '취소한다 ' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(input, { target: { value: '취소한다' } });
+    fireEvent.click(submit);
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'revert-start',
+      expect.objectContaining({ payload: { confirmation: '취소한다' } }), COMMAND_OPTIONS));
+  });
+
   it('"경기 종료"를 눌러도 확인 전에는 실행되지 않고, 취소하면 아무 일도 일어나지 않는다', async () => {
     render(<CoreHarness />);
 

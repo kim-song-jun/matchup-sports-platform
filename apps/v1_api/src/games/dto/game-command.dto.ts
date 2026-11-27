@@ -13,6 +13,7 @@ import {
 
 export enum GameCommandName {
   start = 'start',
+  revert_start = 'revert-start',
   pause = 'pause',
   resume = 'resume',
   end = 'end',

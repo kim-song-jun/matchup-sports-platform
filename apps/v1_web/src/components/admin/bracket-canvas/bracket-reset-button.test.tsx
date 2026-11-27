@@ -43,10 +43,33 @@ async function show(canWrite = true) {
 async function confirmReset() {
   fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
   const dialog = await screen.findByRole('dialog', { name: '대진 초기화' });
+  fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '초기화한다' } });
   fireEvent.click(within(dialog).getByRole('button', { name: '대진 초기화' }));
 }
 
 describe('대진 초기화 실제 HTTP 흐름', () => {
+  it('정확한 문구 입력만 실행을 허용하고 다시 열면 입력을 비운다', async () => {
+    await show();
+    fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
+    let dialog = await screen.findByRole('dialog', { name: '대진 초기화' });
+    const submit = within(dialog).getByRole('button', { name: '대진 초기화' });
+    const input = within(dialog).getByRole('textbox', { name: /초기화한다/ });
+    for (const value of ['', '초기화', ' 초기화한다', '초기화한다 ']) {
+      fireEvent.change(input, { target: { value } });
+      expect(submit).toBeDisabled(); fireEvent.click(submit);
+      expect(writes).toEqual([]); expect(count).toBe(3);
+    }
+    fireEvent.change(input, { target: { value: '초기화한다' } });
+    expect(submit).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: '대진 초기화' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
+    dialog = await screen.findByRole('dialog', { name: '대진 초기화' });
+    expect(within(dialog).getByRole('textbox')).toHaveValue('');
+    expect(within(dialog).getByRole('button', { name: '대진 초기화' })).toBeDisabled();
+    expect(writes).toEqual([]);
+  });
   it('영향을 안내한 뒤 확인한 snapshot을 저장하고 대진 화면을 다시 조회한다', async () => {
     const { toast } = await show();
     fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
@@ -55,9 +78,10 @@ describe('대진 초기화 실제 HTTP 흐름', () => {
     expect(dialog).toHaveTextContent('참가 신청·대회 규칙·등록 시간과 구장은 유지');
     expect(dialog).toHaveTextContent('대진 공개도 해제');
     expect(writes).toEqual([]);
-    fireEvent.click(within(dialog).getByRole('button', { name: '대진 초기화' }));
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '초기화한다' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '대진 초기화' }));
     await screen.findByText('현재 경기 0개');
-    expect(writes).toEqual([{ expectedSnapshot: 'a'.repeat(64), confirmed: true }]);
+    expect(writes).toEqual([{ expectedSnapshot: 'a'.repeat(64), confirmed: true, confirmationText: '초기화한다' }]);
     await waitFor(() => expect(toast).toHaveBeenCalledWith('3경기의 대진을 초기화했어요.', 'success'));
   });
   it('취소하면 쓰기 요청과 기존 대진 변경이 없다', async () => {

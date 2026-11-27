@@ -1,3 +1,7 @@
+## 2026-11-27 — 초기화 직접 입력 확인·감사 상세 (후속 검증 중)
+
+[시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md). `초기화한다` 정확 입력 후 실행, 서버 동일 검증, 변경 전 전체 대진/편성/순위와 처리 결과 감사의 원자적 저장. API22/Web23 및 타입/정책 PASS. 최종 감사 실패 rollback 실DB·새 PR/Alpha3폭은 진행 중이다.
+
 ## 2026-11-27 — 대진 상단 초기화 버튼 (PR #2553 검증 중)
 
 [시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · [PR #2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553). 사용자 A안 상단 독립 버튼. 네 대회 형식·단계형 preview snapshot 검증, 실제 soft-delete·일정 취소·공개 해제·설정 보존을 하나의 tx로 처리한다. API36/Web31·양쪽 타입/정책 PASS, 실제 PostgreSQL11건은 CI 대상. Alpha 0/15(인증 자료 미확인·미배포), 사용자 대회 초기화는 실행하지 않았다.

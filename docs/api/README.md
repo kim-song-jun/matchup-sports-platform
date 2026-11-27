@@ -209,3 +209,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 회원 화면 대리 조회는 최근 로그인한 owner/ops가 별도 감사 grant로 시작하는 10분 조회 전용 세션이다. 일반 로그인 쿠키는 유지하며 모든 쓰기·운영 경로·소켓은 차단하고, 종료 시 감사 기록 후 관리자 화면으로 복귀한다. [관리자·운영 계약](./domains/admin-and-ops.md#회원-화면-대리-조회-2026-11-19)을 따른다.
 
 목업 생성의 `format=staged`는 예선·본선 기본 구성을 만든 뒤 기존 단계 편집기로 세부 설정해요. 상태·결과 제한과 응답 계약은 [단계별 목업](./domains/tournaments.md#단계별-기본-목업-staged-2026-11-26)을 따라요.
+
+대진 초기화 POST는 정확한 confirmationText(초기화한다)를 요구하며, 변경 전 전체 대진 상태와 처리 결과 감사가 같은 트랜잭션에 저장된다. 상세는 tournaments 도메인 계약을 따른다.

@@ -13,6 +13,6 @@ export function useBracketReset(tournamentId: string) {
   const path = `/admin/tournaments/${encodeURIComponent(tournamentId)}/bracket`;
   const preview = () => v1Get<BracketResetPreview>(`${path}/reset-preview`);
   const reset = useMutation({ mutationFn: (expectedSnapshot: string) =>
-    v1Post<{ deletedFixtureCount: number }>(`${path}/reset`, { expectedSnapshot, confirmed: true }) });
+    v1Post<{ deletedFixtureCount: number }>(`${path}/reset`, { expectedSnapshot, confirmed: true, confirmationText: '초기화한다' }) });
   return { preview, reset };
 }

@@ -24,7 +24,7 @@ export function BracketResetButton({ tournamentId, canWrite, showToast }: {
     try {
       const preview = await api.preview();
       if (!preview.canReset) { setError(preview.blockedReason ?? '현재 대진은 초기화할 수 없어요.'); return; }
-      const accepted = await confirm({ title: '대진 초기화', tone: 'danger', confirmLabel: '대진 초기화',
+      const accepted = await confirm({ title: '대진 초기화', tone: 'danger', confirmLabel: '대진 초기화', confirmationText: '초기화한다',
         message: `${preview.fixtureCount}경기의 대진·일정·자리와 진출 연결을 초기화해요. 참가 신청·대회 규칙·등록 시간과 구장은 유지해요. ${preview.stageBased ? '단계 구성은 유지하고 단계별 팀 배정은 해제해요.' : preview.preservesPreliminaryGroups ? '예선 조 편성과 팀 선택은 유지하고 결선 진출팀 선택은 해제해요.' : '생성된 그룹과 팀 배정도 해제해요.'} 대진 공개도 해제되며 되돌릴 수 없어요. 초기화할까요?` });
       if (!accepted) return;
       const result = await api.reset.mutateAsync(preview.snapshot);

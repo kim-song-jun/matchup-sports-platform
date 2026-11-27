@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -7,6 +7,7 @@ import { LeagueTimeAssignment } from './league-time-assignment';
 import { RegisteredFixtureTimePicker } from '@/components/admin/bracket-canvas/fixture-time-picker';
 import type { V1LeagueFixture } from '@/types/league-match';
 import { useState } from 'react';
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ back: vi.fn(), replace: vi.fn() }) }));
 const viewport = vi.hoisted(() => ({ wide: true }));
@@ -57,7 +58,7 @@ describe('league time assignment through the league API', () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
     await waitFor(() => expect(patches).toEqual([{ fieldId: 'court2' }]));
     expect(fixture).toMatchObject({ startAt: '2026-11-20T01:00:00.000Z', fieldId: 'court2', placeName: 'B구장', homeTeamId: 'home', awayTeamId: 'away' });
@@ -73,7 +74,7 @@ describe('league time assignment through the league API', () => {
     fail = true; show();
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
     expect(await screen.findByRole('alert')).toHaveTextContent('일정을 다시 확인해 주세요.');
     expect(fixture).toMatchObject({ fieldId: 'court1', startAt: '2026-11-20T01:00:00.000Z' });
@@ -82,24 +83,44 @@ describe('league time assignment through the league API', () => {
     const { onEditCourt } = show(false);
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     expect(screen.queryByLabelText('이 구장에 경기 배정')).not.toBeInTheDocument();
     expect(onEditCourt).not.toHaveBeenCalled();
     expect(patches).toEqual([]);
   });
-  it.each([false, true])('confirms court conflicts before saving (accepted: %s)', async accepted => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(accepted);
+  it.each([false, true])('구장이 겹치면 window.confirm 이 아니라 앱 확인 창을 띄운다 (그대로 배정: %s)', async accepted => {
+    const native = vi.spyOn(window, 'confirm');
     try {
       show(true, false, [{ ...fixture, teamMatchId: 'f2', fieldId: 'court2', title: '겹치는 경기' }]);
       fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
       await screen.findByRole('option', { name: 'B구장' });
-      fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+      fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
       fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('겹치는 경기'));
+      const dialog = await screen.findByRole('dialog', { name: '시간·구장이 겹쳐요' });
+      expect(native).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent('겹치는 경기');
+      expect(patches).toEqual([]);
+      fireEvent.click(within(dialog).getByRole('button', { name: accepted ? '그대로 배정' : '취소' }));
       if (accepted) await waitFor(() => expect(fixture.fieldId).toBe('court2'));
-      else expect(fixture.fieldId).toBe('court1');
+      else await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(fixture.fieldId).toBe(accepted ? 'court2' : 'court1');
       expect(patches).toEqual(accepted ? [{ fieldId: 'court2' }] : []);
-    } finally { confirm.mockRestore(); }
+    } finally { native.mockRestore(); }
+  });
+  it.each([false, true])('시간을 옮길 때 겹치면 앱 확인 창을 띄운다 (그대로 배정: %s)', async accepted => {
+    const native = vi.spyOn(window, 'confirm');
+    try {
+      show(true, false, [{ ...fixture, teamMatchId: 'f2', startAt: stamp, title: '겹치는 경기' }]);
+      fireEvent.change(await screen.findByLabelText(`${formatKstDateShort(stamp)} ${formatKstTime(stamp)}에 경기 배정`), { target: { value: 'f1' } });
+      const dialog = await screen.findByRole('dialog', { name: '시간·구장이 겹쳐요' });
+      expect(native).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent('겹치는 경기');
+      expect(patches).toEqual([]);
+      fireEvent.click(within(dialog).getByRole('button', { name: accepted ? '그대로 배정' : '취소' }));
+      if (accepted) await waitFor(() => expect(fixture.startAt).toBe(stamp));
+      else await waitFor(() => expect(screen.queryByRole('dialog', { name: '시간·구장이 겹쳐요' })).toBeNull());
+      expect(patches).toEqual(accepted ? [{ startsAt: stamp }] : []);
+    } finally { native.mockRestore(); }
   });
   it('registers a KST time and moves a game using only startsAt, preserving court and teams', async () => {
     show();
@@ -168,7 +189,7 @@ describe('league time assignment through the league API', () => {
     const onChange = vi.fn();
     render(<QueryClientProvider client={client}><RegisteredFixtureTimePicker tournamentId="l1" surface="league-matches" allowUnset={false}
       fixtures={[{ scheduledAt: fixture.startAt }]} value="2026-11-20T10:00" onChange={onChange} disabled={false} /></QueryClientProvider>);
-    const select = screen.getByLabelText('등록된 시간에서 선택');
+    const select = screen.getByLabelText('시각 고르기');
     await waitFor(() => expect(select).toBeEnabled());
     expect(screen.getByRole('option', { name: '등록된 시간을 선택해 주세요' })).toBeDisabled();
     fireEvent.change(select, { target: { value: stamp } });

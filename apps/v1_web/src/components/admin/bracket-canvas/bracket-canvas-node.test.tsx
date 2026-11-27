@@ -87,12 +87,65 @@ describe('BracketCanvasNode — 표시', () => {
     expect(screen.getByRole('button', { name: '8강 1번 경기 열기' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('선택된 칸은 색만이 아니라 테두리 두께로도 구분된다', () => {
+  it('선택한 칸은 2px 색 테두리 없이 1px 테두리 + 옅은 배경', () => {
     renderNode(base, { selected: true });
-    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('2px');
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group.style.border).toBe('1px solid var(--blue500)');
+    expect(group.style.background).toBe('var(--blue50)');
     cleanup();
     renderNode(base, { selected: false });
-    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('1px');
+    const idle = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(idle.style.border).toBe('1px solid var(--border-strong)');
+    expect(idle.style.background).toBe('');
+  });
+
+  it('필터에 해당하지 않는 칸(filterMatch=false)은 옅은 지면·연한 테두리로 가라앉되 불투명도·글자색은 건드리지 않는다', () => {
+    const props = renderNode(base, { filterMatch: false });
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group).toHaveAttribute('data-filter-match', 'false');
+    expect(group.style.background).toBe('var(--surface-soft)');
+    expect(group.style.border).toBe('1px solid var(--border)');
+    // 글자 대비를 해치지 않는다: 불투명도·필터 없이 보조 글자 토큰을 올리는 표시 클래스만 쓴다.
+    expect(group.className).not.toMatch(/opacity-/);
+    expect(group.style.opacity).toBe('');
+    expect(group.style.filter).toBe('');
+    expect(group).toHaveClass('tm-on-tint');
+    expect(screen.getByText('8강 1번 경기')).toHaveStyle({ color: 'var(--text-strong)' });
+    expect(screen.getByRole('group', { name: '8강 1번 경기, 예정' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '8강 1번 경기 열기' }));
+    expect(props.onSelect).toHaveBeenCalledWith('f1');
+  });
+
+  it('필터에 해당하는 칸(filterMatch=true)은 푸터 글자를 굵고 진하게 해 색만이 아니라 글자로 눈에 띈다', () => {
+    renderNode(base, { filterMatch: true });
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group).toHaveAttribute('data-filter-match', 'true');
+    expect(group.style.background).toBe('');
+    const footer = screen.getByRole('button', { name: /^시간 미정 · 구장 미정$/ });
+    expect(footer).toHaveClass('font-semibold');
+    expect(footer).toHaveStyle({ color: 'var(--text-strong)' });
+  });
+
+  it('필터가 없으면(filterMatch 생략) 표시도 없고 푸터도 그대로다(대조군)', () => {
+    renderNode(base);
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group).not.toHaveAttribute('data-filter-match');
+    expect(group.style.background).toBe('');
+    expect(screen.getByRole('button', { name: /^시간 미정 · 구장 미정$/ })).not.toHaveClass('font-semibold');
+  });
+
+  it('선택한 칸은 필터에 해당하지 않아도 선택 표시(파란 1px 테두리 + 옅은 파랑)가 이긴다', () => {
+    renderNode(base, { selected: true, filterMatch: false });
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group.style.border).toBe('1px solid var(--blue500)');
+    expect(group.style.background).toBe('var(--blue50)');
+  });
+
+  it('칸 줄 이름은 홈·원정', () => {
+    renderNode(base);
+    expect(screen.getByRole('button', { name: /^홈 / })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^원정 / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^어웨이 / })).toBeNull();
   });
 });
 
@@ -106,7 +159,7 @@ describe('BracketCanvasNode — 눌러서 배정', () => {
 
   it('고른 팀이 있으면 누른 줄의 자리에 배정한다', () => {
     const props = renderNode(base, { pendingRegistrationId: 'reg-9' });
-    fireEvent.click(screen.getByRole('button', { name: '어웨이 2번 자리, 선택한 팀을 여기에 넣어요' }));
+    fireEvent.click(screen.getByRole('button', { name: '원정 2번 자리, 선택한 팀을 여기에 넣어요' }));
     expect(props.onAssign).toHaveBeenCalledWith('s-away', 'reg-9');
     expect(props.onSelect).not.toHaveBeenCalled();
   });
@@ -172,7 +225,7 @@ describe('BracketCanvasNode — 자리 없는 줄(경기에 팀을 직접 지정
 
   it('이전 경기로 채워지는 줄은 같은 상황에서도 배정하지 않고 칸을 연다', () => {
     const props = renderNode(slotless, { pendingRegistrationId: 'reg-9', ...noSlots });
-    fireEvent.click(screen.getByRole('button', { name: '어웨이 2번 자리' }));
+    fireEvent.click(screen.getByRole('button', { name: '원정 2번 자리' }));
     expect(props.onAssignDirect).not.toHaveBeenCalled();
     expect(props.onSelect).toHaveBeenCalledWith('f1');
   });

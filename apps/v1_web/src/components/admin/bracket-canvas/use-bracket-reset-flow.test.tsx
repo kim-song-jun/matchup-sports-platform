@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useV1DataSource } from '@/components/providers/v1-data-source';
-import { BracketResetButton } from './bracket-reset-button';
+import { useBracketResetFlow } from './use-bracket-reset-flow';
 
 const root = '*/api/v1/admin/tournaments/t1/bracket';
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data });
@@ -33,10 +33,18 @@ function CurrentBracket() {
   const query = useQuery({ queryKey: ['bracket', 't1'], queryFn: () => v1Get<{ count: number }>('/admin/tournaments/t1/bracket') });
   return <p>현재 경기 {query.data?.count ?? '조회 중'}개</p>;
 }
+function ResetHarness({ canWrite, showToast }: { canWrite: boolean; showToast: (message: string, variant?: 'success' | 'error') => void }) {
+  const flow = useBracketResetFlow('t1', canWrite, showToast);
+  return <>
+    <button type="button" disabled={flow.busy} onClick={flow.start}>대진 초기화</button>
+    {flow.error ? <p role="alert">{flow.error}</p> : null}
+    {flow.ConfirmModal}
+  </>;
+}
 async function show(canWrite = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const toast = vi.fn();
-  render(<QueryClientProvider client={client}><BracketResetButton tournamentId="t1" canWrite={canWrite} showToast={toast} /><CurrentBracket /></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><ResetHarness canWrite={canWrite} showToast={toast} /><CurrentBracket /></QueryClientProvider>);
   await screen.findByText('현재 경기 3개');
   return { client, toast };
 }
@@ -109,9 +117,18 @@ describe('대진 초기화 실제 HTTP 흐름', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('대진은 초기화됐지만 최신 화면을 불러오지 못했어요');
     expect(count).toBe(0); expect(toast).not.toHaveBeenCalled();
   });
-  it('조회 전용 관리자는 초기화 버튼이나 미리보기 요청이 없다', async () => {
+  it('쓰기 권한이 없으면 start 가 미리보기 요청도 확인창도 열지 않는다', async () => {
     await show(false);
-    expect(screen.queryByRole('button', { name: '대진 초기화' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
+    await new Promise(resolve => setTimeout(resolve, 30));
     expect(reads).toBe(0); expect(writes).toEqual([]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('진행 중에는 busy 로 한 번 더 시작하지 못한다', async () => {
+    await show();
+    const button = screen.getByRole('button', { name: '대진 초기화' });
+    fireEvent.click(button); fireEvent.click(button);
+    await screen.findByRole('dialog', { name: '대진 초기화' });
+    expect(reads).toBe(1);
   });
 });

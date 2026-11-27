@@ -33,7 +33,8 @@ function StatusMark({ status }: { status: CreateBarStatus }) {
   );
 }
 
-/** 폼 하단에 붙는 상태 줄과 제출 버튼. 버튼은 비어 있어도 누를 수 있다 — 누르면 첫 빈칸·오류 칸으로 간다. */
+/** 폼 하단에 붙는 상태 줄과 제출 버튼. 버튼은 비어 있어도 누를 수 있다 — 누르면 첫 빈칸·오류 칸으로 간다.
+ * lg 의 왼쪽 240px 은 어드민 사이드바(`admin-shell.tsx` 의 고정 폭)를 비운다. */
 export function CreateBottomBar({
   status,
   pending,
@@ -47,9 +48,9 @@ export function CreateBottomBar({
     <div
       role="region"
       aria-label="만들기"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]"
+      className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:left-[240px]"
     >
-      <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
         <p
           role="status"
           className={[

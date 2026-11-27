@@ -2,6 +2,7 @@ import type { TakeoverState } from '@/lib/game-operations-queue';
 import type { GameState } from '@/types/game-operations';
 
 export type ConsoleStatusKey =
+  | 'undoing'
   | 'takeover-handoff'
   | 'takeover-denied'
   | 'read-only'
@@ -56,6 +57,8 @@ export interface ConsoleStatusInput {
   readonly bannerMessage: string | null;
   readonly retryLabel: string | null;
   readonly queue: { readonly waiting: number; readonly failed: number };
+  /** 방금 누른 되돌리기. `sending` 은 요청이 서버에 가 있는 동안, `waiting` 은 다른 전송이 끝나기를 기다리는 동안이다. */
+  readonly undo: 'waiting' | 'sending' | null;
   readonly endPeriodLabel: string;
   readonly gameOperationsErrorMessage: (code: string) => string;
 }
@@ -95,6 +98,18 @@ export function deriveConsoleStatus(input: ConsoleStatusInput): ConsoleStatus {
   const disconnected = connection === 'disconnected' && (!leaseRequired || takeoverEnabled);
   const items: ConsoleStatusItem[] = [];
 
+  // 방금 누른 것의 결과라 맨 앞에 둔다 — 기록 버튼이 잠긴 까닭도 이 줄이 말한다.
+  if (input.undo !== null) {
+    items.push({
+      key: 'undoing',
+      tone: 'info',
+      title: '되돌리는 중이에요…',
+      body:
+        input.undo === 'sending'
+          ? '끝날 때까지 기록 버튼을 잠깐 막아 둬요.'
+          : '보내던 기록을 다 보낸 뒤에 되돌려요.',
+    });
+  }
   if (input.handoff !== null) {
     items.push({
       key: 'takeover-handoff',

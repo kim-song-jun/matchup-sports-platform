@@ -64,6 +64,9 @@ function statusSheet() {
 
 const score = () => screen.getByLabelText(/^스코어 /).getAttribute('aria-label');
 
+/** The one-line status row above the record grid. */
+const statusRow = () => screen.getByRole('button', { name: '자세히' }).closest('[role="status"],[role="alert"]') as HTMLElement;
+
 /** Records a home goal and waits until the server has committed it and the console shows it. */
 async function recordConfirmedHomeGoal() {
   await recordGoal('홈 팀');
@@ -270,14 +273,53 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('되돌리기가 서버에 가 있는 동안 누른 새 기록은 되돌리기가 끝난 뒤에 보낸다 — 되돌리기가 거절되지 않는다', async () => {
+  it('되돌리기가 서버에 가 있는 동안 골을 두 번 눌러도 새 기록이 나가지 않고, 끝난 뒤 한 번 누르면 기록된다', async () => {
     await openConsole();
     await recordConfirmedHomeGoal();
     const reversal = fixture.holdNextReversal();
     fireEvent.click(undoButtonOf(HOME_GOAL));
     await act(async () => { await reversal.started; });
 
+    // 누른 결과가 바로 보인다: 상태 줄이 말하고 기록 버튼이 잠긴다.
+    await waitFor(() => expect(statusRow()).toHaveTextContent('되돌리는 중이에요…'));
+    const goal = screen.getByRole('button', { name: '골' });
+    expect(goal).toBeDisabled();
+    fireEvent.click(goal);
+    fireEvent.click(goal);
+    await flushTransport();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fixture.appends).toHaveLength(1);
+
+    await act(async () => { reversal.release(); });
+
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '골' })).toBeEnabled());
+    expect(statusRow()).not.toHaveTextContent('되돌리는 중이에요');
     await recordGoal('원정 팀');
+    expect(await screen.findByText(AWAY_GOAL)).toBeInTheDocument();
+    await waitFor(() => expect(fixture.appends).toHaveLength(2));
+    await flushTransport();
+    expect(fixture.appends).toHaveLength(2);
+    expect(fixture.reversals).toHaveLength(1);
+    expect(fixture.reversals[0]).toMatchObject({ expectedVersion: 6, outcome: 'reversed' });
+    // 되돌리기가 올린 버전(7)으로 원정 골이 한 번 나간다.
+    expect(fixture.appends[1]).toMatchObject({ expectedVersion: 7, outcome: 'committed' });
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 1점'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('선수 시트를 열어 둔 채 되돌리기가 시작됐으면, 고른 기록은 기다린다고 알리고 되돌리기가 끝난 뒤에 한 번 보낸다', async () => {
+    await openConsole();
+    await recordConfirmedHomeGoal();
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    const sheet = await screen.findByRole('dialog');
+    const reversal = fixture.holdNextReversal();
+    fireEvent.click(undoButtonOf(HOME_GOAL));
+    await act(async () => { await reversal.started; });
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '원정 팀 · 선수 모름' }));
+
+    expect(await screen.findByText('되돌리기를 마치면 바로 기록할게요.')).toBeInTheDocument();
     await flushTransport();
     // 되돌리기가 아직 서버에 있다 — 원정 골은 같은 버전(6)으로 나가지 않고 기다린다.
     expect(fixture.appends).toHaveLength(1);
@@ -289,10 +331,8 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
     await waitFor(() => expect(fixture.appends).toHaveLength(2));
     expect(fixture.reversals).toHaveLength(1);
     expect(fixture.reversals[0]).toMatchObject({ expectedVersion: 6, outcome: 'reversed' });
-    // 되돌리기가 올린 버전(7)으로 원정 골을 보낸다.
     expect(fixture.appends[1]).toMatchObject({ expectedVersion: 7, outcome: 'committed' });
     await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 1점'));
-    expect(screen.queryByRole('alert')).toBeNull();
     expect(document.body).not.toHaveTextContent('Expected version is stale');
   });
 

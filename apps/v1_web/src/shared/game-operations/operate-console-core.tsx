@@ -316,6 +316,7 @@ const STAGE_CHIP_CLASS =
 const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
 const UNDO_FAILED = '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
 const UNDO_BLOCKED_BY_COMMAND = '진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_NO_RESPONSE = '되돌리기 응답을 받지 못했어요. 기록 목록에서 취소됐는지 확인해 주세요.';
 const UNDO_CONFLICT = '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
 const UNDO_FAILURE_BY_CODE: Readonly<Record<string, string>> = {
   VERSION_CONFLICT: UNDO_CONFLICT,
@@ -1073,9 +1074,12 @@ export function OperateConsoleCore({
     [currentPeriodDurationMinutes],
   );
 
+  // 되돌리기와 기록 전송은 둘 다 지금 버전을 싣는다. 같은 버전으로 겹치면 서버가 한쪽을 거절하므로
+  // 되돌리기는 큐가 빈 뒤에 보내고, 새 기록은 서버에 가 있는 되돌리기가 끝난 뒤에 큐에 넣는다.
+  const reverseInFlightRef = useRef<Promise<void> | null>(null);
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
-      if (commandBlocked) return;
+      if (commandBlocked || reverseInFlightRef.current !== null) return;
       // 뛰는 경기 시간이 없으면 기록 시각을 고정할 서버 기준이 없다 — 쉬는 구간에 허용된 기록만 직전 구간 끝 시각으로 받는다.
       if (currentPeriod === null && breakEndCapture !== null && isBreakRecordableAction(button.type)) {
         setPendingAction({
@@ -1231,21 +1235,14 @@ export function OperateConsoleCore({
   }, [commandBlocked]);
   // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.
   const undoStartedRef = useRef(new Set<string>());
-  // 되돌리기와 기록 전송은 둘 다 지금 버전을 싣는다. 같은 버전으로 겹치면 서버가 한쪽을 거절하므로
-  // 되돌리기는 큐가 빈 뒤에 보내고, 새 기록은 서버에 가 있는 되돌리기가 끝난 뒤에 큐에 넣는다.
-  const reverseInFlightRef = useRef<Promise<void> | null>(null);
-  const waitForReverseInFlight = useCallback(() => {
-    const inFlight = reverseInFlightRef.current;
-    if (inFlight === null) return Promise.resolve();
-    // 응답이 끝내 오지 않아도 새 기록을 영영 붙잡지 않는다.
-    return new Promise<void>((resolve) => {
-      const giveUp = setTimeout(resolve, COMMAND_RESPONSE_TIMEOUT_MS);
-      void inFlight.then(() => {
-        clearTimeout(giveUp);
-        resolve();
-      });
-    });
-  }, []);
+  // `sending` 은 되돌리기 요청이 서버에 가 있는 동안이다 — 그동안만 기록 격자를 막고, 다른 전송을 기다리는 동안에는 막지 않는다.
+  const [undoActivity, setUndoActivity] = useState({ running: 0, sending: 0 });
+  const undoPhase = undoActivity.sending > 0 ? 'sending' : undoActivity.running > 0 ? 'waiting' : null;
+  // 선수 시트를 열어 둔 채 되돌리기가 시작되면 격자를 막아도 이 길로 기록이 들어온다 — 기다린다고 알린다.
+  const waitForReverseInFlight = useCallback(async () => {
+    if (reverseInFlightRef.current !== null) showToast('되돌리기를 마치면 바로 기록할게요.');
+    while (reverseInFlightRef.current !== null) await reverseInFlightRef.current;
+  }, [showToast]);
 
   // 서버 기록 목록을 직접 읽어 이 기록이 저장됐는지 확인한다. 읽지 못하면 없다고 단정하지 않는다(`unknown`).
   const lookUpRecordedEvent = useCallback(
@@ -1319,49 +1316,79 @@ export function OperateConsoleCore({
         stop(UNDO_BLOCKED_BY_COMMAND);
         return;
       }
-      let reversed = 0;
-      for (const clientEventId of [...clientEventIds].reverse()) {
-        const found = await resolveRecordedEvent(clientEventId);
-        if (found.kind === 'absent') {
-          stop('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
-          return;
+      setRecordError(null);
+      setUndoActivity((activity) => ({ ...activity, running: activity.running + 1 }));
+      // 첫 요청을 보낼 때부터 이 되돌리기가 끝날 때까지 새 기록을 세워 둔다 — 여러 건을 잇달아 되돌리는 사이에도 끼어들지 않게.
+      const records: { release: (() => void) | null } = { release: null };
+      const holdRecords = () => {
+        if (records.release !== null) return;
+        let resolveHeld: () => void = () => undefined;
+        const held = new Promise<void>((resolve) => {
+          resolveHeld = resolve;
+        });
+        reverseInFlightRef.current = held;
+        setUndoActivity((activity) => ({ ...activity, sending: activity.sending + 1 }));
+        records.release = () => {
+          if (reverseInFlightRef.current === held) reverseInFlightRef.current = null;
+          setUndoActivity((activity) => ({ ...activity, sending: activity.sending - 1 }));
+          resolveHeld();
+        };
+      };
+      try {
+        let reversed = 0;
+        for (const clientEventId of [...clientEventIds].reverse()) {
+          let giveUp: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const found = await resolveRecordedEvent(clientEventId);
+            if (found.kind === 'absent') {
+              stop('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
+              return;
+            }
+            if (found.kind === 'unknown') {
+              stop('전송 결과를 아직 확인하지 못했어요. 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
+              return;
+            }
+            if (found.reversed) continue;
+            const eventId = found.event.id;
+            if (hasPendingWork(opsRef.current.queue)) {
+              showToast('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
+              await waitForQueueIdle();
+              // 기다리는 사이 다른 길로 취소됐을 수 있다.
+              if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+            }
+            // 기다리는 사이 진행 요청이 시작됐을 수 있다.
+            if (commandBlockedRef.current) {
+              stop(UNDO_BLOCKED_BY_COMMAND);
+              return;
+            }
+            holdRecords();
+            const request = opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
+            // API 요청에는 제한 시간이 없다 — 응답이 끝내 안 오면 기록 버튼을 풀고 결과를 모른다고 알린다.
+            const outcome = await Promise.race([
+              request.then(() => 'reversed' as const),
+              new Promise<'no-response'>((resolve) => {
+                giveUp = setTimeout(() => resolve('no-response'), COMMAND_RESPONSE_TIMEOUT_MS);
+              }),
+            ]);
+            if (outcome === 'no-response') {
+              stop(UNDO_NO_RESPONSE);
+              return;
+            }
+            reversed += 1;
+          } catch (err) {
+            // 다른 길로 이미 취소된 기록이다 — 실패가 아니다.
+            if (extractErrorCode(err) === 'EVENT_ALREADY_REVERSED') continue;
+            stop(undoFailureMessage(err, gameOperationsErrorMessage));
+            return;
+          } finally {
+            clearTimeout(giveUp);
+          }
         }
-        if (found.kind === 'unknown') {
-          stop('전송 결과를 아직 확인하지 못했어요. 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
-          return;
-        }
-        if (found.reversed) continue;
-        const eventId = found.event.id;
-        if (hasPendingWork(opsRef.current.queue)) {
-          showToast('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
-          await waitForQueueIdle();
-          // 기다리는 사이 다른 길로 취소됐을 수 있다.
-          if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
-        }
-        // 기다리는 사이 진행 요청이 시작됐을 수 있다.
-        if (commandBlockedRef.current) {
-          stop(UNDO_BLOCKED_BY_COMMAND);
-          return;
-        }
-        const request = opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
-        const settled = request.then(
-          () => undefined,
-          () => undefined,
-        );
-        reverseInFlightRef.current = settled;
-        try {
-          await request;
-        } catch (err) {
-          // 다른 길로 이미 취소된 기록이다 — 실패가 아니다.
-          if (extractErrorCode(err) === 'EVENT_ALREADY_REVERSED') continue;
-          stop(undoFailureMessage(err, gameOperationsErrorMessage));
-          return;
-        } finally {
-          if (reverseInFlightRef.current === settled) reverseInFlightRef.current = null;
-        }
-        reversed += 1;
+        showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
+      } finally {
+        records.release?.();
+        setUndoActivity((activity) => ({ ...activity, running: activity.running - 1 }));
       }
-      showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
     },
     [showToast, resolveRecordedEvent, waitForQueueIdle, gameOperationsErrorMessage],
   );
@@ -2013,6 +2040,7 @@ export function OperateConsoleCore({
       disabled:
         !canOperate ||
         commandBlocked ||
+        undoPhase === 'sending' ||
         (currentPeriod === null && !(breakEndCapture !== null && isBreakRecordableAction(button.type))),
     })),
     ...(substitutionTracked ? [] : [{ key: 'MORE' as const, label: '더보기' }]),
@@ -2053,6 +2081,7 @@ export function OperateConsoleCore({
       waiting: unconfirmedQueueItems.filter((item) => item.status === 'queued' || item.status === 'sending').length,
       failed: unconfirmedQueueItems.filter((item) => item.status === 'failed').length,
     },
+    undo: undoPhase,
     endPeriodLabel: endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount),
     gameOperationsErrorMessage,
   });

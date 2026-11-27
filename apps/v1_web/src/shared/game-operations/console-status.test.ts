@@ -23,6 +23,7 @@ function input(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatusInput 
     bannerMessage: null,
     retryLabel: null,
     queue: { waiting: 0, failed: 0 },
+    undo: null,
     endPeriodLabel: '전반 종료',
     gameOperationsErrorMessage: (code) => `안내(${code})`,
     ...overrides,
@@ -32,6 +33,7 @@ function input(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatusInput 
 const SINGLE_CONDITIONS: ReadonlyArray<
   readonly [ConsoleStatusKey, Partial<ConsoleStatusInput>, 'info' | 'warning' | 'danger', string]
 > = [
+  ['undoing', { undo: 'sending' }, 'info', '되돌리는 중이에요…'],
   [
     'takeover-handoff',
     {
@@ -67,8 +69,8 @@ describe('deriveConsoleStatus — 조건 하나', () => {
     expect(status.headline).toBe(title);
   });
 
-  it('처리표의 15개 key 를 빠짐없이 다룬다', () => {
-    expect(new Set(SINGLE_CONDITIONS.map(([key]) => key)).size).toBe(15);
+  it('처리표의 16개 key 를 빠짐없이 다룬다', () => {
+    expect(new Set(SINGLE_CONDITIONS.map(([key]) => key)).size).toBe(16);
   });
 });
 
@@ -96,9 +98,11 @@ describe('deriveConsoleStatus — 겹침과 우선순위', () => {
         startBlockedByTeams: true,
         syncGap: true,
         behind: true,
+        undo: 'waiting',
       }),
     );
     expect(status.items.map((item) => item.key)).toEqual([
+      'undoing',
       'takeover-handoff',
       'command-error',
       'command-retry',
@@ -128,6 +132,23 @@ describe('deriveConsoleStatus — 겹침과 우선순위', () => {
   it('연결 중 전송 실패가 있으면 queue 항목은 danger 이고 실패 수를 말한다', () => {
     const status = deriveConsoleStatus(input({ queue: { waiting: 3, failed: 1 } }));
     expect(status.items[0]).toMatchObject({ key: 'queue', tone: 'danger', title: '기록 1개를 보내지 못했어요' });
+  });
+});
+
+describe('deriveConsoleStatus — 되돌리는 중', () => {
+  it('방금 누른 되돌리기가 도는 동안에는 다른 안내가 있어도 그것이 제목이다', () => {
+    const status = deriveConsoleStatus(input({ undo: 'sending', commandError: '명령을 처리하지 못했어요.', connection: 'disconnected' }));
+    expect(status.headline).toBe('되돌리는 중이에요… 외 2개');
+    expect(status.items.map((item) => item.key)).toEqual(['undoing', 'command-error', 'disconnected']);
+  });
+
+  it('서버에 보낸 동안과 다른 기록을 기다리는 동안의 본문이 다르다', () => {
+    expect(deriveConsoleStatus(input({ undo: 'sending' })).items[0].body).toBe('끝날 때까지 기록 버튼을 잠깐 막아 둬요.');
+    expect(deriveConsoleStatus(input({ undo: 'waiting' })).items[0].body).toBe('보내던 기록을 다 보낸 뒤에 되돌려요.');
+  });
+
+  it('되돌리기가 없으면 항목도 없다', () => {
+    expect(deriveConsoleStatus(input()).items).toEqual([]);
   });
 });
 

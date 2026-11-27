@@ -3279,6 +3279,8 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
 
     await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    // 지난 실패 안내는 남지 않는다.
+    expect(within(openStatusSheet()).queryByText(/되돌리지 못했어요/)).toBeNull();
   });
 
   it('다른 기록이 전송 중이면 큐가 빌 때까지 기다렸다가 되돌린다', async () => {
@@ -3337,7 +3339,10 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(screen.queryByText('되돌렸어요')).toBeNull();
   });
 
-  it('되돌리기가 서버에 가 있는 동안 누른 새 기록은 되돌리기가 끝난 뒤에 큐에 넣는다', async () => {
+  const recordCells = () =>
+    within(screen.getByRole('group', { name: '기록하기' })).getAllByRole('button').filter((cell) => cell.textContent !== '더보기');
+
+  it('되돌리기가 서버에 가 있는 동안 기록 버튼을 막고 상태 줄이 알린다 — 두 번 눌러도 기록되지 않고, 끝나면 한 번 누른 것만 기록된다', async () => {
     const state = setup();
     const reversal = Promise.withResolvers<void>();
     state.reverseEvent.mockReturnValue(reversal.promise);
@@ -3345,7 +3350,37 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     fireEvent.click(undo);
     await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
 
+    await waitFor(() => expect(statusRow()).toHaveTextContent('되돌리는 중이에요…'));
+    expect(recordCells().length).toBeGreaterThanOrEqual(5);
+    recordCells().forEach((cell) => expect(cell).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(state.submitEvent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      reversal.resolve();
+    });
+
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '골' })).toBeEnabled());
+    expect(statusRow()).not.toHaveTextContent('되돌리는 중이에요');
     recordGoal();
+    await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
+  });
+
+  it('선수 시트를 열어 둔 채 되돌리기가 시작됐으면, 고른 기록은 기다린다고 알리고 되돌리기가 끝난 뒤에 큐에 넣는다', async () => {
+    const state = setup();
+    const reversal = Promise.withResolvers<void>();
+    state.reverseEvent.mockReturnValue(reversal.promise);
+    const { undo } = await recordedGoalWithUndo(state);
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(undo);
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+    expect(await screen.findByText('되돌리기를 마치면 바로 기록할게요.')).toBeInTheDocument();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
@@ -3358,6 +3393,26 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
 
     await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
     expect(state.reverseEvent.mock.invocationCallOrder[0]).toBeLessThan(state.submitEvent.mock.invocationCallOrder[1]);
+  });
+
+  it('되돌리기 응답이 끝내 오지 않으면 기록 버튼을 다시 열고 결과를 모른다고 알린다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const state = setup();
+    state.reverseEvent.mockReturnValue(new Promise(() => {}));
+    const { undo } = await recordedGoalWithUndo(state);
+    fireEvent.click(undo);
+    await waitFor(() => expect(screen.getByRole('button', { name: '골' })).toBeDisabled());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS);
+    });
+
+    expect(screen.getByRole('button', { name: '골' })).toBeEnabled();
+    expect(statusRow()).not.toHaveTextContent('되돌리는 중이에요');
+    expect(
+      within(openStatusSheet()).getByText('되돌리기 응답을 받지 못했어요. 기록 목록에서 취소됐는지 확인해 주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
   });
 
   it('5초 뒤 토스트가 사라진다', async () => {
@@ -3461,6 +3516,93 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
       { eventId: 'e-y2', reason: '경고 누적 퇴장 기록 되돌리기' },
     ]);
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+  });
+
+  it('두 번째 옐로의 레드도 서버에 가 있는 되돌리기가 끝난 뒤에 나간다 — 확인 창은 막히지 않는다', async () => {
+    const card = (id: string, clientEventId: string, color: 'YELLOW' | 'RED') =>
+      recorded(id, clientEventId, { type: 'CARD', participantId: 'p-1', payload: { card: color } });
+    const firstYellow = card('e-y1', 'c-y1', 'YELLOW');
+    const state = setup({ liveEvents: [firstYellow] });
+    const reversal = Promise.withResolvers<void>();
+    state.reverseEvent.mockReturnValue(reversal.promise);
+    const { rerender } = render(<CoreHarness />);
+    // 골을 하나 기록해 되돌리기 토스트를 띄워 둔다.
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    state.submitEvent.mockResolvedValueOnce('q-1').mockResolvedValueOnce('q-2');
+    advance(state, { liveEvents: [firstYellow, recorded('e9', 'c1')], queue: { items: [queuedEvent('q-1', 'acked', 'CARD')] } });
+    rerender(<CoreHarness />);
+
+    // 옐로를 기록해 레드 확인 창이 뜬 사이, 골 되돌리기가 서버로 간다.
+    fireEvent.click(screen.getByRole('button', { name: '옐로카드' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    const sheet = await screen.findByRole('dialog', { name: '정우진이 이 경기에서 옐로 2장이에요' });
+    fireEvent.click(undo);
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+    const submittedBefore = state.submitEvent.mock.calls.length;
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '레드도 기록' }));
+    expect(await screen.findByText('되돌리기를 마치면 바로 기록할게요.')).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(state.submitEvent).toHaveBeenCalledTimes(submittedBefore);
+
+    await act(async () => {
+      reversal.resolve();
+    });
+
+    await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(submittedBefore + 1));
+    expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'CARD', payload: { card: 'RED' } }));
+  });
+
+  it('레드 → 옐로를 잇달아 되돌리는 사이에는 기다리던 새 기록이 끼어들지 않는다', async () => {
+    const card = (id: string, clientEventId: string, color: 'YELLOW' | 'RED') =>
+      recorded(id, clientEventId, { type: 'CARD', participantId: 'p-1', payload: { card: color } });
+    const firstYellow = card('e-y1', 'c-y1', 'YELLOW');
+    const state = setup({ liveEvents: [firstYellow], queue: { items: [queuedEvent('q-1', 'acked', 'CARD')] } });
+    state.submitEvent.mockReset();
+    state.submitEvent.mockResolvedValueOnce('q-1').mockResolvedValueOnce('q-2').mockResolvedValue('q-3');
+    const redReversal = Promise.withResolvers<void>();
+    const yellowReversal = Promise.withResolvers<void>();
+    state.reverseEvent.mockReturnValueOnce(redReversal.promise).mockReturnValueOnce(yellowReversal.promise);
+    const { rerender } = render(<CoreHarness />);
+    fireEvent.click(screen.getByRole('button', { name: '옐로카드' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: '정우진이 이 경기에서 옐로 2장이에요' })).getByRole('button', { name: '레드도 기록' }),
+    );
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    advance(state, { liveEvents: [firstYellow, card('e-y2', 'q-1', 'YELLOW'), card('e-r', 'q-2', 'RED')] });
+    rerender(<CoreHarness />);
+
+    // 골 시트를 열어 둔 채 되돌리기를 누르고, 레드를 되돌리는 동안 선수를 고른다.
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(undo);
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    // 레드가 아직 되돌려지지 않아 퇴장 선수 확인이 한 번 더 뜬다.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '그래도 계속' }));
+    await screen.findByText('되돌리기를 마치면 바로 기록할게요.');
+
+    // 레드가 끝나고 옐로 되돌리기가 서버로 간 사이에도 골은 아직 나가지 않는다.
+    await act(async () => {
+      redReversal.resolve();
+    });
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(state.submitEvent).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: '옐로카드' })).toBeDisabled();
+
+    await act(async () => {
+      yellowReversal.resolve();
+    });
+
+    await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(3));
+    expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'GOAL' }));
+    expect(state.reverseEvent.mock.invocationCallOrder[1]).toBeLessThan(state.submitEvent.mock.invocationCallOrder[2]);
   });
 
   it('두 번째 옐로에서 「옐로만 둘게요」를 고르면 옐로 하나만 되돌릴 수 있다', async () => {

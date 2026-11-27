@@ -31,6 +31,7 @@ function statusOf(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatus {
     bannerMessage: null,
     retryLabel: null,
     queue: { waiting: 0, failed: 0 },
+    undo: null,
     endPeriodLabel: '전반 종료',
     gameOperationsErrorMessage: (code) => `안내(${code})`,
     ...overrides,

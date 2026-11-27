@@ -19,6 +19,7 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { fixtureDeleteConfirm } from './fixture-delete-confirm';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
 import { useStartedTeamChangeReason } from './use-started-team-change-reason';
@@ -226,19 +227,7 @@ export function BracketNodePanel({
   };
 
   const handleDelete = async () => {
-    const downstreamCount = fixtures.filter((candidate) => candidate.bracketSources?.some((source) => source.fixtureId === fixture.id)).length;
-    const linkedImpact = downstreamCount > 0 ? ` 이 경기를 출처로 쓰는 후속 경기 ${downstreamCount}개도 영향을 받아요.` : '';
-    const protection = fixture.result !== null || game?.hasOfficialResult
-      ? ' 결과가 있는 경기는 삭제할 수 없어요.'
-      : game?.state === 'LIVE' || game?.state === 'PAUSED'
-        ? ' 진행 중인 경기는 삭제할 수 없어요.'
-        : '';
-    const ok = await confirm({
-      title: '경기 삭제',
-      message: `${title}를 삭제할까요? 되돌릴 수 없어요.${linkedImpact}${protection}`,
-      confirmLabel: '삭제',
-      tone: 'danger',
-    });
+    const ok = await confirm(fixtureDeleteConfirm({ title, fixture, fixtures }));
     if (!ok) return;
     deleteFixture.mutate(fixture.id, {
       onSuccess: () => {

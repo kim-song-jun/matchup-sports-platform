@@ -230,7 +230,7 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(mobileEditorFixture.fixtureWrites).toEqual([]);
   });
 
-  it('완료 리그의 실제 결과 정정 출구는 유지하고 경기 구조 편집은 열지 않아요', async () => {
+  it('완료 리그의 실제 결과 고치기 출구는 유지하고 경기 구조 편집은 열지 않아요', async () => {
     // Given: 결과가 남은 종료 리그를 쓰기 권한이 있는 운영자가 처음 모바일로 열어요.
     mobileEditorFixture.league = {
       ...mobileLeague([mobileFixture({ resultStage: 'official', gameState: 'ENDED', game: recordedOfficialGame, homeScore: 2, awayScore: 1 })]),
@@ -243,10 +243,10 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     // Then: updateFixture의 LEAGUE_ENDED 계약에 맞춰 저장할 수 없는 수정 진입은 없어요.
     expect(within(sheet).getByText('합성 홈팀')).toBeVisible();
     expect(within(sheet).getByText('합성 원정팀')).toBeVisible();
-    const correctionLink = within(sheet).getByRole('link', { name: '결과 정정 화면으로 가기' });
+    const correctionLink = within(sheet).getByRole('link', { name: '결과 고치기 화면으로 가기' });
     expect(correctionLink).toBeVisible();
     expect(correctionLink).toHaveAttribute('href', `/admin/live/${MOBILE_LEAGUE_ID}/records/corrections?fixtureId=${MOBILE_FIXTURE_ID}`);
-    expect(within(sheet).queryByRole('button', { name: /^(홈|어웨이) 팀 (바꾸기|고르기)$/ })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: /^(홈|원정) 팀 (바꾸기|고르기)$/ })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('button', { name: /경기 수정|일정 수정/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('경기 이름')).not.toBeInTheDocument();
@@ -270,7 +270,7 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     // Then
     const sheet = await screen.findByRole('dialog', { name: '모바일 리그 1주차' });
     expect(within(sheet).getByText('합성 홈팀')).toBeVisible();
-    expect(within(sheet).queryByRole('link', { name: '결과 정정 화면으로 가기' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('link', { name: '결과 고치기 화면으로 가기' })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('button', { name: /경기 수정|일정 수정/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '템플릿으로 다시 만들기' })).not.toBeInTheDocument();
     expect(mobileEditorFixture.fixtureWrites).toEqual([]);

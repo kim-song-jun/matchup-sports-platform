@@ -13,4 +13,3 @@ enum WidgetMilliseconds {
         return valid(WidgetFormat.parseDate(string))
     }
 }
-

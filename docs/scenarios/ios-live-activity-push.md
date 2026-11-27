@@ -30,3 +30,5 @@ Task [20261143](../../.github/tasks/20261143-ios-live-activity-push.md). Parent 
 - [ ] Server topic/environment APNs sandbox vs TestFlight production gateway, tokenKind extension, expiry/retry/out-of-order push handling. Client intentionally sends the two agreed body fields only.
 - [ ] Physical signed-device token issuance/rotation, app terminated remote update/end, swipe/logout/account-change races, final15min wall-clock cleanup and minimum iOS16.2 remain unverified. Existing PR-C cards created with pushType=nil cannot gain a token; new push-capable cards are used from this version. No automatic replacement of a user's card.
 - [ ] iOS17.2+ push-to-start remains a separate future PR; no such stream or token is registered here.
+
+Cleanup: UI harness는12개 전부 skip하여 서버/앱 조작 없음. 전용 UDID shutdown 완료, 다른 시뮬레이터·Android·서버 상태는 변경하지 않음.

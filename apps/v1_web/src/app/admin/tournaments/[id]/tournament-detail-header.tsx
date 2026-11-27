@@ -69,7 +69,7 @@ export function TournamentDetailHeader({
                 aria-expanded={expanded}
                 aria-haspopup={haspopup}
                 onClick={onToggle}
-                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-strong)] text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] ${FOCUS_RING}`}
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] lg:border lg:border-[var(--border-strong)] ${FOCUS_RING}`}
               >
                 <Ellipsis size={18} aria-hidden="true" />
               </button>
@@ -117,7 +117,7 @@ function LiveOpsButton({ href, reasonLabel }: { href: string; reasonLabel?: stri
   }
   return (
     <Link href={href} className="tm-btn tm-btn-md tm-btn-outline whitespace-nowrap gap-1.5">
-      <Activity size={16} aria-hidden="true" />
+      <Activity size={16} aria-hidden="true" className="hidden md:block" />
       현장 운영
     </Link>
   );

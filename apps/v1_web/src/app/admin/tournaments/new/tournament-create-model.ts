@@ -812,7 +812,7 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
-    // Validate where the input renders (PresentationStep); the submit handler jumps to the first invalid step.
+    // 입력 칸이 있는 단계(PresentationStep)에서 검사한다 — 제출은 첫 오류 단계로 이동하므로 다른 단계에 두면 오류가 안 보인다.
     if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
       errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
     }

@@ -953,7 +953,7 @@ describe.each([
   const showToast = vi.fn();
   const confirmMutate = vi.fn();
   const confirmMutateAsync = vi.fn();
-  // Simulates a V1ApiError without a server message, which falls back to the caller's text.
+  // 서버 메시지가 없는 V1ApiError 를 흉내 낸다 — 호출부의 기본 문구로 떨어지는 경로.
   const messagelessError = { displayableMessage: false };
 
   beforeEach(() => {

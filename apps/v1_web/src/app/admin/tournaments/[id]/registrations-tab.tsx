@@ -559,7 +559,7 @@ export function RegistrationsTab({
       ? { ...filter, label: filter.value === 'awaiting_payment' ? '신청 작성 중' : filter.value === 'payment_checking' ? '신청 확인 중' : '신청 완료' }
       : filter,
   );
-  // Free tournaments have no deposit to check; the same awaiting_payment action reads as confirming the application.
+  // 무료 대회에는 확인할 입금이 없다 — 같은 awaiting_payment 처리를 「신청 확인」으로 부른다.
   const confirmNoun = isFreeEntry ? '신청 확인' : '입금 확인';
   // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);

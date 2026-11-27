@@ -5,6 +5,7 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { OPERATIONS_BOARD_PAGE_LIMIT, readOperationsBoardPages } from '@/lib/operations-board-pages';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
@@ -215,21 +216,19 @@ export const resultReviewKeys = {
  */
 async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
-  const items: TournamentOperationsBoardItem[] = [];
-  const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
-  let cursor: string | null = null;
-  let page: TournamentOperationsBoardResponse;
-  do {
-    page = await v1Get<TournamentOperationsBoardResponse>(path, {
+  const pages = await readOperationsBoardPages((cursor) =>
+    v1Get<TournamentOperationsBoardResponse>(path, {
       status: 'ENDED',
-      limit: 100,
+      limit: OPERATIONS_BOARD_PAGE_LIMIT,
       ...(cursor === null ? {} : { cursor }),
-    });
-    items.push(...page.items);
-    liveWarnings.push(...page.liveWarnings);
-    cursor = page.nextCursor;
-  } while (cursor !== null);
-  return { ...page, items, liveWarnings, nextCursor: null };
+    }),
+  );
+  return {
+    ...pages[pages.length - 1],
+    items: pages.flatMap((page) => page.items),
+    liveWarnings: pages.flatMap((page) => page.liveWarnings),
+    nextCursor: null,
+  };
 }
 
 /**

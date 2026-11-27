@@ -149,7 +149,7 @@ function FixtureVideoCard({
  * (`apps/v1_api/src/tournaments/videos/tournament-fixture-videos.service.ts`). 이 셸에 들어올 수
  * 있는 역할 중 그 권한이 없는 쪽은 지원 담당(SUPPORT_READONLY) 하나뿐이라, 그 역할에게는
  * 버튼을 감추고 이유를 적는다 — 눌러 보고 403 을 받는 버튼은 만들지 않는다.
- * 필드 담당자(FIELD_OPERATOR)는 서버에서는 담당 경기에 등록할 수 있지만 이 셸 자체에 들어올
+ * 구장 담당자(FIELD_OPERATOR)는 서버에서는 담당 경기에 등록할 수 있지만 이 셸 자체에 들어올
  * 수 없다(`_gate.tsx`) — 담당 경기 화면이 열릴 때 같은 API 를 재사용하면 된다.
  */
 export function VideosPageClient({ tournamentId }: Props) {
@@ -196,7 +196,7 @@ export function VideosPageClient({ tournamentId }: Props) {
     <div className="tm-content-enter flex flex-col gap-4 w-full">
       <OpsPageHeader
         tournamentTitle={tournament.data?.title}
-        title="경기 영상"
+        title="영상"
         description={
           <>
             경기마다 하이라이트·중계 영상을 등록해요. 유튜브 같은 외부 링크를 붙이거나,{' '}
@@ -207,7 +207,7 @@ export function VideosPageClient({ tournamentId }: Props) {
       />
       {!canManage && (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]" role="status">
-          지원 담당은 등록된 영상을 확인만 할 수 있어요. 등록·삭제는 대회 운영자(디렉터)나 플랫폼
+          지원 담당은 등록된 영상을 확인만 할 수 있어요. 등록·삭제는 대회 운영자나 플랫폼
           운영자에게 요청해 주세요.
         </p>
       )}

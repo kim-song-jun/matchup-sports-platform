@@ -8,10 +8,10 @@ export function tournamentStaffEntryDestination(role: string, tournamentKind?: s
   return '이 대회 운영 보드로';
 }
 
-/** A regular-league director only gets the ops board; this is the notice shown before granting that role, or null when it does not apply. */
+/** A regular-league tournament director only gets the ops board; this is the notice shown before granting that role, or null when it does not apply. */
 export function tournamentStaffGrantLimitNotice(role: string, tournamentKind?: string | null): string | null {
   if (role === 'TOURNAMENT_DIRECTOR' && tournamentKind === 'regular_league') {
-    return '리그에서 디렉터는 운영 보드만 볼 수 있어요. 결과 입력·확정은 운영자가 해요.';
+    return '리그에서 대회 운영자는 운영 보드만 볼 수 있어요. 결과 입력·확정은 플랫폼 운영자가 해요.';
   }
   return null;
 }

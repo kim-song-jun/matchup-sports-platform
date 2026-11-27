@@ -53,9 +53,10 @@ describe('TournamentStatusMenu', () => {
     render(<TournamentStatusMenu {...menuProps()} />);
     openMenu(/접수 중/);
 
-    const menu = screen.getByRole('menu', { name: '대회 상태' });
-    expect(within(menu).getByText('지금: 접수 중')).toBeInTheDocument();
-    const steps = within(within(menu).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
+    // 진행 막대는 메뉴 위 header 라 role="menu" 밖, 같은 팝오버 안에 있다.
+    const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
+    expect(within(panel).getByText('지금: 접수 중')).toBeInTheDocument();
+    const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
     expect(steps.map((step) => step.textContent)).toEqual(['초안', '접수 중', '접수 마감', '진행 중', '완료']);
     expect(steps.map((step) => step.getAttribute('aria-current'))).toEqual([null, 'step', null, null, null]);
   });
@@ -68,8 +69,9 @@ describe('TournamentStatusMenu', () => {
     fireEvent.click(chip);
 
     const menu = screen.getByRole('menu', { name: '대회 상태' });
-    expect(within(menu).getByText('지금: 취소됨')).toBeInTheDocument();
-    expect(within(menu).queryByRole('list', { name: '진행 단계' })).not.toBeInTheDocument();
+    const panel = menu.parentElement as HTMLElement;
+    expect(within(panel).getByText('지금: 취소됨')).toBeInTheDocument();
+    expect(within(panel).queryByRole('list', { name: '진행 단계' })).not.toBeInTheDocument();
     // 취소된 대회는 공개 스위치가 없고 복구만 남는다.
     expect(within(menu).queryByRole('menuitemcheckbox')).not.toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /초안으로 복구/ })).toBeInTheDocument();

@@ -43,10 +43,13 @@ describe('경기를 모두 삭제한 템플릿 조 정리 (PostgreSQL)', () => {
     const { tournamentId, entries } = await seeded('group-fixture-team-swap');
     const select = { teamMatchId: true, groupId: true, fixtureNumber: true, round: true,
       homeRegistrationId: true, awayRegistrationId: true,
-      teamMatch: { select: { homeSlotId: true, awaySlotId: true, startAt: true, fieldId: true } } } as const;
+      teamMatch: { select: { homeSlotId: true, awaySlotId: true, startAt: true, endAt: true, fieldId: true } } } as const;
     const read = () => prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId }, select, orderBy: { teamMatchId: 'asc' } });
+    const scheduled = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { groupId: entries[0].groupId } });
+    await prisma.v1TeamMatch.update({ where: { id: scheduled.teamMatchId }, data: { startAt: new Date("2027-01-08T09:00:00Z"), endAt: null } });
     const before = await read();
-    const [a, b] = before.filter(row => row.groupId === entries[0].groupId);
+    const a = before.find(row => row.teamMatchId === scheduled.teamMatchId)!;
+    const b = before.find(row => row.groupId === a.groupId && row.teamMatchId !== a.teamMatchId)!;
     const key = (row: typeof a) => [row.homeRegistrationId, row.awayRegistrationId, row.teamMatch.homeSlotId, row.teamMatch.awaySlotId].join('|');
     const input = { firstFixtureId: a.teamMatchId, secondFixtureId: b.teamMatchId, firstAssignment: key(a), secondAssignment: key(b) };
     await bracket.swapGroupFixtureTeams(user, tournamentId, input);

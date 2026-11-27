@@ -1135,7 +1135,7 @@ export class TournamentBracketService {
         if (assignment !== expected) throw new ConflictException('팀 배정이 변경됐어요. 최신 대진을 확인해 주세요.');
       }
       for (const [target, source] of [[first, second], [second, first]]) {
-        await updateTournamentMatchInTx(tx, { teamMatchId: target.teamMatchId,
+        await updateTournamentMatchInTx(tx, { teamMatchId: target.teamMatchId, preserveSchedule: true,
           homeRegistrationId: source.homeRegistrationId, awayRegistrationId: source.awayRegistrationId });
         await tx.v1TeamMatch.update({ where: { id: target.teamMatchId }, data: {
           homeSlotId: source.teamMatch.homeSlotId, awaySlotId: source.teamMatch.awaySlotId,

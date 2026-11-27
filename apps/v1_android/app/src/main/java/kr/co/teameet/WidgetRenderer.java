@@ -53,7 +53,7 @@ final class WidgetRenderer {
     private static RemoteViews mediumLive(Context context, WidgetModel.Live live, long now, Map<String, Bitmap> logos) {
         RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.widget_medium_live);
         Header header = header(live, now);
-        rv.setImageViewResource(R.id.m_dot, header.amber ? R.drawable.widget_dot_amber : R.drawable.widget_dot_live);
+        rv.setImageViewResource(R.id.m_dot, dot(header, live));
         rv.setTextViewText(R.id.m_head, header.text);
         clock(rv, R.id.m_clock, header);
         rv.setTextViewText(R.id.m_score, live.scoreVisible() ? live.mine + ":" + live.opponent : "vs");
@@ -82,7 +82,7 @@ final class WidgetRenderer {
     private static RemoteViews squareLive(Context context, WidgetModel.Live live, long now, Map<String, Bitmap> logos) {
         RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.widget_square_live);
         Header header = header(live, now);
-        rv.setImageViewResource(R.id.s_dot, header.amber ? R.drawable.widget_dot_amber : R.drawable.widget_dot_live);
+        rv.setImageViewResource(R.id.s_dot, dot(header, live));
         rv.setTextViewText(R.id.s_head, header.shortText);
         clock(rv, R.id.s_clock, header);
         logo(rv, R.id.s_logo1, logos.get(live.teamLogoUrl));
@@ -132,6 +132,12 @@ final class WidgetRenderer {
             if (elapsed >= 0) h.clockBase = SystemClock.elapsedRealtime() - elapsed;
         }
         return h;
+    }
+
+    /** 진행 중은 빨강, 하프타임·일시정지는 주황, 끝난 경기는 흰색 점. */
+    private static int dot(Header h, WidgetModel.Live live) {
+        if ("ENDED".equals(live.state)) return R.drawable.widget_dot_white;
+        return h.amber ? R.drawable.widget_dot_amber : R.drawable.widget_dot_live;
     }
 
     private static void clock(RemoteViews rv, int id, Header h) {

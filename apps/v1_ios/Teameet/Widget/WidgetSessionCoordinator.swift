@@ -26,6 +26,10 @@ final class WidgetSessionCoordinator: NSObject, WKHTTPCookieStoreObserver {
             let store = try WidgetStore()
             let api = WidgetAPI()
             let transition = try store.transition(owner: owner)
+            if #available(iOS 16.2, *) {
+                await MatchActivityCoordinator.shared.sessionChanged(revision: transition.state.revision,
+                    signedIn: transition.state.owner != nil && transition.state.token != nil)
+            }
             if transition.oldToken != nil || owner == nil { WidgetCenter.shared.reloadAllTimelines() }
             if let old = transition.oldToken {
                 do { try await api.revoke(token: old) }

@@ -22,5 +22,6 @@ struct TeameetWidgets: WidgetBundle {
     var body: some Widget {
         TeameetHomeWidget()
         TeameetLockWidget()
+        if #available(iOS 16.2, *) { MatchLiveActivity() }
     }
 }

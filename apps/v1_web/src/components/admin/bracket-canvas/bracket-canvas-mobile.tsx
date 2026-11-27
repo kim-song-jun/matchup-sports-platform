@@ -224,7 +224,7 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
       {scope === 'tournament' && manual.filter(row => !activeRound || activeRound.sections.some(section =>
         section.nodes.some(node => node.groupId === row.group.id)) || !rounds.some(round => round.sections.some(section =>
           section.nodes.some(node => node.groupId === row.group.id)))).map(({ group, bye }) =>
-        <button type="button" className="tm-btn tm-btn-outline" key={bye.id} onClick={() => setManualId(bye.id)}>
+        <button type="button" className="tm-btn tm-btn-md tm-btn-outline" key={bye.id} onClick={() => setManualId(bye.id)}>
           {group.name} · {bye.sortOrder + 1}번 부전승 · {bye.teamName ?? '팀 미정'}
         </button>)}
       {editing && <BottomSheet open title="부전승 자리 편집" onClose={() => setManualId(null)}>

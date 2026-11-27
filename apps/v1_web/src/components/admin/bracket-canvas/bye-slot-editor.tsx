@@ -53,7 +53,7 @@ export function ByeSlotEditor({ tournamentId, slot, fixture, fixtures, groups, s
       {canWrite ? <button type="submit" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending}>문구 저장</button> : null}
     </form>
     {namedFinal ? <>
-      <button type="button" className="tm-btn tm-btn-outline" disabled={!canWrite} onClick={() => setFinalOpen(true)}>결선 배정팀 변경</button>
+      <button type="button" className="tm-btn tm-btn-md tm-btn-outline" disabled={!canWrite} onClick={() => setFinalOpen(true)}>결선 배정팀 변경</button>
       {finalOpen && <MultiFinalAssignmentDialog tournamentId={tournamentId} initialFinal={track} open onClose={() => setFinalOpen(false)} onApplied={() => setFinalOpen(false)} />}
     </> : <>
     <label htmlFor={`${id}-team`} className="tm-text-label">배정팀</label>

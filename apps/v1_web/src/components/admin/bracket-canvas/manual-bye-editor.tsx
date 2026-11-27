@@ -50,7 +50,7 @@ export function ManualByeEditor({ tournamentId, group, bye, teams, fixtures, gro
           {choice.fixture.fixtureNumber}번 경기 · {choice.side === 'HOME' ? '홈' : '어웨이'}
         </option>)}
       </select></label>
-      <button className="tm-btn tm-btn-primary" disabled={!canWrite || save.isPending}>부전승 저장</button>
+      <button className="tm-btn tm-btn-md tm-btn-primary" disabled={!canWrite || save.isPending}>부전승 저장</button>
       {save.isError && <p role="alert">{extractErrorMessage(save.error, '부전승을 저장하지 못했어요.')}</p>}
     </form>
   </div>;

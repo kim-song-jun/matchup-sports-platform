@@ -101,21 +101,23 @@ export class FcmPushService implements NativePushAdapter, OnModuleInit {
         method: 'POST',
         headers: { authorization: 'Bearer ' + accessToken, 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: {
-            token: device.token,
-            notification: { title: payload.title, body: payload.body ?? '' },
-            data: {
-              notificationId: payload.notificationId,
-              route: payload.route ?? '/notifications',
-            },
-            android: {
-              priority: 'high',
-              notification: {
-                channel_id: 'teameet_general',
-                tag: payload.notificationId,
+          message: payload.dataOnly
+            ? { token: device.token, data: payload.dataOnly, android: { priority: 'high' } }
+            : {
+                token: device.token,
+                notification: { title: payload.title, body: payload.body ?? '' },
+                data: {
+                  notificationId: payload.notificationId,
+                  route: payload.route ?? '/notifications',
+                },
+                android: {
+                  priority: 'high',
+                  notification: {
+                    channel_id: 'teameet_general',
+                    tag: payload.notificationId,
+                  },
+                },
               },
-            },
-          },
         }),
       });
       if (response.ok) return 'delivered';

@@ -621,7 +621,7 @@ export const gameSchemaSourceManifest = {
   // 2026-11-20: additive V1TeamProfile.membershipFee (20261120100000_v1_team_membership_fee); historical game migration unchanged.
   // 2026-11-23: additive V1AccessToken (20261123090000_v1_access_tokens); historical game migration unchanged.
   // 2026-11-27: additive V1Tournament.teamFoulThreshold (20261127090000_v1_tournament_team_foul_threshold); historical game migration unchanged.
-  schema: '990db3888d9f8bd012a94f8003d5e51e968cd3969dec27a591cc120e9994a11e',
+  schema: '49c1c6af0bbe8887671747d26963fc7f8acebf75682aca1437154bdee3dc4db0',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

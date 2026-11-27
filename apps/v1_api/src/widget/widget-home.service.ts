@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { V1ScheduleState, V1ScheduleType } from '@prisma/client';
+import { Prisma, V1ScheduleState, V1ScheduleType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
@@ -44,6 +44,8 @@ export interface WidgetLiveGame {
   /** `ENDED` 는 끝난 지 15분 안인 「방금 끝남」. */
   state: 'LIVE' | 'PAUSED' | 'ENDED';
   startedAt: Date | null;
+  /** 끝난 경기(`ENDED`)에서만 — 공식 결과가 확정된 시각. 「방금 끝남」 15분과 실시간 카드 정리 시각의 기준이다. */
+  endedAt: Date | null;
   /** 우리 팀 기준. 공개 규칙이 가리거나 아직 모르면 null. */
   score: WidgetPerspectiveScore | null;
   /** 승부차기 점수 — 경기가 끝난 뒤에만 있다(진행 중에는 서버가 모른다). */
@@ -108,6 +110,31 @@ interface TeamMeta {
   logoUrl: string | null;
 }
 
+/**
+ * 위젯이 「진행 중」으로 보여 주는 경기 조건 — 위젯 홈과 실시간 푸시가 같은 기준을 쓴다.
+ * `teamIds` 를 주면 그 팀의 경기만, 생략하면 전체(푸시가 지금 움직이는 경기를 찾을 때).
+ */
+export function liveGameWhere(now: Date, teamIds?: string[]): Prisma.V1GameWhereInput {
+  return {
+    ...(teamIds === undefined ? {} : { sides: { some: { teamId: { in: teamIds } } } }),
+    OR: [
+      { state: { in: ['LIVE', 'PAUSED'] }, teamMatch: { is: { startAt: { gte: new Date(now.getTime() - WIDGET_LIVE_MAX_AGE_MS) } } } },
+      // 친선 팀 매치: 첫 득점을 기록하기 전까지 경기 상태는 SCHEDULED 라 킥오프가 지난 것으로 따로 잡는다(점수는 0 : 0).
+      {
+        state: 'SCHEDULED',
+        teamMatch: { is: { status: 'matched', leagueId: null, tournamentId: null, startAt: { lte: now, gte: new Date(now.getTime() - WIDGET_FRIENDLY_STARTED_MS) } } },
+      },
+      // 종료 시각 컬럼이 없어 공식 결과가 확정된 시각으로 잰다(`updatedAt` 은 끝난 뒤 정정·갱신에도 바뀐다). 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다.
+      { state: 'ENDED', currentOfficialRevision: { is: { createdAt: { gte: new Date(now.getTime() - WIDGET_JUST_ENDED_MS) } } } },
+    ],
+    NOT: [
+      { teamMatch: { is: { deletedAt: { not: null } } } },
+      { teamMatch: { is: { status: { in: ['cancelled', 'archived'] } } } },
+      { teamMatch: { is: { tournament: { is: { deletedAt: { not: null } } } } } },
+    ],
+  };
+}
+
 const RESPONDABLE_TYPES = [V1ScheduleType.TRAINING, V1ScheduleType.EVENT] as const;
 
 @Injectable()
@@ -118,14 +145,24 @@ export class WidgetHomeService {
     private readonly scorers: WidgetScorersService,
   ) {}
 
-  async home(userId: string, now: Date = new Date()): Promise<WidgetHome> {
+  private async teamMetaFor(userId: string): Promise<Map<string, TeamMeta>> {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: { userId, status: 'active', team: { status: 'active', deletedAt: null } },
       select: { teamId: true, team: { select: { name: true, memberCount: true, profile: { select: { logoUrl: true } } } } },
     });
-    const teamMeta = new Map<string, TeamMeta>(
+    return new Map(
       memberships.map((m) => [m.teamId, { name: m.team.name, memberCount: m.team.memberCount, logoUrl: resolveTeamLogoUrl(m.teamId, m.team.profile?.logoUrl) }]),
     );
+  }
+
+  /** 푸시용 — 홈 전체를 만들지 않고 진행 중·방금 끝난 경기만. 홈의 `live` 와 같은 값이다. */
+  async liveFor(userId: string, now: Date = new Date()): Promise<WidgetLiveGame[]> {
+    const teamMeta = await this.teamMetaFor(userId);
+    return teamMeta.size === 0 ? [] : this.liveGames([...teamMeta.keys()], teamMeta, now);
+  }
+
+  async home(userId: string, now: Date = new Date()): Promise<WidgetHome> {
+    const teamMeta = await this.teamMetaFor(userId);
     const teamIds = [...teamMeta.keys()];
     if (teamIds.length === 0) return { generatedAt: now, live: [], lastResult: null, pendingCount: 0, pending: [], schedules: [] };
 
@@ -318,30 +355,13 @@ export class WidgetHomeService {
   private async liveGames(teamIds: string[], teamMeta: ReadonlyMap<string, TeamMeta>, now: Date): Promise<WidgetLiveGame[]> {
     const teamIdSet = new Set(teamIds);
     const games = await this.prisma.v1Game.findMany({
-      where: {
-        sides: { some: { teamId: { in: teamIds } } },
-        OR: [
-          { state: { in: ['LIVE', 'PAUSED'] }, teamMatch: { is: { startAt: { gte: new Date(now.getTime() - WIDGET_LIVE_MAX_AGE_MS) } } } },
-          // 친선 팀 매치: 첫 득점을 기록하기 전까지 경기 상태는 SCHEDULED 라 킥오프가 지난 것으로 따로 잡는다(점수는 0 : 0).
-          {
-            state: 'SCHEDULED',
-            teamMatch: { is: { status: 'matched', leagueId: null, tournamentId: null, startAt: { lte: now, gte: new Date(now.getTime() - WIDGET_FRIENDLY_STARTED_MS) } } },
-          },
-          // 종료 시각 컬럼이 없어 공식 결과가 확정된 시각으로 잰다(`updatedAt` 은 끝난 뒤 정정·갱신에도 바뀐다). 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다.
-          { state: 'ENDED', currentOfficialRevision: { is: { createdAt: { gte: new Date(now.getTime() - WIDGET_JUST_ENDED_MS) } } } },
-        ],
-        NOT: [
-          { teamMatch: { is: { deletedAt: { not: null } } } },
-          { teamMatch: { is: { status: { in: ['cancelled', 'archived'] } } } },
-          { teamMatch: { is: { tournament: { is: { deletedAt: { not: null } } } } } },
-        ],
-      },
+      where: liveGameWhere(now, teamIds),
       select: {
         id: true,
         state: true,
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
-        currentOfficialRevision: { select: { score: true, state: true, goalEvents: true } },
+        currentOfficialRevision: { select: { score: true, state: true, goalEvents: true, createdAt: true } },
         sharedRecord: { select: { goals: true } },
         periods: { select: { number: true, state: true, startedAt: true, endedAt: true, pausedTotalMs: true, pausedAt: true } },
         teamMatch: { select: { title: true, startAt: true, placeName: true, tournamentId: true, leagueId: true, league: { select: { title: true } }, tournament: { select: { title: true } } } },
@@ -396,6 +416,7 @@ export class WidgetHomeService {
         competitionKind: game.teamMatch?.tournamentId ? 'TOURNAMENT' : game.teamMatch?.leagueId ? 'LEAGUE' : 'FRIENDLY',
         state,
         startedAt: game.teamMatch?.startAt ?? null,
+        endedAt: state === 'ENDED' ? (game.currentOfficialRevision?.createdAt ?? null) : null,
         score,
         penalties,
         period: state === 'ENDED' ? null : readPeriod(game.state, game.periods),

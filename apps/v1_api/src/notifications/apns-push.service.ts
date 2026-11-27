@@ -177,6 +177,25 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
   }
 
   /**
+   * One Live Activity update or end to one activity push token.
+   *
+   * Reuses the whole delivery path — gateway fallback, provider-token retry and the
+   * permanent/transient split — but not the device store: an activity token is not a registered
+   * device, so the caller owns what happens to a dead one.
+   */
+  async sendLiveActivity(
+    pushToken: string,
+    liveActivity: NonNullable<NativePushPayload['liveActivity']>,
+  ): Promise<'delivered' | 'permanent' | 'transient' | 'disabled'> {
+    if (!this.isConfigured) return 'disabled';
+    const outcome = await this.deliver(
+      { id: 'live-activity', token: pushToken, platform: V1PushPlatform.ios, apnsEnvironment: null },
+      { notificationId: 'live-activity', title: '', liveActivity },
+    );
+    return outcome.result;
+  }
+
+  /**
    * The gateway this device's token is valid at.
    *
    * A token only works at the gateway that issued it: send a sandbox token to the production
@@ -326,23 +345,37 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     providerToken: string,
   ): Promise<{ status: number; body: string }> {
     const session = this.openSession(host);
-    const body = JSON.stringify({
-      aps: { alert: { title: payload.title, body: payload.body }, sound: 'default' },
-      notificationId: payload.notificationId,
-      route: payload.route ?? '/notifications',
-    });
+    const live = payload.liveActivity;
+    const body = JSON.stringify(
+      live
+        ? {
+            aps: {
+              timestamp: Math.floor(this.clock() / 1000),
+              event: live.event,
+              'content-state': live.contentState,
+              ...(live.dismissalDate === undefined ? {} : { 'dismissal-date': live.dismissalDate }),
+            },
+          }
+        : {
+            aps: { alert: { title: payload.title, body: payload.body }, sound: 'default' },
+            notificationId: payload.notificationId,
+            route: payload.route ?? '/notifications',
+          },
+    );
 
     return new Promise((resolve, reject) => {
       const request = session.request({
         [constants.HTTP2_HEADER_METHOD]: 'POST',
         [constants.HTTP2_HEADER_PATH]: `/3/device/${deviceToken}`,
         [constants.HTTP2_HEADER_AUTHORIZATION]: `bearer ${providerToken}`,
-        'apns-topic': this.bundleId!,
-        'apns-push-type': 'alert',
+        // A Live Activity is addressed to a topic of its own and is never collapsed: every
+        // score change must reach the card, not replace an earlier one that is still queued.
+        'apns-topic': live ? `${this.bundleId!}.push-type.liveactivity` : this.bundleId!,
+        'apns-push-type': live ? 'liveactivity' : 'alert',
         'apns-priority': '10',
         // Replaces an earlier notification about the same thing instead of stacking a
         // second copy — the counterpart of the Android notification tag.
-        'apns-collapse-id': payload.notificationId,
+        ...(live ? {} : { 'apns-collapse-id': payload.notificationId }),
       });
 
       let status = 0;

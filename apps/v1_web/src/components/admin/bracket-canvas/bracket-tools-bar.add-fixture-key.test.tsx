@@ -63,7 +63,7 @@ const registrationsState = { status: 'success', truncated: false, refetchFailed:
 
 function Tools({ tournamentId, showToast }: { tournamentId: string; showToast: (message: string, variant?: 'success' | 'error') => void }) {
   const controls = useBracketViewControls();
-  const tools = useBracketTools({ tournamentId, tournament, registrations: [], registrationsState, canWrite: true, role: 'PLATFORM_OPS', showToast, controls, onAssignmentModeChange: vi.fn() });
+  const tools = useBracketTools({ tournamentId, tournament, registrations: [], registrationsState, canWrite: true, role: 'PLATFORM_OPS', showToast, controls, view: 'canvas', onAssignmentModeChange: vi.fn() });
   return <BracketToolsBar tools={tools} tournament={tournament} tournamentId={tournamentId} canWrite view="canvas" onViewChange={vi.fn()} controls={controls} showToast={showToast} />;
 }
 

@@ -54,7 +54,7 @@ Apple App Group/App ID/배포 프로파일 관리자 승인 미확인. 서명 �
 | 2026-11-27 | inject.sh 없음 | 전달 요청, 비밀값 요구/출력 안 함 |
 
 ## Progress Snapshot
-Phase 1/2 구현, Phase 3 검증 중. Alpha 앱+확장 unsigned compile 및 WidgetTests 8/8 PASS. iPhone 17 Pro iOS 26.2 전용 시뮬레이터에서 고정 샘플 7상태×2크기=14개 뷰 캡처/육안 확인. 실제 WidgetKit 호스트/갤러리·실제 alpha API/참석 저장 PASS를 뜻하지 않음. Production unsigned 빌드 진행 중.
+Phase 1/2 구현, Phase 3 검증 중. Alpha 앱+확장 unsigned compile 및 WidgetTests 8/8 PASS. iPhone 17 Pro iOS 26.2 전용 시뮬레이터에서 고정 샘플 7상태×2크기=14개 뷰 캡처/육안 확인. 실제 WidgetKit 호스트/갤러리·실제 alpha API/참석 저장 PASS를 뜻하지 않음. Production unsigned 앱+확장 빌드 PASS. Draft PR #2559 (base dev) 생성.
 
 규칙 감사: AGENTS.md 504줄/50,852바이트, CLAUDE.md 604줄/51,582바이트를 구간별 끝까지 재확인. 두 규칙 문서·Codex 설정·신뢰 등록은 변경하지 않음. 사용자 확정 디자인/머지 금지 지시 우선. 자동 AGENTS byte cap은 도구 직접 읽기로 보완.
 

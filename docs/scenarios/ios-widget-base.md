@@ -10,6 +10,9 @@
 - 샘플은 DEBUG launch argument --widget-preview <state>로만 표시. 네트워크/토큰·서버 저장 증거 아님. 샘플 버튼은 유효 세션 revision이 없어 실제 참석 저장 불가.
 - raw 캡처: output/playwright/visual-audit/ios-widget-base/*.png. PR SHA 고정 갤러리로 공유.
 
+- Production: TeameetProduction unsigned 앱+확장 빌드 PASS.
+- [Draft PR #2559](https://github.com/kim-song-jun/matchup-sports-platform/pull/2559). 샘플 PNG는 de443f18e 커밋 SHA 고정 URL 갤러리 코멘트로 보존하고 최종 트리에서는 제거.
+
 ## 실제 alpha API 및 플랫폼: 확인 필요
 - [ ] 사용자 제공 inject.sh 또는 비밀값 비노출 인증 주입 경로
 - [ ] 앱 실제 로그인 → 토큰 발급 → App Group → 홈 화면 위젯 갤러리

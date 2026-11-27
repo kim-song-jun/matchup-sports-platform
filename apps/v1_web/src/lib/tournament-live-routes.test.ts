@@ -10,6 +10,7 @@ import {
   adminLiveBase,
   fixtureIdFromConsolePath,
   isAdminLiveConsolePath,
+  resultsHref,
   resolveTournamentLiveBase,
   staffLiveBase,
   tournamentIdFromAdminLivePath,
@@ -87,5 +88,13 @@ describe('tournamentIdFromAdminLivePath', () => {
     expect(tournamentIdFromAdminLivePath('/admin/live/t-1/staff')).toBe('t-1');
     expect(tournamentIdFromAdminLivePath('/admin/tournaments/t-1/staff')).toBeNull();
     expect(tournamentIdFromAdminLivePath(null)).toBeNull();
+  });
+});
+
+describe('resultsHref', () => {
+  it('경기를 주면 fixtureId 쿼리를 붙이고 인코딩한다', () => {
+    expect(resultsHref('/admin/live/t-1')).toBe('/admin/live/t-1/results');
+    expect(resultsHref('/admin/live/t-1', 'f7')).toBe('/admin/live/t-1/results?fixtureId=f7');
+    expect(resultsHref('/tournament-ops/tournaments/t-1', 'a b&c')).toBe('/tournament-ops/tournaments/t-1/results?fixtureId=a%20b%26c');
   });
 });

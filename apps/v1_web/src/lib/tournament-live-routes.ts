@@ -27,6 +27,11 @@ export function adminLiveBase(tournamentId: string): string {
   return `/admin/live/${tournamentId}`;
 }
 
+/** 결과 화면. `fixtureId` 를 주면 그 경기가 골라진 채 열린다. */
+export function resultsHref(base: string, fixtureId?: string): string {
+  return fixtureId === undefined ? `${base}/results` : `${base}/results?fixtureId=${encodeURIComponent(fixtureId)}`;
+}
+
 /** 지금 pathname 이 속한 표면의 base. 어느 쪽도 아니면 스태프 표면으로 본다(기존 동작). */
 export function resolveTournamentLiveBase(pathname: string | null, tournamentId: string): string {
   if (pathname !== null && pathname.startsWith('/admin/')) return adminLiveBase(tournamentId);

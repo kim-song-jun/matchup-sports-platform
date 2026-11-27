@@ -4305,16 +4305,46 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(visibleLabels()).toEqual(['연장 전반', '휴식']);
     });
 
-    it('후반 뒤 연장으로 쉬는 중이면 점수 카드가 하프타임이 아니라 휴식이라고 한다', () => {
+    it('후반 뒤 연장으로 쉬는 중이면 단계 줄이 하프타임이 아니라 휴식을 지금 단계로 말한다', () => {
       setup({ periods: extraTimePeriods(['ENDED', 'ENDED', 'HALFTIME', 'SCHEDULED']), periodDurations: WITH_EXTRA_TIME });
       render(<CoreHarness />);
 
       expect(current()).toBe('휴식');
       expect(visibleLabels()).toEqual(['휴식', '연장 전반']);
-      // 지금 단계를 말하는 칩도 단계 줄과 같은 이름이다.
-      const chips = within(screen.getByRole('banner')).getAllByText('휴식').filter((element) => element.closest('ol') === null);
-      expect(chips).toHaveLength(1);
-      expect(within(screen.getByRole('banner')).queryAllByText('하프타임').filter((element) => element.closest('ol') === null)).toHaveLength(0);
+    });
+
+    // 단계 줄이 지금 쉬는 단계를 말하므로 시계 자리에 같은 말을 하는 칩을 또 두지 않는다.
+    const outsideStrip = (text: string) =>
+      within(screen.getByRole('banner')).queryAllByText(text).filter((element) => element.closest('ol') === null);
+
+    it.each([
+      ['하프타임', PERIODS.halftime, undefined, '하프타임'],
+      ['후반 뒤 연장 앞 휴식', extraTimePeriods(['ENDED', 'ENDED', 'HALFTIME', 'SCHEDULED']), WITH_EXTRA_TIME, '휴식'],
+    ] as const)('%s — 단계 줄이 있으면 쉬는 칩이 없다', (_label, periods, periodDurations, breakName) => {
+      setup({ periods, periodDurations });
+      render(<CoreHarness />);
+
+      expect(strip()).not.toBeNull();
+      expect(current()).toBe(breakName);
+      expect(outsideStrip(breakName)).toHaveLength(0);
+    });
+
+    it('정규 시간 종료 칩은 시계가 멈춘 이유를 말하므로 단계 줄이 있어도 남는다', () => {
+      setup({ periods: PERIODS.regulationEnded });
+      render(<CoreHarness />);
+
+      expect(strip()).not.toBeNull();
+      expect(outsideStrip('정규 시간 종료')).toHaveLength(1);
+    });
+
+    it('단계 줄을 그릴 수 없으면 쉬는 칩이 지금 단계를 대신 말한다', () => {
+      // 첫 구간이 HALFTIME 이면 그 앞에 쉬는 단계가 없어 지금 위치를 못 읽는다.
+      setup({ periods: [{ number: 1, state: 'HALFTIME', startedAt: null, endedAt: null }] });
+      render(<CoreHarness />);
+
+      expect(strip()).toBeNull();
+      expect(outsideStrip('휴식')).toHaveLength(1);
+      expect(outsideStrip('진행 중')).toHaveLength(0);
     });
 
     it('결선 연장 경기는 아홉 단계고 승부차기는 점선 조건부 단계로 종료 앞에 있다', () => {

@@ -188,10 +188,10 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(within(events).getAllByRole('listitem')).toHaveLength(1);
     if (canEdit) {
       expect(within(events).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
-      expect(within(events).getByRole('button', { name: '고치기' })).toBeInTheDocument();
+      expect(within(events).getByRole('button', { name: /^고치기 · 기록 취소/ })).toBeInTheDocument();
     } else {
       expect(within(events).queryByRole('button', { name: /어시스트/ })).not.toBeInTheDocument();
-      expect(within(events).queryByRole('button', { name: '고치기' })).not.toBeInTheDocument();
+      expect(within(events).queryByRole('button', { name: /^고치기 · 기록 취소/ })).not.toBeInTheDocument();
     }
   });
 

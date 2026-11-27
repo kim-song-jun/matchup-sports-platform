@@ -230,6 +230,8 @@ export function RecordedEventList({
       (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
       ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
       !reversedIds.has(event.id);
+    const reverseLabel =
+      event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`;
     const canEditTime =
       onEditEvent !== undefined &&
       resultOfficialized !== true &&
@@ -276,10 +278,12 @@ export function RecordedEventList({
             type="button"
             disabled={disabled}
             onClick={() => reverseHandler?.(event)}
-              className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            // 보이는 글자는 「고치기」지만 누르면 기록 취소 확인으로 이어진다 — 보이는 글자를 이름 앞에 두어 음성 조작도 맞춘다.
+            aria-label={event.type === 'SUBSTITUTION' ? undefined : `${reverseLabel} · 기록 취소 (${eventTypeLabel(event)})`}
+            className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             <Undo2 size={12} aria-hidden="true" />
-            {event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`}
+            {reverseLabel}
           </button>
         ) : null}
       </>

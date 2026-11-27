@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 어드민 대회 개편의 모든 레인이 기대는 공용 계약을 먼저 머지한다 — `ActionMenu`(C-1), `SideSheet`(C-2), 대회 정보 섹션 키·딥링크·「채워야 할 설정」 판정(C-5 `info-sections.ts`), 대회 형식 이름 표(C-6), 경기 시간 단계 helper 이동. 화면은 바꾸지 않는다.
+**Goal:** 어드민 대회 개편의 모든 레인이 기대는 공용 계약을 먼저 머지한다 — `ActionMenu`(C-1), `SideSheet`(C-2), 대회 정보 섹션 키·딥링크·「채워야 할 설정」 판정(C-5 `info-sections.ts`), 대회 형식 이름 표(C-6), 경기 시간 단계 helper 이동. 화면 배치는 바꾸지 않는다 — 보이는 변화는 경기 시간 입력칸 이름 하나(정규 구간 3개 이상일 때 「n피리어드」 → 「n부」, 용어표)뿐이다.
 
 **Architecture:** `ActionMenu` 는 768px 이상에서 포털로 띄운 `role="menu"` 팝오버, 미만에서는 기존 `ActionSheet` 를 쓴다. `SideSheet` 는 `useModalA11y` 위에 얹고 `dirty` 일 때 모든 닫기 경로를 `useConfirm` 으로 가로챈다. C-5·C-6·helper 이동은 React 없는 순수 모듈(`lib/`·`[id]/info-sections.ts`)이다.
 

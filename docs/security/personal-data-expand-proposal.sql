@@ -1,0 +1,48 @@
+-- REVIEW PROPOSAL ONLY. Not in the Prisma migration chain. Do not run against a live database.
+-- The blocked global storage integration and the data transition must be reviewed first.
+-- Expand only: no existing values are rewritten by schema deployment.
+ALTER TABLE "v1_users" ADD COLUMN "email_privacy_lookup" TEXT;
+CREATE UNIQUE INDEX "v1_users_email_privacy_lookup_key" ON "v1_users"("email_privacy_lookup");
+ALTER TABLE "v1_users" ADD COLUMN "phone_privacy_lookup" TEXT;
+CREATE UNIQUE INDEX "v1_users_phone_privacy_lookup_key" ON "v1_users"("phone_privacy_lookup");
+ALTER TABLE "v1_auth_identities" ADD COLUMN "email_privacy_lookup" TEXT;
+CREATE INDEX "v1_auth_identities_email_privacy_lookup_idx" ON "v1_auth_identities"("email_privacy_lookup");
+ALTER TABLE "v1_auth_identities" ADD COLUMN "provider_user_key_privacy_lookup" TEXT;
+CREATE INDEX "v1_auth_identities_provider_user_key_privacy_lookup_idx" ON "v1_auth_identities"("provider_user_key_privacy_lookup");
+CREATE UNIQUE INDEX "v1_auth_identity_provider_privacy_key" ON "v1_auth_identities"("provider", "provider_user_key_privacy_lookup");
+ALTER TABLE "v1_user_profiles" ADD COLUMN "real_name_privacy_lookup" TEXT;
+CREATE INDEX "v1_user_profiles_real_name_privacy_lookup_idx" ON "v1_user_profiles"("real_name_privacy_lookup");
+ALTER TABLE "v1_user_profiles" ADD COLUMN "birth_date_privacy_lookup" TEXT;
+CREATE INDEX "v1_user_profiles_birth_date_privacy_lookup_idx" ON "v1_user_profiles"("birth_date_privacy_lookup");
+ALTER TABLE "v1_verification_tokens" ADD COLUMN "target_privacy_lookup" TEXT;
+CREATE INDEX "v1_verification_tokens_target_privacy_lookup_idx" ON "v1_verification_tokens"("target_privacy_lookup");
+ALTER TABLE "v1_phone_verification_challenges" ADD COLUMN "phone_privacy_lookup" TEXT;
+CREATE UNIQUE INDEX "v1_phone_verification_challenges_phone_privacy_lookup_key" ON "v1_phone_verification_challenges"("phone_privacy_lookup");
+ALTER TABLE "v1_email_verification_challenges" ADD COLUMN "email_privacy_lookup" TEXT;
+CREATE UNIQUE INDEX "v1_email_verification_challenges_email_privacy_lookup_key" ON "v1_email_verification_challenges"("email_privacy_lookup");
+ALTER TABLE "v1_tournament_players" ADD COLUMN "real_name_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournament_players_real_name_privacy_lookup_idx" ON "v1_tournament_players"("real_name_privacy_lookup");
+ALTER TABLE "v1_tournament_players" ADD COLUMN "birth_date_snapshot_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournament_players_birth_date_snapshot_privacy_lookup_idx" ON "v1_tournament_players"("birth_date_snapshot_privacy_lookup");
+ALTER TABLE "v1_tournament_players" ADD COLUMN "eligibility_note_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournament_players_eligibility_note_privacy_lookup_idx" ON "v1_tournament_players"("eligibility_note_privacy_lookup");
+ALTER TABLE "v1_tournaments" ADD COLUMN "bank_account_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournaments_bank_account_privacy_lookup_idx" ON "v1_tournaments"("bank_account_privacy_lookup");
+ALTER TABLE "v1_tournaments" ADD COLUMN "bank_holder_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournaments_bank_holder_privacy_lookup_idx" ON "v1_tournaments"("bank_holder_privacy_lookup");
+ALTER TABLE "v1_tournament_registrations" ADD COLUMN "depositor_name_privacy_lookup" TEXT;
+CREATE INDEX "v1_tournament_registrations_depositor_name_privacy_lookup_idx" ON "v1_tournament_registrations"("depositor_name_privacy_lookup");
+ALTER TABLE "v1_inquiries" ADD COLUMN "guest_email_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiries_guest_email_privacy_lookup_idx" ON "v1_inquiries"("guest_email_privacy_lookup");
+ALTER TABLE "v1_inquiries" ADD COLUMN "guest_phone_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiries_guest_phone_privacy_lookup_idx" ON "v1_inquiries"("guest_phone_privacy_lookup");
+ALTER TABLE "v1_inquiries" ADD COLUMN "title_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiries_title_privacy_lookup_idx" ON "v1_inquiries"("title_privacy_lookup");
+ALTER TABLE "v1_inquiries" ADD COLUMN "body_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiries_body_privacy_lookup_idx" ON "v1_inquiries"("body_privacy_lookup");
+ALTER TABLE "v1_inquiries" ADD COLUMN "contact_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiries_contact_privacy_lookup_idx" ON "v1_inquiries"("contact_privacy_lookup");
+ALTER TABLE "v1_inquiry_replies" ADD COLUMN "body_privacy_lookup" TEXT;
+CREATE INDEX "v1_inquiry_replies_body_privacy_lookup_idx" ON "v1_inquiry_replies"("body_privacy_lookup");
+ALTER TABLE "v1_admin_action_logs" ADD COLUMN "reason_privacy_lookup" TEXT;
+CREATE INDEX "v1_admin_action_logs_reason_privacy_lookup_idx" ON "v1_admin_action_logs"("reason_privacy_lookup");

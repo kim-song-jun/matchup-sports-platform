@@ -37,7 +37,7 @@ import {
 } from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { recordSignupConsent } from './signup-record-consent';
-import { hashPassword, verifyPasswordConstantCost } from './password-hash';
+import { hashPassword, needsPasswordRehash, verifyPasswordConstantCost } from './password-hash';
 import { loginAttemptKeys, loginIpKey, type LoginAttemptKeys } from './login-security/login-security.policy';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
@@ -365,7 +365,8 @@ export class AuthService {
       });
     }
 
-    return this.completeEmailLogin(verifiedIdentity, keys);
+    return this.completeEmailLogin(verifiedIdentity, keys,
+      needsPasswordRehash(verifiedIdentity.passwordHash) ? await hashPassword(dto.password) : undefined);
   }
 
   async verifyLoginStepUp(dto: LoginStepUpVerifyDto, context: LoginRequestContext) {
@@ -393,7 +394,7 @@ export class AuthService {
   }
 
   /** Shared by the password path and the step-up verify path, so both end in the same session response. */
-  private async completeEmailLogin(identity: EmailLoginIdentity, keys: LoginAttemptKeys) {
+  private async completeEmailLogin(identity: EmailLoginIdentity, keys: LoginAttemptKeys, upgradedHash?: string) {
     if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
       this.assertNotWithdrawalPending(identity.user.accountStatus, identity.status === 'active' ? identity.user : undefined);
       throw new ForbiddenException({
@@ -408,7 +409,7 @@ export class AuthService {
     await this.prisma.$transaction(async (tx) => {
       const touched = await tx.v1AuthIdentity.updateMany({
         where: { id: identity.id, passwordHash: identity.passwordHash },
-        data: { lastLoginAt: now },
+        data: { lastLoginAt: now, ...(upgradedHash ? { passwordHash: upgradedHash } : {}) },
       });
       if (touched.count === 0) {
         throw new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Email or password is incorrect' });

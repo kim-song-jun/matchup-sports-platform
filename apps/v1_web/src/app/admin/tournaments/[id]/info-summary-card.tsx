@@ -24,7 +24,7 @@ export function InfoSummaryCard({
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 sm:p-5"
+      className="break-keep rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -47,7 +47,7 @@ export function InfoSummaryCard({
               <span className="min-w-0 break-words">{row.value}</span>
               {row.badge ? <InfoBadge tone={row.badge.tone}>{row.badge.text}</InfoBadge> : null}
               {row.note ? (
-                <span className="basis-full text-[length:var(--font-size-caption)] leading-[18px] text-[var(--text-muted)]">{row.note}</span>
+                <span className="min-w-0 basis-full break-words text-[length:var(--font-size-caption)] leading-[18px] text-[var(--text-muted)]">{row.note}</span>
               ) : null}
             </dd>
           </Fragment>

@@ -48,7 +48,7 @@ describe('홍보 섹션 시트', () => {
     expect(home.getByLabelText('장소 문구')).toHaveValue('');
     expect(home.getByLabelText('상금 문구')).toHaveValue('');
     expect(view.inSheet().getByText('켜면 홈과 대회 목록 위쪽에 이 대회가 카드로 보여요.')).toBeInTheDocument();
-    expect(view.inSheet().getByText('비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」 로 넣어요.')).toBeInTheDocument();
+    expect(view.inSheet().getByText('비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」로 넣어요.')).toBeInTheDocument();
     expect(view.sheet().textContent).not.toContain('켜면 대회 정보로 카드 문구를 채워요');
   });
 

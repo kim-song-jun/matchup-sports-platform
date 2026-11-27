@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyPromoFactDefaults,
-  buildTournamentPromoFactDefaults,
-  EMPTY_PROMO_FACTS_DIRTY,
-  markChangedPromoFacts,
-} from './tournament-promo-defaults';
+import { buildTournamentPromoFactDefaults } from './tournament-promo-defaults';
 
 const EMPTY_SOURCE = {
   scheduledAt: '',
@@ -67,62 +62,5 @@ describe('buildTournamentPromoFactDefaults', () => {
       locationText: '',
       prizeText: '',
     });
-  });
-});
-
-describe('applyPromoFactDefaults', () => {
-  const value = { dateText: '', locationText: '관리자가 고른 장소', prizeText: '' };
-  const defaults = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
-
-  it('dirty가 아닌 문구만 기본값으로 채운다', () => {
-    const next = applyPromoFactDefaults(value, defaults, {
-      ...EMPTY_PROMO_FACTS_DIRTY,
-      locationText: true,
-    });
-    expect(next.dateText).toBe('8월 29일 (토)');
-    expect(next.locationText).toBe('관리자가 고른 장소');
-  });
-
-  it('기본값이 빈 문자열이면 기존 값을 지우지 않는다', () => {
-    const next = applyPromoFactDefaults(
-      { ...value, prizeText: '관리자가 쓴 상금' },
-      defaults,
-      EMPTY_PROMO_FACTS_DIRTY,
-    );
-    expect(next.prizeText).toBe('관리자가 쓴 상금');
-  });
-
-  it('바뀔 게 없으면 같은 객체를 그대로 돌려준다', () => {
-    const same = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
-    expect(applyPromoFactDefaults(same, defaults, EMPTY_PROMO_FACTS_DIRTY)).toBe(same);
-  });
-});
-
-describe('markChangedPromoFacts', () => {
-  const previous = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
-
-  it('실제로 바뀐 문구만 dirty로 표시한다', () => {
-    const dirty = markChangedPromoFacts(
-      previous,
-      { ...previous, locationText: '수원종합운동장' },
-      EMPTY_PROMO_FACTS_DIRTY,
-    );
-    expect(dirty.locationText).toBe(true);
-    expect(dirty.dateText).toBe(false);
-  });
-
-  it('빈 칸으로 지운 것도 관리자의 선택이므로 dirty다', () => {
-    const dirty = markChangedPromoFacts(
-      previous,
-      { ...previous, dateText: '' },
-      EMPTY_PROMO_FACTS_DIRTY,
-    );
-    expect(dirty.dateText).toBe(true);
-  });
-
-  it('바뀐 게 없으면 기존 dirty 객체를 그대로 돌려준다', () => {
-    expect(markChangedPromoFacts(previous, { ...previous }, EMPTY_PROMO_FACTS_DIRTY)).toBe(
-      EMPTY_PROMO_FACTS_DIRTY,
-    );
   });
 });

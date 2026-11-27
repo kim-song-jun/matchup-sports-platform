@@ -1437,7 +1437,7 @@ export function gameOperationsErrorMessage(code: string): string {
     case 'CLOCK_DRIFT':
       return '기기 시각이 서버와 많이 달라요. 시간을 확인해주세요.';
     // alpha 실사고(2026-08) 근본 원인: 옐로카드/파울 기록이 이 코드로 거부됐는데
-    // 매핑이 없어 default("이벤트를 기록하지 못했어요")로 뭉개졌다. 실제 원인은
+    // 매핑이 없어 default("기록하지 못했어요")로 뭉개졌다. 실제 원인은
     // `medianOffsetMs()`가 소수(.5) offset을 반환해 `clockMs`가 정수가 아니게
     // 되고, 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)가 거부한 것—
     // `game-operations-clock.ts`에서 고쳤다(새 캡처는 항상 정수). 다만 이 픽스
@@ -1446,7 +1446,7 @@ export function gameOperationsErrorMessage(code: string): string {
     // 보정하고 payloadHash를 다시 계산해 함께 보내므로(아래 구현) 재시도가
     // 실제로 복구 경로가 된다.
     case 'VALIDATION_ERROR':
-      return '이벤트 형식에 문제가 있어 기록하지 못했어요. 다시 시도해주세요.';
+      return '기록 형식에 문제가 있어 저장하지 못했어요. 다시 시도해주세요.';
     // UX 감사 CRITICAL — 서버가 ack를 끝내 보내지 않아 'sending'에 고착되던
     // 상태를 클라이언트 타임아웃으로 감지한 경우에만 붙는 코드(서버가 던지는
     // 코드가 아니다). 네트워크가 끊겼거나 응답이 느린 경우가 대부분이라
@@ -1455,7 +1455,7 @@ export function gameOperationsErrorMessage(code: string): string {
     case 'SEND_TIMEOUT':
       return '서버 응답을 받지 못했어요. 네트워크를 확인하고 다시 시도해주세요.';
     case 'OFFLINE_EVENT_REBASE_CONFLICT':
-      return '오프라인 동안 기록한 이벤트를 다시 확인해주세요.';
+      return '연결이 끊긴 동안 남긴 기록을 다시 확인해주세요.';
     // T1-0 fix round 2: this event path goes through the Socket.IO gateway
     // (game.error), NOT extractErrorMessage -- the design doc assumed the
     // server message would show as-is, but it never reaches this console
@@ -1479,9 +1479,9 @@ export function gameOperationsErrorMessage(code: string): string {
     // 맞춰야 한다(둘이 갈라지면 "다시 시도해주세요" 인데 버튼이 없거나, 재시도해도
     // 안 되는데 버튼만 있는 모순이 생긴다).
     case 'TERMINAL_GAME_IMMUTABLE':
-      return '이미 종료 처리된 경기라 더 이상 이벤트를 기록할 수 없어요.';
+      return '이미 끝난 경기라 더 기록할 수 없어요.';
     case 'EVENT_INVALID':
-      return '이벤트 정보가 올바르지 않아요. 새로고침 후 다시 기록해주세요.';
+      return '기록 정보가 올바르지 않아요. 새로고침 후 다시 기록해주세요.';
     case 'PARTICIPANT_SIDE_MISMATCH':
       return '선택한 선수가 해당 팀 소속이 아니에요. 새로고침 후 다시 기록해주세요.';
     case 'SCORER_REQUIRED':
@@ -1516,11 +1516,11 @@ export function gameOperationsErrorMessage(code: string): string {
       // 사용자가 고칠 수 있는 게 없다 — 입력을 바꾸라고 하지 않는다. 재시도는 여전히
       // 유효한 선택지다(원인이 payload 가 아니라 일시적 서버 오류일 수 있으므로) — 그래서
       // isRetryableGameOperationsErrorCode 는 이 코드를 재시도 가능으로 둔다.
-      return '일시적인 오류로 이벤트를 기록하지 못했어요. 다시 시도해도 계속되면 관리자에게 알려주세요.';
+      return '일시적인 오류로 기록하지 못했어요. 다시 시도해도 계속되면 관리자에게 알려주세요.';
     default:
       // 위 어디에도 없는, 서버가 새로 추가했을 수 있는 코드 — "다시 시도해주세요" 를
       // 단정하지 않는다(그 코드가 재시도로 풀리는지 여기서는 알 수 없다).
-      return '이벤트를 기록하지 못했어요.';
+      return '기록하지 못했어요.';
   }
 }
 

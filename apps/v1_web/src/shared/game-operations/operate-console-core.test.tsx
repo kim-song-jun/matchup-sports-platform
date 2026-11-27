@@ -232,7 +232,7 @@ function queuedEvent(clientEventId: string, status: QueuedGameEvent['status'], t
     status,
     queuedAt: '2026-10-28T00:00:00.000Z',
     attempts: 1,
-    lastError: status === 'failed' ? { code: 'INTERNAL_ERROR', message: '이벤트를 기록하지 못했어요.' } : null,
+    lastError: status === 'failed' ? { code: 'INTERNAL_ERROR', message: '기록하지 못했어요.' } : null,
     ackedSequence: status === 'acked' ? 1 : null,
     ackedVersion: status === 'acked' ? 2 : null,
   };
@@ -613,7 +613,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     expect(screen.getByRole('list', { name: '기록 목록' })).toBeInTheDocument();
 
     const sheet = openStatusSheet();
-    expect(within(sheet).getByText('이벤트를 기록하지 못했어요.')).toBeInTheDocument();
+    expect(within(sheet).getByText('기록하지 못했어요.')).toBeInTheDocument();
     fireEvent.click(within(sheet).getByRole('button', { name: '다시 시도' }));
     expect(state.retryFailedEvent).toHaveBeenCalledWith('client-9');
   });

@@ -106,7 +106,8 @@ export function TournamentOverviewSection() {
         <p className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
           {milestone.headline}
         </p>
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mt-1">
+        {/* 폰은 라벨 칸을 가장 긴 라벨에 맞춘 두 열이라 값이 줄마다 같은 x 에서 시작한다. */}
+        <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2 sm:grid-cols-3 sm:items-start sm:gap-x-4">
           <OverviewFact
             label="경기 일정"
             value={tournament.scheduledAt ? formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt) : null}
@@ -114,7 +115,6 @@ export function TournamentOverviewSection() {
           <OverviewFact label="신청 마감" value={tournament.registrationDeadlineAt ? formatDate(tournament.registrationDeadlineAt) : null} />
           <OverviewFact label="명단 제출 마감" value={tournament.rosterDeadlineAt ? formatDate(tournament.rosterDeadlineAt) : null} />
         </dl>
-      </section>
         {overviewAdvance ? (
           <div
             className={[
@@ -135,6 +135,7 @@ export function TournamentOverviewSection() {
             </button>
           </div>
         ) : null}
+      </section>
 
       {/* 규모 — 각 숫자에서 그 섹션으로 바로 간다 */}
       {showKpi && (
@@ -178,9 +179,8 @@ export function TournamentOverviewSection() {
 
 function OverviewFact({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex items-baseline gap-2 sm:flex-col sm:gap-0.5">
-      {/* 모바일은 라벨과 긴 날짜가 한 줄을 나눠 쓴다. 라벨이 줄어들면 단어 중간에서 접힌다. */}
-      <dt className="shrink-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{label}</dt>
+    <div className="contents sm:flex sm:flex-col sm:gap-0.5">
+      <dt className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{label}</dt>
       <dd
         className={`text-[length:var(--font-size-body-sm)] ${value ? 'text-[var(--text-strong)]' : 'text-[var(--text-muted)]'}`}
       >
@@ -223,7 +223,7 @@ function SetupCard({ items, isDraft }: { items: TournamentSetupItem[]; isDraft: 
         {items.map((item) => (
           <li
             key={item.key}
-            className="flex flex-col gap-2 px-5 py-3 border-b border-[var(--border)] last:border-b-0 sm:flex-row sm:items-center sm:gap-3"
+            className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border)] last:border-b-0"
           >
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -235,13 +235,13 @@ function SetupCard({ items, isDraft }: { items: TournamentSetupItem[]; isDraft: 
               <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.detail}</p>
             </div>
             {item.key === primaryKey ? (
-              <Link href={item.href} className={`tm-btn tm-btn-md tm-btn-primary shrink-0 self-start sm:self-center ${FOCUS_RING}`}>
+              <Link href={item.href} className={`tm-btn tm-btn-md tm-btn-primary shrink-0 ${FOCUS_RING}`}>
                 {item.actionLabel}
               </Link>
             ) : (
               <Link
                 href={item.href}
-                className={`shrink-0 inline-flex items-center gap-0.5 self-start sm:self-center min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] hover:underline transition-colors rounded ${FOCUS_RING}`}
+                className={`-mr-2 shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] hover:underline transition-colors rounded ${FOCUS_RING}`}
               >
                 {item.actionLabel}
                 <ArrowRight size={13} aria-hidden="true" />

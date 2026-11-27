@@ -31,6 +31,7 @@ export type BracketCanvasProps = {
   pendingRegistrationId: string | null;
   canWrite: boolean;
   onSelectFixture: (fixtureId: string) => void;
+  onSelectManualBye?: (groupId: string, id: string) => void;
   onSelectBye?: (slotId: string) => void;
   onAssignSlot: (slotId: string, registrationId: string) => void;
   onAssignDirect: (fixtureId: string, side: SideKey, registrationId: string) => void;
@@ -66,6 +67,7 @@ function SingleBracketCanvas({
   canWrite,
   onSelectFixture,
   onSelectBye,
+  onSelectManualBye,
   onAssignSlot,
   onAssignDirect,
 }: BracketCanvasProps) {
@@ -90,7 +92,7 @@ function SingleBracketCanvas({
   const hasBracketEdges = layout.edges.some((edge) => edge.kind !== 'GROUP_RANK');
   const hasRankEdges = layout.edges.some((edge) => edge.kind === 'GROUP_RANK');
 
-  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} registrations={registrations} renderFixture={(fixture, labels) => <BracketCanvasNode
+  if (sixTeamState) return <SixTeamAdminBracket canWrite={canWrite} state={sixTeamState} fixtures={fixtures} groups={groups} registrations={registrations} renderFixture={(fixture, labels) => <BracketCanvasNode
     fixture={fixture}
     title={`${fixture.fixtureNumber}번 경기`}
     fullTitle={fixtureTitle(fixture, labelGroups ?? groups)}
@@ -132,6 +134,15 @@ function SingleBracketCanvas({
             />
           ))}
         </svg>
+        {layout.manualByes.map(position => {
+          const bye = groups.find(group => group.id === position.groupId)?.groupTeams.find(row => row.id === position.id);
+          return <button key={position.id} type="button" disabled={!onSelectManualBye}
+            onClick={() => onSelectManualBye?.(position.groupId, position.id)}
+            className="absolute rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-3 text-left"
+            style={{ left: position.x, top: position.y, width: 232, height: position.height }}>
+            부전승 · {bye?.teamName ?? '팀 미정'} · {Number(bye?.sortOrder) + 1}번
+          </button>;
+        })}
         {layout.byeNodes.map(position => {
           const slot = slotsById.get(position.slotId);
           if (!slot) return null;

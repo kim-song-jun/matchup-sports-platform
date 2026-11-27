@@ -1239,7 +1239,7 @@ export function TournamentInfoSection() {
               className={inputCls}
             />
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 경기 진행 중에도 바꿀 수 있고, 비우면 5개예요.
+              한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 경기 진행 중에도 바꿀 수 있고, 비우면 5개예요.
             </p>
           </div>
 

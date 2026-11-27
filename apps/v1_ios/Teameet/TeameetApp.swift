@@ -22,7 +22,9 @@ struct TeameetApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--widget-preview") {
+            if #available(iOS 16.2, *), ProcessInfo.processInfo.arguments.contains("--live-activity-preview") {
+                MatchActivityPreview()
+            } else if ProcessInfo.processInfo.arguments.contains("--widget-preview") {
                 WidgetPreviewGallery()
             } else {
                 RootView(config: config, model: model, sessionStore: sessionStore, appDelegate: appDelegate)

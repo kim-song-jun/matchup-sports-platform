@@ -27,6 +27,7 @@ import type {
 } from './tournament-create-model';
 import type { V1CreateTournamentPayload, V1Tournament } from '@/types/api';
 import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
+import { TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
@@ -1189,6 +1190,55 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
     expect(screen.getByRole('button', { name: '대회 만들기' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '다음' })).not.toBeInTheDocument();
+  });
+
+  it('팀 파울 기준이 잘못되면 칸이 있는 1단계에서 다음으로 못 가고 같은 자리에서 오류를 보여 준다', () => {
+    renderPage();
+    fillBasicStep();
+
+    // 칸은 1단계(기본 정보)의 성별 카테고리 위에 있다.
+    const field = screen.getByLabelText(/팀 파울 기준/);
+    const gender = screen.getByText('성별 카테고리');
+    expect(field.compareDocumentPosition(gender) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+    expect(screen.getByText('STEP 1 / 5')).toBeInTheDocument();
+    expect(screen.getByText(TEAM_FOUL_THRESHOLD_ERROR)).toBeInTheDocument();
+    expect(screen.getByLabelText(/팀 파울 기준/)).toHaveAttribute('aria-invalid', 'true');
+
+    // 고치면 다음 단계로 간다.
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    expect(screen.getByText('STEP 2 / 5')).toBeInTheDocument();
+  });
+
+  it('팀 파울 기준 입력은 대회를 만들 때 요청에 실린다', () => {
+    createMutate.mockImplementation(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    fillBasicStep();
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fillScheduleStep();
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: 7 });
+  });
+
+  it('팀 파울 기준을 비워 두면 요청에 null(기본 5개)이 실린다', () => {
+    createMutate.mockImplementation(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: null });
   });
 
   it('상금·홍보 단계에서 대회를 만들면 관리 화면으로 튕기지 않고 확인 단계(5/5)로 진행한다', () => {

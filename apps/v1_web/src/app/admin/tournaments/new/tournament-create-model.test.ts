@@ -558,15 +558,24 @@ describe('대회 생성 — 팀 파울 기준', () => {
     expect(hasUnsavedTournamentChanges(saved, saved.savedPayload)).toBe(false);
   });
 
-  it('1~20 밖이거나 정수가 아니면 경기 설정 단계에서 막고, 빈칸·범위 안 값은 통과한다', () => {
-    const errorsFor = (teamFoulThreshold: string) =>
-      validateTournamentCreateStep({ ...INITIAL_TOURNAMENT_CREATE_STATE, teamFoulThreshold }, 2).teamFoulThreshold;
+  it('1~20 밖이거나 정수가 아니면 입력 칸이 있는 기본 정보 단계(0)에서 막고, 빈칸·범위 안 값은 통과한다', () => {
+    const errorsFor = (teamFoulThreshold: string, step: number) =>
+      validateTournamentCreateStep({ ...INITIAL_TOURNAMENT_CREATE_STATE, teamFoulThreshold }, step).teamFoulThreshold;
 
     for (const bad of ['0', '21', '3.5', '-1', 'abc']) {
-      expect(errorsFor(bad)).toContain('1부터 20 사이의 정수');
+      expect(errorsFor(bad, 0)).toContain('1부터 20 사이의 정수');
     }
     for (const ok of ['', '1', '5', '20']) {
-      expect(errorsFor(ok)).toBeUndefined();
+      expect(errorsFor(ok, 0)).toBeUndefined();
     }
+  });
+
+  it('팀 파울 기준 오류는 입력 칸이 있는 기본 정보 단계(0)에서만 나온다 — 칸이 없는 단계로 되돌리지 않게', () => {
+    const state = { ...INITIAL_TOURNAMENT_CREATE_STATE, teamFoulThreshold: '0' };
+    const reportingSteps = [0, 1, 2, 3].filter(
+      (step) => validateTournamentCreateStep(state, step).teamFoulThreshold !== undefined,
+    );
+
+    expect(reportingSteps).toEqual([0]);
   });
 });

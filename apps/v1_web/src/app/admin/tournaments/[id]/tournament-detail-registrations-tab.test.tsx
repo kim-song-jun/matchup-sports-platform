@@ -945,3 +945,73 @@ describe('RegistrationsTab — 신청 행의 팀별 금액', () => {
     expect(rowB).not.toHaveTextContent('70,000');
   });
 });
+
+describe.each([
+  { kind: '무료 대회', isFreeEntry: true, noun: '신청 확인', done: '신청을 확인했어요.', absentWord: '입금' },
+  { kind: '유료 대회', isFreeEntry: false, noun: '입금 확인', done: '입금을 확인했어요.', absentWord: '신청 확인' },
+])('RegistrationsTab — $kind의 확인 처리 문구', ({ isFreeEntry, noun, done, absentWord }) => {
+  const showToast = vi.fn();
+  const confirmMutate = vi.fn();
+  const confirmMutateAsync = vi.fn();
+  // 서버 메시지가 없는 V1ApiError 를 흉내 낸다 — 호출부의 기본 문구로 떨어지는 경로.
+  const messagelessError = { displayableMessage: false };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const hook of [useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
+      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate: vi.fn(), isPending: false });
+    }
+    useV1ConfirmPaymentMock.mockReturnValue({ mutate: confirmMutate, mutateAsync: confirmMutateAsync, isPending: false } as never);
+    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: { items: [baseRegistration({ id: 'reg-wait', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null })], truncated: false },
+      isPending: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  });
+
+  const renderTab = () => render(<RegistrationsTab tournamentId="tournament-1" canWrite isFreeEntry={isFreeEntry} showToast={showToast} />);
+
+  it(`카드 버튼과 결과 토스트가 "${noun}" 문구를 쓴다`, () => {
+    renderTab();
+    expect(document.body.textContent).not.toContain(absentWord);
+
+    fireEvent.click(screen.getByRole('button', { name: noun }));
+
+    expect(confirmMutate).toHaveBeenCalledWith({ registrationId: 'reg-wait' }, expect.anything());
+    const { onSuccess, onError } = confirmMutate.mock.calls[0][1] as { onSuccess: () => void; onError: (err: unknown) => void };
+    act(() => onSuccess());
+    expect(showToast).toHaveBeenCalledWith(done, 'success');
+    act(() => onError(messagelessError));
+    expect(showToast).toHaveBeenCalledWith(`${noun}에 실패했어요.`, 'error');
+  });
+
+  it(`일괄 처리 버튼·확인창·결과 토스트가 "${noun}" 문구를 쓴다`, async () => {
+    confirmMutateAsync.mockResolvedValueOnce(undefined);
+    renderTab();
+    fireEvent.click(screen.getByRole('checkbox', { name: '대기 FC 일괄 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: `선택 1건 ${noun}` }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(`일괄 ${noun}`);
+    expect(dialog).toHaveTextContent(`선택한 1건을 ${noun} 처리할까요?`);
+    expect(dialog.textContent).not.toContain(absentWord);
+    fireEvent.click(within(dialog).getByRole('button', { name: noun }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith(`1건 ${noun} 완료`, 'success'));
+    expect(confirmMutateAsync).toHaveBeenCalledWith({ registrationId: 'reg-wait' });
+  });
+
+  it(`일괄 처리가 한 건 실패하면 팀 이름과 함께 "${noun}에 실패했어요." 로 알린다`, async () => {
+    confirmMutateAsync.mockRejectedValueOnce(messagelessError);
+    renderTab();
+    fireEvent.click(screen.getByRole('checkbox', { name: '대기 FC 일괄 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: `선택 1건 ${noun}` }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: noun }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith(`대기 FC ${noun}에 실패했어요.`, 'error'));
+  });
+});

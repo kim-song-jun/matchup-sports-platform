@@ -687,3 +687,9 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 구현/검증 기록: [.github/tasks/20261130-competition-stage-composition.md](../../.github/tasks/20261130-competition-stage-composition.md)의 2026-11-26 후속 절. Alpha after/실제 DB 미검증이며 기존 증거를 재사용하지 않아요.
 
 - 2026-11-27: [iOS 홈 위젯 PR-A](ios-widget-base.md) — Alpha unsigned 앱+확장 컴파일, 단위 8/8, 고정 샘플 7/7. 실제 alpha API·위젯 호스트 검증 대기.
+
+- 2026-11-27: [iOS 잠금화면 PR-B 및 로고 후속](ios-widget-lock-screen.md) — Alpha 앱+확장 unsigned, 13/13 단위 PASS. 고정 샘플 7/7, 실제 alpha/WidgetKit 호스트 검증 대기.
+
+- 2026-11-27: [iOS Live Activity PR-C](ios-live-activity.md) — PR-B 위 stacked 변경. 17/17 단위·실제 ActivityKit 합성 데이터 UI 검증, 실제 alpha API는 별도 대기.
+
+- 2026-11-27: [iOS Live Activity 푸시 앱 연동 PR-D](ios-live-activity-push.md) — 서버 별도 PR 초안 계약, 토큰 갱신·폐기 및 endedAt 고정 기한. Alpha 관련24개 단위/앱+확장 컴파일·Production unsigned PASS. 실제 alpha/APNs 검증 대기.

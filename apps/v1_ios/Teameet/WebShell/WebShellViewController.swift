@@ -72,6 +72,12 @@ final class WebShellViewController: UIViewController {
         observeKeyboard()
         widgetSession = WidgetSessionCoordinator(config: config, cookies: webView.configuration.websiteDataStore.httpCookieStore)
         widgetSession?.onFailure = { [weak self] message in self?.model.showNotice(message) }
+        if #available(iOS 16.2, *) {
+            MatchActivityCoordinator.shared.onFailure = { [weak self] message in self?.model.showNotice(message) }
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive),
+                                               name: UIApplication.didBecomeActiveNotification, object: nil)
+        if UIApplication.shared.applicationState == .active { appDidBecomeActive() }
         observeInPageNavigation()
 
         restoreOrLoadInitialRoute()
@@ -177,7 +183,15 @@ final class WebShellViewController: UIViewController {
             name: UIApplication.willEnterForegroundNotification, object: nil)
     }
 
+    @objc private func appDidBecomeActive() {
+        Task {
+            await widgetSession?.synchronize()
+            if #available(iOS 16.2, *) { MatchActivityCoordinator.shared.setForeground(UIApplication.shared.applicationState == .active) }
+        }
+    }
+
     @objc private func appWillResignActive() {
+        if #available(iOS 16.2, *) { MatchActivityCoordinator.shared.setForeground(false) }
         persistSession()
         cancelAppUpdateChecks()
     }

@@ -29,6 +29,10 @@ struct WidgetPreviewGallery: View {
             Text("샘플 시각 검증 · \(state)").font(.headline).foregroundStyle(.white)
             HomeWidgetView(entry: entry, previewFamily: .systemMedium).padding(16).frame(width: 354, height: 170).background(Color(red: 0.21, green: 0.30, blue: 0.49)).clipShape(RoundedRectangle(cornerRadius: 24))
             HomeWidgetView(entry: entry, previewFamily: .systemSmall).padding(16).frame(width: 170, height: 170).background(Color(red: 0.21, green: 0.30, blue: 0.49)).clipShape(RoundedRectangle(cornerRadius: 24))
+            LockWidgetView(entry: entry, previewFamily: .accessoryRectangular)
+                .frame(width: 170, height: 76).foregroundStyle(.white)
+            LockWidgetView(entry: entry, previewFamily: .accessoryInline)
+                .frame(width: 354, height: 24, alignment: .leading).foregroundStyle(.white).lineLimit(1)
             Text("고정 샘플 · API/실제 위젯 갤러리 검증과 별도").font(.caption).foregroundStyle(.white)
         }.padding().frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(red: 0.05, green: 0.08, blue: 0.18))
     }

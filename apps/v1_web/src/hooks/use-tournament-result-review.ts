@@ -5,6 +5,8 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { mergeByFixtureId } from '@/lib/merge-board-pages';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
@@ -238,7 +240,7 @@ async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOp
     usedCursors.add(next);
     cursor = next;
   }
-  return { ...page, items, liveWarnings, nextCursor: null };
+  return { ...page, items: mergeByFixtureId(items), liveWarnings: mergeByFixtureId(liveWarnings), nextCursor: null };
 }
 
 /**
@@ -254,6 +256,8 @@ export function useTournamentEndedFixtures(tournamentId: string, options?: { ena
     queryFn: () => fetchAllEndedFixtures(tournamentId),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
     staleTime: 15_000,
+    // 보드 카드가 「결과 확정 대기」로 바뀌는 주기와 같다 — 메뉴 숫자와 결과 목록이 보드보다 늦지 않게.
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
   });
 }
 

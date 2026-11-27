@@ -15,11 +15,12 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { useTournamentEndedFixtures } from '@/hooks/use-tournament-result-review';
 import { useV1Tournament } from '@/hooks/use-v1-api';
-import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
+import { resolveTournamentLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import { ResultFixtureList, type ResultListItem } from './result-fixture-list';
 import { ResultPanel } from './result-panel';
 
-/** 끝난 경기의 결과를 확정하거나 고치는 한 화면. 옛 결과 검토·결과 정정 화면을 합쳤다. */
+/** 끝난 경기의 결과를 확정하거나 고치는 한 화면. */
 export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const pathname = usePathname();
   const liveBase = resolveTournamentLiveBase(pathname, tournamentId);
@@ -58,14 +59,29 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
     [teamNamesByFixtureId, leagueTitles],
   );
 
+  const overdueFixtureIds = useMemo(() => overdueFixtureIdsOf(ended.data?.liveWarnings), [ended.data?.liveWarnings]);
   const { pending, confirmed, voided } = useMemo(
-    () => partitionResultFixtures(ended.data?.items ?? [], overdueFixtureIdsOf(ended.data?.liveWarnings)),
-    [ended.data],
+    () => partitionResultFixtures(ended.data?.items ?? [], overdueFixtureIds),
+    [ended.data?.items, overdueFixtureIds],
   );
   const all = useMemo(() => [...pending, ...confirmed, ...voided], [pending, confirmed, voided]);
   // 고른 경기가 목록에 없으면(딥링크 경기가 아직 안 끝났거나 이미 처리됨) 첫 확정 대기로 대신하고 이유를 알린다.
   const selected = all.find((item) => item.fixtureId === pickedFixtureId) ?? pending[0] ?? null;
   const pickMissing = ended.isSuccess && pickedFixtureId !== null && !all.some((item) => item.fixtureId === pickedFixtureId);
+
+  // 참가자에게 보이는 결과가 있는 경기(확정됨·결과 무효)만. 종류가 오기 전에는 만들지 않는다 —
+  // 정규 리그가 대회 라우트로 링크돼 404 가 된다.
+  const hasPublicResult = selected !== null && !pending.some((item) => item.fixtureId === selected.fixtureId);
+  const tournamentKind = tournament.data?.kind;
+  const publicHref =
+    hasPublicResult && tournamentKind !== undefined
+      ? fixtureDetailHref({
+          isRegularLeague: tournamentKind === 'regular_league',
+          competitionId: tournamentId,
+          fixtureId: selected.fixtureId,
+          fromHref: resultsHref(liveBase, selected.fixtureId),
+        })
+      : null;
 
   const select = (item: ResultListItem) => {
     setPickedFixtureId(item.fixtureId);
@@ -130,6 +146,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
               onSelect={select}
               titleFor={titleFor}
               boardHref={`${liveBase}/operations`}
+              overdueFixtureIds={overdueFixtureIds}
             />
           ) : null}
           {showPanel ? (
@@ -144,15 +161,25 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
                   목록으로
                 </button>
               ) : null}
-              <h2 ref={panelHeadingRef} tabIndex={-1} className="text-[length:var(--font-size-body-lg)] font-semibold text-[var(--text-strong)] outline-none">
-                {titleFor(selected)}
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-x-3">
+                <h2 ref={panelHeadingRef} tabIndex={-1} className="min-w-0 text-[length:var(--font-size-body-lg)] font-semibold text-[var(--text-strong)] outline-none">
+                  {titleFor(selected)}
+                </h2>
+                {publicHref !== null ? (
+                  <Link
+                    href={publicHref}
+                    className="inline-flex min-h-11 shrink-0 items-center font-semibold text-[length:var(--font-size-label)] text-[var(--blue700)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    공개 화면에서 보기
+                  </Link>
+                ) : null}
+              </div>
               <ResultPanel
                 key={selected.gameId}
                 gameId={selected.gameId}
                 tournamentId={tournamentId}
                 isRegularLeague={tournament.data?.kind === 'regular_league'}
-                autoOpenFix={fromDeepLink && selected.fixtureId === deepLinkFixtureId}
+                autoOpenFix={canAct && fromDeepLink && selected.fixtureId === deepLinkFixtureId}
                 onSaved={() => void ended.refetch()}
                 onOfficialized={() => {
                   setPickedFixtureId(selected.fixtureId);

@@ -58,3 +58,12 @@ describe('GameSummaryHeader 역할 라벨', () => {
     expect(document.body.textContent).not.toContain('undefined');
   });
 });
+
+describe('GameSummaryHeader 결과 상태', () => {
+  it('확정된 결과가 아직 없으면 운영 콘솔과 같은 「확정 전」으로 말한다', () => {
+    render(<GameSummaryHeader game={gameWith('platform_ops')} currentRevision={null} />);
+
+    expect(screen.getByText('확정 전')).toBeInTheDocument();
+    expect(screen.queryByText(/공식 결과 없음/)).not.toBeInTheDocument();
+  });
+});

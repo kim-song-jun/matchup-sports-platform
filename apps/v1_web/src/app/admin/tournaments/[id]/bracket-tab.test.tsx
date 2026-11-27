@@ -620,7 +620,7 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     expect(screen.queryByText(/league_r/)).not.toBeInTheDocument();
   });
 
-  it('모바일 경기 카드에서도 홈·원정과 운영 및 결과 검토 작업을 함께 제공한다', () => {
+  it('모바일 경기 카드에서도 홈·원정과 운영 및 결과 확정 작업을 함께 제공한다', () => {
     bracketGroups = bracket.groups;
     bracketFixtures = [fixtureRow({ id: 'mobile-fx', fixtureNumber: 1, venue: 'A구장' })];
     renderTab();
@@ -636,12 +636,12 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     expect(within(card).getByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 운영 콘솔 열기' }))
       .toHaveAttribute('href', '/admin/live/t-1/fixtures/mobile-fx/operate');
-    const review = within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 검토하러 가기' });
-    expect(review).toHaveAttribute('href', '/admin/live/t-1/result-review?fixtureId=mobile-fx');
+    const review = within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 확정하러 가기' });
+    expect(review).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=mobile-fx');
     expect(review.parentElement).toHaveClass('flex-wrap');
   });
 
-  it('결과가 있는 모바일 경기 카드에는 점수와 해당 경기 결과 정정 링크를 표시한다', () => {
+  it('결과가 있는 모바일 경기 카드에는 점수와 해당 경기 결과 고치기 링크를 표시한다', () => {
     bracketGroups = bracket.groups;
     bracketFixtures = [fixtureRow({
       id: 'mobile-done',
@@ -658,8 +658,8 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     if (!section) throw new Error('경기 일정 섹션을 찾지 못했어요.');
     const card = within(within(section).getByRole('list')).getByRole('listitem');
     expect(within(card).getByText('2 : 1')).toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 고치기 화면 열기' }))
-      .toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=mobile-done');
+    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 고치기' }))
+      .toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=mobile-done');
     expect(within(card).queryByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 삭제' }))
       .not.toBeInTheDocument();
   });

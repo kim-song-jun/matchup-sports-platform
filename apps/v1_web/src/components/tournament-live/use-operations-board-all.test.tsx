@@ -8,7 +8,7 @@ import { useOperationsBoardAll } from './use-operations-board-all';
 
 const requests: URLSearchParams[] = [];
 let secondPageFails = false;
-type Mode = 'normal' | 'no-cursor-key' | 'same-cursor' | 'empty-page' | 'endless';
+type Mode = 'normal' | 'no-cursor-key' | 'same-cursor' | 'empty-page' | 'endless' | 'overlap';
 let mode: Mode = 'normal';
 const item = (n: number) => ({ fixtureId: `f-${n}`, gameId: `g-${n}` });
 
@@ -26,6 +26,12 @@ const server = setupServer(
     if (mode === 'empty-page') {
       const first = params.get('cursor') === null;
       return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: first ? [item(1)] : [], nextCursor: 'more', watermark: 'w', liveWarnings: [] } });
+    }
+    if (mode === 'overlap') {
+      // 쪽 사이에 f-2 가 끝나 서버 정렬이 바뀌어, 끝난 구간에서 다시 온다.
+      return params.get('cursor') === null
+        ? HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [{ ...item(1), gameState: 'LIVE' }, { ...item(2), gameState: 'LIVE' }], nextCursor: 'c1', watermark: 'w', liveWarnings: [{ fixtureId: 'f-2', warnings: ['NO_STAFF_ASSIGNED'] }] } })
+        : HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [{ ...item(2), gameState: 'ENDED' }, item(3)], nextCursor: null, watermark: 'w', liveWarnings: [{ fixtureId: 'f-2', warnings: ['LINEUP_NOT_SUBMITTED'] }] } });
     }
     if (mode === 'endless') {
       return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [item(requests.length)], nextCursor: `c${requests.length}`, watermark: 'w', liveWarnings: [] } });
@@ -117,6 +123,19 @@ describe('useOperationsBoardAll', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(requests).toHaveLength(20);
     expect(result.current.data?.items).toHaveLength(20);
+  });
+
+  it('쪽 사이에 끝난 경기가 두 번 와도 한 번만 세고 나중 상태를 쓴다', async () => {
+    mode = 'overlap';
+    const { result } = renderHook(() => useOperationsBoardAll('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.items.map((i) => [i.fixtureId, (i as { gameState?: string }).gameState])).toEqual([
+      ['f-1', 'LIVE'],
+      ['f-2', 'ENDED'],
+      ['f-3', undefined],
+    ]);
+    expect(result.current.data?.liveWarnings).toEqual([{ fixtureId: 'f-2', warnings: ['LINEUP_NOT_SUBMITTED'] }]);
   });
 
   it('enabled=false 면 읽지 않는다', async () => {

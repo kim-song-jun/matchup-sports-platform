@@ -25,16 +25,30 @@ function NowRow({ label }: { label: string }) {
   );
 }
 
+const TIME_COLUMN_PX = 56;
+/** 카드 제목과 상태 배지가 한 줄에 들어가는 최소 폭. 판이 이보다 좁아지면 열을 줄이지 않고 가로로 민다. */
+const MIN_FIELD_COLUMN_PX = 240;
+const COLUMN_GAP_PX = 8;
+const ROW_PADDING_PX = 24;
+
 /** 구장 열 × 시작 시각 줄. 같은 칸에 겹친 경기는 세로로 쌓는다. */
 export function OperationsTimeline({ columns, cards, nowTimeLabel, renderCard }: OperationsTimelineProps) {
   if (columns.length === 0) return null;
   const groups = groupByTime(cards);
-  const rowStyle: CSSProperties = { gridTemplateColumns: `56px repeat(${columns.length}, minmax(0, 1fr))` };
+  const rowStyle: CSSProperties = {
+    gridTemplateColumns: `${TIME_COLUMN_PX}px repeat(${columns.length}, minmax(${MIN_FIELD_COLUMN_PX}px, 1fr))`,
+    minWidth: `${TIME_COLUMN_PX + ROW_PADDING_PX + columns.length * (MIN_FIELD_COLUMN_PX + COLUMN_GAP_PX)}px`,
+  };
   const nowIndex = nowTimeLabel === null ? -1 : groups.findIndex((g) => g.time > nowTimeLabel);
   const nowAt = nowTimeLabel === null ? null : nowIndex === -1 ? groups.length : nowIndex;
 
   return (
-    <div role="table" aria-label="구장별 경기 시간표" className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+    <div
+      role="table"
+      aria-label="구장별 경기 시간표"
+      tabIndex={0}
+      className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+    >
       <div role="row" style={rowStyle} className="grid gap-2 border-b border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
         <div role="columnheader">
           <span className="sr-only">시간</span>

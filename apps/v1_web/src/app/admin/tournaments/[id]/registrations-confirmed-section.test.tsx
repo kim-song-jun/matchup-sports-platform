@@ -143,7 +143,7 @@ describe('RegistrationsConfirmedSection — 팀 줄', () => {
     const panels = screen.getAllByTestId('game-rosters-panel');
     expect(panels).toHaveLength(1);
     expect(panels[0]).toHaveAttribute('data-registration-id', 'reg-2');
-    expect(panels[0]).toHaveAttribute('data-correction-href', '/admin/live/tournament-1/records/corrections');
+    expect(panels[0]).toHaveAttribute('data-correction-href', '/admin/live/tournament-1/results');
     const row = screen.getByText('팀2', { selector: 'span' }).closest('li') as HTMLElement;
     expect(row).toContainElement(panels[0]);
     expect(row.className).toContain('col-span-full');

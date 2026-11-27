@@ -84,10 +84,9 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
                 사유: {reason}
               </p>
             ) : null}
-            {/* [알파 감사 C] "담당자 처리 · 리비전 #N" — 알파 실측 지적 항목. 11px → 12px. */}
             <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
               {actorText(revision)}
-              {' · '}리비전 #{revision.revision}
+              {' · '}{revision.revision}번째 결과
             </p>
           </li>
         );

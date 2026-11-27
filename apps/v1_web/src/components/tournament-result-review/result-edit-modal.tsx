@@ -50,6 +50,8 @@ export type ResultEditModalProps = {
   title: string;
   message: string;
   confirmLabel: string;
+  /** 제출 버튼 바로 위에 두는 한 줄 안내. */
+  submitHint?: string;
   reasonLabel?: string;
   base: {
     score: GameResultScore;
@@ -313,6 +315,7 @@ export function ResultEditModal({
   title,
   message,
   confirmLabel,
+  submitHint,
   reasonLabel = '사유',
   base,
   sides,
@@ -1142,6 +1145,12 @@ export function ResultEditModal({
             style={{ color: 'var(--red700)', padding: '12px 24px 0', flexShrink: 0 }}
           >
             {timelineMismatch}
+          </p>
+        ) : null}
+
+        {submitHint ? (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '12px 24px 0', flexShrink: 0 }}>
+            {submitHint}
           </p>
         ) : null}
 

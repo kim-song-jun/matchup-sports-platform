@@ -20,6 +20,7 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
@@ -128,16 +129,16 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
     );
   }
 
-  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 기존 결과 고치기 화면으로 보낸다.
+  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 결과 화면의 결과 고치기로 보낸다.
   if (node.state === 'official' && node.game.hasLiveRecords) {
     return (
       <div className="flex flex-col gap-2">
-        <Note>득점 기록이 있는 경기는 결과 고치기 화면에서 고쳐요.</Note>
+        <Note>득점 기록이 있는 경기는 결과 화면에서 고쳐요.</Note>
         <Link
-          href={`/admin/live/${encodeURIComponent(competitionId)}/records/corrections?fixtureId=${encodeURIComponent(node.fixtureId)}`}
+          href={resultsHref(adminLiveBase(competitionId), node.fixtureId)}
           className="tm-btn tm-btn-md tm-btn-outline min-h-[44px]"
         >
-          결과 고치기 화면으로 가기
+          결과 고치기
         </Link>
       </div>
     );

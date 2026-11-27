@@ -345,11 +345,11 @@ describe('BracketNodePanel — 자리 배정', () => {
         expect(screen.getByLabelText('홈 팀 선택')).toBeEnabled();
       });
 
-      it('공식 결과가 있으면 선택창 대신 무효 안내와 결과 고치기 화면 링크를 보여 준다', () => {
+      it('공식 결과가 있으면 선택창 대신 무효 안내와 결과 고치기 링크를 보여 준다', () => {
         renderPanel(started({ game: makeGame({ state: 'ENDED', hasOfficialResult: true, latestRevision: revision('OFFICIAL') }) }));
         expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
         expect(screen.getAllByText('공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.')).toHaveLength(2);
-        expect(screen.getAllByRole('link', { name: '결과 고치기 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
+        expect(screen.getAllByRole('link', { name: '결과 고치기' })[0]).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
       });
 
       it('제출만 된 결과는 서버가 교체 때 폐기하므로 바꿀 수 있다', () => {
@@ -557,9 +557,9 @@ describe('BracketNodePanel — 결과 구역', () => {
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있고 결과가 없으면 결과 고치기 화면 링크를 준다', () => {
+  it('라이브 득점 기록이 있고 결과가 없으면 결과 화면 링크를 준다', () => {
     renderPanel(readyFixture({ game: makeGame({ id: 'game-1', state: 'ENDED', hasLiveRecords: true }) }));
-    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=f1');
+    expect(screen.getByRole('link', { name: '결과 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 

@@ -82,7 +82,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
     vi.mocked(useV1UnpublishTournamentBracket).mockReturnValue(noopMutationHook());
   });
 
-  it('결과 없는 예정 경기 — result-review로 fixtureId+from=admin 딥링크, 운영 열기 CTA도 보임', () => {
+  it('결과 없는 예정 경기 — 결과 화면으로 fixtureId 딥링크, 운영 열기 CTA도 보임', () => {
     vi.mocked(useV1AdminBracket).mockReturnValue({
       data: { groups: [], fixtures: [fixture({ status: 'scheduled', result: null })], standings: [] },
       isPending: false, isError: false, error: null, refetch: vi.fn(),
@@ -94,10 +94,10 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
     // DOM에 렌더한다(CSS hidden/lg:hidden으로만 전환 — jsdom은 레이아웃을 계산하지
     // 않는다). 그래서 각 행 액션이 항상 2벌 존재한다 — admin-shell/tournament-ops-shell
     // 테스트와 동일한 convention으로 getAllByRole을 쓴다.
-    const reviewLinks = screen.getAllByRole('link', { name: /결과 검토하러 가기/ });
+    const reviewLinks = screen.getAllByRole('link', { name: /결과 확정하러 가기/ });
     expect(reviewLinks.length).toBeGreaterThan(0);
     for (const link of reviewLinks) {
-      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/result-review?fixtureId=fx-9');
+      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/results?fixtureId=fx-9');
     }
     const operateLinks = screen.getAllByRole('link', { name: /운영 콘솔 열기/ });
     expect(operateLinks.length).toBeGreaterThan(0);
@@ -106,7 +106,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
     }
   });
 
-  it('결과 있는 종료 경기 — records/corrections로 딥링크, 운영 열기 CTA는 없음', () => {
+  it('결과 있는 종료 경기 — 결과 화면으로 딥링크, 운영 열기 CTA는 없음', () => {
     vi.mocked(useV1AdminBracket).mockReturnValue({
       data: {
         groups: [], standings: [],
@@ -120,10 +120,10 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
 
     render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} canWrite unscheduledOnly={false} />);
 
-    const correctionLinks = screen.getAllByRole('link', { name: /결과 고치기 화면 열기/ });
+    const correctionLinks = screen.getAllByRole('link', { name: /결과 고치기/ });
     expect(correctionLinks.length).toBeGreaterThan(0);
     for (const link of correctionLinks) {
-      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/records/corrections?fixtureId=fx-9');
+      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/results?fixtureId=fx-9');
     }
     expect(screen.queryByRole('link', { name: /운영 콘솔 열기/ })).not.toBeInTheDocument();
   });

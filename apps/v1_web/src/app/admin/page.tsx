@@ -11,6 +11,7 @@ import {
 } from '@/components/admin';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 import { extractErrorMessage } from '@/lib/error-message';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import type { V1AdminHubTournamentCount } from '@/types/api';
 
 // ── Date helpers ──────────────────────────────────────────────────────────
@@ -146,11 +147,11 @@ function InboxSection() {
               ariaLabel={`미승인 대회 신청: ${data.pendingRegistrations.total}건`}
             />
             <AdminKpiCard
-              label="결과 검토 대기"
+              label="결과 확정 대기"
               value={data.resultReviewPending.total}
               tone={data.resultReviewPending.total > 0 ? 'warning' : 'neutral'}
               href="/admin/ops/tournaments"
-              ariaLabel={`결과 검토 대기: ${data.resultReviewPending.total}건`}
+              ariaLabel={`결과 확정 대기: ${data.resultReviewPending.total}건`}
             />
             <AdminKpiCard
               label="미답변 문의"
@@ -184,10 +185,10 @@ function InboxSection() {
             linkLabel="신청 관리"
           />
           <TournamentBreakdownCard
-            title="대회별 결과 검토 대기"
+            title="대회별 결과 확정 대기"
             rows={data.resultReviewPending.tournaments}
-            hrefFor={(id) => `/admin/live/${id}/result-review`}
-            linkLabel="검토하기"
+            hrefFor={(id) => resultsHref(adminLiveBase(id))}
+            linkLabel="결과 확정"
           />
         </div>
       )}

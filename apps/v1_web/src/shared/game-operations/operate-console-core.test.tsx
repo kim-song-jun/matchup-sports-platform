@@ -3317,6 +3317,25 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(within(openStatusSheet()).queryByText(/되돌리지 못했어요/)).toBeNull();
   });
 
+  it('진행 요청 오류가 남아 있어도 거절된 되돌리기는 따로 보이고 앞선다', async () => {
+    const state = setup();
+    state.reverseEvent.mockRejectedValueOnce(rejection('VERSION_CONFLICT', 'Expected version is stale'));
+    testFixtures.sendCommand.mockRejectedValue(rejection('INVALID_COMMAND', '명령을 처리하지 못했어요.', 400));
+    const { undo } = await recordedGoalWithUndo(state);
+
+    fireEvent.click(within(screen.getByRole('group', { name: '경기 진행 조작' })).getByRole('button', { name: '일시 중지' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '일시 중지' }));
+    await findConsoleNotice('명령을 처리하지 못했어요.');
+    fireEvent.click(undo);
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+    await findConsoleNotice('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+    const items = within(openStatusSheet()).getAllByRole('listitem').map((item) => item.textContent ?? '');
+    expect(statusRow()).toHaveTextContent(/^기록을 되돌리지 못했어요 외 \d+개/);
+    expect(items[0]).toContain('기록을 되돌리지 못했어요');
+    expect(items[1]).toContain('요청을 처리하지 못했어요');
+  });
+
   it('다른 기록이 전송 중이면 큐가 빌 때까지 기다렸다가 되돌린다', async () => {
     const state = setup();
     const { undo, rerender } = await recordedGoalWithUndo(state, { queue: { items: [queuedEvent('c2', 'sending')] } });
@@ -3590,7 +3609,7 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     render(<CoreHarness />);
     recordGoal();
     await waitFor(() => expect(statusRow()).toHaveAttribute('role', 'alert'));
-    expect(statusRow()).toHaveTextContent('요청을 처리하지 못했어요');
+    expect(statusRow()).toHaveTextContent('기록을 저장하지 못했어요');
 
     recordGoal();
 

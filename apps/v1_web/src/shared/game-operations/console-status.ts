@@ -6,6 +6,7 @@ export type ConsoleStatusKey =
   | 'takeover-handoff'
   | 'takeover-denied'
   | 'read-only'
+  | 'record-error'
   | 'command-error'
   | 'command-retry'
   | 'banner-message'
@@ -54,6 +55,8 @@ export interface ConsoleStatusInput {
   readonly expiryError: string | null;
   readonly startBlockedByTeams: boolean;
   readonly commandError: string | null;
+  /** 방금 누른 기록·되돌리기가 실패한 결과. 진행 요청 오류와 따로 남는다. */
+  readonly recordError: { readonly kind: 'save' | 'undo'; readonly message: string } | null;
   readonly bannerMessage: string | null;
   readonly retryLabel: string | null;
   readonly queue: { readonly waiting: number; readonly failed: number };
@@ -132,6 +135,14 @@ export function deriveConsoleStatus(input: ConsoleStatusInput): ConsoleStatus {
       tone: 'info',
       title: '보기만 할 수 있어요',
       body: '지원 담당자는 이 경기의 기록을 볼 수만 있어요.',
+    });
+  }
+  if (input.recordError !== null) {
+    items.push({
+      key: 'record-error',
+      tone: 'danger',
+      title: input.recordError.kind === 'save' ? '기록을 저장하지 못했어요' : '기록을 되돌리지 못했어요',
+      body: input.recordError.message,
     });
   }
   if (input.commandError !== null) {

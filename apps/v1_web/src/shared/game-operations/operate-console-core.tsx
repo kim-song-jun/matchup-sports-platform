@@ -363,7 +363,6 @@ const UNDO_FAILURE_BY_CODE: Readonly<Record<string, string>> = {
   VERSION_CONFLICT: UNDO_CONFLICT,
   COMMAND_CONCURRENCY_CONFLICT: UNDO_CONFLICT,
   RESULT_ALREADY_OFFICIAL: '결과가 이미 확정돼 되돌릴 수 없어요. 결과 고치기에서 고쳐 주세요.',
-  TERMINAL_GAME_IMMUTABLE: '취소된 경기라 기록을 되돌릴 수 없어요.',
 };
 /** 기록 권한을 잃어 거절된 코드 — 호스트의 코드별 안내가 이유를 그대로 말한다. */
 const UNDO_PERMISSION_CODES: ReadonlySet<string> = new Set([
@@ -472,7 +471,7 @@ export function OperateConsoleCore({
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   // 기록·되돌리기 실패 안내. 진행 명령의 오류와 따로 둬서 다음 기록을 할 때 지운다 — 지난 실패가 상태 줄에 남지 않게.
-  const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordError, setRecordError] = useState<{ readonly kind: 'save' | 'undo'; readonly message: string } | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
@@ -1351,7 +1350,7 @@ export function OperateConsoleCore({
       const stop = (message: string) => {
         // 끝내지 못했으면 잠금을 푼다 — 다시 누르면 이미 취소된 기록은 건너뛰고 남은 것만 보낸다.
         clientEventIds.forEach((id) => undoStartedRef.current.delete(id));
-        setRecordError(message);
+        setRecordError({ kind: 'undo', message });
       };
       if (commandBlockedRef.current) {
         stop(UNDO_BLOCKED_BY_COMMAND);
@@ -1472,7 +1471,7 @@ export function OperateConsoleCore({
       await waitForReverseInFlight();
       const recordedId = await opsRef.current.submitEvent(input);
       if (recordedId === null) {
-        setRecordError(RECORD_SAVE_FAILED);
+        setRecordError({ kind: 'save', message: RECORD_SAVE_FAILED });
         return;
       }
       const recordedIds = [recordedId];
@@ -1490,7 +1489,7 @@ export function OperateConsoleCore({
           await waitForReverseInFlight();
           const redId = await opsRef.current.submitEvent(redInput);
           if (redId === null) {
-            setRecordError(RECORD_SAVE_FAILED);
+            setRecordError({ kind: 'save', message: RECORD_SAVE_FAILED });
           } else {
             recordedIds.push(redId);
             noun = SECOND_YELLOW_RED_LABEL;
@@ -2131,7 +2130,8 @@ export function OperateConsoleCore({
     periodExpired,
     expiryError: periodRefreshNeeded ? periodExpiryError : null,
     startBlockedByTeams,
-    commandError: commandError ?? recordError,
+    commandError,
+    recordError,
     bannerMessage: ops.bannerMessage,
     retryLabel: pendingCommandRetry?.label ?? null,
     queue: {

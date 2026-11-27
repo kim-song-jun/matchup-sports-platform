@@ -88,7 +88,7 @@ describe('필드 운영콘솔 안내와 체험', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /김하늘/ }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /윤겨울/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    const history = screen.getByRole('heading', { name: /기록된 이벤트/ }).parentElement!;
+    const history = screen.getByRole('heading', { name: /^최근 기록/ }).parentElement!;
     expect(within(history).getByText(/옐로카드/)).toBeInTheDocument();
     expect(within(history).getByText(/윤겨울/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '안내 다시 보기' }));

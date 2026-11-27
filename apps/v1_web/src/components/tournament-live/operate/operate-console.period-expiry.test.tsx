@@ -17,6 +17,25 @@ const server = setupServer();
 let fixture: ReturnType<typeof createFixture>;
 let queryClient: QueryClient;
 
+// The status sheet (BottomSheet) reads the app router; nothing here navigates.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+/** Opens the status line's detail sheet, where each notice's full text lives. */
+function statusSheet() {
+  const open = screen.queryByRole('dialog', { name: '경기 상태' });
+  if (open) return open;
+  fireEvent.click(screen.getByRole('button', { name: '자세히' }));
+  return screen.getByRole('dialog', { name: '경기 상태' });
+}
+
+function closeStatusSheet() {
+  fireEvent.click(within(screen.getByRole('dialog', { name: '경기 상태' })).getByRole('button', { name: '닫기' }));
+}
+
 // Keep the actual console, HTTP hooks, operation hook and clock. Only the
 // transport is substituted, because no Socket.IO server runs in jsdom.
 vi.mock('@/lib/v1-game-operations-socket', () => ({
@@ -173,10 +192,11 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
   it('만료 안내 중에도 기존 수동 기간 종료와 확인을 거쳐 서버 응답을 반영해요', async () => {
     await openConsole();
     expect(await screen.findByText(/설정된 시간이 끝났어요/)).toBeInTheDocument();
-    expect(screen.getByText(/서버.*종료.*확인/)).toBeInTheDocument();
+    expect(within(statusSheet()).getByText(/서버.*종료.*확인/)).toBeInTheDocument();
+    closeStatusSheet();
     expect(fixture.commands).toEqual([]);
     await requestManualEnd();
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     expect(fixture.commands.map(({ command }) => command)).toEqual(['end-period']);
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
   });
@@ -185,7 +205,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
     expect(screen.queryByText('결과 확정')).toBeNull();
@@ -205,7 +225,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
@@ -227,7 +247,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await waitFor(() => fixture.waitForReads(2));
     fixture.endPeriod();
     await releaseRead(held);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
     expect(fixture.commands).toEqual([]);
     expect(fixture.resultRevisions).toEqual([]);
@@ -255,12 +275,14 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await openConsole();
     fixture.setReadError(true);
     await tick(5_000);
-    expect(await screen.findByText(/서버 종료 상태를 읽지 못했어요/)).toBeInTheDocument();
+    expect(await screen.findByText(/경기 진행 상태를 확인하지 못했어요/)).toBeInTheDocument();
+    expect(within(statusSheet()).getByText(/서버 종료 상태를 읽지 못했어요/)).toBeInTheDocument();
+    closeStatusSheet();
     expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeEnabled();
     fixture.setReadError(false);
     fixture.endPeriod();
     fireEvent.click(screen.getByRole('button', { name: '종료 상태 다시 확인' }));
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     expect(fixture.commands).toEqual([]);
   });
 
@@ -270,11 +292,11 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     fixture.setCommandError(true);
     await requestManualEnd();
     const retry = await screen.findByRole('button', { name: '같은 요청 재시도' });
-    expect(screen.getByText(/서버 응답을 받지 못했어요/)).toBeInTheDocument();
-    expect(screen.queryByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeNull();
+    expect(screen.getByText(/정규 시간 종료 요청의 응답을 받지 못했어요/)).toBeInTheDocument();
+    expect(screen.queryByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeNull();
     fixture.setCommandError(false);
     fireEvent.click(retry);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
     expect(fixture.commands.map(({ command }) => command)).toEqual(['end-period', 'end-period']);
     expect(fixture.commands[1]?.body).toEqual(fixture.commands[0]?.body);
   });

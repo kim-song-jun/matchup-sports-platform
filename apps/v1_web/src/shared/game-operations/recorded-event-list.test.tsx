@@ -124,6 +124,22 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
     expect(clocks()).toEqual(['6', '5', '4', '3', '2', '1']);
   });
 
+  it('renderMore 는 줄이 가려졌을 때만 전체 줄 수와 함께 불린다', () => {
+    const six = [1, 2, 3, 4, 5, 6].map((sequence) => goal(sequence, HOME_SIDE_ID, 'p-jung', sequence * 60000));
+    const renderMore = (total: number) => <button type="button">기록 {total}개 전체 보기</button>;
+
+    const { unmount } = render(
+      <RecordedEventList events={six} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={4} renderMore={renderMore} />,
+    );
+    expect(screen.getByRole('button', { name: '기록 6개 전체 보기' })).toBeInTheDocument();
+    unmount();
+
+    render(
+      <RecordedEventList events={six.slice(0, 4)} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={4} renderMore={renderMore} />,
+    );
+    expect(screen.queryByRole('button', { name: /전체 보기/ })).toBeNull();
+  });
+
   it('뒤집는 것이 입력 배열을 바꾸지 않는다 (콘솔의 스코어 파생 등 다른 소비처가 같은 배열을 쓴다)', () => {
     const events = [...EVENTS];
     render(<RecordedEventList events={events} sides={SIDES} lineups={LINEUPS} order="newest-first" />);
@@ -560,7 +576,7 @@ describe('현장 운영 콘솔 가독성 하한', () => {
       },
       {
         dir: 'src/shared/game-operations',
-        required: ['operate-console-core.tsx', 'recorded-event-list.tsx', 'team-foul-counter-bar.tsx'],
+        required: ['operate-console-core.tsx', 'recorded-event-list.tsx', 'console-score-card.tsx'],
       },
     ].map(({ dir, required }) => ({
       path: join(process.cwd(), dir),

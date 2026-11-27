@@ -11,6 +11,7 @@ import type { V1GameResultRevision } from '@/types/api';
 import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 import * as overlayHistory from '@/lib/overlay-history';
+import { installViewport } from '@/test/viewport';
 
 // MD-QA #187: 기록 "수정" 시트(BottomSheet)가 라우터 훅을 쓴다.
 vi.mock('next/navigation', () => ({
@@ -40,6 +41,8 @@ afterEach(() => {
  */
 
 const testFixtures = vi.hoisted(() => ({
+  /** true 면 선수 시트를 스텁이 아니라 실제 `LineupGrid` 로 그린다(명단 줄 수를 볼 때). */
+  realLineupGrid: { current: false },
   auth: vi.fn(),
   lineups: vi.fn(),
   game: vi.fn(),
@@ -72,21 +75,16 @@ type MockedOperations = {
 // SUBSTITUTION 테스트가 "나가는 선수 == 들어오는 선수"라는, 실제 계약
 // (validateSubstitution이 거부하는 상태)과 모순되는 입력을 "정상"으로
 // 통과시켰다(Copilot 리뷰 지적).
-vi.mock('./lineup-grid', async (importOriginal) => ({
+vi.mock('./lineup-grid', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./lineup-grid')>();
+  return {
   // 선택자 함수들은 **실제 구현을 그대로 쓴다**(`importOriginal`). 예전에는 목 안에
   // 로직을 손으로 베껴 뒀는데, 그러면 구현이 바뀔 때 목이 조용히 뒤처진다 -- 실제로
   // [P1-c 후속]에서 `latestLineupForDisplay` 가 추가되자 이 목에 없어서 세 테스트가
   // "export 가 없다"로 깨졌고, 거기서 로직을 또 베꼈다면 **두 규칙이 다르다는 계약을
   // 목이 왜곡**할 수 있었다. 컴포넌트만 가벼운 스텁으로 대체한다.
-  ...(await importOriginal<typeof import('./lineup-grid')>()),
-  LineupGrid: ({
-    onSelectPlayer,
-    restrictSideId,
-    filterParticipantIds,
-    sentOffParticipantIds,
-    sides,
-    renderSideFooter,
-  }: {
+  ...actual,
+  LineupGrid: (props: {
     sides?: ReadonlyArray<{ id: string }>;
     renderSideFooter?: (side: never) => ReactNode;
     onSelectPlayer: (input: {
@@ -101,6 +99,10 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
     filterParticipantIds?: ReadonlySet<string>;
     sentOffParticipantIds?: ReadonlySet<string>;
   }) => {
+    if (testFixtures.realLineupGrid.current) {
+      return <actual.LineupGrid {...(props as unknown as Parameters<typeof actual.LineupGrid>[0])} />;
+    }
+    const { onSelectPlayer, restrictSideId, filterParticipantIds, sentOffParticipantIds, sides, renderSideFooter } = props;
     const participantId = restrictSideId
       ? filterParticipantIds?.has('p-1')
         ? 'p-1'
@@ -128,7 +130,8 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
       </div>
     );
   },
-}));
+  };
+});
 
 // 이슈 #375 — `testFixtures.sendCommand`는 `vi.hoisted`로 파일 전체가 공유하는
 // 스파이라 `vitest.config.mts`에 clearMocks가 없는 이 프로젝트에서는 호출
@@ -141,14 +144,40 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
 // 구현 자체는 건드리지 않는다).
 beforeEach(() => {
   testFixtures.sendCommand.mockClear();
+  testFixtures.realLineupGrid.current = false;
 });
 
 // 진행 명령은 응답 제한 시간을 걸 수 있게 abort 신호를 함께 넘긴다.
 const COMMAND_OPTIONS = { signal: expect.any(AbortSignal) };
 
-/** 콘솔이 운영자에게 알리는 안내(요청 실패 등)를 찾는다. */
-function findConsoleNotice(text: string | RegExp) {
-  return screen.findByText(text);
+/** 상태 줄의 「자세히」 시트를 연다(이미 열려 있으면 그대로). */
+function openStatusSheet() {
+  const existing = screen.queryByRole('dialog', { name: '경기 상태' });
+  if (existing) return existing;
+  fireEvent.click(screen.getByRole('button', { name: '자세히' }));
+  return screen.getByRole('dialog', { name: '경기 상태' });
+}
+
+/** 콘솔이 운영자에게 알리는 안내(요청 실패 등)는 「자세히」 시트 안에 있다. */
+async function findConsoleNotice(text: string | RegExp) {
+  await screen.findByRole('button', { name: '자세히' });
+  return within(openStatusSheet()).findByText(text);
+}
+
+/** 상태 줄(한 줄) 요소. danger 면 alert, 아니면 status 다. */
+function statusRow() {
+  return screen.getByRole('button', { name: '자세히' }).closest('[role="status"],[role="alert"]') as HTMLElement;
+}
+
+/** 점수 카드의 팀 열(「홈 팀명」·「원정 팀명」). */
+function teamColumn(teamName: string) {
+  return within(screen.getByRole('banner')).getByRole('group', { name: new RegExp(`${teamName}$`) });
+}
+
+/** 기록 격자의 「더보기」 칸(교체를 기록하는 종목은 진행 바의 ⋯)으로 더보기 시트를 연다. */
+function openMoreSheet() {
+  fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+  return screen.getByRole('dialog', { name: '더보기' });
 }
 
 const SIDE_ID = 'side-home';
@@ -233,10 +262,16 @@ function CoreHarness({
   fixtureId = 'f-1',
   takeoverEnabled = true,
   operatorScopeKey = 'operator-1',
+  leaseRequired = true,
+  resultHref,
+  sampleMode = false,
 }: {
   fixtureId?: string;
   takeoverEnabled?: boolean;
   operatorScopeKey?: string;
+  leaseRequired?: boolean;
+  resultHref?: string;
+  sampleMode?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { confirm, ConfirmModal } = useConfirm();
@@ -278,12 +313,13 @@ function CoreHarness({
         error: fixtureLineup.error ?? null,
         refetch: fixtureLineup.refetch ?? (async () => undefined),
       }}
-      leaseRequired
+      leaseRequired={leaseRequired}
       takeoverEnabled={takeoverEnabled}
       operatorScopeKey={operatorScopeKey}
       operationContextKey={JSON.stringify(['operation', fixtureId])}
       headerTopClass="top-[52px]"
-      showEmptyRosterNotice={data?.sourceType === 'TEAM_MATCH'}
+      resultHref={resultHref}
+      sampleMode={sampleMode}
       allowPenaltyShootout={data?.isKnockoutFixture === true}
       resultReviewEnabled
       renderResultReview={(gameId) => (
@@ -327,10 +363,16 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     testFixtures.operations.mockReturnValue(consoleState());
   });
 
-  it('실제 콘솔은 소켓 연결 상태를 그대로 보여 준다', () => {
+  it('실제 콘솔은 소켓 연결 상태를 상태 줄에 그대로 보여 준다', () => {
     render(<CoreHarness />);
-    expect(screen.getByText('실시간 연결됨')).toBeInTheDocument();
+    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
     expect(screen.queryByText('체험 중 · 서버 연결 없음')).not.toBeInTheDocument();
+  });
+
+  it('체험 콘솔은 서버에 연결됐다고 말하지 않는다', () => {
+    render(<CoreHarness sampleMode />);
+    expect(statusRow()).toHaveTextContent('체험 중 · 서버 연결 없음');
+    expect(statusRow()).not.toHaveTextContent('연결됨');
   });
 
   it('서버에 확정된 이벤트를 보여준다 — 로컬 큐가 비어 있어도', () => {
@@ -366,30 +408,38 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     expect(refetch).toHaveBeenCalled();
   });
 
-  // MD-QA #165: 다른 운영자가 쥔 경기는 보기 모드로 열고, 코드 없이 누가 운영 중인지와 가져오는 방법을 보여 준다.
-  it('다른 운영자가 운영 중이면 이름과 가져오기 버튼을 보여 주고, 확인해야만 force 로 가져온다', async () => {
+  // 다른 기기가 쥔 경기는 보기 모드로 열고, 코드 없이 누가 기록 중인지와 가져오는 방법을 보여 준다.
+  it('takeover: 「이 기기에서 기록하기」→ 확인 → requestTakeover({force:true}), 「운영 권한」 글자는 화면 어디에도 없다', async () => {
     const state = consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } });
     testFixtures.operations.mockReturnValue(state);
     render(<CoreHarness />);
 
-    expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(statusRow()).toHaveTextContent('다른 기기에서 기록하고 있어요');
     expect(screen.queryByText(/TAKEOVER_HELD/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '운영 권한 가져오기' }));
+    // 버튼은 시트를 열지 않아도 상태 줄 안에 있다.
+    fireEvent.click(within(statusRow()).getByRole('button', { name: '이 기기에서 기록하기' }));
     expect(state.requestTakeover).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole('button', { name: '가져오기' }));
+    const confirmDialog = await screen.findByRole('dialog', { name: '이 기기에서 기록할까요?' });
+    expect(confirmDialog).toHaveTextContent('김운영님의 기기는 보기만 할 수 있게 돼요. 같은 경기를 두 곳에서 기록하지 않도록 먼저 확인해 주세요.');
+    expect(document.body).not.toHaveTextContent('운영 권한');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '이 기기에서 기록하기' }));
     await waitFor(() => expect(state.requestTakeover).toHaveBeenCalledWith({ force: true }));
+    expect(state.requestTakeover).toHaveBeenCalledTimes(1);
+
+    expect(await findConsoleNotice('김운영님이 이 경기를 기록하고 있어요. 이 기기는 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('운영 권한');
   });
 
-  it('권한을 뺏긴 쪽도 코드 대신 누가 가져갔는지 보여 준다', () => {
+  it('권한을 뺏긴 쪽도 코드 대신 누가 가져갔는지 보여 준다', async () => {
     testFixtures.operations.mockReturnValue(
       consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: '박운영' } }),
     );
     render(<CoreHarness />);
 
-    expect(screen.getByText('박운영님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(within(statusRow()).getByRole('button', { name: '이 기기에서 기록하기' })).toBeInTheDocument();
+    expect(await findConsoleNotice('박운영님이 기록 권한을 가져갔어요. 이 기기는 보기만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText(/TAKEOVER_SUPERSEDED/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '운영 권한 가져오기' })).toBeInTheDocument();
   });
 
   // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.
@@ -401,7 +451,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
     const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
     expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
-    expect(screen.getByRole('heading', { name: /기록된 이벤트/ })).toHaveTextContent('최신순');
+    expect(screen.getByRole('heading', { name: /^최근 기록/ })).toHaveTextContent('최신순');
   });
 
   it('takeover가 허용되고 보유 중이면 기록 수정 액션을 노출한다', () => {
@@ -516,13 +566,15 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
   // 큐가 비어 있으면 "전송 상태" 절은 아예 나오지 않아야 한다 — 평상시 화면에 빈 패널이
   // 남아 있으면 운영자가 그걸 이벤트 목록으로 오해한다(예전 회귀의 원인).
-  it('전송할 것이 없으면 전송 상태 절을 세우지 않는다', () => {
+  it('전송할 것이 없으면 상태 줄이 평소 그대로다', () => {
     render(<CoreHarness />);
 
-    expect(screen.queryByText('전송 대기·실패')).toBeNull();
+    expect(statusRow()).toHaveAttribute('role', 'status');
+    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(within(openStatusSheet()).queryByText('보낼 기록')).toBeNull();
   });
 
-  it('대기·실패한 전송이 있을 때만 전송 상태를 따로 세운다', () => {
+  it('실패한 전송이 있으면 상태 줄이 알리고, 자세히에서 다시 보낼 수 있다', () => {
     testFixtures.operations.mockReturnValue(
       consoleState({
         queue: {
@@ -531,16 +583,23 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
       }),
     );
 
+    const state = testFixtures.operations();
     render(<CoreHarness />);
 
-    expect(screen.getByText('전송 대기·실패')).toBeInTheDocument();
+    expect(statusRow()).toHaveAttribute('role', 'alert');
+    expect(statusRow()).toHaveTextContent('기록 1개를 보내지 못했어요');
     // 서버 로그는 그대로 남아 있어야 한다 — 큐가 그것을 대체하지 않는다.
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+
+    const sheet = openStatusSheet();
+    expect(within(sheet).getByText('이벤트를 기록하지 못했어요.')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: '다시 시도' }));
+    expect(state.retryFailedEvent).toHaveBeenCalledWith('client-9');
   });
 
   // 전부 ack 된 평상시에는 이 절이 통째로 사라져야 한다. 예전에는 ack 된 항목까지 남아
   // "골·옐로카드·골 · 기록 완료"가 위 확정 로그와 1:1로 중복됐다(시각·선수·팀 없이).
-  it('전부 서버에 기록된 뒤에는 전송 절을 남기지 않는다', () => {
+  it('전부 서버에 기록된 뒤에는 전송 안내를 남기지 않는다', () => {
     testFixtures.operations.mockReturnValue(
       consoleState({
         queue: {
@@ -551,7 +610,8 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
     render(<CoreHarness />);
 
-    expect(screen.queryByText('전송 대기·실패')).toBeNull();
+    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(within(openStatusSheet()).queryByText('보낼 기록')).toBeNull();
     // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
   });
@@ -638,10 +698,11 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    expect(screen.getByText('경기를 시작해 주세요.')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('경기를 시작해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '기록하기' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^파울/ })).toBeNull();
-    expect(screen.queryByRole('group', { name: /팀 파울/ })).toBeNull();
+    expect(screen.queryByText(/팀 파울/)).toBeNull();
   });
 
   it('모든 피리어드가 끝났으면 마지막 완료 피리어드의 팀 파울을 보여준다', () => {
@@ -663,14 +724,14 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    const foulGroup = screen.getByRole('group', { name: '후반 팀 파울' });
-    expect(foulGroup).toHaveTextContent('파울 1');
-    // 마지막 피리어드 뒤에는 다시 셀 피리어드가 없다.
-    expect(foulGroup).not.toHaveTextContent('0부터 다시 세요');
+    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent('후반 팀 파울 1');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('후반 팀 파울 0');
+    // 마지막 경기 시간 뒤에는 다시 셀 구간이 없다.
+    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 다시 세요');
   });
 
   // 2026-11-18 사용자 결정: 옐로·레드카드도 팀 파울 1개로 세고, 경고 누적 퇴장(옐로 2장 뒤 레드)은 세지 않는다.
-  it('팀 파울 막대는 카드도 파울로 세고 경고 누적 퇴장 레드는 세지 않는다', () => {
+  it('팀 파울은 카드도 파울로 세고 경고 누적 퇴장 레드는 세지 않는다', () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
@@ -695,10 +756,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    const foulGroup = screen.getByRole('group', { name: '전반 팀 파울' });
     // 홈: 옐로 2장 = 파울 2개(레드는 경고 누적 퇴장이라 제외). 원정: 직접 레드 = 파울 1개.
-    expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('파울 2');
-    expect(within(foulGroup).getByText('성수 풋살 클럽').closest('div')).toHaveTextContent('파울 1');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('전반 팀 파울 2');
+    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent('전반 팀 파울 1');
   });
 
   // 대회·리그마다 팀 파울 기준이 다르다 — 서버가 경기 상세에 실어 준 `teamFoulThreshold` 로 경고를 켠다.
@@ -723,10 +783,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     it('대회·리그가 정한 기준(3개)에 이르면 기본값(5개)보다 일찍 경고한다', () => {
       mountWith(homeFouls(3), 3);
 
-      // 피리어드가 하나뿐인 경기라 막대 이름은 "경기 팀 파울"이다 — 이름이 아니라 팀 파울 막대로 찾는다.
-      const foulGroup = screen.getByRole('group', { name: /팀 파울/ });
-      expect(within(foulGroup).getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
-      expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('다음부터 10m 프리킥');
+      expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+      expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('다음부터 10m 프리킥');
+      expect(teamColumn('성수 풋살 클럽')).not.toHaveTextContent('다음부터 10m 프리킥');
     });
 
     it('같은 파울 수라도 기준이 7개면 아직 경고하지 않는다', () => {
@@ -766,9 +825,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    const foulGroup = screen.getByRole('group', { name: '전반 팀 파울' });
-    expect(foulGroup).toHaveTextContent('파울 1');
-    expect(foulGroup).toHaveTextContent('후반에는 0부터 다시 세요');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('전반 팀 파울 1');
+    expect(screen.getByRole('banner')).toHaveTextContent('후반에는 0부터 다시 세요');
   });
 
   it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', async () => {
@@ -1072,11 +1130,11 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
     });
 
-    it('시계 옆에 "전반" 라벨이 없고 진행 단계는 "경기 · 종료"다', () => {
+    it('시계 옆에 "전반" 라벨이 없고 팀 파울은 "경기 팀 파울"이다', () => {
       gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
       render(<CoreHarness />);
-      expect(screen.queryByText('전반')).toBeNull();
-      expect(screen.getByText('경기')).toBeInTheDocument();
+      expect(screen.getByRole('banner')).not.toHaveTextContent('전반');
+      expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('경기 팀 파울 0');
     });
 
     it('연장 피리어드 행이 있어도 정규 1개면 단판이다', () => {
@@ -1211,18 +1269,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       ]);
     }
 
-    it('"후반 시작"과 "되돌리기"를 보여주고, 일시 중지·전반 종료는 숨긴다', () => {
+    it('진행 바에는 "후반 시작"만 있고, 일시 중지·전반 종료는 숨긴다', () => {
       gameAtHalftime();
       render(<CoreHarness />);
 
-      expect(screen.getByRole('button', { name: '후반 시작' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
+      const bar = screen.getByRole('group', { name: '경기 진행 조작' });
+      expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual([
+        '후반 시작',
+        '더보기',
+      ]);
       // 조기 정상 종료는 주 조작 줄이 아니라 ⋯ 더보기 시트 안에 있다.
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
       expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
-      expect(screen.getByText(/하프타임이에요/)).toBeInTheDocument();
-      // 경기를 시작해 주세요 배너가 하프타임 배너로 잘못 겹치지 않아야 한다.
+      expect(within(screen.getByRole('banner')).getByText(/하프타임이에요\. 준비되면 ‘후반 시작’을 눌러 주세요/)).toBeInTheDocument();
+      // 시작 안내가 하프타임 안내와 겹치지 않아야 한다.
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
 
       // 하프타임에도 빠진 골·카드·파울은 앞 피리어드 끝 시각으로 기록할 수 있다
@@ -1237,7 +1298,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
         expect(screen.getByRole('button', { name })).toBeEnabled();
       }
-      expect(screen.getByText(/빠진 골·카드·파울은 지금도 앞 피리어드 끝 시각으로 기록할 수 있어요/)).toBeInTheDocument();
+      expect(screen.getByText(/빠진 골·카드·파울은 지금도 전반 끝 시각으로 기록할 수 있어요/)).toBeInTheDocument();
     });
 
     it('하프타임에 누른 골은 전반이 실제로 뛴 시간(20:00)에 고정해 기록한다', async () => {
@@ -1272,12 +1333,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       );
     });
 
-    it('"되돌리기"를 누르면 확인 없이 곧장 revert-period를 보낸다', async () => {
+    it('더보기의 "전반 종료 되돌리기"는 확인 없이 곧장 revert-period를 보낸다', async () => {
       gameAtHalftime();
       testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
       render(<CoreHarness />);
 
-      fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+      fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^전반 종료 되돌리기/ }));
 
       // UX 감사 item 3 — end/전반종료와 달리 되돌리기는 그 자체가 이미
       // 교정 행동이라 확인 다이얼로그를 거치지 않는다.
@@ -1300,35 +1361,35 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
     ];
 
-    it('전반 중에는 헤더에 "경기 종료"·"몰수·중단으로 종료"가 없고, ⋯ 시트 안에 둘 다 있다', () => {
+    it('전반 중에는 첫 화면에 종료 계열 버튼이 없고, 더보기 시트의 위험 묶음 안에 둘 다 있다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
       render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-      expect(screen.queryByRole('button', { name: /몰수·중단으로 종료/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /경기 일찍 끝내기/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /몰수·중단으로 끝내기/ })).toBeNull();
 
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
-      expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
-      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+      const sheet = openMoreSheet();
+      expect(within(sheet).getByText('되돌리기 어려운 동작')).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeEnabled();
       // 시트 설명은 점수 규칙을 말하지 않는다 — 몰수(3:0, 3골 차 이상이면 기록 그대로)와 중단(기록된 점수)이
       // 한 줄에 섞이면 한쪽이 틀리므로 점수 안내는 종료 창이 고른 종류에 맞춰 한다.
-      expect(within(sheet).getByText('사유를 남기고 마쳐요.')).toBeInTheDocument();
+      expect(within(sheet).getByText('사유를 남기고 마쳐요')).toBeInTheDocument();
       expect(within(sheet).queryByText(/기록된 점수/)).toBeNull();
     });
 
-    it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {
+    it('시트에서 "경기 일찍 끝내기"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {
       gameWithPeriods('LIVE', FIRST_HALF);
       testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
       render(<CoreHarness />);
 
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ }));
+      fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^경기 일찍 끝내기/ }));
 
       const confirmDialog = await screen.findByRole('dialog');
       expect(screen.getAllByRole('dialog')).toHaveLength(1);
-      expect(confirmDialog).not.toHaveAccessibleName('경기 더보기');
+      expect(confirmDialog).toHaveAccessibleName('경기를 종료할까요?');
       expect(testFixtures.sendCommand).not.toHaveBeenCalled();
 
       fireEvent.click(within(confirmDialog).getByRole('button', { name: '경기 종료' }));
@@ -1337,18 +1398,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       );
     });
 
-    it('시트에서 "몰수·중단으로 종료"를 고르면 사유 입력 창이 열린다', () => {
+    it('시트에서 "몰수·중단으로 끝내기"를 고르면 사유 입력 창이 열린다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
       render(<CoreHarness />);
 
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^몰수·중단으로 종료/ }));
+      fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^몰수·중단으로 끝내기/ }));
 
       expect(screen.getAllByRole('dialog')).toHaveLength(1);
       expect(screen.getByRole('dialog', { name: '몰수·중단으로 끝내기' })).toBeInTheDocument();
     });
 
-    it('일시 중지 중에도 "경기 종료"는 헤더가 아니라 시트 안에 있다', () => {
+    it('일시 중지 중에도 종료는 진행 바가 아니라 시트 안에 있다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
       testFixtures.game.mockReturnValue({
         ...testFixtures.game(),
@@ -1359,23 +1419,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       expect(screen.getByRole('button', { name: '재개' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      expect(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ })).toBeInTheDocument();
+      expect(within(openMoreSheet()).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeInTheDocument();
     });
 
-    it('정규 시간 종료 뒤의 "경기 종료"는 헤더 주 버튼이고, 시트에는 몰수·중단만 남는다', () => {
+    it('정규 시간 종료 뒤의 "경기 종료"는 진행 바의 주 버튼이고, 시트의 위험 묶음에는 일찍 끝내기가 없다', () => {
       gameWithPeriods('LIVE', REGULATION_ENDED);
       render(<CoreHarness />);
 
-      expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
+      expect(within(screen.getByRole('group', { name: '경기 진행 조작' })).getByRole('button', { name: '경기 종료' })).toBeEnabled();
 
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
-      expect(within(sheet).queryByRole('button', { name: /^경기 종료/ })).toBeNull();
-      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeInTheDocument();
+      const sheet = openMoreSheet();
+      expect(within(sheet).queryByRole('button', { name: /^경기 일찍 끝내기/ })).toBeNull();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeInTheDocument();
     });
 
-    it('조작할 명령이 없는 경기(종료됨)에는 조작 줄과 ⋯ 가 없다', () => {
+    it('조작할 명령이 없는 경기(종료됨)에는 진행 바와 더보기가 없다', () => {
       gameWithPeriods('LIVE', REGULATION_ENDED);
       testFixtures.game.mockReturnValue({
         ...testFixtures.game(),
@@ -1414,44 +1472,23 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       return list === null ? null : within(list).getByText((_, el) => el?.getAttribute('aria-current') === 'step').textContent;
     };
 
-    it('전반이 뛰는 중이면 전반이 현재 단계다', () => {
+    it('뛰는 동안에는 스트립이 없다 — 상태 칩과 시계가 단계를 말한다', () => {
       gameWithPeriods('LIVE', [
         { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
         { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
       ]);
-      render(<CoreHarness />);
-
-      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
-        '전반', '하프타임', '후반', '종료',
-      ]);
-      expect(current()).toBe('전반');
-    });
-
-    it('하프타임 중이면 하프타임이, 후반 중이면 후반이 현재 단계다', () => {
-      gameWithPeriods('LIVE', [
-        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
-        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
-      ]);
       const { unmount } = render(<CoreHarness />);
-      expect(current()).toBe('하프타임');
+      expect(strip()).toBeNull();
+      expect(within(screen.getByRole('banner')).getByText('진행 중')).toBeInTheDocument();
       unmount();
 
       gameWithPeriods('LIVE', [
         { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
-        { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
       ]);
       render(<CoreHarness />);
-      expect(current()).toBe('후반');
-    });
-
-    it('정규 시간이 끝나 경기 종료만 남았으면 종료가 현재 단계다', () => {
-      gameWithPeriods('LIVE', [
-        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
-        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
-      ]);
-      render(<CoreHarness />);
-
-      expect(current()).toBe('종료');
+      expect(strip()).toBeNull();
+      expect(within(screen.getByRole('banner')).getByText('하프타임')).toBeInTheDocument();
     });
 
     it('끝난 경기는 결과 단계 스트립으로 바뀌고, 공식 결과가 서기 전에는 결과 확인이 현재다', () => {
@@ -1511,8 +1548,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       render(<CoreHarness />);
 
       expect(screen.getByTestId('result-confirm-card')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: '기록하기' })).toBeNull();
       expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
-      expect(screen.queryByRole('group', { name: /팀 파울/ })).toBeNull();
+      expect(screen.queryByText(/팀 파울/)).toBeNull();
       expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
     });
 
@@ -1573,25 +1611,31 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '재개' }));
     }
 
-    it('후반이 뛰는 중에도 ⋯ 시트로 조기 종료와 몰수·중단 종료에 닿는다', () => {
+    it('후반이 뛰는 중에도 더보기 시트로 일찍 끝내기와 몰수·중단으로 끝내기에 닿는다', () => {
       secondHalf('LIVE');
       render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
-      expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
-      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+      const sheet = openMoreSheet();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeEnabled();
     });
 
-    it('연결이 끊긴 동안에는 재개와 ⋯ 을 잠그고 다시 연결하는 중이라고 알리되, 이벤트 기록은 막지 않는다', () => {
+    it('연결이 끊긴 동안에는 재개와 더보기의 종료 계열을 잠그고 다시 연결하는 중이라고 알리되, 기록은 막지 않는다', async () => {
       secondHalf('PAUSED', { connectionStatus: 'disconnected' });
       render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
-      expect(screen.getByText(/실시간 연결이 끊겨 다시 연결하는 중이에요/)).toBeInTheDocument();
+      const sheet = openMoreSheet();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeDisabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeDisabled();
+      expect(within(sheet).getByRole('button', { name: /^경기 시작 취소/ })).toBeDisabled();
+      fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+      expect(statusRow()).toHaveTextContent('연결이 끊겼어요');
+      expect(
+        await findConsoleNotice('다시 연결하는 중이에요. 연결될 때까지 재개·종료 같은 진행 버튼은 잠겨요. 그동안 적는 기록은 이 기기에 모아 두었다가 보내요.'),
+      ).toBeInTheDocument();
       // 골·카드는 이 기기 큐에 모였다가 연결되면 나간다 — 잠그는 건 진행 명령뿐이다.
       expect(screen.getByRole('button', { name: /^골/ })).toBeEnabled();
     });
@@ -1600,21 +1644,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       await confirmResumeAfter({ connectionStatus: 'disconnected' });
 
       expect(
-        await screen.findByText('실시간 연결이 끊겨 있어 ‘재개’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.'),
+        await findConsoleNotice('실시간 연결이 끊겨 있어 ‘재개’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.'),
       ).toBeInTheDocument();
       expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     });
 
-    it('확인 창이 떠 있는 사이 운영 권한이 만료되면 재개를 보내지 않고, 그 이유를 알린다', async () => {
+    it('확인 창이 떠 있는 사이 기록 권한이 만료되면 재개를 보내지 않고, 그 이유를 알린다', async () => {
       await confirmResumeAfter({ takeover: { status: 'expired' } });
 
       expect(
-        await screen.findByText('운영 권한을 다시 확인하는 중이라 ‘재개’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.'),
+        await findConsoleNotice('기록 권한을 다시 확인하는 중이라 ‘재개’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.'),
       ).toBeInTheDocument();
       expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     });
 
-    it('확인 창이 떠 있는 사이 운영 권한이 다시 발급되면 창을 열 때의 토큰이 아니라 새 토큰으로 보낸다', async () => {
+    it('확인 창이 떠 있는 사이 기록 권한이 다시 발급되면 창을 열 때의 토큰이 아니라 새 토큰으로 보낸다', async () => {
       testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
       await confirmResumeAfter({ takeover: { ...HELD, token: 'tok-2' } });
 
@@ -1625,13 +1669,16 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     // 2026-10-01 사용자 결정 — 어드민은 언제든 고칠 수 있어야 한다. 현장 스태프의 잠금(위)은 그대로다.
     describe('플랫폼 운영자는 연결이 끊긴 동안에도', () => {
-      it('재개와 ⋯ 을 쓸 수 있고, 잠그지 않는다고 알린다', () => {
+      it('재개와 더보기의 종료 계열을 쓸 수 있고, 잠그지 않는다고 알린다', async () => {
         secondHalf('PAUSED', { connectionStatus: 'disconnected' }, 'platform_ops');
         render(<CoreHarness />);
 
         expect(screen.getByRole('button', { name: '재개' })).toBeEnabled();
-        expect(screen.getByRole('button', { name: '더보기' })).toBeEnabled();
-        expect(screen.getByText(/진행 버튼은 그대로 쓸 수 있고, 보낸 명령은 서버 기준으로 반영돼요/)).toBeInTheDocument();
+        const sheet = openMoreSheet();
+        expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeEnabled();
+        expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeEnabled();
+        fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+        expect(await findConsoleNotice(/진행 버튼은 그대로 쓸 수 있고, 보낸 명령은 서버 기준으로 반영돼요/)).toBeInTheDocument();
         expect(screen.queryByText(/진행 버튼은 잠겨요/)).toBeNull();
       });
 
@@ -1645,19 +1692,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       });
 
       // 토큰 갱신은 소켓으로만 된다 — 끊긴 채 만료되면 서버가 거절하므로 보내지 않고 이유를 보인다.
-      it('끊긴 사이 운영 권한이 만료되면 진행 버튼을 잠그고 그 이유를 알린다', () => {
+      it('끊긴 사이 기록 권한이 만료되면 진행 버튼을 잠그고 그 이유를 알린다', async () => {
         secondHalf('PAUSED', { connectionStatus: 'disconnected', takeover: { status: 'expired' } }, 'platform_ops');
         render(<CoreHarness />);
 
         expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
-        expect(screen.getByText('연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.')).toBeInTheDocument();
+        expect(
+          await findConsoleNotice('연결이 끊긴 사이 기록 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'),
+        ).toBeInTheDocument();
       });
 
       it('확인 창이 떠 있는 사이 끊기고 권한까지 만료되면 보내지 않고 그 이유를 알린다', async () => {
         await confirmResumeAfter({ connectionStatus: 'disconnected', takeover: { status: 'expired' } }, 'platform_ops');
 
         expect(
-          await screen.findByText('연결이 끊긴 사이 운영 권한이 만료돼 ‘재개’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.'),
+          await findConsoleNotice('연결이 끊긴 사이 기록 권한이 만료돼 ‘재개’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.'),
         ).toBeInTheDocument();
         expect(testFixtures.sendCommand).not.toHaveBeenCalled();
       });
@@ -1689,7 +1738,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS);
         });
-        expect(screen.getByText(/재개 요청의 서버 응답을 받지 못했어요/)).toBeInTheDocument();
+        expect(statusRow()).toHaveTextContent('재개 요청의 응답을 받지 못했어요');
         fireEvent.click(screen.getByRole('button', { name: '같은 요청 재시도' }));
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
@@ -1706,7 +1755,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       }
     });
 
-    describe('재시도 사이 운영 권한이 다시 발급되거나 시간이 흐르면', () => {
+    describe('재시도 사이 기록 권한이 다시 발급되거나 시간이 흐르면', () => {
       const hangUntilAbort: OperateConsoleRuntime['postGameCommand'] = (...[, , , options]) =>
         new Promise<GameCommandResult>((_resolve, reject) => {
           if (options.signal === undefined) throw new Error('Expected command AbortSignal');
@@ -1822,7 +1871,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         await retryAfterTimeout({});
 
         expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2);
-        expect(screen.getByText('A valid exclusive takeover token is required')).toBeInTheDocument();
+        expect(within(openStatusSheet()).getByText('A valid exclusive takeover token is required')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
       });
     });
@@ -2210,12 +2259,15 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     ['홈', { home: 0, away: 1 }, '강남 풋살 클럽'],
     ['원정', { home: 1, away: 0 }, '성수 풋살 클럽'],
     ['양쪽', { home: 0, away: 0 }, '강남 풋살 클럽, 성수 풋살 클럽'],
-  ] as const)('유효 경기 출전자가 %s 팀에 없어도 시작할 수 있고 익명 기록을 안내한다', (_side, counts, teamNames) => {
+  ] as const)('유효 경기 출전자가 %s 팀에 없어도 시작할 수 있고, 시작 전에는 명단 안내를 따로 띄우지 않는다', (_side, counts, teamNames) => {
     setup([], 'TEAM_MATCH', counts);
     render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
-    expect(screen.getByText(`${teamNames} 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.`)).toBeInTheDocument();
+    // 시작 전의 명단은 킥오프 준비 패널이 보여 준다 — 상태 줄·시트가 다른 숫자를 말하지 않는다.
+    expect(statusRow()).not.toHaveTextContent(teamNames.split(', ')[0]);
+    expect(within(openStatusSheet()).queryByText('출전 명단')).toBeNull();
+    expect(document.body).not.toHaveTextContent('익명으로만');
   });
 
   it('명단 불러오기에서 완료 상태로 바뀌어도 시작 전환이 계속 렌더된다', () => {
@@ -2241,7 +2293,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     fixtureLineupState = loadedLineup;
     expect(() => rerender(<CoreHarness />)).not.toThrow();
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
-    expect(screen.getByText('강남 풋살 클럽 팀은 출전 명단이 없어 익명으로만 기록할 수 있어요. 명단 없이도 경기를 시작할 수 있어요.')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('익명으로만');
   });
 
   it('같은 fixture에서 lease 만료 중 command 응답이 끝나도 pending을 풀어 재획득 후 시작을 허용한다', async () => {
@@ -2339,13 +2391,13 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
 
   it('경기 시작 취소는 기록이 없어도 정확한 문구를 입력해야 전송한다', async () => {
     render(<CoreHarness />);
-    fireEvent.click(screen.getByRole('button', { name: '경기 시작 취소' }));
+    expect(screen.queryByRole('button', { name: '경기 시작 취소' })).toBeNull();
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^경기 시작 취소/ }));
     const form = screen.getByRole('form', { name: '경기 시작 취소' });
     const submit = within(form).getByRole('button', { name: '경기 시작 취소 확정' });
     expect(submit).toBeDisabled();
     const input = within(form).getByPlaceholderText('취소한다');
     expect(input).toHaveValue('');
-    expect(screen.getByRole('heading', { name: /기록된 이벤트/ }).closest('section')).toContainElement(form);
     fireEvent.change(input, { target: { value: '취소한다 ' } });
     expect(submit).toBeDisabled();
     fireEvent.change(input, { target: { value: '취소한다' } });
@@ -2437,9 +2489,10 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
 
     await waitFor(() => expect(refetch).toHaveBeenCalled());
-    await screen.findByText('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.');
+    expect(
+      await findConsoleNotice('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
-    expect(screen.getByText('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.')).toBeInTheDocument();
   });
 
   it('진행 중인 종료 요청이 다른 경기로 전환된 뒤 도착해도 새 경기 상태를 오염시키지 않는다', async () => {
@@ -2565,7 +2618,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
 
 // UX 감사 item 4 — takeover.status가 'none'/'requesting'인 동안 명령 버튼·
 // LineupGrid가 전부 비활성인데 이유가 화면에 없었다.
-describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)', () => {
+describe('OperateConsole — 기록 권한 요청 중 안내 (UX 감사 item 4)', () => {
   beforeEach(() => {
     testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
     testFixtures.lineups.mockReturnValue({
@@ -2588,20 +2641,21 @@ describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)'
   });
 
   it.each(['none', 'requesting'] as const)(
-    'takeover.status가 %s이면 권한을 가져오는 중이라는 배너를 보여준다',
+    'takeover.status가 %s이면 상태 줄이 기록할 준비를 하는 중이라고 알린다',
     (status) => {
       testFixtures.operations.mockReturnValue(consoleState({ takeover: { status } }));
       render(<CoreHarness />);
 
-      expect(screen.getByText('경기 운영 권한을 가져오는 중이에요…')).toBeInTheDocument();
+      expect(statusRow()).toHaveTextContent('이 기기에서 기록할 준비를 하는 중이에요…');
     },
   );
 
-  it('권한을 보유하면(held) 배너가 사라진다', () => {
+  it('권한을 보유하면(held) 안내가 사라진다', () => {
     testFixtures.operations.mockReturnValue(consoleState());
     render(<CoreHarness />);
 
-    expect(screen.queryByText('경기 운영 권한을 가져오는 중이에요…')).toBeNull();
+    expect(statusRow()).not.toHaveTextContent('준비를 하는 중');
+    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
   });
 });
 
@@ -3154,5 +3208,452 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledWith({ eventId: 'e-y2', reason: '옐로카드 기록 되돌리기' }));
     expect(state.reverseEvent).toHaveBeenCalledTimes(1);
     expect(state.submitEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · 기록 격자 · 진행 바 · 더보기)', () => {
+  const T0 = '2026-08-07T00:00:00.000Z';
+  const PERIODS = {
+    scheduled: [
+      { number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ],
+    firstHalf: [
+      { number: 1, state: 'LIVE', startedAt: T0, endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ],
+    halftime: [
+      { number: 1, state: 'ENDED', startedAt: T0, endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+    ],
+    regulationEnded: [
+      { number: 1, state: 'ENDED', startedAt: T0, endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+    ],
+    single: [{ number: 1, state: 'LIVE', startedAt: T0, endedAt: null }],
+  } as const;
+
+  function rosterLineup(sideId: string, count: number) {
+    return {
+      id: `lineup-${sideId}`, gameId: 'game-1', sideId, revision: 1, state: 'SUBMITTED', version: 0, submittedAt: T0,
+      supersedesId: null, formation: null, createdAt: '', updatedAt: '', invalidatedAt: null,
+      participants: Array.from({ length: count }, (_, index) => ({
+        id: `${sideId}-p${index + 1}`, gameId: 'game-1', sideId, lineupId: `lineup-${sideId}`, userId: null,
+        displayNameSnapshot: `${sideId === 'side-home' ? '홈' : '원정'}선수${index + 1}`, jerseyNumber: index + 1,
+        position: null, positionX: null, positionY: null, started: true, arrivedAt: null, createdAt: '', updatedAt: '',
+      })),
+    };
+  }
+
+  function setup({
+    state = 'LIVE',
+    periods = PERIODS.firstHalf,
+    substitution = 'rolling',
+    roster = { home: 1, away: 1 },
+    periodDurations,
+    ops = {},
+  }: {
+    state?: GameState;
+    periods?: ReadonlyArray<{ number: number; state: string; startedAt: string | null; endedAt: string | null; pausedAt?: string | null }>;
+    substitution?: 'rolling' | 'limited';
+    roster?: { home: number; away: number };
+    periodDurations?: Array<{ durationMinutes: number; extraTime: boolean }>;
+    ops?: Partial<MockedOperations>;
+  } = {}) {
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [rosterLineup('side-home', roster.home), rosterLineup('side-away', roster.away)] },
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    testFixtures.game.mockReturnValue({
+      data: {
+        id: 'game-1', state, version: 2, lastSequence: 1,
+        periods: periods.map((period) => ({ id: `period-${period.number}`, gameId: 'game-1', pausedTotalMs: 0, pausedAt: null, ...period })),
+        sides: HOME_AWAY_SIDES.map((side) => ({ ...side, teamId: side.sideKey === 'HOME' ? 'team-home' : 'team-away' })),
+        lineups: [],
+        periodDurations,
+        substitutionPolicy: { mode: substitution, maxSubstitutions: substitution === 'limited' ? 5 : null },
+      },
+      isLoading: false, isError: false, refetch: vi.fn(),
+    });
+    const consoleOps = consoleState({ liveEvents: [], gameSnapshot: { version: 2, state }, ...ops });
+    testFixtures.operations.mockReturnValue(consoleOps);
+    return consoleOps;
+  }
+
+  const recordGrid = () => screen.getByRole('group', { name: '기록하기' });
+  const commandBar = () => screen.getByRole('group', { name: '경기 진행 조작' });
+  const barLabels = () =>
+    within(commandBar()).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent);
+
+  describe('진행 명령은 확인을 거친다', () => {
+    const CASES = [
+      ['start', '경기 시작', { state: 'SCHEDULED', periods: PERIODS.scheduled }],
+      ['pause', '일시 중지', { state: 'LIVE', periods: PERIODS.firstHalf }],
+      ['resume', '재개', { state: 'PAUSED', periods: [{ ...PERIODS.firstHalf[0], pausedAt: '2026-08-07T00:05:00.000Z' }, PERIODS.firstHalf[1]] }],
+      ['end-period', '전반 종료', { state: 'LIVE', periods: PERIODS.firstHalf }],
+      ['start-period', '후반 시작', { state: 'LIVE', periods: PERIODS.halftime }],
+      ['end', '경기 종료', { state: 'LIVE', periods: PERIODS.regulationEnded }],
+    ] as const;
+
+    it.each(CASES)('%s 은 확인 창을 거치고, 확인 전에는 sendCommand 가 0회', async (command, label, game) => {
+      testFixtures.sendCommand.mockResolvedValue(gameMutationResult(game.state));
+      setup(game);
+      render(<CoreHarness />);
+
+      fireEvent.click(within(commandBar()).getByRole('button', { name: label }));
+      const dialog = await screen.findByRole('dialog');
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: label }));
+      await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+      expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', command, expect.anything(), COMMAND_OPTIONS);
+    });
+
+    it.each(CASES)('%s 확인 창에서 취소하면 아무 명령도 나가지 않는다', async (_command, label, game) => {
+      setup(game);
+      render(<CoreHarness />);
+
+      fireEvent.click(within(commandBar()).getByRole('button', { name: label }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
+
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('기록 격자와 진행 바', () => {
+    it('기록 격자는 골·자책골·옐로카드·레드카드·파울·더보기 여섯 개(풋살)', () => {
+      setup({ substitution: 'rolling' });
+      render(<CoreHarness />);
+
+      expect(within(recordGrid()).getAllByRole('button').map((button) => button.textContent)).toEqual([
+        '골', '자책골', '옐로카드', '레드카드', '파울', '더보기',
+      ]);
+      // 교체를 기록하지 않는 종목은 더보기가 격자에만 있다.
+      expect(barLabels()).toEqual(['일시 중지', '전반 종료']);
+    });
+
+    it('교체 추적 종목은 격자에 교체가 있고 더보기는 진행 바 ⋯ 로 간다', () => {
+      setup({ substitution: 'limited' });
+      render(<CoreHarness />);
+
+      expect(within(recordGrid()).getAllByRole('button').map((button) => button.textContent)).toEqual([
+        '골', '자책골', '옐로카드', '레드카드', '파울', '교체',
+      ]);
+      expect(barLabels()).toEqual(['일시 중지', '전반 종료', '더보기']);
+      const more = within(commandBar()).getByRole('button', { name: '더보기' });
+      expect(more).toHaveClass('h-11', 'w-11');
+      fireEvent.click(more);
+      expect(screen.getByRole('dialog', { name: '더보기' })).toBeInTheDocument();
+    });
+
+    it('진행 바: LIVE 는 일시 중지·전반 종료 둘뿐, PAUSED 재개, 하프타임 후반 시작, 단판은 정규 시간 종료', () => {
+      setup();
+      const live = render(<CoreHarness />);
+      expect(barLabels()).toEqual(['일시 중지', '전반 종료']);
+      live.unmount();
+
+      setup({ state: 'PAUSED', periods: [{ ...PERIODS.firstHalf[0], pausedAt: '2026-08-07T00:05:00.000Z' }, PERIODS.firstHalf[1]] });
+      const paused = render(<CoreHarness />);
+      expect(barLabels()).toEqual(['재개']);
+      paused.unmount();
+
+      setup({ periods: PERIODS.halftime });
+      const halftime = render(<CoreHarness />);
+      expect(barLabels()).toEqual(['후반 시작']);
+      halftime.unmount();
+
+      setup({ periods: PERIODS.regulationEnded });
+      const ended = render(<CoreHarness />);
+      expect(barLabels()).toEqual(['경기 종료']);
+      ended.unmount();
+
+      setup({ periods: PERIODS.single, periodDurations: [{ durationMinutes: 40, extraTime: false }] });
+      render(<CoreHarness />);
+      expect(barLabels()).toEqual(['일시 중지', '정규 시간 종료']);
+    });
+
+    it('기록 권한이 없으면 기록 칸은 잠기지만 더보기 칸은 눌린다', () => {
+      setup({ ops: { takeover: { status: 'requesting' } } });
+      render(<CoreHarness />);
+
+      for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
+        expect(within(recordGrid()).getByRole('button', { name })).toBeDisabled();
+      }
+      const more = within(recordGrid()).getByRole('button', { name: '더보기' });
+      expect(more).toBeEnabled();
+      fireEvent.click(more);
+      expect(screen.getByRole('dialog', { name: '더보기' })).toBeInTheDocument();
+    });
+
+    it('진행 중 첫 화면에 쉬는 시간 칩·프리셋이 없다', () => {
+      setup();
+      render(<CoreHarness />);
+
+      expect(screen.queryByText(/쉬는 시간/)).toBeNull();
+      for (const minutes of [1, 2, 5, 10, 15, 20]) {
+        expect(screen.queryByRole('button', { name: `${minutes}분` })).toBeNull();
+      }
+    });
+
+    it('DOM 순서: 점수 카드 → 상태 줄 → 최근 기록 → 기록 격자', () => {
+      setup({ ops: { liveEvents: [goal(1)] } });
+      render(<CoreHarness />);
+
+      const follows = (earlier: Element, later: Element) =>
+        Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const card = screen.getByRole('banner');
+      const records = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+      expect(card).toHaveAttribute('data-console-guide', 'overview');
+      expect(commandBar()).toHaveAttribute('data-console-guide', 'commands');
+      expect(recordGrid()).toHaveAttribute('data-console-guide', 'events');
+      expect(records.closest('section')).toHaveAttribute('data-console-guide', 'history');
+      expect(follows(card, statusRow())).toBe(true);
+      expect(follows(statusRow(), records)).toBe(true);
+      expect(follows(records, recordGrid())).toBe(true);
+    });
+  });
+
+  describe('더보기 시트', () => {
+    const labelsOf = (sheet: HTMLElement) =>
+      within(sheet).getAllByRole('button').map((button) => button.textContent ?? '').filter((text) => !/닫기|^$/.test(text));
+
+    it('더보기 시트 항목과 위험 묶음', () => {
+      setup();
+      render(<CoreHarness />);
+
+      const sheet = openMoreSheet();
+      const labels = labelsOf(sheet);
+      expect(labels[0]).toContain('기록 전체 보기·고치기');
+      expect(labels[0]).toContain('시각 고치기, 기록 취소');
+      expect(labels.slice(1).map((label) => label.replace(/(정규|사유|적은).*$/, ''))).toEqual([
+        '경기 일찍 끝내기', '몰수·중단으로 끝내기', '경기 시작 취소',
+      ]);
+      expect(within(sheet).getByText('되돌리기 어려운 동작')).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toHaveTextContent('정규 시간 전에 마쳐요 · 되돌릴 수 없어요');
+      expect(within(sheet).getByRole('button', { name: /^경기 시작 취소/ })).toHaveTextContent('적은 기록을 지우고 시작 전으로');
+    });
+
+    it('하프타임에는 전반 종료 되돌리기가 더해진다', () => {
+      setup({ periods: PERIODS.halftime });
+      render(<CoreHarness />);
+
+      expect(within(openMoreSheet()).getByRole('button', { name: /^전반 종료 되돌리기/ })).toBeEnabled();
+    });
+
+    it('시작 취소는 sampleMode·읽기 전용에서 없고, 기록 전체 보기는 남는다', () => {
+      setup();
+      const sample = render(<CoreHarness sampleMode />);
+      let sheet = openMoreSheet();
+      expect(within(sheet).queryByRole('button', { name: /^경기 시작 취소/ })).toBeNull();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeInTheDocument();
+      sample.unmount();
+
+      setup();
+      render(<CoreHarness takeoverEnabled={false} />);
+      sheet = openMoreSheet();
+      expect(within(sheet).queryByRole('button', { name: /^경기 시작 취소/ })).toBeNull();
+      expect(within(sheet).getByRole('button', { name: /^기록 전체 보기·고치기/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^경기 일찍 끝내기/ })).toBeDisabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 끝내기/ })).toBeDisabled();
+    });
+
+    it('기록 전체 보기·고치기는 모든 기록이 든 시트를 연다', () => {
+      setup({ ops: { liveEvents: [1, 2, 3, 4, 5, 6].map((sequence) => ({ ...goal(sequence), clockMs: sequence * 60000 })) } });
+      render(<CoreHarness />);
+
+      fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^기록 전체 보기·고치기/ }));
+      const sheet = screen.getByRole('dialog', { name: '기록 전체' });
+      expect(within(within(sheet).getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')).toHaveLength(6);
+      expect(screen.queryByRole('dialog', { name: '더보기' })).toBeNull();
+    });
+  });
+
+  describe('최근 기록', () => {
+    const six = [1, 2, 3, 4, 5, 6].map((sequence) => ({ ...goal(sequence), clockMs: sequence * 60000 }));
+    const visibleRows = () =>
+      within(screen.getAllByRole('list', { name: '기록된 이벤트 목록' })[0]).getAllByRole('listitem');
+    let restoreViewport: (() => void) | undefined;
+    afterEach(() => {
+      restoreViewport?.();
+      restoreViewport = undefined;
+    });
+
+    it('최근 기록 4줄과 전체 보기, 1280 폭에서는 전부', () => {
+      restoreViewport = installViewport(390);
+      setup({ ops: { liveEvents: six } });
+      const phone = render(<CoreHarness />);
+
+      expect(screen.getByRole('heading', { name: /^최근 기록/ })).toBeInTheDocument();
+      expect(visibleRows().map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['6', '5', '4', '3']);
+      fireEvent.click(screen.getByRole('button', { name: '기록 6개 전체 보기' }));
+      expect(within(screen.getByRole('dialog', { name: '기록 전체' })).getAllByRole('listitem')).toHaveLength(6);
+      phone.unmount();
+      restoreViewport();
+
+      restoreViewport = installViewport(1280);
+      setup({ ops: { liveEvents: six } });
+      render(<CoreHarness />);
+      expect(visibleRows()).toHaveLength(6);
+      expect(screen.queryByRole('button', { name: /전체 보기$/ })).toBeNull();
+      expect(screen.getByRole('heading', { name: /^기록 ·/ })).toBeInTheDocument();
+    });
+
+    it('기록이 4줄 이하이면 전체 보기 버튼을 두지 않는다', () => {
+      restoreViewport = installViewport(390);
+      setup({ ops: { liveEvents: six.slice(0, 4) } });
+      render(<CoreHarness />);
+
+      expect(visibleRows()).toHaveLength(4);
+      expect(screen.queryByRole('button', { name: /전체 보기$/ })).toBeNull();
+    });
+
+    it('끝난 경기는 폰에서도 기록을 전부 보여 준다', () => {
+      restoreViewport = installViewport(390);
+      setup({ state: 'ENDED', periods: PERIODS.regulationEnded, ops: { liveEvents: six } });
+      render(<CoreHarness />);
+
+      expect(visibleRows()).toHaveLength(6);
+    });
+
+    it('전체 보기 시트에서 고치기를 누르면 시트가 닫히고 고치기 창 하나만 뜬다', async () => {
+      restoreViewport = installViewport(390);
+      setup({ ops: { liveEvents: six } });
+      render(<CoreHarness />);
+
+      fireEvent.click(screen.getByRole('button', { name: '기록 6개 전체 보기' }));
+      const sheet = screen.getByRole('dialog', { name: '기록 전체' });
+      fireEvent.click(within(sheet).getAllByRole('button', { name: '기록 수정 (골)' })[5]);
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '기록 전체' })).toBeNull());
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    });
+  });
+
+  describe('상태 줄', () => {
+    it('조건 셋이 겹쳐도 상태 요소는 하나이고 자세히에 셋이 모두 있다', () => {
+      // 끊김 + 전송 실패 + 서버 안내 메시지
+      setup({
+        ops: {
+          connectionStatus: 'disconnected',
+          bannerMessage: '기록 권한을 다시 확인하지 못했어요.',
+          queue: { items: [queuedEvent('c-1', 'failed')] },
+        },
+      });
+      render(<CoreHarness />);
+
+      expect(document.querySelectorAll('[role="status"],[role="alert"]')).toHaveLength(1);
+      expect(statusRow()).toHaveAttribute('role', 'alert');
+      expect(statusRow()).toHaveTextContent('기록을 확인해 주세요 외 2개');
+
+      const sheet = openStatusSheet();
+      expect(within(sheet).getByText('지금 확인할 것 3개')).toBeInTheDocument();
+      expect(within(sheet).getByText('기록 권한을 다시 확인하지 못했어요.')).toBeInTheDocument();
+      expect(within(sheet).getByText('연결이 끊겼어요')).toBeInTheDocument();
+      expect(within(sheet).getByText('기록 1개를 보내지 못했어요')).toBeInTheDocument();
+    });
+
+    it('보기 전용 지원 담당자에게는 보기만 할 수 있다고 알린다', () => {
+      setup({ ops: { takeover: { status: 'none' } } });
+      render(<CoreHarness takeoverEnabled={false} />);
+
+      expect(statusRow()).toHaveTextContent('보기만 할 수 있어요');
+      expect(within(openStatusSheet()).getByText('지원 담당자는 이 경기의 기록을 볼 수만 있어요.')).toBeInTheDocument();
+    });
+
+    it('서버가 설정된 시간을 넘겼다고 알리면 눌러야 할 버튼 이름까지 말한다', async () => {
+      setup({
+        periods: [{ number: 1, state: 'LIVE', startedAt: '2020-01-01T00:00:00.000Z', endedAt: null }, PERIODS.firstHalf[1]],
+        periodDurations: [{ durationMinutes: 20, extraTime: false }, { durationMinutes: 20, extraTime: false }],
+      });
+      render(<CoreHarness />);
+
+      expect(
+        await findConsoleNotice('서버의 시간 종료 처리를 확인하고 있어요. 처리가 늦어지면 ‘전반 종료’를 눌러 주세요.'),
+      ).toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent('피리어드');
+    });
+  });
+
+  describe('명단은 선수 시트가 쓰는 목록 하나에서 나온다', () => {
+    it('홈 3명·원정 0명이면 시트에 그 숫자가, 골 시트에는 홈 3줄과 두 팀의 선수 모름만, 「익명으로만」은 어디에도 없다', () => {
+      testFixtures.realLineupGrid.current = true;
+      setup({ roster: { home: 3, away: 0 } });
+      render(<CoreHarness />);
+
+      const sheet = openStatusSheet();
+      const roster = within(sheet).getByText('출전 명단').nextElementSibling as HTMLElement;
+      expect(roster).toHaveTextContent('홈 · 강남 풋살 클럽 3명');
+      expect(roster).toHaveTextContent('원정 · 성수 풋살 클럽 0명 · 선수 모름으로만 기록할 수 있어요');
+      fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+
+      fireEvent.click(within(recordGrid()).getByRole('button', { name: '골' }));
+      const picker = screen.getByRole('dialog', { name: '골 · 누가 넣었나요?' });
+      const home = within(picker).getByRole('region', { name: '홈 · 강남 풋살 클럽' });
+      const away = within(picker).getByRole('region', { name: '원정 · 성수 풋살 클럽' });
+      expect(within(home).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+        '홈선수1 선수 이벤트 기록', '홈선수2 선수 이벤트 기록', '홈선수3 선수 이벤트 기록', '강남 풋살 클럽 · 선수 모름',
+      ]);
+      expect(within(away).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+        '성수 풋살 클럽 · 선수 모름',
+      ]);
+      expect(document.body).not.toHaveTextContent('익명으로만');
+    });
+
+    it('SCHEDULED 에는 시트에 출전 명단 줄이 없다', () => {
+      setup({ state: 'SCHEDULED', periods: PERIODS.scheduled, roster: { home: 3, away: 0 } });
+      render(<CoreHarness />);
+
+      const sheet = openStatusSheet();
+      expect(within(sheet).queryByText('출전 명단')).toBeNull();
+      expect(within(sheet).getByText('연결')).toBeInTheDocument();
+      // 그 자리의 명단은 킥오프 준비 패널이다.
+      expect(screen.getByRole('region', { name: '킥오프 준비' })).toBeInTheDocument();
+    });
+  });
+
+  describe('단계 문구는 점수 카드 안에 한 번만', () => {
+    const caption = (text: string | RegExp) => within(screen.getByRole('banner')).getByText(text);
+
+    it('시작 전', () => {
+      setup({ state: 'SCHEDULED', periods: PERIODS.scheduled });
+      render(<CoreHarness />);
+      expect(caption('경기를 시작해 주세요.')).toBeInTheDocument();
+      expect(screen.getAllByText('경기를 시작해 주세요.')).toHaveLength(1);
+    });
+
+    it('하프타임', () => {
+      setup({ periods: PERIODS.halftime });
+      render(<CoreHarness />);
+      expect(
+        caption('하프타임이에요. 준비되면 ‘후반 시작’을 눌러 주세요. 빠진 골·카드·파울은 지금도 전반 끝 시각으로 기록할 수 있어요.'),
+      ).toBeInTheDocument();
+    });
+
+    it('정규 시간 종료 — 기록 권한이 있는 대회 경기', () => {
+      setup({ periods: PERIODS.regulationEnded });
+      render(<CoreHarness />);
+      expect(caption('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    });
+
+    it('정규 시간 종료 — 콘솔에서 끝낼 수 없는 호스트는 결과 제출 화면 링크를 준다', () => {
+      setup({ periods: PERIODS.regulationEnded });
+      render(<CoreHarness leaseRequired={false} resultHref="/team-matches/tm-1/result" />);
+
+      expect(caption(/정규 시간이 끝났어요\. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요\./)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '결과 제출 화면 열기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
+      expect(within(screen.getByRole('banner')).getByRole('link', { name: '결과 보내기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
+      // 이 호스트는 콘솔에서 경기를 끝낼 수 없다.
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    });
+
+    it('뛰는 동안에는 단계 문구가 없다', () => {
+      setup();
+      render(<CoreHarness />);
+      expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
+      expect(screen.queryByText(/하프타임이에요/)).toBeNull();
+      expect(screen.queryByText(/정규 시간이 끝났어요/)).toBeNull();
+    });
   });
 });

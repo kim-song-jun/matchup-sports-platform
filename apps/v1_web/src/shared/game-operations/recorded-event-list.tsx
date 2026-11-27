@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, Handshake, Pencil, Undo2 } from 'lucide-react';
 import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
 import { formatKstMeridiemTime } from '@/lib/date-utils';
@@ -95,6 +95,7 @@ export function RecordedEventList({
   order = 'chronological',
   periodCount,
   maxRows,
+  renderMore,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -137,6 +138,8 @@ export function RecordedEventList({
   readonly order?: 'chronological' | 'newest-first';
   /** 보이는 순서에서 위 N줄만 그린다. 경고 누적 퇴장처럼 합친 줄은 한 줄로 센다. */
   readonly maxRows?: number;
+  /** `maxRows` 로 줄이 가려졌을 때만 목록 아래에 그린다. 인자는 가려진 것까지 합친 전체 줄 수다. */
+  readonly renderMore?: (totalRows: number) => ReactNode;
 }) {
   const lastReset = history.reduce((sequence, event) =>
     event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
@@ -284,6 +287,7 @@ export function RecordedEventList({
   };
 
   return (
+    <>
     <ul
       className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
       aria-label="기록된 이벤트 목록"
@@ -406,6 +410,8 @@ export function RecordedEventList({
         );
       })}
     </ul>
+    {orderedEvents.length < sortedEvents.length ? renderMore?.(sortedEvents.length) : null}
+    </>
   );
 }
 

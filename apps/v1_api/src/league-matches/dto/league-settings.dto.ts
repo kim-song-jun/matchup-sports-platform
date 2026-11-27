@@ -47,7 +47,7 @@ export class UpdateLeagueSettingsDto {
   @Max(2147483647)
   maxTeams?: number | null;
 
-  /** 생략은 기존 성별 유지. 미지정으로 되돌리는 길은 두지 않는다(대회 정보 수정과 같다). */
+  /** 생략은 기존 성별 유지. 이 화면에는 미지정으로 되돌리는 길을 두지 않는다. */
   @IsOptional()
   @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
   genderCategory?: TournamentGenderCategory;

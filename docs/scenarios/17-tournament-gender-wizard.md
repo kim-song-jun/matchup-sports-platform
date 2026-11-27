@@ -4,7 +4,7 @@
 
 ## API / DB
 
-- [ ] `TOURN-029-A` create/update는 `mixed | male | female`만 받고 혼성이 아닌 카테고리의 쿼터를 `null`로 정리한다.
+- [ ] `TOURN-029-A` create/update는 `mixed | male | female`를 받고, update 는 `null`(성별 구분 없음으로 되돌리기)도 받는다. 혼성이 아니면 쿼터를 `null`로 정리한다.
 - [ ] `TOURN-029-B` 최소가 최대보다 크거나, 최소 합이 `maxPlayers`를 넘거나, 성별 최대가 `maxPlayers`를 넘으면 `TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID`다.
 - [ ] `TOURN-029-C` 혼성 대회 선수 추가는 서버 프로필의 `gender`를 기존 `genderSnapshot`에 저장하며 누락 시 `PLAYER_REQUIRED_PROFILE_MISSING`다.
 - [ ] `TOURN-029-D` 혼성 명단 잠금은 registration row lock과 쿼터 집계·감사 로그를 serializable transaction에서 처리한다.

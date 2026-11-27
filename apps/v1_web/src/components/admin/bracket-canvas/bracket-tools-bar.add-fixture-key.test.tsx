@@ -6,14 +6,16 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { clearFixtureRequestKey } from '@/lib/fixture-request-key-store';
 import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { installViewport } from '@/test/viewport';
-import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
+import type { V1Tournament } from '@/types/api';
+import { BracketToolsBar } from './bracket-tools-bar';
+import { useBracketTools } from './use-bracket-tools';
+import { useBracketViewControls } from './use-bracket-view-controls';
 
-// 워크스페이스·대화상자·훅·api-client 는 진짜이고 네트워크만 MSW 다 — 대화상자가 열 때마다 새로 마운트되는 실제 배선과
+// 도구 줄·대화상자·훅·api-client 는 진짜이고 네트워크만 MSW 다 — 대화상자가 열 때마다 새로 마운트되는 실제 배선과
 // 응답 모양(본문 없는 4xx·5xx, 연결 끊김)이 키 수명 판정에 어떻게 닿는지 본다.
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin/tournaments/t-1/bracket', useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => ({ data: bracketData, isPending: false, isError: false, error: null, refetch: vi.fn() }),
-  useV1UpdateFixture: () => ({ mutate: vi.fn(), isPending: false }),
   useV1PublishTournamentBracket: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UnpublishTournamentBracket: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -56,22 +58,21 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+const tournament = { id: 't-1', format: 'knockout', kind: 'regular_tournament', status: 'open', registrationDeadlineAt: null, bracketPublishedAt: null, bracketPublishScheduledAt: null, stagePlan: null } as unknown as V1Tournament;
+const registrationsState = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() } as const;
+
+function Tools({ tournamentId, showToast }: { tournamentId: string; showToast: (message: string, variant?: 'success' | 'error') => void }) {
+  const controls = useBracketViewControls();
+  const tools = useBracketTools({ tournamentId, tournament, registrations: [], registrationsState, canWrite: true, role: 'PLATFORM_OPS', showToast, controls, onAssignmentModeChange: vi.fn() });
+  return <BracketToolsBar tools={tools} tournament={tournament} tournamentId={tournamentId} canWrite view="canvas" onViewChange={vi.fn()} controls={controls} showToast={showToast} />;
+}
+
 function renderWorkspace(tournamentId = 't-1') {
   const showToast = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <BracketCanvasWorkspace
-        tournamentId={tournamentId}
-        format="knockout"
-        registrations={[]}
-        registrationsState={{ status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() }}
-        bracketPublishedAt={null}
-        bracketPublishScheduledAt={null}
-        canWrite
-        showToast={showToast}
-        onShowList={vi.fn()}
-      />
+      <Tools tournamentId={tournamentId} showToast={showToast} />
     </QueryClientProvider>,
   );
   return Object.assign(showToast, { unmount: view.unmount });
@@ -79,7 +80,10 @@ function renderWorkspace(tournamentId = 't-1') {
 
 // 본문 없는 오류 응답은 처음 한 번 에러 리포팅 경로를 타서 기본 1초를 넘길 수 있다.
 const settle = (assertion: () => void) => waitFor(assertion, { timeout: 5000 });
-const openDialog = () => fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+const openDialog = () => {
+  fireEvent.click(screen.getByRole('button', { name: '경기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: /경기 추가/ }));
+};
 const dialogAdd = () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '경기 추가' }));
 const keys = () => bodies.map((body) => body.clientCommandId);
 
@@ -133,8 +137,8 @@ describe('「경기 추가」 요청 키 — 실제 전송 경로', () => {
     else expect(keys()[1]).not.toBe(keys()[0]);
   });
 
-  // 그림↔목록 전환·반응형 폭 전환은 워크스페이스를 통째로 언마운트한다 — 키가 컴포넌트 상태에 있으면 여기서 사라진다.
-  it('응답을 잃은 뒤 워크스페이스가 언마운트됐다 다시 마운트돼도 같은 키로 재전송한다', async () => {
+  // 그림↔목록 전환·반응형 폭 전환은 도구 줄을 통째로 언마운트한다 — 키가 컴포넌트 상태에 있으면 여기서 사라진다.
+  it('응답을 잃은 뒤 도구 줄이 언마운트됐다 다시 마운트돼도 같은 키로 재전송한다', async () => {
     replies.push('network');
     const first = renderWorkspace();
     openDialog();

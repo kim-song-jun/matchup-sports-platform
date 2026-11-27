@@ -134,6 +134,9 @@ export function BracketCanvasWorkspace({
   if (initialTrayOpen === null && registrationsState.status !== 'pending') {
     setInitialTrayOpen(registrationsState.status === 'error' || unplacedTeamCount(registrations, bracket) > 0);
   }
+  // 고른 팀이 다른 경로(무작위 채우기 등)로 자리에 들어갔으면 선택을 푼다.
+  const placedIds = new Set(bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
+  const activePendingId = pendingRegistrationId !== null && !placedIds.has(pendingRegistrationId) ? pendingRegistrationId : null;
   const trayCollapsible = leagueGrid || !canvasSidePanel;
   const trayColumnOpen = controls.trayOpen ?? initialTrayOpen ?? true;
   const selectedFixture = bracket.fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -176,7 +179,7 @@ export function BracketCanvasWorkspace({
       registrationsState={registrationsState}
       slots={bracket.slots}
       directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
-      pendingRegistrationId={pendingRegistrationId}
+      pendingRegistrationId={activePendingId}
       canWrite={canWrite && !staged}
       collapsible={collapsible}
       expanded={collapsible ? controls.trayOpen === true : undefined}
@@ -188,7 +191,7 @@ export function BracketCanvasWorkspace({
   const sharedViewProps = {
     selectedFixtureId: selectedFixture?.id ?? null,
     dimmedFixtureIds,
-    pendingRegistrationId: canWrite && !staged ? pendingRegistrationId : null,
+    pendingRegistrationId: canWrite && !staged ? activePendingId : null,
     canWrite: canWrite && !staged,
     onSelectFixture: selectFixture,
     onAssignSlot: placement.placeIntoSlot,

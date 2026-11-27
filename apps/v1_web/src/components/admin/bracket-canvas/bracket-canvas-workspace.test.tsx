@@ -136,6 +136,16 @@ describe('BracketCanvasWorkspace — 팀 배정(키보드 경로)', () => {
     expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('고른 팀이 다른 경로(무작위 채우기 등)로 자리에 들어가면 선택이 풀린다', () => {
+    const view = renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /서울FC/ }));
+    expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'true');
+    setBracket(makeBracket({ ...populated, slots: slots.map((slot, index) => (index === 0 ? { ...slot, registrationId: 'r1', teamName: '서울FC' } : slot)) }));
+    view.rerender();
+    expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: /선택한 팀을 여기에 넣어요/ })).not.toBeInTheDocument();
+  });
+
   it('읽기 전용에서는 팀을 고를 수 없다', () => {
     renderWorkspace({ canWrite: false });
     expect(screen.getByRole('button', { name: /서울FC/ })).toBeDisabled();

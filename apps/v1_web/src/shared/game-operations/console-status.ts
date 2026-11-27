@@ -107,7 +107,7 @@ export function deriveConsoleStatus(input: ConsoleStatusInput): ConsoleStatus {
       body:
         input.undo === 'sending'
           ? '끝날 때까지 기록 버튼을 잠깐 막아 둬요.'
-          : '보내던 기록을 다 보낸 뒤에 되돌려요.',
+          : '보내던 기록을 다 보낸 뒤에 되돌려요. 오래 걸리면 그만두고 알려 드려요.',
     });
   }
   if (input.handoff !== null) {

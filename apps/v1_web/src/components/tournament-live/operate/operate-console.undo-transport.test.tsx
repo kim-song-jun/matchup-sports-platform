@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
 import { SEND_ACK_TIMEOUT_MS } from '@/hooks/use-v1-game-operations-console';
+import { UNDO_WAIT_LIMIT_MS } from '@/shared/game-operations';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { __resetOverlayHistoryForTests, waitForOverlayHistory } from '@/lib/overlay-history';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
@@ -334,6 +335,40 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
     expect(fixture.appends[1]).toMatchObject({ expectedVersion: 7, outcome: 'committed' });
     await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 1점'));
     expect(document.body).not.toHaveTextContent('Expected version is stale');
+  });
+
+  it('연결이 끊겨 큐가 한도 안에 비지 않으면 되돌리기를 그만두고 알린다 — 다시 연결돼도 뒤늦게 되돌리지 않는다', async () => {
+    await openConsole();
+    await recordConfirmedHomeGoal();
+    act(() => fixture.disconnect());
+    await waitFor(() => expect(statusRow()).toHaveTextContent('연결이 끊겼어요'));
+    // 끊긴 동안 적은 원정 골은 이 기기에 남아 보낼 차례를 기다린다.
+    await recordGoal('원정 팀');
+    await screen.findByText('연결되면 보내요');
+
+    fireEvent.click(undoButtonOf(HOME_GOAL));
+    expect(await screen.findByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.')).toBeInTheDocument();
+    // 기다리는 동안에도 상태 줄이 말하고, 기록 버튼은 잠기지 않는다.
+    await waitFor(() => expect(within(statusSheet()).getByText('되돌리는 중이에요…')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '골' })).toBeEnabled();
+
+    await tick(UNDO_WAIT_LIMIT_MS - 1_000);
+    expect(within(statusSheet()).getByText('되돌리는 중이에요…')).toBeInTheDocument();
+    await tick(1_000);
+
+    expect(
+      await within(statusSheet()).findByText('연결이 돌아오지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(within(statusSheet()).queryByText('되돌리는 중이에요…')).toBeNull();
+    expect(fixture.reversals).toHaveLength(0);
+
+    // 다시 연결되면 기다리던 원정 골은 나가지만, 그만둔 되돌리기는 나가지 않는다.
+    act(() => fixture.reconnect());
+    await waitFor(() => expect(fixture.appends.map((append) => append.outcome)).toEqual(['committed', 'committed']));
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 1점, 원정 팀 1점'));
+    await flushTransport();
+    expect(fixture.reversals).toHaveLength(0);
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
   });
 
   it('그래도 남는 버전 충돌은 서버 영어 원문이 아니라 해요체로 알린다', async () => {

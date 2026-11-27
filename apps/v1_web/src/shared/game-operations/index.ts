@@ -18,4 +18,4 @@ export { deriveConsoleStatus, type ConsoleStatus, type ConsoleStatusActionKind, 
 export { ConsoleStatusPanel, type ConsoleStatusPanelProps, type RosterRow } from './console-status-panel';
 export { ConsoleScoreCard, type ConsoleScoreCardProps } from './console-score-card';
 export { RecordGrid, type RecordCellKey, type RecordGridProps } from './record-grid';
-export { OperateConsoleCore, type OperateConsoleCoreProps, type GameDetailQueryState, type OperateConsoleRuntime, COMMAND_RESPONSE_TIMEOUT_MS, teammatesForSide } from './operate-console-core';
+export { OperateConsoleCore, type OperateConsoleCoreProps, type GameDetailQueryState, type OperateConsoleRuntime, COMMAND_RESPONSE_TIMEOUT_MS, UNDO_WAIT_LIMIT_MS, teammatesForSide } from './operate-console-core';

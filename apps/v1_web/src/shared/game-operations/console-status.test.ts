@@ -144,7 +144,7 @@ describe('deriveConsoleStatus — 되돌리는 중', () => {
 
   it('서버에 보낸 동안과 다른 기록을 기다리는 동안의 본문이 다르다', () => {
     expect(deriveConsoleStatus(input({ undo: 'sending' })).items[0].body).toBe('끝날 때까지 기록 버튼을 잠깐 막아 둬요.');
-    expect(deriveConsoleStatus(input({ undo: 'waiting' })).items[0].body).toBe('보내던 기록을 다 보낸 뒤에 되돌려요.');
+    expect(deriveConsoleStatus(input({ undo: 'waiting' })).items[0].body).toBe('보내던 기록을 다 보낸 뒤에 되돌려요. 오래 걸리면 그만두고 알려 드려요.');
   });
 
   it('되돌리기가 없으면 항목도 없다', () => {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { AbnormalEndDialog, OperateConsoleCore, type GameDetailQueryState, type OperateConsoleRuntime } from '@/shared/game-operations';
-import { COMMAND_RESPONSE_TIMEOUT_MS } from './operate-console-core';
+import { COMMAND_RESPONSE_TIMEOUT_MS, UNDO_WAIT_LIMIT_MS } from './operate-console-core';
 import type { FixtureLineupResponse, GameCommandRequest, GameDetail, GameEventRecord, GameLineup, GameLineupState, GameMutationResult, GameRevisionMutationResult, GameState } from '@/types/game-operations';
 import type { V1GameResultRevision } from '@/types/api';
 import type { QueuedGameEvent } from '@/lib/game-operations-queue';
@@ -3412,6 +3412,103 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(
       within(openStatusSheet()).getByText('되돌리기 응답을 받지 못했어요. 기록 목록에서 취소됐는지 확인해 주세요.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it.each([
+    ['connected', '기록 전송이 끝나지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'],
+    ['disconnected', '연결이 돌아오지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'],
+  ] as const)('큐가 한도 안에 비지 않으면(%s) 되돌리기를 그만두고 알린다 — 그 뒤에 큐가 비어도 보내지 않는다', async (connectionStatus, notice) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const state = setup();
+    const { undo, rerender } = await recordedGoalWithUndo(state, { connectionStatus, queue: { items: [queuedEvent('c2', 'queued')] } });
+    fireEvent.click(undo);
+    expect(await screen.findByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.')).toBeInTheDocument();
+    // 기다리는 동안 상태 줄 항목이 있고, 기록 버튼은 잠기지 않는다.
+    await waitFor(() => expect(within(openStatusSheet()).getByText('되돌리는 중이에요…')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '골' })).toBeEnabled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UNDO_WAIT_LIMIT_MS - 1_000);
+    });
+    expect(within(openStatusSheet()).getByText('되돌리는 중이에요…')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(within(openStatusSheet()).getByText(notice)).toBeInTheDocument();
+    expect(within(openStatusSheet()).queryByText('되돌리는 중이에요…')).toBeNull();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+
+    advance(state, { liveEvents: [recorded('e9', 'c1'), recorded('e10', 'c2', { sequence: 10 })], queue: { items: [queuedEvent('c2', 'acked')] } });
+    rerender(<CoreHarness />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it('되돌릴 기록 자신이 한도 안에 서버에 닿지 않아도 그만두고 알린다 — 뒤늦게 닿아도 보내지 않는다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const state = setup();
+    const { rerender } = render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    advance(state, { connectionStatus: 'disconnected', queue: { items: [queuedEvent('c1', 'queued')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+    rerender(<CoreHarness />);
+    fireEvent.click(undo);
+    expect(await screen.findByText('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UNDO_WAIT_LIMIT_MS);
+    });
+
+    expect(
+      within(openStatusSheet()).getByText('연결이 돌아오지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(testFixtures.serverEvents).not.toHaveBeenCalled();
+
+    advance(state, { queue: { items: [queuedEvent('c1', 'acked')] }, liveEvents: [recorded('e9', 'c1')] });
+    rerender(<CoreHarness />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+  });
+
+  it('서버 목록을 읽느라 한도를 넘기면 기록을 찾았어도 되돌리기를 보내지 않는다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const state = setup();
+    testFixtures.serverEvents.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ events: [recorded('e9', 'c1')], version: 4, state: 'LIVE' }), 7_000);
+        }),
+    );
+    const { rerender } = render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    advance(state, { queue: { items: [queuedEvent('c1', 'sending')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+    rerender(<CoreHarness />);
+    fireEvent.click(undo);
+    await screen.findByText('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
+
+    // 9초 뒤 전송이 실패로 끝나고, 서버 목록 읽기가 7초 걸려 한도(15초)를 넘긴다.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9_000);
+    });
+    advance(state, { queue: { items: [queuedEvent('c1', 'failed')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+    rerender(<CoreHarness />);
+    await waitFor(() => expect(testFixtures.serverEvents).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(7_000);
+    });
+
+    expect(
+      within(openStatusSheet()).getByText('기록 전송이 끝나지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
     expect(screen.queryByText('되돌렸어요')).toBeNull();
   });
 

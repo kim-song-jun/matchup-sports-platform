@@ -304,7 +304,45 @@ interface PendingAction {
 type RecordedEventLookup =
   | { readonly kind: 'found'; readonly event: GameEventRecord; readonly reversed: boolean }
   | { readonly kind: 'absent' }
-  | { readonly kind: 'unknown' };
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'expired' };
+
+/**
+ * 되돌리기가 전송이 끝나기를 기다려 주는 한도. 지나면 그만두고, 그 뒤로는 서버에 되돌리기를 보내지 않는다.
+ * 전송 응답 제한(10초)보다 길어야 그 제한에 걸린 기록을 서버 목록에서 확인할 틈이 남는다.
+ */
+export const UNDO_WAIT_LIMIT_MS = 15_000;
+
+interface UndoWaitLimit {
+  readonly expired: boolean;
+  /** 한도 안에 끝났으면 true, 한도가 먼저 지났으면 false. */
+  readonly wait: (work: Promise<unknown>) => Promise<boolean>;
+  readonly clear: () => void;
+}
+
+function startUndoWaitLimit(): UndoWaitLimit {
+  const state = { expired: false };
+  const wakeOnExpiry: Array<() => void> = [];
+  const timer = setTimeout(() => {
+    state.expired = true;
+    wakeOnExpiry.splice(0).forEach((wake) => wake());
+  }, UNDO_WAIT_LIMIT_MS);
+  return {
+    get expired() {
+      return state.expired;
+    },
+    wait: (work) =>
+      new Promise<boolean>((resolve) => {
+        if (state.expired) {
+          resolve(false);
+          return;
+        }
+        wakeOnExpiry.push(() => resolve(false));
+        void work.then(() => resolve(!state.expired));
+      }),
+    clear: () => clearTimeout(timer),
+  };
+}
 
 /** 뛰는 동안 폰 첫 화면에 두는 최근 기록 줄 수. 나머지는 전체 보기 시트에 있다. */
 const RECENT_RECORD_ROWS = 4;
@@ -316,6 +354,9 @@ const STAGE_CHIP_CLASS =
 const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
 const UNDO_FAILED = '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
 const UNDO_BLOCKED_BY_COMMAND = '진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+// 되돌리기 버튼은 누르면 토스트와 함께 사라진다 — 다시 누르라고 하지 않고 기록 목록을 가리킨다.
+const UNDO_WAIT_EXPIRED = '기록 전송이 끝나지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_WAIT_EXPIRED_OFFLINE = '연결이 돌아오지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
 const UNDO_NO_RESPONSE = '되돌리기 응답을 받지 못했어요. 기록 목록에서 취소됐는지 확인해 주세요.';
 const UNDO_CONFLICT = '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
 const UNDO_FAILURE_BY_CODE: Readonly<Record<string, string>> = {
@@ -1275,7 +1316,7 @@ export function OperateConsoleCore({
   // 되돌릴 기록의 실제 상태를 정한다: 화면 목록 → (전송 중이면 끝날 때까지) → 서버 목록 순서로 본다.
   // 큐가 「전송 실패」로 표시한 기록도 응답만 잃었을 뿐 서버에는 저장됐을 수 있어, 실패 표시만으로 없다고 하지 않는다.
   const resolveRecordedEvent = useCallback(
-    async (clientEventId: string): Promise<RecordedEventLookup> => {
+    async (clientEventId: string, limit: UndoWaitLimit): Promise<RecordedEventLookup> => {
       const inList = (): RecordedEventLookup | null => {
         const events = opsRef.current.liveEvents;
         const event = events.find((candidate) => candidate.clientEventId === clientEventId);
@@ -1290,7 +1331,7 @@ export function OperateConsoleCore({
       const status = statusInQueue();
       if (status === 'queued' || status === 'sending') {
         showToast('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
-        await waitForEventSettled(clientEventId);
+        if (!(await limit.wait(waitForEventSettled(clientEventId)))) return { kind: 'expired' };
       }
       // 확정 응답과 목록 반영 사이의 틈은 잠깐 기다린다.
       if (statusInQueue() === 'acked') await waitForRecordedEvent(clientEventId, 3_000);
@@ -1334,12 +1375,19 @@ export function OperateConsoleCore({
           resolveHeld();
         };
       };
+      const stopExpired = () =>
+        stop(opsRef.current.connectionStatus === 'connected' ? UNDO_WAIT_EXPIRED : UNDO_WAIT_EXPIRED_OFFLINE);
       try {
         let reversed = 0;
         for (const clientEventId of [...clientEventIds].reverse()) {
+          const limit = startUndoWaitLimit();
           let giveUp: ReturnType<typeof setTimeout> | undefined;
           try {
-            const found = await resolveRecordedEvent(clientEventId);
+            const found = await resolveRecordedEvent(clientEventId, limit);
+            if (found.kind === 'expired') {
+              stopExpired();
+              return;
+            }
             if (found.kind === 'absent') {
               stop('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
               return;
@@ -1352,9 +1400,17 @@ export function OperateConsoleCore({
             const eventId = found.event.id;
             if (hasPendingWork(opsRef.current.queue)) {
               showToast('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
-              await waitForQueueIdle();
+              if (!(await limit.wait(waitForQueueIdle()))) {
+                stopExpired();
+                return;
+              }
               // 기다리는 사이 다른 길로 취소됐을 수 있다.
               if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+            }
+            // 서버 목록을 읽는 데 오래 걸려 한도를 넘겼을 수도 있다.
+            if (limit.expired) {
+              stopExpired();
+              return;
             }
             // 기다리는 사이 진행 요청이 시작됐을 수 있다.
             if (commandBlockedRef.current) {
@@ -1381,6 +1437,7 @@ export function OperateConsoleCore({
             stop(undoFailureMessage(err, gameOperationsErrorMessage));
             return;
           } finally {
+            limit.clear();
             clearTimeout(giveUp);
           }
         }

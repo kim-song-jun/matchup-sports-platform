@@ -66,8 +66,8 @@ export function ReasonModal({
       previousFocusRef.current = document.activeElement;
       setReason('');
       setConfirmation('');
-      const id = setTimeout(() => reasonInputRef.current?.focus(), 60);
-      return () => clearTimeout(id);
+      reasonInputRef.current?.focus();
+      return;
     }
     const el = previousFocusRef.current;
     if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();

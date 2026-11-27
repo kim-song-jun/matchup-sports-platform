@@ -240,6 +240,65 @@ describe('OperationsBoardClient — 데스크톱', () => {
   });
 });
 
+function withFields(count: number, extra: V1TournamentOperationsBoardItem[]) {
+  const items = [
+    ...Array.from({ length: count }, (_, i) => fx(i + 1, `fld${i + 1}`, kst(D20, '09:00'))),
+    ...extra,
+  ];
+  scenario.pages = [{ items, nextCursor: null }];
+  scenario.fields = Array.from({ length: count }, (_, i) => ({ id: `fld${i + 1}`, name: `구장 ${i + 1}`, sortOrder: i }));
+  scenario.staff = [];
+  scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+}
+
+describe('OperationsBoardClient — 구장 미정과 칩 모드', () => {
+  const unassigned = () => fx(9, null, kst(D20, '10:00'), { warnings: ['MISSING_SCORER'] });
+
+  it('구장 3곳 + 구장 미정은 구장 4열로 세지 않아 칩 모드가 아니고, 미정 열이 보이고 센다', async () => {
+    withFields(3, [unassigned()]);
+    renderBoard();
+
+    await screen.findByRole('columnheader', { name: /구장 3/ });
+    expect(screen.getByRole('columnheader', { name: /구장 미정/ })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(chips.getByRole('button', { name: '전체' })).toBeInTheDocument();
+    expect(chips.getAllByRole('button').filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+  });
+
+  it('구장 4곳 + 구장 미정은 구장 3곳만 열로 고르되 미정 열은 늘 보이고 센다', async () => {
+    withFields(4, [unassigned()]);
+    renderBoard();
+
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent ?? '');
+    expect(headers.filter((h) => /^구장 [1-4]/.test(h))).toHaveLength(3);
+    expect(headers.some((h) => h.startsWith('구장 미정'))).toBe(true);
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(chips.queryByRole('button', { name: '전체' })).not.toBeInTheDocument();
+    expect(chips.queryByRole('button', { name: '구장 미정' })).not.toBeInTheDocument();
+    expect(chips.getByRole('button', { name: '구장 4' })).toBeDisabled();
+  });
+
+  it('구장 4곳 중 하나를 바꿔 골라도 구장 미정 경기는 남는다', async () => {
+    withFields(4, [unassigned()]);
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    await user.click(chips.getByRole('button', { name: '구장 1' }));
+    await user.click(chips.getByRole('button', { name: '구장 4' }));
+
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+  });
+});
+
 describe('OperationsBoardClient — 결과 무효', () => {
   it('무효 처리된 결과는 확정 대기가 아니라 「결과 무효」이고 결과 다시 입력으로 간다', async () => {
     scenario.pages = [{ items: [fx(5, 'fld1', kst(D20, '09:00'), { gameState: 'ENDED', revisionId: 'rev', currentRevisionState: 'VOID' })], nextCursor: null }];

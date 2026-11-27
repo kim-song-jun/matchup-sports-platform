@@ -24,6 +24,7 @@ import { OperationsListView } from './operations-list-view';
 import { OperationsPhoneList } from './operations-phone-list';
 import { OperationsTimeline } from './operations-timeline';
 import {
+  NO_FIELD_KEY,
   buildBoardCards,
   buildFieldColumns,
   formatDayLabel,
@@ -116,16 +117,26 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const dayIndex = activeDay === null ? -1 : days.indexOf(activeDay);
 
   const columnsAll = useMemo(() => buildFieldColumns(cards, activeDay, registeredFields, staffItems), [cards, activeDay, registeredFields, staffItems]);
-  const multiPick = isDesktop && columnsAll.length > MAX_FIELD_COLUMNS;
-  const validPick = (fieldPick ?? []).filter((key) => columnsAll.some((column) => column.key === key));
+  // 구장 수는 실제 구장만 센다. 구장 미정 열은 골라서 거르는 대상이 아니라 늘 보이고 늘 센다.
+  const fieldColumns = columnsAll.filter((column) => column.key !== NO_FIELD_KEY);
+  const noFieldColumn = columnsAll.find((column) => column.key === NO_FIELD_KEY);
+  const multiPick = isDesktop && fieldColumns.length > MAX_FIELD_COLUMNS;
+  const chipColumns = multiPick ? fieldColumns : columnsAll;
+  const validPick = (fieldPick ?? []).filter((key) => chipColumns.some((column) => column.key === key));
   const selectedKeys = multiPick
     ? validPick.length > 0
       ? validPick
-      : columnsAll.slice(0, MAX_FIELD_COLUMNS).map((column) => column.key)
+      : fieldColumns.slice(0, MAX_FIELD_COLUMNS).map((column) => column.key)
     : validPick.slice(0, 1);
-  const visibleColumns = selectedKeys.length === 0 ? columnsAll : columnsAll.filter((column) => selectedKeys.includes(column.key));
+  const visibleColumns = multiPick
+    ? [...fieldColumns.filter((column) => selectedKeys.includes(column.key)), ...(noFieldColumn ? [noFieldColumn] : [])]
+    : selectedKeys.length === 0
+      ? columnsAll
+      : columnsAll.filter((column) => selectedKeys.includes(column.key));
+  const passesFieldFilter = (card: BoardCard) =>
+    selectedKeys.length === 0 || selectedKeys.includes(card.fieldKey) || (multiPick && card.fieldKey === NO_FIELD_KEY);
 
-  const scopeCards = cards.filter((card) => (card.dayKey === activeDay || card.dayKey === null) && (selectedKeys.length === 0 || selectedKeys.includes(card.fieldKey)));
+  const scopeCards = cards.filter((card) => (card.dayKey === activeDay || card.dayKey === null) && passesFieldFilter(card));
   const checkCount = scopeCards.filter((card) => card.checks.length > 0).length;
   const shown = onlyChecks ? scopeCards.filter((card) => card.checks.length > 0) : scopeCards;
   const dayShown = shown.filter((card) => card.dayKey !== null);
@@ -204,9 +215,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
-            {columnsAll.length > 1 ? (
+            {chipColumns.length > 1 ? (
               <FieldChips
-                columns={columnsAll}
+                columns={chipColumns}
                 mode={multiPick ? 'multi' : 'single'}
                 selected={selectedKeys}
                 maxSelected={multiPick ? MAX_FIELD_COLUMNS : undefined}

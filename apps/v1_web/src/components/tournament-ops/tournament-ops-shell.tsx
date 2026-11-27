@@ -436,7 +436,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
       >
         <div className="min-h-[44px] px-4 pt-2">
           {bridge ? <BridgeLink bridge={bridge} /> : null}
-          {contextLabel ? <p className="truncate pl-[14px] text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{contextLabel}</p> : null}
+          {contextLabel ? <p className="truncate pl-4 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{contextLabel}</p> : null}
         </div>
         <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-3 min-h-[64px]">
           <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />

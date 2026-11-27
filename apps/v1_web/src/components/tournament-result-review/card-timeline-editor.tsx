@@ -66,8 +66,8 @@ export function CardTimelineEditor({ events, participants, periods, periodCount,
                 {event.minute === undefined ? <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>시간 미입력</p> : null}
               </div>
               {isSinglePeriod(periodCount) ? null : <div className="min-w-0">
-                <label className="tm-text-caption" htmlFor={`${prefix}-${index}-period`}>피리어드</label>
-                <select id={`${prefix}-${index}-period`} aria-label={`${index + 1}번째 카드 피리어드`}
+                <label className="tm-text-caption" htmlFor={`${prefix}-${index}-period`}>전·후반</label>
+                <select id={`${prefix}-${index}-period`} aria-label={`${index + 1}번째 카드 전·후반`}
                   className="tm-input w-full" style={{ minHeight: 44 }} value={event.period ?? ''}
                   onChange={(e) => update(index, { period: e.target.value ? Number(e.target.value) : undefined })}>
                   <option value="">선택 안 함</option>

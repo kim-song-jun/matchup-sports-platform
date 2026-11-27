@@ -138,6 +138,24 @@ describe('OperationsTimeline', () => {
     expect(within(screen.getByRole('article', { name: /팀 3$/ })).getByText('예정')).toBeInTheDocument();
   });
 
+  it('승부차기로 갈린 확정 카드는 정규시간 점수 아래에 승부차기를 함께 보여 준다', () => {
+    const penalty = fx('9', 'f1', '2026-12-20T00:00:00Z', {
+      gameState: 'ENDED',
+      revisionId: 'r9',
+      currentRevisionState: 'OFFICIAL',
+      currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0 } },
+    });
+    render(<BoardCardView card={cardsFor([penalty])[0]} liveBase="/admin/live/t-1" consoleQuery="" onOpenInfo={() => {}} />);
+
+    expect(screen.getByRole('article', { name: '팀 9' })).toHaveTextContent('0 : 0');
+    expect(screen.getByRole('article', { name: '팀 9' })).toHaveTextContent('승부차기 2:0');
+  });
+
+  it('확정 결과가 없으면 점수 줄을 그리지 않는다(0:0 으로 오독되지 않게)', () => {
+    render(<BoardCardView card={cardsFor([fx('4', 'f1', '2026-12-20T00:00:00Z', { gameState: 'ENDED', revisionId: null })])[0]} liveBase="/admin/live/t-1" consoleQuery="" onOpenInfo={() => {}} />);
+    expect(screen.getByRole('article', { name: '팀 4' })).not.toHaveTextContent(/\d : \d/);
+  });
+
   it('제목 버튼을 누르면 경기 정보를 연다', async () => {
     const onOpenInfo = vi.fn();
     const cards = cardsFor(items);

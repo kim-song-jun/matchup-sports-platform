@@ -65,15 +65,15 @@ function canRevoke(role: V1TournamentStaffRole, target: V1TournamentStaffAssignm
 }
 
 /**
- * 구장(필드) 안내 · 등록 · 목록 — #373.
+ * 구장 안내 · 등록 · 목록 — #373.
  *
- * "필드"는 경기가 실제로 열리는 코트·구장이다. 필드 담당자(FIELD_OPERATOR)는 담당 필드가
- * 있어야만 배정되는데(grant-staff-modal.tsx 의 requiresField), 필드를 등록할 화면이 어디에도
+ * 구장은 경기가 실제로 열리는 코트다. 구장 담당자(FIELD_OPERATOR)는 담당 구장이
+ * 있어야만 배정되는데(grant-staff-modal.tsx 의 requiresField), 구장을 등록할 화면이 어디에도
  * 없어 선택지가 늘 비어 있었고 배정을 끝낼 수 없었다. 백엔드 POST .../fields 는 이미 있다.
  *
  * 등록은 플랫폼 운영자만 통과한다(tournament-operations-fields.service.ts 의
  * authorizeFieldManagement → FIELD_MANAGEMENT_DENIED). 그래서 폼도 그 역할에만 열고,
- * 대회 디렉터에게는 목록과 "누구에게 요청해야 하는지"를 대신 보여준다 — 눌러 보고 403 을
+ * 대회 운영자에게는 목록과 "누구에게 요청해야 하는지"를 대신 보여준다 — 눌러 보고 403 을
  * 받는 버튼은 만들지 않는다.
  */
 function TournamentFieldsSection({

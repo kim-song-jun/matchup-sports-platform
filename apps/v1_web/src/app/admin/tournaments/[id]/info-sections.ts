@@ -4,6 +4,21 @@ import type { V1Tournament } from '@/types/api';
 export const TOURNAMENT_INFO_SECTIONS = ['basic', 'schedule', 'entry', 'rules', 'public', 'promo'] as const;
 export type TournamentInfoSectionKey = (typeof TOURNAMENT_INFO_SECTIONS)[number];
 
+/** 섹션 카드와 수정 시트가 같이 쓰는 이름과 한 줄 설명. */
+export const TOURNAMENT_INFO_SECTION_META: Record<TournamentInfoSectionKey, { title: string; description: string }> = {
+  basic: { title: '기본', description: '대회를 알아보는 정보예요.' },
+  schedule: { title: '일정·장소', description: '신청과 경기가 열리는 때와 곳이에요.' },
+  entry: { title: '참가', description: '몇 팀이, 몇 명으로, 얼마에 참가하는지예요.' },
+  rules: { title: '경기 규칙', description: '모든 경기에 똑같이 적용돼요.' },
+  public: { title: '공개 화면', description: '참가자가 대회 페이지에서 보는 내용이에요.' },
+  promo: { title: '홍보', description: '켜면 대회 정보로 카드 문구를 채워요.' },
+};
+
+/** `?edit=` 값 해석 — 소문자 섹션 키와 정확히 같을 때만 섹션이다. */
+export function parseInfoEditParam(raw: string | null): TournamentInfoSectionKey | null {
+  return TOURNAMENT_INFO_SECTIONS.find((key) => key === raw) ?? null;
+}
+
 const adminBasePath = (tournamentId: string) => `/admin/tournaments/${tournamentId}`;
 
 /** 스태프 면·샘플처럼 `/admin` 이 아닌 곳에서 쓰면 그 대회 경로를 `basePath` 로 넘긴다. */

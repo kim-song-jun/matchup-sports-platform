@@ -7,7 +7,7 @@ export { RecordedEventList, eventTypeLabel } from './recorded-event-list';
 export { EventTimeCorrectionSheet, type EventTimeCorrectionSheetProps } from './event-time-correction-sheet';
 export { AssistPickerSheet, type AssistPickerSheetProps } from './assist-picker-sheet';
 export { MatchProgressStrip } from './match-progress-strip';
-export { RestTimer } from './rest-timer';
+export { RestTimerCard, RestTimerPresets, useRestTimer, type RestTimerApi, type RestTimerState } from './rest-timer';
 export { endPeriodLabel, isSinglePeriod, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 export { commandConfirmCopy, commitActionConfirmCopy, secondYellowConfirmCopy, penaltyShootoutFinishConfirmCopy, penaltyShootoutOverrideFinishConfirmCopy, penaltyShootoutStartConfirmCopy, eventTimeSummary, playerLabel, sideLabel, type ConfirmCopy } from './confirm-copy';
 export { participantIdentityCopyText, participantIdentityName, participantIdentityPhone } from './participant-identity';

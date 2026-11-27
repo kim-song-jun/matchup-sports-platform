@@ -51,7 +51,7 @@ import { SECOND_YELLOW_RED_LABEL } from '@/lib/second-yellow-red';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
 import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
-import { RestTimer } from './rest-timer';
+import { RestTimerCard, RestTimerPresets, useRestTimer } from './rest-timer';
 import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-banner';
 import { useEventToast, EventToasts } from './event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
@@ -1089,6 +1089,7 @@ export function OperateConsoleCore({
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
+  const rest = useRestTimer({ storageKey: null, autoStart: null });
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
   // MD-QA #187: "수정" 시트의 대상. 시각 정정과 기록 취소를 한 시트에서 고른다.
   const [editTarget, setEditTarget] = useState<GameEventRecord | null>(null);
@@ -2182,7 +2183,11 @@ export function OperateConsoleCore({
           이미 ENDED/CANCELLED된 뒤에는 의미가 없으므로 LIVE/PAUSED에서만 보여준다.
           "다음 피리어드가 없을 때"로 좁히지 않는 이유: 부상 중단은 어느 피리어드
           중에도 필요하다. */}
-      {matchInPlay && <RestTimer />}
+      {matchInPlay && (
+        <div className="px-4">
+          {rest.state.kind === 'idle' ? <RestTimerPresets api={rest} /> : <RestTimerCard api={rest} />}
+        </div>
+      )}
 
       {/* 팀 파울과 이벤트 패드도 경기가 뛰는 동안에만 둔다. 시작 전·종료 뒤엔 전부 비활성이라
           자리만 차지해, 폰에서 그 단계의 할 일(킥오프 준비·결과 확정 카드)을 첫 화면 밖으로 밀었다. */}

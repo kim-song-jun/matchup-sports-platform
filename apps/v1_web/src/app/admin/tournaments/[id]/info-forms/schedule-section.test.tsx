@@ -149,6 +149,17 @@ describe('일정·장소 섹션 시트', () => {
       expect(view.onSaved).not.toHaveBeenCalled();
     });
 
+    it('막힌 뒤 글을 지우면 장소 칸 아래 이유도 사라진다', () => {
+      const view = renderInfoSheet(scheduleSection, start({ venue: null }));
+
+      typeSearch(view, '뚝섬');
+      view.save();
+      typeSearch(view, '');
+
+      const search = view.inSheet().getByRole('combobox', { name: '장소' });
+      expect(search).not.toHaveAccessibleDescription(expect.stringContaining(PENDING_PLACE_ERROR));
+    });
+
     it('닫으려 하면 바뀐 내용으로 보고 버릴지 묻는다', async () => {
       const view = renderInfoSheet(scheduleSection, start({ venue: null }));
 

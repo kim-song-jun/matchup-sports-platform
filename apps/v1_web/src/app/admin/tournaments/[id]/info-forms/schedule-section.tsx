@@ -143,7 +143,7 @@ function ScheduleForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormPro
             value={draft.venue}
             onChange={(value) => set('venue', value)}
             onPendingTextChange={setPendingVenueText}
-            error={errorFor(ids.venue)}
+            error={pendingVenueText === '' && errorFor(ids.venue) === PENDING_VENUE_MESSAGE ? undefined : errorFor(ids.venue)}
             disabled={disabled}
           />
           <Field id={ids.parkingInfo} label="주차 안내" hint="장소 아래에 보여요. 비우면 숨겨요.">

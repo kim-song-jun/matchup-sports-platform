@@ -4,7 +4,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { StagePlanManager } from './stage-plan-manager';
-import { StagePlanToolbar } from './stage-plan-toolbar';
+import { useState } from 'react';
+import { StagePlanDialog } from './stage-plan-dialog';
 import type { StagePlanView } from '@/types/stage-plan';
 vi.mock('@/components/v1-ui/confirm-modal', () => ({ useConfirm: () => ({ confirm: async () => true, ConfirmModal: null }) }));
 const base = '*/api/v1/admin/tournaments/staged/stages';
@@ -145,13 +146,19 @@ describe('단계별 참가팀 확정', () => {
     fireEvent.click(screen.getByRole('button', { name: '표시 설정 저장' }));
     await waitFor(() => expect(payload).toMatchObject({ poolKey: 'league', expectedRevision: 1, overallRankStart: 1 }));
   });
-  it('대진 위에는 도구 버튼만 두고 열린 패널에서 배정·경기 설정을 전환한다', async () => {
+  it('open 일 때만 대화상자가 있고, 열린 패널에서 배정·경기 설정을 전환하며 닫기가 onClose 를 부른다', async () => {
     server.use(http.get(base, () => success(data())));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><StagePlanToolbar tournamentId="staged" canWrite canOverride={false} /></QueryClientProvider>);
+    const onClose = vi.fn();
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return <><button type="button" onClick={() => setOpen(true)}>열기</button>
+        <StagePlanDialog open={open} onClose={() => { onClose(); setOpen(false); }} tournamentId="staged" canWrite canOverride={false} /></>;
+    }
+    render(<QueryClientProvider client={client}><Host /></QueryClientProvider>);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    const trigger = screen.getByRole('button', { name: '단계·진출팀 관리' });
-    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: '열기' }));
     expect(await screen.findByRole('dialog', { name: '단계·진출팀 관리' })).toBeVisible();
     expect(await screen.findByRole('combobox', { name: '1번 자리' })).toBeEnabled();
     fireEvent.change(screen.getByRole('combobox', { name: '1번 자리' }), { target: { value: 'r1' } });
@@ -162,6 +169,7 @@ describe('단계별 참가팀 확정', () => {
     expect(screen.getByRole('combobox', { name: '1번 자리' })).toHaveValue('r1');
     fireEvent.click(screen.getByRole('button', { name: '단계 관리 닫기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
   it('미정 자리를 null로 저장한 초안을 확정 성공으로 표시하지 않는다', async () => {
     let view = data(), payload: unknown;

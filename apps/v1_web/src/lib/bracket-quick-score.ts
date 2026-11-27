@@ -25,7 +25,7 @@ export function parseQuickScore(inputs: QuickScoreInputs, isKnockout: boolean): 
   const home = toScore(inputs.home);
   const away = toScore(inputs.away);
   if (home === null) return { ok: false, error: '홈 점수를 0 이상의 정수로 입력해 주세요.' };
-  if (away === null) return { ok: false, error: '어웨이 점수를 0 이상의 정수로 입력해 주세요.' };
+  if (away === null) return { ok: false, error: '원정 점수를 0 이상의 정수로 입력해 주세요.' };
   if (!needsPenalties(inputs, isKnockout)) return { ok: true, score: { home, away } };
 
   const penaltyHome = toScore(inputs.penaltyHome);

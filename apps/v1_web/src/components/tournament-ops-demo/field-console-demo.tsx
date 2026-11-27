@@ -32,7 +32,7 @@ export function FieldConsoleDemo() {
     <div inert={step !== null}>
       <header className={styles.header}><div className={styles.headerInner}>
         <Link className={styles.brand} href="/home">teameet</Link>
-        <span className={styles.badge}>필드 담당자 콘솔 · 샘플 체험</span>
+        <span className={styles.badge}>구장 담당자 콘솔 · 샘플 체험</span>
         <div className={styles.actions}>
         <DemoReturnLink />
           <button className={styles.quiet} onClick={() => setStep(0)}>안내 다시 보기</button>
@@ -41,7 +41,7 @@ export function FieldConsoleDemo() {
       </div></header>
       <main className={styles.container}>
         <h1 className="tm-text-heading mb-3">경기 운영콘솔 체험</h1>
-        <p className={styles.notice}>실제 필드 담당자와 같은 조작 화면이에요. 5인제 축구·팀별 교체 3회의 샘플 경기로 체험해요. 팀·선수는 모두 샘플이며 실제 서버에 전송하지 않아요. 새로고침하면 체험 기록이 초기화돼요.</p>
+        <p className={styles.notice}>실제 구장 담당자와 같은 조작 화면이에요. 5인제 축구·팀별 교체 3회의 샘플 경기로 체험해요. 팀·선수는 모두 샘플이며 실제 서버에 전송하지 않아요. 새로고침하면 체험 기록이 초기화돼요.</p>
         <QueryClientProvider client={client}>
           <div hidden={step !== null}><FieldConsoleSession key={session} /></div>
         </QueryClientProvider>
@@ -105,7 +105,7 @@ function FieldConsoleSession({ previewPhase = 'before' }: { previewPhase?: 'befo
       if (!event || event.type !== 'GOAL') throw new Error('득점 기록을 찾을 수 없어요.');
       publish({ game: { ...current.current.game, version: current.current.game.version + 1 }, events: current.current.events.map((row) => row.id === eventId ? { ...row, assistParticipantId } : row) });
     },
-    requestTakeover: () => { throw new Error('체험은 한 명의 필드 담당자만 지원해요.'); },
+    requestTakeover: () => { throw new Error('체험은 한 명의 구장 담당자만 지원해요.'); },
     retryFailedEvent: () => { throw new Error('체험에는 실제 서버 전송 대기 기록이 없어요.'); },
     applyCommandResult: (result) => result.version >= current.current.game.version,
   };

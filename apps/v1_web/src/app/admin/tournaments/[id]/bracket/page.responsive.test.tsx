@@ -1,5 +1,5 @@
 /**
- * 뷰포트 분기가 페이지에 실제로 걸려 있는지 — 768 미만은 모바일 컨테이너, 이상은 작업 영역(툴바 포함).
+ * 뷰포트 분기가 페이지에 실제로 걸려 있는지 — 768 미만은 모바일 컨테이너, 이상은 작업 영역.
  * 두 컴포넌트 자체는 각자의 테스트가 검증하므로 여기서는 stub 으로 바꾸고 "누가 어떤 props 로 마운트되는가"만 본다.
  */
 import { render, screen } from '@testing-library/react';
@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
-vi.mock('@/components/admin/bracket-canvas/bracket-reset-button', () => ({ BracketResetButton: () => null }));
+vi.mock('@/components/admin/bracket-canvas/use-bracket-tools', () => ({
+  useBracketTools: () => ({ loading: false, isEmpty: false, hasGroups: true, summary: '', unscheduledCount: 0, menus: { teamFill: [], match: [], timeVenue: [] }, create: null, openCreate: vi.fn(), resetError: null, dialogs: null }),
+}));
+vi.mock('@/components/admin/bracket-canvas/bracket-tools-bar', () => ({ BracketToolsBar: ({ children }: { children: React.ReactNode }) => <div data-testid="tools-bar">{children}</div> }));
 
 const { adminState } = vi.hoisted(() => ({ adminState: { canWrite: true } }));
 
@@ -82,11 +85,5 @@ describe('어드민 대진 페이지 — 뷰포트 분기', () => {
     restoreViewport = installViewport(390);
     render(<AdminTournamentBracketPage />);
     expect(screen.getByTestId('mobile-screen')).toHaveAttribute('data-can-write', 'false');
-  });
-
-  it('[그림|목록] 탭은 모바일에서도 보인다 — 구조 편집은 목록 뷰로 계속 갈 수 있다', () => {
-    restoreViewport = installViewport(390);
-    render(<AdminTournamentBracketPage />);
-    expect(screen.getByRole('tab', { name: '목록' })).toBeInTheDocument();
   });
 });

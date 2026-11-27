@@ -112,7 +112,7 @@ describe('BracketCanvas', () => {
   it('고른 팀이 있으면 빈 자리 줄을 눌러 그 자리에 배정한다(키보드 경로)', () => {
     const { props } = renderCanvas({ pendingRegistrationId: 'reg-1' });
     const nodeOne = screen.getByRole('group', { name: '4강 1번 경기, 예정' });
-    fireEvent.click(within(nodeOne).getByRole('button', { name: '어웨이 2번 자리, 선택한 팀을 여기에 넣어요' }));
+    fireEvent.click(within(nodeOne).getByRole('button', { name: '원정 2번 자리, 선택한 팀을 여기에 넣어요' }));
     expect(props.onAssignSlot).toHaveBeenCalledWith('s2', 'reg-1');
     expect(props.onSelectFixture).not.toHaveBeenCalled();
   });

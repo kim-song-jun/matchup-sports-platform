@@ -102,7 +102,7 @@ function FinalistEditor({ tournamentId, preview, onClose, showToast, onRefresh }
       <Button variant="outline" size="md" disabled={apply.isPending} onClick={() => void refresh()}>순위 다시 불러오기</Button>
       <Button variant="primary" size="md" className="flex-1" disabled={blocked !== null} loading={apply.isPending} onClick={() => void submit()}>배정 저장 · {changedCount}자리</Button></div>
   </div>}>
-    <p className="tm-text-caption text-[var(--text-muted)]">공식 조별 순위를 확인하고 결선 배정안을 조정해요. 순서를 바꾸거나 다른 팀을 선택해도 공식 성적표는 바뀌지 않아요. 저장 뒤 결과가 정정되어도 결선 배정을 자동으로 덮어쓰지 않아요.</p>
+    <p className="tm-text-caption text-[var(--text-muted)]">공식 조별 순위를 확인하고 결선 배정안을 조정해요. 순서를 바꾸거나 다른 팀을 선택해도 공식 성적표는 바뀌지 않아요. 저장 뒤 결과가 고쳐져도 결선 배정을 자동으로 덮어쓰지 않아요.</p>
     {preview.standingsChanged ? <p role="status" className="tm-text-label text-[var(--orange700)]">마지막 배정 이후 조별 순위나 결과가 바뀌었어요. 현재 결선 배정과 최신 순위를 비교해 다시 확인해 주세요.</p> : null}
     <section className="flex flex-col gap-3"><SectionTitle title="조별 순위 · 진출팀 선정" compact />
       <div className="grid gap-4 md:grid-cols-2">{preview.groups.map((group) => <div key={group.id} className="flex flex-col gap-3 rounded-xl bg-[var(--surface-soft)] p-4">

@@ -9,7 +9,7 @@ import type { GameActorRole, GameResultRevisionState } from '@/hooks/use-tournam
  * `extractErrorMessage` -- never a raw stack/technical string.
  */
 export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
-  RESULT_CARD_TIMELINE_INVALID: '카드 기록의 선수·피리어드와 중복 여부를 확인해 주세요.',
+  RESULT_CARD_TIMELINE_INVALID: '카드 기록의 선수·전후반과 중복 여부를 확인해 주세요.',
   DIRECTOR_OFFICIALIZE_DISABLED: '이 기능은 아직 활성화되지 않았어요. 플랫폼 운영팀에 문의해 주세요.',
   STAFF_SCOPE_DENIED: '이 대회의 담당자 권한이 없어졌거나 만료됐어요. 새로고침 후 다시 시도해 주세요.',
   PROJECTION_PREVIEW_MISMATCH: '결과 내용이 방금 바뀌었어요. 최신 내용을 다시 확인한 뒤 시도해 주세요.',
@@ -21,7 +21,7 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   // contract 가 새로 만든 409 다(`officializeResultRevision` STANDARD 흐름의 공식 탈취 가드).
   // 매핑이 없으면 서버 원문(영문)이 그대로 화면에 뜬다.
   RESULT_ALREADY_OFFICIAL:
-    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 결과 정정으로 해주세요.',
+    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 「결과 고치기」로 해주세요.',
   RESULT_REVISION_NOT_FOUND: '결과 정보를 찾을 수 없어요. 화면을 새로고침해 주세요.',
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',
@@ -62,8 +62,8 @@ export function isDirectorOfficializeDisabledError(err: unknown): boolean {
 }
 
 export const REVISION_STATE_LABELS: Record<GameResultRevisionState, string> = {
-  DRAFT: '작성 중(정정 초안)',
-  SUBMITTED: '제출됨 · 검토 대기',
+  DRAFT: '작성 중(고친 결과)',
+  SUBMITTED: '제출됨 · 확정 대기',
   CHANGE_REQUESTED: '수정 요청됨',
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',
@@ -88,9 +88,9 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
  */
 export const ACTOR_ROLE_LABELS: Record<GameActorRole, string> = {
   platform_ops: '플랫폼 운영자',
-  tournament_director: '대회 디렉터',
-  field_operator: '현장 진행요원',
-  support_readonly: '고객지원(읽기 전용)',
+  tournament_director: '대회 운영자',
+  field_operator: '구장 담당자',
+  support_readonly: '지원(보기만)',
   team_owner: '팀장',
   team_manager: '팀 매니저',
   opponent_manager: '상대팀 매니저',

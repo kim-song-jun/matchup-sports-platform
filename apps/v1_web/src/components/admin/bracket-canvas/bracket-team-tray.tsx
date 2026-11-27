@@ -29,6 +29,11 @@ export type BracketTeamTrayProps = {
   canWrite: boolean;
   /** 좁은 태블릿용 — 목록을 한 줄 요약으로 접고 토글로 펼친다. 조회 실패 안내는 접혀도 보인다. */
   collapsible?: boolean;
+  /** collapsible 모드의 펼침을 부모가 쥘 때 쓴다. 없으면 트레이가 자기 상태로 접고 편다. */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+  /** 접지 않는 모드에서 목록을 닫는 방법. 없으면 닫기 버튼을 그리지 않는다. */
+  onClose?: () => void;
   onPick: (registrationId: string | null) => void;
 };
 
@@ -40,10 +45,18 @@ export function BracketTeamTray({
   pendingRegistrationId,
   canWrite,
   collapsible = false,
+  expanded: controlledExpanded,
+  onExpandedChange,
+  onClose,
   onPick,
 }: BracketTeamTrayProps) {
   const listId = useId();
-  const [expanded, setExpanded] = useState(false);
+  const [ownExpanded, setOwnExpanded] = useState(false);
+  const expanded = controlledExpanded ?? ownExpanded;
+  const setExpanded = (next: boolean) => {
+    if (controlledExpanded === undefined) setOwnExpanded(next);
+    onExpandedChange?.(next);
+  };
   const listHidden = collapsible && !expanded;
   const teams = useMemo(
     () =>
@@ -84,7 +97,7 @@ export function BracketTeamTray({
             type="button"
             aria-expanded={expanded}
             aria-controls={expanded && listRendered ? listId : undefined}
-            onClick={() => setExpanded((value) => !value)}
+            onClick={() => setExpanded(!expanded)}
             className="tm-btn tm-btn-sm tm-btn-outline shrink-0"
             style={{ minHeight: 44 }}
           >
@@ -99,6 +112,11 @@ export function BracketTeamTray({
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
             {registrationsState.status === 'success' ? `미배정 ${unplacedCount} / 전체 ${teams.length}` : null}
           </span>
+          {onClose ? (
+            <button type="button" onClick={onClose} aria-label="참가팀 목록 닫기" className="tm-btn tm-btn-sm tm-btn-ghost shrink-0" style={{ minHeight: 44 }}>
+              닫기
+            </button>
+          ) : null}
         </div>
       )}
       {listHidden && pendingTeam !== null ? (

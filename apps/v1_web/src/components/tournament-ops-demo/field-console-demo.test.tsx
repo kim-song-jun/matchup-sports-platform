@@ -16,11 +16,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('필드 운영콘솔 안내와 체험', () => {
-  it('운영콘솔 체험과 기존 주요 기능 안내를 각각 연결한다', () => {
+  it('경기 콘솔 연습과 기존 주요 기능 안내를 각각 연결한다', () => {
     render(<TournamentOpsDemoEntry />);
-    expect(screen.getByRole('link', { name: /운영 콘솔 체험하기/ })).toHaveAttribute('href', '/field-console-demo');
+    expect(screen.getByRole('link', { name: /경기 콘솔 연습하기/ })).toHaveAttribute('href', '/field-console-demo');
     expect(screen.getByRole('link', { name: /주요 기능 보기/ })).toHaveAttribute('href', '/tournament-ops-demo#demo-guide');
-    for (const name of [/운영 콘솔 체험하기/, /주요 기능 보기/]) {
+    for (const name of [/경기 콘솔 연습하기/, /주요 기능 보기/]) {
       const link = screen.getByRole('link', { name });
       expect(link).not.toHaveAttribute('target');
       link.addEventListener('click', event => event.preventDefault(), { once: true });

@@ -35,3 +35,6 @@ TEAMEET_APS_ENVIRONMENT = development
 // Universal Links host, so the Kakao login redirect returns to the app rather than
 // stranding the reader in Safari.
 TEAMEET_APP_LINK_HOST = alpha.teameet.co.kr
+
+TEAMEET_WIDGET_BUNDLE_ID = kr.co.teameet.alpha.widget
+TEAMEET_APP_GROUP = group.kr.co.teameet.alpha

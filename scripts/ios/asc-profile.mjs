@@ -17,6 +17,9 @@
 //   ASC_KEY_FILE=…    path to AuthKey_XXXXXXXX.p8, outside the repository
 //
 // Usage:
+// Widget profiles (App IDs and App Groups must first be registered by the account administrator):
+//   node scripts/ios/asc-profile.mjs create "Teameet Alpha Widget App Store" kr.co.teameet.alpha.widget
+//   node scripts/ios/asc-profile.mjs create "Teameet Production Widget App Store" kr.co.teameet.widget
 //   node scripts/ios/asc-profile.mjs list
 //   node scripts/ios/asc-profile.mjs create "Teameet Alpha App Store" kr.co.teameet.alpha
 import { createSign } from 'node:crypto';

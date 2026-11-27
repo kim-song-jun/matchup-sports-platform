@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import type { AdminToastVariant } from '@/components/admin';
+import { stageBracketView } from '@/lib/stage-bracket-view';
+import type { StagePool } from '@/types/stage-plan';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
@@ -15,6 +17,7 @@ import { BracketLeagueStandings } from './bracket-league-standings';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileScreenProps {
+  pool?: StagePool;
   sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   registrations: V1AdminTournamentRegistration[];
@@ -25,13 +28,15 @@ export interface BracketCanvasMobileScreenProps {
 }
 
 /** 768px 미만의 대진 그림 화면. 구조 편집 도구(툴바·트레이)는 두지 않고 목록과 시트만 보여 준다. */
-export function BracketCanvasMobileScreen({ sixTeamState, tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
-  const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
+export function BracketCanvasMobileScreen({ pool, sixTeamState, tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
+  const { data: fullBracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
+  const bracket = useMemo(() => fullBracket && stageBracketView(fullBracket, pool), [fullBracket, pool]);
+  const league = pool ? pool.format === 'league' : format === 'league';
   const rounds = useMemo(() => {
     if (bracket === undefined) return [];
     const input = { groups: bracket.groups, fixtures: bracket.fixtures, slots: bracket.slots };
-    return format === 'league' ? buildLeagueTournamentMobileRounds(input) : buildBracketMobileRounds(input);
-  }, [bracket, format]);
+    return league ? buildLeagueTournamentMobileRounds(input) : buildBracketMobileRounds(input);
+  }, [bracket, league]);
   const standingsGroups = useMemo(
     () => (bracket === undefined ? [] : buildLeagueStandings({ groups: bracket.groups, standings: bracket.standings })),
     [bracket],
@@ -59,7 +64,7 @@ export function BracketCanvasMobileScreen({ sixTeamState, tournamentId, registra
   return (
     <>
       {canWrite && format === 'group_knockout' ? <div className="mb-3 flex justify-end"><FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /></div> : null}
-      {format === 'league' && standingsGroups.length > 0 ? (
+      {league && standingsGroups.length > 0 ? (
         <details className="mb-3" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)' }}>
           <summary className="tm-text-label flex min-h-[44px] cursor-pointer items-center px-4 font-semibold">조별 순위</summary>
           <div className="px-3 pb-3">

@@ -37,6 +37,11 @@ function BracketPageBody() {
   const [multiFinalsOpen, setMultiFinalsOpen] = useState(false);
   const [multiFinalsMode, setMultiFinalsMode] = useState<'create' | 'rules' | 'assign'>('create');
   const { data: tournament } = useV1AdminTournament(tournamentId);
+  const [stageKey, setStageKey] = useState('');
+  const [poolKey, setPoolKey] = useState('');
+  const stages = tournament?.stagePlan?.stages ?? [];
+  const stage = stages.find(item => item.key === stageKey) ?? stages[0];
+  const pool = stage?.pools.find(item => item.key === poolKey) ?? stage?.pools[0];
   // 확정 팀 목록은 대진 편성에 필요하다. 셸이 아니라 이 섹션에서만 구독한다.
   const { data: regData, isError: regIsError, error: regError, refetch: refetchRegistrations } = useV1AdminTournamentRegistrations(tournamentId);
   const searchParams = useSearchParams();
@@ -80,10 +85,24 @@ function BracketPageBody() {
         activeId={view}
         onSelect={(id) => changeView(id === 'list' ? 'list' : 'canvas')}
       />
+      {view === 'canvas' && stage && pool && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 tm-text-label">단계
+            <select className="tm-input" value={stage.key} onChange={event => { setStageKey(event.target.value); setPoolKey(''); }}>
+              {stages.map(item => <option key={item.key} value={item.key}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 tm-text-label">편성
+            <select className="tm-input" value={pool.key} onChange={event => setPoolKey(event.target.value)}>
+              {stage.pools.map(item => <option key={item.key} value={item.key}>{item.name} · {item.format === 'league' ? '풀리그' : '토너먼트'}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
       {view === 'canvas' ? (
-        <BracketCanvasResponsive
+        <BracketCanvasResponsive key={pool?.key}
           wide={
-            <BracketCanvasWorkspace
+            <BracketCanvasWorkspace pool={pool}
               tournamentId={tournamentId}
               format={tournament?.format}
               sixTeamState={tournament?.sixTeamBracket}
@@ -98,7 +117,7 @@ function BracketPageBody() {
             />
           }
           narrow={
-            <BracketCanvasMobileScreen
+            <BracketCanvasMobileScreen pool={pool}
               tournamentId={tournamentId}
               registrations={registrations}
               registrationsState={registrationsState}

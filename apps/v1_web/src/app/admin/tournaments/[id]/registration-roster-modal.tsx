@@ -178,7 +178,7 @@ export function RosterModal({
   return (
     <SimpleModal
       open={open}
-      title={`명단 검토 — ${registration?.teamName ?? registration?.teamId ?? ''}`}
+      title={`명단 보기 — ${registration?.teamName ?? registration?.teamId ?? ''}`}
       onClose={onClose}
     >
       {!isPending && !isError && players.length > 0 ? (

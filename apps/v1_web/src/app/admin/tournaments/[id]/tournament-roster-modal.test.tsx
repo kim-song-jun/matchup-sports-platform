@@ -84,7 +84,7 @@ function RosterFocusHarness({ canWrite = true }: { canWrite?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)}>명단 검토</button>
+      <button onClick={() => setOpen(true)}>명단 보기</button>
       <button>경기별 명단</button>
       <RosterModal open={open} onClose={() => setOpen(false)} registration={registration} showToast={() => undefined} canWrite={canWrite} />
     </>
@@ -137,9 +137,9 @@ describe('admin tournament roster modal', () => {
     if (state === 'empty') queryState = { ...queryState, data: { ...(queryState.data as object), players: [] } };
     const user = userEvent.setup();
     render(<RosterFocusHarness canWrite={state !== 'read-only'} />);
-    const trigger = screen.getByRole('button', { name: '명단 검토' });
+    const trigger = screen.getByRole('button', { name: '명단 보기' });
     await user.click(trigger);
-    const dialog = screen.getByRole('dialog', { name: '명단 검토 — 번개팀' });
+    const dialog = screen.getByRole('dialog', { name: '명단 보기 — 번개팀' });
     expect(within(dialog).getByRole('button', { name: '모달 닫기' })).toHaveFocus();
     for (const shift of [false, true, true, false]) {
       await user.tab({ shift });
@@ -164,7 +164,7 @@ describe('admin tournament roster modal', () => {
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: '명단 검토 — 번개팀' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '명단 보기 — 번개팀' })).toBeInTheDocument();
     expect(screen.getByText('1995.03.15 · 남성')).toBeInTheDocument();
     expect(screen.getByText('휴대폰 010-1234-5678')).toBeInTheDocument();
   });

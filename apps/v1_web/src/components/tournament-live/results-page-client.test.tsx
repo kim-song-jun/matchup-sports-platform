@@ -33,10 +33,12 @@ vi.mock('@/components/tournament-result-review/game-result-correction-panel', ()
 
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', timestamp: 't', data });
 
-interface Row { fixtureId: string; gameId: string; revisionId: string | null; currentRevisionState?: string; fieldName?: string; fixtureNumber?: number; scheduledAt?: string; currentScore?: unknown }
+interface Row { fixtureId: string; gameId: string; revisionId: string | null; currentRevisionState?: string; fieldName?: string; fixtureNumber?: number; scheduledAt?: string; currentScore?: unknown; warnings?: string[] }
 let pages: Array<{ items: Row[]; nextCursor: string | null }>;
 let revisionStates: Record<string, string>;
 let fixtures: unknown[];
+let tournamentKind: 'regular_tournament' | 'regular_league' | undefined;
+let liveWarnings: Array<{ fixtureId: string; warnings: string[] }>;
 const requestedCursors: Array<string | null> = [];
 
 const server = setupServer(
@@ -44,9 +46,9 @@ const server = setupServer(
     const cursor = new URL(request.url).searchParams.get('cursor');
     requestedCursors.push(cursor);
     const page = pages[cursor === null ? 0 : Number(cursor.replace('c', ''))];
-    return ok({ items: page.items.map(baseItem), nextCursor: page.nextCursor, watermark: 'w', liveWarnings: [] });
+    return ok({ items: page.items.map(baseItem), nextCursor: page.nextCursor, watermark: 'w', liveWarnings });
   }),
-  http.get('*/api/v1/tournaments/:id', () => ok({ id: 't-1', title: '겨울 풋살컵', kind: 'regular_tournament', fixtures, leagueFixtures: [] })),
+  http.get('*/api/v1/tournaments/:id', () => ok({ id: 't-1', title: '겨울 풋살컵', ...(tournamentKind === undefined ? {} : { kind: tournamentKind }), fixtures, leagueFixtures: [] })),
   http.get('*/api/v1/games/:gameId/result-revisions', ({ params }) => ok([{ id: `rv-${String(params.gameId)}`, state: revisionStates[String(params.gameId)] ?? 'OFFICIAL' }])),
 );
 
@@ -68,6 +70,8 @@ beforeEach(() => {
   nav.search = '';
   nav.pathname = '/admin/live/t-1/results';
   requestedCursors.length = 0;
+  tournamentKind = 'regular_tournament';
+  liveWarnings = [];
   restoreViewport = installViewport(1280);
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   pages = [
@@ -145,6 +149,115 @@ describe('ResultsPageClient', () => {
     renderPage('SUPPORT_READONLY');
 
     expect(await screen.findByTestId('correction-panel')).toHaveAttribute('data-auto-open', 'false');
+  });
+
+  it('확정된 경기를 고르면 공개 경기 화면 링크가 나오고, 돌아올 주소는 그 경기를 고른 결과 화면이다', async () => {
+    nav.search = 'fixtureId=f2';
+    renderPage();
+
+    await screen.findByTestId('correction-panel');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/f2?from=%2Fadmin%2Flive%2Ft-1%2Fresults%3FfixtureId%3Df2',
+    );
+  });
+
+  it('정규 리그는 리그 경기 라우트로 링크한다', async () => {
+    tournamentKind = 'regular_league';
+    nav.search = 'fixtureId=f2';
+    renderPage();
+
+    await screen.findByTestId('correction-panel');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/league-matches/t-1/fixtures/f2?from=%2Fadmin%2Flive%2Ft-1%2Fresults%3FfixtureId%3Df2',
+    );
+  });
+
+  it('스태프 표면에서는 돌아올 주소도 스태프 결과 화면이다', async () => {
+    nav.pathname = '/tournament-ops/tournaments/t-1/results';
+    nav.search = 'fixtureId=f2';
+    renderPage();
+
+    await screen.findByTestId('correction-panel');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/f2?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Fresults%3FfixtureId%3Df2',
+    );
+  });
+
+  it('다른 경기를 고르면 공개 화면의 돌아올 주소도 그 경기로 바뀐다', async () => {
+    pages = [
+      {
+        items: [
+          { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2' },
+          { fixtureId: 'f3', gameId: 'g3', revisionId: 'r3', fixtureNumber: 3 },
+        ],
+        nextCursor: null,
+      },
+    ];
+    fixtures = [fixtureNames(2, '잠실 레전드', '마포 FS'), fixtureNames(3, '성수 유나이티드', '한강 FC')];
+    nav.search = 'fixtureId=f2';
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByTestId('correction-panel');
+
+    await user.click(screen.getByRole('button', { name: /성수 유나이티드 vs 한강 FC/ }));
+
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/f3?from=%2Fadmin%2Flive%2Ft-1%2Fresults%3FfixtureId%3Df3',
+    );
+  });
+
+  it('무효 처리된 경기도 공개 화면으로 볼 수 있다', async () => {
+    pages = [{ items: [{ fixtureId: 'f3', gameId: 'g3', revisionId: 'r3', currentRevisionState: 'VOID' }], nextCursor: null }];
+    fixtures = [fixtureNames(3, '성수 유나이티드', '한강 FC')];
+    nav.search = 'fixtureId=f3';
+    renderPage();
+
+    await screen.findByTestId('correction-panel');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute('href', expect.stringContaining('/tournaments/t-1/matches/f3'));
+  });
+
+  it('확정 대기 경기에는 공개 화면 링크가 없다 — 아직 참가자에게 보이는 결과가 없다', async () => {
+    renderPage();
+
+    await screen.findByTestId('review-panel');
+    expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
+  });
+
+  it('대회 종류가 아직 안 왔으면 링크를 만들지 않는다 — 리그가 대회 라우트로 링크돼 404 가 되지 않게', async () => {
+    tournamentKind = undefined;
+    nav.search = 'fixtureId=f2';
+    renderPage();
+
+    await screen.findByTestId('correction-panel');
+    expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
+  });
+
+  it('확정 대기 줄에는 득점자 미기재·검토 기한 초과 경고가 글자로 붙고, 확정됨 줄에는 없다', async () => {
+    pages = [
+      {
+        items: [
+          { fixtureId: 'f1', gameId: 'g1', revisionId: null, warnings: ['MISSING_SCORER'] },
+          { fixtureId: 'f3', gameId: 'g3', revisionId: 'r3', currentRevisionState: 'SUBMITTED', fixtureNumber: 3 },
+          { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2', fieldName: '구장 1', fixtureNumber: 1, warnings: ['MISSING_SCORER'] },
+        ],
+        nextCursor: null,
+      },
+    ];
+    fixtures = [fixtureNames(1, '노원 킥스', '강서 드리블러'), fixtureNames(2, '잠실 레전드', '마포 FS'), fixtureNames(3, '성수 유나이티드', '한강 FC')];
+    liveWarnings = [{ fixtureId: 'f3', warnings: ['RESULT_REVIEW_OVERDUE'] }];
+    renderPage();
+
+    const pendingSection = await screen.findByRole('region', { name: '확정 대기 2' });
+    const row1 = within(pendingSection).getByRole('button', { name: /노원 킥스 vs 강서 드리블러/ });
+    const row3 = within(pendingSection).getByRole('button', { name: /성수 유나이티드 vs 한강 FC/ });
+    expect(within(row1).getByText('득점자 미기재')).toBeInTheDocument();
+    expect(within(row1).queryByText('검토 기한 초과')).not.toBeInTheDocument();
+    expect(within(row3).getByText('검토 기한 초과')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '확정됨 1' })).queryByText('득점자 미기재')).not.toBeInTheDocument();
   });
 
   it('확정 대기 경기 딥링크는 확정 패널을 연다', async () => {

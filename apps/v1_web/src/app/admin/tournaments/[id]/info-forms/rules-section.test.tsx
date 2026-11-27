@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { SIDE_SHEET_DISCARD_CONFIRM } from '@/components/v1-ui/side-sheet';
+import { bindSoftNavigator } from '@/lib/navigation-history';
 import { createTournamentInfoFixture, createTournamentInfoServer } from '@/test/msw/tournament-info-handlers';
 import { renderInfoSheet, setupTournamentInfoBackend } from '@/test/tournament-info-sheet';
 import type { V1Tournament } from '@/types/api';
@@ -174,6 +176,57 @@ describe('경기 규칙 섹션 시트 — 저장 순서(경기 시간 → 경기
         '조별리그 경기 시간', '4강 경기 시간', '결승 경기 시간',
       ]),
     );
+  });
+});
+
+describe('경기 규칙 섹션 시트 — 단계·편성 경기 시간 링크', () => {
+  const stagedBackend = () => {
+    const backend = start({
+      format: 'league_knockouts',
+      stagePlan: { version: 1, stages: [{ key: 'pre', name: '예선', pools: [{ key: 'pool-a', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] }] },
+    });
+    backend.state.periods = {
+      ...backend.state.periods,
+      compositionOverrides: [{ scope: 'stage', key: 'pre', competitionConfigVersionId: 'c-stage', periods: [{ code: 'P', label: '', durationMinutes: 15, extraTime: false }] }],
+    };
+    return backend;
+  };
+  const link = (view: Awaited<ReturnType<typeof open>>) => view.inSheet().getByRole('link', { name: '단계·편성 경기 시간 수정' });
+
+  it('바뀐 게 없으면 묻지 않고 그 대회 면의 대진 화면으로 이동한다(스태프 면이면 스태프 주소)', async () => {
+    const navigate = vi.fn();
+    const unbind = bindSoftNavigator(navigate);
+    const backend = stagedBackend();
+    const view = renderInfoSheet(rulesSection, backend, { basePath: '/tournament-management/tournaments/staff-1' });
+    await view.inSheet().findByLabelText('전반');
+
+    expect(link(view)).toHaveAttribute('href', '/tournament-management/tournaments/staff-1/bracket');
+    fireEvent.click(link(view));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/tournament-management/tournaments/staff-1/bracket'));
+    expect(screen.queryByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).toBeNull();
+    unbind();
+  });
+
+  it('고친 값이 있으면 버릴지 먼저 묻고, 계속 고치기면 이동하지 않는다', async () => {
+    const navigate = vi.fn();
+    const unbind = bindSoftNavigator(navigate);
+    const view = renderInfoSheet(rulesSection, stagedBackend());
+    await view.inSheet().findByLabelText('전반');
+    type(view, '전반', '25');
+
+    fireEvent.click(link(view));
+    const confirm = await screen.findByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title });
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(within(confirm).getByRole('button', { name: SIDE_SHEET_DISCARD_CONFIRM.cancelLabel }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).toBeNull());
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(view.inSheet().getByLabelText('전반')).toHaveValue('25');
+
+    fireEvent.click(link(view));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).getByRole('button', { name: SIDE_SHEET_DISCARD_CONFIRM.confirmLabel }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/\/bracket$/)));
+    unbind();
   });
 });
 

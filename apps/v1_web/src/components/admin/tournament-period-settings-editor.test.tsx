@@ -214,12 +214,14 @@ describe('usePeriodSettingsDraft + PeriodSettingsFields', () => {
         { scope: 'pool', key: 'pool-a', competitionConfigVersionId: 'c-pool', periods: [period(10)] },
       ],
     };
+    const onClick = vi.fn();
     const draftHost = () => {
       const draft = usePeriodSettingsDraft({ tournamentId: 'tournament-1', stagePhases: ['group'] });
       return (
         <PeriodSettingsFields
           draft={draft}
           disabled={false}
+          compositionLink={{ href: '/tournament-management/tournaments/tournament-1/bracket', onClick }}
           stagePlan={{ version: 1, stages: [{ key: 'pre', name: '예선', pools: [{ key: 'pool-a', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] }] }}
         />
       );
@@ -232,8 +234,25 @@ describe('usePeriodSettingsDraft + PeriodSettingsFields', () => {
     expect(screen.getByText('따로 정한 경기: 2개')).toBeInTheDocument();
     expect(screen.getByText('예선 전체 · 15분')).toBeInTheDocument();
     expect(screen.getByText('예선 · A조 · 10분')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '단계·편성 경기 시간 수정' })).toHaveAttribute('href', '/admin/tournaments/tournament-1/bracket');
+    const link = screen.getByRole('link', { name: '단계·편성 경기 시간 수정' });
+    expect(link).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/bracket');
+    fireEvent.click(link);
+    expect(onClick).toHaveBeenCalledTimes(1);
     expect(view.container.textContent).not.toContain('피리어드');
+  });
+
+  it('이동 링크를 받지 않은 쪽(리그 경기 시간)에는 단계·편성 안내만 있고 링크는 없다', async () => {
+    const backend = start();
+    backend.state.periods = {
+      ...backend.state.periods,
+      compositionOverrides: [{ scope: 'stage', key: 'pre', competitionConfigVersionId: 'c-stage', periods: [period(15)] }],
+    };
+    const NoLinkHost = () => <PeriodSettingsFields draft={usePeriodSettingsDraft({ tournamentId: 'tournament-1', stagePhases: [] })} disabled={false} />;
+    wrap(<NoLinkHost />);
+    await screen.findByLabelText('전반');
+
+    expect(screen.getByLabelText('단계·편성별 경기 시간 안내')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '단계·편성 경기 시간 수정' })).toBeNull();
   });
 });
 

@@ -72,8 +72,8 @@ const toDraft = (tournament: V1Tournament): RulesDraft => ({
 
 const noteCls = 'text-[length:var(--font-size-caption)] text-[var(--text-muted)]';
 
-function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps) {
-  const { showToast } = useTournamentAdmin();
+function RulesForm({ base, disabled, ref, onDirtyChange, leaveLinkClick }: InfoSectionFormProps) {
+  const { showToast, basePath } = useTournamentAdmin();
   const { data: bracket } = useV1AdminBracket(base.id);
   const stagePhases = useMemo(() => {
     const inBracket = new Set(bracket?.groups.map((group) => group.phase));
@@ -193,7 +193,12 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
       </FormGroup>
 
       <FormGroup title="경기 시간">
-        <PeriodSettingsFields draft={periods} disabled={disabled} stagePlan={base.stagePlan} />
+        <PeriodSettingsFields
+          draft={periods}
+          disabled={disabled}
+          stagePlan={base.stagePlan}
+          compositionLink={basePath ? { href: `${basePath}/bracket`, onClick: leaveLinkClick(`${basePath}/bracket`) } : undefined}
+        />
       </FormGroup>
 
       <FormGroup title="교체" hint="자유 교체는 나간 선수도 다시 들어갈 수 있어요.">

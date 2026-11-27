@@ -94,7 +94,7 @@ export interface WidgetLastResult {
 export interface WidgetHome {
   generatedAt: Date;
   live: WidgetLiveGame[];
-  /** 아무 일정도 없을 때 채우는 가장 최근 공식 결과. 공개 규칙이 가린 경기는 제외. */
+  /** 가장 최근 공식 결과(일정이 있어도 항상 내려 준다 — 비었을 때 채울지는 받는 쪽이 정한다). 공개 규칙이 가린 경기는 제외. */
   lastResult: WidgetLastResult | null;
   /** 아직 응답하지 않은 훈련·모임 총 건수와 가장 급한 몇 건. */
   pendingCount: number;
@@ -264,6 +264,7 @@ export class WidgetHomeService {
   private async lastResult(teamIds: string[], teamMeta: ReadonlyMap<string, TeamMeta>): Promise<WidgetLastResult | null> {
     const teamIdSet = new Set(teamIds);
     const liveEnabled = await isPublicLiveEnabled(this.prisma);
+    // 최근 5경기 안에서 보여 줄 수 있는 첫 경기를 고른다 — 5경기가 모두 가려졌으면 null.
     const games = await this.prisma.v1Game.findMany({
       where: {
         sides: { some: { teamId: { in: teamIds } } },
@@ -283,7 +284,7 @@ export class WidgetHomeService {
         sharedRecord: { select: { goals: true } },
         teamMatch: { select: { startAt: true, league: { select: { title: true } }, tournament: { select: { title: true } } } },
       },
-      orderBy: [{ teamMatch: { startAt: 'desc' } }, { id: 'desc' }],
+      orderBy: [{ teamMatch: { startAt: { sort: 'desc', nulls: 'last' } } }, { id: 'desc' }],
       take: 5,
     });
     for (const game of games) {

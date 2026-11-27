@@ -292,6 +292,29 @@ describe('TournamentOverviewSection — 방금 만든 초안 안내', () => {
     expect(h.replace).toHaveBeenCalledWith('/admin/tournaments/tournament-1/overview?x=2', { scroll: false });
   });
 
+  it('created=1 이어도 초안이 아니면 안내는 없고 주소 정리(replace)는 계속한다', () => {
+    h.search = 'created=1&x=2';
+    renderWith({ status: 'open' });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(h.replace).toHaveBeenCalledTimes(1);
+    expect(h.replace).toHaveBeenCalledWith('/admin/tournaments/tournament-1/overview?x=2', { scroll: false });
+  });
+
+  it('같은 화면에서 접수를 시작해 초안이 아니게 되면 안내가 사라진다', () => {
+    h.search = 'created=1';
+    const view = renderWith({ status: 'draft' });
+    expect(screen.getByRole('status')).toBeInTheDocument();
+
+    h.tournamentQuery.current = {
+      ...h.tournamentQuery.current,
+      data: { ...(h.tournamentQuery.current.data as object), status: 'open' },
+    };
+    view.rerender(<TournamentOverviewSection />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('created 외 쿼리가 없으면 쿼리 없는 경로로 replace 한다', () => {
     h.search = 'created=1';
     renderWith({ status: 'draft' });

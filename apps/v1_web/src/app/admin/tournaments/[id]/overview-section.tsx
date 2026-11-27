@@ -31,7 +31,7 @@ export function TournamentOverviewSection() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // 처음 렌더에서만 잡아 둔다 — 주소에서 created 를 지운 뒤에도 같은 화면에 있는 동안은 안내가 남는다.
+  // 처음 렌더에서만 잡아 둔다 — 주소에서 created 를 지운 뒤에도 같은 화면에 있는 동안은 (초안인 한) 안내가 남는다.
   const [justCreated] = useState(() => searchParams.get('created') === '1');
   const clearedCreated = useRef(false);
 
@@ -77,7 +77,7 @@ export function TournamentOverviewSection() {
 
   return (
     <div className="tm-content-enter flex flex-col gap-6 break-keep">
-      {justCreated && (
+      {justCreated && tournament.status === 'draft' && (
         <p
           role="status"
           className="flex items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 py-3 text-[length:var(--font-size-body-sm)] font-medium text-[var(--blue700)]"

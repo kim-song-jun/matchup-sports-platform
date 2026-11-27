@@ -47,7 +47,7 @@ const teams = [
     members: 26,
     capacity: 26,
     status: 'closed' as const,
-    statusLabel: '가입 닫힘',
+    statusLabel: '모집 마감',
     tags: ['11:11', '주말', 'A등급'],
     genderRule: '남',
     intro: '주말 11:11 경기를 꾸준히 하는 팀이에요. 현재 모집은 닫혀 있어 다음 모집 알림만 받을 수 있어요.',

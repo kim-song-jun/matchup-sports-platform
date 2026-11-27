@@ -242,12 +242,12 @@ describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
     return values[0];
   }
 
-  it('가입을 닫은 팀은 상단 칩과 표가 같은 말(가입 닫힘)을 쓴다', () => {
+  it('가입을 닫은 팀은 상단 칩과 표가 같은 말(모집 마감)을 쓴다', () => {
     const base = getTeamDetailViewModel('default');
-    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'closed', statusLabel: '가입 닫힘' } }} />);
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'closed', statusLabel: '모집 마감' } }} />);
 
-    expect(screen.getAllByText('가입 닫힘', { selector: '.tm-team-profile-chip' }).length).toBeGreaterThan(0);
-    expect(infoRowValue('가입 신청')).toBe('가입 닫힘');
+    expect(screen.getAllByText('모집 마감', { selector: '.tm-team-profile-chip' }).length).toBeGreaterThan(0);
+    expect(infoRowValue('가입 신청')).toBe('모집 마감');
     expect(screen.queryByText('모집 여부')).toBeNull();
   });
 
@@ -665,7 +665,7 @@ describe('TeamFormPageView', () => {
     expect(screen.getByRole('group', { name: '가입 신청 선택' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '가입 가능' })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
+    fireEvent.click(screen.getByRole('button', { name: '모집 마감' }));
 
     expect(onJoinPolicyChange).toHaveBeenCalledWith('closed');
     expect(screen.getAllByRole('button', { name: /기본 팀 로고 \d+/ })).toHaveLength(10);
@@ -1744,11 +1744,11 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
   });
 
   it('가입이 막힌 팀에만 상태 배지를 붙이고, 스크린리더에도 읽힌다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ status: 'closed', statusLabel: '가입 닫힘' })} />);
+    const { container } = render(<TeamListPageView model={listWith({ status: 'closed', statusLabel: '모집 마감' })} />);
 
     const badge = container.querySelector('.tm-team-card-status-badge');
     expect(badge).not.toBeNull();
-    expect(badge!.textContent).toContain('가입 닫힘');
+    expect(badge!.textContent).toContain('모집 마감');
     // 예전 액션 행은 aria-hidden 이라 안 읽혔다. 배지에는 그 속성이 없어야 한다.
     expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
     // 배지 안의 점은 글자(12px)에 비해 커 보여서 7px → 5px 로 줄였다.

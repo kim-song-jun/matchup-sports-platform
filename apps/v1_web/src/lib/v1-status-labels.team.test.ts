@@ -36,9 +36,9 @@ describe('teamRecruitmentLabel', () => {
     expect(teamRecruitmentLabel({ joinPolicy: 'approval_required', memberCount: 40, memberGoalCount: null })).toBe('가입 가능');
   });
 
-  it('팀장이 닫은 팀은 인원과 상관없이 가입 닫힘이다', () => {
-    expect(teamRecruitmentLabel({ joinPolicy: 'closed', memberCount: 4, memberGoalCount: 24 })).toBe('가입 닫힘');
-    expect(teamRecruitmentLabel({ joinPolicy: 'closed', memberCount: 24, memberGoalCount: 24 })).toBe('가입 닫힘');
+  it('팀장이 닫은 팀은 인원과 상관없이 모집 마감이다', () => {
+    expect(teamRecruitmentLabel({ joinPolicy: 'closed', memberCount: 4, memberGoalCount: 24 })).toBe('모집 마감');
+    expect(teamRecruitmentLabel({ joinPolicy: 'closed', memberCount: 24, memberGoalCount: 24 })).toBe('모집 마감');
   });
 
   it('열려 있어도 정원이 차면 정원 마감이다', () => {

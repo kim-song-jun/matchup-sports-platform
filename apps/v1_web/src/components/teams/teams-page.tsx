@@ -542,7 +542,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
     teamCardGenderLabel(team.genderRule),
     team.level && team.level !== '레벨 미설정' ? team.level : '',
   ].filter(Boolean);
-  // 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13) — 주황 주의 칩.
+  // 기본 상태 '가입 가능'은 칩 없이 두고 예외(모집 마감·정원 마감)만 알린다(H2·G13) — 주황 주의 칩.
   const alertChip = team.status === 'closed' ? team.statusLabel : undefined;
   // 정원이 다 찬 팀 — 버튼이 '정원 마감'으로 막힐 때 왜 막혔는지·언제 다시 되는지 버튼 위에 한 줄(A안).
   const fullNotice = cta === '정원 마감' ? (
@@ -1200,9 +1200,9 @@ function TeamJoinPolicyField({ form }: { form?: TeamFormViewModel['form'] }) {
     },
     {
       value: 'closed' as const,
-      label: '가입 닫힘',
+      label: '모집 마감',
       // 서버는 닫힌 팀의 승인을 막는다(거절은 된다) — '이미 낸 신청도 처리할 수 있다'고 쓰면 틀린 말이 된다.
-      description: '가입 닫힘 · 새 가입 신청을 받지 않아요. 기다리는 신청은 다시 열어야 승인할 수 있어요.',
+      description: '모집 마감 · 새 가입 신청을 받지 않아요. 기다리는 신청은 다시 열어야 승인할 수 있어요.',
     },
   ];
 
@@ -2054,7 +2054,7 @@ function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromH
             <div className="tm-text-body-lg line-clamp-1" style={{ minWidth: 0 }}>{team.name}</div>
             {/* '가입 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
                 50팀 중 50팀이 같은 값이었고, 머리말에도 "50팀 · 가입 가능 50" 이 이미 있다.
-                예외(가입 닫힘·정원 마감)만 이름 옆 배지로 알린다. 점은 5px — 7px 는 글자(12px)에 비해 커 보였다. */}
+                예외(모집 마감·정원 마감)만 이름 옆 배지로 알린다. 점은 5px — 7px 는 글자(12px)에 비해 커 보였다. */}
             {team.status !== 'open' ? (
               <span className="tm-badge tm-badge-grey tm-team-card-status-badge" style={{ flexShrink: 0 }}>
                 <svg width="5" height="5" viewBox="0 0 5 5" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="2.5" cy="2.5" r="2.5" fill="currentColor" /></svg>

@@ -65,4 +65,55 @@ describe('useTournamentEndedFixtures', () => {
       ['ENDED', 'cursor-after-100'],
     ]);
   });
+
+  describe('서버가 커서를 잘못 주어도 요청이 끝없이 이어지지 않는다', () => {
+    const boardReply = (items: unknown[], nextCursor: string | null) =>
+      HttpResponse.json({
+        status: 'success',
+        timestamp: '2026-10-01T00:00:00.000Z',
+        data: { items, nextCursor, watermark: 'w', liveWarnings: [] },
+      });
+
+    it('이미 쓴 커서가 다시 오면 거기서 멈춘다', async () => {
+      server.use(
+        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
+          requests.push(new URL(request.url).searchParams);
+          return boardReply([fixture(requests.length)], 'same-cursor');
+        }),
+      );
+      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(requests.map((params) => params.get('cursor'))).toEqual([null, 'same-cursor']);
+      expect(result.current.data?.items).toHaveLength(2);
+    });
+
+    it('빈 페이지가 오면 커서가 있어도 멈춘다', async () => {
+      server.use(
+        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
+          requests.push(new URL(request.url).searchParams);
+          return boardReply([], 'cursor-after-empty');
+        }),
+      );
+      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(requests).toHaveLength(1);
+      expect(result.current.data?.items).toEqual([]);
+    });
+
+    it('커서가 계속 새로 와도 20쪽에서 멈춘다', async () => {
+      server.use(
+        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
+          requests.push(new URL(request.url).searchParams);
+          return boardReply([fixture(requests.length)], `cursor-${requests.length}`);
+        }),
+      );
+      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(requests).toHaveLength(20);
+      expect(result.current.data?.items).toHaveLength(20);
+    });
+  });
 });

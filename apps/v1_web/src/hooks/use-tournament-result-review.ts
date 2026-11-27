@@ -209,26 +209,35 @@ export const resultReviewKeys = {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
+const ENDED_FIXTURES_PAGE_LIMIT = 100;
+/** 한 번에 읽는 서버 페이지 상한(2,000경기). 서버가 커서를 잘못 주어도 요청이 끝없이 이어지지 않게 한다. */
+const ENDED_FIXTURES_MAX_PAGES = 20;
+
 /**
  * 보드 API 한 페이지 상한(100)에서 멈추면 101번째 경기부터 검토·정정 목록과 `?fixtureId=` 딥링크에서
  * 사라져 어드민이 그 결과를 고칠 수 없다 — 다음 커서가 없을 때까지 읽어 한 목록으로 합친다.
+ * 커서가 없거나, 이미 쓴 커서가 다시 오거나, 빈 페이지가 오면 거기서 멈춘다.
  */
 async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
   const items: TournamentOperationsBoardItem[] = [];
   const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
+  const usedCursors = new Set<string>();
   let cursor: string | null = null;
-  let page: TournamentOperationsBoardResponse;
-  do {
+  let page!: TournamentOperationsBoardResponse;
+  for (let pageCount = 0; pageCount < ENDED_FIXTURES_MAX_PAGES; pageCount += 1) {
     page = await v1Get<TournamentOperationsBoardResponse>(path, {
       status: 'ENDED',
-      limit: 100,
+      limit: ENDED_FIXTURES_PAGE_LIMIT,
       ...(cursor === null ? {} : { cursor }),
     });
     items.push(...page.items);
     liveWarnings.push(...page.liveWarnings);
-    cursor = page.nextCursor;
-  } while (cursor !== null);
+    const next = page.nextCursor;
+    if (!next || page.items.length === 0 || usedCursors.has(next)) break;
+    usedCursors.add(next);
+    cursor = next;
+  }
   return { ...page, items, liveWarnings, nextCursor: null };
 }
 

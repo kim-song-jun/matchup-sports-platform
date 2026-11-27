@@ -1775,7 +1775,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       screen.getByRole('combobox', { name: '상금 항목 1 이름' }).focus();
       flushFocusFrames();
-      for (let index = 0; index < 7; index += 1) {
+      // 줄마다 구분 칸이 이름 앞에 하나씩 있어, 1번 이름에서 3번 내용까지 Tab 9번이다.
+      for (let index = 0; index < 9; index += 1) {
         await user.tab();
         flushFocusFrames();
       }

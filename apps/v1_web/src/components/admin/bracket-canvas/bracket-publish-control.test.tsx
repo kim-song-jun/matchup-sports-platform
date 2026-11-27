@@ -33,11 +33,11 @@ describe('BracketPublishControl', () => {
     expect(within(dialog).getByRole('button', { name: '지금 공개' })).toBeInTheDocument();
   });
 
-  it('마감 전이면 주황 안내 「접수 마감 전이에요. 그래도 공개할까요?」(warning)와 일반 파란 「지금 공개」(danger 아님)', () => {
+  it('마감 전이면 주황 안내 「신청 마감 전이에요. 그래도 공개할까요?」(warning)와 일반 파란 「지금 공개」(danger 아님)', () => {
     show({ registrationDeadlineAt: '2099-01-01T00:00:00.000Z' });
     fireEvent.click(screen.getByRole('button', { name: '대진 공개' }));
     const dialog = sheet();
-    expect(within(dialog).getByRole('status')).toHaveTextContent('접수 마감 전이에요. 그래도 공개할까요?');
+    expect(within(dialog).getByRole('status')).toHaveTextContent('신청 마감 전이에요. 그래도 공개할까요?');
     const confirm = within(dialog).getByRole('button', { name: '지금 공개' });
     expect(confirm.className).toContain('tm-btn-primary');
     expect(confirm.className).not.toContain('tm-btn-danger');
@@ -49,7 +49,7 @@ describe('BracketPublishControl', () => {
   ])('마감 뒤(%s)면 안내가 없다', (_name, props) => {
     show(props);
     fireEvent.click(screen.getByRole('button', { name: '대진 공개' }));
-    expect(screen.queryByText(/접수 마감 전이에요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/신청 마감 전이에요/)).not.toBeInTheDocument();
   });
 
   it('지금 공개 → publish.mutate(undefined), 성공 토스트 「대진표를 공개했어요.」', () => {

@@ -14,7 +14,7 @@ import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { KNOCKOUT_PHASES, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1TournamentStatus } from '@/types/api';
 
-/** 접수가 끝났는지 — 마감 시각이 지났거나, 마감 시각 전이라도 접수를 수동으로 닫은 상태. */
+/** 신청이 끝났는지 — 마감 시각이 지났거나, 마감 시각 전이라도 신청을 수동으로 닫은 상태. */
 export function isRegistrationClosed(status: V1TournamentStatus | undefined, deadlineAt: string | null | undefined, now: number = Date.now()): boolean {
   if (status !== undefined && status !== 'draft' && status !== 'open') return true;
   return deadlineAt ? new Date(deadlineAt).getTime() < now : false;
@@ -138,7 +138,7 @@ export function BracketPublishControl({
   ) : (
     <div className="flex flex-col gap-4">
       <p className="tm-text-label text-[var(--text-muted)]">{summary}</p>
-      {!closedRegistration ? <AlertBanner tone="warning" message="접수 마감 전이에요. 그래도 공개할까요?" /> : null}
+      {!closedRegistration ? <AlertBanner tone="warning" message="신청 마감 전이에요. 그래도 공개할까요?" /> : null}
       <fieldset className="flex flex-col gap-2">
         <legend className="sr-only">공개 방법</legend>
         {([

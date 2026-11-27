@@ -28,6 +28,7 @@ function statusOf(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatus {
     expiryError: null,
     startBlockedByTeams: false,
     commandError: null,
+    recordError: null,
     bannerMessage: null,
     retryLabel: null,
     queue: { waiting: 0, failed: 0 },

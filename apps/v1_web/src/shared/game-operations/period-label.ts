@@ -19,12 +19,12 @@ export function isSinglePeriod(periodCount: number | null | undefined): boolean 
 
 /** "5:00" 같은 시각 앞에 붙는 말머리(끝 공백 포함). 단판이면 빈 문자열이다. */
 export function periodPrefix(periodNumber: number, periodCount?: number | null): string {
-  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber)} `;
+  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber, periodCount)} `;
 }
 
 /** 지금 구간을 끝내는 버튼 문구. 단판의 유일한 정규 구간은 "정규 시간 종료"다. */
 export function endPeriodLabel(periodNumber: number, periodCount?: number | null): string {
-  return isSinglePeriod(periodCount) && periodNumber === 1 ? '정규 시간 종료' : `${periodLabel(periodNumber)} 종료`;
+  return isSinglePeriod(periodCount) && periodNumber === 1 ? '정규 시간 종료' : `${periodLabel(periodNumber, periodCount)} 종료`;
 }
 
 /**

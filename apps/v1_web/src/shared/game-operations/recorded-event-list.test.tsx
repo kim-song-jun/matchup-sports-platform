@@ -124,22 +124,6 @@ describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
     expect(clocks()).toEqual(['6', '5', '4', '3', '2', '1']);
   });
 
-  it('renderMore 는 줄이 가려졌을 때만 전체 줄 수와 함께 불린다', () => {
-    const six = [1, 2, 3, 4, 5, 6].map((sequence) => goal(sequence, HOME_SIDE_ID, 'p-jung', sequence * 60000));
-    const renderMore = (total: number) => <button type="button">기록 {total}개 전체 보기</button>;
-
-    const { unmount } = render(
-      <RecordedEventList events={six} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={4} renderMore={renderMore} />,
-    );
-    expect(screen.getByRole('button', { name: '기록 6개 전체 보기' })).toBeInTheDocument();
-    unmount();
-
-    render(
-      <RecordedEventList events={six.slice(0, 4)} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={4} renderMore={renderMore} />,
-    );
-    expect(screen.queryByRole('button', { name: /전체 보기/ })).toBeNull();
-  });
-
   it('뒤집는 것이 입력 배열을 바꾸지 않는다 (콘솔의 스코어 파생 등 다른 소비처가 같은 배열을 쓴다)', () => {
     const events = [...EVENTS];
     render(<RecordedEventList events={events} sides={SIDES} lineups={LINEUPS} order="newest-first" />);
@@ -353,8 +337,8 @@ describe('RecordedEventList', () => {
     });
   });
 
-  // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.
-  it('does not invent an unknown scorer and labels a participant-less goal as anonymous', () => {
+  // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 「선수 모름」으로 표시한다.
+  it('does not invent an unknown scorer and labels a participant-less goal as 선수 모름', () => {
     render(
       <RecordedEventList
         events={[goal(1, HOME_SIDE_ID, 'p-unknown', 3 * 60000), goal(2, AWAY_SIDE_ID, null, 5 * 60000)]}
@@ -368,14 +352,14 @@ describe('RecordedEventList', () => {
     expect(rows[0]).not.toHaveTextContent('정우진');
     expect(rows[0]).not.toHaveTextContent('·');
     expect(rows[1]).toHaveTextContent('성수 풋살 클럽');
-    expect(rows[1]).toHaveTextContent('골 · 익명');
+    expect(rows[1]).toHaveTextContent('골 · 선수 모름');
     expect(rows[1]).not.toHaveTextContent('조현우');
   });
 
-  it('선수 없는 자책골은 OG로 표시한다', () => {
+  it('선수 없는 자책골도 선수 모름으로 표시한다', () => {
     const ownGoal = { ...goal(1, HOME_SIDE_ID, null, 60000), type: 'OWN_GOAL' as const, payload: { anonymous: true } };
     render(<RecordedEventList events={[ownGoal]} sides={SIDES} lineups={LINEUPS} />);
-    expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('자책골 · OG');
+    expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('자책골 · 선수 모름');
   });
 
   it('shows an empty state instead of an empty list when nothing is recorded yet', () => {
@@ -800,5 +784,73 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     expect(rows[0]).toHaveTextContent('경고 누적 퇴장');
     expect(rows[1]).toHaveTextContent('옐로카드');
     expect(screen.queryByText(/^골/)).toBeNull();
+  });
+});
+
+describe('RecordedEventList — 한 줄 표시(compact)', () => {
+  const rowsOf = () => within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
+  const clocksOf = () => rowsOf().map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1]);
+  const six = [1, 2, 3, 4, 5, 6].map((sequence) => goal(sequence, HOME_SIDE_ID, 'p-jung', sequence * 60000));
+  const reversal = (sequence: number, reverses: string): GameEventRecord => ({
+    ...goal(sequence, HOME_SIDE_ID, null, 0),
+    type: 'CORRECTION',
+    reversesEventId: reverses,
+    payload: { reason: '골 기록 되돌리기' },
+  });
+  const handlers = { onAttachAssist: vi.fn(), onEditEvent: vi.fn(), onReverseEvent: vi.fn() };
+
+  it('줄마다 48px 한 줄에 버튼 하나만 두고, 팀 이름은 줄 끝에 말줄임으로 붙인다', () => {
+    render(<RecordedEventList events={six} sides={SIDES} lineups={LINEUPS} order="newest-first" maxRows={2} compact {...handlers} />);
+
+    expect(clocksOf()).toEqual(['6', '5']);
+    for (const row of rowsOf()) {
+      expect(row).toHaveClass('min-h-[48px]');
+      expect(within(row).getAllByRole('button')).toHaveLength(1);
+      expect(row.querySelector('p')).toHaveClass('truncate');
+      expect(row.querySelector('p')).toHaveTextContent('· 강남 풋살 클럽');
+    }
+  });
+
+  it('되돌려진 기록과 「기록 취소」 줄은 빼고 살아 있는 기록으로 채운다', () => {
+    render(
+      <RecordedEventList
+        events={[...six.slice(0, 3), reversal(7, 'event-3')]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        order="newest-first"
+        maxRows={2}
+        compact
+        {...handlers}
+      />,
+    );
+
+    expect(clocksOf()).toEqual(['2', '1']);
+    expect(screen.queryByText(/취소된 기록|기록 취소/)).toBeNull();
+  });
+
+  it('고친 기록 이력은 한 줄 표시에 두지 않고 새 시각만 보인다', () => {
+    const correction = {
+      ...goal(2, HOME_SIDE_ID, null, 4 * 60000),
+      id: 'tc-1',
+      type: 'TIME_CORRECTION' as const,
+      sideId: null,
+      correctsEventId: 'event-1',
+      payload: { previousClockMs: 6 * 60000, clockMs: 4 * 60000, reason: '자동', lane: 'OPERATOR' },
+    };
+    render(<RecordedEventList events={[six[0], correction]} sides={SIDES} lineups={LINEUPS} compact {...handlers} />);
+
+    expect(rowsOf()).toHaveLength(1);
+    expect(rowsOf()[0]).toHaveTextContent('후반 4:00');
+    expect(screen.queryByRole('button', { name: /고친 기록/ })).toBeNull();
+  });
+
+  it('어시스트가 없는 골은 어시스트 버튼 하나, 어시스트가 있으면 고치기 하나다', () => {
+    const noAssist = goal(1, HOME_SIDE_ID, 'p-jung', 60000);
+    const withAssist = { ...goal(2, HOME_SIDE_ID, 'p-jung', 120000), assistParticipantId: 'p-jung' };
+    render(<RecordedEventList events={[withAssist, noAssist]} sides={SIDES} lineups={LINEUPS} order="newest-first" compact {...handlers} />);
+
+    const [first, second] = rowsOf();
+    expect(within(first).getByRole('button', { name: '이 골에 어시스트 추가' })).toBeInTheDocument();
+    expect(within(second).getByRole('button', { name: /^기록 고치기/ })).toBeInTheDocument();
   });
 });

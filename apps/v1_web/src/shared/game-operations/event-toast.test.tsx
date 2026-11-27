@@ -26,7 +26,9 @@ describe('EventToasts — 액션 버튼 지원', () => {
     render(<EventToasts toasts={result.current.toasts} />);
     const status = screen.getByRole('status');
     expect(status).toHaveClass('tm-native-toast-card');
-    expect(status.parentElement).toHaveClass('tm-native-toast-stack');
+    // 화면에 고정하지 않고 가장 가까운 기준 상자(콘솔에서는 점수 카드) 바로 아래에 겹쳐 뜬다.
+    expect(status.parentElement).toHaveClass('absolute', 'top-full');
+    expect(status.parentElement).not.toHaveClass('fixed', 'tm-native-toast-stack');
     expect(screen.getByText('경기가 시작됐어요')).toBeInTheDocument();
     expect(screen.queryByRole('button')).toBeNull();
   });

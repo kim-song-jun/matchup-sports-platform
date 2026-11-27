@@ -41,6 +41,15 @@ describe('단판 표기', () => {
   });
 });
 
+describe('정규 구간이 셋 이상인 경기', () => {
+  it('말머리와 종료 문구도 구간 수를 따라 번호로 부른다 — 정규 셋째 구간이 「연장」으로 나오지 않는다', () => {
+    expect(periodPrefix(3, 4)).toBe('3번째 경기 시간 ');
+    expect(endPeriodLabel(3, 4)).toBe('3번째 경기 시간 종료');
+    expect(periodPrefix(3, 2)).toBe('연장 전반 ');
+    expect(endPeriodLabel(3, 2)).toBe('연장 전반 종료');
+  });
+});
+
 describe('regularPeriodCountOf', () => {
   const regular = { extraTime: false };
   it('연장 설정은 정규 수에서 뺀다', () => {

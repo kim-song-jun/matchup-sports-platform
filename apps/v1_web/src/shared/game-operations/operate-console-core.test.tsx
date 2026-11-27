@@ -470,8 +470,9 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     );
     render(<CoreHarness />);
 
+    // 폰 첫 화면은 한 줄짜리 두 줄까지만 둔다.
     const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
-    expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
+    expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9']);
     expect(screen.getByRole('heading', { name: /^최근 기록/ })).toHaveTextContent('최신순');
   });
 
@@ -522,6 +523,8 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
       payload: { previousClockMs: 6 * 60000, clockMs: 5 * 60000, reason: '자동', lane: 'OPERATOR' },
     };
     testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [goal(1), correction] }));
+    // 이력 펼침은 전체 목록에 있다 — 넓은 화면의 오른쪽 열이 그 자리다.
+    const restoreViewport = installViewport(1280);
     render(<CoreHarness />);
 
     const list = screen.getByRole('list', { name: '기록 목록' });
@@ -532,6 +535,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     fireEvent.click(within(list).getByRole('button', { name: '기록 고치기 (골)' }));
     const dialog = await screen.findByRole('dialog', { name: '골 기록 고치기' });
     expect(within(dialog).getByRole('button', { name: /고칠 시각 5:00/ })).toBeInTheDocument();
+    restoreViewport();
   });
 
   it('정정 실패는 시트 안에 해요체로 남고 시트는 열려 있다', async () => {
@@ -3047,6 +3051,36 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  // 토스트를 화면 아래에 고정하면 기록 격자 셋째 줄(파울·더보기)이나 선수 시트 위에 얹혀, 다른 버튼을 누르려다 되돌리기가 눌린다.
+  it('토스트는 점수 카드 바로 아래에 겹쳐 떠서 기록 격자와 진행 바를 덮지 않는다', async () => {
+    setup();
+    render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+
+    const card = document.querySelector('[data-console-guide="overview"]') as HTMLElement;
+    expect(card).toContainElement(undo);
+    expect(screen.getByRole('group', { name: '기록하기' })).not.toContainElement(undo);
+    expect(screen.getByRole('group', { name: '경기 진행 조작' })).not.toContainElement(undo);
+    const stack = undo.closest('[aria-live="polite"]') as HTMLElement;
+    expect(stack).toHaveClass('absolute', 'top-full');
+    // 화면에 고정하거나 시트(z-50)보다 높은 층에 두지 않는다 — 점수 카드의 층(z-10) 안에서만 뜬다.
+    expect(stack.className).not.toMatch(/(^|\s)(fixed|bottom-\S+|z-\S+)(\s|$)/);
+    expect(card).toHaveClass('z-10');
+  });
+
+  it('토스트가 떠 있는 동안 더보기를 눌러도 되돌리기는 나가지 않는다', async () => {
+    const state = setup();
+    render(<CoreHarness />);
+    recordGoal();
+    await screen.findByRole('button', { name: '되돌리기' });
+
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+
+    expect(screen.getByRole('dialog', { name: '더보기' })).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+  });
+
   it('되돌리기는 서버 이벤트 id 로 reverseEvent 를 확인 없이 부른다', async () => {
     const state = setup();
     const { rerender } = render(<CoreHarness />);
@@ -3281,6 +3315,25 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
     // 지난 실패 안내는 남지 않는다.
     expect(within(openStatusSheet()).queryByText(/되돌리지 못했어요/)).toBeNull();
+  });
+
+  it('진행 요청 오류가 남아 있어도 거절된 되돌리기는 따로 보이고 앞선다', async () => {
+    const state = setup();
+    state.reverseEvent.mockRejectedValueOnce(rejection('VERSION_CONFLICT', 'Expected version is stale'));
+    testFixtures.sendCommand.mockRejectedValue(rejection('INVALID_COMMAND', '명령을 처리하지 못했어요.', 400));
+    const { undo } = await recordedGoalWithUndo(state);
+
+    fireEvent.click(within(screen.getByRole('group', { name: '경기 진행 조작' })).getByRole('button', { name: '일시 중지' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '일시 중지' }));
+    await findConsoleNotice('명령을 처리하지 못했어요.');
+    fireEvent.click(undo);
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+    await findConsoleNotice('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+    const items = within(openStatusSheet()).getAllByRole('listitem').map((item) => item.textContent ?? '');
+    expect(statusRow()).toHaveTextContent(/^기록을 되돌리지 못했어요 외 \d+개/);
+    expect(items[0]).toContain('기록을 되돌리지 못했어요');
+    expect(items[1]).toContain('요청을 처리하지 못했어요');
   });
 
   it('다른 기록이 전송 중이면 큐가 빌 때까지 기다렸다가 되돌린다', async () => {
@@ -3556,7 +3609,7 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     render(<CoreHarness />);
     recordGoal();
     await waitFor(() => expect(statusRow()).toHaveAttribute('role', 'alert'));
-    expect(statusRow()).toHaveTextContent('요청을 처리하지 못했어요');
+    expect(statusRow()).toHaveTextContent('기록을 저장하지 못했어요');
 
     recordGoal();
 
@@ -3994,14 +4047,20 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       restoreViewport = undefined;
     });
 
-    it('최근 기록 4줄과 전체 보기, 1280 폭에서는 전부', () => {
+    it('폰에서는 한 줄짜리 최근 기록 두 줄만 두고 나머지는 전체 보기로 보낸다, 1280 폭에서는 전부', () => {
       restoreViewport = installViewport(390);
       setup({ ops: { liveEvents: six } });
       const phone = render(<CoreHarness />);
 
       expect(screen.getByRole('heading', { name: /^최근 기록/ })).toBeInTheDocument();
-      expect(visibleRows().map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['6', '5', '4', '3']);
-      fireEvent.click(screen.getByRole('button', { name: '기록 6개 전체 보기' }));
+      expect(visibleRows().map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['6', '5']);
+      // 한 줄 표시: 줄 높이를 48px 로 묶고, 팀 이름을 따로 쌓는 줄이 없고, 버튼은 하나다.
+      for (const row of visibleRows()) {
+        expect(row).toHaveClass('min-h-[48px]');
+        expect(row.querySelector('.basis-full')).toBeNull();
+        expect(within(row).getAllByRole('button')).toHaveLength(1);
+      }
+      fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
       expect(within(screen.getByRole('dialog', { name: '기록 전체' })).getAllByRole('listitem')).toHaveLength(6);
       phone.unmount();
       restoreViewport();
@@ -4010,17 +4069,54 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup({ ops: { liveEvents: six } });
       render(<CoreHarness />);
       expect(visibleRows()).toHaveLength(6);
-      expect(screen.queryByRole('button', { name: /전체 보기$/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: '전체 보기' })).toBeNull();
       expect(screen.getByRole('heading', { name: /^기록 ·/ })).toBeInTheDocument();
     });
 
-    it('기록이 4줄 이하이면 전체 보기 버튼을 두지 않는다', () => {
+    it('기록이 없으면 전체 보기 버튼도 없고, 한 건이라도 있으면 둔다', () => {
       restoreViewport = installViewport(390);
-      setup({ ops: { liveEvents: six.slice(0, 4) } });
+      setup({ ops: { liveEvents: [] } });
+      const empty = render(<CoreHarness />);
+      expect(screen.queryByRole('button', { name: '전체 보기' })).toBeNull();
+      empty.unmount();
+
+      setup({ ops: { liveEvents: six.slice(0, 1) } });
+      render(<CoreHarness />);
+      expect(visibleRows()).toHaveLength(1);
+      expect(screen.getByRole('button', { name: '전체 보기' })).toBeInTheDocument();
+    });
+
+    it('되돌린 기록과 기록 취소 줄은 최근 기록에 두지 않고, 전체 보기에는 그대로 둔다', () => {
+      restoreViewport = installViewport(390);
+      const cancelled = {
+        ...goal(7), id: 'event-7', sequence: 7, clientEventId: 'client-7', type: 'CORRECTION',
+        reversesEventId: 'event-6', participantId: null, payload: { reason: '골 기록 되돌리기' },
+      } as unknown as GameEventRecord;
+      setup({ ops: { liveEvents: [...six.slice(0, 3), six[5], cancelled] } });
       render(<CoreHarness />);
 
-      expect(visibleRows()).toHaveLength(4);
-      expect(screen.queryByRole('button', { name: /전체 보기$/ })).toBeNull();
+      // 6번 골이 취소돼도 최근 두 줄은 아직 살아 있는 기록(3번, 1~2번 중 최신)으로 채운다.
+      expect(visibleRows().map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['3', '2']);
+      expect(screen.queryByText(/취소된 기록|기록 취소/)).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
+      const sheet = screen.getByRole('dialog', { name: '기록 전체' });
+      expect(within(sheet).getByText(/취소된 기록/)).toBeInTheDocument();
+      expect(within(sheet).getByText('기록 취소')).toBeInTheDocument();
+    });
+
+    it('골에 어시스트가 없으면 그 줄의 버튼은 어시스트이고, 어시스트가 있으면 고치기다', () => {
+      restoreViewport = installViewport(390);
+      const noAssist = six.map((event) => ({ ...event, assistParticipantId: null }) as GameEventRecord);
+      const withAssist = { ...noAssist[4], assistParticipantId: 'p-2' } as GameEventRecord;
+      setup({ ops: { liveEvents: [noAssist[0], noAssist[1], noAssist[2], noAssist[3], withAssist, noAssist[5]] } });
+      render(<CoreHarness />);
+
+      const [newest, older] = visibleRows();
+      expect(within(newest).getByRole('button', { name: '이 골에 어시스트 추가' })).toBeInTheDocument();
+      expect(within(newest).queryByRole('button', { name: /^기록 고치기/ })).toBeNull();
+      expect(within(older).queryByRole('button', { name: '이 골에 어시스트 추가' })).toBeNull();
+      expect(within(older).getByRole('button', { name: /^기록 고치기/ })).toBeInTheDocument();
     });
 
     it('끝난 경기는 폰에서도 기록을 전부 보여 준다', () => {
@@ -4036,7 +4132,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup({ ops: { liveEvents: six } });
       render(<CoreHarness />);
 
-      fireEvent.click(screen.getByRole('button', { name: '기록 6개 전체 보기' }));
+      fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
       const sheet = screen.getByRole('dialog', { name: '기록 전체' });
       fireEvent.click(within(sheet).getAllByRole('button', { name: '기록 고치기 (골)' })[5]);
 

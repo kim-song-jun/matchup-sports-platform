@@ -40,6 +40,7 @@ export function RecordGrid({ cells, onSelect }: RecordGridProps) {
         <button
           key={cell.key}
           type="button"
+          aria-haspopup="dialog"
           disabled={cell.disabled === true}
           onClick={() => onSelect(cell.key)}
           className="flex h-[68px] flex-col items-center justify-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)] disabled:cursor-not-allowed disabled:opacity-50"

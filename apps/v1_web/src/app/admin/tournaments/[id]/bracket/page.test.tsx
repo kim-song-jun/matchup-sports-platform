@@ -23,8 +23,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: () => mocks.registrations,
 }));
 vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
-  BracketCanvasWorkspace: (props: { tournamentId: string; format: string | undefined; canWrite: boolean; registrations: unknown[]; registrationsState: { status: string; truncated: boolean; refetchFailed: boolean; onRetry: () => void }; onShowList: () => void }) => (
-    <div data-testid="workspace" data-format={props.format ?? ''} data-can-write={String(props.canWrite)} data-registrations={props.registrations.length} data-reg-status={props.registrationsState.status} data-reg-truncated={String(props.registrationsState.truncated)}>
+  BracketCanvasWorkspace: (props: { pool?: { key: string }; tournamentId: string; format: string | undefined; canWrite: boolean; registrations: unknown[]; registrationsState: { status: string; truncated: boolean; refetchFailed: boolean; onRetry: () => void }; onShowList: () => void }) => (
+    <div data-testid="workspace" data-pool={props.pool?.key} data-format={props.format ?? ''} data-can-write={String(props.canWrite)} data-registrations={props.registrations.length} data-reg-status={props.registrationsState.status} data-reg-truncated={String(props.registrationsState.truncated)}>
       <button type="button" onClick={props.registrationsState.onRetry}>재시도</button>
       <button type="button" onClick={props.onShowList}>목록으로 이동</button>
     </div>
@@ -138,6 +138,21 @@ describe('AdminTournamentBracketPage — 신청 목록 조회 상태를 그림 �
     expect(screen.getByRole('button', { name: '시간 배정' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '구장 배정' })).toBeInTheDocument();
   });
+  it('그림에서 단계를 바꾸면 해당 단계의 첫 편성을 열고 편성을 따로 고를 수 있다', () => {
+    mocks.tournament.data = { format: 'league_knockouts', stagePlan: { stages: [
+      { key: 'pre', name: '예선', pools: [{ key: 'a', name: 'A조', format: 'league' }] },
+      { key: 'finals', name: '본선', pools: [
+        { key: 'upper', name: '상위', format: 'knockout' }, { key: 'lower', name: '하위', format: 'knockout' },
+      ] },
+    ] } };
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByTestId('workspace')).toHaveAttribute('data-pool', 'a');
+    fireEvent.change(screen.getByRole('combobox', { name: '단계' }), { target: { value: 'finals' } });
+    expect(screen.getByTestId('workspace')).toHaveAttribute('data-pool', 'upper');
+    fireEvent.change(screen.getByRole('combobox', { name: '편성' }), { target: { value: 'lower' } });
+    expect(screen.getByTestId('workspace')).toHaveAttribute('data-pool', 'lower');
+  });
+
   it('데이터가 없고 에러도 없으면 pending, 에러면 error(빈 목록으로 숨기지 않는다)', () => {
     mocks.registrations.data = undefined;
     const { unmount } = render(<AdminTournamentBracketPage />);

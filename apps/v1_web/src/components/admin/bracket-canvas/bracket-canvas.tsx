@@ -20,6 +20,7 @@ import { BracketGroupBlock } from './bracket-group-block';
 export type BracketCanvasProps = {
   sixTeamState?: V1SixTeamBracket | null;
   /** Full context preserves source labels and shared-slot locks in isolated diagrams. */
+  scopedPool?: boolean;
   labelGroups?: V1AdminBracketGroup[];
   labelFixtures?: V1AdminBracketFixture[];
   registrations?: readonly V1AdminTournamentRegistration[];
@@ -202,7 +203,7 @@ export function BracketCanvas(props: BracketCanvasProps) {
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .filter(group => group.phase !== 'group' && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))
     .map(group => group.bracketTrack!))];
-  if (props.sixTeamState || tracks.length === 0) return <SingleBracketCanvas {...props} />;
+  if (props.scopedPool || props.sixTeamState || tracks.length === 0) return <SingleBracketCanvas {...props} />;
   const namedGroupIds = new Set(props.groups.filter(group => group.phase !== 'group' && tracks.includes(group.bracketTrack ?? '')).map(group => group.id));
   const sections = [
     { name: '예선·기타 대진', groups: props.groups.filter(group => !namedGroupIds.has(group.id)), fixtures: props.fixtures.filter(fixture => !fixture.groupId || !namedGroupIds.has(fixture.groupId)), preliminary: true },

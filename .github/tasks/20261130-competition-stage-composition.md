@@ -350,3 +350,8 @@ PR #2427 최신 head832e3b33d의 Gates/API/Web 전체 CI PASS·MERGEABLE/CLEAN�
 - Ambiguity: 세부 구성 폼은 목업 패널에 추가하지 않음. 완료/결과 자동생성은 초기 편집 가능성을 보존하기 위해 staged에서는 거부.
 - Progress Snapshot: 최신 origin/dev f3eed1204 기반 fix/stage-mock-controls-20261126 격리 작업트리. 호스트 메모리 약22GB 여유/24논리코어/Node1/Chrome11. Docker 엔진 없음(실제DB 검증 불가), 테스트 직렬 실행.
 - 검증 중간: API90/Web21 PASS. Windows 링크·POSIX 실행 환경을 작업트리 내부 의존성과 Git Bash로 해결. API surface/Web pattern PASS, Web 타입 PASS. 실제DB 통합 시나리오(기본15경기·시작전·구성수정)를 추가했고 Docker 미가동으로 CI 실행 대상. 정식 단계형과 같은 league_knockouts 저장 형식 사용.
+
+### 관리자 그림에서 단계·편성 선택
+
+- 그림에서 단계와 편성을 선택한다. 풀리그는 해당 조의 경기와 순위, 토너먼트는 해당 편성의 라운드와 연결선을 표시한다.
+- 데스크톱과 모바일에 같은 편성 필터를 적용한다. 선택을 바꾸면 기존 경기 상세를 닫는다.

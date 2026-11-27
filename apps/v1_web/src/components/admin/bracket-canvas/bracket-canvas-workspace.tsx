@@ -2,6 +2,8 @@
 
 import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
+import { stageBracketView } from '@/lib/stage-bracket-view';
+import type { StagePool } from '@/types/stage-plan';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
@@ -41,6 +43,7 @@ import { BracketTemplateDialog } from './bracket-template-dialog';
 import { focusFixtureOpener } from './fixture-opener-focus';
 
 export type BracketCanvasWorkspaceProps = {
+  pool?: StagePool;
   sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   format: V1TournamentFormat | undefined;
@@ -55,6 +58,7 @@ export type BracketCanvasWorkspaceProps = {
 };
 
 export function BracketCanvasWorkspace({
+  pool,
   sixTeamState,
   tournamentId,
   format,
@@ -84,7 +88,8 @@ export function BracketCanvasWorkspace({
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
   const canvasSidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
   const leagueSideColumn = useMediaQuery(BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY, true);
-  const leagueGrid = format === 'league';
+  const visible = useMemo(() => bracket && stageBracketView(bracket, pool), [bracket, pool]);
+  const leagueGrid = pool ? pool.format === 'league' : format === 'league';
   const sidePanel = leagueGrid ? leagueSideColumn : canvasSidePanel;
   // 넓은 화면에선 순위표가 옆 열에 있으니 열어 둔 시트를 닫아, 다시 좁혀도 저절로 뜨지 않게 한다.
   useEffect(() => {
@@ -105,8 +110,8 @@ export function BracketCanvasWorkspace({
     [bracket],
   );
   const standingsGroups = useMemo(
-    () => (bracket === undefined ? [] : buildLeagueStandings({ groups: bracket.groups, standings: bracket.standings })),
-    [bracket],
+    () => (visible === undefined ? [] : buildLeagueStandings({ groups: visible.groups, standings: visible.standings })),
+    [visible],
   );
 
   if (isPending) {
@@ -116,7 +121,7 @@ export function BracketCanvasWorkspace({
       </div>
     );
   }
-  if (isError || bracket === undefined || labelContext === null) {
+  if (isError || visible === undefined || bracket === undefined || labelContext === null) {
     return (
       <ErrorState
         title="대진을 불러오지 못했어요"
@@ -405,9 +410,9 @@ export function BracketCanvasWorkspace({
                 </div>
               ) : null}
               <BracketLeagueGrid
-                groups={bracket.groups}
-                fixtures={bracket.fixtures}
-                slots={bracket.slots}
+                groups={visible.groups}
+                fixtures={visible.fixtures}
+                slots={visible.slots}
                 selectedFixtureId={selectedFixture?.id ?? null}
                 pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
                 canWrite={canWrite && !staged}
@@ -417,12 +422,12 @@ export function BracketCanvasWorkspace({
               />
             </div>
           ) : (
-            <BracketCanvas
+            <BracketCanvas scopedPool={Boolean(pool)}
               sixTeamState={sixTeamState}
               registrations={registrations}
-              groups={bracket.groups}
-              fixtures={bracket.fixtures}
-              slots={bracket.slots}
+              groups={visible.groups}
+              fixtures={visible.fixtures}
+              slots={visible.slots}
               selectedFixtureId={selectedFixture?.id ?? null}
               pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
               canWrite={canWrite && !staged}

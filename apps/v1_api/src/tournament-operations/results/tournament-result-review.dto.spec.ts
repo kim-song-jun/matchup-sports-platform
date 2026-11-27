@@ -5,6 +5,7 @@ import { GameScoreDto } from '../../games/dto/game-result.dto';
 import {
   GameResultCorrectionChangesDto,
   SupersedeAndSubmitGameResultRevisionDto,
+  VoidGameResultRevisionDto,
 } from './tournament-result-review.dto';
 
 /**
@@ -29,6 +30,20 @@ import {
  */
 const PIPE_TRANSFORM_OPTIONS = { enableImplicitConversion: true } as const;
 const PIPE_VALIDATOR_OPTIONS = { whitelist: true, forbidNonWhitelisted: true } as const;
+
+describe('결과 무효 확인 문구', () => {
+  it.each([undefined, '', '결과무효', ' 결과 무효', '결과 무효 ', ['결과 무효']])('정확하지 않은 확인 입력 %j를 거절한다', async confirmationText => {
+    const errors = await validateAs(VoidGameResultRevisionDto, { expectedVersion: 1, clientCommandId: 'void-confirm', reason: '오입력', confirmationText });
+    expect(errors.some(error => error.property === 'confirmationText')).toBe(true);
+  });
+  it('정확한 입력을 허용한다', async () => {
+    expect(await validateAs(VoidGameResultRevisionDto, { expectedVersion: 1, clientCommandId: 'void-confirm', reason: '오입력', confirmationText: '결과 무효', resetToScheduled: true })).toEqual([]);
+  });
+  it.each(['true', 'false', 1, 0])('복구 여부에 boolean이 아닌 %j를 거절한다', async resetToScheduled => {
+    const errors = await validateAs(VoidGameResultRevisionDto, { expectedVersion: 1, clientCommandId: 'void-confirm', reason: '오입력', confirmationText: '결과 무효', resetToScheduled });
+    expect(errors.some(error => error.property === 'resetToScheduled')).toBe(true);
+  });
+});
 
 const SIDE_ID = '5b3f6f2e-0000-4000-8000-00000000a001';
 const PARTICIPANT_ID = '5b3f6f2e-0000-4000-8000-00000000b001';

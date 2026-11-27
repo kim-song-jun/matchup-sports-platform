@@ -17,6 +17,7 @@ export type TournamentMatchUpdateInput = {
   teamMatchId: string;
   fixtureNumber?: number;
   scheduledAt?: Date | null;
+  preserveSchedule?: boolean;
   /** undefined 는 그대로 두고, null 은 장소를 비워요. 값이 오면 스냅샷 전체를 교체해요. */
   place?: PlaceSnapshot | null;
   fieldId?: string | null;
@@ -195,7 +196,7 @@ export async function updateTournamentMatchInTx(
     : input.fieldId;
   // 길이를 아는 경기는 그 길이를 새 시작에 그대로 옮기고, 종료 시각이 없던 경기는 새 시작 +
   // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 대진 생성과 같은 기준이다.
-  const nextEndAt = nextStartAt === null
+  const nextEndAt = input.preserveSchedule ? detail.teamMatch.endAt : nextStartAt === null
     ? null
     : detail.teamMatch.startAt !== null && detail.teamMatch.endAt !== null
       ? new Date(nextStartAt.getTime() + (detail.teamMatch.endAt.getTime() - detail.teamMatch.startAt.getTime()))

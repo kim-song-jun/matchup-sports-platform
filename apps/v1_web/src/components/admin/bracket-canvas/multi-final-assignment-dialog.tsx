@@ -14,8 +14,8 @@ import { BracketLeagueStandings } from './bracket-league-standings';
 
 const control = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 tm-text-label';
 const controlUnset = 'h-11 w-full rounded-xl border border-[var(--orange700)] bg-[var(--card-surface)] px-3 tm-text-label';
-type Props = { tournamentId: string; open: boolean; onClose: () => void; onApplied: () => void };
-export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onApplied }: Props) {
+type Props = { initialFinal?: string; tournamentId: string; open: boolean; onClose: () => void; onApplied: () => void };
+export function MultiFinalAssignmentDialog({ initialFinal, tournamentId, open, onClose, onApplied }: Props) {
   const api = useMultiFinals(tournamentId, open);
   const bracket = useV1AdminBracket(open ? tournamentId : '');
   const [view, setView] = useState<MultiFinalView | null>(null);
@@ -49,8 +49,8 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   useEffect(() => {
     if (!open) { initialized.current = false; setView(null); return; }
     if (initialized.current || !api.view.data || api.view.isFetching || api.view.isError) return;
-    initialized.current = true; loadFinal(api.view.data, api.view.data.finals[0]?.name ?? '');
-  }, [open, api.view.data, api.view.isFetching, api.view.isError]);
+    initialized.current = true; loadFinal(api.view.data, api.view.data.finals.find(row => row.name === initialFinal)?.name ?? api.view.data.finals[0]?.name ?? '');
+  }, [open, initialFinal, api.view.data, api.view.isFetching, api.view.isError]);
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [reviewing, error]);
   if (!mounted || typeof document === 'undefined') return null;
   const final = view?.finals.find(row => row.name === name);

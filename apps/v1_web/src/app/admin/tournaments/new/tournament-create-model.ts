@@ -668,6 +668,11 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     if (state.stagePlan) { const error = stagePlanError(state.stagePlan); if (error) errors.stagePlan = error; }
     if (!state.sportId) errors.sportId = '종목을 선택해 주세요.';
     if (!state.title.trim()) errors.title = '대회명을 입력해 주세요.';
+    // 팀 파울 기준 입력칸은 1단계(기본 정보)의 성별 카테고리 위에 있다. 제출은 첫 오류 단계로 이동하므로
+    // 검증은 칸이 있는 단계에서 해야 오류가 보인다(칸을 옮기면 검증도 같이 옮긴다).
+    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
+      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
+    }
   }
 
   if (step === 1) {
@@ -812,10 +817,6 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
-    // 입력 칸이 있는 단계(PresentationStep)에서 검사한다 — 제출은 첫 오류 단계로 이동하므로 다른 단계에 두면 오류가 안 보인다.
-    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
-      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
-    }
     // 서버 DTO 는 꺼진 홍보의 priority 도 0~9999 정수로 검증한다 — 꺼진 카드도 막는다.
     for (const [field, card, label] of [
       ['promoHomePriority', state.promoHome, '홈 홍보 우선순위'],

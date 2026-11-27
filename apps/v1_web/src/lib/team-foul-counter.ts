@@ -43,7 +43,7 @@ export function deriveFoulCounts(events: readonly GameEventRecord[], period: num
 }
 
 /**
- * 팀 파울 경고 기준(개) — 팀 누적 파울이 이 개수에 이르면 콘솔이 "다음부터 10m 프리킥"을 알린다.
+ * 팀 파울 경고 기준(개) — 팀 누적 파울이 이 개수에 이르면 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘는 파울부터 "세컨 파울 · 10m 프리킥"으로 알린다.
  * 대회·리그마다 다를 수 있고(`teamFoulThreshold`), 값을 비워 둔 대회·리그와 친선 경기는 기본값을 쓴다.
  * 서버(`apps/v1_api/src/tournaments/team-foul-threshold.ts`)와 같은 값·같은 범위다.
  */

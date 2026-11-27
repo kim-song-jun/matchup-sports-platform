@@ -575,6 +575,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       expectedVersion: 7,
       clientCommandId: 'task22-void',
       reason: 'result void due to protest upheld',
+      confirmationText: '결과 무효',
     });
     expect(voided.revisionState).toBe(V1GameResultRevisionState.VOID);
     voidRevisionId = voided.revisionId;
@@ -586,6 +587,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         expectedVersion: 8,
         clientCommandId: 'task22-void-again',
         reason: 'retried on an already-void pointer',
+        confirmationText: '결과 무효',
       }),
     );
     expectHttpCode(voidAgain, 409, 'REVISION_MUST_BE_SUPERSEDED');
@@ -622,6 +624,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         expectedVersion: 4,
         clientCommandId: 'task22-conflict-void',
         reason: 'attempted void past a locked downstream fixture',
+        confirmationText: '결과 무효',
       }),
     );
     expectHttpCode(blocked, 409, 'NEXT_FIXTURE_CONFLICT');

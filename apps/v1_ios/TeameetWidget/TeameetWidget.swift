@@ -11,8 +11,19 @@ struct HomeProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (HomeEntry) -> Void) { completion(placeholder(in: context)) }
     func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<HomeEntry>) -> Void) {
         Task {
-            let snapshot: WidgetSnapshot
-            do { snapshot = await WidgetService(store: try WidgetStore(), api: WidgetAPI()).refresh() }
+            var snapshot: WidgetSnapshot
+            do {
+                let store = try WidgetStore()
+                let api = WidgetAPI()
+                snapshot = await WidgetService(store: store, api: api).refresh()
+                if let model = snapshot.model, !snapshot.stale {
+                    await WidgetLogos.prefetch(model: model, store: store, revision: snapshot.revision,
+                                               environment: api.environment, maxCount: WidgetLogoPolicy.extensionLimit)
+                    if try store.read().revision != snapshot.revision {
+                        snapshot = WidgetSnapshot(notice: WidgetFailure.changedSession.localizedDescription)
+                    }
+                }
+            }
             catch { snapshot = WidgetSnapshot(notice: "위젯 저장소를 열지 못했어요") }
             let now = Date()
             var dates = (0...30).map { now.addingTimeInterval(Double($0 * 60)) }
@@ -75,10 +86,7 @@ struct HomeWidgetView: View {
         else { content.padding().background(background) }
     }
     private func currentPlan(_ model: WidgetModel) -> WidgetPlan {
-        var current = model
-        let received = model.generatedAt >= 0 ? model.generatedAt : entry.snapshot.updatedAt
-        if now - received >= 900_000 { current.live.removeAll { $0.state == "ENDED" } }
-        return WidgetPlan.of(current, now: now)
+        WidgetPresentation.plan(model, updatedAt: entry.snapshot.updatedAt, now: now)
     }
     private var background: some View { LinearGradient(colors: [Color(red: 0.21, green: 0.30, blue: 0.49), Color(red: 0.13, green: 0.18, blue: 0.31)], startPoint: .topLeading, endPoint: .bottomTrailing) }
     private func logo(_ name: String, path: String?) -> some View {

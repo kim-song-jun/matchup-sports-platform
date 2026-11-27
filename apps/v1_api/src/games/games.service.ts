@@ -1306,7 +1306,7 @@ export class GamesService {
         // config JSON 을 직접 읽지 않는다. `parseResultPolicy`가 키 부재를 기본값
         // (`earlyStop: true`)으로 메우므로 `config === null`이어도 같은 기본값이다.
         penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
-        // 운영 콘솔의 팀 파울 경고("다음부터 10m 프리킥") 기준. `substitutionPolicy` 와 같은 원칙 —
+        // 운영 콘솔의 팀 파울 경고(예고 "다음부터 10m 프리킥" → 초과 "세컨 파울 · 10m 프리킥") 기준. `substitutionPolicy` 와 같은 원칙 —
         // 서버가 해석해 내려주고 프런트는 기본값을 따로 추측하지 않는다(응답에 없을 때만 폴백).
         teamFoulThreshold: resolveTeamFoulThreshold(competition?.teamFoulThreshold),
       };

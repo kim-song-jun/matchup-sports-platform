@@ -95,6 +95,8 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
   if (node.state === 'live') return <Note>진행 중인 경기예요. 결과는 라이브 콘솔에서 넣어요.</Note>;
   if (!canWrite) return null;
   if (node.game === null) return <Note>이 경기는 아직 결과를 넣을 수 없어요.</Note>;
+  if (scope !== 'league' && node.game.latestRevision?.state === 'VOID') return <BracketResultActions tournamentId={competitionId}
+    fixtureId={node.fixtureId} game={node.game} isKnockout={node.knockout} homeLabel={homeName} awayLabel={awayName} canWrite={canWrite} showToast={showToast} />;
 
   if (node.state === 'scheduled') {
     if (!hasTeam(node.home) || !hasTeam(node.away)) return <Note>두 팀이 정해지면 점수를 넣을 수 있어요.</Note>;
@@ -383,7 +385,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   if (node.byeSlotId && scope === 'tournament') {
     const slot = props.slots.find(slot => slot.id === node.byeSlotId);
     const fixture = props.fixtures?.find(f => f.id === node.fixtureId);
-    if (slot && fixture) return <ByeSlotEditor tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite && !managedFinal} registrationsLoaded={props.registrationsState.status === 'success'} />;
+    if (slot && fixture) return <ByeSlotEditor fixtures={props.fixtures} tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite && !groups.find(group => group.id === slot.groupId)?.bracketTrack?.startsWith('stage:')} registrationsLoaded={props.registrationsState.status === 'success'} />;
   }
   if (view.kind === 'pick') {
     const side = view.side === 'HOME' ? node.home : node.away;

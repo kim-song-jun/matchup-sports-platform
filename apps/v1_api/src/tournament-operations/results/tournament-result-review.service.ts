@@ -1,10 +1,14 @@
 import { closeRevisionReviewSla } from './close-review-sla';
+import { replaceVoidedFixture } from './replace-voided-fixture';
+import { GamesService } from '../../games/games.service';
+import { GameResultVoidProjectionService } from '../../game-operations/game-result-void-projection.service';
 import { appendEventTimeCorrection, syncRevisionEventTimes } from '../../games/event-time-correction';
 import { foldEventTimeCorrections } from '../../games/core/event-time-corrections';
 import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Inject,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -249,6 +253,9 @@ function resolveOutcome(
 
 @Injectable()
 export class TournamentResultReviewService {
+  @Inject(GamesService)
+  private readonly games!: GamesService;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly staffAccess: TournamentStaffAccessService,
@@ -626,6 +633,8 @@ export class TournamentResultReviewService {
     headerIdempotencyKey: string | undefined,
     dto: VoidGameResultRevisionDto,
   ): Promise<GameRevisionMutationResult> {
+    if (dto.confirmationText !== '결과 무효') throw new UnprocessableEntityException({ code: 'RESULT_VOID_CONFIRMATION_REQUIRED', message: '확인 문구에 결과 무효를 정확히 입력해 주세요.' });
+    if (!dto.reason?.trim()) throw new UnprocessableEntityException({ code: 'RESULT_VOID_REASON_REQUIRED', message: '무효 사유를 입력해 주세요.' });
     return this.withResultCommand(
       {
         gameId,
@@ -636,6 +645,7 @@ export class TournamentResultReviewService {
         headerIdempotencyKey,
         bodyCommandId: dto.clientCommandId,
         payload: { revisionId, ...dto },
+        auditReason: dto.reason,
       },
       async (tx, game, context) => {
         await tx.$queryRaw`SELECT id FROM v1_game_result_revisions WHERE id = ${revisionId} FOR UPDATE`;
@@ -643,7 +653,8 @@ export class TournamentResultReviewService {
         if (revision === null) {
           throw this.notFound('RESULT_REVISION_NOT_FOUND');
         }
-        if (game.currentOfficialRevisionId !== revisionId || revision.state !== V1GameResultRevisionState.OFFICIAL) {
+        const restoreVoided = dto.resetToScheduled === true && revision.state === V1GameResultRevisionState.VOID;
+        if (game.currentOfficialRevisionId !== revisionId || revision.state !== V1GameResultRevisionState.OFFICIAL && !restoreVoided) {
           throw new ConflictException({
             code: 'REVISION_MUST_BE_SUPERSEDED',
             message: 'Only the current official revision can be voided',
@@ -652,10 +663,12 @@ export class TournamentResultReviewService {
         const canonicalRevision = game.teamMatchId !== null
           ? await this.loadOfficialRevisionRow(tx, revision.id)
           : null;
+        if (dto.resetToScheduled === true && canonicalRevision === null) throw new ConflictException({ code: 'FIXTURE_RESET_NOT_ALLOWED', message: '공식 결과의 경기 정보를 확인해 주세요.' });
+        if (restoreVoided && !canonicalRevision?.tournamentTeamMatchId) throw new ConflictException({ code: 'FIXTURE_RESET_NOT_ALLOWED', message: '대회 대진만 시작 전 상태로 돌릴 수 있어요.' });
         if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
           await this.assertNoLockedDownstreamTeamMatch(tx, game.teamMatchId!);
         }
-        if (game.teamMatchId !== null) {
+        if (!restoreVoided && game.teamMatchId !== null) {
           if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
             await reverseCanonicalAdvancement(
               tx,
@@ -664,7 +677,7 @@ export class TournamentResultReviewService {
             );
           }
         }
-        const voidRevision = await tx.v1GameResultRevision.create({
+        const voidRevision = restoreVoided ? revision : await tx.v1GameResultRevision.create({
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
@@ -693,12 +706,17 @@ export class TournamentResultReviewService {
           data: { version: { increment: 1 }, currentOfficialRevisionId: voidRevision.id },
         });
         await this.closeReviewSla(tx, revision.id, dto.reason);
+        let replacement: { fixtureId: string; gameId: string } | undefined;
+        if (dto.resetToScheduled === true && canonicalRevision?.tournamentTeamMatchId) {
+          await new GameResultVoidProjectionService().projectInTransaction(tx, voidRevision.id);
+          replacement = await replaceVoidedFixture(tx, this.games, canonicalRevision.tournamentTeamMatchId, context, this.auditWriter, dto.reason);
+        }
         await this.writeOutbox(
           tx,
-          `game:${gameId}:revision:${voidRevision.revision}:voided`,
+          `game:${gameId}:revision:${voidRevision.revision}:${replacement ? 'void-reset' : 'voided'}`,
           gameId,
           'GAME_RESULT_VOIDED',
-          { revisionId: voidRevision.id, supersedesId: revision.id },
+          { revisionId: voidRevision.id, supersedesId: restoreVoided ? revision.supersedesId : revision.id, ...(replacement ? { replacement } : {}) },
           voidRevision.id,
         );
         return {
@@ -710,6 +728,7 @@ export class TournamentResultReviewService {
           revisionId: voidRevision.id,
           revision: voidRevision.revision,
           revisionState: voidRevision.state,
+          ...(replacement ? { replacement } : {}),
         };
       },
     );
@@ -1242,7 +1261,7 @@ export class TournamentResultReviewService {
           // **이 한 줄이 콘솔의 유일한 출처 경계다.** 다섯 개 공개 명령이 전부 이
           // Every live review command uses the canonical TeamMatch resolver;
           // regular-league TeamMatch games remain on this shared console path.
-          const source = await resolveGameSource(tx, game);
+          const source = await resolveGameSource(tx, game, input.action === 'result_revision_void');
           if (source === null) {
             throw this.notFound();
           }
@@ -1359,6 +1378,7 @@ export class TournamentResultReviewService {
           if (decision.kind === 'REPLAY') {
             return { ...decision.responseBody, replayed: true };
           }
+          if (source.archived) throw this.notFound();
           this.assertCommandContext({
             actor,
             expectedVersion: input.expectedVersion,
@@ -1401,6 +1421,7 @@ export class TournamentResultReviewService {
               ...('eventTimeCorrection' in response
                 ? { eventTimeCorrection: response.eventTimeCorrection as AdminEventTimeCorrectionDetail }
                 : {}),
+              ...('replacement' in response ? { replacement: response.replacement as { fixtureId: string; gameId: string } } : {}),
             },
             ...(input.auditReason === undefined ? {} : { reason: input.auditReason }),
             tournamentId: source.tournamentId,

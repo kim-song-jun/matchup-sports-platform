@@ -11,6 +11,7 @@ let secondPageFails = false;
 const item = (n: number) => ({ fixtureId: `f-${n}`, gameId: `g-${n}` });
 
 const server = setupServer(
+  http.post('*/api/v1/logs/client-error', () => HttpResponse.json({ status: 'success', timestamp: 't', data: null })),
   http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
     const params = new URL(request.url).searchParams;
     requests.push(params);

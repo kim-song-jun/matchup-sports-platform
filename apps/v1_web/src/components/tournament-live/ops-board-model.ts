@@ -166,6 +166,14 @@ export function buildBoardCards(input: BuildBoardCardsInput): BoardCard[] {
   });
 }
 
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+/** `'2026-12-20'` → `'12. 20.(일)'`. */
+export function formatDayLabel(dayKey: string): string {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  return `${month}. ${day}.(${WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]})`;
+}
+
 /** 경기가 있는 날을 오름차순으로. 시간 미정 경기는 날이 없어 빠진다. */
 export function listMatchDays(cards: readonly BoardCard[]): string[] {
   return [...new Set(cards.flatMap((c) => (c.dayKey === null ? [] : [c.dayKey])))].sort();

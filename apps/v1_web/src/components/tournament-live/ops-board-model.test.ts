@@ -9,6 +9,7 @@ import {
   NO_FIELD_KEY,
   buildBoardCards,
   buildFieldColumns,
+  formatDayLabel,
   groupByTime,
   kstDayKey,
   kstTimeLabel,
@@ -99,6 +100,13 @@ describe('KST 날짜·시각', () => {
   it('시각 글자는 KST 벽시계다', () => {
     expect(kstTimeLabel('2026-12-20T14:30:00Z')).toBe('23:30');
     expect(kstTimeLabel('2026-12-20T15:30:00Z')).toBe('00:30');
+  });
+});
+
+describe('formatDayLabel', () => {
+  it('KST 날짜 글자에 요일을 붙인다', () => {
+    expect(formatDayLabel('2026-12-20')).toBe('12. 20.(일)');
+    expect(formatDayLabel('2027-01-01')).toBe('1. 1.(금)');
   });
 });
 

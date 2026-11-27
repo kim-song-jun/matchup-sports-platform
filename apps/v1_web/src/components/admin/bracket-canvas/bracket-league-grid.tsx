@@ -16,7 +16,7 @@ export type BracketLeagueGridProps = {
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
   selectedFixtureId: string | null;
-  dimmedFixtureIds?: ReadonlySet<string>;
+  filterMatchIds?: ReadonlySet<string>;
   pendingRegistrationId: string | null;
   canWrite: boolean;
   onSelectFixture: (fixtureId: string) => void;
@@ -25,7 +25,7 @@ export type BracketLeagueGridProps = {
 };
 
 export function BracketLeagueGrid({
-  groups, fixtures, slots, selectedFixtureId, dimmedFixtureIds, pendingRegistrationId, canWrite, onSelectFixture, onAssignSlot, onAssignDirect,
+  groups, fixtures, slots, selectedFixtureId, filterMatchIds, pendingRegistrationId, canWrite, onSelectFixture, onAssignSlot, onAssignDirect,
 }: BracketLeagueGridProps) {
   const grid = useMemo(() => buildLeagueGrid({ groups, fixtures }), [groups, fixtures]);
   const labelContext = useMemo(() => buildSideLabelContext(groups, fixtures, slots), [groups, fixtures, slots]);
@@ -87,7 +87,7 @@ export function BracketLeagueGrid({
                           AWAY: fixture.awaySlotId === null ? null : (slotsById.get(fixture.awaySlotId) ?? null),
                         }}
                         selected={fixture.id === selectedFixtureId}
-                        dimmed={dimmedFixtureIds?.has(fixture.id)}
+                        filterMatch={filterMatchIds?.has(fixture.id)}
                         canWrite={canWrite}
                         pendingRegistrationId={pendingRegistrationId}
                         onSelect={onSelectFixture}

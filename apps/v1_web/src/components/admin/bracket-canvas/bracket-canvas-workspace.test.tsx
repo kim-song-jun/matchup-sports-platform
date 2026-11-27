@@ -364,19 +364,20 @@ describe('BracketCanvasWorkspace — 보기 컨트롤', () => {
     ],
   });
 
-  it('controls.unscheduledOnly: 시간이 있는 칸에 data-dimmed, 시간 미정 칸은 그대로(접근 이름은 그대로)', () => {
+  it('controls.unscheduledOnly: 시간이 있는 칸은 해당 없음(false), 시간 미정 칸은 해당(true)으로 표시한다 — 접근 이름은 그대로', () => {
     setBracket(scheduled);
     renderWorkspace({ controls: staticControls({ unscheduledOnly: true }) });
     const first = screen.getByRole('button', { name: '8강 1번 경기 열기' }).closest('[data-fixture-id]')!;
     const second = screen.getByRole('button', { name: '8강 2번 경기 열기' }).closest('[data-fixture-id]')!;
-    expect(first).toHaveAttribute('data-dimmed', 'true');
-    expect(second).not.toHaveAttribute('data-dimmed');
+    expect(first).toHaveAttribute('data-filter-match', 'false');
+    expect(second).toHaveAttribute('data-filter-match', 'true');
+    expect(document.querySelector('[class*="opacity-"][data-fixture-id]')).toBeNull();
   });
 
-  it('끄면 어떤 칸도 흐리지 않는다(대조군)', () => {
+  it('끄면 어떤 칸에도 필터 표시가 없다(대조군)', () => {
     setBracket(scheduled);
     renderWorkspace({ controls: staticControls({ unscheduledOnly: false }) });
-    expect(document.querySelector('[data-dimmed]')).toBeNull();
+    expect(document.querySelector('[data-filter-match]')).toBeNull();
   });
 
   it('controls.focusRequest 가 오면 그 경기가 열리고 요청이 비워진다', () => {
@@ -492,11 +493,12 @@ describe('BracketCanvasWorkspace — 리그 방식 대회', () => {
     expect(screen.getByTestId('panel')).toHaveTextContent('l1');
   });
 
-  it('리그 격자에서도 시간 미정만 보기는 시간이 있는 칸을 흐리게 한다', () => {
+  it('리그 격자에서도 시간 미정만 보기는 시간이 있는 칸을 해당 없음으로 표시한다', () => {
     setBracket(makeBracket({ ...leagueBracket, fixtures: [{ ...leagueBracket.fixtures[0], scheduledAt: '2026-11-20T01:00:00.000Z' }, ...leagueBracket.fixtures.slice(1)] }));
     render(<Harness {...leagueProps('league')} controls={staticControls({ unscheduledOnly: true })} />);
-    expect(document.querySelectorAll('[data-dimmed]')).toHaveLength(1);
-    expect(document.querySelector('[data-fixture-id="l1"]')).toHaveAttribute('data-dimmed', 'true');
+    expect(document.querySelectorAll('[data-filter-match="false"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-filter-match="true"]')).toHaveLength(2);
+    expect(document.querySelector('[data-fixture-id="l1"]')).toHaveAttribute('data-filter-match', 'false');
   });
 });
 

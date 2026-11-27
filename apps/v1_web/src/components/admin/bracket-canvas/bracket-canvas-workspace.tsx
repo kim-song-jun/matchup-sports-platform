@@ -81,8 +81,8 @@ export function BracketCanvasWorkspace({
     () => (visible === undefined ? [] : buildLeagueStandings({ groups: visible.groups, standings: visible.standings })),
     [visible],
   );
-  const dimmedFixtureIds = useMemo(
-    () => (controls.unscheduledOnly && visible ? new Set(visible.fixtures.filter((fixture) => fixture.scheduledAt !== null).map((fixture) => fixture.id)) : undefined),
+  const filterMatchIds = useMemo(
+    () => (controls.unscheduledOnly && visible ? new Set(visible.fixtures.filter((fixture) => fixture.scheduledAt === null).map((fixture) => fixture.id)) : undefined),
     [controls.unscheduledOnly, visible],
   );
 
@@ -190,7 +190,7 @@ export function BracketCanvasWorkspace({
   );
   const sharedViewProps = {
     selectedFixtureId: selectedFixture?.id ?? null,
-    dimmedFixtureIds,
+    filterMatchIds,
     pendingRegistrationId: canWrite && !staged ? activePendingId : null,
     canWrite: canWrite && !staged,
     onSelectFixture: selectFixture,

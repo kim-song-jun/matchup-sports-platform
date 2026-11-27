@@ -19,6 +19,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
+  GroupTeamSwapDto,
   CreateFixtureDto,
   CreateGroupDto,
   CreateGroupTeamDto,
@@ -66,6 +67,7 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admi
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
+import { lockCompetitionForBracketMutationInTx } from './slots/competition-bracket-lock';
 import { lockGameRows } from '../games/roster/game-row-lock';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { acceptsBracketSource } from './tournament-bracket-phases';
@@ -1106,6 +1108,46 @@ export class TournamentBracketService {
   }
 
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
+  async swapGroupFixtureTeams(user: V1AuthUser, tournamentId: string, dto: GroupTeamSwapDto) {
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
+    const tournament = await this.loadTournament(tournamentId);
+    return this.prisma.$transaction(async tx => {
+      await lockCompetitionForBracketMutationInTx(tx, tournament);
+      const ids = [dto.firstFixtureId, dto.secondFixtureId];
+      const games = await tx.v1Game.findMany({ where: { teamMatchId: { in: ids }, teamMatch: { tournamentId } }, select: { id: true } });
+      await lockGameRows(tx, games.map(game => game.id));
+      const rows = await tx.v1TournamentMatchDetails.findMany({
+        where: { tournamentId, teamMatchId: { in: ids }, group: { phase: 'group' }, teamMatch: { deletedAt: null } },
+        include: { teamMatch: { include: { game: { select: { state: true, _count: { select: { events: true, resultRevisions: true } } } } } } },
+      });
+      const first = rows.find(row => row.teamMatchId === ids[0]);
+      const second = rows.find(row => row.teamMatchId === ids[1]);
+      if (rows.length !== 2 || !first || !second || first.groupId !== second.groupId) {
+        throw new BadRequestException('같은 조의 서로 다른 두 경기를 선택해 주세요.');
+      }
+      for (const [row, expected] of [[first, dto.firstAssignment], [second, dto.secondAssignment]] as const) {
+        const game = row.teamMatch.game;
+        if (game?.state !== 'SCHEDULED' || game._count.events || game._count.resultRevisions ||
+            ['completed', 'archived', 'cancelled'].includes(row.teamMatch.status)) {
+          throw new ConflictException('시작됐거나 기록이 있는 경기는 교환할 수 없어요.');
+        }
+        const assignment = [row.homeRegistrationId, row.awayRegistrationId, row.teamMatch.homeSlotId, row.teamMatch.awaySlotId].join('|');
+        if (assignment !== expected) throw new ConflictException('팀 배정이 변경됐어요. 최신 대진을 확인해 주세요.');
+      }
+      for (const [target, source] of [[first, second], [second, first]]) {
+        await updateTournamentMatchInTx(tx, { teamMatchId: target.teamMatchId,
+          homeRegistrationId: source.homeRegistrationId, awayRegistrationId: source.awayRegistrationId });
+        await tx.v1TeamMatch.update({ where: { id: target.teamMatchId }, data: {
+          homeSlotId: source.teamMatch.homeSlotId, awaySlotId: source.teamMatch.awaySlotId,
+        } });
+      }
+      await this.adminContext.logAdminAction(admin, { action: 'tournament.fixture.groupTeamSwap', targetType: 'tournament',
+        targetId: tournamentId, beforeJson: { fixtureIds: ids, assignments: [dto.firstAssignment, dto.secondAssignment] },
+        afterJson: { fixtureIds: ids, assignments: [dto.secondAssignment, dto.firstAssignment] } }, tx);
+      return { fixtureIds: ids };
+    }, { timeout: 30_000 });
+  }
+
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId });
     rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);

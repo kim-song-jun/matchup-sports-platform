@@ -1365,3 +1365,9 @@ Fresh branch1245860f0 (includes PR2180 image work). Narrow tests added for union
 - Baseline Alpha1245860f0 captured after deploy42183991187 SUCCESS at1440/768/390. Actual login through player fixture account, read-only tournamentf67894a6; no page/network errors observed in this scoped baseline. Browser28716/controller14088 closed normally. Do not alter that existing tournament.
 - Web lint/tsc pending; commit/PR/CI/Copilot/Alpha after verification remain. Own browser helper/dependencies in Windows TEMP/teameet-schedule-final-browser, WSL install/test/lint logs prefixed teameet-schedule-final. No local Next/DB runtime.
 - Final pre-commit Web lint (tsc --noEmit + v1 pattern check) PASS. Focused164/164 and diff/debt checks passed; baseline images reviewed. Ready for exact-scope commit and latest-head CI/review.
+
+### 부전승 자리 수동 편집
+
+- 범위는 기존 부전승 팀과 위치의 교환이다. 대진표에 연결되지 않은 기존 수동 부전승은 다음 경기의 빈 자리 또는 현재 팀 자리로 연결할 수 있다.
+- 운영자는 같은 결선 라운드의 다른 경기에서 직행 자리, 승자 자리 또는 빈 자리를 선택한다. 소스와 목적지가 바뀌었거나 경기 기록이 있으면 저장을 거절한다.
+- 검증 시나리오는 12강에서 부전승팀을 다른 8강 경기로 보내고 반대 방향 승자 연결과 공개 대진을 확인하는 것이다. 수동 생성한 빈 부전승도 팀을 배정하고 다시 열어 확인한다.

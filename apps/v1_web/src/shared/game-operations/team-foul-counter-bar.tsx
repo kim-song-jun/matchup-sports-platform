@@ -10,6 +10,28 @@ import { periodLabel } from './period-label';
  * 다음 피리어드에서 다시 센다는 사실을 화면에 적는다 — 후반에 숫자가 말없이 0이 되면 기록이 사라진 것처럼
  * 읽혔다(MD-QA #189, 2026-10-28 사용자 선택: 규칙은 유지하고 표시만 고친다).
  */
+/**
+ * 팀 파울 표시 단계. 기준이 5개면 5개째는 예고(notice), 6번째 파울부터가 세컨 파울(second)이다.
+ * 색(주황 → 빨강)만으로 구분하지 않고 문구와 함께 쓴다.
+ */
+const STAGE_TONE = {
+  none: { row: '', icon: '', count: 'text-[var(--text-strong)]', text: '', message: '' },
+  notice: {
+    row: 'bg-orange-50 dark:bg-orange-500/10',
+    icon: 'text-orange-500',
+    count: 'text-orange-700 dark:text-orange-300',
+    text: 'text-orange-700 dark:text-orange-300',
+    message: '다음부터 10m 프리킥',
+  },
+  second: {
+    row: 'bg-red-50 dark:bg-red-500/10',
+    icon: 'text-red-500',
+    count: 'text-red-700 dark:text-red-300',
+    text: 'text-red-700 dark:text-red-300',
+    message: '세컨 파울 · 10m 프리킥',
+  },
+} as const;
+
 export function TeamFoulCounterBar({
   sides,
   counts,
@@ -25,7 +47,7 @@ export function TeamFoulCounterBar({
   readonly periodCount?: number | null;
   /** 이 피리어드 다음 피리어드가 있는가(하프타임 포함) — 있으면 다시 센다고 알려 준다. */
   readonly hasNextPeriod?: boolean;
-  /** 이 개수에 이르면 경고한다 — 대회·리그별 기준(`GameDetail.teamFoulThreshold`). 생략하면 기본값. */
+  /** 이 개수에 이르면 예고하고 넘으면 세컨 파울로 알린다 — 대회·리그별 기준(`GameDetail.teamFoulThreshold`). 생략하면 기본값. */
   readonly threshold?: number;
 }) {
   if (sides.length === 0) return null;
@@ -58,33 +80,24 @@ export function TeamFoulCounterBar({
       <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
         {sides.map((side) => {
           const count = counts[side.id] ?? 0;
-          const warning = count >= threshold;
+          // 기준이 5개면 5개째에 "다음부터 10m 프리킥"으로 예고하고, 6번째 파울부터 "세컨 파울 · 10m 프리킥"이다.
+          // 색(주황 → 빨강)만으로 구분하지 않고 문구도 다르게 한다.
+          const stage = count > threshold ? 'second' : count === threshold ? 'notice' : 'none';
+          const tone = STAGE_TONE[stage];
           return (
             <div
               key={side.id}
-              className={
-                warning
-                  ? 'flex flex-wrap items-center justify-between gap-x-2 bg-orange-50 px-3 py-2 dark:bg-orange-500/10'
-                  : 'flex flex-wrap items-center justify-between gap-x-2 px-3 py-2'
-              }
+              className={`flex flex-wrap items-center justify-between gap-x-2 px-3 py-2 ${tone.row}`}
             >
               {/* 공통 접두사가 긴 팀도 구별할 수 있게 이름 전체를 표시한다. 파울 숫자는 한 덩어리로 유지한다. */}
               <span className="min-w-0 flex-1 break-keep text-xs font-medium text-[var(--text-muted)]" style={{ overflowWrap: 'anywhere' }}>{side.displayNameSnapshot}</span>
               <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-                {warning ? <AlertTriangle size={12} aria-hidden="true" className="text-orange-500" /> : null}
-                <span
-                  className={
-                    warning
-                      ? 'text-sm font-bold tabular-nums text-orange-700 dark:text-orange-300'
-                      : 'text-sm font-bold tabular-nums text-[var(--text-strong)]'
-                  }
-                >
-                  파울 {count}
-                </span>
+                {stage !== 'none' ? <AlertTriangle size={12} aria-hidden="true" className={tone.icon} /> : null}
+                <span className={`text-sm font-bold tabular-nums ${tone.count}`}>파울 {count}</span>
               </span>
-              {/* 경고 안내는 이름·숫자 줄 아래 한 줄을 통째로 쓴다 — 같은 줄에 두면 이름이 밀려 사라진다. */}
-              {warning ? (
-                <span className="basis-full text-xs font-semibold text-orange-700 dark:text-orange-300">다음부터 10m 프리킥</span>
+              {/* 안내는 이름·숫자 줄 아래 한 줄을 통째로 쓴다 — 같은 줄에 두면 이름이 밀려 사라진다. */}
+              {tone.message ? (
+                <span className={`basis-full text-xs font-semibold ${tone.text}`}>{tone.message}</span>
               ) : null}
             </div>
           );

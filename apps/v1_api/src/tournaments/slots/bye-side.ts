@@ -69,6 +69,11 @@ export async function setByeSideInTx(tx: Prisma.TransactionClient, ctx: SlotMuta
   await tx.v1TournamentMatchAdvancementEdge.delete({ where: { id: incoming[0].id } });
   await updateTournamentMatchInTx(tx, { teamMatchId: match.id,
     homeRegistrationId: fresh.awayRegistrationId, awayRegistrationId: fresh.homeRegistrationId });
+  if (fresh.homeDisplayLabel !== fresh.awayDisplayLabel) {
+    await tx.v1TournamentMatchDetails.update({ where: { teamMatchId: match.id }, data: {
+      homeDisplayLabel: fresh.awayDisplayLabel, awayDisplayLabel: fresh.homeDisplayLabel,
+    } });
+  }
   await tx.v1TeamMatch.update({ where: { id: match.id }, data: { homeSlotId: match.awaySlotId, awaySlotId: match.homeSlotId } });
   await tx.v1TournamentMatchAdvancementEdge.create({ data: { ...incoming[0], targetSide: current } });
   const rows = await tx.v1TournamentGroupTeam.updateMany({ where: { groupId: slot.groupId!, isBye: true, sortOrder: slot.byeSortOrder }, data: { sortOrder } });

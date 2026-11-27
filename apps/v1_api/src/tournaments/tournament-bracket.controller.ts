@@ -14,6 +14,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
+  GroupTeamSwapDto,
   CreateFixtureDto,
   CreateGroupDto,
   CreateGroupTeamDto,
@@ -47,6 +48,11 @@ export class TournamentBracketController {
     private readonly bracketService: TournamentBracketService,
     private readonly leagueFixtureGenerator: LeagueFixtureGeneratorService,
   ) {}
+
+  @Post('admin/tournaments/:tournamentId/group-fixture-team-swap')
+  swapGroupFixtureTeams(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string, @Body() dto: GroupTeamSwapDto) {
+    return this.bracketService.swapGroupFixtureTeams(user, tournamentId, dto);
+  }
 
   @Post('admin/tournaments/:tournamentId/byes')
   createBye(

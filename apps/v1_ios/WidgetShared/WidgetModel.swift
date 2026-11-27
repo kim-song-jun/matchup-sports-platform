@@ -2,8 +2,8 @@ import Foundation
 
 /// Mirrors PR #2556 WidgetModel. Nullable score and names preserve server privacy gates.
 struct WidgetModel: Codable, Sendable, Equatable {
-    struct Score: Codable, Sendable, Equatable { var mine: Int; var opponent: Int }
-    struct Period: Codable, Sendable, Equatable {
+    struct Score: Codable, Sendable, Hashable { var mine: Int; var opponent: Int }
+    struct Period: Codable, Sendable, Hashable {
         var number = 1
         var phase = "RUNNING"
         var startedAt: Int64 = -1
@@ -30,6 +30,7 @@ struct WidgetModel: Codable, Sendable, Equatable {
         var penalties: Score?
         var period: Period?
         var scorers: [Scorer] = []
+        var endedAt: Int64? = nil
     }
     struct Schedule: Codable, Sendable, Equatable {
         var scheduleId = ""
@@ -88,7 +89,12 @@ struct WidgetModel: Codable, Sendable, Equatable {
             let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        func millis(_ o: [String: Any], _ key: String) -> Int64 { WidgetFormat.parseDate(string(o, key)) }
+        func millis(_ o: [String: Any], _ key: String) -> Int64 {
+            if let number = o[key] as? NSNumber, String(cString: number.objCType) != "c" {
+                return WidgetMilliseconds.valid(number.int64Value) ?? -1
+            }
+            return WidgetFormat.parseDate(string(o, key))
+        }
         func score(_ value: Any?) -> Score? {
             guard let s = value as? [String: Any], let mine = s["mine"] as? Int,
                   let opponent = s["opponent"] as? Int, mine >= 0, opponent >= 0 else { return nil }
@@ -116,7 +122,8 @@ struct WidgetModel: Codable, Sendable, Equatable {
                         teamLogoUrl: string(o, "teamLogoUrl"), opponentName: string(o, "opponentName"),
                         opponentLogoUrl: string(o, "opponentLogoUrl"), competitionName: string(o, "competitionName"),
                         venueName: string(o, "venueName"), state: string(o, "state") ?? "LIVE", score: score(o["score"]),
-                        penalties: score(o["penalties"]), period: period, scorers: scorers)
+                        penalties: score(o["penalties"]), period: period, scorers: scorers,
+                        endedAt: (o["endedAt"] as? NSNumber).flatMap { String(cString: $0.objCType) == "c" ? nil : WidgetMilliseconds.valid($0.int64Value) })
         }
         let last = (body["lastResult"] as? [String: Any]).map {
             LastResult(teamName: string($0, "teamName") ?? "", opponentName: string($0, "opponentName"),
@@ -125,5 +132,18 @@ struct WidgetModel: Codable, Sendable, Equatable {
         return Self(generatedAt: millis(body, "generatedAt"), live: games, lastResult: last,
                     pendingCount: body["pendingCount"] as? Int ?? 0,
                     pending: objects(body["pending"]).map(schedule), schedules: objects(body["schedules"]).map(schedule))
+    }
+}
+
+extension WidgetModel.Period {
+    private enum CodingKeys: String, CodingKey { case number, phase, startedAt, pausedMs, pausedAt, restStartedAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        number = try c.decodeIfPresent(Int.self, forKey: .number) ?? 1
+        phase = try c.decodeIfPresent(String.self, forKey: .phase) ?? "RUNNING"
+        startedAt = try WidgetMilliseconds.decode(c, .startedAt) ?? -1
+        pausedMs = try c.decodeIfPresent(Int64.self, forKey: .pausedMs) ?? 0
+        pausedAt = try WidgetMilliseconds.decode(c, .pausedAt) ?? -1
+        restStartedAt = try WidgetMilliseconds.decode(c, .restStartedAt) ?? -1
     }
 }

@@ -3,9 +3,10 @@
 import { useEffect, useId, useReducer, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Info } from 'lucide-react';
-import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader } from '@/components/admin';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { TournamentGenderChoiceField } from '@/components/admin/tournaments/tournament-gender-choice-field';
+import { AlertBanner } from '@/components/v1-ui/primitives';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { CreateBottomBar } from './create-bottom-bar';
@@ -19,6 +20,7 @@ import {
   summarizeBarStatus,
   validateCreateForm,
   type CreateErrorField,
+  type CreateFormAction,
   type CreateFormErrors,
   type CreateFormState,
   type CreateFormatChoice,
@@ -131,12 +133,14 @@ function ProgressSteps() {
 
 export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateFormatChoice }) {
   const router = useRouter();
-  const { toasts, showToast } = useAdminToast();
   const [state, dispatch] = useReducer(createFormReducer, initialFormat, initialCreateFormState);
   const [errors, setErrors] = useState<CreateFormErrors>({});
   // 요청을 보낸 뒤 오류가 나기 전까지, 성공해 이동하는 동안도 true — 같은 대회를 두 번 만들지 않는다.
   const [pending, setPending] = useState(false);
+  // 서버가 거절한 이유. 사라지는 알림이 아니라 다음 제출이나 입력 수정 전까지 폼 안에 남긴다.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const submitErrorRef = useRef<HTMLDivElement>(null);
   const focusFirstErrorRef = useRef(false);
   const sportGroupName = useId();
   const formatGroupName = useId();
@@ -154,6 +158,15 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
     (control ?? alert).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
     control?.focus({ preventScroll: true });
   }, [errors]);
+
+  useEffect(() => {
+    if (submitError) submitErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+  }, [submitError]);
+
+  const update = (action: CreateFormAction) => {
+    dispatch(action);
+    setSubmitError(null);
+  };
 
   const clearErrors = (...fields: CreateErrorField[]) => {
     setErrors((current) => {
@@ -173,6 +186,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
       setErrors(found);
       return;
     }
+    setSubmitError(null);
     setPending(true);
     createTournament.mutate(buildCreatePayload(state), {
       onSuccess: (tournament) => {
@@ -180,13 +194,13 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
       },
       onError: (error) => {
         setPending(false);
-        showToast(extractErrorMessage(error, '대회를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'), 'error');
+        setSubmitError(extractErrorMessage(error, '대회를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
       },
     });
   };
 
   const setQuota = (field: 'genderMinMale' | 'genderMaxMale' | 'genderMinFemale' | 'genderMaxFemale', value: string) => {
-    dispatch({ type: 'set-field', field, value });
+    update({ type: 'set-field', field, value });
     clearErrors(field, 'genderQuota');
   };
 
@@ -230,7 +244,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
                     checked={state.sportId === sport.id}
                     disabled={pending}
                     onSelect={() => {
-                      dispatch({ type: 'set-field', field: 'sportId', value: sport.id });
+                      update({ type: 'set-field', field: 'sportId', value: sport.id });
                       clearErrors('sportId');
                     }}
                   />
@@ -258,7 +272,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
               id="create-title"
               value={state.title}
               onChange={(event) => {
-                dispatch({ type: 'set-field', field: 'title', value: event.target.value });
+                update({ type: 'set-field', field: 'title', value: event.target.value });
                 clearErrors('title');
               }}
               disabled={pending}
@@ -296,7 +310,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
                       name={formatGroupName}
                       checked={checked}
                       disabled={pending}
-                      onChange={() => dispatch({ type: 'set-format', value: option.value })}
+                      onChange={() => update({ type: 'set-format', value: option.value })}
                       aria-labelledby={titleId}
                       aria-describedby={descriptionId}
                       className="sr-only"
@@ -330,7 +344,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
               label="대회 시작"
               value={state.scheduledAt}
               onChange={(value) => {
-                dispatch({ type: 'set-scheduled-at', value });
+                update({ type: 'set-scheduled-at', value });
                 clearErrors('scheduledAt', 'registrationDeadlineAt');
               }}
               required
@@ -342,7 +356,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
               label="신청 마감"
               value={state.registrationDeadlineAt}
               onChange={(value) => {
-                dispatch({ type: 'set-registration-deadline', value });
+                update({ type: 'set-registration-deadline', value });
                 clearErrors('registrationDeadlineAt');
               }}
               required
@@ -359,11 +373,11 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
             error={errors.teamCount}
             disabled={pending}
             onStep={(delta) => {
-              dispatch({ type: 'step-team-count', delta });
+              update({ type: 'step-team-count', delta });
               clearErrors('teamCount');
             }}
             onChange={(value) => {
-              dispatch({ type: 'set-field', field: 'teamCount', value });
+              update({ type: 'set-field', field: 'teamCount', value });
               clearErrors('teamCount');
             }}
           />
@@ -374,7 +388,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
             disabled={pending}
             hint={state.genderCategory === 'mixed' ? undefined : '혼성을 고르면 남녀 인원 조건을 함께 정할 수 있어요.'}
             onChange={(value) => {
-              dispatch({ type: 'set-gender', value });
+              update({ type: 'set-gender', value });
               clearErrors('genderMinMale', 'genderMaxMale', 'genderMinFemale', 'genderMaxFemale', 'genderQuota');
             }}
           >
@@ -384,6 +398,12 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
           </TournamentGenderChoiceField>
         </div>
 
+        {submitError ? (
+          <div ref={submitErrorRef} className="mt-3 scroll-mb-28">
+            <AlertBanner message={submitError} />
+          </div>
+        ) : null}
+
         <p className="mt-3 flex items-start gap-2 text-[length:var(--font-size-label)] text-[var(--text-caption)]">
           <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
           장소·참가비·경기 규칙·이미지는 초안을 만든 뒤 「대회 정보」에서 채워요.
@@ -391,7 +411,6 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
 
         <CreateBottomBar status={summarizeBarStatus(state, errors)} pending={pending} cancelHref="/admin/tournaments" />
       </form>
-      <AdminToasts toasts={toasts} />
     </div>
   );
 }

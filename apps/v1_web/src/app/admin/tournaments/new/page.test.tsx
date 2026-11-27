@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GENDER_CHOICE_OPTIONS } from '@/components/admin/tournaments/tournament-gender-choice-field';
@@ -65,11 +65,12 @@ afterEach(() => {
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <AdminTournamentsNewPage />
     </QueryClientProvider>,
   );
+  return { client };
 }
 
 const field = (name: RegExp) => screen.getByLabelText(name);
@@ -334,7 +335,7 @@ describe('대회 만들기 한 화면 폼', { timeout: 20_000 }, () => {
     expect(screen.getByText('신청 마감은 대회 시작 전이어야 해요.')).toHaveAttribute('role', 'alert');
   });
 
-  it('서버가 거절하면 이유를 토스트로 보이고 입력을 지키며 다시 눌러 보낼 수 있다', async () => {
+  it('서버가 거절하면 이유를 폼 안 알림으로 남기고 입력을 지키며, 고치거나 다시 누르기 전까지 사라지지 않는다', async () => {
     let call = 0;
     useCreateHandler(() =>
       call++ === 0
@@ -345,15 +346,97 @@ describe('대회 만들기 한 화면 폼', { timeout: 20_000 }, () => {
     await fillRequired();
     fireEvent.click(submitButton());
 
-    expect(await screen.findByText('이 진행 방식은 최대 64팀까지 설정할 수 있어요.')).toBeInTheDocument();
+    const banner = await screen.findByText('이 진행 방식은 최대 64팀까지 설정할 수 있어요.');
+    expect(banner).toHaveAttribute('role', 'alert');
     expect(routerPush).not.toHaveBeenCalled();
     expect(field(/대회명/)).toHaveValue('  겨울컵 ');
     expect(field(/대회 시작/)).toHaveValue('2026-12-20T09:00');
-
     await waitFor(() => expect(submitButton()).toBeEnabled());
+    expect(banner).toBeInTheDocument();
+
+    fireEvent.change(field(/대회명/), { target: { value: '겨울컵 2' } });
+    expect(banner).not.toBeInTheDocument();
+
     fireEvent.click(submitButton());
     await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/admin/tournaments/t-9/overview?created=1'));
     expect(posted).toHaveLength(2);
+  });
+
+  it('거절된 뒤 고치지 않고 다시 눌러도 같은 이유가 또 오면 알림이 다시 나온다', async () => {
+    useCreateHandler(() => failure(409, 'DUPLICATE_TOURNAMENT', '같은 이름의 대회가 이미 있어요.'));
+    renderPage();
+    await fillRequired();
+    fireEvent.click(submitButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('같은 이름의 대회가 이미 있어요.');
+    await waitFor(() => expect(submitButton()).toBeEnabled());
+
+    fireEvent.click(submitButton());
+    expect(screen.queryByText('같은 이름의 대회가 이미 있어요.')).toBeNull();
+    expect(await screen.findByRole('alert')).toHaveTextContent('같은 이름의 대회가 이미 있어요.');
+    expect(posted).toHaveLength(2);
+  });
+
+  it('오류가 난 칸은 aria-invalid 와 설명으로 이유에 이어지고, 고치면 풀린다', async () => {
+    renderPage();
+    const sports = await sportGroup();
+    fireEvent.click(submitButton());
+
+    expect(sports).toHaveAttribute('aria-invalid', 'true');
+    expect(sports).toHaveAccessibleDescription('종목을 선택해 주세요.');
+    expect(field(/대회명/)).toHaveAttribute('aria-invalid', 'true');
+    expect(field(/대회명/)).toHaveAccessibleDescription('대회명을 입력해 주세요.');
+    expect(field(/대회 시작/)).toHaveAttribute('aria-invalid', 'true');
+    expect(field(/대회 시작/)).toHaveAccessibleDescription('대회 시작 일시를 선택해 주세요.');
+    expect(field(/신청 마감/)).toHaveAttribute('aria-invalid', 'true');
+    expect(field(/신청 마감/)).toHaveAccessibleDescription('신청 마감 일시를 선택해 주세요.');
+
+    await pickSport();
+    expect(sports).toHaveAttribute('aria-invalid', 'false');
+    expect(sports).not.toHaveAccessibleDescription();
+  });
+
+  it('팀 수가 첫 오류이면 팀 수 칸으로 가서 이유와 이어진다', async () => {
+    renderPage();
+    await fillRequired();
+    fireEvent.change(field(/팀 수/), { target: { value: '' } });
+    fireEvent.click(submitButton());
+
+    const alert = await screen.findByText('참가 팀 수는 2~64개여야 해요.');
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert).toHaveAttribute('data-error-focus', 'create-team-count');
+    await waitFor(() => expect(document.activeElement).toBe(field(/팀 수/)));
+    expect(field(/팀 수/)).toHaveAttribute('aria-invalid', 'true');
+    expect(field(/팀 수/)).toHaveAccessibleDescription('참가 팀 수는 2~64개여야 해요.');
+  });
+
+  it('시작을 고르면 시작 오류와 함께 자동으로 채워진 마감의 오류도 사라진다', async () => {
+    renderPage();
+    await sportGroup();
+    fireEvent.click(submitButton());
+    expect(screen.getByText('대회 시작 일시를 선택해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('신청 마감 일시를 선택해 주세요.')).toBeInTheDocument();
+
+    fireEvent.change(field(/대회 시작/), { target: { value: '2026-12-20T09:00' } });
+    expect(field(/신청 마감/)).toHaveValue('2026-12-17T23:59');
+    expect(screen.queryByText('대회 시작 일시를 선택해 주세요.')).toBeNull();
+    expect(screen.queryByText('신청 마감 일시를 선택해 주세요.')).toBeNull();
+    // 다른 칸의 오류는 그대로다.
+    expect(screen.getByText('종목을 선택해 주세요.')).toBeInTheDocument();
+  });
+
+  it('종목을 한 번 불러온 뒤 재조회가 실패해도 칩을 그대로 둔다', async () => {
+    const { client } = renderPage();
+    const sports = await sportGroup();
+    server.use(http.get('*/api/v1/master/sports', () => failure(500, 'INTERNAL_ERROR', '서버 오류예요.')));
+    // react-query 는 상태 변화를 다음 틱에 알려 주므로 화면이 갱신될 때까지 흘려보낸다.
+    await act(async () => {
+      await client.refetchQueries();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(client.getQueryCache().findAll().some((query) => query.state.status === 'error')).toBe(true);
+    expect(screen.queryByText('종목을 불러오지 못했어요.')).toBeNull();
+    expect(within(sports).getAllByRole('radio')).toHaveLength(4);
   });
 
   it('종목을 못 불러오면 이유와 다시 불러오기를 보인다', async () => {

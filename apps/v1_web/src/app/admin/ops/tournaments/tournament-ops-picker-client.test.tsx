@@ -4,11 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useV1AdminLeagueMatchList, useV1AdminTournaments } from '@/hooks/use-v1-api';
+import { useV1AdminLeagueMatchList } from '@/hooks/use-v1-api';
 import { TournamentOpsPickerClient, coversToday } from './tournament-ops-picker-client';
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminTournaments: vi.fn(),
   useV1AdminLeagueMatchList: vi.fn(),
 }));
 
@@ -29,6 +28,7 @@ function league(leagueId: string, title: string, state: 'draft' | 'active' | 'co
   return { leagueId, title, state, teamCount: 2, fixtureCount: 2, startsOn, endsOn, seriesId: null, seriesTitle: null, tierLabel: null, seasonNo: null };
 }
 
+type Row = ReturnType<typeof tournament>;
 const TODAY_TOURNAMENT = tournament('t-today', '겨울 풋살컵', 'in_progress', kst('2026-12-20', '09:00'));
 const OPEN_TOURNAMENT = tournament('t-open', '봄 풋살컵', 'open', kst('2027-03-01', '10:00'));
 const SPAN_TOURNAMENT = tournament('t-span', '장기 대회', 'in_progress', kst('2026-12-18', '09:00'), kst('2026-12-22', '18:00'));
@@ -38,7 +38,13 @@ const DRAFT_LEAGUE = league('l-draft', '준비 중 리그', 'draft', '2026-11-01
 
 type Boards = Record<string, string[] | 'error'>;
 let boards: Boards;
+let tournamentRows: Row[];
+/** 이 상태(또는 'recent')의 대회 목록 요청은 500 으로 실패한다. */
+let failListFor: string | null;
 const boardReads: string[] = [];
+const listRequests: URLSearchParams[] = [];
+
+const ok = (data: unknown) => HttpResponse.json({ status: 'success', timestamp: 't', data });
 
 const server = setupServer(
   http.get('*/api/v1/tournament-ops/tournaments/:id/operations', ({ params }) => {
@@ -46,15 +52,30 @@ const server = setupServer(
     boardReads.push(id);
     const entry = boards[id];
     if (entry === 'error' || entry === undefined) {
-      return HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: 'boom' }, { status: 500 });
+      return HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '서버가 응답하지 못했어요.' }, { status: 500 });
     }
-    return HttpResponse.json({
-      status: 'success',
-      timestamp: 't',
-      data: { items: entry.map((at, i) => ({ fixtureId: `${id}-${i}`, scheduledAt: at })), nextCursor: null, watermark: 'w', liveWarnings: [] },
-    });
+    return ok({ items: entry.map((at, i) => ({ fixtureId: `${id}-${i}`, scheduledAt: at })), nextCursor: null, watermark: 'w', liveWarnings: [] });
   }),
-  http.post('*/api/v1/logs/client-error', () => HttpResponse.json({ status: 'success', timestamp: 't', data: null })),
+  // 서버 어드민 대회 목록과 같은 제약: 한 번에 50건까지, 생성 최신순, 커서 페이지.
+  http.get('*/api/v1/admin/tournaments', ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    listRequests.push(params);
+    const limit = Number(params.get('limit') ?? 20);
+    if (limit > 50) {
+      return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_FAILED', message: '페이지 크기는 50을 넘을 수 없어요.' }, { status: 400 });
+    }
+    const status = params.get('status');
+    if (failListFor !== null && (status ?? 'recent') === failListFor) {
+      return HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '서버가 응답하지 못했어요.' }, { status: 500 });
+    }
+    const q = params.get('q');
+    const filtered = tournamentRows.filter((row) => (status === null || row.status === status) && (q === null || row.title.includes(q)));
+    const start = Number(params.get('cursor') ?? 0);
+    const items = filtered.slice(start, start + limit);
+    const next = start + limit < filtered.length ? String(start + limit) : null;
+    return ok({ items, pageInfo: { nextCursor: next, hasNext: next !== null }, summary: { total: filtered.length, byStatus: {} } });
+  }),
+  http.post('*/api/v1/logs/client-error', () => ok(null)),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -64,11 +85,7 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function mockLists(tournaments: unknown[], leagues: unknown[]) {
-  vi.mocked(useV1AdminTournaments).mockReturnValue({
-    data: { items: tournaments, pageInfo: undefined, summary: { total: tournaments.length, byStatus: {} } },
-    isPending: false, isError: false, error: null, refetch: vi.fn(),
-  } as never);
+function mockLeagues(leagues: unknown[]) {
   vi.mocked(useV1AdminLeagueMatchList).mockReturnValue({
     data: { items: leagues }, isPending: false, isError: false, error: null, refetch: vi.fn(),
   } as never);
@@ -78,11 +95,14 @@ beforeEach(() => {
   nav.replace.mockReset();
   nav.search = '';
   boardReads.length = 0;
+  listRequests.length = 0;
+  failListFor = null;
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(kst('2026-12-20', '12:00')));
   boards = { 't-today': [kst('2026-12-20', '10:00')], 't-span': [kst('2026-12-19', '10:00'), kst('2026-12-21', '10:00')], 'l-active': [] };
-  mockLists([TODAY_TOURNAMENT, OPEN_TOURNAMENT, SPAN_TOURNAMENT, DRAFT_TOURNAMENT], [ACTIVE_LEAGUE, DRAFT_LEAGUE]);
+  tournamentRows = [TODAY_TOURNAMENT, OPEN_TOURNAMENT, SPAN_TOURNAMENT, DRAFT_TOURNAMENT];
+  mockLeagues([ACTIVE_LEAGUE, DRAFT_LEAGUE]);
 });
 
 function renderPicker() {
@@ -137,6 +157,33 @@ describe('TournamentOpsPickerClient', () => {
     expect(screen.getByText(/2026\. 12\. 20\.\(일\)/)).toBeInTheDocument();
   });
 
+  it('대회 목록은 서버 한도(50건) 안에서 요청한다', async () => {
+    renderPicker();
+    await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' });
+
+    expect(listRequests.length).toBeGreaterThan(0);
+    for (const params of listRequests) expect(Number(params.get('limit'))).toBeLessThanOrEqual(50);
+  });
+
+  it('최근 50건보다 오래전에 만든 진행 중 대회도 오늘 후보에 들어간다', async () => {
+    const filler = Array.from({ length: 60 }, (_, i) => tournament(`t-old-done-${i}`, `지난 대회 ${i}`, 'completed', kst('2026-01-10', '09:00')));
+    const oldInProgress = tournament('t-old', '오래전에 만든 대회', 'in_progress', kst('2026-12-20', '08:00'), kst('2026-12-21', '18:00'));
+    tournamentRows = [...filler, oldInProgress];
+    boards = { 't-old': [kst('2026-12-20', '10:00')], 'l-active': [kst('2026-12-20', '11:00')] };
+    renderPicker();
+
+    const today = await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 2' });
+    expect(within(today).getAllByText('오래전에 만든 대회').length).toBeGreaterThan(0);
+    expect(boardReads).toContain('t-old');
+  });
+
+  it('최근 50건이 꽉 차 잘렸으면 그 사실을 알린다', async () => {
+    tournamentRows = Array.from({ length: 60 }, (_, i) => tournament(`t-${i}`, `대회 ${i}`, 'completed', kst('2026-01-10', '09:00')));
+    renderPicker();
+
+    expect(await screen.findByText('최근 50건과 진행 중·접수 중 대회를 보여요. 더 오래된 대회는 이름으로 찾아 주세요.')).toBeInTheDocument();
+  });
+
   it('상태 필터 칩이 없고, 접수 중이며 오늘 경기 없는 대회도 전체에서 열 수 있다', async () => {
     renderPicker();
     await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' });
@@ -158,7 +205,7 @@ describe('TournamentOpsPickerClient', () => {
     for (const href of targets) expect(href).toBe('/admin/live/l-active/operations');
   });
 
-  it('오늘 경기가 있는 곳이 하나뿐이면 그 운영 보드를 바로 연다', async () => {
+  it('오늘 경기가 있는 곳이 하나뿐이고 후보를 다 읽었으면 그 운영 보드를 바로 연다', async () => {
     renderPicker();
 
     await waitFor(() => expect(nav.replace).toHaveBeenCalledTimes(1));
@@ -191,16 +238,31 @@ describe('TournamentOpsPickerClient', () => {
     expect(within(allSection()).getAllByText('겨울 풋살컵').length).toBeGreaterThan(0);
   });
 
-  it('후보 하나의 보드를 못 읽어도 화면 오류가 아니고, 그 행은 전체에 남는다', async () => {
+  it('후보 하나의 보드를 못 읽으면 나머지 하나로 바로 가지 않고, 목록과 안내를 보여 준다', async () => {
     boards['t-today'] = 'error';
     boards['l-active'] = [kst('2026-12-20', '11:00')];
     renderPicker();
 
-    await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' });
-    expect(screen.queryByRole('button', { name: '다시 시도하기' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' })).toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('서버가 응답하지 못했어요.');
+    expect(alert).toHaveTextContent('목록에서 직접 골라 주세요');
     expect(within(allSection()).getAllByText('겨울 풋살컵').length).toBeGreaterThan(0);
-    // 판정이 끝나면 읽은 곳(리그) 하나만 오늘이다.
-    await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/admin/live/l-active/operations'));
+    expect(screen.getByRole('button', { name: '다시 확인하기' })).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('후보가 8곳을 넘으면 읽지 못한 곳이 있으므로 바로 열지 않는다', async () => {
+    const many = Array.from({ length: 9 }, (_, i) => tournament(`t-many-${i}`, `동시 대회 ${i}`, 'in_progress', kst('2026-12-20', '09:00')));
+    tournamentRows = many;
+    boards = Object.fromEntries(many.map((row) => [row.id, [kst('2026-12-20', '10:00')]]));
+    boards['l-active'] = [];
+    renderPicker();
+
+    expect(await screen.findByText(/오늘 경기를 확인하는 대회·리그는 8곳까지예요/)).toBeInTheDocument();
+    expect(boardReads.filter((id) => id.startsWith('t-many-'))).toHaveLength(8);
+    expect(nav.replace).not.toHaveBeenCalled();
   });
 
   it('이름 검색이 두 묶음을 모두 거른다', async () => {
@@ -244,6 +306,15 @@ describe('TournamentOpsPickerClient', () => {
     vi.mocked(useV1AdminLeagueMatchList).mockReturnValue({
       data: undefined, isPending: false, isError: true, error: new Error('boom'), refetch: vi.fn(),
     } as never);
+    renderPicker();
+
+    expect(await screen.findByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
+    expect(linkTargets(/운영 보드 열기/)).toEqual([]);
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('진행 중 대회 목록을 못 읽으면 후보를 알 수 없으므로 오류를 보여주고 열지 않는다', async () => {
+    failListFor = 'in_progress';
     renderPicker();
 
     expect(await screen.findByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();

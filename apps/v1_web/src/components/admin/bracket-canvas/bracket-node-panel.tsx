@@ -1,13 +1,11 @@
 'use client';
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
-import { X } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '@/components/v1-ui/button';
+import { Trash2, X } from 'lucide-react';
+import { useState, type KeyboardEvent } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
-import { useV1AssignTournamentSlot, useV1QuickResult, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
-import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
+import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
@@ -40,7 +38,7 @@ export type BracketNodePanelProps = {
   onClose: () => void;
 };
 
-const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
+const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '원정' };
 
 const DIRECT_SIDE_BLOCKED = {
   official: '공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.',
@@ -62,14 +60,11 @@ export function BracketNodePanel({
 }: BracketNodePanelProps) {
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
   const quickResult = useV1QuickResult(tournamentId, 'tournament');
-  const setBracketSources = useV1SetBracketSources(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [quickError, setQuickError] = useState<string | null>(null);
-  const [homeSourceId, setHomeSourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
-  const [awaySourceId, setAwaySourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
 
   const title = fixtureTitle(fixture, groups);
   const locked = isFixtureLocked(fixture);
@@ -79,27 +74,8 @@ export function BracketNodePanel({
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
   const game = fixture.game;
-  const sourceCandidates = bracketSourceCandidates({ target: fixture, groups, fixtures });
-  const sourceOptions = (side: SideKey) => {
-    const currentFixtureId = side === 'HOME' ? homeSourceId : awaySourceId;
-    const oppositeFixtureId = side === 'HOME' ? awaySourceId : homeSourceId;
-    return bracketSourceSideOptions({ candidates: sourceCandidates, fixtures, currentFixtureId, oppositeFixtureId });
-  };
-  const duplicateSourceSelected = homeSourceId !== '' && homeSourceId === awaySourceId;
-
-  const handleSaveSources = () => {
-    setBracketSources.mutate(
-      {
-        fixtureId: fixture.id,
-        homeSourceFixtureId: homeSourceId || null,
-        awaySourceFixtureId: awaySourceId || null,
-      },
-      {
-        onSuccess: () => showToast('진출 연결을 저장했어요.', 'success'),
-        onError: (error) => showToast(describeBracketCanvasError(error, '진출 연결을 저장하지 못했어요.'), 'error'),
-      },
-    );
-  };
+  // 단계·결선 경기는 팀을 자리가 아니라 「팀 채우기」 메뉴의 단계 관리가 정하고, 삭제도 단계 구성이 맡는다.
+  const stageManaged = groups.some((candidate) => candidate.id === fixture.groupId && candidate.bracketTrack?.startsWith('stage:'));
 
   const handleAssign = (slot: V1AdminBracketSlot, registrationId: string) => {
     assignSlot.mutate(
@@ -178,7 +154,7 @@ export function BracketNodePanel({
     const source = classifyFixtureSide(fixture, side, slotsById);
     let body: React.ReactNode;
     if (groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))) {
-      body = <p className="tm-text-caption text-[var(--text-muted)]">진출팀은 페이지 위의 진출팀 배정 화면에서 편집해요.</p>;
+      body = <p className="tm-text-caption text-[var(--text-muted)]">진출팀은 「팀 채우기」 메뉴에서 정해요.</p>;
     } else if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
@@ -186,7 +162,7 @@ export function BracketNodePanel({
           <div className="flex flex-col items-start gap-2">
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{DIRECT_SIDE_BLOCKED[teamChangeAccess]}</p>
             {teamChangeAccess === 'official' && canWrite ? (
-              <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 정정 화면 열기</Link>
+              <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
             ) : null}
           </div>
         );
@@ -299,8 +275,8 @@ export function BracketNodePanel({
     if (game.hasLiveRecords) {
       return (
         <div className="flex flex-col items-start gap-2">
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 정정 화면에서 처리해 주세요.</p>
-          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 정정 화면 열기</Link>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 처리해 주세요.</p>
+          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
         </div>
       );
     }
@@ -338,80 +314,52 @@ export function BracketNodePanel({
 
   const sectionTitle = 'tm-text-label font-semibold';
 
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    // 확인 창은 portal 이라 React 이벤트는 올라와도 DOM 은 패널 밖이다 — 패널 안에서 누른 ESC 만 닫는다.
+    if (event.key === 'Escape' && !event.defaultPrevented && event.currentTarget.contains(event.target as Node)) onClose();
+  };
+  const iconButton = 'flex size-11 shrink-0 items-center justify-center transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+
   return (
     <aside
       aria-label="칸 상세"
+      onKeyDown={onKeyDown}
       className="flex flex-col gap-5 p-4"
-      style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)' }}
+      style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)', boxShadow: 'var(--shadow-dropdown)' }}
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="tm-text-body-lg min-w-0 truncate font-bold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
-        <button
-          type="button"
-          aria-label="패널 닫기"
-          onClick={onClose}
-          className="flex size-11 shrink-0 items-center justify-center transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          style={{ borderRadius: 'var(--radius-control)', color: 'var(--text-muted)' }}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <div className="flex shrink-0 items-center">
+          {canWrite && !stageManaged ? (
+            <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={iconButton}
+              style={{ borderRadius: 'var(--radius-control)', color: 'var(--red700)' }}>
+              <Trash2 size={18} aria-hidden="true" />
+            </button>
+          ) : null}
+          <button type="button" aria-label="패널 닫기" onClick={onClose} className={iconButton}
+            style={{ borderRadius: 'var(--radius-control)', color: 'var(--text-muted)' }}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <section aria-label="팀 자리" className="flex flex-col gap-3">
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>팀 자리</h3>
         {renderSide('HOME')}
         {renderSide('AWAY')}
-        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:'))} showToast={showToast} onSaved={onClose} />
+        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite && !stageManaged} showToast={showToast} onSaved={onClose} />
         {hidesOtherGroupTeams ? (
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
         ) : null}
       </section>
 
-      {isFixtureLinkable(fixture) && sourceCandidates.length > 0 ? (
-        <section aria-label="진출 연결" className="flex flex-col gap-3">
-          <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>진출 연결</h3>
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>이전 경기의 승자나 패자를 이 칸으로 연결해요. 연결된 팀은 자리에서 직접 바꾸지 않고 여기서 출처를 수정해요.</p>
-          {(['HOME', 'AWAY'] as const).map((side) => {
-            const value = side === 'HOME' ? homeSourceId : awaySourceId;
-            const options = sourceOptions(side);
-            return (
-              <label key={side} className="flex flex-col gap-1 tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                {side === 'HOME' ? '홈 출처 경기' : '어웨이 출처 경기'}
-                <select
-                  aria-label={`${side === 'HOME' ? '홈' : '어웨이'} 출처 경기`}
-                  className="tm-input"
-                  style={{ minHeight: 44 }}
-                  value={options.some((candidate) => candidate.id === value) ? value : ''}
-                  disabled={!canWrite || setBracketSources.isPending}
-                  onChange={(event) => side === 'HOME' ? setHomeSourceId(event.target.value) : setAwaySourceId(event.target.value)}
-                >
-                  <option value="">연결 없음 · 직접 배정</option>
-                  {options.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>{`${fixtureTitle(candidate, groups)} ${groups.find((group) => group.id === fixture.groupId)?.phase === 'third_place' ? '패자' : '승자'}`}</option>
-                  ))}
-                </select>
-              </label>
-            );
-          })}
-          {canWrite ? <Button type="button" variant="outline" size="md" disabled={duplicateSourceSelected} loading={setBracketSources.isPending} onClick={handleSaveSources}>진출 연결 저장</Button> : null}
-        </section>
-      ) : null}
+      <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} showToast={showToast} />
 
       <section aria-label="결과" className="flex flex-col gap-3">
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>결과</h3>
         {renderResult()}
       </section>
 
-      <section aria-label="경기 정보" className="flex flex-col gap-3">
-        <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>경기 정보</h3>
-        <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} showToast={showToast} />
-      </section>
-
-      {canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:')) ? (
-        <Button type="button" variant="outline" size="md" className="self-start" style={{ color: 'var(--red700)' }} onClick={() => void handleDelete()}>
-          경기 삭제
-        </Button>
-      ) : null}
       {ConfirmModal}
       {teamChangeDialog}
     </aside>

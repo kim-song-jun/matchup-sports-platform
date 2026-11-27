@@ -148,9 +148,18 @@ describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
 
     // 탭 전환이 아니라 하위 라우트 이동이어야 딥링크·뒤로가기가 동작한다.
     for (const [label, slug] of [
+      ['신청', 'registrations'],
+      ['대진', 'bracket'],
+    ] as const) {
+      expect(screen.getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute(
+        'href',
+        `/admin/tournaments/tournament-1/${slug}`,
+      );
+    }
+    // 자주 쓰지 않는 섹션은 더보기 안에 있다.
+    await userEvent.click(screen.getByRole('button', { name: /더보기/ }));
+    for (const [label, slug] of [
       ['캠페인', 'campaign'],
-      ['신청 관리', 'registrations'],
-      ['대진 관리', 'bracket'],
       ['통계', 'statistics'],
     ] as const) {
       expect(screen.getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute(

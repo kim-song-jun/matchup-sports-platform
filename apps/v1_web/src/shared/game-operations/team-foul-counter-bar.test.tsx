@@ -90,6 +90,40 @@ describe('TeamFoulCounterBar', () => {
     expect(screen.queryByText(/0부터 다시 세요/)).toBeNull();
   });
 
+  // 기준이 5개면 5개째는 "다음부터 10m 프리킥"(예고), 6번째 파울부터가 "세컨 파울 · 10m 프리킥"이다.
+  it('기준에 이르면 예고하고, 기준을 넘는 파울부터는 세컨 파울로 알린다(기본 5개: 5 → 예고, 6 → 세컨 파울)', () => {
+    const { unmount } = render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 5, 'side-away': 4 }} period={1} />);
+    expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+    expect(screen.queryByText('세컨 파울 · 10m 프리킥')).toBeNull();
+    unmount();
+
+    render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 6, 'side-away': 5 }} period={1} />);
+    // 홈 6개 = 기준 초과 → 세컨 파울, 원정 5개 = 기준 도달 → 예고.
+    expect(screen.getAllByText('세컨 파울 · 10m 프리킥')).toHaveLength(1);
+    expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+    expect(screen.getByText('QA0929 마포 FC').closest('div')).toHaveTextContent('세컨 파울 · 10m 프리킥');
+  });
+
+  it('세컨 파울 상태는 예고와 문구뿐 아니라 색도 다르다(색만으로 구분하지 않는다)', () => {
+    render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 6, 'side-away': 5 }} period={1} />);
+    const second = screen.getByText('세컨 파울 · 10m 프리킥');
+    const notice = screen.getByText('다음부터 10m 프리킥');
+    expect(second).toHaveClass('text-red-700');
+    expect(notice).toHaveClass('text-orange-700');
+    expect(second.textContent).not.toBe(notice.textContent);
+  });
+
+  it('기준이 3개면 3개째 예고, 4번째 파울부터 세컨 파울이다', () => {
+    const { unmount } = render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 3, 'side-away': 0 }} period={1} threshold={3} />);
+    expect(screen.getAllByText('다음부터 10m 프리킥')).toHaveLength(1);
+    expect(screen.queryByText('세컨 파울 · 10m 프리킥')).toBeNull();
+    unmount();
+
+    render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 4, 'side-away': 0 }} period={1} threshold={3} />);
+    expect(screen.getAllByText('세컨 파울 · 10m 프리킥')).toHaveLength(1);
+    expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+  });
+
   it('팀이 없으면 아무것도 그리지 않는다', () => {
     const { container } = render(<TeamFoulCounterBar sides={[]} counts={{}} period={1} />);
     expect(container).toBeEmptyDOMElement();

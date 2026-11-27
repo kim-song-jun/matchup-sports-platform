@@ -91,6 +91,14 @@ export class CreateGroupTeamDto {
 
 /** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
 export class CreateBracketByeDto {
+  @ValidateIf(o => o.targetFixtureId !== undefined || o.targetSide !== undefined)
+  @IsUUID()
+  targetFixtureId?: string;
+
+  @ValidateIf(o => o.targetFixtureId !== undefined || o.targetSide !== undefined)
+  @IsIn(['HOME', 'AWAY'])
+  targetSide?: 'HOME' | 'AWAY';
+
   /** Existing bye slot to edit; absent creates a new slot. */
   @IsOptional()
   @IsUUID()
@@ -353,3 +361,19 @@ export class FixtureGoalDto {
 // (TOURNAMENT_RESULT_DERIVED_ONLY)로 끝나는 경로에 달려 있어 한 번도 저장된 적이 없는 죽은
 // 입력이었다. 실제 등록·삭제는 대회 스태프 권한이 걸린
 // `apps/v1_api/src/tournaments/videos/` (CreateFixtureVideoDto)가 담당한다.
+
+export class GroupTeamSwapDto {
+  @IsUUID()
+  firstFixtureId!: string;
+
+  @IsUUID()
+  secondFixtureId!: string;
+
+  @IsString()
+  @MaxLength(200)
+  firstAssignment!: string;
+
+  @IsString()
+  @MaxLength(200)
+  secondAssignment!: string;
+}

@@ -19,6 +19,7 @@ import type { V1AdminBracketFixture } from '@/types/api';
 import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
 import { fixtureTitle } from './bracket-canvas';
 import { FixtureAssignmentContext } from './fixture-assignment-context';
+import { GroupFixtureTeamSwap } from './group-fixture-team-swap';
 
 /** 시간·구장 일괄 배정 패널. 어느 패널을 열지는 도구 메뉴가 쥐고(`mode`), 이 컴포넌트는 그 값을 그린다. */
 export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFields, showToast, mode, onModeChange, children }: {
@@ -230,6 +231,7 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
     </div>
   </section>;
   return <FixtureAssignmentContext.Provider value><div className="flex min-w-0 flex-col gap-4">
+    {canWrite && groups.some(group => group.phase === "group") && <GroupFixtureTeamSwap tournamentId={tournamentId} groups={groups} fixtures={fixtures} teamNames={fixtureName} showToast={showToast} />}
     <div className={mode && wide ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_360px] items-start gap-4' : 'min-w-0'}>
       <div className="min-w-0">{children}</div>
       {mode && wide ? <aside id={`${id}-panel`} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}

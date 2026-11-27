@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => mocks.bracket,
+  useV1CreateBracketBye: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
   useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({

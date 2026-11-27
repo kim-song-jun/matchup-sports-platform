@@ -10,6 +10,7 @@ export class StageLegacyMutationGuard implements CanActivate {
     if (req.method === 'GET') return true;
     const path = req.route?.path ?? '';
     if (path.endsWith('/result') || path.endsWith('/standings/recalculate') || path.includes('competition-config')) return true;
+    if (req.method === 'POST' && path.endsWith('/group-fixture-team-swap')) return true;
     // Presentation/schedule changes use their existing permission and service guards.
     // A mixed request must not smuggle roster or topology changes through this allowlist.
     if (req.method === 'PATCH' && path.endsWith('/fixtures/:fixtureId') && Object.keys(req.body ?? {}).every(k => ['displayTitle', 'homeDisplayLabel', 'awayDisplayLabel', 'fixtureNumber', 'scheduledAt', 'venue', 'venueAddress', 'venueLatitude', 'venueLongitude', 'venueProvider', 'venueProviderId', 'fieldId', 'expectedVersion'].includes(k))) return true;

@@ -20,6 +20,7 @@ import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracke
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
+import { ManualByeEditor } from './manual-bye-editor';
 import { ByeSlotEditor } from './bye-slot-editor';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
@@ -53,6 +54,7 @@ export function BracketCanvasWorkspace({
   controls,
 }: BracketCanvasWorkspaceProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
+  const [manualId, setManualId] = useState<string | null>(null);
   const [selectedByeSlotId, setSelectedByeSlotId] = useState<string | null>(null);
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
   const [pendingRegistrationId, setPendingRegistrationId] = useState<string | null>(null);
@@ -149,10 +151,12 @@ export function BracketCanvasWorkspace({
           AWAY: fixtureSideLabel(selectedFixture, 'AWAY', labelContext),
         };
 
+  const manualGroup = visible.groups.find(group => group.groupTeams.some(row => row.id === manualId));
+  const manualBye = manualGroup?.groupTeams.find(row => row.id === manualId);
   const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && (slot.kind === 'BYE' || slot.byeSortOrder != null));
   const selectFixture = (id: string) => { setSelectedByeSlotId(null); setSelectedFixtureId(id); };
   const selectBye = (slotId: string) => { const fixture = bracket.fixtures.find(f => f.homeSlotId === slotId || f.awaySlotId === slotId); if (fixture) { setSelectedByeSlotId(slotId); setSelectedFixtureId(fixture.id); } };
-  const panel = selectedBye && selectedFixture ? <ByeSlotEditor key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite && !staged} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :
+  const panel = selectedBye && selectedFixture ? <ByeSlotEditor fixtures={bracket.fixtures} key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite && !staged} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :
     selectedFixture !== null && selectedLabels !== null ? (
       <BracketNodePanel
         key={selectedFixture.id}
@@ -215,6 +219,7 @@ export function BracketCanvasWorkspace({
             <BracketLeagueGrid groups={visible.groups} fixtures={visible.fixtures} slots={visible.slots} {...sharedViewProps} />
           ) : (
             <BracketCanvas
+              onSelectManualBye={(_, id) => setManualId(id)}
               scopedPool={Boolean(pool)}
               sixTeamState={sixTeamState}
               registrations={registrations}
@@ -238,6 +243,10 @@ export function BracketCanvasWorkspace({
         ) : null}
       </div>
 
+      {manualGroup && manualBye && <BottomSheet open title="부전승 자리 편집" onClose={() => setManualId(null)}>
+        <ManualByeEditor tournamentId={tournamentId} group={manualGroup} bye={manualBye} teams={confirmedTeams}
+          fixtures={visible.fixtures} groups={visible.groups} canWrite={canWrite && !staged && registrationsState.status === 'success'} onSaved={() => setManualId(null)} />
+      </BottomSheet>}
       {panel !== null && selectedFixture !== null && !sidePanel ? (
         <BottomSheet open onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} ariaLabel={selectedBye ? "부전승 자리 편집" : fixtureTitle(selectedFixture, bracket.groups)}>
           {panel}

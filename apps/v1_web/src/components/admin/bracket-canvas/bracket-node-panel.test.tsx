@@ -545,13 +545,13 @@ describe('BracketNodePanel — 결과 구역', () => {
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 
-  it('무효 처리된 결과는 다시 입력할 수 있게 폼을 연다', () => {
+  it('무효 처리된 결과는 복구 액션을 제공한다', () => {
     renderPanel(
       readyFixture({
         game: makeGame({ id: 'game-1', state: 'ENDED', latestRevision: { id: 'rev', state: 'VOID', entryMethod: 'quick', score: { home: 1, away: 0 } } }),
       }),
     );
-    expect(screen.getByText('무효 처리된 결과예요. 점수를 다시 넣을 수 있어요.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '점수 확정' })).toBeInTheDocument();
+    expect(screen.getByTestId('result-actions')).toHaveTextContent('game-1');
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 });

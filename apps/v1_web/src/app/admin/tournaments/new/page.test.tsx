@@ -504,6 +504,51 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     ));
   });
 
+  // 팀 파울 기준 — 입력칸은 마지막 단계(상금·홍보)에 있다. 검증도 그 단계에서 해야 한다: 앞 단계(참가 조건)에
+  // 두었더니 잘못된 값이 남은 채 `대회 만들기`를 누르면 칸이 없는 단계로 돌려보내져 이유를 알 수 없었다(alpha 실측).
+  it('팀 파울 기준: 입력한 개수는 대회를 만들 때 보내고, 비우면 null(기본 5개)을 보낸다', () => {
+    createMutate.mockImplementation(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    goToPresentationStep();
+
+    expect(screen.getByLabelText(/팀 파울 기준/)).toHaveValue(null);
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: 7 });
+  });
+
+  it('팀 파울 기준: 비워 두면 기본값(null)을 보낸다', () => {
+    createMutate.mockImplementation(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: null });
+  });
+
+  it('팀 파울 기준: 1~20 밖의 값은 만들기를 막고, 칸이 있는 같은 단계에서 오류를 보여 준다', () => {
+    renderPage();
+    goToPresentationStep();
+
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '21' } });
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate).not.toHaveBeenCalled();
+    // 다른 단계로 돌려보내지지 않고 칸이 그대로 있으며, 그 칸 아래에 이유가 보인다.
+    expect(screen.getByLabelText(/팀 파울 기준/)).toBeInTheDocument();
+    expect(screen.getByText(/팀 파울 기준은 1부터 20 사이의 정수/)).toBeInTheDocument();
+
+    // 고치면 다시 만들 수 있다.
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '20' } });
+    expect(screen.queryByText(/팀 파울 기준은 1부터 20 사이의 정수/)).toBeNull();
+  });
+
   it('동점일 때 순서: 참가 조건 단계에서 순서를 옮기면 대회를 만들 때 그 순서를 보낸다', () => {
     createMutate.mockImplementationOnce(
       (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>

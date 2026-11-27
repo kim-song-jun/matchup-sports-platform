@@ -773,9 +773,6 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
         errors.minMatchesPerTeam = '최소 경기 수는 1~50경기 사이의 정수여야 해요.';
       }
     }
-    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
-      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
-    }
     if (state.genderCategory === 'mixed') {
       const minMale = optionalNumeric(state.genderMinMale);
       const maxMale = optionalNumeric(state.genderMaxMale);
@@ -815,6 +812,12 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
+    // 팀 파울 기준 입력칸은 이 단계(상금·홍보)에 있다. 검증을 칸이 없는 앞 단계에 두면, 잘못된 값이 남은 채
+    // 마지막에 `대회 만들기`를 눌렀을 때 오류가 없는 단계로 돌려보내져 이유를 알 수 없고 `다음`도 조용히 막힌다
+    // (alpha 실측, 2026-11-27). 칸과 같은 단계에서 막아야 그 자리에서 오류를 보고 고칠 수 있다.
+    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
+      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
+    }
     // 서버 DTO 는 꺼진 홍보의 priority 도 0~9999 정수로 검증한다 — 꺼진 카드도 막는다.
     for (const [field, card, label] of [
       ['promoHomePriority', state.promoHome, '홈 홍보 우선순위'],

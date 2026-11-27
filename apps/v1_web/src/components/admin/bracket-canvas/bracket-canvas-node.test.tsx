@@ -99,6 +99,23 @@ describe('BracketCanvasNode — 표시', () => {
     expect(idle.style.background).toBe('');
   });
 
+  it('dimmed 칸은 data-dimmed 와 낮은 불투명도만 더하고 접근 이름·동작은 그대로다', () => {
+    const props = renderNode(base, { dimmed: true });
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group).toHaveAttribute('data-dimmed', 'true');
+    expect(group).toHaveClass('opacity-40');
+    expect(screen.getByRole('group', { name: '8강 1번 경기, 예정' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '8강 1번 경기 열기' }));
+    expect(props.onSelect).toHaveBeenCalledWith('f1');
+  });
+
+  it('dimmed 가 아니면 data-dimmed 도 불투명도 클래스도 없다(대조군)', () => {
+    renderNode(base);
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group).not.toHaveAttribute('data-dimmed');
+    expect(group).not.toHaveClass('opacity-40');
+  });
+
   it('칸 줄 이름은 홈·원정', () => {
     renderNode(base);
     expect(screen.getByRole('button', { name: /^홈 / })).toBeInTheDocument();

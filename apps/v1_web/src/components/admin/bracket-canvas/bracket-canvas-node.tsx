@@ -33,6 +33,8 @@ export type BracketCanvasNodeProps = {
   sideLabels: Record<SideKey, string>;
   slots: { HOME: V1AdminBracketSlot | null; AWAY: V1AdminBracketSlot | null };
   selected: boolean;
+  /** 지금 보는 조건(시간 미정만 보기 등)에 해당하지 않는 칸 — 흐리게만 하고 접근 이름·동작은 그대로다. */
+  dimmed?: boolean;
   canWrite: boolean;
   pendingRegistrationId: string | null;
   onSelect: (fixtureId: string) => void;
@@ -48,6 +50,7 @@ export function BracketCanvasNode({
   sideLabels,
   slots,
   selected,
+  dimmed = false,
   canWrite,
   pendingRegistrationId,
   onSelect,
@@ -129,7 +132,8 @@ export function BracketCanvasNode({
       aria-label={`${accessibleTitle}, ${chip.label}`}
       data-fixture-id={fixture.id}
       data-state={state}
-      className={`${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]`}
+      data-dimmed={dimmed ? 'true' : undefined}
+      className={`${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]${dimmed ? ' opacity-40' : ''}`}
       style={{
         ...placement,
         borderRadius: 'var(--radius-container)',

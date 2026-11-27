@@ -25,7 +25,9 @@ function matrixResponse(page) {
 }
 async function openPanel(page) {
   const loaded = matrixResponse(page);
-  await page.getByText(target.teamName, { exact: true }).locator('xpath=ancestor::*[.//button[normalize-space()="경기별 명단"]][1]').getByRole('button', { name: '경기별 명단', exact: true }).click();
+  await page.getByRole('button', { name: `${target.teamName} 더보기`, exact: true }).click();
+  const openItem = /^경기별 명단(?! 접기)/;
+  await page.getByRole('menuitem', { name: openItem }).or(page.getByRole('dialog', { name: target.teamName, exact: true }).getByRole('button', { name: openItem })).click();
   const data = await loaded;
   await page.getByRole('region', { name: `${target.teamName} 경기별 명단`, exact: true }).waitFor();
   return data;

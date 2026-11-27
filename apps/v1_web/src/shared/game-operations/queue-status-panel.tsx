@@ -50,7 +50,7 @@ function eventLabel(item: QueuedGameEvent): string {
   }
   if (item.event.type === 'FOUL') return '파울';
   if (item.event.type === 'SUBSTITUTION') return '교체';
-  if (item.event.type === 'CORRECTION') return '정정';
+  if (item.event.type === 'CORRECTION') return '기록 취소';
   return item.event.type;
 }
 

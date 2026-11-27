@@ -466,7 +466,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     expect(screen.getByText('기록 시각 정정')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    await user.click(screen.getByRole('button', { name: '기록 고치기 (옐로카드)' }));
     const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
     expect(within(dialog).getByText('확정된 결과')).toBeInTheDocument();
 
@@ -491,7 +491,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '기록 수정 (옐로카드)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '기록 고치기 (옐로카드)' })).not.toBeInTheDocument();
   });
 
   it('공식 결과가 없으면(무효 포함) 정정 카드를 보이지 않는다', () => {
@@ -1011,7 +1011,7 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    await user.click(screen.getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
     const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
     expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
 
@@ -1048,7 +1048,7 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    await user.click(screen.getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
     const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
     await user.type(within(dialog).getByLabelText(/정정 사유/), '대조 결과');

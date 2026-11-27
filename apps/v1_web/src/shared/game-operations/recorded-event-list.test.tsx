@@ -240,13 +240,13 @@ describe('RecordedEventList', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('파울');
     expect(rows[0]).toHaveTextContent('취소된 기록');
-    expect(rows[1]).toHaveTextContent('정정');
+    expect(rows[1]).toHaveTextContent('기록 취소');
     expect(rows[1]).not.toHaveTextContent('취소된 기록');
     expect(rows[2]).toHaveTextContent('골');
     expect(rows[2]).not.toHaveTextContent('취소된 기록');
-    expect(within(rows[0]).queryByRole('button', { name: '수정·취소' })).toBeNull();
+    expect(within(rows[0]).queryByRole('button', { name: '고치기' })).toBeNull();
     expect(within(rows[0]).queryByRole('button', { name: /어시스트/ })).toBeNull();
-    await userEvent.click(within(rows[2]).getByRole('button', { name: '수정·취소' }));
+    await userEvent.click(within(rows[2]).getByRole('button', { name: '고치기' }));
     expect(onReverseEvent).toHaveBeenCalledWith(unrelatedUndefinedReference);
   });
 
@@ -263,7 +263,7 @@ describe('RecordedEventList', () => {
       payload: { previousClockMs: 11 * 60000, clockMs: 9 * 60000, reason: '기록 대조', lane: 'OPERATOR' },
     };
 
-    it('정정 행은 줄로 그리지 않고, 원본 줄이 정정된 시각과 "정정됨"을 보여준다', () => {
+    it('시각을 고친 행은 줄로 그리지 않고, 원본 줄이 고친 시각과 "고친 기록"을 보여준다', () => {
       // 증분 수신 직후처럼 원본의 clockMs 가 아직 옛 값(11분)이어도 정정 행의 시각이 이긴다.
       render(<RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
 
@@ -272,13 +272,13 @@ describe('RecordedEventList', () => {
       expect(rows[0]).toHaveTextContent('후반 9:00');
       expect(rows[0]).not.toHaveTextContent('후반 11:00');
       expect(rows[0]).not.toHaveTextContent('TIME_CORRECTION');
-      expect(within(rows[0]).getByRole('button', { name: /정정됨/ })).toHaveAttribute('aria-expanded', 'false');
+      expect(within(rows[0]).getByRole('button', { name: /고친 기록/ })).toHaveAttribute('aria-expanded', 'false');
     });
 
-    it('"정정됨"을 열면 처음 기록·정정 주체·시각이 보이고, 44px 높이의 버튼이다', async () => {
+    it('"고친 기록"을 열면 처음 기록·고친 주체·시각이 보이고, 44px 높이의 버튼이다', async () => {
       render(<RecordedEventList events={[original, timeCorrection]} sides={SIDES} lineups={LINEUPS} />);
 
-      const toggle = screen.getByRole('button', { name: /정정됨/ });
+      const toggle = screen.getByRole('button', { name: /고친 기록/ });
       expect(toggle.className).toContain('min-h-[44px]');
       await userEvent.click(toggle);
 
@@ -301,11 +301,11 @@ describe('RecordedEventList', () => {
       };
       render(<RecordedEventList events={[original, adminCorrection]} sides={SIDES} lineups={LINEUPS} />);
 
-      await userEvent.click(screen.getByRole('button', { name: /정정됨/ }));
+      await userEvent.click(screen.getByRole('button', { name: /고친 기록/ }));
       expect(screen.getByText(/플랫폼 관리자/)).toHaveTextContent('사유: 심판 기록지 대조');
     });
 
-    it('onEditEvent 가 있으면 시각을 고칠 수 있는 줄에 "수정"이 뜨고 원본 이벤트를 넘긴다', async () => {
+    it('onEditEvent 가 있으면 시각을 고칠 수 있는 줄에 "고치기"가 뜨고 원본 이벤트를 넘긴다', async () => {
       const onEditEvent = vi.fn();
       const onReverseEvent = vi.fn();
       render(
@@ -318,15 +318,15 @@ describe('RecordedEventList', () => {
         />,
       );
 
-      expect(screen.queryByRole('button', { name: '수정·취소' })).toBeNull();
-      const edit = screen.getByRole('button', { name: '기록 수정 (골)' });
+      expect(screen.queryByRole('button', { name: '고치기' })).toBeNull();
+      const edit = screen.getByRole('button', { name: '기록 고치기 (골)' });
       expect(edit.className).toContain('min-h-[44px]');
       await userEvent.click(edit);
       expect(onEditEvent).toHaveBeenCalledWith(original);
       expect(onReverseEvent).not.toHaveBeenCalled();
     });
 
-    it('취소된 기록·확정된 결과·레거시 백필 골에는 "수정"을 내지 않는다', () => {
+    it('취소된 기록·확정된 결과에는 시각 고치기를 내지 않고, 레거시 백필 골은 취소로만 이어진다', () => {
       const reversal: GameEventRecord = {
         ...goal(5, HOME_SIDE_ID, 'p-jung', 1),
         id: 'rev-1',
@@ -337,19 +337,19 @@ describe('RecordedEventList', () => {
       const { rerender } = render(
         <RecordedEventList events={[original, reversal, backfilled]} sides={SIDES} lineups={LINEUPS} onEditEvent={vi.fn()} onReverseEvent={vi.fn()} />,
       );
-      expect(screen.queryAllByRole('button', { name: '기록 수정 (골)' })).toHaveLength(0);
-      // 백필 골은 시각 정정이 막혀 있어 기존 "수정·취소"로 물러난다.
-      expect(screen.getAllByRole('button', { name: '수정·취소' })).toHaveLength(1);
+      expect(screen.queryAllByRole('button', { name: '기록 고치기 (골)' })).toHaveLength(0);
+      // 백필 골은 시각을 고칠 수 없어 기록 취소로 이어지는 고치기만 남는다.
+      expect(screen.getAllByRole('button', { name: '고치기' })).toHaveLength(1);
 
       rerender(
         <RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onEditEvent={vi.fn()} resultOfficialized />,
       );
-      expect(screen.queryByRole('button', { name: '기록 수정 (골)' })).toBeNull();
+      expect(screen.queryByRole('button', { name: '기록 고치기 (골)' })).toBeNull();
     });
 
-    it('onEditEvent 가 없으면 기존 "수정·취소"가 그대로다', () => {
+    it('onEditEvent 가 없으면 "고치기"는 기록 취소 콜백으로 이어진다', () => {
       render(<RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
-      expect(screen.getByRole('button', { name: '수정·취소' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '고치기' })).toBeInTheDocument();
     });
   });
 
@@ -532,7 +532,7 @@ describe('RecordedEventList', () => {
     expect(screen.queryByRole('button', { name: /되돌리기/ })).toBeNull();
   });
 
-  it('골·카드 이벤트는 수정·취소 버튼으로 공용 되돌리기 콜백을 호출한다', async () => {
+  it('골·카드 이벤트는 고치기 버튼으로 공용 되돌리기 콜백을 호출한다', async () => {
     const onReverseEvent = vi.fn();
     const recordedGoal = goal(1, HOME_SIDE_ID, 'p-jung', 124_000);
     render(
@@ -543,7 +543,7 @@ describe('RecordedEventList', () => {
         onReverseEvent={onReverseEvent}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: '수정·취소' }));
+    await userEvent.click(screen.getByRole('button', { name: '고치기' }));
     expect(onReverseEvent).toHaveBeenCalledWith(recordedGoal);
   });
 });
@@ -655,7 +655,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
 
     const merged = rowsOf()[1];
     expect(within(merged).getAllByRole('button')).toHaveLength(1);
-    await userEvent.click(within(merged).getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
+    await userEvent.click(within(merged).getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
     expect(onEditEvent).toHaveBeenCalledTimes(1);
     expect(onEditEvent).toHaveBeenCalledWith(red, [second]);
   });
@@ -665,7 +665,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     const only = card(1, 'YELLOW', 1, 11 * 60000);
     render(<RecordedEventList events={[only]} sides={SIDES} lineups={LINEUPS} onEditEvent={onEditEvent} />);
 
-    await userEvent.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
+    await userEvent.click(screen.getByRole('button', { name: '기록 고치기 (옐로카드)' }));
     expect(onEditEvent).toHaveBeenCalledWith(only);
   });
 
@@ -683,7 +683,7 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     expect(within(rowsOf()[1]).queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('시각 수정 없이 취소만 가능한 화면에서는 합친 줄에 옐로·레드 각각의 수정·취소 버튼을 둔다', async () => {
+  it('시각 고치기 없이 취소만 가능한 화면에서는 합친 줄에 옐로·레드 각각의 고치기 버튼을 둔다', async () => {
     const onReverseEvent = vi.fn();
     const second = card(2, 'YELLOW', 2, 31 * 60000);
     const red = card(3, 'RED', 2, 31 * 60000);
@@ -697,9 +697,9 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     );
 
     const merged = rowsOf()[1];
-    await userEvent.click(within(merged).getByRole('button', { name: '옐로 수정·취소' }));
+    await userEvent.click(within(merged).getByRole('button', { name: '옐로 고치기' }));
     expect(onReverseEvent).toHaveBeenLastCalledWith(second);
-    await userEvent.click(within(merged).getByRole('button', { name: '레드 수정·취소' }));
+    await userEvent.click(within(merged).getByRole('button', { name: '레드 고치기' }));
     expect(onReverseEvent).toHaveBeenLastCalledWith(red);
   });
 

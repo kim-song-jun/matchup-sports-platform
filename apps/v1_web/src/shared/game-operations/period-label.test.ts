@@ -7,9 +7,21 @@ describe('periodLabel', () => {
     expect(periodLabel(2)).toBe('후반');
   });
 
-  it('3피리어드 이상은 전/후반이 뜻을 잃으므로 번호 기반으로 되돌아간다', () => {
-    expect(periodLabel(3)).toBe('3피리어드');
-    expect(periodLabel(4)).toBe('4피리어드');
+  it('정규 전·후반 뒤의 셋째·넷째는 연장 전반·연장 후반이다', () => {
+    expect(periodLabel(3)).toBe('연장 전반');
+    expect(periodLabel(4)).toBe('연장 후반');
+    expect(periodLabel(3, 2)).toBe('연장 전반');
+    expect(periodLabel(4, 2)).toBe('연장 후반');
+  });
+
+  it('그 밖의 구간과 정규 구간이 셋 이상인 경기는 번호로 부른다', () => {
+    expect(periodLabel(5)).toBe('5번째 경기 시간');
+    expect(periodLabel(3, 4)).toBe('3번째 경기 시간');
+    expect(periodLabel(4, 4)).toBe('4번째 경기 시간');
+  });
+
+  it('어떤 이름에도 「피리어드」를 쓰지 않는다', () => {
+    for (const number of [1, 2, 3, 4, 5, 6]) expect(periodLabel(number)).not.toContain('피리어드');
   });
 });
 

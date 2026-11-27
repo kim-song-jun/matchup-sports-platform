@@ -282,7 +282,7 @@ describe('LeagueFixturePanel — 경기 삭제', () => {
     renderPanel(nodeOf({ game: makeGame({ id: 'g1', state: 'LIVE' }) }));
     const button = screen.getByRole('button', { name: '경기 삭제' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.');
+    expect(button).toHaveAccessibleDescription('경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 끝내기’로 먼저 끝내 주세요.');
   });
 
   it('취소된 경기는 결과가 있었어도 삭제할 수 있다 — 취소 뒤 삭제의 두 번째 단계', () => {

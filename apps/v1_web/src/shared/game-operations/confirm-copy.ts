@@ -240,14 +240,14 @@ export function commandConfirmCopy(
           }
         : {
             title: `${label}할까요?`,
-            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 종료하고 하프타임으로 넘어가요. 다음 피리어드에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
+            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 종료하고 하프타임으로 넘어가요. 다음 경기 시간에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
             confirmLabel: label,
             tone: 'default',
           };
     case 'start-period':
       return {
         title: `${label}할까요?`,
-        message: '하프타임을 마치고 다음 피리어드를 시작해요.',
+        message: '하프타임을 마치고 다음 경기 시간을 시작해요.',
         confirmLabel: label,
         tone: 'default',
       };

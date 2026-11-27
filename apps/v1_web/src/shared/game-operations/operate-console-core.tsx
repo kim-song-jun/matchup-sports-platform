@@ -992,7 +992,7 @@ export function OperateConsoleCore({
   // 중지처럼 아직 정규 시간이 안 끝난 예외 종료 경로다.
   const endBlockedReason: string | null =
     penaltyShootoutTied && !penaltyShootoutEligible
-      ? '결선 경기는 무승부로 끝낼 수 없어요. 남은 피리어드를 마친 뒤 승부차기 결과를 입력해주세요.'
+      ? '결선 경기는 무승부로 끝낼 수 없어요. 남은 경기 시간을 마친 뒤 승부차기 결과를 입력해 주세요.'
       : null;
 
   // 킥별 기록은 서버에 남지 않는다(옵션 B — `@/lib/penalty-shootout.ts` doc
@@ -1202,7 +1202,7 @@ export function OperateConsoleCore({
       if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
       clientEventIds.forEach((id) => undoStartedRef.current.add(id));
       if (commandBlockedRef.current) {
-        setCommandError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.');
+        setCommandError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
         return;
       }
       let reversed = 0;
@@ -1221,7 +1221,7 @@ export function OperateConsoleCore({
           event = await waitForRecordedEvent(clientEventId, 3_000);
         }
         if (event === null) {
-          setCommandError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.');
+          setCommandError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
           return;
         }
         const eventId = event.id;
@@ -1229,7 +1229,7 @@ export function OperateConsoleCore({
         try {
           await opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
         } catch (err) {
-          setCommandError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.'));
+          setCommandError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
           return;
         }
         reversed += 1;
@@ -1334,7 +1334,7 @@ export function OperateConsoleCore({
         tone: 'danger',
       });
       if (!ok) return;
-      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
+      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 취소` });
     },
     [commandBlocked, confirm, ops],
   );
@@ -1362,8 +1362,8 @@ export function OperateConsoleCore({
             },
       );
       if (!ok) return;
-      await ops.reverseEvent({ eventId: red.id, reason: '레드카드 기록 수정·취소' });
-      if (yellow !== null) await ops.reverseEvent({ eventId: yellow.id, reason: '옐로카드 기록 수정·취소' });
+      await ops.reverseEvent({ eventId: red.id, reason: '레드카드 기록 취소' });
+      if (yellow !== null) await ops.reverseEvent({ eventId: yellow.id, reason: '옐로카드 기록 취소' });
     },
     [commandBlocked, confirm, ops],
   );
@@ -2313,7 +2313,7 @@ export function OperateConsoleCore({
         <EventTimeCorrectionSheet
           open
           mode="operator"
-          title={`${editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget)} 기록 수정`}
+          title={`${editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget)} 기록 고치기`}
           summary={eventTimeSummary(editTarget, sides, lineups, editLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(editTarget))}
           linkedNotice={editLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodLabel(editTarget.period, periodCount)}
@@ -2340,7 +2340,7 @@ export function OperateConsoleCore({
               } catch (err) {
                 if (index === 0) throw err;
                 throw new Error(
-                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 고치면 레드카드만 옮겨요.`,
                 );
               }
             }

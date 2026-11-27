@@ -146,7 +146,7 @@ export function correctionRangeError(periodLabel: string, maxClockMs: number | n
 
 const CORRECTION_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   EVENT_TIME_UNCHANGED: '지금 기록된 시각과 같아요. 다른 시각으로 골라 주세요.',
-  EVENT_CLOCK_OUT_OF_RANGE: '이 피리어드 안의 시각으로 골라 주세요.',
+  EVENT_CLOCK_OUT_OF_RANGE: '이 경기 시간 안의 시각으로 골라 주세요.',
   EVENT_ALREADY_REVERSED: '이미 취소된 기록은 시각을 고칠 수 없어요.',
   EVENT_TIME_NOT_CORRECTABLE: '시각을 고칠 수 있는 기록이 아니에요.',
   EVENT_TIME_REASON_REQUIRED: '정정 사유를 적어 주세요.',

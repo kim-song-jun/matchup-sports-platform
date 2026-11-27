@@ -265,11 +265,11 @@ export function RecordedEventList({
             type="button"
             disabled={disabled}
             onClick={() => onEditEvent?.(listedEvent)}
-            aria-label={`기록 수정 (${eventTypeLabel(event)})`}
+            aria-label={`기록 고치기 (${eventTypeLabel(event)})`}
             className={EDIT_BUTTON_CLASS}
           >
             <Pencil size={12} aria-hidden="true" />
-            {actionPrefix === null ? '수정' : `${actionPrefix} 수정`}
+            {actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`}
           </button>
         ) : canReverse ? (
           <button
@@ -279,7 +279,7 @@ export function RecordedEventList({
               className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             <Undo2 size={12} aria-hidden="true" />
-            {event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '수정·취소' : `${actionPrefix} 수정·취소`}
+            {event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`}
           </button>
         ) : null}
       </>
@@ -363,11 +363,11 @@ export function RecordedEventList({
                     type="button"
                     disabled={disabled}
                     onClick={() => onEditEvent(listedEvent, [mergedYellow])}
-                    aria-label={`기록 수정 (${SECOND_YELLOW_RED_LABEL})`}
+                    aria-label={`기록 고치기 (${SECOND_YELLOW_RED_LABEL})`}
                     className={EDIT_BUTTON_CLASS}
                   >
                     <Pencil size={12} aria-hidden="true" />
-                    수정
+                    고치기
                   </button>
                 ) : (
                   /* 시각 수정이 없는 화면(취소만 되는 곳)은 옐로·레드를 각각 취소할 수 있게 둘을 낸다. */
@@ -441,7 +441,7 @@ function EventTimeCorrectionDisclosure({
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
       >
-        정정됨
+        고친 기록
         <ChevronDown
           size={14}
           aria-hidden="true"
@@ -508,9 +508,9 @@ export function eventTypeLabel(event: GameEventRecord): string {
     case 'SUBSTITUTION':
       return '교체';
     case 'CORRECTION':
-      return '정정';
+      return '기록 취소';
     case 'TIME_CORRECTION':
-      return '시각 정정';
+      return '시각 고치기';
     default:
       return event.type;
   }

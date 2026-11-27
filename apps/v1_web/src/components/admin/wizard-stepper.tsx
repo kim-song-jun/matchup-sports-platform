@@ -8,8 +8,8 @@ export interface WizardStep {
 }
 
 /**
- * 어드민 생성 마법사의 단계 표시 — done/current/locked 3상태 + 진행률. 대회 만들기와 리그 만들기가
- * 같이 쓴다(components/admin/operation-flag-gate-stepper.tsx 의 패턴). "locked" 단계는 버튼 자체를
+ * 어드민 리그 만들기 마법사의 단계 표시 — done/current/locked 3상태 + 진행률
+ * (components/admin/operation-flag-gate-stepper.tsx 의 패턴). "locked" 단계는 버튼 자체를
  * disabled 로 막는다 — 앞 단계를 다 채우기 전에 건너뛰지 못하게 하는 화면 쪽 이중 방어다.
  */
 export function WizardStepper({

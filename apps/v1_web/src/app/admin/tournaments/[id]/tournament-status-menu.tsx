@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { AdminStatusPill } from '@/components/admin';
 import { tournamentVisibilityAction } from '@/components/admin/tournaments/tournament-visibility-control';
 import { ActionMenu } from '@/components/v1-ui/action-menu';
@@ -47,7 +47,9 @@ function StageProgress({ status }: { status: V1TournamentStatus }) {
                   index === current ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-muted)]',
                 ].join(' ')}
               >
+                {index < current ? <Check size={10} aria-hidden="true" className="mr-0.5 inline align-[-1px]" /> : null}
                 {tournamentStatusLabel(stage)}
+                {index < current ? <span className="sr-only"> (지난 단계)</span> : null}
               </span>
             </li>
           ))}

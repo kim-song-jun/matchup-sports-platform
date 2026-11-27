@@ -54,7 +54,8 @@ export function splitTabGroups(
   return { tabs, more };
 }
 
-const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+// 탭 줄은 `overflow-x-auto` 라 바깥으로 그리는 링이 위·아래에서 잘린다 — 안쪽으로 그린다.
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]';
 
 function isActive(pathname: string, basePath: string, item: AdminTabNavItem): boolean {
   if (item.externalHref) return false;

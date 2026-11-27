@@ -126,7 +126,8 @@ export function tournamentInfoNeeds(t: V1Tournament, basePath?: string): InfoNee
       detail: '참가비를 받는데 정산 계좌가 없으면 신청 팀이 입금할 곳을 알 수 없어요.',
     });
   }
-  if (!t.registrationDeadlineAt) {
+  // 접수를 닫은 뒤에는 마감을 정해도 의미가 없다 — 마감 없이 열었다 닫은 대회에 계속 경고하지 않는다.
+  if (!t.registrationDeadlineAt && (t.status === 'draft' || t.status === 'open')) {
     required.push({
       key: 'registration-deadline',
       section: 'schedule',

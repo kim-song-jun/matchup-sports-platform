@@ -75,7 +75,7 @@ export function resolveNextMilestone(tournament: V1Tournament, now: Date): Tourn
     if (left === null) {
       return {
         phase: 'recruiting',
-        headline: '접수 중이에요. 접수 마감 시각이 아직 없어요.',
+        headline: '접수 중이에요. 신청 마감 시각이 아직 없어요.',
         daysLeft: null,
         overdue: false,
       };
@@ -86,14 +86,14 @@ export function resolveNextMilestone(tournament: V1Tournament, now: Date): Tourn
     if (left < 0 || msLeft <= 0) {
       return {
         phase: 'recruiting',
-        headline: '접수 마감 시각이 지났는데 아직 접수 중이에요.',
+        headline: '신청 마감 시각이 지났는데 아직 접수 중이에요.',
         daysLeft: left,
         overdue: true,
       };
     }
     return {
       phase: 'recruiting',
-      headline: `접수 마감까지 ${msLeft < DAY_MS ? hoursOrMinutes(msLeft) : `${left}일`} 남았어요.`,
+      headline: `신청 마감까지 ${msLeft < DAY_MS ? hoursOrMinutes(msLeft) : `${left}일`} 남았어요.`,
       daysLeft: left,
       overdue: false,
     };

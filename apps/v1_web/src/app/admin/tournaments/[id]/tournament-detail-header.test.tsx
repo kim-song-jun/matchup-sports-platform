@@ -57,8 +57,18 @@ describe('TournamentStatusMenu', () => {
     const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
     expect(within(panel).getByText('지금: 접수 중')).toBeInTheDocument();
     const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
-    expect(steps.map((step) => step.textContent)).toEqual(['초안', '접수 중', '접수 마감', '진행 중', '완료']);
+    expect(steps.map((step) => step.textContent)).toEqual(['초안 (지난 단계)', '접수 중', '접수 마감', '진행 중', '완료']);
     expect(steps.map((step) => step.getAttribute('aria-current'))).toEqual([null, 'step', null, null, null]);
+  });
+
+  it('진행 막대는 색만으로 지난 칸을 가르지 않는다 — 지난 단계에만 체크 표시와 글이 붙는다', () => {
+    render(<TournamentStatusMenu {...menuProps({ status: 'in_progress' })} />);
+    openMenu(/진행 중/);
+
+    const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
+    const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
+    expect(steps.map((step) => step.querySelector('svg') !== null)).toEqual([true, true, true, false, false]);
+    expect(steps.map((step) => step.textContent?.includes('지난 단계'))).toEqual([true, true, true, false, false]);
   });
 
   it('취소됨 칩은 공개 여부 글자와 진행 막대가 없다', () => {
@@ -101,7 +111,7 @@ describe('TournamentStatusMenu', () => {
     const menu = screen.getByRole('menu', { name: '대회 상태' });
     expect(within(menu).queryByRole('menuitem')).not.toBeInTheDocument();
     const visibility = within(menu).getByRole('menuitemcheckbox', { name: /참가자에게 공개/ });
-    expect(visibility).toBeDisabled();
+    expect(visibility).toHaveAttribute('aria-disabled', 'true');
     expect(visibility).toHaveAttribute('aria-checked', 'true');
     expect(within(menu).getByText('현재 계정은 공개 상태를 변경할 권한이 없어요.')).toBeInTheDocument();
   });
@@ -131,7 +141,7 @@ describe('TournamentStatusMenu', () => {
 
     render(<TournamentStatusMenu {...menuProps({ visibilityPending: true, onToggleVisibility })} />);
     openMenu(/접수 중/);
-    expect(screen.getByRole('menuitemcheckbox', { name: /참가자에게 공개/ })).toBeDisabled();
+    expect(screen.getByRole('menuitemcheckbox', { name: /참가자에게 공개/ })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('저장 중이에요.')).toBeInTheDocument();
   });
 
@@ -139,7 +149,7 @@ describe('TournamentStatusMenu', () => {
     render(<TournamentStatusMenu {...menuProps({ statusPending: true })} />);
     openMenu(/접수 중/);
     const menu = screen.getByRole('menu', { name: '대회 상태' });
-    for (const item of within(menu).getAllByRole('menuitem')) expect(item).toBeDisabled();
+    for (const item of within(menu).getAllByRole('menuitem')) expect(item).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('열 항목이 하나도 없으면(조회 전용 관리자의 취소된 대회) 버튼 없이 상태만 보인다', () => {

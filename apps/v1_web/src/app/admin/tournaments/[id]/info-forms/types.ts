@@ -1,4 +1,4 @@
-import type { ReactElement, Ref } from 'react';
+import type { MouseEvent, ReactElement, Ref } from 'react';
 import type { SaveContext } from '@/hooks/use-tournament-save-context';
 import type { TournamentPeriodSettingsResponse } from '@/hooks/use-tournament-period-settings';
 import type { SaveStep } from '@/lib/sequential-save';
@@ -22,6 +22,8 @@ export interface InfoSectionFormProps {
   onDirtyChange(dirty: boolean): void;
   /** 업로드처럼 저장을 잠시 막아야 하는 일이 진행 중인가. */
   onBusyChange(busy: boolean): void;
+  /** 시트 밖 화면으로 가는 링크의 클릭 처리 — 바뀐 내용이 있으면 버릴지 묻고, 시트를 걷으며 이동한다. */
+  leaveLinkClick(href: string): (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export type InfoSummaryBadgeTone = 'needed' | 'default' | 'optional' | 'off';

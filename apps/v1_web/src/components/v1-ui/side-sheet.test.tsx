@@ -22,7 +22,7 @@ afterEach(() => {
   __resetNavigationHistoryForTests();
 });
 
-function Harness({ dirty = false, onClose }: { dirty?: boolean; onClose: () => void }) {
+function Harness({ dirty = false, pending = false, onClose }: { dirty?: boolean; pending?: boolean; onClose: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -33,6 +33,7 @@ function Harness({ dirty = false, onClose }: { dirty?: boolean; onClose: () => v
         open={open}
         title="대회 정보 수정"
         dirty={dirty}
+        pending={pending}
         footer={<button type="button">저장</button>}
         onClose={() => {
           onClose();
@@ -72,6 +73,14 @@ describe('SideSheet', () => {
     expect(sheet()).toHaveAttribute('aria-modal', 'true');
     expect(within(sheet()).getByLabelText('대회 이름')).toHaveValue('퀸즈컵');
     expect(within(sheet()).getByRole('button', { name: '저장' })).toBeInTheDocument();
+  });
+
+  it('폰에서 올라오는 시트 높이는 주소창이 보이는 모바일 브라우저에서도 화면 안에 들어오게 dvh 로 잡는다', () => {
+    render(<Harness onClose={vi.fn()} />);
+    openSheet();
+
+    expect(sheet().className).toContain('h-[90dvh]');
+    expect(sheet().className).not.toContain('90vh');
   });
 
   it('footer 는 스크롤되는 본문 밖에 있다', () => {
@@ -148,6 +157,35 @@ describe('SideSheet', () => {
 
     expect(sheet()).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('pending 동안에는 ✕·ESC·바깥 클릭·뒤로가기 어느 것으로도 닫히지 않고 확인 창도 뜨지 않는다', async () => {
+    const onClose = vi.fn();
+    render(<Harness dirty pending onClose={onClose} />);
+    openSheet();
+
+    expect(within(sheet()).getByRole('button', { name: '닫기' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(sheet().parentElement as HTMLElement);
+    await back();
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).toBeNull();
+    expect(sheet()).toBeInTheDocument();
+    expect(currentPath()).toBe(PAGE);
+  });
+
+  it('pending 이 풀리면 다시 닫을 수 있다', async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Harness pending onClose={onClose} />);
+    openSheet();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+
+    rerender(<Harness onClose={onClose} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it('SIDE_SHEET_DISCARD_CONFIRM 은 title·confirmLabel·cancelLabel 이 정해진 문구다', () => {

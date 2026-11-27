@@ -243,7 +243,7 @@ describe('RegistrationsTab — 묶음과 상태', () => {
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     const waitlist = menuItem(openMenuOf('테스트 FC'), '대기로 두기');
-    expect(waitlist).toBeDisabled();
+    expect(waitlist).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(waitlist);
     expect(mutate).not.toHaveBeenCalled();
   });

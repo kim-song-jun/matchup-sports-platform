@@ -139,6 +139,8 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
     tournamentListStatus: 200,
     /** 대회 단건 조회를 이만큼 늦춘다 — 저장 응답과 다시 읽기 사이의 틈을 재현할 때 쓴다. */
     tournamentGetDelayMs: 0,
+    /** 대회 PATCH 응답을 이만큼 늦춘다 — 저장 중인 시트를 재현할 때 쓴다. */
+    tournamentPatchDelayMs: 0,
     /** 200 이 아니면 출전 인원·교체 선택지 조회가 그 상태로 실패한다. */
     lineupOptionsStatus: 200,
     /** 단계별 순위 순서 PUT — `{ stageKey, ...본문 }`. */
@@ -221,6 +223,7 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
     http.patch('*/api/v1/admin/tournaments/:id', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       state.patches.push(body);
+      if (state.tournamentPatchDelayMs > 0) await delay(state.tournamentPatchDelayMs);
       const failure = failures.tournament.shift();
       if (failure) return failed(failure);
       if (body.expectedVersion !== state.tournament.updatedAt) return failed(conflict);

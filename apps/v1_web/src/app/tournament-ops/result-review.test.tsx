@@ -514,6 +514,8 @@ describe('void -- retiring the current official result', () => {
     await user.click(screen.getByRole('button', { name: '무효화' }));
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText('무효화 사유'), '중복 경기로 확인');
+    expect(within(dialog).getByRole('button', { name: '무효화' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('확인 문구: 결과 무효'), '결과 무효');
     await user.click(within(dialog).getByRole('button', { name: '무효화' }));
 
     expect(hookMocks.voidRevision.mutate).toHaveBeenCalledWith(
@@ -540,6 +542,8 @@ describe('void -- retiring the current official result', () => {
     await user.click(screen.getByRole('button', { name: '무효화' }));
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText('무효화 사유'), '중복 경기로 확인');
+    expect(within(dialog).getByRole('button', { name: '무효화' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('확인 문구: 결과 무효'), '결과 무효');
     await user.click(within(dialog).getByRole('button', { name: '무효화' }));
 
     // The gate flip is a real component setState (inside onError), so this re-render picks up

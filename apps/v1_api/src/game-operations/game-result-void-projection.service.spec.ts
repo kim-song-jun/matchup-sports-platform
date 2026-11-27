@@ -40,6 +40,7 @@ function txFor(row: Record<string, unknown>, supersedesId: string | null = null)
     $executeRaw: executeRaw,
     v1GameResultRevision: { findUnique, findUniqueOrThrow },
     v1TeamMatch: { findUnique },
+    v1ProjectionWatermark: { findFirst: jest.fn().mockResolvedValue(null) },
   } as any;
   return { tx, executeRaw, findUnique, findUniqueOrThrow };
 }
@@ -84,6 +85,17 @@ describe('GameResultVoidProjectionService canonical source', () => {
     const { tx, executeRaw, findUnique } = txFor(canonicalRow(), 'revision-official-1');
     findUnique.mockReset().mockResolvedValueOnce({ supersedesId: null }).mockResolvedValueOnce({ deletedAt: new Date() });
     await expect(new GameResultVoidProjectionService().handler(claim(), tx)).rejects.toThrow('CANONICAL_MATCH_REQUIRED');
+    expect(executeRaw).not.toHaveBeenCalled();
+  });
+  it('a reset archive is idempotent only after the exact VOID revision was applied', async () => {
+    const { tx, executeRaw, findUnique } = txFor(canonicalRow(), 'revision-official-1');
+    findUnique.mockReset().mockResolvedValueOnce({ supersedesId: 'revision-official-1' }).mockResolvedValueOnce({ deletedAt: new Date() });
+    tx.v1ProjectionWatermark.findFirst.mockResolvedValue({ id: 'applied-watermark' });
+    await new GameResultVoidProjectionService().handler(claim(), tx);
+    expect(tx.v1ProjectionWatermark.findFirst).toHaveBeenCalledWith({ where: {
+      projection: 'PUBLIC_OFFICIAL_RESULT', entityType: 'GAME', entityId: GAME_ID,
+      revisionId: REVISION_ID, sourceHash: 'hash-void-1', status: 'APPLIED',
+    } });
     expect(executeRaw).not.toHaveBeenCalled();
   });
 });

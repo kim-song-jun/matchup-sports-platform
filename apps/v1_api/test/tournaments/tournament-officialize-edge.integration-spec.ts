@@ -8,6 +8,8 @@ import { V1GameOperationsWorkerService } from '../../src/jobs/v1-game-operations
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { TournamentResultReviewService } from '../../src/tournament-operations/results/tournament-result-review.service';
+import { assertSlotFixturesNotStarted, loadSlotUsingFixtures } from '../../src/tournaments/slots/slot-fixtures';
+import { GameResultVoidProjectionService } from '../../src/game-operations/game-result-void-projection.service';
 
 // Task 22 gap G-3: the DIRECTOR_OFFICIALIZE 403-denial path did not leave a
 // `V1OperationAudit` row, and the success-path audit did not carry the
@@ -31,6 +33,8 @@ const ids = {
   opponentRegistration: '86000000-0000-4000-8000-000000000032',
   denialFixture: '86000000-0000-4000-8000-000000000040',
   successFixture: '86000000-0000-4000-8000-000000000041',
+  resetFixture: '86000000-0000-4000-8000-000000000042',
+  nextFixture: '86000000-0000-4000-8000-000000000043',
   directorAssignment: '86000000-0000-4000-8000-000000000060',
 } as const;
 
@@ -38,6 +42,7 @@ const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService());
+Object.assign(resultReview, { games });
 
 const authUser = (id: string) => ({
   id,
@@ -220,12 +225,14 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
       data: [
         { id: ids.denialFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 denial match', status: 'matched', competitionConfigVersionId: config.id },
         { id: ids.successFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 success match', status: 'matched', competitionConfigVersionId: config.id },
+        ...[ids.resetFixture, ids.nextFixture].map(id => ({ id, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Void reset regression', status: 'matched' as const, competitionConfigVersionId: config.id })),
       ],
     });
     await prisma.v1TournamentMatchDetails.createMany({
       data: [
         { teamMatchId: ids.denialFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
         { teamMatchId: ids.successFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+        ...[ids.resetFixture, ids.nextFixture].map((teamMatchId, index) => ({ teamMatchId, tournamentId: ids.tournament, round: 'group', fixtureNumber: index + 3, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration })),
       ],
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -254,6 +261,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const result = await resultReview.voidResultRevision(authUser(ids.director), gameId, officialRevisionId, 'director-full-void', {
       expectedVersion: before.version, clientCommandId: 'director-full-void', reason: 'assigned director full management',
+      confirmationText: '결과 무효',
     });
     expect(result.revisionState).toBe('VOID');
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
@@ -275,6 +283,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
       expectedVersion: gameBeforeVoid.version,
       clientCommandId: 'task22g3-void-allowed',
       reason: 'director voids the result while the gate is on',
+      confirmationText: '결과 무효',
     });
     expect(voided.revisionState).toBe('VOID');
 
@@ -301,6 +310,78 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     // Reaffirms the flag gate is not itself audited by this lane (Task 5's
     // ownership); only the gated result-review commands are.
     await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'off' } });
+  });
+});
+
+describe('결과 무효 후 시작 전 복구 — 실제 PostgreSQL', () => {
+  beforeAll(async () => { await prisma.$connect(); });
+  afterAll(async () => { await prisma.$disconnect(); });
+
+  it('새 무효와 복구를 한 번에 처리하며 다음 경기 진행을 차단하고 시간·진출 연결을 보존한다', async () => {
+    const source = await buildOfficialGame(ids.resetFixture);
+    const nextGameId = await buildTournamentGame(ids.nextFixture);
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: source.gameId } });
+    const startAt = new Date('2026-11-27T14:00:00.000Z');
+    await prisma.v1TeamMatch.update({ where: { id: ids.resetFixture }, data: { startAt, placeName: '복구 검증 구장' } });
+    await prisma.v1TournamentMatchAdvancementEdge.create({ data: { tournamentId: ids.tournament, sourceTeamMatchId: ids.resetFixture, targetTeamMatchId: ids.nextFixture, sourceOutcome: 'WINNER', targetSide: 'HOME' } });
+    await prisma.v1Game.update({ where: { id: nextGameId }, data: { state: 'LIVE' } });
+    const command = { expectedVersion: game.version, clientCommandId: 'void-reset-new', reason: '잘못된 경기 결과', confirmationText: '결과 무효' as const, resetToScheduled: true };
+    await expect(resultReview.voidResultRevision(authUser(ids.platformOps), game.id, source.officialRevisionId, command.clientCommandId, command)).rejects.toMatchObject({ response: { code: 'NEXT_FIXTURE_CONFLICT' } });
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: game.id } })).currentOfficialRevisionId).toBe(source.officialRevisionId);
+    await prisma.v1Game.update({ where: { id: nextGameId }, data: { state: 'SCHEDULED' } });
+    const result = await resultReview.voidResultRevision(authUser(ids.platformOps), game.id, source.officialRevisionId, command.clientCommandId, command);
+    expect(result.replacement).toBeDefined();
+    const created = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: result.replacement!.fixtureId }, include: { game: true } });
+    expect(created).toMatchObject({ startAt, placeName: '복구 검증 구장', status: 'matched' });
+    expect(created.game).toMatchObject({ state: 'SCHEDULED', currentOfficialRevisionId: null });
+    expect(await prisma.v1GameEvent.count({ where: { gameId: result.replacement!.gameId } })).toBe(0);
+    expect(await prisma.v1TournamentMatchAdvancementEdge.findFirst({ where: { sourceTeamMatchId: created.id, targetTeamMatchId: ids.nextFixture } })).toMatchObject({ sourceOutcome: 'WINNER', targetSide: 'HOME' });
+    expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: ids.nextFixture } })).homeRegistrationId).toBeNull();
+    expect(await prisma.v1GameEvent.count({ where: { gameId: game.id } })).toBeGreaterThan(0);
+  });
+
+  it('감사 저장 실패 시 무효 경기 보관과 새 경기 생성도 모두 롤백한다', async () => {
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: ids.successFixture } });
+    const before = await prisma.v1TeamMatch.count({ where: { tournamentId: ids.tournament } });
+    const failing = new TournamentResultReviewService(prisma, staffAccess, {
+      create: async () => { throw new Error('audit write failed'); },
+    } as unknown as OperationAuditWriterService);
+    Object.assign(failing, { games });
+    await expect(failing.voidResultRevision(authUser(ids.platformOps), game.id, game.currentOfficialRevisionId!, 'void-reset-rollback', {
+      expectedVersion: game.version, clientCommandId: 'void-reset-rollback', reason: '복구 실패 검증', confirmationText: '결과 무효', resetToScheduled: true,
+    })).rejects.toThrow('audit write failed');
+    expect(await prisma.v1TeamMatch.count({ where: { tournamentId: ids.tournament } })).toBe(before);
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.successFixture } })).deletedAt).toBeNull();
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: game.id } })).version).toBe(game.version);
+  });
+
+  it('이미 VOID인 부전승 경기는 기록을 보존하고 편집 가능한 새 예정 경기로 복구하며 재전송은 같은 결과를 돌려준다', async () => {
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: ids.denialFixture } });
+    const source = await prisma.v1TournamentGroup.create({ data: { tournamentId: ids.tournament, name: '12강', phase: 'round12', sortOrder: 0 } });
+    const target = await prisma.v1TournamentGroup.create({ data: { tournamentId: ids.tournament, name: '8강', phase: 'quarter', sortOrder: 1 } });
+    const slot = await prisma.v1TournamentSlot.create({ data: { tournamentId: ids.tournament, groupId: source.id, kind: 'BYE', position: 1, byeSortOrder: 0, registrationId: ids.hostRegistration } });
+    await prisma.v1TournamentGroupTeam.create({ data: { groupId: source.id, registrationId: ids.hostRegistration, isBye: true, sortOrder: 0 } });
+    await prisma.v1TeamMatch.update({ where: { id: ids.denialFixture }, data: { homeSlotId: slot.id } });
+    await prisma.v1TournamentMatchDetails.update({ where: { teamMatchId: ids.denialFixture }, data: { groupId: target.id } });
+    const eventCount = await prisma.v1GameEvent.count({ where: { gameId: game.id } });
+    const revisionCount = await prisma.v1GameResultRevision.count({ where: { gameId: game.id } });
+    const command = { expectedVersion: game.version, clientCommandId: 'void-reset-bye', reason: '부전승 배정 수정', confirmationText: '결과 무효' as const, resetToScheduled: true };
+    const result = await resultReview.voidResultRevision(authUser(ids.platformOps), game.id, game.currentOfficialRevisionId!, command.clientCommandId, command);
+    expect(result.replacement).toBeDefined();
+    const replacement = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: result.replacement!.fixtureId }, include: { game: true, tournamentDetails: true } });
+    expect(replacement).toMatchObject({ status: 'matched', homeSlotId: slot.id, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, deletedAt: null });
+    expect(replacement.game).toMatchObject({ state: 'SCHEDULED', currentOfficialRevisionId: null, version: 0 });
+    expect(replacement.tournamentDetails).toMatchObject({ groupId: target.id, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration });
+    await prisma.$transaction(async tx => { assertSlotFixturesNotStarted(await loadSlotUsingFixtures(tx, [slot.id])); });
+    expect(await prisma.v1GameEvent.count({ where: { gameId: game.id } })).toBe(eventCount);
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId: game.id } })).toBe(revisionCount);
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.denialFixture } })).deletedAt).not.toBeNull();
+    const replay = await resultReview.voidResultRevision(authUser(ids.platformOps), game.id, game.currentOfficialRevisionId!, command.clientCommandId, command);
+    expect(replay).toMatchObject({ replayed: true, replacement: result.replacement });
+    await prisma.$transaction(tx => new GameResultVoidProjectionService().projectInTransaction(tx, game.currentOfficialRevisionId!));
+    const audit = await prisma.v1OperationAudit.findFirstOrThrow({ where: { resourceId: game.id, requestId: command.clientCommandId } });
+    expect(audit.after).toMatchObject({ replacement: result.replacement });
+    expect(audit.reason).toBe(command.reason);
   });
 });
 

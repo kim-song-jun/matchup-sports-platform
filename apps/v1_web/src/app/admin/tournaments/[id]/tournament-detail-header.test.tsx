@@ -57,8 +57,18 @@ describe('TournamentStatusMenu', () => {
     const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
     expect(within(panel).getByText('지금: 접수 중')).toBeInTheDocument();
     const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
-    expect(steps.map((step) => step.textContent)).toEqual(['초안', '접수 중', '접수 마감', '진행 중', '완료']);
+    expect(steps.map((step) => step.textContent)).toEqual(['초안 (지난 단계)', '접수 중', '접수 마감', '진행 중', '완료']);
     expect(steps.map((step) => step.getAttribute('aria-current'))).toEqual([null, 'step', null, null, null]);
+  });
+
+  it('진행 막대는 색만으로 지난 칸을 가르지 않는다 — 지난 단계에만 체크 표시와 글이 붙는다', () => {
+    render(<TournamentStatusMenu {...menuProps({ status: 'in_progress' })} />);
+    openMenu(/진행 중/);
+
+    const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
+    const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
+    expect(steps.map((step) => step.querySelector('svg') !== null)).toEqual([true, true, true, false, false]);
+    expect(steps.map((step) => step.textContent?.includes('지난 단계'))).toEqual([true, true, true, false, false]);
   });
 
   it('취소됨 칩은 공개 여부 글자와 진행 막대가 없다', () => {

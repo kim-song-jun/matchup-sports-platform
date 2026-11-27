@@ -749,8 +749,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent('후반 팀 파울 1');
-    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('후반 팀 파울 0');
+    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent(/팀 파울 1$/);
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 0$/);
     // 마지막 경기 시간 뒤에는 다시 셀 구간이 없다.
     expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 다시 세요');
   });
@@ -782,8 +782,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     render(<CoreHarness />);
 
     // 홈: 옐로 2장 = 파울 2개(레드는 경고 누적 퇴장이라 제외). 원정: 직접 레드 = 파울 1개.
-    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('전반 팀 파울 2');
-    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent('전반 팀 파울 1');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 2$/);
+    expect(teamColumn('성수 풋살 클럽')).toHaveTextContent(/팀 파울 1$/);
   });
 
   // 대회·리그마다 팀 파울 기준이 다르다 — 서버가 경기 상세에 실어 준 `teamFoulThreshold` 로 경고를 켠다.
@@ -831,6 +831,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
   });
 
   // MD-QA #189: 하프타임에는 방금 끝난 전반의 팀 파울을 보여 주고, 후반에 다시 센다고 알려 준다.
+  // 다시 센다는 안내는 하프타임 문구에만 있고 뛰는 동안 점수 카드에는 없다.
   it('하프타임에는 전반 팀 파울과 후반에 0부터 다시 센다는 안내를 보여준다', () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
@@ -850,8 +851,19 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('전반 팀 파울 1');
-    expect(screen.getByRole('banner')).toHaveTextContent('후반에는 0부터 다시 세요');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 1$/);
+    expect(screen.getByRole('banner')).toHaveTextContent('후반에는 팀 파울을 0부터 다시 세요.');
+  });
+
+  it('뛰는 동안에는 다음 경기 시간이 있어도 팀 파울을 0부터 다시 센다는 안내가 점수 카드에 없다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    render(<CoreHarness />);
+
+    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 다시 세요');
+    expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 0$/);
   });
 
   it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', async () => {
@@ -1155,11 +1167,13 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
     });
 
-    it('시계 옆에 "전반" 라벨이 없고 팀 파울은 "경기 팀 파울"이다', () => {
+    it('점수 카드에 "전반"이 없고 단계 줄은 경기 · 종료 둘이다', () => {
       gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
       render(<CoreHarness />);
       expect(screen.getByRole('banner')).not.toHaveTextContent('전반');
-      expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('경기 팀 파울 0');
+      expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 0$/);
+      const items = within(screen.getByRole('list', { name: '경기 진행 단계' })).getAllByRole('listitem');
+      expect(items.map((item) => item.textContent)).toEqual(['경기', '종료']);
     });
 
     it('연장 피리어드 행이 있어도 정규 1개면 단판이다', () => {
@@ -1307,7 +1321,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
       expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
-      expect(within(screen.getByRole('banner')).getByText(/하프타임이에요\. 준비되면 ‘후반 시작’을 눌러 주세요/)).toBeInTheDocument();
+      expect(within(screen.getByRole('banner')).getByText(/빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요/)).toBeInTheDocument();
+      // 다음 행동 이름은 진행 바가 말하므로 안내 문구에 다시 적지 않는다.
+      expect(screen.getByRole('banner')).not.toHaveTextContent('‘후반 시작’');
       // 시작 안내가 하프타임 안내와 겹치지 않아야 한다.
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
 
@@ -1323,7 +1339,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
         expect(screen.getByRole('button', { name })).toBeEnabled();
       }
-      expect(screen.getByText(/빠진 골·카드·파울은 지금도 전반 끝 시각으로 기록할 수 있어요/)).toBeInTheDocument();
+      expect(screen.getByText(/빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요/)).toBeInTheDocument();
     });
 
     it('하프타임에 누른 골은 전반이 실제로 뛴 시간(20:00)에 고정해 기록한다', async () => {
@@ -1489,60 +1505,6 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('button', { name: /명단 수정하기/ })).toBeNull();
     });
   });
-  // Task 180 G6(C-2) — 헤더의 진행 단계 스트립: 전반 · 하프타임 · 후반 · 종료 (끝난 뒤엔 예정 · 진행 · 결과 확인 · 확정).
-  describe('진행 단계 스트립', () => {
-    const strip = () => screen.queryByRole('list', { name: '경기 진행 단계' });
-    const current = () => {
-      const list = strip();
-      return list === null ? null : within(list).getByText((_, el) => el?.getAttribute('aria-current') === 'step').textContent;
-    };
-
-    it('뛰는 동안에는 스트립이 없다 — 상태 칩과 시계가 단계를 말한다', () => {
-      gameWithPeriods('LIVE', [
-        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
-        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
-      ]);
-      const { unmount } = render(<CoreHarness />);
-      expect(strip()).toBeNull();
-      expect(within(screen.getByRole('banner')).getByText('진행 중')).toBeInTheDocument();
-      unmount();
-
-      gameWithPeriods('LIVE', [
-        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
-        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
-      ]);
-      render(<CoreHarness />);
-      expect(strip()).toBeNull();
-      expect(within(screen.getByRole('banner')).getByText('하프타임')).toBeInTheDocument();
-    });
-
-    it('끝난 경기는 결과 단계 스트립으로 바뀌고, 공식 결과가 서기 전에는 결과 확인이 현재다', () => {
-      gameWithPeriods('LIVE', [
-        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
-        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
-      ]);
-      testFixtures.game.mockReturnValue({
-        ...testFixtures.game(),
-        data: { ...testFixtures.game().data, state: 'ENDED' },
-      });
-      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
-      render(<CoreHarness />);
-
-      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
-        '예정', '진행', '결과 확인', '확정',
-      ]);
-      expect(current()).toBe('결과 확인');
-    });
-
-    it('시작 전 경기에는 스트립이 없다 — 그 자리는 킥오프 준비가 맡는다', () => {
-      gameWithPeriods('SCHEDULED', []);
-      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
-      render(<CoreHarness />);
-
-      expect(strip()).toBeNull();
-    });
-  });
-
   // Task 180 G6(F78) — 종료 직후 콘솔은 "287ms" 한 줄이 아니라 결과 확정 카드로 이어진다.
   describe('종료 직후 결과 확정 카드', () => {
     const REGULATION_ENDED = [
@@ -4245,6 +4207,200 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
     });
   });
 
+  // 점수 카드의 진행 단계 줄 — 뛰는 동안은 전반 · 하프타임 · 후반 · 종료(연장·승부차기는 경기 설정에 따라),
+  // 끝난 뒤엔 예정 · 진행 · 결과 확인 · 확정. 글자는 지금과 바로 다음 단계만 보이고 나머지 이름은 스크린리더용이다.
+  describe('진행 단계 줄', () => {
+    const strip = () => screen.queryByRole('list', { name: '경기 진행 단계' });
+    const names = () => within(strip() as HTMLElement).getAllByRole('listitem').map((item) => item.textContent);
+    const current = () => strip()?.querySelector('[aria-current="step"]')?.textContent ?? null;
+    /** 눈에 보이는 글자. 스타일이 없는 jsdom 에서는 시각 숨김 규약(`sr-only`)을 뺀 글자로 잰다. */
+    const visibleLabels = () =>
+      within(strip() as HTMLElement)
+        .getAllByRole('listitem')
+        .map((item) => {
+          const clone = item.cloneNode(true) as HTMLElement;
+          clone.querySelectorAll('.sr-only').forEach((node) => node.remove());
+          return (clone.textContent ?? '').trim();
+        })
+        .filter((text) => text !== '');
+    const WITH_EXTRA_TIME = [
+      { durationMinutes: 20, extraTime: false },
+      { durationMinutes: 20, extraTime: false },
+      { durationMinutes: 5, extraTime: true },
+      { durationMinutes: 5, extraTime: true },
+    ];
+    const extraTimePeriods = (states: readonly [string, string, string, string]) =>
+      states.map((state, index) => ({
+        number: index + 1,
+        state,
+        startedAt: state === 'SCHEDULED' || state === 'HALFTIME' ? null : T0,
+        endedAt: state === 'ENDED' ? '2026-08-07T00:20:00.000Z' : null,
+      }));
+    const asKnockout = () =>
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, isKnockoutFixture: true },
+      });
+
+    it('전반을 뛰는 중이면 단계 줄은 점수 카드 안에 있고 지금은 전반, 다음은 하프타임이다', () => {
+      setup({ periods: PERIODS.firstHalf });
+      render(<CoreHarness />);
+
+      expect(within(screen.getByRole('banner')).getByRole('list', { name: '경기 진행 단계' })).toBe(strip());
+      expect(names()).toEqual(['전반', '하프타임', '후반', '종료']);
+      expect(current()).toBe('전반');
+      expect(visibleLabels()).toEqual(['전반', '하프타임']);
+    });
+
+    it('하프타임이면 지금은 하프타임이고 다음은 후반이다', () => {
+      setup({ periods: PERIODS.halftime });
+      render(<CoreHarness />);
+
+      expect(current()).toBe('하프타임');
+      expect(visibleLabels()).toEqual(['하프타임', '후반']);
+    });
+
+    it('후반을 뛰는 중이면 지금은 후반이고 다음은 종료다', () => {
+      setup({
+        periods: [
+          { number: 1, state: 'ENDED', startedAt: T0, endedAt: '2026-08-07T00:20:00.000Z' },
+          { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+        ],
+      });
+      render(<CoreHarness />);
+
+      expect(current()).toBe('후반');
+      expect(visibleLabels()).toEqual(['후반', '종료']);
+    });
+
+    it('정규 시간이 끝나면 종료가 지금이다', () => {
+      setup({ periods: PERIODS.regulationEnded });
+      render(<CoreHarness />);
+
+      expect(current()).toBe('종료');
+      expect(visibleLabels()).toEqual(['종료']);
+    });
+
+    it('일시 중지 중에도 뛰던 구간이 지금 단계로 남는다', () => {
+      setup({ state: 'PAUSED', periods: [{ ...PERIODS.firstHalf[0], pausedAt: '2026-08-07T00:05:00.000Z' }, PERIODS.firstHalf[1]] });
+      render(<CoreHarness />);
+
+      expect(current()).toBe('전반');
+    });
+
+    it('단판이면 경기 · 종료 둘이다', () => {
+      setup({ periods: PERIODS.single, periodDurations: [{ durationMinutes: 40, extraTime: false }] });
+      render(<CoreHarness />);
+
+      expect(names()).toEqual(['경기', '종료']);
+      expect(current()).toBe('경기');
+    });
+
+    it('연장이 설정된 경기는 하프타임이 전·후반 사이 하나뿐이고 나머지 사이는 휴식이다', () => {
+      setup({ periods: extraTimePeriods(['ENDED', 'ENDED', 'LIVE', 'SCHEDULED']), periodDurations: WITH_EXTRA_TIME });
+      render(<CoreHarness />);
+
+      expect(names()).toEqual(['전반', '하프타임', '후반', '휴식', '연장 전반', '휴식', '연장 후반', '종료']);
+      expect(current()).toBe('연장 전반');
+      expect(visibleLabels()).toEqual(['연장 전반', '휴식']);
+    });
+
+    it('후반 뒤 연장으로 쉬는 중이면 점수 카드가 하프타임이 아니라 휴식이라고 한다', () => {
+      setup({ periods: extraTimePeriods(['ENDED', 'ENDED', 'HALFTIME', 'SCHEDULED']), periodDurations: WITH_EXTRA_TIME });
+      render(<CoreHarness />);
+
+      expect(current()).toBe('휴식');
+      expect(visibleLabels()).toEqual(['휴식', '연장 전반']);
+      // 지금 단계를 말하는 칩도 단계 줄과 같은 이름이다.
+      const chips = within(screen.getByRole('banner')).getAllByText('휴식').filter((element) => element.closest('ol') === null);
+      expect(chips).toHaveLength(1);
+      expect(within(screen.getByRole('banner')).queryAllByText('하프타임').filter((element) => element.closest('ol') === null)).toHaveLength(0);
+    });
+
+    it('결선 연장 경기는 아홉 단계고 승부차기는 점선 조건부 단계로 종료 앞에 있다', () => {
+      setup({ periods: extraTimePeriods(['ENDED', 'ENDED', 'ENDED', 'LIVE']), periodDurations: WITH_EXTRA_TIME });
+      asKnockout();
+      render(<CoreHarness />);
+
+      expect(names()).toHaveLength(9);
+      expect(names().slice(-3)).toEqual(['연장 후반', '승부차기(동점이면)', '종료']);
+      expect(strip()?.querySelector('[data-step-state="conditional"]')?.textContent).toBe('승부차기(동점이면)');
+      // 바로 다음 단계가 승부차기라 「승부차기」 글자가 보인다.
+      expect(visibleLabels()).toEqual(['연장 후반', '승부차기']);
+    });
+
+    it('조별 경기에는 승부차기 단계가 없다', () => {
+      setup({ periods: PERIODS.firstHalf });
+      render(<CoreHarness />);
+
+      expect(names().some((name) => name?.includes('승부차기'))).toBe(false);
+    });
+
+    it('끝난 경기는 결과 단계 이름이 모두 보이고 공식 결과가 서기 전에는 결과 확인이 지금이다', () => {
+      setup({ state: 'ENDED', periods: PERIODS.regulationEnded });
+      render(<CoreHarness />);
+
+      expect(names()).toEqual(['예정', '진행', '결과 확인', '확정']);
+      expect(visibleLabels()).toEqual(['예정', '진행', '결과 확인', '확정']);
+      expect(current()).toBe('결과 확인');
+    });
+
+    it('시작 전 경기에는 단계 줄이 없다 — 그 자리는 킥오프 준비가 맡는다', () => {
+      setup({ state: 'SCHEDULED', periods: PERIODS.scheduled });
+      render(<CoreHarness />);
+
+      expect(strip()).toBeNull();
+    });
+  });
+
+  // 「진행 중」 배지는 경기가 정상으로 흐르는 동안 시계(초록 점)·하프타임 칩·단계 줄이 같은 말을 하므로 숨긴다.
+  describe('상태 배지', () => {
+    const badge = (text: string) => within(screen.getByRole('banner')).queryByText(text);
+
+    it.each([
+      ['전반을 뛰는 중', PERIODS.firstHalf],
+      ['하프타임', PERIODS.halftime],
+      ['정규 시간 종료', PERIODS.regulationEnded],
+    ] as const)('%s 에는 「진행 중」 배지가 없다', (_label, periods) => {
+      setup({ periods });
+      render(<CoreHarness />);
+
+      expect(badge('진행 중')).toBeNull();
+    });
+
+    it('뛰는 중에는 시계가 그 자리를 채운다', () => {
+      setup({ periods: PERIODS.firstHalf });
+      render(<CoreHarness />);
+
+      expect(within(screen.getByRole('banner')).getByLabelText(/전반 경과 시간/)).toBeInTheDocument();
+    });
+
+    it('경기는 진행 중인데 뛰는 구간도 하프타임도 정규 종료도 아니면 이 배지가 유일한 표시라 남는다', () => {
+      setup({ state: 'LIVE', periods: PERIODS.scheduled });
+      render(<CoreHarness />);
+
+      expect(badge('진행 중')).toBeInTheDocument();
+    });
+
+    it('일시 중지 중에는 「일시 중지」 배지가 남는다', () => {
+      setup({ state: 'PAUSED', periods: PERIODS.firstHalf });
+      render(<CoreHarness />);
+
+      expect(badge('일시 중지')).toBeInTheDocument();
+    });
+
+    it('시작 전 · 종료에는 상태 배지가 남는다', () => {
+      setup({ state: 'SCHEDULED', periods: PERIODS.scheduled });
+      const { unmount } = render(<CoreHarness />);
+      expect(badge('시작 전')).toBeInTheDocument();
+      unmount();
+
+      setup({ state: 'ENDED', periods: PERIODS.regulationEnded });
+      render(<CoreHarness />);
+      expect(badge('종료')).toBeInTheDocument();
+    });
+  });
+
   describe('단계 문구는 점수 카드 안에 한 번만', () => {
     const caption = (text: string | RegExp) => within(screen.getByRole('banner')).getByText(text);
 
@@ -4255,25 +4411,38 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(screen.getAllByText('경기를 시작해 주세요.')).toHaveLength(1);
     });
 
-    it('하프타임', () => {
+    it('하프타임 — 늦은 기록과 팀 파울 재시작만 짧게, 다음 행동 이름은 진행 바가 말한다', () => {
       setup({ periods: PERIODS.halftime });
       render(<CoreHarness />);
       expect(
-        caption('하프타임이에요. 준비되면 ‘후반 시작’을 눌러 주세요. 빠진 골·카드·파울은 지금도 전반 끝 시각으로 기록할 수 있어요.'),
+        caption('빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요. 후반에는 팀 파울을 0부터 다시 세요.'),
       ).toBeInTheDocument();
+      expect(screen.getByRole('banner')).not.toHaveTextContent('‘후반 시작’');
     });
 
     it('정규 시간 종료 — 기록 권한이 있는 대회 경기', () => {
       setup({ periods: PERIODS.regulationEnded });
       render(<CoreHarness />);
-      expect(caption('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+      expect(caption('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
+      // 정규 시간이 끝났다는 말은 칩과 단계 줄이 하므로 문구에 되풀이하지 않는다.
+      expect(screen.getByRole('banner')).not.toHaveTextContent('정규 시간이 끝났어요');
+    });
+
+    it('정규 시간 종료 — 결선이 무승부면 승부차기 결과를 입력하라고만 한다', () => {
+      setup({ periods: PERIODS.regulationEnded });
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, isKnockoutFixture: true },
+      });
+      render(<CoreHarness />);
+      expect(caption('무승부예요. 승부차기 결과를 입력해 주세요.')).toBeInTheDocument();
     });
 
     it('정규 시간 종료 — 콘솔에서 끝낼 수 없는 호스트는 결과 제출 화면 링크를 준다', () => {
       setup({ periods: PERIODS.regulationEnded });
       render(<CoreHarness leaseRequired={false} resultHref="/team-matches/tm-1/result" />);
 
-      expect(caption(/정규 시간이 끝났어요\. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요\./)).toBeInTheDocument();
+      expect(caption(/기록을 확인한 뒤 결과를 보내 주세요\./)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '결과 제출 화면 열기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
       expect(within(screen.getByRole('banner')).getByRole('link', { name: '결과 보내기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
       // 이 호스트는 콘솔에서 경기를 끝낼 수 없다.
@@ -4284,8 +4453,8 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup();
       render(<CoreHarness />);
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
-      expect(screen.queryByText(/하프타임이에요/)).toBeNull();
-      expect(screen.queryByText(/정규 시간이 끝났어요/)).toBeNull();
+      expect(screen.queryByText(/빠진 기록은 지금도/)).toBeNull();
+      expect(screen.queryByText(/기록을 확인한 뒤/)).toBeNull();
     });
   });
 });

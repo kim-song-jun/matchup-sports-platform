@@ -46,7 +46,7 @@ import { collectEventTimeCorrections, eventClockUpperBoundMs, eventTimeCorrectio
 import { SECOND_YELLOW_RED_LABEL } from '@/lib/second-yellow-red';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
-import { resultProgressSteps } from '@/lib/match-progress-steps';
+import { breakLabelBefore, matchProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import {
   HALFTIME_REST_SCOPE_PREFIX,
@@ -885,11 +885,6 @@ export function OperateConsoleCore({
   const foulCounts = useMemo(
     () => deriveFoulCounts(ops.liveEvents, periodForDisplay?.number ?? 1),
     [ops.liveEvents, periodForDisplay?.number],
-  );
-  // 팀 파울은 피리어드마다 새로 센다 — 다음 피리어드가 있으면(하프타임 포함) 막대가 다시 센다고 알려 준다.
-  const foulPeriodHasNext = useMemo(
-    () => (gameDetail.data?.periods ?? []).some((period) => period.number === (periodForDisplay?.number ?? 1) + 1),
-    [gameDetail.data?.periods, periodForDisplay?.number],
   );
 
   // 선수 교체: "지금 피치 위" 는 저장된 컬럼이 아니라 started + 확정 SUBSTITUTION
@@ -2152,26 +2147,25 @@ export function OperateConsoleCore({
       }))
     : null;
 
-  // 단계 문구 — 지금 단계에서 다음에 할 일을 점수 카드 안에 한 번만 적는다(상태 줄과 겹치지 않게).
-  const foulPeriodNumber = periodForDisplay?.number ?? 1;
+  // 단계 문구 — 지금 단계에서 알아야 할 것만 점수 카드 안에 한 줄로 적는다. 다음 행동 이름은 하단 진행 버튼이 말한다.
   let stageCaption: ReactNode = null;
   if (gameState === 'ENDED') {
-    stageCaption = <MatchProgressStrip steps={resultProgressSteps({ official: resultOfficialized })} label="경기 진행 단계" />;
+    stageCaption = <MatchProgressStrip steps={resultProgressSteps({ official: resultOfficialized })} label="경기 진행 단계" labels="all" />;
   } else if (halftime && halftimePeriod !== null) {
     stageCaption = (
       <p className={STAGE_CAPTION_CLASS}>
-        하프타임이에요. 준비되면 ‘{startPeriodCommandLabel(halftimePeriod.number, periodCount)}’을 눌러 주세요. 빠진 골·카드·파울은 지금도{' '}
-        {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각으로 기록할 수 있어요.
+        빠진 기록은 지금도 {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각으로 남길 수 있어요.{' '}
+        {periodLabel(halftimePeriod.number, periodCount)}에는 팀 파울을 0부터 다시 세요.
       </p>
     );
   } else if (regulationEnded) {
     stageCaption = penaltyShootoutEligible ? (
-      <p className={STAGE_CAPTION_CLASS}>정규 시간이 무승부로 끝났어요. ‘승부차기 시작’으로 결과를 입력해 주세요.</p>
+      <p className={STAGE_CAPTION_CLASS}>무승부예요. 승부차기 결과를 입력해 주세요.</p>
     ) : leaseRequired ? (
-      <p className={STAGE_CAPTION_CLASS}>정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.</p>
+      <p className={STAGE_CAPTION_CLASS}>기록을 확인한 뒤 경기를 끝내 주세요.</p>
     ) : (
       <p className={STAGE_CAPTION_CLASS}>
-        정규 시간이 끝났어요. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요.
+        기록을 확인한 뒤 결과를 보내 주세요.
         {resultHref ? (
           <Link
             href={resultHref}
@@ -2192,6 +2186,25 @@ export function OperateConsoleCore({
     stageCaption = <p className={STAGE_CAPTION_CLASS}>경기를 시작해 주세요.</p>;
   }
 
+  // 진행 단계 줄 — 뛰는 동안 점수 아래에 둔다. 위치를 못 읽는 순간(상세가 뒤처진 때 등)에는 지어내지 않고 줄을 뺀다.
+  const progressSteps = matchInPlay
+    ? matchProgressSteps({
+        periods: (gameDetail.data?.periods ?? []).map((period) => ({
+          number: period.number,
+          label: periodLabel(period.number, periodCount),
+        })),
+        regularPeriodCount: periodCount,
+        livePeriodNumber: currentPeriod?.number ?? null,
+        breakBeforePeriodNumber: halftimePeriod?.number ?? null,
+        regulationEnded,
+        allowPenaltyShootout,
+        penaltyShootoutEligible,
+      })
+    : [];
+  const progressStrip = progressSteps.some((step) => step.state === 'current') ? (
+    <MatchProgressStrip steps={progressSteps} label="경기 진행 단계" />
+  ) : null;
+
   const clockSlot =
     currentPeriod && currentPeriod.startedAt ? (
       <ElapsedMatchClock
@@ -2205,12 +2218,16 @@ export function OperateConsoleCore({
         onExpiryChange={handlePeriodExpiryChange}
       />
     ) : halftime || regulationEnded ? (
-      // 뛰는 경기 시간이 없어 잴 시계가 없다 — 상태 칩은 여전히 "진행 중"이라 이 칩이 단계를 말한다.
+      // 뛰는 경기 시간이 없어 잴 시계가 없다 — 이 칩이 지금 단계를 말한다.
       <span className={STAGE_CHIP_CLASS}>
         <Timer size={16} aria-hidden="true" />
-        {halftime ? '하프타임' : '정규 시간 종료'}
+        {halftime && halftimePeriod !== null ? breakLabelBefore(halftimePeriod.number, periodCount) : '정규 시간 종료'}
       </span>
     ) : null;
+
+  // 경기가 정상으로 흐르는 동안은 시계(초록 점)·하프타임 칩·단계 줄이 지금 상태를 말하므로 「진행 중」 배지를 숨긴다.
+  // 시작 전·일시 중지·종료·취소와 시계도 칩도 없는 진행 중은 이 배지가 유일한 표시라 그대로 둔다.
+  const stateBadge = gameState === 'LIVE' && clockSlot !== null ? null : gameState ? STATE_LABEL[gameState] : '-';
 
   // 승부차기는 정규 시간 점수와 다른 값이라 스코어에 섞지 않고 따로 적는다. 선축을 모르는 옛 기록은 그 조각을 생략한다.
   const penaltyChip = confirmedPenalties ? (
@@ -2389,13 +2406,11 @@ export function OperateConsoleCore({
           scoreBySideId={headerScoreBySideId}
           foulCounts={foulCounts}
           foulThreshold={resolveTeamFoulThreshold(gameDetail.data?.teamFoulThreshold)}
-          foulPeriodLabel={matchInPlay ? `${periodLabel(foulPeriodNumber, periodCount)} 팀 파울` : null}
-          foulResetNote={
-            matchInPlay && foulPeriodHasNext ? `${periodLabel(foulPeriodNumber + 1, periodCount)}에는 0부터 다시 세요` : null
-          }
-          stateLabel={gameState ? STATE_LABEL[gameState] : '-'}
+          foulLabel={matchInPlay ? '팀 파울' : null}
+          stateLabel={stateBadge}
           clock={clockSlot}
           penaltyChip={penaltyChip}
+          progress={progressStrip}
           caption={stageCaption}
           footer={
             !leaseRequired && resultHref ? (

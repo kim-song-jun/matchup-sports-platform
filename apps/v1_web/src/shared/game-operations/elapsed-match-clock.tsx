@@ -23,7 +23,7 @@ export interface ElapsedMatchClockProps {
   /** `V1GamePeriod.pausedAt`, as ms — start of the currently open pause
    * segment, or `null` when not paused right now. */
   readonly pausedAtMs: number | null;
-  /** 정규 피리어드 수. 1이면 단판이라 시계 옆 "전반" 라벨을 뺀다. */
+  /** 정규 피리어드 수. 1이면 단판이라 스크린리더용 이름에 구간 이름을 붙이지 않는다. 구간은 화면에서 단계 줄이 보인다. */
   readonly periodCount?: number | null;
   /** 현재 기간의 설정 시간. 연장 기간도 자기 durationMinutes를 사용한다. */
   readonly periodDurationMinutes?: number | null;
@@ -76,9 +76,6 @@ export function ElapsedMatchClock({
 
   return (
     <div className="flex items-center gap-2" aria-live="off">
-      {isSinglePeriod(periodCount) ? null : (
-        <span className="text-xs font-semibold text-[var(--text-muted)]">{periodLabel(periodNumber, periodCount)}</span>
-      )}
       {/* 스톱워치 다이얼 — 자릿수가 고정된 큰 숫자를 살짝 어두운 배경 칩 안에
           담아 "지금 흐르고 있는 시각"과 주변 텍스트를 시각적으로 분리한다.
           초록 점(진행 중)/일시정지 아이콘을 숫자 바로 옆에 붙여 한눈에 상태를

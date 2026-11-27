@@ -21,8 +21,16 @@ struct TeameetApp: App {
 
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--widget-preview") {
+                WidgetPreviewGallery()
+            } else {
+                RootView(config: config, model: model, sessionStore: sessionStore, appDelegate: appDelegate)
+            }
+            #else
             RootView(
                 config: config, model: model, sessionStore: sessionStore, appDelegate: appDelegate)
+            #endif
         }
     }
 }

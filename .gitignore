@@ -87,3 +87,6 @@ infra/load/tokens.txt
 
 # 서버에서 배포가 만드는 링크(릴리스와 무관한 nginx 런타임 폴더). setup-ec2.sh 가 클론 안에 만든다.
 deploy/nginx-live
+
+# XcodeGen WidgetKit Info.plist
+/apps/v1_ios/Widget-Info.plist

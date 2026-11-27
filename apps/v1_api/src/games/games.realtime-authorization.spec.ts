@@ -43,6 +43,8 @@ const assignment = {
 
 const unscopedFixture = {
   ...fixture,
+  /** 친선 팀 매치가 직접 정한 팀 파울 기준(null = 기본 5개). */
+  teamFoulThreshold: null as number | null,
   tournamentId: null,
   leagueId: null,
   tournament: null,
@@ -135,6 +137,22 @@ describe('GET /games/:gameId realtime authorization response', () => {
     // 새 서비스를 만들어 `findUnique` mockResolvedValueOnce 순서를 처음부터 맞춘다.
     const unset = createGameService();
     unset.tx.v1Tournament.findFirst.mockResolvedValue({ teamFoulThreshold: null });
+    expect(await unset.service.getGame(user, GAME_ID)).toEqual(expect.objectContaining({ teamFoulThreshold: 5 }));
+  });
+
+  // 친선 팀 매치(대회·리그 소속이 아닌 경기)는 대회·리그 조회 없이 매치 자신의 기준을 쓴다.
+  it('uses the friendly match own team-foul threshold when it has no competition, defaulting to 5', async () => {
+    const user = { id: USER_ID } as V1AuthUser;
+    const own = createGameService({
+      gameFixture: { ...unscopedFixture, teamFoulThreshold: 8 },
+      assignments: [],
+      memberships: [{ teamId: 'host-team', role: 'owner' }],
+    });
+    expect(await own.service.getGame(user, GAME_ID)).toEqual(expect.objectContaining({ teamFoulThreshold: 8 }));
+    // 대회·리그 단건 조회는 타지 않는다.
+    expect(own.tx.v1Tournament.findFirst).not.toHaveBeenCalled();
+
+    const unset = createGameService({ gameFixture: unscopedFixture, assignments: [], memberships: [{ teamId: 'host-team', role: 'owner' }] });
     expect(await unset.service.getGame(user, GAME_ID)).toEqual(expect.objectContaining({ teamFoulThreshold: 5 }));
   });
 

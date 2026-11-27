@@ -289,6 +289,7 @@ export class LeagueMatchAdminService {
           ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
           // 팀 파울 경고 기준 — 생략·null 이면 컬럼을 비워 둔다(= 기본값 5개).
           ...(dto.teamFoulThreshold != null ? { teamFoulThreshold: dto.teamFoulThreshold } : {}),
+          ...(dto.showTeamFouls !== undefined ? { showTeamFouls: dto.showTeamFouls } : {}),
           ...(dto.previousLeagueId !== undefined ? { previousLeagueId: dto.previousLeagueId } : {}),
           registrationDeadlineAt,
           // 참가비를 보냈으면 확정한 것이다(0원 = 무료 확정). 안 보냈으면 미설정으로 남겨 신청 관리가 확인을 받는다.
@@ -585,6 +586,7 @@ export class LeagueMatchAdminService {
       redCardSuspensionMatches: league.redCardSuspensionMatches,
       // null = 기본값(5개). 화면이 "기본 5개"와 직접 입력한 값을 구분해 보여 줄 수 있게 그대로 내린다.
       teamFoulThreshold: league.teamFoulThreshold,
+      showTeamFouls: league.showTeamFouls,
       sportCode: league.sportCode,
       coverImageUrl: league.coverImageUrl,
       listImageUrl: league.listImageUrl,
@@ -2135,7 +2137,7 @@ export class LeagueMatchAdminService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { id: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true, teamFoulThreshold: true },
+      select: { id: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true, teamFoulThreshold: true, showTeamFouls: true },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
@@ -2165,10 +2167,12 @@ export class LeagueMatchAdminService {
       yellowAccumulationLimit?: number | null;
       redCardSuspensionMatches?: number | null;
       teamFoulThreshold?: number | null;
+      showTeamFouls?: boolean;
     } = {};
     if (dto.yellowAccumulationLimit !== undefined) data.yellowAccumulationLimit = dto.yellowAccumulationLimit;
     if (dto.redCardSuspensionMatches !== undefined) data.redCardSuspensionMatches = dto.redCardSuspensionMatches;
     if (dto.teamFoulThreshold !== undefined) data.teamFoulThreshold = dto.teamFoulThreshold;
+    if (dto.showTeamFouls !== undefined) data.showTeamFouls = dto.showTeamFouls;
 
     if (Object.keys(data).length > 0) {
       // `updateMany` + `kind` 가드인 이유는 이 파일의 다른 dual-write 와 같다 — `update` 는
@@ -2204,6 +2208,7 @@ export class LeagueMatchAdminService {
           : league.redCardSuspensionMatches,
       teamFoulThreshold:
         dto.teamFoulThreshold !== undefined ? (dto.teamFoulThreshold ?? null) : league.teamFoulThreshold,
+      showTeamFouls: dto.showTeamFouls !== undefined ? dto.showTeamFouls : league.showTeamFouls,
     };
   }
 
@@ -2555,6 +2560,7 @@ export class LeagueMatchAdminService {
         yellowAccumulationLimit: true,
         redCardSuspensionMatches: true,
         teamFoulThreshold: true,
+        showTeamFouls: true,
         // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
         coverImageUrl: true,
         listImageUrl: true,

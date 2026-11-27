@@ -1741,6 +1741,8 @@ export type V1TeamMatchMutationPayload = {
   rulesText?: string | null;
   /** 1/2개의 기간만 저장한다. 생략하면 생성 기본값 또는 기존 pin을 유지한다. */
   periods?: readonly V1TeamMatchPeriodInput[];
+  /** 팀 파울 경고 기준(개). null = 기본값(5개). 수정 요청에서 생략은 유지, null은 기본값으로 되돌리기. */
+  teamFoulThreshold?: number | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
@@ -1797,6 +1799,8 @@ export type V1TeamMatchEdit = {
     matchFormat?: string | null;
     matchStyle?: string[];
     uniformColor?: string | null;
+    /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
+    teamFoulThreshold?: number | null;
   };
   status: V1TeamMatchApiStatus;
   version: string;
@@ -4238,6 +4242,8 @@ export type V1Tournament = {
   redCardSuspensionMatches: number | null;
   /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
   teamFoulThreshold?: number | null;
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 구버전 응답에는 없다(없으면 켜짐으로 본다). */
+  showTeamFouls?: boolean;
   rulesText: string | null;
   refundPolicyText: string | null;
   registrationCount: number;
@@ -4560,6 +4566,8 @@ export type V1TournamentDetail = {
   redCardSuspensionMatches: number | null;
   /** 팀 파울 경고 기준(개). null = 기본값(5개). 구버전 응답에는 없다. */
   teamFoulThreshold?: number | null;
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 구버전 응답에는 없다(없으면 켜짐으로 본다). */
+  showTeamFouls?: boolean;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -5273,6 +5281,8 @@ export type V1CreateTournamentPayload = {
   redCardSuspensionMatches?: number | null;
   /** 팀 파울 경고 기준(개). 생략·null = 기본값(5개). 수정 요청에서 생략은 유지, null은 기본값으로 되돌리기. */
   teamFoulThreshold?: number | null;
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 생략 = 생성 시 켜짐, 수정 시 유지. */
+  showTeamFouls?: boolean;
   rulesText?: string | null;
   refundPolicyText?: string | null;
 };

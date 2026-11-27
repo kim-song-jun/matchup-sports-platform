@@ -678,6 +678,26 @@ describe('TournamentInfoSection — 팀 파울 기준', () => {
     expect(hooks.mutate.mock.calls[0][0]).not.toHaveProperty('teamFoulThreshold');
   });
 
+  it('관전 화면 팀 파울 스위치는 켜진 채 열리고, 끄면 그 값만 보낸다(진행 중이어도)', () => {
+    renderSection(true, { status: 'in_progress', showTeamFouls: true });
+    save(() => {
+      expect(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' })).toBeChecked();
+      fireEvent.click(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' }));
+    });
+
+    expect(hooks.mutate.mock.calls[0][0]).toEqual({ showTeamFouls: false, expectedVersion: tournament.updatedAt });
+  });
+
+  it('필드가 없던 구버전 응답은 켜짐으로 읽고, 건드리지 않으면 표시 여부를 보내지 않는다', () => {
+    renderSection(true, {});
+    save(() => {
+      expect(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' })).toBeChecked();
+      fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
+    });
+
+    expect(hooks.mutate.mock.calls[0][0]).not.toHaveProperty('showTeamFouls');
+  });
+
   it('진행 중인 대회도 수정할 수 있다(출전정지 규정과 달리 잠그지 않는다)', () => {
     renderSection(true, { status: 'in_progress', teamFoulThreshold: null });
     save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '4' } }));

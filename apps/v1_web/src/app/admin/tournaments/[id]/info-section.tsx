@@ -8,6 +8,7 @@ import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import { parseTeamFoulThresholdInput, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
+import { TeamFoulPublicSwitch } from '@/components/admin/team-foul-public-switch';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
 import type { V1SixTeamCriterion, V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory, V1TournamentTieBreakOrder } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
@@ -130,6 +131,8 @@ export function TournamentInfoSection() {
   const [editYellowLimit, setEditYellowLimit] = useState('');
   const [editRedSuspension, setEditRedSuspension] = useState('');
   const [editTeamFoulThreshold, setEditTeamFoulThreshold] = useState('');
+  // 관전 화면 팀 파울 표시 — 구버전 응답(필드 없음)은 켜짐으로 읽는다.
+  const [editShowTeamFouls, setEditShowTeamFouls] = useState(true);
   const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoHomeEnabled, setPromoHomeEnabled] = useState(false);
@@ -216,6 +219,7 @@ export function TournamentInfoSection() {
         ? ''
         : String(tournament.teamFoulThreshold),
     );
+    setEditShowTeamFouls(tournament.showTeamFouls ?? true);
     setEditRefundPolicyText(tournament.refundPolicyText ?? '');
     setEditOpen(true);
   };
@@ -440,6 +444,10 @@ export function TournamentInfoSection() {
     }
     if (normalizedTeamFoulThreshold !== (tournament.teamFoulThreshold ?? null)) {
       payload.teamFoulThreshold = normalizedTeamFoulThreshold;
+    }
+    // 관전 화면 표시 — 바뀐 때만 보낸다. 대회가 진행 중이어도 바꿀 수 있다.
+    if (editShowTeamFouls !== (tournament.showTeamFouls ?? true)) {
+      payload.showTeamFouls = editShowTeamFouls;
     }
     if (normalizedRefundPolicyText !== tournament.refundPolicyText) {
       payload.refundPolicyText = normalizedRefundPolicyText;
@@ -1241,6 +1249,7 @@ export function TournamentInfoSection() {
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 경기 진행 중에도 바꿀 수 있고, 비우면 5개예요.
             </p>
+            <TeamFoulPublicSwitch checked={editShowTeamFouls} onChange={setEditShowTeamFouls} disabled={updateTournament.isPending} />
           </div>
 
           <div className="flex flex-col gap-2">

@@ -322,3 +322,27 @@ describe('상대팀 부담금은 총비용을 넘을 수 없다', () => {
     expect(getCompleteTeamMatchSteps(withCosts(50000, 30000), ['condition', 'place-time'])).toEqual(['condition', 'place-time']);
   });
 });
+
+describe('팀 파울 기준(친선 매치) — 선택값, 입력했다면 1~20 정수', () => {
+  const withThreshold = (teamFoulThreshold: string) => baseCtx({ draft: { ...baseCtx().draft, teamFoulThreshold } });
+  const payloadOf = (ctx: TeamMatchValidationContext) => buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+
+  it('비워 두면(기본 5개) 막지 않고 null 로 보낸다 — 수정에서는 기본값으로 되돌리는 뜻이다', () => {
+    expect(getTeamMatchMissingFields(baseCtx())).toEqual([]);
+    expect(payloadOf(baseCtx()).payload?.teamFoulThreshold).toBeNull();
+    expect(payloadOf(withThreshold('')).payload?.teamFoulThreshold).toBeNull();
+  });
+
+  it.each(['1', '5', '8', '20'])('%s 개는 숫자로 보낸다', (value) => {
+    expect(getTeamMatchMissingFields(withThreshold(value))).toEqual([]);
+    expect(payloadOf(withThreshold(value)).payload?.teamFoulThreshold).toBe(Number(value));
+  });
+
+  it.each(['0', '21', '2.5', '-1', 'abc'])('%s 은(는) 경기 규칙 단계에서 막고 이유를 알린다', (value) => {
+    const ctx = withThreshold(value);
+    expect(getTeamMatchMissingFields(ctx).map((item) => item.field)).toEqual(['teamFoulThreshold']);
+    expect(getTeamMatchStepErrors(ctx, 'rules').teamFoulThreshold).toContain('1부터 20');
+    expect(getTeamMatchStepErrors(ctx, 'condition').teamFoulThreshold).toBeUndefined();
+    expect(payloadOf(ctx).payload).toBeUndefined();
+  });
+});

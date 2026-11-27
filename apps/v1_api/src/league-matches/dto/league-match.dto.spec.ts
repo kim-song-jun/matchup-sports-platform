@@ -127,3 +127,32 @@ describe('team foul threshold on league DTOs', () => {
     expect(dto.redCardSuspensionMatches).toBeUndefined();
   });
 });
+
+describe('showTeamFouls on league DTOs', () => {
+  const create = (showTeamFouls: unknown) => plainToInstance(CreateLeagueMatchDto, { ...valid, regionId: 'region-busan-jung', showTeamFouls });
+  const discipline = (body: object) => plainToInstance(UpdateLeagueDisciplineDto, body);
+  const on = async (dto: object) => (await validate(dto as never)).filter((error) => error.property === 'showTeamFouls');
+
+  it.each([true, false])('accepts the boolean %p when creating and when editing', async (value) => {
+    expect(await on(create(value))).toHaveLength(0);
+    expect(await on(discipline({ showTeamFouls: value }))).toHaveLength(0);
+  });
+
+  it('accepts omission (create = on, edit = keep)', async () => {
+    expect(await on(create(undefined))).toHaveLength(0);
+    expect(await on(discipline({}))).toHaveLength(0);
+  });
+
+  it.each([null, 'false', 0, 1])('rejects the non-boolean %p on both DTOs (the column is NOT NULL)', async (value) => {
+    expect((await on(create(value))).length).toBeGreaterThan(0);
+    expect((await on(discipline({ showTeamFouls: value }))).length).toBeGreaterThan(0);
+  });
+
+  it('lets the edit DTO carry only the display switch (suspension fields and threshold stay untouched)', async () => {
+    const dto = discipline({ showTeamFouls: false });
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.yellowAccumulationLimit).toBeUndefined();
+    expect(dto.redCardSuspensionMatches).toBeUndefined();
+    expect(dto.teamFoulThreshold).toBeUndefined();
+  });
+});

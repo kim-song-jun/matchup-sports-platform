@@ -102,6 +102,8 @@ function buildFakePrisma(options: {
   events: (FakeGoalEvent | FakeFoulEvent)[];
   /** 대회에 저장된 팀 파울 기준(`V1Tournament.teamFoulThreshold`). 기본값 undefined = 비어 있음(기본 5개). */
   teamFoulThreshold?: number | null;
+  /** 대회의 관전 화면 팀 파울 표시 여부(`V1Tournament.showTeamFouls`). 기본값 undefined = 켜짐. */
+  showTeamFouls?: boolean;
   /** Issue #377 -- this fixture's assigned field, for the staff-bypass scope tests below. */
   fieldId?: string | null;
   /**
@@ -168,6 +170,7 @@ function buildFakePrisma(options: {
           bracketPublishedAt: new Date('2026-01-01T00:00:00.000Z'),
           bracketPublishScheduledAt: null,
           teamFoulThreshold: options.teamFoulThreshold ?? null,
+          showTeamFouls: options.showTeamFouls ?? true,
         };
       },
     },
@@ -1187,6 +1190,7 @@ describe('PublicTournamentRecordsService.getMatch -- teamFouls (라이브 전용
     gameState?: string;
     visibilityMode?: string;
     teamFoulThreshold?: number | null;
+    showTeamFouls?: boolean;
   }) => {
     const prisma = buildFakePrisma({
       scheduledAt: kickoff,
@@ -1245,6 +1249,12 @@ describe('PublicTournamentRecordsService.getMatch -- teamFouls (라이브 전용
 
   it('경기가 이미 종료됐으면 null이다 — 기록으로 남기지 않는다', async () => {
     expect(await teamFoulsFor({ gameState: 'ENDED', periods: [ended(1), ended(2)], events: [foul('side-home', 2)] })).toBeNull();
+  });
+
+  it('대회가 관전 화면 표시를 껐으면 라이브 중에도 싣지 않는다 — 켜면 다시 실린다', async () => {
+    const base = { periods: [live(1)], events: [foul('side-home', 1)] };
+    expect(await teamFoulsFor({ ...base, showTeamFouls: false })).toBeNull();
+    expect((await teamFoulsFor({ ...base, showTeamFouls: true }))?.home).toBe(1);
   });
 
   it('상태만 공개하는 경기(status_only)에는 싣지 않는다', async () => {

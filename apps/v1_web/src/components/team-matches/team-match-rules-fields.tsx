@@ -5,6 +5,7 @@ import { ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { MAX_TEAM_MATCH_PERIOD_MINUTES, validTeamMatchPeriodMinutes } from '@/lib/team-match-periods';
+import { DEFAULT_TEAM_FOUL_THRESHOLD } from '@/lib/team-foul-counter';
 import { validTeamMatchPeriods } from './team-match-rules-draft';
 import type { TeamMatchRulesControl } from './team-matches.types';
 
@@ -66,6 +67,15 @@ export function TeamMatchRulesFields({ rules }: { rules: TeamMatchRulesControl }
           </div>
           <FieldErrorText message={rules.validationError} />
         </fieldset>
+      ) : null}
+      {rules.teamFoulThreshold ? (
+        <div style={{ marginTop: 'var(--spacing-6)' }}>
+          <SectionTitle title="팀 파울 기준 (선택)" />
+          <CreateField id="field-teamFoulThreshold" label="팀 파울 기준" value={rules.teamFoulThreshold.value} type="number" suffix="개"
+            placeholder={`비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개`} error={rules.teamFoulThreshold.error}
+            description={`한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 ‘다음부터 10m 프리킥’으로 예고해요. 비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개예요.`}
+            onChange={rules.teamFoulThreshold.onChange} />
+        </div>
       ) : null}
     </div>
   );

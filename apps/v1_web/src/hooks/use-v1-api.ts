@@ -6404,8 +6404,8 @@ export function useV1UpdateLeagueDiscipline(leagueId: string) {
   return useMutation({
     // 보낸 키만 바뀐다(생략 = 유지). 출전정지 규정 두 칸은 경기가 시작되면 서버가 잠그지만 `teamFoulThreshold` 는
     // 잠기지 않는다 — 그래서 한 요청에 섞어 보내지 않고 각 카드가 자기 칸만 보낸다.
-    mutationFn: (payload: { yellowAccumulationLimit?: number | null; redCardSuspensionMatches?: number | null; teamFoulThreshold?: number | null }) =>
-      v1Patch<{ leagueId: string; yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null; teamFoulThreshold: number | null }>(`/admin/league-matches/${leagueId}`, payload),
+    mutationFn: (payload: { yellowAccumulationLimit?: number | null; redCardSuspensionMatches?: number | null; teamFoulThreshold?: number | null; showTeamFouls?: boolean }) =>
+      v1Patch<{ leagueId: string; yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null; teamFoulThreshold: number | null; showTeamFouls: boolean }>(`/admin/league-matches/${leagueId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });

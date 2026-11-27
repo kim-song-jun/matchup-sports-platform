@@ -1238,6 +1238,7 @@ export class GamesService {
               tournamentId: true,
               leagueId: true,
               fieldId: true,
+              teamFoulThreshold: true,
             },
           },
           sides: { orderBy: { sideKey: 'asc' } },
@@ -1308,7 +1309,10 @@ export class GamesService {
         penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
         // 운영 콘솔의 팀 파울 경고(예고 "다음부터 10m 프리킥" → 초과 "세컨 파울 · 10m 프리킥") 기준. `substitutionPolicy` 와 같은 원칙 —
         // 서버가 해석해 내려주고 프런트는 기본값을 따로 추측하지 않는다(응답에 없을 때만 폴백).
-        teamFoulThreshold: resolveTeamFoulThreshold(competition?.teamFoulThreshold),
+        // 친선 팀 매치(대회·리그 소속이 아닌 경기)는 매치 자신의 값을 쓴다.
+        teamFoulThreshold: resolveTeamFoulThreshold(
+          competitionId === null ? teamMatch?.teamFoulThreshold : competition?.teamFoulThreshold,
+        ),
       };
     });
   }

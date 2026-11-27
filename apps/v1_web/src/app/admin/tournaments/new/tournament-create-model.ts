@@ -131,6 +131,8 @@ export type TournamentCreateState = {
   redCardSuspensionMatches: string;
   /** 팀 파울 경고 기준(개). 빈 문자열 = 기본값(5개). */
   teamFoulThreshold: string;
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 기본 켜짐. */
+  showTeamFouls: boolean;
   rulesText: string;
   refundPolicyText: string;
   coverImageUrl: string | null;
@@ -209,6 +211,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   redCardSuspensionMatches: '',
   // 비워 두면 기본값(5개)이다 — 정지 규정과 달리 비워 두는 것이 정상 상태라 소급 위험이 없다.
   teamFoulThreshold: '',
+  showTeamFouls: true,
   rulesText: '',
   refundPolicyText: '',
   coverImageUrl: null,
@@ -530,6 +533,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       tournament.teamFoulThreshold === null || tournament.teamFoulThreshold === undefined
         ? ''
         : String(tournament.teamFoulThreshold),
+    showTeamFouls: tournament.showTeamFouls ?? true,
     rulesText: tournament.rulesText ?? '',
     refundPolicyText: tournament.refundPolicyText ?? '',
     coverImageUrl: tournament.coverImageUrl,
@@ -895,6 +899,7 @@ export function buildTournamentCreatePayload(
       const parsed = parseTeamFoulThresholdInput(state.teamFoulThreshold);
       return parsed === 'invalid' ? undefined : parsed;
     })(),
+    showTeamFouls: state.showTeamFouls,
     rulesText: state.rulesText.trim() || null,
     refundPolicyText: state.refundPolicyText.trim() || null,
     ...promoPayload('promoHome', state.promoHome),

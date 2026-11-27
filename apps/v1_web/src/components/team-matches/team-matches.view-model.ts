@@ -87,6 +87,7 @@ const draft = {
   endTime: '',
   deadlineDate: '',
   deadlineTime: '',
+  teamFoulThreshold: '',
 };
 
 export function getTeamMatchListViewModel(): TeamMatchListViewModel {

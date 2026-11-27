@@ -543,6 +543,14 @@ describe('대회 생성 — 팀 파울 기준', () => {
     ).toBe(7);
   });
 
+  it('관전 화면 팀 파울 표시는 기본 켜짐이고, 끄면 false 로 보내며, 저장된 값을 불러온다(구버전 응답은 켜짐)', () => {
+    expect(INITIAL_TOURNAMENT_CREATE_STATE.showTeamFouls).toBe(true);
+    expect(buildTournamentCreatePayload(INITIAL_TOURNAMENT_CREATE_STATE).showTeamFouls).toBe(true);
+    expect(buildTournamentCreatePayload({ ...INITIAL_TOURNAMENT_CREATE_STATE, showTeamFouls: false }).showTeamFouls).toBe(false);
+    expect(mapTournamentToWizardFields(draftWithMinimumMatches(1, { showTeamFouls: false })).showTeamFouls).toBe(false);
+    expect(mapTournamentToWizardFields(draftWithMinimumMatches(1)).showTeamFouls).toBe(true);
+  });
+
   it('저장된 대회의 개수를 불러오고, 값이 없거나 구버전 응답이면 빈칸으로 읽는다', () => {
     expect(mapTournamentToWizardFields(draftWithMinimumMatches(1, { teamFoulThreshold: 6 })).teamFoulThreshold).toBe('6');
     expect(mapTournamentToWizardFields(draftWithMinimumMatches(1, { teamFoulThreshold: null })).teamFoulThreshold).toBe('');

@@ -76,7 +76,7 @@ function makeFixtureRow(overrides: Partial<FakeTeamMatchRow> = {}): FakeTeamMatc
 }
 
 function buildService(options: {
-  league?: { id: string; title: string; teamFoulThreshold?: number | null } | null;
+  league?: { id: string; title: string; teamFoulThreshold?: number | null; showTeamFouls?: boolean } | null;
   /** 팀 파울 집계 검증용 이벤트(FOUL·CARD). 기본값 빈 배열. */
   events?: unknown[];
   fixture?: FakeTeamMatchRow | null;
@@ -88,7 +88,7 @@ function buildService(options: {
   const fakePrisma = {
     // BE-5: 리그 제목 조회가 통합 축으로 옮겨졌다.
     v1Tournament: {
-      findFirst: async () => (options.league === undefined ? { id: LEAGUE_ID, title: '가을 정규 리그' } : options.league),
+      findFirst: async () => (options.league === undefined ? { id: LEAGUE_ID, title: '가을 정규 리그', showTeamFouls: true } : options.league),
     },
     v1TeamMatch: {
       findFirst: async () => options.fixture === undefined ? makeFixtureRow() : options.fixture,
@@ -392,10 +392,10 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- teamFouls (�
   const foul = (id: string, sideId: string, sequence: number) => ({
     id, type: 'FOUL', sideId, participantId: null, period: 1, sequence, reversesEventId: null, payload: {},
   });
-  const teamFoulsFor = async (options: { state: string; teamFoulThreshold?: number | null }) =>
+  const teamFoulsFor = async (options: { state: string; teamFoulThreshold?: number | null; showTeamFouls?: boolean }) =>
     (
       await buildService({
-        league: { id: LEAGUE_ID, title: '가을 정규 리그', teamFoulThreshold: options.teamFoulThreshold ?? null },
+        league: { id: LEAGUE_ID, title: '가을 정규 리그', teamFoulThreshold: options.teamFoulThreshold ?? null, showTeamFouls: options.showTeamFouls ?? true },
         events: [foul('f1', 'side-home', 1), foul('f2', 'side-away', 2), foul('f3', 'side-away', 3)],
         fixture: makeFixtureRow({
           game: makeGame({ state: options.state, currentOfficialRevision: null, periods: options.state === 'LIVE' ? [livePeriod] : [{ ...livePeriod, state: 'ENDED' }] }),
@@ -413,6 +413,10 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- teamFouls (�
 
   it('끝난 경기에는 싣지 않는다 — 기록으로 남기지 않는다', async () => {
     expect(await teamFoulsFor({ state: 'ENDED' })).toBeNull();
+  });
+
+  it('리그가 관전 화면 표시를 껐으면 라이브 중에도 싣지 않는다', async () => {
+    expect(await teamFoulsFor({ state: 'LIVE', showTeamFouls: false })).toBeNull();
   });
 });
 

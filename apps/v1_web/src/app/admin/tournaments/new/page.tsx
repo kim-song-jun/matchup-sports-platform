@@ -23,6 +23,7 @@ import type { V1Tournament, V1TournamentFormat } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { GenderCategoryField } from '@/components/admin/gender-category-field';
+import { TeamFoulPublicSwitch } from '@/components/admin/team-foul-public-switch';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import { TieBreakPresetPicker } from '@/components/admin/tournaments/tie-break-preset-picker';
 import {
@@ -803,6 +804,11 @@ function BasicStep({
           <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
             한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 비우면 5개예요.
           </p>
+          <TeamFoulPublicSwitch
+            checked={state.showTeamFouls}
+            onChange={(checked) => dispatch({ type: 'set-field', field: 'showTeamFouls', value: checked })}
+            disabled={pending}
+          />
         </Field>
       </section>
 

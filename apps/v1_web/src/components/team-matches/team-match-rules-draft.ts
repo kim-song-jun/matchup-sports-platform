@@ -95,6 +95,7 @@ function isEditDraft(value: unknown): value is TeamMatchCreateViewModel['draft']
     .every((field) => typeof value[field] === 'string')
     && (value.endDate === undefined || typeof value.endDate === 'string')
     && (value.listImageUrl === undefined || typeof value.listImageUrl === 'string')
+    && (value.teamFoulThreshold === undefined || typeof value.teamFoulThreshold === 'string')
     && Array.isArray(value.style) && value.style.every((item) => typeof item === 'string')
     && typeof value.cost === 'number' && Number.isFinite(value.cost)
     && typeof value.opponentCost === 'number' && Number.isFinite(value.opponentCost)

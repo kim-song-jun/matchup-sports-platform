@@ -820,6 +820,7 @@ export class TeamMatchesService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
+          teamFoulThreshold: dto.teamFoulThreshold ?? null,
           status: 'recruiting',
           competitionConfigVersionId: source.competitionConfigVersionId,
         },
@@ -905,6 +906,8 @@ export class TeamMatchesService {
         matchStyle: teamMatch.matchStyle,
         uniformColor: teamMatch.uniformColor,
         periods: competitionConfig?.config.periods.map(({ durationMinutes }) => ({ durationMinutes })) ?? null,
+        // null = 기본값(5개). 화면이 "기본 5개"와 직접 입력한 값을 구분해 보여 줄 수 있게 그대로 내린다.
+        teamFoulThreshold: teamMatch.teamFoulThreshold,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -982,6 +985,8 @@ export class TeamMatchesService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
+          // 팀 파울 경고 기준 — undefined = 유지, null = 기본값(5개)으로 되돌리기.
+          teamFoulThreshold: dto.teamFoulThreshold,
           competitionConfigVersionId,
         },
       });

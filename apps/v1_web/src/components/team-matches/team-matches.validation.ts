@@ -5,6 +5,7 @@ import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { parseTeamFoulThresholdInput, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 
 /**
  * 팀매치 생성/수정 위저드의 "필수값이 뭔지" 를 판정하는 단일 소스.
@@ -71,6 +72,8 @@ const RULES: Array<{
     return ruleDraftMatches(rules, ctx.hostTeamId, ctx.sportId) && rules?.confirmed === true
       && (rules.mode === 'default' || validTeamMatchPeriods(rules.periods));
   } },
+  // 팀 파울 기준은 선택값이다 — 비워 두는 것(기본 5개)이 정상이고, 입력했는데 범위 밖일 때만 막는다.
+  { field: 'teamFoulThreshold', label: TEAM_FOUL_THRESHOLD_ERROR, step: 'rules', isSatisfied: (ctx) => parseTeamFoulThresholdInput(ctx.draft.teamFoulThreshold ?? '') !== 'invalid' },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
   { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
@@ -191,6 +194,11 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       // 설계를 그대로 따른다 — 위저드 단계 게이팅 리팩터로 이 파일에 옮겨오며 함께 이관).
       rulesText: null,
       ...(draft.rules?.mode === 'custom' && draft.rules.periods ? { periods: draft.rules.periods.map(({ durationMinutes }) => ({ durationMinutes })) } : {}),
+      // 빈칸 = null(기본값 5개). 잘못된 값은 위 결측 검사가 먼저 막으므로 여기까지 오지 않는다.
+      teamFoulThreshold: (() => {
+        const parsed = parseTeamFoulThresholdInput(draft.teamFoulThreshold ?? '');
+        return parsed === 'invalid' ? null : parsed;
+      })(),
       ...levelRange,
       genderRule: normalizeGenderRule(draft.gender),
       matchFormat: draft.format.trim() || null,

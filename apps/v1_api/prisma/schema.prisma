@@ -2034,6 +2034,9 @@ model V1TeamMatch {
   /// 대회·리그 경기 하나만 피리어드를 바꿨다는 표시. true 면 competitionConfigVersionId 가 이 경기 전용
   /// 피리어드 버전이고, 조·단계·대회 기본 피리어드가 바뀌어도 따라가지 않는다.
   periodOverride             Boolean           @default(false) @map("period_override")
+  /// 친선 팀 매치(대회·리그 소속이 아닌 경기) 전용 — 팀 파울 경고 기준. null = 기본값(5개). 대회·리그 경기는
+  /// 소속 대회·리그의 `V1Tournament.teamFoulThreshold` 를 쓰므로 이 컬럼을 읽지 않는다.
+  teamFoulThreshold          Int?              @map("team_foul_threshold")
 
   hostTeam              V1Team?                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User?                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -2914,6 +2917,9 @@ model V1Tournament {
   /// 바꾸지 않아서 기본값을 코드(`DEFAULT_TEAM_FOUL_THRESHOLD`)에 두고 컬럼은 비워 둔다.
   /// 경기 진행 중에도 바꿀 수 있다(출전정지 규정처럼 첫 경기 뒤에 잠그지 않는다).
   teamFoulThreshold          Int?                        @map("team_foul_threshold")
+  /// 진행 중인 경기의 팀 파울을 관전 화면(경기 상세 스코어 카드)에 바로 보여줄지. 기본값 켜짐 — 운영 콘솔의
+  /// 팀 파울·경고는 이 값과 무관하게 그대로다. 대회·리그를 만들 때 정하고 진행 중에도 바꿀 수 있다.
+  showTeamFouls              Boolean                     @default(true) @map("show_team_fouls")
   rulesText                  String?                     @map("rules_text")
   refundPolicyText           String?                     @map("refund_policy_text")
   createdByAdminUserId       String?                     @map("created_by_admin_user_id")

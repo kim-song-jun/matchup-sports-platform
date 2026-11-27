@@ -1178,7 +1178,7 @@ export class PublicTournamentRecordsService {
         deletedAt: null,
         AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
-      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true, teamFoulThreshold: true },
+      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true, teamFoulThreshold: true, showTeamFouls: true },
     });
     if (tournament === null) {
       throw new NotFoundException(NOT_FOUND);
@@ -1276,8 +1276,9 @@ export class PublicTournamentRecordsService {
         ? resolveEndedPeriods(fixture.game?.periods ?? [])
         : null;
     // 라이브 전용 팀 파울 — `periodBreak` 와 같은 게이트라 경기가 끝나면 응답에서 사라진다(기록으로 남기지 않는다).
+    // 대회가 관전 화면 표시를 껐으면(`showTeamFouls`) 라이브 중에도 싣지 않는다.
     const teamFouls =
-      mode === 'live' && !showOfficialResult && status === 'live' && fixture.game !== null
+      tournament.showTeamFouls && mode === 'live' && !showOfficialResult && status === 'live' && fixture.game !== null
         ? await this.computeLiveTeamFouls(fixture.game.id, fixture.game.sides, fixture.game.periods, tournament.teamFoulThreshold)
         : null;
 
@@ -1964,7 +1965,7 @@ export class PublicTournamentRecordsService {
   async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
     const league = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { id: true, title: true, teamFoulThreshold: true },
+      select: { id: true, title: true, teamFoulThreshold: true, showTeamFouls: true },
     });
     if (league === null) {
       throw new NotFoundException(LEAGUE_FIXTURE_NOT_FOUND);
@@ -2041,9 +2042,9 @@ export class PublicTournamentRecordsService {
       mode === 'live' && !showOfficialResult && status === 'live'
         ? resolveEndedPeriods(teamMatch.game?.periods ?? [])
         : null;
-    // getMatch 의 같은 이름 주석 참고 — 라이브 전용이다.
+    // getMatch 의 같은 이름 주석 참고 — 라이브 전용이고 리그가 표시를 껐으면 싣지 않는다.
     const teamFouls =
-      mode === 'live' && !showOfficialResult && status === 'live' && teamMatch.game !== null
+      league.showTeamFouls && mode === 'live' && !showOfficialResult && status === 'live' && teamMatch.game !== null
         ? await this.computeLiveTeamFouls(teamMatch.game.id, teamMatch.game.sides, teamMatch.game.periods, league.teamFoulThreshold)
         : null;
 

@@ -391,6 +391,8 @@ export class TournamentsAdminService {
           redCardSuspensionMatches: dto.redCardSuspensionMatches ?? null,
           // 팀 파울 경고 기준 — 생략하면 null(기본값 5개)이 저장된다.
           teamFoulThreshold: dto.teamFoulThreshold ?? null,
+          // 관전 화면 팀 파울 표시 — 생략하면 컬럼 기본값(켜짐)이 쓰인다.
+          ...(dto.showTeamFouls !== undefined ? { showTeamFouls: dto.showTeamFouls } : {}),
           rulesText: dto.rulesText ?? null,
           refundPolicyText: dto.refundPolicyText ?? null,
           prizePool: dto.prizePool ?? null,
@@ -657,6 +659,8 @@ export class TournamentsAdminService {
     // 팀 파울 경고 기준 — undefined = 유지, null = 기본값(5개)으로 되돌리기. 화면 안내 기준일 뿐이라
     // 출전정지 규정과 달리 경기가 시작된 뒤에도 바꿀 수 있다(대회·리그 중간 수정 요구).
     if (dto.teamFoulThreshold !== undefined) data.teamFoulThreshold = dto.teamFoulThreshold;
+    // 관전 화면 팀 파울 표시 — 마찬가지로 경기가 시작된 뒤에도 바꿀 수 있다(기록·판정과 무관).
+    if (dto.showTeamFouls !== undefined) data.showTeamFouls = dto.showTeamFouls;
     if (dto.rulesText !== undefined) data.rulesText = dto.rulesText;
     if (dto.refundPolicyText !== undefined) data.refundPolicyText = dto.refundPolicyText;
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
@@ -1581,6 +1585,7 @@ export class TournamentsAdminService {
       redCardSuspensionMatches: row.redCardSuspensionMatches,
       // null = 기본값(5개). 화면이 "기본 5개"와 직접 입력한 값을 구분해 보여 줄 수 있게 그대로 내린다.
       teamFoulThreshold: row.teamFoulThreshold,
+      showTeamFouls: row.showTeamFouls,
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,

@@ -97,6 +97,19 @@ describe('OperationsTimeline', () => {
     expect(within(stacked).getAllByRole('article')).toHaveLength(2);
   });
 
+  it('구장 열은 카드 제목이 읽히는 최소 폭을 지키고, 모자라면 판이 가로로 밀린다', () => {
+    renderTimeline(cardsFor(items));
+
+    const table = screen.getByRole('table', { name: '구장별 경기 시간표' });
+    expect(table).toHaveClass('overflow-x-auto');
+    expect(table).toHaveAttribute('tabindex', '0');
+    const rows = within(table).getAllByRole('row');
+    for (const row of rows) {
+      expect(row.style.gridTemplateColumns).toBe('56px repeat(3, minmax(240px, 1fr))');
+      expect(row.style.minWidth).toBe('824px');
+    }
+  });
+
   it('카드마다 링크는 하나 이하이고 운영 콘솔·더보기 컨트롤이 없다', () => {
     renderTimeline(cardsFor(items));
 

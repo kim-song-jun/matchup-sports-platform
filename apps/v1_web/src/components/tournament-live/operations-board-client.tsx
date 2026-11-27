@@ -12,7 +12,7 @@ import { canAssignOperations, useTournamentOpsRole } from '@/components/tourname
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1Tournament, useV1TournamentFields, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
-import { DESKTOP_LIST_MEDIA_QUERY, MD_UP_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import { DESKTOP_LIST_MEDIA_QUERY, MD_UP_MEDIA_QUERY, WIDE_TABLE_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { extractErrorMessage } from '@/lib/error-message';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
@@ -63,6 +63,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const role = useTournamentOpsRole();
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
   const isMdUp = useMediaQuery(MD_UP_MEDIA_QUERY);
+  const isWideTable = useMediaQuery(WIDE_TABLE_MEDIA_QUERY);
   const bundleHeadingId = useId();
 
   const board = useOperationsBoardAll(tournamentId);
@@ -300,7 +301,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           ) : view === 'list' ? (
             <OperationsListView
               cards={[...dayShown, ...unscheduledShown]}
-              isDesktop={isDesktop}
+              isDesktop={isWideTable}
               liveBase={liveBase}
               consoleQuery={consoleQuery}
               onOpenInfo={openInfo}

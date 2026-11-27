@@ -40,6 +40,9 @@ export function useMediaQuery(query: string, serverFallback = false): boolean {
  */
 export const DESKTOP_LIST_MEDIA_QUERY = '(min-width: 1024px)';
 
+/** 운영 보드 「목록」 보기가 일곱 칸 표로 그려지는 최소 폭. 이보다 좁으면 상태 배지·버튼이 옆 칸을 덮어 카드 목록을 쓴다. */
+export const WIDE_TABLE_MEDIA_QUERY = '(min-width: 1280px)';
+
 /**
  * 어드민 대진 그림이 편집 가능한 캔버스(데스크톱)로 바뀌는 폭. 스펙 D8 — 구조 편집은 768px 이상.
  * Tailwind `md` 와 같은 값이다.

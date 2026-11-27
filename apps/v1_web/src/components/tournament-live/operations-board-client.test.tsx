@@ -320,6 +320,21 @@ describe('OperationsBoardClient — 결과 무효', () => {
   });
 });
 
+describe('OperationsBoardClient — 좁은 데스크톱', () => {
+  it('1280 미만에서는 목록 보기가 일곱 칸 표가 아니라 카드 목록이다', async () => {
+    restoreViewport();
+    restoreViewport = installViewport(1100);
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    await user.click(screen.getByRole('tab', { name: '목록' }));
+
+    expect(screen.queryByRole('columnheader', { name: '구장' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(dayItems().length);
+  });
+});
+
 describe('OperationsBoardClient — 확인할 것과 목록', () => {
   it('확인할 것을 켜면 담당자 없음 카드만 남고 개수가 같다(결과 확정 대기는 세지 않는다)', async () => {
     const user = userEvent.setup();

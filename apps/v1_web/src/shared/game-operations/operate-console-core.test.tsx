@@ -10,6 +10,7 @@ import type { FixtureLineupResponse, GameCommandRequest, GameDetail, GameEventRe
 import type { V1GameResultRevision } from '@/types/api';
 import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
+import { liveV1DataSource, V1DataSourceProvider, type V1DataSource } from '@/components/providers/v1-data-source';
 import * as overlayHistory from '@/lib/overlay-history';
 import { installViewport } from '@/test/viewport';
 
@@ -21,10 +22,24 @@ vi.mock('next/navigation', () => ({
 }));
 
 const queryClients: QueryClient[] = [];
+// 되돌리기가 서버 기록 목록(`GET /games/:id/events`)을 읽는 길만 시험이 정한다. 나머지 REST 는 그대로 둔다.
+const serverEventsSource = {
+  ...liveV1DataSource,
+  v1Api: ((path: string, options?: unknown) =>
+    path.endsWith('/events')
+      ? testFixtures.serverEvents(path)
+      : liveV1DataSource.v1Api(path, options as Parameters<V1DataSource['v1Api']>[1])) as V1DataSource['v1Api'],
+} satisfies V1DataSource;
 function render(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   queryClients.push(client);
-  return renderElement(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  return renderElement(ui, {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={client}>
+        <V1DataSourceProvider source={serverEventsSource}>{children}</V1DataSourceProvider>
+      </QueryClientProvider>
+    ),
+  });
 }
 afterEach(() => {
   cleanup();
@@ -48,6 +63,8 @@ const testFixtures = vi.hoisted(() => ({
   game: vi.fn(),
   operations: vi.fn<() => MockedOperations>(),
   sendCommand: vi.fn<OperateConsoleRuntime['postGameCommand']>(),
+  /** 서버 기록 목록 읽기. 기본은 「읽지 못함」 — 필요한 시험이 응답을 정한다. */
+  serverEvents: vi.fn<(path: string) => Promise<unknown>>(),
   // 종료된 경기의 확정 결과(승부차기 포함) 조회 기본 fixture.
   resultRevisions: vi.fn((..._args: unknown[]) => ({
     data: undefined as V1GameResultRevision[] | undefined,
@@ -145,6 +162,8 @@ vi.mock('./lineup-grid', async (importOriginal) => {
 beforeEach(() => {
   testFixtures.sendCommand.mockClear();
   testFixtures.realLineupGrid.current = false;
+  testFixtures.serverEvents.mockReset();
+  testFixtures.serverEvents.mockRejectedValue(new Error('offline'));
   // 쉬는 시간은 기기에 저장된다 — 앞 시험의 타이머가 다음 시험으로 이어지지 않게 비운다.
   window.localStorage.clear();
 });
@@ -3083,7 +3102,44 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
   });
 
-  it('전송 실패한 기록은 reverseEvent 를 부르지 않고 이유를 알린다', async () => {
+  it('전송 실패로 표시된 기록도 서버 목록에 있으면 버전을 맞춘 뒤 되돌린다', async () => {
+    const state = setup();
+    testFixtures.serverEvents.mockResolvedValue({ events: [recorded('e9', 'c1')], version: 4, state: 'LIVE' });
+    const { rerender } = render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    const failed = advance(state, { queue: { items: [queuedEvent('c1', 'failed')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+    rerender(<CoreHarness />);
+
+    fireEvent.click(undo);
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledWith({ eventId: 'e9', reason: '골 기록 되돌리기' }));
+    expect(testFixtures.serverEvents).toHaveBeenCalledWith('/games/game-1/events');
+    // 이 기기가 놓친 커밋만큼 버전을 먼저 맞춘다 — 그래야 되돌리기가 옛 버전으로 나가지 않는다.
+    expect(failed.applyCommandResult).toHaveBeenCalledWith({ state: 'LIVE', version: 4 });
+    expect(failed.applyCommandResult.mock.invocationCallOrder[0]).toBeLessThan(state.reverseEvent.mock.invocationCallOrder[0]);
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+  });
+
+  it('서버가 없다고 확인한 기록은 reverseEvent 를 부르지 않고 그렇게 알린다', async () => {
+    const state = setup();
+    testFixtures.serverEvents.mockResolvedValue({ events: [], version: 2, state: 'LIVE' });
+    const { rerender } = render(<CoreHarness />);
+    recordGoal();
+    const undo = await screen.findByRole('button', { name: '되돌리기' });
+    advance(state, { queue: { items: [queuedEvent('c1', 'failed')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+    rerender(<CoreHarness />);
+
+    fireEvent.click(undo);
+
+    expect(
+      await findConsoleNotice('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it('서버 목록을 읽지 못하면 없다고 단정하지 않고 결과를 모른다고 알린다', async () => {
     const state = setup();
     const { rerender } = render(<CoreHarness />);
     recordGoal();
@@ -3093,9 +3149,21 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
 
     fireEvent.click(undo);
 
-    expect(await findConsoleNotice('전송에 실패한 기록이라 되돌릴 것이 없어요. 다시 보내지 않으면 기록되지 않아요.')).toBeInTheDocument();
+    expect(
+      await findConsoleNotice('전송 결과를 아직 확인하지 못했어요. 기록 목록에 나타나면 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('되돌릴 것이 없어요');
     expect(state.reverseEvent).not.toHaveBeenCalled();
-    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it('서버 기록 목록에 이미 있는 기록은 큐가 실패로 표시해도 「보내지 못했어요」라고 하지 않는다', () => {
+    setup({ liveEvents: [recorded('e9', 'c1')], queue: { items: [queuedEvent('c1', 'failed'), queuedEvent('c2', 'failed')] } });
+    render(<CoreHarness />);
+
+    // c1 은 서버에 있다(응답만 잃음). 손이 필요한 것은 c2 하나다.
+    expect(statusRow()).toHaveTextContent('기록 1개를 보내지 못했어요');
+    const sheet = openStatusSheet();
+    expect(within(within(sheet).getByRole('list', { name: '전송 대기·실패한 기록 목록' })).getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('이미 기록 목록에서 취소한 기록은 다시 되돌리지 않는다', async () => {

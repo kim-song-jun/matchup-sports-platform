@@ -300,6 +300,12 @@ interface PendingAction {
   readonly frozen: FrozenEventCapture;
 }
 
+/** 되돌릴 기록을 찾은 결과. `absent` 는 서버가 없다고 확인한 것, `unknown` 은 확인하지 못한 것이다. */
+type RecordedEventLookup =
+  | { readonly kind: 'found'; readonly event: GameEventRecord; readonly reversed: boolean }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unknown' };
+
 /** 뛰는 동안 폰 첫 화면에 두는 최근 기록 줄 수. 나머지는 전체 보기 시트에 있다. */
 const RECENT_RECORD_ROWS = 4;
 
@@ -1197,50 +1203,103 @@ export function OperateConsoleCore({
   // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.
   const undoStartedRef = useRef(new Set<string>());
 
+  // 서버 기록 목록을 직접 읽어 이 기록이 저장됐는지 확인한다. 읽지 못하면 없다고 단정하지 않는다(`unknown`).
+  const lookUpRecordedEvent = useCallback(
+    async (clientEventId: string): Promise<RecordedEventLookup> => {
+      if (!gameId) return { kind: 'unknown' };
+      const abort = new AbortController();
+      const abortTimer = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
+      try {
+        const page = await v1Api<{ events?: readonly GameEventRecord[]; version?: number; state?: GameState }>(
+          `/games/${gameId}/events`,
+          { method: 'GET', signal: abort.signal },
+        );
+        if (!Array.isArray(page.events)) return { kind: 'unknown' };
+        // 이 기기가 놓친 커밋만큼 버전을 맞춘다 — 옛 버전으로 되돌리기를 보내면 서버가 거절한다.
+        if (typeof page.version === 'number' && page.state !== undefined) {
+          opsRef.current.applyCommandResult({ state: page.state, version: page.version });
+        }
+        const event = page.events.find((candidate) => candidate.clientEventId === clientEventId);
+        if (event === undefined) return { kind: 'absent' };
+        return { kind: 'found', event, reversed: page.events.some((candidate) => candidate.reversesEventId === event.id) };
+      } catch {
+        return { kind: 'unknown' };
+      } finally {
+        clearTimeout(abortTimer);
+      }
+    },
+    [gameId, v1Api],
+  );
+
+  // 되돌릴 기록의 실제 상태를 정한다: 화면 목록 → (전송 중이면 끝날 때까지) → 서버 목록 순서로 본다.
+  // 큐가 「전송 실패」로 표시한 기록도 응답만 잃었을 뿐 서버에는 저장됐을 수 있어, 실패 표시만으로 없다고 하지 않는다.
+  const resolveRecordedEvent = useCallback(
+    async (clientEventId: string): Promise<RecordedEventLookup> => {
+      const inList = (): RecordedEventLookup | null => {
+        const events = opsRef.current.liveEvents;
+        const event = events.find((candidate) => candidate.clientEventId === clientEventId);
+        return event === undefined
+          ? null
+          : { kind: 'found', event, reversed: events.some((candidate) => candidate.reversesEventId === event.id) };
+      };
+      const statusInQueue = () =>
+        opsRef.current.queue.items.find((item) => item.clientEventId === clientEventId)?.status ?? null;
+      const listed = inList();
+      if (listed !== null) return listed;
+      const status = statusInQueue();
+      if (status === 'queued' || status === 'sending') {
+        showToast('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
+        await waitForEventSettled(clientEventId);
+      }
+      // 확정 응답과 목록 반영 사이의 틈은 잠깐 기다린다.
+      if (statusInQueue() === 'acked') await waitForRecordedEvent(clientEventId, 3_000);
+      return inList() ?? lookUpRecordedEvent(clientEventId);
+    },
+    [showToast, waitForEventSettled, waitForRecordedEvent, lookUpRecordedEvent],
+  );
+
   /**
    * 방금 한 기록을 되돌린다. 여러 건이면 뒤에서부터 — 레드를 먼저 되돌려야 도중에 멈춰도 근거 없는 레드가 남지 않는다.
-   * 서버에 없는 기록(전송 실패)·이미 취소한 기록은 되돌렸다고 말하지 않는다.
+   * 서버가 없다고 확인한 기록·이미 취소한 기록은 되돌렸다고 말하지 않는다.
    */
   const undoRecord = useCallback(
     async (clientEventIds: readonly string[], noun: string) => {
       if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
       clientEventIds.forEach((id) => undoStartedRef.current.add(id));
+      let sent = false;
+      const stop = (message: string) => {
+        // 서버에 아무것도 보내지 않았으면 잠금을 푼다 — 남은 토스트로 다시 누를 수 있게.
+        if (!sent) clientEventIds.forEach((id) => undoStartedRef.current.delete(id));
+        setRecordError(message);
+      };
       if (commandBlockedRef.current) {
-        setRecordError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+        stop('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
         return;
       }
       let reversed = 0;
       for (const clientEventId of [...clientEventIds].reverse()) {
-        let event = opsRef.current.liveEvents.find((candidate) => candidate.clientEventId === clientEventId) ?? null;
-        if (event === null) {
-          const queued = opsRef.current.queue.items.find((item) => item.clientEventId === clientEventId);
-          const waiting = queued !== undefined && (queued.status === 'queued' || queued.status === 'sending');
-          // 서버에 닿기 전에는 되돌릴 대상이 없다 — 기다린다는 사실을 알리고 확정된 뒤에 되돌린다.
-          if (waiting) showToast('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
-          const settled = waiting ? await waitForEventSettled(clientEventId) : queued?.status;
-          if (settled === 'failed') {
-            setRecordError('전송에 실패한 기록이라 되돌릴 것이 없어요. 다시 보내지 않으면 기록되지 않아요.');
-            return;
-          }
-          event = await waitForRecordedEvent(clientEventId, 3_000);
-        }
-        if (event === null) {
-          setRecordError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+        const found = await resolveRecordedEvent(clientEventId);
+        if (found.kind === 'absent') {
+          stop('서버에 저장되지 않은 기록이라 되돌릴 것이 없어요. 뒤늦게 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
           return;
         }
-        const eventId = event.id;
-        if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+        if (found.kind === 'unknown') {
+          stop('전송 결과를 아직 확인하지 못했어요. 기록 목록에 나타나면 「고치기」에서 취소해 주세요.');
+          return;
+        }
+        if (found.reversed) continue;
+        sent = true;
         try {
-          await opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
+          await opsRef.current.reverseEvent({ eventId: found.event.id, reason: `${noun} 기록 되돌리기` });
         } catch (err) {
-          setRecordError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
+          stop(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
           return;
         }
         reversed += 1;
       }
       showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
     },
-    [showToast, waitForEventSettled, waitForRecordedEvent],
+    [showToast, resolveRecordedEvent],
   );
 
   // 기록은 확인 없이 저장하고 5초 되돌리기로 복구한다. 확인을 남기는 예외는 수상한 시계와 두 번째 옐로 뒤의 레드뿐이다
@@ -1903,6 +1962,9 @@ export function OperateConsoleCore({
     if (button !== undefined) handleSelectAction(button);
   };
 
+  // 서버 기록 목록에 이미 있는 기록은 「보내지 못한 기록」이 아니다 — 응답만 잃은 것이다.
+  const recordedClientEventIds = new Set(ops.liveEvents.map((event) => event.clientEventId));
+  const unconfirmedQueueItems = ops.queue.items.filter((item) => !recordedClientEventIds.has(item.clientEventId));
   const consoleStatus = deriveConsoleStatus({
     gameState,
     leaseRequired,
@@ -1922,8 +1984,8 @@ export function OperateConsoleCore({
     bannerMessage: ops.bannerMessage,
     retryLabel: pendingCommandRetry?.label ?? null,
     queue: {
-      waiting: ops.queue.items.filter((item) => item.status === 'queued' || item.status === 'sending').length,
-      failed: ops.queue.items.filter((item) => item.status === 'failed').length,
+      waiting: unconfirmedQueueItems.filter((item) => item.status === 'queued' || item.status === 'sending').length,
+      failed: unconfirmedQueueItems.filter((item) => item.status === 'failed').length,
     },
     endPeriodLabel: endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount),
     gameOperationsErrorMessage,
@@ -2200,7 +2262,7 @@ export function OperateConsoleCore({
           status={consoleStatus}
           roster={rosterRows}
           queue={{
-            items: ops.queue.items,
+            items: unconfirmedQueueItems,
             onRetry: ops.retryFailedEvent,
             disabled: commandBlocked,
             isRetryableError: isRetryableGameOperationsErrorCode,

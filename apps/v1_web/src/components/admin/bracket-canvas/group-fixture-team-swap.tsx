@@ -71,7 +71,7 @@ export function GroupFixtureTeamSwap({ tournamentId, groups, fixtures, teamNames
           <legend className="tm-text-label">{group.name}</legend>
           {fixtures.filter(f => f.groupId === group.id && available(f)).map(f =>
             <button type="button" key={f.id} aria-pressed={first?.id === f.id} disabled={saving}
-              className="tm-btn tm-btn-outline justify-between" onClick={() => void choose(f)}>
+              className="tm-btn tm-btn-md tm-btn-outline justify-between" onClick={() => void choose(f)}>
               <span>{f.fixtureNumber}번 경기 · {teamNames(f)}</span>
               {first && first.id !== f.id && <ArrowLeftRight size={16} aria-label="교환" />}
             </button>)}

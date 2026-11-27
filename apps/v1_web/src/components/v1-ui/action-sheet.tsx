@@ -26,6 +26,8 @@ export type ActionSheetAction =
       readonly disabled?: boolean;
       /** 비활성일 때 왜 못 누르는지. 비활성 버튼만 두면 현장에서 이유를 못 찾는다. */
       readonly disabledReason?: string | null;
+      /** 있으면 행 오른쪽에 켜짐/꺼짐 스위치를 그리고 `role="switch"` 로 읽힌다(공개 여부처럼 상태를 바로 바꾸는 항목). */
+      readonly checked?: boolean;
       readonly href?: undefined;
       readonly externalHref?: undefined;
     })
@@ -35,6 +37,7 @@ export type ActionSheetAction =
       readonly onSelect?: undefined;
       readonly disabled?: undefined;
       readonly disabledReason?: undefined;
+      readonly checked?: undefined;
       readonly externalHref?: undefined;
     })
   | (ActionSheetActionBase & {
@@ -46,6 +49,7 @@ export type ActionSheetAction =
       readonly onSelect?: undefined;
       readonly disabled?: undefined;
       readonly disabledReason?: undefined;
+      readonly checked?: undefined;
     });
 
 export interface ActionSheetProps {
@@ -54,6 +58,8 @@ export interface ActionSheetProps {
   readonly title: string;
   /** 제목 아래 한 줄 — 누구·무엇에 대한 시트인지(역할·등번호 등). */
   readonly subtitle?: string;
+  /** 제목 아래·항목 위의 읽기 전용 영역(진행 막대 같은 요약). */
+  readonly header?: ReactNode;
   readonly actions: readonly ActionSheetAction[];
   readonly onClose: () => void;
 }
@@ -69,7 +75,7 @@ const ROW_CLASS =
  * 아니라 다른 상태 기반 시트들처럼 `useModalA11y` 를 쓴다). 동작을 고르면 부모가 시트를 먼저
  * 닫아야 뒤이어 뜨는 확인 창과 겹치지 않는다 — 링크 항목은 `overlayLinkClick` 으로 이동하며 시트가 닫힌다.
  */
-export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionSheetProps) {
+export function ActionSheet({ open, title, subtitle, header, actions, onClose }: ActionSheetProps) {
   const titleId = useId();
   const pathname = usePathname();
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
@@ -111,6 +117,7 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
         {subtitle ? (
           <p className="mb-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{subtitle}</p>
         ) : null}
+        {header}
         <ul className="flex flex-col gap-2 overflow-y-auto">
           {actions.map((action, index) => (
             <li key={action.key}>
@@ -134,7 +141,14 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
                   <ActionLabel action={action}>{action.description}</ActionLabel>
                 </Link>
               ) : (
-                <button type="button" disabled={action.disabled} onClick={action.onSelect} className={ROW_CLASS}>
+                <button
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onSelect}
+                  className={ROW_CLASS}
+                  role={action.checked !== undefined ? 'switch' : undefined}
+                  aria-checked={action.checked}
+                >
                   <ActionLabel action={action}>
                     {action.disabled && action.disabledReason ? action.disabledReason : action.description}
                   </ActionLabel>
@@ -164,7 +178,7 @@ function externalLinkClick(href: string, newTab: boolean, close: () => void) {
   };
 }
 
-function ActionLabel({ action, children }: { action: ActionSheetAction; children: ReactNode }) {
+export function ActionLabel({ action, children }: { action: ActionSheetAction; children: ReactNode }) {
   return (
     <>
       {action.icon ? <span className="flex shrink-0 items-center">{action.icon}</span> : null}
@@ -181,6 +195,9 @@ function ActionLabel({ action, children }: { action: ActionSheetAction; children
           <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{children}</span>
         ) : null}
       </span>
+      {action.checked !== undefined ? (
+        <span aria-hidden="true" className={`tm-toggle ml-auto${action.checked ? ' tm-toggle-on' : ''}`} />
+      ) : null}
     </>
   );
 }

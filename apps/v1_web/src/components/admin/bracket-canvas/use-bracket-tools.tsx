@@ -103,10 +103,13 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
     else setMultiFinals({ mode: 'create', open: true });
   };
 
-  const handleRandomFill = () => randomFill.mutate(undefined, {
-    onSuccess: (result) => showToast(result.assignments.length === 0 ? '채울 수 있는 자리가 없어요.' : `${result.assignments.length}개 자리를 채웠어요.`, 'success'),
-    onError: (err) => showToast(describeBracketCanvasError(err, '자리를 채우지 못했어요.'), 'error'),
-  });
+  const handleRandomFill = () => {
+    if (randomFill.isPending) return;
+    randomFill.mutate(undefined, {
+      onSuccess: (result) => showToast(result.assignments.length === 0 ? '채울 수 있는 자리가 없어요.' : `${result.assignments.length}개 자리를 채웠어요.`, 'success'),
+      onError: (err) => showToast(describeBracketCanvasError(err, '자리를 채우지 못했어요.'), 'error'),
+    });
+  };
   const handlers: Record<BracketToolKey, () => void> = {
     'random-fill': handleRandomFill,
     'standings-fill': () => setDialog('standings'),
@@ -131,6 +134,7 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
     randomFillBlockedReason, formatUnknownReason,
     unplacedTeamCount: bracket === undefined ? 0 : unplacedTeamCount(registrations, bracket),
     unscheduledCount, unscheduledOnly: controls.unscheduledOnly, canvasView: view === 'canvas',
+    randomFillPending: randomFill.isPending, resetBusy: resetFlow.busy,
   });
   const toAction = (item: BracketToolItem): ActionSheetAction => ({
     key: item.key, label: item.label, description: item.description, destructive: item.destructive, groupLabel: item.groupLabel,

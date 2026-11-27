@@ -5,6 +5,7 @@ const base: BracketToolContext = {
   format: 'knockout', hasStagePlan: false, isEmpty: false, canWrite: true, leagueGrid: false,
   hasGroupPhase: false, hasGroupRankSlots: false, randomFillBlockedReason: null, formatUnknownReason: null,
   unplacedTeamCount: 3, unscheduledCount: 4, unscheduledOnly: false, canvasView: true,
+  randomFillPending: false, resetBusy: false,
 };
 const keys = (items: { key: string }[]) => items.map(item => item.key);
 const menus = (overrides: Partial<BracketToolContext> = {}) => buildBracketToolMenus({ ...base, ...overrides });
@@ -100,6 +101,17 @@ describe('buildBracketToolMenus — 항목 모양', () => {
     expect(on.disabledReason ?? null).toBeNull();
     // 켠 채로 모든 경기에 시간이 들어가도 끌 수는 있어야 한다.
     expect(find('unscheduled-only', { unscheduledOnly: true, unscheduledCount: 0 }).disabledReason ?? null).toBeNull();
+  });
+
+  it('무작위 채우기가 진행 중이면 「채우는 중이에요.」로 막고, 기존 막힘 이유가 있으면 그 이유가 먼저다', () => {
+    expect(find('random-fill', { randomFillPending: true }).disabledReason).toBe('채우는 중이에요.');
+    expect(find('random-fill', { randomFillPending: true, randomFillBlockedReason: '비어 있는 자리가 없어요.' }).disabledReason).toBe('비어 있는 자리가 없어요.');
+    expect(find('random-fill').disabledReason ?? null).toBeNull();
+  });
+
+  it('다른 작업이 진행 중이면 대진 초기화를 막는다(대조군: 아니면 열려 있다)', () => {
+    expect(find('reset', { resetBusy: true }).disabledReason).toBe('다른 작업이 끝나면 누를 수 있어요.');
+    expect(find('reset').disabledReason ?? null).toBeNull();
   });
 
   it('참가팀 목록 열기는 자리 없는 팀 수를 설명에 싣는다', () => {

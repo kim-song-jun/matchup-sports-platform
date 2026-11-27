@@ -29,6 +29,10 @@ export interface BracketToolContext {
   unscheduledOnly: boolean;
   /** 그림 보기인지. 참가팀 트레이는 그림 보기에만 있어 목록 보기에서는 「참가팀 목록 열기」를 내지 않는다. */
   canvasView: boolean;
+  /** 무작위 채우기 요청이 진행 중 — 연달아 눌러 두 번 보내지 않게 막는다. */
+  randomFillPending: boolean;
+  /** 초기화 준비나 다른 저장이 진행 중 — 초기화는 그동안 막는다. */
+  resetBusy: boolean;
 }
 
 export interface BracketToolMenus {
@@ -67,7 +71,8 @@ export function buildBracketToolMenus(ctx: BracketToolContext): BracketToolMenus
       { key: 'multi-finals-rules', label: '토너먼트 배정 규칙', description: '순위별로 어느 토너먼트에 가는지 정해요' },
     );
   } else {
-    teamFill.push({ key: 'random-fill', label: '빈 자리 무작위 채우기', description: '확정 팀을 비어 있는 자리에 골고루 넣어요', disabledReason: ctx.randomFillBlockedReason });
+    teamFill.push({ key: 'random-fill', label: '빈 자리 무작위 채우기', description: '확정 팀을 비어 있는 자리에 골고루 넣어요',
+      disabledReason: ctx.randomFillBlockedReason ?? (ctx.randomFillPending ? '채우는 중이에요.' : null) });
     if (ctx.hasGroupRankSlots) {
       teamFill.push({ key: 'standings-fill', label: '조 순위대로 채우기', description: '조별리그가 끝나면 순위에 맞춰 결선 자리에 넣어요' });
     }
@@ -91,7 +96,8 @@ export function buildBracketToolMenus(ctx: BracketToolContext): BracketToolMenus
   } else if (legacyFinals) {
     match.push({ key: 'multi-finals-create', label: '예선·토너먼트 대진 생성', description: '예선 조를 편성하고 토너먼트를 만들어요' });
   }
-  match.push({ key: 'reset', label: '대진 초기화', description: '모든 경기와 팀 자리를 지워요', destructive: true, groupLabel: '되돌릴 수 없는 작업' });
+  match.push({ key: 'reset', label: '대진 초기화', description: '모든 경기와 팀 자리를 지워요', destructive: true, groupLabel: '되돌릴 수 없는 작업',
+    disabledReason: ctx.resetBusy ? '다른 작업이 끝나면 누를 수 있어요.' : null });
 
   const timeVenue: BracketToolItem[] = [
     { key: 'time-assign', label: '시간 일괄 배정', description: '시간을 등록하고 경기를 골라 넣어요' },

@@ -213,7 +213,8 @@ describe('AdminShell nav', () => {
 });
 
 describe('AdminShell 사이드바 선택 표시', () => {
-  const STRIPE_CLASS = /\bborder-l|border-blue-500|border-transparent/;
+  // 선택 표시는 테두리가 아니라 배경이다 — 링크에 border 계열 클래스가 하나도 없어야 한다.
+  const borderClasses = (className: string) => className.split(/\s+/).filter((token) => token.startsWith('border'));
 
   it('선택된 항목과 나머지 모두 왼쪽 색 띠 클래스가 없고, 선택은 aria-current 와 옅은 배경으로 표시한다', () => {
     render(
@@ -227,7 +228,7 @@ describe('AdminShell 사이드바 선택 표시', () => {
     expect(selected.length).toBeGreaterThanOrEqual(2);
     for (const link of selected) {
       expect(link).toHaveAttribute('aria-current', 'page');
-      expect(link.className).not.toMatch(STRIPE_CLASS);
+      expect(borderClasses(link.className)).toEqual([]);
       expect(link.className).toContain('bg-[var(--blue50)]');
     }
 
@@ -235,7 +236,7 @@ describe('AdminShell 사이드바 선택 표시', () => {
     expect(others.length).toBeGreaterThanOrEqual(2);
     for (const link of others) {
       expect(link).not.toHaveAttribute('aria-current');
-      expect(link.className).not.toMatch(STRIPE_CLASS);
+      expect(borderClasses(link.className)).toEqual([]);
       expect(link.className).not.toContain('bg-[var(--blue50)]');
     }
   });

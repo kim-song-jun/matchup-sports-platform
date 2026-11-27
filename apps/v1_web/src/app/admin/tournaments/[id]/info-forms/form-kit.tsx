@@ -57,7 +57,7 @@ export function useSectionDraft<Draft>(
 
   const errorFor = (fieldId: string) => (error?.fieldId === fieldId ? error.message : undefined);
 
-  return { draft, initial, set, setDraft, dirty, fail, errorFor, clearError: () => setError(null) };
+  return { draft, initial, set, fail, errorFor };
 }
 
 export const fieldInputCls =

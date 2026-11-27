@@ -160,6 +160,7 @@ struct HomeWidgetView: View {
             Spacer(minLength: 0)
             Text(WidgetFormat.clock(s.startAt)).font(.largeTitle.bold())
             Text(s.opponentName.map { "vs " + $0 } ?? s.title).font(.headline).lineLimit(2)
+            if s.myResponse == "WAITLISTED" { Text("정원이 차서 대기 중이에요").font(.caption2.bold()).lineLimit(1) }
             if let competition = s.competitionName { Text(competition).font(.caption2).lineLimit(1) }
             if let place = s.placeName { Text("📍 " + place).font(.caption2).lineLimit(1) }
             Spacer(minLength: 0)

@@ -36,7 +36,9 @@
 	<array>
 		<string>Default</string>
 	</array>
-<key>com.apple.security.application-groups</key>
-<array><string>$(TEAMEET_APP_GROUP)</string></array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(TEAMEET_APP_GROUP)</string>
+	</array>
 </dict>
 </plist>

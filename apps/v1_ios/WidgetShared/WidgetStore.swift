@@ -12,6 +12,7 @@ struct WidgetStore: Sendable {
         var updatedAt: Int64 = -1
         var notice: String?
         var attemptedAt: Int64 = -1
+        var refreshAttemptedAt: Int64 = -1
     }
     static let cacheLifetime: Int64 = 3 * 60 * 60 * 1000
     let group: String
@@ -116,10 +117,10 @@ struct WidgetService: Sendable {
               (state.model!.pending + state.model!.schedules).contains(where: { $0.scheduleId == id && $0.isRespondable(at: WidgetFormat.now) })
         else { throw WidgetFailure.invalidResponse }
         do {
-            try await api.attendance(id: id, going: going, token: token)
-            guard try store.update(revision: revision, { $0.model = nil; $0.notice = nil }) else { throw WidgetFailure.changedSession }
-            let result = await refresh()
-            if result.model == nil { throw WidgetFailure.transport }
+            let saved = try await api.attendance(id: id, going: going, token: token)
+            // Already saved on the server: keep the cache and show the answer now, so a failed refresh below cannot blank the widget.
+            guard try store.update(revision: revision, { $0.model = $0.model?.answered(id, status: saved); $0.notice = nil }) else { throw WidgetFailure.changedSession }
+            _ = await refresh()
         } catch {
             if error as? WidgetFailure == .signedOut { try store.invalidate(revision: revision) }
             else {

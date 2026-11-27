@@ -66,6 +66,18 @@ struct WidgetModel: Codable, Sendable, Equatable {
     var pending: [Schedule] = []
     var schedules: [Schedule] = []
 
+    /// Reflects an answer the server accepted: the schedule leaves the pending list and carries the saved status.
+    func answered(_ id: String, status: String) -> Self {
+        var next = self
+        if next.pending.contains(where: { $0.scheduleId == id }) { next.pendingCount = max(0, next.pendingCount - 1) }
+        next.pending.removeAll { $0.scheduleId == id }
+        for index in next.schedules.indices where next.schedules[index].scheduleId == id {
+            next.schedules[index].myResponse = status
+            next.schedules[index].canRespond = false
+        }
+        return next
+    }
+
     static func parse(_ data: Data) throws -> Self {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let body = (root["data"] as? [String: Any]) ?? (root["data"] == nil ? root : nil)

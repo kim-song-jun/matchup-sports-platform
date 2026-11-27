@@ -53,10 +53,18 @@ struct WidgetAPI: Sendable {
     }
     func home(token: String) async throws -> WidgetModel { try WidgetModel.parse(await send(path: "widget/home", token: token)) }
     func revoke(token: String) async throws { _ = try await send(path: "widget/token", method: "DELETE", token: token) }
-    func attendance(id: String, going: Bool, token: String) async throws {
+    /// The status the server saved — a full schedule turns GOING into WAITLISTED (still HTTP 200).
+    @discardableResult
+    func attendance(id: String, going: Bool, token: String) async throws -> String {
         guard !id.isEmpty, id.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { throw WidgetFailure.invalidResponse }
         let body = try JSONEncoder().encode(["status": going ? "GOING" : "NOT_GOING"])
-        _ = try await send(path: "widget/schedules/\(id)/attendance", method: "PUT", token: token, body: body)
+        let data = try await send(path: "widget/schedules/\(id)/attendance", method: "PUT", token: token, body: body)
+        return Self.savedStatus(data, requested: going ? "GOING" : "NOT_GOING")
+    }
+    static func savedStatus(_ data: Data, requested: String) -> String {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return requested }
+        let status = ((root["data"] as? [String: Any]) ?? root)["status"] as? String
+        return status.flatMap { $0.isEmpty ? nil : $0 } ?? requested
     }
 }
 /// Never forward credentials to a redirected request, even on another HTTPS host.

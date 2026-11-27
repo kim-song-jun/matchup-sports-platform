@@ -74,4 +74,21 @@ final class WidgetTests: XCTestCase {
         XCTAssertNil(try store.read().token)
         XCTAssertNil(try store.read().model)
     }
+    func testAnsweredMovesScheduleOutOfPendingAndKeepsSavedStatus() {
+        let p = WidgetModel.Schedule(scheduleId: "p", canRespond: true)
+        let other = WidgetModel.Schedule(scheduleId: "o", canRespond: true)
+        let m = WidgetModel(pendingCount: 2, pending: [p, other], schedules: [p])
+        let next = m.answered("p", status: "WAITLISTED")
+        XCTAssertEqual(next.pending.map(\.scheduleId), ["o"])
+        XCTAssertEqual(next.pendingCount, 1)
+        XCTAssertEqual(next.schedules[0].myResponse, "WAITLISTED")
+        XCTAssertFalse(next.schedules[0].canRespond)
+        XCTAssertEqual(m.answered("missing", status: "GOING"), m)
+    }
+    func testSavedStatusReadsServerResponseOrFallsBack() {
+        XCTAssertEqual(WidgetAPI.savedStatus(Data(#"{"data":{"status":"WAITLISTED"}}"#.utf8), requested: "GOING"), "WAITLISTED")
+        XCTAssertEqual(WidgetAPI.savedStatus(Data(#"{"status":"NOT_GOING"}"#.utf8), requested: "NOT_GOING"), "NOT_GOING")
+        XCTAssertEqual(WidgetAPI.savedStatus(Data("nope".utf8), requested: "GOING"), "GOING")
+        XCTAssertEqual(WidgetAPI.savedStatus(Data(#"{"data":{}}"#.utf8), requested: "GOING"), "GOING")
+    }
 }

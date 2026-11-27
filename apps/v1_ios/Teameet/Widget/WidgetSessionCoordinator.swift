@@ -51,15 +51,17 @@ final class WidgetSessionCoordinator: NSObject, WKHTTPCookieStoreObserver {
                 state = try store.read()
             }
             guard state.revision == revision else { return }
-            guard state.updatedAt < 0 || WidgetFormat.now - state.updatedAt >= 300_000 else { return }
+            // Successful refreshes are 5 minutes apart; failed ones 1 minute, so offline browsing neither hammers the API nor nags.
+            let now = WidgetFormat.now
+            guard state.updatedAt < 0 || now - state.updatedAt >= 300_000, state.refreshAttemptedAt < 0 || now - state.refreshAttemptedAt >= 60_000 else { return }
+            guard try store.update(revision: revision, { $0.refreshAttemptedAt = now }) else { return }
             let snapshot = await WidgetService(store: store, api: api).refresh()
             if let model = snapshot.model {
                 await WidgetLogos.prefetch(model: model, store: store, revision: revision, environment: api.environment)
             }
             WidgetCenter.shared.reloadAllTimelines()
-            if let notice = snapshot.notice { onFailure?(notice) }
         } catch {
-            onFailure?((error as? WidgetFailure)?.localizedDescription ?? "위젯 정보를 저장하지 못했어요. 앱에서 다시 확인해 주세요")
+            // The widget itself shows "업데이트 지연" / sign-in guidance; only a failed revoke (above) needs the user to act.
         }
     }
 }

@@ -16,14 +16,18 @@ import type { InfoSectionDefinition, InfoSectionFormProps } from './types';
 const TITLE_MAX_LENGTH = 100;
 const FORMAT_FREE_HINT = '조나 대진을 만들기 전까지 바꿀 수 있어요.';
 
-/** 진행 방식을 바꿀 수 없는 이유 — 바꿀 수 있으면 null. */
+const FORMAT_LOCKED_BY_BRACKET = '대진이 있어서 진행 방식을 바꿀 수 없어요. 바꾸려면 「대진」에서 경기와 조를 모두 지워 주세요.';
+
+/**
+ * 진행 방식을 바꿀 수 없는 이유 — 바꿀 수 있으면 null.
+ * 서버 사유는 시작된 뒤와 대진·조가 있을 때 둘뿐이라, 시작 여부를 먼저 걸러 내면 남은 서버 사유는 대진·조 때문이다.
+ */
 function formatLockReason(tournament: V1Tournament): string | null {
   if (tournament.stagePlan) return '여러 단계 대회는 진행 방식을 바꿀 수 없어요.';
-  if (tournament.formatChangeBlockedReason) return tournament.formatChangeBlockedReason;
   if (tournament.status === 'in_progress' || tournament.status === 'completed') {
     return '대회가 시작된 뒤에는 진행 방식을 바꿀 수 없어요.';
   }
-  return null;
+  return tournament.formatChangeBlockedReason ? FORMAT_LOCKED_BY_BRACKET : null;
 }
 
 const genderLabel = (choice: GenderChoice) => GENDER_CHOICE_OPTIONS.find(([value]) => value === choice)?.[1] ?? '구분 없음';

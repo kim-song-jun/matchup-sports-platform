@@ -238,11 +238,10 @@ describe('대회 정보 — ?edit= 로 여닫는 수정 시트', () => {
   });
 
   it('대진이 있어 잠긴 진행 방식은 요약 줄과 기본 시트 양쪽에서 잠겨 있다', async () => {
-    const reason = '조나 대진이 만들어져 있어요. 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
-    await renderPage({ initial: { formatChangeBlockedReason: reason }, search: '?edit=basic' });
+    await renderPage({ initial: { formatChangeBlockedReason: '조나 대진이 만들어져 있어 대회 형식을 변경할 수 없어요. 대진표에서 경기와 조를 모두 삭제한 뒤 변경해 주세요.' }, search: '?edit=basic' });
     const sheet = within(await sheetOf('basic'));
 
-    expect(within(screen.getByRole('region', { name: '기본' })).getByText(reason)).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '기본' })).getByText('대진이 있어서 진행 방식을 바꿀 수 없어요. 바꾸려면 「대진」에서 경기와 조를 모두 지워 주세요.')).toBeInTheDocument();
     expect(sheet.getByLabelText('진행 방식')).toBeDisabled();
   });
 });

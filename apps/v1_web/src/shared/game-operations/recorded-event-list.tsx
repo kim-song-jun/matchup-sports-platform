@@ -136,7 +136,7 @@ export function RecordedEventList({
   readonly order?: 'chronological' | 'newest-first';
 }) {
   const lastReset = history.reduce((sequence, event) =>
-    event.type === 'CORRECTION' && event.payload.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
+    event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
       ? Math.max(sequence, event.sequence) : sequence, 0);
   const events = lastReset ? history.filter(event => event.sequence > lastReset) : history;
   if (events.length === 0) {

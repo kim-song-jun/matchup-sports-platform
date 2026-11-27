@@ -60,7 +60,7 @@ export type ResultEditModalProps = {
   sides: readonly TournamentGameSide[];
   /** Pinned period rows from GET /games/:gameId. New goals may only use these numbers. */
   periods: readonly { number: number }[];
-  /** 정규 피리어드 수. 1이면 단판이라 골의 피리어드 칸을 숨긴다(새 골은 첫 피리어드로 들어간다). */
+  /** 정규 경기 시간 구간 수(전·후반이면 2). 1이면 단판이라 골의 전·후반 칸을 숨긴다(새 골은 첫 구간으로 들어간다). */
   periodCount?: number | null;
   /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
@@ -893,10 +893,10 @@ export function ResultEditModal({
                     </div>
                     {isSinglePeriod(periodCount) ? null : (
                       <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
-                        <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>피리어드</label>
+                        <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>전·후반</label>
                         <select
                           id={`${idPrefix}-goal-${index}-period`}
-                          aria-label={`${index + 1}번째 득점 피리어드`}
+                          aria-label={`${index + 1}번째 득점 전·후반`}
                           className="tm-input"
                           value={goal.period ?? ''}
                           onChange={(event) =>

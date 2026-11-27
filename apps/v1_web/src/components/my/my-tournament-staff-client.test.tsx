@@ -89,7 +89,7 @@ describe('MyTournamentStaffPageClient', () => {
     render(<MyTournamentStaffPageClient />);
 
     expect(screen.getByText('성수 5인제 컵')).toBeInTheDocument();
-    expect(screen.getByText('필드 담당자 · A구장 / 필드 담당자 · B구장')).toBeInTheDocument();
+    expect(screen.getByText('구장 담당자 · A구장 / 구장 담당자 · B구장')).toBeInTheDocument();
     expect(screen.getByText('진행 중')).toBeInTheDocument();
   });
 

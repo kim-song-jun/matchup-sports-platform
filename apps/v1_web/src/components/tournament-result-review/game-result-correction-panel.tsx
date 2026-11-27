@@ -14,7 +14,7 @@ import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
-import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
@@ -200,6 +200,7 @@ export function GameResultCorrectionPanel({
           (revision) => revision.state === 'DRAFT' && revision.supersedesId === draftBase.id,
         ) ?? null
       : null;
+  const pendingScore = pendingCorrection === null ? null : readGameResultScore(pendingCorrection.score);
   const entryCopy = isVoided
     ? {
         cardTitle: '무효 처리된 경기의 결과를 다시 입력해요',
@@ -215,17 +216,17 @@ export function GameResultCorrectionPanel({
         reasonLabel: '재입력 사유',
       }
     : {
-        cardTitle: '공식 결과를 정정해요',
-        startCta: '정정 시작',
-        pendingTitle: '정정 초안이 대기 중이에요',
-        confirmCta: '정정 확정',
-        confirmTitle: '정정 내용을 확정할까요?',
-        confirmMessage: '확정 전 사유와 변경 내용을 다시 확인해 주세요.',
-        modalTitle: '결과를 정정할까요?',
+        cardTitle: '공식 결과를 고쳐요',
+        startCta: '결과 고치기',
+        pendingTitle: '고친 결과가 확정을 기다려요',
+        confirmCta: pendingScore === null ? '결과 확정' : `${josa(`${pendingScore.home} : ${pendingScore.away}`, ['으로', '로'])} 결과 확정`,
+        confirmTitle: '고친 결과를 확정할까요?',
+        confirmMessage: '확정 전 이유와 바뀐 내용을 다시 살펴봐 주세요.',
+        modalTitle: '결과를 고칠까요?',
         modalMessage:
           '변경할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 기존 공식 결과가 그대로 유지돼요.',
-        modalConfirmLabel: '정정 제출',
-        reasonLabel: '정정 사유',
+        modalConfirmLabel: '고친 결과로 확정',
+        reasonLabel: '고친 이유',
       };
   const readOnly = !canActOnResultReview(game.actorRole);
   const officializeAlwaysVisible = officializeAlwaysAllowed(game.actorRole);
@@ -241,7 +242,7 @@ export function GameResultCorrectionPanel({
       // 승부차기까지 넣어 읽어준다 — 결선 무승부를 확정하는 자리에서 정규 점수만
       // 보여주면 정작 승자를 가른 값이 확인 문구에서 빠진다.
       message: `${josa(formatGameResultScoreWithPenalties(pendingCorrection.score), ['으로', '로'])} 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
-      confirmLabel: entryCopy.confirmCta,
+      confirmLabel: '결과 확정',
     });
     if (!ok) return;
     officialize.mutate(
@@ -352,17 +353,17 @@ export function GameResultCorrectionPanel({
           className="sr-only"
           style={{ outline: 'none' }}
         >
-          경기 결과 정정
+          경기 결과 고치기
         </h2>
       ) : null}
       <GameSummaryHeader game={game} currentRevision={currentPointerRevision} />
 
       {readOnly ? (
-        <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 정정·무효화 권한이 없어요." />
+        <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 결과를 고치거나 무효로 만들 권한이 없어요." />
       ) : null}
 
       {!currentPointerRevision ? (
-        <AlertBanner tone="info" message="공식 확정된 결과가 없어서 정정할 수 없어요." />
+        <AlertBanner tone="info" message="확정된 결과가 없어서 고칠 수 없어요." />
       ) : null}
 
       {isVoided ? (
@@ -427,7 +428,7 @@ export function GameResultCorrectionPanel({
           )}
           {!officializeAlwaysVisible && directorGateStatus === 'disabled' ? (
             <>
-              <AlertBanner tone="warning" message="정정 확정/무효화 기능이 아직 활성화되지 않았어요. 플랫폼 운영팀에 문의해 주세요." />
+              <AlertBanner tone="warning" message="결과 확정·무효화 기능이 아직 활성화되지 않았어요. 플랫폼 운영팀에 문의해 주세요." />
               <Button variant="ghost" size="sm" onClick={() => setDirectorGateStatus('unknown')}>
                 다시 확인
               </Button>
@@ -465,7 +466,7 @@ export function GameResultCorrectionPanel({
 
       {currentOfficial && game.actorRole === 'platform_ops' && !(inline && correctionFormOpen) ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 정정</p>
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 고치기</p>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
             골·카드·파울·교체가 기록된 시각만 고쳐요. 점수와 카드 수는 바뀌지 않아요. 골·카드는 공개 화면과 결과 변경 이력에도 남아요.
           </p>
@@ -504,7 +505,7 @@ export function GameResultCorrectionPanel({
         <EventTimeCorrectionSheet
           open
           mode="admin"
-          title="기록 시각 정정"
+          title="기록 시각 고치기"
           summary={[timeLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
           linkedNotice={timeLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
@@ -543,7 +544,7 @@ export function GameResultCorrectionPanel({
                 // 옐로 정정은 이미 저장됐고, 화면 데이터는 mutation 의 onSuccess 가 다시 읽는다.
                 if (index === 0) throw err;
                 throw new Error(
-                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 고치면 레드카드만 옮겨요.`,
                 );
               }
             }

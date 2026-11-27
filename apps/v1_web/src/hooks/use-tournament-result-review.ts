@@ -181,6 +181,8 @@ export type TournamentOperationsBoardItem = {
   awayRegistrationId: string | null;
   scheduledAt: string | null;
   currentScore: GameResultScore | null;
+  /** 공식 결과 포인터의 상태(`OFFICIAL`·`VOID`). 확정 결과가 없으면 `null`. */
+  currentRevisionState?: string | null;
   warnings: TournamentOperationsBoardWarning[];
   version: number | null;
   revisionId: string | null;
@@ -233,17 +235,15 @@ async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOp
 /**
  * Ended fixtures for a tournament, via the Task 18 operations board
  * (`GET /tournament-ops/tournaments/:tournamentId/operations?status=ENDED`).
- * A "review" candidate is `gameState === 'ENDED' && revisionId === null`
- * (nothing officialized yet) or carries `RESULT_REVIEW_OVERDUE`; a
- * "correction" candidate is `revisionId !== null` (has an official result).
- * Pages filter this same list for their own purpose -- see
- * `components/tournament-result-review/fixture-picker-list.tsx`.
+ * A "pending" candidate is `gameState === 'ENDED' && revisionId === null`
+ * (nothing officialized yet) or carries `RESULT_REVIEW_OVERDUE`; the rest with
+ * `revisionId !== null` are confirmed. See `components/tournament-ops/result-partition.ts`.
  */
-export function useTournamentEndedFixtures(tournamentId: string) {
+export function useTournamentEndedFixtures(tournamentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: resultReviewKeys.board(tournamentId, 'ENDED'),
     queryFn: () => fetchAllEndedFixtures(tournamentId),
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
     staleTime: 15_000,
   });
 }

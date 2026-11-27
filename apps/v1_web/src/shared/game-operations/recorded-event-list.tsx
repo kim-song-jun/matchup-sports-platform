@@ -334,12 +334,12 @@ export function RecordedEventList({
                 : renderActions(listedEvent, '레드', true);
           return (
             <li key={event.id} className="flex min-h-[48px] items-center gap-2 px-3">
-              <span className="shrink-0 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
+              <span className="shrink-0 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium tabular-nums text-[var(--text-muted)]">
                 {eventTimeLabel(event, periodCount)}
               </span>
               {eventDot(event, mergedYellow !== null)}
               {/* 줄이 길면 팀 이름부터 잘린다 — 누가 했는지가 먼저 남아야 한다. */}
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">
+              <p className="min-w-0 flex-1 truncate text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 {mergedYellow !== null ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(event)}
                 {event.type === 'SUBSTITUTION'
                   ? substitutionDetailSuffix(event, playerName)

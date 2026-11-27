@@ -247,8 +247,8 @@ function endPeriodCommandLabel(currentPeriodNumber: number, periodCount: number 
 /** `nextPeriodNumber`는 지금 HALFTIME인 피리어드의 번호다(halftimePeriod?.
  * number) — currentPeriod(=LIVE 피리어드)가 아니다, 하프타임 중엔 LIVE인
  * 피리어드가 없기 때문이다. */
-function startPeriodCommandLabel(nextPeriodNumber: number): string {
-  return `${periodLabel(nextPeriodNumber)} 시작`;
+function startPeriodCommandLabel(nextPeriodNumber: number, periodCount: number | null): string {
+  return `${periodLabel(nextPeriodNumber, periodCount)} 시작`;
 }
 
 function commandLabel(
@@ -261,7 +261,7 @@ function commandLabel(
     return endPeriodCommandLabel(currentPeriodNumber ?? 1, periodCount);
   }
   if (command === 'start-period') {
-    return startPeriodCommandLabel(nextPeriodNumber ?? 2);
+    return startPeriodCommandLabel(nextPeriodNumber ?? 2, periodCount);
   }
   if (command === 'revert-period') {
     return '되돌리기';
@@ -2160,7 +2160,7 @@ export function OperateConsoleCore({
   } else if (halftime && halftimePeriod !== null) {
     stageCaption = (
       <p className={STAGE_CAPTION_CLASS}>
-        하프타임이에요. 준비되면 ‘{startPeriodCommandLabel(halftimePeriod.number)}’을 눌러 주세요. 빠진 골·카드·파울은 지금도{' '}
+        하프타임이에요. 준비되면 ‘{startPeriodCommandLabel(halftimePeriod.number, periodCount)}’을 눌러 주세요. 빠진 골·카드·파울은 지금도{' '}
         {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각으로 기록할 수 있어요.
       </p>
     );

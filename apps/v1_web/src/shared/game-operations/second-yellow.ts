@@ -7,7 +7,7 @@ import type { EventCaptureCommitInput } from './action-target-picker';
  * 서버 확정 이벤트(취소된 것 제외)와 아직 서버에 닿지 않은 큐 항목을 함께 센다 —
  * 연달아 눌러 두 번째가 아직 큐에 있을 때도 놓치지 않기 위해서다. `failed` 도 센다:
  * "다시 시도"가 성공하면 그대로 기록되는 항목이라 세지 않으면 재시도 뒤 옐로 2장·레드 0이 된다.
- * `acked` 항목은 이미 이벤트 목록에 있으므로 다시 세지 않는다.
+ * `acked` 항목과 응답만 잃어 이미 이벤트 목록에 있는 항목은 다시 세지 않는다.
  */
 export function isSecondYellowWithoutRed(
   events: readonly GameEventRecord[],
@@ -20,6 +20,7 @@ export function isSecondYellowWithoutRed(
   const reversedIds = new Set(
     events.map((event) => event.reversesEventId).filter((id): id is string => id !== null && id !== undefined),
   );
+  const recordedClientEventIds = new Set(events.map((event) => event.clientEventId));
   const cardColors: string[] = [
     ...events
       .filter((event) => event.type === 'CARD' && event.participantId === participantId && !reversedIds.has(event.id))
@@ -28,6 +29,7 @@ export function isSecondYellowWithoutRed(
       .filter(
         (item) =>
           item.status !== 'acked' &&
+          !recordedClientEventIds.has(item.clientEventId) &&
           item.event.type === 'CARD' &&
           item.event.participantId === participantId,
       )

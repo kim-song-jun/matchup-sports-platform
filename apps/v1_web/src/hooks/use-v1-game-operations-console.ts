@@ -653,7 +653,7 @@ export function useV1GameOperationsConsole(
               // durable queue untouched for a later explicit recovery.
               dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
             }
-            setBannerMessage('기록 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
+            setBannerMessage('이 경기를 조회할 권한이 없어요. 새로고침 후 다시 시도해 주세요.');
           }
           if (resyncCoalesced) {
             resyncCoalesced = false;

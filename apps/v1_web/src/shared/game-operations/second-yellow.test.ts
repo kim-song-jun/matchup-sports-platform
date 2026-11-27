@@ -65,6 +65,13 @@ describe('isSecondYellowWithoutRed', () => {
     expect(isSecondYellowWithoutRed([], [], committing('p-1'))).toBe(false);
   });
 
+  it('응답만 잃어 큐에는 failed 로 남은 옐로가 이미 기록 목록에 있으면 두 번 세지 않는다', () => {
+    const recorded = card('p-1', 'YELLOW');
+    const lostAck = { ...queued('p-1', 'YELLOW', 'failed'), clientEventId: recorded.clientEventId };
+    expect(isSecondYellowWithoutRed([recorded], [lostAck], committing('p-1'))).toBe(true);
+    expect(isSecondYellowWithoutRed([], [lostAck], committing('p-1'))).toBe(true);
+  });
+
   it('같은 선수에게 이미 옐로가 하나 있으면 두 번째 옐로에서 묻는다', () => {
     expect(isSecondYellowWithoutRed([card('p-1', 'YELLOW')], [], committing('p-1'))).toBe(true);
   });

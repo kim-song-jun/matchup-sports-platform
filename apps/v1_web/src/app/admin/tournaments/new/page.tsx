@@ -743,6 +743,69 @@ function BasicStep({
         </div>
       </fieldset>}
 
+      {/* 카드 정지 규정 — 비워 두면 이 대회에는 적용되지 않는다. 기본값을 채워 두지
+          않는 것이 의도다: 운영자가 의식하지 못한 채 정지 규정이 켜진 대회가 만들어지면,
+          이미 카드를 받은 선수가 갑자기 못 뛰게 된다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="yellow-accumulation-limit" label="경고 누적 출전정지 (장)">
+          <input
+            id="yellow-accumulation-limit"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.yellowAccumulationLimit}
+            onChange={(event) => setField('yellowAccumulationLimit', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            옐로카드가 이 장수만큼 쌓일 때마다 다음 1경기 출전이 막혀요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+        <Field id="red-card-suspension-matches" label="퇴장 시 출전정지 (경기)">
+          <input
+            id="red-card-suspension-matches"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.redCardSuspensionMatches}
+            onChange={(event) => setField('redCardSuspensionMatches', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            레드카드 1장당 막히는 경기 수예요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+      </section>
+
+      {/* 팀 파울 경고 기준 — 출전정지 규정과 달리 비워 두는 것이 정상이다(기본 5개). 화면 안내 기준일 뿐이라
+          대회가 시작된 뒤에도 대회 상세에서 바꿀 수 있다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="team-foul-threshold" label="팀 파울 기준 (개)" error={errors.teamFoulThreshold}>
+          <input
+            id="team-foul-threshold"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.teamFoulThreshold}
+            onChange={(event) => setField('teamFoulThreshold', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 5개"
+            aria-invalid={Boolean(errors.teamFoulThreshold)}
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 비우면 5개예요.
+          </p>
+        </Field>
+      </section>
+
       <GenderCategoryField
         value={state.genderCategory}
         onChange={(value) => dispatch({ type: 'set-field', field: 'genderCategory', value })}
@@ -1432,69 +1495,6 @@ function PresentationStep({
             placeholder="예: 우승팀 현금 100만원 + 트로피"
             className={textareaClass}
           />
-        </Field>
-      </section>
-
-      {/* 카드 정지 규정 — 비워 두면 이 대회에는 적용되지 않는다. 기본값을 채워 두지
-          않는 것이 의도다: 운영자가 의식하지 못한 채 정지 규정이 켜진 대회가 만들어지면,
-          이미 카드를 받은 선수가 갑자기 못 뛰게 된다. */}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Field id="yellow-accumulation-limit" label="경고 누적 출전정지 (장)">
-          <input
-            id="yellow-accumulation-limit"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={20}
-            value={state.yellowAccumulationLimit}
-            onChange={(event) => setField('yellowAccumulationLimit', event.target.value)}
-            disabled={pending}
-            placeholder="비우면 적용 안 함"
-            className={inputClass}
-          />
-          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-            옐로카드가 이 장수만큼 쌓일 때마다 다음 1경기 출전이 막혀요. 비워 두면 적용하지 않아요.
-          </p>
-        </Field>
-        <Field id="red-card-suspension-matches" label="퇴장 시 출전정지 (경기)">
-          <input
-            id="red-card-suspension-matches"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={20}
-            value={state.redCardSuspensionMatches}
-            onChange={(event) => setField('redCardSuspensionMatches', event.target.value)}
-            disabled={pending}
-            placeholder="비우면 적용 안 함"
-            className={inputClass}
-          />
-          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-            레드카드 1장당 막히는 경기 수예요. 비워 두면 적용하지 않아요.
-          </p>
-        </Field>
-      </section>
-
-      {/* 팀 파울 경고 기준 — 출전정지 규정과 달리 비워 두는 것이 정상이다(기본 5개). 화면 안내 기준일 뿐이라
-          대회가 시작된 뒤에도 대회 상세에서 바꿀 수 있다. */}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Field id="team-foul-threshold" label="팀 파울 기준 (개)" error={errors.teamFoulThreshold}>
-          <input
-            id="team-foul-threshold"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={20}
-            value={state.teamFoulThreshold}
-            onChange={(event) => setField('teamFoulThreshold', event.target.value)}
-            disabled={pending}
-            placeholder="비우면 5개"
-            aria-invalid={Boolean(errors.teamFoulThreshold)}
-            className={inputClass}
-          />
-          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-            한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 비우면 5개예요.
-          </p>
         </Field>
       </section>
 

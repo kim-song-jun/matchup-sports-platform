@@ -8,7 +8,7 @@ import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin'
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { GenderCategoryField, genderCategoryLabel } from '@/components/admin/gender-category-field';
-import { periodLabels, switchPeriodCount } from '@/app/admin/tournaments/new/tournament-create-model';
+import { periodLabels, switchPeriodCount } from '@/lib/tournament-period-phases';
 import { v1Get } from '@/lib/api-client';
 import {
   useSaveTournamentPeriodSettings,

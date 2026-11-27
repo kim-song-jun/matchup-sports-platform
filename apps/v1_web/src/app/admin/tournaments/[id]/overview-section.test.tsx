@@ -230,7 +230,7 @@ describe('TournamentOverviewSection — 요약·KPI', () => {
 
     const band = screen.getByRole('region', { name: '대회 진행 상태' });
     expect(within(band).queryByText('접수 중')).not.toBeInTheDocument();
-    expect(within(band).getByText(/접수 마감까지/)).toBeInTheDocument();
+    expect(within(band).getByText(/신청 마감까지/)).toBeInTheDocument();
   });
 
   it('명단 제출 마감이 없으면 아직 없어요로 보인다', () => {
@@ -248,7 +248,7 @@ describe('TournamentOverviewSection — 요약·KPI', () => {
 
     const band = screen.getByRole('region', { name: '대회 진행 상태' });
     expect(within(band).getByText('확인 필요')).toBeInTheDocument();
-    expect(within(band).getByText('접수 마감 시각이 지났는데 아직 접수 중이에요.')).toBeInTheDocument();
+    expect(within(band).getByText('신청 마감 시각이 지났는데 아직 접수 중이에요.')).toBeInTheDocument();
   });
 });
 

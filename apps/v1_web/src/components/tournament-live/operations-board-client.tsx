@@ -301,7 +301,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           ) : view === 'list' ? (
             <OperationsListView
               cards={[...dayShown, ...unscheduledShown]}
-              isDesktop={isWideTable}
+              asTable={isWideTable}
               liveBase={liveBase}
               consoleQuery={consoleQuery}
               onOpenInfo={openInfo}

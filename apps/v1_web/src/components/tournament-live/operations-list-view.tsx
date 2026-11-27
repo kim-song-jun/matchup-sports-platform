@@ -7,7 +7,8 @@ const CONSOLE_FALLBACK: CardAction = { kind: 'console', label: '경기 콘솔 �
 
 interface OperationsListViewProps {
   cards: readonly BoardCard[];
-  isDesktop: boolean;
+  /** 넓은 폭이면 표, 아니면 카드 목록. */
+  asTable: boolean;
   liveBase: string;
   consoleQuery: string;
   onOpenInfo: (card: BoardCard) => void;
@@ -60,8 +61,8 @@ function TitleButton({ card, onOpenInfo }: { card: BoardCard; onOpenInfo: (card:
 const TH = 'px-4 py-3 text-left text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]';
 
 /** 경기를 한 줄씩 보는 표. 판에서 보기 어려운 긴 대회·리그를 위한 보기이고, 할 일은 카드와 같은 규칙이다. */
-export function OperationsListView({ cards, isDesktop, liveBase, consoleQuery, onOpenInfo }: OperationsListViewProps) {
-  if (!isDesktop) {
+export function OperationsListView({ cards, asTable, liveBase, consoleQuery, onOpenInfo }: OperationsListViewProps) {
+  if (!asTable) {
     return (
       <ul className="flex flex-col gap-2" role="list">
         {cards.map((card) => (

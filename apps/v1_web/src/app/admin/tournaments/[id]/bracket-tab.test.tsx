@@ -314,18 +314,14 @@ function alreadyExists(details: Record<string, unknown>) {
   } as unknown as ConstructorParameters<typeof V1ApiError>[0]);
 }
 
-function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistration[] = []) {
+function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistration[] = [], unscheduledOnly = false) {
   render(
     <BracketTab
       tournamentId="t-1"
       showToast={showToast}
       registrations={registrations}
-      confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
-      confirmedTeamCountStatus="success"
-      registrationDeadlineAt={null}
-      bracketPublishedAt={null}
-      bracketPublishScheduledAt={null}
       canWrite
+      unscheduledOnly={unscheduledOnly}
     />,
   );
   return showToast;
@@ -388,7 +384,7 @@ describe('BracketTab — 진출 연결 출처 선택', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '진출 연결' })[0]);
     const dialog = await screen.findByRole('dialog', { name: '진출 경기 연결' });
     fireEvent.change(within(dialog).getByLabelText('홈 자리'), { target: { value: 'q1' } });
-    const away = within(dialog).getByLabelText('어웨이 자리') as HTMLSelectElement;
+    const away = within(dialog).getByLabelText('원정 자리') as HTMLSelectElement;
     expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
   });
 });
@@ -624,7 +620,7 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     expect(screen.queryByText(/league_r/)).not.toBeInTheDocument();
   });
 
-  it('모바일 경기 카드에서도 홈·어웨이와 운영 및 결과 검토 작업을 함께 제공한다', () => {
+  it('모바일 경기 카드에서도 홈·원정과 운영 및 결과 검토 작업을 함께 제공한다', () => {
     bracketGroups = bracket.groups;
     bracketFixtures = [fixtureRow({ id: 'mobile-fx', fixtureNumber: 1, venue: 'A구장' })];
     renderTab();
@@ -662,13 +658,13 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     if (!section) throw new Error('경기 일정 섹션을 찾지 못했어요.');
     const card = within(within(section).getByRole('list')).getByRole('listitem');
     expect(within(card).getByText('2 : 1')).toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 정정하러 가기' }))
+    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 고치기 화면 열기' }))
       .toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=mobile-done');
     expect(within(card).queryByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 삭제' }))
       .not.toBeInTheDocument();
   });
 
-  it('모바일 카드의 긴 공백 없는 조 이름과 경기장명도 줄바꿈할 수 있다', () => {
+  it('모바일 카드의 긴 공백 없는 조 이름과 구장명도 줄바꿈할 수 있다', () => {
     const longGroupName = '가'.repeat(60);
     const longVenue = '나'.repeat(200);
     bracketGroups = [{ ...bracket.groups[0], name: longGroupName }];
@@ -718,7 +714,7 @@ describe('describeLeagueReplace', () => {
 /**
  * 경기 수정 모달 — 팀을 '미정'으로 되돌리는 해제(TBD) 전송 계약.
  *
- * 고치기 전 흐름: 홈/어웨이 팀을 '미정'으로 되돌려 저장하면 '수정했어요' 토스트는 뜨지만
+ * 고치기 전 흐름: 홈/원정 팀을 '미정'으로 되돌려 저장하면 '수정했어요' 토스트는 뜨지만
  * homeRegistrationId 필드 자체가 요청 바디에서 통째로 빠져(빈 문자열이 falsy라 걸러짐)
  * 서버가 '미변경'으로 읽었다 — 배정이 그대로 남는데 성공 토스트만 떴다. 서버 계약은
  * undefined=미변경 / null=해제로 이미 갈려 있으므로, 프론트는 해제 의도를 null로 명시해야 한다.
@@ -745,7 +741,7 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
 
     // 두 팀 다 이미 배정돼 있어 EntityPicker는 칩+'선택 해제' 버튼을 보여준다.
-    // JSX 순서상 첫 번째가 홈, 두 번째가 어웨이.
+    // JSX 순서상 첫 번째가 홈, 두 번째가 원정.
     const clearButtons = within(dialog).getAllByRole('button', { name: '선택 해제' });
     expect(clearButtons).toHaveLength(2);
     fireEvent.click(clearButtons[0]);
@@ -812,11 +808,11 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     expect(labels).not.toContain('마포FC');
   });
 
-  it('어웨이 후보도 같은 기준으로 다른 조 팀(마포FC)을 거른다', async () => {
+  it('원정 후보도 같은 기준으로 다른 조 팀(마포FC)을 거른다', async () => {
     bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
     renderTab(vi.fn(), registrations());
     const dialog = await openEdit();
-    fireEvent.change(within(dialog).getByPlaceholderText('어웨이 팀 검색'), { target: { value: 'FC' } });
+    fireEvent.change(within(dialog).getByPlaceholderText('원정 팀 검색'), { target: { value: 'FC' } });
     const labels = screen.getAllByRole('option').map((option) => option.textContent ?? '').join();
     expect(labels).toContain('송파FC');
     expect(labels).not.toContain('마포FC');
@@ -853,11 +849,11 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     expect(screen.getByRole('option', { name: '송파FC' })).toBeInTheDocument();
   });
 
-  it('반대편에 선택한 팀은 후보에서 빠져 홈·어웨이에 같은 팀을 고를 수 없다', async () => {
+  it('반대편에 선택한 팀은 후보에서 빠져 홈·원정에 같은 팀을 고를 수 없다', async () => {
     bracketFixtures = [fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: null })];
     renderTab(vi.fn(), registrations());
     const dialog = await openEdit();
-    const awayPicker = within(dialog).getByPlaceholderText('어웨이 팀 검색');
+    const awayPicker = within(dialog).getByPlaceholderText('원정 팀 검색');
     fireEvent.click(awayPicker);
     fireEvent.change(awayPicker, { target: { value: '강남FC' } });
     await waitFor(() => expect(screen.queryByRole('option', { name: '강남FC' })).not.toBeInTheDocument());
@@ -1181,7 +1177,7 @@ describe('BracketTab — 팀 배정 전 대진 자동 생성 안내', () => {
 
 describe('BracketTab — 공통 경기 정보', () => {
   beforeEach(() => { bracketGroups = bracket.groups; bracketSlots = []; bracketFixtures = [fixtureRow({ scheduledAt: '2026-10-25T05:00:00.000Z', fieldId: 'field-a', venue: 'A구장', homeDisplayLabel: '준결승 A 승자' })]; updateFixtureMutate.mockReset(); });
-  it('기존 시각·경기장·문구를 채우고 시각과 문구를 명시적으로 비운다', async () => {
+  it('기존 시각·구장·문구를 채우고 시각과 문구를 명시적으로 비운다', async () => {
     renderTab();
     fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
@@ -1248,5 +1244,64 @@ describe('BracketTab — 직접입력생성회귀', () => {
     expect(screen.queryByRole('dialog', { name: '경기 수정' })).toBeNull();
     createdFixtureReadError = null;
     createdFixtureMissing = false;
+  });
+});
+
+describe('BracketTab — 도구 줄로 옮겨 간 일', () => {
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+    bracketSlots = [];
+  });
+
+  it('목록 위에 공개 카드와 「지금 전체 공개」가 없다(공개는 도구 줄의 「대진 공개」 한 곳)', () => {
+    bracketFixtures = [fixtureRow({ id: 'f1', fixtureNumber: 1 })];
+    renderTab();
+    expect(screen.queryByText('대진표 전체 공개')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /전체 공개|공개 취소|예약/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('공개 예약 시각')).not.toBeInTheDocument();
+  });
+
+  it('목록에는 「전체 대진 만들기」·「결선 진출팀 배정」·「조별 빈 자리 무작위 배정」 버튼이 없다(도구 줄 메뉴로 옮겼다)', () => {
+    bracketFixtures = [fixtureRow({ id: 'f1', fixtureNumber: 1 })];
+    renderTab(vi.fn(), [], false);
+    for (const name of ['전체 대진 만들기', '결선 진출팀 배정', '조별 빈 자리 무작위 배정']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it('경기 일정 전체보기 표는 unscheduledOnly 일 때만 시간 미정 경기만 남긴다', () => {
+    bracketFixtures = [
+      fixtureRow({ id: 'timed', fixtureNumber: 1, scheduledAt: '2026-10-25T05:00:00.000Z' }),
+      fixtureRow({ id: 'open', fixtureNumber: 2, scheduledAt: null }),
+    ];
+    renderTab(vi.fn(), [], true);
+    const section = screen.getByRole('heading', { name: '경기 일정 전체보기' }).parentElement!;
+    expect(within(section).getByText('시간 미정 1경기만 보고 있어요.')).toBeInTheDocument();
+    expect(within(section).getAllByRole('button', { name: /2번 경기 수정$/ }).length).toBeGreaterThan(0);
+    expect(within(section).queryAllByRole('button', { name: /1번 경기 수정$/ })).toHaveLength(0);
+    cleanup();
+    renderTab(vi.fn(), [], false);
+    expect(screen.getAllByRole('button', { name: /1번 경기 수정$/ }).length).toBeGreaterThan(0);
+  });
+
+  it('unscheduledOnly 이고 시간 미정 경기가 없으면 그렇다고 알린다', () => {
+    bracketFixtures = [fixtureRow({ id: 'timed', fixtureNumber: 1, scheduledAt: '2026-10-25T05:00:00.000Z' })];
+    renderTab(vi.fn(), [], true);
+    const section = screen.getByRole('heading', { name: '경기 일정 전체보기' }).parentElement!;
+    expect(within(section).getByText('시간 미정 경기가 없어요.')).toBeInTheDocument();
+    expect(within(section).queryByText('시간 미정 1경기만 보고 있어요.')).not.toBeInTheDocument();
+  });
+
+  it('표 머리와 수정창은 「원정」·「구장」을 쓴다(어웨이·경기장은 어디에도 없다)', async () => {
+    bracketFixtures = [fixtureRow({ id: 'f1', fixtureNumber: 1, venue: 'A구장' })];
+    renderTab();
+    expect(screen.getAllByText('원정').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('시각 · 구장').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    expect(within(dialog).getByLabelText('원정 팀')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('원정 표시 문구')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/어웨이|경기장/);
   });
 });

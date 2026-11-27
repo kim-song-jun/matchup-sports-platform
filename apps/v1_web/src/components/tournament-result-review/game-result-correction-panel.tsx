@@ -373,7 +373,7 @@ export function GameResultCorrectionPanel({
         />
       ) : null}
 
-      {inline && correctionFormOpen ? renderCorrectionEditor() : null}
+      {inline && correctionFormOpen && !readOnly ? renderCorrectionEditor() : null}
 
       {(!inline || !correctionFormOpen) && draftBase && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -557,7 +557,7 @@ export function GameResultCorrectionPanel({
         />
       ) : null}
 
-      {!inline && correctionFormOpen ? renderCorrectionEditor() : null}
+      {!inline && correctionFormOpen && !readOnly ? renderCorrectionEditor() : null}
 
       <ReasonModal
         open={voidRequested}

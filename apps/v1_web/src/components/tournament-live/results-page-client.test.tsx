@@ -140,6 +140,13 @@ describe('ResultsPageClient', () => {
     expect(await screen.findByTestId('correction-panel')).toHaveAttribute('data-auto-open', 'false');
   });
 
+  it('지원(보기만)이 확정된 경기 딥링크로 들어와도 고치기 폼을 바로 열지 않는다', async () => {
+    nav.search = 'fixtureId=f2';
+    renderPage('SUPPORT_READONLY');
+
+    expect(await screen.findByTestId('correction-panel')).toHaveAttribute('data-auto-open', 'false');
+  });
+
   it('확정 대기 경기 딥링크는 확정 패널을 연다', async () => {
     nav.search = 'fixtureId=f1';
     renderPage();

@@ -152,7 +152,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
                 gameId={selected.gameId}
                 tournamentId={tournamentId}
                 isRegularLeague={tournament.data?.kind === 'regular_league'}
-                autoOpenFix={fromDeepLink && selected.fixtureId === deepLinkFixtureId}
+                autoOpenFix={canAct && fromDeepLink && selected.fixtureId === deepLinkFixtureId}
                 onSaved={() => void ended.refetch()}
                 onOfficialized={() => {
                   setPickedFixtureId(selected.fixtureId);

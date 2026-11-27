@@ -650,6 +650,24 @@ describe('correction -- create against the current official revision, always cap
     expect(within(dialog).getByRole('button', { name: '고친 결과로 확정' })).toBeDisabled();
   });
 
+  it('보기만 하는 역할은 딥링크 autoOpen 으로 열려도 고치기 폼이 보이지 않는다', () => {
+    hookMocks.game.data = buildGame('support_readonly', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" inline autoOpen />);
+
+    expect(screen.getByText(/결과를 볼 수만 있어요/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('고친 이유')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('홈 점수')).not.toBeInTheDocument();
+  });
+
+  it('고칠 수 있는 역할은 autoOpen 으로 열면 고치기 폼이 바로 보인다', () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" inline autoOpen />);
+
+    expect(screen.getByLabelText('고친 이유')).toBeInTheDocument();
+  });
+
   it('shows a pending correction draft with a confirm CTA instead of "start correction" once one exists', () => {
     hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
     hookMocks.revisions.data = [

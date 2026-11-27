@@ -152,15 +152,33 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await goal(live.gameId, live.side('HOME'));
     await goal(live.gameId, live.side('AWAY'));
     await goal(live.gameId, live.side('AWAY'));
+    // 득점자: 우리(원정) 김득점 5분 / 상대(홈) 박상대 9분 / 우리 이름 모름 21분 / 취소된 상대 골(15분)은 빠진다.
+    const lineupOf = async (gameId: string, sideId: string) =>
+      (await db.v1GameLineup.findFirst({ where: { gameId, sideId }, orderBy: { revision: 'desc' } })) ?? db.v1GameLineup.create({ data: { gameId, sideId, revision: 1, state: 'LOCKED' } });
+    const playerOf = async (gameId: string, sideId: string, name: string) =>
+      (await db.v1GameParticipant.create({ data: { gameId, sideId, lineupId: (await lineupOf(gameId, sideId)).id, displayNameSnapshot: name } })).id;
+    const mineKim = await playerOf(live.gameId, live.side('AWAY'), '김득점');
+    const oppPark = await playerOf(live.gameId, live.side('HOME'), '박상대');
+    const liveEvents = await db.v1GameEvent.findMany({ where: { gameId: live.gameId }, orderBy: { sequence: 'asc' } });
+    await db.v1GameEvent.update({ where: { id: liveEvents[0].id }, data: { participantId: oppPark, clockMs: 8 * 60_000 + 500 } }); // 상대(홈) 9분
+    await db.v1GameEvent.update({ where: { id: liveEvents[1].id }, data: { participantId: mineKim, clockMs: 5 * 60_000 } }); // 우리 5분
+    await db.v1GameEvent.update({ where: { id: liveEvents[2].id }, data: { clockMs: 20 * 60_000 + 1 } }); // 우리 21분(이름 모름)
+    const cancelled = await goal(live.gameId, live.side('HOME'));
+    await db.v1GameEvent.update({ where: { id: cancelled.id }, data: { clockMs: 15 * 60_000 } });
+    await db.v1GameEvent.create({
+      data: { gameId: live.gameId, sequence: ++seq, clientEventId: `c-${tag}-${seq}`, payloadHash: `h-${seq}`, type: 'CORRECTION', sideId: live.side('HOME'), reversesEventId: cancelled.id, period: 1, clockMs: 15 * 60_000, occurredAt: new Date(), actorUserId: userA, payload: {} },
+    });
     // 친선 팀 매치: 득점이 경기 이벤트가 아니라 공유 기록에 있다(우리가 홈, 2 : 1).
     const friendly = await makeGame('friendly', { startOffsetMs: -10 * MIN, state: 'LIVE', policy: 'LIVE' });
+    const friendlyMine = await playerOf(friendly.gameId, friendly.side('HOME'), '우리선수');
+    const friendlyOpp = await playerOf(friendly.gameId, friendly.side('AWAY'), '상대선수');
     await db.v1TeamMatchRecord.create({
       data: {
         gameId: friendly.gameId,
         goals: [
-          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 3, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: friendlyMine, minute: 3, subMatchId: null },
           { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 9, subMatchId: null },
-          { id: randomUUID(), sideId: friendly.side('AWAY'), ownGoal: false, participantId: null, minute: 14, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('AWAY'), ownGoal: false, participantId: friendlyOpp, minute: null, subMatchId: null },
         ],
       },
     });
@@ -248,6 +266,24 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect(live.find((g) => g.gameId === games.hidden)!.period).toMatchObject({ number: 2, phase: 'HALFTIME', startedAt: null });
     expect(live.find((g) => g.gameId === games.friendly)!.period).toBeNull(); // 친선 팀 매치는 구간 기록이 없다
     expect(live.find((g) => g.gameId === games.justEnded)!.period).toBeNull(); // 끝난 경기
+  });
+
+  it('득점자: 시간순·분 환산, 취소된 골 제외, 친선은 우리 팀 골만 이름, 점수를 가린 경기는 비어 있다', async () => {
+    const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; scorers: unknown[] }>;
+    // 경기 이벤트(대회·리그와 같은 경로): 분 = ceil(clockMs / 60000), 시간순, 취소된 상대 골(15분)은 빠진다.
+    expect(live.find((g) => g.gameId === games.live)!.scorers).toEqual([
+      { side: 'MINE', name: '김득점', minute: 5, ownGoal: false },
+      { side: 'OPPONENT', name: '박상대', minute: 9, ownGoal: false },
+      { side: 'MINE', name: null, minute: 21, ownGoal: false },
+    ]);
+    // 친선 팀 매치(공유 기록): 우리 팀 골만 이름을 붙이고 상대 골은 이름 없이, 분을 모르는 골은 맨 뒤.
+    expect(live.find((g) => g.gameId === games.friendly)!.scorers).toEqual([
+      { side: 'MINE', name: '우리선수', minute: 3, ownGoal: false },
+      { side: 'MINE', name: null, minute: 9, ownGoal: false },
+      { side: 'OPPONENT', name: null, minute: null, ownGoal: false },
+    ]);
+    expect(live.find((g) => g.gameId === games.hidden)!.scorers).toEqual([]); // 점수를 가린 경기는 골 요약도 가린다
+    expect(live.find((g) => g.gameId === games.endedHidden)!.scorers).toEqual([]);
   });
 
   it('지난 경기: 가장 최근 공식 결과(가린 경기는 건너뛴다)와 승무패', async () => {

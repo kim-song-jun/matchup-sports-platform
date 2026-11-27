@@ -46,4 +46,8 @@
 - **현재 구간** — `live[].period`: `{ number, phase: RUNNING|HALFTIME|PAUSED, startedAt, pausedMs, pausedAt, restStartedAt }`. 위젯이 「후반 12'」를 스스로 센다 — 경과 = (지금 − `startedAt`) − `pausedMs` − (`pausedAt` 이 있으면 지금 − `pausedAt`), 하프타임은 `restStartedAt` 부터 쉬는 시간. **하프타임은 경기 상태가 아니라 다음 구간이 `HALFTIME` 인 것**이라 `state` 는 `LIVE` 그대로다. 구간 기록이 없는 경기(친선 팀 매치)와 끝난 경기는 null.
 - **일정 상대·참석 인원** — 경기 일정의 `opponentName`(호스트·승인 신청 팀 중 내 팀이 아닌 쪽), `goingCount`(참석 확정 수), `capacity`(일정 정원, 없으면 활동 중인 팀원 수). 훈련·모임은 `opponentName` 이 null.
 - **지난 경기** — `lastResult`: 내 팀의 가장 최근 **공식** 결과(`score`·`penalties` 는 우리 팀 기준, `result: WIN|DRAW|LOSE` — 동점이면 승부차기로 가리고 그것도 같으면 무). 공개 규칙이 가린 경기(`hidden`·`status_only`)는 건너뛰고, 없으면 null.
-- 득점자 이름은 참가자 동의 규칙을 지켜야 해서 **이 변경에 없다**(후속 변경).
+
+**득점자 (2026-11-27).** `live[].scorers` — 한 골씩 시간순(분을 모르는 골은 맨 뒤): `{ side: MINE|OPPONENT, name, minute, ownGoal }`. `side` 는 우리 팀 기준이고 `minute` 는 웹 경기 화면과 같은 환산(`ceil(clockMs / 60000)`)이다. 취소된 골(`reversesEventId`)은 빠지고 정정한 시각은 반영한다(공개 일정 카드와 같은 읽기 순서).
+- **이름 규칙은 공개 경기 화면과 같다**(`participant-name-gating`): 대회·리그 경기는 동의 규칙이 켜져 있으면 동의한 참가자만, 이름은 닉네임 기본 + 프로필의 실명 공개 설정. 이름을 보여 줄 수 없으면 `name: null` — 받는 쪽은 「득점」만 보여 준다.
+- **친선 팀 매치**는 공개 화면이 진행 중에 득점자를 보여 주지 않으므로(점수만) 위젯은 **우리 팀 골만** 이름을 붙이고 상대 골은 `name: null` 로 준다.
+- 점수를 가린 경기(`status_only`·`hidden`)는 골 요약도 가려 빈 배열이다. 옛 기록을 옮긴 경기는 공식 결과의 골 목록을 쓴다.

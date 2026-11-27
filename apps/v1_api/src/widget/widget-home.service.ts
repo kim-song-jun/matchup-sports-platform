@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleAttendanceService, type SetAttendanceResponse } from '../team-schedules/attendance.service';
 import { visibleTeamMatchScheduleWhere } from '../team-schedules/team-schedules.service';
 import { resolveTeamLogoUrl } from '../teams/team-logo-presets';
+import { WidgetScorersService, type WidgetScorer, type WidgetScorerGame } from './widget-scorers.service';
 import {
   endedGameScore,
   matchResult,
@@ -49,6 +50,8 @@ export interface WidgetLiveGame {
   penalties: WidgetPerspectiveScore | null;
   /** 현재 구간(전반·후반 등)과 시간 계산에 필요한 값. 진행 중이 아니거나 구간 기록이 없는 경기는 null. */
   period: WidgetPeriod | null;
+  /** 한 골씩 시간순(분을 모르는 골은 뒤). 점수를 가린 경기는 빈 배열. 이름 규칙은 `WidgetScorersService`. */
+  scorers: WidgetScorer[];
 }
 
 export interface WidgetScheduleItem {
@@ -112,6 +115,7 @@ export class WidgetHomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendance: ScheduleAttendanceService,
+    private readonly scorers: WidgetScorersService,
   ) {}
 
   async home(userId: string, now: Date = new Date()): Promise<WidgetHome> {
@@ -336,7 +340,7 @@ export class WidgetHomeService {
         state: true,
         sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
         visibilityPolicy: { select: { mode: true } },
-        currentOfficialRevision: { select: { score: true } },
+        currentOfficialRevision: { select: { score: true, state: true, goalEvents: true } },
         sharedRecord: { select: { goals: true } },
         periods: { select: { number: true, state: true, startedAt: true, endedAt: true, pausedTotalMs: true, pausedAt: true } },
         teamMatch: { select: { title: true, startAt: true, placeName: true, tournamentId: true, leagueId: true, league: { select: { title: true } }, tournament: { select: { title: true } } } },
@@ -359,6 +363,7 @@ export class WidgetHomeService {
           });
 
     const items: WidgetLiveGame[] = [];
+    const scorerGames: WidgetScorerGame[] = [];
     for (const game of games) {
       const mine = game.sides.find((side) => side.teamId !== null && teamIdSet.has(side.teamId));
       if (mine === undefined || (game.state !== 'SCHEDULED' && game.state !== 'LIVE' && game.state !== 'PAUSED' && game.state !== 'ENDED')) continue;
@@ -393,8 +398,15 @@ export class WidgetHomeService {
         score,
         penalties,
         period: state === 'ENDED' ? null : readPeriod(game.state, game.periods),
+        scorers: [],
       });
+      // 점수를 보여 줄 수 있는 경기만 득점자도 — 점수를 가린 경기(`status_only` 등)는 골 요약도 가린다.
+      if (score !== null) {
+        scorerGames.push({ gameId: game.id, mineSideId: mine.id, sharedGoals: game.sharedRecord?.goals ?? null, officialGoalEvents: game.currentOfficialRevision?.goalEvents ?? null, officialState: game.currentOfficialRevision?.state ?? null });
+      }
     }
+    const scorersByGame = await this.scorers.load(scorerGames);
+    for (const item of items) item.scorers = scorersByGame.get(item.gameId) ?? [];
     // 진행 중이 앞, 방금 끝난 경기가 뒤.
     return items.sort((a, b) => Number(a.state === 'ENDED') - Number(b.state === 'ENDED'));
   }

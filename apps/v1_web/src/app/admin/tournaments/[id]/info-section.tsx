@@ -34,7 +34,8 @@ import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { placeFromVenueFields, toVenuePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { useTournamentAdmin } from './tournament-admin-context';
 import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
-import { TOURNAMENT_STATUS_LABEL, formatDate, formatDateRange } from './tournament-admin-shared';
+import { formatDate, formatDateRange } from './tournament-admin-shared';
+import { tournamentStatusLabel } from '@/lib/v1-status-labels';
 import {
   SimpleModal,
   formatCurrency,
@@ -572,7 +573,7 @@ export function TournamentInfoSection() {
         </div>
         <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[
-            { label: '상태', value: TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status },
+            { label: '상태', value: tournamentStatusLabel(tournament.status) },
             { label: '형식', value: competitionFormatLabel({ ...tournament, kind: tournament.kind ?? null }) },
             { label: '대회 일정', value: scheduleLabel },
             { label: '장소', value: tournament.venue ?? '미정' },

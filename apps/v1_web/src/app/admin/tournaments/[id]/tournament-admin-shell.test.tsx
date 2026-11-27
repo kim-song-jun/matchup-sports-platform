@@ -1,248 +1,649 @@
 /**
  * tournament-admin-shell.test.tsx
  *
- * 대회별 팝업 화면을 없애고 전역 팝업(/admin/popups) 하나로 합쳤다. 그래서 이 셸의 '팝업'
- * 항목은 대회 하위 탭이 아니라 **경로를 프리필한 전역 화면 링크**여야 한다 — 이 링크가
- * 사라지거나 옛 하위 경로로 되돌아가면 운영자는 그 대회의 팝업을 만들 길이 없어진다.
+ * 대회 상세 셸의 계약: 머리 한 줄(뒤로 · 대회명 · 상태 칩 · 현장 운영 · 주 버튼 · ⋯), 가로 탭 + 더보기,
+ * 모든 상태 전환의 앱 확인 창, 권한·면(플랫폼/스태프/공개 샘플)별로 달라지는 항목.
+ * 대회별 팝업 화면은 없고 전역 팝업 하나라서, 더보기의 「팝업」은 경로를 프리필한 전역 화면 링크여야 한다.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
+import { tournamentOpsAccessDeniedLabel } from '@/lib/tournament-ops-access';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { installMatchMedia } from '@/test/match-media';
 import { TournamentAdminShell, TournamentManagementContent } from './tournament-admin-shell';
 
-const { adminRoleMock, tournamentStatusMock } = vi.hoisted(() => ({
-  adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' },
-  tournamentStatusMock: { value: 'in_progress' as string, canRevertStart: false },
+const h = vi.hoisted(() => ({
+  adminRole: 'ops' as 'owner' | 'ops' | 'support',
+  tournament: {} as Record<string, unknown>,
+  statusPending: false,
+  visibilityPending: false,
+  staff: {} as Record<string, unknown>,
+  pathname: '/admin/tournaments/tournament-1/overview',
+  statusMutate: vi.fn(),
+  visibilityMutate: vi.fn(),
 }));
 
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/admin/tournaments/tournament-1/info',
-}));
-
-const { visibilityMutate, statusMutate } = vi.hoisted(() => ({ visibilityMutate: vi.fn(), statusMutate: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => h.pathname }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminTournament: () => ({
-    data: {
-      id: 'tournament-1',
-      title: '서울 풋살 챔피언십',
-      status: tournamentStatusMock.value,
-      canRevertStart: tournamentStatusMock.canRevertStart,
-      sport: { code: 'futsal', name: '풋살' },
-      operationCounts: { registrations: 3, fixtures: 4, announcements: 1 },
-    },
-    isPending: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-  useV1AdminMe: () => ({ data: { capabilities: ['status:write'], adminRole: adminRoleMock.value } }),
-  useV1ChangeTournamentStatus: () => ({ mutate: statusMutate, isPending: false }),
-  useV1UpdateTournamentVisibility: () => ({ mutate: visibilityMutate, isPending: false, isError: false, isSuccess: false, error: null }),
-  useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
+  useV1AdminTournament: () => ({ data: h.tournament, isPending: false, isError: false, error: null, refetch: vi.fn() }),
+  useV1AdminMe: () => ({ data: { capabilities: ['status:write'], adminRole: h.adminRole } }),
+  useV1ChangeTournamentStatus: () => ({ mutate: h.statusMutate, isPending: h.statusPending }),
+  useV1UpdateTournamentVisibility: () => ({ mutate: h.visibilityMutate, isPending: h.visibilityPending }),
+  useV1TournamentStaffAssignments: () => h.staff,
 }));
 
-describe('TournamentAdminShell 섹션 내비', () => {
-  it('디렉터는 전용 관리 경로를 사용하고 플랫폼 전역 팝업 링크를 보지 않는다', () => {
-    render(<TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface><div>관리 내용</div></TournamentManagementContent>);
-    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/tournament-management');
-    expect(screen.getByRole('link', { name: /개요/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/overview');
-    expect(screen.getByRole('link', { name: /신청 관리/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/registrations');
-    expect(screen.queryByRole('link', { name: /팝업/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/operations');
-    expect(screen.getByRole('region', { name: '공개 설정' })).toBeInTheDocument();
-  });
-  it('징계 현황은 플랫폼 어드민 셸에만 있고 대회 스태프 셸·공개 샘플에는 없다', () => {
-    const { unmount } = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-    expect(screen.getByRole('link', { name: /징계 현황/ })).toHaveAttribute('href', '/admin/tournaments/tournament-1/discipline');
-    unmount();
+const FILLED = {
+  id: 'tournament-1',
+  title: '서울 풋살 챔피언십',
+  status: 'open',
+  canRevertStart: false,
+  isPublic: true,
+  venue: '서울 풋살장',
+  scheduledAt: '2026-12-20T09:00:00+09:00',
+  scheduledEndAt: null,
+  registrationDeadlineAt: '2026-12-17T23:59:00+09:00',
+  rosterDeadlineAt: '2026-12-18T23:59:00+09:00',
+  entryFee: 0,
+  bankAccount: null,
+  teamCount: 8,
+  sport: { code: 'futsal', name: '풋살' },
+  operationCounts: { registrations: 3, fixtures: 4, announcements: 1 },
+};
 
-    const staff = render(<TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface><div /></TournamentManagementContent>);
-    expect(screen.queryByRole('link', { name: /징계 현황/ })).not.toBeInTheDocument();
+const setTournament = (overrides: Record<string, unknown> = {}) => {
+  h.tournament = { ...FILLED, ...overrides };
+};
+
+const CHIP_NAME: Record<string, string> = {
+  draft: '초안',
+  open: '접수 중',
+  closed: '접수 마감',
+  in_progress: '진행 중',
+  completed: '완료',
+  cancelled: '취소됨',
+};
+
+let media: ReturnType<typeof installMatchMedia>;
+
+beforeEach(() => {
+  media = installMatchMedia(390);
+  h.adminRole = 'ops';
+  h.statusPending = false;
+  h.visibilityPending = false;
+  h.pathname = '/admin/tournaments/tournament-1/overview';
+  h.staff = { data: { items: [] }, isPending: false, isError: false, error: null };
+  h.statusMutate.mockReset();
+  h.visibilityMutate.mockReset();
+  setTournament();
+});
+
+afterEach(() => {
+  media.restore();
+  __resetOverlayHistoryForTests();
+});
+
+const renderPlatform = () =>
+  render(
+    <TournamentAdminShell id="tournament-1">
+      <div>섹션 본문</div>
+    </TournamentAdminShell>,
+  );
+
+const renderStaff = () =>
+  render(
+    <TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface>
+      <div>섹션 본문</div>
+    </TournamentManagementContent>,
+  );
+
+const SAMPLE_NAVIGATION = {
+  basePath: '/sample/tournaments/tournament-1',
+  listHref: '/sample',
+  operationsBasePath: '/sample/ops',
+  localPopups: true,
+};
+
+const renderSample = () =>
+  render(
+    <TournamentManagementContent id="tournament-1" role="SUPPORT_READONLY" navigation={SAMPLE_NAVIGATION}>
+      <div>섹션 본문</div>
+    </TournamentManagementContent>,
+  );
+
+function openChipMenu() {
+  const status = String(h.tournament.status);
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${CHIP_NAME[status]}`) }));
+  return screen.queryByRole('dialog', { name: '대회 상태' }) ?? screen.getByRole('menu', { name: '대회 상태' });
+}
+
+/** 폰은 시트(button·switch), 데스크톱은 팝오버(menuitem·menuitemcheckbox) 라서 둘 다 찾는다. */
+function menuAction(surface: HTMLElement, name: RegExp) {
+  return within(surface).queryByRole('menuitem', { name }) ?? within(surface).getByRole('button', { name });
+}
+
+function visibilitySwitch(surface: HTMLElement) {
+  const name = /참가자에게 공개/;
+  return within(surface).queryByRole('menuitemcheckbox', { name }) ?? within(surface).getByRole('switch', { name });
+}
+
+const queryMenuAction = (surface: HTMLElement, name: RegExp) =>
+  within(surface).queryByRole('menuitem', { name }) ?? within(surface).queryByRole('button', { name });
+
+const tabNav = () => screen.getByRole('navigation', { name: '대회 관리 섹션' });
+
+function openMore() {
+  fireEvent.click(within(tabNav()).getByRole('button', { name: /더보기/ }));
+  return screen.queryByRole('dialog', { name: '더보기' }) ?? screen.getByRole('menu', { name: '더보기' });
+}
+
+const moreLink = (surface: HTMLElement, name: RegExp) =>
+  within(surface).queryByRole('menuitem', { name }) ?? within(surface).queryByRole('link', { name });
+
+function openHeaderMore() {
+  fireEvent.click(screen.getByRole('button', { name: '대회 더 보기' }));
+  return screen.queryByRole('dialog', { name: '대회 더 보기' }) ?? screen.getByRole('menu', { name: '대회 더 보기' });
+}
+
+function apiError(message: string) {
+  return new V1ApiError({
+    status: 'error',
+    statusCode: 409,
+    code: 'TOURNAMENT_BANK_ACCOUNT_REQUIRED',
+    message,
+    details: undefined,
+    timestamp: '2026-11-27T00:00:00.000Z',
+  });
+}
+
+describe('머리', () => {
+  it('대회 목록으로 링크가 listHref(스태프 면은 /tournament-management)를 가리키고 대회명이 h1 이다', () => {
+    const platform = renderPlatform();
+    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/admin/tournaments');
+    expect(screen.getByRole('heading', { level: 1, name: '서울 풋살 챔피언십' })).toBeInTheDocument();
+    platform.unmount();
+
+    const staff = renderStaff();
+    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/tournament-management');
     staff.unmount();
 
-    render(
-      <TournamentManagementContent
-        id="tournament-1"
-        role="SUPPORT_READONLY"
-        navigation={{ basePath: '/sample/tournaments/tournament-1', listHref: '/sample', operationsBasePath: '/sample/ops', localPopups: true }}
-      >
-        <div />
-      </TournamentManagementContent>,
-    );
-    expect(screen.queryByRole('link', { name: /징계 현황/ })).not.toBeInTheDocument();
+    renderSample();
+    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/sample');
   });
 
-  it('팝업은 대회 하위 탭이 아니라 경로를 프리필한 전역 팝업 링크다', () => {
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+  it('meta 한 줄은 장소 · 일정 · 팀 수이고 비어 있으면 미정으로 말한다', () => {
+    const { unmount } = renderPlatform();
+    expect(screen.getByText(/^서울 풋살장 · 2026\. 12\. 20\./)).toHaveTextContent(/ · 8팀$/);
+    unmount();
 
-    const popupLink = screen.getByRole('link', { name: /팝업/ });
-    expect(popupLink).toHaveAttribute(
+    setTournament({ venue: null, scheduledAt: null });
+    renderPlatform();
+    expect(screen.getByText('장소 미정 · 일정 미정 · 8팀')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['draft', '접수 시작하기'],
+    ['open', '접수 마감하기'],
+    ['closed', '대회 시작하기'],
+    ['in_progress', '대회 완료하기'],
+  ])('%s 의 주 버튼은 「%s」 하나뿐이다', (status, label) => {
+    setTournament({ status });
+    renderPlatform();
+    expect(screen.getAllByRole('button', { name: label })).toHaveLength(1);
+  });
+
+  it.each(['completed', 'cancelled'])('%s 에는 주 버튼이 없다', (status) => {
+    setTournament({ status });
+    renderPlatform();
+    for (const label of ['접수 시작하기', '접수 마감하기', '대회 시작하기', '대회 완료하기']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+    }
+  });
+
+  it('공개 설정 카드·스태프 배정 콘솔·운영 보드 칩·되돌리기 버튼 줄이 없고, 같은 기능은 칩 메뉴·⋯ 메뉴에서 닿는다', () => {
+    setTournament({ status: 'completed' });
+    renderPlatform();
+
+    expect(screen.queryByRole('region', { name: '공개 설정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '스태프 배정 콘솔' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '운영 보드' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '진행 중으로 되돌리기' })).not.toBeInTheDocument();
+
+    const chipMenu = openChipMenu();
+    expect(visibilitySwitch(chipMenu)).toBeInTheDocument();
+    expect(menuAction(chipMenu, /진행 중으로 되돌리기/)).toBeInTheDocument();
+    fireEvent.click(within(chipMenu).getByRole('button', { name: '닫기' }));
+
+    const headerMenu = openHeaderMore();
+    expect(within(headerMenu).getByRole('link', { name: '스태프 배정' })).toHaveAttribute(
+      'href',
+      '/admin/live/tournament-1/staff',
+    );
+  });
+});
+
+describe('현장 운영 (머리 ↔ ⋯ 메뉴)', () => {
+  it('경기가 있으면 머리에 현장 운영 링크가 있고 ⋯ 안에는 스태프 배정만 있다', () => {
+    const platform = renderPlatform();
+    expect(screen.getByRole('link', { name: /현장 운영/ })).toHaveAttribute('href', '/admin/live/tournament-1/operations');
+    const menu = openHeaderMore();
+    expect(within(menu).getByRole('link', { name: '스태프 배정' })).toBeInTheDocument();
+    expect(within(menu).queryByRole('link', { name: '현장 운영' })).not.toBeInTheDocument();
+    platform.unmount();
+
+    renderStaff();
+    expect(screen.getByRole('link', { name: /현장 운영/ })).toHaveAttribute(
+      'href',
+      '/tournament-ops/tournaments/tournament-1/operations',
+    );
+  });
+
+  it('경기가 없으면 현장 운영이 머리에서 빠지고 ⋯ 메뉴 안에 있다(양방향)', () => {
+    setTournament({ operationCounts: { registrations: 3, fixtures: 0, announcements: 1 } });
+    renderPlatform();
+
+    expect(screen.queryByRole('link', { name: /현장 운영/ })).not.toBeInTheDocument();
+    const menu = openHeaderMore();
+    expect(within(menu).getByRole('link', { name: '현장 운영' })).toHaveAttribute('href', '/admin/live/tournament-1/operations');
+    expect(within(menu).getByRole('link', { name: '스태프 배정' })).toHaveAttribute('href', '/admin/live/tournament-1/staff');
+  });
+
+  it('스태프 배정 조회가 403 이면 현장 운영 항목이 비활성이고 사유 글자가 보인다', () => {
+    h.staff = {
+      isPending: false,
+      isError: true,
+      error: new V1ApiError({
+        status: 'error',
+        statusCode: 403,
+        code: 'STAFF_SCOPE_DENIED',
+        message: 'denied',
+        details: { reason: 'ASSIGNMENT_REQUIRED' },
+        timestamp: '2026-11-27T00:00:00.000Z',
+      }),
+    };
+    const reason = tournamentOpsAccessDeniedLabel('ASSIGNMENT_REQUIRED');
+
+    const withFixtures = renderPlatform();
+    expect(screen.queryByRole('link', { name: /현장 운영/ })).not.toBeInTheDocument();
+    const header = screen.getByRole('button', { name: /현장 운영/ });
+    expect(header).toBeDisabled();
+    expect(header).toHaveTextContent(reason);
+    withFixtures.unmount();
+
+    setTournament({ operationCounts: { registrations: 3, fixtures: 0, announcements: 1 } });
+    renderPlatform();
+    const menu = openHeaderMore();
+    const item = within(menu).getByRole('button', { name: /현장 운영/ });
+    expect(item).toBeDisabled();
+    expect(item).toHaveTextContent(reason);
+  });
+});
+
+describe('탭', () => {
+  it('탭은 개요·신청·대진·공지·대회 정보 + 더보기이고 링크는 대회 경로를 가리킨다', () => {
+    renderPlatform();
+
+    const nav = tabNav();
+    const hrefOf = (name: string) => within(nav).getByRole('link', { name }).getAttribute('href');
+    expect(hrefOf('개요')).toBe('/admin/tournaments/tournament-1/overview');
+    expect(hrefOf('신청 3')).toBe('/admin/tournaments/tournament-1/registrations');
+    expect(hrefOf('대진 4')).toBe('/admin/tournaments/tournament-1/bracket');
+    expect(hrefOf('공지 1')).toBe('/admin/tournaments/tournament-1/announcements');
+    expect(hrefOf('대회 정보')).toBe('/admin/tournaments/tournament-1/info');
+    expect(within(nav).getByRole('link', { name: '개요' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('button', { name: /더보기/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: '시상' })).not.toBeInTheDocument();
+  });
+
+  it('진행 중은 시상·리뷰 관리·통계가 탭이고 대회 정보는 더보기에 있다', () => {
+    setTournament({ status: 'in_progress' });
+    renderPlatform();
+
+    const nav = tabNav();
+    for (const name of ['시상', '리뷰 관리', '통계']) {
+      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
+    }
+    expect(within(nav).queryByRole('link', { name: '대회 정보' })).not.toBeInTheDocument();
+    expect(moreLink(openMore(), /대회 정보/)).toHaveAttribute('href', '/admin/tournaments/tournament-1/info');
+  });
+
+  it('플랫폼 어드민 더보기에는 팝업(전역 팝업 링크)·징계 현황이 있다', () => {
+    renderPlatform();
+    const more = openMore();
+
+    expect(moreLink(more, /팝업/)).toHaveAttribute(
       'href',
       `/admin/content?tab=popups&targetPath=${encodeURIComponent('/tournaments/tournament-1')}`,
     );
-    // 대회 하위 팝업 라우트는 더 이상 존재하지 않는다.
-    expect(popupLink.getAttribute('href')).not.toContain('/admin/tournaments/tournament-1/popups');
+    expect(moreLink(more, /징계 현황/)).toHaveAttribute('href', '/admin/tournaments/tournament-1/discipline');
+    expect(moreLink(more, /협찬/)).toHaveAttribute('href', '/admin/tournaments/tournament-1/sponsors');
   });
 
-  it("'개요'가 운영 그룹의 첫 항목이다 — 기본 랜딩이 여기다", () => {
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-
-    const group = screen.getByRole('group', { name: '운영' });
-    const labels = within(group).getAllByRole('link').map((link) => link.textContent?.trim());
-    expect(labels[0]).toBe('개요');
-    expect(within(group).getByRole('link', { name: /개요/ })).toHaveAttribute(
+  it('스태프 면 더보기에는 팝업·징계 현황이 없고 스태프 경로를 쓴다', () => {
+    renderStaff();
+    expect(within(tabNav()).getByRole('link', { name: '개요' })).toHaveAttribute(
       'href',
-      '/admin/tournaments/tournament-1/overview',
+      '/tournament-management/tournaments/tournament-1/overview',
     );
+    const more = openMore();
+
+    expect(moreLink(more, /팝업/)).toBeNull();
+    expect(moreLink(more, /징계 현황/)).toBeNull();
+    expect(moreLink(more, /협찬/)).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/sponsors');
   });
 
-  it('조회 전용 관리자에게는 상태 변경 버튼을 열지 않는다', () => {
-    // canWrite 를 capabilities 에서 역할 파생으로 옮겼다 — 옮긴 뒤에도 support 는
-    // 상태를 못 바꿔야 한다(서버가 막더라도 화면이 눌리는 것처럼 보이면 결함이다).
-    adminRoleMock.value = 'support';
-    const readOnly = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-    expect(screen.queryByRole('button', { name: '대회 완료하기' })).not.toBeInTheDocument();
-    readOnly.unmount();
+  it('공개 샘플(navigation)은 징계가 없고 팝업이 샘플 경로 슬러그다', () => {
+    renderSample();
+    const more = openMore();
 
-    adminRoleMock.value = 'ops';
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-    expect(screen.getByRole('button', { name: '대회 완료하기' })).toBeInTheDocument();
+    expect(moreLink(more, /징계 현황/)).toBeNull();
+    expect(moreLink(more, /팝업/)).toHaveAttribute('href', '/sample/tournaments/tournament-1/popups');
   });
 
-  it('대회 완료는 확인 창을 거쳐야 실행된다 — 모바일 오탭 방지(2026-10 알파 실측)', async () => {
-    adminRoleMock.value = 'ops';
-    statusMutate.mockClear();
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+  it('앱바가 없는 면(스태프·공개 샘플)에서는 탭 줄 조상이 고정 오프셋을 내려 주지 않아 0 으로 맨 위에 붙는다', () => {
+    const declaredAbove = () => {
+      const declared: string[] = [];
+      for (let node = tabNav().parentElement; node; node = node.parentElement) {
+        if (node.className.includes('--admin-sticky-top') || node.getAttribute('style')?.includes('--admin-sticky-top')) {
+          declared.push(node.className);
+        }
+      }
+      return declared;
+    };
+
+    const staff = renderStaff();
+    expect(tabNav().className).toContain('top-[var(--admin-sticky-top,0px)]');
+    expect(declaredAbove()).toEqual([]);
+    staff.unmount();
+
+    renderSample();
+    expect(declaredAbove()).toEqual([]);
+  });
+
+  it('operationCounts 가 없어도 탭이 깨지지 않는다', () => {
+    setTournament({ operationCounts: undefined });
+    renderPlatform();
+
+    const nav = tabNav();
+    expect(within(nav).getByRole('link', { name: '신청' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: '대진' })).toBeInTheDocument();
+    expect(nav).not.toHaveTextContent(/undefined|NaN/);
+    // 경기가 없다고 보므로 현장 운영은 머리가 아니라 ⋯ 안에 있다.
+    expect(screen.queryByRole('link', { name: /현장 운영/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('권한', () => {
+  it('조회 전용 관리자는 주 버튼·상태 바꾸기·대회 취소가 없고 공개 스위치는 비활성이다', () => {
+    h.adminRole = 'support';
+    renderPlatform();
+
+    expect(screen.queryByRole('button', { name: '접수 마감하기' })).not.toBeInTheDocument();
+    const menu = openChipMenu();
+    expect(queryMenuAction(menu, /접수 마감하기/)).toBeNull();
+    expect(queryMenuAction(menu, /대회 취소하기/)).toBeNull();
+    const toggle = visibilitySwitch(menu);
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('조회 전용 관리자에게는 완료 대회의 되돌리기 항목이 없다', () => {
+    h.adminRole = 'support';
+    setTournament({ status: 'completed' });
+    renderPlatform();
+    expect(queryMenuAction(openChipMenu(), /되돌리기/)).toBeNull();
+  });
+
+  it('조회 전용 관리자는 취소된 대회에서 복구할 수 없고 칩은 상태만 보인다', () => {
+    h.adminRole = 'support';
+    setTournament({ status: 'cancelled' });
+    renderPlatform();
+    expect(screen.queryByRole('button', { name: /취소됨/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /초안으로 복구/ })).not.toBeInTheDocument();
+    expect(screen.getByText('취소됨')).toBeInTheDocument();
+  });
+
+  it('첫 경기 시작 전이어도 조회 전용 관리자는 접수 마감 복귀 항목이 없다', () => {
+    h.adminRole = 'support';
+    setTournament({ status: 'in_progress', canRevertStart: true });
+    renderPlatform();
+    expect(queryMenuAction(openChipMenu(), /접수 마감으로 되돌리기/)).toBeNull();
+  });
+});
+
+describe('상태 확인 창', () => {
+  const FORWARD: [string, string, string, string][] = [
+    ['draft', '접수 시작하기', '접수를 시작할까요?', 'open'],
+    ['open', '접수 마감하기', '접수를 마감할까요?', 'closed'],
+    ['closed', '대회 시작하기', '대회를 시작할까요?', 'in_progress'],
+    ['in_progress', '대회 완료하기', '대회를 완료할까요?', 'completed'],
+  ];
+
+  it.each(FORWARD)('%s 에서 「%s」 는 확인 창을 거쳐야 실행된다', async (status, button, title, target) => {
+    setTournament({ status });
+    renderPlatform();
+
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(title)).toBeInTheDocument();
+    expect(h.statusMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: button }));
+    await vi.waitFor(() => expect(h.statusMutate).toHaveBeenCalledTimes(1));
+    expect(h.statusMutate).toHaveBeenCalledWith({ status: target }, expect.anything());
+  });
+
+  it('접수 다시 열기는 칩 메뉴에서 확인 창을 거쳐 open 으로 보낸다', async () => {
+    setTournament({ status: 'closed' });
+    renderPlatform();
+
+    fireEvent.click(menuAction(openChipMenu(), /접수 다시 열기/));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('접수를 다시 열까요?')).toBeInTheDocument();
+    expect(h.statusMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '접수 다시 열기' }));
+    await vi.waitFor(() => expect(h.statusMutate).toHaveBeenCalledWith({ status: 'open' }, expect.anything()));
+  });
+
+  it('확인 창에서 취소하면 상태 변경을 요청하지 않는다', async () => {
+    setTournament({ status: 'in_progress' });
+    renderPlatform();
 
     fireEvent.click(screen.getByRole('button', { name: '대회 완료하기' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('대회를 완료할까요?')).toBeInTheDocument();
-    expect(statusMutate).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
 
-    fireEvent.click(within(dialog).getByRole('button', { name: '대회 완료하기' }));
-    await vi.waitFor(() => expect(statusMutate).toHaveBeenCalledWith({ status: 'completed' }, expect.anything()));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(h.statusMutate).not.toHaveBeenCalled();
   });
 
+  it('필요 항목(장소·정산 계좌)이 남아도 접수 시작을 막지 않고 확인 창에 항목을 경고한다', async () => {
+    setTournament({ status: 'draft', venue: null, entryFee: 30000, bankAccount: null });
+    renderPlatform();
+
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/장소, 정산 계좌/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작하기' }));
+    await vi.waitFor(() => expect(h.statusMutate).toHaveBeenCalledWith({ status: 'open' }, expect.anything()));
+  });
+
+  it('필요 항목이 없으면 경고 문장이 없다', async () => {
+    setTournament({ status: 'draft' });
+    renderPlatform();
+
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/참가자에게 대회가 공개돼요/)).toBeInTheDocument();
+    expect(dialog).not.toHaveTextContent('아직 채우지 않은 설정');
+  });
+
+  it('초안에서 필요 항목이 남으면 접수 시작하기가 outline, 0 이면 primary 버튼이다', () => {
+    setTournament({ status: 'draft', venue: null });
+    const remaining = renderPlatform();
+    expect(screen.getByRole('button', { name: '접수 시작하기' }).className).toContain('tm-btn-outline');
+    remaining.unmount();
+
+    setTournament({ status: 'draft' });
+    renderPlatform();
+    expect(screen.getByRole('button', { name: '접수 시작하기' }).className).toContain('tm-btn-primary');
+  });
+
+  it('초안이 아닌 상태의 주 버튼은 필요 항목이 남아도 항상 primary 다', () => {
+    setTournament({ status: 'open', venue: null });
+    renderPlatform();
+    expect(screen.getByRole('button', { name: '접수 마감하기' }).className).toContain('tm-btn-primary');
+  });
+
+  it('접수 시작을 확인한 뒤 서버가 거절하면 서버 메시지를 토스트로 보이고 상태 표시는 그대로다', async () => {
+    setTournament({ status: 'draft', entryFee: 30000, bankAccount: null });
+    renderPlatform();
+
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작하기' }));
+    await vi.waitFor(() => expect(h.statusMutate).toHaveBeenCalledTimes(1));
+
+    act(() => h.statusMutate.mock.calls[0][1].onError(apiError('참가비를 받는 대회는 정산 계좌가 있어야 접수를 시작할 수 있어요.')));
+
+    expect(await screen.findByText('참가비를 받는 대회는 정산 계좌가 있어야 접수를 시작할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초안 · 공개' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '접수 시작하기' })).toBeEnabled();
+  });
+
+  it('성공하면 상태를 변경했어요 토스트를 보인다', async () => {
+    setTournament({ status: 'open' });
+    renderPlatform();
+
+    fireEvent.click(screen.getByRole('button', { name: '접수 마감하기' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '접수 마감하기' }));
+    await vi.waitFor(() => expect(h.statusMutate).toHaveBeenCalledTimes(1));
+
+    act(() => h.statusMutate.mock.calls[0][1].onSuccess({ alreadyInStatus: false }));
+    expect(await screen.findByText('상태를 변경했어요.')).toBeInTheDocument();
+  });
+});
+
+describe('공개 스위치', () => {
+  it('공개 스위치를 누르면 isPublic=false 로 저장하고 성공·실패가 토스트로 나온다', async () => {
+    renderPlatform();
+
+    fireEvent.click(visibilitySwitch(openChipMenu()));
+    expect(h.visibilityMutate).toHaveBeenCalledTimes(1);
+    expect(h.visibilityMutate).toHaveBeenCalledWith({ isPublic: false }, expect.anything());
+    // 메뉴는 항목을 고르면 닫힌다.
+    expect(screen.queryByRole('dialog', { name: '대회 상태' })).not.toBeInTheDocument();
+
+    const callbacks = h.visibilityMutate.mock.calls[0][1];
+    act(() => callbacks.onSuccess());
+    expect(await screen.findByText('공개 상태를 저장했어요.')).toBeInTheDocument();
+
+    act(() => callbacks.onError(Object.assign(new Error('x'), { response: { data: { message: '공개 상태를 저장하지 못했어요.' } } })));
+    expect(await screen.findByText('공개 상태를 저장하지 못했어요.')).toBeInTheDocument();
+  });
+
+  it('비공개 대회는 칩이 비공개를 말하고 스위치를 누르면 isPublic=true 로 저장한다', () => {
+    setTournament({ isPublic: false });
+    renderPlatform();
+
+    const menu = openChipMenu();
+    expect(visibilitySwitch(menu)).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(visibilitySwitch(menu));
+    expect(h.visibilityMutate).toHaveBeenCalledWith({ isPublic: true }, expect.anything());
+  });
+});
+
+describe('취소·되돌리기 사유 창', () => {
   it.each(['draft', 'open', 'closed', 'in_progress'])('%s 대회 취소는 공백 사유를 막고 trim한 사유를 보낸다', async (status) => {
-    adminRoleMock.value = 'ops';
-    tournamentStatusMock.value = status;
-    statusMutate.mockReset();
-    try {
-      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-      fireEvent.click(screen.getByRole('button', { name: '취소하기' }));
-      const dialog = await screen.findByRole('alertdialog');
-      const submit = within(dialog).getByRole('button', { name: '대회 취소하기' });
-      const reason = within(dialog).getByRole('textbox', { name: /사유/ });
-      expect(submit).toBeDisabled();
-      fireEvent.change(reason, { target: { value: ' \n\t ' } });
-      fireEvent.click(submit);
-      expect(statusMutate).not.toHaveBeenCalled();
-      expect(reason).toHaveAttribute('maxLength', '500');
-      fireEvent.change(reason, { target: { value: ' 폭우로 안전 확보 불가 ' } });
-      fireEvent.click(submit);
-      expect(statusMutate).toHaveBeenCalledWith({ status: 'cancelled', reason: '폭우로 안전 확보 불가' }, expect.anything());
-      const callbacks = statusMutate.mock.calls[0][1];
-      act(() => callbacks.onError(new Error('일시적인 오류')));
-      expect(reason).toHaveValue(' 폭우로 안전 확보 불가 ');
-      expect(dialog).toBeInTheDocument();
-      fireEvent.click(within(dialog).getByRole('button', { name: '돌아가기' }));
-      expect(statusMutate).toHaveBeenCalledTimes(1);
-    } finally {
-      tournamentStatusMock.value = 'in_progress';
-      statusMutate.mockReset();
-    }
+    setTournament({ status });
+    renderPlatform();
+
+    fireEvent.click(menuAction(openChipMenu(), /대회 취소하기/));
+    const dialog = await screen.findByRole('alertdialog');
+    const submit = within(dialog).getByRole('button', { name: '대회 취소하기' });
+    const reason = within(dialog).getByRole('textbox', { name: /사유/ });
+    expect(submit).toBeDisabled();
+    fireEvent.change(reason, { target: { value: ' \n\t ' } });
+    fireEvent.click(submit);
+    expect(h.statusMutate).not.toHaveBeenCalled();
+    expect(reason).toHaveAttribute('maxLength', '500');
+    fireEvent.change(reason, { target: { value: ' 폭우로 안전 확보 불가 ' } });
+    fireEvent.click(submit);
+    expect(h.statusMutate).toHaveBeenCalledWith({ status: 'cancelled', reason: '폭우로 안전 확보 불가' }, expect.anything());
+    act(() => h.statusMutate.mock.calls[0][1].onError(new Error('일시적인 오류')));
+    expect(reason).toHaveValue(' 폭우로 안전 확보 불가 ');
+    expect(dialog).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '돌아가기' }));
+    expect(h.statusMutate).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ['completed', '진행 중으로 되돌리기', 'in_progress', '되돌리기'],
     ['cancelled', '초안으로 복구', 'draft', '복구하기'],
-  ])('%s 대회는 사유를 받아 %s 로 되돌린다', async (status, buttonName, target, confirmName) => {
-    adminRoleMock.value = 'ops';
-    tournamentStatusMock.value = status;
-    statusMutate.mockClear();
-    try {
-      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+  ])('%s 대회는 사유를 받아 %s 로 되돌린다', async (status, label, target, confirmName) => {
+    setTournament({ status });
+    renderPlatform();
 
-      fireEvent.click(screen.getByRole('button', { name: buttonName }));
-      const dialog = await screen.findByRole('alertdialog');
-      const confirm = within(dialog).getByRole('button', { name: confirmName });
-      expect(confirm).toBeDisabled();
-      expect(statusMutate).not.toHaveBeenCalled();
+    fireEvent.click(menuAction(openChipMenu(), new RegExp(label)));
+    const dialog = await screen.findByRole('alertdialog');
+    const confirm = within(dialog).getByRole('button', { name: confirmName });
+    expect(confirm).toBeDisabled();
+    expect(h.statusMutate).not.toHaveBeenCalled();
 
-      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 잘못 눌렀어요 ' } });
-      fireEvent.click(confirm);
-      expect(statusMutate).toHaveBeenCalledWith({ status: target, reason: '잘못 눌렀어요' }, expect.anything());
-    } finally {
-      tournamentStatusMock.value = 'in_progress';
-    }
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 잘못 눌렀어요 ' } });
+    fireEvent.click(confirm);
+    expect(h.statusMutate).toHaveBeenCalledWith({ status: target, reason: '잘못 눌렀어요' }, expect.anything());
   });
 
   it('첫 경기 시작 전에는 사유를 받아 접수 마감으로 되돌린다', async () => {
-    adminRoleMock.value = 'ops';
-    tournamentStatusMock.value = 'in_progress';
-    tournamentStatusMock.canRevertStart = true;
-    statusMutate.mockClear();
-    try {
-      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-      fireEvent.click(screen.getByRole('button', { name: '접수 마감으로 되돌리기' }));
-      const dialog = await screen.findByRole('alertdialog');
-      expect(within(dialog).getByText(/시작한 경기가 없을 때만/)).toBeInTheDocument();
-      const confirm = within(dialog).getByRole('button', { name: '되돌리기' });
-      expect(confirm).toBeDisabled();
-      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 대회 시작을 잘못 눌렀어요 ' } });
-      fireEvent.click(confirm);
-      expect(statusMutate).toHaveBeenCalledWith({ status: 'closed', reason: '대회 시작을 잘못 눌렀어요' }, expect.anything());
-    } finally {
-      tournamentStatusMock.canRevertStart = false;
-    }
+    setTournament({ status: 'in_progress', canRevertStart: true });
+    renderPlatform();
+
+    fireEvent.click(menuAction(openChipMenu(), /접수 마감으로 되돌리기/));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/시작한 경기가 없을 때만/)).toBeInTheDocument();
+    const confirm = within(dialog).getByRole('button', { name: '되돌리기' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 대회 시작을 잘못 눌렀어요 ' } });
+    fireEvent.click(confirm);
+    expect(h.statusMutate).toHaveBeenCalledWith({ status: 'closed', reason: '대회 시작을 잘못 눌렀어요' }, expect.anything());
   });
 
-  it('첫 경기 시작 전이어도 조회 전용 관리자는 접수 마감 복귀 액션을 못 쓴다', () => {
-    adminRoleMock.value = 'support';
-    tournamentStatusMock.canRevertStart = true;
-    try {
-      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-      expect(screen.queryByRole('button', { name: '접수 마감으로 되돌리기' })).not.toBeInTheDocument();
-    } finally {
-      adminRoleMock.value = 'ops';
-      tournamentStatusMock.canRevertStart = false;
-    }
+  it('진행 중 대회는 시작 전이 아니면 접수 마감 되돌리기 항목이 없다', () => {
+    setTournament({ status: 'in_progress', canRevertStart: false });
+    renderPlatform();
+    expect(queryMenuAction(openChipMenu(), /되돌리기/)).toBeNull();
   });
 
-  it('진행 중 대회에는 되돌리기 버튼이 없고, 조회 전용 관리자에게는 완료 대회에서도 없다', () => {
-    adminRoleMock.value = 'ops';
-    const { unmount } = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-    expect(screen.queryByRole('button', { name: /되돌리기|초안으로 복구/ })).not.toBeInTheDocument();
-    unmount();
+  it.each([
+    ['폰', 390],
+    ['데스크톱', 1440],
+  ])('메뉴 항목을 고르면 메뉴가 닫힌 뒤 사유 창이 열린다 — %s', async (_name, width) => {
+    media.setWidth(width);
+    renderPlatform();
 
-    adminRoleMock.value = 'support';
-    tournamentStatusMock.value = 'completed';
-    try {
-      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-      expect(screen.queryByRole('button', { name: '진행 중으로 되돌리기' })).not.toBeInTheDocument();
-    } finally {
-      tournamentStatusMock.value = 'in_progress';
-      adminRoleMock.value = 'ops';
-    }
-  });
+    fireEvent.click(menuAction(openChipMenu(), /대회 취소하기/));
 
-  it('대회 하위 섹션은 그대로 대회 경로를 가리킨다', () => {
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
-
-    expect(screen.getByRole('link', { name: /신청 관리/ })).toHaveAttribute(
-      'href',
-      '/admin/tournaments/tournament-1/registrations',
-    );
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '대회 상태' })).not.toBeInTheDocument();
   });
 });
 
-describe('TournamentAdminShell 공개 설정', () => {
-  it('공개 대회는 "비공개로 전환"을 보여 주고, 누르면 isPublic=false 로 저장한다', () => {
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+describe('데스크톱 폭', () => {
+  it('상태 칩 메뉴가 팝오버로 열리고 항목을 고르면 같은 확인 창을 띄운다', async () => {
+    media.setWidth(1440);
+    setTournament({ status: 'closed' });
+    renderPlatform();
 
-    const section = screen.getByRole('region', { name: '공개 설정' });
-    expect(section).toHaveTextContent('현재 상태: 공개');
-    fireEvent.click(within(section).getByRole('button', { name: '비공개로 전환' }));
-    expect(visibilityMutate).toHaveBeenCalledWith({ isPublic: false });
+    const menu = openChipMenu();
+    expect(menu).toHaveAttribute('role', 'menu');
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /대회 시작하기/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('대회를 시작할까요?')).toBeInTheDocument();
   });
 });

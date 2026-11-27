@@ -19,7 +19,7 @@ async function runFlow(page) {
   await page.getByRole('dialog').getByLabel(/^대회명/).fill('파트너컵 운영 체험');
   await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
   await page.getByRole('heading', { name: '파트너컵 운영 체험', exact: true }).waitFor();
-  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^신청 관리/ }).click();
+  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^신청/ }).click();
   for (const name of ['블루 FC', '오렌지 FS', '그린 FC', '화이트 FS']) {
     const team = page.getByText(name, { exact: true });
     const card = team.locator('xpath=ancestor::li[1]');
@@ -27,7 +27,7 @@ async function runFlow(page) {
     await page.getByRole('dialog').getByRole('button', { name: '확정', exact: true }).click();
     await card.getByRole('button', { name: '확정', exact: true }).waitFor({ state: 'detached' });
   }
-  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^대진 관리/ }).click();
+  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^대진/ }).click();
   await page.getByRole('button', { name: '템플릿으로 시작', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: '다음', exact: true }).click();
@@ -39,7 +39,7 @@ async function runFlow(page) {
   await dialog.getByRole('button', { name: '이 설정으로 대진 만들기', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 관리 3' }).waitFor();
+  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 3' }).waitFor();
   await page.getByRole('button', { name: /1번 경기 열기$/ }).click();
   const panel = page.getByRole('complementary', { name: '칸 상세' });
   const scores = panel.getByLabel(/ 점수$/);
@@ -77,7 +77,7 @@ async function runFlow(page) {
     report.deployedCommit = initial.headers()['x-teameet-commit'] ?? null;
     if (process.env.QA_EXPECTED_COMMIT) assert.equal(report.deployedCommit, process.env.QA_EXPECTED_COMMIT, 'Unexpected deployed commit');
     if (mode === 'after') {
-      assert.equal(await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link').count(), 11);
+      assert.equal(await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link').count(), 5);
       await runFlow(page);
     }
     for (const width of [1440, 768, 390]) {
@@ -103,7 +103,7 @@ async function runFlow(page) {
       await page.getByRole('button', { name: '체험 초기화', exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: '체험 초기화', exact: true }).click();
       await page.getByRole('heading', { name: 'Teameet 파트너컵 · 샘플', exact: true }).waitFor();
-      await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 관리 0', exact: true }).waitFor();
+      await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진', exact: true }).waitFor();
       report.verdicts.push({ flow: 'healthy sample reset restores default title and empty bracket', verdict: 'PASS' });
       await page.evaluate(() => {
         sessionStorage.setItem('qa-pr2168-unrelated', 'preserve');

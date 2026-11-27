@@ -812,9 +812,7 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
-    // 팀 파울 기준 입력칸은 이 단계(상금·홍보)에 있다. 검증을 칸이 없는 앞 단계에 두면, 잘못된 값이 남은 채
-    // 마지막에 `대회 만들기`를 눌렀을 때 오류가 없는 단계로 돌려보내져 이유를 알 수 없고 `다음`도 조용히 막힌다
-    // (alpha 실측, 2026-11-27). 칸과 같은 단계에서 막아야 그 자리에서 오류를 보고 고칠 수 있다.
+    // 입력 칸이 있는 단계(PresentationStep)에서 검사한다 — 제출은 첫 오류 단계로 이동하므로 다른 단계에 두면 오류가 안 보인다.
     if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
       errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
     }

@@ -112,9 +112,9 @@ const AWAY_PARTICIPANT_ID = '22222222-2222-4c3a-9c1e-2222701eb3';
 function baseProps() {
   return {
     open: true,
-    title: '결과를 정정할까요?',
+    title: '결과를 고칠까요?',
     message: '메시지',
-    confirmLabel: '정정 제출',
+    confirmLabel: '고친 결과로 확정',
     base: {
       score: SCORE,
       goalEvents: goalsMatching(SCORE),
@@ -146,7 +146,7 @@ describe('card timeline correction', () => {
     fireEvent.change(screen.getByLabelText('1번째 카드 선수'), { target: { value: AWAY_PARTICIPANT_ID } });
     fireEvent.click(screen.getByRole('button', { name: '2번째 카드 삭제' }));
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '카드 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     const submitted = props.onConfirm.mock.calls[0][0].actualParticipants;
     expect(submitted[0].cards).toEqual({ yellow: 0, red: 0, events: [] });
     expect(submitted[1].cards).toMatchObject({ yellow: 0, red: 1,
@@ -158,7 +158,7 @@ describe('card timeline correction', () => {
     fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '0' } });
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '누락 카드 추가' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     expect(props.onConfirm.mock.calls[0][0].actualParticipants[0].cards).toMatchObject({
       yellow: 1, red: 0, events: [{ minute: 0, card: 'YELLOW' }],
     });
@@ -260,7 +260,7 @@ describe('ResultEditModal — 출전자 빼기·추가(어드민이 누가 뛰�
     expect(options).toEqual(['선수 선택', '원정 · #7 강아라']);
 
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '출전 명단 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     const submitted = onConfirm.mock.calls[0][0].actualParticipants as Array<{ participantId: string; goals: number; started: boolean }>;
     expect(submitted.map((participant) => participant.participantId)).toEqual([HOME_PARTICIPANT_ID, THIRD_ID]);
     expect(submitted[1]).toMatchObject({ goals: 0, started: true, cards: { yellow: 0, red: 0 } });

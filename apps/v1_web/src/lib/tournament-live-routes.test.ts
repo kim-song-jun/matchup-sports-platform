@@ -10,6 +10,7 @@ import {
   adminLiveBase,
   fixtureIdFromConsolePath,
   isAdminLiveConsolePath,
+  legacyResultsRedirectHref,
   resultsHref,
   resolveTournamentLiveBase,
   staffLiveBase,
@@ -96,5 +97,19 @@ describe('resultsHref', () => {
     expect(resultsHref('/admin/live/t-1')).toBe('/admin/live/t-1/results');
     expect(resultsHref('/admin/live/t-1', 'f7')).toBe('/admin/live/t-1/results?fixtureId=f7');
     expect(resultsHref('/tournament-ops/tournaments/t-1', 'a b&c')).toBe('/tournament-ops/tournaments/t-1/results?fixtureId=a%20b%26c');
+  });
+});
+
+describe('legacyResultsRedirectHref', () => {
+  it('받은 쿼리를 하나도 잃지 않고 결과 화면 주소에 싣는다', () => {
+    expect(legacyResultsRedirectHref('/admin/live/t-1', { fixtureId: 'f1', from: 'admin' })).toBe('/admin/live/t-1/results?fixtureId=f1&from=admin');
+  });
+
+  it('쿼리가 없으면 물음표도 없다', () => {
+    expect(legacyResultsRedirectHref('/tournament-ops/tournaments/t-1', {})).toBe('/tournament-ops/tournaments/t-1/results');
+  });
+
+  it('같은 키가 여러 번 오면 모두 남기고, 비어 있는 값은 건너뛴다', () => {
+    expect(legacyResultsRedirectHref('/admin/live/t-1', { from: ['a', 'b'], skip: undefined, q: 'x y' })).toBe('/admin/live/t-1/results?from=a&from=b&q=x+y');
   });
 });

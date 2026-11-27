@@ -21,7 +21,7 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   // contract 가 새로 만든 409 다(`officializeResultRevision` STANDARD 흐름의 공식 탈취 가드).
   // 매핑이 없으면 서버 원문(영문)이 그대로 화면에 뜬다.
   RESULT_ALREADY_OFFICIAL:
-    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 결과 정정으로 해주세요.',
+    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 「결과 고치기」로 해주세요.',
   RESULT_REVISION_NOT_FOUND: '결과 정보를 찾을 수 없어요. 화면을 새로고침해 주세요.',
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',
@@ -62,8 +62,8 @@ export function isDirectorOfficializeDisabledError(err: unknown): boolean {
 }
 
 export const REVISION_STATE_LABELS: Record<GameResultRevisionState, string> = {
-  DRAFT: '작성 중(정정 초안)',
-  SUBMITTED: '제출됨 · 검토 대기',
+  DRAFT: '작성 중(고친 결과)',
+  SUBMITTED: '제출됨 · 확정 대기',
   CHANGE_REQUESTED: '수정 요청됨',
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',

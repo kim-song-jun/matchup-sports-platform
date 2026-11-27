@@ -32,6 +32,17 @@ export function resultsHref(base: string, fixtureId?: string): string {
   return fixtureId === undefined ? `${base}/results` : `${base}/results?fixtureId=${encodeURIComponent(fixtureId)}`;
 }
 
+/** 옛 결과 검토·결과 정정 주소를 결과 화면으로 보낼 목적지. 받은 쿼리(`fixtureId`·`from` 등)는 그대로 싣는다. */
+export function legacyResultsRedirectHref(base: string, searchParams: Readonly<Record<string, string | string[] | undefined>>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value === undefined) continue;
+    for (const entry of Array.isArray(value) ? value : [value]) query.append(key, entry);
+  }
+  const text = query.toString();
+  return text === '' ? `${base}/results` : `${base}/results?${text}`;
+}
+
 /** 지금 pathname 이 속한 표면의 base. 어느 쪽도 아니면 스태프 표면으로 본다(기존 동작). */
 export function resolveTournamentLiveBase(pathname: string | null, tournamentId: string): string {
   if (pathname !== null && pathname.startsWith('/admin/')) return adminLiveBase(tournamentId);

@@ -76,6 +76,15 @@ export function BoardCardStateBadge({ state }: { state: BoardCardState }) {
   return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
 }
 
+/** 결과 화면 목록 줄의 배지. 보드 카드의 「결과 확정 대기·결과 확정됨」과 같은 색·아이콘이다. */
+export function ResultListBadge({ confirmed }: { confirmed: boolean }) {
+  return confirmed ? (
+    <Pill tone="green" icon={<CheckCircle2 size={12} aria-hidden="true" />} label="확정됨" />
+  ) : (
+    <Pill tone="amber" icon={<Hourglass size={12} aria-hidden="true" />} label="확정 대기" />
+  );
+}
+
 const PUBLIC_FIXTURE_STATE: Readonly<Record<string, V1GameState>> = {
   scheduled: 'SCHEDULED',
   in_progress: 'LIVE',

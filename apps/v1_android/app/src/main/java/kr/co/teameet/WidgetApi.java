@@ -20,6 +20,8 @@ final class WidgetApi {
     }
 
     private static final int TIMEOUT_MS = 10_000;
+    /** 마크는 없어도 위젯이 그려지니 짧게 — 위젯 갱신은 리시버 제한 시간 안에 끝나야 한다. */
+    private static final int LOGO_TIMEOUT_MS = 4_000;
     private static final int MAX_LOGO_BYTES = 512 * 1024;
 
     private WidgetApi() {}
@@ -58,8 +60,11 @@ final class WidgetApi {
         }
     }
 
-    /** 참석·불참을 저장한다. 성공하면 true, 마감·정원 같은 서버 거절은 false. */
-    static boolean respond(String token, String scheduleId, String status) throws IOException {
+    /**
+     * 참석·불참을 저장하고 서버가 실제로 저장한 상태를 돌려준다(정원이 차면 GOING 요청이 WAITLISTED 로 저장된다).
+     * 마감 같은 서버 거절은 null.
+     */
+    static String respond(String token, String scheduleId, String status) throws IOException {
         HttpURLConnection c = open("PUT", "/api/v1/widget/schedules/" + java.net.URLEncoder.encode(scheduleId, "UTF-8") + "/attendance");
         try {
             c.setRequestProperty("Authorization", "Bearer " + token);
@@ -70,9 +75,22 @@ final class WidgetApi {
             }
             int code = c.getResponseCode();
             if (code == 401) throw new Unauthorized();
-            return code >= 200 && code < 300;
+            if (code < 200 || code >= 300) return null;
+            return savedStatus(readBody(c), status);
         } finally {
             c.disconnect();
+        }
+    }
+
+    /** 응답 본문의 `status`. 읽을 수 없으면 요청한 상태를 그대로 쓴다. */
+    static String savedStatus(String body, String requested) {
+        try {
+            JSONObject root = new JSONObject(body);
+            JSONObject data = root.optJSONObject("data");
+            String saved = (data != null ? data : root).optString("status", "");
+            return saved.isEmpty() ? requested : saved;
+        } catch (JSONException e) {
+            return requested;
         }
     }
 
@@ -96,8 +114,8 @@ final class WidgetApi {
         if (!absolute.startsWith("https://")) throw new IOException("logo must be https");
         HttpURLConnection c = (HttpURLConnection) new URL(absolute).openConnection();
         try {
-            c.setConnectTimeout(TIMEOUT_MS);
-            c.setReadTimeout(TIMEOUT_MS);
+            c.setConnectTimeout(LOGO_TIMEOUT_MS);
+            c.setReadTimeout(LOGO_TIMEOUT_MS);
             if (c.getResponseCode() / 100 != 2) throw new IOException("logo http " + c.getResponseCode());
             try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[8192];

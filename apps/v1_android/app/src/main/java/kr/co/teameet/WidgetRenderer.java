@@ -112,8 +112,9 @@ final class WidgetRenderer {
         String league = live.competitionName == null ? "" : " " + live.competitionName;
         WidgetModel.Period p = live.period;
         if ("ENDED".equals(live.state)) {
-            h.text = "종료" + league;
-            h.shortText = "종료";
+            String penalties = live.hasPenalties ? "승부차기 " + live.penaltyMine + ":" + live.penaltyOpponent : null;
+            h.text = "종료" + league + (penalties == null ? "" : " · " + penalties);
+            h.shortText = penalties == null ? "종료" : "종료 · PK " + live.penaltyMine + ":" + live.penaltyOpponent;
         } else if (p != null && "HALFTIME".equals(p.phase)) {
             h.amber = true;
             h.text = "하프타임" + league + " · 휴식";
@@ -281,7 +282,7 @@ final class WidgetRenderer {
         rv.setViewVisibility(boxId, View.VISIBLE);
         rv.setTextViewText(textId, placeName);
         Intent map = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(placeName)));
-        rv.setOnClickPendingIntent(boxId, PendingIntent.getActivity(context, 100 + (placeName.hashCode() & 0xff), map, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        rv.setOnClickPendingIntent(boxId, PendingIntent.getActivity(context, placeName.hashCode(), map, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
     }
 
     static PendingIntent openApp(Context context, String route, int requestCode) {

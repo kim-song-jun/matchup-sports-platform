@@ -73,4 +73,12 @@ final class WidgetFormat {
         String who = scorer.name == null ? "득점" : scorer.name + (scorer.ownGoal ? " (자책)" : "");
         return scorer.minute < 0 ? who : who + " " + scorer.minute + "'";
     }
+
+    /** 서버가 저장한 상태로 알린다 — 정원이 차면 참석이 아니라 대기로 저장된다. */
+    static String savedMessage(String saved) {
+        if ("GOING".equals(saved)) return "참석으로 저장했어요";
+        if ("NOT_GOING".equals(saved)) return "불참으로 저장했어요";
+        if ("WAITLISTED".equals(saved)) return "정원이 차서 대기로 등록했어요";
+        return "저장하지 못했어요. 앱에서 응답해 주세요";
+    }
 }

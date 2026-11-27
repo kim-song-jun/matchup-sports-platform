@@ -17,6 +17,17 @@ final class WidgetLogos {
 
     private WidgetLogos() {}
 
+    /** 이미 받아 둔 마크만(네트워크 없음). 없으면 null. */
+    static Bitmap cached(Context context, String url) {
+        if (url == null) return null;
+        try {
+            File file = new File(dir(context), name(url));
+            return file.isFile() ? BitmapFactory.decodeFile(file.getAbsolutePath()) : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     /** 실패하면 null — 그 자리는 그림 없이 그린다. */
     static Bitmap load(Context context, String url) {
         if (url == null) return null;

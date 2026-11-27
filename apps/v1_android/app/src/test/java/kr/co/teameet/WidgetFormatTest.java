@@ -50,4 +50,18 @@ public final class WidgetFormatTest {
         assertEquals("최OO (자책) 3'", WidgetFormat.scorerLine(new WidgetModel.Scorer(false, "최OO", 3, true)));
         assertEquals("득점", WidgetFormat.scorerLine(new WidgetModel.Scorer(false, null, -1, false)));
     }
+
+    @Test public void savedMessageFollowsWhatTheServerSaved() {
+        assertEquals("참석으로 저장했어요", WidgetFormat.savedMessage("GOING"));
+        assertEquals("불참으로 저장했어요", WidgetFormat.savedMessage("NOT_GOING"));
+        assertEquals("정원이 차서 대기로 등록했어요", WidgetFormat.savedMessage("WAITLISTED"));
+        assertEquals("저장하지 못했어요. 앱에서 응답해 주세요", WidgetFormat.savedMessage(null));
+    }
+
+    @Test public void savedStatusReadsTheResponseOrFallsBackToTheRequest() {
+        assertEquals("WAITLISTED", WidgetApi.savedStatus("{\"data\":{\"status\":\"WAITLISTED\"}}", "GOING"));
+        assertEquals("GOING", WidgetApi.savedStatus("{\"status\":\"GOING\"}", "GOING"));
+        assertEquals("GOING", WidgetApi.savedStatus("not json", "GOING"));
+        assertEquals("NOT_GOING", WidgetApi.savedStatus("{\"data\":{}}", "NOT_GOING"));
+    }
 }

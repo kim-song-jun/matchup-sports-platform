@@ -8,7 +8,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.widget.RemoteViews;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -118,20 +120,38 @@ final class WidgetUpdater {
         try {
             WidgetModel model = WidgetModel.parse(json);
             WidgetPlan plan = WidgetPlan.of(model, now);
+            // 받아 둔 마크로 먼저 그리고, 없는 마크는 그 뒤에 받아 한 번 더 그린다 — 느린 망에서도 화면은 먼저 바뀐다.
             Map<String, Bitmap> logos = new HashMap<>();
+            List<String> missing = new ArrayList<>();
             if (plan.kind == WidgetPlan.Kind.LIVE) {
                 for (String url : new String[] {plan.live.teamLogoUrl, plan.live.opponentLogoUrl}) {
-                    if (url != null && !logos.containsKey(url)) logos.put(url, WidgetLogos.load(context, url));
+                    if (url == null || logos.containsKey(url)) continue;
+                    Bitmap saved = WidgetLogos.cached(context, url);
+                    logos.put(url, saved);
+                    if (saved == null) missing.add(url);
                 }
             }
-            AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            for (int id : ids(context, TeameetWidgetProvider.class)) manager.updateAppWidget(id, WidgetRenderer.medium(context, plan, now, logos));
-            for (int id : ids(context, TeameetSquareWidgetProvider.class)) manager.updateAppWidget(id, WidgetRenderer.square(context, plan, now, logos));
+            draw(context, plan, now, logos);
+            boolean fetched = false;
+            for (String url : missing) {
+                Bitmap bitmap = WidgetLogos.load(context, url);
+                if (bitmap != null) {
+                    logos.put(url, bitmap);
+                    fetched = true;
+                }
+            }
+            if (fetched) draw(context, plan, now, logos);
             if (plan.kind == WidgetPlan.Kind.LIVE && !"ENDED".equals(plan.live.state)) scheduleLiveAlarm(context, now);
             else cancelLiveAlarm(context);
         } catch (Exception e) {
             renderMessage(context, context.getString(R.string.widget_error_title), context.getString(R.string.widget_error_sub));
         }
+    }
+
+    private static void draw(Context context, WidgetPlan plan, long now, Map<String, Bitmap> logos) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        for (int id : ids(context, TeameetWidgetProvider.class)) manager.updateAppWidget(id, WidgetRenderer.medium(context, plan, now, logos));
+        for (int id : ids(context, TeameetSquareWidgetProvider.class)) manager.updateAppWidget(id, WidgetRenderer.square(context, plan, now, logos));
     }
 
     private static void renderMessage(Context context, String title, String sub) {

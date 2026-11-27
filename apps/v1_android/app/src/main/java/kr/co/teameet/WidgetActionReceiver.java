@@ -38,7 +38,7 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
 
     private static void respond(Context context, String scheduleId, String status) {
         String token = WidgetTokenStore.token(context);
-        boolean saved = false;
+        String saved = null;
         if (token != null && scheduleId != null && ("GOING".equals(status) || "NOT_GOING".equals(status))) {
             try {
                 saved = WidgetApi.respond(token, scheduleId, status);
@@ -48,7 +48,7 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
                 // 네트워크가 안 되면 저장 실패로 알린다.
             }
         }
-        String message = saved ? ("GOING".equals(status) ? "참석으로 저장했어요" : "불참으로 저장했어요") : "저장하지 못했어요. 앱에서 응답해 주세요";
+        String message = WidgetFormat.savedMessage(saved);
         new Handler(Looper.getMainLooper()).post(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());
         WidgetUpdater.refresh(context, null);
     }

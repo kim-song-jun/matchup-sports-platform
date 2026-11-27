@@ -30,7 +30,7 @@ export function CancelRequestChoice({
   const keepHelpId = useId();
   return (
     <div id={id} className="flex flex-col gap-2.5 border-t border-[var(--border)] pt-3.5">
-      <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+      <p className="m-0 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
         취소 요청을 어떻게 처리할까요?
       </p>
       <div className="grid gap-2 sm:grid-cols-2">

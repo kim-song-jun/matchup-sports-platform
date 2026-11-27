@@ -21,6 +21,6 @@ Task: [20261111](../../.github/tasks/20261111-preliminary-edit-reset.md)
 ## 현재 증거
 
 - Node22 단일 worker: API 신규+기존 reset 36 PASS, Web 버튼 HTTP/대진 페이지 31 PASS. API/Web 타입·surface/pattern PASS. TournamentsModule import·33개 constructor metadata unresolved0 확인(실제 앱/DB 부트스트랩 아님).
-- 실제 PostgreSQL spec 11건은 일반 세 형식·단계형 재생성·복수 결선 보존·LIVE/결과 초안/피리어드 보호·stale/support·감사 rollback·진출 outcome만 변경된 CAS를 검증하도록 추가했다. 로컬 Docker daemon이 없어 미실행이며 CI 대상이다.
+- 실제 PostgreSQL spec 11건은 일반 세 형식·단계형 재생성·복수 결선 보존·LIVE/결과 초안/피리어드 보호·stale/support·감사 rollback·진출 outcome만 변경된 CAS를 검증한다. 최초 CI45935098816은 group_knockout 준비에서 조당2팀 입력이 지원 최소3팀 계약에 막혀 실패했다. 2개 조×3팀/총6팀으로 수정했으며 planner RED→GREEN 및 API 타입 PASS. 실제 초기화까지의 수정 후 판정은 새 CI에서 확인하며 이전 실패를 성공으로 표시하지 않는다.
 - Alpha 5유형 × 3폭 = 0/15. 현재 관리자 인증 자료가 확인되지 않았고 이 PR은 미배포다. before/after·console/network·실제 사용자 흐름을 통과로 표시하지 않는다. 로컬 next 서버는 실행하지 않았다.
 - 사용자 대회 초기화·DB seed/reset 실행 없음. 테스트 외 사용자 데이터 변경 없음.

@@ -20,9 +20,10 @@ const stages = new StagePlanService(prisma, admins, templates, games);
 const resets = new BracketResetService(prisma, admins, finals);
 const live = (id: string) => prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, teamMatch: { deletedAt: null } }, orderBy: { teamMatchId: 'asc' } });
 async function seeded(label: string, format: 'league' | 'knockout' | 'group_knockout' = 'knockout') {
-  const seed = await seedBracketTournament(prisma, { label, format, teamCount: 4 });
-  if (format === 'league') await templates.apply(user, seed.tournamentId, { kind: 'league', teamCount: 4, legs: 1 });
-  else if (format === 'group_knockout') await templates.apply(user, seed.tournamentId, { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 2, advancePerGroup: 1, legs: 1, thirdPlace: false });
+  const teamCount = format === 'group_knockout' ? 6 : 4;
+  const seed = await seedBracketTournament(prisma, { label, format, teamCount });
+  if (format === 'league') await templates.apply(user, seed.tournamentId, { kind: 'league', teamCount, legs: 1 });
+  else if (format === 'group_knockout') await templates.apply(user, seed.tournamentId, { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false });
   else await templates.apply(user, seed.tournamentId, { kind: 'knockout', size: 4, thirdPlace: false });
   return seed;
 }
@@ -38,6 +39,8 @@ describe('대진 초기화 PostgreSQL 계약', () => {
   it.each(['league', 'knockout', 'group_knockout'] as const)('%s 실제 게임을 보관하고 참가 신청·재사용 시간/구장은 보존한다', async format => {
     const { tournamentId, registrationIds } = await seeded(`reset-${format}`, format);
     const fixtures = await live(tournamentId);
+    expect(fixtures.length).toBeGreaterThan(0);
+    expect(registrationIds).toHaveLength(format === 'group_knockout' ? 6 : 4);
     const field = await prisma.v1TournamentField.create({ data: { tournamentId, name: '보존 구장', scopeKey: 'reset-kept-field' } });
     const time = await prisma.v1TournamentScheduleTime.create({ data: { tournamentId, scheduledAt: new Date('2026-12-01T01:00:00Z') } });
     await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
@@ -45,7 +48,7 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     expect(await live(tournamentId)).toEqual([]);
     const archived = await prisma.v1TeamMatch.findMany({ where: { id: { in: fixtures.map(f => f.teamMatchId) } }, select: { deletedAt: true, game: { select: { state: true } } } });
     expect(archived.every(match => match.deletedAt !== null && match.game?.state === 'CANCELLED')).toBe(true);
-    expect(await prisma.v1TournamentRegistration.count({ where: { id: { in: registrationIds }, status: 'confirmed' } })).toBe(4);
+    expect(await prisma.v1TournamentRegistration.count({ where: { id: { in: registrationIds }, status: 'confirmed' } })).toBe(registrationIds.length);
     expect(await prisma.v1TournamentField.findUnique({ where: { id: field.id } })).not.toBeNull();
     expect(await prisma.v1TournamentScheduleTime.findUnique({ where: { id: time.id } })).not.toBeNull();
     expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId } })).bracketPublishedAt).toBeNull();

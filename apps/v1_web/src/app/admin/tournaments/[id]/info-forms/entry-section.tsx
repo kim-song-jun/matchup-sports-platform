@@ -1,6 +1,8 @@
 'use client';
 
-import { useImperativeHandle } from 'react';
+import { useImperativeHandle, useState } from 'react';
+import { Button } from '@/components/v1-ui/button';
+import { useV1AdminTournaments } from '@/hooks/use-v1-api';
 import { formatEntryFee } from '@/lib/date-utils';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import { saveStep } from '@/lib/sequential-save';
@@ -77,6 +79,27 @@ function EntryForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
   const paid = Number(draft.entryFee) > 0;
   const id = (field: keyof EntryDraft) => infoFieldId(field);
   const setDigits = (field: Exclude<keyof EntryDraft, 'quotaOn'>) => (value: string) => set(field, onlyDigits(value));
+  const recentTournaments = useV1AdminTournaments({ limit: 50 });
+  const [bankNotice, setBankNotice] = useState<string | null>(null);
+
+  /** 계좌를 적어 둔 가장 최근의 다른 대회에서 세 칸을 채운다. 저장은 시트의 「저장」 이 한다. */
+  const copyPreviousBank = async () => {
+    setBankNotice(null);
+    const items = recentTournaments.data?.items ?? (await recentTournaments.refetch()).data?.items;
+    if (!items) {
+      setBankNotice('직전 대회를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      return;
+    }
+    const previous = items.find(
+      (tournament) => tournament.id !== base.id && (tournament.bankName || tournament.bankAccount || tournament.bankHolder),
+    );
+    if (!previous) {
+      setBankNotice('계좌를 적어 둔 직전 대회가 없어요.');
+      return;
+    }
+    for (const [key] of BANK_FIELDS) set(key, previous[key] ?? '');
+    setBankNotice(`${previous.title}의 계좌를 불러왔어요. 저장을 눌러야 반영돼요.`);
+  };
 
   useImperativeHandle(ref, () => ({
     buildSteps(ctx) {
@@ -232,6 +255,14 @@ function EntryForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
                   maxLength={maxLength}
                 />
               ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button type="button" variant="neutral" size="sm" disabled={disabled || !paid} onClick={() => void copyPreviousBank()}>
+                직전 대회 불러오기
+              </Button>
+              {bankNotice ? (
+                <p role="status" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{bankNotice}</p>
+              ) : null}
             </div>
           </fieldset>
         </div>

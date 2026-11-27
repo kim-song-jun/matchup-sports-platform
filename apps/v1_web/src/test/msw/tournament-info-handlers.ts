@@ -134,6 +134,9 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
       { id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] },
       { id: 'sport-football', code: 'football', name: '축구', levels: [] },
     ] as unknown as V1Sport[],
+    /** 대회 목록 조회가 돌려주는 대회들(최근 순). */
+    tournamentList: [] as V1Tournament[],
+    tournamentListStatus: 200,
     /** 200 이 아니면 출전 인원·교체 선택지 조회가 그 상태로 실패한다. */
     lineupOptionsStatus: 200,
     /** 단계별 순위 순서 PUT — `{ stageKey, ...본문 }`. */
@@ -189,6 +192,11 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
       bump();
       return ok({ ...state.periods, expectedVersion: state.tournament.updatedAt, fixturesRepointed: 0 });
     }),
+    http.get('*/api/v1/admin/tournaments', () =>
+      state.tournamentListStatus === 200
+        ? ok({ items: state.tournamentList, pageInfo: { nextCursor: null, hasNextPage: false } })
+        : failed({ status: state.tournamentListStatus, body: {} }),
+    ),
     http.get('*/api/v1/admin/tournaments/:id', () => ok(state.tournament)),
     http.patch('*/api/v1/admin/tournaments/:id', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;

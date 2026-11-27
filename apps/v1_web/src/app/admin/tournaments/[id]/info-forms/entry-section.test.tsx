@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { createTournamentInfoFixture } from '@/test/msw/tournament-info-handlers';
 import { renderInfoSheet, setupTournamentInfoBackend } from '@/test/tournament-info-sheet';
@@ -186,6 +186,61 @@ describe('참가 섹션 시트', () => {
     expect(await view.inSheet().findByRole('alert')).toHaveTextContent('참가비가 있는 대회는 정산 계좌가 필요해요.');
     expect(view.inSheet().getByLabelText('참가비')).toHaveValue('30,000');
     expect(view.onClose).not.toHaveBeenCalled();
+  });
+
+  describe('직전 대회 불러오기', () => {
+    const others = () => [
+      createTournamentInfoFixture({ id: 'tournament-1', title: '지금 대회', bankName: '자기은행', bankAccount: '000', bankHolder: '자신' }),
+      createTournamentInfoFixture({ id: 'tournament-free', title: '무료 대회' }),
+      createTournamentInfoFixture({ id: 'tournament-prev', title: '가을 풋살컵', bankName: '국민은행', bankAccount: '123-456', bankHolder: '티밋' }),
+      createTournamentInfoFixture({ id: 'tournament-older', title: '여름 풋살컵', bankName: '신한은행', bankAccount: '999', bankHolder: '옛 예금주' }),
+    ];
+
+    it('계좌를 적어 둔 가장 최근의 다른 대회에서 세 칸을 채우고, 저장을 눌러야 보낸다', async () => {
+      const backend = start({ entryFee: 30000 });
+      backend.state.tournamentList = others();
+      const view = renderInfoSheet(entrySection, backend);
+
+      fireEvent.click(view.inSheet().getByRole('button', { name: '직전 대회 불러오기' }));
+      await waitFor(() => expect(view.inSheet().getByLabelText('은행명')).toHaveValue('국민은행'));
+      expect(view.inSheet().getByLabelText('계좌번호')).toHaveValue('123-456');
+      expect(view.inSheet().getByLabelText('예금주')).toHaveValue('티밋');
+      expect(view.inSheet().getByRole('status')).toHaveTextContent('가을 풋살컵의 계좌를 불러왔어요. 저장을 눌러야 반영돼요.');
+      expect(backend.state.patches).toEqual([]);
+
+      view.save();
+      await view.saved();
+      expect(view.patchKeys()).toEqual(['bankAccount', 'bankHolder', 'bankName']);
+      expect(backend.state.patches[0]).toMatchObject({ bankName: '국민은행', bankAccount: '123-456', bankHolder: '티밋' });
+    });
+
+    it('계좌를 적어 둔 다른 대회가 없으면 그렇게 알리고 칸을 건드리지 않는다', async () => {
+      const backend = start(paid);
+      backend.state.tournamentList = others().slice(0, 2);
+      const view = renderInfoSheet(entrySection, backend);
+
+      fireEvent.click(view.inSheet().getByRole('button', { name: '직전 대회 불러오기' }));
+
+      expect(await view.inSheet().findByRole('status')).toHaveTextContent('계좌를 적어 둔 직전 대회가 없어요.');
+      expect(view.inSheet().getByLabelText('계좌번호')).toHaveValue('123-456');
+    });
+
+    it('대회 목록을 읽지 못하면 그렇게 알린다', async () => {
+      const backend = start(paid);
+      backend.state.tournamentListStatus = 500;
+      const view = renderInfoSheet(entrySection, backend);
+
+      fireEvent.click(view.inSheet().getByRole('button', { name: '직전 대회 불러오기' }));
+
+      expect(await view.inSheet().findByRole('status')).toHaveTextContent('직전 대회를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      expect(view.inSheet().getByLabelText('계좌번호')).toHaveValue('123-456');
+    });
+
+    it('무료 대회에서는 계좌 칸과 함께 꺼져 있다', () => {
+      const view = renderInfoSheet(entrySection, start());
+
+      expect(view.inSheet().getByRole('button', { name: '직전 대회 불러오기' })).toBeDisabled();
+    });
   });
 
   it('혼성이 아닌 대회에는 혼성 쿼터가 없다', () => {

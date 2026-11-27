@@ -26,6 +26,10 @@ final class WidgetSessionCoordinator: NSObject, WKHTTPCookieStoreObserver {
             let store = try WidgetStore()
             let api = WidgetAPI()
             let transition = try store.transition(owner: owner)
+            if #available(iOS 16.2, *) {
+                await MatchActivityCoordinator.shared.sessionChanged(revision: transition.state.revision,
+                    signedIn: transition.state.owner != nil && transition.state.token != nil)
+            }
             if transition.oldToken != nil || owner == nil { WidgetCenter.shared.reloadAllTimelines() }
             if let old = transition.oldToken {
                 do { try await api.revoke(token: old) }
@@ -56,6 +60,7 @@ final class WidgetSessionCoordinator: NSObject, WKHTTPCookieStoreObserver {
             guard state.updatedAt < 0 || now - state.updatedAt >= 300_000, state.refreshAttemptedAt < 0 || now - state.refreshAttemptedAt >= 60_000 else { return }
             guard try store.update(revision: revision, { $0.refreshAttemptedAt = now }) else { return }
             let snapshot = await WidgetService(store: store, api: api).refresh()
+            if #available(iOS 16.2, *) { MatchActivityCoordinator.shared.observed(snapshot) }
             if let model = snapshot.model {
                 await WidgetLogos.prefetch(model: model, store: store, revision: revision, environment: api.environment)
             }

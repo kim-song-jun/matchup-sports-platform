@@ -13,7 +13,8 @@ import type {
   V1AdminTournamentRegistration,
   V1AdminTournamentRosterResponse,
 } from '@/types/api';
-import { RegistrationsTab, RosterModal } from './registrations-tab';
+import { RosterModal } from './registration-roster-modal';
+import { RegistrationsTab } from './registrations-tab';
 
 const registration: V1AdminTournamentRegistration = {
   id: 'registration-identity', tournamentId: 'tournament-identity', teamId: 'team-identity',

@@ -11,8 +11,8 @@ const service = new ScheduleTimesService(prisma, new AdminContextService(prisma)
 describe('대진 시간 목록 (PostgreSQL)', () => {
   beforeAll(async () => { await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); });
-  it('동시 중복 등록을 1행·1감사로 저장하고 대회 격리와 support 쓰기 차단을 유지한다', async () => {
-    const tournament = await prisma.v1Tournament.create({ data: { sportId: ids.soccerSportId, title: '시간 목록 검증', format: 'league_knockouts' } });
+  it.each(['league', 'knockout', 'group_knockout', 'league_knockouts'] as const)('%s: 동시 등록·수정·격리·support 쓰기 차단을 유지한다', async format => {
+    const tournament = await prisma.v1Tournament.create({ data: { sportId: ids.soccerSportId, title: '시간 목록 검증', format } });
     const other = await prisma.v1Tournament.create({ data: { sportId: ids.soccerSportId, title: '다른 시간 목록 검증', format: 'league_knockouts' } });
     const [first, replay] = await Promise.all([
       service.create(user, tournament.id, { scheduledAt: '2026-11-21T10:00:00+09:00' }),
@@ -23,7 +23,12 @@ describe('대진 시간 목록 (PostgreSQL)', () => {
     expect(await prisma.v1AdminActionLog.count({ where: { targetId: tournament.id, action: 'tournament.schedule_time.create' } })).toBe(1);
     expect((await service.list(user, tournament.id)).items[0].scheduledAt.toISOString()).toBe('2026-11-21T01:00:00.000Z');
     expect((await service.list(user, other.id)).items).toEqual([]);
-    const support = await seedSupportAdmin(prisma, 'schedule-time-support');
+    const updated = await service.update(user, tournament.id, { expectedScheduleTimeId: first.item.id,
+      expectedScheduledAt: first.item.scheduledAt.toISOString(), scheduledAt: '2026-11-21T03:00:00Z' });
+    expect(updated.item?.id).toBe(first.item.id);
+    expect(updated.affectedFixtureCount).toBe(0);
+    expect((await service.list(user, tournament.id)).items[0].scheduledAt.toISOString()).toBe('2026-11-21T03:00:00.000Z');
+    const support = await seedSupportAdmin(prisma, `schedule-time-support-${format}`);
     expect((await service.list(support, tournament.id)).items).toHaveLength(1);
     await expect(service.create(support, tournament.id, { scheduledAt: '2026-11-21T02:00:00Z' })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
     expect(await prisma.v1TournamentScheduleTime.count({ where: { tournamentId: tournament.id } })).toBe(1);

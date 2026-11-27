@@ -10,7 +10,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture, V1UpdateLeagueFixturePayload } from '@/types/league-match';
 import type { V1PlaceView } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
-import { isUnsetPlace, placeFromView, toLeaguePlacePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { isUnsetPlace, placeFromView, placeToView, toLeaguePlacePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { isSamePlace } from '@/lib/same-place';
 import {
   isLeaguePlaceChoiceIncomplete,
@@ -156,6 +156,14 @@ export function LeagueFixtureScheduleModal({
       }
       // 수정에서 placeName 이 없으면 "변경 없음" 이다. 기본 장소로 되돌리려면 빈 문자열을 보내야 서버가 리셋한다.
       Object.assign(patch, placeChoice.mode === 'custom' ? toLeaguePlacePayload(placeChoice.place) : { placeName: '' });
+    }
+    if (changed.field || changed.place || changed.startAt) {
+      const place = placeChoice.mode === 'default' ? defaultPlace : placeChoice.place && placeToView(placeChoice.place);
+      const time = Date.parse(patch.startsAt ?? fixture.startAt);
+      const conflict = scheduleFixtures.find(other => other.teamMatchId !== fixture.teamMatchId && other.status !== 'cancelled' &&
+        Date.parse(other.startAt) === time && (fieldId ? other.fieldId === fieldId :
+          !other.fieldId && place && !isUnsetPlace(place) && isSamePlace(place, fixtureCurrentPlace(other))));
+      if (conflict && !window.confirm(`${conflict.title} 경기와 시간·구장이 겹쳐요. 그대로 저장할까요?`)) return;
     }
     try {
       if (fixtureDirty) await onSubmit(patch);

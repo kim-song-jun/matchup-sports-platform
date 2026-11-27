@@ -1,10 +1,18 @@
-# 리그 + N개 토너먼트 시간·구장 배정
+# 모든 대진 유형 시간·구장 배정
 
 Status: Core Alpha QA verified; detailed state/permission regressions verified in CI
 Task: [20261132](../../.github/tasks/20261132-fixture-time-court-assignment.md)
 
 ## Persona / route
-플랫폼 운영자(owner/ops), 담당 대회 총괄, 조회 전용. `/admin/tournaments/:id/bracket`, format `league_knockouts`.
+플랫폼 운영자(owner/ops), 담당 대회 총괄, 조회 전용. `/admin/tournaments/:id/bracket`, format `league`, `knockout`, `group_knockout`, `league_knockouts` 및 단계형 대회. 별도 정규 리그의 `/admin/league-matches/:id/schedule`도 시간·등록 구장 배정 대상이다.
+
+## 2026-11-27 PR #2546 검증
+
+- 기존 단계·진출팀 관리 툴바와 그림/목록 전환을 보존하며 네 형식에 배정 작업공간을 연결한다.
+- 참가팀 미정 경기에서 시간·구장을 각각 저장한 뒤 새 QueryClient로 재진입해 서버 응답 복원 확인. 모바일은 `시간 미정 · 배정 구장` 표시 확인.
+- 대회·정규 리그에서 충돌 경기 안내 후 취소는 쓰기 없음, 확인은 실제 PATCH. 정규 리그 구장 API 실패는 기존 시각/구장 보존, 조회 전용은 배정 불가.
+- 실제 PostgreSQL 시간 목록 동시 등록·항목 수정·격리·권한 회귀를 네 형식으로 확장. 로컬 DB/Docker 미가동으로 CI에서 실행할 대상이며 단위 테스트 통과와 구분한다.
+- Alpha 신규 범위 5유형 × 3폭(390/768/1440) = 0/15. 로그인 화면에서 차단되어 before/after·console/network·실제 저장을 PASS로 표시하지 않는다. 사용자 로그인 대기.
 
 ## Scenarios
 1. 기존 시간/구장이 있는 경기에서 시간 배정 패널 열기. 기존 값 확인, 새 한국시간 등록 및 새로고침 복원.

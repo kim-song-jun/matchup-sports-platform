@@ -93,6 +93,37 @@ function show(canWrite = true, canManageFields = true, editor = false) {
 const timeLabel = (stamp: string) => `${formatKstDateShort(stamp)} ${formatKstTime(stamp)}`;
 
 describe('registered assignment option editing', () => {
+  it('assigns time and court before teams are known and reloads the saved values', async () => {
+    show();
+    fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
+    fireEvent.change(await screen.findByLabelText(`${timeLabel(stamp)}에 경기 배정`), { target: { value: 'f2' } });
+    await waitFor(() => expect(fixtures[1].scheduledAt).toBe(stamp));
+    await waitFor(() => expect(screen.getByRole('button', { name: '구장 배정' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
+    fireEvent.change(await screen.findByLabelText('B구장에 경기 배정'), { target: { value: 'f2' } });
+    await waitFor(() => expect(fixtures[1]).toMatchObject({ scheduledAt: stamp, fieldId: 'field-b', venue: 'B구장', homeRegistrationId: null, awayRegistrationId: null }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '시간 배정' })).toBeEnabled());
+    cleanup();
+    show();
+    fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
+    const summary = (await screen.findByText('B구장', { selector: 'summary > span' })).closest('details')!;
+    expect(summary).toHaveTextContent('1경기');
+    expect(summary).toHaveTextContent(timeLabel(stamp));
+    expect(patches).toEqual([{ scheduledAt: stamp }, { fieldId: 'field-b' }]);
+  });
+  it.each([false, true])('confirms the conflicting fixture before saving (accepted: %s)', async accepted => {
+    fixtures[1] = { ...fixtures[1], scheduledAt: stamp, fieldId: 'field-b', venue: 'B구장' };
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(accepted);
+    try {
+      show();
+      fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
+      fireEvent.change(await screen.findByLabelText('B구장에 경기 배정'), { target: { value: 'f1' } });
+      await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2번 경기')));
+      if (accepted) await waitFor(() => expect(fixtures[0].fieldId).toBe('field-b'));
+      else expect(fixtures[0].fieldId).toBe('field-a');
+      expect(patches).toEqual(accepted ? [{ fieldId: 'field-b' }] : []);
+    } finally { confirm.mockRestore(); }
+  });
   it('keeps a local draft visible when a different operator replaces its time during a real refetch', async () => {
     const client = show(); fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
     fireEvent.click(await screen.findByRole('button', { name: `${timeLabel(stamp)} 시간 수정` }));

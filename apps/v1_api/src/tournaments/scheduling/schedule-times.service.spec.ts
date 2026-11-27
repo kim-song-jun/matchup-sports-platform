@@ -65,8 +65,9 @@ describe('ScheduleTimesService', () => {
   const edit = { expectedScheduleTimeId: null as string | null, expectedScheduledAt: '2026-11-21T01:00:00Z', scheduledAt: '2026-11-21T02:00:00Z' };
   const fixture = (id: string, tournamentId = 't1'): ScheduledFixture => ({ id, tournamentId, startAt: new Date(edit.expectedScheduledAt), game: { state: 'SCHEDULED' }, fieldId: 'court-a', placeName: 'A구장' });
 
-  it('moves the registered item and all its games while preserving courts and competition isolation', async () => {
-    const { service, rows, fixtures } = setup();
+  it.each(['league', 'knockout', 'group_knockout', 'league_knockouts'])('%s lists, creates and moves times while preserving courts and competition isolation', async format => {
+    const { service, db, rows, fixtures } = setup();
+    db.v1Tournament.findFirst.mockResolvedValue({ id: 't1', format });
     await service.create(user, 't1', { scheduledAt: edit.expectedScheduledAt });
     const originalId = rows[0].id;
     fixtures.push(fixture('first'), fixture('second'), fixture('other', 't2'));
@@ -74,6 +75,7 @@ describe('ScheduleTimesService', () => {
     const result = await service.update(user, 't1', command);
     expect(result.item?.id).toBe(originalId);
     expect(result.affectedFixtureCount).toBe(2);
+    expect((await service.list(user, 't1')).items).toEqual(rows);
     expect(rows[0].scheduledAt.toISOString()).toBe('2026-11-21T02:00:00.000Z');
     expect(fixtures.map(row => [row.startAt.toISOString(), row.fieldId, row.placeName])).toEqual([
       ['2026-11-21T02:00:00.000Z', 'court-a', 'A구장'], ['2026-11-21T02:00:00.000Z', 'court-a', 'A구장'],
@@ -184,13 +186,13 @@ describe('ScheduleTimesService', () => {
     await expect(support.service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' }, 'league-matches')).rejects.toThrow(ForbiddenException);
     expect(support.rows).toHaveLength(0);
   });
-  it('rejects missing or unsupported tournaments without creating times', async () => {
+  it('rejects missing tournaments and accepts knockout tournaments', async () => {
     const { service, db, rows } = setup();
     db.v1Tournament.findFirst.mockResolvedValueOnce(null as never);
     await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).rejects.toMatchObject({ response: { code: 'NOT_FOUND' } });
     db.v1Tournament.findFirst.mockResolvedValueOnce({ id: 't1', format: 'knockout' });
-    await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).rejects.toMatchObject({ response: { code: 'SCHEDULE_TIMES_FORMAT_UNSUPPORTED' } });
-    expect(rows).toHaveLength(0);
+    await expect(service.create(user, 't1', { scheduledAt: '2026-11-21T01:00:00Z' })).resolves.toHaveProperty('item');
+    expect(rows).toHaveLength(1);
   });
 });
 describe('CreateScheduleTimeDto', () => {

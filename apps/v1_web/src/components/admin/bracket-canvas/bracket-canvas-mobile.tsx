@@ -107,8 +107,8 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
         <span className="text-center text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
       ) : null}
       {when || node.quickEntered ? (
-        <span className="flex flex-nowrap items-center gap-2 whitespace-nowrap rounded bg-[var(--grey50)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          {when ? <span>{when}</span> : null}
+        <span className="flex max-w-full flex-nowrap items-center gap-2 whitespace-nowrap rounded bg-[var(--grey50)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          {when ? <span className="min-w-0 truncate">{when} · {node.venue || '구장 미정'}</span> : null}
           {node.quickEntered ? (
             <span className="inline-flex items-center gap-1 font-semibold">
               <Zap size={12} aria-hidden="true" />

@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   registrations: { data: undefined as unknown, isError: false, error: null as unknown, refetch: vi.fn() },
 }));
 
+vi.mock('@/components/admin/bracket-canvas/fixture-assignment-workspace', () => ({
+  FixtureAssignmentWorkspace: ({ children }: { children: React.ReactNode }) => <div data-testid="assignment-workspace">{children}</div>,
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/t-1/bracket',
   useRouter: () => ({ replace: vi.fn() }),

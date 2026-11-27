@@ -12,7 +12,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { randomUuid } from '@/lib/uuid';
-import { assignmentCourts, assignmentPatch, assignmentTimes, fixtureCourtKey, hasAssignmentCollision, instant, isAssigned,
+import { assignmentCourts, assignmentPatch, assignmentTimes, fixtureCourtKey, findAssignmentConflict, hasAssignmentCollision, instant, isAssigned,
   type AssignmentMode, type CourtChoice } from '@/lib/fixture-assignment';
 import type { V1AdminBracketFixture } from '@/types/api';
 import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
@@ -92,6 +92,13 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
 
   async function assign(fixtureId: string, value: string | CourtChoice | null) {
     if (!mode || !canWrite || busy) return;
+    const fixture = fixtures.find(item => item.id === fixtureId);
+    if (fixture && value && fixture.game?.state !== 'CANCELLED') {
+      const court = typeof value === 'string' ? fixtureCourtKey(fixture) : value.key;
+      const time = typeof value === 'string' ? value : fixture.scheduledAt;
+      const conflict = findAssignmentConflict(fixtures, fixtureId, time, court);
+      if (conflict && !window.confirm(`${fixtureTitle(conflict, groups)} · ${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
+    }
     setError(null); setSaving(true);
     try {
       await update.mutateAsync({ fixtureId, ...assignmentPatch(mode, value) });

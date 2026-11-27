@@ -109,6 +109,13 @@ function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}, queryCl
   return { showToast, rounds, queryClient, ...utils };
 }
 
+it('shows an assigned court before the time or either team is decided', () => {
+  const pending = makeFixture({ id: 'court-only', fixtureNumber: 1, groupId: 'g-q', scheduledAt: null, venue: '먼저 배정한 구장' });
+  const rounds = buildBracketMobileRounds({ groups, fixtures: [pending], slots: [] });
+  renderMobile({ rounds });
+  expect(screen.getByRole('button', { name: /먼저 배정한 구장/ })).toHaveTextContent('시간 미정 · 먼저 배정한 구장');
+});
+
 const card = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('BracketCanvasMobile — 목록', () => {

@@ -34,6 +34,12 @@ export function assignmentPatch(mode: AssignmentMode, value: string | CourtChoic
 export function isAssigned(fixture: V1AdminBracketFixture, mode: AssignmentMode, key: string) {
   return mode === 'time' ? Boolean(fixture.scheduledAt && instant(fixture.scheduledAt) === key) : fixtureCourtKey(fixture) === key;
 }
+export function findAssignmentConflict(fixtures: readonly V1AdminBracketFixture[], fixtureId: string, time: string | null, court: string | null) {
+  if (!time || !court) return undefined;
+  return fixtures.find(other => other.id !== fixtureId && other.game?.state !== 'CANCELLED' &&
+    fixtureCourtKey(other) === court && other.scheduledAt && instant(other.scheduledAt) === instant(time));
+}
+
 export function hasAssignmentCollision(fixtures: readonly V1AdminBracketFixture[]) {
   const seen = new Set<string>();
   for (const fixture of fixtures) {

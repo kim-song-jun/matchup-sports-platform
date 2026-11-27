@@ -3,7 +3,8 @@
 import { FixtureTimePicker } from './fixture-time-picker';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import type { PlaceValue } from '@/lib/place';
-import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { findAssignmentConflict } from '@/lib/fixture-assignment';
+import { toVenuePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { fixtureVenueValue, fixtureVenuePatch } from './fixture-venue-patch';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
@@ -102,6 +103,11 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       ...(time === isoToKstDatetimeLocal(fixture.scheduledAt) ? {} : { scheduledAt }),
       ...(fieldId ? (fieldId === fixture.fieldId ? {} : { fieldId }) : { ...(fixture.fieldId ? { fieldId: null } : {}), ...fixtureVenuePatch(clearPlace ? null : venue, fixture) }),
     };
+    if (timeDirty.current || placeDirty.current) {
+      const court = fieldId ? `field:${fieldId}` : !clearPlace && venue ? `venue:${JSON.stringify(toVenuePayload(venue))}` : null;
+      const conflict = findAssignmentConflict(fixtures, fixture.id, scheduledAt, court);
+      if (conflict && !window.confirm(`${conflict.displayTitle || conflict.fixtureNumber + '번 경기'}와 시간·구장이 겹쳐요. 그대로 저장할까요?`)) return;
+    }
     const fixtureChanged = Object.keys(body).length > 0;
     if (!fixtureChanged && !periods.payload) { setMessage('변경한 항목이 없어요.'); return; }
     try {

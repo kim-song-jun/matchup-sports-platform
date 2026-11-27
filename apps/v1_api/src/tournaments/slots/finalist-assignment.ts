@@ -129,12 +129,6 @@ export function validateFinalistAssignments(preview: Awaited<ReturnType<typeof l
     if (!byKey.has(key) || seenTargets.has(key) || !allowed.has(assignment.registrationId) || seenTeams.has(assignment.registrationId)) {
       throw new UnprocessableEntityException({ code: 'FINALIST_ASSIGNMENT_INVALID', message: '중복 자리·중복 팀 또는 배정할 수 없는 팀이 있어요.' });
     }
-    const target = byKey.get(key)!;
-    if (target.sourceGroupId && target.sourceRank) {
-      const rank = preview.groups.find((group) => group.id === target.sourceGroupId)?.ranks.find((row) => row.rank === target.sourceRank);
-      const permitted = rank?.state === 'ready' ? [rank.registrationId] : rank?.state === 'tied' ? rank.tiedRegistrationIds : [];
-      if (!permitted.includes(assignment.registrationId)) throw notReady('조별 순위 출처와 맞는 진출 팀을 선택해 주세요.');
-    }
     seenTargets.add(key); seenTeams.add(assignment.registrationId);
   }
 }

@@ -61,6 +61,18 @@ describe('공통 결선 배정', () => {
     expect(preview.blockedReason).toBeNull();
     expect(() => validateFinalistAssignments(preview, inputFor(preview))).not.toThrow();
   });
+  it('템플릿의 조·순위와 다른 확정 참가팀도 결선 경기 자리에 전달한다', async () => {
+    const { read, details, tx, deps } = setup();
+    details[0].teamMatch.homeSlotId = 'template-slot';
+    const slot = { id: 'template-slot', groupId: 'q', sourceGroupId: 'g0', position: 1, kind: 'GROUP_RANK', registrationId: null };
+    tx.v1TournamentSlot.findMany.mockResolvedValue([slot] as never);
+    tx.v1TournamentSlot.findUniqueOrThrow.mockResolvedValue(slot);
+    const input = inputFor(await read());
+    input.assignments[0].registrationId = 'g1-r2';
+    await applyFinalistAssignment(deps, user, 't', input);
+    expect(assignSlotsBatchInTx).toHaveBeenCalledWith(tx, expect.anything(),
+      expect.arrayContaining([{ slotId: 'template-slot', registrationId: 'g1-r2' }]));
+  });
   it('승자/패자가 연결된 자리는 수동 배정 대상으로 노출하지 않는다', async () => {
     const { tx, read } = setup();
     tx.v1TournamentMatchAdvancementEdge.findMany.mockResolvedValue([{ targetTeamMatchId: 'f0', targetSide: 'HOME', sourceTeamMatchId: 'prev' }]);

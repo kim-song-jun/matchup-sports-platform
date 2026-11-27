@@ -152,6 +152,12 @@ describe('기본 섹션 시트', () => {
     expect(select).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요.');
   });
 
+  it('대회명 칸은 서버와 같은 120자까지 받는다', () => {
+    const view = renderInfoSheet(basicSection, start());
+
+    expect(view.inSheet().getByLabelText(/^대회명/)).toHaveAttribute('maxlength', '120');
+  });
+
   it('잠기지 않은 진행 방식을 바꾸면 format 만 보낸다', async () => {
     const backend = start();
     const view = renderInfoSheet(basicSection, backend);

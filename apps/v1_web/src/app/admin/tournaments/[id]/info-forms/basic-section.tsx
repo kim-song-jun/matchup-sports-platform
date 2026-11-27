@@ -8,12 +8,12 @@ import {
 } from '@/components/admin/tournaments/tournament-gender-choice-field';
 import { useV1MasterSports } from '@/hooks/use-v1-api';
 import { TOURNAMENT_FORMAT_NAMES } from '@/lib/tournament-format-labels';
+import { TOURNAMENT_TITLE_MAX_LENGTH } from '@/lib/tournament-limits';
 import { saveStep } from '@/lib/sequential-save';
 import type { V1Tournament, V1TournamentFormat, V1UpdateTournamentPayload } from '@/types/api';
 import { Field, FormGroup, TextField, fieldBorderCls, fieldInputCls, infoFieldId, useSectionDraft } from './form-kit';
 import type { InfoSectionDefinition, InfoSectionFormProps } from './types';
 
-const TITLE_MAX_LENGTH = 100;
 const FORMAT_FREE_HINT = '조나 대진을 만들기 전까지 바꿀 수 있어요.';
 const STAGED_FORMAT_HINT = '여러 단계는 새 대회를 만들 때 고를 수 있어요.';
 
@@ -105,7 +105,7 @@ function BasicForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
             onChange={(value) => set('title', value)}
             error={errorFor(titleId)}
             disabled={disabled}
-            maxLength={TITLE_MAX_LENGTH}
+            maxLength={TOURNAMENT_TITLE_MAX_LENGTH}
           />
           <Field id={infoFieldId('format')} label="진행 방식" hint={formatHint}>
             {(control) => (

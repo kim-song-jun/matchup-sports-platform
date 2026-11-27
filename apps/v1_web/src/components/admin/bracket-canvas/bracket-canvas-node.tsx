@@ -21,7 +21,7 @@ import type { V1AdminBracketFixture, V1AdminBracketSlot } from '@/types/api';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 import { fixtureOpenerProps } from './fixture-opener-focus';
 
-const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
+const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '원정' };
 
 export type BracketCanvasNodeProps = {
   fixture: V1AdminBracketFixture;
@@ -133,8 +133,9 @@ export function BracketCanvasNode({
       style={{
         ...placement,
         borderRadius: 'var(--radius-container)',
-        // 선택은 색만이 아니라 두께로도 구분한다(색만으로 정보 전달 금지).
-        border: selected ? '2px solid var(--blue500)' : '1px solid var(--border-strong)',
+        // 선택은 옅은 배경 + 1px 테두리 색이다. 두꺼운 색 테두리는 쓰지 않는다.
+        border: selected ? '1px solid var(--blue500)' : '1px solid var(--border-strong)',
+        background: selected ? 'var(--blue50)' : undefined,
       }}
     >
       <button

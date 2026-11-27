@@ -202,7 +202,7 @@ describe('BracketCanvasWorkspace — 팀 배정(키보드 경로)', () => {
     setBracket(makeBracket({ groups: [group], fixtures: [makeFixture({ id: 'f1', groupId: 'g-qf', fixtureNumber: 1 })] }));
     renderWorkspace();
     fireEvent.click(screen.getByRole('button', { name: /서울FC/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^어웨이 .*선택한 팀을 여기에 넣어요$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^원정 .*선택한 팀을 여기에 넣어요$/ }));
     expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r1' }, expect.any(Object));
     expect(mocks.assign).not.toHaveBeenCalled();
 

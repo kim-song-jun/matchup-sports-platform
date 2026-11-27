@@ -29,7 +29,7 @@ function show(scheduleFixtures: V1LeagueFixture[]) {
   render(<QueryClientProvider client={client}><LeagueFixtureScheduleModal leagueId="league" fixture={fixture} scheduleFixtures={scheduleFixtures}
     defaultPlace={null} matchupLabel="홈 vs 원정" teams={[]} teamLockedReason={null} isSubmitting={false}
     onSubmit={mocks.submit} onPeriodsSaved={vi.fn()} onClose={vi.fn()} /></QueryClientProvider>);
-  fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'a' } });
+  fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'a' } });
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
 }
 

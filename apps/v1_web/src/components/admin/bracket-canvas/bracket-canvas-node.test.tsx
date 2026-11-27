@@ -87,12 +87,23 @@ describe('BracketCanvasNode — 표시', () => {
     expect(screen.getByRole('button', { name: '8강 1번 경기 열기' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('선택된 칸은 색만이 아니라 테두리 두께로도 구분된다', () => {
+  it('선택한 칸은 2px 색 테두리 없이 1px 테두리 + 옅은 배경', () => {
     renderNode(base, { selected: true });
-    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('2px');
+    const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(group.style.border).toBe('1px solid var(--blue500)');
+    expect(group.style.background).toBe('var(--blue50)');
     cleanup();
     renderNode(base, { selected: false });
-    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('1px');
+    const idle = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;
+    expect(idle.style.border).toBe('1px solid var(--border-strong)');
+    expect(idle.style.background).toBe('');
+  });
+
+  it('칸 줄 이름은 홈·원정', () => {
+    renderNode(base);
+    expect(screen.getByRole('button', { name: /^홈 / })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^원정 / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^어웨이 / })).toBeNull();
   });
 });
 
@@ -106,7 +117,7 @@ describe('BracketCanvasNode — 눌러서 배정', () => {
 
   it('고른 팀이 있으면 누른 줄의 자리에 배정한다', () => {
     const props = renderNode(base, { pendingRegistrationId: 'reg-9' });
-    fireEvent.click(screen.getByRole('button', { name: '어웨이 2번 자리, 선택한 팀을 여기에 넣어요' }));
+    fireEvent.click(screen.getByRole('button', { name: '원정 2번 자리, 선택한 팀을 여기에 넣어요' }));
     expect(props.onAssign).toHaveBeenCalledWith('s-away', 'reg-9');
     expect(props.onSelect).not.toHaveBeenCalled();
   });
@@ -172,7 +183,7 @@ describe('BracketCanvasNode — 자리 없는 줄(경기에 팀을 직접 지정
 
   it('이전 경기로 채워지는 줄은 같은 상황에서도 배정하지 않고 칸을 연다', () => {
     const props = renderNode(slotless, { pendingRegistrationId: 'reg-9', ...noSlots });
-    fireEvent.click(screen.getByRole('button', { name: '어웨이 2번 자리' }));
+    fireEvent.click(screen.getByRole('button', { name: '원정 2번 자리' }));
     expect(props.onAssignDirect).not.toHaveBeenCalled();
     expect(props.onSelect).toHaveBeenCalledWith('f1');
   });

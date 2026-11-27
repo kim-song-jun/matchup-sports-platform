@@ -90,7 +90,7 @@ beforeEach(() => {
 describe('BracketNodePanel — 자리 배정', () => {
   it('등록 필드를 선택한 대회 일정은 장소 문자열과 나눠 보내지 않는다', () => {
     renderPanel();
-    fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'field-a' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'field-a' } });
     expect(screen.queryByLabelText('장소')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     const payload = mocks.updateFixture.mock.calls[0][0];

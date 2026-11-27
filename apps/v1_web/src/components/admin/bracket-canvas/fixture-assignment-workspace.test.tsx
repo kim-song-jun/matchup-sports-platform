@@ -273,7 +273,7 @@ describe('real fixture assignment API and shared editor', () => {
     expect(summary.parentElement).not.toHaveAttribute('open');
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     fireEvent.change(await screen.findByLabelText('B구장에 경기 배정'), { target: { value: 'f1' } });
-    await waitFor(() => expect(screen.getByLabelText('등록된 경기장(필드)')).toHaveValue('field-b'));
+    await waitFor(() => expect(screen.getByLabelText('등록된 구장')).toHaveValue('field-b'));
     expect(patches[1]).toEqual({ fieldId: 'field-b' });
     expect(fixtures[0].scheduledAt).toBe(times[1].scheduledAt);
     fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));

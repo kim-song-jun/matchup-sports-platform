@@ -1186,7 +1186,7 @@ describe('BracketTab — 공통 경기 정보', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
     expect(within(dialog).getByLabelText('경기 일시')).toHaveValue('2026-10-25T14:00');
-    expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toHaveValue('field-a');
+    expect(within(dialog).getByLabelText('등록된 구장')).toHaveValue('field-a');
     expect(within(dialog).getByLabelText('홈 표시 문구')).toHaveValue('준결승 A 승자');
     fireEvent.click(within(dialog).getByRole('button', { name: '시각 비우기' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '홈 자동 문구 복원' }));
@@ -1228,7 +1228,7 @@ describe('BracketTab — 직접입력생성회귀', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 일정 추가' }));
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
     expect(within(dialog).getByLabelText('대진 번호')).toHaveValue(1);
-    expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toHaveValue('field-a');
+    expect(within(dialog).getByLabelText('등록된 구장')).toHaveValue('field-a');
     expect(within(dialog).getByLabelText('홈 표시 문구')).toHaveValue('재조회한 홈 문구');
     expect(screen.queryByText('화면을 다시 불러올 수 없어요')).toBeNull();
   });

@@ -63,7 +63,7 @@ async function openMobileSchedule() {
   const sheet = await screen.findByRole('dialog', { name: '모바일 리그 1주차' });
   fireEvent.click(within(sheet).getByRole('button', { name: /경기 수정|일정 수정/ }));
   const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
-  await waitFor(() => expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toBeEnabled());
+  await waitFor(() => expect(within(dialog).getByLabelText('등록된 구장')).toBeEnabled());
   return dialog;
 }
 

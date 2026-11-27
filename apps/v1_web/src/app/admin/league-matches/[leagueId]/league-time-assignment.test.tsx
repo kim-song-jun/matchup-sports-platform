@@ -58,7 +58,7 @@ describe('league time assignment through the league API', () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
     await waitFor(() => expect(patches).toEqual([{ fieldId: 'court2' }]));
     expect(fixture).toMatchObject({ startAt: '2026-11-20T01:00:00.000Z', fieldId: 'court2', placeName: 'B구장', homeTeamId: 'home', awayTeamId: 'away' });
@@ -74,7 +74,7 @@ describe('league time assignment through the league API', () => {
     fail = true; show();
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
     expect(await screen.findByRole('alert')).toHaveTextContent('일정을 다시 확인해 주세요.');
     expect(fixture).toMatchObject({ fieldId: 'court1', startAt: '2026-11-20T01:00:00.000Z' });
@@ -83,7 +83,7 @@ describe('league time assignment through the league API', () => {
     const { onEditCourt } = show(false);
     fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
     await screen.findByRole('option', { name: 'B구장' });
-    fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+    fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
     expect(screen.queryByLabelText('이 구장에 경기 배정')).not.toBeInTheDocument();
     expect(onEditCourt).not.toHaveBeenCalled();
     expect(patches).toEqual([]);
@@ -94,7 +94,7 @@ describe('league time assignment through the league API', () => {
       show(true, false, [{ ...fixture, teamMatchId: 'f2', fieldId: 'court2', title: '겹치는 경기' }]);
       fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
       await screen.findByRole('option', { name: 'B구장' });
-      fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
+      fireEvent.change(screen.getByLabelText('등록된 구장'), { target: { value: 'court2' } });
       fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
       const dialog = await screen.findByRole('dialog', { name: '시간·구장이 겹쳐요' });
       expect(native).not.toHaveBeenCalled();

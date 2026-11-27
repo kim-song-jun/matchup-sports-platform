@@ -28,7 +28,7 @@ describe('경기 설정의 등록 경기장 선택', () => {
     const onChange = vi.fn();
     render(<CompetitionFieldPicker tournamentId="league" value="b" onChange={onChange} />);
     expect(screen.getByRole('option', { name: '비활성 구장 (사용 안 함)' })).toBeDisabled();
-    fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'a' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'a' } });
     expect(onChange).toHaveBeenCalledWith('a');
   });
   it('목록 조회 실패는 빈 목록으로 숨기지 않고 재시도한다', () => {
@@ -47,7 +47,7 @@ describe('경기 설정의 등록 경기장 선택', () => {
       awayTeamId: 'a', startAt: '2026-10-20T10:00:00Z', placeName: '기존 구장', status: 'matched' }}
       defaultPlace={null} matchupLabel="홈 vs 원정" teams={[]} teamLockedReason={null} isSubmitting={false}
       onSubmit={mocks.submit} onPeriodsSaved={vi.fn()} onClose={vi.fn()} /></QueryClientProvider>);
-    fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'a' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'a' } });
     expect(screen.queryByText('다른 장소 사용')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(mocks.submit).toHaveBeenCalledWith({ fieldId: 'a' });

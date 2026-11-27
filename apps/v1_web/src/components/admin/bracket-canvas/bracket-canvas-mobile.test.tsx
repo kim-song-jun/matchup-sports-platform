@@ -141,7 +141,7 @@ describe('BracketCanvasMobile — 목록', () => {
   it('모바일 경기 시트에서도 등록된 필드를 선택해 같은 경기로 저장한다', () => {
     renderMobile();
     fireEvent.click(card(/8강 · 1번 경기/));
-    const picker = screen.getByRole('combobox', { name: '등록된 경기장(필드)' });
+    const picker = screen.getByRole('combobox', { name: '등록된 구장' });
     fireEvent.change(picker, { target: { value: 'field-a' } });
     expect(picker).toHaveValue('field-a');
     fireEvent.click(screen.getByRole('button', { name: '경기장 저장' }));

@@ -121,9 +121,9 @@ describe('BracketResultActions — 분기', () => {
     expect(screen.queryByRole('button', { name: '결과 무효' })).not.toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있는 경기는 고치기·무효 대신 정정 화면 링크만 준다', () => {
+  it('라이브 득점 기록이 있는 경기는 고치기·무효 대신 결과 고치기 화면 링크만 준다', () => {
     renderActions({ game: officialGame({ hasLiveRecords: true }) });
-    expect(screen.getByRole('link', { name: '결과 정정 화면 열기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute(
       'href',
       '/admin/live/t-1/records/corrections?fixtureId=f-1',
     );
@@ -139,7 +139,7 @@ describe('BracketResultActions — 분기', () => {
   });
 });
 
-describe('BracketResultActions — 점수 고치기(정정 → 확정)', () => {
+describe('BracketResultActions — 점수 고치기', () => {
   async function startCorrection(home = '3', away = '1') {
     fireEvent.click(screen.getByRole('button', { name: '점수 고치기' }));
     fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: home } });
@@ -148,14 +148,14 @@ describe('BracketResultActions — 점수 고치기(정정 → 확정)', () => {
     return screen.findByRole('dialog');
   }
 
-  it('사유를 입력하면 정정을 만들고, 그 초안을 서버가 준 값 그대로 이어서 확정한다', async () => {
+  it('이유를 입력하면 결과 고치기를 만들고, 그 초안을 서버가 준 값 그대로 이어서 확정한다', async () => {
     mocks.revisions.refetch.mockResolvedValue({
       data: [revision({}), revision({ id: 'rev-2', revision: 2, state: 'DRAFT', score: { home: 3, away: 1 }, supersedesId: 'rev-1' })],
     });
     const props = renderActions();
     const dialog = await startCorrection();
-    fireEvent.change(within(dialog).getByLabelText('정정 사유'), { target: { value: '점수를 잘못 넣었어요' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: '정정 확정' }));
+    fireEvent.change(within(dialog).getByLabelText('고치는 이유'), { target: { value: '점수를 잘못 넣었어요' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 고치기' }));
 
     await waitFor(() => expect(mocks.officialize).toHaveBeenCalledTimes(1));
     expect(mocks.createCorrection).toHaveBeenCalledWith({
@@ -183,39 +183,39 @@ describe('BracketResultActions — 점수 고치기(정정 → 확정)', () => {
     await waitFor(() => expect(props.showToast).toHaveBeenCalledWith('점수를 고쳤어요.', 'success'));
   });
 
-  it('사유가 비어 있으면 정정 확정 버튼이 눌리지 않는다', async () => {
+  it('이유가 비어 있으면 「결과 고치기」 버튼이 눌리지 않는다', async () => {
     renderActions();
     const dialog = await startCorrection();
-    expect(within(dialog).getByRole('button', { name: '정정 확정' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '결과 고치기' })).toBeDisabled();
     expect(mocks.createCorrection).not.toHaveBeenCalled();
   });
 
-  it('다음 경기가 이미 시작돼 확정이 막히면 이유와 "정정 초안이 남아 있어요"를 모달 안에 보여 주고 닫지 않는다', async () => {
+  it('다음 경기가 이미 시작돼 확정이 막히면 이유와 "고치던 내용은 남아 있어요"를 모달 안에 보여 주고 닫지 않는다', async () => {
     mocks.revisions.refetch.mockResolvedValue({
       data: [revision({}), revision({ id: 'rev-2', revision: 2, state: 'DRAFT', score: { home: 3, away: 1 } })],
     });
     mocks.officialize.mockRejectedValue(apiError('NEXT_FIXTURE_CONFLICT'));
     const props = renderActions();
     const dialog = await startCorrection();
-    fireEvent.change(within(dialog).getByLabelText('정정 사유'), { target: { value: '오입력' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: '정정 확정' }));
+    fireEvent.change(within(dialog).getByLabelText('고치는 이유'), { target: { value: '오입력' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 고치기' }));
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('다음 경기가 이미 시작돼서 바꿀 수 없어요.');
-    expect(alert).toHaveTextContent('정정 초안은 남아 있어요');
+    expect(alert).toHaveTextContent('고치던 내용은 남아 있어요');
     expect(props.showToast).not.toHaveBeenCalledWith('점수를 고쳤어요.', 'success');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('정정 생성 단계에서 막히면 초안 안내 없이 서버 이유만 보여 준다', async () => {
+  it('고치기 요청 단계에서 막히면 초안 안내 없이 서버 이유만 보여 준다', async () => {
     mocks.createCorrection.mockRejectedValue(apiError('VERSION_CONFLICT'));
     renderActions();
     const dialog = await startCorrection();
-    fireEvent.change(within(dialog).getByLabelText('정정 사유'), { target: { value: '오입력' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: '정정 확정' }));
+    fireEvent.change(within(dialog).getByLabelText('고치는 이유'), { target: { value: '오입력' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 고치기' }));
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.');
-    expect(alert).not.toHaveTextContent('정정 초안');
+    expect(alert).not.toHaveTextContent('고치던 내용');
     expect(mocks.officialize).not.toHaveBeenCalled();
   });
 });

@@ -53,7 +53,7 @@ export function RegistrationsTab({
   isFreeEntry?: boolean;
   /**
    * 명단 제출 마감. 없으면(리그는 늘 없다) 마감 예외가 아무 차이를 만들지 않으므로 '마감 예외 허용'을
-   * 숨긴다(MD-QA #202). 이미 준 예외를 거두는 '예외 해제'는 그대로 보인다.
+   * 숨긴다. 이미 준 예외를 거두는 '예외 해제'는 그대로 보인다.
    */
   rosterDeadlineAt?: string | null;
 }) {
@@ -64,7 +64,7 @@ export function RegistrationsTab({
   const rejectCancelRequest = useV1RejectCancelRequest();
   // 창은 id 로 신청을 찾는다 — 잠금처럼 목록을 다시 받는 조작 뒤에도 낡은 신청을 들고 있지 않고, 신청이 사라지면 닫힌다.
   const [rosterRegistrationId, setRosterRegistrationId] = useState<string | null>(null);
-  // 경기별 명단 펼침(Task 179) — 한 번에 한 팀만 연다.
+  // 경기별 명단 펼침 — 한 번에 한 팀만 연다.
   const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
   // 펼친 표의 저장 전 칸 변경 — 펼침을 닫거나(다른 팀·접기) 화면을 떠나면 사라진다.
   const [gameRostersDirty, setGameRostersDirty] = useState(false);
@@ -76,7 +76,7 @@ export function RegistrationsTab({
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  // P2-7: 일괄 입금 확인 선택
+  // 일괄 입금 확인 선택
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
@@ -138,7 +138,7 @@ export function RegistrationsTab({
     );
   };
 
-  // P1-1: 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
+  // 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
   const handleConfirmClick = async (reg: V1AdminTournamentRegistration) => {
     if (admissionsBlockedReason) {
       showToast(admissionsBlockedReason, 'error');
@@ -231,7 +231,7 @@ export function RegistrationsTab({
     keepRegistration(target, setCancelError, () => setCancelTarget(null));
   };
 
-  // P2-7: payment_checking으로 넘어가기 전(awaiting_payment) 신청만 일괄 입금 확인 대상 —
+  // payment_checking으로 넘어가기 전(awaiting_payment) 신청만 일괄 입금 확인 대상 —
   // confirmPayment 훅의 BE 가드가 status=awaiting_payment만 허용한다.
   const toggleSelected = (registrationId: string) => {
     setSelectedIds((prev) => {

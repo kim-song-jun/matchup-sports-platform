@@ -7,15 +7,20 @@ import { effectivePublicVisibilityMode } from '../games/public-records/public-vi
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleAttendanceService, type SetAttendanceResponse } from '../team-schedules/attendance.service';
 import { visibleTeamMatchScheduleWhere } from '../team-schedules/team-schedules.service';
+import { resolveTeamLogoUrl } from '../teams/team-logo-presets';
 import {
   endedGameScore,
+  matchResult,
   perspectiveScore,
+  readPeriod,
   tallyGameScore,
   WIDGET_FRIENDLY_STARTED_MS,
   WIDGET_JUST_ENDED_MS,
   WIDGET_LIVE_MAX_AGE_MS,
   WIDGET_PENDING_LIMIT,
   WIDGET_SCHEDULE_LIMIT,
+  type WidgetMatchResult,
+  type WidgetPeriod,
   type WidgetPerspectiveScore,
 } from './widget-home';
 
@@ -25,8 +30,15 @@ export interface WidgetLiveGame {
   gameId: string;
   teamId: string;
   teamName: string;
+  /** 팀 페이지와 같은 마크(저장된 로고, 없으면 기본 마크). 사이트 기준 경로이거나 업로드 주소 — 앞에 도메인을 붙이는 건 받는 쪽. */
+  teamLogoUrl: string | null;
   title: string;
   opponentName: string | null;
+  opponentLogoUrl: string | null;
+  /** 리그·대회 이름. 친선은 null. */
+  competitionName: string | null;
+  /** 장소 이름. 정해지지 않았으면 null. */
+  venueName: string | null;
   competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
   /** `ENDED` 는 끝난 지 15분 안인 「방금 끝남」. */
   state: 'LIVE' | 'PAUSED' | 'ENDED';
@@ -35,6 +47,8 @@ export interface WidgetLiveGame {
   score: WidgetPerspectiveScore | null;
   /** 승부차기 점수 — 경기가 끝난 뒤에만 있다(진행 중에는 서버가 모른다). */
   penalties: WidgetPerspectiveScore | null;
+  /** 현재 구간(전반·후반 등)과 시간 계산에 필요한 값. 진행 중이 아니거나 구간 기록이 없는 경기는 null. */
+  period: WidgetPeriod | null;
 }
 
 export interface WidgetScheduleItem {
@@ -47,18 +61,48 @@ export interface WidgetScheduleItem {
   endAt: Date;
   rsvpDeadlineAt: Date | null;
   placeName: string | null;
+  teamLogoUrl: string | null;
+  /** 경기 일정이면 상대팀과 리그·대회 이름. 훈련·모임은 null. */
+  opponentName: string | null;
+  opponentLogoUrl: string | null;
+  competitionName: string | null;
+  /** 참석 확정 인원과 정원(정원이 없으면 활동 중인 팀원 수). */
+  goingCount: number;
+  capacity: number;
   myResponse: WidgetResponseStatus | null;
   /** 지금 위젯에서 참석·불참을 저장할 수 있는가(훈련·모임이고 마감 전). */
   canRespond: boolean;
 }
 
+export interface WidgetLastResult {
+  gameId: string;
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  opponentName: string | null;
+  opponentLogoUrl: string | null;
+  competitionName: string | null;
+  startedAt: Date | null;
+  score: WidgetPerspectiveScore;
+  penalties: WidgetPerspectiveScore | null;
+  result: WidgetMatchResult;
+}
+
 export interface WidgetHome {
   generatedAt: Date;
   live: WidgetLiveGame[];
+  /** 아무 일정도 없을 때 채우는 가장 최근 공식 결과. 공개 규칙이 가린 경기는 제외. */
+  lastResult: WidgetLastResult | null;
   /** 아직 응답하지 않은 훈련·모임 총 건수와 가장 급한 몇 건. */
   pendingCount: number;
   pending: WidgetScheduleItem[];
   schedules: WidgetScheduleItem[];
+}
+
+interface TeamMeta {
+  name: string;
+  memberCount: number;
+  logoUrl: string | null;
 }
 
 const RESPONDABLE_TYPES = [V1ScheduleType.TRAINING, V1ScheduleType.EVENT] as const;
@@ -73,15 +117,18 @@ export class WidgetHomeService {
   async home(userId: string, now: Date = new Date()): Promise<WidgetHome> {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: { userId, status: 'active', team: { status: 'active', deletedAt: null } },
-      select: { teamId: true, team: { select: { name: true } } },
+      select: { teamId: true, team: { select: { name: true, memberCount: true, profile: { select: { logoUrl: true } } } } },
     });
-    const teamNames = new Map(memberships.map((m) => [m.teamId, m.team.name]));
-    const teamIds = [...teamNames.keys()];
-    if (teamIds.length === 0) return { generatedAt: now, live: [], pendingCount: 0, pending: [], schedules: [] };
+    const teamMeta = new Map<string, TeamMeta>(
+      memberships.map((m) => [m.teamId, { name: m.team.name, memberCount: m.team.memberCount, logoUrl: resolveTeamLogoUrl(m.teamId, m.team.profile?.logoUrl) }]),
+    );
+    const teamIds = [...teamMeta.keys()];
+    if (teamIds.length === 0) return { generatedAt: now, live: [], lastResult: null, pendingCount: 0, pending: [], schedules: [] };
 
     const visible = await visibleTeamMatchScheduleWhere(this.prisma, teamIds);
-    const [live, pending, pendingCount, schedules] = await Promise.all([
-      this.liveGames(teamIds, teamNames, now),
+    const [live, lastResult, pending, pendingCount, schedules] = await Promise.all([
+      this.liveGames(teamIds, teamMeta, now),
+      this.lastResult(teamIds, teamMeta),
       this.prisma.v1TeamSchedule.findMany({
         where: this.pendingWhere(teamIds, userId, now, visible),
         orderBy: [{ rsvpDeadlineAt: { sort: 'asc', nulls: 'last' } }, { startAt: 'asc' }, { id: 'asc' }],
@@ -96,21 +143,33 @@ export class WidgetHomeService {
         include: { attendance: { where: { userId }, select: { status: true } } },
       }),
     ]);
-    const places = await this.placesFor([...pending, ...schedules]);
-    const toItem = (row: (typeof schedules)[number]): WidgetScheduleItem => ({
-      scheduleId: row.id,
-      teamId: row.teamId,
-      teamName: teamNames.get(row.teamId) ?? '',
-      title: row.title,
-      type: row.type,
-      startAt: row.startAt,
-      endAt: row.endAt,
-      rsvpDeadlineAt: row.rsvpDeadlineAt,
-      placeName: row.teamMatchId === null ? null : (places.get(row.teamMatchId) ?? null),
-      myResponse: row.attendance[0]?.status ?? null,
-      canRespond: (RESPONDABLE_TYPES as readonly V1ScheduleType[]).includes(row.type) && (row.rsvpDeadlineAt === null || row.rsvpDeadlineAt > now),
-    });
-    return { generatedAt: now, live, pendingCount, pending: pending.map(toItem), schedules: schedules.map(toItem) };
+    const rows = [...pending, ...schedules];
+    const [matches, going] = await Promise.all([this.matchesFor(rows), this.goingCounts(rows.map((row) => row.id))]);
+    const toItem = (row: (typeof schedules)[number]): WidgetScheduleItem => {
+      const match = row.teamMatchId === null ? undefined : matches.get(row.teamMatchId);
+      const opponent = match?.teams.find((team) => team.id !== row.teamId) ?? null;
+      const mine = teamMeta.get(row.teamId);
+      return {
+        scheduleId: row.id,
+        teamId: row.teamId,
+        teamName: mine?.name ?? '',
+        teamLogoUrl: mine?.logoUrl ?? null,
+        title: row.title,
+        type: row.type,
+        startAt: row.startAt,
+        endAt: row.endAt,
+        rsvpDeadlineAt: row.rsvpDeadlineAt,
+        placeName: match?.placeName ?? null,
+        opponentName: opponent?.name ?? null,
+        opponentLogoUrl: opponent?.logoUrl ?? null,
+        competitionName: match?.competitionName ?? null,
+        goingCount: going.get(row.id) ?? 0,
+        capacity: row.capacity ?? mine?.memberCount ?? 0,
+        myResponse: row.attendance[0]?.status ?? null,
+        canRespond: (RESPONDABLE_TYPES as readonly V1ScheduleType[]).includes(row.type) && (row.rsvpDeadlineAt === null || row.rsvpDeadlineAt > now),
+      };
+    };
+    return { generatedAt: now, live, lastResult, pendingCount, pending: pending.map(toItem), schedules: schedules.map(toItem) };
   }
 
   /** 위젯에서 참석·불참·미정을 저장한다. 마감·정원 같은 규칙은 앱에서 누를 때와 같은 서비스를 그대로 탄다. */
@@ -163,15 +222,95 @@ export class WidgetHomeService {
     };
   }
 
-  private async placesFor(rows: ReadonlyArray<{ teamMatchId: string | null }>): Promise<Map<string, string | null>> {
+  /** 경기 일정의 장소·상대팀·리그 이름. 상대는 호스트와 승인된 신청 팀 중 내 팀이 아닌 쪽이다. */
+  private async matchesFor(rows: ReadonlyArray<{ teamMatchId: string | null }>) {
     const ids = [...new Set(rows.flatMap((row) => (row.teamMatchId === null ? [] : [row.teamMatchId])))];
-    if (ids.length === 0) return new Map();
-    const matches = await this.prisma.v1TeamMatch.findMany({ where: { id: { in: ids } }, select: { id: true, placeName: true } });
-    return new Map(matches.map((match) => [match.id, match.placeName]));
+    const result = new Map<string, { placeName: string | null; competitionName: string | null; teams: Array<{ id: string; name: string; logoUrl: string | null }> }>();
+    if (ids.length === 0) return result;
+    const teamSelect = { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } as const;
+    const matches = await this.prisma.v1TeamMatch.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, placeName: true, league: { select: { title: true } }, tournament: { select: { title: true } }, hostTeam: teamSelect, approvedApplicantTeam: teamSelect },
+    });
+    for (const match of matches) {
+      result.set(match.id, {
+        placeName: match.placeName,
+        competitionName: match.league?.title ?? match.tournament?.title ?? null,
+        teams: [match.hostTeam, match.approvedApplicantTeam].flatMap((team) =>
+          team === null ? [] : [{ id: team.id, name: team.name, logoUrl: resolveTeamLogoUrl(team.id, team.profile?.logoUrl) }],
+        ),
+      });
+    }
+    return result;
+  }
+
+  private async goingCounts(scheduleIds: string[]): Promise<Map<string, number>> {
+    if (scheduleIds.length === 0) return new Map();
+    const rows = await this.prisma.v1ScheduleAttendance.groupBy({ by: ['scheduleId'], where: { scheduleId: { in: scheduleIds }, status: 'GOING' }, _count: { _all: true } });
+    return new Map(rows.map((row) => [row.scheduleId, row._count._all]));
+  }
+
+  private async opponentLogos(teamIds: string[]): Promise<Map<string, string | null>> {
+    if (teamIds.length === 0) return new Map();
+    const teams = await this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, profile: { select: { logoUrl: true } } } });
+    return new Map(teams.map((team) => [team.id, resolveTeamLogoUrl(team.id, team.profile?.logoUrl)]));
+  }
+
+  /** 가장 최근에 끝난 내 팀의 공식 결과 — 위젯이 비었을 때 「지난 경기」로 채운다. 공개 규칙이 가린 경기는 건너뛴다. */
+  private async lastResult(teamIds: string[], teamMeta: ReadonlyMap<string, TeamMeta>): Promise<WidgetLastResult | null> {
+    const teamIdSet = new Set(teamIds);
+    const liveEnabled = await isPublicLiveEnabled(this.prisma);
+    const games = await this.prisma.v1Game.findMany({
+      where: {
+        sides: { some: { teamId: { in: teamIds } } },
+        state: 'ENDED',
+        currentOfficialRevision: { isNot: null },
+        NOT: [
+          { teamMatch: { is: { deletedAt: { not: null } } } },
+          { teamMatch: { is: { status: { in: ['cancelled', 'archived'] } } } },
+          { teamMatch: { is: { tournament: { is: { deletedAt: { not: null } } } } } },
+        ],
+      },
+      select: {
+        id: true,
+        sides: { select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
+        visibilityPolicy: { select: { mode: true } },
+        currentOfficialRevision: { select: { score: true } },
+        sharedRecord: { select: { goals: true } },
+        teamMatch: { select: { startAt: true, league: { select: { title: true } }, tournament: { select: { title: true } } } },
+      },
+      orderBy: [{ teamMatch: { startAt: 'desc' } }, { id: 'desc' }],
+      take: 5,
+    });
+    for (const game of games) {
+      const mode = effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'HIDDEN', liveEnabled);
+      if (mode !== 'live' && mode !== 'official_only') continue;
+      const mine = game.sides.find((side) => side.teamId !== null && teamIdSet.has(side.teamId));
+      if (mine === undefined) continue;
+      const { score, penalties } = endedGameScore(game, mine.sideKey);
+      if (score === null) continue;
+      const other = game.sides.find((side) => side.id !== mine.id);
+      const logos = await this.opponentLogos(other?.teamId ? [other.teamId] : []);
+      const meta = teamMeta.get(mine.teamId!);
+      return {
+        gameId: game.id,
+        teamId: mine.teamId!,
+        teamName: meta?.name ?? mine.displayNameSnapshot,
+        teamLogoUrl: meta?.logoUrl ?? null,
+        opponentName: other?.displayNameSnapshot ?? null,
+        opponentLogoUrl: other?.teamId ? (logos.get(other.teamId) ?? null) : null,
+        competitionName: game.teamMatch?.league?.title ?? game.teamMatch?.tournament?.title ?? null,
+        startedAt: game.teamMatch?.startAt ?? null,
+        score,
+        penalties,
+        result: matchResult(score, penalties),
+      };
+    }
+    return null;
   }
 
   /** 진행 중(시작 후 12시간 안) + 방금 끝난(15분 안) 내 팀 경기. 점수는 공개 경기 화면과 같은 규칙으로만. */
-  private async liveGames(teamIds: string[], teamNames: ReadonlyMap<string, string>, now: Date): Promise<WidgetLiveGame[]> {
+  private async liveGames(teamIds: string[], teamMeta: ReadonlyMap<string, TeamMeta>, now: Date): Promise<WidgetLiveGame[]> {
     const teamIdSet = new Set(teamIds);
     const games = await this.prisma.v1Game.findMany({
       where: {
@@ -199,7 +338,8 @@ export class WidgetHomeService {
         visibilityPolicy: { select: { mode: true } },
         currentOfficialRevision: { select: { score: true } },
         sharedRecord: { select: { goals: true } },
-        teamMatch: { select: { title: true, startAt: true, tournamentId: true, leagueId: true } },
+        periods: { select: { number: true, state: true, startedAt: true, endedAt: true, pausedTotalMs: true, pausedAt: true } },
+        teamMatch: { select: { title: true, startAt: true, placeName: true, tournamentId: true, leagueId: true, league: { select: { title: true } }, tournament: { select: { title: true } } } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 10,
@@ -207,6 +347,8 @@ export class WidgetHomeService {
     if (games.length === 0) return [];
 
     const liveEnabled = await isPublicLiveEnabled(this.prisma);
+    const opponentTeamIds = games.flatMap((game) => game.sides.flatMap((side) => (side.teamId !== null && !teamIdSet.has(side.teamId) ? [side.teamId] : [])));
+    const logos = await this.opponentLogos([...new Set(opponentTeamIds)]);
     const running = games.filter((game) => game.state !== 'ENDED');
     const events =
       running.length === 0
@@ -233,17 +375,24 @@ export class WidgetHomeService {
       } else if (mode === 'live') {
         score = perspectiveScore(tallyGameScore(game, events.filter((event) => event.gameId === game.id)), mine.sideKey);
       }
+      const other = game.sides.find((side) => side.id !== mine.id);
+      const meta = teamMeta.get(mine.teamId!);
       items.push({
         gameId: game.id,
         teamId: mine.teamId!,
-        teamName: teamNames.get(mine.teamId!) ?? mine.displayNameSnapshot,
+        teamName: meta?.name ?? mine.displayNameSnapshot,
+        teamLogoUrl: meta?.logoUrl ?? null,
         title: game.teamMatch?.title ?? '경기',
-        opponentName: game.sides.find((side) => side.id !== mine.id)?.displayNameSnapshot ?? null,
+        opponentName: other?.displayNameSnapshot ?? null,
+        opponentLogoUrl: other?.teamId ? (logos.get(other.teamId) ?? null) : null,
+        competitionName: game.teamMatch?.league?.title ?? game.teamMatch?.tournament?.title ?? null,
+        venueName: game.teamMatch?.placeName ?? null,
         competitionKind: game.teamMatch?.tournamentId ? 'TOURNAMENT' : game.teamMatch?.leagueId ? 'LEAGUE' : 'FRIENDLY',
         state,
         startedAt: game.teamMatch?.startAt ?? null,
         score,
         penalties,
+        period: state === 'ENDED' ? null : readPeriod(game.state, game.periods),
       });
     }
     // 진행 중이 앞, 방금 끝난 경기가 뒤.

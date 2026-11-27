@@ -27,7 +27,7 @@
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/widget/home` | Bearer 위젯 토큰 | `{ generatedAt, live, pendingCount, pending, schedules }` — 실시간 경기·응답 대기·일정을 한 번에. |
+| GET | `/widget/home` | Bearer 위젯 토큰 | `{ generatedAt, live, lastResult, pendingCount, pending, schedules }` — 실시간 경기·지난 경기·응답 대기·일정을 한 번에. |
 | PUT | `/widget/schedules/:scheduleId/attendance` | Bearer 위젯 토큰 | `{ status: GOING \| MAYBE \| NOT_GOING }` → 앱의 `PUT .../attendance/me` 와 같은 응답. |
 
 - **`live`**: 내 팀 경기 중 진행 중(`LIVE`·`PAUSED`, **시작한 지 12시간 안**)과 **공식 결과가 확정된 지 15분 안**(`ENDED`, 「방금 끝남」 — 종료 시각 컬럼이 없어 결과 리비전의 `createdAt` 으로 잰다. 결과를 정정하면 새 리비전이라 정정도 「방금」으로 다시 나온다). 진행 중이 앞이다. 점수(`score`)는 우리 팀 기준이고 공개 경기 화면과 같은 규칙으로만 준다 — 진행 중은 정책이 `live` 일 때, 끝난 경기는 공식 결과가 있고 운영자가 가리지 않았을 때(`hidden`·`status_only` 제외). **승부차기(`penalties`)는 경기가 끝난 뒤에만 있다** — 서버가 승부차기를 `end` 커맨드로 한꺼번에 받아 진행 중에는 알 수 없다(`apps/v1_web/src/lib/penalty-shootout.ts` 설계 주석).
@@ -38,3 +38,12 @@
 **진행 중 점수의 출처 (2026-11-25).** 대회·리그 경기는 경기 이벤트(`V1GameEvent`)의 골을 세고, **친선 팀 매치는 득점을 공유 기록(`V1TeamMatchRecord.goals`)에 두므로 그 골을 센다** — 이벤트만 세면 친선 경기가 항상 0 : 0 으로 나온다(알파에서 한강 로버스·마포 친선으로 확인). `GET /widget/games` 와 `GET /widget/home` 모두 같다.
 
 **친선 팀 매치의 시작 (2026-11-26).** 친선 팀 매치는 첫 득점을 기록해야 경기 상태가 진행 중(`LIVE`)이 된다. 그래서 킥오프가 지났는데 아직 득점이 없는 친선 경기(상태 `SCHEDULED`, 대회·리그가 아니고 팀 매치 상태가 `matched`)도 **킥오프 후 3시간 동안은 `live` 에 진행 중(`LIVE`) 0 : 0 으로** 싣는다 — 공개 경기 목록의 「진행 중」 기준과 같다. 대회·리그 경기는 운영자가 시작해야 진행 중이 된다.
+
+**위젯 v2 표시 정보 (2026-11-27).** 확정한 위젯·실시간 카드 디자인에 필요한 값을 `GET /widget/home` 에 더했다. 값은 모두 기존 데이터에서 읽고, 기존 필드는 그대로다.
+
+- **팀 마크** — `live[]` 의 `teamLogoUrl`·`opponentLogoUrl`, `schedules[]`·`pending[]` 의 `teamLogoUrl`·`opponentLogoUrl`, `lastResult` 의 같은 이름. 팀 페이지와 **같은 마크**다: 저장된 로고(`V1TeamProfile.logoUrl`), 비어 있으면 팀 id 로 고른 기본 마크 10개 중 하나(`team-logo-presets.ts` — 웹 `resolveTeamLogoUrl` 과 같은 알고리즘, 값이 어긋나지 않도록 단위 테스트가 같은 기대값을 건다). 사이트 기준 경로(`/images/team-logos/…`)나 업로드 주소 **그대로** 내려 주므로 받는 쪽이 자기 도메인(알파·운영)을 앞에 붙인다.
+- **리그·장소** — `competitionName`(리그·대회 이름, 친선은 null), `venueName`(경기 장소), 일정은 `placeName`.
+- **현재 구간** — `live[].period`: `{ number, phase: RUNNING|HALFTIME|PAUSED, startedAt, pausedMs, pausedAt, restStartedAt }`. 위젯이 「후반 12'」를 스스로 센다 — 경과 = (지금 − `startedAt`) − `pausedMs` − (`pausedAt` 이 있으면 지금 − `pausedAt`), 하프타임은 `restStartedAt` 부터 쉬는 시간. **하프타임은 경기 상태가 아니라 다음 구간이 `HALFTIME` 인 것**이라 `state` 는 `LIVE` 그대로다. 구간 기록이 없는 경기(친선 팀 매치)와 끝난 경기는 null.
+- **일정 상대·참석 인원** — 경기 일정의 `opponentName`(호스트·승인 신청 팀 중 내 팀이 아닌 쪽), `goingCount`(참석 확정 수), `capacity`(일정 정원, 없으면 활동 중인 팀원 수). 훈련·모임은 `opponentName` 이 null.
+- **지난 경기** — `lastResult`: 내 팀의 가장 최근 **공식** 결과(`score`·`penalties` 는 우리 팀 기준, `result: WIN|DRAW|LOSE` — 동점이면 승부차기로 가리고 그것도 같으면 무). 공개 규칙이 가린 경기(`hidden`·`status_only`)는 건너뛰고, 없으면 null.
+- 득점자 이름은 참가자 동의 규칙을 지켜야 해서 **이 변경에 없다**(후속 변경).

@@ -75,3 +75,51 @@ export function endedGameScore(
   if (result !== null) return { score: result.score, penalties: result.penalties };
   return { score: game.sharedRecord === null ? null : perspectiveScore(tallyGameScore(game, []), mineSideKey), penalties: null };
 }
+
+export type WidgetPeriodPhase = 'RUNNING' | 'HALFTIME' | 'PAUSED';
+
+/**
+ * 진행 중 경기의 현재 구간. 위젯이 「후반 12'」 같은 시간을 스스로 센다 — 서버가 분을 매번 내려 주면 갱신이 늦을 때마다 틀어진다.
+ * 경과 시간 = (지금 − `startedAt`) − `pausedMs` − (`pausedAt` 이 있으면 지금 − `pausedAt`). 하프타임은 `restStartedAt` 부터 센다.
+ * 구간 기록이 없는 경기(친선 팀 매치)는 null — 시간 없이 점수만 보인다.
+ */
+export interface WidgetPeriod {
+  number: number;
+  phase: WidgetPeriodPhase;
+  startedAt: Date | null;
+  pausedMs: number;
+  pausedAt: Date | null;
+  restStartedAt: Date | null;
+}
+
+export function readPeriod(
+  gameState: string,
+  periods: ReadonlyArray<{ number: number; state: string; startedAt: Date | null; endedAt: Date | null; pausedTotalMs: number; pausedAt: Date | null }>,
+): WidgetPeriod | null {
+  const ordered = [...periods].sort((a, b) => a.number - b.number);
+  // 하프타임: 앞 구간은 끝났고 다음 구간이 아직 열리지 않은 상태 — 경기 상태는 계속 LIVE 다(`V1GamePeriodState.HALFTIME`).
+  const halftime = ordered.find((period) => period.state === 'HALFTIME');
+  if (halftime !== undefined) {
+    const previous = ordered.filter((period) => period.number < halftime.number).pop();
+    return { number: halftime.number, phase: 'HALFTIME', startedAt: null, pausedMs: 0, pausedAt: null, restStartedAt: previous?.endedAt ?? null };
+  }
+  const live = ordered.find((period) => period.state === 'LIVE');
+  if (live === undefined) return null;
+  return {
+    number: live.number,
+    phase: gameState === 'PAUSED' || live.pausedAt !== null ? 'PAUSED' : 'RUNNING',
+    startedAt: live.startedAt,
+    pausedMs: live.pausedTotalMs,
+    pausedAt: live.pausedAt,
+    restStartedAt: null,
+  };
+}
+
+export type WidgetMatchResult = 'WIN' | 'DRAW' | 'LOSE';
+
+/** 끝난 경기의 승·무·패(우리 팀 기준). 동점이면 승부차기로 가리고, 그것도 같으면 무. */
+export function matchResult(score: WidgetPerspectiveScore, penalties: WidgetPerspectiveScore | null): WidgetMatchResult {
+  if (score.mine !== score.opponent) return score.mine > score.opponent ? 'WIN' : 'LOSE';
+  if (penalties !== null && penalties.mine !== penalties.opponent) return penalties.mine > penalties.opponent ? 'WIN' : 'LOSE';
+  return 'DRAW';
+}

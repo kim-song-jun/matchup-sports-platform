@@ -3,7 +3,7 @@ import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { AssignSlotDto, SetByeSideDto } from './dto/tournament-slot.dto';
+import { AssignSlotDto, MoveByeDto, SetByeSideDto } from './dto/tournament-slot.dto';
 import { TournamentSlotService } from './tournament-slot.service';
 
 /** 어드민 전용. 인증은 V1AuthGuard, 쓰기 권한(support 거부)은 서비스의 getMutationAdmin 이 다시 본다. */
@@ -17,13 +17,18 @@ export class TournamentSlotController {
     return this.slots.setByeSide(user, slotId, dto.side, dto.expectedSide);
   }
 
+  @Put('admin/tournament-slots/:slotId/bye-position')
+  moveBye(@CurrentUser() user: V1AuthUser, @Param('slotId') slotId: string, @Body() dto: MoveByeDto) {
+    return this.slots.setByeSide(user, slotId, dto.side, dto.expectedSide, dto);
+  }
+
   @Put('admin/tournament-slots/:slotId/assignment')
   assign(
     @CurrentUser() user: V1AuthUser,
     @Param('slotId') slotId: string,
     @Body() dto: AssignSlotDto,
   ) {
-    return this.slots.assignSlot(user, slotId, dto.registrationId);
+    return this.slots.assignSlot(user, slotId, dto.registrationId, dto.swapSlotId, dto.expectedRegistrationId);
   }
 
   @Post('admin/tournaments/:tournamentId/slots/random-fill')

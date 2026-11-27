@@ -66,6 +66,8 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admi
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
+import { lockGameRows } from '../games/roster/game-row-lock';
+import { updateTournamentMatchInTx } from './tournament-match-update';
 import { acceptsBracketSource } from './tournament-bracket-phases';
 import { assertSameBracketTrack } from './bracket-track';
 import { assertBracketTrackRegistrationEligible } from './slots/bracket-track-eligibility';
@@ -574,6 +576,32 @@ export class TournamentBracketService {
           afterJson: { tournamentId, groupId: group.id, phase: group.phase, registrationId, isBye: true, sortOrder: dto.sortOrder },
         }, tx);
         return synced;
+      }
+      if (dto.targetFixtureId && dto.targetSide) {
+        const target = await tx.v1TournamentMatchDetails.findFirst({ where: { teamMatchId: dto.targetFixtureId, tournamentId,
+          teamMatch: { deletedAt: null } }, include: { group: true, teamMatch: { include: { game: true } } } });
+        const game = target?.teamMatch.game;
+        if (!target?.group || !game || target.group.phase === 'third_place' || !acceptsBracketSource(target.group.phase, group.phase) ||
+          (target.group.bracketTrack ?? 'overall') !== (group.bracketTrack ?? 'overall')) throw new ConflictException({ code: 'BYE_POSITION_INVALID', message: '같은 결선의 다음 라운드 경기를 선택해 주세요.' });
+        await lockGameRows(tx, [game.id], false);
+        const locked = await tx.v1Game.findUniqueOrThrow({ where: { id: game.id }, include: {
+          _count: { select: { events: true } }, resultRevisions: { where: { state: { not: 'VOID' } }, select: { id: true } },
+        } });
+        if (locked.state !== 'SCHEDULED' || locked.currentOfficialRevisionId || locked._count.events || locked.resultRevisions.length || target.teamMatch.status === 'cancelled') throw new ConflictException({ code: 'SLOT_LOCKED', message: '경기가 시작됐거나 기록이 있어요.' });
+        const home = dto.targetSide === 'HOME';
+        const existingTeam = home ? target.homeRegistrationId : target.awayRegistrationId;
+        const edge = await tx.v1TournamentMatchAdvancementEdge.findFirst({ where: { targetTeamMatchId: target.teamMatchId, targetSide: dto.targetSide } });
+        if (edge || (home ? target.teamMatch.homeSlotId : target.teamMatch.awaySlotId) ||
+          (existingTeam && existingTeam !== existing?.registrationId)) throw new ConflictException({ code: 'BYE_POSITION_OCCUPIED', message: '이미 팀 또는 진출 연결이 있는 자리예요.' });
+        if (existing?.registrationId) {
+          const prior = await tx.v1TournamentMatchDetails.findFirst({ where: { groupId: target.groupId, teamMatch: { deletedAt: null },
+            OR: [{ homeRegistrationId: existing.registrationId }, { awayRegistrationId: existing.registrationId }] } });
+          if (prior && (prior.teamMatchId !== target.teamMatchId || existingTeam !== existing.registrationId)) throw new ConflictException({ code: 'BYE_POSITION_OCCUPIED', message: '먼저 기존 직행 자리를 연결한 뒤 위치를 옮겨 주세요.' });
+        }
+        const slot = await tx.v1TournamentSlot.create({ data: { tournamentId, groupId: group.id, kind: 'BYE',
+          entryScope: 'legacy', position: dto.sortOrder + 1, byeSortOrder: dto.sortOrder, registrationId } });
+        await updateTournamentMatchInTx(tx, { teamMatchId: target.teamMatchId, [home ? 'homeRegistrationId' : 'awayRegistrationId']: registrationId });
+        await tx.v1TeamMatch.update({ where: { id: target.teamMatchId }, data: { [home ? 'homeSlotId' : 'awaySlotId']: slot.id } });
       }
       let row: Parameters<TournamentBracketService['serializeGroupTeam']>[0];
       if (registrationId) {

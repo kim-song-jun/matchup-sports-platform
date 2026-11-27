@@ -277,7 +277,7 @@ describe('ActionMenu 데스크톱', () => {
     expect(panelOf(menu).style.position).toBe('fixed');
   });
 
-  it('열면 첫 활성 항목에 포커스가 가고 ArrowDown/ArrowUp/Home/End 가 비활성 항목을 건너뛰며 돈다', () => {
+  it('열면 첫 활성 항목에 포커스가 가고 ArrowDown/ArrowUp/Home/End 가 비활성 항목에도 닿으며 돈다', () => {
     renderMenu({
       actions: [
         { key: 'a', label: '첫째', onSelect: vi.fn() },
@@ -288,6 +288,8 @@ describe('ActionMenu 데스크톱', () => {
     const menu = openMenu();
     expect(focusedLabel()).toBe('첫째');
 
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(focusedLabel()).toBe('둘째');
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
     expect(focusedLabel()).toBe('셋째');
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
@@ -440,7 +442,11 @@ describe('ActionMenu 데스크톱', () => {
     const menu = openMenu();
 
     const item = within(menu).getByRole('menuitem', { name: /^접수 마감/ });
-    expect(item).toBeDisabled();
+    // `disabled` 가 아니라 aria-disabled — 키보드로 닿아 사유를 읽을 수 있다.
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item).not.toHaveAttribute('disabled');
+    item.focus();
+    expect(item).toHaveFocus();
     expect(item).toHaveTextContent('이미 마감했어요.');
     expect(item).not.toHaveTextContent('신청을 막아요');
     fireEvent.click(item);

@@ -21,7 +21,7 @@ const GAP = 8;
 const MIN_HEIGHT = 160;
 
 const ROW_CLASS =
-  'flex min-h-[44px] w-full flex-row items-center gap-3 rounded-[var(--radius-chip)] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+  'flex min-h-[44px] w-full flex-row items-center gap-3 rounded-[var(--radius-chip)] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-soft)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
 
 interface ActionMenuPopoverProps {
   readonly label: string;
@@ -88,15 +88,16 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
     setPosition(next);
   }, [anchorRef, align]);
 
-  const items = () =>
-    Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []).filter(
-      (item) => !(item instanceof HTMLButtonElement && item.disabled),
-    );
+  // 비활성 항목도 키보드가 닿는다(aria-disabled) — 눌러도 아무 일이 없는 이유를 읽을 수 있어야 해서.
+  const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []);
 
   // 위치가 잡히기 전 첫 렌더는 visibility:hidden 이라 브라우저가 포커스를 거부한다 — 보이게 된 뒤에 건다.
   const placed = position !== null;
   useEffect(() => {
-    if (placed) (items()[0] ?? menuRef.current)?.focus({ preventScroll: true });
+    if (placed) {
+      const firstUsable = items().find((item) => item.getAttribute('aria-disabled') !== 'true');
+      (firstUsable ?? menuRef.current)?.focus({ preventScroll: true });
+    }
     // 열린 동안 한 번만 — 항목은 매 렌더 새로 읽는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed]);
@@ -136,17 +137,17 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
       onClose();
       return;
     }
-    const enabled = items();
-    if (enabled.length === 0) return;
-    const current = enabled.indexOf(document.activeElement as HTMLElement);
+    const reachable = items();
+    if (reachable.length === 0) return;
+    const current = reachable.indexOf(document.activeElement as HTMLElement);
     let next: number;
-    if (event.key === 'ArrowDown') next = (current + 1) % enabled.length;
-    else if (event.key === 'ArrowUp') next = current <= 0 ? enabled.length - 1 : current - 1;
+    if (event.key === 'ArrowDown') next = (current + 1) % reachable.length;
+    else if (event.key === 'ArrowUp') next = current <= 0 ? reachable.length - 1 : current - 1;
     else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = enabled.length - 1;
+    else if (event.key === 'End') next = reachable.length - 1;
     else return;
     event.preventDefault();
-    enabled[next].focus({ preventScroll: true });
+    reachable[next].focus({ preventScroll: true });
   };
 
   if (typeof document === 'undefined') return null;
@@ -236,9 +237,9 @@ function MenuItem({ action, onClose }: { action: ActionSheetAction; onClose: () 
       role={action.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
       aria-checked={action.checked}
       tabIndex={-1}
-      disabled={action.disabled}
+      aria-disabled={action.disabled ? true : undefined}
       className={ROW_CLASS}
-      onClick={action.onSelect}
+      onClick={action.disabled ? undefined : action.onSelect}
     >
       <ActionLabel action={action}>
         {action.disabled && action.disabledReason ? action.disabledReason : action.description}

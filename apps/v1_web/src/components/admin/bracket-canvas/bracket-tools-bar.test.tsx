@@ -152,7 +152,7 @@ describe('BracketToolsBar — 데스크톱', () => {
     renderBar(props);
     open('팀 채우기');
     const random = item(/빈 자리 무작위 채우기/);
-    expect(random).toBeDisabled();
+    expect(random).toHaveAttribute('aria-disabled', 'true');
     expect(random).toHaveTextContent(reason);
     fireEvent.click(random);
     expect(mocks.randomFill).not.toHaveBeenCalled();
@@ -198,7 +198,7 @@ describe('BracketToolsBar — 데스크톱', () => {
     setBracket({ ...populated, fixtures: populated.fixtures.map((fixture) => ({ ...fixture, scheduledAt: '2026-11-20T01:00:00.000Z' })) });
     renderBar();
     open('시간·구장');
-    expect(item(/시간 미정 경기만 보기/)).toBeDisabled();
+    expect(item(/시간 미정 경기만 보기/)).toHaveAttribute('aria-disabled', 'true');
     expect(item(/시간 미정 경기만 보기/)).toHaveTextContent('모든 경기에 시간이 있어요.');
   });
 

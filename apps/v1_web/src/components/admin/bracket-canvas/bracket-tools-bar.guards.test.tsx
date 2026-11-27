@@ -71,7 +71,7 @@ describe('도구 줄 메뉴 — 진행 중에는 다시 눌리지 않는다', ()
 
     openMenu('팀 채우기');
     const again = await screen.findByRole('menuitem', { name: /빈 자리 무작위 채우기/ });
-    expect(again).toBeDisabled();
+    expect(again).toHaveAttribute('aria-disabled', 'true');
     expect(again).toHaveTextContent('채우는 중이에요.');
     fireEvent.click(again);
 
@@ -96,7 +96,7 @@ describe('도구 줄 메뉴 — 진행 중에는 다시 눌리지 않는다', ()
     fireEvent.click(screen.getByRole('menuitem', { name: /대진 초기화/ }));
     openMenu('경기');
     const reset = await screen.findByRole('menuitem', { name: /대진 초기화/ });
-    expect(reset).toBeDisabled();
+    expect(reset).toHaveAttribute('aria-disabled', 'true');
     expect(reset).toHaveTextContent('다른 작업이 끝나면 누를 수 있어요.');
     openMenu('경기');
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();

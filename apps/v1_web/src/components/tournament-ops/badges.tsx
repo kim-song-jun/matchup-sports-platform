@@ -45,9 +45,9 @@ function Pill({ tone, icon, label }: { tone: Tone; icon: ReactNode; label: strin
 
 const GAME_STATE_META: Record<V1GameState, { label: string; tone: Tone; icon: ReactNode }> = {
   SCHEDULED: { label: '예정', tone: 'gray', icon: <CalendarClock size={12} aria-hidden="true" /> },
-  LIVE: { label: '진행 중', tone: 'green', icon: <CircleDot size={12} aria-hidden="true" /> },
+  LIVE: { label: '진행 중', tone: 'blue', icon: <CircleDot size={12} aria-hidden="true" /> },
   PAUSED: { label: '일시중지', tone: 'amber', icon: <PauseCircle size={12} aria-hidden="true" /> },
-  ENDED: { label: '종료', tone: 'blue', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
+  ENDED: { label: '끝남', tone: 'gray', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
   CANCELLED: { label: '취소됨', tone: 'red', icon: <XCircle size={12} aria-hidden="true" /> },
 };
 
@@ -76,15 +76,15 @@ export function PublicFixtureStateBadge({ status }: { status: string }) {
 }
 
 // ── 운영 보드 경고 배지 ────────────────────────────────────────────────────
-/* 경고 코드 → 한글 라벨의 단일 출처. 결과 검토·정정 화면(fixture-picker-list)도 이걸 쓴다.
+/* 경고 코드 → 한글 라벨의 단일 출처.
  * MISSING_SCORER 는 서버에서 "골에 득점자가 지정되지 않음"(V1GameResultRevision.missingScorer)을
  * 뜻한다 — 예전 라벨 '기록자 없음'은 기록 담당 스태프가 없다는 뜻으로 읽혀서, 운영자가
  * 존재하지도 않는 '기록자' 역할을 배정하려 헤매고 정작 득점자 누락은 방치됐다. */
 export const WARNING_LABELS: Record<V1TournamentOperationsWarningCode, string> = {
-  NO_FIELD_ASSIGNED: '경기장 미배정',
+  NO_FIELD_ASSIGNED: '구장 미배정',
   MISSING_SCORER: '득점자 미기재',
   RESULT_REVIEW_OVERDUE: '검토 기한 초과',
-  NO_STAFF_ASSIGNED: '담당자 미배정',
+  NO_STAFF_ASSIGNED: '구장 담당자 없음',
   LINEUP_NOT_SUBMITTED: '라인업 미제출',
 };
 
@@ -104,9 +104,9 @@ export function WarningBadge({ code }: { code: V1TournamentOperationsWarningCode
 // ── 스태프 역할 라벨 ───────────────────────────────────────────────────────
 export const STAFF_ROLE_LABELS: Record<V1TournamentStaffRole, string> = {
   PLATFORM_OPS: '플랫폼 운영자',
-  TOURNAMENT_DIRECTOR: '대회 디렉터',
-  FIELD_OPERATOR: '필드 담당자',
-  SUPPORT_READONLY: '지원(조회 전용)',
+  TOURNAMENT_DIRECTOR: '대회 운영자',
+  FIELD_OPERATOR: '구장 담당자',
+  SUPPORT_READONLY: '지원(보기만)',
 };
 
 export function staffRoleLabel(role: V1TournamentStaffRole): string {

@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { staffRoleLabel } from './badges';
 
 /**
- * 필드 담당자(FIELD_OPERATOR)가 딥링크로 들어온 경기 콘솔의 최소 크롬.
+ * 구장 담당자(FIELD_OPERATOR)가 딥링크로 들어온 경기 콘솔의 최소 크롬.
  *
  * `TournamentOpsShell`을 쓰지 않는다: 셸의 내비게이션(운영 보드·결과 검토·스태프)은 전부
  * 대회 전역 화면이라 이 역할이 열면 403이 난다 — 누르면 막히는 링크를 만들지 않는 것이

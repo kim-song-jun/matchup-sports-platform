@@ -65,7 +65,7 @@ function canRevoke(role: V1TournamentStaffRole, target: V1TournamentStaffAssignm
 }
 
 /**
- * 경기장(필드) 안내 · 등록 · 목록 — #373.
+ * 구장(필드) 안내 · 등록 · 목록 — #373.
  *
  * "필드"는 경기가 실제로 열리는 코트·구장이다. 필드 담당자(FIELD_OPERATOR)는 담당 필드가
  * 있어야만 배정되는데(grant-staff-modal.tsx 의 requiresField), 필드를 등록할 화면이 어디에도
@@ -110,8 +110,8 @@ function TournamentFieldsSection({
     e.preventDefault();
     if (!canSubmit) return;
     const ok = await confirm({
-      title: `'${trimmedName}' 경기장을 등록할까요?`,
-      message: '등록한 경기장을 경기 설정과 스태프 배정에서 선택할 수 있어요.',
+      title: `'${trimmedName}' 구장을 등록할까요?`,
+      message: '등록한 구장을 경기 설정과 스태프 배정에서 선택할 수 있어요.',
       confirmLabel: '등록하기',
     });
     if (!ok) return;
@@ -130,10 +130,10 @@ function TournamentFieldsSection({
       {
         onSuccess: (field) => {
           setName('');
-          setNotice(`${field.name} 경기장을 등록했어요.`);
+          setNotice(`${field.name} 구장을 등록했어요.`);
         },
         onError: (mutationError) => {
-          setError(extractErrorMessage(mutationError, '경기장을 등록하지 못했어요.'));
+          setError(extractErrorMessage(mutationError, '구장을 등록하지 못했어요.'));
         },
       },
     );
@@ -149,18 +149,18 @@ function TournamentFieldsSection({
           <MapPin size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" compact /></div>
+          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="구장" compact /></div>
           <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
-            경기 설정과 스태프 배정에서 같은 경기장을 선택해요. 기존 경기 장소도 이름별로 모을 수 있어요.
+            경기 설정과 스태프 배정에서 같은 구장을 선택해요. 기존 경기 장소도 이름별로 모을 수 있어요.
           </p>
         </div>
       </div>
 
       {queryError ? <ErrorState compact message={queryError} onRetry={onRetry} /> : isPending ? (
-        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">경기장을 불러오는 중이에요…</p>
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">구장을 불러오는 중이에요…</p>
       ) : fields.length === 0 ? (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
-          아직 등록된 경기장이 없어요.{' '}
+          아직 등록된 구장이 없어요.{' '}
           {canCreate ? '아래에서 먼저 등록해 주세요.' : '플랫폼 운영자에게 등록을 요청해 주세요.'}
         </p>
       ) : (
@@ -192,7 +192,7 @@ function TournamentFieldsSection({
       {canCreate && !queryError && (
         <form onSubmit={handleSubmit} noValidate className="flex flex-col sm:flex-row gap-2">
           <label htmlFor="tournament-field-name" className="sr-only">
-            경기장 이름
+            구장 이름
           </label>
           <input
             id="tournament-field-name"
@@ -201,7 +201,7 @@ function TournamentFieldsSection({
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
             disabled={create.isPending}
-            placeholder="예: A구장, 1번 코트"
+            placeholder="예: 구장 1, A구장"
             aria-invalid={isDuplicateName}
             aria-describedby={isDuplicateName ? 'tournament-field-name-duplicate' : undefined}
             className="h-[44px] min-h-[44px] flex-none sm:flex-1 sm:min-w-0 px-3 text-base sm:text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
@@ -217,7 +217,7 @@ function TournamentFieldsSection({
                 : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
             ].join(' ')}
           >
-            {create.isPending ? '등록 중…' : '경기장 추가'}
+            {create.isPending ? '등록 중…' : '구장 추가'}
           </button>
         </form>
       )}
@@ -228,7 +228,7 @@ function TournamentFieldsSection({
           className="text-[length:var(--font-size-label)] text-[var(--red700)]"
           role="alert"
         >
-          이미 같은 이름의 경기장이 있어요. 등록된 경기장을 선택하거나 다른 이름을 써주세요.
+          이미 같은 이름의 구장이 있어요. 등록된 구장을 선택하거나 다른 이름을 써주세요.
         </p>
       )}
 
@@ -325,7 +325,7 @@ export function StaffClient({ tournamentId }: Props) {
     <div className="tm-content-enter flex flex-col gap-5">
       <OpsPageHeader
         tournamentTitle={tournament.data?.title}
-        title="스태프"
+        title="스태프·구장"
         description="대회 운영을 도와주는 스태프의 배정 현황이에요."
         action={
           canManage ? (
@@ -421,7 +421,7 @@ export function StaffClient({ tournamentId }: Props) {
                         </td>
                         <td className="px-4 py-3 align-middle">
                           {assignment.fieldId
-                            ? fieldNameById.get(assignment.fieldId) ?? '필드'
+                            ? fieldNameById.get(assignment.fieldId) ?? '구장'
                             : assignment.fixtureIds.length > 0
                               ? `경기 ${assignment.fixtureIds.length}건`
                               : '대회 전체'}
@@ -491,7 +491,7 @@ export function StaffClient({ tournamentId }: Props) {
                   </div>
                   <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-1">
                     {assignment.fieldId
-                      ? fieldNameById.get(assignment.fieldId) ?? '필드'
+                      ? fieldNameById.get(assignment.fieldId) ?? '구장'
                       : assignment.fixtureIds.length > 0
                         ? `경기 ${assignment.fixtureIds.length}건`
                         : '대회 전체'}
@@ -521,7 +521,7 @@ export function StaffClient({ tournamentId }: Props) {
         fields={fields.isError ? [] : fields.data?.items ?? []}
         isPending={fields.isPending}
         canCreate={role === 'PLATFORM_OPS'}
-        queryError={fields.isError ? extractErrorMessage(fields.error, '경기장 목록을 불러오지 못했어요.') : undefined}
+        queryError={fields.isError ? extractErrorMessage(fields.error, '구장 목록을 불러오지 못했어요.') : undefined}
         onRetry={() => void fields.refetch()}
       />
 

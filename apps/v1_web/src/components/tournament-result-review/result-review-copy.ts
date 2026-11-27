@@ -88,9 +88,9 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
  */
 export const ACTOR_ROLE_LABELS: Record<GameActorRole, string> = {
   platform_ops: '플랫폼 운영자',
-  tournament_director: '대회 디렉터',
-  field_operator: '현장 진행요원',
-  support_readonly: '고객지원(읽기 전용)',
+  tournament_director: '대회 운영자',
+  field_operator: '구장 담당자',
+  support_readonly: '지원(보기만)',
   team_owner: '팀장',
   team_manager: '팀 매니저',
   opponent_manager: '상대팀 매니저',

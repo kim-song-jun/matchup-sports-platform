@@ -3,7 +3,10 @@ import XCTest
 /// Actual ActivityKit calls with clearly marked synthetic data; never logs in or mutates alpha.
 @MainActor
 final class LiveActivityUITests: XCTestCase {
-    func testSystemSampleStartsUpdatesAndEnds() {
+    func testSystemSampleStartsUpdatesAndEnds() throws {
+        guard ProcessInfo.processInfo.environment["TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST"] == "1" else {
+            throw XCTSkip("Native ActivityKit sample is opt-in; set TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST=1. No alpha/APNs verification is implied.")
+        }
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--live-activity-preview", "live"]

@@ -31,8 +31,6 @@ import { substitutionPolicyLabel } from '../tournament-detail-shared';
 import { ChoiceButtons, DEFAULT_BADGE, FormGroup, SPORT_DEFAULT_BADGE, TextField, infoFieldId, useSectionDraft } from './form-kit';
 import type { InfoSectionDefinition, InfoSectionFormProps, InfoSummaryRow } from './types';
 
-/** 서버가 409 로 돌려주는 안내와 같은 말 — 미리 읽든 저장하다 막히든 같은 길을 보게 한다. */
-const LINEUP_LOCK_ESCAPE_HINT = '꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요.';
 const SUSPENSION_ERROR = '출전정지 기준은 1~20 사이의 정수로 적어 주세요.';
 const SUBSTITUTION_LABEL: Record<V1SubstitutionMode, string> = { limited: '횟수 제한', rolling: '자유 교체' };
 const SIX_TEAM_MODE_NAME = { on: '6강 · 승리팀 중 1팀 결승 직행', off: '일반 토너먼트' };
@@ -157,7 +155,7 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
     const now = current ? ` 지금 ${current}.` : '';
     if (started) {
       const what = subject === '출전 인원' ? '출전 인원을' : '교체 방식을';
-      return { text: `대회가 시작된 뒤에는 ${what} 바꿀 수 없어요.${now} ${LINEUP_LOCK_ESCAPE_HINT}`, tone: 'warning' };
+      return { text: `대회가 시작된 뒤에는 ${what} 바꿀 수 없어요.${now}`, tone: 'warning' };
     }
     if (options.isPending) return { text: '선택지를 불러오는 중이에요…', tone: 'muted' };
     if (options.isError || !options.data) {

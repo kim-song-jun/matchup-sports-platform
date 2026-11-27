@@ -242,9 +242,10 @@ describe('경기 규칙 섹션 시트 — 출전 인원·교체', () => {
     const view = renderInfoSheet(rulesSection, backend);
     await view.inSheet().findByLabelText('전반');
 
-    expect(view.inSheet().getByText(/대회가 시작된 뒤에는 출전 인원을 바꿀 수 없어요\. 지금 6명이에요\./)).toBeInTheDocument();
-    expect(view.inSheet().getByText(/대회가 시작된 뒤에는 교체 방식을 바꿀 수 없어요\. 지금 자유 교체예요\./)).toBeInTheDocument();
-    expect(view.inSheet().getAllByText(/꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요\./)).toHaveLength(2);
+    expect(view.inSheet().getByText('대회가 시작된 뒤에는 출전 인원을 바꿀 수 없어요. 지금 6명이에요.')).toBeInTheDocument();
+    expect(view.inSheet().getByText('대회가 시작된 뒤에는 교체 방식을 바꿀 수 없어요. 지금 자유 교체예요.')).toBeInTheDocument();
+    // 이 화면에서 갈 수 없는 곳을 가리키지 않는다.
+    expect(view.sheet().textContent).not.toContain('대회 설정 변경');
     expect(view.inSheet().queryByRole('group', { name: '출전 인원' })).toBeNull();
     expect(view.inSheet().queryByRole('group', { name: '교체' })).toBeNull();
 

@@ -11,6 +11,7 @@ export interface EventToastAction {
 export interface EventToastItem {
   readonly id: number;
   readonly message: string;
+  readonly description: string | null;
   readonly action: EventToastAction | null;
   /** 퇴장 애니메이션이 재생되는 동안 true. 이 시간이 지나야 실제로 제거된다. */
   readonly exiting?: boolean;
@@ -58,9 +59,9 @@ export function useEventToast() {
   }, []);
 
   const showToast = useCallback(
-    (message: string, opts?: { action?: EventToastAction }) => {
+    (message: string, opts?: { action?: EventToastAction; description?: string }) => {
       const id = ++counterRef.current;
-      setToasts((prev) => [...prev, { id, message, action: opts?.action ?? null }]);
+      setToasts((prev) => [...prev, { id, message, description: opts?.description ?? null, action: opts?.action ?? null }]);
       const timer = setTimeout(() => {
         dismiss(id);
         timerRefs.current = timerRefs.current.filter((t) => t !== timer);
@@ -111,7 +112,12 @@ export function EventToasts({
           }`}
         >
           <CheckCircle2 size={16} aria-hidden="true" className="shrink-0" />
-          <span className="flex-1">{toast.message}</span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span>{toast.message}</span>
+            {toast.description !== null ? (
+              <span className="text-[length:var(--font-size-caption)] font-medium text-white/80">{toast.description}</span>
+            ) : null}
+          </span>
           {toast.action ? (
             <button
               type="button"
@@ -119,7 +125,7 @@ export function EventToasts({
                 toast.action?.onClick();
                 onDismiss?.(toast.id);
               }}
-              className="shrink-0 rounded-lg bg-white/15 px-3 py-2 text-xs font-bold text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+              className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/15 px-3 text-[length:var(--font-size-body-sm)] font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
             >
               {toast.action.label}
             </button>

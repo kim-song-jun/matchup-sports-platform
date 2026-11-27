@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 function CurrentFixture() {
   const query = useV1AdminBracket('t-1');
-  return query.data ? <FixtureMetadataEditor tournamentId="t-1" fixture={query.data.fixtures[0]} groups={query.data.groups} fixtures={query.data.fixtures} slots={[]} canWrite /> : null;
+  return query.data ? <FixtureMetadataEditor tournamentId="t-1" fixture={query.data.fixtures[0]} groups={query.data.groups} fixtures={query.data.fixtures} slots={[]} canWrite showToast={vi.fn()} /> : null;
 }
 function show(canWrite = true, canManageFields = true, editor = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -261,11 +261,11 @@ describe('real fixture assignment API and shared editor', () => {
   });
   it('changes time and court independently, rehydrates the existing manual editor, and keeps collapsed sections', async () => {
     show(true, true, true);
-    expect(await screen.findByLabelText('경기 시각')).toHaveValue('2026-11-21T10:00');
+    expect(await screen.findByLabelText('시각')).toHaveValue('10:00');
     fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
     const selection = await screen.findByLabelText(`${timeLabel(times[1].scheduledAt)}에 경기 배정`);
     fireEvent.change(selection, { target: { value: 'f1' } });
-    await waitFor(() => expect(screen.getByLabelText('경기 시각')).toHaveValue('2026-11-21T10:30'));
+    await waitFor(() => expect(screen.getByLabelText('시각')).toHaveValue('10:30'));
     expect(patches[0]).toEqual({ scheduledAt: times[1].scheduledAt });
     expect(fixtures[0].fieldId).toBe('field-a');
     const summary = screen.getByText(timeLabel(stamp), { selector: 'summary > span' }).closest('summary')!;
@@ -278,8 +278,8 @@ describe('real fixture assignment API and shared editor', () => {
     expect(fixtures[0].scheduledAt).toBe(times[1].scheduledAt);
     fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));
     expect(screen.getByText(timeLabel(stamp), { selector: 'summary > span' }).closest('details')).not.toHaveAttribute('open');
-    fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-11-21T10:45' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '10:45' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await screen.findByLabelText(`${timeLabel('2026-11-21T01:45:00Z')}에 경기 배정`);
     expect(patches[2]).toEqual({ scheduledAt: '2026-11-21T01:45:00.000Z' });
   });

@@ -423,7 +423,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
         <ByeSideControl tournamentId={props.competitionId} fixture={props.fixtures.find((fixture) => fixture.id === node.fixtureId)!}
           slots={props.slots} canWrite={canWrite} showToast={props.showToast} onSaved={props.onDone} />
       ) : null}
-      {scope === 'tournament' && props.fixtures?.find(f => f.id === node.fixtureId) ? <FixtureMetadataEditor key={node.fixtureId} tournamentId={props.competitionId} fixture={props.fixtures.find(f => f.id === node.fixtureId)!} groups={groups} fixtures={props.fixtures} slots={props.slots} canWrite={canWrite} /> : canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
+      {scope === 'tournament' && props.fixtures?.find(f => f.id === node.fixtureId) ? <FixtureMetadataEditor key={node.fixtureId} tournamentId={props.competitionId} fixture={props.fixtures.find(f => f.id === node.fixtureId)!} groups={groups} fixtures={props.fixtures} slots={props.slots} canWrite={canWrite} showToast={props.showToast} /> : canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
       <ResultSection {...props} />
     </div>
   );

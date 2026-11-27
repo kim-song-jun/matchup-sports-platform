@@ -189,7 +189,7 @@ describe('league time assignment through the league API', () => {
     const onChange = vi.fn();
     render(<QueryClientProvider client={client}><RegisteredFixtureTimePicker tournamentId="l1" surface="league-matches" allowUnset={false}
       fixtures={[{ scheduledAt: fixture.startAt }]} value="2026-11-20T10:00" onChange={onChange} disabled={false} /></QueryClientProvider>);
-    const select = screen.getByLabelText('등록된 시간에서 선택');
+    const select = screen.getByLabelText('시각 고르기');
     await waitFor(() => expect(select).toBeEnabled());
     expect(screen.getByRole('option', { name: '등록된 시간을 선택해 주세요' })).toBeDisabled();
     fireEvent.change(select, { target: { value: stamp } });

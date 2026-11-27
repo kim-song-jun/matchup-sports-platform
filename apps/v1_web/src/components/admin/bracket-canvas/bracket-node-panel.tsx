@@ -404,7 +404,7 @@ export function BracketNodePanel({
 
       <section aria-label="경기 정보" className="flex flex-col gap-3">
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>경기 정보</h3>
-        <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} />
+        <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} showToast={showToast} />
       </section>
 
       {canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:')) ? (

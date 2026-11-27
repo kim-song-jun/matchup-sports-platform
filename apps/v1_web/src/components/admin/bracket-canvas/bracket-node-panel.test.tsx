@@ -91,8 +91,8 @@ describe('BracketNodePanel — 자리 배정', () => {
   it('등록 필드를 선택한 대회 일정은 장소 문자열과 나눠 보내지 않는다', () => {
     renderPanel();
     fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'field-a' } });
-    expect(screen.queryByLabelText('장소')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    expect(screen.queryByLabelText('구장 직접 입력')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     const payload = mocks.updateFixture.mock.calls[0][0];
     expect(payload).toMatchObject({ fixtureId: 'f1', fieldId: 'field-a' });
     expect(payload).not.toHaveProperty('venue');
@@ -374,7 +374,7 @@ describe('BracketNodePanel — 자리 배정', () => {
   it('읽기 전용이면 선택창·저장·삭제·점수 입력이 모두 없다', () => {
     renderPanel(fixtureOf({ awayRegistrationId: 'r3', awayTeamName: '대구FC' }), { canWrite: false });
     expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '경기 정보 저장' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
@@ -419,8 +419,9 @@ describe('BracketNodePanel — 진출 연결', () => {
 describe('BracketNodePanel — 일정·삭제', () => {
   it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장하고, 장소를 안 건드렸으면 장소 필드는 보내지 않는다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
-    fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-10T14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.change(screen.getByLabelText('날짜'), { target: { value: '2026-10-10' } });
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '14:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(mocks.updateFixture).toHaveBeenCalledWith(
       { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z' },
     );
@@ -428,8 +429,9 @@ describe('BracketNodePanel — 일정·삭제', () => {
 
   it('장소 이름을 바꾸면 venue 를 함께 보낸다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
-    fireEvent.change(screen.getByLabelText('장소'), { target: { value: '상암 보조구장' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    fireEvent.change(screen.getByLabelText('구장 직접 입력'), { target: { value: '상암 보조구장' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
   });
 

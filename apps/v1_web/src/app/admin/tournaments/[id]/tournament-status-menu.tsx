@@ -97,6 +97,16 @@ export function TournamentStatusMenu({
   const chipLabel = TOURNAMENT_CHIP_LABEL[status];
   const visibilityLabel = status === 'cancelled' ? null : isPublic ? '공개' : '비공개';
 
+  // 열 항목이 없으면(조회 전용 관리자의 취소된 대회) 누를 수 없는 버튼 대신 상태만 보인다.
+  if (actions.length === 0) {
+    return (
+      <span className="inline-flex min-h-[44px] items-center gap-2 px-1 text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)]">
+        <AdminStatusPill status={status} label={chipLabel} />
+        {visibilityLabel ? <span>· {visibilityLabel}</span> : null}
+      </span>
+    );
+  }
+
   return (
     <ActionMenu
       label="대회 상태"

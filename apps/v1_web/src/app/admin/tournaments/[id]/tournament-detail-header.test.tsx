@@ -140,6 +140,13 @@ describe('TournamentStatusMenu', () => {
     for (const item of within(menu).getAllByRole('menuitem')) expect(item).toBeDisabled();
   });
 
+  it('열 항목이 하나도 없으면(조회 전용 관리자의 취소된 대회) 버튼 없이 상태만 보인다', () => {
+    render(<TournamentStatusMenu {...menuProps({ status: 'cancelled', canWrite: false })} />);
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByText('취소됨')).toBeInTheDocument();
+  });
+
   it('폰 폭에서는 같은 메뉴가 dialog 시트로 열리고 진행 막대가 보인다', () => {
     media.setWidth(390);
     render(<TournamentStatusMenu {...menuProps({ status: 'completed' as V1TournamentStatus })} />);

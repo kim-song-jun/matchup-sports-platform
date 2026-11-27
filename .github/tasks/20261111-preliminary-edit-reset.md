@@ -80,6 +80,12 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 - 검증: 기존 페이지22/초기화8/배정17 총47 tests PASS(단일 worker). 웹 타입/패턴·diff whitespace PASS, touched 소스 debt marker0. 동일 lockfile 의존성을 junction으로 재사용했으며 원본은 수정하지 않았다. 실제 Alpha 화면은 미병합 변경이므로 아직 검증하지 않았으며 PR에서 명시한다. 로컬 Next 서버와 데이터 초기화는 실행하지 않는다.
 - Progress: 구현 [x], 관련 회귀 [x], 타입/패턴 [x], dev 대상 PR [ ], 머지 후 Alpha 390/768/1440 화면·console/network [ ]. 미병합 브랜치/worktree는 PR 후속 작업을 위해 유지한다.
 
+### 2026-11-27 PR #2570 추가 — 우측 대진 상세 패널 고정
+
+- 사용자 요청: 시간·구장 배정처럼 대진을 눌렀을 때 나오는 우측 패널도 스크롤에 고정한다. 기존 PR #2570에 추가하며 Owned 범위에 `bracket-canvas-workspace.tsx`를 추가한다.
+- 우측 열에서만 상세/부전승 편집 공통 wrapper에 `sticky top-4 self-start`와 배정 패널과 같은 `max-h-[calc(100dvh-2rem)] overflow-y-auto`를 적용한다. 긴 폼 하단도 패널 내부 스크롤로 접근한다. 하단 시트·선택·닫기·포커스 계약은 유지한다.
+- 검증: 기존 workspace62 tests PASS. 실행 중 같은 workspace의 확인 모달과 경기 도구 다이얼로그가 `closed` key를 공유하는 React 경고를 발견해 도구 key에 고유 prefix를 붙였다. 해당 회귀를 재확인하고 웹 타입/패턴 확인 후 같은 PR에 push한다. 실제 스크롤 고정/긴 폼 조작/390·768·1440 화면·console/network는 dev 머지 후 Alpha에서 확인해야 하며 아직 미검증이다.
+
 ### 기존 구현 이력
 - 최신 origin/dev 4a22824a5 기준 feat/preliminary-edit-reset 격리 worktree.
 - Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 22 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.

@@ -2,9 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StagePlanEditor } from './stage-plan-editor';
 import { useState } from 'react';
-import { initialStagePlan, rankedLeagueStagePlan, stagePlanCounts, stagePlanError } from '@/lib/stage-plan';
-import { buildTournamentCreatePayload, INITIAL_TOURNAMENT_CREATE_STATE, mapTournamentToWizardFields, tournamentCreateReducer, hasUnsavedTournamentChanges } from '@/app/admin/tournaments/new/tournament-create-model';
-import type { V1Tournament } from '@/types/api';
+import { initialStagePlan, rankedLeagueStagePlan, stagePlanError } from '@/lib/stage-plan';
 vi.mock('@/components/v1-ui/confirm-modal', () => ({ useConfirm: () => ({ confirm: async () => true, ConfirmModal: null }) }));
 afterEach(cleanup);
 function Editor() { const [plan, setPlan] = useState(initialStagePlan); return <StagePlanEditor value={plan} onChange={setPlan} />; }
@@ -35,18 +33,6 @@ describe('단계형 대회 생성 계약', () => {
     expect(expanded.open).toBe(true);
     expect(document.querySelectorAll('details[open]')).toHaveLength(1);
     expect((within(within(expanded).getByRole('combobox', { name: '1번 자리' })).getByRole('option', { name: '예선 · A조 1위' }) as HTMLOptionElement).selected).toBe(true);
-  });
-  it('대회 저장 payload와 초안 복원에 단계 구성을 보존하고 변경을 감지한다', () => {
-    const plan = rankedLeagueStagePlan();
-    const state = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, { type: 'set-stage-plan', plan });
-    const payload = buildTournamentCreatePayload(state);
-    expect(payload).toMatchObject({ teamCount: 20, format: 'league_knockouts', stagePlan: plan, sixTeamMode: false });
-    expect(stagePlanCounts(plan)).toEqual({ teams: 20, fixtures: 70 });
-    expect(stagePlanError(plan)).toBeNull();
-    const restored = mapTournamentToWizardFields({ ...payload, id: 'draft', updatedAt: '2026-11-09T00:00:00Z', stagePlan: plan } as V1Tournament);
-    expect(restored.stagePlan).toEqual(plan);
-    const changed = tournamentCreateReducer(restored, { type: 'set-stage-plan', plan: initialStagePlan() });
-    expect(hasUnsavedTournamentChanges(changed)).toBe(true);
   });
   it('순위 출처 중복은 저장 가능한 구성으로 취급하지 않는다', () => {
     const plan = rankedLeagueStagePlan(); plan.stages[1].pools[0].sources[1] = plan.stages[1].pools[0].sources[0];

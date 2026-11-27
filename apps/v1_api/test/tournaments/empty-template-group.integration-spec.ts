@@ -39,6 +39,29 @@ async function deleteFixtures(tournamentId: string) {
 describe('경기를 모두 삭제한 템플릿 조 정리 (PostgreSQL)', () => {
   beforeAll(async () => { await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); });
+  it('같은 조의 두 경기만 슬롯과 등록을 함께 교환하고 이전 배정으로 재요청하면 거부한다', async () => {
+    const { tournamentId, entries } = await seeded('group-fixture-team-swap');
+    const select = { teamMatchId: true, groupId: true, fixtureNumber: true, round: true,
+      homeRegistrationId: true, awayRegistrationId: true,
+      teamMatch: { select: { homeSlotId: true, awaySlotId: true, startAt: true, fieldId: true } } } as const;
+    const read = () => prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId }, select, orderBy: { teamMatchId: 'asc' } });
+    const before = await read();
+    const [a, b] = before.filter(row => row.groupId === entries[0].groupId);
+    const key = (row: typeof a) => [row.homeRegistrationId, row.awayRegistrationId, row.teamMatch.homeSlotId, row.teamMatch.awaySlotId].join('|');
+    const input = { firstFixtureId: a.teamMatchId, secondFixtureId: b.teamMatchId, firstAssignment: key(a), secondAssignment: key(b) };
+    await bracket.swapGroupFixtureTeams(user, tournamentId, input);
+    const after = await read();
+    for (const old of before) {
+      const changed = old === a ? b : old === b ? a : old;
+      expect(after.find(row => row.teamMatchId === old.teamMatchId)).toEqual({
+        ...old, homeRegistrationId: changed.homeRegistrationId, awayRegistrationId: changed.awayRegistrationId,
+        teamMatch: { ...old.teamMatch, homeSlotId: changed.teamMatch.homeSlotId, awaySlotId: changed.teamMatch.awaySlotId },
+      });
+    }
+    await expect(bracket.swapGroupFixtureTeams(user, tournamentId, input)).rejects.toMatchObject({ status: 409 });
+    expect(await read()).toEqual(after);
+  });
+
   it('연결 경기0인 ENTRY를 비우면 편성/순위를 해제하고 빈 조 및 빈 결선 조도 삭제한다', async () => {
     const { tournamentId, entries } = await seeded('empty-template');
     await deleteFixtures(tournamentId);

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useV1DataSource } from '@/components/providers/v1-data-source';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { extractErrorMessage } from '@/lib/error-message';
 import { v1Keys } from '@/lib/query-keys';
@@ -25,6 +26,7 @@ export function GroupFixtureTeamSwap({ tournamentId, groups, fixtures, teamNames
   showToast: (message: string, variant: 'success' | 'error') => void;
 }) {
   const { v1Post } = useV1DataSource();
+  const { confirm, ConfirmModal } = useConfirm();
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const [first, setFirst] = useState<Fixture | null>(null);
@@ -38,8 +40,8 @@ export function GroupFixtureTeamSwap({ tournamentId, groups, fixtures, teamNames
     if (saving || first.groupId !== second.groupId) return;
     const preview = (target: Fixture, source: Fixture) =>
       target.fixtureNumber + '번 경기: ' + teamNames(target) + ' → ' + teamNames(source);
-    if (!window.confirm(['두 경기의 팀 조합을 교환할까요?', preview(first, second), preview(second, first),
-      '경기 번호, 시간, 구장은 유지돼요.'].join('\n'))) return;
+    if (!await confirm({ title: '두 경기의 팀 조합을 교환할까요?', confirmLabel: '팀 조합 교환하기',
+      message: [preview(first, second), preview(second, first), '경기 번호, 시간, 구장은 유지돼요.'].join('\n') })) return;
     setSaving(true);
     try {
       await v1Post('/admin/tournaments/' + tournamentId + '/group-fixture-team-swap', {
@@ -59,6 +61,7 @@ export function GroupFixtureTeamSwap({ tournamentId, groups, fixtures, teamNames
   }
 
   return <section>
+    {ConfirmModal}
     <Button variant={open ? 'primary' : 'outline'} aria-expanded={open} disabled={saving}
       onClick={() => { setOpen(!open); setFirst(null); }}>팀 조합 교환</Button>
     {open && <div className="mt-3 grid gap-3">

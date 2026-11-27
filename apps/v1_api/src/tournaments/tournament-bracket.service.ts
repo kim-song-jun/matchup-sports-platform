@@ -67,6 +67,7 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admi
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
+import { lockCompetitionForBracketMutationInTx } from './slots/competition-bracket-lock';
 import { lockGameRows } from '../games/roster/game-row-lock';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { acceptsBracketSource } from './tournament-bracket-phases';
@@ -1108,9 +1109,10 @@ export class TournamentBracketService {
 
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async swapGroupFixtureTeams(user: V1AuthUser, tournamentId: string, dto: GroupTeamSwapDto) {
-    await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
-    await this.loadTournament(tournamentId);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
+    const tournament = await this.loadTournament(tournamentId);
     return this.prisma.$transaction(async tx => {
+      await lockCompetitionForBracketMutationInTx(tx, tournament);
       const ids = [dto.firstFixtureId, dto.secondFixtureId];
       const games = await tx.v1Game.findMany({ where: { teamMatchId: { in: ids }, teamMatch: { tournamentId } }, select: { id: true } });
       await lockGameRows(tx, games.map(game => game.id));
@@ -1139,8 +1141,11 @@ export class TournamentBracketService {
           homeSlotId: source.teamMatch.homeSlotId, awaySlotId: source.teamMatch.awaySlotId,
         } });
       }
+      await this.adminContext.logAdminAction(admin, { action: 'tournament.fixture.groupTeamSwap', targetType: 'tournament',
+        targetId: tournamentId, beforeJson: { fixtureIds: ids, assignments: [dto.firstAssignment, dto.secondAssignment] },
+        afterJson: { fixtureIds: ids, assignments: [dto.secondAssignment, dto.firstAssignment] } }, tx);
       return { fixtureIds: ids };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { timeout: 30_000 });
   }
 
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {

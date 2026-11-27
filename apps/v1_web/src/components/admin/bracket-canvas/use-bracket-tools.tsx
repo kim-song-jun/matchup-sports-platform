@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { StagePlanDialog } from '@/components/admin/stages/stage-plan-dialog';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
@@ -65,6 +65,11 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
   const randomFill = useV1RandomFillSlots(tournamentId, 'tournament');
   const resetFlow = useBracketResetFlow(tournamentId, canWrite, showToast);
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  // 경기 열기 요청은 그림 보기에서 낸 것만 남긴다 — 목록에서 낸 요청은 그림이 나중에 마운트되며 먼저 소비해 패널을 뜻밖에 연다.
+  // 대진을 다시 읽는 동안 보기가 바뀔 수 있어 요청하는 순간의 보기를 ref 로 읽는다.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const requestFocus = (fixtureId: string) => { if (viewRef.current === 'canvas') controls.requestFocus(fixtureId); };
   // 닫히는 동안 내용이 바뀌지 않게 마지막 방식을 남겨 둔다.
   const [multiFinals, setMultiFinals] = useState<{ mode: MultiFinalsMode; open: boolean }>({ mode: 'create', open: false });
   const format = tournament?.format;
@@ -153,7 +158,7 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
           format={format}
           tournamentId={tournamentId}
           bracket={bracket}
-          onFixtureCreated={controls.requestFocus}
+          onFixtureCreated={requestFocus}
           onClose={close}
           showToast={showToast}
         />
@@ -170,7 +175,7 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
           onApplied={() => {
             void refetch().then(({ data }) => {
               const first = [...(data?.fixtures ?? [])].sort((a, b) => a.fixtureNumber - b.fixtureNumber)[0];
-              if (first) controls.requestFocus(first.id);
+              if (first) requestFocus(first.id);
             });
           }}
           onClose={close}

@@ -18,6 +18,11 @@ export interface AdminTabNavItem {
   externalNote?: string;
 }
 
+export interface AdminTabNavGroup {
+  label: string;
+  items: AdminTabNavItem[];
+}
+
 export interface AdminTabNavMore {
   label: string;
   groups: readonly { label: string; items: readonly AdminTabNavItem[] }[];
@@ -31,6 +36,22 @@ export interface AdminTabNavProps {
   pathname: string;
   /** 섹션 링크 뒤에 붙일 쿼리(`?from=…` 처럼 섹션을 옮겨도 이어 가야 하는 값). 셸 밖으로 나가는 링크에는 붙이지 않는다. */
   query?: string;
+}
+
+/** 묶음 목록의 앞 `limit` 개를 탭으로, 나머지를 원래 묶음 이름 아래 더보기로 나눈다. 빈 묶음은 버린다. */
+export function splitTabGroups(
+  groups: readonly AdminTabNavGroup[],
+  limit: number,
+): { tabs: AdminTabNavItem[]; more: AdminTabNavGroup[] } {
+  const tabs: AdminTabNavItem[] = [];
+  const more: AdminTabNavGroup[] = [];
+  for (const group of groups) {
+    const room = Math.max(0, limit - tabs.length);
+    tabs.push(...group.items.slice(0, room));
+    const rest = group.items.slice(room);
+    if (rest.length > 0) more.push({ label: group.label, items: rest });
+  }
+  return { tabs, more };
 }
 
 const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';

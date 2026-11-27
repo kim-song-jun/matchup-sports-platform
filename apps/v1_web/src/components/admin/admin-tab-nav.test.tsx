@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { installMatchMedia } from '@/test/match-media';
-import { AdminTabNav, type AdminTabNavProps } from './admin-tab-nav';
+import { AdminTabNav, splitTabGroups, type AdminTabNavProps } from './admin-tab-nav';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/admin/things/1/overview' }));
 
@@ -139,5 +139,35 @@ describe('AdminTabNav', () => {
     expect(within(sheet).getByRole('link', { name: /협찬/ })).toHaveAttribute('href', '/admin/things/1/sponsors');
     expect(within(sheet).getByRole('link', { name: /팝업/ })).toHaveAttribute('href', '/admin/content?tab=popups');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});
+
+describe('splitTabGroups', () => {
+  const groups = [
+    { label: '운영', items: [{ slug: 'a', label: 'A' }, { slug: 'b', label: 'B' }] },
+    { label: '설정', items: [{ slug: 'c', label: 'C' }] },
+    { label: '사후', items: [{ slug: 'd', label: 'D' }, { slug: 'e', label: 'E' }] },
+  ];
+
+  it('앞에서부터 limit 개는 탭이고 나머지는 원래 묶음 이름 아래 더보기로 간다', () => {
+    const { tabs, more } = splitTabGroups(groups, 4);
+    expect(tabs.map((tab) => tab.slug)).toEqual(['a', 'b', 'c', 'd']);
+    expect(more).toEqual([{ label: '사후', items: [{ slug: 'e', label: 'E' }] }]);
+  });
+
+  it('묶음 가운데서 잘려도 앞쪽은 탭, 뒤쪽은 더보기이고 비는 묶음은 버린다', () => {
+    const { tabs, more } = splitTabGroups(groups, 1);
+    expect(tabs.map((tab) => tab.slug)).toEqual(['a']);
+    expect(more.map((group) => [group.label, group.items.map((item) => item.slug)])).toEqual([
+      ['운영', ['b']],
+      ['설정', ['c']],
+      ['사후', ['d', 'e']],
+    ]);
+  });
+
+  it('항목이 limit 개 이하면 더보기가 없다', () => {
+    const { tabs, more } = splitTabGroups(groups, 5);
+    expect(tabs).toHaveLength(5);
+    expect(more).toEqual([]);
   });
 });

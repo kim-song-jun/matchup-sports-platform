@@ -24,3 +24,5 @@ Task: [20261141](../../.github/tasks/20261141-ios-widget-lock-screen.md). PR-C L
 - [ ] Apple App Group/서명 프로비저닝
 
 새 대회·경기·DB 변경과 토큰 발급/저장 검증은 실행하지 않음. 샘플 PASS를 실제 API PASS로 보고하지 않음.
+
+[PR #2562](https://github.com/kim-song-jun/matchup-sports-platform/pull/2562). 캡처는 484b57172 SHA 고정 PR 갤러리로 공유하고 최종 트리에서 제거. 전용 시뮬레이터는 검증 후 종료한다.

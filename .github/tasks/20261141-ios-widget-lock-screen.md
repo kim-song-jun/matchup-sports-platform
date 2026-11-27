@@ -32,3 +32,5 @@ PR-A #2559가 dev에 머지됨. 최신 origin/dev e7979b290에서 새 codex/ios-
 구현 완료, 검증/PR 진행 중. Alpha 앱+확장 unsigned test PASS: 기존 WidgetTests 10 + 신규 WidgetFollowupTests 3 = 13/13. 고정 샘플 7상태의 잠금화면 14/14 뷰 캡처·육안 확인. Production unsigned 앱+확장 빌드 PASS. PR-C/D 제외.
 
 현재 worktree /private/tmp/teameet-ios-widget-pr-b, branch codex/ios-widget-pr-b. 원본 iOS/Android worktree 변경하지 않음. 모델/예시의 로고 URL은 nil이며 샘플 첫 글자 표시는 실제 다운로드 결과가 아님. 실제 alpha 토큰 주입·WidgetKit 호스트 네트워크 검증은 여전히 미확인.
+
+PR #2562 (base dev, ready for review) 생성. 샘플 PNG는 484b57172 SHA 고정 갤러리로 보존 후 최종 트리에서 제거. CI/리뷰 및 실제 alpha 확인 필요 항목은 미완료.

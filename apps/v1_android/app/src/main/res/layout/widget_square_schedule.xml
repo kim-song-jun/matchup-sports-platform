@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="12dp">
+    <TextView android:id="@+id/sc_day" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true"
+        android:textColor="#FFFFFFFF" android:textSize="11sp" android:textStyle="bold" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="vertical">
+        <TextView android:id="@+id/sc_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textSize="32sp" android:textStyle="bold" />
+        <TextView android:id="@+id/sc_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:ellipsize="end" android:maxLines="2"
+            android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" />
+    </LinearLayout>
+    <TextView android:id="@+id/sc_league" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="2"
+        android:textColor="#CCFFFFFF" android:textSize="11sp" />
+    <LinearLayout android:id="@+id/sc_place_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_widget_pin" />
+        <TextView android:id="@+id/sc_place" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="3dp" android:layout_weight="1"
+            android:ellipsize="end" android:singleLine="true" android:textColor="#D9FFFFFF" android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

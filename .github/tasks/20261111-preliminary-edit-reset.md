@@ -84,3 +84,7 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 - QA 전용 비공개 대회와 본인 소유 임시 팀 2개만 생성했다. 기준선 캡처 후 대회 cancelled + isPublic=false, 두 QA 팀 해체 완료. 기존 대회·팀 수정 0. 자격증명·쿠키·팀/대회 UUID는 커밋하지 않았다.
 - Headed Chrome PID/Node PPID: 35420/18588, 17548/13228, 11472/28932, 26004/32164, 14528/30448, 15180/10424, 33376/12200, 33436/14488, 33224/1832. 각 시도는 finally에서 browser/context/server 종료 확인. 로그인 1차 load 대기와 후속 hydration/networkidle 대기는 harness 실패로 기록하며 API 실패로 오인하지 않는다. 최종 harness는 React 폼 hydration 이후 로그인했다.
 - 스키마·migration 변경 없음. 관련 모델: Tournament/Group/GroupTeam/Standing/Slot/MatchDetails/TeamMatch/Game/AdvancementEdge 및 일정·감사 기록.
+
+### 2026-11-27 PR #2556 CI 후속
+- Web CI run 45951119915에서 직접 입력 모달 재열기 테스트가 초기화 useEffect 전에 이전 입력을 읽어 실패. 빈 값 확인을 waitFor로 기다리되, 확인 버튼 비활성·쓰기 요청 없음 단언은 유지했다. 제품 코드/도메인 계약 변경 없음.
+- 최신 origin/dev 병합 후 해당 Vitest 파일 단일 worker 검증: 8/8 PASS. Android 빌드는 기존 CI SUCCESS. 전체 CI 결과는 push 후 별도 확인.

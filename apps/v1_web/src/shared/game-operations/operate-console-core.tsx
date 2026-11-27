@@ -1033,14 +1033,10 @@ export function OperateConsoleCore({
     return (gameDetail.data?.sides ?? []).find((side) => side.sideKey === sideKey) ?? null;
   }, [confirmedPenalties, gameDetail.data?.sides]);
 
-  // 과제 2 — 승부차기 시작 버튼 노출 조건. 종료 흐름 개편(사용자 결정 2·3)
-  // 으로 이 시점이 **후반 종료 이후**로 옮겨졌다: 예전엔 "마지막 피리어드가
-  // 아직 LIVE인 동안"(`currentPeriod !== null && !hasNextPeriod`)에 띄웠는데,
-  // 그러면 아직 뛰고 있는 경기 중에 승부차기 입력이 열려 있는 셈이었다.
-  // 지금은 `regulationEnded`(모든 피리어드 ENDED + 게임은 여전히 LIVE) —
-  // 즉 정규 시간이 실제로 끝난 뒤에만 열린다. 이 시스템은 별도의 "연장전"
-  // 피리어드 타입을 두지 않는다(competition-config 프리셋은 전반/후반 두
-  // 피리어드뿐 — `연장`은 대회가 설정한 마지막 피리어드가 곧 그 뜻이다).
+  // 과제 2 — 승부차기 시작 버튼 노출 조건. `regulationEnded`(설정된 피리어드가 모두 ENDED +
+  // 게임은 여전히 LIVE)일 때만 열린다 — 뛰는 중에는 승부차기 입력이 열리지 않는다.
+  // 연장은 별도 피리어드 타입이 아니라 `periodDurations[i].extraTime` 로 구분되는 설정된
+  // 피리어드이므로, 연장이 있는 경기는 그 연장 피리어드까지 끝나야 `regulationEnded` 다.
   //
   // The host adapter supplies this capability from the server's fixture classification.
   // The shared console only decides whether the two sides are tied at regulation end.
@@ -2217,17 +2213,17 @@ export function OperateConsoleCore({
         periodDurationMinutes={gameState === 'LIVE' ? currentPeriodDurationMinutes : null}
         onExpiryChange={handlePeriodExpiryChange}
       />
-    ) : halftime || regulationEnded ? (
-      // 뛰는 경기 시간이 없어 잴 시계가 없다 — 이 칩이 지금 단계를 말한다.
+    ) : regulationEnded || (halftime && progressStrip === null) ? (
+      // 뛰는 경기 시간이 없어 잴 시계가 없다 — 이 칩이 그 이유를 말한다. 쉬는 단계는 단계 줄이 말하므로 줄을 못 그릴 때만 칩이 대신한다.
       <span className={STAGE_CHIP_CLASS}>
         <Timer size={16} aria-hidden="true" />
         {halftime && halftimePeriod !== null ? breakLabelBefore(halftimePeriod.number, periodCount) : '정규 시간 종료'}
       </span>
     ) : null;
 
-  // 경기가 정상으로 흐르는 동안은 시계(초록 점)·하프타임 칩·단계 줄이 지금 상태를 말하므로 「진행 중」 배지를 숨긴다.
-  // 시작 전·일시 중지·종료·취소와 시계도 칩도 없는 진행 중은 이 배지가 유일한 표시라 그대로 둔다.
-  const stateBadge = gameState === 'LIVE' && clockSlot !== null ? null : gameState ? STATE_LABEL[gameState] : '-';
+  // 경기가 정상으로 흐르는 동안은 시계(초록 점)·단계 줄·정규 종료 칩이 지금 상태를 말하므로 「진행 중」 배지를 숨긴다.
+  // 시작 전·일시 중지·종료·취소와 시계도 칩도 단계 줄도 없는 진행 중은 이 배지가 유일한 표시라 그대로 둔다.
+  const stateBadge = gameState === 'LIVE' && (clockSlot !== null || progressStrip !== null) ? null : gameState ? STATE_LABEL[gameState] : '-';
 
   // 승부차기는 정규 시간 점수와 다른 값이라 스코어에 섞지 않고 따로 적는다. 선축을 모르는 옛 기록은 그 조각을 생략한다.
   const penaltyChip = confirmedPenalties ? (

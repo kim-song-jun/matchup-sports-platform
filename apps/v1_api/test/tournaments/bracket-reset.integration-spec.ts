@@ -29,7 +29,7 @@ async function seeded(label: string, format: 'league' | 'knockout' | 'group_knoc
 }
 async function reset(id: string) {
   const preview = await resets.preview(user, id);
-  return resets.reset(user, id, { expectedSnapshot: preview.snapshot, confirmed: true });
+  return resets.reset(user, id, { expectedSnapshot: preview.snapshot, confirmed: true, confirmationText: '초기화한다' });
 }
 
 describe('대진 초기화 PostgreSQL 계약', () => {
@@ -54,6 +54,15 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId } })).bracketPublishedAt).toBeNull();
     expect(await prisma.v1TournamentSlot.count({ where: { tournamentId } })).toBe(0);
     expect(await prisma.v1TournamentMatchAdvancementEdge.count({ where: { tournamentId } })).toBe(0);
+    const audit = await prisma.v1AdminActionLog.findFirstOrThrow({ where: { action: 'tournament.bracket.reset', targetId: tournamentId } });
+    expect(audit.adminUserId).toBeTruthy(); expect(audit.createdAt).toBeInstanceOf(Date);
+    expect(audit.reason).toBe('초기화한다');
+    expect(audit.beforeJson).toMatchObject({ tournament: { id: tournamentId, format },
+      fixtures: fixtures.map(f => expect.objectContaining({ teamMatchId: f.teamMatchId })),
+      groups: expect.any(Array), slots: expect.any(Array), groupTeams: expect.any(Array), edges: expect.any(Array),
+      standings: expect.any(Array), byes: expect.any(Array), overallStandings: expect.any(Array) });
+    expect(audit.afterJson).toMatchObject({ result: 'succeeded', actorUserId: user.id, confirmationText: '초기화한다',
+      archivedFixtureIds: fixtures.map(f => f.teamMatchId), unpublished: true });
   });
 
   it('단계형 초기화 후 같은 구성으로 새 대진을 생성할 수 있다', async () => {
@@ -101,9 +110,9 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     const { tournamentId } = await seeded('reset-stale'), fixtures = await live(tournamentId);
     const preview = await resets.preview(user, tournamentId);
     await prisma.v1TeamMatch.update({ where: { id: fixtures[0].teamMatchId }, data: { startAt: new Date('2026-12-02T01:00:00Z') } });
-    await expect(resets.reset(user, tournamentId, { expectedSnapshot: preview.snapshot, confirmed: true })).rejects.toMatchObject({ response: { code: 'BRACKET_RESET_STALE' } });
+    await expect(resets.reset(user, tournamentId, { expectedSnapshot: preview.snapshot, confirmed: true, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'BRACKET_RESET_STALE' } });
     const support = await seedSupportAdmin(prisma, 'reset-support'), current = await resets.preview(support, tournamentId);
-    await expect(resets.reset(support, tournamentId, { expectedSnapshot: current.snapshot, confirmed: true })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    await expect(resets.reset(support, tournamentId, { expectedSnapshot: current.snapshot, confirmed: true, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
     expect(await live(tournamentId)).toHaveLength(fixtures.length);
   });
 
@@ -111,7 +120,11 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     const { tournamentId } = await seeded('reset-rollback'), fixtures = await live(tournamentId);
     await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
     const groups = await prisma.v1TournamentGroup.count({ where: { tournamentId } });
-    const audit = jest.spyOn(admins, 'logAdminAction').mockRejectedValueOnce(new Error('reset audit failed'));
+    const writeAudit = admins.logAdminAction.bind(admins);
+    const audit = jest.spyOn(admins, 'logAdminAction').mockImplementation((admin, input, tx) => {
+      if (input.action === 'tournament.bracket.reset') throw new Error('reset audit failed');
+      return writeAudit(admin, input, tx);
+    });
     try { await expect(reset(tournamentId)).rejects.toThrow('reset audit failed'); }
     finally { audit.mockRestore(); }
     expect(await live(tournamentId)).toHaveLength(fixtures.length);
@@ -124,7 +137,7 @@ describe('대진 초기화 PostgreSQL 계약', () => {
     const preview = await resets.preview(user, tournamentId);
     const edge = await prisma.v1TournamentMatchAdvancementEdge.findFirstOrThrow({ where: { tournamentId } });
     await prisma.v1TournamentMatchAdvancementEdge.update({ where: { id: edge.id }, data: { sourceOutcome: edge.sourceOutcome === 'WINNER' ? 'LOSER' : 'WINNER' } });
-    await expect(resets.reset(user, tournamentId, { expectedSnapshot: preview.snapshot, confirmed: true })).rejects.toMatchObject({ response: { code: 'BRACKET_RESET_STALE' } });
+    await expect(resets.reset(user, tournamentId, { expectedSnapshot: preview.snapshot, confirmed: true, confirmationText: '초기화한다' })).rejects.toMatchObject({ response: { code: 'BRACKET_RESET_STALE' } });
     expect(await live(tournamentId)).toHaveLength(fixtures.length);
   });
 });

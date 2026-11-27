@@ -150,6 +150,7 @@ export function RegistrationsDraftSection({
             <Button size="sm" variant="outline" onClick={() => handlers.onViewRoster(row)}>
               명단 보기
             </Button>
+            <RegistrationRowMenu registration={row} ctx={ctx} handlers={handlers} />
           </li>
         ))}
       </ul>

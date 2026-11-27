@@ -215,8 +215,10 @@ describe('RegistrationsDraftSection', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('접혀 있다가 펼치면 설명과 임시저장 행이 나오고 할 수 있는 건 명단 보기뿐이다', () => {
+  it('접혀 있다가 펼치면 설명과 임시저장 행이 나오고, 명단 보기와 ⋯ 의 명단 CSV 받기에 닿는다', () => {
     const handlers = handlersFixture();
+    const rowMutate = vi.fn();
+    vi.mocked(useV1ExportRosterCsv).mockReturnValue({ mutate: rowMutate, isPending: false } as never);
     render(<RegistrationsDraftSection rows={[draft]} ctx={viewContextFixture()} handlers={handlers} />);
     const toggle = screen.getByRole('button', { name: /작성 중/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -227,8 +229,15 @@ describe('RegistrationsDraftSection', () => {
     expect(screen.getByText('팀이 아직 제출하지 않은 신청이에요')).toBeInTheDocument();
     const row = screen.getByText('작성팀').closest('li') as HTMLElement;
     expect(row).toHaveTextContent('임시저장');
-    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['명단 보기']);
     fireEvent.click(within(row).getByRole('button', { name: '명단 보기' }));
     expect(handlers.onViewRoster).toHaveBeenCalledWith(expect.objectContaining({ id: 'd' }));
+
+    // 전체 명단 CSV 는 임시저장 신청을 빼므로 이 팀별 CSV 가 임시저장 신청 명단을 받는 유일한 길이다.
+    fireEvent.click(within(row).getByRole('button', { name: '작성팀 더보기' }));
+    const items = within(screen.getByRole('menu', { name: '작성팀' })).getAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['명단 CSV 받기']);
+    fireEvent.click(items[0]);
+    expect(useV1ExportRosterCsv).toHaveBeenCalledWith('d');
+    expect(rowMutate).toHaveBeenCalledTimes(1);
   });
 });

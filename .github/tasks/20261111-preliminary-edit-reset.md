@@ -44,6 +44,9 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ### 2026-11-27 후속 — 초기화 확인 문구와 감사 상세
 
+- 최종 dev cursor: #2557 `096769476` 및 #2558 `6c6e9df87` 모두 dev merge. #2558 최종 head42f2610bc의 CI45953663094 Gates/API/Web PASS(실DB226 suites/1722 tests, API580 suites/9695 tests). 사용자가 두 PR 각각 Copilot 리뷰 예외를 명시 승인했다. 실제 리뷰가 없으므로 clean으로 표시하지 않았다. 머지 커밋의 CI45955159248/Alpha45955159255를 추적한다.
+- Alpha 중간 증거: 배포096769476에서 상단3폭 입력/오타·공백 차단·취소 POST0·재진입 비움 PASS. 잘못된 API2건400/대진 유지, 실제 UI초기화3→0과 마스터 감사1건·경기별 감사3건의 처리자/시각/확인 문구/원본/결과를 관리자 API에서 확인했다. 최종6c6 배포의 상단/기존 설정창 재검증 및 전용2개 대회 정리는 아래 최종 판정에서 갱신한다. 원본 감사/자격증명/쿠키/개인정보는 공개 증거에 내보내지 않는다.
+
 - 진입점 교차 검증 후 보완: #2557은 `096769476`로 dev 머지, CI45948453869 모두 PASS(실DB reset 감사·최종 master 감사 실패 rollback 포함). 사용자는 #2557 리뷰 예외를 별도로 승인했다. 이후 기존 복수 결선 설정창의 별도 reset이 직접 입력을 요구하지 않는 우회를 발견해 같은 작업에서 보완한다. `fix/bracket-reset-entry-consistency`에서 기존 UI/DTO/service에도 정확 입력을 적용하고 공통 `captureBracketResetState`를 재사용해 전체 감사 상세를 남긴다. 새 보완 PR과 Alpha 검증은 진행 중이다. 기존 #2557 예외를 다른 PR에 임의 확대하지 않는다.
 - PR #2558에서도 사용자가 리뷰 예외와 CI 통과 후 머지/Alpha 완료를 명시 승인했다. 감사 교차 검증에서 TeamMatch 자리 연결·Game 공개 정책·연쇄 취소 팀 일정/게스트 모집도 원본 캡처에 포함했다. 실제 DB 회귀에 이들의 이전 값 보존과 CANCELLED/CLOSED/STATUS_ONLY 전이를 추가했다. 이 보완은 새 head CI로 검증하며 이전 head 성공을 대체하지 않는다.
 - CI45951971729 API/Gates PASS, Web 전체13517건 중 재진입 시 이전 입력이 보이는1건이 RED였다. 상태 초기화 useEffect 실행 전 첫 프레임 경합을 확인하고 useConfirm 모달에 open/closed key를 줘 열 때 새 컴포넌트 상태로 시작하도록 수정했다(검증 대기를 늘려 숨기지 않음). 두 초기화 HTTP 흐름+공유 모달40건 GREEN. 수정 head에서 CI를 다시 확인한다.

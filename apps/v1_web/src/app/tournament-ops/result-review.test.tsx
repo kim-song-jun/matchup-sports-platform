@@ -436,7 +436,7 @@ describe('director officialize/void visibility follows the DIRECTOR_OFFICIALIZE 
   });
 });
 
-describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)', () => {
+describe('기록 시각 고치기 -- 확정된 결과의 사건 시각 (MD-QA #187)', () => {
   const yellowCard = {
     id: 'event-card-1',
     gameId: 'game-1',
@@ -468,9 +468,9 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.getByText('기록 시각 정정')).toBeInTheDocument();
+    expect(screen.getByText('기록 시각 고치기')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     expect(within(dialog).getByText('확정된 결과')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
@@ -493,7 +493,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     officialGame('tournament_director');
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
+    expect(screen.queryByText('기록 시각 고치기')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '기록 수정 (옐로카드)' })).not.toBeInTheDocument();
   });
 
@@ -503,7 +503,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     hookMocks.events.data = { events: [yellowCard], lastSequence: 4, gap: null };
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
+    expect(screen.queryByText('기록 시각 고치기')).not.toBeInTheDocument();
   });
 });
 
@@ -982,7 +982,7 @@ describe('re-entry offered once the official result was just voided', () => {
 });
 
 // 경고 누적 퇴장 합친 줄 — 확정 뒤 어드민 시각 정정도 옐로와 레드를 같은 시각으로 함께 옮긴다.
-describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)', () => {
+describe('기록 시각 고치기 -- 경고 누적 퇴장 합친 줄 (확정 뒤)', () => {
   const card = (id: string, sequence: number, color: 'YELLOW' | 'RED', period: number, clockMs: number) => ({
     id,
     gameId: 'game-1',
@@ -1015,7 +1015,7 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
@@ -1052,12 +1052,12 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
     await user.type(within(dialog).getByLabelText(/정정 사유/), '대조 결과');
     await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
-    expect(screen.getByRole('dialog', { name: '기록 시각 정정' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '기록 시각 고치기' })).toBeInTheDocument();
   });
 });

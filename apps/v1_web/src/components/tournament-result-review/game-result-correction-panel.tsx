@@ -466,7 +466,7 @@ export function GameResultCorrectionPanel({
 
       {currentOfficial && game.actorRole === 'platform_ops' && !(inline && correctionFormOpen) ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 정정</p>
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>기록 시각 고치기</p>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
             골·카드·파울·교체가 기록된 시각만 고쳐요. 점수와 카드 수는 바뀌지 않아요. 골·카드는 공개 화면과 결과 변경 이력에도 남아요.
           </p>
@@ -505,7 +505,7 @@ export function GameResultCorrectionPanel({
         <EventTimeCorrectionSheet
           open
           mode="admin"
-          title="기록 시각 정정"
+          title="기록 시각 고치기"
           summary={[timeLinked.length > 0 ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(timeTarget), eventTimeSummary(timeTarget, game.sides, lineupsQuery.data ?? [], '')].filter((part) => part.length > 0).join(' · ')}
           linkedNotice={timeLinked.length > 0 ? '옐로카드와 레드카드가 함께 옮겨져요.' : undefined}
           periodLabel={periodNameOf(timeTarget.period, regularPeriodCountOf(game.periods.length, game.periodDurations))}
@@ -544,7 +544,7 @@ export function GameResultCorrectionPanel({
                 // 옐로 정정은 이미 저장됐고, 화면 데이터는 mutation 의 onSuccess 가 다시 읽는다.
                 if (index === 0) throw err;
                 throw new Error(
-                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 정정하면 레드카드만 옮겨요.`,
+                  `옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요. ${eventTimeCorrectionErrorMessage(err)} 다시 고치면 레드카드만 옮겨요.`,
                 );
               }
             }

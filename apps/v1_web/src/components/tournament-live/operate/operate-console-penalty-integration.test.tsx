@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render as renderElement, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installViewport } from '@/test/viewport';
 import { OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
 
@@ -178,6 +179,8 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
   ] as const)('tournament role %s controls recorded-event editing through the adapter', (role, canEdit) => {
     setup({ liveEvents: [{ ...goal(1), assistParticipantId: null }] });
     mocks.useTournamentOpsRole.mockReturnValue(role);
+    // 줄마다 버튼이 둘 다 있는 전체 목록(넓은 화면의 오른쪽 열)으로 본다.
+    const restoreViewport = installViewport(1280);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(mocks.useV1GameOperationsConsole).toHaveBeenCalledWith(expect.objectContaining({
@@ -193,6 +196,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
       expect(within(events).queryByRole('button', { name: /어시스트/ })).not.toBeInTheDocument();
       expect(within(events).queryByRole('button', { name: '고치기' })).not.toBeInTheDocument();
     }
+    restoreViewport();
   });
 
   it('[MD-QA #180] 대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {

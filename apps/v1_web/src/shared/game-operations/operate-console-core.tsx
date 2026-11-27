@@ -344,8 +344,8 @@ function startUndoWaitLimit(): UndoWaitLimit {
   };
 }
 
-/** 뛰는 동안 폰 첫 화면에 두는 최근 기록 줄 수. 나머지는 전체 보기 시트에 있다. */
-const RECENT_RECORD_ROWS = 4;
+/** 뛰는 동안 폰 첫 화면에 두는 한 줄짜리 최근 기록 줄 수. 390×844 에서 기록 격자가 진행 바 위에 남는 한도이고, 나머지는 전체 보기 시트에 있다. */
+const COMPACT_RECORD_ROWS = 2;
 
 const STAGE_CAPTION_CLASS = 'break-keep text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-body)]';
 const STAGE_CHIP_CLASS =
@@ -2303,7 +2303,7 @@ export function OperateConsoleCore({
   ) : null;
 
   // 기록 목록 하나를 첫 화면(최근 몇 줄)과 전체 보기 시트가 같이 쓴다. 시트에서 고치기를 누르면 시트를 먼저 닫는다.
-  const renderEventList = (options: { maxRows?: number; fromSheet?: boolean } = {}) => {
+  const renderEventList = (options: { compact?: boolean; fromSheet?: boolean } = {}) => {
     const leaveSheet = () => {
       if (options.fromSheet === true) setAllRecordsOpen(false);
     };
@@ -2314,12 +2314,8 @@ export function OperateConsoleCore({
         sides={sides}
         lineups={lineups}
         periodCount={periodCount}
-        maxRows={options.maxRows}
-        renderMore={(totalRows) => (
-          <Button size="md" variant="outline" block className="mt-2 min-h-[44px]" onClick={() => setAllRecordsOpen(true)}>
-            기록 {totalRows}개 전체 보기
-          </Button>
-        )}
+        compact={options.compact}
+        maxRows={options.compact === true ? COMPACT_RECORD_ROWS : undefined}
         onAttachAssist={
           canOperate
             ? (event) => {
@@ -2350,15 +2346,28 @@ export function OperateConsoleCore({
       />
     );
   };
-  // 뛰는 동안 폰·태블릿 첫 화면에는 최근 4줄만 둔다 — 넓은 화면(오른쪽 열)과 끝난 경기는 전부 보여 준다.
+  // 뛰는 동안 폰·태블릿 첫 화면에는 한 줄짜리 최근 기록만 둔다 — 넓은 화면(오른쪽 열)과 끝난 경기는 전부 보여 준다.
   const recentOnly = matchInPlay && !isDesktop;
+  const showAllRecords = recentOnly && ops.liveEvents.length > 0;
   const recordsSection = (
     <section data-console-guide="history" className="px-4">
-      <h3 className="mb-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-        {recentOnly ? '최근 기록' : '기록'}{' '}
-        <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
-      </h3>
-      {renderEventList(recentOnly ? { maxRows: RECENT_RECORD_ROWS } : {})}
+      <div className={showAllRecords ? 'mb-1 flex min-h-[44px] items-center justify-between gap-2' : 'mb-2'}>
+        <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+          {recentOnly ? '최근 기록' : '기록'}{' '}
+          <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
+        </h3>
+        {showAllRecords ? (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setAllRecordsOpen(true)}
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg px-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
+          >
+            전체 보기
+          </button>
+        ) : null}
+      </div>
+      {renderEventList(recentOnly ? { compact: true } : {})}
     </section>
   );
 

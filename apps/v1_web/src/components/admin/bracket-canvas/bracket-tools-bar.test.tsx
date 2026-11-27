@@ -302,6 +302,12 @@ describe('BracketToolsBar — 데스크톱', () => {
     expect(screen.getByRole('button', { name: '공개 설정' })).toBeInTheDocument();
   });
 
+  it('보기 전환 트랙은 두 라벨이 들어가는 고정 폭을 가져 줄바꿈 도구 줄에서 줄어들지 않는다', () => {
+    renderBar();
+    const track = screen.getByRole('tablist', { name: '대진 보기 방식' });
+    expect(track).toHaveClass('w-36', 'shrink-0');
+  });
+
   it('보기 전환이 onViewChange 를 부른다', () => {
     renderBar();
     fireEvent.click(screen.getByRole('tab', { name: '목록' }));

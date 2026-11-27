@@ -143,7 +143,7 @@ export function LeagueManualFixtureModal({
     for (const [index, row] of rows.entries()) {
       const nth = `${index + 1}번째 경기`;
       if (!row.homeTeamId || !row.awayTeamId) {
-        setError(`${nth}의 홈 팀과 어웨이 팀을 모두 골라 주세요.`);
+        setError(`${nth}의 홈 팀과 원정 팀을 모두 골라 주세요.`);
         return;
       }
       if (row.homeTeamId === row.awayTeamId) {
@@ -291,12 +291,12 @@ export function LeagueManualFixtureModal({
                     ))}
                   </select>
                   <select
-                    aria-label={`${nth} 어웨이 팀`}
+                    aria-label={`${nth} 원정 팀`}
                     value={row.awayTeamId}
                     onChange={(event) => updateRow(row.key, { awayTeamId: event.target.value })}
                     className={selectClass}
                   >
-                    <option value="">어웨이 팀</option>
+                    <option value="">원정 팀</option>
                     {teams.map((team) => (
                       <option key={team.id} value={team.id} disabled={team.id === row.homeTeamId}>
                         {team.label}

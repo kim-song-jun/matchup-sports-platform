@@ -93,8 +93,8 @@ describe('LeagueTemplateDialog', () => {
     const { onSubmit, onClose } = setup();
 
     expect(screen.getByRole('radio', { name: '단일 리그' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: '홈·어웨이 리그' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
+    expect(screen.getByRole('radio', { name: '홈·원정 리그' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: '홈·원정 리그' }));
     fillByWeekday();
     fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
 
@@ -129,7 +129,7 @@ describe('LeagueTemplateDialog', () => {
     setup();
     expect(screen.getByText('3라운드 · 6경기를 만들어요')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
+    fireEvent.click(screen.getByRole('radio', { name: '홈·원정 리그' }));
     expect(screen.getByText('6라운드 · 12경기를 만들어요')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('팀 수'), { target: { value: '5' } });

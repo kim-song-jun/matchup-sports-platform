@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { ActionMenuPopover } from './action-menu-popover';
 import { ActionSheet, type ActionSheetAction } from './action-sheet';
 
 /** 팝오버로 바뀌는 폭 — 이보다 좁으면 같은 항목을 `ActionSheet` 로 띄운다. */
@@ -56,6 +57,17 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
       <span ref={anchorRef} className="inline-flex">
         {trigger({ open: shown, onToggle, 'aria-expanded': shown, 'aria-haspopup': 'menu' })}
       </span>
+      {shown && desktop ? (
+        <ActionMenuPopover
+          label={label}
+          subtitle={subtitle}
+          actions={wrapped}
+          header={header}
+          align={align}
+          anchorRef={anchorRef}
+          onClose={close}
+        />
+      ) : null}
       {shown && !desktop ? (
         <ActionSheet open title={label} subtitle={subtitle} header={header} actions={wrapped} onClose={close} />
       ) : null}

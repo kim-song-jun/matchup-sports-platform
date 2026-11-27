@@ -130,11 +130,33 @@ describe('기본 섹션 시트', () => {
     expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('여러 단계 대회는 진행 방식을 바꿀 수 없어요.');
   });
 
+  it('여러 단계는 새 대회를 만들 때만 고를 수 있어서 선택지에 없고 한 줄로 알린다', () => {
+    const view = renderInfoSheet(basicSection, start());
+    const select = view.inSheet().getByLabelText('진행 방식');
+
+    expect(within(select).queryByRole('option', { name: /여러 단계/ })).toBeNull();
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      '조별리그 → 토너먼트',
+      '토너먼트만',
+      '리그전',
+    ]);
+    expect(select).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요. 여러 단계는 새 대회를 만들 때 고를 수 있어요.');
+  });
+
+  it('이미 「여러 단계」인 대회(단계 편성이 없는 옛 대회)는 그 선택지를 그대로 보이고 안내 줄은 없다', () => {
+    const view = renderInfoSheet(basicSection, start({ format: 'league_knockouts' }));
+    const select = view.inSheet().getByLabelText('진행 방식');
+
+    expect(select).toHaveValue('league_knockouts');
+    expect(within(select).getByRole('option', { name: '여러 단계(예선 → 결선 여러 개)' })).toBeInTheDocument();
+    expect(select).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요.');
+  });
+
   it('잠기지 않은 진행 방식을 바꾸면 format 만 보낸다', async () => {
     const backend = start();
     const view = renderInfoSheet(basicSection, backend);
 
-    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요.');
+    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription(/^조나 대진을 만들기 전까지 바꿀 수 있어요\./);
     fireEvent.change(view.inSheet().getByLabelText('진행 방식'), { target: { value: 'knockout' } });
     view.save();
     await view.saved();

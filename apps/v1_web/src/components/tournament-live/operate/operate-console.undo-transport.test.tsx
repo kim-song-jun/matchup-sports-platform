@@ -164,7 +164,7 @@ describe('OperateConsole — 되돌리기는 서버의 실제 상태를 보고 �
     expect(within(statusSheet()).queryByText('보낼 기록')).toBeNull();
   });
 
-  it('실패 처리된 뒤 늦은 확정이 도착한 기록도 되돌린다 — 목록에 나타난 기록을 그대로 쓴다', async () => {
+  it('응답이 늦어도 제한 시간 안에 확정되면 목록에 나타난 그 기록을 되돌린다', async () => {
     fixture.nextAppends('hold');
     await openConsole();
     await recordGoal();
@@ -180,6 +180,33 @@ describe('OperateConsole — 되돌리기는 서버의 실제 상태를 보고 �
     expect(fixture.reversals[0]).toMatchObject({ eventId: 'server-event-1', expectedVersion: 6 });
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
     await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 0점'));
+    expect(fixture.eventsReads).toBe(0);
+  });
+
+  it('실패 처리된 뒤 늦은 확정이 도착한 기록도 되돌린다', async () => {
+    fixture.nextAppends('hold');
+    await openConsole();
+    await recordGoal();
+    fireEvent.click(await screen.findByRole('button', { name: '되돌리기' }));
+    await screen.findByText('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.');
+    const read = fixture.holdNextEventsRead();
+
+    // 10초 뒤 큐가 「전송 실패」로 바꾸고, 되돌리기는 서버 목록을 읽으러 간다.
+    await tick(SEND_ACK_TIMEOUT_MS);
+    await act(async () => { await read.started; });
+    expect(fixture.reversals).toHaveLength(0);
+    // 그 답이 오기 전에, 느린 망을 지난 골이 뒤늦게 확정되고 응답·방송이 도착한다.
+    act(() => fixture.releaseHeld());
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 1점, 원정 팀 0점'));
+    await act(async () => { read.release(); });
+
+    await waitFor(() => expect(fixture.reversals).toHaveLength(1));
+    expect(fixture.reversals[0]).toMatchObject({ eventId: 'server-event-1', expectedVersion: 6 });
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    expect(fixture.reversals[0].outcome).toBe('reversed');
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 0점'));
+    expect(document.body).not.toHaveTextContent('되돌릴 것이 없어요');
+    expect(within(statusSheet()).queryByText('보낼 기록')).toBeNull();
   });
 
   it('서버가 그런 기록이 없다고 확인해 줄 때만 되돌릴 것이 없다고 말한다', async () => {

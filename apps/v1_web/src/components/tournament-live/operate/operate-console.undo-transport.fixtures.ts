@@ -65,11 +65,14 @@ export function createUndoFixture(server: SetupServerApi) {
   const events: GameEventRecord[] = [];
   const appends: ReceivedAppend[] = [];
   const reversals: ReceivedReversal[] = [];
-  const handlers = new Map<string, (payload: unknown) => void>();
+  const listeners = new Map<string, Set<(payload?: unknown) => void>>();
+  const deliver = (event: string, payload?: unknown) => [...(listeners.get(event) ?? [])].forEach((listener) => listener(payload));
   const subscribed = Promise.withResolvers<void>();
   const behaviors: AppendBehavior[] = [];
   const held: Array<() => void> = [];
-  let reverseGate: { readonly started: () => void; readonly wait: Promise<void> } | null = null;
+  type Gate = { readonly started: () => void; readonly wait: Promise<void> };
+  let reverseGate: Gate | null = null;
+  let eventsReadGate: Gate | null = null;
   let eventsReads = 0;
   let eventsReadFails = false;
 
@@ -110,17 +113,24 @@ export function createUndoFixture(server: SetupServerApi) {
     appends.push({ channel, clientEventId: payload.clientEventId, expectedVersion, outcome: 'committed' });
     if (reply) {
       ack({ status: 'ack', sequence: record.sequence, version: game.version });
-      handlers.get('game.event.committed')?.({ gameId: GAME_ID, sequence: record.sequence, version: game.version, event: record });
+      deliver('game.event.committed', { gameId: GAME_ID, sequence: record.sequence, version: game.version, event: record });
     }
     return record;
   }
 
   const socket = {
     connected: true,
-    on(event: string, handler: (payload: unknown) => void) { handlers.set(event, handler); },
-    off(event: string) { handlers.delete(event); },
+    on(event: string, listener: (payload?: unknown) => void) {
+      if (!listeners.has(event)) listeners.set(event, new Set());
+      listeners.get(event)?.add(listener);
+    },
+    off(event: string, listener?: (payload?: unknown) => void) {
+      if (listener) listeners.get(event)?.delete(listener);
+      else listeners.delete(event);
+    },
     emit(event: string, payload: unknown, ack?: (result: unknown) => void) {
-      if (!ack) return;
+      // A request sent while the connection is down never reaches the server.
+      if (!ack || !socket.connected) return;
       if (event === 'game.subscribe') {
         ack({ status: 'subscribed', snapshot: { gameId: GAME_ID, state: game.state, version: game.version, lastSequence: game.lastSequence, events: [...events] } });
         subscribed.resolve();
@@ -147,8 +157,11 @@ export function createUndoFixture(server: SetupServerApi) {
     http.get(`${API}/tournament-ops/tournaments/t-undo/fixtures/f-undo/lineup`, () => success({ gameId: GAME_ID, lineups: [] })),
     http.get(`${API}/games/${GAME_ID}/result-revisions`, () => success([])),
     http.get(`${API}/games/${GAME_ID}/lineups`, () => success([])),
-    http.get(`${API}/games/${GAME_ID}/events`, () => {
+    http.get(`${API}/games/${GAME_ID}/events`, async () => {
       eventsReads += 1;
+      const gate = eventsReadGate;
+      eventsReadGate = null;
+      if (gate) { gate.started(); await gate.wait; }
       if (eventsReadFails) return HttpResponse.error();
       return success({ events: [...events], lastSequence: game.lastSequence, version: game.version, state: game.state, gap: null });
     }),
@@ -173,9 +186,13 @@ export function createUndoFixture(server: SetupServerApi) {
         return failure(409, 'VERSION_CONFLICT', 'Expected version is stale');
       }
       const target = events.find((event) => event.id === entry.eventId);
-      if (target === undefined || events.some((event) => event.reversesEventId === entry.eventId)) {
+      if (target === undefined) {
         entry.outcome = 'rejected';
-        return failure(409, 'EVENT_ALREADY_REVERSED', 'Event is already reversed');
+        return failure(404, 'GAME_EVENT_NOT_FOUND', 'Game event was not found');
+      }
+      if (events.some((event) => event.reversesEventId === entry.eventId)) {
+        entry.outcome = 'rejected';
+        return failure(409, 'EVENT_ALREADY_REVERSED', 'This event was already reversed once');
       }
       commit({
         type: 'CORRECTION', sideId: target.sideId, participantId: target.participantId, period: target.period, clockMs: target.clockMs,
@@ -203,6 +220,22 @@ export function createUndoFixture(server: SetupServerApi) {
       const release = Promise.withResolvers<void>();
       reverseGate = { started: started.resolve, wait: release.promise };
       return { started: started.promise, release: release.resolve };
+    },
+    /** Keeps the next read of the server's record list unanswered until `release()`; it answers with the records as of then. */
+    holdNextEventsRead() {
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      eventsReadGate = { started: started.resolve, wait: release.promise };
+      return { started: started.promise, release: release.resolve };
+    },
+    /** The connection drops: the console is told, and nothing it sends arrives until `reconnect()`. */
+    disconnect() {
+      socket.connected = false;
+      deliver('disconnect', 'transport close');
+    },
+    reconnect() {
+      socket.connected = true;
+      deliver('connect');
     },
     /** Another device changes the game: the version moves without this console being told. */
     bumpVersionElsewhere() { game = { ...game, version: game.version + 1 }; },

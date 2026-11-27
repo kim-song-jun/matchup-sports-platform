@@ -20,7 +20,7 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1AssignTournamentSlot: () => ({ mutate: mocks.assign, isPending: false }),
   useV1QuickResult: () => ({ mutate: mocks.quick, isPending: false }),
-  useV1SetBracketSources: () => ({ mutate: mocks.setSources, isPending: false }),
+  useV1SetBracketSources: () => ({ mutateAsync: mocks.setSources, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
@@ -90,9 +90,9 @@ beforeEach(() => {
 describe('BracketNodePanel — 자리 배정', () => {
   it('등록 필드를 선택한 대회 일정은 장소 문자열과 나눠 보내지 않는다', () => {
     renderPanel();
-    fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'field-a' } });
-    expect(screen.queryByLabelText('장소')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.change(screen.getByRole('combobox', { name: '등록된 구장' }), { target: { value: 'field-a' } });
+    expect(screen.queryByLabelText('구장 직접 입력')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     const payload = mocks.updateFixture.mock.calls[0][0];
     expect(payload).toMatchObject({ fixtureId: 'f1', fieldId: 'field-a' });
     expect(payload).not.toHaveProperty('venue');
@@ -103,12 +103,12 @@ describe('BracketNodePanel — 자리 배정', () => {
     expect(within(homeSelect).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '서울FC', '대구FC']);
     expect(homeSelect).toHaveValue('r1');
     // 어웨이 자리는 비어 있으니 서울FC(홈)·부산FC(3번 자리)는 빠지고 대구FC 만 남는다.
-    expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
+    expect(within(screen.getByLabelText('원정 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
   });
 
   it('팀을 고르면 그 자리에 배정하고, 비워 두기는 null 로 보낸다', () => {
     const props = renderPanel();
-    fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+    fireEvent.change(screen.getByLabelText('원정 팀 선택'), { target: { value: 'r3' } });
     expect(mocks.assign).toHaveBeenCalledWith({ slotId: 's-away', registrationId: 'r3' }, expect.any(Object));
     fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: '' } });
     expect(mocks.assign).toHaveBeenLastCalledWith({ slotId: 's-home', registrationId: null }, expect.any(Object));
@@ -121,7 +121,7 @@ describe('BracketNodePanel — 자리 배정', () => {
 
   it('서버가 거절하면 해요체 안내를 토스트로 보여 준다', () => {
     const props = renderPanel();
-    fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+    fireEvent.change(screen.getByLabelText('원정 팀 선택'), { target: { value: 'r3' } });
     mocks.assign.mock.calls[0][1].onError(
       new V1ApiError({ statusCode: 409, code: 'SLOT_TEAM_ALREADY_PLACED', message: 'x', details: null, requestId: 'r', timestamp: 't' } as unknown as ConstructorParameters<typeof V1ApiError>[0]),
     );
@@ -136,14 +136,14 @@ describe('BracketNodePanel — 자리 배정', () => {
 
   it('자리가 없는 줄은 연결 결과로 채워진다고 알린다', () => {
     renderPanel(fixtureOf({ awaySlotId: null, bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }] }));
-    expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('원정 팀 선택')).not.toBeInTheDocument();
     expect(screen.getByText('이전 경기 결과로 채워져요.')).toBeInTheDocument();
   });
 
   it('신청 목록을 아직 못 불러왔으면 슬롯·직접 지정 선택창을 모두 잠근다', () => {
     renderPanel(fixtureOf(), { registrationsLoaded: false });
     expect(screen.getByLabelText('홈 팀 선택')).toBeDisabled();
-    expect(screen.getByLabelText('어웨이 팀 선택')).toBeDisabled();
+    expect(screen.getByLabelText('원정 팀 선택')).toBeDisabled();
     cleanup();
     renderPanel(fixtureOf({ homeSlotId: null, awaySlotId: null }), { registrationsLoaded: false });
     expect(screen.getByLabelText('홈 팀 선택')).toBeDisabled();
@@ -158,7 +158,7 @@ describe('BracketNodePanel — 자리 배정', () => {
       slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-a' }), slots[2]],
       registrations: [...registrations, makeRegistration({ id: 'r4', teamName: '인천FC' })],
     });
-    const options = within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent);
+    const options = within(screen.getByLabelText('원정 팀 선택')).getAllByRole('option').map((option) => option.textContent);
     expect(options).toContain('인천FC');
     expect(options).not.toContain('대구FC');
     expect(screen.getByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('BracketNodePanel — 자리 배정', () => {
       groups: [makeGroup({ id: 'g-a', name: 'A조', phase: 'group' }), makeGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [memberOfB] })],
       slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-a' }), slots[2]],
     });
-    expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
+    expect(within(screen.getByLabelText('원정 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
     expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
   });
 
@@ -182,7 +182,7 @@ describe('BracketNodePanel — 자리 배정', () => {
       groups: [knockout, stageB],
       slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-qf' }), slots[2]],
     });
-    const options = within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent);
+    const options = within(screen.getByLabelText('원정 팀 선택')).getAllByRole('option').map((option) => option.textContent);
     expect(options).toContain('대구FC');
   });
 
@@ -196,12 +196,12 @@ describe('BracketNodePanel — 자리 배정', () => {
       const home = screen.getByLabelText('홈 팀 선택');
       expect(home).toHaveValue('r1');
       expect(within(home).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '서울FC', '대구FC']);
-      expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '부산FC', '대구FC']);
+      expect(within(screen.getByLabelText('원정 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '부산FC', '대구FC']);
     });
 
     it('고른 쪽 한 줄만 PATCH 하고 슬롯 배정은 부르지 않는다', () => {
       const props = renderPanel(legacy());
-      fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+      fireEvent.change(screen.getByLabelText('원정 팀 선택'), { target: { value: 'r3' } });
       expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r3' }, expect.any(Object));
       expect(mocks.assign).not.toHaveBeenCalled();
       mocks.updateFixture.mock.calls[0][1].onSuccess({ startedTeamChange: null });
@@ -215,7 +215,7 @@ describe('BracketNodePanel — 자리 배정', () => {
 
     it('서버가 거절하면 해요체 안내를 토스트로 보여 준다', () => {
       const props = renderPanel(legacy());
-      fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+      fireEvent.change(screen.getByLabelText('원정 팀 선택'), { target: { value: 'r3' } });
       mocks.updateFixture.mock.calls[0][1].onError({});
       expect(props.showToast).toHaveBeenCalledWith('팀을 넣지 못했어요.', 'error');
     });
@@ -335,7 +335,7 @@ describe('BracketNodePanel — 자리 배정', () => {
 
       it('시작 전 경기는 확인 창 없이 바로 보낸다', () => {
         renderPanel(legacy());
-        fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+        fireEvent.change(screen.getByLabelText('원정 팀 선택'), { target: { value: 'r3' } });
         expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r3' }, expect.any(Object));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
@@ -345,11 +345,11 @@ describe('BracketNodePanel — 자리 배정', () => {
         expect(screen.getByLabelText('홈 팀 선택')).toBeEnabled();
       });
 
-      it('공식 결과가 있으면 선택창 대신 무효 안내와 정정 화면 링크를 보여 준다', () => {
+      it('공식 결과가 있으면 선택창 대신 무효 안내와 결과 고치기 화면 링크를 보여 준다', () => {
         renderPanel(started({ game: makeGame({ state: 'ENDED', hasOfficialResult: true, latestRevision: revision('OFFICIAL') }) }));
         expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
         expect(screen.getAllByText('공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.')).toHaveLength(2);
-        expect(screen.getAllByRole('link', { name: '결과 정정 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
+        expect(screen.getAllByRole('link', { name: '결과 고치기 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
       });
 
       it('제출만 된 결과는 서버가 교체 때 폐기하므로 바꿀 수 있다', () => {
@@ -366,7 +366,7 @@ describe('BracketNodePanel — 자리 배정', () => {
     it('한쪽만 연결 원천이 있으면 그쪽은 안내 문구, 다른 쪽은 선택창이다', () => {
       renderPanel(legacy({ bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }] }));
       expect(screen.getByLabelText('홈 팀 선택')).toBeInTheDocument();
-      expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('원정 팀 선택')).not.toBeInTheDocument();
       expect(screen.getAllByText('이전 경기 결과로 채워져요.')).toHaveLength(1);
     });
   });
@@ -374,53 +374,38 @@ describe('BracketNodePanel — 자리 배정', () => {
   it('읽기 전용이면 선택창·저장·삭제·점수 입력이 모두 없다', () => {
     renderPanel(fixtureOf({ awayRegistrationId: 'r3', awayTeamName: '대구FC' }), { canWrite: false });
     expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '경기 정보 저장' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 });
 
-describe('BracketNodePanel — 진출 연결', () => {
-  it('반대편 출처를 후보에서 빼되 다른 출처와 저장은 유지한다', () => {
-    const sourceGroup = makeGroup({ id: 'g-q', name: '8강', phase: 'quarter', sortOrder: 0 });
-    const targetGroup = makeGroup({ id: 'g-s', name: '4강', phase: 'semi', sortOrder: 1 });
-    const q1 = makeFixture({ id: 'q1', groupId: 'g-q', fixtureNumber: 1, game: makeGame({ id: 'q-game-1' }) });
-    const q2 = makeFixture({ id: 'q2', groupId: 'g-q', fixtureNumber: 2, game: makeGame({ id: 'q-game-2' }) });
-    const target = makeFixture({ id: 's1', groupId: 'g-s', fixtureNumber: 3, game: makeGame({ id: 's-game' }) });
-    renderPanel(target, { groups: [sourceGroup, targetGroup], fixtures: [q1, q2, target] });
-
-    fireEvent.change(screen.getByLabelText('홈 출처 경기'), { target: { value: 'q1' } });
-    const away = screen.getByLabelText('어웨이 출처 경기') as HTMLSelectElement;
-    expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
-    fireEvent.change(away, { target: { value: 'q2' } });
-    fireEvent.click(screen.getByRole('button', { name: '진출 연결 저장' }));
-
-    expect(mocks.setSources).toHaveBeenCalledWith(
-      { fixtureId: 's1', homeSourceFixtureId: 'q1', awaySourceFixtureId: 'q2' },
-      expect.any(Object),
-    );
+describe('BracketNodePanel — 구성·시간·삭제', () => {
+  it('섹션은 팀 자리 · 시간·구장(5칸) · 결과 순이고, 별도 「진출 연결」 구역과 아래쪽 「경기 삭제」 글자 버튼은 없다', () => {
+    renderPanel();
+    const names = within(screen.getByRole('complementary', { name: '칸 상세' })).getAllByRole('heading', { level: 3 }).map(heading => heading.textContent);
+    expect(names).toEqual(['팀 자리', '시간·구장', '결과']);
+    expect(screen.queryByText('진출 연결')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '진출 연결 저장' })).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 삭제', { selector: 'button' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('날짜')).toBeInTheDocument();
+    expect(screen.getByLabelText('시각')).toBeInTheDocument();
+    expect(screen.getByLabelText('등록된 구장')).toBeInTheDocument();
+    expect(screen.queryByLabelText('경기 번호')).not.toBeInTheDocument();
   });
 
-  it('선택한 패널에서 이전 단계 출처를 저장한다', () => {
-    const sourceGroup = makeGroup({ id: 'g-q', name: '8강', phase: 'quarter', sortOrder: 0 });
-    const targetGroup = makeGroup({ id: 'g-s', name: '4강', phase: 'semi', sortOrder: 1 });
-    const sourceFixture = makeFixture({ id: 'q1', groupId: 'g-q', fixtureNumber: 1, game: makeGame({ id: 'q-game' }) });
-    const targetFixture = makeFixture({ id: 's1', groupId: 'g-s', fixtureNumber: 2, game: makeGame({ id: 's-game' }) });
-    renderPanel(targetFixture, { groups: [sourceGroup, targetGroup], fixtures: [sourceFixture, targetFixture] });
-    fireEvent.change(screen.getByLabelText('홈 출처 경기'), { target: { value: 'q1' } });
-    fireEvent.click(screen.getByRole('button', { name: '진출 연결 저장' }));
-    expect(mocks.setSources).toHaveBeenCalledWith(
-      { fixtureId: 's1', homeSourceFixtureId: 'q1', awaySourceFixtureId: null },
-      expect.any(Object),
-    );
+  it('머리의 휴지통이 닫기 버튼 앞에 있고 아이콘만 있다', () => {
+    renderPanel();
+    const trash = screen.getByRole('button', { name: '경기 삭제' });
+    expect(trash).toHaveTextContent('');
+    expect(trash.nextElementSibling).toBe(screen.getByRole('button', { name: '패널 닫기' }));
   });
-});
 
-describe('BracketNodePanel — 일정·삭제', () => {
   it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장하고, 장소를 안 건드렸으면 장소 필드는 보내지 않는다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
-    fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-10T14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.change(screen.getByLabelText('날짜'), { target: { value: '2026-10-10' } });
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '14:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(mocks.updateFixture).toHaveBeenCalledWith(
       { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z' },
     );
@@ -428,9 +413,25 @@ describe('BracketNodePanel — 일정·삭제', () => {
 
   it('장소 이름을 바꾸면 venue 를 함께 보낸다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
-    fireEvent.change(screen.getByLabelText('장소'), { target: { value: '상암 보조구장' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    fireEvent.change(screen.getByLabelText('구장 직접 입력'), { target: { value: '상암 보조구장' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
+  });
+
+  it('머리의 휴지통이 확인 창을 거쳐 deleteFixture 를 부르고, 후속 경기 수·결과 보호 문구가 메시지에 남는다', async () => {
+    const downstream = makeFixture({ id: 'f2', groupId: 'g-qf', fixtureNumber: 2, bracketSources: [{ fixtureId: 'f1', side: 'HOME', outcome: 'WINNER' }] });
+    const fixture = fixtureOf({ game: makeGame({ id: 'game-1', state: 'LIVE' }) });
+    const props = renderPanel(fixture, { fixtures: [fixture, downstream] });
+    fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('후속 경기 1개도 영향을 받아요');
+    expect(dialog).toHaveTextContent('진행 중인 경기는 삭제할 수 없어요');
+    expect(mocks.deleteFixture).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+    await vi.waitFor(() => expect(mocks.deleteFixture).toHaveBeenCalledWith('f1', expect.any(Object)));
+    mocks.deleteFixture.mock.calls[0][1].onSuccess();
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('삭제는 확인을 거치고, 성공하면 패널을 닫는다', async () => {
@@ -448,6 +449,28 @@ describe('BracketNodePanel — 일정·삭제', () => {
     const props = renderPanel();
     fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ESC 로 닫힌다 — 패널 밖(확인 창)에서 누른 ESC 는 패널을 닫지 않는다', async () => {
+    const props = renderPanel();
+    fireEvent.keyDown(screen.getByLabelText('원정 팀 선택'), { key: 'Escape' });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('단계 관리 경기(bracketTrack stage:)와 읽기 전용에는 휴지통이 없고, 팀 자리는 「팀 채우기」 메뉴 안내만 보인다', () => {
+    const staged = makeGroup({ id: 'g-stage', name: '1단계', phase: 'round16', bracketTrack: 'stage:a' });
+    const fixture = fixtureOf({ groupId: 'g-stage' });
+    renderPanel(fixture, { groups: [staged], fixtures: [fixture] });
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('진출팀은 「팀 채우기」 메뉴에서 정해요.')).toHaveLength(2);
+    expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+    cleanup();
+    renderPanel(fixtureOf(), { canWrite: false });
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
   });
 });
 
@@ -506,13 +529,13 @@ describe('BracketNodePanel — 결과 구역', () => {
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있고 결과가 없으면 정정 화면 링크를 준다', () => {
+  it('라이브 득점 기록이 있고 결과가 없으면 결과 고치기 화면 링크를 준다', () => {
     renderPanel(readyFixture({ game: makeGame({ id: 'game-1', state: 'ENDED', hasLiveRecords: true }) }));
-    expect(screen.getByRole('link', { name: '결과 정정 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=f1');
+    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=f1');
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 
-  it('결과가 있으면 폼 대신 확정·정정·무효 동작을 보여 준다', () => {
+  it('결과가 있으면 폼 대신 확정·결과 고치기·무효 동작을 보여 준다', () => {
     renderPanel(
       readyFixture({
         game: makeGame({ id: 'game-1', state: 'ENDED', hasOfficialResult: true, latestRevision: { id: 'rev', state: 'OFFICIAL', entryMethod: 'quick', score: { home: 1, away: 0 } } }),

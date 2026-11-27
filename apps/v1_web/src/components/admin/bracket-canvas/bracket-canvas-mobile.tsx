@@ -48,6 +48,8 @@ export interface BracketCanvasMobileProps {
   };
   /** 고른 라운드 경기 목록 위에 붙일 머리(리그 주차의 날짜·요약·'이 주에 경기 추가'). 없으면 그리지 않는다. */
   renderRoundHeader?: (roundKey: string) => ReactNode;
+  /** 목록 위 안내 줄. null 이면 숨기고, 생략하면 기본 문구를 쓴다(리그 화면 그대로). */
+  hint?: string | null;
 }
 
 // 390 폭에서 탭 한 칸이 44px 터치 타깃과 3~4글자 라벨을 담을 수 있는 한계. 넘으면 셀렉트로 바꾼다.
@@ -121,7 +123,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, fixtureActions, renderRoundHeader }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, fixtureActions, renderRoundHeader, hint }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -135,7 +137,9 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
   }, []);
 
   useEffect(() => {
-    if (focusFixtureId === null || focusFixtureId === lastFocusedFixtureIdRef.current) return;
+    // 같은 경기를 다시 요청해도 열리도록, 요청이 사라지면 마지막으로 연 경기를 잊는다.
+    if (focusFixtureId === null) { lastFocusedFixtureIdRef.current = null; return; }
+    if (focusFixtureId === lastFocusedFixtureIdRef.current) return;
     const containingRound = rounds.find((round) => findNode([round], focusFixtureId) !== null);
     if (containingRound === undefined) return;
     lastFocusedFixtureIdRef.current = focusFixtureId;
@@ -159,8 +163,8 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
 
   return (
     <section aria-label="대진 보기" className="flex flex-col gap-3">
-      {canWrite ? (
-        <AlertBanner tone="info" message={onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.'} />
+      {canWrite && hint !== null ? (
+        <AlertBanner tone="info" message={hint ?? (onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.')} />
       ) : null}
 
       {sixTeamState ? <SixTeamAdminBracket state={sixTeamState} fixtures={[...(fixtures ?? [])]} groups={[...(groups ?? [])]} registrations={registrations} renderFixture={(fixture, labels) => {

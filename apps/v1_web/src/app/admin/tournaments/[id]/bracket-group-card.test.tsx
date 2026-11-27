@@ -143,7 +143,7 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
     fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '12강' } });
     fireEvent.click(screen.getByLabelText('부전승'));
-    expect(screen.queryByLabelText('어웨이 팀 (선택)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('원정 팀 (선택)')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('대진표 위치'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('부전승 팀 (선택 · 미정 가능)'), { target: { value: '강남' } });
     fireEvent.click(screen.getByRole('option', { name: /강남FC/ }));
@@ -320,10 +320,10 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
       expect(optionLabels().join()).toContain('마포FC');
     });
 
-    it('「경기 일정 추가」 어웨이 팀 선택창도 다른 조 팀(마포FC)을 거르고 미편성 팀(송파FC)은 남긴다', () => {
+    it('「경기 일정 추가」 원정 팀 선택창도 다른 조 팀(마포FC)을 거르고 미편성 팀(송파FC)은 남긴다', () => {
       renderCard(stageA, [stageA, stageB]);
       fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
-      fireEvent.change(screen.getByPlaceholderText('어웨이 팀 검색'), { target: { value: 'FC' } });
+      fireEvent.change(screen.getByPlaceholderText('원정 팀 검색'), { target: { value: 'FC' } });
       expect(optionLabels().join()).toContain('송파FC');
       expect(optionLabels().join()).not.toContain('마포FC');
     });
@@ -463,5 +463,5 @@ it('N개 토너먼트의 목록 보기는 구조 변경 버튼 대신 전용 설
     createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
     onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
   expect(screen.queryByRole('button', { name: /수정|삭제|대진 자동 생성|직접 입력/ })).not.toBeInTheDocument();
-  expect(screen.getByText('그림 보기에서 예선 팀을 배정하고, 진출팀 배정 화면에서 결선 진출팀을 편집해요.')).toBeInTheDocument();
+  expect(screen.getByText('그림 보기에서 예선 팀을 배정하고, 「팀 채우기」 메뉴의 「결선 진출팀 직접 정하기」에서 결선 진출팀을 정해요.')).toBeInTheDocument();
 });

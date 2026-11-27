@@ -75,7 +75,7 @@ describe('BracketQuickResultForm — 제출', () => {
     type('서울FC 점수', '2');
     submit();
     expect(props.onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('어웨이 점수를 0 이상의 정수로 입력해 주세요.');
+    expect(screen.getByRole('alert')).toHaveTextContent('원정 점수를 0 이상의 정수로 입력해 주세요.');
   });
 
   it('정정 모드는 현재 점수를 채워 두고 제출 버튼 이름을 바꾼다', () => {

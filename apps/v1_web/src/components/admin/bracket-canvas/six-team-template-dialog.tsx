@@ -362,7 +362,7 @@ export function SixTeamDecisionPanel({
         결정만 바뀌어요.
       </p>
       {data.state.needsReview && (
-        <p role="alert">근거 결과가 정정됐어요. 진출팀을 다시 확인해 주세요.</p>
+        <p role="alert">근거 결과가 고쳐졌어요. 진출팀을 다시 확인해 주세요.</p>
       )}
       <fieldset
         disabled={update.isPending}

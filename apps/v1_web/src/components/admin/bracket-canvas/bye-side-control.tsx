@@ -40,7 +40,7 @@ function ConnectedByeSideControl({ tournamentId, fixture, slot, canWrite, showTo
           });
         }}>
         <option value="HOME">홈 · 위</option>
-        <option value="AWAY">어웨이 · 아래</option>
+        <option value="AWAY">원정 · 아래</option>
       </select>
       <span className="tm-text-caption text-[var(--text-muted)]" role={mutation.isPending ? 'status' : undefined}>
         {mutation.isPending ? '위치와 진출 연결을 저장하고 있어요.' : locked

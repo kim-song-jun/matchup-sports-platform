@@ -5,6 +5,7 @@ import { CompetitionFieldPicker } from '@/components/admin/competition-field-pic
 import { Clock3 } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useCreateFixtureScheduleTime, useFixtureScheduleTimes } from '@/hooks/use-fixture-schedule-times';
@@ -24,6 +25,7 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
   const id = useId();
+  const { confirm, ConfirmModal } = useConfirm();
   const wide = useMediaQuery('(min-width: 1440px)');
   const [open, setOpen] = useState(false);
   const [courtId, setCourtId] = useState('');
@@ -39,6 +41,8 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
   const choices = assignmentTimes(fixtures.map(f => ({ scheduledAt: f.startAt })), times.data?.items ?? []);
   const unavailable = times.isPending || times.isError;
   const close = () => { if (!busy) setOpen(false); };
+  const confirmOverlap = (conflict: V1LeagueFixture) => confirm({ title: '시간·구장이 겹쳐요', confirmLabel: '그대로 배정',
+    message: `${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?` });
   async function add(event: FormEvent) {
     event.preventDefault();
     if (!canWrite || busy || unavailable) return;
@@ -55,7 +59,7 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
     const conflict = fixture && fixtures.find(row => row.teamMatchId !== teamMatchId && row.status !== 'cancelled' &&
       instant(row.startAt) === instant(startsAt) && (fixture.fieldId ? row.fieldId === fixture.fieldId :
         !row.fieldId && fixture.placeName && fixture.placeName !== '장소 미정' && fixture.placeName === row.placeName && fixture.placeAddress === row.placeAddress));
-    if (conflict && !window.confirm(`${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
+    if (conflict && !await confirmOverlap(conflict)) return;
     setError(null); setSaving(true);
     try {
       await update.mutateAsync({ teamMatchId, body: { startsAt } });
@@ -70,7 +74,7 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
     if (!canWrite || busy || !courtId || !target || target.status === 'cancelled') return;
     const conflict = fixtures.find(f => f.teamMatchId !== teamMatchId && f.status !== 'cancelled' &&
       f.fieldId === courtId && instant(f.startAt) === instant(target.startAt));
-    if (conflict && !window.confirm(`${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
+    if (conflict && !await confirmOverlap(conflict)) return;
     setSaving(true); setError(null);
     try {
       await update.mutateAsync({ teamMatchId, body: { fieldId: courtId } });
@@ -141,5 +145,6 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
       {wide && open ? <aside id={id + '-panel'} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}
     </div>
     {!wide && open ? <BottomSheet open={open} onClose={close} ariaLabel="시간 배정"><div className="tm-filter-sheet-handle" aria-hidden="true" /><div id={id + '-panel'}>{panel}</div></BottomSheet> : null}
+    {ConfirmModal}
   </div>;
 }

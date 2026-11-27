@@ -1,60 +1,44 @@
 'use client';
 
-import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { stageBracketView } from '@/lib/stage-bracket-view';
 import type { StagePool } from '@/types/stage-plan';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
-import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { AlertBanner, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import {
-  useV1AdminBracket,
-  useV1UpdateFixture,
-  useV1PublishTournamentBracket,
-  useV1UnpublishTournamentBracket,
-} from '@/hooks/use-v1-api';
-import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
+import { ErrorState } from '@/components/v1-ui/primitives';
+import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import {
   BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY,
   BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY,
   useMediaQuery,
 } from '@/hooks/use-media-query';
-import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { TEAM_IN_OTHER_GROUP_MESSAGE, finalStageConflictMessage, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
-import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
+import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
-import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
-import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracket } from '@/types/api';
-import type { V1CompetitionKind } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
 import { ByeSlotEditor } from './bye-slot-editor';
 import { BracketNodePanel } from './bracket-node-panel';
-import { FinalistAssignmentButton } from './finalist-assignment-button';
-import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
-import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
-import { BracketTemplateDialog } from './bracket-template-dialog';
 import { focusFixtureOpener } from './fixture-opener-focus';
+import { panelDockSide } from './panel-dock-side';
+import { unplacedTeamCount } from './unplaced-team-count';
+import type { BracketViewControls } from './use-bracket-view-controls';
+import { useTeamPlacement } from './use-team-placement';
 
 export type BracketCanvasWorkspaceProps = {
   pool?: StagePool;
   sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   format: V1TournamentFormat | undefined;
-  kind?: V1CompetitionKind | null;
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
-  bracketPublishedAt: string | null | undefined;
-  bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
-  onShowList: () => void;
+  controls: BracketViewControls;
 };
 
 export function BracketCanvasWorkspace({
@@ -62,35 +46,29 @@ export function BracketCanvasWorkspace({
   sixTeamState,
   tournamentId,
   format,
-  kind,
   registrations,
   registrationsState,
-  bracketPublishedAt,
-  bracketPublishScheduledAt,
   canWrite,
   showToast,
-  onShowList,
+  controls,
 }: BracketCanvasWorkspaceProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
-  const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
-  const updateFixture = useV1UpdateFixture(tournamentId);
-  const randomFill = useV1RandomFillSlots(tournamentId, 'tournament');
-  const publishBracket = useV1PublishTournamentBracket(tournamentId);
-  const unpublishBracket = useV1UnpublishTournamentBracket(tournamentId);
-  const { confirm, ConfirmModal } = useConfirm();
   const [selectedByeSlotId, setSelectedByeSlotId] = useState<string | null>(null);
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
   const [pendingRegistrationId, setPendingRegistrationId] = useState<string | null>(null);
-  const [templateOpen, setTemplateOpen] = useState(false);
-  const [toolsMode, setToolsMode] = useState<'add' | 'link' | null>(null);
   const [standingsSheetOpen, setStandingsSheetOpen] = useState(false);
-  const toolbarHintId = useId();
+  // 열림 기본값은 참가팀이 처음 불러와졌을 때 한 번만 정한다 — 팀을 다 넣어도 저절로 접히지 않게.
+  const [initialTrayOpen, setInitialTrayOpen] = useState<boolean | null>(null);
+  const [dock, setDock] = useState<'start' | 'end'>('end');
+  const areaRef = useRef<HTMLDivElement>(null);
+  const handledFocusNonce = useRef(0);
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
   const canvasSidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
   const leagueSideColumn = useMediaQuery(BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY, true);
   const visible = useMemo(() => bracket && stageBracketView(bracket, pool), [bracket, pool]);
   const leagueGrid = pool ? pool.format === 'league' : format === 'league';
   const sidePanel = leagueGrid ? leagueSideColumn : canvasSidePanel;
+  const placement = useTeamPlacement(tournamentId, bracket ?? { groups: [], fixtures: [], standings: [], slots: [] }, showToast, () => setPendingRegistrationId(null));
   // 넓은 화면에선 순위표가 옆 열에 있으니 열어 둔 시트를 닫아, 다시 좁혀도 저절로 뜨지 않게 한다.
   useEffect(() => {
     if (sidePanel) setStandingsSheetOpen(false);
@@ -99,20 +77,39 @@ export function BracketCanvasWorkspace({
     () => (bracket === undefined ? null : buildSideLabelContext(bracket.groups, bracket.fixtures, bracket.slots)),
     [bracket],
   );
-  // 순위 채우기 창이 동률 후보 이름을 그리는 데 쓴다 — 동률 팀은 모두 그 조의 조 편성에 들어 있다.
-  const teamNames = useMemo(
-    () =>
-      new Map(
-        (bracket?.groups ?? []).flatMap((group) =>
-          group.groupTeams.flatMap((team) => (team.registrationId && team.teamName ? [[team.registrationId, team.teamName] as const] : [])),
-        ),
-      ),
-    [bracket],
-  );
   const standingsGroups = useMemo(
     () => (visible === undefined ? [] : buildLeagueStandings({ groups: visible.groups, standings: visible.standings })),
     [visible],
   );
+  const filterMatchIds = useMemo(
+    () => (controls.unscheduledOnly && visible ? new Set(visible.fixtures.filter((fixture) => fixture.scheduledAt === null).map((fixture) => fixture.id)) : undefined),
+    [controls.unscheduledOnly, visible],
+  );
+
+  // 도구 메뉴가 요청한 경기를 연다. 아직 대진에 없으면 요청을 남겨 두었다가 불러온 뒤에 연다.
+  useEffect(() => {
+    const request = controls.focusRequest;
+    if (request === null || request.nonce === handledFocusNonce.current) return;
+    if (!bracket?.fixtures.some((fixture) => fixture.id === request.fixtureId)) return;
+    handledFocusNonce.current = request.nonce;
+    setSelectedByeSlotId(null);
+    setSelectedFixtureId(request.fixtureId);
+    controls.clearFocusRequest();
+  }, [controls, bracket]);
+
+  // 패널은 열린 칸의 반대쪽 가장자리에 붙는다 — 칸을 가리지 않게.
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+    if (area === null || selectedFixtureId === null) return;
+    const opener = Array.from(area.querySelectorAll<HTMLElement>('[data-fixture-opener]')).find((element) => element.getAttribute('data-fixture-opener') === selectedFixtureId);
+    if (opener === undefined) {
+      setDock('end');
+      return;
+    }
+    const areaRect = area.getBoundingClientRect();
+    const openerRect = opener.getBoundingClientRect();
+    setDock(panelDockSide({ nodeCenterX: openerRect.left + openerRect.width / 2 - areaRect.left, containerWidth: areaRect.width }));
+  }, [selectedFixtureId, sidePanel]);
 
   if (isPending) {
     return (
@@ -132,112 +129,17 @@ export function BracketCanvasWorkspace({
   }
 
   const showStandings = leagueGrid && standingsGroups.length > 0;
-  const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
   const staged = bracket.groups.some(group => group.bracketTrack?.startsWith('stage:'));
-  const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
   const confirmedTeams = registrations.filter((registration) => registration.status === 'confirmed');
+  if (initialTrayOpen === null && registrationsState.status !== 'pending') {
+    setInitialTrayOpen(registrationsState.status === 'error' || unplacedTeamCount(registrations, bracket) > 0);
+  }
+  // 고른 팀이 다른 경로(무작위 채우기 등)로 자리에 들어갔으면 선택을 푼다.
   const placedIds = new Set(bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
-  const emptySlotCount = bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId === null).length;
-  const unplacedTeamCount = confirmedTeams.filter((registration) => !placedIds.has(registration.id)).length;
-  const randomFillBlockedReason =
-    registrationsState.status === 'pending'
-      ? '참가팀을 불러오는 중이에요.'
-      : registrationsState.status === 'error'
-        ? '참가팀을 불러오지 못했어요.'
-        : emptySlotCount === 0
-          ? '비어 있는 자리가 없어요.'
-          : unplacedTeamCount === 0
-            ? '배정할 수 있는 팀이 없어요.'
-            : null;
-  const published = isBracketPublished(bracketPublishedAt, bracketPublishScheduledAt);
-  const hasPendingSchedule = !!bracketPublishScheduledAt && !published;
-  // 비활성 이유는 title 대신 화면에 보이게 둔다 — title 은 터치·키보드에서 보이지 않는다.
-  const publishBlockedReason = isEmpty && !published ? '대진을 먼저 만들어야 공개할 수 있어요.' : null;
-  // 방식을 모르면 리그에도 토너먼트 폼이 열리므로, 알 때까지 경기 추가·연결을 막는다.
-  const formatUnknownReason = format === undefined ? '대회 방식을 아직 확인하지 못해 경기를 추가하거나 연결할 수 없어요.' : null;
-  const toolbarHint = !isEmpty ? [randomFillBlockedReason, formatUnknownReason].filter((reason) => reason !== null).join(' ') || null : publishBlockedReason;
+  const activePendingId = pendingRegistrationId !== null && !placedIds.has(pendingRegistrationId) ? pendingRegistrationId : null;
+  const trayCollapsible = leagueGrid || !canvasSidePanel;
+  const trayColumnOpen = controls.trayOpen ?? initialTrayOpen ?? true;
   const selectedFixture = bracket.fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
-  const rightColumn = sidePanel && (selectedFixture !== null || showStandings);
-
-  const handleAssign = (slotId: string, registrationId: string) => {
-    const slotGroupId = bracket.slots.find((slot) => slot.id === slotId)?.groupId ?? null;
-    if (registrationIdsBlockedForGroup(bracket.groups, slotGroupId).has(registrationId)) {
-      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
-      return;
-    }
-    assignSlot.mutate(
-      { slotId, registrationId },
-      {
-        onSuccess: () => {
-          setPendingRegistrationId(null);
-          showToast('팀을 넣었어요.', 'success');
-        },
-        onError: (err) => showToast(describeBracketCanvasError(err, '팀을 넣지 못했어요.'), 'error'),
-      },
-    );
-  };
-
-  const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
-    const targetFixture = bracket.fixtures.find((fixture) => fixture.id === fixtureId);
-    if (registrationIdsBlockedForGroup(bracket.groups, targetFixture?.groupId ?? null).has(registrationId)) {
-      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
-      return;
-    }
-    const finalStageConflict = finalStageConflictMessage(bracket.groups, bracket.fixtures, targetFixture, registrationId);
-    if (finalStageConflict !== null) {
-      showToast(finalStageConflict, 'error');
-      return;
-    }
-    updateFixture.mutate(
-      { fixtureId, ...(side === 'HOME' ? { homeRegistrationId: registrationId } : { awayRegistrationId: registrationId }) },
-      {
-        onSuccess: () => {
-          setPendingRegistrationId(null);
-          showToast('팀을 넣었어요.', 'success');
-        },
-        onError: (err) => showToast(describeBracketCanvasError(err, '팀을 넣지 못했어요.'), 'error'),
-      },
-    );
-  };
-
-  const handleRandomFill = () => {
-    randomFill.mutate(undefined, {
-      onSuccess: (result) => {
-        setPendingRegistrationId(null);
-        showToast(result.assignments.length === 0 ? '채울 수 있는 자리가 없어요.' : `${result.assignments.length}개 자리를 채웠어요.`, 'success');
-      },
-      onError: (err) => showToast(describeBracketCanvasError(err, '자리를 채우지 못했어요.'), 'error'),
-    });
-  };
-
-  const handlePublish = async () => {
-    const ok = await confirm({
-      title: '대진표 전체 공개',
-      message: '공개하면 참가팀과 방문자가 조, 일정, 대진표를 볼 수 있어요. 공개한 뒤에 대진을 바꾸면 바로 보여요.',
-      confirmLabel: '전체 공개',
-    });
-    if (!ok) return;
-    publishBracket.mutate(undefined, {
-      onSuccess: (result) => showToast(result.alreadyPublished ? '이미 공개된 대진표예요.' : '대진표를 공개했어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
-    });
-  };
-
-  const handleUnpublish = async () => {
-    const ok = await confirm({
-      title: published ? '대진표 공개 취소' : '공개 예약 취소',
-      message: published
-        ? '대진표를 다시 비공개로 되돌려요. 이미 대진표를 본 참가자의 기억까지 되돌릴 수는 없어요.'
-        : '예약된 공개를 취소해요. 대진표는 계속 비공개로 남아요.',
-      confirmLabel: published ? '비공개로 되돌리기' : '예약 취소',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    unpublishBracket.mutate(undefined, {
-      onSuccess: (result) => showToast(result.alreadyUnpublished ? '이미 비공개 상태예요.' : '대진표를 비공개로 되돌렸어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '공개 취소에 실패했어요.'), 'error'),
-    });
-  };
 
   const selectedLabels =
     selectedFixture === null
@@ -271,182 +173,70 @@ export function BracketCanvasWorkspace({
       />
     ) : null;
 
+  const tray = (collapsible: boolean) => (
+    <BracketTeamTray
+      registrations={registrations}
+      registrationsState={registrationsState}
+      slots={bracket.slots}
+      directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
+      pendingRegistrationId={activePendingId}
+      canWrite={canWrite && !staged}
+      collapsible={collapsible}
+      expanded={collapsible ? controls.trayOpen === true : undefined}
+      onExpandedChange={collapsible ? controls.setTrayOpen : undefined}
+      onClose={collapsible ? undefined : () => controls.setTrayOpen(false)}
+      onPick={setPendingRegistrationId}
+    />
+  );
+  const sharedViewProps = {
+    selectedFixtureId: selectedFixture?.id ?? null,
+    filterMatchIds,
+    pendingRegistrationId: canWrite && !staged ? activePendingId : null,
+    canWrite: canWrite && !staged,
+    onSelectFixture: selectFixture,
+    onAssignSlot: placement.placeIntoSlot,
+    onAssignDirect: placement.placeDirect,
+  };
+
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col gap-4">
-      {ConfirmModal}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className={`tm-badge tm-badge-sm ${published ? 'tm-badge-green' : 'tm-badge-grey'}`} style={{ gap: 4 }}>
-          <Globe size={12} strokeWidth={2.2} aria-hidden="true" />
-          {published ? '공개 중' : hasPendingSchedule ? '공개 예약됨' : '비공개'}
-        </span>
-        {canWrite ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {!isEmpty && templateFormat !== null ? (
-              <Button variant="outline" size="md" onClick={() => setTemplateOpen(true)}>
-                <LayoutTemplate size={16} aria-hidden="true" />
-                템플릿으로 다시 만들기
-              </Button>
-            ) : null}
-            {!isEmpty && format !== 'league_knockouts' ? (
-              <Button
-                variant="outline"
-                size="md"
-                disabled={randomFillBlockedReason !== null}
-                aria-describedby={randomFillBlockedReason !== null ? toolbarHintId : undefined}
-                loading={randomFill.isPending}
-                onClick={handleRandomFill}
-              >
-                <Shuffle size={16} aria-hidden="true" />
-                빈 자리 무작위 채우기
-              </Button>
-            ) : null}
-            {!isEmpty && canWrite && format === 'group_knockout' ? <FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /> : null}
-            {!isEmpty && canWrite && format !== 'league_knockouts' ? (
-              <BracketStandingsFillButton
-                tournamentId={tournamentId}
-                slots={bracket.slots}
-                teamNames={teamNames}
-                canWrite={canWrite}
-                onFilled={(result) => showToast(describeStandingsFill(result), 'success')}
-                onError={(message) => showToast(message, 'error')}
-              />
-            ) : null}
-            {!isEmpty && format !== 'league_knockouts' ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="md"
-                  disabled={formatUnknownReason !== null}
-                  aria-describedby={formatUnknownReason !== null ? toolbarHintId : undefined}
-                  onClick={() => setToolsMode('add')}
-                >
-                  <Plus size={16} aria-hidden="true" />
-                  경기 추가
-                </Button>
-                {!leagueGrid ? (
-                  <Button
-                    variant="outline"
-                    size="md"
-                    disabled={formatUnknownReason !== null}
-                    aria-describedby={formatUnknownReason !== null ? toolbarHintId : undefined}
-                    onClick={() => setToolsMode('link')}
-                  >
-                    <Link2 size={16} aria-hidden="true" />
-                    경기 연결
-                  </Button>
-                ) : null}
-              </>
-            ) : null}
-            {!published ? (
-              <Button variant="primary" size="md" disabled={isEmpty} aria-describedby={publishBlockedReason !== null ? toolbarHintId : undefined} onClick={() => void handlePublish()}>
-                지금 전체 공개
-              </Button>
-            ) : null}
-            {published || hasPendingSchedule ? (
-              <Button variant="outline" size="md" style={{ color: 'var(--red700)' }} onClick={() => void handleUnpublish()}>
-                {published ? '공개 취소' : '예약 취소'}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-        {canWrite && toolbarHint !== null ? (
-          <p id={toolbarHintId} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-            {toolbarHint}
-          </p>
-        ) : null}
-      </div>
-
-      {published && canWrite ? <AlertBanner tone="warning" message="이미 공개된 대진표예요. 바꾸는 즉시 참가팀에게 보여요." /> : null}
-
-      {isEmpty ? (
-        <EmptyState
-          title="아직 대진이 없어요"
-          sub={
-            format === 'league_knockouts' ? '페이지 위의 예선·토너먼트 대진 생성에서 예선 조를 편성해 주세요.' : templateFormat === null
-              ? '조별+결선 방식은 목록 보기에서 조를 만들어 시작해 주세요.'
-              : '템플릿으로 시작하면 경기와 팀 자리가 한 번에 만들어져요. 팀은 나중에 넣어도 돼요.'
-          }
-          cta={!canWrite || format === 'league_knockouts' ? undefined : templateFormat === null ? '목록으로 보기' : '템플릿으로 시작'}
-          onCta={templateFormat === null ? onShowList : () => setTemplateOpen(true)}
-        />
-      ) : (
-        <div
-          className={`grid gap-4 ${
-            leagueGrid
-              ? rightColumn
-                ? 'grid-cols-[minmax(0,1fr)_320px]'
-                : 'grid-cols-1'
-              : !rightColumn
-                ? 'lg:grid-cols-[240px_minmax(0,1fr)]'
-                : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'
-          }`}
-        >
-          <div className={leagueGrid ? 'col-span-full' : 'contents'}>
-          <BracketTeamTray
-            registrations={registrations}
-            registrationsState={registrationsState}
-            slots={bracket.slots}
-            directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
-            pendingRegistrationId={pendingRegistrationId}
-            canWrite={canWrite && !staged}
-            collapsible={leagueGrid || !sidePanel}
-            onPick={setPendingRegistrationId}
-          />
-          </div>
+      {trayCollapsible ? tray(true) : null}
+      {leagueGrid && showStandings && !sidePanel ? (
+        <div className="flex justify-end">
+          <Button variant="outline" size="md" onClick={() => setStandingsSheetOpen(true)}>
+            순위표
+          </Button>
+        </div>
+      ) : null}
+      <div className={leagueGrid ? (showStandings && sidePanel ? 'grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4' : 'grid grid-cols-1 gap-4') : 'flex items-start gap-4'}>
+        {!trayCollapsible && trayColumnOpen ? <div className="w-[240px] shrink-0">{tray(false)}</div> : null}
+        <div ref={areaRef} data-testid="bracket-canvas-area" className={leagueGrid ? 'relative min-w-0' : 'relative min-w-0 flex-1'}>
           {leagueGrid ? (
-            <div className="flex min-w-0 flex-col gap-3">
-              {showStandings && (sidePanel ? selectedFixture !== null : true) ? (
-                <div className="flex justify-end">
-                  {sidePanel ? (
-                    <Button variant="outline" size="md" onClick={() => setSelectedFixtureId(null)}>
-                      순위표 보기
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="md" onClick={() => setStandingsSheetOpen(true)}>
-                      순위표
-                    </Button>
-                  )}
-                </div>
-              ) : null}
-              <BracketLeagueGrid
-                groups={visible.groups}
-                fixtures={visible.fixtures}
-                slots={visible.slots}
-                selectedFixtureId={selectedFixture?.id ?? null}
-                pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
-                canWrite={canWrite && !staged}
-                onSelectFixture={selectFixture}
-                onAssignSlot={handleAssign}
-                onAssignDirect={handleAssignDirect}
-              />
-            </div>
+            <BracketLeagueGrid groups={visible.groups} fixtures={visible.fixtures} slots={visible.slots} {...sharedViewProps} />
           ) : (
-            <BracketCanvas scopedPool={Boolean(pool)}
+            <BracketCanvas
+              scopedPool={Boolean(pool)}
               sixTeamState={sixTeamState}
               registrations={registrations}
               groups={visible.groups}
               fixtures={visible.fixtures}
               slots={visible.slots}
-              selectedFixtureId={selectedFixture?.id ?? null}
-              pendingRegistrationId={canWrite && !staged ? pendingRegistrationId : null}
-              canWrite={canWrite && !staged}
-              onSelectFixture={selectFixture} onSelectBye={selectBye}
-              onAssignSlot={handleAssign}
-              onAssignDirect={handleAssignDirect}
+              onSelectBye={selectBye}
+              {...sharedViewProps}
             />
           )}
-          {rightColumn ? (
-            panel !== null ? (
-              panel
-            ) : (
-              <aside aria-label="조별 순위" className="sticky top-4 self-start">
-                <BracketLeagueStandings groups={standingsGroups} />
-              </aside>
-            )
+          {panel !== null && sidePanel ? (
+            <div data-dock={dock} className={`pointer-events-none absolute inset-y-0 z-10 w-[360px] max-w-full ${dock === 'start' ? 'start-0' : 'end-0'}`}>
+              <div className="pointer-events-auto sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">{panel}</div>
+            </div>
           ) : null}
         </div>
-      )}
+        {leagueGrid && showStandings && sidePanel ? (
+          <aside aria-label="조별 순위" className="sticky top-4 self-start">
+            <BracketLeagueStandings groups={standingsGroups} />
+          </aside>
+        ) : null}
+      </div>
 
       {panel !== null && selectedFixture !== null && !sidePanel ? (
         <BottomSheet open onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} ariaLabel={selectedBye ? "부전승 자리 편집" : fixtureTitle(selectedFixture, bracket.groups)}>
@@ -458,40 +248,6 @@ export function BracketCanvasWorkspace({
         <BottomSheet open onClose={() => setStandingsSheetOpen(false)} title="조별 순위">
           <BracketLeagueStandings groups={standingsGroups} />
         </BottomSheet>
-      ) : null}
-
-      {format !== undefined ? (
-        <BracketFixtureToolsDialog
-          key={toolsMode ?? 'closed'}
-          open={toolsMode !== null}
-          mode={toolsMode ?? 'add'}
-          format={format}
-          tournamentId={tournamentId}
-          bracket={bracket}
-          onFixtureCreated={setSelectedFixtureId}
-          onClose={() => setToolsMode(null)}
-          showToast={showToast}
-        />
-      ) : null}
-
-      {templateFormat !== null ? (
-        <BracketTemplateDialog
-          open={templateOpen}
-          tournamentId={tournamentId}
-          format={templateFormat}
-          allowSplitBracket={kind === 'regular_tournament'}
-          confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
-          confirmedTeamCountStatus={registrationsState.status}
-          hasExistingBracket={!isEmpty}
-          onApplied={() => {
-            void refetch().then(({ data }) => {
-              const firstFixture = [...(data?.fixtures ?? [])].sort((a, b) => a.fixtureNumber - b.fixtureNumber)[0];
-              if (firstFixture) setSelectedFixtureId(firstFixture.id);
-            });
-          }}
-          onClose={() => setTemplateOpen(false)}
-          showToast={showToast}
-        />
       ) : null}
     </div>
   );

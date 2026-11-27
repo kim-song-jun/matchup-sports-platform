@@ -15,7 +15,7 @@ export function runCsvExport(
   exportCsv.mutate(undefined, {
     onSuccess: (res) => {
       // BOM 이 없으면 Windows 엑셀이 UTF-8 을 CP949 로 읽어 한글(팀명·실명)이 깨진다.
-      const blob = new Blob(['﻿', res.csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([String.fromCharCode(0xfeff), res.csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

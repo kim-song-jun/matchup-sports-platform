@@ -58,7 +58,7 @@ export function CreateTeamCountField({
           onChange={(event) => onChange(onlyDigits(event.target.value))}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? ERROR_ID : OUTCOME_ID}
-          className="tm-input scroll-mb-28 max-w-[84px] text-center"
+          className="tm-input max-w-[84px] text-center"
         />
         <span aria-hidden="true" className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)]">팀</span>
         <button

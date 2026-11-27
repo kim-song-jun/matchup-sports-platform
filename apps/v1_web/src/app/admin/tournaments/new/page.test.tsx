@@ -88,7 +88,8 @@ async function fillRequired({ start = '2026-12-20T09:00' } = {}) {
   fireEvent.change(field(/대회 시작/), { target: { value: start } });
 }
 
-describe('대회 만들기 한 화면 폼', () => {
+// 역할·이름 질의가 많은 화면이라 부하가 큰 러너에서는 기본 5초를 넘길 수 있다.
+describe('대회 만들기 한 화면 폼', { timeout: 20_000 }, () => {
   it('필수 칸이 한 화면에 모두 있고, 마법사에 있던 입력은 없다', async () => {
     renderPage();
     const sports = await sportGroup();

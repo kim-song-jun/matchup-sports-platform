@@ -10,7 +10,7 @@ export default function AdminTournamentsNewPage() {
   const draftId = searchParams.get('draftId');
   const initialFormat = searchParams.get('format') === 'staged' ? 'staged' : 'group_knockout';
 
-  // 예전 마법사가 초안을 만든 뒤 남기던 주소 — 새로고침해도 중복 생성하지 않고 그 대회로 보낸다.
+  // draftId 가 붙은 주소는 폼 대신 그 대회 개요로 보내 같은 대회를 또 만들지 않게 한다.
   useEffect(() => {
     if (draftId) router.replace(`/admin/tournaments/${encodeURIComponent(draftId)}/overview`);
   }, [draftId, router]);

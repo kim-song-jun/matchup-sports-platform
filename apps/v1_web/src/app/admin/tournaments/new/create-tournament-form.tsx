@@ -88,7 +88,7 @@ function ChoiceChip({
         checked={checked}
         disabled={disabled}
         onChange={onSelect}
-        className="sr-only scroll-mb-28"
+        className="sr-only"
       />
       {checked ? <Check size={14} aria-hidden="true" /> : null}
       {label}
@@ -99,7 +99,7 @@ function ChoiceChip({
 function ProgressSteps() {
   const steps = ['필수 정보', '초안에서 나머지 채우기', '접수 시작'];
   return (
-    <ol aria-label="대회 만들기 진행" className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+    <ol aria-label="대회 만들기 진행" className="flex flex-wrap items-center gap-x-2 gap-y-1">
       {steps.map((step, index) => {
         const current = index === 0;
         return (
@@ -191,7 +191,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
   };
 
   return (
-    <>
+    <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="새 대회 만들기"
         description="꼭 필요한 6가지만 정하면 초안이 만들어져요. 나머지는 초안에서 채워요."
@@ -204,7 +204,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
         onSubmit={handleSubmit}
         noValidate
         aria-label="대회 필수 정보"
-        className="mx-auto mt-5 max-w-3xl pb-28"
+        className="mt-5 pb-28 [&_button]:scroll-mb-28 [&_input]:scroll-mb-28"
       >
         <div className="tm-card grid gap-6 px-4 py-5 sm:px-7 sm:py-7">
           <div className="grid gap-2">
@@ -212,14 +212,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
               종목
               <RequiredMark />
             </p>
-            {sports.isError ? (
-              <div role="alert" className="flex flex-wrap items-center gap-3 text-[length:var(--font-size-label)] text-[var(--red700)]">
-                종목을 불러오지 못했어요.
-                <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => void sports.refetch()}>
-                  다시 불러오기
-                </button>
-              </div>
-            ) : sports.data ? (
+            {sports.data ? (
               <div
                 role="radiogroup"
                 aria-labelledby="create-sport-label"
@@ -242,6 +235,13 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
                     }}
                   />
                 ))}
+              </div>
+            ) : sports.isError ? (
+              <div role="alert" className="flex flex-wrap items-center gap-3 text-[length:var(--font-size-label)] text-[var(--red700)]">
+                종목을 불러오지 못했어요.
+                <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => void sports.refetch()}>
+                  다시 불러오기
+                </button>
               </div>
             ) : (
               <p role="status" className="text-[length:var(--font-size-label)] text-[var(--text-caption)]">종목을 불러오고 있어요.</p>
@@ -267,7 +267,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
               placeholder="예: 2026 서울 풋살 오픈"
               aria-invalid={Boolean(errors.title)}
               aria-describedby={errors.title ? 'create-title-error' : undefined}
-              className="tm-input scroll-mb-28"
+              className="tm-input"
             />
             <FieldError id="create-title-error" focusId="create-title" message={errors.title} />
           </div>
@@ -299,7 +299,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
                       onChange={() => dispatch({ type: 'set-format', value: option.value })}
                       aria-labelledby={titleId}
                       aria-describedby={descriptionId}
-                      className="sr-only scroll-mb-28"
+                      className="sr-only"
                     />
                     <span
                       aria-hidden="true"
@@ -392,7 +392,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
         <CreateBottomBar status={summarizeBarStatus(state, errors)} pending={pending} cancelHref="/admin/tournaments" />
       </form>
       <AdminToasts toasts={toasts} />
-    </>
+    </div>
   );
 }
 
@@ -456,7 +456,7 @@ function QuotaRow({
           onChange={(event) => onChange(row.min, event.target.value)}
           aria-invalid={Boolean(minError)}
           aria-describedby={minError ? `${row.minId}-error` : undefined}
-          className="tm-input scroll-mb-28 max-w-[96px]"
+          className="tm-input max-w-[96px]"
         />
         <span aria-hidden="true" className="text-[var(--text-caption)]">~</span>
         <input
@@ -471,7 +471,7 @@ function QuotaRow({
           onChange={(event) => onChange(row.max, event.target.value)}
           aria-invalid={Boolean(maxError)}
           aria-describedby={maxError ? `${row.maxId}-error` : undefined}
-          className="tm-input scroll-mb-28 max-w-[96px]"
+          className="tm-input max-w-[96px]"
         />
         <span className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)]">명</span>
       </div>

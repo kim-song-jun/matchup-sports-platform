@@ -128,6 +128,27 @@ describe('경기 규칙 섹션 시트 — 저장 순서(경기 시간 → 경기
     expect(backend.state.tournament.teamFoulThreshold).toBe(6);
   });
 
+  it('기본 경기 시간은 저장되고 단계 경기 시간이 실패하면, 어느 단계가 실패했는지 이름으로 알린다', async () => {
+    const backend = start();
+    backend.state.bracket = {
+      ...backend.state.bracket,
+      groups: [{ id: 'f', tournamentId: 'tournament-1', name: '결승', phase: 'final', sortOrder: 0, advanceCount: null, createdAt: '', updatedAt: '', groupTeams: [] }],
+    };
+    const view = await open(backend);
+    const finalRow = within(await view.inSheet().findByRole('group', { name: '결승 경기 시간' }));
+    backend.state.failNext('periods', 400, { message: '결승은 이미 시작했어요.' }, 1);
+
+    type(view, '전반', '25');
+    fireEvent.click(finalRow.getByRole('button', { name: '결승 경기 시간 바꾸기' }));
+    fireEvent.change(finalRow.getByLabelText('결승 전반'), { target: { value: '30' } });
+    view.save();
+
+    expect(await view.inSheet().findByRole('alert')).toHaveTextContent(
+      '경기 시간은 저장됐고, 결승 경기 시간 저장에 실패했어요. 결승은 이미 시작했어요.',
+    );
+    expect(backend.state.periodPatches).toHaveLength(2);
+  });
+
   it('경기 시간이 0 이면 그 칸으로 가고 아무것도 보내지 않는다', async () => {
     const backend = start();
     const view = await open(backend);

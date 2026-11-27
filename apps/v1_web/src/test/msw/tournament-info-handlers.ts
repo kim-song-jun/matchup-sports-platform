@@ -103,7 +103,7 @@ const conflict: Failure = { status: 409, body: { code: 'TOURNAMENT_VERSION_CONFL
  * CAS 를 보고, 성공하면 버전을 올린다.
  */
 export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) {
-  const failures: Record<FailTarget, Failure[]> = { tournament: [], periods: [] };
+  const failures: Record<FailTarget, Array<Failure | null>> = { tournament: [], periods: [] };
   let tick = 0;
   const state = {
     tournament: createTournamentInfoFixture(initial),
@@ -146,9 +146,9 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
     /** 서버에 닿은 대회 PATCH 본문(실패한 것 포함) — 순서대로. */
     patches: [] as Record<string, unknown>[],
     periodPatches: [] as Record<string, unknown>[],
-    /** 다음 PATCH 한 번을 이 응답으로 실패시킨다. */
-    failNext(target: FailTarget, status: number, body: Failure['body'] = {}) {
-      failures[target].push({ status, body });
+    /** 다음 PATCH 한 번을 이 응답으로 실패시킨다. `after` 를 주면 그만큼의 PATCH 는 먼저 통과시킨다. */
+    failNext(target: FailTarget, status: number, body: Failure['body'] = {}, after = 0) {
+      failures[target].push(...Array.from({ length: after }, () => null), { status, body });
     },
   };
 

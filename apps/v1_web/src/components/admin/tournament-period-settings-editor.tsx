@@ -28,6 +28,7 @@ import { hasValidPeriodDurations } from '@/lib/tournament-periods';
 import type { StagePlan } from '@/types/stage-plan';
 
 const INVALID_MESSAGE = '경기 시간은 1분 이상으로 입력해 주세요.';
+/** 저장 안내에 쓰는 이름 — 단계는 「결승 경기 시간」 처럼 앞에 단계 이름을 붙여 기본 시간과 가른다. */
 const STEP_LABEL = '경기 시간';
 
 /** 편집의 기준 — 시트를 열고 처음 받은 값. 저장에 성공한 부분만 그 값으로 옮겨 간다. */
@@ -182,7 +183,7 @@ export function usePeriodSettingsDraft({
       for (const { phase, minutes } of changedStages) {
         const change = minutes === null ? { phase, inheritDefault: true } : { phase, periods: toPeriods(minutes) };
         steps.push(
-          saveStep(`periods:${phase}`, STEP_LABEL, change, async () => {
+          saveStep(`periods:${phase}`, `${tournamentPeriodPhaseShortLabel(phase)} ${STEP_LABEL}`, change, async () => {
             await patchPeriods(change);
             setBase((current) => {
               if (!current) return current;

@@ -773,9 +773,6 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
         errors.minMatchesPerTeam = '최소 경기 수는 1~50경기 사이의 정수여야 해요.';
       }
     }
-    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
-      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
-    }
     if (state.genderCategory === 'mixed') {
       const minMale = optionalNumeric(state.genderMinMale);
       const maxMale = optionalNumeric(state.genderMaxMale);
@@ -815,6 +812,10 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
+    // 입력 칸이 있는 단계(PresentationStep)에서 검사한다 — 제출은 첫 오류 단계로 이동하므로 다른 단계에 두면 오류가 안 보인다.
+    if (parseTeamFoulThresholdInput(state.teamFoulThreshold) === 'invalid') {
+      errors.teamFoulThreshold = TEAM_FOUL_THRESHOLD_ERROR;
+    }
     // 서버 DTO 는 꺼진 홍보의 priority 도 0~9999 정수로 검증한다 — 꺼진 카드도 막는다.
     for (const [field, card, label] of [
       ['promoHomePriority', state.promoHome, '홈 홍보 우선순위'],

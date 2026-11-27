@@ -36,6 +36,10 @@
 	-->
 	<key>provisioningProfiles</key>
 	<dict>
+		<key>kr.co.teameet.alpha.widget</key>
+		<string>Teameet Alpha Widget App Store</string>
+		<key>kr.co.teameet.widget</key>
+		<string>Teameet Production Widget App Store</string>
 		<key>kr.co.teameet.alpha</key>
 		<string>Teameet Alpha App Store</string>
 		<key>kr.co.teameet</key>

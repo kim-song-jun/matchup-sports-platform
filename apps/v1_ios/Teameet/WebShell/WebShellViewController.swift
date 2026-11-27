@@ -34,6 +34,7 @@ final class WebShellViewController: UIViewController {
     /// Supplied by the app delegate, which owns the APNs callbacks. Absent only in a build
     /// with no push at all, where the bridge honestly reports "not subscribed".
     private let push: PushCoordinator?
+    private var widgetSession: WidgetSessionCoordinator?
 
     init(
         config: AppConfig,
@@ -69,6 +70,8 @@ final class WebShellViewController: UIViewController {
         reachability.start()
         observeBackgrounding()
         observeKeyboard()
+        widgetSession = WidgetSessionCoordinator(config: config, cookies: webView.configuration.websiteDataStore.httpCookieStore)
+        widgetSession?.onFailure = { [weak self] message in self?.model.showNotice(message) }
         observeInPageNavigation()
 
         restoreOrLoadInitialRoute()
@@ -95,6 +98,7 @@ final class WebShellViewController: UIViewController {
                 guard AllowedNavigation.isInternal(self.webView.url, origin: self.config.webOrigin)
                 else { return }
                 Task {
+                    await self.widgetSession?.synchronize()
                     await self.push?.register()
                     await self.considerAskingAboutNotifications()
                 }
@@ -405,6 +409,7 @@ extension WebShellViewController: WKNavigationDelegate {
         // Mirrors Android's onPageFinished: a registration needs the session cookie, and
         // this is the first moment it is guaranteed to exist.
         Task {
+            await widgetSession?.synchronize()
             await push?.register()
             await considerAskingAboutNotifications()
         }

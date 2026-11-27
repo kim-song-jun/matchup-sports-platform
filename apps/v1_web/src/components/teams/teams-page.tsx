@@ -541,9 +541,13 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
     // 칩은 한 단어라 목록 카드와 같이 '남'·'여'를 '남성'·'여성'으로 풀어 쓴다(가입 조건 표는 그대로).
     teamCardGenderLabel(team.genderRule),
     team.level && team.level !== '레벨 미설정' ? team.level : '',
-    // 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13).
-    team.status === 'closed' ? team.statusLabel : '',
   ].filter(Boolean);
+  // 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13) — 주황 주의 칩.
+  const alertChip = team.status === 'closed' ? team.statusLabel : undefined;
+  // 정원이 다 찬 팀 — 버튼이 '정원 마감'으로 막힐 때 왜 막혔는지·언제 다시 되는지 버튼 위에 한 줄(A안).
+  const fullNotice = cta === '정원 마감' ? (
+    <p className="tm-text-caption tm-team-full-notice">정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.</p>
+  ) : null;
   // 만든 지 3개월이 안 된 팀 — 경기·후기가 아직 없는 이유를 한 단어로 알린다(2026-11-26 사용자 확정).
   const newTeamBadge = team.isNew ? '신생팀' : undefined;
   const recentMatchCount = team.recentMatchCount;
@@ -628,7 +632,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
         <div className="tm-team-detail-desktop-main">
           {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
           {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
-          <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} stats={stats} onShare={onShare} nameAs="h2" footnote={reviewFootnote} />
+          <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} nameAs="h2" footnote={reviewFootnote} />
           {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
           {mineSectionsTop}
           <TeamIntroSection text={team.description} />
@@ -644,6 +648,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
           {/* 이미 소속된 사람에게는 안내를 쓰지 않는다 — 버튼이 이미 "팀 채팅"이라 다른 일을 말하게 된다(F24). */}
           {mode === 'pending' ? <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} /> : null}
           {heroStatus}
+          {fullNotice}
           <div className="tm-team-detail-sidebar-cta">{ctaBlock}</div>
           {needsJoinConfirm ? <p className="tm-text-caption tm-team-side-hint">신청하면 팀장·매니저가 내 프로필을 보고 승인해요.</p> : null}
         </aside>
@@ -654,7 +659,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
       <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
         {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
         {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
-        <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} stats={stats} onShare={onShare} headerRef={mobileHeaderRef} footnote={reviewFootnote} />
+        <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} headerRef={mobileHeaderRef} footnote={reviewFootnote} />
         {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
         {mode === 'pending' ? <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} /> : null}
         {/* 이 화면은 데스크톱·모바일 JSX 를 따로 그린다 — 두 블록을 함께 고치는 것이 이 파일의 규약이다. */}
@@ -669,6 +674,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
       </article>
       <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
         {heroStatus}
+        {fullNotice}
         {ctaBlock}
       </div>
       <ConfirmModal
@@ -853,8 +859,9 @@ function TeamContactRow({ href, unavailableReason, children }: { href?: string; 
   const reasonId = useId();
   return (
     <>
-      {/* 컨택이 앞(좁게), 주 행동(가입 신청)이 뒤(넓게) — 2026-11-26 사용자 확정. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+      {/* 컨택이 앞(좁게), 주 행동(가입 신청)이 뒤(넓게) — 2026-11-26 사용자 확정. 360px 이하에서도 한 줄을
+          지킨다(인라인 grid 를 세로로 쌓는 전역 규칙을 피하려고 클래스로 둔다 — globals.css .tm-team-contact-row). */}
+      <div className="tm-team-contact-row">
         {unavailableReason || !href ? (
           <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled aria-describedby={reasonId}>
             컨택 보내기

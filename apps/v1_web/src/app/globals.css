@@ -5690,7 +5690,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: var(--spacing-3);
   padding: var(--spacing-2) var(--v1-shell-page-x);
   border-bottom: 1px solid var(--grey150);
-  background: var(--bg);
+  /* 종목 색 바탕(배너 색을 옅게) — 값은 sportCompactBarStyle() 이 인라인 변수로 준다. 없으면 기본 바탕. */
+  background: var(--team-accent-soft, var(--bg));
   transform: translate(-50%, -8px);
   opacity: 0;
   visibility: hidden;
@@ -5725,6 +5726,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-team-compact-bar-summary {
+  /* 요약 줄은 진한 종목 색(배지 글자색) — tm-text-caption 색보다 뒤에 와야 이긴다. */
+  color: var(--team-accent-text, var(--text-caption));
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5773,8 +5777,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   font-size: var(--font-size-body);
 }
 
+/* 줄 구분선 — grey100(#f2f4f6)은 흰 바탕에서 거의 안 보였고 --border(grey200)도 옅었다(2026-11-27
+   사용자 지적·비교 후 선택). 배지 테두리와 같은 --border-strong(라이트 grey300 · 다크 #4e5968)으로 둔다. */
 .tm-team-kv-row + .tm-team-kv-row {
-  border-top: 1px solid var(--grey100);
+  border-top: 1px solid var(--border-strong);
 }
 
 .tm-team-kv-row dt {
@@ -5829,6 +5835,35 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 2px;
 }
 
+/* 정원이 다 찬 팀 — [정원 마감] 버튼 바로 위 한 줄 안내. 데스크톱 오른쪽 카드는 카드 gap 이 간격을 맡는다. */
+.tm-team-full-notice {
+  margin: 0;
+  text-align: center;
+}
+
+.tm-fixed-cta .tm-team-full-notice {
+  margin-bottom: var(--spacing-2);
+}
+
+/* 팀 상세 하단 버튼 줄 — [컨택 보내기 | 가입 신청] 1:2. */
+.tm-team-contact-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--spacing-2);
+}
+
+/* 360px 이하에서는 1:2 로 나누면 컨택 칸(약 104px)에 글자가 안 들어간다 — 컨택은 글자 폭만큼, 가입 신청이 나머지를 채운다.
+   (이 폭에서 하단 버튼을 세로로 쌓는 전역 규칙은 인라인 grid 에만 걸리므로 이 줄에는 닿지 않는다.) */
+@media (max-width: 360px) {
+  .tm-team-contact-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .tm-team-contact-row > .tm-btn:first-child {
+    white-space: nowrap;
+  }
+}
+
 /* 참가 중인 경기 — 밑줄 탭(섹션 폭 3등분). */
 .tm-team-tabs {
   display: flex;
@@ -5862,6 +5897,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-participation-list {
   display: grid;
+  /* 칸 폭을 화면에 묶는다 — 없으면 긴 경기 이름이 줄임표 없이 칸을 늘려 상태 배지가 화면 밖으로 밀린다. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--spacing-2);
   margin: 0;
   padding: 0;
@@ -5890,6 +5927,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-participation-badge {
   flex: none;
+}
+
+/* 참가 중인 경기 [자세히 보기 (+N)] / [접기] — 목록 바로 아래 한 줄. */
+.tm-team-participation-more {
+  margin-top: var(--spacing-2);
 }
 
 .tm-team-participation-skeleton {

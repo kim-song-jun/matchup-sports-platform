@@ -9,6 +9,7 @@ import { withFromPath } from '@/lib/session-storage';
 import { tournamentRegistrationStatusConfig } from '@/lib/v1-status-labels';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import type { V1TeamCompetitionEntries } from '@/types/api';
+import { useParticipationPreview } from './team-detail-profile';
 import { TeamGameKindBadge } from './team-game-kind-badge';
 
 export type TeamCompetitionEntryRow = {
@@ -73,46 +74,51 @@ export function toCompetitionEntryRows(
  * 대회·리그 상세, 오른쪽 버튼은 참가 명단 화면으로 바로 간다. 빈 목록·조회 실패는 탭이 따로 보인다.
  */
 export function TeamCompetitionEntryList({ rows }: { rows: TeamCompetitionEntryRow[] }) {
+  // 팀 상세 참가 중인 경기 탭과 같은 규칙 — 앞 5개만 보이고 나머지는 [자세히 보기]로 펼친다.
+  const { listId, shown, toggle } = useParticipationPreview(rows);
   return (
-    <div className="tm-card" style={{ padding: '4px 16px' }}>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {rows.map((row, index) => (
-          <li
-            key={row.key}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 0',
-              borderBottom: index === rows.length - 1 ? undefined : '1px solid var(--border)',
-            }}
-          >
-            <Link
-              href={row.href}
-              style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44, justifyContent: 'center', color: 'inherit', textDecoration: 'none' }}
+    <>
+      <div className="tm-card" style={{ padding: '4px 16px' }}>
+        <ul id={listId} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {shown.map((row, index) => (
+            <li
+              key={row.key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 0',
+                borderBottom: index === shown.length - 1 ? undefined : '1px solid var(--border)',
+              }}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <TeamGameKindBadge kind={row.kind} />
-                <span className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {row.title}
+              <Link
+                href={row.href}
+                style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44, justifyContent: 'center', color: 'inherit', textDecoration: 'none' }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <TeamGameKindBadge kind={row.kind} />
+                  <span className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.title}
+                  </span>
                 </span>
-              </span>
-              <span className="tm-text-caption">
-                <span style={{ color: row.statusColor, fontWeight: 700 }}>{row.statusLabel}</span>
-                {` · 선수 ${row.playerCount}명 · ${row.rosterNote}`}
-              </span>
-            </Link>
-            <Link
-              href={row.rosterHref}
-              className={`tm-btn tm-btn-sm ${row.canEdit ? 'tm-btn-outline' : 'tm-btn-neutral'}`}
-              style={{ minHeight: 44, flex: '0 0 auto' }}
-              aria-label={`${row.title} 참가 선수 ${row.canEdit ? '관리' : '보기'}`}
-            >
-              {row.canEdit ? '참가 선수 관리' : '참가 선수 보기'}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+                <span className="tm-text-caption">
+                  <span style={{ color: row.statusColor, fontWeight: 700 }}>{row.statusLabel}</span>
+                  {` · 선수 ${row.playerCount}명 · ${row.rosterNote}`}
+                </span>
+              </Link>
+              <Link
+                href={row.rosterHref}
+                className={`tm-btn tm-btn-sm ${row.canEdit ? 'tm-btn-outline' : 'tm-btn-neutral'}`}
+                style={{ minHeight: 44, flex: '0 0 auto' }}
+                aria-label={`${row.title} 참가 선수 ${row.canEdit ? '관리' : '보기'}`}
+              >
+                {row.canEdit ? '참가 선수 관리' : '참가 선수 보기'}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {toggle}
+    </>
   );
 }

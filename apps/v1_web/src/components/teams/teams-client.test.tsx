@@ -990,7 +990,7 @@ describe('TeamDetailPageClient — 내 리그', () => {
     leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1'));
   });
 
-  it('참가 중인 리그가 없으면 리그 탭이 없다 — 매치·대회도 없으면 안내 한 줄', () => {
+  it('참가 중인 리그가 없어도 리그 탭은 남고(0), 셋 다 비면 첫 탭(매치)의 안내를 보인다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
     teamApiMocks.useV1LeagueMatches.mockReturnValue({
@@ -1000,8 +1000,8 @@ describe('TeamDetailPageClient — 내 리그', () => {
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.queryByRole('tab', { name: /리그/ })).not.toBeInTheDocument();
-    expect(screen.getAllByText('아직 참가 중인 경기가 없어요')).toHaveLength(2);
+    expect(screen.getAllByRole('tab', { name: /^리그\s*0$/ })).toHaveLength(2);
+    expect(screen.getAllByText('모집 중인 매치가 없어요')).toHaveLength(2);
   });
 
   it('리그 목록을 teamId 필터로 조회한다 (팀매치 역산이 아니라)', () => {
@@ -1226,6 +1226,77 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     expect(screen.getAllByRole('button', { name: '가입이 마감된 팀이에요.' })[0]).toBeDisabled();
   });
 
+  describe('정원 마감(A안) — 주황 칩 · 짧은 [정원 마감] · 버튼 위 한 줄', () => {
+    const fullDetail = (extra: Record<string, unknown> = {}) => {
+      const detail = seededDetail();
+      return { ...detail, memberCount: 6, profile: { ...detail.profile, memberGoalCount: 6 }, ...extra };
+    };
+    const signedIn = () =>
+      teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+
+    it('로그인한 비회원 — 서버 문장 대신 [정원 마감](비활성)과 안내 한 줄, 칩은 주황', () => {
+      signedIn();
+      const detail = fullDetail();
+      teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null } }, isError: false, isPlaceholderData: false });
+      teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '정원이 다 찬 팀이에요.' }, isError: false });
+
+      const { container } = render(<TeamDetailPageClient teamId="team-1" />);
+
+      const buttons = screen.getAllByRole('button', { name: '정원 마감' });
+      expect(buttons).toHaveLength(2); // 데스크톱 오른쪽 카드 · 모바일 하단
+      buttons.forEach((button) => expect(button).toBeDisabled());
+      expect(screen.queryByRole('button', { name: '정원이 다 찬 팀이에요.' })).toBeNull();
+      expect(screen.getAllByText('정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.')).toHaveLength(2);
+      const chips = container.querySelectorAll('.tm-team-profile-chip-alert');
+      expect(chips.length).toBe(2);
+      chips.forEach((chip) => {
+        expect(chip).toHaveTextContent('정원 마감');
+        expect(chip).toHaveClass('tm-badge-orange');
+      });
+    });
+
+    it('로그아웃 상태도 [로그인 후 가입 신청]으로 보내지 않고 [정원 마감]으로 막는다', () => {
+      teamApiMocks.useV1TeamDetail.mockReturnValue({ data: fullDetail(), isError: false, isPlaceholderData: false });
+
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.queryByRole('button', { name: '로그인 후 가입 신청' })).toBeNull();
+      const [button] = screen.getAllByRole('button', { name: '정원 마감' });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(routerMocks.push).not.toHaveBeenCalled();
+    });
+
+    it('이미 신청한 사람은 정원이 차도 [신청 취소]를 그대로 둔다 — 대조군', () => {
+      signedIn();
+      const detail = fullDetail();
+      teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, joinState: 'requested' } }, isError: false, isPlaceholderData: false });
+      teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'requested', message: '', applicationId: 'app-1' }, isError: false });
+
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.getAllByRole('button', { name: '신청 취소' }).length).toBeGreaterThan(0);
+      expect(screen.queryByText('정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.')).toBeNull();
+    });
+
+    it('가입 닫힘이 정원보다 앞선다 — 칩은 [가입 닫힘](주황), 정원 안내 한 줄은 없다', () => {
+      signedIn();
+      const detail = fullDetail({ joinPolicy: 'closed' });
+      teamApiMocks.useV1TeamDetail.mockReturnValue({
+        data: { ...detail, profile: { ...detail.profile, joinPolicy: 'closed' }, viewer: { ...detail.viewer, disabledReason: null } },
+        isError: false,
+        isPlaceholderData: false,
+      });
+      teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '지금은 가입을 받지 않는 팀이에요.' }, isError: false });
+
+      const { container } = render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(container.querySelector('.tm-team-profile-chip-alert')).toHaveTextContent('가입 닫힘');
+      expect(screen.queryByRole('button', { name: '정원 마감' })).toBeNull();
+      expect(screen.queryByText('정원이 다 찼어요. 자리가 나면 다시 신청할 수 있어요.')).toBeNull();
+    });
+  });
+
   describe('컨택 보내기 — 서버가 합산한 canSendContact', () => {
     afterEach(() => {
       teamApiMocks.useV1MyTeams.mockReturnValue({ data: undefined });
@@ -1250,6 +1321,18 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       const [link] = screen.getAllByRole('link', { name: '컨택 보내기' });
       expect(link).toHaveAttribute('href', '/teams/team-1/contact/new');
       expect(screen.queryByText('이 팀은 지금 컨택을 받지 않고 있어요.')).toBeNull();
+    });
+
+    it('버튼 줄은 [컨택 | 가입 신청] 한 줄이고 인라인 grid 를 쓰지 않는다 — 360px 이하 세로 쌓기 전역 규칙을 피한다', () => {
+      renderAsOperator(true);
+
+      // globals.css `.tm-fixed-cta > div[style*="grid"]` 가 360px 이하에서 인라인 grid 를 한 열로 바꾼다(alpha 실측 회귀).
+      for (const link of screen.getAllByRole('link', { name: '컨택 보내기' })) {
+        const row = link.parentElement!;
+        expect(row).toHaveClass('tm-team-contact-row');
+        expect(row).not.toHaveAttribute('style');
+        expect(row.lastElementChild).toHaveTextContent('가입 신청');
+      }
     });
 
     it('값이 없으면(구버전 응답) 링크를 그대로 둔다 — 서버가 컨택 생성 때 다시 막는다', () => {

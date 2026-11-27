@@ -1363,13 +1363,25 @@ function canWithdrawJoin(team: V1TeamDetail, eligibility?: { joinState: string; 
   return resolveJoinState(team, eligibility) === 'requested' && Boolean(eligibility?.applicationId);
 }
 
+/**
+ * 정원이 다 찬 팀(가입은 열려 있음)에 아직 회원도 신청자도 아닌 사람 — 버튼은 짧게 '정원 마감'으로 막는다
+ * (2026-11-27 사용자 확정 A안). 로그아웃 상태도 같다 — 예전엔 '로그인 후 가입 신청'이 눌려 로그인하고
+ * 돌아와서야 정원이 찼다는 걸 알았다. 가입 닫힘이 정원보다 앞선다(teamRecruitmentLabel 순서).
+ */
+const TEAM_FULL_CTA = '정원 마감';
+function isTeamFullForViewer(team: V1TeamDetail, eligibility?: { joinState: string }) {
+  if (isTeamMemberRole(team.viewer.role) || resolveJoinState(team, eligibility) === 'requested') return false;
+  return teamRecruitmentLabel({ joinPolicy: team.profile.joinPolicy, memberCount: team.memberCount, memberGoalCount: team.profile.memberGoalCount }) === '정원 마감';
+}
+
 function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; joinState: string; eligible: boolean; applicationId?: string | null } | undefined, state: TeamJoinAuthState) {
   if (state.authPending) return '로그인 상태 확인 중';
   if (state.authError && state.authRetryable) return '로그인 상태 다시 확인';
   if (state.authError) return '로그인 상태를 확인할 수 없어요';
-  if (state.authUnauthorized) return '로그인 후 가입 신청';
+  if (state.authUnauthorized) return isTeamFullForViewer(team) ? TEAM_FULL_CTA : '로그인 후 가입 신청';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
   if (canWithdrawJoin(team, eligibility)) return '신청 취소';
+  if (isTeamFullForViewer(team, eligibility)) return TEAM_FULL_CTA;
   if (state.eligibilityError && !state.eligibilityUnauthorized) return '다시 시도';
   if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return '로그인 후 가입 신청';
   if (resolveJoinState(team, eligibility) === 'requested') return '신청 상태 확인 중';
@@ -1439,9 +1451,11 @@ function teamDetailCtaAction({
   if (state.authPending) return undefined;
   if (state.authError && state.authRetryable) return retryAuth;
   if (state.authError) return undefined;
-  if (state.authUnauthorized) return login;
+  // 정원 마감은 라벨(teamDetailCtaLabel)과 같은 자리에서 막는다 — 로그인으로 보내지 않는다.
+  if (state.authUnauthorized) return isTeamFullForViewer(team) ? undefined : login;
   if (isTeamMemberRole(team.viewer.role)) return chat;
   if (canWithdrawJoin(team, eligibility)) return withdraw;
+  if (isTeamFullForViewer(team, eligibility)) return undefined;
   if (state.eligibilityError && !state.eligibilityUnauthorized) return retryEligibility;
   if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return login;
   if (resolveJoinState(team, eligibility) === 'requested') return undefined;

@@ -2,7 +2,7 @@
  * 팀 상세 "참가 중인 경기"의 리그·대회 줄(Task 180 R-1 B) — 서버 응답을 줄로 바꾸는 규칙과, 누가 [참가 선수 관리]를 보는지.
  * 탭·빈 목록·조회 실패는 teams-page.test.tsx 의 "참가 중인 경기" 묶음이 본다.
  */
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { v1TeamCompetitionEntriesFixture as fixture } from '@/test/msw/fixtures';
 import type { V1TeamCompetitionEntries, V1TeamCompetitionEntry } from '@/types/api';
@@ -83,5 +83,14 @@ describe('TeamCompetitionEntryList', () => {
     renderList({ ...fixture, viewerCanManageRoster: false });
     expect(screen.queryByRole('link', { name: /참가 선수 관리/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /참가 선수 보기$/ })).toHaveLength(2);
+  });
+
+  it('5개까지만 보이고 나머지는 [자세히 보기 (+N)]로 펼친다(팀 상세 참가 중인 경기와 같은 규칙)', () => {
+    renderList(entries(Array.from({ length: 6 }, () => ({}))));
+    expect(screen.getAllByRole('link', { name: /참가 선수 관리$/ })).toHaveLength(5);
+
+    fireEvent.click(screen.getByRole('button', { name: '자세히 보기 (+1)' }));
+    expect(screen.getAllByRole('link', { name: /참가 선수 관리$/ })).toHaveLength(6);
+    expect(screen.getByRole('button', { name: '접기' })).toHaveAttribute('aria-expanded', 'true');
   });
 });

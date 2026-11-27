@@ -1562,24 +1562,90 @@ describe('TeamDetailPageView — 참가 중인 경기', () => {
     expect(screen.getAllByRole('link', { name: /티밋컵/ })[0]).toHaveAttribute('href', '/tournaments/cup-1');
   });
 
-  it('비어 있는 탭은 숨긴다 — 리그만 있으면 리그 탭 하나', () => {
+  it('빈 탭도 숨기지 않고 셋 다 보이며, 내용이 있는 첫 탭(리그)을 먼저 연다', () => {
     render(<TeamDetailPageView model={model({ myLeagues: [league('lg-1', '가을 리그')] })} />);
 
-    expect(within(firstTablist()).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['리그1']);
+    const tablist = firstTablist();
+    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['매치0', '리그1', '대회0']);
+    expect(within(tablist).getByRole('tab', { name: /리그/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getAllByRole('link', { name: /가을 리그/ })).toHaveLength(2);
+
+    // 빈 탭을 누르면 탭 안에 그 종류의 안내가 보인다.
+    fireEvent.click(within(tablist).getByRole('tab', { name: /매치/ }));
+    expect(screen.getByText('모집 중인 매치가 없어요')).toBeInTheDocument();
+    fireEvent.click(within(tablist).getByRole('tab', { name: /대회/ }));
+    expect(screen.getByText('참가 중인 대회가 없어요')).toBeInTheDocument();
   });
 
-  it('셋 다 비면 탭 없이 안내 한 줄만 둔다', () => {
+  it('셋 다 비어도 탭 셋은 남고, 첫 탭(매치)의 안내를 보인다', () => {
     render(<TeamDetailPageView model={model({})} />);
 
-    expect(screen.queryByRole('tablist', { name: '참가 중인 경기 종류' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('아직 참가 중인 경기가 없어요')).toHaveLength(2);
+    const tablist = firstTablist();
+    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['매치0', '리그0', '대회0']);
+    expect(within(tablist).getByRole('tab', { name: /매치/ })).toHaveAttribute('aria-selected', 'true');
+    // 데스크톱·모바일 두 벌.
+    expect(screen.getAllByText('모집 중인 매치가 없어요')).toHaveLength(2);
   });
 
-  it('불러오는 중인 탭은 비어 있어도 감추지 않고 스켈레톤을 보인다', () => {
+  it('5개까지만 보이고 나머지는 [자세히 보기 (+N)]로 펼치며, 탭을 바꾸면 다시 접힌다', () => {
+    const cups = Array.from({ length: 7 }, (_, i) => ({
+      id: `cup-${i}`,
+      title: `티밋컵 ${i + 1}회`,
+      href: `/tournaments/cup-${i}`,
+      sub: '',
+      status: { label: '모집 중', badgeClass: 'tm-badge-blue' },
+    }));
+    render(<TeamDetailPageView model={model({ myLeagues: [league('lg-1', '가을 리그')], publicTournaments: publicTournaments(cups) })} />);
+    // 첫 벌(데스크톱)만 본다.
+    const section = within(firstTablist().closest('section')!);
+    const desktopRows = () => section.queryAllByRole('link', { name: /티밋컵/ });
+
+    fireEvent.click(section.getByRole('tab', { name: /대회/ }));
+    expect(desktopRows()).toHaveLength(5);
+    const more = section.getByRole('button', { name: '자세히 보기 (+2)' });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(more);
+    expect(desktopRows()).toHaveLength(7);
+    expect(section.getByRole('button', { name: '접기' })).toHaveAttribute('aria-expanded', 'true');
+
+    // 다른 탭에 다녀오면 다시 5개부터 보인다.
+    fireEvent.click(section.getByRole('tab', { name: /리그/ }));
+    expect(section.queryByRole('button', { name: /자세히 보기/ })).not.toBeInTheDocument();
+    fireEvent.click(section.getByRole('tab', { name: /대회/ }));
+    expect(desktopRows()).toHaveLength(5);
+  });
+
+  it('5개 이하면 [자세히 보기]를 두지 않는다', () => {
+    render(<TeamDetailPageView model={model({ myLeagues: [league('lg-1', '가을 리그')] })} />);
+
+    expect(screen.queryByRole('button', { name: /자세히 보기/ })).not.toBeInTheDocument();
+  });
+
+  it('목록 칸 폭을 화면에 묶어 긴 경기 이름이 상태 배지를 화면 밖으로 밀지 않는다', () => {
+    // alpha 360px 실측: 칸 폭이 없으면 긴 대회 이름이 줄임표 없이 칸을 늘려 "진행중" 배지가 잘렸다.
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const list = css.match(/\.tm-team-participation-list\s*\{([^}]*)\}/)?.[1];
+    const text = css.match(/\.tm-team-participation-text\s*\{([^}]*)\}/)?.[1];
+
+    expect(list).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    expect(text).toMatch(/min-width:\s*0/);
+  });
+
+  it('하단 [컨택 | 가입 신청] 줄은 1:2 이고, 360px 이하에서도 세로로 쌓지 않고 컨택만 글자 폭으로 줄인다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const row = css.match(/\n\.tm-team-contact-row\s*\{([^}]*)\}/)?.[1];
+    const narrow = css.match(/@media \(max-width: 360px\)\s*\{\s*\.tm-team-contact-row\s*\{([^}]*)\}/)?.[1];
+
+    expect(row).toMatch(/grid-template-columns:\s*1fr 2fr/);
+    expect(narrow).toMatch(/grid-template-columns:\s*auto minmax\(0,\s*1fr\)/);
+  });
+
+  it('불러오는 중인 탭은 개수 없이 보이고, 누르면 스켈레톤을 보인다', () => {
     render(<TeamDetailPageView model={model({ myLeaguesLoading: true })} />);
 
-    expect(within(firstTablist()).getByRole('tab', { name: '리그' })).toBeInTheDocument();
+    const leagueTab = within(firstTablist()).getByRole('tab', { name: '리그' });
+    fireEvent.click(leagueTab);
     expect(screen.getAllByLabelText('리그 불러오는 중').length).toBeGreaterThan(0);
   });
 
@@ -1592,6 +1658,7 @@ describe('TeamDetailPageView — 참가 중인 경기', () => {
       />,
     );
 
+    fireEvent.click(within(firstTablist()).getByRole('tab', { name: '리그' }));
     expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole('button', { name: '다시 시도' })[0]);
     expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
@@ -1631,7 +1698,7 @@ describe('TeamDetailPageView — 참가 중인 경기', () => {
     );
 
     const tablist = firstTablist();
-    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['리그1', '대회1']);
+    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['매치0', '리그1', '대회1']);
     expect(screen.getAllByRole('link', { name: '가을 정규 리그 참가 선수 관리' }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('선수 추가·빼기와 등번호는 [참가 선수 관리]에서 고쳐요.').length).toBeGreaterThan(0);
     // 팀원에게는 공개 리그 목록을 그리지 않는다 — 신청 줄이 같은 리그를 이미 담는다.
@@ -1785,5 +1852,35 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     const { container } = render(<TeamListPageView model={listWith({ next: '매일 · 저녁 · 실력 중심' })} />);
 
     expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매일 · 저녁 · 실력 중심');
+  });
+});
+
+describe('TeamDetailPageView — 작은 상단 바 종목 색(A안)', () => {
+  it.each([
+    ['futsal', 'var(--blue50)', 'var(--blue700)'],
+    ['soccer', 'var(--green50)', 'var(--green700)'],
+  ])('%s 팀은 바탕을 연한 종목 색, 요약 줄을 진한 종목 색으로 준다', (sportCode, soft, text) => {
+    const base = getTeamDetailViewModel('default');
+    const { container } = render(<TeamDetailPageView model={{ ...base, team: { ...base.team, sportCode } }} />);
+    const bar = container.querySelector<HTMLElement>('.tm-team-compact-bar')!;
+
+    expect(bar.style.getPropertyValue('--team-accent-soft')).toBe(soft);
+    expect(bar.style.getPropertyValue('--team-accent-text')).toBe(text);
+  });
+
+  it('가입 조건 줄 구분선은 --border-strong 이다 — grey100·grey200 은 흰 바탕에서 옅었다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const divider = css.match(/\.tm-team-kv-row \+ \.tm-team-kv-row\s*\{([^}]*)\}/)?.[1];
+
+    expect(divider).toMatch(/border-top:\s*1px solid var\(--border-strong\)/);
+  });
+
+  it('CSS 는 그 변수로 바탕·요약 줄을 칠하고, 값이 없으면 기본 색으로 돌아간다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const bar = css.match(/\n\.tm-team-compact-bar\s*\{([^}]*)\}/)?.[1];
+    const summary = css.match(/\.tm-team-compact-bar-summary\s*\{([^}]*)\}/)?.[1];
+
+    expect(bar).toMatch(/background:\s*var\(--team-accent-soft,\s*var\(--bg\)\)/);
+    expect(summary).toMatch(/color:\s*var\(--team-accent-text,\s*var\(--text-caption\)\)/);
   });
 });

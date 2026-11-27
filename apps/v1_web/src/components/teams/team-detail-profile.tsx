@@ -13,7 +13,7 @@
  */
 
 import Link from 'next/link';
-import type { KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarDays, MapPin } from 'lucide-react';
 import { readTopbarHeight } from '@/components/v1-ui/focus-below-topbar';
@@ -53,6 +53,15 @@ export function sportBannerGradient(sportCode: string | undefined): string {
   return `linear-gradient(135deg, ${accent.dot} 0%, ${accent.gradientTo} 100%)`;
 }
 
+/**
+ * 작은 상단 바의 종목 색 — 배너 색을 옅게 이어받는다(2026-11-27 사용자 확정 A안). 바탕은 종목 배지 바탕,
+ * 요약 줄은 종목 배지 글자색이다(배지와 같은 조합이라 대비가 검증돼 있다).
+ */
+export function sportCompactBarStyle(sportCode: string | undefined): CSSProperties {
+  const accent = getSportAccent(sportCode ?? '');
+  return { '--team-accent-soft': accent.badgeBg, '--team-accent-text': accent.badgeText } as CSSProperties;
+}
+
 export function TeamDetailHeader({
   team,
   chips,
@@ -62,6 +71,7 @@ export function TeamDetailHeader({
   headerRef,
   footnote,
   badge,
+  alertChip,
 }: {
   team: HeaderTeam;
   chips: string[];
@@ -71,6 +81,11 @@ export function TeamDetailHeader({
   footnote?: ReactNode;
   /** 조건 칩 맨 앞의 강조 칩 — 만든 지 3개월 미만이면 '신생팀'. */
   badge?: string;
+  /**
+   * 조건 칩 끝의 주의 칩 — 가입을 받지 않는 예외(가입 닫힘·정원 마감). 회색 조건 칩과 섞이지 않게 주황으로
+   * 둔다(2026-11-27 사용자 확정 A안). 색만으로 말하지 않는다 — 칩은 항상 글자를 담는다.
+   */
+  alertChip?: string;
   /** 데스크톱은 h2, 모바일은 sr-only h1 과 겹치지 않게 aria-hidden div. */
   nameAs?: 'h2' | 'div';
   headerRef?: RefObject<HTMLElement | null>;
@@ -102,13 +117,14 @@ export function TeamDetailHeader({
             <ShareIcon size={20} />
           </button>
         </div>
-        {chips.length || badge ? (
+        {chips.length || badge || alertChip ? (
           <ul className="tm-team-profile-chips" aria-label="팀 조건">
             {/* 모양은 앱 공용 배지(.tm-badge) — 목록 카드·다른 상세와 같은 배지. tm-team-profile-chip* 는 표시용 이름표다. */}
             {badge ? <li className="tm-badge tm-badge-blue tm-team-profile-chip tm-team-profile-chip-badge">{badge}</li> : null}
             {chips.map((chip) => (
               <li key={chip} className="tm-badge tm-badge-grey tm-team-profile-chip">{chip}</li>
             ))}
+            {alertChip ? <li className="tm-badge tm-badge-orange tm-team-profile-chip tm-team-profile-chip-alert">{alertChip}</li> : null}
           </ul>
         ) : null}
       </div>
@@ -147,7 +163,7 @@ export function TeamDetailCompactBar({
   summary,
 }: {
   targetRef: RefObject<HTMLElement | null>;
-  team: Pick<HeaderTeam, 'id' | 'name' | 'logoUrl'>;
+  team: Pick<HeaderTeam, 'id' | 'name' | 'logoUrl' | 'sportCode'>;
   summary: string;
 }) {
   const [visible, setVisible] = useState(false);
@@ -164,7 +180,7 @@ export function TeamDetailCompactBar({
     return () => observer.disconnect();
   }, [targetRef]);
   return (
-    <div className="tm-team-compact-bar tm-hide-desktop" data-visible={visible ? 'true' : 'false'} aria-hidden="true">
+    <div className="tm-team-compact-bar tm-hide-desktop" style={sportCompactBarStyle(team.sportCode)} data-visible={visible ? 'true' : 'false'} aria-hidden="true">
       <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="md" />
       <div className="tm-team-compact-bar-text">
         <div className="tm-team-compact-bar-name">{team.name}</div>
@@ -300,44 +316,82 @@ export type TeamParticipationTab = {
   footer?: ReactNode;
 };
 
+/** 참가 중인 경기 탭은 처음에 이만큼만 보이고 나머지는 [자세히 보기]로 펼친다(2026-11-27 사용자 확정). */
+export const PARTICIPATION_PREVIEW_LIMIT = 5;
+
+/**
+ * 목록을 앞 5개로 자르고, 넘치면 [자세히 보기 (+N)] / [접기] 버튼을 준다. 공개 목록(TeamParticipationList)과
+ * 팀원용 신청 목록(TeamCompetitionEntryList)이 같이 쓴다.
+ */
+export function useParticipationPreview<T>(items: T[]) {
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  const hiddenCount = items.length - PARTICIPATION_PREVIEW_LIMIT;
+  const shown = expanded || hiddenCount <= 0 ? items : items.slice(0, PARTICIPATION_PREVIEW_LIMIT);
+  const toggle =
+    hiddenCount > 0 ? (
+      <button
+        type="button"
+        className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-team-participation-more"
+        aria-expanded={expanded}
+        aria-controls={listId}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {expanded ? '접기' : `자세히 보기 (+${hiddenCount})`}
+      </button>
+    ) : null;
+  return { listId, shown, toggle };
+}
+
 /** 링크 카드 목록 — 매치·공개 리그·공개 대회가 같은 모양을 쓴다. */
 export function TeamParticipationList({ items }: { items: TeamParticipationItem[] }) {
+  const { listId, shown, toggle } = useParticipationPreview(items);
   return (
-    <ul className="tm-team-participation-list">
-      {items.map((item) => (
-        <li key={item.key}>
-          <Link className="tm-list-row tm-pressable tm-team-participation-row" href={item.href}>
-            <span className="tm-team-participation-text">
-              <span className="tm-text-label tm-team-participation-title">{item.title}</span>
-              {item.sub ? <span className="tm-text-caption">{item.sub}</span> : null}
-            </span>
-            {item.status ? (
-              // 색만으로 상태를 말하지 않는다 — 배지는 항상 글자를 담는다.
-              <span className={`tm-badge ${item.status.badgeClass} tm-team-participation-badge`}>{item.status.label}</span>
-            ) : null}
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul id={listId} className="tm-team-participation-list">
+        {shown.map((item) => (
+          <li key={item.key}>
+            <Link className="tm-list-row tm-pressable tm-team-participation-row" href={item.href}>
+              <span className="tm-team-participation-text">
+                <span className="tm-text-label tm-team-participation-title">{item.title}</span>
+                {item.sub ? <span className="tm-text-caption">{item.sub}</span> : null}
+              </span>
+              {item.status ? (
+                // 색만으로 상태를 말하지 않는다 — 배지는 항상 글자를 담는다.
+                <span className={`tm-badge ${item.status.badgeClass} tm-team-participation-badge`}>{item.status.label}</span>
+              ) : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {toggle}
+    </>
   );
 }
 
+/** 비어 있는 탭 안에 보이는 안내 — 탭은 항상 셋 다 보이므로 탭마다 따로 말한다. */
+const PARTICIPATION_EMPTY: Record<TeamParticipationTab['key'], { title: string; sub: string }> = {
+  match: { title: '모집 중인 매치가 없어요', sub: '이 팀이 매치를 열면 여기서 볼 수 있어요.' },
+  league: { title: '참가 중인 리그가 없어요', sub: '이 팀이 리그에 참가하면 여기서 볼 수 있어요.' },
+  tournament: { title: '참가 중인 대회가 없어요', sub: '이 팀이 대회에 참가하면 여기서 볼 수 있어요.' },
+};
+
 /**
- * 참가 중인 경기 — 매치·리그·대회 밑줄 탭. 비어 있는 탭은 숨기고(불러오는 중·실패는 보인다), 셋 다
- * 비면 안내 한 줄만 남긴다. 탭은 좌우 화살표로도 옮길 수 있다.
+ * 참가 중인 경기 — 매치·리그·대회 밑줄 탭. 탭은 비어 있어도 항상 셋 다 보인다(2026-11-27 사용자 확정) —
+ * 빈 탭은 탭 안에 안내를 보인다. 처음에는 내용이 있는 첫 탭을, 셋 다 비었으면 첫 탭(매치)을 연다.
+ * 탭은 좌우 화살표로도 옮길 수 있다.
  */
 export function TeamParticipationSection({ tabs }: { tabs: TeamParticipationTab[] }) {
   const baseId = useId();
-  const visible = tabs.filter((tab) => tab.state !== 'ready' || tab.count > 0);
   const [selected, setSelected] = useState<TeamParticipationTab['key'] | null>(null);
-  const active = visible.find((tab) => tab.key === selected) ?? visible[0];
+  const active = tabs.find((tab) => tab.key === selected) ?? tabs.find((tab) => tab.state === 'ready' && tab.count > 0) ?? tabs[0];
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
     event.preventDefault();
-    const index = visible.findIndex((tab) => tab.key === active?.key);
-    const next = visible[(index + (event.key === 'ArrowRight' ? 1 : visible.length - 1)) % visible.length];
+    const index = tabs.findIndex((tab) => tab.key === active?.key);
+    const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
     setSelected(next.key);
     tabRefs.current.get(next.key)?.focus();
   };
@@ -348,7 +402,7 @@ export function TeamParticipationSection({ tabs }: { tabs: TeamParticipationTab[
       {active ? (
         <>
           <div className="tm-team-tabs" role="tablist" aria-label="참가 중인 경기 종류">
-            {visible.map((tab) => {
+            {tabs.map((tab) => {
               const isActive = tab.key === active.key;
               return (
                 <button
@@ -373,18 +427,23 @@ export function TeamParticipationSection({ tabs }: { tabs: TeamParticipationTab[
               );
             })}
           </div>
-          <div id={`${baseId}-panel-${active.key}`} role="tabpanel" aria-labelledby={`${baseId}-tab-${active.key}`}>
-            {active.content}
-            {active.footer}
+          {/* key — 탭을 바꾸면 패널을 새로 그려 [자세히 보기]로 펼친 상태가 다른 탭으로 옮겨 가지 않게 한다. */}
+          <div key={active.key} id={`${baseId}-panel-${active.key}`} role="tabpanel" aria-labelledby={`${baseId}-tab-${active.key}`}>
+            {active.state === 'ready' && active.count === 0 ? (
+              // grey50 지면 위 캡션 — 다른 틴트 카드처럼 tm-on-tint 로 보조 글자 대비를 올린다.
+              <div className="tm-card tm-on-tint tm-team-participation-empty">
+                <div className="tm-text-label">{PARTICIPATION_EMPTY[active.key].title}</div>
+                <div className="tm-text-caption">{PARTICIPATION_EMPTY[active.key].sub}</div>
+              </div>
+            ) : (
+              <>
+                {active.content}
+                {active.footer}
+              </>
+            )}
           </div>
         </>
-      ) : (
-        // grey50 지면 위 캡션 — 다른 틴트 카드처럼 tm-on-tint 로 보조 글자 대비를 올린다.
-        <div className="tm-card tm-on-tint tm-team-participation-empty">
-          <div className="tm-text-label">아직 참가 중인 경기가 없어요</div>
-          <div className="tm-text-caption">이 팀이 매치를 열거나 리그·대회에 참가하면 여기서 볼 수 있어요.</div>
-        </div>
-      )}
+      ) : null}
     </section>
   );
 }

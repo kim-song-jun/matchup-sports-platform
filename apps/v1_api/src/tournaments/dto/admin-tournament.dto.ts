@@ -305,7 +305,7 @@ export class CreateTournamentDto {
   redCardSuspensionMatches?: number | null;
 
   /**
-   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다.
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "10m 프리킥"으로 알린다.
    * **생략·null = 기본값(5개).** 수정 요청에서 undefined 는 유지, null 은 기본값으로 되돌리기다.
    */
   @IsOptional()
@@ -686,7 +686,7 @@ export class UpdateTournamentDto {
   redCardSuspensionMatches?: number | null;
 
   /**
-   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다.
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "10m 프리킥"으로 알린다.
    * **생략·null = 기본값(5개).** 수정 요청에서 undefined 는 유지, null 은 기본값으로 되돌리기다.
    */
   @IsOptional()

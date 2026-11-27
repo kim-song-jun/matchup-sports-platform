@@ -236,7 +236,7 @@ export interface GameDetail {
   penaltyShootoutPolicy?: GamePenaltyShootoutPolicy;
   /**
    * 팀 파울 경고 기준(개) — 이 경기가 속한 대회·리그의 값을 서버가 해석해 내려준다. 팀 파울이 이 개수에
-   * 이르면 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘는 파울부터 "세컨 파울 · 10m 프리킥"으로 알린다. 값을 비워 둔 대회·리그와 친선 경기는 기본값(5개)이다.
+   * 이르면 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘는 파울부터 "10m 프리킥"으로 알린다. 값을 비워 둔 대회·리그와 친선 경기는 기본값(5개)이다.
    *
    * optional 인 이유는 `penaltyShootoutPolicy` 와 같다 — 이 필드가 없던 서버 응답(캐시된 쿼리·구버전 배포)에서도
    * 콘솔이 렌더돼야 한다. 없으면 기본값(`DEFAULT_TEAM_FOUL_THRESHOLD`)으로 읽는다.

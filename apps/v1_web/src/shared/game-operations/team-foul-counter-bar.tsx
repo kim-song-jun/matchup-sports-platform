@@ -11,7 +11,7 @@ import { periodLabel } from './period-label';
  * 읽혔다(MD-QA #189, 2026-10-28 사용자 선택: 규칙은 유지하고 표시만 고친다).
  */
 /**
- * 팀 파울 표시 단계. 기준이 5개면 5개째는 예고(notice), 6번째 파울부터가 세컨 파울(second)이다.
+ * 팀 파울 표시 단계. 기준이 5개면 5개째는 예고(notice), 6번째 파울부터가 10m 프리킥(second)이다.
  * 색(주황 → 빨강)만으로 구분하지 않고 문구와 함께 쓴다.
  */
 const STAGE_TONE = {
@@ -28,7 +28,7 @@ const STAGE_TONE = {
     icon: 'text-red-500',
     count: 'text-red-700 dark:text-red-300',
     text: 'text-red-700 dark:text-red-300',
-    message: '세컨 파울 · 10m 프리킥',
+    message: '10m 프리킥',
   },
 } as const;
 
@@ -47,7 +47,7 @@ export function TeamFoulCounterBar({
   readonly periodCount?: number | null;
   /** 이 피리어드 다음 피리어드가 있는가(하프타임 포함) — 있으면 다시 센다고 알려 준다. */
   readonly hasNextPeriod?: boolean;
-  /** 이 개수에 이르면 예고하고 넘으면 세컨 파울로 알린다 — 대회·리그별 기준(`GameDetail.teamFoulThreshold`). 생략하면 기본값. */
+  /** 이 개수에 이르면 예고하고 넘으면 10m 프리킥으로 알린다 — 대회·리그별 기준(`GameDetail.teamFoulThreshold`). 생략하면 기본값. */
   readonly threshold?: number;
 }) {
   if (sides.length === 0) return null;
@@ -80,7 +80,7 @@ export function TeamFoulCounterBar({
       <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
         {sides.map((side) => {
           const count = counts[side.id] ?? 0;
-          // 기준이 5개면 5개째에 "다음부터 10m 프리킥"으로 예고하고, 6번째 파울부터 "세컨 파울 · 10m 프리킥"이다.
+          // 기준이 5개면 5개째에 "다음부터 10m 프리킥"으로 예고하고, 6번째 파울부터 "10m 프리킥"이다.
           // 색(주황 → 빨강)만으로 구분하지 않고 문구도 다르게 한다.
           const stage = count > threshold ? 'second' : count === threshold ? 'notice' : 'none';
           const tone = STAGE_TONE[stage];

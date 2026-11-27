@@ -719,18 +719,18 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('다음부터 10m 프리킥');
     });
 
-    it('기준을 넘는 파울부터는 세컨 파울(10m 프리킥)로 알린다 — 기준 3개면 4번째부터', () => {
+    it('기준을 넘는 파울부터는 10m 프리킥으로 알린다 — 기준 3개면 4번째부터', () => {
       mountWith(homeFouls(4), 3);
 
       const foulGroup = screen.getByRole('group', { name: /팀 파울/ });
-      expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('세컨 파울 · 10m 프리킥');
+      expect(within(foulGroup).getByText('강남 풋살 클럽').closest('div')).toHaveTextContent('10m 프리킥');
       expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
     });
 
-    it('기본 기준(5개)이면 6번째 파울부터 세컨 파울이다', () => {
+    it('기본 기준(5개)이면 6번째 파울부터 10m 프리킥이다', () => {
       mountWith(homeFouls(6));
 
-      expect(screen.getAllByText('세컨 파울 · 10m 프리킥')).toHaveLength(1);
+      expect(screen.getAllByText('10m 프리킥')).toHaveLength(1);
     });
 
     it('같은 파울 수라도 기준이 7개면 아직 경고하지 않는다', () => {

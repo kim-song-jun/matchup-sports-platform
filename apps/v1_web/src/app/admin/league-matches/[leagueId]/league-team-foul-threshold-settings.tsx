@@ -11,7 +11,7 @@ import {
 import type { V1AdminLeagueDetail } from '@/types/league-match';
 
 /**
- * 팀 파울 기준 — 한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다.
+ * 팀 파울 기준 — 한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "10m 프리킥"으로 알린다.
  *
  * 옆의 출전정지 규정 카드(`LeagueDisciplineSettings`)와 달리 **잠그지 않는다.** 출전정지는 이미 치른 경기의
  * 카드까지 소급해서 세므로 첫 경기 전에만 정하지만, 이 값은 화면 안내 기준일 뿐 기록·판정을 바꾸지 않아
@@ -68,7 +68,7 @@ export function LeagueTeamFoulThresholdSettings({ league, canWrite, showToast }:
         {canWrite && !editing && loaded && <button type="button" onClick={startEditing} className="tm-btn tm-btn-sm tm-btn-neutral min-h-[44px]">수정</button>}
       </div>
       <p className="mt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-        한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 경기 진행 중에도 바꿀 수 있어요.
+        한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;10m 프리킥&rsquo;으로 알려요. 경기 진행 중에도 바꿀 수 있어요.
       </p>
       {editing && <div className="mt-4 border-t border-[var(--border)] pt-4">
         <label className="text-[length:var(--font-size-body-sm)]">팀 파울 기준 (개)

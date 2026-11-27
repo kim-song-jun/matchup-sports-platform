@@ -40,7 +40,7 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { v1Keys } from '@/lib/query-keys';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { isSecondYellowWithoutRed } from './second-yellow';
-import { latestLineupForDisplay } from './lineup-grid';
+import { latestLineupForDisplay, rosterForSide } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
@@ -2516,15 +2516,8 @@ export function teammatesForSide(
   excludeParticipantId: string | null,
 ): readonly GameLineupParticipant[] {
   if (sideId === null) return [];
-  // LineupGrid·ArrivalCheckinPanel과 **같은 규칙**을 재사용한다. 핵심은 "제출본만"이
-  // 아니라 **셋이 같은 명단을 본다**는 것이다 -- 여기서 규칙이 갈리면 그리드에는 안 보이는
-  // 선수가 어시스트 후보에는 뜨는 모순이 생긴다(이 주석이 원래 막으려던 것).
-  //
-  // [P1-c 후속] 그 셋이 이제 `latestLineupForDisplay`(폴백)로 옮겨 갔다. 제출 없이 시작한
-  // 경기에서 제출본만 보면 세 화면이 통째로 비기 때문이다. 규칙이 바뀌어도 **셋이 함께
-  // 움직인다**는 원래 계약은 그대로다.
-  const lineup = latestLineupForDisplay(lineups, sideId);
-  return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
+  // 선수 시트(`LineupGrid`)와 같은 명단을 봐야 한다 — 규칙이 갈리면 시트에 없는 선수가 어시스트 후보로 뜬다.
+  return rosterForSide(lineups, sideId).filter((participant) => participant.id !== excludeParticipantId);
 }
 
 /** 다른 운영자(또는 내 다른 화면)가 쥐고 있어 보기 모드인 거부 코드. 자동 재요청하지 않는다. */

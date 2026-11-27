@@ -211,7 +211,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     }
     // 시각은 정규 시간 끝(설정 1분)으로 굳는다 — 실제로 흐른 시간이 아니다.
     fireEvent.click(screen.getByRole('button', { name: '골' }));
-    expect(await screen.findByText(/1:00 시점 기록/)).toBeInTheDocument();
+    expect(await screen.findByText(/1:00로 기록돼요/)).toBeInTheDocument();
   });
 
   it('초기 소켓 구독 뒤 worker가 끝낸 최신 상세를 받으면 수동 종료도 그 버전으로 보내요', async () => {

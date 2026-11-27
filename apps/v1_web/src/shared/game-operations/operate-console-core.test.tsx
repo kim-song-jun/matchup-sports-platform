@@ -1278,7 +1278,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       fireEvent.click(screen.getByRole('button', { name: '골' }));
 
-      expect(await screen.findByText(/20:00 시점 기록/)).toBeInTheDocument();
+      expect(await screen.findByText(/20:00로 기록돼요/)).toBeInTheDocument();
     });
 
     it('"후반 시작"을 누르면 확인 모달을 거쳐 start-period를 보낸다', async () => {

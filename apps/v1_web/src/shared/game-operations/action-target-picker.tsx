@@ -7,7 +7,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import type { SentOffRedCard } from '@/lib/on-pitch-state';
 import { recordNounOf } from './confirm-copy';
-import { LineupGrid } from './lineup-grid';
+import { LineupGrid, rosterForSide } from './lineup-grid';
 import { participantIdentityName } from './participant-identity';
 import { periodPrefix } from './period-label';
 import { SentOffConfirmPanel } from './sent-off-confirm-panel';
@@ -50,8 +50,8 @@ export interface ActionTargetPickerProps {
   readonly periodCount?: number | null;
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
-  /** 팀 단위 기록 경로. GOAL/OWN_GOAL은 `payload.anonymous=true`를 함께
-   * 보내 의도적인 익명 기록과 실수로 누락된 득점자를 구분한다. */
+  /** 팀 칸 끝의 「선수 모름」 경로. GOAL/OWN_GOAL은 `payload.anonymous=true`를 함께
+   * 보내 일부러 선수 없이 남긴 기록과 실수로 빠뜨린 득점자를 구분한다. */
   readonly allowTeamOnly: boolean;
   /** SUBSTITUTION 전용 — 지금 피치 위에 있는 참가자 id 집합(`on-pitch-state.
    * ts`가 `started` + 확정 이벤트 로그를 접어 만든 파생값). 1단계("나갈
@@ -79,16 +79,19 @@ export interface ActionTargetPickerProps {
   readonly onCancel: () => void;
 }
 
+const TARGET_QUESTION: Partial<Record<GameEventType, string>> = {
+  GOAL: '누가 넣었나요?',
+  OWN_GOAL: '누구의 자책골인가요?',
+  CARD: '누가 받았나요?',
+  FOUL: '누가 했나요?',
+};
+
 /**
  * 액션 우선 흐름(선수 우선 → 액션 우선 리오더)의 대상 선택 화면: 이미 골/카드/
  * 파울/교체 중 하나가 정해진 상태에서 "누구에게"를 고른다.
  *
- * 팀 구분: 예전 흐름은 선수를 먼저 골라서 팀이 자명했다. 뒤집으면 그 정보가
- * 사라져 "액션 후 양 팀 선수가 다 뜨면 헷갈린다"는 문제가 생긴다 — 이 화면은
- * `LineupGrid`를 그대로 재사용해서 푼다: 그 컴포넌트는 이미 홈/원정을 별도
- * 카드 + 팀명 헤더로 좌우 분리해서 보여주고 있었으므로(옆 팀과 섞이지 않는
- * 시각적 경계가 이미 있다), 별도의 팀 선택 스텝을 추가하지 않고 그 경계를
- * 그대로 물려받는다.
+ * 팀 구분: 골·카드·파울은 `LineupGrid` 의 `columns` 배치로 두 팀을 나란히 놓아(팀 제목 + 칸 경계)
+ * 팀 고르기 단계 없이 한 번에 고른다. 교체는 기존 탭 배치 그대로다.
  *
  * SUBSTITUTION만 내부에 2단계를 더 갖는다: "나갈 선수"(피치 위)를 고르면
  * 팀이 정해지고, 그다음 "들어올 선수"(같은 팀 후보)를 고르면 커밋한다. 시각은
@@ -243,10 +246,34 @@ export function ActionTargetPicker({
   const sentOffWhen =
     sentOffRed === undefined ? null : `${periodPrefix(sentOffRed.period, periodCount)}${formatMatchClock(sentOffRed.clockMs)}`;
 
-  let titleText = `${actionLabel} · 누구인가요?`;
+  let titleText = `${actionLabel} · ${TARGET_QUESTION[actionType] ?? '누구인가요?'}`;
   if (isSubstitution) {
     titleText = substitutionOut === null ? `${actionLabel} · 나가는 선수` : `${actionLabel} · 들어오는 선수`;
   }
+  // 이 단계에서 선수를 누르면 곧바로 저장되는가 — 교체 1단계와 퇴장 확인 중에는 아니다.
+  const tapSaves = sentOffPending === null && (!isSubstitution || substitutionOut !== null);
+
+  const unknownPlayerButton = (side: GameSide) => {
+    const creditedSide = sides.find((candidate) => candidate.id !== side.id);
+    const ownGoalNote = `${creditedSide?.displayNameSnapshot ?? '상대 팀'} 득점으로 기록`;
+    return (
+      <button
+        type="button"
+        onClick={() => commitTeamOnly(side.id)}
+        aria-label={
+          actionType === 'OWN_GOAL'
+            ? `${side.displayNameSnapshot} 자책골 · ${ownGoalNote} (선수 모름)`
+            : `${side.displayNameSnapshot} · 선수 모름`
+        }
+        className="flex min-h-12 w-full flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border)] px-2 py-1 text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      >
+        선수 모름
+        {actionType === 'OWN_GOAL' ? (
+          <span className="break-keep text-center text-[length:var(--font-size-caption)] font-normal">{ownGoalNote}</span>
+        ) : null}
+      </button>
+    );
+  };
 
   return (
     <div
@@ -258,7 +285,7 @@ export function ActionTargetPicker({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-target-picker-title"
-        className="flex max-h-[85vh] w-full max-w-[560px] flex-col rounded-t-2xl bg-[var(--card-surface)] pb-[var(--v1-shell-safe-bottom,0px)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
+        className="flex max-h-[calc(100dvh-48px)] w-full max-w-[560px] flex-col rounded-t-2xl bg-[var(--card-surface)] pb-[var(--v1-shell-safe-bottom,0px)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
@@ -272,7 +299,7 @@ export function ActionTargetPicker({
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
             <p className="mt-0.5 text-xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
-              {periodPrefix(frozen.period, periodCount) && `${periodPrefix(frozen.period, periodCount)}· `}{formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
+              {periodPrefix(frozen.period, periodCount)}{formatMatchClock(frozen.clockMs)}로 기록돼요{tapSaves ? ' · 누르면 바로 저장돼요' : ''}
             </p>
           </div>
           <button
@@ -325,7 +352,7 @@ export function ActionTargetPicker({
                   filterParticipantIds={
                     onPitchParticipantIds &&
                       new Set(
-                        (lineups.find((lineup) => lineup.sideId === substitutionOut.sideId)?.participants ?? [])
+                        rosterForSide(lineups, substitutionOut.sideId)
                           .filter((participant) => !onPitchParticipantIds.has(participant.id))
                           .filter((participant) => !substitutionOutParticipantIds?.has(participant.id))
                           .map((participant) => participant.id),
@@ -339,35 +366,15 @@ export function ActionTargetPicker({
             )
           ) : (
             <LineupGrid
+              layout="columns"
               sides={sides}
               lineups={lineups}
               onSelectPlayer={selectPlayer}
               sentOffParticipantIds={sentOffParticipantIds}
               lineupPositions={lineupPositions}
+              renderSideFooter={allowTeamOnly ? unknownPlayerButton : undefined}
             />
           )}
-
-          {allowTeamOnly && sentOffPending === null ? (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {sides.map((side) => {
-                const creditedSide = sides.find((candidate) => candidate.id !== side.id);
-                return (
-                  <button
-                    key={side.id}
-                    type="button"
-                    onClick={() => commitTeamOnly(side.id)}
-                    className="min-h-[44px] rounded-lg border border-dashed border-[var(--border)] px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                  >
-                    {actionType === 'OWN_GOAL'
-                      ? `${side.displayNameSnapshot} 자책골 · ${creditedSide?.displayNameSnapshot ?? '상대 팀'} 득점으로 기록`
-                      : actionType === 'GOAL'
-                        ? `${side.displayNameSnapshot} · 익명 골로 기록`
-                        : `${side.displayNameSnapshot} · 선수 지정 없이 기록`}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

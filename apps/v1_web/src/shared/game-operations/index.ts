@@ -1,6 +1,6 @@
 export { ActionTargetPicker, type ActionTargetPickerProps, type EventCaptureCommitInput } from './action-target-picker';
 export { isSecondYellowWithoutRed } from './second-yellow';
-export { latestLineupForDisplay, latestOperableLineup, lineupPositionLabel, matchesPlayerQuery, LineupGrid, type LineupGridProps } from './lineup-grid';
+export { latestLineupForDisplay, latestOperableLineup, lineupPositionLabel, matchesPlayerQuery, rosterForSide, LineupGrid, type LineupGridProps } from './lineup-grid';
 export { MatchupTitle } from './matchup-title';
 export { ElapsedMatchClock, type ElapsedMatchClockProps } from './elapsed-match-clock';
 export { RecordedEventList, eventTypeLabel } from './recorded-event-list';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import type { V1LineupConfigPosition } from '@/types/api';
 import { StatusChip } from '@/components/v1-ui/status-chip';
@@ -42,7 +42,14 @@ export interface LineupGridProps {
   readonly sentOffParticipantIds?: ReadonlySet<string>;
   /** 서버의 pinned competition config에서 온 포지션 사전. 저장 코드는 그대로 두고 화면에는 약칭을 쓴다. */
   readonly lineupPositions?: readonly V1LineupConfigPosition[];
+  /** `columns` 는 폰에서도 두 팀을 나란히 놓는다(탭 없음, 이름 한 줄). 기본은 팀 탭이 있는 `tabs`. */
+  readonly layout?: 'tabs' | 'columns';
+  /** 팀 칸 맨 아래에 붙일 것(선수 모름 버튼 등). 명단이 빈 팀에도 그린다. */
+  readonly renderSideFooter?: (side: GameSide) => ReactNode;
 }
+
+/** 검색칸 없이 한눈에 훑을 수 있는 한 팀 인원. */
+const COLUMNS_SEARCH_THRESHOLD = 8;
 
 export function lineupPositionLabel(
   positionCode: string,
@@ -101,6 +108,14 @@ export function latestLineupForDisplay(lineups: readonly GameLineup[], sideId: s
 }
 
 /**
+ * 기록에 고를 수 있는 선수. 선수 시트·어시스트 후보·상태 시트의 명단 수가 모두 이 목록을 쓴다 —
+ * 서로 다른 규칙으로 세면 화면마다 명단이 어긋난다.
+ */
+export function rosterForSide(lineups: readonly GameLineup[], sideId: string): readonly GameLineupParticipant[] {
+  return latestLineupForDisplay(lineups, sideId)?.participants ?? [];
+}
+
+/**
  * 검색어로 선수를 좁힌다. 등번호와 이름 **양쪽**을 본다 — 현장에서 운영자가 아는
  * 정보는 둘 중 하나이고(유니폼 번호를 보고 찾거나, 후보 선수가 이름을 불러주거나),
  * 어느 쪽만 지원하면 나머지 절반은 여전히 스크롤로 훑어야 한다.
@@ -129,7 +144,10 @@ export function LineupGrid({
   restrictSideId,
   sentOffParticipantIds,
   lineupPositions,
+  layout = 'tabs',
+  renderSideFooter,
 }: LineupGridProps) {
+  const columns = layout === 'columns';
   const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
   // 모바일(390px)에서는 두 사이드가 세로로 쌓여, 원정팀을 보려면 홈팀 전체를
   // 스크롤해야 했다(UX 감사 item 5) — sm(640px) 이상은 이미 2열이라 둘 다 한
@@ -151,13 +169,14 @@ export function LineupGrid({
   const [query, setQuery] = useState('');
   // 도착 확인을 한 경기에서만 "도착 전"을 가른다(F71). 검인 전 선수도 기록 대상이라 고를 수 있게 둔다 —
   // 현장에서 검인을 놓친 선수의 득점을 막으면 기록이 틀어진다. 판단은 보이는 팀이 아니라 경기 전체로.
-  const checkInUsed = arrivalCheckInUsed(
-    sides.flatMap((side) => latestLineupForDisplay(lineups, side.id)?.participants ?? []),
-  );
+  const checkInUsed = arrivalCheckInUsed(sides.flatMap((side) => rosterForSide(lineups, side.id)));
+  const searchVisible =
+    filterParticipantIds === undefined &&
+    (!columns || visibleSides.some((side) => rosterForSide(lineups, side.id).length > COLUMNS_SEARCH_THRESHOLD));
 
   return (
     <div>
-      {visibleSides.length > 1 ? (
+      {!columns && visibleSides.length > 1 ? (
         <div role="tablist" aria-label="팀 선택" className="mb-3 flex gap-1 rounded-lg bg-[var(--surface-soft)] p-1 sm:hidden">
           {visibleSides.map((side) => (
             <button
@@ -186,7 +205,7 @@ export function LineupGrid({
       {/* 검색은 교체 대상 선택처럼 목록이 이미 한두 명으로 좁혀진 단계에서는 방해만
           된다 — filterParticipantIds 가 걸린 호출(ActionTargetPicker 의 교체 1·2단계)에는
           띄우지 않는다. */}
-      {filterParticipantIds === undefined ? (
+      {searchVisible ? (
         <div className="mb-3">
           <label htmlFor="lineup-grid-player-search" className="sr-only">
             등번호 또는 이름으로 선수 찾기
@@ -203,33 +222,47 @@ export function LineupGrid({
           />
         </div>
       ) : null}
-      <div className={['grid grid-cols-1 gap-4', visibleSides.length > 1 ? 'sm:grid-cols-2' : ''].join(' ')}>
+      <div
+        className={
+          columns
+            ? `grid gap-2 ${visibleSides.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`
+            : ['grid grid-cols-1 gap-4', visibleSides.length > 1 ? 'sm:grid-cols-2' : ''].join(' ')
+        }
+      >
         {visibleSides.map((side) => {
           const lineup = latestLineupForDisplay(lineups, side.id);
-          const participants = (lineup?.participants ?? [])
+          const sideWord = side.sideKey === 'HOME' ? '홈' : '원정';
+          const participants = rosterForSide(lineups, side.id)
             .filter(
               (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
             )
             .filter((participant) => matchesPlayerQuery(participant, query));
-          const isActiveOnMobile = visibleSides.length <= 1 || activeMobileSideId === side.id;
+          const isActiveOnMobile = columns || visibleSides.length <= 1 || activeMobileSideId === side.id;
           return (
             <section
               key={side.id}
               aria-labelledby={`lineup-side-${side.id}-heading`}
-              className={`rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 ${isActiveOnMobile ? '' : 'hidden sm:block'}`}
+              className={`min-w-0 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] ${columns ? 'p-2' : 'p-3'} ${isActiveOnMobile ? '' : 'hidden sm:block'}`}
             >
-              <h3
-                id={`lineup-side-${side.id}-heading`}
-                className="mb-2 break-keep text-sm font-semibold text-[var(--text-strong)]"
-              >
-                {side.displayNameSnapshot}
-                <span className="ml-2 whitespace-nowrap text-xs font-normal text-[var(--text-muted)]">
-                  {side.sideKey === 'HOME' ? '홈' : '원정'}
-                </span>
-              </h3>
+              {columns ? (
+                <h3
+                  id={`lineup-side-${side.id}-heading`}
+                  className="mb-1 break-keep px-1 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]"
+                >
+                  {sideWord} · {side.displayNameSnapshot}
+                </h3>
+              ) : (
+                <h3
+                  id={`lineup-side-${side.id}-heading`}
+                  className="mb-2 break-keep text-sm font-semibold text-[var(--text-strong)]"
+                >
+                  {side.displayNameSnapshot}
+                  <span className="ml-2 whitespace-nowrap text-xs font-normal text-[var(--text-muted)]">{sideWord}</span>
+                </h3>
+              )}
 
               {lineup === null || participants.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <div className={`flex flex-col items-center gap-2 text-center ${columns ? 'py-3' : 'py-6'}`}>
                   <p className="text-sm text-[var(--text-muted)]">
                     {lineup === null
                       // [P1-c 후속] 예전엔 '제출된 선발 명단이 없어요' 였다. 이제 표시는
@@ -242,7 +275,7 @@ export function LineupGrid({
                   </p>
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2" role="list">
+                <ul className={`flex flex-col ${columns ? 'gap-1' : 'gap-2'}`} role="list">
                   {participants.map((participant) => {
                     const arrivalPending = checkInUsed && participant.arrivedAt === null;
                     const sentOff = sentOffParticipantIds?.has(participant.id) ?? false;
@@ -255,7 +288,9 @@ export function LineupGrid({
                           onClick={() => onSelectPlayer({ sideId: side.id, participant })}
                           aria-label={`${name} 선수 이벤트 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
                           className={[
-                            'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
+                            columns
+                              ? 'flex min-h-12 w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors'
+                              : 'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
                             'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                             disabled ? 'cursor-not-allowed opacity-50' : '',
                           ].join(' ')}
@@ -268,17 +303,24 @@ export function LineupGrid({
                           </span>
                           <span className="min-w-0 flex-1">
                             <span
-                              className={`block break-words text-sm font-medium ${arrivalPending || sentOff ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
+                              className={`block text-sm font-medium ${columns ? 'truncate' : 'break-words'} ${arrivalPending || sentOff ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
                             >
                               {name}
                             </span>
-                            {participant.position ? (
+                            {participant.position && !columns ? (
                               <span className="block text-xs text-[var(--text-muted)]">
                                 {lineupPositionLabel(participant.position, lineupPositions)}
                               </span>
                             ) : null}
+                            {/* 좁은 칸에서는 칩을 이름 아래에 둔다 — 옆에 두면 이름 자리가 남지 않는다. */}
+                            {columns && (sentOff || arrivalPending) ? (
+                              <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                {sentOff ? <StatusChip chip={SENT_OFF_CHIP} /> : null}
+                                {arrivalPending ? <StatusChip chip={ARRIVAL_PENDING_CHIP} /> : null}
+                              </span>
+                            ) : null}
                           </span>
-                          {sentOff || arrivalPending ? (
+                          {!columns && (sentOff || arrivalPending) ? (
                             <span className="flex shrink-0 items-center gap-1">
                               {sentOff ? <StatusChip chip={SENT_OFF_CHIP} /> : null}
                               {arrivalPending ? <StatusChip chip={ARRIVAL_PENDING_CHIP} /> : null}
@@ -290,6 +332,7 @@ export function LineupGrid({
                   })}
                 </ul>
               )}
+              {renderSideFooter ? <div className={columns ? 'mt-1' : 'mt-2'}>{renderSideFooter(side)}</div> : null}
             </section>
           );
         })}

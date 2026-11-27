@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { latestLineupForDisplay, latestOperableLineup, LineupGrid, lineupPositionLabel, matchesPlayerQuery } from './lineup-grid';
+import { latestLineupForDisplay, latestOperableLineup, LineupGrid, lineupPositionLabel, matchesPlayerQuery, rosterForSide } from './lineup-grid';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,5 +373,101 @@ describe('LineupGrid — 운영진 실명', () => {
     const label = screen.getByText('김실명 (홍길동)');
     expect(label).not.toHaveClass('truncate');
     expect(label).toHaveClass('break-words');
+  });
+});
+
+describe('rosterForSide — 기록에 고를 수 있는 선수의 단일 출처', () => {
+  const submitted = lineup([participant('p-submitted', '제출선수', 7)]);
+  const draft: GameLineup = { ...lineup([participant('p-draft', '초안선수', 9)]), id: 'l-draft', state: 'DRAFT', revision: 3 };
+
+  it('제출본이 있으면 그 위에 얹힌 초안보다 제출본을 쓴다', () => {
+    expect(rosterForSide([draft, submitted], 'side-home').map((row) => row.id)).toEqual(['p-submitted']);
+  });
+
+  it('초안만 있으면 초안을 쓴다', () => {
+    expect(rosterForSide([draft], 'side-home').map((row) => row.id)).toEqual(['p-draft']);
+  });
+
+  it('무효가 된(invalidatedAt) 명단은 쓰지 않는다', () => {
+    const invalidated = { ...submitted, invalidatedAt: '2026-09-08T00:00:00Z' };
+    expect(rosterForSide([invalidated], 'side-home')).toEqual([]);
+    expect(rosterForSide([invalidated, draft], 'side-home').map((row) => row.id)).toEqual(['p-draft']);
+  });
+
+  it('그 팀의 명단이 없으면 빈 배열이다', () => {
+    expect(rosterForSide([submitted], 'side-away')).toEqual([]);
+    expect(rosterForSide([], 'side-home')).toEqual([]);
+  });
+});
+
+describe('LineupGrid — columns 배치(두 팀 한 화면)', () => {
+  const BOTH = [side('side-home', '잠실 레전드', 'HOME'), side('side-away', '마포 FS', 'AWAY')];
+  const awayLineup = (participants: GameLineupParticipant[]): GameLineup => ({
+    ...lineup(participants.map((row) => ({ ...row, sideId: 'side-away', lineupId: 'lineup-away' }))),
+    id: 'lineup-away',
+    sideId: 'side-away',
+  });
+  const squad = (prefix: string, size: number) =>
+    Array.from({ length: size }, (_, index) => participant(`${prefix}-${index + 1}`, `${prefix}선수${index + 1}`, index + 1));
+
+  it('columns 는 탭 없이 두 팀 제목과 선수를 한 화면에 그린다', () => {
+    const onSelectPlayer = vi.fn();
+    render(
+      <LineupGrid
+        layout="columns"
+        sides={BOTH}
+        lineups={[lineup(squad('홈', 3)), awayLineup(squad('원정', 2))]}
+        onSelectPlayer={onSelectPlayer}
+      />,
+    );
+
+    expect(screen.queryByRole('tablist')).toBeNull();
+    const home = screen.getByRole('region', { name: '홈 · 잠실 레전드' });
+    const away = screen.getByRole('region', { name: '원정 · 마포 FS' });
+    expect(home).not.toHaveClass('hidden');
+    expect(away).not.toHaveClass('hidden');
+    expect(home.parentElement).toHaveClass('grid-cols-2');
+    expect(within(home).getAllByRole('button')).toHaveLength(3);
+    expect(within(away).getAllByRole('button')).toHaveLength(2);
+    for (const row of within(home).getAllByRole('button')) expect(row).toHaveClass('min-h-12');
+
+    fireEvent.click(within(away).getByRole('button', { name: '원정선수2 선수 이벤트 기록' }));
+    expect(onSelectPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({ sideId: 'side-away', participant: expect.objectContaining({ id: '원정-2' }) }),
+    );
+  });
+
+  it('기본 배치(tabs)는 그대로 탭과 검색칸을 둔다', () => {
+    render(<LineupGrid sides={BOTH} lineups={[lineup(squad('홈', 3)), awayLineup(squad('원정', 2))]} onSelectPlayer={vi.fn()} />);
+    expect(screen.getByRole('tablist', { name: '팀 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
+  });
+
+  it('검색칸은 한 팀이 9명일 때만', () => {
+    const { unmount } = render(
+      <LineupGrid layout="columns" sides={BOTH} lineups={[lineup(squad('홈', 8)), awayLineup(squad('원정', 8))]} onSelectPlayer={vi.fn()} />,
+    );
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    unmount();
+
+    render(
+      <LineupGrid layout="columns" sides={BOTH} lineups={[lineup(squad('홈', 8)), awayLineup(squad('원정', 9))]} onSelectPlayer={vi.fn()} />,
+    );
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
+  });
+
+  it('renderSideFooter 가 팀마다 호출된다', () => {
+    render(
+      <LineupGrid
+        layout="columns"
+        sides={BOTH}
+        lineups={[lineup(squad('홈', 1))]}
+        onSelectPlayer={vi.fn()}
+        renderSideFooter={(footerSide) => <button type="button">{footerSide.displayNameSnapshot} 바닥</button>}
+      />,
+    );
+    expect(within(screen.getByRole('region', { name: '홈 · 잠실 레전드' })).getByRole('button', { name: '잠실 레전드 바닥' })).toBeInTheDocument();
+    // 명단이 없는 팀에도 바닥 버튼은 그린다 — 그 팀을 기록할 유일한 길이다.
+    expect(within(screen.getByRole('region', { name: '원정 · 마포 FS' })).getByRole('button', { name: '마포 FS 바닥' })).toBeInTheDocument();
   });
 });

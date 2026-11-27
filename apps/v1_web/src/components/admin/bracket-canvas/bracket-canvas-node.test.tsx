@@ -237,13 +237,16 @@ describe('BracketCanvasNode — 흐름 배치(position 없음)', () => {
 });
 
 
-it('그림 카드에서는 경기장과 배정된 부전승의 시드 문구를 숨긴다', () => {
-  renderNode(makeFixture({ ...base, venue: 'A경기장', homeRegistrationId: 'r1', homeTeamName: '확정팀' }), {
+it('그림 카드에 시간·구장을 표시하고 눌러 경기를 열며 배정된 부전승 시드 문구는 숨긴다', () => {
+  const props = renderNode(makeFixture({ ...base, venue: 'A경기장', homeRegistrationId: 'r1', homeTeamName: '확정팀' }), {
     sideLabels: { HOME: '확정팀', AWAY: '2번 자리' },
     slots: { HOME: makeSlot({ id: 's-home', kind: 'BYE', label: '3번 시드', registrationId: 'r1' }), AWAY: null },
   });
   expect(screen.getByText('확정팀')).toBeInTheDocument();
   expect(screen.queryByText('3번 시드')).not.toBeInTheDocument();
-  expect(screen.queryByText(/A경기장|경기장 미정/)).not.toBeInTheDocument();
+  const schedule = screen.getByRole('button', { name: '시간 미정 · A경기장' });
+  expect(schedule).toHaveAttribute('title', '시간 미정 · A경기장');
+  fireEvent.click(schedule);
+  expect(props.onSelect).toHaveBeenCalledWith('f1');
   expect(document.querySelector('[data-side=HOME]')).toHaveStyle({ background: 'var(--blue50)' });
 });

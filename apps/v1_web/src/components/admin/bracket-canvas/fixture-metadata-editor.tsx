@@ -2,6 +2,7 @@
 
 import { FixtureTimePicker } from './fixture-time-picker';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
 import { findAssignmentConflict } from '@/lib/fixture-assignment';
 import { toVenuePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
@@ -62,6 +63,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
 }) {
   const id = useId();
   const mutation = useV1UpdateFixture(tournamentId);
+  const { confirm, ConfirmModal } = useConfirm();
   const [number, setNumber] = useState(String(fixture.fixtureNumber));
   const [labels, setLabels] = useState(() => fixtureLabelDraft(fixture));
   const [time, setTime] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
@@ -106,7 +108,11 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     if (timeDirty.current || placeDirty.current) {
       const court = fieldId ? `field:${fieldId}` : !clearPlace && venue ? `venue:${JSON.stringify(toVenuePayload(venue))}` : null;
       const conflict = findAssignmentConflict(fixtures, fixture.id, scheduledAt, court);
-      if (conflict && !window.confirm(`${conflict.displayTitle || conflict.fixtureNumber + '번 경기'}와 시간·구장이 겹쳐요. 그대로 저장할까요?`)) return;
+      if (conflict) {
+        const accepted = await confirm({ title: '시간·구장이 겹쳐요', confirmLabel: '그대로 저장',
+          message: `${conflict.displayTitle || conflict.fixtureNumber + '번 경기'}와 시간·구장이 겹쳐요. 그대로 저장할까요?` });
+        if (!accepted) return;
+      }
     }
     const fixtureChanged = Object.keys(body).length > 0;
     if (!fixtureChanged && !periods.payload) { setMessage('변경한 항목이 없어요.'); return; }
@@ -121,7 +127,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       setError(fixtureChanged ? `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${reason}` : reason);
     }
   }
-  return <form onSubmit={save} className="flex flex-col gap-3" aria-label="경기 정보 편집">
+  return <><form onSubmit={save} className="flex flex-col gap-3" aria-label="경기 정보 편집">
     <label className="flex flex-col gap-1 tm-text-label" htmlFor={`${id}-number`}>경기 번호
       <input id={`${id}-number`} className="tm-input" type="number" min={1} max={2147483647} step={1} value={number} disabled={disabled} onChange={event => edit(() => setNumber(event.target.value))} />
     </label>
@@ -149,5 +155,5 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     {message ? <p role="status" className="tm-text-caption text-[var(--text-muted)]">{message}</p> : null}
     {canWrite ? <button type="submit" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending}>{pending ? '저장 중…' : '경기 정보 저장'}</button> : null}
-  </form>;
+  </form>{ConfirmModal}</>;
 }

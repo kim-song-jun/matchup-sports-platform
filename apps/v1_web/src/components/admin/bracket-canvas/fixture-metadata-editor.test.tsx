@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
@@ -101,4 +101,23 @@ describe('shared fixture metadata editor', () => {
     expect(screen.getByLabelText('경기 제목')).toHaveValue('편집 중인 제목');
     fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     await waitFor(() => expect(save).toHaveBeenCalledWith({ fixtureId: 'final', displayTitle: '편집 중인 제목' }));
+  });
+
+  it.each([false, true])('시간·구장이 겹치면 window.confirm 이 아니라 앱 확인 창을 띄운다 (그대로 저장: %s)', async accepted => {
+    const native = vi.spyOn(window, 'confirm');
+    const other = makeFixture({ id: 'other', groupId: group.id, fixtureNumber: 14, scheduledAt: '2026-10-25T06:00:00.000Z', fieldId: 'field-a', venue: 'A구장' });
+    try {
+      render(<FixtureMetadataEditor tournamentId="t-1" fixture={fixture} fixtures={[source, fixture, other]} groups={[group]} slots={[]} canWrite />);
+      fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-25T15:00' } });
+      fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(native).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent('시간·구장이 겹쳐요');
+      expect(dialog).toHaveTextContent('14번 경기');
+      expect(save).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: accepted ? '그대로 저장' : '취소' }));
+      if (accepted) await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+      else await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(save).toHaveBeenCalledTimes(accepted ? 1 : 0);
+    } finally { native.mockRestore(); }
   });

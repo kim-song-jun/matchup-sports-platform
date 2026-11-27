@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -111,18 +111,24 @@ describe('registered assignment option editing', () => {
     expect(summary).toHaveTextContent(timeLabel(stamp));
     expect(patches).toEqual([{ scheduledAt: stamp }, { fieldId: 'field-b' }]);
   });
-  it.each([false, true])('confirms the conflicting fixture before saving (accepted: %s)', async accepted => {
+  it.each([false, true])('시간·구장이 겹치면 window.confirm 이 아니라 앱 확인 창을 띄운다 (그대로 배정: %s)', async accepted => {
     fixtures[1] = { ...fixtures[1], scheduledAt: stamp, fieldId: 'field-b', venue: 'B구장' };
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(accepted);
+    const native = vi.spyOn(window, 'confirm');
     try {
       show();
       fireEvent.click(screen.getByRole('button', { name: '구장 배정' }));
       fireEvent.change(await screen.findByLabelText('B구장에 경기 배정'), { target: { value: 'f1' } });
-      await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2번 경기')));
+      const dialog = await screen.findByRole('dialog');
+      expect(native).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent('시간·구장이 겹쳐요');
+      expect(dialog).toHaveTextContent('2번 경기');
+      expect(patches).toEqual([]);
+      fireEvent.click(within(dialog).getByRole('button', { name: accepted ? '그대로 배정' : '취소' }));
       if (accepted) await waitFor(() => expect(fixtures[0].fieldId).toBe('field-b'));
-      else expect(fixtures[0].fieldId).toBe('field-a');
+      else await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(fixtures[0].fieldId).toBe(accepted ? 'field-b' : 'field-a');
       expect(patches).toEqual(accepted ? [{ fieldId: 'field-b' }] : []);
-    } finally { confirm.mockRestore(); }
+    } finally { native.mockRestore(); }
   });
   it('keeps a local draft visible when a different operator replaces its time during a real refetch', async () => {
     const client = show(); fireEvent.click(screen.getByRole('button', { name: '시간 배정' }));

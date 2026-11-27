@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type React
 import { ChevronDown, Clock3, MapPin, X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useV1AdminBracket, useV1CreateTournamentField, useV1RenameTournamentField, useV1TournamentFields, useV1UpdateFixture } from '@/hooks/use-v1-api';
@@ -24,6 +25,7 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
   showToast: (message: string, variant?: 'success' | 'error') => void; children: ReactNode; toolbar?: ReactNode;
 }) {
   const id = useId();
+  const { confirm, ConfirmModal } = useConfirm();
   const [mode, setMode] = useState<AssignmentMode | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [timeDraft, setTimeDraft] = useState('');
@@ -97,7 +99,11 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
       const court = typeof value === 'string' ? fixtureCourtKey(fixture) : value.key;
       const time = typeof value === 'string' ? value : fixture.scheduledAt;
       const conflict = findAssignmentConflict(fixtures, fixtureId, time, court);
-      if (conflict && !window.confirm(`${fixtureTitle(conflict, groups)} · ${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
+      if (conflict) {
+        const accepted = await confirm({ title: '시간·구장이 겹쳐요', confirmLabel: '그대로 배정',
+          message: `${fixtureTitle(conflict, groups)} · ${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?` });
+        if (!accepted) return;
+      }
     }
     setError(null); setSaving(true);
     try {
@@ -229,5 +235,6 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
       {mode && wide ? <aside id={`${id}-panel`} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}
     </div>
     {!wide ? <BottomSheet open={mode !== null} onClose={close} ariaLabel={`${label} 배정`}><div className="tm-filter-sheet-handle" aria-hidden="true" /><div id={`${id}-panel`}>{panel}</div></BottomSheet> : null}
+    {ConfirmModal}
   </div></FixtureAssignmentContext.Provider>;
 }

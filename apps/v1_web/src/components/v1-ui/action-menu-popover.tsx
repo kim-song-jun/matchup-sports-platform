@@ -62,14 +62,15 @@ function toSegments(actions: readonly ActionSheetAction[]): Segment[] {
  * 위치는 열릴 때 트리거 기준으로 한 번 잡는다 — 이후 스크롤·크기 변화는 위치를 따라가지 않고 닫는다.
  */
 export function ActionMenuPopover({ label, subtitle, actions, header, align, anchorRef, focusTrigger, onClose }: ActionMenuPopoverProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const subtitleId = useId();
   const [position, setPosition] = useState<CSSProperties | null>(null);
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
-    const menu = menuRef.current;
-    if (!anchor || !menu) return;
+    const panel = panelRef.current;
+    if (!anchor || !panel) return;
     const rect = anchor.getBoundingClientRect();
     const below = window.innerHeight - rect.bottom - MARGIN;
     const above = rect.top - MARGIN;
@@ -81,7 +82,7 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
       next.top = rect.bottom + GAP;
       next.maxHeight = Math.max(MIN_HEIGHT, below - GAP);
     }
-    const room = window.innerWidth - MARGIN - menu.offsetWidth;
+    const room = window.innerWidth - MARGIN - panel.offsetWidth;
     if (align === 'end') next.right = clamp(window.innerWidth - rect.right, MARGIN, room);
     else next.left = clamp(rect.left, MARGIN, room);
     setPosition(next);
@@ -111,11 +112,11 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && (menuRef.current?.contains(target) || anchorRef.current?.contains(target))) return;
+      if (target instanceof Node && (panelRef.current?.contains(target) || anchorRef.current?.contains(target))) return;
       onClose();
     };
     const onScroll = (event: Event) => {
-      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      if (event.target instanceof Node && panelRef.current?.contains(event.target)) return;
       onClose();
     };
     document.addEventListener('pointerdown', onPointerDown, true);
@@ -150,13 +151,11 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
 
   if (typeof document === 'undefined') return null;
 
+  // 제목·header 는 메뉴 밖에 둔다 — role="menu" 는 menuitem·group·separator 만 소유할 수 있어서
+  // header 에 진행 막대 같은 다른 역할이 들어와도 ARIA 구조가 깨지지 않는다.
   return createPortal(
     <div
-      ref={menuRef}
-      role="menu"
-      aria-label={label}
-      aria-describedby={subtitle ? subtitleId : undefined}
-      tabIndex={-1}
+      ref={panelRef}
       onKeyDown={onKeyDown}
       className="w-[360px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 shadow-[var(--shadow-dropdown)]"
       style={{
@@ -175,26 +174,34 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
         </div>
       ) : null}
       {header ? <div className="px-2.5 pb-2">{header}</div> : null}
-      {toSegments(actions).map((segment, index) => (
-        <div
-          key={segment.actions[0].key}
-          role={segment.groupLabel ? 'group' : undefined}
-          aria-label={segment.groupLabel}
-          className={index > 0 ? 'mt-1 border-t border-[var(--border)] pt-1' : undefined}
-        >
-          {segment.groupLabel ? (
-            <p
-              aria-hidden="true"
-              className="px-2.5 pb-1 pt-1.5 text-[length:var(--font-size-caption)] font-bold text-[var(--text-muted)]"
-            >
-              {segment.groupLabel}
-            </p>
-          ) : null}
-          {segment.actions.map((action) => (
-            <MenuItem key={action.key} action={action} onClose={onClose} />
-          ))}
-        </div>
-      ))}
+      <div
+        ref={menuRef}
+        role="menu"
+        aria-label={label}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        tabIndex={-1}
+      >
+        {toSegments(actions).map((segment, index) => (
+          <div
+            key={segment.actions[0].key}
+            role={segment.groupLabel ? 'group' : undefined}
+            aria-label={segment.groupLabel}
+            className={index > 0 ? 'mt-1 border-t border-[var(--border)] pt-1' : undefined}
+          >
+            {segment.groupLabel ? (
+              <p
+                aria-hidden="true"
+                className="px-2.5 pb-1 pt-1.5 text-[length:var(--font-size-caption)] font-bold text-[var(--text-muted)]"
+              >
+                {segment.groupLabel}
+              </p>
+            ) : null}
+            {segment.actions.map((action) => (
+              <MenuItem key={action.key} action={action} onClose={onClose} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>,
     document.body,
   );

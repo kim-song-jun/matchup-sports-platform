@@ -98,7 +98,11 @@ describe('ActionMenu 폰', () => {
     renderMenu({ header: <div>진행 3/8</div>, actions: [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }] });
     fireEvent.click(screen.getByRole('button', { name: '상태' }));
 
-    expect(within(screen.getByRole('dialog', { name: '대회 상태' })).getByText('진행 3/8')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: '대회 상태' });
+    expect(within(dialog).getByText('진행 3/8')).toBeInTheDocument();
+    // 시트는 평범한 목록이다 — header 는 목록 밖이고 menu 의미를 쓰지 않는다.
+    expect(within(within(dialog).getByRole('list')).queryByText('진행 3/8')).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('항목을 고르면 시트가 닫히고 onSelect 가 한 번 불린다', () => {
@@ -197,6 +201,8 @@ describe('ActionMenu 데스크톱', () => {
     return screen.getByRole('menu', { name: '대회 상태' });
   };
   const focusedLabel = () => document.activeElement?.textContent;
+  /** 위치·층·머리를 가진 포털 뿌리 — `role="menu"` 는 그 안의 항목 목록이다. */
+  const panelOf = (menu: HTMLElement) => menu.parentElement as HTMLElement;
 
   it('트리거 아래 role=menu 로 열리고 label 이 이름이며 항목은 menuitem 이다', () => {
     renderMenu({
@@ -224,8 +230,8 @@ describe('ActionMenu 데스크톱', () => {
     const menu = openMenu();
 
     expect(container.contains(menu)).toBe(false);
-    expect(menu.parentElement).toBe(document.body);
-    expect(menu.style.position).toBe('fixed');
+    expect(panelOf(menu).parentElement).toBe(document.body);
+    expect(panelOf(menu).style.position).toBe('fixed');
   });
 
   it('열면 첫 활성 항목에 포커스가 가고 ArrowDown/ArrowUp/Home/End 가 비활성 항목을 건너뛰며 돈다', () => {
@@ -437,17 +443,58 @@ describe('ActionMenu 데스크톱', () => {
     renderMenu({ header: <div>진행 3/8</div>, actions: [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }] });
     const menu = openMenu();
 
-    const head = within(menu).getByText('진행 3/8');
+    const head = within(panelOf(menu)).getByText('진행 3/8');
     const item = within(menu).getByRole('menuitem', { name: '접수 마감' });
     expect(head.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('role=menu 는 항목·묶음만 소유하고 제목·header(진행 막대 등)는 메뉴 밖에 그려진다', () => {
+    renderMenu({
+      subtitle: '접수 중 · 12팀',
+      header: <div role="progressbar" aria-label="진행" aria-valuemin={0} aria-valuemax={8} aria-valuenow={3} />,
+      actions: [
+        { key: 'a', label: '접수 마감', onSelect: vi.fn() },
+        { key: 'b', label: '대진 보기', href: '/admin/tournaments/t-1/bracket', groupLabel: '이동' },
+        { key: 'c', label: '참가자에게 공개', checked: true, groupLabel: '공개', onSelect: vi.fn() },
+      ],
+    });
+    const menu = openMenu();
+
+    const allowed = new Set(['menuitem', 'menuitemcheckbox', 'menuitemradio', 'group', 'separator']);
+    const roles = Array.from(menu.querySelectorAll('[role]')).map((element) => element.getAttribute('role'));
+    expect(roles.length).toBeGreaterThan(0);
+    expect(roles.filter((role) => !allowed.has(role ?? ''))).toEqual([]);
+    expect(within(menu).queryByRole('progressbar')).toBeNull();
+    expect(within(menu).queryByText('접수 중 · 12팀')).toBeNull();
+
+    // 머리는 사라진 것이 아니라 메뉴 바깥 같은 팝오버 안에 그대로 있다.
+    expect(within(panelOf(menu)).getByRole('progressbar', { name: '진행' })).toBeInTheDocument();
+    expect(within(panelOf(menu)).getByText('접수 중 · 12팀')).toBeInTheDocument();
+  });
+
+  it('머리가 메뉴 밖에 있어도 화살표 키는 메뉴 항목만 돈다', () => {
+    renderMenu({
+      header: <button type="button">머리 버튼</button>,
+      actions: [
+        { key: 'a', label: '첫째', onSelect: vi.fn() },
+        { key: 'b', label: '둘째', onSelect: vi.fn() },
+      ],
+    });
+    const menu = openMenu();
+    expect(focusedLabel()).toBe('첫째');
+
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(focusedLabel()).toBe('둘째');
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(focusedLabel()).toBe('첫째');
   });
 
   it('subtitle 이 있으면 label 과 함께 머리에 보이고 menu 의 설명이 된다', () => {
     renderMenu({ subtitle: '접수 중 · 12팀', actions: [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }] });
     const menu = openMenu();
 
-    expect(within(menu).getByText('대회 상태')).toBeInTheDocument();
-    expect(within(menu).getByText('접수 중 · 12팀')).toBeInTheDocument();
+    expect(within(panelOf(menu)).getByText('대회 상태')).toBeInTheDocument();
+    expect(within(panelOf(menu)).getByText('접수 중 · 12팀')).toBeInTheDocument();
     expect(menu).toHaveAccessibleDescription('접수 중 · 12팀');
   });
 
@@ -455,7 +502,7 @@ describe('ActionMenu 데스크톱', () => {
     renderMenu({ actions: [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }] });
     const menu = openMenu();
 
-    expect(within(menu).queryByText('대회 상태')).toBeNull();
+    expect(within(panelOf(menu)).queryByText('대회 상태')).toBeNull();
     expect(menu).not.toHaveAttribute('aria-describedby');
   });
 
@@ -463,14 +510,14 @@ describe('ActionMenu 데스크톱', () => {
     const actions = [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }];
     const { unmount } = renderMenu({ actions, align: 'end' });
     const endMenu = openMenu();
-    expect(endMenu.style.right).not.toBe('');
-    expect(endMenu.style.left).toBe('');
+    expect(panelOf(endMenu).style.right).not.toBe('');
+    expect(panelOf(endMenu).style.left).toBe('');
     unmount();
 
     renderMenu({ actions, align: 'start' });
     const startMenu = openMenu();
-    expect(startMenu.style.left).not.toBe('');
-    expect(startMenu.style.right).toBe('');
+    expect(panelOf(startMenu).style.left).not.toBe('');
+    expect(panelOf(startMenu).style.right).toBe('');
   });
 
   it('트리거 아래 공간이 모자라면 위로 열고, 충분하면 아래로 연다', () => {
@@ -480,14 +527,14 @@ describe('ActionMenu 데스크톱', () => {
       const bottom = window.innerHeight - 10;
       rect.mockReturnValue({ top: bottom - 32, bottom, left: 100, right: 140, width: 40, height: 32, x: 100, y: bottom - 32, toJSON: () => ({}) });
       const nearBottom = openMenu();
-      expect(nearBottom.style.bottom).toBe(`${window.innerHeight - (bottom - 32) + 8}px`);
-      expect(nearBottom.style.top).toBe('');
+      expect(panelOf(nearBottom).style.bottom).toBe(`${window.innerHeight - (bottom - 32) + 8}px`);
+      expect(panelOf(nearBottom).style.top).toBe('');
 
       fireEvent.keyDown(document, { key: 'Escape' });
       rect.mockReturnValue({ top: 40, bottom: 72, left: 100, right: 140, width: 40, height: 32, x: 100, y: 40, toJSON: () => ({}) });
       const nearTop = openMenu();
-      expect(nearTop.style.top).toBe('80px');
-      expect(nearTop.style.bottom).toBe('');
+      expect(panelOf(nearTop).style.top).toBe('80px');
+      expect(panelOf(nearTop).style.bottom).toBe('');
     } finally {
       rect.mockRestore();
     }
@@ -554,7 +601,7 @@ describe('ActionMenu 시트 안', () => {
     const menu = screen.getByRole('menu', { name: '대회 상태' });
 
     const tokens = read('src/app/tokens.css');
-    expect(layerOf(menu, tokens)).toBeGreaterThan(layerOf(sheet.parentElement as HTMLElement, tokens));
+    expect(layerOf(menu.parentElement as HTMLElement, tokens)).toBeGreaterThan(layerOf(sheet.parentElement as HTMLElement, tokens));
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();

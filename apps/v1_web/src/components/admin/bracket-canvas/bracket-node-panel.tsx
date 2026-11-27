@@ -2,7 +2,7 @@
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Trash2, X } from 'lucide-react';
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
@@ -36,6 +36,8 @@ export type BracketNodePanelProps = {
   sideLabels: Record<SideKey, string>;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
+  /** 그림 위에 겹쳐 뜨는 패널은 열릴 때 제목으로 포커스를 가져와 ESC 가 바로 닫게 한다. 시트는 자기 포커스를 관리하므로 켜지 않는다. */
+  autoFocusTitle?: boolean;
   onClose: () => void;
 };
 
@@ -57,6 +59,7 @@ export function BracketNodePanel({
   sideLabels,
   canWrite,
   showToast,
+  autoFocusTitle = false,
   onClose,
 }: BracketNodePanelProps) {
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
@@ -66,6 +69,10 @@ export function BracketNodePanel({
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [quickError, setQuickError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (autoFocusTitle) titleRef.current?.focus();
+  }, [autoFocusTitle]);
 
   const title = fixtureTitle(fixture, groups);
   const locked = isFixtureLocked(fixture);
@@ -317,7 +324,7 @@ export function BracketNodePanel({
       style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)', boxShadow: 'var(--shadow-dropdown)' }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="tm-text-body-lg min-w-0 truncate font-bold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
+        <h2 ref={titleRef} tabIndex={-1} className="tm-text-body-lg min-w-0 truncate font-bold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" style={{ color: 'var(--text-strong)' }}>{title}</h2>
         <div className="flex shrink-0 items-center">
           {canWrite && !stageManaged ? (
             <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={iconButton}

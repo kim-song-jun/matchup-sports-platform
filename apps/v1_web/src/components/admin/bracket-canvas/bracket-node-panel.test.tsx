@@ -461,6 +461,19 @@ describe('BracketNodePanel — 구성·시간·삭제', () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('autoFocusTitle: 열리면 제목으로 포커스가 들어가고, 거기서 누른 ESC 로 닫힌다', () => {
+    const props = renderPanel(fixtureOf(), { autoFocusTitle: true });
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toHaveFocus();
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('autoFocusTitle 이 없으면 포커스를 옮기지 않는다 — 시트는 자기 포커스를 관리한다', () => {
+    renderPanel();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
+  });
+
   it('단계 관리 경기(bracketTrack stage:)와 읽기 전용에는 휴지통이 없고, 팀 자리는 「팀 채우기」 메뉴 안내만 보인다', () => {
     const staged = makeGroup({ id: 'g-stage', name: '1단계', phase: 'round16', bracketTrack: 'stage:a' });
     const fixture = fixtureOf({ groupId: 'g-stage' });

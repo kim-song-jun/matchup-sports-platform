@@ -133,7 +133,7 @@ export function BracketCanvasNode({
       data-fixture-id={fixture.id}
       data-state={state}
       data-dimmed={dimmed ? 'true' : undefined}
-      className={`${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]${dimmed ? ' opacity-40' : ''}`}
+      className={`tm-on-tint ${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]${dimmed ? ' opacity-40' : ''}`}
       style={{
         ...placement,
         borderRadius: 'var(--radius-container)',

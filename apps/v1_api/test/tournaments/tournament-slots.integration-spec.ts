@@ -275,6 +275,20 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: incoming.id } })).toMatchObject({ targetTeamMatchId: source.id, targetSide: 'HOME' });
       await expect(slots.setByeSide(user, bye.id, 'AWAY', 'HOME', move)).rejects.toMatchObject({ response: { code: 'BYE_SIDE_STALE' } });
     });
+    it('수동 부전승을 연결하면 새로 조회한 경기와 이후 팀 변경에 같은 자리가 사용된다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await seedBracketTournament(prisma, { label: 'manual-bye-target', format: 'knockout', teamCount: 3 });
+      const first = await bracket.createGroup(user, tournamentId, { name: '12강', phase: 'round12' });
+      const next = await bracket.createGroup(user, tournamentId, { name: '8강', phase: 'quarter' });
+      const fixture = await bracket.createFixture(user, tournamentId, { groupId: next.id, round: '8강', fixtureNumber: 5 });
+      const empty = await bracket.createBye(user, tournamentId, { groupId: first.id, sortOrder: 0 });
+      await bracket.createBye(user, tournamentId, { groupId: first.id, sortOrder: 0, byeId: empty.id,
+        registrationId: registrationIds[0], targetFixtureId: fixture.id, targetSide: 'AWAY' });
+      const slot = await prisma.v1TournamentSlot.findFirstOrThrow({ where: { tournamentId, groupId: first.id, byeSortOrder: 0 } });
+      expect((await fixturesUsing(slot.id))[0]).toMatchObject({ id: fixture.id, awaySlotId: slot.id, approvedApplicantTeamId: teamIds[0] });
+      await slots.assignSlot(user, slot.id, registrationIds[1]);
+      expect((await fixturesUsing(slot.id))[0].approvedApplicantTeamId).toBe(teamIds[1]);
+      expect(await byeRows(tournamentId)).toEqual({ empty: [], team: [[registrationIds[1], 0]] });
+    });
     async function ko12(label: string, teamCount = 3) {
       const seeded = await seedBracketTournament(prisma, { label, format: 'knockout', teamCount });
       await templates.apply(user, seeded.tournamentId, { kind: 'knockout', size: 12, thirdPlace: false });

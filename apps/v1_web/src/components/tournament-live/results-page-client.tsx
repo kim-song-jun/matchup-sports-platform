@@ -36,6 +36,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const [fromDeepLink, setFromDeepLink] = useState(deepLinkFixtureId !== null);
   const [phoneShowsPanel, setPhoneShowsPanel] = useState(deepLinkFixtureId !== null);
   const [officializedFixtureId, setOfficializedFixtureId] = useState<string | null>(null);
+  const [autoFixtureId, setAutoFixtureId] = useState<string | null>(null);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
 
   // 같은 화면에서 뒤로·앞으로 이동하면 쿼리만 바뀐다 — 새 딥링크를 따른다.
@@ -65,8 +66,12 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
     [ended.data?.items, overdueFixtureIds],
   );
   const all = useMemo(() => [...pending, ...confirmed, ...voided], [pending, confirmed, voided]);
-  // 고른 경기가 목록에 없으면(딥링크 경기가 아직 안 끝났거나 이미 처리됨) 첫 확정 대기로 대신하고 이유를 알린다.
-  const selected = all.find((item) => item.fixtureId === pickedFixtureId) ?? pending[0] ?? null;
+  // 아무것도 고르지 않았거나 고른 경기가 목록에 없으면(딥링크 경기가 아직 안 끝났거나 이미 처리됨) 첫 확정 대기를 자동으로 연다.
+  // 자동으로 연 경기는 목록에 있는 동안 고정한다 — 15초 갱신에 앞 번호 경기가 끝나도 쓰던 패널이 바뀌면 안 된다.
+  const autoAnchorId = all.some((item) => item.fixtureId === autoFixtureId) ? autoFixtureId : (pending[0]?.fixtureId ?? null);
+  if (autoAnchorId !== autoFixtureId) setAutoFixtureId(autoAnchorId);
+  const selected =
+    all.find((item) => item.fixtureId === pickedFixtureId) ?? all.find((item) => item.fixtureId === autoAnchorId) ?? null;
   const pickMissing = ended.isSuccess && pickedFixtureId !== null && !all.some((item) => item.fixtureId === pickedFixtureId);
 
   // 참가자에게 보이는 결과가 있는 경기(확정됨·결과 무효)만. 종류가 오기 전에는 만들지 않는다 —

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -90,13 +90,16 @@ afterEach(() => restoreViewport());
 
 function renderPage(role: V1TournamentStaffRole = 'PLATFORM_OPS') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <TournamentOpsRoleProvider role={role}>
-        <ResultsPageClient tournamentId="t-1" />
-      </TournamentOpsRoleProvider>
-    </QueryClientProvider>,
-  );
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <TournamentOpsRoleProvider role={role}>
+          <ResultsPageClient tournamentId="t-1" />
+        </TournamentOpsRoleProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe('ResultsPageClient', () => {
@@ -274,6 +277,56 @@ describe('ResultsPageClient', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('전달받은 경기는 지금 목록에 없어요. 아직 끝나지 않았거나 이미 처리됐을 수 있어요.');
     expect(await screen.findByTestId('review-panel')).toHaveAttribute('data-game', 'g1');
+  });
+
+  it('15초 갱신으로 앞 번호 확정 대기 경기가 들어와도 자동으로 열린 경기는 바뀌지 않는다', async () => {
+    const { client } = renderPage();
+    expect(await screen.findByTestId('review-panel')).toHaveAttribute('data-game', 'g1');
+
+    pages = [
+      {
+        items: [
+          { fixtureId: 'f0', gameId: 'g0', revisionId: null, fixtureNumber: 3 },
+          { fixtureId: 'f1', gameId: 'g1', revisionId: null },
+          { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2', fieldName: '구장 1', fixtureNumber: 1, scheduledAt: '2026-12-20T00:00:00.000Z', currentScore: { home: 2, away: 1 } },
+        ],
+        nextCursor: null,
+      },
+    ];
+    fixtures = [fixtureNames(0, '성수 유나이티드', '한강 FC'), fixtureNames(1, '노원 킥스', '강서 드리블러'), fixtureNames(2, '잠실 레전드', '마포 FS')];
+    revisionStates.g0 = 'SUBMITTED';
+    await act(async () => {
+      await client.refetchQueries();
+    });
+
+    expect(await screen.findByRole('region', { name: '확정 대기 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '노원 킥스 vs 강서 드리블러' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /노원 킥스 vs 강서 드리블러/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByTestId('review-panel')).toHaveAttribute('data-game', 'g1');
+    expect(screen.getByRole('button', { name: /성수 유나이티드 vs 한강 FC/ })).not.toHaveAttribute('aria-current', 'true');
+  });
+
+  it('자동으로 열린 경기가 목록에서 사라지면 그때 첫 확정 대기 경기로 다시 고른다', async () => {
+    const { client } = renderPage();
+    expect(await screen.findByTestId('review-panel')).toHaveAttribute('data-game', 'g1');
+
+    pages = [
+      {
+        items: [
+          { fixtureId: 'f3', gameId: 'g3', revisionId: null, fixtureNumber: 3 },
+          { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2', fieldName: '구장 1', fixtureNumber: 1, scheduledAt: '2026-12-20T00:00:00.000Z', currentScore: { home: 2, away: 1 } },
+        ],
+        nextCursor: null,
+      },
+    ];
+    fixtures = [fixtureNames(2, '잠실 레전드', '마포 FS'), fixtureNames(3, '성수 유나이티드', '한강 FC')];
+    revisionStates.g3 = 'SUBMITTED';
+    await act(async () => {
+      await client.refetchQueries();
+    });
+
+    await waitFor(() => expect(screen.getByTestId('review-panel')).toHaveAttribute('data-game', 'g3'));
+    expect(screen.getByRole('heading', { name: '성수 유나이티드 vs 한강 FC' })).toBeInTheDocument();
   });
 
   it('결과를 확정하면 안내 문구를 보이고 그 경기를 계속 보여 준다', async () => {

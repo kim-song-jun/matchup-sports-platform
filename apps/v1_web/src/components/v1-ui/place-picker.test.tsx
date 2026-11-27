@@ -15,7 +15,9 @@ function Harness({
   recentVenues,
   onValue,
   maxLength = 120,
+  onPendingText,
 }: {
+  onPendingText?: (text: string) => void;
   initial?: PlaceValue | null;
   recentVenues?: V1RecentVenue[];
   onValue?: (value: PlaceValue | null) => void;
@@ -28,6 +30,7 @@ function Harness({
       value={value}
       recentVenues={recentVenues}
       maxLength={maxLength}
+      onPendingTextChange={onPendingText}
       onChange={(next) => {
         setValue(next);
         onValue?.(next);
@@ -140,6 +143,29 @@ describe('PlacePicker', () => {
     fireEvent.click(screen.getByRole('button', { name: /검색으로 장소 찾기/ }));
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(onValue).toHaveBeenLastCalledWith(null);
+  });
+
+  it('검색 칸에 친 글을 아직 고르지도 확정하지도 않았으면 그 글을 알리고, 고르거나 확정하거나 지우면 비운다', async () => {
+    const onPendingText = vi.fn();
+    renderPicker({ onPendingText });
+    const input = screen.getByRole('combobox');
+
+    fireEvent.change(input, { target: { value: '  망원 ' } });
+    expect(onPendingText).toHaveBeenLastCalledWith('망원');
+
+    fireEvent.change(input, { target: { value: '' } });
+    expect(onPendingText).toHaveBeenLastCalledWith('');
+
+    fireEvent.change(input, { target: { value: '망원 풋살' } });
+    fireEvent.click(await findOption('망원한강공원 풋살장'));
+    expect(onPendingText).toHaveBeenLastCalledWith('');
+
+    fireEvent.click(await screen.findByRole('button', { name: '장소 바꾸기' }));
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: '동네' } });
+    expect(onPendingText).toHaveBeenLastCalledWith('동네');
+    fireEvent.click(await screen.findByRole('option', { name: /이름만 직접 입력/ }));
+    expect(await screen.findByRole('textbox', { name: '장소' })).toHaveValue('동네');
+    expect(onPendingText).toHaveBeenLastCalledWith('');
   });
 
   it('직접 입력 이름은 화면이 넘긴 한도까지 받는다 — 대회 한도 200 이면 150자도 그대로 들어간다', async () => {

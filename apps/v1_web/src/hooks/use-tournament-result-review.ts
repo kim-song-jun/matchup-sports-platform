@@ -5,6 +5,7 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { mergeByFixtureId } from '@/lib/merge-board-pages';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
@@ -238,7 +239,7 @@ async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOp
     usedCursors.add(next);
     cursor = next;
   }
-  return { ...page, items, liveWarnings, nextCursor: null };
+  return { ...page, items: mergeByFixtureId(items), liveWarnings: mergeByFixtureId(liveWarnings), nextCursor: null };
 }
 
 /**

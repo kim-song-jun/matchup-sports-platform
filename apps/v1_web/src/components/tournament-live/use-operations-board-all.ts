@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useV1DataSource } from '@/components/providers/v1-data-source';
+import { mergeByFixtureId } from '@/lib/merge-board-pages';
 import { v1Keys } from '@/lib/query-keys';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import type { v1Get } from '@/lib/api-client';
@@ -40,7 +41,7 @@ export async function fetchOperationsBoardAll(get: typeof v1Get, tournamentId: s
     usedCursors.add(next);
     cursor = next;
   }
-  return { items, liveWarnings };
+  return { items: mergeByFixtureId(items), liveWarnings: mergeByFixtureId(liveWarnings) };
 }
 
 /** 키가 `tournamentOperationsBoardAll` 아래에 있어 구장 배정 등 기존 무효화가 그대로 닿는다. */

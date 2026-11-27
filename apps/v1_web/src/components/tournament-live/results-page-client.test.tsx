@@ -304,6 +304,17 @@ describe('ResultsPageClient', () => {
     expect(requestedCursors).toEqual([null, 'c1']);
   });
 
+  it('쪽 사이에 같은 경기가 두 번 와도 한 번만 센다', async () => {
+    pages = [
+      { items: [{ fixtureId: 'f1', gameId: 'g1', revisionId: null }, { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2' }], nextCursor: 'c1' },
+      { items: [{ fixtureId: 'f2', gameId: 'g2', revisionId: 'r2' }], nextCursor: null },
+    ];
+    renderPage();
+
+    expect(await screen.findByText('끝난 경기 2')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /잠실 레전드 vs 마포 FS/ })).toHaveLength(1);
+  });
+
   it('무효 처리된 결과는 확정 대기도 확정됨도 아닌 「결과 무효」 묶음에 있다', async () => {
     pages = [
       {

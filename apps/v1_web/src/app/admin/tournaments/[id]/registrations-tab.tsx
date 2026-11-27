@@ -561,7 +561,7 @@ export function RegistrationsTab({
   );
   // 무료 대회에는 확인할 입금이 없다 — 같은 awaiting_payment 처리를 「신청 확인」으로 부른다.
   const confirmNoun = isFreeEntry ? '신청 확인' : '입금 확인';
-  // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
+  // 처리 대기 = 확인 중(payment_checking — 무료 대회는 「신청 확인 중」) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
   /** 펼친 경기별 명단을 닫게 되는 조작 — 저장 전 변경이 있으면 버릴지 물은 뒤에만 한다. */

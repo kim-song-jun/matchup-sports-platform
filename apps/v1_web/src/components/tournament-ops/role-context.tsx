@@ -32,3 +32,8 @@ export function useTournamentOpsRole(): V1TournamentStaffRole {
 export function canManageTournamentResults(role: V1TournamentStaffRole): boolean {
   return role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
 }
+
+/** 구장·구장 담당자 배정은 서버가 같은 두 역할에게만 허용한다 — 누르면 403 나는 컨트롤은 화면에서 감춘다. */
+export function canAssignOperations(role: V1TournamentStaffRole): boolean {
+  return role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
+}

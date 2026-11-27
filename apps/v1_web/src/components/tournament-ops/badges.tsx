@@ -8,6 +8,7 @@ import {
   Clock,
   UserX,
   ShieldAlert,
+  Hourglass,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type {
@@ -56,6 +57,22 @@ export function GameStateBadge({ state }: { state: V1GameState | null }) {
     return <Pill tone="gray" icon={<Clock size={12} aria-hidden="true" />} label="경기 미생성" />;
   }
   const meta = GAME_STATE_META[state];
+  return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
+}
+
+/** 운영 보드 카드의 상태 — 경기 상태에 결과 확정 단계를 더한 말. */
+export type BoardCardState = 'scheduled' | 'live' | 'result-pending' | 'result-done' | 'cancelled';
+
+const BOARD_CARD_STATE_META: Record<BoardCardState, { label: string; tone: Tone; icon: ReactNode }> = {
+  scheduled: { label: '예정', tone: 'gray', icon: <CalendarClock size={12} aria-hidden="true" /> },
+  live: { label: '진행 중', tone: 'blue', icon: <CircleDot size={12} aria-hidden="true" /> },
+  'result-pending': { label: '결과 확정 대기', tone: 'amber', icon: <Hourglass size={12} aria-hidden="true" /> },
+  'result-done': { label: '결과 확정됨', tone: 'green', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
+  cancelled: { label: '취소됨', tone: 'red', icon: <XCircle size={12} aria-hidden="true" /> },
+};
+
+export function BoardCardStateBadge({ state }: { state: BoardCardState }) {
+  const meta = BOARD_CARD_STATE_META[state];
   return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
 }
 

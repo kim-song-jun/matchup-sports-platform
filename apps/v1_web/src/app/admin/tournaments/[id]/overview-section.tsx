@@ -26,7 +26,7 @@ const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-blue-500 focus
  * 비어 있는지, 어디로 가야 고치는지만 보여준다. 편집 진입점은 각 섹션이 갖는다.
  */
 export function TournamentOverviewSection() {
-  const { tournamentId, basePath: managementBasePath } = useTournamentAdmin();
+  const { tournamentId, basePath: managementBasePath, overviewAdvance } = useTournamentAdmin();
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(tournamentId);
   const router = useRouter();
   const pathname = usePathname();
@@ -115,6 +115,26 @@ export function TournamentOverviewSection() {
           <OverviewFact label="명단 제출 마감" value={tournament.rosterDeadlineAt ? formatDate(tournament.rosterDeadlineAt) : null} />
         </dl>
       </section>
+        {overviewAdvance ? (
+          <div
+            className={[
+              'mt-2 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between',
+              milestone.overdue ? 'border-[var(--tint-orange-border)]' : 'border-[var(--border)]',
+            ].join(' ')}
+          >
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{overviewAdvance.hint}</p>
+            <button
+              type="button"
+              disabled={overviewAdvance.busy}
+              onClick={overviewAdvance.onClick}
+              className={`tm-btn tm-btn-md w-full whitespace-nowrap sm:w-auto sm:shrink-0 ${
+                overviewAdvance.emphasis === 'primary' ? 'tm-btn-primary' : 'tm-btn-outline'
+              }`}
+            >
+              {overviewAdvance.label}
+            </button>
+          </div>
+        ) : null}
 
       {/* 규모 — 각 숫자에서 그 섹션으로 바로 간다 */}
       {showKpi && (

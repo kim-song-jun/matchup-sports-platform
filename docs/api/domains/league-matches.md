@@ -368,7 +368,7 @@ Optional roster, participant capacity and plan fields:
   `409 TOURNAMENT_CAPACITY_FULL` and the transaction is rolled back.
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
-- `teamFoulThreshold` (1–20, optional): team-foul warning count — the operator console shows "다음부터 10m 프리킥" (notice) once a team's fouls in a period reach it, and "세컨 파울 · 10m 프리킥" (second foul) from the next foul on — with 5, the 6th foul. Omitted or `null` = default 5 (the column stays `NULL`). Editable later with `PATCH /admin/league-matches/:leagueId` and returned by the admin detail (`null` = default).
+- `teamFoulThreshold` (1–20, optional): team-foul warning count — the operator console shows "다음부터 10m 프리킥" (notice) once a team's fouls in a period reach it, and "10m 프리킥" from the next foul on — with 5, the 6th foul. Omitted or `null` = default 5 (the column stays `NULL`). Editable later with `PATCH /admin/league-matches/:leagueId` and returned by the admin detail (`null` = default).
 - `showTeamFouls` (boolean, optional): whether the spectator fixture page draws the live team-foul bars. Omitted on create = on. Same on/off rules as `POST /admin/tournaments` (`null` is rejected; the column is `NOT NULL`).
 - `registrationDeadlineAt` (ISO, optional): stored for open-registration; a past value returns
   `422 LEAGUE_REGISTRATION_DEADLINE_PAST`. Creating does not open registration.

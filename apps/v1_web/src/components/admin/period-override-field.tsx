@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { periodLabels, switchPeriodCount, tournamentPeriodPhaseShortLabel } from '@/app/admin/tournaments/new/tournament-create-model';
+import { periodLabels, switchPeriodCount, tournamentPeriodPhaseShortLabel } from '@/lib/tournament-period-phases';
 import {
   useTournamentMatchPeriods,
   useTournamentPeriodSettings,

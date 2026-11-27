@@ -8,6 +8,8 @@ type TournamentDatetimeFieldProps = {
   required?: boolean;
   disabled?: boolean;
   hint?: string;
+  /** `warning` 이면 hint 를 주황 글자로 그리고 `role="status"` 로 읽힌다 — 막지는 않지만 확인할 값에 쓴다. */
+  hintTone?: 'default' | 'warning';
   error?: string | null;
   min?: string;
 };
@@ -20,6 +22,7 @@ export function TournamentDatetimeField({
   required = false,
   disabled = false,
   hint,
+  hintTone = 'default',
   error,
   min,
 }: TournamentDatetimeFieldProps) {
@@ -69,7 +72,11 @@ export function TournamentDatetimeField({
       ) : hint ? (
         <p
           id={`${id}-hint`}
-          className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]"
+          role={hintTone === 'warning' ? 'status' : undefined}
+          className={[
+            'text-[length:var(--font-size-caption)]',
+            hintTone === 'warning' ? 'text-[var(--orange700)]' : 'text-[var(--text-caption)]',
+          ].join(' ')}
         >
           {hint}
         </p>

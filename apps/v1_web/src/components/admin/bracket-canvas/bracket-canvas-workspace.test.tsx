@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => mocks.bracket,
+  useV1CreateBracketBye: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
   useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
   useV1PublishTournamentBracket: () => ({ mutate: mocks.publish, isPending: false }),
   useV1UnpublishTournamentBracket: () => ({ mutate: mocks.unpublish, isPending: false }),

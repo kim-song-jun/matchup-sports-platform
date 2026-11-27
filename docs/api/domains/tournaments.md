@@ -105,6 +105,7 @@ League compatibility (2026-10-19): public `status=draft` with `kind=league` or `
 ## 부전승 홈·어웨이 (2026-10-27 확장)
 
 - `PUT /api/v1/admin/tournament-slots/:slotId/bye-side`: `{ side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY' }`.
+- 다른 경기로 옮길 때는 `PUT /api/v1/admin/tournament-slots/:slotId/bye-position`에 `sourceFixtureId`, `expectedSide`, `targetFixtureId`, `side`, `expectedOrigin`을 보낸다. 목적지의 기존 슬롯 ID, 승자 원천 경기 ID, 직접 배정한 팀의 참가 ID 또는 빈 자리의 목적지 경기 ID를 검증한다. 수동 부전승 저장 API는 `targetFixtureId`와 `targetSide`를 함께 받아 직행 경기를 연결한다.
   V1AuthGuard + mutation admin(owner/ops), support/비관리자 403. `side`는 원하는 최종 자리이며 같은 요청을 재전송해도 다시 뒤집지 않는다.
 - 부전승 슬롯과 바로 이전 라운드 WINNER 연결 하나를 가진 경기에서 허용한다. GROUP_RANK 부전승도 포함한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
   슬롯 FK, 실제 경기/게임의 홈·어웨이 팀, 승자 edge의 targetSide, 부전승 sortOrder를 대회 잠금+게임 행 잠금 안의 단일 트랜잭션으로 교환한다.
@@ -1181,3 +1182,5 @@ assignment 확장: registrationIds는 자리 수만큼의 (UUID|null) 목록이�
 - 세부 설정은 생성 후 관리자 대진의 ‘단계·진출팀 관리 → 구성 수정’에서 바꿔요. 시작/결과가 없는 상태를 보존하려고 `withResults=true`, `reviewReady=true`, `status=completed`는 400 `MOCK_SEED_STATUS_UNSUPPORTED`로 저장 전에 거절해요. 기본값과 `open`/`in_progress`는 기존 계약을 따라요.
 - 단계 배정으로 경기 명단을 만들기 때문에 `withLineups` 여부와 무관하게 정본 제출본을 반영해요. API 환경 플래그, mutation admin, 감사 로그, 응답 계정 비밀번호 제외 계약은 그대로 적용해요. 응답 `format=staged`이며 일반 목업 응답 필드와 같아요.
 - Web은 `stagePlan`이 있으면 DB format이 `league`여도 단계 관리·시간 배정·구장 배정을 그림/목록 보기에서 유지해요. 기존 목업 카테고리의 동작은 바꾸지 않아요.
+
+부전승 팀을 다른 팀과 맞바꾸는 경우 자리 배정 API에 상대 자리의 `swapSlotId`와 현재 부전승 팀의 `expectedRegistrationId`를 함께 보낸다. 두 자리는 같은 결선 조에 속해야 하며 서버가 양쪽 팀을 확인한 뒤 한 트랜잭션에서 교환한다.

@@ -263,6 +263,18 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect((await fixturesUsing(bye.id))[0].awaySlotId).toBe(bye.id);
       expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: incoming.id } })).toMatchObject({ targetSide: 'HOME' });
     });
+    it('다른 8강의 승자 자리로 옮기면 팀과 12강 승자 연결이 함께 이동한다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await ko12('bye-move');
+      const bye = await slotAt(tournamentId, 1, 'BYE'), peer = await slotAt(tournamentId, 2, 'BYE');
+      const [source] = await fixturesUsing(bye.id), [target] = await fixturesUsing(peer.id);
+      await slots.assignSlot(user, bye.id, registrationIds[0]);
+      const incoming = await prisma.v1TournamentMatchAdvancementEdge.findFirstOrThrow({ where: { targetTeamMatchId: target.id } });
+      const move = { sourceFixtureId: source.id, targetFixtureId: target.id, expectedSide: 'HOME' as const, side: 'AWAY' as const, expectedOrigin: incoming.sourceTeamMatchId };
+      await slots.setByeSide(user, bye.id, 'AWAY', 'HOME', move);
+      expect((await fixturesUsing(bye.id))[0]).toMatchObject({ id: target.id, awaySlotId: bye.id, approvedApplicantTeamId: teamIds[0] });
+      expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: incoming.id } })).toMatchObject({ targetTeamMatchId: source.id, targetSide: 'HOME' });
+      await expect(slots.setByeSide(user, bye.id, 'AWAY', 'HOME', move)).rejects.toMatchObject({ response: { code: 'BYE_SIDE_STALE' } });
+    });
     async function ko12(label: string, teamCount = 3) {
       const seeded = await seedBracketTournament(prisma, { label, format: 'knockout', teamCount });
       await templates.apply(user, seeded.tournamentId, { kind: 'knockout', size: 12, thirdPlace: false });

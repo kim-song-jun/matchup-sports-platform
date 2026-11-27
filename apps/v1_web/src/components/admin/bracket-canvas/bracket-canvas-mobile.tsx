@@ -22,6 +22,7 @@ import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration, V1SixTeamBracket } from '@/types/api';
 import { LeagueFixtureDangerActions } from './league-fixture-danger-actions';
 import { SixTeamAdminBracket } from './six-team-admin-bracket';
+import { ManualByeEditor } from './manual-bye-editor';
 import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
@@ -123,6 +124,10 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
 
 export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, fixtureActions, renderRoundHeader }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
+  const [manualId, setManualId] = useState<string | null>(null);
+  const manual = (groups ?? []).flatMap(group => group.groupTeams.filter(bye => bye.isBye &&
+    !slots.some(slot => slot.groupId === group.id && slot.byeSortOrder === bye.sortOrder)).map(bye => ({ group, bye })));
+  const editing = manual.find(row => row.bye.id === manualId);
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<MobileSheetView>({ kind: 'detail' });
@@ -148,7 +153,7 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
   // 칸이 사라지면(템플릿 교체·새로고침) 시트도 함께 닫힌다 — 없는 경기의 폼을 붙들지 않는다.
   const selected = selectedId === null ? null : findNode(rounds, selectedId);
 
-  if (rounds.length === 0) {
+  if (rounds.length === 0 && manual.length === 0) {
     return (
       <EmptyState
         title="아직 대진이 없어요"
@@ -163,7 +168,7 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
         <AlertBanner tone="info" message={onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.'} />
       ) : null}
 
-      {sixTeamState ? <SixTeamAdminBracket state={sixTeamState} fixtures={[...(fixtures ?? [])]} groups={[...(groups ?? [])]} registrations={registrations} renderFixture={(fixture, labels) => {
+      {sixTeamState ? <SixTeamAdminBracket canWrite={canWrite} state={sixTeamState} fixtures={[...(fixtures ?? [])]} groups={[...(groups ?? [])]} registrations={registrations} renderFixture={(fixture, labels) => {
         const node = findNode(rounds, fixture.id);
         if (!node) return <p role="alert">경기 정보를 불러오지 못했어요.</p>;
         const labeled = labels ? { ...node, home: { ...node.home, slotLabel: labels.HOME }, away: { ...node.away, slotLabel: labels.AWAY } } : node;
@@ -216,6 +221,17 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
         </div>
       ) : null}
 
+      {scope === 'tournament' && manual.filter(row => !activeRound || activeRound.sections.some(section =>
+        section.nodes.some(node => node.groupId === row.group.id)) || !rounds.some(round => round.sections.some(section =>
+          section.nodes.some(node => node.groupId === row.group.id)))).map(({ group, bye }) =>
+        <button type="button" className="tm-btn tm-btn-outline" key={bye.id} onClick={() => setManualId(bye.id)}>
+          {group.name} · {bye.sortOrder + 1}번 부전승 · {bye.teamName ?? '팀 미정'}
+        </button>)}
+      {editing && <BottomSheet open title="부전승 자리 편집" onClose={() => setManualId(null)}>
+        <ManualByeEditor tournamentId={competitionId} group={editing.group} bye={editing.bye} groups={groups ?? []}
+          fixtures={fixtures ?? []} teams={candidates.map(team => ({ id: team.registrationId, teamId: team.registrationId, teamName: team.teamName }))}
+          canWrite={canWrite && registrationsState.status === 'success'} onSaved={() => setManualId(null)} />
+      </BottomSheet>}
       {selected ? (
         <BottomSheet open onClose={closeSheet} title={selected.title}>
           {canWrite && onEditFixture && view.kind === 'detail' ? (

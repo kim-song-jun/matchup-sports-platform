@@ -809,6 +809,19 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(teamColumn('성수 풋살 클럽')).not.toHaveTextContent('다음부터 10m 프리킥');
     });
 
+    it('기준을 넘는 파울부터는 세컨 파울(10m 프리킥)로 알린다 — 기준 3개면 4번째부터', () => {
+      mountWith(homeFouls(4), 3);
+
+      expect(teamColumn('강남 풋살 클럽')).toHaveTextContent('세컨 파울 · 10m 프리킥');
+      expect(screen.queryByText('다음부터 10m 프리킥')).toBeNull();
+    });
+
+    it('기본 기준(5개)이면 6번째 파울부터 세컨 파울이다', () => {
+      mountWith(homeFouls(6));
+
+      expect(screen.getAllByText('세컨 파울 · 10m 프리킥')).toHaveLength(1);
+    });
+
     it('같은 파울 수라도 기준이 7개면 아직 경고하지 않는다', () => {
       mountWith(homeFouls(5), 7);
 

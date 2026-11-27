@@ -12,6 +12,8 @@ import { assertNotInOtherGroupInTx, assignTournamentFixtureSideInTx, ensureGroup
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
+import { moveByeInTx } from './move-bye';
+import type { MoveByeDto } from './dto/tournament-slot.dto';
 import { setByeSideInTx } from './bye-side';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
@@ -314,7 +316,7 @@ export class TournamentSlotService {
     return releaseSlotsForRegistrationInTx(tx, this.context(admin), registrationId);
   }
 
-  async assignSlot(user: V1AuthUser, slotId: string, registrationId: string | null) {
+  async assignSlot(user: V1AuthUser, slotId: string, registrationId: string | null, swapSlotId?: string, expectedRegistrationId?: string | null) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { slotId });
     const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true, group: { select: { phase: true } } } });
     if (slot === null) throw slotNotFound();
@@ -322,19 +324,31 @@ export class TournamentSlotService {
     if (competition.format === 'league_knockouts' && slot.group?.phase !== 'group') throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '토너먼트 설정에서 진출팀을 편집한 뒤 대진을 다시 생성해 주세요.' });
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
-      const affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);
+      let affectedTeamMatchIds: string[];
+      if (swapSlotId) {
+        const rows = await tx.v1TournamentSlot.findMany({ where: { tournamentId: competition.id, id: { in: [slotId, swapSlotId] } } });
+        const bye = rows.find(row => row.id === slotId), other = rows.find(row => row.id === swapSlotId);
+        if (!bye || bye.byeSortOrder == null || !other || other.id === bye.id || other.groupId !== bye.groupId ||
+          !registrationId || other.registrationId !== registrationId || bye.registrationId !== expectedRegistrationId) {
+          throw new ConflictException({ code: 'BYE_SIDE_STALE', message: '팀 배정이 바뀌었어요. 새로고침 후 확인해 주세요.' });
+        }
+        affectedTeamMatchIds = await assignSlotsBatchInTx(tx, this.context(admin), [
+          { slotId, registrationId }, { slotId: swapSlotId, registrationId: bye.registrationId },
+        ]);
+      } else affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);
       const row = await tx.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId }, include: adminBracketSlotInclude });
       return { slot: serializeAdminBracketSlot(row), affectedTeamMatchIds };
     }, SLOT_TRANSACTION_OPTIONS);
   }
 
-  async setByeSide(user: V1AuthUser, slotId: string, side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY') {
+  async setByeSide(user: V1AuthUser, slotId: string, side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY', move?: MoveByeDto) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { slotId });
     const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true } });
     if (!slot) throw slotNotFound();
     const competition = await this.loadCompetition(this.prisma, slot.tournamentId);
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
+      if (move) return moveByeInTx(tx, this.context(admin), competition.id, slotId, move.sourceFixtureId, expectedSide, move.targetFixtureId, side, move.expectedOrigin);
       return setByeSideInTx(tx, this.context(admin), competition.id, slotId, side, expectedSide);
     }, SLOT_TRANSACTION_OPTIONS);
   }

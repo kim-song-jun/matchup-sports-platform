@@ -70,6 +70,7 @@ export function TournamentGenderChoiceField({
               />
               {selected ? <Check size={14} aria-hidden="true" /> : null}
               {label}
+              {/* aria-hidden 이어도 aria-describedby 가 직접 가리키면 설명으로 읽힌다 — 칸 이름에는 섞이지 않는다. */}
               {option === defaultValue ? (
                 <span
                   id={badgeId}

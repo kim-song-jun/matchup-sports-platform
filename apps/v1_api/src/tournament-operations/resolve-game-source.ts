@@ -13,6 +13,7 @@ export type ResolvedGameSource = {
   readonly kind: 'teamMatch'; readonly tournamentId: string; readonly fixtureId: string;
   readonly tournamentKind: 'regular_tournament' | 'regular_league' | null;
   readonly fieldId: string | null; readonly teamMatchId: string;
+  readonly archived: boolean;
 };
 
 /** 해석에 필요한 최소 게임 필드 — 호출자가 이미 잠근 행에서 그대로 넘긴다. */
@@ -31,6 +32,7 @@ export interface GameSourceRef {
 export async function resolveGameSource(
   tx: Prisma.TransactionClient,
   game: GameSourceRef,
+  includeArchived = false,
 ): Promise<ResolvedGameSource | null> {
   // ⚠️ **fail-open 을 만들지 않는다.** "대회 대진이 아니면 전부 팀매치" 로 두면 enum 에
   // 이미 있는 `COMPETITION_FIXTURE`·`FRIENDLY_MATCH`(R1 expand 로 추가된 통합 후 이름)와
@@ -39,9 +41,10 @@ export async function resolveGameSource(
   if (game.sourceType !== V1GameSourceType.TEAM_MATCH) return null;
   if (game.teamMatchId === null) return null;
   const teamMatch = await tx.v1TeamMatch.findUnique({
-    where: { id: game.teamMatchId, deletedAt: null },
+    where: { id: game.teamMatchId, ...(includeArchived ? {} : { deletedAt: null }) },
     select: {
       id: true,
+      deletedAt: true,
       tournamentId: true,
       leagueId: true,
       fieldId: true,
@@ -70,5 +73,6 @@ export async function resolveGameSource(
     fixtureId: teamMatch.id,
     fieldId: teamMatch.fieldId,
     teamMatchId: game.teamMatchId,
+    archived: teamMatch.deletedAt != null,
   };
 }

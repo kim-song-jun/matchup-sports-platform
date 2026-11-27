@@ -18,6 +18,12 @@ export interface ConsoleScoreCardProps {
   readonly stickyClass: string;
 }
 
+/** 기준에 이르면 예고, 기준을 넘는 파울부터 세컨 파울. 색만으로 구분하지 않고 문구가 다르다. */
+const FOUL_STAGE = {
+  notice: { message: '다음부터 10m 프리킥', tone: 'text-[var(--orange700)]' },
+  second: { message: '세컨 파울 · 10m 프리킥', tone: 'text-[var(--red700)]' },
+} as const;
+
 /** 콘솔 머리: 점수 · 팀 파울 · 상태 · 시계를 한 장에 모은다. 스크롤해도 화면 위에 붙어 있다. */
 export function ConsoleScoreCard({
   sides,
@@ -38,7 +44,7 @@ export function ConsoleScoreCard({
   const teamColumn = (side: GameSide, align: 'start' | 'end') => {
     const sideWord = side.sideKey === 'HOME' ? '홈' : '원정';
     const fouls = foulCounts[side.id] ?? 0;
-    const warning = foulPeriodLabel !== null && fouls >= foulThreshold;
+    const stage = foulPeriodLabel === null || fouls < foulThreshold ? null : fouls > foulThreshold ? FOUL_STAGE.second : FOUL_STAGE.notice;
     return (
       <div
         role="group"
@@ -56,17 +62,17 @@ export function ConsoleScoreCard({
         {foulPeriodLabel !== null ? (
           <span
             className={`flex items-center gap-1 whitespace-nowrap text-[length:var(--font-size-caption)] tabular-nums ${
-              warning ? 'font-bold text-[var(--orange700)]' : 'text-[var(--text-body)]'
+              stage !== null ? `font-bold ${stage.tone}` : 'text-[var(--text-body)]'
             }`}
           >
-            {warning ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
+            {stage !== null ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
             <span>
               {foulPeriodLabel} {fouls}
             </span>
           </span>
         ) : null}
-        {warning ? (
-          <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--orange700)]">다음부터 10m 프리킥</span>
+        {stage !== null ? (
+          <span className={`text-[length:var(--font-size-caption)] font-semibold ${stage.tone}`}>{stage.message}</span>
         ) : null}
       </div>
     );

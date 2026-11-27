@@ -6,9 +6,9 @@ import { BracketCanvas } from './bracket-canvas';
 import { BracketCanvasMobile } from './bracket-canvas-mobile';
 import { ByeSlotEditor } from './bye-slot-editor';
 
-const mocks = vi.hoisted(() => ({ update: vi.fn(), assign: vi.fn() }));
+const mocks = vi.hoisted(() => ({ update: vi.fn(), assign: vi.fn(), move: vi.fn() }));
 vi.mock('@/hooks/use-v1-api', () => ({ useV1UpdateFixture: () => ({ mutateAsync: mocks.update, isPending: false }) }));
-vi.mock('@/hooks/use-v1-bracket-canvas', () => ({ useV1AssignTournamentSlot: () => ({ mutateAsync: mocks.assign, isPending: false }) }));
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({ useV1SetByeSide: () => ({ mutate: mocks.move, isPending: false }), useV1AssignTournamentSlot: () => ({ mutateAsync: mocks.assign, isPending: false }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); mocks.update.mockResolvedValue({}); mocks.assign.mockResolvedValue({}); });
@@ -30,6 +30,8 @@ describe('BYE slot editing', () => {
   it('writes text through the linked quarter-final side and assignment through the shared slot, with no BYE schedule', async () => {
     render(<ByeSlotEditor {...common} />);
     expect(screen.getByText(/연결 위치: 8강 5번 경기 · 홈/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('부전승 위치'), { target: { value: 'AWAY' } });
+    expect(mocks.move).toHaveBeenCalledWith({ slotId: 'bye', side: 'AWAY', expectedSide: 'HOME' }, expect.any(Object));
     expect(screen.queryByLabelText('경기 번호')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('경기 시각')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('표시 문구'), { target: { value: '조 1위 중 5위' } });
@@ -38,6 +40,14 @@ describe('BYE slot editing', () => {
     fireEvent.change(screen.getByLabelText('배정팀'), { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '팀 저장' }));
     await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith({ slotId: 'bye', registrationId: 'r1' }));
+  });
+  it('moves a bye into the winning branch of another fixture', () => {
+    const other = makeFixture({ id: 'q2', groupId: 'qf', fixtureNumber: 6,
+      bracketSources: [{ fixtureId: 'source2', side: 'AWAY', outcome: 'WINNER' }] });
+    render(<ByeSlotEditor {...common} fixtures={[fixture, other]} />);
+    fireEvent.change(screen.getByLabelText('부전승 위치'), { target: { value: 'q2AWAY' } });
+    expect(mocks.move).toHaveBeenCalledWith({ slotId: 'bye', sourceFixtureId: 'q1', expectedSide: 'HOME',
+      targetFixtureId: 'q2', side: 'AWAY', expectedOrigin: 'source2' }, expect.any(Object));
   });
   it('offers a group-stage ENTRY team for the BYE while excluding already selected knockout teams', async () => {
     const stage = makeGroup({ id: 'stage', phase: 'group', name: 'A조' });

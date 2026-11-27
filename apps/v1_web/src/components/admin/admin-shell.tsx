@@ -228,6 +228,17 @@ function NavBadge({ count }: { count: number }) {
   );
 }
 
+/** 데스크톱 사이드바와 모바일 서랍이 같이 쓴다. 선택은 한쪽 색 띠가 아니라 옅은 배경으로 표시한다. */
+function sidebarLinkClass(active: boolean): string {
+  return [
+    'tm-admin-sidebar-link mx-2 flex min-h-[44px] items-center gap-3 rounded-lg px-2 py-3 text-sm transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
+    active
+      ? 'bg-[var(--blue50)] text-[var(--blue700)] font-semibold'
+      : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
+  ].join(' ');
+}
+
 // ── Sidebar nav link (desktop) ────────────────────────────────────────────
 function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
@@ -236,14 +247,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       href={item.href}
       aria-current={active ? 'page' : undefined}
       aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
-      className={[
-        'tm-admin-sidebar-link',
-        'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
-        'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-        active
-          ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
-          : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-      ].join(' ')}
+      className={sidebarLinkClass(active)}
     >
       <span
         className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
@@ -424,14 +428,7 @@ function Drawer({
                     aria-current={active ? 'page' : undefined}
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
                     onClick={overlayLinkClick(item.href, pathname, onClose)}
-                    className={[
-                      'tm-admin-sidebar-link',
-                      'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
-                      'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      active
-                        ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
-                        : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-                    ].join(' ')}
+                    className={sidebarLinkClass(active)}
                   >
                     <span
                       className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}

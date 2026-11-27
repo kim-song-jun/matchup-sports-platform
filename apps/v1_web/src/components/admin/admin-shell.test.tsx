@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './admin-shell';
 import { TAB_CONTAINER_SELECTOR, TAB_LINK_SELECTOR } from '@/components/v1-ui/navigation-tab-selectors';
@@ -208,6 +208,35 @@ describe('AdminShell nav', () => {
     for (const link of dashboardLinks) {
       expect(link.matches(TAB_LINK_SELECTOR)).toBe(true);
       expect(link.closest(TAB_CONTAINER_SELECTOR)).not.toBeNull();
+    }
+  });
+});
+
+describe('AdminShell 사이드바 선택 표시', () => {
+  const STRIPE_CLASS = /\bborder-l|border-blue-500|border-transparent/;
+
+  it('선택된 항목과 나머지 모두 왼쪽 색 띠 클래스가 없고, 선택은 aria-current 와 옅은 배경으로 표시한다', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }));
+
+    const selected = screen.getAllByRole('link', { name: '대시보드' });
+    expect(selected.length).toBeGreaterThanOrEqual(2);
+    for (const link of selected) {
+      expect(link).toHaveAttribute('aria-current', 'page');
+      expect(link.className).not.toMatch(STRIPE_CLASS);
+      expect(link.className).toContain('bg-[var(--blue50)]');
+    }
+
+    const others = screen.getAllByRole('link', { name: '모니터링' });
+    expect(others.length).toBeGreaterThanOrEqual(2);
+    for (const link of others) {
+      expect(link).not.toHaveAttribute('aria-current');
+      expect(link.className).not.toMatch(STRIPE_CLASS);
+      expect(link.className).not.toContain('bg-[var(--blue50)]');
     }
   });
 });

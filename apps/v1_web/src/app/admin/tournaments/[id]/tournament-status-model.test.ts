@@ -52,6 +52,13 @@ describe('statusActions — 서버가 허용하는 전환을 순서대로', () =
     expect(rows(status, canRevertStart)).toEqual(expected);
   });
 
+  it('되돌리기 설명은 확인 창 문구의 첫 문장만 메뉴에 싣는다', () => {
+    const revert = (status: V1TournamentStatus, canRevertStart: boolean) =>
+      statusActions(status, { canRevertStart }).find((action) => action.kind === 'revert')?.description;
+    expect(revert('in_progress', true)).toBe('시작한 경기가 없을 때만 되돌릴 수 있어요.');
+    expect(revert('completed', false)).toBe('완료된 대회를 다시 진행 중으로 바꿔요.');
+  });
+
   it('canRevertStart 는 진행 중 → 접수 마감 되돌리기에만 영향을 준다', () => {
     expect(rows('open', true)).toEqual(rows('open', false));
     expect(rows('completed', true)).toEqual(rows('completed', false));

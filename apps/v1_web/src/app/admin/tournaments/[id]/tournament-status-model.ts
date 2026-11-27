@@ -37,8 +37,10 @@ const CANCEL_COPY = { label: '대회 취소하기', description: '취소 사유�
 
 const KIND_ORDER: StatusActionKind[] = ['forward', 'reopen', 'revert', 'cancel'];
 
+// 정규식 lookbehind 는 iOS 16.0~16.3 웹뷰가 파싱하지 못해 쓰지 않는다.
 function firstSentence(text: string): string {
-  return text.split(/(?<=\.)\s/)[0];
+  const end = text.search(/\.\s/);
+  return end === -1 ? text : text.slice(0, end + 1);
 }
 
 /** 서버가 허용하는 전환만 forward → reopen → revert → cancel 순서로 돌려준다. */

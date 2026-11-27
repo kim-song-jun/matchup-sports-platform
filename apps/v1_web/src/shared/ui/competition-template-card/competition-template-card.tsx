@@ -124,7 +124,7 @@ export function CompetitionTemplateGraphicView({ type }: { type: CompetitionTemp
       </g>
       <g className="fill-[var(--text-strong)]" fontSize="8" fontWeight="600" textAnchor="middle">
         <text x="28" y="23">A</text><text x="28" y="59">B</text><text x="88" y="23">C</text><text x="88" y="59">D</text>
-        <text x="185" y="41">{type === 'league-single' ? '서로 1회' : '홈·어웨이'}</text>
+        <text x="185" y="41">{type === 'league-single' ? '서로 1회' : '홈·원정'}</text>
       </g>
     </svg>
   );

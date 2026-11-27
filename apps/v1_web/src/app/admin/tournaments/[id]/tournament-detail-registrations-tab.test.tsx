@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render as renderWithProviders, screen, waitFor
 import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1QueryClient } from '@/lib/query-client';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { installViewport } from '@/test/viewport';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
   useV1AdminTournamentRegistrations,
@@ -23,7 +25,6 @@ import {
   useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
 import { RegistrationsTab } from './registrations-tab';
-import { REGISTRATION_STATUS_FILTERS } from './tournament-detail-shared';
 
 const clients: QueryClient[] = [];
 
@@ -37,10 +38,24 @@ function render(ui: ReactElement) {
   });
 }
 
+// 폭이 갈리는 부품(⋯ 메뉴·취소 처리·골라서 처리)은 데스크톱(1280)이 기본이고, 폰은 테스트가 따로 고른다.
+let restoreViewport: () => void;
+
+beforeEach(() => {
+  restoreViewport = installViewport(1280);
+});
+
 afterEach(() => {
   cleanup();
+  restoreViewport();
+  __resetOverlayHistoryForTests();
   clients.splice(0).forEach((client) => client.clear());
 });
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/admin/tournaments/tournament-1/registrations',
+  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+}));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: vi.fn(),
@@ -53,7 +68,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RosterDeadlineOverrideGrant: vi.fn(),
   useV1RosterDeadlineOverrideRevoke: vi.fn(),
   useV1ExportRosterCsv: vi.fn(),
-  // 탭 상단 버튼 — 기존 describe 들이 따로 세팅하지 않아도 렌더되게 기본값을 준다.
+  // 확정 팀 머리의 버튼 — 기존 describe 들이 따로 세팅하지 않아도 렌더되게 기본값을 준다.
   useV1ExportTournamentRosterCsv: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminTournamentPlayers: vi.fn(),
   useV1UpdatePlayerEligibility: vi.fn(),
@@ -133,133 +148,147 @@ function noopMutationHook<T>(): T {
   return { mutate: vi.fn(), isPending: false } as unknown as T;
 }
 
-describe('RegistrationsTab — 상태 필터의 빈 결과 (#1565)', () => {
+/** 모든 변경 훅을 아무것도 안 하는 mutation 으로 깔고, 신청 목록과 명단 창이 쓰는 조회 훅을 채운다. */
+function arrangeAll(items: V1AdminTournamentRegistration[], query: Record<string, unknown> = {}) {
+  for (const hook of [
+    useV1ConfirmPaymentMock,
+    useV1ConfirmRegistrationMock,
+    useV1CancelRegistrationAdminMock,
+    useV1RejectCancelRequestMock,
+    useV1RosterLockMock,
+    useV1RosterUnlockMock,
+    useV1ExportRosterCsvMock,
+    useV1RosterDeadlineOverrideGrantMock,
+    useV1RosterDeadlineOverrideRevokeMock,
+    useV1UpdatePlayerEligibilityMock,
+    useV1AdminAddPlayerMock,
+    useV1AdminRemovePlayerMock,
+  ] as const) {
+    (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
+  }
+  useV1AdminTournamentPlayersMock.mockReturnValue({
+    data: { players: [], belowMinimum: false },
+    isPending: false,
+    refetch: vi.fn(),
+  } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+  useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+  useV1AdminTournamentRegistrationsMock.mockReturnValue({
+    data: { items, truncated: false },
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...query,
+  } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+}
+
+/** 신청 행의 ⋯ 를 열어 메뉴를 돌려준다. 같은 이름의 팀이 둘이면 첫 번째. */
+function openMenuOf(team: string) {
+  fireEvent.click(screen.getAllByRole('button', { name: `${team} 더보기` })[0]);
+  return screen.getByRole('menu', { name: team });
+}
+
+const menuItem = (menu: HTMLElement, label: string) => within(menu).getByRole('menuitem', { name: new RegExp(`^${label}`) });
+
+describe('RegistrationsTab — 묶음과 상태', () => {
   const mutate = vi.fn();
   const refetch = vi.fn();
-  const items = [
-    baseRegistration({ id: 'reg-alpha', teamName: '합성 A팀' }),
-    baseRegistration({ id: 'reg-beta', teamId: 'team-beta', teamName: '합성 B팀' }),
-  ];
 
-  function arrange(query: Record<string, unknown> = {}) {
-    for (const hook of [useV1ConfirmPaymentMock, useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
-      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
-      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
-      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
+  /** 신청을 바꾸는 mutation 셋은 같은 mutate 하나로 묶어, 어느 길로도 호출되지 않았음을 한 번에 본다. */
+  function arrange(items: V1AdminTournamentRegistration[], query: Record<string, unknown> = {}) {
+    arrangeAll(items, { refetch, ...query });
+    for (const hook of [useV1ConfirmRegistrationMock, useV1ConfirmPaymentMock, useV1CancelRegistrationAdminMock]) {
       (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate, isPending: false });
     }
-    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items, truncated: false }, isPending: false, isError: false, error: null, refetch, ...query } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
   }
 
-  beforeEach(() => { vi.clearAllMocks(); arrange(); });
-  afterEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    arrange([baseRegistration({ id: 'reg-alpha', teamName: '합성 A팀' })]);
+  });
 
-  it('종료·취소된 대회에서는 참가 확정과 대기 버튼을 비활성화한다', () => {
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items: [baseRegistration({ status: 'payment_checking' })] }, isPending: false } as never);
+  it('신청 9개 상태가 처리할 것·확정·대기·취소·작성 중 어디에도 빠지지 않고 한 번씩만 나온다', () => {
+    const statuses = ['submitted', 'awaiting_payment', 'payment_checking', 'paid', 'cancel_requested', 'confirmed', 'waitlisted', 'cancelled', 'draft'] as const;
+    arrange(statuses.map((status) => baseRegistration({ id: `r-${status}`, teamId: `t-${status}`, teamName: `팀-${status}`, status })));
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite tournamentTeamCount={8} showToast={vi.fn()} />);
+
+    expect(screen.getByRole('heading', { name: /처리할 것/ })).toHaveTextContent('5건');
+    expect(screen.getByRole('heading', { name: /확정 팀/ })).toHaveTextContent('1 / 8팀');
+    const waitlistCancelled = screen.getByRole('button', { name: /대기·취소/ });
+    const drafts = screen.getByRole('button', { name: /작성 중/ });
+    expect(waitlistCancelled).toHaveTextContent('2');
+    expect(drafts).toHaveTextContent('작성 중 1');
+    expect(waitlistCancelled).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('팀-waitlisted')).toBeNull();
+
+    fireEvent.click(waitlistCancelled);
+    fireEvent.click(drafts);
+    for (const status of statuses) expect(screen.getAllByText(`팀-${status}`)).toHaveLength(1);
+  });
+
+  it('상태 칩과 처리 대기 배너는 없다 — 처리할 것 머리 한 곳에서만 센다', () => {
+    arrange([baseRegistration({ status: 'payment_checking' }), baseRegistration({ id: 'r2', status: 'cancel_requested' })]);
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    expect(screen.queryByRole('group', { name: '신청 상태 필터' })).toBeNull();
+    expect(screen.queryByText(/처리 대기 중인 신청이/)).toBeNull();
+    expect(screen.getByRole('heading', { name: /처리할 것/ })).toHaveTextContent('2건');
+  });
+
+  it('종료·취소된 대회에서는 확정과 대기로 두기를 비활성화한다', () => {
+    arrange([baseRegistration({ status: 'payment_checking' })]);
     const reason = '종료·취소된 대회에서는 참가 확정·대기 처리를 할 수 없어요.';
     render(<RegistrationsTab tournamentId="tournament-qa" canWrite admissionsBlockedReason={reason} showToast={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent(reason);
-    const confirm = screen.getAllByRole('button', { name: '확정' }).find(button => button.hasAttribute('disabled'))!;
+    const confirm = screen.getByRole('button', { name: '확정' });
     expect(confirm).toBeDisabled();
-    const waitlist = screen.getAllByRole('button', { name: '대기' }).find(button => button.hasAttribute('disabled'));
-    expect(waitlist).toBeDefined();
     fireEvent.click(confirm);
+    const waitlist = menuItem(openMenuOf('테스트 FC'), '대기로 두기');
+    expect(waitlist).toBeDisabled();
+    fireEvent.click(waitlist);
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { tournamentId: 'tournament-qa', canWrite: true, requireCancelReason: false },
-    { tournamentId: 'league-qa', canWrite: true, requireCancelReason: true },
-    { tournamentId: 'tournament-qa', canWrite: false, requireCancelReason: false },
-  ])('전체2→대기0→전체2를 구분하고 실제 공용 props $tournamentId/$canWrite를 유지해요', (props) => {
-    render(<RegistrationsTab {...props} showToast={vi.fn()} />);
-    const filters = within(screen.getByRole('group', { name: '신청 상태 필터' }));
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(filters.getByRole('button', { name: '확정 2' })).toBeInTheDocument();
-    fireEvent.click(filters.getByRole('button', { name: '대기' }));
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
-    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
-    expect(screen.getByText('다른 상태를 선택하거나 전체 신청을 확인해 보세요.')).toBeInTheDocument();
-    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
-    expect(filters.getByRole('button', { name: '대기' })).toHaveAttribute('aria-pressed', 'true');
-    expect(filters.getByRole('button', { name: '확정 2' })).toBeInTheDocument();
-    fireEvent.click(filters.getByRole('button', { name: '전체' }));
-    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(screen.getByText('합성 A팀')).toBeInTheDocument();
-    expect(screen.getByText('합성 B팀')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '명단 검토' })).toHaveLength(2);
-    expect(mutate).not.toHaveBeenCalled();
-  });
-
-  it.each(REGISTRATION_STATUS_FILTERS.filter(({ value }) => value !== 'all'))('$label 빈 결과는 전체 없음 안내를 사용하지 않아요', ({ label }) => {
-    arrange({ data: { items: [], truncated: false } });
-    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    fireEvent.click(within(screen.getByRole('group', { name: '신청 상태 필터' })).getByRole('button', { name: label }));
-    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
-    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
-    expect(mutate).not.toHaveBeenCalled();
-  });
-
-  it('실제 전체0은 전체 빈 안내를 유지하고 상태 필터로 이동할 수 있어요', () => {
-    arrange({ data: { items: [], truncated: false } });
+  it('신청이 하나도 없으면 빈 안내만 보이고 전체 명단 CSV 는 없다', () => {
+    arrange([]);
     render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
     expect(screen.getByText('신청이 없어요')).toBeInTheDocument();
     expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
-    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: '전체 명단 CSV' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /처리할 것/ })).toBeNull();
   });
 
-  it('빠른 연속 상태 변경 후 전체는 원본2건을 유지해요', () => {
+  it('부분 조회는 1,000건 경고와 함께 묶음을 보여요', () => {
+    arrange([baseRegistration()], { data: { items: [baseRegistration()], truncated: true } });
     render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    const filters = within(screen.getByRole('group', { name: '신청 상태 필터' }));
-    for (const name of ['대기', '입금 확인 중', '취소', '대기', '전체']) {
-      fireEvent.click(filters.getByRole('button', { name }));
-    }
-    expect(filters.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(mutate).not.toHaveBeenCalled();
-  });
-
-  it('부분 조회의 선택 상태0은 기존1000건 경고와 함께 보여요', () => {
-    arrange({ data: { items, truncated: true } });
-    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '대기' }));
-    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
     expect(screen.getByText(/신청이 1,000건을 넘어 일부만 불러왔어요/)).toBeInTheDocument();
-    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /확정 팀/ })).toBeInTheDocument();
   });
 
-  it('로딩은 필터 빈 결과로 표시하지 않아요', () => {
-    arrange({ data: undefined, isPending: true });
+  it('로딩은 빈 안내로 표시하지 않아요', () => {
+    arrange([], { data: undefined, isPending: true });
     render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '대기' }));
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
-    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
-    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('신청이 없어요')).toBeNull();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).toBeNull();
   });
 
-  it('API 오류→재조회→정상 빈 결과를 구분하고 선택 상태를 유지해요', () => {
-    arrange({ data: undefined, isError: true, error: new Error('신청 조회 실패') });
+  it('API 오류→다시 시도→정상 목록을 구분해요', () => {
+    arrange([], { data: undefined, isError: true, error: new Error('신청 조회 실패') });
     const view = render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '대기' }));
     expect(screen.getByText('신청 조회 실패')).toBeInTheDocument();
-    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
-    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
     expect(refetch).toHaveBeenCalledTimes(1);
-    arrange();
+
+    arrange([baseRegistration({ teamName: '복구 FC' })]);
     view.rerender(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
-    expect(screen.queryByText('신청 조회 실패')).not.toBeInTheDocument();
-    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '대기' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('신청 조회 실패')).toBeNull();
+    expect(screen.getByText('복구 FC')).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
   });
 });
 
-describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
+describe('RegistrationsTab — 명단 보기 창 안의 잠금과 마감 예외', () => {
   const showToast = vi.fn();
 
   afterEach(() => {
@@ -267,254 +296,121 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
   });
 
   beforeEach(() => {
-    useV1ConfirmPaymentMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ConfirmPayment>>());
-    useV1ConfirmRegistrationMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ConfirmRegistration>>());
-    useV1CancelRegistrationAdminMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1CancelRegistrationAdmin>>());
-    useV1RejectCancelRequestMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RejectCancelRequest>>());
-    useV1RosterLockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterLock>>());
-    useV1RosterUnlockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterUnlock>>());
-    useV1ExportRosterCsvMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ExportRosterCsv>>());
-    useV1AdminTournamentPlayersMock.mockReturnValue({
-      data: { players: [], belowMinimum: false },
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1UpdatePlayerEligibilityMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1UpdatePlayerEligibility>>());
-    useV1AdminAddPlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminAddPlayer>>());
-    useV1AdminRemovePlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminRemovePlayer>>());
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    arrangeAll([baseRegistration()]);
   });
 
-  it('shows "마감 예외 허용" for a confirmed registration with no override, and calls the grant mutation with a success toast', () => {
-    const grantMutate = vi.fn();
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue({
-      mutate: grantMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1RosterDeadlineOverrideGrant>);
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: { items: [baseRegistration({ rosterDeadlineOverrideAt: null })], pageInfo: { nextCursor: null, hasNext: false } },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  function lockedList() {
+    return [baseRegistration({ rosterLockedAt: '2026-08-01T00:00:00.000Z' })];
+  }
 
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-
-    const grantButton = screen.getByRole('button', { name: '마감 예외 허용' });
-    expect(screen.queryByRole('button', { name: '예외 해제' })).not.toBeInTheDocument();
-
-    fireEvent.click(grantButton);
-
-    expect(grantMutate).toHaveBeenCalledWith(
-      'reg-1',
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-
-    const { onSuccess } = grantMutate.mock.calls[0][1];
-    onSuccess();
-    expect(showToast).toHaveBeenCalledWith('명단 제출 마감 예외를 허용했어요.', 'success');
-  });
-
-  // 감사 finding #52: 예외 허용은 잠금과 무관하게 성공하는데, 잠긴 신청은 여전히 명단을
-  // 못 고친다(서버가 잠금 검사를 마감 검사보다 먼저 본다) — 무조건 성공 토스트만 뜨면
-  // 운영자가 "팀이 이제 고칠 수 있다"고 잘못 믿는다.
-  it('grant-override toast warns that the roster is still locked when the target registration is locked', () => {
-    const grantMutate = vi.fn();
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue({
-      mutate: grantMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1RosterDeadlineOverrideGrant>);
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [
-          baseRegistration({ rosterDeadlineOverrideAt: null, rosterLockedAt: '2026-08-01T00:00:00.000Z' }),
-        ],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-
-    fireEvent.click(screen.getByRole('button', { name: '마감 예외 허용' }));
-
-    const { onSuccess } = grantMutate.mock.calls[0][1];
-    onSuccess();
-    expect(showToast).toHaveBeenCalledWith(
-      '명단 제출 마감 예외를 허용했어요. 다만 명단이 아직 잠겨 있어 팀이 수정하려면 잠금 해제도 함께 해야 해요.',
-      'success',
-    );
-  });
-
-  it('shows "예외 해제" for a registration with an active override, and calls the revoke mutation with a success toast', () => {
-    const revokeMutate = vi.fn();
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue({
-      mutate: revokeMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1RosterDeadlineOverrideRevoke>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [baseRegistration({ rosterDeadlineOverrideAt: '2026-08-01T00:00:00.000Z' })],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-
-    const revokeButton = screen.getByRole('button', { name: '예외 해제' });
-    expect(screen.queryByRole('button', { name: '마감 예외 허용' })).not.toBeInTheDocument();
-
-    fireEvent.click(revokeButton);
-
-    expect(revokeMutate).toHaveBeenCalledWith(
-      'reg-1',
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-
-    const { onSuccess } = revokeMutate.mock.calls[0][1];
-    onSuccess();
-    expect(showToast).toHaveBeenCalledWith('예외를 해제했어요.', 'success');
-  });
-
-  // 감사 finding(D-small-ux-consistency #1): rosterLockedAt은 confirmed일 때만 잠기고, 잠긴
-  // 신청이 admin cancel()로 종료돼도 서버(rosterUnlock)에는 status 가드가 없어 잠금 필드가
-  // 그대로 남는다 — 화면이 isLocked만 보면 취소 완료(cancelled)된 신청에도 "잠금 해제"
-  // 버튼이 떠서 어색하다. 잠금이 실제로 의미 있는(명단이 아직 쓰일 수 있는) confirmed·
-  // cancel_requested에서만 노출해야 한다.
-  it('명단 마감이 없으면(리그) 마감 예외 허용을 숨기고, 이미 준 예외의 해제는 남긴다 (MD-QA #202)', () => {
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [
-          baseRegistration({ id: 'reg-plain', teamName: '예외 없음 팀', rosterDeadlineOverrideAt: null }),
-          baseRegistration({ id: 'reg-override', teamName: '예외 받은 팀', rosterDeadlineOverrideAt: '2026-10-01T00:00:00.000Z' }),
-        ],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-
-    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
-
-    expect(screen.queryByRole('button', { name: '마감 예외 허용' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '예외 해제' })).toBeInTheDocument();
-  });
-
-  it('hides "잠금 해제" for a locked-but-cancelled registration, and still shows it while cancel_requested', () => {
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [
-          baseRegistration({
-            id: 'reg-cancelled',
-            status: 'cancelled',
-            rosterLockedAt: '2026-08-01T00:00:00.000Z',
-          }),
-          baseRegistration({
-            id: 'reg-cancel-requested',
-            status: 'cancel_requested',
-            rosterLockedAt: '2026-08-01T00:00:00.000Z',
-          }),
-        ],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-
-    expect(screen.getAllByRole('button', { name: '잠금 해제' })).toHaveLength(1);
-  });
-
-  it('hides every mutation action for read-only admins but keeps roster review and CSV export', () => {
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [
-          baseRegistration({ rosterDeadlineOverrideAt: null }),
-          baseRegistration({ id: 'reg-2', status: 'cancel_requested' }),
-        ],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-
+  it('조회 전용 어드민에게는 변경 버튼이 하나도 없고 명단 보기·CSV·경기별 명단은 남는다', () => {
+    arrangeAll([
+      baseRegistration({ teamName: '확정 FC' }),
+      baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '취소요청 FC', status: 'cancel_requested' }),
+      baseRegistration({ id: 'reg-3', teamId: 'team-3', teamName: '확인 FC', status: 'payment_checking' }),
+    ]);
     render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} />);
 
-    // canWrite=true라면 보였을 mutation 버튼들이 전부 사라져야 한다
-    // ('취소'는 상태 필터 칩과 이름이 겹치므로 모호하지 않은 라벨들로 검증)
-    expect(screen.queryByRole('button', { name: '명단 잠금' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '마감 예외 허용' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '취소 거부(잔류)' })).not.toBeInTheDocument();
-    // 조회성 액션은 유지된다 (RosterModal은 내부에서 canWrite를 별도 게이팅)
-    expect(screen.getAllByRole('button', { name: '명단 검토' })).toHaveLength(2);
+    for (const name of ['명단 잠금', '마감 예외 허용', '취소 처리', '취소 승인', '참가 유지', '골라서 처리', '확정', '입금 확인']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    // 확정 팀 줄 + 처리할 것 두 줄이 모두 「명단 보기」 하나를 가진다.
+    expect(screen.getAllByRole('button', { name: '명단 보기' })).toHaveLength(3);
+
+    const menu = openMenuOf('확정 FC');
+    expect(menuItem(menu, '경기별 명단')).toBeInTheDocument();
+    expect(menuItem(menu, '명단 CSV 받기')).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /^신청 거부/ })).toBeNull();
   });
 
-  // 감사 finding #0: 정원 초과 상태에서 확인 모달이 "대기 명단 처리될 수 있어요"라고 안내해
-  // 놓고 확인 버튼은 항상 decision='confirm'만 보내 서버가 409로 거절했다. 이제 정원 초과
-  // 시에는 버튼 라벨 자체가 "대기로 처리"로 바뀌고, 그 라벨대로 waitlist 결정을 보낸다.
-  it('over-capacity confirm click offers "대기로 처리" and sends decision=waitlist, not confirm', async () => {
+  it('조회 전용이면 명단 보기 창에도 잠금 조작이 없다', () => {
+    arrangeAll(lockedList());
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단 보기' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: /잠금|예외/ })).toBeNull();
+  });
+
+  it('명단 보기 창 안에서 명단을 잠그고, 목록이 다시 오면 같은 창이 잠금 해제로 바뀐다', () => {
+    const lockMutate = vi.fn();
+    useV1RosterLockMock.mockReturnValue({ mutate: lockMutate, isPending: false } as unknown as ReturnType<typeof useV1RosterLock>);
+    const view = render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '명단 보기' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '명단 잠금' }));
+    expect(lockMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
+
+    arrangeAll(lockedList());
+    useV1RosterLockMock.mockReturnValue({ mutate: lockMutate, isPending: false } as unknown as ReturnType<typeof useV1RosterLock>);
+    view.rerender(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: '잠금 해제' })).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '명단 잠금' })).toBeNull();
+    expect(screen.getByText('잠김')).toBeInTheDocument();
+  });
+
+  it('창을 연 신청이 목록에서 사라지면 창이 닫힌다', () => {
+    arrangeAll([baseRegistration(), baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '남는 FC' })]);
+    const view = render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 보기' })[0]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    arrangeAll([baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '남는 FC' })]);
+    view.rerender(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText('남는 FC')).toBeInTheDocument();
+  });
+
+  it('리그(정원·명단 마감 없음)는 팀 수만 말하고 막대가 없으며 창에도 마감 예외 허용이 없다', () => {
+    arrangeAll([baseRegistration()]);
+    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+    expect(screen.getByRole('heading', { name: /확정 팀/ })).toHaveTextContent('1팀');
+    expect(screen.getByRole('heading', { name: /확정 팀/ })).not.toHaveTextContent('/');
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByText('정원이 다 찼어요')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '명단 보기' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: '명단 잠금' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '마감 예외 허용' })).toBeNull();
+  });
+
+  // 정원 초과 상태에서 확인창이 "대기 처리될 수 있어요"라고 안내하고 확인 버튼은 confirm 만 보내 서버가 409 로 거절한 적이 있다.
+  // 정원 초과 시에는 버튼 라벨 자체가 "대기로 처리"로 바뀌고, 그 라벨대로 waitlist 결정을 보낸다.
+  it('정원 초과 확정은 「대기로 처리」를 내고 decision=waitlist 를 보낸다', async () => {
     const confirmMutate = vi.fn();
-    useV1ConfirmRegistrationMock.mockReturnValue({
-      mutate: confirmMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1ConfirmRegistration>);
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: {
-        items: [
-          baseRegistration({ id: 'reg-1', status: 'payment_checking', confirmedAt: null }),
-          // 이미 확정된 1팀 + 정원 1팀 = 이 신청을 확정하면 정원 초과.
-          baseRegistration({ id: 'reg-already-confirmed', status: 'confirmed' }),
-        ],
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+    arrangeAll([
+      baseRegistration({ id: 'reg-1', status: 'payment_checking', confirmedAt: null }),
+      // 이미 확정된 1팀 + 정원 1팀 = 이 신청을 확정하면 정원 초과.
+      baseRegistration({ id: 'reg-already-confirmed', teamId: 'team-2', teamName: '먼저 확정 FC', status: 'confirmed' }),
+    ]);
+    useV1ConfirmRegistrationMock.mockReturnValue({ mutate: confirmMutate, isPending: false } as unknown as ReturnType<typeof useV1ConfirmRegistration>);
 
-    render(
-      <RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite tournamentTeamCount={1} />,
-    );
-
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite tournamentTeamCount={1} />);
     fireEvent.click(screen.getByRole('button', { name: '확정' }));
 
-    // 모달 안내가 정원 초과 사실을 알리고, 확인 액션은 "대기로 처리"로 뜬다(더 이상 "확정"이
-    // 아니다 — 라벨과 실제 동작이 일치해야 한다).
     expect(await screen.findByText(/정원을 초과해 확정할 수 없어요/)).toBeInTheDocument();
-    const waitlistButton = await screen.findByRole('button', { name: '대기로 처리' });
-    fireEvent.click(waitlistButton);
-
+    fireEvent.click(await screen.findByRole('button', { name: '대기로 처리' }));
     await waitFor(() =>
       expect(confirmMutate).toHaveBeenCalledWith(
         { registrationId: 'reg-1', decision: 'waitlist' },
         expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
       ),
+    );
+  });
+
+  it('정원 안이면 확정 확인창이 현재 팀 수를 알리고 decision=confirm 을 보낸다', async () => {
+    const confirmMutate = vi.fn();
+    arrangeAll([baseRegistration({ id: 'reg-1', status: 'paid', confirmedAt: null })]);
+    useV1ConfirmRegistrationMock.mockReturnValue({ mutate: confirmMutate, isPending: false } as unknown as ReturnType<typeof useV1ConfirmRegistration>);
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite tournamentTeamCount={8} />);
+    fireEvent.click(screen.getByRole('button', { name: '확정' }));
+    expect(await screen.findByText('현재 0/8팀 확정 — 이 팀을 확정하면 1/8팀이 돼요.')).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '확정' }));
+    await waitFor(() =>
+      expect(confirmMutate).toHaveBeenCalledWith({ registrationId: 'reg-1', decision: 'confirm' }, expect.anything()),
     );
   });
 });
@@ -535,56 +431,29 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
 
   function arrange(overrides: Partial<V1AdminTournamentRegistration> = {}) {
     const cancelMutate = vi.fn();
-    useV1ConfirmPaymentMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ConfirmPayment>>());
-    useV1ConfirmRegistrationMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ConfirmRegistration>>());
+    const rejectMutate = vi.fn();
+    arrangeAll([baseRegistration(overrides)]);
     useV1CancelRegistrationAdminMock.mockReturnValue({
       mutate: cancelMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useV1CancelRegistrationAdmin>);
-    useV1RejectCancelRequestMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RejectCancelRequest>>());
-    useV1RosterLockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterLock>>());
-    useV1RosterUnlockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterUnlock>>());
-    useV1ExportRosterCsvMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ExportRosterCsv>>());
-    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterDeadlineOverrideGrant>>());
-    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterDeadlineOverrideRevoke>>());
-    useV1AdminTournamentPlayersMock.mockReturnValue({
-      data: { players: [], belowMinimum: false },
+    useV1RejectCancelRequestMock.mockReturnValue({
+      mutate: rejectMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1UpdatePlayerEligibilityMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1UpdatePlayerEligibility>>());
-    useV1AdminAddPlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminAddPlayer>>());
-    useV1AdminRemovePlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminRemovePlayer>>());
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: { items: [baseRegistration(overrides)] },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-    return { cancelMutate };
+    } as unknown as ReturnType<typeof useV1RejectCancelRequest>);
+    return { cancelMutate, rejectMutate };
   }
 
-  /**
-   * 행 액션의 "거부" 버튼. 모달·토스트와 같은 말을 쓴다 — 위쪽 상태 필터 칩의 "취소" 는
-   * **신청 상태 이름**이라 다른 뜻이고, 그래서 이름 충돌도 사라졌다.
-   */
-  function openCancelModal() {
-    // 모달이 열리면 그 안에도 "거부" 가 생긴다 — **열기 전에** 하나뿐일 때 잡는다.
-    const buttons = screen.getAllByRole('button', { name: '거부' });
-    if (buttons.length !== 1) throw new Error(`행 액션 "거부" 가 ${buttons.length}개다`);
-    return buttons[0];
+  /** 행 ⋯ 메뉴의 「신청 거부」 로 사유 창을 연다 — 창의 제출 버튼은 이름이 「거부」 하나다. */
+  function openRejectModal() {
+    fireEvent.click(menuItem(openMenuOf('테스트 FC'), '신청 거부'));
+    return within(screen.getByRole('dialog'));
   }
 
   it('리그: 사유가 비어 있으면 요청을 보내지 않고 이유를 말한다', () => {
     const { cancelMutate } = arrange();
-    render(
-      <RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />,
-    );
-    fireEvent.click(openCancelModal());
-    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
-    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
-    fireEvent.click(submit);
+    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+    fireEvent.click(openRejectModal().getByRole('button', { name: '거부' }));
 
     expect(cancelMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('리그 참가를 거부하려면 사유를 입력해 주세요.');
@@ -592,14 +461,10 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
 
   it('리그: 사유를 적으면 payload 에 실려 나간다 — 이게 없어서 늘 400 이었다', () => {
     const { cancelMutate } = arrange();
-    render(
-      <RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />,
-    );
-    fireEvent.click(openCancelModal());
+    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+    const modal = openRejectModal();
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '정원 초과' } });
-    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
-    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
-    fireEvent.click(submit);
+    fireEvent.click(modal.getByRole('button', { name: '거부' }));
 
     expect(cancelMutate).toHaveBeenCalledWith(
       { registrationId: 'reg-1', reason: '정원 초과' },
@@ -615,10 +480,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
   it('대회: 사유 없이도 보낼 수 있다 — 기존 계약을 바꾸지 않는다', () => {
     const { cancelMutate } = arrange();
     render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-    fireEvent.click(openCancelModal());
-    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
-    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
-    fireEvent.click(submit);
+    fireEvent.click(openRejectModal().getByRole('button', { name: '거부' }));
 
     // 빈 사유는 **키 자체를 빼고** 보낸다 — 서버가 빈 문자열을 어드민 사유로 그대로 저장한다.
     expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
@@ -632,12 +494,28 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
       cancelReason: '선수 부족으로 불참',
     };
 
-    it('취소 요청에는 "거부" 대신 "취소 승인" 액션과 승인 문구가 나온다', () => {
+    /** 「취소 처리」 를 열어 두 선택지 중 하나를 고른다. */
+    function chooseCancelOption(name: '취소 승인' | '참가 유지') {
+      fireEvent.click(screen.getByRole('button', { name: '취소 처리' }));
+      fireEvent.click(screen.getByRole('button', { name }));
+    }
+
+    it('취소 요청에는 「거부」 항목 없이 「취소 처리」 한 버튼만 있고, 눌러야 두 선택지가 나온다', () => {
       arrange(requested);
       render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
 
-      expect(screen.queryByRole('button', { name: '거부' })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+      expect(screen.queryByRole('button', { name: '거부' })).toBeNull();
+      expect(within(openMenuOf('테스트 FC')).queryByRole('menuitem', { name: /^신청 거부/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: '취소 승인' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '취소 처리' }));
+      expect(screen.getByRole('button', { name: '취소 승인' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '참가 유지' })).toBeInTheDocument();
+    });
+
+    it('취소 승인을 고르면 승인 문구와 팀 사유가 든 창이 열린다', () => {
+      arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+      chooseCancelOption('취소 승인');
 
       expect(screen.getByRole('dialog')).toHaveTextContent('참가 취소 요청을 승인할까요?');
       expect(screen.getByRole('dialog')).not.toHaveTextContent('신청을 거부할까요?');
@@ -647,7 +525,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     it('승인은 팀 사유를 건드리지 않고 운영진 사유만 실어 보내며, 결과 문구도 승인이다', () => {
       const { cancelMutate } = arrange(requested);
       render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+      chooseCancelOption('취소 승인');
       fireEvent.change(screen.getByLabelText(/운영진 사유/), { target: { value: '환불 안내함' } });
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소 승인' }));
 
@@ -660,15 +538,85 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     it('리그라도 취소 요청의 승인은 사유 없이 보낼 수 있다 (거부는 여전히 필수)', () => {
       const { cancelMutate } = arrange(requested);
       render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
-      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+      chooseCancelOption('취소 승인');
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소 승인' }));
 
       expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('참가 유지는 확인 창을 거쳐 취소 요청을 거절한다', async () => {
+      const { rejectMutate, cancelMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+      chooseCancelOption('참가 유지');
+
+      const dialog = await screen.findByRole('dialog', { name: '참가 유지' });
+      expect(dialog).toHaveTextContent('취소 요청을 거절하고 이전 상태로 돌릴까요?');
+      fireEvent.click(within(dialog).getByRole('button', { name: '참가 유지하기' }));
+
+      await waitFor(() => expect(rejectMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything()));
+      expect(cancelMutate).not.toHaveBeenCalled();
+      const onSuccess = (rejectMutate.mock.calls[0][1] as { onSuccess: () => void }).onSuccess;
+      act(() => onSuccess());
+      expect(showToast).toHaveBeenCalledWith('참가를 유지했어요.', 'success');
+    });
+
+    it('폰: 취소 처리는 아래 시트에서 고르고 사유를 적어 승인한다 — 따로 뜨는 사유 창이 없다', () => {
+      restoreViewport();
+      restoreViewport = installViewport(390);
+      const { cancelMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '취소 처리' }));
+      const sheet = screen.getByRole('dialog', { name: '테스트 FC 취소 요청' });
+      fireEvent.click(within(sheet).getByRole('radio', { name: '취소 승인' }));
+      fireEvent.change(within(sheet).getByLabelText('운영진 사유 (선택)'), { target: { value: '환불 안내함' } });
+      fireEvent.click(within(sheet).getByRole('button', { name: '취소 승인하기' }));
+
+      expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1', reason: '환불 안내함' }, expect.anything());
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    });
+
+    it('폰: 참가 유지하기는 확인 창 없이 거절을 보내고 시트가 닫힌다', () => {
+      restoreViewport();
+      restoreViewport = installViewport(390);
+      const { rejectMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '취소 처리' }));
+      const sheet = screen.getByRole('dialog', { name: '테스트 FC 취소 요청' });
+      fireEvent.click(within(sheet).getByRole('radio', { name: '참가 유지' }));
+      fireEvent.click(within(sheet).getByRole('button', { name: '참가 유지하기' }));
+
+      expect(rejectMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
+      const { onSuccess } = rejectMutate.mock.calls[0][1] as { onSuccess: () => void };
+      act(() => onSuccess());
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(showToast).toHaveBeenCalledWith('참가를 유지했어요.', 'success');
+    });
+
+    it('폰: 거절이 실패하면 시트 안에 이유를 알림으로 보인다', () => {
+      restoreViewport();
+      restoreViewport = installViewport(390);
+      const { rejectMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '취소 처리' }));
+      const sheet = screen.getByRole('dialog', { name: '테스트 FC 취소 요청' });
+      fireEvent.click(within(sheet).getByRole('radio', { name: '참가 유지' }));
+      fireEvent.click(within(sheet).getByRole('button', { name: '참가 유지하기' }));
+      const { onError } = rejectMutate.mock.calls[0][1] as { onError: (err: unknown) => void };
+      act(() => onError({ displayableMessage: false }));
+
+      expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('참가 유지 처리에 실패했어요.');
     });
   });
 
   describe('처리된 신청의 표시', () => {
+    function expandWaitlistCancelled() {
+      fireEvent.click(screen.getByRole('button', { name: /대기·취소/ }));
+    }
+
     it('팀 사유와 운영진 사유를 따로 보여 주고, 승인과 거부를 다른 상태 이름으로 구분한다', () => {
       arrange({
         status: 'cancelled',
@@ -678,6 +626,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
         cancelOutcome: 'approved',
       });
       const { unmount } = render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+      expandWaitlistCancelled();
       expect(screen.getByText('팀 취소 사유: 선수 부족으로 불참')).toBeInTheDocument();
       expect(screen.getByText('운영진 사유: 환불 안내함')).toBeInTheDocument();
       expect(screen.getByText('취소 승인됨')).toBeInTheDocument();
@@ -685,15 +634,18 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
 
       arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
       render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
+      expandWaitlistCancelled();
       expect(screen.getByText('거부됨')).toBeInTheDocument();
-      expect(screen.queryByText('취소 승인됨')).not.toBeInTheDocument();
+      expect(screen.queryByText('취소 승인됨')).toBeNull();
     });
 
-    it('어드민이 처리하지 않은 취소(결과 없음)는 기존처럼 "취소" 로 남는다', () => {
+    it('어드민이 처리하지 않은 취소(결과 없음)는 기존처럼 「취소됨」 으로 남는다', () => {
       arrange({ status: 'cancelled', cancelOutcome: null });
       render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-      expect(screen.queryByText('취소 승인됨')).not.toBeInTheDocument();
-      expect(screen.queryByText('거부됨')).not.toBeInTheDocument();
+      expandWaitlistCancelled();
+      expect(screen.getByText('취소됨')).toBeInTheDocument();
+      expect(screen.queryByText('취소 승인됨')).toBeNull();
+      expect(screen.queryByText('거부됨')).toBeNull();
     });
   });
 
@@ -706,7 +658,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
   it('팀이 직접 낸 명단에는 자동 확정 표시가 없다', () => {
     arrange({ rosterAutoConfirmedAt: null });
     render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
-    expect(screen.queryByText(/자동 확정/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/자동 확정/)).toBeNull();
   });
 });
 
@@ -715,67 +667,35 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
 
   afterEach(() => vi.clearAllMocks());
 
-  function arrange(items: V1AdminTournamentRegistration[]) {
-    for (const hook of [
-      useV1ConfirmPaymentMock,
-      useV1ConfirmRegistrationMock,
-      useV1CancelRegistrationAdminMock,
-      useV1RejectCancelRequestMock,
-      useV1RosterLockMock,
-      useV1RosterUnlockMock,
-      useV1ExportRosterCsvMock,
-      useV1RosterDeadlineOverrideGrantMock,
-      useV1RosterDeadlineOverrideRevokeMock,
-      useV1UpdatePlayerEligibilityMock,
-      useV1AdminAddPlayerMock,
-      useV1AdminRemovePlayerMock,
-    ] as const) {
-      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
-    }
-    useV1AdminTournamentPlayersMock.mockReturnValue({
-      data: { players: [], belowMinimum: false },
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: { items },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-  }
-
-  it('확정 신청에만 버튼이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 정정 경로를 넘긴다', () => {
-    arrange([
+  it('확정 신청의 ⋯ 에만 항목이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 정정 경로를 넘긴다', () => {
+    arrangeAll([
       baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
       baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
       baseRegistration({ id: 'reg-3', teamId: 'team-3', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null }),
     ]);
     render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
 
-    const toggles = screen.getAllByRole('button', { name: '경기별 명단' });
-    expect(toggles).toHaveLength(2);
-    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
+    expect(within(openMenuOf('대기 FC')).queryByRole('menuitem', { name: /^경기별 명단/ })).toBeNull();
+    expect(screen.queryByTestId('game-rosters-panel')).toBeNull();
 
-    fireEvent.click(toggles[0]);
+    fireEvent.click(menuItem(openMenuOf('성수 FC'), '경기별 명단'));
     const panel = screen.getByTestId('game-rosters-panel');
     expect(panel).toHaveAttribute('data-registration-id', 'reg-1');
     expect(panel).toHaveAttribute('data-correction-href', '/admin/live/league-1/records/corrections');
-    expect(screen.getByRole('button', { name: '경기별 명단 접기' })).toHaveAttribute('aria-expanded', 'true');
+    expect(menuItem(openMenuOf('성수 FC'), '경기별 명단 접기')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+    fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단'));
     expect(screen.getAllByTestId('game-rosters-panel')).toHaveLength(1);
     expect(screen.getByTestId('game-rosters-panel')).toHaveAttribute('data-registration-id', 'reg-2');
 
-    fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
-    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '경기별 명단' })).toHaveLength(2);
+    fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단 접기'));
+    expect(screen.queryByTestId('game-rosters-panel')).toBeNull();
+    expect(menuItem(openMenuOf('마포 FC'), '경기별 명단')).toBeInTheDocument();
   });
 
   describe('저장 전 칸 변경이 있으면 펼침을 닫기 전에 묻는다', () => {
     function arrangeDirty() {
-      arrange([
+      arrangeAll([
         baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
         baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
       ]);
@@ -785,7 +705,7 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
           <a href="/admin/tournaments/tournament-1/bracket">대진 탭</a>
         </>,
       );
-      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
+      fireEvent.click(menuItem(openMenuOf('성수 FC'), '경기별 명단'));
       fireEvent.click(screen.getByRole('button', { name: '칸 바꾸기' }));
     }
 
@@ -793,26 +713,23 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
 
     it('다른 팀을 펼치려 하면 확인창 — "계속 편집"이면 그대로, "버리기"면 넘어간다', async () => {
       arrangeDirty();
-      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단'));
       const dialog = await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' });
       fireEvent.click(within(dialog).getByRole('button', { name: '계속 편집' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
       expect(panelId()).toBe('reg-1');
 
-      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단'));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '버리기' }));
       await waitFor(() => expect(panelId()).toBe('reg-2'));
     });
 
-    it('접기와 펼친 팀을 가리는 상태 필터도 먼저 묻는다', async () => {
+    it('접기도 먼저 묻는다', async () => {
       arrangeDirty();
-      fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
+      fireEvent.click(menuItem(openMenuOf('성수 FC'), '경기별 명단 접기'));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '계속 편집' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
       expect(panelId()).toBe('reg-1');
-
-      fireEvent.click(screen.getByRole('button', { name: /입금 대기/ }));
-      expect(await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' })).toBeInTheDocument();
     });
 
     it('다른 화면으로 가는 링크는 미저장 변경 보호가 막는다', async () => {
@@ -822,64 +739,33 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
     });
 
     it('변경이 없으면 묻지 않고 바로 바꾼다', () => {
-      arrange([
+      arrangeAll([
         baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
         baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
       ]);
       render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
-      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      fireEvent.click(menuItem(openMenuOf('성수 FC'), '경기별 명단'));
+      fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단'));
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(panelId()).toBe('reg-2');
     });
   });
 });
 
-describe('RegistrationsTab — 전체 명단 CSV', () => {
+describe('RegistrationsTab — 명단 CSV', () => {
   const showToast = vi.fn();
 
   afterEach(() => vi.clearAllMocks());
 
-  function arrange(items: V1AdminTournamentRegistration[], mutate = vi.fn()) {
-    for (const hook of [
-      useV1ConfirmPaymentMock,
-      useV1ConfirmRegistrationMock,
-      useV1CancelRegistrationAdminMock,
-      useV1RejectCancelRequestMock,
-      useV1RosterLockMock,
-      useV1RosterUnlockMock,
-      useV1ExportRosterCsvMock,
-      useV1RosterDeadlineOverrideGrantMock,
-      useV1RosterDeadlineOverrideRevokeMock,
-      useV1UpdatePlayerEligibilityMock,
-      useV1AdminAddPlayerMock,
-      useV1AdminRemovePlayerMock,
-    ] as const) {
-      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
-    }
+  it('조회 전용 어드민도 전체 명단을 받는다 — 대회 id 로 한 번 요청하고, 엑셀용 BOM 을 붙여 저장한다', async () => {
+    const mutate = vi.fn((_: undefined, opts: { onSuccess: (res: { filename: string; csv: string }) => void }) =>
+      opts.onSuccess({ filename: 'players_가을컵_all_tourname.csv', csv: 'teamName\n번개팀' }),
+    );
+    arrangeAll([baseRegistration(), baseRegistration({ id: 'reg-2' })]);
     useV1ExportTournamentRosterCsvMock.mockReturnValue({
       mutate,
       isPending: false,
     } as unknown as ReturnType<typeof useV1ExportTournamentRosterCsv>);
-    useV1AdminTournamentPlayersMock.mockReturnValue({
-      data: { players: [], belowMinimum: false },
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: { items },
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
-  }
-
-  it('조회 전용 어드민도 받는다 — 대회 id 로 한 번 요청하고, 엑셀용 BOM 을 붙여 저장한다', async () => {
-    const mutate = vi.fn((_: undefined, opts: { onSuccess: (res: { filename: string; csv: string }) => void }) =>
-      opts.onSuccess({ filename: 'players_가을컵_all_tourname.csv', csv: 'teamName\n번개팀' }),
-    );
-    arrange([baseRegistration(), baseRegistration({ id: 'reg-2' })], mutate);
     let saved: Blob | undefined;
     const createObjectURL = vi.fn((blob: Blob) => {
       saved = blob;
@@ -889,8 +775,6 @@ describe('RegistrationsTab — 전체 명단 CSV', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} />);
-    // 행마다 있는 팀별 CSV 와 별개로, 탭에 하나만 있다.
-    expect(screen.getAllByRole('button', { name: 'CSV' })).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: '전체 명단 CSV' }));
 
     expect(useV1ExportTournamentRosterCsvMock).toHaveBeenCalledWith('tournament-1');
@@ -907,38 +791,31 @@ describe('RegistrationsTab — 전체 명단 CSV', () => {
     click.mockRestore();
   });
 
-  it('신청이 없으면 비활성 — 헤더만 있는 빈 파일을 받지 않게', () => {
-    const mutate = vi.fn();
-    arrange([], mutate);
+  it('팀별 CSV 는 ⋯ 메뉴에서 그 신청 id 로 받고, 실패하면 이유를 알린다', () => {
+    arrangeAll([baseRegistration()]);
+    const rowMutate = vi.fn();
+    useV1ExportRosterCsvMock.mockReturnValue({ mutate: rowMutate, isPending: false } as unknown as ReturnType<typeof useV1ExportRosterCsv>);
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} />);
 
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite rosterDeadlineAt="2099-10-01T00:00:00.000Z" />);
-    const button = screen.getByRole('button', { name: '전체 명단 CSV' });
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(menuItem(openMenuOf('테스트 FC'), '명단 CSV 받기'));
+    expect(useV1ExportRosterCsvMock).toHaveBeenCalledWith('reg-1');
+    expect(rowMutate).toHaveBeenCalledTimes(1);
+    const { onError } = rowMutate.mock.calls[0][1] as { onError: (err: unknown) => void };
+    act(() => onError({ displayableMessage: false }));
+    expect(showToast).toHaveBeenCalledWith('CSV 다운로드에 실패했어요.', 'error');
   });
 });
 
 describe('RegistrationsTab — 신청 행의 팀별 금액', () => {
   it('각 행은 자기 신청의 payment.amount 를 그린다 — 다른 행의 금액이나 현재 참가비가 아니다', () => {
     const pay = (amount: number) => ({ method: 'bank_transfer', status: 'ready', amount }) as unknown as V1AdminTournamentRegistration['payment'];
-    const mutate = vi.fn();
-    for (const hook of [useV1ConfirmPaymentMock, useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
-      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
-      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
-      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
-      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate, isPending: false });
-    }
-    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    const items = [
+    arrangeAll([
       baseRegistration({ id: 'reg-a', teamName: '전 금액 FC', payment: pay(70000) }),
       baseRegistration({ id: 'reg-b', teamId: 'team-b', teamName: '후 금액 FC', payment: pay(80000) }),
-    ];
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items, truncated: false }, isPending: false, isError: false, error: null, refetch: vi.fn() } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+    ]);
     render(<RegistrationsTab tournamentId="league-1" canWrite requireCancelReason showToast={vi.fn()} />);
-    const [rowA, rowB] = screen.getAllByRole('listitem');
-    expect(rowA).toHaveTextContent('전 금액 FC');
+    const rowA = screen.getByText('전 금액 FC').closest('li');
+    const rowB = screen.getByText('후 금액 FC').closest('li');
     expect(rowA).toHaveTextContent('70,000');
     expect(rowA).not.toHaveTextContent('80,000');
     expect(rowB).toHaveTextContent('80,000');
@@ -958,19 +835,8 @@ describe.each([
 
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const hook of [useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
-      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
-      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
-      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
-      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate: vi.fn(), isPending: false });
-    }
+    arrangeAll([baseRegistration({ id: 'reg-wait', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null })]);
     useV1ConfirmPaymentMock.mockReturnValue({ mutate: confirmMutate, mutateAsync: confirmMutateAsync, isPending: false } as never);
-    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
-    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
-    useV1AdminTournamentRegistrationsMock.mockReturnValue({
-      data: { items: [baseRegistration({ id: 'reg-wait', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null })], truncated: false },
-      isPending: false, isError: false, error: null, refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
   });
 
   const renderTab = () => render(<RegistrationsTab tournamentId="tournament-1" canWrite isFreeEntry={isFreeEntry} showToast={showToast} />);
@@ -993,7 +859,7 @@ describe.each([
     confirmMutateAsync.mockResolvedValueOnce(undefined);
     renderTab();
     fireEvent.click(screen.getByRole('checkbox', { name: '대기 FC 일괄 선택' }));
-    fireEvent.click(screen.getByRole('button', { name: `선택 1건 ${noun}` }));
+    fireEvent.click(screen.getByRole('button', { name: `선택한 1팀 ${noun}` }));
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent(`일괄 ${noun}`);
@@ -1009,7 +875,7 @@ describe.each([
     confirmMutateAsync.mockRejectedValueOnce(messagelessError);
     renderTab();
     fireEvent.click(screen.getByRole('checkbox', { name: '대기 FC 일괄 선택' }));
-    fireEvent.click(screen.getByRole('button', { name: `선택 1건 ${noun}` }));
+    fireEvent.click(screen.getByRole('button', { name: `선택한 1팀 ${noun}` }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: noun }));
 
     await waitFor(() => expect(showToast).toHaveBeenCalledWith(`대기 FC ${noun}에 실패했어요.`, 'error'));

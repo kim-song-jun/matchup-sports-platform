@@ -138,7 +138,7 @@ beforeEach(() => {
 async function openRoster(user: ReturnType<typeof userEvent.setup>) {
   const card = (await screen.findByText(registration.teamName ?? '')).closest('li');
   if (!card) throw new Error('실제 신청 카드가 없어요.');
-  await user.click(within(card).getByRole('button', { name: '명단 검토' }));
+  await user.click(within(card).getByRole('button', { name: '명단 보기' }));
   return screen.findByRole('dialog', { name: `명단 검토 — ${registration.teamName}` });
 }
 
@@ -186,7 +186,7 @@ describe('MD-QA #140 실제 대회 셸의 오류·재시도와 명단 요청 수
       expect(await screen.findByText('대회 정보를 다시 조회하지 못했어요.')).toBeInTheDocument();
       expect(tournamentFailures).toBe(2);
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: '명단 검토' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '명단 보기' })).not.toBeInTheDocument();
       expect(client.getQueryData(v1Keys.adminTournament(tournament.id))).toEqual(tournament);
 
       tournamentUnavailable = false;

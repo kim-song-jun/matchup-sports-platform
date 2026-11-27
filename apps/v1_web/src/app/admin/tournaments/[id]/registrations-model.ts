@@ -1,5 +1,5 @@
 import { STATUS_META } from '@/components/admin/admin-status-pill';
-import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
+import { adminRegistrationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1AdminTournamentRegistration, V1TournamentRegistrationStatus } from '@/types/api';
 
 type Registration = V1AdminTournamentRegistration;
@@ -62,18 +62,9 @@ export function isBulkSelectable(reg: Registration): boolean {
   return reg.status === 'awaiting_payment';
 }
 
-const FREE_ENTRY_STATUS_LABEL: Partial<Record<V1TournamentRegistrationStatus, string>> = {
-  awaiting_payment: '신청 작성 중',
-  payment_checking: '신청 확인 중',
-  paid: '신청 완료',
-};
-
 /** `AdminStatusPill` 기본 라벨을 덮어쓸 때만 값이 있다. undefined 면 기본 라벨을 쓴다. */
 export function registrationStatusLabel(reg: Registration, isFreeEntry: boolean): string | undefined {
-  if (reg.status === 'cancelled' && reg.cancelOutcome) return registrationCancelOutcomeLabel(reg.cancelOutcome);
-  // 기본 라벨 「초안」은 대회 초안을 뜻해 신청에는 맞지 않는다.
-  if (reg.status === 'draft') return '임시저장';
-  return isFreeEntry ? FREE_ENTRY_STATUS_LABEL[reg.status] : undefined;
+  return adminRegistrationStatusLabel(reg.status, isFreeEntry, reg.cancelOutcome);
 }
 
 /** 처리할 것 행의 한 줄 설명 — 무료 대회에는 입금 말이 없다. */

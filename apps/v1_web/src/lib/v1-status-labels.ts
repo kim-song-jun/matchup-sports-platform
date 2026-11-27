@@ -473,6 +473,27 @@ export function registrationCancelOutcomeLabel(outcome: V1RegistrationCancelOutc
   return outcome === 'approved' ? '취소 승인됨' : '거부됨';
 }
 
+/** 무료 대회에는 확인할 입금이 없다 — 입금 말이 든 세 상태를 신청 말로 부른다. */
+const FREE_ENTRY_REGISTRATION_LABEL: Partial<Record<V1TournamentRegistrationStatus, string>> = {
+  awaiting_payment: '신청 작성 중',
+  payment_checking: '신청 확인 중',
+  paid: '신청 완료',
+};
+
+/**
+ * 어드민 신청 알약의 라벨 덮어쓰기. `undefined` 면 알약 기본 라벨을 쓴다.
+ * 기본 「초안」은 대회 초안을 뜻해 임시저장 신청에는 맞지 않아 신청 상태 정본의 말을 쓴다.
+ */
+export function adminRegistrationStatusLabel(
+  status: V1TournamentRegistrationStatus,
+  isFreeEntry: boolean,
+  cancelOutcome: V1RegistrationCancelOutcome | null,
+): string | undefined {
+  if (status === 'cancelled' && cancelOutcome) return registrationCancelOutcomeLabel(cancelOutcome);
+  if (status === 'draft') return REGISTRATION_STATUS.draft.label;
+  return isFreeEntry ? FREE_ENTRY_REGISTRATION_LABEL[status] : undefined;
+}
+
 /**
  * 대회·리그 참가 신청 상태 — 내 신청 화면·대회/리그 상세 "우리 팀 참가" 카드·팀 상세 "참가 중인 대회·리그"가
  * 같은 색·말을 쓴다. 배지는 `badgeClass`, 줄 안의 글자는 `textColor`. 모르는 값은 영문 코드 대신 한글로.

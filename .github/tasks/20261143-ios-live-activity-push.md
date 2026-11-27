@@ -1,5 +1,5 @@
 # Task 20261143: PR-D iOS Live Activity push client
-Status: Locally verified; PR/CI pending
+Status: PR #2566 open; local validation passed, CI pending
 
 ## Scope and branch
 - PR-C `7111361bb` → `codex/ios-widget-pr-d`, worktree `/private/tmp/teameet-ios-widget-pr-d`.
@@ -19,7 +19,7 @@ Status: Locally verified; PR/CI pending
 - [x] Request per-activity push token and register/revoke with session fencing and retry.
 - [x] Narrow tests: wire JSON/null/date/logo/expired and persistent deadline + real URLRequest contract/failure.
 - [x] Alpha app+extension and Production unsigned build; sample/system verification separate from alpha/APNs.
-- [ ] Korean ready PR, fixed base + body merge order, blockers documented. No review polling per user.
+- [x] Korean ready PR, fixed base + body merge order, blockers documented. No review polling per user.
 
 ## Ambiguity / dependency log
 - Server API is a draft, server PR not yet linked. No live contract or APNs delivery verification possible before it exists.
@@ -35,3 +35,5 @@ Read handoff end to end. Read applicable .codex API/db rules during scope discov
 - Initial Swift6 compiler private CodingKeys cross-file linkage crash fixed by colocating the Period decoder with its model; test request capture mutable-sendable error fixed using an immutable snapshot. Final runs PASS.
 - No layout changes/new gallery; PR-C system synthetic screenshots remain reference only. No actual alpha/API/APNs call. No server files changed.
 - User requested no review check; do not request/wait for review during PR-D wrap-up.
+
+PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2566 · base codex/ios-widget-pr-c · first line PR-C 머지 후 머지 · ready/non-draft. Native scope14 files, no backend changes. Manual build-only iOS Alpha CI to run on this branch; no review polling/merge.

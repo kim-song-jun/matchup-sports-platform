@@ -32,3 +32,5 @@ Task [20261143](../../.github/tasks/20261143-ios-live-activity-push.md). Parent 
 - [ ] iOS17.2+ push-to-start remains a separate future PR; no such stream or token is registered here.
 
 Cleanup: UI harness는12개 전부 skip하여 서버/앱 조작 없음. 전용 UDID shutdown 완료, 다른 시뮬레이터·Android·서버 상태는 변경하지 않음.
+
+PR [#2566](https://github.com/kim-song-jun/matchup-sports-platform/pull/2566), stacked base codex/ios-widget-pr-c. CI dispatch/결과는 PR 본문·코멘트를 커서로 사용한다. 리뷰 확인·직접 머지는 하지 않는다.

@@ -28,7 +28,8 @@ const server = setupServer(
   http.patch('*/api/v1/admin/league-matches/l1/fixtures/f1', async ({ request }) => {
     const body = await request.json() as { startsAt?: string; fieldId?: string }; patches.push(body);
     if (fail) return HttpResponse.json({ status: 'error', statusCode: 409, code: 'CONFLICT', message: '일정을 다시 확인해 주세요.' }, { status: 409 });
-    fixture = { ...fixture, startAt: body.startsAt ?? fixture.startAt, fieldId: body.fieldId ?? fixture.fieldId }; return ok({ teamMatchId: 'f1' });
+    fixture = { ...fixture, startAt: body.startsAt ?? fixture.startAt, fieldId: body.fieldId ?? fixture.fieldId,
+      ...(body.fieldId === 'court2' ? { placeName: 'B구장' } : {}) }; return ok({ teamMatchId: 'f1' });
   }),
 );
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -59,7 +60,8 @@ describe('league time assignment through the league API', () => {
     fireEvent.change(screen.getByLabelText('등록된 경기장(필드)'), { target: { value: 'court2' } });
     fireEvent.change(screen.getByLabelText('이 구장에 경기 배정'), { target: { value: 'f1' } });
     await waitFor(() => expect(patches).toEqual([{ fieldId: 'court2' }]));
-    expect(fixture.startAt).toBe('2026-11-20T01:00:00.000Z');
+    expect(fixture).toMatchObject({ startAt: '2026-11-20T01:00:00.000Z', fieldId: 'court2', placeName: 'B구장', homeTeamId: 'home', awayTeamId: 'away' });
+    expect(await screen.findByRole('button', { name: /개막전.*B구장/ })).toBeInTheDocument();
   });
   it('opens court editing for the selected real fixture', async () => {
     const { onEditCourt } = show();

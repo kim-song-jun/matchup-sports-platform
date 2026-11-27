@@ -1,0 +1,113 @@
+import type { ReactNode } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import type { GameSide } from '@/types/game-operations';
+
+export interface ConsoleScoreCardProps {
+  readonly sides: readonly GameSide[];
+  readonly scoreBySideId: ReadonlyMap<string, number>;
+  readonly foulCounts: Record<string, number>;
+  readonly foulThreshold: number;
+  /** 「전반 팀 파울」처럼 어느 경기 시간의 숫자인지까지 담은 이름. null 이면 팀 파울을 그리지 않는다. */
+  readonly foulPeriodLabel: string | null;
+  readonly foulResetNote: string | null;
+  readonly stateLabel: string;
+  readonly clock: ReactNode;
+  readonly penaltyChip: ReactNode | null;
+  readonly caption: ReactNode | null;
+  readonly footer: ReactNode | null;
+  readonly stickyClass: string;
+}
+
+/** 콘솔 머리: 점수 · 팀 파울 · 상태 · 시계를 한 장에 모은다. 스크롤해도 화면 위에 붙어 있다. */
+export function ConsoleScoreCard({
+  sides,
+  scoreBySideId,
+  foulCounts,
+  foulThreshold,
+  foulPeriodLabel,
+  foulResetNote,
+  stateLabel,
+  clock,
+  penaltyChip,
+  caption,
+  footer,
+  stickyClass,
+}: ConsoleScoreCardProps) {
+  const [left, right] = sides;
+
+  const teamColumn = (side: GameSide, align: 'start' | 'end') => {
+    const sideWord = side.sideKey === 'HOME' ? '홈' : '원정';
+    const fouls = foulCounts[side.id] ?? 0;
+    const warning = foulPeriodLabel !== null && fouls >= foulThreshold;
+    return (
+      <div
+        role="group"
+        aria-label={`${sideWord} ${side.displayNameSnapshot}`}
+        className={`flex min-w-0 flex-col gap-0.5 ${align === 'end' ? 'items-end text-right' : 'items-start'}`}
+      >
+        <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">{sideWord}</span>
+        {/* 앞머리가 같은 긴 팀 이름도 구별되게 자르지 않고 줄바꿈한다. */}
+        <span
+          className="break-keep text-[length:var(--font-size-body-sm)] font-bold leading-snug text-[var(--text-strong)]"
+          style={{ overflowWrap: 'anywhere' }}
+        >
+          {side.displayNameSnapshot}
+        </span>
+        {foulPeriodLabel !== null ? (
+          <span
+            className={`flex items-center gap-1 whitespace-nowrap text-[length:var(--font-size-caption)] tabular-nums ${
+              warning ? 'font-bold text-[var(--orange700)]' : 'text-[var(--text-body)]'
+            }`}
+          >
+            {warning ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
+            <span>
+              {foulPeriodLabel} {fouls}
+            </span>
+          </span>
+        ) : null}
+        {warning ? (
+          <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--orange700)]">다음부터 10m 프리킥</span>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <header
+      data-console-guide="overview"
+      className={['sticky z-10 border-b border-[var(--border)] bg-[var(--card-surface)] px-4 py-3', stickyClass].join(' ')}
+    >
+      {left === undefined ? (
+        <p className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">경기 콘솔</p>
+      ) : (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          {teamColumn(left, 'start')}
+          <span
+            className="flex items-center gap-2 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
+            aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
+          >
+            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--blue500)]" />
+            {/* 점수는 한 텍스트 노드로 둔다 — 숫자 사이에 요소를 끼우면 읽는 쪽에서 하나의 값으로 잡히지 않는다. */}
+            <span>{sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}</span>
+            {right !== undefined ? (
+              <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--orange500)]" />
+            ) : null}
+          </span>
+          {right !== undefined ? teamColumn(right, 'end') : <span />}
+        </div>
+      )}
+      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border)] pt-2">
+        <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">
+          {stateLabel}
+        </span>
+        {clock}
+        {penaltyChip}
+      </div>
+      {caption !== null ? <div className="mt-2">{caption}</div> : null}
+      {foulResetNote !== null ? (
+        <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{foulResetNote}</p>
+      ) : null}
+      {footer !== null ? <div className="mt-3">{footer}</div> : null}
+    </header>
+  );
+}

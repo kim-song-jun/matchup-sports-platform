@@ -53,6 +53,7 @@ targets:
       - path: Teameet
       - path: WidgetShared
       - path: TeameetWidget/TeameetWidget.swift
+      - path: TeameetWidget/LockWidgetView.swift
     dependencies:
       - target: TeameetWidget
         embed: true

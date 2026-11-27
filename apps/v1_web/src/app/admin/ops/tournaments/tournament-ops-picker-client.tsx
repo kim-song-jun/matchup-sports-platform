@@ -14,8 +14,8 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { fetchOperationsBoardAll } from '@/components/tournament-live/use-operations-board-all';
 import { formatDayLabel, kstDayKey } from '@/components/tournament-live/ops-board-model';
 import type { v1Get } from '@/lib/api-client';
-import type { V1AdminTournamentListPage, V1Tournament } from '@/types/api';
-import type { LeagueStateKey } from '@/lib/v1-status-labels';
+import type { V1AdminTournamentListPage, V1Tournament, V1TournamentStatus } from '@/types/api';
+import { tournamentStatusLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
 
 /** 서버 어드민 대회 목록이 한 번에 줄 수 있는 최대 건수. */
 const PAGE_SIZE = 50;
@@ -59,7 +59,7 @@ async function fetchTournamentPages(get: typeof v1Get, filters: { status?: strin
  * 운영 진입 목록의 한 행 — 대회와 리그가 같은 표에 섞여 나온다.
  *
  * `status` 는 원천의 어휘를 그대로 들고(대회 `in_progress`, 리그 `active`), 알약이 같은 사실을
- * 같은 말로 그린다 — 리그는 `AdminLeagueStatePill`(상태 모델의 "진행 중").
+ * 같은 말로 그린다 — 대회는 `tournamentStatusLabel`, 리그는 `AdminLeagueStatePill`.
  */
 type OpsRow = {
   readonly key: string;
@@ -71,7 +71,7 @@ type OpsRow = {
   /** 지금 경기를 운영할 수 있는 상태인가(초안·종료·취소·보류는 아니다). */
   readonly runnable: boolean;
 } & (
-  | { readonly kind: 'tournament'; readonly status: string }
+  | { readonly kind: 'tournament'; readonly status: V1TournamentStatus }
   | { readonly kind: 'league'; readonly status: LeagueStateKey }
 );
 
@@ -99,8 +99,12 @@ function OpsTable({ rows, empty }: { rows: OpsRow[]; empty: string }) {
       tableMaxWidth="max-w-none"
       actionsHeader="다음 할 일"
       columns={[
-        // head: use tournamentStatusLabel (L1) at integration — 대회 행 알약 라벨은 lib 한 곳에서 와야 한다.
-        { key: 'status', header: '상태', width: 'w-[104px]', render: (row) => (row.kind === 'league' ? <AdminLeagueStatePill state={row.status} /> : <AdminStatusPill status={row.status} />) },
+        {
+          key: 'status',
+          header: '상태',
+          width: 'w-[104px]',
+          render: (row) => (row.kind === 'league' ? <AdminLeagueStatePill state={row.status} /> : <AdminStatusPill status={row.status} label={tournamentStatusLabel(row.status)} />),
+        },
         {
           key: 'title',
           header: '대회·리그',

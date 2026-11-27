@@ -205,6 +205,19 @@ describe('TournamentOpsPickerClient', () => {
     for (const href of targets) expect(href).toBe('/admin/live/l-active/operations');
   });
 
+  it('대회 행 알약은 대회 상태 이름(접수 마감)을 쓰고, 리그 행은 리그 상태 이름 그대로다', async () => {
+    tournamentRows = [...tournamentRows, tournament('t-closed', '여름 풋살컵', 'closed', kst('2027-06-01', '10:00'))];
+    renderPicker();
+    await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' });
+
+    const closedRow = within(allSection()).getAllByText('여름 풋살컵')[0].closest('tr') as HTMLElement;
+    expect(within(closedRow).getByText('접수 마감')).toBeInTheDocument();
+    expect(within(closedRow).queryByText('마감')).not.toBeInTheDocument();
+
+    const leagueRow = within(allSection()).getAllByText('마포 주말 리그')[0].closest('tr') as HTMLElement;
+    expect(within(leagueRow).getByText('시즌 진행 중')).toBeInTheDocument();
+  });
+
   it('오늘 경기가 있는 곳이 하나뿐이고 후보를 다 읽었으면 그 운영 보드를 바로 연다', async () => {
     renderPicker();
 

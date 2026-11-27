@@ -685,3 +685,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 사용자 선택: 목업 형식에 ‘단계별 대회’를 추가하고 기본 구성으로 만든 뒤 세부 설정은 나중에 진행해요.
 - 대상: `/admin/tournaments` 목업 패널 → `staged` 생성 → `/admin/tournaments/:id/bracket` → 단계·진출팀 관리/구성 수정, 시간·구장 배정.
 - 구현/검증 기록: [.github/tasks/20261130-competition-stage-composition.md](../../.github/tasks/20261130-competition-stage-composition.md)의 2026-11-26 후속 절. Alpha after/실제 DB 미검증이며 기존 증거를 재사용하지 않아요.
+
+- 2026-11-27: [iOS 홈 위젯 PR-A](ios-widget-base.md) — Alpha unsigned 앱+확장 컴파일, 단위 8/8, 고정 샘플 7/7. 실제 alpha API·위젯 호스트 검증 대기.

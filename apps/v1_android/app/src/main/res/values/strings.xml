@@ -11,4 +11,11 @@
     <string name="file_chooser_failed">파일 선택기를 열 수 없어요.</string>
     <string name="external_app_unavailable">연결할 앱을 열 수 없어요.</string>
     <string name="exit_confirmation_hint">한 번 더 누르면 종료돼요</string>
+    <string name="widget_description">경기·응답 대기·일정을 한 번에 보는 팀밋 위젯</string>
+    <string name="widget_square_description">경기 중이면 경기, 아니면 응답 대기와 일정을 보여 주는 작은 팀밋 위젯</string>
+    <string name="widget_login_title">팀밋에 로그인해 주세요</string>
+    <string name="widget_login_sub">앱에서 로그인하면 위젯이 채워져요</string>
+    <string name="widget_loading_title">불러오는 중이에요</string>
+    <string name="widget_error_title">지금은 불러올 수 없어요</string>
+    <string name="widget_error_sub">잠시 뒤 다시 시도해요. 눌러서 앱을 열 수 있어요</string>
 </resources>

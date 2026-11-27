@@ -51,7 +51,11 @@ targets:
     platform: iOS
     sources:
       - path: Teameet
+      - path: WidgetShared
+      - path: TeameetWidget/TeameetWidget.swift
     dependencies:
+      - target: TeameetWidget
+        embed: true
       - package: KakaoOpenSDK
         product: KakaoSDKCommon
       - package: KakaoOpenSDK
@@ -140,6 +144,38 @@ targets:
           - kakaokompassauth
           - kakaolink
 
+  TeameetWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TeameetWidget
+      - path: WidgetShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(TEAMEET_WIDGET_BUNDLE_ID)
+        DEVELOPMENT_TEAM: U9J95Q6XD3
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: TeameetWidget/Widget.entitlements
+      configs:
+        Alpha Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Teameet Alpha Widget App Store
+        Production Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Teameet Production Widget App Store
+    info:
+      path: Widget-Info.plist
+      properties:
+        CFBundleDisplayName: 팀밋 홈
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TeameetChannel: $(TEAMEET_CHANNEL)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
   TeameetTests:
     type: bundle.unit-test
     platform: iOS
@@ -158,6 +194,8 @@ targets:
     # while the view controller next to them is not.
     sources:
       - path: TeameetTests
+      - path: WidgetShared
+        excludes: [WidgetLogos.swift]
       - path: Teameet/Navigation
       - path: Teameet/Support/AppConfig.swift
       - path: Teameet/WebShell/WebShellFailurePolicy.swift

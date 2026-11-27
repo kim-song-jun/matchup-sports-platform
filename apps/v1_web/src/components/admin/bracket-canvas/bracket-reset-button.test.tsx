@@ -66,7 +66,8 @@ describe('대진 초기화 실제 HTTP 흐름', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '대진 초기화' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '대진 초기화' }));
     dialog = await screen.findByRole('dialog', { name: '대진 초기화' });
-    expect(within(dialog).getByRole('textbox')).toHaveValue('');
+    // The dialog mounts before its opening effect clears the previous confirmation.
+    await waitFor(() => expect(within(dialog).getByRole('textbox')).toHaveValue(''));
     expect(within(dialog).getByRole('button', { name: '대진 초기화' })).toBeDisabled();
     expect(writes).toEqual([]);
   });

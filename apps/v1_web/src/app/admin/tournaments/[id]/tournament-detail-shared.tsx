@@ -92,8 +92,7 @@ export const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
 /** Returns next allowed statuses from the current one */
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-// 로직이 date-utils formatEntryFee 와 동일해 위임 — 소비 탭들의 import 는 그대로 유지됨.
-export const formatCurrency = formatEntryFee;
+const formatCurrency = formatEntryFee;
 
 export function formatRegistrationPaymentSubtitle(
   payment: V1AdminTournamentRegistration['payment'],
@@ -134,7 +133,7 @@ export function formatGenderQuotaError(details: unknown) {
 // ── Shared input styles ───────────────────────────────────────────────────
 
 /** Non-background portion of the unified h-[44px] submit button. */
-export const submitBtnBaseCls = [
+const submitBtnBaseCls = [
   'inline-flex items-center justify-center gap-2 h-[44px] px-4 rounded-xl',
   'whitespace-nowrap',
   'text-[length:var(--font-size-label)] text-white',

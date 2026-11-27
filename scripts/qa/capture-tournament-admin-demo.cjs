@@ -15,9 +15,10 @@ fs.mkdirSync(output, { recursive: true });
 
 async function runFlow(page) {
   await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대회 정보', exact: true }).click();
-  await page.getByRole('button', { name: '대회 정보 수정', exact: true }).click();
-  await page.getByRole('dialog').getByLabel(/^대회명/).fill('파트너컵 운영 체험');
-  await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기본 수정', exact: true }).click();
+  const basicSheet = page.getByRole('dialog', { name: '기본', exact: true });
+  await basicSheet.getByLabel(/^대회명/).fill('파트너컵 운영 체험');
+  await basicSheet.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByRole('heading', { name: '파트너컵 운영 체험', exact: true }).waitFor();
   await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^신청 관리/ }).click();
   for (const name of ['블루 FC', '오렌지 FS', '그린 FC', '화이트 FS']) {

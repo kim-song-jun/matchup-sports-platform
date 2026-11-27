@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, vi } from 'vitest';
 import { InfoSectionSheet } from '@/app/admin/tournaments/[id]/info-section-sheet';
 import type { InfoSectionDefinition } from '@/app/admin/tournaments/[id]/info-forms/types';
 import { TOURNAMENT_INFO_SECTION_META } from '@/app/admin/tournaments/[id]/info-sections';

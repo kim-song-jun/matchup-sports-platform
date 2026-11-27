@@ -28,7 +28,7 @@
 - 신청 제출은 대회 행 잠금 후 신청을 다시 읽고 `draft`만 처리한다. 실제 쓰기는 `status=draft`와 현재 `updatedAt`을 함께 검증한다. 중복 제출·제출 전 취소 경합은 `409 REGISTRATION_NOT_DRAFT`이며 결제 upsert·약관 기록·알림을 다시 수행하지 않는다. 일반 대회·단계형 대회·정규 리그의 공유 신청 경로에 적용한다.
 - 관리자 `PATCH /api/v1/admin/registrations/:registrationId/confirm`의 새 확정/대기 처리는 잠금 이후 대회가 `completed`/`cancelled`이거나 삭제된 경우 `409 TOURNAMENT_REGISTRATION_CLOSED`다. 이미 목표 상태인 요청의 읽기 전용 `alreadyProcessed` 응답은 유지한다. 환불·취소·기존 명단 관리는 이 새 참가 차단과 별개다.
 - 관리자 대회 상태를 `open`으로 바꿀 때 마감이 현재 시각보다 과거면 `409 REGISTRATION_DEADLINE_PASSED`다. 최초 접수·재개·동일 상태 재요청에 적용하며, 마감 null은 허용한다. 마감 일시를 바꾸고 다시 요청해야 한다.
-- 생성 위저드의 `?draftId=`는 조회 로딩·실패 시 새 생성 폼을 표시하거나 새 POST를 보내지 않는다. 복원은 경기 시간 확인 단계에서 재개한다. 별도 경기 시간 GET이 실패하면 재시도를 제공하고 저장·공개를 차단한다. 서버에 저장된 기본·라운드 시간을 확인하고 기존 초안을 명시 저장한 뒤 공개 확인을 연다. 이전 저장 실패의 미저장 값은 복원하지 않으며 이 사실을 화면에 안내한다. DB 필드·DTO·응답 shape 변경은 없다.
+- `/admin/tournaments/new?draftId=<id>` 형태의 옛 주소는 폼을 그리거나 새 POST 를 보내지 않고 그 대회의 개요(`/admin/tournaments/<id>/overview`)로 이동한다. DB 필드·DTO·응답 shape 변경은 없다.
 
 
 - 대회 create/update DTO의 `sixTeamMode?: boolean`: true는 정원6 + format=knockout만 허용. 기존 대회 기본 false.
@@ -427,7 +427,7 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 일반 대회(`kind=regular_tournament` 및 기존 `kind=null` 행)와 리그 방식 일반 대회
 (`format=league`)는 계속 `teamCount`로 참가팀 정원을 판단한다. `format`으로 두 종류를 구분하지 않는다.
 
-경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
+경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 대회 만들기는 경기 시간을 받지 않고 생성 API 가 종목 기본 피리어드로 만든다. 전·후반 또는 단판(피리어드 1개)으로 고치는 것은 초안 뒤 대회 정보의 경기 시간 편집기이며, 고친 경우에만 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다.
 
 피리어드 설정 저장은 새 설정 버전을 대회(리그)에 연결하면서 **끝나지 않았고 시작 전인 경기**(게임 `SCHEDULED`, 이벤트·결과·시작된 피리어드 없음 — 라인업 제출은 무관)도 같은 버전으로 옮기고 경기 피리어드 행 수를 맞춘다. 옮기는 대상은 피리어드 말고는 현재 설정과 같은 버전을 따르던 경기뿐이다(라인업·결과 규칙이 다른 버전으로 남은 경기는 그대로). 같은 피리어드를 다시 저장하면 버전은 바뀌지 않고(`changed: false`) 예전 버전에 남은 시작 전 경기만 따라온다. 응답 `fixturesRepointed`가 옮긴 경기 수다. 시작했거나 끝난 경기는 만든 때의 피리어드 그대로다. 경기 종료 예정 시각(`endAt`)은 바꾸지 않는다.
 
@@ -442,7 +442,7 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 피리어드 이름: 요청은 시간만 보내고 이름·코드는 서버가 정한다. 전·후반을 하나로 줄이면 `SINGLE_PERIOD`(단일), 단판을 다시 둘로 나누면 `FIRST_HALF`·`SECOND_HALF`(전반·후반)로 저장한다(MD-QA #159). 단판을 세 개 이상으로 나누면 이전 `SINGLE_PERIOD`(단일)를 이어 받지 않고 모든 행을 `PERIOD_N`(N피리어드)으로 새로 정한다. 그 밖에는 같은 순서의 기존 이름을 유지하고, 새로 붙는 피리어드만 `PERIOD_N`(N피리어드)이다.
 
-초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
+초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다.
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
 
@@ -460,7 +460,7 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
 
-생성 마법사의 전체 폼 재시도에는 변경하지 않은 `sportId`도 포함할 수 있다. 동일 종목의 초안 재저장은 정상 저장하며, 실제 종목 변경은 존재 여부 검증 후 처리한다. 종목 ID는 원자적 CAS `updateMany`에 scalar FK로 전달한다(중첩 relation `connect`는 이 연산에서 지원하지 않는다). 전체 폼 재저장도 사용자 지정 피리어드와 최신 버전·감사로그 계약을 유지한다.
+대회 정보 전체 폼 재저장에는 변경하지 않은 `sportId`도 포함할 수 있다. 동일 종목의 초안 재저장은 정상 저장하며, 실제 종목 변경은 존재 여부 검증 후 처리한다. 종목 ID는 원자적 CAS `updateMany`에 scalar FK로 전달한다(중첩 relation `connect`는 이 연산에서 지원하지 않는다). 전체 폼 재저장도 사용자 지정 피리어드와 최신 버전·감사로그 계약을 유지한다.
 
 경기 종료 시각 기본값: 대회·리그 대진을 만들거나 일정을 옮길 때 종료 시각(`endAt`)을 받지 않았으면 **시작 + 그 경기가 쓰는 경기 설정의 정규 시간**(연장 제외 피리어드 합계 — 전·후반이면 둘의 합, 단판이면 그 한 피리어드)으로 채운다. 길이를 아는 경기를 옮기면 기존 길이를 그대로 옮긴다. 피리어드 길이를 모르는 레거시 설정(`{ count }`)이면 지어내지 않고 `null` 로 둔다.
 
@@ -1042,7 +1042,7 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 ## 단계형 대회 구성 (2026-11-09)
 
-기존 생성 형식·데이터는 유지한다. 새 `/admin/tournaments/new-staged` 진입에서만 `stagePlan`을 추가해 생성한다.
+기존 생성 형식·데이터는 유지한다. `/admin/tournaments/new` 에서 진행 방식 「여러 단계」를 고른 경우에만 `stagePlan`(팀 수에 맞춘 기본 예선 구성)을 함께 보낸다. 옛 `/new-staged` 는 `/new?format=staged` 로 이동한다. 단계 구성은 초안 뒤 대진 탭에서 바꾼다.
 DB `format`은 호환용 `league_knockouts`를 사용하며 새 엔진 판정은 `stagePlan != null`이다. 이를 기존 N개 토너먼트로 재해석하지 않는다.
 
 ### 생성·초안 변경

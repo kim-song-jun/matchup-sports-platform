@@ -108,7 +108,7 @@ function AdminTournamentsPageContent() {
               <Plus size={16} aria-hidden="true" />
               대회 만들기
             </Link>
-            <Link href="/admin/tournaments/new-staged" className="tm-btn tm-btn-md tm-btn-neutral">단계형 대회 만들기</Link>
+            <Link href="/admin/league-matches/new" className="tm-btn tm-btn-md tm-btn-neutral">정규 리그 만들기</Link>
             </div>
           ) : undefined
         }

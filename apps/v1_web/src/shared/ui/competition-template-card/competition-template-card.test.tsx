@@ -13,12 +13,4 @@ describe('CompetitionTemplateCard', () => {
     fireEvent.click(choice);
     expect(onChange).toHaveBeenCalledWith('knockout');
   });
-
-  it('separate-route card remains a real link with an understandable accessible name', () => {
-    render(<CompetitionTemplateCard mode="link" href="/admin/league-matches/new" graphic="league-single"
-      title="정규 리그 만들기" description="대회와 별도 화면에서 정규 리그를 만들어요." linkLabel="정규 리그 생성 화면으로 이동" />);
-
-    expect(screen.getByRole('link', { name: /정규 리그 만들기/ })).toHaveAttribute('href', '/admin/league-matches/new');
-    expect(screen.getByText('정규 리그 생성 화면으로 이동 →')).toBeInTheDocument();
-  });
 });

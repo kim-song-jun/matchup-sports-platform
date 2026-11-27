@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useId, type MouseEventHandler, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 
 export type CompetitionTemplateGraphic = 'groups' | 'knockout' | 'knockout-4' | 'knockout-8' | 'knockout-12' | 'knockout-16' | 'league' | 'league-single' | 'league-double';
 
@@ -23,14 +22,7 @@ type RadioCardProps = CardContentProps & {
   onChange: (value: string) => void;
 };
 
-type LinkCardProps = CardContentProps & {
-  mode: 'link';
-  href: string;
-  onClick?: MouseEventHandler<HTMLAnchorElement>;
-  linkLabel?: string;
-};
-
-export type CompetitionTemplateCardProps = RadioCardProps | LinkCardProps;
+export type CompetitionTemplateCardProps = RadioCardProps;
 
 export function CompetitionTemplateGraphicView({ type }: { type: CompetitionTemplateGraphic }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -157,15 +149,6 @@ export function CompetitionTemplateCard(props: CompetitionTemplateCardProps) {
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
   const cardClass = 'flex min-h-[196px] flex-col items-stretch gap-2 rounded-[var(--radius-container)] border bg-[var(--card-surface)] p-4 text-left transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--blue500)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]';
-  if (props.mode === 'link') {
-    return (
-      <Link href={props.href} onClick={props.onClick} aria-labelledby={titleId} aria-describedby={descriptionId}
-        className={`${cardClass} border-[var(--border)] hover:border-[var(--border-strong)]`}>
-        <CardBody {...props} titleId={titleId} descriptionId={descriptionId} />
-        <span className="mt-auto inline-flex min-h-[44px] items-center font-semibold text-[var(--blue600)]">{props.linkLabel ?? '별도 화면에서 만들기'} →</span>
-      </Link>
-    );
-  }
   const radioStateClass = props.disabled
     ? 'cursor-not-allowed border-[var(--border-strong)] bg-[var(--card-surface-muted)]'
     : props.checked

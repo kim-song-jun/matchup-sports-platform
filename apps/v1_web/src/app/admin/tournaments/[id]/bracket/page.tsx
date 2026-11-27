@@ -27,7 +27,7 @@ export default function AdminTournamentBracketPage() {
 }
 
 function BracketPageBody() {
-  const { tournamentId, role, canWrite, showToast } = useTournamentAdmin();
+  const { tournamentId, basePath, role, canWrite, showToast } = useTournamentAdmin();
   const { data: tournament } = useV1AdminTournament(tournamentId);
   const [stageKey, setStageKey] = useState('');
   const [poolKey, setPoolKey] = useState('');
@@ -76,7 +76,7 @@ function BracketPageBody() {
       create={tools.create}
       onCreate={tools.openCreate}
       sixTeamNotice={tournament?.format === 'knockout' && tournament.teamCount === 6 && !tournament.sixTeamMode}
-      infoHref={tournamentInfoHref(tournamentId, 'rules')}
+      infoHref={tournamentInfoHref(tournamentId, 'rules', basePath)}
       listHref={wide && tournament?.format !== 'league_knockouts' ? viewHref('list') : undefined}
     />
   ) : (

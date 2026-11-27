@@ -99,6 +99,35 @@ describe('경기 규칙 섹션 시트 — 저장 순서(경기 시간 → 경기
     ]);
   });
 
+  it('실패가 이어지는 동안 값을 바꿨다가 처음 값으로 돌아와도, 마지막에 적은 값을 다시 보낸다 (25 → 20 → 25)', async () => {
+    const backend = start();
+    const view = await open(backend);
+    const failRules = () => backend.state.failNext('tournament', 400, { message: '거절' });
+    const saveAndFail = async (expectedPeriodPatches: number) => {
+      failRules();
+      view.save();
+      await waitFor(() => expect(backend.state.periodPatches).toHaveLength(expectedPeriodPatches));
+      await waitFor(() => expect(view.inSheet().getByRole('button', { name: '저장' })).toBeEnabled());
+    };
+
+    type(view, '팀 파울 기준', '6');
+    type(view, '전반', '25');
+    await saveAndFail(1);
+    type(view, '전반', '20');
+    await saveAndFail(2);
+    type(view, '전반', '25');
+    view.save();
+    await view.saved();
+
+    expect(backend.state.periodPatches.map((body) => body.periods)).toEqual([
+      [{ durationMinutes: 25 }, { durationMinutes: 20 }],
+      [{ durationMinutes: 20 }, { durationMinutes: 20 }],
+      [{ durationMinutes: 25 }, { durationMinutes: 20 }],
+    ]);
+    expect(backend.state.periods.periods?.map((period) => period.durationMinutes)).toEqual([25, 20]);
+    expect(backend.state.tournament.teamFoulThreshold).toBe(6);
+  });
+
   it('경기 시간이 0 이면 그 칸으로 가고 아무것도 보내지 않는다', async () => {
     const backend = start();
     const view = await open(backend);

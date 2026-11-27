@@ -7,7 +7,7 @@ import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { SIDE_SHEET_DISCARD_CONFIRM, SideSheet } from '@/components/v1-ui/side-sheet';
 import { useTournamentSaveContext } from '@/hooks/use-tournament-save-context';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { runSaveSteps, type SaveStep } from '@/lib/sequential-save';
+import { runSaveSteps, type SavedSteps, type SaveStep } from '@/lib/sequential-save';
 import type { V1Tournament } from '@/types/api';
 import { infoFieldId } from './info-forms/form-kit';
 import type { InfoSectionDefinition, InfoSectionFormHandle } from './info-forms/types';
@@ -43,7 +43,7 @@ export function InfoSectionSheet({
   const [base] = useState(() => initialTournament);
   const saveContext = useTournamentSaveContext(base.id);
   const formRef = useRef<InfoSectionFormHandle>(null);
-  const completedRef = useRef(new Set<string>());
+  const savedStepsRef = useRef<SavedSteps>(new Map());
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -70,8 +70,7 @@ export function InfoSectionSheet({
     }
     setMessage(null);
     setSaving(true);
-    const outcome = await runSaveSteps(built.steps, completedRef.current, failureReason);
-    for (const key of outcome.done) completedRef.current.add(key);
+    const outcome = await runSaveSteps(built.steps, savedStepsRef.current, failureReason);
     setSaving(false);
     if (outcome.status === 'failed') {
       setMessage(outcome.message);

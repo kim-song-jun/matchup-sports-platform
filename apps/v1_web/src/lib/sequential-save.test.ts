@@ -1,66 +1,96 @@
 import { describe, expect, it, vi } from 'vitest';
-import { partialSaveMessage, runSaveSteps, saveStep, type SaveStep } from './sequential-save';
+import { partialSaveMessage, runSaveSteps, saveStep, type SavedSteps } from './sequential-save';
 
-const step = (key: string, label: string, run: () => Promise<void> = async () => {}): SaveStep => ({ key, label, run });
 const reason = () => '사유';
+const ok = async () => {};
+const fresh = (): SavedSteps => new Map();
 
 describe('runSaveSteps', () => {
-  it('runs steps in order', async () => {
+  it('runs steps in order and remembers what each place last saved', async () => {
     const calls: string[] = [];
-    const steps = ['a', 'b', 'c'].map((key) => step(key, key, async () => { calls.push(key); }));
+    const steps = ['a', 'b', 'c'].map((key) => saveStep(key, key, { value: key }, async () => { calls.push(key); }));
+    const saved = fresh();
 
-    const outcome = await runSaveSteps(steps, new Set(), reason);
+    const outcome = await runSaveSteps(steps, saved, reason);
 
     expect(calls).toEqual(['a', 'b', 'c']);
-    expect(outcome).toEqual({ status: 'saved', done: ['a', 'b', 'c'] });
+    expect(outcome).toEqual({ status: 'saved' });
+    expect([...saved.keys()]).toEqual(['a', 'b', 'c']);
   });
 
   it('stops at the first failure and never calls later steps', async () => {
-    const third = vi.fn(async () => {});
+    const third = vi.fn(ok);
     const steps = [
-      step('periods', '경기 시간'),
-      step('rules', '경기 규칙', async () => { throw new Error('boom'); }),
-      step('later', '나중', third),
+      saveStep('periods', '경기 시간', [25, 20], ok),
+      saveStep('rules', '경기 규칙', { teamFoulThreshold: 6 }, async () => { throw new Error('boom'); }),
+      saveStep('later', '나중', {}, third),
     ];
+    const saved = fresh();
 
-    const outcome = await runSaveSteps(steps, new Set(), reason);
+    const outcome = await runSaveSteps(steps, saved, reason);
 
     expect(outcome).toEqual({
       status: 'failed',
-      done: ['periods'],
       failedKey: 'rules',
       message: '경기 시간은 저장됐고, 경기 규칙 저장에 실패했어요. 사유',
     });
     expect(third).not.toHaveBeenCalled();
+    expect([...saved.keys()]).toEqual(['periods']);
   });
 
-  it('skips keys in completed and still lists them in done', async () => {
-    const first = vi.fn(async () => {});
-    const second = vi.fn(async () => {});
-    const steps = [step('periods', '경기 시간', first), step('rules', '경기 규칙', second)];
+  it('a retry skips a step whose content was already saved and sends only the rest', async () => {
+    const saved = fresh();
+    await runSaveSteps(
+      [saveStep('periods', '경기 시간', [25, 20], ok), saveStep('rules', '경기 규칙', { a: 1 }, async () => { throw new Error('boom'); })],
+      saved,
+      reason,
+    );
+    const periodsAgain = vi.fn(ok);
+    const rulesAgain = vi.fn(ok);
 
-    const outcome = await runSaveSteps(steps, new Set(['periods']), reason);
+    const outcome = await runSaveSteps(
+      [saveStep('periods', '경기 시간', [25, 20], periodsAgain), saveStep('rules', '경기 규칙', { a: 1 }, rulesAgain)],
+      saved,
+      reason,
+    );
 
-    expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledTimes(1);
-    expect(outcome).toEqual({ status: 'saved', done: ['periods', 'rules'] });
+    expect(periodsAgain).not.toHaveBeenCalled();
+    expect(rulesAgain).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ status: 'saved' });
   });
 
-  it('a retry that fails again still reports the earlier finished step', async () => {
-    const steps = [step('periods', '경기 시간'), step('rules', '경기 규칙', async () => { throw new Error('again'); })];
+  it('a retry that fails again still says the skipped step is saved', async () => {
+    const saved = fresh();
+    saved.set('periods', JSON.stringify([25, 20]));
 
-    const outcome = await runSaveSteps(steps, new Set(['periods']), reason);
+    const outcome = await runSaveSteps(
+      [saveStep('periods', '경기 시간', [25, 20], ok), saveStep('rules', '경기 규칙', {}, async () => { throw new Error('again'); })],
+      saved,
+      reason,
+    );
 
-    expect(outcome).toMatchObject({ status: 'failed', done: ['periods'], failedKey: 'rules' });
-    expect(outcome.status === 'failed' && outcome.message).toBe('경기 시간은 저장됐고, 경기 규칙 저장에 실패했어요. 사유');
+    expect(outcome).toMatchObject({ status: 'failed', failedKey: 'rules', message: '경기 시간은 저장됐고, 경기 규칙 저장에 실패했어요. 사유' });
+  });
+
+  it('a place whose content changed is sent again — also when it returns to an earlier saved value (A → B → A)', async () => {
+    const saved = fresh();
+    const run = vi.fn(ok);
+    const periods = (minutes: number[]) => saveStep('periods', '경기 시간', minutes, run);
+
+    await runSaveSteps([periods([25, 20])], saved, reason);
+    await runSaveSteps([periods([20, 20])], saved, reason);
+    await runSaveSteps([periods([25, 20])], saved, reason);
+
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(saved.get('periods')).toBe(JSON.stringify([25, 20]));
   });
 
   it('toReason receives the error and the failed step', async () => {
     const error = new Error('boom');
-    const failing = step('rules', '경기 규칙', async () => { throw error; });
+    const failing = saveStep('rules', '경기 규칙', {}, async () => { throw error; });
     const toReason = vi.fn(() => '사유');
 
-    await runSaveSteps([failing], new Set(), toReason);
+    await runSaveSteps([failing], fresh(), toReason);
 
     expect(toReason).toHaveBeenCalledWith(error, failing);
   });
@@ -79,20 +109,5 @@ describe('partialSaveMessage', () => {
 
   it('returns the reason unchanged when nothing was saved', () => {
     expect(partialSaveMessage([], '경기 규칙', '사유')).toBe('사유');
-  });
-});
-
-describe('saveStep', () => {
-  it('같은 이름이라도 보낼 내용이 다르면 key 가 달라, 끝난 단계로 건너뛰지 않는다', async () => {
-    const first = saveStep('periods', '경기 시간', { minutes: [20, 20] }, async () => {});
-    const sameAgain = saveStep('periods', '경기 시간', { minutes: [20, 20] }, vi.fn(async () => {}));
-    const edited = saveStep('periods', '경기 시간', { minutes: [25, 25] }, vi.fn(async () => {}));
-    const completed = new Set([first.key]);
-
-    await runSaveSteps([sameAgain], completed, reason);
-    await runSaveSteps([edited], completed, reason);
-
-    expect(sameAgain.run).not.toHaveBeenCalled();
-    expect(edited.run).toHaveBeenCalledTimes(1);
   });
 });

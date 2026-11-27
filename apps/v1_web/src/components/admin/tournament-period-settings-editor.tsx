@@ -16,7 +16,7 @@ import {
 } from '@/hooks/use-tournament-period-settings';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { onlyDigits } from '@/lib/number-format';
-import { runSaveSteps, saveStep, type SaveStep } from '@/lib/sequential-save';
+import { runSaveSteps, saveStep, type SavedSteps, type SaveStep } from '@/lib/sequential-save';
 import {
   periodLabels,
   switchPeriodCount,
@@ -523,7 +523,7 @@ function PeriodSettingsSheet({
 }) {
   const draft = usePeriodSettingsDraft({ tournamentId, stagePhases: [] });
   const patchPeriods = usePatchPeriods(tournamentId);
-  const completedRef = useRef(new Set<string>());
+  const savedStepsRef = useRef<SavedSteps>(new Map());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
@@ -541,12 +541,11 @@ function PeriodSettingsSheet({
     }
     setMessage(null);
     setSaving(true);
-    const outcome = await runSaveSteps(steps, completedRef.current, (error) =>
+    const outcome = await runSaveSteps(steps, savedStepsRef.current, (error) =>
       extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT'
         ? '다른 곳에서 먼저 저장돼서 이번 저장은 반영되지 않았어요. 입력한 내용은 그대로 두었어요. 다시 저장해 주세요.'
         : extractErrorMessage(error, '경기 시간 저장에 실패했어요.'),
     );
-    for (const key of outcome.done) completedRef.current.add(key);
     setSaving(false);
     if (outcome.status === 'failed') {
       setMessage(outcome.message);

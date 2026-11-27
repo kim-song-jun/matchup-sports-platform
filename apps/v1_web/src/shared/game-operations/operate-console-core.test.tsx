@@ -145,6 +145,8 @@ vi.mock('./lineup-grid', async (importOriginal) => {
 beforeEach(() => {
   testFixtures.sendCommand.mockClear();
   testFixtures.realLineupGrid.current = false;
+  // 쉬는 시간은 기기에 저장된다 — 앞 시험의 타이머가 다음 시험으로 이어지지 않게 비운다.
+  window.localStorage.clear();
 });
 
 // 진행 명령은 응답 제한 시간을 걸 수 있게 abort 신호를 함께 넘긴다.
@@ -2389,21 +2391,53 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
       testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
   });
 
-  it('경기 시작 취소는 기록이 없어도 정확한 문구를 입력해야 전송한다', async () => {
+  it('경기 시작 취소는 ‘취소한다’ 를 정확히 입력해야 확인 버튼이 켜지고 revert-start 에 confirmation 이 실린다', async () => {
+    testFixtures.operations.mockReturnValue(
+      consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents: [goal(1), { ...goal(2), type: 'FOUL' } as GameEventRecord] }),
+    );
     render(<CoreHarness />);
     expect(screen.queryByRole('button', { name: '경기 시작 취소' })).toBeNull();
     fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^경기 시작 취소/ }));
-    const form = screen.getByRole('form', { name: '경기 시작 취소' });
-    const submit = within(form).getByRole('button', { name: '경기 시작 취소 확정' });
+
+    const dialog = await screen.findByRole('dialog', { name: '경기 시작을 취소할까요?' });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(dialog).toHaveTextContent('무효 처리할 경기 기록: 골 1건, 파울 1건. 경기 시계를 초기화하고 시작 전으로 돌아가요.');
+    const submit = within(dialog).getByRole('button', { name: '경기 시작 취소' });
     expect(submit).toBeDisabled();
-    const input = within(form).getByPlaceholderText('취소한다');
-    expect(input).toHaveValue('');
+    const input = within(dialog).getByRole('textbox');
     fireEvent.change(input, { target: { value: '취소한다 ' } });
     expect(submit).toBeDisabled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
+
     fireEvent.change(input, { target: { value: '취소한다' } });
+    expect(submit).toBeEnabled();
     fireEvent.click(submit);
     await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'revert-start',
       expect.objectContaining({ payload: { confirmation: '취소한다' } }), COMMAND_OPTIONS));
+    expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('기록이 없으면 무효 처리할 기록이 없다고 말한다', async () => {
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents: [] }));
+    render(<CoreHarness />);
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^경기 시작 취소/ }));
+
+    expect(await screen.findByRole('dialog', { name: '경기 시작을 취소할까요?' })).toHaveTextContent('무효 처리할 경기 기록: 없음.');
+  });
+
+  it('경기 시작 취소 확인 사이 버전이 바뀌면 보내지 않는다', async () => {
+    const view = render(<CoreHarness />);
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^경기 시작 취소/ }));
+    const dialog = await screen.findByRole('dialog', { name: '경기 시작을 취소할까요?' });
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '취소한다' } });
+
+    // 확인 창이 떠 있는 사이 다른 기록이 커밋돼 버전이 오른다.
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'LIVE' }, liveEvents: [goal(1), goal(2)] }));
+    view.rerender(<CoreHarness />);
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작 취소' }));
+
+    expect(await findConsoleNotice('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.')).toBeInTheDocument();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
   });
 
   it('"경기 종료"를 눌러도 확인 전에는 실행되지 않고, 취소하면 아무 일도 일어나지 않는다', async () => {
@@ -3425,9 +3459,9 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
 
       const sheet = openMoreSheet();
       const labels = labelsOf(sheet);
-      expect(labels[0]).toContain('기록 전체 보기·고치기');
-      expect(labels[0]).toContain('시각 고치기, 기록 취소');
-      expect(labels.slice(1).map((label) => label.replace(/(정규|사유|적은).*$/, ''))).toEqual([
+      expect(labels[0]).toBe('쉬는 시간 재기부상·작전 시간처럼 잠깐 멈출 때');
+      expect(labels[1]).toBe('기록 전체 보기·고치기시각 고치기, 기록 취소');
+      expect(labels.slice(2).map((label) => label.replace(/(정규|사유|적은).*$/, ''))).toEqual([
         '경기 일찍 끝내기', '몰수·중단으로 끝내기', '경기 시작 취소',
       ]);
       expect(within(sheet).getByText('되돌리기 어려운 동작')).toBeInTheDocument();
@@ -3655,5 +3689,196 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(screen.queryByText(/하프타임이에요/)).toBeNull();
       expect(screen.queryByText(/정규 시간이 끝났어요/)).toBeNull();
     });
+  });
+});
+
+describe('OperateConsole — 쉬는 시간', () => {
+  const T0 = '2026-08-07T00:00:00.000Z';
+  const HALFTIME = [
+    { number: 1, state: 'ENDED', startedAt: T0, endedAt: '2026-08-07T00:20:00.000Z' },
+    { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+  ];
+  const FIRST_HALF = [
+    { number: 1, state: 'LIVE', startedAt: T0, endedAt: null },
+    { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+  ];
+  const SECOND_HALF = [
+    { number: 1, state: 'ENDED', startedAt: T0, endedAt: '2026-08-07T00:20:00.000Z' },
+    { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:30:00.000Z', endedAt: null },
+  ];
+
+  function setup(
+    periods: ReadonlyArray<{ number: number; state: string; startedAt: string | null; endedAt: string | null }>,
+    { detailVersion = 2, snapshotVersion = 2, loading = false }: { detailVersion?: number; snapshotVersion?: number; loading?: boolean } = {},
+  ) {
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [] }, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    testFixtures.game.mockReturnValue({
+      data: loading
+        ? undefined
+        : {
+            id: 'game-1', state: 'LIVE', version: detailVersion, lastSequence: 1,
+            periods: periods.map((period) => ({ id: `period-${period.number}`, gameId: 'game-1', pausedTotalMs: 0, pausedAt: null, ...period })),
+            sides: HOME_AWAY_SIDES.map((side) => ({ ...side, teamId: side.sideKey === 'HOME' ? 'team-home' : 'team-away' })),
+            lineups: [],
+            substitutionPolicy: { mode: 'rolling', maxSubstitutions: null },
+          },
+      isLoading: loading, isError: false, refetch: vi.fn(),
+    });
+    testFixtures.operations.mockReturnValue(
+      consoleState({ liveEvents: [], gameSnapshot: loading ? null : { version: snapshotVersion, state: 'LIVE' } }),
+    );
+  }
+
+  const advance = (ms: number) => act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-07T00:20:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('하프타임이 되면 입력 없이 쉬는 시간 10분이 시작되고 1분 추가·쉬는 시간 끝내기가 있다', () => {
+    setup(HALFTIME);
+    render(<CoreHarness />);
+
+    expect(screen.getByRole('button', { name: '쉬는 시간 10분' })).toBeInTheDocument();
+    expect(screen.getByText('10:00 남았어요')).toBeInTheDocument();
+    advance(3_000);
+    expect(screen.getByText('09:57 남았어요')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '1분 추가' }));
+    expect(screen.getByText('10:57 남았어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '쉬는 시간 끝내기' }));
+    expect(screen.queryByText(/남았어요/)).toBeNull();
+    expect(screen.queryByText(/새로고침/)).toBeNull();
+  });
+
+  it('새로고침(재마운트)해도 남은 시간이 이어지고 끝내기한 뒤엔 다시 시작하지 않는다', () => {
+    setup(HALFTIME);
+    const first = render(<CoreHarness />);
+    advance(4 * 60_000);
+    first.unmount();
+
+    setup(HALFTIME);
+    const second = render(<CoreHarness />);
+    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '쉬는 시간 끝내기' }));
+    second.unmount();
+
+    setup(HALFTIME);
+    render(<CoreHarness />);
+    expect(screen.queryByText(/남았어요/)).toBeNull();
+    // 끝낸 뒤에도 더보기에서 다시 잴 수 있다.
+    expect(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ })).toBeInTheDocument();
+  });
+
+  it('경기 정보를 읽는 동안에는 저장된 쉬는 시간을 지우지 않는다', () => {
+    setup(HALFTIME);
+    const first = render(<CoreHarness />);
+    advance(4 * 60_000);
+    first.unmount();
+
+    setup(HALFTIME, { loading: true });
+    const view = render(<CoreHarness />);
+    expect(screen.getByText('불러오는 중이에요…')).toBeInTheDocument();
+    setup(HALFTIME);
+    view.rerender(<CoreHarness />);
+
+    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+  });
+
+  it('하프타임에 늦은 기록으로 상세가 잠깐 뒤처져도 쉬는 시간은 이어진다', () => {
+    setup(HALFTIME);
+    const view = render(<CoreHarness />);
+    advance(4 * 60_000);
+
+    // 늦은 골이 확정돼 소켓 버전이 먼저 오르고, 상세는 아직 옛 버전이다.
+    setup(HALFTIME, { snapshotVersion: 3 });
+    view.rerender(<CoreHarness />);
+    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+
+    setup(HALFTIME, { detailVersion: 3, snapshotVersion: 3 });
+    view.rerender(<CoreHarness />);
+    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+  });
+
+  it('후반 시작하면 카드가 사라진다', () => {
+    setup(HALFTIME);
+    const view = render(<CoreHarness />);
+    expect(screen.getByText('10:00 남았어요')).toBeInTheDocument();
+
+    setup(SECOND_HALF);
+    view.rerender(<CoreHarness />);
+    expect(screen.queryByText(/남았어요/)).toBeNull();
+    expect(screen.queryByText(/쉬는 시간/)).toBeNull();
+  });
+
+  it('쉬는 시간이 끝나면 하프타임 카드는 확인을 누를 때까지 알림으로 남는다', () => {
+    setup(HALFTIME);
+    render(<CoreHarness />);
+    advance(10 * 60_000);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('쉬는 시간이 끝났어요');
+    advance(60_000);
+    expect(screen.getByRole('alert')).toHaveTextContent('쉬는 시간이 끝났어요');
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: '확인' }));
+    expect(screen.queryByText('쉬는 시간이 끝났어요')).toBeNull();
+  });
+
+  it('진행 중에는 쉬는 시간 UI 가 없고 더보기 → 쉬는 시간 재기 → 5분으로 닿는다', () => {
+    setup(FIRST_HALF);
+    render(<CoreHarness />);
+    expect(screen.queryByText(/쉬는 시간/)).toBeNull();
+
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ }));
+    const sheet = screen.getByRole('dialog', { name: '쉬는 시간' });
+    expect(screen.queryByRole('dialog', { name: '더보기' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: '5분' }));
+
+    expect(within(sheet).getByText('05:00 남았어요')).toBeInTheDocument();
+    advance(60_000);
+    expect(within(sheet).getByText('04:00 남았어요')).toBeInTheDocument();
+
+    // 시트를 닫아도 첫 화면에는 쉬는 시간이 나오지 않고, 더보기 항목이 남은 시간을 말한다.
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByText(/남았어요/)).toBeNull();
+    expect(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ })).toHaveTextContent('04:00 남았어요');
+  });
+
+  it('진행 중 끝나면 토스트', () => {
+    setup(FIRST_HALF);
+    render(<CoreHarness />);
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ }));
+    const sheet = screen.getByRole('dialog', { name: '쉬는 시간' });
+    fireEvent.click(within(sheet).getByRole('button', { name: '1분' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByText('쉬는 시간이 끝났어요')).toBeNull();
+
+    advance(60_000);
+
+    expect(screen.getByText('쉬는 시간이 끝났어요')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    // 알린 뒤에는 다시 잴 수 있는 처음 상태로 돌아간다.
+    expect(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ })).toHaveTextContent('부상·작전 시간처럼 잠깐 멈출 때');
+  });
+
+  it('진행 중 시트를 열어 둔 채 끝나면 토스트 대신 시트 안에서 알린다', () => {
+    setup(FIRST_HALF);
+    render(<CoreHarness />);
+    fireEvent.click(within(openMoreSheet()).getByRole('button', { name: /^쉬는 시간 재기/ }));
+    const sheet = screen.getByRole('dialog', { name: '쉬는 시간' });
+    fireEvent.click(within(sheet).getByRole('button', { name: '1분' }));
+
+    advance(60_000);
+
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('쉬는 시간이 끝났어요');
+    expect(screen.getAllByText('쉬는 시간이 끝났어요')).toHaveLength(1);
   });
 });

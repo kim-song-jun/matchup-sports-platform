@@ -21,6 +21,7 @@ export type RestTimerState =
 
 export interface RestTimerApi {
   readonly state: RestTimerState;
+  /** 읽는 순간의 남은 시간. 훅은 매초 다시 그리지 않는다 — 줄어드는 숫자는 `RestTimerCard` 가 스스로 틱을 돈다. */
   readonly remainingMs: number;
   readonly lastMinutes: number;
   start(minutes: number, scope: string): void;
@@ -116,11 +117,13 @@ export function useRestTimer({
   const active = record !== null && !record.dismissed;
   const running = active && nowMs < record.endAtMs;
 
+  // 끝나는 순간에만 다시 그린다 — 이 훅을 쓰는 화면(콘솔 전체)이 초마다 다시 그려지지 않게.
+  const endAtMs = running ? record.endAtMs : null;
   useEffect(() => {
-    if (!running) return;
-    const interval = setInterval(() => setNowMs(Date.now()), 250);
-    return () => clearInterval(interval);
-  }, [running]);
+    if (endAtMs === null) return;
+    const timeout = setTimeout(() => setNowMs(Date.now()), Math.max(0, endAtMs - Date.now()));
+    return () => clearTimeout(timeout);
+  }, [endAtMs]);
 
   const start = useCallback(
     (minutes: number, scope: string) => {
@@ -163,7 +166,9 @@ export function useRestTimer({
 
   return {
     state,
-    remainingMs: running ? Math.max(0, record.endAtMs - nowMs) : 0,
+    get remainingMs() {
+      return endAtMs === null ? 0 : Math.max(0, endAtMs - Date.now());
+    },
     lastMinutes,
     start,
     setLength,
@@ -192,6 +197,13 @@ function PresetChips({ onPick }: { onPick: (minutes: number) => void }) {
 export function RestTimerCard({ api }: { api: RestTimerApi }) {
   const [lengthOpen, setLengthOpen] = useState(false);
   const { state } = api;
+  const [, setTick] = useState(0);
+  const counting = state.kind === 'running';
+  useEffect(() => {
+    if (!counting) return;
+    const interval = setInterval(() => setTick((tick) => tick + 1), 250);
+    return () => clearInterval(interval);
+  }, [counting]);
 
   if (state.kind === 'idle') return null;
 
@@ -213,7 +225,8 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
     );
   }
 
-  const progressPercent = state.totalMs > 0 ? Math.round((1 - api.remainingMs / state.totalMs) * 100) : 0;
+  const remainingMs = Math.max(0, state.endAtMs - Date.now());
+  const progressPercent = state.totalMs > 0 ? Math.round((1 - remainingMs / state.totalMs) * 100) : 0;
   const totalMinutes = Math.round(state.totalMs / 60_000);
   return (
     <section className="flex flex-col gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3">
@@ -236,7 +249,7 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
         />
       ) : null}
       <p className="text-center text-4xl font-black leading-none tabular-nums text-[var(--orange700)]" aria-live="off">
-        {formatRestCountdown(api.remainingMs)} 남았어요
+        {formatRestCountdown(remainingMs)} 남았어요
       </p>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--card-surface)]">
         <div className="h-full rounded-full bg-[var(--orange500)]" style={{ width: `${progressPercent}%` }} />

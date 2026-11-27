@@ -48,6 +48,14 @@ import { AssistPickerSheet } from './assist-picker-sheet';
 import { MatchProgressStrip } from './match-progress-strip';
 import { resultProgressSteps } from '@/lib/match-progress-steps';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import {
+  HALFTIME_REST_SCOPE_PREFIX,
+  MANUAL_REST_SCOPE,
+  RestTimerCard,
+  RestTimerPresets,
+  formatRestCountdown,
+  useRestTimer,
+} from './rest-timer';
 import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-banner';
 import { useEventToast, EventToasts } from './event-toast';
 import { deriveFoulCounts, resolveTeamFoulThreshold } from '@/lib/team-foul-counter';
@@ -387,7 +395,6 @@ export function OperateConsoleCore({
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
-  const [startRevert, setStartRevert] = useState<{ summary: string; version: number; phrase: string } | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
@@ -412,6 +419,7 @@ export function OperateConsoleCore({
   const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [allRecordsOpen, setAllRecordsOpen] = useState(false);
+  const [restSheetOpen, setRestSheetOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
@@ -485,7 +493,6 @@ export function OperateConsoleCore({
       setPendingCommandRetry(null);
       setCommandError(null);
       setCommandPending(false);
-      setStartRevert(null);
     }
     commandCanOperateRef.current = canOperate;
   }, [commandIdentityKey, commandScopeKey, canOperate]);
@@ -1072,6 +1079,37 @@ export function OperateConsoleCore({
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
+
+  // 쉬는 시간은 하프타임이 되면 스스로 시작한다. 범위는 `gameDetailBehind` 로 가리지 않은 원본 상세에서 읽는다 —
+  // 하프타임에 늦은 기록을 넣으면 상세가 잠깐 뒤처지는데, 그때 범위가 사라지면 타이머가 처음부터 다시 돈다.
+  const restHalftimePeriodId =
+    gameState === 'LIVE'
+      ? ((gameDetail.data?.periods ?? []).find((period) => period.state === 'HALFTIME')?.id ?? null)
+      : null;
+  const restHalftimeScope = restHalftimePeriodId === null ? null : `${HALFTIME_REST_SCOPE_PREFIX}${restHalftimePeriodId}`;
+  const rest = useRestTimer({
+    // 경기 정보를 읽는 동안에는 열쇠를 주지 않는다 — 범위를 아직 몰라 저장된 하프타임 타이머를 지워 버린다.
+    storageKey: gameId !== null && gameDetail.data !== undefined ? `teameet.v1.restTimer:${gameId}` : null,
+    autoStart: restHalftimeScope === null ? null : { scope: restHalftimeScope },
+  });
+  const restKind = rest.state.kind;
+  const endRest = rest.end;
+  const previousRestKindRef = useRef(restKind);
+  useEffect(() => {
+    const previous = previousRestKindRef.current;
+    previousRestKindRef.current = restKind;
+    // 하프타임 카드와 열린 시트는 스스로 알린다. 경기 중에 닫아 둔 타이머가 끝났을 때만 토스트로 알린다.
+    if (previous !== 'running' || restKind !== 'finished' || restHalftimeScope !== null || restSheetOpen) return;
+    showToast('쉬는 시간이 끝났어요');
+    endRest();
+  }, [restKind, restHalftimeScope, restSheetOpen, showToast, endRest]);
+  // 더보기 시트가 남은 시간을 보여 주는 동안에만 초마다 다시 그린다.
+  const [, setRestTick] = useState(0);
+  useEffect(() => {
+    if (!moreOpen || restKind !== 'running') return;
+    const interval = setInterval(() => setRestTick((tick) => tick + 1), 1_000);
+    return () => clearInterval(interval);
+  }, [moreOpen, restKind]);
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
   // MD-QA #187: "수정" 시트의 대상. 시각 정정과 기록 취소를 한 시트에서 고른다.
   const [editTarget, setEditTarget] = useState<GameEventRecord | null>(null);
@@ -1526,11 +1564,26 @@ export function OperateConsoleCore({
         for (const event of ops.liveEvents) {
           if (event.type === 'CORRECTION' || event.type === 'TIME_CORRECTION' || reversed.has(event.id)) continue;
           const name = ({ GOAL: '골', OWN_GOAL: '자책골', CARD: '카드', SUBSTITUTION: '교체', FOUL: '파울',
-            PERIOD_START: '피리어드 시작', PERIOD_END: '피리어드 종료', PAUSE: '일시 중지', RESUME: '재개' })[event.type];
+            PERIOD_START: '경기 시간 시작', PERIOD_END: '경기 시간 종료', PAUSE: '일시 중지', RESUME: '재개' })[event.type];
           counts.set(name, (counts.get(name) ?? 0) + 1);
         }
         const summary = [...counts].map(([name, count]) => `${name} ${count}건`).join(', ') || '없음';
-        setStartRevert({ summary, version: gameVersionRef.current, phrase: '' });
+        const versionAtOpen = gameVersionRef.current;
+        const confirmation = '취소한다';
+        const ok = await confirm({
+          title: '경기 시작을 취소할까요?',
+          message: `무효 처리할 경기 기록: ${summary}. 경기 시계를 초기화하고 시작 전으로 돌아가요.`,
+          confirmLabel: '경기 시작 취소',
+          tone: 'danger',
+          confirmationText: confirmation,
+        });
+        if (!ok) return;
+        // 확인 창이 보여 준 기록 요약이 낡았으면 보내지 않는다.
+        if (gameVersionRef.current !== versionAtOpen) {
+          setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.');
+          return;
+        }
+        await handleRunCommand('revert-start', { confirmation }, undefined, confirmedScope);
         return;
       }
       const copy = commandConfirmCopy(command, label, {
@@ -1736,6 +1789,24 @@ export function OperateConsoleCore({
   const endAvailable = availableCommands.includes('end');
   const DANGER_GROUP = '되돌리기 어려운 동작';
   const moreActions: ActionSheetAction[] = [];
+  // 하프타임에는 카드가 화면에 있다. 카드를 끝낸 뒤에는 여기서 다시 잴 수 있다.
+  const restCardVisible = restHalftimeScope !== null && restKind !== 'idle';
+  if (matchInPlay && !restCardVisible) {
+    moreActions.push({
+      key: 'rest-timer',
+      label: '쉬는 시간 재기',
+      description:
+        restKind === 'running'
+          ? `${formatRestCountdown(rest.remainingMs)} 남았어요`
+          : restKind === 'finished'
+            ? '쉬는 시간이 끝났어요'
+            : '부상·작전 시간처럼 잠깐 멈출 때',
+      onSelect: () => {
+        setMoreOpen(false);
+        setRestSheetOpen(true);
+      },
+    });
+  }
   if (matchInPlay) {
     moreActions.push({
       key: 'all-records',
@@ -2143,6 +2214,12 @@ export function OperateConsoleCore({
 
         {commandBar}
 
+        {restCardVisible ? (
+          <div className="px-4">
+            <RestTimerCard api={rest} />
+          </div>
+        ) : null}
+
         {/* 폰·태블릿에서는 최근 기록이 기록 격자 바로 위에 온다. 넓은 화면에서는 오른쪽 열로 간다(아래). */}
         {isDesktop ? null : recordsSection}
 
@@ -2193,26 +2270,20 @@ export function OperateConsoleCore({
           });
         },
       })}
-      {startRevert !== null ? (
-        <BottomSheet open title="경기 시작 취소" onClose={() => setStartRevert(null)}>
-          <form className="flex flex-col gap-3" aria-label="경기 시작 취소" onSubmit={async event => {
-            event.preventDefault();
-            if (startRevert.phrase !== '취소한다' || commandUnavailable) return;
-            if (gameVersionRef.current !== startRevert.version) {
-              setStartRevert(null); setCommandError('경기 기록이 바뀌었어요. 취소할 기록을 다시 확인해 주세요.'); return;
-            }
-            const confirmation = startRevert.phrase;
-            setStartRevert(null);
-            await handleRunCommand('revert-start', { confirmation });
-          }}>
-            <p>무효 처리할 경기 기록: {startRevert.summary}</p>
-            <label className="tm-text-label">경기 시계를 초기화하고 시작 전으로 돌아가려면 ‘취소한다’를 입력해 주세요.
-              <input className="tm-input placeholder:text-[var(--text-muted)]" placeholder="취소한다" autoComplete="off" value={startRevert.phrase}
-                onChange={event => setStartRevert({ ...startRevert, phrase: event.target.value })} />
-            </label>
-            <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setStartRevert(null)}>돌아가기</Button>
-              <Button type="submit" disabled={commandUnavailable || startRevert.phrase !== '취소한다'}>경기 시작 취소 확정</Button></div>
-          </form>
+      {restSheetOpen ? (
+        <BottomSheet open title="쉬는 시간" onClose={() => setRestSheetOpen(false)}>
+          <div className="pb-2">
+            {restKind === 'idle' ? (
+              <RestTimerPresets
+                api={rest}
+                scope={restHalftimeScope ?? MANUAL_REST_SCOPE}
+                // 하프타임에는 고르는 즉시 화면의 카드가 이어받는다.
+                onStarted={restHalftimeScope === null ? undefined : () => setRestSheetOpen(false)}
+              />
+            ) : (
+              <RestTimerCard api={rest} />
+            )}
+          </div>
         </BottomSheet>
       ) : null}
 

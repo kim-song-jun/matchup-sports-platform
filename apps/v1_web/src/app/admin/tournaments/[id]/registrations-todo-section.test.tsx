@@ -255,6 +255,28 @@ describe('RegistrationsTodoSection — 골라서 처리(폰)', () => {
     expect(onBatchConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it('고를 행이 모두 처리돼 고르기 모드가 닫히면, 나중에 새 입금 대기 팀이 와도 저절로 고르기 모드로 돌아가지 않는다', () => {
+    const sectionProps = (rows: V1AdminTournamentRegistration[]) => ({
+      rows,
+      ctx: viewContextFixture(),
+      handlers: handlersFixture(),
+      selectedIds: new Set<string>(),
+      onToggleSelected: vi.fn(),
+      onClearSelected: vi.fn(),
+      onBatchConfirm: vi.fn(),
+    });
+    const view = render(<RegistrationsTodoSection {...sectionProps([awaiting()])} />);
+    fireEvent.click(screen.getByRole('button', { name: '골라서 처리' }));
+    expect(screen.getByRole('button', { name: '그만 고르기' })).toBeInTheDocument();
+
+    view.rerender(<RegistrationsTodoSection {...sectionProps([])} />);
+    view.rerender(<RegistrationsTodoSection {...sectionProps([awaiting({ id: 'n', teamName: '송파' })])} />);
+
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByRole('button', { name: '골라서 처리' })).toBeInTheDocument();
+    expect(within(rowOf('송파')).getByRole('button', { name: '입금 확인' })).toBeInTheDocument();
+  });
+
   it('고를 수 있는 행이 없거나 조회 전용이면 「골라서 처리」가 없다', () => {
     renderSection([checking(), cancelRequested()]);
     expect(screen.queryByRole('button', { name: '골라서 처리' })).toBeNull();

@@ -1002,4 +1002,3 @@ function optionalNumeric(value: string) {
   if (!value.trim()) return null;
   return numeric(value);
 }
-

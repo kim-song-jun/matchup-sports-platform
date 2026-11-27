@@ -2909,6 +2909,11 @@ model V1Tournament {
   /// `yellowAccumulationLimit` 과 독립적으로 켤 수 있다 — 대회마다 "경고 누적만
   /// 본다"거나 "퇴장만 본다"가 다르기 때문이다.
   redCardSuspensionMatches   Int?                        @map("red_card_suspension_matches")
+  /// 팀 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"을 알린다(풋살 팀 누적 파울 경고).
+  /// **null = 기본값(5개).** 출전정지 규정과 달리 소급 위험이 없다 — 화면 안내 기준일 뿐 기록·판정을
+  /// 바꾸지 않아서 기본값을 코드(`DEFAULT_TEAM_FOUL_THRESHOLD`)에 두고 컬럼은 비워 둔다.
+  /// 경기 진행 중에도 바꿀 수 있다(출전정지 규정처럼 첫 경기 뒤에 잠그지 않는다).
+  teamFoulThreshold          Int?                        @map("team_foul_threshold")
   rulesText                  String?                     @map("rules_text")
   refundPolicyText           String?                     @map("refund_policy_text")
   createdByAdminUserId       String?                     @map("created_by_admin_user_id")

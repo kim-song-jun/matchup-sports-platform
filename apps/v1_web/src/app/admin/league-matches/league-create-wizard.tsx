@@ -28,7 +28,8 @@ import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import { LeagueBasicFields, leagueInputClass as inputClass, leagueLabelClass as labelClass } from './league-basic-fields';
 import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import { LeaguePlannedFixtureField, LeagueRosterLimitField, LeagueTeamCapacityField, leagueTeamCapacityError, rosterLimitError, type RosterLimitValue } from './league-settings-fields';
+import { LeaguePlannedFixtureField, LeagueRosterLimitField, LeagueTeamCapacityField, LeagueTeamFoulThresholdField, leagueTeamCapacityError, leagueTeamFoulThresholdError, rosterLimitError, type RosterLimitValue } from './league-settings-fields';
+import { parseTeamFoulThresholdInput } from '@/lib/team-foul-counter';
 import type { V1CreateLeaguePayload } from '@/types/league-match';
 import type { V1TournamentGenderCategory } from '@/types/api';
 
@@ -64,6 +65,8 @@ export interface LeagueCreatePrefill {
   rosterLimit: RosterLimitValue;
   maxTeams: string;
   plannedFixtureCount: string;
+  /** 지난 리그의 팀 파울 기준(개). 빈 문자열·생략 = 기본값(5개). */
+  teamFoulThreshold?: string;
   /** 지난 리그의 피리어드(분). 있으면 만든 직후 새 리그에 저장한다. */
   periodMinutes: string[] | null;
 }
@@ -96,6 +99,8 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
   const [rosterLimit, setRosterLimit] = useState<RosterLimitValue>(prefill?.rosterLimit ?? { unlimited: true, minPlayers: '1', maxPlayers: '20' });
   const [plannedFixtureCount, setPlannedFixtureCount] = useState(prefill?.plannedFixtureCount ?? '');
   const [maxTeams, setMaxTeams] = useState(prefill?.maxTeams ?? '');
+  // 비워 두면 기본값(5개)이다 — 비워 두는 것이 정상 상태라 기본값을 채워 두지 않는다.
+  const [teamFoulThreshold, setTeamFoulThreshold] = useState(prefill?.teamFoulThreshold ?? '');
   // Covers create + period lookup/save so the button stays locked until the whole flow settles.
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
@@ -191,6 +196,8 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
       if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
       if (rosterLimitInvalid) return rosterLimitInvalid;
       if (plannedFixtureCountInvalid) return '총 경기 수는 1~500 사이로 입력해 주세요.';
+      const teamFoulThresholdInvalid = leagueTeamFoulThresholdError(teamFoulThreshold);
+      if (teamFoulThresholdInvalid) return teamFoulThresholdInvalid;
       return null;
     }
     return null;
@@ -232,6 +239,10 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
     maxPlayers: rosterLimit.unlimited ? null : Number(rosterLimit.maxPlayers),
     maxTeams: maxTeams.trim() === '' ? null : Number(maxTeams),
     ...(plannedFixtureCount.trim() !== '' ? { plannedFixtureCount: Number(plannedFixtureCount) } : {}),
+    // 빈칸은 보내지 않는다(= 기본값 5개). 잘못된 값은 단계 검증이 먼저 막는다.
+    ...(typeof parseTeamFoulThresholdInput(teamFoulThreshold) === 'number'
+      ? { teamFoulThreshold: parseTeamFoulThresholdInput(teamFoulThreshold) as number }
+      : {}),
     ...(deadlineIso !== null ? { registrationDeadlineAt: deadlineIso } : {}),
     ...(feeValue !== null ? { entryFee: feeValue } : {}),
     ...(paid ? { bankName: bankName.trim(), bankAccount: bankAccount.trim(), bankHolder: bankHolder.trim() } : {}),
@@ -508,6 +519,12 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
                 </fieldset>
               )}
 
+              <LeagueTeamFoulThresholdField
+                value={teamFoulThreshold}
+                onChange={setTeamFoulThreshold}
+                disabled={locked}
+              />
+
               <div className="tm-on-tint rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
                 순위 규칙: {formatTieBreakRule(LEAGUE_TIE_BREAK_ORDER)} (고정값 — 리그별 변경 미지원)
               </div>
@@ -531,6 +548,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
                 ['팀 명단 인원', rosterLimit.unlimited ? '제한 없음' : `${rosterLimit.minPlayers}~${rosterLimit.maxPlayers}명`],
                 ['총 경기 수', plannedFixtureCount.trim() === '' ? '정하지 않음' : `${plannedFixtureCount}경기`],
                 ['경기 시간', periodMinutes.length === 0 ? '종목 기본값' : periodMinutes.map((value, index) => `${periodNames[index]} ${value}분`).join(' · ')],
+                ['팀 파울 기준', teamFoulThreshold.trim() === '' ? '기본 5개' : `${teamFoulThreshold.trim()}개`],
               ].map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">
                   <dt className="shrink-0 text-[var(--text-muted)] sm:w-28">{label}</dt>

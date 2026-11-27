@@ -42,4 +42,32 @@ export function deriveFoulCounts(events: readonly GameEventRecord[], period: num
   return counts;
 }
 
-export const TEAM_FOUL_WARNING_THRESHOLD = 5;
+/**
+ * 팀 파울 경고 기준(개) — 팀 누적 파울이 이 개수에 이르면 콘솔이 "다음부터 10m 프리킥"을 알린다.
+ * 대회·리그마다 다를 수 있고(`teamFoulThreshold`), 값을 비워 둔 대회·리그와 친선 경기는 기본값을 쓴다.
+ * 서버(`apps/v1_api/src/tournaments/team-foul-threshold.ts`)와 같은 값·같은 범위다.
+ */
+export const DEFAULT_TEAM_FOUL_THRESHOLD = 5;
+export const MIN_TEAM_FOUL_THRESHOLD = 1;
+export const MAX_TEAM_FOUL_THRESHOLD = 20;
+
+/** 서버가 준 값(없거나 범위 밖이면 기본값)을 콘솔이 쓸 개수로 바꾼다. */
+export function resolveTeamFoulThreshold(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return DEFAULT_TEAM_FOUL_THRESHOLD;
+  if (value < MIN_TEAM_FOUL_THRESHOLD || value > MAX_TEAM_FOUL_THRESHOLD) return DEFAULT_TEAM_FOUL_THRESHOLD;
+  return value;
+}
+
+/**
+ * 어드민 입력칸 값을 서버로 보낼 값으로 바꾼다. 빈칸 = null(기본값으로 되돌리기).
+ * 정수가 아니거나 범위 밖이면 `'invalid'` — 호출부가 오류 문구를 보여 준다.
+ */
+export function parseTeamFoulThresholdInput(raw: string): number | null | 'invalid' {
+  const text = raw.trim();
+  if (text === '') return null;
+  if (!/^\d+$/.test(text)) return 'invalid';
+  const value = Number(text);
+  return value >= MIN_TEAM_FOUL_THRESHOLD && value <= MAX_TEAM_FOUL_THRESHOLD ? value : 'invalid';
+}
+
+export const TEAM_FOUL_THRESHOLD_ERROR = `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}부터 ${MAX_TEAM_FOUL_THRESHOLD} 사이의 정수로 입력해 주세요. 비우면 기본 ${DEFAULT_TEAM_FOUL_THRESHOLD}개예요.`;

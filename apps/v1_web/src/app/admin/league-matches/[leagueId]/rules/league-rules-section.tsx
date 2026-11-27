@@ -5,8 +5,9 @@ import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-pe
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
 import { LeagueDisciplineSettings } from '../league-discipline-settings';
+import { LeagueTeamFoulThresholdSettings } from '../league-team-foul-threshold-settings';
 
-/** 경기 규칙 — 피리어드(전·후반 길이)와 출전정지(경고 누적·퇴장) 설정. 리그를 연 뒤 한 번 정해 두는 것들이다. */
+/** 경기 규칙 — 피리어드(전·후반 길이)·출전정지(경고 누적·퇴장)·팀 파울 기준. 앞의 둘은 리그를 연 뒤 한 번 정해 두고, 팀 파울 기준은 진행 중에도 바꿀 수 있다. */
 export default function LeagueRulesSection({ leagueId }: { leagueId: string }) {
   const { data: series } = useV1AdminLeagueMatch(leagueId);
   const canWrite = useAdminCanWrite();
@@ -18,6 +19,7 @@ export default function LeagueRulesSection({ leagueId }: { leagueId: string }) {
     <div className="tm-content-enter">
       <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
       <LeagueDisciplineSettings league={series} canWrite={canWrite} showToast={showToast} />
+      <LeagueTeamFoulThresholdSettings league={series} canWrite={canWrite} showToast={showToast} />
       <AdminToasts toasts={toasts} />
     </div>
   );

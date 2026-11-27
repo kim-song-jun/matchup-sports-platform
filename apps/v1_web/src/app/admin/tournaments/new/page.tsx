@@ -1475,6 +1475,29 @@ function PresentationStep({
         </Field>
       </section>
 
+      {/* 팀 파울 경고 기준 — 출전정지 규정과 달리 비워 두는 것이 정상이다(기본 5개). 화면 안내 기준일 뿐이라
+          대회가 시작된 뒤에도 대회 상세에서 바꿀 수 있다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="team-foul-threshold" label="팀 파울 기준 (개)" error={errors.teamFoulThreshold}>
+          <input
+            id="team-foul-threshold"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.teamFoulThreshold}
+            onChange={(event) => setField('teamFoulThreshold', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 5개"
+            aria-invalid={Boolean(errors.teamFoulThreshold)}
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 비우면 5개예요.
+          </p>
+        </Field>
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="rules-text" label="대회 규정">
           <textarea

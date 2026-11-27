@@ -91,6 +91,8 @@ function createGameService(options: {
     },
     v1CompetitionConfigVersion: { findUnique: jest.fn().mockResolvedValue(null) },
     v1TournamentMatchDetails: { findUnique: jest.fn().mockResolvedValue(null) },
+    // getGame 이 경기가 속한 대회·리그의 팀 파울 경고 기준을 읽는다(`findTournamentOnSurface` → findFirst).
+    v1Tournament: { findFirst: jest.fn().mockResolvedValue({ teamFoulThreshold: 7 }) },
   };
   const prisma = {
     $transaction: jest.fn((callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
@@ -116,6 +118,24 @@ describe('GET /games/:gameId realtime authorization response', () => {
       realtimeAuthorization: { kind: 'staff', subjectVersion: 2 },
     }));
     expect(response).not.toHaveProperty('teamMatch');
+  });
+
+  // 팀 파울 경고 기준 — 소속 대회·리그가 정한 값을 그대로, 비워 둔 대회·리그는 기본값(5)으로 내려준다.
+  it('returns the competition team-foul threshold, defaulting to 5 when the competition left it unset', async () => {
+    const { service, tx } = createGameService();
+    const user = { id: USER_ID } as V1AuthUser;
+
+    expect(await service.getGame(user, GAME_ID)).toEqual(expect.objectContaining({ teamFoulThreshold: 7 }));
+    expect(tx.v1Tournament.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      select: { teamFoulThreshold: true },
+      // 헬퍼가 `where` 를 종류 조건과 함께 `AND` 로 감싼다.
+      where: { AND: expect.arrayContaining([{ id: TOURNAMENT_ID }]) },
+    }));
+
+    // 새 서비스를 만들어 `findUnique` mockResolvedValueOnce 순서를 처음부터 맞춘다.
+    const unset = createGameService();
+    unset.tx.v1Tournament.findFirst.mockResolvedValue({ teamFoulThreshold: null });
+    expect(await unset.service.getGame(user, GAME_ID)).toEqual(expect.objectContaining({ teamFoulThreshold: 5 }));
   });
 
   it('preserves platform-operations bypass as an explicit response state', async () => {

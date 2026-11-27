@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { deriveFoulCounts } from './team-foul-counter';
+import {
+  DEFAULT_TEAM_FOUL_THRESHOLD,
+  deriveFoulCounts,
+  parseTeamFoulThresholdInput,
+  resolveTeamFoulThreshold,
+} from './team-foul-counter';
 import type { GameEventRecord } from '@/types/game-operations';
 
 function foul(id: string, sideId: string, period: number, reversesEventId: string | null = null): GameEventRecord {
@@ -132,5 +137,34 @@ describe('deriveFoulCounts', () => {
       ];
       expect(deriveFoulCounts(events, 1)).toEqual({ 's-home': 2 });
     });
+  });
+});
+
+describe('resolveTeamFoulThreshold', () => {
+  it('서버가 준 값을 그대로 쓰고, 없거나 범위 밖이면 기본값(5)이다', () => {
+    expect(DEFAULT_TEAM_FOUL_THRESHOLD).toBe(5);
+    expect(resolveTeamFoulThreshold(3)).toBe(3);
+    expect(resolveTeamFoulThreshold(20)).toBe(20);
+    expect(resolveTeamFoulThreshold(null)).toBe(5);
+    expect(resolveTeamFoulThreshold(undefined)).toBe(5);
+    expect(resolveTeamFoulThreshold(0)).toBe(5);
+    expect(resolveTeamFoulThreshold(21)).toBe(5);
+    expect(resolveTeamFoulThreshold(2.5)).toBe(5);
+  });
+});
+
+describe('parseTeamFoulThresholdInput', () => {
+  it('빈칸은 null(기본값으로 되돌리기), 1~20 정수는 그 값이다', () => {
+    expect(parseTeamFoulThresholdInput('')).toBeNull();
+    expect(parseTeamFoulThresholdInput('   ')).toBeNull();
+    expect(parseTeamFoulThresholdInput('1')).toBe(1);
+    expect(parseTeamFoulThresholdInput(' 7 ')).toBe(7);
+    expect(parseTeamFoulThresholdInput('20')).toBe(20);
+  });
+
+  it('0·21 이상·소수·음수·글자는 invalid 다', () => {
+    for (const raw of ['0', '21', '3.5', '-1', 'abc', '5개', '1e1']) {
+      expect(parseTeamFoulThresholdInput(raw)).toBe('invalid');
+    }
   });
 });

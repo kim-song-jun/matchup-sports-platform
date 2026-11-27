@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
+import { parseTeamFoulThresholdInput, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
 import type { V1SixTeamCriterion, V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory, V1TournamentTieBreakOrder } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
@@ -128,6 +129,7 @@ export function TournamentInfoSection() {
   // 카드 정지 규정 — 빈 문자열 = 미적용. 생성 폼과 같은 표현을 쓴다.
   const [editYellowLimit, setEditYellowLimit] = useState('');
   const [editRedSuspension, setEditRedSuspension] = useState('');
+  const [editTeamFoulThreshold, setEditTeamFoulThreshold] = useState('');
   const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoHomeEnabled, setPromoHomeEnabled] = useState(false);
@@ -208,6 +210,11 @@ export function TournamentInfoSection() {
       tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
         ? ''
         : String(tournament.redCardSuspensionMatches),
+    );
+    setEditTeamFoulThreshold(
+      tournament.teamFoulThreshold === null || tournament.teamFoulThreshold === undefined
+        ? ''
+        : String(tournament.teamFoulThreshold),
     );
     setEditRefundPolicyText(tournament.refundPolicyText ?? '');
     setEditOpen(true);
@@ -423,6 +430,16 @@ export function TournamentInfoSection() {
     }
     if (normalizedRedSuspension !== (tournament.redCardSuspensionMatches ?? null)) {
       payload.redCardSuspensionMatches = normalizedRedSuspension;
+    }
+    // 팀 파울 경고 기준 — 비우면 null(기본값 5개로 되돌리기)을 명시적으로 보낸다. 출전정지 규정과 달리
+    // 대회가 진행 중이어도 바꿀 수 있다(화면 안내 기준일 뿐 기록·판정을 소급해서 바꾸지 않는다).
+    const normalizedTeamFoulThreshold = parseTeamFoulThresholdInput(editTeamFoulThreshold);
+    if (normalizedTeamFoulThreshold === 'invalid') {
+      showToast(TEAM_FOUL_THRESHOLD_ERROR, 'error');
+      return;
+    }
+    if (normalizedTeamFoulThreshold !== (tournament.teamFoulThreshold ?? null)) {
+      payload.teamFoulThreshold = normalizedTeamFoulThreshold;
     }
     if (normalizedRefundPolicyText !== tournament.refundPolicyText) {
       payload.refundPolicyText = normalizedRefundPolicyText;
@@ -1202,6 +1219,28 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
+          </div>
+
+          {/* 팀 파울 경고 기준. 비우면 기본 5개 — 출전정지 규정과 달리 대회가 진행 중이어도 바꿀 수 있다. */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="edit-team-foul-threshold" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
+              팀 파울 기준 (개)
+            </label>
+            <input
+              id="edit-team-foul-threshold"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={20}
+              value={editTeamFoulThreshold}
+              onChange={(e) => setEditTeamFoulThreshold(e.target.value)}
+              disabled={updateTournament.isPending}
+              placeholder="비우면 5개"
+              className={inputCls}
+            />
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 경기 진행 중에도 바꿀 수 있고, 비우면 5개예요.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">

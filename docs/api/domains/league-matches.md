@@ -368,6 +368,7 @@ Optional roster, participant capacity and plan fields:
   `409 TOURNAMENT_CAPACITY_FULL` and the transaction is rolled back.
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
+- `teamFoulThreshold` (1–20, optional): team-foul warning count — the operator console shows "다음부터 10m 프리킥" once a team's fouls in a period reach it. Omitted or `null` = default 5 (the column stays `NULL`). Editable later with `PATCH /admin/league-matches/:leagueId` and returned by the admin detail (`null` = default).
 - `registrationDeadlineAt` (ISO, optional): stored for open-registration; a past value returns
   `422 LEAGUE_REGISTRATION_DEADLINE_PAST`. Creating does not open registration.
 - `entryFee` (integer 0–100,000,000, optional) with `bankName` / `bankAccount` / `bankHolder`
@@ -696,6 +697,7 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 
 - 대진 재생성은 교체한 모든 옛 대진(기존 취소 대진 포함)의 `deletedAt`을 설정한다. Game·결과·감사 기록은 보존하고 현재 목록·주차·경기 수에서 제외한다. 확정 결과가 있으면 기존 409 계약대로 재생성을 거부한다.
 - `PATCH /admin/league-matches/:leagueId`의 `yellowAccumulationLimit`, `redCardSuspensionMatches`는 리그 상세에서 설정한다. 1~20 정수, `null`은 미적용이며 LIVE·PAUSED·ENDED 경기가 있으면 `LEAGUE_DISCIPLINE_LOCKED`다.
+- 같은 `PATCH /admin/league-matches/:leagueId`가 `teamFoulThreshold`(1~20 정수, `null` = 기본값 5로 되돌리기)도 받는다. 생략한 키는 유지한다. **이 값은 `LEAGUE_DISCIPLINE_LOCKED`로 잠기지 않는다** — 잠금은 `yellowAccumulationLimit`·`redCardSuspensionMatches`를 바꾸는 요청에만 걸리고, 팀 파울 기준은 화면 안내일 뿐 이미 치른 경기를 소급하지 않아 리그 진행 중에도 바꿀 수 있다. 응답에 `teamFoulThreshold`가 포함된다.
 - 빈 확정 명단의 자동 채움은 활성 팀 멤버십 등번호를 참가 명단에 함께 저장한다. 번호를 임의로 생성하거나 기존 참가 명단을 백필하지 않는다.
 - 결과 미입력 리마인더에 두 팀 이름을 표시하고 해당 경기 결과 검토로 연결한다. 단일 경기 취소 알림도 두 팀 이름을 표시한다.
 

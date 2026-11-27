@@ -56,7 +56,7 @@ import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-
 import { useEventToast, EventToasts } from './event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
-import { deriveFoulCounts } from '@/lib/team-foul-counter';
+import { deriveFoulCounts, resolveTeamFoulThreshold } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, deriveSentOffRedCards, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from './team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
@@ -2176,6 +2176,7 @@ export function OperateConsoleCore({
           period={periodForDisplay?.number ?? 1}
           periodCount={periodCount}
           hasNextPeriod={foulPeriodHasNext}
+          threshold={resolveTeamFoulThreshold(gameDetail.data?.teamFoulThreshold)}
         />
       )}
 

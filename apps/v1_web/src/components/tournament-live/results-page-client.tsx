@@ -20,7 +20,7 @@ import { resolveTournamentLiveBase, resultsHref } from '@/lib/tournament-live-ro
 import { ResultFixtureList, type ResultListItem } from './result-fixture-list';
 import { ResultPanel } from './result-panel';
 
-/** 끝난 경기의 결과를 확정하거나 고치는 한 화면. 옛 결과 검토·결과 정정 화면을 합쳤다. */
+/** 끝난 경기의 결과를 확정하거나 고치는 한 화면. */
 export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const pathname = usePathname();
   const liveBase = resolveTournamentLiveBase(pathname, tournamentId);

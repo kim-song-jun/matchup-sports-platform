@@ -127,7 +127,7 @@ function OpsTable({ rows, empty }: { rows: OpsRow[]; empty: string }) {
         },
         {
           key: 'schedule',
-          header: '첫 경기',
+          header: '시작 일정',
           width: 'w-[168px]',
           render: (row) => <span className="whitespace-nowrap text-[var(--text-muted)]">{row.startsAt ? formatAdminKstDateTime(row.startsAt) : '미정'}</span>,
         },
@@ -237,9 +237,11 @@ export function TournamentOpsPickerClient() {
   const listFailed = listFailedQuery !== undefined || leagues.isError;
   const recentTruncated = tournamentData[0]?.more === true;
 
-  const candidatesAll = baseRows.filter(
-    (row) => row.runnable && (row.kind === 'tournament' && row.status === 'in_progress' ? true : coversToday(row.startsAt, row.endsAt, todayKey)),
-  );
+  // 기간이 오늘을 덮는 곳을 먼저 세워 8곳 상한에서 오래전에 끝난 진행 중 대회에 밀리지 않게 한다(같은 쪽 안의 순서는 그대로).
+  const coversTodayRow = (row: OpsRow) => coversToday(row.startsAt, row.endsAt, todayKey);
+  const candidatesAll = baseRows
+    .filter((row) => row.runnable && (row.kind === 'tournament' && row.status === 'in_progress' ? true : coversTodayRow(row)))
+    .sort((left, right) => Number(coversTodayRow(right)) - Number(coversTodayRow(left)));
   const candidates = candidatesAll.slice(0, MAX_TODAY_CANDIDATES);
   const candidatesTruncated = candidatesAll.length > MAX_TODAY_CANDIDATES;
   const boards = useQueries({
@@ -247,6 +249,8 @@ export function TournamentOpsPickerClient() {
       // 운영 보드가 읽는 키와 같아 고르기 화면에서 읽은 것이 보드 첫 화면에도 쓰인다.
       queryKey: [...v1Keys.tournamentOperationsBoardAll(row.id), 'all'] as const,
       queryFn: () => fetchOperationsBoardAll(v1Get, row.id),
+      // 목록이 하나씩 도착할 때마다 후보가 바뀌므로 다 도착한 뒤에 읽는다.
+      enabled: listsSettled,
       retry: false,
       staleTime: 30_000,
     })),
@@ -338,7 +342,12 @@ export function TournamentOpsPickerClient() {
             최근 {PAGE_SIZE}건과 진행 중·접수 중 대회를 보여요. 더 오래된 대회는 이름으로 찾아 주세요.
           </p>
         ) : null}
-        {listsSettled ? <OpsTable rows={shownAll} empty="찾는 대회·리그가 없어요" /> : <AdminListSkeleton rows={5} />}
+        {serverNeedle !== '' && searched.isError ? (
+          <p role="alert" className="text-[length:var(--font-size-label)] text-[var(--orange700)]">
+            이름 검색을 마치지 못했어요. 지금 보이는 목록 안에서만 찾았어요.
+          </p>
+        ) : null}
+        {listsSettled ? <OpsTable rows={shownAll} empty={serverNeedle !== '' && searched.isFetching ? '이름으로 찾는 중이에요' : '찾는 대회·리그가 없어요'} /> : <AdminListSkeleton rows={5} />}
       </section>
     </div>
   );

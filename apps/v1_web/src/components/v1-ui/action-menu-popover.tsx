@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { ActionLabel, type ActionSheetAction } from './action-sheet';
-import { FOCUSABLE_SELECTOR } from './use-modal-a11y';
 import { useTopmostEscape } from './use-topmost-escape';
 
 const MARGIN = 16;
@@ -33,6 +32,8 @@ interface ActionMenuPopoverProps {
   readonly align: 'start' | 'end';
   /** 트리거를 감싼 요소 — 위치 기준이자 포커스를 돌려줄 곳. */
   readonly anchorRef: RefObject<HTMLElement | null>;
+  /** 메뉴를 닫으며 포커스를 트리거로 돌려준다(ESC·Tab). */
+  readonly focusTrigger: () => void;
   readonly onClose: () => void;
 }
 
@@ -60,7 +61,7 @@ function toSegments(actions: readonly ActionSheetAction[]): Segment[] {
  * 데스크톱(768px 이상) ⋯ 메뉴 팝오버. `body` 로 포털해 탭 줄·표 래퍼의 `overflow` 에 잘리지 않고,
  * 위치는 열릴 때 트리거 기준으로 한 번 잡는다 — 이후 스크롤·크기 변화는 위치를 따라가지 않고 닫는다.
  */
-export function ActionMenuPopover({ label, subtitle, actions, header, align, anchorRef, onClose }: ActionMenuPopoverProps) {
+export function ActionMenuPopover({ label, subtitle, actions, header, align, anchorRef, focusTrigger, onClose }: ActionMenuPopoverProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const subtitleId = useId();
   const [position, setPosition] = useState<CSSProperties | null>(null);
@@ -91,15 +92,13 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
       (item) => !(item instanceof HTMLButtonElement && item.disabled),
     );
 
-  const focusTrigger = () => {
-    anchorRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus({ preventScroll: true });
-  };
-
+  // 위치가 잡히기 전 첫 렌더는 visibility:hidden 이라 브라우저가 포커스를 거부한다 — 보이게 된 뒤에 건다.
+  const placed = position !== null;
   useEffect(() => {
-    (items()[0] ?? menuRef.current)?.focus({ preventScroll: true });
-    // 열릴 때 한 번만.
+    if (placed) (items()[0] ?? menuRef.current)?.focus({ preventScroll: true });
+    // 열린 동안 한 번만 — 항목은 매 렌더 새로 읽는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [placed]);
 
   useTopmostEscape({
     open: true,
@@ -162,7 +161,8 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
       className="w-[360px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 shadow-[var(--shadow-dropdown)]"
       style={{
         position: 'fixed',
-        zIndex: 'var(--z-sheet)',
+        // SideSheet(--z-modal) 안의 트리거에서도 열려야 해서 그 위 층이다.
+        zIndex: 'var(--z-modal-top)',
         ...(position ?? { top: 0, left: 0, visibility: 'hidden' }),
       }}
     >
@@ -191,7 +191,7 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
             </p>
           ) : null}
           {segment.actions.map((action) => (
-            <MenuItem key={action.key} action={action} onClose={onClose} onBeforeSelect={focusTrigger} />
+            <MenuItem key={action.key} action={action} onClose={onClose} />
           ))}
         </div>
       ))}
@@ -200,15 +200,7 @@ export function ActionMenuPopover({ label, subtitle, actions, header, align, anc
   );
 }
 
-function MenuItem({
-  action,
-  onClose,
-  onBeforeSelect,
-}: {
-  action: ActionSheetAction;
-  onClose: () => void;
-  onBeforeSelect: () => void;
-}) {
+function MenuItem({ action, onClose }: { action: ActionSheetAction; onClose: () => void }) {
   if (action.externalHref !== undefined) {
     return (
       <a
@@ -239,10 +231,7 @@ function MenuItem({
       tabIndex={-1}
       disabled={action.disabled}
       className={ROW_CLASS}
-      onClick={() => {
-        onBeforeSelect();
-        action.onSelect();
-      }}
+      onClick={action.onSelect}
     >
       <ActionLabel action={action}>
         {action.disabled && action.disabledReason ? action.disabledReason : action.description}

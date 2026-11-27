@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { installMatchMedia } from '@/test/match-media';
 import { ActionMenu, type ActionMenuProps } from './action-menu';
 import { useConfirm } from './confirm-modal';
+import { SideSheet } from './side-sheet';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/admin/tournaments/t-1' }));
 
@@ -120,6 +123,25 @@ describe('ActionMenu 폰', () => {
     expect(screen.queryByRole('dialog', { name: '대회 상태' })).toBeNull();
   });
 
+  it('고른 동작의 확인 창을 닫으면 포커스가 body 가 아니라 트리거로 돌아온다', async () => {
+    render(<ConfirmingMenu />);
+    const button = screen.getByRole('button', { name: '상태' });
+    button.focus();
+    fireEvent.click(button);
+    // 실제 브라우저는 누른 시트 버튼에 포커스를 둔다 — 이 버튼은 곧 시트와 함께 사라진다.
+    const item = screen.getByRole('button', { name: '접수 마감' });
+    item.focus();
+
+    fireEvent.click(item);
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '접수를 마감할까요?' });
+    // 사용자는 확인 창이 포커스를 잡은 뒤에 닫는다.
+    await waitFor(() => expect(confirmDialog.contains(document.activeElement)).toBe(true));
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(button);
+  });
+
   it('href·externalHref·destructive 항목은 ActionSheet 규칙 그대로 그린다', () => {
     renderMenu({
       actions: [
@@ -227,6 +249,31 @@ describe('ActionMenu 데스크톱', () => {
     expect(focusedLabel()).toBe('첫째');
     fireEvent.keyDown(menu, { key: 'End' });
     expect(focusedLabel()).toBe('셋째');
+  });
+
+  it('포커스는 팝오버가 보이는 상태에서 첫 항목에 걸린다 — 숨겨진 요소는 브라우저가 포커스를 받지 않는다', () => {
+    const original = HTMLElement.prototype.focus;
+    const calls: Array<{ label: string | null; visibility: string }> = [];
+    const spy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+      calls.push({ label: this.textContent, visibility: getComputedStyle(this).visibility });
+      return original.call(this, options);
+    });
+    try {
+      renderMenu({
+        actions: [
+          { key: 'a', label: '첫째', onSelect: vi.fn() },
+          { key: 'b', label: '둘째', onSelect: vi.fn() },
+        ],
+      });
+      openMenu();
+
+      const onFirst = calls.filter((call) => call.label === '첫째');
+      expect(onFirst.length).toBeGreaterThan(0);
+      expect(onFirst.every((call) => call.visibility !== 'hidden')).toBe(true);
+      expect(focusedLabel()).toBe('첫째');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('첫 항목이 비활성이면 그 다음 활성 항목에 포커스가 간다', () => {
@@ -482,5 +529,36 @@ describe('ActionMenu 데스크톱', () => {
 
     expect(screen.queryByRole('menu')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('ActionMenu 시트 안', () => {
+  const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+  const tokenOf = (css: string, name: string) => Number(new RegExp(`${name}:\\s*(\\d+)`).exec(css)?.[1]);
+  const layerOf = (element: HTMLElement, css: string) => tokenOf(css, /var\((--z-[\w-]+)\)/.exec(element.style.zIndex)?.[1] ?? '');
+
+  beforeEach(() => {
+    media = installMatchMedia(1280);
+  });
+
+  it('SideSheet 안에서 열어도 팝오버가 시트 덮개보다 위 층이고 ESC 는 메뉴만 닫는다', () => {
+    const onClose = vi.fn();
+    render(
+      <SideSheet open title="대회 정보 수정" onClose={onClose}>
+        <ActionMenu label="대회 상태" trigger={trigger} actions={[{ key: 'a', label: '접수 마감', onSelect: vi.fn() }]} />
+      </SideSheet>,
+    );
+    const sheet = screen.getByRole('dialog', { name: '대회 정보 수정' });
+
+    fireEvent.click(screen.getByRole('button', { name: '상태' }));
+    const menu = screen.getByRole('menu', { name: '대회 상태' });
+
+    const tokens = read('src/app/tokens.css');
+    expect(layerOf(menu, tokens)).toBeGreaterThan(layerOf(sheet.parentElement as HTMLElement, tokens));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByRole('dialog', { name: '대회 정보 수정' })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { ActionMenuPopover } from './action-menu-popover';
 import { ActionSheet, type ActionSheetAction } from './action-sheet';
+import { FOCUSABLE_SELECTOR } from './use-modal-a11y';
 
 /** 팝오버로 바뀌는 폭 — 이보다 좁으면 같은 항목을 `ActionSheet` 로 띄운다. */
 export const ACTION_MENU_DESKTOP_QUERY = '(min-width: 768px)';
@@ -38,6 +39,9 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
   const anchorRef = useRef<HTMLSpanElement>(null);
   const desktop = useMediaQuery(ACTION_MENU_DESKTOP_QUERY);
   const close = useCallback(() => setOpen(false), []);
+  const focusTrigger = useCallback(() => {
+    anchorRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus({ preventScroll: true });
+  }, []);
 
   // 폭이 갈리면 열려 있던 쪽 표면은 사라지므로 닫아 둔다 — 되돌아와도 저절로 다시 열리지 않게.
   const [lastDesktop, setLastDesktop] = useState(desktop);
@@ -50,7 +54,7 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
   const onToggle = () => {
     if (actions.length > 0) setOpen((value) => !value);
   };
-  const wrapped = wrapActions(actions, close);
+  const wrapped = wrapActions(actions, close, focusTrigger);
 
   return (
     <>
@@ -65,6 +69,7 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
           header={header}
           align={align}
           anchorRef={anchorRef}
+          focusTrigger={focusTrigger}
           onClose={close}
         />
       ) : null}
@@ -75,13 +80,22 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
   );
 }
 
-function wrapActions(actions: readonly ActionSheetAction[], close: () => void): readonly ActionSheetAction[] {
+/**
+ * 항목을 고르면 포커스를 트리거로 먼저 옮긴다 — 뒤이어 뜨는 확인 창이 사라질 메뉴 항목이 아니라
+ * 트리거를 복원 대상으로 잡아야 창을 닫은 뒤 포커스가 `body` 로 떨어지지 않는다.
+ */
+function wrapActions(
+  actions: readonly ActionSheetAction[],
+  close: () => void,
+  focusTrigger: () => void,
+): readonly ActionSheetAction[] {
   return actions.map((action) => {
     if (action.onSelect === undefined) return action;
     const { onSelect } = action;
     return {
       ...action,
       onSelect: () => {
+        focusTrigger();
         close();
         onSelect();
       },

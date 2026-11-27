@@ -157,6 +157,19 @@ describe('AdminTournamentBracketPage — 도구 줄과 [그림 | 목록]', () =>
     expect(screen.queryByTestId('assignment-workspace')).not.toBeInTheDocument();
   });
 
+  it('도구가 요청한 경기 열기는 보기를 바꾸면 비워진다 — 나중에 그림으로 돌아와도 패널이 뜻밖에 열리지 않는다', () => {
+    mocks.searchParams = new URLSearchParams('view=list');
+    const view = render(<AdminTournamentBracketPage />);
+    act(() => mocks.toolsInput!.controls.requestFocus('fx-new'));
+    expect(mocks.toolsInput!.controls.focusRequest).toEqual({ fixtureId: 'fx-new', nonce: 1 });
+    // 같은 보기에서 다시 그려도 요청은 그대로다(대조군).
+    view.rerender(<AdminTournamentBracketPage />);
+    expect(mocks.toolsInput!.controls.focusRequest).not.toBeNull();
+    mocks.searchParams = new URLSearchParams();
+    view.rerender(<AdminTournamentBracketPage />);
+    expect(mocks.toolsInput!.controls.focusRequest).toBeNull();
+  });
+
   it('시간·구장 일괄 배정 패널은 도구 줄이 정하고(onAssignmentModeChange) 패널 닫기가 비운다', () => {
     render(<AdminTournamentBracketPage />);
     expect(screen.getByTestId('assignment-workspace')).toHaveAttribute('data-mode', '');

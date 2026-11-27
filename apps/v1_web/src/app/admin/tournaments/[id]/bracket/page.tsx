@@ -4,7 +4,7 @@ import { BracketEmptyState } from '@/components/admin/bracket-canvas/bracket-emp
 import { BracketToolsBar } from '@/components/admin/bracket-canvas/bracket-tools-bar';
 import { useBracketTools } from '@/components/admin/bracket-canvas/use-bracket-tools';
 import { useBracketViewControls } from '@/components/admin/bracket-canvas/use-bracket-view-controls';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BracketCanvasMobileScreen } from '@/components/admin/bracket-canvas/bracket-canvas-mobile-screen';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
@@ -44,6 +44,9 @@ function BracketPageBody() {
   const wide = useMediaQuery(BRACKET_CANVAS_WIDE_MEDIA_QUERY);
   // 폰은 보기가 하나다 — 주소에 view=list 가 있어도 폰에서는 무시한다.
   const view: BracketView = wide && searchParams.get('view') === 'list' ? 'list' : 'canvas';
+  // 보기를 바꾸면 못 연 「경기 열기」 요청은 버린다 — 목록에서 만든 경기가 나중에 그림으로 돌아올 때 패널을 뜻밖에 열지 않게.
+  const { clearFocusRequest } = controls;
+  useEffect(() => { clearFocusRequest(); }, [view, clearFocusRequest]);
   const registrations = regData?.items ?? [];
   // 캐시된 목록은 재조회가 실패해도 쓰되, 실패는 refetchFailed 로 드러낸다.
   const registrationsState: RegistrationsLoadState = {

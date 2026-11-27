@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
@@ -17,6 +18,7 @@ export type ReasonModalProps = {
   tone?: ReasonModalTone;
   submitting?: boolean;
   errorMessage?: string | null;
+  confirmationText?: string;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 };
@@ -43,6 +45,7 @@ export function ReasonModal({
   tone = 'default',
   submitting = false,
   errorMessage,
+  confirmationText,
   onConfirm,
   onCancel,
 }: ReasonModalProps) {
@@ -54,13 +57,15 @@ export function ReasonModal({
   const reasonInputRef = useRef<HTMLTextAreaElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
   const [reason, setReason] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   const trimmedReason = reason.trim();
-  const canSubmit = trimmedReason.length > 0 && !submitting;
+  const canSubmit = trimmedReason.length > 0 && !submitting && (!confirmationText || confirmation === confirmationText);
 
   useEffect(() => {
     if (open) {
       previousFocusRef.current = document.activeElement;
       setReason('');
+      setConfirmation('');
       const id = setTimeout(() => reasonInputRef.current?.focus(), 60);
       return () => clearTimeout(id);
     }
@@ -69,8 +74,9 @@ export function ReasonModal({
     previousFocusRef.current = null;
   }, [open]);
 
-  useOverlayHistory({ open, onClose: onCancel });
-  useTopmostEscape({ open, onEscape: onCancel });
+  const cancel = () => { if (!submitting) onCancel(); };
+  useOverlayHistory({ open, onClose: cancel });
+  useTopmostEscape({ open, onEscape: cancel });
 
   useEffect(() => {
     if (!open) return;
@@ -107,12 +113,12 @@ export function ReasonModal({
 
   const isDanger = tone === 'danger';
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(25,31,40,0.45)', paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))' }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
+        if (event.target === event.currentTarget) cancel();
       }}
     >
       <div
@@ -121,7 +127,7 @@ export function ReasonModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="w-full max-w-[420px] rounded-2xl overflow-hidden"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-[420px] overflow-y-auto rounded-2xl"
         style={{ background: 'var(--surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -152,13 +158,18 @@ export function ReasonModal({
               {errorMessage}
             </p>
           ) : null}
+          {confirmationText ? <div className="mt-4 flex flex-col gap-2">
+            <label htmlFor={`${idPrefix}-confirmation`} className="tm-text-label">확인 문구: {confirmationText}</label>
+            <input id={`${idPrefix}-confirmation`} className="tm-input" value={confirmation} autoComplete="off" disabled={submitting}
+              onChange={event => setConfirmation(event.target.value)} placeholder={confirmationText} />
+          </div> : null}
         </div>
         <div style={{ display: 'flex', gap: 8, padding: '0 24px 24px' }}>
           <button
             type="button"
             className="tm-btn tm-btn-md tm-btn-neutral"
             style={{ flex: 1, minHeight: 44 }}
-            onClick={onCancel}
+            onClick={cancel}
             disabled={submitting}
           >
             {cancelLabel}
@@ -177,6 +188,6 @@ export function ReasonModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body,
   );
 }

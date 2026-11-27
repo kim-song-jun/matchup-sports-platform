@@ -95,6 +95,8 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
   if (node.state === 'live') return <Note>진행 중인 경기예요. 결과는 라이브 콘솔에서 넣어요.</Note>;
   if (!canWrite) return null;
   if (node.game === null) return <Note>이 경기는 아직 결과를 넣을 수 없어요.</Note>;
+  if (scope !== 'league' && node.game.latestRevision?.state === 'VOID') return <BracketResultActions tournamentId={competitionId}
+    fixtureId={node.fixtureId} game={node.game} isKnockout={node.knockout} homeLabel={homeName} awayLabel={awayName} canWrite={canWrite} showToast={showToast} />;
 
   if (node.state === 'scheduled') {
     if (!hasTeam(node.home) || !hasTeam(node.away)) return <Note>두 팀이 정해지면 점수를 넣을 수 있어요.</Note>;

@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -173,6 +173,14 @@ export class OfficializeGameResultRevisionDto {
 
 /** `POST /games/:gameId/result-revisions/:revisionId/void` body. */
 export class VoidGameResultRevisionDto {
+  @IsIn(['결과 무효'])
+  confirmationText!: '결과 무효';
+
+  @IsOptional()
+  @Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }) => obj[key])
+  @IsBoolean()
+  resetToScheduled?: boolean;
+
   @Type(() => Number)
   @IsInt()
   @Min(0)

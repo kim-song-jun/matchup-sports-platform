@@ -1186,3 +1186,7 @@ assignment 확장: registrationIds는 자리 수만큼의 (UUID|null) 목록이�
 - Web은 `stagePlan`이 있으면 DB format이 `league`여도 단계 관리·시간 배정·구장 배정을 그림/목록 보기에서 유지해요. 기존 목업 카테고리의 동작은 바꾸지 않아요.
 
 부전승 팀을 다른 팀과 맞바꾸는 경우 자리 배정 API에 상대 자리의 `swapSlotId`와 현재 부전승 팀의 `expectedRegistrationId`를 함께 보낸다. 두 자리는 같은 결선 조에 속해야 하며 서버가 양쪽 팀을 확인한 뒤 한 트랜잭션에서 교환한다.
+
+### 조별 경기 팀 조합 교환
+
+`POST /admin/tournaments/:tournamentId/group-fixture-team-swap`은 대회 쓰기 권한을 확인하고 같은 조의 예정 경기 두 개의 홈·원정 등록과 슬롯 연결을 한 트랜잭션에서 교환한다. 본문은 `firstFixtureId`, `secondFixtureId`, `firstAssignment`, `secondAssignment`이다. 배정 문자열은 확인 시점의 홈 등록 ID, 원정 등록 ID, 홈 슬롯 ID, 원정 슬롯 ID를 순서대로 파이프로 연결하며 null은 빈 칸이다. 다른 조 또는 동일 경기 선택은 400, 변경된 배정이나 시작·기록된 경기는 409다. 성공 응답 data는 `{ fixtureIds: string[] }`이다.

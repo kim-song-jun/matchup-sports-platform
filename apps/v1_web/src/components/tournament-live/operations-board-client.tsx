@@ -114,6 +114,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   const todayKey = kstDayKey(now.toISOString());
   const nowLabel = kstTimeLabel(now.toISOString());
+  // 「기준」은 보드 데이터를 마지막으로 받은 시각이다. 기기 시계를 쓰면 갱신이 멈춰도 계속 최신처럼 보인다.
+  const updatedLabel = board.dataUpdatedAt > 0 ? kstTimeLabel(new Date(board.dataUpdatedAt).toISOString()) : nowLabel;
+  const refreshStalled = board.data !== undefined && (board.isError || board.fetchStatus === 'paused');
   const days = useMemo(() => listMatchDays(cards), [cards]);
   const activeDay = pickedDay !== null && days.includes(pickedDay) ? pickedDay : pickBoardDay(days, todayKey);
   const dayIndex = activeDay === null ? -1 : days.indexOf(activeDay);
@@ -171,7 +174,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const eyebrowDay = activeDay === null ? '' : ` · ${formatDayLabel(activeDay)}`;
   const headerTitle = `${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`;
   const stats = `끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount}`;
-  const caption = `${nowLabel} 기준 · 15초마다 새로 고쳐요`;
+  const caption = `${updatedLabel} 기준 · ${refreshStalled ? '새로 고치지 못했어요' : '15초마다 새로 고쳐요'}`;
 
   return (
     <div className="tm-content-enter flex flex-col gap-5">
@@ -197,6 +200,16 @@ export function OperationsBoardClient({ tournamentId }: Props) {
       ) : (
         <OperationsBoardPhoneHeader title={headerTitle} stats={stats} caption={caption} publicHref={publicHref} isRefreshing={isRefreshing} onRefresh={refresh} />
       )}
+
+      {refreshStalled ? (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-[var(--tint-orange)] px-3 py-2 text-[length:var(--font-size-label)] text-[var(--orange700)]">
+          <TriangleAlert size={16} aria-hidden="true" className="shrink-0" />
+          <span>새로 고치지 못했어요. {updatedLabel} 기준 화면이에요.</span>
+          <button type="button" onClick={refresh} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">

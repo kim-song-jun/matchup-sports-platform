@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -77,6 +77,7 @@ interface Scenario {
 
 let scenario: Scenario;
 const operationRequests: string[] = [];
+let boardFails = false;
 
 function defaultScenario(): Scenario {
   const items = dayItems();
@@ -99,10 +100,13 @@ const server = setupServer(
   http.get('*/api/v1/tournament-ops/tournaments/:id/operations', ({ request }) => {
     const cursor = new URL(request.url).searchParams.get('cursor');
     operationRequests.push(cursor ?? 'first');
+    if (boardFails) return new HttpResponse(null, { status: 500 });
     const index = cursor === null ? 0 : Number(cursor.replace('c', ''));
     const page = scenario.pages[index];
     return ok({ items: page.items, nextCursor: page.nextCursor, watermark: 'w', liveWarnings: [] });
   }),
+  // 500 응답은 클라이언트 오류 로그 전송을 부른다.
+  http.post('*/api/v1/logs/client-error', () => ok({})),
   http.get('*/api/v1/tournament-ops/tournaments/:id/fields', () =>
     ok({ items: scenario.fields.map((f) => ({ ...f, tournamentId: 't-1', scopeKey: f.id, active: true, version: 1 })) }),
   ),
@@ -124,6 +128,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   scenario = defaultScenario();
   operationRequests.length = 0;
+  boardFails = false;
   restoreViewport = installViewport(1280);
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -430,6 +435,58 @@ describe('OperationsBoardClient — 날짜', () => {
     expect(await screen.findByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
     expect(screen.getByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
     expect(operationRequests).toEqual(['first', 'c1']);
+  });
+});
+
+describe('OperationsBoardClient — 갱신 상태', () => {
+  it('「기준」 시각은 기기 시계가 아니라 마지막으로 받은 시각이다', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+    expect(screen.getByText(/10:15 기준 · 15초마다 새로 고쳐요/)).toBeInTheDocument();
+
+    vi.setSystemTime(new Date(kst(D20, '10:20')));
+    await user.click(screen.getByRole('button', { name: '새로고침' }));
+
+    expect(await screen.findByText(/10:20 기준 · 15초마다 새로 고쳐요/)).toBeInTheDocument();
+  });
+
+  it('갱신이 실패하면 옛 카드 위에 마지막으로 받은 시각과 함께 알리고, 다시 시도하면 사라진다', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    boardFails = true;
+    vi.setSystemTime(new Date(kst(D20, '10:25')));
+    await user.click(screen.getByRole('button', { name: '새로고침' }));
+
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent('새로 고치지 못했어요. 10:15 기준 화면이에요.');
+    expect(screen.getByText(/10:15 기준 · 새로 고치지 못했어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/15초마다 새로 고쳐요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+
+    boardFails = false;
+    vi.setSystemTime(new Date(kst(D20, '10:30')));
+    await user.click(within(notice).getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(screen.getByText(/10:30 기준 · 15초마다 새로 고쳐요/)).toBeInTheDocument();
+  });
+
+  it('기기가 오프라인이라 갱신이 멈춰 있어도 같은 안내를 한다', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    onlineManager.setOnline(false);
+    try {
+      await user.click(screen.getByRole('button', { name: '새로고침' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('새로 고치지 못했어요. 10:15 기준 화면이에요.');
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 });
 

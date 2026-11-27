@@ -58,13 +58,14 @@ function BracketPageBody() {
   });
 
   // 주소가 보기 방식의 정본이다 — 새로고침·뒤로가기에서도 유지되고, 다른 쿼리는 건드리지 않는다.
-  const changeView = (next: BracketView) => {
+  const viewHref = (next: BracketView) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next === 'list') params.set('view', 'list');
     else params.delete('view');
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    return query ? `${pathname}?${query}` : pathname;
   };
+  const changeView = (next: BracketView) => router.replace(viewHref(next), { scroll: false });
 
   const body = view === 'canvas' && tools.isEmpty ? (
     <BracketEmptyState
@@ -73,7 +74,7 @@ function BracketPageBody() {
       onCreate={tools.openCreate}
       sixTeamNotice={tournament?.format === 'knockout' && tournament.teamCount === 6 && !tournament.sixTeamMode}
       infoHref={tournamentInfoHref(tournamentId, 'rules')}
-      onShowList={wide && tournament?.format !== 'league_knockouts' ? () => changeView('list') : undefined}
+      listHref={wide && tournament?.format !== 'league_knockouts' ? viewHref('list') : undefined}
     />
   ) : (
     <div className="flex flex-col gap-4">

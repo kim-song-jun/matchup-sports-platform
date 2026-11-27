@@ -10,7 +10,7 @@ const SUB: Record<BracketCreateKey, string> = {
   'multi-finals-create': '예선 조를 편성하면 토너먼트까지 한 번에 만들어져요.',
 };
 
-export function BracketEmptyState({ canWrite, create, onCreate, sixTeamNotice, infoHref, onShowList }: {
+export function BracketEmptyState({ canWrite, create, onCreate, sixTeamNotice, infoHref, listHref }: {
   canWrite: boolean;
   create: { key: BracketCreateKey; label: string } | null;
   onCreate: () => void;
@@ -18,8 +18,8 @@ export function BracketEmptyState({ canWrite, create, onCreate, sixTeamNotice, i
   sixTeamNotice: boolean;
   /** 6강 방식을 정하는 대회 정보 화면의 주소. */
   infoHref: string;
-  /** 있으면 목록 보기의 수동 조 만들기로 가는 길을 작게 남긴다. */
-  onShowList?: () => void;
+  /** 있으면 목록 보기(수동 조 만들기)로 가는 주소를 작은 글자 링크로 남긴다. */
+  listHref?: string;
 }) {
   return (
     <div className="flex flex-col items-center gap-3">
@@ -34,8 +34,8 @@ export function BracketEmptyState({ canWrite, create, onCreate, sixTeamNotice, i
           6팀 대회예요. <Link href={infoHref} className="font-semibold text-[var(--blue700)] underline">6강 방식을 먼저 정해요</Link>
         </p>
       ) : null}
-      {canWrite && onShowList ? (
-        <button type="button" onClick={onShowList} className="tm-text-caption min-h-11 px-3 text-[var(--text-muted)] underline">직접 조 만들기</button>
+      {canWrite && listHref ? (
+        <Link href={listHref} replace scroll={false} className="tm-text-caption inline-flex min-h-11 items-center px-3 text-[var(--text-muted)] underline">직접 조 만들기</Link>
       ) : null}
     </div>
   );

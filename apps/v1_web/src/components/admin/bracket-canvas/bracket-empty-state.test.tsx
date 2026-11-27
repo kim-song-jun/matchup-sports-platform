@@ -38,7 +38,7 @@ describe('BracketEmptyState', () => {
   });
 
   it('읽기 전용(canWrite=false)은 create 가 있어도 버튼·링크가 없다', () => {
-    show({ canWrite: false, sixTeamNotice: true, onShowList: vi.fn() });
+    show({ canWrite: false, sixTeamNotice: true, listHref: '/x?view=list' });
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('아직 만들어진 대진이 없어요.')).toBeInTheDocument();
@@ -57,15 +57,15 @@ describe('BracketEmptyState', () => {
     expect(document.body).not.toHaveTextContent('큰 화면');
   });
 
-  it('onShowList 가 있으면 「직접 조 만들기」가 목록 보기로 보낸다', () => {
-    const onShowList = vi.fn();
-    show({ onShowList });
-    fireEvent.click(screen.getByRole('button', { name: '직접 조 만들기' }));
-    expect(onShowList).toHaveBeenCalledTimes(1);
+  it('listHref 가 있으면 「직접 조 만들기」는 그 주소로 가는 진짜 링크다(버튼이 아니다)', () => {
+    show({ listHref: '/admin/tournaments/t-1/bracket?view=list' });
+    const link = screen.getByRole('link', { name: '직접 조 만들기' });
+    expect(link).toHaveAttribute('href', '/admin/tournaments/t-1/bracket?view=list');
+    expect(screen.queryByRole('button', { name: '직접 조 만들기' })).not.toBeInTheDocument();
   });
 
-  it('onShowList 가 없으면 「직접 조 만들기」가 없다', () => {
+  it('listHref 가 없으면 「직접 조 만들기」가 없다', () => {
     show();
-    expect(screen.queryByRole('button', { name: '직접 조 만들기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '직접 조 만들기' })).not.toBeInTheDocument();
   });
 });

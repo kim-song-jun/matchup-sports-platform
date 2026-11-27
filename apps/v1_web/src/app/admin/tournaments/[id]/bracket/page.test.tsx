@@ -220,14 +220,15 @@ describe('AdminTournamentBracketPage — 빈 대진', () => {
     expect(screen.queryByText('아직 대진이 없어요')).not.toBeInTheDocument();
   });
 
-  it('「직접 조 만들기」가 목록 보기로 보낸다(조별리그 등 목록으로 조를 만드는 대회만)', () => {
+  it('「직접 조 만들기」는 ?view=list 로 가는 링크다(다른 쿼리는 유지, 조별 목록이 없는 league_knockouts 는 없다)', () => {
+    mocks.searchParams = new URLSearchParams('highlight=f1');
     render(<AdminTournamentBracketPage />);
-    fireEvent.click(screen.getByRole('button', { name: '직접 조 만들기' }));
-    expect(mocks.replace).toHaveBeenLastCalledWith('/admin/tournaments/t-1/bracket?view=list', { scroll: false });
+    expect(screen.getByRole('link', { name: '직접 조 만들기' })).toHaveAttribute('href', '/admin/tournaments/t-1/bracket?highlight=f1&view=list');
+    expect(screen.queryByRole('button', { name: '직접 조 만들기' })).not.toBeInTheDocument();
     cleanup();
     mocks.tournament.data = { format: 'league_knockouts' };
     render(<AdminTournamentBracketPage />);
-    expect(screen.queryByRole('button', { name: '직접 조 만들기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '직접 조 만들기' })).not.toBeInTheDocument();
   });
 
   it('폰의 빈 상태에는 목록으로 가는 길이 없다(폰은 목록이 없다)', () => {
@@ -235,7 +236,7 @@ describe('AdminTournamentBracketPage — 빈 대진', () => {
     restoreViewport = installViewport(390);
     render(<AdminTournamentBracketPage />);
     expect(screen.getByText('아직 대진이 없어요')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '직접 조 만들기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '직접 조 만들기' })).not.toBeInTheDocument();
   });
 
   it('읽기 전용에는 만들기 버튼이 없다', () => {
@@ -243,7 +244,8 @@ describe('AdminTournamentBracketPage — 빈 대진', () => {
     mocks.tools.create = null;
     render(<AdminTournamentBracketPage />);
     expect(screen.getByText('아직 만들어진 대진이 없어요.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /대진 만들기|직접 조 만들기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /대진 만들기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '직접 조 만들기' })).not.toBeInTheDocument();
   });
 
   it.each([

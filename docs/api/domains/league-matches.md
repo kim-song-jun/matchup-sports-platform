@@ -369,9 +369,9 @@ Optional roster, participant capacity and plan fields:
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
 - `teamFoulThreshold` (1–20, optional): team-foul warning count — the operator console shows "다음부터 10m 프리킥" (notice) once a team's fouls in a period reach it, and "10m 프리킥" from the next foul on — with 5, the 6th foul. Omitted or `null` = default 5 (the column stays `NULL`). Editable later with `PATCH /admin/league-matches/:leagueId` and returned by the admin detail (`null` = default).
-- `showTeamFouls` (boolean, optional): whether the spectator fixture page draws the live team-foul bars. Omitted on create = on. Same on/off rules as `POST /admin/tournaments` (`null` is rejected; the column is `NOT NULL`).
 - `registrationDeadlineAt` (ISO, optional): stored for open-registration; a past value returns
   `422 LEAGUE_REGISTRATION_DEADLINE_PAST`. Creating does not open registration.
+- `showTeamFouls` (boolean, optional): whether the spectator fixture page draws the live team-foul bars. Omitted on create = on. Same on/off rules as `POST /admin/tournaments` (`null` is rejected; the column is `NOT NULL`).
 - `entryFee` (integer 0–100,000,000, optional) with `bankName` / `bankAccount` / `bankHolder`
   (same validation as the entry-fee endpoint): sending `entryFee` confirms the fee in the same
   transaction (`entryFeeConfiguredAt` set; 0 is free). `entryFee > 0` without all three bank fields

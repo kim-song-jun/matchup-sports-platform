@@ -18,6 +18,7 @@ import type { V1AdminBracketFixture } from '@/types/api';
 import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
 import { fixtureTitle } from './bracket-canvas';
 import { FixtureAssignmentContext } from './fixture-assignment-context';
+import { GroupFixtureTeamSwap } from './group-fixture-team-swap';
 
 export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFields, showToast, children, toolbar }: {
   tournamentId: string; canWrite: boolean; canManageFields: boolean;
@@ -222,6 +223,7 @@ export function FixtureAssignmentWorkspace({ tournamentId, canWrite, canManageFi
     </div>
   </section>;
   return <FixtureAssignmentContext.Provider value><div className="flex min-w-0 flex-col gap-4">
+    {canWrite && groups.some(group => group.phase === "group") && <GroupFixtureTeamSwap tournamentId={tournamentId} groups={groups} fixtures={fixtures} teamNames={fixtureName} showToast={showToast} />}
     <div className="flex flex-wrap gap-2">{toolbar}<Button variant={mode === 'time' ? 'primary' : 'outline'} onClick={() => open('time')} disabled={busy} aria-expanded={mode === 'time'} aria-controls={`${id}-panel`}><Clock3 size={16} aria-hidden="true" />시간 배정</Button>
       <Button variant={mode === 'court' ? 'primary' : 'outline'} onClick={() => open('court')} disabled={busy} aria-expanded={mode === 'court'} aria-controls={`${id}-panel`}><MapPin size={16} aria-hidden="true" />구장 배정</Button></div>
     <div className={mode && wide ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_360px] items-start gap-4' : 'min-w-0'}>

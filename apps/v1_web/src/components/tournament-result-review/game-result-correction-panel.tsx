@@ -561,8 +561,10 @@ export function GameResultCorrectionPanel({
 
       <ReasonModal
         open={voidRequested}
+        key={voidRequested ? 'void-open' : 'void-closed'}
         title="결과를 무효화할까요?"
-        message="무효화는 되돌릴 수 없어요. 사유를 남겨 주세요."
+        message="기존 경기 기록은 이력으로 보존하고 공식 결과를 취소해요. 대회 경기는 같은 팀·자리·시간·구장으로 시작 전 상태를 만들어요. 다음 경기가 시작됐다면 처리할 수 없어요. 정규 리그는 결과만 무효 처리해요."
+        confirmationText="결과 무효"
         reasonLabel="무효화 사유"
         confirmLabel="무효화"
         tone="danger"

@@ -436,7 +436,7 @@ export function useVoidResultRevision(gameId: string, tournamentId?: string) {
     mutationFn: (input: VoidResultInput) =>
       postGameCommand<GameRevisionMutationResult>(
         `/games/${encodeURIComponent(gameId)}/result-revisions/${encodeURIComponent(input.revisionId)}/void`,
-        { expectedVersion: input.expectedVersion, reason: input.reason },
+        { expectedVersion: input.expectedVersion, reason: input.reason, confirmationText: '결과 무효', resetToScheduled: true },
       ),
     onSuccess: () => invalidateGame(queryClient, gameId, tournamentId),
   });

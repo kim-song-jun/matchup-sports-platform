@@ -237,6 +237,7 @@ export interface GameEventAppendResult extends GameMutationResult {
 }
 
 export interface GameRevisionMutationResult extends GameMutationResult {
+  replacement?: { fixtureId: string; gameId: string };
   revisionId: string;
   revision: number;
   revisionState: GameRevisionState;

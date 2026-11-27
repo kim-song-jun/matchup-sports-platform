@@ -1026,7 +1026,8 @@ describe('빠른 결과 — 무효 뒤 재입력', () => {
       expectedVersion: await gameVersion(gameId),
       clientCommandId: voidKey,
       reason: '점수 오입력',
-    } as never);
+      confirmationText: '결과 무효',
+    });
     expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBeNull();
     // 무효는 팀매치 상태를 되돌리지 않는다 — 재입력 입장 조건이 completed 를 허용해야 하는 이유다.
     expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('completed');

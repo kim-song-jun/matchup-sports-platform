@@ -77,7 +77,6 @@ function BracketPageBody() {
       </> : null);
   const content = (
     <div className="flex flex-col gap-4">
-      {tournament ? <BracketResetButton tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} /> : null}
       <SegmentedTabs
         ariaLabel="대진 보기 방식"
         role="tablist"
@@ -146,5 +145,5 @@ function BracketPageBody() {
     </div>
   );
   return tournament ? <FixtureAssignmentWorkspace tournamentId={tournamentId} canWrite={canWrite}
-    canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} toolbar={assignmentToolbar}>{content}</FixtureAssignmentWorkspace> : content;
+    canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} toolbar={<>{assignmentToolbar}<BracketResetButton tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} /></>}>{content}</FixtureAssignmentWorkspace> : content;
 }

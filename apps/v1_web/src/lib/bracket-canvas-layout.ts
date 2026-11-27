@@ -1,3 +1,4 @@
+import { bracketBranchOrder } from './bracket-branch-order';
 import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { bracketGroupLabel } from '@/lib/bracket-track';
 import type {
@@ -47,6 +48,7 @@ export type CanvasLayout = {
   columns: CanvasColumnLayout[];
   nodes: CanvasNodeLayout[];
   byeNodes: (CanvasNodeLayout & { slotId: string })[];
+  manualByes: { id: string; groupId: string; x: number; y: number; height: number }[];
   edges: CanvasEdgeLayout[];
   /** 조별+결선 대진의 조 편성 블록. 순위 자리가 없는 대진은 빈 배열. */
   groupBlocks: GroupBlockLayout[];
@@ -104,6 +106,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
   const slotsById = new Map(input.slots.map((slot) => [slot.id, slot]));
   const placed = new Map<string, CanvasNodeLayout>();
   const byeNodes: (CanvasNodeLayout & { slotId: string })[] = [];
+  const manualByes: CanvasLayout['manualByes'] = [];
   const columns: CanvasColumnLayout[] = [];
   const groupBlocks: GroupBlockLayout[] = [];
 
@@ -130,24 +133,29 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       byeNodes.push({ slotId: slot.id, fixtureId: target.id, columnKey: seed.key, x, y: cursor, width: CANVAS_NODE_WIDTH, height: 112 });
       cursor += 112 + CANVAS_ROW_GAP;
     };
-    for (const fixture of seed.fixtures) {
-      const target = input.groups.find(group => group.id === seed.groupId)?.phase === 'round12' ? input.fixtures.find(f => f.bracketSources?.some(source => source.fixtureId === fixture.id) && [f.homeSlotId, f.awaySlotId].some(id => id && slotsById.get(id)?.kind === 'BYE')) : undefined;
-      const bye = target ? input.slots.find(slot => slot.kind === 'BYE' && [target.homeSlotId, target.awaySlotId].includes(slot.id)) : undefined;
-      if (bye && target && target.homeSlotId === bye.id) placeBye(bye, target);
-      // 이미 놓인 원천 칸들의 연결 높이 평균에 맞추되, 위 칸과 겹치면 아래로 민다.
-      const anchors = (fixture.bracketSources ?? [])
-        .map((source) => placed.get(source.fixtureId))
-        .filter((node): node is CanvasNodeLayout => node !== undefined)
-        .map((node) => node.y + NODE_ANCHOR_Y);
-      anchors.push(...byeNodes.filter(node => node.fixtureId === fixture.id).map(node => node.y + node.height / 2));
-      const desired = anchors.length > 0 ? Math.round(anchors.reduce((sum, value) => sum + value, 0) / anchors.length) - NODE_ANCHOR_Y : cursor;
-      const y = Math.max(desired, cursor);
+    const manual = (input.groups.find(g => g.id === seed.groupId)?.groupTeams ?? []).filter(bye =>
+      bye.isBye && !input.slots.some(slot => slot.groupId === seed.groupId && slot.byeSortOrder === bye.sortOrder))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    let insertIndex = 0;
+    const insertManual = (until: number) => {
+      while (manual.length && manual[0].sortOrder <= until + insertIndex) {
+        const bye = manual.shift()!;
+        manualByes.push({ id: bye.id, groupId: bye.groupId, x, y: cursor, height: 112 });
+        cursor += 112 + CANVAS_ROW_GAP;
+        insertIndex++;
+      }
+    };
+    for (const [index, fixture] of seed.fixtures.entries()) {
+      insertManual(index);
+      const y = cursor;
       placed.set(fixture.id, { fixtureId: fixture.id, columnKey: seed.key, x, y, width: CANVAS_NODE_WIDTH, height: CANVAS_NODE_HEIGHT });
       cursor = y + CANVAS_NODE_HEIGHT + CANVAS_ROW_GAP;
-      if (bye && target && target.awaySlotId === bye.id) placeBye(bye, target);
     }
+    insertManual(Infinity);
     if (input.groups.find(group => group.id === seed.groupId)?.phase !== 'group') {
-      for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && slot.groupId === seed.groupId && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+      for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && (slot.groupId === seed.groupId || (slot.groupId === null && seed.groupId !== null &&
+        input.fixtures.some(target => [target.homeSlotId, target.awaySlotId].includes(slot.id) &&
+          target.bracketSources?.some(source => seed.fixtures.some(f => f.id === source.fixtureId)))) ) && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
         const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
         if (target) placeBye(slot, target);
       }
@@ -155,6 +163,41 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
     columns.push({ key: seed.key, groupId: seed.groupId, label: seed.label, x, width: CANVAS_NODE_WIDTH, fixtureIds: seed.fixtures.map((fixture) => fixture.id) });
   });
 
+  // Pack source branches in the same home/away order as the public graph.
+  const cards = new Map<string, { y: number; height: number }>();
+  for (const [id, node] of placed) cards.set(id, node);
+  for (const node of byeNodes) cards.set(node.slotId, node);
+  for (const node of manualByes) cards.set(node.id, node);
+  const sources = input.fixtures.flatMap(fixture => [
+    ...(fixture.bracketSources ?? []).map(link => ({ source: link.fixtureId, target: fixture.id, side: link.side, outcome: link.outcome })),
+    ...(['HOME', 'AWAY'] as const).flatMap(side => {
+      const id = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+      return id && cards.has(id) ? [{ source: id, target: fixture.id, side, outcome: 'BYE' }] : [];
+    }),
+  ]);
+  const ordered = bracketBranchOrder(columns.map(column => [
+    ...column.fixtureIds,
+    ...byeNodes.filter(node => node.columnKey === column.key).map(node => node.slotId),
+    ...manualByes.filter(node => node.groupId === column.groupId).map(node => node.id),
+  ].sort((a,b) => cards.get(a)!.y - cards.get(b)!.y)), sources);
+  const incoming = new Map<string, number[]>();
+  for (const column of ordered) {
+    let cursor = FIRST_NODE_Y;
+    for (const id of column) {
+      const node = cards.get(id)!;
+      const anchor = placed.has(id) ? NODE_ANCHOR_Y : node.height / 2;
+      const parents = incoming.get(id) ?? [];
+      const centre = parents.length ? (Math.min(...parents) + Math.max(...parents)) / 2 : cursor + anchor;
+      node.y = Math.max(cursor, Math.round(centre - anchor));
+      cursor = node.y + node.height + CANVAS_ROW_GAP;
+      for (const link of sources.filter(source => source.source === id)) {
+        const anchors = incoming.get(link.target) ?? [];
+        anchors.push(node.y + anchor);
+        incoming.set(link.target, anchors);
+      }
+    }
+  }
+  byeNodes.sort((a,b) => a.x - b.x || a.y - b.y);
   const blockByGroup = new Map(groupBlocks.map((block) => [block.groupId, block]));
   const edges: CanvasEdgeLayout[] = [];
   for (const seed of seeds) {
@@ -205,9 +248,9 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
 
   const nodes = [...placed.values()];
   const width = seeds.length === 0 ? CANVAS_PADDING * 2 : CANVAS_PADDING * 2 + seeds.length * CANVAS_NODE_WIDTH + (seeds.length - 1) * CANVAS_COLUMN_GAP;
-  const nodesBottom = [...nodes, ...byeNodes].reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
+  const nodesBottom = [...nodes, ...byeNodes, ...manualByes].reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
   const bottom = groupBlocks.reduce((max, block) => Math.max(max, block.y + block.height), nodesBottom);
-  return { width, height: bottom + CANVAS_PADDING, columns, nodes, byeNodes, edges, groupBlocks };
+  return { width, height: bottom + CANVAS_PADDING, columns, nodes, byeNodes, manualByes, edges, groupBlocks };
 }
 
 /** 확정 전 결과(제출됨·정정 초안)도 `submitted` — 무효는 다시 입력할 수 있는 `scheduled` 로 돌아간다. */

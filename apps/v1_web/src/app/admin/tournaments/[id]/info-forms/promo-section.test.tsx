@@ -144,6 +144,22 @@ describe('홍보 섹션 시트', () => {
   });
 
   it.each([
+    ['아래 「취소」', (view: View) => within(view.sheet()).getByRole('button', { name: '취소' })],
+    ['위 「닫기」', (view: View) => within(view.sheet()).getByRole('button', { name: '닫기' })],
+  ])('이미지를 올리는 중에 %s 를 눌러도 버릴지 먼저 묻고, 계속 고치면 시트가 남는다', async (_label, closer) => {
+    upload.mutateAsync.mockReturnValue(new Promise(() => {}));
+    const view = renderInfoSheet(promoSection, start(homeOn));
+
+    fireEvent.change(fileInput(view, '홈 오늘의 추천'), { target: { files: [new File(['x'], 'promo.png', { type: 'image/png' })] } });
+    fireEvent.click(closer(view));
+
+    expect(await screen.findByText('저장하지 않고 닫을까요?')).toBeInTheDocument();
+    expect(view.onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '계속 고치기' }));
+    expect(view.onClose).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ['주소 없이 끝나면', () => upload.mutateAsync.mockResolvedValue({ urls: [] }), '업로드된 이미지 URL을 받지 못했어요.'],
     ['실패하면', () => upload.mutateAsync.mockRejectedValue(new Error('서버가 바빠요.')), '서버가 바빠요.'],
   ])('올리기가 %s 그 이유를 시트 안에 보여 준다', async (_label, arrange, message) => {

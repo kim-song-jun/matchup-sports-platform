@@ -50,6 +50,8 @@ export function InfoSectionSheet({
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
   const Form = definition.Form;
+  // 올리는 중인 이미지와 보내는 중인 저장도 닫으면 사라지는 작업이라 바뀐 칸과 같이 센다.
+  const unsaved = dirty || saving || busy;
 
   useEffect(() => {
     if (focusField) document.getElementById(infoFieldId(focusField))?.focus();
@@ -81,7 +83,7 @@ export function InfoSectionSheet({
   };
 
   const cancel = async () => {
-    if (!(dirty || saving) || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
+    if (!unsaved || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
   };
 
   return (
@@ -90,7 +92,7 @@ export function InfoSectionSheet({
         open
         title={title}
         onClose={onClose}
-        dirty={dirty || saving}
+        dirty={unsaved}
         footer={
           <div className="flex flex-col gap-2">
             {message ? (

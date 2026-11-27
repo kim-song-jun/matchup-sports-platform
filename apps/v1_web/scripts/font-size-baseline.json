@@ -33,7 +33,7 @@
   "src/app/admin/tournaments/[id]/bracket-group-quick-add.tsx": 3,
   "src/app/admin/tournaments/[id]/bracket-shared-styles.ts": 2,
   "src/app/admin/tournaments/[id]/bracket-tab.tsx": 5,
-  "src/app/admin/tournaments/[id]/info-section.tsx": 17,
+  "src/app/admin/tournaments/[id]/info-section.tsx": 0,
   "src/app/admin/tournaments/[id]/overview-section.tsx": 2,
   "src/app/admin/tournaments/[id]/registration-roster-modal.tsx": 10,
   "src/app/admin/tournaments/[id]/registrations-tab.tsx": 4,

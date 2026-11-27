@@ -5276,6 +5276,7 @@ export type V1CreateTournamentPayload = {
 
 export type V1UpdateTournamentPayload = Omit<
   Partial<V1CreateTournamentPayload>,
+  | 'genderCategory'
   | 'genderMinMale'
   | 'genderMaxMale'
   | 'genderMinFemale'
@@ -5290,6 +5291,8 @@ export type V1UpdateTournamentPayload = Omit<
   | 'rulesText'
   | 'refundPolicyText'
 > & {
+  /** null = 성별 구분 없음으로 되돌린다. */
+  genderCategory?: V1TournamentGenderCategory | null;
   genderMinMale?: number | null;
   genderMaxMale?: number | null;
   genderMinFemale?: number | null;

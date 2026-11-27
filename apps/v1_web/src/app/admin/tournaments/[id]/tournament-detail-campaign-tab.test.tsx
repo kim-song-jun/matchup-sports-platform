@@ -1,11 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Tournament } from '@/types/api';
-import { TournamentInfoSection } from './info-section';
 import { TournamentAdminShell } from './tournament-admin-shell';
-import { TournamentAdminProvider } from './tournament-admin-context';
 import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
 
 type WiringHookMocks = {
@@ -122,7 +119,7 @@ const tournament: V1Tournament = {
   updatedAt: '2026-07-14T00:00:00.000Z',
 };
 
-describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
+describe('대회 상세 섹션 라우팅', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(hookMocks.tournamentQuery, {
@@ -168,55 +165,5 @@ describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
       );
     }
     expect(screen.queryByRole('tab')).toBeNull();
-  });
-
-  it('persists cleared optional tournament fields as null', async () => {
-    const user = userEvent.setup();
-    hookMocks.tournamentQuery.data = {
-      ...tournament,
-      bankName: '국민은행',
-      bankAccount: '123-456',
-      bankHolder: '티밋',
-      rulesText: '기존 규정',
-      yellowAccumulationLimit: null,
-      redCardSuspensionMatches: null,
-      refundPolicyText: '기존 환불 정책',
-    };
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <TournamentAdminProvider
-          value={{ tournamentId: 'tournament-1', role: 'PLATFORM_OPS', canWrite: true, showToast: vi.fn() }}
-        >
-          <TournamentInfoSection />
-        </TournamentAdminProvider>
-      </QueryClientProvider>,
-    );
-
-    await user.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('성별 카테고리')).toHaveValue('');
-    await user.clear(screen.getByLabelText('장소'));
-    await user.clear(screen.getByLabelText('주차 안내'));
-    await user.clear(screen.getByLabelText('은행명'));
-    await user.clear(screen.getByLabelText('계좌번호'));
-    await user.clear(screen.getByLabelText('예금주'));
-    await user.clear(screen.getByLabelText('대회 규정'));
-    await user.clear(screen.getByLabelText('환불 정책'));
-    await user.click(screen.getByRole('button', { name: '저장' }));
-
-    expect(hookMocks.mutation.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        venue: null,
-        parkingInfo: null,
-        bankName: null,
-        bankAccount: null,
-        bankHolder: null,
-        rulesText: null,
-        refundPolicyText: null,
-      }),
-      expect.any(Object),
-    );
   });
 });

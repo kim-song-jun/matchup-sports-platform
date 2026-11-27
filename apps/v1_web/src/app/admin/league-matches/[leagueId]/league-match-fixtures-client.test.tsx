@@ -2008,7 +2008,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(50);
     expect(screen.getByLabelText('경기 시간(분)')).toHaveAccessibleDescription(
-      '이 리그의 피리어드 설정(전·후반 25분)에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.',
+      '이 리그의 경기 시간(전·후반 25분)에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.',
     );
   });
 

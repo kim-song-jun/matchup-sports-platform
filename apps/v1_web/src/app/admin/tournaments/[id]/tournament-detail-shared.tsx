@@ -32,9 +32,9 @@ export function substitutionPolicyLabel(
   mode: 'limited' | 'rolling' | null,
   maxSubstitutions: number | null,
 ): string {
-  if (mode === null) return '미지정';
-  if (mode === 'rolling') return '무제한(롤링)';
-  return typeof maxSubstitutions === 'number' ? `제한 ${maxSubstitutions}회` : '제한 (횟수 미설정)';
+  if (mode === null) return '정하지 않음';
+  if (mode === 'rolling') return '자유 교체';
+  return typeof maxSubstitutions === 'number' ? `횟수 제한 ${maxSubstitutions}회` : '횟수 제한 (횟수 미설정)';
 }
 
 export function formatPhoneNumber(phone: string | null): string {
@@ -76,8 +76,7 @@ export const ADMIN_CANCELLABLE = new Set<string>([
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-// 로직이 date-utils formatEntryFee 와 동일해 위임 — 소비 탭들의 import 는 그대로 유지됨.
-export const formatCurrency = formatEntryFee;
+const formatCurrency = formatEntryFee;
 
 export function formatRegistrationPaymentSubtitle(
   payment: V1AdminTournamentRegistration['payment'],
@@ -118,7 +117,7 @@ export function formatGenderQuotaError(details: unknown) {
 // ── Shared input styles ───────────────────────────────────────────────────
 
 /** Non-background portion of the unified h-[44px] submit button. */
-export const submitBtnBaseCls = [
+const submitBtnBaseCls = [
   'inline-flex items-center justify-center gap-2 h-[44px] px-4 rounded-xl',
   'whitespace-nowrap',
   'text-[length:var(--font-size-label)] text-white',

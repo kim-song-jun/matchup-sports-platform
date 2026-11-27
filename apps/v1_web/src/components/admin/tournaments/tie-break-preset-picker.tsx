@@ -20,7 +20,7 @@ type TieBreakPresetPickerProps = {
 
 const CUSTOM_VALUE = 'custom';
 
-/** 대회 만들기·정보 수정이 함께 쓰는 「동점일 때 순서」 — 프리셋 카드 셋과 「직접 정하기」. 저장은 언제나 순서 배열이다. */
+/** 「순위 정하는 순서」 — 프리셋 카드 셋과 「직접 정하기」. 저장은 언제나 순서 배열이다. */
 export function TieBreakPresetPicker({ order, onChange, disabled = false, lockedReason = null }: TieBreakPresetPickerProps) {
   const headingId = useId();
   const hintId = useId();
@@ -33,9 +33,9 @@ export function TieBreakPresetPicker({ order, onChange, disabled = false, locked
 
   return (
     <section aria-labelledby={headingId} className="@container grid gap-2">
-      <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">동점일 때 순서</h3>
+      <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">순위 정하는 순서</h3>
       <p id={hintId} className="tm-text-caption text-[var(--text-muted)]">
-        승점이 같을 때 어떤 규정으로 순위를 가를지 골라요. 모든 조별리그가 이 규정을 따라요.
+        승점이 같은 팀을 이 순서로 가려요.
       </p>
       {/* 뷰포트가 아니라 놓인 자리의 폭으로 칸 수를 정한다 — 좁은 수정 모달에서 4칸이 되면 글자가 세로로 깨진다(MD-QA #186 alpha QA). */}
       <div

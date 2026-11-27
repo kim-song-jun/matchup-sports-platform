@@ -1,7 +1,6 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
-import { SectionTitle } from '@/components/v1-ui/primitives';
 import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import {
   PRIZE_CATEGORIES,
@@ -26,6 +25,18 @@ type PrizeBreakdownEditorProps = {
   prizePool: string;
   onPrizePoolChange: (value: string) => void;
   disabled?: boolean;
+};
+
+const MAX_PRIZE_ROWS = 12;
+const LABEL_PLACEHOLDER: Record<PrizeCategory, string> = {
+  '팀 시상': '예: 우승',
+  '개인 시상': '예: 베스트 골키퍼',
+  '기타 시상': '예: 참가상',
+};
+const LABEL_PRESETS: Record<PrizeCategory, readonly string[]> = {
+  '팀 시상': ['우승', '준우승', '3위'],
+  '개인 시상': ['MVP', '득점왕', '도움왕'],
+  '기타 시상': ['참가상', '특별상'],
 };
 
 const fieldClass =
@@ -68,24 +79,34 @@ export function PrizeBreakdownEditor({
         <div>
           <p className="text-[length:var(--font-size-body)] font-semibold text-[var(--text-body)]">상금 배분</p>
           <p className="mt-0.5 text-[length:var(--font-size-caption)] leading-5 text-[var(--text-caption)]">
-            숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.
+            숫자는 원 단위로 정리되고, 트로피·상품권 같은 물품도 적을 수 있어요.
           </p>
         </div>
-        {PRIZE_CATEGORIES.map((category, categoryIndex) => (
-          <section key={category} aria-label={`${category} 입력`} className="grid gap-3 py-3">
-            <SectionTitle title={category} compact />
-            <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">상 이름을 직접 입력해도 {category} 구역에 저장돼요.</p>
-            {rows.map((row, index) => prizeCategoryOf(row) === category ? (
-              <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px]">
+        {rows.map((row, index) => {
+          const category = prizeCategoryOf(row);
+          return (
+            <div key={row.id} className="grid gap-2">
+              <select
+                value={category}
+                onChange={(event) => updateRow(row.id, { category: event.target.value as PrizeCategory })}
+                disabled={disabled}
+                aria-label={`상금 항목 ${index + 1} 구분`}
+                className="h-[44px] w-fit rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
+              >
+                {PRIZE_CATEGORIES.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px]">
                 <input
                   type="text"
-                  list={`tournament-prize-label-presets-${categoryIndex}`}
+                  list={`tournament-prize-label-presets-${PRIZE_CATEGORIES.indexOf(category)}`}
                   value={row.label}
                   onChange={(event) => updateRow(row.id, { label: event.target.value.replaceAll('/', '·') })}
                   disabled={disabled}
                   maxLength={20}
                   aria-label={`상금 항목 ${index + 1} 이름`}
-                  placeholder={category === '팀 시상' ? '예: 우승' : category === '개인 시상' ? '예: 베스트 골키퍼' : '예: 참가상'}
+                  placeholder={LABEL_PLACEHOLDER[category]}
                   className={fieldClass}
                 />
                 <input
@@ -108,24 +129,26 @@ export function PrizeBreakdownEditor({
                   <X size={17} aria-hidden="true" />
                 </button>
               </div>
-            ) : null)}
-            <datalist id={`tournament-prize-label-presets-${categoryIndex}`}>
-              {(category === '팀 시상' ? ['우승', '준우승', '3위'] : category === '개인 시상' ? ['MVP', '득점왕', '도움왕'] : ['참가상', '특별상']).map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
-            <button
-              type="button"
-              onClick={() => onChange([...rows, { id: createPrizeRowId(), category, label: '', value: '' }])}
-              disabled={disabled || rows.length >= 12}
-              className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body)] font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] disabled:opacity-50"
-            >
-              <Plus size={16} aria-hidden="true" />
-              {category} 추가
-            </button>
-          </section>
+            </div>
+          );
+        })}
+        {PRIZE_CATEGORIES.map((category, categoryIndex) => (
+          <datalist key={category} id={`tournament-prize-label-presets-${categoryIndex}`}>
+            {LABEL_PRESETS[category].map((label) => (
+              <option key={label} value={label} />
+            ))}
+          </datalist>
         ))}
-        <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">전체 시상 항목은 최대 12개까지 등록할 수 있어요.</p>
+        <button
+          type="button"
+          onClick={() => onChange([...rows, { id: createPrizeRowId(), category: '팀 시상', label: '', value: '' }])}
+          disabled={disabled || rows.length >= MAX_PRIZE_ROWS}
+          className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body)] font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] disabled:opacity-50"
+        >
+          <Plus size={16} aria-hidden="true" />
+          시상 추가
+        </button>
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">시상 항목은 {MAX_PRIZE_ROWS}개까지 넣을 수 있어요.</p>
         <div className="flex flex-wrap items-center gap-2">
           {total > 0 ? (
             <span className={`text-[length:var(--font-size-caption)] ${mismatch ? 'font-semibold text-[var(--orange700)]' : 'text-[var(--text-caption)]'}`}>

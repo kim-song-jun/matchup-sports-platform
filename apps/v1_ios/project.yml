@@ -54,6 +54,7 @@ targets:
       - path: WidgetShared
       - path: TeameetWidget/TeameetWidget.swift
       - path: TeameetWidget/LockWidgetView.swift
+      - path: TeameetWidget/MatchLiveActivity.swift
     dependencies:
       - target: TeameetWidget
         embed: true
@@ -103,6 +104,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
+        NSSupportsLiveActivities: true
         # WKWebView asks the OS on the page's behalf: <input type="file" accept="image/*"> offers
         # "Take Photo", a video input also records sound, a long-pressed image offers "Save to
         # Photos", and the home/onboarding screens call navigator.geolocation. Without a purpose
@@ -315,6 +317,7 @@ schemes:
       # command line by scripts/ios/verify-push-slice.sh, which reads them from its own
       # environment.
       environmentVariables:
+        TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST: $(TEAMEET_LIVE_ACTIVITY_SAMPLE_UITEST)
         TEAMEET_UITEST_EMAIL: $(TEAMEET_UITEST_EMAIL)
         TEAMEET_UITEST_PASSWORD: $(TEAMEET_UITEST_PASSWORD)
         TEAMEET_UITEST_INQUIRY_ID: $(TEAMEET_UITEST_INQUIRY_ID)

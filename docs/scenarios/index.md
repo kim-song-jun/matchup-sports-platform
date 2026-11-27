@@ -689,3 +689,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 2026-11-27: [iOS 홈 위젯 PR-A](ios-widget-base.md) — Alpha unsigned 앱+확장 컴파일, 단위 8/8, 고정 샘플 7/7. 실제 alpha API·위젯 호스트 검증 대기.
 
 - 2026-11-27: [iOS 잠금화면 PR-B 및 로고 후속](ios-widget-lock-screen.md) — Alpha 앱+확장 unsigned, 13/13 단위 PASS. 고정 샘플 7/7, 실제 alpha/WidgetKit 호스트 검증 대기.
+
+- 2026-11-27: [iOS Live Activity PR-C](ios-live-activity.md) — PR-B 위 stacked 변경. 17/17 단위·실제 ActivityKit 합성 데이터 UI 검증, 실제 alpha API는 별도 대기.

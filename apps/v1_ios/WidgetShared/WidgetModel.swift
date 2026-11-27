@@ -2,8 +2,8 @@ import Foundation
 
 /// Mirrors PR #2556 WidgetModel. Nullable score and names preserve server privacy gates.
 struct WidgetModel: Codable, Sendable, Equatable {
-    struct Score: Codable, Sendable, Equatable { var mine: Int; var opponent: Int }
-    struct Period: Codable, Sendable, Equatable {
+    struct Score: Codable, Sendable, Hashable { var mine: Int; var opponent: Int }
+    struct Period: Codable, Sendable, Hashable {
         var number = 1
         var phase = "RUNNING"
         var startedAt: Int64 = -1

@@ -5895,6 +5895,116 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-left: var(--spacing-1);
 }
 
+/* 소속 회원 팀 상세 — [정보 / 일정 / 기록 / 회비] 밑줄 탭(2026-11-27 사용자 확정 A안).
+ * 스크롤하면 상단바 바로 아래에 붙는다(스크롤 영역이 상단바 아래에서 시작하므로 top: 0). 모바일은 본문 좌우 여백(20px)을
+ * 넘어 화면 끝까지 깔아 붙었을 때 아래 글자가 비치지 않게 한다. */
+.tm-team-detail-tabs {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+  display: flex;
+  margin: var(--spacing-4) -20px 0;
+  padding: 0 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--grey200);
+}
+
+.tm-team-detail-tab {
+  flex: 1;
+  min-height: 48px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tm-team-detail-tab[aria-selected="true"] {
+  color: var(--text-strong);
+  border-bottom-color: var(--grey900);
+}
+
+/* 기록 탭 — 팀 전적 화면 내용을 그대로 쓰는데 그 내용이 자기 좌우 여백(20px)을 가져, 본문 여백과 겹치지 않게 바깥으로 편다. */
+.tm-team-detail-tab-panel > .tm-team-detail-records:first-child {
+  margin: 0 -20px;
+}
+
+/* 패널 안 섹션 간격은 각 섹션 제목의 여백(.tm-section-title)이 정한다 — grid gap 을 겹치면 제목과 카드 사이가 벌어진다. */
+.tm-team-detail-tab-panel > :first-child {
+  margin-top: var(--spacing-5);
+}
+
+.tm-team-detail-more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  color: var(--text-muted);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* 헤더의 ⋯ 팀 관리 메뉴 — 운영진에게는 공유 버튼 자리에 둔다. */
+.tm-team-profile-more {
+  align-self: flex-start;
+  flex: none;
+}
+
+.tm-team-more-menu-button {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tm-team-more-menu {
+  display: grid;
+  gap: var(--spacing-1);
+}
+
+/* 팀 채팅 — 하단 탭바가 없는 화면이라 탭바 높이를 빼고 안전영역 위에 띄운다. */
+.tm-team-chat-fab {
+  bottom: calc(var(--v1-shell-safe-bottom) + var(--v1-shell-fab-gap));
+  border: 0;
+  cursor: pointer;
+}
+
+.tm-team-chat-fab:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tm-team-fee-card {
+  display: grid;
+  gap: var(--spacing-1);
+  padding: var(--spacing-5);
+}
+
+.tm-team-fee-value {
+  font-size: var(--font-size-heading);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-team-fee-value-muted {
+  font-size: var(--font-size-body-lg);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.tm-team-fee-edit {
+  margin-top: var(--spacing-2);
+}
+
 .tm-team-participation-list {
   display: grid;
   /* 칸 폭을 화면에 묶는다 — 없으면 긴 경기 이름이 줄임표 없이 칸을 늘려 상태 배지가 화면 밖으로 밀린다. */

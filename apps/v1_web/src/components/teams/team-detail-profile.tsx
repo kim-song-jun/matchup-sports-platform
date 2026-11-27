@@ -72,6 +72,7 @@ export function TeamDetailHeader({
   footnote,
   badge,
   alertChip,
+  action,
 }: {
   team: HeaderTeam;
   chips: string[];
@@ -86,6 +87,8 @@ export function TeamDetailHeader({
    * 둔다(2026-11-27 사용자 확정 A안). 색만으로 말하지 않는다 — 칩은 항상 글자를 담는다.
    */
   alertChip?: string;
+  /** 공유 버튼 대신 둘 버튼 — 운영진의 ⋯ 팀 관리 메뉴(공유는 그 메뉴 안으로 들어간다). */
+  action?: ReactNode;
   /** 데스크톱은 h2, 모바일은 sr-only h1 과 겹치지 않게 aria-hidden div. */
   nameAs?: 'h2' | 'div';
   headerRef?: RefObject<HTMLElement | null>;
@@ -113,9 +116,11 @@ export function TeamDetailHeader({
             <Name className="tm-team-profile-name" aria-hidden={nameAs === 'div' ? true : undefined}>{team.name}</Name>
             <div className="tm-text-caption tm-team-profile-meta">{[team.sport, team.region].filter(Boolean).join(' · ')}</div>
           </div>
-          <button className="tm-btn tm-btn-icon tm-btn-ghost tm-team-profile-share" type="button" aria-label="공유" onClick={onShare}>
-            <ShareIcon size={20} />
-          </button>
+          {action ?? (
+            <button className="tm-btn tm-btn-icon tm-btn-ghost tm-team-profile-share" type="button" aria-label="공유" onClick={onShare}>
+              <ShareIcon size={20} />
+            </button>
+          )}
         </div>
         {chips.length || badge || alertChip ? (
           <ul className="tm-team-profile-chips" aria-label="팀 조건">

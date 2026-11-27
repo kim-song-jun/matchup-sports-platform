@@ -27,6 +27,8 @@ export interface BracketToolContext {
   unplacedTeamCount: number;
   unscheduledCount: number;
   unscheduledOnly: boolean;
+  /** 그림 보기인지. 참가팀 트레이는 그림 보기에만 있어 목록 보기에서는 「참가팀 목록 열기」를 내지 않는다. */
+  canvasView: boolean;
 }
 
 export interface BracketToolMenus {
@@ -72,7 +74,9 @@ export function buildBracketToolMenus(ctx: BracketToolContext): BracketToolMenus
     if (ctx.format === 'group_knockout' && ctx.hasGroupPhase) {
       teamFill.push({ key: 'finalists', label: '결선 진출팀 직접 정하기', description: '순위와 다르게 넣어야 할 때 써요' });
     }
-    teamFill.push({ key: 'team-tray', label: '참가팀 목록 열기', description: `팀을 골라 자리에 넣어요 · 자리 없는 팀 ${ctx.unplacedTeamCount}` });
+    if (ctx.canvasView) {
+      teamFill.push({ key: 'team-tray', label: '참가팀 목록 열기', description: `팀을 골라 자리에 넣어요 · 자리 없는 팀 ${ctx.unplacedTeamCount}` });
+    }
   }
 
   const match: BracketToolItem[] = [];

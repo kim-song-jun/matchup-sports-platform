@@ -51,7 +51,7 @@ function setup(overrides: Partial<UseBracketToolsInput> = {}) {
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
   const input: UseBracketToolsInput = {
     tournamentId: 't-1', tournament: tournament(), registrations, registrationsState: loaded, canWrite: true, role: 'PLATFORM_OPS',
-    showToast, controls: controlsOf(), onAssignmentModeChange, ...overrides,
+    showToast, controls: controlsOf(), view: 'canvas', onAssignmentModeChange, ...overrides,
   };
   const hook = renderHook(() => useBracketTools(input), { wrapper });
   render(<QueryClientProvider client={new QueryClient()}>{hook.result.current.dialogs}</QueryClientProvider>);
@@ -124,6 +124,11 @@ describe('useBracketTools — 메뉴 항목', () => {
     for (const key of ['add-fixture', 'link-fixtures']) {
       expect(action(result.current.menus.match, key)).toMatchObject({ disabled: true, disabledReason: expect.stringContaining('대회 방식을 아직 확인하지 못해') });
     }
+  });
+
+  it('목록 보기에서는 「참가팀 목록 열기」를 내지 않는다(눌러도 보일 트레이가 없다)', () => {
+    const { result } = setup({ view: 'list' });
+    expect(keys(result.current.menus.teamFill)).toEqual(['random-fill']);
   });
 
   it('참가팀 목록 열기의 설명은 참가팀 트레이의 미배정 수와 같다(경기에 직접 넣은 팀은 뺀다)', () => {

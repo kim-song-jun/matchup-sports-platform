@@ -4,7 +4,7 @@ import { bracketCreateAction, buildBracketToolMenus, hasGroupRankSlots, type Bra
 const base: BracketToolContext = {
   format: 'knockout', hasStagePlan: false, isEmpty: false, canWrite: true, leagueGrid: false,
   hasGroupPhase: false, hasGroupRankSlots: false, randomFillBlockedReason: null, formatUnknownReason: null,
-  unplacedTeamCount: 3, unscheduledCount: 4, unscheduledOnly: false,
+  unplacedTeamCount: 3, unscheduledCount: 4, unscheduledOnly: false, canvasView: true,
 };
 const keys = (items: { key: string }[]) => items.map(item => item.key);
 const menus = (overrides: Partial<BracketToolContext> = {}) => buildBracketToolMenus({ ...base, ...overrides });
@@ -29,6 +29,14 @@ describe('buildBracketToolMenus — 형식별 항목', () => {
 
   it('knockout 은 조 순위가 있어도 결선 진출팀 항목이 없다(대조군)', () => {
     expect(keys(menus({ hasGroupPhase: true }).teamFill)).not.toContain('finalists');
+  });
+
+  it('목록 보기에서는 「참가팀 목록 열기」가 없다(트레이는 그림 보기에만 있다) — 나머지 항목은 그대로', () => {
+    const list = menus({ canvasView: false });
+    expect(keys(list.teamFill)).toEqual(['random-fill']);
+    expect(keys(list.match)).toEqual(['add-fixture', 'link-fixtures', 'template', 'reset']);
+    expect(keys(list.timeVenue)).toEqual(['time-assign', 'court-assign', 'unscheduled-only']);
+    expect(keys(menus({ canvasView: true }).teamFill)).toContain('team-tray');
   });
 
   it('league(leagueGrid): 경기 연결만 빠진다', () => {

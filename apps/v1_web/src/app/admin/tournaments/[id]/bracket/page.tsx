@@ -54,7 +54,7 @@ function BracketPageBody() {
     onRetry: () => void refetchRegistrations(),
   };
   const tools = useBracketTools({
-    tournamentId, tournament, registrations, registrationsState, canWrite, role, showToast, controls, onAssignmentModeChange: setAssignmentMode,
+    tournamentId, tournament, registrations, registrationsState, canWrite, role, showToast, controls, view, onAssignmentModeChange: setAssignmentMode,
   });
 
   // 주소가 보기 방식의 정본이다 — 새로고침·뒤로가기에서도 유지되고, 다른 쿼리는 건드리지 않는다.

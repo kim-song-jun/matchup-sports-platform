@@ -36,6 +36,8 @@ export interface UseBracketToolsInput {
   role: string;
   showToast: (message: string, variant?: 'success' | 'error') => void;
   controls: BracketViewControls;
+  /** 지금 보는 방식 — 그림 보기에만 있는 도구(참가팀 목록)를 목록 보기에서 빼는 데 쓴다. */
+  view: 'canvas' | 'list';
   onAssignmentModeChange: (mode: 'time' | 'court' | null) => void;
 }
 
@@ -58,7 +60,7 @@ type MultiFinalsMode = 'create' | 'rules' | 'assign';
 const MULTI_TOAST = { create: '토너먼트 대진을 생성했어요.', rules: '토너먼트 배정 규칙을 저장했어요.', assign: '진출팀을 대진에 배정했어요.' } as const;
 
 export function useBracketTools(input: UseBracketToolsInput): BracketTools {
-  const { tournamentId, tournament, registrations, registrationsState, canWrite, role, showToast, controls, onAssignmentModeChange } = input;
+  const { tournamentId, tournament, registrations, registrationsState, canWrite, role, showToast, controls, view, onAssignmentModeChange } = input;
   const { data: bracket, isPending, refetch } = useV1AdminBracket(tournamentId);
   const randomFill = useV1RandomFillSlots(tournamentId, 'tournament');
   const resetFlow = useBracketResetFlow(tournamentId, canWrite, showToast);
@@ -128,7 +130,7 @@ export function useBracketTools(input: UseBracketToolsInput): BracketTools {
     hasGroupPhase: groups.some((group) => group.phase === 'group'), hasGroupRankSlots: hasGroupRankSlots(slots),
     randomFillBlockedReason, formatUnknownReason,
     unplacedTeamCount: bracket === undefined ? 0 : unplacedTeamCount(registrations, bracket),
-    unscheduledCount, unscheduledOnly: controls.unscheduledOnly,
+    unscheduledCount, unscheduledOnly: controls.unscheduledOnly, canvasView: view === 'canvas',
   });
   const toAction = (item: BracketToolItem): ActionSheetAction => ({
     key: item.key, label: item.label, description: item.description, destructive: item.destructive, groupLabel: item.groupLabel,

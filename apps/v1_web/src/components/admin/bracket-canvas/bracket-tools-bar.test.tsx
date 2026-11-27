@@ -78,11 +78,12 @@ function Harness(props: { tournament?: V1Tournament; canWrite?: boolean; view?: 
   latest = controls;
   const t = props.tournament ?? tournament();
   const canWrite = props.canWrite ?? true;
+  const view = props.view ?? 'canvas';
   const tools = useBracketTools({
     tournamentId: 't-1', tournament: t, registrations: props.registrations ?? registrations, registrationsState: props.registrationsState ?? loaded,
-    canWrite, role: props.role ?? 'PLATFORM_OPS', showToast: extras.showToast, controls, onAssignmentModeChange: extras.onAssignmentModeChange,
+    canWrite, role: props.role ?? 'PLATFORM_OPS', showToast: extras.showToast, controls, view, onAssignmentModeChange: extras.onAssignmentModeChange,
   });
-  return <BracketToolsBar tools={tools} tournament={t} tournamentId="t-1" canWrite={canWrite} view={props.view ?? 'canvas'} onViewChange={extras.onViewChange}
+  return <BracketToolsBar tools={tools} tournament={t} tournamentId="t-1" canWrite={canWrite} view={view} onViewChange={extras.onViewChange}
     controls={controls} showToast={extras.showToast}><p>본문</p></BracketToolsBar>;
 }
 const renderBar = (props: React.ComponentProps<typeof Harness> = {}) => render(<QueryClientProvider client={new QueryClient()}><Harness {...props} /></QueryClientProvider>);
@@ -162,6 +163,13 @@ describe('BracketToolsBar — 데스크톱', () => {
     open('팀 채우기');
     fireEvent.click(item(/참가팀 목록 열기/));
     expect(latest.trayOpen).toBe(true);
+  });
+
+  it('목록 보기에서는 팀 채우기 메뉴에 「참가팀 목록 열기」가 없다(그림 보기에는 있다)', () => {
+    renderBar({ view: 'list' });
+    open('팀 채우기');
+    expect(screen.getAllByRole('menuitem').map((menuItem) => menuItem.textContent)).toEqual([expect.stringMatching(/^빈 자리 무작위 채우기/)]);
+    expect(screen.queryByRole('menuitem', { name: /참가팀 목록 열기/ })).not.toBeInTheDocument();
   });
 
   it('「시간 일괄 배정」·「구장 일괄 배정」이 onAssignmentModeChange 를 time·court 로 부른다', () => {

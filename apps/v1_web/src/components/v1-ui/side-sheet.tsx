@@ -26,13 +26,15 @@ export interface SideSheetProps {
   readonly footer?: ReactNode;
   /** 바꾼 내용이 있으면 true — 모든 닫기 경로(✕·ESC·바깥·뒤로가기)가 버릴지 먼저 묻는다. */
   readonly dirty?: boolean;
+  /** 저장 중처럼 닫으면 안 되는 동안 true — ✕·ESC·바깥·뒤로가기가 모두 막히고 확인 창도 뜨지 않는다. */
+  readonly pending?: boolean;
 }
 
 /**
  * 오른쪽 수정 시트 — 1024px 이상은 오른쪽에 붙은 480px 패널, 미만은 아래에서 올라오는 90% 높이 시트.
  * 폭별 모양은 클래스(`lg:`)만으로 가른다.
  */
-export function SideSheet({ open, title, onClose, children, footer, dirty = false }: SideSheetProps) {
+export function SideSheet({ open, title, onClose, children, footer, dirty = false, pending = false }: SideSheetProps) {
   const titleId = useId();
   const { confirm, ConfirmModal } = useConfirm();
   // 뒤로가기(SideSheetHistory)로 닫으려다 거절하면 이미 걷힌 표식을 다시 쌓아야 한다 — 그 훅만 새로 마운트하려고 key 를 바꾼다.
@@ -52,6 +54,7 @@ export function SideSheet({ open, title, onClose, children, footer, dirty = fals
     onClose: () => void requestClose(),
     closeOnBack: false,
     exitMs: 0,
+    pending,
   });
 
   if (typeof document === 'undefined') return null;
@@ -80,8 +83,9 @@ export function SideSheet({ open, title, onClose, children, footer, dirty = fals
           <button
             type="button"
             onClick={() => void requestClose()}
+            disabled={pending}
             aria-label="닫기"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -104,7 +108,7 @@ export function SideSheet({ open, title, onClose, children, footer, dirty = fals
   // 확인 창은 시트가 닫혀도 렌더한다 — 열린 채 부모가 시트를 걷어도 확인 상태가 남아 다음에 저절로 뜨지 않게.
   return (
     <>
-      {open ? <SideSheetHistory key={historyEpoch} onClose={() => void closeFromHistory()} /> : null}
+      {open ? <SideSheetHistory key={historyEpoch} locked={pending} onClose={() => void closeFromHistory()} /> : null}
       {open ? createPortal(panel, document.body) : null}
       {ConfirmModal}
     </>
@@ -112,7 +116,7 @@ export function SideSheet({ open, title, onClose, children, footer, dirty = fals
 }
 
 /** 화면에 아무것도 그리지 않고 뒤로가기 표식만 쌓는다 — 다시 마운트하면 표식을 새로 쌓는다. */
-function SideSheetHistory({ onClose }: { onClose: () => void }) {
-  useOverlayHistory({ open: true, onClose });
+function SideSheetHistory({ onClose, locked }: { onClose: () => void; locked: boolean }) {
+  useOverlayHistory({ open: true, onClose, locked });
   return null;
 }

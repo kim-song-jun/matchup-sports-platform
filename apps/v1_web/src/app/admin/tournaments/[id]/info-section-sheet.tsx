@@ -81,7 +81,7 @@ export function InfoSectionSheet({
   };
 
   const cancel = async () => {
-    if (!(dirty || saving) || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
+    if (!dirty || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
   };
 
   return (
@@ -90,14 +90,15 @@ export function InfoSectionSheet({
         open
         title={title}
         onClose={onClose}
-        dirty={dirty || saving}
+        dirty={dirty}
+        pending={saving}
         footer={
           <div className="flex flex-col gap-2">
             {message ? (
               <p role="alert" className="text-[length:var(--font-size-label)] text-[var(--red700)]">{message}</p>
             ) : null}
             <div className="flex gap-2">
-              <Button type="button" variant="neutral" className="flex-1" onClick={() => void cancel()}>
+              <Button type="button" variant="neutral" className="flex-1" disabled={saving} onClick={() => void cancel()}>
                 취소
               </Button>
               <Button type="button" variant="primary" className="flex-1" disabled={saving || busy} onClick={() => void save()}>

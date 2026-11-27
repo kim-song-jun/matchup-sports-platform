@@ -222,6 +222,26 @@ describe('기본 섹션 시트', () => {
     await waitFor(() => expect(view.onClose).toHaveBeenCalledTimes(1));
   });
 
+  it('저장하는 동안에는 닫기·취소·ESC 가 막히고 「저장되지 않아요」 확인도 뜨지 않으며, 저장은 끝까지 간다', async () => {
+    const backend = start();
+    backend.state.tournamentPatchDelayMs = 80;
+    const view = renderInfoSheet(basicSection, backend);
+    fireEvent.change(view.inSheet().getByLabelText(/^대회명/), { target: { value: '저장 중인 이름' } });
+
+    view.save();
+
+    expect(await view.inSheet().findByRole('button', { name: '저장 중…' })).toBeDisabled();
+    expect(view.inSheet().getByRole('button', { name: '닫기' })).toBeDisabled();
+    expect(view.inSheet().getByRole('button', { name: '취소' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).toBeNull();
+    expect(view.onClose).not.toHaveBeenCalled();
+
+    await view.saved();
+    expect(view.onSaved).toHaveBeenCalledWith('기본 설정을 저장했어요.');
+    expect(backend.state.patches).toHaveLength(1);
+  });
+
   it.each(['닫기', '취소'])('안 바꾼 채 %s 를 누르면 묻지 않고 닫는다', async (closeButton) => {
     const view = renderInfoSheet(basicSection, start());
 

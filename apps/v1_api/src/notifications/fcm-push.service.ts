@@ -102,7 +102,8 @@ export class FcmPushService implements NativePushAdapter, OnModuleInit {
         headers: { authorization: 'Bearer ' + accessToken, 'content-type': 'application/json' },
         body: JSON.stringify({
           message: payload.dataOnly
-            ? { token: device.token, data: payload.dataOnly, android: { priority: 'high' } }
+            // 위젯 새로고침은 늦어도 되는 조용한 메시지라 일반 우선순위 — 높은 우선순위는 화면에 보이는 알림이 따르지 않으면 FCM 이 낮출 수 있고 기기를 깨운다.
+            ? { token: device.token, data: payload.dataOnly, android: { priority: 'normal' } }
             : {
                 token: device.token,
                 notification: { title: payload.title, body: payload.body ?? '' },

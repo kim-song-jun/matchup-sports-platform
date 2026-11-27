@@ -31,6 +31,8 @@ export class WidgetPushService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private readonly sent = new Map<string, string>();
+  /** 이번 틱에 본 키 — 틱이 끝나면 못 본 키(끝나서 사라진 경기·지워진 등록)를 `sent` 에서 지운다. */
+  private seen = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -53,6 +55,7 @@ export class WidgetPushService implements OnModuleInit, OnModuleDestroy {
   async tick(now: Date = new Date()): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.seen = new Set();
     try {
       await this.prisma.v1WidgetLiveActivity.deleteMany({ where: { updatedAt: { lt: new Date(now.getTime() - WIDGET_LIVE_MAX_AGE_MS) } } });
       const games = await this.prisma.v1Game.findMany({
@@ -74,15 +77,34 @@ export class WidgetPushService implements OnModuleInit, OnModuleDestroy {
       const androidDevices = await this.androidDevices(teamIds);
       const users = new Set([...activities.map((a) => a.userId), ...androidDevices.keys()]);
 
+      // 같은 팀 구성의 사용자는 위젯이 보여 주는 값이 같다 — 팀 묶음마다 한 번만 계산해 사용자 수만큼 쿼리가 늘지 않게 한다.
+      const memberships = await this.prisma.v1TeamMembership.findMany({
+        where: { userId: { in: [...users] }, status: 'active', team: { status: 'active', deletedAt: null } },
+        select: { userId: true, teamId: true },
+      });
+      const teamsOf = new Map<string, string[]>();
+      for (const m of memberships) teamsOf.set(m.userId, [...(teamsOf.get(m.userId) ?? []), m.teamId]);
+      const groups = new Map<string, { teamIds: string[]; users: string[] }>();
       for (const userId of users) {
-        const live = await this.home.liveFor(userId, now);
+        const ids = [...(teamsOf.get(userId) ?? [])].sort();
+        const key = ids.join(',');
+        const group = groups.get(key) ?? { teamIds: ids, users: [] };
+        group.users.push(userId);
+        groups.set(key, group);
+      }
+
+      for (const group of groups.values()) {
+        const live = await this.home.liveForTeams(group.teamIds, now);
         const byGame = new Map(live.map((game) => [game.gameId, game]));
-        await this.pushAndroid(userId, live, androidDevices.get(userId) ?? []);
-        for (const activity of activities.filter((a) => a.userId === userId)) {
-          const game = byGame.get(activity.gameId);
-          if (game !== undefined) await this.pushActivity(activity, game, now);
+        for (const userId of group.users) {
+          await this.pushAndroid(userId, live, androidDevices.get(userId) ?? []);
+          for (const activity of activities.filter((a) => a.userId === userId)) {
+            const game = byGame.get(activity.gameId);
+            if (game !== undefined) await this.pushActivity(activity, game, now);
+          }
         }
       }
+      for (const key of [...this.sent.keys()]) if (!this.seen.has(key)) this.sent.delete(key);
     } catch (err) {
       this.logger.error({ err }, 'widget push tick failed');
     } finally {
@@ -120,6 +142,7 @@ export class WidgetPushService implements OnModuleInit, OnModuleDestroy {
 
   private async pushActivity(activity: { id: string; pushToken: string }, game: WidgetLiveGame, now: Date): Promise<void> {
     const key = `i:${activity.id}:${activity.pushToken}`;
+    this.seen.add(key);
     const hash = liveStateHash(game);
     if (this.sent.get(key) === hash) return;
     const ended = game.state === 'ENDED';
@@ -138,6 +161,7 @@ export class WidgetPushService implements OnModuleInit, OnModuleDestroy {
 
   /** 지난번 보낸 지문과 다르면 기억하고 true. */
   private changed(key: string, hash: string): boolean {
+    this.seen.add(key);
     if (this.sent.get(key) === hash) return false;
     this.sent.set(key, hash);
     return true;

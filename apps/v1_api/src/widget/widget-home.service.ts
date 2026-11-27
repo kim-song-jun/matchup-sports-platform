@@ -155,9 +155,17 @@ export class WidgetHomeService {
     );
   }
 
-  /** 푸시용 — 홈 전체를 만들지 않고 진행 중·방금 끝난 경기만. 홈의 `live` 와 같은 값이다. */
-  async liveFor(userId: string, now: Date = new Date()): Promise<WidgetLiveGame[]> {
-    const teamMeta = await this.teamMetaFor(userId);
+  /**
+   * 푸시용 — 팀 묶음 하나의 진행 중·방금 끝난 경기만(홈 전체를 만들지 않는다). 홈의 `live` 와 같은 값이다.
+   * 같은 팀 구성의 사용자는 결과가 같아서 호출하는 쪽이 묶어서 한 번만 부른다.
+   */
+  async liveForTeams(teamIds: string[], now: Date = new Date()): Promise<WidgetLiveGame[]> {
+    if (teamIds.length === 0) return [];
+    const teams = await this.prisma.v1Team.findMany({
+      where: { id: { in: teamIds }, status: 'active', deletedAt: null },
+      select: { id: true, name: true, memberCount: true, profile: { select: { logoUrl: true } } },
+    });
+    const teamMeta = new Map<string, TeamMeta>(teams.map((t) => [t.id, { name: t.name, memberCount: t.memberCount, logoUrl: resolveTeamLogoUrl(t.id, t.profile?.logoUrl) }]));
     return teamMeta.size === 0 ? [] : this.liveGames([...teamMeta.keys()], teamMeta, now);
   }
 

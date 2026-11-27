@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './admin-shell';
+import { AdminTabNav } from '@/components/admin/admin-tab-nav';
 import { TAB_CONTAINER_SELECTOR, TAB_LINK_SELECTOR } from '@/components/v1-ui/navigation-tab-selectors';
 
 vi.mock('next/navigation', () => ({
@@ -239,5 +240,28 @@ describe('AdminShell 사이드바 선택 표시', () => {
       expect(borderClasses(link.className)).toEqual([]);
       expect(link.className).not.toContain('bg-[var(--blue50)]');
     }
+  });
+});
+
+describe('AdminShell 가 하위 탭 줄에 내려 주는 고정 기준', () => {
+  const ancestorClasses = (element: HTMLElement) => {
+    const classes: string[] = [];
+    for (let node = element.parentElement; node; node = node.parentElement) classes.push(node.className);
+    return classes.join(' ');
+  };
+
+  it('모바일 앱바 높이를 고정 오프셋으로, 본문 좌우 패딩을 여백으로 내려 준다', () => {
+    render(
+      <AdminShell>
+        <AdminTabNav ariaLabel="섹션" tabs={[{ slug: 'overview', label: '개요' }]} basePath="/admin/things/1" pathname="/admin/things/1/overview" />
+      </AdminShell>,
+    );
+
+    const hosts = ancestorClasses(screen.getByRole('navigation', { name: '섹션' }));
+    expect(hosts).toContain('[--admin-sticky-top:52px]');
+    expect(hosts).toContain('[--admin-gutter:1rem]');
+    expect(hosts).toContain('md:[--admin-gutter:1.5rem]');
+    // 52px 는 같은 셸의 모바일 앱바 높이다.
+    expect(screen.getByRole('banner').className).toContain('h-[52px]');
   });
 });

@@ -64,7 +64,8 @@ function isActive(pathname: string, basePath: string, item: AdminTabNavItem): bo
 
 /**
  * 어드민 상세(대회·리그)의 가로 탭 줄 — 자주 쓰는 탭 몇 개와 오른쪽 「더보기」 메뉴.
- * 폰에서는 상단 앱바 아래에 붙고, 현재 탭은 화면 안으로 스크롤한다.
+ * 폰에서는 화면 위쪽에 붙고, 현재 탭은 화면 안으로 스크롤한다.
+ * 붙는 위치(`--admin-sticky-top`: 앱바 높이)와 본문 좌우 패딩(`--admin-gutter`)은 호스트가 정한다 — 변수가 없으면 0 이다.
  */
 export function AdminTabNav({ ariaLabel, tabs, more, basePath, pathname, query = '' }: AdminTabNavProps) {
   const activeRef = useRef<HTMLAnchorElement>(null);
@@ -89,7 +90,7 @@ export function AdminTabNav({ ariaLabel, tabs, more, basePath, pathname, query =
   return (
     <nav
       aria-label={ariaLabel}
-      className="sticky top-[52px] z-10 -mx-4 border-b border-[var(--border)] bg-[var(--bg)] px-4 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:px-0"
+      className="sticky top-[var(--admin-sticky-top,0px)] z-10 -mx-[var(--admin-gutter,0px)] border-b border-[var(--border)] bg-[var(--bg)] px-[var(--admin-gutter,0px)] lg:static lg:mx-0 lg:px-0"
     >
       <div className="flex items-stretch">
         <div className="flex min-w-0 flex-1 overflow-x-auto">

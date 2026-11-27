@@ -61,6 +61,19 @@ describe('AdminTabNav', () => {
     expect(within(nav()).getByRole('link', { name: '신청 3' })).toHaveAttribute('aria-current', 'page');
   });
 
+  it('고정 오프셋과 좌우 여백은 호스트가 정하고, 값이 없으면 0 이라 앱바 없는 면에서도 맨 위에 붙는다', () => {
+    renderNav();
+
+    const className = nav().className;
+    expect(className).toContain('sticky');
+    expect(className).toContain('top-[var(--admin-sticky-top,0px)]');
+    expect(className).toContain('-mx-[var(--admin-gutter,0px)]');
+    expect(className).toContain('px-[var(--admin-gutter,0px)]');
+    // 어느 한 호스트(어드민 앱바)의 높이를 박아 두지 않는다.
+    expect(className).not.toMatch(/top-\[\d+px\]/);
+    expect(className).toContain('lg:static');
+  });
+
   it('모든 탭 링크는 min-h-[44px]·min-w-[44px] 이다', () => {
     renderNav();
     for (const link of within(nav()).getAllByRole('link')) {

@@ -341,6 +341,26 @@ describe('탭', () => {
     expect(moreLink(more, /팝업/)).toHaveAttribute('href', '/sample/tournaments/tournament-1/popups');
   });
 
+  it('앱바가 없는 면(스태프·공개 샘플)에서는 탭 줄 조상이 고정 오프셋을 내려 주지 않아 0 으로 맨 위에 붙는다', () => {
+    const declaredAbove = () => {
+      const declared: string[] = [];
+      for (let node = tabNav().parentElement; node; node = node.parentElement) {
+        if (node.className.includes('--admin-sticky-top') || node.getAttribute('style')?.includes('--admin-sticky-top')) {
+          declared.push(node.className);
+        }
+      }
+      return declared;
+    };
+
+    const staff = renderStaff();
+    expect(tabNav().className).toContain('top-[var(--admin-sticky-top,0px)]');
+    expect(declaredAbove()).toEqual([]);
+    staff.unmount();
+
+    renderSample();
+    expect(declaredAbove()).toEqual([]);
+  });
+
   it('operationCounts 가 없어도 탭이 깨지지 않는다', () => {
     setTournament({ operationCounts: undefined });
     renderPlatform();

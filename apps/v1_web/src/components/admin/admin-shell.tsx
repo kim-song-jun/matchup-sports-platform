@@ -587,7 +587,8 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
       </div>
 
       {/* ── Right column: appbar + main ───────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
+      {/* --admin-sticky-top 은 아래 모바일 앱바(h-[52px]) 높이, --admin-gutter 는 main 의 좌우 패딩이다. */}
+      <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px] [--admin-sticky-top:52px]">
         {/* Mobile sticky appbar (<lg) */}
         <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
           <button
@@ -615,7 +616,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
+        <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8 [--admin-gutter:1rem] md:[--admin-gutter:1.5rem]">
           <div className={`${wide ? 'max-w-none' : 'max-w-[1200px] xl:max-w-[1320px]'} mx-auto w-full`}>{children}</div>
         </main>
       </div>

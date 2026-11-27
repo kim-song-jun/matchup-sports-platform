@@ -463,5 +463,5 @@ it('N개 토너먼트의 목록 보기는 구조 변경 버튼 대신 전용 설
     createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
     onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
   expect(screen.queryByRole('button', { name: /수정|삭제|대진 자동 생성|직접 입력/ })).not.toBeInTheDocument();
-  expect(screen.getByText('그림 보기에서 예선 팀을 배정하고, 진출팀 배정 화면에서 결선 진출팀을 편집해요.')).toBeInTheDocument();
+  expect(screen.getByText('그림 보기에서 예선 팀을 배정하고, 「팀 채우기」 메뉴의 「결선 진출팀 직접 정하기」에서 결선 진출팀을 정해요.')).toBeInTheDocument();
 });

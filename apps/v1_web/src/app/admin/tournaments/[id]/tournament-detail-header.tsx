@@ -33,6 +33,10 @@ export function TournamentDetailHeader({
   liveOps,
   moreActions,
 }: TournamentDetailHeaderProps) {
+  // 데스크톱에서 오른쪽 묶음을 끝으로 미는 자동 여백은 그 묶음의 첫 컨트롤 하나에만 둔다(둘이면 여백이 갈라진다).
+  const pushRight = (control: 'liveOps' | 'primary' | 'more') =>
+    (liveOps ? 'liveOps' : primaryAction ? 'primary' : 'more') === control ? 'lg:ml-auto' : '';
+
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 lg:flex-nowrap">
       <Link
@@ -51,7 +55,7 @@ export function TournamentDetailHeader({
       </div>
 
       {moreActions.length > 0 ? (
-        <div className="order-3 shrink-0 lg:order-5">
+        <div className={`order-3 shrink-0 lg:order-5 ${pushRight('more')}`}>
           <ActionMenu
             label="대회 더 보기"
             align="end"
@@ -75,7 +79,7 @@ export function TournamentDetailHeader({
       <div className="order-4 flex w-full items-center gap-2 lg:contents">
         <div className="shrink-0 lg:order-3">{statusMenu}</div>
         {liveOps ? (
-          <div className="shrink-0 lg:order-4 lg:ml-auto">
+          <div className={`shrink-0 lg:order-4 ${pushRight('liveOps')}`}>
             <LiveOpsButton {...liveOps} />
           </div>
         ) : null}
@@ -84,9 +88,9 @@ export function TournamentDetailHeader({
             type="button"
             disabled={primaryAction.busy}
             onClick={primaryAction.onClick}
-            className={`tm-btn tm-btn-md min-w-0 flex-1 whitespace-nowrap lg:order-4 lg:flex-none ${
-              liveOps ? '' : 'lg:ml-auto'
-            } ${primaryAction.emphasis === 'primary' ? 'tm-btn-primary' : 'tm-btn-outline'}`}
+            className={`tm-btn tm-btn-md min-w-0 flex-1 whitespace-nowrap lg:order-4 lg:flex-none ${pushRight('primary')} ${
+              primaryAction.emphasis === 'primary' ? 'tm-btn-primary' : 'tm-btn-outline'
+            }`}
           >
             {primaryAction.label}
           </button>

@@ -228,4 +228,36 @@ describe('TournamentDetailHeader', () => {
     const menu = screen.getByRole('menu', { name: '대회 더 보기' });
     expect(within(menu).getByRole('menuitem', { name: '스태프 배정' })).toHaveAttribute('href', '/admin/live/tournament-1/staff');
   });
+
+  // jsdom 에는 레이아웃이 없다 — 데스크톱 한 줄에서 오른쪽 묶음을 끝으로 미는 자동 여백(`lg:ml-auto`)이
+  // 오른쪽 묶음의 첫 컨트롤 하나에만 있는지로 ⋯ 가 어떤 조합에서도 오른쪽 끝에 서는지 본다.
+  describe('오른쪽 묶음 정렬', () => {
+    const MORE = [{ key: 'staff', label: '스태프 배정', href: '/admin/live/tournament-1/staff' }];
+    const LIVE_OPS = { href: '/admin/live/tournament-1/operations' };
+    const PRIMARY = { label: '접수 마감하기', emphasis: 'primary' as const, busy: false, onClick: vi.fn() };
+
+    const pushedRight = (container: HTMLElement) => container.querySelectorAll('[class*="lg:ml-auto"]');
+
+    it.each([
+      ['현장 운영·주 버튼 없음(조회 전용·취소됨)', {}, () => screen.getByRole('button', { name: '대회 더 보기' })],
+      ['주 버튼만', { primaryAction: PRIMARY }, () => screen.getByRole('button', { name: '접수 마감하기' })],
+      ['현장 운영만', { liveOps: LIVE_OPS }, () => screen.getByRole('link', { name: /현장 운영/ })],
+      ['현장 운영 비활성(사유)만', { liveOps: { ...LIVE_OPS, reasonLabel: '스태프 배정이 필요해요.' } }, () => screen.getByRole('button', { name: /현장 운영/ })],
+      ['현장 운영·주 버튼 모두', { liveOps: LIVE_OPS, primaryAction: PRIMARY }, () => screen.getByRole('link', { name: /현장 운영/ })],
+    ] as [string, Partial<TournamentDetailHeaderProps>, () => HTMLElement][])(
+      '%s — 자동 여백은 오른쪽 묶음의 첫 컨트롤에 하나만 있다',
+      (_name, overrides, firstControl) => {
+        const { container } = render(<TournamentDetailHeader {...headerProps({ moreActions: MORE, ...overrides })} />);
+
+        const pushed = pushedRight(container);
+        expect(pushed).toHaveLength(1);
+        expect(pushed[0].contains(firstControl())).toBe(true);
+      },
+    );
+
+    it('⋯ 가 없고 주 버튼도 없으면 밀어낼 컨트롤이 없다', () => {
+      const { container } = render(<TournamentDetailHeader {...headerProps()} />);
+      expect(pushedRight(container)).toHaveLength(0);
+    });
+  });
 });

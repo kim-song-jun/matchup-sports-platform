@@ -11,6 +11,7 @@
 
 - 확인창에 `초기화한다`를 공백까지 정확히 입력해야 실행 버튼이 활성화된다. 취소/닫기 뒤 재진입하면 입력은 비운다. 서버 DTO와 service 모두 같은 문구를 검증하며 누락·다른 문구·문자열 boolean은 400이다. 구버전 클라이언트의 문구 없는 요청도 거절한다.
 - 복수 결선 설정창의 기존 `POST /admin/tournaments/:id/bracket/multi-finals/reset`도 `{ expectedRevision, confirmationText: "초기화한다" }`를 요구한다. 같은 직접 입력 모달과 서버 검증을 적용해 설정창으로 우회할 수 없다. `tournament.multi_finals.reset`은 기존 config 필드를 유지하면서 `beforeJson.bracketState`에 공통 전체 상태와 대회 정보를 저장하고, 결과에 처리자·확인 문구·보관 경기 ID를 남긴다. 상단 초기화와 같은 상태 캡처 함수를 사용하며 모두 같은 tx에서 기록한다.
+- 공통 감사 상태는 원본 TeamMatch(홈/원정 자리 연결 포함)와 Game/공개 정책, 초기화가 함께 취소하는 예정 팀 일정 및 게스트 모집 원본도 보존한다. 결과에는 취소 일정 ID도 남긴다. 실제 PostgreSQL 검증은 초기화 후 일정 CANCELLED·모집 CLOSED·공개 정책 STATUS_ONLY/lineupAt 해제와 해당 이전 값의 감사 보존을 함께 확인한다.
 - 성공 감사는 기존 `tournament.bracket.reset` 로그에 처리자(admin FK 또는 총괄 actor/배정 권한), DB 처리 시각, 대상 대회, 확인 문구, 초기화 전 tournament/config·fixtures/Game 상태·groups·slots·groupTeams·edges·조별/통합 standings·byes 전체와 처리 결과·보관 경기/삭제 그룹/해제 slot·edge ID를 남긴다. 기존 경기별 보관/일정 취소 로그도 유지한다. 감사 저장과 초기화는 같은 트랜잭션이므로 최종 감사 실패도 전체 rollback한다. 입력 취소/DTO 거절을 초기화 성공으로 기록하지 않는다.
 
 - 기존 success/error envelope 적용. UUID path 및 DTO whitelist/forbidNonWhitelisted 적용. offset/시각 입력은 없으며 잘못된 hash·확인 누락/false·추가 필드는 400. 비인증 401, support 쓰기·철회/만료/타 대회 총괄은 403. 조회는 기존 대회 관리 읽기 권한. 없는/삭제된 대회·다른 surface는 404 `TOURNAMENT_NOT_FOUND`.

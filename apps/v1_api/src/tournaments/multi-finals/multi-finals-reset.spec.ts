@@ -32,6 +32,7 @@ function harness(options: { director?: boolean; revoked?: boolean; expiresAt?: D
     v1TournamentStanding: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), deleteMany: jest.fn() },
     v1TournamentOverallStanding: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
     v1TournamentGroupTeam: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },

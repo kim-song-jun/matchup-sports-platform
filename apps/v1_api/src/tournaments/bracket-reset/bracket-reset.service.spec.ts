@@ -32,6 +32,7 @@ function setup(role: 'owner' | 'support' | null = 'owner', directorTournament?: 
         ...(data.stagePlanRevision ? { stagePlanRevision: row.stagePlanRevision + 1 } : {}) }); return row;
     }) },
     v1TeamMatch: { findFirst: jest.fn(async (_args: unknown) => null as { id: string } | null) },
+    v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([{ id: 'schedule', teamMatchId: 'first', state: 'SCHEDULED', guestRecruitment: { id: 'guest', state: 'OPEN' } }]) },
     v1TournamentMatchDetails: { findMany: jest.fn(async () => fixtures.filter(f => !f.deleted)) },
     v1TournamentGroup: { findMany: jest.fn(async () => [...groups]) },
     v1TournamentSlot: { findMany: jest.fn(async () => [...slots]), deleteMany: jest.fn(async () => { slots.length = 0; }) },
@@ -78,9 +79,10 @@ describe('대진 상단 초기화 계약', () => {
       beforeJson: expect.objectContaining({ tournament: expect.objectContaining({ id: 't1', format }),
         fixtures: expect.arrayContaining([expect.objectContaining({ teamMatchId: 'first' })]),
         slots: [{ id: 'slot', registrationId: 'reg1' }], groupTeams: expect.any(Array),
-        edges: [], standings: [], byes: [], overallStandings: [] }),
+        edges: [], standings: [], byes: [], overallStandings: [],
+        schedules: [{ id: 'schedule', teamMatchId: 'first', state: 'SCHEDULED', guestRecruitment: { id: 'guest', state: 'OPEN' } }] }),
       afterJson: expect.objectContaining({ result: 'succeeded', actorUserId: 'actor', confirmationText: '초기화한다',
-        archivedFixtureIds: ['first'], clearedSlotIds: ['slot'], clearedAdvancementEdgeIds: [] }),
+        archivedFixtureIds: ['first'], clearedSlotIds: ['slot'], clearedAdvancementEdgeIds: [], cancelledScheduleIds: ['schedule'] }),
     }) }));
   });
   it('단계 정의와 경기 규칙은 보존하고 생성된 그룹·배정·복구 메타데이터는 지운다', async () => {

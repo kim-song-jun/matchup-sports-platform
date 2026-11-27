@@ -28,7 +28,7 @@ export class BracketResetService {
       sixTeamMode: true, sixTeamBracket: true, bracketPublishedAt: true, bracketPublishScheduledAt: true,
     } });
     if (!tournament) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-    const { fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings } = await captureBracketResetState(tx, id);
+    const { fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings, schedules } = await captureBracketResetState(tx, id);
     const unsafe = await tx.v1TeamMatch.findFirst({ where: { tournamentId: id, deletedAt: null, tournamentDetails: { isNot: null },
       OR: [{ status: { not: 'matched' } }, { game: { is: null } }, { game: { isNot: untouchedGameWhere(true) } }] }, select: { id: true } });
     const preservesPreliminaryGroups = !tournament.stagePlan && (tournament.format === 'league' || tournament.format === 'group_knockout'
@@ -38,7 +38,7 @@ export class BracketResetService {
       : unsafe ? '시작했거나 경기 기록·결과가 있는 경기가 있어 대진을 초기화할 수 없어요.'
         : fixtures.length + slots.length + groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').length === 0
           ? '초기화할 대진이 없어요.' : null;
-    const before = { tournament, fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings };
+    const before = { tournament, fixtures, groups, slots, groupTeams, edges, standings, byes, overallStandings, schedules };
     const hash = createHash('sha256').update(JSON.stringify(before)).digest('hex');
     return { ...before, hash, blockedReason, preservesPreliminaryGroups };
   }
@@ -99,6 +99,7 @@ export class BracketResetService {
           archivedFixtureIds: snapshot.fixtures.map(fixture => fixture.teamMatchId),
           removedGroupIds: snapshot.groups.filter(group => !preservesPreliminaryGroups || group.phase !== 'group').map(group => group.id),
           clearedSlotIds: snapshot.slots.map(slot => slot.id), clearedAdvancementEdgeIds: snapshot.edges.map(edge => edge.id),
+          cancelledScheduleIds: snapshot.schedules.map(schedule => schedule.id),
           unpublished: true, settingsPreserved: true } }, tx);
       return { deletedFixtureCount: snapshot.fixtures.length };
     }, options);

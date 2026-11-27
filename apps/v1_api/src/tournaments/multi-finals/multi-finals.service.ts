@@ -215,6 +215,7 @@ export class MultiFinalsService {
       reason: '초기화한다',
       beforeJson: JSON.parse(JSON.stringify({ ...config, bracketState: { tournament, ...bracketState } })),
       afterJson: { result: 'succeeded', actorUserId: admin.userId, confirmationText: dto.confirmationText,
+        cancelledScheduleIds: bracketState.schedules.map(schedule => schedule.id),
         archivedFixtureIds: fixtures.map(f => f.teamMatchId), deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
     return this.view(tx, id);
   }

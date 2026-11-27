@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentStatus } from '@/types/api';
 import {
-  TOURNAMENT_CHIP_LABEL,
   TOURNAMENT_STAGES,
-  TOURNAMENT_STAGE_LABEL,
   primaryStatusAction,
   stageIndex,
   statusActions,
@@ -14,23 +12,9 @@ import {
 const rows = (status: V1TournamentStatus, canRevertStart = false) =>
   statusActions(status, { canRevertStart }).map((action) => [action.kind, action.target, action.label]);
 
-describe('상태 이름·진행 단계', () => {
-  it('진행 단계 5칸과 칩 이름 6개를 한 곳에서 정한다', () => {
-    expect(TOURNAMENT_STAGES.map((stage) => TOURNAMENT_STAGE_LABEL[stage])).toEqual([
-      '초안',
-      '접수 중',
-      '접수 마감',
-      '진행 중',
-      '완료',
-    ]);
-    expect(TOURNAMENT_CHIP_LABEL).toEqual({
-      draft: '초안',
-      open: '접수 중',
-      closed: '접수 마감',
-      in_progress: '진행 중',
-      completed: '완료',
-      cancelled: '취소됨',
-    });
+describe('진행 단계', () => {
+  it('진행 막대 5칸은 초안 → 접수 중 → 접수 마감 → 진행 중 → 완료 순서다', () => {
+    expect([...TOURNAMENT_STAGES]).toEqual(['draft', 'open', 'closed', 'in_progress', 'completed']);
   });
 
   it('stageIndex 는 0~4 이고 취소는 단계가 없다', () => {

@@ -6,10 +6,9 @@ import { tournamentVisibilityAction } from '@/components/admin/tournaments/tourn
 import { ActionMenu } from '@/components/v1-ui/action-menu';
 import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import type { V1TournamentStatus } from '@/types/api';
+import { tournamentStatusLabel } from '@/lib/v1-status-labels';
 import {
-  TOURNAMENT_CHIP_LABEL,
   TOURNAMENT_STAGES,
-  TOURNAMENT_STAGE_LABEL,
   stageIndex,
   statusActions,
   type StatusAction,
@@ -32,7 +31,7 @@ function StageProgress({ status }: { status: V1TournamentStatus }) {
   return (
     <div className="rounded-xl bg-[var(--surface-soft)] p-3">
       <p className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">
-        지금: {TOURNAMENT_CHIP_LABEL[status]}
+        지금: {tournamentStatusLabel(status)}
       </p>
       {current === null ? null : (
         <ol aria-label="진행 단계" className="mt-2 grid grid-cols-5 gap-1">
@@ -48,7 +47,7 @@ function StageProgress({ status }: { status: V1TournamentStatus }) {
                   index === current ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-muted)]',
                 ].join(' ')}
               >
-                {TOURNAMENT_STAGE_LABEL[stage]}
+                {tournamentStatusLabel(stage)}
               </span>
             </li>
           ))}
@@ -94,7 +93,7 @@ export function TournamentStatusMenu({
     ...all.filter((action) => action.kind === 'cancel').map((action) => toMenuItem(action, '되돌리기 어려운 동작')),
   ];
 
-  const chipLabel = TOURNAMENT_CHIP_LABEL[status];
+  const chipLabel = tournamentStatusLabel(status);
   const visibilityLabel = status === 'cancelled' ? null : isPublic ? '공개' : '비공개';
 
   // 열 항목이 없으면(조회 전용 관리자의 취소된 대회) 누를 수 없는 버튼 대신 상태만 보인다.

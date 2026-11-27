@@ -2,22 +2,9 @@ import type { ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import type { V1TournamentStatus } from '@/types/api';
 import { REVERT_COPY, allowedNextStatuses, revertTargetStatus } from './tournament-admin-shared';
 
-/** 상태 칩 메뉴의 진행 막대 5칸. 취소는 이 흐름 밖이라 칸이 없다. */
+/** 상태 칩 메뉴의 진행 막대 5칸(이름은 `tournamentStatusLabel`). 취소는 이 흐름 밖이라 칸이 없다. */
 export const TOURNAMENT_STAGES = ['draft', 'open', 'closed', 'in_progress', 'completed'] as const;
 type TournamentStage = (typeof TOURNAMENT_STAGES)[number];
-
-export const TOURNAMENT_STAGE_LABEL: Record<TournamentStage, string> = {
-  draft: '초안',
-  open: '접수 중',
-  closed: '접수 마감',
-  in_progress: '진행 중',
-  completed: '완료',
-};
-
-export const TOURNAMENT_CHIP_LABEL: Record<V1TournamentStatus, string> = {
-  ...TOURNAMENT_STAGE_LABEL,
-  cancelled: '취소됨',
-};
 
 export function stageIndex(status: V1TournamentStatus): number | null {
   const index = TOURNAMENT_STAGES.indexOf(status as TournamentStage);

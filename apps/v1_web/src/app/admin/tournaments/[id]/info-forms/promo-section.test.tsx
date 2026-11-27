@@ -38,6 +38,20 @@ describe('홍보 섹션 시트', () => {
     expect(view.onSaved).toHaveBeenCalledWith('홍보 설정을 저장했어요.');
   });
 
+  it('켜기만 해서는 날짜·장소·상금 문구를 채우지 않고, 시트가 그렇게 말한다', () => {
+    const view = renderInfoSheet(promoSection, start({ venue: '성수 풋살장', prizeSummary: '우승 상금 100만원' }));
+
+    fireEvent.click(view.inSheet().getByRole('switch', { name: '홈 오늘의 추천 노출' }));
+
+    const home = card(view, '홈 오늘의 추천');
+    expect(home.getByLabelText('날짜 문구')).toHaveValue('');
+    expect(home.getByLabelText('장소 문구')).toHaveValue('');
+    expect(home.getByLabelText('상금 문구')).toHaveValue('');
+    expect(view.inSheet().getByText('켜면 홈과 대회 목록 위쪽에 이 대회가 카드로 보여요.')).toBeInTheDocument();
+    expect(view.inSheet().getByText('비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」 로 넣어요.')).toBeInTheDocument();
+    expect(view.sheet().textContent).not.toContain('켜면 대회 정보로 카드 문구를 채워요');
+  });
+
   it('대회 목록 상단 카드를 켜면 그 카드의 키만 보낸다', async () => {
     const backend = start(homeOn);
     const view = renderInfoSheet(promoSection, backend);

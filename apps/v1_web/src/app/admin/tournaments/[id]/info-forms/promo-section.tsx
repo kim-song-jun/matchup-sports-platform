@@ -118,6 +118,9 @@ function PromoForm({ base, disabled, ref, onDirtyChange, onBusyChange }: InfoSec
 
   return (
     <div>
+      <p className="pt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+        비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」 로 넣어요.
+      </p>
       {SLOTS.map(({ slot }) => {
         const card = draft[slot];
         const other = slot === 'home' ? 'list' : 'home';

@@ -11,7 +11,7 @@ export const TOURNAMENT_INFO_SECTION_META: Record<TournamentInfoSectionKey, { ti
   entry: { title: '참가', description: '몇 팀이, 몇 명으로, 얼마에 참가하는지예요.' },
   rules: { title: '경기 규칙', description: '모든 경기에 똑같이 적용돼요.' },
   public: { title: '공개 화면', description: '참가자가 대회 페이지에서 보는 내용이에요.' },
-  promo: { title: '홍보', description: '켜면 대회 정보로 카드 문구를 채워요.' },
+  promo: { title: '홍보', description: '켜면 홈과 대회 목록 위쪽에 이 대회가 카드로 보여요.' },
 };
 
 /** `?edit=` 값 해석 — 소문자 섹션 키와 정확히 같을 때만 섹션이다. */

@@ -1,5 +1,6 @@
 'use client';
 import { FixtureAssignmentWorkspace } from '@/components/admin/bracket-canvas/fixture-assignment-workspace';
+import { BracketResetButton } from '@/components/admin/bracket-canvas/bracket-reset-button';
 import { StagePlanToolbar } from '@/components/admin/stages/stage-plan-toolbar';
 import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
 import { useState } from 'react';
@@ -71,6 +72,7 @@ function BracketPageBody() {
       </> : null);
   const content = (
     <div className="flex flex-col gap-4">
+      {tournament ? <BracketResetButton tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} /> : null}
       <SegmentedTabs
         ariaLabel="대진 보기 방식"
         role="tablist"

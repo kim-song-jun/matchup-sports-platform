@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
+vi.mock('@/components/admin/bracket-canvas/bracket-reset-button', () => ({ BracketResetButton: () => null }));
+
 const { adminState } = vi.hoisted(() => ({ adminState: { canWrite: true } }));
 
 vi.mock('next/navigation', () => ({

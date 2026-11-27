@@ -813,6 +813,12 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
   place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
+  http.get(`${api}/admin/tournaments/:tournamentId/bracket/reset-preview`, () => HttpResponse.json({
+    status: 'error', code: 'BRACKET_RESET_REQUIRES_REAL_API', message: '대진 초기화는 실제 API 연결에서만 사용할 수 있어요.',
+  }, { status: 503 })),
+  http.post(`${api}/admin/tournaments/:tournamentId/bracket/reset`, () => HttpResponse.json({
+    status: 'error', code: 'BRACKET_RESET_REQUIRES_REAL_API', message: '대진 초기화는 실제 API 연결에서만 사용할 수 있어요.',
+  }, { status: 503 })),
   ...adminPushHistoryMswHandlers,
   ...namedFinalsMsw.handlers,
   ...scheduleTimeHandlers,

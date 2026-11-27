@@ -5,6 +5,8 @@ import type { V1AdminTournamentRegistration } from '@/types/api';
 import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
+vi.mock('@/components/admin/bracket-canvas/bracket-reset-button', () => ({ BracketResetButton: () => null }));
+
 const mocks = vi.hoisted(() => ({
   registrations: { data: undefined as unknown, isError: false, error: null as unknown, refetch: vi.fn() },
 }));

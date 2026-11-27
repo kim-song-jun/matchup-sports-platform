@@ -54,16 +54,16 @@ import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-s
 import { RestTimerCard, RestTimerPresets, useRestTimer } from './rest-timer';
 import { RedCardPenaltyBanner, type PenaltyNowAnchor } from './red-card-penalty-banner';
 import { useEventToast, EventToasts } from './event-toast';
-import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
-import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts, resolveTeamFoulThreshold } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, deriveSentOffRedCards, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from './team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 import {
+  clockCheckConfirmCopy,
   commandConfirmCopy,
-  commitActionConfirmCopy,
+  recordNounOf,
+  recordedToastCopy,
   secondYellowConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
@@ -416,14 +416,8 @@ export function OperateConsoleCore({
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
   const gameDetailBehind = (gameDetail.data?.version ?? 0) < gameVersion;
-  // 확인 모달이 떠 있는 동안 버전이 낡는 문제(409 VERSION_CONFLICT) —
-  // 커맨드는 이제 예외 없이 확인을 거치고(사용자 결정), 승부차기 입력은 킥을
-  // 다 찍을 때까지 수 분이 걸릴 수도 있다. 그사이 다른 이벤트가 커밋되면
-  // (`use-v1-game-operations-console`의 WS ack가 gameSnapshot.version을
-  // 올린다) 모달을 연 렌더의 클로저가 들고 있던 `gameVersion`은 이미 낡은
-  // 값이고, 그대로 보내면 서버가 CAS에서 409를 던진다(command transport는
-  // 재시도하지 않는다). ref로 "보내는 순간의" 최신 버전을 읽는다 —
-  // 아래 handleRunCommandRef가 토스트 콜백에 쓰는 것과 같은 패턴이다.
+  // 확인 창이 떠 있거나 승부차기를 입력하는 동안 다른 기록이 커밋되면 버전이 올라간다. 창을 연 렌더의
+  // 값으로 보내면 서버가 409 VERSION_CONFLICT 를 주므로, 보내는 순간의 버전을 ref 로 읽는다.
   const gameVersionRef = useRef(gameVersion);
   const commandScopeGenerationRef = useRef(0);
   const commandAttemptRef = useRef(0);
@@ -1023,16 +1017,8 @@ export function OperateConsoleCore({
     if (ok) ops.requestTakeover({ force: true });
   }, [confirm, ops, takeoverHandoff?.holderName]);
 
-  // alpha "452′" 사고 대응 — 예전엔 이 계산이 곧장 `confirm()`을 띄우는
-  // `confirmIfClockSuspicious`였다(시계가 수상할 때만 확인). 과제 1(사용자
-  // 결정: "예외 없이 전부"에 확인 모달)로 이제 모든 커밋이 항상 확인을
-  // 거치므로, 시계가 수상하다고 여기서 또 `confirm()`을 부르면 확인 모달이
-  // 두 번(먼저 이 경고, 그다음 액션 확인) 뜬다 — 나쁜 UX다. 그래서 이 함수는
-  // 더 이상 confirm을 부르지 않고 "경고가 필요한가/피리어드가 몇 분짜리인가"
-  // 만 계산해서 돌려주고, 호출부(`handleCommit`)가
-  // `commitActionConfirmCopy`에 이 값을 건네 **같은 모달 안에** 병합한다.
-  // `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음) 판단 근거가
-  // 없으므로 경고 없이 통과시킨다 — 지어낸 기준으로 막지 않는다.
+  // 기록 시각이 수상한지(경기 시간의 보통 길이를 크게 넘는지)만 계산한다 — 확인은 `handleCommit` 이 띄운다.
+  // 경기 시간 길이를 못 읽었으면 판단 근거가 없으므로 경고 없이 통과시킨다.
   const clockWarningMinutes = useCallback(
     (clockMs: number): number | null => {
       if (currentPeriodDurationMinutes === null || !isClockSuspicious(clockMs, currentPeriodDurationMinutes)) {
@@ -1096,13 +1082,7 @@ export function OperateConsoleCore({
   // 경고 누적 퇴장 합친 줄의 수정이면 `editTarget` 은 레드이고 여기에 함께 옮길 두 번째 옐로가 들어 있다(아니면 빈 배열).
   const [editLinked, setEditLinked] = useState<readonly GameEventRecord[]>([]);
 
-  // Copilot review (PR #276): the toast's action.onClick used to close over
-  // `ops.liveEvents` from the render that submitted the GOAL -- before the
-  // websocket/query round-trip lands that event in liveEvents. The toast
-  // itself is never re-created once shown, so that closure stayed stale for
-  // its whole 5s lifetime and findRecentGoalEvent almost always returned
-  // undefined ("어시스트 추가" silently did nothing). A ref kept in sync via
-  // effect lets the onClick read the live value at click time instead.
+  // 토스트의 되돌리기는 토스트를 띄운 렌더의 클로저로 남는다 — 누르는 순간의 기록 목록을 ref 로 읽는다.
   const liveEventsRef = useRef(ops.liveEvents);
   useEffect(() => {
     liveEventsRef.current = ops.liveEvents;
@@ -1147,60 +1127,140 @@ export function OperateConsoleCore({
     [],
   );
 
+  // 방금 적재한 기록이 서버 기록 목록에 나타날 때까지 기다린다(확정 직후 목록 반영까지의 틈).
+  const waitForRecordedEvent = useCallback(
+    (clientEventId: string, timeoutMs: number) =>
+      new Promise<GameEventRecord | null>((resolve) => {
+        let done = false;
+        const timer = setTimeout(() => {
+          done = true;
+          resolve(null);
+        }, timeoutMs);
+        const check = () => {
+          if (done) return;
+          const event = opsRef.current.liveEvents.find((candidate) => candidate.clientEventId === clientEventId);
+          if (event === undefined) {
+            eventSettledWaitersRef.current.push(check);
+            return;
+          }
+          done = true;
+          clearTimeout(timer);
+          resolve(event);
+        };
+        check();
+      }),
+    [],
+  );
+
+  const commandBlockedRef = useRef(commandBlocked);
+  useEffect(() => {
+    commandBlockedRef.current = commandBlocked;
+  }, [commandBlocked]);
+  // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.
+  const undoStartedRef = useRef(new Set<string>());
+
+  /**
+   * 방금 한 기록을 되돌린다. 여러 건이면 뒤에서부터 — 레드를 먼저 되돌려야 도중에 멈춰도 근거 없는 레드가 남지 않는다.
+   * 서버에 없는 기록(전송 실패)·이미 취소한 기록은 되돌렸다고 말하지 않는다.
+   */
+  const undoRecord = useCallback(
+    async (clientEventIds: readonly string[], noun: string) => {
+      if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
+      clientEventIds.forEach((id) => undoStartedRef.current.add(id));
+      if (commandBlockedRef.current) {
+        setCommandError('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.');
+        return;
+      }
+      let reversed = 0;
+      for (const clientEventId of [...clientEventIds].reverse()) {
+        let event = opsRef.current.liveEvents.find((candidate) => candidate.clientEventId === clientEventId) ?? null;
+        if (event === null) {
+          const queued = opsRef.current.queue.items.find((item) => item.clientEventId === clientEventId);
+          const settled =
+            queued !== undefined && (queued.status === 'queued' || queued.status === 'sending')
+              ? await waitForEventSettled(clientEventId)
+              : queued?.status;
+          if (settled === 'failed') {
+            setCommandError('전송에 실패한 기록이라 되돌릴 것이 없어요. 다시 보내지 않으면 기록되지 않아요.');
+            return;
+          }
+          event = await waitForRecordedEvent(clientEventId, 3_000);
+        }
+        if (event === null) {
+          setCommandError('기록이 아직 서버에 닿지 않아 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.');
+          return;
+        }
+        const eventId = event.id;
+        if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+        try {
+          await opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
+        } catch (err) {
+          setCommandError(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「수정·취소」에서 취소해 주세요.'));
+          return;
+        }
+        reversed += 1;
+      }
+      showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
+    },
+    [showToast, waitForEventSettled, waitForRecordedEvent],
+  );
+
+  // 기록은 확인 없이 저장하고 5초 되돌리기로 복구한다. 확인을 남기는 예외는 수상한 시계와 두 번째 옐로 뒤의 레드뿐이다
+  // (퇴장한 선수 확인은 선택 시트 안에서 끝난다).
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
       if (commandBlocked) return;
-      // 확인 모달을 띄우기 전에 선택 화면부터 닫는다 — 모달 두 개가 겹쳐
-      // 보이지 않게(ActionTargetPicker의 role="dialog" 위에 ConfirmModal의
-      // role="dialog"가 또 뜨는 상태를 만들지 않는다). 확인 문구 자체에
-      // 팀·선수·시각이 다 들어 있으니(요구사항 2) 선택 화면을 먼저 닫아도
-      // 정보가 사라지지 않는다.
       setPendingAction(null);
-      const copy = commitActionConfirmCopy(
-        input,
-        gameDetail.data?.sides ?? [],
-        lineupsQuery.data ?? [],
-        clockWarningMinutes(input.clockMs),
-        periodCount,
-      );
-      if (!(await confirm(copy))) return;
+      const sidesNow = gameDetail.data?.sides ?? [];
+      const lineupsNow = lineupsQuery.data ?? [];
+      const warningMinutes = clockWarningMinutes(input.clockMs);
+      if (
+        warningMinutes !== null &&
+        !(await confirm(clockCheckConfirmCopy(input, sidesNow, lineupsNow, warningMinutes, periodCount)))
+      ) {
+        return;
+      }
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
-      const submitted = opsRef.current.submitEvent(input);
+      // 끊긴 채 적은 기록은 이 기기 큐에만 있다 — 서버 되돌리기를 약속하지 않는다.
+      const connected = opsRef.current.connectionStatus === 'connected';
+      const SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
+      const recordedId = await opsRef.current.submitEvent(input);
+      if (recordedId === null) {
+        setCommandError(SAVE_FAILED);
+        return;
+      }
+      const recordedIds = [recordedId];
+      let noun = recordNounOf(input);
       if (askRed) {
-        const yellowEventId = await submitted;
-        if (yellowEventId === null) return;
         const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
-        const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], lineupsQuery.data ?? [], periodCount);
-        if (await confirm(redCopy)) {
+        if (await confirm(secondYellowConfirmCopy(input, sidesNow, lineupsNow, periodCount))) {
           // 서버는 레드 앞에 옐로가 있는지 보지 않는다 — 옐로가 확정되기 전에 레드를 적재하면 옐로가 실패해도
           // 레드만 남고, 옐로를 다시 보내면 기록 순서가 뒤집힌다.
-          if ((await waitForEventSettled(yellowEventId)) !== 'acked') {
+          if ((await waitForEventSettled(recordedId)) !== 'acked') {
             showToast('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.');
             return;
           }
           await waitForQueueIdle();
-          void opsRef.current.submitEvent(redInput);
+          const redId = await opsRef.current.submitEvent(redInput);
+          if (redId === null) {
+            setCommandError(SAVE_FAILED);
+          } else {
+            recordedIds.push(redId);
+            noun = SECOND_YELLOW_RED_LABEL;
+          }
         }
-      } else {
-        void submitted;
       }
-      // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
-      // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
-      if (input.type === 'GOAL' && input.participantId !== undefined) {
-        const participantId = input.participantId;
-        const clockMs = input.clockMs;
-        showToast('골을 기록했어요', {
-          action: {
-            label: '어시스트 추가',
-            onClick: () => {
-              const match = findRecentGoalEvent(liveEventsRef.current, { participantId, clockMs });
-              if (match) setAssistTarget({ event: match });
-            },
-          },
-        });
+      const copy = recordedToastCopy(input, sidesNow, lineupsNow, noun);
+      if (!connected) {
+        showToast(copy.offlineMessage, { description: '연결되면 보내요' });
+        return;
       }
+      showToast(copy.message, {
+        description: '잘못 눌렀으면 5초 안에 되돌려요',
+        action: { label: '되돌리기', onClick: () => void undoRecord(recordedIds, noun) },
+      });
     },
-    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, undoRecord, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
@@ -1285,22 +1345,9 @@ export function OperateConsoleCore({
   );
 
 
-  // 확인 모달은 더 이상 이 함수 안에서 뜨지 않는다 — 과제 1(사용자 결정:
-  // "예외 없이 전부"에 확인)로 start/pause/resume/end-period/start-period/end
-  // 전부가 확인을 거쳐야 하는데, 그 문구는 명령마다 달라야 한다(요구사항 2:
-  // "정말?" 금지, 팀/스코어가 보여야 함). 그래서 확인은 호출부(아래
-  // `confirmAndRunCommand`, 그리고 승부차기 종료의 `handleFinishPenaltyShootout`)
-  // 가 각자의 문구로 미리 처리하고, 이 함수는 "이미 확인된 명령을 그대로
-  // 실행"만 한다 — `revert-period`(사용자 결정에서 제외된 유일한 명령, 그
-  // 자체가 교정 행동이라 확인이 없다)도 같은 이유로 이 함수를 직접 부른다.
-  // `payload`는 승부차기 종료가 `{ penalties: { home, away } }`를 실어 보내는
-  // 통로다 — 새 커맨드나 새 엔드포인트가 아니라 `end`가 이미 갖고 있던 범용
-  // payload 슬롯을 그대로 쓴다(`GamesService.extractEndPenalties` doc 참고).
-  // F65 fix: 반환값(성공 true / 실패 false)을 추가했다 — 예전엔 항상 undefined라
-  // 호출부가 성공 여부를 알 방법이 없었다. 승부차기 종료(`handleFinishPenaltyShootout`)가
-  // 이 값으로 "서버가 실제로 받아들였을 때만" 로컬 킥 입력을 지운다. 기존 호출부
-  // (revert-period 토스트, confirmAndRunCommand, 몰수 종료)는 반환값을 그냥 무시하므로
-  // 동작이 그대로다.
+  // 이미 확인을 거친 명령을 그대로 실행한다 — 확인 문구는 명령마다 달라 호출부(`confirmAndRunCommand`,
+  // 승부차기 종료)가 띄운다. 확인 없이 부르는 명령은 그 자체가 되돌리기인 `revert-period` 뿐이다.
+  // `payload` 는 `end` 가 승부차기 결과·몰수 사유를 싣는 통로이고, 반환값은 서버가 받아들였는지다.
   const handleRunCommand = useCallback(
     async (
       command: GameCommandName,
@@ -1450,24 +1497,8 @@ export function OperateConsoleCore({
           }
         }
         if (!ownsAttempt()) return false;
-        // 이슈 #375 — 기존 골/교체 되돌리기(findRecentGoalEvent /
-        // ops.reverseEvent)와 같은 토스트 패턴을 따른다: end-period 직후
-        // "방금 실수로 눌렀다"를 바로 되돌릴 수 있는 액션을 붙인다. 골/교체
-        // 되돌리기와 달리 "어떤 이벤트인지" 찾을 필요가 없다 — 되돌릴
-        // 대상은 서버가 "지금 되돌릴 수 있는 전환" 하나로 유일하게 정한다
-        // (GamesService.revertPeriodTransition). 하프타임 창을 넘겨 다음
-        // 피리어드에 이벤트가 이미 생겼다면 서버가 PERIOD_REVERT_HAS_EVENTS로
-        // 거부하고, 그 실패는 이 화면의 공용 오류 배너로 그대로 뜬다(토스트
-        // 자체는 별도 실패 처리를 하지 않는다). 요구사항 6 — 이 되돌리기
-        // 토스트는 확인 모달이 생겼다고 없애지 않는다(사후 복구 수단 유지).
-        //
-        // 종료 흐름 개편 — `hasNextPeriod` 조건이 새로 붙었다. 마지막
-        // 피리어드를 닫는 `end-period`(=후반 종료)는 되돌릴 수 없다:
-        // `revertPeriodTransition`은 "다음 피리어드를 SCHEDULED로 되감고
-        // 이전 피리어드를 다시 LIVE로"가 전부라 되감을 다음 피리어드가
-        // 없으면 PERIOD_REVERT_NOT_AVAILABLE 409다. 그런데도 토스트를
-        // 붙이면 누를 때마다 실패 배너만 뜨는 거짓 복구 수단이 된다 —
-        // 대신 확인 문구가 "되돌릴 수 없다"를 미리 알린다(confirm-copy.ts).
+        // 마지막 경기 시간을 닫는 종료는 서버에 되감을 다음 구간이 없어 되돌릴 수 없다 — 누르면 실패만 하는
+        // 되돌리기를 붙이지 않는다. 되돌리기가 거절되면(다음 구간에 이미 기록이 있음) 공용 오류 안내로 뜬다.
         if (command === 'end-period' && hasNextPeriod) {
           showToast(`${label}했어요`, {
             action: {
@@ -1486,11 +1517,8 @@ export function OperateConsoleCore({
     [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, pendingCommandRetry, showToast, leaseRequired, captureCommandScope, isCommandScopeCurrent, isCommandIdentityCurrent, commandGateFailureMessage, refreshLineupsAfterStart],
   );
 
-  // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
-  // 명령별 확인 문구(`commandConfirmCopy`)를 먼저 보여주고, 확인해야만
-  // `handleRunCommand`를 부른다. `revert-period`는 이 함수의 타입에서부터
-  // 제외돼 있다(사용자 결정에서 빠진 유일한 명령 — 버튼 onClick이 그 경우엔
-  // 이 함수 대신 `handleRunCommand`를 직접 부른다).
+  // 진행 명령 버튼의 진입점 — 명령별 확인 문구를 보여 주고 확인해야만 실행한다.
+  // `revert-period` 는 타입에서부터 빠져 있다(확인 없이 `handleRunCommand` 를 직접 부른다).
   const confirmAndRunCommand = useCallback(
     async (command: Exclude<GameCommandName, 'revert-period'>) => {
       if (commandBlocked) return;
@@ -1525,9 +1553,7 @@ export function OperateConsoleCore({
     [ops.liveEvents, commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, penaltyShootoutTied, substitutionTracked, handleRunCommand, captureCommandScope, isCommandScopeCurrent],
   );
 
-  // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
-  // 로컬 상태 전환뿐) — 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
-  // 거친다.
+  // 승부차기 시작 — 서버에는 아무것도 보내지 않지만(패널을 여는 로컬 상태 전환) 진행 단계를 바꾸므로 확인을 거친다.
   const handleStartPenaltyShootout = useCallback(async () => {
     if (commandBlocked) return;
     const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);

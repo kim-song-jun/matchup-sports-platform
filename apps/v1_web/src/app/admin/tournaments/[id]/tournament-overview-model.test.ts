@@ -165,7 +165,7 @@ describe('buildTournamentSetupItems', () => {
       href: `${BASE}/bracket`,
     });
 
-    // bracketPublishedAt 은 예약 공개가 발효돼도 null 로 남는다 — 이 필드만 보면 공개된 대진표를 계속 미공개로 지적한다.
+    // bracketPublishedAt 은 예약 공개가 발효돼도 null 로 남는다 — 이 값만 보면 공개된 대진표를 계속 미공개로 지적한다.
     const published = buildTournamentSetupItems(
       tournament({ bracketPublishedAt: null, bracketPublishScheduledAt: '2026-08-19T09:00:00+09:00' }),
       NOW,

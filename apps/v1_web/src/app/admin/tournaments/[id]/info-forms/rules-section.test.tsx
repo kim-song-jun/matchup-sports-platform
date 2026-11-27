@@ -349,6 +349,70 @@ describe('경기 규칙 섹션 시트 — 순위 정하는 순서', () => {
     expect(backend.state.patches).toEqual([]);
   });
 
+  describe('단계마다 다른 순서를 같은 시트에서 이어 고르기', () => {
+    const twoStages = {
+      stagePlanRevision: 7,
+      stageTieBreak: {
+        tournamentOrder: DEFAULT_ORDER,
+        stages: [
+          { stageKey: 'preliminary', stageName: '예선 조별리그', ranked: true, order: null, resolvedOrder: DEFAULT_ORDER, lockedReason: null },
+          { stageKey: 'main', stageName: '본선 리그', ranked: true, order: null, resolvedOrder: DEFAULT_ORDER, lockedReason: null },
+        ],
+      } as V1Tournament['stageTieBreak'],
+    } satisfies Partial<V1Tournament>;
+    const first = (view: Awaited<ReturnType<typeof open>>) => view.inSheet().getByLabelText('1단계 · 예선 조별리그');
+    const second = (view: Awaited<ReturnType<typeof open>>) => view.inSheet().getByLabelText('2단계 · 본선 리그');
+
+    it('고른 값이 그대로 보이고, 이어서 고른 단계는 올라간 revision 으로 저장된다', async () => {
+      const backend = start(twoStages);
+      const view = await open(backend);
+
+      fireEvent.change(first(view), { target: { value: 'goals_for_first' } });
+      await waitFor(() => expect(first(view)).toHaveValue('goals_for_first'));
+      await waitFor(() => expect(second(view)).toBeEnabled());
+      fireEvent.change(second(view), { target: { value: 'goal_difference_first' } });
+      await waitFor(() => expect(second(view)).toHaveValue('goal_difference_first'));
+
+      expect(backend.state.stageTieBreakPuts.map((put) => [put.stageKey, put.expectedRevision])).toEqual([
+        ['preliminary', 7],
+        ['main', 8],
+      ]);
+      expect(first(view)).toHaveValue('goals_for_first');
+      expect(backend.state.tournament.stagePlanRevision).toBe(9);
+      expect(view.inSheet().queryByText(/최신 정보를 다시 불러와 주세요/)).toBeNull();
+    });
+
+    it('같은 단계를 한 번 더 바꿔도 저장된다', async () => {
+      const backend = start(twoStages);
+      const view = await open(backend);
+
+      fireEvent.change(first(view), { target: { value: 'goals_for_first' } });
+      await waitFor(() => expect(first(view)).toHaveValue('goals_for_first'));
+      await waitFor(() => expect(first(view)).toBeEnabled());
+      fireEvent.change(first(view), { target: { value: 'goal_difference_first' } });
+      await waitFor(() => expect(first(view)).toHaveValue('goal_difference_first'));
+
+      expect(backend.state.stageTieBreakPuts.map((put) => put.expectedRevision)).toEqual([7, 8]);
+      expect(backend.state.tournament.stageTieBreak?.stages[0].order).toEqual(GOALS_FIRST);
+    });
+
+    it('대회를 다시 읽는 응답이 늦어도, 저장 응답이 준 revision 으로 바로 이어 고를 수 있다', async () => {
+      const backend = start(twoStages);
+      const view = await open(backend);
+      backend.state.tournamentGetDelayMs = 400;
+
+      fireEvent.change(first(view), { target: { value: 'goals_for_first' } });
+      await waitFor(() => expect(backend.state.stageTieBreakPuts).toHaveLength(1));
+      await waitFor(() => expect(second(view)).toBeEnabled());
+      expect(first(view)).toHaveValue('goals_for_first');
+      fireEvent.change(second(view), { target: { value: 'goal_difference_first' } });
+      await waitFor(() => expect(backend.state.stageTieBreakPuts).toHaveLength(2));
+
+      expect(backend.state.stageTieBreakPuts[1].expectedRevision).toBe(8);
+      await waitFor(() => expect(backend.state.tournament.stagePlanRevision).toBe(9));
+    });
+  });
+
   it('대조군: 단계 구성이 없는 대회에는 단계마다 고르는 칸이 없다', async () => {
     const view = await open(start());
 

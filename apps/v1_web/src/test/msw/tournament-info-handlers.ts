@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import type { TournamentPeriodSettingsResponse } from '@/hooks/use-tournament-period-settings';
 import type { V1AdminTournamentBracket, V1LineupSizeOptions, V1Sport, V1Tournament } from '@/types/api';
 
@@ -137,6 +137,8 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
     /** 대회 목록 조회가 돌려주는 대회들(최근 순). */
     tournamentList: [] as V1Tournament[],
     tournamentListStatus: 200,
+    /** 대회 단건 조회를 이만큼 늦춘다 — 저장 응답과 다시 읽기 사이의 틈을 재현할 때 쓴다. */
+    tournamentGetDelayMs: 0,
     /** 200 이 아니면 출전 인원·교체 선택지 조회가 그 상태로 실패한다. */
     lineupOptionsStatus: 200,
     /** 단계별 순위 순서 PUT — `{ stageKey, ...본문 }`. */
@@ -161,9 +163,24 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
     http.get('*/api/v1/admin/competition-configs/lineup-size-options', () =>
       state.lineupOptionsStatus === 200 ? ok(state.lineupOptions) : failed({ status: state.lineupOptionsStatus, body: {} }),
     ),
+    // 실제 서버처럼 단계 구성 revision 으로 CAS 를 보고, 저장하면 revision 을 올리고 그 단계의 순서를 바꾼다.
     http.put('*/api/v1/admin/tournaments/:id/stages/:stageKey/tie-break-order', async ({ request, params }) => {
-      state.stageTieBreakPuts.push({ stageKey: params.stageKey, ...((await request.json()) as Record<string, unknown>) });
-      return ok({ revision: (state.tournament.stagePlanRevision ?? 0) + 1, stageTieBreak: state.tournament.stageTieBreak });
+      const body = (await request.json()) as { expectedRevision: number; order: V1Tournament['tieBreakOrder'] | null };
+      state.stageTieBreakPuts.push({ stageKey: params.stageKey, ...body });
+      const revision = state.tournament.stagePlanRevision ?? 0;
+      if (body.expectedRevision !== revision) {
+        return failed({ status: 409, body: { code: 'STAGE_PLAN_STALE', message: '대회 구성이나 공식 결과가 바뀌었어요. 최신 정보를 다시 불러와 주세요.' } });
+      }
+      const view = state.tournament.stageTieBreak;
+      const stageTieBreak = view && {
+        ...view,
+        stages: view.stages.map((stage) =>
+          stage.stageKey === params.stageKey ? { ...stage, order: body.order, resolvedOrder: body.order ?? view.tournamentOrder } : stage,
+        ),
+      };
+      state.tournament = { ...state.tournament, stagePlanRevision: revision + 1, stageTieBreak };
+      bump();
+      return ok({ revision: revision + 1, stageTieBreak });
     }),
     http.get('*/api/v1/admin/tournaments/:id/bracket', () => ok(state.bracket)),
     http.get('*/api/v1/admin/tournaments/:id/periods', () => ok({ ...state.periods, expectedVersion: state.tournament.updatedAt })),
@@ -197,7 +214,10 @@ export function createTournamentInfoServer(initial: Partial<V1Tournament> = {}) 
         ? ok({ items: state.tournamentList, pageInfo: { nextCursor: null, hasNextPage: false } })
         : failed({ status: state.tournamentListStatus, body: {} }),
     ),
-    http.get('*/api/v1/admin/tournaments/:id', () => ok(state.tournament)),
+    http.get('*/api/v1/admin/tournaments/:id', async () => {
+      if (state.tournamentGetDelayMs > 0) await delay(state.tournamentGetDelayMs);
+      return ok(state.tournament);
+    }),
     http.patch('*/api/v1/admin/tournaments/:id', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       state.patches.push(body);

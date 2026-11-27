@@ -11,7 +11,7 @@ import { SixTeamOrderEditor } from '@/components/admin/tournaments/six-team-orde
 import { StageTieBreakSettings } from '@/components/admin/tournaments/stage-tie-break-settings';
 import { TieBreakPresetPicker } from '@/components/admin/tournaments/tie-break-preset-picker';
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
-import { useV1AdminBracket, useV1LineupSizeOptions } from '@/hooks/use-v1-api';
+import { useV1AdminBracket, useV1AdminTournament, useV1LineupSizeOptions } from '@/hooks/use-v1-api';
 import { josa } from '@/lib/korean';
 import { saveStep } from '@/lib/sequential-save';
 import { DEFAULT_TEAM_FOUL_THRESHOLD, parseTeamFoulThresholdInput, resolveTeamFoulThreshold, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
@@ -84,6 +84,10 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
   const periods = usePeriodSettingsDraft({ tournamentId: base.id, stagePhases });
   const { draft, set, fail, errorFor } = useSectionDraft(base, toDraft, onDirtyChange, periods.dirty);
   const options = useV1LineupSizeOptions(base.sportId);
+  // 단계마다 다른 순서는 고르는 즉시 저장되고 저장마다 단계 구성 revision 이 오른다 — 이 칸만 살아 있는 대회를 본다.
+  const { data: live } = useV1AdminTournament(base.id);
+  const stageTieBreak = live?.stageTieBreak ?? base.stageTieBreak;
+  const stagePlanRevision = live?.stagePlanRevision ?? base.stagePlanRevision ?? 0;
 
   const started = isStarted(base);
   const sixTeamEligible = isSixTeamEligible(base);
@@ -235,12 +239,12 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
             disabled={disabled}
             lockedReason={base.tieBreakOrderBlockedReason ?? null}
           />
-          {base.stageTieBreak ? (
+          {stageTieBreak ? (
             <div className="mt-4">
               <StageTieBreakSettings
                 tournamentId={base.id}
-                stageTieBreak={base.stageTieBreak}
-                stagePlanRevision={base.stagePlanRevision ?? 0}
+                stageTieBreak={stageTieBreak}
+                stagePlanRevision={stagePlanRevision}
                 canWrite={!disabled}
                 showToast={showToast}
               />

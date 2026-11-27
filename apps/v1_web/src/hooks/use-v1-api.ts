@@ -5100,7 +5100,11 @@ export function useV1SetStageTieBreakOrder(tournamentId: string) {
         `/admin/tournaments/${encodeURIComponent(tournamentId)}/stages/${encodeURIComponent(input.stageKey)}/tie-break-order`,
         { expectedRevision: input.expectedRevision, order: input.order },
       ),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // 응답이 준 revision 과 순서를 바로 반영한다 — 다시 읽기를 기다리는 동안 이어 고른 저장이 옛 revision 으로 가지 않게.
+      queryClient.setQueryData<V1Tournament>(v1Keys.adminTournament(tournamentId), (current) =>
+        current ? { ...current, stagePlanRevision: saved.revision, stageTieBreak: saved.stageTieBreak } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: ['stages', tournamentId] });

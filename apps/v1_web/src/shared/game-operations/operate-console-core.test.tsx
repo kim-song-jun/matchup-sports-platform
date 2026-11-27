@@ -1,6 +1,6 @@
 import { act, cleanup, render as renderElement, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -3100,6 +3100,41 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
 
     await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledWith({ eventId: 'e9', reason: '골 기록 되돌리기' }));
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+  });
+
+  it('토스트가 뜨는 바로 그 순간 눌러도 방금 넣은 기록을 큐에서 찾는다 — 서버에 없다고 넘겨짚지 않는다', async () => {
+    const state = setup();
+    let rerenderHarness = () => {};
+    function LiveQueueHarness() {
+      const [, setTick] = useState(0);
+      rerenderHarness = () => setTick((tick) => tick + 1);
+      return <CoreHarness />;
+    }
+    // 실제 훅처럼 큐에 넣는 상태 변경과 id 반환이 함께 일어나, 큐와 토스트가 같은 커밋에 나타난다.
+    state.submitEvent.mockImplementation(async () => {
+      advance(state, { queue: { items: [queuedEvent('c1', 'sending')] }, gameSnapshot: { version: 2, state: 'LIVE' } });
+      rerenderHarness();
+      return 'c1';
+    });
+    render(<LiveQueueHarness />);
+    // 토스트가 DOM 에 붙은 직후, 다음 작업이 돌기 전에 누른다.
+    const pressed = new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        const undo = screen.queryByRole('button', { name: '되돌리기' });
+        if (undo === null) return;
+        observer.disconnect();
+        undo.click();
+        resolve();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+
+    recordGoal();
+    await pressed;
+
+    expect(await screen.findByText('기록을 보내는 중이에요. 서버에 닿으면 되돌릴게요.')).toBeInTheDocument();
+    expect(testFixtures.serverEvents).not.toHaveBeenCalled();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
   });
 
   it('전송 실패로 표시된 기록도 서버 목록에 있으면 버전을 맞춘 뒤 되돌린다', async () => {

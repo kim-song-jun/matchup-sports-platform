@@ -1162,8 +1162,11 @@ export function OperateConsoleCore({
   // 앞 이벤트가 확정되기 전에 뒤 이벤트를 적재하면 서버가 VERSION_CONFLICT 로 거절한다.
   const opsRef = useRef(ops);
   const queueIdleWaitersRef = useRef<Array<() => void>>([]);
-  useEffect(() => {
+  // 커밋과 함께 맞춘다 — 토스트가 뜬 직후의 누름이 방금 넣은 기록을 큐에서 못 보면 서버에 없는 기록으로 넘겨짚는다.
+  useLayoutEffect(() => {
     opsRef.current = ops;
+  }, [ops]);
+  useEffect(() => {
     if (hasPendingWork(ops.queue)) return;
     const waiters = queueIdleWaitersRef.current;
     queueIdleWaitersRef.current = [];
@@ -1223,7 +1226,7 @@ export function OperateConsoleCore({
   );
 
   const commandBlockedRef = useRef(commandBlocked);
-  useEffect(() => {
+  useLayoutEffect(() => {
     commandBlockedRef.current = commandBlocked;
   }, [commandBlocked]);
   // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.

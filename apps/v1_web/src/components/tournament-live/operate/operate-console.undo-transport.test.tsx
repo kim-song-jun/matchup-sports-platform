@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { transferableAbortController } from 'node:util';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setupServer } from 'msw/node';
@@ -64,6 +64,14 @@ function statusSheet() {
 
 const score = () => screen.getByLabelText(/^스코어 /).getAttribute('aria-label');
 
+/** Records a home goal and waits until the server has committed it and the console shows it. */
+async function recordConfirmedHomeGoal() {
+  await recordGoal('홈 팀');
+  await waitFor(() => expect(fixture.events).toHaveLength(1));
+  await waitFor(() => expect(score()).toBe('스코어 홈 팀 1점, 원정 팀 0점'));
+  await screen.findByText(RECORDED);
+}
+
 /** The undo button of the toast that announced this record. */
 function undoButtonOf(message: string) {
   return within(screen.getByText(message).closest('[role="status"]') as HTMLElement).getByRole('button', { name: '되돌리기' });
@@ -76,8 +84,16 @@ async function flushTransport() {
   });
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
+// Every step crosses the real hook, queue and REST client, so a busy machine needs more than the 1s default per wait.
+vi.setConfig({ testTimeout: 30_000 });
+beforeAll(() => {
+  configure({ asyncUtilTimeout: 5_000 });
+  server.listen({ onUnhandledRequest: 'error' });
+});
+afterAll(() => {
+  configure({ asyncUtilTimeout: 1_000 });
+  server.close();
+});
 beforeEach(() => {
   // MSW uses Node Request; keep its real abort implementation in the same realm.
   const nativeAbort = transferableAbortController();
@@ -205,8 +221,7 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
 
   it('다른 기록이 나가는 중이면 그 기록이 확정된 뒤에 되돌린다 — 새 기록이 거절되지 않는다', async () => {
     await openConsole();
-    await recordGoal('홈 팀');
-    await screen.findByText(HOME_GOAL);
+    await recordConfirmedHomeGoal();
     // 원정 골은 느린 망을 지나는 중이다.
     fixture.nextAppends('hold');
     await recordGoal('원정 팀');
@@ -230,8 +245,7 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
 
   it('되돌리기가 서버에 가 있는 동안 누른 새 기록은 되돌리기가 끝난 뒤에 보낸다 — 되돌리기가 거절되지 않는다', async () => {
     await openConsole();
-    await recordGoal('홈 팀');
-    await screen.findByText(HOME_GOAL);
+    await recordConfirmedHomeGoal();
     const reversal = fixture.holdNextReversal();
     fireEvent.click(undoButtonOf(HOME_GOAL));
     await act(async () => { await reversal.started; });
@@ -257,8 +271,7 @@ describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으�
 
   it('그래도 남는 버전 충돌은 서버 영어 원문이 아니라 해요체로 알린다', async () => {
     await openConsole();
-    await recordGoal('홈 팀');
-    await screen.findByText(HOME_GOAL);
+    await recordConfirmedHomeGoal();
     // 다른 기기가 경기를 바꿨고 이 기기는 아직 모른다.
     fixture.bumpVersionElsewhere();
 

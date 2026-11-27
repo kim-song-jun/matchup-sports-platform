@@ -12,7 +12,7 @@ import { canAssignOperations, useTournamentOpsRole } from '@/components/tourname
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1Tournament, useV1TournamentFields, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
-import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import { DESKTOP_LIST_MEDIA_QUERY, MD_UP_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { extractErrorMessage } from '@/lib/error-message';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
@@ -20,6 +20,7 @@ import type { V1TournamentOperationsBoardItem } from '@/types/api';
 import { BoardCardView } from './board-card';
 import { FieldChips } from './field-chips';
 import { MatchInfoSheet } from './match-info-sheet';
+import { OperationsBoardPhoneHeader } from './operations-board-phone-header';
 import { OperationsListView } from './operations-list-view';
 import { OperationsPhoneList } from './operations-phone-list';
 import { OperationsTimeline } from './operations-timeline';
@@ -61,6 +62,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const consoleQuery = liveBase.startsWith('/admin/') ? '' : '?from=board';
   const role = useTournamentOpsRole();
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
+  const isMdUp = useMediaQuery(MD_UP_MEDIA_QUERY);
   const bundleHeadingId = useId();
 
   const board = useOperationsBoardAll(tournamentId);
@@ -167,27 +169,34 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const phoneColumn = !isDesktop && selectedKeys.length === 1 ? columnsAll.find((column) => column.key === selectedKeys[0]) : undefined;
   const nowTimeLabel = activeDay !== null && activeDay === todayKey ? nowLabel : null;
   const eyebrowDay = activeDay === null ? '' : ` · ${formatDayLabel(activeDay)}`;
+  const headerTitle = `${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`;
+  const stats = `끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount}`;
+  const caption = `${nowLabel} 기준 · 15초마다 새로 고쳐요`;
 
   return (
     <div className="tm-content-enter flex flex-col gap-5">
-      <OpsPageHeader
-        tournamentTitle={`${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`}
-        title="운영 보드"
-        description={`끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount} · ${nowLabel} 기준 · 15초마다 새로 고쳐요`}
-        action={
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <button type="button" onClick={refresh} disabled={isRefreshing} className={CONTROL_BUTTON}>
-              <RefreshCw size={16} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
-              새로고침
-            </button>
-            <Link href={publicHref} target="_blank" rel="noopener noreferrer" className={CONTROL_BUTTON}>
-              참가자 화면 보기
-              <ExternalLink size={14} aria-hidden="true" />
-              <span className="sr-only">(새 탭에서 열려요)</span>
-            </Link>
-          </div>
-        }
-      />
+      {isMdUp ? (
+        <OpsPageHeader
+          tournamentTitle={headerTitle}
+          title="운영 보드"
+          description={`${stats} · ${caption}`}
+          action={
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <button type="button" onClick={refresh} disabled={isRefreshing} className={CONTROL_BUTTON}>
+                <RefreshCw size={16} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
+                새로고침
+              </button>
+              <Link href={publicHref} target="_blank" rel="noopener noreferrer" className={CONTROL_BUTTON}>
+                참가자 화면 보기
+                <ExternalLink size={14} aria-hidden="true" />
+                <span className="sr-only">(새 탭에서 열려요)</span>
+              </Link>
+            </div>
+          }
+        />
+      ) : (
+        <OperationsBoardPhoneHeader title={headerTitle} stats={stats} caption={caption} publicHref={publicHref} isRefreshing={isRefreshing} onRefresh={refresh} />
+      )}
 
       {loading ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">

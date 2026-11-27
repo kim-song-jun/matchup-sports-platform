@@ -178,6 +178,7 @@ describe('OperationsBoardClient — 데스크톱', () => {
     expect(screen.getByText(/끝남 3 · 진행 중 1 · 남은 경기 3 · 10:15 기준 · 15초마다 새로 고쳐요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /참가자 화면 보기/ })).toHaveAttribute('href', '/tournaments/t-1');
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual(['운영 보드']);
   });
 
   it('구장 4곳이면 앞 3곳만 열로 그리고, 칩은 최대 3곳까지 고른다', async () => {
@@ -453,6 +454,48 @@ describe('OperationsBoardClient — 폰', () => {
     expect(screen.getByRole('article', { name: '홈8 vs 원정8' })).toBeInTheDocument();
     expect(screen.getByText(/구장 2 · 구장 담당자 이서연 · 14:00까지 · 경기 4/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '끝난 경기 1' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('머리말은 대회명·날짜 한 줄, 개수 한 줄, 갱신 안내 한 줄이고 h1 이 하나뿐이며 상단 바 제목을 되풀이하지 않는다', async () => {
+    restoreViewport();
+    restoreViewport = installViewport(390);
+    renderBoard();
+    await screen.findByRole('article', { name: '홈2 vs 원정2' });
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings.map((h) => h.textContent)).toEqual(['겨울 풋살컵 · 12. 20.(일)']);
+    expect(headings[0]).toHaveClass('truncate');
+    expect(screen.queryByRole('heading', { name: '운영 보드' })).not.toBeInTheDocument();
+    expect(screen.getByText('끝남 3 · 진행 중 1 · 남은 경기 3')).toBeInTheDocument();
+    expect(screen.getByText('10:15 기준 · 15초마다 새로 고쳐요')).toBeInTheDocument();
+  });
+
+  it('폰의 새로고침은 글자 없는 44×44 아이콘 버튼이고 누르면 운영 보드를 다시 읽는다', async () => {
+    restoreViewport();
+    restoreViewport = installViewport(390);
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('article', { name: '홈2 vs 원정2' });
+
+    const refresh = screen.getByRole('button', { name: '새로고침' });
+    expect(refresh).toHaveTextContent('');
+    expect(refresh).toHaveClass('h-11', 'w-11');
+    const before = operationRequests.length;
+    await user.click(refresh);
+
+    await waitFor(() => expect(operationRequests.length).toBeGreaterThan(before));
+  });
+
+  it('폰의 「참가자 화면 보기」는 44px 높이의 글자 링크다', async () => {
+    restoreViewport();
+    restoreViewport = installViewport(390);
+    renderBoard();
+    await screen.findByRole('article', { name: '홈2 vs 원정2' });
+
+    const link = screen.getByRole('link', { name: /참가자 화면 보기/ });
+    expect(link).toHaveAttribute('href', '/tournaments/t-1');
+    expect(link).toHaveClass('min-h-11');
+    expect(link).not.toHaveClass('border');
   });
 
   it('창 폭이 바뀌면 판과 목록이 바뀐다', async () => {

@@ -57,3 +57,6 @@ export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';
  * 1440 미만에선 옆 열을 두면 조 두 열이 다 들어가지 않아(alpha 실측 1280 에서 82px 잘림), 시트(순위표 버튼·칸 패널)로 대신한다.
  */
 export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1440px)';
+
+/** Tailwind `md` 와 같은 값. 폰(미만)과 태블릿 이상에서 머리말 구성이 갈리는 화면이 쓴다. */
+export const MD_UP_MEDIA_QUERY = '(min-width: 768px)';

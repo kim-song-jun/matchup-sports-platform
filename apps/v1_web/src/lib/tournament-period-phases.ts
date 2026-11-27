@@ -1,7 +1,7 @@
 import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 
 /**
- * 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 경기 시간 편집기가 같이 쓴다.
+ * 단계별 경기 시간을 정할 수 있는 대회 단계. 리그 생성과 대회 정보의 경기 시간 편집기가 같이 쓴다.
  * round16 은 정규리그 + N개 토너먼트에서 12팀 결선의 첫 라운드('12강')도 담는다 — 그 라운드의 단계 코드가 틀 기준(16칸)이다.
  */
 export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string; shortLabel: string }> = [

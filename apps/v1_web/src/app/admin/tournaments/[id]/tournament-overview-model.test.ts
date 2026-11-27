@@ -6,7 +6,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { V1Tournament } from '@/types/api';
-import { buildTournamentChecklist, daysUntil, resolveNextMilestone } from './tournament-overview-model';
+import type { StagePlan } from '@/types/stage-plan';
+import {
+  buildTournamentSetupItems,
+  daysUntil,
+  requiredSetupLabels,
+  resolveNextMilestone,
+  type TournamentSetupItem,
+} from './tournament-overview-model';
 
 const NOW = new Date('2026-08-20T10:00:00+09:00');
 
@@ -15,6 +22,9 @@ function tournament(overrides: Partial<V1Tournament> = {}): V1Tournament {
   return {
     id: 'tournament-1',
     status: 'open',
+    venue: '서울 풋살장',
+    minPlayers: 6,
+    maxPlayers: 10,
     registrationDeadlineAt: '2026-08-25T09:00:00+09:00',
     rosterDeadlineAt: '2026-08-28T09:00:00+09:00',
     scheduledAt: '2026-08-30T09:00:00+09:00',
@@ -96,69 +106,141 @@ describe('resolveNextMilestone', () => {
   });
 });
 
-describe('buildTournamentChecklist', () => {
-  it('다 채워진 대회는 지적할 게 없다', () => {
-    expect(buildTournamentChecklist(tournament(), NOW)).toEqual([]);
+const BASE = '/admin/tournaments/tournament-1';
+const STAFF_BASE = '/tournament-management/tournaments/tournament-1';
+const keysOf = (items: TournamentSetupItem[]) => items.map((item) => item.key);
+
+describe('buildTournamentSetupItems', () => {
+  it('다 채워진 접수 중 대회는 항목이 없다', () => {
+    expect(buildTournamentSetupItems(tournament(), NOW, BASE)).toEqual([]);
   });
 
-  it('비어 있는 설정만 골라낸다', () => {
-    const checks = buildTournamentChecklist(
-      tournament({ registrationDeadlineAt: null, coverImageUrl: null }),
-      NOW,
-    );
-    expect(checks.map((check) => check.id)).toEqual(['registration-deadline', 'cover-image']);
-    expect(checks[0].section).toBe('info');
-  });
-
-  it('참가비가 없으면 입금 계좌를 요구하지 않는다', () => {
-    expect(buildTournamentChecklist(tournament({ entryFee: 0, bankAccount: null }), NOW)).toEqual([]);
-    expect(
-      buildTournamentChecklist(tournament({ entryFee: 30000, bankAccount: null }), NOW).map((c) => c.id),
-    ).toEqual(['bank-account']);
-  });
-
-  it('예약 공개 시각이 지난 대진표는 미공개로 보지 않는다', () => {
-    // bracketPublishedAt 은 예약 공개가 발효돼도 null 로 남는다 — 이 필드만 보면
-    // 이미 공개된 대진표를 계속 "미공개"라고 잔소리하게 된다.
-    const published = buildTournamentChecklist(
-      tournament({
-        bracketPublishedAt: null,
-        bracketPublishScheduledAt: '2026-08-19T09:00:00+09:00',
-      }),
-      NOW,
-    );
-    expect(published.map((c) => c.id)).not.toContain('bracket-unpublished');
-
-    const notYet = buildTournamentChecklist(
-      tournament({
-        bracketPublishedAt: null,
-        bracketPublishScheduledAt: '2026-08-29T09:00:00+09:00',
-      }),
-      NOW,
-    );
-    expect(notYet.map((c) => c.id)).toContain('bracket-unpublished');
-  });
-
-  it('경기가 없으면 공개 여부가 아니라 편성부터 지적한다', () => {
-    const checks = buildTournamentChecklist(
-      tournament({
-        bracketPublishedAt: null,
-        operationCounts: { registrations: 5, fixtures: 0, announcements: 2 },
-      }),
-      NOW,
-    );
-    expect(checks.map((c) => c.id)).toContain('no-fixtures');
-    expect(checks.map((c) => c.id)).not.toContain('bracket-unpublished');
-  });
-
-  it('끝난 대회에는 아무것도 요구하지 않는다', () => {
-    const empty = tournament({
-      status: 'completed',
+  it('끝난 대회는 항목이 없다', () => {
+    const empty = {
+      venue: null,
       registrationDeadlineAt: null,
       rosterDeadlineAt: null,
       coverImageUrl: null,
       prizePool: null,
+      operationCounts: { registrations: 0, fixtures: 0, announcements: 0 },
+    };
+    expect(buildTournamentSetupItems(tournament({ status: 'completed', ...empty }), NOW, BASE)).toEqual([]);
+    expect(buildTournamentSetupItems(tournament({ status: 'cancelled', ...empty }), NOW, BASE)).toEqual([]);
+  });
+
+  it('info 항목은 ?edit= 딥링크로, 스태프 면 basePath 에서도 그 경로를 쓴다', () => {
+    const [venue] = buildTournamentSetupItems(tournament({ venue: null }), NOW, BASE);
+    expect(venue.key).toBe('venue');
+    expect(venue.href).toBe('/admin/tournaments/tournament-1/info?edit=schedule');
+
+    const [staffVenue] = buildTournamentSetupItems(tournament({ venue: null }), NOW, STAFF_BASE);
+    expect(staffVenue.href).toBe('/tournament-management/tournaments/tournament-1/info?edit=schedule');
+  });
+
+  it('경기가 없으면 편성부터, 있으면 공개 여부를 지적하고 예약 공개 시각이 지난 대진표는 미공개로 보지 않는다', () => {
+    const noFixtures = buildTournamentSetupItems(
+      tournament({ bracketPublishedAt: null, operationCounts: { registrations: 5, fixtures: 0, announcements: 2 } }),
+      NOW,
+      BASE,
+    );
+    expect(noFixtures).toHaveLength(1);
+    expect(noFixtures[0]).toMatchObject({
+      key: 'bracket',
+      tier: 'optional',
+      label: '대진',
+      detail: '대진 관리에서 조를 만들고 경기를 편성해요.',
+      href: `${BASE}/bracket`,
     });
-    expect(buildTournamentChecklist(empty, NOW)).toEqual([]);
+
+    const unpublished = buildTournamentSetupItems(
+      tournament({ bracketPublishedAt: null, bracketPublishScheduledAt: '2026-08-29T09:00:00+09:00' }),
+      NOW,
+      BASE,
+    );
+    expect(unpublished).toHaveLength(1);
+    expect(unpublished[0]).toMatchObject({
+      key: 'bracket',
+      label: '대진표 공개',
+      detail: '공개 전에는 참가자에게 조와 경기가 보이지 않아요.',
+      href: `${BASE}/bracket`,
+    });
+
+    // bracketPublishedAt 은 예약 공개가 발효돼도 null 로 남는다 — 이 필드만 보면 공개된 대진표를 계속 미공개로 지적한다.
+    const published = buildTournamentSetupItems(
+      tournament({ bracketPublishedAt: null, bracketPublishScheduledAt: '2026-08-19T09:00:00+09:00' }),
+      NOW,
+      BASE,
+    );
+    expect(published).toEqual([]);
+  });
+
+  it('공지가 없으면 공지 항목이 나온다', () => {
+    const items = buildTournamentSetupItems(
+      tournament({ operationCounts: { registrations: 5, fixtures: 12, announcements: 0 } }),
+      NOW,
+      BASE,
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      key: 'announcements',
+      tier: 'optional',
+      label: '공지',
+      detail: '집합 시간·준비물 같은 안내를 공지로 남겨요.',
+      href: `${BASE}/announcements`,
+    });
+  });
+
+  it('operationCounts 가 없는 응답은 경기·공지가 0 건인 것과 같다', () => {
+    const items = buildTournamentSetupItems(tournament({ operationCounts: undefined }), NOW, BASE);
+    expect(keysOf(items)).toEqual(['bracket', 'announcements']);
+  });
+
+  it('단계 순서는 필요 → 기본값 확인 → 선택이다', () => {
+    const items = buildTournamentSetupItems(
+      tournament({ status: 'draft', venue: null, coverImageUrl: null, operationCounts: { registrations: 0, fixtures: 0, announcements: 0 } }),
+      NOW,
+      BASE,
+    );
+    expect(items.map((item) => [item.key, item.tier])).toEqual([
+      ['venue', 'required'],
+      ['entry', 'review'],
+      ['rules', 'review'],
+      ['public-screen', 'optional'],
+      ['bracket', 'optional'],
+      ['announcements', 'optional'],
+    ]);
+  });
+
+  it('requiredSetupLabels 는 필요 항목의 label 만 같은 순서로 준다', () => {
+    const items = buildTournamentSetupItems(tournament({ venue: null, entryFee: 30000, bankAccount: null }), NOW, BASE);
+    expect(requiredSetupLabels(items)).toEqual(['장소', '정산 계좌']);
+    expect(requiredSetupLabels([])).toEqual([]);
+  });
+
+  it.each([
+    ['venue', { venue: null }, '장소 정하기'],
+    ['roster-deadline', { rosterDeadlineAt: null }, '마감 정하기'],
+    ['registration-deadline', { registrationDeadlineAt: null }, '마감 정하기'],
+    ['bank-account', { entryFee: 30000, bankAccount: null }, '계좌 입력하기'],
+    ['scheduled-at', { scheduledAt: null }, '일정 정하기'],
+    ['entry', { status: 'draft' }, '대회 정보'],
+    ['rules', { status: 'draft' }, '대회 정보'],
+    ['public-screen', { coverImageUrl: null }, '대회 정보'],
+    ['bracket', { operationCounts: { registrations: 5, fixtures: 0, announcements: 2 } }, '대진'],
+    ['announcements', { operationCounts: { registrations: 5, fixtures: 12, announcements: 0 } }, '공지'],
+  ] satisfies [string, Partial<V1Tournament>, string][])('actionLabel 은 키별로 정해진 글자다 — %s', (key, overrides, label) => {
+    const item = buildTournamentSetupItems(tournament(overrides), NOW, BASE).find((candidate) => candidate.key === key);
+    expect(item?.actionLabel).toBe(label);
+  });
+
+  it('여러 단계 초안의 단계 구성 항목은 대진 탭으로 가고 actionLabel 은 대진이다', () => {
+    const stagePlan = { version: 1, stages: [] } as StagePlan;
+    const items = buildTournamentSetupItems(
+      tournament({ status: 'draft', format: 'league_knockouts', stagePlan }),
+      NOW,
+      BASE,
+    );
+    const stage = items.find((item) => item.key === 'stage-plan');
+    expect(stage).toMatchObject({ tier: 'review', href: `${BASE}/bracket`, actionLabel: '대진' });
   });
 });

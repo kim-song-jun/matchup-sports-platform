@@ -27,6 +27,7 @@ import type {
 } from './tournament-create-model';
 import type { V1CreateTournamentPayload, V1Tournament } from '@/types/api';
 import { DEFAULT_TOURNAMENT_TIE_BREAK_ORDER } from '@/lib/tournament-tie-break';
+import { TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
@@ -1189,6 +1190,19 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
     expect(screen.getByRole('button', { name: '대회 만들기' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '다음' })).not.toBeInTheDocument();
+  });
+
+  it('팀 파울 기준이 잘못되면 대회 만들기가 칸 없는 단계로 되돌리지 않고 같은 단계에서 오류를 보여 준다', () => {
+    renderPage();
+    goToPresentationStep();
+
+    fireEvent.change(screen.getByLabelText(/팀 파울 기준/), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate).not.toHaveBeenCalled();
+    expect(screen.getByText('STEP 4 / 5')).toBeInTheDocument();
+    expect(screen.getByText(TEAM_FOUL_THRESHOLD_ERROR)).toBeInTheDocument();
+    expect(screen.getByLabelText(/팀 파울 기준/)).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('상금·홍보 단계에서 대회를 만들면 관리 화면으로 튕기지 않고 확인 단계(5/5)로 진행한다', () => {

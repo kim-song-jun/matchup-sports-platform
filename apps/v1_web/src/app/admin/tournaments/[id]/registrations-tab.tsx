@@ -559,6 +559,8 @@ export function RegistrationsTab({
       ? { ...filter, label: filter.value === 'awaiting_payment' ? '신청 작성 중' : filter.value === 'payment_checking' ? '신청 확인 중' : '신청 완료' }
       : filter,
   );
+  // Free tournaments have no deposit to check; the same awaiting_payment action reads as confirming the application.
+  const confirmNoun = isFreeEntry ? '신청 확인' : '입금 확인';
   // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
@@ -593,9 +595,9 @@ export function RegistrationsTab({
     confirmPayment.mutate(
       { registrationId: reg.id },
       {
-        onSuccess: () => showToast('입금을 확인했어요.', 'success'),
+        onSuccess: () => showToast(isFreeEntry ? '신청을 확인했어요.' : '입금을 확인했어요.', 'success'),
         onError: (err) =>
-          showToast(extractErrorMessage(err, '입금 확인에 실패했어요.'), 'error'),
+          showToast(extractErrorMessage(err, `${confirmNoun}에 실패했어요.`), 'error'),
       },
     );
   };
@@ -782,9 +784,9 @@ export function RegistrationsTab({
     const targets = registrations.filter((r) => selectedIds.has(r.id) && r.status === 'awaiting_payment');
     if (targets.length === 0) return;
     const ok = await confirmDialog({
-      title: '일괄 입금 확인',
-      message: `선택한 ${targets.length}건을 입금 확인 처리할까요?`,
-      confirmLabel: '입금 확인',
+      title: `일괄 ${confirmNoun}`,
+      message: `선택한 ${targets.length}건을 ${confirmNoun} 처리할까요?`,
+      confirmLabel: confirmNoun,
     });
     if (!ok) return;
     setIsBatchProcessing(true);
@@ -796,7 +798,7 @@ export function RegistrationsTab({
           successCount += 1;
         } catch (err) {
           const teamLabel = reg.teamName ?? reg.teamId;
-          showToast(extractErrorMessage(err, `${teamLabel} 입금 확인에 실패했어요.`), 'error');
+          showToast(extractErrorMessage(err, `${teamLabel} ${confirmNoun}에 실패했어요.`), 'error');
         }
       }
     } finally {
@@ -804,7 +806,7 @@ export function RegistrationsTab({
       setSelectedIds(new Set());
     }
     if (successCount > 0) {
-      showToast(`${successCount}건 입금 확인 완료`, 'success');
+      showToast(`${successCount}건 ${confirmNoun} 완료`, 'success');
     }
   };
 
@@ -881,7 +883,7 @@ export function RegistrationsTab({
             className={submitBtnCls}
           >
             <Check size={14} aria-hidden="true" />
-            선택 {selectedIds.size}건 입금 확인
+            선택 {selectedIds.size}건 {confirmNoun}
           </button>
         </div>
       )}
@@ -997,7 +999,7 @@ export function RegistrationsTab({
                   onClick={() => handleConfirmPayment(reg)}
                   disabled={confirmPayment.isPending}
                   icon={<Check size={13} />}
-                  label="입금 확인"
+                  label={confirmNoun}
                   tone="blue"
                 />
               )}

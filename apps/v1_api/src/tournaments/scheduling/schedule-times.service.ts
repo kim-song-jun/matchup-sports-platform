@@ -19,9 +19,6 @@ export class ScheduleTimesService {
       where: { id, deletedAt: null }, select: { id: true, format: true },
     });
     if (!tournament) throw new NotFoundException({ code: 'NOT_FOUND', message: '대회를 찾지 못했어요.' });
-    if (surface === 'tournaments' && tournament.format !== 'league_knockouts') {
-      throw new ConflictException({ code: 'SCHEDULE_TIMES_FORMAT_UNSUPPORTED', message: '정규리그 + N개 토너먼트에서 사용하는 시간 목록이에요.' });
-    }
   }
 
   async list(user: V1AuthUser, tournamentId: string, surface: 'tournaments' | 'league-matches' = 'tournaments') {

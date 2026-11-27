@@ -783,7 +783,7 @@ export default function LeagueMatchFixturesClient({
 
   return (
     <LeagueTimeAssignment leagueId={leagueId} fixtures={series.fixtures} canWrite={canWrite && !leagueEnded}
-        fixtureName={matchupLabelOf} refresh={refetch} showToast={showToast}>
+        fixtureName={matchupLabelOf} onEditCourt={setScheduleFixture} refresh={refetch} showToast={showToast}>
     <div className="tm-content-enter">
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs

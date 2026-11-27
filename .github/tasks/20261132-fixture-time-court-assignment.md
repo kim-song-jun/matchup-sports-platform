@@ -99,3 +99,19 @@ Forbidden: 결과·팀·진출 연결·순위·운영 승격·기존 공유 WIP.
 - main 승격은 후속 release/prepare-1.20.0-2364에서 별도 고정 후보로 진행하며 기능 완료와 운영 적용을 구분한다.
 
 - 구현 worktree/브랜치는 최종 릴리스 작업의 소유권 확인 후 정리할 때까지 유지한다. QA 브라우저·helper 정리는 완료했으며 worktree 제거 완료로 표시하지 않는다.
+
+### 2026-11-26 전체 대진 유형 확장
+
+네 대회 형식에서 대진 시간·구장 패널을 사용하며 정규 리그는 경기의 구장 편집으로 연결한다. 대진 그림의 경기 카드에 시간과 구장을 함께 표시하고 배정 시 충돌 경기를 안내한다.
+
+### 2026-11-27 PR #2546 후속 수정
+
+- Scope: backend + frontend + docs, infra/DB schema 변경 없음. 사용자 지시 “진행해줘”에 따라 기존 PR 구현을 최신 `origin/dev` 31edf1afd와 통합한다. 전용 worktree `_worktrees/pr2546-assignment-fix`, 브랜치 `fix/pr2546-assignment-review`. 기존 PR 브랜치에 fast-forward로 전달한다. 다른 세션 WIP와 기존 worktree는 보존한다.
+- Owned: PR #2546의 19개 변경 경로, 배정/모바일 회귀, 시간 목록 PostgreSQL 통합 spec, 본 task 및 scenario/index. Forbidden: main 승격, seed/reset, 다른 세션 파일, 신규 UI 구조/디자인.
+- Phase 1 계약·최신 dev 통합 [x] → Phase 2 수정·회귀 [x] → Phase 3 타입/패턴/커밋 [ ] → Phase 4 PR CI·Copilot·dev 머지 [ ] → Phase 5 Alpha·증거·정리 [ ]. 서브에이전트 사용 없음.
+- 수정: 단계 툴바를 보존한 전체 형식 배정 workspace, 중복 Vitest mock 통합과 복수 결선 wizard 테스트 격리, 리그 구장 저장 중 편집 진입 비활성화. 사용자 승인된 PR 구조를 유지하며 새로운 레이아웃은 도입하지 않는다.
+- Acceptance: [x] 네 형식 API 생성/조회/항목 수정 [x] 팀 미정 경기의 시간/구장 독립 저장·재진입 [x] 대회/리그 충돌 확인·취소와 오류 보존 [x] 단계형 그림/목록 툴바 유지 [x] 모바일 시간 미정+구장 표시 [ ] CI/PostgreSQL [ ] 최신 head Copilot clean [ ] dev 머지 [ ] Alpha 5유형×3폭 15/15.
+- Ambiguity: 최초 정적 검토의 “시간 미정이면 모바일 구장이 숨겨진다”는 오진. `whenText`가 `시간 미정`을 반환함을 확인했고 구장 단독 배정 표시 회귀는 통과했다. 불필요한 렌더 변경을 하지 않는다.
+- Validation: Node 22.23.5 공식 실행 파일, 단일 worker. Web 최초 102건 중 복수 결선 테스트 QueryClient 누락 1건 RED → mock 정리 후 변경 대상 49/49 GREEN. 모바일/등록/반응형 기존 통과 범위는 중복 합산하지 않는다. API 단위 26/26. PostgreSQL 시간 목록 spec을 네 형식으로 확장했으며 로컬 Docker/DB 미가동으로 실행하지 않았다.
+- Security: 기존 auth/admin/surface 검증을 유지한다. `.env*` 미열람, DB seed/reset 없음. Git 자격 증명 관리자 값을 API 인증에 직접 사용하려던 명령은 자동 승인 검토에서 credential probing으로 거절되어 실행하지 않았다. 해당 접근을 재시도하거나 우회하지 않는다.
+- Progress Snapshot: Node 22.23.5에서 최종 Web 9 suites 231/231(49+121+61, 중복 없음), API 단위 26/26, API/Web 타입 PASS. Unix `find`/`grep`에 의존하는 정책 스크립트는 Windows 기본 shell에서 실행 실패 후 Git Bash shell을 지정해 Web 패턴/API surface 모두 PASS. touched 24경로 debt marker 0, diff check PASS, untracked import/파일 없음. 기존 리그 화면 테스트의 act 경고는 결과와 구분한다. 커밋/PR 반영 단계. Alpha와 GitHub 로그아웃 확인; ego-browser space 2(p1 Alpha/p2 GitHub)를 사용자 로그인용으로 handoff했고 텍스트 완료 응답 대기. 이번 Alpha 0/15, before/after·console/network 미검증이며 과거 PASS를 재사용하지 않는다.

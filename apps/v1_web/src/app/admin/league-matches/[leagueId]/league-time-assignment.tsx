@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState, type ReactNode, type FormEvent } from 'react';
+import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { Clock3 } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
@@ -15,7 +16,8 @@ import { isUnsetPlace } from '@/lib/place';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture } from '@/types/league-match';
 
-export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName, refresh, showToast, children }: {
+export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName, refresh, showToast, onEditCourt, children }: {
+  onEditCourt?: (fixture: V1LeagueFixture) => void;
   children?: ReactNode; leagueId: string; fixtures: readonly V1LeagueFixture[]; canWrite: boolean;
   fixtureName: (fixture: V1LeagueFixture) => string;
   refresh: () => Promise<{ isError: boolean }>;
@@ -24,6 +26,8 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
   const id = useId();
   const wide = useMediaQuery('(min-width: 1440px)');
   const [open, setOpen] = useState(false);
+  const [courtId, setCourtId] = useState('');
+  const [courtOpen, setCourtOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +51,11 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
   }
   async function assign(teamMatchId: string, startsAt: string) {
     if (!canWrite || busy || unavailable) return;
+    const fixture = fixtures.find(row => row.teamMatchId === teamMatchId);
+    const conflict = fixture && fixtures.find(row => row.teamMatchId !== teamMatchId && row.status !== 'cancelled' &&
+      instant(row.startAt) === instant(startsAt) && (fixture.fieldId ? row.fieldId === fixture.fieldId :
+        !row.fieldId && fixture.placeName && fixture.placeName !== '장소 미정' && fixture.placeName === row.placeName && fixture.placeAddress === row.placeAddress));
+    if (conflict && !window.confirm(`${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
     setError(null); setSaving(true);
     try {
       await update.mutateAsync({ teamMatchId, body: { startsAt } });
@@ -54,6 +63,21 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
       if (result.isError) { setError('배정은 저장됐지만 최신 대진을 불러오지 못했어요. 다시 불러와 확인해 주세요.'); return; }
       showToast('시간 배정을 저장했어요.', 'success');
     } catch (err) { setError(extractErrorMessage(err, '시간 배정을 저장하지 못했어요.')); }
+    finally { setSaving(false); }
+  }
+  async function assignCourt(teamMatchId: string) {
+    const target = fixtures.find(f => f.teamMatchId === teamMatchId);
+    if (!canWrite || busy || !courtId || !target || target.status === 'cancelled') return;
+    const conflict = fixtures.find(f => f.teamMatchId !== teamMatchId && f.status !== 'cancelled' &&
+      f.fieldId === courtId && instant(f.startAt) === instant(target.startAt));
+    if (conflict && !window.confirm(`${fixtureName(conflict)} 경기와 시간·구장이 겹쳐요. 그대로 배정할까요?`)) return;
+    setSaving(true); setError(null);
+    try {
+      await update.mutateAsync({ teamMatchId, body: { fieldId: courtId } });
+      const result = await refresh();
+      if (result.isError) setError('구장을 저장했지만 최신 대진을 불러오지 못했어요.');
+      else showToast('구장 배정을 저장했어요.', 'success');
+    } catch (err) { setError(extractErrorMessage(err, '구장 배정을 저장하지 못했어요.')); }
     finally { setSaving(false); }
   }
   const panel = <section className="flex flex-col gap-4 p-4" aria-label="시간 배정">
@@ -95,7 +119,23 @@ export function LeagueTimeAssignment({ leagueId, fixtures, canWrite, fixtureName
     </div> : null}
   </section>;
   return <div className="flex min-w-0 flex-col gap-4">
-    <Button className="self-start" variant={open ? 'primary' : 'outline'} onClick={() => setOpen(value => !value)} disabled={busy} aria-expanded={open} aria-controls={id + '-panel'}><Clock3 size={16} aria-hidden="true" />시간 배정</Button>
+    <div className="flex flex-wrap gap-2"><Button className="self-start" variant={open ? 'primary' : 'outline'} onClick={() => { setOpen(value => !value); setCourtOpen(false); }} disabled={busy} aria-expanded={open} aria-controls={id + '-panel'}><Clock3 size={16} aria-hidden="true" />시간 배정</Button>
+      {onEditCourt && <Button variant={courtOpen ? 'primary' : 'outline'} disabled={busy} aria-expanded={courtOpen}
+        onClick={() => { setCourtOpen(value => !value); setOpen(false); setError(null); }}>구장 배정</Button>}</div>
+    {courtOpen && <section aria-label="구장 배정" className="flex flex-col gap-2">
+      <CompetitionFieldPicker tournamentId={leagueId} value={courtId} onChange={setCourtId} allowNew={false}
+        emptyLabel="구장 선택" disabled={busy} />
+      {canWrite && courtId && <label className="tm-text-label">이 구장에 경기 배정
+        <select className="tm-input" value="" disabled={busy} onChange={event => void assignCourt(event.target.value)}>
+          <option value="">경기 선택</option>
+          {fixtures.filter(f => f.status !== 'cancelled' && f.fieldId !== courtId).map(f =>
+            <option key={f.teamMatchId} value={f.teamMatchId}>{fixtureName(f)} · {formatKstDateShort(f.startAt)} {formatKstTime(f.startAt)}</option>)}
+        </select></label>}
+      {error && <p role="alert">{error}</p>}
+      {fixtures.length === 0 && <p>배정할 경기가 없어요.</p>}
+      {fixtures.filter(f => !courtId || f.fieldId === courtId).map(f => <Button key={f.teamMatchId} variant="outline" disabled={!canWrite || busy || f.status === 'cancelled'}
+        onClick={() => onEditCourt?.(f)}>{fixtureName(f)} · {formatKstDateShort(f.startAt)} {formatKstTime(f.startAt)} · {f.placeName || '구장 미정'}</Button>)}
+    </section>}
     <div className={open && wide ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_360px] items-start gap-4' : 'min-w-0'}>
       <div className="min-w-0">{children}</div>
       {wide && open ? <aside id={id + '-panel'} className="sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">{panel}</aside> : null}

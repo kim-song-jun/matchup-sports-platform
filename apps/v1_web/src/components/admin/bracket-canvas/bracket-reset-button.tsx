@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useIsMutating, useQueryClient } from '@tanstack/react-query';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useBracketReset } from '@/hooks/use-bracket-reset';
@@ -37,8 +38,8 @@ export function BracketResetButton({ tournamentId, canWrite, showToast }: {
     } finally { running.current = false; setPreparing(false); }
   }
 
-  return <div className="flex flex-col items-start gap-2">
-    <Button type="button" variant="outline" disabled={preparing || mutations > 0} loading={preparing} onClick={() => void reset()}>대진 초기화</Button>
+  return <div className="flex flex-col items-start gap-2 self-start">
+    <Button type="button" variant="outline" disabled={preparing || mutations > 0} loading={preparing} onClick={() => void reset()}>{!preparing ? <RotateCcw size={16} aria-hidden="true" /> : null}대진 초기화</Button>
     {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     {ConfirmModal}
   </div>;

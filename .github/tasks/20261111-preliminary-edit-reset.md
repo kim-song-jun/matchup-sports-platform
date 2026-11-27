@@ -72,6 +72,20 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 - PR cursor: [#2553](https://github.com/kim-song-jun/matchup-sports-platform/pull/2553), base `dev`, head `feat/bracket-reset-button`. 구현 커밋 f10c204db, 변경22파일·700추가/24삭제, 커밋 트리 clean/diff check PASS. 요청된 PR 생성까지 완료했으며 dev 머지·CI/PostgreSQL·최신 Copilot clean·Alpha 검증은 미완료다. 진행 중 #2546과 다른 세션 worktree를 보존한다. 미병합 작업의 후속 검증을 위해 이번 worktree/브랜치와 세션 소유 의존성 junction도 유지하며 정리 완료로 표시하지 않는다.
 - 2026-11-27 PR 완료 요청 후속: 사용자 “수정해서 pr 완료해줘”에 따라 기존 소유 worktree에서 최신 origin/dev 7ee1be637을 정상 merge했다. CI 45935098816은 Gates/Web PASS, API 통합의 group_knockout 준비만 실패했다(조당2팀은 기존 최소3팀 계약 위반). 실제 planner에서 동일 오류 RED 재현 → 총6팀/2개 조×3팀으로 수정 후 경기7개/자리8개 GREEN 확인. 보존 인원 기대값은 실제 registrationIds 길이를 따르고 형식별4/6팀과 비어 있지 않은 경기 목록을 별도로 단언한다. API 타입 PASS, 실DB는 새 CI로 확인한다. 사용자 데이터 초기화·생산 규칙 변경 없음. Alpha space3에서 여전히 로그인 화면으로 확인돼 실제 QA 인증 gate는 남아 있다.
 
+### 2026-11-27 후속 — 초기화 버튼과 배정 툴바 정렬
+
+- 사용자 요청: “대진 초기화 버튼도 시간배정 이쪽이랑 맞춰줘 이거 pr 올려줘”. 범위는 frontend + docs이며 기존 상단 독립 배치를 배정 툴바의 동일 flex-wrap 행으로 옮긴다.
+- 기준: origin/dev `8208a3588`, `fix/reset-toolbar-align`, `_worktrees/reset-toolbar-align`. 단일 에이전트. Owned: admin bracket page, BracketResetButton, 이 task와 Web patch Changeset. Forbidden: API/DB·초기화 계약·다른 작업 WIP·main.
+- 구현: 공통 toolbar slot으로 이동해 네 대진 형식과 단계형에서 동일하게 배치한다. 동일 outline/md 버튼과 16px 아이콘을 사용하고 좁은 화면에서는 기존 gap-2/flex-wrap을 따른다. 오류 문구는 버튼 아래에서 표시하며 권한·입력 확인·감사 로그는 기존 계약을 유지한다.
+- 검증: 기존 페이지22/초기화8/배정17 총47 tests PASS(단일 worker). 웹 타입/패턴·diff whitespace PASS, touched 소스 debt marker0. 동일 lockfile 의존성을 junction으로 재사용했으며 원본은 수정하지 않았다. 실제 Alpha 화면은 미병합 변경이므로 아직 검증하지 않았으며 PR에서 명시한다. 로컬 Next 서버와 데이터 초기화는 실행하지 않는다.
+- Progress: 구현 [x], 관련 회귀 [x], 타입/패턴 [x], dev 대상 PR [ ], 머지 후 Alpha 390/768/1440 화면·console/network [ ]. 미병합 브랜치/worktree는 PR 후속 작업을 위해 유지한다.
+
+### 2026-11-27 PR #2570 추가 — 우측 대진 상세 패널 고정
+
+- 사용자 요청: 시간·구장 배정처럼 대진을 눌렀을 때 나오는 우측 패널도 스크롤에 고정한다. 기존 PR #2570에 추가하며 Owned 범위에 `bracket-canvas-workspace.tsx`를 추가한다.
+- 우측 열에서만 상세/부전승 편집 공통 wrapper에 `sticky top-4 self-start`와 배정 패널과 같은 `max-h-[calc(100dvh-2rem)] overflow-y-auto`를 적용한다. 긴 폼 하단도 패널 내부 스크롤로 접근한다. 하단 시트·선택·닫기·포커스 계약은 유지한다.
+- 검증: 기존 workspace62 tests PASS. 실행 중 같은 workspace의 확인 모달과 경기 도구 다이얼로그가 `closed` key를 공유하는 React 경고를 발견해 도구 key에 고유 prefix를 붙였다. 해당 회귀를 재확인하고 웹 타입/패턴 확인 후 같은 PR에 push한다. 실제 스크롤 고정/긴 폼 조작/390·768·1440 화면·console/network는 dev 머지 후 Alpha에서 확인해야 하며 아직 미검증이다.
+
 ### 기존 구현 이력
 - 최신 origin/dev 4a22824a5 기준 feat/preliminary-edit-reset 격리 worktree.
 - Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 22 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.

@@ -14,7 +14,7 @@
 
 - **브랜치·워크트리:** `git fetch origin dev` 직후 `origin/dev` 에서 새 워크트리·브랜치(`feat/admin-tournament-create-one-screen-20261127`). PR base = `dev`(머지 직전 `gh pr view <N> --json baseRefName`). 커밋 메시지·PR 제목·본문은 한국어(`feat(web): …`). 로컬 next 서버 금지, `prisma generate` 금지, 시각 검증은 머지 뒤 alpha.
 - **명령(모두 `apps/v1_web` 에서):** `./node_modules/.bin/vitest run <경로>` · `./node_modules/.bin/tsc --noEmit -p tsconfig.json` · `node scripts/v1-pattern-check.mjs`.
-- **용어·문구:** 해요체. 진행 방식 이름은 정확히 「조별리그 → 토너먼트」「토너먼트만」「리그전」「여러 단계 (예선 → 결선 여러 개)」. 「신청 마감」(「접수 마감」 아님), 「대회 시작」, 「팀 수」. 금지어: 정규리그 + N개 토너먼트, 대회 리그전, 단계형, 피리어드, 롤링. 에러는 `extractErrorMessage(err, '해요체 fallback')`, 빈 catch 금지.
+- **용어·문구:** 해요체. 진행 방식 이름은 정확히 「조별리그 → 토너먼트」「토너먼트만」「리그전」「여러 단계(예선 → 결선 여러 개)」. 「신청 마감」(「접수 마감」 아님), 「대회 시작」, 「팀 수」. 금지어: 정규리그 + N개 토너먼트, 대회 리그전, 단계형, 피리어드, 롤링. 에러는 `extractErrorMessage(err, '해요체 fallback')`, 빈 catch 금지.
 - **R-K3(Critical):** 카드·칩·행에 `border-l`/`border-r`(한쪽 색 띠)·`before:` 띠·`inset Npx 0 0 <색>` 그림자·`border-2` 색 테두리 금지. 선택 상태 = 옅은 배경 + 1px 테두리 색(`GenderCategoryField` 의 `border-blue-500 bg-[var(--blue50)]` 패턴).
 - **토큰·접근성:** 하드코딩 색·`text-[Npx]`·`text-sm` 류 금지(`text-[length:var(--font-size-label)]`·`.tm-text-*`). 터치 44px, `<label htmlFor>`·`aria-invalid`·`aria-describedby`, 오류 문구는 `role="alert"` + `data-error-focus=<컨트롤 id>`. `React.forwardRef` 금지. 새 주석은 코드가 말 못 하는 제약만, 파일의 기존 언어(한국어), 3줄 이내.
 - **서버 계약(코드로 확인함, 백엔드 변경 없음):** `CreateTournamentDto` 가 실제로 요구하는 건 `sportId`·`title`·**`teamCount`**(`@IsDefined`, 없으면 `TOURNAMENT_TEAM_COUNT_REQUIRED`)다. 생략하면 서버가 채운다 — `format` `group_knockout`, `minPlayers` 6, `maxPlayers` 10, `entryFee` 0, `genderCategory` null(혼성이 아니면 쿼터도 null), 출전 인원·교체는 `resolveLineupConfigVersionId` 의 종목 canonical 값(`tournaments-admin.service.ts` `create`, 증명 스펙 `tournaments-admin.service.spec.ts` 의 「lineupMaxPlayers omitted → canonical」), 경기 시간은 종목 기본 피리어드(전용 API 로 고칠 때만 따로 저장). **그래서 지금 마법사가 클라이언트에서 채우던 값 중 서버가 안 채워 주는 것은 없다 → 최소 payload 로 보낸다**(6칸 + 성별/쿼터). 서버 기본값 6/10 은 혼성 인원 검증에만 `SERVER_DEFAULT_MAX_PLAYERS = 10` 으로 쓴다.
@@ -49,7 +49,7 @@
   ```ts
   export type CreateFormatChoice = 'group_knockout' | 'knockout' | 'league' | 'staged';
   export const CREATE_FORMAT_OPTIONS: ReadonlyArray<{ value: CreateFormatChoice; label: string; description: string }>;
-  // label/description: 목업 문구 그대로. 「조별리그 → 토너먼트」 조별로 겨룬 뒤 상위 팀끼리 토너먼트를 해요 / 「토너먼트만」 한 번 지면 탈락해요 / 「리그전」 모든 팀과 한 번씩 겨뤄 순위를 정해요 / 「여러 단계 (예선 → 결선 여러 개)」 예선 순위대로 상위·하위 결선을 따로 열어요
+  // label/description: 목업 문구 그대로. 「조별리그 → 토너먼트」 조별로 겨룬 뒤 상위 팀끼리 토너먼트를 해요 / 「토너먼트만」 한 번 지면 탈락해요 / 「리그전」 모든 팀과 한 번씩 겨뤄 순위를 정해요 / 「여러 단계(예선 → 결선 여러 개)」 예선 순위대로 상위·하위 결선을 따로 열어요
   export const DEFAULT_GENDER_CATEGORY: GenderChoice = 'none';  // G2 확정 전 목업 기본값. 바꾸려면 이 한 줄(+ 화면 「기본」 표시는 따라감)
   export const SERVER_DEFAULT_MAX_PLAYERS = 10; export const TEAM_COUNT_MIN = 2; export const TEAM_COUNT_MAX = 64;
   export type CreateFormState = { sportId: string; title: string; format: CreateFormatChoice; scheduledAt: string; registrationDeadlineAt: string;

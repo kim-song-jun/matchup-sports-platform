@@ -129,7 +129,7 @@ export function SideSheet(props: SideSheetProps): JSX.Element;
 ### C-3 대회 정보 섹션 딥링크 (L0 가 상수·함수를 만들고, L3 가 화면에서 연다. L1·L2 가 사용)
 `/admin/tournaments/:id/info?edit=<basic|schedule|entry|rules|public|promo>` — 대회 정보 탭이 열리며 해당 섹션의 `SideSheet` 가 열린다. 닫으면 `edit` 파라미터를 replace 로 지운다. 섹션 키·주소·「채워야 할 것」 판정은 아래 C-5 파일 하나에서만 나온다.
 ### C-5 `info-sections.ts` — `apps/v1_web/src/app/admin/tournaments/[id]/info-sections.ts` (L0 소유)
-`TOURNAMENT_INFO_SECTIONS = ['basic','schedule','entry','rules','public','promo'] as const` · `TournamentInfoSectionKey` · `tournamentInfoHref(tournamentId, section)` · `InfoNeedTier = 'required' | 'review' | 'optional'` · `InfoNeed { key; section; tier; label; detail }` · `tournamentInfoNeeds(tournament): InfoNeed[]`(Q7 등급: 필요 = 장소·명단 제출 마감·유료면 정산 계좌 / 기본값 확인 = 참가 조건·경기 규칙 / 선택 = 이미지·상금·공지). L1 개요 체크리스트와 L3 「채워야 해요」 표시가 같은 함수를 써서 건수가 어긋나지 않는다.
+`TOURNAMENT_INFO_SECTIONS = ['basic','schedule','entry','rules','public','promo'] as const` · `TournamentInfoSectionKey` · `tournamentInfoHref(tournamentId, section)` · `InfoNeedTier = 'required' | 'review' | 'optional'` · `InfoNeed { key; section; tier; label; detail }` · `tournamentInfoNeeds(tournament): InfoNeed[]`(Q7 등급: 필요 = 장소·명단 제출 마감·유료면 정산 계좌(+ 비어 있을 때만 대회 시작·신청 마감 — 기존 개요 체크리스트 신호) / 기본값 확인 = 참가 조건·경기 규칙 / 선택 = 이미지·상금·공지). L1 개요 체크리스트와 L3 「채워야 해요」 표시가 같은 함수를 써서 건수가 어긋나지 않는다.
 ### C-6 대회 형식 이름 (L0 소유)
 용어표의 형식 이름 4개를 한 곳에 둔다(이미 `lib/admin-labels.ts` 등에 형식 라벨 맵이 있으면 그것을 고친다). L2 만들기·L3 대회 정보가 같은 값을 쓴다.
 ### C-4 순서

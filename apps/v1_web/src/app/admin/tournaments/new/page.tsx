@@ -56,15 +56,12 @@ import {
   hasPromoFactEdits,
   tournamentCreateReducer,
   isShortLeadTime,
-  periodLabels,
-  switchPeriodCount,
-  TOURNAMENT_PERIOD_PHASES,
-  tournamentPeriodPhaseLabel,
   validateTournamentCreateStep,
   type TournamentCreateAction,
   type TournamentCreateState,
 } from './tournament-create-model';
 import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings, type TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
+import { periodLabels, switchPeriodCount, TOURNAMENT_PERIOD_PHASES, tournamentPeriodPhaseLabel } from '@/lib/tournament-period-phases';
 import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 function scrollBehavior(): ScrollBehavior {

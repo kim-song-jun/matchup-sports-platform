@@ -17,7 +17,7 @@ import {
   TOURNAMENT_PERIOD_PHASES,
   tournamentPeriodPhaseLabel,
   tournamentPeriodPhaseShortLabel,
-} from '@/app/admin/tournaments/new/tournament-create-model';
+} from '@/lib/tournament-period-phases';
 
 interface TournamentPeriodSettingsEditorProps {
   tournamentId: string;

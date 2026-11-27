@@ -98,6 +98,63 @@ describe('ActionSheet', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('checked 항목은 switch 로 그려지고 켜짐 여부를 aria-checked 와 .tm-toggle-on 으로 말한다', () => {
+    const onSelect = vi.fn();
+    setup([
+      { key: 'on', label: '참가자에게 공개', checked: true, onSelect },
+      { key: 'off', label: '참가자에게 공개 안 함', checked: false, onSelect: vi.fn() },
+    ]);
+
+    const on = screen.getByRole('switch', { name: /^참가자에게 공개$/ });
+    const off = screen.getByRole('switch', { name: /참가자에게 공개 안 함/ });
+    expect(on).toHaveAttribute('aria-checked', 'true');
+    expect(off).toHaveAttribute('aria-checked', 'false');
+    expect(on.querySelector('.tm-toggle-on')).not.toBeNull();
+    expect(off.querySelector('.tm-toggle')).not.toBeNull();
+    expect(off.querySelector('.tm-toggle-on')).toBeNull();
+    fireEvent.click(on);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('checked 가 없는 항목은 switch 가 아니라 평범한 button 이다', () => {
+    setup([{ key: 'a', label: '결과 정정', onSelect: vi.fn() }]);
+
+    expect(screen.getByRole('button', { name: '결과 정정' })).not.toHaveAttribute('aria-checked');
+    expect(screen.queryByRole('switch')).toBeNull();
+  });
+
+  it('비활성 checked 항목은 눌러도 동작하지 않고 이유를 보인다', () => {
+    const onSelect = vi.fn();
+    setup([
+      { key: 'pub', label: '참가자에게 공개', checked: true, disabled: true, disabledReason: '권한이 없어요.', onSelect },
+    ]);
+
+    const toggle = screen.getByRole('switch', { name: /참가자에게 공개/ });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveTextContent('권한이 없어요.');
+    fireEvent.click(toggle);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('header 는 제목 아래·첫 항목 위에 그려진다', () => {
+    render(
+      <ActionSheet
+        open
+        title="경기 더보기"
+        subtitle="결승"
+        header={<div data-testid="head">진행 3/8</div>}
+        actions={[{ key: 'a', label: '동작', onSelect: vi.fn() }]}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const head = screen.getByTestId('head');
+    const title = screen.getByRole('heading', { name: '경기 더보기' });
+    const item = screen.getByRole('button', { name: '동작' });
+    expect(title.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(head.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('조상이 스태킹 컨텍스트여도 시트가 갇히지 않게 body 직속으로 그린다', () => {
     // 스크롤 영역 같은 조상이 스태킹 컨텍스트(iOS 웹뷰의 touch 스크롤 등)면 안쪽 z-index 는 밖의
     // 하단 고정 CTA·상단바와 겨루지 못한다 — 시트가 조상 밖에 있어야 --z-modal 이 전역에서 이긴다.

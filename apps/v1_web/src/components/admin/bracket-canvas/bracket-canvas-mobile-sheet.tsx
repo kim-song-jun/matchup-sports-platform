@@ -1,7 +1,7 @@
 'use client';
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { StatusChip } from '@/components/v1-ui/status-chip';
@@ -25,7 +25,7 @@ import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } f
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import { ByeSlotEditor } from './bye-slot-editor';
-import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureDeleteBlockedReason, fixtureDeleteConfirm } from './fixture-delete-confirm';
 import { fixtureTitle } from './bracket-canvas';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
@@ -358,6 +358,8 @@ function MobileDeleteButton({ fixture, groups, fixtures, competitionId, showToas
 }) {
   const deleteFixture = useV1DeleteFixture(competitionId);
   const { confirm, ConfirmModal } = useConfirm();
+  const reasonId = useId();
+  const blockedReason = fixtureDeleteBlockedReason(fixture);
   const remove = async () => {
     if (!await confirm(fixtureDeleteConfirm({ title: fixtureTitle(fixture, groups), fixture, fixtures }))) return;
     deleteFixture.mutate(fixture.id, {
@@ -366,10 +368,12 @@ function MobileDeleteButton({ fixture, groups, fixtures, competitionId, showToas
     });
   };
   return <>
-    <button type="button" aria-label="경기 삭제" onClick={() => void remove()} disabled={deleteFixture.isPending}
+    <button type="button" aria-label="경기 삭제" onClick={() => void remove()} disabled={deleteFixture.isPending || blockedReason !== null}
+      title={blockedReason ?? undefined} aria-describedby={blockedReason !== null ? reasonId : undefined}
       className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-[var(--red700)] transition-colors hover:bg-[var(--surface-soft)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
       <Trash2 size={18} aria-hidden="true" />
     </button>
+    {blockedReason !== null ? <span id={reasonId} className="sr-only">{blockedReason}</span> : null}
     {ConfirmModal}
   </>;
 }

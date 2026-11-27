@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   searchParams: new URLSearchParams(),
   tournament: { data: undefined as unknown },
   registrations: { data: undefined as unknown, isError: false, error: null as unknown, refetch: vi.fn() },
-  admin: { tournamentId: 't-1', role: 'PLATFORM_OPS', canWrite: true, showToast: vi.fn() },
+  admin: { tournamentId: 't-1', role: 'PLATFORM_OPS', canWrite: true, showToast: vi.fn(), basePath: undefined as string | undefined },
   tools: { isEmpty: false, create: null as null | { key: string; label: string } },
   openCreate: vi.fn(),
   toolsInput: null as null | UseBracketToolsInput,
@@ -78,6 +78,7 @@ beforeEach(() => {
   mocks.tools.isEmpty = false;
   mocks.tools.create = { key: 'template', label: '템플릿으로 대진 만들기' };
   mocks.admin.canWrite = true;
+  mocks.admin.basePath = undefined;
 });
 
 afterEach(() => {
@@ -272,6 +273,24 @@ describe('AdminTournamentBracketPage — 빈 대진', () => {
     const link = screen.queryByRole('link', { name: '6강 방식을 먼저 정해요' });
     if (shown) expect(link).toHaveAttribute('href', '/admin/tournaments/t-1/info?edit=rules');
     else expect(link).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminTournamentBracketPage — 빈 대진의 6강 안내는 같은 면의 대회 정보로 간다', () => {
+  beforeEach(() => {
+    mocks.tools.isEmpty = true;
+    mocks.tournament.data = { format: 'knockout', teamCount: 6 };
+  });
+
+  it('대회 운영자 면(basePath 있음)에서는 /tournament-management 의 대회 정보로 간다', () => {
+    mocks.admin.basePath = '/tournament-management/tournaments/t-1';
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByRole('link', { name: '6강 방식을 먼저 정해요' })).toHaveAttribute('href', '/tournament-management/tournaments/t-1/info?edit=rules');
+  });
+
+  it('플랫폼 어드민 면(basePath 없음)에서는 /admin 의 대회 정보로 간다', () => {
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByRole('link', { name: '6강 방식을 먼저 정해요' })).toHaveAttribute('href', '/admin/tournaments/t-1/info?edit=rules');
   });
 });
 

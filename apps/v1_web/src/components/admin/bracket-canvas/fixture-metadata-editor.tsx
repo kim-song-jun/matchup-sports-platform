@@ -11,7 +11,7 @@ import { fixtureVenueValue, fixtureVenuePatch } from './fixture-venue-patch';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { PeriodOverrideField, useMatchPeriodOverride } from '@/components/admin/period-override-field';
-import { useV1UpdateFixture } from '@/hooks/use-v1-api';
+import { useV1TournamentFields, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { automaticFixtureSideLabel, buildSideLabelContext } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -70,6 +70,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
 }) {
   const id = useId();
   const mutation = useV1UpdateFixture(tournamentId);
+  const registeredFields = useV1TournamentFields(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const [number, setNumber] = useState(String(fixture.fixtureNumber));
   const [labels, setLabels] = useState(() => fixtureLabelDraft(fixture));
@@ -143,6 +144,9 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     }
   }
   const moreId = `${id}-more`;
+  // 고를 수 있는 등록 구장이 없으면 선택창은 「구장 미정」 하나뿐인 빈 칸이다 — 직접 입력을 기본 영역으로 올린다.
+  const venueInBasic = fieldId === '' && registeredFields.data !== undefined && !registeredFields.data.items.some(field => field.active);
+  const venuePicker = <PlacePicker id={`${id}-venue`} label="구장 직접 입력" maxLength={PLACE_NAME_MAX_LENGTH.tournament} value={clearPlace ? null : venue} onChange={value => editPlace(() => { setClearPlace(false); setVenue(value); })} disabled={disabled} />;
   return <><form onSubmit={save} className="flex flex-col gap-3" aria-label="경기 정보 편집">
     <h3 className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>시간·구장</h3>
     <div className="grid grid-cols-2 gap-2">
@@ -156,8 +160,8 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
     <FixtureTimePicker tournamentId={tournamentId} fixtures={fixtures} value={joinLocal(date, clock)} disabled={disabled}
       onChange={value => editTime(value.slice(0, 10), value.slice(11, 16))} />
     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || (!date && !clock)} onClick={() => editTime('', '')}>날짜·시각 비우기</button>
-    <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={value => editPlace(() => { setFieldId(value); setClearPlace(!value); if (!value) setVenue(null); })}
-      disabled={disabled} allowNew={false} allowEmpty emptyLabel="구장 미정" />
+    {venueInBasic ? venuePicker : <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={value => editPlace(() => { setFieldId(value); setClearPlace(!value); if (!value) setVenue(null); })}
+      disabled={disabled} allowNew={false} allowEmpty emptyLabel="구장 미정" />}
     <div className="flex flex-col gap-1">
       <button type="button" className="tm-btn tm-btn-sm tm-btn-outline self-start min-h-[44px]" aria-expanded={moreOpen} aria-controls={moreOpen ? moreId : undefined}
         onClick={() => setMoreOpen(open => !open)}>{moreOpen ? '접기' : '더 보기'}</button>
@@ -178,7 +182,7 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       <label className="flex flex-col gap-1 tm-text-label" htmlFor={`${id}-number`}>경기 번호
         <input id={`${id}-number`} className="tm-input" type="number" min={1} max={2147483647} step={1} value={number} disabled={disabled} onChange={event => edit(() => setNumber(event.target.value))} />
       </label>
-      {!fieldId ? <PlacePicker id={`${id}-venue`} label="구장 직접 입력" maxLength={PLACE_NAME_MAX_LENGTH.tournament} value={clearPlace ? null : venue} onChange={value => editPlace(() => { setClearPlace(false); setVenue(value); })} disabled={disabled} /> : null}
+      {!fieldId && !venueInBasic ? venuePicker : null}
       <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || (!fieldId && !fixture.venue)}
         onClick={() => editPlace(() => { setFieldId(''); setClearPlace(true); setVenue(null); })}>구장 비우기</button>
       <WinnerTargetField tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} canWrite={canWrite} showToast={showToast} />

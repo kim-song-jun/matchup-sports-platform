@@ -101,7 +101,7 @@ describe('LeagueTemplateDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const payload = onSubmit.mock.calls[0][0];
-    // 4팀 홈앤어웨이 = 6라운드 = 6일. 시작일(월)부터 매주.
+    // 4팀 홈·원정 = 6라운드 = 6일. 시작일(월)부터 매주.
     expect(payload).toEqual({
       teamCount: 4,
       legs: 2,
@@ -133,7 +133,7 @@ describe('LeagueTemplateDialog', () => {
     expect(screen.getByText('6라운드 · 12경기를 만들어요')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('팀 수'), { target: { value: '5' } });
-    // 홀수 팀은 부전 한 자리를 더해 라운드가 5, 라운드당 2경기 → 홈앤어웨이 10라운드 20경기.
+    // 홀수 팀은 부전 한 자리를 더해 라운드가 5, 라운드당 2경기 → 홈·원정 10라운드 20경기.
     expect(screen.getByText('10라운드 · 20경기를 만들어요')).toBeInTheDocument();
   });
 

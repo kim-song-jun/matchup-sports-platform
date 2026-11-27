@@ -56,7 +56,7 @@ export function plannedGameCount(teamCount: number, rounds: number): number {
 
 const PLAN_LABEL: Record<WeeksPlan['kind'], string> = {
   single: '단일 라운드로빈',
-  double: '홈앤어웨이',
+  double: '홈·원정 리그',
   custom: '직접 입력',
   fixtures: '총 경기 수',
 };

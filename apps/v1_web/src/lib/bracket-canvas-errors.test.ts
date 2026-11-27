@@ -18,6 +18,7 @@ describe('describeBracketCanvasError', () => {
     ['NEXT_FIXTURE_CONFLICT', '다음 경기가 이미 시작돼서 바꿀 수 없어요.'],
     ['QUICK_RESULT_ROSTER_EMPTY', '참가 명단에 선수가 없는 팀이 있어요. 선수를 등록하거나, 경기를 시작해 운영 콘솔에서 익명으로 기록해 주세요.'],
     ['QUICK_RESULT_ROSTER_SYNCING', '명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.'],
+    ['QUICK_RESULT_HAS_LIVE_RECORDS', '라이브로 기록한 경기예요. 결과 화면에서 결과 고치기로 고쳐 주세요.'],
     ['SLOT_LOCKED', '이미 시작했거나 결과가 있는 경기라 팀을 바꿀 수 없어요.'],
     ['SLOT_TEAM_ALREADY_PLACED', '이미 다른 자리에 들어간 팀이에요.'],
     ['BRACKET_LOCKED', '시작했거나 결과가 있는 경기가 있어 대진을 교체할 수 없어요.'],

@@ -94,7 +94,7 @@ export function CompetitionRosterManager(entry: Entry) {
           key={registrationId} tournamentId={competitionId} registrationId={registrationId}
         /> : <div className={styles.message}>
           <AlertBanner tone="info" message={adminRegistrationsHref
-            ? '신청 관리에서 해당 팀의 명단 검토를 열어 참가 선수를 확인해 주세요.'
+            ? '신청 관리에서 해당 팀의 명단 보기를 열어 참가 선수를 확인해 주세요.'
             : staffViewer
               ? '대회 스태프는 이 탭에서 참가 선수를 바꾸지 않아요. 경기별 출전 선수는 위의 경기 출전 탭에서 확인해 주세요.'
               : '등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요.'} />

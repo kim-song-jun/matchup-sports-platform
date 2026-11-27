@@ -8,6 +8,8 @@ import { useOperationsBoardAll } from './use-operations-board-all';
 
 const requests: URLSearchParams[] = [];
 let secondPageFails = false;
+type Mode = 'normal' | 'no-cursor-key' | 'same-cursor' | 'empty-page' | 'endless';
+let mode: Mode = 'normal';
 const item = (n: number) => ({ fixtureId: `f-${n}`, gameId: `g-${n}` });
 
 const server = setupServer(
@@ -15,6 +17,19 @@ const server = setupServer(
   http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
     const params = new URL(request.url).searchParams;
     requests.push(params);
+    if (mode === 'no-cursor-key') {
+      return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [item(1)], watermark: 'w', liveWarnings: [] } });
+    }
+    if (mode === 'same-cursor') {
+      return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [item(requests.length)], nextCursor: 'stuck', watermark: 'w', liveWarnings: [] } });
+    }
+    if (mode === 'empty-page') {
+      const first = params.get('cursor') === null;
+      return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: first ? [item(1)] : [], nextCursor: 'more', watermark: 'w', liveWarnings: [] } });
+    }
+    if (mode === 'endless') {
+      return HttpResponse.json({ status: 'success', timestamp: 't', data: { items: [item(requests.length)], nextCursor: `c${requests.length}`, watermark: 'w', liveWarnings: [] } });
+    }
     if (params.get('cursor') === null) {
       return HttpResponse.json({
         status: 'success',
@@ -39,6 +54,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   requests.length = 0;
   secondPageFails = false;
+  mode = 'normal';
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
 });
 
@@ -66,6 +82,41 @@ describe('useOperationsBoardAll', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.data).toBeUndefined();
+  });
+
+  it('서버가 nextCursor 를 빼먹어도 같은 요청을 되풀이하지 않고 한 페이지로 끝낸다', async () => {
+    mode = 'no-cursor-key';
+    const { result } = renderHook(() => useOperationsBoardAll('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(1);
+    expect(result.current.data?.items).toHaveLength(1);
+  });
+
+  it('같은 커서가 다시 오면 거기서 멈춘다', async () => {
+    mode = 'same-cursor';
+    const { result } = renderHook(() => useOperationsBoardAll('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests.map((p) => p.get('cursor'))).toEqual([null, 'stuck']);
+  });
+
+  it('빈 페이지가 오면 커서가 남아 있어도 멈춘다', async () => {
+    mode = 'empty-page';
+    const { result } = renderHook(() => useOperationsBoardAll('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(2);
+    expect(result.current.data?.items).toHaveLength(1);
+  });
+
+  it('끝없이 새 커서가 와도 20페이지에서 멈춘다', async () => {
+    mode = 'endless';
+    const { result } = renderHook(() => useOperationsBoardAll('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(20);
+    expect(result.current.data?.items).toHaveLength(20);
   });
 
   it('enabled=false 면 읽지 않는다', async () => {

@@ -15,22 +15,31 @@ export interface OperationsBoardAll {
 }
 
 const PAGE_LIMIT = 100;
+/** 한 번에 읽는 서버 페이지 상한(2,000경기). 서버가 커서를 잘못 주어도 요청이 끝없이 이어지지 않게 한다. */
+const MAX_PAGES = 20;
 
-/** 보드 서버 페이지를 다음 커서가 없을 때까지 읽는다. 한 페이지라도 실패하면 전체가 실패한다. */
+/**
+ * 보드 서버 페이지를 다음 커서가 없을 때까지 읽는다. 한 페이지라도 실패하면 전체가 실패한다.
+ * 커서가 없거나, 이미 쓴 커서가 다시 오거나, 빈 페이지가 오면 거기서 멈춘다.
+ */
 export async function fetchOperationsBoardAll(get: typeof v1Get, tournamentId: string): Promise<OperationsBoardAll> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
   const items: V1TournamentOperationsBoardItem[] = [];
   const liveWarnings: V1TournamentOperationsLiveWarning[] = [];
+  const usedCursors = new Set<string>();
   let cursor: string | null = null;
-  do {
+  for (let pageCount = 0; pageCount < MAX_PAGES; pageCount += 1) {
     const page: V1TournamentOperationsBoardPage = await get<V1TournamentOperationsBoardPage>(path, {
       limit: PAGE_LIMIT,
       ...(cursor === null ? {} : { cursor }),
     });
     items.push(...page.items);
     liveWarnings.push(...page.liveWarnings);
-    cursor = page.nextCursor;
-  } while (cursor !== null);
+    const next = page.nextCursor;
+    if (!next || page.items.length === 0 || usedCursors.has(next)) break;
+    usedCursors.add(next);
+    cursor = next;
+  }
   return { items, liveWarnings };
 }
 

@@ -199,6 +199,17 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     restoreViewport();
   });
 
+  // 운영 셸은 폰 머리 높이(막대 + 돌아가기 줄)를 이 변수로 내보낸다. 변수 없는 구장 담당자 프레임은 막대 52px 로 돌아간다.
+  it.each(['TOURNAMENT_DIRECTOR', 'FIELD_OPERATOR'])('%s 의 점수 카드는 셸 머리 높이 변수 아래에 붙는다', (role) => {
+    setup();
+    mocks.useTournamentOpsRole.mockReturnValue(role);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const card = document.querySelector('[data-console-guide="overview"]');
+    expect(card).toHaveClass('sticky', 'top-[var(--tournament-ops-mobile-header-offset,52px)]');
+    expect(card?.className).not.toMatch(/(^|\s)(lg:)?top-(0|\[52px\])(\s|$)/);
+  });
+
   it('[MD-QA #180] 대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {
     setup();
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
